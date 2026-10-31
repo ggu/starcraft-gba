@@ -127,16 +127,16 @@ int main(void)
     unsigned projectile_slot=100;
     for(int n=0;n<30 && projectile_slot==100;n++) {
         game_update(0,0);
-        for(unsigned j=0;j<100;j++)if(sc64_defiler_projectiles[j].handle)projectile_slot=j;
+        for(unsigned j=0;j<100;j++)if(sc64_defiler_projectile_at(j))projectile_slot=j;
     }
     assert(projectile_slot<100);
-    while(sc64_defiler_projectiles[projectile_slot].age<5)game_update(0,0);
+    while(sc64_defiler_projectile_at(projectile_slot)->age<5)game_update(0,0);
     while(sc64_shared_projectiles.active<100)
         assert(sc64_shared_projectile_acquire(&sc64_shared_projectiles,SC64_SHARED_PROJECTILE_INTERCEPTOR,0));
     sc64_defiler_stage[c2].intent=1;sc64_defiler_stage[c2].phase=1;
     sc64_defiler_stage[c2].age=2;sc64_defiler_stage[c2].target_x=400;sc64_defiler_stage[c2].target_y=320;
     do {game_update(0,0);} while(!sc64_battlecruiser_source_tick_due());
     assert(sc64_defiler_stage[c2].phase==2 && sc64_shared_projectiles.active==99);
-    for(unsigned j=0;j<100;j++)assert(!sc64_defiler_projectiles[j].handle);
+    for(unsigned j=0;j<100;j++)assert(!sc64_defiler_projectile_at(j));
     puts("experimental actual UI cast, directional timing, contention, and timed reserved field passed");return 0;
 }

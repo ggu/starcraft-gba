@@ -11,7 +11,7 @@ static int sc64_defiler_executor_busy(void)
     for(int i=0;i<MAX_UNITS;i++)
         if(sc64_defiler_fields[i].remaining || sc64_defiler_stage[i].intent) return 1;
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++)
-        if(sc64_defiler_projectiles[i].handle) return 1;
+        if(sc64_defiler_projectile_at(i)) return 1;
     return 0;
 }
 #ifdef SC64_SHARED_DEFILER_APPROACH_PROBE
@@ -160,7 +160,7 @@ static void sc64_defiler_executor_unit_tick(void)
             u32 handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,SC64_SHARED_PROJECTILE_SWARM,0);
             if(handle) {
                 unsigned slot=(handle&255u)-1u;
-                sc64_defiler_projectiles[slot]=(Sc64DefilerProjectile){handle,a->target_x,a->target_y,255};
+                sc64_shared_payloads[slot].swarm=(Sc64DefilerProjectile){handle,a->target_x,a->target_y,255};
             }
             a->phase=2;a->age=0;
         } else if(a->phase==2 && ++a->age==4) {
@@ -172,8 +172,8 @@ static void sc64_defiler_executor_bullet_tick(void)
 {
     if(!sc64_battlecruiser_source_tick_due())return;
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) {
-        Sc64DefilerProjectile *p=&sc64_defiler_projectiles[i];
-        if(!p->handle)continue;
+        Sc64DefilerProjectile *p=sc64_defiler_projectile_at(i);
+        if(!p)continue;
         if(p->age==255) {p->age=0;continue;}
         if(++p->age==5) {
             int slot=find_unit_slot();

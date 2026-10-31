@@ -11,13 +11,7 @@ typedef struct {
     u8 active, raw, owner, source_type, damage_class, shots;
     u8 wait[2], impact[2], life[2];
 } Sc64OrdinaryPending;
-typedef struct {
-    u32 handle;
-    int target, damage;
-    u8 owner, source_type, damage_class, impact, life, damaged, reservation_owner;
-} Sc64OrdinaryBullet;
 static Sc64OrdinaryPending sc64_ordinary_pending[MAX_UNITS];
-static Sc64OrdinaryBullet sc64_ordinary_bullets[SC64_SHARED_PROJECTILE_CAPACITY];
 
 static void race_shared_ordinary_cancel(int slot)
 {
@@ -28,19 +22,19 @@ static void race_shared_ordinary_forget_target(int ref)
     for(int i=0;i<MAX_UNITS;i++)
         if(sc64_ordinary_pending[i].active && sc64_ordinary_pending[i].target==ref)
             race_shared_ordinary_cancel(i);
-    for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++)
-        if(sc64_ordinary_bullets[i].handle && sc64_ordinary_bullets[i].target==ref)
-            sc64_ordinary_bullets[i].target=-1;
+    for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) {
+        Sc64OrdinaryBullet *b=sc64_ordinary_bullet_at(i);
+        if(b && b->target==ref) b->target=-1;
+    }
 }
 static void race_shared_ordinary_reset(void)
 {
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) {
-        Sc64OrdinaryBullet *b=&sc64_ordinary_bullets[i];
-        if(b->handle) (void)sc64_shared_projectile_release(&sc64_shared_projectiles,b->handle,
-                                      SC64_SHARED_PROJECTILE_IMPACT,b->reservation_owner);
+        Sc64OrdinaryBullet *b=sc64_ordinary_bullet_at(i);
+        if(b) { (void)sc64_shared_projectile_release(&sc64_shared_projectiles,b->handle,
+                                      SC64_SHARED_PROJECTILE_IMPACT,b->reservation_owner); memset(b,0,sizeof(*b)); }
     }
     memset(sc64_ordinary_pending,0,sizeof(sc64_ordinary_pending));
-    memset(sc64_ordinary_bullets,0,sizeof(sc64_ordinary_bullets));
 }
 static int race_shared_ordinary_pending_any(void)
 {
@@ -114,7 +108,8 @@ static void race_shared_ordinary_release_tick(void)
             u32 handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,SC64_SHARED_PROJECTILE_IMPACT,(unsigned)i);
             if(!handle)continue; /* source allocation failure: cooldown was already spent */
             unsigned slot=(handle&255u)-1u;
-            Sc64OrdinaryBullet *b=&sc64_ordinary_bullets[slot];
+            Sc64OrdinaryBullet *b=&sc64_shared_payloads[slot].ordinary;
+            memset(b,0,sizeof(*b));
             b->handle=handle;b->target=p->target;b->damage=p->damage;b->owner=p->owner;
 #ifdef SC64_SHARED_DARK_SWARM_PROBE
             if(swarm>0)b->target=-1; /* source threshold 255 misses every roll */
@@ -128,7 +123,7 @@ static void race_shared_ordinary_release_tick(void)
 static void race_shared_ordinary_bullet_tick(void)
 {
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) {
-        Sc64OrdinaryBullet *b=&sc64_ordinary_bullets[i];if(!b->handle)continue;
+        Sc64OrdinaryBullet *b=sc64_ordinary_bullet_at(i);if(!b)continue;
         /* Match the existing impact path: loss of targetability permanently
          * clears the reference, even if that slot later becomes visible. */
         if(b->target>=0 && !target_alive(b->target)) b->target=-1;

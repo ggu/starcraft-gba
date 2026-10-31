@@ -623,3 +623,9 @@ The map identifies per-unit Defiler state (8,640 bytes), per-unit pending ordina
 The initial ARM attempt exposed an unused `<string.h>` include in the reservation header, unavailable in the freestanding toolchain. It was removed before the retained links; no behavior changed.
 
 An additional Showcase-only core diagnostic omitted the ordinary projectile stage and approach probes while retaining the caster, hero, field, rectangle and art gates. It linked with `__bss_end` at `0x0203cf84` (4,220 bytes below the working-RAM limit) and `__iwram_end` at `0x03004c80`. Its output is retained in `.local/defiler-arm-core-showcase-3a6`. This establishes only that bounded core's link feasibility; it does not establish room for common projectile contention, general movement, or the current shared product.
+
+### Shared typed payload experiment
+
+Ordinary and Dark Swarm projectile payloads now occupy a union indexed by the existing 100-slot typed arena. Accessors validate the family, slot, generation, and owner before scans, target cancellation, or resets touch a payload. Mixed-slot tests exercise family isolation, stale generation, reuse, ordinary reset while a swarm remains live, and full game reset; actual game-update field/ordinary and Defiler guard fixtures and separate family-only sanitizer fixtures passed. These tests do not establish all source projectile families or full save support.
+
+The full-stage Showcase ARM relink moved `__bss_end` from `0x02040454` to `0x0203ffa4`, saving 1,200 bytes with no reduced arena capacity. It still exceeds the unchanged `0x0203e000` working-RAM bound by 8,100 bytes; IWRAM is unchanged at `0x03004c80`. This remains an unqualified experimental stage, on the earlier shared base. Arguments, logs, map and static stack reports are retained in `.local/shared-payload-union-v1`.

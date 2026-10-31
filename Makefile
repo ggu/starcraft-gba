@@ -6187,3 +6187,9 @@ $(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC
 $(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-parent-cleanup
 test-scarab-parent-cleanup: test-scarab-parent-cleanup-terran test-scarab-parent-cleanup-zerg test-scarab-parent-cleanup-protoss test-scarab-parent-cleanup-showcase
+
+.PHONY: test-shared-payload-mixed
+build/test-shared-payload-mixed: tests/sc64_shared_payload_mixed_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-shared-payload-mixed: build/test-shared-payload-mixed
+	./build/test-shared-payload-mixed

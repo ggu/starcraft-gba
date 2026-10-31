@@ -986,6 +986,50 @@ static Unit u[MAX_UNITS];
 #ifdef SC64_SHARED_PROJECTILE_STAGE
 #include "sc64_shared_projectile_stage.h"
 static Sc64SharedProjectileArena sc64_shared_projectiles;
+#ifdef SC64_SHARED_ORDINARY_STAGE
+typedef struct {
+    u32 handle; int target, damage;
+    u8 owner, source_type, damage_class, impact, life, damaged, reservation_owner;
+} Sc64OrdinaryBullet;
+#endif
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+typedef struct { u32 handle; s16 x,y; u8 age; } Sc64DefilerProjectile;
+#endif
+#if defined(SC64_SHARED_ORDINARY_STAGE) || defined(SC64_SHARED_DEFILER_EXECUTOR)
+typedef union {
+#ifdef SC64_SHARED_ORDINARY_STAGE
+    Sc64OrdinaryBullet ordinary;
+#endif
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+    Sc64DefilerProjectile swarm;
+#endif
+} Sc64SharedProjectilePayload;
+static Sc64SharedProjectilePayload sc64_shared_payloads[SC64_SHARED_PROJECTILE_CAPACITY];
+static int sc64_shared_payload_valid(unsigned i,unsigned type,u32 handle)
+{
+    if(i>=SC64_SHARED_PROJECTILE_CAPACITY || !handle) return 0;
+    Sc64SharedProjectileSlot *s=&sc64_shared_projectiles.slots[i];
+    return s->type==type && (handle&255u)==i+1u && (handle>>8)==s->generation;
+}
+#ifdef SC64_SHARED_ORDINARY_STAGE
+static Sc64OrdinaryBullet *sc64_ordinary_bullet_at(unsigned i)
+{
+    if(i>=SC64_SHARED_PROJECTILE_CAPACITY) return 0;
+    Sc64OrdinaryBullet *b=&sc64_shared_payloads[i].ordinary;
+    return sc64_shared_payload_valid(i,SC64_SHARED_PROJECTILE_IMPACT,b->handle) &&
+           sc64_shared_projectiles.slots[i].owner==b->reservation_owner ? b : 0;
+}
+#endif
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+static Sc64DefilerProjectile *sc64_defiler_projectile_at(unsigned i)
+{
+    if(i>=SC64_SHARED_PROJECTILE_CAPACITY) return 0;
+    Sc64DefilerProjectile *p=&sc64_shared_payloads[i].swarm;
+    return sc64_shared_payload_valid(i,SC64_SHARED_PROJECTILE_SWARM,p->handle) &&
+           sc64_shared_projectiles.slots[i].owner==0 ? p : 0;
+}
+#endif
+#endif
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
 /* Experimental simulation state; never borrow presentation-facing or a
@@ -1021,8 +1065,6 @@ static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
 #error "Defiler executor requires staged casters, shared projectiles, and source clock"
 #endif
 #include "sc64_dark_swarm_state.h"
-typedef struct { u32 handle; s16 x,y; u8 age; } Sc64DefilerProjectile;
-static Sc64DefilerProjectile sc64_defiler_projectiles[SC64_SHARED_PROJECTILE_CAPACITY];
 static Sc64DarkSwarmEffect sc64_defiler_fields[MAX_UNITS];
 static void sc64_defiler_executor_unit_tick(void);
 static void sc64_defiler_executor_bullet_tick(void);
@@ -4924,7 +4966,7 @@ init_state(void)
 #ifdef SC64_SHARED_DEFILER_STAGE
     memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
 #ifdef SC64_SHARED_DEFILER_EXECUTOR
-    memset(sc64_defiler_projectiles,0,sizeof(sc64_defiler_projectiles));
+    memset(sc64_shared_payloads,0,sizeof(sc64_shared_payloads));
     memset(sc64_defiler_fields,0,sizeof(sc64_defiler_fields));
 #endif
 #endif
@@ -5201,7 +5243,7 @@ game_init(void)
 #ifdef SC64_SHARED_DEFILER_STAGE
     memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
 #ifdef SC64_SHARED_DEFILER_EXECUTOR
-    memset(sc64_defiler_projectiles,0,sizeof(sc64_defiler_projectiles));
+    memset(sc64_shared_payloads,0,sizeof(sc64_shared_payloads));
     memset(sc64_defiler_fields,0,sizeof(sc64_defiler_fields));
 #endif
 #endif

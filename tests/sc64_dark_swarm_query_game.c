@@ -26,8 +26,8 @@ static void weapon_case(int raw,int target_type,int x,int should_hit)
     for(int n=0;n<60;n++) {
         game_update(0,0);
         for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) {
-            Sc64OrdinaryBullet *bullet=&sc64_ordinary_bullets[i];
-            if(bullet->handle && bullet->reservation_owner==(unsigned)shooter) {
+            Sc64OrdinaryBullet *bullet=sc64_ordinary_bullet_at(i);
+            if(bullet && bullet->reservation_owner==(unsigned)shooter) {
                 saw_bullet=1;
                 if(!should_hit)assert(bullet->target==-1);
             }
@@ -55,7 +55,7 @@ static void unknown_case(void)
     for(int n=0;n<20 && sc64_ordinary_pending[shooter].active;n++)game_update(0,0);
     assert(!sc64_ordinary_pending[shooter].active && u[target].hp==1000);
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++)
-        assert(!sc64_ordinary_bullets[i].handle || sc64_ordinary_bullets[i].reservation_owner!=(unsigned)shooter);
+        assert(!sc64_ordinary_bullet_at(i) || sc64_ordinary_bullet_at(i)->reservation_owner!=(unsigned)shooter);
     u[shooter].alive=0;u[target].alive=0;
 }
 int main(void)
