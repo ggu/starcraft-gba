@@ -472,7 +472,7 @@ $(error CANONICAL_ROUTE_INDEX must be 0 or 1)
 endif
 CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID)
 # Experimental imported-map walkability packing; canonical products only.
-CANONICAL_PATH_GRID ?= 0
+CANONICAL_PATH_GRID ?= 1
 ifneq ($(words $(filter 0 1,$(CANONICAL_PATH_GRID))),1)
 $(error CANONICAL_PATH_GRID must be 0 or 1)
 endif
