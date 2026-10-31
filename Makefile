@@ -4853,36 +4853,8 @@ $(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run 
 # rather than relying on the earlier Z3/P3 split-profile save fixtures.
 CANONICAL_SKIRMISH_RESUME_ART_INPUTS = $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 CANONICAL_SKIRMISH_RESUME_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
-define CANONICAL_TRACER_PROFILE_FIXTURE
-build/test-sc64-tracer-profile-$(1): tests/sc64_trace_profile_cache_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$($(4)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
-	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $$($(2)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$($(4)) -o $$@
-endef
-$(eval $(call CANONICAL_TRACER_PROFILE_FIXTURE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS))
-# The Z7 release does not enable tracer-duration caching; keep the cache
-# fixture explicitly tied to the older Z6 vector.
-$(eval $(call CANONICAL_TRACER_PROFILE_FIXTURE,zerg-z6,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS))
-$(eval $(call CANONICAL_TRACER_PROFILE_FIXTURE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
-$(eval $(call CANONICAL_TRACER_PROFILE_FIXTURE,showcase,SHOWCASE_FLAGS,SHOWCASE_INPUTS))
-.PHONY: test-sc64-canonical-tracer-profile
-test-sc64-canonical-tracer-profile: $(addprefix build/test-sc64-tracer-profile-,terran zerg protoss showcase)
-	./build/test-sc64-tracer-profile-terran
-	./build/test-sc64-tracer-profile-zerg
-	./build/test-sc64-tracer-profile-protoss
-	./build/test-sc64-tracer-profile-showcase
-.PHONY: test-sc64-zerg-z6-tracer-profile
-test-sc64-zerg-z6-tracer-profile: build/test-sc64-tracer-profile-zerg-z6
-	./build/test-sc64-tracer-profile-zerg-z6
+include tests/sc64-z7-promotion/tracer.mk
 
-define CANONICAL_SKIRMISH_RESUME_PROFILE
-build/test-sc64-skirmish-resume-$(1): tests/sc64_skirmish_resume.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$($(4)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
-	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $$($(2)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$($(4)) -o $$@
-endef
-.PHONY: test-sc64-canonical-skirmish-resume
-test-sc64-canonical-skirmish-resume: $(addprefix build/test-sc64-skirmish-resume-,terran zerg protoss)
-	./build/test-sc64-skirmish-resume-terran
-	./build/test-sc64-skirmish-resume-zerg
-	./build/test-sc64-skirmish-resume-protoss
-test-race-campaigns: test-sc64-canonical-skirmish-resume
 
 # Public actor facts only: no generated maps, art, or ROM required.
 COLLISION_BOUNDS_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -fno-omit-frame-pointer -Istarcraft -DGBA_HOST -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z6_ACTORS -DSC64_TERRAN_LATE_ACTORS -DSC64_P5_ACTORS -DSC64_P6_ACTORS -DSC64_P7_ACTORS -DSC64_P6_COMBAT_ENABLED -DSC64_NYDUS_ENABLED
