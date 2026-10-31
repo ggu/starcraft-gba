@@ -3,16 +3,20 @@
 #include "sc64_impact_events_game.c"
 #undef main
 #include <stdlib.h>
-int main(int argc,char **argv) {
+#ifndef SC64_SCARAB_ATTACK_ENTRY
+#define SC64_SCARAB_ATTACK_ENTRY main
+#endif
+int SC64_SCARAB_ATTACK_ENTRY(int argc,char **argv) {
     int phase=(argc==2 && !strncmp(argv[1],"phase",5)) ? atoi(argv[1]+5) : -1;
     int upgrade=argc==2 && !strcmp(argv[1],"upgrade");
     int poolfull=argc==2 && !strcmp(argv[1],"poolfull");
+    int nearfull=argc==2 && !strcmp(argv[1],"nearfull");
     int destroy=argc==2 && !strcmp(argv[1],"building-destroy");
     int building=(argc==2 && !strcmp(argv[1],"building")) || destroy;
     int turncoat=argc==2 && !strcmp(argv[1],"turncoat");
     int reuse=argc==2 && !strcmp(argv[1],"reuse");
     int shield=argc==2 && !strcmp(argv[1],"shield");
-    int fraction=argc==2 && !strcmp(argv[1],"fraction");assert(argc==1 || upgrade || poolfull || building || turncoat || reuse || shield || fraction || (phase>=0 && phase<5));
+    int fraction=argc==2 && !strcmp(argv[1],"fraction");assert(argc==1 || upgrade || poolfull || nearfull || building || turncoat || reuse || shield || fraction || (phase>=0 && phase<5));
     if(fraction)upgrade=1;
     setup();minerals=500;
     int p=spawn_unit(SIDE,U_REAVER,128,128),t;
@@ -27,20 +31,22 @@ int main(int argc,char **argv) {
     assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
     if(phase>=0) frame=phase; /* controlled game-update cadence phase */
     u[p].selected=1;assert(issue_order(ORDER_ATTACK_MOVE,target_x(t),target_y(t)));int hp=building?b[t-MAX_UNITS].hp:u[t].hp,arrived=0;
-    for(int n=0;n<100;n++) {
 #ifdef SC64_SCARAB_WEAPON_PROBE
-        if(poolfull)for(int i=0;i<SC64_SCARAB_PROBE_BULLETS;i++)sc64_scarab_probe_bullets[i].ticks=200;
+    if(poolfull || nearfull)for(int i=0;i<RACE_IMPACT_CAPACITY-(nearfull?1:0);i++)race_impact_launch(t,1,1,SIDE,-1,U_MARINE,200);
 #endif
+    for(int n=0;n<100;n++) {
         screen=SCREEN_PLAY;game_update(0,0);assert(u[p].alive && (building?b[t-MAX_UNITS].hp:u[t].hp)==hp);
         if(u[c].alive && u[c].order==4){arrived=1;break;}}
     if(!arrived)fprintf(stderr,"no arrival parent=%d child=%d order=%d x=%d y=%d target=%d targetpos=%d,%d\n",u[p].alive,u[c].alive,u[c].order,u[c].x,u[c].y,u[c].target,target_x(t),target_y(t));
     assert(arrived && u[c].target==t && race_scarab_probe_arrived(&u[c]));
 #ifdef SC64_SCARAB_WEAPON_PROBE
-    assert(race_scarab_probe_bullets_pending() && !race_save_game());
     if(poolfull) {
+        assert(!race_scarab_probe_bullets_pending() && race_impact_count==RACE_IMPACT_CAPACITY);
         for(int n=0;n<10;n++){screen=SCREEN_PLAY;game_update(0,0);assert(u[t].hp==hp);}
-        assert(!u[c].alive && u[p].alive);puts("full experimental bullet pool: no fabricated damage");return 0;
+        assert(!u[c].alive && u[p].alive);puts("full shared pool consumes Scarab without fabricated damage");return 0;
     }
+    assert(race_scarab_probe_bullets_pending() && !race_save_game());
+    if(nearfull)assert(race_impact_count==RACE_IMPACT_CAPACITY);
     if(turncoat)u[t].owner=SIDE; /* Controlled ownership change: same object. */
     if(reuse) {
         hit_target_impl_ex(t,1000,U_MARINE,SIDE,-1,SC64_HIT_PRECOMPUTED_HP);

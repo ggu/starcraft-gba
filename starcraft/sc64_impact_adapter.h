@@ -15,6 +15,9 @@
  * an attacker that dies after launch still delivers its projectile.
  * See docs/IMPACT-EVENTS.md for provenance and limits. */
 
+#ifdef SC64_SCARAB_WEAPON_PROBE
+#include "sc64_scarab_impact_packet.h"
+#endif
 static Sc64ImpactEvent race_impact_rows[RACE_IMPACT_CAPACITY];
 static u8 race_impact_count;
 /* Diagnostics only; neither is saved and neither affects simulation. */
@@ -32,8 +35,22 @@ race_impact_reset(void)
 static void
 race_impact_clear_target(int ref)
 {
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    unsigned keep=0;
+    for(unsigned i=0;i<race_impact_count;i++) {
+        Sc64ImpactEvent row=race_impact_rows[i];
+        if(row.source_type==SC64_SCARAB_IMPACT_MARKER) {
+            Sc64ScarabImpact packet;
+            if(sc64_scarab_impact_unpack(&row,&packet) && packet.target==ref)
+                sc64_scarab_impact_forget_target(&row);
+        } else if(sc64_impact_event_target(&row)==ref) continue;
+        race_impact_rows[keep++]=row;
+    }
+    race_impact_count=(u8)keep;
+#else
     if (race_impact_count)
         (void)sc64_impact_clear_target(race_impact_rows, &race_impact_count, ref);
+#endif
 }
 
 static unsigned
@@ -175,6 +192,41 @@ race_impact_resolve(const Sc64ImpactEvent *e)
 static void __attribute__((noinline))
 race_impact_tick(void)
 {
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    /* Advance all rows before resolving, then leave due rows in the shared
+     * queue until taken. Death/slot cleanup can invalidate a later due
+     * Scarab's explicit target without discarding its position splash. */
+    unsigned keep=0;
+    if(!race_impact_count)return;
+    for(unsigned i=0;i<race_impact_count;i++) {
+        Sc64ImpactEvent row=race_impact_rows[i];
+        if(row.source_type==SC64_SCARAB_IMPACT_MARKER) {
+            Sc64ScarabImpact packet;
+            if(!sc64_scarab_impact_unpack(&row,&packet))continue;
+            if(packet.target>=0 && !target_alive(packet.target)) sc64_scarab_impact_forget_target(&row);
+            if(sc64_battlecruiser_source_tick_due() && packet.ticks)
+                row.steps=(u8)(row.steps-16u);
+        } else {
+            if(!target_alive(sc64_impact_event_target(&row)))continue;
+            if(row.steps)--row.steps;
+        }
+        race_impact_rows[keep++]=row;
+    }
+    race_impact_count=(u8)keep;
+    for(;;) {
+        unsigned i;
+        for(i=0;i<race_impact_count;i++) {
+            const Sc64ImpactEvent *row=&race_impact_rows[i];
+            if(row->source_type==SC64_SCARAB_IMPACT_MARKER ? !(row->steps&0x70u) : !row->steps)break;
+        }
+        if(i==race_impact_count)break;
+        Sc64ImpactEvent due=race_impact_rows[i];
+        for(unsigned j=i+1;j<race_impact_count;j++)race_impact_rows[j-1]=race_impact_rows[j];
+        --race_impact_count;
+        if(due.source_type==SC64_SCARAB_IMPACT_MARKER)race_scarab_probe_bullet_resolve(&due);
+        else race_impact_resolve(&due);
+    }
+#else
     Sc64ImpactEvent due[RACE_IMPACT_CAPACITY];
     unsigned ready, keep = 0;
     if (!race_impact_count) return;
@@ -184,6 +236,7 @@ race_impact_tick(void)
     race_impact_count = (u8)keep;
     ready = sc64_impact_step(race_impact_rows, &race_impact_count, due);
     for (unsigned i = 0; i < ready; ++i) race_impact_resolve(&due[i]);
+#endif
 }
 
 /* Save: an empty queue keeps the historical RaceSave-length record. More

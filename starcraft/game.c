@@ -1674,8 +1674,8 @@ static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #if defined(SC64_SCARAB_AUTONOMOUS_PROBE) && (!defined(SC64_SCARAB_PACKED_MOTION_PROBE) || !defined(SC64_SIEGE_SPLASH))
 #error "Autonomous Scarab probe requires packed motion and source bounds"
 #endif
-#if defined(SC64_SCARAB_WEAPON_PROBE) && !defined(SC64_SCARAB_AUTONOMOUS_PROBE)
-#error "Scarab weapon probe requires autonomous control"
+#if defined(SC64_SCARAB_WEAPON_PROBE) && (!defined(SC64_SCARAB_AUTONOMOUS_PROBE) || !defined(SC64_IMPACT_EVENTS))
+#error "Scarab weapon probe requires autonomous control and impact events"
 #endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
@@ -1686,7 +1686,7 @@ static void __attribute__((noinline)) race_scarab_control_dispatch(int slot);
 static void race_scarab_probe_parent_attack(int slot,int target);
 static void race_scarab_probe_parent_tick(int slot);
 #ifdef SC64_SCARAB_WEAPON_PROBE
-static void race_scarab_probe_bullet_tick(void);
+static void race_scarab_probe_bullet_resolve(const Sc64ImpactEvent *packet);
 static void race_scarab_probe_bullet_reset(void);
 static int race_scarab_probe_bullets_pending(void);
 static void race_scarab_probe_target_invalidate(int target);
@@ -8543,9 +8543,6 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_sync_references();
 #endif
-#ifdef SC64_SCARAB_WEAPON_PROBE
-    if (sc64_battlecruiser_source_tick_due()) race_scarab_probe_bullet_tick();
-#endif
     update_orders();
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (sc64_battlecruiser_source_tick_due())
@@ -11711,36 +11708,33 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #include "sc64_scarab_unit_adapter.h"
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
 #ifdef SC64_SCARAB_WEAPON_PROBE
-/* Separate bounded experimental projectile pool, not one row per child.
- * No save format yet carries these pending packets. */
-typedef struct { s16 x,y,target;u8 owner,ticks; } Sc64ScarabProbeBullet;
-/* Weapon 82's observed target-position bullet enters Death immediately;
- * its source Death script reaches domissiledmg at local tick 5. The probe
- * ticks this pool before unit orders, so creation cannot consume a tick. */
-enum { SC64_SCARAB_PROBE_BULLETS=4, SC64_SCARAB_DEATH_DAMAGE_TICKS=5 };
-static Sc64ScarabProbeBullet sc64_scarab_probe_bullets[SC64_SCARAB_PROBE_BULLETS];
-/* Test-only per-owner Scarab damage upgrade bit, not normal weapon level.
- * No research or persistent representation is registered by this probe. */
+/* Pending Scarab packets share the ordinary bounded impact rows. They remain
+ * in-memory only until a checked save schema registers their marker. */
+enum { SC64_SCARAB_DEATH_DAMAGE_TICKS=5 };
 static u8 sc64_scarab_probe_damage_upgrades;
-static void race_scarab_probe_bullet_reset(void) { memset(sc64_scarab_probe_bullets,0,sizeof(sc64_scarab_probe_bullets));sc64_scarab_probe_damage_upgrades=0; }
+static void race_scarab_probe_bullet_reset(void) { sc64_scarab_probe_damage_upgrades=0; }
 static int race_scarab_probe_bullets_pending(void) {
-    if(sc64_scarab_probe_damage_upgrades)return 1; /* not saveable yet */
-    for(int i=0;i<SC64_SCARAB_PROBE_BULLETS;i++)if(sc64_scarab_probe_bullets[i].ticks)return 1;
+    if(sc64_scarab_probe_damage_upgrades)return 1;
+    for(unsigned i=0;i<race_impact_count;i++)
+        if(race_impact_rows[i].source_type==SC64_SCARAB_IMPACT_MARKER)return 1;
     return 0;
 }
 static void race_scarab_probe_target_invalidate(int target) {
-    for(int i=0;i<SC64_SCARAB_PROBE_BULLETS;i++)
-        if(sc64_scarab_probe_bullets[i].ticks && sc64_scarab_probe_bullets[i].target==target)
-            sc64_scarab_probe_bullets[i].target=-1;
+    for(unsigned i=0;i<race_impact_count;i++) {
+        Sc64ScarabImpact packet;Sc64ImpactEvent *row=&race_impact_rows[i];
+        if(sc64_scarab_impact_unpack(row,&packet) && packet.target==target)
+            sc64_scarab_impact_forget_target(row);
+    }
 }
 static int race_scarab_probe_bullet_create(const Unit *q) {
-    for(int i=0;i<SC64_SCARAB_PROBE_BULLETS;i++)if(!sc64_scarab_probe_bullets[i].ticks) {
-        Sc64ScarabProbeBullet *b=&sc64_scarab_probe_bullets[i];
-        b->x=(s16)(q->x*2+(int)(((unsigned)q->carry>>10)&511u)/256);
-        b->y=(s16)(q->y*2+(int)(((unsigned)q->carry>>19)&511u)/256);
-        b->owner=q->owner;b->target=q->target;b->ticks=SC64_SCARAB_DEATH_DAMAGE_TICKS;return 1;
-    }
-    return 0; /* Pool-full source behavior: no projectile, no damage. */
+    Sc64ScarabImpact packet={q->x*2+(int)(((unsigned)q->carry>>10)&511u)/256,
+        q->y*2+(int)(((unsigned)q->carry>>19)&511u)/256,q->target,q->owner,
+        SC64_SCARAB_DEATH_DAMAGE_TICKS+1u};
+    Sc64ImpactEvent row;
+    if(race_impact_count>=RACE_IMPACT_CAPACITY || !sc64_scarab_impact_pack(&row,&packet))return 0;
+    race_impact_rows[race_impact_count++]=row;
+    if(race_impact_count>race_impact_high_water)race_impact_high_water=race_impact_count;
+    return 1; /* Count 6 includes this update's already-due source tick. */
 }
 #endif
 static int race_scarab_probe_target_info(int ref,int *raw,int *x,int *y,int *owner) {
@@ -11782,23 +11776,22 @@ static void race_scarab_probe_hit(int target,unsigned packet_q8,int owner) {
     if(hp_loss)hit_target_impl_ex(target,hp_loss,U_REAVER,owner,SC64_STOCK_DMG_NORMAL,
                                  SC64_HIT_PRECOMPUTED_HP|SC64_HIT_ALLOW_SPLASH_BURROW);
 }
-static void race_scarab_probe_bullet_tick(void) {
-    for(int i=0;i<SC64_SCARAB_PROBE_BULLETS;i++) {
-        Sc64ScarabProbeBullet *b=&sc64_scarab_probe_bullets[i];
-        if(!b->ticks || --b->ticks)continue;
-        for(int j=0;j<MAX_UNITS+MAX_BUILDINGS;j++) {
-            int raw,x,y,owner,dx=0,dy=0,distance;
-            if(!race_scarab_probe_target_info(j,&raw,&x,&y,&owner) || (owner==b->owner && j!=b->target))continue;
-            int l=x*2-siege_bounds[raw][2],r=x*2+siege_bounds[raw][4];
-            int top=y*2-siege_bounds[raw][3],bottom=y*2+siege_bounds[raw][5];
-            if(b->x<l)dx=l-b->x;else if(b->x>r)dx=b->x-r;
-            if(b->y<top)dy=top-b->y;else if(b->y>bottom)dy=b->y-bottom;
-            distance=(int)sc64_siege_xy_length(dx,dy);
-            if(distance>60 || (distance>20 && j<MAX_UNITS && sc64_siege_burrowed(j)))continue;
-            int base=100+25*((sc64_scarab_probe_damage_upgrades>>b->owner)&1u);
-            unsigned packet=(unsigned)base*256u/(distance<=20?1u:distance<=40?2u:4u);
-            race_scarab_probe_hit(j,packet,b->owner);
-        }
+static void race_scarab_probe_bullet_resolve(const Sc64ImpactEvent *row) {
+    Sc64ScarabImpact packet;
+    if(!sc64_scarab_impact_unpack(row,&packet) || packet.ticks)return;
+    for(int j=0;j<MAX_UNITS+MAX_BUILDINGS;j++) {
+        int raw,x,y,owner,dx=0,dy=0,distance;
+        if(!race_scarab_probe_target_info(j,&raw,&x,&y,&owner) ||
+           (owner==packet.owner && j!=packet.target))continue;
+        int l=x*2-siege_bounds[raw][2],r=x*2+siege_bounds[raw][4];
+        int top=y*2-siege_bounds[raw][3],bottom=y*2+siege_bounds[raw][5];
+        if(packet.x<l)dx=l-packet.x;else if(packet.x>r)dx=packet.x-r;
+        if(packet.y<top)dy=top-packet.y;else if(packet.y>bottom)dy=packet.y-bottom;
+        distance=(int)sc64_siege_xy_length(dx,dy);
+        if(distance>60 || (distance>20 && j<MAX_UNITS && sc64_siege_burrowed(j)))continue;
+        int base=100+25*((sc64_scarab_probe_damage_upgrades>>packet.owner)&1u);
+        unsigned amount=(unsigned)base*256u/(distance<=20?1u:distance<=40?2u:4u);
+        race_scarab_probe_hit(j,amount,packet.owner);
     }
 }
 #endif

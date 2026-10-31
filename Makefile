@@ -5808,3 +5808,38 @@ $(eval $(call SCARAB_CROSS_FIXTURE,protoss,$(PROTOSS_ROM_FLAGS),$(SCARAB_P7_BASE
 $(eval $(call SCARAB_CROSS_FIXTURE,showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-cross-codecs
 test-scarab-cross-codecs: test-scarab-cross-zerg test-scarab-cross-protoss test-scarab-cross-showcase
+
+.PHONY: test-scarab-impact-packet test-scarab-shared-impact-terran
+build/test-scarab-impact-packet: tests/sc64_scarab_impact_packet.c starcraft/sc64_scarab_impact_packet.h starcraft/sc64_impact_events.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-scarab-impact-packet: build/test-scarab-impact-packet
+	./build/test-scarab-impact-packet
+
+# Opt-in; requires prepared Terran headers and lookup, never invokes extraction.
+test-scarab-shared-impact-terran:
+	@set -eu; \
+	mkdir -p build/generated/scarab-shared-impact; \
+	run=$$(mktemp -d build/generated/scarab-shared-impact/terran.XXXXXX); \
+	printf 'Scarab shared-impact receipts: %s\n' "$$run"; \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	  -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	  $(TERRAN_ROM_FLAGS) tests/sc64_scarab_shared_impact_game.c tests/sc64_yamato_host_sram_shim.c \
+	  $(filter-out starcraft/game.c,$(STARCRAFT)) -o "$$run/test"; \
+	"$$run/test" "$$run/save-before" "$$run/save-after" "$$run/reject-before" "$$run/reject-after"; \
+	cmp "$$run/save-before" "$$run/save-after"; cmp "$$run/reject-before" "$$run/reject-after"
+
+# Documents a current fail-closed limitation, not a successful save feature.
+.PHONY: test-scarab-postimpact-gap-terran
+test-scarab-postimpact-gap-terran:
+	@set -eu; \
+	mkdir -p build/generated/scarab-shared-impact; \
+	run=$$(mktemp -d build/generated/scarab-shared-impact/postimpact.XXXXXX); \
+	printf 'Scarab post-impact gap receipts: %s\n' "$$run"; \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	  -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	  $(TERRAN_ROM_FLAGS) tests/sc64_scarab_postimpact_save_game.c tests/sc64_yamato_host_sram_shim.c \
+	  $(filter-out starcraft/game.c,$(STARCRAFT)) -o "$$run/test"; \
+	"$$run/test" "$$run/before" "$$run/rejected" "$$run/reused"; \
+	cmp "$$run/before" "$$run/rejected"; ! cmp -s "$$run/rejected" "$$run/reused"
