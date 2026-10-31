@@ -665,6 +665,49 @@ test_p3_sequence_invalidates_bottom_and_matches_redraw(void)
 #endif
 
 #if defined(SC64_SHOWCASE_ENABLED) && defined(SC64_HUD_PAGE_BANDS)
+static void test_showcase_hud_transitions_match_forced_frames(void)
+{
+    fixture();
+    screen = SCREEN_PLAY;
+    gfx_begin(0xe7); gfx_end();
+    gfx_begin(0xe7); gfx_end();
+    assert_game_frame_matches_forced_hud();
+    minerals += 37; gas += 11;
+    assert_game_frame_matches_forced_hud();
+    u[0].alive=1; u[0].owner=SIDE; u[0].type=U_MARINE;
+    u[0].hp=u[0].maxhp=40; u[0].selected=1;
+    assert_game_frame_matches_forced_hud();
+    menu_open=1; menu_cursor=1;
+    assert_game_frame_matches_forced_hud();
+    menu_cursor=2;
+    assert_game_frame_matches_forced_hud();
+    menu_open=0;
+    assert_game_frame_matches_forced_hud();
+    race_campaign.message=11; race_campaign.message_ticks=90;
+    assert_game_frame_matches_forced_hud();
+    race_campaign.message_ticks=0;
+    assert_game_frame_matches_forced_hud();
+    sc64_minimap_visible[7]=1; sc64_minimap_raster_update(7);
+    assert_game_frame_matches_forced_hud();
+    sc64_minimap_visible[7]=0; sc64_minimap_explored[7]=1;
+    sc64_minimap_raster_update(7);
+    assert_game_frame_matches_forced_hud();
+    sc64_minimap_explored[7]=0; sc64_minimap_raster_update(7);
+    assert_game_frame_matches_forced_hud();
+    screen=SCREEN_PAUSE;
+    assert_game_frame_matches_forced_hud();
+    screen=SCREEN_PLAY;
+    assert_game_frame_matches_forced_hud();
+    screen=SCREEN_RESULT;
+    assert_game_frame_matches_forced_hud();
+    screen=SCREEN_PLAY;
+    assert_game_frame_matches_forced_hud();
+    gfx_begin(0xe7); gfx_end();
+    gfx_begin(0xe7); gfx_end();
+    assert_game_frame_matches_forced_hud();
+    assert_game_frame_matches_forced_hud();
+}
+
 static void test_showcase_labels_do_not_persist_in_cached_pages(void)
 {
     fixture();
@@ -691,6 +734,7 @@ main(void)
     fixture();
 #if defined(SC64_SHOWCASE_ENABLED) && defined(SC64_HUD_PAGE_BANDS)
     test_showcase_labels_do_not_persist_in_cached_pages();
+    test_showcase_hud_transitions_match_forced_frames();
     fixture();
 #endif
 #ifdef SC64_HUD_ICONS
