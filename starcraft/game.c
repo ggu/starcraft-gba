@@ -10,6 +10,9 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_RACES)
+#error "Shared transport requires the race engine"
+#endif
 #ifdef SC64_SHARED_TRANSPORT
 #include "sc64_skirmish_transport_tech.h"
 #endif

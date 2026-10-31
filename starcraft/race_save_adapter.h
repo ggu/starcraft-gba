@@ -954,7 +954,7 @@ static int race_skirmish_transport_decode(const RaceSave *candidate, int slot,
 
 static int race_skirmish_saved_transport(const Unit *ship)
 {
-    if (!ship || !ship->alive || ship->owner < 0 || ship->owner >= 5 ||
+    if (!ship || !ship->alive || (unsigned)ship->owner >= 5u ||
         ship->order == ORDER_BOARD || ship->order == ORDER_TRANSPORTED) return 0;
     int raw = ship->raw_type >= 0 ? ship->raw_type : sc64_race_raw_unit(ship->type);
     if (raw < 0 || sc64_race_unit_from_raw(raw) != ship->type) return 0;

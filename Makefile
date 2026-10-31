@@ -6111,3 +6111,24 @@ include tests/carrier-fixtures/Makefile
 include tests/terrain-storage/Makefile
 
 include tests/p8-condition/Makefile
+# Asset-free bounded transport research and source-fact checks.
+build/test-sc64-shared-transport-tech: tests/sc64_skirmish_transport_tech.c starcraft/sc64_skirmish_transport_tech.h starcraft/sc64_transport_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-shared-transport-tech test-sc64-shared-transport-profiles
+test-sc64-shared-transport-tech: build/test-sc64-shared-transport-tech
+	./build/test-sc64-shared-transport-tech
+test: test-sc64-shared-transport-tech
+
+# Explicit opt-in custom-game checks using the already prepared private banks.
+# The normal race product flags remain unchanged while this feature is staged.
+define SC64_SHARED_TRANSPORT_PROFILE
+build/test-sc64-shared-transport-$(1): tests/sc64_shared_transport_game.c tests/sc64_skirmish_resume.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$($(4)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $$($(2)) -DSC64_SHARED_TRANSPORT $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$($(4)) -o $$@
+endef
+$(eval $(call SC64_SHARED_TRANSPORT_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS))
+$(eval $(call SC64_SHARED_TRANSPORT_PROFILE,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS))
+$(eval $(call SC64_SHARED_TRANSPORT_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
+$(eval $(call SC64_SHARED_TRANSPORT_PROFILE,p8,PROTOSS_P8_FLAGS,PROTOSS_P8_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
+$(eval $(call SC64_SHARED_TRANSPORT_PROFILE,showcase,SHOWCASE_FLAGS,SHOWCASE_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
+test-sc64-shared-transport-profiles: $(addprefix build/test-sc64-shared-transport-,terran zerg protoss p8 showcase)
+	@set -e; for profile in terran zerg protoss p8 showcase; do ./build/test-sc64-shared-transport-$$profile; done
