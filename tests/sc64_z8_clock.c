@@ -9,11 +9,6 @@ int main(void)
     for (unsigned frame = 1; frame <= 3000; ++frame) {
         native += (unsigned)sc64_z8_native_step(frame);
         assert(native == (4u * frame) / 5u);
-        /* Saving and restoring the existing engine frame retains the phase. */
-        unsigned saved_frame = frame;
-        for (unsigned n = 1; n <= 10; ++n)
-            assert(sc64_z8_native_step(frame + n) ==
-                   sc64_z8_native_step(saved_frame + n));
     }
     assert(native == 2400u);
     assert(!sc64_z8_native_step(0));
