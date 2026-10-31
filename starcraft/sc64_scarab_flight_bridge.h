@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_SCARAB_FLIGHT_BRIDGE_H
 #define SC64_SCARAB_FLIGHT_BRIDGE_H
-/* Unregistered prerequisite. Call only for a fully authenticated current
- * Scarab namespace; never apply to historical generations. Unit is declared
+/* The experimental Terran namespace stage registers hidden phases only.
+ * Call only for a fully authenticated current Scarab namespace; never apply
+ * to historical generations. Unit is declared
  * by the including engine. Logical build is -1 and order is a 0..4 FSM. */
 #define SC64_SCARAB_FLIGHT_RADIX 131072u
 #define SC64_SCARAB_FLIGHT_KEYS 126353888u

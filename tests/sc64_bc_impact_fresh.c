@@ -2,6 +2,9 @@
 #define main sc64_battlecruiser_unused_skirmish_test_main
 #include "sc64_skirmish_runtime.c"
 #undef main
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#include "../starcraft/sc64_scarab_unit_adapter.h"
+#endif
 #include <string.h>
 extern int sc64_test_sram_transfer(const char *,int);
 static void observe(int a,int t,int a2,int t2,int n) {
@@ -38,10 +41,20 @@ int main(int argc,char **argv) {
         assert(sc64_bc_shots[0].state==SC64_BC_SHOT_CHARGING && sc64_bc_shots[0].age<44);
         race_impact_launch(t,1,1,ENEMY,0,u[a].type,200);
         assert(race_impact_count==1);
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        int parent=spawn_unit(SIDE,U_REAVER,128,128);assert(parent>=0 && race_scarab_parent_init(parent));
+        assert(race_scarab_enqueue(parent,0) && race_scarab_production_tick(parent,0)==SC64_SCARAB_ALLOCATED);
+        for(int i=0;i<20;i++)assert(race_scarab_production_tick(parent,0)==SC64_SCARAB_PROGRESS);
+#endif
         assert(race_save_game() && sc64_test_sram_transfer(argv[2],1));
     } else {
         assert(!strcmp(argv[1],"read") && sc64_test_sram_transfer(argv[2],0) && race_load_game());
         assert(race_impact_count==1);
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        { Sc64ScarabParent p;Sc64ScarabCounts counts;int parent=-1;
+          for(int i=0;i<MAX_UNITS;i++)if(u[i].alive && u[i].type==U_REAVER) { assert(parent<0);parent=i; }
+          assert(race_scarab_parent_read(parent,0,&p,&counts) && p.progress==20 && p.active_slot>=0); }
+#endif
         a=sc64_bc_shots[0].caster;t=sc64_bc_shots[0].target;
         a2=sc64_bc_shots[1].caster;t2=sc64_bc_shots[1].target;
     }

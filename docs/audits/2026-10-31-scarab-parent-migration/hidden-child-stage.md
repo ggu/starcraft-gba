@@ -25,3 +25,21 @@ are in `.local/decoder-proof/hidden-stage-final-{compile,runs}.json` and
 source bank (`0e03fcc54e860ab7d7a9904bcacdd47077045754294193ea7759dc9c949d9845`)
 at its durable path; the earlier vector's generated-bank path was unavailable.
 No complete profile matrix, ARM, stack or performance qualification is claimed.
+
+An independent review found that dead raw-85 rows could be written with an
+outside phase even though the staged reader rejects them. The writer now
+applies its hidden-phase restriction to every Scarab row, including dead rows.
+Six actual writer cases reject live and dead outside/self-destruct rows, dead
+type/raw mismatch and malformed carry without writing SRAM. Seven checksummed
+candidate cases cover invalid inside HP, hidden target/timer, owner and raw
+identity mismatches, orphan parent and impossible parent queue count; each
+falls back to the prior training save and rejects with sampled state and SRAM
+unchanged when that fallback is removed. These are selected corruptions, not
+an exhaustive capacity or whole-world rejection proof.
+
+One staged record also contains a genuinely in-training child at the same
+time as two active Yamato shots and a pending impact; its fresh-process
+continuation output matches the writer. The run and compile receipts are
+`.local/decoder-proof/hidden-combined-{compile,runs}.json`; negative case
+receipts are `hidden-boundary-runs.json`. Mixed old/new tag fallback in both
+sequence orders is still unqualified for child-bearing records.

@@ -1139,7 +1139,9 @@ static int race_save_game(void) {
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     {
         Unit wire;
-        if (!sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+        if (((u[i].type==U_SCARAB || u[i].raw_type==85) &&
+             (((unsigned)u[i].carry>>8)&3u)>1u) ||
+            !sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
             !sc64_unit_save_encode(&race_data.units[i],&wire,
                                    (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
     }
