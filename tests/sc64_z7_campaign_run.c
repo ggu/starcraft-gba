@@ -1808,25 +1808,34 @@ static void z7_defense_screen_point(int *x,int *y)
     else {*x=1050;*y=1620;}
 }
 
+static int z7_r_combat_eligible(int i);
+
 static int army_order(int attack,int x,int y)
 {
+    unsigned char expected[MAX_UNITS]={0};
     cancel_ui_mode();
     if(selected_building>=0&&!deselect_with_local_box())return 0;
     tap(KEY_R); /* Normal combat-group selection. */
-    if(!selected_count()) {
-        fprintf(stderr,"Z7 army R empty frame%u mode%d menu%d box%d help%d prior%u building%d\n",
-            (unsigned)frame,mode,menu_open,box_state,help,(unsigned)prior_keys,selected_building);
-        return 0;
+    if(!selected_count()||selected_building>=0)return 0;
+    for(int i=0;i<MAX_UNITS;i++) {
+        int selected=u[i].alive&&!SC64_TRANSPORT_LOADED(&u[i])&&u[i].selected;
+        int eligible=z7_r_combat_eligible(i);
+        if(selected!=eligible)return 0;
+        expected[i]=(unsigned char)selected;
     }
-    if(!menu_open)tap(KEY_B);
-    if(attack)tap(KEY_DOWN);
+    /* The field menu remembers its last row; navigate from the actual row. */
+    if(!choose_menu_row(attack?MENU_ATTACK:MENU_MOVE)||
+       mode!=(attack?MODE_ATTACK:MODE_MOVE)) {cancel_ui_mode();return 0;}
+    move_cursor(x,y);
+    if(screen!=SCREEN_PLAY||won||lost||menu_open||selected_building>=0||
+       mode!=(attack?MODE_ATTACK:MODE_MOVE)) {cancel_ui_mode();return 0;}
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive) {
+        int selected=!SC64_TRANSPORT_LOADED(&u[i])&&u[i].selected;
+        if(selected!=(expected[i]!=0)||(selected&&!z7_r_combat_eligible(i))) {
+            cancel_ui_mode();return 0;
+        }
+    }
     tap(KEY_A);
-    if(mode!=(attack?MODE_ATTACK:MODE_MOVE)) {
-        fprintf(stderr,"Z7 army menu rejected frame%u mode%d menu%d box%d selected%d\n",
-            (unsigned)frame,mode,menu_open,box_state,selected_count());
-        return 0;
-    }
-    move_cursor(x,y);tap(KEY_A);
     int accepted=0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].selected) {
         if(u[i].order==(attack?ORDER_ATTACK_MOVE:ORDER_MOVE)) { accepted++;continue; }
