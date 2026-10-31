@@ -46,6 +46,27 @@ int main(void)
     assert(replacement == carrier && !race_transport_tick_unit(passenger));
     assert(u[passenger].order == ORDER_IDLE && u[passenger].target == -1 &&
            race_transport_cargo_space(replacement) == 0);
+    /* Execute the actual source trigger 7 / action 11 Kill Unit At Location.
+     * Place the replacement inside its location, with a pending passenger. */
+    {
+        const Sc64Z6SourceAction *kill = NULL;
+        int l, t, r, btm;
+        for (unsigned i = 0; i < SC64_Z6_SOURCE_ACTION_COUNT; ++i)
+            if (sc64_z6_source_actions[i].trigger == 7 &&
+                sc64_z6_source_actions[i].index == 11) kill = &sc64_z6_source_actions[i];
+        assert(kill && kill->opcode == 23 && kill->unit == 42 && kill->group1 == 18);
+        assert(sc64_z6_world_location(&race_z6_world, kill->location, &l, &t, &r, &btm));
+        u[replacement].raw_type = 42; u[replacement].raw_owner = 3;
+        u[replacement].x = (l + r) / 2; u[replacement].y = (t + btm) / 2;
+        u[passenger].x = u[replacement].x + 48; u[passenger].y = u[replacement].y;
+        assert(race_transport_request_board(passenger, replacement));
+        assert(race_z6_runtime_action(&race_z6_world, kill));
+        assert(!u[replacement].alive && u[passenger].alive &&
+               u[passenger].order == ORDER_IDLE && u[passenger].target == -1);
+        assert(race_save_game() && race_load_game());
+        assert(u[passenger].alive && u[passenger].order == ORDER_IDLE &&
+               u[passenger].target == -1);
+    }
     puts("Z6 pending transport order canceled on carrier death: ok");
     return 0;
 }
