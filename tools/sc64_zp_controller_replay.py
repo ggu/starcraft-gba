@@ -261,7 +261,7 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
             final.get("screen") != SCREEN_PLAY or final.get("won") != 0 or
             final.get("lost") != 0 or final.get("outcome") != 0):
         raise ValueError("limited Z7 attempt must remain live and unfinished")
-    for field in ("frame", "fired"):
+    for field in (("frame",) if profile_name == "zerg-z7" else ("frame", "fired")):
         if type(final.get(field)) is not int:
             raise ValueError(f"final event is missing integer field {field}")
     if final["frame"] <= start["frame"]:
@@ -333,14 +333,16 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
 
 def _validate_z7_observation(row: dict, label: str, *, live: bool) -> None:
     """Check the source-defined Z7 runtime observation shape and bounds."""
-    for name, maximum in (("started", 0xFF), ("fired", 0xFF), ("switch10", 1),
+    for name, maximum in (("started", 0xFF), ("switch10", 1),
                           ("ai_script_mask", 15), ("ai_plan_ticks", 240),
                           ("ai_plan_phase", 3), ("fault", 255), ("outcome", 2)):
         value = row.get(name)
         if type(value) is not int or not 0 <= value <= maximum:
             raise ValueError(f"Z7 {label} observation has invalid {name}")
-    if row["fired"] != row["started"]:
-        raise ValueError(f"Z7 {label} fired alias differs from started mask")
+    # Older traces exposed a mislabeled alias; accept it only when it agrees,
+    # but do not require or interpret it as a separate source event mask.
+    if "fired" in row and (type(row["fired"]) is not int or row["fired"] != row["started"]):
+        raise ValueError(f"Z7 {label} legacy fired alias differs from started mask")
     if row["ai_script_mask"] not in (0, 1, 3, 7, 15):
         raise ValueError(f"Z7 {label} AI script mask is not a source-valid prefix")
     if bool(row["ai_script_mask"]) != bool(row["ai_plan_ticks"]):
@@ -531,7 +533,6 @@ def decode_z7_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
                 for i in range(0, total, width)]
 
     model = {"started": read(model_fields, model_size, "started", 1, 2, start=base),
-             "fired": read(model_fields, model_size, "started", 1, 2, start=base),
              "outcome": read(model_fields, model_size, "outcome", 1, 1, start=base),
              "action_cursor": read(model_fields, model_size, "action_cursor", 8, 1, start=base)}
     result = {"model": model,
@@ -782,15 +783,15 @@ def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
         raise RuntimeError("mission completion bit is absent")
     runtime = state.get("race_runtime", {})
     model = runtime.get("model", {})
-    if model.get("outcome") != 1 or model.get("fired") != trace_final["fired"]:
+    if profile_name != "zerg-z7" and (
+            model.get("outcome") != 1 or model.get("fired") != trace_final["fired"]):
         raise RuntimeError("final composite campaign model does not match trace outcome/fired state")
     if profile_name == "zerg-z7":
         runtime = state.get("race_runtime", {})
         model = runtime.get("model", {})
         if runtime.get("fault") != 0:
             raise RuntimeError("Z7 final state reports adapter faults")
-        if (model.get("outcome") != 1 or model.get("started") != trace_final.get("started") or
-                model.get("fired") != trace_final.get("fired")):
+        if model.get("outcome") != 1 or model.get("started") != trace_final.get("started"):
             raise RuntimeError("Z7 source model does not match the completed victory trace")
         if (model.get("action_cursor") != trace_final.get("action_cursors") or
                 runtime.get("action_ticks") != trace_final.get("action_ticks")):

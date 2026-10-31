@@ -225,16 +225,6 @@ static void tap(u16 key)
     step(0);
 }
 
-/* Field controls reopen the order list on the last command. These
- * sequences were written for a list that opens on Move, so a fresh
- * open starts there (no extra input, so the run's timing is unchanged). */
-static void tap_b(void)
-{
-    int fresh = !menu_open && mode == MODE_NORMAL;
-    tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
-}
-
 static int snap4(int current, int target, int bound)
 {
     int delta = target - current;
@@ -316,8 +306,10 @@ static void issue_attack_move(int x, int y)
 {
     select_army();
     if (!selected_count()) return;
-    tap_b();
-    tap(KEY_DOWN); /* ATTACK */
+    tap(KEY_B);
+    for (int guard = 0; menu_open && menu_cursor != MENU_ATTACK && guard < MENU_COUNT; ++guard)
+        tap(menu_cursor < MENU_ATTACK ? KEY_DOWN : KEY_UP);
+    if (!menu_open || menu_cursor != MENU_ATTACK) return;
     tap(KEY_A);
     move_cursor(x, y);
     tap(KEY_A);
@@ -414,6 +406,10 @@ static void maintain_economy(void)
         (void)queue_unit_type(U_OVERLORD);
         return;
     }
+    if (minerals >= 50 && side_workers() + queued_count(U_DRONE) < 10) {
+        (void)queue_unit_type(U_DRONE);
+        return;
+    }
     if (side_building_type(B_SPIRE, 1) >= 0 && side_unit_type_count(U_MUTALISK) < 20 &&
         minerals >= 100 && gas >= 100) {
         (void)queue_unit_type(U_MUTALISK);
@@ -421,7 +417,7 @@ static void maintain_economy(void)
     }
     if (side_building_type(B_SPIRE, 1) >= 0 && side_unit_type_count(U_MUTALISK) < 20)
         return;
-    if (minerals >= 50 && side_workers() < 18) {
+    if (minerals >= 50 && side_workers() + queued_count(U_DRONE) < 12) {
         (void)queue_unit_type(U_DRONE);
         return;
     }
@@ -472,8 +468,10 @@ static int select_worker_slot(int worker)
 static int choose_menu_row(int row)
 {
     if (row < 0 || row >= field_menu_count()) return 0;
-    tap_b();
-    for (int i = 0; i < row; ++i) tap(KEY_DOWN);
+    tap(KEY_B);
+    for (int guard = 0; menu_open && menu_cursor != row && guard < MENU_COUNT; ++guard)
+        tap(menu_cursor < row ? KEY_DOWN : KEY_UP);
+    if (!menu_open || menu_cursor != row) return 0;
     tap(KEY_A);
     return 1;
 }
@@ -518,12 +516,63 @@ static void assign_gas_workers(void)
 {
     int refinery = side_building_type(B_EXTRACTOR, 1);
     if (refinery < 0) return;
-    for (int i = 0; i < MAX_UNITS && side_gas_workers() < 3; ++i) {
+    for (int i = 0; i < MAX_UNITS && side_gas_workers() < 3 &&
+         side_workers() - side_gas_workers() > 3; ++i) {
         if (u[i].alive && u[i].owner == SIDE && sc64_race_is_worker(u[i].type) &&
             u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS && select_worker_slot(i)) {
             move_cursor(b[refinery].x, b[refinery].y);
             tap(KEY_A);
         }
+    }
+}
+
+/* Reassign an idle Drone with a visible mineral click after a patch runs out. */
+static void assign_idle_miner(void)
+{
+    int worker = -1, patch = -1, best = 0x7fffffff, have_idle = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_DRONE &&
+            u[i].order == ORDER_IDLE && !u[i].carry) { have_idle = 1; break; }
+    if (!have_idle) return;
+    /* Stacked Drones may not be independently selectable. Accept the actual
+     * selected eligible Drone, never substitute an index or write selection. */
+    for (int guard = 0; guard < MAX_UNITS; ++guard) {
+        tap(KEY_L);
+        int actual = find_selected_worker();
+        if (selected_count() == 1 && actual >= 0 && u[actual].alive &&
+            u[actual].owner == SIDE && u[actual].type == U_DRONE &&
+            u[actual].order == ORDER_IDLE && !u[actual].carry) { worker = actual; break; }
+    }
+    if (worker < 0) return;
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0) {
+        int nx, ny, load=0;
+        if (!path_next_tile(u[worker].x,u[worker].y,m[i].x,m[i].y,&nx,&ny)) continue;
+        for (int j=0;j<MAX_UNITS;++j)
+            if (u[j].alive && u[j].owner==SIDE && u[j].order==ORDER_MINE && u[j].target==i) ++load;
+        int d = dist2(u[worker].x,u[worker].y,m[i].x,m[i].y) + load * 40000;
+        if (d < best) { best = d; patch = i; }
+    }
+    if (patch < 0) return;
+    if (!currently_visible(m[patch].x,m[patch].y)) {
+        /* The controller may consult map contents, but uses a normal Move to
+         * reveal a field before issuing its contextual mineral command. */
+        if (choose_menu_row(MENU_MOVE) && mode == MODE_MOVE) {
+            move_cursor(m[patch].x,m[patch].y + 24);
+            tap(KEY_A);
+            fprintf(stderr,"Z4 miner%d approaches field%d frame%d order%d\n",worker,patch,frame,u[worker].order);
+        }
+        return;
+    }
+    static const int offsets[][2] = {{0,0},{-8,0},{8,0},{0,-8},{0,8},
+        {-8,-8},{8,-8},{-8,8},{8,8},{-12,0},{12,0},{0,-12},{0,12}};
+    for (unsigned i = 0; i < sizeof(offsets)/sizeof(offsets[0]); ++i) {
+        if (!u[worker].alive || !u[worker].selected || selected_count() != 1) return;
+        move_cursor(m[patch].x + offsets[i][0],m[patch].y + offsets[i][1]);
+        if (selected_worker_mineral_target() != patch) continue;
+        tap(KEY_A);
+        if (u[worker].alive && u[worker].order == ORDER_MINE && u[worker].target == patch)
+            fprintf(stderr,"Z4 miner%d assigned field%d frame%d\n",worker,patch,frame);
+        return;
     }
 }
 
@@ -551,8 +600,7 @@ static void issue_objective_order(void)
     int target_x, target_y;
     if (!(race_z4.hatch_effects & 2u)) {
         if (chrysalis_position(&target_x, &target_y) < 0) return;
-        /* Defend at the objective location until the authored Kerrigan handoff
-         * succeeds; only then send the combat group after Force 3 Command Centers. */
+        /* Defend at the objective while the hatch countdown runs. */
         issue_attack_move(target_x, target_y);
         return;
     }
@@ -631,6 +679,20 @@ int main(int argc, char **argv)
     launch_from_normal_menu();
     checkpoint("start");
 
+    /* Move an Overlord toward the southern approach to improve vision and
+     * detection while the combat group protects the Chrysalis. */
+    int objective_x, objective_y, overlord = -1;
+    if (chrysalis_position(&objective_x, &objective_y) >= 0) {
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].type == U_OVERLORD) { overlord = i; break; }
+        if (overlord >= 0) {
+            for (int guard = 0; guard < MAX_UNITS && !u[overlord].selected; ++guard) tap(KEY_L);
+            if (u[overlord].selected && choose_menu_row(MENU_MOVE) && mode == MODE_MOVE) {
+                move_cursor(objective_x, objective_y + 64);
+                tap(KEY_A);
+            }
+        }
+    }
     issue_objective_order();
     last_order_frame = frame;
     last_production_frame = frame;
@@ -641,6 +703,7 @@ int main(int argc, char **argv)
             last_tech_frame = frame;
         }
         if (frame >= last_production_frame + 600) {
+            assign_idle_miner();
             maintain_economy();
             last_production_frame = frame;
         }

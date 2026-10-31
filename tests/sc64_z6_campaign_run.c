@@ -118,7 +118,8 @@ static int assign_available_gas_workers(int wanted)
 {
     int n=side_gas_workers();
     for(int i=0;i<MAX_UNITS&&n<wanted;i++)if(u[i].alive&&u[i].owner==SIDE&&
-        u[i].raw_type==41&&u[i].order==ORDER_MINE&&assign_gas_worker(i))n++;
+        u[i].raw_type==41&&(u[i].order==ORDER_MINE||u[i].order==ORDER_IDLE)&&
+        assign_gas_worker(i))n++;
     return n;
 }
 static int side_combat_count(void)
@@ -292,7 +293,15 @@ static int build_extra_hatchery(void)
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==41&&
         (u[i].order==ORDER_MINE||u[i].order==ORDER_IDLE)){worker=i;break;}
     if(worker<0||site_x<0){fprintf(stderr,"extra Hatchery site/worker unavailable worker%d site%d,%d\n",worker,site_x,site_y);return 0;}
-    if(!select_slot(worker))return 0;
+    if(!select_slot(worker)) {
+        int actual=-1;
+        if(selected_count()==1)for(int i=0;i<MAX_UNITS;i++)if(u[i].selected&&
+            u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==41&&!u[i].carry&&
+            !SC64_TRANSPORT_LOADED(&u[i])&&
+            (u[i].order==ORDER_IDLE||u[i].order==ORDER_MINE))actual=i;
+        if(actual<0)return 0;
+        worker=actual;
+    }
     if(!choose_menu_row(MENU_DEPOT))return 0;
     if(mode!=MODE_BUILD||menu!=B_HATCHERY)return 0;
     move_cursor(site_x,site_y);tap(KEY_A);
@@ -329,6 +338,70 @@ static int assign_gas_worker(int worker)
     if(!select_slot(worker))return 0;
     move_cursor(b[extractor].x,b[extractor].y);tap(KEY_A);
     return u[worker].order==ORDER_GAS;
+}
+/* Clear an existing group with a nearby ordinary selection drag. */
+static int z6_clear_local_selection(void)
+{
+    if(selected_count()==0&&selected_building<0)return 1;
+    int origin_x=cx,origin_y=cy;
+    for(int radius=16;radius<=128;radius+=16)
+        for(int dy=-radius;dy<=radius;dy+=16)
+            for(int dx=-radius;dx<=radius;dx+=16) {
+                if(FAST_ABS(dx)!=radius&&FAST_ABS(dy)!=radius)continue;
+                int x=origin_x+dx,y=origin_y+dy;
+                if(x<0||y<0||x+16>=WORLD_W||y+16>=WORLD_H)continue;
+                (void)box_select(x,y,x+16,y+16);
+                if(selected_count()==0&&selected_building<0)return 1;
+            }
+    return 0;
+}
+
+/* New workers may remain idle in the carried profile. Order them to a
+ * visible mineral patch using the same selection and click controls as play. */
+static int assign_idle_mineral_workers(void)
+{
+    int assigned=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+        u[i].raw_type==41&&u[i].order==ORDER_IDLE&&!u[i].carry&&
+        !SC64_TRANSPORT_LOADED(&u[i])) {
+        int patch=-1,best=0x7fffffff;
+        for(int j=0;j<MAX_MINERALS;j++)if(m[j].amount>0&&currently_visible(m[j].x,m[j].y)) {
+            int d=dist2(u[i].x,u[i].y,m[j].x,m[j].y);
+            if(d<best){best=d;patch=j;}
+        }
+        if(patch<0)continue;
+        if((selected_count()>1||selected_building>=0)&&!z6_clear_local_selection())continue;
+        int worker=i;
+        if(!select_slot(i)) {
+            worker=-1;
+            if(selected_count()==1)for(int k=0;k<MAX_UNITS;k++)
+                if(u[k].selected&&u[k].alive&&u[k].owner==SIDE&&u[k].raw_type==41&&
+                   u[k].order==ORDER_IDLE&&!u[k].carry&&!SC64_TRANSPORT_LOADED(&u[k]))worker=k;
+            if(worker<0) {
+                /* Stacked idle Drones can be hidden by an active miner.
+                 * A small normal drag can select the stack; only issue the
+                 * mineral order when every selected unit is an empty Drone
+                 * already idle or mining, never a gas or build worker. */
+                int x=limit(u[i].x-16,0,WORLD_W-33);
+                int y=limit(u[i].y-16,0,WORLD_H-33),eligible=1;
+                (void)box_select(x,y,x+32,y+32);
+                for(int k=0;k<MAX_UNITS;k++)if(u[k].selected) {
+                    if(!u[k].alive||u[k].owner!=SIDE||u[k].raw_type!=41||u[k].carry||
+                       SC64_TRANSPORT_LOADED(&u[k])||
+                       (u[k].order!=ORDER_IDLE&&u[k].order!=ORDER_MINE))eligible=0;
+                    else if(u[k].order==ORDER_IDLE)worker=k;
+                }
+                if(!eligible||worker<0)continue;
+            }
+        }
+        move_cursor(m[patch].x,m[patch].y);tap(KEY_A);
+        if(u[worker].alive&&u[worker].order==ORDER_MINE) {
+            assigned++;
+            fprintf(stderr,"normal-input Drone%d assigned mineral%d\n",worker,patch);
+            break;
+        }
+    }
+    return assigned;
 }
 static void move_cursor(int x,int y)
 {
@@ -515,6 +588,8 @@ static int order_group(int attack,int x,int y)
             fprintf(stderr,"Attack-Move controller found no stable safe click for %d,%d at%u\n",x,y,host_ticks);
             return 0;
         }
+        /* A selected escort may die while the cursor crosses the map. */
+        if(!selected_count())return 0;
         if(!controller_selected_attackmove()) {
             fprintf(stderr,"Attack-Move acceptance mismatch at%u cursor%d,%d selected%d mode%d menu%d screen%d\n",
                 host_ticks,cx,cy,selected_count(),mode,menu_open,screen);
@@ -879,6 +954,7 @@ static int clear_force2_locations(void)
 {
     int support_prepared=0,support_x=-1,support_y=-1,support_targets=0;
     int support_casts=0,casts_since_retreat=0,support_waiting=0;
+    int extra_hatchery_attempted=0;
     (void)support_casts; /* Also compile under canonical Z6 flags without the DirectAttack controller. */
     for(unsigned loc=4;loc<=5&&screen==SCREEN_PLAY&&!won&&!lost;loc++) {
         int ll,tt,rr,bb;u32 before=0,after=0;unsigned rounds=0;
@@ -944,7 +1020,7 @@ static int clear_force2_locations(void)
             for(int ei=0;ei<MAX_UNITS;ei++)
                 if(u[ei].alive&&u[ei].owner==SIDE&&u[ei].raw_type!=41&&u[ei].raw_type!=42&&
                    u[ei].raw_type!=51&&dist2(u[ei].x,u[ei].y,wx,wy)<=320*320)escort_near=1;
-            int hero_finish=loc==5&&before<=2&&!escort_near&&kerrigan()>=0;
+            int hero_finish=loc==5&&before<=3&&!escort_near&&kerrigan()>=0;
             if(hero_finish)
                 fprintf(stderr,"  no escort within 320px of final Force2 actors; Kerrigan finishes\n");
             if(before<=1&&!hero_finish) {
@@ -967,8 +1043,9 @@ static int clear_force2_locations(void)
             }
             fprintf(stderr,"  focus Force2 target at%d,%d\n",wx,wy);
             if(hero_finish||!order_fresh_combat_group(1,wx,wy)) {
-                if(loc==5&&before<=2&&kerrigan()>=0) {
+                if(loc==5&&before<=3&&kerrigan()>=0) {
                     int hero=kerrigan();
+                    if(!race_z6.cloak.active&&u[hero].carry>=80*256)(void)hero_cloak();
                     int px=0,py=0;
                     if(dist2(u[hero].x,u[hero].y,wx,wy)>80*80&&
                        route_waypoint(u[hero].x,u[hero].y,wx,wy,16,&px,&py)) {
@@ -1062,6 +1139,13 @@ static int clear_force2_locations(void)
                     }
                 }
                 if(host_ticks-last_production>=600u) {
+                    (void)assign_idle_mineral_workers();
+                    if(loc==4&&!extra_hatchery_attempted&&
+                       owned_building_count(B_HATCHERY)<1&&minerals>=300) {
+                        extra_hatchery_attempted=1;
+                        fprintf(stderr,"normal-input delayed second Hatchery order%d\n",
+                                build_extra_hatchery());
+                    }
                     int hydras=side_raw_count(38),queued=0,workers=0;
                     for(int wi=0;wi<MAX_UNITS;wi++)workers+=u[wi].alive&&u[wi].owner==SIDE&&u[wi].raw_type==41;
                     if(workers<8&&owner_count(SIDE)<48&&minerals>=50)
@@ -1270,6 +1354,7 @@ static int z6_transport_campaign(void)
     if(extractor<0||!building_complete(extractor)||gas_workers==0) {
         fprintf(stderr,"no working gas economy after normal inputs\n"); return 0;
     }
+    (void)assign_idle_mineral_workers();
     /* Keep the initial minerals for the mainland fight; buy the island ferry
      * upgrade only after both authored Force2 unit regions are cleared. */
     int hydras_before=side_raw_count(38);

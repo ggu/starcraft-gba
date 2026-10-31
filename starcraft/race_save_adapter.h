@@ -1,6 +1,10 @@
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
 #include "sc64_construction_save.h"
+#ifdef SC64_SAVE_UI_CONTEXT
+#include "sc64_save_ui_context.h"
+_Static_assert(MAX_BUILDINGS <= 254, "UI save index exceeds one-byte encoding");
+#endif
 #define SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX 25
 #define SC64_BUILDING_DAMAGE_SAVE_MARKER 0x42443031
 #ifdef SC64_SHARED_BATTERY
@@ -1269,6 +1273,19 @@ static int race_save_game(void) {
 #endif
         };
     memcpy(race_data.state,state,sizeof(state));
+#ifdef SC64_SAVE_UI_CONTEXT
+    {
+        int selected = selected_building;
+        if (selected < 0 || selected >= MAX_BUILDINGS || !b[selected].alive) selected = -1;
+#ifdef SC_FIELD_FEEDBACK
+        unsigned last = menu_last;
+#else
+        unsigned last = 0;
+#endif
+        race_data.state[SC64_SAVE_UI_STATE_INDEX] = (int)sc64_save_ui_encode(
+            selected, MAX_BUILDINGS, menu_cursor, last);
+    }
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     race_data.state[27] = 0x42450000 | sc64_battlecruiser_tech_bits;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -1748,6 +1765,9 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
     const int *v=race_data.state;
+#ifdef SC64_SAVE_UI_CONTEXT
+    if (!sc64_save_ui_valid((unsigned)v[SC64_SAVE_UI_STATE_INDEX], MAX_BUILDINGS)) return 0;
+#endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     race_protoss_bind_candidate(v[0], v[2]);
 #endif
@@ -3251,6 +3271,17 @@ static int race_load_game(void) {
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
 #endif
     clear_tracers();death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
+#ifdef SC64_SAVE_UI_CONTEXT
+    if (v[SC64_SAVE_UI_STATE_INDEX]) {
+        unsigned ui = (unsigned)v[SC64_SAVE_UI_STATE_INDEX];
+        unsigned selected = ui & 255u;
+        if (selected && b[selected - 1u].alive) selected_building = (int)selected - 1;
+        menu_cursor = (int)((ui >> 8) & 255u);
+#ifdef SC_FIELD_FEEDBACK
+        menu_last = (u8)((ui >> 16) & 255u);
+#endif
+    }
+#endif
 #ifdef SC64_IMPACT_EVENTS
     race_impact_restore(plan.impact_candidate,plan.impact_candidate_count);
 #endif
