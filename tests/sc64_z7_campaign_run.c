@@ -5014,7 +5014,8 @@ static void attack_step(void)
                 SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,t,SIDE,3);
             int still_threatening=valid&&
                 (dist2(u[t].x,u[t].y,b[hatch].x,b[hatch].y)<=160*160||
-                 z7_threat_near_workers(t,128));
+                 (dist2(u[t].x,u[t].y,b[hatch].x,b[hatch].y)<=220*220&&
+                  z7_threat_near_workers(t,128)));
             if(still_threatening) {
                 int hydras_on_target=0;
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
@@ -5053,7 +5054,7 @@ static void attack_step(void)
                currently_visible(u[i].x,u[i].y)&&
                SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,i,SIDE,3)) {
                 int d=dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y);
-                if((d<=best||z7_threat_near_workers(i,128))&&
+                if((d<=best||(d<=220*220&&z7_threat_near_workers(i,128)))&&
                    (ground<0||d<best)){ground=i;best=d;}
             }
             if(ground>=0) {
