@@ -244,22 +244,38 @@ static void test_cannon_detects_observer(void)
     int second = spawn_unit(ENEMY, U_P7_OBSERVER, 704, 700);
     int watcher = spawn_unit(SIDE, U_DRAGOON, 690, 700);
     assert(observer >= 0 && second >= 0 && watcher >= 0);
+    /* Isolate detector power cycling from attacks on revealed targets. */
+    invincible_units[observer] = invincible_units[second] = 1;
+    int observer_hp = u[observer].hp, observer_shield = u[observer].shield;
+    int second_hp = u[second].hp, second_shield = u[second].shield;
     run(40);
+    assert(u[observer].alive && u[second].alive);
+    assert(u[observer].hp == observer_hp && u[observer].shield == observer_shield);
+    assert(u[second].hp == second_hp && u[second].shield == second_shield);
     assert(sc64_p7_observer_target_is_cloaked(observer));
     assert(!sc64_p7_observer_target_revealed_to(observer, SC64_PROTOSS_HUMAN_SLOT, SIDE));
     int pylon=spawn_complete(SIDE, B_PYLON, 640, 720);
     (void)spawn_complete(SIDE, B_PHOTON_CANNON, 660, 700);
     run(40);
+    assert(u[observer].alive && u[second].alive);
+    assert(u[observer].hp == observer_hp && u[observer].shield == observer_shield);
+    assert(u[second].hp == second_hp && u[second].shield == second_shield);
     assert(sc64_p7_observer_target_revealed_to(observer, SC64_PROTOSS_HUMAN_SLOT, SIDE));
     /* The asker's identity follows its live owner, whatever slot it names. */
     assert(sc64_p7_observer_target_revealed_to(observer, -1, SIDE));
     assert(sc64_p7_observer_target_revealed_to(second, SC64_PROTOSS_HUMAN_SLOT, SIDE));
     b[pylon].alive=0;
     run(40);
+    assert(u[observer].alive && u[second].alive);
+    assert(u[observer].hp == observer_hp && u[observer].shield == observer_shield);
+    assert(u[second].hp == second_hp && u[second].shield == second_shield);
     assert(!sc64_p7_observer_target_revealed_to(observer, SC64_PROTOSS_HUMAN_SLOT, SIDE));
     assert(!sc64_p7_observer_target_revealed_to(second, SC64_PROTOSS_HUMAN_SLOT, SIDE));
     (void)spawn_complete(SIDE, B_PYLON, 640, 720);
     run(40);
+    assert(u[observer].alive && u[second].alive);
+    assert(u[observer].hp == observer_hp && u[observer].shield == observer_shield);
+    assert(u[second].hp == second_hp && u[second].shield == second_shield);
     assert(sc64_p7_observer_target_revealed_to(observer, SC64_PROTOSS_HUMAN_SLOT, SIDE));
     assert(sc64_p7_observer_target_revealed_to(second, SC64_PROTOSS_HUMAN_SLOT, SIDE));
 }
