@@ -420,8 +420,9 @@ class OnboardingTests(unittest.TestCase):
 
     def test_shared_zerg_fixtures_use_promoted_profile(self):
         makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
-        self.assertIn('CANONICAL_ZERG_PROFILE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS)', makefile)
-        self.assertIn('CANONICAL_ZERG_PROFILE_INPUTS = $(ZERG_Z7_CANONICAL_INPUTS)', makefile)
+        promotion_makefile = (ROOT / 'tests/sc64-z7-promotion/Makefile').read_text(encoding='utf-8')
+        self.assertIn('CANONICAL_ZERG_PROFILE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS)', promotion_makefile)
+        self.assertIn('CANONICAL_ZERG_PROFILE_INPUTS = $(ZERG_Z7_CANONICAL_INPUTS)', promotion_makefile)
         for fixture in ('ORDER_MARKER_GAME_FIXTURE', 'IMPACT_EVENTS_GAME_FIXTURE',
                         'IMPACT_ARM_PROBE', 'UNIT_WALK_GAME_FIXTURE',
                         'SHARED_BUILDER_FIXTURE', 'SKIRMISH_CONTROLLER_PROFILE',
@@ -433,7 +434,6 @@ class OnboardingTests(unittest.TestCase):
             self.assertIn('CANONICAL_ZERG_PROFILE_FLAGS', line, fixture)
             self.assertIn('CANONICAL_ZERG_PROFILE_INPUTS', line, fixture)
         self.assertIn('CANONICAL_TRACER_PROFILE_FIXTURE,zerg-z6,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS', makefile)
-        promotion_makefile = (ROOT / 'tests/sc64-z7-promotion/Makefile').read_text(encoding='utf-8')
         self.assertIn('build/test-sc64-tracer-profile-zerg: tests/sc64_z7_tracer_game.c', promotion_makefile)
         self.assertIn('include tests/sc64-z7-promotion/Makefile', makefile)
         self.assertIn('test-sc64-canonical-tracer-profile: $(addprefix build/test-sc64-tracer-profile-,terran zerg protoss showcase)', makefile)
