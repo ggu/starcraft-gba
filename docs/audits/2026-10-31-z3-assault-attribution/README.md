@@ -29,9 +29,12 @@ source. At frame 68352 nine Hydralisks died in one update inside a 24×23-pixel
 area; other updates saw six and five tightly grouped deaths. The stock siege
 splash path was enabled in this profile. Two northern siege tanks at (339,146)
 and (280,179) were present before the last wave and gone afterward. This
-strongly implicates clustered ground assaults against splash defenses, but
-the witness does not instrument the damage callback and does not prove each
-individual casualty's cause.
+strongly implicates clustered ground assaults against splash defenses. A
+second replay records enemy tank cooldown resets: 102 of 108 observed deaths
+coincided with at least one enemy siege tank firing in the same update,
+including all four sampled clustered fatal updates. The witness does not
+instrument the damage callback and cannot prove each individual casualty's
+cause.
 
 Target selection ranks enemy buildings by straight-line distance from the
 Chrysalis, without path or defense evaluation. The trace's strategic targets
