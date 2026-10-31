@@ -180,6 +180,8 @@ static int race_skirmish_start_record(int owner, int producer,
     int type, slot, x, y;
     if (!race_skirmish_record_ready(owner, producer, r)) return 0;
     type = sc64_race_building_from_raw(r->raw_id);
+    if (type==B_SUNKEN_COLONY || type==B_SPORE_COLONY)
+        return race_colony_begin(owner,producer,type);
     rule = sc64_race_building_rule(type);
     if (!rule) return 0;
     bank.minerals = (unsigned short)race_owner_minerals(owner);

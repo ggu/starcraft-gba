@@ -229,6 +229,9 @@ race_z8_save_candidate_world_valid(const RaceSave *candidate, int width, int hei
     for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
         Building building;
         if (!race_save_decode_building(candidate, i, &building)) return 0;
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+        if (!race_colony_morph_state_valid_for(&building,SIDE,SC64_Z8_HUMAN_SLOT)) return 0;
+#endif
         if (!building.alive) continue;
         if (building.raw_owner < 0 || building.raw_owner >= SC64_Z8_OWNER_LIMIT ||
             race_z8_source_owner((unsigned)building.raw_owner) != building.owner ||
