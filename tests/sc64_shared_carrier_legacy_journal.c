@@ -78,6 +78,19 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
                                                 (unsigned)race_cols*16u,
                                                 (unsigned)race_rows*16u));
     race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
+    for (unsigned i=0;i<MAX_UNITS;++i) {
+        Unit decoded;
+        assert(race_save_decode_unit(&race_data,i,(unsigned)race_cols*16u,
+                                     (unsigned)race_rows*16u,&decoded));
+        if (u[i].alive) assert(!memcmp(&decoded,&u[i],sizeof(decoded)));
+        else assert(!decoded.alive);
+    }
+    for (unsigned i=0;i<MAX_BUILDINGS;++i) {
+        Building decoded;
+        assert(race_save_decode_building(&race_data,i,&decoded));
+        if (b[i].alive) assert(!memcmp(&decoded,&b[i],sizeof(decoded)));
+        else assert(!decoded.alive);
+    }
     assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
                                previous,tags,2));
     assert(!memcmp(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,
