@@ -385,14 +385,20 @@ static int queue_combat_unit(void)
         if(selected_building!=i)return combat_reject("selection",wanted,i);
         for(int n=0;n<4&&train_type!=wanted;n++)KEY_TAP(KEY_R);
         if(train_type!=wanted)return combat_reject("menu",wanted,i);
-        int before=b[i].queue_count,bank=minerals;
-        KEY_TAP(KEY_A);
-        if(b[i].queue_count>before){
+        int added=0;
+        /* Same ordinary A press, bounded to at most three purchases per visit. */
+        for(int attempt=0;attempt<3&&b[i].alive&&selected_building==i&&
+            train_type==wanted&&b[i].queue_count<5;attempt++) {
+            if(minerals<(int)rule->minerals||gas<(int)rule->gas||
+               race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)break;
+            int before=b[i].queue_count,bank=minerals;
+            KEY_TAP(KEY_A);
+            if(b[i].queue_count<=before)break;
+            ++added;
             fprintf(trace,"{\"kind\":\"production\",\"frame\":%u,\"building\":%d,\"unit\":\"%s\",\"bank_before\":%d,\"bank_after\":%d,\"gas_after\":%d,\"queue\":%u}\n",
                 (unsigned)frame,i,wanted==U_DRAGOON?"dragoon":"zealot",bank,minerals,gas,(unsigned)b[i].queue_count);
-            return 1;
         }
-        return combat_reject("enqueue",wanted,i);
+        return added?1:combat_reject("enqueue",wanted,i);
     }
     return combat_reject("producer",wanted,-1);
 }
