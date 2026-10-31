@@ -14,14 +14,18 @@
 #include "sc64_z7_source_sight.h"
 #endif
 
-/* Exact source-radius row spans. Z7 opts in explicitly; the Terran runtime
+/* Exact source-radius row spans. Z7 and Z8 opt in explicitly; the Terran runtime
  * gives every human actor its BWAPI sight radius, so it uses them whenever
  * the 56/72 spans are enabled. */
 #if defined(SC64_Z7_SIGHT_SPANS) || \
     (defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS))
 #define SC64_SOURCE_SIGHT_SPANS 1
 #ifdef SC64_Z7_SIGHT_SPANS
+#ifdef SC64_Z8_RUNTIME
+#define SC64_SOURCE_SIGHT_SPANS_ACTIVE() (race_z7_active() || race_z8_active())
+#else
 #define SC64_SOURCE_SIGHT_SPANS_ACTIVE() race_z7_active()
+#endif
 #else
 #define SC64_SOURCE_SIGHT_SPANS_ACTIVE() 1
 /* Moving Terran units walk their source-radius rows in the same IWRAM span
