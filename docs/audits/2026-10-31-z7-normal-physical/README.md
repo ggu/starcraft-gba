@@ -113,12 +113,13 @@ The physical replay and validator Python suite passes 89 tests, including
 its real-ROM backend protocol tests. The default suite is not relabeled as
 an all-mission qualification or a fresh run on every later documentation edit.
 
-The prepared Z7 controller, save, profile, frame and Scourge fixtures pass;
-234 startup/save configurations and 18 terminal skirmish cases pass. The
-complete prepared target still fails in older carried controllers. Z1,
-Z3, Z4 and Z6 failures are retained; controller-only repairs are in separate
-branches, with their own source-scoped wins or remaining failures.
-They are not grounds to claim all seven missions already carried cleanly.
+The complete prepared target now passes at 6d5db14 after the carried
+controller repairs: all seven chapter controllers, save/profile/frame and
+Scourge fixtures, 234 startup/save configurations and 18 terminal skirmish
+cases. The earlier Z1, Z3, Z4 and Z6 failures remain retained. See the
+[combined qualification audit](../2026-10-31-z7-carried-qualification/README.md)
+for exact sources, traces and limits. Host qualification is not relabeled
+as a new full physical-ROM replay for every chapter.
 
 Arguments, logs, frame observations, counters, journal images, failed
 attempts and input manifests remain in ignored qualification directories.
