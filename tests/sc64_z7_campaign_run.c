@@ -1587,18 +1587,52 @@ static int assign_gas_worker(void)
     return assigned;
 }
 
+/* A player can choose only a currently visible field. Keep the economic
+ * assignment local to a completed owned depot and away from visible threats;
+ * route queries use the controller's existing map-path knowledge. */
+static int z7_safe_local_mineral(int patch,int *depot_distance)
+{
+    int best=0x7fffffff, have_depot=0;
+    if(patch<0||patch>=MAX_MINERALS||m[patch].amount<=0||
+       !currently_visible(m[patch].x,m[patch].y))return 0;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
+       sc64_race_is_zerg_townhall(b[i].type)&&building_complete(i)) {
+        int d=dist2(b[i].x,b[i].y,m[patch].x,m[patch].y);
+        have_depot=1;if(d<best)best=d;
+    }
+    if(have_depot&&best>200*200)return 0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+       currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0&&
+       dist2(u[i].x,u[i].y,m[patch].x,m[patch].y)<180*180)return 0;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==ENEMY&&
+       currently_visible(b[i].x,b[i].y)&&
+       dist2(b[i].x,b[i].y,m[patch].x,m[patch].y)<150*150)return 0;
+    if(depot_distance)*depot_distance=have_depot?best:0;
+    return 1;
+}
+
 static int assign_idle_workers_to_minerals(void)
 {
     int assigned=0;
     for(int worker=0;worker<MAX_UNITS;worker++)if(z7_worker_available_for_new_job(worker)&&
         !(u[worker].order==ORDER_BUILD_PENDING&&u[worker].target==B_EXTRACTOR)&&
-        u[worker].order!=ORDER_GAS&&
-        !(u[worker].order==ORDER_MINE&&u[worker].target>=0&&u[worker].target<MAX_MINERALS&&
-          m[u[worker].target].amount>0)) {
-        int target=-1,best=0x7fffffff;
-        for(int j=0;j<MAX_MINERALS;j++)if(m[j].amount>0) {
-            int d=dist2(u[worker].x,u[worker].y,m[j].x,m[j].y);
-            if(d<best){best=d;target=j;}
+        u[worker].order!=ORDER_GAS&&u[worker].order!=ORDER_MOVE&&!u[worker].carry&&
+        !(u[worker].order==ORDER_MINE&&z7_safe_local_mineral(u[worker].target,0))) {
+        int target=-1,best_load=0x7fffffff,best_distance=0x7fffffff;
+        for(int j=0;j<MAX_MINERALS;j++) {
+            int depot_distance,nx,ny,load=0;
+            if(!z7_safe_local_mineral(j,&depot_distance)||
+               !path_next_tile(u[worker].x,u[worker].y,m[j].x,m[j].y,&nx,&ny))continue;
+            int distance=dist2(u[worker].x,u[worker].y,m[j].x,m[j].y);
+            /* Before the first depot, do not send an opening Drone on an
+             * unbounded cross-map search for a mineral. */
+            if(!depot_distance&&distance>200*200)continue;
+            for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&
+               u[k].raw_type==41&&u[k].order==ORDER_MINE&&u[k].target==j)load++;
+            distance+=depot_distance;
+            if(load<best_load||(load==best_load&&distance<best_distance)) {
+                target=j;best_load=load;best_distance=distance;
+            }
         }
         if(target<0)continue;
         if(!select_worker(worker)) {
@@ -1609,7 +1643,7 @@ static int assign_idle_workers_to_minerals(void)
         move_cursor(m[target].x,m[target].y);tap(KEY_A);
         if(u[worker].order==ORDER_MINE&&u[worker].target==target) {
             ++assigned;
-            fprintf(stderr,"Z7 normal-input worker%d assigned mineral%d at frame%d\n",worker,target,frame);
+            fprintf(stderr,"Z7 normal-input worker%d assigned safe local mineral%d at frame%d\n",worker,target,frame);
         } else fprintf(stderr,"Z7 mineral click failed worker%d order%d target%d intended%d cursor%d,%d field%d,%d frame%d\n",
             worker,u[worker].order,u[worker].target,target,cx,cy,m[target].x,m[target].y,frame);
     }
