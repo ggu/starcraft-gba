@@ -4,8 +4,8 @@ The normal Z7 profile places `sc64_contact_blocked_mask_uncached` in IWRAM by
 removing `SC64_CONTACT_STEER_ROM` from its canonical flags. The collision
 predicate, bucket traversal, memory caps, save format, and input handling do
 not change. P7 and P8 already use IWRAM for this function; the late Terran
-profile forces ROM placement in `sc64_contact.h` and is unchanged. No other
-profile flag is changed.
+profile forces ROM placement in `sc64_contact.h` and is unchanged. Z8 inherits
+Z7's flags but explicitly retains its previous ROM placement.
 
 ## Normal product measurement
 
@@ -83,3 +83,24 @@ unchanged EWRAM/IWRAM guards with all 109 inputs checked. P7 and P8 already
 placed the mask in IWRAM, with IWRAM end `030049e0`; Terran T10's existing
 source rule forced ROM placement, with IWRAM end `03004b40`. These are guard
 and placement checks, not new cross-profile performance or full-play claims.
+
+## Derived-profile and replay-link audit
+
+The Z8 canonical vector inherits the Z7 vector, so source commit `5f46ff2`
+explicitly restores `SC64_CONTACT_STEER_ROM` for Z8. A regression assertion
+checks that selection. With identical prepared inputs, the expanded Z8
+compiler argument multisets before and after the correction match. The
+official Z8 builds are byte-identical at SHA-256
+`f0f5cbd4a22bf3466b0c479f9df933ecc5b7ee4ca335d619f544259482dba95e`;
+both end at EWRAM `0203dbb0` and IWRAM `03004400`, with the contact mask in
+ROM. The 109 shared inputs and the recovered Z8 bank, descriptor and
+generated program were checked around the links. This is a build/placement
+comparison, not a full Z8 playthrough claim.
+
+The same source's official Z7 ROM remains byte-identical to `d5857f` above.
+Its separate full, save-prefix and resume-30204 ARM replay harnesses all
+link within the unchanged guards at EWRAM `0203d7e0` and IWRAM `03004f10`.
+The Z7 canonical host and construction-arrival fixtures also inherit the
+Z7 vector; P7, P8 and Terran vectors remain independent. At `5f46ff2`, the
+clean unprepared doctor, source-boundary, default build and full default
+test pass, including 920 Python tests (25 skipped) and native/host fixtures.
