@@ -4283,6 +4283,17 @@ destroy_building(int slot, int source_owner)
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
             if (q->type == B_COMMAND && q->owner == SIDE && !q->under_construction) supply_cap -= 20;
 #endif
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+            /* A delayed impact can kill a morph after production has already
+             * ticked. Clear transient state before a pause can save the dead
+             * row; the next production tick might not run before saving. */
+            if (!race_mode && race_colony_profile_allowed() &&
+                q->type==B_CREEP_COLONY &&
+                (q->flags & (SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG))) {
+                q->flags &= ~(SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG);
+                q->queue_progress=0;
+            }
+#endif
 	    q->alive = 0;
 #ifdef SC64_BATTERY_SERVICE_ENABLED
             race_battery_clear_building_references(slot);

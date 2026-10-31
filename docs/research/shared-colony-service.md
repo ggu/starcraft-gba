@@ -27,7 +27,8 @@ of complete native construction, collision, detection, or AI equivalence.
 `make test-sc64-shared-colony` uses prepared private profile inputs. The Z8
 fixture follows ordinary menu, worker arrival, construction, morph and valid
 mid-morph pause-save/load, then advances normal updates through a delayed
-Spore impact. It seeds an Evolution Chamber when none is already present and
+Spore impact. A queued lethal impact also verifies that immediate pause-save
+and load after morphing-colony destruction retain no transient marker. It seeds an Evolution Chamber when none is already present and
 is not a full organic technology progression. Its canonical and derived-save
 variants cover their respective live save paths. The typed compact fixture
 checks marker and HP-snapshot codec preservation independently. The Z7 impact

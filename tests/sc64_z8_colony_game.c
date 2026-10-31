@@ -98,6 +98,25 @@ int main(void)
     int ground_hp=u[ground].hp, air_hp=u[air].hp;
     for (int tick=0;tick<120 && u[air].alive && u[air].hp==air_hp;++tick) input(0);
     assert(u[air].hp<air_hp && u[ground].hp==ground_hp);
-    puts("Z8 colony menu, build, morph, valid save continuation and air impact passed");
+    /* Restore the valid mid-morph save, then let a queued ordinary impact
+     * resolve at end-of-update, after production. Pause before another
+     * production tick and verify the valid save reloads the destroyed row. */
+    write_candidate_record(&saved);
+    game_init(); held_keys=0; press(KEY_L);
+    assert(screen==SCREEN_PLAY && b[colony].alive && b[colony].under_construction);
+    b[colony].hp=1; /* fixture stages an otherwise ordinary lethal impact */
+    assert(!race_impact_full());
+    race_impact_launch(MAX_UNITS+colony,20,1,ENEMY,0,U_MARINE,1);
+    input(0);
+    assert(!b[colony].alive &&
+           !(b[colony].flags&(SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG)) &&
+           b[colony].queue_progress==0);
+    press(KEY_START); assert(screen==SCREEN_PAUSE);
+    press(KEY_B); fixture_capture_save(&saved);
+    assert(race_z8_save_candidate_world_valid(&saved,race_cols,race_rows));
+    game_init(); held_keys=0; press(KEY_L);
+    assert(screen==SCREEN_PLAY && race_z8_active() && !b[colony].alive &&
+           !(b[colony].flags&(SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG)));
+    puts("Z8 colony menu, morph, impact death and valid save continuation passed");
     return 0;
 }
