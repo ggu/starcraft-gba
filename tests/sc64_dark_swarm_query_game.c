@@ -11,12 +11,12 @@ static int at(int type,int x,int y)
     int q=spawn_unit(ENEMY,type,x,y);assert(q>=0);
     int result=sc64_world_dark_swarm_affects_target(q);u[q].alive=0;return result;
 }
-static void weapon_case(int raw,int x,int should_hit)
+static void weapon_case(int raw,int target_type,int x,int should_hit)
 {
     for(int n=0;n<20 && sc64_shared_projectiles.active;n++)game_update(0,0);
     assert(!sc64_shared_projectiles.active);
     int shooter=spawn_unit(ENEMY,sc64_race_unit_from_raw(raw),x-20,320);
-    int target=spawn_unit(SIDE,U_SHARED_DEFILER,x,320);assert(shooter>=0 && target>=0);
+    int target=spawn_unit(SIDE,target_type,x,320);assert(shooter>=0 && target>=0);
     int bystander=-1;
     if(!should_hit) {bystander=spawn_unit(SIDE,U_SHARED_DEFILER,x-15,320);assert(bystander>=0);u[bystander].hp=u[bystander].maxhp=1000;}
     u[target].hp=u[target].maxhp=1000;
@@ -48,6 +48,7 @@ static void unknown_case(void)
     int shooter=spawn_unit(ENEMY,U_MARINE,380,320);
     int target=spawn_unit(SIDE,U_ZERGLING,400,320);assert(shooter>=0 && target>=0);
     u[target].hp=u[target].maxhp=1000;
+    u[target].raw_type=255; /* Deliberately malformed row for fail-closed test. */
     assert(sc64_world_dark_swarm_affects_target(target)==-1);
     u[shooter].order=ORDER_ATTACK_TARGET;u[shooter].target=target;
     tick_combat(&u[shooter],target);assert(u[shooter].cd>0 && sc64_ordinary_pending[shooter].active);
@@ -72,7 +73,11 @@ int main(void)
     assert(at(U_SHARED_DEFILER,446,320)==1);assert(at(U_SHARED_DEFILER,447,320)==0);
     assert(at(U_SHARED_UNCLEAN_ONE,353,320)==1);assert(at(U_SHARED_UNCLEAN_ONE,352,320)==0);
     assert(at(U_SHARED_UNCLEAN_ONE,446,320)==1);assert(at(U_SHARED_UNCLEAN_ONE,447,320)==0);
+#ifdef SC64_SHARED_DARK_SWARM_SOURCE_RECTS
+    assert(at(U_ZERGLING,400,320)==1); /* authenticated raw37 geometry */
+#else
     assert(at(U_ZERGLING,400,320)==-1); /* unknown geometry fails closed */
+#endif
     int f=-1;for(int i=0;i<MAX_UNITS;i++)if(sc64_defiler_fields[i].remaining)f=i;
     assert(f>=0);u16 saved_ttl=sc64_defiler_fields[f].remaining;
     sc64_defiler_fields[f].remaining=904;assert(at(U_MARINE,400,320)==0);
@@ -82,7 +87,13 @@ int main(void)
     /* Real update dispatch of Marine shots, with synthetic attack orders and
      * target HP. The guaranteed swarm miss retains its live bullet slot. */
     const int tested_raw[5]={0,2,8,38,66};
-    for(int i=0;i<5;i++) {weapon_case(tested_raw[i],400,0);weapon_case(tested_raw[i],500,1);}
+    for(int i=0;i<5;i++) {
+        weapon_case(tested_raw[i],U_SHARED_DEFILER,400,0);
+        weapon_case(tested_raw[i],U_SHARED_DEFILER,500,1);
+    }
+#ifdef SC64_SHARED_DARK_SWARM_SOURCE_RECTS
+    weapon_case(0,U_ZERGLING,400,0);
+#endif
     unknown_case();
     /* Real Yamato order/release; energy and heading are seeded only to
      * isolate launch policy, and are not claimed as ordinary acquisition. */

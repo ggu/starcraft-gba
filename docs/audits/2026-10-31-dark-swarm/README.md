@@ -538,3 +538,43 @@ release. The shared source miss RNG draw, zero-threshold miss, exact flight
 geometry and timers, other actor/weapon pairs, Firebat splash, Zergling melee,
 Scourge, native obstacle interactions, saved active shots, all-product fit and
 production admission remain open. These gates are all off in normal builds.
+
+
+### Optional source rectangle table across products
+
+`tools/sc64_dark_swarm_rects.py` accepts the authenticated private `units.dat`
+SHA-256 `54356d7585c66cd463346996444fd208336eaacf6335d30eb2688aa73c9cb2df`
+and emits an ignored 228-row compact source-rectangle header. The authenticated
+DAT can be extracted from the owned ROM with the existing
+`tools/sc64_openbw_oracle_tables.py` using its required extractor argument and
+a new ignored output directory. The rectangle generator rejects other input
+and does not overwrite an existing header. An independently executed pinned
+OpenBW loader agreed with all 228 generated rows; the retained generated header
+hash is `38d9daa88b97a6b86670180b6bb49bb44923ec8423dd240b2952d0c2d99e67c1`.
+`tests/sc64_openbw_unit_rect_world.cpp` and
+`tests/sc64_compare_source_rects.py` retain that source comparison. A sanitizer check separately rejects negative, out-of-world
+and `INT_MAX` noncompact coordinates before doubling.
+
+The separate, disabled `SC64_SHARED_DARK_SWARM_SOURCE_RECTS` option lets the
+staged field query use this table without P7 actor facts. Sanitized host
+fixtures using Terran, Zerg, P7 and Showcase product flag vectors each reached
+a field through the actual menu and checked the rectangle query. The P7 run
+used a newly generated isolated fact table matching the staged Defiler gate;
+no previously prepared fact header was overwritten. The Showcase run also
+checked source boundaries, the staged ordinary release subset and Yamato.
+These are experimental host checks with additional disabled-stage flags, not
+four normal product builds or production admission. Full actor sight for
+profiles lacking Z/P facts, source RNG, remaining attacks, effect save state,
+rendering qualification, and ARM/hardware fit remain open.
+
+
+### Natural ordinary Defiler energy check
+
+A sanitized synthetic Showcase-host scenario used the normal raw-46 spawn
+energy of 50 and advanced the real game update loop without assigning live
+energy or owner. After 1,999 game updates the actor had enough energy; ordinary
+B/menu/point/A input then produced the staged projectile and field. The
+fixture begins with a test-selected spawned unit. This supports the bounded
+unupgraded stationary path, not the unimplemented Metasynaptic research,
+hallucination rules, native source scheduling outside the verified slices,
+or production admission.

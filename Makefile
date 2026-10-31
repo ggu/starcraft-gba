@@ -65,6 +65,34 @@ build/test-dark-swarm-hero-import: tests/sc64_defiler_import_game.c $(STARCRAFT)
 test-dark-swarm-hero-import: build/test-dark-swarm-hero-import
 	./build/test-dark-swarm-hero-import
 
+# Source-rectangle table is generated privately from authenticated units.dat.
+DARK_SWARM_RECTS_DIR ?= .local/dark-swarm-rects-v1
+DARK_SWARM_PROFILE_FLAGS ?= $(SHOWCASE_FLAGS)
+.PHONY: test-dark-swarm-rect-lookup
+build/test-dark-swarm-rect-lookup: tests/sc64_dark_swarm_rect_lookup.c starcraft/sc64_dark_swarm_rect_lookup.h $(DARK_SWARM_RECTS_DIR)/dark_swarm_rects_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft -I$(DARK_SWARM_RECTS_DIR) $< -o $@
+test-dark-swarm-rect-lookup: build/test-dark-swarm-rect-lookup
+	./build/test-dark-swarm-rect-lookup
+
+.PHONY: test-dark-swarm-source-rects
+build/test-dark-swarm-source-rects: tests/sc64_dark_swarm_query_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(DARK_SWARM_RECTS_DIR)/dark_swarm_rects_generated.h $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_HERO_PROBE -DSC64_SHARED_DARK_SWARM_PROBE -DSC64_SHARED_DARK_SWARM_SOURCE_RECTS -I$(DARK_SWARM_RECTS_DIR) $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-source-rects: build/test-dark-swarm-source-rects
+	./build/test-dark-swarm-source-rects
+
+.PHONY: test-dark-swarm-profile
+build/test-dark-swarm-profile: tests/sc64_dark_swarm_profile_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(DARK_SWARM_RECTS_DIR)/dark_swarm_rects_generated.h common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DARK_SWARM_PROBE -DSC64_SHARED_DARK_SWARM_SOURCE_RECTS -I$(DARK_SWARM_RECTS_DIR) $(DARK_SWARM_PROFILE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-profile: build/test-dark-swarm-profile
+	./build/test-dark-swarm-profile
+
+# Natural unmodified Defiler energy regeneration through the actual update loop.
+.PHONY: test-dark-swarm-natural
+build/test-dark-swarm-natural: tests/sc64_defiler_natural_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-natural: build/test-dark-swarm-natural
+	./build/test-dark-swarm-natural
+
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
 build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build

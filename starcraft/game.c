@@ -998,6 +998,9 @@ typedef struct {
 } Sc64DefilerStageActor;
 static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
 #endif
+#if defined(SC64_SHARED_DARK_SWARM_SOURCE_RECTS) && !defined(SC64_SHARED_DARK_SWARM_PROBE)
+#error "Dark Swarm source rectangles require the experimental query"
+#endif
 #if defined(SC64_SHARED_DEFILER_APPROACH_PROBE) && !defined(SC64_SHARED_DEFILER_EXECUTOR)
 #error "Defiler approach requires the experimental executor"
 #endif
