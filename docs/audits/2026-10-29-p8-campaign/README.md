@@ -526,3 +526,26 @@ matched the current host's screen, frame, mission and result fields at each
 continuation are separate ongoing qualifications; the earlier custom replay is
 not that evidence. The fingerprint used by the continuation path is a bounded
 sample of persisted entities and economy, not full-world atomicity proof.
+
+On runtime `8b2f6aa`, the normal P8 ARM ROM completed the retained ordinary
+input tape in the port-free mGBA core: all 91 checkpoints matched the current
+host's screen, frame, mission and won/lost fields, ending in victory at tick
+90,428/frame 88,769. The ROM's own scheduler and normal main loop remained in
+use; only scheduler input controls were written. The ROM SHA-256 is
+`cb034763aaadbb7994b6455f5be030f28d1025ebcb5e2b2c9d8eb328b5abcf42`, ELF
+`8dd4f1b29843a674844b6ee5ff2ae680f265cd7c01d8b89bd7be37adb3e14cfb`, input
+trace `49006213fa34839dcda388b6f0de2609dce68f497d78a42aadf3e44f6d10f0d5`,
+and backend `1f38e8da8ff4aafa4c9056e38f8fbe267592a22d7978d8cfb6fb70604cedfe4c`.
+
+A separate normal-ROM run exported SRAM from the tape's ordinary pause-menu
+save at tick 32,445/frame 31,677. A fresh process loaded that SRAM using normal
+L/release input. Its sampled entity/economy fingerprint matched the saved sample
+(103 live units, 122 live buildings); its remaining input tape reached victory
+at frame 88,769 with the same final five observed fields. The 32 KiB SRAM hash
+`19c733603712b9f093a435d36da9a38c434c8b52058aca933f22ffab3f12fc5e` remained
+unchanged. The retained result identifies both saved and restored samples and
+records their verdicts. The fingerprint covers selected entity and economy
+fields, and the continuation did not compare intermediate world state. This is
+not a physical-hardware, performance or whole-world parity claim. These results
+predate the later shared AI3 merge `fd3c4d6`; that combination has not yet been
+qualified.
