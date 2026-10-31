@@ -1736,6 +1736,7 @@ static void race_p7_carrier_training_frame_tick(void);
 static void race_p7_carrier_training_clear_slot(int slot);
 static void race_p7_carrier_training_end_frame(void);
 static int race_p7_carrier_training_slots_available(unsigned wanted);
+static int race_p7_carrier_training_queue_owner(int carrier, int owner);
 static unsigned race_p7_carrier_training_child_count(int carrier);
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static int race_p7_interceptor_flight_carrier_holds(int carrier);

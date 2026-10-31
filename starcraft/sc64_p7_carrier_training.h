@@ -275,16 +275,17 @@ static int race_p7_carrier_training_selected(void)
     return 0;
 }
 
-static int race_p7_carrier_training_can_queue(int carrier)
+static int race_p7_carrier_training_can_queue_owner(int carrier, int owner)
 {
     unsigned inside = 0, training = 0;
     Unit *parent;
     if (!race_protoss_services_active() || !sc64_p7_carrier_parent_valid(carrier) ||
-        u[carrier].owner != SIDE ||
-        RACE_PROTOSS_SLOT(&u[carrier]) != SC64_PROTOSS_HUMAN_SLOT) return 0;
+        u[carrier].owner != owner ||
+        (!race_mode && (owner != SIDE ||
+         RACE_PROTOSS_SLOT(&u[carrier]) != SC64_PROTOSS_HUMAN_SLOT))) return 0;
     parent = &u[carrier];
     return parent->carry >= 0 && parent->carry < SC64_P7_CARRIER_QUEUE_LIMIT &&
-        minerals >= SC64_P7_INTERCEPTOR_COST &&
+        race_owner_minerals(owner) >= SC64_P7_INTERCEPTOR_COST &&
         sc64_p7_carrier_count_children(carrier, &inside, &training) &&
         training <= 1 && training + (unsigned)parent->carry <
             SC64_P7_CARRIER_QUEUE_LIMIT &&
@@ -305,8 +306,13 @@ static int race_p7_carrier_training_menu_available(void)
  * Carrier owners use four slots in this mission. */
 static int race_p7_carrier_training_queue(int carrier)
 {
-    if (!race_p7_carrier_training_can_queue(carrier)) return 0;
-    minerals -= SC64_P7_INTERCEPTOR_COST;
+    return race_p7_carrier_training_queue_owner(carrier, SIDE);
+}
+
+static int race_p7_carrier_training_queue_owner(int carrier, int owner)
+{
+    if (!race_p7_carrier_training_can_queue_owner(carrier, owner)) return 0;
+    race_add_owner_resources(owner, -SC64_P7_INTERCEPTOR_COST, 0);
     ++u[carrier].carry;
     return 1;
 }

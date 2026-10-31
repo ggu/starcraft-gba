@@ -75,6 +75,24 @@ static int carrier_children(int carrier, unsigned state)
     return n;
 }
 
+static void test_carrier_ai_owners(void)
+{
+    custom_game();
+    race_bots = 3;
+    for (int owner = 1; owner < 5; ++owner) {
+        if (owner == SIDE) continue;
+        int carrier = spawn_unit(owner, U_P7_CARRIER, 600 + owner * 8, 600);
+        assert(carrier >= 0);
+        race_minerals[owner] = 25;
+        assert(!race_p7_carrier_training_queue_owner(carrier, SIDE));
+        assert(race_p7_carrier_training_queue_owner(carrier, owner));
+        assert(race_minerals[owner] == 0 && u[carrier].carry == 1);
+        assert(!race_p7_carrier_training_queue_owner(carrier, owner));
+        race_p7_carrier_training_source_tick();
+        assert(carrier_children(carrier, SC64_P7_INTERCEPTOR_TRAINING) == 1);
+    }
+}
+
 static void test_carrier_training_and_flight(void)
 {
     custom_game();
@@ -265,6 +283,7 @@ int main(void)
     test_bindings();
     test_unbound_campaign_runs_no_service();
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+    test_carrier_ai_owners();
     test_carrier_training_and_flight();
 #else
     /* Do not inject flight flags into a production-vector check. This is
