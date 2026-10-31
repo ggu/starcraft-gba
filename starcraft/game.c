@@ -1705,7 +1705,7 @@ static int race_impact_save_write(const GbaSaveSelection *previous);
 static int race_impact_save_write(void);
 #endif
 static int race_impact_save_read(Sc64ImpactEvent *candidate, int *count);
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
 static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count);
 #endif
 static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
