@@ -843,6 +843,9 @@ enum {
 };
 enum {
     MODE_NORMAL, MODE_MOVE, MODE_ATTACK, MODE_BUILD
+#ifdef SC64_SHARED_DEFILER_STAGE
+    , MODE_DARK_SWARM_STAGE
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     , MODE_YAMATO
 #endif
@@ -983,7 +986,7 @@ static Unit u[MAX_UNITS];
 #ifdef SC64_SHARED_DEFILER_STAGE
 /* Experimental simulation state; never borrow presentation-facing or a
  * mission payload. Save remains refused while an experimental caster lives. */
-typedef struct { u16 energy_q8; u8 heading, live; } Sc64DefilerStageActor;
+typedef struct { u16 energy_q8; s16 target_x,target_y; u8 heading, live, intent; } Sc64DefilerStageActor;
 static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
 #endif
 #ifdef SC64_UNIT_FACING
@@ -2230,7 +2233,7 @@ spawn_unit(int owner, int type, int x, int y)
     /* Slot reuse always invalidates its predecessor. Source unit direction
      * 13 gives heading 104; ordinary completed Defilers begin at 50 energy. */
     memset(&sc64_defiler_stage[i],0,sizeof(sc64_defiler_stage[i]));
-    if (sc64_race_raw_unit(type)==46) {
+    if (sc64_race_raw_unit(type)==46 || sc64_race_raw_unit(type)==52) {
         sc64_defiler_stage[i].live=1;
         sc64_defiler_stage[i].heading=104;
         sc64_defiler_stage[i].energy_q8=50u*256u;
@@ -5674,9 +5677,34 @@ static int race_bc_yamato_target_at(int x,int y)
     return best;
 }
 #endif
+#ifdef SC64_SHARED_DEFILER_STAGE
+static int field_menu_count_base(void);
+/* Selection must contain exactly one live owned, unloaded supported caster. */
+static int sc64_defiler_stage_selected(void)
+{
+    int slot=-1;
+    if(selected_building>=0) return -1;
+    for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && u[i].selected) {
+        int raw=u[i].raw_type>=0?u[i].raw_type:sc64_race_raw_unit(u[i].type);
+        if(slot>=0 || u[i].owner!=SIDE || SC64_TRANSPORT_LOADED(&u[i]) ||
+           (raw!=46 && raw!=52) || !sc64_defiler_stage[i].live) return -1;
+        slot=i;
+    }
+    return slot;
+}
+#endif
 static void
 choose_command(int choice)
 {
+#ifdef SC64_SHARED_DEFILER_STAGE
+    if(sc64_defiler_stage_selected()>=0 && choice==field_menu_count_base()) {
+        int slot=sc64_defiler_stage_selected();
+        menu_open=0;
+        if(sc64_defiler_stage[slot].energy_q8<100u*256u) {mode=MODE_NORMAL;toast(8);}
+        else mode=MODE_DARK_SWARM_STAGE;
+        return;
+    }
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available() && choice==race_bc_yamato_menu_base()) {
         menu_open=0;mode=MODE_YAMATO;return;
@@ -5963,7 +5991,7 @@ static int race_skirmish_command_count(void)
 /* Advanced Terran commands are available in the T5 development profile.
  * Other factions retain their existing ten-row command list. */
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
-static int field_menu_count(void)
+static int field_menu_count_base(void)
 {
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
@@ -6027,7 +6055,7 @@ static int field_menu_count(void)
 #endif
 }
 #elif defined(SC64_T5_RUNTIME)
-static int field_menu_count(void)
+static int field_menu_count_base(void)
 {
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
@@ -6050,7 +6078,7 @@ static int field_menu_count(void)
     return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1;
 }
 #elif defined(SC64_RACES)
-static int field_menu_count(void)
+static int field_menu_count_base(void)
 {
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
@@ -6071,7 +6099,7 @@ static int field_menu_count(void)
     return MENU_STOP + 1 + race_nexus_command_available() + race_probe_cannon_command_available();
 }
 #else
-#define field_menu_count() MENU_COUNT
+#define field_menu_count_base() MENU_COUNT
 #endif
 
 #ifdef SC64_RACES
@@ -6097,9 +6125,19 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
         "NEXUS" : labels[choice];
 }
 
+#ifdef SC64_SHARED_DEFILER_STAGE
+static int field_menu_count(void)
+{ return field_menu_count_base() + (sc64_defiler_stage_selected()>=0); }
+#else
+#define field_menu_count() field_menu_count_base()
+#endif
+
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_SHARED_DEFILER_STAGE
+    if(sc64_defiler_stage_selected()>=0 && i==field_menu_count_base()) return "DARK SWARM";
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available() && i==race_bc_yamato_menu_base()) return "YAMATO GUN";
 #endif
@@ -6257,6 +6295,19 @@ interact(void)
     /* Only an A press that actually selects a unit can be part of a double
      * tap. Orders, construction, gas assignment and production stay immediate. */
     reset_unit_tap();
+#ifdef SC64_SHARED_DEFILER_STAGE
+    if(!menu_open && mode==MODE_DARK_SWARM_STAGE) {
+        int slot=sc64_defiler_stage_selected();
+        if(slot>=0 && sc64_defiler_stage[slot].energy_q8>=100u*256u &&
+           cx>=0 && cy>=0 && cx<WORLD_W && cy<WORLD_H) {
+            sc64_defiler_stage[slot].target_x=(s16)cx;
+            sc64_defiler_stage[slot].target_y=(s16)cy;
+            sc64_defiler_stage[slot].intent=1;
+            toast(0);
+        } else toast(8);
+        mode=MODE_NORMAL; return;
+    }
+#endif
     if (menu_open) {
 	choose_command(menu_cursor);
 	return;

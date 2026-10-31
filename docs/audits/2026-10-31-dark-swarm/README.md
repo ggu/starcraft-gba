@@ -182,3 +182,18 @@ actual-engine host fixture verifies initial values and save refusal. This is
 not the requested field-menu/order integration: updates, death/load handling,
 interruptions, effect allocation, AI, visual and save continuation are still
 outstanding, and imported actor initialization has not been qualified.
+
+### Experimental field input checkpoint
+
+With `SC64_SHARED_DEFILER_STAGE` only, a single selected owned unloaded
+supported caster gets a Dark Swarm row appended after the existing contextual
+rows. Ordinary B/menu/A input enters a point-target mode; A stores a bounded
+point intent in the caster's stage sidecar. A caster below 100 energy is
+rejected, and B cancels targeting. Enqueuing does not debit energy or create an
+effect. The actual-engine Showcase-vector sanitizer fixture exercises the pad
+sequence, target, cancellation, insufficient energy, mixed/enemy/loaded
+selection checks and the temporary save refusal. It uses a test-created
+ordinary raw-46 actor; imported raw-52 hero and other menu vectors remain to be
+qualified. The intent is not yet consumed by the simulation: source heading,
+approach, animation, projectile and field transitions remain required. This
+checkpoint is therefore not playable Dark Swarm support.

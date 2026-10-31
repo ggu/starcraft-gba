@@ -6,7 +6,8 @@
 int main(void)
 {
     unsigned energy=100u*256u; Sc64DarkSwarmEffect effect={0};
-    game_init();
+    game_init();race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;
+    race_skirmish_init();
     int caster=spawn_unit(SIDE,U_SHARED_DEFILER,320,320);
     assert(caster>=0 && sc64_race_raw_unit(u[caster].type)==46);
     assert(sc64_defiler_stage[caster].live && sc64_defiler_stage[caster].heading==104 &&
@@ -14,6 +15,45 @@ int main(void)
     /* Until a complete schema exists, the actual save path must refuse a
      * live experimental caster instead of writing incomplete state. */
     assert(!race_save_game());
+    /* Exercise ordinary pad menu navigation and point selection. */
+    screen=SCREEN_PLAY; race_mode=1; race_human=R_ZERG; selected_building=-1;
+    u[caster].selected=1; sc64_defiler_stage[caster].energy_q8=100u*256u;
+    game_update(KEY_B,KEY_B); assert(menu_open);
+    for(int n=0;n<64 && menu_cursor!=field_menu_count_base();++n) {
+        game_update(0,0); game_update(KEY_DOWN,KEY_DOWN);
+    }
+    assert(menu_cursor==field_menu_count_base());
+    game_update(0,0); game_update(KEY_A,KEY_A);
+    assert(!menu_open && mode==MODE_DARK_SWARM_STAGE && !sc64_defiler_stage[caster].intent);
+    cx=400;cy=350;game_update(0,0);game_update(KEY_A,KEY_A);
+    assert(mode==MODE_NORMAL && sc64_defiler_stage[caster].intent &&
+           sc64_defiler_stage[caster].target_x==400 && sc64_defiler_stage[caster].target_y==350 &&
+           sc64_defiler_stage[caster].energy_q8==100u*256u);
+    sc64_defiler_stage[caster].intent=0;
+    game_update(0,0);game_update(KEY_B,KEY_B);assert(menu_open);
+    for(int n=0;n<64 && menu_cursor!=field_menu_count_base();++n) {
+        game_update(0,0);game_update(KEY_DOWN,KEY_DOWN);
+    }
+    assert(menu_cursor==field_menu_count_base());
+    game_update(0,0);game_update(KEY_A,KEY_A);assert(mode==MODE_DARK_SWARM_STAGE);
+    game_update(0,0);game_update(KEY_B,KEY_B);
+    assert(mode==MODE_NORMAL && !sc64_defiler_stage[caster].intent);
+    menu_open=0;sc64_defiler_stage[caster].energy_q8=99u*256u;
+    game_update(0,0);game_update(KEY_B,KEY_B);assert(menu_open);
+    for(int n=0;n<64 && menu_cursor!=field_menu_count_base();++n) {
+        game_update(0,0);game_update(KEY_DOWN,KEY_DOWN);
+    }
+    game_update(0,0);game_update(KEY_A,KEY_A);
+    assert(mode==MODE_NORMAL && !menu_open && !sc64_defiler_stage[caster].intent);
+    int other=spawn_unit(SIDE,U_ZERGLING,330,320);assert(other>=0);
+    u[other].selected=1;assert(sc64_defiler_stage_selected()<0);
+    u[other].selected=0;u[caster].owner=ENEMY;assert(sc64_defiler_stage_selected()<0);
+    u[caster].owner=SIDE;
+#ifdef SC64_TRANSPORT_RUNTIME
+    u[caster].order=ORDER_TRANSPORTED;assert(sc64_defiler_stage_selected()<0);
+    u[caster].order=ORDER_IDLE;
+#endif
+    u[caster].selected=0;
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     /* Probe the compact row only; real saves still need explicit semantic
      * validation, versioning and effect/order state. */
