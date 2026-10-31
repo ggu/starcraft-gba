@@ -1861,15 +1861,27 @@ static int z7_home_army_attack(int hatch,int target)
     /* R on any selected building is deliberately excluded, even if it is
        not a producer. Avoid altering the training selection on producers. */
     if(screen!=SCREEN_PLAY||mode!=MODE_NORMAL||menu_open||box_state||help||
-       selected_building>=0)return 0;
+       selected_building>=0) {
+        fprintf(stderr,"Z7 home army R skipped UI frame%u mode%d menu%d box%d help%d building%d\n",
+            (unsigned)frame,mode,menu_open,box_state,help,selected_building);
+        return 0;
+    }
     for(int i=0;i<MAX_UNITS;i++)if(z7_r_combat_eligible(i)) {
         if(!((u[i].type==U_HYDRALISK&&u[i].raw_type==38)||
              (u[i].type==U_MUTALISK&&u[i].raw_type==43))||
            dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y)>
-               policy_home_radius*policy_home_radius)return 0;
+               policy_home_radius*policy_home_radius) {
+            fprintf(stderr,"Z7 home army R skipped unit frame%u slot%d type%d raw%d d2%d radius%d\n",
+                (unsigned)frame,i,u[i].type,u[i].raw_type,
+                dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y),policy_home_radius);
+            return 0;
+        }
         expected[i]=(unsigned char)u[i].raw_type;++n;if(u[i].type==U_HYDRALISK)++hydras;
     }
-    if(!n||!hydras)return 0;
+    if(!n||!hydras) {
+        fprintf(stderr,"Z7 home army R skipped group frame%u group%d hydras%d\n",(unsigned)frame,n,hydras);
+        return 0;
+    }
     if(prior_keys)step(0);
     tap(KEY_R);
     if(screen!=SCREEN_PLAY||mode!=MODE_NORMAL||menu_open||box_state||help||
