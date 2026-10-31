@@ -142,11 +142,82 @@ class ResumeAndRecovery(unittest.TestCase):
         with self.assertRaisesRegex(ai.RecordError, "exactly one"):
             ai.evaluate(case, 0, row + "\n" + row, 1800)
 
+    def test_unsaved_match_is_classified_not_counted(self):
+        case = ("resume", "terran", 0, 0, "zpt", 9000)
+        ended = json.dumps({"kind": "ended-before-save", "frame": 8000})
+        with self.assertRaisesRegex(ai.RecordError, "no save: ended-before-save"):
+            ai.evaluate(case, 4, ended, 1800)
+        with self.assertRaisesRegex(ai.RecordError, "no save: no-save-point"):
+            ai.evaluate(case, 9, "", 1800)
+        # A resume record cannot pass with a nonzero exit, nor without a save.
+        with self.assertRaisesRegex(ai.RecordError, "exactly one"):
+            ai.evaluate(case, 0, ended, 1800)
+
+    def morph(self, scenario, **kw):
+        base = {"kind": "morph-hp", "scenario": ai.MORPH_SCENARIOS[scenario], "start_hp": 400,
+                "during_hp": 370, "during_max": 400, "final_hp": 270, "final_max": 300, "final_raw": 146,
+                "alive": 1, "charged": 50, "completed_at": 581, "reference": "00000000",
+                "resumed": "00000000", "ok": 1}
+        base.update(kw)
+        return [json.dumps(base)]
+
+    def test_morph_hp_records(self):
+        ok = self.morph(0, during_hp=400, final_hp=300)
+        self.assertTrue(ai.evaluate(("morph-hp", "zerg", 1, 1, "t", 0), 0, "\n".join(ok), 1800)["ok"])
+        # Deducting at start (final 300 - 30 = 270 from a 370 snapshot is
+        # right; 170 is the old early-deduction value) must be rejected.
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_morph_hp(self.morph(0, final_hp=170), 0)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_morph_hp(self.morph(1, during_hp=150, final_hp=50), 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_morph_hp(self.morph(2, start_hp=50, during_hp=1, final_hp=1), 2)
+        dies = self.morph(3, start_hp=50, during_hp=0, final_hp=0, final_max=400, final_raw=143,
+                          alive=0, completed_at=-1)
+        self.assertEqual(ai.validate_morph_hp(dies, 3)["alive"], 0)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_morph_hp(self.morph(3, start_hp=50, during_hp=0, alive=1), 3)
+        saved = self.morph(4, reference="1234abcd", resumed="1234abcd")
+        self.assertEqual(ai.validate_morph_hp(saved, 4)["ok"], 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_morph_hp(self.morph(4, reference="1234abcd", resumed="1234abce"), 4)
+        with self.assertRaisesRegex(ai.RecordError, "does not match"):
+            ai.validate_morph_hp(saved, 5)
+        with self.assertRaisesRegex(ai.RecordError, "exactly one"):
+            ai.validate_morph_hp(saved * 2, 4)
+        with self.assertRaisesRegex(ai.RecordError, "disagree"):
+            ai.evaluate(("morph-hp", "zerg", 1, 1, "t", 4), 8, "\n".join(saved), 1800)
+
+    def addon(self, scenario, **kw):
+        base = {"kind": "addon", "scenario": ai.ADDON_SCENARIOS[scenario], "factories": [7, 8],
+                "blocked": 1, "parent": 8, "reserved": [50, 50], "started_on": 1, "charged": [50, 50], "ok": 1}
+        if scenario == 1:
+            base.update(blocked=2, parent=-1, reserved=[150, 0], started_on=-1, charged=[0, 0])
+        base.update(kw)
+        return [json.dumps(base)]
+
+    def test_addon_records(self):
+        self.assertEqual(ai.validate_addon(self.addon(0), 0)["parent"], 8)
+        self.assertEqual(ai.validate_addon(self.addon(1), 1)["parent"], -1)
+        # Reserving the addon's price with no feasible parent is the defect.
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_addon(self.addon(1, reserved=[50, 50]), 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_addon(self.addon(0, parent=7), 0)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_addon(self.addon(0, started_on=0), 0)
+        with self.assertRaisesRegex(ai.RecordError, "pair"):
+            ai.validate_addon(self.addon(0, reserved=[50]), 0)
+        with self.assertRaisesRegex(ai.RecordError, "disagree"):
+            ai.evaluate(("addon", "terran", 1, 2, "t", 0), 9, "\n".join(self.addon(0)), 1800)
+
     def test_case_list_is_complete_and_unique(self):
         cases = ai.cases(36000)
         self.assertEqual(len(cases), len(set(cases)))
         self.assertEqual(sum(c[0] == "resume-morph" for c in cases), 2 * len(ai.PROFILES))
         self.assertFalse(any(c[0] == "resume-morph" for c in ai.cases(36000, "economy")))
+        self.assertEqual(sum(c[0] == "morph-hp" for c in cases), 6 * len(ai.PROFILES))
+        self.assertEqual(sum(c[0] == "addon" for c in cases), 2 * len(ai.PROFILES))
         runs = [c for c in cases if c[0] == "run"]
         self.assertEqual({(c[1], c[2], c[3], len(c[4])) for c in runs if len(set(c[4])) > 1 or len(c[4]) == 1},
                          {(p, m, h, n) for p in ai.PROFILES for m in (0, 1) for h in range(3) for n in (1, 2, 3)})

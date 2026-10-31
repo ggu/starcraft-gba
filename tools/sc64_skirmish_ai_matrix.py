@@ -200,6 +200,85 @@ def validate_recovery(lines, scenario_name):
     return r
 
 
+MORPH_SCENARIOS = ("full", "damaged-during", "low-hp", "low-hp-dies", "save-resume", "save-resume-low-hp")
+ADDON_SCENARIOS = ("first-blocked-second-free", "no-feasible-parent")
+
+
+def _one(lines, kind):
+    rows = [r for r in _records(lines) if r["kind"] == kind]
+    if len(rows) != 1:
+        raise RecordError(f"expected exactly one {kind} record")
+    return rows[0]
+
+
+def _hex(value, name):
+    if type(value) is not str or len(value) != 8 or any(c not in "0123456789abcdef" for c in value):
+        raise RecordError(f"{name} must be an 8-digit hex digest")
+    return value
+
+
+def validate_morph_hp(lines, scenario):
+    """Recompute the BW morph rule from the record; its ok flag must agree."""
+    r = _one(lines, "morph-hp")
+    if r.get("scenario") != MORPH_SCENARIOS[scenario]:
+        raise RecordError("morph-hp record does not match its scenario")
+    for f in ("start_hp", "during_hp", "during_max", "final_hp", "final_max", "final_raw", "completed_at"):
+        _int(r.get(f), f, -1, 1 << 20)
+    for f in ("alive", "ok"):
+        _int(r.get(f), f, 0, 1)
+    _int(r.get("charged"), "charged", -1, 1 << 16)
+    reference, resumed = _hex(r.get("reference"), "reference"), _hex(r.get("resumed"), "resumed")
+    name = MORPH_SCENARIOS[scenario]
+    if name == "low-hp-dies":
+        good = (r["alive"] == 0 and r["during_hp"] == 0 and r["final_raw"] == 143 and
+                r["charged"] == 50 and r["start_hp"] > 0)
+    else:
+        expected = min(300, max(1, r["during_hp"] - 100))
+        good = (r["alive"] == 1 and r["completed_at"] > 0 and r["charged"] == 50 and
+                r["during_max"] == 400 and r["final_max"] == 300 and r["final_raw"] == 146 and
+                r["final_hp"] == expected and 0 < r["during_hp"] <= 400)
+        if name in ("low-hp", "save-resume-low-hp"):
+            good = good and r["during_hp"] == r["start_hp"] and r["start_hp"] < 100
+        if name == "damaged-during":
+            good = good and 0 < r["during_hp"] <= 100
+        if name.startswith("save-resume"):
+            good = good and reference == resumed and reference != "00000000"
+    if r["ok"] != int(good):
+        raise RecordError("morph-hp ok flag disagrees with the recorded hit points")
+    return r
+
+
+def validate_addon(lines, scenario):
+    r = _one(lines, "addon")
+    if r.get("scenario") != ADDON_SCENARIOS[scenario]:
+        raise RecordError("addon record does not match its scenario")
+    for f in ("factories", "reserved", "charged"):
+        v = r.get(f)
+        if type(v) is not list or len(v) != 2:
+            raise RecordError(f"{f} must be a pair")
+        for x in v:
+            _int(x, f, -1, 1 << 16)
+    for f in ("blocked", "parent", "started_on"):
+        _int(r.get(f), f, -2, 1 << 16)
+    _int(r.get("ok"), "ok", 0, 1)
+    if scenario == 0:
+        good = (r["blocked"] == 1 and r["parent"] == r["factories"][1] and r["reserved"] == [50, 50] and
+                r["started_on"] == 1 and r["charged"] == [50, 50])
+    else:
+        good = (r["blocked"] == 2 and r["parent"] == -1 and r["reserved"][1] == 0 and
+                r["reserved"][0] != 50 and r["started_on"] == -1 and r["charged"] == [0, 0])
+    if r["ok"] != int(good):
+        raise RecordError("addon ok flag disagrees with the recorded reservation")
+    return r
+
+
+def classify_end(lines):
+    """Why a save case produced no resume record (never counted as a save)."""
+    kinds = [r["kind"] for r in _records(lines)
+             if r["kind"] in ("ended-before-save", "save-not-possible", "no-morph-before-save")]
+    return kinds[-1] if kinds else "no-record"
+
+
 def cases(ticks, criteria="development"):
     out = []
     for profile in PROFILES:
@@ -226,6 +305,12 @@ def cases(ticks, criteria="development"):
         for profile in PROFILES:
             for human in (0, 2):
                 out.append(("resume-morph", profile, 1, human, "zz", 0))
+            # Focused fixtures: Creep-to-Sunken hit points (human Zerg colony)
+            # and addon feasibility before reservation (Terran opponent).
+            for s in range(len(MORPH_SCENARIOS)):
+                out.append(("morph-hp", profile, 1, 1, "t", s))
+            for s in range(len(ADDON_SCENARIOS)):
+                out.append(("addon", profile, 1, 2, "t", s))
     scenarios = ("pending-builder-killed", "constructing-scv-killed", "foundation-destroyed", "depot-destroyed")
     for profile in PROFILES:
         for map_id in (0, 1):
@@ -255,6 +340,10 @@ def run_case(build: Path, case, every):
         argv += ["--resume-at", str(arg), "--resume-len", "1800"]
     elif kind == "resume-morph":
         argv += ["--resume-at-morph", "--resume-len", "1800"]
+    elif kind == "morph-hp":
+        argv += ["--morph-hp", str(arg)]
+    elif kind == "addon":
+        argv += ["--addon", str(arg)]
     elif kind == "run":
         argv += ["--ticks", str(arg), "--every", str(every)]
     else:
@@ -276,7 +365,21 @@ def evaluate(case, returncode, stdout, every, criteria="development"):
         final = records[-1]
         return {"ok": not failed, "end_frame": final["frame"], "won": final["won"], "lost": final["lost"],
                 "progression": {str(k): v for k, v in prog.items()}, "failed_owners": failed}
+    if kind == "morph-hp":
+        r = validate_morph_hp(lines, arg)
+        if (returncode == 0) != bool(r["ok"]) or returncode not in (0, 8):
+            raise RecordError("exit code and morph-hp record disagree")
+        return {"ok": bool(r["ok"]), "morph_hp": r}
+    if kind == "addon":
+        r = validate_addon(lines, arg)
+        if (returncode == 0) != bool(r["ok"]) or returncode not in (0, 9):
+            raise RecordError("exit code and addon record disagree")
+        return {"ok": bool(r["ok"]), "addon": r}
     if kind in ("resume", "resume-late", "resume-morph"):
+        if returncode in (4, 9) and not any(r["kind"] == "resume" for r in _records(lines)):
+            # The match ended (or no save point existed) before the save:
+            # classified, and never counted as a successful save.
+            raise RecordError(f"no save: {classify_end(lines) if returncode == 4 else 'no-save-point'}")
         r = validate_resume(lines)
         if returncode not in (0, 4, 6):
             raise RecordError(f"harness exit {returncode}")
@@ -321,6 +424,12 @@ def main(argv=None):
             report["cases"].append(row)
             print(f"{label}: {'ok' if row['ok'] else 'FAIL ' + row.get('error', '')}", flush=True)
     report["passed"] = sum(r["ok"] for r in report["cases"])
+    # Every failure keeps its validator reason; group them for the summary.
+    report["failures_by_reason"] = {}
+    for r in report["cases"]:
+        if not r["ok"]:
+            reason = r.get("error") or "progression: owners " + ",".join(map(str, r.get("failed_owners", [])))
+            report["failures_by_reason"].setdefault(reason, []).append("-".join(str(x) for x in r["case"]))
     report["failed"] = len(report["cases"]) - report["passed"]
     (args.output / "report.json").write_text(json.dumps(report, indent=1, default=list) + "\n")
     print(f"{report['passed']} passed, {report['failed']} failed")

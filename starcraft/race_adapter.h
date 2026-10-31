@@ -363,6 +363,17 @@ static int race_site_creep(int owner, int x, int y)
     return 0;
 }
 
+/* A custom-game Creep Colony morphing into a Sunken Colony (400 to 300
+ * maximum) stays a Creep Colony with its maximum while incomplete; raw_type
+ * names the target. Saves derive the maximum from the type, so the morph's
+ * full hit points survive a save, and race_complete_building then applies
+ * the difference as BW does. Returns the target type, or -1. */
+static int race_construction_deferred_morph(const Building *q)
+{
+    return race_mode && q->under_construction && q->type == B_CREEP_COLONY &&
+        q->raw_type == sc64_race_raw_building(B_SUNKEN_COLONY) ? B_SUNKEN_COLONY : -1;
+}
+
 #include "sc64_skirmish_adapter.h"
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
 #ifndef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
@@ -1033,6 +1044,7 @@ static void race_tick_state(void)
 #ifdef SC64_CONSTRUCTION_HP
 static int race_construction_growth_is_morph(const Building *building)
 {
+    if (race_construction_deferred_morph(building) >= 0) return 1;
     if (race_mode && (building->type == B_SUNKEN_COLONY || building->type == B_SPORE_COLONY)) return 1;
     if (building->type == B_LAIR || building->type == B_HIVE ||
         building->type == B_GREATER_SPIRE) return 1;
@@ -1086,15 +1098,18 @@ race_construction_hp_progress(int i, int progress, int total)
 static void race_complete_building(int i)
 {
     const Sc64RaceBuildingRule *r;
+    int deferred;
     if (i < 0 || i >= MAX_BUILDINGS || !b[i].alive || !b[i].under_construction) return;
+    deferred = race_construction_deferred_morph(&b[i]);
+    if (deferred >= 0) {
+        b[i].type = deferred;
+        b[i].maxhp = sc64_race_building_max_hp(deferred);
+    }
     r = sc64_race_building_rule(b[i].type);
     b[i].under_construction = 0;
 #ifdef SC64_CONSTRUCTION_HP
     {
         int old_max = race_construction_morph_source_max(b[i].type);
-        /* A custom-game morph to a lower maximum already applied the
-         * difference when it started (race_skirmish_start_record). */
-        if (race_mode && old_max > b[i].maxhp) old_max = b[i].maxhp;
         if (old_max > 0) {
             b[i].hp = sc64_construction_morph_hp(b[i].hp, old_max, b[i].maxhp);
         }
