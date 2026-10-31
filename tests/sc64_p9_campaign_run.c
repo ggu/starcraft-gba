@@ -532,17 +532,14 @@ static int remine_idle_probe(int home)
 {
     static const int dx[] = {0,8,-8,0,0,8,-8,8,-8};
     static const int dy[] = {0,0,0,8,-8,8,8,-8,-8};
-    int worker=-1;
+    int worker=-1,stale=-1;
     static int next_patch;
     for(int i=0;i<MAX_UNITS;i++){
         if(!(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&SC64_PENDING_BUILD_ORDER(u[i].order))){
             pending_since[i]=-1;continue;
         }
         if(pending_since[i]<0)pending_since[i]=frame;
-        if(worker<0&&frame-pending_since[i]>900){
-            worker=i;
-            if(refused_count<64){refused_x[refused_count]=u[i].tx;refused_y[refused_count++]=u[i].ty;}
-        }
+        if(stale<0&&frame-pending_since[i]>900&&!u[i].carry)stale=i;
     }
     for(int i=0;i<MAX_UNITS&&worker<0;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE){
         if(u[i].order==ORDER_IDLE && !u[i].carry){worker=i;break;}
@@ -552,6 +549,10 @@ static int remine_idle_probe(int home)
                 dist2(b[n].x,b[n].y,m[u[i].target].x,m[u[i].target].y)<320*320)near=1;
             if(!near)worker=i;
         }
+    }
+    if(worker<0&&stale>=0){
+        worker=stale;
+        if(refused_count<64){refused_x[refused_count]=u[worker].tx;refused_y[refused_count++]=u[worker].ty;}
     }
     if(worker<0||home<0)return 0;
     if(!hero_select(worker))return 0;
