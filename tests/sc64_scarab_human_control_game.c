@@ -21,6 +21,14 @@ int main(int argc,char **argv)
     u[p].selected=1;
     int row=(int)sc64_skirmish_menu_count((unsigned)race_human);
     assert(field_menu_count()==row+1 && !strcmp(race_menu_label(row),"BUILD SCARAB"));
+#ifdef SC64_ICON_TABLE_PRESENT
+    { int type=-1,kind=ui_row_kind(row,&type);
+      assert(kind==UI_ROW_SPECIAL && ui_source_icon_for_row(row,kind,type)==85);
+      assert(sc64_icons[85].width>1 && sc64_icons[85].height>1); }
+#endif
+#ifdef SC64_COMMAND_ICONS
+    assert(card_portrait(85)==85 && card_icon(row)==85);
+#endif
     game_update(KEY_B,KEY_B); assert(menu_open);
     menu_cursor=0; /* host fixture starts at the ordinary first row */
     game_update(KEY_UP,KEY_UP); assert(menu_cursor==row);
