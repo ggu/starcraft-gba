@@ -19,3 +19,12 @@ The validator change was merged with the current P8 draft parent `c1cd9d4` as ru
 The actual P7 and P8 product-vector host services passed with the paid/mixed Carrier tests and both protected Observer power-restoration checks. The corrected owner oracle passed 2,000 worlds in each vector, and the eager-reference Carrier parent/child differential passed both vectors under ASan/UBSan. The P7 Carrier training, Interceptor cadence/save and Arbiter cache policy fixtures also passed.
 
 Using exact current-parent ROMs, the retained P7 custom three-AI and natural P8 saves each passed 901 active frames of full captured-state comparison, with nine matching state/pixel checkpoints. Over 900 updates P7 mean full/update/orders cycles changed 1,074,402/673,072/472,693 to 1,054,739/657,895/471,580. P8 changed 1,777,208/1,234,270/434,559 to 1,732,890/1,210,878/433,977. These emulator samples are limited to those saves; the earlier full P8 win remains evidence for its own predecessor runtime, and the P8 parent performance hold remains open.
+
+With the P7 and P8 inputs prepared using the repository setup, contributors can rerun the production-vector host checks with:
+
+```sh
+make test-sc64-carrier-parent-fast-p7 test-sc64-carrier-parent-fast-p8
+make test-sc64-p7-owner-mask test-sc64-p8-owner-mask
+```
+
+The targets use the canonical product flags and their declared inputs; the fixtures do not add gameplay capabilities to those flags. These optional host checks do not build or qualify a ROM.
