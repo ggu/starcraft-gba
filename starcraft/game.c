@@ -460,8 +460,8 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x20000000u) == 0,
 #define SAVE_VERSION SC64_LEGACY_SAVE_VERSION
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
-#if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || !defined(SC64_LATE_TERRAN_STORAGE) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_IMPORTED_SKIRMISH)
-#error "Scarab namespace stage requires the gated Terran impact/Yamato profile"
+#if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || (!defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_LATE_TERRAN_STORAGE))
+#error "Scarab namespace stage requires an explicitly supported impact save profile"
 #endif
 _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
                (SAVE_VERSION & 0x08000000u) == 0,

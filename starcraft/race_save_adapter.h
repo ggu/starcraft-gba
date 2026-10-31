@@ -52,29 +52,50 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
         ((unsigned)candidate->state[27] & 0xffff0000u)==0x42450000u)
         out->carry=(u16)candidate->units[slot][offsetof(Unit,carry)/sizeof(int)];
     return 1;
-#elif defined(SC64_ZP_FULL_STORAGE)
+#elif defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     return sc64_p7_typed_unit_decode(out, &candidate->units[slot], world_width, world_height);
 #elif defined(SC64_Z7_DERIVED_SAVE)
     return sc64_derived_unit_decode(out, &candidate->units[slot], world_width, world_height);
 #else
-    return sc64_zp_unit_save_decode(out, &candidate->units[slot],
-                                    world_width, world_height);
+    return sc64_zp_unit_save_decode(out, &candidate->units[slot], world_width, world_height);
 #endif
 #else
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
     Unit wire;
-    if (!sc64_unit_save_decode(&wire,&candidate->units[slot],world_width,world_height)) return 0;
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    if (!sc64_p7_typed_unit_decode(&wire, &candidate->units[slot], world_width, world_height)) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    if (!sc64_derived_unit_decode(&wire, &candidate->units[slot], world_width, world_height)) return 0;
+#else
+    if (!sc64_zp_unit_save_decode(&wire, &candidate->units[slot], world_width, world_height)) return 0;
+#endif
+#else
+    if (!sc64_unit_save_decode(&wire, &candidate->units[slot], world_width, world_height)) return 0;
+#endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
     if (wire.type==U_SCARAB || wire.raw_type==85) {
         if (!race_scarab_stage_wire || !sc64_scarab_flight_from_wire(&wire,out,1,0) ||
             (((unsigned)out->carry>>8)&3u)>1u) return 0;
         return 1;
     }
-    *out=wire; return 1;
-#else
-    return sc64_unit_save_decode(out, &candidate->units[slot],
-                                 world_width, world_height);
 #endif
+    *out=wire; return 1;
+#endif
+}
+#endif
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_ZP_FULL_STORAGE)
+/* Codec-specific row writer; semantic conversion is performed by the caller. */
+static int race_scarab_zp_encode(RaceSave *candidate, unsigned slot,
+                                  const Unit *unit, unsigned width, unsigned height)
+{
+    if (!candidate || !unit || slot >= MAX_UNITS) return 0;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    return sc64_p7_typed_unit_encode(&candidate->units[slot],unit,width,height);
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    return sc64_derived_unit_encode(&candidate->units[slot],unit,width,height);
+#else
+    return sc64_zp_unit_save_encode(&candidate->units[slot],unit,width,height);
 #endif
 }
 #endif
@@ -1125,6 +1146,16 @@ static int race_save_game(void) {
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    for (int i=0;i<MAX_UNITS;i++) {
+        Unit wire;
+        if (((u[i].type==U_SCARAB || u[i].raw_type==85) &&
+             (((unsigned)u[i].carry>>8)&3u)>1u) ||
+            !sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+            !race_scarab_zp_encode(&race_data,(unsigned)i,&wire,
+                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+    }
+#else
     for(int i=0;i<MAX_UNITS;i++)
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
         if(!sc64_p7_typed_unit_encode(&race_data.units[i], &u[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
@@ -1136,6 +1167,7 @@ static int race_save_game(void) {
         if(!sc64_zp_unit_save_encode(&race_data.units[i], &u[i],
                                      (unsigned)(race_cols * 16),
                                      (unsigned)(race_rows * 16))) return 0;
+#endif
 #endif
 #else
     for(int i=0;i<MAX_UNITS;i++)
@@ -2704,7 +2736,11 @@ static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *conte
                     SC64_SCARAB_PARENT_PACKED : SC64_SCARAB_PARENT_LEGACY,
                     83,q.carry,q.work_timer,&c,&t)) return 0;
             q.carry=c; q.work_timer=t;
+#ifdef SC64_ZP_FULL_STORAGE
+            if (!race_scarab_zp_encode(&race_data,i,&q,(unsigned)width*16u,(unsigned)height*16u)) return 0;
+#else
             if (!sc64_unit_save_encode(&race_data.units[i],&q,(unsigned)width*16u,(unsigned)height*16u)) return 0;
+#endif
         }
     }
     /* A checked new envelope has the existing BC payload layout. Mission
@@ -2795,9 +2831,14 @@ static int race_load_game(void) {
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16), &decoded)) return 0;
 #else
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        if(!race_save_decode_unit(&race_data,(unsigned)i,(unsigned)(race_cols*16),
+                                  (unsigned)(race_rows*16),&decoded)) return 0;
+#else
         if(!sc64_zp_unit_save_decode(&decoded, &race_data.units[i],
                                      (unsigned)(race_cols * 16),
                                      (unsigned)(race_rows * 16))) return 0;
+#endif
 #endif
 #else
 #ifdef SC64_SCARAB_NAMESPACE_STAGE

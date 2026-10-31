@@ -84,8 +84,14 @@ int main(void){gba_init();
  memcpy(before,host_save,sizeof(before));assert(!save_write_first(payload,4,tags[2]));assert(!memcmp(before,host_save,sizeof(before)));
  reset();record(1,0x55667788u,8,0xa5);memcpy(before,host_save,sizeof(before));assert(!save_write_first(payload,4,tags[2]));assert(!memcmp(before,host_save,sizeof(before)));
  reset();record(0,tags[0],2,0xa5);host_save[16]^=1;assert(save_write_first(payload,4,tags[2]));assert(select_record().sequence==1);
- /* Reject duplicate/zero tags, excessive scratch and absent candidates. */
- {u32 dup[3]={tags[0],tags[0],tags[2]},zero[3]={tags[0],0,tags[2]};selection_unchanged_failure(dup,3,sizeof(scratch));selection_unchanged_failure(zero,3,sizeof(scratch));selection_unchanged_failure(tags,0,sizeof(scratch));selection_unchanged_failure(tags,3,SAVE_PAYLOAD_MAX+1);}
+ /* A caller's larger scratch buffer is safe: record length remains bounded
+  * by the journal, and no bytes beyond the selected payload are touched. */
+ {u8 large[SAVE_PAYLOAD_MAX+64];GbaSaveSelection s={0};
+  memset(large,0xcc,sizeof(large));reset();record(0,tags[0],1,0xa5);
+  assert(save_select_validated(large,sizeof(large),tags,3,validate,0,&s));
+  assert(s.length==4 && large[4]==0xcc && large[sizeof(large)-1]==0xcc);}
+ /* Reject duplicate/zero tags and absent candidates. */
+ {u32 dup[3]={tags[0],tags[0],tags[2]},zero[3]={tags[0],0,tags[2]};selection_unchanged_failure(dup,3,sizeof(scratch));selection_unchanged_failure(zero,3,sizeof(scratch));selection_unchanged_failure(tags,0,sizeof(scratch));}
  reset();selection_unchanged_failure(tags,3,sizeof(scratch));
  puts("validated SRAM selection: 3-generation ordering, semantic fallback, wrap and atomic predecessor preservation passed");return 0;
 }

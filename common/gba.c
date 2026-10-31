@@ -1184,7 +1184,7 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection) {
     volatile const u8 *base=(volatile const u8*)SRAM_BASE;
     GbaSaveSelection best={0,0,0,0,-1};
-    if(!scratch||!capacity||capacity>SAVE_PAYLOAD_MAX||!tags||!tag_count||tag_count>3||!validate||!selection)return 0;
+    if(!scratch||!capacity||!tags||!tag_count||tag_count>3||!validate||!selection)return 0;
     for(unsigned i=0;i<tag_count;i++) {
         if(!tags[i])return 0;
         for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
