@@ -102,6 +102,7 @@ static unsigned defense_screen_order_retry_frame;
 /* Controller-only knobs for bounded ordinary-input policy comparisons. */
 static int policy_workers=8,policy_reserve=50,policy_hydras=12;
 static int policy_second_first=1,policy_retreat=0,policy_home_radius=220;
+static int policy_home_army_r;
 static int macro_worker_goal=3;
 static int defense_attack_frame;
 static int workers_retreating;
@@ -1792,6 +1793,94 @@ static int army_order(int attack,int x,int y)
         }
     }
     if(accepted)++actions_taken;
+    return accepted>0;
+}
+
+/* Mirror select_combat_group's eligibility for this campaign build. The
+   extra verification after R makes an engine/control mismatch a fallback,
+   never an attack order for an unverified selection. */
+static int z7_r_combat_eligible(int i)
+{
+    if(!u[i].alive||SC64_TRANSPORT_LOADED(&u[i])||SC64_SCARAB_CHILD(&u[i])||
+       u[i].owner!=SIDE)return 0;
+    int eligible=u[i].type==U_MARINE||u[i].type==U_FIREBAT||u[i].type==U_MEDIC;
+#ifdef SC64_RACES
+    eligible|=!IS_WORKER(u[i].type)&&u[i].type!=U_OVERLORD&&u[i].type!=U_CHRYSALIS;
+#endif
+#ifdef SC64_IMPORTED_MISSION
+    eligible|=u[i].type==U_RAYNOR;
+#endif
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    eligible|=sc64_game_unit_has_flag(u[i].type,SC64_GAME_ACTOR_WEAPON);
+    eligible=eligible&&sc64_game_unit_selectable(u[i].type)&&
+        (!sc64_game_unit_actor_flags(u[i].type)||
+         sc64_game_unit_has_flag(u[i].type,SC64_GAME_ACTOR_WEAPON));
+#endif
+    return eligible;
+}
+
+static int z7_home_ground_target_valid(int hatch,int target)
+{
+    if(screen!=SCREEN_PLAY||won||lost||hatch<0||hatch>=MAX_BUILDINGS||
+       !b[hatch].alive||b[hatch].owner!=SIDE||target<0||target>=MAX_UNITS||
+       !u[target].alive||u[target].owner!=ENEMY||
+       !owners_hostile(SIDE,u[target].owner)||SC64_TRANSPORT_LOADED(&u[target])||
+       sc64_race_unit_flying(u[target].type)||
+       !currently_visible(u[target].x,u[target].y)||
+       !SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,target,SIDE,3))return 0;
+    int d=dist2(u[target].x,u[target].y,b[hatch].x,b[hatch].y);
+    return d<=160*160||(d<=policy_home_radius*policy_home_radius&&
+                        z7_threat_near_workers(target,128));
+}
+
+/* Optional strategy: use R only when the whole combat group is a local
+   Hydra/Muta force. In particular, never pull a distant or hero/NPC unit.
+   Every selection and command is made by ordinary inputs. */
+static int z7_home_army_attack(int hatch,int target)
+{
+    unsigned char expected[MAX_UNITS]={0};
+    int n=0,hydras=0;
+    if(!policy_home_army_r||!z7_home_ground_target_valid(hatch,target))return 0;
+    cancel_ui_mode();
+    /* R on any selected building is deliberately excluded, even if it is
+       not a producer. Avoid altering the training selection on producers. */
+    if(screen!=SCREEN_PLAY||mode!=MODE_NORMAL||menu_open||box_state||help||
+       selected_building>=0)return 0;
+    for(int i=0;i<MAX_UNITS;i++)if(z7_r_combat_eligible(i)) {
+        if(!((u[i].type==U_HYDRALISK&&u[i].raw_type==38)||
+             (u[i].type==U_MUTALISK&&u[i].raw_type==43))||
+           dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y)>
+               policy_home_radius*policy_home_radius)return 0;
+        expected[i]=1;++n;if(u[i].type==U_HYDRALISK)++hydras;
+    }
+    if(!n||!hydras)return 0;
+    if(prior_keys)step(0);
+    tap(KEY_R);
+    if(screen!=SCREEN_PLAY||mode!=MODE_NORMAL||menu_open||box_state||help||
+       selected_building>=0)return 0;
+    for(int i=0;i<MAX_UNITS;i++) {
+        int selected=u[i].alive&&!SC64_TRANSPORT_LOADED(&u[i])&&u[i].selected;
+        if(selected!=expected[i]||z7_r_combat_eligible(i)!=expected[i]||
+           (expected[i]&&dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y)>
+               policy_home_radius*policy_home_radius))return 0;
+    }
+    if(!z7_home_ground_target_valid(hatch,target))return 0;
+    if(!choose_menu_row(MENU_ATTACK)||mode!=MODE_ATTACK) {cancel_ui_mode();return 0;}
+    for(int retry=0;retry<3;retry++) {
+        if(!z7_home_ground_target_valid(hatch,target)) {cancel_ui_mode();return 0;}
+        move_cursor(u[target].x,u[target].y);
+        if(dist2(cx,cy,u[target].x,u[target].y)<20*20)break;
+    }
+    if(!z7_home_ground_target_valid(hatch,target)||
+       dist2(cx,cy,u[target].x,u[target].y)>=20*20||
+       sc64_direct_attack_find_target(cx,cy)!=target) {cancel_ui_mode();return 0;}
+    tap(KEY_A);
+    int accepted=0;
+    for(int i=0;i<MAX_UNITS;i++)if(expected[i]&&u[i].alive&&u[i].selected&&
+       u[i].type==U_HYDRALISK&&u[i].order==ORDER_ATTACK_TARGET&&u[i].target==target)
+        ++accepted;
+    fprintf(stderr,"Z7 home army R target%d group%d hydras%d accepted%d frame%u\n",
+        target,n,hydras,accepted,(unsigned)frame);
     return accepted>0;
 }
 
@@ -4914,7 +5003,8 @@ static void attack_step(void)
                    (ground<0||d<best)){ground=i;best=d;}
             }
             if(ground>=0) {
-                int accepted=typed_attack_target(U_HYDRALISK,ground);
+                int accepted=z7_home_army_attack(hatch,ground);
+                if(!accepted)accepted=typed_attack_target(U_HYDRALISK,ground);
                 fprintf(stderr,"Z7 priority Hydra home threat accepted%d slot%d raw%d d2%d frame%u\n",
                     accepted,ground,u[ground].raw_type,best,(unsigned)frame);
                 hydra_ground_next_order=frame+(accepted?180u:60u);
@@ -5712,6 +5802,7 @@ int main(int argc,char **argv)
             else if(!strcmp(opt,"--policy-retreat")){if(value<0||value>1)return 2;policy_retreat=(int)value;}
             else {if(value<128||value>400)return 2;policy_home_radius=(int)value;}
         }
+        else if(!strcmp(argv[i],"--home-army-r"))policy_home_army_r=1;
         else if(!strcmp(argv[i],"--limit")&&i+1<argc)run_limit=(u32)strtoul(argv[++i],0,10);
         else if(!strcmp(argv[i],"--trace")&&i+1<argc)trace_path=argv[++i];
         else if(!strcmp(argv[i],"--probe-hatch-site")&&i+2<argc) {
@@ -5719,16 +5810,17 @@ int main(int argc,char **argv)
         }
         else if(!strcmp(argv[i],"--force-late-air-at-frame")&&i+1<argc)
             late_air_force_frame=(unsigned)strtoul(argv[++i],0,10);
-        else {fprintf(stderr,"usage: %s [--policy baseline|early-gas] [--limit HOST_TICKS] [--trace PATH] [--probe-hatch-site X Y] [--force-late-air-at-frame FRAME]\n",argv[0]);return 2;}
+        else {fprintf(stderr,"usage: %s [--policy baseline|early-gas] [--home-army-r] [--limit HOST_TICKS] [--trace PATH] [--probe-hatch-site X Y] [--force-late-air-at-frame FRAME]\n",argv[0]);return 2;}
     }
     if(!run_limit||run_limit>1000000u)return 2;
     mkdir(".local",0777);mkdir(".local/sc64",0777);
     trace_file=fopen(trace_path,"w");if(!trace_file){perror("open Z7 controller trace");return 2;}
     fprintf(trace_file,"{\"schema\":1,\"profile\":\"zerg-z7\",\"mission\":18,"
-        "\"policy\":\"%s\",\"events\":[",
-        early_gas_policy?"normal-input Z7 early-gas trial":"normal-input Z7 defensive baseline");
-    fprintf(stderr,"Z7 policy workers%d reserve%d hydras%d second%d retreat%d radius%d\n",
-        policy_workers,policy_reserve,policy_hydras,policy_second_first,policy_retreat,policy_home_radius);
+        "\"policy\":\"%s%s\",\"events\":[",
+        early_gas_policy?"normal-input Z7 early-gas trial":"normal-input Z7 defensive baseline",
+        policy_home_army_r?" + home-army-r":"");
+    fprintf(stderr,"Z7 policy workers%d reserve%d hydras%d second%d retreat%d radius%d home-army-r%d\n",
+        policy_workers,policy_reserve,policy_hydras,policy_second_first,policy_retreat,policy_home_radius,policy_home_army_r);
     launch_from_normal_menu();
     source_checkpoint("start");
     int last_checkpoint=frame;
