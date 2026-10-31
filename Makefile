@@ -6124,3 +6124,14 @@ $(eval $(call SC64_PENDING_TRANSPORT_LEGACY_PROFILE,zerg-z7,ZERG_Z7_CANONICAL_FL
 .PHONY: test-sc64-pending-transport-legacy
 test-sc64-pending-transport-legacy: $(addprefix build/test-sc64-pending-transport-legacy-,terran zerg-z6 zerg-z7)
 	@set -e; for profile in terran zerg-z6 zerg-z7; do ./build/test-sc64-pending-transport-legacy-$$profile; done
+
+# Mission-specific source actors and permissions; fixtures write only normal
+# saves and do not run the negative-SRAM cases in the parent test sources.
+build/test-sc64-pending-transport-p5: tests/sc64_transport_pending_p5.c tests/sc64_p5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-pending-transport-z6: tests/sc64_transport_pending_z6.c tests/sc64_z6_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-pending-transport-missions
+test-sc64-pending-transport-missions: build/test-sc64-pending-transport-p5 build/test-sc64-pending-transport-z6
+	./build/test-sc64-pending-transport-p5
+	./build/test-sc64-pending-transport-z6
