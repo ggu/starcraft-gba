@@ -448,15 +448,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
 {
     unsigned i,j;
     u8 powered_cannons[MAX_BUILDINGS];
-    memset(powered_cannons,0,sizeof(powered_cannons));
-    for(i=0;i<MAX_BUILDINGS;++i) if(b[i].alive &&
-        RACE_PROTOSS_RAW(&b[i])==SC64_P7_CANNON_RAW && building_complete((int)i) &&
-        RACE_PROTOSS_SLOT(&b[i])>=0 && RACE_PROTOSS_SLOT(&b[i])<8) {
-        int live=race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&b[i]));
-        if(live==b[i].owner)
-            powered_cannons[i]=(u8)sc64_p7_observer_pylon_powers((int)i,
-                RACE_PROTOSS_SLOT(&b[i]),live);
-    }
+    int powered_cannons_ready=0;
     unsigned global=(unsigned)RACE_PROTOSS_SERVICE_CLOCK[1] |
                     ((unsigned)RACE_PROTOSS_SERVICE_CLOCK[2]<<8);
     int stagger_reset=0;
@@ -582,6 +574,20 @@ static void sc64_p7_arbiter_cache_source_tick(void)
         timer=SC64_P7_ARBITER_COUNTDOWN(old);
         if (tracked) {
             if (timer==0 || (tracked && !was_tracked)) {
+                /* Building and owner state are unchanged within this tick.
+                 * Compute the shared snapshot only if a refresh needs it. */
+                if (!powered_cannons_ready) {
+                    memset(powered_cannons,0,sizeof(powered_cannons));
+                    for(j=0;j<MAX_BUILDINGS;++j) if(b[j].alive &&
+                        RACE_PROTOSS_RAW(&b[j])==SC64_P7_CANNON_RAW && building_complete((int)j) &&
+                        RACE_PROTOSS_SLOT(&b[j])>=0 && RACE_PROTOSS_SLOT(&b[j])<8) {
+                        int live=race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&b[j]));
+                        if(live==b[j].owner)
+                            powered_cannons[j]=(u8)sc64_p7_observer_pylon_powers((int)j,
+                                RACE_PROTOSS_SLOT(&b[j]),live);
+                    }
+                    powered_cannons_ready=1;
+                }
                 mask=sc64_p7_arbiter_detected_mask((int)i,powered_cannons);
                 timer=30;
             } else {
