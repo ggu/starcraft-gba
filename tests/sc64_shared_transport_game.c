@@ -36,6 +36,25 @@ static void check_jobs(int map)
     for (int i = 0; i < 4; ++i) assert(race_skirmish_transport_tech.owner[i].researched);
 }
 
+static void check_refunds(int map)
+{
+    int lair;
+    launch(map, R_ZERG, 1, R_ZERG);
+    race_minerals[ENEMY] = 1000; race_gas[ENEMY] = 1000;
+    lair = spawn_build(ENEMY, B_LAIR, race_base_x[1], race_base_y[1], 0);
+    assert(lair >= 0 && race_sk_transport_start_owner(ENEMY, lair));
+    destroy_building(lair, SIDE);
+    assert(!race_skirmish_transport_tech.owner[1].remaining);
+    assert(race_minerals[ENEMY] == 950 && race_gas[ENEMY] == 950);
+    race_minerals[ENEMY] = 1000; race_gas[ENEMY] = 1000;
+    lair = spawn_build(ENEMY, B_LAIR, race_base_x[1], race_base_y[1], 0);
+    assert(lair >= 0 && race_sk_transport_start_owner(ENEMY, lair));
+    b[lair].owner = SIDE; /* Simulate a live ownership transfer. */
+    race_sk_transport_research_tick();
+    assert(!race_skirmish_transport_tech.owner[1].remaining);
+    assert(race_minerals[ENEMY] == 1000 && race_gas[ENEMY] == 1000);
+}
+
 static void check_cargo(int map, int human, int bots)
 {
     static const int raw_carriers[3] = {11, 42, 69};
@@ -73,6 +92,14 @@ static void check_cargo(int map, int human, int bots)
     assert(race_save_game());
     assert(race_load_game());
     assert(u[passenger].order == ORDER_IDLE);
+    assert(race_transport_request_board(passenger, ship));
+    u[ship].x = u[passenger].x; u[ship].y = u[passenger].y;
+    assert(race_transport_tick_unit(passenger));
+    hit_target(ship, 10000, U_MARINE, ENEMY);
+    assert(!u[ship].alive && !u[passenger].alive);
+    assert(race_save_game());
+    assert(race_load_game());
+    assert(!u[ship].alive && !u[passenger].alive);
 }
 
 int main(void)
@@ -80,6 +107,7 @@ int main(void)
     gba_init();
     for (int map = 0; map <= SC64_SKIRMISH_IMPORTED_COUNT; ++map) {
         check_jobs(map);
+        check_refunds(map);
         for (int race = 0; race < 3; ++race)
             for (int bots = 1; bots <= 3; ++bots) check_cargo(map, race, bots);
     }
