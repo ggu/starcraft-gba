@@ -1595,7 +1595,7 @@ static int assign_gas_worker(void)
 /* A player can choose only a currently visible field. Keep the economic
  * assignment local to a completed owned depot and away from visible threats;
  * route queries use the controller's existing map-path knowledge. */
-static int z7_safe_local_mineral(int patch,int *depot_distance)
+static int z7_safe_mineral(int patch,int *depot_distance,int remote)
 {
     int best=0x7fffffff, have_depot=0;
     if(patch<0||patch>=MAX_MINERALS)return 0;
@@ -1610,7 +1610,7 @@ static int z7_safe_local_mineral(int patch,int *depot_distance)
         int d=dist2(b[i].x,b[i].y,m[patch].x,m[patch].y);
         have_depot=1;if(d<best)best=d;
     }
-    if(have_depot&&best>200*200)return 0;
+    if(have_depot&&best>200*200&&(!remote||!seen))return 0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
        currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0&&
        dist2(u[i].x,u[i].y,m[patch].x,m[patch].y)<180*180)return 0;
@@ -1619,6 +1619,11 @@ static int z7_safe_local_mineral(int patch,int *depot_distance)
        dist2(b[i].x,b[i].y,m[patch].x,m[patch].y)<150*150)return 0;
     if(depot_distance)*depot_distance=have_depot?best:0;
     return 1;
+}
+
+static int z7_safe_local_mineral(int patch,int *depot_distance)
+{
+    return z7_safe_mineral(patch,depot_distance,0);
 }
 
 /* A mineral center can be obscured by a selectable friendly actor. Search
@@ -1662,6 +1667,22 @@ static int assign_idle_workers_to_minerals(void)
             for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&
                u[k].raw_type==41&&u[k].order==ORDER_MINE&&u[k].target==j)load++;
             distance+=depot_distance;
+            if(load<best_load||(load==best_load&&distance<best_distance)) {
+                target=j;best_load=load;best_distance=distance;
+            }
+        }
+        /* If local fields are exhausted, an observed remote patch is still
+           a legal mineral order. Require current visibility, a live resource,
+           a safe route and the same verified contextual click as local work. */
+        if(target<0)for(int j=0;j<MAX_MINERALS;j++) {
+            int depot_distance,nx,ny,load=0;
+            if((unsigned)frame<patch_retry_after[j]||
+               !currently_visible(m[j].x,m[j].y)||
+               !z7_safe_mineral(j,&depot_distance,1)||
+               !path_next_tile(u[worker].x,u[worker].y,m[j].x,m[j].y,&nx,&ny))continue;
+            for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&
+               u[k].raw_type==41&&u[k].order==ORDER_MINE&&u[k].target==j)load++;
+            int distance=dist2(u[worker].x,u[worker].y,m[j].x,m[j].y)+depot_distance;
             if(load<best_load||(load==best_load&&distance<best_distance)) {
                 target=j;best_load=load;best_distance=distance;
             }
