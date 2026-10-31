@@ -525,7 +525,12 @@ def main(argv=None):
     report["failures_by_reason"] = {}
     for r in report["cases"]:
         if not r["ok"]:
-            reason = r.get("error") or "progression: owners " + ",".join(map(str, r.get("failed_owners", [])))
+            if r.get("error"):
+                reason = r["error"]
+            elif r.get("failed_owners"):
+                reason = "progression: owners " + ",".join(map(str, r["failed_owners"]))
+            else:
+                reason = f"{r['case'][0]} fixture reported failure"
             report["failures_by_reason"].setdefault(reason, []).append("-".join(str(x) for x in r["case"]))
     report["failed"] = len(report["cases"]) - report["passed"]
     (args.output / "report.json").write_text(json.dumps(report, indent=1, default=list) + "\n")
