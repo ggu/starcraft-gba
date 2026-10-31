@@ -527,7 +527,7 @@ endif
 SHOWCASE_HUD_CACHE_FLAGS = $(if $(filter 1,$(SHOWCASE_HUD_CACHE)),-DSC64_HUD_BUFFER_REUSE -DSC64_HUD_VRAM_BANDS -DSC64_MINIMAP_RASTER)
 # Optional Showcase collision comparison; the contact cache replaces the
 # older class-cache and per-direction steering-list implementations.
-SHOWCASE_CONTACT_CACHE ?= 0
+SHOWCASE_CONTACT_CACHE ?= 1
 ifneq ($(words $(filter 0 1,$(SHOWCASE_CONTACT_CACHE))),1)
 $(error SHOWCASE_CONTACT_CACHE must be 0 or 1)
 endif

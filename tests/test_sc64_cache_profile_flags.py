@@ -66,10 +66,10 @@ class CacheProfileFlagsTests(unittest.TestCase):
 
     def test_showcase_contact_opt_in_and_invalid_values(self):
         old = {"-DSC64_COLLISION_CLASS_CACHE", "-DSC64_COLLISION_STEER_LIST"}
-        baseline = profile_defines()
+        baseline = profile_defines("SHOWCASE_CONTACT_CACHE=0")
         self.assertTrue(old <= baseline["SHOWCASE_FLAGS"])
         self.assertNotIn("-DSC64_CONTACT_CACHE", baseline["SHOWCASE_FLAGS"])
-        enabled = profile_defines("SHOWCASE_CONTACT_CACHE=1")
+        enabled = profile_defines()
         self.assertTrue(old.isdisjoint(enabled["SHOWCASE_FLAGS"]))
         self.assertIn("-DSC64_CONTACT_CACHE", enabled["SHOWCASE_FLAGS"])
         for name in CANONICAL + NON_CACHE:
