@@ -5948,3 +5948,27 @@ $(eval $(call SCARAB_HUMAN_CONTROL_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC6
 $(eval $(call SCARAB_HUMAN_CONTROL_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-human-control
 test-scarab-human-control: test-scarab-human-control-terran test-scarab-human-control-zerg test-scarab-human-control-protoss test-scarab-human-control-showcase
+
+# Actual damage/STOP lifecycle checks, with a separately labelled injected
+# unsupported transported-parent case. Prepared inputs only.
+define SCARAB_PARENT_CLEANUP_FIXTURE
+.PHONY: test-scarab-parent-cleanup-$(1)
+test-scarab-parent-cleanup-$(1): $$(CANONICAL_LOOKUP_INPUTS)
+	@set -eu; \
+	mkdir -p build/generated/scarab-parent-cleanup; \
+	run=$$$$(mktemp -d build/generated/scarab-parent-cleanup/$(1).XXXXXX); \
+	printf 'Scarab parent cleanup receipts: %s\n' "$$$$run"; \
+	$(if $(filter protoss,$(1)),$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts"; "$$$$run/facts" > "$$$$run/sc64_fact_tables_generated.h",:); \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	  -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	  -DSC64_SCARAB_HUMAN_CONTROL_PROBE $(2) tests/sc64_scarab_parent_cleanup_game.c \
+	  tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(3) -o "$$$$run/test"; \
+	for map in 0 1; do for case in t i o s c; do "$$$$run/test" $$$$case $$$$map; done; done
+endef
+$(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,terran,$(TERRAN_ROM_FLAGS),))
+$(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,zerg,$(ZERG_ROM_FLAGS),))
+$(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run",$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
+.PHONY: test-scarab-parent-cleanup
+test-scarab-parent-cleanup: test-scarab-parent-cleanup-terran test-scarab-parent-cleanup-zerg test-scarab-parent-cleanup-protoss test-scarab-parent-cleanup-showcase

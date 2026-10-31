@@ -1685,6 +1685,8 @@ static int race_scarab_parent_init(int slot);
 static int race_scarab_production_tick(int slot,int upgraded);
 static int race_scarab_human_selected(void);
 static int race_scarab_human_enqueue(void);
+static void race_scarab_human_parent_lost(int slot);
+static int race_scarab_stop_signal(int slot,int upgraded);
 #endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
@@ -4407,6 +4409,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
                 race_z6_note_unit_death(&u[target]);
             }
 #endif
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+            if (sc64_race_raw_unit(u[target].type)==83) race_scarab_human_parent_lost(target);
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
             /* Carrier recognition stays shared across campaign and skirmish;
              * inspect the live carrier before clearing its slot. */
@@ -5497,12 +5502,18 @@ stop_selected(void)
              * the contextual CANCEL EGG action remains the only cancel path. */
             if (u[i].type == U_Z7_EGG) continue;
 #endif
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+            if (sc64_race_raw_unit(u[i].type)==83) (void)race_scarab_stop_signal(i,0);
+#endif
 	    u[i].order = ORDER_IDLE;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
             if (sc64_race_raw_unit(u[i].type)==12) u[i].work_timer&=~7;
 #endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
             if (sc64_race_raw_unit(u[i].type) != 12)
+#endif
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+            if (sc64_race_raw_unit(u[i].type) != 83)
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
             if (!race_z5_cloak_actor(&u[i]))
@@ -11796,6 +11807,36 @@ static int race_scarab_human_enqueue(void)
 {
     int i=race_scarab_human_selected();
     return i>=0 && race_scarab_enqueue(i,0);
+}
+/* Retire hidden children before the generic parent slot is invalidated.
+ * The adapter detaches an outside child and removes hidden children without
+ * refund. Hidden actors cannot be selected as ordinary attack targets. */
+static void __attribute__((noinline)) race_scarab_human_parent_lost(int slot)
+{
+    Sc64ScarabParent parent; Sc64ScarabCounts counts;
+    if (!race_scarab_parent_read(slot,0,&parent,&counts)) return;
+    for (int i=0;i<MAX_UNITS;++i) {
+        int owner; unsigned phase;
+        if (!race_scarab_child_lookup(i,&owner,&phase) || owner!=slot ||
+            phase>=SC64_SCARAB_CHILD_OUTSIDE) continue;
+        race_scarab_probe_target_invalidate(i);
+#ifdef SC64_IMPACT_EVENTS
+        race_impact_clear_target(i);
+#endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+        race_bc_yamato_target_removed((unsigned)i);
+        sc64_bc_shot_caster_gone(sc64_bc_shots,(unsigned)i);
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+        race_p7_projectile_clear_references(i);
+#endif
+#ifdef SC64_DIRECT_ATTACK
+        sc64_direct_attack_clear_references(i);
+#endif
+        u[i].selected=0;
+    }
+    (void)race_scarab_parent_lost(slot,0);
+    target_lists_valid=0; sc64_target_index_end(); sc64_unit_bucket_active=0;
 }
 #endif
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
