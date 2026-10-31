@@ -1677,6 +1677,15 @@ static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #if defined(SC64_SCARAB_WEAPON_PROBE) && (!defined(SC64_SCARAB_AUTONOMOUS_PROBE) || !defined(SC64_IMPACT_EVENTS))
 #error "Scarab weapon probe requires autonomous control and impact events"
 #endif
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+#if !defined(SC64_SCARAB_NAMESPACE_STAGE) || !defined(SC64_SCARAB_WEAPON_PROBE)
+#error "Scarab human control probe requires namespace and weapon probes"
+#endif
+static int race_scarab_parent_init(int slot);
+static int race_scarab_production_tick(int slot,int upgraded);
+static int race_scarab_human_selected(void);
+static int race_scarab_human_enqueue(void);
+#endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
 #error "Scarab flight control probe requires runtime and source cadence"
@@ -2317,6 +2326,13 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].target = -1;
     u[i].path_timer = 0;
     u[i].path_retry = 0;u[i].path_x=x;u[i].path_y=y;
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    /* Refuse slot reuse if an existing child still claims this new parent. */
+    if (sc64_race_raw_unit(type) == 83 && !race_scarab_parent_init(i)) {
+        u[i].alive = 0;
+        return -1;
+    }
+#endif
     if (owner == SIDE)
 	supply_used += unit_supply(type);
     return i;
@@ -5655,6 +5671,12 @@ static int race_bc_yamato_target_at(int x,int y)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    if (choice == (race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) : MENU_STOP+1) &&
+        race_scarab_human_selected() >= 0) {
+        menu_open=0; mode=MODE_NORMAL; toast(race_scarab_human_enqueue()?4:8); return;
+    }
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available() && choice==race_bc_yamato_menu_base()) {
         menu_open=0;mode=MODE_YAMATO;return;
@@ -5925,6 +5947,9 @@ choose_command(int choice)
 static int race_skirmish_command_count(void)
 {
     int count = (int)sc64_skirmish_menu_count((unsigned)race_human);
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    count += race_scarab_human_selected() >= 0;
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     count += race_skirmish_dropship_menu_available();
 #endif
@@ -5953,6 +5978,9 @@ static int field_menu_count(void)
     if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
 #endif
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    if (race_scarab_human_selected() >= 0) return MENU_STOP+2;
+#endif
 #ifdef SC64_SHARED_BUNKER
     if (race_bunker_menu_available()) return MENU_STOP+2;
 #endif
@@ -6017,6 +6045,9 @@ static int field_menu_count(void)
     if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
 #endif
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    if (race_scarab_human_selected() >= 0) return MENU_STOP+2;
+#endif
 #ifdef SC64_SHARED_BUNKER
     if (race_bunker_menu_available()) return MENU_STOP+2;
 #endif
@@ -6040,6 +6071,9 @@ static int field_menu_count(void)
     if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
 #endif
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    if (race_scarab_human_selected() >= 0) return MENU_STOP+2;
+#endif
 #ifdef SC64_SHARED_BUNKER
     if (race_bunker_menu_available()) return MENU_STOP+2;
 #endif
@@ -6078,6 +6112,10 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    if (i == (race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) : MENU_STOP+1) &&
+        race_scarab_human_selected() >= 0) return "BUILD SCARAB";
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available() && i==race_bc_yamato_menu_base()) return "YAMATO GUN";
 #endif
@@ -7310,8 +7348,12 @@ target_lists_unavailable:
 	if (!q->alive)
 	    continue;
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
-        if (sc64_race_raw_unit(q->type)==83 && sc64_battlecruiser_source_tick_due())
+        if (sc64_race_raw_unit(q->type)==83 && sc64_battlecruiser_source_tick_due()) {
             race_scarab_probe_parent_tick(i);
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+            (void)race_scarab_production_tick(i,0);
+#endif
+        }
 #endif
         if (SC64_SCARAB_CHILD(q)) {
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
@@ -11738,6 +11780,24 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #include "sc64_scarab_unit_adapter.h"
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+static int race_scarab_human_selected(void)
+{
+    int selected=-1;
+    if (selected_building>=0) return -1;
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].selected) {
+        if (selected>=0 || u[i].owner!=SIDE || SC64_TRANSPORT_LOADED(&u[i]) ||
+            !race_scarab_parent_identity(i)) return -1;
+        selected=i;
+    }
+    return selected;
+}
+static int race_scarab_human_enqueue(void)
+{
+    int i=race_scarab_human_selected();
+    return i>=0 && race_scarab_enqueue(i,0);
+}
+#endif
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
 #ifdef SC64_SCARAB_WEAPON_PROBE
 /* Pending Scarab packets share the ordinary bounded impact rows. They remain

@@ -5925,3 +5925,26 @@ test-scarab-shared-impact-terran test-scarab-postimpact-gap-terran \
   test-scarab-cross-zerg test-scarab-cross-protoss test-scarab-cross-showcase \
   test-scarab-deadrow-terran test-scarab-deadrow-zerg test-scarab-deadrow-protoss test-scarab-deadrow-showcase \
   test-scarab-sunken-terran test-scarab-sunken-zerg test-scarab-sunken-protoss test-scarab-sunken-showcase: $(CANONICAL_LOOKUP_INPUTS)
+
+# Opt-in real spawn/menu/training experiment; local prepared inputs only.
+define SCARAB_HUMAN_CONTROL_FIXTURE
+.PHONY: test-scarab-human-control-$(1)
+test-scarab-human-control-$(1): $$(CANONICAL_LOOKUP_INPUTS)
+	@set -eu; \
+	mkdir -p build/generated/scarab-human-control; \
+	run=$$$$(mktemp -d build/generated/scarab-human-control/$(1).XXXXXX); \
+	printf 'Scarab human control receipts: %s\n' "$$$$run"; \
+	$(if $(filter protoss,$(1)),$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts"; "$$$$run/facts" > "$$$$run/sc64_fact_tables_generated.h",:); \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	  -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	  -DSC64_SCARAB_HUMAN_CONTROL_PROBE $(2) tests/sc64_scarab_human_control_game.c \
+	  tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(3) -o "$$$$run/test"; \
+	"$$$$run/test" 0; "$$$$run/test" 1
+endef
+$(eval $(call SCARAB_HUMAN_CONTROL_FIXTURE,terran,$(TERRAN_ROM_FLAGS),))
+$(eval $(call SCARAB_HUMAN_CONTROL_FIXTURE,zerg,$(ZERG_ROM_FLAGS),))
+$(eval $(call SCARAB_HUMAN_CONTROL_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run",$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SCARAB_HUMAN_CONTROL_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
+.PHONY: test-scarab-human-control
+test-scarab-human-control: test-scarab-human-control-terran test-scarab-human-control-zerg test-scarab-human-control-protoss test-scarab-human-control-showcase
