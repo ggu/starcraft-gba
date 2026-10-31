@@ -162,6 +162,51 @@ static void aura_union_oracle(void)
     puts("P7 Arbiter aura union oracle passed (80 randomized worlds)");
 }
 
+/* Generic games derive the source slot from the live owner, regardless of
+ * the imported raw-owner field. Exercise every owner-index lane, including
+ * an unavailable-index fallback, against a separate all-pairs union. */
+static void generic_aura_owner_lanes(void)
+{
+    for(int fallback=0;fallback<2;++fallback) {
+        int expected[MAX_UNITS]={0};
+        int arbs[5],targets[5];
+        memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+        memset(visible,0,sizeof(visible));
+        memset(race_protoss_generic_clock,0,sizeof(race_protoss_generic_clock));
+        race_protoss_generic_clock[1]=150;
+        race_mode=1;
+        sc64_p7_arbiter_cache_initialized=0;
+        sc64_p7_arbiter_cache_due=0;
+        for(int owner=0;owner<5;++owner) {
+            arbs[owner]=make_actor(owner,71,U_P7_ARBITER,0,63,64);
+            targets[owner]=make_actor(owner,65,U_ZEALOT,4,64,63);
+            (void)make_actor(owner,65,U_ZEALOT,-1,640,640);
+        }
+        if(fallback) (void)make_actor(5,65,U_ZEALOT,7,128,128);
+        sc64_target_index_begin();
+        assert(sc64_target_index_active==!fallback);
+        for(int owner=0;owner<5;++owner) {
+            int arb=arbs[owner];
+            for(int target=0;target<MAX_UNITS;++target) {
+                if(target==arb || !sc64_p7_observer_arbiter_aura_candidate(target) ||
+                   !sc64_p7_arbiter_same_source(arb,target)) continue;
+                int distance=sc64_p7_observer_rect_distance(71u,u[arb].x,u[arb].y,0,
+                    (unsigned)RACE_PROTOSS_RAW(&u[target]),u[target].x,u[target].y,0);
+                if(sc64_p7_arbiter_finder_square(arb,target) && distance>=0 && distance<=160)
+                    expected[target]=1;
+            }
+            assert(expected[targets[owner]]);
+        }
+        sc64_p7_arbiter_cache_source_tick();
+        for(int i=0;i<MAX_UNITS;++i) {
+            unsigned want=u[i].alive ? sc64_p7_arbiter_pack(0,expected[i]?30:0,
+                                                          expected[i],expected[i]) : 0;
+            assert(u[i].weapon==(u16)want);
+        }
+    }
+    puts("Generic Arbiter aura matches all-pairs union in all five owner lanes and fallback");
+}
+
 int main(void)
 {
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
@@ -170,5 +215,6 @@ int main(void)
     assert(SC64_RACE_SAVE_GENERATION==39u);
 #endif
     aura_union_oracle();
+    generic_aura_owner_lanes();
     return 0;
 }
