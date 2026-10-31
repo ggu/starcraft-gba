@@ -65,6 +65,60 @@ class Verdict(unittest.TestCase):
             sram.verdict(r)
 
 
+class CompletedUpdates(unittest.TestCase):
+    def game(self, stops, initial=40):
+        class Replay:
+            def __init__(self):
+                self.current = initial
+                self.stops = iter(stops)
+                self.calls = 0
+                self.writes = []
+
+            def tick(self, *, expected):
+                self.calls += 1
+                self.current = next(self.stops)
+
+            def write(self, address, data):
+                self.writes.append((address, data))
+
+        game = sram.Game.__new__(sram.Game)
+        game.rsp = Replay()
+        game.u32 = lambda name: game.rsp.current
+        game.sym = {"demo_schedule_events": 1, "demo_schedule_count": 2, "demo_schedule_index": 3}
+        game.update, game.keys, game.updates, game.stale_update_stops = 4, 0, 0, 0
+        return game
+
+    def test_reentered_stop_is_not_another_update(self):
+        game = self.game([40, 41, 42])
+        game.step(0, 2)
+        self.assertEqual((game.updates, game.rsp.calls, game.stale_update_stops), (2, 3, 1))
+
+    def test_reentered_stop_does_not_resend_input(self):
+        game = self.game([40, 41])
+        game.step(sram.KEY_A)
+        self.assertEqual(len(game.rsp.writes), 3)
+        self.assertEqual(game.rsp.writes[0], (1, (41).to_bytes(4, "little") + (1).to_bytes(4, "little")))
+
+    def test_skipped_or_backwards_ticks_fail(self):
+        for tick in (39, 42):
+            game = self.game([tick])
+            with self.assertRaisesRegex(sram.ContinuationError, "scheduler jumped"):
+                game.step()
+            self.assertEqual(game.updates, 0)
+
+    def test_stationary_scheduler_fails_with_a_bound(self):
+        game = self.game([40] * 8)
+        with self.assertRaisesRegex(sram.ContinuationError, "eight breakpoint stops"):
+            game.step()
+        self.assertEqual((game.updates, game.rsp.calls), (0, 8))
+
+    def test_window_boundary_still_counts_one_update(self):
+        game = self.game([250, 251], initial=249)
+        game.step(0, 2)
+        self.assertEqual(game.updates, 2)
+        self.assertEqual(game.stale_update_stops, 0)
+
+
 class EntityRows(unittest.TestCase):
     def test_reads_live_rows_at_dwarf_widths(self):
         layout = Layout({"alive": 0, "owner": 1, "x": 2, "hp": 4},
