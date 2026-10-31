@@ -1813,6 +1813,11 @@ static inline int sc64_race_unit_from_raw(int raw)
       !defined(SC64_Z3_ENABLED) && !defined(SC64_T5_RUNTIME)
     case 11: return U_DROPSHIP;
 #endif
+#if defined(SC64_SHARED_TRANSPORT) && \
+    !(defined(SC64_UNIFIED) && (defined(SC64_Z3_ENABLED) || defined(SC64_T5_RUNTIME))) && \
+    !(defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_T5_RUNTIME))
+    case 11: return U_DROPSHIP;
+#endif
     case 3: return U_GOLIATH; case 5: return U_TANK; case 30: return U_SIEGE_TANK;
     case 8: return U_WRAITH; case 43: return U_MUTALISK;
     case 53: return U_HUNTER_KILLER; case 216: return U_CHRYSALIS;
