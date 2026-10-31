@@ -63,6 +63,20 @@ input paths still exist. The final source checkpoint also passed 18 focused
 Python replay tests and `git diff --check`. No fresh ARM build or all-mission
 qualification is claimed by this audit.
 
+To run the optional UI-context fixture on all six existing production
+vectors when their prepared inputs are available:
+
+```sh
+make test-sc64-shared-mechanics-ui-context
+```
+
+This builds separate host binaries for Terran, Zerg, Protoss, Showcase, Races
+and Unified, enabling only `SC64_SAVE_UI_CONTEXT` in each existing vector. It
+runs the full shared-mechanics fixture, including its original assertions and
+UI save tests. `make test-sc64-shared-mechanics` remains the default-off
+matrix. This target has not itself been run as part of the historical witness
+above; those recorded UI-on builds covered Terran, Zerg and Protoss.
+
 ## SHA-256 evidence
 
 | Artifact | SHA-256 |
