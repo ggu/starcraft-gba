@@ -61,3 +61,25 @@ to that pointer is 11,776 bytes. Disassembly shows the relocated mask's own
 stack frame decreases from 168 to 136 bytes. That local inspection is not a
 whole-call-chain or interrupt high-water measurement for this ROM. Existing
 historical painted-stack results used a different binary and do not qualify it.
+
+## Source-scoped verification
+
+The official `zerg-z7` target at source commit `b7f15f7` reproduced the
+qualified `d5857f` ROM above. Its complete compiler argument vector matched
+the manually qualified placement build, and all 109 prepared input hashes
+matched before and after compilation. The subsequent `ae8eb1b` commit changes
+only the test's expected flag string; Makefile, `common/`, and `starcraft/`
+are unchanged from the qualified build.
+
+At exact head `ae8eb1b`, a clean unprepared checkout passed `./dev doctor`,
+`python3 tools/check_source_tree.py`, `./dev build`, and the full `./dev test`.
+The latter includes 920 Python tests (25 skipped) and the native/host fixtures.
+The first default test run failed only because the existing source test still
+expected the removed flag; its failure was retained and the expectation was
+updated before the successful rerun.
+
+Separate normal P7, P8, and Terran T10 links at source `79757a7` passed their
+unchanged EWRAM/IWRAM guards with all 109 inputs checked. P7 and P8 already
+placed the mask in IWRAM, with IWRAM end `030049e0`; Terran T10's existing
+source rule forced ROM placement, with IWRAM end `03004b40`. These are guard
+and placement checks, not new cross-profile performance or full-play claims.
