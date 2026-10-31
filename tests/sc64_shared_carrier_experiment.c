@@ -308,12 +308,35 @@ static void test_paid_carrier_command(void)
     int target=spawn_unit(ENEMY,U_ZERGLING,u[carrier].x+64,u[carrier].y);
     assert(target>=0);
     int hp=u[target].hp, launched=0;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    unsigned previous_shared=0; int saw_shared=0,saw_retirement=0;
+#endif
     u[carrier].order=ORDER_ATTACK_TARGET; u[carrier].target=target;
     for (int i=0;i<400 && screen==SCREEN_PLAY && u[target].alive;++i) {
         game_update(0,0);
         if (children(carrier,SC64_P7_INTERCEPTOR_OUTSIDE)) launched=1;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+        unsigned shared=0;
+        for(unsigned k=0;k<SC64_SHARED_PROJECTILE_CAPACITY;k++)
+            shared+=sc64_shared_projectiles.slots[k].type==SC64_SHARED_PROJECTILE_INTERCEPTOR;
+        if(shared)saw_shared=1;
+        if(shared<previous_shared)saw_retirement=1;
+        previous_shared=shared;
+#endif
     }
     assert(launched && (!u[target].alive || u[target].hp<hp));
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    /* Follow source-ticked flight beyond the first damage observation. */
+    for(int i=0;i<200 && screen==SCREEN_PLAY && !saw_retirement;i++) {
+        game_update(0,0);unsigned shared=0;
+        for(unsigned k=0;k<SC64_SHARED_PROJECTILE_CAPACITY;k++)
+            shared+=sc64_shared_projectiles.slots[k].type==SC64_SHARED_PROJECTILE_INTERCEPTOR;
+        if(shared)saw_shared=1;
+        if(shared<previous_shared)saw_retirement=1;
+        previous_shared=shared;
+    }
+    assert(saw_shared && saw_retirement);
+#endif
 }
 
 int main(void)

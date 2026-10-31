@@ -64,6 +64,7 @@ static int race_shared_ordinary_prepare(Unit *q,int target,int flying,int damage
          (raw==3 && flying && attack->weapon_id==8 && hits==2) ||
          (raw==2 && !flying && attack->weapon_id==4 && hits==1) ||
          (raw==8 && !flying && attack->weapon_id==16 && hits==1) ||
+         (raw==8 && flying && attack->weapon_id==15 && hits==1) ||
          (raw==38 && !flying && attack->weapon_id==38 && hits==1) ||
          (raw==66 && !flying && attack->weapon_id==66 && hits==1))) return 0;
     unsigned shots=(raw==70 || raw==3)?2u:1u;
