@@ -169,6 +169,7 @@ static int command_selected(int which,int x,int y)
 }
 
 static int hero_command(int slot,int x,int y);
+static int hero_select(int slot);
 
 /* Distance from (x,y) to the nearest armed enemy (Overlords are harmless
  * detectors), capped at 1024 pixels. */
@@ -224,9 +225,9 @@ static int army_command(int which,int x,int y)
             if(d<bd){bd=d;anchor=i;}
         }
         if(anchor<0)break;
-        close_menus();
-        clear_selected_building();
-        move_cursor(u[anchor].x,u[anchor].y);
+        /* Native L cycling places the cursor on the chosen unit without a
+         * cross-map cursor traversal; double-tap then selects its type. */
+        if(!hero_select(anchor))continue;
         if(army_cursor_emergency)break;
         KEY_TAP(KEY_A);KEY_TAP(KEY_A);
         int bad=0,count=0;
