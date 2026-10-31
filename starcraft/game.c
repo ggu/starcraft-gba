@@ -5674,6 +5674,15 @@ static int __attribute__((noinline)) race_bunker_menu_available(void)
 }
 #endif
 
+#ifdef SC64_RACES
+enum {
+    RACE_CONTEXT_SCARAB, RACE_CONTEXT_YAMATO, RACE_CONTEXT_BC_BUILDING,
+    RACE_CONTEXT_BUNKER, RACE_CONTEXT_TRANSPORT, RACE_CONTEXT_BATTERY,
+    RACE_CONTEXT_CARRIER, RACE_CONTEXT_COUNT
+};
+static int race_context_command_base(int context);
+#endif
+
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
 static int race_bc_lab_menu_available(void)
 {
@@ -5682,7 +5691,7 @@ static int race_bc_lab_menu_available(void)
         building_complete(i) && sc64_race_raw_building(b[i].type)==118;
 }
 static int race_bc_menu_base(void)
-{ return race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) : MENU_STOP+1; }
+{ return race_context_command_base(RACE_CONTEXT_BC_BUILDING); }
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
 static int race_bc_facility_menu_available(void)
 {
@@ -5696,7 +5705,7 @@ static int race_bc_facility_menu_available(void)
 static int race_bc_yamato_target_valid(int target,const Unit *caster,int require_visible);
 static int race_bc_yamato_issue(int slot,int target);
 static int race_bc_yamato_menu_base(void)
-{ return race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1; }
+{ return race_context_command_base(RACE_CONTEXT_YAMATO); }
 static int race_bc_yamato_command_available(void)
 {
     if (selected_building>=0) return 0;
@@ -5721,11 +5730,65 @@ static int race_bc_yamato_target_at(int x,int y)
     return best;
 }
 #endif
+#ifdef SC64_RACES
+/* Mixed selections may expose more than one unit command. All custom-game
+ * count, label and dispatch paths use these same contiguous offsets. */
+static int race_context_command_width(int context)
+{
+    switch (context) {
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    case RACE_CONTEXT_SCARAB: return race_scarab_human_selected() >= 0;
+#endif
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    case RACE_CONTEXT_YAMATO: return race_bc_yamato_command_available();
+#endif
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    case RACE_CONTEXT_BC_BUILDING:
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        if (race_bc_facility_menu_available()) return 1;
+#endif
+        return race_bc_lab_menu_available() ? (b[selected_building].level ? 1 : 2) : 0;
+#endif
+#ifdef SC64_SHARED_BUNKER
+    case RACE_CONTEXT_BUNKER: return race_bunker_menu_available();
+#endif
+#ifdef SC64_TRANSPORT_RUNTIME
+    case RACE_CONTEXT_TRANSPORT: return race_skirmish_dropship_menu_available();
+#endif
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    case RACE_CONTEXT_BATTERY: return race_battery_command_available();
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    case RACE_CONTEXT_CARRIER: return race_p7_carrier_training_menu_available();
+#endif
+    default: return 0;
+    }
+}
+
+static int race_context_command_base(int context)
+{
+    if (!race_mode) return MENU_STOP+1;
+    int base = (int)sc64_skirmish_menu_count((unsigned)race_human);
+    for (int i = 0; i < context; ++i) base += race_context_command_width(i);
+    return base;
+}
+#endif
+
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static int race_carrier_command_base(void)
+{ return race_context_command_base(RACE_CONTEXT_CARRIER); }
+#endif
 static void
 choose_command(int choice)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (race_mode && choice==race_carrier_command_base() && race_p7_carrier_training_menu_available()) {
+        menu_open=0; mode=MODE_NORMAL;
+        toast(race_p7_carrier_training_queue_selected()?4:8); return;
+    }
+#endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-    if (choice == (race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) : MENU_STOP+1) &&
+    if (choice == race_context_command_base(RACE_CONTEXT_SCARAB) &&
         race_scarab_human_selected() >= 0) {
         menu_open=0; mode=MODE_NORMAL; toast(race_scarab_human_enqueue()?4:8); return;
     }
@@ -5762,7 +5825,7 @@ choose_command(int choice)
     }
 #endif
 #ifdef SC64_SHARED_BUNKER
-    if (choice==(race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1) &&
+    if (choice==race_context_command_base(RACE_CONTEXT_BUNKER) &&
         race_bunker_menu_available()) {
         menu_open=0;mode=MODE_NORMAL;
         toast(race_bunker_request_unload(selected_building)?0:8);return;
@@ -5772,13 +5835,13 @@ choose_command(int choice)
     if (race_mode) {
         Sc64SkirmishMenuRow row;
 #ifdef SC64_TRANSPORT_RUNTIME
-        if (choice == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+        if (choice == race_context_command_base(RACE_CONTEXT_TRANSPORT) &&
             race_skirmish_dropship_menu_available()) {
             menu_open = 0; mode = MODE_UNLOAD; return;
         }
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
-        if (choice == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+        if (choice == race_context_command_base(RACE_CONTEXT_BATTERY) &&
             race_battery_command_available()) {
             menu_open=0; mode=MODE_RECHARGE; return;
         }
@@ -5999,20 +6062,7 @@ choose_command(int choice)
 #ifdef SC64_RACES
 static int race_skirmish_command_count(void)
 {
-    int count = (int)sc64_skirmish_menu_count((unsigned)race_human);
-#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-    count += race_scarab_human_selected() >= 0;
-#endif
-#ifdef SC64_TRANSPORT_RUNTIME
-    count += race_skirmish_dropship_menu_available();
-#endif
-#ifdef SC64_BATTERY_SERVICE_ENABLED
-    count += race_battery_command_available();
-#endif
-#ifdef SC64_SHARED_BUNKER
-    count += race_bunker_menu_available();
-#endif
-    return count;
+    return race_context_command_base(RACE_CONTEXT_COUNT);
 }
 #endif
 
@@ -6021,6 +6071,7 @@ static int race_skirmish_command_count(void)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6030,7 +6081,6 @@ static int field_menu_count(void)
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
     if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
 #endif
-    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     if (race_scarab_human_selected() >= 0) return MENU_STOP+2;
 #endif
@@ -6088,6 +6138,7 @@ static int field_menu_count(void)
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 {
+    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6097,7 +6148,6 @@ static int field_menu_count(void)
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
     if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
 #endif
-    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     if (race_scarab_human_selected() >= 0) return MENU_STOP+2;
 #endif
@@ -6114,6 +6164,7 @@ static int field_menu_count(void)
 #elif defined(SC64_RACES)
 static int field_menu_count(void)
 {
+    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6123,7 +6174,6 @@ static int field_menu_count(void)
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
     if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
 #endif
-    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     if (race_scarab_human_selected() >= 0) return MENU_STOP+2;
 #endif
@@ -6165,8 +6215,12 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (race_mode && i==race_carrier_command_base() && race_p7_carrier_training_menu_available())
+        return "BUILD INTERCEPTOR";
+#endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-    if (i == (race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) : MENU_STOP+1) &&
+    if (i == race_context_command_base(RACE_CONTEXT_SCARAB) &&
         race_scarab_human_selected() >= 0) return "BUILD SCARAB";
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
@@ -6184,17 +6238,17 @@ static const char *race_menu_label(int i)
     }
 #endif
 #ifdef SC64_SHARED_BUNKER
-    if (i==(race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1) &&
+    if (i==race_context_command_base(RACE_CONTEXT_BUNKER) &&
         race_bunker_menu_available()) return "UNLOAD CARGO";
 #endif
     if (race_mode) {
         Sc64SkirmishMenuRow row;
 #ifdef SC64_BATTERY_SERVICE_ENABLED
-        if (i == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+        if (i == race_context_command_base(RACE_CONTEXT_BATTERY) &&
             race_battery_command_available()) return "RECHARGE";
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
-        if (i == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+        if (i == race_context_command_base(RACE_CONTEXT_TRANSPORT) &&
             race_skirmish_dropship_menu_available()) return "UNLOAD CARGO";
 #endif
         return sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) ? row.label : "";

@@ -275,7 +275,7 @@ static int race_p7_carrier_training_live_world_valid(void)
 
 static int race_p7_carrier_training_selected(void)
 {
-    if (!race_carrier_services_active()) return 0;
+    if (!race_carrier_services_active() || selected_building >= 0) return 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].selected && u[i].owner==SIDE &&
             RACE_PROTOSS_SLOT(&u[i])==SC64_PROTOSS_HUMAN_SLOT &&
