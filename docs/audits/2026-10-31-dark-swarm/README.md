@@ -91,3 +91,16 @@ field already reserves 14 for construction and 15 for the shared Battery, so
 an order/save design must not silently allocate a conflicting value. Exact
 casting animation release timing and production-safe UI, AI and effect storage
 are still prerequisites for an integrated order.
+
+### Source cast animation evidence
+
+The authenticated N64 `iscript.bin` SHA-256 is
+`f8e5f3d0fcca644470c37de65486e44b09eb30141eedccea3445afe7bc0f65bc`.
+The source DAT chain resolves ordinary Defiler raw 46 and Unclean One raw 52
+to the same image 13 and IScript 9. The `CastSpell` path performs four
+one-source-tick waits, then emits `castspell` at source tick 4. In pinned
+OpenBW this opcode validates the active spell order and fires its configured
+weapon. Dark Swarm is allocated later by that projectile's hit handler. This
+is evidence for a distinct animation/release stage, not for creating the
+swarm immediately when energy is debited. Projectile flight/hit scheduling and
+interruptions still require actual-world verification.
