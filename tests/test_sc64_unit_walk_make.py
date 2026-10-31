@@ -5,13 +5,15 @@ import subprocess
 import tempfile
 import unittest
 
+from tests.make_fixture import copy_makefile_with_includes
+
 ROOT = Path(__file__).resolve().parents[1]
 
 class WalkMakeTest(unittest.TestCase):
     def test_missing_walk_uses_walk_generator(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / 'Makefile').write_bytes((ROOT / 'Makefile').read_bytes())
+            copy_makefile_with_includes(ROOT, root)
             (root / 'tools').symlink_to(ROOT / 'tools', target_is_directory=True)
             facing = '.local/sc64/facing/generated/sc64_unit_facing_generated.h'
             target = '.local/sc64/walk/generated/sc64_unit_walk_generated.h'

@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from tests.make_fixture import copy_makefile_with_includes
+
 ROOT = Path(__file__).resolve().parents[1]
 loader = importlib.machinery.SourceFileLoader('bc_dev', str(ROOT / 'dev'))
 spec = importlib.util.spec_from_loader(loader.name, loader)
@@ -70,7 +72,7 @@ class CanonicalLinkTests(unittest.TestCase):
         import re
         import subprocess
         with tempfile.TemporaryDirectory() as tmp:
-            (Path(tmp) / 'Makefile').write_text((ROOT / 'Makefile').read_text())
+            copy_makefile_with_includes(ROOT, Path(tmp))
             targets = [f'build/test-sc64-construction-arrival{suffix}-{profile}'
                        for profile in ('terran', 'zerg-z6', 'protoss-p7')
                        for suffix in ('', '-save')]
