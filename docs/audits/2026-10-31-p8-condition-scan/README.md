@@ -7,3 +7,13 @@ The actual-P8 actor-pool differential fixture compares all nine authenticated P8
 Both literal normal `-g` P8 ROM links passed existing guards. Probe-off EWRAM/IWRAM ended at `0x0203899c`/`0x030049e0`; probe-on ended at `0x02038cbc`/`0x030049e0`. The probe-off ROM SHA-256 `1b2700822d8c362c57ac03e228303a58320dce41e98371fbc5cd06584cec2c30` matches the retained public-P8 control; the probe-on ROM SHA-256 is `54cfbe2da8169767424cc71172b1b6319d7be508fb2c58dec62225f7f734cf68`. Arguments, maps, ROM/ELF hashes and verified same-byte compression receipts are in `.local/p8-condition-arm-v2`.
 
 A port-free paired run resumed the same retained natural P8 SRAM state, without injected actors or world changes. The 901 sampled frames matched for the captured actor/building/mineral, visibility, resources, mission and service-clock state, and nine rendered pixel/palette checkpoints matched. Across the paired 900 guest-cycle samples, update mean fell from 1,210,878 to 1,158,897; p95 from 2,988,542 to 2,584,409; p99 from 3,589,422 to 3,165,149. Maximum update cycles changed from 5,027,355 to 5,028,109. The samples are one saved-mission window, not a complete replay, native N64 measurement, or near-30-FPS claim. Full samples, hashes, runner/save provenance and captures are retained in `.local/p8-condition-paired-v1/result.json`.
+
+### Unrun action-visibility regression child
+
+A separate local child adds a fixture that dispatches an actual P8 CreateUnit
+source action between condition evaluations and then invokes a test-only
+removal callback through the engine damage path. P8's source action bridge
+does not implement a kill/remove trigger opcode, so the latter is synthetic
+and is not evidence of an authored P8 removal action. The fixture also checks
+provider restoration after an error. It has not been compiled or run; the
+published checkpoint and its previously recorded evidence remain unchanged.
