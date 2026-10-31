@@ -6129,8 +6129,8 @@ test-sc64-pending-transport-legacy: $(addprefix build/test-sc64-pending-transpor
 # saves and do not run the negative-SRAM cases in the parent test sources.
 build/test-sc64-pending-transport-p5: tests/sc64_transport_pending_p5.c tests/sc64_p5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
-build/test-sc64-pending-transport-z6: tests/sc64_transport_pending_z6.c tests/sc64_z6_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-pending-transport-z6: tests/sc64_transport_pending_z6.c tests/sc64_z6_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-pending-transport-missions
 test-sc64-pending-transport-missions: build/test-sc64-pending-transport-p5 build/test-sc64-pending-transport-z6
 	./build/test-sc64-pending-transport-p5
