@@ -13,6 +13,31 @@ static int sc64_shared_carrier_overlap(const void *a, size_t an,
     return ap<bp+bn && bp<ap+an;
 }
 
+/* In a custom world, mission-specific payloads follow the common fields and
+ * precede the optional Battlecruiser shot extension. Keep the exact bounds
+ * profile-derived; a compact envelope may omit this span only after proving
+ * every byte is zero. */
+static int __attribute__((unused))
+sc64_shared_carrier_custom_omission_bounds(size_t *begin,size_t *end)
+{
+    if (!begin || !end) return 0;
+#ifdef SC64_UNIFIED
+#ifdef SC64_ZP_FULL_STORAGE
+    *begin=offsetof(RaceSave,invincible_bits)+sizeof(((RaceSave *)0)->invincible_bits);
+#else
+    *begin=offsetof(RaceSave,invincible_buildings)+sizeof(((RaceSave *)0)->invincible_buildings);
+#endif
+#else
+    *begin=offsetof(RaceSave,campaign)+sizeof(((RaceSave *)0)->campaign);
+#endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    *end=offsetof(RaceSave,battlecruiser_shots);
+#else
+    *end=sizeof(RaceSave);
+#endif
+    return *begin<=*end && *end<=sizeof(RaceSave);
+}
+
 /* Relocate a checksummed predecessor envelope in scratch only. The legacy
  * actor arrays start at the same offset, but a larger custom union may move
  * every subsequent field and any variable-length sidecar. This does not

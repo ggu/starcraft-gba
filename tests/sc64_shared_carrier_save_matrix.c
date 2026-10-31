@@ -32,10 +32,15 @@ static void test_full_envelope(void)
     for (int i=0;i<MAX_BUILDINGS;++i) building_count+=b[i].alive!=0;
     assert(unit_count==MAX_UNITS && building_count==MAX_BUILDINGS);
     memcpy(saved_units,u,sizeof(u)); memcpy(saved_buildings,b,sizeof(b));
+    size_t omitted_begin, omitted_end;
+    assert(race_save_serialize(1));
+    assert(sc64_shared_carrier_custom_omission_bounds(&omitted_begin,&omitted_end));
+    for (size_t i=omitted_begin;i<omitted_end;++i) assert(!((const u8 *)&race_data)[i]);
     printf("envelope fixed=%zu carrier_packet=%u units=%zu buildings=%zu sram_payload=%u",
            sizeof(RaceSave),(unsigned)SC64_CODEC_BYTES,
            sizeof(race_data.carrier_custom.units),sizeof(race_data.carrier_custom.buildings),
            (unsigned)SAVE_PAYLOAD_MAX);
+    printf(" custom_zero_span=%zu",omitted_end-omitted_begin);
 #ifdef SC64_IMPACT_EVENTS
     static Sc64ImpactEvent expected[RACE_IMPACT_CAPACITY];
     race_impact_reset();
