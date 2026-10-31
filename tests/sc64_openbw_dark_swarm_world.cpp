@@ -50,14 +50,14 @@ int main(int argc,char **argv){
   api.setup_info.resource_type=1;api.setup_info.starting_minerals=500;
   auto map=flat_chk();api.load_map_data(map.data(),map.size(),{},false);
   std::cout<<"flat map initialized "<<game->map_tile_width<<"x"<<game->map_tile_height<<"\n";
-  int raw=46,phase=0,full=0,dx=160; if(sscanf(scenario.c_str(),"%d:%d:%d:%d",&raw,&phase,&full,&dx)<3)return 2;
+  int raw=46,phase=0,full=0,dx=160,dy=0; if(sscanf(scenario.c_str(),"%d:%d:%d:%d:%d",&raw,&phase,&full,&dx,&dy)<3)return 2;
   auto *caster=api.create_starting_unit(api.get_unit_type((UnitTypes)raw),{320,320},0);
   if(!caster)throw std::runtime_error("caster create failed");
   caster->energy=fp8::integer(100);
   action_state actions{};action_functions input(*world,actions);
   for(int i=0;i<phase;i++)api.next_frame();
   if(!input.action_select(0,caster))throw std::runtime_error("selection failed");
-  if(!input.action_order(0,api.get_order_type(Orders::CastDarkSwarm),{320+dx,320},nullptr,nullptr,false))throw std::runtime_error("cast action rejected");
+  if(!input.action_order(0,api.get_order_type(Orders::CastDarkSwarm),{320+dx,320+dy},nullptr,nullptr,false))throw std::runtime_error("cast action rejected");
   std::cout<<"start raw="<<raw<<" phase="<<phase<<" full="<<full<<" frame="<<world->current_frame<<"\n";
   if(full==1){int n=0;while(api.create_bullet(api.get_weapon_type((WeaponTypes)0),caster,caster->position,0,caster->heading))++n;std::cout<<"poolfull allocated="<<n<<"\n";}
   if(full==2){int n=0;while(api.create_unit(api.get_unit_type(UnitTypes::Zerg_Zergling),{900,900},2))++n;std::cout<<"unitpool allocated="<<n<<" free="<<(world->units_container.top()!=nullptr)<<"\n";}

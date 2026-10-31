@@ -309,3 +309,19 @@ correct ordinary integration must represent individual release times and
 partial allocation, preserve cooldown/RNG ordering, and cover interruptions
 and local queue limits. The reference observations do not establish a general
 GBA tick formula, and no ordinary allocation behavior has been changed here.
+
+### Controlled direction-dependent casting observations
+
+The executing OpenBW world probe accepts an optional y displacement as well as
+x displacement. With a stationary caster at source `(320,320)`, 100 energy
+injected for the experiment, initial phase 1, no pool exhaustion and an
+in-range point, both raw46 and raw52 produced these first observed source
+samples (energy debit / projectile present / field present): east `(160,0)`
+`2/5/10`, south `(0,160)` `2/5/10`, west `(-160,0)` `4/7/12`, north
+`(0,-160)` `5/8/13`, and southeast `(112,112)` `1/4/9`. All ten processes
+exited zero. The source weapon's authenticated attack-angle value is 16;
+turning affects readiness, so a fixed delay from the input action is incorrect.
+These are synthetic OpenBW-world observations using the pinned source header and
+owned input tables, not native N64 execution or proof for moving casters,
+obstacles, interruption or other scheduler phases. The added harness input does
+not implement the staged Defiler order, projectile, field, or save state.
