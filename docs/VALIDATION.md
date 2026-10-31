@@ -8191,17 +8191,20 @@ an alias for `started`; the source model has no separate fired mask.
 
 ### Normal-ROM Z7 replay driver (qualification pending)
 
-`tools/sc64_z7_normal_replay.py` drives an unchanged normal Z7 ROM through
-its existing scheduler controls. It does not replace `common/main.c` or
-write actors, resources, UI state or mission state. Given a validated
+`tools/sc64_z7_normal_replay.py --physical` drives an unchanged normal Z7
+release ROM using emulator button inputs. The release deliberately omits
+the debugger scheduler. Physical mode disables all guest-memory writes in
+the backend; the tool does not replace `common/main.c` or write actors,
+resources, UI state or mission state. Scheduler replay remains available
+for separately identified builds that expose its controls. Given a validated
 winning host trace and a matching prepared normal product, run:
 
 ```sh
-python3 tools/sc64_z7_normal_replay.py \
+python3 tools/sc64_z7_normal_replay.py --physical \
   --trace .local/qualification/strict-trace.json \
   --rom build/StarCraft-Zerg-Z7-GBA.gba \
   --elf build/starcraft-zerg-z7.elf \
-  --runner /absolute/path/to/runner-read \
+  --runner /absolute/path/to/runner-physical \
   --output .local/qualification/z7-normal-full
 ```
 
@@ -8255,3 +8258,5 @@ prebuild guard. One earlier host compile began below that guard after it was
 mistaken for a RAM requirement; it completed before interruption. The attempt
 is retained, and all 109 fixed input content hashes matched afterward.
 No canonical menu, actor capacity or release ROM package is changed here.
+
+Physical replay also records the existing shipped main-loop timing counters when available. The reported rate includes presentation waits and UI updates in that replay; it is emulator main-loop evidence, not a physical-device FPS guarantee. Every timing histogram must account for exactly the observed update count.

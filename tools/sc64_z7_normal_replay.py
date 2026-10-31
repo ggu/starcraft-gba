@@ -159,6 +159,34 @@ def require_unchanged(paths, before):
         raise RuntimeError('trace, ROM, ELF or runner changed during replay')
 
 
+def timing_snapshot(rsp, sym, sizes):
+    """Read the shipped main-loop counters while execution is stopped."""
+    widths={'demo_frame':4,'demo_total_cycles':8,'demo_peak_cycles':4,'demo_tick_buckets':32}
+    if any(name not in sym for name in widths):
+        return None
+    if any(sizes.get(name)!=width for name,width in widths.items()):
+        raise ValueError('invalid main-loop timing symbol width')
+    values={name:rsp.read(sym[name],width) for name,width in widths.items()}
+    return {'updates':int.from_bytes(values['demo_frame'],'little'),
+            'cycles':int.from_bytes(values['demo_total_cycles'],'little'),
+            'peak':int.from_bytes(values['demo_peak_cycles'],'little'),
+            'buckets':list(struct.unpack('<8I',values['demo_tick_buckets']))}
+
+
+def timing_delta(before, after, updates):
+    if before is None or after is None:
+        return None
+    count=after['updates']-before['updates']
+    cycles=after['cycles']-before['cycles']
+    buckets=[new-old for old,new in zip(before['buckets'],after['buckets'])]
+    if count!=updates or count<=0 or cycles<=0 or any(n<0 for n in buckets) or sum(buckets)!=count:
+        raise RuntimeError('main-loop timing counters do not match replay updates')
+    return {'updates':count,'guest_cycles':cycles,'mean_cycles':cycles/count,
+            'effective_main_loop_hz':16777216*count/cycles,'peak_since_boot':after['peak'],
+            'vblank_buckets':buckets,
+            'scope':'emulated main-loop work including presentation waits and UI; not physical-device FPS'}
+
+
 def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None, physical=False):
     if export_save and (save_input or saved_state or stop is not None):
         raise ValueError('save export requires a cut, without resume or prefix options')
@@ -227,6 +255,7 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             rsp.breakpoint(sym['game_update']&~1,False);rsp.breakpoint(sym['demo_replay_checkpoint']&~1,True)
             rsp.tick(expected=sym['demo_replay_checkpoint']&~1)
             if u32('demo_schedule_tick')!=0: raise RuntimeError('scheduler did not start at zero')
+        initial_timing=timing_snapshot(rsp,sym,sizes)
         if save_input:
             if physical:
                 rsp.play_to(2, events)
@@ -262,6 +291,7 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
                 state=snapshot(rsp,sym,sizes,layouts)
                 if u32('race_selected_mission')!=z7.MISSION: raise RuntimeError('unexpected selected mission')
                 compare(plan['observations'][checks[tick]],state,checks[tick])
+                state['main_loop_counters']=timing_snapshot(rsp,sym,sizes)
                 records.append({'tick':tick,**state});(output/'progress.json').write_text(json.dumps(records,indent=2)+'\n')
             if not physical and i+1<len(pages):
                 write_page(pages[i+1]['events'][:capacity]);rsp.write(sym['demo_schedule_length'],struct.pack('<I',pages[i+1]['end']))
@@ -285,7 +315,8 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
         if full and (not records or records[-1]['tick']!=stop or records[-1]['won']!=1 or records[-1]['outcome']!=1 or records[-1]['lost']!=0): raise RuntimeError('normal ROM did not win')
         require_unchanged(inputs,before)
         result={'status':'won' if full else 'prefix','stop':stop,'checkpoint_count':len(records),'checkpoints':records,'scope':'named Z7 model fields, entity counts and economy; not full entity arrays','sha256':before,
-                'transport': 'physical-buttons' if physical else 'debug-scheduler'}
+                'transport': 'physical-buttons' if physical else 'debug-scheduler',
+                'timing':timing_delta(initial_timing,timing_snapshot(rsp,sym,sizes),stop)}
         if export_save:
             result['save']={'cut':cut,'journal':journal,'sha256':input_hashes((output/'saved.sav',output/'saved-state.json'))}
         if save_input:

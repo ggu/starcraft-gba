@@ -64,5 +64,19 @@ class PhysicalDriverTest(unittest.TestCase):
         self.assertEqual((result['status'],buttons.completed,buttons.held),('prefix',1,1))
         self.assertEqual(result['checkpoint_count'],0)
 
+    def test_timing_requires_complete_matching_update_histogram(self):
+        before={'updates':12,'cycles':100,'peak':1,'buckets':[0]*8}
+        after={'updates':42,'cycles':16777316,'peak':800000,'buckets':[0,30,0,0,0,0,0,0]}
+        result=replay.timing_delta(before,after,30)
+        self.assertEqual(result['effective_main_loop_hz'],30)
+        self.assertEqual(result['updates'],30)
+        self.assertIn('not physical-device FPS',result['scope'])
+        for field in ('updates','cycles','buckets'):
+            bad=dict(after)
+            bad[field]=([0]*8 if field=='buckets' else before[field])
+            with self.subTest(field=field),self.assertRaises(RuntimeError):
+                replay.timing_delta(before,bad,30)
+        self.assertIsNone(replay.timing_delta(None,after,30))
+
 
 if __name__=='__main__':unittest.main()
