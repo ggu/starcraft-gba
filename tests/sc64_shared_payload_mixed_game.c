@@ -36,5 +36,16 @@ int main(void)
     assert(swarm);s=(swarm&255u)-1u;
     sc64_shared_payloads[s].swarm=(Sc64DefilerProjectile){swarm,23,42,3};
     game_init();assert(!sc64_shared_projectiles.active && !sc64_defiler_projectile_at(s));
+#ifdef SC64_SHARED_ACTOR_STATE_UNION_PROBE
+    /* A malformed type change must not reinterpret ordinary windup as a caster. */
+    game_init();race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;race_skirmish_init();
+    int actor=spawn_unit(SIDE,U_MARINE,160,160);assert(actor>=0);
+    SC64_ACTOR_KIND(actor,SC64_ACTOR_ORDINARY);
+    memset(&SC64_ORDINARY_PENDING(actor),0xff,sizeof(SC64_ORDINARY_PENDING(actor)));
+    u[actor].type=U_SHARED_DEFILER;u[actor].raw_type=46;u[actor].selected=1;selected_building=-1;
+    assert(sc64_defiler_stage_selected()<0);
+    assert(SC64_ACTOR_IS_ORDINARY(actor));
+    race_shared_ordinary_cancel(actor);assert(!SC64_ACTOR_IS_ORDINARY(actor));
+#endif
     puts("mixed typed payload reuse, generation and reset passed");return 0;
 }

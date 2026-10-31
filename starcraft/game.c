@@ -1049,7 +1049,34 @@ typedef struct {
 #endif
 #endif
 } Sc64DefilerStageActor;
+#ifdef SC64_SHARED_ACTOR_STATE_UNION_PROBE
+#ifndef SC64_SHARED_ORDINARY_STAGE
+#error "actor-state union requires staged ordinary attacks"
+#endif
+typedef struct {
+    int target, damage; s16 order, actor_target;
+    u8 active, raw, owner, source_type, damage_class, shots;
+    u8 wait[2], impact[2], life[2];
+} Sc64OrdinaryPending;
+typedef union { Sc64DefilerStageActor defiler; Sc64OrdinaryPending ordinary; } Sc64SharedActorState;
+static Sc64SharedActorState sc64_shared_actor_state[MAX_UNITS];
+static u8 sc64_shared_actor_kind[MAX_UNITS];
+enum { SC64_ACTOR_NONE, SC64_ACTOR_DEFILER, SC64_ACTOR_ORDINARY };
+#define SC64_DEFILER_ACTOR(i) (sc64_shared_actor_state[(i)].defiler)
+#define SC64_ORDINARY_PENDING(i) (sc64_shared_actor_state[(i)].ordinary)
+#define SC64_ACTOR_IS_DEFILER(i) (sc64_shared_actor_kind[(i)]==SC64_ACTOR_DEFILER)
+#define SC64_ACTOR_IS_ORDINARY(i) (sc64_shared_actor_kind[(i)]==SC64_ACTOR_ORDINARY)
+#define SC64_ACTOR_KIND(i,k) (sc64_shared_actor_kind[(i)]=(k))
+#define SC64_DEFILER_RESET_ALL() do { memset(sc64_shared_actor_state,0,sizeof(sc64_shared_actor_state)); memset(sc64_shared_actor_kind,0,sizeof(sc64_shared_actor_kind)); } while(0)
+#else
 static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
+#define SC64_DEFILER_ACTOR(i) (sc64_defiler_stage[(i)])
+#define SC64_ORDINARY_PENDING(i) (sc64_ordinary_pending[(i)])
+#define SC64_ACTOR_IS_DEFILER(i) 1
+#define SC64_ACTOR_IS_ORDINARY(i) 1
+#define SC64_ACTOR_KIND(i,k) ((void)0)
+#define SC64_DEFILER_RESET_ALL() memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage))
+#endif
 #endif
 #if defined(SC64_SHARED_DARK_SWARM_SOURCE_RECTS) && !defined(SC64_SHARED_DARK_SWARM_PROBE)
 #error "Dark Swarm source rectangles require the experimental query"
@@ -2385,11 +2412,13 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_SHARED_DEFILER_STAGE
     /* Slot reuse always invalidates its predecessor. Source unit direction
      * 13 gives heading 104; ordinary completed Defilers begin at 50 energy. */
-    memset(&sc64_defiler_stage[i],0,sizeof(sc64_defiler_stage[i]));
+    memset(&SC64_DEFILER_ACTOR(i),0,sizeof(SC64_DEFILER_ACTOR(i)));
+    SC64_ACTOR_KIND(i,SC64_ACTOR_NONE);
     if (sc64_race_raw_unit(type)==46 || sc64_race_raw_unit(type)==52) {
-        sc64_defiler_stage[i].live=1;
-        sc64_defiler_stage[i].heading=104;
-        sc64_defiler_stage[i].energy_q8=(sc64_race_raw_unit(type)==52 ? 250u*256u/4u : 50u*256u);
+        SC64_ACTOR_KIND(i,SC64_ACTOR_DEFILER);
+        SC64_DEFILER_ACTOR(i).live=1;
+        SC64_DEFILER_ACTOR(i).heading=104;
+        SC64_DEFILER_ACTOR(i).energy_q8=(sc64_race_raw_unit(type)==52 ? 250u*256u/4u : 50u*256u);
     }
 #endif
 #ifdef SC64_COLLISION_CLASS_CACHE
@@ -4989,7 +5018,7 @@ init_state(void)
     sc64_shared_projectile_reset(&sc64_shared_projectiles);
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
-    memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
+    SC64_DEFILER_RESET_ALL();
 #ifdef SC64_SHARED_DEFILER_EXECUTOR
     memset(sc64_shared_payloads,0,sizeof(sc64_shared_payloads));
 #ifndef SC64_SHARED_DEFILER_UNIT_FIELD_PROBE
@@ -5268,7 +5297,7 @@ game_init(void)
 #endif
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
-    memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
+    SC64_DEFILER_RESET_ALL();
 #ifdef SC64_SHARED_DEFILER_EXECUTOR
     memset(sc64_shared_payloads,0,sizeof(sc64_shared_payloads));
 #ifndef SC64_SHARED_DEFILER_UNIT_FIELD_PROBE
@@ -5495,7 +5524,7 @@ issue_order(int order, int tx, int ty)
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
             /* A newly accepted move/attack replaces the pending point order. */
-            if (sc64_defiler_stage[i].live) { sc64_defiler_stage[i].intent=0; sc64_defiler_stage[i].phase=0; }
+            if (SC64_ACTOR_IS_DEFILER(i) && SC64_DEFILER_ACTOR(i).live) { SC64_DEFILER_ACTOR(i).intent=0; SC64_DEFILER_ACTOR(i).phase=0; }
 #endif
 	    u[i].order = order;
 	#ifdef SC64_REACHABLE_FORMATION
@@ -5713,7 +5742,7 @@ stop_selected(void)
             if (sc64_race_raw_unit(u[i].type)==83) (void)race_scarab_stop_signal(i,0);
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
-            if (sc64_defiler_stage[i].live) { sc64_defiler_stage[i].intent=0; sc64_defiler_stage[i].phase=0; }
+            if (SC64_ACTOR_IS_DEFILER(i) && SC64_DEFILER_ACTOR(i).live) { SC64_DEFILER_ACTOR(i).intent=0; SC64_DEFILER_ACTOR(i).phase=0; }
 #endif
 #ifdef SC64_SHARED_ORDINARY_STAGE
             race_shared_ordinary_cancel(i);
@@ -5902,7 +5931,7 @@ static int sc64_defiler_stage_selected(void)
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && u[i].selected) {
         int raw=u[i].raw_type>=0?u[i].raw_type:sc64_race_raw_unit(u[i].type);
         if(slot>=0 || u[i].owner!=SIDE || SC64_TRANSPORT_LOADED(&u[i]) ||
-           (raw!=46 && raw!=52) || !sc64_defiler_stage[i].live) return -1;
+           (raw!=46 && raw!=52) || !SC64_ACTOR_IS_DEFILER(i) || !SC64_DEFILER_ACTOR(i).live) return -1;
         slot=i;
     }
     return slot;
@@ -5915,7 +5944,7 @@ choose_command(int choice)
     if(sc64_defiler_stage_selected()>=0 && choice==field_menu_count_base()) {
         int slot=sc64_defiler_stage_selected();
         menu_open=0;
-        if(sc64_defiler_stage[slot].energy_q8<100u*256u) {mode=MODE_NORMAL;toast(8);}
+        if(SC64_DEFILER_ACTOR(slot).energy_q8<100u*256u) {mode=MODE_NORMAL;toast(8);}
         else mode=MODE_DARK_SWARM_STAGE;
         return;
     }
@@ -6537,20 +6566,20 @@ interact(void)
 #ifdef SC64_SHARED_DEFILER_STAGE
     if(!menu_open && mode==MODE_DARK_SWARM_STAGE) {
         int slot=sc64_defiler_stage_selected();
-        if(slot>=0 && sc64_defiler_stage[slot].energy_q8>=100u*256u &&
+        if(slot>=0 && SC64_DEFILER_ACTOR(slot).energy_q8>=100u*256u &&
 #ifdef SC64_SHARED_DEFILER_EXECUTOR
            u[slot].order==ORDER_IDLE &&
 #endif
            cx>=0 && cy>=0 && cx<WORLD_W && cy<WORLD_H) {
-            sc64_defiler_stage[slot].target_x=(s16)cx;
-            sc64_defiler_stage[slot].target_y=(s16)cy;
-            sc64_defiler_stage[slot].intent=1;
-            sc64_defiler_stage[slot].phase=0; sc64_defiler_stage[slot].age=0;
+            SC64_DEFILER_ACTOR(slot).target_x=(s16)cx;
+            SC64_DEFILER_ACTOR(slot).target_y=(s16)cy;
+            SC64_DEFILER_ACTOR(slot).intent=1;
+            SC64_DEFILER_ACTOR(slot).phase=0; SC64_DEFILER_ACTOR(slot).age=0;
 #ifdef SC64_SHARED_DEFILER_APPROACH_PROBE
-            sc64_defiler_stage[slot].motion_age=0; sc64_defiler_stage[slot].moving=0;
-            sc64_defiler_stage[slot].stopped=0; sc64_defiler_stage[slot].blocked=0;
+            SC64_DEFILER_ACTOR(slot).motion_age=0; SC64_DEFILER_ACTOR(slot).moving=0;
+            SC64_DEFILER_ACTOR(slot).stopped=0; SC64_DEFILER_ACTOR(slot).blocked=0;
 #ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
-            sc64_defiler_stage[slot].diagonal=0;sc64_defiler_stage[slot].turning=0;
+            SC64_DEFILER_ACTOR(slot).diagonal=0;SC64_DEFILER_ACTOR(slot).turning=0;
 #endif
 #endif
             toast(0);

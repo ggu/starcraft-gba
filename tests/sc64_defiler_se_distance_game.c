@@ -21,11 +21,11 @@ int main(int argc,char **argv)
     test_phase=0;click_cast(c,160+distance/2,160+distance/2);
     int tick=1;
     while(tick<=120) {
-        Sc64DefilerStageActor *a=&sc64_defiler_stage[c];
+        Sc64DefilerStageActor *a=&SC64_DEFILER_ACTOR(c);
         printf("t=%d x=%d y=%d heading=%u phase=%u blocked=%u qx=%d qy=%d\n",tick,
                sc64_interceptor_integer_part(a->x_q8),sc64_interceptor_integer_part(a->y_q8),
                a->heading,a->phase,a->blocked,(int)a->x_q8,(int)a->y_q8);
         game_update(0,0);if(sc64_battlecruiser_source_tick_due())++tick;
     }
-    assert(!sc64_defiler_stage[c].blocked);return 0;
+    assert(!SC64_DEFILER_ACTOR(c).blocked);return 0;
 }

@@ -18,8 +18,8 @@ int main(void)
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive && u[i].raw_type==52) {assert(slot<0);slot=i;}
     assert(slot>=0 && u[slot].type==U_SHARED_UNCLEAN_ONE && u[slot].owner==SIDE);
     assert(u[slot].raw_owner==map.human_slot && u[slot].hp==250 && u[slot].armor==3);
-    assert(sc64_defiler_stage[slot].live && sc64_defiler_stage[slot].energy_q8==16000 &&
-           sc64_defiler_stage[slot].heading==104 && !race_save_game());
+    assert(SC64_DEFILER_ACTOR(slot).live && SC64_DEFILER_ACTOR(slot).energy_q8==16000 &&
+           SC64_DEFILER_ACTOR(slot).heading==104 && !race_save_game());
     sc64_defiler_import_fixture_map=0;
     puts("synthetic raw52 authored record through actual campaign loader passed");return 0;
 }

@@ -16,17 +16,17 @@ int main(void)
         test_phase=0;click_cast(c,160+dx[k],160+dy[k]);
         int t=1;
         while(t<=60) {
-            Sc64DefilerStageActor *a=&sc64_defiler_stage[c];
+            Sc64DefilerStageActor *a=&SC64_DEFILER_ACTOR(c);
             int x=a->motion_age?sc64_interceptor_integer_part(a->x_q8):u[c].x*2;
             int y=a->motion_age?sc64_interceptor_integer_part(a->y_q8):u[c].y*2;
             printf("case=%d t=%d x=%d y=%d heading=%d phase=%d blocked=%d qx=%d qy=%d\n",k,t,x,y,(int)a->heading,a->phase,a->blocked,(int)a->x_q8,(int)a->y_q8);
             game_update(0,0);if(sc64_battlecruiser_source_tick_due())++t;
         }
 #ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
-        assert(!sc64_defiler_stage[c].blocked);
+        assert(!SC64_DEFILER_ACTOR(c).blocked);
 #else
-        if(k==4)assert(sc64_defiler_stage[c].blocked);
-        else assert(!sc64_defiler_stage[c].blocked);
+        if(k==4)assert(SC64_DEFILER_ACTOR(c).blocked);
+        else assert(!SC64_DEFILER_ACTOR(c).blocked);
 #endif
     }
     /* STOP during a real clear-path approach cancels the cast and movement. */
@@ -35,11 +35,11 @@ int main(void)
     int walking=spawn_unit(SIDE,U_SHARED_DEFILER,160,160);assert(walking>=0);
     test_phase=0;click_cast(walking,360,160);
     for(int n=0;n<12;n++)game_update(0,0);
-    assert(u[walking].x>160 && sc64_defiler_stage[walking].intent);
+    assert(u[walking].x>160 && SC64_DEFILER_ACTOR(walking).intent);
     stop_selected();int stopped_x=u[walking].x,stopped_y=u[walking].y;
     for(int n=0;n<30;n++)game_update(0,0);
-    assert(!sc64_defiler_stage[walking].intent && u[walking].x==stopped_x &&
-           u[walking].y==stopped_y && sc64_defiler_stage[walking].energy_q8>=100u*256u &&
+    assert(!SC64_DEFILER_ACTOR(walking).intent && u[walking].x==stopped_x &&
+           u[walking].y==stopped_y && SC64_DEFILER_ACTOR(walking).energy_q8>=100u*256u &&
            !sc64_shared_projectiles.active);
     /* A blocked terrain corridor stays pending without walking or paying. */
     game_init();race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;race_skirmish_init();
@@ -48,8 +48,8 @@ int main(void)
     int c=spawn_unit(SIDE,U_SHARED_DEFILER,160,160);assert(c>=0);
     test_phase=0;click_cast(c,360,160);
     for(int n=0;n<40;n++)game_update(0,0);
-    assert(sc64_defiler_stage[c].blocked && u[c].x==160 && u[c].y==160 &&
-           sc64_defiler_stage[c].energy_q8>=100u*256u && !sc64_shared_projectiles.active);
-    stop_selected();assert(!sc64_defiler_stage[c].intent);
+    assert(SC64_DEFILER_ACTOR(c).blocked && u[c].x==160 && u[c].y==160 &&
+           SC64_DEFILER_ACTOR(c).energy_q8>=100u*256u && !sc64_shared_projectiles.active);
+    stop_selected();assert(!SC64_DEFILER_ACTOR(c).intent);
     return 0;
 }

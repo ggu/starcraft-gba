@@ -19,15 +19,15 @@ int main(void)
     for(int axis=0;axis<2;axis++)for(int k=0;k<2;k++) {
         u[c].x=160;u[c].y=160;
         if(axis)u[c].y=bad[k];else u[c].x=bad[k];
-        sc64_defiler_stage[c].target_x=300;sc64_defiler_stage[c].target_y=300;
-        sc64_defiler_stage[c].intent=1;sc64_defiler_stage[c].phase=0;
+        SC64_DEFILER_ACTOR(c).target_x=300;SC64_DEFILER_ACTOR(c).target_y=300;
+        SC64_DEFILER_ACTOR(c).intent=1;SC64_DEFILER_ACTOR(c).phase=0;
         if(!sc64_battlecruiser_source_tick_due())++frame;
         sc64_defiler_executor_unit_tick();
-        assert(!sc64_defiler_stage[c].intent && !sc64_defiler_stage[c].phase &&
+        assert(!SC64_DEFILER_ACTOR(c).intent && !SC64_DEFILER_ACTOR(c).phase &&
                !sc64_shared_projectiles.active);
     }
-    u[c].x=160;u[c].y=160;sc64_defiler_stage[c].target_x=-1;
-    sc64_defiler_stage[c].intent=1;sc64_defiler_stage[c].phase=0;
-    sc64_defiler_executor_unit_tick();assert(!sc64_defiler_stage[c].intent);
+    u[c].x=160;u[c].y=160;SC64_DEFILER_ACTOR(c).target_x=-1;
+    SC64_DEFILER_ACTOR(c).intent=1;SC64_DEFILER_ACTOR(c).phase=0;
+    sc64_defiler_executor_unit_tick();assert(!SC64_DEFILER_ACTOR(c).intent);
     puts("noncompact malformed Defiler coordinates fail before arithmetic");return 0;
 }

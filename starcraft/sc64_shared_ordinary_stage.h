@@ -5,6 +5,7 @@
  * separate from live bullets: only actual release attempts claim arena slots.
  * Other weapons keep their existing path and do not yet contend here. */
 _Static_assert(MAX_UNITS <= 256, "ordinary reservation owner fits the arena byte");
+#ifndef SC64_SHARED_ACTOR_STATE_UNION_PROBE
 typedef struct {
     int target, damage;
     s16 order, actor_target;
@@ -12,15 +13,24 @@ typedef struct {
     u8 wait[2], impact[2], life[2];
 } Sc64OrdinaryPending;
 static Sc64OrdinaryPending sc64_ordinary_pending[MAX_UNITS];
+#ifndef SC64_ORDINARY_PENDING
+#define SC64_ORDINARY_PENDING(i) (sc64_ordinary_pending[(i)])
+#define SC64_ACTOR_IS_ORDINARY(i) 1
+#define SC64_ACTOR_KIND(i,k) ((void)0)
+#endif
+#endif
 
 static void race_shared_ordinary_cancel(int slot)
 {
-    if(slot>=0 && slot<MAX_UNITS) memset(&sc64_ordinary_pending[slot],0,sizeof(sc64_ordinary_pending[slot]));
+    if(slot>=0 && slot<MAX_UNITS && SC64_ACTOR_IS_ORDINARY(slot)) {
+        memset(&SC64_ORDINARY_PENDING(slot),0,sizeof(SC64_ORDINARY_PENDING(slot)));
+        SC64_ACTOR_KIND(slot,SC64_ACTOR_NONE);
+    }
 }
 static void race_shared_ordinary_forget_target(int ref)
 {
     for(int i=0;i<MAX_UNITS;i++)
-        if(sc64_ordinary_pending[i].active && sc64_ordinary_pending[i].target==ref)
+        if(SC64_ACTOR_IS_ORDINARY(i) && SC64_ORDINARY_PENDING(i).active && SC64_ORDINARY_PENDING(i).target==ref)
             race_shared_ordinary_cancel(i);
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) {
         Sc64OrdinaryBullet *b=sc64_ordinary_bullet_at(i);
@@ -34,11 +44,11 @@ static void race_shared_ordinary_reset(void)
         if(b) { (void)sc64_shared_projectile_release(&sc64_shared_projectiles,b->handle,
                                       SC64_SHARED_PROJECTILE_IMPACT,b->reservation_owner); memset(b,0,sizeof(*b)); }
     }
-    memset(sc64_ordinary_pending,0,sizeof(sc64_ordinary_pending));
+    for(int i=0;i<MAX_UNITS;i++)race_shared_ordinary_cancel(i);
 }
 static int race_shared_ordinary_pending_any(void)
 {
-    for(int i=0;i<MAX_UNITS;i++)if(sc64_ordinary_pending[i].active)return 1;
+    for(int i=0;i<MAX_UNITS;i++)if(SC64_ACTOR_IS_ORDINARY(i) && SC64_ORDINARY_PENDING(i).active)return 1;
     return 0;
 }
 /* Only explicitly source-tested actor/weapon/mode pairs participate.
@@ -58,7 +68,10 @@ static int race_shared_ordinary_prepare(Unit *q,int target,int flying,int damage
          (raw==66 && !flying && attack->weapon_id==66 && hits==1))) return 0;
     unsigned shots=(raw==70 || raw==3)?2u:1u;
     Sc64OrdinaryPending p={0};
-    if(sc64_ordinary_pending[slot].active)return 1;
+#ifdef SC64_SHARED_ACTOR_STATE_UNION_PROBE
+    if(SC64_ACTOR_IS_DEFILER(slot))return 0;
+#endif
+    if(SC64_ACTOR_IS_ORDINARY(slot) && SC64_ORDINARY_PENDING(slot).active)return 1;
     p.target=target;p.damage=damage;p.order=q->order;p.actor_target=q->target;
     p.raw=(u8)raw;p.owner=(u8)q->owner;p.source_type=(u8)q->type;
     p.damage_class=(u8)(attack->weapon->damage_class+1);p.shots=(u8)shots;
@@ -82,12 +95,13 @@ static int race_shared_ordinary_prepare(Unit *q,int target,int flying,int damage
         p.life[i]=(u8)(life?life:1u);
         if(p.life[i]<p.impact[i])p.life[i]=p.impact[i];
     }
-    p.active=1;sc64_ordinary_pending[slot]=p;return 1;
+    p.active=1;SC64_ORDINARY_PENDING(slot)=p;SC64_ACTOR_KIND(slot,SC64_ACTOR_ORDINARY);return 1;
 }
 static void race_shared_ordinary_release_tick(void)
 {
     for(int i=0;i<MAX_UNITS;i++) {
-        Sc64OrdinaryPending *p=&sc64_ordinary_pending[i];Unit *q=&u[i];
+        if(!SC64_ACTOR_IS_ORDINARY(i))continue;
+        Sc64OrdinaryPending *p=&SC64_ORDINARY_PENDING(i);Unit *q=&u[i];
         if(!p->active)continue;
         int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
         if(!q->alive || raw!=p->raw || q->owner!=p->owner || q->order!=p->order ||

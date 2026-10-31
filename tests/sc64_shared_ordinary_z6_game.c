@@ -19,7 +19,7 @@ int main(void)
     u[actor].order=ORDER_ATTACK_TARGET;u[actor].target=target;
     int hp=u[target].hp;assert(!race_z6_hallucination_can_deal_damage(actor));
     tick_combat(&u[actor],target);
-    assert(!sc64_ordinary_pending[actor].active && !sc64_shared_projectiles.active);
+    assert(!SC64_ORDINARY_PENDING(actor).active && !sc64_shared_projectiles.active);
     assert(u[target].hp==hp);
     puts("Z6 hallucination cannot reserve or damage through ordinary stage");return 0;
 }

@@ -21,7 +21,7 @@ static void weapon_case(int raw,int target_type,int x,int should_hit)
     if(!should_hit) {bystander=spawn_unit(SIDE,U_SHARED_DEFILER,x-15,320);assert(bystander>=0);u[bystander].hp=u[bystander].maxhp=1000;}
     u[target].hp=u[target].maxhp=1000;
     u[shooter].order=ORDER_ATTACK_TARGET;u[shooter].target=target;
-    tick_combat(&u[shooter],target);assert(sc64_ordinary_pending[shooter].active);
+    tick_combat(&u[shooter],target);assert(SC64_ORDINARY_PENDING(shooter).active);
     int saw_bullet=0;
     for(int n=0;n<60;n++) {
         game_update(0,0);
@@ -51,9 +51,9 @@ static void unknown_case(void)
     u[target].raw_type=255; /* Deliberately malformed row for fail-closed test. */
     assert(sc64_world_dark_swarm_affects_target(target)==-1);
     u[shooter].order=ORDER_ATTACK_TARGET;u[shooter].target=target;
-    tick_combat(&u[shooter],target);assert(u[shooter].cd>0 && sc64_ordinary_pending[shooter].active);
-    for(int n=0;n<20 && sc64_ordinary_pending[shooter].active;n++)game_update(0,0);
-    assert(!sc64_ordinary_pending[shooter].active && u[target].hp==1000);
+    tick_combat(&u[shooter],target);assert(u[shooter].cd>0 && SC64_ORDINARY_PENDING(shooter).active);
+    for(int n=0;n<20 && SC64_ORDINARY_PENDING(shooter).active;n++)game_update(0,0);
+    assert(!SC64_ORDINARY_PENDING(shooter).active && u[target].hp==1000);
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++)
         assert(!sc64_ordinary_bullet_at(i) || sc64_ordinary_bullet_at(i)->reservation_owner!=(unsigned)shooter);
     u[shooter].alive=0;u[target].alive=0;

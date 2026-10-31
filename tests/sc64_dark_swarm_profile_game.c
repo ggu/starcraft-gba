@@ -12,7 +12,7 @@ int main(void)
     game_init();race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;race_skirmish_init();
     int c=spawn_unit(SIDE,U_SHARED_DEFILER,320,320);assert(c>=0);
     screen=SCREEN_PLAY;race_mode=1;selected_building=-1;u[c].selected=1;
-    sc64_defiler_stage[c].energy_q8=100u*256u; /* controlled cast setup */
+    SC64_DEFILER_ACTOR(c).energy_q8=100u*256u; /* controlled cast setup */
     game_update(KEY_B,KEY_B);assert(menu_open);
     for(int n=0;n<64 && menu_cursor!=field_menu_count_base();n++) {game_update(0,0);game_update(KEY_DOWN,KEY_DOWN);}
     assert(menu_cursor==field_menu_count_base());game_update(0,0);game_update(KEY_A,KEY_A);

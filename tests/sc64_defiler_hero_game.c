@@ -22,12 +22,12 @@ int main(void)
     int c=spawn_unit(SIDE,type,320,320);assert(c>=0);
     assert(supply_used==before_supply);
     assert(u[c].maxhp==250 && u[c].hp==250 && u[c].armor==3);
-    assert(sc64_defiler_stage[c].live && sc64_defiler_stage[c].heading==104 &&
-           sc64_defiler_stage[c].energy_q8==16000);
+    assert(SC64_DEFILER_ACTOR(c).live && SC64_DEFILER_ACTOR(c).heading==104 &&
+           SC64_DEFILER_ACTOR(c).energy_q8==16000);
     assert(!race_save_game());
     screen=SCREEN_PLAY;race_mode=1;selected_building=-1;u[c].selected=1;
-    for(int n=0;n<1600 && sc64_defiler_stage[c].energy_q8<100u*256u;n++)game_update(0,0);
-    assert(u[c].alive && sc64_defiler_stage[c].energy_q8>=100u*256u);
+    for(int n=0;n<1600 && SC64_DEFILER_ACTOR(c).energy_q8<100u*256u;n++)game_update(0,0);
+    assert(u[c].alive && SC64_DEFILER_ACTOR(c).energy_q8>=100u*256u);
     game_update(KEY_B,KEY_B);assert(menu_open);
     for(int n=0;n<64 && menu_cursor!=field_menu_count_base();n++) {game_update(0,0);game_update(KEY_DOWN,KEY_DOWN);}
     assert(menu_cursor==field_menu_count_base());game_update(0,0);game_update(KEY_A,KEY_A);
@@ -38,6 +38,6 @@ int main(void)
         game_update(0,0);did_bullet|=sc64_shared_projectiles.active!=0;
         for(int i=0;i<MAX_UNITS;i++)did_field|=sc64_defiler_field_get(i).remaining!=0;
     }
-    assert(did_bullet && did_field && sc64_defiler_stage[c].energy_q8<100u*256u);
+    assert(did_bullet && did_field && SC64_DEFILER_ACTOR(c).energy_q8<100u*256u);
     puts("raw52 distinct actor natural energy regeneration and actual menu cast passed");return 0;
 }

@@ -9,7 +9,7 @@
 static int sc64_defiler_executor_busy(void)
 {
     for(int i=0;i<MAX_UNITS;i++)
-        if(sc64_defiler_field_get(i).remaining || sc64_defiler_stage[i].intent) return 1;
+        if(sc64_defiler_field_get(i).remaining || (SC64_ACTOR_IS_DEFILER(i) && SC64_DEFILER_ACTOR(i).intent)) return 1;
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++)
         if(sc64_defiler_projectile_at(i)) return 1;
     return 0;
@@ -119,7 +119,8 @@ static void sc64_defiler_executor_unit_tick(void)
         if(value.remaining || sc64_defiler_field_get(i).remaining) sc64_defiler_field_set(i,value);
     }
     for(int i=0;i<MAX_UNITS;i++) {
-        Sc64DefilerStageActor *a=&sc64_defiler_stage[i]; Unit *q=&u[i];
+        if(!SC64_ACTOR_IS_DEFILER(i))continue;
+        Sc64DefilerStageActor *a=&SC64_DEFILER_ACTOR(i); Unit *q=&u[i];
         if(!a->live)continue;
         if(!q->alive || !target_alive(i)) { a->intent=0; a->phase=0;continue; }
         int canonical_raw=sc64_race_raw_unit(q->type);
@@ -183,7 +184,8 @@ static void sc64_defiler_executor_bullet_tick(void)
                 if(w>=160 && h>=192) {
                     sc64_unit_prepare_reuse(slot);
                     memset(&u[slot],0,sizeof(u[slot]));
-                    memset(&sc64_defiler_stage[slot],0,sizeof(sc64_defiler_stage[slot]));
+                    memset(&SC64_DEFILER_ACTOR(slot),0,sizeof(SC64_DEFILER_ACTOR(slot)));
+                    SC64_ACTOR_KIND(slot,SC64_ACTOR_NONE);
                     if(x<80)x=80;else if(x+80>=w)x=w-80;
                     if(y<80)y=80;else if(y+80>=h-32)y=h-112;
                     Sc64DarkSwarmEffect field;sc64_dark_swarm_created(&field,x,y);

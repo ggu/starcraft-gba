@@ -10,25 +10,25 @@ int main(void)
     race_skirmish_init();
     int caster=spawn_unit(SIDE,U_SHARED_DEFILER,320,320);
     assert(caster>=0 && sc64_race_raw_unit(u[caster].type)==46);
-    assert(sc64_defiler_stage[caster].live && sc64_defiler_stage[caster].heading==104 &&
-           sc64_defiler_stage[caster].energy_q8==50u*256u);
+    assert(SC64_DEFILER_ACTOR(caster).live && SC64_DEFILER_ACTOR(caster).heading==104 &&
+           SC64_DEFILER_ACTOR(caster).energy_q8==50u*256u);
     /* Until a complete schema exists, the actual save path must refuse a
      * live experimental caster instead of writing incomplete state. */
     assert(!race_save_game());
     /* Exercise ordinary pad menu navigation and point selection. */
     screen=SCREEN_PLAY; race_mode=1; race_human=R_ZERG; selected_building=-1;
-    u[caster].selected=1; sc64_defiler_stage[caster].energy_q8=100u*256u;
+    u[caster].selected=1; SC64_DEFILER_ACTOR(caster).energy_q8=100u*256u;
     game_update(KEY_B,KEY_B); assert(menu_open);
     for(int n=0;n<64 && menu_cursor!=field_menu_count_base();++n) {
         game_update(0,0); game_update(KEY_DOWN,KEY_DOWN);
     }
     assert(menu_cursor==field_menu_count_base());
     game_update(0,0); game_update(KEY_A,KEY_A);
-    assert(!menu_open && mode==MODE_DARK_SWARM_STAGE && !sc64_defiler_stage[caster].intent);
+    assert(!menu_open && mode==MODE_DARK_SWARM_STAGE && !SC64_DEFILER_ACTOR(caster).intent);
     cx=400;cy=350;game_update(0,0);game_update(KEY_A,KEY_A);
-    assert(mode==MODE_NORMAL && sc64_defiler_stage[caster].intent &&
-           sc64_defiler_stage[caster].target_x==400 && sc64_defiler_stage[caster].target_y==350 &&
-           sc64_defiler_stage[caster].energy_q8==100u*256u);
+    assert(mode==MODE_NORMAL && SC64_DEFILER_ACTOR(caster).intent &&
+           SC64_DEFILER_ACTOR(caster).target_x==400 && SC64_DEFILER_ACTOR(caster).target_y==350 &&
+           SC64_DEFILER_ACTOR(caster).energy_q8==100u*256u);
     /* STOP replaces an unlaunched point order without spending energy. */
     game_update(0,0); game_update(KEY_B,KEY_B); assert(menu_open);
     for(int n=0;n<64 && menu_cursor!=MENU_STOP;++n) {
@@ -36,10 +36,10 @@ int main(void)
     }
     assert(menu_cursor==MENU_STOP);
     game_update(0,0); game_update(KEY_A,KEY_A);
-    assert(!sc64_defiler_stage[caster].intent && sc64_defiler_stage[caster].energy_q8==100u*256u);
-    sc64_defiler_stage[caster].intent=1;
+    assert(!SC64_DEFILER_ACTOR(caster).intent && SC64_DEFILER_ACTOR(caster).energy_q8==100u*256u);
+    SC64_DEFILER_ACTOR(caster).intent=1;
     assert(issue_order(ORDER_MOVE,420,350)==1);
-    assert(!sc64_defiler_stage[caster].intent && sc64_defiler_stage[caster].energy_q8==100u*256u);
+    assert(!SC64_DEFILER_ACTOR(caster).intent && SC64_DEFILER_ACTOR(caster).energy_q8==100u*256u);
     game_update(0,0);game_update(KEY_B,KEY_B);assert(menu_open);
     for(int n=0;n<64 && menu_cursor!=field_menu_count_base();++n) {
         game_update(0,0);game_update(KEY_DOWN,KEY_DOWN);
@@ -47,14 +47,14 @@ int main(void)
     assert(menu_cursor==field_menu_count_base());
     game_update(0,0);game_update(KEY_A,KEY_A);assert(mode==MODE_DARK_SWARM_STAGE);
     game_update(0,0);game_update(KEY_B,KEY_B);
-    assert(mode==MODE_NORMAL && !sc64_defiler_stage[caster].intent);
-    menu_open=0;sc64_defiler_stage[caster].energy_q8=99u*256u;
+    assert(mode==MODE_NORMAL && !SC64_DEFILER_ACTOR(caster).intent);
+    menu_open=0;SC64_DEFILER_ACTOR(caster).energy_q8=99u*256u;
     game_update(0,0);game_update(KEY_B,KEY_B);assert(menu_open);
     for(int n=0;n<64 && menu_cursor!=field_menu_count_base();++n) {
         game_update(0,0);game_update(KEY_DOWN,KEY_DOWN);
     }
     game_update(0,0);game_update(KEY_A,KEY_A);
-    assert(mode==MODE_NORMAL && !menu_open && !sc64_defiler_stage[caster].intent);
+    assert(mode==MODE_NORMAL && !menu_open && !SC64_DEFILER_ACTOR(caster).intent);
     int other=spawn_unit(SIDE,U_ZERGLING,330,320);assert(other>=0);
     u[other].selected=1;assert(sc64_defiler_stage_selected()<0);
     u[other].selected=0;u[caster].owner=ENEMY;assert(sc64_defiler_stage_selected()<0);
