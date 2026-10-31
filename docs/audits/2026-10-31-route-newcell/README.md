@@ -1,5 +1,8 @@
 # Fresh-cell route writer experiment
 
+This records the initial disabled prototype. Current canonical qualification
+and activation scope are in [the later audit](../2026-10-31-fresh-route-cell/README.md).
+
 The optional `SC64_ROUTE_NEW_CELL` experiment applies only to full, split, packed route floods using the borrowed visited grid. Each newly discovered cell begins with unreachable bits `111` and is enqueued once; the writer clears only the bits that differ from its direction. Seed writes and all other contexts retain the generic writer. To fit the tight IWRAM guard, the experiment moves that generic writer to ROM, including its calls in the separate depot flood. It is disabled by default and is not qualified for promotion.
 
 At source `8dd34c2`, ARM disassembly showed the original 120-byte IWRAM writer called from each neighbor path; the experimental writer was 56 bytes in IWRAM and the generic writer 88 bytes in ROM. An ASan/UBSan 128×128 complete-field and next-step BFS oracle passed, including restoration of the borrowed walkability grid. A further 256 direct writer cases compared all packed-bit phases, arbitrary adjacent values, boundary cells and canaries to the generic writer. The bounded depot BFS oracle also passed, and unsupported partial or non-visited-grid feature combinations were rejected. The Zerg ARM product linked under unchanged guards; BSS stayed `02037134` and IWRAM fell from `03004c40` to `03004c08`.
