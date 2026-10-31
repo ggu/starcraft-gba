@@ -316,6 +316,14 @@ static int source_force_military(int raw_owner)
     return n;
 }
 
+static int combat_reject(const char *reason,int wanted,int producer)
+{
+    if(frame>=45000) fprintf(trace,"{\"kind\":\"production-reject\",\"frame\":%u,\"reason\":\"%s\",\"wanted\":%d,\"producer\":%d,\"selected_building\":%d,\"train_type\":%d,\"bank\":[%d,%d],\"supply\":[%d,%d],\"queue\":%d}\n",
+        (unsigned)frame,reason,wanted,producer,selected_building,train_type,minerals,gas,
+        race_owner_supply(SIDE),race_owner_supply_cap(SIDE),producer>=0?b[producer].queue_count:-1);
+    return 0;
+}
+
 static int queue_combat_unit(void)
 {
     int wanted=U_ZEALOT;
@@ -324,20 +332,21 @@ static int queue_combat_unit(void)
         b[j].type==B_CYBERNETICS_CORE&&building_complete(j);
     if(core&&gas>=50&&minerals>=125)wanted=U_DRAGOON;
     const Sc64RaceUnitRule *rule=sc64_race_unit_rule(wanted);
-    if(!rule||minerals<(int)rule->minerals||gas<(int)rule->gas||
-       race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)return 0;
+    if(!rule)return combat_reject("missing-rule",wanted,-1);
+    if(minerals<(int)rule->minerals||gas<(int)rule->gas)return combat_reject("resources",wanted,-1);
+    if(race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)return combat_reject("supply",wanted,-1);
     int producer=-1,best_queue=6;
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
         b[i].type==B_GATEWAY&&building_complete(i)&&b[i].queue_count<best_queue){
         producer=i;best_queue=b[i].queue_count;
     }
     if(producer>=0){int i=producer;
-        if(!normalize_field())return 0;
-        if(!move_cursor(b[i].x,b[i].y))return 0;
+        if(!normalize_field())return combat_reject("normalize",wanted,i);
+        if(!move_cursor(b[i].x,b[i].y))return combat_reject("cursor",wanted,i);
         KEY_TAP(KEY_A);
-        if(selected_building!=i)return 0;
+        if(selected_building!=i)return combat_reject("selection",wanted,i);
         for(int n=0;n<4&&train_type!=wanted;n++)KEY_TAP(KEY_R);
-        if(train_type!=wanted)return 0;
+        if(train_type!=wanted)return combat_reject("menu",wanted,i);
         int before=b[i].queue_count,bank=minerals;
         KEY_TAP(KEY_A);
         if(b[i].queue_count>before){
@@ -345,9 +354,9 @@ static int queue_combat_unit(void)
                 (unsigned)frame,i,wanted==U_DRAGOON?"dragoon":"zealot",bank,minerals,gas,(unsigned)b[i].queue_count);
             return 1;
         }
-        return 0;
+        return combat_reject("enqueue",wanted,i);
     }
-    return 0;
+    return combat_reject("producer",wanted,-1);
 }
 
 static int probe_count(void)
