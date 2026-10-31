@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+from tools.sc64_walk_pair import verify as verify_walk_pair
 
 ROOT = Path(__file__).resolve().parent
 REFERENCE = ROOT / "references" / "sc64-maps"
@@ -283,6 +284,13 @@ def walk_cycle_input_ready(path: Path) -> bool:
             "sc64_unit_walk_cycle(" in text and
             re.search(r"static const Sc64UnitWalkCycle sc64_unit_walk_i\d+ =",
                       text) is not None)
+
+
+def walk_pair_input_ready(walk: Path, facing: Path) -> bool:
+    try:
+        return verify_walk_pair(walk.read_bytes(), facing.read_bytes())
+    except OSError:
+        return False
 
 
 def attack_pose_input_ready(path: Path) -> bool:
@@ -687,7 +695,8 @@ def build(game: str) -> None:
     if game in BC_PROFILES and not bc_inputs_ready():
         raise RuntimeError("canonical BC builds need isolated cover and body inputs; run ./dev sc64 prepare-bc --rom PATH")
     if game in CONSTRUCTION_PROFILES and not (facing_sprite_input_ready(ROOT / FACING_HEADER) and
-                                              walk_cycle_input_ready(ROOT / WALK_HEADER)):
+                                              walk_cycle_input_ready(ROOT / WALK_HEADER) and
+                                              walk_pair_input_ready(ROOT / WALK_HEADER, ROOT / FACING_HEADER)):
         raise RuntimeError(
             "race-engine builds require the directional sprite and walk-cycle banks; "
             "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
@@ -847,8 +856,9 @@ def prepare(rom: Path, profile: str) -> None:
             raise RuntimeError("directional sprite preparation produced a stale or empty bank")
         run([sys.executable, str(ROOT / "tools/sc64_unit_walk_frames.py"),
              "--rom", str(private_rom), "--out", str((ROOT / WALK_HEADER).parent)])
-        if not walk_cycle_input_ready(ROOT / WALK_HEADER):
-            raise RuntimeError("walk-cycle preparation produced a stale or empty bank")
+        if not (walk_cycle_input_ready(ROOT / WALK_HEADER) and
+                walk_pair_input_ready(ROOT / WALK_HEADER, ROOT / FACING_HEADER)):
+            raise RuntimeError("walk-cycle preparation produced a stale, empty or mismatched bank")
         (ROOT / WALK_WORDS_HEADER).parent.mkdir(parents=True, exist_ok=True)
         run([sys.executable, str(ROOT / "tools/sc64_unit_walk_words.py"),
              "--managed-update", str(ROOT / WALK_HEADER), str(ROOT / FACING_HEADER),
@@ -1091,7 +1101,7 @@ def status(profile: str) -> int:
         elif label == "Source construction art":
             ready = construction_color_input_ready(path)
         elif label == "Unit walk cycles":
-            ready = walk_cycle_input_ready(path)
+            ready = walk_cycle_input_ready(path) and walk_pair_input_ready(path, ROOT / FACING_HEADER)
         elif label.endswith("gated map data"):
             map_profile = ("protoss-p6" if label == "Protoss chapter 6 gated map data" or
                            label == "Protoss P6 gated map data" else
@@ -1129,6 +1139,7 @@ def status(profile: str) -> int:
                any(not path.is_file() for _, path in paths) or
                (profile in FACING_PROFILES and not facing_sprite_input_ready(ROOT / FACING_HEADER)) or
                (profile in CONSTRUCTION_PROFILES and not walk_cycle_input_ready(ROOT / WALK_HEADER)) or
+               (profile in CONSTRUCTION_PROFILES and not walk_pair_input_ready(ROOT / WALK_HEADER, ROOT / FACING_HEADER)) or
                (profile in FACING_PROFILES and not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER)) or
                (profile in FACING_PROFILES and not attack_pose_input_ready(ROOT / ATTACK_POSE_HEADER)) or
                (profile in FACING_PROFILES and not weapon_source_input_ready(ROOT / WEAPON_SOURCE_HEADER)) or

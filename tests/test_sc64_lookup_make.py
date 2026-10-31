@@ -54,6 +54,7 @@ class LookupMakeTest(unittest.TestCase):
             with self.subTest(target=target):
                 self.assertTrue(reachable(rules, target, INDEX), 'selected header can be absent or stale')
                 self.assertTrue(reachable(rules, target, CONFIG), 'mode changes must rebuild consumers')
+                self.assertTrue(reachable(rules, target, 'build/walk-pair-verified'), 'walk and facing must match')
         self.assertFalse(reachable(rules, 'build/starcraft.elf', INDEX))
         self.assertFalse(reachable(rules, 'build/starcraft.elf', CONFIG))
 

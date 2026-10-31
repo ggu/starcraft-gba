@@ -11,6 +11,7 @@ import tempfile
 import re
 from sc64_unit_facing import pack_word_phases
 from sc64_weapon_lookup_index import validate_output
+from sc64_walk_pair import verify as verify_walk_pair
 
 # Hot ground actors only; every other actor continues to use its original pose.
 DEFAULT_UNITS = (0, 32, 37, 38, 41, 65)
@@ -98,7 +99,7 @@ def derive(walk: str, facing: str, units=DEFAULT_UNITS) -> str:
 
 def config_key(mode, walk, facing):
     if mode not in ('0', '1'): raise ValueError('mode must be 0 or 1')
-    paths = [walk, facing, pathlib.Path(__file__), pathlib.Path(__file__).with_name('sc64_unit_facing.py')]
+    paths = [walk, facing, pathlib.Path(__file__), pathlib.Path(__file__).with_name('sc64_unit_facing.py'), pathlib.Path(__file__).with_name('sc64_walk_pair.py')]
     items = [(str(p.resolve()), hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None) for p in paths]
     return base64.urlsafe_b64encode(json.dumps([mode, DEFAULT_UNITS, items], separators=(',', ':')).encode()).decode()
 
@@ -122,7 +123,9 @@ def main():
         # Validate the destination's ignored-path rules with an absent sibling.
         validate_output(args.walk,args.output.with_name(args.output.name+'.validation-probe'))
     else: validate_output(args.walk,args.output)
-    data=derive(args.walk.read_text(), args.facing.read_text())
+    walk_data=args.walk.read_bytes(); facing_data=args.facing.read_bytes()
+    if not verify_walk_pair(walk_data,facing_data): raise ValueError('walk/facing banks do not match; re-prepare both')
+    data=derive(walk_data.decode('ascii'), facing_data.decode('ascii'))
     if not args.managed_update:
         with args.output.open('x') as out: out.write(data)
         return

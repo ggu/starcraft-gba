@@ -1,5 +1,6 @@
 """New-contributor paths must work without an emulator or imported game data."""
 import contextlib
+import hashlib
 import importlib.machinery
 import importlib.util
 import io
@@ -117,6 +118,7 @@ CONSTRUCTION_COLOR_HEADER = (
 )
 
 WALK_CYCLE_HEADER = (
+    '#define SC64_UNIT_WALK_FACING_SHA256 "' + hashlib.sha256(FACING_SPRITE_HEADER.encode('ascii')).hexdigest() + '"\n'
     '#define SC64_UNIT_WALK_BANK_VERSION 1\n'
     'static const Sc64UnitWalkStep sc64_unit_walk_i54_steps[1] = {{0}};\n'
     'static const Sc64UnitWalkCycle sc64_unit_walk_i54 = {0};\n'

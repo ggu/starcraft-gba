@@ -301,7 +301,13 @@ $(SC64_ORDER_MARKER_HEADER): tools/sc64_order_marker_pack.py tools/sc64_construc
 # race-engine product draws them; the headers are imported from the ROM.
 UNIT_FACING_HEADER := .local/sc64/facing/generated/sc64_unit_facing_generated.h
 UNIT_WALK_HEADER := .local/sc64/walk/generated/sc64_unit_walk_generated.h
-UNIT_FACING_INPUTS := $(UNIT_FACING_HEADER) $(UNIT_WALK_HEADER)
+WALK_PAIR_CHECK := build/walk-pair-verified
+UNIT_FACING_INPUTS := $(UNIT_FACING_HEADER) $(UNIT_WALK_HEADER) $(WALK_PAIR_CHECK)
+.PHONY: force-walk-pair-check
+force-walk-pair-check:
+$(WALK_PAIR_CHECK): $(UNIT_WALK_HEADER) $(UNIT_FACING_HEADER) tools/sc64_walk_pair.py force-walk-pair-check | build
+	@$(PYTHON) tools/sc64_walk_pair.py $(UNIT_WALK_HEADER) $(UNIT_FACING_HEADER) > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 UNIT_FACING_FLAGS := -I.local/sc64/facing/generated -I.local/sc64/walk/generated -DSC64_UNIT_FACING -DSC64_UNIT_WALK_FRAMES
 # Prepared private banks are immutable build inputs. A missing bank can be
 # prepared explicitly, but source checkout timestamps must not re-extract it.
@@ -495,7 +501,7 @@ CANONICAL_LOOKUP_INPUTS = $(if $(filter 1,$(CANONICAL_WALK_WORDS)),$(WALK_WORDS_
 SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER) $(CANONICAL_LOOKUP_INPUTS)
 CANONICAL_LOOKUP_FLAGS = $(if $(and $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(filter -DSC64_WEAPON_SOURCE_VFX,$(CANONICAL_WEAPON_FLAGS))),-Ibuild/generated/weapon-lookup '-DSC64_WEAPON_SOURCE_BANK_HEADER="sc64_weapon_source_indexed.h"')
 
-$(WALK_WORDS_HEADER): $(UNIT_WALK_HEADER) $(UNIT_FACING_HEADER) tools/sc64_unit_walk_words.py tools/sc64_unit_facing.py build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
+$(WALK_WORDS_HEADER): $(UNIT_WALK_HEADER) $(UNIT_FACING_HEADER) $(WALK_PAIR_CHECK) tools/sc64_unit_walk_words.py tools/sc64_unit_facing.py tools/sc64_walk_pair.py build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
 	mkdir -p $(@D)
 	$(PYTHON) tools/sc64_unit_walk_words.py --managed-update $(UNIT_WALK_HEADER) $(UNIT_FACING_HEADER) $@
 
@@ -5686,7 +5692,7 @@ $(foreach p,terran zerg protoss showcase,$(foreach c,flight research yamato,$(ev
 # Source-bound ordinary-input BC witness. This is opt-in and compiles directly
 # against already-prepared inputs; it never invokes their generator recipes.
 .PHONY: test-sc64-bc-normal-input
-test-sc64-bc-normal-input:
+test-sc64-bc-normal-input: $(UNIT_FACING_INPUTS)
 	@set -eu; \
 	mkdir -p .local/build/bc-normal-input; \
 	run=$$(mktemp -d .local/build/bc-normal-input/run.XXXXXX); \

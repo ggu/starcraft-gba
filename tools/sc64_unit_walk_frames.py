@@ -128,6 +128,10 @@ def generate(rom: Path, remap_path: Path, out: Path, facing_manifest: Path) -> d
     facing_summary = json.loads(facing_manifest.read_text())
     if facing_summary.get('rom_sha1') != sha1:
         raise ValueError('facing bank was generated from a different ROM')
+    facing_header = facing_manifest.parent / 'sc64_unit_facing_generated.h'
+    facing_hash = hashlib.sha256(facing_header.read_bytes()).hexdigest()
+    if facing_summary.get('header_sha256') != facing_hash:
+        raise ValueError('facing manifest does not authenticate its header; re-prepare facing')
     # Pose 0 reuses the facing bank's pixels; only units that bank kept qualify.
     facing_kept = {entry['unit_id']: entry for entry in facing_summary['entries']
                    if 'skipped' not in entry and entry.get('directional')}
@@ -151,6 +155,7 @@ def generate(rom: Path, remap_path: Path, out: Path, facing_manifest: Path) -> d
              '#ifndef SC64_UNIT_WALK_GENERATED_H',
              '#define SC64_UNIT_WALK_GENERATED_H',
              '#define SC64_UNIT_WALK_BANK_VERSION 1',
+             f'#define SC64_UNIT_WALK_FACING_SHA256 \"{facing_hash}\"',
              '#if !defined(SC64_UNIT_FACING_BANK_VERSION) || SC64_UNIT_FACING_BANK_VERSION != 2',
              '#error "sc64_unit_walk_generated.h needs the version 2 unit-facing bank"',
              '#endif',

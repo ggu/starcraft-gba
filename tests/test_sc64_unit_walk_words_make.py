@@ -2,6 +2,7 @@
 """Mode, source and generator changes must invalidate managed sidecars."""
 from pathlib import Path
 import shutil
+import hashlib
 import subprocess
 import tempfile
 import unittest
@@ -24,8 +25,10 @@ class WalkWordsMakeTest(unittest.TestCase):
             walk.write_text('static const Sc64SpriteFrame pose[32] = {\n'+','.join([frame]*32)+'\n};\n'
                             'static const Sc64UnitWalkStep sc64_unit_walk_i1_steps[1] = {\n{0u,pose}\n};\n'+
                             ''.join('case %d: return &sc64_unit_walk_i1;\n'%n for n in (0,32,37,38,41,65)))
+            digest=hashlib.sha256(facing.read_bytes()).hexdigest()
+            walk.write_text('#define SC64_UNIT_WALK_FACING_SHA256 "'+digest+'"\n'+walk.read_text())
             (root/'fixture.mk').write_text('''check: build/walk-consumer
-build/walk-consumer: $(CANONICAL_LOOKUP_INPUTS)
+build/walk-consumer: $(CANONICAL_LOOKUP_INPUTS) $(UNIT_FACING_INPUTS)
 \t@printf 'rebuilt\\n' >> build/rebuilds
 \t@touch $@
 ''')
@@ -39,6 +42,11 @@ build/walk-consumer: $(CANONICAL_LOOKUP_INPUTS)
             self.assertEqual(run(1),2);self.assertEqual(run(1),2)
             output=root/'.local/walk-words-managed/sc64_walk_words_generated.h'
             before=output.read_bytes();facing.write_text(facing.read_text().replace('0x01','0x02'))
+            with self.assertRaises(subprocess.CalledProcessError):run(1)
+            with self.assertRaises(subprocess.CalledProcessError):run(0)
+            self.assertEqual(output.read_bytes(),before)
+            new_digest=hashlib.sha256(facing.read_bytes()).hexdigest()
+            walk.write_text(walk.read_text().replace(digest,new_digest))
             self.assertEqual(run(1),3);self.assertNotEqual(before,output.read_bytes())
             walk.write_text(walk.read_text()+'\n/* changed */\n')
             self.assertEqual(run(1),4)
@@ -50,6 +58,7 @@ build/walk-consumer: $(CANONICAL_LOOKUP_INPUTS)
             self.assertEqual(output.read_bytes(),retained)
             facing.write_text('static const unsigned char pixels[2] = {\n0x02,0x00,\n};\n')
             output.write_text('unmanaged')
+            tool.write_text(tool.read_text()+'\n')
             with self.assertRaises(subprocess.CalledProcessError):run(1)
             self.assertEqual(output.read_text(),'unmanaged')
 
