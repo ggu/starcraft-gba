@@ -63,7 +63,7 @@ def c_units(units: list[dict[str, int]]) -> str:
     return ''.join(result)
 
 
-def convert_wasteland(rom_path: Path, base: Path) -> tuple[dict, list[dict[str, int]], list[int], list[int], list[int], list[bytes]]:
+def convert_wasteland(rom_path: Path, base: Path, include_cover: bool = False) -> tuple[dict, list[dict[str, int]], list[int], list[int], list[int], list[bytes]]:
     importer = load_module('sc64_campaign_import', ROOT / 'tools/sc64_import.py')
     assets = load_module('sc64_campaign_assets', ROOT / 'tools/sc64_assets.py')
     extractor = importer.upstream_module(importer.UPSTREAM)
@@ -134,7 +134,7 @@ def convert_wasteland(rom_path: Path, base: Path) -> tuple[dict, list[dict[str, 
             deduplicated[packed] = index
             tiles.append(packed)
         lookup.append(index)
-        blocked.append(int((walk_mask & 0x0660) != 0x0660))
+        blocked.append(int((walk_mask & 0x0660) != 0x0660) | (assets.cv5_cover(tile_id, source['cv5']) << 1 if include_cover else 0))
 
     units = importer.unit_rows(sections.get(b'UNIT', b''))
     runtime_units = [unit for unit in units if unit['source_type'] != 214]
@@ -150,7 +150,7 @@ def convert_wasteland(rom_path: Path, base: Path) -> tuple[dict, list[dict[str, 
         'source_tile_count': len(tile_ids),
         'unique_source_tiles': len(decoded),
         'unique_gba_tiles_after_palette_merge': len(tiles),
-        'blocked_cells': sum(blocked),
+        'blocked_cells': sum(v & 1 for v in blocked),
         'source_assets_sha256': {name: hashlib.sha256(data).hexdigest()
                                  for name, data in source.items()},
     }
@@ -158,8 +158,8 @@ def convert_wasteland(rom_path: Path, base: Path) -> tuple[dict, list[dict[str, 
 
 
 def pack(rom_path: Path = DEFAULT_ROM, base: Path = DEFAULT_BASE,
-         output: Path = DEFAULT_OUTPUT) -> dict:
-    mission, units, _, lookup, blocked, tiles = convert_wasteland(rom_path, base)
+         output: Path = DEFAULT_OUTPUT, include_cover: bool = False) -> dict:
+    mission, units, _, lookup, blocked, tiles = convert_wasteland(rom_path, base, include_cover)
     lines = [
         '/* Generated privately by tools/sc64_campaign_pack.py; do not commit. */\n',
         '#ifndef SC64_CAMPAIGN_GENERATED_H\n#define SC64_CAMPAIGN_GENERATED_H\n',
@@ -196,6 +196,7 @@ def pack(rom_path: Path = DEFAULT_ROM, base: Path = DEFAULT_BASE,
     ])
     content = ''.join(lines)
     output.parent.mkdir(parents=True, exist_ok=True)
+    if include_cover: content='#define SC64_CAMPAIGN_COVER_DATA 1\n'+content
     output.write_text(content, encoding='ascii')
     report = {
         'schema': 1,
@@ -234,11 +235,12 @@ def main() -> None:
     parser.add_argument('--rom', type=Path, default=DEFAULT_ROM)
     parser.add_argument('--backwater-generated', type=Path, default=DEFAULT_BASE)
     parser.add_argument('--out', type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument('--cover', action='store_true')
     args = parser.parse_args()
     if not args.rom.is_file():
         parser.error(f'ROM does not exist: {args.rom}')
     try:
-        report = pack(args.rom, args.backwater_generated, args.out)
+        report = pack(args.rom, args.backwater_generated, args.out, args.cover)
     except (OSError, ValueError, RuntimeError, KeyError) as error:
         print(f'sc64_campaign_pack: {error}', file=sys.stderr)
         raise SystemExit(1)

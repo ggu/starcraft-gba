@@ -1,9 +1,10 @@
 # Z8 trigger scheduler
 
 `starcraft/sc64_z8_triggers.h` is a standalone scheduler for the 39 triggers
-of the authenticated Zerg mission 8 scenario. It is **not integrated**. No
-build target includes it, the campaign menus do not offer Z8, and nothing here
-claims that Z8 is playable, complete or performance-qualified.
+of the authenticated Zerg mission 8 scenario. The explicit `zerg-z8` candidate
+runs it on the live game (see [Game binding](#game-binding-zerg-z8-candidate)).
+The canonical Zerg profiles do not include it, and nothing here claims that Z8
+is complete, won through ordinary inputs or performance-qualified.
 
 It reuses the private descriptor from `tools/sc64_z8_pack.py`, described in
 [the Z8 source foundation](audits/2026-10-27-z8-source-foundation/README.md).
@@ -201,6 +202,25 @@ bound to the native traversal order before it can claim parity. The engine
 services for all three AI FourCCs remain unimplemented and fail closed; a
 generic AI substitute is not acceptable. Thus this adapter does not make the
 mission playable or complete.
+
+## Game binding (`zerg-z8` candidate)
+
+`starcraft/sc64_z8_runtime_adapter.h` runs the scheduler once per engine
+update with the Fastest speed entry (42 ms), so one update is one native
+frame. `tools/sc64_z8_program_pack.py` renders the private descriptor into
+scheduler-layout ROM tables under `build/generated/z8/`. It also renders the
+four linked Nydus records. The world adapter and the default-property create
+service from the game bridge supply the callbacks. These parts are authored:
+
+- Transmission waits a fixed 4,000 ms, because the sound lengths are not imported.
+- CenterView snaps the camera and releases its wait on the next update.
+- The only Kill row (the human's Nexus kills) counts destroyed starting Nexuses.
+- The three AI scripts run the bounded backend in `starcraft/sc64_z8_ai.h`.
+- Hero Dark Templars are cloaked to the human unless an Overlord or a complete
+  Spore Colony is in range.
+
+Saves keep a 180-byte compact form (`starcraft/sc64_z8_state.h`). Restore
+rebuilds the full image from the program and validates it before use.
 
 ## Integration follow-up
 

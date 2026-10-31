@@ -100,8 +100,11 @@ int main(void) {
     assert(patch>=0&&patch<MAX_MINERALS&&dist2(u[produced].x,u[produced].y,m[patch].x,m[patch].y)<200*200);
     init_mission(1);
     int carrier=-1;for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==SIDE&&u[j].type==U_DRONE)carrier=j;
-    assert(carrier>=0);race_campaign.carrier_unit=carrier;u[carrier].order=ORDER_IDLE;frame=30;
-    economy();assert(u[carrier].order==ORDER_IDLE);
+    assert(carrier>=0);race_campaign.carrier_unit=carrier;u[carrier].order=ORDER_IDLE;frame=29;
+    /* Exercise the normal update across the former 30-frame auto-mining
+       boundary: a stopped carrier must keep its controller order. */
+    assert(screen==SCREEN_PLAY&&!menu_open&&mode==MODE_NORMAL);
+    game_update(0,0);assert(frame==30&&u[carrier].order==ORDER_IDLE);
     /* A melee attacker reaches a building perimeter and applies armor to
        each Zealot blade hit, rather than walking into blocked center tiles. */
     init_mission(0);memset(u,0,sizeof(u));memset(b,0,sizeof(b));

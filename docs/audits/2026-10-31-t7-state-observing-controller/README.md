@@ -1,0 +1,7 @@
+# T7 state-observing controller witness
+
+On shared source 91628a4, this bounded host controller uses ordinary button inputs for a paid Dropship delivery before committing its starting forces to a costly preclear. Idle workers receive visible mineral orders; gas assignments avoid carried resources. Its existing air planner observes hostile world state regardless of fog. This is a state-observing host witness, not a blind-human or visibility-limited policy.
+
+The prepared-input ASan/UBSan controller run won at host tick 4,012 / frame 3,751 within the existing 60,000-tick limit. Kerrigan and the emitter survived, the emitter overlapped source location 1, source victory and the completion bit 1024 were set, and unsupported faults were zero. The carrier died at delivery; its survival is not an original success criterion. The ordinary controller trace has 663 held-input transitions and SHA-256 `20afc1e91883c978dbf2a44d2d4416e3d027d260a1e13ec67dbef9849bfbe6f4`.
+
+A separate host replay consumed only those held-input transitions and called the real game update, without running the controller planner or writing live game state. It independently reached the same terminal tick, frame, victory, hero/emitter conditions and completion bit. This is one host run and replay, not ARM, fresh-process persistence, hardware or performance qualification. Private traces and prepared inputs are not included.

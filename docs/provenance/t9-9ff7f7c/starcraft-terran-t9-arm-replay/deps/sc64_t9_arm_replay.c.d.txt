@@ -1,0 +1,142 @@
+build/starcraft-terran-t9-arm-replay.elf: tests/sc64_t9_arm_replay.c \
+ tests/../starcraft/game.c tests/../starcraft/../common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ tests/../starcraft/sc64_bitgrid.h common/gba.h \
+ tests/../starcraft/sc64_map_math.h \
+ tests/../starcraft/sc64_construction_hp.h \
+ tests/../starcraft/sc64_minimap_terrain.h \
+ tests/../starcraft/sc64_weapon_vfx.h \
+ tests/../starcraft/sc64_weapon_source_runtime.h \
+ tests/../starcraft/sc64_weapon_source_vfx.h \
+ .local/sc64/weapon-vfx/generated/sc64_weapon_source_generated.h \
+ tests/../starcraft/sc64_tank_source_vfx.h \
+ tests/../starcraft/sc64_construction_vfx.h \
+ tests/../starcraft/sc64_death_vfx.h \
+ .local/sc64/backwater/generated/sc64_mission_generated.h \
+ starcraft/sc64_types.h starcraft/../common/gba.h \
+ .local/sc64/backwater/generated/sc64_assets_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_races_generated.h \
+ tests/../starcraft/sc64_frontend.h tests/../starcraft/campaign_catalog.h \
+ tests/../starcraft/sc64_briefing.h \
+ .local/sc64/skirmish/generated/sc64_skirmish_generated.h \
+ .local/sc64/backwater/generated/sc64_sprites_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h \
+ tests/../starcraft/sc64_p8_sprite_adapter.h \
+ tests/../starcraft/sc64_construction_source.h \
+ tests/../starcraft/sc64_construction_animation.h \
+ .local/sc64/construction/generated/sc64_construction_sprites_generated.h \
+ starcraft/sc64_construction_source.h \
+ tests/../starcraft/sc64_death_source.h \
+ .local/sc64/death/generated/sc64_death_sprites_generated.h \
+ starcraft/sc64_death_source.h \
+ tests/../starcraft/sc64_unit_attack_source.h \
+ .local/sc64/attack-poses/generated/sc64_unit_attack_source_generated.h \
+ tests/../starcraft/sc64_display.h tests/../starcraft/sc64_backwater.h \
+ tests/../starcraft/sc64_types.h tests/../starcraft/race_rules.h \
+ tests/../starcraft/sc64_t6_actor_rules.h \
+ tests/../starcraft/sc64_terran_late_actor_rules.h \
+ tests/../starcraft/sc64_stock_motion.h \
+ tests/../starcraft/sc64_stock_profiles.h \
+ tests/../starcraft/sc64_stock_combat.h \
+ tests/../starcraft/sc64_game_actor_facts.h \
+ tests/../starcraft/sc64_t4_world.h tests/../starcraft/sc64_t4_runtime.h \
+ tests/../starcraft/sc64_t4_triggers.h \
+ tests/../starcraft/sc64_trigger_types.h \
+ .local/sc64/races/generated/sc64_t4_scenario_generated.h \
+ starcraft/sc64_trigger_types.h tests/../starcraft/sc64_t5_runtime.h \
+ tests/../starcraft/sc64_resource_actions.h \
+ tests/../starcraft/sc64_t5_ai.h \
+ tests/../starcraft/sc64_t5_actor_adapter.h \
+ tests/../starcraft/sc64_t5_actor_rules.h \
+ .local/sc64/races/generated/sc64_t5_scenario_generated.h \
+ tests/../starcraft/sc64_t6_mission_state.h \
+ tests/../starcraft/sc64_t6_runtime.h \
+ tests/../starcraft/sc64_t6_scenario_adapter.h \
+ .local/sc64/races/generated/sc64_t6_scenario_generated.h \
+ tests/../starcraft/sc64_terran_late_mission_state.h \
+ tests/../starcraft/sc64_terran_late_runtime.h \
+ tests/../starcraft/race_missions.h tests/../starcraft/sc64_t3.h \
+ tests/../starcraft/sc64_weapon_vfx_profiles.h \
+ tests/../starcraft/sc64_race_save_types.h \
+ tests/../starcraft/sc64_compact_building_save.h \
+ tests/../starcraft/sc64_compact_unit_save.h \
+ tests/../starcraft/sc64_collision.h \
+ tests/../starcraft/sc64_persistent_collision.h \
+ tests/../starcraft/sc64_contact.h tests/../starcraft/sc64_targets.h \
+ tests/../starcraft/sc64_font.h \
+ .local/sc64/interface/generated/sc64_font_generated.h \
+ tests/../starcraft/sc64_icons.h \
+ .local/sc64/interface/generated/sc64_icons_generated.h \
+ tests/../starcraft/sc64_chrome.h \
+ .local/sc64/interface/generated/sc64_chrome_generated.h \
+ .local/sc64/briefings/generated/sc64_briefing_generated.h \
+ starcraft/sc64_briefing.h tests/../starcraft/sc64_visibility.h \
+ tests/../starcraft/sc64_unit_walk.h tests/../starcraft/sc64_routes.h \
+ tests/../starcraft/sc64_route_monotone_probe.h \
+ tests/../starcraft/sc64_transport_adapter.h \
+ tests/../starcraft/sc64_transport_rules.h \
+ tests/../starcraft/sc64_backwater_adapter.h \
+ tests/../starcraft/field_controls.h tests/../starcraft/ui_widgets.h \
+ tests/../starcraft/sc64_terran_flight.h \
+ tests/../starcraft/sc64_unit_facing.h \
+ .local/sc64/facing/generated/sc64_unit_facing_generated.h \
+ tests/../starcraft/sc64_weapon_vfx_render.h \
+ tests/../starcraft/sc64_tank_source_vfx_render.h \
+ .local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h \
+ tests/../starcraft/sc64_weapon_source_vfx_render.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/limits.h \
+ tests/../starcraft/sc64_weapon_source_vfx_bounds.h \
+ tests/../starcraft/sc64_death_vfx_render.h \
+ tests/../starcraft/sc64_t4_prop_art.h \
+ tests/../starcraft/sc64_t4_actions.h \
+ tests/../starcraft/sc64_static_key.h \
+ tests/../starcraft/sc64_terrain_cache.h \
+ tests/../starcraft/sc64_obj_vram.h \
+ tests/../starcraft/sc64_static_dirty_rows.h \
+ tests/../starcraft/sc64_frontend_draw.h tests/../starcraft/game_audio.h \
+ .local/sc64/audio/generated/sc64_audio_generated.h \
+ tests/../starcraft/race_combat.h \
+ tests/../starcraft/sc64_t5_availability_adapter.h \
+ tests/../starcraft/sc64_unit_availability.h \
+ .local/sc64/terran-late/import-stage/sc64_t5_availability_generated.h \
+ tests/../starcraft/sc64_t6_availability_adapter.h \
+ .local/sc64/races/generated/sc64_t6_availability_generated.h \
+ tests/../starcraft/race_adapter.h tests/../starcraft/race_skirmish.h \
+ tests/../starcraft/sc64_t5_tech_adapter.h \
+ tests/../starcraft/sc64_t6_tech_adapter.h \
+ tests/../starcraft/sc64_t4_actor_adapter.h \
+ tests/../starcraft/sc64_t4_effects_adapter.h \
+ tests/../starcraft/sc64_t4_queries.h \
+ tests/../starcraft/sc64_t4_creation_adapter.h \
+ tests/../starcraft/sc64_t4_scenario_adapter.h \
+ tests/../starcraft/sc64_t4_count_cache.h \
+ tests/../starcraft/sc64_t4_trap_adapter.h \
+ tests/../starcraft/sc64_t5_world_adapter.h \
+ tests/../starcraft/sc64_t5_mine_adapter.h \
+ tests/../starcraft/sc64_t5_scenario_adapter.h \
+ tests/../starcraft/sc64_t6_world_adapter.h \
+ tests/../starcraft/sc64_t6_repair_world.h \
+ tests/../starcraft/sc64_t6_repair_adapter.h \
+ tests/../starcraft/sc64_terran_late_repair.h \
+ tests/../starcraft/sc64_terran_late_world.h \
+ tests/../starcraft/sc64_terran_late_count_cache.h \
+ .local/sc64/terran-late/import-stage/sc64_t7_scenario_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t8_scenario_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t9_scenario_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t10_scenario_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t7_availability_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t8_availability_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t9_availability_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t10_availability_generated.h \
+ tests/../starcraft/race_campaign_adapter.h \
+ tests/../starcraft/sc64_t3_adapter.h \
+ tests/../starcraft/sc64_z8_game_bridge.h \
+ tests/../starcraft/race_save_adapter.h \
+ tests/../starcraft/sc64_construction_save.h \
+ tests/../starcraft/sc64_t5_save_adapter.h \
+ tests/../starcraft/sc64_transport_save_adapter.h \
+ tests/../starcraft/sc64_t6_save_adapter.h \
+ tests/../starcraft/sc64_terran_late_save_adapter.h \
+ build/t9-arm/sc64_t9_tape_generated.h

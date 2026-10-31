@@ -543,15 +543,23 @@ static int assign_gas_worker(void)
     return ok;
 }
 
-/* Starting SCVs stand nearer the Zerg-side field than the home line. A Move
- * to the home line lets the ordinary idle-worker rule pick a home patch. */
+/* Use the visible contextual mineral command; movement does not assign work. */
 static int send_worker_home(int slot)
 {
-    int hx, hy, cc = home_cc();
-    if (cc < 0 || !home_patch_center(&hx, &hy) || !click_select_unit(slot)) return 0;
-    int tx = (b[cc].x + hx * 3) / 4, ty = (b[cc].y + hy * 3) / 4;
-    order_selection(0, tx, ty);
-    return u[slot].alive && u[slot].order == ORDER_MOVE;
+    static const int dx[] = {0,8,-8,0,0,8,-8,8,-8};
+    static const int dy[] = {0,0,0,8,-8,8,8,-8,-8};
+    if (home_cc() < 0 || !u[slot].alive || u[slot].carry || !click_select_unit(slot)) return 0;
+    for (int j = 0; j < MAX_MINERALS && host_tick < (u32)limit_ticks; ++j) {
+        if (!home_patch[j] || m[j].amount <= 0 || !currently_visible(m[j].x,m[j].y)) continue;
+        for (unsigned k = 0; k < sizeof(dx)/sizeof(dx[0]); ++k) {
+            move_cursor(m[j].x+dx[k],m[j].y+dy[k]);
+            if (!u[slot].alive || !u[slot].selected || u[slot].carry) return 0;
+            if (selected_worker_mineral_target() != j || field_ui_a_action(selected_count()) != UI_A_MINE) continue;
+            tap(KEY_A);
+            if (u[slot].alive && u[slot].order == ORDER_MINE && u[slot].target == j) return 1;
+        }
+    }
+    return 0;
 }
 
 static int queue_scv(void)
@@ -603,6 +611,9 @@ static int manage_economy(void)
 {
     int cc = home_cc();
     if (cc < 0) return 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == T9_RAW_SCV &&
+            u[i].order == ORDER_IDLE && !u[i].carry && send_worker_home(i)) return 1;
     int scvs = side_count_raw(T9_RAW_SCV) + queued_units(U_SCV);
     int refinery = source_building(T9_RAW_REFINERY, SIDE);
     int ports = side_building_count(T9_RAW_STARPORT, 0);
@@ -1131,8 +1142,8 @@ int main(int argc, char **argv)
     /* On the normal menu the briefing's START press runs mission tick 1, so
      * the controller leaves that tick neutral. */
     step(0);
-    /* Both starting SCVs walk to the home line; the idle-worker rule then
-     * picks home patches. Production follows from run_policy(). */
+    /* Give empty starting SCVs explicit contextual orders to visible home
+     * patches. Production follows from run_policy(). */
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == T9_RAW_SCV)
             fprintf(stderr, "T9 opening worker slot=%d home=%d tick=%u\n",

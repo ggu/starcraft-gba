@@ -37,7 +37,7 @@ RACE_UNIT_IDS = {
     'tassadar': 78, 'tassadar_hero_zp': 79,
     'probe': 64, 'zealot': 65, 'dragoon': 66, 'high_templar': 67,
     'archon': 68, 'shuttle': 69, 'scout': 70, 'carrier': 72,
-    'interceptor': 73, 'reaver': 83, 'observer': 84,
+    'interceptor': 73, 'reaver': 83, 'observer': 84, 'scarab': 85,
     'zergling': 37, 'hydralisk': 38, 'ultralisk': 39, 'broodling': 40,
     'drone': 41, 'overlord': 42, 'mutalisk': 43, 'guardian': 44,
     'queen': 45, 'defiler': 46, 'scourge': 47, 'larva': 35, 'egg': 36,

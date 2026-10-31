@@ -13,10 +13,19 @@ typedef struct {
     unsigned long tick;
     int frame, minerals, marines, scv, zerg;
     int raynor_owner, raynor_alive;
+    u32 state_hash;
 } Checkpoint;
-static InputEvent events[512];
+#ifndef SC64_T1_EVENT_CAP
+#define SC64_T1_EVENT_CAP 4096
+#endif
+#ifndef SC64_T1_CHECKPOINT_CAP
+#define SC64_T1_CHECKPOINT_CAP 256
+#endif
+static InputEvent events[SC64_T1_EVENT_CAP];
 static int event_count;
-static Checkpoint checkpoints[64];
+static unsigned event_total;
+static Checkpoint checkpoints[SC64_T1_CHECKPOINT_CAP];
+static int trace_overflow;
 static int checkpoint_count;
 static unsigned long input_tick;
 static u16 previous_held;
@@ -89,15 +98,20 @@ static void
 input_frame(u16 held)
 {
     u16 pressed = held & (u16)~previous_held;
-    if (held != previous_held && event_count < (int)(sizeof(events) / sizeof(events[0]))) {
-        events[event_count].tick = input_tick;
-        events[event_count].held = held;
-        event_count++;
+    if (held != previous_held) {
+        ++event_total;
+        if (event_count >= SC64_T1_EVENT_CAP) trace_overflow = 1;
+        else {
+            events[event_count].tick = input_tick;
+            events[event_count].held = held;
+            event_count++;
+        }
     }
     game_update(held, pressed);
     previous_held = held;
     input_tick++;
-    if (input_tick % 1000 == 0 && checkpoint_count < (int)(sizeof(checkpoints) / sizeof(checkpoints[0]))) {
+    if (input_tick % 1000 == 0) {
+        if (checkpoint_count >= SC64_T1_CHECKPOINT_CAP) { trace_overflow = 1; return; }
         Checkpoint *c = &checkpoints[checkpoint_count++];
         int hero = raynor_slot();
         c->tick = input_tick;
@@ -108,6 +122,7 @@ input_frame(u16 held)
         c->zerg = alive_count(ENEMY, U_ZERGLING);
         c->raynor_owner = hero >= 0 ? u[hero].owner : -1;
         c->raynor_alive = hero >= 0 && u[hero].alive;
+        c->state_hash = mission_state_hash();
     }
 }
 
@@ -334,27 +349,22 @@ wait_for_minerals(int amount, int max_updates)
 static int
 select_nearest_worker(void)
 {
-    int attempt, i, worker;
-    for (attempt = 0; attempt < 5; attempt++) {
-        int best = 0x7fffffff;
-        worker = -1;
-        for (i = 0; i < MAX_UNITS; i++)
-            if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV) {
-                int d = distance_squared(u[i].x, u[i].y, cx, cy);
-                if (d < best) { best = d; worker = i; }
-            }
-        if (worker < 0)
-            return 0;
-        move_cursor_near(u[worker].x, u[worker].y);
-        if (!move_cursor_exact(u[worker].x, u[worker].y))
-            continue;
-        press_key(KEY_A);
-        for (i = 0; i < MAX_UNITS; i++)
-            if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV && u[i].selected)
-                return 1;
+    /* A clean L tap cycles actual friendly units and moves the game cursor.
+     * It avoids chasing a worker that is overlapped by a Command Center. */
+    movement_base = 0;
+    if (selected_building >= 0) {
+        press_key(KEY_SELECT);
+        if (selected_building >= 0 || screen != SCREEN_PLAY) return 0;
+    }
+    for (int attempt=0; attempt<=MAX_UNITS && screen==SCREEN_PLAY; ++attempt) {
+        press_key(KEY_L);
+        for (int i=0;i<MAX_UNITS;++i)
+            if (u[i].alive && u[i].owner==SIDE && u[i].type==U_SCV && u[i].selected) return 1;
     }
     return 0;
 }
+
+#include "sc64_visible_worker_orders.h"
 
 static int
 start_barracks(void)
@@ -386,7 +396,10 @@ start_barracks(void)
         else press_key(KEY_UP);
     }
     press_key(KEY_A);
-    if (mode != MODE_BUILD || !move_cursor_exact(site_x, site_y)) {
+    if (mode == MODE_BUILD) move_cursor_near(site_x, site_y);
+    int snapped_x = cx, snapped_y = cy;
+    field_ui_site(menu, &snapped_x, &snapped_y);
+    if (mode != MODE_BUILD || snapped_x != site_x || snapped_y != site_y) {
         fprintf(stderr, "Barracks placement mode/cursor failed mode=%d cursor=%d,%d target=%d,%d menu=%d\n",
                 mode,cx,cy,site_x,site_y,menu_open);
         return 0;
@@ -501,10 +514,34 @@ main(int argc, char **argv)
         return 6;
     if (!wait_for_clear(pair, 9000))
         return 7;
-    if (!wait_for_minerals(400, 30000))
+    /* Count the first native assignment in the original income budget. */
+    unsigned long income_deadline = input_tick + 30000u;
+    if (!order_idle_workers_to_visible_minerals() || input_tick > income_deadline) {
+        fprintf(stderr,"T1 no idle worker accepted visible mineral input frame=%d minerals=%d\n",frame,minerals);
         return 8;
+    }
+    /* Reissue only ordinary visible-field orders after an assigned field
+     * depletes; keep the original 30,000 input-update budget. */
+    unsigned long next_worker_order = input_tick + 600u;
+    while (input_tick < income_deadline && minerals < 400 && screen != SCREEN_RESULT) {
+        if (input_tick >= next_worker_order) {
+            next_worker_order = input_tick + 600u;
+            (void)order_idle_workers_to_visible_minerals();
+        }
+        if (input_tick < income_deadline) input_frame(movement_base);
+    }
+    if (minerals < 400 || input_tick > income_deadline) {
+        fprintf(stderr,"T1 income timeout frame=%d minerals=%d screen=%d\n",frame,minerals,screen);
+        for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV)
+            fprintf(stderr,"T1 worker %d alive=%d hp=%d order=%d target=%d cargo=%d pos=%d,%d\n",i,u[i].alive,u[i].hp,u[i].order,u[i].target,u[i].carry,u[i].x,u[i].y);
+        for(int i=0;i<MAX_MINERALS;++i)if(currently_visible(m[i].x,m[i].y))
+            fprintf(stderr,"T1 visible field %d amount=%d pos=%d,%d\n",i,m[i].amount,m[i].x,m[i].y);
+        return 8;
+    }
+    fprintf(stderr,"T1 phase income finished frame=%d tick=%lu\n",frame,input_tick);
     if (!save_load_round_trip())
         return 12;
+    fprintf(stderr,"T1 phase save/load finished frame=%d tick=%lu\n",frame,input_tick);
 
     home = command_center_slot();
     if (home < 0 || !start_barracks()) {
@@ -515,31 +552,35 @@ main(int argc, char **argv)
                 mode, menu_open, selected_building, cx, cy);
         return 9;
     }
+    fprintf(stderr,"T1 phase Barracks complete frame=%d tick=%lu\n",frame,input_tick);
     if (!queue_five_marines(5000))
         return 10;
+    fprintf(stderr,"T1 phase production complete frame=%d tick=%lu\n",frame,input_tick);
     for (i = 0; i < 6000 && screen != SCREEN_RESULT; i++)
         input_frame(movement_base);
 
     if (!won || lost || !u[initial_raynor].alive || u[initial_raynor].owner != SIDE ||
         alive_count(SIDE, U_MARINE) < 10 || barracks_slot() < 0 || alive_count(SIDE, U_SCV) < 1)
         result = 11;
+    fprintf(stderr,"T1 trace transitions=%u checkpoints=%d\n",event_total,checkpoint_count);
+    if (trace_overflow) { fprintf(stderr,"T1 trace capacity exceeded; recording is incomplete\n"); return 67; }
     if (trace_path) {
         trace = fopen(trace_path, "w");
         if (!trace) {
             perror(trace_path);
             return 65;
         }
-        fprintf(trace, "{\"total_ticks\":%lu,\"events\":[", input_tick);
+        fprintf(trace, "{\"schema\":2,\"complete\":true,\"total_ticks\":%lu,\"event_count\":%d,\"checkpoint_count\":%d,\"events\":[", input_tick,event_count,checkpoint_count);
         for (i = 0; i < event_count; i++)
             fprintf(trace, "%s{\"tick\":%lu,\"held\":%u}", i ? "," : "", events[i].tick, events[i].held);
         fprintf(trace, "],\"checkpoints\":[");
         for (i = 0; i < checkpoint_count; i++) {
             Checkpoint *c = &checkpoints[i];
-            fprintf(trace, "%s{\"tick\":%lu,\"frame\":%d,\"minerals\":%d,\"marines\":%d,\"scv\":%d,\"zerg\":%d,\"raynor_owner\":%d,\"raynor_alive\":%d}",
-                i ? "," : "", c->tick, c->frame, c->minerals, c->marines, c->scv, c->zerg, c->raynor_owner, c->raynor_alive);
+            fprintf(trace, "%s{\"tick\":%lu,\"frame\":%d,\"minerals\":%d,\"marines\":%d,\"scv\":%d,\"zerg\":%d,\"raynor_owner\":%d,\"raynor_alive\":%d,\"state_hash\":%u}",
+                i ? "," : "", c->tick, c->frame, c->minerals, c->marines, c->scv, c->zerg, c->raynor_owner, c->raynor_alive, (unsigned)c->state_hash);
         }
-        fprintf(trace, "],\"expected\":{\"won\":%d,\"marines\":%d,\"scv\":%d,\"minerals\":%d,\"frame\":%d}}\n",
-            won ? 1 : 0, alive_count(SIDE, U_MARINE), alive_count(SIDE, U_SCV), minerals, frame);
+        fprintf(trace, "],\"expected\":{\"won\":%d,\"marines\":%d,\"scv\":%d,\"minerals\":%d,\"frame\":%d,\"lost\":%d,\"state_hash\":%u}}\n",
+            won ? 1 : 0, alive_count(SIDE, U_MARINE), alive_count(SIDE, U_SCV), minerals, frame, lost, (unsigned)mission_state_hash());
         if (fclose(trace) != 0) {
             perror(trace_path);
             return 65;

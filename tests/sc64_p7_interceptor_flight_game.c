@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 static unsigned source_ticks;
 
@@ -241,7 +242,8 @@ static void reject_without_live_mutation(const RaceSave *bad, u32 container_vers
     int before_frame = frame, before_minerals = minerals;
     memcpy(before_u, u, sizeof(u)); memcpy(before_b, b, sizeof(b));
     memcpy(before_pool, race_p7_projectile_host_words, sizeof(before_pool));
-    save_write(bad, sizeof(*bad), container_version);
+    if (container_version == SAVE_VERSION) write_candidate_record(bad);
+    else save_write(bad, sizeof(*bad), container_version);
     assert(!race_load_game());
     assert(memcmp(before_u, u, sizeof(u)) == 0 && memcmp(before_b, b, sizeof(b)) == 0);
     assert(memcmp(before_pool, race_p7_projectile_host_words, sizeof(before_pool)) == 0);
@@ -257,7 +259,7 @@ static void test_save_rejection(void)
     source_step(3);
     int child = find_state(carrier, SC64_P7_INTERCEPTOR_OUTSIDE);
     assert(child >= 0 && race_save_game());
-    good = race_data;
+    fixture_capture_save(&good);
     for (unsigned test = 0; test < 11; ++test) {
         int slot = test == 10 ? carrier : child;
         Unit actor = u[slot];
@@ -277,14 +279,14 @@ static void test_save_rejection(void)
         assert(sc64_p7_typed_unit_encode(&bad.units[slot], &actor,
             (unsigned)(race_cols * 16), (unsigned)(race_rows * 16)));
         reject_without_live_mutation(&bad, SAVE_VERSION);
-        save_write(&good, sizeof(good), SAVE_VERSION); assert(race_load_game());
+        write_candidate_record(&good); assert(race_load_game());
     }
     /* P6 used the same Protoss magic with generation 30. A save carrying that
      * container identity must be rejected before touching the P7 live world. */
     bad = good;
     bad.version = 0x53435030u + 30u;
     reject_without_live_mutation(&bad, 0x53435030u + 30u);
-    save_write(&good, sizeof(good), SAVE_VERSION); assert(race_load_game());
+    write_candidate_record(&good); assert(race_load_game());
 }
 
 /* Full game updates: an attack-moving Carrier fights through the mission
@@ -353,7 +355,7 @@ static void test_profile_matrix(void)
 int main(void)
 {
     game_init();
-    assert(SC64_RACE_SAVE_GENERATION == 43u && sizeof(RaceSave) == 16292u);
+    assert(SC64_RACE_SAVE_GENERATION == 43u && sizeof(RaceSave) == 16292u + SC64_BC_SAVE_EXTRA_BYTES);
     test_launch_attack_and_return();
     test_shield_retreat_and_hangar_rows();
     test_parent_death_detaches();

@@ -3,6 +3,7 @@
 #define main skirmish_runtime_fixture_main
 #include "sc64_skirmish_runtime.c"
 #undef main
+#include "sc64_save_candidate_fixture.h"
 
 #ifndef SC64_SHARED_BUNKER
 #error "shared Bunker fixture requires the shared capability"
@@ -41,8 +42,8 @@ static void reject_without_live_mutation(const RaceSave *candidate)
 {
     int old_m=minerals,old_g=gas;
     memcpy(live_units_before,u,sizeof(u)); memcpy(live_buildings_before,b,sizeof(b));
-    save_write(candidate,sizeof(*candidate),SAVE_VERSION);
-    save_write(candidate,sizeof(*candidate),SAVE_VERSION);
+    write_candidate_record(candidate);
+    assert(!race_bunker_save_world_valid(&race_data, race_cols, race_rows));
     assert(!race_load_game());
     assert(!memcmp(live_units_before,u,sizeof(u)) && !memcmp(live_buildings_before,b,sizeof(b)));
     assert(minerals==old_m && gas==old_g);
@@ -60,7 +61,7 @@ int main(void)
         assert(SC64_TRANSPORT_LOADED(&u[actors[i]]));
     }
     assert(race_bunker_cargo_space(bunker)==4);
-    assert(race_save_game()); valid_candidate=race_data;
+    assert(race_save_game()); fixture_capture_save(&valid_candidate);
     assert(race_load_game());
     assert(race_bunker_cargo_space(bunker)==4);
     for(int i=0;i<4;++i)

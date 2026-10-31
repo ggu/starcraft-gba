@@ -307,6 +307,37 @@ sc64_weapon_source_vfx_cached_bounds(void)
 #endif
 }
 
+/* Optional generated bounds apply only to exact immutable bank profiles.
+ * Unknown banks, synthetic/stack copies and invalid entries use the original
+ * global envelope. Integer-address checks avoid unrelated-pointer arithmetic. */
+static inline uint32_t
+sc64_weapon_source_vfx_profile_bounds(const Sc64WeaponSourceAttackProfile *profile)
+{
+    uint32_t global = sc64_weapon_source_vfx_cached_bounds();
+#if defined(SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION) && \
+    SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION == 1
+    if ((global & UINT32_C(0xc0000000)) == SC64_WEAPON_SOURCE_VFX_BOUNDS_VALID && profile) {
+        uintptr_t base = (uintptr_t)(const void *)sc64_weapon_source_profiles;
+        uintptr_t addr = (uintptr_t)(const void *)profile;
+        if (addr >= base) {
+            uintptr_t offset = addr - base;
+            if (offset % sizeof(sc64_weapon_source_profiles[0]) == 0) {
+                uintptr_t index = offset / sizeof(sc64_weapon_source_profiles[0]);
+                if (index < SC64_WEAPON_SOURCE_PROFILE_COUNT &&
+                    index < sizeof(sc64_weapon_source_profile_bounds) / sizeof(sc64_weapon_source_profile_bounds[0])) {
+                    uint32_t value = sc64_weapon_source_profile_bounds[index];
+                    if ((value & UINT32_C(0xc0000000)) == SC64_WEAPON_SOURCE_VFX_BOUNDS_VALID)
+                        return value;
+                }
+            }
+        }
+    }
+#else
+    (void)profile;
+#endif
+    return global;
+}
+
 static inline int
 sc64_weapon_source_vfx_motion_has_proven_bounds(uint8_t bullet_type)
 {
@@ -370,6 +401,46 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
      * renderer's straight endpoint interpolation proof. Preserve those. */
     if (!sc64_weapon_source_vfx_motion_has_proven_bounds(
             profile->weapon_bullet_type)) return 0;
+    /* Normal map coordinates fit signed 16 bits. The largest possible
+     * signed-byte source offset times a signed 16-bit direction component,
+     * the camera subtraction and 15-bit radius all fit in int32_t. Keep the
+     * wide path below for synthetic/extreme inputs and invalid directions. */
+    if ((uint32_t)x0 + 32768u <= 65535u &&
+        (uint32_t)y0 + 32768u <= 65535u &&
+        (uint32_t)x1 + 32768u <= 65535u &&
+        (uint32_t)y1 + 32768u <= 65535u &&
+        (uint32_t)camx + 32768u <= 65535u &&
+        (uint32_t)camy + 32768u <= 65535u && key.direction <= 31u) {
+        uint16_t rx, ry;
+        uint32_t global_bounds = sc64_weapon_source_vfx_cached_bounds();
+        if (!sc64_weapon_source_vfx_bounds_unpack(global_bounds, &rx, &ry)) return 0;
+        const int16_t *v = sc64_weapon_source_direction_q8[key.direction];
+        int lx = x0 + ((int)profile->forward_offset * v[0]) / 512;
+        int ly = y0 + ((int)profile->forward_offset * v[1]) / 512 -
+                 (int)profile->upward_offset / 2;
+        int lo_x = x0, hi_x = x0, lo_y = y0, hi_y = y0;
+        if (lx < lo_x) lo_x = lx;
+        if (lx > hi_x) hi_x = lx;
+        if (x1 < lo_x) lo_x = x1;
+        if (x1 > hi_x) hi_x = x1;
+        if (ly < lo_y) lo_y = ly;
+        if (ly > hi_y) hi_y = ly;
+        if (y1 < lo_y) lo_y = y1;
+        if (y1 > hi_y) hi_y = y1;
+        lo_x -= camx; hi_x -= camx; lo_y -= camy; hi_y -= camy;
+        if (hi_x + (int)rx < 0 || lo_x - (int)rx >= 240 ||
+            hi_y + (int)ry < 0 || lo_y - (int)ry >= 108) return 1;
+#if defined(SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION) && \
+    SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION == 1
+        uint32_t profile_bounds = sc64_weapon_source_vfx_profile_bounds(profile);
+        if (profile_bounds == global_bounds ||
+            !sc64_weapon_source_vfx_bounds_unpack(profile_bounds, &rx, &ry)) return 0;
+        return hi_x + (int)rx < 0 || lo_x - (int)rx >= 240 ||
+               hi_y + (int)ry < 0 || lo_y - (int)ry >= 108;
+#else
+        return 0;
+#endif
+    }
     int64_t dx = (int64_t)x1 - x0, dy = (int64_t)y1 - y0;
     uint64_t abs_dx = (uint64_t)(dx < 0 ? -dx : dx);
     uint64_t abs_dy = (uint64_t)(dy < 0 ? -dy : dy);
@@ -568,6 +639,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
                                      int x0, int y0, int x1, int y1, int live,
                                      uint32_t gba_age)
 {
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    u32 section_start=gba_clock();
+#endif
     if (!live) return;
     if (!p || !p->projectile_image) return;
     int launch_x, launch_y;
@@ -581,6 +655,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
     Sc64WeaponSourceMotion motion =
         sc64_weapon_source_motion_prepare(p, launch_x, launch_y, x1, y1);
     if (!sc64_weapon_source_trace_has_duration_motion(p, launch_x, launch_y, x1, y1, &motion)) return;
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_motion+=gba_clock()-section_start; section_start=gba_clock();
+#endif
     uint32_t attack_age = sc64_weapon_source_vfx_source_tick(gba_age);
     uint32_t release_ticks = sc64_weapon_source_trace_release_ticks(p);
     /* The captured tracer begins at attack-init. Keep the attacker animation
@@ -598,6 +675,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
             attack_age, attack_age, p->attack_image, actor_frame, x0, y0,
             key.direction, actor_mirror, 0, 0, x0, y0, x1, y1, 0);
     }
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_actor+=gba_clock()-section_start; section_start=gba_clock();
+#endif
     if (attack_age < release_ticks) return;
     uint32_t source_age = attack_age - release_ticks;
     uint32_t init_ticks = sc64_weapon_source_trace_startup_ticks(p);
@@ -663,6 +743,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
                 draw_image_id, draw_image, draw_frame, draw_mirror, px, py);
     }
 
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_projectile+=gba_clock()-section_start; section_start=gba_clock();
+#endif
     /* Child images from each missile script remain independent while their
      * own Init animation is alive. This covers projectile trails and impact
      * sparks as well as ordinary IMGOL/SPROL records. */
@@ -682,6 +765,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
             moving ? flight_ticks : 0u, &motion);
     }
 
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_children+=gba_clock()-section_start;
+#endif
 }
 
 static inline void

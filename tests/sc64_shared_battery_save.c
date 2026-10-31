@@ -3,6 +3,7 @@
 #define main skirmish_runtime_fixture_main
 #include "sc64_skirmish_runtime.c"
 #undef main
+#include "sc64_save_candidate_fixture.h"
 
 #ifndef SC64_SHARED_BATTERY
 #error "shared Battery fixture requires the shared capability"
@@ -41,8 +42,7 @@ static void reject_without_live_mutation(const RaceSave *candidate)
 {
     int old_m=minerals,old_g=gas;
     memcpy(live_units_before,u,sizeof(u)); memcpy(live_buildings_before,b,sizeof(b));
-    save_write(candidate,sizeof(*candidate),SAVE_VERSION);
-    save_write(candidate,sizeof(*candidate),SAVE_VERSION);
+    write_candidate_record(candidate);
     assert(!race_load_game());
     assert(!memcmp(live_units_before,u,sizeof(u)) && !memcmp(live_buildings_before,b,sizeof(b)));
     assert(minerals==old_m && gas==old_g);
@@ -66,7 +66,7 @@ int main(void)
     u[unit].raw_type=-1; u[unit].raw_owner=-1;
     u[unit].shield=1; u[unit].shield_remainder=7;
     u[unit].order=ORDER_RECHARGE; u[unit].target=battery; u[unit].work_timer=0;
-    assert(race_save_game()); valid_candidate=race_data;
+    assert(race_save_game()); fixture_capture_save(&valid_candidate);
     assert(valid_candidate.state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]==SC64_SHIELD_PHASE_SAVE_MARKER);
     assert(race_load_game());
     assert(b[battery].queue_progress==12345 && b[battery].level==3);
@@ -88,6 +88,7 @@ int main(void)
         }
         if (mutation<2 || mutation==5) encode_unit(&invalid_candidate,unit,&actor);
         else encode_building(&invalid_candidate,battery,&target);
+        if (mutation == 0) assert(!race_battery_saved_world_valid(&invalid_candidate, race_cols, race_rows));
         reject_without_live_mutation(&invalid_candidate);
     }
     /* A genuine legacy non-P7 candidate migrates only shielded units. */
@@ -100,8 +101,7 @@ int main(void)
     legacy_battery.queue_progress=0;
     legacy_battery.queue[0]=U_MARINE; legacy_battery.queue[3]=U_SCV;
     encode_building(&invalid_candidate,battery,&legacy_battery);
-    save_write(&invalid_candidate,sizeof(invalid_candidate),SAVE_VERSION);
-    save_write(&invalid_candidate,sizeof(invalid_candidate),SAVE_VERSION);
+    write_candidate_record(&invalid_candidate);
     assert(race_load_game());
     assert(u[unit].shield_remainder==1276 && u[unshielded].shield_remainder==9);
     assert(b[battery].queue_count==0 && b[battery].queue_head==0 &&
@@ -122,8 +122,7 @@ int main(void)
     invalid_candidate=valid_candidate;
     phase_actor=u[unit]; phase_actor.order=ORDER_IDLE; phase_actor.target=-1;
     phase_actor.shield_remainder=317; encode_unit(&invalid_candidate,unit,&phase_actor);
-    save_write(&invalid_candidate,sizeof(invalid_candidate),SAVE_VERSION);
-    save_write(&invalid_candidate,sizeof(invalid_candidate),SAVE_VERSION);
+    write_candidate_record(&invalid_candidate);
     assert(race_load_game() && u[unit].shield_remainder==317);
     invalid_candidate=valid_candidate;
     invalid_candidate.state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]=0x12345678;
@@ -134,8 +133,7 @@ int main(void)
     phase_actor.order=ORDER_IDLE; phase_actor.target=-1; phase_actor.shield_remainder=320;
     encode_unit(&invalid_candidate,unit,&phase_actor);
     reject_without_live_mutation(&invalid_candidate);
-    save_write(&valid_candidate,sizeof(valid_candidate),SAVE_VERSION);
-    save_write(&valid_candidate,sizeof(valid_candidate),SAVE_VERSION);
+    write_candidate_record(&valid_candidate);
     assert(race_load_game());
     /* The candidate-only validator must not interpret or overwrite the shared
      * mission union when a non-P7 campaign carries a recharge order. */
