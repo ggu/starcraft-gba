@@ -330,7 +330,7 @@ static int race_site_powered(int owner, int x, int y)
 {
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i)
-        if (building_complete(i) && b[i].owner == owner && b[i].type == B_PYLON &&
+        if (b[i].type == B_PYLON && b[i].owner == owner && building_complete(i) &&
             dist2(x, y, b[i].x, b[i].y) <= 144 * 144) return 1;
     return 0;
 }
