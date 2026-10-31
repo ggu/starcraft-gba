@@ -180,3 +180,36 @@ with explicit probe flags retained unchanged RAM guards at
 `__bss_end=0x020370c0`, `__iwram_end=0x03004e30`; its argv and output are in
 `scarab-autonomous-arm-link.json`. This is one older-branch profile, not a
 current-product matrix, ARM replay, performance or hardware qualification.
+
+## Paid-child attack and delayed splash experiment
+
+The normally disabled `SC64_SCARAB_WEAPON_PROBE` extends the autonomous probe.
+It diverts Reaver combat before the generic hit path, selects an existing paid
+inside child, and launches it; generic Reaver damage does not also occur. At
+source-range arrival the probe creates a separate bounded four-packet pool
+entry and requests child removal on the next source tick. A full pool produces
+no fabricated damage. Pending packets and the probe's test-only per-owner
+Scarab-damage upgrade bit are not saved; a save is refused while either exists.
+
+The probe's five-source-tick impact delay is the bounded observation in the
+pinned full-world far trace (arrival frame 120, victim damage frame 125), not
+a universal derivation of IScript and bullet scheduling. The experimental
+resolver uses the source unit rectangle and length helper, enemy-splash radii
+20/40/60, 100 base or test-injected Scarab upgrade 125, the engine's existing
+normal-damage armor/shield path, same-owner exclusion and ground-only unit
+filtering. Buildings, explicit-friendly-target exceptions, owner/slot reuse,
+upgrade research/persistence and fractional half/quarter damage fidelity are
+not implemented. The fixed pool and separate owner bit are global experimental
+state; no per-child array was added. This does not register normal gameplay.
+
+The ASan/UBSan actual game-update fixture uses ordinary attack-move input with
+the parent alive and a real paid child. A synthetic durable Marine witnesses
+100 and 125 damage exactly five source ticks after arrival, no earlier or
+duplicate damage, and unchanged friendly ground worker and enemy flying unit.
+The upgrade bit is injected after launch to test impact-time lookup; it is not
+a research or save test. A synthetic full-pool case causes no damage. Receipts
+are `.local/decoder-proof/scarab-weapon-{compile,runs,arm-link}.json`. A direct
+single Terran old-branch normal-recipe link with all probe flags kept the
+existing guards (`__bss_end=0x020370e0`, `__iwram_end=0x03004f00`), only
+256 bytes below the strict IWRAM limit; this is not a current-product matrix,
+ARM replay, timing or hardware qualification. All probes remain off.

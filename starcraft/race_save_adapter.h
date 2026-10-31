@@ -1012,6 +1012,9 @@ static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,u
 static int race_scarab_stage_previous(GbaSaveSelection *selection);
 #endif
 static int race_save_game(void) {
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    if (race_scarab_probe_bullets_pending()) return 0;
+#endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     GbaSaveSelection previous;
     int have_previous=race_scarab_stage_previous(&previous);
