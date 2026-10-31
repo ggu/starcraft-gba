@@ -169,6 +169,28 @@ a passive human, then:
   continues for L ticks. It then reloads the SRAM into a reinitialized game,
   continues for L ticks, and requires identical world digests.
 
+- `--builder S` follows a walking builder: 0, saved and reloaded mid-walk,
+  it arrives on the same frame; 1, jammed in place, it is released after 40
+  passes and its structure is planned again; 2, the same with a save at
+  pass 20.
+- `--workers S` checks idle opponent workers, since the shared update no
+  longer sends idle workers to minerals: 0, a worker stopped with the
+  engine's STOP returns to a local field within two passes; 1, the human's
+  stopped worker stays idle; 2, a worker whose field runs out moves to
+  another; 3, an SCV that finishes a structure returns to work.
+
 `tools/sc64_skirmish_ai_matrix.py` runs the harness across products, maps,
 human races and opponent mixes. It validates every record strictly, failing on
-missing, duplicate, malformed or out-of-order records.
+missing, duplicate, malformed or out-of-order records. A save case whose match
+ends before the save point is reported as `no save` with its reason and never
+counts as a save.
+
+`tools/sc64_skirmish_sram_continuation.py` checks the same continuation on the
+unchanged ARM product in two processes of the pinned port-free mGBA backend
+(`tools/sc64_headless_replay.c`). Process 1 starts a custom game from an empty
+save with menu inputs, plays with a passive human, saves through the pause
+menu and runs the uninterrupted reference. Process 2 loads the exported 32 KiB
+SRAM with L on HOME. The restored world must equal the saved world, and the
+continuation must equal the reference, compared by a fingerprint of frame,
+banks, mineral fields and every live unit's and building's semantic fields.
+`--tamper-sram` corrupts the record as a negative control, which must fail.
