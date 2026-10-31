@@ -190,7 +190,7 @@ static int side_hatchery(void)
 {
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && !b[i].under_construction && b[i].owner == SIDE &&
-            b[i].type == B_HATCHERY) return i;
+            sc64_race_is_zerg_townhall(b[i].type)) return i;
     return -1;
 }
 
@@ -215,6 +215,18 @@ static int side_worker_count(void)
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && sc64_race_is_worker(u[i].type)) ++count;
     return count;
+}
+
+static int armed_count(void)
+{
+    int n=0;
+    for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].owner==SIDE &&
+        (sc64_race_unit_damage_vs(u[i].type,0)>0 || sc64_race_unit_damage_vs(u[i].type,1)>0)) ++n;
+    return n;
+}
+static int side_type_count(int type)
+{
+    int n=0;for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==type)++n;return n;
 }
 
 static int side_queued_count(int type)
@@ -281,7 +293,8 @@ static void build_extractor_at_geyser(void)
 static void assign_gas_workers(void)
 {
     int extractor = side_extractor();
-    if (extractor < 0 || !building_complete(extractor) || side_gas_workers() >= 3) return;
+    if (extractor < 0 || !building_complete(extractor) || side_gas_workers() >= 3 ||
+        side_worker_count() - side_gas_workers() <= 3) return;
     int worker = -1, best = 0x7fffffff;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
         u[i].type == U_DRONE && u[i].order != ORDER_GAS && u[i].order != ORDER_BUILD) {
@@ -291,6 +304,106 @@ static void assign_gas_workers(void)
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
     move_cursor(b[extractor].x, b[extractor].y);
     tap(KEY_A); /* Selected Drone assigns itself to the completed Extractor. */
+}
+
+/* Reassign an idle Drone with a visible mineral click after a patch runs out. */
+static void assign_idle_miner(void)
+{
+    int worker = -1, patch = -1, best = 0x7fffffff, have_idle = 0;
+    int hatch = side_hatchery();
+    if (hatch < 0) return;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_DRONE &&
+            u[i].order == ORDER_IDLE && !u[i].carry) { have_idle = 1; break; }
+    if (!have_idle) return;
+    /* Stacked Drones may not be independently selectable. Accept the actual
+     * selected eligible Drone, never substitute an index or write selection. */
+    for (int guard = 0; guard < MAX_UNITS; ++guard) {
+        tap(KEY_L);
+        int actual = find_selected_worker();
+        if (selected_count() == 1 && actual >= 0 && u[actual].alive &&
+            u[actual].owner == SIDE && u[actual].type == U_DRONE &&
+            u[actual].order == ORDER_IDLE && !u[actual].carry) { worker = actual; break; }
+    }
+    if (worker < 0) return;
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 &&
+        dist2(b[hatch].x,b[hatch].y,m[i].x,m[i].y) <= 220*220) {
+        int nx, ny, load=0, unsafe=0;
+        for (int j=0;j<MAX_UNITS;++j) if (u[j].alive && u[j].owner==ENEMY &&
+            currently_visible(u[j].x,u[j].y) && dist2(u[j].x,u[j].y,m[i].x,m[i].y)<120*120)
+            {unsafe=1; break;}
+        if (unsafe) continue;
+        if (!path_next_tile(u[worker].x,u[worker].y,m[i].x,m[i].y,&nx,&ny)) continue;
+        for (int j=0;j<MAX_UNITS;++j)
+            if (u[j].alive && u[j].owner==SIDE && u[j].order==ORDER_MINE && u[j].target==i) ++load;
+        int d = dist2(u[worker].x,u[worker].y,m[i].x,m[i].y) + load * 40000;
+        if (d < best) { best = d; patch = i; }
+    }
+    if (patch < 0) return;
+    if (!currently_visible(m[patch].x,m[patch].y)) {
+        /* The controller may consult map contents, but uses a normal Move to
+         * reveal a field before issuing its contextual mineral command. */
+        tap_b();
+        if (menu_open && menu_cursor == MENU_MOVE) tap(KEY_A);
+        if (mode == MODE_MOVE) {
+            move_cursor(m[patch].x,m[patch].y + 24);
+            tap(KEY_A);
+            fprintf(stderr,"Z3 miner%d approaches field%d frame%d order%d\n",worker,patch,frame,u[worker].order);
+        }
+        return;
+    }
+    static const int offsets[][2] = {{0,0},{-8,0},{8,0},{0,-8},{0,8},
+        {-8,-8},{8,-8},{-8,8},{8,8},{-12,0},{12,0},{0,-12},{0,12}};
+    for (unsigned i = 0; i < sizeof(offsets)/sizeof(offsets[0]); ++i) {
+        if (!u[worker].alive || !u[worker].selected || selected_count() != 1) return;
+        move_cursor(m[patch].x + offsets[i][0],m[patch].y + offsets[i][1]);
+        if (selected_worker_mineral_target() != patch) continue;
+        tap(KEY_A);
+        if (u[worker].alive && u[worker].order == ORDER_MINE && u[worker].target == patch)
+            fprintf(stderr,"Z3 miner%d assigned field%d frame%d\n",worker,patch,frame);
+        return;
+    }
+}
+
+/* A ground assault has repeatedly stalled against the enemy base. Build the
+ * ordinary Lair/Spire tech through the same menu used by a human player. */
+static void advance_air_tech(void)
+{
+    int h=side_hatchery();
+    if(h<0 || side_worker_count()<6 || !side_has_building(B_SPAWNING_POOL)) return;
+    if (!side_has_building_any(B_LAIR) && armed_count()<40) return;
+    if(!side_has_building_any(B_LAIR)) {
+        if(b[h].type!=B_HATCHERY || b[h].queue_count || minerals<building_cost(B_LAIR) ||
+           gas<building_gas_cost(B_LAIR)) return;
+        move_cursor(b[h].x,b[h].y); tap(KEY_A);
+        if(selected_building!=h) return;
+        tap_b();
+        for(int n=0;menu_open && menu_cursor!=MENU_ZP_LAIR && n<MENU_COUNT;++n) tap(KEY_DOWN);
+        if(menu_open && menu_cursor==MENU_ZP_LAIR) tap(KEY_A);
+        return;
+    }
+    if(!side_has_building(B_LAIR) || side_has_building_any(B_SPIRE) ||
+       minerals<building_cost(B_SPIRE) || gas<building_gas_cost(B_SPIRE)) return;
+    int sx=-1,sy=-1,best=0x7fffffff;
+    for(int dy=-128;dy<=128;dy+=16)for(int dx=-128;dx<=128;dx+=16) {
+        int x=b[h].x+dx,y=b[h].y+dy,d=dx*dx+dy*dy;
+        if(d<48*48 || d>=best || !race_can_site(SIDE,B_SPIRE,x,y) || !can_place(B_SPIRE,x,y)) continue;
+        best=d;sx=x;sy=y;
+    }
+    if(sx<0)return;
+    int worker=-1;
+    for(int n=0;n<MAX_UNITS;++n) {
+        tap(KEY_L); int v=find_selected_worker();
+        if(selected_count()==1 && v>=0 && u[v].alive && u[v].owner==SIDE &&
+           u[v].type==U_DRONE && u[v].order!=ORDER_GAS && u[v].order!=ORDER_BUILD &&
+           !SC64_PENDING_BUILD_ORDER(u[v].order)) {worker=v;break;}
+    }
+    if(worker<0)return;
+    tap_b();
+    for(int n=0;menu_open && menu_cursor!=MENU_ZP_SPIRE && n<MENU_COUNT;++n) tap(KEY_DOWN);
+    if(!menu_open || menu_cursor!=MENU_ZP_SPIRE)return;
+    tap(KEY_A);
+    if(mode==MODE_BUILD && menu==B_SPIRE) {move_cursor(sx,sy);tap(KEY_A);}
 }
 
 static void build_hydralisk_den(void)
@@ -374,13 +487,18 @@ static int local_combat_count(int x, int y, int radius)
 {
     int count=0;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].owner==SIDE &&
-        !sc64_race_is_worker(u[i].type) &&
+        (sc64_race_unit_damage_vs(u[i].type,0)>0 || sc64_race_unit_damage_vs(u[i].type,1)>0) &&
         abs(u[i].x-x)<=radius && abs(u[i].y-y)<=radius) ++count;
     return count;
 }
 
 static void issue_selected_attack_order_at(int x, int y)
 {
+    /* Do not issue an order to a defense box containing mining Drones. */
+    for (int i=0; i<MAX_UNITS; ++i) if (u[i].alive && u[i].selected &&
+        u[i].owner==SIDE && sc64_race_is_worker(u[i].type)) {
+        return;
+    }
     if (selected_building>=0) {
         tap_b();
         tap(KEY_DOWN);
@@ -394,10 +512,38 @@ static void issue_selected_attack_order_at(int x, int y)
     tap(KEY_A);
 }
 
+/* L selects one unit even when many units share one position. */
+static int select_single_hydra(int x,int y,int radius,int inside)
+{
+    for(int n=0;n<MAX_UNITS;++n) {
+        tap(KEY_L);
+        if(selected_count()!=1)continue;
+        for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].selected&&u[i].owner==SIDE&&
+            u[i].type==U_HYDRALISK &&
+            ((dist2(u[i].x,u[i].y,x,y)<=radius*radius)==inside))return 1;
+    }
+    return 0;
+}
+
 static void issue_attack_order(void)
 {
-    int x, y;
-    if (enemy_target_position(&x, &y)) issue_attack_order_at(x, y);
+    int x,y;
+    if (!enemy_target_position(&x,&y)) return;
+    if (strcmp(policy,"hybrid")) { issue_attack_order_at(x,y); return; }
+    /* L cycles a single aircraft even when it overlaps the ground reserve.
+     * Send idle Mutalisks individually; leave Hydralisks at the objectives. */
+    for(int sent=0;sent<16 && screen==SCREEN_PLAY && !won && !lost;++sent) {
+        int found=0;
+        for(int n=0;n<MAX_UNITS;++n) {
+            tap(KEY_L);
+            if(selected_count()!=1)continue;
+            for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].owner==SIDE&&u[i].selected&&
+                u[i].type==U_MUTALISK&&u[i].order==ORDER_IDLE) {found=1;break;}
+            if(found)break;
+        }
+        if(!found)break;
+        issue_selected_attack_order_at(x,y);
+    }
 }
 
 static void issue_order_at(int x, int y)
@@ -446,12 +592,14 @@ static int unit_choice(void)
     int free_supply = race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE);
     if (free_supply <= 4 && minerals >= sc64_race_unit_rules[U_OVERLORD].minerals)
         return U_OVERLORD;
-    if (gas >= sc64_race_unit_rules[U_HYDRALISK].gas &&
-        minerals >= sc64_race_unit_rules[U_HYDRALISK].minerals &&
-        side_has_building(B_HYDRALISK_DEN)) return U_HYDRALISK;
     if (side_worker_count() + side_queued_count(U_DRONE) < 8 &&
         minerals >= sc64_race_unit_rules[U_DRONE].minerals)
         return U_DRONE;
+    if (side_has_building(B_SPIRE) && minerals>=100 && gas>=100)
+        return U_MUTALISK;
+    if (gas >= sc64_race_unit_rules[U_HYDRALISK].gas &&
+        minerals >= sc64_race_unit_rules[U_HYDRALISK].minerals &&
+        side_has_building(B_HYDRALISK_DEN)) return U_HYDRALISK;
     if (minerals >= sc64_race_unit_rules[U_ZERGLING].minerals &&
         side_has_building(B_SPAWNING_POOL)) return U_ZERGLING;
     return -1;
@@ -461,6 +609,8 @@ static void queue_one_unit(void)
 {
     int hatch = side_hatchery(), choice = unit_choice();
     if (hatch < 0 || choice < 0 || b[hatch].queue_count >= 3 || !b[hatch].larva) return;
+    if (side_worker_count() >= 6 && armed_count()>=40 &&
+        side_has_building(B_SPAWNING_POOL) && !side_has_building_any(B_LAIR)) return;
     move_cursor(b[hatch].x, b[hatch].y);
     tap(KEY_A); /* select the authored Hatchery */
     for (int i = 0; i < 4 && train_type != choice; ++i) tap(KEY_R);
@@ -552,9 +702,8 @@ int main(int argc, char **argv)
     launch_z3();
     checkpoint("start");
 
-    /* The game auto-assigns idle Drones to the nearest mineral through its
-       normal economy tick. Attack and production choices below are driven by
-       observed state; this loop never writes gameplay globals or entities. */
+    /* Resource and attack planning can inspect world state and map contents;
+       every game action below uses controller inputs. */
     int chrysalis_x, chrysalis_y;
     assert(mature_chrysalis_position(&chrysalis_x, &chrysalis_y) &&
            "source raw 150 was not imported as human mature Chrysalis building");
@@ -569,8 +718,11 @@ int main(int argc, char **argv)
     int next_action = frame + 3600;
     int next_extractor_attempt = frame;
     int next_gas_assignment = frame;
+    int next_miner_assignment = frame;
     int next_den_attempt = frame;
+    int next_air_attempt = frame;
     int next_defense_scan = frame + 120;
+    int next_hatch_guard = frame + 300;
     int defended_target = -1;
     while (frame < RUN_LIMIT && screen == SCREEN_PLAY && !won && !lost) {
         if (!strcmp(policy, "hybrid") && frame >= next_defense_scan) {
@@ -594,11 +746,37 @@ int main(int argc, char **argv)
                         defended_target=target;
                 }
             }
+            int hatch=side_hatchery();
+            if (hatch>=0 && (enemy_distance<0 || enemy_distance>=220*220)) {
+                int hx=b[hatch].x,hy=b[hatch].y,tx=0,ty=0,attacker=-1;
+                int hd=nearest_enemy_unit_position(hx,hy,&tx,&ty,&attacker);
+                if (hd>=0 && hd<180*180 && local_combat_count(hx,hy,160)>0) {
+                    if (select_single_hydra(hx,hy,160,1) && screen==SCREEN_PLAY && !won && !lost)
+                        issue_selected_attack_order_at(tx,ty);
+                }
+            }
             next_defense_scan=frame+120;
+        }
+        /* Reinforce the objective and Hatchery individually: spawned units
+         * can stack, so a box around either site may capture the whole army. */
+        if (frame >= next_hatch_guard) {
+            int h=side_hatchery();
+            if (local_combat_count(chrysalis_x,chrysalis_y,120)<10) {
+                if(select_single_hydra(chrysalis_x,chrysalis_y,120,0))
+                    issue_selected_attack_order_at(guard_x,guard_y);
+            } else if (h>=0 && local_combat_count(b[h].x,b[h].y,120)<4) {
+                if(select_single_hydra(b[h].x,b[h].y,120,0))
+                    issue_selected_attack_order_at(b[h].x,b[h].y);
+            }
+            next_hatch_guard=frame+300;
         }
         if (frame >= next_extractor_attempt && side_extractor() < 0 && minerals >= 50) {
             build_extractor_at_geyser();
             next_extractor_attempt = frame + 900;
+        }
+        if (frame >= next_miner_assignment) {
+            assign_idle_miner();
+            next_miner_assignment = frame + 600;
         }
         if (frame >= next_gas_assignment && side_extractor() >= 0) {
             assign_gas_workers();
@@ -607,6 +785,10 @@ int main(int argc, char **argv)
         if (frame >= next_den_attempt && side_extractor() >= 0) {
             build_hydralisk_den();
             next_den_attempt = frame + 900;
+        }
+        if (frame >= next_air_attempt) {
+            advance_air_tech();
+            next_air_attempt = frame + 600;
         }
         if (frame >= next_train) {
             queue_one_unit();
@@ -623,13 +805,10 @@ int main(int argc, char **argv)
                 enemy_unit_distance = nearest_enemy_unit_position(chrysalis_x,
                                                                    chrysalis_y,
                                                                    &ex, &ey, 0);
-                if (enemy_unit_distance >= 0 && enemy_unit_distance < 420 * 420)
-                    issue_attack_order_at(ex, ey);
-                else if (threat >= 0 && owner_units(SIDE) - side_worker_count() >= 40 &&
-                         mature_chrysalis_health() >= 150)
+                if ((enemy_unit_distance < 0 || enemy_unit_distance >= 220 * 220) &&
+                    threat >= 0 && armed_count() >= 60 && side_type_count(U_MUTALISK)>=12 &&
+                    side_has_building(B_SPIRE) && mature_chrysalis_health() >= 150)
                     issue_attack_order();
-                else
-                    issue_order_at(guard_x, guard_y);
             }
             next_action = frame + (!strcmp(policy, "guard") ? 900 : 1800);
         }
