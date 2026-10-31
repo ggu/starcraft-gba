@@ -298,6 +298,44 @@ static int issue_attack(int x,int y)
     return 1;
 }
 
+/* Ordinary UI escort: select the actual Observer and issue MOVE behind the
+ * combat group's leading selected actor. Never move it to the target itself. */
+static int escort_observer(int waypoint_x,int waypoint_y)
+{
+    int observer=-1,front=-1,best=0x7fffffff,sx=0,sy=0,count=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE) {
+        if(u[i].raw_type==84 && observer<0)observer=i;
+        if(u[i].selected) {
+            int d=dist2(u[i].x,u[i].y,waypoint_x,waypoint_y);
+            sx+=u[i].x;sy+=u[i].y;++count;
+            if(d<best){best=d;front=i;}
+        }
+    }
+    if(observer<0||front<0||!count)return 0;
+    int dx=waypoint_x-sx/count,dy=waypoint_y-sy/count;
+    int length2=dx*dx+dy*dy,length=0;
+    if(!length2)return 0;
+    while((length+1)*(length+1)<=length2)++length;
+    int x=limit(u[front].x-64*dx/length,0,WORLD_W-1);
+    int y=limit(u[front].y-64*dy/length,0,WORLD_H-1);
+    if(!normalize_field()||!clear_selected_building()||
+       !move_cursor(u[observer].x-4,u[observer].y-4))return 0;
+    input(KEY_L);input(KEY_L|KEY_RIGHT|KEY_DOWN);
+    input(KEY_L|KEY_RIGHT|KEY_DOWN);input(0);
+    if(selected_count()!=1||!u[observer].selected)
+        for(int n=0;n<MAX_UNITS&&screen==SCREEN_PLAY&&u[observer].alive&&
+            (selected_count()!=1||!u[observer].selected);++n)KEY_TAP(KEY_L);
+    if(selected_count()!=1||!u[observer].alive||u[observer].owner!=SIDE||
+       u[observer].raw_type!=84||!u[observer].selected)return 0;
+    if(!choose_field_row(MENU_MOVE)||mode!=MODE_MOVE||!move_cursor(x,y))return 0;
+    if(selected_count()!=1||!u[observer].alive||!u[observer].selected)return 0;
+    KEY_TAP(KEY_A);
+    if(u[observer].order!=ORDER_MOVE)return 0;
+    fprintf(trace,"{\"kind\":\"observer-escort\",\"frame\":%u,\"observer\":%d,\"front\":%d,\"front_xy\":[%d,%d],\"waypoint\":[%d,%d],\"destination\":[%d,%d],\"actual_destination\":[%d,%d]}\n",
+        (unsigned)frame,observer,front,u[front].x,u[front].y,waypoint_x,waypoint_y,x,y,u[observer].tx,u[observer].ty);
+    return 1;
+}
+
 static int live_units(int owner)
 {
     int n=0;for(int i=0;i<MAX_UNITS;i++)n+=u[i].alive&&(owner<0||u[i].owner==owner);return n;
@@ -807,6 +845,7 @@ int main(int argc,char **argv)
                         (unsigned)frame,target_x,target_y,ax,ay,path_grid_valid);
                 }
                 if((has_route||use_threat)&&issue_attack(command_x,command_y)){
+                    (void)escort_observer(command_x,command_y);
                     last_order=frame;
                     fprintf(trace,"{\"kind\":\"command\",\"frame\":%u,\"target\":\"%s\",\"target_slot\":%d,\"target_owner\":%d,\"path_distance\":%d,\"stalled_orders\":%d,\"target_xy\":[%d,%d],\"command_xy\":[%d,%d],\"route_steps\":%d,\"army_center\":[%d,%d],\"heroes_alive\":%d}\n",
                         (unsigned)frame,use_threat?"hero-threat":"nexus",use_threat?threat:t,target_owner,target_path,stalled_orders,target_x,target_y,command_x,command_y,route_steps,ax,ay,heroes_alive());
