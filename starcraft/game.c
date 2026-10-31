@@ -301,6 +301,8 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #endif
 #if defined(SC64_Z8_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 46u
+#elif defined(SC64_P9_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 45u
 #elif defined(SC64_P8_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 44u
 #elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
@@ -1616,6 +1618,17 @@ static void race_p8_note_product_building(int building);
 /* P8 binds the shared Protoss unit services (sc64_protoss_services.h). */
 #define SC64_PROTOSS_LATER_BINDINGS
 #endif
+#ifdef SC64_P9_RUNTIME
+#define SC64_P9_GLOBAL_ID 28
+static int race_p9_active(void);
+static int race_p9_map_shape_valid(const Sc64RaceMap *map);
+static int race_p9_runtime_init(const Sc64RaceMap *map);
+static int race_p9_runtime_tick(u32 elapsed_updates);
+static int race_p9_outcome(void);
+static void race_p9_note_unit_spawn(int slot, int owner, int type);
+static void race_p9_note_building_spawn(int slot, int owner, int type);
+static void race_p9_note_product_building(int building);
+#endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
        SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
 #ifdef SC64_SIEGE_SPLASH
@@ -2244,6 +2257,9 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_P8_RUNTIME
     race_p8_note_unit_spawn(i, owner, type);
 #endif
+#ifdef SC64_P9_RUNTIME
+    race_p9_note_unit_spawn(i, owner, type);
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -2411,6 +2427,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
 #ifdef SC64_P8_RUNTIME
     race_p8_note_building_spawn(i, owner, type);
+#endif
+#ifdef SC64_P9_RUNTIME
+    race_p9_note_building_spawn(i, owner, type);
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (race_battery_active() && sc64_race_raw_building(type) == 172) {
@@ -11621,8 +11640,33 @@ game_self_test(void)
 #endif
 #include "race_campaign_adapter.h"
 #include "sc64_z8_game_bridge.h"
+#ifdef SC64_P9_RUNTIME
+/* P9 builds dispatch the shared-service hooks between P8 and P9 (see
+ * sc64_p9_runtime_adapter.h); P8's own definitions take P8-only names. */
+#define race_protoss_later_services_active race_p8_later_services_active
+#define race_protoss_later_source_owner race_p8_later_source_owner
+#define race_protoss_later_service_clock race_p8_later_service_clock
+#define race_protoss_later_service_mission race_p8_later_service_mission
+#define race_protoss_later_mission_source_owner race_p8_later_mission_source_owner
+#define race_protoss_later_battery_initialize race_p8_later_battery_initialize
+#define race_protoss_later_battery_world_valid race_p8_later_battery_world_valid
+#define race_protoss_later_battery_candidate_valid race_p8_later_battery_candidate_valid
+#endif
 #ifdef SC64_P8_RUNTIME
 #include "sc64_p8_runtime_adapter.h"
+#endif
+#ifdef SC64_P9_RUNTIME
+#undef race_protoss_later_services_active
+#undef race_protoss_later_source_owner
+#undef race_protoss_later_service_clock
+#undef race_protoss_later_service_mission
+#undef race_protoss_later_mission_source_owner
+#undef race_protoss_later_battery_initialize
+#undef race_protoss_later_battery_world_valid
+#undef race_protoss_later_battery_candidate_valid
+#endif
+#ifdef SC64_P9_RUNTIME
+#include "sc64_p9_runtime_adapter.h"
 #endif
 #ifdef SC64_NYDUS_ENABLED
 static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
