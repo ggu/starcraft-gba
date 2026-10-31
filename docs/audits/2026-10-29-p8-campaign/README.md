@@ -585,3 +585,18 @@ A separate clean, unprepared default build and test at `bf73484` passed:
 881 Python tests with 23 skips, subsequent 5- and 8-test groups, and remaining
 host/sanitizer fixtures. The default ROM SHA-256 was
 `73c0deeeb36cca4cb8614248a7e60cadac11a0ec542f2ece31c37b171e2c56b8`.
+
+### Current detector-geometry fact contract
+
+At source `75e1cd2`, the geometry table revision contract requires freshly
+generated rectangle facts. A new P8-specific directory was generated with the
+actual P8 feature vector; its header SHA-256 is
+`13a6436fa5d4e5ab8e6c36a396a08cd71d8cc0d669d5c2196f70763bf38e17a9`.
+The normal P8 ARM link passed the unchanged IWRAM `030049e0` and BSS
+`0203899c` guards; its ROM is byte-identical to the normal P8 ROM used in the
+full and fresh-process tests above (SHA-256 `3d2fb002838d4ee01095c813c5485aab7616aae2bd76d43fd6cf65b199008b81`).
+The original 103 pinned inputs remained unchanged. The six FactV2 tests and the
+actual P8-vector Protoss service fixture, including Overlord detection, passed;
+the fixture retained ASan/UBSan with debug information disabled. This is P8
+qualification; other product closures and missing service capabilities require
+their own checks.
