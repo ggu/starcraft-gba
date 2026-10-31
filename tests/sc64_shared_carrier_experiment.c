@@ -19,6 +19,8 @@ static void test_render_arena(void)
     unsigned end=SC64_OBJ_VRAM_CACHE_OFFSET;
 #ifdef SC64_TERRAIN_CACHE_VRAM
     end += 240u*(unsigned)SC64_TERRAIN_CACHE_VRAM_ROWS;
+    memset(SC64_OBJ_VRAM_CACHE,0x5a,240u*(unsigned)SC64_TERRAIN_CACHE_VRAM_ROWS);
+    sc64_terrain_cache_valid=0;
 #endif
     assert(end+16u<=GBA_VRAM_SCRATCH_BYTES);
     for (unsigned i=0;i<16;++i) GBA_VRAM_SCRATCH[end+i]=(u8)(0xa0u+i);
@@ -30,6 +32,12 @@ static void test_render_arena(void)
         assert(!memcmp(arena,race_p7_projectile_host_words,sizeof(arena)));
         for (unsigned j=0;j<16;++j) assert(GBA_VRAM_SCRATCH[end+j]==(u8)(0xa0u+j));
     }
+#ifdef SC64_TERRAIN_CACHE_VRAM
+    int cache_written=0;
+    for (unsigned i=0;i<240u*(unsigned)SC64_TERRAIN_CACHE_VRAM_ROWS;++i)
+        if (SC64_OBJ_VRAM_CACHE[i]!=0x5a) { cache_written=1; break; }
+    assert(cache_written);
+#endif
     cx=old_cx; cy=old_cy;
 }
 static void test_typed_rows(void)
@@ -52,27 +60,32 @@ static void test_typed_rows(void)
 #if !defined(SC64_P7_PROJECTILES_ENABLED)
 static void test_staged_candidate(void)
 {
-    static RaceSave candidate;
-    static Unit scratch[MAX_UNITS], before[MAX_UNITS];
+    RaceSave *candidate=&race_data;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    Unit *scratch=sc64_zp_route_save_scratch.carrier_candidate.units;
+#else
+    Unit *scratch=sc64_combined_route_save_scratch.carrier_candidate.units;
+#endif
+    static Unit before[MAX_UNITS];
     static Building before_buildings[MAX_BUILDINGS];
     static u16 before_pool[SC64_ARENA_WORDS];
     memcpy(before,u,sizeof(before));
     memcpy(before_buildings,b,sizeof(before_buildings));
     memcpy(before_pool,race_p7_projectile_host_words,sizeof(before_pool));
-    assert(sc64_shared_carrier_candidate_encode(&candidate,u,b,&race_p7_projectiles,
+    assert(sc64_shared_carrier_candidate_encode(candidate,u,b,&race_p7_projectiles,
                                                 race_cols*16,race_rows*16));
-    assert(sc64_shared_carrier_candidate_valid(&candidate,scratch,MAX_UNITS,
+    assert(sc64_shared_carrier_candidate_valid(candidate,scratch,MAX_UNITS,
                                                race_cols*16,race_rows*16));
     race_mode=0;
-    assert(sc64_shared_carrier_candidate_valid(&candidate,scratch,MAX_UNITS,
+    assert(sc64_shared_carrier_candidate_valid(candidate,scratch,MAX_UNITS,
                                                race_cols*16,race_rows*16));
     race_mode=1;
-    assert(!sc64_shared_carrier_candidate_valid(&candidate,u,MAX_UNITS,
+    assert(!sc64_shared_carrier_candidate_valid(candidate,u,MAX_UNITS,
                                                 race_cols*16,race_rows*16));
-    candidate.carrier_custom.projectiles[2]^=0x80;
-    assert(!sc64_shared_carrier_candidate_valid(&candidate,scratch,MAX_UNITS,
+    candidate->carrier_custom.projectiles[2]^=0x80;
+    assert(!sc64_shared_carrier_candidate_valid(candidate,scratch,MAX_UNITS,
                                                 race_cols*16,race_rows*16));
-    candidate.carrier_custom.projectiles[2]^=0x80;
+    candidate->carrier_custom.projectiles[2]^=0x80;
     int child=-1;
     for (int i=0;i<MAX_UNITS;++i)
         if (scratch[i].alive && scratch[i].type==SC64_INTERCEPTOR_TYPE &&
@@ -80,9 +93,9 @@ static void test_staged_candidate(void)
             { child=i; break; }
     assert(child>=0);
     scratch[child].build=-1;
-    assert(sc64_p7_typed_unit_encode(&candidate.carrier_custom.units[child],
+    assert(sc64_p7_typed_unit_encode(&candidate->carrier_custom.units[child],
                                      &scratch[child],race_cols*16,race_rows*16));
-    assert(!sc64_shared_carrier_candidate_valid(&candidate,scratch,MAX_UNITS,
+    assert(!sc64_shared_carrier_candidate_valid(candidate,scratch,MAX_UNITS,
                                                 race_cols*16,race_rows*16));
     assert(!memcmp(before,u,sizeof(before)));
     assert(!memcmp(before_buildings,b,sizeof(before_buildings)));

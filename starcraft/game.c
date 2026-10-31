@@ -1255,10 +1255,19 @@ static Sc64ZpRouteSaveScratch sc64_zp_route_save_scratch;
 typedef union {
     u16 bfs_queue[MAP_CELLS];
     RaceSave save;
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+    /* Candidate actor validation shares the existing route scratch; it must
+     * not add a second full actor pool to live EWRAM. */
+    struct { RaceSave save; Unit units[MAX_UNITS]; } carrier_candidate;
+#endif
 #ifdef SC64_IMPACT_EVENTS
     RaceImpactRecord impact_record;
 #endif
 } Sc64CombinedRouteSaveScratch;
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+_Static_assert(sizeof(RaceSave)+sizeof(Unit)*MAX_UNITS<=sizeof(u16)*MAP_CELLS,
+               "Carrier candidate decode must fit combined route scratch");
+#endif
 #ifdef SC64_IMPACT_EVENTS
 _Static_assert(sizeof(RaceImpactRecord) <= sizeof(u16) * MAP_CELLS,
                "impact save record must fit existing route scratch");
