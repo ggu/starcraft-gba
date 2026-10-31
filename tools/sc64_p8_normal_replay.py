@@ -11,6 +11,10 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+from types import SimpleNamespace
+
+import sc64_races_profile as races
+import sc64_skirmish_sram_continuation as continuation
 
 import sc64_headless_replay as headless
 import sc64_p8_arm_replay as p8
@@ -22,8 +26,59 @@ def u32(rsp, address):
     return struct.unpack('<I', rsp.read(address, 4))[0]
 
 
-def run(trace, reference, rom, elf, runner, output, stop=None, export_save=False):
+def persisted_summary(rsp, sym, sizes, elf):
+    """Sample the shared continuation helper's bounded semantic world fields."""
+    unit_stride, unit_layout = races.dwarf_struct_layout(elf, 'Unit')
+    building_name = 'Sc64ZpCompactBuilding' if sizes['b'] == 160 * 48 else 'Building'
+    building_stride, building_layout = races.dwarf_struct_layout(elf, building_name)
+    proxy = SimpleNamespace(rsp=rsp, sym=sym, sizes=sizes, unit_stride=unit_stride,
+                            unit_layout=unit_layout, building_stride=building_stride,
+                            building_layout=building_layout,
+                            u32=lambda name: int.from_bytes(rsp.read(sym[name], 4), 'little', signed=True))
+    return continuation.summary(continuation.Game.state(proxy))
+
+
+def resume_inputs(transitions, resume):
+    """Quick-load with L/release, then continue the original held-key tape."""
+    previous = 0
+    for tick, held in transitions:
+        if tick > resume:
+            break
+        previous = held
+    inputs = [(0, 512), (1, 0)]
+    if previous:
+        inputs.append((2, previous))
+    inputs += [(2 + tick - resume, held) for tick, held in transitions if tick > resume]
+    return inputs
+
+
+def verify_restored(before, restored):
+    """Require an intact saved summary and matching bounded restored sample."""
+    for sample in (before, restored):
+        if not isinstance(sample, dict) or type(sample.get('frame')) is not int:
+            raise ValueError('invalid persisted-state summary')
+        fingerprint = sample.get('fingerprint')
+        if not isinstance(fingerprint, str) or len(fingerprint) != 64 or any(c not in '0123456789abcdef' for c in fingerprint):
+            raise ValueError('invalid persisted-state fingerprint')
+    if restored['fingerprint'] != before['fingerprint'] or restored['frame'] != before['frame']:
+        raise RuntimeError(f'restored world differs from saved sample: {restored} vs {before}')
+    return True
+
+
+def validate_save_boundary(plan, stop):
+    if not plan.get('save') or stop != plan['save'].get('resume_call'):
+        raise ValueError('SRAM export requires the tape pause-menu save boundary')
+
+
+def run(trace, reference, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None):
     plan = p8.load_trace(trace)
+    if save_input and (not saved_state or export_save or stop is not None or not plan['save']):
+        raise ValueError('resume requires a save and saved-state summary, without prefix/export options')
+    save_hash = hashlib.sha256(save_input.read_bytes()).hexdigest() if save_input else None
+    if export_save:
+        validate_save_boundary(plan, plan['stop'] if stop is None else stop)
+    original_stop = plan['stop']
+    resume = plan['save']['resume_call'] if save_input else 0
     stop = plan['stop'] if stop is None else stop
     if not 0 < stop <= plan['stop']:
         raise ValueError('prefix must be within the validated tape')
@@ -42,12 +97,19 @@ def run(trace, reference, rom, elf, runner, output, stop=None, export_save=False
     mode, capacity = scheduler.schedule_mode(sym, sizes)
     if mode != 'windowed' or scheduler.checkpoint_ticks(sym) != 1000:
         raise ValueError('normal P8 replay needs the 1000-tick window scheduler')
-    pages = scheduler.make_schedule_pages({'inputs': plan['transitions']}, stop, 1000)
+    transitions = plan['transitions']
+    if save_input:
+        inputs = resume_inputs(transitions, resume)
+        stop = 2 + original_stop - resume
+    else:
+        inputs = transitions
+    pages = scheduler.make_schedule_pages({'inputs': inputs}, stop, 1000)
     output.mkdir(parents=True, exist_ok=False)
     proc = rsp = log = None
     records = []
     try:
         proc, rsp, log = headless.start(runner, rom, output, sym, sizes,
+                                        save_input=save_input,
                                         save_output=output / "saved.sav" if export_save else None)
         if u32(rsp, sym['screen']) != 0 or u32(rsp, sym['frame']) != 0:
             raise RuntimeError('fresh boot is not at title')
@@ -64,6 +126,22 @@ def run(trace, reference, rom, elf, runner, output, stop=None, export_save=False
         rsp.tick(expected=sym['demo_replay_checkpoint'] & ~1)
         if u32(rsp, sym['demo_schedule_tick']) != 0:
             raise RuntimeError('scheduler did not begin at zero')
+        if save_input:
+            rsp.breakpoint(sym['demo_replay_checkpoint'] & ~1, False)
+            rsp.breakpoint(sym['game_update'] & ~1, True)
+            for _ in range(16):
+                rsp.tick(expected=sym['game_update'] & ~1)
+                if u32(rsp, sym['demo_schedule_tick']) == 2: break
+            else:
+                raise RuntimeError('fresh-process load did not reach two updates')
+            restored = persisted_summary(rsp, sym, sizes, elf)
+            (output / 'restored-state.json').write_text(json.dumps(restored, indent=2) + '\n')
+            before = json.loads(saved_state.read_text())
+            verify_restored(before, restored)
+            if u32(rsp, sym['screen']) != 1 or u32(rsp, sym['race_selected_mission']) != 27:
+                raise RuntimeError('fresh process did not load P8 into play')
+            rsp.breakpoint(sym['game_update'] & ~1, False)
+            rsp.breakpoint(sym['demo_replay_checkpoint'] & ~1, True)
         for i, page in enumerate(pages):
             events = page['events']
             chunks = [events[n:n + capacity] for n in range(0, len(events), capacity)] or [[]]
@@ -104,18 +182,29 @@ def run(trace, reference, rom, elf, runner, output, stop=None, export_save=False
             state['tick'] = tick
             records.append(state)
             (output / 'progress.json').write_text(json.dumps({'checkpoints': records}, indent=2) + '\n')
-            if tick in checks:
-                mismatches = {k: [int(checks[tick][k]), state[k]] for k in ('screen', 'frame', 'won', 'lost', 'mission') if int(checks[tick][k]) != state[k]}
+            reference_tick = original_stop if save_input and tick == stop else tick if not save_input else -1
+            if reference_tick in checks:
+                mismatches = {k: [int(checks[reference_tick][k]), state[k]] for k in ('screen', 'frame', 'won', 'lost', 'mission') if int(checks[reference_tick][k]) != state[k]}
                 if mismatches:
                     raise RuntimeError(f'host checkpoint {tick} differs: {mismatches}')
             print('P8 normal', tick, state, flush=True)
-        full = stop == plan['stop']
+        full = bool(save_input) or stop == plan['stop']
         if full and (records[-1]['won'] != 1 or records[-1]['lost'] != 0):
             raise RuntimeError('normal ROM did not win')
         if export_save:
+            (output / 'saved-state.json').write_text(json.dumps(persisted_summary(rsp, sym, sizes, elf), indent=2) + '\n')
             rsp.export_sram()
+        if save_input and hashlib.sha256(save_input.read_bytes()).hexdigest() != save_hash:
+            raise RuntimeError('fresh-process SRAM input changed')
         result = {'status': 'won' if full else 'prefix', 'stop': stop, 'checkpoints': records,
                   'sha256': {str(p.resolve()): hashlib.sha256(p.read_bytes()).hexdigest() for p in (trace, reference, rom, elf, runner)}}
+        if save_input:
+            result['resume'] = {'save_input': str(save_input.resolve()), 'save_sha256': save_hash,
+                                'saved_state': str(saved_state.resolve()),
+                                'saved_state_sha256': hashlib.sha256(saved_state.read_bytes()).hexdigest(),
+                                'saved': before, 'restored': restored,
+                                'restored_matches': True, 'sram_unchanged': True,
+                                'scope': 'bounded entity and economy fingerprint; final five-field match only'}
         (output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
         return result
     finally:
@@ -136,8 +225,10 @@ def main():
         ap.add_argument('--' + name, type=Path, required=True)
     ap.add_argument('--stop', type=int)
     ap.add_argument('--export-save', action='store_true')
+    ap.add_argument('--save-input', type=Path)
+    ap.add_argument('--saved-state', type=Path)
     a = ap.parse_args()
-    run(a.trace, a.reference, a.rom, a.elf, a.runner, a.output, a.stop, a.export_save)
+    run(a.trace, a.reference, a.rom, a.elf, a.runner, a.output, a.stop, a.export_save, a.save_input, a.saved_state)
 
 
 if __name__ == '__main__':

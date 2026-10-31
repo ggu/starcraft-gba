@@ -503,3 +503,26 @@ candidate prepare use unconditional binding cleanup. The current host receipts,
 normal ARM verification and source-boundary result were inspected separately.
 This does not promote P8, establish all-four-product integration or replace the
 older custom guest replay with a current normal-ROM campaign replay.
+
+### Current shared controls and route integration
+
+Merge `8b2f6aa` incorporates shared `d44891d` into the P8 candidate with
+Scarab controls disabled in the normal vector. The retained host input tape
+replayed on the current source with byte-identical 91 checkpoint/final output
+and victory. The P8-vector sanitizer carried startup/save matrix passed 234
+configurations; Protoss service binding load/rejection checks and the skirmish
+AI fixture passed. All 103 retained input hashes matched. The normal P8 ARM
+link and ROM verification passed the unchanged guards: IWRAM `030049e0`, BSS
+`0203899c`, ROM SHA-256
+`cb034763aaadbb7994b6455f5be030f28d1025ebcb5e2b2c9d8eb328b5abcf42`.
+
+The new opt-in `tools/sc64_p8_normal_replay.py` drives the normal ROM's
+existing input scheduler through a port-free mGBA backend; it does not write
+actor or world state. Some thousand-tick windows contain more transitions
+than its 256-entry queue, so the driver refills only consumed scheduler entries
+at game-update breakpoints. A 6,000-tick prefix including such a dense window
+matched the current host's screen, frame, mission and result fields at each
+1,000-tick checkpoint. Full normal-ROM completion and fresh-process SRAM
+continuation are separate ongoing qualifications; the earlier custom replay is
+not that evidence. The fingerprint used by the continuation path is a bounded
+sample of persisted entities and economy, not full-world atomicity proof.
