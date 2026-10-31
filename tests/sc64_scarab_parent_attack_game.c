@@ -18,7 +18,12 @@ int SC64_SCARAB_ATTACK_ENTRY(int argc,char **argv) {
     int shield=argc==2 && !strcmp(argv[1],"shield");
     int fraction=argc==2 && !strcmp(argv[1],"fraction");assert(argc==1 || upgrade || poolfull || nearfull || building || turncoat || reuse || shield || fraction || (phase>=0 && phase<5));
     if(fraction)upgrade=1;
-    setup();minerals=500;
+    setup();
+#ifdef SC64_SCARAB_TEST_MAP
+    race_skirmish_map=SC64_SCARAB_TEST_MAP;race_skirmish_init();
+    memset(u,0,sizeof(u));memset(b,0,sizeof(b));screen=SCREEN_PLAY;
+#endif
+    minerals=500;
     int p=spawn_unit(SIDE,U_REAVER,128,128),t;
     if(building) {int bslot=spawn_build(ENEMY,B_DEPOT,190,128,0);assert(bslot>=0);if(destroy)b[bslot].hp=b[bslot].maxhp=80;t=MAX_UNITS+bslot;}
     else {t=spawn_unit(ENEMY,shield?U_PROBE:U_MARINE,180,128);assert(t>=0);u[t].hp=u[t].maxhp=200;if(shield)u[t].shield=20;}

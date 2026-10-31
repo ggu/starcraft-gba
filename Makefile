@@ -5843,3 +5843,36 @@ test-scarab-postimpact-gap-terran:
 	  $(filter-out starcraft/game.c,$(STARCRAFT)) -o "$$run/test"; \
 	"$$run/test" "$$run/before" "$$run/rejected" "$$run/reused"; \
 	cmp "$$run/before" "$$run/rejected"; ! cmp -s "$$run/rejected" "$$run/reused"
+
+# Opt-in post-combat save checks; existing prepared inputs only. P7 facts are
+# generated in the run directory, never over an existing source bank.
+define SCARAB_DEADROW_FIXTURE
+.PHONY: test-scarab-deadrow-$(1)
+test-scarab-deadrow-$(1):
+	@set -eu; \
+	mkdir -p build/generated/scarab-deadrow; \
+	run=$$$$(mktemp -d build/generated/scarab-deadrow/$(1).XXXXXX); \
+	printf 'Scarab post-impact save receipts: %s\n' "$$$$run"; \
+	$(if $(filter protoss,$(1)),$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts"; "$$$$run/facts" > "$$$$run/sc64_fact_tables_generated.h",:); \
+	for fixture in postimpact_fresh deadwire_game; do \
+	  $(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	    -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	    -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	    $(2) "tests/sc64_scarab_$$$$fixture.c" tests/sc64_yamato_host_sram_shim.c \
+	    $(filter-out starcraft/game.c,$(STARCRAFT)) $(3) -o "$$$$run/$$$$fixture"; \
+	done; \
+	for map in 0 1; do \
+	  "$$$$run/postimpact_fresh" write "$$$$run/$$$$map.sram" "$$$$map" "$$$$run/write-$$$$map.snap"; \
+	  cp "$$$$run/$$$$map.sram" "$$$$run/load-before-$$$$map.sram"; \
+	  "$$$$run/postimpact_fresh" read "$$$$run/$$$$map.sram" "$$$$map" "$$$$run/read-$$$$map.snap"; \
+	  cmp "$$$$run/write-$$$$map.snap" "$$$$run/read-$$$$map.snap"; cmp "$$$$run/$$$$map.sram" "$$$$run/load-before-$$$$map.sram"; \
+	  "$$$$run/deadwire_game" "$$$$run/reject-before-$$$$map.sram" "$$$$run/reject-after-$$$$map.sram" "$$$$map"; \
+	  cmp "$$$$run/reject-before-$$$$map.sram" "$$$$run/reject-after-$$$$map.sram"; \
+	done
+endef
+$(eval $(call SCARAB_DEADROW_FIXTURE,terran,$(TERRAN_ROM_FLAGS),))
+$(eval $(call SCARAB_DEADROW_FIXTURE,zerg,$(ZERG_ROM_FLAGS),))
+$(eval $(call SCARAB_DEADROW_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run",$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SCARAB_DEADROW_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
+.PHONY: test-scarab-deadrow
+test-scarab-deadrow: test-scarab-deadrow-terran test-scarab-deadrow-zerg test-scarab-deadrow-protoss test-scarab-deadrow-showcase

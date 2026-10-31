@@ -1031,6 +1031,19 @@ static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,u
 
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 static int race_scarab_stage_previous(GbaSaveSelection *selection);
+/* Dead rows are semantically empty. Validate the actor's identity/flight
+ * fields first, then canonicalize only the serialization temporary. Live
+ * outside children remain unsupported and are never transformed. */
+static int race_scarab_save_wire(const Unit *live,Unit *wire)
+{
+    if(!live || !wire || !sc64_scarab_flight_to_wire(live,wire,1,0)) return 0;
+    if((live->type==U_SCARAB || live->raw_type==85) &&
+       (((unsigned)live->carry>>8)&3u)>1u) {
+        if(live->alive)return 0;
+        memset(wire,0,sizeof(*wire));
+    }
+    return 1;
+}
 #endif
 static int race_save_game(void) {
 #ifdef SC64_SCARAB_WEAPON_PROBE
@@ -1149,9 +1162,7 @@ static int race_save_game(void) {
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     for (int i=0;i<MAX_UNITS;i++) {
         Unit wire;
-        if (((u[i].type==U_SCARAB || u[i].raw_type==85) &&
-             (((unsigned)u[i].carry>>8)&3u)>1u) ||
-            !sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+        if (!race_scarab_save_wire(&u[i],&wire) ||
             !race_scarab_zp_encode(&race_data,(unsigned)i,&wire,
                                    (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
     }
@@ -1174,9 +1185,7 @@ static int race_save_game(void) {
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     {
         Unit wire;
-        if (((u[i].type==U_SCARAB || u[i].raw_type==85) &&
-             (((unsigned)u[i].carry>>8)&3u)>1u) ||
-            !sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+        if (!race_scarab_save_wire(&u[i],&wire) ||
             !sc64_unit_save_encode(&race_data.units[i],&wire,
                                    (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
     }
