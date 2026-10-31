@@ -471,7 +471,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 (old&SC64_P7_ARBITER_TRACKED)!=0);
             ++visible_ordinal;
         }
-    unsigned aura[MAX_UNITS];
+    u8 aura[MAX_UNITS];
     for (i=0;i<MAX_UNITS;++i) aura[i]=0;
     for (i=0;i<MAX_UNITS;++i) if (u[i].alive && RACE_PROTOSS_RAW(&u[i])==71u &&
         RACE_PROTOSS_SLOT(&u[i])>=0 && RACE_PROTOSS_SLOT(&u[i])<8 && !(u[i].flags&8u) &&
