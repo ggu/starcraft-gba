@@ -1686,6 +1686,7 @@ static int race_scarab_production_tick(int slot,int upgraded);
 static int race_scarab_human_selected(void);
 static int race_scarab_human_enqueue(void);
 static void race_scarab_human_parent_lost(int slot);
+static void race_scarab_human_parent_step(int slot);
 static int race_scarab_stop_signal(int slot,int upgraded);
 #endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
@@ -7360,9 +7361,10 @@ target_lists_unavailable:
 	    continue;
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
         if (sc64_race_raw_unit(q->type)==83 && sc64_battlecruiser_source_tick_due()) {
-            race_scarab_probe_parent_tick(i);
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-            (void)race_scarab_production_tick(i,0);
+            race_scarab_human_parent_step(i);
+#else
+            race_scarab_probe_parent_tick(i);
 #endif
         }
 #endif
@@ -11807,6 +11809,13 @@ static int race_scarab_human_enqueue(void)
 {
     int i=race_scarab_human_selected();
     return i>=0 && race_scarab_enqueue(i,0);
+}
+/* Keep the experimental paid production state machine out of the hot
+ * per-frame order loop; it runs only on the shared source cadence. */
+static void __attribute__((noinline)) race_scarab_human_parent_step(int slot)
+{
+    race_scarab_probe_parent_tick(slot);
+    (void)race_scarab_production_tick(slot,0);
 }
 /* Retire hidden children before the generic parent slot is invalidated.
  * The adapter detaches an outside child and removes hidden children without
