@@ -285,6 +285,189 @@ static int ready_sunken_morph(void) { return sunken_morph() >= 0; }
 static void kill_unit(int slot) { hit_target(slot, 10000, U_MARINE, SIDE); }
 static void kill_building(int slot) { hit_target(MAX_UNITS + slot, 100000, U_MARINE, SIDE); }
 
+static int save_through_pause(void)
+{
+#ifdef SC64_IMPACT_EVENTS
+    for (int t = 0; t < 120 && race_impact_count > RACE_IMPACT_SAVE_CAPACITY; ++t) input(0);
+    if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+#endif
+    if (screen != SCREEN_PLAY || won || lost) return 0;
+    tap(KEY_START); if (screen != SCREEN_PAUSE) return 0;
+    input(KEY_B);
+    input(KEY_A); input(0);
+    return screen == SCREEN_PLAY;
+}
+
+static int reload_saved(void)
+{
+    game_init(); previous = 0;
+    input(KEY_L);
+    return screen == SCREEN_PLAY && race_mode;
+}
+
+/* ---- Walking builders. Construction pays on arrival; a walking builder's
+ * work_timer counts planning passes (already saved by every unit codec) and
+ * the planner releases it after RACE_AI_STALL_PASSES. ---- */
+static int built_since(int owner, int type, int x, int y)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == owner && b[i].type == type &&
+            dist2(b[i].x, b[i].y, x, y) <= 32 * 32) return i;
+    return -1;
+}
+
+/* Run until the builder arrives (a structure of its type stands at its
+ * site), is released (idle), or the limit. jam != 0 returns it to (jx,jy)
+ * every update, as a unit stuck in a crowd. Returns the event frame. */
+static int follow_builder(int slot, int type, int x, int y, int jam, int jx, int jy,
+                          int limit, int *arrived, int *released)
+{
+    int owner = u[slot].owner;
+    *arrived = *released = 0;
+    for (int t = 0; t < limit && screen == SCREEN_PLAY && !won && !lost; ++t) {
+        input(0);
+        if (built_since(owner, type, x, y) >= 0) { *arrived = 1; return frame; }
+        if (!u[slot].alive || u[slot].order != ORDER_BUILD_PENDING) {
+            /* The same pass that releases a builder sends it back to work. */
+            *released = u[slot].alive && u[slot].order != ORDER_BUILD;
+            return frame;
+        }
+        if (jam) { u[slot].x = jx; u[slot].y = jy; }
+    }
+    return -1;
+}
+
+static int builder_walk(int scenario)
+{
+    static const char *names[] = { "walk-save-resume", "timeout-replan", "timeout-save-resume" };
+    int owner = first_bot(), slot, type, x, y, jx, jy, ok = 0, arrived = 0, released = 0;
+    int event = -1, ref_event = -1, timer_at_save = -1, replanned = -1, before, start = -1;
+    uint32_t reference = 0, resumed = 0;
+    if (scenario < 0 || scenario > 2) return 0;
+    if (!run_until(20000, ready_pending_builder)) goto done;
+    slot = pending_builder(); type = u[slot].target; x = u[slot].tx; y = u[slot].ty;
+    jx = u[slot].x; jy = u[slot].y; start = frame;
+    before = count_type(owner, type, 0);
+    if (scenario == 0) {
+        int ref_arrived, ref_released, horizon;
+        /* Save once the walk has been counted by at least one pass. */
+        while (screen == SCREEN_PLAY && u[slot].alive && u[slot].order == ORDER_BUILD_PENDING &&
+               u[slot].work_timer < 1) input(0);
+        if (u[slot].order != ORDER_BUILD_PENDING || !save_through_pause()) goto done;
+        timer_at_save = u[slot].work_timer;
+        ref_event = follow_builder(slot, type, x, y, 0, 0, 0, 1800, &ref_arrived, &ref_released);
+        horizon = frame + 60;
+        while (frame < horizon) input(0);
+        reference = world_hash();
+        if (!reload_saved()) goto done;
+        if (u[slot].order != ORDER_BUILD_PENDING || u[slot].work_timer != timer_at_save) goto done;
+        event = follow_builder(slot, type, x, y, 0, 0, 0, 1800, &arrived, &released);
+        while (frame < horizon) input(0);
+        resumed = world_hash();
+        ok = ref_arrived && arrived && event == ref_event && reference == resumed;
+    } else {
+        if (scenario == 2) {
+            /* Jam until the pass counter is halfway, then save mid-wait. */
+            for (int t = 0; t < 4000 && u[slot].alive && u[slot].order == ORDER_BUILD_PENDING &&
+                 u[slot].work_timer < RACE_AI_STALL_PASSES / 2; ++t) {
+                input(0); u[slot].x = jx; u[slot].y = jy;
+            }
+            if (!save_through_pause()) goto done;
+            timer_at_save = u[slot].work_timer;
+            ref_event = follow_builder(slot, type, x, y, 1, jx, jy, 4000, &arrived, &released);
+            if (!released) goto done;
+            reference = world_hash();
+            if (!reload_saved() || u[slot].work_timer != timer_at_save) goto done;
+        }
+        event = follow_builder(slot, type, x, y, 1, jx, jy, 4000, &arrived, &released);
+        if (scenario == 2) resumed = world_hash();
+        /* Released, nothing paid; the structure is planned again. */
+        for (int t = 0; t < 2400 && released && replanned < 0; ++t) {
+            input(0);
+            if (count_type(owner, type, 0) >= before) replanned = frame;
+        }
+        ok = released && !arrived && replanned >= 0 &&
+            event - start <= (RACE_AI_STALL_PASSES + 2) * RACE_AI_PERIOD &&
+            (scenario != 2 || (event == ref_event && reference == resumed));
+    }
+done:
+    printf("{\"kind\":\"builder\",\"scenario\":\"%s\",\"start\":%d,\"timer_at_save\":%d,\"event\":%d,\"reference_event\":%d,"
+           "\"arrived\":%d,\"released\":%d,\"replanned\":%d,\"stall_passes\":%d,\"reference\":\"%08x\","
+           "\"resumed\":\"%08x\",\"ok\":%d}\n",
+           scenario >= 0 && scenario <= 2 ? names[scenario] : "?", start, timer_at_save, event, ref_event,
+           arrived, released, replanned, RACE_AI_STALL_PASSES, reference, resumed, ok);
+    return ok;
+}
+
+/* ---- Workers after STOP, depletion and construction. The shared update
+ * no longer sends idle workers to the nearest field; the planner sends its
+ * own idle workers back, and never touches the human's. STOP is the
+ * engine's stop_selected applied to one selected worker. ---- */
+static void stop_one(int slot)
+{
+    for (int i = 0; i < MAX_UNITS; ++i) u[i].selected = 0;
+    u[slot].selected = 1;
+    stop_selected();
+    u[slot].selected = 0;
+}
+
+static int worker_with(int owner, int order)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == owner && sc64_race_is_worker(u[i].type) &&
+            u[i].order == order && !u[i].carry) return i;
+    return -1;
+}
+
+static int local_patch(int owner, int patch)
+{
+    int base = race_ai_owner_base(owner);
+    return patch >= 0 && patch < MAX_MINERALS && m[patch].amount > 0 &&
+        dist2(m[patch].x, m[patch].y, race_base_x[base], race_base_y[base]) <= 320 * 320;
+}
+
+static int worker_jobs(int scenario)
+{
+    static const char *names[] = { "bot-stop-returns", "human-stop-stays", "depleted-patch-reassigned",
+                                   "constructed-scv-returns" };
+    int owner = scenario == 1 ? SIDE : first_bot(), slot = -1, ok = 0, back = -1, old = -1, idle_at = -1;
+    if (scenario < 0 || scenario > 3) return 0;
+    for (int t = 0; t < 900; ++t) input(0);
+    if (scenario == 3) {
+        if (race_owner_identity(owner) != R_TER || !run_until(20000, ready_scv_constructing)) goto done;
+        slot = scv_constructing();
+        while (screen == SCREEN_PLAY && u[slot].alive && u[slot].order == ORDER_BUILD) input(0);
+        idle_at = frame;
+    } else {
+        slot = worker_with(owner, ORDER_MINE);
+        if (slot < 0) goto done;
+        old = u[slot].target;
+        if (scenario == 2) {
+            m[old].amount = 0;               /* the field this worker mines runs out */
+            for (int t = 0; t < 600 && u[slot].order == ORDER_MINE && u[slot].target == old; ++t) input(0);
+        } else stop_one(slot);
+        idle_at = frame;
+    }
+    for (int t = 0; t < 600 && screen == SCREEN_PLAY; ++t) {
+        input(0);
+        if (back < 0 && u[slot].alive &&
+            ((u[slot].order == ORDER_MINE && local_patch(owner, u[slot].target)) ||
+             (scenario == 3 && (u[slot].order == ORDER_GAS || SC64_BUILD_WORKER_ORDER(u[slot].order)))))
+            back = frame;
+    }
+    if (scenario == 1)
+        ok = u[slot].alive && u[slot].order == ORDER_IDLE && back < 0;
+    else
+        ok = back >= 0 && back - idle_at <= 2 * RACE_AI_PERIOD + RACE_AI_PHASE &&
+            (scenario != 2 || u[slot].target != old);
+done:
+    printf("{\"kind\":\"workers\",\"scenario\":\"%s\",\"slot\":%d,\"idle_at\":%d,\"back_at\":%d,"
+           "\"old_patch\":%d,\"new_patch\":%d,\"order\":%d,\"ok\":%d}\n",
+           scenario >= 0 && scenario <= 3 ? names[scenario] : "?", slot, idle_at, back, old,
+           slot >= 0 ? u[slot].target : -1, slot >= 0 ? u[slot].order : -1, ok);
+    return ok;
+}
+
 static int recovery(int scenario)
 {
     int owner = first_bot(), ok = 0, type = -1, slot = -1, bank = 0, f0;
@@ -400,7 +583,7 @@ static int parse_races(const char *text, int *races)
 int main(int argc, char **argv)
 {
     int map = 1, human = R_TER, ticks = 18000, every = 1800, resume_at = -1, resume_len = 1800;
-    int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0;
+    int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, builder = -1, workers = -1;
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -413,10 +596,14 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--resume-len") && i + 1 < argc) resume_len = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--recovery") && i + 1 < argc) recover = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--resume-at-morph")) resume_morph = 1;
+        else if (!strcmp(argv[i], "--builder") && i + 1 < argc) builder = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--workers") && i + 1 < argc) workers = atoi(argv[++i]);
         else { fprintf(stderr, "unknown argument %s\n", argv[i]); return 2; }
     }
     launch(map, human, bots, races);
     if (recover >= 0) return recovery(recover) ? 0 : 7;
+    if (builder >= 0) return builder_walk(builder) ? 0 : 11;
+    if (workers >= 0) return worker_jobs(workers) ? 0 : 12;
     if (resume_at < 0 && !resume_morph) {
         run_ticks(ticks, every, stdout);
         snapshot(stdout, "final");
