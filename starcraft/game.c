@@ -11568,6 +11568,12 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #include "sc64_scarab_unit_adapter.h"
+#ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
+#ifndef GBA_HOST
+#error "Clear-motion probe is host-only"
+#endif
+#include "sc64_scarab_clear_motion.h"
+#endif
 static void race_scarab_control_dispatch(int slot)
 {
     Unit *q=&u[slot];
@@ -11579,6 +11585,24 @@ static void race_scarab_control_dispatch(int slot)
         } else q->target=-1;
     }
     int action=race_scarab_flight_control_tick(slot,0,0);
+#ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
+    if (action==SC64_SCARAB_CONTROL_CONTINUE && (q->order==2 || q->order==3)) {
+        Sc64ScarabChildFields f; int32_t x=(int32_t)q->x*512,y=(int32_t)q->y*512;
+        if (sc64_scarab_child_fields_unpack(q->carry,q->work_timer,&f) &&
+            sc64_scarab_clear_motion(&x,&y,(int32_t)q->tx*512,(int32_t)q->ty*512,
+                                     q->path_retry,90u-f.life,1)) {
+            int nx=(int)(x/512),ny=(int)(y/512),clear=1;
+            for (int k=1;k<=8 && clear;k++) {
+                int sx=q->x+(nx-q->x)*k/8,sy=q->y+(ny-q->y)*k/8;
+                if (sx<0 || sy<0 || sx>=WORLD_W || sy>=WORLD_H ||
+                    terrain_blocked(sx/16,sy/16) || !unit_step_clear(q,sx,sy)) clear=0;
+                for(int j=0;j<MAX_BUILDINGS && clear;j++)
+                    if (b[j].alive && dist2(sx,sy,b[j].x,b[j].y)<36*36) clear=0;
+            }
+            if (clear) { q->x=nx;q->y=ny;sc64_unit_bucket_move(q);sc64_target_index_move(q); }
+        }
+    }
+#endif
     if (action==SC64_SCARAB_CONTROL_REMOVE) {
         int was_invincible=invincible_units[slot], flags=q->flags, hp=q->hp;
         invincible_units[slot]=0;q->flags&=~16;q->hp=1;

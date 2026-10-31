@@ -22,13 +22,21 @@ int main(void) {
     assert(race_scarab_parent_read(p,0,&parent,&counts));c=parent.active_slot;
     for(int i=0;i<105;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
     assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED && race_scarab_launch_child(p,0,c));
-    int target=spawn_unit(ENEMY,U_ZERGLING,400,400);assert(target>=0);
+    int target=spawn_unit(ENEMY,U_ZERGLING,400,128);assert(target>=0);
     assert(spawn_unit(ENEMY,U_ZERGLING,600,600)>=0);u[c].target=target;
+#ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
+    u[c].path_retry=64; /* Explicit source heading supplied by the host test. */
+#endif
     assert(race_scarab_parent_lost(p,0));u[p].alive=0;frame=0;game_update(0,0);
     Sc64ScarabChildFields f;assert(sc64_scarab_child_fields_unpack(u[c].carry,u[c].work_timer,&f));
     assert(f.parent_slot==SC64_SCARAB_FIELD_NO_SLOT && f.life==90 && f.no_collision==7);
     assert(u[c].target==target && u[c].tx==u[target].x && u[c].ty==u[target].y);
-    int x=u[c].tx,y=u[c].ty;u[target].alive=0;screen=SCREEN_PLAY;game_update(0,0);
+#ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
+    int start_x=u[c].x;
+    for(int j=0;j<3;j++){screen=SCREEN_PLAY;game_update(0,0);}
+    assert(u[c].x==start_x+8);
+#endif
+    int x=u[c].tx,y=u[c].ty;u[target].alive=0;frame=0;screen=SCREEN_PLAY;game_update(0,0);
     assert(u[c].target==-1 && u[c].tx==x && u[c].ty==y);
     assert(race_scarab_child_set(c,SC64_SCARAB_FIELD_NO_SLOT,SC64_SCARAB_CHILD_OUTSIDE,1,0));
     frame=0;screen=SCREEN_PLAY;game_update(0,0);assert(!u[c].alive && !invincible_units[c]);

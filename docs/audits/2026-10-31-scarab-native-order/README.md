@@ -64,3 +64,27 @@ be enabled as gameplay. Other hidden-target classes, complete death/reference
 cleanup, cadence across profiles, Q8 motion and native/N64 execution remain
 unqualified. The test's terminal screen is reset to PLAY for its second update;
 it is not an ordinary playable match.
+
+## Host-only aligned clear-motion slice
+
+The independent, host-only `SC64_SCARAB_CLEAR_MOTION_PROBE` adds a much
+narrower motion experiment to that dispatcher. It accepts only an explicitly
+supplied, already-aligned east or south source heading and a target at least
+64 source pixels away. It keeps source coordinates in Q8 for its calculation,
+waits through the observed startup, then moves by 16 source pixels per due
+source tick. The adapter converts the integer GBA position at half scale and
+checks every intermediate host-engine point against conservative terrain,
+unit and building guards. It does not implement turns, arbitrary fractions,
+source pathing, blocked-route recovery or arrival clamping. The host test
+supplies the heading in an otherwise unused field; this is not a product field
+allocation or save format.
+
+The clear-motion fixture's four post-initialization positions match the
+retained pinned OpenBW far/east and south source-frame traces. The comparator
+is `tools/sc64_scarab_clear_oracle_compare.py`; the separate actual game
+update fixture moves an aligned actor by eight GBA pixels on the corresponding
+due tick. Sanitized build and run receipts are `scarab-clear-{compile,run}.json`
+in `.local/decoder-proof`. The source traces show only this bounded straight
+case; 27-unit source turning, general Q8 fractions, obstacles, pursuit and
+impact still require reference-backed implementation. The probe can stall or
+expire outside its narrow case and must not be enabled in a product.
