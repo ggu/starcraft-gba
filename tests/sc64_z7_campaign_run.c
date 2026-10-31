@@ -5682,7 +5682,7 @@ int main(int argc,char **argv)
                 !strcmp(argv[i],"--policy-hydras")||!strcmp(argv[i],"--policy-second-first")||
                 !strcmp(argv[i],"--policy-retreat")||!strcmp(argv[i],"--policy-home-radius"))) {
             const char *opt=argv[i++];char *end=0;long value=strtol(argv[i],&end,10);
-            if(!end||*end)return 2;
+            if(!end||end==argv[i]||*end)return 2;
             if(!strcmp(opt,"--policy-workers")){if(value<4||value>16)return 2;policy_workers=(int)value;}
             else if(!strcmp(opt,"--policy-reserve")){if(value<0||value>100)return 2;policy_reserve=(int)value;}
             else if(!strcmp(opt,"--policy-hydras")){if(value<8||value>20)return 2;policy_hydras=(int)value;}
