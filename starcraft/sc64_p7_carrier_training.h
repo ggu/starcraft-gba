@@ -95,6 +95,8 @@ static int sc64_p7_carrier_child_valid_in(const Unit *actors, int count,
     int mapped_owner, service_slot;
     if (!actors || count < 0 || count > MAX_UNITS || slot < 0 || slot >= count)
         return 0;
+    /* Reject ordinary rows before resolving their source owner. */
+    if (!actors[slot].alive || actors[slot].type != U_P7_INTERCEPTOR) return 0;
     service_slot = RACE_PROTOSS_SLOT(&actors[slot]);
     mapped_owner = service_slot >= 0 && service_slot < 8 ?
         race_protoss_source_owner((unsigned)service_slot) : -1;

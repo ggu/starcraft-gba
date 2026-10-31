@@ -17,6 +17,16 @@ static int eager_parent(const Unit *actors,int count,int slot)
         RACE_PROTOSS_RAW(&actors[slot])==SC64_P7_CARRIER_RAW && actors[slot].owner==mapped;
 }
 
+static int eager_child(const Unit *actors,int count,int slot)
+{
+    int mapped,source;
+    if (!actors || count<0 || count>MAX_UNITS || slot<0 || slot>=count) return 0;
+    source=RACE_PROTOSS_SLOT(&actors[slot]);
+    mapped=source>=0 && source<8 ? race_protoss_source_owner((unsigned)source) : -1;
+    return actors[slot].alive && mapped>=0 && actors[slot].type==U_P7_INTERCEPTOR &&
+        RACE_PROTOSS_RAW(&actors[slot])==SC64_P7_INTERCEPTOR_RAW && actors[slot].owner==mapped;
+}
+
 int main(void)
 {
     Unit q={0};
@@ -37,6 +47,7 @@ int main(void)
             for(unsigned t=0;t<sizeof(raws)/sizeof(raws[0]);++t) {
                 q.type=type;q.alive=lives[a];q.owner=owners[o];q.raw_owner=owners[r];q.raw_type=raws[t];
                 assert(sc64_p7_carrier_parent_valid_in(&q,1,0)==eager_parent(&q,1,0));
+                assert(sc64_p7_carrier_child_valid_in(&q,1,0)==eager_child(&q,1,0));
             }
         }
     }
@@ -44,6 +55,10 @@ int main(void)
     assert(!sc64_p7_carrier_parent_valid_in(&q,1,-1));
     assert(!sc64_p7_carrier_parent_valid_in(&q,1,1));
     assert(!sc64_p7_carrier_parent_valid_in(&q,MAX_UNITS+1,0));
-    puts("Carrier parent early rejection matches eager reference");
+    assert(!sc64_p7_carrier_child_valid_in(NULL,1,0));
+    assert(!sc64_p7_carrier_child_valid_in(&q,1,-1));
+    assert(!sc64_p7_carrier_child_valid_in(&q,1,1));
+    assert(!sc64_p7_carrier_child_valid_in(&q,MAX_UNITS+1,0));
+    puts("Carrier parent and child early rejection match eager reference");
     return 0;
 }
