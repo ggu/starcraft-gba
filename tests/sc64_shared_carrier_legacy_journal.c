@@ -370,6 +370,7 @@ int main(int argc,char **argv)
     /* Actual entry point loads the predecessor; campaign writes retain the
      * old envelope so a separate unmodified reader can consume them. */
     u8 stale_ordinal, stale_index;
+    race_p7_projectile_reset();
     assert(sc64_pool_acquire(&race_p7_projectiles,&stale_ordinal,&stale_index));
     race_protoss_generic_clock[0]=2; race_protoss_generic_clock[1]=7;
     race_p7_projectile_fault=1;

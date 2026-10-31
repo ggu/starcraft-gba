@@ -44,7 +44,7 @@ static int sc64_shared_carrier_expand_legacy(void *buffer, size_t length,
 }
 /* The inverse is used only after a complete legacy-format candidate and its
  * variable sidecars have been constructed in the expanded scratch layout. */
-static int sc64_shared_carrier_compact_legacy(void *buffer, size_t length,
+static int __attribute__((unused)) sc64_shared_carrier_compact_legacy(void *buffer, size_t length,
                                               size_t capacity, size_t *compacted)
 {
     const size_t old_tail=offsetof(RaceSave,buildings)+sizeof(((RaceSave *)0)->buildings);

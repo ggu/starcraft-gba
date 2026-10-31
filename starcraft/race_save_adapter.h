@@ -3010,7 +3010,7 @@ static int race_load_preflight(RaceLoadPlan *plan) {
     return ok;
 }
 
-#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+#if defined(SC64_SHARED_CARRIER_SAVE_VERSION) && (defined(GBA_HOST) || defined(SC64_SHARED_CARRIER_SAVE_EXPERIMENT))
 /* Authenticate an envelope before expanding an old layout or decoding its
  * sidecars. The validator only touches bounded save/route scratch and plan. */
 static int race_shared_carrier_stage_prepare(const void *raw,u32 len,u32 tag,void *context) {
