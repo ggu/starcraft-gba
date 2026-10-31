@@ -8,6 +8,22 @@
 #error "compile with the staged shared transport capability"
 #endif
 
+/* An ordinary pause-menu save must use the new envelope tag. This runs first
+ * in a fresh host process, before any journal record has been written. */
+static void check_pause_save_namespace(void)
+{
+    static unsigned char saved[16384];
+    u32 length = 0;
+    launch(0, R_TER, 1, -1);
+    tap(KEY_START); assert(screen == SCREEN_PAUSE);
+    input(KEY_B);
+    assert((pause_notice & 0xc0) == UI_NOTICE_SAVED);
+    assert(save_read_latest(saved, sizeof(saved), SC64_TRANSPORT_SAVE_VERSION, &length));
+    assert(length > 0);
+    assert(!save_read_latest(saved, sizeof(saved), SAVE_VERSION, &length));
+    assert(race_load_game());
+}
+
 static void check_jobs(int map)
 {
     static const int owners[4] = { SIDE, ENEMY, RESCUABLE, 4 };
@@ -250,6 +266,7 @@ static void check_source_art(void)
 int main(void)
 {
     gba_init();
+    check_pause_save_namespace();
     check_source_art();
     check_capacity_and_owner();
     for (int map = 0; map <= SC64_SKIRMISH_IMPORTED_COUNT; ++map) {

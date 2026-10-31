@@ -87,8 +87,12 @@ static inline int sc64_transport_space_required_raw(unsigned raw_type,
 }
 
 #ifdef SC64_SHARED_TRANSPORT
-/* Shared skirmish admission has the complete immutable source facts. Mission
- * adapters retain their narrower, separately qualified cargo whitelist. */
+/* Shared transport uses the same immutable capacity facts in every mode. */
+static inline int sc64_transport_unconditional_carrier_raw(unsigned raw_type)
+{
+    return raw_type == SC64_TRANSPORT_DROPSHIP_RAW ||
+           raw_type == SC64_TRANSPORT_SHUTTLE_RAW;
+}
 static inline int sc64_transport_shared_space_required_raw(unsigned raw_type,
                                                            unsigned *out_space)
 {

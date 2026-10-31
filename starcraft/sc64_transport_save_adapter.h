@@ -63,6 +63,10 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
                     width * 16, height * 16)) return 0;
             continue;
         }
+#ifdef SC64_SHARED_TRANSPORT
+        if (order == ORDER_BOARD || order == ORDER_TRANSPORTED || order == ORDER_UNLOAD)
+            continue; /* checked by the candidate-wide shared transport pass */
+#endif
         if (order == ORDER_UNLOAD) {
             if (actor.type != U_DROPSHIP || actor.raw_type != 11 ||
                 carrier != -1 || actor.work_timer < 0 ||
@@ -126,6 +130,10 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
                     width * 16, height * 16)) return 0;
             continue;
         }
+#ifdef SC64_SHARED_TRANSPORT
+        if (order == ORDER_BOARD || order == ORDER_TRANSPORTED || order == ORDER_UNLOAD)
+            continue; /* checked by the candidate-wide shared transport pass */
+#endif
         if (order == ORDER_UNLOAD) {
             if (CARGO_U(i, type) != U_DROPSHIP || CARGO_U(i, raw_type) != 11 ||
                 carrier != -1 || CARGO_U(i, work_timer) < 0 ||

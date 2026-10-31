@@ -1,5 +1,9 @@
 # Development
 
+> Transport1 activation is a candidate pending its own runtime, save and
+> performance qualification. Earlier controller, replay and timing results
+> below refer to the pre-activation profiles unless explicitly stated.
+
 The default StarCraft skirmish builds without ROMs, extracted assets, or external reference checkouts. The required tools are Git, GNU Make, `arm-none-eabi-gcc` with its `objcopy` and `size` tools, Clang, and Python 3.10 or newer. The project uses Python's standard library; no `pip install` step is needed. mGBA is only needed to play or run emulator workflows.
 
 The stage-by-stage campaign sections below preserve dated implementation
@@ -1204,7 +1208,7 @@ Prepare the Terran inputs, then build, test and play the normal-menu ROM:
 ./dev sc64 play --profile terran
 ```
 
-This produces `build/StarCraft-Terran-GBA.gba`, an 8 MiB ROM. To build all
+This produces `build/StarCraft-Terran-Transport1-GBA.gba`, an 8 MiB ROM. To build all
 three race campaigns, first prepare the shared inputs with the Terran profile,
 then run `make race-campaigns test-race-campaigns`. Preparing Zerg or Protoss
 alone is not sufficient for that aggregate target. The original 32 MiB N64
@@ -1306,8 +1310,8 @@ flags and save identity remain separate.
 ```
 
 Replace `zerg` with `protoss` for the P7 candidate. The output pairs are
-`build/StarCraft-Zerg-Z7-GBA.gba` / `build/starcraft-zerg-z7.elf` and
-`build/StarCraft-Protoss-P7-GBA.gba` / `build/starcraft-protoss-p7.elf`.
+`build/StarCraft-Zerg-Z7-Transport1-GBA.gba` / `build/starcraft-zerg-z7.elf` and
+`build/StarCraft-Protoss-P7-Transport1-GBA.gba` / `build/starcraft-protoss-p7.elf`.
 Explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
 `build/starcraft-protoss-p6.elf`.
 Explicit `zerg-z4` (`--profile zerg-z4`) preserves the earlier four-entry
@@ -1325,14 +1329,14 @@ of map, human race and independently selected AI races. The setup/save matrix
 does not prove a completed match for every combination. Build guards still
 enforce the same IWRAM and EWRAM reserves.
 
-Canonical Zerg uses `SCZ7`, save generation 36, the Z7 storage/runtime and
+Canonical Zerg uses `SCZ7`, base save generation 36 in the Transport1 namespace, the Z7 storage/runtime and
 query flags, a word-packed inherited sprite bank under
 `.local/sc64/zerg-z6/generated`, and the canonical drawing flags. Preparing
 `zerg` also generates the Z5/Z6/Z7 inputs and that bank. Its save directory,
-`.local/play/zerg-z7`, is separate from explicit Z6, Z4 and Z3 profiles.
+`.local/play/zerg-z7-transport1`, is separate from explicit Z6, Z4 and Z3 profiles.
 Explicit `zerg-z6` retains its SCZ6 generation-32 ROM and `.local/play/zerg-z6`;
 no SRAM is automatically imported. The P7
-candidate uses `SCP7`, generation 43 and `.local/play/protoss-p7`; its all-chapter
+candidate uses `SCP7`, base generation 43 in the Transport1 namespace and `.local/play/protoss-p7-transport1`; its all-chapter
 packed sprite bank is `.local/sc64/protoss-p7/generated`, separate from the
 probe and P6 banks. Explicit `protoss-p6` uses `SCP6`, generation 30 and
 `.local/play/protoss-p6`; it carries P1–P5 including Shuttle transport, then P6
@@ -3049,7 +3053,7 @@ Deaths use a separate transient pool; see
 [Death animations](#death-animations).
 
 For repeatable filming setups, `make showcase` builds the separate
-`StarCraft-Showcase-GBA.gba` with a hidden scene menu. On HOME hold R, add L,
+`StarCraft-Showcase-Transport1-GBA.gba` with a hidden scene menu. On HOME hold R, add L,
 then tap Select. `make test-sc64-showcase` checks the menu, scene resets,
 last-stand timing and save isolation with the existing private P7 inputs.
 The frontend input model also runs in the asset-free host suite. See

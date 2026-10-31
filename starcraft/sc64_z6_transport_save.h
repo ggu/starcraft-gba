@@ -80,6 +80,11 @@ static int race_z6_transport_save_candidate_valid(
         if ((actor.order==ORDER_BOARD || actor.order==ORDER_TRANSPORTED) &&
             actor.target>=MAX_UNITS) continue; /* candidate-wide pass */
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+        /* The shared candidate pass validates the link and the candidate's
+         * Z6 research state before any world state is installed. */
+        continue;
+#endif
         if (!is_z6 || candidate->state[0] != 0 ||
             candidate->state[1] != R_ZERG ||
             candidate->state[2] != SC64_Z6_GLOBAL_ID || !tech ||

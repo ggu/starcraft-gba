@@ -31,11 +31,11 @@ static int race_transport_carrier_type(const Unit *q)
 {
     if (!q) return 0;
 #ifdef SC64_SHARED_TRANSPORT
-    if (race_mode) {
+    {
         int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
-        if (raw == SC64_TRANSPORT_SHUTTLE_RAW &&
+        if (sc64_transport_unconditional_carrier_raw((unsigned)raw) &&
             sc64_race_unit_from_raw(raw) == q->type) return 1;
-        if (raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD) {
+        if (race_mode && raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD) {
             int owner = sc64_sk_transport_owner_index(q->owner);
             if (owner >= 0 && race_skirmish_transport_tech.owner[owner].researched)
                 return 1;
@@ -75,13 +75,16 @@ static int race_transport_passenger_space(const Unit *q)
 {
     unsigned space;
     int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
-    if (race_mode && (raw < 0 ||
+    if ((race_mode
+#ifdef SC64_SHARED_TRANSPORT
+         || 1
+#endif
+        ) && (raw < 0 ||
         (sc64_race_unit_from_raw(raw) != q->type &&
          !(raw == 19 && q->type == U_RAYNOR)))) return -1;
     if (!q->alive || (q->flags & 2) || sc64_race_unit_flying(q->type) ||
 #ifdef SC64_SHARED_TRANSPORT
-        !(race_mode ? sc64_transport_shared_space_required_raw((unsigned)raw, &space) :
-                      sc64_transport_space_required_raw((unsigned)raw, &space)) ||
+        !sc64_transport_shared_space_required_raw((unsigned)raw, &space) ||
 #else
         !sc64_transport_space_required_raw((unsigned)raw, &space) ||
 #endif
@@ -115,6 +118,22 @@ static int __attribute__((unused)) race_skirmish_transport_menu_available(void)
             race_transport_cargo_space(i) > 0) return 1;
     return 0;
 }
+
+#ifdef SC64_SHARED_TRANSPORT
+static int race_shared_campaign_transport_menu_available(void)
+{
+    if (race_mode || selected_building >= 0) return 0;
+#ifdef SC64_T5_RUNTIME
+    /* Terran campaigns already expose MENU_UNLOAD in their full menu. */
+    if (race_human == R_TER) return 0;
+#endif
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].selected && u[i].owner == SIDE &&
+            race_transport_carrier_valid(i) && race_transport_cargo_space(i) > 0)
+            return 1;
+    return 0;
+}
+#endif
 
 #ifdef SC64_P5_SHUTTLE_ENABLED
 static int race_p5_shuttle_menu_available(void)

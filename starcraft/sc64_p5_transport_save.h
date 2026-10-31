@@ -93,6 +93,11 @@ static int race_p5_transport_save_candidate_valid(const RaceSave *candidate,
         if ((actor.order==ORDER_BOARD || actor.order==ORDER_TRANSPORTED) &&
             actor.target>=MAX_UNITS) continue; /* candidate-wide pass */
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+        /* Candidate-wide shared validator checks transport links and capacity. */
+        if (actor.order == ORDER_BOARD || actor.order == ORDER_TRANSPORTED ||
+            actor.order == ORDER_UNLOAD) continue;
+#endif
         if (actor.order >= ORDER_BOARD &&
             (candidate->state[0] || candidate->state[2] != SC64_P5_GLOBAL_ID ||
              actor.owner != SIDE)) return 0;

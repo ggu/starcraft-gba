@@ -7,6 +7,12 @@
 #include "../starcraft/game.c"
 #include "sc64_save_candidate_fixture.h"
 
+#ifdef SC64_SHARED_TRANSPORT
+#define PROFILE_WIRE_TAG SC64_TRANSPORT_SAVE_VERSION
+#else
+#define PROFILE_WIRE_TAG SAVE_VERSION
+#endif
+
 #ifdef SC64_SKIRMISH_ROSTER
 #define PROFILE_ROSTER_TAG 0x80000000u
 #else
@@ -305,21 +311,19 @@ static void reject_generation2_save(int mission, int legacy_container)
     for (int tick = 0; tick < 60; ++tick) game_update(0, 0);
     assert_unused_geysers_cleared();
     static RaceSave old;
-    static unsigned char envelope[sizeof(RaceSave)
-#ifdef SC64_IMPACT_EVENTS
-                                  + RACE_IMPACT_RECORD_MAX
-#endif
-                                  ];
+    static unsigned char envelope[16384];
     u32 length = 0;
     assert(race_save_game());
 #ifdef SC64_IMPACT_EVENTS
     fixture_capture_save(&old);
 #else
+#ifndef SC64_SHARED_TRANSPORT
     assert(save_read(&race_data, sizeof(race_data), SAVE_VERSION));
+#endif
     fixture_capture_save(&old);
 #endif
     assert(old.version == SAVE_VERSION);
-    assert(save_read_latest(envelope, (u32)sizeof(envelope), SAVE_VERSION, &length));
+    assert(save_read_latest(envelope, (u32)sizeof(envelope), PROFILE_WIRE_TAG, &length));
     assert(length >= offsetof(RaceSave, version) + sizeof(old.version));
     old.version = PROFILE_OLD_SAVE_TAG;
     if (legacy_container) {
@@ -327,11 +331,11 @@ static void reject_generation2_save(int mission, int legacy_container)
          * so neither can mask the historical container under test. */
         for (int i = 0; i < 2; ++i) {
             u32 current_length = 0;
-            if (!save_read_latest(envelope, (u32)sizeof(envelope), SAVE_VERSION,
+            if (!save_read_latest(envelope, (u32)sizeof(envelope), PROFILE_WIRE_TAG,
                                   &current_length)) break;
-            save_test_corrupt_latest(current_length, SAVE_VERSION);
+            save_test_corrupt_latest(current_length, PROFILE_WIRE_TAG);
         }
-        assert(!save_read_latest(envelope, (u32)sizeof(envelope), SAVE_VERSION, &length));
+        assert(!save_read_latest(envelope, (u32)sizeof(envelope), PROFILE_WIRE_TAG, &length));
         save_write(&old, sizeof(old), PROFILE_OLD_SAVE_TAG);
         RaceSave legacy;
         assert(save_read(&legacy, sizeof(legacy), PROFILE_OLD_SAVE_TAG));
@@ -340,10 +344,10 @@ static void reject_generation2_save(int mission, int legacy_container)
         /* Preserve the exact current envelope and replace only its payload
          * version, so the negative reaches the intended format validator. */
         memcpy(envelope + offsetof(RaceSave, version), &old.version, sizeof(old.version));
-        save_write(envelope, length, SAVE_VERSION);
+        save_write(envelope, length, PROFILE_WIRE_TAG);
         {
             static unsigned char readback[sizeof(envelope)]; u32 actual = 0;
-            assert(save_read_latest(readback, (u32)sizeof(readback), SAVE_VERSION, &actual));
+            assert(save_read_latest(readback, (u32)sizeof(readback), PROFILE_WIRE_TAG, &actual));
             assert(actual == length && memcmp(readback, envelope, length) == 0);
         }
 #ifdef SC64_IMPACT_EVENTS
