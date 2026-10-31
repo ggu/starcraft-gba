@@ -159,7 +159,7 @@ def require_unchanged(paths, before):
         raise RuntimeError('trace, ROM, ELF or runner changed during replay')
 
 
-def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None):
+def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None, physical=False):
     if export_save and (save_input or saved_state or stop is not None):
         raise ValueError('save export requires a cut, without resume or prefix options')
     if bool(save_input) != bool(saved_state) or (save_input and (export_save or stop is not None)):
@@ -192,9 +192,14 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
         checks={t:t for t in plan['observations']}
     stop=pages[-1]['end']
     sym,sizes=symbols(elf),symbol_sizes(elf)
-    mode,capacity=scheduler.schedule_mode(sym,sizes)
-    if mode!='windowed' or scheduler.checkpoint_ticks(sym)!=1000:
-        raise ValueError('normal Z7 replay requires the 1000-tick window scheduler')
+    if physical:
+        import sc64_headless_physical as transport
+        capacity = None
+    else:
+        transport = headless
+        mode,capacity=scheduler.schedule_mode(sym,sizes)
+        if mode!='windowed' or scheduler.checkpoint_ticks(sym)!=1000:
+            raise ValueError('scheduler replay requires the 1000-tick window scheduler; use --physical for release ROMs')
     layouts=make_layout(elf,sizes)
     save_layout = races.dwarf_struct_layout(elf,'RaceSave') if cut is not None else None
     if save_input:
@@ -212,43 +217,53 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
         rsp.write(sym['demo_schedule_events'],b''.join(struct.pack('<2I',*item) for item in events))
         rsp.write(sym['demo_schedule_count'],struct.pack('<I',len(events)))
     try:
-        proc,rsp,log=headless.start(runner,rom,output,sym,sizes, save_input=save_input,
+        proc,rsp,log=transport.start(runner,rom,output,sym,sizes, save_input=save_input,
                                     save_output=output / "saved.sav" if export_save else None)
         if u32('screen')!=0 or u32('frame')!=0: raise RuntimeError('fresh boot is not at title')
-        write_page(pages[0]['events'][:capacity]);rsp.write(sym['demo_schedule_index'],struct.pack('<I',0))
-        rsp.write(sym['demo_schedule_length'],struct.pack('<I',pages[0]['end']))
-        rsp.write(sym['demo_schedule_active'],struct.pack('<I',1))
-        rsp.breakpoint(sym['game_update']&~1,False);rsp.breakpoint(sym['demo_replay_checkpoint']&~1,True)
-        rsp.tick(expected=sym['demo_replay_checkpoint']&~1)
-        if u32('demo_schedule_tick')!=0: raise RuntimeError('scheduler did not start at zero')
+        if not physical:
+            write_page(pages[0]['events'][:capacity]);rsp.write(sym['demo_schedule_index'],struct.pack('<I',0))
+            rsp.write(sym['demo_schedule_length'],struct.pack('<I',pages[0]['end']))
+            rsp.write(sym['demo_schedule_active'],struct.pack('<I',1))
+            rsp.breakpoint(sym['game_update']&~1,False);rsp.breakpoint(sym['demo_replay_checkpoint']&~1,True)
+            rsp.tick(expected=sym['demo_replay_checkpoint']&~1)
+            if u32('demo_schedule_tick')!=0: raise RuntimeError('scheduler did not start at zero')
         if save_input:
-            rsp.breakpoint(sym['demo_replay_checkpoint']&~1,False)
-            rsp.breakpoint(sym['game_update']&~1,True)
-            for _ in range(16):
-                rsp.tick(expected=sym['game_update']&~1)
-                if u32('demo_schedule_tick') == 2: break
-            else: raise RuntimeError('fresh-process load did not reach two updates')
+            if physical:
+                rsp.play_to(2, events)
+            else:
+                rsp.breakpoint(sym['demo_replay_checkpoint']&~1,False)
+                rsp.breakpoint(sym['game_update']&~1,True)
+                for _ in range(16):
+                    rsp.tick(expected=sym['game_update']&~1)
+                    if u32('demo_schedule_tick') == 2: break
+                else: raise RuntimeError('fresh-process load did not reach two updates')
             restored=save.saved_summary(rsp,sym,sizes,elf,cut,sample_snapshot)
             saved=save.read_summary(saved_state)
             save.verify_restored(saved,restored,cut,z7.MISSION)
             save.verify_cut_summary(restored,plan['observations'][cut],cut,1)
             (output/'restored-state.json').write_text(json.dumps(restored,indent=2)+'\n')
-            rsp.breakpoint(sym['game_update']&~1,False)
-            rsp.breakpoint(sym['demo_replay_checkpoint']&~1,True)
+            if not physical:
+                rsp.breakpoint(sym['game_update']&~1,False)
+                rsp.breakpoint(sym['demo_replay_checkpoint']&~1,True)
         for i,page in enumerate(pages):
-            chunks=[page['events'][n:n+capacity] for n in range(0,len(page['events']),capacity)] or [[]]; active=0
-            if len(chunks)>1:
-                active=play_dense(rsp,sym,page,chunks,write_page)
-            rsp.tick(expected=sym['demo_replay_checkpoint']&~1)
             tick=page['end']
-            if u32('demo_schedule_tick')!=tick or active!=len(chunks)-1 or u32('demo_schedule_index')!=len(chunks[-1]) or u32('demo_schedule_count')!=len(chunks[-1]):
-                raise RuntimeError('scheduler did not consume its page')
+            if physical:
+                rsp.play_page(page)
+                if rsp.completed != tick:
+                    raise RuntimeError('physical input did not reach its update boundary')
+            else:
+                chunks=[page['events'][n:n+capacity] for n in range(0,len(page['events']),capacity)] or [[]]; active=0
+                if len(chunks)>1:
+                    active=play_dense(rsp,sym,page,chunks,write_page)
+                rsp.tick(expected=sym['demo_replay_checkpoint']&~1)
+                if u32('demo_schedule_tick')!=tick or active!=len(chunks)-1 or u32('demo_schedule_index')!=len(chunks[-1]) or u32('demo_schedule_count')!=len(chunks[-1]):
+                    raise RuntimeError('scheduler did not consume its page')
             if tick in checks:
                 state=snapshot(rsp,sym,sizes,layouts)
                 if u32('race_selected_mission')!=z7.MISSION: raise RuntimeError('unexpected selected mission')
                 compare(plan['observations'][checks[tick]],state,checks[tick])
                 records.append({'tick':tick,**state});(output/'progress.json').write_text(json.dumps(records,indent=2)+'\n')
-            if i+1<len(pages):
+            if not physical and i+1<len(pages):
                 write_page(pages[i+1]['events'][:capacity]);rsp.write(sym['demo_schedule_length'],struct.pack('<I',pages[i+1]['end']))
         if export_save:
             paused_state=snapshot(rsp,sym,sizes,layouts)
@@ -269,7 +284,8 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
         full=bool(save_input) or (not export_save and stop==plan['stop'])
         if full and (not records or records[-1]['tick']!=stop or records[-1]['won']!=1 or records[-1]['outcome']!=1 or records[-1]['lost']!=0): raise RuntimeError('normal ROM did not win')
         require_unchanged(inputs,before)
-        result={'status':'won' if full else 'prefix','stop':stop,'checkpoint_count':len(records),'checkpoints':records,'scope':'named Z7 model fields, entity counts and economy; not full entity arrays','sha256':before}
+        result={'status':'won' if full else 'prefix','stop':stop,'checkpoint_count':len(records),'checkpoints':records,'scope':'named Z7 model fields, entity counts and economy; not full entity arrays','sha256':before,
+                'transport': 'physical-buttons' if physical else 'debug-scheduler'}
         if export_save:
             result['save']={'cut':cut,'journal':journal,'sha256':input_hashes((output/'saved.sav',output/'saved-state.json'))}
         if save_input:
@@ -289,7 +305,8 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ('trace','rom','elf','runner','output'):ap.add_argument('--'+name,type=Path,required=True)
     ap.add_argument('--stop',type=int); ap.add_argument('--cut',type=int)
+    ap.add_argument('--physical',action='store_true',help='Use emulator buttons; supports release ROMs without scheduler symbols')
     ap.add_argument('--export-save',action='store_true'); ap.add_argument('--save-input',type=Path); ap.add_argument('--saved-state',type=Path)
-    a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut)
+    a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut,a.physical)
 
 if __name__=='__main__':main()
