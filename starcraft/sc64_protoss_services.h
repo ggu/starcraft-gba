@@ -81,6 +81,15 @@ static inline int race_protoss_service_binding(void)
 #define race_protoss_services_active() \
     (race_protoss_service_binding() != SC64_PROTOSS_BIND_NONE)
 
+/* Temporary qualification fence for the experimental cross-profile Carrier
+ * adapter. Existing P7/P8 flight keeps its mission bindings; the new adapter
+ * reaches campaign worlds only after their save and runtime qualification. */
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#define race_carrier_services_active() (race_mode && race_protoss_services_active())
+#else
+#define race_carrier_services_active() race_protoss_services_active()
+#endif
+
 /* Generic slots follow the live owner: SIDE is the human slot. */
 static inline int race_protoss_generic_slot(int owner)
 {

@@ -13,6 +13,25 @@ static int children(int carrier, unsigned state)
                  u[i].build==carrier && sc64_p7_carrier_child_state(&u[i])==state;
     return count;
 }
+static void test_render_arena(void)
+{
+    static u16 arena[SC64_ARENA_WORDS];
+    unsigned end=SC64_OBJ_VRAM_CACHE_OFFSET;
+#ifdef SC64_TERRAIN_CACHE_VRAM
+    end += 240u*(unsigned)SC64_TERRAIN_CACHE_VRAM_ROWS;
+#endif
+    assert(end+16u<=GBA_VRAM_SCRATCH_BYTES);
+    for (unsigned i=0;i<16;++i) GBA_VRAM_SCRATCH[end+i]=(u8)(0xa0u+i);
+    memcpy(arena,race_p7_projectile_host_words,sizeof(arena));
+    int old_cx=cx, old_cy=cy;
+    for (int i=0;i<3;++i) {
+        cx=old_cx+i*16; cy=old_cy+i*8;
+        game_render();
+        assert(!memcmp(arena,race_p7_projectile_host_words,sizeof(arena)));
+        for (unsigned j=0;j<16;++j) assert(GBA_VRAM_SCRATCH[end+j]==(u8)(0xa0u+j));
+    }
+    cx=old_cx; cy=old_cy;
+}
 static void test_typed_rows(void)
 {
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive) {
@@ -30,6 +49,46 @@ static void test_typed_rows(void)
         assert(!memcmp(&decoded,&b[i],sizeof(decoded)));
     }
 }
+#if !defined(SC64_P7_PROJECTILES_ENABLED)
+static void test_staged_candidate(void)
+{
+    static RaceSave candidate;
+    static Unit scratch[MAX_UNITS], before[MAX_UNITS];
+    static Building before_buildings[MAX_BUILDINGS];
+    static u16 before_pool[SC64_ARENA_WORDS];
+    memcpy(before,u,sizeof(before));
+    memcpy(before_buildings,b,sizeof(before_buildings));
+    memcpy(before_pool,race_p7_projectile_host_words,sizeof(before_pool));
+    assert(sc64_shared_carrier_candidate_encode(&candidate,u,b,&race_p7_projectiles,
+                                                race_cols*16,race_rows*16));
+    assert(sc64_shared_carrier_candidate_valid(&candidate,scratch,MAX_UNITS,
+                                               race_cols*16,race_rows*16));
+    race_mode=0;
+    assert(sc64_shared_carrier_candidate_valid(&candidate,scratch,MAX_UNITS,
+                                               race_cols*16,race_rows*16));
+    race_mode=1;
+    assert(!sc64_shared_carrier_candidate_valid(&candidate,u,MAX_UNITS,
+                                                race_cols*16,race_rows*16));
+    candidate.carrier_custom.projectiles[2]^=0x80;
+    assert(!sc64_shared_carrier_candidate_valid(&candidate,scratch,MAX_UNITS,
+                                                race_cols*16,race_rows*16));
+    candidate.carrier_custom.projectiles[2]^=0x80;
+    int child=-1;
+    for (int i=0;i<MAX_UNITS;++i)
+        if (scratch[i].alive && scratch[i].type==SC64_INTERCEPTOR_TYPE &&
+            sc64_p7_carrier_child_state(&scratch[i])==SC64_P7_INTERCEPTOR_OUTSIDE)
+            { child=i; break; }
+    assert(child>=0);
+    scratch[child].build=-1;
+    assert(sc64_p7_typed_unit_encode(&candidate.carrier_custom.units[child],
+                                     &scratch[child],race_cols*16,race_rows*16));
+    assert(!sc64_shared_carrier_candidate_valid(&candidate,scratch,MAX_UNITS,
+                                                race_cols*16,race_rows*16));
+    assert(!memcmp(before,u,sizeof(before)));
+    assert(!memcmp(before_buildings,b,sizeof(before_buildings)));
+    assert(!memcmp(before_pool,race_p7_projectile_host_words,sizeof(before_pool)));
+}
+#endif
 static void test_catalog_rows(void)
 {
     for (unsigned n=0;n<sc64_skirmish_record_count();++n) {
@@ -73,8 +132,16 @@ static void test_catalog_rows(void)
 }
 int main(void)
 {
+    assert(SC64_OBJ_VRAM_PROJECTILE_BYTES == SC64_ARENA_WORDS*sizeof(u16));
+    assert(SC64_OBJ_VRAM_CACHE_OFFSET >= SC64_OBJ_VRAM_PROJECTILE_BYTES);
     game_init(); race_mode=1; race_human=R_PROTOSS; race_bots=1; race_skirmish_map=0;
     race_skirmish_init(); screen=SCREEN_PLAY;
+#ifndef SC64_P7_PROJECTILES_ENABLED
+    assert(race_carrier_services_active());
+    race_mode=0; race_selected_mission=SC64_P7_GLOBAL_ID;
+    assert(!race_carrier_services_active());
+    race_mode=1;
+#endif
     test_typed_rows();
     test_catalog_rows();
     int carrier=spawn_unit(SIDE,SC64_CARRIER_TYPE,600,600);
@@ -103,6 +170,13 @@ int main(void)
             sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE) child=i;
     assert(child>=0);
     test_typed_rows();
+    for (int i=0;i<160 && sc64_pool_active_head(&race_p7_projectiles)==SC64_END;++i)
+        game_update(0,0);
+    assert(sc64_pool_active_head(&race_p7_projectiles)!=SC64_END);
+    test_render_arena();
+#if !defined(SC64_P7_PROJECTILES_ENABLED)
+    test_staged_candidate();
+#endif
     hit_target(doomed,10000,U_MARINE,ENEMY);
     assert(!u[doomed].alive && u[child].alive && u[child].build==-1 &&
            sc64_p7_carrier_child_state(&u[child])==SC64_P7_INTERCEPTOR_DETACHED);

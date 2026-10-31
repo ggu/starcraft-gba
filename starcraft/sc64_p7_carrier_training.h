@@ -95,6 +95,8 @@ static int sc64_p7_carrier_child_valid_in(const Unit *actors, int count,
     int mapped_owner, service_slot;
     if (!actors || count < 0 || count > MAX_UNITS || slot < 0 || slot >= count)
         return 0;
+    if (!actors[slot].alive || actors[slot].type != SC64_INTERCEPTOR_TYPE)
+        return 0;
     service_slot = RACE_PROTOSS_SLOT(&actors[slot]);
     mapped_owner = service_slot >= 0 && service_slot < 8 ?
         race_protoss_source_owner((unsigned)service_slot) : -1;
@@ -152,7 +154,7 @@ static unsigned race_p7_carrier_training_child_count(int carrier)
 static int race_p7_carrier_training_slots_available(unsigned wanted)
 {
     unsigned free_slots = 0, commitments = wanted, created = 0;
-    if (!race_protoss_services_active()) return 1;
+    if (!race_carrier_services_active()) return 1;
     /* Only P7 reserves slots for its three scripted Carrier creates. */
 #ifdef SC64_P7_RUNTIME
     if (race_p7_active()) {
@@ -269,11 +271,11 @@ static int race_p7_carrier_training_candidate_valid(const Unit *actors,
 }
 
 static int race_p7_carrier_training_live_world_valid(void)
-{ return !race_protoss_services_active() || race_p7_carrier_training_candidate_valid(u, MAX_UNITS); }
+{ return !race_carrier_services_active() || race_p7_carrier_training_candidate_valid(u, MAX_UNITS); }
 
 static int race_p7_carrier_training_selected(void)
 {
-    if (!race_protoss_services_active()) return 0;
+    if (!race_carrier_services_active()) return 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].selected && u[i].owner==SIDE &&
             RACE_PROTOSS_SLOT(&u[i])==SC64_PROTOSS_HUMAN_SLOT &&
@@ -285,7 +287,7 @@ static int race_p7_carrier_training_can_queue_owner(int carrier, int owner)
 {
     unsigned inside = 0, training = 0;
     Unit *parent;
-    if (!race_protoss_services_active() || !sc64_p7_carrier_parent_valid(carrier) ||
+    if (!race_carrier_services_active() || !sc64_p7_carrier_parent_valid(carrier) ||
         u[carrier].owner != owner ||
         (!race_mode && (owner != SIDE ||
          RACE_PROTOSS_SLOT(&u[carrier]) != SC64_PROTOSS_HUMAN_SLOT))) return 0;
@@ -339,7 +341,7 @@ static int race_p7_carrier_training_start(int carrier)
     unsigned inside = 0, training = 0;
     Unit *parent;
     int slot;
-    if (!race_protoss_services_active() || !sc64_p7_carrier_parent_valid(carrier)) return -1;
+    if (!race_carrier_services_active() || !sc64_p7_carrier_parent_valid(carrier)) return -1;
     parent = &u[carrier];
     if (parent->carry <= 0 ||
         !sc64_p7_carrier_count_children(carrier, &inside, &training) ||
@@ -392,7 +394,7 @@ static void sc64_p7_carrier_inside_insert_front(int child_slot)
 static int race_p7_carrier_training_stock(int carrier, unsigned count)
 {
     unsigned inside = 0, training = 0, added = 0;
-    if (!race_protoss_services_active() || !sc64_p7_carrier_parent_valid(carrier))
+    if (!race_carrier_services_active() || !sc64_p7_carrier_parent_valid(carrier))
         return 0;
     while (added < count &&
            sc64_p7_carrier_count_children(carrier, &inside, &training) &&
@@ -479,14 +481,14 @@ static void race_p7_carrier_training_source_tick(void)
  * by the projectile and Observer systems, without introducing another clock. */
 static void race_p7_carrier_training_frame_tick(void)
 {
-    if (race_protoss_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0] != 4u) {
+    if (race_carrier_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0] != 4u) {
         race_p7_carrier_training_source_tick();
 #if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
         race_p7_interceptor_flight_source_tick();
 #endif
     }
 #if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
-    if (race_protoss_services_active()) race_p7_interceptor_flight_frame_move();
+    if (race_carrier_services_active()) race_p7_interceptor_flight_frame_move();
 #endif
 }
 
@@ -550,7 +552,7 @@ static void race_p7_carrier_training_parent_died(
  * completed-update boundary so its hidden children cannot remain orphaned. */
 static void race_p7_carrier_training_end_frame(void)
 {
-    if (!race_protoss_services_active()) return;
+    if (!race_carrier_services_active()) return;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (!u[i].alive && u[i].type == SC64_CARRIER_TYPE &&
             RACE_PROTOSS_RAW(&u[i]) == SC64_P7_CARRIER_RAW)

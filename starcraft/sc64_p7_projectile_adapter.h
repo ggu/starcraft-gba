@@ -84,7 +84,7 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
     Sc64ProjectileRow row;
     u8 id,native_index;
 #if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
-    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
+    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_SHARED_CARRIER_EXPERIMENT)
     /* All children in this profile are still inside the hangar. */
     (void)shooter; (void)target; (void)heading;
     (void)source_x_q8; (void)source_y_q8;
@@ -95,7 +95,7 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
     if (shooter>=0 && shooter<MAX_UNITS && SC64_CARRIER_HANGAR_HIDDEN(&u[shooter]))
         return 0;
 #endif
-    if (!race_protoss_services_active() || race_p7_projectile_fault || shooter<0 ||
+    if (!race_carrier_services_active() || race_p7_projectile_fault || shooter<0 ||
         shooter>=MAX_UNITS || !u[shooter].alive ||
         u[shooter].type!=SC64_INTERCEPTOR_TYPE || RACE_PROTOSS_RAW(&u[shooter])!=73 ||
         RACE_PROTOSS_SLOT(&u[shooter])<0 || RACE_PROTOSS_SLOT(&u[shooter])>=8 ||
@@ -152,7 +152,7 @@ static void race_p7_projectile_source_tick(void)
 
 static void race_p7_projectile_tick_if_due(void)
 {
-    if (race_protoss_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0]!=4u)
+    if (race_carrier_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0]!=4u)
         race_p7_projectile_source_tick();
 }
 

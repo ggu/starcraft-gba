@@ -12,7 +12,7 @@
 #ifndef SC64_OBJ_VRAM_H
 #define SC64_OBJ_VRAM_H
 
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 #include "sc64_interceptor_pool_codec.h"
 #define SC64_OBJ_VRAM_PROJECTILE_BYTES (SC64_ARENA_WORDS * 2u)
 #else
@@ -30,7 +30,7 @@ _Static_assert(SC64_OBJ_VRAM_CACHE_OFFSET <= GBA_VRAM_SCRATCH_BYTES,
 _Static_assert((SC64_OBJ_VRAM_CACHE_OFFSET & 3u) == 0u,
                "the VRAM terrain cache must stay word aligned for DMA");
 #if defined(SC64_TILE_RENDERER) && \
-    (defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_TERRAIN_CACHE_VRAM))
+    (defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT) || defined(SC64_TERRAIN_CACHE_VRAM))
 #error "the experimental tile renderer owns the whole OBJ tile VRAM"
 #endif
 
