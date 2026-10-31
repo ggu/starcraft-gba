@@ -124,6 +124,10 @@ enum {
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
     U_SHARED_BATTLECRUISER,
 #endif
+#ifdef SC64_P9_DATA_ENABLED
+    /* Appended so earlier profiles keep their values. */
+    U_P9_DEFILER,
+#endif
 #ifdef SC64_SCARAB_RUNTIME
     /* Appended identity only: production and lifecycle are separate services. */
     U_SCARAB,
@@ -214,6 +218,10 @@ enum {
 #endif
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
     B_SHARED_SCIENCE_FACILITY, B_SHARED_PHYSICS_LAB,
+#endif
+#if defined(SC64_P9_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
+    /* P9 source raw 136, a starting Zerg structure with no production path. */
+    B_P9_DEFILER_MOUND,
 #endif
     SC_RB_COUNT
 };
@@ -394,6 +402,11 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #ifdef SC64_P8_DATA_ENABLED
     , [U_P8_HYPERION] = { R_TER, 0, 255, 0, 0, 0, 0, 850, 0, 0 }
 #endif
+#ifdef SC64_P9_DATA_ENABLED
+    /* Stock Zerg_Defiler: 80 HP, 50/150, supply 4 (doubled 2). Scenario
+       actor only; its spells are not implemented. */
+    , [U_P9_DEFILER] = { R_ZERG, 0, 255, 4, 50, 150, 750, 80, 0, 0 }
+#endif
 #ifdef SC64_P6_ACTORS
     /* Scenario actors have no production path. Supply is source
        unitSupplyRequired at raw 50/74/75: 2/2/0 doubled supply. */
@@ -557,6 +570,9 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
 #elif defined(SC64_P8_DATA_ENABLED)
     , [B_STASIS_CELL_PRISON] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 150, 0, 1, 2000, 0 }
+#endif
+#if defined(SC64_P9_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
+    , [B_P9_DEFILER_MOUND] = { R_ZERG, SC_RACE_F_BUILDING, 255, 0, 100, 100, 900, 850, 0 }
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     , [B_ZP_CONTROL_TOWER] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 500, 0 }
@@ -743,6 +759,9 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_P8_DATA_ENABLED
         ,[U_P8_HYPERION] = "HYPERION"
 #endif
+#ifdef SC64_P9_DATA_ENABLED
+        ,[U_P9_DEFILER] = "DEFILER"
+#endif
 #ifdef SC64_SCARAB_RUNTIME
         ,[U_SCARAB] = "SCARAB"
 #endif
@@ -823,6 +842,10 @@ static inline const char *sc64_race_building_name(int type)
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
         ,[B_SHARED_SCIENCE_FACILITY] = "SCIENCE FACILITY"
         ,[B_SHARED_PHYSICS_LAB] = "PHYSICS LAB"
+#endif
+#if defined(SC64_P9_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS) && \
+    !defined(SC64_NYDUS_ENABLED)
+        ,[B_P9_DEFILER_MOUND] = "DEFILER MOUND"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -1474,6 +1497,10 @@ static inline int sc64_race_unit_armor(int type)
     case U_FENIX_DRAGOON: return 3;
     case U_HUNTER_KILLER: case U_FENIX: case U_TASSADAR: return 2;
     case U_MEDIC: return 1;
+#ifdef SC64_P9_DATA_ENABLED
+    /* Stock Zerg_Defiler armor; placed actors take it from the stock row. */
+    case U_P9_DEFILER: return 1;
+#endif
     default: return 0;
     }
 }
@@ -1626,6 +1653,9 @@ static inline int sc64_race_raw_unit(int type)
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
     case U_SHARED_BATTLECRUISER: return 12;
 #endif
+#ifdef SC64_P9_DATA_ENABLED
+    case U_P9_DEFILER: return 46;
+#endif
     default: return -1;
     }
 }
@@ -1690,6 +1720,9 @@ static inline int sc64_race_raw_building(int type)
 #endif
 #if defined(SC64_P8_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
     case B_STASIS_CELL_PRISON: return 168;
+#endif
+#if defined(SC64_P9_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case B_P9_DEFILER_MOUND: return 136;
 #endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
     case B_Z6_ROBOTICS_SUPPORT_BAY: return 171;
@@ -1860,6 +1893,9 @@ static inline int sc64_race_unit_from_raw(int raw)
 #ifdef SC64_P8_DATA_ENABLED
     case 28: return U_P8_HYPERION;
 #endif
+#ifdef SC64_P9_DATA_ENABLED
+    case 46: return U_P9_DEFILER;
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     case 36: return U_Z7_EGG;
 #endif
@@ -1873,7 +1909,10 @@ static inline int sc64_race_unit_from_raw(int raw)
 #ifndef SC64_Z6_ACTORS
     case 44: return U_SK_GUARDIAN;
 #endif
-    case 46: return U_SK_DEFILER; case 62: return U_SK_DEVOURER;
+#ifndef SC64_P9_DATA_ENABLED
+    case 46: return U_SK_DEFILER;
+#endif
+    case 62: return U_SK_DEVOURER;
     case 103: return U_SK_LURKER;
 #ifndef SC64_P6_ACTORS
     case 50: return U_SK_INFESTED_TERRAN;
@@ -1977,6 +2016,9 @@ static inline int sc64_race_building_from_raw(int raw)
 #endif
 #if defined(SC64_P8_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
     case 168: return B_STASIS_CELL_PRISON;
+#endif
+#if defined(SC64_P9_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case 136: return B_P9_DEFILER_MOUND;
 #endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P7_ACTORS)
     case 171: return B_Z6_ROBOTICS_SUPPORT_BAY;
