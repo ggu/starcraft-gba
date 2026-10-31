@@ -1616,6 +1616,24 @@ static int z7_safe_local_mineral(int patch,int *depot_distance)
     return 1;
 }
 
+/* A mineral center can be obscured by a selectable friendly actor. Search
+ * reachable cursor positions within the ordinary 16-pixel click radius and
+ * confirm the same contextual target the game will dispatch. */
+static int z7_click_visible_mineral(int worker,int patch)
+{
+    static const int offsets[][2]={{0,0},{-8,0},{8,0},{0,-8},{0,8},
+        {-8,-8},{8,-8},{-8,8},{8,8},{-12,0},{12,0},{0,-12},{0,12}};
+    for(unsigned i=0;i<sizeof(offsets)/sizeof(offsets[0]);i++) {
+        if(!u[worker].alive||!u[worker].selected||selected_count()!=1||
+           !currently_visible(m[patch].x,m[patch].y))return 0;
+        move_cursor(m[patch].x+offsets[i][0],m[patch].y+offsets[i][1]);
+        if(selected_worker_mineral_target()!=patch)continue;
+        tap(KEY_A);
+        return u[worker].alive&&u[worker].order==ORDER_MINE&&u[worker].target==patch;
+    }
+    return 0;
+}
+
 static int assign_idle_workers_to_minerals(void)
 {
     int assigned=0;
@@ -1657,8 +1675,7 @@ static int assign_idle_workers_to_minerals(void)
             }
             continue;
         }
-        move_cursor(m[target].x,m[target].y);tap(KEY_A);
-        if(u[worker].order==ORDER_MINE&&u[worker].target==target) {
+        if(z7_click_visible_mineral(worker,target)) {
             ++assigned;
             fprintf(stderr,"Z7 normal-input worker%d assigned safe local mineral%d at frame%d\n",worker,target,frame);
         } else fprintf(stderr,"Z7 mineral click failed worker%d order%d target%d intended%d cursor%d,%d field%d,%d frame%d\n",
