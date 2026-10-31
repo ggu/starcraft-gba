@@ -6,10 +6,10 @@ controller is playable or that the GBA collision model is equivalent.
 
 ## Native call path
 
-The resident dispatcher at `0x80081804` handles opcode 11 by reading the four
-signed bounds for the requested location, calculating the signed midpoint of
-each axis, and calling game-overlay routine `0x80133B80` with the unit type and
-center. A zero modifier becomes one creation; nonzero modifiers bound the
+The opcode-11 wrapper at `0x800819EC` calls the resident helper at
+`0x80081804`, which resolves the owner and reads the four signed bounds for
+the requested location. The helper calculates the signed midpoint of each
+axis and calls game-overlay routine `0x80133B80` with the unit type and center. A zero modifier becomes one creation; nonzero modifiers bound the
 number of calls.
 
 `0x80133B80` checks native type availability and uses type-specific signed
