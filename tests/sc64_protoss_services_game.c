@@ -110,6 +110,21 @@ static void test_carrier_ai_owners(void)
     }
 }
 
+#ifndef SC64_SHARED_CARRIER_EXPERIMENT
+static void test_default_ai_does_not_auto_buy_interceptors(void)
+{
+    custom_game();
+    int owner=ENEMY;
+    int carrier=spawn_unit(owner,U_P7_CARRIER,600,600);
+    assert(carrier>=0);
+    race_minerals[owner]=25;
+    int human_funds=minerals;
+    race_ai_plan(owner);
+    assert(u[carrier].carry==0 && race_minerals[owner]==25 && minerals==human_funds);
+    assert(carrier_children(carrier,SC64_P7_INTERCEPTOR_TRAINING)==0);
+}
+#endif
+
 static void test_paid_carrier_and_interceptor_commands(void)
 {
     custom_game();
@@ -440,6 +455,9 @@ int main(void)
     test_unbound_campaign_runs_no_service();
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
     test_carrier_ai_owners();
+#ifndef SC64_SHARED_CARRIER_EXPERIMENT
+    test_default_ai_does_not_auto_buy_interceptors();
+#endif
     test_paid_carrier_and_interceptor_commands();
     test_mixed_context_commands();
     test_carrier_training_and_flight();
