@@ -2493,17 +2493,17 @@ build/starcraft-zerg.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard st
 build/StarCraft-Zerg-GBA.gba: build/starcraft-zerg.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z3' SCZ3
-verify-zerg: build/StarCraft-Zerg-Z6-GBA.gba
+verify-zerg: build/StarCraft-Zerg-Z7-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg
 build/test-zerg: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) tests/sc64_split_run.c common/gba.c starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-zerg-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
-test-zerg: build/test-zerg build/test-sc64-zerg-promoted-profile
+test-zerg-z6: build/test-zerg build/test-sc64-zerg-promoted-profile
 	./build/test-zerg
 	./build/test-sc64-zerg-promoted-profile
 .PHONY: test-zerg-z6
-test-zerg-z6: test-zerg
+test-zerg: test-zerg-z7
 test-zerg-z3: test-sc64-z3-runtime
 # Explicit legacy four-entry Zerg product.
 build/test-zerg-z4: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
@@ -4678,7 +4678,7 @@ test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64
 	./build/test-sc64-zerg-carried-z4 --limit 150000 --trace .local/sc64/z6-carried-z4-controller.json
 	./build/test-sc64-zerg-carried-z5 --limit 60000 --trace .local/sc64/z6-carried-z5-diagnostics.json --attempt .local/sc64/z6-carried-z5-attempt.json --verified .local/sc64/z6-carried-z5-controller.json
 	./build/test-sc64-zerg-carried-z6 --trace .local/sc64/z6-carried-z6-controller.json
-test-zerg: test-sc64-zerg-carried-missions
+test-zerg-z6: test-sc64-zerg-carried-missions
 
 # P2's timed source roster must not become a false Fenix death when the
 # bounded unit pool is full. Cover both the shared and canonical adapters.
@@ -4859,7 +4859,7 @@ build/test-sc64-tracer-profile-$(1): tests/sc64_trace_profile_cache_game.c $$(ST
 	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $$($(2)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$($(4)) -o $$@
 endef
 $(eval $(call CANONICAL_TRACER_PROFILE_FIXTURE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS))
-$(eval $(call CANONICAL_TRACER_PROFILE_FIXTURE,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS))
+$(eval $(call CANONICAL_TRACER_PROFILE_FIXTURE,zerg,ZERG_Z7_CANONICAL_FLAGS,ZERG_Z7_CANONICAL_INPUTS))
 $(eval $(call CANONICAL_TRACER_PROFILE_FIXTURE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
 $(eval $(call CANONICAL_TRACER_PROFILE_FIXTURE,showcase,SHOWCASE_FLAGS,SHOWCASE_INPUTS))
 .PHONY: test-sc64-canonical-tracer-profile
@@ -4965,7 +4965,7 @@ build/test-sc64-contact-mask-math: tests/sc64_contact_mask_math.c starcraft/sc64
 test-sc64-contact-mask-math: build/test-sc64-contact-mask-math
 	./build/test-sc64-contact-mask-math
 test: test-sc64-contact-mask-math
-test-zerg: test-sc64-contact-cache-zerg
+test-zerg-z6: test-sc64-contact-cache-zerg
 test-protoss: test-sc64-contact-cache-protoss
 
 # Optional P7 ordinary-input performance replay; excluded from default targets.
@@ -5772,7 +5772,7 @@ test-sc64-terrain-transfer-scenes: $(addprefix build/test-sc64-terrain-transfer-
 # Expand prerequisites after all canonical profile definitions; recipes retain
 # variable references so late flag additions reach the actual resume fixtures.
 $(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS))
-$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS))
+$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,zerg,ZERG_Z7_CANONICAL_FLAGS,ZERG_Z7_CANONICAL_INPUTS))
 $(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
 
 # Each canonical ROM uses the isolated BC source banks.
