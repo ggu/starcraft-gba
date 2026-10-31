@@ -1602,6 +1602,9 @@ static int race_z8_unit_hidden_from_side(int unit);
 #ifdef SC64_P8_RUNTIME
 #define SC64_P8_GLOBAL_ID 27
 static int race_p8_active(void);
+static int race_p8_source_owner(unsigned slot);
+static int race_p8_unit_product_available(int owner,int raw_owner,int type);
+static int race_p8_building_product_available(int owner,int raw_owner,int type);
 static int race_p8_world_paused(void);
 static int race_p8_map_shape_valid(const Sc64RaceMap *map);
 static int race_p8_runtime_init(const Sc64RaceMap *map);
@@ -11564,6 +11567,9 @@ game_self_test(void)
 #endif
 #ifdef SC64_T6_RUNTIME
 #include "sc64_t6_availability_adapter.h"
+#endif
+#ifdef SC64_P8_RUNTIME
+#include "sc64_p8_availability_adapter.h"
 #endif
 #include "race_adapter.h"
 #ifdef SC64_P7_OBSERVER_ENABLED

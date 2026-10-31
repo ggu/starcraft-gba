@@ -654,6 +654,9 @@ static int race_queue_unit(int owner, int producer, int type)
         ) ||
         b[producer].queue_count >= 5 || (!race_mode && !race_owner_has_prereq(owner, r->prereq))) return 0;
 #endif
+#ifdef SC64_P8_RUNTIME
+    if (!race_p8_unit_product_available(owner,b[producer].raw_owner,type)) return 0;
+#endif
 #ifdef SC64_T5_RUNTIME
     if (!race_t5_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
     if (type == U_DROPSHIP && race_t5_active() &&
@@ -770,6 +773,9 @@ static int race_build_request_valid(int owner, int worker, int type,
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     if (owner < 0 || owner > 4 || !x || !y) return 0;
+#ifdef SC64_P8_RUNTIME
+    if (!race_p8_building_product_available(owner,worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,type)) return 0;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (!race_late_building_product_available(owner,
             worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,

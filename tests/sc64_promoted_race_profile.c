@@ -507,6 +507,55 @@ static void test_all_skirmish_lineups(void)
 }
 
 #ifdef SC64_P8_RUNTIME
+static void test_p8_source_permissions(void)
+{
+    campaign_start_from_menu(SC64_P8_GLOBAL_ID);
+    assert(race_p8_active());
+    for (int slot=0;slot<8;slot++) {
+        int owner=race_p8_source_owner((unsigned)slot);
+        if(owner<0 || owner>4) continue;
+        assert(!race_p8_source_product_available(owner,slot,71));
+        assert(!race_p8_source_product_available(owner,slot,170));
+    }
+    /* A checksummed candidate containing a forbidden queued product must be
+     * rejected before live state changes. */
+    assert(race_save_game());
+    static RaceSave bad;
+    fixture_capture_save(&bad);
+    int row=-1;
+    for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].owner==SIDE){row=i;break;}
+    assert(row>=0);
+    Building forged=b[row]; forged.queue_head=0; forged.queue_count=1; forged.queue[0]=U_P7_ARBITER;
+    assert(sc64_p7_typed_building_encode(&bad.buildings[row],&forged,(unsigned)race_cols*16u,(unsigned)race_rows*16u));
+    int saved_frame=frame,saved_minerals=minerals;
+    write_candidate_record(&bad);
+    assert(!race_load_game());
+    assert(frame==saved_frame && minerals==saved_minerals && b[row].queue_count==0);
+    assert(!race_p8_unit_product_available(SIDE,7,U_P7_ARBITER));
+    int producer=spawn_build(SIDE,B_P7_ARBITER_TRIBUNAL,u[0].x,u[0].y,0);
+    assert(producer>=0);
+    b[producer].raw_owner=7;
+    assert(!race_queue_unit(SIDE,producer,U_P7_ARBITER));
+    b[producer].queue[0]=U_P7_ARBITER; b[producer].queue_head=0; b[producer].queue_count=1;
+    assert(!race_save_game());
+    b[producer].queue_count=0; b[producer].alive=0;
+    assert(!race_p8_building_product_available(SIDE,7,B_P7_ARBITER_TRIBUNAL));
+    assert(race_p8_unit_product_available(SIDE,7,U_PROBE));
+    int w=-1;
+    for(int i=0;i<MAX_UNITS;i++) if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE){w=i;break;}
+    assert(w>=0);
+    const char *reason=ui_missing_tech(B_P7_ARBITER_TRIBUNAL,w);
+    assert(reason && !*reason);
+    int x=u[w].x,y=u[w].y;
+    assert(!race_build_request_valid(SIDE,w,B_P7_ARBITER_TRIBUNAL,&x,&y,0));
+    assert(!race_build_request_valid(SIDE,w,B_P7_ARBITER_TRIBUNAL,&x,&y,1));
+    /* Already placed source actors and trigger creation are not admission. */
+    assert(race_p8_active());
+    race_mode=1;
+    assert(race_p8_unit_product_available(SIDE,7,U_P7_ARBITER));
+    assert(race_p8_building_product_available(SIDE,7,B_P7_ARBITER_TRIBUNAL));
+}
+
 static void test_p7_journal_isolation(void)
 {
     static const u8 old_record[] = {1,2,3,4,5,6,7,8};
@@ -528,6 +577,7 @@ int main(void)
     gba_init();
 #ifdef SC64_P8_RUNTIME
     test_p7_journal_isolation();
+    test_p8_source_permissions();
 #endif
     assert(SC64_RACE_SAVE_GENERATION == PROFILE_SAVE_GENERATION);
     const unsigned mission_count = sizeof(profile_missions) / sizeof(profile_missions[0]);

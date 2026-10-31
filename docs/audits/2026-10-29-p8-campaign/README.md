@@ -422,3 +422,13 @@ closure. Add authenticated private-input generation and check production,
 construction request and arrival, UI and save/resume behavior before claiming
 source permissions or considering canonical promotion. Do not distribute the
 source record or generated availability bank.
+
+The P8 PUNI adapter now authenticates the retained CHK and emits its bitmap
+only under ignored `.local/p8-availability`. P8 production and construction
+admission (including arrival) consult the source-owner bit; the build menu
+hides denied buildings. Preplaced and trigger-created actors and skirmish
+admission do not use this gate. The save path rejects pending build orders and
+production queues that violate P8 admission, both before writing and during
+candidate preflight. This closes the two identified production permissions in
+the focused fixture; fresh final-profile campaign, resume and memory checks
+remain necessary before promotion.

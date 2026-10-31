@@ -1859,14 +1859,18 @@ P8_SCENARIO_HEADER := .local/sc64/zp-stage/generated/scenarios/sc64_p8_scenario_
 # worktree's build directory (never into the shared .local inputs).
 P8_BATTERY_DIR := build/generated/p8-battery
 P8_BATTERY_HEADER := $(P8_BATTERY_DIR)/sc64_p8_battery_properties_generated.h
-P8_CAMPAIGN_DEFINES := -DSC64_P8_DATA_ENABLED -DSC64_P8_RUNTIME -DSC64_P8_CAMPAIGN_ENTRY -DSC64_Z8_GAME_POOL_BRIDGE -DSC64_P8_GAME_POOL_BRIDGE -I$(P8_BATTERY_DIR)
+P8_AVAILABILITY_DIR := .local/p8-availability
+P8_AVAILABILITY_HEADER := $(P8_AVAILABILITY_DIR)/sc64_p8_availability_generated.h
+$(P8_AVAILABILITY_HEADER): tools/sc64_p8_availability.py tools/sc64_t5_availability.py .local/sc64/zp-stage/generated/source_maps/p8/source.chk .local/sc64/zp-stage/generated/source_maps/p8/manifest.json | build
+	$(PYTHON) tools/sc64_p8_availability.py --source .local/sc64/zp-stage/generated/source_maps/p8/source.chk --manifest .local/sc64/zp-stage/generated/source_maps/p8/manifest.json --out $@
+P8_CAMPAIGN_DEFINES := -DSC64_P8_DATA_ENABLED -DSC64_P8_RUNTIME -DSC64_P8_CAMPAIGN_ENTRY -DSC64_Z8_GAME_POOL_BRIDGE -DSC64_P8_GAME_POOL_BRIDGE -I$(P8_BATTERY_DIR) -I$(P8_AVAILABILITY_DIR)
 PROTOSS_P8_FLAGS = $(patsubst -I$(BC_P7_FACT_DIR),-I$(P8_FACT_V2_DIR),$(PROTOSS_P7_CANONICAL_FLAGS)) $(P8_CAMPAIGN_DEFINES)
-PROTOSS_P8_INPUTS = $(filter-out $(P7_FACT_V2_HEADER),$(PROTOSS_P7_CANONICAL_INPUTS)) $(P8_FACT_V2_HEADER) $(P8_SCENARIO_HEADER) $(P8_BATTERY_HEADER)
+PROTOSS_P8_INPUTS = $(filter-out $(P7_FACT_V2_HEADER),$(PROTOSS_P7_CANONICAL_INPUTS)) $(P8_FACT_V2_HEADER) $(P8_SCENARIO_HEADER) $(P8_BATTERY_HEADER) $(P8_AVAILABILITY_HEADER)
 $(P8_BATTERY_HEADER): tools/sc64_p7_battery_pack.py tools/sc64_zp_scenario_pack.py tools/sc64_races_pack.py .local/sc64/zp-stage/generated/source_maps/p8/source.chk .local/sc64/zp-stage/generated/source_maps/p8/manifest.json | build
 	$(PYTHON) tools/sc64_p7_battery_pack.py --mission P8 --output $@
-$(P8_FACT_V2_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile | build
+$(P8_FACT_V2_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile | build
 	mkdir -p $(P8_FACT_V2_DIR)
-	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P8_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES)) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT $< -o build/sc64-p8-fact-v2-gen
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P8_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES)) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT tools/sc64_fact_tables_gen.c -o build/sc64-p8-fact-v2-gen
 	./build/sc64-p8-fact-v2-gen > $@.tmp
 	mv $@.tmp $@
 build/starcraft-protoss-p8.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.ld Makefile | build

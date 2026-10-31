@@ -935,6 +935,9 @@ static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,u
 #endif
 
 static int race_save_game(void) {
+#ifdef SC64_P8_RUNTIME
+    if (!race_p8_live_products_valid()) return 0;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (sc64_bc_pause_offset>4) return 0;
     race_bc_yamato_sync_references();
@@ -1789,6 +1792,11 @@ static int race_load_game_candidate(void) {
         int target=RACE_U(i,target),order=RACE_U(i,order);
         if((order==ORDER_MINE&&(target<0||target>=MAX_MINERALS))||
            ((order==ORDER_GAS||order==ORDER_BUILD)&&(target<0||target>=MAX_BUILDINGS)))return 0;
+#ifdef SC64_P8_RUNTIME
+        if (v[0]==0 && v[2]==SC64_P8_GLOBAL_ID && SC64_PENDING_BUILD_ORDER(order) &&
+            !race_p8_source_product_available(RACE_U(i,owner),RACE_U(i,raw_owner),
+                sc64_race_raw_building(target))) return 0;
+#endif
         if (SC64_PENDING_BUILD_ORDER(order) &&
             !sc64_pending_build_save_identity_valid(&race_data,
                 RACE_U(i,alive), RACE_U(i,owner), RACE_U(i,type), target,
@@ -1989,6 +1997,11 @@ static int race_load_game_candidate(void) {
             int type=race_data.buildings[i][offsetof(Building,queue)/sizeof(int)+(RACE_B(i,queue_head)+j)%5];
 #endif
             if(type<0||type>=SC_RU_COUNT)return 0;
+#ifdef SC64_P8_RUNTIME
+            if (v[0]==0 && v[2]==SC64_P8_GLOBAL_ID &&
+                !race_p8_source_product_available(candidate_building.owner,candidate_building.raw_owner,
+                    sc64_race_raw_unit(type))) return 0;
+#endif
         }
     }
 #undef RACE_U
