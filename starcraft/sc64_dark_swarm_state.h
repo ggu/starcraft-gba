@@ -5,7 +5,7 @@
 /* This isolated state stage does not enable casting, targeting or rendering.
  * OpenBW creates a neutral, non-colliding effect with remove_timer=900; the
  * caller owns allocation, coordinates, update order and capacity. */
-#define SC64_DARK_SWARM_REMOVE_TICKS 900u
+#define SC64_DARK_SWARM_REMOVE_SOURCE_TICKS 900u
 
 typedef struct {
     int x, y;
@@ -16,12 +16,12 @@ typedef struct {
  * and clamped the position using the actual source unit bounds. */
 static inline void sc64_dark_swarm_created(Sc64DarkSwarmEffect *effect, int x, int y)
 {
-    effect->x=x; effect->y=y; effect->remaining=SC64_DARK_SWARM_REMOVE_TICKS;
+    effect->x=x; effect->y=y; effect->remaining=SC64_DARK_SWARM_REMOVE_SOURCE_TICKS;
 }
 
-/* Source decrements a nonzero completed-unit remove timer once per update and
- * removes the effect on the update that takes it to zero. */
-static inline int sc64_dark_swarm_tick(Sc64DarkSwarmEffect *effect)
+/* Source decrements a nonzero completed-unit remove timer once per source simulation tick and
+ * removes the effect on the source tick that takes it to zero. */
+static inline int sc64_dark_swarm_source_tick(Sc64DarkSwarmEffect *effect)
 {
     if (!effect->remaining) return 0;
     return --effect->remaining == 0;
@@ -31,6 +31,6 @@ static inline int sc64_dark_swarm_tick(Sc64DarkSwarmEffect *effect)
  * slot limit; an inactive slot has no lifetime to validate. */
 static inline int sc64_dark_swarm_remaining_valid(unsigned remaining)
 {
-    return remaining <= SC64_DARK_SWARM_REMOVE_TICKS;
+    return remaining <= SC64_DARK_SWARM_REMOVE_SOURCE_TICKS;
 }
 #endif

@@ -10,7 +10,7 @@ The pinned OpenBW `bwgame.h` copy used in this audit has SHA-256
 Its `Dark_Swarm` tech eligibility requires a Defiler that is not burrowed; the
 position-target validation accepts a point. Its `dark_swarm` function clamps the
 point to the effect unit's bounds, creates a non-colliding effect under neutral
-owner 11, and assigns a 900-update remove timer. Completed-unit processing
+owner 11, and assigns a 900-source-tick remove timer. Completed-unit processing
 decrements a nonzero remove timer and removes the unit when it reaches zero.
 The new isolated lifecycle primitive implements only that last bounded rule;
 allocation, map clamping, save encoding and update scheduling remain the
@@ -31,3 +31,37 @@ versioned save continuation for every supported mode. These items are not
 implied by the lifecycle check or enabled in current products.
 
 Run the asset-free lifetime and boundary check with `make test-dark-swarm-state`.
+
+## Authenticated N64 facts and probe boundary
+
+The retained authenticated N64 `units.dat` and `techdata.dat` hashes match
+`tools/sc64_openbw_oracle_tables.py`. Parsing those tables with the pinned
+OpenBW DAT loaders yields tech 14 energy 100 and unit 202 dimensions
+left/top 80 and right/bottom 79 source pixels. Its art metadata follows unit
+202 → flingy 125 → sprite 286 → image 337 → GRP index 369 (BOLT `00E/070`).
+This identifies the source record; it does not provide or qualify rendered art.
+
+OpenBW deducts energy when an in-range, ready caster enters its casting
+animation; the effect is created later at the projectile hit, so failure to
+allocate the effect cannot retroactively refund that energy. The opt-in
+`SC64_DARK_SWARM_CAST_PROBE` models those two separate points using an actual
+engine Defiler, caller-owned source fixed-point energy and allocated effect
+slot. Caller-established ownership, range, cooldown, facing, animation and
+visibility are prerequisites, not implemented by the probe. Its placement uses
+the source bounds and map clamp including the excluded bottom 32 pixels.
+No production path includes this probe or enables casting.
+
+A sanitizer host check built with the current Showcase flags plus the test-only
+skirmish roster gate exercises the real unit record, insufficient energy,
+burrow rejection, debit before failed allocation, boundary placement and the
+existing source cadence predicate. In the tested generic binding, 1,125 game
+frames yielded 900 source ticks; only those ticks advanced the effect timer.
+This does not qualify another mode's timing or save-resume behavior.
+
+The pinned launch RNG returns a 15-bit LCG value, and the missile launch masks
+it with 255 before its `<=` comparison; the swarm threshold therefore covers
+all 256 possible samples. This applies to the referenced fly/follow/bounce and
+appear-at-target launch paths when both source and target exist. It is not
+evidence that unrelated self-destruct, source-position, direct or splash
+resolution paths are immune; their exact behavior remains to be tested before
+wiring ordinary combat.
