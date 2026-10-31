@@ -39,3 +39,16 @@ prove playable flight, all map/race combinations, old experimental packed
 parent compatibility, hardware timing, or full save-state equivalence.
 The same full probe link for Terran passed at `020370f0/03004e68`. The 104
 frozen input hashes matched again after these checks.
+
+At source `00917a0`, a separate unprepared checkout passed `./dev build` and
+`./dev test`: 842 Python tests, 23 skips, the separate 5- and 8-test suites,
+and all native checks. The default ROM SHA-256 was
+`73c0deeeb36cca4cb8614248a7e60cadac11a0ec542f2ece31c37b171e2c56b8`,
+matching the preceding port. Four normal gate-OFF ARM builds passed unchanged
+reserve guards: Terran `020370c0/03004b78`, Zerg `02037134/03004c48`, P7
+`020382ec/03004a18`, Showcase `0203df40/03004e08`. The oversized-scratch
+selector regression passed. A schema-derived pre-BC impact-envelope migration
+and old experimental BC-marker rejection fixture passed under all four
+profiles; it is not a historical-release save. All 104 frozen input hashes
+matched after the checks. Detailed outputs remain in the ignored qualification
+and codec-receipts directories.
