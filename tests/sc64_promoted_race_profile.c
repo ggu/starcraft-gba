@@ -96,7 +96,7 @@ _Static_assert(SC64_P8_GLOBAL_ID == 27, "P8 catalog identity");
 static const int profile_missions[] = {2,3,22,23,24,25,26,27};
 static const char *const profile_titles[] = {
     "FIRST STRIKE", "INTO THE FLAMES", "HIGHER GROUND", "THE HUNT FOR TASSADAR",
-    "CHOOSING SIDES", "INTO THE DARKNESS", "HOMELAND", "THE TRIAL OF TASSADAR"
+    "CHOOSING SIDES", "INTO THE DARKNESS", "HOMELAND", "THE TRIAL"
 };
 #elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P7_RUNTIME)
 #define PROFILE_FACTION SC64_FACTION_PROTOSS
