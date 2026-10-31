@@ -432,3 +432,20 @@ production queues that violate P8 admission, both before writing and during
 candidate preflight. This closes the two identified production permissions in
 the focused fixture; fresh final-profile campaign, resume and memory checks
 remain necessary before promotion.
+
+### P8 PUNI and shared-route replay, current candidate
+
+At runtime head `e0e8e1f`, the current P8 candidate uses the authenticated
+PUNI admission gate and shared VISIT_GRID/WORD_CLEAR route flags. The normal
+P8 ARM ROM passed the existing link guards (`__iwram_end=0x03004a18`,
+`__bss_end=0x0203899c`). The sanitized ordinary-input controller and full,
+prefix and fresh-process host replay passed their strict continuation check.
+
+Three separately linked custom-scheduler ARM replay ROMs also passed their
+existing guards. Isolated mGBA full, prefix and fresh-process resume completed;
+the strict full/resume comparison returned `same_end=true` at the same win
+(tick 90,428, frame 88,769, zero faults, digest 309601471). Full, prefix and
+resume retained 94, 36 and 64 records respectively. This is a custom replay
+scheduler and isolated emulator result, not a normal-menu ARM replay, physical
+hardware, frame-rate or complete source-fidelity qualification. Scarab and
+broader carried-mission/service qualification remain open. No Actions ran.
