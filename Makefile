@@ -1,7 +1,5 @@
 .DEFAULT_GOAL := all
 
-include tests/defiler/early/Makefile
-
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
 build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build
@@ -6103,6 +6101,7 @@ $(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-parent-cleanup
 test-scarab-parent-cleanup: test-scarab-parent-cleanup-terran test-scarab-parent-cleanup-zerg test-scarab-parent-cleanup-protoss test-scarab-parent-cleanup-showcase
 
+include tests/defiler/early/Makefile
 include tests/defiler/Makefile
 include tests/carrier/Makefile
 include tests/carrier-fixtures/Makefile
