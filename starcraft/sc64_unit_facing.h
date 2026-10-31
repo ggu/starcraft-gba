@@ -19,6 +19,12 @@
 #include "sc64_unit_facing_generated.h"
 #ifdef SC64_UNIT_WALK_FRAMES
 #include "sc64_unit_walk_generated.h"
+#ifdef SC64_WALK_WORDS
+#if !defined(SC64_UNIT_WORD_SPRITES)
+#error "SC64_WALK_WORDS requires SC64_UNIT_WORD_SPRITES"
+#endif
+#include "sc64_walk_words_generated.h"
+#endif
 #endif
 
 #if defined(SC64_UNIT_WORD_SPRITES) && !defined(SC64_UNIT_FACING_WORD_METADATA)
@@ -146,7 +152,7 @@ static unsigned sc64_walk_clock_ticks;
  * cycle runs on the game clock while the unit moves; the slot offsets its
  * phase so a group does not march in lockstep. */
 static const Sc64SpriteFrame *
-sc64_walk_pose(unsigned raw, int slot)
+sc64_walk_pose_step(unsigned raw, int slot, unsigned *step_out)
 {
     const Sc64UnitWalkCycle *cycle = sc64_unit_walk_cycle((unsigned short)raw);
     if (!cycle) return 0;
@@ -157,15 +163,28 @@ sc64_walk_pose(unsigned raw, int slot)
     unsigned tick = (sc64_walk_clock_ticks + (unsigned)slot * 3u) % cycle->cycle_ticks;
     unsigned step = 0;
     while (step + 1 < cycle->count && cycle->steps[step + 1].tick <= tick) ++step;
+    if (step_out) *step_out = step;
     return cycle->steps[step].frames;
 }
+static const Sc64SpriteFrame *sc64_walk_pose(unsigned raw, int slot)
+{ return sc64_walk_pose_step(raw, slot, 0); }
 
 /* Walk frames are stored for every heading, so they never need the mirrored
  * blitter, which runs from ROM. */
 static void
-sc64_walk_blit(const Sc64SpriteFrame *pose, int dir, int x, int y)
+sc64_walk_blit(const Sc64SpriteFrame *pose, unsigned raw, unsigned step, int dir, int x, int y)
 {
     const Sc64SpriteFrame *s = &pose[dir];
+#ifdef SC64_WALK_WORDS
+    const GbaSpriteWordFrame *word = sc64_walk_word_frame(raw,step,(unsigned)dir);
+    if (word) {
+        gfx_blit_sprite_words(x - s->canvas_w / 2 + s->offset_x,
+                              y - s->canvas_h / 2 + s->offset_y, word);
+        return;
+    }
+#else
+    (void)raw; (void)step;
+#endif
     gfx_blit_sprite(x - s->canvas_w / 2 + s->offset_x, y - s->canvas_h / 2 + s->offset_y,
                     s->w, s->h, s->pixels);
 }
@@ -188,8 +207,9 @@ sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
         int sieged = q->type == U_SIEGE_TANK, lift = SC64_WALK_LIFT(walk);
 #ifdef SC64_UNIT_WALK_FRAMES
         /* Rolling treads replace the lift for the hull and its turret. */
-        const Sc64SpriteFrame *pose = walk && !sieged ? sc64_walk_pose(5u, slot) : 0;
-        if (pose) { sc64_walk_blit(pose, dir, x, y); lift = 0; }
+        unsigned step = 0;
+        const Sc64SpriteFrame *pose = walk && !sieged ? sc64_walk_pose_step(5u, slot, &step) : 0;
+        if (pose) { sc64_walk_blit(pose, 5u, step, dir, x, y); lift = 0; }
         else
 #endif
         if (!sc64_facing_blit(sieged ? 30u : 5u, dir, x, y - lift)) return 0;
@@ -199,9 +219,10 @@ sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
 #endif
 #ifdef SC64_UNIT_WALK_FRAMES
     if (walk) {
-        const Sc64SpriteFrame *pose = sc64_walk_pose((unsigned)raw, slot);
+        unsigned step = 0;
+        const Sc64SpriteFrame *pose = sc64_walk_pose_step((unsigned)raw, slot, &step);
         if (pose) {
-            sc64_walk_blit(pose, dir, x, y);
+            sc64_walk_blit(pose, (unsigned)raw, step, dir, x, y);
             return 1;
         }
     }
