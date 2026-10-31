@@ -525,6 +525,16 @@ ifneq ($(filter $(SHOWCASE_HUD_CACHE),0 1),$(SHOWCASE_HUD_CACHE))
 $(error SHOWCASE_HUD_CACHE must be 0 or 1)
 endif
 SHOWCASE_HUD_CACHE_FLAGS = $(if $(filter 1,$(SHOWCASE_HUD_CACHE)),-DSC64_HUD_BUFFER_REUSE -DSC64_HUD_VRAM_BANDS -DSC64_MINIMAP_RASTER)
+# Optional Showcase collision comparison; the contact cache replaces the
+# older class-cache and per-direction steering-list implementations.
+SHOWCASE_CONTACT_CACHE ?= 1
+ifneq ($(words $(filter 0 1,$(SHOWCASE_CONTACT_CACHE))),1)
+$(error SHOWCASE_CONTACT_CACHE must be 0 or 1)
+endif
+ifneq ($(filter $(SHOWCASE_CONTACT_CACHE),0 1),$(SHOWCASE_CONTACT_CACHE))
+$(error SHOWCASE_CONTACT_CACHE must be 0 or 1)
+endif
+SHOWCASE_CONTACT_BASE_FLAGS = $(if $(filter 1,$(SHOWCASE_CONTACT_CACHE)),$(filter-out -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST,$(P7_TYPED_RECT_FLAGS)) -DSC64_CONTACT_CACHE,$(P7_TYPED_RECT_FLAGS))
 # Experimental packed walking frames; original-art and legacy products stay independent.
 CANONICAL_WALK_WORDS ?= 1
 ifneq ($(words $(filter 0 1,$(CANONICAL_WALK_WORDS))),1)
@@ -556,7 +566,7 @@ $(error CANONICAL_LOOKUP_INDEX must be 0 or 1)
 endif
 # Read-only key comparison also handles sub-second changes with macOS Make 3.81.
 sc64_lookup_quote = '$(subst ','"'"',$(1))'
-CANONICAL_LOOKUP_CONFIG_KEY := $(shell $(PYTHON) tools/sc64_weapon_lookup_index.py --config-key $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_INDEX)) $(call sc64_lookup_quote,$(WEAPON_SOURCE_HEADER)))-route$(CANONICAL_ROUTE_INDEX)-newcell$(CANONICAL_ROUTE_NEW_CELL)-pathgrid$(CANONICAL_PATH_GRID)-showhud$(SHOWCASE_HUD_CACHE)-walk$(shell $(PYTHON) tools/sc64_unit_walk_words.py --config-key $(CANONICAL_WALK_WORDS) $(call sc64_lookup_quote,$(UNIT_WALK_HEADER)) $(call sc64_lookup_quote,$(UNIT_FACING_HEADER)))
+CANONICAL_LOOKUP_CONFIG_KEY := $(shell $(PYTHON) tools/sc64_weapon_lookup_index.py --config-key $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_INDEX)) $(call sc64_lookup_quote,$(WEAPON_SOURCE_HEADER)))-route$(CANONICAL_ROUTE_INDEX)-newcell$(CANONICAL_ROUTE_NEW_CELL)-pathgrid$(CANONICAL_PATH_GRID)-showhud$(SHOWCASE_HUD_CACHE)-showcontact$(SHOWCASE_CONTACT_CACHE)-walk$(shell $(PYTHON) tools/sc64_unit_walk_words.py --config-key $(CANONICAL_WALK_WORDS) $(call sc64_lookup_quote,$(UNIT_WALK_HEADER)) $(call sc64_lookup_quote,$(UNIT_FACING_HEADER)))
 CANONICAL_LOOKUP_REBUILD := $(if $(shell test -f build/canonical-lookup-config && printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' | cmp -s - build/canonical-lookup-config && printf matched),,force-canonical-lookup-rebuild)
 INDEXED_WEAPON_HEADER := build/generated/weapon-lookup/sc64_weapon_source_indexed.h
 CANONICAL_LOOKUP_INPUTS = $(if $(filter 1,$(CANONICAL_WALK_WORDS)),$(WALK_WORDS_HEADER)) $(if $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(INDEXED_WEAPON_HEADER)) build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
@@ -4454,7 +4464,7 @@ endif
 # Clip world art before it reaches either HUD band. Keep the infrequent
 # procedural diamond fallback in ROM so clipping retains the IWRAM reserve.
 SHOWCASE_INPUTS = $(BC_INPUTS) $(P7_ARBITER_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
-SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SHOWCASE_HUD_CACHE_FLAGS)
+SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(SHOWCASE_CONTACT_BASE_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SHOWCASE_HUD_CACHE_FLAGS)
 build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@

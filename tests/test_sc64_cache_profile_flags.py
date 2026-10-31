@@ -64,6 +64,20 @@ class CacheProfileFlagsTests(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 profile_defines("SHOWCASE_HUD_CACHE=" + invalid)
 
+    def test_showcase_contact_opt_in_and_invalid_values(self):
+        old = {"-DSC64_COLLISION_CLASS_CACHE", "-DSC64_COLLISION_STEER_LIST"}
+        baseline = profile_defines("SHOWCASE_CONTACT_CACHE=0")
+        self.assertTrue(old <= baseline["SHOWCASE_FLAGS"])
+        self.assertNotIn("-DSC64_CONTACT_CACHE", baseline["SHOWCASE_FLAGS"])
+        enabled = profile_defines()
+        self.assertTrue(old.isdisjoint(enabled["SHOWCASE_FLAGS"]))
+        self.assertIn("-DSC64_CONTACT_CACHE", enabled["SHOWCASE_FLAGS"])
+        for name in CANONICAL + NON_CACHE:
+            self.assertEqual(baseline[name], enabled[name])
+        for invalid in ("", "2", "0 1", "yes"):
+            with self.assertRaises(subprocess.CalledProcessError):
+                profile_defines("SHOWCASE_CONTACT_CACHE=" + invalid)
+
     def test_disabling_cache_group_also_removes_the_persistent_raster(self):
         profiles = profile_defines("CANONICAL_CACHE_FLAGS=")
         for name in CANONICAL:
