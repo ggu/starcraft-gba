@@ -426,7 +426,7 @@ source record or generated availability bank.
 The P8 PUNI adapter now authenticates the retained CHK and emits its bitmap
 only under ignored `.local/p8-availability`. P8 production and construction
 admission (including arrival) consult the source-owner bit; the build menu
-hides denied buildings. Preplaced and trigger-created actors and skirmish
+reports denied buildings as unavailable. Preplaced and trigger-created actors and skirmish
 admission do not use this gate. The save path rejects pending build orders and
 production queues that violate P8 admission, both before writing and during
 candidate preflight. This closes the two identified production permissions in
