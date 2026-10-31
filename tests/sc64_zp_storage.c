@@ -41,7 +41,9 @@
 #error "Compile with the opt-in Zerg/Protoss storage gate"
 #endif
 
-#ifdef SC64_P6_STORM_ENABLED
+#if defined(SC64_P7_TYPED_COMPACT_ENABLED)
+_Static_assert(SC64_RACE_SAVE_GENERATION == 43u, "P7 typed storage generation");
+#elif defined(SC64_P6_STORM_ENABLED)
 _Static_assert(SC64_RACE_SAVE_GENERATION == 30u, "distinct P6 Storm storage generation");
 #elif defined(SC64_P5_SHUTTLE_ENABLED)
 _Static_assert(SC64_RACE_SAVE_GENERATION == 26u, "distinct P5 Shuttle storage generation");
@@ -293,36 +295,66 @@ static void test_save_union_and_generation(void)
     static RaceSave save, loaded;
     Unit source, decoded;
     Building building, decoded_building;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    Sc64P7TypedUnitSave bad_unit;
+#else
     StorageFixtureUnitSave bad_unit;
+#endif
     memset(&save, 0, sizeof(save));
     memset(&loaded, 0, sizeof(loaded));
     save.version = SAVE_VERSION;
-    assert(save.version == 0x53435a30u + SC64_RACE_SAVE_GENERATION ||
-           save.version == 0x53435030u + SC64_RACE_SAVE_GENERATION);
+    assert((save.version & ~(0x80000000u | 0x20000000u)) ==
+           SC64_BASE_SAVE_VERSION);
     memset(&source, 0, sizeof(source));
     source.x = source.y = 2047;
     source.hp = 8; source.maxhp = 10; source.owner = 2; source.type = U_DRONE;
     source.alive = 1; source.order = ORDER_IDLE; source.target = -1;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    int armor;
+    assert(sc64_p7_typed_unit_canonical(source.type, &source.maxhp, &armor, 0));
+    source.armor = (u8)armor; source.build = -1;
+    source.raw_type = source.raw_owner = -1;
+    assert(sc64_p7_typed_unit_encode(&save.units[MAX_UNITS - 1], &source, 2048, 2048));
+#else
     assert(storage_fixture_unit_encode(&save.units[MAX_UNITS - 1], &source, 2048, 2048));
+#endif
     memset(&building, 0, sizeof(building));
     building.x = building.y = 2047;
     building.hp = 10; building.maxhp = 10; building.owner = 2;
     building.type = B_HATCHERY; building.alive = 1;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    building.maxhp = sc64_p7_typed_building_maxhp(building.type);
+    building.raw_type = building.raw_owner = -1;
+    assert(sc64_p7_typed_building_encode(&save.buildings[MAX_BUILDINGS - 1],
+                                        &building, 2048, 2048));
+#else
     assert(sc64_building_save_encode(&save.buildings[MAX_BUILDINGS - 1],
                                      &building, 2048, 2048));
+#endif
     save.fog[(MAP_CELLS - 1) >> 3] |= (u8)(1u << ((MAP_CELLS - 1) & 7));
     save_write(&save, sizeof(save), SAVE_VERSION);
     assert(save_read(&loaded, sizeof(loaded), SAVE_VERSION));
     assert(loaded.version == SAVE_VERSION);
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    assert(sc64_p7_typed_unit_decode(&decoded, &loaded.units[MAX_UNITS - 1], 2048, 2048));
+#else
     assert(storage_fixture_unit_decode(&decoded, &loaded.units[MAX_UNITS - 1], 2048, 2048));
+#endif
     assert(memcmp(&decoded, &source, sizeof(source)) == 0);
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    assert(sc64_p7_typed_building_decode(&decoded_building,
+                                        &loaded.buildings[MAX_BUILDINGS - 1], 2048, 2048));
+#else
     assert(sc64_building_save_decode(&decoded_building,
                                      &loaded.buildings[MAX_BUILDINGS - 1]));
+#endif
     assert(memcmp(&decoded_building, &building, sizeof(building)) == 0);
     assert((loaded.fog[(MAP_CELLS - 1) >> 3] &
             (u8)(1u << ((MAP_CELLS - 1) & 7))) != 0);
     bad_unit = loaded.units[MAX_UNITS - 1];
-#ifdef SC64_ZP_FULL_STORAGE
+#if defined(SC64_P7_TYPED_COMPACT_ENABLED)
+    bad_unit.bytes[27] &= 0x7fu; /* occupied marker is required */
+#elif defined(SC64_ZP_FULL_STORAGE)
     /* Same invalid path_timer value as the standalone malformed-row case. */
     for (unsigned i = 0; i < 5; ++i) {
         unsigned bit = 187u + i;
@@ -333,7 +365,11 @@ static void test_save_union_and_generation(void)
 #else
     bad_unit.bytes[SC64_PACKED_UNIT_SAVE_BYTES - 1] |= 0x80;
 #endif
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    assert(!sc64_p7_typed_unit_decode(&decoded, &bad_unit, 2048, 2048));
+#else
     assert(!storage_fixture_unit_decode(&decoded, &bad_unit, 2048, 2048));
+#endif
     assert(sizeof(sc64_zp_route_save_scratch) >= sizeof(RaceSave));
     assert(sizeof(sc64_zp_route_save_scratch) >= MAP_CELLS * sizeof(u16));
 #ifdef SC64_ZP_FULL_STORAGE
