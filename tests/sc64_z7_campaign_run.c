@@ -1808,10 +1808,41 @@ static void z7_defense_screen_point(int *x,int *y)
     else {*x=1050;*y=1620;}
 }
 
+static int army_order_opening(int attack,int x,int y)
+{
+    cancel_ui_mode();
+    if(selected_building>=0&&!deselect_with_local_box())return 0;
+    tap(KEY_R); /* Normal combat-group selection. */
+    if(!selected_count())return 0;
+    if(!menu_open)tap(KEY_B);
+    if(attack)tap(KEY_DOWN);
+    tap(KEY_A);
+    if(mode!=(attack?MODE_ATTACK:MODE_MOVE))return 0;
+    move_cursor(x,y);tap(KEY_A);
+    int accepted=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].selected) {
+        if(u[i].order==(attack?ORDER_ATTACK_MOVE:ORDER_MOVE)) { accepted++;continue; }
+        if(!attack||u[i].order!=ORDER_ATTACK_TARGET)continue;
+        int target=u[i].target;
+        if(target>=0&&target<MAX_UNITS&&u[target].alive&&u[target].owner==ENEMY&&
+           currently_visible(u[target].x,u[target].y)&&
+           dist2(x,y,u[target].x,u[target].y)<=32*32)accepted++;
+        else if(target>=MAX_UNITS&&target<MAX_UNITS+MAX_BUILDINGS) {
+            int slot=target-MAX_UNITS;
+            if(b[slot].alive&&b[slot].owner==ENEMY&&currently_visible(b[slot].x,b[slot].y)&&
+               dist2(x,y,b[slot].x,b[slot].y)<=32*32)accepted++;
+        }
+    }
+    if(accepted)++actions_taken;
+    return accepted>0;
+}
+
+
 static int z7_r_combat_eligible(int i);
 
 static int army_order(int attack,int x,int y)
 {
+    if((unsigned)frame<45000u)return army_order_opening(attack,x,y);
     unsigned char expected[MAX_UNITS]={0};
     cancel_ui_mode();
     if(selected_building>=0&&!deselect_with_local_box())return 0;
