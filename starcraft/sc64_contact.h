@@ -513,6 +513,30 @@ sc64_contact_memo_eligible(const Unit *q, int speed)
     return sc64_contact_mover(q, &radius, &flying) == 2;
 }
 
+#ifdef SC64_DIAGNOSTIC_CONTACT_SPLIT
+/* Position change since the previous update_orders entry, not a prediction
+ * of future movement. Diagnostic only; counters wrap modulo 2^32. */
+volatile u32 diag_contact_visit_moved, diag_contact_visit_stationary;
+volatile u32 diag_contact_geometry_moved, diag_contact_geometry_stationary;
+static s16 diag_contact_prev_x[MAX_UNITS], diag_contact_prev_y[MAX_UNITS];
+static u8 diag_contact_moved[MAX_UNITS], diag_contact_prev_alive[MAX_UNITS];
+static void sc64_contact_split_begin(void)
+{
+    int i;
+    diag_contact_visit_moved = diag_contact_visit_stationary = 0;
+    diag_contact_geometry_moved = diag_contact_geometry_stationary = 0;
+    for (i = 0; i < MAX_UNITS; ++i) {
+        diag_contact_moved[i] = u[i].alive && diag_contact_prev_alive[i] &&
+            (u[i].x != diag_contact_prev_x[i] || u[i].y != diag_contact_prev_y[i]);
+        diag_contact_prev_x[i] = u[i].x; diag_contact_prev_y[i] = u[i].y;
+        diag_contact_prev_alive[i] = u[i].alive;
+    }
+}
+#define CONTACT_SPLIT(kind, i) do { if (diag_contact_moved[i]) ++diag_contact_##kind##_moved; else ++diag_contact_##kind##_stationary; } while (0)
+#else
+#define CONTACT_SPLIT(kind, i) ((void)0)
+#endif
+
 static unsigned __attribute__((noinline))
 sc64_contact_blocked_mask_uncached(const Unit *q, int speed);
 static unsigned __attribute__((noinline))
@@ -577,6 +601,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i]) {
                 const Unit *c = &u[i];
+                CONTACT_SPLIT(visit, i);
                 u8 cc;
                 int radius, ox, oy, limit_axis;
 #ifndef SC64_CONTACT_MASK_TABLE
@@ -599,6 +624,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 limit_axis = radius + speed;
                 if (ox <= -limit_axis || ox >= limit_axis ||
                     oy <= -limit_axis || oy >= limit_axis) continue;
+                CONTACT_SPLIT(geometry, i);
 #ifdef SC64_CONTACT_MASK_TABLE
                 mask = sc64_contact_mask_apply_geometry(mask, radius, speed, ox, oy);
 #else

@@ -7427,6 +7427,9 @@ static void GBA_HOT
 update_orders(void)
 {
     int i, target;
+#ifdef SC64_DIAGNOSTIC_CONTACT_SPLIT
+    sc64_contact_split_begin();
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     race_transport_activity = 0;
 #endif
