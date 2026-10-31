@@ -91,6 +91,19 @@ class PhysicalProtocolTests(unittest.TestCase):
         self.assertTrue(all(x.startswith("ERR") for x in rows[9:13]), rows)
         self.assertRegex(rows[13], r"^STEPS 1 1 [0-9]+$")
 
+    def test_stale_counter_is_bounded(self):
+        runner, rom, elf = (os.environ[k] for k in ("SC64_PHYSICAL_RUNNER", "SC64_PHYSICAL_ROM", "SC64_PHYSICAL_ELF"))
+        pc = symbols(Path(elf))["gba_keys"] & ~1
+        # This aligned safety-margin word is outside the linked EWRAM data;
+        # it is only read, and remains constant as input samples advance.
+        commands = [f"Z{pc:x}", "c", f"U1,{pc:x},0203fffc", "q"]
+        with tempfile.TemporaryDirectory() as td:
+            env = {**os.environ, "HOME": td, "XDG_CONFIG_HOME": str(Path(td) / ".config")}
+            p = subprocess.run([runner, rom, "--physical"], input="\n".join(commands) + "\n",
+                               capture_output=True, text=True, timeout=60, env=env)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(p.stdout.splitlines(), ["READY", "OK", f"STOP {pc:08x}", "ERR step"])
+
 
 if __name__ == "__main__":
     unittest.main()
