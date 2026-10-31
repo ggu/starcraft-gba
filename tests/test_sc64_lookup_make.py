@@ -58,6 +58,35 @@ class LookupMakeTest(unittest.TestCase):
         self.assertFalse(reachable(rules, 'build/starcraft.elf', INDEX))
         self.assertFalse(reachable(rules, 'build/starcraft.elf', CONFIG))
 
+    def test_path_grid_flag_only_in_four_canonical_vectors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / 'vectors.mk'
+            fixture.write_text("""$(info T:$(TERRAN_ROM_FLAGS))
+$(info Z:$(ZERG_ROM_FLAGS))
+$(info P:$(PROTOSS_P7_CANONICAL_FLAGS))
+$(info S:$(SHOWCASE_FLAGS))
+$(info ORIGINAL:$(CFLAGS))
+.PHONY: vector-fixture
+vector-fixture:
+\t@:
+""")
+            def vectors(value):
+                result = subprocess.run(['make', '-s', '-f', 'Makefile', '-f', str(fixture),
+                                         f'CANONICAL_PATH_GRID={value}', 'vector-fixture'],
+                                        cwd=ROOT, text=True, capture_output=True)
+                return result
+            for value in ('0', '1'):
+                result = vectors(value)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                lines = dict(line.split(':', 1) for line in result.stdout.splitlines()
+                             if ':' in line and line.split(':', 1)[0] in ('T', 'Z', 'P', 'S', 'ORIGINAL'))
+                self.assertEqual(set(lines), {'T', 'Z', 'P', 'S', 'ORIGINAL'})
+                for profile in ('T', 'Z', 'P', 'S'):
+                    self.assertEqual('-DSC64_BULK_TERRAIN_GRID' in lines[profile].split(), value == '1', profile)
+                self.assertNotIn('-DSC64_BULK_TERRAIN_GRID', lines['ORIGINAL'].split())
+            for bad in ('', '2', '0 1', 'yes'):
+                self.assertNotEqual(vectors(bad).returncode, 0, bad)
+
     def test_mode_switch_and_older_alternate_bank(self):
         # Run the real rules with synthetic private inputs, no asset generators.
         with tempfile.TemporaryDirectory() as directory:
@@ -73,9 +102,9 @@ build/lookup-consumer: $(CANONICAL_LOOKUP_INPUTS)
 \t@touch $@
 ''')
 
-            def build(mode, bank='first', route=1):
+            def build(mode, bank='first', route=1, path_grid=0):
                 subprocess.run(['make', '-f', 'Makefile', '-f', 'fixture.mk',
-                                f'CANONICAL_LOOKUP_INDEX={mode}', f'CANONICAL_ROUTE_INDEX={route}', 'CANONICAL_WALK_WORDS=0', f'WEAPON_SOURCE_DIR={bank}',
+                                f'CANONICAL_LOOKUP_INDEX={mode}', f'CANONICAL_ROUTE_INDEX={route}', f'CANONICAL_PATH_GRID={path_grid}', 'CANONICAL_WALK_WORDS=0', f'WEAPON_SOURCE_DIR={bank}',
                                 '-o', f'{bank}/sc64_weapon_source_generated.h', 'lookup-fixture'],
                                cwd=root, check=True, capture_output=True)
                 return (root / 'build/rebuilds').read_text().splitlines()
@@ -98,6 +127,10 @@ build/lookup-consumer: $(CANONICAL_LOOKUP_INPUTS)
             self.assertEqual(len(build(1, 'second', 0)), 6)
             self.assertEqual(len(build(1, 'second', 1)), 7)
             self.assertEqual(len(build(1, 'second', 1)), 7)
+            self.assertEqual(len(build(1, 'second', 1, 1)), 8, 'same-tick enabling rebuilds')
+            self.assertEqual(len(build(1, 'second', 1, 1)), 8, 'unchanged enabled config is a no-op')
+            self.assertEqual(len(build(1, 'second', 1, 0)), 9, 'same-tick disabling rebuilds')
+            self.assertEqual(len(build(1, 'second', 1, 0)), 9, 'unchanged disabled config is a no-op')
 
 
 if __name__ == '__main__':
