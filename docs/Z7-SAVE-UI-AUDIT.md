@@ -74,8 +74,20 @@ This builds separate host binaries for Terran, Zerg, Protoss, Showcase, Races
 and Unified, enabling only `SC64_SAVE_UI_CONTEXT` in each existing vector. It
 runs the full shared-mechanics fixture, including its original assertions and
 UI save tests. `make test-sc64-shared-mechanics` remains the default-off
-matrix. This target has not itself been run as part of the historical witness
-above; those recorded UI-on builds covered Terran, Zerg and Protoss.
+matrix. The historical witness above covered Terran, Zerg and Protoss with
+the flag both off and on. The remaining Showcase, Races and Unified UI-on
+full fixtures subsequently passed at cc5a2dc, exercising all original
+construction/burn assertions and all three human races' UI tests. This
+establishes six UI-on product vectors, not twelve fresh off/on runs.
+
+The remaining builds used 109 verified pinned inputs and two independently
+hashed derived headers without regenerating them; all hashes matched before
+and after. Their log SHA-256 is recorded below. To preserve the unchanged
+512 KiB source-file guard, the optional recipes were then moved into
+`tests/sc64-save-ui-context/Makefile` (fd015a9 on the combined branch,
+25a07b5 on the fixture branch). A six-vector dry run confirmed identical
+compile commands apart from the UI define and output names. The relocation
+was not relabeled as a repeat of the native runs.
 
 ## SHA-256 evidence
 
@@ -93,4 +105,5 @@ above; those recorded UI-on builds covered Terran, Zerg and Protoss.
 | New-ROM legacy reader result | `ae62bab6b8d78822437c7771f837c001348a1788c914a106b01e2a086fb14cb8` |
 | Old-ROM new-record reader result | `cb194899c7130ef73fa8bf6d8c77804f6e41364056ce2b34219b04ba3a008342` |
 | Mutated SRAM checks result | `dbb51d7e55486c436db6eab40fbc2453d0c3db36a26367e1fee43c2c2206b9e7` |
-| Six-fixture test log | `b70de6692c47704e640943db37556b9b4d0cbba74bc5841c07ed31a81bd3f8d4` |
+| Historical Terran/Zerg/Protoss OFF+ON log | `b70de6692c47704e640943db37556b9b4d0cbba74bc5841c07ed31a81bd3f8d4` |
+| Remaining Showcase/Races/Unified ON log | `c51795bd79e9b47c29dcc80cf8e67786e03fdf04a33f73ba64d6a5aeba4a2207` |

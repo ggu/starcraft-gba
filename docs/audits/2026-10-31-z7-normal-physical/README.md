@@ -104,10 +104,14 @@ artifact hashes, malformed-record checks and qualification limits.
 
 ## Verification and remaining scope
 
-The exact earlier 197677a unprepared default build and test suite pass.
-The current physical replay and validator Python suite passes 89 tests,
-including its real-ROM backend protocol tests. Default native checks are
-not relabeled as a fresh run of every later tool-only source revision.
+The unprepared 747cf26 checkpoint passes local doctor, source boundary,
+default build and the full default test suite. With the opt-in save source
+included but disabled, fd015a9 also passes doctor and a fresh default build.
+Its complete default ROM is byte-identical to the tested 747cf26 default ROM
+(SHA-256 73c0deeeb36cca4cb8614248a7e60cadac11a0ec542f2ece31c37b171e2c56b8).
+The physical replay and validator Python suite passes 89 tests, including
+its real-ROM backend protocol tests. The default suite is not relabeled as
+an all-mission qualification or a fresh run on every later documentation edit.
 
 The prepared Z7 controller, save, profile, frame and Scourge fixtures pass;
 234 startup/save configurations and 18 terminal skirmish cases pass. The
