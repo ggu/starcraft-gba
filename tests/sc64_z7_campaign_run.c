@@ -1819,13 +1819,12 @@ static int z7_r_combat_eligible(int i)
     return eligible;
 }
 
-static int z7_home_ground_target_valid(int hatch,int target)
+static int z7_home_target_valid(int hatch,int target)
 {
     if(screen!=SCREEN_PLAY||won||lost||hatch<0||hatch>=MAX_BUILDINGS||
        !b[hatch].alive||b[hatch].owner!=SIDE||target<0||target>=MAX_UNITS||
        !u[target].alive||u[target].owner!=ENEMY||
        !owners_hostile(SIDE,u[target].owner)||SC64_TRANSPORT_LOADED(&u[target])||
-       sc64_race_unit_flying(u[target].type)||
        !currently_visible(u[target].x,u[target].y)||
        !SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,target,SIDE,3))return 0;
     int d=dist2(u[target].x,u[target].y,b[hatch].x,b[hatch].y);
@@ -1854,7 +1853,7 @@ static int z7_home_army_attack(int hatch,int target)
 {
     unsigned char expected[MAX_UNITS]={0};
     int n=0,hydras=0;
-    if(!policy_home_army_r||!z7_home_ground_target_valid(hatch,target))return 0;
+    if(!policy_home_army_r||!z7_home_target_valid(hatch,target))return 0;
     int target_type=u[target].type,target_raw=u[target].raw_type;
     int target_owner=u[target].raw_owner,target_hp=u[target].hp;
     cancel_ui_mode();
@@ -1887,14 +1886,14 @@ static int z7_home_army_attack(int hatch,int target)
     if(screen!=SCREEN_PLAY||mode!=MODE_NORMAL||menu_open||box_state||help||
        selected_building>=0)return 0;
     if(!z7_home_army_selection_matches(hatch,expected))return 0;
-    if(!z7_home_ground_target_valid(hatch,target))return 0;
+    if(!z7_home_target_valid(hatch,target))return 0;
     if(!choose_menu_row(MENU_ATTACK)||mode!=MODE_ATTACK) {cancel_ui_mode();return 0;}
     for(int retry=0;retry<3;retry++) {
-        if(!z7_home_ground_target_valid(hatch,target)) {cancel_ui_mode();return 0;}
+        if(!z7_home_target_valid(hatch,target)) {cancel_ui_mode();return 0;}
         move_cursor(u[target].x,u[target].y);
         if(dist2(cx,cy,u[target].x,u[target].y)<20*20)break;
     }
-    if(!z7_home_ground_target_valid(hatch,target)||
+    if(!z7_home_target_valid(hatch,target)||
        !z7_home_army_selection_matches(hatch,expected)||
        u[target].type!=target_type||u[target].raw_type!=target_raw||
        u[target].raw_owner!=target_owner||u[target].hp>target_hp||
@@ -5014,6 +5013,28 @@ static void attack_step(void)
        !offense_ready) {
         int cover_x,cover_y,air_x=1050,air_y=1510;
         z7_defense_screen_point(&cover_x,&cover_y);
+        /* A visible flyer attacking the worker line needs the same fast
+           response as a ground raid. Typed selection can take over a hundred
+           frames while the target moves; use R only under its strict local
+           ordinary-Hydra/Muta preflight and otherwise retain the typed path. */
+        static unsigned worker_air_next_order;
+        if((unsigned)frame>=worker_air_next_order&&unit_type_count(U_HYDRALISK,SIDE)>0) {
+            int threat=-1,best=0x7fffffff;
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+               owners_hostile(SIDE,u[i].owner)&&sc64_race_unit_flying(u[i].type)&&
+               z7_home_target_valid(hatch,i)&&z7_threat_near_workers(i,128)) {
+                int d=dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y);
+                if(d<best){threat=i;best=d;}
+            }
+            if(threat>=0) {
+                int accepted=z7_home_army_attack(hatch,threat);
+                if(!accepted)accepted=typed_attack_target(U_HYDRALISK,threat);
+                fprintf(stderr,"Z7 worker air threat accepted%d slot%d d2%d frame%u\n",
+                    accepted,threat,best,(unsigned)frame);
+                worker_air_next_order=(unsigned)frame+(accepted?180u:60u);
+                if(accepted)return;
+            }
+        }
         /* Do not let a long air-screen gesture defer an already visible
          * ground attack at the Hatchery. This uses the same live target and
          * ordinary group order as the existing post-air defense below. */
