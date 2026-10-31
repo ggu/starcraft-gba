@@ -367,7 +367,13 @@ typedef struct {
     u8 type, order, speed, p6, mask, valid;
 } Sc64ContactMemoEntry;
 _Static_assert(sizeof(Sc64ContactMemoEntry) <= 16, "contact memo entry exceeds bound");
-static Sc64ContactMemoEntry sc64_contact_memo_entries[4];
+#ifndef SC64_CONTACT_MEMO_CAPACITY
+#define SC64_CONTACT_MEMO_CAPACITY 4
+#endif
+#if SC64_CONTACT_MEMO_CAPACITY < 1 || SC64_CONTACT_MEMO_CAPACITY > 32
+#error "contact memo capacity must be in the range 1..32"
+#endif
+static Sc64ContactMemoEntry sc64_contact_memo_entries[SC64_CONTACT_MEMO_CAPACITY];
 static u8 sc64_contact_memo_count;
 #ifdef SC64_CONTACT_MEMO_ORACLE
 static u32 sc64_contact_memo_generation;
@@ -418,7 +424,7 @@ sc64_contact_memo_remember(const Unit *q, int speed, int p6, unsigned mask)
     if (i < sc64_contact_memo_count) {
         for (j = i; j; --j) sc64_contact_memo_entries[j] = sc64_contact_memo_entries[j - 1u];
     } else {
-        if (sc64_contact_memo_count < 4u) ++sc64_contact_memo_count;
+        if (sc64_contact_memo_count < SC64_CONTACT_MEMO_CAPACITY) ++sc64_contact_memo_count;
         for (j = sc64_contact_memo_count - 1u; j; --j)
             sc64_contact_memo_entries[j] = sc64_contact_memo_entries[j - 1u];
     }
