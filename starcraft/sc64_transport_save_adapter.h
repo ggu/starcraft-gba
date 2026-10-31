@@ -26,7 +26,12 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
         candidate->state[2] <= SC64_TERRAN_LATE_GLOBAL_T10) max_order = ORDER_REPAIR;
 #endif
 #endif
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_SHARED_CARRIER_SAVE_VERSION)
+#define CARGO_DECODE_BUILDING(out, slot) race_save_decode_building(candidate, (unsigned)(slot), (out))
+#else
+#define CARGO_DECODE_BUILDING(out, slot) sc64_building_save_decode((out), &candidate->buildings[(slot)])
+#endif
+#if defined(SC64_T6_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
 #define CARGO_B(i, field) saved_building.field
 #else
 #define CARGO_B(i, field) candidate->buildings[(i)][offsetof(Building, field) / sizeof(int)]
@@ -163,9 +168,9 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
 #endif
     }
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
         Building saved_building;
-        if (!sc64_building_save_decode(&saved_building, &candidate->buildings[i]))
+        if (!CARGO_DECODE_BUILDING(&saved_building, i))
             return 0;
 #endif
         if (!CARGO_B(i, alive) || CARGO_B(i, type) != B_CONTROL_TOWER) continue;
@@ -181,9 +186,9 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
                   CARGO_B(i, build_progress) >= building_build_time(B_CONTROL_TOWER)))) return 0;
             int parent = -1;
             for (int j=0; j<MAX_BUILDINGS; ++j) {
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
                 Building other;
-                if (!sc64_building_save_decode(&other, &candidate->buildings[j])) return 0;
+                if (!CARGO_DECODE_BUILDING(&other, j)) return 0;
 #define SK_PARENT(f) other.f
 #else
 #define SK_PARENT(f) CARGO_B(j, f)
@@ -214,10 +219,9 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
         /* An orphan stays a normal destructible building, but cannot grant
          * another Starport the attachment prerequisite. */
         if (parent < 0) continue;
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
         Building parent_building;
-        if (!sc64_building_save_decode(&parent_building,
-                                       &candidate->buildings[parent]) ||
+        if (!CARGO_DECODE_BUILDING(&parent_building, parent) ||
             !parent_building.alive || parent_building.type != B_STARPORT ||
             parent_building.raw_type != 114 ||
             parent_building.owner != saved_building.owner ||
@@ -236,6 +240,7 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
     }
 #undef CARGO_B
 #undef CARGO_U
+#undef CARGO_DECODE_BUILDING
     return 1;
 }
 #endif

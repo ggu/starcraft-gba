@@ -5,8 +5,10 @@
 /* Generation-40 P7 row.  This codec is deliberately separate from both the
  * generation-22 ZP row and the Z7 derived row: the 16-bit weapon field remains
  * opaque so P7 cloak/cache state can survive a save exactly. */
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
 static inline int sc64_zp_actor_default_hp(int type);
 static inline int sc64_zp_actor_default_shields(int type);
+#endif
 
 #define SC64_P7_TYPED_UNIT_SAVE_BYTES 28
 typedef struct { u8 bytes[SC64_P7_TYPED_UNIT_SAVE_BYTES]; }
@@ -53,9 +55,15 @@ static int sc64_p7_typed_unit_canonical(int type, int *maxhp, int *armor,
     int hp, shields;
     if (type < 0 || type >= SC_RU_COUNT) return 0;
     rule = sc64_race_unit_rule(type);
+    hp = 0;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
     hp = sc64_zp_actor_default_hp(type);
+#endif
     if (!hp && rule) hp = rule->hp;
+    shields = 0;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
     shields = sc64_zp_actor_default_shields(type);
+#endif
     if (!shields && rule) shields = rule->shields;
     if (hp <= 0 || hp > 131071 || shields < 0 || shields > 400) return 0;
     if (maxhp) *maxhp = hp;

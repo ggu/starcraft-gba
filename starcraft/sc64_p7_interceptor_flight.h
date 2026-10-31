@@ -2,9 +2,9 @@
 #ifndef SC64_P7_INTERCEPTOR_FLIGHT_H
 #define SC64_P7_INTERCEPTOR_FLIGHT_H
 
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
-#if !defined(SC64_P7_CARRIER_TRAINING_ENABLED) || \
-    !defined(SC64_P7_PROJECTILES_ENABLED)
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
+#if !defined(SC64_SHARED_CARRIER_EXPERIMENT) && (!defined(SC64_P7_CARRIER_TRAINING_ENABLED) || \
+    !defined(SC64_P7_PROJECTILES_ENABLED))
 #error "Interceptor flight requires P7 Carrier training and projectiles"
 #endif
 #include "sc64_interceptor_orders.h"
@@ -105,7 +105,7 @@ static int race_p7_flight_carrier_target(int carrier)
 static int race_p7_interceptor_flight_carrier_holds(int carrier)
 {
     int target;
-    if (!race_protoss_services_active() || !sc64_p7_carrier_parent_valid(carrier) ||
+    if (!race_carrier_services_active() || !sc64_p7_carrier_parent_valid(carrier) ||
         !race_p7_carrier_training_child_count(carrier)) return 0;
     target = race_p7_flight_carrier_target(carrier);
     return target >= 0 &&
@@ -349,10 +349,10 @@ static void race_p7_flight_carrier_tick(int carrier)
  * newly released child starts its order on the next source tick. */
 static void race_p7_interceptor_flight_source_tick(void)
 {
-    if (!race_protoss_services_active()) return;
+    if (!race_carrier_services_active()) return;
     for (int i = 0; i < MAX_UNITS; ++i) {
         unsigned state;
-        if (!u[i].alive || u[i].type != U_P7_INTERCEPTOR ||
+        if (!u[i].alive || u[i].type != SC64_INTERCEPTOR_TYPE ||
             RACE_PROTOSS_RAW(&u[i]) != SC64_P7_INTERCEPTOR_RAW) continue;
         state = sc64_p7_carrier_child_state(&u[i]);
         if (state == SC64_P7_INTERCEPTOR_OUTSIDE ||
@@ -369,7 +369,7 @@ static void race_p7_interceptor_flight_frame_move(void)
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
         unsigned state;
-        if (!q->alive || q->type != U_P7_INTERCEPTOR) continue;
+        if (!q->alive || q->type != SC64_INTERCEPTOR_TYPE) continue;
         state = sc64_p7_carrier_child_state(q);
         if ((state == SC64_P7_INTERCEPTOR_OUTSIDE ||
              state == SC64_P7_INTERCEPTOR_DETACHED) &&

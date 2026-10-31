@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_P7_PROJECTILE_ADAPTER_H
 #define SC64_P7_PROJECTILE_ADAPTER_H
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 
 /* Mode 4 leaves the upper 16 KiB of OBJ VRAM unused by the display. This
  * pool owns its first 4816 bytes through the map in sc64_obj_vram.h, which
@@ -84,20 +84,20 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
     Sc64ProjectileRow row;
     u8 id,native_index;
 #if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
-    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
+    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_SHARED_CARRIER_EXPERIMENT)
     /* All children in this profile are still inside the hangar. */
     (void)shooter; (void)target; (void)heading;
     (void)source_x_q8; (void)source_y_q8;
     return 0;
 #endif
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     /* Only launched Interceptors fire; hangar rows stay inert. */
     if (shooter>=0 && shooter<MAX_UNITS && SC64_CARRIER_HANGAR_HIDDEN(&u[shooter]))
         return 0;
 #endif
-    if (!race_protoss_services_active() || race_p7_projectile_fault || shooter<0 ||
+    if (!race_carrier_services_active() || race_p7_projectile_fault || shooter<0 ||
         shooter>=MAX_UNITS || !u[shooter].alive ||
-        u[shooter].type!=U_P7_INTERCEPTOR || RACE_PROTOSS_RAW(&u[shooter])!=73 ||
+        u[shooter].type!=SC64_INTERCEPTOR_TYPE || RACE_PROTOSS_RAW(&u[shooter])!=73 ||
         RACE_PROTOSS_SLOT(&u[shooter])<0 || RACE_PROTOSS_SLOT(&u[shooter])>=8 ||
         race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[shooter]))!=u[shooter].owner ||
         source_x_q8<0 || source_y_q8<0 ||
@@ -143,7 +143,7 @@ static void race_p7_projectile_source_tick(void)
         if (impact && race_p7_projectile_target_alive(row.target_ref)) {
             int owner=race_protoss_source_owner(row.raw_source_owner);
             int damage=6+(owner==SIDE?weapons_level:0);
-            if (owner>=0) hit_target(row.target_ref,damage,U_P7_INTERCEPTOR,owner);
+            if (owner>=0) hit_target(row.target_ref,damage,SC64_INTERCEPTOR_TYPE,owner);
         }
         id=next;
     }
@@ -152,7 +152,7 @@ static void race_p7_projectile_source_tick(void)
 
 static void race_p7_projectile_tick_if_due(void)
 {
-    if (race_protoss_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0]!=4u)
+    if (race_carrier_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0]!=4u)
         race_p7_projectile_source_tick();
 }
 

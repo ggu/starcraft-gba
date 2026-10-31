@@ -27,6 +27,7 @@ static RaceImpactRecord race_impact_record;
 #else
 static RaceSave race_data;
 #endif
+#include "sc64_shared_carrier_codec.h"
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 #include "sc64_scarab_flight_bridge.h"
 /* Set only from the authenticated selected tag, before candidate decoding. */
@@ -35,12 +36,17 @@ static int race_scarab_stage_wire;
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
 static int
 race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                       unsigned world_width, unsigned world_height, Unit *out)
 {
     if (!candidate || !out || slot >= MAX_UNITS) return 0;
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if (SC64_IS_CARRIER_SAVE_VERSION(candidate->version))
+        return sc64_p7_typed_unit_decode(out, &candidate->carrier_custom.units[slot],
+                                         world_width, world_height);
+#endif
 #if !defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
     (void)world_width; (void)world_height;
     memset(out,0,sizeof(*out));
@@ -164,11 +170,16 @@ race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsi
     return 1;
 }
 #endif
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_RESEARCH_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_RESEARCH_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
 static int
 race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *out)
 {
     if (!candidate || !out || slot >= MAX_BUILDINGS) return 0;
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if (SC64_IS_CARRIER_SAVE_VERSION(candidate->version))
+        return sc64_p7_typed_building_decode(out, &candidate->carrier_custom.buildings[slot],
+                                             2048, 2048);
+#endif
 #if !defined(SC64_T6_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
     memset(out,0,sizeof(*out));
     for (unsigned j=0;j<RACE_BUILD_WORDS;++j) {
@@ -499,7 +510,7 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
 static int race_battery_save_unit(const RaceSave *candidate, unsigned slot,
                                   unsigned ww, unsigned wh, Unit *out)
 {
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     return race_save_decode_unit(candidate, slot, ww, wh, out);
 #else
     if (!candidate || !out || slot >= MAX_UNITS) return 0;
@@ -515,6 +526,10 @@ static int race_battery_save_encode_unit(RaceSave *candidate, unsigned slot,
                                          unsigned ww, unsigned wh, const Unit *q)
 {
     if (!candidate || !q || slot>=MAX_UNITS) return 0;
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if (SC64_IS_CARRIER_SAVE_VERSION(candidate->version))
+        return sc64_p7_typed_unit_encode(&candidate->carrier_custom.units[slot],q,ww,wh);
+#endif
 #ifdef SC64_ZP_FULL_STORAGE
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     return sc64_p7_typed_unit_encode(&candidate->units[slot],q,ww,wh);
@@ -540,6 +555,10 @@ static int race_battery_save_encode_building(RaceSave *candidate, unsigned slot,
                                              const Building *q)
 {
     if (!candidate || !q || slot>=MAX_BUILDINGS) return 0;
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if (SC64_IS_CARRIER_SAVE_VERSION(candidate->version))
+        return sc64_p7_typed_building_encode(&candidate->carrier_custom.buildings[slot],q,ww,wh);
+#endif
 #ifdef SC64_ZP_FULL_STORAGE
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     return sc64_p7_typed_building_encode(&candidate->buildings[slot],q,ww,wh);
@@ -602,7 +621,7 @@ static int race_battery_migrate_shield_phase(RaceSave *candidate, int width, int
 static int race_battery_save_building(const RaceSave *candidate, unsigned slot,
                                       Building *out)
 {
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     return race_save_decode_building(candidate, slot, out);
 #else
     if (!candidate || !out || slot >= MAX_BUILDINGS) return 0;
@@ -688,7 +707,7 @@ static int race_bunker_save_reference(const RaceSave *candidate, const Unit *act
         actor->target<MAX_UNITS || actor->target>=MAX_UNITS+MAX_BUILDINGS)
         return 0;
     slot=actor->target-MAX_UNITS;
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     if (!race_save_decode_building(candidate,(unsigned)slot,&bunker)) return 0;
 #else
     for (unsigned j=0;j<RACE_BUILD_WORDS;++j) {
@@ -717,7 +736,7 @@ static int race_bunker_save_world_valid(const RaceSave *candidate, int width, in
     if (!candidate || width<1 || height<1 || width>128 || height>128) return 0;
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit actor;
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
         if (!race_save_decode_unit(candidate,i,(unsigned)width*16u,(unsigned)height*16u,&actor)) return 0;
 #else
         for (unsigned j=0;j<RACE_UNIT_WORDS;++j) {
@@ -905,7 +924,7 @@ static int race_skirmish_transport_decode(const RaceSave *candidate, int slot,
                                            int width, int height, Unit *out)
 {
     if (!candidate || !out || slot < 0 || slot >= MAX_UNITS) return 0;
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     return race_save_decode_unit(candidate, (unsigned)slot,
                                  (unsigned)width * 16u, (unsigned)height * 16u, out);
 #else
@@ -1052,7 +1071,153 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
     return 1;
 }
 #endif
-static int race_save_game(void) {
+/* Serialize the mutually exclusive actor representations without touching the
+ * surrounding metadata or sidecars. Callers select a format by version. */
+static int race_save_encode_actors(void) {
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    /* The tagged layout owns the complete actor region; never write legacy
+     * rows into this union after encoding the packet. Its writer is gated off
+     * until journal selection and full-world restore are qualified. */
+    if (SC64_IS_CARRIER_SAVE_VERSION(race_data.version)) {
+        if (!sc64_shared_carrier_candidate_encode(&race_data,u,b,&race_p7_projectiles,
+                                                   (unsigned)race_cols*16u,
+                                                   (unsigned)race_rows*16u)) return 0;
+    } else
+#endif
+    {
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    for (int i=0;i<MAX_UNITS;i++) {
+        Unit wire;
+        if (!race_scarab_save_wire(&u[i],&wire) ||
+            !race_scarab_zp_encode(&race_data,(unsigned)i,&wire,
+                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+    }
+#else
+    for(int i=0;i<MAX_UNITS;i++)
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+        if(!sc64_p7_typed_unit_encode(&race_data.units[i], &u[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
+        if(!sc64_derived_unit_encode(&race_data.units[i], &u[i],
+                                     (unsigned)(race_cols * 16),
+                                     (unsigned)(race_rows * 16))) return 0;
+#else
+        if(!sc64_zp_unit_save_encode(&race_data.units[i], &u[i],
+                                     (unsigned)(race_cols * 16),
+                                     (unsigned)(race_rows * 16))) return 0;
+#endif
+#endif
+#else
+    for(int i=0;i<MAX_UNITS;i++)
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    {
+        Unit wire;
+        if (!race_scarab_save_wire(&u[i],&wire) ||
+            !sc64_unit_save_encode(&race_data.units[i],&wire,
+                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+    }
+#else
+        if(!sc64_unit_save_encode(&race_data.units[i], &u[i],
+                                  (unsigned)(race_cols * 16),
+                                  (unsigned)(race_rows * 16))) return 0;
+#endif
+#endif
+#else
+    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
+        int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+        if (u[i].alive && sc64_race_raw_unit(u[i].type)==12 &&
+            j==offsetof(Unit,carry)/sizeof(int) && n>=32768) n-=65536;
+#endif
+        race_data.units[i][j]=(s16)n;
+    }
+#endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    race_scarab_stage_wire=1;
+#endif
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(!sc64_p7_typed_building_encode(&race_data.buildings[i], &b[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(!sc64_derived_building_encode(&race_data.buildings[i], &b[i],
+                                        (unsigned)(race_cols * 16),
+                                        (unsigned)(race_rows * 16))) return 0;
+#else
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(!sc64_building_save_encode(&race_data.buildings[i], &b[i],
+                                     (unsigned)(race_cols * 16),
+                                     (unsigned)(race_rows * 16))) return 0;
+#endif
+#else
+    for(int i=0;i<MAX_BUILDINGS;i++)for(unsigned j=0;j<RACE_BUILD_WORDS;j++) {
+        int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));
+#if !defined(SC64_T6_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
+        if (b[i].alive && b[i].type == B_ZERG_BEACON && b[i].raw_type == 194 &&
+            b[i].hp == 100000 && b[i].maxhp == 100000 &&
+            (j == offsetof(Building,hp)/sizeof(int) ||
+             j == offsetof(Building,maxhp)/sizeof(int)))
+            n = SC64_LEGACY_BEACON_HP_SENTINEL;
+#endif
+#ifdef SC64_T4_RUNTIME
+        if(sc64_race_t4_building_intrinsically_invincible(b[i].type) &&
+           (j==offsetof(Building,hp)/sizeof(int) ||
+            j==offsetof(Building,maxhp)/sizeof(int)))n=0;
+#endif
+        race_data.buildings[i][j]=(s16)n;
+    }
+#endif
+    }
+    return 1;
+}
+/* Candidate-only load outputs live outside the route/save scratch union. */
+typedef struct {
+    int building_damage_marker;
+    union {
+        int unused;
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+        Sc64T4RuntimeState t4;
+#endif
+#ifdef SC64_T5_RUNTIME
+        Sc64T5RuntimeState t5;
+#endif
+#ifdef SC64_T6_RUNTIME
+        Sc64T6MissionState t6;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        Sc64TerranLateMissionState terran_late;
+#endif
+    } expanded;
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    int expanded_t4_valid;
+#endif
+#ifdef SC64_T5_RUNTIME
+    int expanded_t5_valid;
+#endif
+#ifdef SC64_T6_RUNTIME
+    int expanded_t6_valid;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    int expanded_terran_late_valid;
+#endif
+#ifdef SC64_IMPACT_EVENTS
+    Sc64ImpactEvent impact_candidate[RACE_IMPACT_SAVE_CAPACITY ? RACE_IMPACT_SAVE_CAPACITY : 1];
+    int impact_candidate_count;
+#endif
+} RaceLoadPlan;
+
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+static int race_shared_carrier_stage_prepare(const void *raw,u32 len,u32 tag,void *context);
+static int race_shared_carrier_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selected);
+static void race_shared_carrier_stage_commit(const RaceLoadPlan *plan);
+#endif
+
+/* Build the complete fixed save candidate without publishing SRAM. The
+ * experimental tag is available only to bounded qualification callers until
+ * its journal and non-failing restore have been proved. */
+static int race_save_serialize(int shared_carrier) {
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_live_products_valid()) return 0;
 #endif
@@ -1060,8 +1225,6 @@ static int race_save_game(void) {
     if (race_scarab_probe_bullets_pending()) return 0;
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
-    GbaSaveSelection previous;
-    int have_previous=race_scarab_stage_previous(&previous);
     if (race_mode!=1 || race_skirmish_map<0 || race_skirmish_map>SC64_SKIRMISH_IMPORTED_COUNT ||
         !sc64_race_storage_geometry_valid(race_cols,race_rows)) return 0;
     if (race_skirmish_map==0 ? (race_cols!=64 || race_rows!=64) :
@@ -1158,99 +1321,26 @@ static int race_save_game(void) {
      * padding and optional fields before serializing this record. */
     memset(&race_data, 0, sizeof(race_data));
 #endif
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if (shared_carrier) {
+        if (race_mode!=1 || race_p7_projectile_fault) return 0;
+        memset(&race_data,0,sizeof(race_data));
+    }
+#else
+    (void)shared_carrier;
+#endif
     race_data.version=
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
         SC64_SCARAB_SAVE_VERSION;
+#elif defined(SC64_SHARED_CARRIER_SAVE_VERSION)
+        shared_carrier ? SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION : SAVE_VERSION;
 #else
         SAVE_VERSION;
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     memcpy(race_data.battlecruiser_shots,sc64_bc_shots,sizeof(sc64_bc_shots));
 #endif
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-#ifdef SC64_ZP_FULL_STORAGE
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-    for (int i=0;i<MAX_UNITS;i++) {
-        Unit wire;
-        if (!race_scarab_save_wire(&u[i],&wire) ||
-            !race_scarab_zp_encode(&race_data,(unsigned)i,&wire,
-                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
-    }
-#else
-    for(int i=0;i<MAX_UNITS;i++)
-#ifdef SC64_P7_TYPED_COMPACT_ENABLED
-        if(!sc64_p7_typed_unit_encode(&race_data.units[i], &u[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
-#elif defined(SC64_Z7_DERIVED_SAVE)
-        if(!sc64_derived_unit_encode(&race_data.units[i], &u[i],
-                                     (unsigned)(race_cols * 16),
-                                     (unsigned)(race_rows * 16))) return 0;
-#else
-        if(!sc64_zp_unit_save_encode(&race_data.units[i], &u[i],
-                                     (unsigned)(race_cols * 16),
-                                     (unsigned)(race_rows * 16))) return 0;
-#endif
-#endif
-#else
-    for(int i=0;i<MAX_UNITS;i++)
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-    {
-        Unit wire;
-        if (!race_scarab_save_wire(&u[i],&wire) ||
-            !sc64_unit_save_encode(&race_data.units[i],&wire,
-                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
-    }
-#else
-        if(!sc64_unit_save_encode(&race_data.units[i], &u[i],
-                                  (unsigned)(race_cols * 16),
-                                  (unsigned)(race_rows * 16))) return 0;
-#endif
-#endif
-#else
-    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
-        int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-        if (u[i].alive && sc64_race_raw_unit(u[i].type)==12 &&
-            j==offsetof(Unit,carry)/sizeof(int) && n>=32768) n-=65536;
-#endif
-        race_data.units[i][j]=(s16)n;
-    }
-#endif
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-    race_scarab_stage_wire=1;
-#endif
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-#ifdef SC64_P7_TYPED_COMPACT_ENABLED
-    for(int i=0;i<MAX_BUILDINGS;i++)
-        if(!sc64_p7_typed_building_encode(&race_data.buildings[i], &b[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
-#elif defined(SC64_Z7_DERIVED_SAVE)
-    for(int i=0;i<MAX_BUILDINGS;i++)
-        if(!sc64_derived_building_encode(&race_data.buildings[i], &b[i],
-                                        (unsigned)(race_cols * 16),
-                                        (unsigned)(race_rows * 16))) return 0;
-#else
-    for(int i=0;i<MAX_BUILDINGS;i++)
-        if(!sc64_building_save_encode(&race_data.buildings[i], &b[i],
-                                     (unsigned)(race_cols * 16),
-                                     (unsigned)(race_rows * 16))) return 0;
-#endif
-#else
-    for(int i=0;i<MAX_BUILDINGS;i++)for(unsigned j=0;j<RACE_BUILD_WORDS;j++) {
-        int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));
-#if !defined(SC64_T6_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
-        if (b[i].alive && b[i].type == B_ZERG_BEACON && b[i].raw_type == 194 &&
-            b[i].hp == 100000 && b[i].maxhp == 100000 &&
-            (j == offsetof(Building,hp)/sizeof(int) ||
-             j == offsetof(Building,maxhp)/sizeof(int)))
-            n = SC64_LEGACY_BEACON_HP_SENTINEL;
-#endif
-#ifdef SC64_T4_RUNTIME
-        if(sc64_race_t4_building_intrinsically_invincible(b[i].type) &&
-           (j==offsetof(Building,hp)/sizeof(int) ||
-            j==offsetof(Building,maxhp)/sizeof(int)))n=0;
-#endif
-        race_data.buildings[i][j]=(s16)n;
-    }
-#endif
+    if (!race_save_encode_actors()) return 0;
     memset(race_data.fog,0,sizeof(race_data.fog));
     for(int i=0;i<MAP_CELLS;i++)if(SC64_GRID_GET(explored,i))race_data.fog[i>>3]|=1u<<(i&7);
 #ifdef SC64_ZP_FULL_STORAGE
@@ -1286,6 +1376,11 @@ static int race_save_game(void) {
         race_data.state[SC64_PROTOSS_CLOCK_STATE_INDEX] =
             race_protoss_clock_word(race_protoss_generic_clock);
     }
+#endif
+#if defined(SC64_SHARED_CARRIER_SAVE_VERSION) && !defined(SC64_P7_BATTERY_ENABLED)
+    if (shared_carrier)
+        race_data.state[SC64_PROTOSS_CLOCK_STATE_INDEX] =
+            race_protoss_clock_word(race_protoss_generic_clock);
 #endif
 #ifdef SC64_CONSTRUCTION_HP
     race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
@@ -1690,6 +1785,97 @@ static int race_save_game(void) {
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,(unsigned)race_rows*16u)) return 0;
 #endif
+    return 1;
+}
+static int race_save_game(void) {
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    /* Qualification route: custom worlds use the new tag; campaign worlds
+     * retain the legacy envelope and layout. */
+    {
+        const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION,SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+                          ,SC64_LEGACY_SAVE_VERSION
+#endif
+                         };
+        RaceLoadPlan plan={0}; GbaSaveSelection previous;
+        int have_previous;
+        const u32 tag=race_mode ? SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION : SAVE_VERSION;
+        have_previous=race_shared_carrier_stage_select(&plan,&previous);
+        if (!race_save_serialize(race_mode!=0)) return 0;
+#ifdef SC64_IMPACT_EVENTS
+        u32 length;
+        if (!race_impact_save_pack(&length)) return 0;
+        const void *record=&race_impact_record;
+#else
+        u32 length=sizeof(race_data);
+        const void *record=&race_data;
+#endif
+        /* Reject malformed full candidates before touching either journal.
+         * Preflight consumes the shared scratch tail, so repack sidecars
+         * from the unchanged live queue after it succeeds. */
+        if (race_mode) {
+            size_t compacted;
+#ifdef SC64_IMPACT_EVENTS
+            if (!sc64_shared_carrier_compact_custom(&race_impact_record,length,
+                                                     sizeof(race_impact_record),&compacted)) return 0;
+#else
+            if (!sc64_shared_carrier_compact_custom(&race_data,length,sizeof(race_data),&compacted)) return 0;
+#endif
+            length=(u32)compacted;
+            if (!race_shared_carrier_stage_prepare(record,length,tag,&plan)) return 0;
+#ifdef SC64_IMPACT_EVENTS
+            if (!race_impact_save_pack(&length)) return 0;
+#else
+            length=sizeof(race_data);
+#endif
+#ifdef SC64_IMPACT_EVENTS
+            if (!sc64_shared_carrier_compact_custom(&race_impact_record,length,
+                                                     sizeof(race_impact_record),&compacted)) return 0;
+#else
+            if (!sc64_shared_carrier_compact_custom(&race_data,length,sizeof(race_data),&compacted)) return 0;
+#endif
+            length=(u32)compacted;
+        }
+        if (!race_mode) {
+            size_t compacted;
+#ifdef SC64_IMPACT_EVENTS
+            if (!sc64_shared_carrier_compact_legacy(&race_impact_record,length,
+                                                     sizeof(race_impact_record),&compacted)) return 0;
+#else
+            if (!sc64_shared_carrier_compact_legacy(&race_data,length,sizeof(race_data),&compacted)) return 0;
+#endif
+            length=(u32)compacted;
+            /* Validate the actual predecessor envelope before publishing it.
+             * Expansion and sidecar decode consume scratch, so reconstruct
+             * the compact envelope after successful detached preflight. */
+            if (!race_shared_carrier_stage_prepare(record,length,tag,&plan)) return 0;
+#ifdef SC64_IMPACT_EVENTS
+            if (!race_impact_save_pack(&length) ||
+                !sc64_shared_carrier_compact_legacy(&race_impact_record,length,
+                                                     sizeof(race_impact_record),&compacted)) return 0;
+#else
+            length=sizeof(race_data);
+            if (!sc64_shared_carrier_compact_legacy(&race_data,length,sizeof(race_data),&compacted)) return 0;
+#endif
+            length=(u32)compacted;
+        }
+        if (have_previous) {
+            if (!save_write_selected(record,length,tag,
+                                     &previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
+        } else if (!save_write_first(record,length,tag)) return 0;
+        toast(7); return 1;
+    }
+#else
+    /* Journal migration and atomic restoration are not qualified yet. */
+    return 0;
+#endif
+#endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    GbaSaveSelection previous;
+    int have_previous=race_scarab_stage_previous(&previous);
+#endif
+    if (!race_save_serialize(0)) return 0;
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
@@ -1706,55 +1892,23 @@ static int race_save_game(void) {
 #endif
     toast(7);return 1;
 }
-/* Candidate-only load outputs live outside the route/save scratch union. */
-typedef struct {
-    int building_damage_marker;
-    union {
-        int unused;
-#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-        Sc64T4RuntimeState t4;
-#endif
-#ifdef SC64_T5_RUNTIME
-        Sc64T5RuntimeState t5;
-#endif
-#ifdef SC64_T6_RUNTIME
-        Sc64T6MissionState t6;
-#endif
-#ifdef SC64_TERRAN_LATE_RUNTIME
-        Sc64TerranLateMissionState terran_late;
-#endif
-    } expanded;
-#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-    int expanded_t4_valid;
-#endif
-#ifdef SC64_T5_RUNTIME
-    int expanded_t5_valid;
-#endif
-#ifdef SC64_T6_RUNTIME
-    int expanded_t6_valid;
-#endif
-#ifdef SC64_TERRAN_LATE_RUNTIME
-    int expanded_terran_late_valid;
-#endif
-#ifdef SC64_IMPACT_EVENTS
-    Sc64ImpactEvent impact_candidate[RACE_IMPACT_SAVE_CAPACITY ? RACE_IMPACT_SAVE_CAPACITY : 1];
-    int impact_candidate_count;
-#endif
-} RaceLoadPlan;
-
 /* May modify candidate/route scratch, never the live world or SRAM. */
 static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
     const int *v=race_data.state;
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     race_protoss_bind_candidate(v[0], v[2]);
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
     /* Only the generic binding keeps its service clock in the state words. */
     if (!race_protoss_clock_word_valid(v[SC64_PROTOSS_CLOCK_STATE_INDEX]) ||
         (v[SC64_PROTOSS_CLOCK_STATE_INDEX] && !v[0])) return 0;
+#endif
+#if defined(SC64_SHARED_CARRIER_SAVE_VERSION) && !defined(SC64_P7_BATTERY_ENABLED)
+    if (SC64_IS_CARRIER_SAVE_VERSION(race_data.version) &&
+        (!v[0] || !race_protoss_clock_word_valid(v[SC64_PROTOSS_CLOCK_STATE_INDEX]))) return 0;
 #endif
     int building_damage_marker=v[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX];
     if (building_damage_marker && building_damage_marker!=SC64_BUILDING_DAMAGE_SAVE_MARKER) return 0;
@@ -1872,6 +2026,33 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if (SC64_IS_CARRIER_SAVE_VERSION(race_data.version)) {
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+        Unit *carrier_scratch=sc64_zp_route_save_scratch.carrier_candidate.units;
+#elif defined(SC64_IMPORTED_MISSION) && defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+        Unit *carrier_scratch=sc64_combined_route_save_scratch.carrier_candidate.units;
+#else
+#error "Shared Carrier candidate preflight requires bounded route scratch"
+#endif
+        if (!v[0] || v[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX]!=SC64_BUILDING_DAMAGE_SAVE_MARKER
+#ifdef SC64_CONSTRUCTION_HP
+            || v[SC64_CONSTRUCTION_SAVE_MARKER_INDEX]!=SC64_CONSTRUCTION_SAVE_MARKER
+#endif
+#ifdef SC64_SHARED_BATTERY
+            || v[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]!=SC64_SHIELD_PHASE_SAVE_MARKER
+#endif
+            || !sc64_shared_carrier_candidate_valid(&race_data,carrier_scratch,
+                MAX_UNITS,(unsigned)width*16u,(unsigned)height*16u)) return 0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        /* Unlike pre-cache legacy saves, a tagged candidate must preserve a
+         * valid cache word for every nonempty actor; never silently repair a
+         * malformed new-format word during the commit. */
+        for (unsigned i=0;i<MAX_UNITS;++i)
+            if (!sc64_p7_arbiter_cache_unit_valid(&carrier_scratch[i])) return 0;
+#endif
+    }
+#endif
 #ifdef SC64_SHARED_BATTERY
     if (!race_battery_migrate_shield_phase(&race_data,width,height)) return 0;
 #endif
@@ -1879,18 +2060,18 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||
         race_data.ore[i]<0||race_data.ore[i]>65535||race_data.vespene[i]<0||race_data.vespene[i]>65535)return 0;
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
 #define RACE_U(i,f) candidate_unit.f
 #else
 #define RACE_U(i,f) race_data.units[i][offsetof(Unit,f)/sizeof(int)]
 #endif
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
 #define RACE_B(i,f) candidate_building.f
 #else
 #define RACE_B(i,f) race_data.buildings[i][offsetof(Building,f)/sizeof(int)]
 #endif
     for(int i=0;i<MAX_UNITS;i++) {
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
         Unit candidate_unit;
         if(!race_save_decode_unit(&race_data, (unsigned)i,
                                   (unsigned)(width * 16),
@@ -2048,7 +2229,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     unsigned p7_battery_seen=0;
 #endif
     for(int i=0;i<MAX_BUILDINGS;i++) {
-#if defined(SC64_ZP_FULL_STORAGE)
+#if defined(SC64_ZP_FULL_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
         Building candidate_building;
         if (!race_save_decode_building(&race_data, (unsigned)i,
                                        &candidate_building) ||
@@ -2144,7 +2325,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #endif
         for(int j=0;j<RACE_B(i,queue_count);j++) {
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
             int type=candidate_building.queue[(RACE_B(i,queue_head)+j)%5];
 #else
             int type=race_data.buildings[i][offsetof(Building,queue)/sizeof(int)+(RACE_B(i,queue_head)+j)%5];
@@ -2862,12 +3043,233 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 }
 
 static int race_load_preflight(RaceLoadPlan *plan) {
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    signed char old_binding=race_protoss_binding_override;
+    int old_mission=race_protoss_override_mission;
+#endif
     int ok = race_load_preflight_candidate(plan);
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    race_protoss_binding_override=old_binding;
+    race_protoss_override_mission=old_mission;
+#elif defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     race_protoss_unbind_candidate();
 #endif
     return ok;
 }
+
+#if defined(SC64_SHARED_CARRIER_SAVE_VERSION) && (defined(GBA_HOST) || defined(SC64_SHARED_CARRIER_SAVE_EXPERIMENT))
+/* Authenticate an envelope before expanding an old layout or decoding its
+ * sidecars. The validator only touches bounded save/route scratch and plan. */
+static int race_shared_carrier_stage_prepare(const void *raw,u32 len,u32 tag,void *context) {
+    RaceLoadPlan *plan=context;
+    size_t expanded=0;
+    if (!plan || (tag!=SAVE_VERSION && tag!=SC64_SHARED_CARRIER_SAVE_VERSION &&
+                  tag!=SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+                  && tag!=SC64_LEGACY_SAVE_VERSION
+#endif
+                 )) return 0;
+#ifdef SC64_IMPACT_EVENTS
+    if (raw!=(const void *)&race_impact_record) return 0;
+    if (tag==SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION) {
+        if (!sc64_shared_carrier_expand_custom(&race_impact_record,len,
+                                                sizeof(race_impact_record),&expanded)) return 0;
+        len=(u32)expanded;
+    } else if (tag!=SC64_SHARED_CARRIER_SAVE_VERSION) {
+        if (!sc64_shared_carrier_expand_legacy(&race_impact_record,len,
+                                                sizeof(race_impact_record),&expanded)) return 0;
+        len=(u32)expanded;
+    }
+    memset(plan,0,sizeof(*plan));
+    if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,
+                                          &plan->impact_candidate_count)) return 0;
+#else
+    if (raw!=(const void *)&race_data) return 0;
+    if (tag==SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION) {
+        if (!sc64_shared_carrier_expand_custom(&race_data,len,sizeof(race_data),&expanded)) return 0;
+        len=(u32)expanded;
+    } else if (tag!=SC64_SHARED_CARRIER_SAVE_VERSION) {
+        if (!sc64_shared_carrier_expand_legacy(&race_data,len,sizeof(race_data),&expanded)) return 0;
+        len=(u32)expanded;
+    }
+    if (len!=sizeof(race_data)) return 0;
+    memset(plan,0,sizeof(*plan));
+#endif
+    if ((u32)race_data.version!=tag) return 0;
+    return race_load_preflight(plan);
+}
+
+static int race_shared_carrier_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selected) {
+    const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION,SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+                      ,SC64_LEGACY_SAVE_VERSION
+#endif
+                     };
+#ifdef SC64_IMPACT_EVENTS
+    void *record=&race_impact_record; u32 capacity=sizeof(race_impact_record);
+#else
+    void *record=&race_data; u32 capacity=sizeof(race_data);
+#endif
+    if (!save_select_validated(record,capacity,tags,sizeof(tags)/sizeof(tags[0]),
+                               race_shared_carrier_stage_prepare,plan,selected)) return 0;
+    /* Selection restores raw bytes, so rebuild the selected detached plan. */
+    return race_shared_carrier_stage_prepare(record,selected->length,selected->tag,plan);
+}
+
+/* Commit only a tagged custom candidate immediately after its successful
+ * detached preflight. The decoded actor table and the checked packet remain
+ * in the route/save scratch until the route cache is reset at the end. */
+static void race_shared_carrier_stage_commit(const RaceLoadPlan *plan) {
+    const int *v=race_data.state;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    const Unit *actors=sc64_zp_route_save_scratch.carrier_candidate.units;
+#else
+    const Unit *actors=sc64_combined_route_save_scratch.carrier_candidate.units;
+#endif
+    race_mode=v[0]; race_human=v[1]; race_selected_mission=v[2];
+    race_completed=v[3]; race_bots=v[4];
+#ifdef SC64_IMPORTED_SKIRMISH
+    race_skirmish_map=v[20]; for (int i=0;i<3;++i) race_bot_races[i]=v[21+i];
+#endif
+    minerals=v[5]; gas=v[6]; frame=v[7]; cx=v[8]; cy=v[9]; train_type=v[10];
+    weapons_level=v[11]; armor_level=v[12]; weapons_research=v[13];
+    armor_research=v[14]; seed=(u32)v[15]; geyser_count=v[16];
+    mission_objective_stage=v[17]; won=v[18]; lost=v[19];
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    sc64_battlecruiser_tech_bits=(u16)((unsigned)v[27]&65535u);
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    memcpy(sc64_bc_shots,race_data.battlecruiser_shots,sizeof(sc64_bc_shots));
+    sc64_bc_pause_offset=(u8)((unsigned)v[28]&7u);
+    if ((unsigned)v[28]==0) sc64_bc_spell_rng=42u;
+    else memcpy(&sc64_bc_spell_rng,&v[29],sizeof(sc64_bc_spell_rng));
+#endif
+#endif
+    race_cols=64; race_rows=64; race_skirmish_geometry();
+    memcpy(u,actors,sizeof(u));
+    for (unsigned i=0;i<MAX_BUILDINGS;++i)
+        (void)sc64_p7_typed_building_decode(&b[i],&race_data.carrier_custom.buildings[i],
+                                              (unsigned)race_cols*16u,(unsigned)race_rows*16u);
+#ifdef SC64_ZP_FULL_STORAGE
+    for (unsigned i=0;i<MAX_MINERALS;++i)
+        (void)race_save_decode_mineral(&race_data,i,(unsigned)race_cols*16u,
+                                       (unsigned)race_rows*16u,&m[i]);
+#else
+    memcpy(m,race_data.minerals_map,sizeof(m));
+#endif
+    SC64_GRID_CLEAR(explored);
+    for (int i=0;i<MAP_CELLS;++i)
+        if ((race_data.fog[i>>3]>>(i&7))&1) SC64_GRID_SET(explored,i,1);
+    memcpy(race_player,race_data.players,sizeof(race_player));
+    memcpy(race_minerals,race_data.ore,sizeof(race_minerals));
+    memcpy(race_gas,race_data.vespene,sizeof(race_gas));
+    memcpy(geysers,race_data.geysers,sizeof(race_data.geysers));
+    race_campaign=race_data.campaign;
+#ifdef SC64_UNIFIED
+    backwater=race_data.backwater; backwater_message_ticks=0;
+#ifdef SC64_ZP_FULL_STORAGE
+    for (unsigned i=0;i<MAX_UNITS;++i) invincible_units[i]=(u8)race_save_unit_invincible(&race_data,i);
+    for (unsigned i=0;i<MAX_BUILDINGS;++i) invincible_buildings[i]=(u8)race_save_building_invincible(&race_data,i);
+#else
+    memcpy(invincible_units,race_data.invincible_units,sizeof(invincible_units));
+    memcpy(invincible_buildings,race_data.invincible_buildings,sizeof(invincible_buildings));
+#endif
+#endif
+    race_protoss_clock_from_word(race_protoss_generic_clock,v[SC64_PROTOSS_CLOCK_STATE_INDEX]);
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    sc64_p7_arbiter_cache_due=0;
+    sc64_p7_arbiter_cache_initialized=
+        race_protoss_generic_clock[1] || race_protoss_generic_clock[2];
+    for (int i=0;i<MAX_UNITS;++i)
+        if (!sc64_p7_arbiter_cache_empty_unit(&u[i]) &&
+            !SC64_P7_ARBITER_CACHE_VALID(u[i].weapon)) u[i].weapon=(u16)(1u<<13);
+#endif
+    /* Candidate validation already proved both packet and actor graph. */
+    (void)sc64_codec_decode(&race_p7_projectiles,race_data.carrier_custom.projectiles,SC64_CODEC_BYTES);
+    race_p7_projectile_fault=0;
+#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
+    memset(&race_t3,0,sizeof(race_t3)); race_t3_buildings_killed=0;
+#endif
+#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
+    memset(&race_z3,0,sizeof(race_z3)); race_z3_action_ticks=0;
+#endif
+#if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    memset(&race_p3,0,sizeof(race_p3)); race_p3_action_ticks=0;
+#endif
+#ifdef SC64_Z4_RUNTIME
+    memset(&race_z4,0,sizeof(race_z4));
+#endif
+#ifdef SC64_P4_RUNTIME
+    memset(&race_p4,0,sizeof(race_p4));
+#endif
+#ifdef SC64_P5_RUNTIME
+    memset(&race_p5,0,sizeof(race_p5)); memset(&race_p5_world,0,sizeof(race_p5_world));
+#endif
+#ifdef SC64_P6_RUNTIME
+    memset(&race_p6,0,sizeof(race_p6)); memset(&race_p6_world,0,sizeof(race_p6_world));
+    memset(race_p6_doodad_bindings,0,sizeof(race_p6_doodad_bindings)); race_p6_doodad_bindings_valid=0;
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    memset(&race_p7,0,sizeof(race_p7)); memset(&race_p7_world,0,sizeof(race_p7_world)); race_p7_map=0;
+#endif
+#ifdef SC64_P8_RUNTIME
+    memset(&race_p8,0,sizeof(race_p8)); race_p8_map=0;
+#endif
+#ifdef SC64_Z5_RUNTIME
+    memset(&race_z5,0,sizeof(race_z5)); memset(&race_z5_world,0,sizeof(race_z5_world));
+    memset(race_z5_doodads,0,sizeof(race_z5_doodads));
+#endif
+#ifdef SC64_Z6_RUNTIME
+    memset(&race_z6,0,sizeof(race_z6)); memset(&race_z6_world,0,sizeof(race_z6_world));
+#endif
+#ifdef SC64_Z7_RUNTIME
+    memset(&race_z7,0,sizeof(race_z7)); memset(&race_z7_world,0,sizeof(race_z7_world));
+    memset(&race_z7_ops,0,sizeof(race_z7_ops)); race_z7_map=0;
+#endif
+#ifdef SC64_Z8_RUNTIME
+    (void)race_z8_runtime_init(0); /* custom mode takes its infallible reset path */
+#endif
+#ifdef SC64_NYDUS_ENABLED
+    (void)race_nydus_rebind_loaded_world(); /* custom candidate already checked */
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    memset(&race_t4,0,sizeof(race_t4));
+#endif
+#ifdef SC64_T5_RUNTIME
+    memset(&race_t5,0,sizeof(race_t5));
+#endif
+#ifdef SC64_T6_RUNTIME
+    memset(&race_t6,0,sizeof(race_t6));
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    memset(&race_late,0,sizeof(race_late));
+#endif
+    clear_tracers(); death_vfx_reset(); mode=MODE_NORMAL; menu_open=help=0; selected_building=-1;
+#ifdef SC64_IMPACT_EVENTS
+    race_impact_restore(plan->impact_candidate,plan->impact_candidate_count);
+#else
+    (void)plan;
+#endif
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    path_grid_valid=0;
+#ifdef SC64_DIRECT_FIRING_POINTS
+    sc64_direct_firing_cache_invalidate();
+#endif
+#ifdef SC64_IMPORTED_MISSION
+    sc64_routes_reset();
+#endif
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && IS_WORKER(u[i].type) &&
+            (u[i].order==ORDER_MINE || u[i].order==ORDER_GAS) && u[i].build>=0 &&
+            (!race_resource_depot_valid_for(&u[i],u[i].build) ||
+             !race_resource_depot_reachable(&u[i],u[i].build))) u[i].build=-1;
+#else
+    invalidate_path_grid();
+#endif
+    sc64_visibility_reset(); update_exploration(); reset_selection_gestures();
+    supply_used=race_owner_supply(SIDE); supply_cap=race_owner_supply_cap(SIDE);
+    screen=won||lost?SCREEN_RESULT:SCREEN_PLAY; toast(7);
+}
+#endif
 
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 /* Stage scope: supported skirmish geometries and the Terran compact codec.
@@ -2921,6 +3323,26 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 #endif
 static int race_load_game(void) {
     RaceLoadPlan plan = {0};
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    {
+        GbaSaveSelection selected;
+        if (!race_shared_carrier_stage_select(&plan,&selected)) return 0;
+        if (SC64_IS_CARRIER_SAVE_VERSION(selected.tag)) {
+            race_shared_carrier_stage_commit(&plan);
+            return 1;
+        }
+        /* Legacy commit can fail after mutating the live world. Until its
+         * rebinds are proven infallible or staged, do not enter it from this
+         * experimental reader. Selection and migration still inspect old
+         * records without changing SRAM or the live world. */
+        return 0;
+    }
+#else
+    /* Do not interpret a predecessor journal with the experimental layout. */
+    return 0;
+#endif
+#endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     GbaSaveSelection selected;
     if (!race_scarab_stage_select(&plan,&selected)) return 0;
@@ -3249,6 +3671,17 @@ static int race_load_game(void) {
     /* Last commit step: later mission rebind failures must not clear the old
      * projectile arena. The candidate packet already passed full preflight. */
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
+#endif
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    /* A predecessor has no shared Carrier packet. Clear any arena left by a
+     * newer live world only after its complete legacy preflight and rebinds. */
+    race_p7_projectile_reset();
+#ifndef SC64_P7_BATTERY_ENABLED
+    memset(race_protoss_generic_clock,0,sizeof(race_protoss_generic_clock));
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    sc64_p7_arbiter_cache_due=0; sc64_p7_arbiter_cache_initialized=0;
+#endif
+#endif
 #endif
     clear_tracers();death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
 #ifdef SC64_IMPACT_EVENTS

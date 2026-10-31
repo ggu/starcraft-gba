@@ -9,7 +9,7 @@ class ScarabFlightBridgeTest(unittest.TestCase):
         definition = game[game.rindex('typedef struct {', 0, end):end]
         fixture = (ROOT / 'tests/sc64_scarab_flight_bridge.c').read_text().replace('/* SC64_REAL_UNIT_DEFINITION */', definition).replace('"../starcraft/', '"' + str(ROOT / 'starcraft') + '/')
         save = (ROOT / 'starcraft/race_save_adapter.h').read_text()
-        start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_save_game(void)'))
+        start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_save_encode_actors(void)'))
         end = save.index('\n#endif\n#if defined(SC64_T6_STORAGE)', start)
         fixture = fixture.replace('/* SC64_REAL_LEGACY_ENCODE */', save[start:end])
         start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_load_game(void)'))
