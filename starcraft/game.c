@@ -2580,6 +2580,31 @@ invalidate_path_grid(void)
 #endif
 }
 
+#if defined(SC64_BULK_TERRAIN_GRID) && defined(SC64_RACES) && \
+    defined(SC64_IMPORTED_MISSION) && \
+    (defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE))
+#include "sc64_terrain_grid_pack.h"
+/* Select only immutable byte-map sources. Procedural arena and Showcase
+ * retain the original per-cell terrain_blocked path. */
+#ifdef SC64_BULK_TERRAIN_GRID_TEST
+static int sc64_bulk_terrain_force_scalar;
+#endif
+static const u8 *sc64_base_blocked_map(void)
+{
+#ifdef SC64_BULK_TERRAIN_GRID_TEST
+    if (sc64_bulk_terrain_force_scalar) return 0;
+#endif
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) return 0;
+#endif
+    if (!race_mode) return sc64_race_maps[race_selected_mission].blocked;
+#ifdef SC64_IMPORTED_SKIRMISH
+    if (race_skirmish_map > 0) return sc64_skirmish_maps[race_skirmish_map-1].blocked;
+#endif
+    return 0;
+}
+#endif
+
 #if (defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 /* Rebuilds follow map/door changes. Keep the larger span visibility path in
  * IWRAM and this occasional full-grid rebuild in ROM within the same reserve. */
@@ -2590,6 +2615,13 @@ static void GBA_HOT
 build_path_grid(void)
 {
     int col, row, i;
+#if defined(SC64_BULK_TERRAIN_GRID) && defined(SC64_RACES) && \
+    defined(SC64_IMPORTED_MISSION) && \
+    (defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE))
+    const u8 *base_blocked = sc64_base_blocked_map();
+    if (base_blocked) sc64_terrain_grid_pack(path_walkable, base_blocked, (unsigned)MAP_COLS * (unsigned)MAP_ROWS);
+    else
+#endif
     for (row = 0; row < MAP_ROWS; row++)
 	for (col = 0; col < MAP_COLS; col++) {
 	    int cell = col + row * MAP_COLS;
