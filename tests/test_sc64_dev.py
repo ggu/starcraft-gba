@@ -837,7 +837,8 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
         makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
         self.assertIn(
-            'ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) '
+            'ZERG_Z7_CANONICAL_FLAGS = -DSC64_Z7_VISIBILITY_PHASE_REJECT '
+            '$(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) '
             '-DSC64_CONTACT_CACHE -DSC64_CONTACT_STOCK_ROM '
             '-DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ',
             makefile)
