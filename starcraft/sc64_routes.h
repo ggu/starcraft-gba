@@ -1127,6 +1127,12 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     field = sc64_route_field[slot];
     memset(field, 255, MAP_CELLS * sizeof(*field));
 #endif
+#ifdef SC64_ROUTE_NEW_CELL
+    /* Every depot rebuild clears the field above, including re-created
+     * partial fields. Seed cells use the generic writer; newly discovered
+     * neighbors are visited once while the walkability bit is borrowed. */
+    u8 *new_field = sc64_route_field[slot];
+#endif
     x0 = center_x >= 32 ? (center_x - 32) / 16 : 0;
     y0 = center_y >= 32 ? (center_y - 32) / 16 : 0;
     x1 = (center_x + 32) / 16; if (x1 >= MAP_COLS) x1 = MAP_COLS - 1;
@@ -1162,10 +1168,15 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
 /* The game supplies paired accessors. Borrow its walkable bit as visited
  * during this synchronous flood, then restore every queued cell below.
  * Read-only custom accessors retain the field-based visited test. */
+#ifdef SC64_ROUTE_NEW_CELL
+#define SC64_ROUTE_DEPOT_PUT(next, direction) sc64_route_put_new(new_field, (next), (direction))
+#else
+#define SC64_ROUTE_DEPOT_PUT(next, direction) sc64_route_put(slot, (next), (direction))
+#endif
 #define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
             if (SC64_GRID_GET(path_walkable, next)) { \
-                sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; \
+                SC64_ROUTE_DEPOT_PUT(next, direction); bfs_queue[tail++] = (u16)next; \
                 SC64_GRID_SET(path_walkable, next, 0); } }
 #else
 #define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
@@ -1184,6 +1195,9 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
         SC64_DEPOT_FLOOD(y > 0, cell - MAP_COLS, 3);
         SC64_DEPOT_FLOOD(y + 1 < MAP_ROWS, cell + MAP_COLS, 4);
 #undef SC64_DEPOT_FLOOD
+#ifdef SC64_ROUTE_DEPOT_PUT
+#undef SC64_ROUTE_DEPOT_PUT
+#endif
     }
 #if defined(SC64_RACES) && defined(SC64_GRID_SET)
     for (i=0;i<tail;++i) SC64_GRID_SET(path_walkable,bfs_queue[i],1);
