@@ -62,12 +62,23 @@ rule tables.
 
 Addons and building morphs go through `race_skirmish_start_record`. The human
 command row uses the same function. It pays from the owner's own bank and
-starts the normal construction clock. A morph to a lower maximum (Creep
-Colony 400 to Sunken Colony 300) applies the maximum-HP difference when it
-starts rather than when it completes, so the final hit points match the
-Brood War rule. Previously the morphing structure held more hit points than
-its new maximum, which save validators reject. An addon that would seal its producer's unit
-exit is not started.
+starts the normal construction clock.
+
+A morph to a lower maximum (Creep Colony 400 to Sunken Colony 300) keeps the
+Creep Colony type, maximum and hit points while it is incomplete, with
+`raw_type` naming the target. It switches when the morph completes and applies
+the Brood War difference then: final hit points are hit points at completion
+minus 100, clamped to 1..300. Saves derive the maximum from the type, so the
+morph's full hit points survive save and reload in every product codec
+(`race_construction_deferred_morph`). Previously the structure took the
+Sunken type at once and held more hit points than its maximum, which every
+save validator rejected.
+
+The planner picks an addon's parent before it reserves anything. The parent
+must be ready for the record, its addon footprint must be placeable with a
+free building slot, and the addon must not seal the producer's unit exit
+(path-grid flood with the predicted footprint). When no parent qualifies, the
+step is skipped and holds no money.
 
 **Military**
 

@@ -174,21 +174,16 @@ static int race_skirmish_start_record(int owner, int producer,
         b[slot].build_progress = 0;
     } else {
         slot = producer;
-        b[slot].type = type; b[slot].raw_type = r->raw_id;
-        {
-            /* BW applies the maximum-HP difference when a morph completes.
-             * A morph to a lower maximum (Creep Colony 400 to Sunken Colony
-             * 300) applies it now instead, since saves derive the maximum
-             * from the type and reject more hit points than that maximum;
-             * race_complete_building then leaves those hit points alone. */
-            int old_max = b[slot].maxhp, new_max = sc64_race_building_max_hp(type);
-            b[slot].maxhp = new_max;
-            if (new_max < old_max) {
-                int hp = b[slot].hp + new_max - old_max;
-                b[slot].hp = hp < 1 ? 1 : hp > new_max ? new_max : hp;
-            }
-        }
+        b[slot].raw_type = r->raw_id;
         b[slot].under_construction = 1; b[slot].build_progress = 0;
+        /* BW applies a morph's maximum-HP difference when it completes.
+         * Saves derive the maximum from the type and reject more hit
+         * points than that, so a morph to a lower maximum keeps its source
+         * type and maximum until race_complete_building switches it. */
+        if (race_construction_deferred_morph(&b[slot]) < 0) {
+            b[slot].type = type;
+            b[slot].maxhp = sc64_race_building_max_hp(type);
+        }
         invalidate_path_grid();
     }
     if (owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }

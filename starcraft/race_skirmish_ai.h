@@ -158,7 +158,10 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             continue;
         }
         ++c->buildings;
-        key = race_ai_key(sc64_race_raw_building(q->type));
+        /* A Creep Colony morphing into a Sunken Colony counts as the
+         * pending Sunken (race_construction_deferred_morph). */
+        key = race_ai_key(sc64_race_raw_building(race_construction_deferred_morph(q) >= 0 ?
+                                                 race_construction_deferred_morph(q) : q->type));
         if (q->under_construction &&
             !(race_mode && (q->type == B_LAIR || q->type == B_HIVE))) {
             if (key >= 0 && c->pend[key] < 255) ++c->pend[key];
@@ -743,32 +746,34 @@ static const Sc64SkirmishRecord *race_ai_record(const RaceAiCensus *c, int raw)
     return race_skirmish_build_record(c->owner, raw);
 }
 
+/* The first producer that can take this addon or morph now: ready for the
+ * record, and for an addon a placeable footprint, a free building slot and
+ * a unit exit the addon would not seal. Checked before any reservation, so
+ * an infeasible addon never holds the owner's money. */
 static int race_ai_attach_parent(const RaceAiCensus *c, const Sc64SkirmishRecord *r)
 {
-    for (int i = 0; i < MAX_BUILDINGS; ++i)
-        if (b[i].alive && b[i].owner == c->owner &&
-            sc64_race_raw_building(b[i].type) == r->parent_raw &&
-            race_skirmish_record_ready(c->owner, i, r)) return i;
+    int addon = r->kind == SC64_SK_ADDON ? sc64_race_building_from_raw(r->raw_id) : -1;
+    if (r->kind == SC64_SK_ADDON && (addon < 0 || find_build_slot() < 0)) return -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        if (!b[i].alive || b[i].owner != c->owner ||
+            sc64_race_raw_building(b[i].type) != r->parent_raw ||
+            !race_skirmish_record_ready(c->owner, i, r)) continue;
+        if (addon >= 0 && (!can_place(addon, b[i].x + 48, b[i].y + 8) ||
+                           !race_ai_exit_escapes(i, addon, b[i].x + 48, b[i].y + 8))) continue;
+        return i;
+    }
     return -1;
 }
 
-/* Start the next addon or morph on an eligible completed producer. An
- * addon that would seal the producer's unit exit is not started. */
-static int race_ai_start_attached(RaceAiCensus *c, const Sc64SkirmishRecord *r)
+/* Start the addon or morph on a parent from race_ai_attach_parent. */
+static int race_ai_start_attached(RaceAiCensus *c, const Sc64SkirmishRecord *r, int parent)
 {
-    for (int i = 0; i < MAX_BUILDINGS; ++i) {
-        if (!b[i].alive || b[i].owner != c->owner ||
-            sc64_race_raw_building(b[i].type) != r->parent_raw) continue;
-        if (r->kind == SC64_SK_ADDON &&
-            !race_ai_exit_escapes(i, sc64_race_building_from_raw(r->raw_id), b[i].x + 48, b[i].y + 8))
-            continue;
-        if (race_skirmish_start_record(c->owner, i, r)) {
-            int key = race_ai_key(r->raw_id);
-            if (key >= 0) ++c->pend[key];
-            return 1;
-        }
+    if (parent < 0 || !race_skirmish_start_record(c->owner, parent, r)) return 0;
+    {
+        int key = race_ai_key(r->raw_id);
+        if (key >= 0) ++c->pend[key];
     }
-    return 0;
+    return 1;
 }
 
 /* Defense structures face the map center. Zerg morph a Creep Colony. */
@@ -779,7 +784,8 @@ static int race_ai_start_defense(RaceAiCensus *c, int raw)
     if (type < 0) return 0;
     if (c->race == R_ZERG) {
         const Sc64SkirmishRecord *r = race_ai_record(c, raw);
-        if (r && r->kind == SC64_SK_BUILDING_MORPH && race_ai_start_attached(c, r)) return 1;
+        if (r && r->kind == SC64_SK_BUILDING_MORPH &&
+            race_ai_start_attached(c, r, race_ai_attach_parent(c, r))) return 1;
         if (c->have[AK_CREEP] + c->pend[AK_CREEP]) return 0; /* wait for the colony */
         type = B_CREEP_COLONY;
         ax = c->hx; ay = c->hy;
@@ -828,7 +834,7 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
         const RaceAiStep *step = &plan[s];
         const Sc64SkirmishRecord *r;
         const Sc64RaceBuildingRule *rule;
-        int key = race_ai_key(step->raw), type, have, x, y, started = 0;
+        int key = race_ai_key(step->raw), type, have, x, y, started = 0, parent = -1;
         /* Small mineral fields lower the worker gates with the target. */
         if (c->workers < step->workers && c->workers < worker_target - 1) continue;
         if ((step->flags & RACE_AI_IF_AIR) && !c->enemy_air && !c->enemy_air_tech) continue;
@@ -856,7 +862,7 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
         if (have >= step->count) continue;
         if (!race_skirmish_requirements(c->owner, r)) continue;
         if ((step->kind == RACE_AI_STEP_ADDON || step->kind == RACE_AI_STEP_MORPH) &&
-            race_ai_attach_parent(c, r) < 0) continue;
+            (parent = race_ai_attach_parent(c, r)) < 0) continue;
         if (step->kind == RACE_AI_STEP_GAS && !race_ai_build_gas(c, 1)) continue;
         if (!race_ai_affordable(c, rule->minerals, rule->gas)) {
             /* Reserve only when the gas side can eventually be met. */
@@ -872,7 +878,7 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
             break;
         case RACE_AI_STEP_GAS: started = race_ai_build_gas(c, 0); break;
         case RACE_AI_STEP_ADDON:
-        case RACE_AI_STEP_MORPH: started = race_ai_start_attached(c, r); break;
+        case RACE_AI_STEP_MORPH: started = race_ai_start_attached(c, r, parent); break;
         case RACE_AI_STEP_DEFENSE: started = race_ai_start_defense(c, step->raw); break;
         }
         if (started) return;

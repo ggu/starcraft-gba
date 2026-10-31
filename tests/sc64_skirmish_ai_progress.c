@@ -181,7 +181,7 @@ static uint32_t world_hash(void)
         MIX(q->alive);
         if (!q->alive) continue;
         MIX(q->owner); MIX(q->type); MIX(q->x); MIX(q->y); MIX(q->hp); MIX(q->under_construction);
-        MIX(q->build_progress); MIX(q->queue_count); MIX(q->queue_progress); MIX(q->larva);
+        MIX(q->maxhp); MIX(q->raw_type); MIX(q->build_progress); MIX(q->queue_count); MIX(q->queue_progress); MIX(q->larva);
         for (int j = 0; j < q->queue_count && j < 5; ++j) MIX(q->queue[(q->queue_head + j) % 5]);
     }
 #undef MIX
@@ -276,8 +276,9 @@ static int count_type(int owner, int type, int complete_only)
 static int sunken_morph(void)
 {
     for (int i = 0; i < MAX_BUILDINGS; ++i)
-        if (b[i].alive && b[i].owner != SIDE && b[i].type == B_SUNKEN_COLONY &&
-            b[i].under_construction && b[i].build_progress > 30) return i;
+        if (b[i].alive && b[i].owner != SIDE &&
+            race_construction_deferred_morph(&b[i]) == B_SUNKEN_COLONY &&
+            b[i].build_progress > 30) return i;
     return -1;
 }
 static int ready_sunken_morph(void) { return sunken_morph() >= 0; }
@@ -386,6 +387,232 @@ done:
     return 0;
 }
 
+/* ---- Creep Colony to Sunken Colony morph hit points. BW keeps the
+ * colony's hit points while it morphs and applies the maximum-HP
+ * difference (300 - 400) on completion, clamped to 1..300. The human's
+ * colony is used so the planner never touches it; it is started through
+ * the same paid service as the command row. ---- */
+static int human_site(int type, int *x, int *y)
+{
+    for (int r = 48; r <= 160; r += 16)
+        for (int dy = -r; dy <= r; dy += 16)
+            for (int dx = -r; dx <= r; dx += 16) {
+                int px = race_base_x[0] + dx, py = race_base_y[0] + dy;
+                if ((dx == -r || dx == r || dy == -r || dy == r) &&
+                    race_can_site(SIDE, type, px, py) && can_place(type, px, py)) {
+                    *x = px; *y = py; return 1;
+                }
+            }
+    return 0;
+}
+
+static int spawn_complete(int type)
+{
+    int x, y, slot;
+    if (!human_site(type, &x, &y)) return -1;
+    slot = spawn_build(SIDE, type, x, y, 0);
+    if (slot >= 0) invalidate_path_grid();
+    return slot;
+}
+
+static int damage_building(int slot, int amount)
+{
+    hit_target(MAX_UNITS + slot, amount, U_MARINE, ENEMY);
+    return b[slot].alive ? b[slot].hp : 0;
+}
+
+static int morph_expected(int hp)
+{
+    hp += 300 - 400;
+    return hp < 1 ? 1 : hp > 300 ? 300 : hp;
+}
+
+static int save_through_pause(void)
+{
+#ifdef SC64_IMPACT_EVENTS
+    for (int t = 0; t < 120 && race_impact_count > RACE_IMPACT_SAVE_CAPACITY; ++t) input(0);
+    if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+#endif
+    if (screen != SCREEN_PLAY || won || lost) return 0;
+    tap(KEY_START); if (screen != SCREEN_PAUSE) return 0;
+    input(KEY_B);
+    input(KEY_A); input(0);
+    return screen == SCREEN_PLAY;
+}
+
+static int morph_hp(int scenario)
+{
+    static const char *names[] = { "full", "damaged-during", "low-hp", "low-hp-dies",
+                                   "save-resume", "save-resume-low-hp" };
+    int creep, pool, ok = 0, start_hp = -1, during_hp = -1, during_max = -1, final_hp = -1;
+    int final_max = -1, final_type = -1, alive = 0, charged = 0, completed_at = -1;
+    uint32_t reference = 0, resumed = 0;
+    const Sc64SkirmishRecord *r;
+    if (scenario < 0 || scenario > 5 || race_human != R_ZERG) return 0;
+    for (int t = 0; t < 60; ++t) input(0);
+    pool = spawn_complete(B_SPAWNING_POOL);
+    creep = spawn_complete(B_CREEP_COLONY);
+    r = race_skirmish_build_record(SIDE, sc64_race_raw_building(B_SUNKEN_COLONY));
+    if (pool < 0 || creep < 0 || !r || r->kind != SC64_SK_BUILDING_MORPH ||
+        b[creep].hp != 400 || b[creep].maxhp != 400) goto done;
+    if (scenario == 2 || scenario == 3 || scenario == 5)
+        damage_building(creep, 350);               /* damaged before the morph */
+    start_hp = b[creep].hp;
+    minerals += 50; charged = minerals;
+    if (!race_skirmish_start_record(SIDE, creep, r)) goto done;
+    charged -= minerals;                           /* paid from the human's bank */
+    /* While incomplete the colony keeps its type, maximum and hit points. */
+    if (b[creep].type != B_CREEP_COLONY || b[creep].maxhp != 400 ||
+        b[creep].hp != start_hp || race_construction_deferred_morph(&b[creep]) != B_SUNKEN_COLONY)
+        goto done;
+    for (int t = 0; t < 120; ++t) input(0);
+    if (scenario == 1) damage_building(creep, 350); /* BW: survives with 50 */
+    if (scenario == 3) damage_building(creep, 60);  /* 50 hit points: destroyed */
+    if (scenario == 4) damage_building(creep, 30);
+    during_hp = b[creep].alive ? b[creep].hp : 0; during_max = b[creep].maxhp;
+    if (scenario == 4 || scenario == 5) {
+        int len;
+        if (!b[creep].alive || !b[creep].under_construction || !save_through_pause()) goto done;
+        len = 400;
+        for (int t = 1; t < len; ++t) input(0);
+        reference = world_hash();
+        final_hp = b[creep].hp;
+        game_init(); previous = 0;
+        input(KEY_L);
+        if (screen != SCREEN_PLAY || !race_mode) goto done;
+        /* The reloaded morph still holds its source maximum and hit points. */
+        if (b[creep].type != B_CREEP_COLONY || b[creep].maxhp != 400 ||
+            b[creep].hp != during_hp || !b[creep].under_construction) goto done;
+        for (int t = 0; t < len; ++t) input(0);
+        resumed = world_hash();
+        if (resumed != reference || b[creep].hp != final_hp) goto done;
+    } else {
+        for (int t = 0; t < 400 && b[creep].alive && b[creep].under_construction; ++t) input(0);
+    }
+    alive = b[creep].alive;
+    if (alive && !b[creep].under_construction) completed_at = frame;
+    final_hp = alive ? b[creep].hp : 0; final_max = b[creep].maxhp; final_type = b[creep].type;
+    if (scenario == 3)
+        ok = !alive && during_hp == 0 && charged == 50 && sc64_race_raw_building(final_type) == 143;
+    else
+        ok = alive && completed_at >= 0 && charged == 50 && final_type == B_SUNKEN_COLONY &&
+            final_max == 300 && final_hp == morph_expected(during_hp) && during_max == 400 &&
+            (scenario != 1 || (during_hp > 0 && during_hp <= 100)) &&
+            (scenario != 2 || during_hp == start_hp);
+done:
+    printf("{\"kind\":\"morph-hp\",\"scenario\":\"%s\",\"start_hp\":%d,\"during_hp\":%d,\"during_max\":%d,"
+           "\"final_hp\":%d,\"final_max\":%d,\"final_raw\":%d,\"alive\":%d,\"charged\":%d,"
+           "\"completed_at\":%d,\"reference\":\"%08x\",\"resumed\":\"%08x\",\"ok\":%d}\n",
+           scenario >= 0 && scenario <= 5 ? names[scenario] : "?", creep >= 0 ? start_hp : -1,
+           during_hp, during_max, final_hp, final_max,
+           final_type >= 0 ? sc64_race_raw_building(final_type) : -1, alive, charged,
+           completed_at, reference, resumed, ok);
+    return ok;
+}
+
+/* ---- Addon feasibility. A Terran opponent with every step before the
+ * Machine Shop satisfied and an empty bank either reserves the Machine
+ * Shop's price (some Factory can take it) or skips the step without
+ * reserving (no Factory can). With the price available, the addon starts
+ * on the first feasible Factory. Fixture structures are spawned complete;
+ * the planner itself pays for the addon. ---- */
+/* Machine Shop exists in every canonical profile through its raw ID. */
+#define SHOP_TYPE sc64_race_building_from_raw(120)
+/* Spawn a complete fixture structure near the owner's start. With an
+ * addon type, keep only a site whose addon footprint is free and would
+ * leave the producer's unit exit open. */
+static int owner_spawn(int owner, int type, int addon)
+{
+    int base = race_ai_owner_base(owner);
+    for (int r = 64; r <= 224; r += 16)
+        for (int dy = -r; dy <= r; dy += 16)
+            for (int dx = -r; dx <= r; dx += 16) {
+                int px = race_base_x[base] + dx, py = race_base_y[base] + dy, slot;
+                if ((dx != -r && dx != r && dy != -r && dy != r) ||
+                    !race_can_site(owner, type, px, py) || !can_place(type, px, py) ||
+                    (addon >= 0 && !can_place(addon, px + 48, py + 8))) continue;
+                slot = spawn_build(owner, type, px, py, 0);
+                if (slot < 0) return -1;
+                invalidate_path_grid();
+                if (addon < 0 || race_ai_exit_escapes(slot, addon, px + 48, py + 8)) return slot;
+                b[slot].alive = 0;
+                invalidate_path_grid();
+            }
+    return -1;
+}
+
+static int addon_at(int owner, int parent)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == owner && b[i].type == SHOP_TYPE &&
+            b[i].x == b[parent].x + 48 && b[i].y == b[parent].y + 8) return i;
+    return -1;
+}
+
+static int addon_feasibility(int scenario)
+{
+    static const char *names[] = { "first-blocked-second-free", "no-feasible-parent" };
+    int owner = first_bot(), f[2] = { -1, -1 }, blockers = 0, parent = -2, ok = 0;
+    int reserve_m = -1, reserve_g = -1, started_on = -1, charged_m = -1, charged_g = -1;
+    const Sc64SkirmishRecord *r;
+    RaceAiCensus c;
+    if ((scenario != 0 && scenario != 1) || race_owner_identity(owner) != R_TER) return 0;
+    for (int t = 0; t < 30; ++t) input(0);
+    /* Satisfy the steps before the Machine Shop. */
+    if (owner_spawn(owner, B_BARRACKS, -1) < 0 || owner_spawn(owner, B_BARRACKS, -1) < 0) goto done;
+    {
+        int base = race_ai_owner_base(owner), g = -1, best = 0x7fffffff;
+        for (int i = 0; i < geyser_count; ++i) {
+            int d = dist2(geysers[i].x, geysers[i].y, race_base_x[base], race_base_y[base]);
+            if (d < best && can_place(B_REFINERY, geysers[i].x, geysers[i].y)) { best = d; g = i; }
+        }
+        if (g < 0 || spawn_build(owner, B_REFINERY, geysers[g].x, geysers[g].y, 0) < 0) goto done;
+    }
+    for (int i = 0; i < 2; ++i) if ((f[i] = owner_spawn(owner, B_FACTORY, SHOP_TYPE)) < 0) goto done;
+    for (int n = 0; n < 12; ++n)
+        if (spawn_unit(owner, U_SCV, race_base_x[race_ai_owner_base(owner)], race_base_y[race_ai_owner_base(owner)] + 48) < 0) goto done;
+    /* Occupy the addon footprint of the first Factory (both in scenario 1). */
+    for (int i = 0; i <= scenario; ++i) {
+        if (spawn_build(owner, B_DEPOT, b[f[i]].x + 48, b[f[i]].y + 8, 0) < 0) goto done;
+        ++blockers;
+    }
+    invalidate_path_grid();
+    if (can_place(SHOP_TYPE, b[f[0]].x + 48, b[f[0]].y + 8) ||
+        can_place(SHOP_TYPE, b[f[1]].x + 48, b[f[1]].y + 8) != (scenario == 0)) goto done;
+    r = race_skirmish_build_record(owner, sc64_race_raw_building(SHOP_TYPE));
+    if (!r || r->kind != SC64_SK_ADDON) goto done;
+    /* Empty bank: what does one development pass reserve? */
+    race_minerals[owner] = 0; race_gas[owner] = 0;
+    race_ai_census(owner, &c);
+    parent = race_ai_attach_parent(&c, r);
+    if (getenv("AI_DEBUG"))
+        for (int i = 0; i < 2; ++i)
+            fprintf(stderr, "factory %d at %d,%d ready %d place %d escapes %d escapes-now %d\n", f[i], b[f[i]].x, b[f[i]].y,
+                    race_skirmish_record_ready(owner, f[i], r), can_place(SHOP_TYPE, b[f[i]].x + 48, b[f[i]].y + 8),
+                    race_ai_exit_escapes(f[i], SHOP_TYPE, b[f[i]].x + 48, b[f[i]].y + 8), race_ai_exit_escapes(f[i], -1, 0, 0));
+    reserve_m = c.reserve_minerals; reserve_g = c.reserve_gas;
+    race_ai_develop(&c);
+    reserve_m = c.reserve_minerals - reserve_m; reserve_g = c.reserve_gas - reserve_g;
+    /* Exactly the Machine Shop's price: does a pass start it? */
+    race_minerals[owner] = 50; race_gas[owner] = 50;
+    race_ai_census(owner, &c);
+    race_ai_develop(&c);
+    charged_m = 50 - race_minerals[owner]; charged_g = 50 - race_gas[owner];
+    for (int i = 0; i < 2; ++i) if (addon_at(owner, f[i]) >= 0) started_on = started_on < 0 ? i : 9;
+    if (scenario == 0)
+        ok = parent == f[1] && reserve_m == 50 && reserve_g == 50 && started_on == 1 &&
+            charged_m == 50 && charged_g == 50 && b[addon_at(owner, f[1])].under_construction;
+    else
+        ok = parent == -1 && reserve_g == 0 && reserve_m != 50 && started_on == -1 &&
+            charged_g == 0 && charged_m == 0;
+done:
+    printf("{\"kind\":\"addon\",\"scenario\":\"%s\",\"factories\":[%d,%d],\"blocked\":%d,\"parent\":%d,"
+           "\"reserved\":[%d,%d],\"started_on\":%d,\"charged\":[%d,%d],\"ok\":%d}\n",
+           scenario == 0 || scenario == 1 ? names[scenario] : "?", f[0], f[1], blockers,
+           parent, reserve_m, reserve_g, started_on, charged_m, charged_g, ok);
+    return ok;
+}
+
 static int parse_races(const char *text, int *races)
 {
     int n = 0;
@@ -400,7 +627,7 @@ static int parse_races(const char *text, int *races)
 int main(int argc, char **argv)
 {
     int map = 1, human = R_TER, ticks = 18000, every = 1800, resume_at = -1, resume_len = 1800;
-    int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0;
+    int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1;
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -413,10 +640,14 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--resume-len") && i + 1 < argc) resume_len = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--recovery") && i + 1 < argc) recover = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--resume-at-morph")) resume_morph = 1;
+        else if (!strcmp(argv[i], "--morph-hp") && i + 1 < argc) morph = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--addon") && i + 1 < argc) addon = atoi(argv[++i]);
         else { fprintf(stderr, "unknown argument %s\n", argv[i]); return 2; }
     }
     launch(map, human, bots, races);
     if (recover >= 0) return recovery(recover) ? 0 : 7;
+    if (morph >= 0) return morph_hp(morph) ? 0 : 8;
+    if (addon >= 0) return addon_feasibility(addon) ? 0 : 9;
     if (resume_at < 0 && !resume_morph) {
         run_ticks(ticks, every, stdout);
         snapshot(stdout, "final");
