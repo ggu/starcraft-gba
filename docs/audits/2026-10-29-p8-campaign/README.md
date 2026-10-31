@@ -463,3 +463,22 @@ Merge `afa5077` incorporates shared packed flyer hover over the walking checkpoi
 ### Shared AI-economy sync
 
 Merge `41c52a4` carries the shared AI-economy change. The normal P8 ARM ROM passed unchanged RAM guards (IWRAM end `0x03004a18`, EWRAM BSS end `0x0203899c`, SHA-256 `72a79df8d99b300bab19a1b358f34f96d566b25c0f4a8132cc668fbbdb5e4249`). The retained host full input tape matched its earlier run at all 91 checkpoints and the final state. Under actual P8 flags, nine sanitizer skirmish worker cases passed: each of three AI races with bot STOP recovery, human STOP preservation and depleted-field reassignment. All 103 frozen inputs remained unchanged. The earlier custom guest replay remains evidence for `e0e8e1f`, not a new guest run of this sync; admission holds remain open.
+
+### Shared Scarab foundation integration checkpoint
+
+Merge `723b3db` combines the P8 candidate with shared integration `652ff63`.
+Scarab runtime and namespace staging remain disabled in the normal P8 vector.
+The save conflict preserves P8 candidate service binding and wraps each save
+preflight call with unconditional binding cleanup, including staged selection
+calls; the two unit-name entries retain explicit enum indices.
+
+With the retained P8 input tape and prepared inputs, the current merge's host
+replay matched all 91 earlier checkpoint lines and its final win at tick 90428
+(frame 88769). Under the P8 vector, the sanitizer carried-profile startup/save
+matrix passed 234 skirmish configurations, the Protoss service fixture passed
+its successful-load and invalid-candidate cleanup checks, and the skirmish AI
+fixture completed. These are host checks. Combined namespace-stage fallback
+with P8 service binding, the current normal ARM guard, and independent review
+remain outstanding; the earlier guest replay applies only to its recorded older
+runtime. This checkpoint does not promote P8 or close its documented service and
+admission holds.
