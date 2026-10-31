@@ -8168,3 +8168,22 @@ Evidence, all on the private inputs prepared in this workspace:
 Walk poses are presentation only and are not saved. Turn rates, independent
 turret tracking and idle flyer animations are not modelled. No physical
 hardware or frame-rate claim is made.
+
+### Z7 public-base host controller witness (2026-10-31)
+
+On public base `232bc0f`, the Z7 canonical host controller uses the explicit
+early-gas policy and a 200,000-tick limit. A state-observing run won at host
+tick 179,764, with a valid fault-free terminal model, the native completion
+flags and no source-owner-4 buildings. Its corrected trace SHA-256 is
+`5121ed97ea0ea3d57697ce2c7fc57eac2082e3a457bb4ad98517f09ecf510489`. A
+fresh host process replayed its 14,344 held-key transitions and matched all
+303 recorded checkpoints without running the controller's planning code.
+The replay comparator did not qualify the run: host timing records are zero
+and no SRAM was supplied.
+
+The controller's path and placement queries can consult hidden occupancy
+and warm route caches. The host witness therefore is not a strict
+visibility-only policy proof. No normal ARM replay, fresh-process SRAM
+qualification, physical-hardware result, or menu promotion is claimed by
+this result. Historical Z7 traces that contain a `fired` field used it as
+an alias for `started`; the source model has no separate fired mask.
