@@ -379,6 +379,29 @@ static int queue_probe(void)
     return 1;
 }
 
+/* Diagnostic only: log rejection reasons and real resource rows late in the
+ * run. These observations are never used to choose a worker or patch. */
+static int mineral_attempt_rejected(const char *reason, int worker, int home, int patch)
+{
+    if (frame < 30000) return 0;
+    int active = 0, visible = 0, total = 0, visible_total = 0;
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0) {
+        ++active; total += m[i].amount;
+        if (currently_visible(m[i].x, m[i].y)) { ++visible; visible_total += m[i].amount; }
+    }
+    fprintf(trace, "{\"kind\":\"mineral-rejection\",\"frame\":%u,\"reason\":\"%s\",\"worker\":%d,\"home\":%d,\"patch\":%d,\"path_valid\":%d,\"active\":%d,\"visible\":%d,\"amount\":%d,\"visible_amount\":%d}\n",
+            (unsigned)frame, reason, worker, home, patch, path_grid_valid,
+            active, visible, total, visible_total);
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 || i == 5)
+        fprintf(trace, "{\"kind\":\"mineral-row\",\"frame\":%u,\"slot\":%d,\"x\":%d,\"y\":%d,\"amount\":%d,\"visible\":%d}\n",
+                (unsigned)frame, i, m[i].x, m[i].y, m[i].amount,
+                currently_visible(m[i].x, m[i].y));
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE)
+        fprintf(trace, "{\"kind\":\"mineral-worker\",\"frame\":%u,\"slot\":%d,\"x\":%d,\"y\":%d,\"order\":%d,\"target\":%d,\"carry\":%d,\"path_timer\":%d}\n",
+                (unsigned)frame, i, u[i].x, u[i].y, u[i].order, u[i].target, u[i].carry, u[i].path_timer);
+    return 0;
+}
+
 /* Controller policy: attempt one idle, empty Probe using only normal input.
  * Resource choice sees only currently visible nonempty patches and a
  * read-only walkability snapshot. No worker order is assigned directly. */
@@ -389,7 +412,8 @@ static int assign_idle_probe_to_minerals(void)
     static int queue[MAP_CELLS];
     int worker = -1, home = -1, best = 0x7fffffff;
     int patch = -1, patch_distance = 0x7fffffff, head = 0, tail = 0;
-    if (!path_grid_valid) return 0;
+    int visible_patches = 0;
+    if (!path_grid_valid) return mineral_attempt_rejected("path-invalid", worker, home, patch);
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
         u[i].type == U_PROBE && u[i].order == ORDER_IDLE && !u[i].carry) {
         for (int j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive &&
@@ -398,7 +422,7 @@ static int assign_idle_probe_to_minerals(void)
             if (d < best) { best = d; worker = i; home = j; }
         }
     }
-    if (worker < 0 || home < 0) return 0;
+    if (worker < 0 || home < 0) return mineral_attempt_rejected("no-idle-worker-or-home", worker, home, patch);
     int start = limit(u[worker].x / 16, 0, MAP_COLS - 1) +
                 limit(u[worker].y / 16, 0, MAP_ROWS - 1) * MAP_COLS;
     memset(seen, 0, sizeof(seen)); seen[start] = 1; queue[tail++] = start;
@@ -414,6 +438,7 @@ static int assign_idle_probe_to_minerals(void)
     }
     for (int i = 0; i < MAX_MINERALS; ++i) {
         if (!currently_visible(m[i].x, m[i].y) || m[i].amount <= 0) continue;
+        ++visible_patches;
         int px = m[i].x / 16, py = m[i].y / 16, reachable = 0;
         for (int y = py - 1; y <= py + 1; ++y)
             for (int x = px - 1; x <= px + 1; ++x)
@@ -422,8 +447,10 @@ static int assign_idle_probe_to_minerals(void)
         int d = dist2(u[worker].x, u[worker].y, m[i].x, m[i].y);
         if (reachable && d < patch_distance) { patch_distance = d; patch = i; }
     }
-    if (patch < 0 || !normalize_field() || !clear_selected_building() ||
-        !move_cursor(u[worker].x - 4, u[worker].y - 4)) return 0;
+    if (patch < 0) return mineral_attempt_rejected(visible_patches ? "no-reachable-patch" : "no-visible-patch", worker, home, patch);
+    if (!normalize_field() || !clear_selected_building() ||
+        !move_cursor(u[worker].x - 4, u[worker].y - 4))
+        return mineral_attempt_rejected("ui-worker-position", worker, home, patch);
     /* Tiny UI drag clears prior selection and attempts just this worker.
      * A cluster can select more than one; in that case issue no order. */
     input(KEY_L); input(KEY_L | KEY_RIGHT | KEY_DOWN);
@@ -436,31 +463,34 @@ static int assign_idle_probe_to_minerals(void)
             KEY_TAP(KEY_L);
     }
     if (selected_count() != 1 || !u[worker].selected || !u[worker].alive ||
-        u[worker].order != ORDER_IDLE || u[worker].carry) return 0;
-    if (!move_cursor(m[patch].x, m[patch].y)) return 0;
+        u[worker].order != ORDER_IDLE || u[worker].carry)
+        return mineral_attempt_rejected("ui-worker-selection", worker, home, patch);
+    if (!move_cursor(m[patch].x, m[patch].y))
+        return mineral_attempt_rejected("ui-patch-position", worker, home, patch);
     if (selected_count() != 1 || !u[worker].selected || !u[worker].alive ||
         u[worker].order != ORDER_IDLE || u[worker].carry ||
-        selected_worker_mineral_target() != patch) return 0;
+        selected_worker_mineral_target() != patch)
+        return mineral_attempt_rejected("ui-patch-priority", worker, home, patch);
     int refinery = nearest_refinery(cx, cy);
     if (refinery >= 0 && dist2(cx, cy, b[refinery].x, b[refinery].y) < 24 * 24)
-        return 0;
+        return mineral_attempt_rejected("ui-refinery-priority", worker, home, patch);
 #ifdef SC64_SHARED_BUNKER
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (race_bunker_carrier_valid(i) && b[i].owner == SIDE &&
-            dist2(cx, cy, b[i].x, b[i].y) < 20 * 20) return 0;
+            dist2(cx, cy, b[i].x, b[i].y) < 20 * 20) return mineral_attempt_rejected("ui-bunker-priority", worker, home, patch);
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
     for (int i = 0; i < MAX_UNITS; ++i)
         if (race_transport_carrier_valid(i) && u[i].owner == SIDE &&
-            dist2(cx, cy, u[i].x, u[i].y) < 18 * 18) return 0;
+            dist2(cx, cy, u[i].x, u[i].y) < 18 * 18) return mineral_attempt_rejected("ui-carrier-priority", worker, home, patch);
 #endif
 #ifdef SC_FIELD_FEEDBACK
     int hostile_x, hostile_y;
-    if (ui_hostile_at(cx, cy, &hostile_x, &hostile_y)) return 0;
+    if (ui_hostile_at(cx, cy, &hostile_x, &hostile_y)) return mineral_attempt_rejected("ui-hostile-priority", worker, home, patch);
 #endif
     KEY_TAP(KEY_A);
     if (!u[worker].alive || u[worker].order != ORDER_MINE ||
-        u[worker].target != patch) return 0;
+        u[worker].target != patch) return mineral_attempt_rejected("ui-order-not-accepted", worker, home, patch);
     fprintf(trace, "{\"kind\":\"economy\",\"frame\":%u,\"action\":\"assign-idle-mineral\",\"worker\":%d,\"patch\":%d,\"home\":%d}\n",
             (unsigned)frame, worker, patch, home);
     return 1;
