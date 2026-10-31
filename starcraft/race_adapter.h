@@ -686,7 +686,7 @@ static int race_queue_unit(int owner, int producer, int type)
 #ifdef SC64_SHARED_SCOURGE_COMBAT
     if (!race_product_slots_available((unsigned)count)) return 0;
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     if (race_protoss_services_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P4_RUNTIME
@@ -1421,8 +1421,11 @@ static void race_skirmish_init(void)
     static const int mdx[4] = { 56, 42, 56, 42 };
     static const int mdy[4] = { 24, 40, 8, 20 };
     int i, j, owner, worker_type, townhall, supply_building;
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     race_p7_projectile_reset();
+#endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_RUNTIME)
+    memset(race_protoss_generic_clock, 0, sizeof(race_protoss_generic_clock));
 #endif
 #ifdef SC64_ZP_FULL_STORAGE
     if (race_skirmish_map > 0) {

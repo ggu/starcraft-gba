@@ -17,7 +17,7 @@ class ScarabFieldsTest(unittest.TestCase):
         # Capture the actual legacy save/load loops, including the flag
         # widening and BC conditional, so this exercises production casts.
         save = (ROOT / 'starcraft/race_save_adapter.h').read_text()
-        encode_start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_save_game(void)'))
+        encode_start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_save_encode_actors(void)'))
         # Stop at the loop's own closing line. Adjacent profile branches can
         # change independently (the namespace stage adds one after encoding).
         encode_end = save.index('\n    }', encode_start) + len('\n    }')
