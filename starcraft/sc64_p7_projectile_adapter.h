@@ -97,7 +97,7 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
 #endif
     if (!race_protoss_services_active() || race_p7_projectile_fault || shooter<0 ||
         shooter>=MAX_UNITS || !u[shooter].alive ||
-        u[shooter].type!=U_P7_INTERCEPTOR || RACE_PROTOSS_RAW(&u[shooter])!=73 ||
+        u[shooter].type!=SC64_INTERCEPTOR_TYPE || RACE_PROTOSS_RAW(&u[shooter])!=73 ||
         RACE_PROTOSS_SLOT(&u[shooter])<0 || RACE_PROTOSS_SLOT(&u[shooter])>=8 ||
         race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[shooter]))!=u[shooter].owner ||
         source_x_q8<0 || source_y_q8<0 ||
@@ -143,7 +143,7 @@ static void race_p7_projectile_source_tick(void)
         if (impact && race_p7_projectile_target_alive(row.target_ref)) {
             int owner=race_protoss_source_owner(row.raw_source_owner);
             int damage=6+(owner==SIDE?weapons_level:0);
-            if (owner>=0) hit_target(row.target_ref,damage,U_P7_INTERCEPTOR,owner);
+            if (owner>=0) hit_target(row.target_ref,damage,SC64_INTERCEPTOR_TYPE,owner);
         }
         id=next;
     }

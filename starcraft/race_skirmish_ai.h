@@ -1203,7 +1203,7 @@ static void __attribute__((noinline)) race_ai_plan(int owner)
     /* A Carrier has its own paid queue; ordinary building production cannot
      * stock it. Limit each planning pass to one purchase per Carrier. */
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == owner && u[i].type == U_P7_CARRIER)
+        if (u[i].alive && u[i].owner == owner && u[i].type == SC64_CARRIER_TYPE)
             (void)race_p7_carrier_training_queue_owner(i, owner);
 #endif
     race_ai_military(&c);
