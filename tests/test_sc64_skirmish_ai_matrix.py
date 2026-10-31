@@ -263,6 +263,32 @@ class ResumeAndRecovery(unittest.TestCase):
         with self.assertRaisesRegex(ai.RecordError, "disagrees"):
             ai.validate_workers(self.workers(2, new_patch=9), 2)
 
+    def commit(self, scenario, **kw):
+        base = {"kind": "commit", "scenario": ai.COMMIT_SCENARIOS[scenario], "kept": 3, "army_supply": 6,
+                "committed": 3, "commit_frame": 10800, "reference": "00000000", "resumed": "00000000", "ok": 1}
+        if scenario == 3:
+            base.update(committed=0, commit_frame=-1)
+        base.update(kw)
+        return [json.dumps(base)]
+
+    def test_commit_records(self):
+        self.assertEqual(ai.validate_commit(self.commit(0), 0)["committed"], 3)
+        self.assertEqual(ai.validate_commit(self.commit(3), 3)["commit_frame"], -1)
+        # A small army staying home under a forced commit is the defect.
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_commit(self.commit(0, committed=0, commit_frame=-1), 0)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_commit(self.commit(1, army_supply=14), 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_commit(self.commit(3, committed=3, commit_frame=10800), 3)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_commit(self.commit(2), 2)
+        self.assertEqual(ai.validate_commit(self.commit(2, reference="1234abcd", resumed="1234abcd"), 2)["ok"], 1)
+        with self.assertRaisesRegex(ai.RecordError, "does not match"):
+            ai.validate_commit(self.commit(0), 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagree"):
+            ai.evaluate(("commit", "terran", 1, 2, "t", 0), 10, "\n".join(self.commit(0)), 1800)
+
     def test_case_list_is_complete_and_unique(self):
         cases = ai.cases(36000)
         self.assertEqual(len(cases), len(set(cases)))
@@ -270,6 +296,7 @@ class ResumeAndRecovery(unittest.TestCase):
         self.assertFalse(any(c[0] == "resume-morph" for c in ai.cases(36000, "economy")))
         self.assertEqual(sum(c[0] == "morph-hp" for c in cases), 6 * len(ai.PROFILES))
         self.assertEqual(sum(c[0] == "addon" for c in cases), 2 * len(ai.PROFILES))
+        self.assertEqual(sum(c[0] == "commit" for c in cases), 4 * len(ai.PROFILES))
         self.assertEqual(sum(c[0] == "builder" for c in cases), 3 * len(ai.PROFILES))
         self.assertEqual(sum(c[0] == "workers" for c in cases), 4 * len(ai.PROFILES))
         runs = [c for c in cases if c[0] == "run"]
