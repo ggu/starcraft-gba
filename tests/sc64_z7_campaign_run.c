@@ -985,14 +985,15 @@ static int find_build_site(int type,int *out_x,int *out_y)
                currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0&&
                dist2(x,y,u[i].x,u[i].y)<144*144)fixed_legal=0;
             if(fixed_legal){*out_x=x;*out_y=y;return 1;}
-            /* If the familiar second defense tile is blocked, try the existing
-               terrain and reachability search around mineral cover. Its risk
-               check uses only enemies currently visible to the player. */
-            if(sunken_count==1) {
+            /* Either familiar site may become blocked by the live resource
+               line. Search ordinary legal, reachable sites around cover for
+               the first defense as well as the second. Risk checks use only
+               currently visible enemies. */
+            {
                 int hatch=z7_townhall(SIDE);
                 if(hatch>=0&&z7_front_colony_site(hatch,out_x,out_y)) {
-                    fprintf(stderr,"Z7 second defense fallback site%d,%d frame%u\n",
-                        *out_x,*out_y,(unsigned)frame);
+                    fprintf(stderr,"Z7 defense%d fallback site%d,%d frame%u\n",
+                        sunken_count+1,*out_x,*out_y,(unsigned)frame);
                     return 1;
                 }
             }
