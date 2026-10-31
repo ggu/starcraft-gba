@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Canonical race-skirmish AI progression, capability and resume harness.
- * Every gameplay change goes through game_update() with ordinary inputs; the
- * human stays passive unless --human-defend is given. Snapshots only read
- * actor storage. Build once per canonical race profile. */
+ * Progression uses game_update() with ordinary inputs and a passive human.
+ * Named scenario fixtures inject setup and failures explicitly; snapshots
+ * only read actor storage. Build once per canonical race profile. */
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -945,6 +945,43 @@ done:
     return ok;
 }
 
+/* Synthetic policy regression: nearby depots do not multiply one attacker,
+ * and an armed worker does not replace the documented non-worker threat. */
+static int threat_census(void)
+{
+    int owner=first_bot();
+    if (race_owner_identity(owner)!=R_TER) return 0;
+    for (int scenario=0;scenario<4;scenario++) {
+        RaceAiCensus c;
+        memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+        assert(spawn_build(owner,B_COMMAND,320,320,0)>=0);
+        assert(spawn_build(owner,B_COMMAND,384,320,0)>=0);
+        int workers[2];
+        for(int k=0;k<2;k++) {
+            workers[k]=spawn_unit(owner,U_SCV,324+8*k,320);
+            assert(workers[k]>=0);u[workers[k]].order=ORDER_MINE;
+        }
+        int enemy_x=scenario==3?384+RACE_AI_THREAT_RANGE:480;
+        int enemy=spawn_unit(SIDE,U_MARINE,enemy_x,320);assert(enemy>=0);
+        if(scenario==1)assert(spawn_unit(SIDE,U_MARINE,496,320)>=0);
+        if(scenario==2)assert(spawn_unit(SIDE,U_SCV,332,320)>=0);
+        race_ai_census(owner,&c);
+        int expected=scenario==3?0:scenario==1?2:1;
+        int ok=c.depots==2 && c.threat_count==expected &&
+            (expected?c.threat==enemy && c.threat_x==enemy_x &&
+                      c.threat_d==(enemy_x-384)*(enemy_x-384):c.threat<0);
+        if(ok) {
+            race_ai_military(&c);
+            for(int k=0;k<2;k++)
+                ok &= u[workers[k]].order==(scenario==1?ORDER_ATTACK_MOVE:ORDER_MINE);
+        }
+        printf("{\"kind\":\"threat-census\",\"scenario\":%d,\"expected\":%d,\"count\":%d,\"target\":%d,\"ok\":%d}\n",
+               scenario,expected,c.threat_count,c.threat,ok);
+        if(!ok)return 0;
+    }
+    return 1;
+}
+
 static int parse_races(const char *text, int *races)
 {
     int n = 0;
@@ -960,7 +997,7 @@ int main(int argc, char **argv)
 {
     int map = 1, human = R_TER, ticks = 18000, every = 1800, resume_at = -1, resume_len = 1800;
     int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1, commit = -1;
-    int builder = -1, workers = -1, ai_sunken = 0;
+    int builder = -1, workers = -1, ai_sunken = 0, threats = 0;
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -975,6 +1012,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--resume-at-morph")) resume_morph = 1;
         else if (!strcmp(argv[i], "--morph-hp") && i + 1 < argc) morph = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--ai-sunken-save")) ai_sunken = 1;
+        else if (!strcmp(argv[i], "--threat-census")) threats = 1;
         else if (!strcmp(argv[i], "--addon") && i + 1 < argc) addon = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--commit") && i + 1 < argc) commit = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--builder") && i + 1 < argc) builder = atoi(argv[++i]);
@@ -985,6 +1023,7 @@ int main(int argc, char **argv)
     if (recover >= 0) return recovery(recover) ? 0 : 7;
     if (morph >= 0) return morph_hp(morph) ? 0 : 8;
     if (ai_sunken) return ai_sunken_save() ? 0 : 13;
+    if (threats) return threat_census() ? 0 : 14;
     if (addon >= 0) return addon_feasibility(addon) ? 0 : 9;
     if (commit >= 0) return forced_commit(commit) ? 0 : 10;
     if (builder >= 0) return builder_walk(builder) ? 0 : 11;
