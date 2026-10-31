@@ -75,9 +75,13 @@ and after the frozen run.
 The 11,622 recorded key transitions have strictly increasing host ticks,
 valid ten-bit key masks, changed held states, and pressed masks consistent with
 the previous held state. The final logged transition is tick 121474 and the
-win checkpoint is tick 121979. These checks validate the host trace structure;
-they do not prove it replays on the physical-key backend or fits a legacy ROM
-tape. Those qualifications remain separate.
+win checkpoint is tick 121979. Schema, mission, unique deployment at host
+tick 7, Start input, unique final result and source victory predicate were also
+checked. These checks validate the host trace structure; they do not prove it
+replays on the physical-key backend or fits a legacy ROM tape. The legacy
+`tools/sc64_z3_controller_replay.py` validator hardcodes an older final state
+and rejects this trace; it has not been updated. Those qualifications remain
+separate.
 
 The controller counts armed units, maintains separate ground defenders at the
 Hatchery and Chrysalis, builds a Lair and Spire, and directs individually
