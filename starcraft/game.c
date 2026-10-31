@@ -82,7 +82,7 @@ static void sc64_contact_memo_invalidate(void);
 #ifndef SC64_DEATH_VFX_DISABLED
 #include "sc64_death_vfx.h"
 #endif
-#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER)
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER) || defined(SC64_SHARED_TRANSPORT)
 #define SC64_TRANSPORT_RUNTIME
 #endif
 #if defined(SC64_P5_SHUTTLE_ENABLED) && !defined(SC64_P5_RUNTIME)

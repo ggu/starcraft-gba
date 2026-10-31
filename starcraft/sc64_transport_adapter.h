@@ -1,7 +1,7 @@
 #ifndef SC64_TRANSPORT_ADAPTER_H
 #define SC64_TRANSPORT_ADAPTER_H
 
-#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER)
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER) || defined(SC64_SHARED_TRANSPORT)
 #include "sc64_transport_rules.h"
 
 #if defined(SC64_P5_SHUTTLE_ENABLED) && \
