@@ -540,7 +540,7 @@ static int remine_idle_probe(int home)
     if(worker<0||home<0)return 0;
     /* Mine at whichever Nexus has the nearest live patch. */
     for(int n=0;n<MAX_BUILDINGS;n++)if(b[n].alive&&b[n].owner==SIDE&&b[n].type==B_NEXUS&&
-        building_complete(n))for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0){
+        building_complete(n))for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0 && currently_visible(m[k].x,m[k].y)){
         int d=dist2(m[k].x,m[k].y,b[n].x,b[n].y);
         if(d<best){best=d;patch=k;}
     }
@@ -674,7 +674,7 @@ int main(int argc,char **argv)
             }
             if(ex>=0&&dist2(u[f].tx,u[f].ty,ex,ey)>48*48){
                 (void)hero_command(f,ex,ey);
-                next_hero=frame+900;
+                next_hero=frame+180;
             }
             next_evade=frame+120;
         }
@@ -754,7 +754,7 @@ int main(int argc,char **argv)
                 ax/=an;ay/=an;
                 if(dist2(u[z].tx,u[z].ty,ax,ay)>48*48)(void)hero_command(z,ax,ay);
             } else (void)hero_command(z,fenix_home_x+24,fenix_home_y);
-            next_hero=frame+900;
+            next_hero=frame+180;
             next_escort=frame+60;
         }
         /* While the save waits for a structure to warp in, skip the slow
@@ -769,7 +769,7 @@ int main(int argc,char **argv)
          * the army only for an assault. */
         if(!saving&&frame>=next_hero){
             int rx=start_x,ry=start_y;
-            if(home>=0){rx=b[home].x-80;ry=b[home].y-60;}
+            if(home>=0){rx=b[home].x;ry=b[home].y+48;}
             fenix_home_x=rx;fenix_home_y=ry;
             if((z>=0&&u[z].owner==RESCUABLE)||(f>=0&&u[f].owner==RESCUABLE)){
                 int t=z>=0&&u[z].owner==RESCUABLE?z:f;
@@ -780,7 +780,7 @@ int main(int argc,char **argv)
                 if(!attacking&&z>=0&&u[z].owner==SIDE&&dist2(u[z].x,u[z].y,rx+24,ry)>48*48)
                     (void)hero_command(z,rx+24,ry);
             }
-            next_hero=frame+900;
+            next_hero=frame+180;
         }
         /* Between assaults the army waits west of the build area. */
         if(!saving&&!attacking&&home>=0&&frame>=next_stage){
