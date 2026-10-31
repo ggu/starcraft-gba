@@ -60,6 +60,7 @@ static int race_shared_ordinary_prepare(Unit *q,int target,int flying,int damage
     int slot=(int)(q-u),raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
     if(slot<0||slot>=MAX_UNITS||!attack||!attack->weapon) return 0;
     if(!((raw==0 && attack->weapon_id==0 && hits==1) ||
+         (raw==1 && flying && attack->weapon_id==2 && hits==1) ||
          (raw==70 && flying && attack->weapon_id==74 && hits==2) ||
          (raw==3 && flying && attack->weapon_id==8 && hits==2) ||
          (raw==2 && !flying && attack->weapon_id==4 && hits==1) ||

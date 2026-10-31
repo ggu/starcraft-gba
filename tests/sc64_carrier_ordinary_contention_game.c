@@ -53,11 +53,13 @@ int main(void)
     int m2=scenario(0,98,0),m1=scenario(0,99,0),m0=scenario(0,100,0);
     int s2=scenario(70,98,0),s1=scenario(70,99,0),s0=scenario(70,100,0);
     int w2=scenario(8,98,0),w1=scenario(8,99,0),w0=scenario(8,100,0);
+    int g2=scenario(1,98,0),g1=scenario(1,99,0),g0=scenario(1,100,0);
     int ba2=scenario(12,98,0),ba1=scenario(12,99,0),ba0=scenario(12,100,0);
     int bg2=scenario(12,98,1),bg1=scenario(12,99,1),bg0=scenario(12,100,1);
     assert(m2==m1 && m1>0 && !m0);
     assert(s2==2*s1 && s1>0 && !s0);
     assert(w2==w1 && w1>0 && !w0);
+    assert(g2==g1 && g1>0 && !g0);
     assert(ba2==ba1 && ba1>0 && !ba0);
     assert(bg2==bg1 && bg1>0 && !bg0);
     /* Exercise the regular game-update dispatcher at a full arena. */
