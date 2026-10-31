@@ -36,12 +36,12 @@ static void check_jobs(int map)
     for (int i = 0; i < 4; ++i) assert(race_skirmish_transport_tech.owner[i].researched);
 }
 
-static void check_cargo(int map, int human)
+static void check_cargo(int map, int human, int bots)
 {
     static const int raw_carriers[3] = {11, 42, 69};
     static const int passengers[3] = {U_MARINE, U_ZERGLING, U_ZEALOT};
     int type, ship, passenger;
-    launch(map, human, 3, -1);
+    launch(map, human, bots, -1);
     if (human == R_ZERG) race_skirmish_transport_tech.owner[0].researched = 1;
     type = sc64_race_unit_from_raw(raw_carriers[human]);
     assert(type >= 0);
@@ -80,7 +80,8 @@ int main(void)
     gba_init();
     for (int map = 0; map <= SC64_SKIRMISH_IMPORTED_COUNT; ++map) {
         check_jobs(map);
-        for (int race = 0; race < 3; ++race) check_cargo(map, race);
+        for (int race = 0; race < 3; ++race)
+            for (int bots = 1; bots <= 3; ++bots) check_cargo(map, race, bots);
     }
     puts("shared custom transport research/save: ok");
     return 0;
