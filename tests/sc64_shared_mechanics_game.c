@@ -375,6 +375,50 @@ static void test_construction_save_compatibility(void)
     expect_candidate_rejected();
 }
 
+#ifdef SC64_SAVE_UI_CONTEXT
+static void test_ui_save_context(int human)
+{
+    game_init();
+    race_mode=1; race_human=human; race_bots=1; race_skirmish_map=0;
+    race_skirmish_init(); screen=SCREEN_PLAY;
+    int building=spawn_build(SIDE, foundation_for_race(human),320,320,0);
+    assert(building>=0); selected_building=building; menu_cursor=3;
+#ifdef SC_FIELD_FEEDBACK
+    menu_last=2;
+#endif
+    assert(race_save_game()); saved_candidate=race_data;
+    selected_building=-1; menu_cursor=0;
+#ifdef SC_FIELD_FEEDBACK
+    menu_last=0;
+#endif
+    assert(race_load_game()); assert(selected_building==building && menu_cursor==3);
+#ifdef SC_FIELD_FEEDBACK
+    assert(menu_last==2);
+#endif
+    /* Legacy zero keeps the historical selection reset. */
+    saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=0;
+    save_write(&saved_candidate,sizeof(saved_candidate),SAVE_VERSION);
+    selected_building=building; assert(race_load_game()); assert(selected_building==-1);
+    /* A valid encoded slot that is now absent is harmless. */
+    int absent=-1; for(int i=0;i<MAX_BUILDINGS;i++) if(!b[i].alive) { absent=i; break; }
+    assert(absent>=0);
+    saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=(int)sc64_save_ui_encode(absent,MAX_BUILDINGS,3,2);
+    save_write(&saved_candidate,sizeof(saved_candidate),SAVE_VERSION);
+    assert(race_load_game()); assert(selected_building==-1);
+    const unsigned invalid[] = {0x12345678u,SC64_SAVE_UI_TAG | (MAX_BUILDINGS+1u),
+                                SC64_SAVE_UI_TAG | (64u<<8),SC64_SAVE_UI_TAG | (64u<<16)};
+    for (unsigned i=0;i<sizeof(invalid)/sizeof(invalid[0]);++i) {
+        saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=(int)invalid[i]; expect_candidate_rejected();
+    }
+    selected_building=MAX_BUILDINGS+5; menu_cursor=300;
+#ifdef SC_FIELD_FEEDBACK
+    menu_last=255;
+#endif
+    assert(race_save_game());
+    assert((unsigned)race_data.state[SC64_SAVE_UI_STATE_INDEX] == SC64_SAVE_UI_TAG);
+}
+#endif
+
 int main(void)
 {
     for (int mode = 0; mode <= 1; ++mode) {
@@ -388,6 +432,9 @@ int main(void)
     }
     test_construction_save_compatibility();
     test_burn_save_compatibility();
+#ifdef SC64_SAVE_UI_CONTEXT
+    for (int race=R_TER;race<=R_PROTOSS;++race) test_ui_save_context(race);
+#endif
 #ifdef SC64_T6_RUNTIME
     test_burn_fraction_repair(0);
     test_burn_fraction_repair(1);
