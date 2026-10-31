@@ -1046,6 +1046,10 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
 }
 #endif
 static int race_save_game(void) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    /* The experimental typed reservations have no persistent codec yet. */
+    if(sc64_shared_projectiles.active) return 0;
+#endif
 #ifdef SC64_SHARED_DEFILER_STAGE
     /* Experimental Defiler energy, pending cast and field state have no
      * save schema. Refuse rather than serialize a misleading partial world. */
@@ -2777,6 +2781,11 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 }
 #endif
 static int race_load_game(void) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    /* Existing saves lack typed reservations; never overwrite active stage
+     * projectiles while this experimental reconstruction is unsupported. */
+    if(sc64_shared_projectiles.active) return 0;
+#endif
     RaceLoadPlan plan = {0};
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     GbaSaveSelection selected;

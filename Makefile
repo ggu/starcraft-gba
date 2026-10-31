@@ -4299,6 +4299,12 @@ test-starcraft: test-sc64-interceptor-motion
 # slots. Child training/flight/weapon-event integration remains separate.
 P7_PROJECTILE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_P7_PROJECTILES_ENABLED
 P7_PROJECTILE_SOURCES := starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_pool_codec.c
+# Isolated typed-arena experiment; canonical flags remain unchanged.
+.PHONY: test-sc64-shared-projectile-stage
+build/test-sc64-shared-projectile-stage: tests/sc64_shared_projectile_stage_game.c starcraft/sc64_shared_projectile_stage.h $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) -DSC64_SHARED_PROJECTILE_STAGE $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+test-sc64-shared-projectile-stage: build/test-sc64-shared-projectile-stage
+	./build/test-sc64-shared-projectile-stage
 build/test-sc64-p7-projectile: tests/sc64_p7_projectile_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_PROJECTILE_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
 .PHONY: test-sc64-p7-projectile protoss-p7-projectile-probe

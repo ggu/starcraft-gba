@@ -17,9 +17,23 @@ static Sc64Arena race_p7_projectiles={SC64_OBJ_VRAM_PROJECTILES,SC64_ARENA_WORDS
 #define race_p7_projectile_host_words ((u16 *)(void *)GBA_VRAM_SCRATCH)
 #endif
 static u8 race_p7_projectile_fault;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+static u32 sc64_shared_interceptor_handles[SC64_POOL_CAPACITY];
+static void sc64_shared_interceptor_clear(void)
+{
+    for(unsigned i=0;i<SC64_POOL_CAPACITY;++i) if(sc64_shared_interceptor_handles[i]) {
+        (void)sc64_shared_projectile_release(&sc64_shared_projectiles,
+            sc64_shared_interceptor_handles[i],SC64_SHARED_PROJECTILE_INTERCEPTOR,i);
+        sc64_shared_interceptor_handles[i]=0;
+    }
+}
+#endif
 
 static void race_p7_projectile_reset(void)
 {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    sc64_shared_interceptor_clear();
+#endif
     race_p7_projectile_fault=(u8)!sc64_pool_init(&race_p7_projectiles);
 }
 
@@ -31,7 +45,26 @@ static int race_p7_projectile_encode(u8 *packet)
 
 static int race_p7_projectile_restore(const u8 *packet)
 {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    /* Do not overwrite another family's live reservation on an experimental
+     * load. The shared typed codec is not implemented yet. */
+    if(sc64_shared_projectiles.active) return 0;
+#endif
     if (!sc64_codec_decode(&race_p7_projectiles,packet,SC64_CODEC_BYTES)) return 0;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    {
+        u8 id=sc64_pool_active_head(&race_p7_projectiles); unsigned steps=0;
+        memset(sc64_shared_interceptor_handles,0,sizeof(sc64_shared_interceptor_handles));
+        while(id!=SC64_END && steps++<SC64_POOL_CAPACITY) {
+            Sc64ProjectileRow row; u32 handle;
+            if(!sc64_pool_get_row(&race_p7_projectiles,id,&row)) return 0;
+            handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,SC64_SHARED_PROJECTILE_INTERCEPTOR,id);
+            if(!handle) return 0;
+            sc64_shared_interceptor_handles[id]=handle; id=row.next_link;
+        }
+        if(id!=SC64_END) return 0;
+    }
+#endif
     race_p7_projectile_fault=0;
     return 1;
 }
@@ -108,8 +141,20 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
             (s16)(target_x(target)*2),(s16)(target_y(target)*2),heading,
             (u16)target,(u8)shooter,(u8)u[shooter].raw_owner)) return 0;
     if (!sc64_pool_acquire(&race_p7_projectiles,&id,&native_index)) return 0;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    u32 shared_handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,
+        SC64_SHARED_PROJECTILE_INTERCEPTOR,id);
+    if(!shared_handle) { (void)sc64_pool_retire(&race_p7_projectiles,id); return 0; }
+    sc64_shared_interceptor_handles[id]=shared_handle;
+#endif
     (void)native_index;
     if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+        (void)sc64_shared_projectile_release(&sc64_shared_projectiles,shared_handle,
+            SC64_SHARED_PROJECTILE_INTERCEPTOR,id);
+        sc64_shared_interceptor_handles[id]=0;
+        (void)sc64_pool_retire(&race_p7_projectiles,id);
+#endif
         race_p7_projectile_fault=1; return 0;
     }
     return 1;
@@ -138,7 +183,14 @@ static void race_p7_projectile_source_tick(void)
         /* The pulse is consumed inside this complete update. A saved DYING
          * row must never reapply it after load. Commit before callbacks. */
         row.pending_damage_event=0;
-        if (row.state==3 && !sc64_pool_retire(&race_p7_projectiles,id)) break;
+        if (row.state==3) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+            if(!sc64_shared_projectile_release(&sc64_shared_projectiles,
+               sc64_shared_interceptor_handles[id],SC64_SHARED_PROJECTILE_INTERCEPTOR,id)) break;
+            sc64_shared_interceptor_handles[id]=0;
+#endif
+            if(!sc64_pool_retire(&race_p7_projectiles,id)) break;
+        }
         if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) break;
         if (impact && race_p7_projectile_target_alive(row.target_ref)) {
             int owner=race_p7_source_owner(row.raw_source_owner);

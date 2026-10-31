@@ -197,3 +197,31 @@ ordinary raw-46 actor; imported raw-52 hero and other menu vectors remain to be
 qualified. The intent is not yet consumed by the simulation: source heading,
 approach, animation, projectile and field transitions remain required. This
 checkpoint is therefore not playable Dark Swarm support.
+
+### Typed projectile reservation stage
+
+`SC64_SHARED_PROJECTILE_STAGE` adds a 100-entry typed reservation arena and
+routes actual P7 Interceptor projectile creation and retirement through it;
+existing Interceptor motion, drawing and damage remain in their original arena.
+A failed typed reservation rolls back the newly acquired Interceptor slot;
+shooter death invalidates references without retiring an in-flight shot.
+Reset invalidates outstanding reservation handles. A validated older P7
+projectile packet can reconstruct Interceptor reservations into an empty stage
+arena. Saving or loading is refused while the experimental typed arena is
+active, pending a supported transactional codec.
+
+The sanitizer fixture fills 99 reservations as a synthetic second type, launches
+one real Interceptor projectile, verifies that a second real launch fails at
+100, frees a reservation and successfully launches again. It also checks
+wrong-type and stale-handle rejection, shooter death, eventual retirement,
+reset and old Interceptor packet reconstruction. The second type in this test
+is a reservation, not a real Yamato launch. The normal flags remain off.
+
+This is not yet the source-wide allocator: real Yamato, ordinary pending
+impacts and Dark Swarm are not routed through it, so there is not yet honest
+competition among all live projectile families. The 16-bit generation may
+wrap under repeated slot reuse and must be addressed before activation; save
+migration, all four profile bounds and source allocation failure semantics also
+remain unqualified. The earlier menu-count wrapper was fixed to retain its
+actual function symbol with the stage gate off; the exact gate-off P7 delayed
+impact/save and 18 skirmish setups pass.

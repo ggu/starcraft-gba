@@ -983,6 +983,10 @@ _Static_assert(sizeof(SaveData) <= 16368, "Save exceeds an alternating SRAM reco
 static SaveData data;
 #endif
 static Unit u[MAX_UNITS];
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+#include "sc64_shared_projectile_stage.h"
+static Sc64SharedProjectileArena sc64_shared_projectiles;
+#endif
 #ifdef SC64_SHARED_DEFILER_STAGE
 /* Experimental simulation state; never borrow presentation-facing or a
  * mission payload. Save remains refused while an experimental caster lives. */
@@ -4822,6 +4826,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    sc64_shared_projectile_reset(&sc64_shared_projectiles);
+#endif
 #ifdef SC64_SHARED_DEFILER_STAGE
     memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
 #endif
@@ -5077,6 +5084,9 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    sc64_shared_projectile_reset(&sc64_shared_projectiles);
+#endif
 #ifdef SC64_SHARED_DEFILER_STAGE
     memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
 #endif
@@ -6125,12 +6135,14 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
         "NEXUS" : labels[choice];
 }
 
-#ifdef SC64_SHARED_DEFILER_STAGE
 static int field_menu_count(void)
-{ return field_menu_count_base() + (sc64_defiler_stage_selected()>=0); }
+{
+#ifdef SC64_SHARED_DEFILER_STAGE
+    return field_menu_count_base() + (sc64_defiler_stage_selected()>=0);
 #else
-#define field_menu_count() field_menu_count_base()
+    return field_menu_count_base();
 #endif
+}
 
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
