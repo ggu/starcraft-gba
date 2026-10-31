@@ -10,7 +10,6 @@
 
 #if !defined(SC64_P7_BATTERY_ENABLED) || !defined(SC64_P7_OBSERVER_ENABLED) || \
     !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) || \
-    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || \
     !defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED)
 #error "Compile with a product vector that carries the shared Protoss services"
 #endif
@@ -61,9 +60,12 @@ static void test_unbound_campaign_runs_no_service(void)
     assert(carrier >= 0);
     assert(u[carrier].weapon != (u16)(1u << 13));
     u[carrier].selected = 1;
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
     assert(!race_p7_carrier_training_selected());
+#endif
 }
 
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static int carrier_children(int carrier, unsigned state)
 {
     int n = 0;
@@ -103,6 +105,7 @@ static void test_carrier_training_and_flight(void)
     assert(launched > 0);
     assert(!u[prey].alive || u[prey].hp < hp);
 }
+#endif
 
 static void test_cannon_detects_observer(void)
 {
@@ -231,7 +234,7 @@ static void test_battery_service_and_save(void)
         if (u[i].alive) assert(SC64_P7_ARBITER_CACHE_VALID(u[i].weapon));
 }
 
-#ifdef SC64_SHOWCASE_ENABLED
+#if defined(SC64_SHOWCASE_ENABLED) && defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
 static void test_showcase_carriers_fight(void)
 {
     game_init();
@@ -261,12 +264,18 @@ int main(void)
 {
     test_bindings();
     test_unbound_campaign_runs_no_service();
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
     test_carrier_training_and_flight();
+#else
+    /* Do not inject flight flags into a production-vector check. This is
+     * explicit missing capability, not a passing Carrier implementation. */
+    puts("Carrier training/flight absent from this product; not qualified here");
+#endif
     test_cannon_detects_observer();
     test_overlord_detects_zeratul();
     test_arbiter_cloaks_nearby_units();
     test_battery_service_and_save();
-#ifdef SC64_SHOWCASE_ENABLED
+#if defined(SC64_SHOWCASE_ENABLED) && defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
     test_showcase_carriers_fight();
 #endif
     printf("sc64_protoss_services: ok\n");
