@@ -325,3 +325,11 @@ These are synthetic OpenBW-world observations using the pinned source header and
 owned input tables, not native N64 execution or proof for moving casters,
 obstacles, interruption or other scheduler phases. The added harness input does
 not implement the staged Defiler order, projectile, field, or save state.
+
+`tests/sc64_openbw_ordinary_projectile_world.cpp` retains the reproducible
+ordinary allocation probe. It validates the six controlled occupancy cases,
+including spent cooldown, expected first-release bullet count and no first
+impact when full, using private authenticated OpenBW input tables and the
+synthetic walkable map. All six assertion runs exited zero. Its first-release
+sample numbers are fixture-specific and are not used as a general-purpose
+GBA scheduler or a claim of complete ordinary-projectile integration.
