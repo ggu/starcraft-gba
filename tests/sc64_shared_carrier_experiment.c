@@ -32,13 +32,27 @@ int main(void)
         if (children(carrier,SC64_P7_INTERCEPTOR_OUTSIDE)) launched=1;
     }
     assert(launched && (!u[prey].alive || u[prey].hp<hp));
+    int doomed=spawn_unit(SIDE,SC64_CARRIER_TYPE,700,700);
+    int victim=spawn_unit(ENEMY,U_ZERGLING,790,700);
+    assert(doomed>=0 && victim>=0 && race_p7_carrier_training_stock(doomed,1)==1);
+    for (int i=0;i<80 && !children(doomed,SC64_P7_INTERCEPTOR_OUTSIDE);++i)
+        game_update(0,0);
+    int child=-1;
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && u[i].type==SC64_INTERCEPTOR_TYPE && u[i].build==doomed &&
+            sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE) child=i;
+    assert(child>=0);
+    hit_target(doomed,10000,U_MARINE,ENEMY);
+    assert(!u[doomed].alive && u[child].alive && u[child].build==-1 &&
+           sc64_p7_carrier_child_state(&u[child])==SC64_P7_INTERCEPTOR_DETACHED);
     /* Each custom-game opponent uses its own wallet and actor binding. */
     for (int owner=1; owner<5; ++owner) {
         if (owner==SIDE) continue;
         int bot=spawn_unit(owner,SC64_CARRIER_TYPE,500+owner*16,500);
         assert(bot>=0); race_minerals[owner]=25;
         assert(!race_p7_carrier_training_queue_owner(bot,SIDE));
-        assert(race_p7_carrier_training_queue_owner(bot,owner));
+        race_ai_plan(owner);
+        assert(u[bot].carry==1);
         assert(race_minerals[owner]==0);
         assert(!race_p7_carrier_training_queue_owner(bot,owner));
         race_p7_carrier_training_source_tick();
