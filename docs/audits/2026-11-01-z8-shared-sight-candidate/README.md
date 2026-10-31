@@ -1,0 +1,7 @@
+# Z8 shared source-sight candidate
+
+This candidate uses the shared raw source-sight facts for Z8 units and buildings after existing scenario-specific fact precedence. It derives the starting Overlord's Dark Templar detection radius from the same source sight fact at half scale. It preserves the existing grounded Spore detector cap and does not grant Antennae or change other profiles. The existing unfinished-building and in-place-morph visibility keys now also apply to Z8, so cache removal uses the same identity that was added.
+
+The focused prepared-input fixture compares incremental visibility to a full-cell scan across movement, loaded-unit removal, building completion and morph changes; checks profile isolation and detector boundaries; and exercises ordinary save/load visibility reconstruction. The separate existing full Z8 fixture was updated for the new source-derived radius but is not required by this focused target. These are proposed tests until a qualified native run is recorded.
+
+Z8 does not activate the optional Z7 source-sight span fast path. Wider source sight therefore uses scalar remove/add visibility updates for moving actors; increasing an Overlord footprint from the previous generic radius may increase work. A paired corrected-clock Z8 performance window and ARM memory guards are required before promotion. Source-derived ranges and center-distance detection remain a bounded project/reference model; exact N64 detection geometry is not established.
