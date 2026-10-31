@@ -34,6 +34,84 @@ static int check_legacy_candidate(const void *data,u32 length,u32 tag,void *cont
     if (!race_load_preflight(plan)) { fprintf(stderr,"legacy game preflight failed length=%u expanded=%zu tag=%08x\n",length,expanded,tag); return 0; }
     return 1;
 }
+
+/* This intentionally validates only the staged actor/shot payload. The
+ * product's complete metadata, sidecars and non-failing live commit are not
+ * wired to this probe, so it is not a game-save implementation. */
+static int check_probe_candidate(const void *data,u32 length,u32 tag,void *context)
+{
+    if (tag==SAVE_VERSION) return check_legacy_candidate(data,length,tag,context);
+    if (tag!=SC64_SHARED_CARRIER_SAVE_VERSION || length!=sizeof(RaceSave) ||
+        ((const RaceSave *)data)->version!=tag) return 0;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    Unit *scratch=sc64_zp_route_save_scratch.carrier_candidate.units;
+#else
+    Unit *scratch=sc64_combined_route_save_scratch.carrier_candidate.units;
+#endif
+    return sc64_shared_carrier_candidate_valid(data,scratch,MAX_UNITS,
+                                                (unsigned)race_cols*16u,
+                                                (unsigned)race_rows*16u);
+}
+
+static void test_staged_journal_migration(const GbaSaveSelection *previous)
+{
+    static u8 predecessor[SAVE_SLOT_SIZE];
+    static Unit before_units[MAX_UNITS];
+    static Building before_buildings[MAX_BUILDINGS];
+    static u8 before_vram[GBA_VRAM_SCRATCH_BYTES];
+    static RaceLoadPlan plan;
+    const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION};
+    GbaSaveSelection selected;
+    assert(previous->slot==0 || previous->slot==1);
+    memcpy(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,sizeof(predecessor));
+
+    game_init(); race_mode=1; race_human=R_PROTOSS; race_bots=1;
+    race_skirmish_map=0; race_skirmish_init(); screen=SCREEN_PLAY;
+    int carrier=spawn_unit(SIDE,SC64_CARRIER_TYPE,600,600);
+    int target=spawn_unit(ENEMY,U_ZERGLING,660,600);
+    assert(carrier>=0 && target>=0 && race_p7_carrier_training_stock(carrier,1)==1);
+    for (int i=0;i<240 && sc64_pool_active_head(&race_p7_projectiles)==SC64_END;++i)
+        game_update(0,0);
+    assert(sc64_pool_active_head(&race_p7_projectiles)!=SC64_END);
+    memset(&race_data,0,sizeof(race_data));
+    assert(sc64_shared_carrier_candidate_encode(&race_data,u,b,&race_p7_projectiles,
+                                                (unsigned)race_cols*16u,
+                                                (unsigned)race_rows*16u));
+    race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
+    assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
+                               previous,tags,2));
+    assert(!memcmp(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,
+                   sizeof(predecessor)));
+    memcpy(before_units,u,sizeof(u)); memcpy(before_buildings,b,sizeof(b));
+    memcpy(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram));
+    int old_frame=frame, old_minerals=minerals, old_gas=gas, old_mode=race_mode;
+    u32 old_seed=seed;
+    u8 old_clock[3]; memcpy(old_clock,race_protoss_generic_clock,sizeof(old_clock));
+#ifdef SC64_IMPACT_EVENTS
+    assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,2,
+                                 check_probe_candidate,&plan,&selected));
+#else
+    assert(save_select_validated(&race_data,sizeof(race_data),tags,2,
+                                 check_probe_candidate,&plan,&selected));
+#endif
+    assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION && selected.slot!=previous->slot);
+    save_test_corrupt_latest(sizeof(RaceSave),SC64_SHARED_CARRIER_SAVE_VERSION);
+#ifdef SC64_IMPACT_EVENTS
+    assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,2,
+                                 check_probe_candidate,&plan,&selected));
+#else
+    assert(save_select_validated(&race_data,sizeof(race_data),tags,2,
+                                 check_probe_candidate,&plan,&selected));
+#endif
+    assert(selected.tag==SAVE_VERSION && selected.slot==previous->slot);
+    assert(!memcmp(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,
+                   sizeof(predecessor)));
+    assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
+           !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)));
+    assert(frame==old_frame && minerals==old_minerals && gas==old_gas &&
+           race_mode==old_mode && seed==old_seed &&
+           !memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
+}
 #endif
 
 int main(int argc,char **argv)
@@ -77,6 +155,8 @@ int main(int argc,char **argv)
            race_human==old_human && race_bots==old_bots && screen==old_screen && seed==old_seed);
     assert(!memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
     puts("legacy journal preflight: ok");
+    test_staged_journal_migration(&selected);
+    puts("staged actor/shot journal migration: ok");
 #else
     game_init();
     if (campaign) {
