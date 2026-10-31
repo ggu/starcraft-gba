@@ -369,8 +369,17 @@ int main(int argc,char **argv)
 #ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
     /* Actual entry point loads the predecessor; campaign writes retain the
      * old envelope so a separate unmodified reader can consume them. */
+    u8 stale_ordinal, stale_index;
+    assert(sc64_pool_acquire(&race_p7_projectiles,&stale_ordinal,&stale_index));
+    race_protoss_generic_clock[0]=2; race_protoss_generic_clock[1]=7;
+    race_p7_projectile_fault=1;
     assert(race_load_game());
     assert(race_mode==!campaign);
+    assert(sc64_pool_active_head(&race_p7_projectiles)==SC64_END && !race_p7_projectile_fault);
+#ifndef SC64_P7_BATTERY_ENABLED
+    assert(!race_protoss_generic_clock[0] && !race_protoss_generic_clock[1] &&
+           !race_protoss_generic_clock[2]);
+#endif
     if (campaign) {
         assert(race_save_game());
         if (argc==4) {

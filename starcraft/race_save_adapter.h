@@ -3618,6 +3618,17 @@ race_shared_carrier_legacy_commit: ;
      * projectile arena. The candidate packet already passed full preflight. */
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
 #endif
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    /* A predecessor has no shared Carrier packet. Clear any arena left by a
+     * newer live world only after its complete legacy preflight and rebinds. */
+    race_p7_projectile_reset();
+#ifndef SC64_P7_BATTERY_ENABLED
+    memset(race_protoss_generic_clock,0,sizeof(race_protoss_generic_clock));
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    sc64_p7_arbiter_cache_due=0; sc64_p7_arbiter_cache_initialized=0;
+#endif
+#endif
+#endif
     clear_tracers();death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
 #ifdef SC64_IMPACT_EVENTS
     race_impact_restore(plan.impact_candidate,plan.impact_candidate_count);

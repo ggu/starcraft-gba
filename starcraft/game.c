@@ -481,6 +481,9 @@ _Static_assert((SAVE_VERSION & 0x04000000u) == 0 &&
 #if defined(SC64_SHARED_CARRIER_SAVE_EXPERIMENT) && !defined(SC64_SHARED_CARRIER_SAVE_VERSION)
 #error "Shared Carrier save experiment requires the shared custom Carrier format"
 #endif
+#if defined(SC64_SHARED_CARRIER_SAVE_EXPERIMENT) && defined(SC64_SCARAB_NAMESPACE_STAGE)
+#error "Carrier and Scarab experimental save namespaces require a combined codec"
+#endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
 #endif
