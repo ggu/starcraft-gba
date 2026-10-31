@@ -197,9 +197,9 @@ a universal derivation of IScript and bullet scheduling. The experimental
 resolver uses the source unit rectangle and length helper, enemy-splash radii
 20/40/60, 100 base or test-injected Scarab upgrade 125, the engine's existing
 normal-damage armor/shield path, same-owner exclusion and ground-only unit
-filtering. Buildings, explicit-friendly-target exceptions, owner/slot reuse,
-upgrade research/persistence and fractional half/quarter damage fidelity are
-not implemented. The fixed pool and separate owner bit are global experimental
+filtering. At that checkpoint, buildings, explicit-friendly-target exceptions,
+owner/slot reuse, upgrade research/persistence and fractional half/quarter
+damage fidelity were not implemented. The fixed pool and separate owner bit are global experimental
 state; no per-child array was added. This does not register normal gameplay.
 
 The ASan/UBSan actual game-update fixture uses ordinary attack-move input with
@@ -213,3 +213,36 @@ single Terran old-branch normal-recipe link with all probe flags kept the
 existing guards (`__bss_end=0x020370e0`, `__iwram_end=0x03004f00`), only
 256 bytes below the strict IWRAM limit; this is not a current-product matrix,
 ARM replay, timing or hardware qualification. All probes remain off.
+
+### Building and explicit-target extension
+
+The same disabled experiment now admits grounded building targets and includes
+them in splash, using their source raw bounds and the existing building damage
+and destruction path. Its axial GBA route adaptation checks the target's actual
+source rectangle rather than treating the engine's larger navigation padding
+as physical collision. This is not source-equivalent building pathing; diagonal,
+blocked and airborne cases need further work.
+
+Pinned OpenBW `bullet_deal_splash_damage` excludes same-owner units except
+the bullet's explicit target. The probe now carries that target identity and
+invalidates it on the existing unit/building damage-death and slot-reuse hooks,
+so an ownership change of the same live target is distinguished from a reused
+slot. Other removal/transfer paths must still be audited. Source damage divides
+the Q8 packet before armor and shields; the probe now retains Q8 through that
+calculation, but the engine stores integer HP and shield values, so fractional
+residue is discarded at that boundary. It does not claim exact repeated
+fractional shield or HP outcomes, shield-upgrade semantics, hallucinations or
+all source modifiers.
+
+Nine ASan/UBSan actual-update cases cover the previous base/upgrade/full-pool
+checks plus a paid child targeting and damaging or destroying a building,
+an explicit target changing to the shooter's owner, target death followed by
+same-slot friendly reuse, shield absorption and a 62.5-Q8 middle splash
+quantized to 62 integer HP. The controlled ownership change, reuse and durable
+health values are fixture setup. No generic parent hit is allowed. The retained
+one-case five-source-tick delay is not general source-bullet scheduling proof.
+Compile and run receipts are `scarab-weapon-building-{compile,runs}.json` in
+`.local/decoder-proof`. The single older-branch Terran experimental ARM link
+at `scarab-weapon-building-arm-link.json` passes unchanged guards at
+`__bss_end=0x020370e8`, `__iwram_end=0x03004f00`; this is neither four-profile
+qualification nor evidence to enable the probe in products.
