@@ -5278,6 +5278,7 @@ test-sc64-shared-mechanics: build/test-sc64-shared-mechanics-terran build/test-s
 
 include tests/sc64-save-ui-context/Makefile
 include tests/sc64-z8-nydus-art/Makefile
+include tests/sc64-colony/Makefile
 
 # Shared Protoss unit services (Carrier Interceptors, cloak and detection,
 # Shield Batteries) in custom games and Showcase scenes, on the production

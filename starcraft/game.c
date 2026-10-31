@@ -1578,12 +1578,14 @@ static int race_z7_egg_cancel_available(void);
 static int race_z7_egg_cancel_selected(void);
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-static int race_z7_colony_start_sunken(int building);
-static int race_z7_colony_start_spore(int building);
-static int race_z7_colony_morph_available_for(int building,int target_type);
+static int race_colony_profile_allowed(void);
+static int race_colony_product_allowed(int owner,int raw_owner,int type);
+static int race_colony_start_sunken(int building);
+static int race_colony_start_spore(int building);
+static int race_colony_morph_available_for(int building,int target_type);
 static int race_z7_spore_morph_command_available(void);
-static int race_z7_colony_pre_building_tick(void);
-static int race_z7_colony_post_building_tick(void);
+static int race_colony_pre_building_tick(void);
+static int race_colony_post_building_tick(void);
 #endif
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
@@ -1601,6 +1603,7 @@ static int race_p7_archon_splash_attack(Unit *q, int target);
 static int race_z8_active(void);
 static int race_z8_map_shape_valid(const Sc64RaceMap *map);
 static int race_z8_source_owner(unsigned slot);
+static int race_z8_colony_product_available(int owner,int raw_owner,int type);
 static int race_z8_runtime_init(const Sc64RaceMap *map);
 static int race_z8_runtime_tick(void);
 static int race_z8_outcome(void);
@@ -5625,29 +5628,59 @@ static int race_selected_storm_hero(void)
 #endif
 
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-static int race_z7_colony_command_available(void)
+/* Admission remains profile-owned until each profile has source permissions,
+ * asset and save qualification. Shared mechanics do not activate missions. */
+static int race_colony_profile_allowed(void)
 {
-    if (!race_z7_active() || race_human!=R_ZERG || selected_building<0 ||
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) return 1;
+#endif
+    return race_z7_active();
+}
+
+static int race_colony_owner_allowed(int owner, int raw_owner)
+{
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) return owner==SIDE && raw_owner>=0 &&
+        race_z8_source_owner((unsigned)raw_owner)==owner;
+#endif
+    return race_z7_active() && owner==SIDE && raw_owner==race_z7_product_source_owner(owner);
+}
+
+static int race_colony_product_allowed(int owner, int raw_owner, int type)
+{
+    (void)type;
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) return race_z8_colony_product_available(owner,raw_owner,type);
+#endif
+    return race_z7_active() && owner==SIDE && raw_owner==race_z7_product_source_owner(owner);
+}
+
+static int race_colony_command_available(void)
+{
+    if (!race_colony_profile_allowed() || race_human!=R_ZERG || selected_building<0 ||
         selected_building>=MAX_BUILDINGS) return 0;
     for (unsigned i=0; i<MAX_UNITS; ++i)
         if (u[i].alive && u[i].selected) return 0;
     const Building *q=&b[selected_building];
     return q->alive && q->owner==SIDE && q->type==B_CREEP_COLONY &&
-        q->raw_type==sc64_race_raw_building(B_CREEP_COLONY) && q->raw_owner==3;
+        q->raw_type==sc64_race_raw_building(B_CREEP_COLONY) &&
+        race_colony_owner_allowed(q->owner,q->raw_owner);
 }
 
 static int race_z7_spore_morph_command_available(void)
 {
-    return race_z7_colony_command_available() &&
-        race_z7_colony_morph_available_for(selected_building,B_SPORE_COLONY);
+    return race_colony_command_available() &&
+        race_colony_morph_available_for(selected_building,B_SPORE_COLONY);
 }
 
 static int race_z7_creep_command_available(void)
 {
     int found=0;
-    if (!race_z7_active() || race_human!=R_ZERG || selected_building>=0) return 0;
+    if (!race_colony_profile_allowed() || race_human!=R_ZERG || selected_building>=0) return 0;
     for (unsigned i=0; i<MAX_UNITS; ++i) if (u[i].alive && u[i].selected) {
-        if (u[i].owner!=SIDE || u[i].type!=U_DRONE) return 0;
+        if (u[i].owner!=SIDE || u[i].type!=U_DRONE ||
+            !race_colony_product_allowed(u[i].owner,u[i].raw_owner,B_CREEP_COLONY)) return 0;
         found=1;
     }
     return found;
@@ -5858,13 +5891,13 @@ choose_command(int choice)
     }
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (choice==MENU_STOP+1 && race_z7_colony_command_available()) {
+    if (choice==MENU_STOP+1 && race_colony_command_available()) {
         menu_open=0; mode=MODE_NORMAL;
-        toast(race_z7_colony_start_sunken(selected_building)?3:8); return;
+        toast(race_colony_start_sunken(selected_building)?3:8); return;
     }
     if (choice==MENU_STOP+2 && race_z7_spore_morph_command_available()) {
         menu_open=0; mode=MODE_NORMAL;
-        toast(race_z7_colony_start_spore(selected_building)?3:8); return;
+        toast(race_colony_start_spore(selected_building)?3:8); return;
     }
     if (choice==MENU_Z7_CREEP) {
         menu_open=0;
@@ -6086,7 +6119,7 @@ static int field_menu_count(void)
     if (race_z7_egg_cancel_available()) return MENU_STOP + 2;
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (race_z7_colony_command_available())
+    if (race_colony_command_available())
         return MENU_STOP+2+race_z7_spore_morph_command_available();
 #endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
@@ -6187,7 +6220,7 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) return "CANCEL EGG";
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (choice==MENU_STOP+1 && race_z7_colony_command_available()) return "SUNKEN";
+    if (choice==MENU_STOP+1 && race_colony_command_available()) return "SUNKEN";
     if (choice==MENU_STOP+2 && race_z7_spore_morph_command_available()) return "SPORE";
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
@@ -7827,13 +7860,13 @@ update_production(void)
 {
 #ifdef SC64_RACES
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (!race_z7_colony_pre_building_tick()) {
+    if (!race_colony_pre_building_tick()) {
         ++mission_unsupported_count; screen=SCREEN_PAUSE; toast(14); return;
     }
 #endif
     race_tick_buildings();
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (!race_z7_colony_post_building_tick()) {
+    if (!race_colony_post_building_tick()) {
         ++mission_unsupported_count; screen=SCREEN_PAUSE; toast(14); return;
     }
 #endif
@@ -11842,7 +11875,7 @@ game_self_test(void)
 #include "sc64_p7_interceptor_flight.h"
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-#include "sc64_z7_colony_adapter.h"
+#include "sc64_colony_service.h"
 #endif
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_tech_adapter.h"

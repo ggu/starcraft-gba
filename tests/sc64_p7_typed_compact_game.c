@@ -75,6 +75,23 @@ static void test_p7_typed_building_codec(void)
     q.x=48; q.y=64; q.hp=q.maxhp=100000; q.owner=NEUTRAL;
     q.type=B_ZERG_BEACON; q.alive=1; q.raw_type=194; q.raw_owner=0;
     q.build_progress=-1;
+    /* A campaign colony morph's persisted marker and HP snapshot must
+     * survive this codec even though this profile does not enable Z8. */
+    memset(&q,0,sizeof(q));
+    q.x=100; q.y=100; q.hp=275; q.maxhp=400; q.alive=1;
+    q.owner=SIDE; q.type=B_CREEP_COLONY; q.raw_type=143; q.raw_owner=3;
+    q.under_construction=1; q.build_progress=87; q.queue_progress=275;
+    q.flags=0x4000u; /* staged Spore marker */
+    assert(sc64_p7_typed_building_encode(&row,&q,2048,2048));
+    assert(sc64_p7_typed_building_decode(&decoded,&row,2048,2048));
+    assert(decoded.type==q.type && decoded.raw_type==q.raw_type &&
+           decoded.raw_owner==q.raw_owner && decoded.flags==q.flags &&
+           decoded.queue_progress==q.queue_progress &&
+           decoded.build_progress==q.build_progress && decoded.hp==q.hp);
+    memset(&q,0,sizeof(q));
+    q.x=48; q.y=64; q.hp=q.maxhp=100000; q.owner=NEUTRAL;
+    q.type=B_ZERG_BEACON; q.alive=1; q.raw_type=194; q.raw_owner=0;
+    q.build_progress=-1;
     assert(sc64_p7_typed_building_maxhp(B_ZERG_BEACON)==100000);
     assert(sc64_p7_typed_building_encode(&row,&q,2048,2048));
     assert(sc64_p7_typed_building_decode(&decoded,&row,2048,2048));

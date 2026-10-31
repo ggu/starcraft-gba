@@ -265,6 +265,10 @@ ui_missing_tech(int type, int worker)
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_building_product_available(SIDE,worker>=0 ? u[worker].raw_owner : -1,type)) return "";
 #endif
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (type==B_CREEP_COLONY && race_colony_profile_allowed() &&
+        !race_colony_product_allowed(SIDE,worker>=0 ? u[worker].raw_owner : -1,type)) return "";
+#endif
     need = r->prereq;
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (race_z7_active() && type == B_EXTRACTOR) need &= ~(unsigned)SC_PR_HATCHERY;
