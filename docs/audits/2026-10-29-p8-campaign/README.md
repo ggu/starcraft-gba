@@ -580,3 +580,8 @@ boundary check passed. Consequently the two normal-ROM records above apply to
 these exact P8 ROM bytes; this does not transfer unrelated product results or
 close the candidate's remaining source-service and fidelity holds. P8 remains
 explicitly unpromoted.
+
+A separate clean, unprepared default build and test at `bf73484` passed:
+881 Python tests with 23 skips, subsequent 5- and 8-test groups, and remaining
+host/sanitizer fixtures. The default ROM SHA-256 was
+`73c0deeeb36cca4cb8614248a7e60cadac11a0ec542f2ece31c37b171e2c56b8`.
