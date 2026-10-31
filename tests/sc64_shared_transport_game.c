@@ -36,10 +36,43 @@ static void check_jobs(int map)
     for (int i = 0; i < 4; ++i) assert(race_skirmish_transport_tech.owner[i].researched);
 }
 
+static void check_cargo(int map, int human)
+{
+    static const int raw_carriers[3] = {11, 42, 69};
+    static const int passengers[3] = {U_MARINE, U_ZERGLING, U_ZEALOT};
+    int type, ship, passenger;
+    launch(map, human, 3, -1);
+    if (human == R_ZERG) race_skirmish_transport_tech.owner[0].researched = 1;
+    type = sc64_race_unit_from_raw(raw_carriers[human]);
+    assert(type >= 0);
+    ship = spawn_unit(SIDE, type, race_base_x[0], race_base_y[0]);
+    passenger = spawn_unit(SIDE, passengers[human], race_base_x[0], race_base_y[0]);
+    assert(ship >= 0 && passenger >= 0 && race_transport_carrier_valid(ship));
+    assert(race_transport_request_board(passenger, ship));
+    assert(race_transport_tick_unit(passenger));
+    assert(u[passenger].order == ORDER_TRANSPORTED);
+    assert(race_save_game());
+    assert(race_load_game());
+    assert(u[passenger].order == ORDER_TRANSPORTED && u[passenger].target == ship);
+    assert(race_transport_cargo_space(ship) > 0);
+    assert(race_transport_request_unload(ship, u[ship].x, u[ship].y));
+    for (int y = 1; y < race_rows - 1 && u[passenger].order == ORDER_TRANSPORTED; ++y)
+        for (int x = 1; x < race_cols - 1 && u[passenger].order == ORDER_TRANSPORTED; ++x) {
+            if (!is_traversable(x, y, -1)) continue;
+            u[ship].x = u[ship].tx = x * 16 + 8;
+            u[ship].y = u[ship].ty = y * 16 + 8;
+            race_transport_try_unload(ship);
+        }
+    assert(u[passenger].order == ORDER_IDLE);
+}
+
 int main(void)
 {
     gba_init();
-    for (int map = 0; map <= SC64_SKIRMISH_IMPORTED_COUNT; ++map) check_jobs(map);
+    for (int map = 0; map <= SC64_SKIRMISH_IMPORTED_COUNT; ++map) {
+        check_jobs(map);
+        for (int race = 0; race < 3; ++race) check_cargo(map, race);
+    }
     puts("shared custom transport research/save: ok");
     return 0;
 }
