@@ -1,5 +1,9 @@
 # Fixed-race campaign builds
 
+> Transport1 activation is a candidate pending its own runtime, save and
+> performance qualification. Earlier controller, replay and timing results
+> below refer to the pre-activation profiles unless explicitly stated.
+
 The standard Terran, Zerg and Protoss targets remain separate ROMs. The
 integrated Terran runtime now has controller-driven host wins and recorded
 normal-menu ARM wins for all ten Terran missions across frozen builds. The
@@ -35,7 +39,7 @@ campaign startup/save checks and the Outpost/Blood Bath race-and-AI matrix.
 
 Use `zerg` or `protoss` in place of `terran` for the other builds. `prepare` accepts a `.z64`, `.v64`, or `.n64` image, or a ZIP containing exactly one supported image. It verifies the image and uses the pinned `sc64-maps` extractor; the first preparation requires Git and network access to fetch that tool. `status` checks preparation and build outputs. Build and test do not need an emulator; `play` requires mGBA. See [Development](DEVELOPMENT.md) for tool requirements and [SC64 development notes](SC64.md) for import details.
 
-The default ROM targets are `build/StarCraft-Terran-GBA.gba`, `build/StarCraft-Zerg-Z7-GBA.gba`, and the P7 candidate `build/StarCraft-Protoss-P7-GBA.gba`. Explicit `protoss-p6` retains `build/StarCraft-Protoss-P6-GBA.gba` and its generation-30 identity. The candidate uses `.local/play/protoss-p7`; P6 uses `.local/play/protoss-p6`. Z7 uses `.local/play/zerg-z7`, explicit Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
+The default ROM targets are `build/StarCraft-Terran-Transport1-GBA.gba`, `build/StarCraft-Zerg-Z7-Transport1-GBA.gba`, and the P7 candidate `build/StarCraft-Protoss-P7-Transport1-GBA.gba`. Explicit `protoss-p6` retains `build/StarCraft-Protoss-P6-GBA.gba` and its generation-30 identity. Terran uses `.local/play/terran-transport1`; the candidate uses `.local/play/protoss-p7-transport1`; P6 uses `.local/play/protoss-p6`. Z7 uses `.local/play/zerg-z7-transport1`, explicit Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
 
 To build and test all three race campaigns, prepare `terran`, `zerg` and
 `protoss` with the same verified ROM, then run
@@ -137,8 +141,8 @@ remain unqualified in the canonical profiles.
 
 P8 **The Trial of Tassadar** has a separate, unpromoted `protoss-p8`
 candidate. It carries the canonical P1–P7 profile, is built with
-`make protoss-p8` and writes `StarCraft-Protoss-P8-GBA.gba` /
-`starcraft-protoss-p8.elf`, code `SCP8`, generation 44. P8 binds the shared
+`make protoss-p8` and writes `StarCraft-Protoss-P8-Transport1-GBA.gba` /
+`starcraft-protoss-p8.elf`, code `SCP8`, base generation 44 in the separate Transport1 namespace. P8 binds the shared
 Protoss unit services: Carrier Interceptor training and flight, Arbiter
 cloaking, detection, and Shield Batteries authenticated from its own map.
 Custom games and Showcase scenes bind the same services generically (see
@@ -178,12 +182,11 @@ Extractor. Gas depletion is still outside the shared engine model.
 
 Zerg 3 **The New Dominion**, Zerg 4 **Agent of the Swarm**, and Protoss 3
 **Higher Ground** are on the second campaign menu page. Canonical Zerg is
-`StarCraft-Zerg-Z7-GBA.gba` / `starcraft-zerg-z7.elf`, code `SCZ7`, generation
-36. Explicit `zerg-z6` retains `SCZ6`, generation 32. The explicit legacy `zerg-z4` target retains `StarCraft-Zerg-Z4-GBA.gba` /
+`StarCraft-Zerg-Z7-Transport1-GBA.gba` / `starcraft-zerg-z7.elf`, code `SCZ7`, base generation 36 in the separate Transport1 namespace. Explicit `zerg-z6` retains `SCZ6`, generation 32. The explicit legacy `zerg-z4` target retains `StarCraft-Zerg-Z4-GBA.gba` /
 `starcraft-zerg-z4.elf`, code `SCZ4`, generation 20. The explicit legacy `zerg-z3` target retains `StarCraft-Zerg-GBA.gba` /
 `starcraft-zerg.elf` (versioned `-Z3` names alias these), code `SCZ3`,
-generation 5. The P7 candidate uses `StarCraft-Protoss-P7-GBA.gba` /
-`starcraft-protoss-p7.elf`, code `SCP7`, generation 43. Explicit `protoss-p6`
+generation 5. The P7 candidate uses `StarCraft-Protoss-P7-Transport1-GBA.gba` /
+`starcraft-protoss-p7.elf`, code `SCP7`, base generation 43 in the separate Transport1 namespace. Explicit `protoss-p6`
 retains `StarCraft-Protoss-P6-GBA.gba` / `starcraft-protoss-p6.elf`, code
 `SCP6`, generation 30. Explicit
 `protoss-p5-shuttle` keeps `StarCraft-Protoss-P5-Shuttle-GBA.gba` /
