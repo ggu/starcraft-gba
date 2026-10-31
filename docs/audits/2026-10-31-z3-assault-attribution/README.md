@@ -61,3 +61,37 @@ Hydralisk group remained near the Chrysalis. This is strong spatial and
 temporal evidence of an unattended Wraith attack, not a damage-callback trace.
 The witness uses aggregate checkpoint matching; private replay inputs and
 generated assets are not checked in.
+
+## Focused controller qualification
+
+Controller source `7325b33` on the staged `197677a` engine was built with the
+full Z7 carried Z3 flag vector and host ASan/UBSan. A fresh normal-menu run
+won at native frame 120346 (host tick 121979), with the Chrysalis at 250 HP,
+three enemy units and three enemy buildings remaining, and the source victory
+condition and campaign-complete phase set. The frozen-source rerun's trace is
+`/tmp/z3-7325b33-frozen-20261031.json`; its SHA-256 is
+`c588e33cdf744e782edfdbfbbdef73f56884b017f133d02708c813b58b601114`,
+identical to the preceding qualifying run. The test exited zero under both
+sanitizers. All 109 pinned private inputs matched the verified receipt before
+and after the frozen run.
+
+The 11,622 recorded key transitions have strictly increasing host ticks,
+valid ten-bit key masks, changed held states, and pressed masks consistent with
+the previous held state. The final logged transition is tick 121474 and the
+win checkpoint is tick 121979. These checks validate the host trace structure;
+they do not prove it replays on the physical-key backend or fits a legacy ROM
+tape. Those qualifications remain separate.
+
+The controller counts armed units, maintains separate ground defenders at the
+Hatchery and Chrysalis, builds a Lair and Spire, and directs individually
+selected idle Mutalisks against the enemy while keeping ground troops away from
+the concentrated siege corridor. It keeps a mineral-worker reserve and
+reassigns idle workers with contextual clicks after a normal Move reveals a
+map-known field. Target and field choices use the controller's observed world
+and map oracle, including information outside current fog. A source audit of the
+controller found no assignments to UI cursor/selection, unit/building state,
+resources, mission flags or objective state: after normal initialization,
+game actions flow through `step` → `game_update` with held/pressed keys. This
+is bounded host evidence, not hardware timing, an independent input-only
+replay, or proof for another profile. Failed tactical experiments and witness
+logs remain in `/tmp` as described above.
