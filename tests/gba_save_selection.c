@@ -93,9 +93,15 @@ int main(void){gba_init();
  /* Reject duplicate/zero tags and absent candidates. */
  {u32 dup[3]={tags[0],tags[0],tags[2]},zero[3]={tags[0],0,tags[2]};selection_unchanged_failure(dup,3,sizeof(scratch));selection_unchanged_failure(zero,3,sizeof(scratch));selection_unchanged_failure(tags,0,sizeof(scratch));}
  {u32 four[4]={tags[0],tags[1],tags[2],0x40506070u};GbaSaveSelection s={0};
-  reset();record(0,four[3],1,0xa5);
+  reset();record(0,four[0],1,0xa5);record(1,four[3],2,0xa5);
   assert(save_select_validated(scratch,sizeof(scratch),four,4,validate,0,&s));
-  assert(s.tag==four[3] && s.slot==0);}
+  assert(s.tag==four[3] && s.slot==1);
+  record(1,four[3],2,0);assert(save_select_validated(scratch,sizeof(scratch),four,4,validate,0,&s));
+  assert(s.tag==four[0] && s.slot==0);
+  u8 predecessor[SAVE_SLOT_SIZE];memcpy(predecessor,host_save,sizeof(predecessor));
+  const u8 next[]={0x40,0xa5,1,2};
+  assert(save_write_selected(next,sizeof(next),four[3],&s,four,4));
+  assert(!memcmp(predecessor,host_save,sizeof(predecessor)));}
  reset();selection_unchanged_failure(tags,3,sizeof(scratch));
  puts("validated SRAM selection: 3-generation ordering, semantic fallback, wrap and atomic predecessor preservation passed");return 0;
 }
