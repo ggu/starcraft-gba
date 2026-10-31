@@ -226,25 +226,26 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             continue;
         }
         if (q->owner != owner) {
-            int flying, d;
+            int flying, d, nearby = 0;
             if (!owners_hostile(owner, q->owner) || !race_ai_armed(q->type)) continue;
+            /* Only armed non-workers participate in this defense policy. */
+            if (sc64_race_is_worker(q->type)) continue;
             flying = sc64_race_unit_flying(q->type);
-            if (!sc64_race_is_worker(q->type)) {
-                ++c->enemy_army;
-                if (flying) ++c->enemy_air;
-            }
-            /* Threat: the hostile armed actor nearest any owned depot. */
+            ++c->enemy_army;
+            if (flying) ++c->enemy_air;
+            /* Count distinct actors, while choosing the distance to their
+             * nearest owned depot. Overlapping bases do not multiply them. */
             for (int k = 0; k < c->depots || (k == 0 && !c->depots); ++k) {
                 int ax = c->depots ? b[c->depot[k]].x : c->hx;
                 int ay = c->depots ? b[c->depot[k]].y : c->hy;
                 d = dist2(q->x, q->y, ax, ay);
-                if (d < RACE_AI_THREAT_RANGE * RACE_AI_THREAT_RANGE &&
-                    !sc64_race_is_worker(q->type)) ++c->threat_count;
+                if (d < RACE_AI_THREAT_RANGE * RACE_AI_THREAT_RANGE) nearby = 1;
                 if (d < best_threat) {
                     best_threat = d; c->threat = i;
                     c->threat_x = q->x; c->threat_y = q->y;
                 }
             }
+            c->threat_count += nearby;
             continue;
         }
         ++c->units;

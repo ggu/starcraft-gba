@@ -178,6 +178,11 @@ launches a match through the normal Custom Game menu with ordinary inputs and
 a passive human, then:
 
 - `--audit` prints the catalog capability matrix for the profile.
+- `--threat-census` injects a small synthetic policy fixture: two overlapping
+  depots, one or two distinct non-worker attackers, a nearer armed worker,
+  and the exact threat-range boundary. It checks both target selection and
+  whether miners are pulled. Each attacker counts once across owned depots;
+  workers remain outside the documented defense-threat policy.
 - `--map M --human R --bots RRR --ticks N --every K` writes JSON snapshots of
   each owner's bank, workers (mining, gas, idle, building), supply, army and
   air counts, and counts of each unit and structure raw ID.
