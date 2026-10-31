@@ -1,6 +1,9 @@
 #ifndef SC64_VISIBILITY_H
 #define SC64_VISIBILITY_H
 #include "sc64_scarab_presence.h"
+#ifdef SC64_Z8_RUNTIME
+#include "sc64_source_sight_tiles.h"
+#endif
 
 #if defined(SC64_Z7_SIGHT_SPANS) && \
     (!defined(SC64_Z7_SOURCE_SIGHT) || !defined(SC64_VISIBILITY_SPANS))
