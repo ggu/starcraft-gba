@@ -1035,11 +1035,17 @@ static Sc64DefilerProjectile *sc64_defiler_projectile_at(unsigned i)
 /* Experimental simulation state; never borrow presentation-facing or a
  * mission payload. Save remains refused while an experimental caster lives. */
 typedef struct {
-    u16 energy_q8; s16 target_x,target_y; u8 heading, live, intent, phase, age;
+    u16 energy_q8; s16 target_x,target_y; u8 heading;
+    /* phase is 0..2 and source script age is 0..4. */
+    u16 live:1, intent:1, phase:2, age:3;
 #ifdef SC64_SHARED_DEFILER_APPROACH_PROBE
-    s32 x_q8,y_q8; u16 motion_age; u8 moving, stopped, blocked;
+    u16 moving:1, stopped:1, blocked:1;
 #ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
-    s16 waypoint_x,waypoint_y;u8 velocity,turning,diagonal;
+    u16 turning:1, diagonal:1;
+#endif
+    s32 x_q8,y_q8; u16 motion_age;
+#ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
+    s16 waypoint_x,waypoint_y;u8 velocity;
 #endif
 #endif
 } Sc64DefilerStageActor;
