@@ -40,8 +40,8 @@ full campaign-parity claim follows from these checks.
 The source-only follow-up commits `99f0801` and `f784e09` fix test fixture
 stubs, legacy-loop extraction anchors, and the fact-generator gate list. A
 fresh unprepared default build and complete test suite passed at `f784e09`.
-The added fact gates change generated fact signatures: gated builds at this
-new revision require freshly generated, separately named fact tables before
-they can be considered qualified. The saturation actors include synthetic
+The added fact gates change generated fact signatures. Fresh, separately named
+P7 tables passed a normal P7 ARM link and services host fixture, plus the
+experiment-enabled Carrier host fixture. The saturation actors include synthetic
 states; the tests do not exhaust every possible live phase, mission rebind, or
 combined-namespace state.
