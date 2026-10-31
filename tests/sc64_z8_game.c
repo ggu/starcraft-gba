@@ -96,7 +96,7 @@ static void test_binding(void)
 /* The first passes run T2 (human resources), T8 and T9 (AI wallets, towns). */
 static void test_opening_triggers(void)
 {
-    for (int i = 0; i < 120; ++i) input(0);
+    for (int i = 0; i < 150; ++i) input(0);
     assert(!race_z8_sched.fault && race_z8_outcome() == SC64_Z8_OUTCOME_NONE);
     assert(minerals == 350 && gas == 350);
     assert(race_z8_ai_minerals[0] >= 7000u && race_z8_ai_minerals[1] >= 7000u);
@@ -275,12 +275,20 @@ int main(void)
     test_save_continuation();
     test_rejects_corrupt_candidate();
     test_rejects_invalid_source_world();
-    /* Back to the pause save (frame 2121): T10's first Dark Templar is out. */
+    /* Return to the pause save and await the authored Dark Templar. */
     write_candidate_record(&pause_save);
     game_init();
     held_keys = 0;
     press(KEY_L);
     assert(screen == SCREEN_PLAY && race_z8_active());
+    for (int tick = 0; tick < 2000; ++tick) {
+        int found = 0;
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].raw_type == 74 && u[i].owner == ENEMY) found = 1;
+        if (found) break;
+        assert(screen == SCREEN_PLAY);
+        input(0);
+    }
     test_dark_templar_cloak();
     printf("Z8 campaign binding: %u instances, %u Nydus links, RaceSave %u bytes, generation %u\n",
            (unsigned)race_z8_sched.instance_count, (unsigned)race_nydus.count,

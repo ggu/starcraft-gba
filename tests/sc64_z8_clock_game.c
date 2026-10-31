@@ -89,7 +89,14 @@ int main(void)
     for (unsigned phase = 0; phase < 5; ++phase) {
         u32 expected;
         launch_z8_from_normal_menu();
-        for (int i = 0; i < 120; ++i) input(0);
+        for (int i = 0; i < 150; ++i) {
+            assert(screen == SCREEN_PLAY);
+            input(0);
+            assert(race_z8_sched.frames == (u32)(4u * (unsigned)frame / 5u));
+        }
+        assert(minerals == 350 && gas == 350);
+        assert(race_z8_ai_minerals[0] >= 7000u && race_z8_ai_minerals[1] >= 7000u);
+        assert(race_z8_ai.started == 3u && sc64_z8_switch_get(&race_z8_sched, 0));
         for (int i = 0; i < 20 &&
              ((unsigned)frame % 5u != phase || race_z8_camera_release); ++i) {
             assert(screen == SCREEN_PLAY);
