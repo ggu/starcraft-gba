@@ -92,6 +92,25 @@ static int race_p8_source_owner(unsigned slot)
     return slot == SC64_P8_HUMAN_SLOT ? SIDE : map->owner_modes[slot];
 }
 
+#ifdef SC64_SCARAB_RUNTIME
+#include "sc64_scarab_wallet.h"
+/* Preserve source-slot provenance even when both computer forces share ENEMY.
+ * An unsupported source player must not fall back to the generic enemy bank. */
+static Sc64ScarabWallet race_p8_scarab_wallet(const Unit *parent)
+{
+    Sc64ScarabWallet bank = {.limit = SC64_P8_AI_WALLET_LIMIT};
+    if (!parent || parent->raw_owner < 0 || parent->raw_owner >= 8 ||
+        race_p8_source_owner((unsigned)parent->raw_owner) != parent->owner) return bank;
+    switch (parent->raw_owner) {
+    case SC64_P8_HUMAN_SLOT: bank.engine = &minerals; break;
+    case 0: bank.source = &race_p8.ai_minerals[0]; break;
+    case 3: bank.source = &race_p8.ai_minerals[1]; break;
+    default: break;
+    }
+    return bank;
+}
+#endif
+
 /* P8 runs the shared Protoss unit services with its own owner map and clock
  * (declared with the service macros in game.c). */
 static int race_protoss_later_services_active(void) { return race_p8_active(); }
