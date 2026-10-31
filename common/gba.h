@@ -107,6 +107,10 @@ u32 rng_next(u32 *seed);
 int clampi(int x,int lo,int hi);
 int absi(int x);
 void save_write(const void *data,u32 length,u32 tag);
+#ifdef SC64_SHARED_TRANSPORT
+int save_write_parts(const void *data,u32 length,const void *tail,u32 tail_length,u32 tag);
+int save_read_parts(void *data,u32 length,void *tail,u32 tail_length,u32 tag);
+#endif
 void save_write_migrating(const void *data,u32 length,u32 tag,u32 legacy_length,u32 legacy_tag);
 void save_write_migrating_feature(const void *data,u32 length,u32 tag,u32 legacy_tag,
                                   u32 marker_offset,u32 marker_mask,u32 marker_value);

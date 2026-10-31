@@ -91,7 +91,7 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
     };
     if (type == U_Z6_GUARDIAN) return &guardian;
 #endif
-#ifdef SC64_P5_ACTORS
+#if defined(SC64_P5_ACTORS) || (defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_SKIRMISH_ROSTER))
     /* Shuttle source facts are shared; the optional P5 transport profile
        supplies bounded cargo orders and saves. */
     static const Sc64ZpActorFact shuttle = {
@@ -100,6 +100,13 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN
     };
+#ifdef SC64_P5_ACTORS
+    if (type == U_P5_SHUTTLE) return &shuttle;
+#else
+    if (type == U_SHARED_SHUTTLE) return &shuttle;
+#endif
+#endif
+#ifdef SC64_P5_ACTORS
     static const Sc64ZpActorFact battlecruiser = {
         12,500,0,3,400,300,2000,352, 37,29,37,29,1,2,
         25,3,30,192,1, 25,3,30,192,1,
@@ -107,7 +114,6 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|
         SC64_ZP_ACTOR_MEN|SC64_ZP_ACTOR_WEAPON
     };
-    if (type == U_P5_SHUTTLE) return &shuttle;
     if (type == U_P5_BATTLECRUISER) return &battlecruiser;
 #endif
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)

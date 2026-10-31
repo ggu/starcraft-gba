@@ -1,7 +1,7 @@
 #ifndef SC64_TRANSPORT_ADAPTER_H
 #define SC64_TRANSPORT_ADAPTER_H
 
-#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER)
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER) || defined(SC64_SHARED_TRANSPORT)
 #include "sc64_transport_rules.h"
 
 #if defined(SC64_P5_SHUTTLE_ENABLED) && \
@@ -30,6 +30,18 @@ static int race_transport_carrier_type(const Unit *q)
 #endif
 {
     if (!q) return 0;
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_mode) {
+        int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+        if (raw == SC64_TRANSPORT_SHUTTLE_RAW &&
+            sc64_race_unit_from_raw(raw) == q->type) return 1;
+        if (raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD) {
+            int owner = sc64_sk_transport_owner_index(q->owner);
+            if (owner >= 0 && race_skirmish_transport_tech.owner[owner].researched)
+                return 1;
+        }
+    }
+#endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
     if (race_z6_active() && race_z6_transport_overlord_ready() &&
         q->type==U_OVERLORD && q->raw_type==42 && q->raw_owner==3 && q->owner==SIDE)
@@ -67,7 +79,12 @@ static int race_transport_passenger_space(const Unit *q)
         (sc64_race_unit_from_raw(raw) != q->type &&
          !(raw == 19 && q->type == U_RAYNOR)))) return -1;
     if (!q->alive || (q->flags & 2) || sc64_race_unit_flying(q->type) ||
+#ifdef SC64_SHARED_TRANSPORT
+        !(race_mode ? sc64_transport_shared_space_required_raw((unsigned)raw, &space) :
+                      sc64_transport_space_required_raw((unsigned)raw, &space)) ||
+#else
         !sc64_transport_space_required_raw((unsigned)raw, &space) ||
+#endif
         space == SC64_TRANSPORT_SPACE_UNAVAILABLE) return -1;
     return (int)space;
 }
@@ -89,12 +106,12 @@ static int race_transport_cargo_space(int carrier)
 
 /* Context command for ordinary custom games; existing campaign commands
  * continue to use their mission-specific predicates. */
-static int __attribute__((unused)) race_skirmish_dropship_menu_available(void)
+static int __attribute__((unused)) race_skirmish_transport_menu_available(void)
 {
     if (!race_mode || selected_building >= 0) return 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].selected && u[i].owner == SIDE &&
-            race_transport_carrier_valid(i) && u[i].type == U_DROPSHIP &&
+            race_transport_carrier_valid(i) &&
             race_transport_cargo_space(i) > 0) return 1;
     return 0;
 }
@@ -167,8 +184,16 @@ static int race_transport_request_unload(int carrier, int x, int y)
 
 static void race_transport_destroy_cargo(int carrier)
 {
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i]) && u[i].target == carrier) {
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || u[i].target != carrier) continue;
+        /* A pending passenger is still alive in the world. Cancel its
+         * reference before the carrier slot can be saved or reused. */
+        if (u[i].order == ORDER_BOARD) {
+            u[i].order = ORDER_IDLE; u[i].target = -1;
+            u[i].path_timer = u[i].path_retry = 0;
+            continue;
+        }
+        if (SC64_TRANSPORT_LOADED(&u[i])) {
 #ifdef SC64_P5_SHUTTLE_ENABLED
             /* Destroying a carrier kills its passengers in this authored
              * runtime. Count those deaths before clearing their source owner. */
@@ -184,6 +209,7 @@ static void race_transport_destroy_cargo(int carrier)
             u[i].hp = 0; u[i].alive = u[i].selected = 0;
             u[i].order = ORDER_IDLE; u[i].target = -1;
         }
+    }
     race_transport_changed();
 }
 

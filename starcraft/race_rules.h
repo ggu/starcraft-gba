@@ -128,6 +128,9 @@ enum {
     /* Appended identity only: production and lifecycle are separate services. */
     U_SCARAB,
 #endif
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    U_SHARED_SHUTTLE,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -456,6 +459,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
     , [U_SHARED_BATTLECRUISER] = { R_TER, 0, 255, 12, 400, 300, 2000, 500, 0, 0 }
 #endif
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    , [U_SHARED_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 4, 200, 0, 900, 80, 60, 0 }
+#endif
 };
 
 static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
@@ -745,6 +751,9 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #ifdef SC64_SCARAB_RUNTIME
         ,[U_SCARAB] = "SCARAB"
+#endif
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+        ,[U_SHARED_SHUTTLE] = "SHUTTLE"
 #endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
@@ -1277,6 +1286,9 @@ static inline int sc64_race_unit_flying(int type)
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return late->flying;
 #endif
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    if (type == U_SHARED_SHUTTLE) return 1;
+#endif
     return type == U_OVERLORD || type == U_WRAITH || type == U_MUTALISK || type == U_SCOUT || type == U_QUEEN || type == U_DROPSHIP || type == U_SCOURGE
 #ifdef SC64_T4_RUNTIME
     || type == U_MAP_REVEALER
@@ -1626,6 +1638,9 @@ static inline int sc64_race_raw_unit(int type)
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
     case U_SHARED_BATTLECRUISER: return 12;
 #endif
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    case U_SHARED_SHUTTLE: return 69;
+#endif
     default: return -1;
     }
 }
@@ -1798,6 +1813,11 @@ static inline int sc64_race_unit_from_raw(int raw)
       !defined(SC64_Z3_ENABLED) && !defined(SC64_T5_RUNTIME)
     case 11: return U_DROPSHIP;
 #endif
+#if defined(SC64_SHARED_TRANSPORT) && \
+    !(defined(SC64_UNIFIED) && (defined(SC64_Z3_ENABLED) || defined(SC64_T5_RUNTIME))) && \
+    !(defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_T5_RUNTIME))
+    case 11: return U_DROPSHIP;
+#endif
     case 3: return U_GOLIATH; case 5: return U_TANK; case 30: return U_SIEGE_TANK;
     case 8: return U_WRAITH; case 43: return U_MUTALISK;
     case 53: return U_HUNTER_KILLER; case 216: return U_CHRYSALIS;
@@ -1894,6 +1914,9 @@ static inline int sc64_race_unit_from_raw(int raw)
 #endif
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
     case 12: return U_SHARED_BATTLECRUISER;
+#endif
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    case 69: return U_SHARED_SHUTTLE;
 #endif
     default: return -1;
     }
