@@ -253,10 +253,12 @@ static int hero_select(int slot)
 {
     if(slot<0||!u[slot].alive||u[slot].owner!=SIDE)return 0;
     close_menus();
-    clear_selected_building();
-    move_cursor(u[slot].x,u[slot].y);KEY_TAP(KEY_A);
-    for(int n=0;n<40&&(!u[slot].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
-    return u[slot].selected&&selected_count()==1;
+    /* L taps cycle friendly units and put the cursor on the selected unit.
+     * Deselect a building first: L on a Barracks can cancel its queue. */
+    if(selected_building>=0){KEY_TAP(KEY_SELECT);if(selected_building>=0)return 0;}
+    for(int n=0;n<=MAX_UNITS&&u[slot].alive&&
+        (!u[slot].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
+    return u[slot].alive&&u[slot].selected&&selected_count()==1;
 }
 
 static int hero_order(int slot,int which,int x,int y)
@@ -500,10 +502,7 @@ static int build_cannon(int near_x,int near_y)
         best=d;site_x=x;site_y=y;
     }
     if(site_x<0){if(getenv("P9_BLOG"))fprintf(stderr,"cannon no site f=%d near=%d,%d\n",frame,near_x,near_y);return 0;}
-    close_menus();clear_selected_building();
-    move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
-    for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
-    if(!u[worker].selected||selected_count()!=1)return 0;
+    if(!hero_select(worker))return 0;
     KEY_TAP(KEY_B);
     for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=MENU_STOP+2;n++)KEY_TAP(KEY_DOWN);
     if(!menu_open||menu_cursor!=MENU_STOP+2){
