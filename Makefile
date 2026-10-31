@@ -5255,7 +5255,7 @@ $(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_C
 # names are passed because some canonical flags are defined later.
 define SKIRMISH_AI_PROGRESS_PROFILE
 build/test-sc64-skirmish-ai-progress-$(1): tests/sc64_skirmish_ai_progress.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$($(4)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
-	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $$($(2)) $$< common/gba.c $$($(4)) -o $$@
+	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $$($(2)) $$< common/gba.c starcraft/sc64_bc_body_art.c $$($(4)) -o $$@
 endef
 $(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
 $(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,))
