@@ -32,8 +32,10 @@ static void test_source_action_between_conditions(void)
     const Sc64P8SourceAction *action=0;
     for(unsigned i=0;i<SC64_P8_SOURCE_ACTION_COUNT;i++) {
         const Sc64P8SourceAction *a=&sc64_p8_source_actions[i];
-        if(a->opcode==11u && !a->group2 && a->location && a->group1<8u &&
-           a->unit<106u && a->unit!=101u && a->trigger==4u) {action=a;break;}
+        if(a->opcode==11u && a->flags==0x10u && !a->modifier &&
+           !a->group2 && !a->string_id && !a->wav_id && !a->time &&
+           a->location && a->group1<8u && a->unit<106u &&
+           a->unit!=101u && a->trigger==4u) {action=a;break;}
     }
     assert(action);
     Sc64P8SourceCondition condition={0};
@@ -57,6 +59,7 @@ static void test_source_action_between_conditions(void)
     synthetic_remove_action(created);
     assert(sc64_p8_world_condition(&race_p8_world,&condition,SC64_P8_HUMAN_SLOT)==0);
     assert(race_p8_condition_live_scan(&race_p8_world,&condition,SC64_P8_HUMAN_SLOT)==0);
+    assert(sc64_p8_world_condition(&race_p8_world,&condition,8u)==-1);
     assert(race_p8_condition_live_scan(&race_p8_world,&condition,8u)==-1);
     assert(race_p8_view.actor_at==sc64_z8_game_actor_at &&
            race_p8_view.actor_count==MAX_UNITS+MAX_BUILDINGS);
