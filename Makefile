@@ -1978,6 +1978,12 @@ protoss-p9: verify-protoss-p9
 P9_ARM_DIR := build/p9-arm
 P9_ARM_TRACE := $(P9_ARM_DIR)/p9-controller.jsonl
 P9_REPLAY_TOOL := $(PYTHON) tools/sc64_p8_arm_replay.py --mission 28 --prefix P9
+build/test-sc64-p9-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P9_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+.PHONY: test-sc64-p9-carried-profile
+test-sc64-p9-carried-profile: build/test-sc64-p9-carried-profile
+	./build/test-sc64-p9-carried-profile
+
 build/test-sc64-p9-campaign-run: tests/sc64_p9_campaign_run.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P9_FLAGS) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 $(P9_ARM_TRACE): build/test-sc64-p9-campaign-run
