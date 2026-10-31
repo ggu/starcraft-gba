@@ -6104,3 +6104,5 @@ test-scarab-parent-cleanup: test-scarab-parent-cleanup-terran test-scarab-parent
 include tests/carrier-fixtures/Makefile
 
 include tests/terrain-storage/Makefile
+
+include tests/p8-condition/Makefile
