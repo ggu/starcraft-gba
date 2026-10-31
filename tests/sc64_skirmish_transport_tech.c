@@ -1,10 +1,22 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include <assert.h>
 #include "../starcraft/sc64_skirmish_transport_tech.h"
+#define SC64_SHARED_TRANSPORT 1
+#include "../starcraft/sc64_transport_rules.h"
 
 int main(void)
 {
     Sc64SkTransportTech tech = {0};
+    unsigned space;
+    assert(sc64_transport_space_provided_raw(11) == 8);
+    assert(sc64_transport_space_provided_raw(42) == 8);
+    assert(sc64_transport_space_provided_raw(69) == 8);
+    assert(sc64_transport_space_required_raw(17, &space) && space == 2);
+    assert(sc64_transport_space_required_raw(77, &space) && space == 2);
+    assert(sc64_transport_space_required_raw(78, &space) && space == 4);
+    assert(sc64_transport_space_required_raw(83, &space) && space == 4);
+    assert(sc64_transport_space_required_raw(42, &space) && space == 255);
+    assert(!sc64_transport_space_required_raw(228, &space));
     uint8_t bytes[16];
     Sc64SkTransportTech decoded;
     int minerals[4] = {300, 300, 300, 300};
