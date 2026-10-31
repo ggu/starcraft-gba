@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Z6 source actors with a seeded valid researched upgrade: carrier death,
  * ordinary immediate save/load, and carrier-slot reuse. */
+#include <stdio.h>
 #define main sc64_z6_runtime_baseline_main
 #include "sc64_z6_runtime.c"
 #undef main
