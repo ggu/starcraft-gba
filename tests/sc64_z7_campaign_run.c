@@ -4993,7 +4993,18 @@ static void attack_step(void)
             campaign_assault_target_raw=0;
             next_assault_refresh=(unsigned)frame+600u;
         }
-        (void)campaign_assault_retarget();return;
+        int rc=campaign_assault_retarget();
+        static unsigned last_assault_sample;
+        if((unsigned)frame-last_assault_sample>=600u) {
+            int x=-1,y=-1,bslot=-1;
+            int visible=nearest_enemy_building(&x,&y,&bslot);
+            fprintf(stderr,"Z7 assault diagnostic frame%u rc%d target%d building%d visible%d visibleSlot%d xy%d,%d recon%d stage%d selected%d selectedBuilding%d mode%d menu%d cursor%d,%d\n",
+                (unsigned)frame,rc,campaign_assault_target,campaign_assault_is_building,
+                visible,bslot,x,y,campaign_recon_active,campaign_recon_stage,
+                selected_count(),selected_building,mode,menu_open,cx,cy);
+            last_assault_sample=(unsigned)frame;
+        }
+        return;
     }
     /* Controller strategy: let the home-cover opening build a stable line,
        then preserve Mutalisks for Guardian defense while Hydralisks attack. */
