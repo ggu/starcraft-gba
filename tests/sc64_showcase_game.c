@@ -130,7 +130,7 @@ static int check_movement_facing(void)
             if (sc64_facing[0] != dir)
                 return fail("moving unit did not track one of eight headings during cooldown");
             gfx_begin(0);
-            if (!sc64_facing_draw(q, raw, 120, 80))
+            if (!sc64_facing_draw(q, raw, 120, 80, 0))
                 return fail("moving unit did not render its selected heading");
             hashes[hi] = framebuffer_hash();
         }
@@ -968,7 +968,7 @@ int main(void)
     unsigned marine_raw = (unsigned)sc64_race_raw_unit(U_MARINE);
     sc64_facing[reclaimed] = 8;
     gfx_begin(0);
-    if (!sc64_facing_draw(&u[reclaimed], (int)marine_raw, 120, 80) ||
+    if (!sc64_facing_draw(&u[reclaimed], (int)marine_raw, 120, 80, 0) ||
         framebuffer_hash() == 2166136261u)
         return fail("raw_type=-1 generic unit did not resolve its directional sprite");
 #endif
