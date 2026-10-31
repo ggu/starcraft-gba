@@ -1668,6 +1668,31 @@ static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *can
 #endif
 static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #endif
+#if defined(SC64_SCARAB_PACKED_MOTION_PROBE) && !defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE)
+#error "Packed motion probe requires flight control"
+#endif
+#if defined(SC64_SCARAB_AUTONOMOUS_PROBE) && (!defined(SC64_SCARAB_PACKED_MOTION_PROBE) || !defined(SC64_SIEGE_SPLASH))
+#error "Autonomous Scarab probe requires packed motion and source bounds"
+#endif
+#if defined(SC64_SCARAB_WEAPON_PROBE) && !defined(SC64_SCARAB_AUTONOMOUS_PROBE)
+#error "Scarab weapon probe requires autonomous control"
+#endif
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+#if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+#error "Scarab flight control probe requires runtime and source cadence"
+#endif
+static void __attribute__((noinline)) race_scarab_control_dispatch(int slot);
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+static void race_scarab_probe_parent_attack(int slot,int target);
+static void race_scarab_probe_parent_tick(int slot);
+#ifdef SC64_SCARAB_WEAPON_PROBE
+static void race_scarab_probe_bullet_tick(void);
+static void race_scarab_probe_bullet_reset(void);
+static int race_scarab_probe_bullets_pending(void);
+static void race_scarab_probe_target_invalidate(int target);
+#endif
+#endif
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int race_p7_carrier_training_menu_available(void);
 static int race_p7_carrier_training_queue_selected(void);
@@ -2149,6 +2174,9 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    race_scarab_probe_target_invalidate(i);
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     /* A recycled slot must never inherit a cast or an incoming missile. */
     sc64_bc_shot_caster_gone(sc64_bc_shots,(unsigned)i);
@@ -2300,6 +2328,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    race_scarab_probe_target_invalidate(MAX_UNITS+i);
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_target_removed((unsigned)(MAX_UNITS+i));
 #endif
@@ -4120,6 +4151,9 @@ destroy_building(int slot, int source_owner)
 {
     Building *q = &b[slot];
     if (!q->alive) return;
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    race_scarab_probe_target_invalidate(MAX_UNITS+slot);
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_target_removed((unsigned)(MAX_UNITS+slot));
 #endif
@@ -4290,6 +4324,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 	}
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
+#ifdef SC64_SCARAB_WEAPON_PROBE
+            race_scarab_probe_target_invalidate(target);
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
             race_bc_yamato_target_removed((unsigned)target);
             sc64_bc_shot_caster_gone(sc64_bc_shots,(unsigned)target);
@@ -4986,6 +5023,9 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    race_scarab_probe_bullet_reset();
+#endif
     sc64_walk_reset_all();
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_all();
@@ -6885,6 +6925,12 @@ static void
 tick_combat(Unit * q, int target)
 {
     int dx, dy, range, damage;
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+    if (sc64_race_raw_unit(q->type)==83) {
+        race_scarab_probe_parent_attack((int)(q-u),target);
+        return; /* Never fall through to the generic immediate Reaver hit. */
+    }
+#endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     /* Only the child weapon-event adapter may fire weapon 79. Until that
      * lifecycle is connected, never fall back to instant generic damage. */
@@ -7231,7 +7277,16 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
-        if (SC64_SCARAB_CHILD(q)) continue; /* the child adapter owns orders */
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+        if (sc64_race_raw_unit(q->type)==83 && sc64_battlecruiser_source_tick_due())
+            race_scarab_probe_parent_tick(i);
+#endif
+        if (SC64_SCARAB_CHILD(q)) {
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+            if (sc64_battlecruiser_source_tick_due()) race_scarab_control_dispatch(i);
+#endif
+            continue; /* the child adapter owns orders */
+        }
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         if (SC64_CARRIER_CHILD_SCRIPTED(q)) continue;
 #endif
@@ -8465,6 +8520,9 @@ game_update(u16 held, u16 pressed)
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_sync_references();
+#endif
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    if (sc64_battlecruiser_source_tick_due()) race_scarab_probe_bullet_tick();
 #endif
     update_orders();
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -11626,6 +11684,298 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #include "race_save_adapter.h"
 #ifdef SC64_IMPACT_EVENTS
 #include "sc64_impact_adapter.h"
+#endif
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+#include "sc64_scarab_unit_adapter.h"
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+#ifdef SC64_SCARAB_WEAPON_PROBE
+/* Separate bounded experimental projectile pool, not one row per child.
+ * No save format yet carries these pending packets. */
+typedef struct { s16 x,y,target;u8 owner,ticks; } Sc64ScarabProbeBullet;
+enum { SC64_SCARAB_PROBE_BULLETS=4, SC64_SCARAB_PROBE_IMPACT_TICKS=5 };
+static Sc64ScarabProbeBullet sc64_scarab_probe_bullets[SC64_SCARAB_PROBE_BULLETS];
+/* Test-only per-owner Scarab damage upgrade bit, not normal weapon level.
+ * No research or persistent representation is registered by this probe. */
+static u8 sc64_scarab_probe_damage_upgrades;
+static void race_scarab_probe_bullet_reset(void) { memset(sc64_scarab_probe_bullets,0,sizeof(sc64_scarab_probe_bullets));sc64_scarab_probe_damage_upgrades=0; }
+static int race_scarab_probe_bullets_pending(void) {
+    if(sc64_scarab_probe_damage_upgrades)return 1; /* not saveable yet */
+    for(int i=0;i<SC64_SCARAB_PROBE_BULLETS;i++)if(sc64_scarab_probe_bullets[i].ticks)return 1;
+    return 0;
+}
+static void race_scarab_probe_target_invalidate(int target) {
+    for(int i=0;i<SC64_SCARAB_PROBE_BULLETS;i++)
+        if(sc64_scarab_probe_bullets[i].ticks && sc64_scarab_probe_bullets[i].target==target)
+            sc64_scarab_probe_bullets[i].target=-1;
+}
+static int race_scarab_probe_bullet_create(const Unit *q) {
+    for(int i=0;i<SC64_SCARAB_PROBE_BULLETS;i++)if(!sc64_scarab_probe_bullets[i].ticks) {
+        Sc64ScarabProbeBullet *b=&sc64_scarab_probe_bullets[i];
+        b->x=(s16)(q->x*2+(int)(((unsigned)q->carry>>10)&511u)/256);
+        b->y=(s16)(q->y*2+(int)(((unsigned)q->carry>>19)&511u)/256);
+        b->owner=q->owner;b->target=q->target;b->ticks=SC64_SCARAB_PROBE_IMPACT_TICKS;return 1;
+    }
+    return 0; /* Pool-full source behavior: no projectile, no damage. */
+}
+#endif
+static int race_scarab_probe_target_info(int ref,int *raw,int *x,int *y,int *owner) {
+    if(ref<0 || ref>=MAX_UNITS+MAX_BUILDINGS || !target_alive(ref))return 0;
+    if(ref<MAX_UNITS) {
+        Unit *v=&u[ref];
+        if(SC64_TRANSPORT_LOADED(v) || SC64_SCARAB_HIDDEN(v) || sc64_race_unit_flying(v->type))return 0;
+        *raw=v->raw_type>=0?v->raw_type:sc64_race_raw_unit(v->type);
+        *x=v->x;*y=v->y;*owner=v->owner;
+    } else {
+        Building *v=&b[ref-MAX_UNITS];
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        if(race_bc_facility_airborne(ref-MAX_UNITS))return 0;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if(race_late_airborne(ref-MAX_UNITS))return 0;
+#endif
+        *raw=v->raw_type>=0?v->raw_type:sc64_race_raw_building(v->type);
+        *x=v->x;*y=v->y;*owner=v->owner;
+    }
+    return *raw>=0 && *raw<228;
+}
+#ifdef SC64_SCARAB_WEAPON_PROBE
+/* The engine stores integer HP/shields, so fractional residue cannot survive
+ * this call. Keep all source division and armor work in Q8 until that boundary. */
+static void race_scarab_probe_hit(int target,unsigned packet_q8,int owner) {
+    int *shield,armor,shield_loss,hp_loss;unsigned absorbed,armor_q8;
+    if(sc64_siege_hidden_or_immune(target))return;
+    if(target<MAX_UNITS) {shield=&u[target].shield;armor=u[target].armor+(u[target].owner==SIDE?armor_level:0);}
+    else {shield=&b[target-MAX_UNITS].shield;armor=sc64_race_building_armor(b[target-MAX_UNITS].type);}
+    if(packet_q8<128u)packet_q8=128u;
+    absorbed=*shield>0?(packet_q8<(unsigned)*shield*256u?packet_q8:(unsigned)*shield*256u):0;
+    packet_q8-=absorbed;shield_loss=(int)(absorbed/256u);
+    armor_q8=(unsigned)(armor>0?armor:0)*256u;
+    packet_q8=packet_q8>armor_q8?packet_q8-armor_q8:0;
+    if(!absorbed && packet_q8<128u)packet_q8=128u;
+    hp_loss=(int)(packet_q8/256u);
+    if(shield_loss)*shield-=shield_loss;
+    if(hp_loss)hit_target_impl_ex(target,hp_loss,U_REAVER,owner,SC64_STOCK_DMG_NORMAL,
+                                 SC64_HIT_PRECOMPUTED_HP|SC64_HIT_ALLOW_SPLASH_BURROW);
+}
+static void race_scarab_probe_bullet_tick(void) {
+    for(int i=0;i<SC64_SCARAB_PROBE_BULLETS;i++) {
+        Sc64ScarabProbeBullet *b=&sc64_scarab_probe_bullets[i];
+        if(!b->ticks || --b->ticks)continue;
+        for(int j=0;j<MAX_UNITS+MAX_BUILDINGS;j++) {
+            int raw,x,y,owner,dx=0,dy=0,distance;
+            if(!race_scarab_probe_target_info(j,&raw,&x,&y,&owner) || (owner==b->owner && j!=b->target))continue;
+            int l=x*2-siege_bounds[raw][2],r=x*2+siege_bounds[raw][4];
+            int top=y*2-siege_bounds[raw][3],bottom=y*2+siege_bounds[raw][5];
+            if(b->x<l)dx=l-b->x;else if(b->x>r)dx=b->x-r;
+            if(b->y<top)dy=top-b->y;else if(b->y>bottom)dy=b->y-bottom;
+            distance=(int)sc64_siege_xy_length(dx,dy);
+            if(distance>60 || (distance>20 && j<MAX_UNITS && sc64_siege_burrowed(j)))continue;
+            int base=100+25*((sc64_scarab_probe_damage_upgrades>>b->owner)&1u);
+            unsigned packet=(unsigned)base*256u/(distance<=20?1u:distance<=40?2u:4u);
+            race_scarab_probe_hit(j,packet,b->owner);
+        }
+    }
+}
+#endif
+static void race_scarab_probe_parent_tick(int slot)
+{
+    (void)race_scarab_cooldown_tick(slot,0);
+}
+static void race_scarab_probe_parent_attack(int slot,int target)
+{
+    Sc64ScarabParent p;Sc64ScarabCounts counts;Unit *q=&u[slot];int raw,x,y,owner;
+    if ((q->raw_type!=-1 && q->raw_type!=83) ||
+        !race_scarab_probe_target_info(target,&raw,&x,&y,&owner) ||
+        !owners_hostile(q->owner,owner) ||
+        !race_scarab_parent_read(slot,0,&p,&counts)) return;
+    int dx=x-q->x,dy=y-q->y;
+    int range=(sc64_race_unit_range_vs(q->type,0)+1)/2;
+    if (dx*dx+dy*dy>range*range) { move_toward(q,x,y);return; }
+    if (p.cooldown || counts.outside || !counts.inside) return;
+    for (int i=0;i<MAX_UNITS;i++) {
+        int parent;unsigned phase;
+        if (race_scarab_child_lookup(i,&parent,&phase) && parent==slot && phase==SC64_SCARAB_CHILD_INSIDE) {
+            q->target=target;q->tx=x;q->ty=y;
+            (void)race_scarab_launch_child(slot,0,i);return;
+        }
+    }
+}
+#endif
+#ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
+#ifndef GBA_HOST
+#error "Clear-motion probe is host-only"
+#endif
+#include "sc64_scarab_clear_motion.h"
+#endif
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
+#ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
+#error "Choose one Scarab motion probe"
+#endif
+#include "sc64_scarab_steer_motion.h"
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+#include "sc64_siege_source_bounds.h"
+/* Inclusive source rectangles and source integer-length approximation. */
+static int race_scarab_probe_arrived(const Unit *q)
+{
+    int t=q->target,raw,sx,sy,tx,ty,owner,dx=0,dy=0;
+    if(t<0) {
+        sx=q->x*2+(int)(((unsigned)q->carry>>10)&511u)/256;
+        sy=q->y*2+(int)(((unsigned)q->carry>>19)&511u)/256;
+        return sx==q->tx*2 && sy==q->ty*2;
+    }
+    if(!race_scarab_probe_target_info(t,&raw,&tx,&ty,&owner))return 0;
+    sx=q->x*2+(int)(((unsigned)q->carry>>10)&511u)/256;
+    sy=q->y*2+(int)(((unsigned)q->carry>>19)&511u)/256;
+    tx*=2;ty*=2;
+    if(sx-2>tx+siege_bounds[raw][4])dx=sx-2-(tx+siege_bounds[raw][4]);
+    else if(tx-siege_bounds[raw][2]>sx+2)dx=tx-siege_bounds[raw][2]-(sx+2);
+    if(sy-2>ty+siege_bounds[raw][5])dy=sy-2-(ty+siege_bounds[raw][5]);
+    else if(ty-siege_bounds[raw][3]>sy+2)dy=ty-siege_bounds[raw][3]-(sy+2);
+    return sc64_interceptor_len_raw(dx,dy)<=10;
+}
+#endif
+/* Only outside probe actors use these scratch fields. No outside save is
+ * admitted. `cd`: heading/velocity bytes; `weapon`: turn/waypoint flags;
+ * path_timer/path_retry: prior source waypoint; carry: two Q8 fractions. */
+static int race_scarab_probe_motion_load(const Unit *q,Sc64ScarabSteer *s)
+{
+    Sc64ScarabChildFields f;unsigned bits;
+    if (!q || !s || !race_scarab_child_fields_read(q->carry,q->work_timer,&f) ||
+        f.phase!=SC64_SCARAB_CHILD_OUTSIDE || !f.life || q->x<0 || q->y<0 ||
+        (unsigned)q->weapon>3 || (unsigned)q->cd>65535u ||
+        (unsigned)q->path_timer>32767u || (unsigned)q->path_retry>32767u) return 0;
+    bits=(unsigned)q->carry;
+    *s=(Sc64ScarabSteer){.x=(s32)q->x*512+(int)((bits>>10)&511u),
+        .y=(s32)q->y*512+(int)((bits>>19)&511u),.heading=(u8)q->cd,
+        .velocity=(u8)((unsigned)q->cd>>8),.turning=(u8)(q->weapon&1),
+        .age=(u8)(90u-f.life),.waypoint_x=q->path_timer,.waypoint_y=q->path_retry,
+        .waypoint_known=(u8)((q->weapon>>1)&1)};
+    return 1;
+}
+static int race_scarab_probe_motion_store(Unit *q,const Sc64ScarabSteer *s)
+{
+    if (!q || !s || s->x<0 || s->y<0 || s->x/512>32767 || s->y/512>32767 ||
+        s->turning>1 || s->waypoint_known>1 || s->waypoint_x<0 || s->waypoint_y<0 ||
+        s->waypoint_x>32767 || s->waypoint_y>32767) return 0;
+    q->x=(s16)(s->x/512);q->y=(s16)(s->y/512);
+    q->carry=(q->carry&1023) | ((s->x&511)<<10) | ((s->y&511)<<19);
+    q->cd=(u16)(s->heading|((unsigned)s->velocity<<8));
+    q->weapon=(u16)(s->turning|(s->waypoint_known<<1));
+    q->path_timer=(u16)s->waypoint_x;q->path_retry=(u16)s->waypoint_y;return 1;
+}
+#endif
+static void __attribute__((noinline)) race_scarab_control_dispatch(int slot)
+{
+    Unit *q=&u[slot];
+    if ((((unsigned)q->carry>>8)&3u)<2u) return;
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
+    if (q->order==1) {
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+        if (q->target>=0 && q->target<MAX_UNITS+MAX_BUILDINGS && target_alive(q->target)) {
+            q->tx=target_x(q->target);q->ty=target_y(q->target);
+            q->cd=sc64_interceptor_dir(q->tx-q->x,q->ty-q->y);
+        }
+#endif
+        unsigned heading=(unsigned)q->cd&255u;
+        q->cd=(u16)(heading|(heading<<8));q->weapon=1;q->path_timer=0;q->path_retry=0;
+    }
+#endif
+    if (q->target>=0) {
+        if (q->target<MAX_UNITS+MAX_BUILDINGS && target_alive(q->target) &&
+            (q->target>=MAX_UNITS || !SC64_SCARAB_HIDDEN(&u[q->target]))) {
+            q->tx=target_x(q->target);q->ty=target_y(q->target);
+        } else q->target=-1;
+    }
+    int action=race_scarab_flight_control_tick(slot,
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+        race_scarab_probe_arrived(q),
+#else
+        0,
+#endif
+#ifdef SC64_SCARAB_WEAPON_PROBE
+        q->order==4);
+    if (action==SC64_SCARAB_CONTROL_ARRIVED) (void)race_scarab_probe_bullet_create(q);
+#else
+        0);
+#endif
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
+    if (action==SC64_SCARAB_CONTROL_CONTINUE && (q->order==2 || q->order==3)) {
+        Sc64ScarabChildFields f;Sc64ScarabSteer next;
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+        /* Adapt the existing GBA route service to source-coordinate waypoints.
+         * This does not claim equivalence to OpenBW path generation. */
+        int wx=q->tx,wy=q->ty;
+        if (q->target>=0 && q->target<MAX_UNITS+MAX_BUILDINGS && target_alive(q->target)) {
+            int raw,tx,ty,owner;
+            if(race_scarab_probe_target_info(q->target,&raw,&tx,&ty,&owner)) {
+                /* Stop the GBA route at the source 10-pixel range boundary
+                 * for axial targets; diagonal approach remains unqualified. */
+                if(q->y==ty && q->x<tx)wx=(tx*2-siege_bounds[raw][2]-11)/2;
+                else if(q->y==ty && q->x>tx)wx=(tx*2+siege_bounds[raw][4]+12)/2;
+                else if(q->x==tx && q->y<ty)wy=(ty*2-siege_bounds[raw][3]-11)/2;
+                else if(q->x==tx && q->y>ty)wy=(ty*2+siege_bounds[raw][5]+12)/2;
+            }
+        }
+        int axial_building=q->target>=MAX_UNITS && q->target<MAX_UNITS+MAX_BUILDINGS &&
+                           (q->x==q->tx || q->y==q->ty);
+        if (!axial_building && !direct_path_clear(q->x,q->y,wx,wy) &&
+            !path_next_tile(q->x,q->y,wx,wy,&wx,&wy)) return;
+        q->path_x=(s16)(wx*2);q->path_y=(s16)(wy*2);
+#endif
+        if (race_scarab_child_fields_read(q->carry,q->work_timer,&f) && f.life<90 &&
+            race_scarab_probe_motion_load(q,&next) && sc64_scarab_steer_tick(&next,q->path_x,q->path_y,1)) {
+            int nx=(int)(next.x/512),ny=(int)(next.y/512),clear=1;
+            int dx=nx-q->x,dy=ny-q->y,steps=absi(dx)>absi(dy)?absi(dx):absi(dy);
+            if (steps>16) clear=0;
+            for (int k=1;k<=steps && clear;k++) {
+                int sx=q->x+dx*k/steps,sy=q->y+dy*k/steps;
+                if (sx<0 || sy<0 || sx>=WORLD_W || sy>=WORLD_H || terrain_blocked(sx/16,sy/16) || !unit_step_clear(q,sx,sy)) clear=0;
+                for(int j=0;j<MAX_BUILDINGS && clear;j++) if(b[j].alive) {
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+                    if(j+MAX_UNITS==q->target && axial_building) {
+                        int raw=b[j].raw_type>=0?b[j].raw_type:sc64_race_raw_building(b[j].type);
+                        if(raw<0 || raw>=228 || (sx*2+2>=b[j].x*2-siege_bounds[raw][2] &&
+                           sx*2-2<=b[j].x*2+siege_bounds[raw][4] && sy*2+2>=b[j].y*2-siege_bounds[raw][3] &&
+                           sy*2-2<=b[j].y*2+siege_bounds[raw][5]))clear=0;
+                    } else
+#endif
+                    if(dist2(sx,sy,b[j].x,b[j].y)<36*36)clear=0;
+                }
+            }
+            if (clear && race_scarab_probe_motion_store(q,&next)) { sc64_unit_bucket_move(q);sc64_target_index_move(q); }
+        }
+    }
+#endif
+#ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
+    if (action==SC64_SCARAB_CONTROL_CONTINUE && (q->order==2 || q->order==3)) {
+        Sc64ScarabChildFields f; int32_t x=(int32_t)q->x*512,y=(int32_t)q->y*512;
+        if (sc64_scarab_child_fields_unpack(q->carry,q->work_timer,&f) &&
+            sc64_scarab_clear_motion(&x,&y,(int32_t)q->tx*512,(int32_t)q->ty*512,
+                                     q->path_retry,90u-f.life,1)) {
+            int nx=(int)(x/512),ny=(int)(y/512),clear=1;
+            for (int k=1;k<=8 && clear;k++) {
+                int sx=q->x+(nx-q->x)*k/8,sy=q->y+(ny-q->y)*k/8;
+                if (sx<0 || sy<0 || sx>=WORLD_W || sy>=WORLD_H ||
+                    terrain_blocked(sx/16,sy/16) || !unit_step_clear(q,sx,sy)) clear=0;
+                for(int j=0;j<MAX_BUILDINGS && clear;j++)
+                    if (b[j].alive && dist2(sx,sy,b[j].x,b[j].y)<36*36) clear=0;
+            }
+            if (clear) { q->x=nx;q->y=ny;sc64_unit_bucket_move(q);sc64_target_index_move(q); }
+        }
+    }
+#endif
+    if (action==SC64_SCARAB_CONTROL_REMOVE) {
+        int was_invincible=invincible_units[slot], flags=q->flags, hp=q->hp;
+        invincible_units[slot]=0;q->flags&=~16;q->hp=1;
+        hit_target_impl_ex(slot,1,U_SCARAB,-1,-1,SC64_HIT_PRECOMPUTED_HP);
+        if (q->alive) { invincible_units[slot]=was_invincible;q->flags=flags;q->hp=hp;return; }
+        invincible_units[slot]=0;q->selected=0;
+#ifdef SC64_IMPACT_EVENTS
+        race_impact_clear_target(slot);
+#endif
+        target_lists_valid=0;sc64_target_index_end();sc64_unit_bucket_active=0;
+    }
+}
 #endif
 #endif
 

@@ -4,6 +4,9 @@
 #ifndef SC64_SCARAB_RUNTIME
 #error "Scarab unit adapter requires the explicit experimental gate"
 #endif
+#if defined(SC64_SCARAB_PACKED_MOTION_PROBE) && !defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE)
+#error "Packed motion probe requires source-order control"
+#endif
 #if !defined(SC64_RACES) || (!defined(SC64_UNIFIED) && !defined(SC64_BACKWATER))
 #error "Scarab unit adapter requires race identities and the invincibility array"
 #endif
@@ -26,6 +29,17 @@ enum {
 };
 typedef struct { int parent_slot; } Sc64ScarabUnitContext;
 
+static int race_scarab_child_fields_read(int carry,int timer,Sc64ScarabChildFields *out)
+{
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
+    unsigned bits=(unsigned)carry,phase=(bits>>8)&3u;
+    if (carry<0 || bits>=(1u<<28) || (phase<2 && (bits>>10))) return 0;
+    return sc64_scarab_child_fields_unpack((int)(bits&1023u),timer,out);
+#else
+    return sc64_scarab_child_fields_unpack(carry,timer,out);
+#endif
+}
+
 static int race_scarab_parent_identity(int slot)
 {
     return slot >= 0 && slot < MAX_UNITS && u[slot].alive &&
@@ -41,7 +55,7 @@ static int race_scarab_child_lookup(int child_slot, int *parent_slot, unsigned *
     Sc64ScarabChildFields f;
     if (child_slot < 0 || child_slot >= MAX_UNITS || !u[child_slot].alive ||
         u[child_slot].type != U_SCARAB || u[child_slot].raw_type != 85 ||
-        !sc64_scarab_child_fields_unpack(u[child_slot].carry,u[child_slot].work_timer,&f) ||
+        !race_scarab_child_fields_read(u[child_slot].carry,u[child_slot].work_timer,&f) ||
         u[child_slot].owner >= 5 || u[child_slot].build != -1) return 0;
     if (f.parent_slot != SC64_SCARAB_FIELD_NO_SLOT &&
         (f.parent_slot >= MAX_UNITS || !race_scarab_parent_identity((int)f.parent_slot) ||
@@ -50,6 +64,9 @@ static int race_scarab_child_lookup(int child_slot, int *parent_slot, unsigned *
     if ((f.phase == SC64_SCARAB_CHILD_TRAINING || f.phase == SC64_SCARAB_CHILD_INSIDE) &&
         (f.life || f.no_collision)) return 0;
     if (f.phase == SC64_SCARAB_CHILD_OUTSIDE &&
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+        !(u[child_slot].order==1 && f.life==0 && f.no_collision==0) &&
+#endif
         !sc64_scarab_flight_valid(&(Sc64ScarabFlight){(uint8_t)f.life,(uint8_t)f.no_collision})) return 0;
     if (parent_slot) *parent_slot=f.parent_slot==SC64_SCARAB_FIELD_NO_SLOT ? -1 : (int)f.parent_slot;
     if (phase) *phase=f.phase;
@@ -62,8 +79,16 @@ static int race_scarab_child_set(int slot, unsigned parent, unsigned phase,
     Sc64ScarabChildFields f={parent,phase,life,no_collision}; int carry,timer;
     if (slot<0 || slot>=MAX_UNITS || !u[slot].alive || u[slot].type!=U_SCARAB ||
         !sc64_scarab_child_fields_pack(&f,&carry,&timer)) return 0;
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
+    { Sc64ScarabChildFields previous;
+      if (!race_scarab_child_fields_read(u[slot].carry,u[slot].work_timer,&previous)) return 0; }
+#endif
     int was_hidden=SC64_SCARAB_HIDDEN(&u[slot]);
     int was_noncolliding=!!SC64_SCARAB_NONCOLLIDING(&u[slot]);
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
+    if (phase>=SC64_SCARAB_CHILD_OUTSIDE && (((unsigned)u[slot].carry>>8)&3u)>=SC64_SCARAB_CHILD_OUTSIDE)
+        carry|=u[slot].carry & (int)0x0ffffc00u;
+#endif
     u[slot].carry=carry; u[slot].work_timer=(u16)timer;
     if (was_hidden!=!!SC64_SCARAB_HIDDEN(&u[slot]) ||
         was_noncolliding!=!!SC64_SCARAB_NONCOLLIDING(&u[slot])) {
@@ -86,7 +111,7 @@ static int race_scarab_parent_init(int parent_slot)
     if (!race_scarab_parent_identity(parent_slot)) return 0;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].type==U_SCARAB) {
         Sc64ScarabChildFields child;
-        if (!sc64_scarab_child_fields_unpack(u[i].carry,u[i].work_timer,&child) ||
+        if (!race_scarab_child_fields_read(u[i].carry,u[i].work_timer,&child) ||
             child.parent_slot==(unsigned)parent_slot) return 0;
     }
     if (!sc64_scarab_parent_fields_pack(&f,&carry,&timer)) return 0;
@@ -105,7 +130,7 @@ static int race_scarab_parent_read(int slot, int upgraded,
     *counts=(Sc64ScarabCounts){0,0};
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].type==U_SCARAB) {
         Sc64ScarabChildFields child; int p; unsigned phase;
-        if (!sc64_scarab_child_fields_unpack(u[i].carry,u[i].work_timer,&child)) return 0;
+        if (!race_scarab_child_fields_read(u[i].carry,u[i].work_timer,&child)) return 0;
         if (child.parent_slot != (unsigned)slot) continue;
         if (!race_scarab_child_lookup(i,&p,&phase) || p!=slot) return 0;
         if (phase==SC64_SCARAB_CHILD_TRAINING) { if(training>=0)return 0; training=i; }
@@ -151,11 +176,52 @@ static int race_scarab_complete(void *ctx,int slot)
 static int race_scarab_launch_cb(void *ctx,int slot)
 {
     Sc64ScarabUnitContext *c=ctx; int p; unsigned phase;
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+    if (!race_scarab_child_lookup(slot,&p,&phase) || p!=c->parent_slot || phase!=SC64_SCARAB_CHILD_INSIDE ||
+        !race_scarab_child_set(slot,(unsigned)p,SC64_SCARAB_CHILD_OUTSIDE,0,0)) return 0;
+    u[slot].order=1; /* bridge code for source order state 0 */
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+    u[slot].target=u[p].target;u[slot].tx=u[p].tx;u[slot].ty=u[p].ty;
+#endif
+    return 1;
+#else
     return race_scarab_child_lookup(slot,&p,&phase) && p==c->parent_slot &&
            phase==SC64_SCARAB_CHILD_INSIDE &&
            race_scarab_child_set(slot,(unsigned)p,SC64_SCARAB_CHILD_OUTSIDE,
                                  SC64_SCARAB_LIFETIME,SC64_SCARAB_NO_COLLISION_TICKS);
+#endif
 }
+
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+/* Source-order control slice only. Caller supplies an authoritative arrival
+ * result and handles returned animation/removal requests. No movement,
+ * animation, damage or automatic dispatch is implemented here. */
+enum { SC64_SCARAB_CONTROL_INVALID=-1, SC64_SCARAB_CONTROL_CONTINUE=0,
+       SC64_SCARAB_CONTROL_ARRIVED=1, SC64_SCARAB_CONTROL_REMOVE=2 };
+static int race_scarab_flight_control_tick(int slot,int arrived,int signal)
+{
+    Sc64ScarabChildFields f;Unit *q;
+    if (slot<0 || slot>=MAX_UNITS || (arrived!=0 && arrived!=1) || (signal!=0 && signal!=1)) return SC64_SCARAB_CONTROL_INVALID;
+    q=&u[slot];
+    if (!q->alive || q->type!=U_SCARAB || q->raw_type!=85 ||
+        !race_scarab_child_fields_read(q->carry,q->work_timer,&f)) return SC64_SCARAB_CONTROL_INVALID;
+    if (f.phase==SC64_SCARAB_CHILD_SELF_DESTRUCT) return SC64_SCARAB_CONTROL_REMOVE;
+    if (f.phase!=SC64_SCARAB_CHILD_OUTSIDE) return SC64_SCARAB_CONTROL_INVALID;
+    if (q->order==1) {
+        if (f.life || f.no_collision) return SC64_SCARAB_CONTROL_INVALID;
+        if (!race_scarab_child_set(slot,f.parent_slot,f.phase,90,7)) return SC64_SCARAB_CONTROL_INVALID;
+        q->order=2;return SC64_SCARAB_CONTROL_CONTINUE;
+    }
+    if ((q->order!=2 && q->order!=3 && q->order!=4) || !f.life) return SC64_SCARAB_CONTROL_INVALID;
+    if (f.life==1) return SC64_SCARAB_CONTROL_REMOVE;
+    --f.life;if (f.no_collision) --f.no_collision;
+    if (!race_scarab_child_set(slot,f.parent_slot,f.phase,f.life,f.no_collision)) return SC64_SCARAB_CONTROL_INVALID;
+    if (q->order==2 && !f.no_collision) q->order=3;
+    if ((q->order==2 || q->order==3) && arrived) { q->order=4;return SC64_SCARAB_CONTROL_ARRIVED; }
+    if (q->order==4 && signal) return SC64_SCARAB_CONTROL_REMOVE;
+    return SC64_SCARAB_CONTROL_CONTINUE;
+}
+#endif
 static int race_scarab_cancel_cb(void *ctx,int slot)
 {
     Sc64ScarabUnitContext *c=ctx; int p; unsigned phase;
@@ -241,7 +307,7 @@ static int race_scarab_stop_signal(int slot,int upgraded)
     for (int i=0;i<MAX_UNITS;++i) { int parent; unsigned phase;
         if (race_scarab_child_lookup(i,&parent,&phase) && parent==slot && phase==SC64_SCARAB_CHILD_OUTSIDE) {
             Sc64ScarabChildFields f;
-            if (!sc64_scarab_child_fields_unpack(u[i].carry,u[i].work_timer,&f) ||
+            if (!race_scarab_child_fields_read(u[i].carry,u[i].work_timer,&f) ||
                 !race_scarab_child_set(i,(unsigned)slot,SC64_SCARAB_CHILD_SELF_DESTRUCT,f.life,f.no_collision)) return 0;
         }
     }
@@ -258,7 +324,7 @@ static int race_scarab_parent_lost(int slot,int upgraded)
         if (race_scarab_child_lookup(i,&parent,&phase) && parent==slot) {
             if (phase==SC64_SCARAB_CHILD_OUTSIDE || phase==SC64_SCARAB_CHILD_SELF_DESTRUCT) {
                 Sc64ScarabChildFields f;
-                if (!sc64_scarab_child_fields_unpack(u[i].carry,u[i].work_timer,&f) ||
+                if (!race_scarab_child_fields_read(u[i].carry,u[i].work_timer,&f) ||
                     !race_scarab_child_set(i,SC64_SCARAB_FIELD_NO_SLOT,phase,f.life,f.no_collision)) return 0;
             } else u[i].alive=0;
         }
@@ -273,7 +339,7 @@ static int race_scarab_child_lost(int slot,int upgraded,int lost_slot)
     if (!race_scarab_parent_identity(slot) || lost_slot<0 || lost_slot>=MAX_UNITS || u[lost_slot].alive ||
         u[lost_slot].type!=U_SCARAB || u[lost_slot].raw_type!=85 ||
         u[lost_slot].owner!=u[slot].owner || u[lost_slot].raw_owner!=u[slot].raw_owner ||
-        !sc64_scarab_child_fields_unpack(u[lost_slot].carry,u[lost_slot].work_timer,&child) ||
+        !race_scarab_child_fields_read(u[lost_slot].carry,u[lost_slot].work_timer,&child) ||
         child.parent_slot!=(unsigned)slot || child.phase!=SC64_SCARAB_CHILD_TRAINING ||
         !sc64_scarab_parent_fields_unpack(u[slot].carry,u[slot].work_timer,&f)) return 0;
     p=(Sc64ScarabParent){f.active_slot==SC64_SCARAB_FIELD_NO_SLOT ? -1 : (int)f.active_slot,
