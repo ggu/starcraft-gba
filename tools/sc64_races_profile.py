@@ -47,10 +47,11 @@ class DwarfOffsets(dict[str, int]):
     """Offset mapping that also carries compiler-derived field ABI metadata."""
 
     def __init__(self, offsets: dict[str, int], widths: dict[str, int],
-                 signed: dict[str, bool]):
+                 signed: dict[str, bool], arrays: dict[str, tuple[int, int, bool]] | None = None):
         super().__init__(offsets)
         self.widths = widths
         self.signed = signed
+        self.arrays = arrays if arrays is not None else {}
 
 
 def _dwarf_dies(text: str) -> list[dict]:
@@ -149,9 +150,48 @@ def parse_dwarf_struct(text: str, name: str, elf_label: str = 'ELF') -> tuple[in
             return scalar_type(_dwarf_ref(info), trail)
         return None
 
+    def array_type(ref: int | None) -> tuple[int, int, bool] | None:
+        # A single constant-size dimension only; dynamic/multidimensional
+        # layouts must not be guessed by consumers of this metadata.
+        seen_refs: set[int] = set()
+        while ref is not None and ref not in seen_refs:
+            seen_refs.add(ref)
+            info = by_offset.get(ref)
+            if info is None:
+                return None
+            if info['tag'] == 'DW_TAG_array_type':
+                element = scalar_type(_dwarf_ref(info))
+                index = dies.index(info)
+                children = []
+                for child in dies[index + 1:]:
+                    if child['depth'] <= info['depth']:
+                        break
+                    if child['depth'] == info['depth'] + 1:
+                        children.append(child)
+                if element is None or len(children) != 1 or children[0]['tag'] != 'DW_TAG_subrange_type':
+                    return None
+                lower = _dwarf_attr(children[0], 'DW_AT_lower_bound')
+                count = _dwarf_attr(children[0], 'DW_AT_count')
+                upper = _dwarf_attr(children[0], 'DW_AT_upper_bound')
+                if lower is not None and lower != '0':
+                    return None
+                if count is not None and count.isdigit():
+                    n = int(count)
+                elif upper is not None and upper.isdigit():
+                    n = int(upper) + 1
+                else:
+                    return None
+                return (n, element[0], element[1]) if n > 0 else None
+            if info['tag'] not in ('DW_TAG_typedef', 'DW_TAG_const_type', 'DW_TAG_volatile_type',
+                                    'DW_TAG_restrict_type', 'DW_TAG_atomic_type'):
+                return None
+            ref = _dwarf_ref(info)
+        return None
+
     offsets: dict[str, int] = {}
     widths: dict[str, int] = {}
     signed: dict[str, bool] = {}
+    arrays: dict[str, tuple[int, int, bool]] = {}
     struct_index = dies.index(struct_die)
     for member in dies[struct_index + 1:]:
         if member['depth'] <= struct_die['depth']:
@@ -169,7 +209,11 @@ def parse_dwarf_struct(text: str, name: str, elf_label: str = 'ELF') -> tuple[in
         layout = scalar_type(_dwarf_ref(member))
         if layout is not None:
             widths[field_name], signed[field_name] = layout
-    return int(size_text), DwarfOffsets(offsets, widths, signed)
+        else:
+            array = array_type(_dwarf_ref(member))
+            if array is not None:
+                arrays[field_name] = array
+    return int(size_text), DwarfOffsets(offsets, widths, signed, arrays)
 
 
 def dwarf_struct_layout(elf: Path, name: str) -> tuple[int, DwarfOffsets]:
