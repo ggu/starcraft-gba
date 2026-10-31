@@ -185,6 +185,23 @@ class SaveTest(unittest.TestCase):
             with self.assertRaises(SystemExit): replay.main()
             run.assert_not_called()
 
+    def test_save_formats_cannot_cross_resume_provenance(self):
+        inputs = {'trace': 'trace-hash', 'rom': 'rom-hash', 'elf': 'elf-hash',
+                  'runner': 'runner-hash', 'save': 'save-hash'}
+        legacy_inputs = replay.save_format_provenance(inputs, 'legacy')
+        self.assertEqual(legacy_inputs, inputs)
+        legacy = {'provenance': legacy_inputs}
+        transport1_inputs = replay.save_format_provenance(inputs, 'transport1')
+        self.assertEqual(transport1_inputs, {**inputs, 'save_format': 'transport1'})
+        transport1 = {'provenance': dict(transport1_inputs)}
+        save.verify_provenance(legacy, legacy_inputs)
+        save.verify_provenance(transport1, transport1_inputs)
+        with self.assertRaisesRegex(ValueError, 'provenance'):
+            save.verify_provenance(legacy, transport1_inputs)
+        with self.assertRaisesRegex(ValueError, 'provenance'):
+            save.verify_provenance(transport1, legacy_inputs)
+        with self.assertRaises(ValueError): replay.save_format_provenance(inputs, 'unknown')
+
     def test_second_slot_and_provenance_are_fail_closed(self):
         from sc64_races_profile import DwarfOffsets
         fields=DwarfOffsets({'version':0,'state':8},{'version':4},{},{'state':(32,4,True)})

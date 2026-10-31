@@ -187,6 +187,14 @@ def timing_delta(before, after, updates):
             'scope':'emulated main-loop work including presentation waits and UI; not physical-device FPS'}
 
 
+def save_format_provenance(provenance, save_format):
+    """Bind the new namespace while retaining older legacy summaries."""
+    if save_format not in save.SAVE_FORMATS:
+        raise ValueError('unsupported Z7 save format')
+    return ({**provenance, 'save_format': save_format}
+            if save_format != 'legacy' else dict(provenance))
+
+
 def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None, physical=False, save_format='legacy'):
     if save_format not in save.SAVE_FORMATS:
         raise ValueError('unsupported Z7 save format')
@@ -200,8 +208,7 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
     before=input_hashes(inputs)
     provenance={name:before[str(path.resolve())] for name,path in
                 zip(('trace','rom','elf','runner'),(trace,rom,elf,runner))}
-    # Preserve old legacy summary provenance while binding the new namespace.
-    if save_format != 'legacy': provenance['save_format'] = save_format
+    provenance=save_format_provenance(provenance,save_format)
     plan,pages=build_plan(trace,cut if export_save else stop)
     if cut is not None: save.validate_cut(plan,cut)
     original_stop=plan['stop']
