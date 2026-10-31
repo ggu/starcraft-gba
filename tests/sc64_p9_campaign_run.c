@@ -567,7 +567,22 @@ static int remine_idle_probe(int home)
             dist2(m[k].x,m[k].y,b[n].x,b[n].y)<320*320)near=1;
         if(near){patch=k;break;}
     }
-    if(patch<0)return 0;
+    if(patch<0){
+        /* An empty idle Probe at a depleted base can walk to an existing
+         * Nexus with visible ore; mining is issued on a later call. */
+        int dest=-1,best=0x7fffffff;
+        if(u[worker].order!=ORDER_IDLE||u[worker].carry)return 0;
+        for(int n=0;n<MAX_BUILDINGS;n++)if(b[n].alive&&b[n].owner==SIDE&&
+            b[n].type==B_NEXUS&&building_complete(n)){
+            int has_ore=0;
+            for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0&&currently_visible(m[k].x,m[k].y)&&
+                dist2(m[k].x,m[k].y,b[n].x,b[n].y)<320*320){has_ore=1;break;}
+            int d=dist2(u[worker].x,u[worker].y,b[n].x,b[n].y);
+            if(has_ore&&d>320*320&&d<best){dest=n;best=d;}
+        }
+        if(dest<0)return 0;
+        return command_selected(MENU_MOVE,b[dest].x,b[dest].y+48);
+    }
     next_patch=(patch+1)%MAX_MINERALS;
     for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0]);k++) {
         int x=m[patch].x+dx[k],y=m[patch].y+dy[k];
