@@ -53,7 +53,7 @@ static int check_probe_candidate(const void *data,u32 length,u32 tag,void *conte
                                                 (unsigned)race_rows*16u);
 }
 
-static void test_staged_journal_migration(const GbaSaveSelection *previous)
+static void test_staged_journal_migration(const GbaSaveSelection *previous, int campaign)
 {
     static u8 predecessor[SAVE_SLOT_SIZE];
     static Unit before_units[MAX_UNITS];
@@ -312,6 +312,25 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
     assert(frame==old_frame && minerals==old_minerals && gas==old_gas &&
            race_mode==old_mode && seed==old_seed &&
            !memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    /* The game entry point must fall back to the intact predecessor, then
+     * leave the live world untouched when neither journal is valid. */
+    assert(race_load_game());
+    assert(race_mode==!campaign && sc64_pool_active_head(&race_p7_projectiles)==SC64_END);
+    memcpy(before_units,u,sizeof(u)); memcpy(before_buildings,b,sizeof(b));
+    memcpy(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram));
+    old_frame=frame; old_minerals=minerals; old_gas=gas; old_mode=race_mode; old_seed=seed;
+    memcpy(old_clock,race_protoss_generic_clock,sizeof(old_clock));
+    host_save[(unsigned)previous->slot*SAVE_SLOT_SIZE+8u]^=1u;
+    assert(!race_load_game());
+    assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
+           !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)) &&
+           frame==old_frame && minerals==old_minerals && gas==old_gas &&
+           race_mode==old_mode && seed==old_seed &&
+           !memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
+#else
+    (void)campaign;
+#endif
 }
 #endif
 
@@ -390,7 +409,7 @@ int main(int argc,char **argv)
         memcpy(host_save,before_sram,sizeof(host_save));
     }
 #endif
-    test_staged_journal_migration(&selected);
+    test_staged_journal_migration(&selected,campaign);
     puts("staged actor/shot journal migration: ok");
 #else
     game_init();
