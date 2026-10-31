@@ -150,8 +150,9 @@ host showcase simulation ends every scene with byte-identical unit and
 building state whether facing is on or off. The facing frames add about
 416 KiB of ROM. The showcase ROM keeps the IWRAM end it has without facing
 (0x030049e8) and ends BSS at 0x0203dfd8, under the 0x0203e000 guard.
-Canonical ROMs leave the flag off. A tank cannot yet aim its turret
-independently while driving.
+Every race-engine ROM now turns facing on as well, together with the source
+walk cycles described in `docs/DEVELOPMENT.md`. A tank cannot yet aim its
+turret independently while driving.
 
 For a controller-only mGBA replay, captures and timings:
 
