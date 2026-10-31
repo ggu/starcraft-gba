@@ -23,6 +23,8 @@ static inline void sc64_shared_projectile_reset(Sc64SharedProjectileArena *a)
 }
 /* Handles include a generation and one-based slot; stale handles cannot
  * release a replacement before the 16-bit generation wraps. Zero is always an invalid handle. */
+static inline int sc64_shared_projectile_has_capacity(const Sc64SharedProjectileArena *a)
+{ return a && a->active<SC64_SHARED_PROJECTILE_CAPACITY; }
 static inline uint32_t sc64_shared_projectile_acquire(Sc64SharedProjectileArena *a,unsigned type,unsigned owner)
 {
     if(!a || type<1 || type>SC64_SHARED_PROJECTILE_IMPACT || owner>255) return 0;

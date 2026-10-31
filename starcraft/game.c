@@ -1346,6 +1346,9 @@ static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race
 static u16 sc64_battlecruiser_tech_bits;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
 static Sc64BcYamatoShot sc64_bc_shots[SC64_BC_SHOT_LIMIT];
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+static u32 sc64_shared_yamato_handles[SC64_BC_SHOT_LIMIT];
+#endif
 /* Number of frame-counter increments during scripted world pauses, mod 5. */
 static u8 sc64_bc_pause_offset;
 /* Private spell-only LCG: deterministic across saves, but not the complete
@@ -4837,6 +4840,9 @@ init_state(void)
     sc64_battlecruiser_tech_bits = 0;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     memset(sc64_bc_shots,0,sizeof(sc64_bc_shots));
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    memset(sc64_shared_yamato_handles,0,sizeof(sc64_shared_yamato_handles));
+#endif
     sc64_bc_pause_offset=0; sc64_bc_spell_rng=42u;
 #endif
 #endif
@@ -5086,6 +5092,9 @@ game_init(void)
 {
 #ifdef SC64_SHARED_PROJECTILE_STAGE
     sc64_shared_projectile_reset(&sc64_shared_projectiles);
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    memset(sc64_shared_yamato_handles,0,sizeof(sc64_shared_yamato_handles));
+#endif
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
     memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));

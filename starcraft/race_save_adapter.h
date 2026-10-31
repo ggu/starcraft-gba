@@ -2721,6 +2721,10 @@ static int race_load_preflight(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (!race_bc_shots_candidate_valid(&race_data,(unsigned)width*16u,(unsigned)height*16u)) return 0;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    for(unsigned i=0;i<SC64_BC_SHOT_LIMIT;++i)
+        if(race_data.battlecruiser_shots[i].state==SC64_BC_SHOT_FLIGHT) return 0;
+#endif
 #endif
 #ifdef SC64_SCARAB_RUNTIME
     if (!race_scarab_save_candidate_valid(&race_data,(unsigned)width*16u,

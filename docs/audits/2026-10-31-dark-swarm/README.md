@@ -225,3 +225,31 @@ migration, all four profile bounds and source allocation failure semantics also
 remain unqualified. The earlier menu-count wrapper was fixed to retain its
 actual function symbol with the stage gate off; the exact gate-off P7 delayed
 impact/save and 18 skirmish setups pass.
+
+### Real Yamato contention stage
+
+Under `SC64_SHARED_PROJECTILE_STAGE`, Yamato approach and charge retain their
+existing two-row cap and do not reserve a typed projectile slot. At actual
+release, a free typed slot is required before the launch miss roll; successful
+flight retains that reservation through caster death, target loss and slot
+reuse, and releases it when the projectile retires. If no slot is available,
+the source-style release path retains the already-spent energy and existing
+recovery/cooldown state. A preflight rejects legacy in-flight Yamato saves
+under this experimental gate until a shared reservation codec is supported;
+normal products do not enable this gate.
+
+An actual-engine ASan/UBSan test uses 99 real Interceptor shots plus a real
+Yamato, then 100 real Interceptor shots plus a real Yamato charge. It checks
+contention in both directions, no pre-release reservation, full-pool refusal,
+no extra launch miss RNG on a full pool, caster and target death, target-slot
+reuse, projectile retirement and reset. The test uses P7 and BC logic with the
+Yamato art flag omitted; it does not validate rendering, the complete shared
+RNG stream, a combined save codec or native hardware. Gate-off resolved
+Yamato flight/save/miss/removal tests also passed. The earlier gate-off fixture
+was first run with autolaunch enabled even though that fixture expects manual
+release and failed its age assertion; with its required manual-release vector
+it passed.
+
+Ordinary impact packets, Scarabs and Dark Swarm remain outside this typed
+reservation. The 16-bit handle generation wrap and all-profile/link/save
+qualification remain open, so this stage is not ready to activate.

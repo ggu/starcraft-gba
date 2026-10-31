@@ -4305,6 +4305,14 @@ build/test-sc64-shared-projectile-stage: tests/sc64_shared_projectile_stage_game
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) -DSC64_SHARED_PROJECTILE_STAGE $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 test-sc64-shared-projectile-stage: build/test-sc64-shared-projectile-stage
 	./build/test-sc64-shared-projectile-stage
+
+# Combined live-family contention fixture; the art renderer is unchanged and
+# intentionally outside this focused host test.
+.PHONY: test-sc64-shared-yamato-interceptor
+build/test-sc64-shared-yamato-interceptor: tests/sc64_shared_yamato_interceptor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(filter-out -DSC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT,$(BC_FLAGS)) $(P7_INTERCEPTOR_FLIGHT_FLAGS) -DSC64_SHARED_PROJECTILE_STAGE $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-sc64-shared-yamato-interceptor: build/test-sc64-shared-yamato-interceptor
+	./build/test-sc64-shared-yamato-interceptor
 build/test-sc64-p7-projectile: tests/sc64_p7_projectile_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_PROJECTILE_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
 .PHONY: test-sc64-p7-projectile protoss-p7-projectile-probe
