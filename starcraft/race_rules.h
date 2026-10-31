@@ -124,6 +124,10 @@ enum {
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
     U_SHARED_BATTLECRUISER,
 #endif
+#ifdef SC64_SCARAB_RUNTIME
+    /* Appended identity only: production and lifecycle are separate services. */
+    U_SCARAB,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -315,6 +319,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     },
     [U_HUNTER_KILLER] = { R_ZERG, 0, B_HATCHERY, 0, 150, 50, 780, 160, 0, SC_PR_HYDRALISK_DEN },
     [U_REAVER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 8, 200, 100, 1050, 100, 80, 0 },
+#ifdef SC64_SCARAB_RUNTIME
+    [U_SCARAB] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 0, 15, 0, 105, 20, 10, 0 },
+#endif
     [U_FENIX_DRAGOON] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 0, 300, 100, 1500, 240, 240, 0 },
     /* Siege Mode is an existing Tank transformed in place, not a factory
      * product; its source-type conversion therefore has no training cost. */
@@ -732,6 +739,9 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
         ,[U_SHARED_BATTLECRUISER] = "BATTLECRUISER"
+#endif
+#ifdef SC64_SCARAB_RUNTIME
+        ,[U_SCARAB] = "SCARAB"
 #endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
@@ -1525,6 +1535,9 @@ static inline int sc64_race_raw_unit(int type)
     case U_PROBE: return 64; case U_ZEALOT: return 65; case U_DRAGOON: return 66;
     case U_SCOUT: return 70; case U_FENIX: return 77; case U_FENIX_DRAGOON: return 78;
     case U_TASSADAR: return 79; case U_REAVER: return 83; case U_GOLIATH: return 3;
+#ifdef SC64_SCARAB_RUNTIME
+    case U_SCARAB: return 85;
+#endif
     case U_TANK: return 5; case U_SIEGE_TANK: return 30;
     case U_WRAITH: return 8; case U_CHRYSALIS: return 216;
     case U_VULTURE: return 2; case U_DROPSHIP: return 11; case U_SCOURGE: return 47;
@@ -1766,6 +1779,9 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 64: return U_PROBE; case 65: return U_ZEALOT; case 66: return U_DRAGOON;
     case 70: return U_SCOUT; case 77: return U_FENIX;
     case 78: return U_FENIX_DRAGOON; case 83: return U_REAVER;
+#ifdef SC64_SCARAB_RUNTIME
+    case 85: return U_SCARAB;
+#endif
     case 79: return U_TASSADAR;
     case 2: return U_VULTURE;
 #if defined(SC64_UNIFIED) && (defined(SC64_Z3_ENABLED) || defined(SC64_T5_RUNTIME))

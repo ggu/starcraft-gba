@@ -3092,3 +3092,13 @@ The fixed tick 17937 and frame 17658 are a source-bound witness for this
 controller and runtime, not a general scenario or hardware guarantee; a
 runtime change that alters the controller timeline requires a fresh witness
 and review. This host test is not a physical-GBA or frame-rate qualification.
+
+### Gated Scarab component fixtures
+
+With the four canonical profiles' private inputs already prepared,
+`make test-scarab-unit-adapter` and `make test-scarab-presence` each compile and run
+four host sanitizer fixtures with `SC64_SCARAB_RUNTIME`. They generate only a
+new source-fact table under a fresh ignored `build/generated/scarab-p7/run.*`
+directory; they do not prepare imported art or replace an existing fact table.
+These component checks do not enable Reaver production or qualify gameplay,
+SRAM continuation, physical hardware, or performance.

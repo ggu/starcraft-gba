@@ -66,7 +66,7 @@ ui_hostile_at(int x, int y, int *tx, int *ty)
 {
     int i;
     for (i = 0; i < MAX_UNITS; i++)
-        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && owners_hostile(SIDE, u[i].owner) &&
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && owners_hostile(SIDE, u[i].owner) &&
             dist2(x, y, u[i].x, u[i].y) < 9 * 9 && currently_visible(u[i].x, u[i].y)) {
             *tx = u[i].x; *ty = u[i].y;
             return 1;
