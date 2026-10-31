@@ -54,6 +54,7 @@ class LookupMakeTest(unittest.TestCase):
             with self.subTest(target=target):
                 self.assertTrue(reachable(rules, target, INDEX), 'selected header can be absent or stale')
                 self.assertTrue(reachable(rules, target, CONFIG), 'mode changes must rebuild consumers')
+                self.assertTrue(reachable(rules, target, 'build/walk-pair-verified'), 'walk and facing must match')
         self.assertFalse(reachable(rules, 'build/starcraft.elf', INDEX))
         self.assertFalse(reachable(rules, 'build/starcraft.elf', CONFIG))
 
@@ -74,7 +75,7 @@ build/lookup-consumer: $(CANONICAL_LOOKUP_INPUTS)
 
             def build(mode, bank='first', route=1):
                 subprocess.run(['make', '-f', 'Makefile', '-f', 'fixture.mk',
-                                f'CANONICAL_LOOKUP_INDEX={mode}', f'CANONICAL_ROUTE_INDEX={route}', f'WEAPON_SOURCE_DIR={bank}',
+                                f'CANONICAL_LOOKUP_INDEX={mode}', f'CANONICAL_ROUTE_INDEX={route}', 'CANONICAL_WALK_WORDS=0', f'WEAPON_SOURCE_DIR={bank}',
                                 '-o', f'{bank}/sc64_weapon_source_generated.h', 'lookup-fixture'],
                                cwd=root, check=True, capture_output=True)
                 return (root / 'build/rebuilds').read_text().splitlines()
