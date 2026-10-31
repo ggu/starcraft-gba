@@ -134,6 +134,19 @@ class Game:
         self.rsp.write(self.sym["demo_schedule_length"], struct.pack("<I", 0x7fffffff))
         self.rsp.write(self.sym["demo_schedule_active"], struct.pack("<I", 1))
         self.updates = 0
+        self.stale_update_stops = 0
+        # The current main-loop iteration latched scheduler-disabled before
+        # the host enabled it. Synchronize while still at the neutral title;
+        # subsequent step() calls then have an active scheduler throughout.
+        if self.u32("screen") != SCREEN_TITLE:
+            raise ContinuationError("scheduler bootstrap is not on the title screen")
+        self.synchronize_scheduler()
+
+    def synchronize_scheduler(self) -> None:
+        """Finish the neutral startup boundary separately from measured updates."""
+        self.step(0)
+        self.bootstrap_stops = self.stale_update_stops + 1
+        self.updates = self.stale_update_stops = 0
 
     def u32(self, name: str, offset: int = 0) -> int:
         return int.from_bytes(self.rsp.read(self.sym[name] + offset, 4), "little", signed=True)
@@ -141,13 +154,25 @@ class Game:
     def step(self, keys: int = 0, n: int = 1) -> None:
         """Run n updates holding keys; the scheduler applies them from the next update."""
         for _ in range(n):
+            tick = self.u32("demo_schedule_tick")
             if keys != self.keys:
-                tick = self.u32("demo_schedule_tick")
                 self.rsp.write(self.sym["demo_schedule_events"], struct.pack("<2I", tick + 1, keys))
                 self.rsp.write(self.sym["demo_schedule_count"], struct.pack("<I", 1))
                 self.rsp.write(self.sym["demo_schedule_index"], struct.pack("<I", 0))
                 self.keys = keys
-            self.rsp.tick(expected=self.update)
+            # A hardware breakpoint can be entered again at the same audio
+            # boundary (observed on ARM with no scheduler/frame advance).
+            # Count completed main-loop updates, not breakpoint notifications.
+            for _ in range(8):
+                self.rsp.tick(expected=self.update)
+                observed = self.u32("demo_schedule_tick")
+                if observed == tick + 1:
+                    break
+                if observed != tick:
+                    raise ContinuationError(f"scheduler jumped from {tick} to {observed}")
+                self.stale_update_stops += 1
+            else:
+                raise ContinuationError("scheduler did not advance after eight breakpoint stops")
             self.updates += 1
 
     def tap(self, key: int) -> None:
@@ -270,6 +295,8 @@ def run(args) -> dict:
         game.step(KEY_A)
         game.step(0, args.continue_updates)
         record["reference"] = summary(game.state())
+        record["phase1_stale_update_stops"] = game.stale_update_stops
+        record["phase1_bootstrap_stops"] = game.bootstrap_stops
         game.rsp.export_sram()
     finally:
         game.close()
@@ -290,6 +317,8 @@ def run(args) -> dict:
         record["restored"] = summary(game.state())
         game.step(0, args.continue_updates)
         record["resumed"] = summary(game.state())
+        record["phase2_stale_update_stops"] = game.stale_update_stops
+        record["phase2_bootstrap_stops"] = game.bootstrap_stops
         game.rsp.export_sram()
     finally:
         game.close()

@@ -459,3 +459,47 @@ The full P8 win and full/prefix/fresh host and guest replay results above remain
 ### Shared hover integration checkpoint
 
 Merge `afa5077` incorporates shared packed flyer hover over the walking checkpoint. Its normal P8 ARM ROM passed existing guards (IWRAM end `0x03004a18`, EWRAM BSS end `0x0203899c`, SHA-256 `c973cdf48c79a5f41626dd4714737d227254b701f6261e5aa4664a9ea2ceeb93`). The carried-profile startup/save and 234 skirmish cases, P8 preflight, P7 observer and battery rule tests, and races/unified walking and hover-frame tests passed; the 103 frozen prepared inputs were unchanged. Earlier full P8 victory and custom guest full/prefix/fresh replay remain evidence for runtime `e0e8e1f`, not a replay of this hover merge. Integration of the subsequent shared AI-economy change and its checks is pending. This remains an unpromoted candidate with the documented service and admission holds.
+
+### Shared AI-economy sync
+
+Merge `41c52a4` carries the shared AI-economy change. The normal P8 ARM ROM passed unchanged RAM guards (IWRAM end `0x03004a18`, EWRAM BSS end `0x0203899c`, SHA-256 `72a79df8d99b300bab19a1b358f34f96d566b25c0f4a8132cc668fbbdb5e4249`). The retained host full input tape matched its earlier run at all 91 checkpoints and the final state. Under actual P8 flags, nine sanitizer skirmish worker cases passed: each of three AI races with bot STOP recovery, human STOP preservation and depleted-field reassignment. All 103 frozen inputs remained unchanged. The earlier custom guest replay remains evidence for `e0e8e1f`, not a new guest run of this sync; admission holds remain open.
+
+### Shared Scarab foundation integration checkpoint
+
+Merge `723b3db` combines the P8 candidate with shared integration `652ff63`.
+Scarab runtime and namespace staging remain disabled in the normal P8 vector.
+The save conflict preserves P8 candidate service binding and wraps each save
+preflight call with unconditional binding cleanup, including staged selection
+calls; the two unit-name entries retain explicit enum indices.
+
+With the retained P8 input tape and prepared inputs, the current merge's host
+replay matched all 91 earlier checkpoint lines and its final win at tick 90428
+(frame 88769). Under the P8 vector, the sanitizer carried-profile startup/save
+matrix passed 234 skirmish configurations, the Protoss service fixture passed
+its successful-load and invalid-candidate cleanup checks, and the skirmish AI
+fixture completed. These are host checks. Combined namespace-stage fallback
+with P8 service binding, the current normal ARM guard, and independent review
+remain outstanding; the earlier guest replay applies only to its recorded older
+runtime. This checkpoint does not promote P8 or close its documented service and
+admission holds.
+
+The normal P8 ARM product at runtime `723b3db` subsequently passed its existing
+ROM verification and link guards: IWRAM end `0x03004a18`, EWRAM BSS end
+`0x0203899c`, ROM SHA-256
+`c5264e1b6c860cf63bf8d9e12417c50c61f1d040d44855a43c027127f09a8a51`.
+The 103 retained prepared inputs matched their recorded hashes before and after.
+A separate sanitizer fresh-process skirmish test compiled with the P8 vector
+and explicit Scarab runtime/namespace-stage flags wrote two valid journal
+slots, corrupted the newer child semantically while retaining its checksum,
+and successfully loaded the older slot. The test checked that the Protoss
+binding override was cleared both after explicit rejection of the newer
+candidate and after successful fallback. Namespace staging remains restricted
+to its supported skirmish scope; this is not a P8 campaign namespace test.
+The earlier guest replay and the documented P8 admission holds are unchanged.
+
+Independent source review of the combined preflight wrapper found no concrete
+blocker for this candidate checkpoint: both ordinary load and each staged
+candidate prepare use unconditional binding cleanup. The current host receipts,
+normal ARM verification and source-boundary result were inspected separately.
+This does not promote P8, establish all-four-product integration or replace the
+older custom guest replay with a current normal-ROM campaign replay.

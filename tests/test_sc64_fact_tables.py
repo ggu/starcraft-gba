@@ -24,6 +24,7 @@ NON_GATES = {"SC64_ZP_FACT_RANGE_CULL", "SC64_FACT_TABLES"}
 CONFIGS = {name: ("SC64_RACES",) + defines
            for name, defines in FACT_RANGE_CONFIGS.items()}
 CONFIGS.update({
+    "scarab_identity": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_SCARAB_RUNTIME"),
     "shared_battlecruiser": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
                             "SC64_BATTLECRUISER_EXPERIMENT"),
     "all_race_roster": ("SC64_RACES", "SC64_UNIFIED", "SC64_ZP_CAMPAIGN_ACTORS",
@@ -163,6 +164,21 @@ class FactTablesTest(unittest.TestCase):
                             label + "-check", ("-I", str(table_dir)))
                         self.assertNotEqual(built.returncode, 0)
                         self.assertIn(f"generated {state} {gate}".encode(), built.stderr)
+
+    def test_tables_reject_scarab_gate_mismatch_both_directions(self):
+        base = CONFIGS["zp_p7"]
+        with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-scarab-") as directory:
+            for name, generated, used, state in (
+                ("off-on", base, base + ("SC64_SCARAB_RUNTIME",), "without"),
+                ("on-off", base + ("SC64_SCARAB_RUNTIME",), base, "with"),
+            ):
+                with self.subTest(direction=name):
+                    table_dir = generate(self.compiler, generated, directory, name)
+                    built, _ = compile_program(self.compiler, CHECK,
+                        used + ("SC64_FACT_TABLES",), directory,
+                        name + "-check", ("-I", str(table_dir)))
+                    self.assertNotEqual(built.returncode, 0)
+                    self.assertIn(f"generated {state} SC64_SCARAB_RUNTIME".encode(), built.stderr)
 
     def test_tables_reject_carrier_flight_gate_mismatch(self):
         with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-flight-") as directory:
