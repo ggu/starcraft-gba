@@ -2,7 +2,8 @@
  * Port-free mGBA 0.10.5 backend for the controller replay tools.
  * Build against the matching private libmgba.a with USE_DEBUGGERS enabled.
  * The line protocol exposes only reads, writes, hardware breakpoints, continue
- * and the 64-bit emulated cycle clock. Optional SRAM files are imported only
+ * and the 64-bit emulated cycle clock. --physical disables guest writes and
+ * exposes bounded button input and breakpoint-stepped update batches. Optional SRAM files are imported only
  * before boot and exported only to an explicitly configured new output file.
  * It never modifies the ROM file or accepts SRAM bus-write commands. */
 #include <mgba/core/core.h>
@@ -66,15 +67,17 @@ static int export_sram(struct mCore *core, const char *path) {
     return ok;
 }
 int main(int argc, char **argv) {
-    if (argc < 12 || (argc - 12) % 2) return 2;
+    int physical = argc >= 3 && !strcmp(argv[2], "--physical");
+    int options = physical ? 3 : 12;
+    if (argc < options || (argc - options) % 2) return 2;
     const char *save_input = NULL, *save_output = NULL;
-    for (int i = 12; i < argc; i += 2) {
+    for (int i = options; i < argc; i += 2) {
         if (!strcmp(argv[i], "--save-input") && !save_input) save_input = argv[i+1];
         else if (!strcmp(argv[i], "--save-output") && !save_output) save_output = argv[i+1];
         else return 2;
     }
     struct { uint32_t start, size; } allowed[5];
-    for (unsigned i=0; i<5; ++i) {
+    for (unsigned i=0; !physical && i<5; ++i) {
         const char *a=argv[2+i*2], *b=argv[3+i*2]; uint32_t start, size;
         if (!number(&a,16,&start) || *a || !number(&b,10,&size) || *b || !size ||
             start < 0x02000000 || start >= 0x02040000 || size > 0x02040000 - start) return 2;
@@ -117,7 +120,7 @@ int main(int argc, char **argv) {
             for (unsigned i = 0; i < length; ++i)
                 printf("%02x", (unsigned) core->rawRead8(core, address + i, -1) & 255);
             putchar('\n');
-        } else if (line[0] == 'M' && number(&p,16,&address) && *p++ == ',' &&
+        } else if (!physical && line[0] == 'M' && number(&p,16,&address) && *p++ == ',' &&
                    number(&p,10,&length) && *p++ == ':' && length && length <= 512) {
             const char *data = p-1; int valid = strlen(p) == 2u * length;
             for (unsigned i = 0; valid && i < length; ++i)
@@ -130,6 +133,38 @@ int main(int argc, char **argv) {
                 for (unsigned i = 0; i < length; ++i)
                     core->busWrite8(core, address + i, (uint8_t) (hexval(data[1+2*i])*16 + hexval(data[2+2*i])));
                 puts("OK");
+            }
+        } else if (physical && line[0] == 'K' && number(&p,16,&address) && !*p && address<=1023u) {
+            core->setKeys(core, address);
+            puts("OK");
+        } else if (physical && line[0] == 'U' && number(&p,10,&length) && *p++ == ',' &&
+                   number(&p,16,&address) && *p++ == ',') {
+            uint32_t counter_address=0;
+            int valid=number(&p,16,&counter_address) && !*p && length>0 && length<=256 &&
+                !(counter_address&3u) &&
+                ((counter_address>=0x02000000 && counter_address<=0x0203fffcu) ||
+                 (counter_address>=0x03000000 && counter_address<=0x03007ffcu));
+            int registered=0;
+            for(unsigned i=0;i<point_count;i++)if(points[i].address==address)registered=1;
+            if(!valid || !registered || stopped!=1 || stop_address!=address) puts("ERR step");
+            else {
+                uint32_t before=0;
+                for(unsigned j=0;j<4;j++)before|=(uint32_t)core->rawRead8(core,counter_address+j,-1)<<(8*j);
+                uint64_t start=mTimingGlobalTime(core->timing);
+                unsigned completed=0,stale=0;
+                while(completed<length && before!=UINT32_MAX) {
+                    stopped=0;debugger.state=DEBUGGER_RUNNING;
+                    while(!stopped && mTimingGlobalTime(core->timing)-start<UINT64_C(17179869184))
+                        mDebuggerRun(&debugger);
+                    if(stopped!=1||stop_address!=address)break;
+                    uint32_t now=0;
+                    for(unsigned j=0;j<4;j++)now|=(uint32_t)core->rawRead8(core,counter_address+j,-1)<<(8*j);
+                    if(now==before) {if(++stale>8)break;continue;}
+                    if(now!=before+1u)break;
+                    before=now;completed++;stale=0;
+                }
+                if(completed!=length)puts("ERR step");
+                else printf("STEPS %u %" PRIu32 " %" PRIu64 "\n",completed,before,mTimingGlobalTime(core->timing));
             }
         } else if (line[0] == 'Z' && number(&p,16,&address) && !*p && point_count < 8) {
             struct mBreakpoint bp = {.address=address, .segment=-1, .type=BREAKPOINT_HARDWARE};
