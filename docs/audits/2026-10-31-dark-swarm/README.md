@@ -364,3 +364,40 @@ the capacity remains full for the post-impact tail and clears on tick 28. This
 is evidence for that script and test setup, not hardware or full allocator
 qualification. Interceptor retirement remains tied to its existing DYING to
 FREE transition. All experimental flags remain off in normal products.
+
+
+### Disabled stationary Defiler executor
+
+`SC64_SHARED_DEFILER_EXECUTOR` adds a deliberately limited actual-game consumer
+for the existing field-menu point intent. It requires the staged Defiler,
+shared projectile arena and existing source clock. In the tested stationary
+raw-46 controlled interior, the actor turns toward the point, pays energy,
+attempts a typed projectile allocation at its later script event, and creates
+a separately timed field on projectile impact. A full projectile arena still
+spends energy; a full ordinary unit pool prevents field creation. Field slots
+are non-colliding sidecars reserved from the same unit budget; unit reuse and
+the existing free-slot preflights account for them. New releases are attempted
+before bullet retirements. Projectile and field lifetime survive caster loss.
+Pending casts, projectiles and fields refuse save/load.
+
+On a synthetic actual-engine Showcase setup, ordinary B/menu/A input and five
+source headings at each of five GBA/source clock phases matched the retained
+controlled OpenBW samples: debit at source ticks 2, 2, 4, 5 and 1 for east,
+south, west, north and southeast, then projectile at debit+3, field at
+projectile+5, retirement one tick later. ASan/UBSan fixtures also cover full
+typed/projectile and actor pools, a seeded simultaneous release/retirement
+ordering counterexample, reserved slot expiry, and save refusal. The source
+world oracle used authenticated private data and a synthetic flat map; it is
+not native N64 or hardware proof.
+
+This remains off in all normal products. It is not complete Dark Swarm: the
+controlled interior is narrower than the source's unit-rectangle range and
+halt calculation; visible-target checks, movement/approach, interruption and
+full slot-retirement semantics, raw-52 hero and energy upgrades, the field
+rendering, weapon launch miss protection, all-family shared bullet contention,
+and persistent save format remain unqualified. A separate controlled eastward
+source-world expiry probe across initial phases 0–4 observed the active field
+leave at timer zero and its dead unit retain its slot for four more source
+samples; the stage now models that inactive slot tail separately from active
+field lifetime. Other expiry conditions remain unqualified. No production-
+admission claim follows from these fixtures.

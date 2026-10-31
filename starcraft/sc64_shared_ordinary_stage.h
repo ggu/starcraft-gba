@@ -85,7 +85,7 @@ static int race_shared_ordinary_prepare(Unit *q,int target,int flying,int damage
     }
     p.active=1;sc64_ordinary_pending[slot]=p;return 1;
 }
-static void race_shared_ordinary_tick(void)
+static void race_shared_ordinary_release_tick(void)
 {
     for(int i=0;i<MAX_UNITS;i++) {
         Sc64OrdinaryPending *p=&sc64_ordinary_pending[i];Unit *q=&u[i];
@@ -109,6 +109,9 @@ static void race_shared_ordinary_tick(void)
         }
         if(!waiting)race_shared_ordinary_cancel(i);
     }
+}
+static void race_shared_ordinary_bullet_tick(void)
+{
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) {
         Sc64OrdinaryBullet *b=&sc64_ordinary_bullets[i];if(!b->handle)continue;
         /* Match the existing impact path: loss of targetability permanently
@@ -124,4 +127,6 @@ static void race_shared_ordinary_tick(void)
         }
     }
 }
+static void race_shared_ordinary_tick(void)
+{ race_shared_ordinary_release_tick(); race_shared_ordinary_bullet_tick(); }
 #endif

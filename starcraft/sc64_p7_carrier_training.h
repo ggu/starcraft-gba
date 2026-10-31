@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_P7_CARRIER_TRAINING_H
 #define SC64_P7_CARRIER_TRAINING_H
+#include "sc64_unit_slot_free.h"
 
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 #if !defined(SC64_P7_PROJECTILES_ENABLED) || !defined(SC64_P7_ACTORS)
@@ -169,7 +170,7 @@ static int race_p7_carrier_training_slots_available(unsigned wanted)
             commitments += (unsigned)sc64_race_product_count(type);
         }
     }
-    for (int i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+    for (int i = 0; i < MAX_UNITS; ++i) free_slots += SC64_UNIT_SLOT_FREE(i);
     return commitments <= free_slots;
 }
 

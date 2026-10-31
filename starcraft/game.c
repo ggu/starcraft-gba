@@ -990,8 +990,23 @@ static Sc64SharedProjectileArena sc64_shared_projectiles;
 #ifdef SC64_SHARED_DEFILER_STAGE
 /* Experimental simulation state; never borrow presentation-facing or a
  * mission payload. Save remains refused while an experimental caster lives. */
-typedef struct { u16 energy_q8; s16 target_x,target_y; u8 heading, live, intent; } Sc64DefilerStageActor;
+typedef struct { u16 energy_q8; s16 target_x,target_y; u8 heading, live, intent, phase, age; } Sc64DefilerStageActor;
 static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
+#endif
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+#if !defined(SC64_SHARED_DEFILER_STAGE) || !defined(SC64_SHARED_PROJECTILE_STAGE) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+#error "Defiler executor requires staged casters, shared projectiles, and source clock"
+#endif
+#include "sc64_dark_swarm_state.h"
+typedef struct { u32 handle; s16 x,y; u8 age; } Sc64DefilerProjectile;
+static Sc64DefilerProjectile sc64_defiler_projectiles[SC64_SHARED_PROJECTILE_CAPACITY];
+static Sc64DarkSwarmEffect sc64_defiler_fields[MAX_UNITS];
+static void sc64_defiler_executor_unit_tick(void);
+static void sc64_defiler_executor_bullet_tick(void);
+static int sc64_defiler_executor_busy(void);
+#define SC64_UNIT_SLOT_FREE(i) (!u[i].alive && !sc64_defiler_fields[i].remaining)
+#else
+#define SC64_UNIT_SLOT_FREE(i) (!u[i].alive)
 #endif
 #ifdef SC64_UNIT_FACING
 static void sc64_facing_reset_all(void);
@@ -1057,6 +1072,8 @@ static void race_shared_ordinary_reset(void);
 static void race_shared_ordinary_cancel(int slot);
 static int race_shared_ordinary_pending_any(void);
 static void race_shared_ordinary_tick(void);
+static void race_shared_ordinary_release_tick(void);
+static void race_shared_ordinary_bullet_tick(void);
 static void race_shared_ordinary_forget_target(int ref);
 #endif
 /* Every world start and load clears in-flight effects; a load restores its
@@ -2195,7 +2212,7 @@ find_unit_slot(void)
 {
     int i;
     for (i = 0; i < MAX_UNITS; i++)
-	if (!u[i].alive)
+	if (SC64_UNIT_SLOT_FREE(i))
 	    return i;
     return -1;
 }
@@ -2210,16 +2227,9 @@ find_build_slot(void)
     return -1;
 }
 
-static int
-spawn_unit(int owner, int type, int x, int y)
+/* Clear references before a staged field reuses an actor slot. */
+static void sc64_unit_prepare_reuse(int i)
 {
-#ifdef SC64_CONTACT_MEMO_ENABLED
-    SC64_CONTACT_MEMO_INVALIDATE();
-#endif
-
-    int i = find_unit_slot();
-    if (i < 0)
-	return -1;
 #ifdef SC64_SHARED_ORDINARY_STAGE
     race_shared_ordinary_cancel(i);
 #endif
@@ -2249,6 +2259,19 @@ spawn_unit(int owner, int type, int x, int y)
 #endif
     /* A newly produced unit can reuse a dead unit's array slot. */
     if (unit_tap == i) reset_unit_tap();
+}
+
+static int
+spawn_unit(int owner, int type, int x, int y)
+{
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+
+    int i = find_unit_slot();
+    if (i < 0)
+	return -1;
+    sc64_unit_prepare_reuse(i);
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     invincible_units[i] = (u8)(
@@ -4877,6 +4900,10 @@ init_state(void)
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
     memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+    memset(sc64_defiler_projectiles,0,sizeof(sc64_defiler_projectiles));
+    memset(sc64_defiler_fields,0,sizeof(sc64_defiler_fields));
+#endif
 #endif
     sc64_walk_reset_all();
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
@@ -5150,6 +5177,10 @@ game_init(void)
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
     memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+    memset(sc64_defiler_projectiles,0,sizeof(sc64_defiler_projectiles));
+    memset(sc64_defiler_fields,0,sizeof(sc64_defiler_fields));
+#endif
 #endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_bullet_reset();
@@ -5370,7 +5401,7 @@ issue_order(int order, int tx, int ty)
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
             /* A newly accepted move/attack replaces the pending point order. */
-            if (sc64_defiler_stage[i].live) sc64_defiler_stage[i].intent=0;
+            if (sc64_defiler_stage[i].live) { sc64_defiler_stage[i].intent=0; sc64_defiler_stage[i].phase=0; }
 #endif
 	    u[i].order = order;
 	#ifdef SC64_REACHABLE_FORMATION
@@ -5588,7 +5619,7 @@ stop_selected(void)
             if (sc64_race_raw_unit(u[i].type)==83) (void)race_scarab_stop_signal(i,0);
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
-            if (sc64_defiler_stage[i].live) sc64_defiler_stage[i].intent=0;
+            if (sc64_defiler_stage[i].live) { sc64_defiler_stage[i].intent=0; sc64_defiler_stage[i].phase=0; }
 #endif
 #ifdef SC64_SHARED_ORDINARY_STAGE
             race_shared_ordinary_cancel(i);
@@ -6413,10 +6444,14 @@ interact(void)
     if(!menu_open && mode==MODE_DARK_SWARM_STAGE) {
         int slot=sc64_defiler_stage_selected();
         if(slot>=0 && sc64_defiler_stage[slot].energy_q8>=100u*256u &&
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+           u[slot].order==ORDER_IDLE &&
+#endif
            cx>=0 && cy>=0 && cx<WORLD_W && cy<WORLD_H) {
             sc64_defiler_stage[slot].target_x=(s16)cx;
             sc64_defiler_stage[slot].target_y=(s16)cy;
             sc64_defiler_stage[slot].intent=1;
+            sc64_defiler_stage[slot].phase=0; sc64_defiler_stage[slot].age=0;
             toast(0);
         } else toast(8);
         mode=MODE_NORMAL; return;
@@ -8785,9 +8820,18 @@ game_update(u16 held, u16 pressed)
     race_bc_yamato_sync_references();
 #endif
     update_orders();
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+    sc64_defiler_executor_unit_tick();
+#endif
 #ifdef SC64_SHARED_ORDINARY_STAGE
     /* Source unit/IScript releases precede that update's bullet retirement. */
-    race_shared_ordinary_tick();
+    race_shared_ordinary_release_tick();
+#endif
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+    sc64_defiler_executor_bullet_tick();
+#endif
+#ifdef SC64_SHARED_ORDINARY_STAGE
+    race_shared_ordinary_bullet_tick();
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (sc64_battlecruiser_source_tick_due()) {
@@ -11960,6 +12004,9 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #include "sc64_impact_adapter.h"
 #ifdef SC64_SHARED_ORDINARY_STAGE
 #include "sc64_shared_ordinary_stage.h"
+#endif
+#ifdef SC64_SHARED_DEFILER_EXECUTOR
+#include "sc64_defiler_executor.h"
 #endif
 #endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE

@@ -1,5 +1,6 @@
 #ifndef SC64_RACE_ADAPTER_H
 #define SC64_RACE_ADAPTER_H
+#include "sc64_unit_slot_free.h"
 
 #include "race_skirmish.h"
 #ifdef SC64_P3_PRODUCTION_EXIT
@@ -586,9 +587,9 @@ static int __attribute__((noinline)) race_product_slots_available(unsigned wante
 {
     unsigned free_slots = 0, committed = wanted;
     for (int i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive) ++free_slots;
+        if (SC64_UNIT_SLOT_FREE(i)) ++free_slots;
 #ifdef SC64_Z7_EGG_PRODUCTION
-        else if (u[i].type == U_Z7_EGG) {
+        else if (u[i].alive && u[i].type == U_Z7_EGG) {
             if (!sc64_z7_egg_product_valid(u[i].target)) return 0;
             committed += (unsigned)(sc64_z7_egg_product_count(u[i].target) - 1);
         }
@@ -694,7 +695,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
         unsigned committed = race_p4_reserved_units();
         unsigned free_slots = 0;
-        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += SC64_UNIT_SLOT_FREE(slot);
         for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
             for (int q = 0; q < b[slot].queue_count; ++q) {
                 int queued = b[slot].queue[(b[slot].queue_head + q) % 5];
@@ -707,7 +708,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_mode && race_selected_mission == SC64_P5_GLOBAL_ID) {
         unsigned committed = race_p5_reserved_units();
         unsigned free_slots = 0;
-        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += SC64_UNIT_SLOT_FREE(slot);
         for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
             for (int q = 0; q < b[slot].queue_count; ++q) {
                 int queued = b[slot].queue[(b[slot].queue_head + q) % 5];
@@ -727,7 +728,7 @@ static int race_queue_unit(int owner, int producer, int type)
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (egg_job) {
         int free_slots = 0;
-        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += SC64_UNIT_SLOT_FREE(slot);
         if (!free_slots) return 0;
     }
 #endif
@@ -1314,7 +1315,7 @@ static void race_tick_buildings(void)
 #ifdef SC64_P4_RUNTIME
         if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
             unsigned free_slots = 0;
-            for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+            for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += SC64_UNIT_SLOT_FREE(slot);
             if (free_slots < race_p4_reserved_units() + (unsigned)sc64_race_product_count(type)) {
                 b[i].queue_progress = frames - 1;
                 continue;
@@ -1330,7 +1331,7 @@ static void race_tick_buildings(void)
             if (sc64_race_product_count(type) == 2) {
                 int second_x, second_y, free_slots = 0;
                 ctx.reserved = 0;
-                for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+                for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += SC64_UNIT_SLOT_FREE(slot);
                 if (free_slots < 2 ||
                     !sc64_p3_find_production_exit(i, type, x, y, &first_x, &first_y, &ctx)) {
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
@@ -1380,7 +1381,7 @@ static void race_tick_buildings(void)
 #endif
         if (sc64_race_product_count(type) == 2) {
             int free_slots=0;
-            for(int slot=0;slot<MAX_UNITS;slot++)if(!u[slot].alive)free_slots++;
+            for(int slot=0;slot<MAX_UNITS;slot++)if (SC64_UNIT_SLOT_FREE(slot))free_slots++;
             if(free_slots<2){b[i].queue_progress=frames-1;continue;}
             if (spawn_unit(owner, type, x, y) < 0 || spawn_unit(owner, type, x + 8, y) < 0) {
                 b[i].queue_progress = frames - 1;
