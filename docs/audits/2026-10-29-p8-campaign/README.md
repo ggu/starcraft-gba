@@ -395,3 +395,30 @@ candidate still needs broader carried-mission, service and source-capability
 qualification before canonical promotion; notably the separate Scarab work
 is not enabled or qualified here. No private data or captures are committed,
 and no Actions were dispatched.
+
+### Carried profiles and source admission
+
+The actual P8 flag vector passed the promoted-profile fixture for all eight
+normal-menu mission entries: 60 active updates and save/load/resave per entry,
+plus 234 skirmish startup/save configurations. The fixture asserts generation
+44 and its distinct tagged save identity. A synthetic generation-43 P7-tagged
+journal was rejected without changing its record or sampled live state; this
+is not a real-file migration test or a guarantee that subsequent writes to a
+shared SRAM device preserve both generations. SCP8 remains a separate product.
+
+The carried P7 controller under the P8 vector and the unmodified `7e80a10`
+P7 vector produced 1,770 equal JSON records apart from the profile label.
+Both ended without a win at 60,000 calls. This establishes no observed change
+on that run, not a P7 victory or a complete regression matrix.
+
+Promotion is blocked by source admission as well as the separately scoped
+Scarab lifecycle. The authenticated local P8 CHK has a single 5,700-byte PUNI
+payload, SHA-256 `41892d465558f723f06b9d442cc6fb657d1efcd629b33b1ba5a11036909bb527`.
+Its effective bits disable Arbiter (raw 71) and Arbiter Tribunal (raw 170)
+for source slots 0–7. The current P8 candidate has no P8-specific PUNI guard
+in unit or building admission, while both identities are mapped. The map
+actor/create census and the existing campaign win do not prove availability
+closure. Add authenticated private-input generation and check production,
+construction request and arrival, UI and save/resume behavior before claiming
+source permissions or considering canonical promotion. Do not distribute the
+source record or generated availability bank.
