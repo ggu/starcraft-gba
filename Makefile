@@ -4853,7 +4853,7 @@ $(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run 
 # rather than relying on the earlier Z3/P3 split-profile save fixtures.
 CANONICAL_SKIRMISH_RESUME_ART_INPUTS = $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 CANONICAL_SKIRMISH_RESUME_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
-include tests/sc64-z7-promotion/tracer.mk
+include tests/sc64-z7-promotion/tracer/Makefile
 
 
 # Public actor facts only: no generated maps, art, or ROM required.
