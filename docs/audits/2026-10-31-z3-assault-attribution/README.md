@@ -45,3 +45,16 @@ An authorized next experiment should count armed units, protect both the
 Hatchery and Chrysalis, and use ordinary commands for separated attack groups
 or protected anti-tank air. No engine, mission objective, damage, actor limit
 or scripted AI should be changed to manufacture a win.
+
+The late-air attempt was separately replayed through the same input-only
+witness with Hatchery damage reporting (`tests/sc64_z3_hatch_witness.c`,
+private trace `/tmp/z3-late-air-20261031.json`). The Hatchery at (752,1368)
+lost 7 HP per hit from frame 42988 to its destruction at 58354. One hostile
+raw-8 Wraith at (799,1298) was the only enemy within 300 pixels in each
+recorded damage snapshot. At frames 42000, 43200, 54000 and 58200, the only
+friendly nonworkers within 160 pixels of the Hatchery were unarmed Overlords.
+The controller's local combat count included those Overlords, while its main
+Hydralisk group remained near the Chrysalis. This is strong spatial and
+temporal evidence of an unattended Wraith attack, not a damage-callback trace.
+The witness uses aggregate checkpoint matching; private replay inputs and
+generated assets are not checked in.
