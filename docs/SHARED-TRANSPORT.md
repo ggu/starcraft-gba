@@ -67,3 +67,17 @@ This evidence does not establish AI transport or research tactics, native AI
 parity, near-30-fps performance, or release admission. Shared transport combined
 with the experimental Scarab save namespace has not been runtime or save
 qualified. Campaign cargo permissions remain a separate qualification gap.
+
+## Activation candidate
+
+The activation candidate routes the normal Terran, Z7, P7 and Showcase builds
+through the shared transport capability. The explicit Z8 and P8 candidates
+inherit it. ROM filenames include `Transport1`, and `dev play` uses separate
+versioned save directories for the normal race aliases. The explicit legacy
+Z6 product keeps its earlier flags, filename and save directory. P7 and P8
+use separately generated fact tables with the transport actor gate enabled.
+
+These routes are candidates until their exact-source runtime, memory, save and
+performance checks pass. A `Transport1` save is a separate namespace: the new
+reader does not import a predecessor save. Reusing older SRAM manually is
+unsupported; the new journal makes no claim to fence an older reader.
