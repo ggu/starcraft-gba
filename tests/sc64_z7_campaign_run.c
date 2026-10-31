@@ -3970,16 +3970,6 @@ static void macro_step(void)
     /* Use live worker and mineral-patch proximity as the evacuation trigger;
        a broad Hatchery radius can strand otherwise productive Drones. */
     int home=z7_townhall(SIDE);
-    /* Update the safety interval before any defended-home budget return. */
-    if(workers_retreating) {
-        if(enemy_at_minerals)workers_safe_since=0;
-        else if(!workers_safe_since)workers_safe_since=(unsigned)frame;
-        else if((unsigned)frame-workers_safe_since>=1200u) {
-            workers_retreating=0;workers_safe_since=0;
-            fprintf(stderr,"Z7 normal-input workers resume mining after safe interval frame%u\n",
-                (unsigned)frame);
-        }
-    }
     /* The defended-home branch below returns while waiting for paid tech.
      * Start safe local mining first or that wait can never earn minerals. */
     if(!enemy_at_minerals&&!workers_retreating&&assign_idle_workers_to_minerals())return;
@@ -4680,6 +4670,15 @@ static void macro_step(void)
     if(enemy_at_minerals&&building_complete(raw_building(135,SIDE))&&
        owned_building_count(B_SUNKEN_COLONY)>=2&&minerals>=50&&
        queue_hatchery_type(U_ZERGLING))return;
+    if(workers_retreating) {
+        if(enemy_at_minerals)workers_safe_since=0;
+        else if(!workers_safe_since)workers_safe_since=(unsigned)frame;
+        else if((unsigned)frame-workers_safe_since>=1200u) {
+            workers_retreating=0;workers_safe_since=0;
+            fprintf(stderr,"Z7 normal-input workers resume mining after safe interval frame%u\n",
+                (unsigned)frame);
+        }
+    }
     /* Once the source attack reaches the mineral line, preserve remaining
        miners with ordinary per-worker Move orders. Keep any active builder
        on its source construction; do not select or mutate it here. */
