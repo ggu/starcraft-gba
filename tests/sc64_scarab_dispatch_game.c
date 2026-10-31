@@ -14,6 +14,20 @@ int main(void) {
     race_impact_launch(c,1,1,ENEMY,0,U_MARINE,100);assert(race_impact_count==1);
     frame=0;game_update(0,0);
     assert(!u[c].alive && !invincible_units[c] && race_impact_count==0);
+#ifndef SC64_DEATH_VFX_DISABLED
+    { int effects=0;
+      for(int i=0;i<SC64_DEATH_VFX_POOL;i++) {
+        Sc64DeathVfx e;death_vfx_test_load_row(i,&e);
+        if(e.style && e.raw==85) {
+          ++effects;assert(e.birth==(u32)frame);
+#ifdef SC64_DEATH_SOURCE_ART
+          assert(e.source && e.total_su==10);
+#endif
+        }
+      }
+      assert(effects==1); /* Fresh STOP creates the same immediate overlay. */
+    }
+#endif
     /* A second fresh shot survives loss of its parent, follows a live
      * target's latest position, and keeps that position when target dies. */
     setup();minerals=500;p=spawn_unit(SIDE,U_REAVER,128,128);

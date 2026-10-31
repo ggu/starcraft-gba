@@ -7832,6 +7832,28 @@ death_vfx_scan(void)
 #endif
 }
 
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+/* The source creates the Scarab's Death overlay as it enters Die. Spawn it
+ * now rather than waiting for the alternate-frame observer. Remove the old
+ * seen bit so that observer cannot emit a duplicate for the same death. */
+static void __attribute__((noinline))
+death_vfx_scarab_immediate(int slot)
+{
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+    Sc64DeathVfx pool[SC64_DEATH_VFX_POOL];
+    death_vfx_test_load_pool(pool);
+#else
+    Sc64DeathVfx *pool=death_vfx;
+#endif
+    death_vfx_spawn_slot(pool,slot,u[slot].x,u[slot].y,u[slot].owner);
+    unsigned byte=(unsigned)slot>>3, mask=1u<<((unsigned)slot&7u);
+    death_vfx_seen_set_byte(byte,death_vfx_seen_get_byte(byte)&~mask);
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+    death_vfx_test_store_pool(pool);
+#endif
+}
+#endif
+
 /* An effect still in its collapse/explosion phase keeps the outro running. */
 static int
 death_vfx_bursting(u32 now)
@@ -11692,7 +11714,10 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 /* Separate bounded experimental projectile pool, not one row per child.
  * No save format yet carries these pending packets. */
 typedef struct { s16 x,y,target;u8 owner,ticks; } Sc64ScarabProbeBullet;
-enum { SC64_SCARAB_PROBE_BULLETS=4, SC64_SCARAB_PROBE_IMPACT_TICKS=5 };
+/* Weapon 82's observed target-position bullet enters Death immediately;
+ * its source Death script reaches domissiledmg at local tick 5. The probe
+ * ticks this pool before unit orders, so creation cannot consume a tick. */
+enum { SC64_SCARAB_PROBE_BULLETS=4, SC64_SCARAB_DEATH_DAMAGE_TICKS=5 };
 static Sc64ScarabProbeBullet sc64_scarab_probe_bullets[SC64_SCARAB_PROBE_BULLETS];
 /* Test-only per-owner Scarab damage upgrade bit, not normal weapon level.
  * No research or persistent representation is registered by this probe. */
@@ -11713,7 +11738,7 @@ static int race_scarab_probe_bullet_create(const Unit *q) {
         Sc64ScarabProbeBullet *b=&sc64_scarab_probe_bullets[i];
         b->x=(s16)(q->x*2+(int)(((unsigned)q->carry>>10)&511u)/256);
         b->y=(s16)(q->y*2+(int)(((unsigned)q->carry>>19)&511u)/256);
-        b->owner=q->owner;b->target=q->target;b->ticks=SC64_SCARAB_PROBE_IMPACT_TICKS;return 1;
+        b->owner=q->owner;b->target=q->target;b->ticks=SC64_SCARAB_DEATH_DAMAGE_TICKS;return 1;
     }
     return 0; /* Pool-full source behavior: no projectile, no damage. */
 }
@@ -11970,6 +11995,9 @@ static void __attribute__((noinline)) race_scarab_control_dispatch(int slot)
         hit_target_impl_ex(slot,1,U_SCARAB,-1,-1,SC64_HIT_PRECOMPUTED_HP);
         if (q->alive) { invincible_units[slot]=was_invincible;q->flags=flags;q->hp=hp;return; }
         invincible_units[slot]=0;q->selected=0;
+#ifndef SC64_DEATH_VFX_DISABLED
+        death_vfx_scarab_immediate(slot);
+#endif
 #ifdef SC64_IMPACT_EVENTS
         race_impact_clear_target(slot);
 #endif

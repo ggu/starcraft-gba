@@ -2,7 +2,9 @@
 #define main sc64_impact_unused_main
 #include "sc64_impact_events_game.c"
 #undef main
+#include <stdlib.h>
 int main(int argc,char **argv) {
+    int phase=(argc==2 && !strncmp(argv[1],"phase",5)) ? atoi(argv[1]+5) : -1;
     int upgrade=argc==2 && !strcmp(argv[1],"upgrade");
     int poolfull=argc==2 && !strcmp(argv[1],"poolfull");
     int destroy=argc==2 && !strcmp(argv[1],"building-destroy");
@@ -10,7 +12,7 @@ int main(int argc,char **argv) {
     int turncoat=argc==2 && !strcmp(argv[1],"turncoat");
     int reuse=argc==2 && !strcmp(argv[1],"reuse");
     int shield=argc==2 && !strcmp(argv[1],"shield");
-    int fraction=argc==2 && !strcmp(argv[1],"fraction");assert(argc==1 || upgrade || poolfull || building || turncoat || reuse || shield || fraction);
+    int fraction=argc==2 && !strcmp(argv[1],"fraction");assert(argc==1 || upgrade || poolfull || building || turncoat || reuse || shield || fraction || (phase>=0 && phase<5));
     if(fraction)upgrade=1;
     setup();minerals=500;
     int p=spawn_unit(SIDE,U_REAVER,128,128),t;
@@ -23,6 +25,7 @@ int main(int argc,char **argv) {
     Sc64ScarabParent parent;Sc64ScarabCounts counts;assert(race_scarab_parent_read(p,0,&parent,&counts));int c=parent.active_slot;
     for(int i=0;i<105;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
     assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
+    if(phase>=0) frame=phase; /* controlled game-update cadence phase */
     u[p].selected=1;assert(issue_order(ORDER_ATTACK_MOVE,target_x(t),target_y(t)));int hp=building?b[t-MAX_UNITS].hp:u[t].hp,arrived=0;
     for(int n=0;n<100;n++) {
 #ifdef SC64_SCARAB_WEAPON_PROBE
@@ -50,19 +53,61 @@ int main(int argc,char **argv) {
     int armor=building?sc64_race_building_armor(b[t-MAX_UNITS].type):u[t].armor+(u[t].owner==SIDE?armor_level:0);
     int expected=reuse?0:sc64_stock_hp_damage_after_armor(100+25*upgrade-(shield?u[t].shield:0),armor,SC64_STOCK_DMG_NORMAL,SC64_STOCK_SIZE_LARGE);
     int source_ticks=0;
+#ifndef SC64_DEATH_VFX_DISABLED
+    int death_seen=0;u32 death_birth=0;
+#endif
     while(source_ticks<5) {
         screen=SCREEN_PLAY;game_update(0,0);
         if(sc64_battlecruiser_source_tick_due())source_ticks++;
+        /* Source sigorder removes the child on the next source tick, while
+         * the separate bullet remains pending until its Death-script event. */
+        if(source_ticks==0)assert(u[c].alive);
+        else assert(!u[c].alive);
+        if(source_ticks<5)assert(race_scarab_probe_bullets_pending());
+#ifndef SC64_DEATH_VFX_DISABLED
+        if(!u[c].alive) {
+            int found=0;
+            for(int i=0;i<SC64_DEATH_VFX_POOL;i++) {
+                Sc64DeathVfx effect;death_vfx_test_load_row(i,&effect);
+                if(effect.style && effect.raw==85) {
+                    ++found;
+                    if(!death_seen) { death_birth=effect.birth;assert(effect.birth==(u32)frame); }
+#ifdef SC64_DEATH_SOURCE_ART
+                    assert(effect.source && effect.burst_su==10 && effect.total_su==10);
+#endif
+                }
+            }
+            assert(found<=1);
+            if(found)death_seen=1;
+            assert(death_seen); /* Die update creates the source overlay. */
+        }
+#endif
         if(source_ticks<5)assert((building?b[t-MAX_UNITS].hp:u[t].hp)==hp);
         assert(u[friendly].hp==friendly_hp && u[air].hp==air_hp);
     }
+#ifndef SC64_DEATH_VFX_DISABLED
+    assert(death_seen);
+#endif
     assert((destroy?!b[t-MAX_UNITS].alive:(building?b[t-MAX_UNITS].alive:u[t].alive)) && (building?b[t-MAX_UNITS].hp:u[t].hp)==hp-expected && !u[c].alive && u[p].alive);
     if(fraction)assert(u[collateral].hp==138); /* Q8 62.5 quantized at integer HP boundary. */
     if(shield)assert(u[t].shield==0);
     if(upgrade)sc64_scarab_probe_damage_upgrades=0;
     assert(!race_scarab_probe_bullets_pending());
     for(int n=0;n<20;n++) {screen=SCREEN_PLAY;game_update(0,0);
-        assert((building?b[t-MAX_UNITS].hp:u[t].hp)==hp-expected);}
+        assert((building?b[t-MAX_UNITS].hp:u[t].hp)==hp-expected);
+#ifndef SC64_DEATH_VFX_DISABLED
+        int found=0;
+        for(int i=0;i<SC64_DEATH_VFX_POOL;i++) {
+            Sc64DeathVfx effect;death_vfx_test_load_row(i,&effect);
+            if(effect.style && effect.raw==85 && effect.birth==death_birth) {
+                ++found;
+                if((u32)frame-death_birth>=13u)assert(sc64_death_vfx_expired(&effect,death_vfx_now()));
+            }
+        }
+        assert(found<=1); /* the alternate-frame scan never duplicates it */
+        if(phase>=0)assert(found==1);
+#endif
+    }
     printf("ordinary attack: five-source-tick impact, damage=%d, friendly/air unchanged\n",expected);
 #else
     puts("ordinary attack launched paid Scarab without generic hit; impact unimplemented");
