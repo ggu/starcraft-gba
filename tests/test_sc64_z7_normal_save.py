@@ -104,6 +104,50 @@ class SaveTest(unittest.TestCase):
         with self.assertRaises(ValueError): save.validate_journal(image,(161,fields),10)
         with self.assertRaises(ValueError): save.validate_journal(image,layout,11)
 
+    def test_second_slot_and_provenance_are_fail_closed(self):
+        from sc64_races_profile import DwarfOffsets
+        fields=DwarfOffsets({'version':0,'state':8},{'version':4},{},{'state':(32,4,True)})
+        payload=bytearray(160)
+        struct.pack_into('<I',payload,0,save.CANONICAL_Z7_EGG_TAG)
+        struct.pack_into('<i',payload,16,18)
+        struct.pack_into('<i',payload,36,10)
+        h=2166136261
+        for b in payload: h=((h ^ b)*16777619) % 2**32
+        image=bytearray(b'\xff'*32768)
+        image[:16]=struct.pack('<4I',save.CANONICAL_Z7_EGG_TAG,160,h,1)
+        image[16:176]=payload
+        newer=image.copy();newer[16384:16384+176]=image[:176]
+        struct.pack_into('<I',newer,16384+12,2)
+        corrupt=image.copy();corrupt[16384]=0
+        for bad in (newer,corrupt):
+            with self.assertRaisesRegex(ValueError,'second SRAM slot'): save.validate_journal(bad,(160,fields),10)
+        provenance={'trace':'a','rom':'b','elf':'c','runner':'d','save':'e'}
+        summary={'provenance':provenance}
+        save.verify_provenance(summary,provenance)
+        for key in provenance:
+            changed=dict(provenance);changed[key]='different'
+            with self.subTest(key=key), self.assertRaises(ValueError): save.verify_provenance(summary,changed)
+
+    def test_cut_sample_requires_all_host_fields_and_world_frame(self):
+        import sc64_z7_arm_replay as z7
+        reference={key:0 for key in z7.SCALARS}
+        reference.update({key:[0]*8 for key in z7.LISTS})
+        reference.update(screen=1, frame=10)
+        model={key:copy.deepcopy(reference[key]) for key in save.MODEL_FIELDS}
+        paused=copy.deepcopy(reference);paused['screen']=2
+        summary={'cut':10,'mission':18,'world':{'frame':10,'screen':2,'units':0,'buildings':0},
+                 'model':model,'observation':paused}
+        save.verify_cut_summary(summary,reference,10,2)
+        for key in z7.SCALARS+z7.LISTS:
+            changed=copy.deepcopy(summary)
+            changed['observation'][key]=[1]*8 if key in z7.LISTS else -1
+            with self.subTest(field=key), self.assertRaises(RuntimeError):
+                save.verify_cut_summary(changed,reference,10,2)
+        changed=copy.deepcopy(summary);changed['world']['frame']=11
+        with self.assertRaises(RuntimeError): save.verify_cut_summary(changed,reference,10,2)
+        changed=copy.deepcopy(summary);changed['model']['started']=1
+        with self.assertRaises(RuntimeError): save.verify_cut_summary(changed,reference,10,2)
+
     def test_fake_rsp_reads_actual_model_and_summary(self):
         from sc64_races_profile import DwarfOffsets
         def off(pos,widths=None,arrays=None):
@@ -123,10 +167,14 @@ class SaveTest(unittest.TestCase):
         class FakeRsp:
             def read(self,address,length): return bytes(mem[address:address+length])
         rsp=FakeRsp(); sym={'race_z7':0,'race_selected_mission':48}
-        world={'frame':10,'screen':2,'fingerprint':'a'*64}
+        world={'frame':10,'screen':2,'fingerprint':'a'*64,'units':4,'buildings':2}
+        def fake_snapshot(r,s,z):
+            state={key:0 for key in replay.z7.SCALARS}
+            state.update(replay.model_snapshot(r,s,layouts)); state.update(frame=10,screen=2)
+            return state
         with patch.object(save.p8,'persisted_summary',return_value=world):
             sample=save.saved_summary(rsp,sym,{},None,10,
-                                      lambda r,s,z: replay.model_snapshot(r,s,layouts))
+                                      fake_snapshot)
         self.assertEqual(sample['model']['started'],254)
         self.assertEqual(sample['model']['action_cursors'],list(range(8)))
         self.assertEqual(sample['model']['action_ticks'],list(range(20,28)))
@@ -136,7 +184,7 @@ class SaveTest(unittest.TestCase):
         mem[32] ^= 1
         with patch.object(save.p8,'persisted_summary',return_value=restored['world']):
             changed=save.saved_summary(rsp,sym,{},None,10,
-                                       lambda r,s,z: replay.model_snapshot(r,s,layouts))
+                                       fake_snapshot)
         with self.assertRaises(RuntimeError): save.verify_restored(sample,changed,10,18)
 
 

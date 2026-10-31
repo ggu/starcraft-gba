@@ -8,6 +8,9 @@ import sc64_z7_arm_replay as z7
 import sc64_p8_normal_replay as p8
 
 START, B, L = 8, 2, 512
+# Canonical Z7 Egg profile only: SC64_RACE_SAVE_GENERATION=36 in game.c.
+# The tag is a profile constraint, not a value inferred from DWARF.
+CANONICAL_Z7_EGG_TAG = 0x53435a54
 
 
 def validate_cut(plan, cut):
@@ -63,9 +66,12 @@ def validate_journal(data, layout, frame):
         raise ValueError('ELF RaceSave fields exceed payload')
     if len(data) != 32768:
         raise ValueError('SRAM image must be exactly 32768 bytes')
+    # Refuse an ambiguous newer (or partially written) slot, even if slot 0 is valid.
+    if data[16384:] != b'\xff' * 16384:
+        raise ValueError('second SRAM slot is not erased')
     # Fresh title starts with blank SRAM, so a successful first save is slot 0, sequence 1.
     tag, length, checksum, sequence = struct.unpack_from('<4I', data)
-    if (tag, length, sequence) != (z7.SAVE_TAG, size, 1):
+    if (tag, length, sequence) != (CANONICAL_Z7_EGG_TAG, size, 1):
         raise ValueError('invalid fresh Z7 journal header')
     payload = data[16:16+size]
     h = 2166136261
@@ -87,7 +93,38 @@ def saved_summary(rsp, sym, sizes, elf, cut, snapshot):
     observed = snapshot(rsp, sym, sizes)
     return {'cut': cut, 'mission': int.from_bytes(rsp.read(sym['race_selected_mission'], 4), 'little'),
             'world': p8.persisted_summary(rsp, sym, sizes, elf),
-            'model': {key: observed[key] for key in MODEL_FIELDS}}
+            'model': {key: observed[key] for key in MODEL_FIELDS},
+            'observation': {key: observed[key] for key in z7.SCALARS + z7.LISTS}}
+
+
+def verify_cut_summary(sample, reference, cut, screen):
+    """Bind all retained cut observations to the saved or restored sample."""
+    if not isinstance(sample, dict) or sample.get('cut') != cut or sample.get('mission') != z7.MISSION:
+        raise ValueError('saved summary has wrong cut or mission')
+    observed = sample.get('observation')
+    world = sample.get('world')
+    model = sample.get('model')
+    if not isinstance(observed,dict) or not isinstance(world,dict) or not isinstance(model,dict):
+        raise ValueError('saved summary is incomplete')
+    for key in z7.SCALARS + z7.LISTS:
+        expected = screen if key == 'screen' else reference[key]
+        if observed.get(key) != expected:
+            raise RuntimeError(f'saved cut observation differs: {key}')
+    if world.get('frame') != reference['frame'] or world.get('screen') != screen:
+        raise RuntimeError('saved world frame or screen differs from cut')
+    for key in MODEL_FIELDS:
+        if model.get(key) != reference[key]:
+            raise RuntimeError(f'saved Z7 model differs from cut: {key}')
+    for world_key, observed_keys in (('units', ('side_units','enemy_units')),
+                                     ('buildings', ('side_buildings','enemy_buildings'))):
+        count=world.get(world_key)
+        if type(count) is not int or any(count < reference[key] for key in observed_keys):
+            raise RuntimeError(f'saved world {world_key} count differs from cut')
+
+
+def verify_provenance(sample, provenance):
+    if sample.get('provenance') != provenance:
+        raise ValueError('saved summary provenance differs from replay inputs or seed')
 
 
 def verify_restored(saved, restored, cut, mission):

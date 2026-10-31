@@ -8224,6 +8224,11 @@ loads with title L/release, verifies the mission and bounded persisted-world
 fingerprint and Z7 model fields, and replays the remaining tape. Before export
 succeeds it validates the first journal record, its payload checksum, mission,
 frame and ELF-derived RaceSave size; the journal has no separate header checksum.
+The verifier explicitly supports the canonical Z7 Egg generation-36 save tag
+`0x53435a54` and requires the other slot to be erased. It rejects other save
+generations rather than inferring a tag from ELF DWARF. The saved summary binds
+the cut sample to the trace, ROM, ELF, runner and SRAM hashes; resume checks
+that binding and every retained cut field before starting the new process.
 It compares subsequent retained
 host observations, including the terminal win. The save and summary are
 hashed with the other inputs and checked for changes. A failure remains a

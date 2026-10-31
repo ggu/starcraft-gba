@@ -168,6 +168,8 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
         raise ValueError('save export and resume require an explicit cut')
     inputs=(trace,rom,elf,runner) + ((save_input,saved_state) if save_input else ())
     before=input_hashes(inputs)
+    provenance={name:before[str(path.resolve())] for name,path in
+                zip(('trace','rom','elf','runner'),(trace,rom,elf,runner))}
     plan,pages=build_plan(trace,cut if export_save else stop)
     if cut is not None: save.validate_cut(plan,cut)
     original_stop=plan['stop']
@@ -199,6 +201,8 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
         seed_summary=save.read_summary(saved_state)
         if not isinstance(seed_summary,dict) or seed_summary.get('cut') != cut:
             raise ValueError('saved summary has wrong cut')
+        save.verify_provenance(seed_summary,{**provenance,'save':before[str(save_input.resolve())]})
+        save.verify_cut_summary(seed_summary,plan['observations'][cut],cut,2)
         save.validate_journal(save_input.read_bytes(),save_layout,seed_summary['world']['frame'])
     def sample_snapshot(rsp,sym,sizes): return snapshot(rsp,sym,sizes,layouts)
     output.mkdir(parents=True,exist_ok=False)
@@ -227,6 +231,7 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             restored=save.saved_summary(rsp,sym,sizes,elf,cut,sample_snapshot)
             saved=save.read_summary(saved_state)
             save.verify_restored(saved,restored,cut,z7.MISSION)
+            save.verify_cut_summary(restored,plan['observations'][cut],cut,1)
             (output/'restored-state.json').write_text(json.dumps(restored,indent=2)+'\n')
             rsp.breakpoint(sym['game_update']&~1,False)
             rsp.breakpoint(sym['demo_replay_checkpoint']&~1,True)
@@ -254,11 +259,13 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             sample=save.saved_summary(rsp,sym,sizes,elf,cut,sample_snapshot)
             if sample['mission']!=z7.MISSION or sample['world']['screen']!=2:
                 raise RuntimeError('ordinary save did not remain in Z7 pause')
-            (output/'saved-state.json').write_text(json.dumps(sample,indent=2)+'\n')
+            save.verify_cut_summary(sample,expected,cut,2)
             rsp.export_sram()
             if not (output/'saved.sav').is_file() or (output/'saved.sav').stat().st_size != 32768:
                 raise RuntimeError('SRAM export is missing or incomplete')
             journal=save.validate_journal((output/'saved.sav').read_bytes(),save_layout,sample['world']['frame'])
+            sample['provenance']={**provenance,'save':hashlib.sha256((output/'saved.sav').read_bytes()).hexdigest()}
+            (output/'saved-state.json').write_text(json.dumps(sample,indent=2)+'\n')
         full=bool(save_input) or (not export_save and stop==plan['stop'])
         if full and (not records or records[-1]['tick']!=stop or records[-1]['won']!=1 or records[-1]['outcome']!=1 or records[-1]['lost']!=0): raise RuntimeError('normal ROM did not win')
         require_unchanged(inputs,before)
