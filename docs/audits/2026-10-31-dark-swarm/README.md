@@ -457,8 +457,9 @@ source tick to a 250-energy maximum. An actual sanitized Showcase-host fixture
 uses the real raw-to-runtime mapping and normal `spawn_unit`, waits through
 normal `game_update` regeneration without assigning energy or raw owner, then
 uses B/menu/A to create a bullet and field. Live hero saves remain refused.
-This synthetic-spawn test does not establish imported campaign raw-52 setup,
-P9 integration, hero body art, all energy effects or hardware behavior. Raw 46 and 52 now
+This synthetic-spawn test alone does not establish imported campaign setup,
+P9 integration, hero body art, all energy effects or hardware behavior; the
+separate bounded loader check below covers a synthetic authored record. Raw 46 and 52 now
 have authenticated 320-source-pixel sight and respective source bounds
 13/12/13/12 and 14/14/14/14; an actual generated fact-table fixture checks
 these values and rejects pre-change geometry headers. Ordinary Defiler Metasynaptic Node research and hallucinated-energy rules
@@ -495,3 +496,14 @@ This is not complete shared Dark Swarm damage behavior: only that experimental Y
 bound; other ordinary weapons and projectile types, all-profile source
 geometry, the zero-threshold miss and global source RNG stream, launch ordering
 on the exact field-expiry tick, save/load and hardware remain open. The gate is off in normal products.
+
+
+### Campaign loader hero check
+
+An additional sanitized host fixture passes a synthetic authored raw-52 unit
+record through the actual `init_state` and campaign unit loader. The loader
+assigns the distinct hero identity, human source owner, HP and armor, and the
+spawn path initializes heading and 62.5 energy; the fixture does not patch
+the resulting live raw identity, owner or energy. Its compile-only map override
+selects that synthetic record and is disabled in products. This qualifies the
+bounded loader path, not the authored P9 map or a P9 continuation.

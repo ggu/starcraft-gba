@@ -424,6 +424,13 @@ race_campaign_ai_tick(void)
     (void)producer_type;
 }
 
+#ifdef SC64_DEFILER_IMPORT_FIXTURE
+#if !defined(SC64_SHARED_DEFILER_HERO_PROBE)
+#error "Defiler import fixture requires the disabled hero probe"
+#endif
+/* Synthetic authored map record for the isolated import fixture only. */
+static const Sc64RaceMap *sc64_defiler_import_fixture_map;
+#endif
 static void
 race_campaign_init(void)
 {
@@ -537,6 +544,9 @@ race_campaign_init(void)
         );
 #endif
     map = &sc64_race_maps[race_selected_mission];
+#ifdef SC64_DEFILER_IMPORT_FIXTURE
+    if(sc64_defiler_import_fixture_map)map=sc64_defiler_import_fixture_map;
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active() && !race_z7_source_row_counts(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;

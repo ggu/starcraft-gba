@@ -58,6 +58,13 @@ build/test-dark-swarm-query: tests/sc64_dark_swarm_query_game.c tests/sc64_defil
 test-dark-swarm-query: build/test-dark-swarm-query
 	./build/test-dark-swarm-query
 
+# Synthetic authored unit through the actual campaign import path.
+.PHONY: test-dark-swarm-hero-import
+build/test-dark-swarm-hero-import: tests/sc64_defiler_import_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_HERO_PROBE -DSC64_DEFILER_IMPORT_FIXTURE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-hero-import: build/test-dark-swarm-hero-import
+	./build/test-dark-swarm-hero-import
+
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
 build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build
