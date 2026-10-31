@@ -337,6 +337,17 @@ static int follow_builder(int slot, int type, int x, int y, int jam, int jx, int
     return -1;
 }
 
+/* A walking builder already counted by a pass and still well short of its
+ * site, so a save lands mid-walk. */
+static int counted_builder(void)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == first_bot() && u[i].order == ORDER_BUILD_PENDING &&
+            u[i].work_timer >= 1 && dist2(u[i].x, u[i].y, u[i].tx, u[i].ty) > 96 * 96) return i;
+    return -1;
+}
+static int ready_counted_builder(void) { return counted_builder() >= 0; }
+
 static int builder_walk(int scenario)
 {
     static const char *names[] = { "walk-save-resume", "timeout-replan", "timeout-save-resume" };
@@ -344,16 +355,14 @@ static int builder_walk(int scenario)
     int event = -1, ref_event = -1, timer_at_save = -1, replanned = -1, before, start = -1;
     uint32_t reference = 0, resumed = 0;
     if (scenario < 0 || scenario > 2) return 0;
-    if (!run_until(20000, ready_pending_builder)) goto done;
-    slot = pending_builder(); type = u[slot].target; x = u[slot].tx; y = u[slot].ty;
+    if (!run_until(20000, scenario == 0 ? ready_counted_builder : ready_pending_builder)) goto done;
+    slot = scenario == 0 ? counted_builder() : pending_builder();
+    type = u[slot].target; x = u[slot].tx; y = u[slot].ty;
     jx = u[slot].x; jy = u[slot].y; start = frame;
     before = count_type(owner, type, 0);
     if (scenario == 0) {
         int ref_arrived, ref_released, horizon;
-        /* Save once the walk has been counted by at least one pass. */
-        while (screen == SCREEN_PLAY && u[slot].alive && u[slot].order == ORDER_BUILD_PENDING &&
-               u[slot].work_timer < 1) input(0);
-        if (u[slot].order != ORDER_BUILD_PENDING || !save_through_pause()) goto done;
+        if (!save_through_pause()) goto done;
         timer_at_save = u[slot].work_timer;
         ref_event = follow_builder(slot, type, x, y, 0, 0, 0, 1800, &ref_arrived, &ref_released);
         horizon = frame + 60;
