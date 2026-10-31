@@ -8187,3 +8187,50 @@ visibility-only policy proof. No normal ARM replay, fresh-process SRAM
 qualification, physical-hardware result, or menu promotion is claimed by
 this result. Historical Z7 traces that contain a `fired` field used it as
 an alias for `started`; the source model has no separate fired mask.
+
+
+### Normal-ROM Z7 replay driver (qualification pending)
+
+`tools/sc64_z7_normal_replay.py` drives an unchanged normal Z7 ROM through
+its existing scheduler controls. It does not replace `common/main.c` or
+write actors, resources, UI state or mission state. Given a validated
+winning host trace and a matching prepared normal product, run:
+
+```sh
+python3 tools/sc64_z7_normal_replay.py \
+  --trace .local/qualification/strict-trace.json \
+  --rom build/StarCraft-Zerg-Z7-GBA.gba \
+  --elf build/starcraft-zerg-z7.elf \
+  --runner /absolute/path/to/runner-read \
+  --output .local/qualification/z7-normal-full
+```
+
+Use a new output directory for every attempt. `--stop 1000` is a bounded
+diagnostic only. The driver validates terminal source fields, converts
+one-based host inputs to scheduler ticks, observes every retained checkpoint,
+checks all named Z7 model/action-array, entity-count and economy fields,
+checks the selected mission, and rejects input files changed during a run.
+It handles dense event windows without writing game state. It does not
+compare complete actor arrays or implement SRAM export/resume.
+
+At the source checkpoint adding this driver, no current normal-ROM run has
+been performed. The strict state-observing controller witness at `fe63889`
+uses public engine parent `232bc0f` and wins at host tick 179764; its internal
+path and placement probes can inspect hidden occupancy and warm route
+caches. A separate input-only host tape consumes 14,344 key transitions and
+matches all 303 retained model/count/economy observations, including the
+victory, without controller probes. That is a scoped host parity result.
+The existing full replay verifier still reports it unqualified because the
+host emits unsupported zero timing records and SRAM is absent; those failures
+are retained rather than silently filtered out. Neither result establishes
+normal ARM timing, saved continuation, complete world-state equivalence,
+hardware performance or Z7 campaign promotion.
+
+The combined source checkpoint passes 70 focused Python replay and validator
+tests plus the source-boundary check. Those checks do not substitute for a
+fresh default native suite or optional profile qualification. Native ARM and
+SRAM work remains pending disk space; the Mac was below the retained 2 GiB
+prebuild guard. One earlier host compile began below that guard after it was
+mistaken for a RAM requirement; it completed before interruption. The attempt
+is retained, and all 109 fixed input content hashes matched afterward.
+No canonical menu, actor capacity or release ROM package is changed here.
