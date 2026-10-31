@@ -659,6 +659,27 @@ static void census(const char *label)
         race_p7.runtime.model.outcome,race_p7.runtime.fault,
         (unsigned)race_p7.runtime.switch_bits,(unsigned)race_p7.runtime.model.action_cursor[8],
         (unsigned)race_p7.runtime.model.action_cursor[9],(unsigned)race_p7.runtime.model.action_cursor[5]);
+    /* Read-only late-combat samples: retain each actor so movement, damage,
+       visibility and cached detection can be compared across checkpoints. */
+    if(frame>=45000) {
+        fprintf(trace,"{\"kind\":\"tactical-target\",\"frame\":%u,\"slot\":%d,\"hp\":%d,\"shield\":%d}\n",
+            (unsigned)frame,target,target>=0?b[target].hp:-1,target>=0?b[target].shield:-1);
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive) {
+            int eligible=u[i].owner==SIDE && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) &&
+                !IS_WORKER(u[i].type) && u[i].type!=U_OVERLORD && u[i].type!=U_CHRYSALIS &&
+                sc64_game_unit_selectable(u[i].type) && (!sc64_game_unit_actor_flags(u[i].type) ||
+                sc64_game_unit_has_flag(u[i].type,SC64_GAME_ACTOR_WEAPON));
+            int cloaked=0,detected=0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+            if(u[i].owner!=SIDE) {
+                cloaked=sc64_p7_observer_target_is_cloaked(i);
+                detected=sc64_p7_observer_detector_sees(i,7,SIDE);
+            }
+#endif
+            fprintf(trace,"{\"kind\":\"tactical-unit\",\"frame\":%u,\"slot\":%d,\"raw\":%d,\"source_owner\":%d,\"owner\":%d,\"xy\":[%d,%d],\"hp\":%d,\"shield\":%d,\"order\":%d,\"target\":%d,\"selected\":%d,\"combat_eligible\":%d,\"visible\":%d,\"cloaked\":%d,\"detected\":%d}\n",
+                (unsigned)frame,i,u[i].raw_type,u[i].raw_owner,u[i].owner,u[i].x,u[i].y,u[i].hp,u[i].shield,u[i].order,u[i].target,u[i].selected,eligible,currently_visible(u[i].x,u[i].y),cloaked,detected);
+        }
+    }
     fflush(trace);
 }
 
