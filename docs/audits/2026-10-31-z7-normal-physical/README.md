@@ -93,10 +93,14 @@ enemy building; that failed attempt remains retained and is not a saved win.
 
 A separate opt-in shared save-context prototype uses the previously unused
 state word 31, leaving the Protoss service clock at word 30 unchanged. Its
-actual new save restores the selection and command preferences, and both
-old-to-new and new-to-old Z7 reader compatibility have been observed. Its
-complete resumed ARM witness is still pending at this audit checkpoint.
-The prototype is not included or enabled by this source checkpoint.
+actual new save restores the selection and command preferences. Its fresh
+process now completes the remaining 222 observations and wins, covering all
+303 observations together with the 81-observation save prefix. Both
+old-to-new and new-to-old Z7 reader compatibility have been observed.
+The prototype is included in this branch but remains disabled by default;
+the original release ROM and its failed continuation are unchanged. See the
+[save-context audit](../../Z7-SAVE-UI-AUDIT.md) for exact source,
+artifact hashes, malformed-record checks and qualification limits.
 
 ## Verification and remaining scope
 
