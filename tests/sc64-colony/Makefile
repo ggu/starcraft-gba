@@ -1,6 +1,6 @@
 # Prepared-profile shared colony checks. No private source payloads are tracked.
 COLONY_TEST_CFLAGS = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
-build/test-sc64-z7-colony-update: tests/sc64_z7_colony_update.c tests/sc64_z7_colonies_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h | build
+build/test-sc64-z7-colony-update: tests/sc64_z7_colony_update.c tests/sc64_z7_colonies_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.c common/gba.h | build
 	$(CLANG) $(COLONY_TEST_CFLAGS) $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z8-colony: tests/sc64_z8_colony_game.c tests/sc64_z8_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z8_CANONICAL_INPUTS) common/gba.c common/gba.h | build
 	$(CLANG) $(COLONY_TEST_CFLAGS) $(ZERG_Z8_CANONICAL_FLAGS) $< common/gba.c -o $@
