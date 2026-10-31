@@ -6462,6 +6462,9 @@ static int field_menu_count_base(void)
 #else
 #define field_menu_count_base() MENU_COUNT
 #endif
+#ifndef SC64_RACES
+#define field_menu_count() field_menu_count_base()
+#endif
 
 #ifdef SC64_RACES
 static const char *field_menu_base_label(int choice, const char *const *labels)
