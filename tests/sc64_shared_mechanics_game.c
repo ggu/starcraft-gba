@@ -412,8 +412,13 @@ static void test_ui_save_context(int human)
     int absent=-1; for(int i=0;i<MAX_BUILDINGS;i++) if(!b[i].alive) { absent=i; break; }
     assert(absent>=0);
     assert(sc64_save_ui_valid(0,MAX_BUILDINGS));
+    saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=0;
+    write_candidate_record(); selected_building=building;
+    assert(race_load_game()); assert(selected_building==-1);
     unsigned stale=sc64_save_ui_encode(absent,MAX_BUILDINGS,3,2);
     assert(sc64_save_ui_valid(stale,MAX_BUILDINGS));
+    saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=(int)stale;
+    write_candidate_record(); assert(race_load_game()); assert(selected_building==-1);
     const unsigned invalid[] = {0x12345678u,SC64_SAVE_UI_TAG | (MAX_BUILDINGS+1u),
                                 SC64_SAVE_UI_TAG | (64u<<8),SC64_SAVE_UI_TAG | (64u<<16)};
     for (unsigned i=0;i<sizeof(invalid)/sizeof(invalid[0]);++i) {
@@ -422,6 +427,8 @@ static void test_ui_save_context(int human)
         race_data.state[SC64_SAVE_UI_STATE_INDEX]=(int)invalid[i];
         RaceLoadPlan plan={0};
         assert(!race_load_preflight_candidate(&plan));
+        saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=(int)invalid[i];
+        expect_candidate_rejected();
     }
     /* Saving a stale selection succeeds and emits none. */
     selected_building=absent; menu_cursor=3;
