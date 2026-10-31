@@ -50,6 +50,9 @@ static int race_scarab_child_lookup(int child_slot, int *parent_slot, unsigned *
     if ((f.phase == SC64_SCARAB_CHILD_TRAINING || f.phase == SC64_SCARAB_CHILD_INSIDE) &&
         (f.life || f.no_collision)) return 0;
     if (f.phase == SC64_SCARAB_CHILD_OUTSIDE &&
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+        !(u[child_slot].order==1 && f.life==0 && f.no_collision==0) &&
+#endif
         !sc64_scarab_flight_valid(&(Sc64ScarabFlight){(uint8_t)f.life,(uint8_t)f.no_collision})) return 0;
     if (parent_slot) *parent_slot=f.parent_slot==SC64_SCARAB_FIELD_NO_SLOT ? -1 : (int)f.parent_slot;
     if (phase) *phase=f.phase;

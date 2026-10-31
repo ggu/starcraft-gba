@@ -44,3 +44,23 @@ requests and detached parent identity. Compile argv and run outcome are kept
 in `.local/decoder-proof/scarab-control-{compile,run}.json`. This is an
 explicitly invoked control experiment, not an automatic flight implementation,
 position or target-follow proof, or qualification for outside-child saves.
+
+## Experimental dispatch slice
+
+Under the same disabled probe gate, the actual unit update loop invokes the
+control on the existing BC source cadence. A fresh zero-life release can be
+found by STOP and parent-loss hooks before its first order tick. While a target
+is live, the probe stores its current position; on target loss it clears the
+reference but retains that position. On STOP or expiry it requests removal
+through the existing unit death path and clears pending-impact and target-index
+state. The actual `game_update` host fixture checks fresh STOP, one pending
+impact reference, fresh parent detachment, live-target position retention and
+expiry. Compile and run receipts are `scarab-dispatch-{compile,run}.json` in
+`.local/decoder-proof`.
+
+The probe does not move toward the target, detect arrival or schedule an
+animation or bullet. It can consequently expire while stationary and must not
+be enabled as gameplay. Other hidden-target classes, complete death/reference
+cleanup, cadence across profiles, Q8 motion and native/N64 execution remain
+unqualified. The test's terminal screen is reset to PLAY for its second update;
+it is not an ordinary playable match.

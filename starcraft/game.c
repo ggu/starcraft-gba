@@ -1661,6 +1661,12 @@ static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *can
 #endif
 static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #endif
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+#if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+#error "Scarab flight control probe requires runtime and source cadence"
+#endif
+static void race_scarab_control_dispatch(int slot);
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int race_p7_carrier_training_menu_available(void);
 static int race_p7_carrier_training_queue_selected(void);
@@ -7158,7 +7164,12 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
-        if (SC64_SCARAB_CHILD(q)) continue; /* the child adapter owns orders */
+        if (SC64_SCARAB_CHILD(q)) {
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+            if (sc64_battlecruiser_source_tick_due()) race_scarab_control_dispatch(i);
+#endif
+            continue; /* the child adapter owns orders */
+        }
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         if (SC64_CARRIER_CHILD_SCRIPTED(q)) continue;
 #endif
@@ -11554,6 +11565,32 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #include "race_save_adapter.h"
 #ifdef SC64_IMPACT_EVENTS
 #include "sc64_impact_adapter.h"
+#endif
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+#include "sc64_scarab_unit_adapter.h"
+static void race_scarab_control_dispatch(int slot)
+{
+    Unit *q=&u[slot];
+    if ((((unsigned)q->carry>>8)&3u)<2u) return;
+    if (q->target>=0) {
+        if (q->target<MAX_UNITS+MAX_BUILDINGS && target_alive(q->target) &&
+            (q->target>=MAX_UNITS || !SC64_SCARAB_HIDDEN(&u[q->target]))) {
+            q->tx=target_x(q->target);q->ty=target_y(q->target);
+        } else q->target=-1;
+    }
+    int action=race_scarab_flight_control_tick(slot,0,0);
+    if (action==SC64_SCARAB_CONTROL_REMOVE) {
+        int was_invincible=invincible_units[slot], flags=q->flags, hp=q->hp;
+        invincible_units[slot]=0;q->flags&=~16;q->hp=1;
+        hit_target_impl_ex(slot,1,U_SCARAB,-1,-1,SC64_HIT_PRECOMPUTED_HP);
+        if (q->alive) { invincible_units[slot]=was_invincible;q->flags=flags;q->hp=hp;return; }
+        invincible_units[slot]=0;q->selected=0;
+#ifdef SC64_IMPACT_EVENTS
+        race_impact_clear_target(slot);
+#endif
+        target_lists_valid=0;sc64_target_index_end();sc64_unit_bucket_active=0;
+    }
+}
 #endif
 #endif
 
