@@ -364,3 +364,34 @@ python3 tools/sc64_build_provenance.py record build/provenance/p8/roms \
 - Mission text, transmissions and sounds are not presented.
 - Performance is far below the 30-fps goal and has no hardware measurement.
 - The candidate is not promoted. Canonical Protoss remains P7.
+
+## Shared-engine integration recheck, 2026-10-31
+
+The explicit P8 candidate was integrated on `7e80a10` and retains the current
+shared Battery, bunker, construction, weapon lookup and cache flags. Its
+normal product remains P7; this P8 candidate is not a promotion. The ordinary
+input controller was adjusted to issue visible mineral orders to idle Probes
+and keep Fenix near the defended Nexus. It does not inject resources or actors.
+
+At runtime source `76d7211`, the sanitized controller won at call 90,428,
+frame 88,769, with Fenix at 240 HP and the Hyperion at 674 HP. A full host
+replay and a fresh-process SRAM resume matched the strict continuation and
+reached the same result. The normal P8 ARM ROM and full, prefix and resume
+replay ROMs linked with unchanged guard limits: normal IWRAM ended at
+`0x03004ab8`, BSS at `0x0203899c`. Isolated mGBA replay reached the same
+win and fresh-process SRAM continuation; the comparison reports `same_end`.
+This is local emulator evidence, not physical hardware or frame-rate proof.
+
+The shared service checks pass for P7 and P8, and current shared Battery save
+fixtures pass for Protoss and Showcase. Showcase does not gain Carrier or
+Interceptor services from this candidate. A P7 canonical controller run did
+not win, but its 60,000-call trace was byte-identical to unmodified `7e80a10`
+with the same prepared inputs. That base qualification issue remains open.
+
+The later fixture/documentation-only commits do not change qualified runtime
+code. At `d1d91d8`, a separate checkout without private inputs passed the
+default build, tests (23 optional skips), and source-tree boundary check. This
+candidate still needs broader carried-mission, service and source-capability
+qualification before canonical promotion; notably the separate Scarab work
+is not enabled or qualified here. No private data or captures are committed,
+and no Actions were dispatched.
