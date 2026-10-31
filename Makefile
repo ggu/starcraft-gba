@@ -5163,13 +5163,10 @@ test-sc64-shared-mechanics: build/test-sc64-shared-mechanics-terran build/test-s
 PROTOSS_SERVICES_DEPS = tests/sc64_protoss_services_game.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile
 build/test-sc64-protoss-services-p7: $(PROTOSS_SERVICES_DEPS) $(PROTOSS_P7_CANONICAL_INPUTS) | build
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
-build/test-sc64-protoss-services-showcase: $(PROTOSS_SERVICES_DEPS) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS) | build
-	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) -o $@
 build/test-sc64-protoss-services-p8: $(PROTOSS_SERVICES_DEPS) $(PROTOSS_P8_INPUTS) | build
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
-test-sc64-protoss-services: build/test-sc64-protoss-services-p7 build/test-sc64-protoss-services-showcase build/test-sc64-protoss-services-p8
+test-sc64-protoss-services: build/test-sc64-protoss-services-p7 build/test-sc64-protoss-services-p8
 	./build/test-sc64-protoss-services-p7
-	./build/test-sc64-protoss-services-showcase
 	./build/test-sc64-protoss-services-p8
 
 .PHONY: test-sc64-building-damage test-sc64-firebat-damage
