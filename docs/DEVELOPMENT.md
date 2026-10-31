@@ -67,10 +67,11 @@ pixel/state checks, measurements and memory limits.
 
 ## Directional unit sprites
 
-Canonical Terran, Zerg, Protoss and Showcase builds select directional frames
-from the source unit images instead of always drawing frame zero. Refresh an
-older workspace with `./dev sc64 prepare --rom PATH --profile terran` (or
-`zerg` / `protoss`). Preparation writes the private bank under
+Every race-engine build (Races, unified, the race campaigns, the canonical
+Terran, Zerg and Protoss products and Showcase) selects directional frames from
+the source unit images instead of always drawing frame zero. Refresh an older
+workspace with `./dev sc64 prepare --rom PATH --profile terran` (or `zerg`,
+`protoss`, `races`, `unified`). Preparation writes the private bank under
 `.local/sc64/facing/generated/`; status/build reject older banks without the
 directional metadata and packed-frame payload. The source image's directional
 flag determines whether its frames represent headings; frame count alone does
@@ -81,9 +82,28 @@ units aim toward their target when firing. Facing is presentation state: a new
 game, scene restart, accepted load or reused actor slot starts at north until
 the unit moves or fires. It does not change the save format or combat rules.
 This adds directional idle poses, including Tank hull/turret layers; it does
-not implement the original walking cycles, turn rates or independent turret
-tracking. Canonical campaigns and Showcase use packed directional frames.
+not implement turn rates or independent turret tracking. Canonical campaigns
+and Showcase use packed directional frames.
 `make -B showcase SHOWCASE_UNIT_WORD_FLAGS=` selects the indexed comparison path.
+
+### Walk cycles
+
+`SC64_UNIT_WALK_FRAMES` (in every race-engine build) plays each unit's source
+walking animation while it moves. `tools/sc64_unit_walk_frames.py` follows the
+`playfram`/`wait` loop of the IScript Walking animation and writes the timed
+poses to `.local/sc64/walk/generated/`; preparation runs it after the facing
+importer. The 2026-10-29 bank covers 34 units, among them the Marine, Zergling,
+Hydralisk, Drone, Zealot, Dragoon, Goliath and Tank treads (1,260,912 pixel
+bytes). Each pose stores all 32 headings, so walking units always take the
+plain sprite blitter; pose 0's eastern frames are shared with the facing bank.
+The SCV, Probe and most flyers loop a single pose in the source (they hover),
+so they keep their facing frame and the one-pixel stride lift.
+
+The cycle runs on the game clock (four source ticks per five game ticks) while
+the walk tracker sees the unit stepping, offset by actor slot. A unit that stops
+shows its facing frame again after one drawn tick. Walk poses are presentation
+state only; nothing is saved or read by the simulation. Mutalisk-style
+flyers flap only while they move; their idle loops are not imported.
 
 ## Source weapon and attack animations
 
@@ -3072,3 +3092,13 @@ The fixed tick 17937 and frame 17658 are a source-bound witness for this
 controller and runtime, not a general scenario or hardware guarantee; a
 runtime change that alters the controller timeline requires a fresh witness
 and review. This host test is not a physical-GBA or frame-rate qualification.
+
+### Gated Scarab component fixtures
+
+With the four canonical profiles' private inputs already prepared,
+`make test-scarab-unit-adapter` and `make test-scarab-presence` each compile and run
+four host sanitizer fixtures with `SC64_SCARAB_RUNTIME`. They generate only a
+new source-fact table under a fresh ignored `build/generated/scarab-p7/run.*`
+directory; they do not prepare imported art or replace an existing fact table.
+These component checks do not enable Reaver production or qualify gameplay,
+SRAM continuation, physical hardware, or performance.

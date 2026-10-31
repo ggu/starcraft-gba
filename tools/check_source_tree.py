@@ -5,7 +5,7 @@ import re
 import subprocess
 import sys
 
-ALLOWED_SUFFIXES = {'.c', '.h', '.s', '.ld', '.py', '.md', '.json', '.yml', '.yaml', '.txt'}
+ALLOWED_SUFFIXES = {'.c', '.cpp', '.h', '.s', '.ld', '.py', '.md', '.json', '.yml', '.yaml', '.txt'}
 ALLOWED_NAMES = {'Makefile', 'dev', 'LICENSE', 'COPYING', '.gitignore', '.gitattributes'}
 FORBIDDEN_DIRS = {'.local', 'build', 'references', 'generated', 'extracted', '__pycache__', 'node_modules', '.venv'}
 SECRET_PATTERNS = (
@@ -32,7 +32,7 @@ def main():
             continue
         if any(part in FORBIDDEN_DIRS for part in path.parts):
             failures.append(f'{name}: local/generated directory is prohibited')
-        if path.name.endswith(('_generated.h', '-trigger-report.json', '_pack_report.json')):
+        if path.name.endswith(('_generated.h', '_generated.cpp', '-trigger-report.json', '_pack_report.json')):
             failures.append(f'{name}: game-derived generated data is prohibited')
         if path.name.startswith('.env') or path.name.lower() in {'credentials', 'id_rsa', 'id_ed25519'}:
             failures.append(f'{name}: credential path is prohibited')

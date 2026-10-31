@@ -70,6 +70,14 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #error "SC64_ROUTE_L_FAST_PATH requires SC64_RACES and SC64_ROUTE_PACK3"
 #endif
 #endif
+#ifdef SC64_ROUTE_NEW_CELL
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3) || \
+    !defined(SC64_ROUTE_VISIT_GRID) || !defined(SC64_ROUTE_FLOOD_SPLIT) || \
+    defined(SC64_ROUTE_PARTIAL_FLOOD)
+#error "SC64_ROUTE_NEW_CELL requires a full packed visited-grid split flood"
+#endif
+#endif
+
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 #if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3) || \
     !defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_LARGE_MAPS)
@@ -335,7 +343,11 @@ static int GBA_HOT sc64_route_get(int slot, int cell)
 #endif
 }
 
+#ifdef SC64_ROUTE_NEW_CELL
+static void __attribute__((noinline)) sc64_route_put(int slot, int cell, int direction)
+#else
 static void GBA_HOT sc64_route_put(int slot, int cell, int direction)
+#endif
 {
 #ifdef SC64_ROUTE_PACK3
     u32 bit = (u32)cell * 3u;
@@ -403,6 +415,20 @@ static int sc64_route_origin_ready(int slot, int origin, int origin_walkable)
 }
 #endif
 
+#ifdef SC64_ROUTE_NEW_CELL
+/* Only a fresh full flood may call this: each destination's three bits are
+ * still 111, and the borrowed visited grid prevents a second write. */
+static void GBA_HOT __attribute__((noinline))
+sc64_route_put_new(u8 *field, int cell, int direction)
+{
+    u32 bit=(u32)cell*3u;
+    unsigned byte=bit>>3, shift=bit&7u;
+    unsigned clear=(7u^(unsigned)direction)<<shift;
+    field[byte]&=(u8)~clear;
+    if(shift>5u)field[byte+1]&=(u8)~(clear>>8);
+}
+#endif
+
 #ifdef SC64_ROUTE_FLOOD_SPLIT
 /* Keep lookup/metadata cold while preserving a hot flood loop. The caller
  * passes the existing seed queue and partial-completeness state unchanged. */
@@ -411,6 +437,9 @@ sc64_route_flood(int slot, int head, int *tail, int origin,
                  int origin_walkable, int complete)
 {
     int qtail = *tail;
+#ifdef SC64_ROUTE_NEW_CELL
+    u8 *new_field = sc64_route_field[slot];
+#endif
 #ifndef SC64_ROUTE_PARTIAL_FLOOD
     (void)origin;
     (void)origin_walkable;
@@ -430,10 +459,15 @@ sc64_route_flood(int slot, int head, int *tail, int origin,
         /* The stored direction takes the neighbour back toward this cell. */
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_VISIT_GRID
+#ifdef SC64_ROUTE_NEW_CELL
+#define SC64_ROUTE_FLOOD_PUT(next, direction) sc64_route_put_new(new_field, (next), (direction))
+#else
+#define SC64_ROUTE_FLOOD_PUT(next, direction) sc64_route_put(slot, (next), (direction))
+#endif
 #define SC64_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
             if (SC64_GRID_GET(path_walkable, next)) { \
-                sc64_route_put(slot, next, (direction)); bfs_queue[qtail++] = (u16)next; \
+                SC64_ROUTE_FLOOD_PUT(next, direction); bfs_queue[qtail++] = (u16)next; \
                 SC64_GRID_SET(path_walkable, next, 0); } }
 #else
 #define SC64_FLOOD(condition, neighbour, direction) \
@@ -453,6 +487,9 @@ sc64_route_flood(int slot, int head, int *tail, int origin,
         SC64_FLOOD(row > 0, cell - MAP_COLS, 3);
         SC64_FLOOD(row + 1 < MAP_ROWS, cell + MAP_COLS, 4);
 #undef SC64_FLOOD
+#ifdef SC64_ROUTE_FLOOD_PUT
+#undef SC64_ROUTE_FLOOD_PUT
+#endif
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
         if (sc64_route_origin_ready(slot, origin, origin_walkable)) {
             if (head < qtail) complete = 0;
@@ -1090,6 +1127,12 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     field = sc64_route_field[slot];
     memset(field, 255, MAP_CELLS * sizeof(*field));
 #endif
+#ifdef SC64_ROUTE_NEW_CELL
+    /* Every depot rebuild clears the field above, including re-created
+     * partial fields. Seed cells use the generic writer; newly discovered
+     * neighbors are visited once while the walkability bit is borrowed. */
+    u8 *new_field = sc64_route_field[slot];
+#endif
     x0 = center_x >= 32 ? (center_x - 32) / 16 : 0;
     y0 = center_y >= 32 ? (center_y - 32) / 16 : 0;
     x1 = (center_x + 32) / 16; if (x1 >= MAP_COLS) x1 = MAP_COLS - 1;
@@ -1125,10 +1168,15 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
 /* The game supplies paired accessors. Borrow its walkable bit as visited
  * during this synchronous flood, then restore every queued cell below.
  * Read-only custom accessors retain the field-based visited test. */
+#ifdef SC64_ROUTE_NEW_CELL
+#define SC64_ROUTE_DEPOT_PUT(next, direction) sc64_route_put_new(new_field, (next), (direction))
+#else
+#define SC64_ROUTE_DEPOT_PUT(next, direction) sc64_route_put(slot, (next), (direction))
+#endif
 #define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
             if (SC64_GRID_GET(path_walkable, next)) { \
-                sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; \
+                SC64_ROUTE_DEPOT_PUT(next, direction); bfs_queue[tail++] = (u16)next; \
                 SC64_GRID_SET(path_walkable, next, 0); } }
 #else
 #define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
@@ -1147,6 +1195,9 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
         SC64_DEPOT_FLOOD(y > 0, cell - MAP_COLS, 3);
         SC64_DEPOT_FLOOD(y + 1 < MAP_ROWS, cell + MAP_COLS, 4);
 #undef SC64_DEPOT_FLOOD
+#ifdef SC64_ROUTE_DEPOT_PUT
+#undef SC64_ROUTE_DEPOT_PUT
+#endif
     }
 #if defined(SC64_RACES) && defined(SC64_GRID_SET)
     for (i=0;i<tail;++i) SC64_GRID_SET(path_walkable,bfs_queue[i],1);

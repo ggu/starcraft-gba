@@ -351,8 +351,32 @@ static void test_decay_extension_and_wrap(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_NEW_CELL
+/* A fresh cell can straddle bytes already holding arbitrary neighbouring
+ * directions. Verify every bit phase, first/last cells and canaries. */
+static void test_new_cell_writer(void)
+{
+    u8 packed[SC64_ROUTE_BYTES + 2];
+    for(int trial=0;trial<256;trial++) {
+        int cell=trial<8?trial:trial<16?MAP_CELLS-1-(trial-8):(int)(random32()%MAP_CELLS);
+        int direction=1+(trial%4);
+        for(unsigned i=0;i<SC64_ROUTE_BYTES;i++)sc64_route_field[0][i]=(u8)random32();
+        sc64_route_put(0,cell,7);
+        packed[0]=0x5a;packed[SC64_ROUTE_BYTES+1]=0xa5;
+        memcpy(packed+1,sc64_route_field[0],SC64_ROUTE_BYTES);
+        sc64_route_put(0,cell,direction);
+        sc64_route_put_new(packed+1,cell,direction);
+        assert(packed[0]==0x5a && packed[SC64_ROUTE_BYTES+1]==0xa5);
+        assert(!memcmp(packed+1,sc64_route_field[0],SC64_ROUTE_BYTES));
+    }
+}
+#endif
+
 int main(void)
 {
+#ifdef SC64_ROUTE_NEW_CELL
+    test_new_cell_writer();
+#endif
     test_partial_and_packed_grid();
 #ifdef SC64_ROUTE_DECAY_FREQ
     test_lfu_policy_edges();

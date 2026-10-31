@@ -15,8 +15,9 @@ game's own loader. The restored fingerprint must equal the saved one, and
 controller inputs are written; game state is read, never written.
 
 The fingerprint covers frame, owner banks, mineral fields and the semantic
-fields of every live unit and building, read at their DWARF offsets and
-widths. Transient UI, path caches, audio and render state are outside it.
+selected persisted fields of every live unit and building, including active
+production queues, read at their DWARF offsets and widths. It is not a complete
+save-state comparison; transient UI, path caches, audio and render state are outside it.
 """
 from __future__ import annotations
 
@@ -36,10 +37,10 @@ FRONT_HOME, FRONT_SKIRMISH = 0, 4
 KEY_A, KEY_B, KEY_START, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_L = 1, 2, 8, 16, 64, 128, 512
 SRAM_BYTES = 32768
 UNIT_FIELDS = ("owner", "type", "x", "y", "hp", "shield", "order", "tx", "ty", "carry",
-               "target", "work_timer", "raw_type", "raw_owner")
+               "target", "work_timer", "raw_type", "raw_owner", "cd", "build", "flags", "shield_remainder")
 BUILDING_FIELDS = ("owner", "type", "x", "y", "hp", "shield", "under_construction",
                    "build_progress", "queue_count", "queue_head", "queue_progress",
-                   "raw_type", "raw_owner", "larva", "level")
+                   "raw_type", "raw_owner", "larva", "level", "flags", "larva_timer", "shield_remainder")
 RACES = "tzp"
 
 
@@ -47,7 +48,8 @@ class ContinuationError(RuntimeError):
     pass
 
 
-def entity_rows(data: bytes, stride: int, layout, fields: tuple[str, ...]) -> list[tuple]:
+def entity_rows(data: bytes, stride: int, layout, fields: tuple[str, ...], *,
+                active_queue: bool = False) -> list[tuple]:
     """Live rows as tuples of the named fields, in slot order."""
     if not stride or len(data) % stride:
         raise ContinuationError("entity bank size does not match its DWARF stride")
@@ -55,8 +57,16 @@ def entity_rows(data: bytes, stride: int, layout, fields: tuple[str, ...]) -> li
     for name in ("alive",) + fields:
         if name not in layout or widths.get(name) not in (1, 2, 4):
             raise ContinuationError(f"DWARF layout lacks scalar field {name}")
-        if layout[name] + widths[name] > stride:
+        if type(layout[name]) is not int or layout[name] < 0 or layout[name] + widths[name] > stride:
             raise ContinuationError(f"field {name} exceeds the DWARF stride")
+    if active_queue:
+        queue = getattr(layout, "arrays", {}).get("queue")
+        if ("queue" not in layout or type(layout["queue"]) is not int or layout["queue"] < 0 or
+                type(queue) is not tuple or len(queue) != 3 or type(queue[0]) is not int or
+                queue[0] != 5 or type(queue[1]) is not int or queue[1] not in (1, 2, 4) or
+                type(queue[2]) is not bool or layout["queue"] + queue[0] * queue[1] > stride or
+                "queue_head" not in fields or "queue_count" not in fields):
+            raise ContinuationError("DWARF layout lacks a valid five-element queue array")
     rows = []
     for slot in range(len(data) // stride):
         row = data[slot * stride:(slot + 1) * stride]
@@ -65,7 +75,18 @@ def entity_rows(data: bytes, stride: int, layout, fields: tuple[str, ...]) -> li
             return int.from_bytes(row[o:o + w], "little", signed=signed and w > 1)
         if not get("alive", False):
             continue
-        rows.append((slot,) + tuple(get(name) for name in fields))
+        values = (slot,) + tuple(get(name) for name in fields)
+        if active_queue:
+            count, head = get("queue_count"), get("queue_head")
+            if not 0 <= count <= 5 or not 0 <= head < 5:
+                raise ContinuationError("invalid live building queue count or head")
+            width, signed = queue[1:]
+            start = layout["queue"]
+            active = tuple(int.from_bytes(row[start + ((head + i) % 5) * width:
+                                              start + ((head + i) % 5 + 1) * width],
+                                          "little", signed=signed) for i in range(count))
+            values += (active,)
+        rows.append(values)
     return rows
 
 
@@ -113,6 +134,19 @@ class Game:
         self.rsp.write(self.sym["demo_schedule_length"], struct.pack("<I", 0x7fffffff))
         self.rsp.write(self.sym["demo_schedule_active"], struct.pack("<I", 1))
         self.updates = 0
+        self.stale_update_stops = 0
+        # The current main-loop iteration latched scheduler-disabled before
+        # the host enabled it. Synchronize while still at the neutral title;
+        # subsequent step() calls then have an active scheduler throughout.
+        if self.u32("screen") != SCREEN_TITLE:
+            raise ContinuationError("scheduler bootstrap is not on the title screen")
+        self.synchronize_scheduler()
+
+    def synchronize_scheduler(self) -> None:
+        """Finish the neutral startup boundary separately from measured updates."""
+        self.step(0)
+        self.bootstrap_stops = self.stale_update_stops + 1
+        self.updates = self.stale_update_stops = 0
 
     def u32(self, name: str, offset: int = 0) -> int:
         return int.from_bytes(self.rsp.read(self.sym[name] + offset, 4), "little", signed=True)
@@ -120,13 +154,25 @@ class Game:
     def step(self, keys: int = 0, n: int = 1) -> None:
         """Run n updates holding keys; the scheduler applies them from the next update."""
         for _ in range(n):
+            tick = self.u32("demo_schedule_tick")
             if keys != self.keys:
-                tick = self.u32("demo_schedule_tick")
                 self.rsp.write(self.sym["demo_schedule_events"], struct.pack("<2I", tick + 1, keys))
                 self.rsp.write(self.sym["demo_schedule_count"], struct.pack("<I", 1))
                 self.rsp.write(self.sym["demo_schedule_index"], struct.pack("<I", 0))
                 self.keys = keys
-            self.rsp.tick(expected=self.update)
+            # A hardware breakpoint can be entered again at the same audio
+            # boundary (observed on ARM with no scheduler/frame advance).
+            # Count completed main-loop updates, not breakpoint notifications.
+            for _ in range(8):
+                self.rsp.tick(expected=self.update)
+                observed = self.u32("demo_schedule_tick")
+                if observed == tick + 1:
+                    break
+                if observed != tick:
+                    raise ContinuationError(f"scheduler jumped from {tick} to {observed}")
+                self.stale_update_stops += 1
+            else:
+                raise ContinuationError("scheduler did not advance after eight breakpoint stops")
             self.updates += 1
 
     def tap(self, key: int) -> None:
@@ -171,7 +217,7 @@ class Game:
         units = entity_rows(self.rsp.read(self.sym["u"], self.sizes["u"]), self.unit_stride,
                             self.unit_layout, UNIT_FIELDS)
         buildings = entity_rows(self.rsp.read(self.sym["b"], self.sizes["b"]), self.building_stride,
-                                self.building_layout, BUILDING_FIELDS)
+                                self.building_layout, BUILDING_FIELDS, active_queue=True)
         return {"frame": self.u32("frame"), "screen": self.u32("screen"),
                 "minerals": self.u32("minerals"), "gas": self.u32("gas"),
                 "race_minerals": self.rsp.read(self.sym["race_minerals"], self.sizes["race_minerals"]).hex(),
@@ -249,6 +295,8 @@ def run(args) -> dict:
         game.step(KEY_A)
         game.step(0, args.continue_updates)
         record["reference"] = summary(game.state())
+        record["phase1_stale_update_stops"] = game.stale_update_stops
+        record["phase1_bootstrap_stops"] = game.bootstrap_stops
         game.rsp.export_sram()
     finally:
         game.close()
@@ -269,6 +317,8 @@ def run(args) -> dict:
         record["restored"] = summary(game.state())
         game.step(0, args.continue_updates)
         record["resumed"] = summary(game.state())
+        record["phase2_stale_update_stops"] = game.stale_update_stops
+        record["phase2_bootstrap_stops"] = game.bootstrap_stops
         game.rsp.export_sram()
     finally:
         game.close()
