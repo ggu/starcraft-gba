@@ -5,9 +5,10 @@
 
 static int reference_can_attack(int attacker, int target, int owner)
 {
-#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
-    /* The P3 Scourge override includes hostility/air-only constraints that
-     * race_can_attack alone does not model. */
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+    defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
+    /* The shared wrapper includes Scourge hostility and air-only rules as
+     * well as the T6 burrow protection when that runtime is enabled. */
     return sc64_p3_can_attack_from(attacker, target, owner);
 #elif defined(SC64_T4_RUNTIME)
     int expected = race_can_attack(attacker, target);

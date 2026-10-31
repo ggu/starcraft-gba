@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+from tools.sc64_walk_pair import verify as verify_walk_pair
 
 ROOT = Path(__file__).resolve().parent
 REFERENCE = ROOT / "references" / "sc64-maps"
@@ -152,6 +153,8 @@ STAGED_CAMPAIGN_INPUTS["zerg-z6-probe"] = STAGED_CAMPAIGN_INPUTS["zerg-z6"]
 
 FACING_PROFILES = ("terran", "zerg", "zerg-z6", "zerg-z7", "zerg-z4", "protoss", "protoss-p7", "protoss-p5-shuttle", "protoss-p6")
 FACING_HEADER = ".local/sc64/facing/generated/sc64_unit_facing_generated.h"
+WALK_HEADER = ".local/sc64/walk/generated/sc64_unit_walk_generated.h"
+WALK_WORDS_HEADER = ".local/walk-words-managed/sc64_walk_words_generated.h"
 TANK_VFX_HEADER = ".local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h"
 WEAPON_SOURCE_HEADER = ".local/sc64/weapon-vfx/generated/sc64_weapon_source_generated.h"
 ATTACK_POSE_HEADER = ".local/sc64/attack-poses/generated/sc64_unit_attack_source_generated.h"
@@ -266,6 +269,28 @@ def facing_sprite_input_ready(path: Path) -> bool:
                       text) is not None and
             re.search(r"static const unsigned char sc64_unit_facing_\d+_0_pixels\[[1-9]\d*\]",
                       text) is not None)
+
+
+def walk_cycle_input_ready(path: Path) -> bool:
+    """Require the 32-heading walk-cycle bank with at least one cycle."""
+    try:
+        text = path.read_text(encoding="ascii")
+    except (OSError, UnicodeError):
+        return False
+    return (re.search(r"^#define\s+SC64_UNIT_WALK_BANK_VERSION\s+1\s*$",
+                      text, re.MULTILINE) is not None and
+            re.search(r"^#define\s+SC64_UNIT_WALK_HEADINGS\s+32u\s*$",
+                      text, re.MULTILINE) is not None and
+            "sc64_unit_walk_cycle(" in text and
+            re.search(r"static const Sc64UnitWalkCycle sc64_unit_walk_i\d+ =",
+                      text) is not None)
+
+
+def walk_pair_input_ready(walk: Path, facing: Path) -> bool:
+    try:
+        return verify_walk_pair(walk.read_bytes(), facing.read_bytes())
+    except OSError:
+        return False
 
 
 def attack_pose_input_ready(path: Path) -> bool:
@@ -667,6 +692,14 @@ def build(game: str) -> None:
         raise RuntimeError(
             "source construction art requires the blue-glow modifier bank; "
             "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
+    if game in BC_PROFILES and not bc_inputs_ready():
+        raise RuntimeError("canonical BC builds need isolated cover and body inputs; run ./dev sc64 prepare-bc --rom PATH")
+    if game in CONSTRUCTION_PROFILES and not (facing_sprite_input_ready(ROOT / FACING_HEADER) and
+                                              walk_cycle_input_ready(ROOT / WALK_HEADER) and
+                                              walk_pair_input_ready(ROOT / WALK_HEADER, ROOT / FACING_HEADER)):
+        raise RuntimeError(
+            "race-engine builds require the directional sprite and walk-cycle banks; "
+            "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
     make_target, _ = GAMES[game]
     run(["make", make_target])
 
@@ -719,6 +752,58 @@ def ensure_extractor() -> None:
         raise RuntimeError(f"Pinned extractor checkout verification failed: {head}")
 
 
+# The shared BC capability is prepared independently: no existing source bank
+# is rewritten. All four canonical race products consume this same overlay.
+BC_DIR = Path(".local/sc64/bc/generated")
+BC_BODY_HEADER = Path(".local/sc64/bc-body/sc64_bc_body_art_generated.h")
+BC_YAMATO_HEADER = Path(".local/sc64/bc-yamato/generated/yamato_source_generated.h")
+BC_MARKERS = {
+    "sc64_assets_generated.h": "SC64_ASSET_COVER_DATA",
+    "sc64_races_generated.h": "SC64_RACES_COVER_DATA",
+    "sc64_skirmish_generated.h": "SC64_SKIRMISH_COVER_DATA",
+}
+BC_PROFILES = ("terran", "zerg", "zerg-z6", "protoss", "protoss-p7")
+
+
+def bc_inputs_ready() -> bool:
+    try:
+        for name, marker in BC_MARKERS.items():
+            if not re.search(r"^#define\s+" + marker + r"\s+1\s*$",
+                             (ROOT / BC_DIR / name).read_text(encoding="ascii"), re.MULTILINE):
+                return False
+        body = (ROOT / BC_BODY_HEADER).read_text(encoding="ascii")
+        yamato = (ROOT / BC_YAMATO_HEADER).read_text(encoding="ascii")
+        return ("SC64_YAMATO_FRAME_COUNT" in yamato and "sc64_yamato_pixels" in yamato and
+                "sc64_yamato_light_lut" in yamato and
+                "#define SC64_BC_BODY_ART_FORMAT_VERSION 1u" in body and
+                all(name in body for name in ("sc64_race_sprite_science_facility_frame_0_pixels",
+                                               "sc64_race_sprite_physics_lab_frame_0_pixels")))
+    except (OSError, UnicodeError):
+        return False
+
+
+def prepare_bc(rom: Path) -> None:
+    rom = rom.expanduser().resolve()
+    if not rom.is_file():
+        raise RuntimeError(f"User-supplied ROM does not exist: {rom}")
+    ensure_extractor()
+    out = ROOT / BC_DIR
+    run([sys.executable, str(ROOT / "tools/sc64_assets.py"), "--rom", str(rom),
+         "--profile", "backwater", "--out", str(out), "--cover"])
+    for name in ("races", "skirmish"):
+        run([sys.executable, str(ROOT / f"tools/sc64_{name}_pack.py"), "--rom", str(rom),
+             "--backwater-generated", str(out), "--out", str(out / f"sc64_{name}_generated.h"), "--cover"])
+    run([sys.executable, str(ROOT / "tools/sc64_bc_body_art.py"), "--rom", str(rom),
+         "--remap", str(out / "palette-remap.bin"), "--header", str(ROOT / BC_BODY_HEADER)])
+    run([sys.executable, str(ROOT / "tools/sc64_yamato_assets.py"), "--rom", str(rom),
+         "--out", str((ROOT / BC_YAMATO_HEADER).parent),
+         "--palette-remap", str(out / "palette-remap.bin"),
+         "--palette-json", str(out / "palette.json")])
+    if not bc_inputs_ready():
+        raise RuntimeError("BC preparation produced incomplete cover, body or Yamato data")
+    print("Prepared isolated BC cover and facility art under .local/sc64/.")
+
+
 def prepare(rom: Path, profile: str) -> None:
     rom = rom.expanduser().resolve()
     if not rom.is_file():
@@ -764,6 +849,20 @@ def prepare(rom: Path, profile: str) -> None:
              "--rom", str(private_rom)])
         if not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER):
             raise RuntimeError("construction preparation produced a stale blue-glow bank")
+        # Every race-engine product draws directional frames and walk cycles.
+        run([sys.executable, str(ROOT / "tools/sc64_unit_facing.py"),
+             "--rom", str(private_rom), "--out", str((ROOT / FACING_HEADER).parent)])
+        if not facing_sprite_input_ready(ROOT / FACING_HEADER):
+            raise RuntimeError("directional sprite preparation produced a stale or empty bank")
+        run([sys.executable, str(ROOT / "tools/sc64_unit_walk_frames.py"),
+             "--rom", str(private_rom), "--out", str((ROOT / WALK_HEADER).parent)])
+        if not (walk_cycle_input_ready(ROOT / WALK_HEADER) and
+                walk_pair_input_ready(ROOT / WALK_HEADER, ROOT / FACING_HEADER)):
+            raise RuntimeError("walk-cycle preparation produced a stale, empty or mismatched bank")
+        (ROOT / WALK_WORDS_HEADER).parent.mkdir(parents=True, exist_ok=True)
+        run([sys.executable, str(ROOT / "tools/sc64_unit_walk_words.py"),
+             "--managed-update", str(ROOT / WALK_HEADER), str(ROOT / FACING_HEADER),
+             str(ROOT / WALK_WORDS_HEADER)])
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
         run([sys.executable, str(ROOT / "tools/sc64_font_assets.py"),
              "--rom", str(private_rom)])
@@ -878,10 +977,6 @@ def prepare(rom: Path, profile: str) -> None:
                  "--out", str(stage / "sprites"),
                  "--header", str(stage / "sc64_race_sprites_generated.h")])
     if profile in FACING_PROFILES:
-        run([sys.executable, str(ROOT / "tools/sc64_unit_facing.py"),
-             "--rom", str(private_rom), "--out", str((ROOT / FACING_HEADER).parent)])
-        if not facing_sprite_input_ready(ROOT / FACING_HEADER):
-            raise RuntimeError("directional sprite preparation produced a stale or empty bank")
         run([sys.executable, str(ROOT / "tools/sc64_tank_source_vfx.py"),
              "--rom", str(private_rom), "--out", str((ROOT / TANK_VFX_HEADER).parent)])
         if not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER):
@@ -927,6 +1022,8 @@ def status(profile: str) -> int:
             ("Menu artwork", "sc64_menu_generated.h"),
         ))
         paths.append(("Source construction art", ROOT / CONSTRUCTION_HEADER))
+        paths.append(("Directional unit sprites", ROOT / FACING_HEADER))
+        paths.append(("Unit walk cycles", ROOT / WALK_HEADER))
         paths.append(("Campaign briefings and portraits", ROOT /
                       ".local/sc64/briefings/generated/sc64_briefing_generated.h"))
         for label, name in (("Original interface fonts", "sc64_font_generated.h"),
@@ -981,7 +1078,6 @@ def status(profile: str) -> int:
         paths.extend((f"Terran T{mission} {kind}", stage / f"sc64_t{mission}_{kind}_generated.h")
                      for mission in range(7, 11) for kind in ("scenario", "availability"))
     if profile in FACING_PROFILES:
-        paths.append(("Directional unit sprites", ROOT / FACING_HEADER))
         paths.append(("Tank firing effects", ROOT / TANK_VFX_HEADER))
         paths.append(("Unit attack poses", ROOT / ATTACK_POSE_HEADER))
         paths.append(("Source weapon effects", ROOT / WEAPON_SOURCE_HEADER))
@@ -1004,6 +1100,8 @@ def status(profile: str) -> int:
             ready = death_source_input_ready(path)
         elif label == "Source construction art":
             ready = construction_color_input_ready(path)
+        elif label == "Unit walk cycles":
+            ready = walk_cycle_input_ready(path) and walk_pair_input_ready(path, ROOT / FACING_HEADER)
         elif label.endswith("gated map data"):
             map_profile = ("protoss-p6" if label == "Protoss chapter 6 gated map data" or
                            label == "Protoss P6 gated map data" else
@@ -1030,13 +1128,18 @@ def status(profile: str) -> int:
         note = (f" (run ./dev sc64 prepare --rom PATH --profile {profile} to regenerate unit-word metadata)"
                 if profile in ("zerg", "zerg-z4") and label == "Zerg chapter 4 sprites" and not ready
                 else "")
-        if (profile in FACING_PROFILES and not ready and label in
-                ("Directional unit sprites", "Tank firing effects", "Unit attack poses",
-                 "Source weapon effects", "Source death art")):
+        if (profile in CONSTRUCTION_PROFILES and not ready and label in
+                ("Directional unit sprites", "Unit walk cycles", "Tank firing effects",
+                 "Unit attack poses", "Source weapon effects", "Source death art")):
             note = f" (run ./dev sc64 prepare --rom PATH --profile {profile} to regenerate)"
         print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}{note}")
-    return int(any(not path.is_file() for _, path in paths) or
+    if profile in BC_PROFILES:
+        print(f"{'READY  ' if bc_inputs_ready() else 'MISSING'} BC cover, facility and Yamato art: {ROOT / BC_DIR}")
+    return int((profile in BC_PROFILES and not bc_inputs_ready()) or
+               any(not path.is_file() for _, path in paths) or
                (profile in FACING_PROFILES and not facing_sprite_input_ready(ROOT / FACING_HEADER)) or
+               (profile in CONSTRUCTION_PROFILES and not walk_cycle_input_ready(ROOT / WALK_HEADER)) or
+               (profile in CONSTRUCTION_PROFILES and not walk_pair_input_ready(ROOT / WALK_HEADER, ROOT / FACING_HEADER)) or
                (profile in FACING_PROFILES and not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER)) or
                (profile in FACING_PROFILES and not attack_pose_input_ready(ROOT / ATTACK_POSE_HEADER)) or
                (profile in FACING_PROFILES and not weapon_source_input_ready(ROOT / WEAPON_SOURCE_HEADER)) or
@@ -1087,7 +1190,7 @@ def main() -> int:
     play_parser = commands.add_parser("play", help="build and launch a StarCraft profile in mGBA")
     play_parser.add_argument("game", nargs="?", choices=GAMES, default="starcraft")
     sc64 = commands.add_parser("sc64", help="prepare or inspect optional local StarCraft 64 profiles")
-    sc64.add_argument("action", choices=("prepare", "status", "build", "test", "play"))
+    sc64.add_argument("action", choices=("prepare", "prepare-bc", "status", "build", "test", "play"))
     sc64.add_argument("--rom", type=Path, help="user-supplied USA N64 ROM (or ZIP) for prepare")
     sc64.add_argument("--profile", choices=SC64_PROFILES, default="unified")
     args = parser.parse_args()
@@ -1102,7 +1205,11 @@ def main() -> int:
             return 0
         if args.command == "play":
             return play(args.game)
-        if args.action == "prepare":
+        if args.action == "prepare-bc":
+            if args.rom is None:
+                raise RuntimeError("sc64 prepare-bc requires --rom PATH")
+            prepare_bc(args.rom)
+        elif args.action == "prepare":
             if args.rom is None:
                 raise RuntimeError("sc64 prepare requires --rom PATH; the ROM is not downloaded")
             prepare(args.rom, args.profile)

@@ -1,5 +1,6 @@
 """New-contributor paths must work without an emulator or imported game data."""
 import contextlib
+import hashlib
 import importlib.machinery
 import importlib.util
 import io
@@ -47,6 +48,7 @@ ATTACK_POSE_HEADER = (
 )
 WEAPON_SOURCE_HEADER = (
     '#define SC64_WEAPON_SOURCE_BANK_VERSION 1\n'
+    '#define SC64_WEAPON_SOURCE_SPROLUSELO_LO 1\n'
     '#define SC64_WEAPON_SOURCE_METADATA 1\n'
     '#define SC64_WEAPON_SOURCE_PROFILE_COUNT 1\n'
     '#define SC64_WEAPON_SOURCE_IMAGE_COUNT 1\n'
@@ -115,6 +117,21 @@ CONSTRUCTION_COLOR_HEADER = (
     'sc64_construction_modifier_lookup(int image_id, int *rows);\n'
 )
 
+WALK_CYCLE_HEADER = (
+    '#define SC64_UNIT_WALK_FACING_SHA256 "' + hashlib.sha256(FACING_SPRITE_HEADER.encode('ascii')).hexdigest() + '"\n'
+    '#define SC64_UNIT_WALK_BANK_VERSION 1\n'
+    'static const Sc64UnitWalkStep sc64_unit_walk_i54_steps[1] = {{0}};\n'
+    'static const Sc64UnitWalkCycle sc64_unit_walk_i54 = {0};\n'
+    'static inline const Sc64UnitWalkCycle *sc64_unit_walk_cycle(unsigned short raw_type) { return 0; }\n'
+    '#define SC64_UNIT_WALK_HEADINGS 32u\n'
+)
+
+
+def emit_walk_header(root):
+    path = root / dev.WALK_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(WALK_CYCLE_HEADER, encoding='ascii')
+
 
 def emit_construction_header(root):
     path = root / dev.CONSTRUCTION_HEADER
@@ -127,6 +144,7 @@ def emit_facing_header(root):
     path = root / dev.FACING_HEADER
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(FACING_SPRITE_HEADER, encoding='ascii')
+    emit_walk_header(root)
     path = root / dev.TANK_VFX_HEADER
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(TANK_VFX_HEADER, encoding='ascii')
@@ -226,6 +244,22 @@ class OnboardingTests(unittest.TestCase):
             header.write_text(FACING_SPRITE_HEADER, encoding='ascii')
             self.assertTrue(dev.facing_sprite_input_ready(header))
 
+    def test_walk_cycle_readiness_requires_version_headings_and_a_cycle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'walk.h'
+            invalid = (
+                WALK_CYCLE_HEADER.replace('BANK_VERSION 1', 'BANK_VERSION 10'),
+                WALK_CYCLE_HEADER.replace('HEADINGS 32u', 'HEADINGS 17u'),
+                WALK_CYCLE_HEADER.replace('sc64_unit_walk_cycle(', 'missing_accessor('),
+                WALK_CYCLE_HEADER.replace('sc64_unit_walk_i54 =', 'missing_cycle ='),
+            )
+            self.assertFalse(dev.walk_cycle_input_ready(header))
+            for text in invalid:
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.walk_cycle_input_ready(header))
+            header.write_text(WALK_CYCLE_HEADER, encoding='ascii')
+            self.assertTrue(dev.walk_cycle_input_ready(header))
+
     def test_attack_pose_readiness_requires_version_accessors_and_pixels(self):
         with tempfile.TemporaryDirectory() as directory:
             header = Path(directory) / 'attack.h'
@@ -272,7 +306,8 @@ class OnboardingTests(unittest.TestCase):
             header.write_text(WEAPON_SOURCE_HEADER, encoding='ascii')
             self.assertTrue(dev.weapon_source_input_ready(header))
 
-    def test_terran_build_requires_directional_bank_before_make(self):
+    @patch.object(dev, "bc_inputs_ready", return_value=True)
+    def test_terran_build_requires_directional_bank_before_make(self, _bc_ready):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             header = root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h'
@@ -445,6 +480,10 @@ class OnboardingTests(unittest.TestCase):
                     emit(output, UNIT_WORD_SPRITE_HEADER)
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script in ('sc64_font_assets.py', 'sc64_icon_assets.py', 'sc64_chrome_assets.py'):
                     names = {'sc64_font_assets.py': 'sc64_font_generated.h',
                              'sc64_icon_assets.py': 'sc64_icons_generated.h',
@@ -568,7 +607,8 @@ class OnboardingTests(unittest.TestCase):
             with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(dev.status('zerg-z4'), 1)
 
-    def test_canonical_zerg_requires_chapter_five_and_six_inputs(self):
+    @patch.object(dev, "bc_inputs_ready", return_value=True)
+    def test_canonical_zerg_requires_chapter_five_and_six_inputs(self, _bc_ready):
         z6_gate = ('#if defined(SC64_UNIFIED) && defined(SC64_Z6_DATA_ENABLED)\nsc64_race_z6_units\n'
                    '#endif /* SC64_UNIFIED && SC64_Z6_DATA_ENABLED */\n')
         with tempfile.TemporaryDirectory() as directory:
@@ -623,7 +663,8 @@ class OnboardingTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
                     dev.build('zerg')
 
-    def test_terran_build_requires_real_word_metadata_before_make(self):
+    @patch.object(dev, "bc_inputs_ready", return_value=True)
+    def test_terran_build_requires_real_word_metadata_before_make(self, _bc_ready):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             header = root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h'
@@ -1006,6 +1047,8 @@ class OnboardingTests(unittest.TestCase):
                         emit_construction_header(root)
                     elif script == 'sc64_unit_facing.py':
                         emit_facing_header(root)
+                    elif script == 'sc64_unit_walk_frames.py':
+                        emit_walk_header(root)
                     elif script == 'sc64_unit_attack_sprites.py':
                         emit_attack_pose_header(root)
                     elif script == 'sc64_weapon_source_sprites.py':
@@ -1243,7 +1286,8 @@ class OnboardingTests(unittest.TestCase):
             header.write_text(DEATH_SOURCE_HEADER, encoding='ascii')
             self.assertTrue(dev.death_source_input_ready(header))
 
-    def test_canonical_race_build_requires_current_death_bank(self):
+    @patch.object(dev, "bc_inputs_ready", return_value=True)
+    def test_canonical_race_build_requires_current_death_bank(self, _bc_ready):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / '.local/sc64/terran-late/import-stage').mkdir(parents=True)
@@ -1251,6 +1295,7 @@ class OnboardingTests(unittest.TestCase):
                 UNIT_WORD_SPRITE_HEADER, encoding='ascii')
             for relative, content in (
                 (dev.FACING_HEADER, FACING_SPRITE_HEADER),
+                (dev.WALK_HEADER, WALK_CYCLE_HEADER),
                 (dev.TANK_VFX_HEADER, TANK_VFX_HEADER),
                 (dev.ATTACK_POSE_HEADER, ATTACK_POSE_HEADER),
                 (dev.WEAPON_SOURCE_HEADER, WEAPON_SOURCE_HEADER),
@@ -1364,6 +1409,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script == 'sc64_unit_attack_sprites.py':
                     emit_attack_pose_header(root)
                 elif script == 'sc64_weapon_source_sprites.py':
@@ -1467,6 +1514,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script == 'sc64_unit_attack_sprites.py':
                     emit_attack_pose_header(root)
                 elif script == 'sc64_weapon_source_sprites.py':
@@ -1553,6 +1602,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1767,6 +1818,8 @@ class OnboardingTests(unittest.TestCase):
                     emit_construction_header(root)
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script == 'sc64_unit_attack_sprites.py':
                     emit_attack_pose_header(root)
                 elif script == 'sc64_weapon_source_sprites.py':

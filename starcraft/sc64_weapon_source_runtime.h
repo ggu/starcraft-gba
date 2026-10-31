@@ -12,6 +12,10 @@
 #error "Regenerate the versioned source weapon VFX bank"
 #endif
 
+#if !defined(SC64_WEAPON_SOURCE_SPROLUSELO_LO) || SC64_WEAPON_SOURCE_SPROLUSELO_LO != 1
+#error "Regenerate the source weapon VFX bank with SPROLUSELO LO offsets"
+#endif
+
 #define SC64_SOURCE_PROFILE_HAS_PROJECTILE 0x01u
 #define SC64_SOURCE_BULLET_FLY 0u
 #define SC64_SOURCE_BULLET_FOLLOW 1u

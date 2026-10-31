@@ -18,6 +18,10 @@
 #include "sc64_p7_world_adapter.h"
 
 static Sc64P7PersistentState race_p7;
+#if defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT) && defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+static unsigned sc64_bc_p7_visual_phase(void)
+{ return (4u+5u-(unsigned)race_p7.reserved[0])%5u; }
+#endif
 static Sc64P7WorldContext race_p7_world;
 static Sc64P7WorldOps race_p7_ops;
 static const Sc64RaceMap *race_p7_map;

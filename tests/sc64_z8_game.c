@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 #ifndef SC64_Z8_RUNTIME
 #error "Compile this fixture with the zerg-z8 profile flags"
@@ -114,8 +115,13 @@ static void test_save_continuation(void)
     press(KEY_START);
     assert(screen == SCREEN_PAUSE);
     press(KEY_B);
-    assert(save_read(&saved, sizeof(saved), SAVE_VERSION));
+#ifndef SC64_IMPACT_EVENTS
+    assert(save_read(&race_data, sizeof(race_data), SAVE_VERSION));
+#endif
+    fixture_capture_save(&saved);
     pause_save = saved;
+    assert(race_z8_save_candidate_world_valid(&saved, race_cols, race_rows));
+    assert(race_z8_ai.produce_index[0] && race_z8_ai.produce_index[1]);
     saved_frame = (unsigned)frame;
     press(KEY_START);
     assert(screen == SCREEN_PLAY);
@@ -126,7 +132,7 @@ static void test_save_continuation(void)
     /* An idle human loses to the first Dark Templar raid during the
      * reference run, and that defeat autosaves. Reload the pause save. */
     reference_lost = lost;
-    save_write(&saved, sizeof(saved), SAVE_VERSION);
+    write_candidate_record(&saved);
     game_init();
     held_keys = 0;
     press(KEY_L);
@@ -146,21 +152,89 @@ static void test_rejects_corrupt_candidate(void)
 {
     static RaceSave good, bad;
     u32 before;
-    assert(save_read(&good, sizeof(good), SAVE_VERSION));
+    good = pause_save;
     before = world_digest();
     bad = good;
     bad.z8.instance[0] = 0xffu; /* invalid flags */
-    save_write(&bad, sizeof(bad), SAVE_VERSION);
+    write_candidate_record(&bad);
     assert(!load_game() && world_digest() == before);
     bad = good;
     bad.z8.reserved = 1;
-    save_write(&bad, sizeof(bad), SAVE_VERSION);
+    write_candidate_record(&bad);
     assert(!load_game() && world_digest() == before);
     bad = good;
     bad.z8.ai[offsetof(Sc64Z8AiState, reserved)] = 1;
-    save_write(&bad, sizeof(bad), SAVE_VERSION);
+    write_candidate_record(&bad);
     assert(!load_game() && world_digest() == before);
-    save_write(&good, sizeof(good), SAVE_VERSION);
+    write_candidate_record(&good);
+}
+
+/* Each record is serialized through the production envelope and read back
+ * before the selected Z8 world validator and atomic load are checked. */
+static void assert_bad_z8_world(RaceSave *bad, u32 before)
+{
+    write_candidate_record(bad);
+    assert(!race_z8_save_candidate_world_valid(&race_data, race_cols, race_rows));
+    assert(!load_game() && world_digest() == before);
+}
+
+static int encode_z8_candidate_unit(RaceSave *save, unsigned slot,
+                                    unsigned ww, unsigned wh, const Unit *unit)
+{
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    return sc64_p7_typed_unit_encode(&save->units[slot], unit, ww, wh);
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    return sc64_derived_unit_encode(&save->units[slot], unit, ww, wh);
+#else
+    return sc64_zp_unit_save_encode(&save->units[slot], unit, ww, wh);
+#endif
+}
+
+static int encode_z8_candidate_building(RaceSave *save, unsigned slot,
+                                        unsigned ww, unsigned wh, const Building *building)
+{
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    return sc64_p7_typed_building_encode(&save->buildings[slot], building, ww, wh);
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    return sc64_derived_building_encode(&save->buildings[slot], building, ww, wh);
+#else
+    return sc64_building_save_encode(&save->buildings[slot], building, ww, wh);
+#endif
+}
+
+static void test_rejects_invalid_source_world(void)
+{
+    static RaceSave bad;
+    Unit actor; Building building;
+    int unit = -1, structure = -1;
+    const unsigned ww = (unsigned)race_cols * 16u, wh = (unsigned)race_rows * 16u;
+    u32 before = world_digest();
+    for (unsigned i=0; i<MAX_UNITS; ++i) {
+        assert(race_save_decode_unit(&pause_save, i, ww, wh, &actor));
+        if (actor.alive && actor.owner == SIDE && actor.raw_owner == SC64_Z8_HUMAN_SLOT) {unit=(int)i;break;}
+    }
+    for (unsigned i=0; i<MAX_BUILDINGS; ++i) {
+        assert(race_save_decode_building(&pause_save, i, &building));
+        if (building.alive && building.owner == SIDE && building.raw_owner == SC64_Z8_HUMAN_SLOT) {structure=(int)i;break;}
+    }
+    assert(unit>=0 && structure>=0);
+    assert(race_save_decode_unit(&pause_save, (unsigned)unit, ww, wh, &actor));
+    bad=pause_save; actor.raw_owner=1;
+    assert(encode_z8_candidate_unit(&bad, (unsigned)unit, ww, wh, &actor));
+    assert_bad_z8_world(&bad,before);
+    assert(race_save_decode_unit(&pause_save, (unsigned)unit, ww, wh, &actor));
+    bad=pause_save; actor.raw_type = sc64_race_raw_unit(actor.type)==0 ? 7 : 0;
+    assert(encode_z8_candidate_unit(&bad, (unsigned)unit, ww, wh, &actor));
+    assert_bad_z8_world(&bad,before);
+    assert(race_save_decode_building(&pause_save, (unsigned)structure, &building));
+    bad=pause_save; building.raw_owner=1;
+    assert(encode_z8_candidate_building(&bad, (unsigned)structure, ww, wh, &building));
+    assert_bad_z8_world(&bad,before);
+    assert(race_save_decode_building(&pause_save, (unsigned)structure, &building));
+    bad=pause_save; building.raw_type=254;
+    assert(encode_z8_candidate_building(&bad, (unsigned)structure, ww, wh, &building));
+    assert_bad_z8_world(&bad,before);
+    write_candidate_record(&pause_save);
 }
 
 /* Fixture-only placement (not gameplay evidence): a human Overlord in
@@ -200,8 +274,9 @@ int main(void)
     test_opening_triggers();
     test_save_continuation();
     test_rejects_corrupt_candidate();
+    test_rejects_invalid_source_world();
     /* Back to the pause save (frame 2121): T10's first Dark Templar is out. */
-    save_write(&pause_save, sizeof(pause_save), SAVE_VERSION);
+    write_candidate_record(&pause_save);
     game_init();
     held_keys = 0;
     press(KEY_L);

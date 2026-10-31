@@ -189,6 +189,19 @@ class WeaponSourceSpriteTests(unittest.TestCase):
                                    {"x":0,"y":0},{"x":0,"y":0}])
         self.assertIn("00E/004", hashes)
 
+    def test_sproluselo_collects_attack_table(self):
+        count = 999
+        image_data = bytearray(14 * count + 6 * 4 * count)
+        struct.pack_into("<I", image_data, 18 * count + 17 * 4, 19)
+        raw = struct.pack("<IIIIbbbb", 2, 1, 16, 18, 0, -10, 4, -8)
+        tables, offsets, _ = source._collect_lo_tables(
+            lambda path: raw if path == "00D/012" else None,
+            bytes(image_data), {"referenced_images": {"17": {}},
+                "source_animations": {"17": {"GndAttkInit": {
+                    "visual_references": [{"opcode": 21, "args": [332, 0]}]}}}})
+        self.assertEqual((tables[0]["image_id"], tables[0]["lo_kind"]), (17, 0))
+        self.assertEqual(offsets, [{"x": 0, "y": -10}, {"x": 4, "y": -8}])
+
     def test_raster_bank_keeps_projectiles_and_child_layers_only(self):
         report = {"units": [{"actor_images": [{"image":10}],
                       "weapons": [{"weapon_graphic_chain": {"image": 30}}]}],

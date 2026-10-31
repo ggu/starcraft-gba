@@ -26,6 +26,8 @@ static int field_menu_count(void);
 static const char *race_menu_label(int i);
 static int race_owner_identity(int owner);
 static int race_owner_has_prereq(int owner, unsigned short prereq);
+/* Defined by the custom-game adapter included after the UI declarations. */
+static int race_skirmish_record_available(const Sc64SkirmishRecord *record);
 static const char *race_campaign_objective_text(void);
 static const char *race_campaign_victory_text(void);
 static const char *race_campaign_failure_text(void);
@@ -43,7 +45,7 @@ static int race_t6_building_product_available(int owner, int raw_owner, int type
 /* ui_action (game.c, beside the other field state) holds one of these. */
 enum {
     UI_A_NONE, UI_A_SELECT, UI_A_DESELECT, UI_A_TRAIN, UI_A_ATTACK,
-    UI_A_MOVE_HERE, UI_A_ATTACK_HERE, UI_A_PLACE, UI_A_GAS, UI_A_MOVE
+    UI_A_MOVE_HERE, UI_A_ATTACK_HERE, UI_A_PLACE, UI_A_GAS, UI_A_MOVE, UI_A_MINE
 };
 
 /* Why a command or site is unavailable, or UI_SITE_OK. */
@@ -64,7 +66,7 @@ ui_hostile_at(int x, int y, int *tx, int *ty)
 {
     int i;
     for (i = 0; i < MAX_UNITS; i++)
-        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && owners_hostile(SIDE, u[i].owner) &&
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && owners_hostile(SIDE, u[i].owner) &&
             dist2(x, y, u[i].x, u[i].y) < 9 * 9 && currently_visible(u[i].x, u[i].y)) {
             *tx = u[i].x; *ty = u[i].y;
             return 1;
@@ -108,6 +110,7 @@ field_ui_a_action(int selected)
     if (selected_building >= 0 && b[selected_building].alive && field_ui_on_selected_building())
         return b[selected_building].under_construction ? UI_A_NONE : UI_A_TRAIN;
     if (selected && ui_hostile_at(cx, cy, &hx, &hy)) return UI_A_ATTACK;
+    if (selected_worker_mineral_target() >= 0) return UI_A_MINE;
     if (target >= 0) return UI_A_SELECT;
     if (selected_building >= 0) return UI_A_DESELECT;
     return selected ? UI_A_MOVE : UI_A_NONE;
@@ -210,6 +213,7 @@ field_ui_site(int type, int *x, int *y)
 static int
 field_ui_build_worker(int type)
 {
+    if (race_mode) return race_skirmish_worker(type);
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     int i, best = -1, d, best_d = 0x7fffffff;
     if (!r) return -1;
@@ -227,6 +231,11 @@ field_ui_build_worker(int type)
 static const char *
 ui_missing_tech(int type, int worker)
 {
+    if (race_mode) {
+        const Sc64SkirmishRecord *record = sc64_skirmish_menu_record((unsigned)race_human,
+            (unsigned)sc64_race_raw_building(type));
+        return record && race_skirmish_record_available(record) ? 0 : "";
+    }
     static const char *const names[14] = {
         "HATCHERY", "SPAWNING POOL", "HYDRALISK DEN", "NEXUS", "GATEWAY",
         "CYBERNETICS CORE", "PYLON", "FORGE", "SUPPLY DEPOT", "BARRACKS",
@@ -271,6 +280,23 @@ ui_row_kind(int i, int *type)
         {B_GATEWAY, B_PYLON, B_ASSIMILATOR, B_CYBERNETICS_CORE, B_FORGE}};
     const char *label;
     *type = -1;
+    /* Custom games use catalog row kinds directly. The campaign menu below
+     * keeps its legacy label mapping and compile-profile-specific rows. */
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+        if (!sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row))
+            return UI_ROW_SPECIAL;
+        if (row.kind == SC64_SK_MENU_MOVE || row.kind == SC64_SK_MENU_ATTACK ||
+            row.kind == SC64_SK_MENU_STOP) return UI_ROW_ORDER;
+        if (row.kind == SC64_SK_MENU_WEAPONS || row.kind == SC64_SK_MENU_ARMOR)
+            return UI_ROW_RESEARCH;
+        if (!row.record) return UI_ROW_SPECIAL;
+        *type = sc64_race_building_from_raw(row.record->raw_id);
+        if (row.kind == SC64_SK_MENU_BUILD) return UI_ROW_BUILD;
+        if (row.kind == SC64_SK_MENU_ADDON || row.kind == SC64_SK_MENU_MORPH)
+            return UI_ROW_MORPH;
+        return UI_ROW_SPECIAL;
+    }
     if (i == MENU_MOVE || i == MENU_ATTACK || i == MENU_STOP) return UI_ROW_ORDER;
     if (i == MENU_WEAPONS || i == MENU_ARMOR) return UI_ROW_RESEARCH;
     if (i < MENU_STOP) { *type = base[race_human][i - MENU_BARRACKS]; return UI_ROW_BUILD; }
@@ -324,6 +350,23 @@ ui_row_state(int i, int *cost, int *gas_cost, const char **need)
         return ui_research_state(i, need);
     }
     if (kind == UI_ROW_SPECIAL) return UI_SITE_OK;
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+        const Sc64StockUnitProfile *profile;
+        if (!sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) || !row.record)
+            return UI_SITE_OK;
+        profile = sc64_stock_unit_profile(row.record->raw_id);
+        if (!profile) return UI_SITE_TECH;
+        *cost = profile->minerals;
+        *gas_cost = profile->gas;
+        if (!race_skirmish_record_available(row.record)) return UI_SITE_TECH;
+        if (type < 0) return UI_SITE_TECH;
+        if (kind == UI_ROW_BUILD && field_ui_build_worker(type) < 0)
+            return UI_SITE_WORKER;
+        if (minerals < *cost) return UI_SITE_MINERALS;
+        if (gas < *gas_cost) return UI_SITE_GAS;
+        return UI_SITE_OK;
+    }
     *cost = building_cost(type);
     *gas_cost = building_gas_cost(type);
     if (kind == UI_ROW_BUILD) {
@@ -446,6 +489,11 @@ ui_source_icon_for_row(int i, int kind, int type)
 {
 #ifdef SC64_ICON_TABLE_PRESENT
     const char *label;
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+        if (sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) && row.record &&
+            row.record->raw_id < SC64_ICON_UNIT_COUNT) return row.record->raw_id;
+    }
     if (i == MENU_MOVE) return SC64_ICON_MOVE;
     if (i == MENU_ATTACK) return SC64_ICON_ATTACK;
     if (i == MENU_STOP) return SC64_ICON_STOP;
@@ -472,6 +520,9 @@ ui_source_icon_for_row(int i, int kind, int type)
         return race_late_airborne(selected_building) ? SC64_ICON_LAND : SC64_ICON_LIFT;
 #endif
     if (ui_same(label, "BUILD INTERCEPTOR")) return 73;
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    if (ui_same(label, "BUILD SCARAB")) return 85;
+#endif
     if (ui_same(label, "CANCEL EGG")) return 36;
     if (ui_same(label, "SUNKEN")) return 146;
     if (ui_same(label, "SPORE")) return 144;
@@ -638,6 +689,7 @@ field_controls_hint(void)
     case UI_A_SELECT: return "B COMMANDS  A SELECT";
     case UI_A_DESELECT: return "B COMMANDS  A DESELECT";
     case UI_A_GAS: return "B COMMANDS  A GATHER GAS";
+    case UI_A_MINE: return "B COMMANDS  A MINE";
     case UI_A_MOVE: return "B COMMANDS  A MOVE";
     default: return 0;
     }
@@ -651,6 +703,7 @@ field_controls_unit_hint(void)
     case UI_A_ATTACK: return "A ATTACK B ORDERS";
     case UI_A_SELECT: return "A SELECT B ORDERS";
     case UI_A_GAS: return "A GAS B ORDERS";
+    case UI_A_MINE: return "A MINE B ORDERS";
     case UI_A_MOVE: return "A MOVE B ORDERS";
     default: return "B ORDERS SEL DROP";
     }
@@ -664,6 +717,14 @@ ui_structure_note(int x, int y, int type, const char *label)
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     const char *name = sc64_race_building_name(type);
     if (!ui_same(name, label)) gfx_text(x, y, name, C_DIM);
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    else if (sc64_race_raw_building(type)==172)
+        gfx_text(x,y,"RECHARGES SHIELDS",C_DIM);
+#endif
+#ifdef SC64_SHARED_BUNKER
+    else if (sc64_race_raw_building(type)==125)
+        gfx_text(x,y,"GARRISON FOUR INFANTRY",C_DIM);
+#endif
     else if (r && r->supply_provided) {
         gfx_text(x, y, "+", C_DIM);
         gfx_num(x + 6, y, r->supply_provided / 2, C_DIM);

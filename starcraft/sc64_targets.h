@@ -1,5 +1,6 @@
 #ifndef SC64_TARGETS_H
 #define SC64_TARGETS_H
+#include "sc64_scarab_presence.h"
 
 /* Short-lived 64px spatial index for nearest-enemy queries in update_orders.
  * The default 24x24 grid covers 96x96; SC64_LARGE_MAPS uses 32x24 for
@@ -102,7 +103,7 @@ sc64_target_remove(int entity, int owner)
 }
 
 static void
-sc64_target_index_begin(void)
+sc64_target_index_clear(void)
 {
     int i;
     sc64_target_index_active = 0;
@@ -122,11 +123,39 @@ sc64_target_index_begin(void)
     memset(sc64_target_owner_columns, 0, sizeof(sc64_target_owner_columns));
     memset(sc64_target_owner_rows, 0, sizeof(sc64_target_owner_rows));
 #endif
+}
+
+/* Keep the standalone full scan for callers without freshly built lists. */
+static void __attribute__((unused))
+sc64_target_index_begin(void)
+{
+    int i;
+    sc64_target_index_clear();
     for (i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_HIDDEN(&u[i]) &&
             !sc64_target_insert(i, u[i].owner, u[i].x, u[i].y)) return;
     for (i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && !sc64_target_insert(MAX_UNITS + i, b[i].owner, b[i].x, b[i].y)) return;
+    sc64_target_index_active = 1;
+}
+
+/* Only use immediately after update_orders builds and validates these lists.
+ * Each list is ascending by slot; unit entries precede building entries for
+ * each owner, preserving insertion and tie order within every owner cell. */
+#ifndef GBA_HOST
+static void __attribute__((noinline, long_call))
+#else
+static void
+#endif
+sc64_target_index_begin_owner_lists(void)
+{
+    sc64_target_index_clear();
+    for (int owner = 0; owner < 5; ++owner) {
+        for (int i = target_unit_head[owner]; i >= 0; i = target_unit_next[i])
+            if (!sc64_target_insert(i, owner, u[i].x, u[i].y)) return;
+        for (int i = target_building_head[owner]; i >= 0; i = target_building_next[i])
+            if (!sc64_target_insert(MAX_UNITS + i, owner, b[i].x, b[i].y)) return;
+    }
     sc64_target_index_active = 1;
 }
 
@@ -135,6 +164,10 @@ sc64_target_index_move(Unit *q)
 {
     int entity = (int)(q - u), cell;
     if (!sc64_target_index_active || entity < 0 || entity >= MAX_UNITS) return;
+    if (SC64_SCARAB_HIDDEN(q)) {
+        sc64_target_index_active = 0; /* hidden rows were never linked */
+        return;
+    }
     if (!sc64_target_cell_for(q->x, q->y, &cell)) {
         sc64_target_index_active = 0;
         return;

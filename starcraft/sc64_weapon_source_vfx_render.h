@@ -307,6 +307,37 @@ sc64_weapon_source_vfx_cached_bounds(void)
 #endif
 }
 
+/* Optional generated bounds apply only to exact immutable bank profiles.
+ * Unknown banks, synthetic/stack copies and invalid entries use the original
+ * global envelope. Integer-address checks avoid unrelated-pointer arithmetic. */
+static inline uint32_t
+sc64_weapon_source_vfx_profile_bounds(const Sc64WeaponSourceAttackProfile *profile)
+{
+    uint32_t global = sc64_weapon_source_vfx_cached_bounds();
+#if defined(SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION) && \
+    SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION == 1
+    if ((global & UINT32_C(0xc0000000)) == SC64_WEAPON_SOURCE_VFX_BOUNDS_VALID && profile) {
+        uintptr_t base = (uintptr_t)(const void *)sc64_weapon_source_profiles;
+        uintptr_t addr = (uintptr_t)(const void *)profile;
+        if (addr >= base) {
+            uintptr_t offset = addr - base;
+            if (offset % sizeof(sc64_weapon_source_profiles[0]) == 0) {
+                uintptr_t index = offset / sizeof(sc64_weapon_source_profiles[0]);
+                if (index < SC64_WEAPON_SOURCE_PROFILE_COUNT &&
+                    index < sizeof(sc64_weapon_source_profile_bounds) / sizeof(sc64_weapon_source_profile_bounds[0])) {
+                    uint32_t value = sc64_weapon_source_profile_bounds[index];
+                    if ((value & UINT32_C(0xc0000000)) == SC64_WEAPON_SOURCE_VFX_BOUNDS_VALID)
+                        return value;
+                }
+            }
+        }
+    }
+#else
+    (void)profile;
+#endif
+    return global;
+}
+
 static inline int
 sc64_weapon_source_vfx_motion_has_proven_bounds(uint8_t bullet_type)
 {
@@ -381,8 +412,8 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
         (uint32_t)camx + 32768u <= 65535u &&
         (uint32_t)camy + 32768u <= 65535u && key.direction <= 31u) {
         uint16_t rx, ry;
-        if (!sc64_weapon_source_vfx_bounds_unpack(
-                sc64_weapon_source_vfx_cached_bounds(), &rx, &ry)) return 0;
+        uint32_t global_bounds = sc64_weapon_source_vfx_cached_bounds();
+        if (!sc64_weapon_source_vfx_bounds_unpack(global_bounds, &rx, &ry)) return 0;
         const int16_t *v = sc64_weapon_source_direction_q8[key.direction];
         int lx = x0 + ((int)profile->forward_offset * v[0]) / 512;
         int ly = y0 + ((int)profile->forward_offset * v[1]) / 512 -
@@ -397,8 +428,18 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
         if (y1 < lo_y) lo_y = y1;
         if (y1 > hi_y) hi_y = y1;
         lo_x -= camx; hi_x -= camx; lo_y -= camy; hi_y -= camy;
+        if (hi_x + (int)rx < 0 || lo_x - (int)rx >= 240 ||
+            hi_y + (int)ry < 0 || lo_y - (int)ry >= 108) return 1;
+#if defined(SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION) && \
+    SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION == 1
+        uint32_t profile_bounds = sc64_weapon_source_vfx_profile_bounds(profile);
+        if (profile_bounds == global_bounds ||
+            !sc64_weapon_source_vfx_bounds_unpack(profile_bounds, &rx, &ry)) return 0;
         return hi_x + (int)rx < 0 || lo_x - (int)rx >= 240 ||
                hi_y + (int)ry < 0 || lo_y - (int)ry >= 108;
+#else
+        return 0;
+#endif
     }
     int64_t dx = (int64_t)x1 - x0, dy = (int64_t)y1 - y0;
     uint64_t abs_dx = (uint64_t)(dx < 0 ? -dx : dx);
@@ -496,6 +537,25 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
             int64_t child_age_signed = (int64_t)child_clock - trigger;
             if (child_age_signed < 0 || child_age_signed >= child_life) continue;
             uint32_t child_age = (uint32_t)child_age_signed;
+            int child_dx = source_dx, child_dy = source_dy;
+            if (overlay->opcode == 21u) {
+                /* SPROLUSELO samples the parent's frame at sprite birth.
+                 * Later parent animation frames cannot move that sprite. */
+                const Sc64WeaponSourceImage *parent =
+                    sc64_weapon_source_image_lookup(parent_image);
+                int birth_mirror = 0;
+                uint64_t birth_tick = (uint64_t)overlay->source_tick +
+                                      (uint64_t)iteration * loop_len;
+                if (birth_tick > UINT32_MAX) continue;
+                uint16_t birth_frame = sc64_weapon_source_vfx_source_frame(
+                    parent, anim, (uint32_t)birth_tick, direction, &birth_mirror);
+                int16_t lo_dx, lo_dy;
+                if (birth_frame == UINT16_MAX ||
+                    !sc64_weapon_source_lo_lookup(parent_image, overlay->lo_index,
+                                                  birth_frame, 0, &lo_dx, &lo_dy)) continue;
+                child_dx = birth_mirror ? -lo_dx : lo_dx;
+                child_dy = lo_dy;
+            }
             int draw_x = world_x, draw_y = world_y;
             if (sprite && motion) {
                 int born_x, born_y;
@@ -527,7 +587,7 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
             if (!child_frame) continue;
             sc64_weapon_source_vfx_draw_image_frame_resolved(
                 overlay->image_id, child_image, child_frame, child_mirror,
-                draw_x + source_dx / 2, draw_y + source_dy / 2);
+                draw_x + child_dx / 2, draw_y + child_dy / 2);
         }
     }
 }
@@ -579,6 +639,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
                                      int x0, int y0, int x1, int y1, int live,
                                      uint32_t gba_age)
 {
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    u32 section_start=gba_clock();
+#endif
     if (!live) return;
     if (!p || !p->projectile_image) return;
     int launch_x, launch_y;
@@ -592,6 +655,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
     Sc64WeaponSourceMotion motion =
         sc64_weapon_source_motion_prepare(p, launch_x, launch_y, x1, y1);
     if (!sc64_weapon_source_trace_has_duration_motion(p, launch_x, launch_y, x1, y1, &motion)) return;
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_motion+=gba_clock()-section_start; section_start=gba_clock();
+#endif
     uint32_t attack_age = sc64_weapon_source_vfx_source_tick(gba_age);
     uint32_t release_ticks = sc64_weapon_source_trace_release_ticks(p);
     /* The captured tracer begins at attack-init. Keep the attacker animation
@@ -609,6 +675,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
             attack_age, attack_age, p->attack_image, actor_frame, x0, y0,
             key.direction, actor_mirror, 0, 0, x0, y0, x1, y1, 0);
     }
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_actor+=gba_clock()-section_start; section_start=gba_clock();
+#endif
     if (attack_age < release_ticks) return;
     uint32_t source_age = attack_age - release_ticks;
     uint32_t init_ticks = sc64_weapon_source_trace_startup_ticks(p);
@@ -674,6 +743,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
                 draw_image_id, draw_image, draw_frame, draw_mirror, px, py);
     }
 
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_projectile+=gba_clock()-section_start; section_start=gba_clock();
+#endif
     /* Child images from each missile script remain independent while their
      * own Init animation is alive. This covers projectile trails and impact
      * sparks as well as ordinary IMGOL/SPROL records. */
@@ -693,6 +765,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
             moving ? flight_ticks : 0u, &motion);
     }
 
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_children+=gba_clock()-section_start;
+#endif
 }
 
 static inline void

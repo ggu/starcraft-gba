@@ -1,5 +1,6 @@
 #ifndef SC64_PERSISTENT_COLLISION_H
 #define SC64_PERSISTENT_COLLISION_H
+#include "sc64_scarab_presence.h"
 
 _Static_assert(MAX_UNITS < 255, "Spatial unit indices must fit below the sentinel");
 
@@ -77,7 +78,7 @@ sc64_unit_buckets_begin(void)
     for (i = 0; i < MAX_UNITS; ++i) {
         int x = u[i].x, y = u[i].y;
         u16 old_cell = sc64_unit_bucket_cell[i];
-        if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])) {
+        if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i])) {
             sc64_unit_bucket_remove(i);
             continue;
         }
@@ -106,7 +107,7 @@ sc64_unit_bucket_move(Unit *q)
 
     int slot = (int)(q - u), old_cell, new_cell;
     if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
-    if (!q->alive || SC64_TRANSPORT_LOADED(q)) {
+    if (!q->alive || SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_NONCOLLIDING(q)) {
         sc64_unit_bucket_remove(slot);
         return;
     }
@@ -168,7 +169,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
             int i;
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i])
-                if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
+                if (&u[i] != q && u[i].alive && !(SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i]))) {
 #ifdef SC64_P6_COMBAT_ENABLED
                     if (race_p6_combat_unit_burrowed(i)) continue;
 #endif

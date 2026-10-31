@@ -19,6 +19,8 @@ a separate actor. The Reaver's launched Scarab raw unit 85 / weapon 82 is also
 kept distinct from the Reaver's own unit row.
 
 Generated files belong under ignored `.local/sc64/weapon-vfx/generated/`.
+Regenerate an existing bank after updating this pipeline: the runtime requires
+the SPROLUSELO LO capability marker and rejects older banks at compile time.
 Prepare them through the profile tooling; do not commit ROMs, extracted art,
 generated headers or captures. The generator rejects unauthenticated ROMs,
 unknown image modifiers, malformed dimensions and invalid frame/LO offsets

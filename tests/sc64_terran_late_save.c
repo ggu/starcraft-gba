@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 #ifndef SC64_TERRAN_LATE_RUNTIME
 #error "Compile with the generation-18 late Terran runtime profile"
@@ -60,10 +61,11 @@ static void assert_live_unchanged(void)
 static void reject_atomically(const RaceSave *bad)
 {
     remember_live();
-    save_write(bad, sizeof(*bad), SAVE_VERSION);
+    write_candidate_record(bad);
+    assert(!race_terran_late_save_candidate_valid(&race_data, race_cols, race_rows));
     assert(!race_load_game());
     assert_live_unchanged();
-    save_write(&valid_record, sizeof(valid_record), SAVE_VERSION);
+    write_candidate_record(&valid_record);
 }
 
 static void test_all_map_geometries_roundtrip(void)
@@ -80,7 +82,7 @@ static void test_all_map_geometries_roundtrip(void)
             assert(!race_late.triggers.player[p].fault);
         }
         assert(race_save_game());
-        valid_record = race_data;
+        fixture_capture_save(&valid_record);
         assert(valid_record.version == SAVE_VERSION);
         assert(race_terran_late_save_candidate_valid(
             &valid_record, race_cols, race_rows));
@@ -132,7 +134,7 @@ static void test_t7_emitter_and_mutable_region(void)
      * before that action, the sentinel is the valid saved state. */
     assert(race_late.emitter_unit == SC64_TERRAN_LATE_NO_SLOT);
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     assert(race_terran_late_save_candidate_valid(&valid_record, 128, 96));
 
     /* Direct creation fixture isolates post-create/link persistence. */
@@ -184,7 +186,7 @@ static void test_t7_emitter_and_mutable_region(void)
     race_late.mutable_location[2] = original->right + 32;
     race_late.mutable_location[3] = original->bottom;
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     assert(race_terran_late_save_candidate_valid(&valid_record, 128, 96));
 
     {
@@ -228,7 +230,7 @@ static void test_wait_state_survives_save(void)
      * not claim the source mission reaches that state during gameplay. */
     assert(found);
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     assert(race_terran_late_save_candidate_valid(&valid_record,
                                                  race_cols, race_rows));
     u16 saved_wait = 0;
@@ -262,7 +264,7 @@ static void test_flight_goal_roundtrip_and_candidate_checks(void)
     assert(race_late_flight_order(slot, x, y, 0));
     assert(race_late.flight_goals[slot] & SC64_FLIGHT_ACTIVE);
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     assert(race_terran_late_save_candidate_valid(&valid_record, race_cols, race_rows));
 
     /* Save/load preserves the in-flight command and its exact destination. */

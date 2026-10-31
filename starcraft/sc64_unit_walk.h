@@ -4,14 +4,16 @@
 
 /* Presentation-only walk cycle for every unit in every profile.
  *
- * Neither the original-art shapes nor the imported single-pose sprite frames
- * carry a movement cycle, so a moving unit used to glide. A ground unit's
- * path timer counts down once on every tick it is moved, and freezes when
- * nothing moves it, so it doubles as a step counter. Three bits per actor
- * slot remember its low bits and bridge one tick, which costs no RAM where
- * the facing byte already exists (facing uses only its low five bits).
+ * The original-art shapes and imported units without a source walk cycle
+ * (see sc64_unit_facing.h) carry no movement frames, so they would glide. A
+ * ground unit's path timer counts down once on every tick it is moved, and
+ * freezes when nothing moves it, so it doubles as a step counter. Three bits
+ * per actor slot remember its low bits and bridge one tick, which costs no
+ * RAM where the facing byte already exists (facing uses only its low five
+ * bits).
  * Flyers keep no state: they are moving while an order carries them toward
- * a different point. Nothing here is read by the simulation or saved; after
+ * a different point. Flyers with a source cycle play it while hovering too
+ * (sc64_facing_draw); the phase here only drives the lift of those without. Nothing here is read by the simulation or saved; after
  * a load a unit may hold one stride frame. */
 
 #define SC64_WALK_KEY_SHIFT 5

@@ -1061,6 +1061,9 @@ sc64_terran_late_human_near(int x, int y)
 static void
 sc64_terran_late_transfer_unit(Unit *q)
 {
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (!race_bc_before_unit_transfer(q,SIDE,-1)) return;
+#endif
     q->owner = SIDE; q->selected = 0; q->order = ORDER_IDLE;
     q->target = -1; q->tx = q->x; q->ty = q->y;
     q->path_timer = q->path_retry = 0;
@@ -1076,7 +1079,7 @@ sc64_terran_late_transfer_group(int source_owner)
             sc64_terran_late_transfer_unit(&u[i]);
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == RESCUABLE &&
-            b[i].raw_owner == source_owner) b[i].owner = SIDE;
+            b[i].raw_owner == source_owner && SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) b[i].owner = SIDE;
 }
 
 static void
@@ -1100,7 +1103,7 @@ sc64_terran_late_world_tick(void)
                         sc64_race_is_zerg_townhall(b[i].type);
             if (depot && !b[i].under_construction)
                 sc64_terran_late_transfer_group(source);
-            else b[i].owner = SIDE;
+            else if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) b[i].owner = SIDE;
             changed = 1;
         }
     if (!changed) return;

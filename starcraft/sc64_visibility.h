@@ -1,5 +1,6 @@
 #ifndef SC64_VISIBILITY_H
 #define SC64_VISIBILITY_H
+#include "sc64_scarab_presence.h"
 
 #if defined(SC64_Z7_SIGHT_SPANS) && \
     (!defined(SC64_Z7_SOURCE_SIGHT) || !defined(SC64_VISIBILITY_SPANS))
@@ -857,7 +858,7 @@ sc64_update_exploration(void)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
                      !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
-                     !SC64_TRANSPORT_LOADED(&u[i]);
+                     !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_HIDDEN(&u[i]);
         int x = active ? u[i].x : 0;
         int y = active ? u[i].y : 0;
         int type = active ? u[i].type : 0;
