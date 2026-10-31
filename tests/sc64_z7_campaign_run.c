@@ -1593,8 +1593,13 @@ static int assign_gas_worker(void)
 static int z7_safe_local_mineral(int patch,int *depot_distance)
 {
     int best=0x7fffffff, have_depot=0;
-    if(patch<0||patch>=MAX_MINERALS||m[patch].amount<=0||
-       !currently_visible(m[patch].x,m[patch].y))return 0;
+    if(patch<0||patch>=MAX_MINERALS)return 0;
+    int x=m[patch].x,y=m[patch].y;
+    if(x<0||y<0||x>=WORLD_W||y>=WORLD_H)return 0;
+    int seen=currently_visible(x,y);
+    if(!seen&&!SC64_GRID_GET(explored,x/16+(y/16)*MAP_COLS))return 0;
+    /* Hidden resource amount is not known until a worker restores vision. */
+    if(seen&&m[patch].amount<=0)return 0;
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
        sc64_race_is_zerg_townhall(b[i].type)&&building_complete(i)) {
         int d=dist2(b[i].x,b[i].y,m[patch].x,m[patch].y);
@@ -1638,6 +1643,18 @@ static int assign_idle_workers_to_minerals(void)
         if(!select_worker(worker)) {
             fprintf(stderr,"Z7 mineral select failed worker%d order%d target%d frame%d\n",
                 worker,u[worker].order,u[worker].target,frame);
+            continue;
+        }
+        if(!currently_visible(m[target].x,m[target].y)) {
+            /* Approach an explored field with ordinary Move input; the
+             * actual resource click waits until it is visible. */
+            if(!menu_open)tap(KEY_B);
+            if(!choose_menu_row(MENU_MOVE)||mode!=MODE_MOVE) {cancel_ui_mode();continue;}
+            move_cursor(m[target].x,m[target].y);tap(KEY_A);
+            if(u[worker].order==ORDER_MOVE) {
+                ++assigned;
+                fprintf(stderr,"Z7 normal-input worker%d approaches explored local mineral%d at frame%d\n",worker,target,frame);
+            }
             continue;
         }
         move_cursor(m[target].x,m[target].y);tap(KEY_A);
