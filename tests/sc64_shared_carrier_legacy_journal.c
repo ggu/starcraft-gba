@@ -61,7 +61,7 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
     static Building before_buildings[MAX_BUILDINGS];
     static u8 before_vram[GBA_VRAM_SCRATCH_BYTES];
     static RaceLoadPlan plan;
-    const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION};
+    const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION,SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION};
     GbaSaveSelection selected;
     assert(previous->slot==0 || previous->slot==1);
     memcpy(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,sizeof(predecessor));
@@ -127,7 +127,8 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
     assert(!race_save_serialize(1));
     race_p7_projectile_fault=0;
     assert(race_save_serialize(1));
-    assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION);
+    assert(race_data.version==SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION);
+    race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
     assert(race_data.state[0]==race_mode && race_data.state[1]==race_human &&
            race_data.state[5]==minerals && race_data.state[6]==gas &&
            race_data.state[7]==frame && (u32)race_data.state[15]==seed &&
@@ -139,10 +140,10 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
     u32 packed_length=0;
     assert(race_impact_save_pack(&packed_length));
     assert(save_write_selected(&race_impact_record,packed_length,SC64_SHARED_CARRIER_SAVE_VERSION,
-                               previous,tags,2));
+                               previous,tags,3));
 #else
     assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
-                               previous,tags,2));
+                               previous,tags,3));
 #endif
     assert(race_shared_carrier_stage_select(&plan,&selected));
     assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION && selected.slot!=previous->slot);
@@ -168,10 +169,10 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
 #ifdef SC64_IMPACT_EVENTS
     assert(race_impact_save_pack(&packed_length));
     assert(save_write_selected(&race_impact_record,packed_length,SC64_SHARED_CARRIER_SAVE_VERSION,
-                               previous,tags,2));
+                               previous,tags,3));
 #else
     assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
-                               previous,tags,2));
+                               previous,tags,3));
 #endif
     assert(race_shared_carrier_stage_select(&plan,&selected));
     assert(selected.tag==SAVE_VERSION && selected.slot==previous->slot);
@@ -180,13 +181,14 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
     assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
            !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)));
     assert(race_save_serialize(1));
+    race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
 #ifdef SC64_IMPACT_EVENTS
     assert(race_impact_save_pack(&packed_length));
     assert(save_write_selected(&race_impact_record,packed_length,SC64_SHARED_CARRIER_SAVE_VERSION,
-                               previous,tags,2));
+                               previous,tags,3));
 #else
     assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
-                               previous,tags,2));
+                               previous,tags,3));
 #endif
     assert(race_shared_carrier_stage_select(&plan,&selected));
     assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION);
@@ -264,7 +266,7 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
         else assert(!decoded.alive);
     }
     assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
-                               previous,tags,2));
+                               previous,tags,3));
     assert(!memcmp(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,
                    sizeof(predecessor)));
     memcpy(before_units,u,sizeof(u)); memcpy(before_buildings,b,sizeof(b));
@@ -273,10 +275,10 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
     u32 old_seed=seed;
     u8 old_clock[3]; memcpy(old_clock,race_protoss_generic_clock,sizeof(old_clock));
 #ifdef SC64_IMPACT_EVENTS
-    assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,2,
+    assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,3,
                                  check_probe_candidate,&plan,&selected));
 #else
-    assert(save_select_validated(&race_data,sizeof(race_data),tags,2,
+    assert(save_select_validated(&race_data,sizeof(race_data),tags,3,
                                  check_probe_candidate,&plan,&selected));
 #endif
     assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION && selected.slot!=previous->slot);
@@ -297,12 +299,12 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
                                      (unsigned)race_cols*16u,(unsigned)race_rows*16u));
     race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
     assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
-                               previous,tags,2));
+                               previous,tags,3));
 #ifdef SC64_IMPACT_EVENTS
-    assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,2,
+    assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,3,
                                  check_probe_candidate,&plan,&selected));
 #else
-    assert(save_select_validated(&race_data,sizeof(race_data),tags,2,
+    assert(save_select_validated(&race_data,sizeof(race_data),tags,3,
                                  check_probe_candidate,&plan,&selected));
 #endif
     assert(selected.tag==SAVE_VERSION && selected.slot==previous->slot);
@@ -312,13 +314,13 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
                                                 (unsigned)race_rows*16u));
     race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
     assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
-                               previous,tags,2));
+                               previous,tags,3));
     save_test_corrupt_latest(sizeof(RaceSave),SC64_SHARED_CARRIER_SAVE_VERSION);
 #ifdef SC64_IMPACT_EVENTS
-    assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,2,
+    assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,3,
                                  check_probe_candidate,&plan,&selected));
 #else
-    assert(save_select_validated(&race_data,sizeof(race_data),tags,2,
+    assert(save_select_validated(&race_data,sizeof(race_data),tags,3,
                                  check_probe_candidate,&plan,&selected));
 #endif
     assert(selected.tag==SAVE_VERSION && selected.slot==previous->slot);

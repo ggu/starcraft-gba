@@ -477,6 +477,13 @@ _Static_assert((SAVE_VERSION & 0x04000000u) == 0 &&
                (SC64_LEGACY_SAVE_VERSION & 0x04000000u) == 0,
                "Carrier tag overlaps an existing save namespace");
 #define SC64_SHARED_CARRIER_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
+_Static_assert((SAVE_VERSION & 0x80000000u)==0 &&
+               (SC64_LEGACY_SAVE_VERSION & 0x80000000u)==0,
+               "Compact Carrier tag overlaps an existing save namespace");
+#define SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION (SAVE_VERSION | 0x80000000u)
+#define SC64_IS_CARRIER_SAVE_VERSION(v) \
+    ((u32)(v)==SC64_SHARED_CARRIER_SAVE_VERSION || \
+     (u32)(v)==SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION)
 #endif
 #if defined(SC64_SHARED_CARRIER_SAVE_EXPERIMENT) && !defined(SC64_SHARED_CARRIER_SAVE_VERSION)
 #error "Shared Carrier save experiment requires the shared custom Carrier format"

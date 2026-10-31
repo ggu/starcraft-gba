@@ -21,21 +21,38 @@ static int __attribute__((unused))
 sc64_shared_carrier_custom_omission_bounds(size_t *begin,size_t *end)
 {
     if (!begin || !end) return 0;
-#ifdef SC64_UNIFIED
-#ifdef SC64_ZP_FULL_STORAGE
-    *begin=offsetof(RaceSave,invincible_bits)+sizeof(((RaceSave *)0)->invincible_bits);
-#else
-    *begin=offsetof(RaceSave,invincible_buildings)+sizeof(((RaceSave *)0)->invincible_buildings);
-#endif
-#else
-    *begin=offsetof(RaceSave,campaign)+sizeof(((RaceSave *)0)->campaign);
-#endif
-#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-    *end=offsetof(RaceSave,battlecruiser_shots);
-#else
-    *end=sizeof(RaceSave);
-#endif
+    *begin=SC64_CARRIER_OMIT_BEGIN;
+    *end=SC64_CARRIER_OMIT_END;
     return *begin<=*end && *end<=sizeof(RaceSave);
+}
+
+/* A distinct compact tag identifies this wire representation. No live
+ * fields are discarded: a custom candidate may omit the mission span only
+ * when it is all zero, and expansion reconstructs precisely those bytes. */
+static int __attribute__((unused))
+sc64_shared_carrier_compact_custom(void *buffer,size_t length,size_t capacity,size_t *compacted)
+{
+    size_t begin,end;
+    if (!buffer || !compacted || !sc64_shared_carrier_custom_omission_bounds(&begin,&end) ||
+        length<end || length>capacity ||
+        sc64_shared_carrier_overlap(buffer,capacity,compacted,sizeof(*compacted))) return 0;
+    for (size_t i=begin;i<end;++i) if (((const u8 *)buffer)[i]) return 0;
+    memmove((u8 *)buffer+begin,(u8 *)buffer+end,length-end);
+    *compacted=length-(end-begin);
+    return 1;
+}
+
+static int __attribute__((unused))
+sc64_shared_carrier_expand_custom(void *buffer,size_t length,size_t capacity,size_t *expanded)
+{
+    size_t begin,end;
+    if (!buffer || !expanded || !sc64_shared_carrier_custom_omission_bounds(&begin,&end) ||
+        length<begin || length>capacity || end-begin>capacity-length ||
+        sc64_shared_carrier_overlap(buffer,capacity,expanded,sizeof(*expanded))) return 0;
+    memmove((u8 *)buffer+end,(u8 *)buffer+begin,length-begin);
+    memset((u8 *)buffer+begin,0,end-begin);
+    *expanded=length+(end-begin);
+    return 1;
 }
 
 /* Relocate a checksummed predecessor envelope in scratch only. The legacy

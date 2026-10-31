@@ -31,11 +31,38 @@ static void test_full_envelope(void)
     for (int i=0;i<MAX_UNITS;++i) unit_count+=u[i].alive!=0;
     for (int i=0;i<MAX_BUILDINGS;++i) building_count+=b[i].alive!=0;
     assert(unit_count==MAX_UNITS && building_count==MAX_BUILDINGS);
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    /* Two detached in-flight Yamato shots exercise the maximum sidecar. */
+    Sc64BcYamatoShot saved_bc[SC64_BC_SHOT_LIMIT];
+    for (int i=0;i<SC64_BC_SHOT_LIMIT;++i) {
+        Sc64BcMotionFields motion={.x_q8=300u*512u,.y_q8=300u*512u,
+            .destination_x=(s16)(u[target].x*2),.destination_y=(s16)(u[target].y*2),
+            .turn_rate=127u,.lifetime=100u};
+        sc64_bc_shots[i]=(Sc64BcYamatoShot){.caster=SC64_BC_SHOT_NO_CASTER,
+            .target=(u16)target,.state=SC64_BC_SHOT_FLIGHT};
+        assert(sc64_bc_motion_pack(&sc64_bc_shots[i],&motion));
+    }
+    memcpy(saved_bc,sc64_bc_shots,sizeof(saved_bc));
+#endif
     memcpy(saved_units,u,sizeof(u)); memcpy(saved_buildings,b,sizeof(b));
     size_t omitted_begin, omitted_end;
     assert(race_save_serialize(1));
     assert(sc64_shared_carrier_custom_omission_bounds(&omitted_begin,&omitted_end));
     for (size_t i=omitted_begin;i<omitted_end;++i) assert(!((const u8 *)&race_data)[i]);
+    static u8 compact_probe[sizeof(RaceSave)], original_probe[sizeof(RaceSave)];
+    size_t compacted,expanded;
+    memcpy(original_probe,&race_data,sizeof(race_data));
+    memcpy(compact_probe,original_probe,sizeof(compact_probe));
+    assert(omitted_end>omitted_begin);
+    compact_probe[omitted_begin]=1;
+    assert(!sc64_shared_carrier_compact_custom(compact_probe,sizeof(compact_probe),
+                                                sizeof(compact_probe),&compacted));
+    compact_probe[omitted_begin]=0;
+    assert(!memcmp(compact_probe,original_probe,sizeof(compact_probe)));
+    assert(sc64_shared_carrier_compact_custom(compact_probe,sizeof(compact_probe),
+                                               sizeof(compact_probe),&compacted));
+    assert(sc64_shared_carrier_expand_custom(compact_probe,compacted,sizeof(compact_probe),&expanded));
+    assert(expanded==sizeof(compact_probe) && !memcmp(compact_probe,original_probe,sizeof(compact_probe)));
     printf("envelope fixed=%zu carrier_packet=%u units=%zu buildings=%zu sram_payload=%u",
            sizeof(RaceSave),(unsigned)SC64_CODEC_BYTES,
            sizeof(race_data.carrier_custom.units),sizeof(race_data.carrier_custom.buildings),
@@ -50,7 +77,7 @@ static void test_full_envelope(void)
     memcpy(expected,race_impact_rows,sizeof(expected));
     printf(" impact_saved=%d impact_runtime=%d impact_header=%zu impact_row=%zu worst_bytes=%zu",
            RACE_IMPACT_SAVE_CAPACITY,RACE_IMPACT_CAPACITY,sizeof(Sc64ImpactSaveHeader),
-           sizeof(Sc64ImpactEvent),sizeof(RaceSave)+sizeof(Sc64ImpactSaveHeader)+
+           sizeof(Sc64ImpactEvent),sizeof(RaceSave)-SC64_CARRIER_OMIT_BYTES+sizeof(Sc64ImpactSaveHeader)+
            (size_t)RACE_IMPACT_SAVE_CAPACITY*sizeof(Sc64ImpactEvent));
 #else
     printf(" impact_sidecar=disabled");
@@ -61,11 +88,17 @@ static void test_full_envelope(void)
 #ifdef SC64_IMPACT_EVENTS
     race_impact_reset();
 #endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    memset(sc64_bc_shots,0,sizeof(sc64_bc_shots));
+#endif
     assert(race_load_game());
     for (int i=0;i<MAX_UNITS;++i)
         if (saved_units[i].alive && !IS_WORKER(saved_units[i].type))
             assert(!memcmp(&saved_units[i],&u[i],sizeof(Unit)));
     assert(!memcmp(saved_buildings,b,sizeof(b)));
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    assert(!memcmp(saved_bc,sc64_bc_shots,sizeof(saved_bc)));
+#endif
 #ifdef SC64_IMPACT_EVENTS
     assert(race_impact_count==RACE_IMPACT_SAVE_CAPACITY &&
            !memcmp(expected,race_impact_rows,race_impact_count*sizeof(expected[0])));

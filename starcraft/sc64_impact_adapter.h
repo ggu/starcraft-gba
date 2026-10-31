@@ -255,7 +255,24 @@ static int race_impact_save_pack(u32 *length)
     for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i)
         if (shots[i].state) { mask |= 1u << i; offset += sizeof(shots[i]); }
     if (race_impact_count) bytes = sc64_impact_save_bytes(race_impact_count);
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    /* The expanded scratch is compacted before SRAM publication. Legacy
+     * envelopes use the old actor layout; compact Carrier envelopes omit
+     * the checked zero mission span. */
+    size_t extra;
+    if ((u32)race_data.version==SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION)
+        extra=SC64_CARRIER_OMIT_BYTES;
+    else {
+        size_t old_tail=offsetof(RaceSave,buildings)+sizeof(race_data.buildings);
+        size_t prefix=sizeof(race_data.minerals_map)+sizeof(race_data.fog);
+        size_t old_state=(old_tail+prefix+3u)&~(size_t)3u;
+        extra=offsetof(RaceSave,state)-old_state;
+    }
+    if ((size_t)offset+bytes>RACE_IMPACT_RECORD_MAX+extra ||
+        (size_t)offset+bytes>sizeof(race_impact_record)) return 0;
+#else
     if (offset + bytes > RACE_IMPACT_RECORD_MAX) return 0;
+#endif
     race_data.state[28] = (race_data.state[28] & ~24u) | (mask << 3);
     offset = base;
     for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i)
@@ -320,6 +337,7 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
 #endif
 #ifdef SC64_SHARED_CARRIER_SAVE_VERSION
         && selected_tag != SC64_SHARED_CARRIER_SAVE_VERSION
+        && selected_tag != SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION
 #endif
        ) return 0;
     if (len < base) return 0;

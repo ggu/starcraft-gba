@@ -43,7 +43,7 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
 {
     if (!candidate || !out || slot >= MAX_UNITS) return 0;
 #ifdef SC64_SHARED_CARRIER_SAVE_VERSION
-    if ((u32)candidate->version == SC64_SHARED_CARRIER_SAVE_VERSION)
+    if (SC64_IS_CARRIER_SAVE_VERSION(candidate->version))
         return sc64_p7_typed_unit_decode(out, &candidate->carrier_custom.units[slot],
                                          world_width, world_height);
 #endif
@@ -176,7 +176,7 @@ race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *ou
 {
     if (!candidate || !out || slot >= MAX_BUILDINGS) return 0;
 #ifdef SC64_SHARED_CARRIER_SAVE_VERSION
-    if ((u32)candidate->version == SC64_SHARED_CARRIER_SAVE_VERSION)
+    if (SC64_IS_CARRIER_SAVE_VERSION(candidate->version))
         return sc64_p7_typed_building_decode(out, &candidate->carrier_custom.buildings[slot],
                                              2048, 2048);
 #endif
@@ -527,7 +527,7 @@ static int race_battery_save_encode_unit(RaceSave *candidate, unsigned slot,
 {
     if (!candidate || !q || slot>=MAX_UNITS) return 0;
 #ifdef SC64_SHARED_CARRIER_SAVE_VERSION
-    if ((u32)candidate->version==SC64_SHARED_CARRIER_SAVE_VERSION)
+    if (SC64_IS_CARRIER_SAVE_VERSION(candidate->version))
         return sc64_p7_typed_unit_encode(&candidate->carrier_custom.units[slot],q,ww,wh);
 #endif
 #ifdef SC64_ZP_FULL_STORAGE
@@ -556,7 +556,7 @@ static int race_battery_save_encode_building(RaceSave *candidate, unsigned slot,
 {
     if (!candidate || !q || slot>=MAX_BUILDINGS) return 0;
 #ifdef SC64_SHARED_CARRIER_SAVE_VERSION
-    if ((u32)candidate->version==SC64_SHARED_CARRIER_SAVE_VERSION)
+    if (SC64_IS_CARRIER_SAVE_VERSION(candidate->version))
         return sc64_p7_typed_building_encode(&candidate->carrier_custom.buildings[slot],q,ww,wh);
 #endif
 #ifdef SC64_ZP_FULL_STORAGE
@@ -1078,7 +1078,7 @@ static int race_save_encode_actors(void) {
     /* The tagged layout owns the complete actor region; never write legacy
      * rows into this union after encoding the packet. Its writer is gated off
      * until journal selection and full-world restore are qualified. */
-    if ((u32)race_data.version == SC64_SHARED_CARRIER_SAVE_VERSION) {
+    if (SC64_IS_CARRIER_SAVE_VERSION(race_data.version)) {
         if (!sc64_shared_carrier_candidate_encode(&race_data,u,b,&race_p7_projectiles,
                                                    (unsigned)race_cols*16u,
                                                    (unsigned)race_rows*16u)) return 0;
@@ -1333,7 +1333,7 @@ static int race_save_serialize(int shared_carrier) {
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
         SC64_SCARAB_SAVE_VERSION;
 #elif defined(SC64_SHARED_CARRIER_SAVE_VERSION)
-        shared_carrier ? SC64_SHARED_CARRIER_SAVE_VERSION : SAVE_VERSION;
+        shared_carrier ? SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION : SAVE_VERSION;
 #else
         SAVE_VERSION;
 #endif
@@ -1793,14 +1793,14 @@ static int race_save_game(void) {
     /* Qualification route: custom worlds use the new tag; campaign worlds
      * retain the legacy envelope and layout. */
     {
-        const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION
+        const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION,SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
                           ,SC64_LEGACY_SAVE_VERSION
 #endif
                          };
         RaceLoadPlan plan={0}; GbaSaveSelection previous;
         int have_previous;
-        const u32 tag=race_mode ? SC64_SHARED_CARRIER_SAVE_VERSION : SAVE_VERSION;
+        const u32 tag=race_mode ? SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION : SAVE_VERSION;
         have_previous=race_shared_carrier_stage_select(&plan,&previous);
         if (!race_save_serialize(race_mode!=0)) return 0;
 #ifdef SC64_IMPACT_EVENTS
@@ -1815,10 +1815,27 @@ static int race_save_game(void) {
          * Preflight consumes the shared scratch tail, so repack sidecars
          * from the unchanged live queue after it succeeds. */
         if (race_mode) {
+            size_t compacted;
+#ifdef SC64_IMPACT_EVENTS
+            if (!sc64_shared_carrier_compact_custom(&race_impact_record,length,
+                                                     sizeof(race_impact_record),&compacted)) return 0;
+#else
+            if (!sc64_shared_carrier_compact_custom(&race_data,length,sizeof(race_data),&compacted)) return 0;
+#endif
+            length=(u32)compacted;
             if (!race_shared_carrier_stage_prepare(record,length,tag,&plan)) return 0;
 #ifdef SC64_IMPACT_EVENTS
             if (!race_impact_save_pack(&length)) return 0;
+#else
+            length=sizeof(race_data);
 #endif
+#ifdef SC64_IMPACT_EVENTS
+            if (!sc64_shared_carrier_compact_custom(&race_impact_record,length,
+                                                     sizeof(race_impact_record),&compacted)) return 0;
+#else
+            if (!sc64_shared_carrier_compact_custom(&race_data,length,sizeof(race_data),&compacted)) return 0;
+#endif
+            length=(u32)compacted;
         }
         if (!race_mode) {
             size_t compacted;
@@ -1890,7 +1907,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         (v[SC64_PROTOSS_CLOCK_STATE_INDEX] && !v[0])) return 0;
 #endif
 #if defined(SC64_SHARED_CARRIER_SAVE_VERSION) && !defined(SC64_P7_BATTERY_ENABLED)
-    if ((u32)race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION &&
+    if (SC64_IS_CARRIER_SAVE_VERSION(race_data.version) &&
         (!v[0] || !race_protoss_clock_word_valid(v[SC64_PROTOSS_CLOCK_STATE_INDEX]))) return 0;
 #endif
     int building_damage_marker=v[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX];
@@ -2010,7 +2027,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
 #ifdef SC64_SHARED_CARRIER_SAVE_VERSION
-    if ((u32)race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION) {
+    if (SC64_IS_CARRIER_SAVE_VERSION(race_data.version)) {
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
         Unit *carrier_scratch=sc64_zp_route_save_scratch.carrier_candidate.units;
 #elif defined(SC64_IMPORTED_MISSION) && defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -3039,14 +3056,19 @@ static int race_load_preflight(RaceLoadPlan *plan) {
 static int race_shared_carrier_stage_prepare(const void *raw,u32 len,u32 tag,void *context) {
     RaceLoadPlan *plan=context;
     size_t expanded=0;
-    if (!plan || (tag!=SAVE_VERSION && tag!=SC64_SHARED_CARRIER_SAVE_VERSION
+    if (!plan || (tag!=SAVE_VERSION && tag!=SC64_SHARED_CARRIER_SAVE_VERSION &&
+                  tag!=SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
                   && tag!=SC64_LEGACY_SAVE_VERSION
 #endif
                  )) return 0;
 #ifdef SC64_IMPACT_EVENTS
     if (raw!=(const void *)&race_impact_record) return 0;
-    if (tag!=SC64_SHARED_CARRIER_SAVE_VERSION) {
+    if (tag==SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION) {
+        if (!sc64_shared_carrier_expand_custom(&race_impact_record,len,
+                                                sizeof(race_impact_record),&expanded)) return 0;
+        len=(u32)expanded;
+    } else if (tag!=SC64_SHARED_CARRIER_SAVE_VERSION) {
         if (!sc64_shared_carrier_expand_legacy(&race_impact_record,len,
                                                 sizeof(race_impact_record),&expanded)) return 0;
         len=(u32)expanded;
@@ -3056,7 +3078,10 @@ static int race_shared_carrier_stage_prepare(const void *raw,u32 len,u32 tag,voi
                                           &plan->impact_candidate_count)) return 0;
 #else
     if (raw!=(const void *)&race_data) return 0;
-    if (tag!=SC64_SHARED_CARRIER_SAVE_VERSION) {
+    if (tag==SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION) {
+        if (!sc64_shared_carrier_expand_custom(&race_data,len,sizeof(race_data),&expanded)) return 0;
+        len=(u32)expanded;
+    } else if (tag!=SC64_SHARED_CARRIER_SAVE_VERSION) {
         if (!sc64_shared_carrier_expand_legacy(&race_data,len,sizeof(race_data),&expanded)) return 0;
         len=(u32)expanded;
     }
@@ -3068,7 +3093,7 @@ static int race_shared_carrier_stage_prepare(const void *raw,u32 len,u32 tag,voi
 }
 
 static int race_shared_carrier_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selected) {
-    const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION
+    const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION,SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
                       ,SC64_LEGACY_SAVE_VERSION
 #endif
@@ -3296,7 +3321,7 @@ static int race_load_game(void) {
     {
         GbaSaveSelection selected;
         if (!race_shared_carrier_stage_select(&plan,&selected)) return 0;
-        if (selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION) {
+        if (SC64_IS_CARRIER_SAVE_VERSION(selected.tag)) {
             race_shared_carrier_stage_commit(&plan);
             return 1;
         }

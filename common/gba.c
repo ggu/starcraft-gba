@@ -1184,7 +1184,7 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection) {
     volatile const u8 *base=(volatile const u8*)SRAM_BASE;
     GbaSaveSelection best={0,0,0,0,-1};
-    if(!scratch||!capacity||!tags||!tag_count||tag_count>3||!validate||!selection)return 0;
+    if(!scratch||!capacity||!tags||!tag_count||tag_count>4||!validate||!selection)return 0;
     for(unsigned i=0;i<tag_count;i++) {
         if(!tags[i])return 0;
         for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
@@ -1222,7 +1222,7 @@ int save_write_selected(const void *data,u32 len,u32 tag,const GbaSaveSelection 
                         const u32 *tags,unsigned tag_count) {
     volatile u8 *base=(volatile u8*)SRAM_BASE;
     int new_allowed=0,old_allowed=0;
-    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag||!previous||!tags||!tag_count||tag_count>3||
+    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag||!previous||!tags||!tag_count||tag_count>4||
        previous->slot<0||previous->slot>1||!previous->tag||!previous->length||!previous->sequence)return 0;
     for(unsigned i=0;i<tag_count;i++) {
         if(!tags[i])return 0;

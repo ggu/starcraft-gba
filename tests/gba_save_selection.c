@@ -92,6 +92,10 @@ int main(void){gba_init();
   assert(s.length==4 && large[4]==0xcc && large[sizeof(large)-1]==0xcc);}
  /* Reject duplicate/zero tags and absent candidates. */
  {u32 dup[3]={tags[0],tags[0],tags[2]},zero[3]={tags[0],0,tags[2]};selection_unchanged_failure(dup,3,sizeof(scratch));selection_unchanged_failure(zero,3,sizeof(scratch));selection_unchanged_failure(tags,0,sizeof(scratch));}
+ {u32 four[4]={tags[0],tags[1],tags[2],0x40506070u};GbaSaveSelection s={0};
+  reset();record(0,four[3],1,0xa5);
+  assert(save_select_validated(scratch,sizeof(scratch),four,4,validate,0,&s));
+  assert(s.tag==four[3] && s.slot==0);}
  reset();selection_unchanged_failure(tags,3,sizeof(scratch));
  puts("validated SRAM selection: 3-generation ordering, semantic fallback, wrap and atomic predecessor preservation passed");return 0;
 }

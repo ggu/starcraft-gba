@@ -267,6 +267,24 @@ typedef struct {
     Sc64BcYamatoShot battlecruiser_shots[SC64_BC_SHOT_LIMIT];
 #endif
 } RaceSave;
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#ifdef SC64_UNIFIED
+#ifdef SC64_ZP_FULL_STORAGE
+#define SC64_CARRIER_OMIT_BEGIN (offsetof(RaceSave,invincible_bits)+sizeof(((RaceSave *)0)->invincible_bits))
+#else
+#define SC64_CARRIER_OMIT_BEGIN (offsetof(RaceSave,invincible_buildings)+sizeof(((RaceSave *)0)->invincible_buildings))
+#endif
+#else
+#define SC64_CARRIER_OMIT_BEGIN (offsetof(RaceSave,campaign)+sizeof(((RaceSave *)0)->campaign))
+#endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+#define SC64_CARRIER_OMIT_END offsetof(RaceSave,battlecruiser_shots)
+#else
+#define SC64_CARRIER_OMIT_END sizeof(RaceSave)
+#endif
+#define SC64_CARRIER_OMIT_BYTES (SC64_CARRIER_OMIT_END-SC64_CARRIER_OMIT_BEGIN)
+_Static_assert(SC64_CARRIER_OMIT_BEGIN<=SC64_CARRIER_OMIT_END,"Carrier custom omission bounds");
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
 #define SC64_BC_SAVE_EXTRA_BYTES (sizeof(Sc64BcYamatoShot)*SC64_BC_SHOT_LIMIT)
 _Static_assert(offsetof(RaceSave,battlecruiser_shots)+SC64_BC_SAVE_EXTRA_BYTES==sizeof(RaceSave),

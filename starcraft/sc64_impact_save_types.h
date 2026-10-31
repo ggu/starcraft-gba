@@ -15,9 +15,17 @@
 #define RACE_IMPACT_ROWS 32
 
 enum {
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    /* Compact custom envelopes omit only a validated zero mission span. */
+    RACE_IMPACT_SAVE_ROOM = (RACE_IMPACT_RECORD_MAX - (int)sizeof(RaceSave) +
+                             (int)SC64_CARRIER_OMIT_BYTES -
+                             (int)sizeof(Sc64ImpactSaveHeader)) /
+                            (int)sizeof(Sc64ImpactEvent),
+#else
     RACE_IMPACT_SAVE_ROOM = (RACE_IMPACT_RECORD_MAX - ((int)sizeof(RaceSave) - (int)SC64_BC_SAVE_EXTRA_BYTES) -
                              (int)sizeof(Sc64ImpactSaveHeader)) /
                             (int)sizeof(Sc64ImpactEvent),
+#endif
 #ifdef SC64_IMPACT_TEST_CAPACITY
     RACE_IMPACT_CAPACITY = SC64_IMPACT_TEST_CAPACITY,
 #else
@@ -49,7 +57,14 @@ typedef struct {
     u8 impacts[sizeof(Sc64ImpactSaveHeader) +
                RACE_IMPACT_SAVE_CAPACITY * sizeof(Sc64ImpactEvent)];
 } RaceImpactRecord;
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+_Static_assert(RACE_IMPACT_SAVE_CAPACITY == RACE_IMPACT_CAPACITY,
+               "Compact Carrier saves must hold the full impact queue");
+_Static_assert(sizeof(RaceImpactRecord) <= RACE_IMPACT_RECORD_MAX + SC64_CARRIER_OMIT_BYTES,
+               "expanded Carrier impact scratch exceeds compact envelope budget");
+#else
 _Static_assert(sizeof(RaceImpactRecord) <= RACE_IMPACT_RECORD_MAX + SC64_BC_SAVE_EXTRA_BYTES,
                "impact record exceeds one SRAM record");
+#endif
 
 #endif
