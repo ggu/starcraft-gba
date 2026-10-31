@@ -442,7 +442,7 @@ def main() -> None:
     run.add_argument("--rom", type=pathlib.Path, default=DEFAULT_ROM)
     run.add_argument("--elf", type=pathlib.Path, default=DEFAULT_ELF)
     run.add_argument("--shipped-rom", type=pathlib.Path,
-                     default=ROOT / "build" / "StarCraft-Terran-GBA.gba")
+                     default=ROOT / "build" / "StarCraft-Terran-Transport1-GBA.gba")
     run.add_argument("--out", type=pathlib.Path)
     run.add_argument("--timeout", type=float, default=7200)
     audit = sub.add_parser("audit", help="re-check a retained mGBA log (.log or .log.gz)")

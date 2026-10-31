@@ -109,7 +109,7 @@ def run(elf: Path, rom: Path, out: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--elf", type=Path, default=Path("build/starcraft-showcase.elf"))
-    parser.add_argument("--rom", type=Path, default=Path("build/StarCraft-Showcase-GBA.gba"))
+    parser.add_argument("--rom", type=Path, default=Path("build/StarCraft-Showcase-Transport1-GBA.gba"))
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     run(args.elf, args.rom, args.out)
