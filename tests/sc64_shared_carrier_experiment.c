@@ -59,6 +59,28 @@ static void test_typed_rows(void)
 }
 #if !defined(SC64_P7_PROJECTILES_ENABLED)
 typedef struct { Unit *scratch; unsigned ww,wh; } CarrierCandidateCheck;
+static void test_legacy_scratch_relocation(void)
+{
+    static u8 data[32768], original[32768];
+    const size_t old_tail=offsetof(RaceSave,buildings)+sizeof(((RaceSave *)0)->buildings);
+    const size_t new_tail=offsetof(RaceSave,minerals_map);
+    const size_t delta=new_tail-old_tail;
+    const size_t old_length=sizeof(RaceSave)-delta+9;
+    size_t expanded=0;
+    assert(old_tail<=new_tail && old_length+delta<=sizeof(data));
+    for (size_t i=0;i<sizeof(data);++i) data[i]=(u8)(i*37u+11u);
+    memcpy(original,data,sizeof(data));
+    assert(!sc64_shared_carrier_expand_legacy(data,old_tail-1,sizeof(data),&expanded));
+    assert(!memcmp(data,original,sizeof(data)));
+    assert(!sc64_shared_carrier_expand_legacy(data,old_length,old_length+delta-1,&expanded));
+    assert(!memcmp(data,original,sizeof(data)));
+    assert(!sc64_shared_carrier_expand_legacy(&expanded,old_length,
+                                             old_length+delta,&expanded));
+    assert(sc64_shared_carrier_expand_legacy(data,old_length,sizeof(data),&expanded));
+    assert(expanded==old_length+delta && !memcmp(data,original,old_tail));
+    for (size_t i=old_tail;i<new_tail;++i) assert(data[i]==0);
+    assert(!memcmp(data+new_tail,original+old_tail,old_length-old_tail));
+}
 static int validate_staged_journal(const void *data,u32 length,u32 tag,void *context)
 {
     CarrierCandidateCheck *check=context;
@@ -259,6 +281,9 @@ static void test_paid_carrier_command(void)
 
 int main(void)
 {
+#if !defined(SC64_P7_PROJECTILES_ENABLED)
+    test_legacy_scratch_relocation();
+#endif
     assert(SC64_OBJ_VRAM_PROJECTILE_BYTES == SC64_ARENA_WORDS*sizeof(u16));
     assert(SC64_OBJ_VRAM_CACHE_OFFSET >= SC64_OBJ_VRAM_PROJECTILE_BYTES);
     game_init(); race_mode=1; race_human=R_PROTOSS; race_bots=1; race_skirmish_map=0;

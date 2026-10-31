@@ -12,6 +12,27 @@ static int sc64_shared_carrier_overlap(const void *a, size_t an,
     if (!a || !b || an>UINTPTR_MAX-ap || bn>UINTPTR_MAX-bp) return 1;
     return ap<bp+bn && bp<ap+an;
 }
+
+/* Relocate a checksummed predecessor envelope in scratch only. The legacy
+ * actor arrays start at the same offset, but a larger custom union may move
+ * every subsequent field and any variable-length sidecar. This does not
+ * validate or commit the candidate and must run only after tag/CRC checks. */
+static int sc64_shared_carrier_expand_legacy(void *buffer, size_t length,
+                                             size_t capacity, size_t *expanded)
+{
+    const size_t old_tail=offsetof(RaceSave,buildings)+
+        sizeof(((RaceSave *)0)->buildings);
+    const size_t new_tail=offsetof(RaceSave,minerals_map);
+    size_t delta;
+    if (!buffer || !expanded || (old_tail&3u) || old_tail>new_tail || length<old_tail ||
+        length>capacity || sc64_shared_carrier_overlap(buffer,capacity,expanded,sizeof(*expanded))) return 0;
+    delta=new_tail-old_tail;
+    if (delta>capacity-length) return 0;
+    memmove((u8 *)buffer+new_tail,(u8 *)buffer+old_tail,length-old_tail);
+    memset((u8 *)buffer+old_tail,0,delta);
+    *expanded=length+delta;
+    return 1;
+}
 static int sc64_shared_carrier_candidate_encode(RaceSave *dst,
                                                 const Unit *actors,
                                                 const Building *buildings,
