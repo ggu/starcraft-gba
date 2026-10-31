@@ -88,7 +88,8 @@ step is skipped and holds no money.
   army supply reaches a threshold. The threshold starts at 12 Marines' worth
   and grows slowly with match time and with hostile static defenses. An owner
   that has used its whole unit share, an owner whose minerals are exhausted,
-  and any owner after 25 minutes attack with what they have.
+  and any owner after 25 minutes attack with whatever army they have, even
+  one below the normal threshold (for example three Marines).
 - An attack targets the nearest hostile structure to the rally point, with a
   25% preference for depots. When no hostile structure or ground unit remains
   near the target, the attacking group picks the next nearest structure.

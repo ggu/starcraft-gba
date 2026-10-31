@@ -1006,12 +1006,14 @@ static int race_ai_attack_threshold(const RaceAiCensus *c)
     t += c->enemy_defense * 2 > 16 ? 16 : c->enemy_defense * 2;
     if (t > 64) t = 64;
     /* A maxed-out owner, an owner whose mineral fields are exhausted, and
-     * any owner after 25 minutes attack with what they have, so mined-out
-     * maps resolve instead of stalling. */
+     * any owner after 25 minutes attack with whatever army they have, even
+     * one below the normal threshold, so mined-out maps resolve instead of
+     * stalling. */
     if ((c->units + c->queued_units >= cap - 4 || minutes >= 25 ||
-         (!c->patches && race_owner_minerals(c->owner) < 100)) && t > c->army_supply)
+         (!c->patches && race_owner_minerals(c->owner) < 100)) &&
+        c->army_supply > 0 && t > c->army_supply)
         t = c->army_supply;
-    return t < 12 ? 12 : t;
+    return t;
 }
 
 /* Spread a group over a 5x3 block at 16 px pitch: converging on one point

@@ -202,6 +202,8 @@ def validate_recovery(lines, scenario_name):
 
 MORPH_SCENARIOS = ("full", "damaged-during", "low-hp", "low-hp-dies", "save-resume", "save-resume-low-hp")
 ADDON_SCENARIOS = ("first-blocked-second-free", "no-feasible-parent")
+COMMIT_SCENARIOS = ("exhausted-small-army", "late-small-army", "exhausted-small-army-resume",
+                    "minerals-small-army-stays")
 
 
 def _one(lines, kind):
@@ -272,6 +274,27 @@ def validate_addon(lines, scenario):
     return r
 
 
+def validate_commit(lines, scenario):
+    """A forced commit sends a small army; the normal threshold keeps it home."""
+    r = _one(lines, "commit")
+    if r.get("scenario") != COMMIT_SCENARIOS[scenario]:
+        raise RecordError("commit record does not match its scenario")
+    for f in ("kept", "army_supply", "committed", "commit_frame"):
+        _int(r.get(f), f, -1, 1 << 20)
+    _int(r.get("ok"), "ok", 0, 1)
+    reference, resumed = _hex(r.get("reference"), "reference"), _hex(r.get("resumed"), "resumed")
+    small = r["kept"] == 3 and 0 < r["army_supply"] < 12
+    if COMMIT_SCENARIOS[scenario] == "minerals-small-army-stays":
+        good = small and r["commit_frame"] == -1 and r["committed"] == 0
+    else:
+        good = small and r["commit_frame"] > 0 and r["committed"] == 3
+        if scenario == 2:
+            good = good and reference == resumed and reference != "00000000"
+    if r["ok"] != int(good):
+        raise RecordError("commit ok flag disagrees with the recorded orders")
+    return r
+
+
 def classify_end(lines):
     """Why a save case produced no resume record (never counted as a save)."""
     kinds = [r["kind"] for r in _records(lines)
@@ -311,6 +334,9 @@ def cases(ticks, criteria="development"):
                 out.append(("morph-hp", profile, 1, 1, "t", s))
             for s in range(len(ADDON_SCENARIOS)):
                 out.append(("addon", profile, 1, 2, "t", s))
+            # Forced commit with an army below the normal threshold.
+            for s in range(len(COMMIT_SCENARIOS)):
+                out.append(("commit", profile, 1, 2, "t", s))
     scenarios = ("pending-builder-killed", "constructing-scv-killed", "foundation-destroyed", "depot-destroyed")
     for profile in PROFILES:
         for map_id in (0, 1):
@@ -344,6 +370,8 @@ def run_case(build: Path, case, every):
         argv += ["--morph-hp", str(arg)]
     elif kind == "addon":
         argv += ["--addon", str(arg)]
+    elif kind == "commit":
+        argv += ["--commit", str(arg)]
     elif kind == "run":
         argv += ["--ticks", str(arg), "--every", str(every)]
     else:
@@ -375,6 +403,11 @@ def evaluate(case, returncode, stdout, every, criteria="development"):
         if (returncode == 0) != bool(r["ok"]) or returncode not in (0, 9):
             raise RecordError("exit code and addon record disagree")
         return {"ok": bool(r["ok"]), "addon": r}
+    if kind == "commit":
+        r = validate_commit(lines, arg)
+        if (returncode == 0) != bool(r["ok"]) or returncode not in (0, 10):
+            raise RecordError("exit code and commit record disagree")
+        return {"ok": bool(r["ok"]), "commit": r}
     if kind in ("resume", "resume-late", "resume-morph"):
         if returncode in (4, 9) and not any(r["kind"] == "resume" for r in _records(lines)):
             # The match ended (or no save point existed) before the save:

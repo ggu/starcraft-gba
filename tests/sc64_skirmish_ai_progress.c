@@ -613,6 +613,125 @@ done:
     return ok;
 }
 
+/* ---- Forced commit with a small army. Just before minute 6 the Terran
+ * opponent's army is cut to three Marines (6 supply, below the normal
+ * threshold of 24). An exhausted owner (no local minerals, bank under 100)
+ * or an owner past 25 minutes must attack with them; an owner with
+ * minerals must keep them home. Losses use the engine's hit_target path;
+ * nothing is granted. ---- */
+static int army_units(int owner, int *list, int max)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (race_ai_movable_army(&u[i], owner)) { if (n < max) list[n] = i; ++n; }
+    return n;
+}
+
+static int cut_army(int owner, int keep, int *kept_slots)
+{
+    int kept = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!race_ai_movable_army(&u[i], owner)) continue;
+        if (kept < keep && u[i].type == U_MARINE) { kept_slots[kept++] = i; continue; }
+        kill_unit(i);
+    }
+    /* Cancel queued army products so the army cannot refill at once. */
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == owner && !sc64_race_is_worker(b[i].queue[b[i].queue_head]))
+            b[i].queue_count = 0, b[i].queue_progress = 0;
+    return kept;
+}
+
+static void exhaust_minerals(int owner)
+{
+    for (int i = 0; i < MAX_MINERALS; ++i)
+        for (int k = 0; k < MAX_BUILDINGS; ++k)
+            if (b[k].alive && b[k].owner == owner && race_ai_is_depot(b[k].type) &&
+                dist2(m[i].x, m[i].y, b[k].x, b[k].y) < 320 * 320) { m[i].amount = 0; break; }
+    race_minerals[owner] = 0;
+}
+
+/* Frame at which every kept unit carries an attack-move order to a point
+ * outside home range, or -1 within the limit. */
+static int await_commit(int owner, const int *kept, int n, int limit, int *committed)
+{
+    RaceAiCensus c;
+    for (int t = 0; t < limit && screen == SCREEN_PLAY && !won && !lost; ++t) {
+        int out = 0;
+        input(0);
+        race_ai_census(owner, &c);
+        for (int k = 0; k < n; ++k)
+            if (u[kept[k]].alive && u[kept[k]].owner == owner && u[kept[k]].order == ORDER_ATTACK_MOVE &&
+                dist2(u[kept[k]].tx, u[kept[k]].ty, c.hx, c.hy) >
+                RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) ++out;
+        if (n > 0 && out == n) { *committed = n; return frame; }
+    }
+    return -1;
+}
+
+/* Fixture defense for the late case: opponent army units that reach the
+ * passive human's base die through hit_target, so the match lasts. */
+static void defend_human(int owner)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == owner && !sc64_race_is_worker(u[i].type) &&
+            dist2(u[i].x, u[i].y, race_base_x[0], race_base_y[0]) < 640 * 640) kill_unit(i);
+}
+
+static int forced_commit(int scenario)
+{
+    static const char *names[] = { "exhausted-small-army", "late-small-army",
+                                   "exhausted-small-army-resume", "minerals-small-army-stays" };
+    int owner = first_bot(), kept = 0, committed = 0, at = -1, ok = 0, supply = -1, slots[3];
+    int setup = scenario == 1 ? 45000 - 120 : 10800 - 120;
+    uint32_t reference = 0, resumed = 0;
+    RaceAiCensus c;
+    if (scenario < 0 || scenario > 3 || race_owner_identity(owner) != R_TER) return 0;
+    while (frame < setup && screen == SCREEN_PLAY && !won && !lost) {
+        input(0);
+        if (scenario == 1) defend_human(owner);
+    }
+    if (screen != SCREEN_PLAY || won || lost) goto done;
+    kept = cut_army(owner, 3, slots);
+    if (kept != 3) goto done;
+    if (scenario == 0 || scenario == 2) exhaust_minerals(owner);
+    if (scenario == 1) {
+        /* Only the 25-minute rule may apply: local minerals remain. */
+        for (int i = 0; i < MAX_MINERALS; ++i)
+            if (dist2(m[i].x, m[i].y, race_base_x[race_ai_owner_base(owner)],
+                      race_base_y[race_ai_owner_base(owner)]) < 320 * 320) m[i].amount = 1500;
+    }
+    race_ai_census(owner, &c);
+    supply = c.army_supply;
+    if (scenario == 2) {
+        int ref_at, ref_n = 0;
+        if (!save_through_pause()) goto done;
+        ref_at = await_commit(owner, slots, 3, 600, &ref_n);
+        while (frame < setup + 720 && screen == SCREEN_PLAY && !won && !lost) input(0);
+        reference = world_hash();
+        game_init(); previous = 0;
+        input(KEY_L);
+        if (screen != SCREEN_PLAY || !race_mode) goto done;
+        at = await_commit(owner, slots, 3, 600, &committed);
+        while (frame < setup + 720 && screen == SCREEN_PLAY && !won && !lost) input(0);
+        resumed = world_hash();
+        ok = ref_at >= 0 && at == ref_at && committed == ref_n && reference == resumed;
+    } else if (scenario == 3) {
+        at = await_commit(owner, slots, 3, 600, &committed);
+        ok = at < 0;
+    } else {
+        at = await_commit(owner, slots, 3, 600, &committed);
+        ok = at >= 0;
+    }
+    ok = ok && supply > 0 && supply < 12;
+done:
+    printf("{\"kind\":\"commit\",\"scenario\":\"%s\",\"kept\":%d,\"army_supply\":%d,\"committed\":%d,"
+           "\"commit_frame\":%d,\"reference\":\"%08x\",\"resumed\":\"%08x\",\"ok\":%d}\n",
+           scenario >= 0 && scenario <= 3 ? names[scenario] : "?", kept, supply, committed, at,
+           reference, resumed, ok);
+    return ok;
+}
+
 static int parse_races(const char *text, int *races)
 {
     int n = 0;
@@ -627,7 +746,7 @@ static int parse_races(const char *text, int *races)
 int main(int argc, char **argv)
 {
     int map = 1, human = R_TER, ticks = 18000, every = 1800, resume_at = -1, resume_len = 1800;
-    int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1;
+    int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1, commit = -1;
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -642,12 +761,14 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--resume-at-morph")) resume_morph = 1;
         else if (!strcmp(argv[i], "--morph-hp") && i + 1 < argc) morph = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--addon") && i + 1 < argc) addon = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--commit") && i + 1 < argc) commit = atoi(argv[++i]);
         else { fprintf(stderr, "unknown argument %s\n", argv[i]); return 2; }
     }
     launch(map, human, bots, races);
     if (recover >= 0) return recovery(recover) ? 0 : 7;
     if (morph >= 0) return morph_hp(morph) ? 0 : 8;
     if (addon >= 0) return addon_feasibility(addon) ? 0 : 9;
+    if (commit >= 0) return forced_commit(commit) ? 0 : 10;
     if (resume_at < 0 && !resume_morph) {
         run_ticks(ticks, every, stdout);
         snapshot(stdout, "final");
