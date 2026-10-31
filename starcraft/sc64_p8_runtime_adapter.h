@@ -267,6 +267,40 @@ static int race_p8_run_ai(void *context, const Sc64P8SourceAction *action,
 
 /* Rebuild the transient view, wallets, locations and timer bindings around
  * the persistent state. */
+#ifdef SC64_P8_LIVE_CONDITION_PROBE
+/* Rebuild for each read-only condition, so actors created or removed by an
+ * earlier trigger action are visible in native pool order. Dead rows in the
+ * original provider always return an empty successful view. */
+static u16 race_p8_condition_live[MAX_UNITS + MAX_BUILDINGS];
+static int race_p8_condition_actor_at(void *context, unsigned index,
+                                       Sc64Z8ActorView *out)
+{
+    (void)context;
+    if(index>=race_p8_view.actor_count) return -1;
+    return sc64_z8_game_actor_at(0,race_p8_condition_live[index],out);
+}
+static int race_p8_condition_live_scan(void *context,
+                                       const Sc64P8SourceCondition *source,
+                                       unsigned owner)
+{
+    Sc64P8WorldContext *world=(Sc64P8WorldContext *)context;
+    if(!source || (source->flags&2u) || (source->opcode!=2u && source->opcode!=3u) ||
+       !world || world->actors!=&race_p8_view ||
+       race_p8_view.actor_at!=sc64_z8_game_actor_at ||
+       race_p8_view.actor_count!=MAX_UNITS+MAX_BUILDINGS)
+        return sc64_p8_world_condition(context,source,owner);
+    unsigned count=0;
+    for(unsigned i=0;i<MAX_UNITS;i++)if(u[i].alive)race_p8_condition_live[count++]=(u16)i;
+    for(unsigned i=0;i<MAX_BUILDINGS;i++)if(b[i].alive)race_p8_condition_live[count++]=(u16)(MAX_UNITS+i);
+    race_p8_view.actor_count=(u16)count;
+    race_p8_view.actor_at=race_p8_condition_actor_at;
+    int result=sc64_p8_world_condition(context,source,owner);
+    race_p8_view.actor_at=sc64_z8_game_actor_at;
+    race_p8_view.actor_count=(u16)(MAX_UNITS+MAX_BUILDINGS);
+    return result;
+}
+#endif
+
 static int race_p8_bind(const Sc64RaceMap *map)
 {
     s8 live[SC64_Z8_SOURCE_OWNER_LIMIT];
@@ -328,6 +362,9 @@ static int race_p8_bind(const Sc64RaceMap *map)
     if (!sc64_p8_timed_service_valid(&race_p8_timed)) return 0;
 
     race_p8_source_ops = sc64_p8_world_ops(&race_p8_world);
+#ifdef SC64_P8_LIVE_CONDITION_PROBE
+    race_p8_source_ops.condition = race_p8_condition_live_scan;
+#endif
     race_p8_ops = sc64_p8_source_world_ops(&race_p8_source_ops);
     return 1;
 }
