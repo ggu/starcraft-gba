@@ -997,7 +997,11 @@ static int race_skirmish_transport_save_valid(const RaceSave *candidate,
             (actor.flags & 2) || sc64_race_unit_flying(actor.type) ||
             raw < 0 || (sc64_race_unit_from_raw(raw) != actor.type &&
                         !(raw == 19 && actor.type == U_RAYNOR)) ||
+#ifdef SC64_SHARED_TRANSPORT
+            !sc64_transport_shared_space_required_raw((unsigned)raw, &space) ||
+#else
             !sc64_transport_space_required_raw((unsigned)raw, &space) ||
+#endif
             space == SC64_TRANSPORT_SPACE_UNAVAILABLE) return 0;
         if (actor.order == ORDER_TRANSPORTED) {
             if (actor.selected || actor.x != carrier.x || actor.y != carrier.y ||

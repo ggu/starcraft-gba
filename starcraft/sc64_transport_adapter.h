@@ -79,7 +79,12 @@ static int race_transport_passenger_space(const Unit *q)
         (sc64_race_unit_from_raw(raw) != q->type &&
          !(raw == 19 && q->type == U_RAYNOR)))) return -1;
     if (!q->alive || (q->flags & 2) || sc64_race_unit_flying(q->type) ||
+#ifdef SC64_SHARED_TRANSPORT
+        !(race_mode ? sc64_transport_shared_space_required_raw((unsigned)raw, &space) :
+                      sc64_transport_space_required_raw((unsigned)raw, &space)) ||
+#else
         !sc64_transport_space_required_raw((unsigned)raw, &space) ||
+#endif
         space == SC64_TRANSPORT_SPACE_UNAVAILABLE) return -1;
     return (int)space;
 }
