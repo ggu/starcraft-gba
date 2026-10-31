@@ -495,6 +495,20 @@ static void census(const char *label)
         race_p7.runtime.model.outcome,race_p7.runtime.fault,
         (unsigned)race_p7.runtime.switch_bits,(unsigned)race_p7.runtime.model.action_cursor[8],
         (unsigned)race_p7.runtime.model.action_cursor[9],(unsigned)race_p7.runtime.model.action_cursor[5]);
+    /* Read-only economy diagnostic. This reports the real worker orders and
+     * mineral rows without changing an order, visibility, or world state. */
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
+        u[i].type == U_PROBE) {
+        int target = u[i].target;
+        int amount = target >= 0 && target < MAX_MINERALS ? m[target].amount : -1;
+        fprintf(trace, "{\"kind\":\"economy-worker\",\"frame\":%u,\"slot\":%d,\"x\":%d,\"y\":%d,\"order\":%d,\"target\":%d,\"target_minerals\":%d,\"carry\":%d,\"build\":%d,\"path_timer\":%d}\n",
+                (unsigned)frame, i, u[i].x, u[i].y, u[i].order, target, amount,
+                u[i].carry, u[i].build, u[i].path_timer);
+    }
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 || i == 5)
+        fprintf(trace, "{\"kind\":\"economy-mineral\",\"frame\":%u,\"slot\":%d,\"x\":%d,\"y\":%d,\"amount\":%d,\"visible\":%d}\n",
+                (unsigned)frame, i, m[i].x, m[i].y, m[i].amount,
+                currently_visible(m[i].x, m[i].y));
     fflush(trace);
 }
 
