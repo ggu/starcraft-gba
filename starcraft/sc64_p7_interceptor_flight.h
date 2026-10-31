@@ -2,9 +2,9 @@
 #ifndef SC64_P7_INTERCEPTOR_FLIGHT_H
 #define SC64_P7_INTERCEPTOR_FLIGHT_H
 
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
-#if !defined(SC64_P7_CARRIER_TRAINING_ENABLED) || \
-    !defined(SC64_P7_PROJECTILES_ENABLED)
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
+#if !defined(SC64_SHARED_CARRIER_EXPERIMENT) && (!defined(SC64_P7_CARRIER_TRAINING_ENABLED) || \
+    !defined(SC64_P7_PROJECTILES_ENABLED))
 #error "Interceptor flight requires P7 Carrier training and projectiles"
 #endif
 #include "sc64_interceptor_orders.h"

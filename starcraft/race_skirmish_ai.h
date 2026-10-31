@@ -1199,7 +1199,7 @@ static void __attribute__((noinline)) race_ai_plan(int owner)
     race_ai_balance_gas(&c);
     if (!race_ai_supply(&c)) race_ai_develop(&c);
     race_ai_produce(&c);
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     /* A Carrier has its own paid queue; ordinary building production cannot
      * stock it. Limit each planning pass to one purchase per Carrier. */
     for (int i = 0; i < MAX_UNITS; ++i)

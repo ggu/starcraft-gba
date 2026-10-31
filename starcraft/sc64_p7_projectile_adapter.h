@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_P7_PROJECTILE_ADAPTER_H
 #define SC64_P7_PROJECTILE_ADAPTER_H
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 
 /* Mode 4 leaves the upper 16 KiB of OBJ VRAM unused by the display. This
  * pool owns its first 4816 bytes through the map in sc64_obj_vram.h, which
@@ -90,7 +90,7 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
     (void)source_x_q8; (void)source_y_q8;
     return 0;
 #endif
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     /* Only launched Interceptors fire; hangar rows stay inert. */
     if (shooter>=0 && shooter<MAX_UNITS && SC64_CARRIER_HANGAR_HIDDEN(&u[shooter]))
         return 0;

@@ -2,8 +2,8 @@
 #ifndef SC64_P7_CARRIER_TRAINING_H
 #define SC64_P7_CARRIER_TRAINING_H
 
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-#if !defined(SC64_P7_PROJECTILES_ENABLED) || !defined(SC64_P7_ACTORS)
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
+#if !defined(SC64_SHARED_CARRIER_EXPERIMENT) && (!defined(SC64_P7_PROJECTILES_ENABLED) || !defined(SC64_P7_ACTORS))
 #error "P7 Carrier training requires the typed P7 Interceptor actor profile"
 #endif
 
@@ -33,7 +33,7 @@ enum {
     SC64_P7_INTERCEPTOR_DETACHED = 4
 };
 
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 static void race_p7_interceptor_flight_detach(int child);
 static void race_p7_interceptor_flight_source_tick(void);
 static void race_p7_interceptor_flight_frame_move(void);
@@ -120,7 +120,7 @@ static int sc64_p7_carrier_count_children_in(const Unit *actors, int count,
         state = sc64_p7_carrier_child_state(child);
         if (state == SC64_P7_INTERCEPTOR_INSIDE) ++in;
         else if (state == SC64_P7_INTERCEPTOR_TRAINING) ++work;
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
         /* Launched children still occupy one of the Carrier's slots. */
         else if (state == SC64_P7_INTERCEPTOR_OUTSIDE) ++in;
 #endif
@@ -152,12 +152,16 @@ static int race_p7_carrier_training_slots_available(unsigned wanted)
     unsigned free_slots = 0, commitments = wanted, created = 0;
     if (!race_protoss_services_active()) return 1;
     /* Only P7 reserves slots for its three scripted Carrier creates. */
+#ifdef SC64_P7_RUNTIME
     if (race_p7_active()) {
     if (race_p7.created_mask & 0xf8u) return 0;
     for (unsigned mask = race_p7.created_mask & 7u; mask; mask &= mask - 1u)
         ++created;
     commitments += 3u - created;
     }
+#else
+    (void)created;
+#endif
     for (int i = 0; i < MAX_UNITS; ++i) {
         if (!u[i].alive || u[i].type != SC64_CARRIER_TYPE ||
             RACE_PROTOSS_RAW(&u[i]) != SC64_P7_CARRIER_RAW) continue;
@@ -211,13 +215,13 @@ static int race_p7_carrier_training_candidate_valid(const Unit *actors,
                                                     &inside, &training) ||
                 training > 1 || inside + training + (unsigned)q->carry >
                     SC64_P7_CARRIER_CAPACITY) return 0;
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
             /* Generation 43 keeps the 7-tick release timer in work_timer. */
             if (q->work_timer > 7) return 0;
 #endif
         }
         if (q->type != SC64_INTERCEPTOR_TYPE) continue;
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
         state = sc64_p7_carrier_child_state(q);
         if (state == SC64_P7_INTERCEPTOR_OUTSIDE ||
             state == SC64_P7_INTERCEPTOR_DETACHED) {
@@ -439,7 +443,7 @@ static void race_p7_carrier_training_source_tick(void)
         Unit *child = &u[i];
         if (!child->alive || child->type != SC64_INTERCEPTOR_TYPE ||
             RACE_PROTOSS_RAW(child) != SC64_P7_INTERCEPTOR_RAW) continue;
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
         /* Flight owns launched and detached children. */
         if (sc64_p7_carrier_child_state(child) >= SC64_P7_INTERCEPTOR_OUTSIDE)
             continue;
@@ -475,11 +479,11 @@ static void race_p7_carrier_training_frame_tick(void)
 {
     if (race_protoss_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0] != 4u) {
         race_p7_carrier_training_source_tick();
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
         race_p7_interceptor_flight_source_tick();
 #endif
     }
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     if (race_protoss_services_active()) race_p7_interceptor_flight_frame_move();
 #endif
 }
@@ -526,7 +530,7 @@ static void race_p7_carrier_training_parent_died(
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].type == SC64_INTERCEPTOR_TYPE &&
             RACE_PROTOSS_RAW(&u[i]) == SC64_P7_INTERCEPTOR_RAW && u[i].build == carrier) {
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
             /* Native: launched fighters outlive the Carrier for 15-45
              * source ticks; hangar children die with it. */
             if (u[i].alive && sc64_p7_carrier_child_state(&u[i]) ==
@@ -556,7 +560,7 @@ static void race_p7_carrier_training_end_frame(void)
         if (child->type != SC64_INTERCEPTOR_TYPE ||
             RACE_PROTOSS_RAW(child) != SC64_P7_INTERCEPTOR_RAW) continue;
         state = sc64_p7_carrier_child_state(child);
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
         if (state == SC64_P7_INTERCEPTOR_OUTSIDE && child->alive &&
             (child->build < 0 || child->build >= MAX_UNITS ||
              !sc64_p7_carrier_parent_valid(child->build) ||

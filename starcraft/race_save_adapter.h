@@ -1053,6 +1053,10 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
 }
 #endif
 static int race_save_game(void) {
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+    /* The experimental custom-game binding has no qualified codec yet. */
+    if (race_mode) return 0;
+#endif
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_live_products_valid()) return 0;
 #endif
@@ -2958,6 +2962,9 @@ static int race_load_game(void) {
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
 #endif
     if (!race_load_preflight(&plan)) return 0;
+#endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+    if (race_data.state[0]) return 0;
 #endif
     const int *v = race_data.state;
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];

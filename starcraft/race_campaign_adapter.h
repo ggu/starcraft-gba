@@ -429,7 +429,7 @@ race_campaign_init(void)
     const Sc64RaceMap *map;
     int i, player_x = 0, player_y = 0, player_n = 0;
     int human_owner;
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     race_p7_projectile_reset();
 #endif
 

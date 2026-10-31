@@ -227,10 +227,10 @@ static u32 sc64_unit_words_explicit_raw_calls;
     (!defined(SC64_P7_TYPED_COMPACT_ENABLED) || !defined(SC64_P7_ACTORS))
 #error "Interceptor projectiles require the P7 typed save and shared source clock"
 #endif
-#if defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_TILE_RENDERER)
+#if (defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)) && defined(SC64_TILE_RENDERER)
 #error "Interceptor arena and experimental tile sprites overlap OBJ VRAM"
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 #include "sc64_interceptor_motion.h"
 _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
                "Interceptor arena exceeds Mode 4 OBJ reserve");
@@ -804,18 +804,18 @@ _Static_assert(ORDER_BUILD_PENDING < 16, "four-bit persistent order field");
 #else
 #define SC64_TRANSPORT_LOADED(q) 0
 #endif
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 /* Training (state 1) and inside (state 2) children stay off-map; launched
  * and detached Interceptors fly, but the flight adapter owns their orders. */
-#define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==U_P7_INTERCEPTOR && \
+#define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==SC64_INTERCEPTOR_TYPE && \
     ((((unsigned)(q)->flags >> 8) & 7u) - 1u) < 2u)
-#define SC64_CARRIER_CHILD_SCRIPTED(q) ((q)->type==U_P7_INTERCEPTOR)
+#define SC64_CARRIER_CHILD_SCRIPTED(q) ((q)->type==SC64_INTERCEPTOR_TYPE)
 /* Raw73 keeps no type-level hidden flag here, so per-row checks replace it. */
 #define SC64_CARRIER_STATE_HIDDEN(q) SC64_CARRIER_HANGAR_HIDDEN(q)
 #elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
 /* This stage has only training/inside children; all raw73 rows stay off-map. */
-#define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==U_P7_INTERCEPTOR)
-#define SC64_CARRIER_CHILD_SCRIPTED(q) ((q)->type==U_P7_INTERCEPTOR)
+#define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==SC64_INTERCEPTOR_TYPE)
+#define SC64_CARRIER_CHILD_SCRIPTED(q) ((q)->type==SC64_INTERCEPTOR_TYPE)
 #define SC64_CARRIER_STATE_HIDDEN(q) 0 /* the raw73 type flag hides them */
 #else
 #define SC64_CARRIER_HANGAR_HIDDEN(q) 0
@@ -1225,7 +1225,7 @@ static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 typedef union {
     u16 bfs_queue[MAP_CELLS];
     RaceSave save;
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     struct { RaceSave save; Unit units[MAX_UNITS]; } carrier_candidate;
 #endif
 #ifdef SC64_Z8_RUNTIME
@@ -1244,7 +1244,7 @@ _Static_assert(sizeof(RaceSave)+sizeof(Sc64Z8SchedulerState)<=sizeof(u16)*MAP_CE
 _Static_assert(sizeof(RaceImpactRecord) <= sizeof(u16) * MAP_CELLS,
                "impact save record must fit existing route scratch");
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 _Static_assert(sizeof(RaceSave)+sizeof(Unit)*MAX_UNITS<=sizeof(u16)*MAP_CELLS,
                "Carrier candidate decode must fit existing route scratch");
 #endif
@@ -1632,10 +1632,12 @@ enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
 static void hit_target_impl_ex(int,int,int,int,int,int);
 static void race_siege_splash_attack(Unit *,int,int);
 #endif
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
+#ifdef SC64_P7_RUNTIME
 static int race_p7_active(void);
+#endif
 #include "sc64_protoss_services.h"
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 static int race_p7_carrier_training_stock(int carrier, unsigned count);
 #endif
 #endif
@@ -1661,7 +1663,7 @@ static void race_battery_clear_building_references(int slot);
 static int race_p7_battery_initialize_source(const Sc64RaceMap *map);
 static int race_p7_battery_live_world_valid(void);
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 static int race_p7_source_owner(unsigned source_slot);
 static void race_p7_projectile_reset(void);
 static void race_p7_projectile_clear_references(int ref);
@@ -1728,7 +1730,7 @@ static void race_scarab_probe_target_invalidate(int target);
 #endif
 #endif
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 static int race_p7_carrier_training_menu_available(void);
 static int race_p7_carrier_training_queue_selected(void);
 static void race_p7_carrier_training_source_tick(void);
@@ -1738,7 +1740,7 @@ static void race_p7_carrier_training_end_frame(void);
 static int race_p7_carrier_training_slots_available(unsigned wanted);
 static int race_p7_carrier_training_queue_owner(int carrier, int owner);
 static unsigned race_p7_carrier_training_child_count(int carrier);
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 static int race_p7_interceptor_flight_carrier_holds(int carrier);
 static int race_p7_interceptor_flight_carrier_order(int carrier);
 #endif
@@ -2222,13 +2224,13 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_slot(i);
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     race_p7_projectile_clear_references(i);
 #endif
 #ifdef SC64_IMPACT_EVENTS
     race_impact_clear_target(i);
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     race_p7_carrier_training_clear_slot(i);
 #endif
 #ifdef SC64_DIRECT_ATTACK
@@ -2384,7 +2386,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
        structure there must not inherit it (and its selected vital bar). */
     if (selected_building == i)
         selected_building = -1;
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     race_p7_projectile_clear_references(MAX_UNITS+i);
 #endif
 #ifdef SC64_IMPACT_EVENTS
@@ -4412,7 +4414,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
             race_bc_yamato_target_removed((unsigned)target);
             sc64_bc_shot_caster_gone(sc64_bc_shots,(unsigned)target);
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
             race_p7_carrier_training_clear_slot(target);
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
@@ -5783,7 +5785,7 @@ choose_command(int choice)
         /* Fixed first-ten control rows deliberately retain their old IDs. */
     }
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) {
         menu_open=0; mode=MODE_NORMAL;
         toast(race_p7_carrier_training_queue_selected()?4:8); return;
@@ -6026,7 +6028,7 @@ static int field_menu_count(void)
 #ifdef SC64_SHARED_BUNKER
     if (race_bunker_menu_available()) return MENU_STOP+2;
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     if (race_p7_carrier_training_menu_available()) return MENU_STOP+2;
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
@@ -6131,7 +6133,7 @@ static int field_menu_count(void)
 #ifdef SC64_RACES
 static const char *field_menu_base_label(int choice, const char *const *labels)
 {
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return "BUILD INTERCEPTOR";
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
@@ -7043,10 +7045,10 @@ tick_combat(Unit * q, int target)
         return; /* Never fall through to the generic immediate Reaver hit. */
     }
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     /* Only the child weapon-event adapter may fire weapon 79. Until that
      * lifecycle is connected, never fall back to instant generic damage. */
-    if (q->type==U_P7_INTERCEPTOR) return;
+    if (q->type==SC64_INTERCEPTOR_TYPE) return;
 #endif
 #if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
     defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
@@ -7404,12 +7406,12 @@ target_lists_unavailable:
 #endif
             continue; /* the child adapter owns orders */
         }
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
         if (SC64_CARRIER_CHILD_SCRIPTED(q)) continue;
 #endif
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
         /* An engaged Carrier stops and launches instead of closing in. */
-        if (q->type == U_P7_CARRIER && race_p7_interceptor_flight_carrier_order(i))
+        if (q->type == SC64_CARRIER_TYPE && race_p7_interceptor_flight_carrier_order(i))
             continue;
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
@@ -8662,7 +8664,11 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (race_protoss_services_active()) sc64_p7_arbiter_cache_frame_tick();
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+    if (race_protoss_services_active())
+        RACE_PROTOSS_SERVICE_CLOCK[0] = (u8)((RACE_PROTOSS_SERVICE_CLOCK[0] + 4u) % 5u);
+#endif
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     race_p7_carrier_training_frame_tick();
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
@@ -8684,7 +8690,7 @@ game_update(u16 held, u16 pressed)
             if (sc64_bc_shots[i].state==SC64_BC_SHOT_FLIGHT)
                 (void)race_bc_yamato_projectile_step(i);
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     race_p7_projectile_tick_if_due();
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
@@ -8772,8 +8778,8 @@ game_update(u16 held, u16 pressed)
 #endif
 #endif
     update_exploration();
-#ifdef SC64_P7_PROJECTILES_ENABLED
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     race_p7_carrier_training_end_frame();
 #endif
     if (race_protoss_services_active()) race_p7_projectile_clear_dead_references();
@@ -10380,7 +10386,7 @@ sc64_tile_background_done:
     draw_death_vfx(0);
 #endif
     draw_tracers();
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     if (race_protoss_services_active()) race_p7_projectile_draw();
 #endif
 #ifdef SC64_P4_STORM_ENABLED
@@ -10852,8 +10858,8 @@ draw_hud_commands_body(void)
                     gfx_text(hud_left+47, 137, "B BUILD", C_GOLD);
 #endif
 		else
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-                if (race_protoss_services_active() && u[i].type==U_P7_CARRIER) {
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
+                if (race_protoss_services_active() && u[i].type==SC64_CARRIER_TYPE) {
                     gfx_text(hud_left+47,137,"IC",C_CYAN);
                     gfx_num(hud_left+65,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
                     gfx_text(hud_left+79,137,"HANGAR / FLIGHT WIP",C_GOLD);
@@ -11076,8 +11082,8 @@ sc64_hud_race_keys(int *values,int first)
         values[28]=(int)((u32)minerals|((u32)gas<<16));
     }
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if(first>=0 && race_protoss_services_active() && u[first].type==U_P7_CARRIER)
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
+    if(first>=0 && race_protoss_services_active() && u[first].type==SC64_CARRIER_TYPE)
         values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
@@ -11784,6 +11790,8 @@ game_self_test(void)
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_runtime_adapter.h"
 #include "sc64_p7_battery_adapter.h"
+#endif
+#if defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 #include "sc64_p7_projectile_adapter.h"
 #include "sc64_p7_carrier_training.h"
 #include "sc64_p7_interceptor_flight.h"
@@ -11895,7 +11903,7 @@ static void __attribute__((noinline)) race_scarab_human_parent_lost(int slot)
         race_bc_yamato_target_removed((unsigned)i);
         sc64_bc_shot_caster_gone(sc64_bc_shots,(unsigned)i);
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
         race_p7_projectile_clear_references(i);
 #endif
 #ifdef SC64_DIRECT_ATTACK
