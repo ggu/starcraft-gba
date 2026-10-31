@@ -1,5 +1,20 @@
 .DEFAULT_GOAL := all
 
+# Asset-free journal selection prototype; not yet wired to game persistence.
+.PHONY: test-scarab-save-selection
+build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -Wno-misleading-indentation -fsanitize=address,undefined -DGBA_HOST -DSC64_SCARAB_RUNTIME -Icommon $< -o $@
+test-scarab-save-selection: build/test-scarab-save-selection
+	./build/test-scarab-save-selection
+test: test-scarab-save-selection
+
+.PHONY: test-scarab-parent-migration
+build/test-scarab-parent-migration: tests/sc64_scarab_parent_migration.c starcraft/sc64_scarab_fields.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-scarab-parent-migration: build/test-scarab-parent-migration
+	./build/test-scarab-parent-migration
+test: test-scarab-parent-migration
+
 .PHONY: test-gfx-shapes
 build/test-gfx-shapes: tests/gfx_shapes_rom.c common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SHAPES_ROM_ARM -Icommon $< common/gba.c -o $@
@@ -5650,3 +5665,33 @@ CANONICAL_LOOKUP_EXTRA_TARGETS := \
     build/test-sc64-terrain-transfer-scene-showcase \
     test-sc64-bc-normal-input
 $(CANONICAL_LOOKUP_EXTRA_TARGETS): $(CANONICAL_LOOKUP_INPUTS)
+
+# Explicit Scarab Unit fixtures. These consume prepared inputs directly and
+# never invoke private asset recipes. Each run gets its own source-only P7
+# facts under a new directory; old profile banks are not overwritten.
+SCARAB_P7_BASE_FLAGS = $(filter-out -DSC64_FACT_TABLES -I$(BC_P7_FACT_DIR) -I$(P7_FACT_V2_DIR),$(PROTOSS_ROM_FLAGS))
+SCARAB_FIXTURE_unit_adapter := tests/sc64_scarab_unit_adapter_game.c
+SCARAB_FIXTURE_presence := tests/sc64_scarab_presence_game.c
+SCARAB_FIXTURE_save := tests/sc64_scarab_save_game.c
+
+define SCARAB_PREPARED_FIXTURE
+.PHONY: test-scarab-$(1)
+test-scarab-$(1):
+	@set -eu; \
+	mkdir -p build/generated/scarab-p7; \
+	run=$$$$(mktemp -d build/generated/scarab-p7/run.XXXXXX); \
+	printf 'Scarab fixture evidence: %s\n' "$$$$run"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $$(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts-generator"; \
+	"$$$$run/facts-generator" > "$$$$run/sc64_fact_tables_generated.h"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME $$(TERRAN_ROM_FLAGS) $$(SCARAB_FIXTURE_$(2)) common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o "$$$$run/terran"; \
+	"$$$$run/terran"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME $$(ZERG_ROM_FLAGS) $$(SCARAB_FIXTURE_$(2)) common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o "$$$$run/zerg"; \
+	"$$$$run/zerg"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME $$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run" $$(SCARAB_FIXTURE_$(2)) common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) -o "$$$$run/protoss"; \
+	"$$$$run/protoss"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME $$(SHOWCASE_FLAGS) $$(SCARAB_FIXTURE_$(2)) common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o "$$$$run/showcase"; \
+	"$$$$run/showcase"
+endef
+$(eval $(call SCARAB_PREPARED_FIXTURE,unit-adapter,unit_adapter))
+$(eval $(call SCARAB_PREPARED_FIXTURE,presence,presence))
+$(eval $(call SCARAB_PREPARED_FIXTURE,save,save))

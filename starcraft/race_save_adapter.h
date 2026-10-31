@@ -27,10 +27,15 @@ static RaceImpactRecord race_impact_record;
 #else
 static RaceSave race_data;
 #endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#include "sc64_scarab_flight_bridge.h"
+/* Set only from the authenticated selected tag, before candidate decoding. */
+static int race_scarab_stage_wire;
+#endif
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME)
 static int
 race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                       unsigned world_width, unsigned world_height, Unit *out)
@@ -57,9 +62,85 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                                     world_width, world_height);
 #endif
 #else
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    Unit wire;
+    if (!sc64_unit_save_decode(&wire,&candidate->units[slot],world_width,world_height)) return 0;
+    if (wire.type==U_SCARAB || wire.raw_type==85) {
+        if (!race_scarab_stage_wire || !sc64_scarab_flight_from_wire(&wire,out,1,0) ||
+            (((unsigned)out->carry>>8)&3u)>1u) return 0;
+        return 1;
+    }
+    *out=wire; return 1;
+#else
     return sc64_unit_save_decode(out, &candidate->units[slot],
                                  world_width, world_height);
 #endif
+#endif
+}
+#endif
+#ifdef SC64_SCARAB_RUNTIME
+#include "sc64_scarab_fields.h"
+#include "sc64_scarab_lifecycle.h"
+/* Read candidate rows only; never alias or mutate the live world. This is a
+ * bounded graph check for the inactive Scarab prototype, not a save migration. */
+static int
+race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsigned height)
+{
+    if (!candidate || !width || !height) return 0;
+    for (unsigned i=0; i<MAX_UNITS; ++i) {
+        Unit q;
+        if (!race_save_decode_unit(candidate,i,width,height,&q)) return 0;
+        if (!q.alive) continue;
+        if ((q.type==U_SCARAB) != (q.raw_type==85)) return 0;
+        if (q.type==U_SCARAB) {
+            Sc64ScarabChildFields child;
+            if ((unsigned)q.owner>=5 || q.raw_owner < -1 || q.raw_owner > 255 || q.selected ||
+                q.build!=-1 || q.maxhp!=20 || q.hp<=0 || q.hp>20 ||
+                q.shield<0 || q.shield>10 ||
+                !sc64_scarab_child_fields_unpack(q.carry,q.work_timer,&child)) return 0;
+            if (child.phase<2 && (child.life || child.no_collision ||
+                                  q.order!=ORDER_IDLE || q.target!=-1)) return 0;
+            if (child.phase==2 && !sc64_scarab_flight_valid(
+                &(Sc64ScarabFlight){(uint8_t)child.life,(uint8_t)child.no_collision})) return 0;
+            if (child.parent_slot!=SC64_SCARAB_FIELD_NO_SLOT) {
+                Unit parent;
+                if (child.parent_slot>=MAX_UNITS || child.parent_slot==i ||
+                    !race_save_decode_unit(candidate,child.parent_slot,width,height,&parent) ||
+                    !parent.alive || sc64_race_raw_unit(parent.type)!=83 ||
+                    (parent.raw_type!=-1 && parent.raw_type!=83) ||
+                    parent.owner!=q.owner || parent.raw_owner!=q.raw_owner) return 0;
+            }
+        }
+        if (sc64_race_raw_unit(q.type)==83) {
+            Sc64ScarabParentFields f;
+            Sc64ScarabCounts counts={0,0}; int training=-1;
+            if ((q.raw_type!=-1 && q.raw_type!=83) || (unsigned)q.owner>=5 ||
+                q.raw_owner < -1 || q.raw_owner > 255 ||
+                !sc64_scarab_parent_fields_unpack(q.carry,q.work_timer,&f)) return 0;
+            for (unsigned j=0; j<MAX_UNITS; ++j) {
+                Unit child; Sc64ScarabChildFields cf;
+                if (!race_save_decode_unit(candidate,j,width,height,&child)) return 0;
+                if (!child.alive || child.type!=U_SCARAB) continue;
+                if (!sc64_scarab_child_fields_unpack(child.carry,child.work_timer,&cf)) return 0;
+                if (cf.parent_slot!=i) continue;
+                if (cf.phase==0) {
+                    unsigned hp;
+                    if (training>=0 || !sc64_scarab_training_hp_q8(f.progress,&hp) ||
+                        child.hp!=(int)(hp>>8)) return 0;
+                    training=(int)j;
+                } else if (cf.phase==1) {
+                    if (child.hp!=20) return 0;
+                    ++counts.inside;
+                } else ++counts.outside;
+            }
+            Sc64ScarabParent p={f.active_slot==SC64_SCARAB_FIELD_NO_SLOT ? -1 : (int)f.active_slot,
+                                (uint16_t)f.progress,(uint8_t)f.queued,(uint8_t)f.cooldown};
+            /* Above-current-capacity worlds may arise after ownership changes;
+             * the lifecycle helper permits them but refuses new admission. */
+            if (training!=p.active_slot || !sc64_scarab_parent_valid(&p,counts,1)) return 0;
+        }
+    }
+    return 1;
 }
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_RESEARCH_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
@@ -927,7 +1008,30 @@ static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,u
 }
 #endif
 
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+static int race_scarab_stage_previous(GbaSaveSelection *selection);
+#endif
 static int race_save_game(void) {
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    GbaSaveSelection previous;
+    int have_previous=race_scarab_stage_previous(&previous);
+    if (race_mode!=1 || race_skirmish_map<0 || race_skirmish_map>SC64_SKIRMISH_IMPORTED_COUNT ||
+        !sc64_race_storage_geometry_valid(race_cols,race_rows)) return 0;
+    if (race_skirmish_map==0 ? (race_cols!=64 || race_rows!=64) :
+        (race_cols!=sc64_skirmish_maps[race_skirmish_map-1].width ||
+         race_rows!=sc64_skirmish_maps[race_skirmish_map-1].height)) return 0;
+    for (int i=0;i<MAX_UNITS;i++) if (u[i].alive) {
+        Sc64ScarabParentFields f;
+        if (u[i].type==U_SCARAB || u[i].raw_type==85) {
+            Unit wire;
+            if (!sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+                (((unsigned)u[i].carry>>8)&3u)>1u) return 0;
+        }
+        if (sc64_race_raw_unit(u[i].type)==83 &&
+            ((u[i].raw_type!=-1 && u[i].raw_type!=83) ||
+             !sc64_scarab_parent_fields_unpack(u[i].carry,u[i].work_timer,&f))) return 0;
+    }
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (sc64_bc_pause_offset>4) return 0;
     race_bc_yamato_sync_references();
@@ -1007,7 +1111,12 @@ static int race_save_game(void) {
      * padding and optional fields before serializing this record. */
     memset(&race_data, 0, sizeof(race_data));
 #endif
-    race_data.version=SAVE_VERSION;
+    race_data.version=
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        SC64_SCARAB_SAVE_VERSION;
+#else
+        SAVE_VERSION;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     memcpy(race_data.battlecruiser_shots,sc64_bc_shots,sizeof(sc64_bc_shots));
 #endif
@@ -1027,9 +1136,20 @@ static int race_save_game(void) {
 #endif
 #else
     for(int i=0;i<MAX_UNITS;i++)
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    {
+        Unit wire;
+        if (((u[i].type==U_SCARAB || u[i].raw_type==85) &&
+             (((unsigned)u[i].carry>>8)&3u)>1u) ||
+            !sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+            !sc64_unit_save_encode(&race_data.units[i],&wire,
+                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+    }
+#else
         if(!sc64_unit_save_encode(&race_data.units[i], &u[i],
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16))) return 0;
+#endif
 #endif
 #else
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
@@ -1040,6 +1160,9 @@ static int race_save_game(void) {
 #endif
         race_data.units[i][j]=(s16)n;
     }
+#endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    race_scarab_stage_wire=1;
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
@@ -1105,6 +1228,10 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_CONSTRUCTION_HP
     race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
+#endif
+#ifdef SC64_SCARAB_RUNTIME
+    if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,
+                                           (unsigned)race_rows*16u)) return 0;
 #endif
     memcpy(race_data.players,race_player,sizeof(race_player));
 #ifdef SC64_RACES
@@ -1468,9 +1595,16 @@ static int race_save_game(void) {
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (!race_bc_shots_candidate_valid(&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H)) return 0;
 #endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,(unsigned)race_rows*16u)) return 0;
+#endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    if (!race_impact_save_write(have_previous ? &previous : 0)) return 0;
+#else
     if (!race_impact_save_write()) return 0;
+#endif
 #elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
     save_write_migrating_feature(&race_data,sizeof(race_data),SAVE_VERSION,
                          SC64_LEGACY_SAVE_VERSION, offsetof(RaceSave,state)+27u*sizeof(int),
@@ -1480,57 +1614,45 @@ static int race_save_game(void) {
 #endif
     toast(7);return 1;
 }
-static int race_load_game(void) {
+/* Candidate-only load outputs live outside the route/save scratch union. */
+typedef struct {
+    int building_damage_marker;
+    /* The mission dispatch below selects at most one expanded state. */
+    union {
+        int unused;
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-    Sc64T4RuntimeState expanded_t4;
-    int expanded_t4_valid = 0;
+        Sc64T4RuntimeState t4;
 #endif
 #ifdef SC64_T5_RUNTIME
-    Sc64T5RuntimeState expanded_t5;
-    int expanded_t5_valid = 0;
+        Sc64T5RuntimeState t5;
 #endif
 #ifdef SC64_T6_RUNTIME
-    Sc64T6MissionState expanded_t6;
-    int expanded_t6_valid = 0;
+        Sc64T6MissionState t6;
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
-    Sc64TerranLateMissionState expanded_terran_late;
-    int expanded_terran_late_valid = 0;
+        Sc64TerranLateMissionState terran_late;
+#endif
+    } expanded;
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    int expanded_t4_valid;
+#endif
+#ifdef SC64_T5_RUNTIME
+    int expanded_t5_valid;
+#endif
+#ifdef SC64_T6_RUNTIME
+    int expanded_t6_valid;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    int expanded_terran_late_valid;
 #endif
 #ifdef SC64_IMPACT_EVENTS
-    /* Decode both queues before validators reuse the scratch tail. */
     Sc64ImpactEvent impact_candidate[RACE_IMPACT_SAVE_CAPACITY ? RACE_IMPACT_SAVE_CAPACITY : 1];
-    int impact_candidate_count = 0;
-    if (!race_impact_save_read(impact_candidate,&impact_candidate_count)) return 0;
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-    if (race_data.version == SAVE_VERSION) {
-        if (((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u
-#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-            || ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
-               ((unsigned)race_data.state[28] & 7u)>4u
+    int impact_candidate_count;
 #endif
-            ) return 0;
-    } else if (race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
-#else
-    if (race_data.version != SAVE_VERSION) return 0;
-#endif
-#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
-    if (save_read(&race_data,sizeof(race_data),SAVE_VERSION)) {
-        if (race_data.version != SAVE_VERSION ||
-            ((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u
-#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-            || ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
-               ((unsigned)race_data.state[28] & 7u)>4u
-#endif
-            ) return 0;
-    } else {
-        memset(&race_data,0,sizeof(race_data));
-        if (!save_read(&race_data,sizeof(race_data)-SC64_BC_SAVE_EXTRA_BYTES,SC64_LEGACY_SAVE_VERSION) ||
-            race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
-    }
-#else
-    if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
-#endif
+} RaceLoadPlan;
+
+/* May modify candidate/route scratch, never the live world or SRAM. */
+static int race_load_preflight(RaceLoadPlan *plan) {
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
@@ -2407,31 +2529,31 @@ static int race_load_game(void) {
     if (!v[0] && v[2] >= SC64_TERRAN_LATE_GLOBAL_T7 &&
         v[2] <= SC64_TERRAN_LATE_GLOBAL_T10) {
         if (!race_terran_late_save_candidate_valid(&race_data, width, height) ||
-            !race_terran_late_save_expand(&expanded_terran_late,
+            !race_terran_late_save_expand(&plan->expanded.terran_late,
                                           &race_data.terran_late,
                                           v[2], width, height)) return 0;
-        expanded_terran_late_valid = 1;
+        plan->expanded_terran_late_valid = 1;
     } else
 #endif
 #ifdef SC64_T6_RUNTIME
     if (!v[0] && v[2] == SC64_T6_GLOBAL_ID) {
         if (!race_t6_save_candidate_valid(&race_data, width, height) ||
-            !race_t6_save_expand(&expanded_t6, &race_data.t6)) return 0;
-        expanded_t6_valid = 1;
+            !race_t6_save_expand(&plan->expanded.t6, &race_data.t6)) return 0;
+        plan->expanded_t6_valid = 1;
     } else
 #endif
 #ifdef SC64_T5_RUNTIME
     if (!v[0] && v[2] == SC64_T5_GLOBAL_ID) {
         if (!race_t5_save_candidate_valid(&race_data, width, height) ||
-            !race_t5_save_expand(&expanded_t5, &race_data.t5)) return 0;
-        expanded_t5_valid = 1;
+            !race_t5_save_expand(&plan->expanded.t5, &race_data.t5)) return 0;
+        plan->expanded_t5_valid = 1;
     } else
 #endif
     if (!v[0] && v[2] == SC64_T4_GLOBAL_ID) {
         if (!race_t4_save_candidate_valid(&race_data, width, height)) return 0;
 #ifdef SC64_T3_ENABLED
-        if (!race_t4_save_expand(&expanded_t4, &race_data.t4)) return 0;
-        expanded_t4_valid = 1;
+        if (!race_t4_save_expand(&plan->expanded.t4, &race_data.t4)) return 0;
+        plan->expanded_t4_valid = 1;
 #endif
     } else {
         const u8 *t4 = (const u8 *)&race_data.t4;
@@ -2480,7 +2602,7 @@ static int race_load_game(void) {
     }
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-    if (!v[0] && v[2] == SC64_T4_GLOBAL_ID && !expanded_t4_valid) return 0;
+    if (!v[0] && v[2] == SC64_T4_GLOBAL_ID && !plan->expanded_t4_valid) return 0;
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (!race_p7_projectile_save_candidate_valid(&race_data,
@@ -2545,6 +2667,101 @@ static int race_load_game(void) {
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (!race_bc_shots_candidate_valid(&race_data,(unsigned)width*16u,(unsigned)height*16u)) return 0;
 #endif
+#ifdef SC64_SCARAB_RUNTIME
+    if (!race_scarab_save_candidate_valid(&race_data,(unsigned)width*16u,
+                                           (unsigned)height*16u)) return 0;
+#endif
+    plan->building_damage_marker = building_damage_marker;
+    return 1;
+}
+
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+/* Stage scope: supported skirmish geometries and the Terran compact codec.
+ * The tag, never field values, determines the parent representation. */
+static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *context) {
+    RaceLoadPlan *plan=context;
+    if (raw != (const void *)&race_impact_record) return 0;
+    memset(plan,0,sizeof(*plan));
+    if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,
+                                          &plan->impact_candidate_count)) return 0;
+    race_scarab_stage_wire=(tag==SC64_SCARAB_SAVE_VERSION);
+    int map=race_data.state[20], width=64, height=64;
+    if (race_data.state[0]!=1 || map<0 || map>SC64_SKIRMISH_IMPORTED_COUNT) return 0;
+    if (map) { width=sc64_skirmish_maps[map-1].width; height=sc64_skirmish_maps[map-1].height; }
+    if (!sc64_race_storage_geometry_valid(width,height)) return 0;
+    for (unsigned i=0;i<MAX_UNITS;i++) {
+        Unit q;
+        if (!race_save_decode_unit(&race_data,i,(unsigned)width*16u,(unsigned)height*16u,&q)) return 0;
+        if (!q.alive) continue;
+        if ((q.type==U_SCARAB || q.raw_type==85) && !race_scarab_stage_wire) return 0;
+        if (sc64_race_raw_unit(q.type)==83) {
+            int c,t;
+            if (q.raw_type!=-1 && q.raw_type!=83) return 0;
+            if (!sc64_scarab_parent_convert(tag==SC64_SCARAB_SAVE_VERSION ?
+                    SC64_SCARAB_PARENT_PACKED : SC64_SCARAB_PARENT_LEGACY,
+                    83,q.carry,q.work_timer,&c,&t)) return 0;
+            q.carry=c; q.work_timer=t;
+            if (!sc64_unit_save_encode(&race_data.units[i],&q,(unsigned)width*16u,(unsigned)height*16u)) return 0;
+        }
+    }
+    /* A checked new envelope has the existing BC payload layout. Mission
+     * validators still expect the existing internal version token. */
+    if (tag==SC64_SCARAB_SAVE_VERSION) race_data.version=SAVE_VERSION;
+    return race_load_preflight(plan);
+}
+static int race_scarab_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
+    const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SAVE_VERSION,SC64_SCARAB_SAVE_VERSION};
+    if (!save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,3,
+                               race_scarab_stage_prepare,plan,selection)) return 0;
+    return race_scarab_stage_prepare(&race_impact_record,selection->length,
+                                     selection->tag,plan);
+}
+static int race_scarab_stage_previous(GbaSaveSelection *selection) {
+    RaceLoadPlan plan;
+    return race_scarab_stage_select(&plan,selection);
+}
+#endif
+static int race_load_game(void) {
+    RaceLoadPlan plan = {0};
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    GbaSaveSelection selected;
+    if (!race_scarab_stage_select(&plan,&selected)) return 0;
+#else
+#ifdef SC64_IMPACT_EVENTS
+    /* Decode both queues before validators reuse the scratch tail. */
+    if (!race_impact_save_read(plan.impact_candidate,&plan.impact_candidate_count)) return 0;
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (race_data.version == SAVE_VERSION) {
+        if (((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+            || ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
+               ((unsigned)race_data.state[28] & 7u)>4u
+#endif
+            ) return 0;
+    } else if (race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
+#else
+    if (race_data.version != SAVE_VERSION) return 0;
+#endif
+#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+    if (save_read(&race_data,sizeof(race_data),SAVE_VERSION)) {
+        if (race_data.version != SAVE_VERSION ||
+            ((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+            || ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
+               ((unsigned)race_data.state[28] & 7u)>4u
+#endif
+            ) return 0;
+    } else {
+        memset(&race_data,0,sizeof(race_data));
+        if (!save_read(&race_data,sizeof(race_data)-SC64_BC_SAVE_EXTRA_BYTES,SC64_LEGACY_SAVE_VERSION) ||
+            race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
+    }
+#else
+    if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
+#endif
+    if (!race_load_preflight(&plan)) return 0;
+#endif
+    const int *v = race_data.state;
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     sc64_battlecruiser_tech_bits = (u16)((unsigned)v[27] & 65535u);
@@ -2580,9 +2797,14 @@ static int race_load_game(void) {
                                      (unsigned)(race_rows * 16))) return 0;
 #endif
 #else
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        if(!race_save_decode_unit(&race_data,(unsigned)i,(unsigned)(race_cols*16),
+                                  (unsigned)(race_rows*16),&decoded)) return 0;
+#else
         if(!sc64_unit_save_decode(&decoded, &race_data.units[i],
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16))) return 0;
+#endif
 #endif
         memcpy(&u[i], &decoded, sizeof(decoded));
     }
@@ -2623,7 +2845,7 @@ static int race_load_game(void) {
 /* Historical completed saves predate fractional burn and attacker storage.
      * Initialize their previously unused Terran shield word explicitly; zero
      * would otherwise falsely credit player zero for an environmental death. */
-    if (!building_damage_marker)
+    if (!plan.building_damage_marker)
         for (int i=0;i<MAX_BUILDINGS;++i)
             if (b[i].alive && race_building_can_burn(&b[i]))
                 b[i].shield_remainder=NEUTRAL*256;
@@ -2774,7 +2996,7 @@ static int race_load_game(void) {
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID) {
 #ifdef SC64_T3_ENABLED
-        race_t4 = expanded_t4;
+        race_t4 = plan.expanded.t4;
 #else
         race_t4 = race_data.t4;
 #endif
@@ -2782,15 +3004,15 @@ static int race_load_game(void) {
         memset(&race_t4, 0, sizeof(race_t4));
 #endif
 #ifdef SC64_T5_RUNTIME
-    if (expanded_t5_valid) race_t5 = expanded_t5;
+    if (plan.expanded_t5_valid) race_t5 = plan.expanded.t5;
     else memset(&race_t5, 0, sizeof(race_t5));
 #endif
 #ifdef SC64_T6_RUNTIME
-    if (expanded_t6_valid) race_t6 = expanded_t6;
+    if (plan.expanded_t6_valid) race_t6 = plan.expanded.t6;
     else memset(&race_t6, 0, sizeof(race_t6));
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
-    if (expanded_terran_late_valid) race_late = expanded_terran_late;
+    if (plan.expanded_terran_late_valid) race_late = plan.expanded.terran_late;
     else memset(&race_late, 0, sizeof(race_late));
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
@@ -2800,7 +3022,7 @@ static int race_load_game(void) {
 #endif
     clear_tracers();death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
 #ifdef SC64_IMPACT_EVENTS
-    race_impact_restore(impact_candidate,impact_candidate_count);
+    race_impact_restore(plan.impact_candidate,plan.impact_candidate_count);
 #endif
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
     /* Loading restores the same serialized topology as the payload. Rebuild

@@ -1179,6 +1179,84 @@ int save_read_latest(void *data,u32 capacity,u32 tag,u32 *len) {
     *len=stored;
     return 1;
 }
+#ifdef SC64_SCARAB_RUNTIME
+int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
+                          GbaSaveValidator validate,void *context,GbaSaveSelection *selection) {
+    volatile const u8 *base=(volatile const u8*)SRAM_BASE;
+    GbaSaveSelection best={0,0,0,0,-1};
+    if(!scratch||!capacity||capacity>SAVE_PAYLOAD_MAX||!tags||!tag_count||tag_count>3||!validate||!selection)return 0;
+    for(unsigned i=0;i<tag_count;i++) {
+        if(!tags[i])return 0;
+        for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
+    }
+    for(int slot=0;slot<2;slot++) {
+        volatile const u8 *p=base+(unsigned)slot*SAVE_SLOT_SIZE;
+        u32 tag=sram_get32(p),len=sram_get32(p+4),seq=sram_get32(p+12);int allowed=0;
+        for(unsigned i=0;i<tag_count;i++)if(tags[i]==tag)allowed=1;
+        if(!allowed||len>capacity||!valid_record(p,0,tag))continue;
+        for(u32 i=0;i<len;i++)((u8*)scratch)[i]=p[16+i];
+        if(!validate(scratch,len,tag,context))continue;
+        if(best.slot>=0 && seq-best.sequence==0x80000000u)return 0;
+        if(best.slot<0||(s32)(seq-best.sequence)>0)
+            best=(GbaSaveSelection){tag,len,seq,sram_get32(p+8),slot};
+    }
+    if(best.slot<0)return 0;
+    volatile const u8 *p=base+(unsigned)best.slot*SAVE_SLOT_SIZE;
+    if(!valid_record(p,best.length,best.tag)||sram_get32(p+12)!=best.sequence||
+       sram_get32(p+8)!=best.checksum)return 0;
+    for(u32 i=0;i<best.length;i++)((u8*)scratch)[i]=p[16+i];
+    *selection=best;return 1;
+}
+int save_select_transaction(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
+                            GbaSaveValidator prepare,GbaSaveCommit commit,void *context,
+                            GbaSaveSelection *selection) {
+    GbaSaveSelection chosen;
+    if(!commit || !selection ||
+       !save_select_validated(scratch,capacity,tags,tag_count,prepare,context,&chosen))return 0;
+    if(!prepare(scratch,chosen.length,chosen.tag,context))return 0;
+    commit(context);
+    *selection=chosen;
+    return 1;
+}
+int save_write_selected(const void *data,u32 len,u32 tag,const GbaSaveSelection *previous,
+                        const u32 *tags,unsigned tag_count) {
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    int new_allowed=0,old_allowed=0;
+    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag||!previous||!tags||!tag_count||tag_count>3||
+       previous->slot<0||previous->slot>1||!previous->tag||!previous->length||!previous->sequence)return 0;
+    for(unsigned i=0;i<tag_count;i++) {
+        if(!tags[i])return 0;
+        for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
+        if(tags[i]==tag)new_allowed=1;
+        if(tags[i]==previous->tag)old_allowed=1;
+    }
+    if(!new_allowed||!old_allowed)return 0;
+    volatile const u8 *old=base+(unsigned)previous->slot*SAVE_SLOT_SIZE;
+    if(!valid_record(old,previous->length,previous->tag)||sram_get32(old+12)!=previous->sequence||
+       sram_get32(old+8)!=previous->checksum)return 0;
+    volatile u8 *p=base+(unsigned)(1-previous->slot)*SAVE_SLOT_SIZE;
+    u32 other=sram_get32(p);int other_allowed=0;
+    for(unsigned i=0;i<tag_count;i++)if(tags[i]==other)other_allowed=1;
+    if(other && !other_allowed && valid_record(p,0,other))return 0;
+    u32 sequence=previous->sequence+1;if(!sequence)sequence=1;
+    const u8 *src=data;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));sram_put32(p+12,sequence);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);return 1;
+}
+int save_write_first(const void *data,u32 len,u32 tag) {
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag)return 0;
+    for(unsigned slot=0;slot<2;slot++) {
+        volatile const u8 *p=base+slot*SAVE_SLOT_SIZE;u32 existing=sram_get32(p);
+        if(existing && valid_record(p,0,existing))return 0;
+    }
+    const u8 *src=data;volatile u8 *p=base;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));sram_put32(p+12,1);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);return 1;
+}
+#endif
 #ifdef GBA_HOST
 void save_test_corrupt_latest(u32 len,u32 tag) {
     int newest=newest_record(len,tag);
