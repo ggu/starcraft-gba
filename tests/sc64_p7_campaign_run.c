@@ -312,12 +312,14 @@ static int escort_observer(int waypoint_x,int waypoint_y)
         }
     }
     if(observer<0||front<0||!count)return 0;
+    unsigned planned_frame=frame;
+    int front_x=u[front].x,front_y=u[front].y,front_raw=u[front].raw_type;
     int dx=waypoint_x-sx/count,dy=waypoint_y-sy/count;
     int length2=dx*dx+dy*dy,length=0;
     if(!length2)return 0;
     while((length+1)*(length+1)<=length2)++length;
-    int x=limit(u[front].x-64*dx/length,0,WORLD_W-1);
-    int y=limit(u[front].y-64*dy/length,0,WORLD_H-1);
+    int x=limit(front_x-64*dx/length,0,WORLD_W-1);
+    int y=limit(front_y-64*dy/length,0,WORLD_H-1);
     if(!normalize_field()||!clear_selected_building()||
        !move_cursor(u[observer].x-4,u[observer].y-4))return 0;
     input(KEY_L);input(KEY_L|KEY_RIGHT|KEY_DOWN);
@@ -331,8 +333,8 @@ static int escort_observer(int waypoint_x,int waypoint_y)
     if(selected_count()!=1||!u[observer].alive||!u[observer].selected)return 0;
     KEY_TAP(KEY_A);
     if(u[observer].order!=ORDER_MOVE)return 0;
-    fprintf(trace,"{\"kind\":\"observer-escort\",\"frame\":%u,\"observer\":%d,\"front\":%d,\"front_xy\":[%d,%d],\"waypoint\":[%d,%d],\"destination\":[%d,%d],\"actual_destination\":[%d,%d]}\n",
-        (unsigned)frame,observer,front,u[front].x,u[front].y,waypoint_x,waypoint_y,x,y,u[observer].tx,u[observer].ty);
+    fprintf(trace,"{\"kind\":\"observer-escort\",\"frame\":%u,\"observer\":%d,\"front\":%d,\"planned_frame\":%u,\"planned_front_raw\":%d,\"planned_front_xy\":[%d,%d],\"current_front_alive\":%d,\"current_front_raw\":%d,\"current_front_xy\":[%d,%d],\"waypoint\":[%d,%d],\"destination\":[%d,%d],\"actual_destination\":[%d,%d]}\n",
+        (unsigned)frame,observer,front,planned_frame,front_raw,front_x,front_y,u[front].alive,u[front].raw_type,u[front].x,u[front].y,waypoint_x,waypoint_y,x,y,u[observer].tx,u[observer].ty);
     return 1;
 }
 
@@ -387,8 +389,9 @@ static int queue_combat_unit(void)
         if(train_type!=wanted)return combat_reject("menu",wanted,i);
         int added=0;
         /* Same ordinary A press, bounded to at most three purchases per visit. */
-        for(int attempt=0;attempt<3&&b[i].alive&&selected_building==i&&
-            train_type==wanted&&b[i].queue_count<5;attempt++) {
+        for(int attempt=0;attempt<3&&screen==SCREEN_PLAY&&!menu_open&&
+            b[i].alive&&b[i].owner==SIDE&&b[i].type==B_GATEWAY&&building_complete(i)&&
+            selected_building==i&&train_type==wanted&&b[i].queue_count<5;attempt++) {
             if(minerals<(int)rule->minerals||gas<(int)rule->gas||
                race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)break;
             int before=b[i].queue_count,bank=minerals;
@@ -398,7 +401,7 @@ static int queue_combat_unit(void)
             fprintf(trace,"{\"kind\":\"production\",\"frame\":%u,\"building\":%d,\"unit\":\"%s\",\"bank_before\":%d,\"bank_after\":%d,\"gas_after\":%d,\"queue\":%u}\n",
                 (unsigned)frame,i,wanted==U_DRAGOON?"dragoon":"zealot",bank,minerals,gas,(unsigned)b[i].queue_count);
         }
-        return added?1:combat_reject("enqueue",wanted,i);
+        return added?1:combat_reject("no-observed-queue-increase",wanted,i);
     }
     return combat_reject("producer",wanted,-1);
 }
