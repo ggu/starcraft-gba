@@ -2390,6 +2390,19 @@ static int nearest_enemy_building(int *out_x,int *out_y,int *out_slot)
     *out_x=b[best].x;*out_y=b[best].y;*out_slot=best;return 1;
 }
 
+/* A centroid can land in blocked terrain even while members of a dispersed
+   army can walk. Test actual living combat units for ordinary route orders. */
+static int campaign_combat_can_reach(int x,int y)
+{
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+       !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
+       sc64_race_unit_damage(u[i].type)>0) {
+        int nx,ny;
+        if(path_next_tile(u[i].x,u[i].y,x,y,&nx,&ny))return 1;
+    }
+    return 0;
+}
+
 static int campaign_nearest_unexplored(int *out_x,int *out_y)
 {
     int ax=0,ay=0,n=0;
@@ -2414,8 +2427,7 @@ static int campaign_nearest_unexplored(int *out_x,int *out_y)
                 if(!skip&&d<best_d){best_x=x;best_y=y;best_d=d;}
             }
             if(best_x<0)break;
-            int nx,ny;
-            if(path_next_tile(ax,ay,best_x,best_y,&nx,&ny)) {
+            if(campaign_combat_can_reach(best_x,best_y)) {
                 *out_x=best_x;*out_y=best_y;return 1;
             }
             rejected_x[rejected]=best_x;rejected_y[rejected]=best_y;++rejected;
@@ -2544,20 +2556,13 @@ static int campaign_recon_waypoint(int stage,int *out_x,int *out_y)
     static const int route[][2]={{224,864},{656,152},{1168,104},{1856,776}};
     if(stage<4) {
         int tx=route[stage][0],ty=route[stage][1];
-        int ax=0,ay=0,n=0;
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-           !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
-           sc64_race_unit_damage(u[i].type)>0) { ax+=u[i].x;ay+=u[i].y;++n; }
-        if(!n)return 0;
-        ax/=n;ay/=n;
-        int nx,ny;
-        if(path_next_tile(ax,ay,tx,ty,&nx,&ny)){*out_x=tx;*out_y=ty;return 1;}
+        if(campaign_combat_can_reach(tx,ty)){*out_x=tx;*out_y=ty;return 1;}
         int best_x=-1,best_y=-1,best_d=0x7fffffff;
         for(int dy=-128;dy<=128;dy+=32)for(int dx=-128;dx<=128;dx+=32) {
             int x=tx+dx,y=ty+dy;
             if(x<16||y<16||x>=WORLD_W-16||y>=WORLD_H-16)continue;
             int d=dist2(x,y,tx,ty);
-            if(d>=best_d||!path_next_tile(ax,ay,x,y,&nx,&ny))continue;
+            if(d>=best_d||!campaign_combat_can_reach(x,y))continue;
             best_x=x;best_y=y;best_d=d;
         }
         if(best_x<0)return 0;
@@ -3701,7 +3706,11 @@ static int campaign_assault_retarget(void)
                             campaign_recon_stage,scout_x,scout_y,(unsigned)frame,
                             combat_count(SIDE),movers);
                     } else next_recon_retry=(unsigned)frame+600u;
-                } else next_recon_retry=(unsigned)frame+600u;
+                } else {
+                    /* Do not retry an unreachable fixed waypoint forever. */
+                    if(campaign_recon_stage<4)campaign_recon_stage++;
+                    next_recon_retry=(unsigned)frame+600u;
+                }
             }
         } else if((unsigned)frame<9000u&&!campaign_assault_hold_set) {
             accepted=typed_attack_move(U_HYDRALISK,1030,1620);
