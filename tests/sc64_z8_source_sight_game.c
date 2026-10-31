@@ -74,6 +74,7 @@ static void test_z8_facts_and_visibility(void)
 {
     clear_fixture();
     assert(race_z8_active() && !race_z7_active());
+    assert(SC64_SOURCE_SIGHT_SPANS_ACTIVE());
     assert(sc64_source_sight_raw_pixels(42)==288);
     assert(sc64_actor_unit_sight_pixels(U_OVERLORD)==288);
     assert(sc64_actor_unit_sight_pixels(U_DRONE)==224);
@@ -82,6 +83,7 @@ static void test_z8_facts_and_visibility(void)
     assert(race_z8_overlord_detect_px()==sc64_source_sight_raw_pixels(42)/2);
     put_unit(0,42,SIDE,168,168);
     put_unit(1,38,SIDE,316,296);
+    put_unit(2,42,SIDE,8,8); /* clipped map edge */
     put_building(0,131,SIDE,704,672);
     put_building(1,144,SIDE,1056,1056);
     b[0].under_construction=1;
@@ -89,6 +91,9 @@ static void test_z8_facts_and_visibility(void)
     assert(sc64_z7_building_visibility_key(&b[0])==-(B_HATCHERY+1));
     assert(sc64_actor_building_sight_pixels(-(B_HATCHERY+1))==128);
     assert_visible_matches_full_scan();
+    /* Exercise same-cell/subtile movement before crossing cells. */
+    u[0].x=169;u[0].y=170;u[2].x=10;u[2].y=9;
+    sc64_update_exploration();assert_visible_matches_full_scan();
     u[0].x=187;u[0].y=177;u[1].x=340;b[0].x=720;
     sc64_update_exploration();assert_visible_matches_full_scan();
     b[0].under_construction=0;sc64_update_exploration();
@@ -108,15 +113,19 @@ static void test_z8_facts_and_visibility(void)
     assert_visible_matches_full_scan();
     u[0].order=ORDER_TRANSPORTED;sc64_update_exploration();
     assert_visible_matches_full_scan();
-    u[0].order=ORDER_IDLE;u[1].alive=0;b[1].alive=0;
+    u[0].order=ORDER_IDLE;sc64_update_exploration();
+    assert_visible_matches_full_scan();
+    u[1].alive=0;u[2].alive=0;b[1].alive=0;
     sc64_update_exploration();assert_visible_matches_full_scan();
 
     race_selected_mission=SC64_Z6_GLOBAL_ID;
     assert(!race_z8_active() && !race_z7_active());
+    assert(!SC64_SOURCE_SIGHT_SPANS_ACTIVE());
     assert(sc64_actor_unit_sight_pixels(U_OVERLORD)==0);
     race_selected_mission=SC64_Z7_GLOBAL_ID;
     assert(sc64_actor_unit_sight_pixels(U_OVERLORD)==288);
     race_mode=1;
+    assert(!SC64_SOURCE_SIGHT_SPANS_ACTIVE());
     assert(sc64_actor_unit_sight_pixels(U_OVERLORD)==0);
 }
 
