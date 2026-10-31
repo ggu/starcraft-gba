@@ -60,9 +60,14 @@ static Sc64ScarabWallet race_p7_scarab_wallet(const Unit *parent)
     Sc64ScarabWallet bank = {0};
     if (!parent || parent->raw_owner < 0 || parent->raw_owner >= 8 ||
         race_p7_source_owner((unsigned)parent->raw_owner) != parent->owner) return bank;
-    if (parent->raw_owner == 7) bank.engine = &minerals;
-    else if (parent->raw_owner == 0 || parent->raw_owner == 4)
+    if (parent->raw_owner == 7) {
+        bank.engine = &minerals; bank.limit = 65535;
+    } else if (parent->raw_owner == 0 || parent->raw_owner == 4) {
         bank.source = &race_p7.source_minerals[parent->raw_owner];
+        /* The authenticated one-shot grants and P7 save validator bound
+         * each force wallet to 10,000, including cancellation refunds. */
+        bank.limit = 10000;
+    }
     return bank;
 }
 #endif

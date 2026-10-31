@@ -16,7 +16,7 @@ static int reaver(int owner, int source)
 }
 
 static void campaign_wallets(int mission, uint32_t *first, uint32_t *second,
-                             int first_source, int second_source)
+                             int first_source, int second_source, unsigned limit)
 {
     memset(u, 0, sizeof(u));
     race_mode = 0; race_selected_mission = mission;
@@ -32,9 +32,9 @@ static void campaign_wallets(int mission, uint32_t *first, uint32_t *second,
     assert(!race_scarab_cancel(a, 0, 0) && *first == 200);
     assert(race_scarab_enqueue(a, 0) &&
            race_scarab_production_tick(a, 0) == SC64_SCARAB_ALLOCATED);
-    *first = 65530;
+    *first = limit - 5u;
     Unit overflow_parent = u[a];
-    assert(!race_scarab_cancel_all(a, 0) && *first == 65530 &&
+    assert(!race_scarab_cancel_all(a, 0) && *first == limit - 5u &&
            !memcmp(&overflow_parent, &u[a], sizeof(overflow_parent)));
     *first = 185;
     assert(race_scarab_cancel_all(a, 0) && *first == 200);
@@ -45,8 +45,8 @@ static void campaign_wallets(int mission, uint32_t *first, uint32_t *second,
     u[a].raw_owner = second_source;
     assert(race_scarab_enqueue(a, 0) && *first == 200 && *second == 270);
     assert(race_scarab_cancel_all(a, 0) && *second == 285);
-    *first = 65535;
-    assert(race_scarab_enqueue(a, 0) && *first == 65535 && *second == 270);
+    *first = limit;
+    assert(race_scarab_enqueue(a, 0) && *first == limit && *second == 270);
     assert(race_scarab_cancel_all(a, 0) && *second == 285);
     u[a].raw_owner = first_source;
     *first = 14;
@@ -66,11 +66,11 @@ int main(void)
     gba_init();
 #ifdef SC64_P7_RUNTIME
     campaign_wallets(SC64_P7_GLOBAL_ID, &race_p7.source_minerals[0],
-                     &race_p7.source_minerals[4], 0, 4);
+                     &race_p7.source_minerals[4], 0, 4, 10000);
 #endif
 #ifdef SC64_P8_RUNTIME
     campaign_wallets(SC64_P8_GLOBAL_ID, &race_p8.ai_minerals[0],
-                     &race_p8.ai_minerals[1], 0, 3);
+                     &race_p8.ai_minerals[1], 0, 3, 65535);
 #endif
     memset(u, 0, sizeof(u));
     race_mode = 1; minerals = 100; race_minerals[ENEMY] = 200;

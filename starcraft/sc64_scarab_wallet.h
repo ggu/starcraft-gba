@@ -9,6 +9,7 @@
 typedef struct {
     int *engine;
     uint32_t *source;
+    unsigned limit;
 } Sc64ScarabWallet;
 
 static inline int sc64_scarab_wallet_value_valid(int value)
@@ -16,12 +17,13 @@ static inline int sc64_scarab_wallet_value_valid(int value)
 
 static inline int sc64_scarab_wallet_read(Sc64ScarabWallet bank, int *value)
 {
-    if (!value || (!!bank.engine == !!bank.source)) return 0;
+    if (!value || (!!bank.engine == !!bank.source) || bank.limit > 65535u) return 0;
     if (bank.engine) {
-        if (!sc64_scarab_wallet_value_valid(*bank.engine)) return 0;
+        if (!sc64_scarab_wallet_value_valid(*bank.engine) ||
+            (unsigned)*bank.engine > bank.limit) return 0;
         *value = *bank.engine;
     } else {
-        if (*bank.source > 65535u) return 0;
+        if (*bank.source > bank.limit) return 0;
         *value = (int)*bank.source;
     }
     return 1;

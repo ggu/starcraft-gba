@@ -98,7 +98,7 @@ static int race_p8_source_owner(unsigned slot)
  * An unsupported source player must not fall back to the generic enemy bank. */
 static Sc64ScarabWallet race_p8_scarab_wallet(const Unit *parent)
 {
-    Sc64ScarabWallet bank = {0};
+    Sc64ScarabWallet bank = {.limit = SC64_P8_AI_WALLET_LIMIT};
     if (!parent || parent->raw_owner < 0 || parent->raw_owner >= 8 ||
         race_p8_source_owner((unsigned)parent->raw_owner) != parent->owner) return bank;
     switch (parent->raw_owner) {

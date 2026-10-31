@@ -149,7 +149,7 @@ static int race_scarab_parent_write(int slot, const Sc64ScarabParent *p)
 }
 static Sc64ScarabWallet race_scarab_owner_bank(int slot)
 {
-    Sc64ScarabWallet bank = {0};
+    Sc64ScarabWallet bank = {.limit = 65535};
     if (!race_scarab_parent_identity(slot)) return bank;
 #ifdef SC64_P8_RUNTIME
     if (race_p8_active()) return race_p8_scarab_wallet(&u[slot]);
@@ -251,7 +251,8 @@ static int race_scarab_enqueue(int slot,int upgraded)
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts) ||
         !sc64_scarab_wallet_read(bank=race_scarab_owner_bank(slot),&next)) return 0;
     if (!sc64_scarab_enqueue(&p,counts,upgraded,&next) ||
-        !sc64_scarab_wallet_value_valid(next) || !race_scarab_parent_write(slot,&p)) return 0;
+        !sc64_scarab_wallet_value_valid(next) || (unsigned)next > bank.limit ||
+        !race_scarab_parent_write(slot,&p)) return 0;
     sc64_scarab_wallet_commit(bank,next); return 1;
 }
 /* Invoke only on a source tick. No automatic game-loop registration. */
@@ -286,7 +287,8 @@ static int race_scarab_cancel(int slot,int upgraded,unsigned index)
     Sc64ScarabWallet bank; int next;
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts) ||
         !sc64_scarab_wallet_read(bank=race_scarab_owner_bank(slot),&next)) return 0;
-    if (!sc64_scarab_cancel(&p,counts,upgraded,&race_scarab_ops,&c,index,&next,65535)) return 0;
+    if (!sc64_scarab_cancel(&p,counts,upgraded,&race_scarab_ops,&c,index,&next,
+                           (int)bank.limit)) return 0;
     if (!race_scarab_parent_write(slot,&p)) return 0;
     sc64_scarab_wallet_commit(bank,next); return 1;
 }
@@ -299,7 +301,7 @@ static int race_scarab_cancel_all(int slot,int upgraded)
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts) ||
         !sc64_scarab_wallet_read(bank=race_scarab_owner_bank(slot),&balance)) return 0;
     int refund=(int)p.queued*SC64_SCARAB_COST;
-    if (refund>65535-balance) return 0;
+    if ((unsigned)refund>bank.limit-(unsigned)balance) return 0;
     if (p.active_slot>=0 && !race_scarab_cancel_cb(&c,p.active_slot)) return 0;
     p.queued=0; p.active_slot=-1; p.progress=0;
     if (!race_scarab_parent_write(slot,&p)) return 0;
