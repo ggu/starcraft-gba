@@ -218,6 +218,22 @@ static void explicit_cases(void)
     b[0].owner = SIDE;
     expect_mask(0, powered);
 
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+    /* Later service bindings also include mobile and static Zerg detectors. */
+    reset_case();
+    u[1].alive=1; u[1].type=U_OVERLORD; u[1].raw_type=SC64_OVERLORD_RAW;
+    u[1].owner=enemy; u[1].raw_owner=0; u[1].x=u[0].x; u[1].y=u[0].y;
+    expect_mask(1u<<0,powered);
+    reset_case();
+    b[0].alive=1; b[0].type=B_SPORE_COLONY; b[0].raw_type=SC64_SPORE_COLONY_RAW;
+    b[0].owner=enemy; b[0].raw_owner=0; b[0].x=u[0].x; b[0].y=u[0].y;
+    expect_mask(1u<<0,powered);
+#endif
+    /* Generic binding derives slots from live owner, not raw mission owner. */
+    race_mode=1;
+    reset_case(); observer(1,0,2);
+    expect_mask(1u<<2,powered);
+    race_mode=0;
     reset_case();
     observer(1, 0, enemy);
     u[0].x = WORLD_W;
@@ -232,7 +248,15 @@ int main(void)
     explicit_cases();
     unsigned positive = 0;
     for (int run = 0; run < 2000; ++run) {
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+        race_mode = (run%5)==1;
+        race_selected_mission = (run%5)==2 ? SC64_P8_GLOBAL_ID : SC64_P7_GLOBAL_ID;
+        race_protoss_binding_override = (run%5)==3 ? SC64_PROTOSS_BIND_GENERIC :
+                                        (run%5)==4 ? SC64_PROTOSS_BIND_LATER : -1;
+        race_protoss_override_mission=SC64_P8_GLOBAL_ID;
+#else
         race_mode = run & 1;
+#endif
         reset_case();
         for (int i = 1; i < MAX_UNITS; ++i) {
             if (rnd() % 5 != 0) continue;
