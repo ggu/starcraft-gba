@@ -53,7 +53,8 @@ static int check_probe_candidate(const void *data,u32 length,u32 tag,void *conte
                                                 (unsigned)race_rows*16u);
 }
 
-static void test_staged_journal_migration(const GbaSaveSelection *previous, int campaign)
+static void test_staged_journal_migration(const GbaSaveSelection *previous, int campaign,
+                                          const char *custom_output)
 {
     static u8 predecessor[SAVE_SLOT_SIZE];
     static Unit before_units[MAX_UNITS];
@@ -87,6 +88,10 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
     static u8 entry_packet[SC64_CODEC_BYTES], entry_restored[SC64_CODEC_BYTES];
     assert(sc64_codec_encode(&race_p7_projectiles,entry_packet,sizeof(entry_packet)));
     assert(race_save_game());
+    if (!campaign && custom_output) {
+        FILE *output=fopen(custom_output,"wb"); assert(output);
+        assert(fwrite(host_save,1,sizeof(host_save),output)==sizeof(host_save)); assert(!fclose(output));
+    }
     assert(!memcmp(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,
                    sizeof(predecessor)));
     u[carrier].hp=1; minerals=0; frame=0;
@@ -330,6 +335,7 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
            !memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
 #else
     (void)campaign;
+    (void)custom_output;
 #endif
 }
 #endif
@@ -337,7 +343,26 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
 int main(int argc,char **argv)
 {
     assert((argc==3 || argc==4) && (!strcmp(argv[2],"custom") || !strcmp(argv[2],"campaign") ||
-                                    !strcmp(argv[2],"verify_campaign")));
+                                    !strcmp(argv[2],"verify_campaign") || !strcmp(argv[2],"verify_custom")));
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    if (!strcmp(argv[2],"verify_custom")) {
+        FILE *input=fopen(argv[1],"rb"); assert(input);
+        assert(fread(host_save,1,sizeof(host_save),input)==sizeof(host_save)); assert(!fclose(input));
+        game_init(); assert(race_load_game() && race_mode);
+        int carrier=0,interceptor=0;
+        for (int i=0;i<MAX_UNITS;++i) if (u[i].alive) {
+            carrier+=u[i].type==SC64_CARRIER_TYPE;
+            interceptor+=u[i].type==SC64_INTERCEPTOR_TYPE;
+        }
+        assert(carrier && interceptor && sc64_pool_active_head(&race_p7_projectiles)!=SC64_END);
+#ifdef SC64_IMPACT_EVENTS
+        assert(race_impact_count==1);
+#endif
+        for (int i=0;i<30;++i) game_update(0,0);
+        puts("fresh Carrier journal load and continuation: ok");
+        return 0;
+    }
+#endif
 #if !defined(SC64_SHARED_CARRIER_EXPERIMENT) || defined(SC64_P7_PROJECTILES_ENABLED)
     if (!strcmp(argv[2],"verify_campaign")) {
         FILE *input=fopen(argv[1],"rb"); assert(input);
@@ -409,7 +434,7 @@ int main(int argc,char **argv)
         memcpy(host_save,before_sram,sizeof(host_save));
     }
 #endif
-    test_staged_journal_migration(&selected,campaign);
+    test_staged_journal_migration(&selected,campaign,argc==4 && !campaign ? argv[3] : 0);
     puts("staged actor/shot journal migration: ok");
 #else
     game_init();
