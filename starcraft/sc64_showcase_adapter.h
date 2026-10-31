@@ -63,9 +63,17 @@ static void sc64_showcase_start(int scene)
     (void)sc64_showcase_base(ENEMY,scene==3?B_COMMAND:B_HATCHERY,864,864);
     if(scene==6)(void)sc64_showcase_base(RESCUABLE,B_NEXUS,864,160);
     if(scene==0) {
-        for(int i=0;i<3;++i)
-            (void)sc64_showcase_actor(SIDE,U_P7_CARRIER,437,480+i*28,
-                                      ORDER_MOVE,520,480+i*28);
+        for(int i=0;i<3;++i) {
+            int carrier=sc64_showcase_actor(SIDE,U_P7_CARRIER,437,480+i*28,
+                                            ORDER_MOVE,520,480+i*28);
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+            /* Authored like a placed Carrier with four Interceptors aboard;
+               the shared Carrier service launches them in the fight. */
+            if(carrier>=0)(void)race_p7_carrier_training_stock(carrier,4);
+#else
+            (void)carrier;
+#endif
+        }
         sc64_showcase_group(SIDE,U_SCOUT,4,475,480,2,18,ORDER_ATTACK_MOVE,585,510);
         sc64_showcase_group(SIDE,U_ZEALOT,6,475,525,3,14,ORDER_ATTACK_MOVE,585,530);
         sc64_showcase_group(ENEMY,U_HYDRALISK,12,566,476,4,14,ORDER_ATTACK_MOVE,475,510);

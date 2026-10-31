@@ -337,12 +337,16 @@ static int race_site_powered(int owner, int x, int y)
 }
 
 #ifdef SC64_P7_BATTERY_ENABLED
+/* Native psi geometry from the owner's own complete Pylons. In custom games
+ * every owner may build; mission bindings keep their human-slot rule. */
 static int race_p7_battery_site_powered(int owner,int x,int y)
 {
-    if (!race_p7_active() || owner!=SIDE) return 0;
+    int generic=race_protoss_service_binding()==SC64_PROTOSS_BIND_GENERIC;
+    if (!race_protoss_services_active() || (!generic && owner!=SIDE)) return 0;
     for (int i=0;i<MAX_BUILDINGS;++i)
         if (building_complete(i) && b[i].type==B_PYLON &&
-            b[i].raw_type==156 && b[i].owner==owner && b[i].raw_owner==7 &&
+            RACE_PROTOSS_RAW(&b[i])==156 && b[i].owner==owner &&
+            (generic || RACE_PROTOSS_SLOT(&b[i])==SC64_PROTOSS_HUMAN_SLOT) &&
             sc64_p7_in_psi_range(x-b[i].x,y-b[i].y)) return 1;
     return 0;
 }
@@ -641,11 +645,7 @@ static int race_queue_unit(int owner, int producer, int type)
         (!building_complete(producer) && !(egg_job && race_z7_morphing_egg_hall(owner, producer)) &&
             !(race_mode && b[producer].alive && (b[producer].type == B_LAIR || b[producer].type == B_HIVE))) ||
         b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type,
-#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
-            (race_mode && sc64_race_raw_unit(type) == 12) ? B_STARPORT : r->producer
-#else
-            r->producer
-#endif
+            race_skirmish_product_producer(type)
         ) ||
         (!race_mode && !race_owner_has_prereq(owner, r->prereq))) return 0;
     if (!egg_job && b[producer].queue_count >= 5) return 0;
@@ -654,13 +654,12 @@ static int race_queue_unit(int owner, int producer, int type)
         (!building_complete(producer) && !(race_mode && b[producer].alive &&
             (b[producer].type == B_LAIR || b[producer].type == B_HIVE))) ||
         b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type,
-#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
-            (race_mode && sc64_race_raw_unit(type) == 12) ? B_STARPORT : r->producer
-#else
-            r->producer
-#endif
+            race_skirmish_product_producer(type)
         ) ||
         b[producer].queue_count >= 5 || (!race_mode && !race_owner_has_prereq(owner, r->prereq))) return 0;
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (!race_p8_unit_product_available(owner,b[producer].raw_owner,type)) return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
     if (!race_t5_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
@@ -689,7 +688,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_product_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (race_p7_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
+    if (race_protoss_services_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P4_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
@@ -778,6 +777,9 @@ static int race_build_request_valid(int owner, int worker, int type,
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     if (owner < 0 || owner > 4 || !x || !y) return 0;
+#ifdef SC64_P8_RUNTIME
+    if (!race_p8_building_product_available(owner,worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,type)) return 0;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (!race_late_building_product_available(owner,
             worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
@@ -1301,6 +1303,9 @@ static void race_tick_buildings(void)
         type = b[i].queue[b[i].queue_head];
 #ifdef SC64_Z8_RUNTIME
         race_z8_note_product_building(i);
+#endif
+#ifdef SC64_P8_RUNTIME
+        race_p8_note_product_building(i);
 #endif
         {
             const Sc64RaceUnitRule *ur = sc64_race_unit_rule(type);

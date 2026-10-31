@@ -128,18 +128,18 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
     if (shooter>=0 && shooter<MAX_UNITS && SC64_CARRIER_HANGAR_HIDDEN(&u[shooter]))
         return 0;
 #endif
-    if (!race_p7_active() || race_p7_projectile_fault || shooter<0 ||
+    if (!race_protoss_services_active() || race_p7_projectile_fault || shooter<0 ||
         shooter>=MAX_UNITS || !u[shooter].alive ||
-        u[shooter].type!=U_P7_INTERCEPTOR || u[shooter].raw_type!=73 ||
-        u[shooter].raw_owner<0 || u[shooter].raw_owner>=8 ||
-        race_p7_source_owner((unsigned)u[shooter].raw_owner)!=u[shooter].owner ||
+        u[shooter].type!=U_P7_INTERCEPTOR || RACE_PROTOSS_RAW(&u[shooter])!=73 ||
+        RACE_PROTOSS_SLOT(&u[shooter])<0 || RACE_PROTOSS_SLOT(&u[shooter])>=8 ||
+        race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[shooter]))!=u[shooter].owner ||
         source_x_q8<0 || source_y_q8<0 ||
         source_x_q8>=race_cols*8192 || source_y_q8>=race_rows*8192 ||
         source_x_q8/512!=u[shooter].x || source_y_q8/512!=u[shooter].y ||
         target<0 || !race_p7_projectile_target_alive((unsigned)target) ||
         !sc64_interceptor_projectile_launch(&row,source_x_q8,source_y_q8,
             (s16)(target_x(target)*2),(s16)(target_y(target)*2),heading,
-            (u16)target,(u8)shooter,(u8)u[shooter].raw_owner)) return 0;
+            (u16)target,(u8)shooter,(u8)RACE_PROTOSS_SLOT(&u[shooter]))) return 0;
     if (!sc64_pool_acquire(&race_p7_projectiles,&id,&native_index)) return 0;
 #ifdef SC64_SHARED_PROJECTILE_STAGE
     u32 shared_handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,
@@ -193,7 +193,7 @@ static void race_p7_projectile_source_tick(void)
         }
         if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) break;
         if (impact && race_p7_projectile_target_alive(row.target_ref)) {
-            int owner=race_p7_source_owner(row.raw_source_owner);
+            int owner=race_protoss_source_owner(row.raw_source_owner);
             int damage=6+(owner==SIDE?weapons_level:0);
             if (owner>=0) hit_target(row.target_ref,damage,U_P7_INTERCEPTOR,owner);
         }
@@ -204,7 +204,7 @@ static void race_p7_projectile_source_tick(void)
 
 static void race_p7_projectile_tick_if_due(void)
 {
-    if (race_p7_active() && race_p7.reserved[0]!=4u)
+    if (race_protoss_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0]!=4u)
         race_p7_projectile_source_tick();
 }
 

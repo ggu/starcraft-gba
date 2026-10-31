@@ -67,6 +67,29 @@ static int race_skirmish_attached(int producer, unsigned raw, int completed)
     return 0;
 }
 
+/* Scenario rules keep their impossible producer sentinel. A custom-game
+ * product may override it only when its complete actor service is present;
+ * admission and the paid queue must resolve the same ordinary producer. */
+static int race_skirmish_product_producer(int type)
+{
+    const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
+    if (!r) return 255;
+    if (race_mode) {
+        int raw = sc64_race_raw_unit(type);
+#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
+        if (raw == 12) return B_STARPORT;
+#endif
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && \
+    defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
+    defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_P7_ACTORS)
+        if (raw == 72 && type == U_P7_CARRIER && race_protoss_services_active())
+            return B_STARGATE;
+#endif
+        (void)raw;
+    }
+    return r->producer;
+}
+
 static int race_skirmish_product_admitted(int owner, int producer,
                                           const Sc64SkirmishRecord *r)
 {
@@ -86,11 +109,7 @@ static int race_skirmish_product_admitted(int owner, int producer,
     /* Production remains unavailable until its service is complete. */
     if (r->raw_id == 12) return 0;
 #endif
-#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
-    if (r->raw_id == 83 || !ur || (ur->producer == 255 && r->raw_id != 12)) return 0;
-#else
-    if (r->raw_id == 83 || !ur || ur->producer == 255) return 0;
-#endif
+    if (r->raw_id == 83 || !ur || race_skirmish_product_producer(type) == 255) return 0;
     producer_raw = sc64_race_raw_building(b[producer].type);
     if (r->producer_raw == 35) {
         if (!sc64_race_is_zerg_townhall(b[producer].type)) return 0;

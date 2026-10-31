@@ -6,10 +6,10 @@
 #if !defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
     !defined(SC64_ZP_CAMPAIGN_ACTORS) || \
     !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || \
-    !defined(SC64_Z7_RUNTIME) || \
     !defined(SC64_P6_ACTORS) || !defined(SC64_P7_ACTORS) || \
-    !defined(SC64_NYDUS_ENABLED)
-#error "Z8 live pool bridge requires full ZP pools, P6/P7 source actors and Nydus"
+    !((defined(SC64_Z7_RUNTIME) && defined(SC64_NYDUS_ENABLED)) || \
+      defined(SC64_P8_RUNTIME))
+#error "Z8 live pool bridge requires full ZP pools, P6/P7 source actors and the Z7/Nydus or P8 runtime"
 #endif
 
 #include "sc64_z8_world_adapter.h"
@@ -64,11 +64,17 @@ sc64_z8_game_source_extents(unsigned raw, int x, int y, int building,
                                    &world_right, &world_bottom)) {
         /* Z7 already carries pinned raw dimensions for standard Zerg actors
          * and structures that are outside the ZP feature-fact table. */
+#ifdef SC64_Z7_RUNTIME
         int ok = building ? sc64_z7_world_building_rect(raw, x, y,
                     &world_left, &world_top, &world_right, &world_bottom) :
                             sc64_z7_world_actor_rect(raw, x, y,
                     &world_left, &world_top, &world_right, &world_bottom);
         if (!ok) return 0;
+#else
+        /* The Protoss P8 profile carries no Z7 raw table; every P8 actor
+         * has a feature fact or a pinned P7 rect. */
+        return 0;
+#endif
     }
     *left = x * 2 - world_left;
     *top = y * 2 - world_top;

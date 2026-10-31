@@ -31,10 +31,12 @@ static int race_p5_saved_p7_recharge_valid(const RaceSave *candidate,
     Building battery;
     const Sc64RaceUnitRule *rule;
     int target;
-    if (!candidate || !actor || candidate->state[0] ||
-        candidate->state[2] != SC64_P7_GLOBAL_ID || actor->order != ORDER_P7_RECHARGE ||
-        actor->raw_type == 73 || actor->raw_type == 85 ||
-        actor->raw_owner < 0 || actor->raw_owner >= 8 || actor->work_timer != 0 ||
+    /* Load preflight binds the candidate's mode (race_load_game). */
+    if (!candidate || !actor || !race_protoss_services_active() ||
+        actor->order != ORDER_P7_RECHARGE ||
+        RACE_PROTOSS_RAW(actor) == 73 || RACE_PROTOSS_RAW(actor) == 85 ||
+        RACE_PROTOSS_SLOT(actor) < 0 || RACE_PROTOSS_SLOT(actor) >= 8 ||
+        actor->work_timer != 0 ||
         SC64_TRANSPORT_LOADED(actor)) return 0;
     rule=sc64_race_unit_rule(actor->type);
     if (!rule || rule->race != R_PROTOSS || !(rule->flags & SC_RACE_F_SHIELDS) ||
@@ -47,9 +49,9 @@ static int race_p5_saved_p7_recharge_valid(const RaceSave *candidate,
     if (target<0 || target>=MAX_BUILDINGS ||
         !race_save_decode_building(candidate,(unsigned)target,&battery)) return 0;
     return battery.alive && battery.type==B_P7_SHIELD_BATTERY &&
-        battery.raw_type==172 && !battery.under_construction &&
+        RACE_PROTOSS_RAW(&battery)==172 && !battery.under_construction &&
         battery.owner==actor->owner &&
-        battery.raw_owner==actor->raw_owner;
+        RACE_PROTOSS_SLOT(&battery)==RACE_PROTOSS_SLOT(actor);
 }
 #endif
 

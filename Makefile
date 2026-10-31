@@ -2090,6 +2090,98 @@ build/StarCraft-Protoss-P7-GBA.gba: build/starcraft-protoss-p7.elf tools/fix_rom
 .PHONY: protoss-p7
 protoss-p7: verify-protoss
 
+# Explicit P8 candidate: the canonical P1-P7 profile plus The Trial of
+# Tassadar as an eighth entry. It has its own SCP8 code, generation-44 saves
+# and fact tables for its larger roster; canonical Protoss stays P7.
+P8_FACT_V2_DIR := build/generated/p8-fact-v2
+P8_FACT_V2_HEADER := $(P8_FACT_V2_DIR)/sc64_fact_tables_generated.h
+P8_SCENARIO_HEADER := .local/sc64/zp-stage/generated/scenarios/sc64_p8_scenario_generated.h
+# P8's map Shield Batteries, authenticated from its private CHK into this
+# worktree's build directory (never into the shared .local inputs).
+P8_BATTERY_DIR := build/generated/p8-battery
+P8_BATTERY_HEADER := $(P8_BATTERY_DIR)/sc64_p8_battery_properties_generated.h
+P8_AVAILABILITY_DIR := .local/p8-availability
+P8_AVAILABILITY_HEADER := $(P8_AVAILABILITY_DIR)/sc64_p8_availability_generated.h
+$(P8_AVAILABILITY_HEADER): tools/sc64_p8_availability.py tools/sc64_t5_availability.py .local/sc64/zp-stage/generated/source_maps/p8/source.chk .local/sc64/zp-stage/generated/source_maps/p8/manifest.json | build
+	$(PYTHON) tools/sc64_p8_availability.py --source .local/sc64/zp-stage/generated/source_maps/p8/source.chk --manifest .local/sc64/zp-stage/generated/source_maps/p8/manifest.json --out $@
+P8_CAMPAIGN_DEFINES := -DSC64_P8_DATA_ENABLED -DSC64_P8_RUNTIME -DSC64_P8_CAMPAIGN_ENTRY -DSC64_Z8_GAME_POOL_BRIDGE -DSC64_P8_GAME_POOL_BRIDGE -I$(P8_BATTERY_DIR) -I$(P8_AVAILABILITY_DIR)
+PROTOSS_P8_FLAGS = $(patsubst -I$(BC_P7_FACT_DIR),-I$(P8_FACT_V2_DIR),$(PROTOSS_P7_CANONICAL_FLAGS)) $(P8_CAMPAIGN_DEFINES)
+PROTOSS_P8_INPUTS = $(filter-out $(P7_FACT_V2_HEADER),$(PROTOSS_P7_CANONICAL_INPUTS)) $(P8_FACT_V2_HEADER) $(P8_SCENARIO_HEADER) $(P8_BATTERY_HEADER) $(P8_AVAILABILITY_HEADER)
+$(P8_BATTERY_HEADER): tools/sc64_p7_battery_pack.py tools/sc64_zp_scenario_pack.py tools/sc64_races_pack.py .local/sc64/zp-stage/generated/source_maps/p8/source.chk .local/sc64/zp-stage/generated/source_maps/p8/manifest.json | build
+	$(PYTHON) tools/sc64_p7_battery_pack.py --mission P8 --output $@
+$(P8_FACT_V2_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile | build
+	mkdir -p $(P8_FACT_V2_DIR)
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P8_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES)) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT tools/sc64_fact_tables_gen.c -o build/sc64-p8-fact-v2-gen
+	./build/sc64-p8-fact-v2-gen > $@.tmp
+	mv $@.tmp $@
+build/starcraft-protoss-p8.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(PROTOSS_P8_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p8.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P8-GBA.gba: build/starcraft-protoss-p8.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS8' SCP8
+.PHONY: protoss-p8 verify-protoss-p8
+verify-protoss-p8: build/StarCraft-Protoss-P8-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p8
+protoss-p8: verify-protoss-p8
+
+# P8 ordinary-input qualification. The host controller writes its trace and
+# pause-menu SRAM image under build/p8-arm; the replay probe source builds as
+# host programs and as ARM ROMs (full tape, save prefix, fresh-process resume).
+P8_ARM_DIR := build/p8-arm
+P8_ARM_TRACE := $(P8_ARM_DIR)/p8-controller.jsonl
+P8_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+P8_REPLAY_COMMON := $(filter-out common/main.c,$(COMMON))
+build/test-sc64-p8-carried-p7-controller: tests/sc64_p7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_P8_FLAGS) -DP7_CONTROLLER_PROFILE=\"PROTOSS_P8_FLAGS\" $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+
+build/test-sc64-p8-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+.PHONY: test-sc64-p8-carried-profile
+test-sc64-p8-carried-profile: build/test-sc64-p8-carried-profile
+	./build/test-sc64-p8-carried-profile
+
+build/test-sc64-p8-campaign-run: tests/sc64_p8_campaign_run.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+$(P8_ARM_TRACE): build/test-sc64-p8-campaign-run
+	mkdir -p $(P8_ARM_DIR)
+	./build/test-sc64-p8-campaign-run $@
+.PHONY: test-sc64-p8-controller
+test-sc64-p8-controller: $(P8_ARM_TRACE)
+$(P8_ARM_DIR)/sc64_p8_tape_generated.h: $(P8_ARM_TRACE) tools/sc64_p8_arm_replay.py
+	$(PYTHON) tools/sc64_p8_arm_replay.py tape $< $@
+P8_REPLAY_DEPS = tests/sc64_p8_arm_replay.c $(P8_ARM_DIR)/sc64_p8_tape_generated.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile
+build/test-sc64-p8-replay: $(P8_REPLAY_DEPS) | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+build/test-sc64-p8-replay-prefix: $(P8_REPLAY_DEPS) | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) -DP8_REPLAY_PREFIX $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+build/test-sc64-p8-replay-resume: $(P8_REPLAY_DEPS) | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) -DP8_REPLAY_RESUME $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+# Host replays: the full tape must win; prefix saves, a fresh process loads
+# that SRAM image and its continuation must match the full replay.
+.PHONY: test-sc64-p8-replay
+test-sc64-p8-replay: build/test-sc64-p8-replay build/test-sc64-p8-replay-prefix build/test-sc64-p8-replay-resume tools/sc64_p8_arm_replay.py
+	./build/test-sc64-p8-replay > $(P8_ARM_DIR)/host-full.txt
+	rm -f $(P8_ARM_DIR)/host-prefix.sav
+	./build/test-sc64-p8-replay-prefix $(P8_ARM_DIR)/host-prefix.sav > $(P8_ARM_DIR)/host-prefix.txt || true
+	./build/test-sc64-p8-replay-resume $(P8_ARM_DIR)/host-prefix.sav > $(P8_ARM_DIR)/host-resume.txt
+	$(PYTHON) tools/sc64_p8_arm_replay.py compare --from-tick $$(sed -n 's/^#define P8_TAPE_RESUME_TICK \([0-9]*\)u$$/\1/p' $(P8_ARM_DIR)/sc64_p8_tape_generated.h) $(P8_ARM_DIR)/host-full.txt $(P8_ARM_DIR)/host-resume.txt
+.PHONY: test-sc64-protoss-p8
+test-sc64-protoss-p8: test-sc64-p8-controller test-sc64-p8-replay
+define P8_ARM_ROM
+build/starcraft-protoss-p8-$(1).elf: $$(P8_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
+	$$(CC) $$(CFLAGS) $$(PROTOSS_P8_FLAGS) -I$$(P8_ARM_DIR) $(2) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p8-$(1).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-Protoss-P8-$(3).gba: build/starcraft-protoss-p8-$(1).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC P8 REPLAY' SCP8
+endef
+$(eval $(call P8_ARM_ROM,replay,,Replay))
+$(eval $(call P8_ARM_ROM,replay-prefix,-DP8_REPLAY_PREFIX,Replay-Prefix))
+$(eval $(call P8_ARM_ROM,replay-resume,-DP8_REPLAY_RESUME,Replay-Resume))
+.PHONY: sc64-p8-arm-replay
+sc64-p8-arm-replay: build/StarCraft-Protoss-P8-Replay.gba build/StarCraft-Protoss-P8-Replay-Prefix.gba build/StarCraft-Protoss-P8-Replay-Resume.gba
+
 build/test-sc64-p5-transport-on: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_P5_SHUTTLE_ENABLED $< -o $@
 build/test-sc64-p5-transport-off: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
@@ -4551,7 +4643,7 @@ SHOWCASE_INPUTS = $(BC_INPUTS) $(P7_ARBITER_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
 SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(SHOWCASE_CONTACT_BASE_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SHOWCASE_HUD_CACHE_FLAGS)
 build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Showcase-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -5263,7 +5355,7 @@ $(foreach profile,terran zerg-z6 protoss-p7 zerg-z7,$(eval $(call CONSTRUCTION_A
 # log (tests/sc64_ui_arm_probe.c). Run twice with one isolated save directory.
 UI_ARM_COMMON := $(filter-out common/main.c,$(COMMON))
 build/starcraft-showcase-ui-probe.elf: tests/sc64_ui_arm_probe.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(COMMAND_ICON_HEADER) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase-ui-probe.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase-ui-probe.map -lgcc -o $@
 	$(SIZE) $@
 build/starcraft64-races-ui-probe.elf: tests/sc64_ui_arm_probe.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(RACES_FLAGS) $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -Wl,-Map,build/starcraft64-races-ui-probe.map -lgcc -o $@
@@ -5365,7 +5457,7 @@ build/test-sc64-shared-mechanics-zerg: tests/sc64_shared_mechanics_game.c $(STAR
 build/test-sc64-shared-mechanics-protoss: tests/sc64_shared_mechanics_game.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-shared-mechanics-showcase: tests/sc64_shared_mechanics_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
-	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) -o $@
 build/test-sc64-shared-mechanics-races: tests/sc64_shared_mechanics_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(RACES_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 build/test-sc64-shared-mechanics-unified: tests/sc64_shared_mechanics_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
@@ -5377,6 +5469,22 @@ test-sc64-shared-mechanics: build/test-sc64-shared-mechanics-terran build/test-s
 	./build/test-sc64-shared-mechanics-showcase
 	./build/test-sc64-shared-mechanics-races
 	./build/test-sc64-shared-mechanics-unified
+
+# Shared Protoss unit services (Carrier Interceptors, cloak and detection,
+# Shield Batteries) in custom games and Showcase scenes, on the production
+# compile vectors of every product that carries those actors.
+.PHONY: test-sc64-protoss-services
+PROTOSS_SERVICES_DEPS = tests/sc64_protoss_services_game.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile
+build/test-sc64-protoss-services-p7: $(PROTOSS_SERVICES_DEPS) $(PROTOSS_P7_CANONICAL_INPUTS) | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+build/test-sc64-protoss-services-p8: $(PROTOSS_SERVICES_DEPS) $(PROTOSS_P8_INPUTS) | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+build/test-sc64-protoss-services-showcase: $(PROTOSS_SERVICES_DEPS) $(SHOWCASE_INPUTS) | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+test-sc64-protoss-services: build/test-sc64-protoss-services-p7 build/test-sc64-protoss-services-p8 build/test-sc64-protoss-services-showcase
+	./build/test-sc64-protoss-services-p7
+	./build/test-sc64-protoss-services-p8
+	./build/test-sc64-protoss-services-showcase
 
 .PHONY: test-sc64-building-damage test-sc64-firebat-damage
 test-sc64-building-damage: build/test-sc64-building-damage

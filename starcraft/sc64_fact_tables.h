@@ -49,6 +49,10 @@
     !(SC64_FACT_GENERATED_FEATURES & SC64_FACT_FEATURE_P7_RECT)
 #error "rectangle lookup requires V2 with the P7 rectangle feature"
 #endif
+#if !defined(SC64_FACT_P7_RECT_REVISION) || \
+    SC64_FACT_P7_RECT_REVISION != SC64_FACT_P7_RECT_REVISION_CURRENT
+#error "rectangle tables require current geometry revision; regenerate fact tables"
+#endif
 #endif
 
 #undef sc64_game_unit_actor_flags

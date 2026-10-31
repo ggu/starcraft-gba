@@ -495,6 +495,15 @@ race_campaign_init(void)
     memset(&race_z7_ops, 0, sizeof(race_z7_ops));
     race_z7_map = 0;
 #endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    /* Every game starts with a fresh shared Protoss service clock; mission
+     * bindings reset their own clocks in their runtime init. */
+    memset(race_protoss_generic_clock, 0, sizeof(race_protoss_generic_clock));
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    sc64_p7_arbiter_cache_due = 0;
+    sc64_p7_arbiter_cache_initialized = 0;
+#endif
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
@@ -527,6 +536,9 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
          && race_selected_mission != SC64_P7_GLOBAL_ID
+#endif
+#ifdef SC64_P8_RUNTIME
+         && race_selected_mission != SC64_P8_GLOBAL_ID
 #endif
 #ifdef SC64_Z7_RUNTIME
          && race_selected_mission != SC64_Z7_GLOBAL_ID
@@ -579,6 +591,11 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (race_p7_active() && !race_p7_map_shape_valid(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (race_p8_active() && !race_p8_map_shape_valid(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
@@ -903,6 +920,11 @@ race_campaign_init(void)
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
+#ifdef SC64_P8_RUNTIME
+    if (!race_p8_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
     switch (race_selected_mission) {
 #ifdef SC64_Z7_RUNTIME
     case SC64_Z7_GLOBAL_ID: minerals = gas = 0; break;
@@ -918,6 +940,9 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
     case SC64_P7_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_P8_RUNTIME
+    case SC64_P8_GLOBAL_ID: minerals = gas = 0; break;
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     case 10: case 11: case 12: case 13: minerals = gas = 0; break;
@@ -1249,6 +1274,21 @@ race_campaign_tick(void)
         return;
     }
 #endif
+#ifdef SC64_P8_RUNTIME
+    if (mission == SC64_P8_GLOBAL_ID) {
+        if (!race_p8_runtime_tick(race_campaign.elapsed_frames)) {
+            screen=SCREEN_PAUSE; toast(14); return;
+        }
+        if (race_p8_outcome()==SC64_P8_OUTCOME_WON) {
+            won=1; lost=0; race_campaign.phase=SC64_RACE_PHASE_COMPLETE;
+            race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;
+            race_completed |= 1 << SC64_P8_GLOBAL_ID;
+        } else if (race_p8_outcome()==SC64_P8_OUTCOME_LOST) {
+            won=0; lost=1; race_campaign.phase=SC64_RACE_PHASE_FAILED;
+        }
+        return;
+    }
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (mission == SC64_Z7_GLOBAL_ID) {
         if (!race_z7_runtime_tick(0, race_campaign.elapsed_frames)) {
@@ -1460,6 +1500,9 @@ race_campaign_objective_text(void)
 #endif
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active()) return "Destroy both Protoss Nexuses. Keep Kerrigan alive and the Dark Templar out of the hives.";
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (race_p8_active()) return "Free Tassadar from the Stasis Cell. Keep Fenix and the Hyperion alive.";
 #endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active()) return "Destroy all enemy buildings.";

@@ -871,6 +871,9 @@ static int race_p7_union_tail_valid(const RaceSave *candidate)
     if (sizeof(candidate->p6)>union_size) union_size=sizeof(candidate->p6);
 #endif
     if (sizeof(candidate->p7)>union_size) union_size=sizeof(candidate->p7);
+#ifdef SC64_P8_RUNTIME
+    if (sizeof(candidate->p8)>union_size) union_size=sizeof(candidate->p8);
+#endif
     if (candidate->state[0]==0) {
 #ifdef SC64_P5_RUNTIME
         if (candidate->state[2]==SC64_P5_GLOBAL_ID)
@@ -882,6 +885,10 @@ static int race_p7_union_tail_valid(const RaceSave *candidate)
 #endif
         if (candidate->state[2]==SC64_P7_GLOBAL_ID)
             active_size=sizeof(candidate->p7);
+#ifdef SC64_P8_RUNTIME
+        if (candidate->state[2]==SC64_P8_GLOBAL_ID)
+            active_size=sizeof(candidate->p8);
+#endif
     }
     if (active_size>union_size) return 0;
     const u8 *bytes=(const u8 *)&candidate->p7;
@@ -1062,6 +1069,9 @@ static int race_save_game(void) {
     for (int i=0;i<MAX_UNITS;++i)
         if (u[i].alive && (sc64_race_raw_unit(u[i].type)==46 ||
                            sc64_race_raw_unit(u[i].type)==52)) return 0;
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (!race_p8_live_products_valid()) return 0;
 #endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     if (race_scarab_probe_bullets_pending()) return 0;
@@ -1287,6 +1297,13 @@ static int race_save_game(void) {
 #ifdef SC64_SHARED_BATTERY
     race_data.state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]=SC64_SHIELD_PHASE_SAVE_MARKER;
 #endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (race_mode) {
+        if (!race_p7_battery_live_world_valid()) return 0;
+        race_data.state[SC64_PROTOSS_CLOCK_STATE_INDEX] =
+            race_protoss_clock_word(race_protoss_generic_clock);
+    }
+#endif
 #ifdef SC64_CONSTRUCTION_HP
     race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
 #endif
@@ -1372,6 +1389,9 @@ static int race_save_game(void) {
 #ifdef SC64_P7_BATTERY_ENABLED
                !race_p7_active() &&
 #endif
+#ifdef SC64_P8_RUNTIME
+               !race_p8_active() &&
+#endif
                1) {
         memset(&race_data.p5, 0, sizeof(race_data.p5));
     }
@@ -1393,6 +1413,9 @@ static int race_save_game(void) {
 #ifdef SC64_P7_BATTERY_ENABLED
                !race_p7_active() &&
 #endif
+#ifdef SC64_P8_RUNTIME
+               !race_p8_active() &&
+#endif
                1) {
 #endif
         memset(&race_data.p6, 0, sizeof(race_data.p6));
@@ -1410,8 +1433,20 @@ static int race_save_game(void) {
 #ifdef SC64_P6_RUNTIME
                !race_p6_active() &&
 #endif
+#ifdef SC64_P8_RUNTIME
+               !race_p8_active() &&
+#endif
                1) {
         memset(&race_data.p7,0,sizeof(race_data.p7));
+    }
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (race_p8_active()) {
+        if (!race_p8_runtime_state_valid() ||
+            !race_p7_battery_live_world_valid()) return 0;
+        /* Clear the whole shared union so its tail stays zero. */
+        memset(&race_data.p6,0,sizeof(race_data.p6));
+        race_data.p8=race_p8;
     }
 #endif
 #ifdef SC64_Z5_RUNTIME
@@ -1513,6 +1548,9 @@ static int race_save_game(void) {
 #ifdef SC64_P7_BATTERY_ENABLED
              !race_p7_active() &&
 #endif
+#ifdef SC64_P8_RUNTIME
+             !race_p8_active() &&
+#endif
              1) {
 #else
     else {
@@ -1535,6 +1573,9 @@ static int race_save_game(void) {
 #ifdef SC64_P7_BATTERY_ENABLED
              !race_p7_active() &&
 #endif
+#ifdef SC64_P8_RUNTIME
+             !race_p8_active() &&
+#endif
              1) {
 #else
     else {
@@ -1555,10 +1596,17 @@ static int race_save_game(void) {
 #ifdef SC64_P6_RUNTIME
              !race_p6_active() &&
 #endif
+#ifdef SC64_P8_RUNTIME
+             !race_p8_active() &&
+#endif
              1) {
         const u8 *bytes=(const u8 *)&race_data.p7;
         for (unsigned i=0;i<sizeof(race_data.p7);++i) if (bytes[i]) return 0;
     }
+#ifdef SC64_P8_RUNTIME
+    if (race_p8_active() && !sc64_p8_persistent_state_valid(&race_data.p8))
+        return 0;
+#endif
 #if defined(SC64_P5_RUNTIME) && defined(SC64_P6_RUNTIME)
     if (race_p7_active()) {
         const u8 *bytes=(const u8 *)&race_data.p7;
@@ -1678,7 +1726,6 @@ static int race_save_game(void) {
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
-    /* The mission dispatch below selects at most one expanded state. */
     union {
         int unused;
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -1713,11 +1760,19 @@ typedef struct {
 } RaceLoadPlan;
 
 /* May modify candidate/route scratch, never the live world or SRAM. */
-static int race_load_preflight(RaceLoadPlan *plan) {
+static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
     const int *v=race_data.state;
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+    race_protoss_bind_candidate(v[0], v[2]);
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    /* Only the generic binding keeps its service clock in the state words. */
+    if (!race_protoss_clock_word_valid(v[SC64_PROTOSS_CLOCK_STATE_INDEX]) ||
+        (v[SC64_PROTOSS_CLOCK_STATE_INDEX] && !v[0])) return 0;
+#endif
     int building_damage_marker=v[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX];
     if (building_damage_marker && building_damage_marker!=SC64_BUILDING_DAMAGE_SAVE_MARKER) return 0;
 #ifdef SC64_CONSTRUCTION_HP
@@ -1743,6 +1798,9 @@ static int race_load_preflight(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
        &&v[2]!=SC64_P7_GLOBAL_ID
+#endif
+#ifdef SC64_P8_RUNTIME
+       &&v[2]!=SC64_P8_GLOBAL_ID
 #endif
 #ifdef SC64_Z6_RUNTIME
        &&v[2]!=SC64_Z6_GLOBAL_ID
@@ -1782,6 +1840,9 @@ static int race_load_preflight(RaceLoadPlan *plan) {
 #ifdef SC64_P7_BATTERY_ENABLED
         &&v[2]!=SC64_P7_GLOBAL_ID
 #endif
+#ifdef SC64_P8_RUNTIME
+        &&v[2]!=SC64_P8_GLOBAL_ID
+#endif
 #ifdef SC64_Z6_RUNTIME
         &&v[2]!=SC64_Z6_GLOBAL_ID
 #endif
@@ -1805,6 +1866,9 @@ static int race_load_preflight(RaceLoadPlan *plan) {
                                                )
 #ifdef SC64_P7_BATTERY_ENABLED
        | (1u << SC64_P7_GLOBAL_ID)
+#endif
+#ifdef SC64_P8_RUNTIME
+       | (1u << SC64_P8_GLOBAL_ID)
 #endif
 #ifdef SC64_T5_RUNTIME
        | (1u << SC64_T5_GLOBAL_ID)
@@ -1898,6 +1962,11 @@ static int race_load_preflight(RaceLoadPlan *plan) {
         int target=RACE_U(i,target),order=RACE_U(i,order);
         if((order==ORDER_MINE&&(target<0||target>=MAX_MINERALS))||
            ((order==ORDER_GAS||order==ORDER_BUILD)&&(target<0||target>=MAX_BUILDINGS)))return 0;
+#ifdef SC64_P8_RUNTIME
+        if (v[0]==0 && v[2]==SC64_P8_GLOBAL_ID && SC64_PENDING_BUILD_ORDER(order) &&
+            !race_p8_source_product_available(RACE_U(i,owner),RACE_U(i,raw_owner),
+                sc64_race_raw_building(target))) return 0;
+#endif
         if (SC64_PENDING_BUILD_ORDER(order) &&
             !sc64_pending_build_save_identity_valid(&race_data,
                 RACE_U(i,alive), RACE_U(i,owner), RACE_U(i,type), target,
@@ -1910,10 +1979,10 @@ static int race_load_preflight(RaceLoadPlan *plan) {
              * A pause/save preserves that order until its next service tick. */
             Building target_battery;
             const Sc64RaceUnitRule *unit_rule=sc64_race_unit_rule(candidate_unit.type);
-            if (race_data.state[0] != 0 ||
-                race_data.state[2] != SC64_P7_GLOBAL_ID ||
-                candidate_unit.raw_type==73 || candidate_unit.raw_type==85 ||
-                candidate_unit.raw_owner<0 || candidate_unit.raw_owner>=8 ||
+            /* The candidate's mode is bound for this preflight. */
+            if (!race_protoss_services_active() ||
+                RACE_PROTOSS_RAW(&candidate_unit)==73 || RACE_PROTOSS_RAW(&candidate_unit)==85 ||
+                RACE_PROTOSS_SLOT(&candidate_unit)<0 || RACE_PROTOSS_SLOT(&candidate_unit)>=8 ||
                 candidate_unit.work_timer!=0 || !unit_rule ||
                 unit_rule->race!=R_PROTOSS ||
                 !(unit_rule->flags&SC_RACE_F_SHIELDS) ||
@@ -1926,9 +1995,9 @@ static int race_load_preflight(RaceLoadPlan *plan) {
                 target>=MAX_BUILDINGS ||
                 !race_save_decode_building(&race_data,(unsigned)target,&target_battery) ||
                 !target_battery.alive || target_battery.type!=B_P7_SHIELD_BATTERY ||
-                target_battery.raw_type!=172 || target_battery.under_construction ||
+                RACE_PROTOSS_RAW(&target_battery)!=172 || target_battery.under_construction ||
                 target_battery.owner!=candidate_unit.owner ||
-                target_battery.raw_owner!=candidate_unit.raw_owner) return 0;
+                RACE_PROTOSS_SLOT(&target_battery)!=RACE_PROTOSS_SLOT(&candidate_unit)) return 0;
         }
 #endif
 #ifdef SC64_T6_RUNTIME
@@ -2079,6 +2148,17 @@ static int race_load_preflight(RaceLoadPlan *plan) {
             if (candidate_building.raw_owner!=0 && candidate_building.raw_owner!=4 &&
                 candidate_building.raw_owner!=7) return 0;
         }
+        else if (candidate_building.type==B_P7_SHIELD_BATTERY &&
+                 race_protoss_service_binding()==SC64_PROTOSS_BIND_GENERIC &&
+                 !race_protoss_generic_battery_candidate_valid(&candidate_building))
+            return 0;
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+        else if (candidate_building.type==B_P7_SHIELD_BATTERY &&
+                 race_protoss_service_binding()==SC64_PROTOSS_BIND_LATER &&
+                 !race_protoss_later_battery_candidate_valid(race_data.state[2],
+                                                             &candidate_building))
+            return 0;
+#endif
 #endif
         for(int j=0;j<RACE_B(i,queue_count);j++) {
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
@@ -2087,6 +2167,11 @@ static int race_load_preflight(RaceLoadPlan *plan) {
             int type=race_data.buildings[i][offsetof(Building,queue)/sizeof(int)+(RACE_B(i,queue_head)+j)%5];
 #endif
             if(type<0||type>=SC_RU_COUNT)return 0;
+#ifdef SC64_P8_RUNTIME
+            if (v[0]==0 && v[2]==SC64_P8_GLOBAL_ID &&
+                !race_p8_source_product_available(candidate_building.owner,candidate_building.raw_owner,
+                    sc64_race_raw_unit(type))) return 0;
+#endif
         }
     }
 #undef RACE_U
@@ -2308,6 +2393,11 @@ static int race_load_preflight(RaceLoadPlan *plan) {
             /* P7 shares the Protoss mission payload union. */
         } else
 #endif
+#ifdef SC64_P8_RUNTIME
+        if (!v[0] && v[2] == SC64_P8_GLOBAL_ID) {
+            /* P8 shares the Protoss mission payload union. */
+        } else
+#endif
         {
         const u8 *bytes = (const u8 *)&race_data.p5;
         for (unsigned i = 0; i < sizeof(race_data.p5); ++i)
@@ -2335,6 +2425,11 @@ static int race_load_preflight(RaceLoadPlan *plan) {
 #if defined(SC64_P7_BATTERY_ENABLED)
         if (!v[0] && v[2] == SC64_P7_GLOBAL_ID) {
             /* P7 owns the payload in the shared union. */
+        } else
+#endif
+#ifdef SC64_P8_RUNTIME
+        if (!v[0] && v[2] == SC64_P8_GLOBAL_ID) {
+            /* P8 owns the payload in the shared union. */
         } else
 #endif
         {
@@ -2405,6 +2500,11 @@ static int race_load_preflight(RaceLoadPlan *plan) {
             /* P6 owns the shared payload. */
         } else
 #endif
+#ifdef SC64_P8_RUNTIME
+        if (!v[0] && v[2]==SC64_P8_GLOBAL_ID) {
+            /* P8 owns the shared payload. */
+        } else
+#endif
         {
             const u8 *bytes=(const u8 *)&race_data.p7;
             for (unsigned i=0;i<sizeof(race_data.p7);++i)
@@ -2418,6 +2518,48 @@ static int race_load_preflight(RaceLoadPlan *plan) {
             if (bytes[i]) return 0;
     }
 #endif
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (!v[0] && v[2]==SC64_P8_GLOBAL_ID) {
+        const Sc64P8PersistentState *p8=&race_data.p8;
+        unsigned outcome=p8->runtime[SC64_P8_RUNNER_HUMAN].outcome;
+        unsigned phase=race_data.campaign.phase;
+        if (!sc64_p8_persistent_state_valid(p8) ||
+            !race_p8_map_shape_valid(&sc64_race_maps[SC64_P8_GLOBAL_ID]) ||
+            race_data.campaign.mission!=SC64_P8_GLOBAL_ID ||
+            race_data.campaign.elapsed_frames!=(u32)v[7] ||
+            p8->runtime[SC64_P8_RUNNER_DEFENDERS].outcome!=SC64_P8_OUTCOME_RUNNING ||
+            p8->runtime[SC64_P8_RUNNER_CONCLAVE].outcome!=SC64_P8_OUTCOME_RUNNING)
+            return 0;
+        /* The shared census requires a source identity on every live actor. */
+        for (unsigned i=0;i<MAX_UNITS;++i) {
+            Unit candidate;
+            if (!race_save_decode_unit(&race_data,i,(unsigned)(width*16),
+                                       (unsigned)(height*16),&candidate)) return 0;
+            if (candidate.alive && (candidate.raw_owner<0 || candidate.raw_owner>=8 ||
+                sc64_race_unit_from_raw(candidate.raw_type)<0)) return 0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+            if (!sc64_p7_arbiter_cache_unit_valid(&candidate)) return 0;
+#endif
+        }
+        for (unsigned i=0;i<MAX_BUILDINGS;++i) {
+            Building candidate;
+            if (!race_save_decode_building(&race_data,i,&candidate)) return 0;
+            if (candidate.alive && (candidate.raw_owner<0 || candidate.raw_owner>=8 ||
+                sc64_race_building_from_raw(candidate.raw_type)<0)) return 0;
+        }
+        if (outcome==SC64_P8_OUTCOME_RUNNING) {
+            if (v[18]||v[19]||phase!=SC64_RACE_PHASE_ACTIVE||
+                (race_data.campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+        } else if (outcome==SC64_P8_OUTCOME_WON) {
+            if (!v[18]||v[19]||phase!=SC64_RACE_PHASE_COMPLETE||
+                !(race_data.campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY)||
+                !(v[3]&(1<<SC64_P8_GLOBAL_ID))) return 0;
+        } else if (outcome==SC64_P8_OUTCOME_LOST) {
+            if (v[18]||!v[19]||phase!=SC64_RACE_PHASE_FAILED||
+                (race_data.campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+        } else return 0;
+    }
 #endif
 #ifdef SC64_Z5_RUNTIME
     if (!v[0] && v[2] == SC64_Z5_GLOBAL_ID) {
@@ -2740,6 +2882,14 @@ static int race_load_preflight(RaceLoadPlan *plan) {
     return 1;
 }
 
+static int race_load_preflight(RaceLoadPlan *plan) {
+    int ok = race_load_preflight_candidate(plan);
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+    race_protoss_unbind_candidate();
+#endif
+    return ok;
+}
+
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 /* Stage scope: supported skirmish geometries and the Terran compact codec.
  * The tag, never field values, determines the parent representation. */
@@ -3021,6 +3171,23 @@ static int race_load_game(void) {
     }
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
+    /* Custom games: restore the shared service clock. Saves from before the
+     * shared services carry no cache word; those actors start with an empty
+     * one. */
+    if (race_mode) {
+        race_protoss_clock_from_word(race_protoss_generic_clock,
+                                     v[SC64_PROTOSS_CLOCK_STATE_INDEX]);
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        sc64_p7_arbiter_cache_due=0;
+        sc64_p7_arbiter_cache_initialized=
+            race_protoss_generic_clock[1] || race_protoss_generic_clock[2];
+        for (int i=0;i<MAX_UNITS;++i)
+            if (!sc64_p7_arbiter_cache_empty_unit(&u[i]) &&
+                !SC64_P7_ARBITER_CACHE_VALID(u[i].weapon))
+                u[i].weapon=(u16)(1u<<13);
+#endif
+        if (!race_p7_battery_live_world_valid()) return 0;
+    }
     if (race_p7_active()) {
         race_p7 = race_data.p7;
         if (!race_p7_rebind_loaded_world(&sc64_race_maps[SC64_P7_GLOBAL_ID]) ||
@@ -3029,6 +3196,16 @@ static int race_load_game(void) {
         memset(&race_p7, 0, sizeof(race_p7));
         memset(&race_p7_world, 0, sizeof(race_p7_world));
         race_p7_map = 0;
+    }
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (race_p8_active()) {
+        race_p8 = race_data.p8;
+        if (!race_p8_rebind_loaded_world(&sc64_race_maps[SC64_P8_GLOBAL_ID]))
+            return 0;
+    } else {
+        memset(&race_p8, 0, sizeof(race_p8));
+        race_p8_map = 0;
     }
 #endif
 #ifdef SC64_Z5_RUNTIME
