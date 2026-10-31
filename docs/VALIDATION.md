@@ -8264,3 +8264,43 @@ is retained, and all 109 fixed input content hashes matched afterward.
 No canonical menu, actor capacity or release ROM package is changed here.
 
 Physical replay also records the existing shipped main-loop timing counters when available. The reported rate includes presentation waits and UI updates in that replay; it is emulator main-loop evidence, not a physical-device FPS guarantee. Every timing histogram must account for exactly the observed update count.
+
+### Opt-in race save UI context: Z7 continuation witness (2026-10-31)
+
+The `SC64_SAVE_UI_CONTEXT` experiment uses RaceSave state word 31 for a
+versioned selected-building and command-menu preference record. Word 30 is
+already the generic Protoss service clock. The feature is not enabled in the
+canonical build flags. It retains the existing RaceSave size and validates the
+extension before applying the candidate world. A legacy zero word preserves
+the old reset behavior; a dead selected building restores as no selection.
+
+With public Z7 source `55751df`, the physical-resume boundary fix `63f63ee`
+and the opt-in UI prototype through `276137a`, a normal Z7 experimental ROM
+(SHA-256 `64bea52aad8a8535256e2386339c2a3e888e05af6bbe73de9bd9342721068e9b`)
+was replayed with the input-only host trace, using physical emulator buttons.
+The unchanged named model/count/economy checks passed at all 303 retained
+observations: 81 through the ordinary pause-save cut at host tick 30204, and
+222 after a fresh-process title load. The resumed run won at host tick 179764,
+frame 177804, with no Z7 fault. Its output stop was 149561 updates, including
+one title load update. The SRAM seed and replay inputs were hash-checked for
+changes. This is an emulator witness for this ROM, trace and bounded state
+comparison; it is not complete world equivalence, other missions, physical
+hardware, or a 30 FPS claim. The resumed loop averaged approximately 6.19 Hz
+in this emulator, including UI and presentation work.
+
+At the cut, the ordinary save's marked UI context encoded building 57 and
+menu cursor/last command 1. A fresh process restored these fields and the
+bounded saved world/model fingerprint. The original shipping ROM loaded the
+new record with its old UI reset behavior, and the experimental ROM likewise
+loaded an original zero-word SRAM record. Separately mutated, checksummed
+records demonstrated safe handling of a dead selected building and rejection
+of malformed marker, building index, cursor and last-command values at title.
+
+The shared fixture's manual candidate writer was corrected on the test-only
+branch to use the actual compact impact envelope where required. Its original
+construction and burn assertions, plus explicit UI extension load/rejection
+cases, passed for Terran, Zerg and Protoss production profile builds with the
+feature both disabled and enabled. Each enabled profile exercised all three
+human races. The 109 prepared build inputs were checked unchanged at those
+builds' preflight and postflight; these historical checks do not assert the
+continued availability of the original input paths.
