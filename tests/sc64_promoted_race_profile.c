@@ -506,9 +506,29 @@ static void test_all_skirmish_lineups(void)
     printf("Promoted race skirmish startup/save matrix: %d configurations passed\n", cases);
 }
 
+#ifdef SC64_P8_RUNTIME
+static void test_p7_journal_isolation(void)
+{
+    static const u8 old_record[] = {1,2,3,4,5,6,7,8};
+    u8 copy[sizeof(old_record)]; u32 len=0;
+    const u32 p7_tag=0x5343505bu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG;
+    assert(p7_tag != SAVE_VERSION);
+    game_init();
+    int old_screen=screen, old_frame=frame;
+    save_write(old_record,sizeof(old_record),p7_tag);
+    assert(!race_load_game());
+    assert(screen==old_screen && frame==old_frame);
+    assert(save_read_latest(copy,sizeof(copy),p7_tag,&len));
+    assert(len==sizeof(copy) && !memcmp(copy,old_record,sizeof(copy)));
+}
+#endif
+
 int main(void)
 {
     gba_init();
+#ifdef SC64_P8_RUNTIME
+    test_p7_journal_isolation();
+#endif
     assert(SC64_RACE_SAVE_GENERATION == PROFILE_SAVE_GENERATION);
     const unsigned mission_count = sizeof(profile_missions) / sizeof(profile_missions[0]);
     assert(sc64_catalog_playable_count(PROFILE_FACTION) == mission_count);
