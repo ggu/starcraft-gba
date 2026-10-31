@@ -1,5 +1,6 @@
 /* Moving imported units turn toward their destination and cycle their
- * source walk poses; standing units keep their facing frame.
+ * source walk poses; standing ground units keep their facing frame, while
+ * idle flyers keep beating their wings.
  * SPDX-License-Identifier: GPL-3.0-or-later */
 #include <assert.h>
 #include <stdio.h>
@@ -150,6 +151,70 @@ static void test_walk(int type, const char *name)
            name, east, north_west);
 }
 
+/* An idle flyer with a source cycle keeps playing it in place: every pose
+ * shows across one cycle, drawn at its facing, with no stride lift. A flyer
+ * without one holds its facing frame. Nothing it draws moves or orders it. */
+static void test_hover(int type, const char *name)
+{
+    int raw = sc64_race_raw_unit(type);
+    if (raw < 0) {
+        printf("SKIP %s hover: not in this race bank\n", name);
+        return;
+    }
+    assert(sc64_race_unit_flying(type));
+    const Sc64UnitWalkCycle *cycle = sc64_unit_walk_cycle((unsigned short)raw);
+    setup();
+    int slot = spawn_unit(SIDE, type, 200, 200);
+    assert(slot >= 0 && u[slot].order == ORDER_IDLE);
+    int x = u[slot].x, y = u[slot].y;
+    if (!cycle) {
+        const Sc64SpriteFrame *idle = sc64_unit_facing_frames((unsigned short)raw);
+        assert(idle);
+        frame = 0;
+        unsigned first = draw_centred(slot);
+        for (frame = 1; frame < 40; ++frame) assert(draw_centred(slot) == first);
+        assert(first == expected_centred(idle, 0));
+        printf("PASS %s hover: no source cycle, facing frame held\n", name);
+        return;
+    }
+    const Sc64SpriteFrame *seen[SC64_UNIT_WALK_MAX_STEPS] = {0};
+    int poses = 0, changes = 0;
+    unsigned last = 0;
+    /* Five game frames make four source ticks. */
+    for (frame = 0; frame < (int)cycle->cycle_ticks * 5 / 4 + 5; ++frame) {
+        unsigned drawn = draw_centred(slot);
+        const Sc64SpriteFrame *pose = sc64_walk_pose((unsigned)raw, slot);
+        assert(pose && drawn == expected_pose(pose, sc64_facing[slot] & SC64_FACING_MASK));
+        changes += frame && drawn != last;
+        last = drawn;
+        int known = 0;
+        for (int i = 0; i < poses; ++i) known |= seen[i] == pose;
+        if (!known && poses < (int)SC64_UNIT_WALK_MAX_STEPS) seen[poses++] = pose;
+    }
+    assert(poses == (int)cycle->count);
+    assert(cycle->count < 2 || changes > 0);
+    /* Rendering must never mutate the actor's simulation state, including
+     * moving, attacking, stopping, and a paused frame. */
+    const int orders[] = { ORDER_IDLE, ORDER_MOVE, ORDER_ATTACK_TARGET, ORDER_IDLE };
+    for (unsigned k=0;k<sizeof(orders)/sizeof(orders[0]);++k) {
+        u[slot].order=orders[k]; u[slot].target=-1;
+        u[slot].tx=x+64; u[slot].ty=y;
+        screen=k==3 ? SCREEN_PAUSE : SCREEN_PLAY;
+        Unit before=u[slot]; frame=23;
+        unsigned first=draw_centred(slot);
+        assert(!memcmp(&before,&u[slot],sizeof(before)));
+        const Sc64SpriteFrame *pose=sc64_walk_pose((unsigned)raw,slot);
+        assert(pose && first==expected_pose(pose,sc64_facing[slot]&SC64_FACING_MASK));
+        if (screen==SCREEN_PAUSE) {
+            assert(draw_centred(slot)==first);
+            assert(!memcmp(&before,&u[slot],sizeof(before)));
+        }
+    }
+    screen=SCREEN_PLAY; u[slot].order=ORDER_IDLE;
+    assert(u[slot].x == x && u[slot].y == y);
+    printf("PASS %s hover: %d poses while idle, %d changes\n", name, poses, changes);
+}
+
 /* A moving Tank rolls its tread poses; the turret stays level with them. */
 static void test_tank(void)
 {
@@ -194,6 +259,9 @@ int main(void)
     test_walk(U_ZEALOT, "zealot");
     test_walk(U_HYDRALISK, "hydralisk");
     test_walk(U_DRONE, "drone");
+    test_hover(U_MUTALISK, "mutalisk");
+    test_hover(U_OVERLORD, "overlord");
+    test_hover(U_WRAITH, "wraith");
     test_tank();
     return 0;
 }
