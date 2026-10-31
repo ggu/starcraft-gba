@@ -632,6 +632,12 @@ int main(int argc,char **argv)
        command itself is entirely controller input. */
     click(limit(cx+96,0,WORLD_W-1),limit(cy+96,0,WORLD_H-1));
     for(int target=0;target<256&&screen==SCREEN_PLAY&&!won&&!lost;target++) {
+        /* Defense interruptions can end an attack wait before its periodic
+         * economy check. Rebuild a lost Extractor through ordinary inputs. */
+        if(!count_buildings(SIDE,B_EXTRACTOR)&&minerals>=50) {
+            (void)ensure_extractor();
+            if(screen!=SCREEN_PLAY||won||lost)break;
+        }
         if(order_local_defense()) {
             for(int hold=0;hold<2400&&screen==SCREEN_PLAY&&!won&&!lost;hold++) {
                 controller_frame(0);
