@@ -395,21 +395,26 @@ static void test_ui_save_context(int human)
 #ifdef SC_FIELD_FEEDBACK
     assert(menu_last==2);
 #endif
-    /* Legacy zero keeps the historical selection reset. */
-    saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=0;
-    save_write(&saved_candidate,sizeof(saved_candidate),SAVE_VERSION);
-    selected_building=building; assert(race_load_game()); assert(selected_building==-1);
-    /* A valid encoded slot that is now absent is harmless. */
+    /* The candidate validator accepts a legacy zero and a now-dead but
+       in-range building; malformed extensions fail before commit. */
     int absent=-1; for(int i=0;i<MAX_BUILDINGS;i++) if(!b[i].alive) { absent=i; break; }
     assert(absent>=0);
-    saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=(int)sc64_save_ui_encode(absent,MAX_BUILDINGS,3,2);
-    save_write(&saved_candidate,sizeof(saved_candidate),SAVE_VERSION);
-    assert(race_load_game()); assert(selected_building==-1);
+    assert(sc64_save_ui_valid(0,MAX_BUILDINGS));
+    unsigned stale=sc64_save_ui_encode(absent,MAX_BUILDINGS,3,2);
+    assert(sc64_save_ui_valid(stale,MAX_BUILDINGS));
     const unsigned invalid[] = {0x12345678u,SC64_SAVE_UI_TAG | (MAX_BUILDINGS+1u),
                                 SC64_SAVE_UI_TAG | (64u<<8),SC64_SAVE_UI_TAG | (64u<<16)};
     for (unsigned i=0;i<sizeof(invalid)/sizeof(invalid[0]);++i) {
-        saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=(int)invalid[i]; expect_candidate_rejected();
+        assert(!sc64_save_ui_valid(invalid[i],MAX_BUILDINGS));
+        race_data=saved_candidate;
+        race_data.state[SC64_SAVE_UI_STATE_INDEX]=(int)invalid[i];
+        RaceLoadPlan plan={0};
+        assert(!race_load_preflight_candidate(&plan));
     }
+    /* Saving a stale selection succeeds and emits none. */
+    selected_building=absent; menu_cursor=3;
+    assert(race_save_game()); assert(race_load_game());
+    assert(selected_building==-1);
     selected_building=MAX_BUILDINGS+5; menu_cursor=300;
 #ifdef SC_FIELD_FEEDBACK
     menu_last=255;
