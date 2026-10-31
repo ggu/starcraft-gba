@@ -253,3 +253,34 @@ it passed.
 Ordinary impact packets, Scarabs and Dark Swarm remain outside this typed
 reservation. The 16-bit handle generation wrap and all-profile/link/save
 qualification remain open, so this stage is not ready to activate.
+
+### Real Scarab reservation checkpoint
+
+On shared merge `e7df0d1`, `SC64_SHARED_PROJECTILE_STAGE` and the existing
+Scarab weapon probe together reserve one typed slot when the actual Scarab
+bullet is created, and release it on impact or queue reset. A gated 32-entry
+handle sidecar follows the existing compacted impact rows. Target loss keeps
+the positional Scarab packet and its reservation; ordinary impact rows remain
+unreserved in this stage. A full typed arena leaves the child consumed and
+produces no bullet, matching the referenced Scarab allocation-failure flow.
+Normal products keep both stages off; the added sidecar and arena are not
+qualified for normal memory admission.
+
+A synthetic-host P7+BC fixture launched 99 real Interceptor projectiles and a
+real Scarab bullet, observed both families refuse the hundred-and-first
+allocation, then verified Scarab retirement frees a slot for a real
+Interceptor. A separate Terran-vector actual-game-update fixture covered a
+paid Reaver child with 100 synthetic occupants, target loss, row compaction and
+reset. The existing five-paid-child/mixed-impact/save-rejection fixture passed
+with the stage gates. Synthetic pool occupants are not evidence of real
+ordinary weapon contention. The first real-family fixture had only 40-HP target
+health, so its Scarab impact killed that target and invalidated the subsequent
+Interceptor launch; a 500-HP synthetic target corrected that test assumption.
+
+This checkpoint does not implement the source-wide allocator. Ordinary impact
+rows may represent two source bullets and include attack animation time before
+release; reserving one slot at queue creation would count the wrong objects at
+the wrong time. Full-queue cooldown behavior, partial two-shot allocation,
+source RNG timing, remaining families, generation wrap, save migration and all
+profile memory bounds remain open. Neither Defiler input consumption nor
+production admission follows from these tests.

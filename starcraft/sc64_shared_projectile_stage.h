@@ -8,7 +8,7 @@
 #define SC64_SHARED_PROJECTILE_CAPACITY 100u
 enum { SC64_SHARED_PROJECTILE_FREE=0, SC64_SHARED_PROJECTILE_INTERCEPTOR=1,
        SC64_SHARED_PROJECTILE_YAMATO=2, SC64_SHARED_PROJECTILE_SWARM=3,
-       SC64_SHARED_PROJECTILE_IMPACT=4 };
+       SC64_SHARED_PROJECTILE_IMPACT=4, SC64_SHARED_PROJECTILE_SCARAB=5 };
 typedef struct { uint16_t generation; uint8_t type, owner; } Sc64SharedProjectileSlot;
 typedef struct { Sc64SharedProjectileSlot slots[SC64_SHARED_PROJECTILE_CAPACITY]; uint8_t active; } Sc64SharedProjectileArena;
 /* A reset invalidates outstanding handles as well as clearing live rows. */
@@ -27,7 +27,7 @@ static inline int sc64_shared_projectile_has_capacity(const Sc64SharedProjectile
 { return a && a->active<SC64_SHARED_PROJECTILE_CAPACITY; }
 static inline uint32_t sc64_shared_projectile_acquire(Sc64SharedProjectileArena *a,unsigned type,unsigned owner)
 {
-    if(!a || type<1 || type>SC64_SHARED_PROJECTILE_IMPACT || owner>255) return 0;
+    if(!a || type<1 || type>SC64_SHARED_PROJECTILE_SCARAB || owner>255) return 0;
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) if(!a->slots[i].type) {
         uint16_t g=(uint16_t)(a->slots[i].generation+1u); if(!g) g=1;
         a->slots[i].generation=g; a->slots[i].type=(uint8_t)type;

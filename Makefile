@@ -4323,6 +4323,19 @@ build/test-sc64-shared-yamato-interceptor: tests/sc64_shared_yamato_interceptor_
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(filter-out -DSC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT,$(BC_FLAGS)) $(P7_INTERCEPTOR_FLIGHT_FLAGS) -DSC64_SHARED_PROJECTILE_STAGE $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 test-sc64-shared-yamato-interceptor: build/test-sc64-shared-yamato-interceptor
 	./build/test-sc64-shared-yamato-interceptor
+
+# Explicit experimental combined-family fixture; production flags stay off.
+.PHONY: test-sc64-shared-scarab-interceptor
+build/test-sc64-shared-scarab-interceptor: tests/sc64_shared_scarab_interceptor_game.c tests/sc64_shared_yamato_interceptor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(filter-out -DSC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT,$(BC_FLAGS)) $(P7_INTERCEPTOR_FLIGHT_FLAGS) -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_FLIGHT_CONTROL_PROBE -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-sc64-shared-scarab-interceptor: build/test-sc64-shared-scarab-interceptor
+	./build/test-sc64-shared-scarab-interceptor
+
+.PHONY: test-sc64-shared-scarab-arena
+build/test-sc64-shared-scarab-arena: tests/sc64_scarab_shared_arena_game.c tests/sc64_impact_events_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(CANONICAL_LOOKUP_INPUTS) | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE $(TERRAN_ROM_FLAGS) $< tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+test-sc64-shared-scarab-arena: build/test-sc64-shared-scarab-arena
+	./build/test-sc64-shared-scarab-arena
 build/test-sc64-p7-projectile: tests/sc64_p7_projectile_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_PROJECTILE_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
 .PHONY: test-sc64-p7-projectile protoss-p7-projectile-probe

@@ -11974,6 +11974,11 @@ static int race_scarab_probe_bullet_create(const Unit *q) {
         SC64_SCARAB_DEATH_DAMAGE_TICKS+1u};
     Sc64ImpactEvent row;
     if(race_impact_count>=RACE_IMPACT_CAPACITY || !sc64_scarab_impact_pack(&row,&packet))return 0;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    u32 handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,SC64_SHARED_PROJECTILE_SCARAB,0);
+    if(!handle)return 0;
+    race_impact_scarab_handles[race_impact_count]=handle;
+#endif
     race_impact_rows[race_impact_count++]=row;
     if(race_impact_count>race_impact_high_water)race_impact_high_water=race_impact_count;
     return 1; /* Count 6 includes this update's already-due source tick. */
