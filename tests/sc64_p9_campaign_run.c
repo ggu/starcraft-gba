@@ -633,7 +633,7 @@ int main(int argc,char **argv)
 
     int saved=0;
     int next_checkpoint=2000;
-    int next_probe=60,next_supply=400,next_build=200,next_gas=3000,next_production=900;
+    int next_probe=60,next_supply=400,next_build=200,next_gas=300,next_production=900;
     int next_order=60,next_hero=600;
     int attacking=0,front_distance=-1,next_zeratul=0,front_unit=-1,next_expand=8000,next_stage=3000;
     int next_save_build=0,escort_home=0,next_escort=0,cover_until=0;
@@ -718,19 +718,19 @@ int main(int argc,char **argv)
             next_supply=frame+150;
         }
         if(home>=0&&frame>=next_build){
-            int want_gateway=count_type(B_GATEWAY,0)<1||(probe_count()>=10&&count_type(B_GATEWAY,0)<6);
+            int want_gateway=count_type(B_GATEWAY,0)<1||(probe_count()>=10 && count_type(B_PHOTON_CANNON,0)>=4 && count_type(B_GATEWAY,0)<6);
             int built=0;
             if(want_gateway){
                 built=build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1);
                 /* No powered site: widen the Pylon field first. */
                 if(!built)built=build_structure(B_PYLON,MENU_DEPOT,96,448,-1,-1);
             }
-            if(!built&&!count_type(B_CYBERNETICS_CORE,0)&&count_type(B_GATEWAY,1))
-                built=build_structure(B_CYBERNETICS_CORE,MENU_ACADEMY,80,224,-1,-1);
-            if(!built&&!count_type(B_FORGE,0)&&count_type(B_GATEWAY,0)>=2)
+            if(!built&&!count_type(B_FORGE,0)&&count_type(B_GATEWAY,0)>=1)
                 built=build_structure(B_FORGE,MENU_ENG_BAY,80,224,-1,-1);
             if(!built&&count_type(B_FORGE,1)&&count_type(B_PHOTON_CANNON,0)<4&&fenix_home_x>=0)
                 built=build_cannon(fenix_home_x,fenix_home_y);
+            if(!built&&!count_type(B_CYBERNETICS_CORE,0)&&count_type(B_GATEWAY,1)&&count_type(B_PHOTON_CANNON,0)>=4)
+                built=build_structure(B_CYBERNETICS_CORE,MENU_ACADEMY,80,224,-1,-1);
             /* Two more by the expansion Nexus once it stands. */
             if(!built&&count_type(B_FORGE,1)&&count_type(B_PHOTON_CANNON,0)<6)
                 for(int n=0;n<MAX_BUILDINGS&&!built;n++)if(n!=home&&b[n].alive&&b[n].owner==SIDE&&
@@ -740,7 +740,7 @@ int main(int argc,char **argv)
         if(frame>=next_gas){
             (void)assign_gas_worker();
             for(int k=0;k<4&&remine_idle_probe(home);k++){}
-            next_gas=frame+700;
+            next_gas=frame+300;
         }
         /* After a Cerebrate falls, Zeratul (60 hit points) travels home
          * inside the regrouping army, never alone. */
