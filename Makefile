@@ -493,7 +493,7 @@ endif
 CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID)
 # Fresh-cell writer requires the existing paired-visit route configuration.
 # Showcase also needs the split flood when this option is enabled.
-CANONICAL_ROUTE_NEW_CELL ?= 1
+CANONICAL_ROUTE_NEW_CELL ?= $(CANONICAL_ROUTE_INDEX)
 ifneq ($(words $(filter 0 1,$(CANONICAL_ROUTE_NEW_CELL))),1)
 $(error CANONICAL_ROUTE_NEW_CELL must be 0 or 1)
 endif
