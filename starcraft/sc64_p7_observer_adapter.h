@@ -215,6 +215,24 @@ static int sc64_p7_arbiter_cache_empty_unit(const void *actor)
     return sc64_bytes_are_zero(actor, sizeof(Unit));
 }
 
+/* u[] supplies aligned, complete Unit objects. Unroll the representation
+ * check for zero-filled unused slots; retain the generic byte-safe fallback
+ * for other layouts and compilers. No padding or tail bytes are ignored. */
+static int sc64_p7_arbiter_cache_empty_slot(unsigned slot)
+{
+#if defined(__GNUC__) || defined(__clang__)
+    if (_Alignof(Unit) >= 4 && sizeof(Unit) % 4 == 0) {
+        const Sc64ZeroAlias32 *p=(const Sc64ZeroAlias32 *)(const void *)&u[slot];
+        unsigned n=(unsigned)(sizeof(Unit)/4), i=0;
+        for (;i+4<=n;i+=4)
+            if ((p[i] | p[i+1] | p[i+2] | p[i+3]) != 0) return 0;
+        for (;i<n;++i) if (p[i] != 0) return 0;
+        return 1;
+    }
+#endif
+    return sc64_p7_arbiter_cache_empty_unit(&u[slot]);
+}
+
 static int sc64_p7_observer_arbiter_aura_candidate(int target)
 {
     unsigned actor_flags;
@@ -549,7 +567,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
             /* The old value is already the exact dead-row result. Zero rows
              * still need the complete representation check below. */
             if (old != sc64_p7_arbiter_pack(0,0,0,0) &&
-                !sc64_p7_arbiter_cache_empty_unit(&u[i]))
+                !sc64_p7_arbiter_cache_empty_slot(i))
                 u[i].weapon=(u16)sc64_p7_arbiter_pack(0,0,0,0);
             continue;
         }

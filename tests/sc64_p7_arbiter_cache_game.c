@@ -111,6 +111,15 @@ int main(void)
     /* Dead rows are either entirely empty, nonempty with an already
      * canonical cache word, or nonempty requiring normalization. Preserve
      * every other byte and leave an empty slot byte-for-byte empty. */
+    /* Every representation byte, including padding, participates. */
+    for (unsigned byte=0;byte<sizeof(Unit);++byte) {
+        unsigned char *representation=(unsigned char *)&u[MAX_UNITS-3];
+        representation[byte]=0xa5;
+        assert(sc64_p7_arbiter_cache_empty_slot(MAX_UNITS-3)==
+               sc64_p7_arbiter_cache_empty_unit(&u[MAX_UNITS-3]));
+        representation[byte]=0;
+    }
+    assert(sc64_p7_arbiter_cache_empty_slot(MAX_UNITS-3));
     u[MAX_UNITS-1].x=17;
     u[MAX_UNITS-2].x=19;
     u[MAX_UNITS-2].weapon=(u16)sc64_p7_arbiter_pack(0,0,0,0);
