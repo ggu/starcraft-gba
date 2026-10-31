@@ -27,6 +27,11 @@ static RaceImpactRecord race_impact_record;
 #else
 static RaceSave race_data;
 #endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#include "sc64_scarab_flight_bridge.h"
+/* Set only from the authenticated selected tag, before candidate decoding. */
+static int race_scarab_stage_wire;
+#endif
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
@@ -57,8 +62,19 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                                     world_width, world_height);
 #endif
 #else
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    Unit wire;
+    if (!sc64_unit_save_decode(&wire,&candidate->units[slot],world_width,world_height)) return 0;
+    if (wire.type==U_SCARAB || wire.raw_type==85) {
+        if (!race_scarab_stage_wire || !sc64_scarab_flight_from_wire(&wire,out,1,0) ||
+            (((unsigned)out->carry>>8)&3u)>1u) return 0;
+        return 1;
+    }
+    *out=wire; return 1;
+#else
     return sc64_unit_save_decode(out, &candidate->units[slot],
                                  world_width, world_height);
+#endif
 #endif
 }
 #endif
@@ -1006,7 +1022,11 @@ static int race_save_game(void) {
          race_rows!=sc64_skirmish_maps[race_skirmish_map-1].height)) return 0;
     for (int i=0;i<MAX_UNITS;i++) if (u[i].alive) {
         Sc64ScarabParentFields f;
-        if (u[i].type==U_SCARAB || u[i].raw_type==85) return 0;
+        if (u[i].type==U_SCARAB || u[i].raw_type==85) {
+            Unit wire;
+            if (!sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+                (((unsigned)u[i].carry>>8)&3u)>1u) return 0;
+        }
         if (sc64_race_raw_unit(u[i].type)==83 &&
             ((u[i].raw_type!=-1 && u[i].raw_type!=83) ||
              !sc64_scarab_parent_fields_unpack(u[i].carry,u[i].work_timer,&f))) return 0;
@@ -1116,9 +1136,18 @@ static int race_save_game(void) {
 #endif
 #else
     for(int i=0;i<MAX_UNITS;i++)
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    {
+        Unit wire;
+        if (!sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+            !sc64_unit_save_encode(&race_data.units[i],&wire,
+                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+    }
+#else
         if(!sc64_unit_save_encode(&race_data.units[i], &u[i],
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16))) return 0;
+#endif
 #endif
 #else
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
@@ -1129,6 +1158,9 @@ static int race_save_game(void) {
 #endif
         race_data.units[i][j]=(s16)n;
     }
+#endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    race_scarab_stage_wire=1;
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
@@ -2650,6 +2682,7 @@ static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *conte
     memset(plan,0,sizeof(*plan));
     if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,
                                           &plan->impact_candidate_count)) return 0;
+    race_scarab_stage_wire=(tag==SC64_SCARAB_SAVE_VERSION);
     int map=race_data.state[20], width=64, height=64;
     if (race_data.state[0]!=1 || map<0 || map>SC64_SKIRMISH_IMPORTED_COUNT) return 0;
     if (map) { width=sc64_skirmish_maps[map-1].width; height=sc64_skirmish_maps[map-1].height; }
@@ -2658,7 +2691,7 @@ static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *conte
         Unit q;
         if (!race_save_decode_unit(&race_data,i,(unsigned)width*16u,(unsigned)height*16u,&q)) return 0;
         if (!q.alive) continue;
-        if (q.type==U_SCARAB || q.raw_type==85) return 0;
+        if ((q.type==U_SCARAB || q.raw_type==85) && !race_scarab_stage_wire) return 0;
         if (sc64_race_raw_unit(q.type)==83) {
             int c,t;
             if (q.raw_type!=-1 && q.raw_type!=83) return 0;
@@ -2762,9 +2795,14 @@ static int race_load_game(void) {
                                      (unsigned)(race_rows * 16))) return 0;
 #endif
 #else
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        if(!race_save_decode_unit(&race_data,(unsigned)i,(unsigned)(race_cols*16),
+                                  (unsigned)(race_rows*16),&decoded)) return 0;
+#else
         if(!sc64_unit_save_decode(&decoded, &race_data.units[i],
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16))) return 0;
+#endif
 #endif
         memcpy(&u[i], &decoded, sizeof(decoded));
     }
