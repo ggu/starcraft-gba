@@ -482,3 +482,17 @@ with P8 service binding, the current normal ARM guard, and independent review
 remain outstanding; the earlier guest replay applies only to its recorded older
 runtime. This checkpoint does not promote P8 or close its documented service and
 admission holds.
+
+The normal P8 ARM product at runtime `723b3db` subsequently passed its existing
+ROM verification and link guards: IWRAM end `0x03004a18`, EWRAM BSS end
+`0x0203899c`, ROM SHA-256
+`c5264e1b6c860cf63bf8d9e12417c50c61f1d040d44855a43c027127f09a8a51`.
+The 103 retained prepared inputs matched their recorded hashes before and after.
+A separate sanitizer fresh-process skirmish test compiled with the P8 vector
+and explicit Scarab runtime/namespace-stage flags wrote two valid journal
+slots, corrupted the newer child semantically while retaining its checksum,
+and successfully loaded the older slot. The test checked that the Protoss
+binding override was cleared both after explicit rejection of the newer
+candidate and after successful fallback. Namespace staging remains restricted
+to its supported skirmish scope; this is not a P8 campaign namespace test.
+The earlier guest replay and the documented P8 admission holds are unchanged.
