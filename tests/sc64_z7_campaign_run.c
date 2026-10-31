@@ -4067,7 +4067,10 @@ static void macro_step(void)
         int live_workers=worker_count(-1);
         int pending_workers=queued_unit_count(U_DRONE);
         if(!building_complete(home))return;
-        if(live_workers+pending_workers<4&&minerals>=50&&
+        /* Keep one Drone purchase in reserve while any worker remains;
+         * spend that reserve only to recover from total worker loss. */
+        int drone_bank=live_workers>0?100:50;
+        if(live_workers+pending_workers<4&&minerals>=drone_bank&&
            queue_hatchery_type(U_DRONE))return;
         /* Do not wait for the Den or two Sunken defenses: seize the cleared
            local geyser through ordinary builder/menu inputs while it is safe. */
@@ -4147,7 +4150,7 @@ static void macro_step(void)
         /* A completed Creep Colony needs only the paid Sunken morph, not a
            live Drone. Dispatch it before replacing workers so the 50-mineral
            morph cannot be delayed by an unnecessary six-worker placement gate. */
-        if(ready_second_sunken_colony<0&&live_workers+pending_workers<8&&minerals>=50&&
+        if(ready_second_sunken_colony<0&&live_workers+pending_workers<8&&minerals>=drone_bank&&
            queue_hatchery_type(U_DRONE))return;
         int supply_cap=race_owner_supply_cap(SIDE);
         int supply_used=race_owner_reserved_supply(SIDE);
@@ -4195,7 +4198,7 @@ static void macro_step(void)
                 return;
             }
         }
-        if(live_workers+pending_workers<8&&minerals>=50&&
+        if(live_workers+pending_workers<8&&minerals>=drone_bank&&
            queue_hatchery_type(U_DRONE))return;
         /* Correct the source's position-relative autoassignment after the
            six-worker line exists; keep the protected eastern mineral band. */
