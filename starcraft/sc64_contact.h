@@ -519,6 +519,7 @@ sc64_contact_memo_eligible(const Unit *q, int speed)
 volatile u32 diag_contact_visit_moved, diag_contact_visit_stationary;
 volatile u32 diag_contact_geometry_moved, diag_contact_geometry_stationary;
 volatile u32 diag_traversable_calls;
+volatile u32 diag_geometry_zero_nonzero_speed, diag_geometry_nonzero_contributes, diag_geometry_nonzero_redundant;
 static s16 diag_contact_prev_x[MAX_UNITS], diag_contact_prev_y[MAX_UNITS];
 static u8 diag_contact_moved[MAX_UNITS], diag_contact_prev_alive[MAX_UNITS];
 static void __attribute__((noinline)) sc64_contact_split_begin(void)
@@ -527,6 +528,8 @@ static void __attribute__((noinline)) sc64_contact_split_begin(void)
     diag_contact_visit_moved = diag_contact_visit_stationary = 0;
     diag_contact_geometry_moved = diag_contact_geometry_stationary = 0;
     diag_traversable_calls = 0;
+    diag_geometry_zero_nonzero_speed = 0;
+    diag_geometry_nonzero_contributes = diag_geometry_nonzero_redundant = 0;
     for (i = 0; i < MAX_UNITS; ++i) {
         diag_contact_moved[i] = u[i].alive && diag_contact_prev_alive[i] &&
             (u[i].x != diag_contact_prev_x[i] || u[i].y != diag_contact_prev_y[i]);
@@ -538,6 +541,14 @@ static void __attribute__((noinline)) sc64_contact_split_visit(int i)
 { if (diag_contact_moved[i]) ++diag_contact_visit_moved; else ++diag_contact_visit_stationary; }
 static void __attribute__((noinline)) sc64_contact_split_geometry(int i)
 { if (diag_contact_moved[i]) ++diag_contact_geometry_moved; else ++diag_contact_geometry_stationary; }
+static void __attribute__((noinline))
+sc64_diagnostic_geometry_result(int ox, int oy, int speed, unsigned before, unsigned after)
+{
+    if (!ox && !oy) {
+        if (speed) ++diag_geometry_zero_nonzero_speed;
+    } else if (before != after) ++diag_geometry_nonzero_contributes;
+    else ++diag_geometry_nonzero_redundant;
+}
 static void __attribute__((noinline)) sc64_diagnostic_traversable(void)
 { ++diag_traversable_calls; }
 #define CONTACT_SPLIT(kind, i) sc64_contact_split_##kind(i)
@@ -633,6 +644,9 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 if (ox <= -limit_axis || ox >= limit_axis ||
                     oy <= -limit_axis || oy >= limit_axis) continue;
                 CONTACT_SPLIT(geometry, i);
+#ifdef SC64_DIAGNOSTIC_CONTACT_SPLIT
+                unsigned diag_before_geometry = mask;
+#endif
 #ifdef SC64_CONTACT_MASK_TABLE
                 mask = sc64_contact_mask_apply_geometry(mask, radius, speed, ox, oy);
 #else
@@ -647,6 +661,9 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                     d2 = dx * dx + dy * dy;
                     if (d2 < radius * radius && d2 <= od2) mask |= 1u << k;
                 }
+#endif
+#ifdef SC64_DIAGNOSTIC_CONTACT_SPLIT
+                sc64_diagnostic_geometry_result(ox, oy, speed, diag_before_geometry, mask);
 #endif
                 if (mask == 0xffu) return mask;
             }
