@@ -204,6 +204,10 @@ MORPH_SCENARIOS = ("full", "damaged-during", "low-hp", "low-hp-dies", "save-resu
 ADDON_SCENARIOS = ("first-blocked-second-free", "no-feasible-parent")
 COMMIT_SCENARIOS = ("exhausted-small-army", "late-small-army", "exhausted-small-army-resume",
                     "minerals-small-army-stays")
+BUILDER_SCENARIOS = ("walk-save-resume", "timeout-replan", "timeout-save-resume")
+WORKER_SCENARIOS = ("bot-stop-returns", "human-stop-stays", "depleted-patch-reassigned",
+                    "constructed-scv-returns")
+PLAN_PERIOD, PLAN_PHASE, STALL_PASSES = 48, 16, 40
 
 
 def _one(lines, kind):
@@ -295,6 +299,52 @@ def validate_commit(lines, scenario):
     return r
 
 
+def validate_builder(lines, scenario):
+    """Walking builders: arrival and timeout survive save/reload; a released
+    builder costs nothing and its structure is planned again."""
+    r = _one(lines, "builder")
+    if r.get("scenario") != BUILDER_SCENARIOS[scenario]:
+        raise RecordError("builder record does not match its scenario")
+    for f in ("start", "timer_at_save", "event", "reference_event", "replanned"):
+        _int(r.get(f), f, -1, 1 << 24)
+    for f in ("arrived", "released", "ok"):
+        _int(r.get(f), f, 0, 1)
+    if r.get("stall_passes") != STALL_PASSES:
+        raise RecordError("stall_passes differs from the planner constant")
+    reference, resumed = _hex(r.get("reference"), "reference"), _hex(r.get("resumed"), "resumed")
+    if scenario == 0:
+        good = (r["arrived"] == 1 and r["timer_at_save"] >= 1 and r["event"] > 0 and
+                r["event"] == r["reference_event"] and reference == resumed and reference != "00000000")
+    else:
+        good = (r["released"] == 1 and r["arrived"] == 0 and r["replanned"] >= r["event"] > r["start"] >= 0 and
+                r["event"] - r["start"] <= (STALL_PASSES + 2) * PLAN_PERIOD)
+        if scenario == 2:
+            good = good and (r["timer_at_save"] == STALL_PASSES // 2 and r["event"] == r["reference_event"] and
+                             reference == resumed and reference != "00000000")
+    if r["ok"] != int(good):
+        raise RecordError("builder ok flag disagrees with the recorded events")
+    return r
+
+
+def validate_workers(lines, scenario):
+    r = _one(lines, "workers")
+    if r.get("scenario") != WORKER_SCENARIOS[scenario]:
+        raise RecordError("workers record does not match its scenario")
+    for f in ("slot", "idle_at", "back_at", "old_patch", "new_patch", "order"):
+        _int(r.get(f), f, -1, 1 << 24)
+    _int(r.get("ok"), "ok", 0, 1)
+    if scenario == 1:
+        good = r["slot"] >= 0 and r["back_at"] == -1 and r["order"] == 0
+    else:
+        good = (r["slot"] >= 0 and r["idle_at"] > 0 and
+                0 <= r["back_at"] - r["idle_at"] <= 2 * PLAN_PERIOD + PLAN_PHASE)
+        if scenario == 2:
+            good = good and r["new_patch"] != r["old_patch"]
+    if r["ok"] != int(good):
+        raise RecordError("workers ok flag disagrees with the recorded orders")
+    return r
+
+
 def classify_end(lines):
     """Why a save case produced no resume record (never counted as a save)."""
     kinds = [r["kind"] for r in _records(lines)
@@ -337,6 +387,11 @@ def cases(ticks, criteria="development"):
             # Forced commit with an army below the normal threshold.
             for s in range(len(COMMIT_SCENARIOS)):
                 out.append(("commit", profile, 1, 2, "t", s))
+    for profile in PROFILES:
+        for s in range(len(BUILDER_SCENARIOS)):
+            out.append(("builder", profile, 1, 2, "t", s))
+        for s in range(len(WORKER_SCENARIOS)):
+            out.append(("workers", profile, 1, 2, "t", s))
     scenarios = ("pending-builder-killed", "constructing-scv-killed", "foundation-destroyed", "depot-destroyed")
     for profile in PROFILES:
         for map_id in (0, 1):
@@ -372,6 +427,10 @@ def run_case(build: Path, case, every):
         argv += ["--addon", str(arg)]
     elif kind == "commit":
         argv += ["--commit", str(arg)]
+    elif kind == "builder":
+        argv += ["--builder", str(arg)]
+    elif kind == "workers":
+        argv += ["--workers", str(arg)]
     elif kind == "run":
         argv += ["--ticks", str(arg), "--every", str(every)]
     else:
@@ -408,6 +467,11 @@ def evaluate(case, returncode, stdout, every, criteria="development"):
         if (returncode == 0) != bool(r["ok"]) or returncode not in (0, 10):
             raise RecordError("exit code and commit record disagree")
         return {"ok": bool(r["ok"]), "commit": r}
+    if kind in ("builder", "workers"):
+        r = (validate_builder if kind == "builder" else validate_workers)(lines, arg)
+        if (returncode == 0) != bool(r["ok"]) or returncode not in (0, 11 if kind == "builder" else 12):
+            raise RecordError(f"exit code and {kind} record disagree")
+        return {"ok": bool(r["ok"]), kind: r}
     if kind in ("resume", "resume-late", "resume-morph"):
         if returncode in (4, 9) and not any(r["kind"] == "resume" for r in _records(lines)):
             # The match ended (or no save point existed) before the save:
