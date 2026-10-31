@@ -27,10 +27,11 @@ class WalkWordsMakeTest(unittest.TestCase):
                             ''.join('case %d: return &sc64_unit_walk_i1;\n'%n for n in (0,32,37,38,41,65)))
             digest=hashlib.sha256(facing.read_bytes()).hexdigest()
             walk.write_text('#define SC64_UNIT_WALK_FACING_SHA256 "'+digest+'"\n'+walk.read_text())
+            (root/'consumer.c').write_text('int walk_consumer(void) { return 0; }\n')
             (root/'fixture.mk').write_text('''check: build/walk-consumer
 build/walk-consumer: $(CANONICAL_LOOKUP_INPUTS) $(UNIT_FACING_INPUTS)
+\t@$(CC) $(TERRAN_ROM_FLAGS) -c consumer.c -o $@
 \t@printf 'rebuilt\\n' >> build/rebuilds
-\t@touch $@
 ''')
             def run(mode):
                 args=['make','-f','Makefile','-f','fixture.mk','CANONICAL_LOOKUP_INDEX=0',
@@ -38,9 +39,11 @@ build/walk-consumer: $(CANONICAL_LOOKUP_INPUTS) $(UNIT_FACING_INPUTS)
                       'UNIT_FACING_HEADER=bank/facing.h','check']
                 subprocess.run(args,cwd=root,check=True,capture_output=True)
                 return len((root/'build/rebuilds').read_text().splitlines())
-            self.assertEqual(run(0),1);self.assertEqual(run(0),1)
-            self.assertEqual(run(1),2);self.assertEqual(run(1),2)
             output=root/'.local/walk-words-managed/sc64_walk_words_generated.h'
+            self.assertEqual(run(0),1); self.assertFalse(output.exists())
+            self.assertEqual(run(0),1); self.assertFalse(output.exists())
+            self.assertEqual(run(1),2); generated_mtime=output.stat().st_mtime_ns
+            self.assertEqual(run(1),2); self.assertEqual(output.stat().st_mtime_ns,generated_mtime)
             before=output.read_bytes();facing.write_text(facing.read_text().replace('0x01','0x02'))
             with self.assertRaises(subprocess.CalledProcessError):run(1)
             with self.assertRaises(subprocess.CalledProcessError):run(0)
