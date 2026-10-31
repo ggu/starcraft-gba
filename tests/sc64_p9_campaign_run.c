@@ -678,6 +678,9 @@ int main(int argc,char **argv)
         if(menu_open)KEY_TAP(KEY_B);
         int home=home_nexus();
         int z=hero(75),f=hero(78);
+        /* While the assault is close, keep control near the objective so a
+         * long trip to a home worker cannot delay Zeratul's next order. */
+        int critical_assault=attacking&&front_distance>=0&&front_distance<30;
         /* Fenix, with an enemy within 256 pixels, walks to the reachable
          * spot near the Nexus whose path keeps farthest from every enemy;
          * Protoss hit points do not regenerate. Checked at the start of
@@ -715,12 +718,12 @@ int main(int argc,char **argv)
             if(!pending)(void)build_nexus(1470,1930);
             next_build=frame+300;
         }
-        if(home>=0&&frame>=next_mine){
+        if(!critical_assault&&home>=0&&frame>=next_mine){
             for(int k=0;k<8&&remine_idle_probe(home);k++){}
             next_mine=frame+180;
         }
-        if(home>=0&&frame>=next_probe){(void)queue_probe();next_probe=frame+300;}
-        if(home>=0&&count_type(B_NEXUS,0)<2&&frame>=next_expand){
+        if(!critical_assault&&home>=0&&frame>=next_probe){(void)queue_probe();next_probe=frame+300;}
+        if(!critical_assault&&home>=0&&count_type(B_NEXUS,0)<2&&frame>=next_expand){
             int left=0;
             for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0&&dist2(m[k].x,m[k].y,b[home].x,b[home].y)<320*320)
                 left+=m[k].amount;
@@ -737,7 +740,7 @@ int main(int argc,char **argv)
                 next_expand=frame+3000;
             }
         }
-        if(home>=0&&frame>=next_supply){
+        if(!critical_assault&&home>=0&&frame>=next_supply){
             /* Count Pylons already rising; a builder still walking to its
              * site is covered by the cooldown after each Pylon order. */
             static int last_pylon_order=-100000;
@@ -751,7 +754,7 @@ int main(int argc,char **argv)
                 fprintf(stderr,"pylon skip f=%d pending=%d since=%d bank=%d\n",frame,pending,frame-last_pylon_order,minerals);
             next_supply=frame+150;
         }
-        if(home>=0&&frame>=next_build){
+        if(!critical_assault&&home>=0&&frame>=next_build){
             int want_gateway=count_type(B_GATEWAY,0)<1||(probe_count()>=10&&count_type(B_GATEWAY,0)<6);
             int built=0;
             if(want_gateway){
@@ -771,7 +774,7 @@ int main(int argc,char **argv)
                     b[n].type==B_NEXUS&&building_complete(n))built=build_cannon(b[n].x,b[n].y-48);
             next_build=frame+(minerals>=400?240:600);
         }
-        if(frame>=next_gas){
+        if(!critical_assault&&frame>=next_gas){
             (void)assign_gas_worker();
             for(int k=0;k<4&&remine_idle_probe(home);k++){}
             next_gas=frame+700;
@@ -794,7 +797,7 @@ int main(int argc,char **argv)
         /* While the save waits for a structure to warp in, skip the slow
          * army and hero blocks so the short window is not missed. */
         int saving=!saved&&frame>=P9_SAVE_FRAME;
-        if(frame>=next_production&&!(saving_for_nexus&&minerals<500)){
+        if(!critical_assault&&frame>=next_production&&!(saving_for_nexus&&minerals<500)){
             int queued=0;
             while(queued<6&&queue_combat_unit())++queued;
             next_production=frame+60;
