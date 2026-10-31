@@ -528,7 +528,61 @@ static int pending_since[MAX_UNITS];
 
 /* Return one idle Probe to the nearest mineral patch near the Nexus. A
  * pending build stuck for 900 frames (its site occupied) is abandoned. */
-static int remine_idle_probe(int home)
+static int remine_before_first_objective(int home)
+{
+    static const int dx[] = {0,8,-8,0,0,8,-8,8,-8};
+    static const int dy[] = {0,0,0,8,-8,8,8,-8,-8};
+    int worker=-1;
+    static int next_patch;
+    for(int i=0;i<MAX_UNITS;i++){
+        if(!(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&SC64_PENDING_BUILD_ORDER(u[i].order))){
+            pending_since[i]=-1;continue;
+        }
+        if(pending_since[i]<0)pending_since[i]=frame;
+        if(worker<0&&frame-pending_since[i]>900){
+            worker=i;
+            if(refused_count<64){refused_x[refused_count]=u[i].tx;refused_y[refused_count++]=u[i].ty;}
+        }
+    }
+    for(int i=0;i<MAX_UNITS&&worker<0;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE){
+        if(u[i].order==ORDER_IDLE && !u[i].carry){worker=i;break;}
+        if(u[i].order==ORDER_MINE&&!u[i].carry&&u[i].target>=0&&u[i].target<MAX_MINERALS){
+            int near=0;
+            for(int n=0;n<MAX_BUILDINGS;n++)if(b[n].alive&&b[n].owner==SIDE&&b[n].type==B_NEXUS&&
+                dist2(b[n].x,b[n].y,m[u[i].target].x,m[u[i].target].y)<320*320)near=1;
+            if(!near)worker=i;
+        }
+    }
+    if(worker<0||home<0)return 0;
+    if(!hero_select(worker))return 0;
+    /* One local visible field per call; resume at the next slot on failure.
+     * This bounds cursor work while preserving all nine hit-box positions. */
+    int patch=-1;
+    for(int offset=0;offset<MAX_MINERALS;offset++){
+        int k=(next_patch+offset)%MAX_MINERALS,near=0;
+        if(m[k].amount<=0||!currently_visible(m[k].x,m[k].y)||
+           dist2(u[worker].x,u[worker].y,m[k].x,m[k].y)>320*320)continue;
+        for(int n=0;n<MAX_BUILDINGS;n++)if(b[n].alive&&b[n].owner==SIDE&&
+            b[n].type==B_NEXUS&&building_complete(n)&&
+            dist2(m[k].x,m[k].y,b[n].x,b[n].y)<320*320)near=1;
+        if(near){patch=k;break;}
+    }
+    if(patch<0)return 0;
+    next_patch=(patch+1)%MAX_MINERALS;
+    for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0]);k++) {
+        int x=m[patch].x+dx[k],y=m[patch].y+dy[k];
+        move_cursor(x,y);
+        if(!u[worker].alive||!u[worker].selected||selected_count()!=1)return 0;
+        if(absi(cx-x)>2||absi(cy-y)>2||!currently_visible(m[patch].x,m[patch].y)||
+           field_ui_a_action(selected_count())!=UI_A_MINE||selected_worker_mineral_target()!=patch)continue;
+        KEY_TAP(KEY_A);
+        if(u[worker].order==ORDER_MINE&&u[worker].target==patch)return 1;
+    }
+    return 0;
+}
+
+
+static int remine_after_first_objective(int home)
 {
     static const int dx[] = {0,8,-8,0,0,8,-8,8,-8};
     static const int dy[] = {0,0,0,8,-8,8,8,-8,-8};
@@ -597,6 +651,12 @@ static int remine_idle_probe(int home)
     }
 
     return 0;
+}
+
+
+static int remine_idle_probe(int home)
+{
+    return (race_p9.switches&1u)?remine_after_first_objective(home):remine_before_first_objective(home);
 }
 
 static int assign_gas_worker(void)
