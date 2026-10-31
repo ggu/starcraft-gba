@@ -5932,6 +5932,11 @@ choose_command(int choice)
         /* Fixed first-ten control rows deliberately retain their old IDs. */
     }
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+    if (choice == MENU_STOP + 1 && race_shared_campaign_transport_menu_available()) {
+        menu_open = 0; mode = MODE_UNLOAD; return;
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) {
         menu_open=0; mode=MODE_NORMAL;
@@ -5975,11 +5980,6 @@ choose_command(int choice)
     }
     if (choice == MENU_STOP + 2 && race_probe_cannon_command_available()) {
         menu_open = 0; mode = MODE_BUILD; menu = B_PHOTON_CANNON; return;
-    }
-#endif
-#ifdef SC64_SHARED_TRANSPORT
-    if (choice == MENU_STOP + 1 && race_shared_campaign_transport_menu_available()) {
-        menu_open = 0; mode = MODE_UNLOAD; return;
     }
 #endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED

@@ -44,7 +44,22 @@ static void test_mission(int mission)
     assert(u[passenger].order == ORDER_TRANSPORTED && u[passenger].target == ship);
     clear_selection(); u[ship].selected = 1; selected_building = -1;
     assert(race_shared_campaign_transport_menu_available());
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    /* A box can select a loaded Shuttle and a Carrier together. The visible
+     * row, its count and dispatch must agree on the unload action. */
+    int carrier = spawn_unit(SIDE, U_P7_CARRIER, u[ship].x, u[ship].y);
+    assert(carrier >= 0);
+    u[carrier].selected = 1;
+    assert(race_p7_carrier_training_menu_available());
+    int money_before = minerals, queue_before = u[carrier].carry;
+    assert(field_menu_count() > MENU_STOP + 1);
+    assert(!strcmp(race_menu_label(MENU_STOP + 1), "UNLOAD CARGO"));
+#endif
     choose_command(MENU_STOP + 1); assert(mode == MODE_UNLOAD);
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    assert(minerals == money_before && u[carrier].carry == queue_before);
+    u[carrier].selected = 0;
+#endif
     assert(race_transport_request_unload(ship, u[ship].x, u[ship].y));
     for (int y = 1; y < race_rows - 1 && u[passenger].order == ORDER_TRANSPORTED; ++y)
         for (int x = 1; x < race_cols - 1 && u[passenger].order == ORDER_TRANSPORTED; ++x) {
