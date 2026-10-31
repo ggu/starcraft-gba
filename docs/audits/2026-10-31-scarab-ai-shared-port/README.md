@@ -52,3 +52,8 @@ roster. With the namespace stage omitted and the flight/weapon probes plus
 energy flag enabled, Zerg and Showcase link at `02037154/03004f68` and
 `0203df68/03004ff0` respectively; Protoss still rejects the old fact-table
 fingerprint. These partial links do not qualify persistence or other services.
+
+The subsequent clean, unprepared `./dev build` and `./dev test` at the exact
+runtime merge `91e1857` passed. The Python suite ran 842 tests with 23 skips;
+the native checks and separate 5- and 8-test suites passed. The initial clean
+run was interrupted under disk pressure and its partial log is preserved.
