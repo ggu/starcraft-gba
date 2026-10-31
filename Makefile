@@ -1825,10 +1825,10 @@ build/test-sc64-protoss-canonical-frame: tests/sc64_z3_frame_coverage.c $(STARCR
 build/test-sc64-protoss-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 .PHONY: test-canonical-render
-test-canonical-render: build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud
+test-canonical-render: build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z7-canonical-frame build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud
 	./build/test-sc64-terran-full-frame
 	./build/test-sc64-terran-full-hud
-	./build/test-sc64-z4-frame-coverage
+	./build/test-sc64-z7-canonical-frame
 	./build/test-sc64-zerg-canonical-hud
 	./build/test-sc64-protoss-canonical-frame
 	./build/test-sc64-protoss-canonical-hud
