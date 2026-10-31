@@ -5919,3 +5919,9 @@ $(eval $(call SCARAB_SUNKEN_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_
 $(eval $(call SCARAB_SUNKEN_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-sunken
 test-scarab-sunken: test-scarab-sunken-terran test-scarab-sunken-zerg test-scarab-sunken-protoss test-scarab-sunken-showcase
+
+# Opt-in probes use canonical weapon flags and must track the selected bank.
+test-scarab-shared-impact-terran test-scarab-postimpact-gap-terran \
+  test-scarab-cross-zerg test-scarab-cross-protoss test-scarab-cross-showcase \
+  test-scarab-deadrow-terran test-scarab-deadrow-zerg test-scarab-deadrow-protoss test-scarab-deadrow-showcase \
+  test-scarab-sunken-terran test-scarab-sunken-zerg test-scarab-sunken-protoss test-scarab-sunken-showcase: $(CANONICAL_LOOKUP_INPUTS)
