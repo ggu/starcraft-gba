@@ -22,7 +22,36 @@ FULL_PROFILE_HEADER = Path(os.environ.get(
 )).resolve()
 
 
+def renderer_dry_run(target: str) -> subprocess.CompletedProcess[str]:
+    """Resolve the target's real compile recipe without rebuilding private inputs."""
+    database = subprocess.run(
+        ["make", "-rRqp", "--no-print-directory", target],
+        cwd=ROOT, capture_output=True, text=True)
+    matches = [line for line in database.stdout.splitlines()
+               if line.startswith(target + ":")]
+    if len(matches) != 1:
+        raise AssertionError(f"Expected one Make target for {target}: {database.stderr}")
+    prerequisites = shlex.split(matches[0].split(":", 1)[1])
+    generated = sorted({path for path in prerequisites
+                        if path.startswith((".local/", "build/"))})
+    old_args = [item for path in generated for item in ("-o", path)]
+    return subprocess.run(
+        ["make", "-Bn", "--no-print-directory", *old_args, target],
+        cwd=ROOT, capture_output=True, text=True)
+
+
 class PhotonCannonRendererTests(unittest.TestCase):
+    def test_canonical_zerg_dry_run_uses_z7_and_keeps_z4(self) -> None:
+        z7 = renderer_dry_run("build/test-sc64-z7-canonical-frame")
+        self.assertEqual(z7.returncode, 0, z7.stderr)
+        self.assertIn("-DSC64_Z7_RUNTIME", z7.stdout)
+        self.assertIn("-I.local/sc64/zerg-z6/generated", z7.stdout)
+        self.assertIn("tests/sc64_z3_frame_coverage.c", z7.stdout)
+        z4 = renderer_dry_run("build/test-sc64-z4-frame-coverage")
+        self.assertEqual(z4.returncode, 0, z4.stderr)
+        self.assertNotIn("-DSC64_Z7_RUNTIME", z4.stdout)
+        self.assertIn("-DSC64_Z4_RUNTIME", z4.stdout)
+
     def test_base_race_enums_have_unconditional_opaque_sprites(self) -> None:
         compiler = shutil.which("clang") or shutil.which("cc")
         header = PRIVATE_HEADER / "sc64_race_sprites_generated.h"
@@ -174,7 +203,8 @@ int main(void) {
         from tools.sc64_race_sprites import (
             LATE_BUILDING_IDS, LATE_UNIT_IDS, RACE_UNIT_IDS,
             T4_BUILDING_IDS, T4_UNIT_IDS, T6_UNIT_IDS,
-            ZP_BUILDING_IDS, ZP_UNIT_IDS,
+            Z5_BUILDING_IDS, Z5_DOODAD_IDS, Z5_UNIT_IDS, Z6_BUILDING_IDS,
+            Z6_UNIT_IDS, ZP_BUILDING_IDS, ZP_UNIT_IDS,
         )
 
         profiles = (
@@ -191,11 +221,18 @@ int main(void) {
              set(T4_UNIT_IDS.values()) | set(T6_UNIT_IDS.values()) |
              set(LATE_UNIT_IDS.values()),
              set(T4_BUILDING_IDS.values()) | set(LATE_BUILDING_IDS.values()), set()),
-            ("zerg", "build/test-sc64-z4-frame-coverage",
+            ("zerg-z4", "build/test-sc64-z4-frame-coverage",
              Path(".local/sc64/zp-stage/generated/sc64_race_sprites_generated.h"),
              (".local/sc64/zp-stage/generated/sc64_races_generated.h",
               ".local/sc64/z4/generated/sc64_z4_scenario_generated.h"),
              set(ZP_UNIT_IDS.values()), set(), set(ZP_BUILDING_IDS.values())),
+            ("zerg", "build/test-sc64-z7-canonical-frame",
+             Path(".local/sc64/zerg-z6/generated/sc64_race_sprites_generated.h"),
+             (".local/sc64/zp-stage/generated/sc64_races_generated.h",
+              ".local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h"),
+             set(ZP_UNIT_IDS.values()),
+             set(Z5_BUILDING_IDS.values()) | set(Z5_DOODAD_IDS.values()) |
+             set(Z6_BUILDING_IDS.values()), set(ZP_BUILDING_IDS.values())),
             ("protoss", "build/test-sc64-protoss-canonical-frame",
              Path(".local/sc64/zp-stage/generated/sc64_race_sprites_generated.h"),
              (".local/sc64/zp-stage/generated/sc64_races_generated.h",
@@ -287,6 +324,13 @@ int main(void) {
                 for raw in explicit_buildings:
                     source_lines.append(opaque_check(f"sc64_race_building_sprite({raw},0)",
                                                      f"building raw {raw}"))
+                if profile == "zerg":
+                    for raw in sorted(set(Z5_UNIT_IDS.values())):
+                        source_lines.append(opaque_check(f"sc64_z5_actor_sprite({raw})",
+                                                         f"Z5 unit raw {raw}"))
+                    for raw in sorted(set(Z6_UNIT_IDS.values())):
+                        source_lines.append(opaque_check(f"sc64_z6_actor_sprite({raw})",
+                                                         f"Z6 unit raw {raw}"))
                 if zp_buildings:
                     for name, raw in sorted(ZP_BUILDING_IDS.items(), key=lambda pair: pair[1]):
                         enum = {
@@ -304,9 +348,7 @@ int main(void) {
                     source = directory / "canonical-roster.c"
                     executable = directory / "canonical-roster"
                     source.write_text("".join(source_lines), encoding="ascii")
-                    dry_run = subprocess.run(
-                        ["make", "-Bn", "--no-print-directory", target],
-                        cwd=ROOT, capture_output=True, text=True)
+                    dry_run = renderer_dry_run(target)
                     optional_banks = (
                         ".local/sc64/audio/generated/sc64_audio_generated.bin",
                         ".local/sc64/construction/generated/sc64_construction_sprites_generated.h",
