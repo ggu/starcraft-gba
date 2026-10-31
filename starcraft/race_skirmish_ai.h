@@ -791,7 +791,10 @@ static int race_ai_start_defense(RaceAiCensus *c, int raw)
         type = B_CREEP_COLONY;
         ax = c->hx; ay = c->hy;
     }
-    if (!race_ai_find_site(c, type, ax, ay, 0, c->race == R_ZERG ? 3 : 2, 1, &x, &y)) return 0;
+    /* A developed Zerg base can occupy all four inner rings. Use the full
+     * existing six-ring lattice; creep, lanes and reachability still decide
+     * eligibility, with the same single-ring and candidate work budget. */
+    if (!race_ai_find_site(c, type, ax, ay, 0, c->race == R_ZERG ? 5 : 2, 1, &x, &y)) return 0;
     return race_ai_start_build(c, type, x, y);
 }
 
