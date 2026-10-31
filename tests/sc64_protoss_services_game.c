@@ -153,12 +153,24 @@ static void test_arbiter_cloaks_nearby_units(void)
 
 static RaceSave saved_candidate;
 
+/* Use the active product envelope so candidate checks exercise semantic
+ * validation rather than failing earlier on a mismatched record layout. */
+static void write_test_candidate(void)
+{
+#ifdef SC64_IMPACT_EVENTS
+    race_data = saved_candidate;
+    assert(race_impact_save_write());
+#else
+    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+#endif
+}
+
 static void expect_candidate_rejected(void)
 {
     Unit before[MAX_UNITS];
     memcpy(before, u, sizeof(u));
     int old_minerals = minerals, old_frame = frame;
-    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    write_test_candidate();
     assert(!race_load_game());
     assert(memcmp(before, u, sizeof(u)) == 0);
     assert(minerals == old_minerals && frame == old_frame);
@@ -211,7 +223,7 @@ static void test_battery_service_and_save(void)
     /* Custom games saved before the shared services load with an empty
        clock and empty cache words. */
     saved_candidate.state[SC64_PROTOSS_CLOCK_STATE_INDEX] = 0;
-    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    write_test_candidate();
     assert(race_load_game());
     assert(!race_protoss_generic_clock[0] && !race_protoss_generic_clock[1] &&
            !race_protoss_generic_clock[2]);
