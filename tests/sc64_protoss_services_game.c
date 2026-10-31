@@ -312,7 +312,6 @@ static void write_test_candidate(void)
     race_data = saved_candidate;
     assert(race_impact_save_write());
 #else
-    test_incomplete_carrier_service_cannot_train();
     save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
 #endif
 }
@@ -419,6 +418,7 @@ int main(void)
     test_mixed_context_commands();
     test_carrier_training_and_flight();
 #else
+    test_incomplete_carrier_service_cannot_train();
     /* Do not inject flight flags into a production-vector check. This is
      * explicit missing capability, not a passing Carrier implementation. */
     puts("Carrier training/flight absent from this product; not qualified here");
