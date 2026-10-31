@@ -10,6 +10,15 @@ spec.loader.exec_module(assets)
 
 
 class TerrainTests(unittest.TestCase):
+    def test_cover_reads_cv5_group_not_variant_or_vf4(self):
+        cv5 = bytearray(52 * 3)
+        struct.pack_into('<H', cv5, 52 + 2, 0x10)
+        self.assertEqual([assets.cv5_cover(16 + variant, cv5) for variant in range(16)], [1] * 16)
+        self.assertEqual(assets.cv5_cover(32, cv5), 0)
+        self.assertEqual(assets.cv5_cover(0x8000 | 16, cv5), 1)
+        with self.assertRaisesRegex(ValueError, 'CV5 flags outside'):
+            assets.cv5_cover(48, cv5)
+
     def test_minitile_order_flip_and_walk_flags(self):
         cv5 = bytearray(52)
         vx4 = struct.pack('<16H', *[i & 1 for i in range(16)])

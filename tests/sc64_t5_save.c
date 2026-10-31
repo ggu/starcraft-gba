@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 static RaceSave valid_record;
 static Unit saved_units[MAX_UNITS];
@@ -106,13 +107,13 @@ static void assert_live_unchanged(void)
 
 static void reset_to_good_sram(void)
 {
-    save_write(&valid_record, sizeof(valid_record), SAVE_VERSION);
+    write_candidate_record(&valid_record);
 }
 
 static void reject_record_atomically(const RaceSave *bad)
 {
     remember_live();
-    save_write(bad, sizeof(*bad), SAVE_VERSION);
+    write_candidate_record(bad);
     assert(!race_load_game());
     assert_live_unchanged();
     reset_to_good_sram();
@@ -131,7 +132,7 @@ static void active_runtime_roundtrip(void)
     assert(race_t5.resources[0].total_gas_gathered == 300);
 
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     assert(race_data.t5.active_mask == SC64_T5_ACTIVE_SOURCE_MASK);
     assert(race_t5_save_candidate_valid(&race_data, race_cols, race_rows));
     {
@@ -194,6 +195,18 @@ static void malformed_records_are_atomic(void)
         /* An in-range mission bit from another race remains invalid. */
         case 12: bad.state[3] |= 1u << 0; break;
         }
+        if (n <= 9 && n != 4)
+            assert(!race_t5_save_candidate_valid(&bad, race_cols, race_rows));
+        else if (n == 4) assert(bad.campaign.phase == 0xff);
+        else if (n == 10) assert(((const u8 *)&bad.t5)[sizeof(bad.t5)] == 1);
+        else if (n == 11) {
+            int found = 0;
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (saved_unit_field(&bad, i, offsetof(Unit, alive)) &&
+                    saved_unit_field(&bad, i, offsetof(Unit, type)) == U_SPIDER_MINE &&
+                    saved_unit_field(&bad, i, offsetof(Unit, carry)) == 99) found = 1;
+            assert(found);
+        } else assert(bad.state[3] & 1u);
         reject_record_atomically(&bad);
     }
 }
@@ -204,7 +217,7 @@ static void inactive_context_must_be_canonical(void)
     start_t5();
     for (int i = 0; i < 3; ++i) game_update(0, 0);
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     saved = race_t5;
     ++race_t5.player[1].elapsed_ticks; /* Source slot 1 is omitted from save. */
     assert(!race_save_game());
@@ -217,7 +230,7 @@ static void early_provenance_is_rejected(void)
 {
     start_t5();
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     assert(!valid_record.t5.ai.requested_scripts[2]);
     RaceSave bad = valid_record;
     bad.t5.ai.requested_scripts[2] |= SC64_T5_SCRIPT_BIT_RSCU;
@@ -253,7 +266,7 @@ static void gated_grant_roundtrip(void)
     assert(race_t5.resources[6].current_gas == 6000);
     assert(race_t5.resources[6].total_minerals_gathered == 6000);
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     {
         RaceSave erased_grant = valid_record;
         memset(&erased_grant.t5.resources[6], 0,
@@ -293,7 +306,7 @@ static void terminal_outcome_roundtrip(int victory)
     assert(race_campaign.phase ==
            (victory ? SC64_RACE_PHASE_COMPLETE : SC64_RACE_PHASE_FAILED));
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     Sc64T5RuntimeState expected_runtime = race_t5;
     Sc64RaceCampaignState expected_campaign = race_campaign;
 
@@ -341,13 +354,13 @@ static void trigger_wait_resume_roundtrip(void)
     assert(race_t5.player[0].active_wait == 10);
     assert(race_t5.player[0].wait_ticks > 0);
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
 
     /* Compare uninterrupted continuation with SRAM expansion/resumption from
      * the exact same active Wait state, including AI and actor/world state. */
     for (int i = 0; i < 12; ++i) game_update(0, 0);
     remember_live();
-    save_write(&valid_record, sizeof(valid_record), SAVE_VERSION);
+    write_candidate_record(&valid_record);
     assert(race_load_game());
     for (int i = 0; i < 12; ++i) game_update(0, 0);
     assert(!memcmp(saved_units, u, sizeof(u)));
@@ -373,7 +386,7 @@ static void mine_state_roundtrip(unsigned mine_state)
     u[mine].target = mine_state == SC64_T5_MINE_CHASING ? 3 : -1;
     for (int i = 0; i < 3; ++i) game_update(0, 0);
     assert(race_save_game());
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     remember_live();
     u[mine].carry = 0; u[mine].target = -1; u[mine].work_timer = 0;
     assert(race_load_game());
@@ -390,7 +403,7 @@ static void normal_pause_save_and_load(void)
     game_update(0, 0);
     game_update(KEY_B, KEY_B); /* Pause menu save command. */
     assert(race_save_game()); /* Also assert the adapter can save this pause state. */
-    valid_record = race_data;
+    fixture_capture_save(&valid_record);
     remember_live();
     game_update(0, 0);
     game_update(KEY_A, KEY_A); /* Resume through the ordinary pause menu. */

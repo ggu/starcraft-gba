@@ -121,6 +121,9 @@ enum {
 #endif
 #endif
 #endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    U_SHARED_BATTLECRUISER,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -204,6 +207,9 @@ enum {
     B_SK_SCIENCE_FACILITY, B_SK_NUCLEAR_SILO, B_SK_COVERT_OPS,
     B_SK_PHYSICS_LAB, B_SK_DEFILER_MOUND,
 #endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    B_SHARED_SCIENCE_FACILITY, B_SHARED_PHYSICS_LAB,
 #endif
     SC_RB_COUNT
 };
@@ -440,6 +446,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     , [U_SK_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 4, 200, 0, 900, 80, 60, 0 }
 #endif
 #endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    , [U_SHARED_BATTLECRUISER] = { R_TER, 0, 255, 12, 400, 300, 2000, 500, 0, 0 }
+#endif
 };
 
 static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
@@ -615,6 +624,10 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_SK_DEFILER_MOUND] = { R_ZERG, SC_RACE_F_BUILDING, 255, 0, 100, 100, 900, 850, 0 }
 #endif
 #endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    , [B_SHARED_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
+    , [B_SHARED_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
+#endif
 };
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
@@ -717,6 +730,9 @@ static inline const char *sc64_race_unit_name(int type)
         ,[U_SK_SHUTTLE] = "SHUTTLE"
 #endif
 #endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+        ,[U_SHARED_BATTLECRUISER] = "BATTLECRUISER"
+#endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
 }
@@ -788,6 +804,10 @@ static inline const char *sc64_race_building_name(int type)
         ,[B_SK_PHYSICS_LAB] = "PHYSICS LAB"
         ,[B_SK_DEFILER_MOUND] = "DEFILER MOUND"
 #endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+        ,[B_SHARED_SCIENCE_FACILITY] = "SCIENCE FACILITY"
+        ,[B_SHARED_PHYSICS_LAB] = "PHYSICS LAB"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -1585,9 +1605,33 @@ static inline int sc64_race_raw_unit(int type)
     case U_SK_SHUTTLE: return 69;
 #endif
 #endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    case U_SHARED_BATTLECRUISER: return 12;
+#endif
     default: return -1;
     }
 }
+
+
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+/* Exact raw-12 identities, including profiles that carry multiple aliases. */
+static inline int sc64_race_is_battlecruiser(int type)
+{
+#ifdef SC64_TERRAN_LATE_ACTORS
+    if (type == U_BATTLECRUISER) return 1;
+#endif
+#ifdef SC64_P5_ACTORS
+    if (type == U_P5_BATTLECRUISER) return 1;
+#endif
+#if defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    if (type == U_SK_BATTLECRUISER) return 1;
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    if (type == U_SHARED_BATTLECRUISER) return 1;
+#endif
+    return 0;
+}
+#endif
 
 static inline int sc64_race_raw_building(int type)
 {
@@ -1685,6 +1729,10 @@ static inline int sc64_race_raw_building(int type)
     case B_SK_COVERT_OPS: return 117; case B_SK_PHYSICS_LAB: return 118;
     case B_SK_DEFILER_MOUND: return 136;
 #endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case B_SHARED_SCIENCE_FACILITY: return 116;
+    case B_SHARED_PHYSICS_LAB: return 118;
 #endif
     default: return -1;
     }
@@ -1823,6 +1871,9 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 69: return U_SK_SHUTTLE;
 #endif
 #endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    case 12: return U_SHARED_BATTLECRUISER;
+#endif
     default: return -1;
     }
 }
@@ -1944,6 +1995,10 @@ static inline int sc64_race_building_from_raw(int raw)
     case 159: return B_SK_OBSERVATORY;
     case 170: return B_SK_ARBITER_TRIBUNAL;
 #endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case 116: return B_SHARED_SCIENCE_FACILITY;
+    case 118: return B_SHARED_PHYSICS_LAB;
 #endif
     default: return -1;
     }

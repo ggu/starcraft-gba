@@ -83,6 +83,16 @@ Zerg building frames cover the ordinary buildings except Nydus Canal 134. Protos
 
 ## Important capability gaps
 
+The shared Battlecruiser candidate adds normal paid Starport production through
+an attached Control Tower and owned Physics Lab, Q8 energy, Lab research,
+Facility flight and Yamato orders in all four canonical products. It therefore
+supplies that Lab's previously missing ordinary product/service. Its source
+inputs are reproducible with `./dev sc64 prepare-bc --rom PATH`. It does not
+enable the full identity extension or complete other late-tech services.
+See the [candidate audit](audits/2026-10-30-shared-battlecruiser/README.md) for
+the host/ARM scope, limited impact-save capacity and measured performance
+regression that keeps this work under qualification.
+
 - The runtime compact enum and raw-ID adapters are profile-conditional in [`race_rules.h`](../starcraft/race_rules.h). Most early campaign builds do not even allocate runtime identities for later standard products. Terran-late actors, P7 actors, and certain Zerg campaign actors are gated to their campaign profiles.
 - Reaver raw 83 is explicitly unavailable from generic custom-game production until its Scarab production/ammunition service exists; a direct-damage substitute is not counted as complete support.
 - Nuclear Silo raw 108 remains in the catalog but is unavailable from custom-game construction until its missile ammunition and launch lifecycle exists. A mapped building identity alone must not allow an inert paid add-on. The final integration review also identified other late-tech structures whose payoff depends on still-unavailable actor services; auditing and implementing those paths remains open before promotion.

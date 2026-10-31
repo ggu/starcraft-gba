@@ -180,17 +180,25 @@ sc64_visibility_source_change(int cell, int add)
 {
     unsigned count = sc64_visibility_source_count(cell);
     if (add) {
-        if (!count) SC64_MINIMAP_VISIBLE_ADD(cell);
-        ++count; /* At most one source per bounded unit/building slot. */
+        if (!count) {
+            SC64_MINIMAP_VISIBLE_ADD(cell);
+            SC64_GRID_SET(visible, cell, 1);
+        }
+        ++count;
+        if (count == 256u)
+            sc64_visible_sources_high[(unsigned)cell >> 3] |=
+                (u8)(1u << ((unsigned)cell & 7));
     } else if (count) {
         --count;
-        if (!count) SC64_MINIMAP_VISIBLE_REMOVE(cell);
+        if (count == 255u)
+            sc64_visible_sources_high[(unsigned)cell >> 3] &=
+                (u8)~(1u << ((unsigned)cell & 7));
+        if (!count) {
+            SC64_MINIMAP_VISIBLE_REMOVE(cell);
+            SC64_GRID_SET(visible, cell, 0);
+        }
     }
     sc64_visible_sources[cell] = (u8)count;
-    u8 mask = (u8)(1u << ((unsigned)cell & 7));
-    if (count & 256u) sc64_visible_sources_high[(unsigned)cell >> 3] |= mask;
-    else sc64_visible_sources_high[(unsigned)cell >> 3] &= (u8)~mask;
-    SC64_GRID_SET(visible, cell, count != 0);
 }
 #endif
 
@@ -490,15 +498,59 @@ sc64_visibility_row_span(int x, int y, int row, int radius, int extent,
     *last = col1;
 }
 
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+/* Counts stay within the asserted source-slot bound. For ordinary overlap,
+ * only the low byte changes; inspect the ninth bit at boundary values. */
+static void __attribute__((noinline))
+sc64_visibility_apply_count_span(int first_cell, int last_cell, int add)
+{
+    int cell;
+    if (add) {
+        for (cell = first_cell; cell <= last_cell; ++cell) {
+            unsigned low = sc64_visible_sources[cell];
+            if (!low && !(sc64_visible_sources_high[(unsigned)cell >> 3] &
+                          (1u << ((unsigned)cell & 7)))) {
+                SC64_MINIMAP_VISIBLE_ADD(cell);
+                SC64_GRID_SET(visible, cell, 1);
+            }
+            if (low == 255u)
+                sc64_visible_sources_high[(unsigned)cell >> 3] |=
+                    (u8)(1u << ((unsigned)cell & 7));
+            sc64_visible_sources[cell] = (u8)(low + 1u);
+        }
+    } else {
+        for (cell = first_cell; cell <= last_cell; ++cell) {
+            unsigned low = sc64_visible_sources[cell];
+            unsigned mask = 1u << ((unsigned)cell & 7);
+            u8 *high = &sc64_visible_sources_high[(unsigned)cell >> 3];
+            if (!low) {
+                if (!(*high & mask)) continue;
+                *high &= (u8)~mask;
+                sc64_visible_sources[cell] = 255;
+            } else {
+                --low;
+                sc64_visible_sources[cell] = (u8)low;
+                if (!low && !(*high & mask)) {
+                    SC64_MINIMAP_VISIBLE_REMOVE(cell);
+                    SC64_GRID_SET(visible, cell, 0);
+                }
+            }
+        }
+    }
+}
+#endif
+
 static void GBA_HOT __attribute__((noinline))
 sc64_visibility_apply_span(int row, int first, int last, int add)
 {
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    if (first <= last)
+        sc64_visibility_apply_count_span(first + row * MAP_COLS,
+                                         last + row * MAP_COLS, add);
+#else
     int col;
     for (col = first; col <= last; ++col) {
         int cell = col + row * MAP_COLS;
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-        sc64_visibility_source_change(cell, add);
-#else
         if (add) {
             if (sc64_visible_sources[cell] == 0)
                 SC64_MINIMAP_VISIBLE_ADD(cell);
@@ -510,8 +562,8 @@ sc64_visibility_apply_span(int row, int first, int last, int add)
                 SC64_MINIMAP_VISIBLE_REMOVE(cell);
         }
         SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
-#endif
     }
+#endif
 }
 #ifdef SC64_SOURCE_SIGHT_SPANS
 /* Exact source-radius row spans for authored Z7 unit/building sight radii.

@@ -463,6 +463,28 @@ static int controller_collect_emitter(int emitter)
     return 0;
 }
 
+static int controller_assign_minerals(void)
+{
+    static const int dx[]={0,8,-8,0,0,8,-8,8,-8},dy[]={0,0,0,8,-8,8,8,-8,-8};
+    int cc=raw_building(106,SIDE),assigned=0;
+    if(cc<0||!building_complete(cc))return 0;
+    for(int i=0;i<MAX_UNITS&&host_tick<(u32)tick_limit;i++) {
+        if(!u[i].alive||u[i].owner!=SIDE||u[i].raw_type!=7||u[i].order!=ORDER_IDLE||u[i].carry||
+           i==(int)race_late.emitter_carrier||SC64_TRANSPORT_LOADED(&u[i])||!select_unit(i))continue;
+        for(int j=0;j<MAX_MINERALS&&u[i].order==ORDER_IDLE;j++) {
+            if(m[j].amount<=0||!currently_visible(m[j].x,m[j].y)||dist2(m[j].x,m[j].y,b[cc].x,b[cc].y)>256*256)continue;
+            for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0]);k++) {
+                move_cursor(m[j].x+dx[k],m[j].y+dy[k]);
+                if(!u[i].alive||!u[i].selected||u[i].carry)break;
+                if(selected_worker_mineral_target()!=j||field_ui_a_action(selected_count())!=UI_A_MINE)continue;
+                tap(KEY_A);
+                if(u[i].order==ORDER_MINE&&u[i].target==j){assigned++;fprintf(stderr,"T7 mineral SCV=%d patch=%d\n",i,j);break;}
+            }
+        }
+    }
+    return assigned;
+}
+
 static void controller_assign_gas_workers(void)
 {
     int refinery=raw_building(110,SIDE);
@@ -471,14 +493,14 @@ static void controller_assign_gas_workers(void)
     for(int n=0;n<3&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;n++){
         int worker=-1,best=0x7fffffff;
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==7&&
-           i!=(int)race_late.emitter_carrier&&u[i].order!=ORDER_GAS&&
+           i!=(int)race_late.emitter_carrier&&u[i].order!=ORDER_GAS&&!u[i].carry&&
            !SC64_TRANSPORT_LOADED(&u[i])){
             int d=dist2(u[i].x,u[i].y,b[refinery].x,b[refinery].y);
             if(d<best){best=d;worker=i;}
         }
         if(worker<0)break;
         if(!u[worker].alive||!select_unit(worker))continue;
-        move_cursor(b[refinery].x,b[refinery].y);tap(KEY_A);
+        move_cursor(b[refinery].x,b[refinery].y);if(!u[worker].alive||!u[worker].selected||u[worker].carry)continue;tap(KEY_A);
         if(u[worker].order==ORDER_GAS&&u[worker].target==refinery){
             ++assigned;
             fprintf(stderr,"T7 assigned SCV=%d to refinery=%d\n",worker,refinery);
@@ -692,6 +714,7 @@ static int build_marine_force(int target_count)
 {
     for(int t=0;t<20000&&current_count_type(U_MARINE)<target_count&&
         host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;t++){
+        if(t%1000==0)(void)controller_assign_minerals();
         int barracks=raw_building(111,SIDE);
         if(barracks<0||!building_complete(barracks))return 0;
         if(b[barracks].queue_count<5&&minerals>=50&&
@@ -1141,6 +1164,8 @@ static void progress_until_terminal(void)
                 return;
             }
             controller_assign_gas_workers();
+            (void)controller_assign_minerals();
+            if(controller_air_deliver_emitter(emitter)) goto delivery_complete;
             /* Gather the Marines already supplied by the scenario and clear
                only a source-hostile Goliath that can reach the drop point.
                Repeated Wraith waves spent far beyond source weapon range. */
@@ -1163,6 +1188,7 @@ static void progress_until_terminal(void)
       (unsigned)host_tick,(unsigned)race_late.emitter_unit,
       race_late.emitter_unit<MAX_UNITS?u[race_late.emitter_unit].owner:-1,
       race_late.emitter_unit<MAX_UNITS?u[race_late.emitter_unit].alive:0);
+delivery_complete:
     for(int i=0;i<5000&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;i++)step(0);
 }
 

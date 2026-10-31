@@ -66,6 +66,12 @@ static int race_z5_source_owner(unsigned source_slot);
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) {
+        int owner = raw_owner < 0 ? -1 : race_z8_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active()) {
         int owner = raw_owner < 0 ? -1 : race_z7_source_owner((unsigned)raw_owner);
@@ -227,6 +233,9 @@ static void race_p4_rescue_tick(void)
             u[j].raw_type != 101 && u[j].raw_type != 150) {
             int dx = u[i].x - u[j].x, dy = u[i].y - u[j].y;
             if (dx * dx + dy * dy <= 32 * 32) {
+                #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+                if (!race_bc_before_unit_transfer(&u[i],SIDE,-1)) break;
+                #endif
                 u[i].owner = SIDE; u[i].selected = 0;
                 u[i].order = ORDER_IDLE; u[i].target = -1;
                 u[i].tx = u[i].x; u[i].ty = u[i].y;
@@ -238,7 +247,10 @@ static void race_p4_rescue_tick(void)
         for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
             u[j].raw_type != 101 && u[j].raw_type != 150) {
             int dx = b[i].x - u[j].x, dy = b[i].y - u[j].y;
-            if (dx * dx + dy * dy <= 32 * 32) { b[i].owner = SIDE; break; }
+            if (dx * dx + dy * dy <= 32 * 32) {
+                if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) b[i].owner = SIDE;
+                break;
+            }
         }
     }
 }
@@ -511,6 +523,9 @@ race_campaign_init(void)
 #ifdef SC64_Z7_RUNTIME
          && race_selected_mission != SC64_Z7_GLOBAL_ID
 #endif
+#ifdef SC64_Z8_RUNTIME
+         && race_selected_mission != SC64_Z8_GLOBAL_ID
+#endif
          ) || !sc64_race_maps[race_selected_mission].width)
         race_selected_mission = sc64_frontend_first_mission(
 #ifdef SC64_CAMPAIGN_RACE
@@ -523,6 +538,11 @@ race_campaign_init(void)
     map = &sc64_race_maps[race_selected_mission];
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active() && !race_z7_source_row_counts(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active() && !race_z8_map_shape_valid(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
@@ -608,6 +628,7 @@ race_campaign_init(void)
     clear_tracers();
     death_vfx_reset();
     reset_selection_gestures();
+    memset(geysers, 0, sizeof(geysers));
     geyser_count = 0;
     supply_used = 0;
     supply_cap = 0;
@@ -640,6 +661,9 @@ race_campaign_init(void)
         int owner = map->owner_modes[i];
 #ifdef SC64_Z7_RUNTIME
         if (race_z7_active()) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_Z8_RUNTIME
+        if (race_z8_active()) owner = race_campaign_owner(map, i);
 #endif
 #ifdef SC64_Z4_RUNTIME
         if (race_selected_mission == SC64_RACE_MISSION_Z4) owner = race_campaign_owner(map, i);
@@ -857,6 +881,11 @@ race_campaign_init(void)
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
+#ifdef SC64_Z8_RUNTIME
+    if (!race_z8_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (race_p7_active() &&
         (!race_p7_runtime_init(map) || !race_p7_battery_initialize_source(map))) {
@@ -866,6 +895,9 @@ race_campaign_init(void)
     switch (race_selected_mission) {
 #ifdef SC64_Z7_RUNTIME
     case SC64_Z7_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_Z8_RUNTIME
+    case SC64_Z8_GLOBAL_ID: minerals = gas = 0; break;
 #endif
 #ifdef SC64_Z6_RUNTIME
     case SC64_Z6_GLOBAL_ID: minerals = gas = 0; break;
@@ -1191,6 +1223,21 @@ race_campaign_tick(void)
         return;
     }
 #endif
+#ifdef SC64_Z8_RUNTIME
+    if (mission == SC64_Z8_GLOBAL_ID) {
+        if (!race_z8_runtime_tick()) {
+            screen=SCREEN_PAUSE; toast(14); return;
+        }
+        if (race_z8_outcome()==SC64_Z8_OUTCOME_VICTORY) {
+            won=1; lost=0; race_campaign.phase=SC64_RACE_PHASE_COMPLETE;
+            race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;
+            race_completed |= 1 << SC64_Z8_GLOBAL_ID;
+        } else if (race_z8_outcome()==SC64_Z8_OUTCOME_DEFEAT) {
+            won=0; lost=1; race_campaign.phase=SC64_RACE_PHASE_FAILED;
+        }
+        return;
+    }
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (mission == SC64_Z7_GLOBAL_ID) {
         if (!race_z7_runtime_tick(0, race_campaign.elapsed_frames)) {
@@ -1332,7 +1379,7 @@ race_campaign_tick(void)
                 }
                 for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == RESCUABLE &&
                     b[i].x >= 224 && b[i].x <= 784 && b[i].y >= 848 && b[i].y <= 1200) {
-                    b[i].owner = SIDE; joined = 1;
+                    if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) { b[i].owner = SIDE; joined = 1; }
                 }
                 if (joined) race_campaign_set_message(8);
             }
@@ -1399,6 +1446,9 @@ race_campaign_objective_text(void)
 {
 #ifdef SC64_P7_BATTERY_ENABLED
     if (race_p7_active()) return "Destroy the Conclave heart. Keep Fenix, Zeratul, and Tassadar alive.";
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) return "Destroy both Protoss Nexuses. Keep Kerrigan alive and the Dark Templar out of the hives.";
 #endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active()) return "Destroy all enemy buildings.";
@@ -1472,6 +1522,9 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) return "THE TEMPLAR ARE BROKEN";
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active()) return "THE CULLING IS COMPLETE";
 #endif
@@ -1541,6 +1594,9 @@ race_campaign_victory_text(void)
 static const char *
 race_campaign_failure_text(void)
 {
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) return "THE BROOD HAS FALLEN";
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active()) return "THE BROOD HAS FALLEN";
 #endif

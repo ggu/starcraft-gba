@@ -8,10 +8,9 @@
  * does not enable Z8 gameplay or claim that its trigger/actor semantics are
  * implemented.
  *
- * Still-unimplemented semantic domains include the 39-trigger scheduler and
- * PreserveTrigger lifecycle, Kill conditions, native AI FourCC behavior,
- * non-default property-aware actor creation, MoveLocation/SetInvincibility,
- * Observer detection/cloak, and linked Nydus transport.
+ * The zerg-z8 candidate binds the scheduler (sc64_z8_runtime_adapter.h).
+ * Native AI FourCC behavior, the native kill census, non-default property
+ * creation and Observer detection remain authored or unimplemented there.
  */
 #ifndef SC64_Z8_SOURCE_H
 #define SC64_Z8_SOURCE_H
