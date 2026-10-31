@@ -29,6 +29,15 @@ build/test-dark-swarm-render: tests/sc64_defiler_executor_game.c $(STARCRAFT) $(
 test-dark-swarm-render: build/test-dark-swarm-render
 	./build/test-dark-swarm-render
 
+# Requires retained pinned OpenBW flat-world oracle logs and prepared inputs.
+DARK_SWARM_ORACLE_DIR ?= .local/defiler-approach-audit
+.PHONY: test-dark-swarm-approach
+build/test-dark-swarm-approach: tests/sc64_defiler_approach_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_APPROACH_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-approach: build/test-dark-swarm-approach
+	./build/test-dark-swarm-approach > build/test-dark-swarm-approach.log
+	$(PYTHON) tests/sc64_compare_defiler_approach.py --actual build/test-dark-swarm-approach.log --oracle-dir $(DARK_SWARM_ORACLE_DIR)
+
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
 build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build

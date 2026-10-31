@@ -419,3 +419,30 @@ menu cast to a field and checks visible pixels at interior, horizontal and
 vertical scene edges while preserving the HUD bands. It does not establish
 source-exact blending, final death-frame lifetime, all profile palettes, ARM
 fit, or native hardware appearance. Normal products remain unchanged.
+
+
+### Disabled cardinal clear-path approach
+
+The additional `SC64_SHARED_DEFILER_APPROACH_PROBE` drives a stationary-start
+point order through actual `game_update` using source-Q8 position, Defiler
+IScript's four-source-pixel walking step and the source order's nine-update
+range-check cadence. It requires a clear direct GBA terrain path and checks
+ordinary actor collision at each step; blocked routes stay pending without
+spending energy. This is an explicitly restricted GBA collision adaptation,
+not OpenBW pathfinding. Non-cardinal paths fail closed. STOP clears the pending
+order.
+
+A synthetic prepared Showcase host fixture used ordinary menu input on clear
+terrain, then compared its output to retained pinned OpenBW flat-world oracle
+logs from an isolated caster at source phase zero. All 60 source samples of
+position and heading matched for each of four cardinal routes, including debit at source samples 46, 46, 19 and 19; the
+blocked-corridor case stayed in place without spending energy. The opt-in
+`test-dark-swarm-approach` target requires those retained oracle logs through
+`DARK_SWARM_ORACLE_DIR`. Source diagonal tracing showed an independent velocity
+direction that turns toward intermediate 64-source-pixel waypoints while
+visible heading stays fixed. It is intentionally not treated as cardinal
+movement and remains unsupported, as do obstacle pathfinding, source
+collision/range-edge semantics, moving starts, later order-timer phases and
+multi-actor scheduling, raw-52 energy and full runtime integration. The
+stationary center-distance band above 256 and at most 288 source pixels remains
+pending rather than casting or approaching. Normal flags remain off.

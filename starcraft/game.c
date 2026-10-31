@@ -990,8 +990,16 @@ static Sc64SharedProjectileArena sc64_shared_projectiles;
 #ifdef SC64_SHARED_DEFILER_STAGE
 /* Experimental simulation state; never borrow presentation-facing or a
  * mission payload. Save remains refused while an experimental caster lives. */
-typedef struct { u16 energy_q8; s16 target_x,target_y; u8 heading, live, intent, phase, age; } Sc64DefilerStageActor;
+typedef struct {
+    u16 energy_q8; s16 target_x,target_y; u8 heading, live, intent, phase, age;
+#ifdef SC64_SHARED_DEFILER_APPROACH_PROBE
+    s32 x_q8,y_q8; u16 motion_age; u8 moving, stopped, blocked;
+#endif
+} Sc64DefilerStageActor;
 static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
+#endif
+#if defined(SC64_SHARED_DEFILER_APPROACH_PROBE) && !defined(SC64_SHARED_DEFILER_EXECUTOR)
+#error "Defiler approach requires the experimental executor"
 #endif
 #if defined(SC64_SHARED_DEFILER_ART_PROBE) && (!defined(SC64_SHARED_DEFILER_EXECUTOR) || !defined(SC64_WEAPON_SOURCE_VFX))
 #error "Defiler art requires the experimental executor and source VFX renderer"
@@ -6455,6 +6463,10 @@ interact(void)
             sc64_defiler_stage[slot].target_y=(s16)cy;
             sc64_defiler_stage[slot].intent=1;
             sc64_defiler_stage[slot].phase=0; sc64_defiler_stage[slot].age=0;
+#ifdef SC64_SHARED_DEFILER_APPROACH_PROBE
+            sc64_defiler_stage[slot].motion_age=0; sc64_defiler_stage[slot].moving=0;
+            sc64_defiler_stage[slot].stopped=0; sc64_defiler_stage[slot].blocked=0;
+#endif
             toast(0);
         } else toast(8);
         mode=MODE_NORMAL; return;

@@ -14,6 +14,45 @@ static int sc64_defiler_executor_busy(void)
         if(sc64_defiler_projectiles[i].handle) return 1;
     return 0;
 }
+#ifdef SC64_SHARED_DEFILER_APPROACH_PROBE
+/* Source-Q8 direct, unobstructed stationary-start slice. The source walking
+ * IScript supplies four source pixels per update; the spell order rechecks
+ * its range every nine source updates. Collision/pathing outside this direct
+ * slice is deliberately left pending, not approximated with stock steering. */
+static int sc64_defiler_clear_approach(Sc64DefilerStageActor *a,Unit *q)
+{
+    if(a->blocked)return 0;
+    if(!a->motion_age) {
+#ifndef SC64_SHARED_DEFILER_DIAGONAL_RESEARCH
+        if(a->target_x!=q->x && a->target_y!=q->y) {a->blocked=1;return 0;}
+#endif
+        if(!direct_path_clear(q->x,q->y,a->target_x,a->target_y)) {a->blocked=1;return 0;}
+        a->x_q8=(s32)q->x*512;a->y_q8=(s32)q->y*512;a->moving=1;
+    }
+    ++a->motion_age;
+    s32 dx=(s32)a->target_x*512-a->x_q8,dy=(s32)a->target_y*512-a->y_q8;
+    u8 desired=(dx||dy)?sc64_interceptor_dir(dx,dy):a->heading;
+    int order_due=(a->motion_age%9u)==1u;
+    if(a->stopped) return order_due;
+    int stop=order_due && sc64_interceptor_len_raw(dx,dy)<=288*256;
+    if(a->motion_age>=3) {
+        int can_move=a->motion_age>=4 && sc64_interceptor_abs32(sc64_interceptor_turn_delta(a->heading,desired))<32;
+        sc64_interceptor_toward(&a->heading,desired,27);
+        if(can_move && (dx||dy)) {
+            Sc64InterceptorDirectionVector v=sc64_interceptor_direction_vector[a->heading];
+            s32 nx=a->x_q8+sc64_interceptor_integer_part((s32)v.x*1024);
+            s32 ny=a->y_q8+sc64_interceptor_integer_part((s32)v.y*1024);
+            int gx=sc64_interceptor_integer_part(nx)/2,gy=sc64_interceptor_integer_part(ny)/2;
+            if(!is_traversable(gx/16,gy/16,q->x/16+(q->y/16)*MAP_COLS) ||
+               !unit_step_clear(q,gx,gy)) {a->blocked=1;return 0;}
+            a->x_q8=nx;a->y_q8=ny;q->x=gx;q->y=gy;
+            sc64_unit_bucket_move(q);sc64_target_index_move(q);
+        }
+    }
+    if(stop) {a->moving=0;a->stopped=1;}
+    return 0;
+}
+#endif
 static void sc64_defiler_executor_unit_tick(void)
 {
     if(!sc64_battlecruiser_source_tick_due()) return;
@@ -38,8 +77,13 @@ static void sc64_defiler_executor_unit_tick(void)
         if(!a->intent)continue;
         if(a->phase==0) {
             int dx=(a->target_x-q->x)*2,dy=(a->target_y-q->y)*2;
-            /* Only the controlled interior is admitted. Source rectangle
-             * range, halt distance, visibility and approach remain open. */
+            /* The rectangle/halt boundary and visibility remain open. */
+#ifdef SC64_SHARED_DEFILER_APPROACH_PROBE
+            if(a->motion_age || (s32)dx*dx+(s32)dy*dy>288*288) {
+                if(!sc64_defiler_clear_approach(a,q))continue;
+                dx=(a->target_x-q->x)*2;dy=(a->target_y-q->y)*2;
+            } else
+#endif
             if((s32)dx*dx+(s32)dy*dy>256*256)continue;
             u8 desired=(dx||dy)?sc64_interceptor_dir(dx,dy):a->heading;
             if(a->age)sc64_interceptor_toward(&a->heading,desired,27);
