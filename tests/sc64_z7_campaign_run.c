@@ -5705,7 +5705,7 @@ int main(int argc,char **argv)
            the worker evacuation menu consumes its multi-update selection and
            move gestures. Evacuation still runs in the same host iteration. */
         attack_step();
-        int worker_evacuated=z7_urgent_worker_evacuation();
+        int worker_evacuated=0; /* Retain workers on the protected line. */
         /* Keep paid unit and worker replacement running during retreats. */
         macro_step();
         if(frame>=last_checkpoint+Z7_CHECKPOINT_PERIOD) {
