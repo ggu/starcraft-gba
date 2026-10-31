@@ -12,7 +12,9 @@ typedef struct { unsigned tick; int minerals,gas,drones,hydras,zerglings,overlor
 /* An open menu or pause holds the world clock; bound host ticks so a
    stuck controller fails instead of hanging (a win takes about 60k). */
 #define Z1_TICK_LIMIT 240000u
-static Z1Event events[2048];
+/* Host capture only; physical-key replay streams the tape externally. */
+#define Z1_EVENT_CAPACITY 16384
+static Z1Event events[Z1_EVENT_CAPACITY];
 static Z1Checkpoint checkpoints[256];
 static unsigned input_tick;
 static unsigned short previous_held;
@@ -223,6 +225,34 @@ static void assign_gas(void)
     /* StarCraft's context action assigns the selected worker to this
        completed refinery regardless of its current position. */
     if(cursor_near(b[ref].x,b[ref].y))press(KEY_A);
+}
+/* New workers can be idle after the Pool consumes a miner. Issue the
+ * ordinary contextual mineral command rather than assuming auto-assignment. */
+static int assign_idle_miner(void)
+{
+    static const int offsets[][2]={{0,0},{-8,0},{8,0},{0,-8},{0,8},
+        {-8,-8},{8,-8},{-8,8},{8,8},{-12,0},{12,0},{0,-12},{0,12}};
+    int worker=-1,patch=-1,best=0x7fffffff;
+    for(int i=0;i<MAX_UNITS;i++)
+        if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE&&u[i].order==ORDER_IDLE)
+            {worker=i;break;}
+    if(worker<0)return 0;
+    for(int i=0;i<MAX_MINERALS;i++)if(m[i].amount>0&&currently_visible(m[i].x,m[i].y)) {
+        int d=dist2(u[worker].x,u[worker].y,m[i].x,m[i].y);
+        if(d<best){best=d;patch=i;}
+    }
+    if(patch<0)return 0;
+    int guard=0;
+    while(guard++<MAX_UNITS&&find_selected_worker()!=worker)press(KEY_L);
+    if(find_selected_worker()!=worker)return 0;
+    for(unsigned i=0;i<sizeof(offsets)/sizeof(offsets[0]);i++) {
+        if(!u[worker].alive||!u[worker].selected||selected_count()!=1)return 0;
+        if(!cursor_near(m[patch].x+offsets[i][0],m[patch].y+offsets[i][1]))return 0;
+        if(selected_worker_mineral_target()!=patch)continue;
+        press(KEY_A);
+        return u[worker].alive&&u[worker].order==ORDER_MINE&&u[worker].target==patch;
+    }
+    return 0;
 }
 static int queued_unit(int h,int type)
 {
@@ -492,6 +522,9 @@ int main(int argc,char **argv)
         if(!select_hatchery())return fail("reselect Hatchery during tech rush");
         int queued_supply_overlord=0;
         for(int t=0;t<4800&&screen==SCREEN_PLAY&&count_units(SIDE,U_DRONE)<4;t++) {
+            if(t%120==0 && assign_idle_miner()) {
+                if(!select_hatchery())return fail("reselect Hatchery after assigning miner");
+            }
             if(!queued_supply_overlord&&race_owner_reserved_supply(SIDE)+2>race_owner_supply_cap(SIDE)&&
                minerals>=100&&b[hatch].larva>0&&b[hatch].queue_count<5) {
                 select_train_type(U_OVERLORD);
@@ -566,7 +599,7 @@ int main(int argc,char **argv)
            !queued_unit(hatch,desired))press(KEY_A);
         controller_frame(0);
         if(t%300==0)refresh_local_defense();
-        if(t%600==0) { ensure_campaign_tech();assign_gas();select_hatchery(); }
+        if(t%600==0) { ensure_campaign_tech();assign_gas();assign_idle_miner();select_hatchery(); }
         int live=count_units(SIDE,U_HYDRALISK);
         if(live>focused_hydras&&focused_hydras<3) {
             int wi=-1,wd=0x7fffffff;
@@ -613,7 +646,7 @@ int main(int argc,char **argv)
     }
     for(int i=0;i<120&&screen==SCREEN_PLAY&&!won&&!lost;i++)controller_frame(0);
     write_trace();
-    if(event_overflow||event_count>2048)return fail("controller event trace exceeded ARM replay capacity");
+    if(event_overflow)return fail("controller event trace exceeded host capture capacity");
     if(!won||lost||!race_campaign_won())return fail("controller attack did not complete Z1");
     if(count_units(SIDE,U_HYDRALISK)<1||count_buildings(SIDE,B_EXTRACTOR)<1||
        count_buildings(SIDE,B_SPAWNING_POOL)<1||count_buildings(SIDE,B_HYDRALISK_DEN)<1)
