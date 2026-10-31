@@ -5676,7 +5676,7 @@ SCARAB_FIXTURE_save := tests/sc64_scarab_save_game.c
 
 define SCARAB_PREPARED_FIXTURE
 .PHONY: test-scarab-$(1)
-test-scarab-$(1):
+test-scarab-$(1): $$(CANONICAL_LOOKUP_INPUTS)
 	@set -eu; \
 	mkdir -p build/generated/scarab-p7; \
 	run=$$$$(mktemp -d build/generated/scarab-p7/run.XXXXXX); \
