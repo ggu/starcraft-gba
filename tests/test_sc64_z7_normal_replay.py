@@ -98,6 +98,44 @@ class NormalZ7PlanTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'too late'):
             replay.play_dense(f,sym,{'first':0,'end':301},chunks,lambda page:setattr(f,'page',page))
 
+    def test_dense_repeated_breakpoint_stops_are_bounded(self):
+        import struct
+        sym={'demo_schedule_tick':1,'demo_schedule_index':2,
+             'demo_replay_checkpoint':4,'game_update':6}
+        events=[(i, i%2) for i in range(301)]
+        chunks=[events[:256],events[256:]]
+        class Fake:
+            def __init__(self, repeats):
+                self.tick_value=-1; self.index=0; self.page=chunks[0]; self.seen=[]
+                self.repeats=repeats
+            def breakpoint(self, address, enabled): pass
+            def tick(self, expected):
+                if self.tick_value==42 and self.repeats:
+                    self.repeats-=1; return
+                self.tick_value+=1
+                if self.index<len(self.page) and self.page[self.index][0]==self.tick_value:
+                    self.seen.append(self.page[self.index]); self.index+=1
+            def read(self,address,length):
+                return struct.pack('<I',self.tick_value if address==1 else self.index)
+            def write(self,address,data):self.index=struct.unpack('<I',data)[0]
+        f=Fake(8)
+        self.assertEqual(replay.play_dense(f,sym,{'first':0,'end':301},chunks,lambda p:setattr(f,'page',p)),1)
+        self.assertEqual(f.seen,events)
+        f=Fake(9)
+        with self.assertRaisesRegex(RuntimeError,'stalled'):
+            replay.play_dense(f,sym,{'first':0,'end':301},chunks,lambda p:setattr(f,'page',p))
+
+    def test_input_hashes_reject_every_changed_artifact(self):
+        paths=[Path(self.tmp.name)/n for n in ('trace','rom','elf','runner')]
+        for p in paths:p.write_bytes(b'original')
+        before=replay.input_hashes(paths)
+        replay.require_unchanged(paths,before)
+        for p in paths:
+            p.write_bytes(b'changed')
+            with self.subTest(path=p.name),self.assertRaisesRegex(RuntimeError,'changed'):
+                replay.require_unchanged(paths,before)
+            p.write_bytes(b'original')
+
     def test_dwarf_snapshot_counts_and_model_arrays(self):
         from unittest.mock import patch
         from sc64_races_profile import DwarfOffsets

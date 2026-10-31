@@ -124,11 +124,15 @@ def play_dense(rsp, sym, page, chunks, write_page):
     def u32(name): return int.from_bytes(rsp.read(sym[name],4),'little')
     rsp.breakpoint(sym['demo_replay_checkpoint']&~1,False)
     rsp.breakpoint(sym['game_update']&~1,True)
-    last=page['first']-1; active=0
+    last=page['first']-1; active=0; stale=0
     while last<page['end']-1:
         rsp.tick(expected=sym['game_update']&~1);tick=u32('demo_schedule_tick')
-        if tick<=last or tick>=page['end']: raise RuntimeError('invalid dense-page tick')
-        last=tick;index=u32('demo_schedule_index')
+        if tick<last or tick>=page['end']: raise RuntimeError('invalid dense-page tick')
+        if tick==last:
+            stale+=1
+            if stale>8: raise RuntimeError('dense-page breakpoint stalled')
+            continue
+        stale=0;last=tick;index=u32('demo_schedule_index')
         if index>len(chunks[active]): raise RuntimeError('invalid dense-page cursor')
         if index==len(chunks[active]) and active+1<len(chunks):
             active+=1
@@ -139,7 +143,17 @@ def play_dense(rsp, sym, page, chunks, write_page):
     return active
 
 
+def input_hashes(paths):
+    return {str(p.resolve()): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
+
+
+def require_unchanged(paths, before):
+    if input_hashes(paths)!=before:
+        raise RuntimeError('trace, ROM, ELF or runner changed during replay')
+
+
 def run(trace, rom, elf, runner, output, stop=None):
+    inputs=(trace,rom,elf,runner);before=input_hashes(inputs)
     plan,pages=build_plan(trace,stop);stop=pages[-1]['end']
     sym,sizes=symbols(elf),symbol_sizes(elf)
     mode,capacity=scheduler.schedule_mode(sym,sizes)
@@ -178,7 +192,8 @@ def run(trace, rom, elf, runner, output, stop=None):
                 write_page(pages[i+1]['events'][:capacity]);rsp.write(sym['demo_schedule_length'],struct.pack('<I',pages[i+1]['end']))
         full=stop==plan['stop']
         if full and (not records or records[-1]['tick']!=stop or records[-1]['won']!=1 or records[-1]['outcome']!=1 or records[-1]['lost']!=0): raise RuntimeError('normal ROM did not win')
-        result={'status':'won' if full else 'prefix','stop':stop,'checkpoint_count':len(records),'checkpoints':records,'scope':'named Z7 model fields, entity counts and economy; not full entity arrays','sha256':{str(p.resolve()):hashlib.sha256(p.read_bytes()).hexdigest() for p in (trace,rom,elf,runner)}}
+        require_unchanged(inputs,before)
+        result={'status':'won' if full else 'prefix','stop':stop,'checkpoint_count':len(records),'checkpoints':records,'scope':'named Z7 model fields, entity counts and economy; not full entity arrays','sha256':before}
         (output/'result.json').write_text(json.dumps(result,indent=2)+'\n');return result
     finally:
         if proc is not None:
