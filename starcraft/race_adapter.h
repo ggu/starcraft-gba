@@ -644,11 +644,7 @@ static int race_queue_unit(int owner, int producer, int type)
         (!building_complete(producer) && !(egg_job && race_z7_morphing_egg_hall(owner, producer)) &&
             !(race_mode && b[producer].alive && (b[producer].type == B_LAIR || b[producer].type == B_HIVE))) ||
         b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type,
-#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
-            (race_mode && sc64_race_raw_unit(type) == 12) ? B_STARPORT : r->producer
-#else
-            r->producer
-#endif
+            race_skirmish_product_producer(type)
         ) ||
         (!race_mode && !race_owner_has_prereq(owner, r->prereq))) return 0;
     if (!egg_job && b[producer].queue_count >= 5) return 0;
@@ -657,11 +653,7 @@ static int race_queue_unit(int owner, int producer, int type)
         (!building_complete(producer) && !(race_mode && b[producer].alive &&
             (b[producer].type == B_LAIR || b[producer].type == B_HIVE))) ||
         b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type,
-#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
-            (race_mode && sc64_race_raw_unit(type) == 12) ? B_STARPORT : r->producer
-#else
-            r->producer
-#endif
+            race_skirmish_product_producer(type)
         ) ||
         b[producer].queue_count >= 5 || (!race_mode && !race_owner_has_prereq(owner, r->prereq))) return 0;
 #endif
