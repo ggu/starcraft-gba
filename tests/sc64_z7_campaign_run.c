@@ -3688,8 +3688,11 @@ static int campaign_assault_retarget(void)
             static unsigned next_recon_retry;
             if(!campaign_recon_active&&(unsigned)frame>=next_recon_retry) {
                 int scout_x=-1,scout_y=-1;
-                if(campaign_recon_waypoint(campaign_recon_stage,&scout_x,&scout_y)) {
+                int waypoint_found=campaign_recon_waypoint(campaign_recon_stage,&scout_x,&scout_y);
+                if(waypoint_found) {
                     accepted=army_order(1,scout_x,scout_y);
+                    fprintf(stderr,"Z7 recon attempt stage%d xy%d,%d accepted%d frame%u\n",
+                        campaign_recon_stage,scout_x,scout_y,accepted,(unsigned)frame);
                     if(accepted) {
                         int movers=0;
                         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
@@ -3707,6 +3710,8 @@ static int campaign_assault_retarget(void)
                             combat_count(SIDE),movers);
                     } else next_recon_retry=(unsigned)frame+600u;
                 } else {
+                    fprintf(stderr,"Z7 recon no reachable waypoint stage%d frame%u\n",
+                        campaign_recon_stage,(unsigned)frame);
                     /* Do not retry an unreachable fixed waypoint forever. */
                     if(campaign_recon_stage<4)campaign_recon_stage++;
                     next_recon_retry=(unsigned)frame+600u;
