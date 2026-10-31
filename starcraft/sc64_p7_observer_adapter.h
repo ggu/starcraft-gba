@@ -545,14 +545,17 @@ static void sc64_p7_arbiter_cache_source_tick(void)
     for (i=0;i<MAX_UNITS;++i) {
         unsigned old=(unsigned)u[i].weapon;
         unsigned mask=0,timer=0;
-        int tracked=aura[i] || sc64_p7_observer_is_cloaked((unsigned)RACE_PROTOSS_RAW(&u[i]));
-        int was_tracked=SC64_P7_ARBITER_CACHE_VALID(old) &&
-                        (old&SC64_P7_ARBITER_TRACKED)!=0;
         if (!u[i].alive) {
-            if (!sc64_p7_arbiter_cache_empty_unit(&u[i]))
+            /* The old value is already the exact dead-row result. Zero rows
+             * still need the complete representation check below. */
+            if (old != sc64_p7_arbiter_pack(0,0,0,0) &&
+                !sc64_p7_arbiter_cache_empty_unit(&u[i]))
                 u[i].weapon=(u16)sc64_p7_arbiter_pack(0,0,0,0);
             continue;
         }
+        int tracked=aura[i] || sc64_p7_observer_is_cloaked((unsigned)RACE_PROTOSS_RAW(&u[i]));
+        int was_tracked=SC64_P7_ARBITER_CACHE_VALID(old) &&
+                        (old&SC64_P7_ARBITER_TRACKED)!=0;
         if (!SC64_P7_ARBITER_CACHE_VALID(old)) {
             /* Fail closed on malformed in-memory rows; spawn initializes it. */
             u[i].weapon=(u16)sc64_p7_arbiter_pack(0,0,0,0);
