@@ -5795,8 +5795,8 @@ $(eval $(call SCARAB_PREPARED_FIXTURE,unit-adapter,unit_adapter))
 $(eval $(call SCARAB_PREPARED_FIXTURE,presence,presence))
 $(eval $(call SCARAB_PREPARED_FIXTURE,save,save))
 
-# Opt-in actual-codec Scarab journal checks. Consume only already-prepared
-# inputs: no extraction/generation rules are prerequisites of these targets.
+# Opt-in actual-codec Scarab journal checks use prepared local inputs.
+# Canonical lookup dependencies are declared below.
 # Each P7 run generates its own source-only roster facts in a new run folder.
 define SCARAB_CROSS_FIXTURE
 .PHONY: test-scarab-cross-$(1)
