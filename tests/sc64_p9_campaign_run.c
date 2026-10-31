@@ -876,7 +876,7 @@ int main(int argc,char **argv)
                 int vx=u[z].x-b[c].x,vy=u[z].y-b[c].y,len=FAST_ABS(vx)+FAST_ABS(vy);
                 if(len>0)(void)hero_command(z,u[z].x+vx*96/len,u[z].y+vy*96/len);
             } else if(c>=0&&front_distance>=0&&front_distance<14&&guarding_sunken(c)<0&&
-                      b[c].hp<500&&guards<=2&&u[z].shield>=300&&escort>=10){
+                      guards<=2&&u[z].shield>=300&&escort>=10){
                 const Sc64P9SourceLocation *l=&sc64_p9_source_locations[loc-1];
                 int lx=(int)(l->left+l->right)/4,ly=(int)(l->top+l->bottom)/4;
                 int zx=lx,zy=ly+20,zd=-1;
@@ -885,8 +885,8 @@ int main(int argc,char **argv)
                 zeratul_entering=1;
                 (void)hero_command(z,zx,zy);
             } else if(c>=0&&front_unit>=0&&u[front_unit].alive&&u[front_unit].owner==SIDE&&
-                      front_distance>=0&&front_distance<30){
-                /* Cloaked, he waits at home until the front is close, then
+                      front_distance>=0&&front_distance<100){
+                /* Cloaked, he leaves home early enough to trail the front; then
                  * trails it: its centre, 96 pixels back from the Cerebrate. */
                 int ax=0,ay=0,an=0;
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
@@ -931,9 +931,8 @@ int main(int argc,char **argv)
                 int lx=(int)(l->left+l->right)/4,ly=(int)(l->top+l->bottom)/4;
                 /* Route from the frontline unit nearest the Cerebrate; newly
                  * trained units at home would skew an army average. Zeratul
-                 * (no weapon flag, so outside R's group) trails the group
-                 * around that unit and enters the Cerebrate's location only
-                 * once it is nearly dead. */
+                 * is deliberately excluded by the type-group selector and
+                 * follows the group separately into the source location. */
                 int front=-1,fd=0x7fffffff,gx=0,gy=0,gn=0;
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!IS_WORKER(u[i].type)&&
                     u[i].raw_type!=75&&u[i].raw_type!=78){
