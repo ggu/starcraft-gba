@@ -8221,7 +8221,10 @@ release after that observation and exports `saved.sav` and `saved-state.json`.
 Run again with a different output directory, `--cut TICK --save-input
 /path/to/saved.sav --saved-state /path/to/saved-state.json`. The second process
 loads with title L/release, verifies the mission and bounded persisted-world
-fingerprint, and replays the remaining tape. It compares subsequent retained
+fingerprint and Z7 model fields, and replays the remaining tape. Before export
+succeeds it validates the first journal record, its payload checksum, mission,
+frame and ELF-derived RaceSave size; the journal has no separate header checksum.
+It compares subsequent retained
 host observations, including the terminal win. The save and summary are
 hashed with the other inputs and checked for changes. A failure remains a
 failure; these source-level facilities do not establish a successful run.

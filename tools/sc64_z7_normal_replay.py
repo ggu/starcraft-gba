@@ -85,11 +85,8 @@ def make_layout(elf, sizes):
     return layouts
 
 
-def snapshot(rsp, sym, sizes, layouts):
-    def scalar(name):
-        if sizes.get(name) != 4: raise ValueError(f'invalid {name} symbol width')
-        return int.from_bytes(rsp.read(sym[name],4), 'little', signed=True)
-    out = {k: scalar(k) for k in ('screen','frame','won','lost','minerals','gas')}
+def model_snapshot(rsp, sym, layouts):
+    out = {}
     p, r, m = (layouts[n] for n in ('Sc64Z7PersistentState','Sc64Z7RuntimeState','Sc64Z7State'))
     raw = rsp.read(sym['race_z7'],p[0]); base = p[1]['runtime']; model = base + r[1]['model']
     def value(base, layout, name, width):
@@ -98,6 +95,15 @@ def snapshot(rsp, sym, sizes, layouts):
     for key,width in [('switch10',1),('ai_script_mask',1),('ai_plan_ticks',2),('ai_plan_phase',1),('fault',1)]: out[key]=value(base,r,key,width)
     for key,layout,member,offset,width in [('action_cursors',m,'action_cursor',model,1),('action_ticks',r,'action_ticks',base,2)]:
         off=_field(layout,member,width,array=8);out[key]=[int.from_bytes(raw[offset+off+i*width:offset+off+(i+1)*width], 'little') for i in range(8)]
+    return out
+
+
+def snapshot(rsp, sym, sizes, layouts):
+    def scalar(name):
+        if sizes.get(name) != 4: raise ValueError(f'invalid {name} symbol width')
+        return int.from_bytes(rsp.read(sym[name],4), 'little', signed=True)
+    out = {k: scalar(k) for k in ('screen','frame','won','lost','minerals','gas')}
+    out.update(model_snapshot(rsp,sym,layouts))
     for symbol, key, layout in [('u','units',layouts['Unit']),('b','buildings',layouts['Sc64ZpCompactBuilding'])]:
         data=rsp.read(sym[symbol],sizes[symbol]);stride,fields=layout
         def get(row,name):
@@ -188,6 +194,13 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
     if mode!='windowed' or scheduler.checkpoint_ticks(sym)!=1000:
         raise ValueError('normal Z7 replay requires the 1000-tick window scheduler')
     layouts=make_layout(elf,sizes)
+    save_layout = races.dwarf_struct_layout(elf,'RaceSave') if cut is not None else None
+    if save_input:
+        seed_summary=save.read_summary(saved_state)
+        if not isinstance(seed_summary,dict) or seed_summary.get('cut') != cut:
+            raise ValueError('saved summary has wrong cut')
+        save.validate_journal(save_input.read_bytes(),save_layout,seed_summary['world']['frame'])
+    def sample_snapshot(rsp,sym,sizes): return snapshot(rsp,sym,sizes,layouts)
     output.mkdir(parents=True,exist_ok=False)
     proc=rsp=log=None; records=[]
     def u32(name): return int.from_bytes(rsp.read(sym[name],4),'little')
@@ -211,7 +224,7 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
                 rsp.tick(expected=sym['game_update']&~1)
                 if u32('demo_schedule_tick') == 2: break
             else: raise RuntimeError('fresh-process load did not reach two updates')
-            restored=save.saved_summary(rsp,sym,sizes,elf,cut)
+            restored=save.saved_summary(rsp,sym,sizes,elf,cut,sample_snapshot)
             saved=save.read_summary(saved_state)
             save.verify_restored(saved,restored,cut,z7.MISSION)
             (output/'restored-state.json').write_text(json.dumps(restored,indent=2)+'\n')
@@ -233,21 +246,27 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             if i+1<len(pages):
                 write_page(pages[i+1]['events'][:capacity]);rsp.write(sym['demo_schedule_length'],struct.pack('<I',pages[i+1]['end']))
         if export_save:
-            sample=save.saved_summary(rsp,sym,sizes,elf,cut)
+            paused_state=snapshot(rsp,sym,sizes,layouts)
+            expected=plan['observations'][cut]
+            mismatch={k:[expected[k],paused_state[k]] for k in z7.SCALARS+z7.LISTS
+                      if k != 'screen' and expected[k] != paused_state[k]}
+            if mismatch: raise RuntimeError(f'pause save changed cut state: {mismatch}')
+            sample=save.saved_summary(rsp,sym,sizes,elf,cut,sample_snapshot)
             if sample['mission']!=z7.MISSION or sample['world']['screen']!=2:
                 raise RuntimeError('ordinary save did not remain in Z7 pause')
             (output/'saved-state.json').write_text(json.dumps(sample,indent=2)+'\n')
             rsp.export_sram()
             if not (output/'saved.sav').is_file() or (output/'saved.sav').stat().st_size != 32768:
                 raise RuntimeError('SRAM export is missing or incomplete')
+            journal=save.validate_journal((output/'saved.sav').read_bytes(),save_layout,sample['world']['frame'])
         full=bool(save_input) or (not export_save and stop==plan['stop'])
         if full and (not records or records[-1]['tick']!=stop or records[-1]['won']!=1 or records[-1]['outcome']!=1 or records[-1]['lost']!=0): raise RuntimeError('normal ROM did not win')
         require_unchanged(inputs,before)
         result={'status':'won' if full else 'prefix','stop':stop,'checkpoint_count':len(records),'checkpoints':records,'scope':'named Z7 model fields, entity counts and economy; not full entity arrays','sha256':before}
         if export_save:
-            result['save']={'cut':cut,'sha256':input_hashes((output/'saved.sav',output/'saved-state.json'))}
+            result['save']={'cut':cut,'journal':journal,'sha256':input_hashes((output/'saved.sav',output/'saved-state.json'))}
         if save_input:
-            result['resume']={'cut':cut,'restored_matches':True,'sram_unchanged':True}
+            result['resume']={'cut':cut,'restored_matches':True,'seed_file_unchanged':True}
         (output/'result.json').write_text(json.dumps(result,indent=2)+'\n');return result
     finally:
         if proc is not None:
