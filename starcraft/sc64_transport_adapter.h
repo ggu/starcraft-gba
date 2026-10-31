@@ -123,6 +123,10 @@ static int __attribute__((unused)) race_skirmish_transport_menu_available(void)
 static int race_shared_campaign_transport_menu_available(void)
 {
     if (race_mode || selected_building >= 0) return 0;
+#ifdef SC64_T5_RUNTIME
+    /* Terran campaigns already expose MENU_UNLOAD in their full menu. */
+    if (race_human == R_TER) return 0;
+#endif
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].selected && u[i].owner == SIDE &&
             race_transport_carrier_valid(i) && race_transport_cargo_space(i) > 0)

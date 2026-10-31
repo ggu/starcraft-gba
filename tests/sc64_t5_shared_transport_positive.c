@@ -16,6 +16,10 @@ static void test_ordinary_t5_save_load(void)
     assert(race_save_game());
     assert(race_load_game());
     assert(SC64_TRANSPORT_LOADED(&u[passenger]) && u[passenger].target == ship);
+    clear_selection(); u[ship].selected = 1; selected_building = -1;
+    assert(field_menu_count() > MENU_UNLOAD);
+    assert(!strcmp(race_menu_label(MENU_UNLOAD), "UNLOAD CARGO"));
+    choose_command(MENU_UNLOAD); assert(mode == MODE_UNLOAD);
 }
 int main(void)
 {
