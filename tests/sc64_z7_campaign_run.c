@@ -4935,6 +4935,27 @@ static void attack_step(void)
             completed_building_count(B_SUNKEN_COLONY),minerals,gas);
         home_screen_released=1;
     }
+    /* Once the defended base has funded the released army and no enemy
+       building is visible, use the existing ordinary-input exploration
+       controller rather than waiting forever for a target to appear. */
+    if(early_gas_policy&&offense_ready&&!campaign_assault_active&&
+       (unsigned)frame>=45000u&&!nearest_enemy_building(&bx,&by,&slot)) {
+        campaign_assault_active=1;
+        fprintf(stderr,"Z7 released army begins ordinary reconnaissance frame%u workers%d combat%d\n",
+            (unsigned)frame,worker_count(-1),combat_count(SIDE));
+    }
+    if(early_gas_policy&&campaign_assault_active&&
+       (visible_worker_threat||workers_retreating)) {
+        int cover_x,cover_y;
+        z7_defense_screen_point(&cover_x,&cover_y);
+        int recalled=army_order(1,cover_x,cover_y);
+        fprintf(stderr,"Z7 reconnaissance recall for worker threat accepted%d frame%u\n",
+            recalled,(unsigned)frame);
+        campaign_assault_active=0;campaign_recon_active=0;
+        campaign_assault_target=-1;campaign_assault_is_building=0;
+        campaign_assault_target_raw=0;
+        if(recalled)return;
+    }
     /* Research policy: keep pursuing observed targets after the switch and
        periodically reselect to admit paid reinforcements. This has not won. */
     if(early_gas_policy&&campaign_assault_active) {
