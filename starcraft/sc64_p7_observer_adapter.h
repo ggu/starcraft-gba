@@ -494,6 +494,12 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                                       &al,&at,&ar,&ab)) continue;
 #endif
         if (sc64_target_index_active) {
+            /* update_orders has just rebuilt this owner-partitioned index;
+             * no actor ownership changes during the cache pass. Aura requires
+             * the same live owner even when source slots alias, so other
+             * owner chains cannot contribute. Keep the exact source check. */
+            int owner=u[i].owner;
+            if((unsigned)owner>=5u) continue;
             /* Target index cells are 64 GBA pixels. 160 source pixels is
              * 80 GBA pixels; 32 additional GBA pixels cover the maximum
              * authenticated P7 unit half-extent before exact broadphase. */
@@ -502,8 +508,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
             int cols=(WORLD_W+63)/64, rows=(WORLD_H+63)/64;
             if (x0<0)x0=0; if(y0<0)y0=0;
             if(x1>=cols)x1=cols-1; if(y1>=rows)y1=rows-1;
-            for (int cy=y0;cy<=y1;++cy) for(int cx=x0;cx<=x1;++cx)
-                for(int owner=0;owner<5;++owner) {
+            for (int cy=y0;cy<=y1;++cy) for(int cx=x0;cx<=x1;++cx) {
                     int cell=cx+cy*SC64_TARGET_GRID_COLS;
                     Sc64TargetIndex ent=sc64_target_head[owner][cell];
                     while(ent!=SC64_TARGET_NONE) {
