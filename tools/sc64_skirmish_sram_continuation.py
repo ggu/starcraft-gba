@@ -135,6 +135,18 @@ class Game:
         self.rsp.write(self.sym["demo_schedule_active"], struct.pack("<I", 1))
         self.updates = 0
         self.stale_update_stops = 0
+        # The current main-loop iteration latched scheduler-disabled before
+        # the host enabled it. Synchronize while still at the neutral title;
+        # subsequent step() calls then have an active scheduler throughout.
+        if self.u32("screen") != SCREEN_TITLE:
+            raise ContinuationError("scheduler bootstrap is not on the title screen")
+        self.synchronize_scheduler()
+
+    def synchronize_scheduler(self) -> None:
+        """Finish the neutral startup boundary separately from measured updates."""
+        self.step(0)
+        self.bootstrap_stops = self.stale_update_stops + 1
+        self.updates = self.stale_update_stops = 0
 
     def u32(self, name: str, offset: int = 0) -> int:
         return int.from_bytes(self.rsp.read(self.sym[name] + offset, 4), "little", signed=True)
@@ -284,6 +296,7 @@ def run(args) -> dict:
         game.step(0, args.continue_updates)
         record["reference"] = summary(game.state())
         record["phase1_stale_update_stops"] = game.stale_update_stops
+        record["phase1_bootstrap_stops"] = game.bootstrap_stops
         game.rsp.export_sram()
     finally:
         game.close()
@@ -305,6 +318,7 @@ def run(args) -> dict:
         game.step(0, args.continue_updates)
         record["resumed"] = summary(game.state())
         record["phase2_stale_update_stops"] = game.stale_update_stops
+        record["phase2_bootstrap_stops"] = game.bootstrap_stops
         game.rsp.export_sram()
     finally:
         game.close()

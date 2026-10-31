@@ -118,6 +118,13 @@ class CompletedUpdates(unittest.TestCase):
         self.assertEqual(game.updates, 2)
         self.assertEqual(game.stale_update_stops, 0)
 
+    def test_bootstrap_is_separate_from_completed_update_counts(self):
+        game = self.game([0, 1, 2], initial=0)
+        game.synchronize_scheduler()
+        self.assertEqual((game.bootstrap_stops, game.updates, game.stale_update_stops), (2, 0, 0))
+        game.step(0)
+        self.assertEqual((game.updates, game.stale_update_stops), (1, 0))
+
 
 class EntityRows(unittest.TestCase):
     def test_reads_live_rows_at_dwarf_widths(self):
