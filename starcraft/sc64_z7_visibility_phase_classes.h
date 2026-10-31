@@ -1,7 +1,9 @@
 #ifndef SC64_Z7_VISIBILITY_PHASE_CLASSES_H
 #define SC64_Z7_VISIBILITY_PHASE_CLASSES_H
-/* Exact unbounded cell-center circles for each center phase (y * 16 + x).
- * Labels are unique per distinct relative row footprint within each radius. */
+/* Pure integer geometry, no game asset data: for each phase and radius,
+ * derive each row interval from floor(sqrt(radius^2 - dy^2)), assigning
+ * successive labels to distinct complete unbounded relative row footprints.
+ * Phase index is y * 16 + x; labels are local to each radius. */
 static const u8 sc64_z7_visibility_phase_class[8][256] = {
     { /* radius 64, 111 classes */
         0, 0, 0, 0, 1, 1, 1, 2, 3, 4, 5, 5, 5, 6, 6, 6,

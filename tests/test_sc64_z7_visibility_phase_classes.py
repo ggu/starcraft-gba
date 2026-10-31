@@ -8,13 +8,15 @@ class VisibilityPhaseClasses(unittest.TestCase):
     def test_all_phases_and_radii(self):
         source = (pathlib.Path(__file__).resolve().parents[1] /
                   'starcraft/sc64_z7_visibility_phase_classes.h').read_text()
-        rows = re.findall(r'\{ /\* radius (\d+), \d+ classes \*/(.*?)\}',
+        rows = re.findall(r'\{ /\* radius (\d+), (\d+) classes \*/(.*?)\}',
                           source, re.S)
-        self.assertEqual([int(r) for r, _ in rows], list(range(64, 177, 16)))
-        for radius_text, data in rows:
+        self.assertEqual([int(r) for r, _, _ in rows], list(range(64, 177, 16)))
+        for radius_text, count_text, data in rows:
             radius = int(radius_text)
             labels = [int(v) for v in re.findall(r'\d+', data)]
             self.assertEqual(len(labels), 256)
+            self.assertTrue(all(0 <= label <= 255 for label in labels))
+            self.assertEqual(len(set(labels)), int(count_text))
             label_to_cells, cells_to_label = {}, {}
             for phase, label in enumerate(labels):
                 x, y = phase % 16, phase // 16
