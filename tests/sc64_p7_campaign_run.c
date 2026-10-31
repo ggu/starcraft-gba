@@ -428,9 +428,36 @@ static int assign_idle_probe_to_minerals(void)
      * A cluster can select more than one; in that case issue no order. */
     input(KEY_L); input(KEY_L | KEY_RIGHT | KEY_DOWN);
     input(KEY_L | KEY_RIGHT | KEY_DOWN); input(0);
+    if (selected_count() != 1 || !u[worker].selected) {
+        /* Clustered workers can share the tiny box. L-tap uses the ordinary
+         * single-unit cycle; bound the search to one full unit pool. */
+        for (int attempts = 0; attempts < MAX_UNITS && screen == SCREEN_PLAY &&
+             u[worker].alive && (selected_count() != 1 || !u[worker].selected); ++attempts)
+            KEY_TAP(KEY_L);
+    }
     if (selected_count() != 1 || !u[worker].selected || !u[worker].alive ||
         u[worker].order != ORDER_IDLE || u[worker].carry) return 0;
     if (!move_cursor(m[patch].x, m[patch].y)) return 0;
+    if (selected_count() != 1 || !u[worker].selected || !u[worker].alive ||
+        u[worker].order != ORDER_IDLE || u[worker].carry ||
+        selected_worker_mineral_target() != patch) return 0;
+    int refinery = nearest_refinery(cx, cy);
+    if (refinery >= 0 && dist2(cx, cy, b[refinery].x, b[refinery].y) < 24 * 24)
+        return 0;
+#ifdef SC64_SHARED_BUNKER
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (race_bunker_carrier_valid(i) && b[i].owner == SIDE &&
+            dist2(cx, cy, b[i].x, b[i].y) < 20 * 20) return 0;
+#endif
+#ifdef SC64_TRANSPORT_RUNTIME
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (race_transport_carrier_valid(i) && u[i].owner == SIDE &&
+            dist2(cx, cy, u[i].x, u[i].y) < 18 * 18) return 0;
+#endif
+#ifdef SC_FIELD_FEEDBACK
+    int hostile_x, hostile_y;
+    if (ui_hostile_at(cx, cy, &hostile_x, &hostile_y)) return 0;
+#endif
     KEY_TAP(KEY_A);
     if (!u[worker].alive || u[worker].order != ORDER_MINE ||
         u[worker].target != patch) return 0;
