@@ -72,9 +72,9 @@ build/lookup-consumer: $(CANONICAL_LOOKUP_INPUTS)
 \t@touch $@
 ''')
 
-            def build(mode, bank='first'):
+            def build(mode, bank='first', route=1):
                 subprocess.run(['make', '-f', 'Makefile', '-f', 'fixture.mk',
-                                f'CANONICAL_LOOKUP_INDEX={mode}', f'WEAPON_SOURCE_DIR={bank}',
+                                f'CANONICAL_LOOKUP_INDEX={mode}', f'CANONICAL_ROUTE_INDEX={route}', f'WEAPON_SOURCE_DIR={bank}',
                                 '-o', f'{bank}/sc64_weapon_source_generated.h', 'lookup-fixture'],
                                cwd=root, check=True, capture_output=True)
                 return (root / 'build/rebuilds').read_text().splitlines()
@@ -94,6 +94,9 @@ build/lookup-consumer: $(CANONICAL_LOOKUP_INPUTS)
             self.assertEqual(len(build(1, 'second')), 5)
             self.assertEqual((root / INDEX).read_bytes(), original)
             self.assertEqual(len(build(1, 'second')), 5)
+            self.assertEqual(len(build(1, 'second', 0)), 6)
+            self.assertEqual(len(build(1, 'second', 1)), 7)
+            self.assertEqual(len(build(1, 'second', 1)), 7)
 
 
 if __name__ == '__main__':
