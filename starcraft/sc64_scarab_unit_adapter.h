@@ -151,11 +151,49 @@ static int race_scarab_complete(void *ctx,int slot)
 static int race_scarab_launch_cb(void *ctx,int slot)
 {
     Sc64ScarabUnitContext *c=ctx; int p; unsigned phase;
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+    if (!race_scarab_child_lookup(slot,&p,&phase) || p!=c->parent_slot || phase!=SC64_SCARAB_CHILD_INSIDE ||
+        !race_scarab_child_set(slot,(unsigned)p,SC64_SCARAB_CHILD_OUTSIDE,0,0)) return 0;
+    u[slot].order=1; /* bridge code for source order state 0 */
+    return 1;
+#else
     return race_scarab_child_lookup(slot,&p,&phase) && p==c->parent_slot &&
            phase==SC64_SCARAB_CHILD_INSIDE &&
            race_scarab_child_set(slot,(unsigned)p,SC64_SCARAB_CHILD_OUTSIDE,
                                  SC64_SCARAB_LIFETIME,SC64_SCARAB_NO_COLLISION_TICKS);
+#endif
 }
+
+#ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
+/* Source-order control slice only. Caller supplies an authoritative arrival
+ * result and handles returned animation/removal requests. No movement,
+ * animation, damage or automatic dispatch is implemented here. */
+enum { SC64_SCARAB_CONTROL_INVALID=-1, SC64_SCARAB_CONTROL_CONTINUE=0,
+       SC64_SCARAB_CONTROL_ARRIVED=1, SC64_SCARAB_CONTROL_REMOVE=2 };
+static int race_scarab_flight_control_tick(int slot,int arrived,int signal)
+{
+    Sc64ScarabChildFields f;Unit *q;
+    if (slot<0 || slot>=MAX_UNITS || (arrived!=0 && arrived!=1) || (signal!=0 && signal!=1)) return SC64_SCARAB_CONTROL_INVALID;
+    q=&u[slot];
+    if (!q->alive || q->type!=U_SCARAB || q->raw_type!=85 ||
+        !sc64_scarab_child_fields_unpack(q->carry,q->work_timer,&f)) return SC64_SCARAB_CONTROL_INVALID;
+    if (f.phase==SC64_SCARAB_CHILD_SELF_DESTRUCT) return SC64_SCARAB_CONTROL_REMOVE;
+    if (f.phase!=SC64_SCARAB_CHILD_OUTSIDE) return SC64_SCARAB_CONTROL_INVALID;
+    if (q->order==1) {
+        if (f.life || f.no_collision) return SC64_SCARAB_CONTROL_INVALID;
+        if (!race_scarab_child_set(slot,f.parent_slot,f.phase,90,7)) return SC64_SCARAB_CONTROL_INVALID;
+        q->order=2;return SC64_SCARAB_CONTROL_CONTINUE;
+    }
+    if ((q->order!=2 && q->order!=3 && q->order!=4) || !f.life) return SC64_SCARAB_CONTROL_INVALID;
+    if (f.life==1) return SC64_SCARAB_CONTROL_REMOVE;
+    --f.life;if (f.no_collision) --f.no_collision;
+    if (!race_scarab_child_set(slot,f.parent_slot,f.phase,f.life,f.no_collision)) return SC64_SCARAB_CONTROL_INVALID;
+    if (q->order==2 && !f.no_collision) q->order=3;
+    if ((q->order==2 || q->order==3) && arrived) { q->order=4;return SC64_SCARAB_CONTROL_ARRIVED; }
+    if (q->order==4 && signal) return SC64_SCARAB_CONTROL_REMOVE;
+    return SC64_SCARAB_CONTROL_CONTINUE;
+}
+#endif
 static int race_scarab_cancel_cb(void *ctx,int slot)
 {
     Sc64ScarabUnitContext *c=ctx; int p; unsigned phase;

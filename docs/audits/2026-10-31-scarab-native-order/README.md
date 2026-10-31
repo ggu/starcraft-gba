@@ -25,3 +25,22 @@ The oracle logs remain private. Before registration, implement actual bounded
 source movement and scheduler integration, post-arrival animation/bullet and
 failure semantics, lifetime and STOP/parent cleanup, and fresh-process save
 qualification with an explicit compatible wire policy.
+
+## Actual Unit control experiment
+
+The separate, normally undefined `SC64_SCARAB_FLIGHT_CONTROL_PROBE` gate
+changes the unit adapter's launch callback to retain source fresh state until
+the first explicit control tick. The control function then initializes 90/7,
+decrements timers on subsequent supplied source ticks, transitions out of
+collision grace, accepts a caller-supplied arrival result, and returns
+animation or removal requests. It does not move units, calculate arrival,
+dispatch itself from the game loop, generate damage or clean up a removed
+unit. Callers must not treat those requests as completed engine actions.
+
+The ASan/UBSan actual-engine Unit fixture uses the real paid enqueue, build,
+launch, STOP and parent-loss adapters, and checks initialization, 7-tick grace,
+arrival both during and after grace, signal/expiry/self-destruct removal
+requests and detached parent identity. Compile argv and run outcome are kept
+in `.local/decoder-proof/scarab-control-{compile,run}.json`. This is an
+explicitly invoked control experiment, not an automatic flight implementation,
+position or target-follow proof, or qualification for outside-child saves.
