@@ -95,6 +95,39 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
                                  check_probe_candidate,&plan,&selected));
 #endif
     assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION && selected.slot!=previous->slot);
+    /* A checksummed but semantically broken newer candidate must not mask the
+     * real predecessor. Keep the test candidate independent of live actors. */
+    memset(&race_data,0,sizeof(race_data));
+    assert(sc64_shared_carrier_candidate_encode(&race_data,u,b,&race_p7_projectiles,
+                                                (unsigned)race_cols*16u,
+                                                (unsigned)race_rows*16u));
+    int linked=-1;
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && u[i].type==SC64_INTERCEPTOR_TYPE &&
+            sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE)
+            { linked=i; break; }
+    assert(linked>=0);
+    Unit invalid=u[linked]; invalid.build=-1;
+    assert(sc64_p7_typed_unit_encode(&race_data.carrier_custom.units[linked],&invalid,
+                                     (unsigned)race_cols*16u,(unsigned)race_rows*16u));
+    race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
+    assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
+                               previous,tags,2));
+#ifdef SC64_IMPACT_EVENTS
+    assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,2,
+                                 check_probe_candidate,&plan,&selected));
+#else
+    assert(save_select_validated(&race_data,sizeof(race_data),tags,2,
+                                 check_probe_candidate,&plan,&selected));
+#endif
+    assert(selected.tag==SAVE_VERSION && selected.slot==previous->slot);
+    memset(&race_data,0,sizeof(race_data));
+    assert(sc64_shared_carrier_candidate_encode(&race_data,u,b,&race_p7_projectiles,
+                                                (unsigned)race_cols*16u,
+                                                (unsigned)race_rows*16u));
+    race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
+    assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
+                               previous,tags,2));
     save_test_corrupt_latest(sizeof(RaceSave),SC64_SHARED_CARRIER_SAVE_VERSION);
 #ifdef SC64_IMPACT_EVENTS
     assert(save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,2,
