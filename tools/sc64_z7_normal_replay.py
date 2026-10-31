@@ -187,27 +187,56 @@ def timing_delta(before, after, updates):
             'scope':'emulated main-loop work including presentation waits and UI; not physical-device FPS'}
 
 
-def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None, physical=False):
+def save_format_provenance(provenance, save_format):
+    """Bind the new namespace while retaining older legacy summaries."""
+    if save_format not in save.SAVE_FORMATS:
+        raise ValueError('unsupported Z7 save format')
+    return ({**provenance, 'save_format': save_format}
+            if save_format != 'legacy' else dict(provenance))
+
+
+def resume_window(plan, cut, resume_stop):
+    """Bound resume at a recorded observation, retaining all prior inputs."""
+    end = plan['stop'] if resume_stop is None else resume_stop
+    if (type(end) is not int or not cut < end <= plan['stop'] or
+            end not in plan['observations']):
+        raise ValueError('resume stop must be an observation after the cut and at or before trace end')
+    transitions = [(tick, held) for tick, held in plan['transitions'] if tick <= end]
+    observations = {tick: row for tick, row in plan['observations'].items() if cut < tick <= end}
+    return end, transitions, observations
+
+
+def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None, physical=False, save_format='legacy', resume_stop=None):
+    if save_format not in save.SAVE_FORMATS:
+        raise ValueError('unsupported Z7 save format')
     if export_save and (save_input or saved_state or stop is not None):
         raise ValueError('save export requires a cut, without resume or prefix options')
     if bool(save_input) != bool(saved_state) or (save_input and (export_save or stop is not None)):
         raise ValueError('resume requires both save and saved summary, without prefix/export options')
+    if resume_stop is not None and not save_input:
+        raise ValueError('resume stop requires a save input')
     if bool(export_save or save_input) != (cut is not None):
         raise ValueError('save export and resume require an explicit cut')
     inputs=(trace,rom,elf,runner) + ((save_input,saved_state) if save_input else ())
     before=input_hashes(inputs)
     provenance={name:before[str(path.resolve())] for name,path in
                 zip(('trace','rom','elf','runner'),(trace,rom,elf,runner))}
+    provenance=save_format_provenance(provenance,save_format)
     plan,pages=build_plan(trace,cut if export_save else stop)
     if cut is not None: save.validate_cut(plan,cut)
-    original_stop=plan['stop']
+    trace_stop=plan['stop']
+    original_stop=trace_stop
+    resume_transitions=plan['transitions']
+    resume_observations=plan['observations']
+    if save_input:
+        original_stop,resume_transitions,resume_observations=resume_window(plan,cut,resume_stop)
     load_updates=1 if physical else 2
     if export_save or save_input:
         events = ([(t-1,h) for t,h in plan['transitions'] if t <= cut] + save.save_inputs(cut)
-                  if export_save else save.resume_inputs(plan['transitions'],cut,load_updates))
+                  if export_save else save.resume_inputs(resume_transitions,cut,load_updates))
         end = cut + 4 if export_save else load_updates + original_stop - cut
         checks = ({t:t for t in plan['observations'] if t <= cut} if export_save else
-                  {load_updates+t-cut:t for t in plan['observations'] if t > cut})
+                  {load_updates+t-cut:t for t in resume_observations})
         boundaries=sorted(set(range(1000,end+1,1000)) | set(checks) | {end})
         pages=[]; first=0; index=0
         for boundary in boundaries:
@@ -237,7 +266,7 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             raise ValueError('saved summary has wrong cut')
         save.verify_provenance(seed_summary,{**provenance,'save':before[str(save_input.resolve())]})
         save.verify_cut_summary(seed_summary,plan['observations'][cut],cut,2)
-        save.validate_journal(save_input.read_bytes(),save_layout,seed_summary['world']['frame'])
+        save.validate_journal(save_input.read_bytes(),save_layout,seed_summary['world']['frame'],save_format)
     def sample_snapshot(rsp,sym,sizes): return snapshot(rsp,sym,sizes,layouts)
     output.mkdir(parents=True,exist_ok=False)
     proc=rsp=log=None; records=[]
@@ -309,10 +338,10 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             rsp.export_sram()
             if not (output/'saved.sav').is_file() or (output/'saved.sav').stat().st_size != 32768:
                 raise RuntimeError('SRAM export is missing or incomplete')
-            journal=save.validate_journal((output/'saved.sav').read_bytes(),save_layout,sample['world']['frame'])
+            journal=save.validate_journal((output/'saved.sav').read_bytes(),save_layout,sample['world']['frame'],save_format)
             sample['provenance']={**provenance,'save':hashlib.sha256((output/'saved.sav').read_bytes()).hexdigest()}
             (output/'saved-state.json').write_text(json.dumps(sample,indent=2)+'\n')
-        full=bool(save_input) or (not export_save and stop==plan['stop'])
+        full=(bool(save_input) and original_stop==trace_stop) or (not export_save and not save_input and stop==trace_stop)
         if full and (not records or records[-1]['tick']!=stop or records[-1]['won']!=1 or records[-1]['outcome']!=1 or records[-1]['lost']!=0): raise RuntimeError('normal ROM did not win')
         require_unchanged(inputs,before)
         result={'status':'won' if full else 'prefix','stop':stop,'checkpoint_count':len(records),'checkpoints':records,'scope':'named Z7 model fields, entity counts and economy; not full entity arrays','sha256':before,
@@ -337,8 +366,11 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ('trace','rom','elf','runner','output'):ap.add_argument('--'+name,type=Path,required=True)
     ap.add_argument('--stop',type=int); ap.add_argument('--cut',type=int)
+    ap.add_argument('--resume-stop',type=int,help='Bound a resume at a recorded observation; short resumes are prefixes')
+    ap.add_argument('--save-format',choices=save.SAVE_FORMATS,default='legacy',
+                    help='Explicit journal namespace; transport1 accepts only the zero-impact campaign trailer')
     ap.add_argument('--physical',action='store_true',help='Use emulator buttons; supports release ROMs without scheduler symbols')
     ap.add_argument('--export-save',action='store_true'); ap.add_argument('--save-input',type=Path); ap.add_argument('--saved-state',type=Path)
-    a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut,a.physical)
+    a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut,a.physical,a.save_format,a.resume_stop)
 
 if __name__=='__main__':main()
