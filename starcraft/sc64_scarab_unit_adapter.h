@@ -180,6 +180,9 @@ static int race_scarab_launch_cb(void *ctx,int slot)
     if (!race_scarab_child_lookup(slot,&p,&phase) || p!=c->parent_slot || phase!=SC64_SCARAB_CHILD_INSIDE ||
         !race_scarab_child_set(slot,(unsigned)p,SC64_SCARAB_CHILD_OUTSIDE,0,0)) return 0;
     u[slot].order=1; /* bridge code for source order state 0 */
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+    u[slot].target=u[p].target;u[slot].tx=u[p].tx;u[slot].ty=u[p].ty;
+#endif
     return 1;
 #else
     return race_scarab_child_lookup(slot,&p,&phase) && p==c->parent_slot &&

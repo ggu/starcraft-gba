@@ -151,3 +151,32 @@ failed and passing link receipts are `scarab-packed-arm-link-first-failure.json`
 and `scarab-packed-arm-link.json` in `.local/decoder-proof`; no generators ran.
 Source path generation, obstacles, arrival and weapon scheduling, complete
 cleanup and outside-save migration remain open.
+
+## Autonomous route-to-arrival experiment
+
+The additional disabled `SC64_SCARAB_AUTONOMOUS_PROBE` derives an initial
+heading and target from the launching parent and requests waypoints from the
+existing GBA direct-path and bounded route helpers. These are GBA pathing
+adaptations, not OpenBW's path generator. For an axial live unit target it
+chooses a range-boundary endpoint to avoid the GBA collision guard preventing
+arrival. Arrival uses the source inclusive raw-unit bounds, Scarab bounds 2,
+integer length approximation and ten-source-pixel range; detached target
+loss retains the last destination and requires reaching it exactly. Buildings,
+diagonal endpoint behavior and general obstacles remain unqualified.
+
+The actual game-update fixture trains and launches a paid child, explicitly
+detaches its parent to isolate the unadmitted generic Reaver attack, and needs
+no injected heading or waypoint. One axial living-target case reaches the
+source range boundary; a target-death case reaches the retained position. Both
+then wait until lifetime expiry and retire through the probe's death path.
+Neither emits weapon 82 or changes victim health: state 6 animation, bullet
+allocation and delayed splash are not implemented, so this is not combat or
+a complete Reaver service. The fixture resets the result screen to PLAY each
+update and does not constitute a normal match.
+
+Sanitized compile and both run receipts are in `.local/decoder-proof/`
+`scarab-autonomous-{compile,runs}.json`. A direct Terran normal-recipe link
+with explicit probe flags retained unchanged RAM guards at
+`__bss_end=0x020370c0`, `__iwram_end=0x03004e30`; its argv and output are in
+`scarab-autonomous-arm-link.json`. This is one older-branch profile, not a
+current-product matrix, ARM replay, performance or hardware qualification.
