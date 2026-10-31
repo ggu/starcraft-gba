@@ -110,6 +110,12 @@ class RaceProfileTests(unittest.TestCase):
         self.assertEqual(fields.arrays["queue"], (5, 1, False))
         _, invalid = races.parse_dwarf_struct(fixture.replace("DW_AT_upper_bound : 4", "DW_AT_upper_bound : dynamic"), "Building")
         self.assertNotIn("queue", invalid.arrays)
+        multi = fixture + "\n <2><320>: Abbrev Number: 8 (DW_TAG_subrange_type)\n    <321> DW_AT_upper_bound : 1"
+        _, invalid = races.parse_dwarf_struct(multi, "Building")
+        self.assertNotIn("queue", invalid.arrays)
+        shifted = fixture + "\n    <312> DW_AT_lower_bound : 1"
+        _, invalid = races.parse_dwarf_struct(shifted, "Building")
+        self.assertNotIn("queue", invalid.arrays)
 
     def test_typedef_cycles_and_missing_names_fail_closed(self) -> None:
         cyclic = "\n".join([
