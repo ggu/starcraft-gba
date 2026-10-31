@@ -15,6 +15,7 @@ int main(void)
     assert(sc64_transport_shared_space_required_raw(77, &space) && space == 2);
     assert(sc64_transport_shared_space_required_raw(78, &space) && space == 4);
     assert(sc64_transport_shared_space_required_raw(83, &space) && space == 4);
+    assert(!sc64_transport_space_required_raw(83, &space));
     assert(sc64_transport_shared_space_required_raw(42, &space) && space == 255);
     assert(!sc64_transport_shared_space_required_raw(228, &space));
     uint8_t bytes[16];
