@@ -4133,6 +4133,8 @@ static void macro_step(void)
         int first_defense_started=owned_building_count(B_SUNKEN_COLONY)>0;
         for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
            (b[i].flags&SC64_Z7_SUNKEN_MORPH_FLAG))first_defense_started=1;
+        if(ready_second_sunken_colony<0&&completed_building_count(B_SUNKEN_COLONY)>=1&&
+           z7_progress_second_sunken(worker_goal))return;
         if(ready_second_sunken_colony<0&&first_defense_started&&den>=0&&
            building_complete(den)&&live_workers>=5&&minerals>=75&&gas>=25&&
            unit_type_count(U_HYDRALISK,SIDE)+queued_unit_count(U_HYDRALISK)<12&&
