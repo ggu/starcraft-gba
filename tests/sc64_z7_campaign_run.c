@@ -1763,7 +1763,7 @@ static void z7_defense_screen_point(int *x,int *y)
     /* Keep the source approach at its established opening point. Once the
        enemy geyser is cleared and our Extractor exists, move the ground screen
        toward it while keeping the army on the mineral side of the line. */
-    if(geyser_secured&&raw_building(149,SIDE)>=0) {*x=960;*y=1600;}
+    if(geyser_secured&&raw_building(149,SIDE)>=0) {*x=1100;*y=1700;}
     else {*x=1050;*y=1620;}
 }
 
