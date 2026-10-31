@@ -193,7 +193,25 @@ static void test_hover(int type, const char *name)
     }
     assert(poses == (int)cycle->count);
     assert(cycle->count < 2 || changes > 0);
-    assert(u[slot].order == ORDER_IDLE && u[slot].x == x && u[slot].y == y);
+    /* Rendering must never mutate the actor's simulation state, including
+     * moving, attacking, stopping, and a paused frame. */
+    const int orders[] = { ORDER_IDLE, ORDER_MOVE, ORDER_ATTACK_TARGET, ORDER_IDLE };
+    for (unsigned k=0;k<sizeof(orders)/sizeof(orders[0]);++k) {
+        u[slot].order=orders[k]; u[slot].target=-1;
+        u[slot].tx=x+64; u[slot].ty=y;
+        screen=k==3 ? SCREEN_PAUSE : SCREEN_PLAY;
+        Unit before=u[slot]; frame=23;
+        unsigned first=draw_centred(slot);
+        assert(!memcmp(&before,&u[slot],sizeof(before)));
+        const Sc64SpriteFrame *pose=sc64_walk_pose((unsigned)raw,slot);
+        assert(pose && first==expected_pose(pose,sc64_facing[slot]&SC64_FACING_MASK));
+        if (screen==SCREEN_PAUSE) {
+            assert(draw_centred(slot)==first);
+            assert(!memcmp(&before,&u[slot],sizeof(before)));
+        }
+    }
+    screen=SCREEN_PLAY; u[slot].order=ORDER_IDLE;
+    assert(u[slot].x == x && u[slot].y == y);
     printf("PASS %s hover: %d poses while idle, %d changes\n", name, poses, changes);
 }
 
