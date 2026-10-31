@@ -52,3 +52,6 @@ build/test-sc64-campaign-shuttle-p7: tests/sc64_campaign_shared_shuttle.c $(STAR
 	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-campaign-shuttle-p8: tests/sc64_campaign_shared_shuttle.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+
+build/test-sc64-t5-shared-transport-positive: tests/sc64_t5_shared_transport_positive.c tests/sc64_transport_engine.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(T5_PROBE_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $< common/gba.c -o $@
