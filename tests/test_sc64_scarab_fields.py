@@ -18,9 +18,11 @@ class ScarabFieldsTest(unittest.TestCase):
         # widening and BC conditional, so this exercises production casts.
         save = (ROOT / 'starcraft/race_save_adapter.h').read_text()
         encode_start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_save_game(void)'))
-        encode_end = save.index('\n#endif\n#if defined(SC64_T6_STORAGE)', encode_start)
+        # Stop at the loop's own closing line. Adjacent profile branches can
+        # change independently (the namespace stage adds one after encoding).
+        encode_end = save.index('\n    }', encode_start) + len('\n    }')
         decode_start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_load_game(void)'))
-        decode_end = save.index('\n#endif\n#if defined(SC64_T6_STORAGE)', decode_start)
+        decode_end = save.index('\n    }', decode_start) + len('\n    }')
         fixture = fixture.replace('/* SC64_REAL_LEGACY_ENCODE */', save[encode_start:encode_end])
         fixture = fixture.replace('/* SC64_REAL_LEGACY_DECODE */', save[decode_start:decode_end])
         fixture = fixture.replace('"../starcraft/', '"' + str(ROOT / 'starcraft') + '/')
