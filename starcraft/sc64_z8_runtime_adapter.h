@@ -105,6 +105,17 @@ static int race_z8_source_owner(unsigned slot)
     return -1;
 }
 
+/* PUNI is source-slot scoped. Only colony products use this first shared
+ * route; other production retains its existing profile behavior. */
+static int race_z8_colony_product_available(int owner,int raw_owner,int type)
+{
+    int raw=sc64_race_raw_building(type);
+    if (!race_z8_active() || owner!=SIDE || raw_owner<0 ||
+        race_z8_source_owner((unsigned)raw_owner)!=owner || raw<0) return 0;
+    return sc64_z8_permission_available(&sc64_z8_permission_table,
+                                         (unsigned)raw_owner,(unsigned)raw);
+}
+
 static void race_z8_note_unit_spawn(int slot, int owner, int type)
 {
     if (!race_z8_active() || slot < 0 || slot >= MAX_UNITS) return;

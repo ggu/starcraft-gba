@@ -378,6 +378,44 @@ static int race_construction_deferred_morph(const Building *q)
         q->raw_type == sc64_race_raw_building(B_SUNKEN_COLONY) ? B_SUNKEN_COLONY : -1;
 }
 
+/* Common paid in-place colony admission. Existing custom-game saves encode
+ * the target in raw_type; the staged campaign codec retains source raw type
+ * and uses its reserved morph marker. Both forms remain readable. */
+static int race_colony_begin(int owner, int building, int target_type)
+{
+    Building *q;
+    Sc64RaceBank bank;
+    if (owner<0 || owner>4 || building<0 || building>=MAX_BUILDINGS ||
+        (target_type!=B_SUNKEN_COLONY && target_type!=B_SPORE_COLONY)) return 0;
+    q=&b[building];
+    if (!q->alive || q->owner!=owner || q->type!=B_CREEP_COLONY ||
+        q->under_construction || q->queue_count) return 0;
+    if (sc64_race_building_rule(B_CREEP_COLONY)->build_frames !=
+        sc64_race_building_rule(target_type)->build_frames) return 0;
+    bank.minerals=(unsigned short)race_owner_minerals(owner);
+    bank.gas=(unsigned short)race_owner_gas(owner);
+    if (!sc64_race_pay_building(&bank,target_type)) return 0;
+    if (race_mode) {
+        q->raw_type=sc64_race_raw_building(target_type);
+        q->under_construction=1; q->build_progress=0;
+        if (race_construction_deferred_morph(q)<0) {
+            q->type=target_type; q->maxhp=sc64_race_building_max_hp(target_type);
+        }
+    } else {
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+        q->under_construction=1; q->build_progress=0; q->queue_progress=q->hp;
+        q->flags |= target_type==B_SPORE_COLONY ?
+            SC64_Z7_SPORE_MORPH_FLAG : SC64_Z7_SUNKEN_MORPH_FLAG;
+#else
+        return 0;
+#endif
+    }
+    if (owner==SIDE) { minerals=bank.minerals; gas=bank.gas; }
+    else { race_minerals[owner]=bank.minerals; race_gas[owner]=bank.gas; }
+    invalidate_path_grid();
+    return 1;
+}
+
 #include "sc64_skirmish_adapter.h"
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
 #ifndef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
@@ -776,6 +814,10 @@ static int race_build_request_valid(int owner, int worker, int type,
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     if (owner < 0 || owner > 4 || !x || !y) return 0;
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (type==B_CREEP_COLONY && race_colony_profile_allowed() &&
+        !race_colony_product_allowed(owner,worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,type)) return 0;
+#endif
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_building_product_available(owner,worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,type)) return 0;
 #endif
