@@ -1,6 +1,9 @@
 #ifndef SC64_VISIBILITY_H
 #define SC64_VISIBILITY_H
 #include "sc64_scarab_presence.h"
+#ifdef SC64_Z8_RUNTIME
+#include "sc64_source_sight_tiles.h"
+#endif
 
 #if defined(SC64_Z7_SIGHT_SPANS) && \
     (!defined(SC64_Z7_SOURCE_SIGHT) || !defined(SC64_VISIBILITY_SPANS))
@@ -11,14 +14,18 @@
 #include "sc64_z7_source_sight.h"
 #endif
 
-/* Exact source-radius row spans. Z7 opts in explicitly; the Terran runtime
+/* Exact source-radius row spans. Z7 and Z8 opt in explicitly; the Terran runtime
  * gives every human actor its BWAPI sight radius, so it uses them whenever
  * the 56/72 spans are enabled. */
 #if defined(SC64_Z7_SIGHT_SPANS) || \
     (defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS))
 #define SC64_SOURCE_SIGHT_SPANS 1
 #ifdef SC64_Z7_SIGHT_SPANS
+#ifdef SC64_Z8_RUNTIME
+#define SC64_SOURCE_SIGHT_SPANS_ACTIVE() (race_z7_active() || race_z8_active())
+#else
 #define SC64_SOURCE_SIGHT_SPANS_ACTIVE() race_z7_active()
+#endif
 #else
 #define SC64_SOURCE_SIGHT_SPANS_ACTIVE() 1
 /* Moving Terran units walk their source-radius rows in the same IWRAM span
@@ -248,6 +255,11 @@ sc64_actor_unit_sight_pixels(int type)
     int pixels = sc64_zp_actor_sight_source_pixels(type);
     if (pixels) return pixels;
 #endif
+#ifdef SC64_Z8_RUNTIME
+    /* Preserve scenario-specific facts above; use shared base facts for other
+       mapped actors only while the Z8 source campaign is active. */
+    if (race_z8_active()) return sc64_source_sight_raw_pixels(sc64_race_raw_unit(type));
+#endif
 #ifdef SC64_T4_RUNTIME
     return sc64_race_t4_sight_source_pixels(type);
 #else
@@ -265,6 +277,12 @@ sc64_actor_building_sight_pixels(int type)
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     int pixels = sc64_zp_building_sight_source_pixels(type);
     if (pixels) return pixels;
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) {
+        if (type < 0) return 4 * 32;
+        return sc64_source_sight_raw_pixels(sc64_race_raw_building(type));
+    }
 #endif
 #ifdef SC64_T4_RUNTIME
 #ifndef SC64_Z7_SOURCE_SIGHT

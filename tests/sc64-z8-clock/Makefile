@@ -15,3 +15,10 @@ build/test-sc64-z8-clock-derived-game: tests/sc64_z8_clock_game.c $(STARCRAFT) $
 test-sc64-z8-clock-game: build/test-sc64-z8-clock-game build/test-sc64-z8-clock-derived-game
 	./build/test-sc64-z8-clock-game
 	./build/test-sc64-z8-clock-derived-game
+
+# Prepared Z8 inputs: source-sight selection, visibility-cache and detection checks.
+build/test-sc64-z8-source-sight: tests/sc64_z8_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z8_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z8_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z8-source-sight
+test-sc64-z8-source-sight: build/test-sc64-z8-source-sight
+	./build/test-sc64-z8-source-sight
