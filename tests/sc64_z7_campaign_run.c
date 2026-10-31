@@ -4127,6 +4127,16 @@ static void macro_step(void)
             if(colony>=0&&!b[colony].under_construction&&minerals>=50)
                 ready_second_sunken_colony=colony;
         }
+        /* Once a first defense is morphing, reinforce the vulnerable ground
+           screen before spending every mineral on replacement Drones. Keep a
+           minimum operating worker line and use the existing paid queue. */
+        int first_defense_started=owned_building_count(B_SUNKEN_COLONY)>0;
+        for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
+           (b[i].flags&SC64_Z7_SUNKEN_MORPH_FLAG))first_defense_started=1;
+        if(ready_second_sunken_colony<0&&first_defense_started&&den>=0&&
+           building_complete(den)&&live_workers>=5&&minerals>=75&&gas>=25&&
+           unit_type_count(U_HYDRALISK,SIDE)+queued_unit_count(U_HYDRALISK)<12&&
+           queue_hatchery_type(U_HYDRALISK))return;
         /* A completed Creep Colony needs only the paid Sunken morph, not a
            live Drone. Dispatch it before replacing workers so the 50-mineral
            morph cannot be delayed by an unnecessary six-worker placement gate. */
