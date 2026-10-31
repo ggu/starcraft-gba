@@ -93,6 +93,24 @@ class RaceProfileTests(unittest.TestCase):
         self.assertEqual(fields.widths, {"hp": 4, "x": 2, "owner": 1})
         self.assertEqual(fields.signed, {"hp": True, "x": True, "owner": False})
 
+    def test_array_element_and_extent_come_from_dwarf(self) -> None:
+        fixture = dwarf_fixture().replace(
+            " <1><200>: Abbrev Number: 5 (DW_TAG_base_type)",
+            "\n".join([" <2><160>: Abbrev Number: 4 (DW_TAG_member)",
+                       "    <161> DW_AT_name : queue", "    <162> DW_AT_type : <0x300>",
+                       "    <163> DW_AT_data_member_location : 35",
+                       " <1><200>: Abbrev Number: 5 (DW_TAG_base_type)"]))
+        fixture += "\n" + "\n".join([
+            " <1><300>: Abbrev Number: 7 (DW_TAG_array_type)",
+            "    <301> DW_AT_type : <0x220>",
+            " <2><310>: Abbrev Number: 8 (DW_TAG_subrange_type)",
+            "    <311> DW_AT_upper_bound : 4"])
+        _, fields = races.parse_dwarf_struct(fixture, "Building")
+        self.assertEqual(fields["queue"], 35)
+        self.assertEqual(fields.arrays["queue"], (5, 1, False))
+        _, invalid = races.parse_dwarf_struct(fixture.replace("DW_AT_upper_bound : 4", "DW_AT_upper_bound : dynamic"), "Building")
+        self.assertNotIn("queue", invalid.arrays)
+
     def test_typedef_cycles_and_missing_names_fail_closed(self) -> None:
         cyclic = "\n".join([
             " <1><100>: Abbrev Number: 1 (DW_TAG_typedef)",

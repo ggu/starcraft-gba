@@ -11,9 +11,10 @@ import sc64_skirmish_sram_continuation as sram  # noqa: E402
 
 
 class Layout(dict):
-    def __init__(self, offsets, widths):
+    def __init__(self, offsets, widths, arrays=None):
         super().__init__(offsets)
         self.widths = widths
+        self.arrays = arrays or {}
 
 
 def record():
@@ -78,6 +79,40 @@ class EntityRows(unittest.TestCase):
             sram.entity_rows(bytes(8), 8, layout, ("owner", "hp"))
         with self.assertRaisesRegex(sram.ContinuationError, "stride"):
             sram.entity_rows(bytes(7), 8, layout, ("owner",))
+
+    def test_active_queue_detects_changes_and_ignores_inactive_ring_cells(self):
+        for width in (1, 4):
+            with self.subTest(width=width):
+                stride = 4 + 5 * width
+                layout = Layout({"alive": 0, "queue_head": 1, "queue_count": 2, "queue": 4},
+                                {"alive": 1, "queue_head": 1, "queue_count": 1},
+                                {"queue": (5, width, width == 4)})
+                row = bytearray(stride); row[0:3] = bytes((1, 4, 2))
+                def put(slot, value):
+                    row[4 + slot * width:4 + (slot + 1) * width] = value.to_bytes(width, "little")
+                put(4, 7); put(0, 11)
+                def digest():
+                    return sram.fingerprint({"buildings": sram.entity_rows(
+                        bytes(row), stride, layout, ("queue_head", "queue_count"), active_queue=True)})
+                before = digest(); put(2, 17)
+                self.assertEqual(before, digest(), "inactive slot must not affect state")
+                put(0, 12)
+                self.assertNotEqual(before, digest(), "active queued type must affect state")
+
+    def test_queue_layout_and_state_fail_closed(self):
+        fields = ("queue_head", "queue_count")
+        for metadata, offset in ((None, 4), ((4, 1, False), 4), ((5, 3, False), 4),
+                                 ((5, 1, False), -1), ((5, 1, False), 5)):
+            layout = Layout({"alive": 0, "queue_head": 1, "queue_count": 2, "queue": offset},
+                            {"alive": 1, "queue_head": 1, "queue_count": 1},
+                            {"queue": metadata} if metadata else {})
+            with self.subTest(metadata=metadata, offset=offset), self.assertRaises(sram.ContinuationError):
+                sram.entity_rows(bytes([1, 0, 1]) + bytes(6), 9, layout, fields, active_queue=True)
+        layout = Layout({"alive": 0, "queue_head": 1, "queue_count": 2, "queue": 4},
+                        {"alive": 1, "queue_head": 1, "queue_count": 1}, {"queue": (5, 1, False)})
+        for head, count in ((5, 1), (0, 6)):
+            with self.assertRaisesRegex(sram.ContinuationError, "queue count or head"):
+                sram.entity_rows(bytes([1, head, count]) + bytes(6), 9, layout, fields, active_queue=True)
 
     def test_fingerprint_is_order_independent_for_keys(self):
         self.assertEqual(sram.fingerprint({"a": 1, "b": [1, 2]}), sram.fingerprint({"b": [1, 2], "a": 1}))
