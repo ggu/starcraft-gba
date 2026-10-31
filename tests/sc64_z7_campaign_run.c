@@ -2484,6 +2484,38 @@ static int campaign_nearest_unexplored(int *out_x,int *out_y)
     return 0;
 }
 
+/* When the nearest unseen cells lie behind disconnected terrain, try an
+   explored, currently fogged frontier instead. Its adjacent unseen cell is
+   discovered only after the normal Attack-Move brings friendly sight. */
+static int campaign_reachable_frontier(int *out_x,int *out_y)
+{
+    int ax=0,ay=0,n=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+       !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
+       sc64_race_unit_damage(u[i].type)>0) {ax+=u[i].x;ay+=u[i].y;n++;}
+    if(!n)return 0;
+    ax/=n;ay/=n;
+    int rejected[256],count=0;
+    for(int attempt=0;attempt<256;attempt++) {
+        int best=-1,best_d=0x7fffffff;
+        for(int row=1;row<MAP_ROWS-1;row++)for(int col=1;col<MAP_COLS-1;col++) {
+            int idx=col+row*MAP_COLS,skip=0;
+            if(!SC64_GRID_GET(explored,idx)||SC64_GRID_GET(visible,idx))continue;
+            if(SC64_GRID_GET(explored,idx-1)&&SC64_GRID_GET(explored,idx+1)&&
+               SC64_GRID_GET(explored,idx-MAP_COLS)&&SC64_GRID_GET(explored,idx+MAP_COLS))continue;
+            for(int j=0;j<count;j++)if(rejected[j]==idx){skip=1;break;}
+            if(skip)continue;
+            int x=col*16+8,y=row*16+8,d=dist2(ax,ay,x,y);
+            if(d<best_d){best=idx;best_d=d;}
+        }
+        if(best<0)return 0;
+        int x=(best%MAP_COLS)*16+8,y=(best/MAP_COLS)*16+8;
+        if(campaign_combat_can_reach(x,y)){*out_x=x;*out_y=y;return 1;}
+        rejected[count++]=best;
+    }
+    return 0;
+}
+
 static int campaign_local_unexplored(int *out_x,int *out_y)
 {
     int ax=0,ay=0,n=0;
@@ -2616,7 +2648,8 @@ static int campaign_recon_waypoint(int stage,int *out_x,int *out_y)
         if(best_x<0)return 0;
         *out_x=best_x;*out_y=best_y;return 1;
     }
-    return campaign_nearest_unexplored(out_x,out_y);
+    if(campaign_nearest_unexplored(out_x,out_y))return 1;
+    return campaign_reachable_frontier(out_x,out_y);
 }
 
 static int campaign_source_region4(int x,int y)
