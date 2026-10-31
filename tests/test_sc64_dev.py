@@ -807,6 +807,9 @@ class OnboardingTests(unittest.TestCase):
             '-DSC64_CONTACT_CACHE -DSC64_CONTACT_STOCK_ROM '
             '-DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ',
             makefile)
+        z8_flags = next(line for line in makefile.splitlines()
+                        if line.startswith('ZERG_Z8_CANONICAL_FLAGS ='))
+        self.assertIn('-DSC64_CONTACT_STEER_ROM', z8_flags)
         self.assertIn('ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS',
                       makefile)
         self.assertIn('ZERG_Z7_CANONICAL_FLAGS) $(3) $$< common/gba.c -o $$@', makefile)
