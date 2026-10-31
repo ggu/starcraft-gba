@@ -427,12 +427,12 @@ class OnboardingTests(unittest.TestCase):
                         'SHARED_BUILDER_FIXTURE', 'SKIRMISH_CONTROLLER_PROFILE',
                         'SKIRMISH_AI_PROGRESS_PROFILE', 'DEPOT_APPROACH_GAME_FIXTURE',
                         'OWNER_LIST_FIXTURE', 'TERRAIN_TRANSFER_SCENE',
-                        'CANONICAL_TRACER_PROFILE_FIXTURE',
                         'CANONICAL_SKIRMISH_RESUME_PROFILE'):
             line = next(line for line in makefile.splitlines()
                         if f'call {fixture},zerg,' in line)
             self.assertIn('CANONICAL_ZERG_PROFILE_FLAGS', line, fixture)
             self.assertIn('CANONICAL_ZERG_PROFILE_INPUTS', line, fixture)
+        self.assertIn('CANONICAL_TRACER_PROFILE_FIXTURE,zerg-z6,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS', makefile)
         self.assertIn('CONSTRUCTION_ARRIVAL_FLAGS_zerg-z6 = $(ZERG_ROM_FLAGS)', makefile)
         self.assertIn('BC_PROFILE_FIXTURE,$(case),zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS', makefile)
 
