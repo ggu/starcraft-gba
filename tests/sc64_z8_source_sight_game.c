@@ -140,9 +140,41 @@ static void test_z8_detector_boundaries(void)
     race_z8_update_cloak();assert(race_z8_unit_hidden_from_side(1));
 }
 
+static unsigned held_keys;
+static void input(unsigned held)
+{ game_update((u16)held,(u16)(held & ~held_keys));held_keys=held; }
+static void press(unsigned key) { input(key);input(0); }
+
+static void test_ordinary_save_load_visibility(void)
+{
+    u8 expected_visible[sizeof(visible)],expected_hidden[sizeof(race_z8_hidden)];
+    game_init();held_keys=0;
+    int ordinal=sc64_catalog_playable_ordinal(SC64_FACTION_ZERG,SC64_Z8_GLOBAL_ID);
+    assert(ordinal==7);
+    press(KEY_A);
+    for(int page=0;page<ordinal/2;++page)press(KEY_RIGHT);
+    if(ordinal&1)press(KEY_DOWN);
+    press(KEY_A);press(KEY_START);
+    assert(screen==SCREEN_PLAY && race_z8_active());
+    for(int i=0;i<150;++i){assert(screen==SCREEN_PLAY);input(0);}
+    for(int i=0;i<20 && race_z8_camera_release;++i)input(0);
+    assert(screen==SCREEN_PLAY && !race_z8_camera_release);
+    press(KEY_START);assert(screen==SCREEN_PAUSE);
+    press(KEY_B);press(KEY_START);
+    for(int i=0;i<20;++i)input(0);
+    memcpy(expected_visible,visible,sizeof(visible));
+    memcpy(expected_hidden,race_z8_hidden,sizeof(race_z8_hidden));
+    game_init();held_keys=0;press(KEY_L);
+    assert(screen==SCREEN_PLAY && race_z8_active());
+    for(int i=0;i<20;++i)input(0);
+    assert(memcmp(expected_visible,visible,sizeof(visible))==0);
+    assert(memcmp(expected_hidden,race_z8_hidden,sizeof(race_z8_hidden))==0);
+}
+
 int main(void)
 {
     init_state();test_z8_facts_and_visibility();test_z8_detector_boundaries();
+    test_ordinary_save_load_visibility();
     puts("Z8 shared source sight, cache and detector boundaries");
     return 0;
 }
