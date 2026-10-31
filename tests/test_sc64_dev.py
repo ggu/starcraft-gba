@@ -418,6 +418,24 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['protoss-p6'],
                          ('StarCraft-Protoss-P6-GBA.gba', 'starcraft-protoss-p6.elf'))
 
+    def test_shared_zerg_fixtures_use_promoted_profile(self):
+        makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
+        self.assertIn('CANONICAL_ZERG_PROFILE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS)', makefile)
+        self.assertIn('CANONICAL_ZERG_PROFILE_INPUTS = $(ZERG_Z7_CANONICAL_INPUTS)', makefile)
+        for fixture in ('ORDER_MARKER_GAME_FIXTURE', 'IMPACT_EVENTS_GAME_FIXTURE',
+                        'IMPACT_ARM_PROBE', 'UNIT_WALK_GAME_FIXTURE',
+                        'SHARED_BUILDER_FIXTURE', 'SKIRMISH_CONTROLLER_PROFILE',
+                        'SKIRMISH_AI_PROGRESS_PROFILE', 'DEPOT_APPROACH_GAME_FIXTURE',
+                        'OWNER_LIST_FIXTURE', 'TERRAIN_TRANSFER_SCENE',
+                        'CANONICAL_TRACER_PROFILE_FIXTURE',
+                        'CANONICAL_SKIRMISH_RESUME_PROFILE'):
+            line = next(line for line in makefile.splitlines()
+                        if f'call {fixture},zerg,' in line)
+            self.assertIn('CANONICAL_ZERG_PROFILE_FLAGS', line, fixture)
+            self.assertIn('CANONICAL_ZERG_PROFILE_INPUTS', line, fixture)
+        self.assertIn('CONSTRUCTION_ARRIVAL_FLAGS_zerg-z6 = $(ZERG_ROM_FLAGS)', makefile)
+        self.assertIn('BC_PROFILE_FIXTURE,$(case),zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS', makefile)
+
     def test_p4_storm_and_legacy_p3_have_explicit_build_and_save_routes(self):
         self.assertEqual(dev.GAMES['protoss-p3'],
                          ('protoss-p3', 'build/StarCraft-Protoss-GBA.gba'))
