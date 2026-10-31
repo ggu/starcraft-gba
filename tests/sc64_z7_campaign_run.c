@@ -3859,8 +3859,13 @@ static int z7_front_colony_site(int hatch,int *out_x,int *out_y)
     z7_mineral_cover_point(hatch,&cover_x,&cover_y);
     int best=0x7fffffff,found=0,site_x=0,site_y=0;
     for(int dy=-96;dy<=96;dy+=16)for(int dx=-96;dx<=96;dx+=16) {
-        int x=cursor_lattice_coordinate(cx,cover_x+dx,WORLD_W);
-        int y=cursor_lattice_coordinate(cy,cover_y+dy,WORLD_H);
+        int cursor_x=cursor_lattice_coordinate(cx,cover_x+dx,WORLD_W);
+        int cursor_y=cursor_lattice_coordinate(cy,cover_y+dy,WORLD_H);
+        int x=cursor_x,y=cursor_y;
+#ifdef SC64_FIELD_CONTROLS
+        /* The build action snaps after cursor input; validate the actual site. */
+        field_ui_site(B_CREEP_COLONY,&x,&y);
+#endif
         int field_d=dist2(x,y,cover_x,cover_y);
         if(x<24||y<24||x>=WORLD_W-24||y>=WORLD_H-24||
            field_d>96*96||dist2(x,y,b[hatch].x,b[hatch].y)<64*64||
@@ -3877,7 +3882,7 @@ static int z7_front_colony_site(int hatch,int *out_x,int *out_y)
         if(!reachable)continue;
         int visible_threat_bonus=nearest==0x7fffffff?0:nearest/32;
         int score=field_d*2+dist2(x,y,b[hatch].x,b[hatch].y)/8-visible_threat_bonus;
-        if(score<best){best=score;site_x=x;site_y=y;found=1;}
+        if(score<best){best=score;site_x=cursor_x;site_y=cursor_y;found=1;}
     }
     if(found){*out_x=site_x;*out_y=site_y;}
     return found;
