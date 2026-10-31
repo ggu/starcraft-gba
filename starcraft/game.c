@@ -5758,7 +5758,7 @@ static int race_context_command_width(int context)
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     case RACE_CONTEXT_BATTERY: return race_battery_command_available();
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     case RACE_CONTEXT_CARRIER: return race_p7_carrier_training_menu_available();
 #endif
     default: return 0;
@@ -5774,14 +5774,14 @@ static int race_context_command_base(int context)
 }
 #endif
 
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 static int race_carrier_command_base(void)
 { return race_context_command_base(RACE_CONTEXT_CARRIER); }
 #endif
 static void
 choose_command(int choice)
 {
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     if (race_mode && choice==race_carrier_command_base() && race_p7_carrier_training_menu_available()) {
         menu_open=0; mode=MODE_NORMAL;
         toast(race_p7_carrier_training_queue_selected()?4:8); return;
@@ -6215,7 +6215,7 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     if (race_mode && i==race_carrier_command_base() && race_p7_carrier_training_menu_available())
         return "BUILD INTERCEPTOR";
 #endif

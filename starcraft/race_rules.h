@@ -235,6 +235,11 @@ enum {
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
     B_SHARED_SCIENCE_FACILITY, B_SHARED_PHYSICS_LAB,
 #endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_ACTORS) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    /* Append without changing any existing campaign or save identity. */
+    B_SHARED_FLEET_BEACON,
+#define SC64_SHARED_FLEET_BEACON_IDENTITY
+#endif
     SC_RB_COUNT
 };
 
@@ -661,6 +666,9 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_SHARED_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
     , [B_SHARED_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
 #endif
+#ifdef SC64_SHARED_FLEET_BEACON_IDENTITY
+    , [B_SHARED_FLEET_BEACON] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 300, 200, 900, 500, 0 }
+#endif
 };
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
@@ -855,6 +863,9 @@ static inline const char *sc64_race_building_name(int type)
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
         ,[B_SHARED_SCIENCE_FACILITY] = "SCIENCE FACILITY"
         ,[B_SHARED_PHYSICS_LAB] = "PHYSICS LAB"
+#endif
+#ifdef SC64_SHARED_FLEET_BEACON_IDENTITY
+        ,[B_SHARED_FLEET_BEACON] = "FLEET BEACON"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -1790,6 +1801,9 @@ static inline int sc64_race_raw_building(int type)
     case B_SHARED_SCIENCE_FACILITY: return 116;
     case B_SHARED_PHYSICS_LAB: return 118;
 #endif
+#ifdef SC64_SHARED_FLEET_BEACON_IDENTITY
+    case B_SHARED_FLEET_BEACON: return 169;
+#endif
     default: return -1;
     }
 }
@@ -2064,6 +2078,9 @@ static inline int sc64_race_building_from_raw(int raw)
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
     case 116: return B_SHARED_SCIENCE_FACILITY;
     case 118: return B_SHARED_PHYSICS_LAB;
+#endif
+#ifdef SC64_SHARED_FLEET_BEACON_IDENTITY
+    case 169: return B_SHARED_FLEET_BEACON;
 #endif
     default: return -1;
     }

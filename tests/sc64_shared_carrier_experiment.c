@@ -58,6 +58,14 @@ static void test_typed_rows(void)
     }
 }
 #if !defined(SC64_P7_PROJECTILES_ENABLED)
+typedef struct { Unit *scratch; unsigned ww,wh; } CarrierCandidateCheck;
+static int validate_staged_journal(const void *data,u32 length,u32 tag,void *context)
+{
+    CarrierCandidateCheck *check=context;
+    return tag==0x43415231u && length==sizeof(RaceSave) &&
+        sc64_shared_carrier_candidate_valid(data,check->scratch,MAX_UNITS,
+                                             check->ww,check->wh);
+}
 static void test_staged_candidate(unsigned child_state)
 {
     RaceSave *candidate=&race_data;
@@ -76,6 +84,23 @@ static void test_staged_candidate(unsigned child_state)
                                                 race_cols*16,race_rows*16));
     assert(sc64_shared_carrier_candidate_valid(candidate,scratch,MAX_UNITS,
                                                race_cols*16,race_rows*16));
+    static int journal_tested;
+    if (!journal_tested) {
+        const u32 tags[]={0x43415231u};
+        GbaSaveSelection previous, selected;
+        CarrierCandidateCheck check={scratch,(unsigned)race_cols*16u,(unsigned)race_rows*16u};
+        candidate->state[31]=11;
+        assert(save_write_first(candidate,sizeof(*candidate),tags[0]));
+        assert(save_select_validated(candidate,sizeof(*candidate),tags,1,
+                                     validate_staged_journal,&check,&previous));
+        candidate->state[31]=22;
+        assert(save_write_selected(candidate,sizeof(*candidate),tags[0],&previous,tags,1));
+        save_test_corrupt_latest(sizeof(*candidate),tags[0]);
+        assert(save_select_validated(candidate,sizeof(*candidate),tags,1,
+                                     validate_staged_journal,&check,&selected));
+        assert(selected.slot==previous.slot && candidate->state[31]==11);
+        journal_tested=1;
+    }
     race_mode=0;
     assert(sc64_shared_carrier_candidate_valid(candidate,scratch,MAX_UNITS,
                                                race_cols*16,race_rows*16));
@@ -186,6 +211,52 @@ static void test_custom_game_matrix(void)
         }
 }
 
+static void test_paid_carrier_command(void)
+{
+    game_init(); race_mode=1; race_human=R_PROTOSS; race_bots=1;
+    race_skirmish_map=0; race_skirmish_init(); screen=SCREEN_PLAY;
+    minerals=gas=5000;
+    assert(spawn_build(SIDE,B_PYLON,600,600,0)>=0);
+    int gate=spawn_build(SIDE,B_STARGATE,610,620,0);
+    int beacon=sc64_race_building_from_raw(169);
+    assert(gate>=0 && beacon>=0);
+    const Sc64SkirmishRecord *row=0;
+    for (unsigned i=0;i<sc64_skirmish_product_count(167);++i) {
+        const Sc64SkirmishRecord *candidate=sc64_skirmish_product_at(167,i);
+        if (candidate->raw_id==72) row=candidate;
+    }
+    assert(row && !race_skirmish_product_admitted(SIDE,gate,row));
+    assert(spawn_build(SIDE,beacon,620,640,0)>=0);
+    assert(race_skirmish_product_admitted(SIDE,gate,row));
+    selected_building=gate; cx=b[gate].x; cy=b[gate].y;
+    train_type=SC64_CARRIER_TYPE;
+    int old_minerals=minerals, old_gas=gas;
+    interact();
+    assert(b[gate].queue_count==1 && minerals==old_minerals-350 && gas==old_gas-250);
+    selected_building=-1;
+    for (int i=0;i<unit_build_time(SC64_CARRIER_TYPE)+8 && b[gate].queue_count;++i)
+        race_tick_buildings();
+    assert(!b[gate].queue_count);
+    int carrier=-1;
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && u[i].owner==SIDE && u[i].type==SC64_CARRIER_TYPE) carrier=i;
+    assert(carrier>=0);
+    u[carrier].selected=1;
+    int command=race_carrier_command_base();
+    assert(!strcmp(race_menu_label(command),"BUILD INTERCEPTOR"));
+    old_minerals=minerals;
+    game_update(KEY_B,KEY_B);
+    assert(menu_open);
+    for (int guard=0;menu_cursor!=command && guard<field_menu_count();++guard)
+        game_update(KEY_DOWN,KEY_DOWN);
+    assert(menu_cursor==command);
+    game_update(KEY_A,KEY_A);
+    assert(!menu_open && minerals==old_minerals-25 && u[carrier].carry==1);
+    u[carrier].selected=0;
+    for (int i=0;i<430 && screen==SCREEN_PLAY;++i) game_update(0,0);
+    assert(children(carrier,SC64_P7_INTERCEPTOR_INSIDE)==1);
+}
+
 int main(void)
 {
     assert(SC64_OBJ_VRAM_PROJECTILE_BYTES == SC64_ARENA_WORDS*sizeof(u16));
@@ -253,5 +324,6 @@ int main(void)
         assert(children(bot,SC64_P7_INTERCEPTOR_TRAINING)==1);
     }
     test_custom_game_matrix();
+    test_paid_carrier_command();
     puts("shared carrier experiment: ok"); return 0;
 }
