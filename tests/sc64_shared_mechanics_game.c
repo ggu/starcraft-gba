@@ -421,6 +421,10 @@ static void test_ui_save_context(int human)
 
 int main(void)
 {
+#ifdef SC64_SAVE_UI_FIXTURE_ONLY
+    for (int race=R_TER;race<=R_PROTOSS;++race) test_ui_save_context(race);
+    return 0;
+#endif
     for (int mode = 0; mode <= 1; ++mode) {
         test_construction_shared_in_both_modes(mode, R_TER);
         test_construction_shared_in_both_modes(mode, R_PROTOSS);
