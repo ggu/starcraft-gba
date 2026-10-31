@@ -4899,6 +4899,28 @@ static void attack_step(void)
        !offense_ready) {
         int cover_x,cover_y,air_x=1050,air_y=1510;
         z7_defense_screen_point(&cover_x,&cover_y);
+        /* Do not let a long air-screen gesture defer an already visible
+         * ground attack at the Hatchery. This uses the same live target and
+         * ordinary group order as the existing post-air defense below. */
+        if(hydra_ground_target_slot<0&&(unsigned)frame>=hydra_ground_next_order&&
+           unit_type_count(U_HYDRALISK,SIDE)>0) {
+            int ground=-1,best=160*160;
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+               owners_hostile(SIDE,u[i].owner)&&!SC64_TRANSPORT_LOADED(&u[i])&&
+               !sc64_race_unit_flying(u[i].type)&&currently_visible(u[i].x,u[i].y)&&
+               SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,i,SIDE,3)) {
+                int d=dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y);
+                if((d<=best||(d<=policy_home_radius*policy_home_radius&&z7_threat_near_workers(i,128)))&&
+                   (ground<0||d<best)){ground=i;best=d;}
+            }
+            if(ground>=0) {
+                int accepted=typed_attack_target(U_HYDRALISK,ground);
+                fprintf(stderr,"Z7 priority Hydra home threat accepted%d slot%d raw%d d2%d frame%u\n",
+                    accepted,ground,u[ground].raw_type,best,(unsigned)frame);
+                hydra_ground_next_order=frame+(accepted?180u:60u);
+                if(accepted){hydra_ground_target_slot=ground;return;}
+            }
+        }
         /* Guardians can hit the mineral line from outside Mutalisk sight.
            Keep the Hydras on worker cover and advance only the air group to
            a nearby forward screen where it can see the ground-only threat. */
