@@ -4,7 +4,7 @@
 #define main previous_defiler_test
 #include "sc64_defiler_executor_game.c"
 #undef main
-#ifndef SC64_P7_CARRIER_TRAINING_ENABLED
+#if !defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_SHARED_CARRIER_EXPERIMENT)
 #error "requires staged Carrier training"
 #endif
 #ifndef SC64_SHARED_ACTOR_STATE_UNION_PROBE
@@ -14,7 +14,7 @@ int main(void)
 {
     game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;race_skirmish_map=0;race_skirmish_init();
     for(int i=0;i<MAX_UNITS;i++)u[i].selected=0;
-    int carrier=spawn_unit(SIDE,U_P7_CARRIER,160,160);assert(carrier>=0);
+    int carrier=spawn_unit(SIDE,SC64_CARRIER_TYPE,160,160);assert(carrier>=0);
     u[carrier].selected=1;selected_building=-1;minerals=100;
     assert(race_p7_carrier_training_menu_available());
     int carrier_command=race_carrier_command_base();
