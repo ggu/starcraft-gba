@@ -1950,7 +1950,14 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #else
 #error "Shared Carrier candidate preflight requires bounded route scratch"
 #endif
-        if (!v[0] || !sc64_shared_carrier_candidate_valid(&race_data,carrier_scratch,
+        if (!v[0] || v[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX]!=SC64_BUILDING_DAMAGE_SAVE_MARKER
+#ifdef SC64_CONSTRUCTION_HP
+            || v[SC64_CONSTRUCTION_SAVE_MARKER_INDEX]!=SC64_CONSTRUCTION_SAVE_MARKER
+#endif
+#ifdef SC64_SHARED_BATTERY
+            || v[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]!=SC64_SHIELD_PHASE_SAVE_MARKER
+#endif
+            || !sc64_shared_carrier_candidate_valid(&race_data,carrier_scratch,
                 MAX_UNITS,(unsigned)width*16u,(unsigned)height*16u)) return 0;
     }
 #endif
@@ -3007,6 +3014,151 @@ static int race_shared_carrier_stage_select(RaceLoadPlan *plan,GbaSaveSelection 
                                race_shared_carrier_stage_prepare,plan,selected)) return 0;
     /* Selection restores raw bytes, so rebuild the selected detached plan. */
     return race_shared_carrier_stage_prepare(record,selected->length,selected->tag,plan);
+}
+
+/* Commit only a tagged custom candidate immediately after its successful
+ * detached preflight. The decoded actor table and the checked packet remain
+ * in the route/save scratch until the route cache is reset at the end. */
+static void race_shared_carrier_stage_commit(const RaceLoadPlan *plan) {
+    const int *v=race_data.state;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    const Unit *actors=sc64_zp_route_save_scratch.carrier_candidate.units;
+#else
+    const Unit *actors=sc64_combined_route_save_scratch.carrier_candidate.units;
+#endif
+    race_mode=v[0]; race_human=v[1]; race_selected_mission=v[2];
+    race_completed=v[3]; race_bots=v[4];
+#ifdef SC64_IMPORTED_SKIRMISH
+    race_skirmish_map=v[20]; for (int i=0;i<3;++i) race_bot_races[i]=v[21+i];
+#endif
+    minerals=v[5]; gas=v[6]; frame=v[7]; cx=v[8]; cy=v[9]; train_type=v[10];
+    weapons_level=v[11]; armor_level=v[12]; weapons_research=v[13];
+    armor_research=v[14]; seed=(u32)v[15]; geyser_count=v[16];
+    mission_objective_stage=v[17]; won=v[18]; lost=v[19];
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    sc64_battlecruiser_tech_bits=(u16)((unsigned)v[27]&65535u);
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    memcpy(sc64_bc_shots,race_data.battlecruiser_shots,sizeof(sc64_bc_shots));
+    sc64_bc_pause_offset=(u8)((unsigned)v[28]&7u);
+    if ((unsigned)v[28]==0) sc64_bc_spell_rng=42u;
+    else memcpy(&sc64_bc_spell_rng,&v[29],sizeof(sc64_bc_spell_rng));
+#endif
+#endif
+    race_cols=64; race_rows=64; race_skirmish_geometry();
+    memcpy(u,actors,sizeof(u));
+    for (unsigned i=0;i<MAX_BUILDINGS;++i)
+        (void)sc64_p7_typed_building_decode(&b[i],&race_data.carrier_custom.buildings[i],
+                                              (unsigned)race_cols*16u,(unsigned)race_rows*16u);
+#ifdef SC64_ZP_FULL_STORAGE
+    for (unsigned i=0;i<MAX_MINERALS;++i)
+        (void)race_save_decode_mineral(&race_data,i,(unsigned)race_cols*16u,
+                                       (unsigned)race_rows*16u,&m[i]);
+#else
+    memcpy(m,race_data.minerals_map,sizeof(m));
+#endif
+    SC64_GRID_CLEAR(explored);
+    for (int i=0;i<MAP_CELLS;++i)
+        if ((race_data.fog[i>>3]>>(i&7))&1) SC64_GRID_SET(explored,i,1);
+    memcpy(race_player,race_data.players,sizeof(race_player));
+    memcpy(race_minerals,race_data.ore,sizeof(race_minerals));
+    memcpy(race_gas,race_data.vespene,sizeof(race_gas));
+    memcpy(geysers,race_data.geysers,sizeof(race_data.geysers));
+    race_campaign=race_data.campaign;
+#ifdef SC64_UNIFIED
+    backwater=race_data.backwater; backwater_message_ticks=0;
+#ifdef SC64_ZP_FULL_STORAGE
+    for (unsigned i=0;i<MAX_UNITS;++i) invincible_units[i]=(u8)race_save_unit_invincible(&race_data,i);
+    for (unsigned i=0;i<MAX_BUILDINGS;++i) invincible_buildings[i]=(u8)race_save_building_invincible(&race_data,i);
+#else
+    memcpy(invincible_units,race_data.invincible_units,sizeof(invincible_units));
+    memcpy(invincible_buildings,race_data.invincible_buildings,sizeof(invincible_buildings));
+#endif
+#endif
+    race_protoss_clock_from_word(race_protoss_generic_clock,v[SC64_PROTOSS_CLOCK_STATE_INDEX]);
+    /* Candidate validation already proved both packet and actor graph. */
+    (void)sc64_codec_decode(&race_p7_projectiles,race_data.carrier_custom.projectiles,SC64_CODEC_BYTES);
+#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
+    memset(&race_t3,0,sizeof(race_t3)); race_t3_buildings_killed=0;
+#endif
+#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
+    memset(&race_z3,0,sizeof(race_z3)); race_z3_action_ticks=0;
+#endif
+#if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    memset(&race_p3,0,sizeof(race_p3)); race_p3_action_ticks=0;
+#endif
+#ifdef SC64_Z4_RUNTIME
+    memset(&race_z4,0,sizeof(race_z4));
+#endif
+#ifdef SC64_P4_RUNTIME
+    memset(&race_p4,0,sizeof(race_p4));
+#endif
+#ifdef SC64_P5_RUNTIME
+    memset(&race_p5,0,sizeof(race_p5)); memset(&race_p5_world,0,sizeof(race_p5_world));
+#endif
+#ifdef SC64_P6_RUNTIME
+    memset(&race_p6,0,sizeof(race_p6)); memset(&race_p6_world,0,sizeof(race_p6_world));
+    memset(race_p6_doodad_bindings,0,sizeof(race_p6_doodad_bindings)); race_p6_doodad_bindings_valid=0;
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    memset(&race_p7,0,sizeof(race_p7)); memset(&race_p7_world,0,sizeof(race_p7_world)); race_p7_map=0;
+#endif
+#ifdef SC64_P8_RUNTIME
+    memset(&race_p8,0,sizeof(race_p8)); race_p8_map=0;
+#endif
+#ifdef SC64_Z5_RUNTIME
+    memset(&race_z5,0,sizeof(race_z5)); memset(&race_z5_world,0,sizeof(race_z5_world));
+    memset(race_z5_doodads,0,sizeof(race_z5_doodads));
+#endif
+#ifdef SC64_Z6_RUNTIME
+    memset(&race_z6,0,sizeof(race_z6)); memset(&race_z6_world,0,sizeof(race_z6_world));
+#endif
+#ifdef SC64_Z7_RUNTIME
+    memset(&race_z7,0,sizeof(race_z7)); memset(&race_z7_world,0,sizeof(race_z7_world));
+    memset(&race_z7_ops,0,sizeof(race_z7_ops)); race_z7_map=0;
+#endif
+#ifdef SC64_Z8_RUNTIME
+    (void)race_z8_runtime_init(0); /* custom mode takes its infallible reset path */
+#endif
+#ifdef SC64_NYDUS_ENABLED
+    (void)race_nydus_rebind_loaded_world(); /* custom candidate already checked */
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    memset(&race_t4,0,sizeof(race_t4));
+#endif
+#ifdef SC64_T5_RUNTIME
+    memset(&race_t5,0,sizeof(race_t5));
+#endif
+#ifdef SC64_T6_RUNTIME
+    memset(&race_t6,0,sizeof(race_t6));
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    memset(&race_late,0,sizeof(race_late));
+#endif
+    clear_tracers(); death_vfx_reset(); mode=MODE_NORMAL; menu_open=help=0; selected_building=-1;
+#ifdef SC64_IMPACT_EVENTS
+    race_impact_restore(plan->impact_candidate,plan->impact_candidate_count);
+#else
+    (void)plan;
+#endif
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    path_grid_valid=0;
+#ifdef SC64_DIRECT_FIRING_POINTS
+    sc64_direct_firing_cache_invalidate();
+#endif
+#ifdef SC64_IMPORTED_MISSION
+    sc64_routes_reset();
+#endif
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && IS_WORKER(u[i].type) &&
+            (u[i].order==ORDER_MINE || u[i].order==ORDER_GAS) && u[i].build>=0 &&
+            (!race_resource_depot_valid_for(&u[i],u[i].build) ||
+             !race_resource_depot_reachable(&u[i],u[i].build))) u[i].build=-1;
+#else
+    invalidate_path_grid();
+#endif
+    sc64_visibility_reset(); update_exploration(); reset_selection_gestures();
+    supply_used=race_owner_supply(SIDE); supply_cap=race_owner_supply_cap(SIDE);
+    screen=won||lost?SCREEN_RESULT:SCREEN_PLAY; toast(7);
 }
 #endif
 

@@ -107,6 +107,67 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
            !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)));
     assert(!memcmp(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,
                    sizeof(predecessor)));
+    /* A checksummed full envelope with a broken child link must fall back to
+     * the real predecessor after all sidecars have been decoded. */
+    int full_linked=-1;
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && u[i].type==SC64_INTERCEPTOR_TYPE &&
+            sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE)
+            { full_linked=i; break; }
+    assert(full_linked>=0);
+    Unit full_invalid=u[full_linked]; full_invalid.build=-1;
+    assert(sc64_p7_typed_unit_encode(&race_data.carrier_custom.units[full_linked],
+                                     &full_invalid,(unsigned)race_cols*16u,(unsigned)race_rows*16u));
+#ifdef SC64_IMPACT_EVENTS
+    assert(race_impact_save_pack(&packed_length));
+    assert(save_write_selected(&race_impact_record,packed_length,SC64_SHARED_CARRIER_SAVE_VERSION,
+                               previous,tags,2));
+#else
+    assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
+                               previous,tags,2));
+#endif
+    assert(race_shared_carrier_stage_select(&plan,&selected));
+    assert(selected.tag==SAVE_VERSION && selected.slot==previous->slot);
+    assert(!memcmp(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,
+                   sizeof(predecessor)));
+    assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
+           !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)));
+    assert(race_save_serialize(1));
+#ifdef SC64_IMPACT_EVENTS
+    assert(race_impact_save_pack(&packed_length));
+    assert(save_write_selected(&race_impact_record,packed_length,SC64_SHARED_CARRIER_SAVE_VERSION,
+                               previous,tags,2));
+#else
+    assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
+                               previous,tags,2));
+#endif
+    assert(race_shared_carrier_stage_select(&plan,&selected));
+    assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION);
+    /* Exercise the detached commit separately from the still-disabled game
+     * loader. Route scratch is consumed only after all saved fields copy. */
+    static u8 expected_packet[SC64_CODEC_BYTES], restored_packet[SC64_CODEC_BYTES];
+    memcpy(expected_packet,race_data.carrier_custom.projectiles,sizeof(expected_packet));
+    int saved_minerals=minerals, saved_frame=frame;
+    u8 saved_clock[3]; memcpy(saved_clock,race_protoss_generic_clock,sizeof(saved_clock));
+    u[carrier].hp=1; minerals=0; frame=0;
+    memset(race_protoss_generic_clock,0,sizeof(saved_clock));
+    assert(sc64_pool_init(&race_p7_projectiles));
+#ifdef SC64_IMPACT_EVENTS
+    race_impact_reset();
+#endif
+    race_shared_carrier_stage_commit(&plan);
+    assert(!memcmp(&u[carrier],&before_units[carrier],sizeof(Unit)) &&
+           !memcmp(&u[target],&before_units[target],sizeof(Unit)) &&
+           !memcmp(b,before_buildings,sizeof(b)));
+    assert(minerals==saved_minerals && frame==saved_frame &&
+           !memcmp(saved_clock,race_protoss_generic_clock,sizeof(saved_clock)));
+    assert(sc64_codec_encode(&race_p7_projectiles,restored_packet,sizeof(restored_packet)) &&
+           !memcmp(expected_packet,restored_packet,sizeof(expected_packet)));
+#ifdef SC64_IMPACT_EVENTS
+    assert(race_impact_count==1 && !memcmp(&race_impact_rows[0],&expected_impact,sizeof(expected_impact)));
+#endif
+    assert(race_shared_carrier_stage_select(&plan,&selected));
+    assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION);
     race_data.state[31]=0x13579;
     assert(race_save_encode_actors());
     assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION && race_data.state[31]==0x13579);
