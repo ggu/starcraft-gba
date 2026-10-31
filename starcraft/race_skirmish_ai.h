@@ -226,25 +226,26 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             continue;
         }
         if (q->owner != owner) {
-            int flying, d;
+            int flying, d, nearby = 0;
             if (!owners_hostile(owner, q->owner) || !race_ai_armed(q->type)) continue;
+            /* Only armed non-workers participate in this defense policy. */
+            if (sc64_race_is_worker(q->type)) continue;
             flying = sc64_race_unit_flying(q->type);
-            if (!sc64_race_is_worker(q->type)) {
-                ++c->enemy_army;
-                if (flying) ++c->enemy_air;
-            }
-            /* Threat: the hostile armed actor nearest any owned depot. */
+            ++c->enemy_army;
+            if (flying) ++c->enemy_air;
+            /* Count distinct actors, while choosing the distance to their
+             * nearest owned depot. Overlapping bases do not multiply them. */
             for (int k = 0; k < c->depots || (k == 0 && !c->depots); ++k) {
                 int ax = c->depots ? b[c->depot[k]].x : c->hx;
                 int ay = c->depots ? b[c->depot[k]].y : c->hy;
                 d = dist2(q->x, q->y, ax, ay);
-                if (d < RACE_AI_THREAT_RANGE * RACE_AI_THREAT_RANGE &&
-                    !sc64_race_is_worker(q->type)) ++c->threat_count;
+                if (d < RACE_AI_THREAT_RANGE * RACE_AI_THREAT_RANGE) nearby = 1;
                 if (d < best_threat) {
                     best_threat = d; c->threat = i;
                     c->threat_x = q->x; c->threat_y = q->y;
                 }
             }
+            c->threat_count += nearby;
             continue;
         }
         ++c->units;
@@ -790,7 +791,10 @@ static int race_ai_start_defense(RaceAiCensus *c, int raw)
         type = B_CREEP_COLONY;
         ax = c->hx; ay = c->hy;
     }
-    if (!race_ai_find_site(c, type, ax, ay, 0, c->race == R_ZERG ? 3 : 2, 1, &x, &y)) return 0;
+    /* A developed Zerg base can occupy all four inner rings. Use the full
+     * existing six-ring lattice; creep, lanes and reachability still decide
+     * eligibility, with the same single-ring and candidate work budget. */
+    if (!race_ai_find_site(c, type, ax, ay, 0, c->race == R_ZERG ? 5 : 2, 1, &x, &y)) return 0;
     return race_ai_start_build(c, type, x, y);
 }
 
@@ -994,6 +998,28 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
 
 /* -------------------------------------------------------------- military */
 
+/* Army supply (doubled units) needed before an attack. It grows slowly
+ * with match time and with hostile static defenses, but never beyond what
+ * this owner's unit share can field. */
+static int race_ai_attack_threshold(const RaceAiCensus *c)
+{
+    int minutes = frame / 1800, t = 24, cap = race_ai_unit_cap();
+    /* No offensive before six minutes; defense is unaffected. */
+    if (minutes < 6) return 0x7fff;
+    t += (minutes - 6) * 2;
+    t += c->enemy_defense * 2 > 16 ? 16 : c->enemy_defense * 2;
+    if (t > 64) t = 64;
+    /* A maxed-out owner, an owner whose mineral fields are exhausted, and
+     * any owner after 25 minutes attack with whatever army they have, even
+     * one below the normal threshold, so mined-out maps resolve instead of
+     * stalling. */
+    if ((c->units + c->queued_units >= cap - 4 || minutes >= 25 ||
+         (!c->patches && race_owner_minerals(c->owner) < 100)) &&
+        c->army_supply > 0 && t > c->army_supply)
+        t = c->army_supply;
+    return t;
+}
+
 /* Spread a group over a 5x3 block at 16 px pitch: converging on one point
  * jams units, and each jammed unit repeats a route search every few frames. */
 static void race_ai_order(Unit *q, int order, int x, int y, int n)
@@ -1020,23 +1046,147 @@ static int race_ai_movable_army(const Unit *q, int owner)
     return 1;
 }
 
-/* The existing opponent rule, unchanged in this stage: once four armed units
- * exist, every armed unit attack-moves to the hostile structure nearest the
- * owner's base. */
-static void __attribute__((noinline)) race_ai_military(RaceAiCensus *c)
+/* Nearest hostile structure to (x,y); depots win ties within 25%. */
+static int race_ai_target(const RaceAiCensus *c, int x, int y, int *tx, int *ty)
 {
-    int target = -1, best = 0x7fffffff, n = 0;
-    if (c->army < 4) return;
+    int best = -1, best_d = 0x7fffffff;
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         int d;
         if (!b[i].alive || !owners_hostile(c->owner, b[i].owner)) continue;
-        d = dist2(race_base_x[c->base], race_base_y[c->base], b[i].x, b[i].y);
-        if (d < best) { best = d; target = i; }
+        d = dist2(x, y, b[i].x, b[i].y);
+        if (race_ai_is_depot(b[i].type)) d -= d / 4;
+        if (d < best_d) { best_d = d; best = i; }
     }
-    if (target < 0) return;
+    if (best < 0) {
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            int d;
+            if (!u[i].alive || !owners_hostile(c->owner, u[i].owner) || SC64_TRANSPORT_LOADED(&u[i])) continue;
+            d = dist2(x, y, u[i].x, u[i].y);
+            if (d < best_d) { best_d = d; best = MAX_BUILDINGS + i; }
+        }
+        if (best < 0) return 0;
+        *tx = u[best - MAX_BUILDINGS].x; *ty = u[best - MAX_BUILDINGS].y;
+        return 1;
+    }
+    *tx = b[best].x; *ty = b[best].y;
+    return 1;
+}
+
+/* An objective stays live while a hostile structure or ground unit is near
+ * it. Aircraft do not hold it: a ground army could wait under one forever. */
+static int race_ai_hostile_near(const RaceAiCensus *c, int x, int y, int radius)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && owners_hostile(c->owner, b[i].owner) &&
+            dist2(x, y, b[i].x, b[i].y) < radius * radius) return 1;
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (race_ai_movable_army(&u[i], c->owner))
-            race_ai_order(&u[i], ORDER_ATTACK_MOVE, b[target].x, b[target].y, n++);
+        if (u[i].alive && owners_hostile(c->owner, u[i].owner) && !SC64_TRANSPORT_LOADED(&u[i]) &&
+            !sc64_race_unit_flying(u[i].type) && dist2(x, y, u[i].x, u[i].y) < radius * radius) return 1;
+    return 0;
+}
+
+static void __attribute__((noinline)) race_ai_military(RaceAiCensus *c)
+{
+    int rx = c->hx + (WORLD_W / 2 - c->hx) * 3 / 10, ry = c->hy + (WORLD_H / 2 - c->hy) * 3 / 10;
+    int threshold = race_ai_attack_threshold(c), n = 0, tx, ty;
+    int home_supply = c->army_supply - c->deployed_supply;
+    if (c->threat >= 0) {
+        /* Defend: every army unit, and workers if the army is outnumbered. */
+        int pulled = 0, worker_defense = c->threat_count >= 2 && c->home_army < c->threat_count &&
+            c->threat_d < 192 * 192;
+        int recall = c->threat_count > c->home_army;
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            Unit *q = &u[i];
+            if (race_ai_movable_army(q, c->owner)) {
+                if (recall || dist2(q->x, q->y, c->hx, c->hy) <=
+                    RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE)
+                    race_ai_order(q, ORDER_ATTACK_MOVE, c->threat_x, c->threat_y, n++);
+            }
+            else if (worker_defense && pulled < 6 && q->alive && q->owner == c->owner &&
+                     sc64_race_is_worker(q->type) && q->order == ORDER_MINE &&
+                     dist2(q->x, q->y, c->threat_x, c->threat_y) < 224 * 224) {
+                race_ai_order(q, ORDER_ATTACK_MOVE, c->threat_x, c->threat_y, pulled++);
+                q->carry = 0;
+            }
+        }
+        return;
+    }
+    if (c->deployed) {
+        int deployed_tx = -1, deployed_ty = -1, any_x = 0, any_y = 0;
+        /* Too few left: regroup at the rally point. */
+        int regroup = threshold > 64 ? 64 : threshold;
+        if (c->deployed_supply * 4 < regroup && home_supply < regroup) {
+            /* Units already fighting a target finish that fight. */
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (race_ai_movable_army(&u[i], c->owner) && u[i].order != ORDER_ATTACK_TARGET &&
+                    dist2(u[i].x, u[i].y, c->hx, c->hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE)
+                    race_ai_order(&u[i], ORDER_MOVE, rx, ry, n++);
+            return;
+        }
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (race_ai_movable_army(&u[i], c->owner) &&
+                dist2(u[i].x, u[i].y, c->hx, c->hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) {
+                any_x = u[i].x; any_y = u[i].y;
+                if (u[i].order == ORDER_ATTACK_MOVE) { deployed_tx = u[i].tx; deployed_ty = u[i].ty; break; }
+            }
+        /* A destroyed objective leaves units crowding its old position in
+         * attack-move; retarget once nothing hostile remains near it. */
+        if (deployed_tx >= 0 && !race_ai_hostile_near(c, deployed_tx, deployed_ty, 128)) {
+            any_x = deployed_tx; any_y = deployed_ty; deployed_tx = -1;
+        }
+        if (deployed_tx < 0 && !race_ai_target(c, any_x, any_y, &deployed_tx, &deployed_ty)) return;
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            Unit *q = &u[i];
+            int far;
+            if (!race_ai_movable_army(q, c->owner)) continue;
+            far = dist2(q->x, q->y, c->hx, c->hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE;
+            /* Idle deployed units take the next target; home units join in
+             * groups so reinforcements do not trickle in one at a time. */
+            if (far ? (q->order == ORDER_IDLE || q->order == ORDER_ATTACK_MOVE ||
+                       q->order == ORDER_MOVE) : home_supply >= 12)
+                race_ai_order(q, ORDER_ATTACK_MOVE, deployed_tx, deployed_ty, n++);
+        }
+        return;
+    }
+    /* Last resort on an exhausted map: with no army, no local minerals and
+     * no means to train, the workers attack so the match can resolve. */
+    if (!c->army && !c->patches && race_owner_minerals(c->owner) < 50 &&
+        frame >= 54000 && race_ai_target(c, c->hx, c->hy, &tx, &ty)) {
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == c->owner && sc64_race_is_worker(u[i].type) &&
+                !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_BUILD_WORKER_ORDER(u[i].order))
+                race_ai_order(&u[i], ORDER_ATTACK_MOVE, tx, ty, n++);
+        return;
+    }
+    if (c->army_supply >= threshold && race_ai_target(c, rx, ry, &tx, &ty)) {
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (race_ai_movable_army(&u[i], c->owner))
+                race_ai_order(&u[i], ORDER_ATTACK_MOVE, tx, ty, n++);
+        return;
+    }
+    /* Gather idle units at the rally point in front of the base. */
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i];
+        if (race_ai_movable_army(q, c->owner) && q->order == ORDER_IDLE &&
+            dist2(q->x, q->y, rx, ry) > 96 * 96)
+            race_ai_order(q, ORDER_MOVE, rx, ry, n++);
+    }
+}
+
+/* One worker visits the nearest other start location early. It returns to
+ * mining through idle-worker recovery after arriving. */
+static void race_ai_scout(RaceAiCensus *c)
+{
+    int best = -1, best_d = 0x7fffffff, w;
+    if (frame < 1800 || frame >= 1800 + RACE_AI_PERIOD || c->workers < 8) return;
+    for (int s = 0; s < 4; ++s) {
+        int d = dist2(race_base_x[s], race_base_y[s], c->hx, c->hy);
+        if (s == c->base || d < 256 * 256) continue;
+        if (d < best_d) { best_d = d; best = s; }
+    }
+    if (best < 0) return;
+    w = race_ai_nearest_worker(c, ORDER_MINE, race_base_x[best], race_base_y[best]);
+    if (w >= 0) { race_ai_order(&u[w], ORDER_MOVE, race_base_x[best], race_base_y[best], 2); u[w].carry = 0; }
 }
 
 static void __attribute__((noinline)) race_ai_plan(int owner)
@@ -1050,6 +1200,7 @@ static void __attribute__((noinline)) race_ai_plan(int owner)
     if (!race_ai_supply(&c)) race_ai_develop(&c);
     race_ai_produce(&c);
     race_ai_military(&c);
+    race_ai_scout(&c);
 }
 
 /* Bots plan on distinct frames, each once per RACE_AI_PERIOD. */
