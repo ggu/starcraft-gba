@@ -1887,6 +1887,12 @@ P8_ARM_DIR := build/p8-arm
 P8_ARM_TRACE := $(P8_ARM_DIR)/p8-controller.jsonl
 P8_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
 P8_REPLAY_COMMON := $(filter-out common/main.c,$(COMMON))
+build/test-sc64-p8-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+.PHONY: test-sc64-p8-carried-profile
+test-sc64-p8-carried-profile: build/test-sc64-p8-carried-profile
+	./build/test-sc64-p8-carried-profile
+
 build/test-sc64-p8-campaign-run: tests/sc64_p8_campaign_run.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 $(P8_ARM_TRACE): build/test-sc64-p8-campaign-run
