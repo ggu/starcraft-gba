@@ -44,3 +44,11 @@ canonical renderer roster dry-run failures because the frozen input subset did
 not include `palette-remap.bin` needed by make dependencies (842 tests, 17
 skips). That result is not a clean default-profile test. An independent
 unprepared check is tracked separately in the port receipts.
+
+The identical full experimental stack does not compile in Zerg, Protoss or
+Showcase: the namespace stage requires Terran impact/Yamato and uses the
+Terran save codec. Protoss additionally needs facts generated for the new
+roster. With the namespace stage omitted and the flight/weapon probes plus
+energy flag enabled, Zerg and Showcase link at `02037154/03004f68` and
+`0203df68/03004ff0` respectively; Protoss still rejects the old fact-table
+fingerprint. These partial links do not qualify persistence or other services.
