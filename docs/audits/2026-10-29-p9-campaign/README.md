@@ -350,3 +350,22 @@ The normal P9 ARM ROM at that head passed existing RAM guards (IWRAM end `0x0300
 ### Shared AI-economy sync
 
 Merge `c1a9c71` carries the shared AI-economy change. The normal P9 ARM ROM passed unchanged guards (IWRAM end `0x03004a48`, EWRAM BSS end `0x02038d7c`, SHA-256 `9327a45480de525509e120e374bd54accef0b1843940e47abc99dbfceccb0bfb`). The retained full host input tape matched the `1986928` host run at all 147 checkpoints and its final victory state. Under actual P9 flags, nine sanitizer skirmish worker cases passed: each of three AI races with bot STOP recovery, human STOP preservation and depleted-field reassignment. All 103 frozen inputs remained unchanged. The custom guest full/prefix/fresh qualification above is evidence for `1986928`, not a new guest run of this sync; Defiler and other admission holds remain open.
+
+### Shared Scarab foundation integration checkpoint
+
+Merge `288afdf` incorporates P8 parent `54a6350` and shared integration
+`652ff63`, before the later route activation. Conflict resolution retains the
+P9 Defiler identity before the optional Scarab identity and fingerprints both
+feature gates. Scarab runtime and namespace staging remain off in the normal P9
+vector. The current-source host full replay matched all 147 prior checkpoint
+lines and its final victory. With actual P9 flags, the sanitizer carried-profile
+startup/save matrix passed 234 skirmish configurations and the Protoss service
+fixture passed successful-load and invalid-candidate checks.
+
+The normal P9 ARM product passed ROM verification and existing link guards:
+IWRAM end `0x03004a48`, EWRAM BSS end `0x02038d7c`, ROM SHA-256
+`453fd19b02c302972e2079fdba1a2d23501975acaba1007492a2b2f4eaf51a11`.
+Of 103 retained input hashes, 102 matched; the P9 fact header was intentionally
+regenerated from current source to include the new feature-gate fingerprint.
+The older custom guest replay remains evidence for `1986928`; it was not rerun
+for this sync. Defiler and other documented admission holds remain open.
