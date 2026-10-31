@@ -210,6 +210,58 @@ class ResumeAndRecovery(unittest.TestCase):
             ai.validate_addon(self.addon(0, reserved=[50]), 0)
         with self.assertRaisesRegex(ai.RecordError, "disagree"):
             ai.evaluate(("addon", "terran", 1, 2, "t", 0), 9, "\n".join(self.addon(0)), 1800)
+    def builder(self, scenario, **kw):
+        base = {"kind": "builder", "scenario": ai.BUILDER_SCENARIOS[scenario], "start": 1968,
+                "timer_at_save": 1, "event": 2079, "reference_event": 2079, "arrived": 1, "released": 0,
+                "replanned": -1, "stall_passes": 40, "reference": "03050aa7", "resumed": "03050aa7", "ok": 1}
+        if scenario:
+            base.update(timer_at_save=20 if scenario == 2 else -1, event=3936, arrived=0, released=1,
+                        replanned=3937, reference_event=3936 if scenario == 2 else -1)
+            if scenario == 1:
+                base.update(reference="00000000", resumed="00000000")
+        base.update(kw)
+        return [json.dumps(base)]
+
+    def test_builder_records(self):
+        for s in range(3):
+            self.assertEqual(ai.validate_builder(self.builder(s), s)["ok"], 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_builder(self.builder(0, resumed="03050aa8"), 0)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_builder(self.builder(0, timer_at_save=0), 0)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_builder(self.builder(1, replanned=-1), 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_builder(self.builder(1, event=1968 + 43 * 48), 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_builder(self.builder(2, event=3984), 2)
+        with self.assertRaisesRegex(ai.RecordError, "stall_passes"):
+            ai.validate_builder(self.builder(1, stall_passes=30), 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagree"):
+            ai.evaluate(("builder", "terran", 1, 2, "t", 1), 11, "\n".join(self.builder(1)), 1800)
+
+    def workers(self, scenario, **kw):
+        base = {"kind": "workers", "scenario": ai.WORKER_SCENARIOS[scenario], "slot": 6, "idle_at": 901,
+                "back_at": 912, "old_patch": 9, "new_patch": 9, "order": 4, "ok": 1}
+        if scenario == 1:
+            base.update(back_at=-1, order=0)
+        if scenario == 2:
+            base.update(new_patch=17)
+        base.update(kw)
+        return [json.dumps(base)]
+
+    def test_worker_records(self):
+        for s in range(4):
+            self.assertEqual(ai.validate_workers(self.workers(s), s)["ok"], 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_workers(self.workers(0, back_at=-1), 0)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_workers(self.workers(0, back_at=901 + 113), 0)
+        # The planner must never take over the human's stopped worker.
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_workers(self.workers(1, back_at=950, order=4), 1)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_workers(self.workers(2, new_patch=9), 2)
 
     def test_case_list_is_complete_and_unique(self):
         cases = ai.cases(36000)
@@ -218,6 +270,8 @@ class ResumeAndRecovery(unittest.TestCase):
         self.assertFalse(any(c[0] == "resume-morph" for c in ai.cases(36000, "economy")))
         self.assertEqual(sum(c[0] == "morph-hp" for c in cases), 6 * len(ai.PROFILES))
         self.assertEqual(sum(c[0] == "addon" for c in cases), 2 * len(ai.PROFILES))
+        self.assertEqual(sum(c[0] == "builder" for c in cases), 3 * len(ai.PROFILES))
+        self.assertEqual(sum(c[0] == "workers" for c in cases), 4 * len(ai.PROFILES))
         runs = [c for c in cases if c[0] == "run"]
         self.assertEqual({(c[1], c[2], c[3], len(c[4])) for c in runs if len(set(c[4])) > 1 or len(c[4]) == 1},
                          {(p, m, h, n) for p in ai.PROFILES for m in (0, 1) for h in range(3) for n in (1, 2, 3)})
