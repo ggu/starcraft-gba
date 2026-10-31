@@ -172,3 +172,13 @@ state; later replace the guard with a versioned transactional codec. Debit,
 release, projectile and field allocation should be separate transitions driven
 by source ticks and the actual-world observations above. This is a design to
 implement and test, not an assertion that the current game has those paths.
+
+The executing oracle also reports the completed ordinary caster's creation
+values: N64 `unit_direction=13`, source simulation heading 104 and initial
+energy 50×256. The experimental gate now initializes a dedicated per-slot
+simulation sidecar with these values and clears it on slot reuse and new-game
+initialization. It does not use visual facing or a mission payload. The
+actual-engine host fixture verifies initial values and save refusal. This is
+not the requested field-menu/order integration: updates, death/load handling,
+interruptions, effect allocation, AI, visual and save continuation are still
+outstanding, and imported actor initialization has not been qualified.

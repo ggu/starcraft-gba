@@ -980,6 +980,12 @@ _Static_assert(sizeof(SaveData) <= 16368, "Save exceeds an alternating SRAM reco
 static SaveData data;
 #endif
 static Unit u[MAX_UNITS];
+#ifdef SC64_SHARED_DEFILER_STAGE
+/* Experimental simulation state; never borrow presentation-facing or a
+ * mission payload. Save remains refused while an experimental caster lives. */
+typedef struct { u16 energy_q8; u8 heading, live; } Sc64DefilerStageActor;
+static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
+#endif
 #ifdef SC64_UNIT_FACING
 static void sc64_facing_reset_all(void);
 static void sc64_facing_reset_slot(int slot);
@@ -2220,6 +2226,16 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].y = y;
     u[i].owner = owner;
     u[i].type = type;
+#ifdef SC64_SHARED_DEFILER_STAGE
+    /* Slot reuse always invalidates its predecessor. Source unit direction
+     * 13 gives heading 104; ordinary completed Defilers begin at 50 energy. */
+    memset(&sc64_defiler_stage[i],0,sizeof(sc64_defiler_stage[i]));
+    if (sc64_race_raw_unit(type)==46) {
+        sc64_defiler_stage[i].live=1;
+        sc64_defiler_stage[i].heading=104;
+        sc64_defiler_stage[i].energy_q8=50u*256u;
+    }
+#endif
 #ifdef SC64_COLLISION_CLASS_CACHE
     sc64_unit_collision_class_invalidate(i);
 #endif
@@ -4803,6 +4819,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_SHARED_DEFILER_STAGE
+    memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
+#endif
     sc64_walk_reset_all();
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     sc64_battlecruiser_tech_bits = 0;
@@ -5055,6 +5074,9 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+#ifdef SC64_SHARED_DEFILER_STAGE
+    memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_bullet_reset();
 #endif

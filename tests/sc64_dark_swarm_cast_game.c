@@ -9,6 +9,8 @@ int main(void)
     game_init();
     int caster=spawn_unit(SIDE,U_SHARED_DEFILER,320,320);
     assert(caster>=0 && sc64_race_raw_unit(u[caster].type)==46);
+    assert(sc64_defiler_stage[caster].live && sc64_defiler_stage[caster].heading==104 &&
+           sc64_defiler_stage[caster].energy_q8==50u*256u);
     /* Until a complete schema exists, the actual save path must refuse a
      * live experimental caster instead of writing incomplete state. */
     assert(!race_save_game());
