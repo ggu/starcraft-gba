@@ -568,11 +568,22 @@ static int remine_idle_probe(int home)
             dist2(m[k].x,m[k].y,b[n].x,b[n].y)<320*320)near=1;
         if(near){patch=k;break;}
     }
-    if(patch<0){
-        /* An empty idle Probe at a depleted base can walk to an existing
+    if(patch<0)goto move_to_expansion;
+    next_patch=(patch+1)%MAX_MINERALS;
+    for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0]);k++) {
+        int x=m[patch].x+dx[k],y=m[patch].y+dy[k];
+        move_cursor(x,y);
+        if(!u[worker].alive||!u[worker].selected||selected_count()!=1)return 0;
+        if(absi(cx-x)>2||absi(cy-y)>2||!currently_visible(m[patch].x,m[patch].y)||
+           field_ui_a_action(selected_count())!=UI_A_MINE||selected_worker_mineral_target()!=patch)continue;
+        KEY_TAP(KEY_A);
+        if(u[worker].order==ORDER_MINE&&u[worker].target==patch)return 1;
+    }
+    move_to_expansion: {
+        /* An empty idle or stale-building Probe at a depleted base can walk to an existing
          * Nexus with visible ore; mining is issued on a later call. */
         int dest=-1,best=0x7fffffff;
-        if(u[worker].order!=ORDER_IDLE||u[worker].carry)return 0;
+        if((u[worker].order!=ORDER_IDLE&&worker!=stale)||u[worker].carry)return 0;
         for(int n=0;n<MAX_BUILDINGS;n++)if(b[n].alive&&b[n].owner==SIDE&&
             b[n].type==B_NEXUS&&building_complete(n)){
             int has_ore=0;
@@ -584,16 +595,7 @@ static int remine_idle_probe(int home)
         if(dest<0)return 0;
         return command_selected(MENU_MOVE,b[dest].x,b[dest].y+48);
     }
-    next_patch=(patch+1)%MAX_MINERALS;
-    for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0]);k++) {
-        int x=m[patch].x+dx[k],y=m[patch].y+dy[k];
-        move_cursor(x,y);
-        if(!u[worker].alive||!u[worker].selected||selected_count()!=1)return 0;
-        if(absi(cx-x)>2||absi(cy-y)>2||!currently_visible(m[patch].x,m[patch].y)||
-           field_ui_a_action(selected_count())!=UI_A_MINE||selected_worker_mineral_target()!=patch)continue;
-        KEY_TAP(KEY_A);
-        if(u[worker].order==ORDER_MINE&&u[worker].target==patch)return 1;
-    }
+
     return 0;
 }
 
