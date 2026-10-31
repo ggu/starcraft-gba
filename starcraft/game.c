@@ -11025,7 +11025,7 @@ draw_hud_commands_body(void)
                 } else
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
-#ifdef SC64_T5_RUNTIME
+#if defined(SC64_T5_RUNTIME) && !defined(SC64_SHARED_TRANSPORT)
                 if (u[i].type == U_DROPSHIP) {
 #else
                 if (race_transport_carrier_type(&u[i])) {
