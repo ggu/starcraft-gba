@@ -74,12 +74,14 @@ static int race_skirmish_product_producer(int type)
 {
     const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
     if (!r) return 255;
+#ifdef SC64_SHARED_TRANSPORT
+    /* The producer is a source fact; per-mission product availability is
+     * checked independently by race_queue_unit. */
+    if (sc64_race_raw_unit(type) == 69 && sc64_race_unit_from_raw(69) == type)
+        return B_ROBOTICS_FACILITY;
+#endif
     if (race_mode) {
         int raw = sc64_race_raw_unit(type);
-#ifdef SC64_SHARED_TRANSPORT
-        if (raw == 69 && sc64_race_unit_from_raw(raw) == type)
-            return B_ROBOTICS_FACILITY;
-#endif
 #ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
         if (raw == 12) return B_STARPORT;
 #endif
