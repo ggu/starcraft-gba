@@ -28,6 +28,9 @@ static void
 race_t4_transfer_unit(int slot)
 {
     Unit *q = &u[slot];
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (!race_bc_before_unit_transfer(q,SIDE,-1)) return;
+#endif
     q->owner = SIDE; q->selected = 0; q->order = ORDER_IDLE;
     q->target = -1; q->tx = q->x; q->ty = q->y;
     q->path_timer = q->path_retry = 0; q->weapon = weapons_level;

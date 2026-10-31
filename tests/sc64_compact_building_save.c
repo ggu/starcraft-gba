@@ -7,7 +7,7 @@
 
 typedef uint8_t u8;
 typedef uint32_t u32;
-enum { SC_RU_COUNT = 48, SC_RB_COUNT = 45 };
+enum { SC_RU_COUNT = 48, SC_RB_COUNT = 100 };
 typedef struct {
     int x, y, hp, maxhp, owner, type, alive;
     int queue[5], queue_head, queue_count, queue_progress;
@@ -23,7 +23,7 @@ static void fill_full(Building *b)
     memset(b, 0, sizeof(*b));
     b->x = 2047; b->y = 2046;
     b->hp = b->maxhp = 100000;
-    b->owner = 4; b->type = 44; b->alive = 1;
+    b->owner = 4; b->type = 99; b->alive = 1;
     for (int i = 0; i < 5; ++i) b->queue[i] = i;
     b->queue_head = 4; b->queue_count = 5;
     b->queue_progress = 65535; b->build_progress = 65534;
@@ -79,7 +79,7 @@ static void rejects_without_mutating_outputs(void)
     REJECT_FIELD(hp, -131073);
     REJECT_FIELD(hp, -1);
     REJECT_FIELD(maxhp, 131072);
-    REJECT_FIELD(type, 64);
+    REJECT_FIELD(type, 100);
     REJECT_FIELD(queue[0], 64);
     REJECT_FIELD(queue_head, 5);
     REJECT_FIELD(queue_count, 6);
@@ -99,6 +99,26 @@ static void rejects_without_mutating_outputs(void)
     assert(sc64_building_save_encode(&row, &b, 2048, 2048));
     memset(&sentinel, 0x3c, sizeof(sentinel)); after = sentinel;
     row.bytes[27] |= 0x80; /* Reserved high bit must remain zero. */
+    assert(!sc64_building_save_decode(&after, &row));
+    assert(!memcmp(&after, &sentinel, sizeof(after)));
+    /* Existing six-bit rows leave the new type extension bit clear and remain
+     * valid under the widened codec. */
+    b.type = 63;
+    assert(sc64_building_save_encode(&row, &b, 2048, 2048));
+    assert(!(row.bytes[27] & 0x01));
+    assert(sc64_building_save_decode(&after, &row) && after.type == 63);
+    b.type = 99;
+    assert(sc64_building_save_encode(&row, &b, 2048, 2048));
+    assert(row.bytes[27] & 0x01);
+    assert(sc64_building_save_decode(&after, &row) && after.type == 99);
+    /* A syntactically valid extended value outside this profile's enum is
+     * still rejected atomically by the decoder. */
+    for (unsigned i = 0; i < 6; ++i) {
+        u8 mask = (u8)(1u << ((60u + i) & 7u));
+        if ((36u >> i) & 1u) row.bytes[(60u + i) >> 3] |= mask;
+        else row.bytes[(60u + i) >> 3] &= (u8)~mask;
+    }
+    after = sentinel;
     assert(!sc64_building_save_decode(&after, &row));
     assert(!memcmp(&after, &sentinel, sizeof(after)));
     assert(sc64_building_save_encode(&row, &b, 2048, 2048));

@@ -95,15 +95,15 @@ int main(void)
     unsigned blocked = 0;
     for (unsigned i = 0; i < (unsigned)map->width * map->height; ++i) {
         assert(map->tile_lookup[i] < map->tile_count);
-        assert(map->blocked[i] <= 1);
-        blocked += map->blocked[i] != 0;
+        assert(map->blocked[i] <= 3);
+        blocked += (map->blocked[i] & 1) != 0;
     }
     assert(blocked == 3384);
     unsigned long long terrain_hash = 14695981039346656037ull;
     for (unsigned i = 0; i < (unsigned)map->width * map->height; ++i)
         terrain_hash = hash_u16(terrain_hash, map->tile_lookup[i]);
     for (unsigned i = 0; i < (unsigned)map->width * map->height; ++i)
-        terrain_hash = hash_byte(terrain_hash, map->blocked[i]);
+        terrain_hash = hash_byte(terrain_hash, map->blocked[i] & 1);
     for (unsigned i = 0; i < (unsigned)map->tile_count * 256; ++i)
         terrain_hash = hash_byte(terrain_hash, ((const unsigned char *)map->tile_pixels)[i]);
     assert(terrain_hash == 0x3451be6ebfefb88full);

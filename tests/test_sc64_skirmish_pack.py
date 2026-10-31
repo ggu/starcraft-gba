@@ -18,6 +18,17 @@ class SkirmishPackTests(unittest.TestCase):
         component = PACKER.connected_component(blocked, width, height, 1 + width)
         self.assertNotIn(6 + 6 * width, component)
 
+    def test_cover_bit_does_not_block_start_or_connectivity(self):
+        width = height = 16
+        starts = [(32, 32), (208, 32), (32, 208), (208, 208)]
+        terrain = [2] * (width * height)
+        self.assertEqual(len(PACKER.connected_component(terrain, width, height, 0)), 256)
+        self.assertEqual(PACKER.select_starts(terrain, width, height, starts),
+                         PACKER.select_starts([0] * (width * height), width, height, starts))
+        terrain[1 + 2 * width] = 3
+        with self.assertRaisesRegex(ValueError, 'clear 3x3'):
+            PACKER.select_starts(terrain, width, height, starts)
+
     def test_start_selection_requires_clear_spawn_and_shared_access(self):
         width = height = 16
         blocked = [0] * (width * height)

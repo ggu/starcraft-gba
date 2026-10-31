@@ -40,6 +40,10 @@ race_can_attack(int attacker,int target) {
             return sc64_race_unit_can_attack_air(attacker);
         }
     } else if((b[target-MAX_UNITS].flags&16)||b[target-MAX_UNITS].type==B_ZERG_BEACON)return 0;
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if(target>=MAX_UNITS&&race_bc_facility_airborne(target-MAX_UNITS))
+        return attacker<0||sc64_race_unit_can_attack_air(attacker);
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if(target>=MAX_UNITS&&race_late_airborne(target-MAX_UNITS))
         return attacker<0||sc64_race_unit_can_attack_air(attacker);
@@ -113,7 +117,7 @@ static void GBA_HOT race_tick_defenses(void) {
             int d=dist2(q->x,q->y,u[j].x,u[j].y);
             if(d<bestd){bestd=d;best=j;}
         }
-        if(best>=0){hit_stock_building_target(q,best,damage);
+        if(best>=0){if(!hit_stock_building_target(q,best,damage))continue;
 
 #ifdef SC64_WEAPON_SOURCE_VFX
             if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type)))
@@ -206,7 +210,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         int best = race_defense_target_from_zp_lists(
             q, ground, air, range, head, next, hostile_mask[q->owner]);
         if (best >= 0) {
-            hit_stock_building_target(q,best,damage);
+            if (!hit_stock_building_target(q,best,damage)) continue;
 
 #ifdef SC64_WEAPON_SOURCE_VFX
             if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type)))
@@ -266,7 +270,7 @@ static __attribute__((noinline)) void race_tick_defenses_p3_targets(void) {
             if (d < bestd) { bestd = d; best = j; }
         }
         if (best >= 0) {
-            hit_stock_building_target(q,best,damage);
+            if (!hit_stock_building_target(q,best,damage)) continue;
 
 #ifdef SC64_WEAPON_SOURCE_VFX
             if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type)))
@@ -354,7 +358,7 @@ static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
             race_defense_target_from_owner_lists(q, ground, air, range, head, next,
                                                  hostile_mask[q->owner]) : -1;
         if (best >= 0) {
-            hit_stock_building_target(q,best,damage);
+            if (!hit_stock_building_target(q,best,damage)) continue;
 
 #ifdef SC64_WEAPON_SOURCE_VFX
             if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type)))

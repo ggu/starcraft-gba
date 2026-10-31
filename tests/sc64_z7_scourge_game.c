@@ -135,6 +135,31 @@ static void test_spire_gate_and_playable_selection(void)
     assert(train_type == U_SCOURGE && u[egg].alive &&
            u[egg].type == U_Z7_EGG && u[egg].target == U_SCOURGE &&
            u[egg].work_timer == remaining && supply_used == used_before + 2);
+#ifdef SC64_SHARED_SCOURGE_COMBAT
+    /* Shared production admits Scourge in ordinary skirmish as a paid pair. */
+    game_init(); race_mode = 1; race_human = R_ZERG; race_bots = 0; init_state();
+    minerals = gas = 5000;
+    hatchery = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_HATCHERY) { hatchery = i; break; }
+    assert(hatchery >= 0 && spawn_build(SIDE, B_SPIRE, 400, 400, 0) >= 0);
+    assert(spawn_unit(SIDE, U_OVERLORD, 450, 450) >= 0);
+    selected_building = hatchery; train_type = U_DRONE;
+    int found = 0;
+    for (int i = 0; i < 12; ++i) { select_next_train_type(); if (train_type == U_SCOURGE) found = 1; }
+    assert(found);
+    int before = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) before += u[i].alive && u[i].owner == SIDE && u[i].type == U_SCOURGE;
+    ore = minerals; gas_before = gas; larva = b[hatchery].larva;
+    int reserved = race_owner_reserved_supply(SIDE);
+    assert(race_queue_unit(SIDE, hatchery, U_SCOURGE));
+    assert(minerals == ore - 25 && gas == gas_before - 75 && b[hatchery].larva == larva - 1);
+    assert(race_owner_reserved_supply(SIDE) == reserved + 2);
+    for (int i = 0; i < 800 && b[hatchery].queue_count; ++i) race_tick_buildings();
+    int after = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) after += u[i].alive && u[i].owner == SIDE && u[i].type == U_SCOURGE;
+    assert(!b[hatchery].queue_count && after == before + 2);
+#else
     /* The Z7 experiment must not expose a serial, single-Scourge purchase
        through the same ROM's skirmish controls. */
     race_mode = 1;
@@ -148,6 +173,7 @@ static void test_spire_gate_and_playable_selection(void)
     gas_before = gas;
     assert(!race_queue_unit(SIDE, hatchery, U_SCOURGE));
     assert(minerals == ore && gas == gas_before);
+#endif
 }
 
 static int hatch_paid_scourges(void)
@@ -185,7 +211,18 @@ static void test_air_only_validity_and_guarded_targets(void)
     u[valid].order = ORDER_IDLE;
 #endif
     assert(SC64_CAN_ATTACK_FROM(U_SCOURGE, valid, SIDE));
+    /* Automatic acquisition uses human fog; reveal through an actual allied
+     * unit, then verify that visibility loss suppresses the same target. */
+    u[scourge].x = u[scourge].tx = 400;
+    u[scourge].y = u[scourge].ty = 400;
+    update_exploration();
+    assert(currently_visible(u[valid].x, u[valid].y));
     assert(nearest_enemy_typed(400, 400, SIDE, 16, U_SCOURGE) == valid);
+    u[scourge].x = u[scourge].tx = 800;
+    u[scourge].y = u[scourge].ty = 800;
+    update_exploration();
+    assert(!currently_visible(u[valid].x, u[valid].y));
+    assert(nearest_enemy_typed(400, 400, SIDE, 16, U_SCOURGE) == -1);
 
     tick_combat(&u[scourge], MAX_UNITS + MAX_BUILDINGS);
     assert(u[scourge].alive);

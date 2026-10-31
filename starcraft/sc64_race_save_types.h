@@ -35,7 +35,7 @@ _Static_assert(SC_RU_COUNT <= 64, "late Terran unit codec uses six-bit types");
 #endif
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
 _Static_assert(SC_RU_COUNT <= 64, "P7 typed unit type field uses six bits");
-_Static_assert(SC_RB_COUNT <= 64, "P7 typed building type field uses six bits");
+_Static_assert(SC_RB_COUNT <= 128, "P7 typed building type field uses seven bits");
 #include "sc64_p7_typed_unit_save.h"
 #include "sc64_p7_typed_building_save.h"
 #endif
@@ -56,6 +56,9 @@ _Static_assert(SC_RB_COUNT <= 64, "P7 typed building type field uses six bits");
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_state.h"
+#endif
+#ifdef SC64_Z8_RUNTIME
+#include "sc64_z8_state.h"
 #endif
 
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -166,6 +169,9 @@ typedef struct {
 #ifdef SC64_Z7_RUNTIME
         Sc64Z7PersistentState z7;
 #endif
+#ifdef SC64_Z8_RUNTIME
+        Sc64Z8PersistentState z8;
+#endif
     };
 #elif defined(SC64_Z5_RUNTIME)
     Sc64Z5PersistentState z5;
@@ -235,10 +241,24 @@ typedef struct {
     u8 interceptor_projectiles[SC64_CODEC_BYTES];
     u8 interceptor_padding;
 #endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    Sc64BcYamatoShot battlecruiser_shots[SC64_BC_SHOT_LIMIT];
+#endif
 } RaceSave;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+#define SC64_BC_SAVE_EXTRA_BYTES (sizeof(Sc64BcYamatoShot)*SC64_BC_SHOT_LIMIT)
+_Static_assert(offsetof(RaceSave,battlecruiser_shots)+SC64_BC_SAVE_EXTRA_BYTES==sizeof(RaceSave),
+               "BC queue must be appended after the legacy save payload");
+#else
+#define SC64_BC_SAVE_EXTRA_BYTES 0u
+#endif
 #if defined(SC64_Z5_RUNTIME) && defined(SC64_Z6_RUNTIME)
 _Static_assert(sizeof(Sc64Z6PersistentState) <= sizeof(Sc64Z5PersistentState),
                "Z6 must fit in the existing Z5 save payload");
+#endif
+#ifdef SC64_Z8_RUNTIME
+_Static_assert(sizeof(Sc64Z8PersistentState) <= sizeof(Sc64Z5PersistentState),
+               "Z8 must fit in the existing Z5 save payload");
 #endif
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 #ifdef SC64_T6_STORAGE
@@ -246,16 +266,16 @@ _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 #ifdef SC64_TERRAN_LATE_RUNTIME
 _Static_assert(sizeof(RaceSave) <= 16368, "generation-18 late mission payload budget");
 #else
-_Static_assert(sizeof(RaceSave) == 15312, "generation-17 late Terran save payload");
+_Static_assert(sizeof(RaceSave) == 15312 + SC64_BC_SAVE_EXTRA_BYTES, "generation-17 late Terran save payload");
 #endif
 #elif defined(SC64_T6_RUNTIME)
-_Static_assert(sizeof(RaceSave) == 15644, "generation-16 T6 save payload");
+_Static_assert(sizeof(RaceSave) == 15644 + SC64_BC_SAVE_EXTRA_BYTES, "generation-16 T6 save payload");
 #else
-_Static_assert(sizeof(RaceSave) == 15384, "generation-15 expanded storage payload");
+_Static_assert(sizeof(RaceSave) == 15384 + SC64_BC_SAVE_EXTRA_BYTES, "generation-15 expanded storage payload");
 #endif
 #endif
 #if defined(SC64_T5_RUNTIME) && !defined(SC64_T6_STORAGE)
-_Static_assert(sizeof(RaceSave) == 16328, "T5 shares the existing SRAM payload");
+_Static_assert(sizeof(RaceSave) == 16328 + SC64_BC_SAVE_EXTRA_BYTES, "T5 shares the existing SRAM payload");
 #endif
 
 #endif

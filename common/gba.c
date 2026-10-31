@@ -487,6 +487,38 @@ HOT_MODE4 int gfx_blit_window(int y,int height,const u8 *source,int stride,int r
  }
  return 1;
 }
+/* Internal terrain-only window: caller must redraw exposed edge tiles before
+ * presentation. Unlike gfx_blit_window, this may overwrite that dirty edge. */
+int gfx_blit_terrain_window(int y,int height,const u8 *source,int stride,int rows,int left,int top) {
+ if(!source||((uintptr_t)source&3)||stride!=240||rows<=0||y<0||height<=0||height>160||y>160-height||!left||(left&3)||left<=-240||left>=240)
+  return gfx_blit_window(y,height,source,stride,rows,left,top);
+#ifdef GBA_SCENE_CLIP
+ /* Edge redraw must cover every row that the bulk copy may touch. */
+ if(gfx_clip_top>y || gfx_clip_bottom<y+height)
+  return gfx_blit_window(y,height,source,stride,rows,left,top);
+#endif
+ if(top>=rows||top<=-height)return 1;
+ int first=top<0?-top:0,last=height;if(top>rows-height)last=rows-top;
+ if(first>=last)return 1;
+ int lo=first,hi=last;
+ if((top+lo)*240+left<0)lo++;
+ if((top+hi-1)*240+left+240>rows*240)hi--;
+ if(lo>=hi)return gfx_blit_window(y,height,source,stride,rows,left,top);
+ if(lo>first&&!gfx_blit_window(y+first,lo-first,source,stride,rows,left,top+first))return 0;
+ if(hi<last&&!gfx_blit_window(y+hi,last-hi,source,stride,rows,left,top+hi))return 0;
+ GFX_TILE_TOUCH(0,y+lo,240,y+hi);
+ const u8 *in=source+(top+lo)*240+left;
+#ifdef GBA_HOST
+ volatile u16 *out=pixels+(y+lo)*120;
+ for(int i=0;i<(hi-lo)*120;i++)out[i]=(u16)in[2*i]|((u16)in[2*i+1]<<8);
+#else
+ REG32(0x040000d4)=(u32)in;
+ REG32(0x040000d8)=(u32)(pixels+(y+lo)*120);
+ REG32(0x040000dc)=0x84000000|(u32)((hi-lo)*60);
+ while(REG32(0x040000dc)&0x80000000){}
+#endif
+ return 1;
+}
 #if defined(D2_DEN_OF_EVIL) || defined(GBA_HOST)
 /* Nearest-neighbour 2x opaque cache window. Each source pixel becomes a
    2x2 block; the caller's framebuffer fill supplies pixels beyond cache edges. */
@@ -626,12 +658,16 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
   int col=left;const u8*s=src+row*width;
   volatile u16*d=pixels+(y+row)*120+((x+col)>>1);
   if((x+col)&1){if(s[col])*d=(*d&255)|((u16)s[col]<<8);d++;col++;}
+#ifdef GBA_SPRITE_WORDS
+  /* Advancing both pointers by two preserves their alignment difference. */
+  int word_right=(((uintptr_t)d^(uintptr_t)(s+col))&3u)?0:right;
+#endif
   for(;col+1<right;col+=2,d++){
 #ifdef GBA_SPRITE_WORDS
    /* A quad is word-copied only when ROM and VRAM are both aligned. Mixed
       quads fall through to the exact pair compositor; after one pair, both
       alignments are off and that fallback remains in use until re-aligned. */
-   if(col+3<right && !((uintptr_t)d&3u) && !((uintptr_t)(s+col)&3u)) {
+   if(col+3<word_right && !((uintptr_t)d&3u)) {
     u32 pixels32=*(const u32 *)(const void *)(s+col);
     if(!pixels32 || !(((pixels32-0x01010101u)&~pixels32&0x80808080u))) {
      if(pixels32) *(volatile u32 *)(void *)d=pixels32;
@@ -840,10 +876,34 @@ HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
         if(left)*dst=(*dst&0xff00)|color;
     }
 }
-HOT void gfx_frame(int x,int y,int w,int h,u8 c){gfx_rect(x,y,w,1,c);gfx_rect(x,y+h-1,w,1,c);gfx_rect(x,y,1,h,c);gfx_rect(x+w-1,y,1,h,c);}
+#if defined(GBA_SHAPES_ROM_ARM) && !defined(GBA_HOST)
+#define SHAPE_HOT __attribute__((long_call,target("arm")))
+#else
+#define SHAPE_HOT HOT
+#endif
+SHAPE_HOT void gfx_frame(int x,int y,int w,int h,u8 c){gfx_rect(x,y,w,1,c);gfx_rect(x,y+h-1,w,1,c);gfx_rect(x,y,1,h,c);gfx_rect(x+w-1,y,1,h,c);}
 int absi(int x){return x<0?-x:x;}
 int clampi(int x,int lo,int hi){return x<lo?lo:(x>hi?hi:x);}
-HOT void gfx_line(int x0,int y0,int x1,int y1,u8 c){int dx=absi(x1-x0),sx=x0<x1?1:-1,dy=-absi(y1-y0),sy=y0<y1?1:-1,err=dx+dy;for(;;){gfx_pixel(x0,y0,c);if(x0==x1&&y0==y1)break;int e=2*err;if(e>=dy){err+=dy;x0+=sx;}if(e<=dx){err+=dx;y0+=sy;}}}
+SHAPE_HOT void gfx_line(int x0,int y0,int x1,int y1,u8 c){
+#ifdef GBA_SHAPES_ROM_ARM
+ if(y0==y1){
+    if((unsigned)y0>=160)return;
+    int lo=x0<x1?x0:x1,hi=x0<x1?x1:x0;
+    if(hi<0||lo>=240)return;
+    if(lo<0)lo=0;
+    if(hi>239)hi=239;
+    gfx_rect(lo,y0,hi-lo+1,1,c);return;
+ }
+ if(x0==x1){
+    if((unsigned)x0>=240)return;
+    int lo=y0<y1?y0:y1,hi=y0<y1?y1:y0;
+    if(hi<0||lo>=160)return;
+    if(lo<0)lo=0;
+    if(hi>159)hi=159;
+    gfx_rect(x0,lo,1,hi-lo+1,c);return;
+ }
+#endif
+ int dx=absi(x1-x0),sx=x0<x1?1:-1,dy=-absi(y1-y0),sy=y0<y1?1:-1,err=dx+dy;for(;;){gfx_pixel(x0,y0,c);if(x0==x1&&y0==y1)break;int e=2*err;if(e>=dy){err+=dy;x0+=sx;}if(e<=dx){err+=dx;y0+=sy;}}}
 #if (defined(SC64_P3_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_T4_RUNTIME) || defined(SC64_Z5_CONSUME_ENABLED)
 /* These imported profiles render from source sprites and do not call this
  * fallback. Keep it in ROM to reserve IWRAM for visibility updates. */
@@ -1015,10 +1075,14 @@ static u32 sram_get32(volatile const u8*p){u32 v=0;for(int i=0;i<4;i++)v|=(u32)p
    lost during a write. Commit the tag last; a checksum covers the payload. */
 #define SAVE_SLOT_SIZE 16384u
 #define SAVE_PAYLOAD_MAX (SAVE_SLOT_SIZE-16u)
+/* A zero len accepts any stored payload length; slot alternation and the
+   sequence clock are shared by every record with the same tag. */
 static int valid_record(volatile const u8 *p,u32 len,u32 tag) {
-    if(sram_get32(p)!=tag||sram_get32(p+4)!=len||!sram_get32(p+12))return 0;
+    u32 stored=sram_get32(p+4);
+    if(sram_get32(p)!=tag||!stored||stored>SAVE_PAYLOAD_MAX||(len&&stored!=len)||
+       !sram_get32(p+12))return 0;
     u32 h=2166136261u;
-    for(u32 i=0;i<len;i++){h^=p[16+i];h*=16777619u;}
+    for(u32 i=0;i<stored;i++){h^=p[16+i];h*=16777619u;}
     return h==sram_get32(p+8);
 }
 static int newest_record(u32 len,u32 tag) {
@@ -1030,9 +1094,9 @@ static int newest_record(u32 len,u32 tag) {
     return (s32)(sram_get32(base+SAVE_SLOT_SIZE+12)-sram_get32(base+12))>0?1:0;
 }
 void save_write(const void *data,u32 len,u32 tag) {
-    if(len>SAVE_PAYLOAD_MAX||!tag)return;
+    if(!len||len>SAVE_PAYLOAD_MAX||!tag)return;
     volatile u8 *base=(volatile u8*)SRAM_BASE;
-    int newest=newest_record(len,tag);
+    int newest=newest_record(0,tag);
     u32 sequence=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
     if(!sequence)sequence=1;
     volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
@@ -1044,6 +1108,55 @@ void save_write(const void *data,u32 len,u32 tag) {
     for(u32 i=0;i<len;i++)p[16+i]=src[i];
     sram_put32(p,tag);
 }
+/* Preserve the newest readable predecessor when writing the first record of
+ * a new format. Tags share the same physical two-slot SRAM journal. */
+void save_write_migrating(const void *data,u32 len,u32 tag,u32 legacy_len,u32 legacy_tag) {
+    if(len>SAVE_PAYLOAD_MAX||legacy_len>SAVE_PAYLOAD_MAX||!tag||!legacy_tag)return;
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    int current=newest_record(0,tag), legacy=newest_record(legacy_len,legacy_tag), newest;
+    if(current<0)newest=legacy;
+    else if(legacy<0)newest=current;
+    else newest=(s32)(sram_get32(base+current*SAVE_SLOT_SIZE+12)-
+                      sram_get32(base+legacy*SAVE_SLOT_SIZE+12))>0?current:legacy;
+    u32 sequence=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
+    if(!sequence)sequence=1;
+    volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
+    const u8 *src=data;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));
+    sram_put32(p+12,sequence);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);
+}
+/* An incompatible experimental record may share a tag. It must not displace
+ * the readable legacy predecessor during the first committed feature write. */
+void save_write_migrating_feature(const void *data,u32 len,u32 tag,u32 legacy_tag,
+                                  u32 marker_offset,u32 marker_mask,u32 marker_value) {
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    int current=-1, legacy, newest;
+    if (!len || len>SAVE_PAYLOAD_MAX || !tag || !legacy_tag ||
+        marker_offset>SAVE_PAYLOAD_MAX-4u) return;
+    for (int i=0;i<2;++i) {
+        volatile const u8 *p=base+i*SAVE_SLOT_SIZE;
+        if (!valid_record(p,0,tag) || sram_get32(p+4)<marker_offset+4u ||
+            (sram_get32(p+16+marker_offset)&marker_mask)!=marker_value) continue;
+        if (current<0 || (s32)(sram_get32(p+12)-
+            sram_get32(base+current*SAVE_SLOT_SIZE+12))>0) current=i;
+    }
+    legacy=newest_record(0,legacy_tag);
+    if(current<0)newest=legacy;
+    else if(legacy<0)newest=current;
+    else newest=(s32)(sram_get32(base+current*SAVE_SLOT_SIZE+12)-
+                      sram_get32(base+legacy*SAVE_SLOT_SIZE+12))>0?current:legacy;
+    u32 sequence=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
+    if(!sequence)sequence=1;
+    volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
+    const u8 *src=data;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));
+    sram_put32(p+12,sequence);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);
+}
+
 int save_read(void *data,u32 len,u32 tag) {
     if(len>SAVE_PAYLOAD_MAX||!tag)return 0;
     int newest=newest_record(len,tag);
@@ -1051,6 +1164,19 @@ int save_read(void *data,u32 len,u32 tag) {
     volatile const u8 *src=(volatile const u8*)SRAM_BASE+newest*SAVE_SLOT_SIZE+16;
     u8 *dst=data;
     for(u32 i=0;i<len;i++)dst[i]=src[i];
+    return 1;
+}
+/* Newest valid record for tag, whatever its length, if it fits capacity. */
+int save_read_latest(void *data,u32 capacity,u32 tag,u32 *len) {
+    if(!tag||!len)return 0;
+    int newest=newest_record(0,tag);
+    if(newest<0)return 0;
+    volatile const u8 *p=(volatile const u8*)SRAM_BASE+newest*SAVE_SLOT_SIZE;
+    u32 stored=sram_get32(p+4);
+    if(stored>capacity)return 0;
+    u8 *dst=data;
+    for(u32 i=0;i<stored;i++)dst[i]=p[16+i];
+    *len=stored;
     return 1;
 }
 #ifdef GBA_HOST

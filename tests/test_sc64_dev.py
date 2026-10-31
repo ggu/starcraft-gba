@@ -1,5 +1,6 @@
 """New-contributor paths must work without an emulator or imported game data."""
 import contextlib
+import hashlib
 import importlib.machinery
 import importlib.util
 import io
@@ -47,6 +48,7 @@ ATTACK_POSE_HEADER = (
 )
 WEAPON_SOURCE_HEADER = (
     '#define SC64_WEAPON_SOURCE_BANK_VERSION 1\n'
+    '#define SC64_WEAPON_SOURCE_SPROLUSELO_LO 1\n'
     '#define SC64_WEAPON_SOURCE_METADATA 1\n'
     '#define SC64_WEAPON_SOURCE_PROFILE_COUNT 1\n'
     '#define SC64_WEAPON_SOURCE_IMAGE_COUNT 1\n'
@@ -116,6 +118,7 @@ CONSTRUCTION_COLOR_HEADER = (
 )
 
 WALK_CYCLE_HEADER = (
+    '#define SC64_UNIT_WALK_FACING_SHA256 "' + hashlib.sha256(FACING_SPRITE_HEADER.encode('ascii')).hexdigest() + '"\n'
     '#define SC64_UNIT_WALK_BANK_VERSION 1\n'
     'static const Sc64UnitWalkStep sc64_unit_walk_i54_steps[1] = {{0}};\n'
     'static const Sc64UnitWalkCycle sc64_unit_walk_i54 = {0};\n'
@@ -303,7 +306,8 @@ class OnboardingTests(unittest.TestCase):
             header.write_text(WEAPON_SOURCE_HEADER, encoding='ascii')
             self.assertTrue(dev.weapon_source_input_ready(header))
 
-    def test_terran_build_requires_directional_bank_before_make(self):
+    @patch.object(dev, "bc_inputs_ready", return_value=True)
+    def test_terran_build_requires_directional_bank_before_make(self, _bc_ready):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             header = root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h'
@@ -603,7 +607,8 @@ class OnboardingTests(unittest.TestCase):
             with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(dev.status('zerg-z4'), 1)
 
-    def test_canonical_zerg_requires_chapter_five_and_six_inputs(self):
+    @patch.object(dev, "bc_inputs_ready", return_value=True)
+    def test_canonical_zerg_requires_chapter_five_and_six_inputs(self, _bc_ready):
         z6_gate = ('#if defined(SC64_UNIFIED) && defined(SC64_Z6_DATA_ENABLED)\nsc64_race_z6_units\n'
                    '#endif /* SC64_UNIFIED && SC64_Z6_DATA_ENABLED */\n')
         with tempfile.TemporaryDirectory() as directory:
@@ -658,7 +663,8 @@ class OnboardingTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
                     dev.build('zerg')
 
-    def test_terran_build_requires_real_word_metadata_before_make(self):
+    @patch.object(dev, "bc_inputs_ready", return_value=True)
+    def test_terran_build_requires_real_word_metadata_before_make(self, _bc_ready):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             header = root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h'
@@ -1280,7 +1286,8 @@ class OnboardingTests(unittest.TestCase):
             header.write_text(DEATH_SOURCE_HEADER, encoding='ascii')
             self.assertTrue(dev.death_source_input_ready(header))
 
-    def test_canonical_race_build_requires_current_death_bank(self):
+    @patch.object(dev, "bc_inputs_ready", return_value=True)
+    def test_canonical_race_build_requires_current_death_bank(self, _bc_ready):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / '.local/sc64/terran-late/import-stage').mkdir(parents=True)

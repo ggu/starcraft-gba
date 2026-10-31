@@ -90,6 +90,40 @@ enum {
     /* P8 source raw 28 is a distinct actor despite sharing raw12 source art. */
     U_P8_HYPERION,
 #endif
+#ifdef SC64_SKIRMISH_ROSTER
+    /* Missing ordinary catalog identities are appended only in the opt-in
+     * skirmish roster profile; existing campaign aliases keep their IDs. */
+#ifndef SC64_TERRAN_LATE_ACTORS
+    U_SK_SCIENCE_VESSEL,
+#ifndef SC64_P5_ACTORS
+    U_SK_BATTLECRUISER,
+#endif
+#endif
+#ifndef SC64_Z6_ACTORS
+    U_SK_GUARDIAN,
+#endif
+    U_SK_DEFILER, U_SK_DEVOURER, U_SK_LURKER,
+#ifndef SC64_P6_ACTORS
+    U_SK_INFESTED_TERRAN,
+#endif
+    U_SK_VALKYRIE,
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
+    U_SK_HIGH_TEMPLAR,
+#endif
+    U_SK_DARK_TEMPLAR,
+#ifndef SC64_P7_ACTORS
+    U_SK_OBSERVER, U_SK_CARRIER, U_SK_ARBITER, U_SK_ARCHON,
+#endif
+    U_SK_CORSAIR, U_SK_DARK_ARCHON,
+#ifndef SC64_TERRAN_LATE_ACTORS
+#ifndef SC64_P5_ACTORS
+    U_SK_SHUTTLE,
+#endif
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    U_SHARED_BATTLECRUISER,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -156,12 +190,43 @@ enum {
     /* Raw 134, appended last so every disabled profile keeps its values. */
     B_NYDUS_CANAL,
 #endif
+#ifdef SC64_SKIRMISH_ROSTER
+    /* Raw-ID mappings missing from this compile profile, appended after all
+     * legacy and campaign-specific building identities. */
+    B_SK_COMSAT,
+#ifndef SC64_NYDUS_ENABLED
+    B_SK_NYDUS,
+#endif
+#ifndef SC64_P7_ACTORS
+#ifndef SC64_TERRAN_LATE_ACTORS
+    B_SK_CITADEL_ADUN, B_SK_FLEET_BEACON,
+#endif
+    B_SK_TEMPLAR_ARCHIVES, B_SK_OBSERVATORY, B_SK_ARBITER_TRIBUNAL,
+#endif
+#ifndef SC64_TERRAN_LATE_ACTORS
+    B_SK_SCIENCE_FACILITY, B_SK_NUCLEAR_SILO, B_SK_COVERT_OPS,
+    B_SK_PHYSICS_LAB, B_SK_DEFILER_MOUND,
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    B_SHARED_SCIENCE_FACILITY, B_SHARED_PHYSICS_LAB,
+#endif
     SC_RB_COUNT
 };
 
-#ifdef SC64_TERRAN_LATE_ACTORS
+#ifdef SC64_SKIRMISH_ROSTER
+_Static_assert(SC_RU_COUNT <= 64, "skirmish roster unit types remain within six-bit save capacity");
+_Static_assert(SC_RB_COUNT <= 128, "skirmish roster building types remain within seven-bit save capacity");
+#endif
+
+#if defined(SC64_TERRAN_LATE_ACTORS) || defined(SC64_T4_RUNTIME)
 static inline int sc64_race_raw_unit(int type);
 static inline int sc64_race_raw_building(int type);
+#endif
+#ifdef SC64_T4_RUNTIME
+#include "sc64_source_sight_tiles.h"
+#endif
+#ifdef SC64_TERRAN_LATE_ACTORS
 #include "sc64_terran_late_actor_rules.h"
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
@@ -187,7 +252,7 @@ enum {
     SC_PR_GATEWAY = 1u << 4, SC_PR_CYBERNETICS_CORE = 1u << 5,
     SC_PR_PYLON = 1u << 6, SC_PR_FORGE = 1u << 7,
     SC_PR_DEPOT = 1u << 8, SC_PR_BARRACKS = 1u << 9
-#ifdef SC64_ZP_CAMPAIGN_STORAGE
+#if defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_SCOURGE_COMBAT)
     , SC_PR_SPIRE = 1u << 12, SC_PR_LAIR = 1u << 13
 #endif
 #ifdef SC64_T5_RUNTIME
@@ -265,7 +330,7 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     },
     /* BWAPI raw 47 Scourge: 25 HP, 25/75, 1 doubled supply. */
     [U_SCOURGE] = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 1, 25, 75, 450, 25, 0,
-#ifdef SC64_Z7_SCOURGE_COMBAT
+#if defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
         SC_PR_SPIRE
 #else
         0
@@ -344,6 +409,45 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     , [U_P7_INTERCEPTOR] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 0, 25, 0, 300, 40, 40, 0 }
+#endif
+#ifdef SC64_SKIRMISH_ROSTER
+    /* Ordinary catalog records absent from this profile's legacy raw map.
+     * Values are numeric stock facts; morph-only rows retain producer 255 so
+     * this mapping extension does not enable unsupported morph behavior. */
+#ifndef SC64_TERRAN_LATE_ACTORS
+    , [U_SK_SCIENCE_VESSEL] = { R_TER, 0, B_STARPORT, 4, 100, 225, 1200, 200, 0, 0 }
+#ifndef SC64_P5_ACTORS
+    , [U_SK_BATTLECRUISER] = { R_TER, 0, B_STARPORT, 12, 400, 300, 2000, 500, 0, 0 }
+#endif
+#endif
+#ifndef SC64_Z6_ACTORS
+    , [U_SK_GUARDIAN] = { R_ZERG, 0, 255, 4, 50, 100, 600, 150, 0, 0 }
+#endif
+    , [U_SK_DEFILER] = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 4, 50, 150, 750, 80, 0, 0 }
+    , [U_SK_DEVOURER] = { R_ZERG, 0, 255, 4, 150, 50, 600, 250, 0, 0 }
+    , [U_SK_LURKER] = { R_ZERG, 0, 255, 4, 50, 100, 600, 125, 0, 0 }
+#ifndef SC64_P6_ACTORS
+    , [U_SK_INFESTED_TERRAN] = { R_ZERG, 0, B_INFESTED_COMMAND, 2, 100, 50, 600, 60, 0, 0 }
+#endif
+    , [U_SK_VALKYRIE] = { R_TER, 0, B_STARPORT, 6, 250, 125, 750, 200, 0, 0 }
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
+    , [U_SK_HIGH_TEMPLAR] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 50, 150, 750, 40, 40, 0 }
+#endif
+    , [U_SK_DARK_TEMPLAR] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 125, 100, 750, 80, 40, 0 }
+#ifndef SC64_P7_ACTORS
+    , [U_SK_OBSERVER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 2, 25, 75, 600, 40, 20, 0 }
+    , [U_SK_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 12, 350, 250, 2100, 300, 150, 0 }
+    , [U_SK_ARBITER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 8, 100, 350, 2400, 200, 150, 0 }
+    , [U_SK_ARCHON] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 8, 0, 0, 300, 10, 350, 0 }
+#endif
+    , [U_SK_CORSAIR] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 4, 150, 100, 600, 100, 80, 0 }
+    , [U_SK_DARK_ARCHON] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 8, 0, 0, 300, 25, 200, 0 }
+#if !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    , [U_SK_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 4, 200, 0, 900, 80, 60, 0 }
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    , [U_SHARED_BATTLECRUISER] = { R_TER, 0, 255, 12, 400, 300, 2000, 500, 0, 0 }
 #endif
 };
 
@@ -496,6 +600,34 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
      * are not implemented, so no runtime producer is exposed. */
     , [B_NYDUS_CANAL] = { R_ZERG, SC_RACE_F_BUILDING, 255, 0, 150, 0, 600, 250, 0 }
 #endif
+#ifdef SC64_SKIRMISH_ROSTER
+    /* Stock values are from sc64_stock_profiles.h. Worker/admission and
+     * placement requirements remain in the skirmish catalog/runtime. */
+    , [B_SK_COMSAT] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 500, 0 }
+#ifndef SC64_NYDUS_ENABLED
+    , [B_SK_NYDUS] = { R_ZERG, SC_RACE_F_BUILDING, 255, 0, 150, 0, 600, 250, 0 }
+#endif
+#ifndef SC64_P7_ACTORS
+#ifndef SC64_TERRAN_LATE_ACTORS
+    , [B_SK_CITADEL_ADUN] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 150, 100, 900, 450, 0 }
+    , [B_SK_FLEET_BEACON] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 300, 200, 900, 500, 0 }
+#endif
+    , [B_SK_TEMPLAR_ARCHIVES] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 150, 200, 900, 500, 0 }
+    , [B_SK_OBSERVATORY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 50, 100, 450, 250, 0 }
+    , [B_SK_ARBITER_TRIBUNAL] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 200, 150, 900, 500, 0 }
+#endif
+#ifndef SC64_TERRAN_LATE_ACTORS
+    , [B_SK_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
+    , [B_SK_NUCLEAR_SILO] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 100, 1200, 600, 0 }
+    , [B_SK_COVERT_OPS] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 750, 0 }
+    , [B_SK_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
+    , [B_SK_DEFILER_MOUND] = { R_ZERG, SC_RACE_F_BUILDING, 255, 0, 100, 100, 900, 850, 0 }
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    , [B_SHARED_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
+    , [B_SHARED_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
+#endif
 };
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
@@ -504,6 +636,15 @@ static inline const Sc64RaceBuildingRule *sc64_race_building_rule(int type)
 { return type >= 0 && type < SC_RB_COUNT ? &sc64_race_building_rules[type] : 0; }
 static inline int sc64_race_is_worker(int type)
 { const Sc64RaceUnitRule *r = sc64_race_unit_rule(type); return r && (r->flags & SC_RACE_F_WORKER); }
+/* One larva produces two bodies for the source pair products. */
+static inline int sc64_race_product_count(int type)
+{
+    if (type == U_ZERGLING) return 2;
+#if defined(SC64_SHARED_SCOURGE_COMBAT) || defined(SC64_Z7_SCOURGE_COMBAT)
+    if (type == U_SCOURGE) return 2;
+#endif
+    return 1;
+}
 static inline unsigned short sc64_race_unit_supply_provided(int type)
 { return type == U_OVERLORD ? 16 : 0; }
 /* A completed Hatchery, Lair, or Hive is a Zerg town hall. Lairs and Hives
@@ -556,6 +697,42 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_P7_PROJECTILES_ENABLED
         ,"INTERCEPTOR"
 #endif
+#ifdef SC64_SKIRMISH_ROSTER
+#ifndef SC64_TERRAN_LATE_ACTORS
+        ,[U_SK_SCIENCE_VESSEL] = "SCIENCE VESSEL"
+#ifndef SC64_P5_ACTORS
+        ,[U_SK_BATTLECRUISER] = "BATTLECRUISER"
+#endif
+#endif
+#ifndef SC64_Z6_ACTORS
+        ,[U_SK_GUARDIAN] = "GUARDIAN"
+#endif
+        ,[U_SK_DEFILER] = "DEFILER"
+        ,[U_SK_DEVOURER] = "DEVOURER"
+        ,[U_SK_LURKER] = "LURKER"
+#ifndef SC64_P6_ACTORS
+        ,[U_SK_INFESTED_TERRAN] = "INFESTED TERRAN"
+#endif
+        ,[U_SK_VALKYRIE] = "VALKYRIE"
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
+        ,[U_SK_HIGH_TEMPLAR] = "HIGH TEMPLAR"
+#endif
+        ,[U_SK_DARK_TEMPLAR] = "DARK TEMPLAR"
+#ifndef SC64_P7_ACTORS
+        ,[U_SK_OBSERVER] = "OBSERVER"
+        ,[U_SK_CARRIER] = "CARRIER"
+        ,[U_SK_ARBITER] = "ARBITER"
+        ,[U_SK_ARCHON] = "ARCHON"
+#endif
+        ,[U_SK_CORSAIR] = "CORSAIR"
+        ,[U_SK_DARK_ARCHON] = "DARK ARCHON"
+#if !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+        ,[U_SK_SHUTTLE] = "SHUTTLE"
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+        ,[U_SHARED_BATTLECRUISER] = "BATTLECRUISER"
+#endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
 }
@@ -605,6 +782,32 @@ static inline const char *sc64_race_building_name(int type)
 #endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
         ,"ROBOTICS SUPPORT BAY","SHIELD BATTERY"
+#endif
+#ifdef SC64_SKIRMISH_ROSTER
+        ,[B_SK_COMSAT] = "COMSAT STATION"
+#ifndef SC64_NYDUS_ENABLED
+        ,[B_SK_NYDUS] = "NYDUS CANAL"
+#endif
+#ifndef SC64_P7_ACTORS
+#ifndef SC64_TERRAN_LATE_ACTORS
+        ,[B_SK_CITADEL_ADUN] = "CITADEL OF ADUN"
+        ,[B_SK_FLEET_BEACON] = "FLEET BEACON"
+#endif
+        ,[B_SK_TEMPLAR_ARCHIVES] = "TEMPLAR ARCHIVES"
+        ,[B_SK_OBSERVATORY] = "OBSERVATORY"
+        ,[B_SK_ARBITER_TRIBUNAL] = "ARBITER TRIBUNAL"
+#endif
+#ifndef SC64_TERRAN_LATE_ACTORS
+        ,[B_SK_SCIENCE_FACILITY] = "SCIENCE FACILITY"
+        ,[B_SK_NUCLEAR_SILO] = "NUCLEAR SILO"
+        ,[B_SK_COVERT_OPS] = "COVERT OPS"
+        ,[B_SK_PHYSICS_LAB] = "PHYSICS LAB"
+        ,[B_SK_DEFILER_MOUND] = "DEFILER MOUND"
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+        ,[B_SHARED_SCIENCE_FACILITY] = "SCIENCE FACILITY"
+        ,[B_SHARED_PHYSICS_LAB] = "PHYSICS LAB"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -763,7 +966,10 @@ static inline int sc64_race_t4_sight_source_pixels(int type)
     case U_CIVILIAN: case U_RHYNADON: case U_RAGNASAUR: return 7*32;
     case U_MAP_REVEALER: return 10*32;
     case U_DATA_DISK: return 5*32;
-    default: return 0;
+    /* Every other mapped actor uses its pinned BWAPI sightRange.  Human
+       automatic acquisition is gated on this sight, so it must reach the
+       source weapon ranges (Goliath, Wraith, Vulture, Kerrigan, ...). */
+    default: return sc64_source_sight_raw_pixels(sc64_race_raw_unit(type));
     }
 }
 static inline int sc64_race_t4_building_sight_source_pixels(int type)
@@ -781,7 +987,7 @@ static inline int sc64_race_t4_building_sight_source_pixels(int type)
     case B_WALL_FLAME_TRAP: return 3 * 32;
     case B_UPPER_DOOR: case B_RIGHT_UPPER_DOOR:
     case B_PIT_DOOR: case B_RIGHT_PIT_DOOR: return 1 * 32;
-    default: return 0;
+    default: return sc64_source_sight_raw_pixels(sc64_race_raw_building(type));
     }
 }
 static inline int sc64_race_t4_unit_intrinsically_invincible(int type)
@@ -1083,7 +1289,8 @@ static inline int sc64_race_unit_can_attack_air(int type)
     case -1: case U_MARINE: case U_HYDRALISK: case U_HUNTER_KILLER:
     case U_DRAGOON: case U_FENIX_DRAGOON: case U_GOLIATH:
     case U_WRAITH: case U_MUTALISK: case U_SCOUT:
-#ifdef SC64_Z7_SCOURGE_COMBAT
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+    defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
     case U_SCOURGE:
 #endif
 #ifdef SC64_T4_RUNTIME
@@ -1131,7 +1338,7 @@ static inline int sc64_race_unit_damage_vs(int type, int target_flying)
     /* Pinned BWAPI Suicide_Scourge: 110 normal damage, cooldown 1, 3px
      * maximum range, air-only. game.c applies the engine's 2:1 scale. */
     if (type == U_SCOURGE) return target_flying ? 110 : 0;
-#elif defined(SC64_Z7_SCOURGE_COMBAT)
+#elif defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
     /* Fixed-damage Suicide Scourge; no generic weapon-level bonus. */
     if (type == U_SCOURGE) return target_flying ? 110 : 0;
 #endif
@@ -1167,7 +1374,7 @@ static inline int sc64_race_unit_range_vs(int type, int target_flying)
 #endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     if (type == U_SCOURGE) return target_flying ? 3 : 0;
-#elif defined(SC64_Z7_SCOURGE_COMBAT)
+#elif defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
     if (type == U_SCOURGE) return target_flying ? 3 : 0;
 #endif
     if (type == U_VULTURE && target_flying) return 0;
@@ -1200,7 +1407,7 @@ static inline int sc64_race_unit_cooldown_vs(int type, int target_flying)
 #endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     if (type == U_SCOURGE) return target_flying ? 1 : 0;
-#elif defined(SC64_Z7_SCOURGE_COMBAT)
+#elif defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
     if (type == U_SCOURGE) return target_flying ? 1 : 0;
 #endif
     if (type == U_WRAITH && target_flying) return 22;
@@ -1369,9 +1576,62 @@ static inline int sc64_race_raw_unit(int type)
 #ifdef SC64_P8_DATA_ENABLED
     case U_P8_HYPERION: return 28;
 #endif
+#ifdef SC64_SKIRMISH_ROSTER
+#ifndef SC64_TERRAN_LATE_ACTORS
+    case U_SK_SCIENCE_VESSEL: return 9;
+#ifndef SC64_P5_ACTORS
+    case U_SK_BATTLECRUISER: return 12;
+#endif
+#endif
+#ifndef SC64_Z6_ACTORS
+    case U_SK_GUARDIAN: return 44;
+#endif
+    case U_SK_DEFILER: return 46; case U_SK_DEVOURER: return 62;
+    case U_SK_LURKER: return 103;
+#ifndef SC64_P6_ACTORS
+    case U_SK_INFESTED_TERRAN: return 50;
+#endif
+    case U_SK_VALKYRIE: return 58;
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
+    case U_SK_HIGH_TEMPLAR: return 67;
+#endif
+    case U_SK_DARK_TEMPLAR: return 61;
+#ifndef SC64_P7_ACTORS
+    case U_SK_OBSERVER: return 84; case U_SK_CARRIER: return 72;
+    case U_SK_ARBITER: return 71; case U_SK_ARCHON: return 68;
+#endif
+    case U_SK_CORSAIR: return 60; case U_SK_DARK_ARCHON: return 63;
+#if !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    case U_SK_SHUTTLE: return 69;
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    case U_SHARED_BATTLECRUISER: return 12;
+#endif
     default: return -1;
     }
 }
+
+
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+/* Exact raw-12 identities, including profiles that carry multiple aliases. */
+static inline int sc64_race_is_battlecruiser(int type)
+{
+#ifdef SC64_TERRAN_LATE_ACTORS
+    if (type == U_BATTLECRUISER) return 1;
+#endif
+#ifdef SC64_P5_ACTORS
+    if (type == U_P5_BATTLECRUISER) return 1;
+#endif
+#if defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    if (type == U_SK_BATTLECRUISER) return 1;
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    if (type == U_SHARED_BATTLECRUISER) return 1;
+#endif
+    return 0;
+}
+#endif
 
 static inline int sc64_race_raw_building(int type)
 {
@@ -1452,6 +1712,28 @@ static inline int sc64_race_raw_building(int type)
 #ifdef SC64_NYDUS_ENABLED
     case B_NYDUS_CANAL: return 134;
 #endif
+#ifdef SC64_SKIRMISH_ROSTER
+    case B_SK_COMSAT: return 107;
+#ifndef SC64_NYDUS_ENABLED
+    case B_SK_NYDUS: return 134;
+#endif
+#ifndef SC64_P7_ACTORS
+#ifndef SC64_TERRAN_LATE_ACTORS
+    case B_SK_CITADEL_ADUN: return 163; case B_SK_FLEET_BEACON: return 169;
+#endif
+    case B_SK_TEMPLAR_ARCHIVES: return 165; case B_SK_OBSERVATORY: return 159;
+    case B_SK_ARBITER_TRIBUNAL: return 170;
+#endif
+#ifndef SC64_TERRAN_LATE_ACTORS
+    case B_SK_SCIENCE_FACILITY: return 116; case B_SK_NUCLEAR_SILO: return 108;
+    case B_SK_COVERT_OPS: return 117; case B_SK_PHYSICS_LAB: return 118;
+    case B_SK_DEFILER_MOUND: return 136;
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case B_SHARED_SCIENCE_FACILITY: return 116;
+    case B_SHARED_PHYSICS_LAB: return 118;
+#endif
     default: return -1;
     }
 }
@@ -1487,6 +1769,12 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 79: return U_TASSADAR;
     case 2: return U_VULTURE;
 #if defined(SC64_UNIFIED) && (defined(SC64_Z3_ENABLED) || defined(SC64_T5_RUNTIME))
+    case 11: return U_DROPSHIP;
+#endif
+#if defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_UNIFIED) && !defined(SC64_T5_RUNTIME)
+    case 11: return U_DROPSHIP;
+#elif defined(SC64_SKIRMISH_ROSTER) && defined(SC64_UNIFIED) && \
+      !defined(SC64_Z3_ENABLED) && !defined(SC64_T5_RUNTIME)
     case 11: return U_DROPSHIP;
 #endif
     case 3: return U_GOLIATH; case 5: return U_TANK; case 30: return U_SIEGE_TANK;
@@ -1553,6 +1841,38 @@ static inline int sc64_race_unit_from_raw(int raw)
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     case 36: return U_Z7_EGG;
+#endif
+#ifdef SC64_SKIRMISH_ROSTER
+#ifndef SC64_TERRAN_LATE_ACTORS
+    case 9: return U_SK_SCIENCE_VESSEL;
+#ifndef SC64_P5_ACTORS
+    case 12: return U_SK_BATTLECRUISER;
+#endif
+#endif
+#ifndef SC64_Z6_ACTORS
+    case 44: return U_SK_GUARDIAN;
+#endif
+    case 46: return U_SK_DEFILER; case 62: return U_SK_DEVOURER;
+    case 103: return U_SK_LURKER;
+#ifndef SC64_P6_ACTORS
+    case 50: return U_SK_INFESTED_TERRAN;
+#endif
+    case 58: return U_SK_VALKYRIE;
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
+    case 67: return U_SK_HIGH_TEMPLAR;
+#endif
+    case 61: return U_SK_DARK_TEMPLAR;
+#ifndef SC64_P7_ACTORS
+    case 84: return U_SK_OBSERVER; case 72: return U_SK_CARRIER;
+    case 71: return U_SK_ARBITER; case 68: return U_SK_ARCHON;
+#endif
+    case 60: return U_SK_CORSAIR; case 63: return U_SK_DARK_ARCHON;
+#if !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    case 69: return U_SK_SHUTTLE;
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    case 12: return U_SHARED_BATTLECRUISER;
 #endif
     default: return -1;
     }
@@ -1653,6 +1973,32 @@ static inline int sc64_race_building_from_raw(int raw)
 #endif
 #ifdef SC64_NYDUS_ENABLED
     case 134: return B_NYDUS_CANAL;
+#endif
+#ifdef SC64_SKIRMISH_ROSTER
+    case 107: return B_SK_COMSAT;
+#ifndef SC64_NYDUS_ENABLED
+    case 134: return B_SK_NYDUS;
+#endif
+#ifndef SC64_TERRAN_LATE_ACTORS
+    case 108: return B_SK_NUCLEAR_SILO;
+    case 117: return B_SK_COVERT_OPS;
+    case 118: return B_SK_PHYSICS_LAB;
+    case 116: return B_SK_SCIENCE_FACILITY;
+    case 136: return B_SK_DEFILER_MOUND;
+#ifndef SC64_P7_ACTORS
+    case 163: return B_SK_CITADEL_ADUN;
+    case 169: return B_SK_FLEET_BEACON;
+#endif
+#endif
+#ifndef SC64_P7_ACTORS
+    case 165: return B_SK_TEMPLAR_ARCHIVES;
+    case 159: return B_SK_OBSERVATORY;
+    case 170: return B_SK_ARBITER_TRIBUNAL;
+#endif
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case 116: return B_SHARED_SCIENCE_FACILITY;
+    case 118: return B_SHARED_PHYSICS_LAB;
 #endif
     default: return -1;
     }

@@ -6228,6 +6228,1868 @@ T1–T8 and the other Terran checks pass before that point, and T10 run directly
 wins at tick 3,552. No frame-rate, physical-hardware or ARM replay result is
 claimed.
 
+### Z7 ARM win and SRAM continuation at runtime base 9ff7f7c (2026-10-29)
+
+These results are historical. They were produced at `9ff7f7c`, and later
+shared-runtime merges (#148, #149, #152, #153) leave current-main
+qualification open. They come from a replay probe ROM that replaces
+`common/main.c`, not from replaying the unchanged production ROM.
+
+On `codex/source-release` `9ff7f7c`, `make test-sc64-z7-canonical-controller`
+reproduces PR #123's ordinary-input Z7 trace byte for byte (SHA-256
+`2d28b63d74ac4438630561b714444ba77a12a9e79e9b4062133c928c447b8198`, win at tick 821,565 / frame 808,493). The new
+`tests/sc64_z7_arm_replay.c` replaces `common/main.c` and compiles the rest
+under `ZERG_Z7_CANONICAL_FLAGS`. It plays that trace's 70,561 held-key
+transitions from the title screen through the shipped
+update/audio/render loop. Nothing writes game state. At each of the
+trace's 909 checkpoint ticks, it reports the controller's trace fields to
+the mGBA debug log. `tools/sc64_z7_arm_replay.py` builds the tape, runs one
+isolated mGBA process per replay (no debugger) and compares every field.
+Its verdict fails closed. A run qualifies only if all of these hold:
+- the mode's expected checkpoint coverage is non-empty and fully matched;
+- any cut is inside the tape;
+- there is exactly one coherent final timing record;
+- the SRAM records are verified, which happens before the verdict.
+
+Asset-free unit tests cover the negative cases. The executed build commands,
+ordered `-D`/`-I` vectors, dependencies and input hashes come from
+`tools/sc64_build_provenance.py`. Each rebuilt ROM is byte-identical to its
+evidence ROM.
+
+The full ARM replay matches 909/909 and wins. A prefix ROM saves through the
+ordinary pause menu at tick 403,482, after 669/669 matches. Its single
+SRAM record (generation-36 tag, 16,296 bytes, valid checksum) matches the
+host prefix payload byte for byte. A fresh mGBA process loads it with L on
+the title screen and matches the remaining 240 checkpoints through the same
+win. It writes the victory autosave as sequence 2 and keeps the pause
+save. The cut must be a tick where the field UI's unsaved remembered command row
+and gesture state equal their post-load defaults. A cut at tick 400,350
+replayed the tape into a different command after loading, because the save
+does not keep `menu_last`. The full run averages 1,992,668 guest
+cycles per frame (about 8.4 frames/s); its peak frame is 56.7 M cycles. The
+probe links at IWRAM `0x03004e08` (same as the release ROM) and BSS
+`0x0203d818`; the release ROM is at BSS `0x0203d730`.
+
+`make test-zerg-z7` fails on this base for reasons that predate this work.
+The Scourge fixture fails under PR #133's human-fog gate. Carried Z1 and Z5
+fail under PR #84's field controls, bisected to merge `83b264c` and also
+failing in canonical `make test-zerg`. Carried Z6 does not clear Force 2
+under Z7 flags but wins under canonical flags. Carried Z2–Z4, the Z7
+profile/save/frame fixtures and the 18-match skirmish matrix pass. See the
+[audit](audits/2026-10-29-z7-current-arm-sram/README.md). This is emulator
+evidence for the shipped game loop, not physical-GBA or 30-fps
+qualification. Z7 is not promoted.
+## Moving-projectile damage at impact (2026-10-29)
+
+Moving source projectiles now deal damage at their drawn impact frame through
+a bounded, saved queue; see [Pending projectile impacts](IMPACT-EVENTS.md).
+The candidate is stacked on `761597d`. Base and candidate were built from the
+same private inputs.
+
+`./dev build`, `./dev test`, `python3 tools/check_source_tree.py` and the
+host SRAM checks pass. `make test-sc64-impact-events-game` passes under
+ASan/UBSan for Terran, Zerg, Protoss P7 and Showcase (queue 32; save 32, 10,
+11, 32 rows). Its `races` and `unified` vectors keep immediate damage.
+`make test-unified` passes. Its `test-sc64-weapon-vfx-game` guard now pins the
+compact race `Tracer`.
+
+Five normal 32 MiB ARM products (Showcase, Terran, Zerg Z6/Z7, Protoss P7)
+link within unchanged guards. IWRAM is byte-identical, and EWRAM headroom
+grows by 56–72 B.
+
+Campaign controllers, run with traces in a private workspace:
+
+- **Terran.** T1–T6, T8, T10 and the save, repair, world-save, target, HUD
+  and collision checks pass.
+  - T5 now wins at tick 193,011. Unmodified base loses (Raynor dies), so this
+    is a changed trajectory, not a claimed fix.
+  - T7 (no win at 60,000), T9 (no win at 500,000) and `terran-late-world`'s
+    Firebat splash assertion fail identically on base.
+- **Zerg Z6/Z7.** The Z6 split controller, promoted profile, Z7 profile, save
+  and frame checks pass.
+  - The Z7 normal-input controller regresses. It reaches its 1,000,000-tick
+    limit without a win, while base wins at 821,565.
+  - The impacts-disabled build reproduces base's trace exactly.
+  - At frame 47,500 the scripted policy sends its 11 drones to a distant
+    mineral field through enemy Sunken Colonies, and its economy does not
+    recover.
+- **Protoss.** The split controller, P7 OBJ VRAM and P7 save/projectile checks
+  pass.
+- **Pre-existing on base**, failing identically:
+  - the P4 canonical controller (`LOST`);
+  - the P4 Storm save assertion;
+  - the Z7 Scourge targeting assertion;
+  - the generation-30 promoted/storage asserts;
+  - the P7 controller rule's link error.
+
+In the no-GDB mGBA probe:
+
+- One shot's timing costs 6,161 cycles, and a full-queue step 1,794.
+- The disabled build matches base's digest and update cycles.
+- Equal-load windows cost the same, but the stress battle's heavy phase lasts
+  longer.
+
+The scene exceeds the 30 fps budget on base as well, so no hardware frame-rate
+result is claimed. ARM replays and fresh-process SRAM qualification were not
+run; the follow-up below adds them.
+
+### Pending impacts on current default: Z7, ARM replay and saves (2026-10-30)
+
+The candidate was merged with default `cfdbe16`, which includes PR #152.
+
+- `./dev build`, `./dev test`, `python3 tools/check_source_tree.py` and
+  `make test-sc64-impact-events-game` pass.
+- The five product ROMs link within unchanged guards. IWRAM symbols, sizes
+  and end address equal default's, and EWRAM headroom grows by 56–72 B.
+
+**Z7.**
+- Default `cfdbe16` itself no longer wins the Z7 normal-input controller: it
+  reaches the 1,000,000-tick limit at frame 999,093 with 45 enemy buildings.
+  This branch with `-DSC64_IMPACT_EVENTS_DISABLED` reproduces that trace byte
+  for byte. With impacts enabled it also reaches the limit.
+- A bisect of default's merges puts the regression at PR #161 (`6e1cb67`,
+  loaded-worker depot routing). PRs #148, #157 and #158 still win at host
+  tick 821,565.
+- The earlier impacts-only Z7 difference on `761597d` came from the
+  controller's lowest-slot home Hatchery rule, not from the impact path; see
+  [the diagnosis](IMPACT-EVENTS.md#z7-controller-diagnosis).
+- The Zerg lane owns the controller. Z7 is not gated here, because no current
+  build of either kind qualifies a win.
+
+**Unusable controllers.** Two other host controllers fail on default with or
+without impacts:
+- The canonical P7 controller fails a cursor guard; its Make rule also
+  compiles `game.c` in place of the controller, because
+  `P7_CAMPAIGN_CONTROLLER` is defined after the rule uses it.
+- The P6 controller does not start P6 in the P7 ROM.
+
+**ARM.** No-GDB mGBA runs of four diagnostic ROMs all match their host
+oracles:
+- An input-only replay of the T10 controller's held keys wins at frame 3,361,
+  matching all 35 checkpoints with up to 6 impacts pending.
+- Two-process normal-menu skirmish saves restore 5 (Terran) and 4 (P7)
+  pending impacts.
+- A P7 capacity save first refuses 12 pending impacts, then saves all 11 rows
+  and restores them.
+- Each restored world equals the saved world, and all continuation
+  checkpoints match the first process.
+
+Protocol, hashes and limits are in
+[Pending projectile impacts](IMPACT-EVENTS.md#arm-replay-and-fresh-process-saves).
+These are emulator results for a probe-entry mission and skirmishes, not
+normal-menu campaign or hardware qualification.
+
+
+### Z8 candidate profile (2026-10-29, in progress)
+
+`make zerg-z8` builds the Z1–Z7 candidate plus Z8 (`SCZ8`, generation 46).
+It binds the authenticated Z8 program to the live game through
+`starcraft/sc64_z8_runtime_adapter.h`. The program tables come from the
+private descriptor (fingerprint `f80b5f9e…`) via
+`tools/sc64_z8_program_pack.py`. The ROM links at BSS `0x0203dbf0` / IWRAM
+`0x03004f18`. The `zerg-z7` ROM is byte-identical to its base.
+
+`make test-zerg-z8` passes under ASan/UBSan. It launches Z8 through the
+ordinary menu and checks the trigger, owner and Nydus binding and the opening
+triggers. It also checks a pause-menu save that reloads in a fresh game and
+continues identically for 3,000 updates, the rejection of corrupt candidates,
+and the hero Dark Templar cloak. The asset-free `make test-sc64-z8-state`
+round-trips the 180-byte compact save on an authored program.
+
+The AI backend, Transmission duration, CenterView camera snap and Nexus
+kill census are authored, not native. There is no ordinary-input Z8 win, ARM
+replay, SRAM continuation or timing result. See the
+[audit](audits/2026-10-29-z8-playable/README.md).
+
+### Canonical skirmish controller qualification correction (2026-10-29)
+
+The match targets now expand the actual `TERRAN_ROM_FLAGS`, `ZERG_ROM_FLAGS`
+and `PROTOSS_ROM_FLAGS` at execution, with the required companion translation
+units. The earlier 54-match report above used chapter flag subsets; it does
+not qualify the current canonical products. A dry-run regression checks the
+ordered feature/include vectors and catches both early expansion and an older
+chapter substituted for a canonical profile.
+
+On runtime base `8d1e653`, the corrected controller passes 27 focused
+construction/selection/command-witness cases under host sanitizers. All 54
+map/race/opponent configurations were attempted: 51 finish (4 wins, 47 losses),
+and three hit the unchanged 120,000-input-tick limit. The Terran product stalls
+on imported map 1, human Protoss, three bots; Zerg and Protoss products stall on
+map 1, human Terran, two bots. These are failures, not completed matches. No
+AI thresholds or terminal rules were changed to produce a pass.
+
+The Terran stall exposes a real resource-return routing defect: a Gateway
+beside the Nexus makes its center route unreachable while a point inside the
+existing drop-off ring is reachable. Loaded Probes keep their eight minerals
+and cannot finish the return trip. A normal-input minimal reproduction fails
+on this runtime; shared-engine repair and requalification remain outstanding.
+Other stalled configurations still require diagnosis.
+
+The controller now tracks pending travel separately from paid foundations,
+observes completion/loss on every input tick, navigates remembered menu rows,
+and follows moving workers when selecting them. It emits action witnesses
+only for accepted clicks. Matrix failures are retained while the remaining
+configurations continue, and stale trace files cannot satisfy a new run.
+This host evidence does not establish ARM performance or hardware behavior.
+
+
+### Shared worker depot-circle routing (2026-10-29)
+
+A loaded worker could fail to route to its depot center even though its
+32-pixel drop-off area was reachable. This stalled four mineral carriers in
+three canonical matrix cases. Return movement and optional nearest-depot
+reachability now use the same complete set of walkable cells intersecting the
+existing deposit circle. The imported engine stores one multi-source field per
+cached depot in the existing route pool, with a separate goal-key namespace;
+ordinary point routes cannot reuse it as a connected-component or suffix hint.
+The original-art path uses its existing forward-BFS storage. Cargo amounts,
+drop-off distance, order state and save schema are unchanged.
+
+An independent pixel-enumeration/BFS oracle passes 11 sanitizer configurations,
+including legacy distance fields, packed fields, partial and split floods,
+borrowed grids, active stride, rectangles and 128-by-128 maps. The real Blood
+Bath reproduction, mineral/gas trips, a forced long detour, live-waypoint
+save/load, depot-slot reuse, lift/land and nearest reachable-depot cases pass.
+All eight prepared depot fixture variants pass (four products, normal and
+nearest-depot paths). All 54 canonical normal-input matches finish within the
+unchanged 120,000-tick limit: Terran 3 wins/15 losses, Zerg 3/15, Protoss 4/14.
+The three earlier stalled cases now finish. Canonical startup/save/UI checks
+also pass, including 702 skirmish startup/save combinations. The promoted
+Protoss fixture had stale P6-only expectations; it now checks P7's exact
+save generation 43, identity and seven-entry catalog while retaining P6 checks.
+These startup/save checks do not demonstrate full campaign wins.
+
+All four ARM links pass the unchanged guards. EWRAM headroom is 28,480 bytes
+for Terran, 28,372 for Zerg, 23,828 for Protoss P7 and 200 for Showcase. IWRAM
+headroom is respectively 496, 72, 960 and 56 bytes. Captured actual per-TU
+commands, raw dependencies, consumed input hashes, link maps and output hashes
+are retained privately. Frozen imported inputs were copied from available
+files matching the recorded hashes; some historical source links had been
+removed externally. The old failed single-point/eager-scan prototype was
+rejected and is not included.
+
+The unchanged production-loop headless replay of the new Terran ROM matches
+the completed host trace (loss at frame 9,428) and measures 28.08 effective fps
+over 9,426 advancing PLAY frames. A separate late three-AI window measures
+20.36 fps over 992 advancing frames, with eight nonadvancing PLAY updates
+reported separately. This fails the near-30-fps objective for that workload.
+The new and old traces differ, so these are separate workload measurements,
+not an isolated patch speed comparison or physical-GBA qualification.
+
+Read-only profiling of that same three-AI replay reproduces all 9,000 timing
+rows exactly. Mean frame work is 823,830 guest cycles: update-entry to audio
+249,145; audio to render 64; render to next update 574,621 (includes presentation
+and loop overhead). The drawing counter averages 480,890 cycles, including
+206,532 for the unit/effect phase and 124,372 for background. The unit/effect
+phase includes death effects, tracers and projectiles; it does not isolate sprite
+compositing. The 27 route-build frames have
+the largest update spikes; even zero-build frames average only 21.67 fps.
+Rendering is the next sustained-cost target; route construction remains a
+separate spike target. Counters overlap and must not all be added together.
+
+### Exact source-animation clock arithmetic (2026-10-29)
+
+The 30 Hz to 24 Hz presentation clock now computes `floor(4*n/5)` as
+`n - ceil(n/5)` using one 32-bit division. The inverse computes saturated
+`ceil(5*n/4)` as `n + ceil(n/4)` with a checked sum. These identities preserve
+the original result for every unsigned 32-bit input, including wrap-domain
+ages and the saturation boundary. Animation event timing and duration remain
+unchanged. An independent original-64-bit-formula oracle passes 2,062,934
+bounded, boundary and random cases; the existing VFX sampling test also passes.
+The actual Terran attack-pose call site uses `__aeabi_uidiv` in place of
+`__aeabi_uldivmod`; unrelated 64-bit operations remain.
+
+All four ARM products link within the same RAM guards and have unchanged
+EWRAM/IWRAM headroom. Actual per-TU compiler/link commands, dependencies,
+consumed-input hashes and ROM/ELF hashes are recorded privately. The only
+changed consumed source header is the clock helper; imported inputs and
+ordered game feature definitions match the paired baseline.
+
+On the identical recorded three-AI workload, the advancing-frame count remains
+992 and cycles fall from 817,238,918 to 810,213,225 (0.86 percent), moving the
+measured rate from 20.36 to 20.54 fps. All 9,000 tick/frame/phase observations
+match. The full one-AI replay also matches all 9,488 observations and decoded
+terminal entity banks, still losing at frame 9,428; its 9,426 advancing frames
+fall from 5,630,905,715 to 5,627,534,060 cycles (28.08 to 28.10 fps). These are
+paired mGBA guest-cycle measurements. The three-AI near-30-fps goal remains
+unmet; this is a small improvement rather than a completed performance pass.
+
+A larger transparent-edge facing-sprite experiment was rejected before
+promotion. It passed synthetic and real-bank pixel oracles and all four link
+guards, but the identical three-AI workload regressed to 20.31 fps. Its static
+bank transparency ratio did not establish a useful runtime saving. The source
+prototype and failed performance evidence remain private; the original sprite
+renderer and generated data format are retained.
+
+### Indexed sprite row alignment (2026-10-30)
+
+The indexed compositor now checks source/destination alignment compatibility
+once per row. Advancing both pointers by two preserves their modulo-four
+difference, so incompatible rows cannot take the four-pixel word path.
+The existing pair compositor, transparency, odd edges and clipping remain
+unchanged. Independent randomized framebuffer fixtures pass with source
+alignments 0..3, word/non-word variants and vertical scene clipping.
+
+All four retained canonical ARM products pass unchanged RAM guards. EWRAM
+is unchanged; IWRAM grows by eight bytes in Terran/Zerg/P7, with respective
+488/64/952 bytes remaining. Showcase compiles out this optional word-path
+change and its ROM and margins remain identical (200 bytes EWRAM, 56 IWRAM).
+Actual ordered per-TU compiler/link argv, dependencies and output hashes are
+retained privately; only common/gba.c differs in the paired consumed inputs.
+
+Against the preceding clock-math product, the identical three-AI window
+retains all 9,000 tick/frame/phase observations and 992 advancing frames.
+Cycles fall from 810,213,225 to 806,838,185 (0.42 percent), about 20.54 to
+20.63 fps. The full one-AI replay retains all 9,488 observations and captured
+terminal state, with 9,426 advancing frames: 5,627,534,060 to 5,626,410,088
+cycles (0.02 percent). These small paired emulator gains do not establish
+physical-hardware or broad campaign/near-30-fps qualification.
+
+Read-only primitive attribution reproduces every clock-baseline cycle row.
+In that workload, indexed sprites consume 81.6 million cycles, including
+65.2 million in source death art; packed facing sprites consume only 6.9
+million. A long-lived building-remnant image accounts for most indexed
+death drawing. This measured usage motivates a separate remnant-packing
+candidate; static transparency counts alone did not justify the rejected
+facing-span prototype.
+
+### Packed building remnants (2026-10-30)
+
+The authenticated death importer now also packs persistent remnant layers of
+building raw IDs 106..175. This adds six image banks (110, 111, 216, 217, 335,
+336), 24 frames and 291,232 phase-word bytes. Transient bursts and unsupported
+actors retain their existing paths. Indexed pixels, layer timing, colors,
+visibility, lifetimes and the clipped HUD-edge fallback are unchanged.
+
+A fresh baseline generation exactly matches the retained input bank. The
+candidate preserves all non-word header content byte for byte and all 780
+preexisting packed declarations. Ten importer tests pass. The optional private
+bank oracle checks every new frame/phase against indexed bytes and independently
+composites 144 patterned framebuffer cases, including scene edges, under
+ASan/UBSan. No generated bank or game assets are tracked.
+
+All four retained canonical ARM products link within the unchanged ROM/RAM
+limits, with EWRAM/IWRAM margins identical to the preceding row-alignment
+candidate. Actual per-TU argv, raw dependencies, consumed input hashes, linker
+maps and output hashes are retained privately. Only the expected generated
+death-bank header differs in paired consumed inputs; ordered feature/include
+vectors remain identical.
+
+The identical three-AI late window retains all 9,000 tick/frame/phase rows and
+992 advancing frames. Cycles fall from 806,838,185 to 779,509,400 (3.39 percent),
+about 20.63 to 21.35 fps. A separate read-only pixel observer reproduces every
+pinned-observer cycle row for both products and all 992 full-frame pixel hashes
+match (602 distinct hashes), proving picture parity for this window. Earlier
+clock-baseline attribution identified repeated building-remnant image 336 draws;
+the pixel observer itself does not identify individual sprite calls.
+
+The full one-AI replay retains all 9,488 observations and decoded terminal
+entity/configuration state: 9,426 advancing frames, 5,626,410,088 to
+5,623,881,694 cycles (0.045 percent), still about 28.12 fps. These are narrow
+paired emulator measurements, not physical-hardware or all-campaign proof.
+The late three-AI near-30-fps target remains unmet.
+
+### Reuse source projectile motion within a draw (2026-10-30)
+
+Source trace drawing now computes distance and flight ticks once and reuses
+them for duration, projectile placement and matching flight/death children.
+The 16-byte automatic record is internal to a synchronous draw. A non-NULL
+record requires the same immutable profile and launch/end coordinates;
+actor/init overlays and the pre-existing public wrappers request fresh values.
+No saved or persistent RAM state, source timelines or pixels change.
+
+An independent copy of the original arithmetic matches 26,896 boundary and
+deterministic random cases under ASan/UBSan, including null
+outputs, zero distance/speed, stationary/unknown bullet types and unsigned
+32-bit ages. Full-int in-flight cases that already overflow the original signed
+64-bit product are outside this equivalence claim. A separate authored moving
+projectile fixture asserts all 27 original draw events across 40 ages, including
+child birth positions and no extra calls after expiry. Existing source VFX
+sampling, raster, runtime, alias-resolution and reverse-byte fixtures pass.
+
+Four retained canonical ARM products pass unchanged ROM/RAM guards, with
+identical margins to the remnant baseline. Actual per-TU compiler/link argv,
+raw dependencies, consumed input/audio hashes and output maps/hashes are
+retained. Only the two source runtime/render headers differ in consumed inputs;
+ordered feature/include vectors and imported assets match.
+
+Exact-argv recompilation with stack-usage reporting preserves every executable
+object section. Compiler static trace/overlay frames shrink across all four
+profiles; for example Terran draw_tracers is 888 to 608 bytes and its overlay
+helper 328 to 272. The new preparation helper has a 72-byte static frame.
+The inspected Terran path through preparation and nonzero 64-bit division
+sums to 1,504 bytes including main, game_render and outgoing argument areas,
+compared with 1,768 for the corresponding baseline overlay/division path.
+These specific paths are not a whole-program stack bound; deeper sprite
+helpers, startup and interrupts are not covered. The fixed reserve is unchanged.
+
+The identical late three-AI replay retains all 9,000 tick/frame/phase rows and
+992 advancing frames: 779,509,400 to 757,021,353 cycles (2.88 percent lower),
+about 21.35 to 21.98 fps. A separate read-only observer reproduces every pinned
+cycle row and all 992 full-frame hashes match, with 602 distinct baseline
+hashes. The full one-AI replay retains all 9,488 observations and decoded
+terminal state, still losing at frame 9,428; 9,426 advancing frames cost
+5,623,881,694 to 5,624,163,624 cycles (0.005 percent higher), still about
+28.12 fps. This is a mixed workload result, not a universal speedup.
+These narrow emulator checks do not establish hardware, all-scene or near-30-fps
+qualification; the full goal remains open.
+
+### Custom-game catalog integration checkpoint (2026-10-30)
+
+The current-main/PR147 integration adds shared native production catalogs,
+selected-builder availability, paid addon and building-morph paths. Focused
+four-profile sanitizer fixtures pass input-driven Factory/Machine Shop/Tank
+Mode and Stargate/Scout chains, save/lifecycle and source building-art checks.
+The Scourge service uses source pair cost/larva accounting, two-body supply and
+slot reservation, air-only target guards and suicide damage. Native Dropship
+custom-game boarding, unloading, carrier loss and candidate-only cargo/attachment
+save validation are covered where the profile maps its identity. Campaign
+validation predicates remain separate. Reaver production is unavailable until
+its Scarab lifecycle is implemented; Siege transition and complete roster
+services remain open.
+
+The consumed Terran art bank differed from today's importer. Its historical
+input was reproduced exactly; current source preparation was audited and found
+to flatten modifier-10 shadows as opaque palette pixels, expanding Scout health
+bounds by 42 pixels. The corrected generator defers those shadow layers and
+records their metadata privately. It restores the body crop and adds the real
+Factory body frame. A patterned-framebuffer oracle validates Factory, Machine
+Shop and Stargate source-body mapping and field/HUD clipping across four profile
+vectors; the old Terran bank fails specifically on missing Factory art. Separate
+shadow rendering remains unfinished, and broader bank changes are not claimed
+pixel-identical to the old bank.
+
+Default-off SRAM tags are unchanged. The opt-in expanded identity extension
+reserves bit31 of its profile-specific base tag, with a compile-time collision
+assertion. Runtime fixtures cover both directions of outer/embedded tag rejection,
+valid construction/addon/morph/cargo roundtrips and rejection before live-state
+mutation. Old and integrated codecs produce identical sampled low-type rows
+(9,000 compact and 12,000 P7 typed rows); this is not exhaustive over every
+possible payload. Opt-in P7 host proof uses a separately regenerated fact table,
+not the default-off canonical artifact.
+
+An early frozen-source ARM link passes unchanged guards in all four canonical
+products with EWRAM headroom 28480/28372/23828/200 bytes and IWRAM
+496/56/952/56 bytes (Terran/Zerg/P7/Showcase). This is a resource preflight,
+not final gameplay/performance or physical-GBA qualification. The frozen-source
+controller matrices and sampled timing are recorded below; campaign completion
+and fresh-process ARM SRAM qualification remain open. The
+full Z7 Egg fixture now supplies its source-required Spire and explicitly
+visible target cells; adult-over-Egg and Egg-fallback assertions are retained,
+and an unseen-target negative case passes with combat flags on and off.
+
+
+### Custom-game integration qualification after fact-table repair
+
+The runtime checkpoint is `8a85d6d`; subsequent controller-vector and canonical
+P7 Make repairs change verification tooling only. At verification commit
+`97531b1`, the full default suite passes: 683 Python checks (16 optional skips),
+the additional eight-test suite and host C checks. Source-boundary, doctor and
+default build checks also pass. Documentation-only updates follow that tested
+commit. The shared Scourge capability
+is now part of the generated fact-table fingerprint. Canonical P7 was rebuilt
+with table SHA-256
+`ed2289496f7587ecd5758931652e6ddd1ff15c4f8184539b0301a22d1e28caf9`.
+The prior table is not substituted for this qualification. The new table also
+includes the current raw-194 building rectangle; its change is not described as
+metadata-only. Terran, Zerg and Showcase do not consume that P7 table; their
+retained compiled engine input hashes still match the checkpoint.
+
+The actual Make native gate executes four existing runtime fixtures and five
+additional fixtures per product, with production flags and interceptor companion
+translation units. The P7 subset was rebuilt against the repaired table. Runtime,
+button chains, save validation, Scourge and art pass. Dropship runs pass in Terran
+and Zerg; P7/Showcase explicitly skip because their default identity mapping lacks
+raw 11. These skips do not establish transport service coverage.
+
+Host controllers reach valid terminal outcomes in all 54 configurations (two
+maps, three human races, one through three rotated bots, in each race product):
+10 wins, 44 losses, no cap failures. All 702 startup/save configurations and 27
+focused construction regressions pass. The P7 18/234/9 subset was rerun with the
+repaired table. These are normal-input match tests, not proof that every standard
+unit or every campaign can be completed.
+
+Input-only mGBA 0.10.5 replays use the pinned port-free backend, 64-bit guest
+cycle clock, separately counted menu/nonadvancing updates, and exact ROM/ELF/trace
+hashes. One-AI runs reach the same host terminal state. Three-AI runs below are
+nonterminal samples of updates 8,001 through 9,000. The human race matches its
+product for these six workloads.
+
+| Product | One-AI advancing frames | One-AI guest cycles | Mean fps | Three-AI sample cycles / 1,000 frames | Mean fps |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Terran | 9,459 | 5,633,448,297 | 28.17 | 667,976,266 | 25.12 |
+| Zerg | 8,623 | 5,082,001,791 | 28.47 | 754,769,344 | 22.23 |
+| Protoss P7 | 7,183 | 4,523,842,208 | 26.64 | 645,500,178 | 25.99 |
+
+These workloads differ from the preceding main-branch traces. Their rates are
+observations, not paired optimization deltas, stable-30-fps proof, hardware
+qualification or coverage of all race/AI compositions.
+
+Additional existing prepared inputs were resolved into an isolated overlay,
+without changing earlier frozen banks. The actual canonical Terran target passes
+its early mission/save checks but fails to finish T5 at 200,000 ticks. Repeating
+T5 on current default `1d864f4` with the same inputs yields a byte-identical trace
+(SHA-256 `6553d8e2b0c2373f0fbff8e0b76733d29407a68a47a18327bee3e85ad8c27bdf`)
+and the same failure. Transport-engine and Z7 runtime pass; transport-query, P3
+Scourge and Z6 transport fixtures fail identical assertions on the two snapshots.
+These comparisons classify observed existing failures; they do not make the
+aggregate campaign gate pass.
+
+The canonical P7 controller target previously lost its controller prerequisite
+by referring to a later Make rule-template name and compiled `game.c` as its
+entry point. It now names the controller source as the first prerequisite, and a
+Make regression checks the source, dependencies and three companion units. The
+corrected actual build links. Its bounded run reaches a cursor-guard failure,
+which also reproduces on current default with the same recipe repair and that
+base's compatible fact table. The subsequent controller repair is recorded below.
+
+Private executed-argv, raw dependencies, input/output hashes, traces and logs are
+retained under `.local/build/skirmish-catalog-{controller-v1,controller-v2,native-final-v1,native-final-v2,arm-preflight-v1,arm-final-v2,runtime-v2,runtime-profiles-v2}`
+and `.local/build/campaign-regression-{v1,base-v1}`. Source artifacts only are
+committed. No Actions, SD writes or debugger sockets were used. Full roster
+services, campaign completion and near-30-fps work remain active.
+
+
+### Campaign-controller and ARM SRAM follow-up (2026-10-30)
+
+Verification commit `e2a80cb` repairs the existing T5/P7 controllers for field
+controls. No production engine source or ROM flags change in this follow-up.
+T5 replaces its direct menu-row assignment with D-pad navigation, maintains
+home defense during tech/hero operations, and continues the Wraith plan if the
+optional Dropship is unavailable. Seven explicit path-grid initialization calls
+are replaced with guards that wait for the real simulation's grid. Two final
+host runs win at tick 159,216 / frame 158,491 with zero faults, both heroes and
+the Command Center alive, and zero enemy buildings. Their traces are identical
+(SHA-256 `4ca8aeb7813eb51d3d5206e3761ecdcf6fdcf501b017b1c10c95882094b4282f`).
+This uses probe entry and inherited unseen-enemy/map knowledge; it is not a
+normal-menu ARM replay or a player-information-limited policy qualification.
+
+P7 closes the field menu before moving its cursor, navigates from the remembered
+row, filters unavailable/pending builders and propagates cursor failure without
+sending an unintended A press. A route starts from a combat unit near the
+combat group's mean, avoiding repeated orders based on a forward straggler.
+Two host runs reproduce the same strict win at frame 48,939 / 49,229 calls,
+within the unchanged 60,000-call bound, with all three heroes alive. The host
+strict verdict checks native outcome, faults, victory conditions and timers.
+A port-free normal-menu ARM replay reaches the same frame, RESULT/win and loss
+clear, matching slot/owner/raw type/position/HP for all 147 live units and 101
+buildings. Guest switch/action-timer internals were not captured; their direct
+ARM parity is not claimed. The whole replay costs 127,596,445,835 guest cycles
+including menus. A separate 997-advancing-frame window measures about 6.82 fps:
+campaign performance remains far below the target despite the completion proof.
+
+The Terran aggregate now passes T5, T6, late-world/save/repair and target checks,
+then stops at T7. Independent T7, T8 and T9 controllers do not win at their
+unchanged limits; T10 wins. A stale Firebat fixture expected invented radial
+collateral that the engine had already removed; the replacement tests direct
+invincibility under both supported flags and controlled direct damage, without
+claiming the unresolved native Flame Thrower splash geometry. The target
+broadphase fixture now recognizes the shared and legacy Z7 Scourge wrapper
+configurations. These are verification repairs, not new weapon mechanics.
+
+The headless transport can boot from read-only 32-KiB SRAM and export a new
+image through the core API, while memory writes remain limited to the five
+scheduler fields. All seven optional real-backend protocol tests pass. A
+no-SRAM-option run reproduces all 9,000 original Zerg timing rows and the exact
+754,769,344-cycle sample. The recorded SDK rebuild has identical file-backed
+Mach-O sections; output-name/signature metadata makes its full file hash differ.
+
+Using the locally packaged canonical candidates, all three native-race one-AI
+skirmishes save/load a human foundation with its HP and construction progress
+preserved. Separate ordinary-input runs save/load a paid production queue with
+its ordered product and progress preserved. A fresh emulator boot with the
+engine-written SRAM matches an in-place load at offsets 0, 100 and 1,000,
+including full runtime actor-bank hashes. All six cases pass. Nine negative
+runs reject corrupted checksums, embedded-version mismatches and outer-version
+mismatches without changing HOME's actor banks or the input files. Record tags,
+lengths, checksums and embedded versions are checked independently. These cases
+do not establish every cargo/morph, mission, pixel or physical-hardware save path.
+
+The final default gates pass on `e2a80cb`: source boundary (1,006 indexed files),
+doctor, build, 685 Python checks (17 optional skips), additional eight-test suite
+and host C checks. Private evidence is retained in `.local/build/e2a80-final-gates`,
+`campaign-regression-v1`, `t5-grid-guard-v1`, `p7-ordinary-arm-v1`,
+`skirmish-sram-v2` and `skirmish-sram-queue-v1`. Shared roster/campaign and
+near-30-fps work remains open. No Actions, debugger sockets or SD writes were used.
+
+
+### Visibility-owner short circuit (2026-10-30)
+
+At runtime commit `014c7b8`, the common Arbiter detection helper skips sight-radius
+and squared-distance work once a candidate's exact source-owner bits are already
+present in the accumulated visibility mask. Existing axis culls, invalid-owner
+fallbacks, detector eligibility and owner mapping remain authoritative. No global
+cache, capability flag, save field or mission-active predicate is added.
+
+A frozen copy of the preceding linear implementation lives only in
+`tests/sc64_p7_owner_mask_game.c`. The prepared P7 and Showcase Make targets pass
+2,000 positive randomized cases each, plus explicit human-grid, source-slot,
+aliased-owner, duplicate, loaded/hidden, powered-cannon and map-boundary cases.
+Showcase explicitly skips the unavailable interceptor-specific identity case.
+The 24 native fixture invocations pass (22 actual passes and two intentional
+Dropship identity skips). P7's 18/234/9 match/startup/construction subset passes
+again with the current generated table.
+
+The winning P7 sample uses 2,442,974,059 rather than 2,453,127,565 cycles over
+1,000 updates, a 0.41 percent reduction. The whole 49,229-call winning tape uses
+127,213,865,473 rather than 127,596,445,835 cycles, a 0.30 percent reduction,
+with the same final win/frame and gameplay snapshot. Across 9,000 prefix updates,
+unit/building/P7-state/visibility hashes and the rendered 240x160 framebuffer
+hashes match. The native Protoss three-AI sample remains exactly 645,500,178
+cycles. These are narrow workload results; the campaign remains near 6.8 fps,
+far below the goal.
+
+All four fresh ARM builds record executed per-TU ordered compiler arguments,
+raw dependencies, consumed headers/audio, linker arguments/maps and toolchain
+inputs. Their formatted ROM code/data match the qualified private candidates
+exactly; the unused linear reference was removed from production code before
+promotion. EWRAM/IWRAM bounds are unchanged, and the inspected cache-source-tick
+static frame remains 1,280 bytes. This is not a whole-program stack bound.
+
+Raw VRAM differences are confined to the audio arena between mode-4 pages at
+the inspected checkpoints, not visible frame pages or OBJ VRAM. The initial
+music pointer difference is the exact audio-blob relocation; later decoder/PCM
+phase differs along with elapsed cycles and interrupt counts. Audio source/bank
+hashes match and inspected stream pointers remain in bounds. Bit-identical PCM
+or perceptual audio equivalence is not claimed.
+
+The newly packaged candidates pass the six native-race foundation/production
+queue fresh-process SRAM cases again. A seventh case saves the ordinary P7
+winning tape at call 5,000 / frame 4,966: decoded world fields, the entire
+persistent P7 state and campaign state roundtrip, then fresh/in-place loads
+match those states and full actor-bank hashes at offsets 0, 100 and 1,000.
+Malformed-image rejection remains covered separately. These checks do not prove
+an entire resumed campaign or all cargo/morph paths.
+
+Default gates at `014c7b8` pass: source boundary (1,007 indexed files), doctor,
+build, 685 Python checks (17 optional skips), additional eight-test suite and
+host C checks. The subsequent Showcase-oracle change is test-only and both
+prepared oracle targets pass. Private proof lives in `.local/build/p7-owner-*`,
+including `p7-owner-final-v1` for per-TU provenance and
+`p7-owner-campaign-sram-final-v1` for the mission-state continuation. Full roster,
+remaining campaigns and near-30-fps work remain open; no Actions or SD writes.
+
+### T7 and T9 controller repairs (2026-10-30)
+
+With runtime source `5ad0adc`, the repaired T7 controller wins twice at input
+call 47,735 / frame 47,101 within the unchanged 60,000-call bound. Both traces
+are identical, with zero faults, Kerrigan alive and the emitter delivered to
+the native goal. Menu normalization now uses D-pad inputs, route planning waits
+for the engine's path grid, and the escort retries the paid Dropship transfer
+or ground relay when its carrier dies. The inherited risk planner reads unseen
+hostile positions; this is not an information-limited playthrough.
+
+The T9 controller wins twice at input call 45,625 / frame 44,896 within its
+unchanged 500,000-call bound. Both traces are identical, with zero faults,
+Kerrigan alive, no remaining Protoss buildings and 21 remaining Zerg buildings.
+Its policy uses ordinary commands, visible enemies, remembered buildings and
+immutable scenario placement hints. Neither controller writes actors, wallets,
+mission state or the menu cursor, or forces a path-grid rebuild.
+
+These are host probe-entry checks, not normal-menu ARM, SRAM continuation or
+performance qualification. The T7 source SHA-256 is
+`d2e67fc965e7031be0a516f607b73c2e2d87816b9d445bacf2da947fce7758c3`,
+and the T9 source SHA-256 is
+`cba1eeb7878f7e686f8be804d3874dfe3453bd9fc9dfbe881044ca4a61af2d2d`.
+Executed compiler arguments, raw dependencies, consumed-input hashes and both
+run logs/traces are retained in `.local/build/t7-repair-v3` and
+`.local/build/t9-policy-port-v1`. T8 remains the unresolved Terran controller;
+the full current aggregate has not yet passed. Runtime rules and limits are
+unchanged by these controller repairs.
+
+### Native cargo and building-morph SRAM continuation (2026-10-30)
+
+The qualified `014c7b8` Terran and Zerg products pass three additional
+fresh-process ARM continuation cases. Native host fixtures seed the initial
+actors, prerequisites, resources and larva, then use the engine's boarding,
+paid morph/queue and save paths to create 32-KiB SRAM. ARM loads that image,
+saves through the pause menu, and compares an in-place load with a fresh HOME
+load. These are fixture-seeded lifecycle checks, not ordinary player acquisition.
+
+- Terran Dropship cargo survives load and unloads through ordinary menu inputs.
+  Complete unit/building banks and decoded state match at offsets 0, 55, 100
+  and 1,100 scheduler ticks, with the Marine alive and no longer loaded.
+- A Zerg Lair saved at morph progress 400 completes on both continuations.
+  Complete banks and decoded state match at offsets 0, 100, 1,100 and 2,200
+  simulation updates, retaining larva state.
+- Hive and Greater Spire morphs complete at the same offsets. A paid Drone
+  queue overlaps the Hive morph, completes, and increases the human Drone
+  count from four to five. Larva replenish and morph HP reaches the new maxima
+  identically in both continuations.
+
+The ARM-resaved images have two valid, independently checked record checksums
+with the expected tags and payload sizes. The seed images remain immutable;
+guest memory writes are limited to the existing input scheduler. Actual host
+compiler arguments, raw dependencies and consumed-input hashes accompany the
+seed fixtures in `.local/build/p7-owner-cargo-morph-sram-v1`, together with the
+ARM state/bank comparisons. Other cargo types, malformed lifecycle combinations,
+whole resumed missions and physical hardware remain outside these cases.
+
+### T8 resource expansion and P7 count optimization (2026-10-30)
+
+The dedicated T8 controller replaces the shared assault runner in the public
+T8 Make target; T10 is unchanged. It uses ordinary lift/land, boarding, unloading,
+construction, production and attack commands to sustain its economy across
+three mineral fields, preserve gas collection and add a second Starport.
+Two host probe-entry runs win identically at input call 193,336 / frame 185,476,
+within the unchanged 200,000-call bound. Norad remains alive, hostile buildings
+reach zero, the native primary objective and completion bit are set, and no
+faults occur. The source SHA-256 is
+`c8c7eb642f9bbf6e9a8331a5ab5a9cba6c9788a8099a17a012f22ed7580d4146`.
+Both traces hash to
+`5d17c5ab0be19d89b515aee1f3c4b50dfd0243580dc83f8a01ccd2ffc2a97279`.
+Evidence in `.local/build/t8-policy-port-v1` includes the executed compiler
+arguments, raw dependencies and 172 input hashes. The inherited policy reads
+unseen enemy and mineral positions. This is neither an information-limited
+playthrough nor normal-menu ARM qualification. The full aggregate is checked
+separately from these individual wins.
+
+The P7 Command census now skips type-match calls for unequal exact raw IDs
+and reuses the identical Nexus match for the two applicable owner selectors.
+The authenticated trigger-row check, owner/raw validation, kind-aware matching
+and fail-closed behavior are unchanged. No cache, persistent storage, mission
+predicate or compiler flag is added. A frozen preceding census remains only in
+`tests/sc64_p7_count_snapshot_reference.c`. The P7 and Showcase public sanitizer
+targets pass explicit nonzero witnesses for all eight count rows, 500 populated
+valid worlds, 3,000 mixed valid/malformed cases, wrong-kind raw IDs, inactive and
+mismatched contexts, null context and failed-snapshot sentinel preservation.
+
+The complete normal-menu P7 winning tape takes 124,487,769,867 cycles versus
+127,213,865,473 on the preceding owner-optimized build, a 2.14 percent reduction.
+All 50 checkpoint positions/outcomes and the complete observed final gameplay
+snapshot match. Across 9,000 prefix updates, unit/building/P7-state/visibility
+and rendered-framebuffer hashes match. The 1,000-update measured window takes
+2,394,919,369 versus 2,442,974,059 cycles, a 1.97 percent reduction. The campaign
+still falls far short of 30 fps; these results do not establish audio equivalence.
+
+All four production links retain their exact previous RAM bounds. Terran and
+Zerg ROMs are byte-identical to the preceding builds; Protoss and Showcase
+consume only the intended changed runtime header. Native three-AI samples in
+P7 and Showcase remain cycle-identical at 645,500,178 and 693,760,156 respectively.
+A new P7 save at update 5,000 / frame 4,966 roundtrips its complete actor banks
+and persistent mission state, with fresh/in-place continuations equal through
+1,000 updates. Executed per-TU arguments, dependencies, input hashes, maps,
+replays and SRAM evidence are under `.local/build/p7-count-{opt,final}-v1` and
+`.local/build/p7-count-campaign-sram-final-v1`. Canonical candidates are packaged
+locally; no SD delivery or physical-hardware qualification is claimed.
+
+The public `make test-sc64-terran-full-campaign` aggregate passes on the current
+runtime and controller sources at `89067f3`, including all ten mission runners,
+early and late save/world/repair checks, combat/target/contact checks, and the
+234-configuration startup/save matrix. It was built in a fresh private snapshot
+with held prepared inputs, actual per-TU compiler arguments and raw dependencies;
+all 312 consumed inputs are hashed, and project source/Make inputs match the
+committed versions. Evidence is in `.local/build/terran-controllers-final-v1`.
+This clears the earlier aggregate controller failures, without turning host
+probe entry into an ARM campaign-progression claim. Default source/doctor/build
+and tests pass at `ebacc8a` (685 Python checks with 23 optional skips, the
+additional eight-test suite and host C checks); the count change additionally
+passes its two prepared-profile sanitizer targets and four ARM links. The source
+boundary passes all 1,009 indexed files after adding the two new test sources.
+
+The repaired T9 tape also wins through the normal campaign menu on the canonical
+Terran ARM executable. A fresh HOME boot uses 13 ordinary launch calls before
+the 45,625-call host tape; no SRAM unlock fixture or actor-state writes are used.
+At scheduler tick 45,638 / frame 44,896, the guest reaches RESULT/win, primary
+objective complete, completion bit 4,096, Kerrigan alive, zero trigger faults,
+zero Protoss buildings and 21 Zerg buildings. All recorded host checkpoints
+match. A read-only final host observer retains the original input trace and
+matches the guest's 192 live units by slot, owner/source owner, runtime/raw type,
+position, HP, order and target, and all 42 buildings by slot, owners, types,
+position and construction state. Building HP was not captured by that observer.
+The port-free replay takes 51,972,781,802 64-bit guest cycles including menus;
+it is not steady-30-fps or hardware proof. The controller's scenario-placement
+hints remain part of its information assumptions. The Terran ROM is byte-identical
+to the current four-profile build. Evidence and exact ROM/ELF/backend identities
+are retained in `.local/build/terran-late-new-arm-v1`.
+
+### Nuclear Silo admission guard (2026-10-30)
+
+Final enabled-content review found that a mapped Nuclear Silo could be paid
+for despite missing nuclear ammunition/launch services. Commit `6203b45` keeps
+its catalog row visible but unavailable. A native Terran fixture supplies the
+completed prerequisites, a free add-on site and sufficient funds, then checks
+that admission and purchase reject without wallet, selection or actor-bank
+mutation. Positive Machine Shop and Control Tower paths still pass. All four
+runtime fixture vectors pass; the other three explicitly skip the Silo-specific
+fixture because the required native identities are absent.
+
+All four subsequent ARM products retain the same RAM bounds and record their
+per-TU arguments, raw dependencies, maps and input hashes. The P7 campaign prefix
+matches the count-qualified build at all 9,000 state, pixel and timing rows;
+its measured window remains 2,394,919,369 cycles. The Showcase three-AI prefix
+matches state/pixels and its measured window remains 693,760,156 cycles, while
+51 earlier timing rows differ. The earlier full P7 tape result is not a
+full-tape run of these new binaries. Private proof is in
+`.local/build/silo-gate-review-v1` and `.local/build/silo-gate-arm-v1`.
+
+The canonical packages in
+`.local/releases/20261030-custom-catalog-silo-candidate` match their qualified
+builds outside the standard header. No SD write is claimed. Integration remains
+draft while other late-tech structures with unavailable actor services are
+resolved; neither a mapped identity nor a catalog row is full roster support.
+
+### Shared Shield Battery and bounded hot-loop work (2026-10-30)
+
+The common race-engine capability set now includes Shield Battery services.
+All four canonical products use the same raw-172 construction, exact psi power,
+energy regeneration, command-driven transfer, owner validation, power-loss and
+dead-slot cancellation. The selected Battery shows energy and a Recharge hint.
+P7 map properties and source ownership remain authenticated, without widening
+its mission-active predicate or writing another mission's persistent union.
+
+New recharge order 15 uses an unused four-bit encoding; legacy P7 order values
+are unchanged. Unit shield fractions consistently use 1/1280 points. Save word
+26 carries an SH12 marker; markerless non-P7 shield phases are multiplied by
+four before live-state replacement, while P7 phases and non-shield regeneration
+fields remain unchanged. Markerless empty Battery queues normalize inert stale
+cells left by old slot reuse, preserving energy; marked malformed queues stay
+invalid. Unknown markers, incompatible orders and malformed identities reject
+before replacing the live actors. New-to-old binary downgrade loading is not
+promised. Record sizes, actor limits and the reserved stack space are unchanged.
+
+The eight public game/save fixtures pass under sanitizers in Terran, Zerg, P7
+and Showcase. The intended legacy P7 Battery fixture passes after replacing its
+obsolete immediate-build expectation with actual pending travel and arrival
+payment. Native save tests cover partial energy, phase and recharge state,
+malformed candidate rejection, marker migration and P5/P6 union isolation.
+Imported Battery body pixels and clipping pass in all four art banks; source
+construction selects the Protoss warp image/blend data. A full visual review of
+the complete construction animation is not part of those art checks.
+
+Two bounded performance changes remove redundant clearing of unreachable owner
+list links and scan animation events backward for the original last eligible
+frame. Actual owner-list rebuild fixtures pass 10,000 randomized updates in each
+profile, including invalid-owner fallback; the frame selector matches its frozen
+forward reference in 320,000 sanitizer-backed comparisons. The isolated paired
+Zerg three-AI sample improves 1.07 percent before adding Battery behavior.
+
+The combined v3 Zerg map-0/human-Zerg/three-AI workload takes 747,475,403 versus
+754,769,344 cycles over 1,000 advancing frames, a net 0.966 percent reduction.
+Across 8,928 advancing prefix frames, live unit fields (normalizing the old
+shield fraction denominator), complete building banks, visibility, resources
+and displayed pixels match. Timing-dependent hardware frame counters are
+excluded. This is one busy workload and remains below 30 fps, not a steady-rate
+or hardware claim.
+
+All four v3 ARM links pass the unchanged guards with EWRAM/IWRAM margins of
+28,480/488 bytes (Terran), 28,372/48 (Zerg), 23,828/952 (P7), and 200/56
+(Showcase). No global service pool or clock is allocated. Each native-host-seeded
+ARM save resumes an active recharge; fresh/in-place full state and actor banks
+match at updates 0, 1, 2, 3, 4, 100 and 1,000, through recharge completion.
+These seeds do not establish ordinary player acquisition; native fixtures
+separately exercise paid construction and menu controls. P7's 9,000-call prefix
+also matches the previous qualified state and pixel digests at every update.
+
+Private evidence lives in `.local/build/shared-battery-arm-v3`,
+`shared-battery-sram-v3`, `shared-battery-p7-prefix-v3`,
+`battery-public-targets-v1`, `shared-battery-matrix-v1`,
+`battery-save-integrated-v3`, `battery-art-review-v1`,
+`zerg-visible-vfx-v1` and `battery-zerg-net-v1`. The v3 P7 normal-menu replay
+subsequently completed all 49,229 calls and won at frame 48,939, taking
+123,808,001,557 guest cycles including menus. All 50 milestone observations and
+the observed final snapshot match the previous count candidate. Evidence is in
+`shared-battery-p7-full-v3`. The native v1 matrix completed 54 matches (10 wins,
+44 losses, zero harness failures), 702 startup/save configurations and 27
+construction cases. The v1 campaign gates passed the full Terran host aggregate,
+P7 canonical checks and legacy Battery checks; these remain distinct from full
+ARM campaign progression and full roster parity.
+
+### Shared-profile guard and Scourge effect corrections (2026-10-30)
+
+Checking the plain unified product exposed two missing capability guards in
+the preceding integration. Battery mobility validation referenced the extended
+actor-facts API even when that API was absent, and shared Scourge target checks
+referenced mission invincibility storage in plain race builds that do not
+allocate it. Runtime and candidate-save Battery checks now share a guarded
+predicate; its native shielded Protoss identities are movable. The
+Scourge check retains invincibility protection wherever its storage exists.
+
+The unified weapon fixture then found a real effect defect: the Scourge burst
+mapping was enabled for P3/Z7 but omitted the shared Scourge capability. The
+mapping now follows the shared mechanic. The added impact regression checks the
+burst profile, shields/armor damage, attacker consumption, supply decrement and
+absence of repeated damage. Existing weapon assertions were retained. A separate
+plain-profile Battery fixture checks native Zealot eligibility and rejects a
+forged Battery target in both runtime and candidate validation, without a skip.
+Fresh `make unified` and `make test-unified` pass in the frozen v5 snapshot.
+The unified ARM image leaves 3,224 EWRAM and 752 IWRAM bytes before the guards.
+Earlier failed snapshots and compiler logs are retained rather than counted as
+passing checks.
+
+All four v6 canonical ARM links pass unchanged memory guards. Protoss and
+Showcase ROMs are byte-identical to v3, so their v3 SRAM and P7 replay proofs
+apply to the same executable bytes. Terran and Zerg changed with the effect
+mapping. Their new Battery saves match complete fresh/in-place actor banks and
+state at updates 0, 1, 2, 3, 4, 100 and 1,000. These are host-fixture-seeded
+saves, not ordinary-acquisition qualification. The Zerg three-AI sample remains
+747,475,403 cycles over 1,000 updates (22.45 effective fps); all 8,928 advancing
+prefix observations match v3's unit fields, building bank, visibility, resources
+and rendered pixels. This broad parity check does not substitute for the
+targeted Scourge impact fixtures.
+
+The v2 native matrix again passes all 54 terminal matches across both maps,
+all human races and one to three AIs, plus 702 startup/save configurations and
+27 construction cases. The four-profile Battery game/save and shared Scourge
+fixtures pass all 12 cases. The public VFX profile target passes with its
+designated flags. An exploratory invocation with canonical source-effect flags
+was incompatible with that fixture's legacy-tracer assertions and is not used
+as qualification. No production assertion was relaxed to accommodate it.
+
+The fresh full Terran host aggregate also passes all ten controllers and its
+included combat, world, repair, save and startup checks. The final default
+doctor/build/test gates pass: 685 Python checks with 23 optional skips, the
+additional eight-test suite and the host C checks. These snapshots precede
+only a two-line Battery comment correction; no C tokens or line counts changed.
+The subsequent v7 four-profile ARM rebuild consumes that final header and is
+byte-identical to v6, with unchanged bounds. Default, unified and Terran gate
+evidence is in `shared-battery-fallback-final-gates-v2`,
+`shared-battery-unified-v5` and `shared-battery-campaign-gates-v2`.
+
+Actual compiler vectors, raw dependencies, input hashes and maps are under
+`shared-battery-unified-v5`, `shared-battery-arm-v6`, `shared-battery-arm-v7`,
+`shared-battery-skirmish-v2`, `shared-battery-sram-v6`,
+`shared-battery-zerg-v6` and `shared-battery-vfx-public-v6`. The four canonical
+ROMs in `.local/releases/20261030-shared-battery-profile-fixes` match these
+qualified products outside the standard header. No SD delivery, physical
+hardware qualification or steady-30-fps result is claimed. The full roster
+services and remaining campaign stages still require implementation.
+
+### Shared Bunker service (2026-10-30)
+
+Raw 125 now has a common garrison service across Terran, Zerg, Protoss and
+Showcase, with the common capability also enabled in plain race/unified builds.
+The authored eligibility/fire-class rules were checked against the existing
+pinned BWAPI UnitType facts and OpenBW behavior: four cargo points, same-player
+Terran one-space occupants, the occupant's own weapon plus 64 source pixels of
+range, and attempted ejection on destruction. The current imported unit set has
+no authentic zero-space Terran passenger. Custom live owners, rescued human
+campaign identities and distinct nonhuman source owners are checked separately.
+
+The eight frozen native game/save fixtures pass under ASan/UBSan in all four
+canonical compiler vectors. They cover missing prerequisites, paid SCV travel
+and construction, unfinished-building rejection, five simultaneous board orders
+with four arrivals, ordinary contextual boarding/unload, an 80-pixel approach
+and a diagonal route around a blocked cell, cooldown/range/immunity, tagged
+source-weapon effects, Firebat air exclusion, unarmed SCV/Medic passengers,
+transport-command coexistence, successful ejection, fixture-blocked failed
+ejection, supply/corpse cleanup, pending cancellation and slot reuse. High-ID
+building targets still take damage and save successfully without overflowing
+the P7 target cache. Nine malformed candidate cases reject without replacing
+the actor banks or wallet. No save schema or actor limit was expanded.
+
+Four additional seeded actual-first-campaign fixtures pass boarding, firing,
+unload and save/load while preserving mission phase/objective state. These are
+host fixtures with injected actors, not ordinary-acquisition or ARM campaign
+playthroughs. A separate plain unified host boarding/save/load round trip passes.
+The ordinary-input skirmish matrix again completes all 54 matches (10 wins,
+44 losses); every individual result matches the preceding Battery matrix.
+All 702 startup/save configurations and 27 construction cases pass too.
+
+Four final v3 ARM links pass the unchanged guards with the same EWRAM/IWRAM
+margins as the preceding build: 28,480/488, 28,372/48, 23,828/952 and 200/56
+bytes respectively. Fresh/in-place SRAM continuation matches full snapshots
+and actor banks through updates 0, 1, 2, 3, 4, 100 and 1,000 in every product.
+The native seeds contain three Marines and a Firebat, active cooldowns and a
+cached target. Separate fresh-boot ARM runs select the Bunker and unload all
+four passengers through ordinary A/B/directional input. No guest actor writes
+or edited SRAM payloads are used. The native fixture setup remains distinct
+from ordinary acquisition on hardware.
+
+The first ARM stress comparison found an unnecessary spatial-index invalidation
+on every building-slot creation. Cleanup now invalidates only actual cargo or
+boarding transitions. The corrected v3 Zerg three-AI replay matches all 8,928
+advancing unit/building/visibility/resource observations and actual framebuffer
+hashes. The observer's pixel record includes a hardware frame counter; an
+initial comparison incorrectly counted that counter as a pixel difference.
+The displayed 240-by-160 image hashes match, including the first flagged frames.
+The measured 1,000-update sample takes 748,598,135 cycles (22.41 effective fps),
+about 0.15 percent more than the preceding 747,475,403-cycle build. This is a
+small feature overhead, not a performance improvement or a 30-fps result.
+
+One separate native-seeded four-occupant scene averages 29.26–29.61 effective
+fps across the four products over 1,000 updates after 100 warmup updates.
+There is no paired empty-Bunker control, so it does not isolate service cost
+or establish a worst-case bound. P7's 9,000-call normal-menu prefix matches its
+preceding unit/building/mission/visibility/framebuffer hashes. A read-only ARM
+capture confirms the Bunker capacity/unload HUD fits and loaded infantry bodies
+stay hidden; the image alone is not proof of a particular weapon's provenance.
+Exact N64 Bunker overlay geometry and original order timing remain separate
+fidelity work, as do whole-program stack and physical-hardware qualification.
+
+The full current P7 normal-menu winning tape also passes all 49,229 calls,
+ending at frame 48,939 with a win. All 50 milestone observations and the final
+observed snapshot match the preceding Battery run. It takes 123,827,664,277
+guest cycles including menus, versus 123,808,001,557 before this service
+(about 0.016 percent more). This is complete tape coverage, not a steady-30-fps
+or all-campaign-progression claim. The pinned runner command, result and
+comparison are under `shared-bunker-p7-full-v3`.
+
+The final frozen aggregate passes default doctor/build/test (685 Python checks,
+17 optional skips, the separate eight-test suite and C checks), unified ARM
+build and host tests, and all ten full-Terran host controllers with their
+included checks. The plain unified link leaves 3,216 EWRAM and 600 IWRAM bytes
+before the unchanged guards. Source/Make inputs stayed frozen throughout these
+gates; commands, per-TU arguments, dependencies and hashes are in
+`shared-bunker-final-gates-v1`. These host campaign results are not full ARM
+campaign progression.
+
+Private evidence is retained under `shared-bunker-native-v4`,
+`shared-bunker-campaign-v3`, `bunker-plain-save-v2`, `shared-bunker-skirmish-v1`,
+`shared-bunker-arm-v3`, `shared-bunker-sram-v3`, `shared-bunker-unload-v3`,
+`shared-bunker-zerg-v3`, `shared-bunker-occupied-sample-v3`,
+`shared-bunker-p7-prefix-v3`, `shared-bunker-p7-full-v3` and
+`shared-bunker-visual-v3`.
+Compiler arguments, raw dependencies, consumed hashes and maps are captured;
+intermediate failed runs are not counted as final qualification. Canonical ROMs
+are packaged locally in `.local/releases/20261030-shared-bunker-candidate`.
+No SD delivery or Actions run is claimed. The full roster, remaining campaign
+stages and near-30-fps goal remain incomplete.
+
+The seeded campaign and plain unified checks were rerun against committed
+runtime `b15c582`; their consumed project dependencies match exactly. Earlier
+runs before the no-op index fix remain historical evidence. The four ARM
+products, native game/save matrix and ordinary skirmish matrix also have
+committed-source closure records. The broad default/unified/Terran snapshot
+differs from the final tracked tree only in documentation; optional per-TU
+dependencies match, while default build/test provenance uses the full source
+snapshot rather than a per-TU capture.
+
+Existing read-only stage latches over the same busy Zerg sample identify map
+rendering as the largest measured stage (mean 302,434 cycles), followed by
+orders (173,311) and HUD (72,515). Map includes background (132,256), building
+(9,944) and unit/effect drawing (116,449); these are not additive independent
+totals. Render latches describe the latest completed draw and may not align
+one-to-one with update entries. The orders maximum is 2,174,022 cycles. Timing
+rows are identical to the original v3 sample; no instrumentation build or actor
+state writes were used. Distributions and provenance are retained in
+`shared-bunker-stage-profile-v3`, to guide the next rendering/spike optimization.
+
+### Shared rendering and depot-flood performance batch (2026-10-30)
+
+The next batch keeps simulation results and rendered pixels unchanged:
+
+- Facing examines only the signed quadrant's nine candidate directions, with
+  the original lowest-index tie rule at the north-west wrap. The T5 facing
+  fixture compares the actual helper with the original 32-vector search for
+  all 16,785,409 coordinate pairs in `[-2048, 2048]` squared.
+- The synchronous depot flood temporarily clears each enqueued walkable bit,
+  avoiding packed route-field reads for visited checks. Every queued bit is
+  restored before return. Seed/neighbor order, route fields and cache policy
+  stay the same; custom read-only grid accessors retain the field-based path.
+- Canonical race and Showcase renderers compute the static terrain key once
+  per draw, using the existing caller-supplied-key API.
+- Source effects reuse the image lookup already resolved by the caller when
+  locating its frame. The synthetic render fixture now supplies the generated
+  frame-directory contract and checks exact pointers against its old lookup,
+  as well as the existing moving-projectile and child draw-event sequence.
+
+On the pinned busy Zerg three-AI tape, updates 8001–9000 take 730,928,748
+cycles versus the Bunker baseline's 748,598,135: 2.3603% fewer cycles and
+22.41 to 22.95 effective fps. Both measurements use the same uninstrumented
+64-bit mGBA cycle runner, including audio, rendering and presentation waits.
+All 8,928 advancing gameplay-state and framebuffer SHA observations match the
+baseline; only the hardware-counter prefix is excluded from pixel comparisons.
+This is one nonterminal sample, not a universal or physical-hardware 30-fps
+claim. The complete roster, campaign and performance goals remain open.
+
+The frozen combined candidate links all four canonical products without
+changing actor limits or RAM reserves. Remaining EWRAM/IWRAM bytes are Terran
+28,480/488, Zerg 28,372/48, Protoss 23,828/952 and Showcase 200/56.
+Independent exhaustive direction and real-bank frame-pointer oracles, terrain
+key/scroll tests, depot BFS variants, motion-reuse and facing-clip checks are
+retained locally. The final default gate additionally exposed the standalone
+grid-accessor compatibility issue; its repair preserves the read-only accessor
+contract instead of requiring new mutable storage.
+
+Private provenance, executed compiler arguments, raw dependencies, consumed
+hashes, maps and comparisons are in `shared-render-batch-v1` and
+`shared-render-cross-profile-v1`. The rejected terrain row-mask experiment
+showed no useful gain. Separate tile-clean and grouped-animation experiments
+remain private and are not included in the batch's performance claim.
+
+Final qualification of committed runtime `8d96343` passes default
+doctor/build/test (685 Python tests, 17 optional skips, the separate eight-test
+suite and C fixtures), unified build/test, the complete Terran host aggregate
+and the actual T5 facing fixture's 16,785,409 comparisons. Both synthetic
+source-effect fixtures retain their original draw/pointer assertions after
+supplying the authored directory metadata; initial failing runs remain
+historical evidence, not passes. Final default evidence is
+`shared-render-default-gate-v3`; other broad gates and T5 facing are in
+`shared-render-final-gates-v2`.
+
+The corrected source's four canonical ARM products are in
+`shared-render-cross-profile-v2`. Their game payloads equal the timed combined
+candidate's payloads byte for byte, with only normal GBA boot headers and
+padding differing. All 54 individual skirmish result JSONs equal the Bunker
+baseline. Fresh startup/save and construction checks pass 702 and 27 cases;
+four native-seeded garrisons match fresh/in-place ARM state through 1,000
+updates; all 9,000 P7 prefix observations match. These are recorded in
+`shared-render-skirmish-v2`, `shared-render-bunker-sram-v1` and
+`shared-render-p7-prefix-v1`. The full P7 winning run described above predates
+this batch; the current batch has prefix evidence, not a new full winning run.
+
+`shared-render-proof-closure-v1` checks consumed project/input hashes,
+per-TU commands and exact product links to the replay results. It additionally
+verifies the audio assembler blob byte for byte inside each linked ROM.
+Updated normal-Make ROMs are retained locally in
+`.local/releases/20261030-render-performance-candidate`, with hashes and
+header-only equivalence to those qualified products. No SD write or Actions
+run occurred. No claim of complete campaigns, full roster or 30 fps is made.
+
+### Follow-up audio, terrain and animation lookup batch (2026-10-30)
+
+The follow-up skips an audio slot only when the live actor is dead and its
+previous snapshot is already zero. Death transitions, nonzero stale snapshots,
+new/reused actors, construction completion, selection, event admission and
+discontinuous ticks keep their original handling. No sound is removed and no
+new snapshot storage is allocated. A deterministic 10,000-step differential
+matches ordered cues and complete observer snapshots in each canonical profile;
+the public hook fixture also checks deaths, dead-slot clearing, reuse and
+discontinuities in the default and imported profiles.
+
+The terrain tile test derives bounds from the view already validated by a
+successful cache reuse, avoiding repeated validation per tile. Failed reuse
+still clears that precondition. Added edge/phase tests cover 49 camera pairs,
+queries outside the view and failed reuse. Actual renderer comparisons pass
+all four profiles across cold/warm cameras, fog changes, screen transitions,
+resource/building mutation, save/load and restart.
+
+Projectile rendering resolves Init, Death and Flight animation records through
+one lower-bound search and an adjacent scan. The generated table must remain
+strictly ordered by image and animation ID. The real renderer's generated-bank
+fixture compares exact pointers with the original lookup for all 65,536 image
+IDs, including absent images/phases; authored synthetic tables retain the
+existing moving-projectile, child-event and alias-pointer assertions.
+
+The same busy Zerg three-AI sample takes 714,338,530 cycles versus 730,928,748
+for the preceding batch: 2.270% fewer cycles and 22.95 to 23.49 effective fps.
+All 8,928 advancing gameplay-state and actual framebuffer hashes match. The
+combined audio differential also matches the preceding batch. These are
+bounded nonterminal observations, not complete campaign, universal 30-fps or
+physical-hardware qualification. Actor counts and all RAM reserve guards stay
+unchanged; the four canonical links retain their preceding memory margins.
+
+Private measured products, commands and comparisons are in
+`shared-render-followup-v1`. Four-profile ARM links, audio comparisons, actual
+framebuffer coverage, terrain and animation oracles are in
+`shared-render-followup-cross-v1`. Initial malformed harness setups and an
+overstrict authored test assumption about other live actors in the default
+fixture were corrected and are not counted as passes. The final default,
+generated-bank and unified gate evidence is recorded separately under
+`followup-final-gates-v1`.
+
+Final follow-up gates pass the actual generated-bank oracle, default build/test
+(685 Python tests, 17 optional skips and the separate eight-test suite), plus
+unified build/test. The committed-source closure at `3e2ead3` verifies every
+consumed canonical project/external input and the audio bytes embedded in each
+ROM; the broad snapshot differs only in this validation document. Four
+native-seeded Bunker saves match fresh/in-place ARM continuation through 1,000
+updates. The current P7 9,000-call ordinary-input prefix matches the preceding
+batch for actor, mission, visibility and framebuffer hashes, with no terminal
+win claim. Evidence is in `shared-followup-proof-closure-v1`,
+`shared-followup-bunker-sram-v1` and `shared-followup-p7-prefix-v1`.
+
+Normal-Make packages with header-only differences from qualified products are
+in `.local/releases/20261030-render-followup-candidate`. All four hashes are
+recorded; delivery is local to the Mac, with no SD write or Actions run.
+
+The preceding four-optimization batch was separately extracted onto exact
+default `1d864f4`, qualified independently and merged as PR #168. Its own busy
+Zerg sample improves 751,639,571 to 731,761,211 cycles (22.32 to 22.93 fps),
+with 8,948 observed gameplay/framebuffer rows matching. Its 54 ordinary-match
+traces match exact default, and default/unified gates and four ARM links pass.
+The default full Terran aggregate still fails at the pre-existing T5 controller
+cap: an exact-baseline run has the same result, byte-identical trace and 660
+matching log lines. The stopped aggregate does not qualify T6–T10. That
+standalone failure is not a green campaign gate and must not be conflated with
+the earlier repaired-controller qualification on this integration branch.
+Private records are in `default-perf-evidence-v1`; the skipped-patch first
+attempt was identified and retained as baseline-only, then real candidate
+qualification was performed. Merge `2b08ca3` brings the qualified default
+change into this branch without changing its source tree at all.
+
+### Bound depot searches to the requesting worker (2026-10-30)
+
+The shared race capability now stops a depot flood once it assigns the
+requesting walkable origin. Root and neighbor ordering are unchanged. Such a
+field is explicitly incomplete: it can serve an already assigned origin but
+cannot prove an unreachable component. Another unassigned origin rebuilds the
+same slot from the roots. Blocked origins and the full-field helper still
+request a complete flood, preserving the shortest-neighbor choice. All queued
+walkability bits, including the unexpanded frontier, are restored before
+return. Invalid depot, geometry and origin arguments return before grid writes.
+No extra persistent frontier, actor storage or route pool is allocated.
+
+`SC64_DEPOT_BOUNDED` is supplied once by `RACES_FLAGS`, so the same engine
+behavior applies to the race, unified, campaign and Showcase products. A
+non-race build explicitly rejects the capability; disabled legacy builds stay
+supported. The depot oracle covers 18 configurations, including packed and
+nibble directions, partial point floods, temporary visited bits, read-only grid
+access, rectangular and 128-by-128 maps, blocked origins and cache churn.
+
+The exact final route header (private experiment v3) reduces the busy Zerg
+three-AI sample from 714,338,530 to 697,484,133 cycles: 2.3594% less work,
+23.49 to 24.05 effective fps. All 8,928 advancing gameplay and framebuffer rows
+match. Earlier Terran and Protoss timing experiments used v2 and are not
+performance qualification of this final header. This sample remains below
+30 fps and does not establish a worst-frame bound or hardware performance.
+
+The exact v3 native comparison matches all 54 ordinary skirmish results and
+passes 702 startup/save configurations. Four seeded Bunker SRAM continuations
+match fresh and in-place ARM processes through 1,000 updates; the P7 9,000-call
+ordinary-input prefix also matches. These do not establish new full campaign
+wins. The four canonical ARM links preserve the fixed EWRAM/IWRAM guards;
+remaining margins in bytes are Terran 28,480/488, Zerg 28,372/48, Protoss
+23,828/952 and Showcase 200/56. Plain race and unified ARM products also link.
+
+Final builds using the actual Make capability definition are byte-identical
+to the qualified v3 canonical products. Default doctor/build/test (686 Python
+tests, 17 optional skips and the separate eight-test suite), unified build/test
+and the full Terran host aggregate pass in the final frozen source snapshot.
+The latter qualifies host probes, not ordinary-menu ARM campaign completion.
+Source, raw dependencies, actual commands, generated inputs, maps and product
+hashes are retained privately under `depot-bounded-v3`,
+`depot-bounded-v3-native-v1`, `depot-bounded-v3-four-arm-v1`,
+`depot-bounded-v3-runtime-v1`, `depot-bounded-v3-sram-v1`,
+`depot-bounded-final-arm-v2`, `depot-bounded-final-generic-v1` and
+`depot-bounded-final-gates-v1`. The final closure reports no source drift;
+failed capture-wrapper attempts are retained separately and are not passes.
+
+Default PR #169 separately qualifies the preceding audio/terrain/lookup batch
+on its own base, with a 23.58-fps busy sample. PR #170 separately repairs the
+Terran host controllers, including their retained source-map/hidden-world
+planning. Those default results are not substitutes for this integration
+branch's different source and generated inputs. Full roster services, all
+campaigns, N64 fidelity and near-30-fps performance remain unfinished.
+
+### Default-branch bounded depot searches (2026-10-30)
+
+This batch is independently qualified on default `fcb5195`; it does not
+include the separate draft roster/service integration. `RACES_FLAGS` now
+supplies `SC64_DEPOT_BOUNDED` across the race-engine products. A depot flood
+can stop after discovering the requesting walkable origin. Partial fields
+serve only discovered origins, never unreachable-component proofs; another
+unassigned origin rebuilds from the roots. Full-field callers and blocked
+origins still request a complete field. All queued walkability bits, including
+the unexpanded frontier, are restored. No new persistent frontier or pool,
+actor-limit reduction or RAM-reserve change is introduced.
+
+Eighteen depot oracle configurations cover packed/nibble directions, partial
+point fields, visited-grid borrowing, read-only grid access, blocked origins,
+cache churn, rectangular maps and 128-by-128 maps. Capability tests verify
+the common flag appears once and reject its use without the race engine.
+Default doctor/build/test passes (678 Python tests, 16 optional skips, the
+separate eight-test suite and C fixtures), as do unified build/test and the
+full Terran host aggregate. The latter remains source-map/hidden-world host
+probe coverage, not ordinary-menu ARM campaign completion. All 54 individual
+normal-input skirmish results match the earlier exact-default evidence; 702
+startup/save configurations and 27 construction cases pass.
+
+The paired busy Zerg three-AI sample decreases from 711,493,203 to 695,201,548
+guest cycles over 1,000 updates: 23.58 to 24.13 effective fps, with all 8,948
+state and framebuffer observations matching. This is a nonterminal sample,
+not steady-30-fps, whole-campaign or physical-hardware qualification. The
+four canonical ARM links retain the fixed guards; EWRAM/IWRAM headroom in
+bytes is Terran 28,480/488, Zerg 28,372/64, Protoss 23,828/952 and Showcase
+200/56. Actual per-TU arguments, raw dependencies, input hashes, ELF/maps/ROMs,
+comparison logs and the zero-mismatch source closure are retained privately
+in `default-depot-bounded-v1`. The reused baseline runtime inputs are checked
+against the current default Git tree and the independently qualified PR #169
+products; an earlier mismatching PR #168 comparison is not baseline evidence
+for this batch. No proprietary data is committed and no Actions run occurred.
+
+### Reuse resolved source-projectile metadata (2026-10-30)
+
+The shared tracer renderer now unpacks a tagged projectile and resolves its
+attack profile once for offscreen culling and drawing. The packed-key wrappers
+remain available; malformed keys and absent profiles still produce no effect.
+The resolved values live on the stack. No simulation, damage timing, persistent
+storage, actor limits or RAM reserves change.
+
+The actual preceding renderer header and the resolved path produce the same
+frame digest across 1,410,048 generated-bank cases, including headings, motion
+ages, fog, clipping, mirrored poses and child overlays. The fixture reports
+344,832 culls, 163,060 drawn cases and digest `403bcc76fe61a883` for both
+implementations. The fixture uses a deterministic test compositor; the separate
+production replay matches all 8,928 advancing gameplay and actual framebuffer
+observations. The numeric capture counter is not treated as a pixel digest.
+
+The same busy Zerg three-AI window takes 693,601,985 cycles instead of
+697,484,133: 0.557% less work, 24.05 to 24.19 effective fps. This is one
+nonterminal workload, not a universal 30-fps or physical-hardware result.
+The public bank fixture checks both wrapper and direct resolved paths,
+malformed keys and absent profiles. Private independent-oracle sources retain
+the frozen preceding header; wrapper-versus-wrapper checks alone are not
+claimed as an independent implementation comparison.
+
+Default doctor/build/test (686 Python tests, 17 optional skips and the separate
+eight-test suite), unified build/test and the full Terran host aggregate pass
+on the exact final three-file source snapshot. Host-controller information
+limits remain unchanged. All four canonical ARM links keep their preceding
+memory bounds. The final capture uses the actual Make flags without injecting
+an additional depot define; its ROMs are byte-identical to the previously
+qualified canonical products. The timed raw Zerg image has the same game
+payload as the normally packaged image, apart from the cartridge header and
+unused tail padding.
+
+Actual per-TU commands, raw dependencies, source/input hashes, maps, product
+comparisons and logs are private in `vfx-resolved-tracer-v1`,
+`vfx-resolved-final-gates-v1` and `vfx-resolved-final-arm-v1`. The gate closure
+reports no consumed-input drift and no symlinks in its input trees. This stage
+does not claim a repeated full P7 win or fresh Bunker SRAM replay; those remain
+earlier-stage evidence. Full roster services, all campaigns, broader visual
+fidelity and near-30-fps performance remain unfinished.
+
+### Default-branch resolved projectile metadata (2026-10-30)
+
+Independently qualified on default `26a2fec`, this shared rendering change
+unpacks a tagged tracer and resolves its attack profile once, reusing those
+values for offscreen culling and drawing. Packed-key APIs remain available;
+malformed keys and absent profiles retain their no-effect behavior. Values
+live on the stack, with no simulation, damage timing, persistent pool, actor
+limit or RAM-reserve change. This excludes the draft roster/service work.
+
+The frozen preceding default renderer and the new resolved path match all
+1,410,048 generated-bank cases and digest `403bcc76fe61a883`, including
+headings, motion ages, fog, clipping, mirrored poses and child overlays.
+That fixture uses a deterministic test compositor; the separate production
+Zerg replay matches all 8,948 gameplay and framebuffer observations. Its
+1,000-update busy three-AI sample improves from 695,201,548 to 691,839,468
+guest cycles, or 24.13 to 24.25 effective fps. This is one nonterminal
+workload, not steady-30-fps, complete-campaign or hardware qualification.
+
+Default doctor/build/test passes (678 Python tests, 16 optional skips and
+the separate eight-test suite), as do unified build/test and the full Terran
+host aggregate. Host controllers retain their source-map/hidden-world
+information limits. Four canonical ARM builds preserve the fixed guards;
+EWRAM/IWRAM headroom in bytes is Terran 28,480/488, Zerg 28,372/64, Protoss
+23,828/952 and Showcase 200/56. Actual Make flags are recorded without
+injected definitions. Paired consumed inputs differ only in the intended
+game and renderer source; generated assets, other inputs and toolchain match
+the baseline. Commands, raw dependencies, input/source hashes, maps and
+comparisons are private in `default-resolved-tracer-v1`. The earlier #171
+54-match, 702 startup/save and 27 construction results are baseline evidence
+for unchanged gameplay paths, not new runs of this renderer-only stage.
+No Actions were run and no proprietary inputs are committed.
+
+### Source sprite birth offsets and clock domains (2026-10-30)
+
+On terrain integration `d924f54`, source opcode 21 (SPROLUSELO) now uses the
+parent image's imported LO offset at sprite birth, including facing and
+mirroring. The birth sample uses absolute source-animation time even when
+presentation uses time relative to weapon release. Negative relative births
+and loop iterations retain that distinction. Older generated banks are
+rejected at compile time; regenerate them with the updated importer.
+
+The authenticated bank has six such events bound to five attack profiles:
+Hydralisk ground/air, Drone ground and Hunter Killer ground/air. Tests cover
+both headings, imported child pixels and offsets, and the source/relative
+clock counterexample. The old helper fails that counterexample; the corrected
+helper passes. The Drone attack inherits a pre-attack frame unavailable to
+this renderer and retains its existing frame-zero fallback. Global sprite
+elevation/order, general native VM semantics and exact N64 execution remain
+unproven; this is not an all-projectile fidelity claim.
+
+The exact nine source files pass the frozen clock candidate's doctor,
+default build/test, unified build/test and full Terran host aggregate. On
+the combined terrain/source-offset snapshot, all four canonical ARM products
+pass the unchanged reserve guards with captured per-TU dependencies and the
+same authenticated generated bank. Cached/fresh rendering matches 512 scenes
+per profile with actual engine traces, across the five attack profiles, both
+headings and ages 7/8. Separate real-bank child-overlay scenes also match
+512 cases per profile and assert that the child changes pixels; the engine
+trace comparison alone does not instrument the child draw independently.
+All frozen source/input hashes remain unchanged after testing.
+
+Private provenance is in `iscript-event-clock-v1` and
+`terrain-clock-combined-v2`, including the negative oracle, bank/profile
+composition, four ARM links and scene logs. The preceding terrain-only
+timings remain measurements of that stage; no new combined fps or campaign
+completion result is claimed. Source only; no Actions or hardware claim.
+
+### Shared terrain window transfer (2026-10-30)
+
+On integration base `81fc21b`, the terrain cache uses a specialized aligned
+DMA3 window transfer for horizontal shifts. It may overwrite only edge tiles
+that the caller redraws before presentation. The generic window API remains
+unchanged; partial rows, unaligned shifts and narrower scene clips use it.
+The shared cache serves campaign, custom-game and Showcase products without
+adding persistent storage or reducing actor limits or RAM reserves.
+
+The promoted six-file patch matches the frozen v3 source byte for byte.
+Its Make-wired sanitizer fixture passes 5,292 clipped-window cases; removing
+the narrow-clip fallback reproduces the regression caught during development.
+Four prepared-profile scene fixtures each pass 512 camera-phase/direction
+cases with fog, construction, mineral depletion and static objects on exposed
+edges. The default build/test and source-boundary checks pass. The preceding
+v2 runtime also passes doctor, unified build/test and the full Terran host
+aggregate. V3 adds the permanent test wiring: its four canonical ARM ROMs,
+ordered compiler arguments and consumed inputs match v2 exactly, so that
+runtime evidence transfers by identity rather than being claimed as rerun.
+All four links preserve the fixed EWRAM and IWRAM reserve guards.
+
+Paired real ARM-emulator custom-game samples, 1,000 updates each, preserve
+every observed gameplay/framebuffer row: Terran 8,926, Zerg 8,928 and Protoss
+8,927. Guest cycles fall from 613,489,611 to 605,343,334 (27.35 to 27.72 fps),
+693,601,985 to 682,929,112 (24.19 to 24.57 fps), and 613,726,043 to 604,206,765
+(27.34 to 27.77 fps), respectively. These are busy nonterminal samples,
+not full campaign wins, steady 30 fps or physical-hardware measurements.
+Initial unguarded prototype measurements are superseded by these results.
+
+Private evidence is in `terrain-transfer-final-v2` and
+`terrain-transfer-final-v3`: raw dependencies, executed compiler arguments,
+source/input hashes, maps, paired replays, regression and scene logs, and
+`final-closure.json` record zero drift and the ROM identity checks. No Actions
+were dispatched and no proprietary inputs are committed. Full roster services,
+remaining campaigns and broader fidelity/performance qualification stay open.
+
+### Default-branch terrain transfer (2026-10-30)
+
+Independently extracted on `ae691253`, the shared terrain cache transfers aligned
+horizontal windows with one bounded DMA3 operation, then redraws exposed edge
+tiles. Generic windows, unaligned shifts, partial boundary rows and narrower
+scene clips retain their existing path. No persistent buffers, actor limits,
+sight ranges or RAM reserves change. The six executable/test files were
+qualified at `dfda937`; the later validation addition changes documentation only.
+
+Local source-boundary, doctor, default build/test, unified build/test and the
+full Terran host aggregate pass. Sanitizer checks cover 5,292 clipped-window
+cases and four prepared profiles with 512 cached/fresh scene comparisons each.
+All four normal ARM links preserve the fixed guards; remaining EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. Captured Make commands, per-TU dependencies and input hashes match the
+private input copies. Public-main weapon and P7 fact banks were used; this
+extraction does not include the draft roster services or source-birth offset fix.
+
+A separate port-free mGBA probe uses actual production flags and replaces only
+main. Over 1,501 play ticks after a normal-menu launch (observed mission field
+8), alternating horizontal camera input produces matching selected-state and
+displayed-framebuffer rolling hashes at all four checkpoints. Timed update,
+audio and rendering work, including presentation waits, falls from 992,093,504
+to 983,925,857 guest cycles, a 0.823 percent reduction for this workload. This
+is hash-based observational evidence, not byte-for-byte state proof, steady
+30 fps or physical-hardware qualification. An initial whole-VRAM hash included
+audio scratch/offscreen data and is superseded by the displayed-page probe.
+
+Evidence remains private in `terrain-public-extract-v1`. The Terran host gate
+wrote four controller-trace outputs inside its independent copy; all other
+75 preexisting prepared files remained identical. No shared inputs were
+regenerated, no Actions were dispatched and no proprietary data is committed.
+
+
+### Shared visibility count spans (2026-10-30)
+
+Qualified on integration runtime `7871191` at private commit `01cc02bf`, this
+change writes visibility and its minimap occupancy only when a cell crosses
+zero sources, and updates the ninth source-count bit only at 255/256. A
+bounded ROM helper applies row spans without repeated per-cell call setup.
+Source sight geometry, exploration, source-slot limits, saved state and RAM
+reserves are unchanged. Reset clears counts and visibility together before
+rebuilding sources, preserving the count/grid invariant used by the fast path.
+
+The exact three adopted source/test files pass independent ASan/UBSan full-grid
+reference-count, visible/explored-grid and minimap oracles. Cases include
+30-source ownership batches, 250 to 280 to 250 overlap, all-edge out-of-map
+centers, empty spans and a 511 to 510 to 255 to zero source sequence. Default
+source/doctor/build/test, unified build/test and the full Terran host aggregate
+pass on the frozen candidate. Four production-vector ARM builds preserve
+all existing bounds: EWRAM/IWRAM spare bytes remain Terran 28,536/328, Zerg
+28,444/48, Protoss 23,900/952 and Showcase 272/56. Recorded consumed-input
+hashes differ only in the intended header, with no missing dependencies.
+
+A port-free paired T5 replay has 22 nonempty 500-tick windows through tick
+11,000. The ownership-transfer sight peak drops from 3,065,139 to 2,122,219
+guest cycles (30.76 percent); summed sight work drops from 346,715,658 to
+341,592,769 (1.48 percent). Summed full-frame cycles change from 7,613,203,711
+to 7,606,083,937, about 0.094 percent less work for this short interval.
+The reported checkpoint state/fog digests match. Seven separately measured
+palette-resolved 240 by 160 bitmap CRCs at ticks 7,500 through 10,500 also
+match. These observations are not every-frame/full-state equivalence, a full
+campaign result, general FPS improvement or physical-hardware qualification.
+An empty duplicate final timing row is excluded from all aggregates.
+
+Evidence remains private under `sight-span-private-20261030/.local/checks`
+and `.local/probe`, with the earlier candidate retained separately. Four
+controller-trace test outputs changed during the Terran gate; the other 190
+copied inputs were unchanged, with no asset-generation recipes. Source only;
+no Actions were dispatched. Battlecruiser/Yamato remains separate experimental
+work, and full roster/campaign and near-30-fps goals remain unfinished.
+
+### Default visibility span counts (2026-10-30)
+
+This independently extracted optimization updates cell visibility/minimap
+occupancy only at zero-source transitions and the ninth count bit only at
+255/256. A bounded ROM row helper avoids repeated per-cell call setup.
+Sight ranges, geometry, explored state, source slots, persistent storage
+and RAM reserves remain unchanged. Independent full-grid/count/minimap
+oracles cover ownership batches, 255/256 transitions, 511-source sequences,
+out-of-map centers and empty spans.
+
+Exact visibility commit `673d890` on default `71a134df` passes source/doctor,
+default build/test, unified build/test and the full Terran host aggregate.
+Current-default integration `e6f821d` on `fdb63f3` passes source/doctor/default
+build, focused sanitizer oracles and four actual Make ARM captures plus normal
+links. Each profile's source and input closure is verified. Spare EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. The later base change contains only PR176's generated-map mineral-style
+initialization and its fixture assertions. The full gates/timing were not
+rerun on that integrated head; the visibility code is identical, the base
+change was independently qualified and its new combined ARM links were checked.
+
+The fresh port-free T5 comparison at `673d890` has 22 nonempty timing windows
+and 10,991 gameplay ticks. Selected-state/fog checkpoint hashes and seven
+palette-resolved framebuffer CRCs agree. Peak sight cost at tick 9,000 falls
+from 3,062,662 to 2,122,499 guest cycles (30.70 percent). Summed sight cost is
+346,957,909 to 342,107,187 (1.398 percent less); full-frame cost is
+7,645,233,405 to 7,638,767,300 (0.0846 percent less). This one shortened
+emulator trace does not establish general FPS, all-frame/state equality,
+physical hardware behavior or full campaign completion.
+
+Private records are in `visibility-public-v1` and `visibility-fdb-v1`. Four
+private controller traces were rewritten by the host gate; other prepared
+inputs were preserved. Some completed auxiliary unified/Terran test-build
+images were removed during disk cleanup without a prior per-file inventory;
+the four captured canonical ARM products, raw dependencies, probe products,
+source/input snapshots and test logs remain. No Actions were dispatched and
+no proprietary inputs are committed. The later documentation-only commit
+does not change the qualified executable/test files.
+
+
+### Shared integrated cartridge stage (2026-10-30)
+
+Runtime `b3d631c` combines the shared tech-tree/unit services with merged
+stock source sight, delayed projectile impacts, terrain DMA, source-birth
+overlay offsets, visibility spans and real generated-map mineral styles.
+The subsequent default-qualification merge changes documentation only.
+The default branch separately received the terrain transfer, canonical resume
+recipe repair, generated mineral sprites and visibility spans in PRs 174,
+177, 176 and 178. The larger service integration remains a draft.
+
+The integrated predecessor `7871191` passes default build/test, unified
+build/test, full Terran host aggregate, four normal ARM guards, six impact
+game vectors, four skirmish runtime vectors and twelve terrain/clock scenes.
+A fresh 54-match ordinary-input host matrix reaches terminal results across
+three products/both maps/all human races/one to three opponents (10 wins,
+44 losses). The canonical resume recipe exposed an early Make expansion
+defect for P7; the fixed recipes compile all three actual product vectors and
+pass 72 menu-driven save/continuation cases. Those match/save runs precede
+the later visibility and mineral changes and are not claimed as repeated
+on the final cartridge. The visibility candidate separately passes its full
+seven gates, four ARM guards and oracles, as recorded above.
+
+All four final `b3d631c` ordinary Make products pass source/command/dependency
+closure, reserve guards, 32 MiB header/payload/padding checks and package
+readback. Current weapon bank `99efc112` and P7 facts `ed228949` are used;
+the final mineral rendering fixtures pass on those actual inputs across
+all four products. These checks deliberately do not substitute older
+public-main bank qualification for the integration's inputs. EWRAM/IWRAM
+spare bytes are Terran 28,536/328, Zerg 28,444/48, Protoss 23,900/952 and
+Showcase 272/56. The Mac-only release is
+`20261030-sight-minerals-candidate`, with verified ZIP/member hashes and a
+scoped manifest. Existing KODAK delivery remains the earlier `66afaff`;
+these later ROMs were not copied after the card's safe eject.
+
+Evidence is private in `terrain-clock-main-*`, `shared-current-final-gates-v1`,
+`shared-current-skirmish-v1`, `sight-span-package-v2` and
+`sight-minerals-package-v1`. The shared source tracker and profile counts
+remain partial: Terran has ten campaign menu entries, Zerg six and Protoss
+seven. All thirty staged missions, full roster services and near-30-fps
+performance are unfinished. Pending-impact save capacity is eleven rows in
+P7 and ten in Zerg, with safe refusal if exceeded. Battlecruiser/Yamato
+remains private/default-off pending production integration and broader
+qualification. No Actions were dispatched and no proprietary assets are
+committed.
+## T9 ordinary-input qualification (2026-10-29)
+
+This record closes the T9 completion item left open in the 2026-10-26 and
+2026-10-28 sections, and only for what it measured. It covers a host
+completion with ordinary inputs and a normal-menu ARM replay of the same
+inputs in mGBA, on the commits and private inputs listed below. It does not
+cover physical hardware, saving and resuming inside T9, or other Terran controllers. The T5, T7 and T8 outcomes below are historical
+results on the stated runtime, not claims about current main.
+
+The result applies only to runtime `9ff7f7c`. It does not qualify any later
+runtime. To stay mergeable, this branch later merged `codex/source-release` at
+`97c39fa` (as `d8985c1`) and then at `ae69125` (as `f0c238b`). That base is
+57 commits past `9ff7f7c` and changes 33 files under `starcraft/` and
+`common/`. Neither merge nor the later integration with `2847ab0` was re-qualified; the replay
+audit below re-checks only the retained `9ff7f7c` logs. T9 needs a fresh host completion and ARM replay on any runtime
+that is to be qualified.
+
+Provenance of the qualifying run:
+
+- **Runtime:** `codex/source-release` at
+  `9ff7f7c6a8cd93937845203ca69a7ee669f77c58`, merged into this branch as
+  `0c754cc44f07039d657132f88c4c7ce2504b2be8`. `git diff 9ff7f7c 0c754cc --
+  starcraft common` is empty.
+- **Controller, probe and driver:** commit
+  `2d575f6509137cd986c04fbe03e2f48aa32a2e83`. The ROMs, trace and tape below
+  were built from that tree.
+- **Build-provenance capture:** commit
+  `70b86da7111c9ce0e838078de4490f1ba719dbbf`. After `2d575f6` the branch adds
+  only the capture tool, its test and documentation. The capture rebuilt both
+  ROMs byte for byte (see "Build provenance").
+
+### Why the earlier controller stalled
+
+`tests/sc64_t9_campaign_run.c` stopped at its 500,000-tick limit on base
+`a4ff09d` (43 Protoss buildings, one Wraith, wallet 42/14). The cause was the
+controller, not the engine:
+
+- Its ground-reachability check read the lazily built path grid before the
+  engine had built it, and it used 8-connected steps where engine routes use
+  four. Every mineral patch and geyser therefore looked unreachable. The
+  controller ferried an SCV to the home geyser by Dropship and tried to place a
+  second Command Center there, which failed. With a single long gas trip, gas
+  stayed near zero and only one Wraith was ever built. The whole T9 map is one
+  4-connected ground component.
+- Clicking an SCV while another SCV was still selected issued the engine's
+  repair order to the selected SCV. When the selected SCV was a builder, that
+  cancelled its construction (a Starport stayed at 1 HP).
+- The home mineral line holds 11,100 minerals and is mined out after roughly
+  20,000 ticks. Idle SCVs then take the nearest patch on the map, in the Zerg
+  base, and die there.
+- Flyers move on eight headings, diagonal first. A Wraith attack-move from the
+  base to the north-east Protoss base clips two Zerg Spore Colonies and
+  auto-acquires them. Any Force 3 building death is a native defeat trigger.
+
+### Controller policy
+
+The rewritten controller still enters through the compile-time mission-12
+probe and changes the world only through `game_update()` with ordinary keys.
+It never writes actors, resources, triggers or mission state, and it does not
+force phases or weaken objectives. Victory is the unchanged native trigger
+(Force 2 commands no buildings). The native defeat triggers stay live:
+Kerrigan's death, losing every unit, and any Force 3 building death.
+
+The policy reads only the player's own units, buildings and wallet; static
+terrain, minerals and geysers; and the immutable scenario placement table.
+From the placement table it takes the 43 Protoss structure sites as briefing
+targets and the 21 Zerg structure sites as no-fly zones. Hostile actors count
+only while their cell is in the player's current `visible` grid. Hostile
+buildings seen once are remembered at their last seen position until that
+cell is visible again without them. Diagnostic output (`--verbose`,
+`--final-inspect`, `--map`) may print more, but no input decision depends on
+it. Tick 1 is left neutral because on the normal menu the briefing's START
+frame runs that tick.
+
+Economy: the opening SCVs walk to the home line and the ordinary idle-worker
+rule assigns them patches. The controller builds a Starport, then a Refinery on
+the home geyser, and trains SCVs up to 20 while that line lasts. It keeps at
+least nine SCVs on minerals and puts up to ten on gas; once the home line is
+gone, every SCV goes to gas. Supply Depots are built ahead of demand and a
+third Starport follows. Fleet: Wraiths gather east of the mineral line. At 24,
+the clump launches as a wave whose membership the controller tracks itself.
+Each leg is planned on 32-pixel cells with a 192-pixel exclusion around Zerg
+structures and visible Zerg actors, plus a soft cost near visible Dragoons and
+remembered Photon Cannons. Waypoints are emitted at heading changes, so each
+eight-direction leg is flown as planned. The final leg is an attack-move on
+the nearest remembered Protoss building or uncleared briefing site.
+
+### Host completion
+
+```sh
+make test-sc64-t9-controller   # writes build/t9-arm/t9-controller.json
+./build/test-sc64-t9-campaign-run --trace PATH --verbose
+```
+
+The run wins at host tick 51,696 (frame 50,926): all 43 Force 2 buildings
+destroyed, all 21 Force 3 buildings intact, Kerrigan alive, zero trigger
+faults, phase 3, and the T9 completion bit set. 42 Wraiths and 13 SCVs
+survive; the wallet ends at 40/5,850. Two runs produce byte-identical traces
+(SHA-256 `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74`,
+2,807 input transitions). The earlier runtime `a4ff09d` and the qualifying
+runtime `9ff7f7c` produce the same trace byte for byte. Before tick 1 was made
+neutral, the same policy won at tick 44,292.
+
+### Normal-menu ARM replay
+
+`tests/sc64_t9_arm_replay.c` replaces `common/main.c` in an otherwise
+canonical Terran build (`TERRAN_ROM_FLAGS`). The ROM boots, taps A, RIGHT×4, A
+and START through the ordinary campaign menu and briefing to mission 12, then
+plays the trace's key transitions through the shipped
+`game_update()`/`audio_update()`/`game_render()` loop. Observations go to the
+mGBA debug log; no debugger port is opened and nothing writes game state.
+`tools/sc64_t9_arm_replay.py run` starts one mGBA process with its own HOME,
+config and save directory and compares every ARM observation with the host
+trace's observation at the same tick.
+
+```sh
+make sc64-t9-arm-replay
+python3 tools/sc64_t9_arm_replay.py run --out build/emulator/t9-arm-replay
+python3 tools/sc64_t9_arm_replay.py audit build/emulator/t9-arm-replay/mgba.log
+```
+
+**Result: ARM win.** The qualifying run (hashes below) launched mission 12
+from the menu at frame 1 with zero faults and played all 2,807 tape entries.
+Every one of its 52 observations (launch, ticks 1,000–51,000 and the final
+tick) matched the host trace exactly: frame, screen, win and loss, faults,
+phase, objective flags, completion bits, Protoss and Zerg building counts,
+Kerrigan, unit counts, both resources and the selection. At tick 51,696
+(frame 50,926) the ARM build reports `won=1`, phase 3, objective flag 1,
+`race_completed=4096`, 0/43 Protoss Force 2 buildings, 21/21 Zerg Force 3
+buildings and Kerrigan alive, identical to the host. The driver reported
+`ok: true` after 163 seconds of wall time.
+
+The driver checks the whole probe log, not just its markers. A log qualifies
+only with exactly the probe's line order:
+
+1. START
+2. the seven menu keys
+3. LAUNCH ok
+4. one CHECK/CHECK2 pair per observation
+5. both timing records
+6. DONE
+
+Every line must parse completely, with every field in the probe's order.
+Each line is checked against the trace and the probe's schedule:
+
+- START must give the trace's tape length and stop tick.
+- The menu keys must be the normal route.
+- LAUNCH must report 13 menu frames, one mission frame, the play screen,
+  mission 12 and
+  `race_mode=0`.
+- DONE must have consumed every tape entry.
+- Each CHECK2 must carry the tick of the CHECK before it.
+- Observations must fall exactly on tick 1, every 1,000 ticks and the stop
+  tick.
+
+A repeated tick and kind is rejected rather than merged, as is a periodic and
+terminal pair that disagrees at the stop tick. Asset-free tests cover each of
+these and the reviewed counterexamples. Those counterexamples are a `T9 LAUNCH
+ok` or `T9 DONE` marker without its fields, and conflicting `CHECK2` lines
+appended after DONE.
+
+The host trace must also be a complete reference on its own, before any log
+is read. Every observation must carry every compared field as an integer.
+Periodic observations must fall on every 1,000 ticks through the stop tick,
+once each, and every row must be an input, the start, a periodic, a terminal
+or one of the controller's labelled checkpoints. Earlier, the comparison
+checked only the observations and fields the trace supplied: with the host's
+tick-1000 periodic record removed, an ARM `gas=999` there still passed, with
+one observation compared. Asset-free tests now cover a missing periodic
+record (including at the stop tick), an off-cadence or repeated one, a
+missing or non-integer field, an unknown kind, and that counterexample.
+
+`audit` re-ran these checks on 2026-10-30 against the retained evidence. The
+host trace (`8868402d…`) loads: 51 periodic observations at ticks
+1,000–51,000, the start, two labelled checkpoints and the tick-51,696 win, all
+complete. The qualifying log (SHA-256
+`82b4f4bf6e7385888fb660297749c5cfac1a4a7f020d40a8c394e5cdb03cb9bb`, 118 probe
+lines) passes against it, with 52/52 observations matched and no log or
+timing errors. Injecting the reviewed counterexamples into a copy of the log
+makes it fail. Removing the trace's tick-1000 periodic record, or the `gas`
+field of its tick-2000 one, makes the trace fail to load. That counterexample
+needed an edited trace: it does not show a divergence in the recorded run.
+
+Guest-cycle timing comes from the GBA timers (TM2/TM3 at 16,777,216 Hz).
+These are emulator guest cycles, not a physical-hardware measurement. The
+mission counters start on the briefing's START release, which runs tick 1, so
+they cover exactly the 51,696 mission frames. The 13 boot, menu and
+START-press frames before it are reported separately (16,837,365 cycles). The
+driver rejects a run without exactly one well-formed record of each kind, or
+whose mission record does not cover ticks 1..stop, or whose buckets do not sum
+to its frames.
+
+| Mission measure (ticks 1–51,696) | Value |
+| --- | --- |
+| Total cycles | 57,803,662,926 (3,445.4 guest seconds) |
+| Mean per frame | 1,118,146 cycles (3.98 VBlank periods; effective 15.0 fps) |
+| `game_update()` share | 23,304,360,278 cycles (40.3%) |
+| Peak frame | 12,612,714 cycles (44.9 VBlank periods) |
+| Frames by rounded VBlank periods (0…6, ≥7) | 0, 0, 3,348, 20,666, 14,019, 7,731, 3,239, 2,693 |
+
+The mean is well above one 280,896-cycle VBlank period. On this build T9 runs
+at roughly a quarter of the 60 Hz frame rate in its late, unit-heavy phase.
+That is a performance observation, not a qualification failure; performance is
+tracked separately.
+
+Superseded runs are not part of this record's evidence, and the stricter audit
+rejects each of them:
+- A replay on runtime `a4ff09d` (branch commit `10fc402`) also matched 52/52,
+  but its timing included the menu frames. It has no separate menu timing
+  record, so its log is out of shape.
+- Three earlier partial replays were stopped by wall-clock caps and a full host
+  disk, so their logs end before the final observation. They had logged mGBA
+  at mask 127, which records every DMA. The driver now uses decimal mask 7
+  (fatal, error and warn).
+
+### Hashes and inputs
+
+| Item | SHA-256 |
+| --- | --- |
+| Canonical Terran ROM `build/StarCraft-Terran-GBA.gba` (32 MiB) | `685788ff1909fd532d4d128e18d5bd4c108b13b581c4d248672e9900783954df` |
+| Its retained ELF | `5fcb78f02d5c4cce8608c13b1786283328ac8a9a4ea289bae544325f58119a18` |
+| Replay ROM `build/StarCraft-Terran-T9-ARM-Replay.gba` (32 MiB) | `3a8986dcf5e71e1c4aef7d984e883904ad80cf2e912ccb8740da40e0f19d5276` |
+| Its retained ELF | `0a57e591b1dab8a30426b581006d3f4b54f59b84836ad2b39da07f49a9ef4e49` |
+| Host trace `build/t9-arm/t9-controller.json` | `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74` |
+| Generated tape header | `3a70737c14a909f48752f287854287e96b27a3a427c6f54270315b585eb45a9a` |
+| Private T9 scenario header | `e879cf500ce748efff5ede644e4d1790b5cdf9380de9fc95406ca362175cc0bd` |
+| Private T9 availability header | `cf4996518f08027a487fc499c188c7855dbf9c77a77b3e9c467f28a1649ab517` |
+| Private late-Terran race header | `9231da838e256a48dfd3d06f63708f5f05c9afe2326ccfeceb07e337cc35c0bf` |
+| Private late-Terran sprite header | `b7a9f5dde6984567d07e46adabdb3a3bbca4dec1d72c68260bfdd4a39e7b3ae4` |
+| Format-2 audio bank (advisor build) | `bd0adfd0ce83c0bb054d40c8f6bc69d91a55ca0f846f7ada56d48d98d7f72427` |
+
+The private inputs come from the StarCraft 64 USA ROM with SHA-1
+`a36d91b5aac7bb95df0d7de5f9814f5270e25c2b` and the pinned `sc64-maps`
+checkout at `09b57f787a247107d1de82b8c5eab2734667ea1d`. They are prepared
+locally and stay out of Git, as do the trace, tape, ROMs and emulator logs.
+The replay ROM links within the unchanged IWRAM guard
+(`__iwram_end = 0x03004e38 < 0x03005000`) and BSS guard
+(`__bss_end = 0x020369b0 < 0x0203e000`) in `common/gba.ld`.
+
+### Build provenance
+
+`docs/provenance/t9-9ff7f7c/` records the executed builds of both ROMs. It was
+captured by `tools/sc64_t9_build_provenance.py` from the real `make` recipes
+with the compiler driver wrapped, not from a dry run. For each ROM it holds:
+
+- the driver argv and every executed `cc1`, `as` and `collect2` argv, in order
+- each unit's ordered `-D` and `-I` options as `cc1` received them, with every
+  `-I` ahead of the `-D` options and the driver-added `-D__USES_INITFINI__`
+- each unit's raw `-MD` dependency file
+- SHA-256 manifests of every consumed source, generated header, audio blob,
+  linker script, library and toolchain binary
+
+Its README gives the command and method. The rebuild matched both ROM hashes
+above byte for byte. Against the retained ELFs that produced the qualifying ROMs, the
+rebuilt ELFs differ in 12 bytes, all in `.strtab`. Those bytes are two local
+`FILE` symbols named after the driver's random temporary objects. Every other
+section, including code, data, IWRAM and DWARF, is identical. The ELF hash
+therefore changes on every build, and the ROM hash identifies the build. The
+sorted `make -n` flag-set hash in earlier revisions of this record could not
+establish include order or the consumed inputs, and the provenance folder
+replaces it.
+
+### Other checks in this environment
+
+All of these ran on the qualifying tree (runtime `9ff7f7c`, branch code
+`2d575f6`):
+
+- `./dev build` passes.
+- `./dev test` runs 663 Python checks. The only failure is the Protoss
+  sprite-roster case of `test_sc64_photon_cannon_renderer`. It cannot find the
+  private `sc64_fact_tables_generated.h` in this checkout's inputs, and it
+  fails the same way on unmodified base.
+- `./dev sc64 build --profile terran` passes.
+- `./dev sc64 test --profile terran` passes T1–T4, then stops at the T5
+  controller, which loses at tick 111,945. Unmodified `a4ff09d` loses T5 at
+  the same tick with the same inputs.
+- Run individually past that stop:
+  - T6 wins at tick 19,552.
+  - The late world, save and repair tests pass.
+  - T9 wins at tick 51,696.
+  - T10 wins at tick 3,552.
+  - T7 does not win by its 60,000-tick limit, and T8 does not win by 200,000.
+    Unmodified `a4ff09d` gives identical results for both.
+
+This branch changes neither the runtime nor the T5, T7 or T8 controllers, so
+those three results are also the results of unmodified `9ff7f7c`. The
+regressions are outside this change and remain open.
+
+No physical-GBA result is claimed.
+
 ## Source walk cycles and facing in every race ROM (2026-10-29)
 
 `RACES_FLAGS` now carries `SC64_UNIT_FACING` and the new

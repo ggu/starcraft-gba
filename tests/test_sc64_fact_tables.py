@@ -24,6 +24,11 @@ NON_GATES = {"SC64_ZP_FACT_RANGE_CULL", "SC64_FACT_TABLES"}
 CONFIGS = {name: ("SC64_RACES",) + defines
            for name, defines in FACT_RANGE_CONFIGS.items()}
 CONFIGS.update({
+    "shared_battlecruiser": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
+                            "SC64_BATTLECRUISER_EXPERIMENT"),
+    "all_race_roster": ("SC64_RACES", "SC64_UNIFIED", "SC64_ZP_CAMPAIGN_ACTORS",
+                        "SC64_Z5_ACTORS", "SC64_Z5_DOODADS", "SC64_Z6_RUNTIME",
+                        "SC64_Z6_ACTORS", "SC64_SKIRMISH_ROSTER"),
     "zp_p7_projectiles": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
                           "SC64_P7_ACTORS", "SC64_P7_PROJECTILES_ENABLED"),
     "zp_p7_carrier": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_P7_ACTORS",
@@ -39,6 +44,11 @@ CONFIGS.update({
                   "SC64_Z7_EGG_PRODUCTION"),
     "zp_nydus": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_Z6_ACTORS",
                  "SC64_Z6_RUNTIME", "SC64_NYDUS_ENABLED"),
+    "zp_z6_shared_scourge": ("SC64_RACES", "SC64_UNIFIED", "SC64_ZP_CAMPAIGN_ACTORS",
+                              "SC64_Z6_ACTORS", "SC64_Z6_RUNTIME", "SC64_SHARED_SCOURGE_COMBAT"),
+    "p7_shared_scourge": ("SC64_RACES", "SC64_UNIFIED", "SC64_P3_ENABLED",
+                          "SC64_ZP_CAMPAIGN_ACTORS", "SC64_P7_ACTORS",
+                          "SC64_SHARED_SCOURGE_COMBAT"),
     "zp_p8_data": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
                    "SC64_P8_DATA_ENABLED"),
     "p7_move_profile": ("SC64_RACES", "SC64_UNIFIED", "SC64_P3_ENABLED",
@@ -111,13 +121,46 @@ class FactTablesTest(unittest.TestCase):
     def test_tables_reject_a_build_with_different_gates(self):
         with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-gate-") as directory:
             table_dir = generate(self.compiler, CONFIGS["zp_p7"], directory, "zp_p7")
-            for other in ("zp_p7_projectiles", "zp_p6", "zp"):
+            for other in ("zp_p7_projectiles", "zp_p6", "zp", "all_race_roster"):
                 with self.subTest(build=other):
                     built, _ = compile_program(
                         self.compiler, CHECK, CONFIGS[other] + ("SC64_FACT_TABLES",),
                         directory, other + "-mismatch", ("-I", str(table_dir)))
                     self.assertNotEqual(built.returncode, 0)
                     self.assertIn(b"fact tables were generated", built.stderr)
+
+    def test_tables_reject_shared_scourge_mismatch_both_directions(self):
+        base = CONFIGS["zp_z6_runtime"]
+        shared = base + ("SC64_SHARED_SCOURGE_COMBAT",)
+        with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-scourge-") as directory:
+            for name, generated, used, message in (
+                ("off-to-on", base, shared, b"generated without SC64_SHARED_SCOURGE_COMBAT"),
+                ("on-to-off", shared, base, b"generated with SC64_SHARED_SCOURGE_COMBAT"),
+            ):
+                with self.subTest(direction=name):
+                    table_dir = generate(self.compiler, generated, directory, name)
+                    built, _ = compile_program(self.compiler, CHECK, used + ("SC64_FACT_TABLES",),
+                                               directory, name + "-check", ("-I", str(table_dir)))
+                    self.assertNotEqual(built.returncode, 0)
+                    self.assertIn(message, built.stderr)
+
+    def test_tables_reject_bc_energy_yamato_mismatch_both_directions(self):
+        base = CONFIGS["zp_p7"] + ("SC64_BATTLECRUISER_EXPERIMENT",)
+        with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-bc-") as directory:
+            for gate in ("SC64_BATTLECRUISER_ENERGY_EXPERIMENT",
+                         "SC64_BATTLECRUISER_YAMATO_EXPERIMENT"):
+                for name, generated, used, state in (
+                    ("off-on", base, base + (gate,), "without"),
+                    ("on-off", base + (gate,), base, "with"),
+                ):
+                    label = gate + name
+                    with self.subTest(gate=gate, direction=name):
+                        table_dir = generate(self.compiler, generated, directory, label)
+                        built, _ = compile_program(self.compiler, CHECK,
+                            used + ("SC64_FACT_TABLES",), directory,
+                            label + "-check", ("-I", str(table_dir)))
+                        self.assertNotEqual(built.returncode, 0)
+                        self.assertIn(f"generated {state} {gate}".encode(), built.stderr)
 
     def test_tables_reject_carrier_flight_gate_mismatch(self):
         with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-flight-") as directory:

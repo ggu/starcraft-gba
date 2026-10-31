@@ -66,6 +66,27 @@ static void test_actual_shot(int type,int owner,int air)
     assert(u[target].hp+u[target].shield==after);
 }
 
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+    defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
+static void test_scourge_impact(void)
+{
+    clear_world();
+    int attacker=spawn_unit(SIDE,U_SCOURGE,64,48);
+    int target=spawn_unit(ENEMY,U_WRAITH,65,48);
+    assert(attacker>=0 && target>=0);
+    u[target].hp=u[target].maxhp=200; u[target].shield=20; u[target].armor=3;
+    int supply=supply_used;
+    int profile=sc64_weapon_vfx_unit_profile(U_SCOURGE,1);
+    assert(sc64_weapon_vfx_style(profile)==SC64_WEAPON_VFX_STYLE_BURST);
+    tick_combat(&u[attacker],target);
+    assert(!u[attacker].alive && supply_used==supply-1);
+    assert(u[target].shield==0 && u[target].hp==113);
+    assert(tracers[0].color==profile && tracers[0].life>0);
+    tick_combat(&u[attacker],target);
+    assert(u[target].hp==113);
+}
+#endif
+
 static void test_fog_camera_and_overflow(void)
 {
     clear_world();
@@ -112,7 +133,8 @@ int main(void)
     gba_init(); game_init();
     race_mode=1; race_human=R_ZERG; race_bots=1;
     race_skirmish_init(); screen=SCREEN_PLAY;
-    _Static_assert(sizeof(Tracer)==6*sizeof(int),"visual metadata keeps tracer layout");
+    /* Visual metadata never grows a tracer; race builds keep 16-bit endpoints. */
+    _Static_assert(sizeof(Tracer)==4*sizeof(s16)+2*sizeof(int),"visual metadata keeps tracer layout");
     test_profiles();
     int types[]={U_MARINE,U_FIREBAT,U_HYDRALISK,U_HUNTER_KILLER,U_ZERGLING,
         U_ZEALOT,U_DRAGOON,U_GOLIATH,U_WRAITH,U_SCOUT,U_TANK,U_SIEGE_TANK,
@@ -122,6 +144,10 @@ int main(void)
     }
     test_actual_shot(U_GOLIATH,SIDE,1); test_actual_shot(U_WRAITH,SIDE,1);
     test_actual_shot(U_SCOUT,SIDE,1); test_actual_shot(U_MUTALISK,SIDE,1);
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+    defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
+    test_scourge_impact();
+#endif
     test_fog_camera_and_overflow(); dump_gallery();
     puts("PASS actual ground/air shots, impact lifetimes, HUD/fog/camera clipping, pool overflow and immediate-damage contract");
     return 0;

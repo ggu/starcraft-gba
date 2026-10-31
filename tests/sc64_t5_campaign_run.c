@@ -69,7 +69,7 @@ static int reachable_location_distance(int sx, int sy, unsigned location,
     if (!out_x || !out_y || start < 0 || start >= MAP_CELLS || !location ||
         location > sc64_t5_scenario.location_count) return -1;
     const Sc64T4Location *r = &sc64_t5_scenario.locations[location - 1];
-    build_path_grid();
+    if (!path_grid_valid) return -1;
     memset(seen, 0, sizeof(seen)); memset(distance, 0, sizeof(distance));
     seen[start] = 1; queue[tail++] = (u16)start;
     while (head < tail) {
@@ -99,7 +99,7 @@ static int reachable_actor_location_point(int slot, unsigned location,
         !location || location > sc64_t5_scenario.location_count) return -1;
     int start = u[slot].x / 16 + (u[slot].y / 16) * MAP_COLS;
     const Sc64T4Location *r = &sc64_t5_scenario.locations[location - 1];
-    build_path_grid();
+    if (!path_grid_valid) return -1;
     memset(seen, 0, sizeof(seen)); memset(distance, 0, sizeof(distance));
     seen[start] = 1; queue[tail++] = (u16)start;
     while (head < tail) {
@@ -157,7 +157,8 @@ static int nearest_enemy_approach(int *out_x, int *out_y)
     if (!out_x || !out_y || lead < 0) return -1;
     int start = u[lead].x / 16 + (u[lead].y / 16) * MAP_COLS;
     if (start < 0 || start >= MAP_CELLS) return -1;
-    build_path_grid(); memset(seen, 0, sizeof(seen));
+    if (!path_grid_valid) return -1;
+    memset(seen, 0, sizeof(seen));
     memset(distance, 0, sizeof(distance)); seen[start] = 1; queue[tail++] = (u16)start;
     while (head < tail) {
         int cell = queue[head++], col = cell % MAP_COLS, row = cell / MAP_COLS;
@@ -193,7 +194,8 @@ static int nearest_enemy_approach_from_mode(int sx, int sy, int *out_x, int *out
     static u16 queue[MAP_CELLS], distance[MAP_CELLS];
     int start = sx / 16 + (sy / 16) * MAP_COLS, head = 0, tail = 0;
     if (!out_x || !out_y || start < 0 || start >= MAP_CELLS) return -1;
-    build_path_grid(); memset(seen, 0, sizeof(seen));
+    if (!path_grid_valid) return -1;
+    memset(seen, 0, sizeof(seen));
     memset(distance, 0, sizeof(distance)); seen[start] = 1; queue[tail++] = (u16)start;
     while (head < tail) {
         int cell = queue[head++], col = cell % MAP_COLS, row = cell / MAP_COLS;
@@ -301,14 +303,15 @@ static void tap(u16 key)
     step(0);
 }
 
-/* Field controls reopen the order list on the last command. These
- * sequences were written for a list that opens on Move, so a fresh
- * open starts there (no extra input, so the run's timing is unchanged). */
+/* Field controls reopen the order list on the last command. Navigate
+ * back to Move with normal inputs for callers that start from that row. */
 static void tap_b(void)
 {
     int fresh = !menu_open && mode == MODE_NORMAL;
     tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+    for (int guard = 0; fresh && menu_open && menu_cursor != MENU_MOVE &&
+         guard < field_menu_count() && host_ticks < (u32)run_limit; ++guard)
+        tap(KEY_UP);
 }
 
 static int controller_normalize_field(void)
@@ -389,13 +392,15 @@ static int select_human_group(void)
 
 static int command_group_to(int x, int y, int attack_move)
 {
-    if (!select_human_group()) return 0;
-    tap_b();
-    if (attack_move) tap(KEY_DOWN);
-    tap(KEY_A);
-    move_cursor(x, y);
-    tap(KEY_A);
-    return 1;
+    int issued = 0;
+    for (int i = 0; i < MAX_UNITS && host_ticks < (u32)run_limit &&
+         screen == SCREEN_PLAY && !won && !lost; ++i) {
+        if (!u[i].alive || u[i].owner != SIDE || IS_WORKER(u[i].type) ||
+            SC64_TRANSPORT_LOADED(&u[i]) || !sc64_game_unit_selectable(u[i].type)) continue;
+        if (controller_order_actor(i, x, y, attack_move)) ++issued;
+    }
+    fprintf(stderr, "T5 escort commands issued=%d; workers excluded\n", issued);
+    return issued > 0;
 }
 
 static int controller_order_actor(int slot, int x, int y, int attack_move)
@@ -410,8 +415,8 @@ static int controller_order_actor(int slot, int x, int y, int attack_move)
         if (!select_human_group()) return 0;
         move_cursor(u[slot].x, u[slot].y);
         tap(KEY_A);
-        return u[slot].alive && u[slot].selected && selected_count() == 1 &&
-               selected_building < 0;
+        if (!u[slot].alive || !u[slot].selected || selected_count() != 1 ||
+            selected_building >= 0) return 0;
     }
     int selected = 0;
     for (int retry = 0; retry <= MAX_UNITS && screen == SCREEN_PLAY &&
@@ -430,6 +435,8 @@ static int controller_order_actor(int slot, int x, int y, int attack_move)
     if (attack_move) tap(KEY_DOWN);
     tap(KEY_A);
     move_cursor(x, y);
+    if (!u[slot].alive || !u[slot].selected || selected_count() != 1 ||
+        selected_building >= 0) return 0;
     tap(KEY_A);
     return 1;
 }
@@ -766,7 +773,7 @@ static int controller_landing_point(int *out_x, int *out_y)
     T5LandingCandidate best[T5_LANDING_CANDIDATES];
     int count = 0, terrain_candidates = 0, threat_safe = 0, ground_reachable = 0;
     if (!out_x || !out_y) return 0;
-    build_path_grid();
+    if (!path_grid_valid) return 0;
     for (int cell = 0; cell < MAP_CELLS; ++cell) {
         if (!SC64_GRID_GET(path_walkable, cell)) continue;
         ++terrain_candidates;
@@ -870,7 +877,7 @@ static int controller_home_staging_point(int ship, int *out_x, int *out_y)
         !b[trace_starport_slot].alive || !out_x || !out_y) return 0;
     const int sx = b[trace_starport_slot].x, sy = b[trace_starport_slot].y;
     int best = 0x7fffffff, found = 0;
-    build_path_grid();
+    if (!path_grid_valid) return 0;
     for (int cell = 0; cell < MAP_CELLS; ++cell) {
         if (!SC64_GRID_GET(path_walkable, cell)) continue;
         int x = (cell % MAP_COLS) * 16 + 8, y = (cell / MAP_COLS) * 16 + 8;
@@ -1250,6 +1257,55 @@ static int controller_count_queued_type(int type)
     return count;
 }
 
+/* The mineral command must use a visible field and native contextual A;
+ * MOVE alone no longer causes an idle worker to start harvesting. */
+static int controller_mine_visible_patch(int worker, int patch)
+{
+    static const int dx[]={0,8,-8,0,0,8,-8,8,-8};
+    static const int dy[]={0,0,0,8,-8,8,8,-8,-8};
+    if(worker<0||worker>=MAX_UNITS||patch<0||patch>=MAX_MINERALS||
+       !u[worker].alive||u[worker].owner!=SIDE||u[worker].type!=U_SCV||u[worker].carry||
+       !currently_visible(m[patch].x,m[patch].y)||m[patch].amount<=0||
+       !controller_select_unit(worker))return 0;
+    for(unsigned n=0;n<sizeof(dx)/sizeof(dx[0]) && host_ticks<(u32)run_limit;++n) {
+        move_cursor(m[patch].x+dx[n],m[patch].y+dy[n]);
+        if(!u[worker].alive||!u[worker].selected||u[worker].carry||
+           !currently_visible(m[patch].x,m[patch].y))return 0;
+        if(field_ui_a_action(selected_count())!=UI_A_MINE || selected_worker_mineral_target()!=patch)continue;
+        tap(KEY_A);
+        return u[worker].alive&&u[worker].order==ORDER_MINE&&u[worker].target==patch;
+    }
+    return 0;
+}
+
+/* Try a bounded set of nearby visible fields: a field can be obscured by a
+ * unit or a higher-priority interaction even though its center is visible. */
+static int controller_mine_nearby(int worker, int command)
+{
+    int tried[4], count = 0;
+    while (count < 4 && host_ticks < (u32)run_limit) {
+        int patch = -1, best = 0x7fffffff;
+        for (int j = 0; j < MAX_MINERALS; ++j) {
+            int seen = 0;
+            for (int k = 0; k < count; ++k) if (tried[k] == j) seen = 1;
+            if (seen || m[j].amount <= 0 || !currently_visible(m[j].x, m[j].y)) continue;
+            int cc_d = dist2(m[j].x, m[j].y, b[command].x, b[command].y);
+            int worker_d = dist2(m[j].x, m[j].y, u[worker].x, u[worker].y);
+            if (cc_d > 256 * 256 || worker_d > 288 * 288) continue;
+            int score = worker_d + cc_d / 4;
+            if (score < best) { best = score; patch = j; }
+        }
+        if (patch < 0) break;
+        tried[count++] = patch;
+        if (controller_mine_visible_patch(worker, patch)) {
+            fprintf(stderr, "T5 native mineral A accepted SCV=%d patch=%d frame=%d\n", worker, patch, frame);
+            return 1;
+        }
+        if (!u[worker].alive || u[worker].carry) break;
+    }
+    return 0;
+}
+
 static int controller_reassign_excess_gas_to_minerals(int keep_gas_workers)
 {
     int mineral_workers, gas_workers, idle_workers, other_workers, live_workers;
@@ -1260,7 +1316,7 @@ static int controller_reassign_excess_gas_to_minerals(int keep_gas_workers)
     for (int i = 0; i < MAX_UNITS && gas_workers > keep_gas_workers &&
          host_ticks < (u32)run_limit; ++i) {
         if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV ||
-            u[i].order != ORDER_GAS || u[i].target < 0 || u[i].target >= MAX_BUILDINGS ||
+            u[i].order != ORDER_GAS || u[i].carry || u[i].target < 0 || u[i].target >= MAX_BUILDINGS ||
             !b[u[i].target].alive || b[u[i].target].type != B_REFINERY) continue;
         int patch = -1, best_score = 0x7fffffff, command = -1;
         for (int j = 0; j < MAX_BUILDINGS; ++j)
@@ -1268,7 +1324,7 @@ static int controller_reassign_excess_gas_to_minerals(int keep_gas_workers)
                 command = j; break;
             }
         if (command < 0) break;
-        for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
+        for (int j = 0; j < MAX_MINERALS; ++j) if (currently_visible(m[j].x,m[j].y) && m[j].amount > 0) {
             int cc_d = dist2(m[j].x, m[j].y, b[command].x, b[command].y);
             if (cc_d > 256 * 256) continue;
             int score = dist2(u[i].x, u[i].y, m[j].x, m[j].y) + cc_d / 4;
@@ -1278,7 +1334,7 @@ static int controller_reassign_excess_gas_to_minerals(int keep_gas_workers)
         int before = minerals;
         fprintf(stderr, "T5 reassigning excess gas SCV=%d to mineral patch=%d at %d,%d gas-workers=%d keep=%d\n",
                 i, patch, m[patch].x, m[patch].y, gas_workers, keep_gas_workers);
-        if (!controller_order_actor(i, m[patch].x, m[patch].y, 0)) continue;
+        if (!controller_mine_visible_patch(i, patch)) continue;
         for (int t = 0; t < 1200 && host_ticks < (u32)run_limit &&
              screen == SCREEN_PLAY && !won && !lost; ++t) {
             if (u[i].order == ORDER_MINE && u[i].target >= 0 &&
@@ -1574,7 +1630,7 @@ static int controller_safe_home_point(int actor, int *out_x, int *out_y)
         if (d < nearest) { nearest = d; command = i; }
     }
     if (command < 0) return 0;
-    build_path_grid();
+    if (!path_grid_valid) return 0;
     memset(seen, 0, sizeof(seen)); memset(distance, 0, sizeof(distance));
     int start = u[actor].x / 16 + (u[actor].y / 16) * MAP_COLS;
     if (start < 0 || start >= MAP_CELLS) return 0;
@@ -1669,6 +1725,9 @@ static int controller_park_kerrigan_safely(void)
 
 static int controller_assign_idle_scvs_to_gas(int maximum)
 {
+    /* Stop pulling empty workers from minerals once the visible gas bank is
+     * already sufficient for the intended air wing. Preserve loaded cargo. */
+    if (gas >= 2000) return 0;
     int existing = 0, assigned = 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
@@ -1682,10 +1741,13 @@ static int controller_assign_idle_scvs_to_gas(int maximum)
         if (!b[ref].alive || b[ref].owner != SIDE || b[ref].type != B_REFINERY ||
             !building_complete(ref)) continue;
         for (int i = 0; i < MAX_UNITS && assigned < needed; ++i) {
-            if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV ||
+            if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV || u[i].carry ||
                 (u[i].order != ORDER_IDLE && u[i].order != ORDER_MINE)) continue;
             if (!controller_select_unit(i)) continue;
             move_cursor(b[ref].x, b[ref].y);
+            /* Selection and cursor motion advance the simulation; a miner may
+             * have collected cargo after the earlier eligibility check. */
+            if (!u[i].alive || !u[i].selected || u[i].owner != SIDE || u[i].carry) continue;
             tap(KEY_A); /* ordinary worker interaction assigns this Refinery */
             if (u[i].order == ORDER_GAS && u[i].target == ref) {
                 ++assigned;
@@ -1702,71 +1764,12 @@ static int controller_assign_idle_scvs_to_gas(int maximum)
 
 static int controller_assign_idle_scvs_to_minerals(int maximum)
 {
-    int command = find_side_building(B_COMMAND, 1), assigned = 0;
-    int idle_seen = 0, active_fields = 0, nearby_fields = 0;
-    for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
-        ++active_fields;
-        if (command >= 0 && dist2(m[j].x, m[j].y, b[command].x, b[command].y) <= 256 * 256)
-            ++nearby_fields;
-    }
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
-            !SC64_TRANSPORT_LOADED(&u[i]) && u[i].order == ORDER_IDLE) ++idle_seen;
-    if (maximum <= 0) return 0;
-    if (command < 0) {
-        fprintf(stderr, "T5 mineral retarget skipped: no completed owned Command Center; idle=%d active-fields=%d\n",
-                idle_seen, active_fields);
-        return 0;
-    }
-    if (idle_seen)
-        fprintf(stderr, "T5 mineral retarget check: CC=%d at=%d,%d idle=%d active-fields=%d within-256=%d\n",
-                command, b[command].x, b[command].y, idle_seen, active_fields, nearby_fields);
-    for (int i = 0; i < MAX_UNITS && assigned < maximum &&
-         host_ticks < (u32)run_limit; ++i) {
-        if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV ||
-            SC64_TRANSPORT_LOADED(&u[i]) || u[i].order != ORDER_IDLE) continue;
-        int patch = -1, best_score = 0x7fffffff;
-        for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
-            int cc_d = dist2(m[j].x, m[j].y, b[command].x, b[command].y);
-            int worker_d = dist2(m[j].x, m[j].y, u[i].x, u[i].y);
-            if (cc_d > 256 * 256 || worker_d > 288 * 288) continue;
-            int score = worker_d + cc_d / 4;
-            if (score < best_score) { best_score = score; patch = j; }
-        }
-        if (patch < 0) {
-            int active = 0, nearest = -1, nearest_d = 0x7fffffff;
-            for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
-                int d = dist2(m[j].x, m[j].y, b[command].x, b[command].y);
-                ++active;
-                if (d < nearest_d) { nearest_d = d; nearest = j; }
-            }
-            fprintf(stderr, "T5 no nearby mineral assignment for idle-SCV=%d xy=%d,%d active-fields=%d nearest-patch=%d d2=%d\n",
-                    i, u[i].x, u[i].y, active, nearest, nearest_d);
-            continue;
-        }
-        int before = minerals;
-        if (dist2(u[i].x, u[i].y, m[patch].x, m[patch].y) > 7 * 7 &&
-            !controller_order_actor(i, m[patch].x, m[patch].y, 0)) {
-            fprintf(stderr, "T5 could not issue mineral MOVE idle-SCV=%d order=%d target=%d building=%d mode=%d\n",
-                    i, u[i].order, u[i].target, selected_building, mode);
-            continue;
-        }
-        for (int t = 0; t < 1200 && host_ticks < (u32)run_limit &&
-             screen == SCREEN_PLAY && !won && !lost; ++t) {
-            if (u[i].order == ORDER_MINE && u[i].target >= 0 &&
-                u[i].target < MAX_MINERALS && m[u[i].target].amount > 0) break;
-            step(0);
-        }
-        if (u[i].alive && u[i].owner == SIDE && u[i].order == ORDER_MINE &&
-            u[i].target >= 0 && u[i].target < MAX_MINERALS && m[u[i].target].amount > 0) {
-            ++assigned;
-            fprintf(stderr, "T5 mineral assignment verified idle-SCV=%d patch=%d source=%d,%d amount=%d wallet=%d->%d\n",
-                    i, u[i].target, m[u[i].target].x, m[u[i].target].y,
-                    m[u[i].target].amount, before, minerals);
-        } else {
-            fprintf(stderr, "T5 idle-SCV mineral assignment failed slot=%d order=%d target=%d xy=%d,%d\n",
-                    i, u[i].order, u[i].target, u[i].x, u[i].y);
-        }
+    int command=find_side_building(B_COMMAND,1),assigned=0;
+    if(maximum<=0||command<0)return 0;
+    for(int i=0;i<MAX_UNITS&&assigned<maximum&&host_ticks<(u32)run_limit;++i) {
+        if(!u[i].alive||u[i].owner!=SIDE||u[i].type!=U_SCV||
+           SC64_TRANSPORT_LOADED(&u[i])||u[i].order!=ORDER_IDLE||u[i].carry)continue;
+        if(controller_mine_nearby(i,command)) ++assigned;
     }
     return assigned;
 }
@@ -1787,7 +1790,7 @@ static int controller_recover_stalled_miner(void)
 
     for (int i = 0; i < MAX_UNITS && host_ticks < (u32)run_limit; ++i) {
         if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV ||
-            SC64_TRANSPORT_LOADED(&u[i]) || u[i].order != ORDER_MOVE ||
+            SC64_TRANSPORT_LOADED(&u[i]) || u[i].carry || u[i].order != ORDER_MOVE ||
             u[i].target >= 0 || u[i].path_retry <= 0 ||
             u[i].tx < 0 || u[i].tx >= WORLD_W || u[i].ty < 0 || u[i].ty >= WORLD_H ||
             dist2(u[i].x, u[i].y, u[i].tx, u[i].ty) <= 288 * 288) continue;
@@ -1800,7 +1803,7 @@ static int controller_recover_stalled_miner(void)
         if (!u[slot].alive || u[slot].order != ORDER_IDLE) continue;
 
         int patch = -1, best_score = 0x7fffffff;
-        for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
+        for (int j = 0; j < MAX_MINERALS; ++j) if (currently_visible(m[j].x,m[j].y) && m[j].amount > 0) {
             int cc_distance = dist2(m[j].x, m[j].y, b[command].x, b[command].y);
             int worker_distance = dist2(m[j].x, m[j].y, u[slot].x, u[slot].y);
             if (cc_distance > 256 * 256 || worker_distance > 288 * 288) continue;
@@ -1815,7 +1818,7 @@ static int controller_recover_stalled_miner(void)
         fprintf(stderr, "T5 recovering stalled SCV=%d old-goal=%d,%d retry=%d to mineral patch=%d at=%d,%d\n",
                 slot, u[slot].tx, u[slot].ty, u[slot].path_retry,
                 patch, m[patch].x, m[patch].y);
-        if (!controller_order_actor(slot, m[patch].x, m[patch].y, 0)) return 0;
+        if (!controller_mine_visible_patch(slot, patch)) return 0;
         for (int t = 0; t < 1200 && host_ticks < (u32)run_limit &&
              screen == SCREEN_PLAY && !won && !lost && u[slot].alive; ++t) {
             if (u[slot].order == ORDER_MINE && u[slot].target >= 0 &&
@@ -2295,9 +2298,13 @@ int main(int argc, char **argv)
         wait_frames(3600);
         int starport = -1, ship = -1, landing_x = -1, landing_y = -1;
         checkpoint("before-starport-tech");
+        controller_service_home_base();
         (void)controller_park_hero_safely(19);
+        controller_service_home_base();
         (void)controller_park_hero_safely(20);
+        controller_service_home_base();
         (void)controller_park_kerrigan_safely();
+        controller_service_home_base();
         (void)controller_hold_visible_marines();
         (void)controller_assign_idle_scvs_to_gas(3);
         checkpoint("heroes-held-safe-home");
@@ -2313,8 +2320,9 @@ int main(int argc, char **argv)
                         trace_tower_slot = i; break;
                     }
                 checkpoint("control-tower-complete");
-                if (controller_build_dropship(starport, &ship)) {
-                    checkpoint("dropship-complete");
+                int ship_ready = controller_build_dropship(starport, &ship);
+                if (b[starport].alive && building_complete(starport)) {
+                    checkpoint(ship_ready ? "dropship-complete" : "dropship-unavailable");
                     /* Add paid supply capacity so the Wraith wave is not capped
                        by the pre-existing garrison, while keeping the Marines
                        and heroes in the home defense. */
@@ -2360,7 +2368,7 @@ int main(int argc, char **argv)
                                 fprintf(stderr, "T5 maintenance mineral retargets=%d tick=%u\n",
                                         retargeted, (unsigned)host_ticks);
                             if (gas > 2000)
-                                (void)controller_reassign_excess_gas_to_minerals(2);
+                                (void)controller_reassign_excess_gas_to_minerals(0);
                         }
                         if (controller_wraith_count() >= 12 &&
                             host_ticks - last_wraith_order_tick >= 1200) {
@@ -2384,6 +2392,7 @@ int main(int argc, char **argv)
     }
     while (host_ticks < (u32)run_limit && screen == SCREEN_PLAY && !won && !lost) {
         step(0);
+        if (host_ticks % 300 == 0) controller_service_home_base();
         if (trace_file && host_ticks % T5_CHECKPOINT_PERIOD == 0)
             checkpoint("periodic");
     }

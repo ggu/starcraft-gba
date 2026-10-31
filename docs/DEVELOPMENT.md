@@ -421,10 +421,12 @@ checkerboard-dithered. Generated art and its manifest stay under
 `--out` and `--upstream` for other local paths.
 
 The importer currently compiles 167 actors from 61 image banks (about 770 KB
-of pixels). Canonical builds also prepack combat-unit collapse and remnant frames
-for the existing word compositor (about 891 KB of ROM data, no new RAM).
-Neutral actors and buildings use the same source pixels through indexed drawing
-to fit the complete Terran ROM. The indexed fallback handles HUD-edge clipping. Adding
+of pixels). Canonical builds also prepack combat-unit collapse/remnant frames
+and persistent building remnants for the existing word compositor (about 1.18 MB
+of ROM data, no new RAM). Neutral actors and building bursts keep indexed art;
+HUD-edge frames use the clipped indexed fallback. `make test-sc64-death-remnant-words`
+compares all newly packed building-remnant frames against their indexed pixels
+using the prepared private bank. Adding
 `-DSC64_DEATH_INDEXED_REMNANTS` to the source death flags selects identical
 indexed pixels for a performance comparison. The preview ROM is `build/StarCraft-Death-Preview-GBA.gba`; its
 menus and missions match the unified profile. Canonical race builds and
@@ -2005,6 +2007,45 @@ The arguments are map (0 built-in arena, 1 imported), human race (0 Terran,
 The controller uses ordinary HOME/menu navigation and `game_update` inputs;
 its world reads guide decisions without modifying resources, actors or AI.
 
+The match binaries use `TERRAN_ROM_FLAGS`, `ZERG_ROM_FLAGS` and
+`PROTOSS_ROM_FLAGS`, including the canonical rendering, routing and companion
+translation units. An asset-free Make regression checks the emitted ordered
+feature/include vectors, including flags defined after the target macro.
+Earlier chapter-only controller builds do not establish canonical-profile parity.
+
+To check construction and command navigation separately with prepared inputs:
+
+```sh
+make test-sc64-skirmish-build-controller
+```
+
+Each product tests all three human races through pending travel, paid foundation
+and completion, plus cancellation and retry. It also checks isolated foundation
+loss and a cursor gesture interrupted by the harness tick limit. A pending
+request is accepted before it spends resources; it is not counted as a completed
+producer. The controller observes construction every input tick and navigates
+the menu's actual remembered command rather than assuming it reopens at Move.
+The foundation-loss setup is synthetic; the ordinary match controller never
+writes actors, resources or AI. Its full-world reads make it a deterministic
+input workload, not a demonstration of a human player's information limits.
+
+### Worker depot-circle routing checks
+
+Loaded workers route to a reachable point inside the existing 32-pixel deposit
+circle. Imported profiles share a multi-source field in the existing route
+cache, keyed separately from ordinary point destinations. The original-art
+profile uses its existing bounded BFS storage for the same destination rule.
+No save field or cache buffer was added. Normal topology changes and loading
+clear these derived fields; committed worker waypoints keep their existing
+save semantics.
+
+Asset-free geometry, BFS and default worker tests run in `./dev test`. With
+private inputs prepared, run `make test-sc64-depot-approach` for real Blood Bath
+mineral return, synthetic gas return, live-waypoint saves and depot lifecycle
+checks under all three canonical race profiles and Showcase, both with and
+without optional nearest-depot selection. `make test-sc64-skirmish-matches`
+then checks complete ordinary-input matches; it still treats a limit as failure.
+
 ### Dense input replay without a larger queue
 
 Some full controller routes exceed 256 transitions in a 1,000-tick window.
@@ -2020,20 +2061,33 @@ python3 tools/sc64_zp_controller_replay.py --help
 The Z3 and staged Zerg/Protoss replay tools discover the shorter period from
 the ELF. Other existing profilers still expect their documented 1,000-tick
 builds. Rebuild with the original flags before using those profilers.
-For a dense skirmish ROM/ELF, use the dedicated observer:
+For a skirmish ROM/ELF with the existing windowed scheduler, build the
+[port-free mGBA observer](research/sc64-headless-skirmish-replay.md), then run:
 
 ```sh
 python3 tools/sc64_skirmish_controller_replay.py \
   --trace .local/sc64/skirmish/example.json \
   --rom /absolute/path/to/matching.gba \
-  --elf /absolute/path/to/matching.elf
+  --elf /absolute/path/to/matching.elf \
+  --headless-runner /absolute/path/to/sc64-headless-replay \
+  --full-per-update
 ```
 
 Supply the matching build used to generate the trace; profile-specific actor
-capacities can change the outcome. The tool verifies a fresh HOME start,
-feeds only scheduler input fields, and checks the final configuration, frame,
-result and live actor counts. Its FPS mean uses GBA timer deltas between live
-PLAY checkpoints, excluding HOME/start and final RESULT intervals.
+capacities and private inputs can change the outcome. The tool verifies a fresh
+HOME start, feeds only scheduler input fields, and checks the final configuration,
+frame, result and live actor counts. The headless path uses mGBA's 64-bit guest
+cycle clock and records every update, separating menu, nonadvancing PLAY and
+outside-PLAY intervals. A prefix selected with `--sample-start` and
+`--sample-updates` is a nonterminal sample, not a completed replay. The legacy
+GDB path requires an explicit port; its modulo timer counts do not establish
+unwrapped FPS. The headless path opens no debugger socket.
+
+Qualification harnesses can use the headless transport's optional `save_input`
+and `save_output` paths to boot with an existing 32-KiB SRAM image and export a
+new image. Import happens before boot; live memory writes remain restricted to
+the scheduler. See the [SRAM transport contract](research/sc64-headless-skirmish-replay.md)
+for file ownership, record validation and gameplay-comparison requirements.
 
 ### Prepare the qualified staged Zerg and Protoss builds
 
@@ -2954,6 +3008,27 @@ actors whose combat is still unsupported.
 `make test-sc64-weapon-vfx` checks asset-free rendering geometry and clipping.
 With the existing private inputs, `make test-sc64-weapon-vfx-profiles` checks
 the unified, full Terran, Z7 and P7 actor sets and actual firing events.
+The optional source weapon bank can include per-profile culling envelopes.
+Existing banks remain usable with the global envelope. To prepare and qualify
+an upgraded bank without overwriting existing inputs, provide the authenticated
+ROM and the palette files from your prepared source import, and choose a new
+ignored output directory:
+
+```sh
+python3 tools/sc64_weapon_source_sprites.py \
+  --rom /path/to/StarCraft64-USA.z64 \
+  --palette-remap .local/sc64/backwater/generated/palette-remap.bin \
+  --palette-json .local/sc64/backwater/generated/palette.json \
+  --out .local/sc64/weapon-vfx-bounds/generated
+make test-sc64-weapon-profile-bounds-bank \
+  WEAPON_SOURCE_DIR=.local/sc64/weapon-vfx-bounds/generated
+```
+
+The qualification target reads the prepared bank without generating inputs;
+it checks profile provenance and fallback, raster culling, and the wide-path
+differential. The default host suite also tests the generator using authored,
+asset-free fixtures. Keep generated data under ignored local storage.
+
 `make showcase` includes the effects in the filming ROM; the canonical race
 builds include them as well. The transient pool holds 32 effects in race
 profiles and retains 12 in the original-art save format. Overflow replaces
@@ -2985,3 +3060,35 @@ metrics, then rechecks the existing scheduled/injected-input loop. An optional
 Z7 link comparison recovers 2,072 BSS bytes with the same IWRAM end and
 unchanged memory guards. This is input infrastructure and does not change
 gameplay, save formats, actor limits or the campaign qualification scope.
+
+### Battlecruiser source inputs
+
+The [shared candidate audit](audits/2026-10-30-shared-battlecruiser/README.md)
+records the tested source, setup, save limits and remaining performance gates.
+`make test-bc-canonical test-bc-fresh-canonical` exercises the four actual
+canonical flag sets when their private inputs are prepared; the fixtures seed
+infrastructure/funds/energy and do not claim normal-input campaign completion.
+
+The canonical Terran, Zerg, Protoss and Showcase profiles use the shared
+Battlecruiser and Yamato services. After preparing the ordinary race profile,
+run `./dev sc64 prepare-bc --rom PATH` with the verified USA ROM. This writes
+cover-encoded terrain, race and skirmish tables to `.local/sc64/bc/generated`
+the two facility body frames to `.local/sc64/bc-body/`, and Yamato art to
+`.local/sc64/bc-yamato/generated/`. The separate
+outputs leave the existing imported banks intact. `./dev sc64 status --profile
+terran` (or `zerg`, `protoss`, `protoss-p7`) reports whether the new inputs
+are present. Repeat preparation when the private source inputs change.
+
+### Prepared BC ordinary-input host witness
+
+With the Terran and BC inputs already prepared, run `make test-sc64-bc-normal-input`.
+This opt-in target compiles the controller and separate replay/fresh-load
+programs with the canonical Terran flags, runs ordinary menu and game inputs,
+validates the resulting trace, saves during an in-flight Yamato shot, and
+loads that save through HOME/L in a fresh host process. It does not generate
+or modify imported inputs. The target creates a new ignored directory under
+`.local/build/bc-normal-input/` for its binaries, trace, transitions and SRAM.
+The fixed tick 17937 and frame 17658 are a source-bound witness for this
+controller and runtime, not a general scenario or hardware guarantee; a
+runtime change that alters the controller timeline requires a fresh witness
+and review. This host test is not a physical-GBA or frame-rate qualification.

@@ -34,7 +34,7 @@ main(void)
     game_init();
     if (SC64_CAMPAIGN_COUNT != 2 || SC64_CAMPAIGN_T1_UNIT_COUNT != 46)
         return fail("generated mission descriptor size");
-    for (i = 0; i < MAP_CELLS; ++i) blocked += sc64_campaign_maps[0].blocked[i] != 0;
+    for (i = 0; i < MAP_CELLS; ++i) blocked += (sc64_campaign_maps[0].blocked[i] & 1) != 0;
     if (!blocked)
         return fail("campaign collision grid unavailable");
 

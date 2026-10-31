@@ -151,14 +151,14 @@ static void wait_frames(int n)
 
 static void tap(u16 key){step(key);step(0);}
 
-/* Field controls reopen the order list on the last command. These
- * sequences were written for a list that opens on Move, so a fresh
- * open starts there (no extra input, so the run's timing is unchanged). */
+/* Field controls reopen the order list on the last command. Return to
+ * Move using bounded normal inputs before commands that expect that row. */
 static void tap_b(void)
 {
     int fresh = !menu_open && mode == MODE_NORMAL;
     tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+    for (int guard=0;fresh&&menu_open&&menu_cursor!=MENU_MOVE&&
+         guard<field_menu_count()&&host_tick<(u32)tick_limit;guard++) tap(KEY_UP);
 }
 
 static void move_cursor(int x,int y)
@@ -361,7 +361,8 @@ static int reachable_location_point(int sx,int sy,unsigned id,int *ox,int *oy)
     static u16 heap_node[MAP_CELLS*8];static u32 heap_key[MAP_CELLS*8];
     if(!id||id>sc64_t7_scenario.location_count||!ox||!oy)return -1;
     int start=sx/16+(sy/16)*MAP_COLS;if(start<0||start>=MAP_CELLS)return -1;
-    build_path_grid();memset(closed,0,sizeof(closed));memset(parent,0xff,sizeof(parent));
+    if(!path_grid_valid)return -1;
+    memset(closed,0,sizeof(closed));memset(parent,0xff,sizeof(parent));
     for(int i=0;i<MAP_CELLS;i++){cost[i]=0xffffffffu;risk[i]=0;steps[i]=0;}
     /* Prefer ground paths that stay well outside enemy weapon envelopes.
        Movers can advance while we are issuing each waypoint, so use a wider
@@ -462,6 +463,28 @@ static int controller_collect_emitter(int emitter)
     return 0;
 }
 
+static int controller_assign_minerals(void)
+{
+    static const int dx[]={0,8,-8,0,0,8,-8,8,-8},dy[]={0,0,0,8,-8,8,8,-8,-8};
+    int cc=raw_building(106,SIDE),assigned=0;
+    if(cc<0||!building_complete(cc))return 0;
+    for(int i=0;i<MAX_UNITS&&host_tick<(u32)tick_limit;i++) {
+        if(!u[i].alive||u[i].owner!=SIDE||u[i].raw_type!=7||u[i].order!=ORDER_IDLE||u[i].carry||
+           i==(int)race_late.emitter_carrier||SC64_TRANSPORT_LOADED(&u[i])||!select_unit(i))continue;
+        for(int j=0;j<MAX_MINERALS&&u[i].order==ORDER_IDLE;j++) {
+            if(m[j].amount<=0||!currently_visible(m[j].x,m[j].y)||dist2(m[j].x,m[j].y,b[cc].x,b[cc].y)>256*256)continue;
+            for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0]);k++) {
+                move_cursor(m[j].x+dx[k],m[j].y+dy[k]);
+                if(!u[i].alive||!u[i].selected||u[i].carry)break;
+                if(selected_worker_mineral_target()!=j||field_ui_a_action(selected_count())!=UI_A_MINE)continue;
+                tap(KEY_A);
+                if(u[i].order==ORDER_MINE&&u[i].target==j){assigned++;fprintf(stderr,"T7 mineral SCV=%d patch=%d\n",i,j);break;}
+            }
+        }
+    }
+    return assigned;
+}
+
 static void controller_assign_gas_workers(void)
 {
     int refinery=raw_building(110,SIDE);
@@ -470,14 +493,14 @@ static void controller_assign_gas_workers(void)
     for(int n=0;n<3&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;n++){
         int worker=-1,best=0x7fffffff;
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==7&&
-           i!=(int)race_late.emitter_carrier&&u[i].order!=ORDER_GAS&&
+           i!=(int)race_late.emitter_carrier&&u[i].order!=ORDER_GAS&&!u[i].carry&&
            !SC64_TRANSPORT_LOADED(&u[i])){
             int d=dist2(u[i].x,u[i].y,b[refinery].x,b[refinery].y);
             if(d<best){best=d;worker=i;}
         }
         if(worker<0)break;
         if(!u[worker].alive||!select_unit(worker))continue;
-        move_cursor(b[refinery].x,b[refinery].y);tap(KEY_A);
+        move_cursor(b[refinery].x,b[refinery].y);if(!u[worker].alive||!u[worker].selected||u[worker].carry)continue;tap(KEY_A);
         if(u[worker].order==ORDER_GAS&&u[worker].target==refinery){
             ++assigned;
             fprintf(stderr,"T7 assigned SCV=%d to refinery=%d\n",worker,refinery);
@@ -691,6 +714,7 @@ static int build_marine_force(int target_count)
 {
     for(int t=0;t<20000&&current_count_type(U_MARINE)<target_count&&
         host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;t++){
+        if(t%1000==0)(void)controller_assign_minerals();
         int barracks=raw_building(111,SIDE);
         if(barracks<0||!building_complete(barracks))return 0;
         if(b[barracks].queue_count<5&&minerals>=50&&
@@ -1088,9 +1112,16 @@ static int controller_deliver_emitter(void)
         int wx=gx,wy=gy;
         /* Move armed groups to a short point ahead before the slow SCV. This
            uses only ordinary attack-move commands and keeps the escort near. */
+        if(!stage_emitter_carrier()){
+            if(!u[carrier].alive||race_late.emitter_carrier!=carrier)continue;
+            return 0;
+        }
         escort_clear_local_threat(carrier);
         if(!u[carrier].alive||race_late.emitter_carrier!=carrier)continue;
-        if(!order_unit(carrier,wx,wy))return 0;
+        if(!order_unit(carrier,wx,wy)){
+            if(!u[carrier].alive||race_late.emitter_carrier!=carrier)continue;
+            return 0;
+        }
         (void)order_visible_type(U_MARINE,wx,wy);
         (void)order_visible_type(U_VULTURE,wx,wy);
         (void)order_visible_type(U_FIREBAT,wx,wy);
@@ -1133,6 +1164,8 @@ static void progress_until_terminal(void)
                 return;
             }
             controller_assign_gas_workers();
+            (void)controller_assign_minerals();
+            if(controller_air_deliver_emitter(emitter)) goto delivery_complete;
             /* Gather the Marines already supplied by the scenario and clear
                only a source-hostile Goliath that can reach the drop point.
                Repeated Wraith waves spent far beyond source weapon range. */
@@ -1143,19 +1176,19 @@ static void progress_until_terminal(void)
                 fprintf(stderr,"T7 hold emitter carrier: Goliath preclear not verified\n");
                 return;
             }
-            /* First try the quick Dropship route. If the hostile air defense
-               stops that transfer, only the already-precleared second
-               attempt may use the ground route. */
+            /* Try the paid Dropship route after preclear; fall back to the
+               ground relay if that ordinary-input transfer fails. */
             if(attempt==0){
                 if(!controller_air_deliver_emitter(emitter))
                     controller_deliver_emitter();
-            }else if(!controller_deliver_emitter())
-                controller_air_deliver_emitter(emitter);
+            }else if(!controller_air_deliver_emitter(emitter))
+                controller_deliver_emitter();
         }
     } else fprintf(stderr,"T7 objective actor not human-owned tick=%u emitter_slot=%u owner=%d alive=%d\n",
       (unsigned)host_tick,(unsigned)race_late.emitter_unit,
       race_late.emitter_unit<MAX_UNITS?u[race_late.emitter_unit].owner:-1,
       race_late.emitter_unit<MAX_UNITS?u[race_late.emitter_unit].alive:0);
+delivery_complete:
     for(int i=0;i<5000&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;i++)step(0);
 }
 
