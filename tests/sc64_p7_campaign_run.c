@@ -389,9 +389,12 @@ static int mineral_attempt_rejected(const char *reason, int worker, int home, in
         ++active; total += m[i].amount;
         if (currently_visible(m[i].x, m[i].y)) { ++visible; visible_total += m[i].amount; }
     }
-    fprintf(trace, "{\"kind\":\"mineral-rejection\",\"frame\":%u,\"reason\":\"%s\",\"worker\":%d,\"home\":%d,\"patch\":%d,\"path_valid\":%d,\"active\":%d,\"visible\":%d,\"amount\":%d,\"visible_amount\":%d}\n",
+    fprintf(trace, "{\"kind\":\"mineral-rejection\",\"frame\":%u,\"reason\":\"%s\",\"worker\":%d,\"home\":%d,\"patch\":%d,\"path_valid\":%d,\"active\":%d,\"visible\":%d,\"amount\":%d,\"visible_amount\":%d,\"cursor\":[%d,%d],\"selection_target\":%d,\"selected_count\":%d,\"worker_selected\":%d,\"worker_alive\":%d,\"worker_order\":%d,\"worker_carry\":%d,\"helper_patch\":%d}\n",
             (unsigned)frame, reason, worker, home, patch, path_grid_valid,
-            active, visible, total, visible_total);
+            active, visible, total, visible_total, cx, cy, selection_target(), selected_count(),
+            worker >= 0 ? u[worker].selected : -1, worker >= 0 ? u[worker].alive : -1,
+            worker >= 0 ? u[worker].order : -1, worker >= 0 ? u[worker].carry : -1,
+            selected_worker_mineral_target());
     for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 || i == 5)
         fprintf(trace, "{\"kind\":\"mineral-row\",\"frame\":%u,\"slot\":%d,\"x\":%d,\"y\":%d,\"amount\":%d,\"visible\":%d}\n",
                 (unsigned)frame, i, m[i].x, m[i].y, m[i].amount,
@@ -400,6 +403,20 @@ static int mineral_attempt_rejected(const char *reason, int worker, int home, in
         fprintf(trace, "{\"kind\":\"mineral-worker\",\"frame\":%u,\"slot\":%d,\"x\":%d,\"y\":%d,\"order\":%d,\"target\":%d,\"carry\":%d,\"path_timer\":%d}\n",
                 (unsigned)frame, i, u[i].x, u[i].y, u[i].order, u[i].target, u[i].carry, u[i].path_timer);
     return 0;
+}
+
+/* A conservative read-only approximation of friendly selection precedence:
+ * a point near any friendly actor/building is skipped, even if that object is
+ * not selectable. The actual contextual helper is checked again before A. */
+static int mineral_click_clear(int x, int y)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && dist2(x, y, u[i].x, u[i].y) < 31 * 31)
+            return 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && dist2(x, y, b[i].x, b[i].y) < 26 * 26)
+            return 0;
+    return 1;
 }
 
 /* Controller policy: attempt one idle, empty Probe using only normal input.
@@ -466,7 +483,36 @@ static int assign_idle_probe_to_minerals(void)
     if (selected_count() != 1 || !u[worker].selected || !u[worker].alive ||
         u[worker].order != ORDER_IDLE || u[worker].carry)
         return mineral_attempt_rejected("ui-worker-selection", worker, home, patch);
-    if (!move_cursor(m[patch].x, m[patch].y))
+    /* Search all visible reachable patches for a safe point on the current
+     * four-pixel cursor lattice, strictly inside the patch's 16px radius. */
+    if (!path_grid_valid) return mineral_attempt_rejected("path-invalid-after-selection", worker, home, patch);
+    int click_x = -1, click_y = -1, click_rank = 0x7fffffff;
+    patch = -1; patch_distance = 0x7fffffff;
+    for (int i = 0; i < MAX_MINERALS; ++i) {
+        if (!currently_visible(m[i].x, m[i].y) || m[i].amount <= 0) continue;
+        int px = m[i].x / 16, py = m[i].y / 16, reachable = 0;
+        for (int y = py - 1; y <= py + 1; ++y)
+            for (int x = px - 1; x <= px + 1; ++x)
+                if (x >= 0 && y >= 0 && x < MAP_COLS && y < MAP_ROWS &&
+                    seen[x + y * MAP_COLS]) reachable = 1;
+        if (!reachable) continue;
+        int d = dist2(u[worker].x, u[worker].y, m[i].x, m[i].y);
+        if (d > patch_distance) continue;
+        for (int y = m[i].y - 15; y <= m[i].y + 15; ++y)
+            for (int x = m[i].x - 15; x <= m[i].x + 15; ++x) {
+                if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ||
+                    (x - cx) % 4 || (y - cy) % 4 ||
+                    dist2(x, y, m[i].x, m[i].y) >= 16 * 16 ||
+                    !mineral_click_clear(x, y)) continue;
+                int rank = dist2(x, y, m[i].x, m[i].y);
+                if (d < patch_distance || (d == patch_distance && rank < click_rank)) {
+                    patch = i; patch_distance = d; click_rank = rank;
+                    click_x = x; click_y = y;
+                }
+            }
+    }
+    if (patch < 0) return mineral_attempt_rejected("no-clear-clickpoint", worker, home, patch);
+    if (!move_cursor(click_x, click_y))
         return mineral_attempt_rejected("ui-patch-position", worker, home, patch);
     if (selected_count() != 1 || !u[worker].selected || !u[worker].alive ||
         u[worker].order != ORDER_IDLE || u[worker].carry ||
