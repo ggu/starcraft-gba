@@ -126,14 +126,14 @@ static void tap(u16 key)
     step(0);
 }
 
-/* Field controls reopen the order list on the last command. These
- * sequences were written for a list that opens on Move, so a fresh
- * open starts there (no extra input, so the run's timing is unchanged). */
+/* Navigate the remembered command row using ordinary controller inputs. */
 static void tap_b(void)
 {
     int fresh = !menu_open && mode == MODE_NORMAL;
     tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+    if (fresh)
+        for (int guard = 0; menu_open && menu_cursor != MENU_MOVE && guard < MENU_COUNT; ++guard)
+            tap(menu_cursor > MENU_MOVE ? KEY_UP : KEY_DOWN);
 }
 
 static int snap_cursor_axis(int current, int target, int limit)
