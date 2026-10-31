@@ -1829,6 +1829,19 @@ static int race_save_game(void) {
             if (!sc64_shared_carrier_compact_legacy(&race_data,length,sizeof(race_data),&compacted)) return 0;
 #endif
             length=(u32)compacted;
+            /* Validate the actual predecessor envelope before publishing it.
+             * Expansion and sidecar decode consume scratch, so reconstruct
+             * the compact envelope after successful detached preflight. */
+            if (!race_shared_carrier_stage_prepare(record,length,tag,&plan)) return 0;
+#ifdef SC64_IMPACT_EVENTS
+            if (!race_impact_save_pack(&length) ||
+                !sc64_shared_carrier_compact_legacy(&race_impact_record,length,
+                                                     sizeof(race_impact_record),&compacted)) return 0;
+#else
+            length=sizeof(race_data);
+            if (!sc64_shared_carrier_compact_legacy(&race_data,length,sizeof(race_data),&compacted)) return 0;
+#endif
+            length=(u32)compacted;
         }
         if (have_previous) {
             if (!save_write_selected(record,length,tag,

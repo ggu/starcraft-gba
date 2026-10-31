@@ -438,6 +438,13 @@ int main(int argc,char **argv)
            !race_protoss_generic_clock[2]);
 #endif
     if (campaign) {
+        static u8 rejected_campaign_sram[sizeof(host_save)];
+        int saved_minerals=minerals;
+        memcpy(rejected_campaign_sram,host_save,sizeof(host_save));
+        minerals=-1;
+        assert(!race_save_game());
+        assert(!memcmp(rejected_campaign_sram,host_save,sizeof(host_save)));
+        minerals=saved_minerals;
         assert(race_save_game());
         if (argc==4) {
             FILE *output=fopen(argv[3],"wb"); assert(output);
