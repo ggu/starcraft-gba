@@ -21,6 +21,13 @@ class WalkWordsTest(unittest.TestCase):
         self.assertEqual(output.count('static const GbaSpriteWordFrame sc64_walk_word_0 ='),1)
         self.assertIn('0x00000001u,0x000000ffu',output)
         self.assertEqual(output.count('&sc64_walk_word_0'),32)
+        self.assertEqual(output, m.derive(walk, facing.replace('0x01','0x001'), (37,)))
+        for bad in (facing.replace('0x01','0x100'), facing.replace('0x01','0x01junk'),
+                    facing.replace('0x01,0x00,','0x01,0x00,garbage,')):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):m.derive(walk,bad,(37,))
+        for bad in (walk+walk, walk.replace('_steps[1]','_steps[2]'),
+                    walk.replace('{0u,pose}','{0u,pose}junk')):
+            with self.subTest(bad=bad[-50:]), self.assertRaises(ValueError):m.derive(bad,facing,(37,))
         with self.assertRaises(ValueError):m.derive(walk,facing,(38,))
         with self.assertRaises(ValueError):m.derive(walk.replace(frame,'{1,2,3,1,4,4,facing_pixels}',1),facing,(37,))
 
