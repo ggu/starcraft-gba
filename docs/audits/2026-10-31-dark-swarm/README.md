@@ -129,3 +129,28 @@ its bounded pending state; the four-bit save-order slots are already occupied.
 The guarded caster-save refusal above must also cover any active field when
 field storage is introduced. These are unresolved integration requirements,
 not completed casting support.
+
+### Executing OpenBW world oracle
+
+A controlled synthetic 32×32 walkable world was run with the pinned OpenBW
+reference and authenticated N64 DAT, image metadata and IScript inputs. It is
+not native N64 execution. The harness creates a raw-46 or raw-52 caster at
+(320,320), explicitly sets 100 energy for the experiment, and issues the real
+position-target Dark Swarm action. For a target 160 source pixels east, both
+casters and initial scheduler phases 0–4 produced the same observations
+relative to action: energy debit at sample 2, projectile present at sample 5,
+field present at sample 10 with timer 900, and timer 899 at sample 11. Source
+heading samples 1–3 were 104, 77, 64. With a target 400 pixels east the caster
+moved to (456,320) before debit at sample 46, projectile at 49 and field at
+54. These traces are specific to the stated controlled geometry and initial
+state; they are not a general timing formula.
+
+With the bullet pool exhausted before the action, both casters still paid the
+energy but no Dark Swarm projectile or field appeared. Separately exhausting
+the unit pool (1,699 additional units alongside the caster) still allowed the
+projectile but prevented field allocation; energy remained spent. These
+observations support keeping debit, projectile allocation and field allocation
+as distinct steps. The source harness is
+`tests/sc64_openbw_dark_swarm_world.cpp`; it reads private inputs by path and
+does not contain those inputs. Actual UI/order, movement/turn state, visual,
+damage and continuation integration remain open.
