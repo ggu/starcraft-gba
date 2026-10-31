@@ -203,7 +203,13 @@ int main(int argc, char **argv)
     out_text(loaded ? "P8 RESUME ok" : "P8 RESUME fail");
     out_field("frame", (long)frame); out_field("screen", screen);
     out_flush();
-    if (!loaded) { out_text("P8 DONE"); out_flush(); for (;;) frame_with(0); }
+    if (!loaded) { out_text("P8 DONE"); out_flush();
+#ifdef GBA_HOST
+        return 1;
+#else
+        for (;;) frame_with(0);
+#endif
+    }
     first = P8_TAPE_RESUME_TICK;
     report("resume", first);
 #endif

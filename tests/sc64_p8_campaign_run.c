@@ -615,6 +615,10 @@ int main(int argc,char **argv)
             int paused=screen==SCREEN_PAUSE;
             KEY_TAP(KEY_B);
             KEY_TAP(KEY_START);
+            /* A pause-menu attempt must have committed an SRAM record. */
+            int any_saved=0;
+            for(unsigned i=0;i<sizeof(host_save);i++) any_saved |= host_save[i];
+            assert(any_saved);
             saved=1;
             char save_path[512];
             snprintf(save_path,sizeof(save_path),"%s.sav",path);

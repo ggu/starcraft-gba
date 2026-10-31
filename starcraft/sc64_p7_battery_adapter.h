@@ -74,6 +74,16 @@ static int race_p7_battery_live_world_valid(void)
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (!sc64_p7_arbiter_cache_world_valid()) return 0;
 #endif
+    if (race_protoss_service_binding()==SC64_PROTOSS_BIND_GENERIC) {
+        for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive &&
+            b[i].type==B_P7_SHIELD_BATTERY &&
+            (RACE_PROTOSS_RAW(&b[i])!=172 || !sc64_p7_battery_fields_valid(i))) return 0;
+        return 1;
+    }
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+    if (race_protoss_service_binding()==SC64_PROTOSS_BIND_LATER)
+        return race_protoss_later_battery_world_valid();
+#endif
     for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive &&
         b[i].type==B_P7_SHIELD_BATTERY) {
         if (b[i].raw_type!=172 || !sc64_p7_battery_fields_valid(i)) return 0;
