@@ -65,3 +65,29 @@ appear-at-target launch paths when both source and target exist. It is not
 evidence that unrelated self-destruct, source-position, direct or splash
 resolution paths are immune; their exact behavior remains to be tested before
 wiring ordinary combat.
+
+## Shared identity investigation
+
+The four canonical Terran, Zerg, P7 and Showcase flag vectors do not enable
+`SC64_SKIRMISH_ROSTER`; the earlier extra-roster fixture therefore did not
+prove that a normal product could represent raw 46. The opt-in
+`SC64_SHARED_DEFILER_STAGE` appends one ordinary Defiler identity after the
+existing identities when no roster or P9 identity is present; it aliases an
+existing P9 Defiler or skirmish Defiler instead of adding a duplicate. It also
+participates in the generated-fact feature fingerprint. It does not enable
+production or any spell command. Four header-level tests with the actual
+canonical flag vectors passed the raw-46 round trip. A sanitizer game probe
+using Showcase flags plus only this stage gate passed; its typed compact row
+also round-tripped a 50-energy Q8 value in the existing per-unit `carry` field.
+That codec observation is not a save-format admission: caster energy semantic
+validation, source regeneration, save versions, order and effect continuation
+remain to be implemented. No mission payload is assigned for this stage.
+
+The authenticated weapon 59 has source minimum range 0, maximum range 288,
+cooldown 1, bullet type 5 and hit type 13. The reference also accepts the
+Unclean One (raw 52) as a Defiler; the current probe covers ordinary raw 46
+only and must not replace existing hero handling. The four-bit persisted order
+field already reserves 14 for construction and 15 for the shared Battery, so
+an order/save design must not silently allocate a conflicting value. Exact
+casting animation release timing and production-safe UI, AI and effect storage
+are still prerequisites for an integrated order.

@@ -7,8 +7,19 @@ int main(void)
 {
     unsigned energy=100u*256u; Sc64DarkSwarmEffect effect={0};
     game_init();
-    int caster=spawn_unit(SIDE,U_SK_DEFILER,320,320);
+    int caster=spawn_unit(SIDE,U_SHARED_DEFILER,320,320);
     assert(caster>=0 && sc64_race_raw_unit(u[caster].type)==46);
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    /* Probe the compact row only; real saves still need explicit semantic
+     * validation, versioning and effect/order state. */
+    {
+        Sc64P7TypedUnitSave row; Unit restored;
+        u[caster].carry=50*256;
+        assert(sc64_p7_typed_unit_encode(&row,&u[caster],2048,2048));
+        assert(sc64_p7_typed_unit_decode(&restored,&row,2048,2048));
+        assert(restored.type==U_SHARED_DEFILER && restored.carry==50*256);
+    }
+#endif
     assert(!sc64_dark_swarm_probe_begin(&u[caster],1,&energy));
     assert(energy==100u*256u);
     assert(sc64_dark_swarm_probe_begin(&u[caster],0,&energy) && energy==0);

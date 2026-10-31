@@ -7,10 +7,10 @@ build/test-dark-swarm-state: tests/sc64_dark_swarm_state.c starcraft/sc64_dark_s
 test-dark-swarm-state: build/test-dark-swarm-state
 	./build/test-dark-swarm-state
 
-# Experimental actual-actor check; the additional roster gate is test-only.
+# Experimental actual-actor check; the shared Defiler identity gate is test-only.
 .PHONY: test-dark-swarm-cast-probe
 build/test-dark-swarm-cast-probe: tests/sc64_dark_swarm_cast_game.c starcraft/sc64_dark_swarm_cast_probe.h starcraft/sc64_dark_swarm_state.h $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
-	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SKIRMISH_ROSTER -DSC64_DARK_SWARM_CAST_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_DEFILER_STAGE -DSC64_DARK_SWARM_CAST_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 test-dark-swarm-cast-probe: build/test-dark-swarm-cast-probe
 	./build/test-dark-swarm-cast-probe
 
