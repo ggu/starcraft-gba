@@ -2,7 +2,6 @@
 #ifndef SC64_SHARED_PROJECTILE_STAGE_H
 #define SC64_SHARED_PROJECTILE_STAGE_H
 #include <stdint.h>
-#include <string.h>
 /* Experimental typed reservations only. Motion and damage remain owned by
  * each existing family. No reservation is evicted to make space. */
 #define SC64_SHARED_PROJECTILE_CAPACITY 100u
