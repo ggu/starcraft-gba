@@ -664,11 +664,35 @@ test_p3_sequence_invalidates_bottom_and_matches_redraw(void)
 }
 #endif
 
+#if defined(SC64_SHOWCASE_ENABLED) && defined(SC64_HUD_PAGE_BANDS)
+static void test_showcase_labels_do_not_persist_in_cached_pages(void)
+{
+    fixture();
+    screen = SCREEN_PLAY;
+    gfx_begin(0xe7); gfx_end();
+    gfx_begin(0xe7); gfx_end();
+    sc64_showcase_scene = 0;
+    game_render(); game_render();
+    sc64_showcase_scene = -1;
+    assert_game_frame_matches_forced_hud();
+    assert_game_frame_matches_forced_hud();
+    sc64_showcase_scene = 2;
+    game_render(); game_render();
+    sc64_showcase_scene = -1;
+    assert_game_frame_matches_forced_hud();
+    assert_game_frame_matches_forced_hud();
+}
+#endif
+
 int
 main(void)
 {
     gba_init();
     fixture();
+#if defined(SC64_SHOWCASE_ENABLED) && defined(SC64_HUD_PAGE_BANDS)
+    test_showcase_labels_do_not_persist_in_cached_pages();
+    fixture();
+#endif
 #ifdef SC64_HUD_ICONS
     test_top_bar_draws_resource_icons();
 #endif

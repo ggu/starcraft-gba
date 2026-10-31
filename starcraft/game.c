@@ -11262,7 +11262,13 @@ game_render(void)
 #endif
 	draw_hud();
 #ifdef SC64_SHOWCASE_ENABLED
-        if (sc64_showcase_scene >= 0) sc64_showcase_draw_label();
+        if (sc64_showcase_scene >= 0) {
+            sc64_showcase_draw_label();
+#ifdef SC64_HUD_PAGE_BANDS
+            /* The showcase label overwrites the cached bottom band. */
+            sc64_hud_bottom_band_invalidate();
+#endif
+        }
 #endif
 #ifdef SC64_IMPORTED_MISSION
         sc64_hud_cycles = gba_clock() - profile_start;
