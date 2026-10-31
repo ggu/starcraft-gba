@@ -104,6 +104,8 @@ static int home_nexus(void)
     return -1;
 }
 
+static int army_cursor_watch, army_cursor_emergency;
+
 static void move_cursor(int x,int y)
 {
     unsigned guard=0;
@@ -115,9 +117,16 @@ static void move_cursor(int x,int y)
         if(cx<x)held|=KEY_RIGHT;else if(cx>x)held|=KEY_LEFT;
         if(cy<y)held|=KEY_DOWN;else if(cy>y)held|=KEY_UP;
         input(held);
+        if(army_cursor_watch)for(int i=0;i<MAX_UNITS;i++)
+            if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==75&&u[i].shield<380&&
+               SC64_P7_ARBITER_CACHE_VALID(u[i].weapon)&&
+               (SC64_P7_ARBITER_DETECTED_MASK(u[i].weapon)&~(1u<<7))) {
+                army_cursor_emergency=1;break;
+            }
+        if(army_cursor_emergency)break;
     }
     input(0);
-    if(cx!=x||cy!=y)
+    if(!army_cursor_emergency&&(cx!=x||cy!=y))
         fprintf(stderr,"cursor guard frame=%d wanted=%d,%d got=%d,%d\n",frame,x,y,cx,cy);
 }
 
@@ -153,7 +162,9 @@ static int command_selected(int which,int x,int y)
     }
     KEY_TAP(KEY_A);
     if(mode!=(which==MENU_ATTACK?MODE_ATTACK:MODE_MOVE)){close_menus();return 0;}
-    move_cursor(x,y);KEY_TAP(KEY_A);
+    move_cursor(x,y);
+    if(army_cursor_emergency){close_menus();return 0;}
+    KEY_TAP(KEY_A);
     return 1;
 }
 
@@ -216,6 +227,7 @@ static int army_command(int which,int x,int y)
         close_menus();
         clear_selected_building();
         move_cursor(u[anchor].x,u[anchor].y);
+        if(army_cursor_emergency)break;
         KEY_TAP(KEY_A);KEY_TAP(KEY_A);
         int bad=0,count=0;
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){
@@ -229,6 +241,7 @@ static int army_command(int which,int x,int y)
         if(!count||bad)continue;
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected)ordered[i]=1;
         if(command_selected(which,x,y))++groups;
+        if(army_cursor_emergency)break;
     }
     return groups>0;
 }
@@ -967,7 +980,14 @@ int main(int argc,char **argv)
                 /* Reinforcements far behind are sent only every fifth order. */
                 static int order_round;
                 army_anchor_limit=(order_round++%5)?480:0;
+                army_cursor_watch=1;army_cursor_emergency=0;
                 (void)army_command(MENU_ATTACK,wx,wy);
+                army_cursor_watch=0;
+                if(army_cursor_emergency&&z>=0&&u[z].alive&&fenix_home_x>=0){
+                    army_cursor_emergency=0;
+                    (void)hero_command(z,fenix_home_x+24,fenix_home_y);
+                    next_zeratul=frame+30;
+                }
                 army_anchor_limit=0;
                 front_distance=distance;
                 front_unit=front;
