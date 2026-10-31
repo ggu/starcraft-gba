@@ -91,15 +91,22 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
 #ifdef SC64_IMPACT_EVENTS
     u32 packed_length=0;
     assert(race_impact_save_pack(&packed_length));
-    memset(&plan,0,sizeof(plan));
-    assert(race_impact_save_decode_selected(packed_length,SC64_SHARED_CARRIER_SAVE_VERSION,
-                                            plan.impact_candidate,&plan.impact_candidate_count));
+    assert(save_write_selected(&race_impact_record,packed_length,SC64_SHARED_CARRIER_SAVE_VERSION,
+                               previous,tags,2));
+#else
+    assert(save_write_selected(&race_data,sizeof(race_data),SC64_SHARED_CARRIER_SAVE_VERSION,
+                               previous,tags,2));
+#endif
+    assert(race_shared_carrier_stage_select(&plan,&selected));
+    assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION && selected.slot!=previous->slot);
+#ifdef SC64_IMPACT_EVENTS
     assert(plan.impact_candidate_count==1 &&
            !memcmp(&plan.impact_candidate[0],&expected_impact,sizeof(expected_impact)));
 #endif
-    assert(race_load_preflight(&plan));
     assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
            !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)));
+    assert(!memcmp(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,
+                   sizeof(predecessor)));
     race_data.state[31]=0x13579;
     assert(race_save_encode_actors());
     assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION && race_data.state[31]==0x13579);

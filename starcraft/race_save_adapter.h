@@ -2958,6 +2958,58 @@ static int race_load_preflight(RaceLoadPlan *plan) {
     return ok;
 }
 
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+/* Authenticate an envelope before expanding an old layout or decoding its
+ * sidecars. The validator only touches bounded save/route scratch and plan. */
+static int race_shared_carrier_stage_prepare(const void *raw,u32 len,u32 tag,void *context) {
+    RaceLoadPlan *plan=context;
+    size_t expanded=0;
+    if (!plan || (tag!=SAVE_VERSION && tag!=SC64_SHARED_CARRIER_SAVE_VERSION
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+                  && tag!=SC64_LEGACY_SAVE_VERSION
+#endif
+                 )) return 0;
+#ifdef SC64_IMPACT_EVENTS
+    if (raw!=(const void *)&race_impact_record) return 0;
+    if (tag!=SC64_SHARED_CARRIER_SAVE_VERSION) {
+        if (!sc64_shared_carrier_expand_legacy(&race_impact_record,len,
+                                                sizeof(race_impact_record),&expanded)) return 0;
+        len=(u32)expanded;
+    }
+    memset(plan,0,sizeof(*plan));
+    if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,
+                                          &plan->impact_candidate_count)) return 0;
+#else
+    if (raw!=(const void *)&race_data) return 0;
+    if (tag!=SC64_SHARED_CARRIER_SAVE_VERSION) {
+        if (!sc64_shared_carrier_expand_legacy(&race_data,len,sizeof(race_data),&expanded)) return 0;
+        len=(u32)expanded;
+    }
+    if (len!=sizeof(race_data)) return 0;
+    memset(plan,0,sizeof(*plan));
+#endif
+    if ((u32)race_data.version!=tag) return 0;
+    return race_load_preflight(plan);
+}
+
+static int race_shared_carrier_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selected) {
+    const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+                      ,SC64_LEGACY_SAVE_VERSION
+#endif
+                     };
+#ifdef SC64_IMPACT_EVENTS
+    void *record=&race_impact_record; u32 capacity=sizeof(race_impact_record);
+#else
+    void *record=&race_data; u32 capacity=sizeof(race_data);
+#endif
+    if (!save_select_validated(record,capacity,tags,sizeof(tags)/sizeof(tags[0]),
+                               race_shared_carrier_stage_prepare,plan,selected)) return 0;
+    /* Selection restores raw bytes, so rebuild the selected detached plan. */
+    return race_shared_carrier_stage_prepare(record,selected->length,selected->tag,plan);
+}
+#endif
+
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 /* Stage scope: supported skirmish geometries and the Terran compact codec.
  * The tag, never field values, determines the parent representation. */
