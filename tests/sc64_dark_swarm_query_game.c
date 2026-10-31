@@ -86,8 +86,8 @@ int main(void)
     assert(sc64_world_dark_swarm_affects_target(MAX_UNITS)==0); /* building */
     /* Real update dispatch of Marine shots, with synthetic attack orders and
      * target HP. The guaranteed swarm miss retains its live bullet slot. */
-    const int tested_raw[5]={0,2,8,38,66};
-    for(int i=0;i<5;i++) {
+    const int tested_raw[6]={0,2,8,12,38,66};
+    for(int i=0;i<6;i++) {
         weapon_case(tested_raw[i],U_SHARED_DEFILER,400,0);
         weapon_case(tested_raw[i],U_SHARED_DEFILER,500,1);
     }

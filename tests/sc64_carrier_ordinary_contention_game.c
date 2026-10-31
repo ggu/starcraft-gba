@@ -6,7 +6,7 @@
 #if !defined(SC64_SHARED_CARRIER_EXPERIMENT) || !defined(SC64_SHARED_ORDINARY_STAGE)
 #error "requires shared Carrier and ordinary projectile experiments"
 #endif
-static void setup(int *fighter,int *laser_target,int *actor,int *victim,int raw)
+static void setup(int *fighter,int *laser_target,int *actor,int *victim,int raw,int ground)
 {
     game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;race_skirmish_map=0;race_skirmish_init();
     int carrier=spawn_unit(SIDE,SC64_CARRIER_TYPE,48,48);
@@ -14,7 +14,7 @@ static void setup(int *fighter,int *laser_target,int *actor,int *victim,int raw)
     *laser_target=spawn_unit(ENEMY,U_MARINE,400,400);
     int type=sc64_race_unit_from_raw(raw);assert(type>=0);
     *actor=spawn_unit(SIDE,type,160,160);
-    *victim=spawn_unit(ENEMY,sc64_race_unit_from_raw(12),220,160);
+    *victim=spawn_unit(ENEMY,ground?U_MARINE:sc64_race_unit_from_raw(12),220,160);
     assert(carrier>=0 && *fighter>=0 && *laser_target>=0 && *actor>=0 && *victim>=0);
     /* A controlled launched fighter state; no paid-training claim. */
     u[*fighter].build=(s16)carrier;assert(!SC64_CARRIER_HANGAR_HIDDEN(&u[*fighter]));
@@ -22,9 +22,9 @@ static void setup(int *fighter,int *laser_target,int *actor,int *victim,int raw)
     u[*victim].hp=u[*victim].maxhp=1000;
     u[*actor].raw_type=raw;u[*actor].order=ORDER_ATTACK_TARGET;u[*actor].target=*victim;u[*actor].cd=0;
 }
-static int scenario(int raw,int occupied)
+static int scenario(int raw,int occupied,int ground)
 {
-    int fighter,laser_target,actor,victim;setup(&fighter,&laser_target,&actor,&victim,raw);
+    int fighter,laser_target,actor,victim;setup(&fighter,&laser_target,&actor,&victim,raw,ground);
     for(int i=0;i<occupied;i++)assert(race_p7_projectile_fire(fighter,laser_target,64,64*512,64*512));
     assert(sc64_shared_projectiles.active==(unsigned)occupied);
     tick_combat(&u[actor],victim);
@@ -50,14 +50,18 @@ static int scenario(int raw,int occupied)
 }
 int main(void)
 {
-    int m2=scenario(0,98),m1=scenario(0,99),m0=scenario(0,100);
-    int s2=scenario(70,98),s1=scenario(70,99),s0=scenario(70,100);
-    int w2=scenario(8,98),w1=scenario(8,99),w0=scenario(8,100);
+    int m2=scenario(0,98,0),m1=scenario(0,99,0),m0=scenario(0,100,0);
+    int s2=scenario(70,98,0),s1=scenario(70,99,0),s0=scenario(70,100,0);
+    int w2=scenario(8,98,0),w1=scenario(8,99,0),w0=scenario(8,100,0);
+    int ba2=scenario(12,98,0),ba1=scenario(12,99,0),ba0=scenario(12,100,0);
+    int bg2=scenario(12,98,1),bg1=scenario(12,99,1),bg0=scenario(12,100,1);
     assert(m2==m1 && m1>0 && !m0);
     assert(s2==2*s1 && s1>0 && !s0);
     assert(w2==w1 && w1>0 && !w0);
+    assert(ba2==ba1 && ba1>0 && !ba0);
+    assert(bg2==bg1 && bg1>0 && !bg0);
     /* Exercise the regular game-update dispatcher at a full arena. */
-    int fighter,laser_target,actor,victim;setup(&fighter,&laser_target,&actor,&victim,8);
+    int fighter,laser_target,actor,victim;setup(&fighter,&laser_target,&actor,&victim,8,0);
     for(int i=0;i<100;i++)assert(race_p7_projectile_fire(fighter,laser_target,64,64*512,64*512));
     tick_combat(&u[actor],victim);
     assert(SC64_ORDINARY_PENDING(actor).active && u[actor].cd>0);

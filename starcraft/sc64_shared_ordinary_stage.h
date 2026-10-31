@@ -65,6 +65,8 @@ static int race_shared_ordinary_prepare(Unit *q,int target,int flying,int damage
          (raw==2 && !flying && attack->weapon_id==4 && hits==1) ||
          (raw==8 && !flying && attack->weapon_id==16 && hits==1) ||
          (raw==8 && flying && attack->weapon_id==15 && hits==1) ||
+         (raw==12 && !flying && attack->weapon_id==19 && hits==1) ||
+         (raw==12 && flying && attack->weapon_id==20 && hits==1) ||
          (raw==38 && !flying && attack->weapon_id==38 && hits==1) ||
          (raw==66 && !flying && attack->weapon_id==66 && hits==1))) return 0;
     unsigned shots=(raw==70 || raw==3)?2u:1u;
@@ -116,7 +118,7 @@ static void race_shared_ordinary_release_tick(void)
 #ifdef SC64_SHARED_DARK_SWARM_PROBE
             /* These source-tested normal-hit weapons receive the guaranteed
              * field miss. Air-only staged pairs cannot hit a ground target. */
-            int swarm=(p->raw==0 || p->raw==2 || p->raw==8 || p->raw==38 || p->raw==66)
+            int swarm=(p->raw==0 || p->raw==2 || p->raw==8 || p->raw==12 || p->raw==38 || p->raw==66)
                 ?sc64_world_dark_swarm_affects_target(p->target):0;
             if(swarm<0)continue; /* unknown geometry: no unsafe staged hit */
 #endif
