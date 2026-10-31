@@ -10,6 +10,7 @@ static int race_sk_transport_producer_valid(int slot, int owner)
         owner < 5 && race_player[owner] == R_ZERG && b[slot].alive &&
         b[slot].hp > 0 && b[slot].owner == owner &&
         (b[slot].type == B_LAIR || b[slot].type == B_HIVE) &&
+        (b[slot].raw_type < 0 || b[slot].raw_type == sc64_race_raw_building(b[slot].type)) &&
         !b[slot].under_construction;
 }
 
@@ -63,8 +64,11 @@ static void race_sk_transport_research_tick(void)
     for (int i = 0; i < SC64_SK_TRANSPORT_OWNERS; ++i) {
         Sc64SkTransportJob *job = &race_skirmish_transport_tech.owner[i];
         if (!job->remaining) continue;
-        if (!race_sk_transport_producer_valid((int)job->producer_plus_one - 1, owners[i])) {
-            (void)race_sk_transport_cancel_owner(owners[i], 1);
+        int slot = (int)job->producer_plus_one - 1;
+        if (!race_sk_transport_producer_valid(slot, owners[i])) {
+            int destroyed = slot < 0 || slot >= MAX_BUILDINGS ||
+                !b[slot].alive || b[slot].hp <= 0;
+            (void)race_sk_transport_cancel_owner(owners[i], destroyed);
             continue;
         }
         sc64_sk_transport_tick(job);
