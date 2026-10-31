@@ -39,8 +39,18 @@ static void write_candidate_record(const RaceSave *candidate)
     assert(memcmp(&race_data, &expected, sizeof(expected)) == 0);
 #else
     static RaceSave readback;
+#ifdef SC64_SHARED_TRANSPORT
+    u8 trailer[SC64_TRANSPORT_TRAILER_BYTES], read_trailer[SC64_TRANSPORT_TRAILER_BYTES];
+    sc64_sk_transport_encode(trailer, &race_skirmish_transport_candidate);
+    assert(save_write_parts(&expected, sizeof(expected), trailer, sizeof(trailer),
+                            SC64_TRANSPORT_SAVE_VERSION));
+    assert(save_read_parts(&readback, sizeof(readback), read_trailer, sizeof(read_trailer),
+                           SC64_TRANSPORT_SAVE_VERSION));
+    assert(memcmp(trailer, read_trailer, sizeof(trailer)) == 0);
+#else
     save_write(&expected, sizeof(expected), SAVE_VERSION);
     assert(save_read(&readback, sizeof(readback), SAVE_VERSION));
+#endif
     assert(memcmp(&readback, &expected, sizeof(expected)) == 0);
     race_data = readback;
 #endif

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 static u16 previous;
 static void frame_input(u16 held) {
@@ -131,8 +132,10 @@ static void check_invalid_save_rejection(void) {
     for (int i = 0; i < 3; ++i) old_races[i] = race_bot_races[i];
 
     assert(race_save_game());
-    race_data.state[20] = SC64_SKIRMISH_IMPORTED_COUNT + 1;
-    save_write(&race_data, sizeof(race_data), SAVE_VERSION);
+    static RaceSave candidate;
+    fixture_capture_save(&candidate);
+    candidate.state[20] = SC64_SKIRMISH_IMPORTED_COUNT + 1;
+    write_candidate_record(&candidate);
     assert(!race_load_game());
     assert(screen == old_screen && race_mode == old_mode && race_skirmish_map == old_map);
     assert(race_human == old_human && race_cols == old_cols && race_rows == old_rows);
@@ -145,10 +148,11 @@ static void check_invalid_save_rejection(void) {
     for (int i = 0; i < SC64_BASE_MISSION_COUNT; ++i)
         if (!sc64_catalog_mission_allowed(i, SC64_CAMPAIGN_RACE)) { alien = i; break; }
     assert(alien >= 0);
-    race_data.state[0] = 0;
-    race_data.state[2] = alien;
-    race_data.campaign.mission = alien;
-    save_write(&race_data, sizeof(race_data), SAVE_VERSION);
+    fixture_capture_save(&candidate);
+    candidate.state[0] = 0;
+    candidate.state[2] = alien;
+    candidate.campaign.mission = alien;
+    write_candidate_record(&candidate);
     assert(!race_load_game());
     assert(screen == old_screen && race_mode == old_mode && race_skirmish_map == old_map);
     assert(race_human == old_human && race_cols == old_cols && race_rows == old_rows);
