@@ -388,6 +388,12 @@ static void regroup_hydras(int below,int target)
     if(h<0||!race_owner_has_type(SIDE,B_HYDRALISK_DEN))return;
     if(count_units(SIDE,U_HYDRALISK)+count_units(SIDE,U_ZERGLING)>0)defend_hatch_with_army(200,790);
     for(int t=0;t<9000&&screen==SCREEN_PLAY&&!won&&!lost;t++) {
+        /* Regrouping can span the loss of the Extractor; restore it before
+         * queued combat units consume the remaining mineral reserve. */
+        if(!count_buildings(SIDE,B_EXTRACTOR)&&minerals>=50) {
+            (void)ensure_extractor();
+            if(screen!=SCREEN_PLAY||won||lost||!b[h].alive)break;
+        }
         int live=count_units(SIDE,U_HYDRALISK)+queued_units(h,U_HYDRALISK);
         if(live>=target||(gas<25&&!queued_units(h,U_HYDRALISK)))break;
         if(selected_building!=h)click(b[h].x,b[h].y);
