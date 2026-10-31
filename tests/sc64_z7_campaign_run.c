@@ -1833,6 +1833,20 @@ static int z7_home_ground_target_valid(int hatch,int target)
                         z7_threat_near_workers(target,128));
 }
 
+static int z7_home_army_selection_matches(int hatch,const unsigned char *expected)
+{
+    if(hatch<0||hatch>=MAX_BUILDINGS||!b[hatch].alive||b[hatch].owner!=SIDE||
+       selected_building>=0)return 0;
+    for(int i=0;i<MAX_UNITS;i++) {
+        int selected=u[i].alive&&!SC64_TRANSPORT_LOADED(&u[i])&&u[i].selected;
+        if(selected!=(expected[i]!=0)||z7_r_combat_eligible(i)!=(expected[i]!=0)||
+           (expected[i]&&(u[i].raw_type!=expected[i]||
+            dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y)>
+                policy_home_radius*policy_home_radius)))return 0;
+    }
+    return 1;
+}
+
 /* Optional strategy: use R only when the whole combat group is a local
    Hydra/Muta force. In particular, never pull a distant or hero/NPC unit.
    Every selection and command is made by ordinary inputs. */
@@ -1841,6 +1855,8 @@ static int z7_home_army_attack(int hatch,int target)
     unsigned char expected[MAX_UNITS]={0};
     int n=0,hydras=0;
     if(!policy_home_army_r||!z7_home_ground_target_valid(hatch,target))return 0;
+    int target_type=u[target].type,target_raw=u[target].raw_type;
+    int target_owner=u[target].raw_owner,target_hp=u[target].hp;
     cancel_ui_mode();
     /* R on any selected building is deliberately excluded, even if it is
        not a producer. Avoid altering the training selection on producers. */
@@ -1851,19 +1867,14 @@ static int z7_home_army_attack(int hatch,int target)
              (u[i].type==U_MUTALISK&&u[i].raw_type==43))||
            dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y)>
                policy_home_radius*policy_home_radius)return 0;
-        expected[i]=1;++n;if(u[i].type==U_HYDRALISK)++hydras;
+        expected[i]=(unsigned char)u[i].raw_type;++n;if(u[i].type==U_HYDRALISK)++hydras;
     }
     if(!n||!hydras)return 0;
     if(prior_keys)step(0);
     tap(KEY_R);
     if(screen!=SCREEN_PLAY||mode!=MODE_NORMAL||menu_open||box_state||help||
        selected_building>=0)return 0;
-    for(int i=0;i<MAX_UNITS;i++) {
-        int selected=u[i].alive&&!SC64_TRANSPORT_LOADED(&u[i])&&u[i].selected;
-        if(selected!=expected[i]||z7_r_combat_eligible(i)!=expected[i]||
-           (expected[i]&&dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y)>
-               policy_home_radius*policy_home_radius))return 0;
-    }
+    if(!z7_home_army_selection_matches(hatch,expected))return 0;
     if(!z7_home_ground_target_valid(hatch,target))return 0;
     if(!choose_menu_row(MENU_ATTACK)||mode!=MODE_ATTACK) {cancel_ui_mode();return 0;}
     for(int retry=0;retry<3;retry++) {
@@ -1872,6 +1883,9 @@ static int z7_home_army_attack(int hatch,int target)
         if(dist2(cx,cy,u[target].x,u[target].y)<20*20)break;
     }
     if(!z7_home_ground_target_valid(hatch,target)||
+       !z7_home_army_selection_matches(hatch,expected)||
+       u[target].type!=target_type||u[target].raw_type!=target_raw||
+       u[target].raw_owner!=target_owner||u[target].hp>target_hp||
        dist2(cx,cy,u[target].x,u[target].y)>=20*20||
        sc64_direct_attack_find_target(cx,cy)!=target) {cancel_ui_mode();return 0;}
     tap(KEY_A);
