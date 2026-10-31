@@ -8,6 +8,8 @@ import unittest
 
 from tests.test_sc64_weapon_lookup_index import BANK
 
+from tests.make_fixture import copy_makefile_with_includes
+
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = 'build/generated/weapon-lookup/sc64_weapon_source_indexed.h'
 CONFIG = 'build/canonical-lookup-config'
@@ -139,7 +141,7 @@ vector-fixture:
         # Run the real rules with synthetic private inputs, no asset generators.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / 'Makefile').write_bytes((ROOT / 'Makefile').read_bytes())
+            copy_makefile_with_includes(ROOT, root)
             (root / 'tools').symlink_to(ROOT / 'tools', target_is_directory=True)
             for name, bank in [('first', BANK), ('second', BANK.replace('{741}', '{740}').replace('{741,255}', '{740,255}'))]:
                 (root / name).mkdir()
@@ -150,9 +152,9 @@ build/lookup-consumer: $(CANONICAL_LOOKUP_INPUTS)
 \t@touch $@
 ''')
 
-            def build(mode, bank='first', route=1, path_grid=0, newcell=0, showhud=1, showcontact=0):
+            def build(mode, bank='first', route=1, path_grid=0, newcell=0, showhud=1, showcontact=0, showterrain=1):
                 subprocess.run(['make', '-f', 'Makefile', '-f', 'fixture.mk',
-                                f'CANONICAL_LOOKUP_INDEX={mode}', f'CANONICAL_ROUTE_INDEX={route}', f'CANONICAL_PATH_GRID={path_grid}', f'CANONICAL_ROUTE_NEW_CELL={newcell}', f'SHOWCASE_HUD_CACHE={showhud}', f'SHOWCASE_CONTACT_CACHE={showcontact}', 'CANONICAL_WALK_WORDS=0', f'WEAPON_SOURCE_DIR={bank}',
+                                f'CANONICAL_LOOKUP_INDEX={mode}', f'CANONICAL_ROUTE_INDEX={route}', f'CANONICAL_PATH_GRID={path_grid}', f'CANONICAL_ROUTE_NEW_CELL={newcell}', f'SHOWCASE_HUD_CACHE={showhud}', f'SHOWCASE_CONTACT_CACHE={showcontact}', f'SHOWCASE_TERRAIN_CACHE_VRAM={showterrain}', 'CANONICAL_WALK_WORDS=0', f'WEAPON_SOURCE_DIR={bank}',
                                 '-o', f'{bank}/sc64_weapon_source_generated.h', 'lookup-fixture'],
                                cwd=root, check=True, capture_output=True)
                 return (root / 'build/rebuilds').read_text().splitlines()
@@ -188,6 +190,17 @@ build/lookup-consumer: $(CANONICAL_LOOKUP_INPUTS)
             self.assertEqual(len(build(1, 'second', 1, 0, 0, 1, 1)), 14)
             self.assertEqual(len(build(1, 'second', 1, 0, 0, 1, 1)), 14)
             self.assertEqual(len(build(1, 'second', 1, 0, 0, 1, 0)), 15)
+            self.assertEqual(len(build(1, 'second', 1, 0, 0, 1, 0, 0)), 16)
+            self.assertEqual(len(build(1, 'second', 1, 0, 0, 1, 0, 0)), 16)
+            self.assertEqual(len(build(1, 'second', 1, 0, 0, 1, 0, 1)), 17)
+            self.assertEqual(len(build(1, 'second', 1, 0, 0, 1, 0, 1)), 17)
+            # Modify only this fixture's copy, never its linked source module.
+            module = root / 'config/showcase-cache/Makefile'
+            contents = module.read_bytes()
+            module.unlink()
+            module.write_bytes(contents + b'\nSHOWCASE_TERRAIN_CACHE_FLAGS += -DSC64_FIXTURE_CONFIG_CHANGE\n')
+            self.assertEqual(len(build(1, 'second', 1, 0, 0, 1, 0, 1)), 18)
+            self.assertEqual(len(build(1, 'second', 1, 0, 0, 1, 0, 1)), 18)
 
 
 if __name__ == '__main__':

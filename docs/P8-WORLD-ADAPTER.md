@@ -2,8 +2,11 @@
 
 `starcraft/sc64_p8_world_adapter.h` connects the existing bounded P8 source
 callbacks to the typed world services already used by Z8. It is a caller-owned
-adapter only. P8 is not wired into `game.c`, a menu, campaign state or saves;
-this code does not claim that P8 is playable or qualified.
+adapter. The explicit `protoss-p8` candidate now binds it to the game, the
+campaign menu and saves through `starcraft/sc64_p8_runtime_adapter.h`; see
+the [P8 candidate audit](audits/2026-10-29-p8-campaign/README.md). The
+sections below describe the adapter contract as originally added; their
+"not wired" notes predate that binding.
 
 ## Actor and capacity preflight
 

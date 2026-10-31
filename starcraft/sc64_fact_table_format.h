@@ -15,6 +15,10 @@
 #define SC64_FACT_TABLE_FORMAT_V2 2u
 #define SC64_FACT_FEATURE_SIGHT 1u
 #define SC64_FACT_FEATURE_P7_RECT 2u
+/* Revision 2 includes the shared Overlord and Spore detector rectangles.
+ * The packed V2 word layout is unchanged; older generated closures lack
+ * those rows and must be regenerated before selecting rectangle lookup. */
+#define SC64_FACT_P7_RECT_REVISION_CURRENT 2u
 #define SC64_FACT_UNIT_FLAGS_MASK 0xffffu
 #define SC64_FACT_UNIT_RADIUS_SHIFT 16
 #define SC64_FACT_UNIT_RADIUS_MASK 0x3fu

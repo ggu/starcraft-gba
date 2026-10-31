@@ -740,6 +740,9 @@ static inline const char *sc64_race_unit_name(int type)
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
         ,[U_SHARED_BATTLECRUISER] = "BATTLECRUISER"
 #endif
+#ifdef SC64_P8_DATA_ENABLED
+        ,[U_P8_HYPERION] = "HYPERION"
+#endif
 #ifdef SC64_SCARAB_RUNTIME
         ,[U_SCARAB] = "SCARAB"
 #endif
@@ -772,6 +775,8 @@ static inline const char *sc64_race_building_name(int type)
         "ULTRALISK CAVERN","CITADEL OF ADUN","STASIS CELL PRISON","FLEET BEACON",
         "ROBOTICS SUPPORT BAY","SHIELD BATTERY","SPECIAL ION CANNON",
         "SCIENCE FACILITY","PHYSICS LAB"
+#elif defined(SC64_P8_DATA_ENABLED)
+        ,"STASIS CELL PRISON"
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
         ,"CONTROL TOWER","MACHINE SHOP","ARMORY","QUEEN'S NEST","ULTRALISK CAVERN","PROTOSS BEACON"

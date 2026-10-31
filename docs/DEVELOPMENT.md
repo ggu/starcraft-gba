@@ -2815,6 +2815,15 @@ keep their existing flags and generated headers. A mismatched roster, format
 or requested feature fails at compile time; out-of-roster sight requests use
 the original policy.
 
+Rectangle closures also record a geometry revision. Current shared detector
+support requires revision 2, including Overlord and Spore Colony bounds;
+older rectangle headers fail with a regeneration diagnostic. The supported
+Make recipes regenerate these derived facts when their source changes. Do not
+freeze a build-generated fact header with `make -o` across geometry changes.
+For a side-by-side qualification, use a fresh `BC_P7_FACT_DIR` or
+`P8_FACT_V2_DIR` command-line path so the original header remains available.
+This changes the derived closure, not the supplied ROM or imported art bank.
+
 `test-sc64-fact-v2` is asset-free. The ordinary-input performance replay
 covers 2,000 in-play frames; the separate campaign controller requires a
 strict mission win and validates its input trace. Neither test promotes P7

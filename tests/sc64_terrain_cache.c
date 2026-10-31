@@ -287,6 +287,29 @@ main(void)
     return 0;
 }
 #else
+#ifdef SC64_TERRAIN_CACHE_VRAM
+static u8 obj_guard(unsigned offset)
+{ return (u8)(0xa5u ^ (offset * 37u)); }
+
+static void seed_obj_guards(void)
+{
+    for (unsigned i = 0; i < GBA_VRAM_SCRATCH_BYTES; ++i)
+        GBA_VRAM_SCRATCH[i] = obj_guard(i);
+}
+
+static void verify_obj_guards(void)
+{
+    unsigned lo = SC64_OBJ_VRAM_CACHE_OFFSET;
+    unsigned hi = lo + 240u * SC64_TERRAIN_CACHE_VRAM_ROWS;
+    unsigned changed = 0;
+    for (unsigned i = 0; i < GBA_VRAM_SCRATCH_BYTES; ++i) {
+        if (i < lo || i >= hi) assert(GBA_VRAM_SCRATCH[i] == obj_guard(i));
+        else changed += GBA_VRAM_SCRATCH[i] != obj_guard(i);
+    }
+    assert(changed > 0); /* The actual cache must have used its VRAM rows. */
+}
+#endif
+
 static void
 render_cell(int col, int row, int camx, int camy)
 {
@@ -389,6 +412,9 @@ main(void)
     _Alignas(4) u8 expected[240 * SC64_TERRAIN_CACHE_HEIGHT];
     _Alignas(4) u8 observed[240 * SC64_TERRAIN_CACHE_HEIGHT];
     gba_init();
+#ifdef SC64_TERRAIN_CACHE_VRAM
+    seed_obj_guards();
+#endif
     test_static_key = 17;
     memset(visible, 0, sizeof(visible));
     memset(explored, 0, sizeof(explored));
@@ -433,6 +459,9 @@ main(void)
     render_fixture(17, 11, 1);
     compare_incremental_with_fresh(17, 11);
     test_scroll_differential();
+#ifdef SC64_TERRAIN_CACHE_VRAM
+    verify_obj_guards();
+#endif
     return 0;
 }
 #endif
