@@ -517,7 +517,10 @@ static int pending_since[MAX_UNITS];
  * pending build stuck for 900 frames (its site occupied) is abandoned. */
 static int remine_idle_probe(int home)
 {
-    int worker=-1,patch=-1,best=0x7fffffff;
+    static const int dx[] = {0,8,-8,0,0,8,-8,8,-8};
+    static const int dy[] = {0,0,0,8,-8,8,8,-8,-8};
+    int worker=-1;
+    unsigned char tried[MAX_MINERALS] = {0};
     for(int i=0;i<MAX_UNITS;i++){
         if(!(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&SC64_PENDING_BUILD_ORDER(u[i].order))){
             pending_since[i]=-1;continue;
@@ -538,22 +541,32 @@ static int remine_idle_probe(int home)
         }
     }
     if(worker<0||home<0)return 0;
-    /* Mine at whichever Nexus has the nearest live patch. */
-    for(int n=0;n<MAX_BUILDINGS;n++)if(b[n].alive&&b[n].owner==SIDE&&b[n].type==B_NEXUS&&
-        building_complete(n))for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0 && currently_visible(m[k].x,m[k].y)){
-        int d=dist2(m[k].x,m[k].y,b[n].x,b[n].y);
-        if(d<best){best=d;patch=k;}
-    }
-    if(patch<0)return 0;
     close_menus();clear_selected_building();
     move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
     for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
     if(!u[worker].selected||selected_count()!=1)return 0;
-    move_cursor(m[patch].x,m[patch].y);
-    if(!currently_visible(m[patch].x,m[patch].y) ||
-       field_ui_a_action(selected_count())!=UI_A_MINE) return 0;
-    KEY_TAP(KEY_A);
-    return u[worker].order==ORDER_MINE && u[worker].target==patch;
+    /* Try nearby visible fields in distance order, including hit-box offsets:
+     * another unit can intercept selection at a mineral field's center. */
+    for(int attempt=0;attempt<MAX_MINERALS;attempt++) {
+        int patch=-1,best=0x7fffffff;
+        for(int n=0;n<MAX_BUILDINGS;n++)if(b[n].alive&&b[n].owner==SIDE&&b[n].type==B_NEXUS&&
+            building_complete(n))for(int k=0;k<MAX_MINERALS;k++)if(!tried[k]&&m[k].amount>0&&currently_visible(m[k].x,m[k].y)) {
+            int d=dist2(m[k].x,m[k].y,b[n].x,b[n].y);
+            if(d<best){best=d;patch=k;}
+        }
+        if(patch<0)break;
+        tried[patch]=1;
+        for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0]);k++) {
+            int x=m[patch].x+dx[k],y=m[patch].y+dy[k];
+            move_cursor(x,y);
+            if(!u[worker].alive||!u[worker].selected||selected_count()!=1)return 0;
+            if(absi(cx-x)>2||absi(cy-y)>2||!currently_visible(m[patch].x,m[patch].y)||
+               field_ui_a_action(selected_count())!=UI_A_MINE||selected_worker_mineral_target()!=patch)continue;
+            KEY_TAP(KEY_A);
+            if(u[worker].order==ORDER_MINE&&u[worker].target==patch)return 1;
+        }
+    }
+    return 0;
 }
 
 static int assign_gas_worker(void)
