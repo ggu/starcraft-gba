@@ -3709,18 +3709,23 @@ static int retreat_worker_individually(int worker,int threat)
             mode,menu_open,cx,cy,selected_count(),selected_building);
         return 0;
     }
-    static const int candidate[][2]={{560,1800},{560,1940},{640,1800},{640,1940}};
-    int safe_x=-1,safe_y=-1;
-    unsigned phase=retreat_phase++;
-    for(unsigned probe=0;probe<sizeof(candidate)/sizeof(candidate[0]);probe++) {
-        unsigned ci=(phase+probe)%((unsigned)(sizeof(candidate)/sizeof(candidate[0])));
-        int x=candidate[ci][0],y=candidate[ci][1],nx=-1,ny=-1;
-        if(!path_next_tile(u[worker].x,u[worker].y,x,y,&nx,&ny))continue;
-        int safe=1;
+    int safe_x=-1,safe_y=-1,best=0x7fffffff;
+    int hatch=z7_townhall(SIDE);
+    int center_x=hatch>=0?b[hatch].x:u[worker].x;
+    int center_y=hatch>=0?b[hatch].y:u[worker].y;
+    /* Use only currently visible, reachable nearby ground. A worker should
+     * be able to return to the defended line after the danger clears. */
+    for(int dy=-160;dy<=160;dy+=32)for(int dx=-160;dx<=160;dx+=32) {
+        int x=center_x+dx,y=center_y+dy,nx=-1,ny=-1,safe=1;
+        if(x<16||y<16||x>=WORLD_W-16||y>=WORLD_H-16||
+           !currently_visible(x,y)||!path_next_tile(u[worker].x,u[worker].y,x,y,&nx,&ny))continue;
         for(int i=0;i<MAX_UNITS&&safe;i++)if(u[i].alive&&u[i].owner==ENEMY&&
             currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0&&
-            dist2(x,y,u[i].x,u[i].y)<280*280)safe=0;
-        if(safe){safe_x=x;safe_y=y;break;}
+            dist2(x,y,u[i].x,u[i].y)<160*160)safe=0;
+        for(int i=0;i<MAX_BUILDINGS&&safe;i++)if(b[i].alive&&b[i].owner==ENEMY&&
+            currently_visible(b[i].x,b[i].y)&&dist2(x,y,b[i].x,b[i].y)<150*150)safe=0;
+        int d=dist2(u[worker].x,u[worker].y,x,y);
+        if(safe&&d<best){best=d;safe_x=x;safe_y=y;}
     }
     if(safe_x<0) {
         fprintf(stderr,"Z7 evacuation waypoint failed frame%u slot%d order%d threat%d mode%d menu%d cursor%d,%d selected%d\n",
