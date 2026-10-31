@@ -11,6 +11,18 @@ extern "C" {
 #define SC64_CODEC_BYTES 2103u
 #define SC64_ARENA_WORDS 2408u
 #define SC64_END 127u
+/* Runtime wire format carries both source hit bits. Until general
+ * hallucination is implemented, only the staged Dark Swarm miss bit may be
+ * accepted by a game-save candidate. The raw pool codec remains lossless for
+ * all four bit patterns. */
+static inline int sc64_interceptor_save_hit_flags_supported(unsigned flags)
+{
+#ifdef SC64_SHARED_DARK_SWARM_PROBE
+    return (flags & ~1u) == 0;
+#else
+    return flags == 0;
+#endif
+}
 /* Runtime arena access is through volatile 16-bit words only. The caller
  * supplies aligned storage and keeps packet buffers disjoint from it. */
 typedef struct { volatile uint16_t *words; size_t word_count; } Sc64Arena;

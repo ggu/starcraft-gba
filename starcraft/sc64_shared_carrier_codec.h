@@ -115,7 +115,7 @@ static int sc64_shared_carrier_candidate_valid(const RaceSave *src,
             row.x_q8_source >= (s32)(ww*512)+margin ||
             row.y_q8_source >= (s32)(wh*512)+margin ||
             row.turn_rate_raw<127 || row.turn_rate_raw>383 ||
-            row.order_signal_bit0 || row.hit_flags_low2 ||
+            row.order_signal_bit0 || !sc64_interceptor_save_hit_flags_supported(row.hit_flags_low2) ||
             (row.movement_flags_low4&4u) || row.raw_source_owner>=8 ||
             race_protoss_generic_source_owner(row.raw_source_owner)<0 ||
             row.destination_x_source<0 || row.destination_x_source>=(int)(ww*2) ||

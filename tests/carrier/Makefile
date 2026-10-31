@@ -19,3 +19,13 @@ endef
 $(eval $(call SHARED_CARRIER_LEGACY_FIXTURE,terran,TERRAN_ROM_FLAGS,$(TERRAN_FULL_INPUTS)))
 $(eval $(call SHARED_CARRIER_LEGACY_FIXTURE,zerg,ZERG_ROM_FLAGS,$(ZERG_Z6_INPUTS)))
 $(eval $(call SHARED_CARRIER_LEGACY_FIXTURE,showcase,SHOWCASE_FLAGS,$(SHOWCASE_INPUTS)))
+
+# The source hit bits stay lossless; candidate support follows live capabilities.
+build/test-sc64-carrier-save-flags-base: tests/sc64_interceptor_save_flags.c starcraft/sc64_interceptor_pool_codec.h tests/carrier/Makefile | build
+	$(CLANG) -std=c11 -O1 -g0 -fsanitize=address,undefined $< -o $@
+build/test-sc64-carrier-save-flags-swarm: tests/sc64_interceptor_save_flags.c starcraft/sc64_interceptor_pool_codec.h tests/carrier/Makefile | build
+	$(CLANG) -std=c11 -O1 -g0 -fsanitize=address,undefined -DSC64_SHARED_DARK_SWARM_PROBE $< -o $@
+.PHONY: test-sc64-carrier-save-flags
+test-sc64-carrier-save-flags: build/test-sc64-carrier-save-flags-base build/test-sc64-carrier-save-flags-swarm
+	./build/test-sc64-carrier-save-flags-base
+	./build/test-sc64-carrier-save-flags-swarm
