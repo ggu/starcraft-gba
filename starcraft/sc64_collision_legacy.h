@@ -1,5 +1,6 @@
 #ifndef SC64_COLLISION_LEGACY_H
 #define SC64_COLLISION_LEGACY_H
+#include "sc64_scarab_presence.h"
 
 _Static_assert(MAX_UNITS < 255, "Spatial unit indices must fit below the sentinel");
 
@@ -166,7 +167,7 @@ sc64_unit_buckets_begin(void)
         sc64_unit_bucket_cell[i] = 0xffffu;
     }
     for (i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
+        if (u[i].alive && !(SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i]))) {
             int x = u[i].x, y = u[i].y;
             if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return;
             sc64_unit_bucket_insert(i, sc64_unit_bucket_cell_at(x, y));
@@ -185,6 +186,7 @@ sc64_unit_bucket_move(Unit *q)
     int slot = (int)(q - u), old_cell, new_cell;
     u8 before, after;
     if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
+    if (SC64_SCARAB_NONCOLLIDING(q)) { sc64_unit_bucket_active = 0; return; }
     old_cell = sc64_unit_bucket_cell[slot];
     new_cell = sc64_unit_bucket_cell_at(q->x, q->y);
     if (old_cell == 0xffffu) {
@@ -257,7 +259,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
             int i;
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i])
-                if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
+                if (&u[i] != q && u[i].alive && !(SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i]))) {
 #ifdef SC64_P6_COMBAT_ENABLED
                     if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
@@ -441,7 +443,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i]) {
                 int candidate_radius, candidate_flying, candidate_collidable;
-                if (&u[i] == q || !u[i].alive || SC64_TRANSPORT_LOADED(&u[i]))
+                if (&u[i] == q || !u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i]))
                     continue;
 #ifdef SC64_P6_COMBAT_ENABLED
                 if (race_p6_combat_unit_burrowed(i)) continue;

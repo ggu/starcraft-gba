@@ -1,5 +1,33 @@
 .DEFAULT_GOAL := all
 
+# Asset-free journal selection prototype; not yet wired to game persistence.
+.PHONY: test-scarab-save-selection
+build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -Wno-misleading-indentation -fsanitize=address,undefined -DGBA_HOST -DSC64_SCARAB_RUNTIME -Icommon $< -o $@
+test-scarab-save-selection: build/test-scarab-save-selection
+	./build/test-scarab-save-selection
+test: test-scarab-save-selection
+
+.PHONY: test-scarab-parent-migration
+build/test-scarab-parent-migration: tests/sc64_scarab_parent_migration.c starcraft/sc64_scarab_fields.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-scarab-parent-migration: build/test-scarab-parent-migration
+	./build/test-scarab-parent-migration
+test: test-scarab-parent-migration
+
+.PHONY: test-scarab-order-state
+build/test-scarab-order-state: tests/sc64_scarab_order_state.c starcraft/sc64_scarab_order_state.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-scarab-order-state: build/test-scarab-order-state
+	./build/test-scarab-order-state
+# Asset-free differential test for optional packed terrain initialization.
+.PHONY: test-sc64-terrain-grid-pack
+build/test-sc64-terrain-grid-pack: tests/sc64_terrain_grid_pack.c starcraft/sc64_terrain_grid_pack.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft $< -o $@
+test-sc64-terrain-grid-pack: build/test-sc64-terrain-grid-pack
+	./build/test-sc64-terrain-grid-pack
+test: test-sc64-terrain-grid-pack
+
 .PHONY: test-gfx-shapes
 build/test-gfx-shapes: tests/gfx_shapes_rom.c common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SHAPES_ROM_ARM -Icommon $< common/gba.c -o $@
@@ -463,6 +491,15 @@ ifneq ($(words $(CANONICAL_ROUTE_INDEX)),1)
 $(error CANONICAL_ROUTE_INDEX must be 0 or 1)
 endif
 CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID)
+# Experimental imported-map walkability packing; canonical products only.
+CANONICAL_PATH_GRID ?= 1
+ifneq ($(words $(filter 0 1,$(CANONICAL_PATH_GRID))),1)
+$(error CANONICAL_PATH_GRID must be 0 or 1)
+endif
+ifneq ($(filter $(CANONICAL_PATH_GRID),0 1),$(CANONICAL_PATH_GRID))
+$(error CANONICAL_PATH_GRID must be 0 or 1)
+endif
+CANONICAL_PATH_GRID_FLAGS = $(if $(filter 1,$(CANONICAL_PATH_GRID)),-DSC64_BULK_TERRAIN_GRID)
 # Experimental packed walking frames; original-art and legacy products stay independent.
 CANONICAL_WALK_WORDS ?= 1
 ifneq ($(words $(filter 0 1,$(CANONICAL_WALK_WORDS))),1)
@@ -494,7 +531,7 @@ $(error CANONICAL_LOOKUP_INDEX must be 0 or 1)
 endif
 # Read-only key comparison also handles sub-second changes with macOS Make 3.81.
 sc64_lookup_quote = '$(subst ','"'"',$(1))'
-CANONICAL_LOOKUP_CONFIG_KEY := $(shell $(PYTHON) tools/sc64_weapon_lookup_index.py --config-key $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_INDEX)) $(call sc64_lookup_quote,$(WEAPON_SOURCE_HEADER)))-route$(CANONICAL_ROUTE_INDEX)-walk$(shell $(PYTHON) tools/sc64_unit_walk_words.py --config-key $(CANONICAL_WALK_WORDS) $(call sc64_lookup_quote,$(UNIT_WALK_HEADER)) $(call sc64_lookup_quote,$(UNIT_FACING_HEADER)))
+CANONICAL_LOOKUP_CONFIG_KEY := $(shell $(PYTHON) tools/sc64_weapon_lookup_index.py --config-key $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_INDEX)) $(call sc64_lookup_quote,$(WEAPON_SOURCE_HEADER)))-route$(CANONICAL_ROUTE_INDEX)-pathgrid$(CANONICAL_PATH_GRID)-walk$(shell $(PYTHON) tools/sc64_unit_walk_words.py --config-key $(CANONICAL_WALK_WORDS) $(call sc64_lookup_quote,$(UNIT_WALK_HEADER)) $(call sc64_lookup_quote,$(UNIT_FACING_HEADER)))
 CANONICAL_LOOKUP_REBUILD := $(if $(shell test -f build/canonical-lookup-config && printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' | cmp -s - build/canonical-lookup-config && printf matched),,force-canonical-lookup-rebuild)
 INDEXED_WEAPON_HEADER := build/generated/weapon-lookup/sc64_weapon_source_indexed.h
 CANONICAL_LOOKUP_INPUTS = $(if $(filter 1,$(CANONICAL_WALK_WORDS)),$(WALK_WORDS_HEADER)) $(if $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(INDEXED_WEAPON_HEADER)) build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
@@ -534,7 +571,7 @@ DEATH_ART_DIR := .local/sc64/death/generated
 DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
 CANONICAL_DEATH_FLAGS ?= -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
 CANONICAL_DEATH_INPUTS = $(if $(filter -DSC64_DEATH_SOURCE_ART,$(CANONICAL_DEATH_FLAGS)),$(DEATH_ART_HEADER))
-TERRAN_ROM_FLAGS = $(BC_FLAGS) $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS)
+TERRAN_ROM_FLAGS = $(BC_FLAGS) $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS) $(CONTACT_ROM_PLACEMENT_FLAGS)
 # Explicit legacy Z1-Z4 product: SCZ4, save generation 20, unchanged flags.
@@ -546,7 +583,7 @@ ZERG_Z4_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS)
 ZERG_Z6_BANK := .local/sc64/zerg-z6/generated
 ZERG_Z6_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z6_PROBE_FLAGS)) -DSC64_ZP_DEFENSE_TARGETS
 ZERG_Z6_INPUTS = $(BC_INPUTS) $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z6_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h $(CANONICAL_LOOKUP_INPUTS)
-ZERG_ROM_FLAGS = $(BC_FLAGS) $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS)
+ZERG_ROM_FLAGS = $(BC_FLAGS) $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
@@ -567,7 +604,7 @@ PROTOSS_P7_SPRITE_DIR := .local/sc64/protoss-p7/generated
 PROTOSS_P7_SPRITE_HEADER := $(PROTOSS_P7_SPRITE_DIR)/sc64_race_sprites_generated.h
 # P7 has room for the steering pass and inline stock step in IWRAM. Keep the
 # P6 placement choices and historical P7 probes independent of this profile.
-PROTOSS_P7_CANONICAL_FLAGS = $(BC_FLAGS) -I$(PROTOSS_P7_SPRITE_DIR) $(filter-out -I$(P7_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) -I$(BC_P7_FACT_DIR) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(filter-out -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(PROTOSS_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) -DSC64_P7_ARBITER_AURA_ONCE $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS)
+PROTOSS_P7_CANONICAL_FLAGS = $(BC_FLAGS) -I$(PROTOSS_P7_SPRITE_DIR) $(filter-out -I$(P7_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) -I$(BC_P7_FACT_DIR) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(filter-out -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(PROTOSS_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) -DSC64_P7_ARBITER_AURA_ONCE $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS)
 PROTOSS_P7_CANONICAL_INPUTS = $(BC_INPUTS) $(filter-out .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p7/generated/sc64_race_sprites_generated.h,$(P7_ARBITER_INPUTS)) $(PROTOSS_P7_SPRITE_HEADER) $(BC_P7_FACT_HEADER) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 PROTOSS_ROM_FLAGS = $(PROTOSS_P7_CANONICAL_FLAGS)
 PROTOSS_CANONICAL_INPUTS = $(PROTOSS_P7_CANONICAL_INPUTS)
@@ -4391,7 +4428,7 @@ endif
 # Clip world art before it reaches either HUD band. Keep the infrequent
 # procedural diamond fallback in ROM so clipping retains the IWRAM reserve.
 SHOWCASE_INPUTS = $(BC_INPUTS) $(P7_ARBITER_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
-SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS)
+SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS)
 build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
@@ -5832,3 +5869,164 @@ CANONICAL_LOOKUP_EXTRA_TARGETS := \
     build/test-sc64-terrain-transfer-scene-showcase \
     test-sc64-bc-normal-input
 $(CANONICAL_LOOKUP_EXTRA_TARGETS): $(CANONICAL_LOOKUP_INPUTS)
+
+# Explicit Scarab Unit fixtures. These consume prepared inputs directly and
+# never invoke private asset recipes. Each run gets its own source-only P7
+# facts under a new directory; old profile banks are not overwritten.
+SCARAB_P7_BASE_FLAGS = $(filter-out -DSC64_FACT_TABLES -I$(BC_P7_FACT_DIR) -I$(P7_FACT_V2_DIR),$(PROTOSS_ROM_FLAGS))
+SCARAB_FIXTURE_unit_adapter := tests/sc64_scarab_unit_adapter_game.c
+SCARAB_FIXTURE_presence := tests/sc64_scarab_presence_game.c
+SCARAB_FIXTURE_save := tests/sc64_scarab_save_game.c
+
+define SCARAB_PREPARED_FIXTURE
+.PHONY: test-scarab-$(1)
+test-scarab-$(1): $$(CANONICAL_LOOKUP_INPUTS)
+	@set -eu; \
+	mkdir -p build/generated/scarab-p7; \
+	run=$$$$(mktemp -d build/generated/scarab-p7/run.XXXXXX); \
+	printf 'Scarab fixture evidence: %s\n' "$$$$run"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $$(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts-generator"; \
+	"$$$$run/facts-generator" > "$$$$run/sc64_fact_tables_generated.h"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME $$(TERRAN_ROM_FLAGS) $$(SCARAB_FIXTURE_$(2)) common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o "$$$$run/terran"; \
+	"$$$$run/terran"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME $$(ZERG_ROM_FLAGS) $$(SCARAB_FIXTURE_$(2)) common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o "$$$$run/zerg"; \
+	"$$$$run/zerg"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME $$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run" $$(SCARAB_FIXTURE_$(2)) common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) -o "$$$$run/protoss"; \
+	"$$$$run/protoss"; \
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME $$(SHOWCASE_FLAGS) $$(SCARAB_FIXTURE_$(2)) common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o "$$$$run/showcase"; \
+	"$$$$run/showcase"
+endef
+$(eval $(call SCARAB_PREPARED_FIXTURE,unit-adapter,unit_adapter))
+$(eval $(call SCARAB_PREPARED_FIXTURE,presence,presence))
+$(eval $(call SCARAB_PREPARED_FIXTURE,save,save))
+
+# Opt-in actual-codec Scarab journal checks use prepared local inputs.
+# Canonical lookup dependencies are declared below.
+# Each P7 run generates its own source-only roster facts in a new run folder.
+define SCARAB_CROSS_FIXTURE
+.PHONY: test-scarab-cross-$(1)
+test-scarab-cross-$(1):
+	@set -eu; \
+	mkdir -p build/generated/scarab-cross; \
+	run=$$$$(mktemp -d build/generated/scarab-cross/$(1).XXXXXX); \
+	printf 'Scarab cross-codec receipts: %s\n' "$$$$run"; \
+	$(if $(filter protoss,$(1)),$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts"; "$$$$run/facts" > "$$$$run/sc64_fact_tables_generated.h",:); \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable $(2) tests/sc64_scarab_cross_codec_old_fresh.c tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(4) -o "$$$$run/old"; \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE $(3) tests/sc64_scarab_cross_codec_fresh.c tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(4) -o "$$$$run/new"; \
+	for map in 0 1; do \
+	  fresh="$$$$run/fresh-$$$$map.sram"; mixed="$$$$run/mixed-$$$$map.sram"; \
+	  "$$$$run/new" write "$$$$fresh" "$$$$map"; \
+	  cp "$$$$fresh" "$$$$run/before-reject-$$$$map.sram"; \
+	  "$$$$run/new" reject-outside "$$$$fresh" "$$$$map"; cmp "$$$$fresh" "$$$$run/before-reject-$$$$map.sram"; \
+	  "$$$$run/new" complete "$$$$fresh" "$$$$map"; "$$$$run/new" verify "$$$$fresh" "$$$$map"; \
+	  "$$$$run/old" "$$$$mixed" "$$$$map"; "$$$$run/new" write-over-old "$$$$mixed" "$$$$map"; \
+	  "$$$$run/new" corrupt "$$$$mixed" "$$$$map"; cp "$$$$mixed" "$$$$run/before-fallback-$$$$map.sram"; \
+	  "$$$$run/new" fallback-old "$$$$mixed" "$$$$map"; cmp "$$$$mixed" "$$$$run/before-fallback-$$$$map.sram"; \
+	done
+endef
+$(eval $(call SCARAB_CROSS_FIXTURE,zerg,$(ZERG_ROM_FLAGS),$(ZERG_ROM_FLAGS),))
+$(eval $(call SCARAB_CROSS_FIXTURE,protoss,$(PROTOSS_ROM_FLAGS),$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run",$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SCARAB_CROSS_FIXTURE,showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_FLAGS),))
+.PHONY: test-scarab-cross-codecs
+test-scarab-cross-codecs: test-scarab-cross-zerg test-scarab-cross-protoss test-scarab-cross-showcase
+
+.PHONY: test-scarab-impact-packet test-scarab-shared-impact-terran
+build/test-scarab-impact-packet: tests/sc64_scarab_impact_packet.c starcraft/sc64_scarab_impact_packet.h starcraft/sc64_impact_events.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-scarab-impact-packet: build/test-scarab-impact-packet
+	./build/test-scarab-impact-packet
+
+# Opt-in; requires prepared Terran headers and lookup, never invokes extraction.
+test-scarab-shared-impact-terran:
+	@set -eu; \
+	mkdir -p build/generated/scarab-shared-impact; \
+	run=$$(mktemp -d build/generated/scarab-shared-impact/terran.XXXXXX); \
+	printf 'Scarab shared-impact receipts: %s\n' "$$run"; \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	  -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	  $(TERRAN_ROM_FLAGS) tests/sc64_scarab_shared_impact_game.c tests/sc64_yamato_host_sram_shim.c \
+	  $(filter-out starcraft/game.c,$(STARCRAFT)) -o "$$run/test"; \
+	"$$run/test" "$$run/save-before" "$$run/save-after" "$$run/reject-before" "$$run/reject-after"; \
+	cmp "$$run/save-before" "$$run/save-after"; cmp "$$run/reject-before" "$$run/reject-after"
+
+# Documents a current fail-closed limitation, not a successful save feature.
+.PHONY: test-scarab-postimpact-gap-terran
+test-scarab-postimpact-gap-terran:
+	@set -eu; \
+	mkdir -p build/generated/scarab-shared-impact; \
+	run=$$(mktemp -d build/generated/scarab-shared-impact/postimpact.XXXXXX); \
+	printf 'Scarab post-impact gap receipts: %s\n' "$$run"; \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	  -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	  $(TERRAN_ROM_FLAGS) tests/sc64_scarab_postimpact_save_game.c tests/sc64_yamato_host_sram_shim.c \
+	  $(filter-out starcraft/game.c,$(STARCRAFT)) -o "$$run/test"; \
+	"$$run/test" "$$run/before" "$$run/rejected" "$$run/reused"; \
+	cmp "$$run/before" "$$run/rejected"; ! cmp -s "$$run/rejected" "$$run/reused"
+
+# Opt-in post-combat save checks; existing prepared inputs only. P7 facts are
+# generated in the run directory, never over an existing source bank.
+define SCARAB_DEADROW_FIXTURE
+.PHONY: test-scarab-deadrow-$(1)
+test-scarab-deadrow-$(1):
+	@set -eu; \
+	mkdir -p build/generated/scarab-deadrow; \
+	run=$$$$(mktemp -d build/generated/scarab-deadrow/$(1).XXXXXX); \
+	printf 'Scarab post-impact save receipts: %s\n' "$$$$run"; \
+	$(if $(filter protoss,$(1)),$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts"; "$$$$run/facts" > "$$$$run/sc64_fact_tables_generated.h",:); \
+	for fixture in postimpact_fresh deadwire_game; do \
+	  $(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	    -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	    -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	    $(2) "tests/sc64_scarab_$$$$fixture.c" tests/sc64_yamato_host_sram_shim.c \
+	    $(filter-out starcraft/game.c,$(STARCRAFT)) $(3) -o "$$$$run/$$$$fixture"; \
+	done; \
+	for map in 0 1; do \
+	  "$$$$run/postimpact_fresh" write "$$$$run/$$$$map.sram" "$$$$map" "$$$$run/write-$$$$map.snap"; \
+	  cp "$$$$run/$$$$map.sram" "$$$$run/load-before-$$$$map.sram"; \
+	  "$$$$run/postimpact_fresh" read "$$$$run/$$$$map.sram" "$$$$map" "$$$$run/read-$$$$map.snap"; \
+	  cmp "$$$$run/write-$$$$map.snap" "$$$$run/read-$$$$map.snap"; cmp "$$$$run/$$$$map.sram" "$$$$run/load-before-$$$$map.sram"; \
+	  "$$$$run/deadwire_game" "$$$$run/reject-before-$$$$map.sram" "$$$$run/reject-after-$$$$map.sram" "$$$$map"; \
+	  cmp "$$$$run/reject-before-$$$$map.sram" "$$$$run/reject-after-$$$$map.sram"; \
+	done
+endef
+$(eval $(call SCARAB_DEADROW_FIXTURE,terran,$(TERRAN_ROM_FLAGS),))
+$(eval $(call SCARAB_DEADROW_FIXTURE,zerg,$(ZERG_ROM_FLAGS),))
+$(eval $(call SCARAB_DEADROW_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run",$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SCARAB_DEADROW_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
+.PHONY: test-scarab-deadrow
+test-scarab-deadrow: test-scarab-deadrow-terran test-scarab-deadrow-zerg test-scarab-deadrow-protoss test-scarab-deadrow-showcase
+
+# Opt-in namespace compatibility with the current human/AI Sunken morph.
+# Uses existing prepared inputs and isolated generated P7 facts, like deadrow.
+define SCARAB_SUNKEN_FIXTURE
+.PHONY: test-scarab-sunken-$(1)
+test-scarab-sunken-$(1):
+	@set -eu; \
+	mkdir -p build/generated/scarab-sunken; \
+	run=$$$$(mktemp -d build/generated/scarab-sunken/$(1).XXXXXX); \
+	printf 'Scarab Sunken morph receipts: %s\n' "$$$$run"; \
+	$(if $(filter protoss,$(1)),$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts"; "$$$$run/facts" > "$$$$run/sc64_fact_tables_generated.h",:); \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	  -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	  $(2) tests/sc64_skirmish_ai_progress.c tests/sc64_yamato_host_sram_shim.c \
+	  $(filter-out starcraft/game.c,$(STARCRAFT)) $(3) -o "$$$$run/test"; \
+	for map in 0 1; do \
+	  "$$$$run/test" --map "$$$$map" --human z --bots t --morph-hp 4; \
+	  "$$$$run/test" --map "$$$$map" --human t --bots z --ai-sunken-save; \
+	done
+endef
+$(eval $(call SCARAB_SUNKEN_FIXTURE,terran,$(TERRAN_ROM_FLAGS),))
+$(eval $(call SCARAB_SUNKEN_FIXTURE,zerg,$(ZERG_ROM_FLAGS),))
+$(eval $(call SCARAB_SUNKEN_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run",$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SCARAB_SUNKEN_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
+.PHONY: test-scarab-sunken
+test-scarab-sunken: test-scarab-sunken-terran test-scarab-sunken-zerg test-scarab-sunken-protoss test-scarab-sunken-showcase
+
+# Opt-in probes use canonical weapon flags and must track the selected bank.
+test-scarab-shared-impact-terran test-scarab-postimpact-gap-terran \
+  test-scarab-cross-zerg test-scarab-cross-protoss test-scarab-cross-showcase \
+  test-scarab-deadrow-terran test-scarab-deadrow-zerg test-scarab-deadrow-protoss test-scarab-deadrow-showcase \
+  test-scarab-sunken-terran test-scarab-sunken-zerg test-scarab-sunken-protoss test-scarab-sunken-showcase: $(CANONICAL_LOOKUP_INPUTS)

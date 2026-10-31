@@ -33,9 +33,10 @@ build/walk-consumer: $(CANONICAL_LOOKUP_INPUTS) $(UNIT_FACING_INPUTS)
 \t@$(CC) $(TERRAN_ROM_FLAGS) -c consumer.c -o $@
 \t@printf 'rebuilt\\n' >> build/rebuilds
 ''')
-            def run(mode):
+            def run(mode, path_grid=0):
                 args=['make','-f','Makefile','-f','fixture.mk','CANONICAL_LOOKUP_INDEX=0',
-                      'CANONICAL_WALK_WORDS='+str(mode),'UNIT_WALK_HEADER=bank/walk.h',
+                      'CANONICAL_WALK_WORDS='+str(mode),'CANONICAL_PATH_GRID='+str(path_grid),
+                      'UNIT_WALK_HEADER=bank/walk.h',
                       'UNIT_FACING_HEADER=bank/facing.h','check']
                 subprocess.run(args,cwd=root,check=True,capture_output=True)
                 return len((root/'build/rebuilds').read_text().splitlines())
@@ -56,6 +57,11 @@ build/walk-consumer: $(CANONICAL_LOOKUP_INPUTS) $(UNIT_FACING_INPUTS)
             tool=root/'tools/sc64_unit_walk_words.py';tool.write_text(tool.read_text()+'\n')
             self.assertEqual(run(1),5);self.assertEqual(run(0),6);self.assertEqual(run(1),7)
             self.assertEqual(run(1),7)
+            retained=output.read_bytes()
+            self.assertEqual(run(1,1),8);self.assertEqual(output.read_bytes(),retained)
+            self.assertEqual(run(1,1),8)
+            self.assertEqual(run(1,0),9);self.assertEqual(output.read_bytes(),retained)
+            self.assertEqual(run(1,0),9)
             retained=output.read_bytes(); facing.write_text('bad input')
             with self.assertRaises(subprocess.CalledProcessError):run(1)
             self.assertEqual(output.read_bytes(),retained)
