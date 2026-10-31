@@ -75,6 +75,7 @@ static int sc64_p7_carrier_parent_valid_in(const Unit *actors, int count,
     int mapped_owner, service_slot;
     if (!actors || count < 0 || count > MAX_UNITS || slot < 0 || slot >= count)
         return 0;
+    /* Reject ordinary rows before resolving their source owner. */
     if (!actors[slot].alive || actors[slot].type != SC64_CARRIER_TYPE)
         return 0;
     service_slot = RACE_PROTOSS_SLOT(&actors[slot]);
@@ -95,6 +96,7 @@ static int sc64_p7_carrier_child_valid_in(const Unit *actors, int count,
     int mapped_owner, service_slot;
     if (!actors || count < 0 || count > MAX_UNITS || slot < 0 || slot >= count)
         return 0;
+    /* Reject ordinary rows before resolving their source owner. */
     if (!actors[slot].alive || actors[slot].type != SC64_INTERCEPTOR_TYPE)
         return 0;
     service_slot = RACE_PROTOSS_SLOT(&actors[slot]);

@@ -78,6 +78,19 @@ class CacheProfileFlagsTests(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 profile_defines("SHOWCASE_CONTACT_CACHE=" + invalid)
 
+    def test_showcase_terrain_storage_toggle_keeps_other_profiles(self):
+        enabled = profile_defines()
+        disabled = profile_defines("SHOWCASE_TERRAIN_CACHE_VRAM=0")
+        self.assertIn("-DSC64_TERRAIN_CACHE_VRAM", enabled["SHOWCASE_FLAGS"])
+        self.assertNotIn("-DSC64_TERRAIN_CACHE_VRAM", disabled["SHOWCASE_FLAGS"])
+        self.assertEqual(enabled["SHOWCASE_FLAGS"] - {"-DSC64_TERRAIN_CACHE_VRAM"},
+                         disabled["SHOWCASE_FLAGS"])
+        for name in CANONICAL + NON_CACHE:
+            self.assertEqual(enabled[name], disabled[name])
+        for invalid in ("", "2", "0 1", "yes"):
+            with self.assertRaises(subprocess.CalledProcessError):
+                profile_defines("SHOWCASE_TERRAIN_CACHE_VRAM=" + invalid)
+
     def test_disabling_cache_group_also_removes_the_persistent_raster(self):
         profiles = profile_defines("CANONICAL_CACHE_FLAGS=")
         for name in CANONICAL:
