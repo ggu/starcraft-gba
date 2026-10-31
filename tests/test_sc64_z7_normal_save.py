@@ -178,12 +178,30 @@ class SaveTest(unittest.TestCase):
     def test_cli_passes_explicit_save_format_and_defaults_to_legacy(self):
         argv = ['replay', '--trace', 't', '--rom', 'r', '--elf', 'e', '--runner', 'b', '--output', 'o']
         with patch.object(sys, 'argv', argv), patch.object(replay, 'run') as run:
-            replay.main(); self.assertEqual(run.call_args.args[-1], 'legacy')
+            replay.main(); self.assertEqual(run.call_args.args[-2:], ('legacy', None))
         with patch.object(sys, 'argv', argv + ['--save-format', 'transport1']), patch.object(replay, 'run') as run:
-            replay.main(); self.assertEqual(run.call_args.args[-1], 'transport1')
+            replay.main(); self.assertEqual(run.call_args.args[-2:], ('transport1', None))
         with patch.object(sys, 'argv', argv + ['--save-format', 'unexpected']), patch.object(replay, 'run') as run:
             with self.assertRaises(SystemExit): replay.main()
             run.assert_not_called()
+
+    def test_resume_window_is_a_checked_observation_prefix(self):
+        plan = {'stop': 30, 'observations': {10: {}, 20: {}, 25: {}, 30: {}},
+                'transitions': [(1,1), (4,0), (11,4), (21,8), (26,0)]}
+        end, transitions, observations = replay.resume_window(plan, 10, 20)
+        self.assertEqual((end, transitions, list(observations)),
+                         (20, [(1,1), (4,0), (11,4)], [20]))
+        self.assertEqual(replay.resume_window(plan,10,None)[0],30)
+        self.assertEqual(replay.resume_window(plan,10,30)[0],30)
+        for invalid in (10, 19, 31, True, '20'):
+            with self.subTest(stop=invalid), self.assertRaises(ValueError):
+                replay.resume_window(plan,10,invalid)
+        argv=['replay','--trace','t','--rom','r','--elf','e','--runner','b','--output','o',
+              '--resume-stop','20']
+        with patch.object(sys,'argv',argv), patch.object(replay,'run') as run:
+            replay.main(); self.assertEqual(run.call_args.args[-1],20)
+        with self.assertRaisesRegex(ValueError,'resume stop requires'):
+            replay.run(None,None,None,None,None,resume_stop=20)
 
     def test_save_formats_cannot_cross_resume_provenance(self):
         inputs = {'trace': 'trace-hash', 'rom': 'rom-hash', 'elf': 'elf-hash',
