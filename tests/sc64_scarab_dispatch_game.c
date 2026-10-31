@@ -27,13 +27,11 @@ int main(void) {
 #ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
     u[c].path_retry=64; /* Explicit source heading supplied by the host test. */
 #endif
-#ifdef SC64_SCARAB_STEER_MOTION_PROBE
-    /* Q8 diagonal vector is the source oracle's initial position translated
-     * one source pixel north to make the half-scale engine start integral. */
-    u[c].x=169;u[c].y=168;u[c].path_retry=95;u[c].path_x=402;u[c].path_y=400;
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
+    u[c].x=169;u[c].y=168;u[c].carry|=256<<19;u[c].cd=95;u[c].path_x=402;u[c].path_y=401;
 #endif
     assert(race_scarab_parent_lost(p,0));u[p].alive=0;frame=0;game_update(0,0);
-    Sc64ScarabChildFields f;assert(sc64_scarab_child_fields_unpack(u[c].carry,u[c].work_timer,&f));
+    Sc64ScarabChildFields f;assert(race_scarab_child_fields_read(u[c].carry,u[c].work_timer,&f));
     assert(f.parent_slot==SC64_SCARAB_FIELD_NO_SLOT && f.life==90 && f.no_collision==7);
     assert(u[c].target==target && u[c].tx==u[target].x && u[c].ty==u[target].y);
 #ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
@@ -41,10 +39,16 @@ int main(void) {
     for(int j=0;j<3;j++){screen=SCREEN_PLAY;game_update(0,0);}
     assert(u[c].x==start_x+8);
 #endif
-#ifdef SC64_SCARAB_STEER_MOTION_PROBE
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
     for(int j=0;j<3;j++){screen=SCREEN_PLAY;game_update(0,0);}
-    assert(sc64_scarab_probe_steer[c].x==89488 && sc64_scarab_probe_steer[c].y==88848);
-    assert(u[c].x==174 && u[c].y==173);
+    { Sc64ScarabSteer s;assert(race_scarab_probe_motion_load(&u[c],&s));
+      assert(s.x==89488 && s.y==89104 && u[c].x==174 && u[c].y==174); }
+    assert(!race_save_game()); /* Outside motion is not a registered save. */
+    { unsigned fractions=(unsigned)u[c].carry & 0x0ffffc00u;
+      assert(fractions && race_scarab_child_set(c,SC64_SCARAB_FIELD_NO_SLOT,SC64_SCARAB_CHILD_SELF_DESTRUCT,80,0));
+      assert(((unsigned)u[c].carry & 0x0ffffc00u)==fractions);
+      assert(race_scarab_child_set(c,SC64_SCARAB_FIELD_NO_SLOT,SC64_SCARAB_CHILD_OUTSIDE,80,0));
+      assert(((unsigned)u[c].carry & 0x0ffffc00u)==fractions); }
 #endif
     int x=u[c].tx,y=u[c].ty;u[target].alive=0;frame=0;screen=SCREEN_PLAY;game_update(0,0);
     assert(u[c].target==-1 && u[c].tx==x && u[c].ty==y);

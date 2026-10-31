@@ -1661,11 +1661,14 @@ static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *can
 #endif
 static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #endif
+#if defined(SC64_SCARAB_PACKED_MOTION_PROBE) && !defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE)
+#error "Packed motion probe requires flight control"
+#endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
 #error "Scarab flight control probe requires runtime and source cadence"
 #endif
-static void race_scarab_control_dispatch(int slot);
+static void __attribute__((noinline)) race_scarab_control_dispatch(int slot);
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int race_p7_carrier_training_menu_available(void);
@@ -11574,24 +11577,49 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #endif
 #include "sc64_scarab_clear_motion.h"
 #endif
-#ifdef SC64_SCARAB_STEER_MOTION_PROBE
-#ifndef GBA_HOST
-#error "Steer-motion probe is host-only"
-#endif
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
 #ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
 #error "Choose one Scarab motion probe"
 #endif
 #include "sc64_scarab_steer_motion.h"
-static Sc64ScarabSteer sc64_scarab_probe_steer[MAX_UNITS];
+/* Only outside probe actors use these scratch fields. No outside save is
+ * admitted. `cd`: heading/velocity bytes; `weapon`: turn/waypoint flags;
+ * path_timer/path_retry: prior source waypoint; carry: two Q8 fractions. */
+static int race_scarab_probe_motion_load(const Unit *q,Sc64ScarabSteer *s)
+{
+    Sc64ScarabChildFields f;unsigned bits;
+    if (!q || !s || !race_scarab_child_fields_read(q->carry,q->work_timer,&f) ||
+        f.phase!=SC64_SCARAB_CHILD_OUTSIDE || !f.life || q->x<0 || q->y<0 ||
+        (unsigned)q->weapon>3 || (unsigned)q->cd>65535u ||
+        (unsigned)q->path_timer>32767u || (unsigned)q->path_retry>32767u) return 0;
+    bits=(unsigned)q->carry;
+    *s=(Sc64ScarabSteer){.x=(s32)q->x*512+(int)((bits>>10)&511u),
+        .y=(s32)q->y*512+(int)((bits>>19)&511u),.heading=(u8)q->cd,
+        .velocity=(u8)((unsigned)q->cd>>8),.turning=(u8)(q->weapon&1),
+        .age=(u8)(90u-f.life),.waypoint_x=q->path_timer,.waypoint_y=q->path_retry,
+        .waypoint_known=(u8)((q->weapon>>1)&1)};
+    return 1;
+}
+static int race_scarab_probe_motion_store(Unit *q,const Sc64ScarabSteer *s)
+{
+    if (!q || !s || s->x<0 || s->y<0 || s->x/512>32767 || s->y/512>32767 ||
+        s->turning>1 || s->waypoint_known>1 || s->waypoint_x<0 || s->waypoint_y<0 ||
+        s->waypoint_x>32767 || s->waypoint_y>32767) return 0;
+    q->x=(s16)(s->x/512);q->y=(s16)(s->y/512);
+    q->carry=(q->carry&1023) | ((s->x&511)<<10) | ((s->y&511)<<19);
+    q->cd=(u16)(s->heading|((unsigned)s->velocity<<8));
+    q->weapon=(u16)(s->turning|(s->waypoint_known<<1));
+    q->path_timer=(u16)s->waypoint_x;q->path_retry=(u16)s->waypoint_y;return 1;
+}
 #endif
-static void race_scarab_control_dispatch(int slot)
+static void __attribute__((noinline)) race_scarab_control_dispatch(int slot)
 {
     Unit *q=&u[slot];
     if ((((unsigned)q->carry>>8)&3u)<2u) return;
-#ifdef SC64_SCARAB_STEER_MOTION_PROBE
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
     if (q->order==1) {
-        Sc64ScarabSteer fresh={.x=(s32)q->x*512,.y=(s32)q->y*512,.heading=(u8)q->path_retry,.velocity=(u8)q->path_retry,.turning=1,.age=1};
-        sc64_scarab_probe_steer[slot]=fresh;
+        unsigned heading=(unsigned)q->cd&255u;
+        q->cd=(u16)(heading|(heading<<8));q->weapon=1;q->path_timer=0;q->path_retry=0;
     }
 #endif
     if (q->target>=0) {
@@ -11601,13 +11629,11 @@ static void race_scarab_control_dispatch(int slot)
         } else q->target=-1;
     }
     int action=race_scarab_flight_control_tick(slot,0,0);
-#ifdef SC64_SCARAB_STEER_MOTION_PROBE
-    /* Host fixture supplies source waypoint coordinates; path generation and
-     * arrival remain deliberately outside this experiment. */
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
     if (action==SC64_SCARAB_CONTROL_CONTINUE && (q->order==2 || q->order==3)) {
-        Sc64ScarabChildFields f;Sc64ScarabSteer next=sc64_scarab_probe_steer[slot];
-        if (sc64_scarab_child_fields_unpack(q->carry,q->work_timer,&f) && f.life<90 &&
-            sc64_scarab_steer_tick(&next,q->path_x,q->path_y,1)) {
+        Sc64ScarabChildFields f;Sc64ScarabSteer next;
+        if (race_scarab_child_fields_read(q->carry,q->work_timer,&f) && f.life<90 &&
+            race_scarab_probe_motion_load(q,&next) && sc64_scarab_steer_tick(&next,q->path_x,q->path_y,1)) {
             int nx=(int)(next.x/512),ny=(int)(next.y/512),clear=1;
             int dx=nx-q->x,dy=ny-q->y,steps=absi(dx)>absi(dy)?absi(dx):absi(dy);
             if (steps>16) clear=0;
@@ -11616,7 +11642,7 @@ static void race_scarab_control_dispatch(int slot)
                 if (sx<0 || sy<0 || sx>=WORLD_W || sy>=WORLD_H || terrain_blocked(sx/16,sy/16) || !unit_step_clear(q,sx,sy)) clear=0;
                 for(int j=0;j<MAX_BUILDINGS && clear;j++) if(b[j].alive && dist2(sx,sy,b[j].x,b[j].y)<36*36)clear=0;
             }
-            if (clear) { sc64_scarab_probe_steer[slot]=next;q->x=nx;q->y=ny;sc64_unit_bucket_move(q);sc64_target_index_move(q); }
+            if (clear && race_scarab_probe_motion_store(q,&next)) { sc64_unit_bucket_move(q);sc64_target_index_move(q); }
         }
     }
 #endif

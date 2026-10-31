@@ -119,3 +119,35 @@ The host build/run receipts are `.local/decoder-proof/scarab-steer-{compile,run}
 Neither stage is registered for product gameplay or saves. Actual source
 waypoint generation, obstacles, target following and loss, animation/bullet
 allocation, cleanup, and all-product fit remain open.
+
+## Packed Unit motion probe
+
+The disabled `SC64_SCARAB_PACKED_MOTION_PROBE` replaces the previous host-only
+per-slot steering array. For outside probe children, `carry` holds the parent
+and phase in bits 0–9 and the two source-Q8 fractions in bits 10–18 and 19–27;
+`q.x*512 + frac_x` and `q.y*512 + frac_y` reconstruct source-Q8 positions.
+`cd` holds the heading and velocity bytes, `weapon` holds turning and
+previous-waypoint-valid bits, and `path_timer/path_retry` hold the prior source
+waypoint. The fixture supplies the next waypoint in `path_x/path_y`; age comes
+from the source lifetime. These fields are an experimental runtime contract,
+not an outside save layout or a normal product feature.
+
+The existing hidden-child decoder remains strict. A probe-specific reader
+accepts fractions only for outside/self-destruct rows and the setter preserves
+them through timer, STOP and parent-loss transitions. Outside saves still fail
+closed. Through actual `game_update` calls, the packed replay matches all seven
+retained OpenBW waypoint traces in source Q8 positions and headings through
+their observed arrival frames; the inputs remain oracle-supplied waypoints.
+The separate actual Unit fixture checks fresh STOP, parent loss, retained target,
+expiry, preserved fractions and outside-save rejection under ASan/UBSan.
+
+A direct link using the Terran normal Make recipe plus the explicit probe flags
+initially failed its unchanged IWRAM stack guard. Keeping the experimental
+dispatcher out of the hot section allowed the link to pass at
+`__iwram_end=0x03004e30` and `__bss_end=0x020370c0`; no guard or capacity was
+reduced. This single, older-branch experimental link is not a current-product
+matrix, gameplay performance measurement or hardware qualification. The
+failed and passing link receipts are `scarab-packed-arm-link-first-failure.json`
+and `scarab-packed-arm-link.json` in `.local/decoder-proof`; no generators ran.
+Source path generation, obstacles, arrival and weapon scheduling, complete
+cleanup and outside-save migration remain open.
