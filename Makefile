@@ -1956,7 +1956,7 @@ P8_AVAILABILITY_DIR := .local/p8-availability
 P8_AVAILABILITY_HEADER := $(P8_AVAILABILITY_DIR)/sc64_p8_availability_generated.h
 $(P8_AVAILABILITY_HEADER): tools/sc64_p8_availability.py tools/sc64_t5_availability.py .local/sc64/zp-stage/generated/source_maps/p8/source.chk .local/sc64/zp-stage/generated/source_maps/p8/manifest.json | build
 	$(PYTHON) tools/sc64_p8_availability.py --source .local/sc64/zp-stage/generated/source_maps/p8/source.chk --manifest .local/sc64/zp-stage/generated/source_maps/p8/manifest.json --out $@
-P8_CAMPAIGN_DEFINES := -DSC64_P8_DATA_ENABLED -DSC64_P8_RUNTIME -DSC64_P8_CAMPAIGN_ENTRY -DSC64_Z8_GAME_POOL_BRIDGE -DSC64_P8_GAME_POOL_BRIDGE -I$(P8_BATTERY_DIR) -I$(P8_AVAILABILITY_DIR)
+P8_CAMPAIGN_DEFINES := -DSC64_P8_LIVE_CONDITION_PROBE -DSC64_P8_DATA_ENABLED -DSC64_P8_RUNTIME -DSC64_P8_CAMPAIGN_ENTRY -DSC64_Z8_GAME_POOL_BRIDGE -DSC64_P8_GAME_POOL_BRIDGE -I$(P8_BATTERY_DIR) -I$(P8_AVAILABILITY_DIR)
 PROTOSS_P8_FLAGS = $(patsubst -I$(BC_P7_FACT_DIR),-I$(P8_FACT_V2_DIR),$(PROTOSS_P7_CANONICAL_FLAGS)) $(P8_CAMPAIGN_DEFINES)
 PROTOSS_P8_INPUTS = $(filter-out $(P7_FACT_V2_HEADER),$(PROTOSS_P7_CANONICAL_INPUTS)) $(P8_FACT_V2_HEADER) $(P8_SCENARIO_HEADER) $(P8_BATTERY_HEADER) $(P8_AVAILABILITY_HEADER)
 $(P8_BATTERY_HEADER): tools/sc64_p7_battery_pack.py tools/sc64_zp_scenario_pack.py tools/sc64_races_pack.py .local/sc64/zp-stage/generated/source_maps/p8/source.chk .local/sc64/zp-stage/generated/source_maps/p8/manifest.json | build
