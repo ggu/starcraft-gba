@@ -124,7 +124,9 @@ Python tests with 26 skips, plus separate five- and eight-test suites.
 
 The physical Z7 Transport1 run used an ordinary neutral cut, pause/save and
 fresh load. Its bounded continuation through trace observation 324 passed; the
-full fresh-resume replay also completed successfully. This does not establish
-near-30-fps performance, full native AI parity, AI transport tactics, a Z8
+full fresh-resume replay reached WIN at trace tick 179753 / game frame 177804,
+matching 302 post-cut named observations (303 including the retained cut).
+This is named-state evidence, not whole-world equality or an uninterrupted
+full run. It does not establish near-30-fps performance, full native AI parity, AI transport tactics, a Z8
 win, or a P7 controller win. Experimental Scarab namespace composition remains
 unqualified.
