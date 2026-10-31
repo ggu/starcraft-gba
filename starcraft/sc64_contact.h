@@ -518,13 +518,15 @@ sc64_contact_memo_eligible(const Unit *q, int speed)
  * of future movement. Diagnostic only; counters wrap modulo 2^32. */
 volatile u32 diag_contact_visit_moved, diag_contact_visit_stationary;
 volatile u32 diag_contact_geometry_moved, diag_contact_geometry_stationary;
+volatile u32 diag_traversable_calls;
 static s16 diag_contact_prev_x[MAX_UNITS], diag_contact_prev_y[MAX_UNITS];
 static u8 diag_contact_moved[MAX_UNITS], diag_contact_prev_alive[MAX_UNITS];
-static void sc64_contact_split_begin(void)
+static void __attribute__((noinline)) sc64_contact_split_begin(void)
 {
     int i;
     diag_contact_visit_moved = diag_contact_visit_stationary = 0;
     diag_contact_geometry_moved = diag_contact_geometry_stationary = 0;
+    diag_traversable_calls = 0;
     for (i = 0; i < MAX_UNITS; ++i) {
         diag_contact_moved[i] = u[i].alive && diag_contact_prev_alive[i] &&
             (u[i].x != diag_contact_prev_x[i] || u[i].y != diag_contact_prev_y[i]);
@@ -532,7 +534,13 @@ static void sc64_contact_split_begin(void)
         diag_contact_prev_alive[i] = u[i].alive;
     }
 }
-#define CONTACT_SPLIT(kind, i) do { if (diag_contact_moved[i]) ++diag_contact_##kind##_moved; else ++diag_contact_##kind##_stationary; } while (0)
+static void __attribute__((noinline)) sc64_contact_split_visit(int i)
+{ if (diag_contact_moved[i]) ++diag_contact_visit_moved; else ++diag_contact_visit_stationary; }
+static void __attribute__((noinline)) sc64_contact_split_geometry(int i)
+{ if (diag_contact_moved[i]) ++diag_contact_geometry_moved; else ++diag_contact_geometry_stationary; }
+static void __attribute__((noinline)) sc64_diagnostic_traversable(void)
+{ ++diag_traversable_calls; }
+#define CONTACT_SPLIT(kind, i) sc64_contact_split_##kind(i)
 #else
 #define CONTACT_SPLIT(kind, i) ((void)0)
 #endif

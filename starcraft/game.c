@@ -2881,6 +2881,9 @@ static int GBA_HOT
 is_traversable(int col, int row, int from_cell)
 {
     int cell;
+#ifdef SC64_DIAGNOSTIC_CONTACT_SPLIT
+    sc64_diagnostic_traversable();
+#endif
     if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS)
 	return 0;
     if (!path_grid_valid)
