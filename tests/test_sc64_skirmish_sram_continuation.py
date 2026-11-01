@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
@@ -26,6 +27,10 @@ def record():
 
 
 class Verdict(unittest.TestCase):
+    def test_physical_rejects_tampering_before_accessing_output(self):
+        with self.assertRaisesRegex(sram.ContinuationError, "cannot tamper"):
+            sram.run(SimpleNamespace(physical=True, tamper_sram=True))
+
     def test_valid(self):
         self.assertTrue(sram.verdict(record())["ok"])
 
