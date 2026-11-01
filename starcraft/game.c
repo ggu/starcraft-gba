@@ -2386,6 +2386,9 @@ spawn_unit(int owner, int type, int x, int y)
         return -1;
     }
 #endif
+#ifdef SC64_CONTACT_GROUP_INDEX
+    sc64_unit_bucket_spawn_rekey(i);
+#endif
     if (owner == SIDE)
 	supply_used += unit_supply(type);
     return i;
@@ -7579,7 +7582,15 @@ target_lists_unavailable:
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (q->type == U_Z7_EGG) {
+#ifdef SC64_CONTACT_GROUP_INDEX
+            int old_bucket_type = q->type;
+#endif
             (void)race_z7_egg_tick_unit(i);
+#ifdef SC64_CONTACT_GROUP_INDEX
+            if (q->type != old_bucket_type && sc64_unit_bucket_active &&
+                sc64_unit_bucket_cell[i] != 0xffffu)
+                sc64_unit_bucket_group_rekey(i, sc64_unit_bucket_cell[i]);
+#endif
             continue;
         }
 #endif
