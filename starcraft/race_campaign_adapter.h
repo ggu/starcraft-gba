@@ -535,6 +535,9 @@ race_campaign_init(void)
 #ifdef SC64_P9_RUNTIME
          && race_selected_mission != SC64_P9_GLOBAL_ID
 #endif
+#ifdef SC64_P10_RUNTIME
+         && race_selected_mission != SC64_P10_GLOBAL_ID
+#endif
 #ifdef SC64_Z7_RUNTIME
          && race_selected_mission != SC64_Z7_GLOBAL_ID
 #endif
@@ -593,6 +596,11 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_P9_RUNTIME
     if (race_p9_active() && !race_p9_map_shape_valid(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_P10_RUNTIME
+    if (race_p10_active() && !race_p10_map_shape_valid(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
@@ -927,6 +935,11 @@ race_campaign_init(void)
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
+#ifdef SC64_P10_RUNTIME
+    if (!race_p10_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
     switch (race_selected_mission) {
 #ifdef SC64_Z7_RUNTIME
     case SC64_Z7_GLOBAL_ID: minerals = gas = 0; break;
@@ -948,6 +961,9 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_P9_RUNTIME
     case SC64_P9_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_P10_RUNTIME
+    case SC64_P10_GLOBAL_ID: minerals = gas = 0; break;
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     case 10: case 11: case 12: case 13: minerals = gas = 0; break;
@@ -1309,6 +1325,21 @@ race_campaign_tick(void)
         return;
     }
 #endif
+#ifdef SC64_P10_RUNTIME
+    if (mission == SC64_P10_GLOBAL_ID) {
+        if (!race_p10_runtime_tick(race_campaign.elapsed_frames)) {
+            screen=SCREEN_PAUSE; toast(14); return;
+        }
+        if (race_p10_outcome()==SC64_P10_OUTCOME_WON) {
+            won=1; lost=0; race_campaign.phase=SC64_RACE_PHASE_COMPLETE;
+            race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;
+            race_completed |= 1 << SC64_P10_GLOBAL_ID;
+        } else if (race_p10_outcome()==SC64_P10_OUTCOME_LOST) {
+            won=0; lost=1; race_campaign.phase=SC64_RACE_PHASE_FAILED;
+        }
+        return;
+    }
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (mission == SC64_Z7_GLOBAL_ID) {
         if (!race_z7_runtime_tick(0, race_campaign.elapsed_frames)) {
@@ -1526,6 +1557,9 @@ race_campaign_objective_text(void)
 #endif
 #ifdef SC64_P9_RUNTIME
     if (race_p9_active()) return "Bring Zeratul to each Cerebrate as it falls. Keep Zeratul and Fenix alive.";
+#endif
+#ifdef SC64_P10_RUNTIME
+    if (race_p10_active()) return "Destroy the Overmind. Keep Zeratul, the Gantrithor and the Hyperion alive.";
 #endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active()) return "Destroy all enemy buildings.";

@@ -310,6 +310,9 @@ int main(void) {
         self.assertIn('#ifdef SC64_P8_DATA_ENABLED', p8_adapter)
         self.assertIn('raw_type == 28u) raw_type = 12u', p8_adapter)
         unit_assets.add(28)  # P8 raw28 uses the verified shared raw12 descriptor.
+        self.assertIn('#ifdef SC64_P10_DATA_ENABLED', p8_adapter)
+        self.assertIn('raw_type == 82u) raw_type = 72u', p8_adapter)
+        unit_assets.add(82)  # P10 raw82 Gantrithor reuses the raw72 Carrier art.
         self.assertEqual(runtime_units - unit_assets, {101},
                          'raw 101 is intentionally source-invisible')
         extended_units = numeric_raw_ids('sc64_race_raw_unit(int type)',

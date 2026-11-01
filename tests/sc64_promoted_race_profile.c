@@ -84,6 +84,21 @@ static const int profile_missions[] = {0, 1, 14, 15};
 static const char *const profile_titles[] = {
     "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM"
 };
+#elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P10_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_PROTOSS
+#define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
+#define PROFILE_RACE R_PROTOSS
+#define PROFILE_SAVE_GENERATION 47u
+#define PROFILE_OLD_SAVE_TAG 0x53435032u
+_Static_assert(SC64_RACE_SAVE_GENERATION == 47u, "P10 requires generation 47");
+_Static_assert(SAVE_VERSION == (0x5343505fu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG), "P10 save identity");
+_Static_assert(SC64_P10_GLOBAL_ID == 29, "P10 catalog identity");
+static const int profile_missions[] = {2,3,22,23,24,25,26,27,28,29};
+static const char *const profile_titles[] = {
+    "FIRST STRIKE", "INTO THE FLAMES", "HIGHER GROUND", "THE HUNT FOR TASSADAR",
+    "CHOOSING SIDES", "INTO THE DARKNESS", "HOMELAND", "THE TRIAL", "SHADOW HUNTERS",
+    "EYE OF THE STORM"
+};
 #elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P9_RUNTIME)
 #define PROFILE_FACTION SC64_FACTION_PROTOSS
 #define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS

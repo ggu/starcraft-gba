@@ -719,8 +719,31 @@ static void census(const char *label)
     fflush(trace);
 }
 
+static void check_candidate_cursor_bounds(void)
+{
+    Sc64P9PersistentState candidate = {0};
+    assert(sc64_p9_source_state_valid(&candidate));
+    for (unsigned r = 0; r < SC64_P9_RUNNER_COUNT; ++r) {
+        for (unsigned t = 0; t < SC64_P9_TRIGGER_LIMIT; ++t) {
+            unsigned count = sc64_p9_source_triggers[t].action_count;
+            if (!count || count >= 256u) continue;
+            candidate.runner[r].started = candidate.runner[r].running = (u16)(1u << t);
+            candidate.runner[r].cursor[t] = (u8)(count - 1u);
+            assert(sc64_p9_persistent_state_valid(&candidate));
+            assert(sc64_p9_source_state_valid(&candidate));
+            candidate.runner[r].cursor[t] = (u8)count;
+            assert(sc64_p9_persistent_state_valid(&candidate));
+            assert(!sc64_p9_source_state_valid(&candidate));
+            candidate.runner[r].cursor[t] = 0;
+            candidate.runner[r].started = candidate.runner[r].running = 0;
+        }
+    }
+}
+
 int main(int argc,char **argv)
 {
+    check_candidate_cursor_bounds();
+    if (argc == 2 && !strcmp(argv[1], "--cursor-preflight")) return 0;
     const char *path=argc>1?argv[1]:".local/traces/p9-controller.jsonl";
     unsigned limit_ticks=argc>2?(unsigned)strtoul(argv[2],0,10):P9_RUN_LIMIT;
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}

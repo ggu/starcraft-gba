@@ -11,6 +11,11 @@ sc64_p8_unit_sprite_for_raw(unsigned short raw_type)
 #ifdef SC64_P8_DATA_ENABLED
     if (raw_type == 28u) raw_type = 12u;
 #endif
+#ifdef SC64_P10_DATA_ENABLED
+    /* P10's raw82 Gantrithor uses the Carrier's art (raw72); its N64 art
+     * chain is not separately verified. */
+    if (raw_type == 82u) raw_type = 72u;
+#endif
     return sc64_race_unit_sprite(raw_type);
 }
 
