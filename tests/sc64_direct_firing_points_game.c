@@ -910,6 +910,21 @@ static void test_range_cold_point_corridor(void)
     sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
     SC64_GRID_SET(path_walkable, tx / 16 + ty / 16 * MAP_COLS, 0);
     assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(sc64_range_corridor_last_checks == 1);
+    /* Multiple units and blocked candidates draw from the same update cap. */
+    {
+        unsigned total = 0;
+        sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+        for (int unit = 0; unit < 4; ++unit) {
+            for (int candidate = 0; candidate < 50; ++candidate) {
+                assert(!sc64_range_point_corridor(start_x, start_y + unit * 16,
+                    tx, ty, tx, ty, 0, &nx, &ny));
+                total += sc64_range_corridor_last_checks;
+            }
+        }
+        assert(total == SC64_RANGE_CORRIDOR_BUDGET);
+        assert(sc64_range_corridor_budget == 0);
+    }
 }
 
 /* Exercise real slot reuse with an active copy, a snapshot and a separate

@@ -7337,7 +7337,8 @@ sc64_range_corridor_leg(int x, int y, int tx, int ty, u8 *budget)
 
 /* Prove an open two-turn point corridor using no more than 160 cell checks.
  * Only the first leg is installed: every later leg is independently planned
- * against current topology and weapon range. No storage survives this call. */
+ * against current topology and weapon range. All calls share the update's
+ * remaining cell-inspection budget. */
 static int __attribute__((noinline))
 sc64_range_point_corridor(int x, int y, int gx, int gy, int tx, int ty,
                           int minimum, int *nx, int *ny)
@@ -7354,8 +7355,11 @@ sc64_range_point_corridor(int x, int y, int gx, int gy, int tx, int ty,
         x >= MAP_COLS * 16 || y >= MAP_ROWS * 16 ||
         tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16 ||
         gx < 0 || gy < 0 || gx >= MAP_COLS * 16 || gy >= MAP_ROWS * 16 ||
-        dx > 32 * 16 || dy > 32 * 16 ||
-        !SC64_GRID_GET(path_walkable, gx / 16 + (gy / 16) * MAP_COLS))
+        dx > 32 * 16 || dy > 32 * 16)
+        return 0;
+    --*budget;
+    SC64_RANGE_CORRIDOR_CHECK();
+    if (!SC64_GRID_GET(path_walkable, gx / 16 + (gy / 16) * MAP_COLS))
         return 0;
     /* Locate the first blocker along the dominant axis once. Testing that
      * same wall cell at each offset avoids rescanning a long blocked leg. */
