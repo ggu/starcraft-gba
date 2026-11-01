@@ -54,6 +54,8 @@ CONFIGS.update({
                    "SC64_P8_DATA_ENABLED"),
     "zp_p9_data": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
                    "SC64_P8_DATA_ENABLED", "SC64_P9_DATA_ENABLED"),
+    "zp_p10_data": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_P8_DATA_ENABLED",
+                    "SC64_P9_DATA_ENABLED", "SC64_P10_DATA_ENABLED"),
     "p7_move_profile": ("SC64_RACES", "SC64_UNIFIED", "SC64_P3_ENABLED",
                         "SC64_ZP_CAMPAIGN_ACTORS", "SC64_ZP_CAMPAIGN_STORAGE",
                         "SC64_P5_ACTORS", "SC64_Z6_ACTORS", "SC64_P6_ACTORS",
