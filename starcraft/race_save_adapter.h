@@ -39,7 +39,7 @@ static int race_scarab_stage_wire;
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN)
 static int
 race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                       unsigned world_width, unsigned world_height, Unit *out)
@@ -168,7 +168,7 @@ race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsi
     return 1;
 }
 #endif
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_RESEARCH_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || defined(SC64_SHARED_TRANSPORT)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_RESEARCH_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || defined(SC64_SHARED_TRANSPORT) || defined(SC64_SHARED_HP_REGEN)
 static int
 race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *out)
 {
