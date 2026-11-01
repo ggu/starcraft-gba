@@ -212,7 +212,7 @@ static int army_center(int *x,int *y)
 static int move_cursor(int x,int y)
 {
     unsigned guard=0;
-    if(menu_open || (mode!=MODE_NORMAL && mode!=MODE_ATTACK && mode!=MODE_BUILD)) return 0;
+    if(menu_open || (mode!=MODE_NORMAL && mode!=MODE_MOVE && mode!=MODE_ATTACK && mode!=MODE_BUILD)) return 0;
     x=limit(x,0,WORLD_W-1);y=limit(y,0,WORLD_H-1);
     x=cx+((x-cx)>=0?((x-cx+2)/4):((x-cx-2)/4))*4;
     y=cy+((y-cy)>=0?((y-cy+2)/4):((y-cy-2)/4))*4;
