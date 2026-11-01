@@ -60,19 +60,24 @@ static void clear_fixture_journal(void)
 #endif
 }
 
-/* Retain the real writer's variable-length impact and transport extension.
- * Only the version and unit rows are replaced in the authored test record. */
+/* Retain the real writer's variable-length Yamato, impact and transport
+ * extension while replacing the complete fixed body with the fixture. */
+static u8 authored_envelope[sizeof(RaceImpactRecord)];
+static void prepare_fixture(const RaceSave *body)
+{
+    size_t body_length = sizeof(*body);
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    body_length -= SC64_BC_SAVE_EXTRA_BYTES;
+#endif
+    assert(fixture_length >= body_length);
+    memcpy(authored_envelope,fixture_envelope,fixture_length);
+    memcpy(authored_envelope,body,body_length);
+}
+
 static void write_fixture(const RaceSave *body, u32 tag)
 {
-    static u8 envelope[sizeof(RaceImpactRecord)];
-    assert(fixture_length >= offsetof(RaceSave,units)+sizeof(body->units));
-    memcpy(envelope,fixture_envelope,fixture_length);
-    memcpy(envelope+offsetof(RaceSave,version),&body->version,sizeof(body->version));
-    memcpy(envelope+offsetof(RaceSave,units),body->units,sizeof(body->units));
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-    memcpy(envelope+offsetof(RaceSave,state)+27u*sizeof(int),&body->state[27],sizeof(int));
-#endif
-    save_write(envelope,fixture_length,tag);
+    prepare_fixture(body);
+    save_write(authored_envelope,fixture_length,tag);
 }
 
 static void assert_reject_atomic(const RaceSave *bad, u32 tag)
@@ -156,6 +161,41 @@ static void cargo_save_case(int human)
     }
     clear_fixture_journal();
     write_fixture(&legacy,CARGO_LEGACY_TAG);
+    /* Publish a checksum-valid newer record with invalid cargo bits. The
+     * loader must fall back, and the next save must retain that predecessor. */
+    {
+        RaceLoadPlan plan;
+        GbaSaveSelection old_selection, fallback, newest;
+        static u8 retained[sizeof(RaceImpactRecord)];
+        u32 retained_length;
+        const u32 tags[] = { CARGO_LEGACY_TAG, CARGO_CURRENT_TAG };
+        Unit invalid = expected[0];
+        assert(race_worker_cargo_select(&plan,&old_selection));
+        assert(old_selection.tag == CARGO_LEGACY_TAG);
+        bad = checkpoint;
+        invalid.flags |= SC64_WORKER_CARGO_KIND_MASK;
+        encode_unit(&bad,(unsigned)slots[0],&invalid);
+        prepare_fixture(&bad);
+        assert(save_write_selected(authored_envelope,fixture_length,CARGO_CURRENT_TAG,
+                                   &old_selection,tags,2));
+        assert(save_read_latest(retained,sizeof(retained),CARGO_CURRENT_TAG,&retained_length));
+        assert(retained_length == fixture_length);
+        assert(race_worker_cargo_select(&plan,&fallback));
+        assert(fallback.tag == old_selection.tag && fallback.slot == old_selection.slot &&
+               fallback.sequence == old_selection.sequence);
+        assert(race_load_game());
+        assert(u[slots[0]].carry == expected[0].carry &&
+               !(u[slots[0]].flags & SC64_WORKER_CARGO_KIND_MASK));
+        assert(u[slots[1]].carry == expected[1].carry &&
+               sc64_worker_cargo_is_gas(&u[slots[1]]));
+        assert(race_save_game());
+        assert(save_read_latest(retained,sizeof(retained),CARGO_LEGACY_TAG,&retained_length));
+        assert(race_worker_cargo_select(&plan,&newest));
+        assert(newest.tag == CARGO_CURRENT_TAG && newest.slot != old_selection.slot);
+        assert((s32)(newest.sequence-old_selection.sequence)>0);
+        clear_fixture_journal();
+        write_fixture(&legacy,CARGO_LEGACY_TAG);
+    }
     assert(race_load_game());
     for (int j=0;j<5;++j) {
         assert(u[slots[j]].carry==expected[j].carry);
