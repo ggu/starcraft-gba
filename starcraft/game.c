@@ -1733,6 +1733,15 @@ static void race_scarab_human_parent_lost(int slot);
 static void race_scarab_human_parent_step(int slot);
 static int race_scarab_stop_signal(int slot,int upgraded);
 #endif
+#ifdef SC64_SCARAB_AI_DISPATCH_PROBE
+#if !defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE) || !defined(SC64_RACES) || !defined(SC64_IMPORTED_MISSION)
+#error "Scarab AI dispatch probe requires flight control, races and imported missions"
+#endif
+#include "sc64_scarab_ai_dispatch.h"
+static Sc64ScarabAiClock race_scarab_ai_clock;
+static int race_scarab_ai_roster_ready;
+static void race_scarab_ai_active_update(void);
+#endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
 #error "Scarab flight control probe requires runtime and source cadence"
@@ -4588,6 +4597,9 @@ hit_stock_building_target(const Building *source,int target,int damage)
 static int
 save_game(void)
 {
+#ifdef SC64_SCARAB_AI_DISPATCH_PROBE
+    return 0; /* No phase wire format exists for this explicit probe. */
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) return 0;
 #endif
@@ -4645,6 +4657,9 @@ save_game(void)
 static int
 load_game(void)
 {
+#ifdef SC64_SCARAB_AI_DISPATCH_PROBE
+    return 0; /* Never silently reset a saved decision phase. */
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) return 0;
 #endif
@@ -4906,6 +4921,10 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_SCARAB_AI_DISPATCH_PROBE
+    memset(&race_scarab_ai_clock,0,sizeof(race_scarab_ai_clock));
+    race_scarab_ai_roster_ready=0;
+#endif
     sc64_walk_reset_all();
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     sc64_battlecruiser_tech_bits = 0;
@@ -8890,6 +8909,9 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_IMPORTED_MISSION
     update_imported_mission();
 #endif
+#ifdef SC64_SCARAB_AI_DISPATCH_PROBE
+    race_scarab_ai_active_update();
+#endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
     sc64_update_mission_cycles = gba_clock() - sc64_update_stage_start;
     sc64_update_stage_start = gba_clock();
@@ -12031,6 +12053,50 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #include "sc64_scarab_unit_adapter.h"
+#ifdef SC64_SCARAB_AI_DISPATCH_PROBE
+/* An unknown profile, including Showcase, has no authorized AI roster. */
+static void race_scarab_ai_roster_add(unsigned n,int owner,int source)
+{
+    if (n>=SC64_SCARAB_AI_OWNER_LIMIT || source < -1 || source > 254) return;
+    race_scarab_ai_clock.owner[n]=(Sc64ScarabAiDecision){1,(u8)owner,
+        (u8)(source<0 ? 255 : source),SC64_SCARAB_AI_PERIOD};
+}
+static void race_scarab_ai_build_roster(void)
+{
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene>=0) return;
+#endif
+    if (race_mode) {
+        for (int i=0;i<race_bots && i<3;++i)
+            race_scarab_ai_roster_add((unsigned)i,race_bot_owner_ids[i],-1);
+        return;
+    }
+#ifdef SC64_P7_RUNTIME
+    if (race_p7_active()) { race_scarab_ai_roster_add(0,ENEMY,0);race_scarab_ai_roster_add(1,ENEMY,4);return; }
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (race_p8_active()) { race_scarab_ai_roster_add(0,ENEMY,0);race_scarab_ai_roster_add(1,ENEMY,3);return; }
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) { race_scarab_ai_roster_add(0,ENEMY,1);race_scarab_ai_roster_add(1,ENEMY,2);return; }
+#endif
+}
+static void race_scarab_ai_decide(void *context,unsigned index,unsigned owner,unsigned source)
+{
+    int raw=source==255u ? -1 : (int)source;
+    (void)context;(void)index;
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && u[i].owner==(int)owner && u[i].raw_owner==raw)
+            (void)race_scarab_ai_enqueue_one(i,(int)owner,raw);
+}
+static void race_scarab_ai_active_update(void)
+{
+    if (!race_scarab_ai_roster_ready) {
+        race_scarab_ai_build_roster();race_scarab_ai_roster_ready=1;
+    }
+    (void)sc64_scarab_ai_clock_tick(&race_scarab_ai_clock,0,race_scarab_ai_decide,0);
+}
+#endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
 static int race_scarab_human_selected(void)
 {
