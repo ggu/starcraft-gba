@@ -231,6 +231,33 @@ static void z7_hit_observer(int target, int damage, int source_type, int source_
     }
 }
 
+/* Scoped controller input guard. Slot reuse with identical observable fields is
+ * indistinguishable: the game exposes no building generation token. */
+typedef struct { int active, failed, slot, type, raw_type, raw_owner, complete, egg_hall; } Z7ProducerGuard;
+static Z7ProducerGuard z7_producer_guard;
+static int z7_guard_valid(void)
+{
+    Z7ProducerGuard *g=&z7_producer_guard;
+    if(!g->active)return 1;
+    int i=g->slot;
+    return !g->failed&&screen==SCREEN_PLAY&&!won&&!lost&&i>=0&&i<MAX_BUILDINGS&&
+        b[i].alive&&b[i].owner==SIDE&&b[i].type==g->type&&
+        b[i].raw_type==g->raw_type&&b[i].raw_owner==g->raw_owner&&
+        building_complete(i)==g->complete&&
+        race_z7_morphing_egg_hall(SIDE,i)==g->egg_hall;
+}
+static int z7_guard_begin(int slot)
+{
+    if(z7_producer_guard.active||screen!=SCREEN_PLAY||won||lost||slot<0||
+       slot>=MAX_BUILDINGS||!b[slot].alive||b[slot].owner!=SIDE)return 0;
+    z7_producer_guard=(Z7ProducerGuard){1,0,slot,b[slot].type,b[slot].raw_type,
+        b[slot].raw_owner,building_complete(slot),race_z7_morphing_egg_hall(SIDE,slot)};
+    return 1;
+}
+static void z7_guard_end(void) { memset(&z7_producer_guard,0,sizeof(z7_producer_guard)); }
+#ifdef SC64_Z7_GUARD_FIXTURE
+static void z7_guard_fixture_update(u16 held,u16 pressed);
+#endif
 static void step(u16 held);
 static void tap(u16 key) { step(key); step(0); }
 
@@ -314,6 +341,7 @@ static void trace_input(u16 held,u16 pressed)
 
 static void step(u16 held)
 {
+    if(!z7_guard_valid()){z7_producer_guard.failed=1;return;}
     if(screen==SCREEN_RESULT||won||lost)return;
     u16 pressed=(u16)(held&(u16)~prior_keys);
     int drone_hp[MAX_UNITS];
@@ -342,7 +370,12 @@ static void step(u16 held)
            (u[i].type==U_HYDRALISK||u[i].type==U_MUTALISK)) {
             defender_hp[i]=u[i].hp;defender_raw[i]=u[i].raw_type;
         } else {defender_hp[i]=-1;defender_raw[i]=-1;}
+#ifdef SC64_Z7_GUARD_FIXTURE
+    z7_guard_fixture_update(held,pressed);
+#else
     game_update(held,pressed);
+#endif
+    if(!z7_guard_valid())z7_producer_guard.failed=1;
     z7_last_seen_observe();
     if((unsigned)frame>=11200u&&(unsigned)frame<=13200u) {
         int observed=0;
@@ -500,7 +533,7 @@ static void move_cursor(int x,int y)
     }
     x=limit(cx+((x-cx)>=0?((x-cx+2)/4):((x-cx-2)/4))*4,0,WORLD_W-1);
     y=limit(cy+((y-cy)>=0?((y-cy+2)/4):((y-cy-2)/4))*4,0,WORLD_H-1);
-    while((cx!=x||cy!=y)&&screen==SCREEN_PLAY&&!won&&!lost&&guard++<6000u) {
+    while((cx!=x||cy!=y)&&screen==SCREEN_PLAY&&!won&&!lost&&z7_guard_valid()&&guard++<6000u) {
         u16 held=KEY_R;
         if(cx<x)held|=KEY_RIGHT; if(cx>x)held|=KEY_LEFT;
         if(cy<y)held|=KEY_DOWN; if(cy>y)held|=KEY_UP;
@@ -517,7 +550,7 @@ static int box_select(int left,int top,int right,int bottom)
     cancel_ui_mode();
     move_cursor(left,top); step(KEY_L);
     unsigned guard=0;
-    while((cx<right||cy<bottom)&&screen==SCREEN_PLAY&&!won&&!lost&&guard++<6000u) {
+    while((cx<right||cy<bottom)&&screen==SCREEN_PLAY&&!won&&!lost&&z7_guard_valid()&&guard++<6000u) {
         u16 held=KEY_L;
         if(cx<right)held|=KEY_RIGHT;
         if(cy<bottom)held|=KEY_DOWN;
@@ -558,9 +591,9 @@ static int deselect_with_local_box(void)
 {
     if(selected_count()==0&&selected_building<0)return 1;
     cancel_ui_mode();
-    for(int radius=0;radius<=256;radius+=16)
-        for(int dy=-radius;dy<=radius;dy+=16)
-            for(int dx=-radius;dx<=radius;dx+=16) {
+    for(int radius=0;radius<=256&&z7_guard_valid();radius+=16)
+        for(int dy=-radius;dy<=radius&&z7_guard_valid();dy+=16)
+            for(int dx=-radius;dx<=radius&&z7_guard_valid();dx+=16) {
                 int ax=dx<0?-dx:dx,ay=dy<0?-dy:dy;
                 if(radius&&(ax>ay?ax:ay)!=radius)continue;
                 int left=cursor_lattice_coordinate(cx,cx+dx,WORLD_W);
@@ -864,14 +897,20 @@ static int select_worker(int slot)
 
 static int select_building_slot(int slot)
 {
-    if(slot<0||slot>=MAX_BUILDINGS||!b[slot].alive||b[slot].owner!=SIDE)return 0;
+    int owned=!z7_producer_guard.active,ok=0;
+    if(owned&&!z7_guard_begin(slot))return 0;
+    if(!z7_guard_valid()||z7_producer_guard.slot!=slot)goto done;
     cancel_ui_mode();
-    /* A selected nonproducer building makes A clicks queue at that old
-       building. Clear building selection through the ordinary box gesture
-       before selecting another building. */
-    if((selected_building>=0||selected_count())&&!deselect_with_local_box())return 0;
-    move_cursor(b[slot].x,b[slot].y);tap(KEY_A);
-    return selected_building==slot;
+    if(!z7_guard_valid())goto done;
+    if((selected_building>=0||selected_count())&&!deselect_with_local_box())goto done;
+    if(!z7_guard_valid())goto done;
+    move_cursor(b[slot].x,b[slot].y);
+    if(!z7_guard_valid())goto done;
+    tap(KEY_A);
+    ok=z7_guard_valid()&&selected_building==slot;
+done:
+    if(owned)z7_guard_end();
+    return ok;
 }
 
 static int base_center(int *x,int *y)
@@ -1510,16 +1549,18 @@ static int queue_hatchery_type(int type)
            (building_complete(i)||race_z7_morphing_egg_hall(SIDE,i))&&
            b[i].queue_count<5&&b[i].larva>0) {producer=i;break;}
     }
-    if(producer<0||!select_building_slot(producer)) {
+    if(producer<0||!z7_guard_begin(producer))return 0;
+    if(!select_building_slot(producer)) {
         if((type==U_DRONE||type==U_HYDRALISK)&&
            (last_queue_fail_frame==0||frame-last_queue_fail_frame>=600)) {
             fprintf(stderr,"Z7 unit queue blocked type%d producer%d workers%d minerals%d gas%d frame%d mode%d menu%d\n",
                 type,producer,worker_count(-1),minerals,gas,frame,mode,menu);
             last_queue_fail_frame=frame;
         }
-        return 0;
+        z7_guard_end(); return 0;
     }
-    for(int n=0;n<5&&train_type!=type;n++)tap(KEY_R);
+    for(int n=0;n<5&&train_type!=type&&z7_guard_valid()&&selected_building==producer;n++)tap(KEY_R);
+    if(!z7_guard_valid()||selected_building!=producer){z7_guard_end();return 0;}
     if(train_type!=type) {
         if((type==U_DRONE||type==U_HYDRALISK)&&
            (last_queue_fail_frame==0||frame-last_queue_fail_frame>=600)) {
@@ -1527,12 +1568,13 @@ static int queue_hatchery_type(int type)
                 type,train_type,producer,frame,mode,menu);
             last_queue_fail_frame=frame;
         }
-        return 0;
+        z7_guard_end(); return 0;
     }
     int before=b[producer].queue_count;
     int pending_before=queued_unit_count(type);
     int minerals_before=minerals,gas_before=gas,larva_before=b[producer].larva;
     tap(KEY_A);
+    if(!z7_guard_valid()||selected_building!=producer){z7_guard_end();return 0;}
     if(b[producer].queue_count>before||queued_unit_count(type)>pending_before
 #ifdef SC64_Z7_EGG_PRODUCTION
        ||(race_z7_active()&&b[producer].larva<larva_before&&
@@ -1554,7 +1596,7 @@ static int queue_hatchery_type(int type)
             type,producer,(unsigned)frame,before,b[producer].queue_count,
             pending_before,queued_unit_count(type),larva_before,b[producer].larva,
             minerals_before,gas_before,minerals,gas);
-        return 1;
+        z7_guard_end(); return 1;
     }
     if((type==U_DRONE||type==U_HYDRALISK)&&
        (last_queue_fail_frame==0||frame-last_queue_fail_frame>=600)) {
@@ -1564,7 +1606,7 @@ static int queue_hatchery_type(int type)
             race_owner_has_prereq(SIDE,SC_PR_HYDRALISK_DEN));
         last_queue_fail_frame=frame;
     }
-    return 0;
+    z7_guard_end(); return 0;
 }
 
 static int assign_gas_worker(void)
