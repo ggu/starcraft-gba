@@ -4,6 +4,39 @@
 #if !defined(SC64_SHARED_HP_REGEN) || !defined(SC64_RACES)
 #error "requires shared HP regeneration in a race-engine profile"
 #endif
+/* Actor-owned phases must not share a global clock or owner restriction.
+ * This is controlled fixture setup, not ordinary-input play. */
+static void test_actor_phase_owners_and_reuse(void)
+{
+    int slots[5];
+    memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+    for (int owner=0;owner<5;++owner) {
+        int slot=spawn_unit(owner,U_ZERGLING,100+owner*20,100);
+        assert(slot>=0);slots[owner]=slot;
+        u[slot].hp=u[slot].maxhp-2;
+        u[slot].shield_remainder=(unsigned)owner;
+    }
+    for (int tick=0;tick<79;++tick) race_shared_hp_regen_tick();
+    for (int owner=0;owner<5;++owner) {
+        Unit *q=&u[slots[owner]];
+        assert(q->hp==q->maxhp-2+(owner>0));
+        assert(q->shield_remainder==(unsigned)((owner+79)%80));
+    }
+    race_shared_hp_regen_tick();
+    for (int owner=0;owner<5;++owner) {
+        Unit *q=&u[slots[owner]];
+        assert(q->hp==q->maxhp-1 && q->shield_remainder==(unsigned)owner);
+    }
+    /* A dead slot must not inherit the old occupant's phase on spawn. */
+    int slot=slots[0];u[slot].alive=0;u[slot].shield_remainder=63;
+    assert(spawn_unit(SIDE,U_ZERGLING,200,200)==slot);
+    assert(u[slot].shield_remainder==0);
+    u[slot].hp=u[slot].maxhp-1;
+    for(int tick=0;tick<79;++tick) race_shared_hp_regen_tick();
+    assert(u[slot].hp==u[slot].maxhp-1 && u[slot].shield_remainder==79);
+    race_shared_hp_regen_tick();
+    assert(u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
+}
 int main(void)
 {
     game_init();
@@ -36,5 +69,6 @@ int main(void)
     race_shared_hp_regen_tick();
     assert(b[colony].hp==bh+1 && b[colony].shield_remainder==0);
     assert(u[marine].shield_remainder==79);
+    test_actor_phase_owners_and_reuse();
     return 0;
 }
