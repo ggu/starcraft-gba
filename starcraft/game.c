@@ -7308,6 +7308,16 @@ move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
         move_toward(q, tx, ty);
         return;
     }
+#if defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
+    if (dist2(q->x, q->y, tx, ty) >= minimum * minimum &&
+        sc64_range_cached_point_step(q->x, q->y, tx, ty, &nx, &ny) &&
+        dist2(nx, ny, tx, ty) >= minimum * minimum) {
+        q->path_x = nx; q->path_y = ny;
+        q->path_retry = 0; q->path_timer = 24;
+        move_toward(q, tx, ty);
+        return;
+    }
+#endif
     if (sc64_direct_firing_waypoint(q->x, q->y, tx, ty,
                                     minimum, maximum, &nx, &ny)) {
         q->path_x = nx; q->path_y = ny;

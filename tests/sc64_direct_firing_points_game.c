@@ -813,6 +813,55 @@ static void test_melee_and_explicit_move_are_unchanged(void)
 }
 
 #ifdef SC64_RANGE_WORK
+/* Cached point fields may guide range movement without another flood. */
+static void test_range_cached_point_fields(void)
+{
+    int nx = -1, ny = -1, slot = 0;
+    int col = 10, row = 10, goal_col = 20, goal_row = 10;
+    int cell, goal; u32 builds;
+    setup_combat_scene(); clear_walk_grid(); sc64_routes_reset();
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    assert(sc64_route_configure());
+#endif
+    cell = col + row * MAP_COLS; goal = goal_col + goal_row * MAP_COLS;
+    memset(sc64_route_field[slot], 0xff,
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+           sc64_route_active_bytes
+#else
+           sizeof(sc64_route_field[slot])
+#endif
+    );
+    sc64_route_goal[slot] = (u16)goal; sc64_route_valid[slot] = 1;
+    sc64_route_put(slot, cell, 1); sc64_route_put(slot, cell + 1, 1);
+    builds = sc64_route_builds;
+    assert(sc64_range_cached_point_step(168,168,328,168,&nx,&ny));
+    assert(nx == 184 && ny == 168 && sc64_route_builds == builds);
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    sc64_route_valid[slot] = 2;
+    assert(sc64_range_cached_point_step(168,168,328,168,&nx,&ny));
+    sc64_route_put(slot, cell, SC64_ROUTE_UNREACHABLE);
+    assert(!sc64_range_cached_point_step(168,168,328,168,&nx,&ny));
+    assert(sc64_route_builds == builds);
+    sc64_route_valid[slot] = 1;
+#endif
+    /* Blocked origins use the same adjacent-gradient policy as normal routes. */
+    SC64_GRID_SET(path_walkable,cell,0);
+    assert(sc64_range_cached_point_step(168,168,328,168,&nx,&ny));
+    assert(nx == 184 && ny == 168 && sc64_route_builds == builds);
+    SC64_GRID_SET(path_walkable,cell,1); sc64_route_put(slot,cell,1);
+    /* A wall blocks the target center; a warm point field avoids a new flood. */
+    SC64_GRID_SET(path_walkable,15 + row * MAP_COLS,0);
+    u[attacker].x=168; u[attacker].y=168; u[attacker].path_timer=0; u[attacker].path_retry=0;
+    move_toward_weapon_range(&u[attacker],victim,328,168,0,64);
+    assert(u[attacker].path_x==184 && u[attacker].path_y==168);
+    assert(sc64_route_builds==builds);
+    /* A too-close unit must not follow that inward point gradient. */
+    u[attacker].x=168; u[attacker].y=168; u[attacker].path_timer=0; u[attacker].path_retry=0;
+    move_toward_weapon_range(&u[attacker],victim,328,168,200,240);
+    assert(u[attacker].path_x != 184 || u[attacker].path_y != 168);
+    assert(sc64_route_builds==builds);
+}
+
 /* Exercise real slot reuse with an active copy, a snapshot and a separate
  * pending target. Reuse must not discard the unrelated pending request. */
 static void test_range_target_slot_reuse(void)
@@ -877,6 +926,7 @@ int main(void)
     test_one_corner_combat_moves_and_only_fires_in_range();
     test_melee_and_explicit_move_are_unchanged();
 #ifdef SC64_RANGE_WORK
+    test_range_cached_point_fields();
     test_range_work_scheduler_contracts();
     test_range_target_slot_reuse();
     test_range_dead_target_cleanup();

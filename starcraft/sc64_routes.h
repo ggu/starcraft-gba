@@ -1510,6 +1510,47 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
 }
 #endif
 
+#if defined(SC64_RANGE_WORK) && defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
+/* Only read an existing point field. Never initiate or resume a flood. */
+static int __attribute__((noinline))
+sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
+{
+    int col, row, goal, cell, slot = -1, direction;
+    if (!path_grid_valid || x < 0 || y < 0 || tx < 0 || ty < 0 ||
+        x >= MAP_COLS * 16 || y >= MAP_ROWS * 16 ||
+        tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16) return 0;
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    if (!sc64_route_configure()) return 0;
+#endif
+    col = x / 16; row = y / 16; cell = col + row * MAP_COLS;
+    goal = tx / 16 + (ty / 16) * MAP_COLS;
+    for (int i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i) {
+        if ((sc64_route_valid[i] != 1 && sc64_route_valid[i] != 2) ||
+            sc64_route_goal[i] != (u16)goal) continue;
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+        if (sc64_route_valid[i] == 2 &&
+            !sc64_route_origin_ready(i, cell, SC64_GRID_GET(path_walkable, cell)))
+            continue;
+#endif
+        slot = i; break;
+    }
+    if (slot < 0) return 0;
+    direction = sc64_route_get(slot, cell);
+    if (direction == SC64_ROUTE_UNREACHABLE && !SC64_GRID_GET(path_walkable, cell)) {
+        if (!sc64_route_blocked_start(slot, col, row, goal, &col, &row)) return 0;
+    } else if (direction == SC64_ROUTE_UNREACHABLE) return 0;
+    else if (direction == 0) { *nx = tx; *ny = ty; return 1; }
+    else if (direction == 1) ++col;
+    else if (direction == 2) --col;
+    else if (direction == 3) ++row;
+    else if (direction == 4) --row;
+    else return 0;
+    if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) return 0;
+    *nx = col * 16 + 8; *ny = row * 16 + 8;
+    return 1;
+}
+#endif
+
 #ifdef SC64_ROUTE_L_FAST_PATH
 /* The reverse BFS expands left, right, up, then down. Its preferred shortest
  * path runs from the goal horizontally, then vertically. If every cell on that
