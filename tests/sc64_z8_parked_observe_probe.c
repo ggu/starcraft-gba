@@ -5,6 +5,9 @@
 #endif
 #include <stdio.h>
 static unsigned held,ticks;
+#ifdef SC64_Z8_TRIAL_HERO_RETREAT
+static int hero_retreat_issued;
+#endif
 static unsigned char original_seen[6],original_gone[6];
 static void original_escort_census(void){static const int slots[]={48,53,54,55,56,57},raw[]={42,37,37,38,38,37};for(int k=0;k<6;k++){int i=slots[k];int match=u[i].alive&&u[i].owner==SIDE&&u[i].raw_owner==3&&u[i].raw_type==raw[k];if(!original_seen[k]){if(match)original_seen[k]=1;continue;}if(!original_gone[k]&&!match){original_gone[k]=1;printf("ORIGINAL_ESCORT_GONE frame%d slot%d expected_raw%d alive%d current_raw%d owner%d raw_owner%d\n",frame,i,raw[k],u[i].alive,u[i].raw_type,u[i].owner,u[i].raw_owner);}}}
 static void detector_damage_census(void){static int last=-1;int i=48;if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==42){if(last>=0&&u[i].hp<last){printf("DETECTOR_DAMAGE frame%d slot%d raw%d owner%d hp%d previous%d xy%d,%d\n",frame,i,u[i].raw_type,u[i].owner,u[i].hp,last,u[i].x,u[i].y);for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==ENEMY&&dist2(u[j].x,u[j].y,u[i].x,u[i].y)<512*512)printf("NEAR_HOSTILE frame%d slot%d raw%d owner%d hp%d xy%d,%d cd%d target%d order%d\n",frame,j,u[j].raw_type,u[j].owner,u[j].hp,u[j].x,u[j].y,u[j].cd,u[j].target,u[j].order);}last=u[i].hp;}else if(last>0){printf("DETECTOR_REMOVED frame%d slot%d last_hp%d\n",frame,i,last);last=0;}}
@@ -19,7 +22,7 @@ static void observe_transition(Observation before,Observation after){
  static int original_seen=0,original_gone=0;static const int ids[]={0,1,15,16,17};
 #ifdef SC64_Z8_TRIAL_HERO_RETREAT
  static int retreat_arrived;
- if(!retreat_arrived&&after.match&&dist2(after.x,after.y,1320,1680)<=32*32){
+ if(hero_retreat_issued&&!retreat_arrived&&after.match&&dist2(after.x,after.y,1320,1680)<=32*32){
   retreat_arrived=1;
   printf("HERO_RETREAT_ARRIVED frame%d hp%d xy%d,%d order%d\n",after.frame,after.hp,after.x,after.y,u[10].order);
  }
@@ -70,6 +73,8 @@ static int retreat_original_hero(void)
   return 0;
  }
  int ok=order(i,MENU_MOVE,1320,1680);
+ ok=ok&&u[i].alive&&u[i].owner==SIDE&&u[i].raw_owner==3&&u[i].raw_type==51;
+ hero_retreat_issued=ok;
  printf("HERO_RETREAT_ISSUE start%d end%d accepted%d alive%d raw%d raw_owner%d hp%d xy%d,%d tx%d ty%d order%d\n",start,frame,ok,u[i].alive,u[i].raw_type,u[i].raw_owner,u[i].hp,u[i].x,u[i].y,u[i].tx,u[i].ty,u[i].order);
  return ok;
 }
