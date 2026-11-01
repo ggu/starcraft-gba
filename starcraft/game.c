@@ -1965,8 +1965,8 @@ static int currently_visible(int x, int y);
 #ifdef SC64_SHARED_BUNKER
 static void race_bunker_clear_slot(int slot);
 #endif
-#ifdef SC64_DIRECT_ATTACK
 static int target_alive(int target);
+#ifdef SC64_DIRECT_ATTACK
 static int target_x(int target), target_y(int target);
 static void sc64_direct_attack_clear_references(int entity);
 static int sc64_direct_attack_find_target(int x, int y);
