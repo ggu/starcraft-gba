@@ -1,7 +1,9 @@
 # Current-release range-routing integration
 
-This reconciles draft PR #134 with release `7181c093`. The experiment remains
-disabled in every normal product. The earlier audit in
+This reconciles PR #134 with release `7181c093`. The branch enables shared
+bounded range routing by default starting at `4072d735`, with the qualification
+and limits recorded below. Earlier disabled stages remain identified by revision.
+The earlier audit in
 `../2026-10-29-range-work/README.md` describes historical revisions, not this
 integration's performance or campaign qualification.
 
@@ -39,15 +41,15 @@ and authenticated existing prepared inputs. No asset generators or hosted
 Actions were run for these checks. Native checks were serialized with the local
 qualification lock. No game data, binaries, saves or captures are committed.
 
-## Activation remains unqualified
+## Early activation hold (before the following qualification)
 
 ARM link success and host sanitizer checks do not establish whole-frame speed,
 acceptable navigation latency, full mission completion, fresh-process SRAM
 continuity or hardware behavior. In particular, a work-unit quota is not a
 cycle budget. Paired gameplay latency and ARM timing must exercise blocked,
 unreachable, moving and competing targets, along with ordinary economy work.
-Keep the shared flag disabled until that evidence supports activation across
-campaign, custom-game and Showcase builds.
+At that early checkpoint the flag remained disabled pending evidence across
+campaign, custom-game and Showcase builds. Later qualification follows below.
 
 ## Full source checks and latency decision
 
@@ -180,7 +182,7 @@ python3 tools/sc64_range_probe_read.py --runner /path/to/runner-read-only \
 
 Use the existing native qualification lock, frozen source and prepared-input
 hash guards for local runs. Keep all game inputs, instrumented binaries and
-results ignored. No hosted Actions or SD writes were used. The shared release flag remains OFF. Current startup coverage is recorded below; longer and crowded ARM gameplay, fresh-process save qualification, remaining navigation latency and campaign gates still require qualification before activation.
+results ignored. No hosted Actions or SD writes were used. At this checkpoint the shared release flag remained OFF. Subsequent startup, fresh-process and crowded-game qualification, including its remaining performance limits, follows below.
 
 ## Current full-source and lineup qualification
 
@@ -213,3 +215,80 @@ same-process round-trip evidence. It does not compare another uninterrupted
 60-update branch after each load, use a fresh process or prove complete
 matches. The separate 500-update continuation fixture and short ARM timing
 probe establish their narrower properties, not those broader claims.
+
+## Fresh-process SRAM and crowded-game qualification
+
+At `c44bdba5`, all four normal ON products (T10, Z7, P7 and Showcase) pass an
+ordinary physical-button save/load check: Custom Game on map 0, human Terran
+against one Zerg AI; pause with START, save with B at game frame 61, and export
+the genuine 32 KiB SRAM. A fresh process loads it using HOME L. Named semantic
+state, lobby, nine live units and three buildings match the save; 60 more game
+updates reach frame 121 and match uninterrupted play. Loading does not change
+the exported SRAM. These are selected persisted-field comparisons, not full
+machine-state or hardware qualification. No debugger world writes or malformed
+records are used.
+
+The reusable `--physical` mode in `tools/sc64_skirmish_sram_continuation.py`
+uses the existing read-only K/U backend and the game's normal UI. Its focused
+16-case tests and public Z7 60+60 command pass; the four-product results above
+were obtained with the preceding equivalent private driver.
+
+The authored `tests/sc64_range_crowd_arm_probe.c` retains normal map terrain,
+AI and unit stats, adds combatants once at boot, and never heals, reveals,
+retargets or repairs orders per update. Each OFF/ON pair runs 500 physical
+zero-input updates with matching initial-world hash and sampled per-update
+population/movement/cooldown/health counters. Cooldown rises and aggregate
+health decreases are combat proxies, not per-weapon hit proofs. The 48- and
+96-actor scenes exercise combat; the 16-actor scene does not.
+
+| Scene / actual production vector | OFF mean / p95 cycles | ON mean / p95 cycles |
+| --- | ---: | ---: |
+| 16 actors / Z7 | 573,591 / 561,533 | 573,573 / 561,533 |
+| 48 actors / Z7 | 754,040 / 917,721 | 761,874 / 1,620,548 |
+| 96 actors / Z7 | 1,158,029 / 1,916,355 | 1,151,242 / 1,759,066 |
+| 48 actors / T10 | 704,994 / 842,585 | 704,965 / 842,601 |
+| 48 actors / P7 | 872,799 / 1,123,159 | 872,769 / 1,123,170 |
+| 48 actors / Showcase | 828,016 / 1,122,992 | 827,986 / 1,122,970 |
+
+These `c44bdba5` measurements contradict any claim of near-30-fps crowded
+play: both variants often exceed 561,792 cycles. The Z7 48-actor ON scene also
+has two approximately million-cycle update regressions. Exact read-only
+replays identify additional point-route builds during orders at ticks 323 and
+329, with the range worker idle, no queued jobs and the full corridor budget.
+Cache-slot key changes establish point fields specifically; no actor/caller is
+inferred merely from the generic route-build counter.
+
+## Lazy scratch ownership and incremental activation
+
+`92fd123f` (integrated as `b805929e`) fixes the idle-cache regression. Ordinary
+routes can use the entire existing pool while no range worker owns scratch.
+Before a worker starts, metadata for every field overlapping the last two
+maximum-sized planes is invalidated. A variable-stride field crossing the byte
+boundary is invalidated too. The worker retains ownership through DONE leases
+and snapshot copying; retirement releases slots without resurrecting their old
+valid bits. Geometry configuration keeps the full stable field bases and does
+not reset work when only ownership changes. No storage, actor or save row grows.
+
+Exact-revision sanitizer checks cover fixed and active strides, five map
+geometries, overlapping slots, tagged snapshots/copies, real dequeue/start,
+full idle-cache reuse and release. An independent source review found no
+reservation-lifecycle defect; generated ARM fit and timing remain separate
+checks.
+
+Replaying the identical 48-actor Z7 ON scene with this header removes the two
+observed extra floods. Update cycles at 323/329 become 310,158/310,804, compared
+with OFF 308,589/309,093 and old ON 1,290,839/1,301,669. The cache build count
+stays 37 at those ticks. All 500 sampled gameplay counters still match both
+older variants. Mean update cycles are 362,466 versus OFF 360,802; no aligned
+update exceeds OFF by one refresh interval. Whole-frame mean/p95 remain
+758,504/1,103,410, with 447/500 above two refresh frames: this resolves the
+observed cache regression, not the broader frame-rate problem.
+
+Beginning at `4072d735`, the branch enables this shared behavior for normal
+Terran, Zerg, Protoss and Showcase products. An explicit
+`CANONICAL_RANGE_WORK_FLAGS=` restores the OFF baseline for comparisons.
+Activation is an incremental routing improvement, not completion of all
+campaigns or the near-30-fps goal. The known 28-update first-hit tradeoff in
+the scripted unit-target case remains documented. Crowded simulation/rendering
+costs require further optimization; campaign wins and hardware parity remain
+separate evidence.
