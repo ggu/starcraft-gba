@@ -1351,6 +1351,12 @@ static void race_tick_buildings(void)
 #ifdef SC64_P8_RUNTIME
         race_p8_note_product_building(i);
 #endif
+#ifdef SC64_P9_RUNTIME
+        race_p9_note_product_building(i);
+#endif
+#ifdef SC64_P10_RUNTIME
+        race_p10_note_product_building(i);
+#endif
         {
             const Sc64RaceUnitRule *ur = sc64_race_unit_rule(type);
             if (!ur) continue;
