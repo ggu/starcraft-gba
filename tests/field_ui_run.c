@@ -455,6 +455,71 @@ smart_move_tests(void)
     check(screen == SCREEN_PLAY, "A resumes");
 }
 
+/* Selections are StarCraft ellipses at the actor's base, not boxes. */
+static void
+selection_circle_tests(void)
+{
+    check(selection_color(SIDE) == C_GREEN, "own selection is green");
+    check(selection_color(NEUTRAL) == C_GOLD, "neutral selection is yellow");
+    check(selection_color(ENEMY) == C_RED, "enemy selection is red");
+
+    gfx_begin(C_BLACK);
+    draw_selection_ellipse(120, 60, 10, 6, C_GREEN, 0);
+    check(gfx_test_pixel(110, 60) == C_GREEN && gfx_test_pixel(130, 60) == C_GREEN,
+          "ellipse reaches its horizontal radius");
+    check(gfx_test_pixel(120, 54) == C_GREEN && gfx_test_pixel(120, 66) == C_GREEN,
+          "ellipse reaches its vertical radius");
+    check(gfx_test_pixel(120, 60) == C_BLACK, "ellipse is an outline");
+    for (int y = 54; y <= 66; y++) {
+        check(count_color(110, y, 10, 1, C_GREEN) > 0 &&
+              count_color(121, y, 10, 1, C_GREEN) > 0, "ellipse has no gaps");
+        for (int x = 110; x <= 130; x++)
+            check(gfx_test_pixel(x, y) == gfx_test_pixel(240 - x, y),
+                  "ellipse is symmetric");
+    }
+    gfx_begin(C_BLACK);
+    draw_selection_ellipse(120, 60, 10, 6, C_GREEN, 1);
+    check(count_color(100, 40, 41, 20, C_GREEN) == 0 &&
+          gfx_test_pixel(120, 66) == C_GREEN, "front arc stays below centre");
+
+    fixture();
+    int marine = slot_of(SIDE, U_MARINE);
+    if (marine < 0) marine = slot_of(SIDE, U_SCV);
+    check(marine >= 0, "a friendly unit to select");
+    if (marine < 0) return;
+    Unit *q = &u[marine];
+    camx = q->x - 120; camy = q->y - 50;
+    /* Default art is 8x8: rx 5, ry 3, centred two rows below the unit. */
+    for (int i = 0; i < MAX_UNITS; i++) u[i].selected = 0;
+    selected_building = -1;
+    render(); /* clamps the camera */
+    int x = q->x - camx, y = q->y - camy + 12;
+    check(gfx_test_pixel(x - 5, y + 2) != C_GREEN &&
+          gfx_test_pixel(x + 5, y + 2) != C_GREEN, "unselected unit has no ellipse");
+    q->selected = 1;
+    render();
+    check(gfx_test_pixel(x - 5, y + 2) == C_GREEN &&
+          gfx_test_pixel(x + 5, y + 2) == C_GREEN, "selected unit has a green ellipse");
+    check(count_color(x - 6, y - 6, 13, 1, C_HIGHLIGHT) == 0, "no selection box");
+
+    q->selected = 0;
+    int cc = building_of(SIDE, B_COMMAND);
+    check(cc >= 0, "a friendly command center to select");
+    if (cc < 0) return;
+    Building *c = &b[cc];
+    camx = c->x - 120; camy = c->y - 50;
+    /* Default building art is 24x24: rx 14, ry 8, centred five rows down. */
+    selected_building = cc;
+    render();
+    x = c->x - camx; y = c->y - camy + 12;
+    check(gfx_test_pixel(x, y + 13) == C_GREEN &&
+          gfx_test_pixel(x - 14, y + 5) == C_GREEN &&
+          gfx_test_pixel(x + 14, y + 5) == C_GREEN,
+          "selected building has a green front arc");
+    check(gfx_test_pixel(x - 14, y + 4) != C_GREEN, "building arc has no far half");
+    selected_building = -1;
+}
+
 int
 main(void)
 {
@@ -472,11 +537,12 @@ main(void)
     refinery_snap_tests();
     title_and_pause_tests();
     render_smoke();
+    selection_circle_tests();
     if (failures) return 1;
 #ifdef SC_COMMAND_RING
-    puts("Default menus and controls (ring build): deselect, smart move, smart attack, R tap, placement status order, snapping, title/pause/result: ok");
+    puts("Default menus and controls (ring build): deselect, smart move, smart attack, R tap, placement status order, snapping, title/pause/result, selection ellipses: ok");
 #else
-    puts("Default menus and controls: deselect, smart move, smart attack, R tap, list memory, placement status order, snapping, title/pause/result: ok");
+    puts("Default menus and controls: deselect, smart move, smart attack, R tap, list memory, placement status order, snapping, title/pause/result, selection ellipses: ok");
 #endif
     return 0;
 }
