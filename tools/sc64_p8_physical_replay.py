@@ -36,7 +36,7 @@ def snapshot(rsp, sym, sizes, elf):
         if sizes.get(name) != 4:
             raise ValueError('invalid scalar symbol ' + name)
         return int.from_bytes(rsp.read(sym[name], 4), 'little', signed=True)
-    result = {k: read(k) for k in ('screen', 'frame', 'won', 'lost', 'race_selected_mission')}
+    result = {k: read(k) for k in ('screen', 'frame', 'won', 'lost', 'race_selected_mission', 'race_mode', 'race_completed')}
     state = races.dwarf_struct_layout(elf, 'Sc64P8PersistentState')
     runtime = races.dwarf_struct_layout(elf, 'Sc64P8RuntimeState')
     if sizes['race_p8'] != state[0] or 'runtime' not in state[1]:
@@ -94,6 +94,16 @@ def validate_plan(path):
     return plan, cut
 
 
+def resume_events(transitions, cut):
+    # One fresh L update replaces the original START-close update at cut.
+    return [(0,512)] + [(t-cut,v) for t,v in transitions if t > cut]
+
+
+def resume_boundary(tick, cut):
+    if tick <= cut: raise ValueError('resume boundary must follow cut')
+    return tick-cut
+
+
 def run(trace, rom, elf, runner, output, *, resume=None, summary=None, stop=None):
     plan, cut = validate_plan(trace)
     if bool(resume) != bool(summary):
@@ -110,8 +120,8 @@ def run(trace, rom, elf, runner, output, *, resume=None, summary=None, stop=None
         if seed['provenance'] != {str(p.resolve()): digest(p) for p in (trace,rom,elf,runner)} or seed['save_sha256'] != digest(resume):
             raise ValueError('save provenance differs')
         save.validate_neutral_journal(resume.read_bytes(), layout, seed['snapshot']['frame'])
-        events = [(0,512)] + [(t-cut+1,v) for t,v in plan['transitions'] if t >= cut+1]
-        end = stop-cut+1
+        events = resume_events(plan['transitions'],cut)
+        end = resume_boundary(stop,cut)
     else:
         events = [(t,v) for t,v in plan['transitions'] if t < cut]
         end = cut
@@ -134,7 +144,7 @@ def run(trace, rom, elf, runner, output, *, resume=None, summary=None, stop=None
         boundaries = sorted(t for t in plan['checkpoints'] if (cut if resume else 0) < t <= stop)
         if stop not in boundaries: boundaries.append(stop)
         for tick in boundaries:
-            native_tick = tick-cut+1 if resume else tick
+            native_tick = resume_boundary(tick,cut) if resume else tick
             rsp.play_to(native_tick,events)
             observed = snapshot(rsp,sym,sizes,elf)
             if tick in plan['checkpoints']:
@@ -163,7 +173,7 @@ def run(trace, rom, elf, runner, output, *, resume=None, summary=None, stop=None
             saved={'snapshot':observed,'provenance':before,'save_sha256':digest(image)}
             (output/'saved-state.json').write_text(json.dumps(saved,indent=2)+'\n')
         elif stop == plan['stop']:
-            if (observed['screen'] != 3 or observed['won'] != 1 or observed['lost'] != 0 or observed['runners'][0]['outcome'] != 1 or observed['campaign']['phase'] != 3 or not observed['campaign']['objective_flags'] & 1 or observed['stasis_cells']):
+            if (observed['screen'] != 3 or observed['won'] != 1 or observed['lost'] != 0 or observed['runners'][0]['outcome'] != 1 or observed['race_mode'] != 0 or not observed['race_completed'] & (1 << 27) or not observed['runners'][0]['done'] & (1 << 4) or observed['campaign']['mission'] != 27 or observed['campaign']['phase'] != 3 or not observed['campaign']['objective_flags'] & 1 or observed['stasis_cells']):
                 raise RuntimeError('physical continuation did not reach P8 WIN')
             result['status']='won'
         if before != {str(p.resolve()):digest(p) for p in inputs}:
