@@ -32,3 +32,12 @@ case is only a helper check and does not establish the real update-orders egg
 dispatch; that lifecycle remains a qualification requirement. The optional
 invalid-class case reports unavailable when the profile has no representable
 invalid class, and is not evidence of coverage in that configuration.
+
+A separate bounded host lifecycle fixture now prepares a real Z7 Egg whose
+remaining timer is set to one and calls `update_orders()`, observing the real
+Egg dispatch after the paired Zergling birth while the bucket is active. Its
+host-only callback compares both the in-dispatch and rebuilt-bucket result to the
+full-world oracle. The transport fixture requests real board and unload actions
+and checks nonzero-speed masks before and after rebuilding. Fixture setup is
+controlled host state; it is not an ordinary-input or paid-production proof.
+Both tests are source-only and unrun until the frozen qualification is executed.

@@ -82,12 +82,8 @@ test_linked_death_and_load_are_dynamic(void)
     u[1].order = ORDER_IDLE;
     assert(sc64_contact_blocked_mask(&u[0], 0) == 0xffu);
 
-    /* Loading at begin omits the slot; unloading later does not insert it. */
-    reset_world(1);
-    u[1].order = ORDER_TRANSPORTED;
-    sc64_unit_buckets_begin();
-    u[1].order = ORDER_IDLE;
-    assert(sc64_contact_blocked_mask(&u[0], 0) == 0u);
+    /* This direct order-field mutation is only a dynamic filter check;
+     * actual board/unload lifecycle is covered by the transport fixture. */
 }
 
 /* Unit-level helper check only; the actual update_orders egg dispatch must be

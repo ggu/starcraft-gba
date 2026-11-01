@@ -7599,6 +7599,9 @@ target_lists_unavailable:
                 sc64_unit_bucket_cell[i] != 0xffffu)
                 sc64_unit_bucket_group_rekey(i, sc64_unit_bucket_cell[i]);
 #endif
+#if defined(GBA_HOST) && defined(SC64_CONTACT_GROUP_TEST_EGG_HOOK)
+            sc64_contact_group_test_egg_observe(i);
+#endif
             continue;
         }
 #endif
