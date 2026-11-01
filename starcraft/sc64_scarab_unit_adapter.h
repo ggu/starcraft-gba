@@ -255,6 +255,34 @@ static int race_scarab_enqueue(int slot,int upgraded)
         !race_scarab_parent_write(slot,&p)) return 0;
     sc64_scarab_wallet_commit(bank,next); return 1;
 }
+/* Bounded AI decision service. The caller snapshots parent identity and
+ * decides when to request one paid entry; this function supplies no polling
+ * cadence or strategic/native-AI claim. Only explicitly represented owner
+ * wallets are admitted. Capacity-upgrade state is not yet shared/persisted,
+ * so this service deliberately uses the unupgraded capacity. */
+static int race_scarab_ai_enqueue_one(int slot,int expected_owner,int expected_source_owner)
+{
+    if (!race_scarab_parent_identity(slot) || expected_owner == SIDE ||
+        u[slot].owner != expected_owner || u[slot].raw_owner != expected_source_owner ||
+        (u[slot].raw_type >= 0 && u[slot].raw_type != 83)) return 0;
+    if (race_mode) {
+        /* Imported custom opponents have independently indexed engine banks. */
+        if (race_bot_index(expected_owner) < 0) return 0;
+    } else {
+        int supported=0;
+#ifdef SC64_P8_RUNTIME
+        if (race_p8_active() && expected_owner==ENEMY &&
+            (expected_source_owner==0 || expected_source_owner==3)) supported=1;
+#endif
+#ifdef SC64_P7_RUNTIME
+        if (race_p7_active() && expected_owner==ENEMY &&
+            (expected_source_owner==0 || expected_source_owner==4)) supported=1;
+#endif
+        /* Never charge the generic enemy bank for an unknown campaign. */
+        if (!supported) return 0;
+    }
+    return race_scarab_enqueue(slot,0);
+}
 /* Invoke only on a source tick. No automatic game-loop registration. */
 static int race_scarab_production_tick(int slot,int upgraded)
 {
