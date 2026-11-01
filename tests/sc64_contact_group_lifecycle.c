@@ -18,8 +18,14 @@ static void sc64_contact_group_test_egg_observe(int slot)
     int lings=0;
     for (int i=0;i<MAX_UNITS;i++) if (u[i].alive && u[i].type==U_ZERGLING) lings++;
     assert(lings >= 2); /* The real pair birth attempted its second spawn. */
-    for (int speed=1;speed<=2;speed++)
-        assert(sc64_contact_blocked_mask(&u[watched_mover],speed)==reference_mask(&u[watched_mover],speed));
+    /* This witness is deliberately beside the in-place newborn. It proves
+     * at least that actor contributes, not that both pair members do. */
+    int toward_bit=u[watched_mover].x>u[slot].x?4:0;
+    for (int speed=1;speed<=2;speed++) {
+        unsigned expected=reference_mask(&u[watched_mover],speed);
+        assert(expected & (1u<<toward_bit));
+        assert(sc64_contact_blocked_mask(&u[watched_mover],speed)==expected);
+    }
     observed_egg++;
 }
 static void init_z7_world(void)
@@ -47,6 +53,9 @@ static void test_real_egg_dispatch_and_pair(void)
     int egg=-1;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].type==U_Z7_EGG&&u[i].target==U_ZERGLING){egg=i;break;}
     assert(egg>=0);u[egg].work_timer=1; /* bounded host fixture setup */
+    int side=u[egg].x+3<WORLD_W?1:-1;
+    u[watched_mover].x=u[egg].x+3*side;u[watched_mover].y=u[egg].y;
+    u[watched_mover].order=ORDER_IDLE;
     watch_egg=1;observed_egg=0;update_orders();watch_egg=0;
     assert(observed_egg==1&&u[egg].alive&&u[egg].type==U_ZERGLING);
     sc64_unit_buckets_begin();

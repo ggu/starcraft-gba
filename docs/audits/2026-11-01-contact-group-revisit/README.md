@@ -41,3 +41,9 @@ full-world oracle. The transport fixture requests real board and unload actions
 and checks nonzero-speed masks before and after rebuilding. Fixture setup is
 controlled host state; it is not an ordinary-input or paid-production proof.
 Both tests are source-only and unrun until the frozen qualification is executed.
+
+The host Egg witness is placed three pixels from the queued Egg before the
+real `update_orders()` call. The read-only callback requires a nonzero
+toward-newborn collision bit as well as full-world equality at speeds 1 and 2.
+This demonstrates a contribution from the in-place newborn if the fixture
+passes; it does not establish collision coverage of the second pair member.
