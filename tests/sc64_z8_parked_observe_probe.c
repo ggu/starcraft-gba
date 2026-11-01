@@ -86,6 +86,7 @@ static int select_one(int slot)
  int raw=u[slot].raw_type,source_owner=u[slot].raw_owner;
  for(int n=0;n<MAX_UNITS&&screen==SCREEN_PLAY&&!won&&!lost;n++){
   tap(KEY_L);
+  if(screen!=SCREEN_PLAY||won||lost)return 0;
   if(!u[slot].alive||u[slot].owner!=SIDE||u[slot].raw_type!=raw||u[slot].raw_owner!=source_owner){
    printf("SELECT_REJECT frame%d slot%d reason=actor_changed\n",frame,slot);
    return 0;
