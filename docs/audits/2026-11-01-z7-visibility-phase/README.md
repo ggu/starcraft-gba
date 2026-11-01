@@ -22,6 +22,27 @@ peak decreased from 53,931,783 to 53,713,860. This is not physical-device FPS.
 The corresponding gated link used no additional BSS and retained IWRAM end
 03004f80 under the existing 03005000 boundary.
 
-Normal-profile identity, inherited Z8 qualification, source boundary, and the
-clean default suite must pass on the activation commit before admission. The
-full Z7 physical proof applies only if the normal ROM matches the ON hash above.
+The full Z7 physical proof applies to the normal ROM because its hash matches
+the ON hash above. The activation qualification is recorded below.
+
+## Activation qualification
+
+The activation source at `e7961ec` passed source-boundary, doctor, default
+build, and the clean unprepared default suite: 932 Python discovery tests
+passed with 26 skips. The preceding focused `c7a9005` source differs only in
+its subsequently corrected onboarding test expectation; runtime and Makefile
+contents are identical. Its normal Z7 ROM exactly matched the tested ON ROM
+`8c61048b47df6d6de9952e61e9bb09871d238877760ca7c3b8d6e5d32b039dba`.
+The inherited normal Z8 ROM was
+`5696e42d69a93ada0be92c5f9f2a4273853719df6947ea1f02870e5d889815c8`;
+its source-sight host oracle passed, with BSS end `0203dbd8` and IWRAM end
+`03004bf0`, within the unchanged guards. The Z7 full-grid and independent
+all-phase oracles also passed on the focused activation source.
+
+The fresh ordinary physical-button prefix matched one named baseline
+observation, and the full fresh-save continuation matched all 302 named
+baseline observations. The full mean reduction was 1.275057% and peak
+reduction 0.404072%. The independently checked comparison result SHA-256 is
+`9d79c123676e092cafd706d82eef8f4ce18355f0bc3f87e6e5f0d84fb75eb7da`.
+These observations cover named state and do not establish a physical-device
+frame rate.
