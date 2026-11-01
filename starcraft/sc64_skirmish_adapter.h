@@ -36,7 +36,7 @@ static int race_skirmish_has_raw(int owner, unsigned raw)
 
 static int race_skirmish_requirements(int owner, const Sc64SkirmishRecord *r)
 {
-    return r && r->race == race_owner_identity(owner) &&
+    return r && sc64_skirmish_menu_supported(r) && r->race == race_owner_identity(owner) &&
         r->tech_key == SC64_SK_NONE &&
         race_skirmish_has_raw(owner, r->prereq1_raw) &&
         race_skirmish_has_raw(owner, r->prereq2_raw);
