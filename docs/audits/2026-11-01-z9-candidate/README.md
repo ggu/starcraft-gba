@@ -184,3 +184,9 @@ all environmental and unrelated to this change:
   against the native AI programs or a native trace.
 - Mission text, sound, native kill/death ledgers and physical-GBA behavior
   are not claimed.
+
+## Crystal-carrier preflight follow-up
+
+At source `e2f92d9b6df7435315cc95ad30e82f34753e799e`, candidate preflight validates the saved carrier against the decoded world before applying live state. Pure host checks reject a dead or non-Drone carrier without mutating the candidate or world; existing ordinary save continuations pass at 3,000 and 1,000 updates. The Z9 canonical host fixture and late scheduler passed under ASan/UBSan. The verified Z9 ROM SHA-256 is `d4b78a0f3cf2d8e6f5a848035254925d0773d8a1d7ab737cfa359ca1c0f0dfc5`; ELF SHA-256 is `c78ffd3214c978777cacce0daa80ffad383794149ba777f024c119071c8af8ad`, BSS end `0x0203df88`, IWRAM end `0x03004bf0`. The clean unprepared boundary, doctor, default build and full test passed: 951 Python tests, 26 skipped, plus native fixture groups. All 109 pinned inputs and named sidecars were verified. Logs are in `/tmp/sc64-z9-carrier-qualification-20261101`.
+
+The victory exercised by the existing fixture uses state placement and is not an ordinary-input mission win. Native AI parity and conditional post-mission carrier removal remain unqualified.
