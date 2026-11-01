@@ -483,15 +483,21 @@ static int race_p9_bind(const Sc64RaceMap *map)
     return 1;
 }
 
-static int race_p9_runtime_state_valid(void)
+/* Check candidate cursors against immutable source bounds before commit. */
+static int sc64_p9_source_state_valid(const Sc64P9PersistentState *state)
 {
-    if (!sc64_p9_persistent_state_valid(&race_p9)) return 0;
+    if (!sc64_p9_persistent_state_valid(state)) return 0;
     for (unsigned r = 0; r < SC64_P9_RUNNER_COUNT; ++r)
         for (unsigned t = 0; t < SC64_P9_TRIGGER_LIMIT; ++t)
-            if ((race_p9.runner[r].running & (1u << t)) &&
-                race_p9.runner[r].cursor[t] >= sc64_p9_source_triggers[t].action_count)
+            if ((state->runner[r].running & (1u << t)) &&
+                state->runner[r].cursor[t] >= sc64_p9_source_triggers[t].action_count)
                 return 0;
     return 1;
+}
+
+static int race_p9_runtime_state_valid(void)
+{
+    return sc64_p9_source_state_valid(&race_p9);
 }
 
 static int race_p9_runtime_init(const Sc64RaceMap *map)

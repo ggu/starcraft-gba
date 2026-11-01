@@ -2671,7 +2671,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         const Sc64P9PersistentState *p9=&race_data.p9;
         unsigned outcome=p9->runner[SC64_P9_RUNNER_HUMAN].outcome;
         unsigned phase=race_data.campaign.phase;
-        if (!sc64_p9_persistent_state_valid(p9) ||
+        if (!sc64_p9_source_state_valid(p9) ||
             !race_p9_map_shape_valid(&sc64_race_maps[SC64_P9_GLOBAL_ID]) ||
             race_data.campaign.mission!=SC64_P9_GLOBAL_ID ||
             race_data.campaign.elapsed_frames!=(u32)v[7]) return 0;
