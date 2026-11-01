@@ -31,6 +31,8 @@ static void init_z7_world(void)
     race_player[SIDE]=race_player[ENEMY]=race_player[NEUTRAL]=R_ZERG;
     race_player[RESCUABLE]=race_player[4]=R_ZERG;
     race_z7_map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];
+    race_cols=race_z7_map->width;race_rows=race_z7_map->height;
+    assert(race_cols==SC64_Z7_MAP_COLS && race_rows==SC64_Z7_MAP_ROWS);
     minerals=5000;gas=5000;supply_used=0;supply_cap=0;
     assert(race_z7_active());
 }
@@ -62,22 +64,37 @@ static void test_real_board_and_unload(void)
     assert(race_transport_request_board(passenger,ship));
     assert(race_transport_tick_unit(passenger));
     assert(SC64_TRANSPORT_LOADED(&u[passenger]));
+    assert(!sc64_unit_bucket_active); /* real boarding invalidates indexes */
     for(int speed=1;speed<=2;speed++)
         assert(sc64_contact_blocked_mask(&u[mover],speed)==reference_mask(&u[mover],speed));
     assert(race_transport_request_unload(ship,u[ship].x,u[ship].y));
     for(int y=1;y<race_rows-1&&SC64_TRANSPORT_LOADED(&u[passenger]);y++)
         for(int x=1;x<race_cols-1&&SC64_TRANSPORT_LOADED(&u[passenger]);x++){
             if(!is_traversable(x,y,-1))continue;
+            /* Controlled reposition occurs only between bucket windows. */
+            sc64_unit_buckets_end();
             u[ship].x=u[ship].tx=x*16+8;u[ship].y=u[ship].ty=y*16+8;
+            sc64_unit_buckets_begin();assert(sc64_unit_bucket_active);
             race_transport_try_unload(ship);
         }
     assert(!SC64_TRANSPORT_LOADED(&u[passenger]));
+    assert(!sc64_unit_bucket_active); /* real unloading invalidates indexes */
+    /* Query beside the NEW landing position; the passenger must contribute
+     * the toward-it bit, so a dropped member cannot pass vacuously. */
+    int side = u[passenger].x + 3 < WORLD_W ? 1 : -1;
+    u[mover].x=u[passenger].x+3*side;u[mover].y=u[passenger].y;
+    sc64_unit_bucket_move(&u[mover]); /* inactive: preserve normal fallback */
+    unsigned toward=1u<<(side>0?4:0);
+    assert(reference_mask(&u[mover],1)&toward);
     for(int speed=1;speed<=2;speed++)
         assert(sc64_contact_blocked_mask(&u[mover],speed)==reference_mask(&u[mover],speed));
     sc64_unit_buckets_end();
-    sc64_unit_buckets_begin();
-    for(int speed=1;speed<=2;speed++)
-        assert(sc64_contact_blocked_mask(&u[mover],speed)==reference_mask(&u[mover],speed));
+    sc64_unit_buckets_begin();assert(sc64_unit_bucket_active);
+    for(int speed=1;speed<=2;speed++){
+        unsigned expected=reference_mask(&u[mover],speed);
+        assert(sc64_contact_blocked_mask(&u[mover],speed)==expected);
+        assert(sc64_contact_blocked_mask(&u[mover],speed)==expected); /* memo path */
+    }
     sc64_unit_buckets_end();
 }
 int main(void)
