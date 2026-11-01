@@ -67,3 +67,33 @@ contact-cache differential also passed in both modes with identical reports:
 71,716 mutations, and zero failures; its memo oracle reported no unhooked
 mutations. These are controlled host fixtures, not player-input proof. Normal
 ARM fit, OFF ROM identity and current physical performance remain unmeasured.
+
+## ARM placement and attempted replacement trace
+
+At source `7d16c46c88053f268de93edae2f80fb192d93d00` on engine base
+`30858e34246418c6847d8c7e11a779b3ef701b12`, normal Z7 OFF and opt-in ON
+ARM links and the unchanged ROM verifier passed under the native lock. OFF ROM
+SHA-256 `3251518bd82b07923fc9ded25c390c1b38354d4ca9305a13ed297508eab7f352`
+matched the base. ON ROM SHA-256 was
+`1132da285bc708063d4a08d04d1ce389cbeaec872751be46d2e3fae943a94b60`.
+OFF/ON EWRAM BSS ends were `0203d718`/`0203d808` (+240 bytes), and
+IWRAM ends were `03004f80`/`03004ad0`; stack use was not measured. The
+receipt is `/tmp/sc64-contact-group-arm-7d16-20261101/result.json`. Earlier
+statements that ARM fit was unmeasured describe the preceding stage.
+
+The prior winning physical input trace `5121ed97ea0ea3d57697ce2c7fc57eac2082e3a457bb4ad98517f09ecf510489`
+is unavailable; the retained `3251518b` physical WIN remains evidence for
+that fixed input and binary. Two new ordinary-input host controller attempts
+on the current 308 engine did not produce qualified replacements. The modern
+controller, early-gas with a 200000-update bound, reached the bound with zero
+workers, source fault zero and 54 enemy source buildings; its incomplete trace
+SHA-256 was `1e5c477609db3211794aff731490e435d85f4cfa7bc763c6fdf44c460e8c33e5`.
+The historical 232bc planning policy, with the current strict terminal checks
+and the same policy and bound, lost at host 15290/frame 15035, source fault
+zero and 55 enemy source buildings; its partial trace SHA-256 was
+`056faa9c515609e8f33d0ded07e52b1218adca0f86fa11c40bcce15d889140f0`.
+The logs are `/tmp/sc64-z7-strict-regenerate-308-output-20261101/run.log` and
+`/tmp/sc64-z7-historical-policy-output-20261101/run.log`, respectively.
+Neither partial trace is a winning witness or suitable for the proposed ROI
+comparison. Current grouped-contact performance remains unmeasured; no
+historical speedup, physical-hardware FPS or admission is claimed.
