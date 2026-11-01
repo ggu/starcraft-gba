@@ -29,7 +29,7 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
     int cells=MAP_COLS*MAP_ROWS;
     static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
     static int prev[MAP_CELLS],queue[MAP_CELLS];
-    /* Match the eligible combat shortcut, but use the forward quartile
+    /* Use the explicit-weapon subset of the combat shortcut and the forward quartile
      * rather than its centroid: an already-arrived formation can straddle a
      * waypoint while its center keeps issuing the same eight cells. This is
      * a host-world policy query; actual orders still use the normal UI. */
