@@ -7,12 +7,12 @@ P9_SCENARIO_HEADER := .local/sc64/zp-stage/generated/scenarios/sc64_p9_scenario_
 P9_CAMPAIGN_DEFINES := -DSC64_P9_DATA_ENABLED -DSC64_P9_RUNTIME -DSC64_P9_CAMPAIGN_ENTRY
 PROTOSS_P9_FLAGS = $(patsubst -I$(P8_FACT_V2_DIR),-I$(P9_FACT_V2_DIR),$(PROTOSS_P8_FLAGS)) $(P9_CAMPAIGN_DEFINES)
 PROTOSS_P9_INPUTS = $(filter-out $(P8_FACT_V2_HEADER),$(PROTOSS_P8_INPUTS)) $(P9_FACT_V2_HEADER) $(P9_SCENARIO_HEADER)
-$(P9_FACT_V2_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile | build
+$(P9_FACT_V2_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile | build
 	mkdir -p $(P9_FACT_V2_DIR)
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P9_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES) $(P9_CAMPAIGN_DEFINES)) $(SC64_RELEASE_TRANSPORT_FLAGS) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT tools/sc64_fact_tables_gen.c -o build/sc64-p9-fact-v2-gen
 	./build/sc64-p9-fact-v2-gen > $@.tmp
 	mv $@.tmp $@
-build/starcraft-protoss-p9.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.ld Makefile | build
+build/starcraft-protoss-p9.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.ld Makefile mk/protoss-p9/Makefile | build
 	$(CC) $(CFLAGS) $(PROTOSS_P9_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p9.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Protoss-P9-Transport1-GBA.gba: build/starcraft-protoss-p9.elf tools/fix_rom.py
@@ -27,22 +27,22 @@ protoss-p9: verify-protoss-p9
 P9_ARM_DIR := build/p9-arm
 P9_ARM_TRACE := $(P9_ARM_DIR)/p9-controller.jsonl
 P9_REPLAY_TOOL := $(PYTHON) tools/sc64_p8_arm_replay.py --mission 28 --prefix P9
-build/test-sc64-p9-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+build/test-sc64-p9-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile | build
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P9_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 .PHONY: test-sc64-p9-carried-profile
 test-sc64-p9-carried-profile: build/test-sc64-p9-carried-profile
 	./build/test-sc64-p9-carried-profile
 
-build/test-sc64-p9-campaign-run: tests/sc64_p9_campaign_run.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+build/test-sc64-p9-campaign-run: tests/sc64_p9_campaign_run.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile | build
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P9_FLAGS) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 $(P9_ARM_TRACE): build/test-sc64-p9-campaign-run
 	mkdir -p $(P9_ARM_DIR)
 	./build/test-sc64-p9-campaign-run $@
 .PHONY: test-sc64-p9-controller
 test-sc64-p9-controller: $(P9_ARM_TRACE)
-$(P9_ARM_DIR)/sc64_p9_tape_generated.h: $(P9_ARM_TRACE) tools/sc64_p8_arm_replay.py
+$(P9_ARM_DIR)/sc64_p9_tape_generated.h: $(P9_ARM_TRACE) tools/sc64_p8_arm_replay.py mk/protoss-p9/Makefile
 	$(P9_REPLAY_TOOL) tape $< $@
-P9_REPLAY_DEPS = tests/sc64_p9_arm_replay.c $(P9_ARM_DIR)/sc64_p9_tape_generated.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile
+P9_REPLAY_DEPS = tests/sc64_p9_arm_replay.c $(P9_ARM_DIR)/sc64_p9_tape_generated.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P9_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile
 build/test-sc64-p9-replay: $(P9_REPLAY_DEPS) | build
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P9_FLAGS) -I$(P9_ARM_DIR) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-p9-replay-prefix: $(P9_REPLAY_DEPS) | build
