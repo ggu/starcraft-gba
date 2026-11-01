@@ -282,6 +282,30 @@ static void test_rejects_invalid_source_world(void)
     write_candidate_record(&pause_save);
 }
 
+/* Pure candidate checks: no SRAM mutation or live-state writes. */
+static void test_carrier_candidate_preflight(void)
+{
+    static RaceSave candidate, before_candidate;
+    Unit actor; int other=-1, dead=-1;
+    unsigned ww=(unsigned)race_cols*16u, wh=(unsigned)race_rows*16u;
+    u32 before=world_digest();
+    candidate=pause_save;
+    assert(race_zl_save_candidate_world_valid(&candidate,race_cols,race_rows));
+    for(unsigned i=0;i<MAX_UNITS;++i) {
+        assert(race_save_decode_unit(&candidate,i,ww,wh,&actor));
+        if (!actor.alive && dead<0) dead=(int)i;
+        if (actor.alive && (actor.owner!=SIDE || actor.raw_type!=SC64_ZL_RAW_DRONE) && other<0)
+            other=(int)i;
+    }
+    assert(other>=0 && dead>=0);
+    candidate.zl.crystal_carrier=(u8)other;before_candidate=candidate;
+    assert(!race_zl_save_candidate_world_valid(&candidate,race_cols,race_rows));
+    assert(!memcmp(&candidate,&before_candidate,sizeof(candidate)) && world_digest()==before);
+    candidate=pause_save;candidate.zl.crystal_carrier=(u8)dead;before_candidate=candidate;
+    assert(!race_zl_save_candidate_world_valid(&candidate,race_cols,race_rows));
+    assert(!memcmp(&candidate,&before_candidate,sizeof(candidate)) && world_digest()==before);
+}
+
 /* Fixture-only countdown write (not gameplay evidence): expiring the timer
  * fires T4, which recreates the Drone, re-centres location 3 on it and
  * creates the crystal that the Drone then carries. */
@@ -325,11 +349,13 @@ int main(void)
     test_opening_triggers();
     test_drone_enters_formation();
     check_continuation("countdown running", 6);
+    test_carrier_candidate_preflight();
     test_rejects_corrupt_candidate();
     test_rejects_invalid_source_world();
     reload(&pause_save, pause_frame);
     test_crystal_returns();
     check_continuation("crystal carried", 2);
+    test_carrier_candidate_preflight();
     test_crystal_delivery();
     printf("Z9 campaign binding: %u instances, RaceSave %u bytes, generation %u\n",
            (unsigned)race_zl_sched.core.instance_count, (unsigned)sizeof(RaceSave),

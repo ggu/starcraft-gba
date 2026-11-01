@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_z7_candidate_test_writer.h"
 
 #ifdef SC64_Z7_DERIVED_SAVE
 #define TEST_UNIT_ENCODE sc64_derived_unit_encode
@@ -179,7 +180,7 @@ static void assert_rejected_without_live_mutation(const RaceSave *bad)
     memcpy(old_buildings, b, sizeof(b));
     memcpy(old_ore, race_minerals, sizeof(old_ore));
     memcpy(old_gas, race_gas, sizeof(old_gas));
-    save_write(bad, sizeof(*bad), SAVE_VERSION);
+    sc64_z7_test_write_candidate(bad);
     assert(!race_load_game());
     assert(!memcmp(old_units, u, sizeof(u)));
     assert(!memcmp(old_buildings, b, sizeof(b)));
@@ -217,7 +218,7 @@ static void test_human_egg_roundtrip_and_corruption(void)
     assert(race_z7_save_candidate_valid(&good, &good.z7,
                                         SC64_Z7_MAP_COLS, SC64_Z7_MAP_ROWS));
     assert(!memcmp(&unchanged, &good, sizeof(good)));
-    save_write(&good, sizeof(good), SAVE_VERSION);
+    sc64_z7_test_write_candidate(&good);
     assert(race_load_game());
     assert(u[egg].alive && u[egg].type == U_Z7_EGG &&
            u[egg].target == U_DRONE && u[egg].work_timer ==
