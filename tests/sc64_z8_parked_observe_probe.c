@@ -23,6 +23,7 @@ static int trip_admitted, reserve_active, trip_aborted, hatch_confirmed;
 /* Preserve the already qualified opening input path until the first observed
  * Dark Templar is cleared; subsequent macro may use the selection shortcut. */
 static int opening_selection_fastpath_allowed;
+static int next_hydra_retry,next_drone_retry;
 static int hatch_x=-1,hatch_y=-1,hatch_pending,hatch_started;
 static int forward_identity_valid(void)
 {
@@ -35,6 +36,22 @@ static void forward_observe(void)
  static int last_minerals=-1,last_gas=-1,last_queue=-1;
  static int was_alive[MAX_BUILDINGS],was_type[MAX_BUILDINGS],was_owner[MAX_BUILDINGS];
  if(screen!=SCREEN_PLAY)return;
+ /* Read-only actor census: fixed original slots alone miss new products. */
+ {
+  static unsigned char was_hydra[MAX_UNITS];static int last_hydra_sample=-1;
+  for(int i=0;i<MAX_UNITS;i++){
+   int match=u[i].alive&&u[i].owner==SIDE&&u[i].raw_owner==3&&u[i].raw_type==38;
+   if(match&&!was_hydra[i])printf("MACRO_HYDRA_SEEN frame%d slot%d hp%d xy%d,%d order%d target%d\n",frame,i,u[i].hp,u[i].x,u[i].y,u[i].order,u[i].target);
+   if(!match&&was_hydra[i])printf("MACRO_HYDRA_GONE frame%d slot%d alive%d owner%d raw%d source%d\n",frame,i,u[i].alive,u[i].owner,u[i].raw_type,u[i].raw_owner);
+   was_hydra[i]=(unsigned char)match;
+   if(match&&frame%120==0&&frame!=last_hydra_sample)
+    printf("MACRO_HYDRA_SAMPLE frame%d slot%d hp%d xy%d,%d order%d target%d loaded%d\n",frame,i,u[i].hp,u[i].x,u[i].y,u[i].order,u[i].target,SC64_TRANSPORT_LOADED(&u[i]));
+  }
+  if(frame%120==0&&frame!=last_hydra_sample){
+   printf("MACRO_PRODUCER_SAMPLE frame%d alive%d owner%d raw%d queue%d headtype%d larva%d money%d/%d\n",frame,b[63].alive,b[63].owner,b[63].raw_type,b[63].queue_count,b[63].queue_count?b[63].queue[b[63].queue_head]:-1,b[63].larva,minerals,gas);
+   last_hydra_sample=frame;
+  }
+ }
  if(minerals!=last_minerals||gas!=last_gas||b[63].queue_count!=last_queue){
   printf("MACRO_WALLET frame%d before%d/%d/q%d after%d/%d/q%d reserve%d\n",frame,last_minerals,last_gas,last_queue,minerals,gas,b[63].queue_count,reserve_active);
   last_minerals=minerals;last_gas=gas;last_queue=b[63].queue_count;
@@ -419,6 +436,35 @@ done:
 static int side_building(int type,int complete){for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==type&&(!complete||building_complete(i)))return i;return -1;}
 static int build(int worker,int type,int row){int x=-1,y=-1,best=0x7fffffff;for(int yy=b[63].y-128;yy<=b[63].y+128;yy+=16)for(int xx=b[63].x-128;xx<=b[63].x+128;xx+=16)if(race_can_site(SIDE,type,xx,yy)&&can_place(type,xx,yy)){int d=dist2(u[worker].x,u[worker].y,xx,yy);if(d<best){best=d;x=xx;y=yy;}}if(x<0)return 0;int ok=order(worker,row,x,y);for(int retry=0;mode==MODE_BUILD&&retry<12;retry++){int fx=-1,fy=-1;for(int yy=b[63].y-128;yy<=b[63].y+128&&fx<0;yy+=16)for(int xx=b[63].x-128;xx<=b[63].x+128;xx+=16){int clear=1;for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&dist2(u[j].x,u[j].y,xx,yy)<64*64)clear=0;if(clear&&race_can_site(SIDE,type,xx,yy)&&can_place(type,xx,yy)){fx=xx;fy=yy;break;}}if(fx<0)break;move_cursor(fx,fy);tap(KEY_A);printf(" retry%d xy%d,%d mode%d frame%d\n",retry,fx,fy,mode,frame);}printf("build type%d worker%d site%d,%d issued%d frame%d money%d/%d order%d mode%d cursor%d,%d worker%d can%d race%d\n",type,worker,x,y,ok,frame,minerals,gas,u[worker].order,mode,cx,cy,field_ui_build_worker(type),can_place(type,cx,cy),race_can_site(SIDE,type,cx,cy));return ok;}
 static void queue_type(int type){move_cursor(b[63].x,b[63].y);tap(KEY_A);for(int i=0;i<8&&train_type!=type;i++)tap(KEY_R);if(selected_building==63&&train_type==type)tap(KEY_A);printf("queue type%d frame%d selected%d count%d mineral%d gas%d\n",type,frame,selected_building,b[63].queue_count,minerals,gas);}
+#ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+/* One paid production request, confirmed from a newly appended queue row.
+ * Do not press A to reselect an already selected producer: that would queue
+ * the currently displayed type. These are observations and normal inputs. */
+static int queue_type_admitted(int type)
+{
+ const int producer=63;
+ if(screen!=SCREEN_PLAY||won||lost||!b[producer].alive||b[producer].owner!=SIDE||
+    !building_complete(producer)||b[producer].queue_count>=5||b[producer].larva<1||
+    menu_open||mode!=MODE_NORMAL)return 0;
+ if(!move_cursor(b[producer].x,b[producer].y))return 0;
+ if(selected_building!=producer)tap(KEY_A);
+ if(screen!=SCREEN_PLAY||won||lost||selected_building!=producer||
+    !b[producer].alive||b[producer].owner!=SIDE||b[producer].queue_count>=5)return 0;
+ for(int i=0;i<8&&train_type!=type;i++)tap(KEY_R);
+ if(screen!=SCREEN_PLAY||won||lost||selected_building!=producer||train_type!=type||
+    !b[producer].alive||b[producer].owner!=SIDE||b[producer].queue_count>=5||
+    b[producer].larva<1||menu_open||mode!=MODE_NORMAL)return 0;
+ int before_m=minerals,before_g=gas,before_larva=b[producer].larva;
+ int before_count=b[producer].queue_count,before_head=b[producer].queue_head;
+ step(KEY_A);
+ int admitted=screen==SCREEN_PLAY&&!won&&!lost&&b[producer].alive&&
+    b[producer].owner==SIDE&&b[producer].queue_head==before_head&&
+    b[producer].queue_count==before_count+1&&
+    b[producer].queue[(before_head+before_count)%5]==type;
+ printf("MACRO_QUEUE_ADMISSION frame%d type%d admitted%d before%d/%d/l%d/q%d after%d/%d/l%d/q%d tailtype%d\n",frame,type,admitted,before_m,before_g,before_larva,before_count,minerals,gas,b[producer].larva,b[producer].queue_count,b[producer].queue_count?b[producer].queue[(b[producer].queue_head+b[producer].queue_count-1)%5]:-1);
+ step(0);return admitted;
+}
+#endif
 static int worker_count(void){int n=0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE)n++;return n;}
 static int morph_spore(int slot){
  move_cursor(b[slot].x,b[slot].y);tap(KEY_A);
@@ -454,7 +500,13 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
 #ifdef SC64_Z8_TRIAL_HERO_RETREAT
  if(!retreat_original_hero())return 3;
 #endif
- order(55,MENU_ATTACK,880,1640);order(56,MENU_ATTACK,880,1640);int l[]={53,54,57};for(int j=0;j<3;j++)order(l[j],MENU_ATTACK,880,1640);order(16,MENU_MOVE,Z8_NORTH_DETECT_X,Z8_NORTH_DETECT_Y);for(int i=17;i<=22;i++)order(i,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(7,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(8,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(11,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(13,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);for(int j=5;j<=6;j++){select_one(j);int p=j==5?11:10;move_cursor(m[p].x,m[p].y);tap(KEY_A);printf("mine worker%d order%d target%d frame%d\n",j,u[j].order,u[j].target,frame);}queue_type(U_DRONE);queue_type(U_DRONE);}
+ order(55,MENU_ATTACK,880,1640);order(56,MENU_ATTACK,880,1640);int l[]={53,54,57};for(int j=0;j<3;j++)order(l[j],MENU_ATTACK,880,1640);order(16,MENU_MOVE,Z8_NORTH_DETECT_X,Z8_NORTH_DETECT_Y);for(int i=17;i<=22;i++)order(i,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(7,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(8,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(11,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(13,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);for(int j=5;j<=6;j++){select_one(j);int p=j==5?11:10;move_cursor(m[p].x,m[p].y);tap(KEY_A);printf("mine worker%d order%d target%d frame%d\n",j,u[j].order,u[j].target,frame);}
+#ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+ queue_type_admitted(U_DRONE);queue_type_admitted(U_DRONE);
+#else
+ queue_type(U_DRONE);queue_type(U_DRONE);
+#endif
+ }
 #ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
  /* Only clear a build policy after its actual foundation was seen and is
   * now gone; an accepted job that is still walking is not a failure. */
@@ -474,10 +526,10 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
     b[65].alive&&building_complete(65)&&b[65].type==B_CREEP_COLONY)spore=morph_spore(65);
  if(!den&&side_building(B_SPAWNING_POOL,1)>=0&&minerals>=100&&gas>=50&&macro_can_spend(100))
   for(int i=0;i<MAX_UNITS;i++)if(macro_worker_available(i)){den=build(i,B_HYDRALISK_DEN,MENU_ACADEMY);break;}
- if(frame>=3800&&extra_drone<2&&minerals>=50&&macro_can_spend(50)&&b[63].queue_count==0){
-  int before=minerals,gas_before=gas,queue_before=b[63].queue_count;
-  queue_type(U_DRONE);extra_drone++;
-  printf("MACRO_QUEUE_ATTEMPT frame%d type%d before%d/%d/q%d after%d/%d/q%d\n",frame,U_DRONE,before,gas_before,queue_before,minerals,gas,b[63].queue_count);
+ if(frame>=3800&&frame>=next_drone_retry&&extra_drone<2&&minerals>=50&&macro_can_spend(50)&&b[63].queue_count==0){
+  int accepted=queue_type_admitted(U_DRONE);
+  if(accepted)extra_drone++;else next_drone_retry=frame+120;
+  printf("MACRO_DRONE_RESULT frame%d accepted%d accepted_total%d retry_frame%d\n",frame,accepted,extra_drone,next_drone_retry);
  }
  /* Admit a trip only after base prerequisites and Spore policy are complete;
   * once admitted, preserve 300 minerals until a foundation or abort. */
@@ -525,10 +577,10 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
   }
  }
  if(hatch_confirmed)forward=1;
- if(hydra<5&&side_building(B_HYDRALISK_DEN,1)>=0&&minerals>=75&&gas>=25&&macro_can_spend(75)&&b[63].queue_count==0&&b[63].larva){
-  int before=minerals,gas_before=gas,queue_before=b[63].queue_count;
-  queue_type(U_HYDRALISK);hydra++;
-  printf("MACRO_QUEUE_ATTEMPT frame%d type%d before%d/%d/q%d after%d/%d/q%d\n",frame,U_HYDRALISK,before,gas_before,queue_before,minerals,gas,b[63].queue_count);
+ if(hydra<5&&frame>=next_hydra_retry&&side_building(B_HYDRALISK_DEN,1)>=0&&minerals>=75&&gas>=25&&macro_can_spend(75)&&b[63].queue_count==0&&b[63].larva){
+  int accepted=queue_type_admitted(U_HYDRALISK);
+  if(accepted)hydra++;else next_hydra_retry=frame+120;
+  printf("MACRO_HYDRA_RESULT frame%d accepted%d accepted_total%d retry_frame%d\n",frame,accepted,hydra,next_hydra_retry);
  }
 #else
  if(!pool&&minerals>=200){pool=build(5,B_SPAWNING_POOL,MENU_BARRACKS);}if(!evo&&minerals>=75&&side_building(B_SPAWNING_POOL,1)>=0){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){evo=build(i,B_EVOLUTION_CHAMBER,MENU_ENG_BAY);break;}}if(!spore&&minerals>=50&&side_building(B_EVOLUTION_CHAMBER,1)>=0&&b[65].alive&&building_complete(65)&&b[65].type==B_CREEP_COLONY){spore=morph_spore(65);}if(!den&&side_building(B_SPAWNING_POOL,1)>=0&&minerals>=100&&gas>=50){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){den=build(i,B_HYDRALISK_DEN,MENU_ACADEMY);break;}}if(frame>=3800&&extra_drone<2&&minerals>=50&&b[63].queue_count==0){queue_type(U_DRONE);extra_drone++;}if(frame>=4200&&extra_drone>=2&&!nydus&&worker_count()>=4){for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==SIDE&&u[j].type==U_DRONE)printf(" WORKER slot%d order%d xy%d,%d carry%d hp%d\n",j,u[j].order,u[j].x,u[j].y,u[j].carry,u[j].hp);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE&&u[i].order!=ORDER_BUILD&&u[i].order!=ORDER_BUILD_PENDING&&u[i].x>1500&&u[i].y<500){traveler=i;break;}if(traveler>=0&&select_one(traveler)){move_cursor(b[67].x,b[67].y);tap(KEY_A);nydus=1;printf("NYDUS issued slot%d frame%d order%d target%d xy%d,%d\n",traveler,frame,u[traveler].order,u[traveler].target,u[traveler].x,u[traveler].y);}}
