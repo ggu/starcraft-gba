@@ -876,10 +876,34 @@ HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
         if(left)*dst=(*dst&0xff00)|color;
     }
 }
-HOT void gfx_frame(int x,int y,int w,int h,u8 c){gfx_rect(x,y,w,1,c);gfx_rect(x,y+h-1,w,1,c);gfx_rect(x,y,1,h,c);gfx_rect(x+w-1,y,1,h,c);}
+#if defined(GBA_SHAPES_ROM_ARM) && !defined(GBA_HOST)
+#define SHAPE_HOT __attribute__((long_call,target("arm")))
+#else
+#define SHAPE_HOT HOT
+#endif
+SHAPE_HOT void gfx_frame(int x,int y,int w,int h,u8 c){gfx_rect(x,y,w,1,c);gfx_rect(x,y+h-1,w,1,c);gfx_rect(x,y,1,h,c);gfx_rect(x+w-1,y,1,h,c);}
 int absi(int x){return x<0?-x:x;}
 int clampi(int x,int lo,int hi){return x<lo?lo:(x>hi?hi:x);}
-HOT void gfx_line(int x0,int y0,int x1,int y1,u8 c){int dx=absi(x1-x0),sx=x0<x1?1:-1,dy=-absi(y1-y0),sy=y0<y1?1:-1,err=dx+dy;for(;;){gfx_pixel(x0,y0,c);if(x0==x1&&y0==y1)break;int e=2*err;if(e>=dy){err+=dy;x0+=sx;}if(e<=dx){err+=dx;y0+=sy;}}}
+SHAPE_HOT void gfx_line(int x0,int y0,int x1,int y1,u8 c){
+#ifdef GBA_SHAPES_ROM_ARM
+ if(y0==y1){
+    if((unsigned)y0>=160)return;
+    int lo=x0<x1?x0:x1,hi=x0<x1?x1:x0;
+    if(hi<0||lo>=240)return;
+    if(lo<0)lo=0;
+    if(hi>239)hi=239;
+    gfx_rect(lo,y0,hi-lo+1,1,c);return;
+ }
+ if(x0==x1){
+    if((unsigned)x0>=240)return;
+    int lo=y0<y1?y0:y1,hi=y0<y1?y1:y0;
+    if(hi<0||lo>=160)return;
+    if(lo<0)lo=0;
+    if(hi>159)hi=159;
+    gfx_rect(x0,lo,1,hi-lo+1,c);return;
+ }
+#endif
+ int dx=absi(x1-x0),sx=x0<x1?1:-1,dy=-absi(y1-y0),sy=y0<y1?1:-1,err=dx+dy;for(;;){gfx_pixel(x0,y0,c);if(x0==x1&&y0==y1)break;int e=2*err;if(e>=dy){err+=dy;x0+=sx;}if(e<=dx){err+=dx;y0+=sy;}}}
 #if (defined(SC64_P3_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_T4_RUNTIME) || defined(SC64_Z5_CONSUME_ENABLED)
 /* These imported profiles render from source sprites and do not call this
  * fallback. Keep it in ROM to reserve IWRAM for visibility updates. */
@@ -1084,6 +1108,55 @@ void save_write(const void *data,u32 len,u32 tag) {
     for(u32 i=0;i<len;i++)p[16+i]=src[i];
     sram_put32(p,tag);
 }
+/* Preserve the newest readable predecessor when writing the first record of
+ * a new format. Tags share the same physical two-slot SRAM journal. */
+void save_write_migrating(const void *data,u32 len,u32 tag,u32 legacy_len,u32 legacy_tag) {
+    if(len>SAVE_PAYLOAD_MAX||legacy_len>SAVE_PAYLOAD_MAX||!tag||!legacy_tag)return;
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    int current=newest_record(0,tag), legacy=newest_record(legacy_len,legacy_tag), newest;
+    if(current<0)newest=legacy;
+    else if(legacy<0)newest=current;
+    else newest=(s32)(sram_get32(base+current*SAVE_SLOT_SIZE+12)-
+                      sram_get32(base+legacy*SAVE_SLOT_SIZE+12))>0?current:legacy;
+    u32 sequence=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
+    if(!sequence)sequence=1;
+    volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
+    const u8 *src=data;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));
+    sram_put32(p+12,sequence);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);
+}
+/* An incompatible experimental record may share a tag. It must not displace
+ * the readable legacy predecessor during the first committed feature write. */
+void save_write_migrating_feature(const void *data,u32 len,u32 tag,u32 legacy_tag,
+                                  u32 marker_offset,u32 marker_mask,u32 marker_value) {
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    int current=-1, legacy, newest;
+    if (!len || len>SAVE_PAYLOAD_MAX || !tag || !legacy_tag ||
+        marker_offset>SAVE_PAYLOAD_MAX-4u) return;
+    for (int i=0;i<2;++i) {
+        volatile const u8 *p=base+i*SAVE_SLOT_SIZE;
+        if (!valid_record(p,0,tag) || sram_get32(p+4)<marker_offset+4u ||
+            (sram_get32(p+16+marker_offset)&marker_mask)!=marker_value) continue;
+        if (current<0 || (s32)(sram_get32(p+12)-
+            sram_get32(base+current*SAVE_SLOT_SIZE+12))>0) current=i;
+    }
+    legacy=newest_record(0,legacy_tag);
+    if(current<0)newest=legacy;
+    else if(legacy<0)newest=current;
+    else newest=(s32)(sram_get32(base+current*SAVE_SLOT_SIZE+12)-
+                      sram_get32(base+legacy*SAVE_SLOT_SIZE+12))>0?current:legacy;
+    u32 sequence=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
+    if(!sequence)sequence=1;
+    volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
+    const u8 *src=data;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));
+    sram_put32(p+12,sequence);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);
+}
+
 int save_read(void *data,u32 len,u32 tag) {
     if(len>SAVE_PAYLOAD_MAX||!tag)return 0;
     int newest=newest_record(len,tag);
@@ -1106,6 +1179,84 @@ int save_read_latest(void *data,u32 capacity,u32 tag,u32 *len) {
     *len=stored;
     return 1;
 }
+#ifdef SC64_SCARAB_RUNTIME
+int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
+                          GbaSaveValidator validate,void *context,GbaSaveSelection *selection) {
+    volatile const u8 *base=(volatile const u8*)SRAM_BASE;
+    GbaSaveSelection best={0,0,0,0,-1};
+    if(!scratch||!capacity||!tags||!tag_count||tag_count>3||!validate||!selection)return 0;
+    for(unsigned i=0;i<tag_count;i++) {
+        if(!tags[i])return 0;
+        for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
+    }
+    for(int slot=0;slot<2;slot++) {
+        volatile const u8 *p=base+(unsigned)slot*SAVE_SLOT_SIZE;
+        u32 tag=sram_get32(p),len=sram_get32(p+4),seq=sram_get32(p+12);int allowed=0;
+        for(unsigned i=0;i<tag_count;i++)if(tags[i]==tag)allowed=1;
+        if(!allowed||len>capacity||!valid_record(p,0,tag))continue;
+        for(u32 i=0;i<len;i++)((u8*)scratch)[i]=p[16+i];
+        if(!validate(scratch,len,tag,context))continue;
+        if(best.slot>=0 && seq-best.sequence==0x80000000u)return 0;
+        if(best.slot<0||(s32)(seq-best.sequence)>0)
+            best=(GbaSaveSelection){tag,len,seq,sram_get32(p+8),slot};
+    }
+    if(best.slot<0)return 0;
+    volatile const u8 *p=base+(unsigned)best.slot*SAVE_SLOT_SIZE;
+    if(!valid_record(p,best.length,best.tag)||sram_get32(p+12)!=best.sequence||
+       sram_get32(p+8)!=best.checksum)return 0;
+    for(u32 i=0;i<best.length;i++)((u8*)scratch)[i]=p[16+i];
+    *selection=best;return 1;
+}
+int save_select_transaction(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
+                            GbaSaveValidator prepare,GbaSaveCommit commit,void *context,
+                            GbaSaveSelection *selection) {
+    GbaSaveSelection chosen;
+    if(!commit || !selection ||
+       !save_select_validated(scratch,capacity,tags,tag_count,prepare,context,&chosen))return 0;
+    if(!prepare(scratch,chosen.length,chosen.tag,context))return 0;
+    commit(context);
+    *selection=chosen;
+    return 1;
+}
+int save_write_selected(const void *data,u32 len,u32 tag,const GbaSaveSelection *previous,
+                        const u32 *tags,unsigned tag_count) {
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    int new_allowed=0,old_allowed=0;
+    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag||!previous||!tags||!tag_count||tag_count>3||
+       previous->slot<0||previous->slot>1||!previous->tag||!previous->length||!previous->sequence)return 0;
+    for(unsigned i=0;i<tag_count;i++) {
+        if(!tags[i])return 0;
+        for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
+        if(tags[i]==tag)new_allowed=1;
+        if(tags[i]==previous->tag)old_allowed=1;
+    }
+    if(!new_allowed||!old_allowed)return 0;
+    volatile const u8 *old=base+(unsigned)previous->slot*SAVE_SLOT_SIZE;
+    if(!valid_record(old,previous->length,previous->tag)||sram_get32(old+12)!=previous->sequence||
+       sram_get32(old+8)!=previous->checksum)return 0;
+    volatile u8 *p=base+(unsigned)(1-previous->slot)*SAVE_SLOT_SIZE;
+    u32 other=sram_get32(p);int other_allowed=0;
+    for(unsigned i=0;i<tag_count;i++)if(tags[i]==other)other_allowed=1;
+    if(other && !other_allowed && valid_record(p,0,other))return 0;
+    u32 sequence=previous->sequence+1;if(!sequence)sequence=1;
+    const u8 *src=data;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));sram_put32(p+12,sequence);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);return 1;
+}
+int save_write_first(const void *data,u32 len,u32 tag) {
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag)return 0;
+    for(unsigned slot=0;slot<2;slot++) {
+        volatile const u8 *p=base+slot*SAVE_SLOT_SIZE;u32 existing=sram_get32(p);
+        if(existing && valid_record(p,0,existing))return 0;
+    }
+    const u8 *src=data;volatile u8 *p=base;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));sram_put32(p+12,1);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);return 1;
+}
+#endif
 #ifdef GBA_HOST
 void save_test_corrupt_latest(u32 len,u32 tag) {
     int newest=newest_record(len,tag);

@@ -55,8 +55,8 @@ sc64_packed_building_get(const Sc64PackedBuildingSave *row, unsigned *bit,
 /* All values below are bounded by the current game representation: map
  * coordinates are at most 2047, max HP/shields at most 131071 (100000 is the
  * canonical T4 prop value), and HP uses a biased signed 18-bit range
- * because hit_target may leave a killed building below zero. Unit/building
- * enums fit six bits, source IDs fit one byte, and the engine's
+ * because hit_target may leave a killed building below zero. Unit enums fit
+ * six bits, building enums fit seven bits, source IDs fit one byte, and the engine's
  * queue/construction/cooldown counters fit 16 bits. The encoder fails closed
  * if a future rule exceeds these bounds. */
 static int
@@ -86,7 +86,7 @@ sc64_building_save_encode(Sc64PackedBuildingSave *row, const Building *bld,
         hp < -SC64_PACKED_BUILDING_HP_BIAS || hp >= SC64_PACKED_BUILDING_HP_BIAS ||
         (bld->alive && hp < 0) || maxhp < 0 || maxhp > 131071 ||
         bld->owner < 0 || bld->owner > 4 || bld->type < 0 || bld->type >= SC_RB_COUNT ||
-        SC_RB_COUNT > 64 || bld->queue_head < 0 || bld->queue_head > 4 ||
+        SC_RB_COUNT > 128 || bld->queue_head < 0 || bld->queue_head > 4 ||
         bld->queue_count < 0 || bld->queue_count > 5 ||
         bld->queue_progress < 0 || bld->queue_progress > 65535 ||
         bld->build_progress < -1 || bld->build_progress > 65534 ||
@@ -108,7 +108,7 @@ sc64_building_save_encode(Sc64PackedBuildingSave *row, const Building *bld,
 #define SC64_PUT(width, value) do { if (!sc64_packed_building_put(&encoded, &bit, (width), (u32)(value))) return 0; } while (0)
     SC64_PUT(11, bld->x); SC64_PUT(11, bld->y);
     SC64_PUT(18, hp + SC64_PACKED_BUILDING_HP_BIAS); SC64_PUT(17, maxhp);
-    SC64_PUT(3, bld->owner); SC64_PUT(6, bld->type); SC64_PUT(1, bld->alive);
+    SC64_PUT(3, bld->owner); SC64_PUT(6, bld->type & 63); SC64_PUT(1, bld->alive);
     for (unsigned i = 0; i < 5; ++i) SC64_PUT(6, bld->queue[i]);
     SC64_PUT(3, bld->queue_head); SC64_PUT(3, bld->queue_count);
     SC64_PUT(16, bld->queue_progress); SC64_PUT(16, build_progress);
@@ -116,8 +116,11 @@ sc64_building_save_encode(Sc64PackedBuildingSave *row, const Building *bld,
     SC64_PUT(17, bld->shield); SC64_PUT(9, raw_type); SC64_PUT(9, raw_owner);
     SC64_PUT(16, bld->flags); SC64_PUT(2, bld->larva);
     SC64_PUT(9, bld->larva_timer); SC64_PUT(11, bld->shield_remainder);
+    /* Preserve every legacy field offset; the seventh type bit occupies the
+     * first previously reserved bit at the end of the row. */
+    SC64_PUT(1, (unsigned)bld->type >> 6);
 #undef SC64_PUT
-    if (bit != 216) return 0;
+    if (bit != 217) return 0;
     *row = encoded;
     return 1;
 }
@@ -150,13 +153,16 @@ sc64_building_save_decode(Building *out, const Sc64PackedBuildingSave *row)
     SC64_GET(16, decoded.flags); SC64_GET(2, decoded.larva);
     SC64_GET(9, decoded.larva_timer); SC64_GET(11, decoded.shield_remainder);
 #undef SC64_GET
-    if (bit != 216 || decoded.alive > 1 || decoded.type >= SC_RB_COUNT ||
+    if (bit != 216 || decoded.alive > 1 ||
         (decoded.alive && decoded.hp < 0) || decoded.maxhp > 131071 ||
         decoded.owner > 4 || decoded.queue_head > 4 || decoded.queue_count > 5 ||
         decoded.level > 127 || decoded.raw_type > 255 ||
         decoded.raw_owner > 255 || decoded.larva > 3 ||
         decoded.shield_remainder > 1279 || decoded.build_progress < -1) return 0;
-    /* Eight spare bits are reserved and must remain zero, as must any future
+    if (!sc64_packed_building_get(row, &bit, 1, &v)) return 0;
+    decoded.type |= (int)v << 6;
+    if (decoded.type >= SC_RB_COUNT) return 0;
+    /* Seven spare bits are reserved and must remain zero, as must any future
      * padding. This also rejects noncanonical encodings before live mutation. */
     for (; bit < SC64_PACKED_BUILDING_SAVE_BYTES * 8u; ++bit)
         if ((row->bytes[bit >> 3] >> (bit & 7u)) & 1u) return 0;

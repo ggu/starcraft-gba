@@ -67,10 +67,11 @@ pixel/state checks, measurements and memory limits.
 
 ## Directional unit sprites
 
-Canonical Terran, Zerg, Protoss and Showcase builds select directional frames
-from the source unit images instead of always drawing frame zero. Refresh an
-older workspace with `./dev sc64 prepare --rom PATH --profile terran` (or
-`zerg` / `protoss`). Preparation writes the private bank under
+Every race-engine build (Races, unified, the race campaigns, the canonical
+Terran, Zerg and Protoss products and Showcase) selects directional frames from
+the source unit images instead of always drawing frame zero. Refresh an older
+workspace with `./dev sc64 prepare --rom PATH --profile terran` (or `zerg`,
+`protoss`, `races`, `unified`). Preparation writes the private bank under
 `.local/sc64/facing/generated/`; status/build reject older banks without the
 directional metadata and packed-frame payload. The source image's directional
 flag determines whether its frames represent headings; frame count alone does
@@ -81,9 +82,28 @@ units aim toward their target when firing. Facing is presentation state: a new
 game, scene restart, accepted load or reused actor slot starts at north until
 the unit moves or fires. It does not change the save format or combat rules.
 This adds directional idle poses, including Tank hull/turret layers; it does
-not implement the original walking cycles, turn rates or independent turret
-tracking. Canonical campaigns and Showcase use packed directional frames.
+not implement turn rates or independent turret tracking. Canonical campaigns
+and Showcase use packed directional frames.
 `make -B showcase SHOWCASE_UNIT_WORD_FLAGS=` selects the indexed comparison path.
+
+### Walk cycles
+
+`SC64_UNIT_WALK_FRAMES` (in every race-engine build) plays each unit's source
+walking animation while it moves. `tools/sc64_unit_walk_frames.py` follows the
+`playfram`/`wait` loop of the IScript Walking animation and writes the timed
+poses to `.local/sc64/walk/generated/`; preparation runs it after the facing
+importer. The 2026-10-29 bank covers 34 units, among them the Marine, Zergling,
+Hydralisk, Drone, Zealot, Dragoon, Goliath and Tank treads (1,260,912 pixel
+bytes). Each pose stores all 32 headings, so walking units always take the
+plain sprite blitter; pose 0's eastern frames are shared with the facing bank.
+The SCV, Probe and most flyers loop a single pose in the source (they hover),
+so they keep their facing frame and the one-pixel stride lift.
+
+The cycle runs on the game clock (four source ticks per five game ticks) while
+the walk tracker sees the unit stepping, offset by actor slot. A unit that stops
+shows its facing frame again after one drawn tick. Walk poses are presentation
+state only; nothing is saved or read by the simulation. Mutalisk-style
+flyers flap only while they move; their idle loops are not imported.
 
 ## Source weapon and attack animations
 
@@ -2063,6 +2083,12 @@ outside-PLAY intervals. A prefix selected with `--sample-start` and
 GDB path requires an explicit port; its modulo timer counts do not establish
 unwrapped FPS. The headless path opens no debugger socket.
 
+Qualification harnesses can use the headless transport's optional `save_input`
+and `save_output` paths to boot with an existing 32-KiB SRAM image and export a
+new image. Import happens before boot; live memory writes remain restricted to
+the scheduler. See the [SRAM transport contract](research/sc64-headless-skirmish-replay.md)
+for file ownership, record validation and gameplay-comparison requirements.
+
 ### Prepare the qualified staged Zerg and Protoss builds
 
 The wrapper also supports the six-mission Zerg development profile and the
@@ -2982,6 +3008,27 @@ actors whose combat is still unsupported.
 `make test-sc64-weapon-vfx` checks asset-free rendering geometry and clipping.
 With the existing private inputs, `make test-sc64-weapon-vfx-profiles` checks
 the unified, full Terran, Z7 and P7 actor sets and actual firing events.
+The optional source weapon bank can include per-profile culling envelopes.
+Existing banks remain usable with the global envelope. To prepare and qualify
+an upgraded bank without overwriting existing inputs, provide the authenticated
+ROM and the palette files from your prepared source import, and choose a new
+ignored output directory:
+
+```sh
+python3 tools/sc64_weapon_source_sprites.py \
+  --rom /path/to/StarCraft64-USA.z64 \
+  --palette-remap .local/sc64/backwater/generated/palette-remap.bin \
+  --palette-json .local/sc64/backwater/generated/palette.json \
+  --out .local/sc64/weapon-vfx-bounds/generated
+make test-sc64-weapon-profile-bounds-bank \
+  WEAPON_SOURCE_DIR=.local/sc64/weapon-vfx-bounds/generated
+```
+
+The qualification target reads the prepared bank without generating inputs;
+it checks profile provenance and fallback, raster culling, and the wide-path
+differential. The default host suite also tests the generator using authored,
+asset-free fixtures. Keep generated data under ignored local storage.
+
 `make showcase` includes the effects in the filming ROM; the canonical race
 builds include them as well. The transient pool holds 32 effects in race
 profiles and retains 12 in the original-art save format. Overflow replaces
@@ -3013,3 +3060,45 @@ metrics, then rechecks the existing scheduled/injected-input loop. An optional
 Z7 link comparison recovers 2,072 BSS bytes with the same IWRAM end and
 unchanged memory guards. This is input infrastructure and does not change
 gameplay, save formats, actor limits or the campaign qualification scope.
+
+### Battlecruiser source inputs
+
+The [shared candidate audit](audits/2026-10-30-shared-battlecruiser/README.md)
+records the tested source, setup, save limits and remaining performance gates.
+`make test-bc-canonical test-bc-fresh-canonical` exercises the four actual
+canonical flag sets when their private inputs are prepared; the fixtures seed
+infrastructure/funds/energy and do not claim normal-input campaign completion.
+
+The canonical Terran, Zerg, Protoss and Showcase profiles use the shared
+Battlecruiser and Yamato services. After preparing the ordinary race profile,
+run `./dev sc64 prepare-bc --rom PATH` with the verified USA ROM. This writes
+cover-encoded terrain, race and skirmish tables to `.local/sc64/bc/generated`
+the two facility body frames to `.local/sc64/bc-body/`, and Yamato art to
+`.local/sc64/bc-yamato/generated/`. The separate
+outputs leave the existing imported banks intact. `./dev sc64 status --profile
+terran` (or `zerg`, `protoss`, `protoss-p7`) reports whether the new inputs
+are present. Repeat preparation when the private source inputs change.
+
+### Prepared BC ordinary-input host witness
+
+With the Terran and BC inputs already prepared, run `make test-sc64-bc-normal-input`.
+This opt-in target compiles the controller and separate replay/fresh-load
+programs with the canonical Terran flags, runs ordinary menu and game inputs,
+validates the resulting trace, saves during an in-flight Yamato shot, and
+loads that save through HOME/L in a fresh host process. It does not generate
+or modify imported inputs. The target creates a new ignored directory under
+`.local/build/bc-normal-input/` for its binaries, trace, transitions and SRAM.
+The fixed tick 17937 and frame 17658 are a source-bound witness for this
+controller and runtime, not a general scenario or hardware guarantee; a
+runtime change that alters the controller timeline requires a fresh witness
+and review. This host test is not a physical-GBA or frame-rate qualification.
+
+### Gated Scarab component fixtures
+
+With the four canonical profiles' private inputs already prepared,
+`make test-scarab-unit-adapter` and `make test-scarab-presence` each compile and run
+four host sanitizer fixtures with `SC64_SCARAB_RUNTIME`. They generate only a
+new source-fact table under a fresh ignored `build/generated/scarab-p7/run.*`
+directory; they do not prepare imported art or replace an existing fact table.
+These component checks do not enable Reaver production or qualify gameplay,
+SRAM continuation, physical hardware, or performance.

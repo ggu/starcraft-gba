@@ -53,8 +53,22 @@ class HeadlessReplay:
     def clock(self) -> int:
         return int(self.cmd("t"))
 
+    def export_sram(self) -> None:
+        if self.cmd("s") != "OK 32768":
+            raise RuntimeError("headless backend did not export a complete SRAM image")
 
-def start(runner: Path, rom: Path, out: Path, symbols: dict, sizes: dict):
+
+def start(runner: Path, rom: Path, out: Path, symbols: dict, sizes: dict, *,
+          save_input: Path | None = None, save_output: Path | None = None):
+    save_args = []
+    if save_input is not None:
+        if not save_input.is_file() or save_input.stat().st_size != 32768:
+            raise ValueError("SRAM input must be an existing 32768-byte image")
+        save_args += ["--save-input", str(save_input.resolve())]
+    if save_output is not None:
+        if save_output.exists() or not save_output.parent.is_dir():
+            raise ValueError("SRAM output must be a new file in an existing directory")
+        save_args += ["--save-output", str(save_output.resolve())]
     home = (out / "home").resolve()
     home.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
@@ -68,7 +82,7 @@ def start(runner: Path, rom: Path, out: Path, symbols: dict, sizes: dict):
         raise ValueError("scheduler write ranges overlap")
     args = [part for address, size in ranges for part in (f"{address:x}", str(size))]
     log = (out / "headless.log").open("w")
-    proc = subprocess.Popen([str(runner.resolve()), str(rom.resolve()), *args], stdin=subprocess.PIPE,
+    proc = subprocess.Popen([str(runner.resolve()), str(rom.resolve()), *args, *save_args], stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=log, text=True, bufsize=1, env=env)
     try:
         assert proc.stdout is not None

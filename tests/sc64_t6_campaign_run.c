@@ -50,6 +50,11 @@ static void step(u16 held)
     prior_keys = held;
     ++host_ticks;
     if (watch_norad && norad_slot >= 0 && (host_ticks % 250u) == 0) {
+        if(hero_slot>=0)fprintf(stderr,"T6 HEROWATCH tick=%u alive=%d hp=%d xy=%d,%d order=%d goal=%d,%d\n",(unsigned)host_ticks,u[hero_slot].alive,u[hero_slot].hp,u[hero_slot].x,u[hero_slot].y,u[hero_slot].order,u[hero_slot].tx,u[hero_slot].ty);
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_MARINE)
+            fprintf(stderr,"T6 DEFENSE tick=%u marine=%d xy=%d,%d hp=%d order=%d target=%d\n",(unsigned)host_ticks,i,u[i].x,u[i].y,u[i].hp,u[i].order,u[i].target);
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&owners_hostile(SIDE,u[i].owner)&&u[i].raw_type==43&&currently_visible(u[i].x,u[i].y))
+            fprintf(stderr,"T6 DEFENSE tick=%u visible-air=%d xy=%d,%d hp=%d order=%d target=%d\n",(unsigned)host_ticks,i,u[i].x,u[i].y,u[i].hp,u[i].order,u[i].target);
         int nearest = 0x7fffffff, nearest_slot = -1, targeting = 0;
         int repair_slot=-1,repair_distance=-1;
         int nx = b[norad_slot].x, ny = b[norad_slot].y;
@@ -577,15 +582,26 @@ static int find_site(int type, int nearx, int neary, int radius, int *ox, int *o
     if(bx<0)return 0;*ox=bx;*oy=by;return 1;
 }
 
+static int controller_wait_foundation(int worker,int type,int x,int y)
+{
+    if(!u[worker].alive||u[worker].order!=ORDER_BUILD_PENDING||u[worker].target!=type)return -1;
+    for(int t=0;t<3000&&host_ticks<(u32)run_limit&&screen==SCREEN_PLAY&&!won&&!lost&&
+        u[worker].alive&&u[worker].order==ORDER_BUILD_PENDING;t++)step(0);
+    if(!u[worker].alive||u[worker].order!=ORDER_BUILD||u[worker].target<0||u[worker].target>=MAX_BUILDINGS)return -1;
+    int slot=u[worker].target;
+    if(!b[slot].alive||b[slot].owner!=SIDE||b[slot].type!=type||
+       b[slot].raw_type!=sc64_race_raw_building(type)||dist2(x,y,b[slot].x,b[slot].y)>=64*64)return -1;
+    return slot;
+}
+
 static int build_paid(int type, int menu_row, int nearx, int neary, int radius, int *out)
 {
-    int worker=-1,x,y,before=owner_buildings(SIDE);
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&!SC64_TRANSPORT_LOADED(&u[i])){worker=i;break;}
+    int worker=-1,x,y;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&i!=repair_worker_slot&&!u[i].carry&&!SC64_TRANSPORT_LOADED(&u[i])){worker=i;break;}
     if(worker<0||!select_unit(worker)||!choose_build(menu_row)||!find_site(type,nearx,neary,radius,&x,&y))return 0;
     move_cursor(x,y);x=cx;y=cy;if(!race_can_site(SIDE,type,x,y)||!can_place(type,x,y))return 0;
-    tap(KEY_A);int slot=-1;
-    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==type&&b[i].under_construction&&dist2(b[i].x,b[i].y,x,y)<64*64){slot=i;break;}
-    if(slot<0||owner_buildings(SIDE)<=before)return 0;
+    tap(KEY_A);int slot=controller_wait_foundation(worker,type,x,y);
+    if(slot<0)return 0;
     if(out)*out=slot;return 1;
 }
 
@@ -606,9 +622,9 @@ static int nearest_owned_cc_geyser(void)
 static int controller_build_refinery(int *out)
 {
     if(out)*out=-1;
-    int gi=nearest_owned_cc_geyser(),worker=-1,before=owner_buildings(SIDE);
+    int gi=nearest_owned_cc_geyser(),worker=-1;
     if(gi<0||minerals<building_cost(B_REFINERY))return 0;
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&!SC64_TRANSPORT_LOADED(&u[i])){worker=i;break;}
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&i!=repair_worker_slot&&!u[i].carry&&!SC64_TRANSPORT_LOADED(&u[i])){worker=i;break;}
     if(worker<0||!select_unit(worker)||!choose_build(4))return 0;
     int x=geysers[gi].x,y=geysers[gi].y;
     move_cursor(x,y);x=cx;y=cy;
@@ -620,10 +636,8 @@ static int controller_build_refinery(int *out)
     }
     /* The command records an unpaid pending order. Advance the ordinary
        simulation until its SCV arrives and commits the real foundation. */
-    for(int t=0;t<3000&&host_ticks<(u32)run_limit&&screen==SCREEN_PLAY&&!won&&!lost&&
-        u[worker].alive&&u[worker].order==ORDER_BUILD_PENDING;t++)step(0);
-    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_REFINERY&&b[i].under_construction&&dist2(x,y,b[i].x,b[i].y)<64*64){slot=i;break;}
-    if(slot<0||owner_buildings(SIDE)<=before){fprintf(stderr,"T6 refinery command did not start at %d,%d mineral=%d\n",x,y,minerals);normal_field();return 0;}
+    slot=controller_wait_foundation(worker,B_REFINERY,x,y);
+    if(slot<0){fprintf(stderr,"T6 refinery command did not start at %d,%d mineral=%d\n",x,y,minerals);normal_field();return 0;}
     fprintf(stderr,"T6 controller started paid Refinery slot=%d site=%d,%d worker=%d wallet=%d/%d\n",slot,x,y,worker,minerals,gas);
     if(out)*out=slot;return 1;
 }
@@ -632,10 +646,10 @@ static int controller_assign_gas(int refinery,int max_workers)
 {
     int assigned=0;
     for(int i=0;i<MAX_UNITS&&assigned<max_workers&&host_ticks<(u32)run_limit;i++)
-        if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&!SC64_TRANSPORT_LOADED(&u[i])&&
+        if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&i!=repair_worker_slot&&!u[i].carry&&!SC64_TRANSPORT_LOADED(&u[i])&&
            !(u[i].order==ORDER_GAS&&u[i].target==refinery)){
             if(!select_unit(i))continue;
-            move_cursor(b[refinery].x,b[refinery].y);tap(KEY_A);
+            move_cursor(b[refinery].x,b[refinery].y);if(!u[i].alive||!u[i].selected||u[i].carry)continue;tap(KEY_A);
             if(u[i].alive&&u[i].order==ORDER_GAS&&u[i].target==refinery)++assigned;
         }
     return assigned;
@@ -704,10 +718,10 @@ static int controller_build_starport(int factory, int *out)
     if(factory<0||factory>=MAX_BUILDINGS||!b[factory].alive||
        b[factory].owner!=SIDE||!building_complete(factory))return 0;
     for(int i=0;i<MAX_UNITS;i++)
-        if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&
+        if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&i!=repair_worker_slot&&!u[i].carry&&
            !SC64_TRANSPORT_LOADED(&u[i])&&u[i].order!=ORDER_GAS){worker=i;break;}
     if(worker<0)for(int i=0;i<MAX_UNITS;i++)
-        if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&
+        if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&i!=repair_worker_slot&&!u[i].carry&&
            !SC64_TRANSPORT_LOADED(&u[i])){worker=i;break;}
     if(worker<0||minerals<building_cost(B_STARPORT)||gas<building_gas_cost(B_STARPORT))return 0;
     for(int cy=16;cy<WORLD_H-48;cy+=16)for(int cx0=32;cx0<WORLD_W-64;cx0+=16){
@@ -734,12 +748,8 @@ static int controller_build_starport(int factory, int *out)
                 planned_x,planned_y,x,y,worker);
         normal_field();return 0;
     }
-    int before=owner_buildings(SIDE);
     tap(KEY_A);
-    int slot=-1;
-    if(owner_buildings(SIDE)>before)for(int i=0;i<MAX_BUILDINGS;i++)
-        if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_STARPORT&&
-           b[i].under_construction&&dist2(x,y,b[i].x,b[i].y)<64*64){slot=i;break;}
+    int slot=controller_wait_foundation(worker,B_STARPORT,x,y);
     if(slot<0){fprintf(stderr,"T6 Starport placement produced no building at=%d,%d mode=%d\n",x,y,mode);normal_field();return 0;}
     fprintf(stderr,"T6 controller started addon-clear paid Starport slot=%d at=%d,%d addon=%d,%d worker=%d\n",slot,x,y,tx,ty,worker);
     if(out)*out=slot;
@@ -803,6 +813,58 @@ static int controller_start_norad_repair(void)
             count, b[target].hp, b[target].maxhp);
     checkpoint(count ? "norad-repair-started" : "norad-repair-unavailable");
     return count;
+}
+
+static int controller_assign_mineral(int release_gas)
+{
+    static const int dx[]={0,8,-8,0,0,8,-8,8,-8},dy[]={0,0,0,8,-8,8,8,-8,-8};
+    int cc=source_building(106,SIDE);
+    if(cc<0||!building_complete(cc))return 0;
+    for(int i=0;i<MAX_UNITS&&host_ticks<(u32)run_limit;i++){
+        if(!u[i].alive||u[i].owner!=SIDE||u[i].type!=U_SCV||i==repair_worker_slot||
+           (u[i].order!=ORDER_IDLE&&!(release_gas&&u[i].order==ORDER_GAS))||u[i].carry||SC64_TRANSPORT_LOADED(&u[i])||!select_unit(i))continue;
+        for(int j=0;j<MAX_MINERALS;j++)if(m[j].amount>0&&currently_visible(m[j].x,m[j].y)&&dist2(m[j].x,m[j].y,b[cc].x,b[cc].y)<256*256){
+            for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0]);k++){
+                move_cursor(m[j].x+dx[k],m[j].y+dy[k]);
+                if(!u[i].alive||!u[i].selected||u[i].carry)break;
+                if(selected_worker_mineral_target()!=j||field_ui_a_action(selected_count())!=UI_A_MINE)continue;
+                tap(KEY_A);if(u[i].order==ORDER_MINE&&u[i].target==j){fprintf(stderr,"T6 mineral SCV=%d patch=%d\n",i,j);return 1;}
+            }
+        }
+    }
+    return 0;
+}
+
+static int controller_remaining_gas_budget(void)
+{
+    int budget=100; /* preserve gas for ongoing paid Norad repair */
+    if(source_building(113,SIDE)<0)budget+=building_gas_cost(B_FACTORY);
+    int port=source_building(114,SIDE);
+    if(port<0)budget+=building_gas_cost(B_STARPORT);
+    if(port<0||!race_t6_starport_has_control_tower(port))budget+=building_gas_cost(B_CONTROL_TOWER);
+    int ships=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DROPSHIP)ships++;
+    if(port>=0)for(int i=0;i<b[port].queue_count&&i<5;i++)if(b[port].queue[(b[port].queue_head+i)%5]==U_DROPSHIP)ships++;
+    if(ships<2)budget+=(2-ships)*unit_gas_cost(U_DROPSHIP);
+    return budget;
+}
+
+/* Direct surviving Marines toward an actually visible air threat at Norad.
+ * Double-tap selection verifies that only Marines receive the native order. */
+static int controller_defend_norad_air(void)
+{
+    if(norad_slot<0||!b[norad_slot].alive)return 0;
+    int target=-1,best=192*192;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&owners_hostile(SIDE,u[i].owner)&&
+        u[i].raw_type==43&&currently_visible(u[i].x,u[i].y)){
+        int d=dist2(u[i].x,u[i].y,b[norad_slot].x,b[norad_slot].y);
+        if(d<best){best=d;target=i;}
+    }
+    if(target<0)return 0;
+    int x=u[target].x,y=u[target].y;
+    int issued=group_visible_type_to(U_MARINE,x,y,1);
+    fprintf(stderr,"T6 visible air defense target=%d xy=%d,%d issued=%d\n",target,x,y,issued);
+    return issued;
 }
 
 static int all_source_count(int raw, int building, int owner)
@@ -890,6 +952,7 @@ int main(int argc,char **argv)
      * is handled by the T6 world policy; this harness only issues a group move. */
     int rescue_cc=source_building(106,RESCUABLE), rx=-1,ry=-1;
     int lead=hero_slot;
+    int hero_start_x=lead>=0?u[lead].x:-1,hero_start_y=lead>=0?u[lead].y:-1;
     int repair_workers = 0;
     if(lead<0||!u[lead].alive||u[lead].owner!=SIDE)
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE){lead=i;break;}
@@ -909,10 +972,26 @@ int main(int argc,char **argv)
                 step(0);
             }
             checkpoint("base-contact-attempt");
+            /* The rescued force includes workers already near the Norad.
+             * Keep the nearest free for a paid repair after gas arrives. */
+            if(norad_slot>=0&&b[norad_slot].alive){
+                int best=0x7fffffff;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&!u[i].carry&&!SC64_TRANSPORT_LOADED(&u[i])){
+                    int d=dist2(u[i].x,u[i].y,b[norad_slot].x,b[norad_slot].y);
+                    if(d<best){best=d;repair_worker_slot=i;}
+                }
+                fprintf(stderr,"T6 reserved near-Norad SCV=%d d2=%d\n",repair_worker_slot,best);
+            }
             /* Repair is deferred until there is an actual paid gas economy;
              * an underfunded reference repair order stops immediately. */
         } else fprintf(stderr,"T6 base lead click failed lead=%d alive=%d pos=%d,%d target=%d\n",
                        lead,u[lead].alive,u[lead].x,u[lead].y,selection_target());
+    }
+    /* Do not leave Raynor beside the rescued base as raids converge. Return
+     * him to his original staging point via his ordinary individual order. */
+    if(hero_slot>=0&&u[hero_slot].alive&&u[hero_slot].owner==SIDE&&hero_start_x>=0){
+        int parked=order_actor(hero_slot,hero_start_x,hero_start_y,0);
+        fprintf(stderr,"T6 Raynor staging order=%d destination=%d,%d\n",parked,hero_start_x,hero_start_y);
     }
     /* The source Norad starts damaged and is under pressure from the nearby
      * hostile force. Move combat groups there while the captured base begins
@@ -929,9 +1008,9 @@ int main(int argc,char **argv)
     }
     fprintf(stderr,"T6 Norad repair command count=%d\n",repair_workers);
     int refinery=source_building(110,SIDE),gas_workers=0;
-    int refinery_check=0,worker_check=0,tech_check=0;
+    int refinery_check=0,worker_check=0,tech_check=0,defense_check=0;
     if(refinery>=0&&building_complete(refinery)){
-        gas_workers=controller_assign_gas(refinery,3);
+        gas_workers=controller_assign_gas(refinery,1);
         fprintf(stderr,"T6 assigned existing Refinery workers=%d wallet=%d/%d\n",gas_workers,minerals,gas);
         checkpoint("refinery-active");
     }
@@ -943,8 +1022,15 @@ int main(int argc,char **argv)
      * alive without spending the opening worker on a long cross-map route. */
     while(host_ticks<(u32)run_limit&&screen==SCREEN_PLAY&&!won&&!lost){
         step(0);
+        if(host_ticks>=(u32)defense_check){defense_check=(int)host_ticks+1200;(void)controller_defend_norad_air();}
+        if(refinery<0||!b[refinery].alive)refinery=source_building(110,SIDE);
         if(host_ticks>=(u32)worker_check){
             worker_check=(int)host_ticks+300;
+            (void)controller_assign_mineral(gas>=controller_remaining_gas_budget());
+            if(repair_workers && (repair_worker_slot<0 || !u[repair_worker_slot].alive ||
+               u[repair_worker_slot].order!=ORDER_REPAIR))repair_workers=0;
+            if(!repair_workers&&minerals>0&&gas>0&&norad_slot>=0&&b[norad_slot].alive&&
+               b[norad_slot].hp<b[norad_slot].maxhp)repair_workers=controller_start_norad_repair();
             if(controller_live_scv_count()+controller_queued_scv_count()<4&&
                minerals>=unit_cost(U_SCV)) controller_queue_scv();
         }
@@ -1014,7 +1100,7 @@ int main(int argc,char **argv)
                controller_build_refinery(&refinery)){
                 if(wait_building(refinery,1000)){
                     fprintf(stderr,"T6 controller completed Refinery slot=%d\n",refinery);
-                    gas_workers=controller_assign_gas(refinery,3);
+                    gas_workers=controller_assign_gas(refinery,1);
                     fprintf(stderr,"T6 assigned refinery workers=%d wallet=%d/%d\n",gas_workers,minerals,gas);
                     checkpoint("refinery-active");
                 } else {

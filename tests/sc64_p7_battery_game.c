@@ -408,29 +408,30 @@ int main(void)
     assert(mode==MODE_BUILD && menu==B_P7_SHIELD_BATTERY);
     minerals=100; gas=0; cx=site_x; cy=site_y;
     start_build(B_P7_SHIELD_BATTERY);
-    assert(u[probe].order==ORDER_BUILD && minerals==0);
-    int human_battery=u[probe].target;
-    assert(human_battery>=0 && b[human_battery].alive &&
-           b[human_battery].raw_owner==7 && b[human_battery].raw_type==172 &&
-           b[human_battery].under_construction);
-
-    /* Arrive through the real Probe build-order path, serialize construction,
-       reload it, then advance the actual Protoss building timer to completion. */
-    for (int step=0;step<10000 &&
-         dist2(u[probe].x,u[probe].y,b[human_battery].x,b[human_battery].y)>36*36;
-         ++step)
-        move_toward(&u[probe],b[human_battery].x,b[human_battery].y);
-    assert(race_builder_arrived(probe));
+    assert(u[probe].order==ORDER_BUILD_PENDING && minerals==100);
+    assert(u[probe].target==B_P7_SHIELD_BATTERY);
+    int human_battery=-1, before_arrival=minerals;
+    /* Ordinary updates move the Probe, charge at arrival and start the warp. */
+    for (int step=0;step<10000 && human_battery<0;++step) {
+        before_arrival=minerals;
+        game_update(0,0);
+        for (int i=0;i<MAX_BUILDINGS;++i)
+            if (b[i].alive && b[i].raw_type==172 && b[i].raw_owner==7 &&
+                b[i].x==site_x && b[i].y==site_y && b[i].under_construction) {
+                human_battery=i; break;
+            }
+    }
+    assert(human_battery>=0 && minerals==before_arrival-100 && u[probe].alive);
     assert(u[probe].order==ORDER_IDLE && u[probe].target==-1 &&
-           b[human_battery].under_construction &&
-           b[human_battery].build_progress==0);
+           b[human_battery].under_construction);
+    int foundation_progress=b[human_battery].build_progress;
     /* Native construction does not pause after a placed building loses psi.
        Exercise that distinction on the real paid Battery timer. */
     for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].raw_owner=6;
     assert(!race_p7_battery_site_powered(SIDE,pylon_x,pylon_y));
     for (int tick=0;tick<3;++tick) race_tick_buildings();
     assert(b[human_battery].under_construction &&
-           b[human_battery].build_progress==3);
+           b[human_battery].build_progress==foundation_progress+3);
     for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].raw_owner=pylon_raw_owner[n];
     int construction_progress=b[human_battery].build_progress;
     int construction_energy=b[human_battery].queue_progress;

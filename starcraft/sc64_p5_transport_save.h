@@ -66,6 +66,12 @@ static int race_p5_transport_save_candidate_valid(const RaceSave *candidate,
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &actor)) return 0;
         if (!actor.alive) continue;
+#ifdef SC64_SHARED_BATTERY
+        if (actor.order==ORDER_RECHARGE) {
+            if (!race_battery_saved_recharge_valid(candidate,&actor)) return 0;
+            continue;
+        }
+#endif
         if (actor.order < ORDER_IDLE ||
             (actor.order > ORDER_UNLOAD &&
              !SC64_PENDING_BUILD_ORDER(actor.order))) {
@@ -81,6 +87,10 @@ static int race_p5_transport_save_candidate_valid(const RaceSave *candidate,
                     width * 16, height * 16)) return 0;
             continue;
         }
+#ifdef SC64_SHARED_BUNKER
+        if ((actor.order==ORDER_BOARD || actor.order==ORDER_TRANSPORTED) &&
+            actor.target>=MAX_UNITS) continue; /* candidate-wide pass */
+#endif
         if (actor.order >= ORDER_BOARD &&
             (candidate->state[0] || candidate->state[2] != SC64_P5_GLOBAL_ID ||
              actor.owner != SIDE)) return 0;

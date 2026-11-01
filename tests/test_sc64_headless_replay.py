@@ -35,6 +35,19 @@ class HeadlessTransportTests(unittest.TestCase):
                 headless.start(Path("runner"), Path("rom"), Path(out), symbols, sizes)
             spawn.assert_not_called()
 
+    def test_invalid_sram_inputs_and_existing_outputs_do_not_spawn(self):
+        with tempfile.TemporaryDirectory() as td, mock.patch.object(headless.subprocess, "Popen") as spawn:
+            root = Path(td)
+            image = root / "save.sav"
+            image.write_bytes(b"original")
+            for options in ({"save_input": image}, {"save_output": image},
+                            {"save_input": root / "absent.sav"},
+                            {"save_output": root / "absent" / "out.sav"}):
+                with self.subTest(options=options), self.assertRaises(ValueError):
+                    headless.start(Path("runner"), Path("rom"), root, {}, {}, **options)
+            self.assertEqual(image.read_bytes(), b"original")
+            spawn.assert_not_called()
+
 
 @unittest.skipUnless(os.environ.get("SC64_HEADLESS_RUNNER") and os.environ.get("SC64_HEADLESS_ROM"),
                      "private headless backend and ROM not supplied")
@@ -61,7 +74,7 @@ class HeadlessProtocolTests(unittest.TestCase):
         commands = ["t", "m04000000,2", "m0e000000,1", "m02000000,1junk",
                     "m0203ffff,2", "mffffffff,2", "M02000000,1:ffjunk",
                     "M02000000,1:f", "M02000100,1:00", "canything", "tjunk",
-                    "Z08000000junk", "z08000000junk", "qjunk", "x" * 5000, "t", "q"]
+                    "Z08000000junk", "z08000000junk", "s", "sanything", "qjunk", "x" * 5000, "t", "q"]
         p = subprocess.run([self.runner, self.rom, *self.ranges],
                            input="\n".join(commands) + "\n", capture_output=True,
                            text=True, timeout=10, env=self.env)
@@ -70,6 +83,19 @@ class HeadlessProtocolTests(unittest.TestCase):
         self.assertEqual(lines[0], "READY")
         self.assertEqual(lines[1], lines[-1])  # malformed commands did not advance the core
         self.assertTrue(all(line.startswith("ERR") for line in lines[2:-1]), lines)
+
+    def test_sram_options_fail_closed_before_boot(self):
+        image = Path(self.home.name) / "short.sav"
+        image.write_bytes(b"keep")
+        options = (["--save-input", str(image)], ["--unknown", str(image)],
+                   ["--save-output", str(image), "--save-output", str(image)])
+        for args in options:
+            with self.subTest(args=args):
+                p = subprocess.run([self.runner, self.rom, *self.ranges, *args],
+                                   capture_output=True, text=True, timeout=10, env=self.env)
+                self.assertNotEqual(p.returncode, 0)
+                self.assertNotIn("READY", p.stdout)
+        self.assertEqual(image.read_bytes(), b"keep")
 
 
 if __name__ == "__main__":

@@ -311,18 +311,19 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
         int dx=cx-u[i].x,dy=cy-u[i].y;
         if(dx < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dx > SC64_P7_SIGHT_UNIT_AXIS_BOUND ||
             dy < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dy > SC64_P7_SIGHT_UNIT_AXIS_BOUND) continue;
-        int radius=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
 #else
-        int radius=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
         int dx=cx-u[i].x,dy=cy-u[i].y;
 #endif
-        if(dx*dx+dy*dy>radius*radius) continue;
+        unsigned candidate=0;
         if(source>=0&&source<8) {
             int live=race_p7_source_owner((unsigned)source);
-            if(live>=0&&live==u[i].owner) visible_owners|=1u<<(unsigned)source;
+            if(live>=0&&live==u[i].owner) candidate=1u<<(unsigned)source;
         } else for(unsigned owner=0;owner<7;++owner)
-            if(race_p7_source_owner(owner)==u[i].owner)
-                visible_owners|=1u<<owner;
+            if(race_p7_source_owner(owner)==u[i].owner) candidate|=1u<<owner;
+        if(!(candidate & ~visible_owners)) continue;
+        int radius=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
+        if(dx*dx+dy*dy>radius*radius) continue;
+        visible_owners|=candidate;
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive) {
         int source=b[i].raw_owner;
@@ -330,18 +331,19 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
         int dx=cx-b[i].x,dy=cy-b[i].y;
         if(dx < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dx > SC64_P7_SIGHT_BUILDING_AXIS_BOUND ||
             dy < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dy > SC64_P7_SIGHT_BUILDING_AXIS_BOUND) continue;
-        int radius=sc64_p7_observer_sight_radius_runtime(b[i].type,1);
 #else
-        int radius=sc64_p7_observer_sight_radius_runtime(b[i].type,1);
         int dx=cx-b[i].x,dy=cy-b[i].y;
 #endif
-        if(dx*dx+dy*dy>radius*radius) continue;
+        unsigned candidate=0;
         if(source>=0&&source<8) {
             int live=race_p7_source_owner((unsigned)source);
-            if(live>=0&&live==b[i].owner) visible_owners|=1u<<(unsigned)source;
+            if(live>=0&&live==b[i].owner) candidate=1u<<(unsigned)source;
         } else for(unsigned owner=0;owner<7;++owner)
-            if(race_p7_source_owner(owner)==b[i].owner)
-                visible_owners|=1u<<owner;
+            if(race_p7_source_owner(owner)==b[i].owner) candidate|=1u<<owner;
+        if(!(candidate & ~visible_owners)) continue;
+        int radius=sc64_p7_observer_sight_radius_runtime(b[i].type,1);
+        if(dx*dx+dy*dy>radius*radius) continue;
+        visible_owners|=candidate;
     }
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED

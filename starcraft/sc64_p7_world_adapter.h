@@ -97,22 +97,20 @@ static int sc64_p7_count_snapshot_begin(Sc64P7WorldContext *ctx)
             if (owner13) ++next.count[0];
             if (owner17) {
                 for (unsigned q=1;q<=3;++q) {
-                    int match=sc64_p7_world_type_match(wanted[q],(unsigned)raw,pass);
-                    if (match<0) return 0;
-                    if (match) ++next.count[q];
+                    if ((unsigned)raw == wanted[q]) {
+                        int match=sc64_p7_world_type_match(wanted[q],(unsigned)raw,pass);
+                        if (match<0) return 0;
+                        if (match) ++next.count[q];
+                    }
                 }
             }
             if (owner19) ++next.count[4];
-            if (owner18) {
-                ++next.count[5];
+            if (owner18) ++next.count[5];
+            if ((owner18 || owner19) && raw == 154) {
                 int match=sc64_p7_world_type_match(154,(unsigned)raw,pass);
                 if (match<0) return 0;
-                if (match) ++next.count[6];
-            }
-            if (owner19) {
-                int match=sc64_p7_world_type_match(154,(unsigned)raw,pass);
-                if (match<0) return 0;
-                if (match) ++next.count[7];
+                if (match && owner18) ++next.count[6];
+                if (match && owner19) ++next.count[7];
             }
         }
     }

@@ -59,7 +59,7 @@ def nearest(color: int, palette: list[int], candidates: list[int]) -> int:
 
 
 def connected_component(blocked: list[int], width: int, height: int, start: int) -> set[int]:
-    if not (0 <= start < width * height) or blocked[start]:
+    if not (0 <= start < width * height) or (blocked[start] & 1):
         raise ValueError('start marker is outside walkable terrain')
     seen = {start}
     queue = deque([start])
@@ -69,7 +69,7 @@ def connected_component(blocked: list[int], width: int, height: int, start: int)
         for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
             if 0 <= nx < width and 0 <= ny < height:
                 nxt = nx + ny * width
-                if nxt not in seen and not blocked[nxt]:
+                if nxt not in seen and not (blocked[nxt] & 1):
                     seen.add(nxt)
                     queue.append(nxt)
     return seen
@@ -83,7 +83,7 @@ def validate_dimensions(path: str, width: int, height: int) -> None:
 def spawn_clear(blocked: list[int], width: int, height: int, x_px: int, y_px: int) -> bool:
     """Check the authored 3x3-cell town hall footprint around a start marker."""
     cx, cy = x_px // 16, y_px // 16
-    return all(0 <= x < width and 0 <= y < height and not blocked[x + y * width]
+    return all(0 <= x < width and 0 <= y < height and not (blocked[x + y * width] & 1)
                for y in range(cy - 1, cy + 2) for x in range(cx - 1, cx + 2))
 
 
@@ -167,7 +167,7 @@ def _emit_map(lines: list[str], index: int, slug: str, info, blocked: list[int],
     return f'    {{{info.width}u,{info.height}u,{prefix}_tiles,{prefix}_lookup,{prefix}_blocked,{{{",".join(str(x) for x, _ in starts)}}},{{{",".join(str(y) for _, y in starts)}}},{prefix}_minerals,{len(minerals)}u,{prefix}_geysers,{len(geysers)}u,"{info.name}"}},\n'
 
 
-def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict:
+def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT, include_cover: bool = False) -> dict:
     importer = load('sc64_skirmish_import', ROOT / 'tools/sc64_import.py')
     assets = load('sc64_skirmish_assets', ROOT / 'tools/sc64_assets.py')
     x = importer.upstream_module(importer.UPSTREAM)
@@ -225,7 +225,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 dedup[packed] = len(pixels)
                 pixels.append(packed)
             lookup.append(dedup[packed])
-            blocked.append(int((walk & 0x0660) != 0x0660))
+            blocked.append(int((walk & 0x0660) != 0x0660) | (assets.cv5_cover(tid, sources['cv5']) << 1 if include_cover else 0))
         units = importer.unit_rows(sections.get(b'UNIT', b''))
         raw_starts = [(u['x_source_px'] // 2, u['y_source_px'] // 2)
                       for u in units if u['source_type'] == START_TYPE]
@@ -249,12 +249,13 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                         'geyser_policy': 'source neutral placements retained',
                         'geysers': geysers,
                         'cells': len(tile_ids), 'unique_runtime_tiles': len(pixels),
-                        'blocked_cells': sum(blocked),
+                        'blocked_cells': sum(v & 1 for v in blocked),
                         'chk_sha1': hashlib.sha1(chk).hexdigest(),
                         'terrain_assets_sha256': {k: hashlib.sha256(v).hexdigest() for k, v in sources.items()}})
     lines.extend([f'static const Sc64SkirmishMap sc64_skirmish_maps[{len(MAPS)}] = {{\n', *descriptors, '};\n', '#endif /* SC64_SKIRMISH_GENERATED_H */\n'])
     content = ''.join(lines)
     output.parent.mkdir(parents=True, exist_ok=True)
+    if include_cover: content='#define SC64_SKIRMISH_COVER_DATA 1\n'+content
     output.write_text(content, encoding='ascii')
     report = {'schema': 1, 'source': {'rom_sha1': ROM_SHA1,
               'extractor': 'references/sc64-maps/extract_sc64_maps.py', 'extractor_commit': UPSTREAM_COMMIT},
@@ -271,9 +272,10 @@ if __name__ == '__main__':
     parser.add_argument('--rom', type=Path, default=ROM)
     parser.add_argument('--backwater-generated', type=Path, default=BASE)
     parser.add_argument('--out', type=Path, default=OUTPUT)
+    parser.add_argument('--cover', action='store_true')
     args = parser.parse_args()
     try:
-        print(json.dumps(pack(args.rom, args.backwater_generated, args.out), indent=2))
+        print(json.dumps(pack(args.rom, args.backwater_generated, args.out, args.cover), indent=2))
     except (OSError, ValueError, RuntimeError, KeyError) as exc:
         print(f'sc64_skirmish_pack: {exc}', file=sys.stderr)
         raise SystemExit(1)

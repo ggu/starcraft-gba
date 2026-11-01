@@ -18,7 +18,7 @@ static const char *unit_name(int type);
 enum {
     UI_A_NONE, UI_A_SELECT, UI_A_DESELECT, UI_A_TRAIN, UI_A_ASSIGN_GAS,
     UI_A_GATHER_GAS, UI_A_ATTACK, UI_A_MOVE_HERE, UI_A_ATTACK_HERE,
-    UI_A_PLACE, UI_A_GROUP, UI_A_MOVE
+    UI_A_PLACE, UI_A_GROUP, UI_A_MOVE, UI_A_MINE
 };
 
 /* Facts the cursor, list and HUD all need, gathered in one pass per drawn
@@ -203,6 +203,7 @@ field_ui_a_action(void)
         return type == B_REFINERY ? UI_A_ASSIGN_GAS : UI_A_NONE;
     }
     if (n && ui_hostile_at(cx, cy, &hx, &hy)) return UI_A_ATTACK;
+    if (selected_worker_mineral_target() >= 0) return UI_A_MINE;
     if (tx >= 0) return UI_A_SELECT;
     if (selected_building >= 0) return UI_A_DESELECT;
     return n ? UI_A_MOVE : UI_A_NONE;
@@ -370,7 +371,7 @@ field_ui_draw_cursor(int x, int y)
         gfx_rect(x - 2, y - 7, 5, 1, C_PANEL); gfx_rect(x - 2, y + 6, 5, 1, C_PANEL);
         gfx_rect(x - 7, y - 2, 1, 5, C_PANEL); gfx_rect(x + 6, y - 2, 1, 5, C_PANEL);
     } else if (action == UI_A_SELECT || action == UI_A_GROUP || action == UI_A_TRAIN ||
-               action == UI_A_ASSIGN_GAS || action == UI_A_GATHER_GAS) {
+               action == UI_A_ASSIGN_GAS || action == UI_A_GATHER_GAS || action == UI_A_MINE) {
         gfx_frame(x - 5, y - 5, 11, 11, color);
         gfx_rect(x - 1, y - 6, 3, 1, C_PANEL); gfx_rect(x - 1, y + 5, 3, 1, C_PANEL);
         gfx_rect(x - 6, y - 1, 1, 3, C_PANEL); gfx_rect(x + 5, y - 1, 1, 3, C_PANEL);
@@ -436,7 +437,7 @@ ui_hint_line(int a_action)
 {
     static const char *const a_text[] = {
         0, "SELECT", "DESELECT", "TRAIN", "ADD GAS WORKER", "GATHER GAS",
-        "ATTACK", "MOVE HERE", "ATTACK HERE", "PLACE", "ALL OF TYPE", "MOVE"
+        "ATTACK", "MOVE HERE", "ATTACK HERE", "PLACE", "ALL OF TYPE", "MOVE", "MINE"
     };
     int x = 3;
     if (a_action == UI_A_TRAIN) {

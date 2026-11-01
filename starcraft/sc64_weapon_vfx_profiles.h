@@ -71,7 +71,8 @@ sc64_weapon_vfx_unit_profile(int type, int target_air)
 #if defined(SC64_T5_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         color=C_ORANGE; style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_SHELL; break;
 #endif
-#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || defined(SC64_Z7_SCOURGE_COMBAT)
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+    defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
     case U_SCOURGE:
         color=C_GREEN; style=target_air ? SC64_WEAPON_VFX_STYLE_BURST : SC64_WEAPON_VFX_STYLE_NONE; break;
 #endif

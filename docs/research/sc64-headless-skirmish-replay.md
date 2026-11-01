@@ -5,8 +5,9 @@ core with in-process hardware breakpoints. The Python skirmish replay feeds the
 ROM's existing windowed input scheduler and checks the resulting configuration
 and trace observations. The backend accepts writes only to the five scheduler
 symbols passed from the ELF. Use a fresh private HOME and output directory.
-Headless reads are restricted to EWRAM, IWRAM and loaded ROM; MMIO and SRAM are not read,
-and HOME screenshots are omitted. The pinned 0.10.5 `rawRead8` uses `GBAView8`;
+Memory-read commands are restricted to EWRAM, IWRAM and loaded ROM; MMIO and
+SRAM bus access is rejected, and HOME screenshots are omitted. The pinned
+0.10.5 `rawRead8` uses `GBAView8`;
 its RAM and in-bounds ROM paths read memory with no timer or I/O register access.
 
 The local reference build uses mGBA 0.10.5 at commit
@@ -30,6 +31,20 @@ build's link dependencies instead. Record the source commit, configure cache,
 compiler, library hash, runner hash, ROM and ELF hashes, and trace hash when
 using the measurements as evidence. Private source assets and ROMs remain
 outside version control.
+
+For fresh-process SRAM qualification, the transport's `start()` also accepts
+keyword paths `save_input` and `save_output`. An input must be an existing
+32,768-byte SRAM image. The backend loads it through mGBA's read-only temporary
+save-file interface before reset. It is not an emulator state or a way to write
+live actors. The output must be a new file; `HeadlessReplay.export_sram()`
+clones the current SRAM through mGBA without advancing the guest. An existing
+output is never overwritten. The underlying optional backend arguments are
+`--save-input PATH` and `--save-output PATH`, and the export command is `s`.
+With neither argument, the previous protocol and scheduler allowlist remain
+unchanged. These options are transport APIs for qualification harnesses, not
+options of the skirmish trace CLI above. Check the engine's record tag, payload
+length, checksum and embedded version, and compare actual loaded gameplay;
+exporting a file alone does not qualify save/load.
 
 For a completed host trace, use `tools/sc64_skirmish_controller_replay.py`
 with `--trace`, `--rom`, `--elf`, `--output`, `--headless-runner` and

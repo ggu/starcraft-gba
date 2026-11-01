@@ -14,7 +14,7 @@ static void reset_world(void)
     game_init();
     memset(u, 0, sizeof(u));
     memset(b, 0, sizeof(b));
-    memset(tracers, 0, sizeof(tracers));
+    clear_tracers(); /* Also clears deferred impacts between fixture cases. */
     memset(visible, 0xff, sizeof(visible));
     memset(explored, 0xff, sizeof(explored));
     camx = camy = 0;
@@ -153,6 +153,17 @@ static int sprite_frame_equal(const Sc64SpriteFrame *a, const Sc64SpriteFrame *b
         memcmp(a->pixels, b->pixels, (size_t)a->w * a->h) == 0);
 }
 
+/* Canonical profiles may deliver weapon damage through the impact queue. */
+static void wait_for_native_impact(int target, int before)
+{
+#ifdef SC64_IMPACT_EVENTS
+    for (int tick = 0; tick < 256 && u[target].hp == before; ++tick)
+        race_impact_tick();
+#else
+    (void)target; (void)before;
+#endif
+}
+
 static void test_scout_air_combat(void)
 {
     reset_world();
@@ -160,7 +171,8 @@ static void test_scout_air_combat(void)
     int target = make_unit(ENEMY, U_MUTALISK, 43, 124, 100);
     int before = u[target].hp;
     tick_combat(&u[scout], target);
-    assert(u[target].hp < before); /* Native damage remains immediate. */
+    wait_for_native_impact(target, before);
+    assert(u[target].hp < before);
     assert(live_tracers() == 2);
     unsigned found = 0;
     for (int i = 0; i < MAX_TRACERS; ++i) {
@@ -200,6 +212,7 @@ static void test_zealot_pose_lifecycle(void)
     int target = make_unit(ENEMY, U_ZERGLING, 37, 106, 100);
     int before = u[target].hp;
     tick_combat(&u[zealot], target);
+    wait_for_native_impact(target, before);
     assert(u[target].hp < before);
     assert(u[zealot].cd > 0);
     update_tracers();
@@ -231,6 +244,7 @@ static void test_photon_cannon_defense_emission(void)
     int before = u[target].hp;
     b[cannon].queue_progress = 0;
     race_tick_defenses();
+    wait_for_native_impact(target, before);
     assert(u[target].hp < before);
     unsigned tagged = 0;
     for (int i = 0; i < MAX_TRACERS; ++i) {
@@ -250,6 +264,7 @@ static void test_archon_splash_emission(void)
     int target = make_unit(ENEMY, U_ZEALOT, 65, 116, 100);
     int before = u[target].hp;
     tick_combat(&u[archon], target);
+    wait_for_native_impact(target, before);
     assert(u[target].hp < before);
     assert(live_tracers() > 0);
     Sc64WeaponSourceVfxKey key;
@@ -270,6 +285,7 @@ static void test_special_event_source_vfx(void)
     assert(sc64_stock_attack_select(13, 0, &mine_attack));
     assert(mine_attack.weapon_id == 6); /* Stock Spider Mine suicide weapon. */
     sc64_t5_mine_explode(&u[mine]);
+    wait_for_native_impact(victim, hp);
     assert(!u[mine].alive && u[victim].hp < hp);
     assert(has_source_tracer(13, mine_attack.weapon_id, (unsigned)mine + 1u));
 #endif

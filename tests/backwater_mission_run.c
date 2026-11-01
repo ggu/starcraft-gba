@@ -67,15 +67,9 @@ static void move_cursor_near(int x, int y)
 
 static void move_cursor_exact(int x, int y)
 {
-    int guard=0;
+    /* Building selection is hit-tested; no exact cursor parity is needed. */
     movement_base &= (u16)~KEY_R;
-    while ((cx!=x || cy!=y) && guard++<1500) {
-        int dx=x-cx, dy=y-cy;
-        u16 h=movement_base;
-        if(dx>0)h|=KEY_RIGHT; else if(dx<0)h|=KEY_LEFT;
-        if(dy>0)h|=KEY_DOWN; else if(dy<0)h|=KEY_UP;
-        input_frame(h);
-    }
+    move_cursor_near(x,y);
 }
 
 static int count_units(int owner, int type)
@@ -183,16 +177,11 @@ static int select_worker(void)
     return find_selected_worker()>=0;
 }
 
+#include "sc64_visible_worker_orders.h"
+
 static int begin_mining(void)
 {
-    int worker,patch;
-    if(!select_worker())return 0;
-    worker=find_selected_worker();
-    patch=nearest_patch(u[worker].x,u[worker].y);
-    if(patch<0)return 0;
-    move_cursor_near(m[patch].x,m[patch].y);
-    press_key(KEY_A);
-    return 1;
+    return order_idle_workers_to_visible_minerals() > 0;
 }
 
 static int wait_for_minerals(int target,int limit)
@@ -303,6 +292,9 @@ int main(int argc,char **argv)
     if(!location_center(SC64_BW_LOC_SCV_BUNKER,&x,&y))return 13;
     if(!rescue_at(x,y,18000))return 14;
     if(count_units(SIDE,U_SCV)<3)return 14;
+    /* Move rescued idle SCVs into visible mineral work by ordinary input. */
+    if(!order_idle_workers_to_visible_minerals())
+        fprintf(stderr,"Backwater: no rescued idle worker accepted a visible mineral order\n");
 
     if(!wait_for_minerals(300,50000))fprintf(stderr,"economy short: %d minerals at frame %d\n",minerals,frame);
     for(i=0;i<MAX_BUILDINGS;i++) if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_BARRACKS) {

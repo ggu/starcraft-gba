@@ -166,7 +166,7 @@ static int race_p7_carrier_training_slots_available(unsigned wanted)
         for (int q = 0; q < b[i].queue_count; ++q) {
             int type = b[i].queue[(b[i].queue_head + q) % 5];
             if (type < 0 || type >= SC_RU_COUNT) return 0;
-            commitments += type == U_ZERGLING ? 2u : 1u;
+            commitments += (unsigned)sc64_race_product_count(type);
         }
     }
     for (int i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;

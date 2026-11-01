@@ -101,6 +101,10 @@ static void check_townhall(int type)
 static void check_incomplete_townhall(int type)
 {
     fixture(type, 1);
+    /* These are unfinished imported campaign records. Custom-game Lair/Hive
+       upgrades now retain the existing hall's creep, supply and larva clock;
+       their paid in-place lifecycle is covered in sc64_skirmish_runtime.c. */
+    race_mode = 0;
     assert(!race_owner_has_prereq(SIDE, SC_PR_HATCHERY));
     assert(!race_site_creep(SIDE, b[0].x + 100, b[0].y));
     assert(!race_queue_unit(SIDE, 0, U_DRONE));

@@ -2,11 +2,15 @@
  * Port-free mGBA 0.10.5 backend for the controller replay tools.
  * Build against the matching private libmgba.a with USE_DEBUGGERS enabled.
  * The line protocol exposes only reads, writes, hardware breakpoints, continue
- * and the 64-bit emulated cycle clock. It never modifies the ROM file. */
+ * and the 64-bit emulated cycle clock. Optional SRAM files are imported only
+ * before boot and exported only to an explicitly configured new output file.
+ * It never modifies the ROM file or accepts SRAM bus-write commands. */
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
 #include <mgba/core/timing.h>
 #include <mgba/debugger/debugger.h>
+#include <mgba-util/vfs.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -49,8 +53,26 @@ static int in_readable_memory(uint32_t address, uint32_t length, size_t rom_size
                       (address >= 0x08000000 && address < 0x0a000000 && length <= 0x0a000000 - address &&
                        (uint64_t)(address - 0x08000000) + length <= rom_size));
 }
+static int export_sram(struct mCore *core, const char *path) {
+    void *data = NULL;
+    size_t size = core->savedataClone(core, &data);
+    /* These games use two 16-KiB SRAM records, not emulator save states. */
+    if (!path || size != 32768 || !data) { free(data); return 0; }
+    FILE *file = fopen(path, "wbx");
+    if (!file) { free(data); return 0; }
+    int ok = fwrite(data, 1, size, file) == size;
+    if (fclose(file)) ok = 0;
+    free(data);
+    return ok;
+}
 int main(int argc, char **argv) {
-    if (argc != 12) return 2;
+    if (argc < 12 || (argc - 12) % 2) return 2;
+    const char *save_input = NULL, *save_output = NULL;
+    for (int i = 12; i < argc; i += 2) {
+        if (!strcmp(argv[i], "--save-input") && !save_input) save_input = argv[i+1];
+        else if (!strcmp(argv[i], "--save-output") && !save_output) save_output = argv[i+1];
+        else return 2;
+    }
     struct { uint32_t start, size; } allowed[5];
     for (unsigned i=0; i<5; ++i) {
         const char *a=argv[2+i*2], *b=argv[3+i*2]; uint32_t start, size;
@@ -67,7 +89,14 @@ int main(int argc, char **argv) {
     mCoreInitConfig(core, "sc64-headless");
     core->setVideoBuffer(core, pixels, 256);
     if (!mCoreLoadFile(core, argv[1])) return 4;
-    mCoreLoadConfig(core); core->reset(core);
+    mCoreLoadConfig(core);
+    if (save_input) {
+        struct VFile *file = VFileOpen(save_input, O_RDONLY);
+        if (!file) return 5;
+        if (file->size(file) != 32768) { file->close(file); return 5; }
+        if (!core->loadTemporarySave(core, file)) { file->close(file); return 5; }
+    }
+    core->reset(core);
     struct mDebugger debugger = {0};
     debugger.type = DEBUGGER_CUSTOM; debugger.entered = entered;
     mDebuggerAttach(&debugger, core);
@@ -120,6 +149,9 @@ int main(int argc, char **argv) {
             if (stopped == 1) printf("STOP %08x\n", stop_address);
             else puts("ERR execution");
         } else if (!strcmp(line, "t")) printf("%" PRIu64 "\n", mTimingGlobalTime(core->timing));
+        else if (!strcmp(line, "s") && save_output) {
+            puts(export_sram(core, save_output) ? "OK 32768" : "ERR save");
+        }
         else if (!strcmp(line, "q")) break;
         else puts("ERR command");
         fflush(stdout);

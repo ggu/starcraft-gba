@@ -385,6 +385,8 @@ static void test_ling_second_birth_failure_is_not_retried(void)
 static void test_scourge_pair_birth(void)
 {
     reset_world();
+    /* Shared Scourge production requires the completed source Spire. */
+    assert(spawn_build(SIDE, B_SPIRE, 352, 160, 0) >= 0);
     assert(sc64_z7_egg_product_count(U_SCOURGE) == 2);
     assert(race_queue_unit(SIDE, hatchery, U_SCOURGE));
     int egg = find_egg(U_SCOURGE);
@@ -438,6 +440,12 @@ static void test_actor_facts_and_target_priority(void)
     u[enemy_egg].maxhp = u[enemy_egg].hp = 200;
     u[enemy_egg].armor = 10;
     target_lists_valid = 0;
+    /* This synthetic setup does not run the sight refresh. Verify fog first,
+     * then reveal both actual candidate cells for the priority comparison. */
+    memset(visible, 0, sizeof(visible));
+    assert(nearest_enemy_typed(old_x, old_y, SIDE, 96, U_MARINE) == -1);
+    SC64_GRID_SET(visible, u[enemy_egg].x / 16 + (u[enemy_egg].y / 16) * MAP_COLS, 1);
+    SC64_GRID_SET(visible, u[adult].x / 16 + (u[adult].y / 16) * MAP_COLS, 1);
     assert(nearest_enemy_typed(old_x, old_y, SIDE, 96, U_MARINE) == adult);
     int adult_hp = u[adult].hp;
     tick_combat(&u[enemy_egg], adult);

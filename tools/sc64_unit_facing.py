@@ -204,7 +204,7 @@ def generate(rom: Path, remap_path: Path, out: Path) -> dict:
     lines += ['    default: return 0;', '    }', '}', '#endif /* SC64_UNIT_WORD_SPRITES */', '#endif', '']
     out.mkdir(parents=True, exist_ok=True)
     (out / 'sc64_unit_facing_generated.h').write_text('\n'.join(lines))
-    summary = {'rom_sha1': sha1, 'units': len(cases), 'pixel_bytes': total,
+    summary = {'rom_sha1': sha1, 'header_sha256': hashlib.sha256((out / 'sc64_unit_facing_generated.h').read_bytes()).hexdigest(), 'units': len(cases), 'pixel_bytes': total,
                'direction_metadata': 'images.dat has_directional_frames',
                'entries': manifest}
     (out / 'manifest.json').write_text(json.dumps(summary, indent=2) + '\n')
