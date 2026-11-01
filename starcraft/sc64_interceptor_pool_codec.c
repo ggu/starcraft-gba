@@ -503,6 +503,22 @@ packet_preflight(const uint8_t *in, size_t n,
     return 1;
 }
 
+/* All pre-write decoder checks, shared with the caller's candidate preflight. */
+static int
+target_preflight(const Sc64Arena *a, const uint8_t *in, size_t n,
+                 uint8_t next_ids[SC64_POOL_CAPACITY], uint8_t heads[3])
+{
+    return arena_ok(a) && in && n==SC64_CODEC_BYTES &&
+        !packet_overlaps_arena(a,in,n) && packet_preflight(in,n,next_ids,heads);
+}
+
+int
+sc64_codec_validate_target(const Sc64Arena *a, const uint8_t *in, size_t n)
+{
+    uint8_t next_ids[SC64_POOL_CAPACITY], heads[3];
+    return target_preflight(a,in,n,next_ids,heads);
+}
+
 int
 sc64_codec_validate(const uint8_t *in, size_t n)
 {
@@ -537,9 +553,7 @@ int
 sc64_codec_decode(Sc64Arena * a, const uint8_t * in, size_t n)
 {
     uint8_t next_ids[SC64_POOL_CAPACITY], heads[3];
-    if (!arena_ok(a) || !in || n!=SC64_CODEC_BYTES ||
-        packet_overlaps_arena(a,in,n) ||
-        !packet_preflight(in,n,next_ids,heads)) return 0;
+    if (!target_preflight(a,in,n,next_ids,heads)) return 0;
     uint8_t active_head=heads[0], free_head=heads[1], count=heads[2];
     size_t pos;
 

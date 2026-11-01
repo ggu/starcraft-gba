@@ -165,6 +165,31 @@ static void test_save_preflight_and_atomic_rejection(void)
     }
 }
 
+static void test_candidate_rejects_bad_projectile_target(void)
+{
+    static Unit before_u[MAX_UNITS];
+    static Building before_b[MAX_BUILDINGS];
+    static u16 before_pool[SC64_ARENA_WORDS];
+    RaceLoadPlan plan={0};
+    launch_p7();assert(race_save_game());
+    assert(sc64_codec_validate(race_data.interceptor_projectiles,SC64_CODEC_BYTES));
+    assert(race_load_preflight(&plan));
+    memcpy(before_u,u,sizeof(u));memcpy(before_b,b,sizeof(b));
+    memcpy(before_pool,race_p7_projectile_host_words,sizeof(before_pool));
+    Sc64P7PersistentState before_p7=race_p7;
+    int before_frame=frame,before_minerals=minerals,before_gas=gas;
+    size_t old_count=race_p7_projectiles.word_count;
+    race_p7_projectiles.word_count=SC64_ARENA_WORDS-1;
+    assert(sc64_codec_validate(race_data.interceptor_projectiles,SC64_CODEC_BYTES));
+    assert(!race_load_preflight(&plan));
+    assert(!memcmp(before_u,u,sizeof(u)) && !memcmp(before_b,b,sizeof(b)));
+    assert(!memcmp(before_pool,race_p7_projectile_host_words,sizeof(before_pool)));
+    assert(!memcmp(&before_p7,&race_p7,sizeof(before_p7)));
+    assert(frame==before_frame && minerals==before_minerals && gas==before_gas);
+    race_p7_projectiles.word_count=old_count;
+    assert(race_load_preflight(&plan));
+}
+
 static void test_pause_and_profile_matrix(void)
 {
     int shooter,target;
@@ -198,6 +223,7 @@ int main(void)
     test_delayed_impact_and_save();
     test_dead_slots_are_not_new_targets();
     test_save_preflight_and_atomic_rejection();
+    test_candidate_rejects_bad_projectile_target();
     test_pause_and_profile_matrix();
     puts("PASS P7 delayed impact/save, unit/building reuse, dead shooter, atomic rejection, pause and 18 skirmish setups");
     return 0;
