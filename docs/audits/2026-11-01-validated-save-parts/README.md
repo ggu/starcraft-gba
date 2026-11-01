@@ -9,12 +9,18 @@ payload buffer:
 - `save_write_parts_selected` rechecks the selected predecessor's tag,
   length, sequence and checksum, protects unrelated valid alternate records,
   and writes the opposite slot with the next nonzero sequence.
-- `save_write_parts_first` refuses to overwrite any checksummed record in
-  either slot, including another namespace.
+- `save_write_parts_first` refuses to overwrite any committed checksummed
+  record in either slot, including another namespace.
 
-The destination tag is cleared before metadata/payload stores and committed
-last. Both spans contribute to the same checksum and payload length. Existing
-contiguous writers and normal Transport1 paths are unchanged. Existing
+The HP protocol requires a nonzero high tag byte as a one-byte commit marker.
+That byte is cleared first, before the remaining tag/metadata/payload stores,
+and restored last after the three low tag bytes. Zero-high-byte partial tags
+are uncommitted and retryable, even when their payload checksum is valid.
+They are not supported foreign namespaces; allowed tag lists reject them.
+Both spans contribute to the same FNV-1a checksum and payload length. Existing
+HP-off contiguous writers and normal Transport1 paths are unchanged. The HP
+contiguous selected/fresh writers use the same bytewise marker protocol.
+Existing
 semantic-selection APIs become available under `SC64_SHARED_HP_REGEN` as
 well as the Scarab stage; only the HP gate adds the split selected/fresh
 writers. No product gate is enabled and no save namespace is assigned here.
@@ -25,8 +31,12 @@ The source-only host fixture compares complete SRAM output against the
 existing contiguous APIs at multiple splits, both slot orders, wrap and the
 maximum payload. It includes rejected/stale tokens, invalid lengths and
 pointers, duplicate/zero/unknown tags, semantic rejection of newer records,
-preserved predecessors and a tag-last interruption model around the span
-boundary. The existing selection fixture is also compiled under the HP gate.
+preserved predecessors, every byte of tag invalidation/commit and interrupted
+payload stores around the span boundary, including successful retry from
+checksum-valid partial tags. A host-only observer also checks the actual
+writers at each tag-byte store, including the contiguous HP writers; the
+default ARM stores have no observer. The existing selection fixture is also
+compiled under the HP gate.
 These tests are unrun; native qualification must wait for the active physical
 replay. No hardware power-loss or game-level save/load qualification is
 claimed.

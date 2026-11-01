@@ -1211,13 +1211,40 @@ int save_read_latest(void *data,u32 capacity,u32 tag,u32 *len) {
     return 1;
 }
 #if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN)
+#ifdef SC64_SHARED_HP_REGEN
+/* SRAM tag stores are bytewise. A nonzero high byte commits this namespace;
+ * clear it before changing any other byte and restore it only after the
+ * complete record. Partial tags remain retryable, not unrelated records. */
+#define SAVE_VALIDATED_TAG_VALID(tag) (((tag)&0xff000000u)!=0)
+#if defined(GBA_HOST) && defined(GBA_SAVE_TAG_STORE_TEST)
+#define SAVE_VALIDATED_TAG_BYTE(p,i,value) GBA_SAVE_TAG_STORE_TEST(p,i,(u8)(value))
+#else
+#define SAVE_VALIDATED_TAG_BYTE(p,i,value) ((p)[i]=(u8)(value))
+#endif
+static void save_validated_invalidate(volatile u8 *p) {
+    SAVE_VALIDATED_TAG_BYTE(p,3,0); SAVE_VALIDATED_TAG_BYTE(p,0,0);
+    SAVE_VALIDATED_TAG_BYTE(p,1,0); SAVE_VALIDATED_TAG_BYTE(p,2,0);
+}
+static void save_validated_commit_tag(volatile u8 *p,u32 tag) {
+    SAVE_VALIDATED_TAG_BYTE(p,0,tag); SAVE_VALIDATED_TAG_BYTE(p,1,tag>>8);
+    SAVE_VALIDATED_TAG_BYTE(p,2,tag>>16); SAVE_VALIDATED_TAG_BYTE(p,3,tag>>24);
+}
+#define SAVE_VALIDATED_INVALIDATE(p) save_validated_invalidate(p)
+#define SAVE_VALIDATED_COMMIT_TAG(p,tag) save_validated_commit_tag(p,tag)
+#else
+#define SAVE_VALIDATED_TAG_VALID(tag) ((tag)!=0)
+#define SAVE_VALIDATED_INVALIDATE(p) sram_put32(p,0)
+#define SAVE_VALIDATED_COMMIT_TAG(p,tag) sram_put32(p,tag)
+#endif
+#define SAVE_VALIDATED_IS_COMMITTED(p,tag) \
+    (SAVE_VALIDATED_TAG_VALID(tag)&&valid_record(p,0,tag))
 int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection) {
     volatile const u8 *base=(volatile const u8*)SRAM_BASE;
     GbaSaveSelection best={0,0,0,0,-1};
     if(!scratch||!capacity||!tags||!tag_count||tag_count>3||!validate||!selection)return 0;
     for(unsigned i=0;i<tag_count;i++) {
-        if(!tags[i])return 0;
+        if(!SAVE_VALIDATED_TAG_VALID(tags[i]))return 0;
         for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
     }
     for(int slot=0;slot<2;slot++) {
@@ -1253,10 +1280,10 @@ int save_write_selected(const void *data,u32 len,u32 tag,const GbaSaveSelection 
                         const u32 *tags,unsigned tag_count) {
     volatile u8 *base=(volatile u8*)SRAM_BASE;
     int new_allowed=0,old_allowed=0;
-    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag||!previous||!tags||!tag_count||tag_count>3||
+    if(!data||!len||len>SAVE_PAYLOAD_MAX||!SAVE_VALIDATED_TAG_VALID(tag)||!previous||!tags||!tag_count||tag_count>3||
        previous->slot<0||previous->slot>1||!previous->tag||!previous->length||!previous->sequence)return 0;
     for(unsigned i=0;i<tag_count;i++) {
-        if(!tags[i])return 0;
+        if(!SAVE_VALIDATED_TAG_VALID(tags[i]))return 0;
         for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
         if(tags[i]==tag)new_allowed=1;
         if(tags[i]==previous->tag)old_allowed=1;
@@ -1268,24 +1295,24 @@ int save_write_selected(const void *data,u32 len,u32 tag,const GbaSaveSelection 
     volatile u8 *p=base+(unsigned)(1-previous->slot)*SAVE_SLOT_SIZE;
     u32 other=sram_get32(p);int other_allowed=0;
     for(unsigned i=0;i<tag_count;i++)if(tags[i]==other)other_allowed=1;
-    if(other && !other_allowed && valid_record(p,0,other))return 0;
+    if(!other_allowed && SAVE_VALIDATED_IS_COMMITTED(p,other))return 0;
     u32 sequence=previous->sequence+1;if(!sequence)sequence=1;
     const u8 *src=data;
-    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));sram_put32(p+12,sequence);
+    SAVE_VALIDATED_INVALIDATE(p);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));sram_put32(p+12,sequence);
     for(u32 i=0;i<len;i++)p[16+i]=src[i];
-    sram_put32(p,tag);return 1;
+    SAVE_VALIDATED_COMMIT_TAG(p,tag);return 1;
 }
 int save_write_first(const void *data,u32 len,u32 tag) {
     volatile u8 *base=(volatile u8*)SRAM_BASE;
-    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag)return 0;
+    if(!data||!len||len>SAVE_PAYLOAD_MAX||!SAVE_VALIDATED_TAG_VALID(tag))return 0;
     for(unsigned slot=0;slot<2;slot++) {
         volatile const u8 *p=base+slot*SAVE_SLOT_SIZE;u32 existing=sram_get32(p);
-        if(existing && valid_record(p,0,existing))return 0;
+        if(SAVE_VALIDATED_IS_COMMITTED(p,existing))return 0;
     }
     const u8 *src=data;volatile u8 *p=base;
-    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));sram_put32(p+12,1);
+    SAVE_VALIDATED_INVALIDATE(p);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));sram_put32(p+12,1);
     for(u32 i=0;i<len;i++)p[16+i]=src[i];
-    sram_put32(p,tag);return 1;
+    SAVE_VALIDATED_COMMIT_TAG(p,tag);return 1;
 }
 #ifdef SC64_SHARED_HP_REGEN
 static u32 save_parts_checksum(const u8 *a,u32 len,const u8 *b,u32 tail_len) {
@@ -1297,11 +1324,11 @@ static u32 save_parts_checksum(const u8 *a,u32 len,const u8 *b,u32 tail_len) {
 static void save_parts_commit(volatile u8 *p,const u8 *a,u32 len,
                                const u8 *b,u32 tail_len,u32 tag,u32 sequence) {
     u32 checksum=save_parts_checksum(a,len,b,tail_len);
-    sram_put32(p,0);sram_put32(p+4,len+tail_len);
+    SAVE_VALIDATED_INVALIDATE(p);sram_put32(p+4,len+tail_len);
     sram_put32(p+8,checksum);sram_put32(p+12,sequence);
     for(u32 i=0;i<len;i++)p[16+i]=a[i];
     for(u32 i=0;i<tail_len;i++)p[16+len+i]=b[i];
-    sram_put32(p,tag);
+    SAVE_VALIDATED_COMMIT_TAG(p,tag);
 }
 int save_write_parts_selected(const void *data,u32 len,const void *tail,u32 tail_len,
                               u32 tag,const GbaSaveSelection *previous,
@@ -1309,10 +1336,10 @@ int save_write_parts_selected(const void *data,u32 len,const void *tail,u32 tail
     volatile u8 *base=(volatile u8*)SRAM_BASE;
     int new_allowed=0,old_allowed=0;
     if(!data||!tail||!len||!tail_len||len>SAVE_PAYLOAD_MAX||tail_len>SAVE_PAYLOAD_MAX-len||
-       !tag||!previous||!tags||!tag_count||tag_count>3||previous->slot<0||previous->slot>1||
+       !SAVE_VALIDATED_TAG_VALID(tag)||!previous||!tags||!tag_count||tag_count>3||previous->slot<0||previous->slot>1||
        !previous->tag||!previous->length||!previous->sequence)return 0;
     for(unsigned i=0;i<tag_count;i++) {
-        if(!tags[i])return 0;
+        if(!SAVE_VALIDATED_TAG_VALID(tags[i]))return 0;
         for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
         if(tags[i]==tag)new_allowed=1;
         if(tags[i]==previous->tag)old_allowed=1;
@@ -1324,22 +1351,27 @@ int save_write_parts_selected(const void *data,u32 len,const void *tail,u32 tail
     volatile u8 *p=base+(unsigned)(1-previous->slot)*SAVE_SLOT_SIZE;
     u32 other=sram_get32(p);int other_allowed=0;
     for(unsigned i=0;i<tag_count;i++)if(tags[i]==other)other_allowed=1;
-    if(other&&!other_allowed&&valid_record(p,0,other))return 0;
+    if(!other_allowed&&SAVE_VALIDATED_IS_COMMITTED(p,other))return 0;
     u32 sequence=previous->sequence+1;if(!sequence)sequence=1;
     save_parts_commit(p,data,len,tail,tail_len,tag,sequence);
     return 1;
 }
 int save_write_parts_first(const void *data,u32 len,const void *tail,u32 tail_len,u32 tag) {
     volatile u8 *base=(volatile u8*)SRAM_BASE;
-    if(!data||!tail||!len||!tail_len||len>SAVE_PAYLOAD_MAX||tail_len>SAVE_PAYLOAD_MAX-len||!tag)return 0;
+    if(!data||!tail||!len||!tail_len||len>SAVE_PAYLOAD_MAX||tail_len>SAVE_PAYLOAD_MAX-len||!SAVE_VALIDATED_TAG_VALID(tag))return 0;
     for(unsigned slot=0;slot<2;slot++) {
         volatile const u8 *p=base+slot*SAVE_SLOT_SIZE;u32 existing=sram_get32(p);
-        if(existing&&valid_record(p,0,existing))return 0;
+        if(SAVE_VALIDATED_IS_COMMITTED(p,existing))return 0;
     }
     save_parts_commit(base,data,len,tail,tail_len,tag,1);
     return 1;
 }
 #endif
+#undef SAVE_VALIDATED_TAG_VALID
+#undef SAVE_VALIDATED_INVALIDATE
+#undef SAVE_VALIDATED_COMMIT_TAG
+#undef SAVE_VALIDATED_IS_COMMITTED
+#undef SAVE_VALIDATED_TAG_BYTE
 #endif
 #ifdef GBA_HOST
 void save_test_corrupt_latest(u32 len,u32 tag) {
