@@ -5,6 +5,10 @@
 #error "SC64_COLLISION_CLASS_CACHE requires the per-frame legacy bucket lifecycle"
 #endif
 
+#if defined(SC64_CONTACT_GROUP_INDEX) && defined(SC64_LATE_TERRAN_STORAGE)
+#error "contact grouping is not supported by persistent collision buckets"
+#endif
+
 /* Persistent reconciliation saves a full per-frame rebuild for the largest
  * late Terran roster. Other profiles keep the proven original lifecycle. */
 #ifdef SC64_LATE_TERRAN_STORAGE

@@ -27,6 +27,14 @@
 #error "SC64_CONTACT_CACHE supersedes the collision class cache and steering list"
 #endif
 
+/* Persistent and other flat bucket implementations do not define the
+ * legacy grouped traversal adapter. */
+#ifndef SC64_UNIT_BUCKET_FOR_EACH
+#define SC64_UNIT_BUCKET_FOR_EACH(cell, slot) \
+    for ((slot) = sc64_unit_bucket_head[(cell)]; (slot) != 0xff; \
+         (slot) = sc64_unit_bucket_next[slot])
+#endif
+
 #define SC64_CONTACT_RADIUS_MASK 0x1fu
 #define SC64_CONTACT_IGNORE 0x1fu /* chrysalis or non-collidable candidate */
 #define SC64_CONTACT_BURROWABLE 0x20u
@@ -221,8 +229,7 @@ sc64_contact_step_clear(const Unit *q, int nx, int ny, int strict)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
-                 i = sc64_unit_bucket_next[i]) {
+            SC64_UNIT_BUCKET_FOR_EACH(col + row * MAP_COLS, i) {
                 const Unit *c = &u[i];
                 u8 cc;
                 int radius, dx, dy, ox, oy;
@@ -546,6 +553,98 @@ sc64_contact_blocked_mask_memo(const Unit *q, int speed)
 }
 #endif
 
+#ifdef SC64_CONTACT_GROUP_INDEX
+static unsigned __attribute__((noinline))
+sc64_contact_group_blocked_mask(const Unit *q, int speed, unsigned mask,
+                                int mover_radius, int mover_flying)
+{
+    int mover_slot = (int)(q - u), minx, maxx, miny, maxy, row, col;
+    int reach = SC64_CONTACT_REACH(mover_flying) + speed;
+#ifndef SC64_CONTACT_MASK_TABLE
+    unsigned pending;
+    int k;
+#endif
+    minx = (q->x - reach) >> 4; maxx = (q->x + reach) >> 4;
+    miny = (q->y - reach) >> 4; maxy = (q->y + reach) >> 4;
+    if (minx < 0) minx = 0;
+    if (miny < 0) miny = 0;
+    if (maxx >= MAP_COLS) maxx = MAP_COLS - 1;
+    if (maxy >= MAP_ROWS) maxy = MAP_ROWS - 1;
+    for (row = miny; row <= maxy; ++row)
+        for (col = minx; col <= maxx; ++col) {
+            int rep;
+            for (rep = sc64_unit_bucket_head[col + row * MAP_COLS]; rep != 0xff;
+                 rep = sc64_unit_bucket_group_next[rep]) {
+                int i, candidate = -1;
+                int uniform = 1;
+                const Unit *c;
+                u8 cc;
+                int radius, ox, oy, limit_axis;
+#ifndef SC64_CONTACT_MASK_TABLE
+                int od2;
+#endif
+                /* Some mission callbacks move actors after this index was
+                 * built without rekeying it. Collapse only if current keys
+                 * still match; otherwise preserve the baseline member scan. */
+                for (i = rep; i != 0xff; i = sc64_unit_bucket_next[i]) {
+                    c = &u[i];
+                    if (c->type != u[rep].type || c->x != u[rep].x ||
+                        c->y != u[rep].y)
+                        uniform = 0;
+                    if (i == mover_slot || !c->alive || SC64_TRANSPORT_LOADED(c) || SC64_SCARAB_NONCOLLIDING(c))
+                        continue;
+                    if (candidate < 0) candidate = i;
+                }
+                if (candidate < 0) continue;
+                /* A reference fallback can depend on individual slot state. */
+                if (!(sc64_contact_class_for(u[candidate].type) & SC64_CONTACT_VALID))
+                    uniform = 0;
+                for (i = uniform ? candidate : rep; i != 0xff;
+                     i = uniform ? 0xff : sc64_unit_bucket_next[i]) {
+                    c = &u[i];
+                    if (i == mover_slot || !c->alive || SC64_TRANSPORT_LOADED(c) || SC64_SCARAB_NONCOLLIDING(c))
+                        continue;
+                    cc = sc64_contact_class_for(c->type);
+                    if (!(cc & SC64_CONTACT_VALID)) {
+                        mask = sc64_contact_mask_reference(q, i, speed, mask,
+                                                           mover_radius, mover_flying);
+                        continue;
+                    }
+                    radius = (int)(cc & SC64_CONTACT_RADIUS_MASK);
+                    if (radius == (int)SC64_CONTACT_IGNORE) continue;
+                    if (((cc & SC64_CONTACT_FLYING) != 0) != mover_flying) continue;
+                    if (radius < mover_radius) radius = mover_radius;
+                    ox = c->x - q->x; oy = c->y - q->y;
+                    if (speed != 0 && ox == 0 && oy == 0) continue;
+                    limit_axis = radius + speed;
+                    if (ox <= -limit_axis || ox >= limit_axis ||
+                        oy <= -limit_axis || oy >= limit_axis) continue;
+#ifdef SC64_CONTACT_MASK_TABLE
+                    mask = sc64_contact_mask_apply_geometry(mask, radius, speed, ox, oy);
+#else
+                    od2 = ox * ox + oy * oy;
+                    pending = ~mask & 0xffu;
+                    for (k = 0; pending; ++k, pending >>= 1) {
+                        int dx, dy, d2;
+                        if (!(pending & 1u)) continue;
+                        dx = ox - sc64_contact_dx[k] * speed;
+                        dy = oy - sc64_contact_dy[k] * speed;
+                        if (dx <= -radius || dx >= radius ||
+                            dy <= -radius || dy >= radius) continue;
+                        d2 = dx * dx + dy * dy;
+                        if (d2 < radius * radius && d2 <= od2)
+                            mask |= 1u << k;
+                    }
+#endif
+                    if (mask == 0xffu) return mask;
+                }
+            }
+        }
+    return mask;
+}
+#endif
+
+
 static unsigned
 #if defined(SC64_CONTACT_STEER_ROM)
 __attribute__((noinline))
@@ -555,14 +654,20 @@ GBA_HOT
 sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 {
     unsigned mask;
+    int mover_radius, mover_flying;
+#ifndef SC64_CONTACT_GROUP_INDEX
 #ifndef SC64_CONTACT_MASK_TABLE
     unsigned pending;
     int k;
 #endif
-    int mover_radius, mover_flying, mover_slot = (int)(q - u), p6;
+    int mover_slot = (int)(q - u), p6;
     int minx, maxx, miny, maxy, row, col, reach;
+#endif
     if (sc64_contact_mask_prepare(q, speed, &mask, &mover_radius, &mover_flying))
         return mask;
+#ifdef SC64_CONTACT_GROUP_INDEX
+    return sc64_contact_group_blocked_mask(q, speed, mask, mover_radius, mover_flying);
+#else
     p6 = sc64_contact_p6_active();
     reach = SC64_CONTACT_REACH(mover_flying) + speed;
     minx = (q->x - reach) >> 4; maxx = (q->x + reach) >> 4;
@@ -574,8 +679,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
-                 i = sc64_unit_bucket_next[i]) {
+            SC64_UNIT_BUCKET_FOR_EACH(col + row * MAP_COLS, i) {
                 const Unit *c = &u[i];
                 u8 cc;
                 int radius, ox, oy, limit_axis;
@@ -621,6 +725,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
             }
         }
     return mask;
+#endif
 }
 
 #ifdef SC64_CONTACT_MEMO_ENABLED
