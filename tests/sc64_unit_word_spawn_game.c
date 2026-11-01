@@ -46,10 +46,8 @@ static void check_unit_render(Unit *unit, int explicit_raw)
     draw_mission_sprite(sprite, x, y);
     int sprite_y = y - sprite->canvas_h / 2 + sprite->offset_y;
     if (unit->selected) {
-        int sprite_x = x - sprite->canvas_w / 2 + sprite->offset_x;
+        /* The selection ellipse is drawn by a separate pass before units. */
         int sprite_w = sprite->w, sprite_h = sprite->h;
-        gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4,
-                  C_HIGHLIGHT);
         draw_actor_vitals(x, sprite_y + sprite_h + 3, sprite_w + 4, unit->hp,
                           unit->maxhp, unit->shield,
                           sc64_actor_max_shields(unit->type, 0), 0, 0);
