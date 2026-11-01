@@ -97,12 +97,13 @@ defense or a mission win. The local log is
 `/tmp/sc64-z8-north-intercept-fced3c7-20261101.log`, SHA-256
 `d0773a8b17f8cf6d5e9d6d34004297b91a152e3ab57f566b03b9b9fac5f0c47e`.
 
-## Controller selection correction (unrun)
+## Controller selection correction
 
 Source inspection of the northern trial found a controller timing error:
-`select_one` spent up to 240 selection cycles trying to select a dead or
-enemy-owned slot. For the missing original Zerglings in slots 21 and 22,
-these attempts cannot succeed. The next trial rejects a non-live/non-human
+`select_one` could spend up to 240 selection cycles trying to select a dead or
+enemy-owned slot. Later northern observations showed enemy replacements in
+slots 21 and 22, but did not establish that they were unavailable when their
+opening orders ran. The corrected helper rejects a non-live/non-human
 actor before issuing input and aborts if its source identity or ownership
 changes during selection. It preserves ordinary L-button selection for valid
 actors. It cannot distinguish replacement by an identical source identity in
@@ -110,6 +111,36 @@ the same slot without a generation ID.
 
 This shortens previously futile UI sequences and can change all subsequent
 timing, economic and combat behavior; earlier results do not qualify it. The
-same northern and hero staging policy is retained to test this correction
+same northern and hero staging policy was retained to test this correction
 before choosing another retreat or offensive plan. It is a host controller
-fix only, and has not been compiled or run.
+fix only.
+
+The corrected source `f8b465b` compiled and ran under ASan/UBSan without a
+report, with source and pins unchanged. It rejected an unavailable traveler
+in slot 6 at 7899. That removed 480 futile selection updates, but the ordinary
+idle loop absorbed those updates before the next scheduled action. The named
+first interception, northern kill at 10643, original hero death at 12853 and
+T1 defeat at 12937 were unchanged. The regular-loop count rose from 8444 to
+8924, while total ordinary updates stayed 13083. This is not whole-world
+equivalence or a new mission win. The local log is
+`/tmp/sc64-z8-selection-guard-f8b465b-20261101.log`.
+
+## Early Nexus offensive trial (unrun)
+
+`tests/sc64_z8_nexus_push_probe.c` proposes an offensive continuation using
+the same ordinary controls. After the first southern raid, it sends Kerrigan
+to `(1904,1968)` rather than the previously unsafe retreat position. The
+static terrain grid has a cardinal path to that cell, but dynamic reachability
+and long-term safety are unverified. At frame 5500 it attack-moves surviving
+original northern heavy units and Zerglings toward the source-owner-2 Nexus
+at `(1712,1208)`. If that Nexus is destroyed, surviving actors receive ordinary
+attack orders toward the source-owner-1 Nexus at `(400,1704)`, accompanied by
+the surviving southern detector. The source liveness check is explicitly a
+host-world oracle; this is not a fair-play AI or a player scouting example.
+
+This changes several tactical and input-timing choices together. It may
+abandon a hive, expose the army or detector, or fail to acquire a valid path.
+No HP, damage, resource, source objective or AI permission is changed. An
+offensive order being accepted will not be treated as destruction or a win;
+the existing strict engine/source victory predicate and bound remain intact.
+This trial is uncompiled and unrun.

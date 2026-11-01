@@ -4,6 +4,13 @@
 #error "This trial requires canonical Z8 sight, spans and phase flags"
 #endif
 #include <stdio.h>
+#ifdef SC64_Z8_TRIAL_NEXUS_PUSH
+#define Z8_HERO_RETREAT_X 1904
+#define Z8_HERO_RETREAT_Y 1968
+#else
+#define Z8_HERO_RETREAT_X 1320
+#define Z8_HERO_RETREAT_Y 1680
+#endif
 static unsigned held,ticks;
 #ifdef SC64_Z8_TRIAL_NORTH_INTERCEPT
 #define Z8_NORTH_DETECT_X 1640
@@ -58,7 +65,7 @@ static void observe_transition(Observation before,Observation after){
  static int original_seen=0,original_gone=0;static const int ids[]={0,1,15,16,17};
 #ifdef SC64_Z8_TRIAL_HERO_RETREAT
  static int retreat_arrived;
- if(hero_retreat_issued&&!retreat_arrived&&after.match&&dist2(after.x,after.y,1320,1680)<=32*32){
+ if(hero_retreat_issued&&!retreat_arrived&&after.match&&dist2(after.x,after.y,Z8_HERO_RETREAT_X,Z8_HERO_RETREAT_Y)<=32*32){
   retreat_arrived=1;
   printf("HERO_RETREAT_ARRIVED frame%d hp%d xy%d,%d order%d\n",after.frame,after.hp,after.x,after.y,u[10].order);
  }
@@ -125,11 +132,50 @@ static int retreat_original_hero(void)
   printf("HERO_RETREAT_REJECT frame%d original_hero_missing=1\n",frame);
   return 0;
  }
- int ok=order(i,MENU_MOVE,1320,1680);
+ int ok=order(i,MENU_MOVE,Z8_HERO_RETREAT_X,Z8_HERO_RETREAT_Y);
  ok=ok&&u[i].alive&&u[i].owner==SIDE&&u[i].raw_owner==3&&u[i].raw_type==51;
  hero_retreat_issued=ok;
  printf("HERO_RETREAT_ISSUE start%d end%d accepted%d alive%d raw%d raw_owner%d hp%d xy%d,%d tx%d ty%d order%d\n",start,frame,ok,u[i].alive,u[i].raw_type,u[i].raw_owner,u[i].hp,u[i].x,u[i].y,u[i].tx,u[i].ty,u[i].order);
  return ok;
+}
+#endif
+#ifdef SC64_Z8_TRIAL_NEXUS_PUSH
+static int nexus_push_phase;
+static int source_nexus_alive(int owner)
+{
+ for(int i=0;i<MAX_BUILDINGS;i++)
+  if(b[i].alive&&b[i].raw_type==154&&b[i].raw_owner==owner)return 1;
+ return 0;
+}
+static void push_original_northern_army(int x,int y)
+{
+ static const int slots[]={7,8,11,13,17,18,19,20},raw[]={39,39,38,38,37,37,37,37};
+ for(unsigned k=0;k<sizeof(slots)/sizeof(slots[0])&&screen==SCREEN_PLAY&&!won&&!lost;k++){
+  int i=slots[k];
+  if(!u[i].alive||u[i].owner!=SIDE||u[i].raw_owner!=3||u[i].raw_type!=raw[k]){
+   printf("NEXUS_PUSH_SKIP frame%d slot%d expected_raw%d\n",frame,i,raw[k]);
+   continue;
+  }
+  int ok=order(i,MENU_ATTACK,x,y);
+  printf("NEXUS_PUSH_ORDER frame%d phase%d slot%d accepted%d raw%d hp%d xy%d,%d tx%d ty%d\n",frame,nexus_push_phase,i,ok,u[i].raw_type,u[i].hp,u[i].x,u[i].y,u[i].tx,u[i].ty);
+ }
+}
+static void nexus_push_tick(void)
+{
+ /* These are fixed authored-map waypoints and ordinary attack orders. The
+  * stage transition observes source Nexus liveness as a host-world oracle. */
+ if(!nexus_push_phase&&frame>=5500){
+  nexus_push_phase=1;
+  printf("NEXUS_PUSH_BEGIN frame%d east_alive%d west_alive%d\n",frame,source_nexus_alive(2),source_nexus_alive(1));
+  push_original_northern_army(1712,1208);
+ }
+ if(nexus_push_phase==1&&!source_nexus_alive(2)&&screen==SCREEN_PLAY&&!won&&!lost){
+  nexus_push_phase=2;
+  printf("NEXUS_PUSH_EAST_CLEARED frame%d west_alive%d\n",frame,source_nexus_alive(1));
+  if(u[48].alive&&u[48].owner==SIDE&&u[48].raw_owner==3&&u[48].raw_type==42)
+   (void)order(48,MENU_MOVE,500,1800);
+  push_original_northern_army(400,1704);
+ }
 }
 #endif
 static void dispatch_hero(void){
@@ -189,6 +235,9 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
  if(first_seen&&!first_clear&&(first_slot<0||!u[first_slot].alive||u[first_slot].raw_type!=74||u[first_slot].owner!=ENEMY)){first_clear=1;printf("FIRST_CLEARED frame%d slot%d\n",frame,first_slot);}
  if(first_seen&&!first_clear&&!lower_attempted&&visible_raid(first_slot)&&u[first_slot].y>=1660){lower_attempted=1;lower_visible_attack(first_slot);}
  if(!first_clear)continue;
+#ifdef SC64_Z8_TRIAL_NEXUS_PUSH
+ if(opening_started)nexus_push_tick();
+#endif
  if(!opening_started){opening_started=1;
 #ifdef SC64_Z8_TRIAL_HERO_RETREAT
  if(!retreat_original_hero())return 3;
