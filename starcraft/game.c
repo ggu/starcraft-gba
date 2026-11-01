@@ -305,7 +305,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_Z8_RUNTIME)
+#if defined(SC64_Z9_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 48u
+#elif defined(SC64_Z8_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 46u
 #elif defined(SC64_P8_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 44u
@@ -1235,6 +1237,9 @@ static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 #ifdef SC64_Z8_RUNTIME
 #include "sc64_z8_triggers.h"
 #endif
+#ifdef SC64_Z9_RUNTIME
+#include "sc64_zerg_late_triggers.h"
+#endif
 typedef union {
     u16 bfs_queue[MAP_CELLS];
     RaceSave save;
@@ -1245,6 +1250,10 @@ typedef union {
     /* A Z8 save candidate expands into this image before it is accepted. */
     struct { RaceSave save; Sc64Z8SchedulerState scheduler; } z8_candidate;
 #endif
+#ifdef SC64_Z9_RUNTIME
+    /* A Z9/Z10 save candidate expands into this image before it is accepted. */
+    struct { RaceSave save; Sc64ZlSchedulerState scheduler; } zl_candidate;
+#endif
 #ifdef SC64_IMPACT_EVENTS
     RaceImpactRecord impact_record;
 #endif
@@ -1252,6 +1261,10 @@ typedef union {
 #ifdef SC64_Z8_RUNTIME
 _Static_assert(sizeof(RaceSave)+sizeof(Sc64Z8SchedulerState)<=sizeof(u16)*MAP_CELLS,
                "Z8 candidate expansion must fit existing route scratch");
+#endif
+#ifdef SC64_Z9_RUNTIME
+_Static_assert(sizeof(RaceSave)+sizeof(Sc64ZlSchedulerState)<=sizeof(u16)*MAP_CELLS,
+               "Z9/Z10 candidate expansion must fit existing route scratch");
 #endif
 #ifdef SC64_IMPACT_EVENTS
 _Static_assert(sizeof(RaceImpactRecord) <= sizeof(u16) * MAP_CELLS,
@@ -1629,6 +1642,20 @@ static void race_z8_note_unit_spawn(int slot, int owner, int type);
 static void race_z8_note_building_spawn(int slot, int owner, int type);
 static void race_z8_note_product_building(int building);
 static int race_z8_unit_hidden_from_side(int unit);
+#endif
+#ifdef SC64_Z9_RUNTIME
+#define SC64_Z9_GLOBAL_ID 20
+#define SC64_Z10_GLOBAL_ID 21
+static int race_zl_active(void);
+static int race_zl_map_shape_valid(const Sc64RaceMap *map);
+static int race_zl_source_owner(unsigned slot);
+static int race_zl_colony_product_available(int owner,int raw_owner,int type);
+static int race_zl_runtime_init(const Sc64RaceMap *map);
+static int race_zl_runtime_tick(void);
+static int race_zl_outcome(void);
+static void race_zl_note_unit_spawn(int slot, int owner, int type);
+static void race_zl_note_building_spawn(int slot, int owner, int type);
+static void race_zl_note_product_building(int building);
 #endif
 #ifdef SC64_P8_RUNTIME
 #define SC64_P8_GLOBAL_ID 27
@@ -2316,6 +2343,9 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_Z8_RUNTIME
     race_z8_note_unit_spawn(i, owner, type);
 #endif
+#ifdef SC64_Z9_RUNTIME
+    race_zl_note_unit_spawn(i, owner, type);
+#endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     if (race_p7_active() && owner == SIDE) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -2504,6 +2534,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
 #ifdef SC64_Z8_RUNTIME
     race_z8_note_building_spawn(i, owner, type);
+#endif
+#ifdef SC64_Z9_RUNTIME
+    race_zl_note_building_spawn(i, owner, type);
 #endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     if (race_p7_active() && owner == SIDE) {
@@ -5687,6 +5720,9 @@ static int race_colony_profile_allowed(void)
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active()) return 1;
 #endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return 1;
+#endif
     return race_z7_active();
 }
 
@@ -5696,6 +5732,10 @@ static int race_colony_owner_allowed(int owner, int raw_owner)
     if (race_z8_active()) return owner==SIDE && raw_owner>=0 &&
         race_z8_source_owner((unsigned)raw_owner)==owner;
 #endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return owner==SIDE && raw_owner>=0 &&
+        race_zl_source_owner((unsigned)raw_owner)==owner;
+#endif
     return race_z7_active() && owner==SIDE && raw_owner==race_z7_product_source_owner(owner);
 }
 
@@ -5704,6 +5744,9 @@ static int race_colony_product_allowed(int owner, int raw_owner, int type)
     (void)type;
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active()) return race_z8_colony_product_available(owner,raw_owner,type);
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return race_zl_colony_product_available(owner,raw_owner,type);
 #endif
     return race_z7_active() && owner==SIDE && raw_owner==race_z7_product_source_owner(owner);
 }
@@ -12024,6 +12067,9 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #endif
 #ifdef SC64_Z8_RUNTIME
 #include "sc64_z8_runtime_adapter.h"
+#endif
+#ifdef SC64_Z9_RUNTIME
+#include "sc64_zerg_late_runtime_adapter.h"
 #endif
 #include "race_save_adapter.h"
 #ifdef SC64_IMPACT_EVENTS

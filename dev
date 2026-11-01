@@ -28,6 +28,8 @@ GAMES = {
     "zerg": ("zerg", "build/StarCraft-Zerg-Z7-Transport1-GBA.gba"),
     "zerg-z6": ("zerg-z6", "build/StarCraft-Zerg-Z6-GBA.gba"),
     "zerg-z7": ("zerg-z7", "build/StarCraft-Zerg-Z7-Transport1-GBA.gba"),
+    # Explicit candidates; each keeps its own .local/play/<profile> saves.
+    "zerg-z9": ("zerg-z9", "build/StarCraft-Zerg-Z9-Transport1-GBA.gba"),
     "zerg-z4": ("zerg-z4", "build/StarCraft-Zerg-Z4-GBA.gba"),
     "zerg-z3": ("zerg-z3", "build/StarCraft-Zerg-GBA.gba"),
     "protoss": ("protoss", "build/StarCraft-Protoss-P7-Transport1-GBA.gba"),

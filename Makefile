@@ -4052,6 +4052,9 @@ build/test-sc64-z8-game: tests/sc64_z8_game.c $(STARCRAFT) $(wildcard starcraft/
 test-zerg-z8: build/test-sc64-z8-game
 	./build/test-sc64-z8-game
 
+# Late Zerg (Z9/Z10) candidates and their fixtures.
+include tests/sc64-zerg-late/Makefile
+
 # Preserve a named six-entry product alongside the existing `zerg` alias.
 .PHONY: verify-zerg-z6 zerg-z6
 verify-zerg-z6: build/StarCraft-Zerg-Z6-GBA.gba

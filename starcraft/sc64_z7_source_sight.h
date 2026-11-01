@@ -65,6 +65,9 @@ sc64_z7_building_visibility_key(const Building *q)
 #ifdef SC64_Z8_RUNTIME
         && !race_z8_active()
 #endif
+#ifdef SC64_Z9_RUNTIME
+        && !race_zl_active()
+#endif
         )) return q ? q->type : 0;
     /* Native morphs keep the source UnitType until completion. The bounded
        runtime changes q->type to its target immediately, so recover the

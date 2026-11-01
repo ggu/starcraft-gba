@@ -6427,6 +6427,32 @@ kill census are authored, not native. There is no ordinary-input Z8 win, ARM
 replay, SRAM continuation or timing result. See the
 [audit](audits/2026-10-29-z8-playable/README.md).
 
+### Z9 candidate profile (2026-11-01, not qualified)
+
+`make zerg-z9` builds the Z1–Z8 candidate plus Z9 (`SCZ9`, generation 48).
+It binds the authenticated Z9 program (descriptor `38921cb2…`) through
+`starcraft/sc64_zerg_late_runtime_adapter.h`. The ROM links at BSS
+`0x0203df88` / IWRAM `0x03004bf0`. The default ROM and every existing Zerg
+ROM (`zerg`, `zerg-z3` to `zerg-z8`) are byte-identical to their base.
+
+`make test-zerg-z9` passes under ASan/UBSan. It launches Z9 through the
+ordinary menu and checks the binding and opening triggers. It then follows
+the crystal chain, with fixture state writes in place of a controller:
+- a Drone at the formation is removed and the countdown starts;
+- the countdown's expiry recreates the Drone with the crystal, which the
+  Drone carries;
+- delivery to location 1 is a Victory.
+
+Two pause-menu saves, one with the countdown running and one with the
+crystal carried, reload in a fresh game and continue identically. Corrupt
+candidates are rejected. The asset-free `make test-sc64-zerg-late-state`
+round-trips the 160-byte compact save on an authored program.
+
+The AI backend, countdown cadence, Transmission duration, camera snap and
+crystal carry are authored, not native. There is no ordinary-input Z9 win,
+ARM replay, SRAM continuation or timing result. See the
+[audit](audits/2026-11-01-z9-candidate/README.md).
+
 ### Canonical skirmish controller qualification correction (2026-10-29)
 
 The match targets now expand the actual `TERRAN_ROM_FLAGS`, `ZERG_ROM_FLAGS`

@@ -363,13 +363,14 @@ int main(void) {
         building_assets |= set(Z5_BUILDING_IDS.values()) | set(Z5_DOODAD_IDS.values())
         building_assets |= set(Z6_BUILDING_IDS.values()) | set(P6_DOODAD_IDS.values())
         building_assets |= set(P7_BUILDING_IDS.values())
-        self.assertEqual(runtime_buildings - building_assets, {134},
-                         'raw 134 belongs to the default-off Nydus runtime, '
-                         'whose source art is not imported yet')
+        self.assertEqual(runtime_buildings - building_assets, {134, 173},
+                         'raw 134 belongs to the default-off Nydus runtime and '
+                         'raw 173 to the default-off Z9 candidate; neither has '
+                         'art in this shared bank')
         extended_buildings = numeric_raw_ids('sc64_race_raw_building(int type)',
                                             'sc64_race_unit_from_raw(int raw)', True)
-        self.assertEqual(extended_buildings - building_assets, {107, 134},
-                         'Comsat and Nydus source art remain unprepared')
+        self.assertEqual(extended_buildings - building_assets, {107, 134, 173},
+                         'Comsat, Nydus and Z9 formation source art remain unprepared')
 
     def test_header_remaps_opaque_indices_and_keeps_transparency_zero(self):
         frame = {'pixels': bytes((0, 9, 0, 7)), 'alpha': bytes((0, 1, 0, 1)),

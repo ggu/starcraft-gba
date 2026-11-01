@@ -1345,6 +1345,9 @@ static void race_tick_buildings(void)
 #ifdef SC64_Z8_RUNTIME
         race_z8_note_product_building(i);
 #endif
+#ifdef SC64_Z9_RUNTIME
+        race_zl_note_product_building(i);
+#endif
 #ifdef SC64_P8_RUNTIME
         race_p8_note_product_building(i);
 #endif

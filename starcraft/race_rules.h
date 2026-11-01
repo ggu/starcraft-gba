@@ -197,6 +197,11 @@ enum {
     /* Raw 134, appended last so every disabled profile keeps its values. */
     B_NYDUS_CANAL,
 #endif
+#ifdef SC64_Z9_RUNTIME
+    /* Raw 173, the invincible neutral Z9 objective prop; appended after all
+     * earlier campaign identities so disabled profiles keep their values. */
+    B_ZL_KHAYDARIN_FORMATION,
+#endif
 #ifdef SC64_SKIRMISH_ROSTER
     /* Raw-ID mappings missing from this compile profile, appended after all
      * legacy and campaign-specific building identities. */
@@ -613,6 +618,10 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
      * are not implemented, so no runtime producer is exposed. */
     , [B_NYDUS_CANAL] = { R_ZERG, SC_RACE_F_BUILDING, 255, 0, 150, 0, 600, 250, 0 }
 #endif
+#ifdef SC64_Z9_RUNTIME
+    /* Scenario-only prop; 100000 HP comes from its ZP building fact. */
+    , [B_ZL_KHAYDARIN_FORMATION] = { R_PROTOSS, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 0, 0 }
+#endif
 #ifdef SC64_SKIRMISH_ROSTER
     /* Stock values are from sc64_stock_profiles.h. Worker/admission and
      * placement requirements remain in the skirmish catalog/runtime. */
@@ -806,6 +815,9 @@ static inline const char *sc64_race_building_name(int type)
 #endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
         ,"ROBOTICS SUPPORT BAY","SHIELD BATTERY"
+#endif
+#ifdef SC64_Z9_RUNTIME
+        ,[B_ZL_KHAYDARIN_FORMATION] = "KHAYDARIN CRYSTAL FORMATION"
 #endif
 #ifdef SC64_SKIRMISH_ROSTER
         ,[B_SK_COMSAT] = "COMSAT STATION"
@@ -1745,6 +1757,9 @@ static inline int sc64_race_raw_building(int type)
 #ifdef SC64_NYDUS_ENABLED
     case B_NYDUS_CANAL: return 134;
 #endif
+#ifdef SC64_Z9_RUNTIME
+    case B_ZL_KHAYDARIN_FORMATION: return 173;
+#endif
 #ifdef SC64_SKIRMISH_ROSTER
     case B_SK_COMSAT: return 107;
 #ifndef SC64_NYDUS_ENABLED
@@ -1883,6 +1898,12 @@ static inline int sc64_race_unit_from_raw(int raw)
 #ifdef SC64_Z7_EGG_PRODUCTION
     case 36: return U_Z7_EGG;
 #endif
+#ifdef SC64_Z9_RUNTIME
+    /* The Z9/Z10 Khaydarin Crystal powerup keeps raw 219 on the actor and
+     * reuses the Z2 Young Chrysalis powerup rules: not collidable, not
+     * selectable, carried by a Drone. */
+    case 219: return U_CHRYSALIS;
+#endif
 #ifdef SC64_SKIRMISH_ROSTER
 #ifndef SC64_TERRAN_LATE_ACTORS
     case 9: return U_SK_SCIENCE_VESSEL;
@@ -2017,6 +2038,9 @@ static inline int sc64_race_building_from_raw(int raw)
 #endif
 #ifdef SC64_NYDUS_ENABLED
     case 134: return B_NYDUS_CANAL;
+#endif
+#ifdef SC64_Z9_RUNTIME
+    case 173: return B_ZL_KHAYDARIN_FORMATION;
 #endif
 #ifdef SC64_SKIRMISH_ROSTER
     case 107: return B_SK_COMSAT;
