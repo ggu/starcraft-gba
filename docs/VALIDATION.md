@@ -6453,6 +6453,30 @@ crystal carry are authored, not native. There is no ordinary-input Z9 win,
 ARM replay, SRAM continuation or timing result. See the
 [audit](audits/2026-11-01-z9-candidate/README.md).
 
+### Z10 candidate profile (2026-11-01, not qualified)
+
+`make zerg-z10` builds the Z1–Z9 candidate plus Z10 (`SCZA`, generation 49),
+binding the authenticated Z10 program (descriptor `97c32263…`) through the
+same late-Zerg adapter. The ROM links at BSS `0x0203df88` / IWRAM
+`0x03004bf0`. The default ROM, every existing Zerg ROM and the `zerg-z9`
+candidate are byte-identical to their base.
+
+`make test-zerg-z10` passes under ASan/UBSan. It reruns the Z9 fixture under
+the Z10 flags with unchanged digests. The Z10 fixture checks the binding and
+opening triggers, then follows the program with fixture state writes in
+place of a controller:
+- a guard death starts the guard's town through the Deaths row;
+- destroying the Temple creates the Drone and crystal through the Kill row;
+- delivery to location 4 is a Victory.
+
+Two pause-menu saves (all towns running, crystal carried) reload in a fresh
+game and continue identically. Corrupt candidates are rejected.
+
+The Kill and Deaths censuses, town AI, timed presentation and crystal carry
+are authored. There is no ordinary-input Z10 win, ARM replay, SRAM
+continuation or timing result. See the
+[audit](audits/2026-11-01-z10-candidate/README.md).
+
 ### Canonical skirmish controller qualification correction (2026-10-29)
 
 The match targets now expand the actual `TERRAN_ROM_FLAGS`, `ZERG_ROM_FLAGS`

@@ -2642,8 +2642,11 @@ descriptor to a new ignored `.local/build/z9-*` or `.local/build/z10-*` path,
 and `verify` compares every row with the source. `make zerg-z9` renders the
 default `.local/build/z9-source/descriptor.json` into
 `build/generated/z9/sc64_z9_program_generated.h`. The candidate defaults to
-the Z8 sprite bank (`ZERG_Z9_BANK`). Neither tool regenerates shared banks.
-See the [Z9 candidate audit](audits/2026-11-01-z9-candidate/README.md).
+the Z8 sprite bank (`ZERG_Z9_BANK`). `make zerg-z10` does the same with
+`.local/build/z10-source/descriptor.json` and `ZERG_Z10_BANK`. Neither tool
+regenerates shared banks. See the
+[Z9](audits/2026-11-01-z9-candidate/README.md) and
+[Z10](audits/2026-11-01-z10-candidate/README.md) candidate audits.
 
 ## Experimental P7 menu and prevalidated tick
 

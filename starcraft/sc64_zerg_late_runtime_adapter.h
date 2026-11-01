@@ -107,6 +107,44 @@ static const Sc64ZlMission race_z9_mission = {
     0, 0
 };
 
+#ifdef SC64_Z10_RUNTIME
+static const u32 race_z10_ai_scripts[] = {
+    SC64_ZL_FOURCC('Z','1','0','a'), SC64_ZL_FOURCC('Z','1','0','b'),
+    SC64_ZL_FOURCC('Z','1','0','c'), SC64_ZL_FOURCC('Z','1','0','d'),
+    SC64_ZL_FOURCC('Z','1','0','e')
+};
+static const Sc64ZlProgram race_z10_program = {
+    { sc64_z10_program_triggers, sc64_z10_program_conditions,
+      sc64_z10_program_actions, sc64_z10_program_locations,
+      SC64_Z10_PROGRAM_TRIGGER_COUNT, SC64_Z10_PROGRAM_CONDITION_COUNT,
+      SC64_Z10_PROGRAM_ACTION_COUNT, SC64_Z10_PROGRAM_LOCATION_COUNT,
+      SC64_Z10_PROGRAM_MAP_PIXEL_WIDTH, SC64_Z10_PROGRAM_MAP_PIXEL_HEIGHT },
+    race_z10_ai_scripts, 5
+};
+/* Z10 towns: slot 2 (force 3, Z10a/Z10b) and slot 7 (force 4, Z10c/Z10d)
+ * start at once; slot 0 (force 2, the Temple's guard, Z10e) starts after
+ * its first death or once no Temple remains. */
+static const Sc64ZlAiScript race_z10_ai_policy[] = {
+    { SC64_ZL_FOURCC('Z','1','0','a'), 2, 0 },
+    { SC64_ZL_FOURCC('Z','1','0','b'), 2, 0 },
+    { SC64_ZL_FOURCC('Z','1','0','c'), 7, 1 },
+    { SC64_ZL_FOURCC('Z','1','0','d'), 7, 1 },
+    { SC64_ZL_FOURCC('Z','1','0','e'), 0, 2 }
+};
+static const Sc64ZlMission race_z10_mission = {
+    SC64_Z10_GLOBAL_ID, "Z10", 337, 96, 128,
+    { 1, 2, 1, 0, 2, 2, 2, 1 },
+    /* Slot 11 holds the resources; slots 1 and 4-6 are inactive and own no
+     * map rows. */
+    { ENEMY, -1, ENEMY, SIDE, -1, -1, -1, ENEMY, -1, -1, -1, NEUTRAL },
+    &race_z10_program, sc64_z10_program_forces, SC64_Z10_PROGRAM_ACTIVE_MASK,
+    &sc64_z10_program_permissions,
+    { 2, 7, 0 }, race_z10_ai_policy,
+    sizeof(race_z10_ai_policy) / sizeof(race_z10_ai_policy[0]),
+    174, 1u << 0
+};
+#endif
+
 static Sc64ZlSchedulerState race_zl_sched;
 static Sc64ZlAiState race_zl_ai;
 static u32 race_zl_ai_minerals[SC64_ZL_AI_TOWNS], race_zl_ai_gas[SC64_ZL_AI_TOWNS];

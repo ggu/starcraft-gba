@@ -128,6 +128,15 @@ continuations, using fixture placements rather than ordinary input. Z9 has
 no ordinary-input win, ARM replay or timing and is not qualified. See the
 [Z9 candidate audit](audits/2026-11-01-z9-candidate/README.md).
 
+Z10 runs in a separate `zerg-z10` candidate (`make zerg-z10`, code `SCZA`,
+generation 49), stacked on Z9: the Z1–Z9 candidate plus Z10 as the tenth
+Zerg entry. Its 10-trigger program, destructible Protoss Temple, Kill and
+Deaths censuses, three authored towns and the crystal delivery run on the
+live game. Host fixtures cover the Temple-to-delivery chain and two
+pause-menu save continuations, again with fixture placements. Z10 has no
+ordinary-input win, ARM replay or timing and is not qualified. See the
+[Z10 candidate audit](audits/2026-11-01-z10-candidate/README.md).
+
 The current standalone Z7 release candidate uses the CONTACT movement path
 and omits debugger input queues; it keeps the generation-36 save identity.
 Its ARM link passes the existing RAM guards, and the CONTACT host replay

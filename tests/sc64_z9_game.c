@@ -35,7 +35,11 @@ static void launch_z9_from_normal_menu(void)
     assert(race_front.page == SC_FRONT_HOME);
     ordinal = sc64_catalog_playable_ordinal(SC64_FACTION_ZERG, SC64_Z9_GLOBAL_ID);
     assert(ordinal == 8);
+#ifdef SC64_Z10_RUNTIME
+    assert(sc64_catalog_playable_count(SC64_FACTION_ZERG) == 10);
+#else
     assert(sc64_catalog_playable_count(SC64_FACTION_ZERG) == 9);
+#endif
     press(KEY_A);
     assert(race_front.page == SC_FRONT_MISSION && race_front.faction == SC_FRONT_ZERG);
     for (int page = 0; page < ordinal / 2; ++page) press(KEY_RIGHT);
@@ -318,7 +322,11 @@ static void test_crystal_delivery(void)
 
 int main(void)
 {
+#ifdef SC64_Z10_RUNTIME
+    assert(SC64_RACE_SAVE_GENERATION == 49u);
+#else
     assert(SC64_RACE_SAVE_GENERATION == 48u);
+#endif
     assert(sizeof(RaceSave) <= 16368u);
     launch_z9_from_normal_menu();
     test_binding();
