@@ -11,10 +11,35 @@
 static RaceSave hp_candidate_copy, hp_candidate_before;
 static Unit hp_world_units_before[MAX_UNITS];
 static Building hp_world_buildings_before[MAX_BUILDINGS];
+static int fixture_encode_hp_unit(RaceSave *save,unsigned slot,const Unit *q,
+                                  unsigned width,unsigned height)
+{
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    return sc64_p7_typed_unit_encode(&save->units[slot],q,width,height);
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    return sc64_derived_unit_encode(&save->units[slot],q,width,height);
+#else
+    return sc64_zp_unit_save_encode(&save->units[slot],q,width,height);
+#endif
+#elif defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    return sc64_unit_save_encode(&save->units[slot],q,width,height);
+#else
+    (void)width;(void)height;
+    for(unsigned j=0;j<RACE_UNIT_WORDS;++j) {
+        int n;memcpy(&n,(const u8 *)q+j*sizeof(int),sizeof(n));
+        save->units[slot][j]=(s16)n;
+    }
+    return 1;
+#endif
+}
 static void test_candidate_geometry_and_rows(void)
 {
     game_init();race_mode=1;race_human=R_TER;race_bots=1;init_state();
-    assert(screen==SCREEN_PLAY && race_save_game());
+    assert(screen==SCREEN_PLAY);
+    int witness=spawn_unit(SIDE,U_ZERGLING,160,160);assert(witness>=0);
+    u[witness].hp--;u[witness].shield_remainder=79;
+    assert(race_save_game());
     hp_candidate_copy=race_data;hp_candidate_before=hp_candidate_copy;
     memcpy(hp_world_units_before,u,sizeof(u));
     memcpy(hp_world_buildings_before,b,sizeof(b));
@@ -23,23 +48,49 @@ static void test_candidate_geometry_and_rows(void)
     assert(rows.candidate==&hp_candidate_copy && rows.width==(unsigned)race_cols &&
            rows.height==(unsigned)race_rows);
     for(unsigned i=0;i<MAX_UNITS;++i) {
-        Unit a,b0;
+        Unit a;const Unit *live=&hp_world_units_before[i];
         assert(race_hp_prepared_unit(&rows,i,&a));
-        assert(race_save_decode_unit(&hp_candidate_copy,i,rows.width*16u,rows.height*16u,&b0));
-        assert(!memcmp(&a,&b0,sizeof(a)));
+        assert(a.alive==live->alive);
+        if(!live->alive) continue;
+        assert(a.type==live->type && a.owner==live->owner && a.hp==live->hp &&
+               a.maxhp==live->maxhp && a.x==live->x && a.y==live->y &&
+               a.shield_remainder==live->shield_remainder);
     }
     for(unsigned i=0;i<MAX_BUILDINGS;++i) {
-        Building a,b0;
+        Building a;const Building *live=&hp_world_buildings_before[i];
         assert(race_hp_prepared_building(&rows,i,&a));
-        assert(race_save_decode_building(&hp_candidate_copy,i,&b0));
-        assert(!memcmp(&a,&b0,sizeof(a)));
+        assert(a.alive==live->alive);
+        if(!live->alive) continue;
+        assert(a.type==live->type && a.owner==live->owner && a.hp==live->hp &&
+               a.maxhp==live->maxhp && a.x==live->x && a.y==live->y);
     }
     assert(!memcmp(&hp_candidate_copy,&hp_candidate_before,sizeof(hp_candidate_copy)));
     assert(!memcmp(hp_world_units_before,u,sizeof(u)) && !memcmp(hp_world_buildings_before,b,sizeof(b)));
-    hp_candidate_copy.state[0]=2;
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    Unit untouched;memset(&untouched,0x5a,sizeof(untouched));Unit sentinel=untouched;
+    int wire_before=race_scarab_stage_wire;race_scarab_stage_wire=!wire_before;
+    assert(!race_hp_prepared_unit(&rows,(unsigned)witness,&untouched));
+    assert(!memcmp(&untouched,&sentinel,sizeof(untouched)));
+    race_scarab_stage_wire=wire_before;
+#endif
     RaceHpPreparedRows unchanged=rows;
+    hp_candidate_copy.state[0]=2;
     assert(!race_hp_prepare_rows(&hp_candidate_copy,&rows));
-    assert(rows.candidate==unchanged.candidate && rows.width==unchanged.width && rows.height==unchanged.height);
+    assert(rows.candidate==unchanged.candidate && rows.width==unchanged.width &&
+           rows.height==unchanged.height);
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    assert(rows.scarab_wire==unchanged.scarab_wire);
+#endif
+    hp_candidate_copy=hp_candidate_before;
+    Unit invalid=hp_world_units_before[witness];invalid.shield_remainder=80;
+    assert(fixture_encode_hp_unit(&hp_candidate_copy,(unsigned)witness,&invalid,
+                                  rows.width*16u,rows.height*16u));
+    assert(!race_hp_prepare_rows(&hp_candidate_copy,&rows));
+    assert(rows.candidate==unchanged.candidate && rows.width==unchanged.width &&
+           rows.height==unchanged.height);
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    assert(rows.scarab_wire==unchanged.scarab_wire);
+#endif
     assert(!memcmp(hp_world_units_before,u,sizeof(u)) && !memcmp(hp_world_buildings_before,b,sizeof(b)));
 }
 static void test_actor_phase_owners_and_reuse(void)

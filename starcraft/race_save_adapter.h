@@ -1801,25 +1801,38 @@ static int race_save_game(void) {
 }
 #ifdef SC64_SHARED_HP_REGEN
 /* The token describes a validated candidate geometry, but does not keep the
- * candidate immutable. It must not outlive or alias a later scratch write. */
+ * candidate immutable. Caller must keep plan/output outside route/save scratch,
+ * preserve candidate bytes, and hold decoding context stable until finished. */
 typedef struct {
     const RaceSave *candidate;
     unsigned width, height;
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    int scarab_wire;
+#endif
 } RaceHpPreparedRows;
+
+static int race_hp_prepared_context_valid(const RaceHpPreparedRows *rows)
+{
+    if (!rows || !rows->candidate) return 0;
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    if (rows->scarab_wire!=race_scarab_stage_wire) return 0;
+#endif
+    return 1;
+}
 
 static int race_hp_prepared_unit(const RaceHpPreparedRows *rows, unsigned slot, Unit *out)
 {
-    return rows && rows->candidate &&
+    return race_hp_prepared_context_valid(rows) &&
         race_save_decode_unit(rows->candidate,slot,rows->width*16u,rows->height*16u,out);
 }
 static int race_hp_prepared_building(const RaceHpPreparedRows *rows, unsigned slot, Building *out)
 {
-    return rows && rows->candidate && race_save_decode_building(rows->candidate,slot,out);
+    return race_hp_prepared_context_valid(rows) && race_save_decode_building(rows->candidate,slot,out);
 }
 #ifdef SC64_ZP_FULL_STORAGE
 static int race_hp_prepared_mineral(const RaceHpPreparedRows *rows, unsigned slot, Mineral *out)
 {
-    return rows && rows->candidate &&
+    return race_hp_prepared_context_valid(rows) &&
         race_save_decode_mineral(rows->candidate,slot,rows->width*16u,rows->height*16u,out);
 }
 #endif
@@ -1844,6 +1857,9 @@ static int race_hp_prepare_rows(const RaceSave *candidate, RaceHpPreparedRows *o
 #endif
     if (!sc64_race_storage_geometry_valid(width,height)) return 0;
     prepared.candidate=candidate;prepared.width=(unsigned)width;prepared.height=(unsigned)height;
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    prepared.scarab_wire=race_scarab_stage_wire;
+#endif
     for(unsigned i=0;i<MAX_UNITS;++i) {
         Unit q;
         if (!race_hp_prepared_unit(&prepared,i,&q) ||
