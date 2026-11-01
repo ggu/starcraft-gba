@@ -37,6 +37,17 @@ static void test_actor_phase_owners_and_reuse(void)
     race_shared_hp_regen_tick();
     assert(u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
 }
+static void test_campaign_and_skirmish_bindings(void)
+{
+    for(int custom=0;custom<=1;++custom) {
+        game_init();memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+        race_mode=custom;
+        int slot=spawn_unit(SIDE,U_ZERGLING,100,100);assert(slot>=0);
+        u[slot].hp=u[slot].maxhp-1;u[slot].shield_remainder=79;
+        race_shared_hp_regen_tick();
+        assert(u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
+    }
+}
 #ifdef SC64_P6_COMBAT_ENABLED
 static void test_p6_burrowed_regenerates(void)
 {
@@ -114,6 +125,7 @@ int main(void)
     assert(u[marine].shield_remainder==79);
     test_actor_phase_owners_and_reuse();
     test_paused_and_live_update();
+    test_campaign_and_skirmish_bindings();
 #ifdef SC64_P6_COMBAT_ENABLED
     test_p6_burrowed_regenerates();
 #endif
