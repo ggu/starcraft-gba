@@ -642,10 +642,29 @@ sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta)
 }
 
 #ifndef SC64_SHARED_SPAN_TABLES
+#ifdef SC64_Z7_VISIBILITY_PHASE_REJECT
+#include "sc64_z7_visibility_phase_classes.h"
+/* Equal unbounded footprints remain equal after any map clipping. */
+static int __attribute__((noinline))
+sc64_z7_visibility_same_phase_footprint(int ox, int oy, int nx, int ny, int radius)
+{
+    int index;
+    if (ox < 0 || oy < 0 || nx < 0 || ny < 0 ||
+        ox / 16 != nx / 16 || oy / 16 != ny / 16) return 0;
+    index = sc64_z7_visibility_radius_index(radius);
+    if (index < 0) return 0;
+    return sc64_z7_visibility_phase_class[index][((oy & 15) << 4) | (ox & 15)] ==
+           sc64_z7_visibility_phase_class[index][((ny & 15) << 4) | (nx & 15)];
+}
+#endif
 static void __attribute__((noinline))
 sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
                               int radius)
 {
+#ifdef SC64_Z7_VISIBILITY_PHASE_REJECT
+    if (sc64_z7_visibility_same_phase_footprint(old_x, old_y, new_x, new_y, radius))
+        return;
+#endif
     int extent = (radius + 23) / 16;
     int old_row = old_y / 16, new_row = new_y / 16;
     int row, row0 = (old_row < new_row ? old_row : new_row) - extent;

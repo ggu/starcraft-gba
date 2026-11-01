@@ -372,6 +372,8 @@ class Z7SightSpansTests(unittest.TestCase):
                 ("scalar", [], 0),
                 ("legacy-spans", ["-DSC64_VISIBILITY_SPANS"], 0),
                 ("z7-spans", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS"], 1),
+                ("z7-phase", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
+                              "-DSC64_Z7_VISIBILITY_PHASE_REJECT"], 1),
             )
             for suffix, extra, expect_z7 in variants:
                 binary = Path(temp) / f"fixture-{suffix}"
