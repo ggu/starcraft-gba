@@ -426,8 +426,8 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
 #endif
  order(55,MENU_ATTACK,880,1640);order(56,MENU_ATTACK,880,1640);int l[]={53,54,57};for(int j=0;j<3;j++)order(l[j],MENU_ATTACK,880,1640);order(16,MENU_MOVE,Z8_NORTH_DETECT_X,Z8_NORTH_DETECT_Y);for(int i=17;i<=22;i++)order(i,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(7,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(8,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(11,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(13,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);for(int j=5;j<=6;j++){select_one(j);int p=j==5?11:10;move_cursor(m[p].x,m[p].y);tap(KEY_A);printf("mine worker%d order%d target%d frame%d\n",j,u[j].order,u[j].target,frame);}queue_type(U_DRONE);queue_type(U_DRONE);}
 #ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
- if(!pool&&minerals>=200&&macro_can_spend(200)&&macro_worker_available(5))
-  pool=build(5,B_SPAWNING_POOL,MENU_BARRACKS);
+ if(!pool&&minerals>=200&&macro_can_spend(200))
+  for(int i=0;i<MAX_UNITS;i++)if(macro_worker_available(i)){pool=build(i,B_SPAWNING_POOL,MENU_BARRACKS);break;}
  if(!evo&&minerals>=75&&macro_can_spend(75)&&side_building(B_SPAWNING_POOL,1)>=0)
   for(int i=0;i<MAX_UNITS;i++)if(macro_worker_available(i)){evo=build(i,B_EVOLUTION_CHAMBER,MENU_ENG_BAY);break;}
  if(!spore&&minerals>=50&&macro_can_spend(50)&&side_building(B_EVOLUTION_CHAMBER,1)>=0&&
