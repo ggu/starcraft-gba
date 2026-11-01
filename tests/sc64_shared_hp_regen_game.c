@@ -48,6 +48,21 @@ static void test_campaign_and_skirmish_bindings(void)
         assert(u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
     }
 }
+#ifdef SC64_SHOWCASE_ENABLED
+static void test_showcase_live_update(void)
+{
+    game_init();sc64_showcase_start(5);
+    assert(screen==SCREEN_PAUSE && sc64_showcase_scene==5);
+    int slot=-1;
+    for(int i=0;i<MAX_UNITS;++i)
+        if(u[i].alive && u[i].type==U_ZERGLING) {slot=i;break;}
+    assert(slot>=0 && u[slot].hp==u[slot].maxhp);
+    u[slot].hp--;u[slot].shield_remainder=79;
+    game_update(KEY_A,KEY_A);assert(screen==SCREEN_PLAY);
+    game_update(0,0);
+    assert(u[slot].alive && u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
+}
+#endif
 #ifdef SC64_P6_COMBAT_ENABLED
 static void test_p6_burrowed_regenerates(void)
 {
@@ -126,6 +141,9 @@ int main(void)
     test_actor_phase_owners_and_reuse();
     test_paused_and_live_update();
     test_campaign_and_skirmish_bindings();
+#ifdef SC64_SHOWCASE_ENABLED
+    test_showcase_live_update();
+#endif
 #ifdef SC64_P6_COMBAT_ENABLED
     test_p6_burrowed_regenerates();
 #endif
