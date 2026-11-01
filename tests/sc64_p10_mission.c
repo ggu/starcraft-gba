@@ -146,6 +146,29 @@ static void run_updates(unsigned n)
     }
 }
 
+/* Candidate checks are pure and reject a cursor that structural validation
+ * alone permits but that indexes beyond its source trigger's actions. */
+static void check_candidate_cursor_bounds(void)
+{
+    Sc64P10PersistentState candidate = {0};
+    assert(sc64_p10_source_state_valid(&candidate));
+    for (unsigned r = 0; r < SC64_P10_RUNNER_COUNT; ++r) {
+        for (unsigned t = 0; t < SC64_P10_TRIGGER_LIMIT; ++t) {
+            unsigned count = sc64_p10_source_triggers[t].action_count;
+            if (!count || count >= SC64_P10_ACTION_LIMIT) continue;
+            candidate.runner[r].started = candidate.runner[r].running = (u16)(1u << t);
+            candidate.runner[r].cursor[t] = (u8)(count - 1u);
+            assert(sc64_p10_persistent_state_valid(&candidate));
+            assert(sc64_p10_source_state_valid(&candidate));
+            candidate.runner[r].cursor[t] = (u8)count;
+            assert(sc64_p10_persistent_state_valid(&candidate));
+            assert(!sc64_p10_source_state_valid(&candidate));
+            candidate.runner[r].cursor[t] = 0;
+            candidate.runner[r].started = candidate.runner[r].running = 0;
+        }
+    }
+}
+
 static void check_startup(void)
 {
     start_p10();
@@ -347,6 +370,7 @@ int main(int argc, char **argv)
     gba_init();
     if (argc == 3 && !strcmp(argv[1], "--resume")) return resume_main(argv[2]);
     if (argc != 2) { fprintf(stderr, "usage: %s OUTDIR\n", argv[0]); return 2; }
+    check_candidate_cursor_bounds();
     check_startup();
     check_save_continuation(argv[0], argv[1]);
     check_victory();

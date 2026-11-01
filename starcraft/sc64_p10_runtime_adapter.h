@@ -519,15 +519,22 @@ static int race_p10_bind(const Sc64RaceMap *map)
     return 1;
 }
 
-static int race_p10_runtime_state_valid(void)
+/* Pure candidate check: use the same source-action bounds before committing a
+ * save candidate and when validating the live runtime. */
+static int sc64_p10_source_state_valid(const Sc64P10PersistentState *state)
 {
-    if (!sc64_p10_persistent_state_valid(&race_p10)) return 0;
+    if (!sc64_p10_persistent_state_valid(state)) return 0;
     for (unsigned r = 0; r < SC64_P10_RUNNER_COUNT; ++r)
         for (unsigned t = 0; t < SC64_P10_TRIGGER_LIMIT; ++t)
-            if ((race_p10.runner[r].running & (1u << t)) &&
-                race_p10.runner[r].cursor[t] >= sc64_p10_source_triggers[t].action_count)
+            if ((state->runner[r].running & (1u << t)) &&
+                state->runner[r].cursor[t] >= sc64_p10_source_triggers[t].action_count)
                 return 0;
     return 1;
+}
+
+static int race_p10_runtime_state_valid(void)
+{
+    return sc64_p10_source_state_valid(&race_p10);
 }
 
 static int race_p10_runtime_init(const Sc64RaceMap *map)
