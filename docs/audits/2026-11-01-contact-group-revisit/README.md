@@ -97,3 +97,23 @@ The logs are `/tmp/sc64-z7-strict-regenerate-308-output-20261101/run.log` and
 Neither partial trace is a winning witness or suitable for the proposed ROI
 comparison. Current grouped-contact performance remains unmeasured; no
 historical speedup, physical-hardware FPS or admission is claimed.
+
+## Early-battle diagnostic comparison
+
+The frozen `30858e3` normal OFF and grouped ON ROMs ran a fresh physical-button
+prefix of the new host trace through update 9900. This trace ended at the host
+bound without victory, so this is a diagnostic prefix, not a full mission
+qualification or replacement for a winning trace. Both modes matched all 25
+named prefix observations and nine full canonical entity scalar/array,
+visibility/source-count/minimap, active frame and palette samples. At update
+9000 both were PLAY without loss or fault with 23 friendly and 85 enemy units;
+at 9900 they had 24 friendly and 87 enemy units.
+
+Across updates 9001–9900, total cycles averaged 1,100,718 OFF and 1,113,187 ON
+(+1.13%); p95 was 1,404,401 versus 1,404,531 and window maximum 3,443,432
+versus 3,655,056. Mean update cycles were 448,301 versus 463,711, and mean draw
+cycles 570,573 versus 570,834. These are emulator guest-cycle observations,
+not physical-device FPS. Grouping remains OFF and is not promoted. The full
+receipt and per-update samples are in
+`/tmp/sc64-contact-group-early-battle-20261101/`; driver SHA-256 was
+`482977693aab2dbbfd9e92682b8ee17e7482b24c7d46c29f5f738bc13a9f3b68`.
