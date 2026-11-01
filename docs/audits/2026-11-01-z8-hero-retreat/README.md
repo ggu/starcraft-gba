@@ -25,5 +25,34 @@ bound exhaustion is not a win.
 
 The branch remains based on the parked trial's phase-enabled source. No
 normal campaign menu, main branch, release or SD contents are changed.
-The new trial has not been compiled or run yet. There is no Z8 victory,
-safe-position or next-mission admission claim.
+There is no Z8 victory or next-mission admission claim.
+
+## Bounded host result
+
+At frozen source `7e873a4`, the canonical Z8 ASan/UBSan host trial compiled
+and ran under the exclusive native lock, with the 109 pinned entries and
+five existing sidecars checked before and after. It cleared the original
+first Templar at the unchanged frame 2188. The ordinary retreat was accepted
+at 2347, and the original hero entered the 32-pixel arrival threshold at 2678.
+At the final frame 11009 she remained alive, raw identity 51, source owner 3,
+human-owned, with 328 HP at `(1318,1675)`. The earlier hero-death failure did
+not recur in this run. This only establishes survival through this trial.
+
+The run still ended in source defeat, with no scheduler fault or sanitizer
+report. Human instance T16 entered its sequence at 10990 and completed at
+11009, changing outcome from running to defeat; T1 did not change then.
+T16's source condition concerns a hero Dark Templar in location 19, the
+northeastern hive region. The observed northern Templar became detected at
+10760 and lost some shields, then left detection with about 32 shields and
+reached that region. The southern detector remained alive; all five original
+southern ground escorts were removed between 9194 and 9344. Their later
+slot contents are not surviving escorts.
+
+The explicit verdict is `LOSS`, return status 1, at native frame 8807 after
+11161 ordinary update calls and 7202 regular-loop iterations. The retained
+log is `/tmp/sc64-z8-hero-retreat-7e873a4-20261101.log`; the separate local
+result receipt binds its hash and the driver. This is a host policy result,
+not a physical GBA run, a current merged-branch binary qualification or a
+demonstration that the position remains safe through later waves. The next
+policy needs an earlier northern detector/attacker interception and continued
+coverage of all three hive regions while pursuing both enemy Nexuses.
