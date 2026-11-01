@@ -500,6 +500,7 @@ static void test_range_work_scheduler_contracts(void)
                                   u[target_slot].x, u[target_slot].y));
         {
             int next_x = -1, next_y = -1;
+            sc64_range_corridor_budget = 0;
             assert(!sc64_direct_firing_waypoint(u[mover_slot].x,
                 u[mover_slot].y, u[target_slot].x, u[target_slot].y,
                 0, 112, &next_x, &next_y));
@@ -862,6 +863,70 @@ static void test_range_cached_point_fields(void)
     assert(sc64_route_builds==builds);
 }
 
+/* Cold reachable walls must start moving before the range flood completes;
+ * a sealed wall or blocked target still waits for bounded range routing. */
+static void test_range_cold_point_corridor(void)
+{
+    int nx, ny, start_x = 22 * 16 + 8, start_y = 40 * 16 + 8;
+    int tx = 32 * 16 + 8, ty = start_y;
+    setup_combat_scene(); clear_walk_grid(); sc64_routes_reset();
+    for (int row = 0; row < MAP_ROWS; ++row)
+        if (row != 20) SC64_GRID_SET(path_walkable, 24 + row * MAP_COLS, 0);
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    assert(sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(nx == start_x && ny == 20 * 16 + 8);
+    assert(sc64_range_corridor_last_checks <= 160);
+    assert(direct_path_clear(start_x, start_y, nx, ny));
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    u[attacker].x = start_x; u[attacker].y = start_y;
+    u[attacker].path_timer = 0; u[attacker].path_retry = 0;
+    move_toward_weapon_range(&u[attacker], victim, tx, ty, 0, 112);
+    assert(u[attacker].x != start_x || u[attacker].y != start_y);
+    assert(!sc64_range_route_queue_count && !sc64_range_route_active.valid);
+    /* At the opening, a long L is witnessed and installs only its clear
+     * horizontal first leg, even though the full path exceeds 128 pixels. */
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    assert(sc64_range_point_corridor(start_x, 20 * 16 + 8, tx, 28 * 16 + 8,
+                                     tx, ty, 0, &nx, &ny));
+    assert(nx == tx && ny == 20 * 16 + 8);
+    assert(sc64_range_corridor_last_checks <= 160);
+    assert(direct_path_clear(start_x, 20 * 16 + 8, nx, ny));
+    /* Repeated calls and topology invalidation cannot refill a frame budget. */
+    sc64_range_corridor_budget = 1;
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(sc64_range_corridor_budget == 0 && sc64_range_corridor_last_checks == 1);
+    sc64_routes_reset();
+    assert(sc64_range_corridor_budget == 0);
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(sc64_range_corridor_last_checks == 0);
+    assert(!sc64_range_point_corridor(-1, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    /* A minimum radius intersecting the first leg rejects the witness. */
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 200, &nx, &ny));
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    SC64_GRID_SET(path_walkable, 24 + 20 * MAP_COLS, 0);
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(sc64_range_corridor_last_checks <= 160);
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    SC64_GRID_SET(path_walkable, tx / 16 + ty / 16 * MAP_COLS, 0);
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(sc64_range_corridor_last_checks == 1);
+    /* Multiple units and blocked candidates draw from the same update cap. */
+    {
+        unsigned total = 0;
+        sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+        for (int unit = 0; unit < 4; ++unit) {
+            for (int candidate = 0; candidate < 50; ++candidate) {
+                assert(!sc64_range_point_corridor(start_x, start_y + unit * 16,
+                    tx, ty, tx, ty, 0, &nx, &ny));
+                total += sc64_range_corridor_last_checks;
+            }
+        }
+        assert(total == SC64_RANGE_CORRIDOR_BUDGET);
+        assert(sc64_range_corridor_budget == 0);
+    }
+}
+
 /* Exercise real slot reuse with an active copy, a snapshot and a separate
  * pending target. Reuse must not discard the unrelated pending request. */
 static void test_range_target_slot_reuse(void)
@@ -926,6 +991,7 @@ int main(void)
     test_one_corner_combat_moves_and_only_fires_in_range();
     test_melee_and_explicit_move_are_unchanged();
 #ifdef SC64_RANGE_WORK
+    test_range_cold_point_corridor();
     test_range_cached_point_fields();
     test_range_work_scheduler_contracts();
     test_range_target_slot_reuse();

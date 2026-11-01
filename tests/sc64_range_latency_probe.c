@@ -28,7 +28,7 @@ static void scenario(const char *name, int sealed, int competing, int moving)
     }
     memset(visible, 0xff, sizeof(visible));
     { int nx, ny; point_route = path_next_tile(u[a[0]].x, u[a[0]].y, u[t[0]].x, u[t[0]].y, &nx, &ny);
-      assert(!sc64_direct_firing_waypoint(u[a[0]].x, u[a[0]].y, u[t[0]].x, u[t[0]].y, 0, unit_range(U_TANK), &nx, &ny)); }
+      assert(!direct_path_clear(u[a[0]].x, u[a[0]].y, u[t[0]].x, u[t[0]].y)); }
     sc64_routes_reset();
     sc64_direct_firing_cache_invalidate();
 #ifdef SC64_RANGE_WORK
@@ -105,10 +105,9 @@ static void contention_scene(void)
         if (row != 10 && row != 54) SC64_GRID_SET(path_walkable, 30 + row * MAP_COLS, 0);
     memset(visible, 0xff, sizeof(visible));
     for (int i = 0; i < 2; ++i) {
-        int nx, ny;
         assert(currently_visible(target_x(targets[i]), target_y(targets[i])));
-        assert(!sc64_direct_firing_waypoint(u[attackers[i]].x, u[attackers[i]].y,
-            target_x(targets[i]), target_y(targets[i]), 0, unit_range(U_TANK) + 18, &nx, &ny));
+        assert(!direct_path_clear(u[attackers[i]].x, u[attackers[i]].y,
+            target_x(targets[i]), target_y(targets[i])));
         u[attackers[i]].selected = 1;
         assert(sc64_direct_attack_issue_target(targets[i]) == 1);
         u[attackers[i]].selected = 0;
@@ -151,7 +150,8 @@ static void contention_scene(void)
     puts("");
     fflush(stdout);
     for (int i = 0; i < 2; ++i) assert(first_drop[i] == -1);
-#ifdef SC64_RANGE_WORK
-    assert(active_mask == 3 && simultaneous > 0);
-#endif
+    /* Fast corridor witnesses may avoid queuing entirely; both attacks must
+     * still complete while each original order stays valid. */
+    assert(first_move[0] > 0 && first_move[1] > 0);
+    assert(first_hit[0] > 0 && first_hit[1] > 0);
 }
