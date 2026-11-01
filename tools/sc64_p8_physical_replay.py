@@ -80,6 +80,17 @@ def validate_plan(path):
         raise ValueError('unexpected pause-save button sequence')
     if mark['resume_call'] != cut + 2:
         raise ValueError('unexpected resume alignment')
+    checkpoints = {}
+    for line in path.read_text().splitlines():
+        row = json.loads(line)
+        if row.get('kind') == 'checkpoint':
+            tick = row['call_index']
+            if type(tick) is not int or tick in checkpoints or not 0 <= tick <= plan['stop']:
+                raise ValueError('invalid or duplicate checkpoint')
+            checkpoints[tick] = row
+    if plan['stop'] not in checkpoints:
+        raise ValueError('missing final checkpoint')
+    plan['checkpoints'] = checkpoints
     return plan, cut
 
 
@@ -119,12 +130,30 @@ def run(trace, rom, elf, runner, output, *, resume=None, summary=None, stop=None
             if restored['p8_persistent_sha256'] != saved['p8_persistent_sha256']:
                 raise RuntimeError('P8 persistent state differs after load')
             (output/'restored.json').write_text(json.dumps(restored,indent=2)+'\n')
-        rsp.play_to(end,events)
-        observed = snapshot(rsp,sym,sizes,elf)
+        records=[]
+        boundaries = sorted(t for t in plan['checkpoints'] if (cut if resume else 0) < t <= stop)
+        if stop not in boundaries: boundaries.append(stop)
+        for tick in boundaries:
+            native_tick = tick-cut+1 if resume else tick
+            rsp.play_to(native_tick,events)
+            observed = snapshot(rsp,sym,sizes,elf)
+            if tick in plan['checkpoints']:
+                expected=plan['checkpoints'][tick]
+                for name in ('screen','frame','won','lost'):
+                    if observed[name] != expected[name]:
+                        raise RuntimeError(f'checkpoint {tick} {name} differs')
+                if [r['fault'] for r in observed['runners']] != expected['fault'] or observed['runners'][0]['outcome'] != expected['outcome']:
+                    raise RuntimeError(f'checkpoint {tick} runtime differs')
+                hp=observed['stasis_cells'][0] if len(observed['stasis_cells']) == 1 else -1
+                if hp != expected['stasis_hp']:
+                    raise RuntimeError(f'checkpoint {tick} Stasis Cell differs')
+                records.append({'tick':tick,'snapshot':observed})
+                (output/'progress.json').write_text(json.dumps(records,indent=2)+'\n')
+
         if observed['race_selected_mission'] != 27 or any(r['fault'] for r in observed['runners']):
             raise RuntimeError('wrong mission or P8 runtime fault')
         result = {'status':'prefix','cut':cut,'stop':stop,'snapshot':observed,'inputs':before,
-                  'scope':'physical inputs; named P8 runtime and bounded saved-world fields'}
+                  'scope':'physical inputs; named P8 runtime and bounded saved-world fields','checkpoints':records}
         if not resume:
             if observed['screen'] != 2 or observed['frame'] != plan['save']['frame']-1:
                 raise RuntimeError('physical pause/save frame differs from host trace')
