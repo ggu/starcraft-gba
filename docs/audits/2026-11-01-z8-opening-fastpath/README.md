@@ -28,3 +28,27 @@ gate and use, keeps the same source world and ordinary button operations,
 original-hero identity checks and 20,000-step bound. The controller reads the
 world as an oracle; this is not an unaided human or physical-input trial.
 Clearance, survival, macro success and campaign WIN are not yet established.
+
+## One bounded host trial
+
+At source head `893879b5a3f020eac8abfe68e0f6cd65923d475c`, the single
+sanitized host trial reported strict LOSS at frame 13412, native frame 10729,
+source trigger 17 with location-18 count 1 and fault zero. The original
+Kerrigan remained alive at 328 HP. This is not a mission WIN.
+
+The observed opening matched the earlier boxed trace at the logged events:
+detector order frame 444; Kerrigan's Nydus request/exit frames 490/521;
+attack-move frame 826 to (900,1544); first Dark Templar visible frame 2119
+and cleared frame 2188. The selection shortcut was enabled at that clearance.
+The later controlled macro saw its Drone trip admitted at 7411 and arrive at
+7477, with the spending reservation active. A Hatchery order was accepted
+and pending at 9343; a foundation appeared at 9667. The log does not show a
+six-Hydralisk readiness/push event before defeat. This single coupled trial
+supports the usefulness of preserving the observed opening; it does not
+establish a unique cause for the earlier missed kill or prove later macro
+success. Ordinary input was driven by a host controller using world
+observations, not an unaided human or physical replay.
+
+The 109 pinned inputs and five sidecars were checked unchanged. The retained
+log SHA-256 is
+`9e88a155473fdf953d34b89ab2d1d534890e3a7ff10325bde0881f3d7aebf95c`.
