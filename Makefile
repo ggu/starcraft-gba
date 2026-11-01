@@ -586,7 +586,7 @@ CANONICAL_WEAPON_FLAGS ?= -DSC64_TANK_SOURCE_VFX -I.local/sc64/tank-vfx/generate
 # Direct firing points only replace a failed center route with a bounded set
 # of clear corridors. Clearing this override opts out of the staged fix.
 CANONICAL_DIRECT_FIRING_FLAGS ?= -DSC64_DIRECT_FIRING_POINTS
-CANONICAL_RANGE_WORK_FLAGS ?=
+CANONICAL_RANGE_WORK_FLAGS ?= -DSC64_RANGE_WORK
 DEATH_ART_DIR := .local/sc64/death/generated
 DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
 CANONICAL_DEATH_FLAGS ?= -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)

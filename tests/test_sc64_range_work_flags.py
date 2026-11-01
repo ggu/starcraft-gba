@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the optional range worker reaches all canonical race products."""
+"""Check shared range routing and its baseline opt-out in canonical products."""
 
 import os
 from pathlib import Path
@@ -13,7 +13,7 @@ FLAG = "-DSC64_RANGE_WORK"
 
 def product_flags(extra_flag):
     env = os.environ.copy()
-    if extra_flag:
+    if extra_flag is not None:
         env["CANONICAL_RANGE_WORK_FLAGS"] = extra_flag
     else:
         env.pop("CANONICAL_RANGE_WORK_FLAGS", None)
@@ -43,13 +43,16 @@ def product_flags(extra_flag):
 
 
 def main():
-    default = product_flags("")
+    default = product_flags(None)
+    disabled = product_flags("")
     enabled = product_flags(FLAG)
     for product in PRODUCTS:
-        assert FLAG not in default[product], (product, default[product])
+        assert FLAG in default[product], (product, default[product])
         assert FLAG in enabled[product], (product, enabled[product])
-        assert [x for x in enabled[product] if x != FLAG] == default[product], product
-    print("SC64 range-work flag default/opt-in wiring passed for all four products")
+        assert FLAG not in disabled[product], (product, disabled[product])
+        assert default[product] == enabled[product], product
+        assert [x for x in enabled[product] if x != FLAG] == disabled[product], product
+    print("SC64 range-work default/opt-out wiring passed for all four products")
 
 
 if __name__ == "__main__":
