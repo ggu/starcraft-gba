@@ -1,6 +1,9 @@
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
 #include "sc64_construction_save.h"
+#if defined(SC64_WORKER_CARGO_KIND) && (!defined(SC64_IMPACT_EVENTS) || defined(SC64_SCARAB_NAMESPACE_STAGE))
+#error "worker cargo requires the impact journal and does not support the Scarab draft"
+#endif
 #ifdef SC64_SAVE_UI_CONTEXT
 #include "sc64_save_ui_context.h"
 _Static_assert(MAX_BUILDINGS <= 254, "UI save index exceeds one-byte encoding");
@@ -39,7 +42,7 @@ static int race_scarab_stage_wire;
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME) || defined(SC64_WORKER_CARGO_KIND)
 static int
 race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                       unsigned world_width, unsigned world_height, Unit *out)
@@ -167,6 +170,9 @@ race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsi
     }
     return 1;
 }
+#endif
+#ifdef SC64_WORKER_CARGO_KIND
+#include "sc64_worker_cargo_save.h"
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_RESEARCH_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || defined(SC64_SHARED_TRANSPORT)
 static int
@@ -1168,6 +1174,9 @@ static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,u
 }
 #endif
 
+#ifdef SC64_WORKER_CARGO_KIND
+static int race_worker_cargo_previous(GbaSaveSelection *selection);
+#endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 static int race_scarab_stage_previous(GbaSaveSelection *selection);
 /* Dead rows are semantically empty. Validate the actor's identity/flight
@@ -1185,6 +1194,10 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
 }
 #endif
 static int race_save_game(void) {
+#ifdef SC64_WORKER_CARGO_KIND
+    GbaSaveSelection cargo_previous;
+    int cargo_have_previous=race_worker_cargo_previous(&cargo_previous);
+#endif
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_live_products_valid()) return 0;
 #endif
@@ -1242,6 +1255,10 @@ static int race_save_game(void) {
                                               (unsigned)key, SC64_BC_TECH_REACTOR);
         if (u[i].carry < 0 || u[i].carry > sc64_battlecruiser_energy_cap(reactor)) return 0;
     }
+#endif
+#ifdef SC64_WORKER_CARGO_KIND
+    for (unsigned i=0;i<MAX_UNITS;++i)
+        if (!sc64_worker_cargo_state_valid(&u[i])) return 0;
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (race_z5_active() && !race_z5_cloak_world_state_valid()) return 0;
@@ -1921,7 +1938,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#ifdef SC64_WORKER_CARGO_KIND
+    if (!race_impact_save_write(cargo_have_previous ? &cargo_previous : 0)) return 0;
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     if (!race_impact_save_write(have_previous ? &previous : 0)) return 0;
 #else
     if (!race_impact_save_write()) return 0;
@@ -1955,6 +1974,9 @@ static int race_save_game(void) {
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_WORKER_CARGO_KIND
+    int legacy_worker_cargo;
+#endif
     union {
         int unused;
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -2156,6 +2178,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
 #ifdef SC64_SHARED_BATTERY
     if (!race_battery_migrate_shield_phase(&race_data,width,height)) return 0;
+#endif
+#ifdef SC64_WORKER_CARGO_KIND
+    if (!race_save_worker_cargo_prepare(&race_data,(unsigned)width*16u,
+                                        (unsigned)height*16u,plan->legacy_worker_cargo)) return 0;
+    race_data.version = SAVE_VERSION;
 #endif
     if(v[8]<0||v[8]>=width*16||v[9]<0||v[9]>=height*16||v[11]<0||v[11]>2||
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
@@ -3296,6 +3323,58 @@ static int race_load_preflight(RaceLoadPlan *plan) {
     return ok;
 }
 
+#ifdef SC64_WORKER_CARGO_KIND
+/* Select and validate both generations together before publication. The
+ * callback only mutates the shared candidate and its load plan. */
+static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,void *context) {
+    RaceLoadPlan *plan=context;
+    if (raw != (const void *)&race_impact_record) return 0;
+    memset(plan,0,sizeof(*plan));
+#ifdef SC64_SHARED_TRANSPORT
+    if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION) return 0;
+    plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
+#else
+    if (tag != SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_SAVE_VERSION
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+        && tag != SC64_LEGACY_SAVE_VERSION
+#endif
+       ) return 0;
+    plan->legacy_worker_cargo=(tag!=SAVE_VERSION);
+#endif
+    if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,&plan->impact_candidate_count)) return 0;
+#if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) && !defined(SC64_SHARED_TRANSPORT)
+    if (race_data.version != tag) return 0;
+#else
+    if (race_data.version != (plan->legacy_worker_cargo ? SC64_WORKER_CARGO_LEGACY_SAVE_VERSION : SAVE_VERSION)) return 0;
+#endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+#if !defined(SC64_SHARED_TRANSPORT)
+    if (tag==SC64_LEGACY_SAVE_VERSION) {
+        if (race_data.state[27] != 0) return 0;
+    } else
+#endif
+    if (((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u) return 0;
+#endif
+    return race_load_preflight(plan);
+}
+static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
+#ifdef SC64_SHARED_TRANSPORT
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION};
+#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+    const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,SAVE_VERSION};
+#else
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,SAVE_VERSION};
+#endif
+    if (!save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
+                               race_worker_cargo_prepare_selected,plan,selection)) return 0;
+    return race_worker_cargo_prepare_selected(&race_impact_record,selection->length,selection->tag,plan);
+}
+static int race_worker_cargo_previous(GbaSaveSelection *selection) {
+    RaceLoadPlan plan;
+    return race_worker_cargo_select(&plan,selection);
+}
+#endif
+
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 /* Stage scope: supported skirmish geometries and the Terran compact codec.
  * The tag, never field values, determines the parent representation. */
@@ -3358,7 +3437,10 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 #endif
 static int race_load_game(void) {
     RaceLoadPlan plan = {0};
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#ifdef SC64_WORKER_CARGO_KIND
+    GbaSaveSelection selected;
+    if (!race_worker_cargo_select(&plan,&selected)) return 0;
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     GbaSaveSelection selected;
     if (!race_scarab_stage_select(&plan,&selected)) return 0;
 #else

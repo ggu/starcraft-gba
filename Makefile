@@ -6112,3 +6112,5 @@ include tests/sc64-scarab-wallet/Makefile
 include tests/sc64-protoss-preflight/Makefile
 
 include tests/sc64-range-work/Makefile
+
+include tests/sc64-worker-cargo/Makefile
