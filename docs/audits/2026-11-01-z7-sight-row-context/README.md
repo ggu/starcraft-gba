@@ -1,25 +1,25 @@
 # Prepared source-sight row contexts
 
-This candidate is based on experimental integration `8e4a333`.
-`SC64_Z7_VISIBILITY_ROW_CONTEXT` is absent from normal product flags. It
+The candidate was initially based on experimental integration `8e4a333`.
+The normal Z7 profile now selects `SC64_Z7_VISIBILITY_ROW_CONTEXT`, inherited
+by Z8. It
 prepares each old/new center's truncated tile coordinates, clipping extent,
 radius and halfwidth-table pointer once per supported source-sight transition.
 The row loop uses those temporary values instead of deriving them again for
 every old and new row. The phase-footprint rejection still runs first.
 
 The contexts live on the stack and do not add persistent state or BSS.
-The bounded result below does not establish a full-mission speedup. The existing
+The initial bounded result alone did not establish a full-mission speedup. The existing
 source-sight activation and unsupported-radius fallback are unchanged; this
 is a shared visibility implementation candidate, not a mission rule change.
 
-Qualification must run the independent bounded-row squared-distance oracle
+The candidate-stage qualification plan required the independent bounded-row squared-distance oracle
 (including negative centers and map edges) and the existing full-grid
 source-count, minimap, lifecycle and fallback oracle with the candidate flag.
 Then check normal Z7 and inherited Z8 ARM links against their existing guards,
 OFF ROM identity, and a current source-matched ordinary-input ON/OFF window.
-Only uninstrumented timing with matching retained state and render evidence
-can justify further admission. A bounded window alone is not a full mission
-or hardware frame-rate result.
+The bounded window was not a full mission or hardware frame-rate result.
+Later qualification is recorded below.
 
 ## Initial qualification
 
@@ -41,9 +41,8 @@ sprite header. A separate Z8-only follow-up copied the already-prepared,
 hash-verified Nydus-complete Z8 bank and program, without regeneration, and
 passed both normal ARM builds. Earlier Z7 and oracle results were retained.
 Local receipts are `/tmp/sc64-z7-row-context-preflight-20261101/result.json`
-and `/tmp/sc64-z7-row-context-z8-followup-20261101/result.json`. No full-mission
-physical replay, full clean default suite or activation is claimed for this
-candidate.
+and `/tmp/sc64-z7-row-context-z8-followup-20261101/result.json`. At that initial
+stage, full physical replay, clean default suite and activation were pending.
 
 ## Bounded ordinary-input timing
 
@@ -67,8 +66,8 @@ The 900 consecutive shipped cumulative-cycle deltas gave:
 The window maximum is the largest of the 900 measured per-update deltas,
 not the peak-since-boot counter. Timing includes presentation/UI and does not
 establish physical-device FPS or near-30-fps performance. The worse window
-maximum is retained as a qualification concern. A full ordinary save/fresh
-continuation and normal-profile activation checks remain necessary.
+maximum is retained as a qualification concern. At that stage, a full ordinary save/fresh continuation and normal-profile
+activation checks were still pending.
 
 The local receipt is `/tmp/sc64-contact-row-threeway-20261101/result.json`,
 SHA-256 `448e4bc0b590f643e3e16238548694a194b601bf8050b7c4750bf8c0e69ab837`.
@@ -89,5 +88,22 @@ maximum increased 0.658%, a separate measure from the peak since boot. These
 figures are not physical-device FPS. The ON continuation result SHA-256 is
 `05b47ee39f68673df979450f3c6e9351798b7ff10902f00100519b17750987e3`.
 
-Normal Z7/Z8 ROM identity and guards, inherited Z8 source-sight host oracle,
-and the clean default suite remain required on the activation source.
+The subsequent normal-profile activation qualification is recorded below.
+
+
+## Normal activation qualification
+
+Activation source `e8fd130` passed the independent phase oracle, Z7 full-grid
+sight oracle, and gated Z8 source-sight host fixture. Its normal Z7 ROM was
+byte-identical to the full physical candidate
+`856059b0f5443d0c673380cd8744e70f914089514009cf95223696c57be1e373`;
+the inherited normal Z8 ROM matched the qualified gated Z8 ROM
+`b896fbdf6871f6252127d0461c9ec678589a5ffd362c24eeab5ac985001d49ab`.
+Their BSS/IWRAM ends were `0203d718`/`03004f80` and
+`0203dbd8`/`03004bf0` respectively, within the unchanged guards. ELF debug
+file hashes differ between builds; the ROM bytes are identical.
+
+The clean unprepared activation worktree passed source boundary, doctor,
+default build and full default test; Python discovery ran 932 tests with
+26 skips. The 44-byte increase in the nested static transition/helper frames
+is a compiler estimate, not a complete stack high-water measurement.
