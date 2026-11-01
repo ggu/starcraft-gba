@@ -29,3 +29,18 @@ are not treated as destroyed. Reserved funds and a delayed
 push may themselves worsen defense. These are policy choices, not a proven
 victory strategy. This variant has not been compiled or run; its strict
 victory, original Kerrigan identity and update bound are unchanged.
+
+## Bounded host trial
+
+The single `a567311` candidate trial reached strict LOSS at frame 2600
+(native frame 2080), with fault zero. The first Dark Templar survived its
+initial engagement, left detection, and triggered source defeat 17. Original
+Kerrigan was still valid at 328 HP. The run ended before the traveler, mineral
+reservation, pending foundation or six-Hydralisk readiness stages were
+reached; it provides no evidence that those policies work or fail. The changed
+selection fast path altered controller input timing, and this trial also
+contains the boxed policy and shared-spawn hook candidate, so the cause of the
+failed defense is not isolated. No unchanged rerun is claimed.
+
+The retained host log SHA-256 is
+`2f655eb17aa9297f0dc1784176e2a04ff67069084b95d9e96db6bb3ccb49319d`.
