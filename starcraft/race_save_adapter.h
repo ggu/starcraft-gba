@@ -1799,9 +1799,77 @@ static int race_save_game(void) {
 #endif
     toast(7);return 1;
 }
+#ifdef SC64_SHARED_HP_REGEN
+/* The token describes a validated candidate geometry, but does not keep the
+ * candidate immutable. It must not outlive or alias a later scratch write. */
+typedef struct {
+    const RaceSave *candidate;
+    unsigned width, height;
+} RaceHpPreparedRows;
+
+static int race_hp_prepared_unit(const RaceHpPreparedRows *rows, unsigned slot, Unit *out)
+{
+    return rows && rows->candidate &&
+        race_save_decode_unit(rows->candidate,slot,rows->width*16u,rows->height*16u,out);
+}
+static int race_hp_prepared_building(const RaceHpPreparedRows *rows, unsigned slot, Building *out)
+{
+    return rows && rows->candidate && race_save_decode_building(rows->candidate,slot,out);
+}
+#ifdef SC64_ZP_FULL_STORAGE
+static int race_hp_prepared_mineral(const RaceHpPreparedRows *rows, unsigned slot, Mineral *out)
+{
+    return rows && rows->candidate &&
+        race_save_decode_mineral(rows->candidate,slot,rows->width*16u,rows->height*16u,out);
+}
+#endif
+/* Candidate-only row/geometry preparation. No live world, binding, route
+ * scratch, or SRAM writes. The output is installed only after every row
+ * decodes; existing full semantic preflight remains mandatory. */
+static int race_hp_prepare_rows(const RaceSave *candidate, RaceHpPreparedRows *out)
+{
+    RaceHpPreparedRows prepared; int mode,mission,width,height;
+    if (!candidate || !out) return 0;
+    mode=candidate->state[0];mission=candidate->state[2];
+    if ((unsigned)mode>1u || (unsigned)mission>=SC64_RACE_MAP_COUNT) return 0;
+    width=mode?64:sc64_race_maps[mission].width;
+    height=mode?64:sc64_race_maps[mission].height;
+#ifdef SC64_IMPORTED_SKIRMISH
+    int map=candidate->state[20];
+    if (map<0 || map>SC64_SKIRMISH_IMPORTED_COUNT) return 0;
+    if (mode && map) {
+        width=sc64_skirmish_maps[map-1].width;
+        height=sc64_skirmish_maps[map-1].height;
+    }
+#endif
+    if (!sc64_race_storage_geometry_valid(width,height)) return 0;
+    prepared.candidate=candidate;prepared.width=(unsigned)width;prepared.height=(unsigned)height;
+    for(unsigned i=0;i<MAX_UNITS;++i) {
+        Unit q;
+        if (!race_hp_prepared_unit(&prepared,i,&q) ||
+            !race_shared_hp_regen_unit_phase_valid(&q)) return 0;
+    }
+    for(unsigned i=0;i<MAX_BUILDINGS;++i) {
+        Building q;
+        if (!race_hp_prepared_building(&prepared,i,&q) ||
+            !race_shared_hp_regen_building_phase_valid(&q,mode)) return 0;
+    }
+#ifdef SC64_ZP_FULL_STORAGE
+    for(unsigned i=0;i<MAX_MINERALS;++i) {
+        Mineral q;
+        if (!race_hp_prepared_mineral(&prepared,i,&q)) return 0;
+    }
+#endif
+    *out=prepared;return 1;
+}
+#endif
+
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_SHARED_HP_REGEN
+    RaceHpPreparedRows hp_rows;
+#endif
     union {
         int unused;
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -2972,6 +3040,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_SCARAB_RUNTIME
     if (!race_scarab_save_candidate_valid(&race_data,(unsigned)width*16u,
                                            (unsigned)height*16u)) return 0;
+#endif
+#ifdef SC64_SHARED_HP_REGEN
+    /* Last: earlier validators may normalize candidate rows in place. */
+    if (!race_hp_prepare_rows(&race_data,&plan->hp_rows)) return 0;
 #endif
     plan->building_damage_marker = building_damage_marker;
     return 1;

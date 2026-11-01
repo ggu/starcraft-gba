@@ -6,6 +6,42 @@
 #endif
 /* Actor-owned phases must not share a global clock or owner restriction.
  * This is controlled fixture setup, not ordinary-input play. */
+/* A host-only ordinary custom save supplies rows; all preparation and row
+ * decodes below operate on an isolated copy, without SRAM modification. */
+static RaceSave hp_candidate_copy, hp_candidate_before;
+static Unit hp_world_units_before[MAX_UNITS];
+static Building hp_world_buildings_before[MAX_BUILDINGS];
+static void test_candidate_geometry_and_rows(void)
+{
+    game_init();race_mode=1;race_human=R_TER;race_bots=1;init_state();
+    assert(screen==SCREEN_PLAY && race_save_game());
+    hp_candidate_copy=race_data;hp_candidate_before=hp_candidate_copy;
+    memcpy(hp_world_units_before,u,sizeof(u));
+    memcpy(hp_world_buildings_before,b,sizeof(b));
+    RaceHpPreparedRows rows={0};
+    assert(race_hp_prepare_rows(&hp_candidate_copy,&rows));
+    assert(rows.candidate==&hp_candidate_copy && rows.width==(unsigned)race_cols &&
+           rows.height==(unsigned)race_rows);
+    for(unsigned i=0;i<MAX_UNITS;++i) {
+        Unit a,b0;
+        assert(race_hp_prepared_unit(&rows,i,&a));
+        assert(race_save_decode_unit(&hp_candidate_copy,i,rows.width*16u,rows.height*16u,&b0));
+        assert(!memcmp(&a,&b0,sizeof(a)));
+    }
+    for(unsigned i=0;i<MAX_BUILDINGS;++i) {
+        Building a,b0;
+        assert(race_hp_prepared_building(&rows,i,&a));
+        assert(race_save_decode_building(&hp_candidate_copy,i,&b0));
+        assert(!memcmp(&a,&b0,sizeof(a)));
+    }
+    assert(!memcmp(&hp_candidate_copy,&hp_candidate_before,sizeof(hp_candidate_copy)));
+    assert(!memcmp(hp_world_units_before,u,sizeof(u)) && !memcmp(hp_world_buildings_before,b,sizeof(b)));
+    hp_candidate_copy.state[0]=2;
+    RaceHpPreparedRows unchanged=rows;
+    assert(!race_hp_prepare_rows(&hp_candidate_copy,&rows));
+    assert(rows.candidate==unchanged.candidate && rows.width==unchanged.width && rows.height==unchanged.height);
+    assert(!memcmp(hp_world_units_before,u,sizeof(u)) && !memcmp(hp_world_buildings_before,b,sizeof(b)));
+}
 static void test_actor_phase_owners_and_reuse(void)
 {
     int slots[5];
@@ -164,6 +200,7 @@ int main(void)
     race_shared_hp_regen_tick();
     assert(b[colony].hp==bh+1 && b[colony].shield_remainder==0);
     assert(u[marine].shield_remainder==79);
+    test_candidate_geometry_and_rows();
     test_actor_phase_owners_and_reuse();
     test_paused_and_live_update();
     test_campaign_and_skirmish_bindings();
