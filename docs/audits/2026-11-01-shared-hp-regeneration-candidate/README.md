@@ -39,3 +39,32 @@ Candidate scratch is not entirely local today. Transport decoding writes global 
 Selection alone is not atomic load. Existing `race_load_game` begins assigning live mode, wallets, unit/building arrays and mission data after preflight, but can still return failure during row decode or P5/P6/P7/P8/Z5/Z6/Z7/Z8 live rebind, Battery validation, Nydus rebind, or P7 projectile restoration. `save_select_transaction` currently takes a `void` commit callback and cannot roll those changes back. Before using it for HPRegen1, each fallible post-preflight step must either become a candidate-derived, fully validated bounded plan with an infallible commit or be proven equivalent for every supported profile and refactored so its failure happens before the first live write. Snapshotting the whole world would violate the stated memory constraints and is not assumed. Until that proof and refactor exist, strict atomicity is not established and the product compile guard must remain. The existing Scarab selector and all feature-off readers/writers remain unchanged by this proposal.
 
 Qualification must use normal valid saves in each supported envelope plus existing authorized mock-SRAM checks: partial-phase fresh loads, older-valid/newer-semantically-rejected fallback, checksum failure, interrupted writes, unrelated valid slot preservation, exact new-tag/inner-tag provenance, no predecessor import, and snapshots of live units/buildings/wallets, services, bindings, projectile state and route-visible behavior after rejection. Test cases must also cover the plain legacy-row decoder availability, compact/derived/P7 typed rows, completed loaded and burrowed units, incomplete colony morph with retained phase, full HP, row reuse and all source-alias rules. Optional forged guest-SRAM predecessor experiments remain out of scope.
+
+## Host qualification preparation (unrun)
+
+The isolated qualification composition is based on experimental `4712e3a`,
+with journal component `35f5ed4`, property metadata `0928e41` and the
+`d84ce21` service/strict-preflight stack cherry-picked. Product builds remain
+blocked by the existing compile guard; fixture builds may use only the
+explicit `GBA_HOST` and `SC64_SHARED_HP_REGEN_TEST_ONLY` escape. This does
+not integrate the HPRegen1 journal or qualify a new save envelope.
+
+The compact stock profile's 50 eligibility bits come from the authenticated
+N64/PC agreement documented in the sibling facts audit. The test closure must
+use this source table, not substitute fabricated eligibility. Prepared-profile
+fact tables must be generated from the exact target feature flags and this
+source into separate ignored directories, with inputs, compiler command and
+hashes recorded; pinned source inputs and earlier generated fact headers are
+never overwritten. No regeneration has yet been run in this worktree.
+
+Planned ASan/UBSan host checks include: helper boundaries and 80 live updates;
+all represented owner slots and canonical campaign, skirmish and Showcase
+bindings; loaded and actually burrowed actor state; completed and incomplete
+colony morph, both phase bounds and relevant raw aliases; death and slot reuse;
+actual update and pause paths; and Z5 with the old mission-specific tick
+suppressed under the shared gate. Host-controlled actors and direct state
+checks are fixture setup, not ordinary-input or game-level save/load proof.
+Unsupported completion identities and any profile or feature whose evidence
+is missing must be reported rather than inferred. The service stores phase per
+actor; the expected 80-update interval is not a global clock phase. No native
+compile or fixture result has been obtained for this composition.
