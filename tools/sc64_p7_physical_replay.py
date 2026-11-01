@@ -54,7 +54,7 @@ def layout(elf,sym,sizes):
         width=sizes.get(symbol,0)
         if not width or width%out[name][0]:raise ValueError('invalid entity stride')
         checked_symbol(sym,sizes,symbol,width)
-    for name in ('frame','screen','won','lost','race_selected_mission'):
+    for name in ('frame','screen','won','lost','race_selected_mission','race_mode'):
         checked_symbol(sym,sizes,name,4)
     for name,fields in [('Sc64P7PersistentState',('runtime',)),('Sc64P7RuntimeState',('model','action_ticks','switch_bits','fault')),('Sc64P7State',('started','outcome','action_cursor')),('Sc64RaceCampaignState',('mission','phase')),('Unit',('alive','owner','raw_type','raw_owner')),('Sc64ZpCompactBuilding',('alive','raw_type','raw_owner','hp'))]:
         length,members=out[name]
@@ -72,7 +72,7 @@ def snapshot(rsp,sym,sizes,l):
         size,m=l[name];w=width or m.widths.get(key)
         if w not in (1,2,4) or m[key]+w>size:raise ValueError('invalid field width '+name+'.'+key)
         return int.from_bytes(raw[base+m[key]:base+m[key]+w],'little',signed=signed)
-    out={n:scalar(n) for n in ('frame','screen','won','lost','race_selected_mission')}
+    out={n:scalar(n) for n in ('frame','screen','won','lost','race_selected_mission','race_mode')}
     campaign=rsp.read(sym['race_campaign'],sizes['race_campaign'])
     out['campaign_mission']=field(campaign,'Sc64RaceCampaignState','mission');out['phase']=field(campaign,'Sc64RaceCampaignState','phase')
     p=rsp.read(sym['race_p7'],sizes['race_p7']);base=l['Sc64P7PersistentState'][1]['runtime'];model=base+l['Sc64P7RuntimeState'][1]['model']
@@ -109,10 +109,13 @@ def main():
             raise RuntimeError('not at fresh title')
         for end in ([12,1000] if a.stop==1000 else [12,1000,49968]):
             rsp.play_to(end,events);state=snapshot(rsp,sym,sizes,layouts);records.append({'updates':end,**state})
-            if state['race_selected_mission']!=26 or state['campaign_mission']!=26:raise RuntimeError('wrong mission')
-            if end==12 and (state['frame'],state['screen'])!=(1,1):raise RuntimeError('launch mismatch')
+            if state['race_mode']!=0 or state['race_selected_mission']!=26 or state['campaign_mission']!=26:raise RuntimeError('wrong mission or mode')
+            if end==12:
+                initial={(x['slot'],x['source_owner']) for x in state['nexuses'] if x['alive']}
+                if (state['frame'],state['screen'])!=(1,1) or not {(34,0),(74,0),(109,4)}<=initial:
+                    raise RuntimeError('launch or source Nexus census mismatch')
             if end==1000 and (state['frame'],state['screen'])!=(963,1):raise RuntimeError('prefix host mapping mismatch')
-            if end==49968 and not(state['screen']==3 and state['won']==1 and state['lost']==0 and state['outcome']==1 and state['fault']==0 and state['switch_bits']==1 and state['victory_cursor']==0 and state['action_timers_clear'] and not(state['started']&15) and state['started']&(1<<5) and all(state['heroes'][i]>=1 for i in (75,78,79)) and not any(x['alive'] and x['source_owner']==0 for x in state['nexuses'])):raise RuntimeError('strict P7 result mismatch')
+            if end==49968 and not(state['frame']==48739 and state['screen']==3 and state['won']==1 and state['lost']==0 and state['outcome']==1 and state['fault']==0 and state['switch_bits']==1 and state['victory_cursor']==0 and state['action_timers_clear'] and not(state['started']&15) and state['started']&(1<<5) and all(state['heroes'][i]>=1 for i in (75,78,79)) and not any(x['alive'] and x['source_owner']==0 for x in state['nexuses'])):raise RuntimeError('strict P7 result mismatch')
         for p,h in ((a.trace,TRACE_SHA),(a.rom,ROM_SHA),(a.elf,ELF_SHA),(a.runner,RUNNER_SHA)):
             if sha(p)!=h:raise RuntimeError('input changed')
         shared.require_unchanged(paths,before)
