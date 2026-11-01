@@ -94,9 +94,12 @@ static void case_load_after_birth(void)
 }
 #endif
 
-int main(void)
+int main(int argc,char **argv)
 {
     game_init();
+    if(argc==2 && !strcmp(argv[1],"birth")) { case_birth(0); return 0; }
+    if(argc==2 && !strcmp(argv[1],"reuse")) { case_birth(1); return 0; }
+    assert(argc==1);
     case_birth(0);
     case_birth(1);
     case_out_of_bounds_birth(-1,100);
