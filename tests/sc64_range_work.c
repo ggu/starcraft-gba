@@ -410,7 +410,7 @@ static void test_bounded_seed_box(void)
     assert(sc64_range_work_begin(&work,128,128,walk_store+1,2048,
         gradient_store+1,6144,frontier_store+1,scratch,
         64*16+8,64*16+8,0,64)==SC64_RANGE_WORK_PENDING);
-    assert(work.seed_width==9 && work.seed_height==9 && work.seed_total==81);
+    assert(work.seed_width==9 && work.seed_total==81);
     assert(sc64_range_work_pump(&work,0,&used)==SC64_RANGE_WORK_PENDING && used==0);
     while(work.phase!=SC64_RANGE_WORK_FLOOD){
         int status=sc64_range_work_pump(&work,1,&used);

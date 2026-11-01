@@ -1940,6 +1940,16 @@ static int race_save_game(void) {
 #else
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);
 #endif
+#ifdef SC64_RANGE_WORK
+    /* Match the load boundary after publication: these navigation caches are
+     * not serialized. Preserve committed worker depot assignments, which are
+     * serialized and do not represent a topology change. */
+    path_grid_valid = 0;
+#ifdef SC64_DIRECT_FIRING_POINTS
+    sc64_direct_firing_cache_invalidate();
+#endif
+    sc64_routes_reset();
+#endif
     toast(7);return 1;
 }
 /* Candidate-only load outputs live outside the route/save scratch union. */

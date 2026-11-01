@@ -1307,6 +1307,9 @@ static u16 bfs_queue[MAP_CELLS];
 static u16 bfs_queue[MAP_CELLS];
 #endif
 static void sc64_routes_reset(void);
+#ifdef SC64_RANGE_WORK
+static void sc64_range_route_forget_target(int target);
+#endif
 #else
 static int bfs_prev[MAP_CELLS], bfs_queue[MAP_CELLS];
 static u16 bfs_seen[MAP_CELLS], bfs_generation;
@@ -1327,6 +1330,12 @@ sc64_direct_firing_cache_invalidate(void)
 {
     sc64_direct_firing_cache.valid = 0;
 }
+#endif
+#ifdef SC64_RANGE_WORK
+#if !defined(SC64_DIRECT_FIRING_POINTS) || !defined(SC64_RACES) || \
+    !defined(SC64_IMPORTED_MISSION) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_RANGE_WORK requires imported race routing, packed route fields, and direct firing points"
+#endif
 #endif
 static int minerals, gas, supply_used, supply_cap, frame, mode, menu, train_type;
 static int geyser_count;
@@ -1956,8 +1965,8 @@ static int currently_visible(int x, int y);
 #ifdef SC64_SHARED_BUNKER
 static void race_bunker_clear_slot(int slot);
 #endif
-#ifdef SC64_DIRECT_ATTACK
 static int target_alive(int target);
+#ifdef SC64_DIRECT_ATTACK
 static int target_x(int target), target_y(int target);
 static void sc64_direct_attack_clear_references(int entity);
 static int sc64_direct_attack_find_target(int x, int y);
@@ -2288,6 +2297,9 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_RANGE_WORK
+    sc64_range_route_forget_target(i);
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_target_invalidate(i);
 #endif
@@ -2472,6 +2484,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_RANGE_WORK
+    sc64_range_route_forget_target(MAX_UNITS+i);
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_target_invalidate(MAX_UNITS+i);
 #endif
@@ -2998,6 +3013,11 @@ is_traversable(int col, int row, int from_cell)
 }
 
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_RANGE_WORK
+/* target_alive itself expects an in-range entity reference. */
+#define SC64_RANGE_TARGET_VALID(t) \
+    ((unsigned)(t) < (unsigned)(MAX_UNITS + MAX_BUILDINGS) && target_alive(t))
+#endif
 #include "sc64_routes.h"
 #endif
 #include "sc64_depot_goal.h"
@@ -7183,6 +7203,11 @@ sc64_direct_firing_approach(int x, int y, int px, int py, int *nx, int *ny)
     return sc64_direct_firing_corner(x, y, px, py, nx, ny);
 }
 
+#ifdef SC64_RANGE_WORK
+static int sc64_range_point_corridor(int x, int y, int gx, int gy,
+                                     int tx, int ty, int minimum,
+                                     int *nx, int *ny);
+#endif
 static int __attribute__((noinline))
 sc64_direct_firing_waypoint(int x, int y, int tx, int ty,
                             int minimum, int maximum, int *nx, int *ny)
@@ -7262,14 +7287,210 @@ sc64_direct_firing_waypoint(int x, int y, int tx, int ty,
         sc64_direct_firing_cache.valid = 1;
         return 1;
     }
+#ifdef SC64_RANGE_WORK
+    /* Reuse the already selected exact-band cells; the shared per-update
+     * cell budget covers all candidates and all units. */
+    for (int i = 0; i < count; ++i) {
+        int cell = points[i];
+        int px = (cell % MAP_COLS) * 16 + 8;
+        int py = (cell / MAP_COLS) * 16 + 8;
+        if (!sc64_range_point_corridor(x, y, px, py, tx, ty, minimum, nx, ny)) continue;
+        sc64_direct_firing_cache.tx = (u16)tx;
+        sc64_direct_firing_cache.ty = (u16)ty;
+        sc64_direct_firing_cache.minimum = (u16)minimum;
+        sc64_direct_firing_cache.maximum = (u16)maximum;
+        sc64_direct_firing_cache.x = (u16)px;
+        sc64_direct_firing_cache.y = (u16)py;
+        sc64_direct_firing_cache.valid = 1;
+        return 1;
+    }
+#endif
     return 0;
 }
 
+#ifdef SC64_RANGE_WORK
+#define SC64_RANGE_CORRIDOR_BUDGET 160u
+static u8 sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+#ifdef GBA_HOST
+static unsigned sc64_range_corridor_last_checks;
+#define SC64_RANGE_CORRIDOR_CHECK() (++sc64_range_corridor_last_checks)
+#else
+#define SC64_RANGE_CORRIDOR_CHECK() ((void)0)
+#endif
+/* A single axis leg with an explicit cell-inspection budget. */
+static int __attribute__((noinline))
+sc64_range_corridor_leg(int x, int y, int tx, int ty, u8 *budget)
+{
+    int col = x / 16, row = y / 16, end_col = tx / 16, end_row = ty / 16;
+    int dx = end_col > col ? 1 : end_col < col ? -1 : 0;
+    int dy = end_row > row ? 1 : end_row < row ? -1 : 0;
+    if (dx && dy) return 0;
+    while (col != end_col || row != end_row) {
+        if (!*budget) return 0;
+        --*budget;
+        SC64_RANGE_CORRIDOR_CHECK();
+        col += dx; row += dy;
+        if (!SC64_GRID_GET(path_walkable, col + row * MAP_COLS)) return 0;
+    }
+    return 1;
+}
+
+/* Prove an open two-turn point corridor using no more than 160 cell checks.
+ * Only the first leg is installed: every later leg is independently planned
+ * against current topology and weapon range. All calls share the update's
+ * remaining cell-inspection budget. */
+static int __attribute__((noinline))
+sc64_range_point_corridor(int x, int y, int gx, int gy, int tx, int ty,
+                          int minimum, int *nx, int *ny)
+{
+    int dx = FAST_ABS(gx - x), dy = FAST_ABS(gy - y);
+    int vertical = dx >= dy, open[2] = {1, 1};
+    int wall_col = x / 16, wall_row = y / 16, wall_found = 0;
+    int direction = vertical ? (gx > x ? 1 : -1) : (gy > y ? 1 : -1);
+    u8 *budget = &sc64_range_corridor_budget;
+#ifdef GBA_HOST
+    sc64_range_corridor_last_checks = 0;
+#endif
+    if (!*budget || x < 0 || y < 0 || tx < 0 || ty < 0 ||
+        x >= MAP_COLS * 16 || y >= MAP_ROWS * 16 ||
+        tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16 ||
+        gx < 0 || gy < 0 || gx >= MAP_COLS * 16 || gy >= MAP_ROWS * 16 ||
+        dx > 32 * 16 || dy > 32 * 16)
+        return 0;
+    --*budget;
+    SC64_RANGE_CORRIDOR_CHECK();
+    if (!SC64_GRID_GET(path_walkable, gx / 16 + (gy / 16) * MAP_COLS))
+        return 0;
+    /* Locate the first blocker along the dominant axis once. Testing that
+     * same wall cell at each offset avoids rescanning a long blocked leg. */
+    for (int n = 0; n < 32 && *budget; ++n) {
+        if (vertical) wall_col += direction; else wall_row += direction;
+        if (wall_col < 0 || wall_row < 0 || wall_col >= MAP_COLS || wall_row >= MAP_ROWS) break;
+        --*budget;
+        SC64_RANGE_CORRIDOR_CHECK();
+        if (!SC64_GRID_GET(path_walkable, wall_col + wall_row * MAP_COLS)) {
+            wall_found = 1; break;
+        }
+        if ((vertical && wall_col == gx / 16) || (!vertical && wall_row == gy / 16)) break;
+    }
+    if (!wall_found) {
+        int ax = vertical ? gx : x, ay = vertical ? y : gy;
+        int closest_x = vertical ? limit(tx, x < ax ? x : ax, x > ax ? x : ax) : x;
+        int closest_y = vertical ? y : limit(ty, y < ay ? y : ay, y > ay ? y : ay);
+        /* The dominant leg was just verified above. A long L can use it
+         * without revisiting cells; validate its remaining leg separately. */
+        if ((vertical ? wall_col == gx / 16 : wall_row == gy / 16) &&
+            dist2(closest_x, closest_y, tx, ty) >= minimum * minimum &&
+            sc64_range_corridor_leg(ax, ay, gx, gy, budget)) {
+            *nx = ax; *ny = ay;
+            return 1;
+        }
+        return 0;
+    }
+    for (int offset = 1; offset <= 32 && *budget; ++offset) {
+        for (int side = 0; side < 2 && *budget; ++side) {
+            int sign = side ? 1 : -1;
+            int ax = vertical ? x : (x / 16 + sign * offset) * 16 + 8;
+            int ay = vertical ? (y / 16 + sign * offset) * 16 + 8 : y;
+            int px = vertical ? x : (x / 16 + sign * (offset - 1)) * 16 + 8;
+            int py = vertical ? (y / 16 + sign * (offset - 1)) * 16 + 8 : y;
+            int bx = vertical ? gx : ax, by = vertical ? ay : gy;
+            int closest_x = vertical ? x : limit(tx, x < ax ? x : ax, x > ax ? x : ax);
+            int closest_y = vertical ? limit(ty, y < ay ? y : ay, y > ay ? y : ay) : y;
+            if (!open[side]) continue;
+            if (ax < 0 || ay < 0 || ax >= MAP_COLS * 16 || ay >= MAP_ROWS * 16 ||
+                !sc64_range_corridor_leg(px, py, ax, ay, budget)) {
+                open[side] = 0;
+                continue;
+            }
+            if (dist2(closest_x, closest_y, tx, ty) < minimum * minimum) continue;
+            if (!*budget) return 0;
+            --*budget;
+            SC64_RANGE_CORRIDOR_CHECK();
+            if (!SC64_GRID_GET(path_walkable,
+                    (vertical ? wall_col : ax / 16) +
+                    (vertical ? ay / 16 : wall_row) * MAP_COLS)) continue;
+            if (sc64_range_corridor_leg(ax, ay, bx, by, budget) &&
+                sc64_range_corridor_leg(bx, by, gx, gy, budget)) {
+                *nx = ax; *ny = ay;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+#undef SC64_RANGE_CORRIDOR_CHECK
+#endif
+
 static void __attribute__((noinline))
+#ifdef SC64_RANGE_WORK
+move_toward_weapon_range(Unit *q, int target, int tx, int ty,
+                         int minimum, int maximum)
+#else
 move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
+#endif
 {
     int may_plan = q->path_retry == 0 && q->path_timer <= 0;
     int nx, ny;
+#ifdef SC64_RANGE_WORK
+    if (maximum < 32 || sc64_race_unit_flying(q->type)) {
+        move_toward(q, tx, ty);
+        return;
+    }
+    if (!may_plan) {
+        move_toward(q, tx, ty);
+        return;
+    }
+    if (direct_path_clear(q->x, q->y, tx, ty)) {
+        move_toward(q, tx, ty);
+        return;
+    }
+#if defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
+    if (dist2(q->x, q->y, tx, ty) >= minimum * minimum &&
+        sc64_range_cached_point_step(q->x, q->y, tx, ty, &nx, &ny) &&
+        dist2(nx, ny, tx, ty) >= minimum * minimum) {
+        q->path_x = nx; q->path_y = ny;
+        q->path_retry = 0; q->path_timer = 24;
+        move_toward(q, tx, ty);
+        return;
+    }
+#endif
+    if (sc64_direct_firing_waypoint(q->x, q->y, tx, ty,
+                                    minimum, maximum, &nx, &ny)) {
+        q->path_x = nx; q->path_y = ny;
+        q->path_retry = 0; q->path_timer = 24;
+        move_toward(q, tx, ty);
+        return;
+    }
+    {
+        int next_col = -1, next_row = -1;
+        int status = sc64_range_route_next(target, tx, ty, minimum, maximum,
+                                           q->x / 16, q->y / 16,
+                                           &next_col, &next_row);
+        if (status == SC64_RANGE_ROUTE_FOUND ||
+            status == SC64_RANGE_ROUTE_STALE_GUIDANCE) {
+            /* A completed old seed at the current tile is not progress toward
+             * a moving target. Wait for the queued fresh snapshot instead of
+             * asking move_toward() for its synchronous point flood. */
+            if (status == SC64_RANGE_ROUTE_STALE_GUIDANCE &&
+                next_col == q->x / 16 && next_row == q->y / 16) {
+                q->path_x = q->x; q->path_y = q->y;
+                q->path_retry = 12; q->path_timer = 0;
+                return;
+            }
+            q->path_x = next_col * 16 + 8;
+            q->path_y = next_row * 16 + 8;
+            q->path_retry = 0; q->path_timer = 24;
+            move_toward(q, tx, ty);
+            return;
+        }
+        /* Pending, cancelled, and completed no-path jobs retry without
+         * invoking the synchronous whole-map route flood. */
+        q->path_x = q->x; q->path_y = q->y;
+        q->path_retry = 12; q->path_timer = 0;
+        return;
+    }
+#else
     move_toward(q, tx, ty);
     if (!may_plan || q->path_retry != 12 || maximum < 32 ||
         sc64_race_unit_flying(q->type)) return;
@@ -7277,6 +7498,7 @@ move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
         return;
     q->path_x = nx; q->path_y = ny;
     q->path_retry = 0; q->path_timer = 24;
+#endif
 }
 #endif
 #ifdef SC64_UNIT_FACING
@@ -7515,8 +7737,13 @@ tick_combat(Unit * q, int target)
         if (q->order==ORDER_TRANSPORTED && q->target>=MAX_UNITS) return;
 #endif
 #ifdef SC64_DIRECT_FIRING_POINTS
+#ifdef SC64_RANGE_WORK
+	move_toward_weapon_range(q, target, target_x(target), target_y(target),
+                                 minimum_range, range);
+#else
 	move_toward_weapon_range(q, target_x(target), target_y(target),
                                  minimum_range, range);
+#endif
 #else
 	move_toward(q, target_x(target), target_y(target));
 #endif
@@ -8918,6 +9145,12 @@ game_update(u16 held, u16 pressed)
 	interact();
 
     frame++;
+#ifdef SC64_RANGE_WORK
+    if (screen == SCREEN_PLAY) {
+        sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+        sc64_range_route_tick();
+    }
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) ++sc64_showcase_ticks;
 #endif

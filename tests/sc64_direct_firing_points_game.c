@@ -16,6 +16,9 @@ static void clear_walk_grid(void)
 #ifdef SC64_DIRECT_FIRING_POINTS
     sc64_direct_firing_cache_invalidate();
 #endif
+#ifdef SC64_RANGE_WORK
+    sc64_range_route_reset();
+#endif
 }
 
 static void block_center_ring(int tx, int ty)
@@ -35,6 +38,492 @@ static void assert_band(int x, int y, int tx, int ty, int minimum, int maximum)
     assert(x >= 8 && y >= 8 && x < MAP_COLS * 16 && y < MAP_ROWS * 16);
     assert(SC64_GRID_GET(path_walkable, x / 16 + (y / 16) * MAP_COLS));
 }
+
+#ifdef SC64_RANGE_WORK
+static void range_route_pump_one_tick(void)
+{
+    ++frame;
+    sc64_range_route_tick();
+    assert(sc64_range_route_last_units <= SC64_RANGE_WORK_BUDGET_PER_TICK);
+}
+
+static void range_route_game_update_tick(void)
+{
+    game_update(0, 0);
+    assert(sc64_range_route_last_units <= SC64_RANGE_WORK_BUDGET_PER_TICK);
+}
+
+static void range_route_pump_to_done(unsigned max_ticks, int target,
+                                     int tx, int ty, int col, int row)
+{
+    for (unsigned tick = 0; tick < max_ticks; ++tick) {
+        int next_col = -1, next_row = -1;
+        if (sc64_range_route_active.valid &&
+            sc64_range_route_active.target == (u16)target &&
+            sc64_range_route_work.target_x == (u16)tx &&
+            sc64_range_route_work.target_y == (u16)ty &&
+            sc64_range_route_work.min_range == 0 &&
+            sc64_range_route_work.max_range == 64 &&
+            sc64_range_route_work.phase == SC64_RANGE_WORK_DONE) return;
+        /* A pending combat order needs 12 retry ticks plus one timer-drain
+         * tick before its next plan. Refresh at that 14-frame cadence. */
+        if (tick % 14u == 0u) {
+            (void)sc64_range_route_next(target, tx, ty, 0, 64, col, row,
+                                        &next_col, &next_row);
+            for (int i = 0; i < SC64_RANGE_ROUTE_QUEUE_CAPACITY; ++i) {
+                Sc64RangeRouteJob *queued = &sc64_range_route_pending[i];
+                if (queued->valid) {
+                    next_col = next_row = -1;
+                    (void)sc64_range_route_next(queued->target, queued->tx,
+                        queued->ty, queued->minimum, queued->maximum, 0, 0,
+                        &next_col, &next_row);
+                }
+            }
+        }
+        range_route_pump_one_tick();
+    }
+    assert(!"range work failed to complete within bounded fixture limit");
+}
+
+static int range_route_queued_target(int target)
+{
+    for (int i = 0; i < SC64_RANGE_ROUTE_QUEUE_CAPACITY; ++i)
+        if (sc64_range_route_pending[i].valid &&
+            sc64_range_route_pending[i].target == target) return 1;
+    return 0;
+}
+
+static int range_route_request_present(int target, int tx, int ty)
+{
+    if (sc64_range_route_active.valid &&
+        sc64_range_route_active.target == (u16)target &&
+        sc64_range_route_work.target_x == (u16)tx &&
+        sc64_range_route_work.target_y == (u16)ty &&
+        sc64_range_route_work.min_range == 0 &&
+        sc64_range_route_work.max_range == 64) return 1;
+    for (int i = 0; i < SC64_RANGE_ROUTE_QUEUE_CAPACITY; ++i) {
+        const Sc64RangeRouteJob *job = &sc64_range_route_pending[i];
+        if (job->valid && job->target == (u16)target &&
+            job->tx == (u16)tx && job->ty == (u16)ty &&
+            job->minimum == 0 && job->maximum == 64) return 1;
+    }
+    return 0;
+}
+
+static int range_route_active_position_was_requested(int target,
+                                                      int first_tx,
+                                                      int latest_tx,
+                                                      int first_ty)
+{
+    Sc64RangeRouteJob current = sc64_range_route_active_key();
+    const Sc64RangeRouteJob *job = &current;
+    if (!job->valid || job->target != (u16)target ||
+        job->minimum != 0 || job->maximum != 64 ||
+        job->tx < (u16)first_tx || job->tx > (u16)latest_tx) return 0;
+    if (job->ty == (u16)first_ty && job->tx == (u16)first_tx) return 1;
+    return job->ty == (u16)(first_ty + 16) &&
+        ((job->tx - (u16)first_tx) % 16u) == 0u;
+}
+
+static Sc64RangeRouteJob range_route_stale_guidance_source(int target)
+{
+    if (sc64_range_route_active.valid &&
+        sc64_range_route_active.target == (u16)target &&
+        sc64_range_route_work.min_range == 0 &&
+        sc64_range_route_work.max_range == 64 &&
+        (sc64_range_route_work.phase == SC64_RANGE_WORK_FLOOD ||
+         sc64_range_route_work.phase == SC64_RANGE_WORK_DONE))
+        return sc64_range_route_active_key();
+    assert(sc64_range_route_snapshot_slot >= 0 &&
+           sc64_range_route_snapshot_slot < SC64_ROUTE_ACTIVE_SLOTS &&
+           sc64_route_valid[sc64_range_route_snapshot_slot] == 3 &&
+           sc64_range_route_snapshot_key.valid &&
+           sc64_range_route_snapshot_key.target == (u16)target &&
+           sc64_range_route_snapshot_key.minimum == 0 &&
+           sc64_range_route_snapshot_key.maximum == 64);
+    {
+        Sc64RangeRouteJob key = {0};
+        key.target = sc64_range_route_snapshot_key.target;
+        key.tx = sc64_range_route_snapshot_key.tx; key.ty = sc64_range_route_snapshot_key.ty;
+        key.minimum = sc64_range_route_snapshot_key.minimum;
+        key.maximum = sc64_range_route_snapshot_key.maximum; key.valid = 1;
+        return key;
+    }
+}
+
+static void test_range_scheduler_stays_lazy_and_releases_abandoned_copy(void)
+{
+    const int tx = 10 * 16 + 8, ty = 10 * 16 + 8;
+    int nc = -1, nr = -1;
+    sc64_range_route_reset();
+    path_grid_valid = 0;
+    sc64_range_route_tick();
+    assert(!path_grid_valid); /* no queued work: no eager whole-grid rebuild */
+
+#if SC64_RANGE_WORK_BUDGET_PER_TICK < 96u
+    /* A one-cell component completes quickly while the 6144-byte maximum-map
+     * snapshot takes multiple bounded copy ticks at this test quota. */
+    sc64_range_route_reset();
+    memset(path_walkable, 0, sizeof(path_walkable));
+    SC64_GRID_SET(path_walkable, 10 + 10 * MAP_COLS, 1);
+    path_grid_valid = 1;
+    assert(sc64_range_route_next(100, tx, ty, 0, 0, 10, 10,
+                                 &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+    for (unsigned tick = 0; tick < 1000u &&
+         sc64_range_route_work.phase != SC64_RANGE_WORK_DONE; ++tick)
+        range_route_pump_one_tick();
+    assert(sc64_range_route_active.valid &&
+           sc64_range_route_work.phase == SC64_RANGE_WORK_DONE);
+    assert(sc64_range_route_next(101, 20 * 16 + 8, ty, 0, 0, 10, 10,
+                                 &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+    frame = (int)(sc64_range_route_complete_frame +
+                  SC64_RANGE_ROUTE_RESULT_LEASE);
+    range_route_pump_one_tick();
+    assert(sc64_range_route_copy_slot >= 0);
+    assert(sc64_range_route_copy_cursor > 0 &&
+           sc64_range_route_copy_cursor <
+               sc64_range_work_ceil3((unsigned)sc64_range_route_work.cols * sc64_range_route_work.rows));
+    frame = (int)(sc64_range_route_pending[
+        sc64_range_route_queue_head].last_request +
+        SC64_RANGE_ROUTE_IDLE_LIMIT + 1u);
+    range_route_pump_one_tick();
+    assert(sc64_range_route_queue_count == 0);
+    assert(sc64_range_route_copy_slot < 0);
+    assert(sc64_range_route_snapshot_slot < 0);
+#endif
+    sc64_range_route_reset();
+    clear_walk_grid();
+}
+
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+static void test_range_query_reconfigures_shape_before_snapshot_lookup(void)
+{
+    int old_cols = race_cols, old_rows = race_rows;
+    int nc = -1, nr = -1;
+    race_cols = 64; race_rows = 64;
+    sc64_routes_reset();
+    clear_walk_grid();
+    assert(sc64_range_route_next(102, 40 * 16 + 8, 40 * 16 + 8,
+        0, 64, 10, 10, &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+    range_route_pump_one_tick();
+    assert(sc64_range_route_active.valid);
+
+    /* Model a map-shape update before the end-of-frame worker tick. Reconfigure
+     * must discard the old active field before the new query can inspect it. */
+    race_cols = 96; race_rows = 64;
+    path_grid_valid = 0;
+    assert(sc64_range_route_next(102, 50 * 16 + 8, 40 * 16 + 8,
+        0, 64, 10, 10, &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+    assert(!sc64_range_route_active.valid);
+    assert(sc64_range_route_queue_count == 1);
+
+    race_cols = old_cols; race_rows = old_rows;
+    sc64_routes_reset();
+    path_grid_valid = 0;
+}
+#endif
+
+/* Scheduler-only cases use explicit synthetic target IDs. */
+static void seed_range_synthetic_targets(void)
+{
+    for (int i=70;i<=102;++i) { u[i].alive=1;u[i].type=U_MARINE;u[i].owner=ENEMY; }
+}
+
+static void test_range_work_scheduler_contracts(void)
+{
+    const int tx = 56 * 16 + 8, ty = 40 * 16 + 8;
+    int nc = -1, nr = -1, status;
+    u32 route_builds_before;
+    game_init();
+    init_state();
+    seed_range_synthetic_targets();
+    test_range_scheduler_stays_lazy_and_releases_abandoned_copy();
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    test_range_query_reconfigures_shape_before_snapshot_lookup();
+#endif
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    seed_range_synthetic_targets();
+    memset(race_player, 0xff, sizeof(race_player));
+    race_player[SIDE] = race_player[ENEMY] = R_ZERG;
+    race_mode = 1;
+    race_human = R_ZERG;
+    assert(spawn_build(SIDE, B_COMMAND, 1000, 1000, 0) >= 0);
+    assert(spawn_build(ENEMY, B_COMMAND, 1500, 1000, 0) >= 0);
+    won = lost = 0;
+    screen = SCREEN_PLAY;
+    clear_walk_grid();
+    for (int row = 0; row < MAP_ROWS; ++row)
+        if (row != 20) SC64_GRID_SET(path_walkable, 24 + row * MAP_COLS, 0);
+
+    /* First query is admitted but cannot expose an uncomputed gradient. */
+    status = sc64_range_route_next(70, tx, ty, 0, 64, 5, 40, &nc, &nr);
+    assert(status == SC64_RANGE_ROUTE_PENDING);
+    assert(!sc64_range_route_active.valid);
+    range_route_pump_one_tick();
+    assert(sc64_range_route_active.valid &&
+           sc64_range_route_active.target == 70);
+    status = sc64_range_route_next(70, tx, ty, 0, 64, 5, 40, &nc, &nr);
+    assert(status == SC64_RANGE_ROUTE_PENDING);
+
+    /* A second target queues behind the active query. Completion is retained
+       for a finite lease, then FIFO service advances to the waiting target. */
+    assert(sc64_range_route_next(71, tx - 128, ty, 0, 64, 4, 40,
+                                 &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+    assert(range_route_queued_target(71));
+    range_route_pump_to_done((MAP_COLS * MAP_ROWS) + 1000u,
+                             70, tx, ty, 5, 40);
+    status = sc64_range_route_next(70, tx, ty, 0, 64, 5, 40, &nc, &nr);
+    assert(status == SC64_RANGE_ROUTE_FOUND);
+    {
+        int col = 5, row = 40;
+        for (int step = 0; step < MAP_COLS * MAP_ROWS; ++step) {
+            int next_col = -1, next_row = -1;
+            status = sc64_range_route_next(70, tx, ty, 0, 64,
+                                           col, row, &next_col, &next_row);
+            assert(status == SC64_RANGE_ROUTE_FOUND);
+            assert(SC64_GRID_GET(path_walkable,
+                                 next_col + next_row * MAP_COLS));
+            if (next_col == col && next_row == row) {
+                int dx = next_col * 16 + 8 - tx;
+                int dy = next_row * 16 + 8 - ty;
+                assert(dx * dx + dy * dy <= 64 * 64);
+                break;
+            }
+            col = next_col; row = next_row;
+            assert(step + 1 < MAP_COLS * MAP_ROWS);
+        }
+    }
+    for (int tick = 0; tick + 1 < SC64_RANGE_ROUTE_RESULT_LEASE; ++tick) {
+        if (tick % 14 == 0) {
+            assert(sc64_range_route_next(70, tx, ty, 0, 64, 5, 40,
+                &nc, &nr) == SC64_RANGE_ROUTE_FOUND);
+            assert(sc64_range_route_next(71, tx - 128, ty, 0, 64, 4, 40,
+                &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+        }
+        range_route_pump_one_tick();
+    }
+    assert(sc64_range_route_active.valid &&
+           sc64_range_route_active.target == 70);
+    for (int tick = 0; tick < 14; ++tick) {
+        if (tick == 0)
+            assert(sc64_range_route_next(71, tx - 128, ty, 0, 64, 4, 40,
+                &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+        range_route_pump_one_tick();
+    }
+    assert(sc64_range_route_active.valid &&
+           sc64_range_route_active.target == 71);
+
+    /* Move the target at each 14-frame replan cadence while game_update pumps
+       bounded work. Completed jobs may roll forward at the default quota, so
+       validate the active key against requested positions and require the
+       newest request to remain active or queued. */
+    {
+        const int first_tx = tx - 128;
+        int latest_tx = first_tx, latest_ty = ty + 16;
+        int stale_guidance_count = 0;
+        int have_guidance_key = 0;
+        Sc64RangeRouteJob guidance_key = {0};
+        for (int move = 0; move < 8; ++move) {
+            for (int tick = 0; tick < 14; ++tick)
+                range_route_game_update_tick();
+            latest_tx += 16;
+            status = sc64_range_route_next(71, latest_tx, latest_ty,
+                                           0, 64, 4, 40, &nc, &nr);
+            if (status == SC64_RANGE_ROUTE_STALE_GUIDANCE) {
+                ++stale_guidance_count;
+                if (!have_guidance_key) {
+                    guidance_key = range_route_stale_guidance_source(71);
+                    have_guidance_key = 1;
+                }
+            } else assert(status == SC64_RANGE_ROUTE_CANCELLED ||
+                          status == SC64_RANGE_ROUTE_PENDING ||
+                          status == SC64_RANGE_ROUTE_FOUND);
+            assert(range_route_request_present(71, latest_tx, latest_ty));
+            if (sc64_range_route_active.valid)
+                assert(range_route_active_position_was_requested(
+                    71, first_tx, latest_tx, ty));
+        }
+        for (int tick = 0; stale_guidance_count == 0 &&
+             tick < MAP_COLS * MAP_ROWS * 2; ++tick) {
+            if (tick % 14 == 0) {
+                status = sc64_range_route_next(71, latest_tx, latest_ty,
+                    0, 64, 4, 40, &nc, &nr);
+                if (status == SC64_RANGE_ROUTE_STALE_GUIDANCE) {
+                    ++stale_guidance_count;
+                    guidance_key = range_route_stale_guidance_source(71);
+                    have_guidance_key = 1;
+                } else assert(status == SC64_RANGE_ROUTE_CANCELLED ||
+                              status == SC64_RANGE_ROUTE_PENDING ||
+                              status == SC64_RANGE_ROUTE_FOUND);
+                assert(range_route_request_present(71, latest_tx, latest_ty));
+            }
+            if (!stale_guidance_count) range_route_game_update_tick();
+        }
+        assert(stale_guidance_count > 0 && have_guidance_key);
+        assert(guidance_key.target == 71 && guidance_key.minimum == 0 &&
+               guidance_key.maximum == 64 &&
+               guidance_key.tx >= (u16)first_tx &&
+               guidance_key.tx <= (u16)latest_tx);
+        /* Make the current position far enough from this witnessed field's
+           seed that following it demonstrates useful stale guidance. */
+        latest_tx = (int)guidance_key.tx + 128;
+        latest_ty = (int)guidance_key.ty + 16;
+        status = sc64_range_route_next(71, latest_tx, latest_ty,
+            0, 64, 4, 40, &nc, &nr);
+        assert(status == SC64_RANGE_ROUTE_STALE_GUIDANCE);
+        assert(range_route_request_present(71, latest_tx, latest_ty));
+        /* Follow the actual stale field across the wall to its firing ring,
+           then verify that ring is outside the moved target's current range. */
+        {
+            int col = 4, row = 40, reached_seed = 0;
+            for (int step = 0; step < MAP_COLS * MAP_ROWS; ++step) {
+                int next_col = -1, next_row = -1;
+                status = sc64_range_route_next(71, latest_tx, latest_ty,
+                    0, 64, col, row, &next_col, &next_row);
+                assert(status == SC64_RANGE_ROUTE_STALE_GUIDANCE);
+                assert(SC64_GRID_GET(path_walkable,
+                    next_col + next_row * MAP_COLS));
+                if (next_col == col && next_row == row) {
+                    int dx = col * 16 + 8 - guidance_key.tx;
+                    int dy = row * 16 + 8 - guidance_key.ty;
+                    assert(dx * dx + dy * dy <= 64 * 64);
+                    assert(dist2(col * 16 + 8, row * 16 + 8,
+                                 latest_tx, latest_ty) > 64 * 64);
+                    reached_seed = 1;
+                    break;
+                }
+                col = next_col; row = next_row;
+            }
+            assert(reached_seed);
+        }
+        range_route_pump_to_done((MAP_COLS * MAP_ROWS) + 1000u,
+                                 71, latest_tx, latest_ty, 4, 40);
+        assert(sc64_range_route_active.valid &&
+               sc64_range_route_active.target == 71 &&
+               sc64_range_route_work.target_x == latest_tx &&
+               sc64_range_route_work.target_y == latest_ty &&
+               sc64_range_route_work.phase == SC64_RANGE_WORK_DONE);
+        status = sc64_range_route_next(71, latest_tx + 16, latest_ty, 0, 64,
+                                       4, 40, &nc, &nr);
+        assert(status == SC64_RANGE_ROUTE_STALE_GUIDANCE);
+        for (unsigned tick = 0; tick < 1000u &&
+             (sc64_range_route_snapshot_slot < 0 ||
+              sc64_range_route_snapshot_key.tx != (u16)latest_tx ||
+              sc64_range_route_snapshot_key.ty != (u16)latest_ty); ++tick)
+            range_route_pump_one_tick();
+        assert(sc64_range_route_snapshot_slot >= 0 &&
+               sc64_route_valid[sc64_range_route_snapshot_slot] == 3 &&
+               sc64_range_route_snapshot_key.target == 71 &&
+               sc64_range_route_snapshot_key.tx == (u16)latest_tx &&
+               sc64_range_route_snapshot_key.ty == (u16)latest_ty);
+    }
+
+    /* A topology reset discards active and queued derived work. */
+    assert(sc64_range_route_next(72, tx, ty, 0, 64, 4, 40,
+                                 &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+    invalidate_path_grid();
+    assert(!sc64_range_route_active.valid);
+    assert(!range_route_queued_target(72));
+    clear_walk_grid();
+
+    /* A sealed component finishes as NO_PATH, rather than exposing a stale
+       seed or invoking the synchronous route flood. Count only this operation:
+       earlier game updates can route unrelated live synthetic targets. */
+    route_builds_before = sc64_route_builds;
+    for (int row = 0; row < MAP_ROWS; ++row)
+        SC64_GRID_SET(path_walkable, 12 + row * MAP_COLS, 0);
+    assert(sc64_range_route_next(73, tx, ty, 0, 64, 4, 40,
+                                 &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+    range_route_pump_to_done((MAP_COLS * MAP_ROWS) + 1000u,
+                             73, tx, ty, 4, 40);
+    assert(sc64_range_route_next(73, tx, ty, 0, 64, 4, 40,
+                                 &nc, &nr) == SC64_RANGE_ROUTE_NO_PATH);
+    assert(sc64_route_builds == route_builds_before);
+    sc64_range_route_reset();
+
+    /* Sixteen-bit request stamps remain wrap-safe for queue and active idle
+       expiry, including the exact 48/49-frame threshold. */
+    sc64_range_route_reset();
+    frame = 65530;
+    assert(sc64_range_route_next(74, tx, ty, 0, 64, 4, 40,
+                                 &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+    frame += SC64_RANGE_ROUTE_IDLE_LIMIT - 1;
+    sc64_range_route_tick();
+    assert(sc64_range_route_active.valid &&
+           sc64_range_route_active.target == 74);
+    ++frame;
+    sc64_range_route_tick();
+    assert(sc64_range_route_active.valid);
+    ++frame;
+    sc64_range_route_tick();
+    assert(!sc64_range_route_active.valid);
+
+    assert(sc64_range_route_next(75, tx, ty, 0, 64, 4, 40,
+                                 &nc, &nr) == SC64_RANGE_ROUTE_PENDING);
+    sc64_range_route_tick();
+    assert(sc64_range_route_active.valid);
+    frame += SC64_RANGE_ROUTE_IDLE_LIMIT;
+    sc64_range_route_tick();
+    assert(sc64_range_route_active.valid);
+    ++frame;
+    sc64_range_route_tick();
+    assert(!sc64_range_route_active.valid);
+
+    /* Drive a live Unit's native attack-target combat path every frame while
+       game_update pumps the scheduler. Target motion follows the 14-frame
+       retry cadence for the whole wall-crossing run. */
+    sc64_range_route_reset();
+    /* Synthetic scheduler targets must not participate in the live scene. */
+    for (int i = 70; i <= 102; ++i) memset(&u[i], 0, sizeof(u[i]));
+    clear_walk_grid();
+    for (int row = 0; row < MAP_ROWS; ++row)
+        if (row != 20) SC64_GRID_SET(path_walkable, 24 + row * MAP_COLS, 0);
+    {
+        const int ty = 40 * 16 + 8;
+        int mover_slot = spawn_unit(SIDE, U_TANK, 22 * 16 + 8, ty);
+        int target_slot = spawn_unit(ENEMY, U_HYDRALISK, 32 * 16 + 8, ty);
+        int crossed_gap = 0;
+        u32 builds = sc64_route_builds;
+        assert(mover_slot >= 0 && target_slot >= 0);
+        assert(u[mover_slot].alive && u[mover_slot].owner == SIDE &&
+               u[mover_slot].type == U_TANK);
+        assert(u[target_slot].alive && u[target_slot].owner == ENEMY &&
+               u[target_slot].type == U_HYDRALISK);
+        u[mover_slot].order = ORDER_ATTACK_TARGET;
+        u[mover_slot].target = target_slot;
+        u[target_slot].hp = u[target_slot].maxhp = 65535;
+#ifdef SC64_DIRECT_ATTACK
+        memset(visible, 0xff, sizeof(visible));
+#endif
+        assert(!direct_path_clear(u[mover_slot].x, u[mover_slot].y,
+                                  u[target_slot].x, u[target_slot].y));
+        {
+            int next_x = -1, next_y = -1;
+            sc64_range_corridor_budget = 0;
+            assert(!sc64_direct_firing_waypoint(u[mover_slot].x,
+                u[mover_slot].y, u[target_slot].x, u[target_slot].y,
+                0, 112, &next_x, &next_y));
+        }
+        for (int tick = 0; tick < MAP_COLS * MAP_ROWS * 2; ++tick) {
+            range_route_game_update_tick();
+            if (tick % 14 == 0)
+                u[target_slot].x = ((tick / 14) & 1 ? 31 : 32) * 16 + 8;
+#ifndef SC64_DIRECT_ATTACK
+            tick_combat(&u[mover_slot], target_slot);
+#endif
+            if (u[mover_slot].x >= 24 * 16 &&
+                u[mover_slot].y >= 18 * 16 && u[mover_slot].y <= 22 * 16)
+                crossed_gap = 1;
+            if (crossed_gap) break;
+        }
+        assert(crossed_gap);
+        assert(u[mover_slot].alive && u[target_slot].alive);
+        assert(sc64_route_builds == builds);
+    }
+    sc64_range_route_reset();
+}
+#endif
 
 static void test_bounded_search_key_and_origin_revalidation(void)
 {
@@ -166,15 +655,35 @@ static void test_obstructed_candidates_keep_baseline_retry(void)
 static void test_save_load_invalidates_cache(void)
 {
     int nx, ny;
+#ifdef SC64_RANGE_WORK
+    int target = -1;
+#endif
     game_init();
     race_mode = 1; race_human = R_ZERG; race_bots = 1; race_skirmish_map = 0;
     race_skirmish_init();
     clear_walk_grid();
     assert(sc64_direct_firing_waypoint(200, 200, 300, 200, 0, 64, &nx, &ny));
     assert(race_save_game());
+#ifdef SC64_RANGE_WORK
+    assert(!sc64_direct_firing_cache.valid);
+#else
     assert(sc64_direct_firing_cache.valid);
+#endif
+#ifdef SC64_RANGE_WORK
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (target_alive(i)) { target = i; break; }
+    assert(target >= 0);
+    assert(sc64_range_route_next(target, 300, 200, 0, 64, 10, 10,
+                                 &nx, &ny) == SC64_RANGE_ROUTE_PENDING);
+    range_route_pump_one_tick();
+    assert(sc64_range_route_active.valid);
+#endif
     assert(race_load_game());
     assert(!sc64_direct_firing_cache.valid);
+#ifdef SC64_RANGE_WORK
+    assert(!sc64_range_route_active.valid);
+    assert(!range_route_queued_target(target));
+#endif
 }
 #endif
 
@@ -214,7 +723,11 @@ static void test_combat_hook_or_baseline(void)
     tick_combat(&u[attacker], victim);
 #ifdef SC64_DIRECT_FIRING_POINTS
     assert(sc64_direct_firing_cache.valid);
+#ifdef SC64_RANGE_WORK
+    assert(u[attacker].path_retry == 0 && u[attacker].path_timer == 23);
+#else
     assert(u[attacker].path_retry == 0 && u[attacker].path_timer == 24);
+#endif
     assert(u[attacker].path_x != u[victim].x || u[attacker].path_y != u[victim].y);
     assert_band(u[attacker].path_x, u[attacker].path_y,
                 u[victim].x, u[victim].y, 0, 64);
@@ -223,6 +736,9 @@ static void test_combat_hook_or_baseline(void)
     assert(u[attacker].path_retry == 12 && u[attacker].path_timer == 0);
 #endif
     for (int tick = 0; tick < 500; ++tick) {
+#ifdef SC64_RANGE_WORK
+        sc64_range_route_tick();
+#endif
         int x = u[attacker].x, y = u[attacker].y;
         int hp = u[victim].hp;
         int distance = dist2(x, y, u[victim].x, u[victim].y);
@@ -301,6 +817,278 @@ static void test_melee_and_explicit_move_are_unchanged(void)
 #endif
 }
 
+#ifdef SC64_RANGE_WORK
+/* Cached point fields may guide range movement without another flood. */
+static void test_range_cached_point_fields(void)
+{
+    int nx = -1, ny = -1, slot = 0;
+    int col = 10, row = 10, goal_col = 20, goal_row = 10;
+    int cell, goal; u32 builds;
+    setup_combat_scene(); clear_walk_grid(); sc64_routes_reset();
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    assert(sc64_route_configure());
+#endif
+    cell = col + row * MAP_COLS; goal = goal_col + goal_row * MAP_COLS;
+    memset(sc64_route_field[slot], 0xff,
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+           sc64_route_active_bytes
+#else
+           sizeof(sc64_route_field[slot])
+#endif
+    );
+    sc64_route_goal[slot] = (u16)goal; sc64_route_valid[slot] = 1;
+    sc64_route_put(slot, cell, 1); sc64_route_put(slot, cell + 1, 1);
+    builds = sc64_route_builds;
+    assert(sc64_range_cached_point_step(168,168,328,168,&nx,&ny));
+    assert(nx == 184 && ny == 168 && sc64_route_builds == builds);
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    sc64_route_valid[slot] = 2;
+    assert(sc64_range_cached_point_step(168,168,328,168,&nx,&ny));
+    sc64_route_put(slot, cell, SC64_ROUTE_UNREACHABLE);
+    assert(!sc64_range_cached_point_step(168,168,328,168,&nx,&ny));
+    assert(sc64_route_builds == builds);
+    sc64_route_valid[slot] = 1;
+#endif
+    /* Blocked origins use the same adjacent-gradient policy as normal routes. */
+    SC64_GRID_SET(path_walkable,cell,0);
+    assert(sc64_range_cached_point_step(168,168,328,168,&nx,&ny));
+    assert(nx == 184 && ny == 168 && sc64_route_builds == builds);
+    SC64_GRID_SET(path_walkable,cell,1); sc64_route_put(slot,cell,1);
+    /* A wall blocks the target center; a warm point field avoids a new flood. */
+    SC64_GRID_SET(path_walkable,15 + row * MAP_COLS,0);
+    u[attacker].x=168; u[attacker].y=168; u[attacker].path_timer=0; u[attacker].path_retry=0;
+    move_toward_weapon_range(&u[attacker],victim,328,168,0,64);
+    assert(u[attacker].path_x==184 && u[attacker].path_y==168);
+    assert(sc64_route_builds==builds);
+    /* A too-close unit must not follow that inward point gradient. */
+    u[attacker].x=168; u[attacker].y=168; u[attacker].path_timer=0; u[attacker].path_retry=0;
+    move_toward_weapon_range(&u[attacker],victim,328,168,200,240);
+    assert(u[attacker].path_x != 184 || u[attacker].path_y != 168);
+    assert(sc64_route_builds==builds);
+}
+
+/* Fill every idle cache slot with actual point floods, then claim scratch and
+ * ensure the two overlapping fields alone must be rebuilt after release. */
+static void test_range_idle_point_cache_capacity(void)
+{
+    int slots, reduced, nx, ny;
+    u32 builds;
+    setup_combat_scene(); clear_walk_grid(); sc64_routes_reset();
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    assert(sc64_route_configure());
+#endif
+    slots = SC64_ROUTE_ACTIVE_SLOTS;
+    reduced = sc64_range_route_reduced_slots();
+    assert(slots >= reduced && reduced > 0);
+    builds = sc64_route_builds;
+    for (int i = 0; i < slots; ++i) {
+        int goal = (i + 2) + 2 * MAP_COLS;
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+        assert(sc64_route_slot_for_origin(goal, -1, 0) >= 0);
+#else
+        assert(sc64_route_slot(goal) >= 0);
+#endif
+    }
+    assert(sc64_route_builds == builds + (u32)slots);
+    builds = sc64_route_builds;
+    for (int i = 0; i < slots; ++i) {
+        int goal = (i + 2) + 2 * MAP_COLS;
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+        assert(sc64_route_slot_for_origin(goal, -1, 0) >= 0);
+#else
+        assert(sc64_route_slot(goal) >= 0);
+#endif
+    }
+    assert(sc64_route_builds == builds);
+    assert(sc64_range_route_next(victim, 400, 400, 0, 64, 5, 5, &nx, &ny) == SC64_RANGE_ROUTE_PENDING);
+    assert(SC64_ROUTE_ACTIVE_SLOTS == slots);
+    sc64_range_route_tick();
+    assert(sc64_range_route_active.valid && SC64_ROUTE_ACTIVE_SLOTS == reduced);
+    for (int i = reduced; i < slots; ++i) assert(!sc64_route_valid[i]);
+    sc64_range_route_reset();
+    assert(SC64_ROUTE_ACTIVE_SLOTS == slots);
+    for (int i = reduced; i < slots; ++i) assert(!sc64_route_valid[i]);
+    sc64_routes_reset();
+}
+
+/* Cold reachable walls must start moving before the range flood completes;
+ * a sealed wall or blocked target still waits for bounded range routing. */
+static void test_range_cold_point_corridor(void)
+{
+    int nx, ny, start_x = 22 * 16 + 8, start_y = 40 * 16 + 8;
+    int tx = 32 * 16 + 8, ty = start_y;
+    setup_combat_scene(); clear_walk_grid(); sc64_routes_reset();
+    for (int row = 0; row < MAP_ROWS; ++row)
+        if (row != 20) SC64_GRID_SET(path_walkable, 24 + row * MAP_COLS, 0);
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    assert(sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(nx == start_x && ny == 20 * 16 + 8);
+    assert(sc64_range_corridor_last_checks <= 160);
+    assert(direct_path_clear(start_x, start_y, nx, ny));
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    u[attacker].x = start_x; u[attacker].y = start_y;
+    u[attacker].path_timer = 0; u[attacker].path_retry = 0;
+    move_toward_weapon_range(&u[attacker], victim, tx, ty, 0, 112);
+    assert(u[attacker].x != start_x || u[attacker].y != start_y);
+    assert(!sc64_range_route_queue_count && !sc64_range_route_active.valid);
+    /* At the opening, a long L is witnessed and installs only its clear
+     * horizontal first leg, even though the full path exceeds 128 pixels. */
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    assert(sc64_range_point_corridor(start_x, 20 * 16 + 8, tx, 28 * 16 + 8,
+                                     tx, ty, 0, &nx, &ny));
+    assert(nx == tx && ny == 20 * 16 + 8);
+    assert(sc64_range_corridor_last_checks <= 160);
+    assert(direct_path_clear(start_x, 20 * 16 + 8, nx, ny));
+    /* Repeated calls and topology invalidation cannot refill a frame budget. */
+    sc64_range_corridor_budget = 1;
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(sc64_range_corridor_budget == 0 && sc64_range_corridor_last_checks == 1);
+    sc64_routes_reset();
+    assert(sc64_range_corridor_budget == 0);
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(sc64_range_corridor_last_checks == 0);
+    assert(!sc64_range_point_corridor(-1, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    /* A minimum radius intersecting the first leg rejects the witness. */
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 200, &nx, &ny));
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    SC64_GRID_SET(path_walkable, 24 + 20 * MAP_COLS, 0);
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(sc64_range_corridor_last_checks <= 160);
+    sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+    SC64_GRID_SET(path_walkable, tx / 16 + ty / 16 * MAP_COLS, 0);
+    assert(!sc64_range_point_corridor(start_x, start_y, tx, ty, tx, ty, 0, &nx, &ny));
+    assert(sc64_range_corridor_last_checks == 1);
+    /* Multiple units and blocked candidates draw from the same update cap. */
+    {
+        unsigned total = 0;
+        sc64_range_corridor_budget = SC64_RANGE_CORRIDOR_BUDGET;
+        for (int unit = 0; unit < 4; ++unit) {
+            for (int candidate = 0; candidate < 50; ++candidate) {
+                assert(!sc64_range_point_corridor(start_x, start_y + unit * 16,
+                    tx, ty, tx, ty, 0, &nx, &ny));
+                total += sc64_range_corridor_last_checks;
+            }
+        }
+        assert(total == SC64_RANGE_CORRIDOR_BUDGET);
+        assert(sc64_range_corridor_budget == 0);
+    }
+}
+
+/* Independent pixel-by-pixel safety oracle for returned first legs. Failed
+ * searches are permitted: this checks the witness, not search completeness. */
+static unsigned range_oracle_rand(unsigned *state)
+{
+    *state = *state * 1664525u + 1013904223u;
+    return *state;
+}
+
+static void test_range_corridor_pixel_oracle(void)
+{
+    unsigned state = 0x71a935cdu, successes = 0, orientations = 0;
+    unsigned nonzero_min = 0, offcenter = 0;
+    int nx, ny;
+    setup_combat_scene();
+    for (unsigned trial = 0; trial < 4096u; ++trial) {
+        int x, y, gx, gy, tx, ty, minimum;
+        unsigned initial = trial % (SC64_RANGE_CORRIDOR_BUDGET + 1u);
+        unsigned spent;
+        memset(path_walkable, 0xff, sizeof(path_walkable));
+        path_grid_valid = 1;
+        for (int k = 0; k < 100; ++k) {
+            unsigned col = range_oracle_rand(&state) % (unsigned)MAP_COLS;
+            unsigned row = range_oracle_rand(&state) % (unsigned)MAP_ROWS;
+            SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
+        }
+        x = (int)(range_oracle_rand(&state) % (unsigned)(MAP_COLS * 16));
+        y = (int)(range_oracle_rand(&state) % (unsigned)(MAP_ROWS * 16));
+        gx = (int)(range_oracle_rand(&state) % (unsigned)(MAP_COLS * 16));
+        gy = (int)(range_oracle_rand(&state) % (unsigned)(MAP_ROWS * 16));
+        tx = (int)(range_oracle_rand(&state) % (unsigned)(MAP_COLS * 16));
+        ty = (int)(range_oracle_rand(&state) % (unsigned)(MAP_ROWS * 16));
+        minimum = (int)(range_oracle_rand(&state) % 161u);
+        SC64_GRID_SET(path_walkable, x / 16 + (y / 16) * MAP_COLS, 1);
+        sc64_range_corridor_budget = (u8)initial;
+        if (sc64_range_point_corridor(x, y, gx, gy, tx, ty, minimum, &nx, &ny)) {
+            int px = x, py = y;
+            int sx = nx > x ? 1 : nx < x ? -1 : 0;
+            int sy = ny > y ? 1 : ny < y ? -1 : 0;
+            assert(!(sx && sy));
+            assert(nx >= 0 && ny >= 0 && nx < MAP_COLS * 16 && ny < MAP_ROWS * 16);
+            for (;;) {
+                assert(px >= 0 && py >= 0 && px < MAP_COLS * 16 && py < MAP_ROWS * 16);
+                assert(SC64_GRID_GET(path_walkable, px / 16 + (py / 16) * MAP_COLS));
+                assert(dist2(px, py, tx, ty) >= minimum * minimum);
+                if (px == nx && py == ny) break;
+                px += sx; py += sy;
+            }
+            ++successes;
+            if (sx) orientations |= 1u;
+            if (sy) orientations |= 2u;
+            if (minimum) ++nonzero_min;
+            if ((x & 15) != 8 || (y & 15) != 8) ++offcenter;
+        }
+        spent = initial - sc64_range_corridor_budget;
+        assert(spent == sc64_range_corridor_last_checks);
+        assert(spent <= initial);
+    }
+    assert(successes >= 20 && orientations == 3u && nonzero_min && offcenter);
+    printf("range pixel oracle: %u first legs, orientations=%u, nonzero-min=%u, off-center=%u\n",
+           successes, orientations, nonzero_min, offcenter);
+}
+
+/* Exercise real slot reuse with an active copy, a snapshot and a separate
+ * pending target. Reuse must not discard the unrelated pending request. */
+static void test_range_target_slot_reuse(void)
+{
+    sc64_range_route_reset();
+    memset(u,0,sizeof(u));
+    sc64_range_route_active=(Sc64RangeRouteActive){.target=0,.valid=1};
+    sc64_range_route_snapshot_key=(Sc64RangeRouteSnapshotKey){.target=0,.valid=1};
+    sc64_range_route_snapshot_slot=0;sc64_route_valid[0]=3;
+    sc64_range_route_copy_slot=1;sc64_route_valid[1]=3;
+    sc64_range_route_pending[0]=(Sc64RangeRouteJob){.target=0,.valid=1};
+    sc64_range_route_pending[1]=(Sc64RangeRouteJob){.target=1,.valid=1};
+    sc64_range_route_queue_head=0;sc64_range_route_queue_count=2;
+    assert(spawn_unit(ENEMY,U_MARINE,128,128)==0);
+    assert(!sc64_range_route_active.valid && sc64_range_route_copy_slot==-1);
+    assert(sc64_range_route_snapshot_slot==-1 && !sc64_range_route_snapshot_key.valid);
+    assert(sc64_route_valid[0]==0 && sc64_route_valid[1]==0);
+    assert(sc64_range_route_queue_count==1 && sc64_range_route_pending[0].target==1);
+    sc64_range_route_reset();
+}
+/* A real lethal hit invalidates pending work at the next bounded worker tick. */
+static void test_range_dead_target_cleanup(void)
+{
+    setup_combat_scene();
+    sc64_range_route_active=(Sc64RangeRouteActive){.target=(u16)victim,.valid=1};
+    sc64_range_route_snapshot_key=(Sc64RangeRouteSnapshotKey){.target=(u16)victim,.valid=1};
+    sc64_range_route_snapshot_slot=0;sc64_route_valid[0]=3;
+    sc64_range_route_copy_slot=1;sc64_route_valid[1]=3;
+    sc64_range_route_pending[0]=(Sc64RangeRouteJob){.target=(u16)victim,.valid=1};
+    sc64_range_route_queue_head=0;sc64_range_route_queue_count=1;
+    hit_target(victim,1000,U_MARINE,SIDE);assert(!u[victim].alive);
+    sc64_range_route_tick();
+    assert(!sc64_range_route_active.valid && !sc64_range_route_queue_count);
+    assert(sc64_range_route_snapshot_slot==-1 && sc64_range_route_copy_slot==-1);
+    assert(!sc64_route_valid[0] && !sc64_route_valid[1]);
+}
+
+/* A depot flood must not treat a tagged range copy as a matching depot or
+ * evict its storage while the bounded copy is in progress. */
+static void test_range_copy_depot_isolation(void)
+{
+    int slot;
+    clear_walk_grid();sc64_routes_reset();
+    sc64_range_route_copy_slot=0;sc64_route_valid[0]=3;
+    sc64_route_goal[0]=(u16)(SC64_ROUTE_DEPOT_TAG | 0u);
+    slot=sc64_route_depot_slot_for_origin(0,160,160,-1);
+    assert(slot>0 && sc64_range_route_copy_slot==0 && sc64_route_valid[0]==3);
+    assert(sc64_route_valid[slot]==1 && sc64_route_goal[slot]==SC64_ROUTE_DEPOT_TAG);
+    sc64_range_route_reset();
+}
+#endif
+
 int main(void)
 {
     gba_init();
@@ -312,6 +1100,16 @@ int main(void)
     test_combat_hook_or_baseline();
     test_one_corner_combat_moves_and_only_fires_in_range();
     test_melee_and_explicit_move_are_unchanged();
+#ifdef SC64_RANGE_WORK
+    test_range_cold_point_corridor();
+    test_range_corridor_pixel_oracle();
+    test_range_idle_point_cache_capacity();
+    test_range_cached_point_fields();
+    test_range_work_scheduler_contracts();
+    test_range_target_slot_reuse();
+    test_range_dead_target_cleanup();
+    test_range_copy_depot_isolation();
+#endif
 #ifdef SC64_DIRECT_FIRING_POINTS
     setup_combat_scene();
     {

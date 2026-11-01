@@ -14,6 +14,10 @@ game's own loader. The restored fingerprint must equal the saved one, and
 --continue neutral updates must reproduce the reference. Only scheduled
 controller inputs are written; game state is read, never written.
 
+With --physical, input uses only physical-button transport and guest memory is
+read-only. The legacy default uses the debug input scheduler. Physical mode
+rejects SRAM tampering and checks the restored lobby as well.
+
 The fingerprint covers frame, owner banks, mineral fields and the semantic
 selected persisted fields of every live unit and building, including active
 production queues, read at their DWARF offsets and widths. It is not a complete
@@ -235,6 +239,45 @@ class Game:
         self.log.close()
 
 
+
+class PhysicalGame(Game):
+    """Read named state while driving only the normal physical buttons."""
+
+    def __init__(self, runner: Path, rom: Path, elf: Path, out: Path, *,
+                 save_input: Path | None = None, save_output: Path | None = None):
+        import sc64_headless_physical as physical
+        import sc64_split_smoke as split
+        self.sym, self.sizes = symbols(elf), symbol_sizes(elf)
+        for name in ("screen", "frame", "race_mode", "race_front", "race_human",
+                     "race_bots", "race_skirmish_map", "u", "b", "m", "minerals",
+                     "gas", "race_minerals", "race_gas"):
+            if name not in self.sym:
+                raise ContinuationError(f"ELF lacks symbol {name}")
+        self.unit_stride, self.unit_layout = races.dwarf_struct_layout(elf, "Unit")
+        building = "Sc64ZpCompactBuilding" if self.sizes["b"] == 160 * 48 else "Building"
+        self.building_stride, self.building_layout = races.dwarf_struct_layout(elf, building)
+        self.front = split.frontend_offsets(elf)
+        out.mkdir(parents=True, exist_ok=True)
+        self.proc, self.rsp, self.log = physical.PhysicalReplay.start(
+            runner, rom, out, self.sym, self.sizes,
+            save_input=save_input, save_output=save_output)
+        self.keys = 0
+        self.updates = self.stale_update_stops = self.bootstrap_stops = 0
+
+    def step(self, keys: int = 0, n: int = 1) -> None:
+        if self.rsp.held != keys:
+            self.rsp.set_keys(keys)
+        self.rsp._advance(n)
+        self.keys = keys
+        self.updates = self.rsp.completed
+
+    def state(self) -> dict:
+        state = super().state()
+        for name in ("race_mode", "race_human", "race_bots", "race_skirmish_map"):
+            state[name] = self.u32(name)
+        return state
+
+
 def summary(state: dict) -> dict:
     return {"frame": state["frame"], "screen": state["screen"], "units": len(state["units"]),
             "buildings": len(state["buildings"]), "fingerprint": fingerprint(
@@ -269,6 +312,10 @@ def verdict(record: dict) -> dict:
 
 
 def run(args) -> dict:
+    use_physical = getattr(args, "physical", False)
+    if use_physical and getattr(args, "tamper_sram", False):
+        raise ContinuationError("physical mode cannot tamper with SRAM")
+    game_class = PhysicalGame if use_physical else Game
     out = args.output
     if out.exists():
         raise ContinuationError(f"{out} already exists")
@@ -281,7 +328,7 @@ def run(args) -> dict:
               "runner_sha256": hashlib.sha256(args.runner.read_bytes()).hexdigest(),
               "map": args.map, "human": args.human, "bots": args.bots,
               "play": args.play, "continue": args.continue_updates}
-    game = Game(args.runner, args.rom, args.elf, out / "phase1", save_output=sram)
+    game = game_class(args.runner, args.rom, args.elf, out / "phase1", save_output=sram)
     try:
         game.launch(args.map, human, bots)
         game.step(0, args.play)
@@ -291,7 +338,11 @@ def run(args) -> dict:
         if game.u32("screen") != SCREEN_PAUSE:
             raise ContinuationError("START did not open the pause menu")
         game.step(KEY_B)
-        record["saved"] = summary(game.state())
+        saved = game.state()
+        record["saved"] = summary(saved)
+        if use_physical:
+            record["saved_lobby"] = {name: saved[name] for name in
+                ("race_mode", "race_human", "race_bots", "race_skirmish_map")}
         game.step(KEY_A)
         game.step(0, args.continue_updates)
         record["reference"] = summary(game.state())
@@ -309,12 +360,16 @@ def run(args) -> dict:
         record["tampered"] = True
     record["sram_bytes"], record["sram_sha256"] = len(data), hashlib.sha256(data).hexdigest()
     after = out / "phase2.sav"
-    game = Game(args.runner, args.rom, args.elf, out / "phase2", save_input=sram, save_output=after)
+    game = game_class(args.runner, args.rom, args.elf, out / "phase2", save_input=sram, save_output=after)
     try:
         game.step(0, 2)
         game.step(KEY_L)
         record["loaded"] = bool(game.u32("screen") == SCREEN_PLAY and game.u32("race_mode") == 1)
-        record["restored"] = summary(game.state())
+        restored = game.state()
+        record["restored"] = summary(restored)
+        if use_physical:
+            record["restored_lobby"] = {name: restored[name] for name in
+                ("race_mode", "race_human", "race_bots", "race_skirmish_map")}
         game.step(0, args.continue_updates)
         record["resumed"] = summary(game.state())
         record["phase2_stale_update_stops"] = game.stale_update_stops
@@ -324,6 +379,15 @@ def run(args) -> dict:
         game.close()
     record["sram_unchanged"] = after.read_bytes() == data
     record.update(verdict(record))
+    if use_physical:
+        record["transport"] = "physical-buttons"
+        record["checks"]["lobby_matches"] = record["saved_lobby"] == record["restored_lobby"] == {
+            "race_mode": 1, "race_human": human, "race_bots": len(bots),
+            "race_skirmish_map": args.map}
+        record["checks"]["game_updates_match"] = (
+            record["reference"]["frame"] - record["saved"]["frame"] == args.continue_updates and
+            record["resumed"]["frame"] - record["restored"]["frame"] == args.continue_updates)
+        record["ok"] = record["ok"] and record["checks"]["lobby_matches"] and record["checks"]["game_updates_match"]
     for home in out.glob("phase*/home"):
         for path in sorted(home.rglob("*"), reverse=True):
             path.unlink() if path.is_file() or path.is_symlink() else path.rmdir()
@@ -342,9 +406,13 @@ def main(argv=None) -> int:
     parser.add_argument("--bots", default="zpt")
     parser.add_argument("--play", type=int, default=9000)
     parser.add_argument("--continue", dest="continue_updates", type=int, default=900)
+    parser.add_argument("--physical", action="store_true",
+                        help="use physical buttons and read-only guest state")
     parser.add_argument("--tamper-sram", action="store_true",
                         help="negative control: corrupt the saved record before phase 2")
     args = parser.parse_args(argv)
+    if args.physical and args.tamper_sram:
+        parser.error("--physical cannot be combined with --tamper-sram")
     if not 1 <= len(args.bots) <= 3 or any(c not in RACES for c in args.bots):
         parser.error("--bots takes one to three of t, z, p")
     if not 60 <= args.continue_updates <= 20000 or not 60 <= args.play <= 60000:

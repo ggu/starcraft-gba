@@ -1,7 +1,8 @@
 # Incremental range-field primitive
 
 `starcraft/sc64_range_work.h` is a source-only, caller-owned BFS worker. It is
-not connected to the game loop. The caller supplies a read-only bit-packed
+connected through the shared game adapter in `sc64_routes.h`; this page
+describes the standalone primitive. The caller supplies a read-only bit-packed
 walk grid, a writable 3-bit gradient field, and scratch storage. No map-sized
 storage is allocated by the worker, and it does not use the engine's shared
 `bfs_queue`.
@@ -50,12 +51,13 @@ both `C` and `V` are at most `N`, `ceil(ceil(3N/8)/64) +
 ceil(scratch_required(N)/64) + 2N` is a finite upper bound. Phase transitions
 add at most `N+3` constant-time checks, since each of at most `N` BFS layers
 advances once. These are completion bounds, not recommended frame quotas.
-Choosing the per-frame quota and integrating a pump remain separate work.
+The engine adapter chooses a per-update quota; that work-unit quota is not a
+whole-frame cycle guarantee. See `audits/2026-11-01-range-work/README.md`.
 
 This primitive does not solve scheduling multiple target keys, starvation,
 moving-target snapshots, cancellation policy, or how a combat caller should
-react to `PENDING`. Those remain integration decisions; this file makes no
-engine behavior or SRAM claims.
+react to `PENDING`. The shared adapter handles those integration decisions; the primitive itself
+makes no engine behavior or SRAM claims.
 
 Asset-free verification command:
 
