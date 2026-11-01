@@ -483,6 +483,25 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
 #define SC64_SCARAB_TRANSPORT_SAVE_VERSION (SC64_SCARAB_SAVE_VERSION | 0x04000000u)
 #endif
 #endif
+#ifdef SC64_SHARED_HP_REGEN
+/* Staged identity only. Product builds are blocked until the candidate-aware
+ * journal is integrated; these constants do not change any reader/writer. */
+_Static_assert((SAVE_VERSION & 0x02000000u) != 0,
+               "HP regeneration tag transform requires reserved bit");
+#define SC64_HP_REGEN_INNER_TAG (SAVE_VERSION ^ 0x02000000u)
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_SHARED_TRANSPORT)
+#define SC64_HP_REGEN_PREDECESSOR_TAG SC64_SCARAB_TRANSPORT_SAVE_VERSION
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
+#define SC64_HP_REGEN_PREDECESSOR_TAG SC64_SCARAB_SAVE_VERSION
+#elif defined(SC64_SHARED_TRANSPORT)
+#define SC64_HP_REGEN_PREDECESSOR_TAG SC64_TRANSPORT_SAVE_VERSION
+#else
+#define SC64_HP_REGEN_PREDECESSOR_TAG SAVE_VERSION
+#endif
+_Static_assert((SC64_HP_REGEN_PREDECESSOR_TAG & 0x02000000u) != 0,
+               "HP regeneration outer tag overlaps reserved namespace");
+#define SC64_HP_REGEN_OUTER_TAG (SC64_HP_REGEN_PREDECESSOR_TAG ^ 0x02000000u)
+#endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
 #endif
@@ -1827,6 +1846,9 @@ static void race_construction_worker_tick(int worker);
 static int race_building_can_burn(const Building *building);
 #if defined(SC64_SHARED_HP_REGEN) && !defined(SC64_RACES)
 #error "SC64_SHARED_HP_REGEN requires SC64_RACES"
+#endif
+#if defined(SC64_SHARED_HP_REGEN) && !(defined(GBA_HOST) && defined(SC64_SHARED_HP_REGEN_TEST_ONLY))
+#error "Shared HP regeneration requires its unimplemented validated HPRegen1 journal"
 #endif
 static void race_tick_buildings(void),race_tick_state(void),race_tick_ai(void),race_tick_defenses(void);
 #ifdef SC64_SHARED_HP_REGEN

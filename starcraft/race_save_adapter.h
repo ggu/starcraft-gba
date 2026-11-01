@@ -1111,6 +1111,12 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
 }
 #endif
 static int race_save_game(void) {
+#ifdef SC64_SHARED_HP_REGEN
+    for (int i=0;i<MAX_UNITS;i++)
+        if (!race_shared_hp_regen_unit_phase_valid(&u[i])) return 0;
+    for (int i=0;i<MAX_BUILDINGS;i++)
+        if (!race_shared_hp_regen_building_phase_valid(&b[i],race_mode)) return 0;
+#endif
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_live_products_valid()) return 0;
 #endif
@@ -1965,6 +1971,19 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
+#ifdef SC64_SHARED_HP_REGEN
+    for (int i=0;i<MAX_UNITS;i++) {
+        Unit q;
+        if (!race_save_decode_unit(&race_data,(unsigned)i,(unsigned)width*16u,
+                                   (unsigned)height*16u,&q) ||
+            !race_shared_hp_regen_unit_phase_valid(&q)) return 0;
+    }
+    for (int i=0;i<MAX_BUILDINGS;i++) {
+        Building q;
+        if (!race_save_decode_building(&race_data,(unsigned)i,&q) ||
+            !race_shared_hp_regen_building_phase_valid(&q,v[0])) return 0;
+    }
+#endif
 #ifdef SC64_SHARED_BATTERY
     if (!race_battery_migrate_shield_phase(&race_data,width,height)) return 0;
 #endif

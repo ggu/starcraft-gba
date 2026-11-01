@@ -1012,6 +1012,53 @@ static int race_shared_hp_regen_raw(int raw, int expected_type, int building)
                    sc64_race_unit_from_raw(raw) != expected_type) return -1;
     return raw;
 }
+/* The current unit pool models completed actors and a distinct Egg row.
+ * Larva/Cocoon/Lurker Egg have no supported Unit completion representation;
+ * fail closed if a future profile maps one without an explicit lifecycle. */
+static int race_shared_hp_regen_unit_completed(const Unit *q, int raw)
+{
+    if (!q || !q->alive || raw==35 || raw==36 || raw==59 || raw==97) return 0;
+#ifdef SC64_Z7_EGG_PRODUCTION
+    if (q->type==U_Z7_EGG) return 0;
+#endif
+    return 1;
+}
+
+/* Strict phase preflight is intentionally independent of the live mission.
+ * New namespace candidates may not admit a regenerating raw identity that
+ * this runtime would silently skip. No legacy payload normalization occurs. */
+static int race_shared_hp_regen_unit_phase_valid(const Unit *q)
+{
+    int raw, expected; const Sc64StockUnitProfile *a,*b;
+    if (!q->alive) return 1;
+    if ((unsigned)q->type >= SC_RU_COUNT) return 0;
+    expected=sc64_race_raw_unit(q->type);
+    raw=q->raw_type>=0?q->raw_type:expected;
+    a=sc64_stock_unit_profile(raw);b=sc64_stock_unit_profile(expected);
+    if (!((a&&(a->flags&SC64_STOCK_F_REGENERATES_HP)) ||
+          (b&&(b->flags&SC64_STOCK_F_REGENERATES_HP)))) return 1;
+    return race_shared_hp_regen_raw(raw,q->type,0)>=0 &&
+           race_shared_hp_regen_unit_completed(q,raw) &&
+           sc64_race_unit_rule(q->type) && !sc64_race_unit_rule(q->type)->shields &&
+           (unsigned)q->shield_remainder<SC64_SHARED_HP_REGEN_PHASES;
+}
+static int race_shared_hp_regen_building_phase_valid(const Building *q,int custom)
+{
+    int raw,expected,morph; const Sc64StockUnitProfile *a,*b;
+    if (!q->alive) return 1;
+    if ((unsigned)q->type >= SC_RB_COUNT) return 0;
+    expected=sc64_race_raw_building(q->type);
+    raw=q->raw_type>=0?q->raw_type:expected;
+    a=sc64_stock_unit_profile(raw);b=sc64_stock_unit_profile(expected);
+    if (!((a&&(a->flags&SC64_STOCK_F_REGENERATES_HP)) ||
+          (b&&(b->flags&SC64_STOCK_F_REGENERATES_HP)))) return 1;
+    morph=custom&&q->under_construction&&q->type==B_CREEP_COLONY&&
+          (raw==sc64_race_raw_building(B_SUNKEN_COLONY)||
+           raw==sc64_race_raw_building(B_SPORE_COLONY));
+    return (morph||race_shared_hp_regen_raw(raw,q->type,1)>=0) &&
+           !sc64_race_building_shields(q->type) &&
+           (unsigned)q->shield_remainder<SC64_SHARED_HP_REGEN_PHASES;
+}
 static void __attribute__((noinline)) race_shared_hp_regen_tick(void)
 {
     for (int i = 0; i < MAX_UNITS; ++i) {
@@ -1019,7 +1066,8 @@ static void __attribute__((noinline)) race_shared_hp_regen_tick(void)
         if (!q->alive || (unsigned)q->type >= SC_RU_COUNT || (unsigned)q->owner >= 5 ||
             !sc64_race_unit_rule(q->type) || sc64_race_unit_rule(q->type)->shields) continue;
         raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
-        if (race_shared_hp_regen_raw(raw, q->type, 0) < 0) continue;
+        if (race_shared_hp_regen_raw(raw, q->type, 0) < 0 ||
+            !race_shared_hp_regen_unit_completed(q,raw)) continue;
         phase = (unsigned)q->shield_remainder;
         if (sc64_shared_hp_regen_tick(&q->hp, q->maxhp, &phase, 1))
             q->shield_remainder = phase;
