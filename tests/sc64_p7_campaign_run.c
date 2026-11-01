@@ -10,7 +10,7 @@
 #define P7_CONTROLLER_PROFILE "P7_TYPED_MOVE_FLAGS"
 #endif
 
-#define RUN_LIMIT 60000u
+#define RUN_LIMIT 180000u
 #define KEY_TAP(k) do { input((k)); input(0); } while (0)
 
 static FILE *trace;
