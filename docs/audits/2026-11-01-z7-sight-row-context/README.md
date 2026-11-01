@@ -75,3 +75,19 @@ SHA-256 `448e4bc0b590f643e3e16238548694a194b601bf8050b7c4750bf8c0e69ab837`.
 Root independently recomputed the three means, p95s, maxima and bucket counts
 from all 900 per-variant samples. The contact candidate was slightly slower
 and is not adopted.
+
+## Full fresh physical continuation
+
+The gated Z7 ROM `856059b0f5443d0c673380cd8744e70f914089514009cf95223696c57be1e373`
+exported its own ordinary physical-button save at cut 12 and resumed in a fresh
+process. The prefix observation and all 302 retained continuation observations
+matched the current phase-enabled baseline. The continuation reached victory
+across 179,753 updates. Mean emulated main-loop cycles including presentation
+and UI fell from 2,158,730.324 to 2,099,758.494 (2.731783%); peak since boot
+fell from 53,713,860 to 53,689,552 (0.045255%). The earlier 900-update window
+maximum increased 0.658%, a separate measure from the peak since boot. These
+figures are not physical-device FPS. The ON continuation result SHA-256 is
+`05b47ee39f68673df979450f3c6e9351798b7ff10902f00100519b17750987e3`.
+
+Normal Z7/Z8 ROM identity and guards, inherited Z8 source-sight host oracle,
+and the clean default suite remain required on the activation source.
