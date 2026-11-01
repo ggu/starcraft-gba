@@ -13,6 +13,9 @@ def check(root: Path, facts_path: Path) -> None:
     facts = json.loads(facts_path.read_text(encoding='utf-8'))
     units = {u['id']: u for u in facts['units'] if u['id'] < 228}
     weapons = {w['id']: w for w in facts['weapons']}
+    if any(type(u.get(key)) is not bool for u in units.values()
+           for key in ('is_building', 'regenerates_hp')):
+        raise ValueError('unit facts require boolean is_building and regenerates_hp; re-extract the pinned reference')
     with tempfile.TemporaryDirectory(prefix='sc64-stock-profiles-') as temp:
         binary = Path(temp) / 'dump'
         subprocess.run(['clang', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -39,7 +42,7 @@ def check(root: Path, facts_path: Path) -> None:
         raise AssertionError(f'weapon coverage mismatch: {len(weapon_rows)} vs {len(weapons)}')
     building_count = 0
     for raw_id, u in units.items():
-        expected = [int(u['is_building']), u['ground_weapon']['id'],
+        expected = [int(u['is_building']) | (int(u['regenerates_hp']) << 1), u['ground_weapon']['id'],
                     u['air_weapon']['id'], u['ground_weapon_hits'],
                     u['air_weapon_hits'], u['size']['id'], u['armor'],
                     u['mineral_cost'], u['gas_cost'], u['build_time'],
