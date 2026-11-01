@@ -116,7 +116,7 @@ void save_write_migrating_feature(const void *data,u32 length,u32 tag,u32 legacy
                                   u32 marker_offset,u32 marker_mask,u32 marker_value);
 int save_read(void *data,u32 length,u32 tag);
 int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
-#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN)
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN) || defined(SC64_WORKER_CARGO_KIND)
 /* Two-slot semantic selection. With SC64_SHARED_HP_REGEN, tags must have a
  * nonzero most-significant byte; that byte is the commit marker and zero
  * denotes an interrupted/uncommitted record. Other builds retain their
