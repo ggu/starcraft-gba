@@ -105,6 +105,8 @@ def main():
     a.output.mkdir(parents=True,exist_ok=False);proc=rsp=log=None;records=[]
     try:
         proc,rsp,log=physical.start(a.runner,a.rom,a.output,sym,sizes)
+        if int.from_bytes(rsp.read(sym['screen'],4),'little')!=0 or int.from_bytes(rsp.read(sym['frame'],4),'little')!=0:
+            raise RuntimeError('not at fresh title')
         for end in ([12,1000] if a.stop==1000 else [12,1000,49968]):
             rsp.play_to(end,events);state=snapshot(rsp,sym,sizes,layouts);records.append({'updates':end,**state})
             if state['race_selected_mission']!=26 or state['campaign_mission']!=26:raise RuntimeError('wrong mission')
