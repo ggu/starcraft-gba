@@ -77,7 +77,13 @@ static int race_colony_morph_state_valid_for(const Building *q, int owner, int s
         q->raw_owner != source_owner ||
         q->maxhp != SC64_Z7_CREEP_HP || q->queue_count != 0 ||
         q->queue_progress < 1 || q->queue_progress > SC64_Z7_CREEP_HP ||
-        q->shield != 0 || q->shield_remainder != 0 || q->build_progress < 0 ||
+        q->shield != 0 ||
+#ifdef SC64_SHARED_HP_REGEN
+        (unsigned)q->shield_remainder >= SC64_SHARED_HP_REGEN_PHASES ||
+#else
+        q->shield_remainder != 0 ||
+#endif
+        q->build_progress < 0 ||
         (q->under_construction &&
          q->build_progress >= target_ticks) ||
         (!q->under_construction &&

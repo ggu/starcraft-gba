@@ -1825,7 +1825,13 @@ static void race_complete_building(int building);
 static void race_construction_worker_tick(int worker);
 #endif
 static int race_building_can_burn(const Building *building);
+#if defined(SC64_SHARED_HP_REGEN) && !defined(SC64_RACES)
+#error "SC64_SHARED_HP_REGEN requires SC64_RACES"
+#endif
 static void race_tick_buildings(void),race_tick_state(void),race_tick_ai(void),race_tick_defenses(void);
+#ifdef SC64_SHARED_HP_REGEN
+static void race_shared_hp_regen_tick(void);
+#endif
 static void race_skirmish_init(void),race_skirmish_outcome(void);
 static void race_skirmish_geometry(void);
 #if defined(SC64_RACES) && defined(SC64_HAS_SPRITES)
@@ -8838,6 +8844,10 @@ game_update(u16 held, u16 pressed)
 #endif
 #ifdef SC64_IMPORTED_MISSION
     profile_start = gba_clock();
+#endif
+#ifdef SC64_SHARED_HP_REGEN
+    /* Source unit-values regeneration precedes movement and combat. */
+    race_shared_hp_regen_tick();
 #endif
 #ifdef SC64_NYDUS_ENABLED
     race_nydus_tick_world();
