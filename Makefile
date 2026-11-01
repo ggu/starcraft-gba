@@ -4893,6 +4893,7 @@ test-sc64-contact-bucket-birth: build/test-sc64-contact-bucket-birth
 # query, unit_step_clear() and sc64_stock_motion_step(). Each variant needs its
 # profile's private generated inputs, so none of them is part of `make test`.
 CONTACT_CACHE_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_CONTACT_MEMO_ORACLE -Icommon
+include tests/sc64-spawn-index/Makefile
 build/test-sc64-contact-cache-races: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(RACES_FLAGS) -DSC64_CONTACT_CACHE $< common/gba.c -o $@
 build/test-sc64-contact-cache-p7: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.h common/gba.c Makefile | build
