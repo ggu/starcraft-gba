@@ -20,6 +20,9 @@ static unsigned held,ticks;
  * slot reuse. Watch after every ordinary game_update, including UI steps. */
 static int reserved_slot=-1, reserved_raw=-1, reserved_owner=-1;
 static int trip_admitted, reserve_active, trip_aborted, hatch_confirmed;
+/* Preserve the already qualified opening input path until the first observed
+ * Dark Templar is cleared; subsequent macro may use the selection shortcut. */
+static int opening_selection_fastpath_allowed;
 static int hatch_x=-1,hatch_y=-1,hatch_pending,hatch_started;
 static int forward_identity_valid(void)
 {
@@ -154,8 +157,11 @@ static int select_one(int slot)
  }
  int raw=u[slot].raw_type,source_owner=u[slot].raw_owner;
 #ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
- if(screen==SCREEN_PLAY&&!won&&!lost&&u[slot].selected&&selected_count()==1&&selected_building<0)
+ if(opening_selection_fastpath_allowed&&screen==SCREEN_PLAY&&!won&&!lost&&
+    u[slot].selected&&selected_count()==1&&selected_building<0){
+  printf("SELECT_FASTPATH frame%d slot%d cursor%d,%d\n",frame,slot,cx,cy);
   return 1;
+ }
 #endif
  for(int n=0;n<MAX_UNITS&&screen==SCREEN_PLAY&&!won&&!lost;n++){
   tap(KEY_L);
@@ -432,7 +438,13 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
  int first_slot=-1,first_seen=0,first_clear=0,lower_attempted=0,opening_started=0;
  int pool=0,den=0,evo=0,spore=0,hydra=0,deploy[240]={0}, traveler=-1,nydus=0,arrived=0,forward=0,extra_drone=0,south_reloc=0,reinf=0,pursue=0,north_reloc=0,reinf_track[240]={0};int trial_steps=0;for(;trial_steps<20000&&screen==SCREEN_PLAY&&!won&&!lost;trial_steps++){step(0);
  if(!first_seen){for(int i=0;i<MAX_UNITS;i++)if(visible_raid(i)){first_seen=1;first_slot=i;printf("FIRST_VISIBLE frame%d slot%d xy%d,%d hero%d,%d cursor%d,%d\n",frame,i,u[i].x,u[i].y,u[10].x,u[10].y,cx,cy);break;}}
- if(first_seen&&!first_clear&&(first_slot<0||!u[first_slot].alive||u[first_slot].raw_type!=74||u[first_slot].owner!=ENEMY)){first_clear=1;printf("FIRST_CLEARED frame%d slot%d\n",frame,first_slot);}
+ if(first_seen&&!first_clear&&(first_slot<0||!u[first_slot].alive||u[first_slot].raw_type!=74||u[first_slot].owner!=ENEMY)){
+  first_clear=1;printf("FIRST_CLEARED frame%d slot%d\n",frame,first_slot);
+#ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+  opening_selection_fastpath_allowed=1;
+  printf("SELECT_FASTPATH_ENABLED frame%d first_slot%d\n",frame,first_slot);
+#endif
+ }
  if(first_seen&&!first_clear&&!lower_attempted&&visible_raid(first_slot)&&u[first_slot].y>=1660){lower_attempted=1;lower_visible_attack(first_slot);}
  if(!first_clear)continue;
 #ifdef SC64_Z8_TRIAL_NEXUS_PUSH
