@@ -664,7 +664,11 @@ static void test_save_load_invalidates_cache(void)
     clear_walk_grid();
     assert(sc64_direct_firing_waypoint(200, 200, 300, 200, 0, 64, &nx, &ny));
     assert(race_save_game());
+#ifdef SC64_RANGE_WORK
+    assert(!sc64_direct_firing_cache.valid);
+#else
     assert(sc64_direct_firing_cache.valid);
+#endif
 #ifdef SC64_RANGE_WORK
     for (int i = 0; i < MAX_UNITS; ++i)
         if (target_alive(i)) { target = i; break; }
