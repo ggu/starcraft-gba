@@ -17,6 +17,13 @@ static Observation observe_snapshot(void){
 }
 static void observe_transition(Observation before,Observation after){
  static int original_seen=0,original_gone=0;static const int ids[]={0,1,15,16,17};
+#ifdef SC64_Z8_TRIAL_HERO_RETREAT
+ static int retreat_arrived;
+ if(!retreat_arrived&&after.match&&dist2(after.x,after.y,1320,1680)<=32*32){
+  retreat_arrived=1;
+  printf("HERO_RETREAT_ARRIVED frame%d hp%d xy%d,%d order%d\n",after.frame,after.hp,after.x,after.y,u[10].order);
+ }
+#endif
  if(before.match)original_seen=1;
  if(original_seen&&!original_gone&&before.match&&(!after.match||after.hp<before.hp)){
   printf("HERO_TRANSITION frame%d prior_frame%d match%d hp%d prior_hp%d xy%d,%d new_raw%d new_owner%d raw_owner%d alive%d\n",after.frame,before.frame,after.match,after.hp,before.hp,before.x,before.y,u[10].raw_type,u[10].owner,u[10].raw_owner,u[10].alive);
@@ -50,6 +57,23 @@ static int order(int slot,int row,int x,int y){
  ok=applied==1;
 report:printf("ORDER frame%d slot%d selected%d selectedCount%d alive%d raw%d owner%d row%d requested%d,%d cursor%d,%d armed%d applied%d ok%d order%d target%d tx%d ty%d mode%d\n",frame,slot,selected_slot,selected_count(),u[slot].alive,u[slot].raw_type,u[slot].owner,row,x,y,cx,cy,armed,applied,ok,u[slot].order,u[slot].target,u[slot].tx,u[slot].ty,mode);return ok;}
 static void hero_census(void){int i=10;printf("HERO_STATE frame%d alive%d owner%d raw_owner%d raw%d hp%d xy%d,%d order%d target%d tx%d ty%d\n",frame,u[i].alive,u[i].owner,u[i].raw_owner,u[i].raw_type,u[i].hp,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty);}
+#ifdef SC64_Z8_TRIAL_HERO_RETREAT
+/* Trial controller policy only: preserve the original hero after the opening
+ * raid is cleared. The destination is an authored-map terrain candidate, not
+ * a teleport or a gameplay exception; the ordinary Move order must reach it.
+ * This observation trial still reads the world and is not a fair-play AI. */
+static int retreat_original_hero(void)
+{
+ int i=10,start=frame;
+ if(!u[i].alive||u[i].owner!=SIDE||u[i].raw_owner!=3||u[i].raw_type!=51){
+  printf("HERO_RETREAT_REJECT frame%d original_hero_missing=1\n",frame);
+  return 0;
+ }
+ int ok=order(i,MENU_MOVE,1320,1680);
+ printf("HERO_RETREAT_ISSUE start%d end%d accepted%d alive%d raw%d raw_owner%d hp%d xy%d,%d tx%d ty%d order%d\n",start,frame,ok,u[i].alive,u[i].raw_type,u[i].raw_owner,u[i].hp,u[i].x,u[i].y,u[i].tx,u[i].ty,u[i].order);
+ return ok;
+}
+#endif
 static void dispatch_hero(void){
  int i=10,entrance=67,issued=0,arrived=0;
  hero_census();
@@ -107,7 +131,11 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
  if(first_seen&&!first_clear&&(first_slot<0||!u[first_slot].alive||u[first_slot].raw_type!=74||u[first_slot].owner!=ENEMY)){first_clear=1;printf("FIRST_CLEARED frame%d slot%d\n",frame,first_slot);}
  if(first_seen&&!first_clear&&!lower_attempted&&visible_raid(first_slot)&&u[first_slot].y>=1660){lower_attempted=1;lower_visible_attack(first_slot);}
  if(!first_clear)continue;
- if(!opening_started){opening_started=1;order(55,MENU_ATTACK,880,1640);order(56,MENU_ATTACK,880,1640);int l[]={53,54,57};for(int j=0;j<3;j++)order(l[j],MENU_ATTACK,880,1640);order(16,MENU_MOVE,1770,500);for(int i=17;i<=22;i++)order(i,MENU_ATTACK,1770,500);order(7,MENU_ATTACK,1770,500);order(8,MENU_ATTACK,1770,500);order(11,MENU_ATTACK,1770,500);order(13,MENU_ATTACK,1770,500);for(int j=5;j<=6;j++){select_one(j);int p=j==5?11:10;move_cursor(m[p].x,m[p].y);tap(KEY_A);printf("mine worker%d order%d target%d frame%d\n",j,u[j].order,u[j].target,frame);}queue_type(U_DRONE);queue_type(U_DRONE);}
+ if(!opening_started){opening_started=1;
+#ifdef SC64_Z8_TRIAL_HERO_RETREAT
+ if(!retreat_original_hero())return 3;
+#endif
+ order(55,MENU_ATTACK,880,1640);order(56,MENU_ATTACK,880,1640);int l[]={53,54,57};for(int j=0;j<3;j++)order(l[j],MENU_ATTACK,880,1640);order(16,MENU_MOVE,1770,500);for(int i=17;i<=22;i++)order(i,MENU_ATTACK,1770,500);order(7,MENU_ATTACK,1770,500);order(8,MENU_ATTACK,1770,500);order(11,MENU_ATTACK,1770,500);order(13,MENU_ATTACK,1770,500);for(int j=5;j<=6;j++){select_one(j);int p=j==5?11:10;move_cursor(m[p].x,m[p].y);tap(KEY_A);printf("mine worker%d order%d target%d frame%d\n",j,u[j].order,u[j].target,frame);}queue_type(U_DRONE);queue_type(U_DRONE);}
  if(!pool&&minerals>=200){pool=build(5,B_SPAWNING_POOL,MENU_BARRACKS);}if(!evo&&minerals>=75&&side_building(B_SPAWNING_POOL,1)>=0){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){evo=build(i,B_EVOLUTION_CHAMBER,MENU_ENG_BAY);break;}}if(!spore&&minerals>=50&&side_building(B_EVOLUTION_CHAMBER,1)>=0&&b[65].alive&&building_complete(65)&&b[65].type==B_CREEP_COLONY){spore=morph_spore(65);}if(!den&&side_building(B_SPAWNING_POOL,1)>=0&&minerals>=100&&gas>=50){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){den=build(i,B_HYDRALISK_DEN,MENU_ACADEMY);break;}}if(frame>=3800&&extra_drone<2&&minerals>=50&&b[63].queue_count==0){queue_type(U_DRONE);extra_drone++;}if(frame>=4200&&extra_drone>=2&&!nydus&&worker_count()>=4){for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==SIDE&&u[j].type==U_DRONE)printf(" WORKER slot%d order%d xy%d,%d carry%d hp%d\n",j,u[j].order,u[j].x,u[j].y,u[j].carry,u[j].hp);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE&&u[i].order!=ORDER_BUILD&&u[i].order!=ORDER_BUILD_PENDING&&u[i].x>1500&&u[i].y<500){traveler=i;break;}if(traveler>=0&&select_one(traveler)){move_cursor(b[67].x,b[67].y);tap(KEY_A);nydus=1;printf("NYDUS issued slot%d frame%d order%d target%d xy%d,%d\n",traveler,frame,u[traveler].order,u[traveler].target,u[traveler].x,u[traveler].y);}}
  if(nydus&&!arrived&&traveler>=0&&u[traveler].alive&&u[traveler].x>1800&&u[traveler].y>1750){arrived=1;printf("NYDUS arrived slot%d frame%d xy%d,%d\n",traveler,frame,u[traveler].x,u[traveler].y);}
  if(arrived&&!forward&&minerals>=300&&traveler>=0&&u[traveler].alive){int xx=-1,yy=-1,best=0x7fffffff;for(int y=1680;y<=1872;y+=16)for(int x=1248;x<=1520;x+=16)if(race_can_site(SIDE,B_HATCHERY,x,y)&&can_place(B_HATCHERY,x,y)){int d=dist2(x,y,1344,1808);if(d<best){best=d;xx=x;yy=y;}}if(xx>=0){int ok=order(traveler,MENU_DEPOT,xx,yy);forward=1;printf("FORWARD hatch issue%d frame%d site%d,%d worker%d order%d mode%d funds%d\n",ok,frame,xx,yy,traveler,u[traveler].order,mode,minerals);}}
@@ -119,6 +147,11 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
  {const Sc64Z8Condition *cond=&sc64_z8_program_conditions[sc64_z8_program_triggers[17].first_condition];u32 count=0;int rc=sc64_z8_world_count(&race_z8_view,cond,SC64_Z8_HUMAN_SLOT,sc64_z8_rect(&race_z8_sched,cond->location),&count);printf("FINAL_T17 location%u rc%d count%u outcome%d\n",cond->location,rc,count,race_z8_outcome());}for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HATCHERY)printf(" HATCH%d frame%d xy%d,%d hp%d under%d progress%d\n",i,frame,b[i].x,b[i].y,b[i].hp,b[i].under_construction,b[i].build_progress);if(traveler>=0&&traveler<MAX_UNITS)printf(" TRAVELER%d alive%d hp%d xy%d,%d order%d target%d\n",traveler,u[traveler].alive,u[traveler].hp,u[traveler].x,u[traveler].y,u[traveler].order,u[traveler].target);else printf(" TRAVELER unavailable slot%d\n",traveler);printf("END frame%d native%u won%d lost%d screen%d money%d/%d pool%d den%d hydra%d fault%d hero alive%d hp%d xy%d,%d\n",frame,race_z8_sched.frames,won,lost,screen,minerals,gas,side_building(B_SPAWNING_POOL,1),side_building(B_HYDRALISK_DEN,1),hydra,race_z8_sched.fault,u[10].alive,u[10].hp,u[10].x,u[10].y);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==74)printf("END DT%d hp%d xy%d,%d\n",i,u[i].hp,u[i].x,u[i].y);
  int outcome=race_z8_outcome(),fault=race_z8_sched.fault;
  int victory=won&&!lost&&outcome==SC64_Z8_OUTCOME_VICTORY&&!fault;
+#ifdef SC64_Z8_TRIAL_HERO_RETREAT
+ int original_hero=u[10].alive&&u[10].owner==SIDE&&u[10].raw_owner==3&&u[10].raw_type==51;
+ printf("FINAL_ORIGINAL_HERO valid%d hp%d xy%d,%d\n",original_hero,u[10].hp,u[10].x,u[10].y);
+ victory= victory&&original_hero;
+#endif
  const char *verdict=victory?"WIN":(lost&&outcome==SC64_Z8_OUTCOME_DEFEAT&&!fault)?"LOSS":fault?"FAULT":trial_steps>=20000?"BOUND":"OTHER";
  printf("TRIAL_VERDICT status=%s won=%d lost=%d outcome=%d fault=%d frame=%d native=%u loop_steps=%d loop_bound=20000 ticks=%u\n",verdict,won,lost,outcome,fault,frame,race_z8_sched.frames,trial_steps,ticks);
  return victory?0:1;}
