@@ -119,3 +119,9 @@ human structure.
   ledgers. The town AI, timed presentation and crystal carry are authored,
   as in Z9.
 - Mission text, sound and physical-GBA behavior are not claimed.
+
+## Crystal-carrier preflight follow-up
+
+At source `7bd9daf01d6db8b5d2736abc8edc880c86e63419`, both the carried Z9 fixture and Z10 fixture passed under the canonical Z10 ASan/UBSan vector. Pure candidate checks reject dead and non-Drone crystal-carrier references before applying live state; the existing ordinary save continuations pass for 3,000 and 1,000 updates in each mission. The verified Z10 ROM SHA-256 is `61eb2bda30a69cda4f3230dc9e376273128ca7ff9a07b4990701c6704b15fc09`; ELF SHA-256 is `5d3009fe9706871e92c9eb5255b85227c63e06f7291c8cd28304ee14435a10c1`, BSS end `0x0203df88`, IWRAM end `0x03004bf0`. All 109 pinned inputs and named sidecars were verified. Logs are in `/tmp/sc64-z10-carrier-focus-20261101`.
+
+The fixture's mission victory uses state placement and is not an ordinary-input win. Native AI parity and conditional post-mission carrier removal remain unqualified. The merged Z9 audit and this paragraph are documentation-only changes after the tested head; the final combined default suite is tracked separately.
