@@ -65,6 +65,18 @@ int main(void)
     assert(screen==SCREEN_PLAY && !race_mode && race_selected_mission==mission);
     assert(race_save_game());
     snapshot();
+    /* Packet is valid, but a short live destination must fail candidate
+     * preparation before any world/service state is installed. */
+    {
+        RaceLoadPlan plan={0};size_t words=race_p7_projectiles.word_count;
+        assert(sc64_codec_validate(race_data.interceptor_projectiles,SC64_CODEC_BYTES));
+        assert(race_load_preflight(&plan));
+        race_p7_projectiles.word_count=SC64_ARENA_WORDS-1;
+        assert(!race_load_preflight(&plan));
+        race_p7_projectiles.word_count=words;
+        world_unchanged();
+        assert(race_load_preflight(&plan));
+    }
     for(int i=0;i<2;i++){
         signed char prior=i?SC64_PROTOSS_BIND_GENERIC:-1;
         int prior_mission=i?SC64_P7_GLOBAL_ID:mission+1;
