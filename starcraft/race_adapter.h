@@ -863,7 +863,13 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
 #ifdef SC64_T6_RUNTIME
     if (u[worker].order == ORDER_REPAIR) {
         u[worker].carry = 0; u[worker].work_timer = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+        sc64_worker_cargo_clear(&u[worker]);
+#endif
     }
+#endif
+#ifdef SC64_WORKER_CARGO_KIND
+    sc64_worker_gather_pending_set(&u[worker], 0);
 #endif
     u[worker].order = ORDER_BUILD_PENDING;
     u[worker].target = type;
@@ -951,6 +957,10 @@ static int race_builder_arrived(int worker)
     if (race_owner_identity(u[worker].owner) == R_ZERG) {
         int supply = unit_supply(u[worker].type);
         u[worker].carry = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+        sc64_worker_cargo_clear(&u[worker]);
+        sc64_worker_gather_pending_set(&u[worker], 0);
+#endif
 #ifdef SC64_Z6_RUNTIME
         if (race_z6_active() && u[worker].owner==SIDE &&
             u[worker].raw_type==41 && u[worker].raw_owner==3 &&
@@ -960,6 +970,9 @@ static int race_builder_arrived(int worker)
         u[worker].alive = 0;
     } else {
         u[worker].order = ORDER_IDLE;
+#ifdef SC64_WORKER_CARGO_KIND
+        sc64_worker_gather_pending_set(&u[worker], 0);
+#endif
         u[worker].target = -1;
     }
     return 1;
@@ -1603,6 +1616,34 @@ static int race_skirmish_site_for(int owner, int type, int *x, int *y)
 /* Canonical custom-game opponents; the planner lives in race_skirmish_ai.h. */
 static void race_tick_ai(void)
 {
+#ifdef SC64_WORKER_CARGO_KIND
+    /* Resume cargo-bearing bot workers without overriding human orders. */
+    if (!(frame % RACE_AI_PHASE)) {
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            Unit *worker = &u[i];
+            int target;
+            if (!worker->alive || worker->owner == SIDE ||
+                race_bot_index(worker->owner) < 0 || SC64_TRANSPORT_LOADED(worker) ||
+                !sc64_race_is_worker(worker->type) || worker->order != ORDER_IDLE ||
+                worker->carry <= 0) continue;
+            if (sc64_worker_cargo_is_gas(worker)) {
+                target = race_owner_refinery(worker->owner);
+                if (target < 0) continue;
+                worker->order = ORDER_GAS;
+                worker->tx = b[target].x; worker->ty = b[target].y;
+            } else {
+                target = nearest_mineral(worker->x, worker->y);
+                if (target < 0) continue;
+                worker->order = ORDER_MINE;
+                worker->tx = m[target].x; worker->ty = m[target].y;
+            }
+            worker->target = target;
+            sc64_worker_gather_pending_set(worker, 1);
+            worker->build = -1;
+            worker->work_timer = worker->path_timer = worker->path_retry = 0;
+        }
+    }
+#endif
     race_ai_tick();
 }
 

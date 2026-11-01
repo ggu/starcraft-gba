@@ -1210,7 +1210,7 @@ int save_read_latest(void *data,u32 capacity,u32 tag,u32 *len) {
     *len=stored;
     return 1;
 }
-#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN)
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN) || defined(SC64_WORKER_CARGO_KIND)
 #ifdef SC64_SHARED_HP_REGEN
 /* SRAM tag stores are bytewise. A nonzero high byte commits this namespace;
  * clear it before changing any other byte and restore it only after the

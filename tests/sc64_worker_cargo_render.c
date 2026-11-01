@@ -37,6 +37,9 @@ static void check_worker(int type, int raw, int order, int gas)
     q.hp = q.maxhp = 60;
     q.carry = 8;
     q.order = order;
+#ifdef SC64_WORKER_CARGO_KIND
+    if (gas) q.flags = SC64_WORKER_CARGO_GAS;
+#endif
     camx = camy = 0;
 
     const Sc64SpriteFrame *s = raw >= 0 ? sc64_race_unit_sprite(raw) : 0;
@@ -65,17 +68,41 @@ static void check_worker(int type, int raw, int order, int gas)
     int top_row = gas ? by - 2 : by - 3;
     u8 top_color = gas ? C_GREEN_DARK : C_CYAN;
     q.carry = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+    q.flags = 0;
+#endif
     render_unit(&q);
     assert(memcmp(carried, pixels, sizeof(carried)) != 0);
     assert(gfx_test_pixel(bx, top_row) != top_color);
 
     q.carry = 8;
+#ifdef SC64_WORKER_CARGO_KIND
+    q.flags = gas ? SC64_WORKER_CARGO_GAS : 0;
+    for (int n = 0; n < 2; ++n) {
+        q.order = n ? ORDER_IDLE : ORDER_MOVE;
+        render_unit(&q);
+        assert(gfx_test_pixel(bx, top_row) == top_color);
+        assert(gfx_test_pixel(bx, by) == (gas ? C_GREEN : C_BLUE));
+    }
+    q.flags = SC64_WORKER_CARGO_UNKNOWN;
+    render_unit(&q);
+    assert(gfx_test_pixel(bx, top_row) != top_color);
+#ifdef SC64_T6_RUNTIME
+    q.flags = 0; q.order = ORDER_REPAIR;
+    render_unit(&q);
+    assert(gfx_test_pixel(bx, top_row) != top_color);
+#endif
+#else
     q.order = ORDER_IDLE;
     render_unit(&q);
     assert(gfx_test_pixel(bx, by) != C_WHITE);
+#endif
 
     /* Caster energy and non-worker cargo fields do not draw a cargo marker. */
     q.type = U_MARINE;
+#ifdef SC64_WORKER_CARGO_KIND
+    q.flags = 0;
+#endif
     q.raw_type = -1;
     q.carry = 8;
     q.order = ORDER_IDLE;
@@ -127,8 +154,11 @@ int main(void)
     race_selected_mission = 0;
     init_state();
     check_worker(U_SCV, 7, ORDER_MINE, 0);
+    check_worker(U_SCV, 7, ORDER_GAS, 1);
+    check_worker(U_DRONE, 41, ORDER_MINE, 0);
     check_worker(U_DRONE, 41, ORDER_GAS, 1);
     check_worker(U_PROBE, 64, ORDER_MINE, 0);
+    check_worker(U_PROBE, 64, ORDER_GAS, 1);
     check_worker(U_PROBE, -1, ORDER_GAS, 1); /* generic worker fallback */
     check_fog_and_map_clip();
     puts("PASS authored worker cargo badges, clearing, fog, and HUD clipping");

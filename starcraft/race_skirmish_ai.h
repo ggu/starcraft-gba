@@ -326,6 +326,10 @@ static void __attribute__((noinline)) race_ai_recover_workers(RaceAiCensus *c)
         int depot = -1, depot_d = 0x7fffffff, best = -1, best_score = 0x7fffffff;
         if (!q->alive || q->owner != c->owner || q->order != ORDER_IDLE ||
             !sc64_race_is_worker(q->type) || SC64_TRANSPORT_LOADED(q)) continue;
+#ifdef SC64_WORKER_CARGO_KIND
+        /* A gas load needs a refinery target; keep it until one exists. */
+        if (q->carry > 0 && sc64_worker_cargo_is_gas(q)) continue;
+#endif
         for (int k = 0; k < c->depots; ++k) {
             int d = dist2(q->x, q->y, b[c->depot[k]].x, b[c->depot[k]].y);
             if (d < depot_d) { depot_d = d; depot = c->depot[k]; }
@@ -339,7 +343,12 @@ static void __attribute__((noinline)) race_ai_recover_workers(RaceAiCensus *c)
             if (score < best_score) { best_score = score; best = p; }
         }
         if (best < 0) return;
-        q->order = ORDER_MINE; q->target = best; q->work_timer = 0; q->carry = 0;
+        q->order = ORDER_MINE; q->target = best; q->work_timer = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+        sc64_worker_gather_pending_set(q, 1);
+#else
+        q->carry = 0;
+#endif
         if (load[best] < 255) ++load[best];
         --c->idle_workers; ++c->miners; ++moved;
     }
@@ -375,12 +384,24 @@ static void race_ai_balance_gas(RaceAiCensus *c)
         int w = race_ai_nearest_worker(c, ORDER_MINE, b[ref].x, b[ref].y);
         if (w < 0) w = race_ai_nearest_worker(c, ORDER_IDLE, b[ref].x, b[ref].y);
         if (w >= 0) {
-            u[w].order = ORDER_GAS; u[w].target = ref; u[w].carry = 0; u[w].work_timer = 0;
+            u[w].order = ORDER_GAS; u[w].target = ref; u[w].work_timer = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+            sc64_worker_gather_pending_set(&u[w], 1);
+#else
+            u[w].carry = 0;
+#endif
             ++c->gas_workers; ++c->refinery_load[light];
         }
     } else if (c->gas_workers > want + 1) {
         int w = race_ai_nearest_worker(c, ORDER_GAS, c->hx, c->hy);
-        if (w >= 0) { u[w].order = ORDER_IDLE; u[w].target = -1; u[w].carry = 0; }
+        if (w >= 0) {
+            u[w].order = ORDER_IDLE; u[w].target = -1;
+#ifdef SC64_WORKER_CARGO_KIND
+            sc64_worker_gather_pending_set(&u[w], 0);
+#else
+            u[w].carry = 0;
+#endif
+        }
     }
 }
 
@@ -409,7 +430,12 @@ static void __attribute__((noinline)) race_ai_recover_construction(RaceAiCensus 
         w = race_ai_nearest_worker(c, ORDER_MINE, b[i].x, b[i].y);
         if (w < 0) w = race_ai_nearest_worker(c, ORDER_IDLE, b[i].x, b[i].y);
         if (w < 0) return;
-        u[w].order = ORDER_BUILD; u[w].target = i; u[w].carry = 0;
+        u[w].order = ORDER_BUILD; u[w].target = i;
+#ifdef SC64_WORKER_CARGO_KIND
+        sc64_worker_gather_pending_set(&u[w], 0);
+#else
+        u[w].carry = 0;
+#endif
         u[w].path_timer = u[w].path_retry = 0;
         return; /* one per pass */
     }
@@ -1106,7 +1132,11 @@ static void __attribute__((noinline)) race_ai_military(RaceAiCensus *c)
                      sc64_race_is_worker(q->type) && q->order == ORDER_MINE &&
                      dist2(q->x, q->y, c->threat_x, c->threat_y) < 224 * 224) {
                 race_ai_order(q, ORDER_ATTACK_MOVE, c->threat_x, c->threat_y, pulled++);
+#ifdef SC64_WORKER_CARGO_KIND
+                sc64_worker_gather_pending_set(q, 0);
+#else
                 q->carry = 0;
+#endif
             }
         }
         return;
@@ -1186,7 +1216,14 @@ static void race_ai_scout(RaceAiCensus *c)
     }
     if (best < 0) return;
     w = race_ai_nearest_worker(c, ORDER_MINE, race_base_x[best], race_base_y[best]);
-    if (w >= 0) { race_ai_order(&u[w], ORDER_MOVE, race_base_x[best], race_base_y[best], 2); u[w].carry = 0; }
+    if (w >= 0) {
+        race_ai_order(&u[w], ORDER_MOVE, race_base_x[best], race_base_y[best], 2);
+#ifdef SC64_WORKER_CARGO_KIND
+        sc64_worker_gather_pending_set(&u[w], 0);
+#else
+        u[w].carry = 0;
+#endif
+    }
 }
 
 static void __attribute__((noinline)) race_ai_plan(int owner)
