@@ -376,7 +376,10 @@ consecutive_geometry_cases(void)
         }
         u[3].type = U_ZERGLING; /* potentially different effective radius */
         u[4].type = U_CHRYSALIS; /* ignored candidate */
-        u[5].type = -1;          /* undescribable class -> reference path */
+#if !defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
+        u[5].type = -1;          /* wide type: undescribable -> reference path */
+        assert(!(sc64_contact_class_for(u[5].type) & SC64_CONTACT_VALID));
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
         u[6].order = ORDER_TRANSPORTED;
 #endif

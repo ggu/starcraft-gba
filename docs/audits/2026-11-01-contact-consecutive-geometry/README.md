@@ -17,3 +17,8 @@ counts establish incidence, not a production cycle gain; the diagnostic build
 is not this candidate. This opt-in candidate needs focused differential tests,
 unchanged normal OFF ROM identity, normal memory guards, and a paired current
 physical window before any enablement or performance claim.
+
+The focused fixture uses type -1 as an undescribable reference candidate only
+where the unit type field is wide; packed byte-type profiles do not claim that
+case. The Scarab-specific fixture branch runs only in configurations that
+actually define `SC64_SCARAB_RUNTIME` and must be separately qualified there.
