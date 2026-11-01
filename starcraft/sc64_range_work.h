@@ -32,13 +32,13 @@ typedef struct Sc64RangeWork {
     u8 *frontier;
     unsigned short bit_bytes;
     unsigned short plane_bytes;
-    unsigned short cursor, current_plane, next_count;
+    unsigned short cursor, next_count;
     unsigned short target_x, target_y, min_range, max_range;
     unsigned char cols, rows;
     /* A 128 x 128 map requires at most four 8-way summary levels. */
     unsigned short summary_offset[4];
     unsigned short seed_total;
-    unsigned char seed_left, seed_top, seed_width, seed_col, seed_row;
+    unsigned char seed_left, seed_width, seed_col, seed_row, current_plane;
     unsigned char summary_depth;
     unsigned char phase;
     /* Zero means general stride; otherwise this stores log2(cols) + 1. */
@@ -206,19 +206,18 @@ static int sc64_range_work_begin(Sc64RangeWork *work,
     }
     work->seed_left = (unsigned short)(target_x > max_range ?
         (target_x - max_range) / 16 : 0);
-    work->seed_top = (unsigned short)(target_y > max_range ?
+    work->seed_row = (unsigned char)(target_y > max_range ?
         (target_y - max_range) / 16 : 0);
     {
         unsigned right = (unsigned)(target_x + max_range) / 16u;
         unsigned bottom = (unsigned)(target_y + max_range) / 16u;
-        unsigned left = work->seed_left, top = work->seed_top;
+        unsigned left = work->seed_left, top = work->seed_row;
         if (right >= (unsigned)cols) right = (unsigned)cols - 1u;
         if (bottom >= (unsigned)rows) bottom = (unsigned)rows - 1u;
         work->seed_width = (unsigned short)(right - left + 1u);
         work->seed_total = (unsigned short)(work->seed_width * (bottom - top + 1u));
     }
     work->seed_col = work->seed_left;
-    work->seed_row = work->seed_top;
     if (walk_need > 8u) {
         unsigned level_bytes = walk_need, offset = walk_need;
         while (level_bytes > 1u) {
@@ -245,7 +244,7 @@ static void sc64_range_work_reset(Sc64RangeWork *work)
     work->target_x = work->target_y = 0;
     work->min_range = work->max_range = 0;
     memset(work->summary_offset, 0, sizeof(work->summary_offset));
-    work->seed_left = work->seed_top = work->seed_width = 0;
+    work->seed_left = work->seed_width = 0;
     work->seed_total = 0;
     work->seed_col = work->seed_row = 0;
     work->summary_depth = 0;
