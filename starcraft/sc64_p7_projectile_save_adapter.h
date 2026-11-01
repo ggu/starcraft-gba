@@ -12,7 +12,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
     if (!candidate || candidate->interceptor_padding ||
         !ww || !wh || ww>2048 || wh>2048) return 0;
     packet=candidate->interceptor_projectiles;
-    if (!sc64_codec_validate(packet,SC64_CODEC_BYTES)) return 0;
+    if (!sc64_codec_validate_target(&race_p7_projectiles,packet,SC64_CODEC_BYTES)) return 0;
     count=sc64_codec_allocated_count(packet,SC64_CODEC_BYTES);
     if (count<0) return 0;
     /* Load preflight binds the candidate's mode (race_load_game). */
