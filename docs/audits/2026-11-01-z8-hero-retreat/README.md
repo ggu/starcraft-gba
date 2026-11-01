@@ -56,3 +56,22 @@ not a physical GBA run, a current merged-branch binary qualification or a
 demonstration that the position remains safe through later waves. The next
 policy needs an earlier northern detector/attacker interception and continued
 coverage of all three hive regions while pursuing both enemy Nexuses.
+
+## Northern interception follow-up (unrun)
+
+`tests/sc64_z8_north_intercept_probe.c` retains the ordinary hero retreat and
+first southern interception, but stages the northern Overlord at `(1640,832)`
+and the northern ground group at `(1664,832)` rather than `(1770,500)`. It
+also removes the former single-Hydralisk pursuit toward `(1900,350)` at 8600.
+The stage points are fixed controller inputs; no order follows a hidden
+Templar's coordinates. Read-only logs include raid identity, detection and
+HP/shield transitions, plus sampled defender positions, targets and cooldowns.
+
+The old observed raid crossed `(1656,831)`, but that does not prove that the
+adjacent formation target is reachable with current dynamic obstructions.
+At a stationary detector's exact 144-pixel radius, the old trajectory would
+enter detection earlier; its total detection residence would be similar.
+The previous northern engagement removed only about 48 shield points, so
+earlier vision alone does not establish lethal interception. Defender arrival,
+attack-move pursuit, survival, collision and paid economic development must
+all be observed in a fresh ordinary-input trial. No new result is claimed.
