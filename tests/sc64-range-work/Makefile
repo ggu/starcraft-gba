@@ -1,7 +1,5 @@
 # Opt-in range-worker qualification, using current Z7 canonical inputs.
-.PHONY: range-work-print-flags test-sc64-range-work-flags test-sc64-range-work-engine test-sc64-range-work-engine-default test-sc64-range-work-save-resume test-sc64-range-copy-alignment
-range-work-print-flags:
-	@printf '%s\n' 'terran=$(TERRAN_ROM_FLAGS)' 'zerg=$(ZERG_Z7_CANONICAL_FLAGS)' 'protoss=$(PROTOSS_P7_CANONICAL_FLAGS)' 'showcase=$(SHOWCASE_FLAGS)'
+.PHONY: test-sc64-range-work-flags test-sc64-range-work-engine test-sc64-range-work-engine-default test-sc64-range-work-save-resume test-sc64-range-copy-alignment
 test-sc64-range-work-flags:
 	python3 tests/test_sc64_range_work_flags.py
 build/test-sc64-range-work-engine: tests/sc64_direct_firing_points_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.h common/gba.c Makefile tests/sc64-range-work/Makefile | build

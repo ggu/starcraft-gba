@@ -2,7 +2,9 @@
 """Check the optional range worker reaches all canonical race products."""
 
 import os
+from pathlib import Path
 import subprocess
+import tempfile
 
 
 PRODUCTS = ("terran", "zerg", "protoss", "showcase")
@@ -15,11 +17,23 @@ def product_flags(extra_flag):
         env["CANONICAL_RANGE_WORK_FLAGS"] = extra_flag
     else:
         env.pop("CANONICAL_RANGE_WORK_FLAGS", None)
-    output = subprocess.check_output(
-        ["make", "--no-print-directory", "-s", "range-work-print-flags"],
-        env=env,
-        text=True,
-    )
+    # Inspect expanded vectors without creating a production recipe that
+    # appears to consume a private asset bank. Printing flags needs no assets.
+    with tempfile.TemporaryDirectory() as directory:
+        fixture = Path(directory) / "vectors.mk"
+        fixture.write_text(
+            "$(info terran=$(TERRAN_ROM_FLAGS))\n"
+            "$(info zerg=$(ZERG_Z7_CANONICAL_FLAGS))\n"
+            "$(info protoss=$(PROTOSS_P7_CANONICAL_FLAGS))\n"
+            "$(info showcase=$(SHOWCASE_FLAGS))\n"
+            ".PHONY: range-work-print-flags\nrange-work-print-flags:\n\t@:\n"
+        )
+        output = subprocess.check_output(
+            ["make", "--no-print-directory", "-s", "-f", "Makefile",
+             "-f", str(fixture), "range-work-print-flags"],
+            env=env,
+            text=True,
+        )
     result = {}
     for line in output.splitlines():
         key, value = line.split("=", 1)
