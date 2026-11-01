@@ -61,7 +61,7 @@ and this change.
 - `make zerg-z10` links:
   - BSS end `0x0203df88`, IWRAM end `0x03004bf0`, within the `0x0203e000` /
     `0x03005000` guards, with 120 bytes of BSS spare;
-  - ROM SHA-256 `4037575b…`, with the Z8 sprite bank and the inputs listed
+  - ROM SHA-256 `6d16babd…`, with the Z8 sprite bank and the inputs listed
     in the Z9 audit.
 - `make test-zerg-z10` runs two ASan/UBSan host fixtures:
   - **Carried Z9 fixture** under the Z10 flags. It passes with the same
@@ -91,7 +91,20 @@ and this change.
 
 ## Byte identity
 
-To be filled from the final run.
+This branch was built with the inputs listed in the Z9 audit. With the
+new flags off, the default ROM and the `zerg`/`zerg-z7`, `zerg-z3`,
+`zerg-z4`, `zerg-z5`, `zerg-z6` and `zerg-z8` ROMs match the base hashes
+listed there exactly. The stacked `zerg-z9` candidate is unchanged from
+its own branch (`65bfcb14744bfc2c3f27ac62af3552d34868e0cdbdad9db15bc6ceb719958f44`).
+The new `zerg-z10` ROM is
+`6d16babd8602d92f052d5a6cf08dc3cf912585b9d33742e361272bb19eb2943d`.
+
+`make test-zerg-z8`, `make test-zerg-z9` and `make test-sc64-zerg-late-state`
+pass on this branch.
+
+An idle human in Z10 is defeated by T0 at frame 10,992 (scratch probe):
+Z10's human owns no beacon, and the waves fall back to any destructible
+human structure.
 
 ## Not qualified
 
