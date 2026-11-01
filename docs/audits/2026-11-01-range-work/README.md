@@ -180,7 +180,36 @@ python3 tools/sc64_range_probe_read.py --runner /path/to/runner-read-only \
 
 Use the existing native qualification lock, frozen source and prepared-input
 hash guards for local runs. Keep all game inputs, instrumented binaries and
-results ignored. No hosted Actions or SD writes were used. The shared release
-flag remains OFF: representative current-product mode/save coverage, longer
-and crowded ARM gameplay, remaining navigation latency and campaign gates
-still require qualification before activation.
+results ignored. No hosted Actions or SD writes were used. The shared release flag remains OFF. Current startup coverage is recorded below; longer and crowded ARM gameplay, fresh-process save qualification, remaining navigation latency and campaign gates still require qualification before activation.
+
+## Current full-source and lineup qualification
+
+The clean, empty-input checks at `7fa1990f` pass: `./dev build`, `./dev test`,
+flag wiring and the source boundary. Python discovery runs 951 cases with
+26 optional skips; the additional 5- and 8-case suites and C fixtures also
+pass. Later changes add the executed probe/reader, documentation and a tested
+menu fixture; they do not change production runtime from `3c8bee1b`.
+
+The checked-in reader at `2feec585` independently replays the same OFF/ON
+instrumented pair for 100 updates each with physical zero-button input and
+reproduces the exact cycle results above. Both fault counters stay zero.
+
+`tests/sc64_range_menu_matrix_probe.c` runs against each actual current T10,
+Z7, P7 and Showcase production compiler vector with the opt-in flag ON under
+ASan/UBSan. The vectors are derived from those normal ARM build recipes,
+retaining their feature/include flags and companion game sources rather than
+using stale older-profile host targets. All four pass 234 real-menu cases:
+
+- Both supported maps and all three human races.
+- One AI with each of three races, two AIs with all nine independent race
+  assignments, and three AIs with all 27 assignments.
+- Navigation by ordinary key inputs, then live owner, unit, building and map
+  shape checks followed by 60 gameplay updates.
+- An ordinary same-process save/load/save, including configuration checks
+  and byte-equivalent complete `RaceSave` reserialization.
+
+That totals 936 lineups across the four builds. This is startup and immediate
+same-process round-trip evidence. It does not compare another uninterrupted
+60-update branch after each load, use a fresh process or prove complete
+matches. The separate 500-update continuation fixture and short ARM timing
+probe establish their narrower properties, not those broader claims.
