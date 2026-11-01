@@ -116,8 +116,12 @@ void save_write_migrating_feature(const void *data,u32 length,u32 tag,u32 legacy
                                   u32 marker_offset,u32 marker_mask,u32 marker_value);
 int save_read(void *data,u32 length,u32 tag);
 int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
-#ifdef SC64_SCARAB_RUNTIME
-/* Two-slot semantic selection. The validator may inspect/copy its scratch
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN)
+/* Two-slot semantic selection. With SC64_SHARED_HP_REGEN, tags must have a
+ * nonzero most-significant byte; that byte is the commit marker and zero
+ * denotes an interrupted/uncommitted record. Other builds retain their
+ * existing unrestricted nonzero-tag protocol.
+ * The validator may inspect/copy its scratch
  * payload but must not alter SRAM or live state. The chosen bytes are copied
  * again after selection. A token names the validated predecessor slot. */
 typedef struct { u32 tag, length, sequence, checksum; int slot; } GbaSaveSelection;
@@ -132,8 +136,17 @@ int save_select_transaction(void *scratch,u32 capacity,const u32 *tags,unsigned 
                             GbaSaveSelection *selection);
 int save_write_selected(const void *data,u32 length,u32 tag,const GbaSaveSelection *previous,
                         const u32 *tags,unsigned tag_count);
-/* Fresh journal only: fail if either slot contains any checksummed record. */
+/* Fresh journal only: fail if either slot contains a committed checksummed
+ * record. In the HP protocol a zero high tag byte is not committed. */
 int save_write_first(const void *data,u32 length,u32 tag);
+#ifdef SC64_SHARED_HP_REGEN
+/* Two nonempty RAM spans, one journal record. These retain the same selected
+ * predecessor/fresh-journal policy without assembling a contiguous payload. */
+int save_write_parts_selected(const void *data,u32 length,const void *tail,u32 tail_length,
+                              u32 tag,const GbaSaveSelection *previous,
+                              const u32 *tags,unsigned tag_count);
+int save_write_parts_first(const void *data,u32 length,const void *tail,u32 tail_length,u32 tag);
+#endif
 #endif
 void audio_tone(int frequency,int frames,int volume);
 void audio_noise(int frames,int volume);
