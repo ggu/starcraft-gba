@@ -30,14 +30,15 @@ typedef struct Sc64RangeWork {
     const u8 *walk;
     u8 *gradient;
     u8 *frontier;
-    unsigned short cells, gradient_bytes, frontier_bytes, bit_bytes;
+    unsigned short bit_bytes;
     unsigned short plane_bytes;
     unsigned short cursor, current_plane, next_count;
-    unsigned short cols, rows, target_x, target_y, min_range, max_range;
+    unsigned short target_x, target_y, min_range, max_range;
+    unsigned char cols, rows;
     /* A 128 x 128 map requires at most four 8-way summary levels. */
     unsigned short summary_offset[4];
-    unsigned short seed_left, seed_top, seed_width, seed_total;
-    unsigned short seed_col, seed_row;
+    unsigned short seed_total;
+    unsigned char seed_left, seed_top, seed_width, seed_col, seed_row;
     unsigned char summary_depth;
     unsigned char phase;
     /* Zero means general stride; otherwise this stores log2(cols) + 1. */
@@ -189,9 +190,6 @@ static int sc64_range_work_begin(Sc64RangeWork *work,
     work->walk = walk;
     work->gradient = gradient;
     work->frontier = frontier;
-    work->cells = cells;
-    work->gradient_bytes = gradient_need;
-    work->frontier_bytes = frontier_need;
     work->bit_bytes = walk_need;
     work->plane_bytes = plane_need;
     work->cols = cols;
@@ -240,8 +238,7 @@ static void sc64_range_work_reset(Sc64RangeWork *work)
     work->walk = 0;
     work->gradient = 0;
     work->frontier = 0;
-    work->cells = work->gradient_bytes = 0;
-    work->frontier_bytes = work->bit_bytes = 0;
+    work->bit_bytes = 0;
     work->plane_bytes = 0;
     work->cursor = work->current_plane = work->next_count = 0;
     work->cols = work->rows = 0;
@@ -267,8 +264,8 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
         work->phase == SC64_RANGE_WORK_FAILED) return SC64_RANGE_WORK_ERROR;
     while (done < budget) {
         if (work->phase == SC64_RANGE_WORK_CLEAR_GRADIENT) {
-            if (work->cursor < work->gradient_bytes) {
-                unsigned count = work->gradient_bytes - work->cursor;
+            if (work->cursor < sc64_range_work_ceil3((unsigned)work->cols * work->rows)) {
+                unsigned count = sc64_range_work_ceil3((unsigned)work->cols * work->rows) - work->cursor;
                 if (count > 64u) count = 64u;
                 memset(work->gradient + work->cursor, 0xff, count);
                 work->cursor += count;
@@ -280,8 +277,8 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
             continue;
         }
         if (work->phase == SC64_RANGE_WORK_CLEAR_FRONTIER) {
-            if (work->cursor < work->frontier_bytes) {
-                unsigned count = work->frontier_bytes - work->cursor;
+            if (work->cursor < (2u * work->plane_bytes)) {
+                unsigned count = (2u * work->plane_bytes) - work->cursor;
                 if (count > 64u) count = 64u;
                 memset(work->frontier + work->cursor, 0, count);
                 work->cursor += count;

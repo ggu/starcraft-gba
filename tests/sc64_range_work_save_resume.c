@@ -205,7 +205,7 @@ static void test_live_save_boundary_restarts_range_worker(void)
 #ifdef SC64_T4_RUNTIME
     {
         int invalid_slot = -1;
-        Sc64RangeRouteJob previous_job = sc64_range_route_active;
+        Sc64RangeRouteJob previous_job = sc64_range_route_active_key();
         Sc64RangeWork previous_work = sc64_range_route_work;
         unsigned previous_queue = sc64_range_route_queue_count;
         Building previous_building;
@@ -218,7 +218,7 @@ static void test_live_save_boundary_restarts_range_worker(void)
         b[invalid_slot] = previous_building;
         assert(sc64_range_route_active.valid == previous_job.valid &&
                sc64_range_route_active.target == previous_job.target &&
-               sc64_range_route_active.tx == previous_job.tx &&
+               sc64_range_route_work.target_x == previous_job.tx &&
                sc64_range_route_work.phase == previous_work.phase &&
                sc64_range_route_work.cursor == previous_work.cursor &&
                sc64_range_route_queue_count == previous_queue);
@@ -301,7 +301,7 @@ static void test_save_restarts_partial_snapshot_copy(void)
     assert(sc64_range_route_copy_slot >= 0 &&
            sc64_range_route_copy_cursor > 0 &&
            sc64_range_route_copy_cursor <
-               sc64_range_route_work.gradient_bytes);
+               sc64_range_work_ceil3((unsigned)sc64_range_route_work.cols * sc64_range_route_work.rows));
     assert(race_save_game());
     assert(!sc64_range_route_active.valid &&
            sc64_range_route_work.phase == SC64_RANGE_WORK_IDLE &&

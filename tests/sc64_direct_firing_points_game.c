@@ -60,10 +60,10 @@ static void range_route_pump_to_done(unsigned max_ticks, int target,
         int next_col = -1, next_row = -1;
         if (sc64_range_route_active.valid &&
             sc64_range_route_active.target == (u16)target &&
-            sc64_range_route_active.tx == (u16)tx &&
-            sc64_range_route_active.ty == (u16)ty &&
-            sc64_range_route_active.minimum == 0 &&
-            sc64_range_route_active.maximum == 64 &&
+            sc64_range_route_work.target_x == (u16)tx &&
+            sc64_range_route_work.target_y == (u16)ty &&
+            sc64_range_route_work.min_range == 0 &&
+            sc64_range_route_work.max_range == 64 &&
             sc64_range_route_work.phase == SC64_RANGE_WORK_DONE) return;
         /* A pending combat order needs 12 retry ticks plus one timer-drain
          * tick before its next plan. Refresh at that 14-frame cadence. */
@@ -97,10 +97,10 @@ static int range_route_request_present(int target, int tx, int ty)
 {
     if (sc64_range_route_active.valid &&
         sc64_range_route_active.target == (u16)target &&
-        sc64_range_route_active.tx == (u16)tx &&
-        sc64_range_route_active.ty == (u16)ty &&
-        sc64_range_route_active.minimum == 0 &&
-        sc64_range_route_active.maximum == 64) return 1;
+        sc64_range_route_work.target_x == (u16)tx &&
+        sc64_range_route_work.target_y == (u16)ty &&
+        sc64_range_route_work.min_range == 0 &&
+        sc64_range_route_work.max_range == 64) return 1;
     for (int i = 0; i < SC64_RANGE_ROUTE_QUEUE_CAPACITY; ++i) {
         const Sc64RangeRouteJob *job = &sc64_range_route_pending[i];
         if (job->valid && job->target == (u16)target &&
@@ -115,7 +115,8 @@ static int range_route_active_position_was_requested(int target,
                                                       int latest_tx,
                                                       int first_ty)
 {
-    const Sc64RangeRouteJob *job = &sc64_range_route_active;
+    Sc64RangeRouteJob current = sc64_range_route_active_key();
+    const Sc64RangeRouteJob *job = &current;
     if (!job->valid || job->target != (u16)target ||
         job->minimum != 0 || job->maximum != 64 ||
         job->tx < (u16)first_tx || job->tx > (u16)latest_tx) return 0;
@@ -128,11 +129,11 @@ static Sc64RangeRouteJob range_route_stale_guidance_source(int target)
 {
     if (sc64_range_route_active.valid &&
         sc64_range_route_active.target == (u16)target &&
-        sc64_range_route_active.minimum == 0 &&
-        sc64_range_route_active.maximum == 64 &&
+        sc64_range_route_work.min_range == 0 &&
+        sc64_range_route_work.max_range == 64 &&
         (sc64_range_route_work.phase == SC64_RANGE_WORK_FLOOD ||
          sc64_range_route_work.phase == SC64_RANGE_WORK_DONE))
-        return sc64_range_route_active;
+        return sc64_range_route_active_key();
     assert(sc64_range_route_snapshot_slot >= 0 &&
            sc64_range_route_snapshot_slot < SC64_ROUTE_ACTIVE_SLOTS &&
            sc64_route_valid[sc64_range_route_snapshot_slot] == 3 &&
@@ -140,7 +141,14 @@ static Sc64RangeRouteJob range_route_stale_guidance_source(int target)
            sc64_range_route_snapshot_key.target == (u16)target &&
            sc64_range_route_snapshot_key.minimum == 0 &&
            sc64_range_route_snapshot_key.maximum == 64);
-    return sc64_range_route_snapshot_key;
+    {
+        Sc64RangeRouteJob key = {0};
+        key.target = sc64_range_route_snapshot_key.target;
+        key.tx = sc64_range_route_snapshot_key.tx; key.ty = sc64_range_route_snapshot_key.ty;
+        key.minimum = sc64_range_route_snapshot_key.minimum;
+        key.maximum = sc64_range_route_snapshot_key.maximum; key.valid = 1;
+        return key;
+    }
 }
 
 static void test_range_scheduler_stays_lazy_and_releases_abandoned_copy(void)
@@ -174,7 +182,7 @@ static void test_range_scheduler_stays_lazy_and_releases_abandoned_copy(void)
     assert(sc64_range_route_copy_slot >= 0);
     assert(sc64_range_route_copy_cursor > 0 &&
            sc64_range_route_copy_cursor <
-               sc64_range_route_work.gradient_bytes);
+               sc64_range_work_ceil3((unsigned)sc64_range_route_work.cols * sc64_range_route_work.rows));
     frame = (int)(sc64_range_route_pending[
         sc64_range_route_queue_head].last_request +
         SC64_RANGE_ROUTE_IDLE_LIMIT + 1u);
@@ -394,8 +402,8 @@ static void test_range_work_scheduler_contracts(void)
                                  71, latest_tx, latest_ty, 4, 40);
         assert(sc64_range_route_active.valid &&
                sc64_range_route_active.target == 71 &&
-               sc64_range_route_active.tx == latest_tx &&
-               sc64_range_route_active.ty == latest_ty &&
+               sc64_range_route_work.target_x == latest_tx &&
+               sc64_range_route_work.target_y == latest_ty &&
                sc64_range_route_work.phase == SC64_RANGE_WORK_DONE);
         status = sc64_range_route_next(71, latest_tx + 16, latest_ty, 0, 64,
                                        4, 40, &nc, &nr);
@@ -808,8 +816,8 @@ static void test_range_target_slot_reuse(void)
 {
     sc64_range_route_reset();
     memset(u,0,sizeof(u));
-    sc64_range_route_active=(Sc64RangeRouteJob){.target=0,.valid=1};
-    sc64_range_route_snapshot_key=(Sc64RangeRouteJob){.target=0,.valid=1};
+    sc64_range_route_active=(Sc64RangeRouteActive){.target=0,.valid=1};
+    sc64_range_route_snapshot_key=(Sc64RangeRouteSnapshotKey){.target=0,.valid=1};
     sc64_range_route_snapshot_slot=0;sc64_route_valid[0]=3;
     sc64_range_route_copy_slot=1;sc64_route_valid[1]=3;
     sc64_range_route_pending[0]=(Sc64RangeRouteJob){.target=0,.valid=1};
@@ -826,8 +834,8 @@ static void test_range_target_slot_reuse(void)
 static void test_range_dead_target_cleanup(void)
 {
     setup_combat_scene();
-    sc64_range_route_active=(Sc64RangeRouteJob){.target=(u16)victim,.valid=1};
-    sc64_range_route_snapshot_key=(Sc64RangeRouteJob){.target=(u16)victim,.valid=1};
+    sc64_range_route_active=(Sc64RangeRouteActive){.target=(u16)victim,.valid=1};
+    sc64_range_route_snapshot_key=(Sc64RangeRouteSnapshotKey){.target=(u16)victim,.valid=1};
     sc64_range_route_snapshot_slot=0;sc64_route_valid[0]=3;
     sc64_range_route_copy_slot=1;sc64_route_valid[1]=3;
     sc64_range_route_pending[0]=(Sc64RangeRouteJob){.target=(u16)victim,.valid=1};
