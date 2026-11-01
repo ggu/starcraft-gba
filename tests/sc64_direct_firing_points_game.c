@@ -253,7 +253,6 @@ static void test_range_work_scheduler_contracts(void)
     won = lost = 0;
     screen = SCREEN_PLAY;
     clear_walk_grid();
-    route_builds_before = sc64_route_builds;
     for (int row = 0; row < MAP_ROWS; ++row)
         if (row != 20) SC64_GRID_SET(path_walkable, 24 + row * MAP_COLS, 0);
 
@@ -429,7 +428,9 @@ static void test_range_work_scheduler_contracts(void)
     clear_walk_grid();
 
     /* A sealed component finishes as NO_PATH, rather than exposing a stale
-       seed or invoking the synchronous route flood. */
+       seed or invoking the synchronous route flood. Count only this operation:
+       earlier game updates can route unrelated live synthetic targets. */
+    route_builds_before = sc64_route_builds;
     for (int row = 0; row < MAP_ROWS; ++row)
         SC64_GRID_SET(path_walkable, 12 + row * MAP_COLS, 0);
     assert(sc64_range_route_next(73, tx, ty, 0, 64, 4, 40,
