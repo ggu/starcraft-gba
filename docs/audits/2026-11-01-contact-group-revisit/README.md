@@ -47,3 +47,23 @@ real `update_orders()` call. The read-only callback requires a nonzero
 toward-newborn collision bit as well as full-world equality at speeds 1 and 2.
 This demonstrates a contribution from the in-place newborn if the fixture
 passes; it does not establish collision coverage of the second pair member.
+
+## Focused host qualification
+
+At `d1a3b7b`, the unchanged membership fixture passed with grouping disabled
+and enabled. Both runs reported the invalid-class fixture unavailable in the
+canonical Z7 profile, so that case is not claimed as covered. The initial
+lifecycle OFF run stopped because its controlled Egg setup omitted the supply
+provider needed by the real production admission check; that failure remains
+separate from the later result.
+
+At `f234987`, which adds the existing canonical fixture's Overlord supply
+provider without changing runtime code, the controlled real Egg-dispatch and
+board/unload lifecycle fixtures passed with grouping OFF and ON. The
+near-newborn full-world witness required an actual nonzero collision; it does
+not prove collision coverage for the second newborn. The canonical Z7
+contact-cache differential also passed in both modes with identical reports:
+4,141,228 step checks, 637,112 indexed and 130,670 inactive mask checks,
+71,716 mutations, and zero failures; its memo oracle reported no unhooked
+mutations. These are controlled host fixtures, not player-input proof. Normal
+ARM fit, OFF ROM identity and current physical performance remain unmeasured.
