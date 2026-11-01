@@ -37,6 +37,20 @@ static void test_actor_phase_owners_and_reuse(void)
     race_shared_hp_regen_tick();
     assert(u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
 }
+#ifdef SC64_Z5_RUNTIME
+static void test_z5_legacy_tick_disabled(void)
+{
+    game_init();memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+    race_mode=0;race_selected_mission=SC64_Z5_GLOBAL_ID;
+    assert(race_z5_active());
+    int slot=spawn_unit(SIDE,U_ZERGLING,100,100);assert(slot>=0);
+    u[slot].hp=u[slot].maxhp-2;u[slot].shield_remainder=0;
+    for(int i=0;i<79;++i) { race_shared_hp_regen_tick();race_tick_state(); }
+    assert(u[slot].hp==u[slot].maxhp-2 && u[slot].shield_remainder==79);
+    race_shared_hp_regen_tick();race_tick_state();
+    assert(u[slot].hp==u[slot].maxhp-1 && u[slot].shield_remainder==0);
+}
+#endif
 static void test_paused_and_live_update(void)
 {
     /* Controlled host setup isolates the pause return and real update path. */
@@ -85,5 +99,8 @@ int main(void)
     assert(u[marine].shield_remainder==79);
     test_actor_phase_owners_and_reuse();
     test_paused_and_live_update();
+#ifdef SC64_Z5_RUNTIME
+    test_z5_legacy_tick_disabled();
+#endif
     return 0;
 }
