@@ -9,6 +9,9 @@
     (!defined(SC64_Z7_SOURCE_SIGHT) || !defined(SC64_VISIBILITY_SPANS))
 #error "SC64_Z7_SIGHT_SPANS requires SC64_Z7_SOURCE_SIGHT and SC64_VISIBILITY_SPANS"
 #endif
+#if defined(SC64_Z7_VISIBILITY_ROW_CONTEXT) && !defined(SC64_Z7_SIGHT_SPANS)
+#error "SC64_Z7_VISIBILITY_ROW_CONTEXT requires SC64_Z7_SIGHT_SPANS"
+#endif
 
 #ifdef SC64_Z7_SOURCE_SIGHT
 #include "sc64_z7_source_sight.h"
@@ -642,6 +645,50 @@ sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta)
 }
 
 #ifndef SC64_SHARED_SPAN_TABLES
+#ifdef SC64_Z7_VISIBILITY_ROW_CONTEXT
+/* A transition's centers, clipping extent and radius table do not change
+ * between rows. Keep this temporary context on the stack, not in the world. */
+typedef struct {
+    int x, y, col, row, radius, extent;
+    const u8 *halfwidths;
+} Sc64Z7VisibilityRowContext;
+
+static inline int
+sc64_z7_visibility_prepare_rows(Sc64Z7VisibilityRowContext *ctx,
+                                 int x, int y, int radius)
+{
+    int index = sc64_z7_visibility_radius_index(radius);
+    if (index < 0) return 0;
+    ctx->x = x; ctx->y = y;
+    ctx->col = x / 16; ctx->row = y / 16;
+    ctx->radius = radius; ctx->extent = (radius + 23) / 16;
+    ctx->halfwidths = sc64_z7_visibility_halfwidths +
+                      sc64_z7_visibility_halfwidth_offsets[index];
+    return 1;
+}
+
+static void __attribute__((noinline))
+sc64_z7_visibility_prepared_row_span(const Sc64Z7VisibilityRowContext *ctx,
+                                     int row, int *first, int *last)
+{
+    int dy, halfwidth, col0, col1;
+    *first = 1; *last = 0;
+    if (row < ctx->row - ctx->extent || row > ctx->row + ctx->extent ||
+        row < 0 || row >= MAP_ROWS) return;
+    dy = row * 16 + 8 - ctx->y;
+    if (dy < 0) dy = -dy;
+    if (dy > ctx->radius) return;
+    halfwidth = ctx->halfwidths[dy];
+    col0 = sc64_visibility_ceil_div16(ctx->x - halfwidth - 8);
+    col1 = sc64_visibility_floor_div16(ctx->x + halfwidth - 8);
+    if (col0 < ctx->col - ctx->extent) col0 = ctx->col - ctx->extent;
+    if (col1 > ctx->col + ctx->extent) col1 = ctx->col + ctx->extent;
+    if (col0 < 0) col0 = 0;
+    if (col1 >= MAP_COLS) col1 = MAP_COLS - 1;
+    if (col0 > col1) return;
+    *first = col0; *last = col1;
+}
+#endif
 #ifdef SC64_Z7_VISIBILITY_PHASE_REJECT
 #include "sc64_z7_visibility_phase_classes.h"
 /* Equal unbounded footprints remain equal after any map clipping. */
@@ -669,10 +716,20 @@ sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
     int old_row = old_y / 16, new_row = new_y / 16;
     int row, row0 = (old_row < new_row ? old_row : new_row) - extent;
     int row1 = (old_row > new_row ? old_row : new_row) + extent;
+#ifdef SC64_Z7_VISIBILITY_ROW_CONTEXT
+    Sc64Z7VisibilityRowContext old_ctx, new_ctx;
+    if (!sc64_z7_visibility_prepare_rows(&old_ctx, old_x, old_y, radius) ||
+        !sc64_z7_visibility_prepare_rows(&new_ctx, new_x, new_y, radius)) return;
+#endif
     for (row = row0; row <= row1; ++row) {
         int of, ol, nf, nl;
+#ifdef SC64_Z7_VISIBILITY_ROW_CONTEXT
+        sc64_z7_visibility_prepared_row_span(&old_ctx, row, &of, &ol);
+        sc64_z7_visibility_prepared_row_span(&new_ctx, row, &nf, &nl);
+#else
         sc64_z7_visibility_row_span(old_x, old_y, row, radius, extent, &of, &ol);
         sc64_z7_visibility_row_span(new_x, new_y, row, radius, extent, &nf, &nl);
+#endif
         if (of > ol) {
             sc64_visibility_apply_span(row, nf, nl, 1);
         } else if (nf > nl) {
