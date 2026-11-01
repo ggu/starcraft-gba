@@ -18,7 +18,9 @@ int main(int argc,char **argv)
             }
         }
     }
-    if(victory_count==1 && victory_trigger<SC64_P8_TRIGGER_LIMIT) {
+    if(victory_count==1 && victory_trigger<SC64_P8_TRIGGER_LIMIT &&
+       sc64_p8_source_metadata_valid() &&
+       sc64_p8_source_triggers[victory_trigger].condition_count>0) {
         Sc64P8TriggerInfo info={0};
         if(sc64_p8_source_trigger_info(0,victory_trigger,&info))
             enabled=sc64_p8_runtime_trigger_enabled(&info,7,1)==1;
