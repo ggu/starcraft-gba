@@ -1,0 +1,127 @@
+# Z10 candidate profile (2026-11-01, not qualified)
+
+Zerg mission 10, "Full Circle", now runs in an explicit `zerg-z10`
+candidate. It is the Z1–Z9 candidate plus Z10 as the tenth campaign entry,
+with code `SCZA`, title `SC ZERG Z10` and generation-49 saves. It stacks on
+the [Z9 candidate](../2026-11-01-z9-candidate/README.md) and reuses its
+late-Zerg scheduler, runtime adapter, compact save and town AI. The
+canonical `zerg` alias, the existing `zerg-z3`…`zerg-z8` ROMs and the
+`zerg-z9` candidate are unchanged (hashes below). Z10 has no ordinary-input
+win, ARM replay or timing yet, so this is not a mission qualification.
+
+## Source
+
+`tools/sc64_zerg_late_pack.py pack --mission Z10` verifies the retained
+scenario against its pinned contract:
+- global catalog entry 21, map path `008/01D`, 96×128 tiles;
+- CHK SHA-256 `1a8f0e1d…`;
+- descriptor fingerprint `97c32263…`.
+
+`make zerg-z10` renders it into ignored tables at
+`build/generated/z10/sc64_z10_program_generated.h`:
+- 10 triggers, 10 conditions, 30 actions and 64 locations;
+- active owners 0, 2, 3 and 7, with forces 2, 3, 1 and 4.
+
+The map, with 337 retained rows, was already in the shared staged race-map
+header behind `SC64_Z10_DATA_ENABLED`.
+
+The program, as decoded from the authenticated rows:
+- **Defeat:** the human commands no units (T0).
+- **Temple:** when the human has killed the Protoss Temple (raw 174, slot 0),
+  T2 creates a human Drone and the Khaydarin Crystal at location 1.
+- **Victory:** the crystal is brought to location 4, the Temple's site (T3).
+- **Towns:**
+  - Slot 2 (`Z10a`/`Z10b`, 8,000 resources) and slot 7 (`Z10c`/`Z10d`,
+    8,000) start at once.
+  - Slot 0, the Temple's guard (20,000), runs `Z10e` once switch 10 is set.
+    Switch 10 is set by the guard's first death (T7) or by the absence of any
+    Temple (T8).
+
+## Engine additions
+
+- Raw 174 gets a `SC64_Z10_RUNTIME`-only building identity with pinned BWAPI
+  facts: 7×3 tiles, 112/48/111/47 source pixels, 1,500 HP, armor 1. It is
+  destructible.
+- The Z10 mission table binds the program through the shared adapter.
+- **Kill census:** the starting Temples minus those alive. This is the same
+  authored stand-in as Z8's Nexus census, since only the human fights the
+  Temple.
+- **Deaths census:** slot 0's starting actors minus those alive. Slot 0
+  produces nothing until this row has fired, so the count is exact up to
+  that point. Like any disappearance, a removal would also count; Z10
+  removes no slot-0 actor.
+- The Drone, crystal, crystal carry, timed presentation, compact save and
+  town AI are the Z9 candidate's.
+
+## Evidence
+
+Run at base `72b6de1f` (`codex/p8-playable-20261029`) plus the Z9 change
+and this change.
+
+- `make zerg-z10` links:
+  - BSS end `0x0203df88`, IWRAM end `0x03004bf0`, within the `0x0203e000` /
+    `0x03005000` guards, with 120 bytes of BSS spare;
+  - ROM SHA-256 `6d16babd…`, with the Z8 sprite bank and the inputs listed
+    in the Z9 audit.
+- `make test-zerg-z10` runs two ASan/UBSan host fixtures:
+  - **Carried Z9 fixture** under the Z10 flags. It passes with the same
+    save-continuation digests as in the Z9 build (`cce4ad17`, `21b66920`).
+  - **Z10 fixture:**
+    - Z10 is launched through the ordinary campaign menu as the tenth Zerg
+      entry, with no unsupported rows.
+    - It checks the binding: 10 instances, active mask `0x8d`, forces, the
+      human's starting units, the destructible 1,500-HP Temple, and 60
+      starting slot-0 actors. The authored FourCC constants match the
+      authenticated action rows.
+    - The opening triggers run: 1,000/1,000 human resources, towns 2 and 7
+      started, and 20,000 for the guard.
+    - Removing one guard Zealot (a fixture-only state write) satisfies the
+      Deaths row. T7 sets switch 10, and T9 starts the guard's town.
+    - An ordinary pause-menu save with all three towns running reloads from
+      the title screen and matches the uninterrupted run for 3,000 updates.
+      Corrupt candidates are rejected: instance flags, a non-zero union tail,
+      and a moved location that Z10 cannot have.
+    - From that save, destroying the Temple (fixture-only) satisfies the
+      Kill row. T2 creates the Drone and crystal at location 1, and the Drone
+      carries the crystal.
+    - A second pause-menu save, with the crystal carried, matches for 1,000
+      updates.
+    - The carrier placed in location 4 (fixture-only) completes T3's
+      presentation and Victory.
+
+## Byte identity
+
+This branch was built with the inputs listed in the Z9 audit. With the
+new flags off, the default ROM and the `zerg`/`zerg-z7`, `zerg-z3`,
+`zerg-z4`, `zerg-z5`, `zerg-z6` and `zerg-z8` ROMs match the base hashes
+listed there exactly. The stacked `zerg-z9` candidate is unchanged from
+its own branch (`65bfcb14744bfc2c3f27ac62af3552d34868e0cdbdad9db15bc6ceb719958f44`).
+The new `zerg-z10` ROM is
+`6d16babd8602d92f052d5a6cf08dc3cf912585b9d33742e361272bb19eb2943d`.
+
+`make test-zerg-z8`, `make test-zerg-z9` and `make test-sc64-zerg-late-state`
+pass on this branch.
+
+An idle human in Z10 is defeated by T0 at frame 10,992 (scratch probe):
+Z10's human owns no beacon, and the waves fall back to any destructible
+human structure.
+
+## Not qualified
+
+- **No ordinary-input host controller win.** The fixture removes a guard,
+  destroys the Temple and moves the carrier by state writes.
+- **No input-only ARM replay and no fresh-process SRAM continuation.**
+- **No ARM frame timing.**
+- **Sprite art:** the default bank is the Z8 bank, which has no art for raw
+  174 (Temple) or raw 219 (crystal). The renderer draws its generic fallback
+  for them.
+- **The Kill and Deaths censuses are authored stand-ins**, not native
+  ledgers. The town AI, timed presentation and crystal carry are authored,
+  as in Z9.
+- Mission text, sound and physical-GBA behavior are not claimed.
+
+## Crystal-carrier preflight follow-up
+
+At source `7bd9daf01d6db8b5d2736abc8edc880c86e63419`, both the carried Z9 fixture and Z10 fixture passed under the canonical Z10 ASan/UBSan vector. Pure candidate checks reject dead and non-Drone crystal-carrier references before applying live state; the existing ordinary save continuations pass for 3,000 and 1,000 updates in each mission. The verified Z10 ROM SHA-256 is `61eb2bda30a69cda4f3230dc9e376273128ca7ff9a07b4990701c6704b15fc09`; ELF SHA-256 is `5d3009fe9706871e92c9eb5255b85227c63e06f7291c8cd28304ee14435a10c1`, BSS end `0x0203df88`, IWRAM end `0x03004bf0`. All 109 pinned inputs and named sidecars were verified. Logs are in `/tmp/sc64-z10-carrier-focus-20261101`.
+
+The fixture's mission victory uses state placement and is not an ordinary-input win. Native AI parity and conditional post-mission carrier removal remain unqualified. The merged Z9 audit and this paragraph are documentation-only changes after the tested head; the final combined default suite is tracked separately.

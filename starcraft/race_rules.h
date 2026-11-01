@@ -202,6 +202,10 @@ enum {
      * earlier campaign identities so disabled profiles keep their values. */
     B_ZL_KHAYDARIN_FORMATION,
 #endif
+#ifdef SC64_Z10_RUNTIME
+    /* Raw 174, Z10's Kill objective. */
+    B_ZL_PROTOSS_TEMPLE,
+#endif
 #ifdef SC64_SKIRMISH_ROSTER
     /* Raw-ID mappings missing from this compile profile, appended after all
      * legacy and campaign-specific building identities. */
@@ -622,6 +626,10 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     /* Scenario-only prop; 100000 HP comes from its ZP building fact. */
     , [B_ZL_KHAYDARIN_FORMATION] = { R_PROTOSS, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 0, 0 }
 #endif
+#ifdef SC64_Z10_RUNTIME
+    /* Scenario-only objective; HP and armor come from its ZP building fact. */
+    , [B_ZL_PROTOSS_TEMPLE] = { R_PROTOSS, SC_RACE_F_BUILDING, 255, 0, 250, 0, 1, 1500, 0 }
+#endif
 #ifdef SC64_SKIRMISH_ROSTER
     /* Stock values are from sc64_stock_profiles.h. Worker/admission and
      * placement requirements remain in the skirmish catalog/runtime. */
@@ -818,6 +826,9 @@ static inline const char *sc64_race_building_name(int type)
 #endif
 #ifdef SC64_Z9_RUNTIME
         ,[B_ZL_KHAYDARIN_FORMATION] = "KHAYDARIN CRYSTAL FORMATION"
+#endif
+#ifdef SC64_Z10_RUNTIME
+        ,[B_ZL_PROTOSS_TEMPLE] = "PROTOSS TEMPLE"
 #endif
 #ifdef SC64_SKIRMISH_ROSTER
         ,[B_SK_COMSAT] = "COMSAT STATION"
@@ -1760,6 +1771,9 @@ static inline int sc64_race_raw_building(int type)
 #ifdef SC64_Z9_RUNTIME
     case B_ZL_KHAYDARIN_FORMATION: return 173;
 #endif
+#ifdef SC64_Z10_RUNTIME
+    case B_ZL_PROTOSS_TEMPLE: return 174;
+#endif
 #ifdef SC64_SKIRMISH_ROSTER
     case B_SK_COMSAT: return 107;
 #ifndef SC64_NYDUS_ENABLED
@@ -2041,6 +2055,9 @@ static inline int sc64_race_building_from_raw(int raw)
 #endif
 #ifdef SC64_Z9_RUNTIME
     case 173: return B_ZL_KHAYDARIN_FORMATION;
+#endif
+#ifdef SC64_Z10_RUNTIME
+    case 174: return B_ZL_PROTOSS_TEMPLE;
 #endif
 #ifdef SC64_SKIRMISH_ROSTER
     case 107: return B_SK_COMSAT;

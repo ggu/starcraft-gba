@@ -305,7 +305,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_Z9_RUNTIME)
+#if defined(SC64_Z10_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 49u
+#elif defined(SC64_Z9_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 48u
 #elif defined(SC64_Z8_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 46u
