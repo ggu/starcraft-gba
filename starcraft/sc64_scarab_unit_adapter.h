@@ -12,15 +12,16 @@
 #endif
 #include "sc64_scarab_fields.h"
 #include "sc64_scarab_lifecycle.h"
+#include "sc64_scarab_wallet.h"
 _Static_assert(MAX_UNITS <= SC64_SCARAB_FIELD_SLOT_LIMIT, "Scarab slot encoding must cover the actor pool");
 
-/* This header is deliberately not included by the game yet. Call only after
- * spawn_unit and race_owner_minerals are defined. The eventual integration must
+/* Included by the gated flight experiment, or explicitly by prepared fixtures,
+ * after spawn_unit and campaign wallet bindings are defined. Admission still must
  * exclude training/inside children from ordinary simulation, targeting,
  * rendering and selection, preserve Reaver carry/work_timer on STOP, and
  * validate the actual candidate world before loading. Slot reuse must run the
  * parent/child loss hooks before reuse; slot plus owner alone is not a
- * generation identity. No current save version claims these fields. */
+ * generation identity. This wallet binding does not widen save-format support. */
 enum {
     SC64_SCARAB_CHILD_TRAINING = 0,
     SC64_SCARAB_CHILD_INSIDE = 1,
@@ -146,9 +147,20 @@ static int race_scarab_parent_write(int slot, const Sc64ScarabParent *p)
     if(!sc64_scarab_parent_fields_pack(&f,&carry,&timer)) return 0;
     u[slot].carry=carry; u[slot].work_timer=(u16)timer; return 1;
 }
-static int *race_scarab_owner_bank(int owner)
+static Sc64ScarabWallet race_scarab_owner_bank(int slot)
 {
-    return owner==SIDE ? &minerals : owner>=0 && owner<5 ? &race_minerals[owner] : 0;
+    Sc64ScarabWallet bank = {.limit = 65535};
+    if (!race_scarab_parent_identity(slot)) return bank;
+#ifdef SC64_P8_RUNTIME
+    if (race_p8_active()) return race_p8_scarab_wallet(&u[slot]);
+#endif
+#ifdef SC64_P7_RUNTIME
+    if (race_p7_active()) return race_p7_scarab_wallet(&u[slot]);
+#endif
+    int owner = u[slot].owner;
+    bank.engine = owner == SIDE ? &minerals :
+                  owner >= 0 && owner < 5 ? &race_minerals[owner] : 0;
+    return bank;
 }
 static int race_scarab_allocate(void *ctx,int *slot)
 {
@@ -235,12 +247,13 @@ static const Sc64ScarabOps race_scarab_ops={race_scarab_allocate,race_scarab_com
                                             race_scarab_launch_cb,race_scarab_cancel_cb};
 static int race_scarab_enqueue(int slot,int upgraded)
 {
-    Sc64ScarabParent p; Sc64ScarabCounts counts; int *bank;
+    Sc64ScarabParent p; Sc64ScarabCounts counts; Sc64ScarabWallet bank; int next;
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts) ||
-        !(bank=race_scarab_owner_bank(u[slot].owner)) || *bank<0 || *bank>65535) return 0;
-    int next=*bank;
-    if (!sc64_scarab_enqueue(&p,counts,upgraded,&next) || !race_scarab_parent_write(slot,&p)) return 0;
-    *bank=next; return 1;
+        !sc64_scarab_wallet_read(bank=race_scarab_owner_bank(slot),&next)) return 0;
+    if (!sc64_scarab_enqueue(&p,counts,upgraded,&next) ||
+        !sc64_scarab_wallet_value_valid(next) || (unsigned)next > bank.limit ||
+        !race_scarab_parent_write(slot,&p)) return 0;
+    sc64_scarab_wallet_commit(bank,next); return 1;
 }
 /* Invoke only on a source tick. No automatic game-loop registration. */
 static int race_scarab_production_tick(int slot,int upgraded)
@@ -270,27 +283,29 @@ static int race_scarab_cooldown_tick(int slot,int upgraded)
 }
 static int race_scarab_cancel(int slot,int upgraded,unsigned index)
 {
-    Sc64ScarabParent p; Sc64ScarabCounts counts; Sc64ScarabUnitContext c={slot}; int *bank;
+    Sc64ScarabParent p; Sc64ScarabCounts counts; Sc64ScarabUnitContext c={slot};
+    Sc64ScarabWallet bank; int next;
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts) ||
-        !(bank=race_scarab_owner_bank(u[slot].owner))) return 0;
-    int next=*bank;
-    if (!sc64_scarab_cancel(&p,counts,upgraded,&race_scarab_ops,&c,index,&next,65535)) return 0;
+        !sc64_scarab_wallet_read(bank=race_scarab_owner_bank(slot),&next)) return 0;
+    if (!sc64_scarab_cancel(&p,counts,upgraded,&race_scarab_ops,&c,index,&next,
+                           (int)bank.limit)) return 0;
     if (!race_scarab_parent_write(slot,&p)) return 0;
-    *bank=next; return 1;
+    sc64_scarab_wallet_commit(bank,next); return 1;
 }
 /* Transfer callers cancel every paid entry while the old owner still owns the
  * parent and children. Preflight the total refund before touching any slot. */
 static int race_scarab_cancel_all(int slot,int upgraded)
 {
-    Sc64ScarabParent p; Sc64ScarabCounts counts; Sc64ScarabUnitContext c={slot}; int *bank;
+    Sc64ScarabParent p; Sc64ScarabCounts counts; Sc64ScarabUnitContext c={slot};
+    Sc64ScarabWallet bank; int balance;
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts) ||
-        !(bank=race_scarab_owner_bank(u[slot].owner))) return 0;
+        !sc64_scarab_wallet_read(bank=race_scarab_owner_bank(slot),&balance)) return 0;
     int refund=(int)p.queued*SC64_SCARAB_COST;
-    if (*bank<0 || *bank>65535 || refund>65535-*bank) return 0;
+    if ((unsigned)refund>bank.limit-(unsigned)balance) return 0;
     if (p.active_slot>=0 && !race_scarab_cancel_cb(&c,p.active_slot)) return 0;
     p.queued=0; p.active_slot=-1; p.progress=0;
     if (!race_scarab_parent_write(slot,&p)) return 0;
-    *bank+=refund; return 1;
+    sc64_scarab_wallet_commit(bank,balance+refund); return 1;
 }
 static int race_scarab_launch_child(int slot,int upgraded,int child)
 {

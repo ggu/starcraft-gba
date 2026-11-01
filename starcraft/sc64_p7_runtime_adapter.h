@@ -29,6 +29,18 @@ static const Sc64RaceMap *race_p7_map;
 static int race_p7_active(void)
 { return !race_mode && race_selected_mission == SC64_P7_GLOBAL_ID; }
 
+/* The saved clock of the current service binding (sc64_protoss_services.h). */
+static u8 *race_protoss_service_clock(void)
+{
+    switch (race_protoss_service_binding()) {
+    case SC64_PROTOSS_BIND_P7: return race_p7.reserved;
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+    case SC64_PROTOSS_BIND_LATER: return race_protoss_later_service_clock();
+#endif
+    default: return race_protoss_generic_clock;
+    }
+}
+
 /* Resolve from the canonical descriptor before transient bindings exist. The
  * owner table is not rewritten: two computer source forces may share ENEMY. */
 static int race_p7_source_owner(unsigned slot)
@@ -40,6 +52,25 @@ static int race_p7_source_owner(unsigned slot)
     if (!sc64_p7_active_slots[slot]) return -1;
     return slot==map->human_slot ? SIDE : map->owner_modes[slot];
 }
+
+#ifdef SC64_SCARAB_RUNTIME
+#include "sc64_scarab_wallet.h"
+static Sc64ScarabWallet race_p7_scarab_wallet(const Unit *parent)
+{
+    Sc64ScarabWallet bank = {0};
+    if (!parent || parent->raw_owner < 0 || parent->raw_owner >= 8 ||
+        race_p7_source_owner((unsigned)parent->raw_owner) != parent->owner) return bank;
+    if (parent->raw_owner == 7) {
+        bank.engine = &minerals; bank.limit = 65535;
+    } else if (parent->raw_owner == 0 || parent->raw_owner == 4) {
+        bank.source = &race_p7.source_minerals[parent->raw_owner];
+        /* The authenticated one-shot grants and P7 save validator bound
+         * each force wallet to 10,000, including cancellation refunds. */
+        bank.limit = 10000;
+    }
+    return bank;
+}
+#endif
 
 static int race_p7_map_shape_valid(const Sc64RaceMap *map)
 {

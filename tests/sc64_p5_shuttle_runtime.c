@@ -197,7 +197,12 @@ static void check_candidate_rejections(const RaceSave *good, int carrier,
     assert(race_save_decode_unit(good, (unsigned)passenger, WORLD_W, WORLD_H, &actor));
     actor.target = MAX_UNITS;
     encode_candidate_unit(&bad, passenger, &actor);
+#ifdef SC64_SHARED_BUNKER
+    /* Building targets are owned by the candidate-wide Bunker validator. */
+    assert(!race_bunker_save_world_valid(&bad, race_cols, race_rows));
+#else
     assert(!race_p5_transport_save_candidate_valid(&bad, race_cols, race_rows));
+#endif
 
     /* P5 Count/Bring and death attribution use source provenance. Both
      * impossible sentinel/out-of-range owners must fail candidate and load

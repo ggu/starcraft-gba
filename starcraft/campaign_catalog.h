@@ -45,6 +45,13 @@
 #error "P7 entry requires the authenticated P1-P7 Protoss runtime, data, actors and ability profile"
 #endif
 #endif
+#ifdef SC64_P8_CAMPAIGN_ENTRY
+#if !defined(SC64_P7_CAMPAIGN_ENTRY) || !defined(SC64_P8_RUNTIME) || \
+    !defined(SC64_P8_DATA_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2
+#error "P8 entry requires the authenticated P1-P8 Protoss runtime and data"
+#endif
+#endif
 #ifdef SC64_Z6_CAMPAIGN_ENTRY
 #if !defined(SC64_Z5_CAMPAIGN_ENTRY) || !defined(SC64_Z6_RUNTIME) || \
     !defined(SC64_Z6_DATA_ENABLED) || !defined(SC64_Z6_ACTORS) || \
@@ -66,6 +73,20 @@
     !defined(SC64_Z8_DATA_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
     !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 1
 #error "Z8 entry requires the authenticated Z1-Z8 Zerg runtime and data"
+#endif
+#endif
+#ifdef SC64_Z9_CAMPAIGN_ENTRY
+#if !defined(SC64_Z8_CAMPAIGN_ENTRY) || !defined(SC64_Z9_RUNTIME) || \
+    !defined(SC64_Z9_DATA_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 1
+#error "Z9 entry requires the authenticated Z1-Z9 Zerg runtime and data"
+#endif
+#endif
+#ifdef SC64_Z10_CAMPAIGN_ENTRY
+#if !defined(SC64_Z9_CAMPAIGN_ENTRY) || !defined(SC64_Z10_RUNTIME) || \
+    !defined(SC64_Z10_DATA_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 1
+#error "Z10 entry requires the authenticated Z1-Z10 Zerg runtime and data"
 #endif
 #endif
 #ifdef SC64_T5_CAMPAIGN_ENTRY
@@ -215,8 +236,20 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "EYE FOR AN EYE"},
-    {20, SC64_FACTION_ZERG, 9, 0, "THE INVASION OF AIUR"},
-    {21, SC64_FACTION_ZERG, 10, 0, "FULL CIRCLE"},
+    {20, SC64_FACTION_ZERG, 9,
+#ifdef SC64_Z9_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE INVASION OF AIUR"},
+    {21, SC64_FACTION_ZERG, 10,
+#ifdef SC64_Z10_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "FULL CIRCLE"},
     {22, SC64_FACTION_PROTOSS, 3,
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
      1,
@@ -252,7 +285,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "HOMELAND"},
-    {27, SC64_FACTION_PROTOSS, 8, 0, "THE TRIAL"},
+    {27, SC64_FACTION_PROTOSS, 8,
+#ifdef SC64_P8_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE TRIAL"},
     {28, SC64_FACTION_PROTOSS, 9, 0, "SHADOW HUNTERS"},
     {29, SC64_FACTION_PROTOSS, 10, 0, "EYE OF THE STORM"}
 };

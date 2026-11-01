@@ -33,18 +33,16 @@ _Static_assert(SC64_Z8_PROGRAM_TRIGGER_COUNT == SC64_Z8_SOURCE_TRIGGER_COUNT &&
 enum {
     SC64_Z8_MAP_UNITS = 194,
     SC64_Z8_HUMAN_SLOT = 3,
-    /* One engine update is one native frame at the Fastest speed entry. */
+    /* Native Fastest speed-table entry; applied once per native step. */
     SC64_Z8_FRAME_MS = 42,
     /* Every Z8 Transmission subtracts its time from a sound length that is
      * not imported; this bounded authored value stands in for it. */
     SC64_Z8_TRANSMISSION_MS = 4000,
     SC64_Z8_RAW_NEXUS = 154,
-    /* Pinned BWAPI Overlord sight (11 tiles) is its detection range; the
-     * pinned OpenBW cap for a grounded building detector is seven tiles.
-     * Engine pixels are source pixels / 2. */
+    /* Pinned OpenBW caps grounded-building detection at seven tiles.
+     * Mobile detector sight comes from shared base source facts below. */
     SC64_Z8_RAW_OVERLORD = 42,
     SC64_Z8_RAW_SPORE_COLONY = 144,
-    SC64_Z8_OVERLORD_DETECT_PX = 11 * 16,
     SC64_Z8_SPORE_DETECT_PX = 7 * 16,
     SC64_Z8_RAW_HATCHERY = 131,
     SC64_Z8_RAW_LAIR = 132,
@@ -58,6 +56,8 @@ static const Sc64Z8Program race_z8_program = {
     SC64_Z8_PROGRAM_ACTION_COUNT, SC64_Z8_PROGRAM_LOCATION_COUNT,
     SC64_Z8_PROGRAM_MAP_PIXEL_WIDTH, SC64_Z8_PROGRAM_MAP_PIXEL_HEIGHT
 };
+
+#include "sc64_z8_clock.h"
 
 static Sc64Z8SchedulerState race_z8_sched;
 static Sc64Z8AiState race_z8_ai;
@@ -105,6 +105,17 @@ static int race_z8_source_owner(unsigned slot)
     return -1;
 }
 
+/* PUNI is source-slot scoped. Only colony products use this first shared
+ * route; other production retains its existing profile behavior. */
+static int race_z8_colony_product_available(int owner,int raw_owner,int type)
+{
+    int raw=sc64_race_raw_building(type);
+    if (!race_z8_active() || owner!=SIDE || raw_owner<0 ||
+        race_z8_source_owner((unsigned)raw_owner)!=owner || raw<0) return 0;
+    return sc64_z8_permission_available(&sc64_z8_permission_table,
+                                         (unsigned)raw_owner,(unsigned)raw);
+}
+
 static void race_z8_note_unit_spawn(int slot, int owner, int type)
 {
     if (!race_z8_active() || slot < 0 || slot >= MAX_UNITS) return;
@@ -124,6 +135,11 @@ static void race_z8_note_product_building(int building)
     race_z8_product_slot = race_z8_active() && building >= 0 &&
         building < MAX_BUILDINGS ? (s8)b[building].raw_owner : -1;
 }
+
+/* Z8 starts with Antennae level zero; no upgrade is granted here. Source
+ * sight is in full-scale pixels and this world is half scale. */
+static int race_z8_overlord_detect_px(void)
+{ return sc64_source_sight_raw_pixels(SC64_Z8_RAW_OVERLORD) / 2; }
 
 static int __attribute__((noinline)) race_z8_unit_hidden_from_side(int unit)
 {
@@ -147,7 +163,7 @@ static void race_z8_update_cloak(void)
                    u[j].raw_type == SC64_Z8_RAW_OVERLORD &&
                    !SC64_TRANSPORT_LOADED(&u[j]) &&
                    dist2(u[j].x, u[j].y, u[i].x, u[i].y) <=
-                       SC64_Z8_OVERLORD_DETECT_PX * SC64_Z8_OVERLORD_DETECT_PX;
+                       race_z8_overlord_detect_px() * race_z8_overlord_detect_px();
         for (int j = 0; j < MAX_BUILDINGS && !seen; ++j)
             seen = b[j].alive && b[j].owner == SIDE &&
                    b[j].raw_type == SC64_Z8_RAW_SPORE_COLONY && building_complete(j) &&
@@ -461,19 +477,22 @@ static void race_z8_ai_tick(void)
     }
 }
 
-/* One engine update is one native frame of the scheduler. Returns 0 on any
- * fault; the caller pauses the mission. */
+/* The scheduler advances four native steps per five active engine updates.
+ * AI and cloak remain on the engine clock. A fault pauses the mission. */
 static int race_z8_runtime_tick(void)
 {
+    int native_due;
     if (!race_z8_active()) return 1;
     if (!race_z8_map) return 0;
-    if (race_z8_camera_release) {
+    native_due = sc64_z8_native_step((unsigned)frame);
+    if (native_due && race_z8_camera_release) {
         race_z8_camera_release = 0;
         if (!sc64_z8_release_wait(&race_z8_sched, SC64_Z8_HUMAN_SLOT)) return 0;
     }
     race_z8_human_minerals = (u32)minerals;
     race_z8_human_gas = (u32)gas;
-    if (!sc64_z8_tick_prevalidated(&race_z8_sched, &race_z8_program,
+    if (native_due &&
+        !sc64_z8_tick_prevalidated(&race_z8_sched, &race_z8_program,
                                    &sc64_z8_world_ops, &race_z8_view, 0)) return 0;
     if (race_z8_human_minerals > 65535u || race_z8_human_gas > 65535u) return 0;
     for (unsigned t = 0; t < SC64_Z8_AI_TOWNS; ++t)

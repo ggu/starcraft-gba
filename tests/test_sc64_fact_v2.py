@@ -170,6 +170,25 @@ class FactV2Test(unittest.TestCase):
         self.compile("sight-policy-build", SIGHT_POLICY_CHECK, GATES, exe)
         self.run_executable("sight-policy-run", exe, "P7 sight pure policy exact:")
 
+    def test_stale_rectangle_geometry_revision_rejects(self):
+        table_dir, header = self.generate("current-rect", FEATURES["rect"])
+        text = header.read_text()
+        marker = "#define SC64_FACT_P7_RECT_REVISION 2u\n"
+        self.assertIn(marker, text)
+        consumer = GATES + ("SC64_FACT_TABLES",) + FEATURES["rect"]
+        current = self.current / "current-rect-check"
+        self.compile("current-rect-check-build", FACT_CHECK, consumer, current, table_dir)
+        self.run_executable("current-rect-check-run", current, "fact tables exact:")
+        for name, replacement in (("unmarked", ""),
+                                  ("old", "#define SC64_FACT_P7_RECT_REVISION 1u\n")):
+            old_dir = self.current / name
+            old_dir.mkdir()
+            (old_dir / header.name).write_text(text.replace(marker, replacement))
+            self.compile(name + "-rect-check-build", FACT_CHECK, consumer,
+                         self.current / (name + "-rect-check"), old_dir,
+                         expected=False,
+                         stderr_text="rectangle tables require current geometry revision")
+
     def test_legacy_unversioned_v1_is_fact_only_compatible(self):
         table_dir, header = self.generate("legacy-source", ())
         text = header.read_text()

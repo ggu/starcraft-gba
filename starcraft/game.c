@@ -10,6 +10,12 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_RACES)
+#error "Shared transport requires the race engine"
+#endif
+#ifdef SC64_SHARED_TRANSPORT
+#include "sc64_skirmish_transport_tech.h"
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 #include "sc64_battlecruiser_rules.h"
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -79,7 +85,7 @@ static void sc64_contact_memo_invalidate(void);
 #ifndef SC64_DEATH_VFX_DISABLED
 #include "sc64_death_vfx.h"
 #endif
-#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER)
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER) || defined(SC64_SHARED_TRANSPORT)
 #define SC64_TRANSPORT_RUNTIME
 #endif
 #if defined(SC64_P5_SHUTTLE_ENABLED) && !defined(SC64_P5_RUNTIME)
@@ -299,8 +305,14 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_Z8_RUNTIME)
+#if defined(SC64_Z10_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 49u
+#elif defined(SC64_Z9_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 48u
+#elif defined(SC64_Z8_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 46u
+#elif defined(SC64_P8_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 44u
 #elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 43u
 #elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
@@ -459,6 +471,10 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x20000000u) == 0,
 #else
 #define SAVE_VERSION SC64_LEGACY_SAVE_VERSION
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+_Static_assert((SAVE_VERSION & 0x04000000u) == 0, "transport save namespace overlaps");
+#define SC64_TRANSPORT_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
+#endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || (!defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_LATE_TERRAN_STORAGE))
 #error "Scarab namespace stage requires an explicitly supported impact save profile"
@@ -467,6 +483,9 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
                (SAVE_VERSION & 0x08000000u) == 0,
                "Scarab tag overlaps an existing save namespace");
 #define SC64_SCARAB_SAVE_VERSION (SAVE_VERSION | 0x08000000u)
+#ifdef SC64_SHARED_TRANSPORT
+#define SC64_SCARAB_TRANSPORT_SAVE_VERSION (SC64_SCARAB_SAVE_VERSION | 0x04000000u)
+#endif
 #endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
@@ -1220,6 +1239,9 @@ static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 #ifdef SC64_Z8_RUNTIME
 #include "sc64_z8_triggers.h"
 #endif
+#ifdef SC64_Z9_RUNTIME
+#include "sc64_zerg_late_triggers.h"
+#endif
 typedef union {
     u16 bfs_queue[MAP_CELLS];
     RaceSave save;
@@ -1230,6 +1252,10 @@ typedef union {
     /* A Z8 save candidate expands into this image before it is accepted. */
     struct { RaceSave save; Sc64Z8SchedulerState scheduler; } z8_candidate;
 #endif
+#ifdef SC64_Z9_RUNTIME
+    /* A Z9/Z10 save candidate expands into this image before it is accepted. */
+    struct { RaceSave save; Sc64ZlSchedulerState scheduler; } zl_candidate;
+#endif
 #ifdef SC64_IMPACT_EVENTS
     RaceImpactRecord impact_record;
 #endif
@@ -1237,6 +1263,10 @@ typedef union {
 #ifdef SC64_Z8_RUNTIME
 _Static_assert(sizeof(RaceSave)+sizeof(Sc64Z8SchedulerState)<=sizeof(u16)*MAP_CELLS,
                "Z8 candidate expansion must fit existing route scratch");
+#endif
+#ifdef SC64_Z9_RUNTIME
+_Static_assert(sizeof(RaceSave)+sizeof(Sc64ZlSchedulerState)<=sizeof(u16)*MAP_CELLS,
+               "Z9/Z10 candidate expansion must fit existing route scratch");
 #endif
 #ifdef SC64_IMPACT_EVENTS
 _Static_assert(sizeof(RaceImpactRecord) <= sizeof(u16) * MAP_CELLS,
@@ -1396,6 +1426,11 @@ static int race_bc_before_building_transfer(int slot,int new_owner);
 #endif
 #ifndef SC64_BC_ALLOW_BUILDING_TRANSFER
 #define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) 1
+#endif
+#ifdef SC64_SHARED_TRANSPORT
+_Static_assert(MAX_BUILDINGS <= 255, "transport research producer index exceeds one byte");
+static Sc64SkTransportTech race_skirmish_transport_tech;
+static Sc64SkTransportTech race_skirmish_transport_candidate;
 #endif
 static int race_skirmish_map;
 static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
@@ -1576,12 +1611,14 @@ static int race_z7_egg_cancel_available(void);
 static int race_z7_egg_cancel_selected(void);
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-static int race_z7_colony_start_sunken(int building);
-static int race_z7_colony_start_spore(int building);
-static int race_z7_colony_morph_available_for(int building,int target_type);
+static int race_colony_profile_allowed(void);
+static int race_colony_product_allowed(int owner,int raw_owner,int type);
+static int race_colony_start_sunken(int building);
+static int race_colony_start_spore(int building);
+static int race_colony_morph_available_for(int building,int target_type);
 static int race_z7_spore_morph_command_available(void);
-static int race_z7_colony_pre_building_tick(void);
-static int race_z7_colony_post_building_tick(void);
+static int race_colony_pre_building_tick(void);
+static int race_colony_post_building_tick(void);
 #endif
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
@@ -1599,6 +1636,7 @@ static int race_p7_archon_splash_attack(Unit *q, int target);
 static int race_z8_active(void);
 static int race_z8_map_shape_valid(const Sc64RaceMap *map);
 static int race_z8_source_owner(unsigned slot);
+static int race_z8_colony_product_available(int owner,int raw_owner,int type);
 static int race_z8_runtime_init(const Sc64RaceMap *map);
 static int race_z8_runtime_tick(void);
 static int race_z8_outcome(void);
@@ -1606,6 +1644,37 @@ static void race_z8_note_unit_spawn(int slot, int owner, int type);
 static void race_z8_note_building_spawn(int slot, int owner, int type);
 static void race_z8_note_product_building(int building);
 static int race_z8_unit_hidden_from_side(int unit);
+#endif
+#ifdef SC64_Z9_RUNTIME
+#define SC64_Z9_GLOBAL_ID 20
+#define SC64_Z10_GLOBAL_ID 21
+static int race_zl_active(void);
+static int race_zl_map_shape_valid(const Sc64RaceMap *map);
+static int race_zl_source_owner(unsigned slot);
+static int race_zl_colony_product_available(int owner,int raw_owner,int type);
+static int race_zl_runtime_init(const Sc64RaceMap *map);
+static int race_zl_runtime_tick(void);
+static int race_zl_outcome(void);
+static void race_zl_note_unit_spawn(int slot, int owner, int type);
+static void race_zl_note_building_spawn(int slot, int owner, int type);
+static void race_zl_note_product_building(int building);
+#endif
+#ifdef SC64_P8_RUNTIME
+#define SC64_P8_GLOBAL_ID 27
+static int race_p8_active(void);
+static int race_p8_source_owner(unsigned slot);
+static int race_p8_unit_product_available(int owner,int raw_owner,int type);
+static int race_p8_building_product_available(int owner,int raw_owner,int type);
+static int race_p8_world_paused(void);
+static int race_p8_map_shape_valid(const Sc64RaceMap *map);
+static int race_p8_runtime_init(const Sc64RaceMap *map);
+static int race_p8_runtime_tick(u32 elapsed_updates);
+static int race_p8_outcome(void);
+static void race_p8_note_unit_spawn(int slot, int owner, int type);
+static void race_p8_note_building_spawn(int slot, int owner, int type);
+static void race_p8_note_product_building(int building);
+/* P8 binds the shared Protoss unit services (sc64_protoss_services.h). */
+#define SC64_PROTOSS_LATER_BINDINGS
 #endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
        SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
@@ -1615,6 +1684,10 @@ static void race_siege_splash_attack(Unit *,int,int);
 #endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
 static int race_p7_active(void);
+#include "sc64_protoss_services.h"
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static int race_p7_carrier_training_stock(int carrier, unsigned count);
+#endif
 #endif
 #ifdef SC64_NYDUS_ENABLED
 static void race_nydus_note_building_lost(int slot);
@@ -1791,6 +1864,9 @@ static const Sc64SpriteFrame *mission_building_sprite(int type);
 static int race_owner_supply(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
 static void race_add_owner_resources(int owner,int ore,int vespene);
+#ifdef SC64_SHARED_TRANSPORT
+static int race_owner_minerals(int owner), race_owner_gas(int owner);
+#endif
 static int race_save_game(void),race_load_game(void);
 static void race_campaign_init(void),race_campaign_tick(void);
 #endif
@@ -2269,11 +2345,17 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_Z8_RUNTIME
     race_z8_note_unit_spawn(i, owner, type);
 #endif
+#ifdef SC64_Z9_RUNTIME
+    race_zl_note_unit_spawn(i, owner, type);
+#endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     if (race_p7_active() && owner == SIDE) {
         u[i].raw_type = sc64_race_raw_unit(type);
         u[i].raw_owner = 7;
     }
+#endif
+#ifdef SC64_P8_RUNTIME
+    race_p8_note_unit_spawn(i, owner, type);
 #endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
@@ -2324,7 +2406,7 @@ spawn_unit(int owner, int type, int x, int y)
 #endif
     u[i].weapon = owner == SIDE ? weapons_level : 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (race_p7_active()) u[i].weapon = (u16)(1u << 13);
+    if (race_protoss_services_active()) u[i].weapon = (u16)(1u << 13);
 #endif
     u[i].target = -1;
     u[i].path_timer = 0;
@@ -2334,6 +2416,17 @@ spawn_unit(int owner, int type, int x, int y)
     if (sc64_race_raw_unit(type) == 83 && !race_scarab_parent_init(i)) {
         u[i].alive = 0;
         return -1;
+    }
+#endif
+#if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
+    /* A birth can reuse a dead linked slot or occupy an unlinked slot while
+     * update_orders() is querying the current collision buckets.  Reconcile
+     * it before any subsequent actor can query, not on its first movement. */
+    if (sc64_unit_bucket_active) {
+        if (u[i].x < 0 || u[i].y < 0 || u[i].x >= WORLD_W || u[i].y >= WORLD_H)
+            sc64_unit_bucket_active = 0; /* use the full-world fallback */
+        else
+            sc64_unit_bucket_move(&u[i]);
     }
 #endif
     if (owner == SIDE)
@@ -2444,11 +2537,17 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #ifdef SC64_Z8_RUNTIME
     race_z8_note_building_spawn(i, owner, type);
 #endif
+#ifdef SC64_Z9_RUNTIME
+    race_zl_note_building_spawn(i, owner, type);
+#endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     if (race_p7_active() && owner == SIDE) {
         b[i].raw_type = sc64_race_raw_building(type);
         b[i].raw_owner = 7;
     }
+#endif
+#ifdef SC64_P8_RUNTIME
+    race_p8_note_building_spawn(i, owner, type);
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (race_battery_active() && sc64_race_raw_building(type) == 172) {
@@ -3312,6 +3411,9 @@ move_toward(Unit * q, int tx, int ty)
 #ifdef SC64_TRANSPORT_RUNTIME
 #include "sc64_transport_adapter.h"
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+#include "sc64_skirmish_transport_adapter.h"
+#endif
 
 /* These expand in query declarations/calls outside the race-specific block
  * too, so keep the source-owner plumbing available in every profile. */
@@ -3930,7 +4032,7 @@ sc64_direct_attack_find_target(int x, int y)
         if (!owners_hostile(SIDE, owner) || !currently_visible(tx, ty) ||
             !sc64_direct_target_state(entity, SIDE, &s)) continue;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-        if (race_p7_active() && sc64_p7_observer_target_is_cloaked(entity)) {
+        if (race_protoss_services_active() && sc64_p7_observer_target_is_cloaked(entity)) {
             int eligible=0;
             for (int a=0;a<MAX_UNITS;++a) if (u[a].alive && u[a].selected &&
                 u[a].owner==SIDE && !SC64_TRANSPORT_LOADED(&u[a]) &&
@@ -4202,6 +4304,9 @@ destroy_building(int slot, int source_owner)
 {
     Building *q = &b[slot];
     if (!q->alive) return;
+#ifdef SC64_SHARED_TRANSPORT
+    race_sk_transport_producer_destroyed(slot);
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_target_invalidate(MAX_UNITS+slot);
 #endif
@@ -4250,6 +4355,17 @@ destroy_building(int slot, int source_owner)
 		supply_cap -= 16;
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
             if (q->type == B_COMMAND && q->owner == SIDE && !q->under_construction) supply_cap -= 20;
+#endif
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+            /* A delayed impact can kill a morph after production has already
+             * ticked. Clear transient state before a pause can save the dead
+             * row; the next production tick might not run before saving. */
+            if (!race_mode && race_colony_profile_allowed() &&
+                q->type==B_CREEP_COLONY &&
+                (q->flags & (SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG))) {
+                q->flags &= ~(SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG);
+                q->queue_progress=0;
+            }
 #endif
 	    q->alive = 0;
 #ifdef SC64_BATTERY_SERVICE_ENABLED
@@ -4843,6 +4959,9 @@ init_state(void)
     toast_timer=toast_id=enemy_timer=wave=0;
     weapons_level=armor_level=weapons_research=armor_research=0;
     mission_objective_stage=mission_unsupported_count=0;
+#ifdef SC64_SHARED_TRANSPORT
+    memset(&race_skirmish_transport_tech, 0, sizeof(race_skirmish_transport_tech));
+#endif
     train_type=race_mode?(race_human==R_TER?U_SCV:race_human==R_ZERG?U_DRONE:U_PROBE):
         (race_selected_mission<2?U_DRONE:U_PROBE);
     SC64_GRID_CLEAR(explored);SC64_GRID_CLEAR(visible);
@@ -5596,29 +5715,69 @@ static int race_selected_storm_hero(void)
 #endif
 
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-static int race_z7_colony_command_available(void)
+/* Admission remains profile-owned until each profile has source permissions,
+ * asset and save qualification. Shared mechanics do not activate missions. */
+static int race_colony_profile_allowed(void)
 {
-    if (!race_z7_active() || race_human!=R_ZERG || selected_building<0 ||
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) return 1;
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return 1;
+#endif
+    return race_z7_active();
+}
+
+static int race_colony_owner_allowed(int owner, int raw_owner)
+{
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) return owner==SIDE && raw_owner>=0 &&
+        race_z8_source_owner((unsigned)raw_owner)==owner;
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return owner==SIDE && raw_owner>=0 &&
+        race_zl_source_owner((unsigned)raw_owner)==owner;
+#endif
+    return race_z7_active() && owner==SIDE && raw_owner==race_z7_product_source_owner(owner);
+}
+
+static int race_colony_product_allowed(int owner, int raw_owner, int type)
+{
+    (void)type;
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) return race_z8_colony_product_available(owner,raw_owner,type);
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return race_zl_colony_product_available(owner,raw_owner,type);
+#endif
+    return race_z7_active() && owner==SIDE && raw_owner==race_z7_product_source_owner(owner);
+}
+
+static int race_colony_command_available(void)
+{
+    if (!race_colony_profile_allowed() || race_human!=R_ZERG || selected_building<0 ||
         selected_building>=MAX_BUILDINGS) return 0;
     for (unsigned i=0; i<MAX_UNITS; ++i)
         if (u[i].alive && u[i].selected) return 0;
     const Building *q=&b[selected_building];
     return q->alive && q->owner==SIDE && q->type==B_CREEP_COLONY &&
-        q->raw_type==sc64_race_raw_building(B_CREEP_COLONY) && q->raw_owner==3;
+        q->raw_type==sc64_race_raw_building(B_CREEP_COLONY) &&
+        race_colony_owner_allowed(q->owner,q->raw_owner);
 }
 
 static int race_z7_spore_morph_command_available(void)
 {
-    return race_z7_colony_command_available() &&
-        race_z7_colony_morph_available_for(selected_building,B_SPORE_COLONY);
+    return race_colony_command_available() &&
+        race_colony_morph_available_for(selected_building,B_SPORE_COLONY);
 }
 
 static int race_z7_creep_command_available(void)
 {
     int found=0;
-    if (!race_z7_active() || race_human!=R_ZERG || selected_building>=0) return 0;
+    if (!race_colony_profile_allowed() || race_human!=R_ZERG || selected_building>=0) return 0;
     for (unsigned i=0; i<MAX_UNITS; ++i) if (u[i].alive && u[i].selected) {
-        if (u[i].owner!=SIDE || u[i].type!=U_DRONE) return 0;
+        if (u[i].owner!=SIDE || u[i].type!=U_DRONE ||
+            !race_colony_product_allowed(u[i].owner,u[i].raw_owner,B_CREEP_COLONY)) return 0;
         found=1;
     }
     return found;
@@ -5633,6 +5792,15 @@ static int __attribute__((noinline)) race_bunker_menu_available(void)
 }
 #endif
 
+#ifdef SC64_RACES
+enum {
+    RACE_CONTEXT_SCARAB, RACE_CONTEXT_YAMATO, RACE_CONTEXT_BC_BUILDING,
+    RACE_CONTEXT_BUNKER, RACE_CONTEXT_TRANSPORT, RACE_CONTEXT_TRANSPORT_TECH, RACE_CONTEXT_BATTERY,
+    RACE_CONTEXT_CARRIER, RACE_CONTEXT_COUNT
+};
+static int race_context_command_base(int context);
+#endif
+
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
 static int race_bc_lab_menu_available(void)
 {
@@ -5641,7 +5809,7 @@ static int race_bc_lab_menu_available(void)
         building_complete(i) && sc64_race_raw_building(b[i].type)==118;
 }
 static int race_bc_menu_base(void)
-{ return race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) : MENU_STOP+1; }
+{ return race_context_command_base(RACE_CONTEXT_BC_BUILDING); }
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
 static int race_bc_facility_menu_available(void)
 {
@@ -5655,7 +5823,7 @@ static int race_bc_facility_menu_available(void)
 static int race_bc_yamato_target_valid(int target,const Unit *caster,int require_visible);
 static int race_bc_yamato_issue(int slot,int target);
 static int race_bc_yamato_menu_base(void)
-{ return race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1; }
+{ return race_context_command_base(RACE_CONTEXT_YAMATO); }
 static int race_bc_yamato_command_available(void)
 {
     if (selected_building>=0) return 0;
@@ -5680,11 +5848,68 @@ static int race_bc_yamato_target_at(int x,int y)
     return best;
 }
 #endif
+#ifdef SC64_RACES
+/* Mixed selections may expose more than one unit command. All custom-game
+ * count, label and dispatch paths use these same contiguous offsets. */
+static int race_context_command_width(int context)
+{
+    switch (context) {
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+    case RACE_CONTEXT_SCARAB: return race_scarab_human_selected() >= 0;
+#endif
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    case RACE_CONTEXT_YAMATO: return race_bc_yamato_command_available();
+#endif
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    case RACE_CONTEXT_BC_BUILDING:
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        if (race_bc_facility_menu_available()) return 1;
+#endif
+        return race_bc_lab_menu_available() ? (b[selected_building].level ? 1 : 2) : 0;
+#endif
+#ifdef SC64_SHARED_BUNKER
+    case RACE_CONTEXT_BUNKER: return race_bunker_menu_available();
+#endif
+#ifdef SC64_TRANSPORT_RUNTIME
+    case RACE_CONTEXT_TRANSPORT: return race_skirmish_transport_menu_available();
+#endif
+#ifdef SC64_SHARED_TRANSPORT
+    case RACE_CONTEXT_TRANSPORT_TECH: return race_sk_transport_research_menu();
+#endif
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    case RACE_CONTEXT_BATTERY: return race_battery_command_available();
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    case RACE_CONTEXT_CARRIER: return race_p7_carrier_training_menu_available();
+#endif
+    default: return 0;
+    }
+}
+
+static int race_context_command_base(int context)
+{
+    if (!race_mode) return MENU_STOP+1;
+    int base = (int)sc64_skirmish_menu_count((unsigned)race_human);
+    for (int i = 0; i < context; ++i) base += race_context_command_width(i);
+    return base;
+}
+#endif
+
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static int race_carrier_command_base(void)
+{ return race_context_command_base(RACE_CONTEXT_CARRIER); }
+#endif
 static void
 choose_command(int choice)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (race_mode && choice==race_carrier_command_base() && race_p7_carrier_training_menu_available()) {
+        menu_open=0; mode=MODE_NORMAL;
+        toast(race_p7_carrier_training_queue_selected()?4:8); return;
+    }
+#endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-    if (choice == (race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) : MENU_STOP+1) &&
+    if (choice == race_context_command_base(RACE_CONTEXT_SCARAB) &&
         race_scarab_human_selected() >= 0) {
         menu_open=0; mode=MODE_NORMAL; toast(race_scarab_human_enqueue()?4:8); return;
     }
@@ -5721,7 +5946,7 @@ choose_command(int choice)
     }
 #endif
 #ifdef SC64_SHARED_BUNKER
-    if (choice==(race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1) &&
+    if (choice==race_context_command_base(RACE_CONTEXT_BUNKER) &&
         race_bunker_menu_available()) {
         menu_open=0;mode=MODE_NORMAL;
         toast(race_bunker_request_unload(selected_building)?0:8);return;
@@ -5730,14 +5955,24 @@ choose_command(int choice)
 #ifdef SC64_RACES
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_SHARED_TRANSPORT
+        if (choice == race_context_command_base(RACE_CONTEXT_TRANSPORT_TECH) &&
+            race_sk_transport_research_menu()) {
+            int key = sc64_sk_transport_owner_index(SIDE);
+            int result = race_skirmish_transport_tech.owner[key].remaining ?
+                race_sk_transport_cancel_owner(SIDE, 0) :
+                race_sk_transport_start_owner(SIDE, selected_building);
+            menu_open = 0; mode = MODE_NORMAL; toast(result ? 4 : 8); return;
+        }
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
-        if (choice == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
-            race_skirmish_dropship_menu_available()) {
+        if (choice == race_context_command_base(RACE_CONTEXT_TRANSPORT) &&
+            race_skirmish_transport_menu_available()) {
             menu_open = 0; mode = MODE_UNLOAD; return;
         }
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
-        if (choice == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+        if (choice == race_context_command_base(RACE_CONTEXT_BATTERY) &&
             race_battery_command_available()) {
             menu_open=0; mode=MODE_RECHARGE; return;
         }
@@ -5753,6 +5988,11 @@ choose_command(int choice)
         /* Fixed first-ten control rows deliberately retain their old IDs. */
     }
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+    if (choice == MENU_STOP + 1 && race_shared_campaign_transport_menu_available()) {
+        menu_open = 0; mode = MODE_UNLOAD; return;
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) {
         menu_open=0; mode=MODE_NORMAL;
@@ -5766,13 +6006,13 @@ choose_command(int choice)
     }
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (choice==MENU_STOP+1 && race_z7_colony_command_available()) {
+    if (choice==MENU_STOP+1 && race_colony_command_available()) {
         menu_open=0; mode=MODE_NORMAL;
-        toast(race_z7_colony_start_sunken(selected_building)?3:8); return;
+        toast(race_colony_start_sunken(selected_building)?3:8); return;
     }
     if (choice==MENU_STOP+2 && race_z7_spore_morph_command_available()) {
         menu_open=0; mode=MODE_NORMAL;
-        toast(race_z7_colony_start_spore(selected_building)?3:8); return;
+        toast(race_colony_start_spore(selected_building)?3:8); return;
     }
     if (choice==MENU_Z7_CREEP) {
         menu_open=0;
@@ -5958,20 +6198,7 @@ choose_command(int choice)
 #ifdef SC64_RACES
 static int race_skirmish_command_count(void)
 {
-    int count = (int)sc64_skirmish_menu_count((unsigned)race_human);
-#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-    count += race_scarab_human_selected() >= 0;
-#endif
-#ifdef SC64_TRANSPORT_RUNTIME
-    count += race_skirmish_dropship_menu_available();
-#endif
-#ifdef SC64_BATTERY_SERVICE_ENABLED
-    count += race_battery_command_available();
-#endif
-#ifdef SC64_SHARED_BUNKER
-    count += race_bunker_menu_available();
-#endif
-    return count;
+    return race_context_command_base(RACE_CONTEXT_COUNT);
 }
 #endif
 
@@ -5980,6 +6207,7 @@ static int race_skirmish_command_count(void)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -5989,7 +6217,6 @@ static int field_menu_count(void)
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
     if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
 #endif
-    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     if (race_scarab_human_selected() >= 0) return MENU_STOP+2;
 #endif
@@ -6007,7 +6234,7 @@ static int field_menu_count(void)
     if (race_z7_egg_cancel_available()) return MENU_STOP + 2;
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (race_z7_colony_command_available())
+    if (race_colony_command_available())
         return MENU_STOP+2+race_z7_spore_morph_command_available();
 #endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
@@ -6033,6 +6260,9 @@ static int field_menu_count(void)
 #ifdef SC64_P4_STORM_ENABLED
     if (race_p4_storm_menu_available()) return MENU_STOP + 2;
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_shared_campaign_transport_menu_available()) return MENU_STOP + 2;
+#endif
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
@@ -6047,6 +6277,7 @@ static int field_menu_count(void)
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 {
+    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6056,7 +6287,6 @@ static int field_menu_count(void)
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
     if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
 #endif
-    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     if (race_scarab_human_selected() >= 0) return MENU_STOP+2;
 #endif
@@ -6066,6 +6296,9 @@ static int field_menu_count(void)
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (race_battery_command_available()) return MENU_STOP+2;
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_shared_campaign_transport_menu_available()) return MENU_STOP + 2;
+#endif
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
     return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1;
@@ -6073,6 +6306,7 @@ static int field_menu_count(void)
 #elif defined(SC64_RACES)
 static int field_menu_count(void)
 {
+    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6082,7 +6316,6 @@ static int field_menu_count(void)
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
     if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
 #endif
-    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     if (race_scarab_human_selected() >= 0) return MENU_STOP+2;
 #endif
@@ -6108,7 +6341,7 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) return "CANCEL EGG";
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (choice==MENU_STOP+1 && race_z7_colony_command_available()) return "SUNKEN";
+    if (choice==MENU_STOP+1 && race_colony_command_available()) return "SUNKEN";
     if (choice==MENU_STOP+2 && race_z7_spore_morph_command_available()) return "SPORE";
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
@@ -6124,8 +6357,12 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (race_mode && i==race_carrier_command_base() && race_p7_carrier_training_menu_available())
+        return "BUILD INTERCEPTOR";
+#endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-    if (i == (race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) : MENU_STOP+1) &&
+    if (i == race_context_command_base(RACE_CONTEXT_SCARAB) &&
         race_scarab_human_selected() >= 0) return "BUILD SCARAB";
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
@@ -6143,18 +6380,24 @@ static const char *race_menu_label(int i)
     }
 #endif
 #ifdef SC64_SHARED_BUNKER
-    if (i==(race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1) &&
+    if (i==race_context_command_base(RACE_CONTEXT_BUNKER) &&
         race_bunker_menu_available()) return "UNLOAD CARGO";
 #endif
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_SHARED_TRANSPORT
+        if (i == race_context_command_base(RACE_CONTEXT_TRANSPORT_TECH) &&
+            race_sk_transport_research_menu())
+            return race_skirmish_transport_tech.owner[sc64_sk_transport_owner_index(SIDE)].remaining ?
+                "CANCEL RESEARCH" : "VENTRAL SACS";
+#endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
-        if (i == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+        if (i == race_context_command_base(RACE_CONTEXT_BATTERY) &&
             race_battery_command_available()) return "RECHARGE";
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
-        if (i == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
-            race_skirmish_dropship_menu_available()) return "UNLOAD CARGO";
+        if (i == race_context_command_base(RACE_CONTEXT_TRANSPORT) &&
+            race_skirmish_transport_menu_available()) return "UNLOAD CARGO";
 #endif
         return sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) ? row.label : "";
     }
@@ -6179,6 +6422,10 @@ static const char *race_menu_label(int i)
         },
         {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
     const char *const *labels=race_labels[race_human];
+#ifdef SC64_SHARED_TRANSPORT
+    if (i == MENU_STOP + 1 && race_shared_campaign_transport_menu_available())
+        return "UNLOAD CARGO";
+#endif
 #ifdef SC64_T5_RUNTIME
     static const char *const advanced_labels[] = {
         "FACTORY", "STARPORT", "CONTROL TOWER", "UNLOAD CARGO"
@@ -6192,6 +6439,10 @@ static const char *race_menu_label(int i)
         advanced_labels[i - MENU_FACTORY] : labels[i];
 #else
     const char *label = field_menu_base_label(i, labels);
+#ifdef SC64_SHARED_TRANSPORT
+    if (i == MENU_STOP + 1 && race_shared_campaign_transport_menu_available())
+        label = "UNLOAD CARGO";
+#endif
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 #ifdef SC64_P4_STORM_ENABLED
     if (i == MENU_STOP + 1 && race_p4_storm_menu_available()) label = "STORM";
@@ -7346,7 +7597,7 @@ target_lists_unavailable:
 #ifdef SC64_RACES
     if (target_lists_valid) sc64_target_index_begin_owner_lists();
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (race_p7_active()) sc64_p7_arbiter_cache_process_due();
+    if (race_protoss_services_active()) sc64_p7_arbiter_cache_process_due();
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     sc64_target_hostility_snapshot();
@@ -7744,13 +7995,16 @@ update_production(void)
 {
 #ifdef SC64_RACES
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (!race_z7_colony_pre_building_tick()) {
+    if (!race_colony_pre_building_tick()) {
         ++mission_unsupported_count; screen=SCREEN_PAUSE; toast(14); return;
     }
 #endif
     race_tick_buildings();
+#ifdef SC64_SHARED_TRANSPORT
+    race_sk_transport_research_tick();
+#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (!race_z7_colony_post_building_tick()) {
+    if (!race_colony_post_building_tick()) {
         ++mission_unsupported_count; screen=SCREEN_PAUSE; toast(14); return;
     }
 #endif
@@ -8474,6 +8728,23 @@ game_update(u16 held, u16 pressed)
         return;
     }
 #endif
+#ifdef SC64_P8_RUNTIME
+    /* P8 PauseGame freezes combat, production, orders and commands while the
+     * source trigger clock and its waits continue (native source pause). */
+    if (race_p8_world_paused()) {
+        ++frame;
+        update_imported_mission();
+        update_exploration();
+        if (won || lost) {
+            if (won) race_completed |= 1 << race_selected_mission;
+            save_game();
+            reset_selection_gestures();
+            screen = SCREEN_RESULT;
+            result_timer = 0;
+        }
+        return;
+    }
+#endif
 #ifdef SC_FIELD_FEEDBACK
     if (ping_life) --ping_life;
 #endif
@@ -8613,7 +8884,7 @@ game_update(u16 held, u16 pressed)
     if (sc64_showcase_scene >= 0) ++sc64_showcase_ticks;
 #endif
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (race_p7_active()) sc64_p7_arbiter_cache_frame_tick();
+    if (race_protoss_services_active()) sc64_p7_arbiter_cache_frame_tick();
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_frame_tick();
@@ -8729,7 +9000,7 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_end_frame();
 #endif
-    if (race_p7_active()) race_p7_projectile_clear_dead_references();
+    if (race_protoss_services_active()) race_p7_projectile_clear_dead_references();
 #endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_sight_cycles = gba_clock() - profile_sight_start;
@@ -10334,7 +10605,7 @@ sc64_tile_background_done:
 #endif
     draw_tracers();
 #ifdef SC64_P7_PROJECTILES_ENABLED
-    if (race_p7_active()) race_p7_projectile_draw();
+    if (race_protoss_services_active()) race_p7_projectile_draw();
 #endif
 #ifdef SC64_P4_STORM_ENABLED
     race_p4_storm_draw();
@@ -10806,7 +11077,7 @@ draw_hud_commands_body(void)
 #endif
 		else
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-                if (race_p7_active() && u[i].type==U_P7_CARRIER) {
+                if (race_protoss_services_active() && u[i].type==U_P7_CARRIER) {
                     gfx_text(hud_left+47,137,"IC",C_CYAN);
                     gfx_num(hud_left+65,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
                     gfx_text(hud_left+79,137,"HANGAR / FLIGHT WIP",C_GOLD);
@@ -10832,7 +11103,7 @@ draw_hud_commands_body(void)
                 } else
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
-#ifdef SC64_T5_RUNTIME
+#if defined(SC64_T5_RUNTIME) && !defined(SC64_SHARED_TRANSPORT)
                 if (u[i].type == U_DROPSHIP) {
 #else
                 if (race_transport_carrier_type(&u[i])) {
@@ -11030,7 +11301,7 @@ sc64_hud_race_keys(int *values,int first)
     }
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if(first>=0 && race_p7_active() && u[first].type==U_P7_CARRIER)
+    if(first>=0 && race_protoss_services_active() && u[first].type==U_P7_CARRIER)
         values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
@@ -11723,6 +11994,9 @@ game_self_test(void)
 #ifdef SC64_T6_RUNTIME
 #include "sc64_t6_availability_adapter.h"
 #endif
+#ifdef SC64_P8_RUNTIME
+#include "sc64_p8_availability_adapter.h"
+#endif
 #include "race_adapter.h"
 #ifdef SC64_P7_OBSERVER_ENABLED
 #include "sc64_p7_runtime_adapter.h"
@@ -11739,7 +12013,7 @@ game_self_test(void)
 #include "sc64_p7_interceptor_flight.h"
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-#include "sc64_z7_colony_adapter.h"
+#include "sc64_colony_service.h"
 #endif
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_tech_adapter.h"
@@ -11773,6 +12047,9 @@ game_self_test(void)
 #endif
 #include "race_campaign_adapter.h"
 #include "sc64_z8_game_bridge.h"
+#ifdef SC64_P8_RUNTIME
+#include "sc64_p8_runtime_adapter.h"
+#endif
 #ifdef SC64_NYDUS_ENABLED
 static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
 static int race_save_decode_building(const RaceSave *, unsigned, Building *);
@@ -11792,6 +12069,9 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #endif
 #ifdef SC64_Z8_RUNTIME
 #include "sc64_z8_runtime_adapter.h"
+#endif
+#ifdef SC64_Z9_RUNTIME
+#include "sc64_zerg_late_runtime_adapter.h"
 #endif
 #include "race_save_adapter.h"
 #ifdef SC64_IMPACT_EVENTS

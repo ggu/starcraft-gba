@@ -37,6 +37,10 @@ uint8_t sc64_pool_active_head(const Sc64Arena *a);
 int sc64_codec_encode(const Sc64Arena *a, uint8_t *out, size_t out_size);
 /* Full packet preflight without modifying an arena or a live game world. */
 int sc64_codec_validate(const uint8_t *in, size_t in_size);
+/* Packet preflight plus the destination arena's size and disjointness.
+ * The arena descriptor and packet must remain stable until decode. This does
+ * not guarantee decode's final pool validation or make decode infallible. */
+int sc64_codec_validate_target(const Sc64Arena *a, const uint8_t *in, size_t in_size);
 /* Header-only count, or -1 for malformed header/size. This is not a full
  * preflight; callers accepting external packets must also validate them. */
 int sc64_codec_allocated_count(const uint8_t *in, size_t in_size);

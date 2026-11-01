@@ -1,0 +1,3 @@
+9154407e989bfb20b26b3ef9e1d72f726d92a3d898ba0012ea91cba459e21d25  build/test-sc64-p8-replay
+db71d0534e8bf18161775f1a3c2c6ca8666a617bc6c2b83f8cdf9fd10edce987  build/test-sc64-p8-replay-prefix
+de0751aa45724720b61919a8b27b67bae0f284373131d7db287e89076221a98c  build/test-sc64-p8-replay-resume

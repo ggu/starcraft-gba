@@ -1,5 +1,9 @@
 # Development
 
+> Transport1 activation is a candidate pending its own runtime, save and
+> performance qualification. Earlier controller, replay and timing results
+> below refer to the pre-activation profiles unless explicitly stated.
+
 The default StarCraft skirmish builds without ROMs, extracted assets, or external reference checkouts. The required tools are Git, GNU Make, `arm-none-eabi-gcc` with its `objcopy` and `size` tools, Clang, and Python 3.10 or newer. The project uses Python's standard library; no `pip install` step is needed. mGBA is only needed to play or run emulator workflows.
 
 The stage-by-stage campaign sections below preserve dated implementation
@@ -1204,7 +1208,7 @@ Prepare the Terran inputs, then build, test and play the normal-menu ROM:
 ./dev sc64 play --profile terran
 ```
 
-This produces `build/StarCraft-Terran-GBA.gba`, an 8 MiB ROM. To build all
+This produces `build/StarCraft-Terran-Transport1-GBA.gba`, an 8 MiB ROM. To build all
 three race campaigns, first prepare the shared inputs with the Terran profile,
 then run `make race-campaigns test-race-campaigns`. Preparing Zerg or Protoss
 alone is not sufficient for that aggregate target. The original 32 MiB N64
@@ -1285,7 +1289,7 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss builds
 
-The standard Zerg build includes its first six missions. The canonical Protoss
+The standard Zerg build includes its first seven missions. The canonical Protoss
 target includes P1–P7 and has passed its canonical presentation, save, host
 campaign and bounded ARM continuation checks. Explicit `protoss-p6` still builds
 the separately identified P1–P6 generation-30 image. Prepare either profile
@@ -1306,8 +1310,8 @@ flags and save identity remain separate.
 ```
 
 Replace `zerg` with `protoss` for the P7 candidate. The output pairs are
-`build/StarCraft-Zerg-Z6-GBA.gba` / `build/starcraft-zerg-z6.elf` and
-`build/StarCraft-Protoss-P7-GBA.gba` / `build/starcraft-protoss-p7.elf`.
+`build/StarCraft-Zerg-Z7-Transport1-GBA.gba` / `build/starcraft-zerg-z7.elf` and
+`build/StarCraft-Protoss-P7-Transport1-GBA.gba` / `build/starcraft-protoss-p7.elf`.
 Explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
 `build/starcraft-protoss-p6.elf`.
 Explicit `zerg-z4` (`--profile zerg-z4`) preserves the earlier four-entry
@@ -1318,19 +1322,21 @@ save identity; versioned `-Z3` names are aliases. `protoss-p3` preserves the
 legacy P3 real files, code and save path. Retain matching
 frozen ROM/ELF pairs for replay.
 
-The canonical Zerg test target runs ordinary-input controllers for all six
-chapters under the canonical flags, normal-menu startup/save fixtures for all
-six campaign entries, and all 234 combinations
+The canonical Zerg test target runs ordinary-input controllers for all seven
+chapters under the canonical flags, normal-menu startup/save fixtures and
+the skirmish matrix, including all 234 combinations
 of map, human race and independently selected AI races. The setup/save matrix
 does not prove a completed match for every combination. Build guards still
 enforce the same IWRAM and EWRAM reserves.
 
-Canonical Zerg uses `SCZ6`, save generation 32, the Z6 storage/runtime and
-query flags, a word-packed six-chapter sprite bank under
+Canonical Zerg uses `SCZ7`, base save generation 36 in the Transport1 namespace, the Z7 storage/runtime and
+query flags, a word-packed inherited sprite bank under
 `.local/sc64/zerg-z6/generated`, and the canonical drawing flags. Preparing
-`zerg` also generates the Z5/Z6 inputs and that bank. Its save directory,
-`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. The P7
-candidate uses `SCP7`, generation 43 and `.local/play/protoss-p7`; its all-chapter
+`zerg` also generates the Z5/Z6/Z7 inputs and that bank. Its save directory,
+`.local/play/zerg-z7-transport1`, is separate from explicit Z6, Z4 and Z3 profiles.
+Explicit `zerg-z6` retains its SCZ6 generation-32 ROM and `.local/play/zerg-z6`;
+no SRAM is automatically imported. The P7
+candidate uses `SCP7`, base generation 43 in the Transport1 namespace and `.local/play/protoss-p7-transport1`; its all-chapter
 packed sprite bank is `.local/sc64/protoss-p7/generated`, separate from the
 probe and P6 banks. Explicit `protoss-p6` uses `SCP6`, generation 30 and
 `.local/play/protoss-p6`; it carries P1–P5 including Shuttle transport, then P6
@@ -1796,7 +1802,7 @@ compare the full world or pixels or complete the mission. Mean full-frame
 cost was 1,069,633 cycles versus 1,026,851 for the reference (+4.17%). These
 are emulator measurements, not hardware or 30-fps qualifications. The Z6
 canonical profile remains unchanged. Campaign qualification was 22/30 at this
-Z7 audit; subsequent canonical P7 integration brings the current total to 23/30.
+Z7 audit; subsequent P7 integration brought the total to 23/30; Z7 promotion brings it to 24/30.
 
 `make test-sc64-z7-reachable-formation` checks the default-off
 `SC64_REACHABLE_FORMATION` group-order fallback against the original slot
@@ -2108,7 +2114,7 @@ These generate the required maps, art, scenario, ability and transport headers
 under `.local/`; Z6 also generates its inherited Z5 sprite bank. Inspect
 readiness with `./dev sc64 status --profile zerg-z6` or the corresponding
 Protoss profile. The output ROMs are `build/StarCraft-Zerg-Z6-Probe-GBA.gba`
-and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and `protoss` names select the canonical six-mission
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and `protoss` names select the canonical seven-mission
 products; these explicit staged names keep their own files.
 
 ### Reproduce the canonical P6 host win
@@ -2628,6 +2634,20 @@ It does not regenerate shared banks or enable Z8 gameplay. See the
 [Z8 source foundation audit](audits/2026-10-27-z8-source-foundation/README.md)
 for explicit commands, provenance, supported data and remaining runtime work.
 
+## Z9/Z10 authenticated source descriptors
+
+`tools/sc64_zerg_late_pack.py pack --mission Z9` (or `Z10`) authenticates the
+retained scenario against a pinned per-mission contract. It writes a
+descriptor to a new ignored `.local/build/z9-*` or `.local/build/z10-*` path,
+and `verify` compares every row with the source. `make zerg-z9` renders the
+default `.local/build/z9-source/descriptor.json` into
+`build/generated/z9/sc64_z9_program_generated.h`. The candidate defaults to
+the Z8 sprite bank (`ZERG_Z9_BANK`). `make zerg-z10` does the same with
+`.local/build/z10-source/descriptor.json` and `ZERG_Z10_BANK`. Neither tool
+regenerates shared banks. See the
+[Z9](audits/2026-11-01-z9-candidate/README.md) and
+[Z10](audits/2026-11-01-z10-candidate/README.md) candidate audits.
+
 ## Experimental P7 menu and prevalidated tick
 
 After preparing the current private P6/P7 inputs, build separate Homeland
@@ -2646,7 +2666,7 @@ the later Carrier/Arbiter work or full normal-input win. These historical
 probe targets remain separate. The current canonical Protoss build enables P7
 with the full runtime and bounded ARM save continuation described in the
 [canonical qualification](research/p7-canonical-candidate-qualification.md);
-campaign coverage is 23/30. Native AI fidelity and performance remain unfinished.
+campaign coverage is 24/30. Native AI fidelity and performance remain unfinished.
 
 The optimized probe additionally enables `SC64_P7_PREVALIDATED_TICK`. It
 validates immutable mission data at initialization and load, then checks
@@ -2814,6 +2834,15 @@ and Interceptor flight paths. The older V1 fact probe and canonical P6 ROM
 keep their existing flags and generated headers. A mismatched roster, format
 or requested feature fails at compile time; out-of-roster sight requests use
 the original policy.
+
+Rectangle closures also record a geometry revision. Current shared detector
+support requires revision 2, including Overlord and Spore Colony bounds;
+older rectangle headers fail with a regeneration diagnostic. The supported
+Make recipes regenerate these derived facts when their source changes. Do not
+freeze a build-generated fact header with `make -o` across geometry changes.
+For a side-by-side qualification, use a fresh `BC_P7_FACT_DIR` or
+`P8_FACT_V2_DIR` command-line path so the original header remains available.
+This changes the derived closure, not the supplied ROM or imported art bank.
 
 `test-sc64-fact-v2` is asset-free. The ordinary-input performance replay
 covers 2,000 in-play frames; the separate campaign controller requires a
@@ -3038,7 +3067,7 @@ Deaths use a separate transient pool; see
 [Death animations](#death-animations).
 
 For repeatable filming setups, `make showcase` builds the separate
-`StarCraft-Showcase-GBA.gba` with a hidden scene menu. On HOME hold R, add L,
+`StarCraft-Showcase-Transport1-GBA.gba` with a hidden scene menu. On HOME hold R, add L,
 then tap Select. `make test-sc64-showcase` checks the menu, scene resets,
 last-stand timing and save isolation with the existing private P7 inputs.
 The frontend input model also runs in the asset-free host suite. See

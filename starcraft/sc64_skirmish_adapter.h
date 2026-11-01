@@ -67,6 +67,35 @@ static int race_skirmish_attached(int producer, unsigned raw, int completed)
     return 0;
 }
 
+/* Scenario rules keep their impossible producer sentinel. A custom-game
+ * product may override it only when its complete actor service is present;
+ * admission and the paid queue must resolve the same ordinary producer. */
+static int race_skirmish_product_producer(int type)
+{
+    const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
+    if (!r) return 255;
+#ifdef SC64_SHARED_TRANSPORT
+    /* The producer is a source fact; per-mission product availability is
+     * checked independently by race_queue_unit. */
+    if (sc64_race_raw_unit(type) == 69 && sc64_race_unit_from_raw(69) == type)
+        return B_ROBOTICS_FACILITY;
+#endif
+    if (race_mode) {
+        int raw = sc64_race_raw_unit(type);
+#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
+        if (raw == 12) return B_STARPORT;
+#endif
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && \
+    defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
+    defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_P7_ACTORS)
+        if (raw == 72 && type == U_P7_CARRIER && race_protoss_services_active())
+            return B_STARGATE;
+#endif
+        (void)raw;
+    }
+    return r->producer;
+}
+
 static int race_skirmish_product_admitted(int owner, int producer,
                                           const Sc64SkirmishRecord *r)
 {
@@ -86,11 +115,7 @@ static int race_skirmish_product_admitted(int owner, int producer,
     /* Production remains unavailable until its service is complete. */
     if (r->raw_id == 12) return 0;
 #endif
-#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
-    if (r->raw_id == 83 || !ur || (ur->producer == 255 && r->raw_id != 12)) return 0;
-#else
-    if (r->raw_id == 83 || !ur || ur->producer == 255) return 0;
-#endif
+    if (r->raw_id == 83 || !ur || race_skirmish_product_producer(type) == 255) return 0;
     producer_raw = sc64_race_raw_building(b[producer].type);
     if (r->producer_raw == 35) {
         if (!sc64_race_is_zerg_townhall(b[producer].type)) return 0;
@@ -137,6 +162,9 @@ static int race_skirmish_record_ready(int owner, int producer,
     if (!race_mode || !race_skirmish_requirements(owner, r) ||
         sc64_race_building_from_raw(r->raw_id) < 0) return 0;
     if (r->kind != SC64_SK_ADDON && r->kind != SC64_SK_BUILDING_MORPH) return 0;
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_sk_transport_job_uses(producer)) return 0;
+#endif
     /* Infestation is an ability targeting a damaged enemy Command Center,
      * not an ordinary in-place upgrade of an owned structure. */
     if (r->raw_id == 130 || producer < 0 || producer >= MAX_BUILDINGS ||
@@ -161,6 +189,8 @@ static int race_skirmish_start_record(int owner, int producer,
     int type, slot, x, y;
     if (!race_skirmish_record_ready(owner, producer, r)) return 0;
     type = sc64_race_building_from_raw(r->raw_id);
+    if (type==B_SUNKEN_COLONY || type==B_SPORE_COLONY)
+        return race_colony_begin(owner,producer,type);
     rule = sc64_race_building_rule(type);
     if (!rule) return 0;
     bank.minerals = (unsigned short)race_owner_minerals(owner);

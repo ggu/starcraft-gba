@@ -10,13 +10,24 @@
 #define P7_CONTROLLER_PROFILE "P7_TYPED_MOVE_FLAGS"
 #endif
 
-#define RUN_LIMIT 60000u
+#define RUN_LIMIT 180000u
 #define KEY_TAP(k) do { input((k)); input(0); } while (0)
 
 static FILE *trace;
 static u16 prior;
 static unsigned host_tick;
 static int army_center(int *x,int *y);
+
+/* Imported actors have explicit flags; standard roster actors use zero flags
+ * and their shared ground/air damage facts for weapon eligibility. */
+static int route_combat_type_eligible(int type)
+{
+    unsigned flags=sc64_game_unit_actor_flags(type);
+    if(IS_WORKER(type)||type==U_OVERLORD||type==U_CHRYSALIS||
+       !sc64_game_unit_selectable(type))return 0;
+    return flags ? (flags & SC64_GAME_ACTOR_WEAPON)!=0 :
+        sc64_race_unit_damage_vs(type,0)>0||sc64_race_unit_damage_vs(type,1)>0;
+}
 
 /* This is deliberately a read-only controller-side route query.  The game
  * builds its walkability plane as part of ordinary simulation; if it is not
@@ -29,16 +40,27 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
     int cells=MAP_COLS*MAP_ROWS;
     static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
     static int prev[MAP_CELLS],queue[MAP_CELLS];
-    int sx=0,sy=0,n=0,best_origin=0x7fffffff, sumx=0,sumy=0;
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type!=U_PROBE){
-        sumx+=u[i].x;sumy+=u[i].y;++n;
+    /* Use weapon-capable members of the combat shortcut and the forward quartile
+     * rather than its centroid: an already-arrived formation can straddle a
+     * waypoint while its center keeps issuing the same eight cells. This is
+     * a host-world policy query; actual orders still use the normal UI. */
+    int candidates[MAX_UNITS],distances[MAX_UNITS],n=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+        !SC64_TRANSPORT_LOADED(&u[i])&&!SC64_SCARAB_CHILD(&u[i])&&
+        route_combat_type_eligible(u[i].type)) {
+        int d=dist2(u[i].x,u[i].y,tx,ty),at=n++;
+        while(at>0&&(d<distances[at-1]||(d==distances[at-1]&&i<candidates[at-1]))) {
+            distances[at]=distances[at-1];candidates[at]=candidates[at-1];--at;
+        }
+        distances[at]=d;candidates[at]=i;
     }
-    if(n)for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type!=U_PROBE){
-        int d=dist2(u[i].x,u[i].y,sumx/n,sumy/n);
-        if(d<best_origin){best_origin=d;sx=u[i].x;sy=u[i].y;}
+    if(!n||!path_grid_valid) {
+        fprintf(trace,"{\"kind\":\"route-origin-reject\",\"frame\":%u,\"reason\":\"%s\",\"target\":[%d,%d]}\n",
+            (unsigned)frame,n?"path-grid-invalid":"no-eligible-combat",tx,ty);
+        return 0;
     }
-    if(!n||!path_grid_valid)return 0;
-    sx=limit(sx/16,0,MAP_COLS-1);sy=limit(sy/16,0,MAP_ROWS-1);
+    int origin=candidates[(n-1)/4],origin_x=u[origin].x,origin_y=u[origin].y;
+    int sx=limit(origin_x/16,0,MAP_COLS-1),sy=limit(origin_y/16,0,MAP_ROWS-1);
     int start=sx+sy*MAP_COLS,gx=limit(tx/16,0,MAP_COLS-1),gy=limit(ty/16,0,MAP_ROWS-1);
     int head=0,tail=0,best=-1,bestd=0x7fffffff;
     for(int i=0;i<cells;i++)prev[i]=-2;
@@ -62,7 +84,11 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
             prev[next]=cell;queue[tail++]=next;
         }
     }
-    if(best<0)return 0;
+    if(best<0) {
+        fprintf(trace,"{\"kind\":\"route-origin-reject\",\"frame\":%u,\"reason\":\"no-reachable-route\",\"slot\":%d,\"xy\":[%d,%d],\"target\":[%d,%d]}\n",
+            (unsigned)frame,origin,origin_x,origin_y,tx,ty);
+        return 0;
+    }
     int path[MAP_CELLS],len=0;
     for(int c=best;c>=0&&len<cells;c=prev[c])path[len++]=c;
     if(!len)return 0;
@@ -72,6 +98,8 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
     int cell=path[pick];
     *wx=(cell%MAP_COLS)*16+8;*wy=(cell/MAP_COLS)*16+8;
     if(steps_out)*steps_out=distance-pick;
+    fprintf(trace,"{\"kind\":\"route-origin\",\"frame\":%u,\"slot\":%d,\"raw\":%d,\"xy\":[%d,%d],\"combat_count\":%d,\"rank\":%d,\"target\":[%d,%d],\"path_distance\":%d,\"waypoint\":[%d,%d]}\n",
+        (unsigned)frame,origin,u[origin].raw_type,origin_x,origin_y,n,(n-1)/4,tx,ty,distance,*wx,*wy);
     return 1;
 }
 
@@ -212,7 +240,7 @@ static int army_center(int *x,int *y)
 static int move_cursor(int x,int y)
 {
     unsigned guard=0;
-    if(menu_open || (mode!=MODE_NORMAL && mode!=MODE_ATTACK && mode!=MODE_BUILD)) return 0;
+    if(menu_open || (mode!=MODE_NORMAL && mode!=MODE_MOVE && mode!=MODE_ATTACK && mode!=MODE_BUILD)) return 0;
     x=limit(x,0,WORLD_W-1);y=limit(y,0,WORLD_H-1);
     x=cx+((x-cx)>=0?((x-cx+2)/4):((x-cx-2)/4))*4;
     y=cy+((y-cy)>=0?((y-cy+2)/4):((y-cy-2)/4))*4;
@@ -298,6 +326,46 @@ static int issue_attack(int x,int y)
     return 1;
 }
 
+/* Ordinary UI escort: select the actual Observer and issue MOVE behind the
+ * combat group's leading selected actor. Never move it to the target itself. */
+static int escort_observer(int waypoint_x,int waypoint_y)
+{
+    int observer=-1,front=-1,best=0x7fffffff,sx=0,sy=0,count=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE) {
+        if(u[i].raw_type==84 && observer<0)observer=i;
+        if(u[i].selected) {
+            int d=dist2(u[i].x,u[i].y,waypoint_x,waypoint_y);
+            sx+=u[i].x;sy+=u[i].y;++count;
+            if(d<best){best=d;front=i;}
+        }
+    }
+    if(observer<0||front<0||!count)return 0;
+    unsigned planned_frame=frame;
+    int front_x=u[front].x,front_y=u[front].y,front_raw=u[front].raw_type;
+    int dx=waypoint_x-sx/count,dy=waypoint_y-sy/count;
+    int length2=dx*dx+dy*dy,length=0;
+    if(!length2)return 0;
+    while((length+1)*(length+1)<=length2)++length;
+    int x=limit(front_x-64*dx/length,0,WORLD_W-1);
+    int y=limit(front_y-64*dy/length,0,WORLD_H-1);
+    if(!normalize_field()||!clear_selected_building()||
+       !move_cursor(u[observer].x-4,u[observer].y-4))return 0;
+    input(KEY_L);input(KEY_L|KEY_RIGHT|KEY_DOWN);
+    input(KEY_L|KEY_RIGHT|KEY_DOWN);input(0);
+    if(selected_count()!=1||!u[observer].selected)
+        for(int n=0;n<MAX_UNITS&&screen==SCREEN_PLAY&&u[observer].alive&&
+            (selected_count()!=1||!u[observer].selected);++n)KEY_TAP(KEY_L);
+    if(selected_count()!=1||!u[observer].alive||u[observer].owner!=SIDE||
+       u[observer].raw_type!=84||!u[observer].selected)return 0;
+    if(!choose_field_row(MENU_MOVE)||mode!=MODE_MOVE||!move_cursor(x,y))return 0;
+    if(selected_count()!=1||!u[observer].alive||!u[observer].selected)return 0;
+    KEY_TAP(KEY_A);
+    if(u[observer].order!=ORDER_MOVE)return 0;
+    fprintf(trace,"{\"kind\":\"observer-escort\",\"frame\":%u,\"observer\":%d,\"front\":%d,\"planned_frame\":%u,\"planned_front_raw\":%d,\"planned_front_xy\":[%d,%d],\"current_front_alive\":%d,\"current_front_raw\":%d,\"current_front_xy\":[%d,%d],\"waypoint\":[%d,%d],\"destination\":[%d,%d],\"actual_destination\":[%d,%d]}\n",
+        (unsigned)frame,observer,front,planned_frame,front_raw,front_x,front_y,u[front].alive,u[front].raw_type,u[front].x,u[front].y,waypoint_x,waypoint_y,x,y,u[observer].tx,u[observer].ty);
+    return 1;
+}
+
 static int live_units(int owner)
 {
     int n=0;for(int i=0;i<MAX_UNITS;i++)n+=u[i].alive&&(owner<0||u[i].owner==owner);return n;
@@ -316,6 +384,14 @@ static int source_force_military(int raw_owner)
     return n;
 }
 
+static int combat_reject(const char *reason,int wanted,int producer)
+{
+    if(frame>=45000) fprintf(trace,"{\"kind\":\"production-reject\",\"frame\":%u,\"reason\":\"%s\",\"wanted\":%d,\"producer\":%d,\"selected_building\":%d,\"train_type\":%d,\"bank\":[%d,%d],\"supply\":[%d,%d],\"queue\":%d}\n",
+        (unsigned)frame,reason,wanted,producer,selected_building,train_type,minerals,gas,
+        race_owner_supply(SIDE),race_owner_supply_cap(SIDE),producer>=0?b[producer].queue_count:-1);
+    return 0;
+}
+
 static int queue_combat_unit(void)
 {
     int wanted=U_ZEALOT;
@@ -324,30 +400,38 @@ static int queue_combat_unit(void)
         b[j].type==B_CYBERNETICS_CORE&&building_complete(j);
     if(core&&gas>=50&&minerals>=125)wanted=U_DRAGOON;
     const Sc64RaceUnitRule *rule=sc64_race_unit_rule(wanted);
-    if(!rule||minerals<(int)rule->minerals||gas<(int)rule->gas||
-       race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)return 0;
+    if(!rule)return combat_reject("missing-rule",wanted,-1);
+    if(minerals<(int)rule->minerals||gas<(int)rule->gas)return combat_reject("resources",wanted,-1);
+    if(race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)return combat_reject("supply",wanted,-1);
     int producer=-1,best_queue=6;
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
         b[i].type==B_GATEWAY&&building_complete(i)&&b[i].queue_count<best_queue){
         producer=i;best_queue=b[i].queue_count;
     }
     if(producer>=0){int i=producer;
-        if(!normalize_field())return 0;
-        if(!move_cursor(b[i].x,b[i].y))return 0;
+        if(!normalize_field())return combat_reject("normalize",wanted,i);
+        if(!move_cursor(b[i].x,b[i].y))return combat_reject("cursor",wanted,i);
         KEY_TAP(KEY_A);
-        if(selected_building!=i)return 0;
+        if(selected_building!=i)return combat_reject("selection",wanted,i);
         for(int n=0;n<4&&train_type!=wanted;n++)KEY_TAP(KEY_R);
-        if(train_type!=wanted)return 0;
-        int before=b[i].queue_count,bank=minerals;
-        KEY_TAP(KEY_A);
-        if(b[i].queue_count>before){
+        if(train_type!=wanted)return combat_reject("menu",wanted,i);
+        int added=0;
+        /* Same ordinary A press, bounded to at most three purchases per visit. */
+        for(int attempt=0;attempt<3&&screen==SCREEN_PLAY&&!menu_open&&
+            b[i].alive&&b[i].owner==SIDE&&b[i].type==B_GATEWAY&&building_complete(i)&&
+            selected_building==i&&train_type==wanted&&b[i].queue_count<5;attempt++) {
+            if(minerals<(int)rule->minerals||gas<(int)rule->gas||
+               race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)break;
+            int before=b[i].queue_count,bank=minerals;
+            KEY_TAP(KEY_A);
+            if(b[i].queue_count<=before)break;
+            ++added;
             fprintf(trace,"{\"kind\":\"production\",\"frame\":%u,\"building\":%d,\"unit\":\"%s\",\"bank_before\":%d,\"bank_after\":%d,\"gas_after\":%d,\"queue\":%u}\n",
                 (unsigned)frame,i,wanted==U_DRAGOON?"dragoon":"zealot",bank,minerals,gas,(unsigned)b[i].queue_count);
-            return 1;
         }
-        return 0;
+        return added?1:combat_reject("no-observed-queue-increase",wanted,i);
     }
-    return 0;
+    return combat_reject("producer",wanted,-1);
 }
 
 static int probe_count(void)
@@ -376,6 +460,170 @@ static int queue_probe(void)
     if(b[home].queue_count<=before)return 0;
     fprintf(trace,"{\"kind\":\"production\",\"frame\":%u,\"building\":%d,\"unit\":\"probe\",\"bank_before\":%d,\"bank_after\":%d,\"gas_after\":%d,\"queue\":%u}\n",
         (unsigned)frame,home,bank,minerals,gas,(unsigned)b[home].queue_count);
+    return 1;
+}
+
+/* Diagnostic only: log rejection reasons and real resource rows late in the
+ * run. These observations are never used to choose a worker or patch. */
+static int mineral_attempt_rejected(const char *reason, int worker, int home, int patch)
+{
+    if (frame < 30000) return 0;
+    int active = 0, visible = 0, total = 0, visible_total = 0;
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0) {
+        ++active; total += m[i].amount;
+        if (currently_visible(m[i].x, m[i].y)) { ++visible; visible_total += m[i].amount; }
+    }
+    fprintf(trace, "{\"kind\":\"mineral-rejection\",\"frame\":%u,\"reason\":\"%s\",\"worker\":%d,\"home\":%d,\"patch\":%d,\"path_valid\":%d,\"active\":%d,\"visible\":%d,\"amount\":%d,\"visible_amount\":%d,\"cursor\":[%d,%d],\"selection_target\":%d,\"selected_count\":%d,\"worker_selected\":%d,\"worker_alive\":%d,\"worker_order\":%d,\"worker_carry\":%d,\"helper_patch\":%d}\n",
+            (unsigned)frame, reason, worker, home, patch, path_grid_valid,
+            active, visible, total, visible_total, cx, cy, selection_target(), selected_count(),
+            worker >= 0 ? u[worker].selected : -1, worker >= 0 ? u[worker].alive : -1,
+            worker >= 0 ? u[worker].order : -1, worker >= 0 ? u[worker].carry : -1,
+            selected_worker_mineral_target());
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 || i == 5)
+        fprintf(trace, "{\"kind\":\"mineral-row\",\"frame\":%u,\"slot\":%d,\"x\":%d,\"y\":%d,\"amount\":%d,\"visible\":%d}\n",
+                (unsigned)frame, i, m[i].x, m[i].y, m[i].amount,
+                currently_visible(m[i].x, m[i].y));
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE)
+        fprintf(trace, "{\"kind\":\"mineral-worker\",\"frame\":%u,\"slot\":%d,\"x\":%d,\"y\":%d,\"order\":%d,\"target\":%d,\"carry\":%d,\"path_timer\":%d}\n",
+                (unsigned)frame, i, u[i].x, u[i].y, u[i].order, u[i].target, u[i].carry, u[i].path_timer);
+    return 0;
+}
+
+/* A conservative read-only approximation of friendly selection precedence:
+ * a point near any friendly actor/building is skipped, even if that object is
+ * not selectable. The actual contextual helper is checked again before A. */
+static int mineral_click_clear(int x, int y)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && dist2(x, y, u[i].x, u[i].y) < 31 * 31)
+            return 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && dist2(x, y, b[i].x, b[i].y) < 26 * 26)
+            return 0;
+    return 1;
+}
+
+/* Controller policy: attempt one idle, empty Probe using only normal input.
+ * Resource choice sees only currently visible nonempty patches and a
+ * read-only walkability snapshot. No worker order is assigned directly. */
+static int assign_idle_probe_to_minerals(void)
+{
+    static const int dx[4] = {1, -1, 0, 0}, dy[4] = {0, 0, 1, -1};
+    static u8 seen[MAP_CELLS];
+    static int queue[MAP_CELLS];
+    int worker = -1, home = -1, best = 0x7fffffff;
+    int patch = -1, patch_distance = 0x7fffffff, head = 0, tail = 0;
+    int visible_patches = 0, eligible_workers = 0;
+    if (!path_grid_valid) return mineral_attempt_rejected("path-invalid", worker, home, patch);
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
+        u[i].type == U_PROBE && u[i].order == ORDER_IDLE && !u[i].carry) {
+        ++eligible_workers;
+        for (int j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive &&
+            b[j].owner == SIDE && b[j].type == B_NEXUS && building_complete(j)) {
+            int d = dist2(u[i].x, u[i].y, b[j].x, b[j].y);
+            if (d < best) { best = d; worker = i; home = j; }
+        }
+    }
+    if (worker < 0 || home < 0) return mineral_attempt_rejected(eligible_workers ? "no-complete-home" : "no-eligible-worker", worker, home, patch);
+    int start = limit(u[worker].x / 16, 0, MAP_COLS - 1) +
+                limit(u[worker].y / 16, 0, MAP_ROWS - 1) * MAP_COLS;
+    memset(seen, 0, sizeof(seen)); seen[start] = 1; queue[tail++] = start;
+    while (head < tail) {
+        int cell = queue[head++], x = cell % MAP_COLS, y = cell / MAP_COLS;
+        for (int k = 0; k < 4; ++k) {
+            int nx = x + dx[k], ny = y + dy[k];
+            if (nx < 0 || ny < 0 || nx >= MAP_COLS || ny >= MAP_ROWS) continue;
+            int next = nx + ny * MAP_COLS;
+            if (seen[next] || !SC64_GRID_GET(path_walkable, next)) continue;
+            seen[next] = 1; queue[tail++] = next;
+        }
+    }
+    for (int i = 0; i < MAX_MINERALS; ++i) {
+        if (!currently_visible(m[i].x, m[i].y) || m[i].amount <= 0) continue;
+        ++visible_patches;
+        int px = m[i].x / 16, py = m[i].y / 16, reachable = 0;
+        for (int y = py - 1; y <= py + 1; ++y)
+            for (int x = px - 1; x <= px + 1; ++x)
+                if (x >= 0 && y >= 0 && x < MAP_COLS && y < MAP_ROWS &&
+                    seen[x + y * MAP_COLS]) reachable = 1;
+        int d = dist2(u[worker].x, u[worker].y, m[i].x, m[i].y);
+        if (reachable && d < patch_distance) { patch_distance = d; patch = i; }
+    }
+    if (patch < 0) return mineral_attempt_rejected(visible_patches ? "no-reachable-patch" : "no-visible-patch", worker, home, patch);
+    if (!normalize_field() || !clear_selected_building() ||
+        !move_cursor(u[worker].x - 4, u[worker].y - 4))
+        return mineral_attempt_rejected("ui-worker-position", worker, home, patch);
+    /* Tiny UI drag clears prior selection and attempts just this worker.
+     * A cluster can select more than one; in that case issue no order. */
+    input(KEY_L); input(KEY_L | KEY_RIGHT | KEY_DOWN);
+    input(KEY_L | KEY_RIGHT | KEY_DOWN); input(0);
+    if (selected_count() != 1 || !u[worker].selected) {
+        /* Clustered workers can share the tiny box. L-tap uses the ordinary
+         * single-unit cycle; bound the search to one full unit pool. */
+        for (int attempts = 0; attempts < MAX_UNITS && screen == SCREEN_PLAY &&
+             u[worker].alive && (selected_count() != 1 || !u[worker].selected); ++attempts)
+            KEY_TAP(KEY_L);
+    }
+    if (selected_count() != 1 || !u[worker].selected || !u[worker].alive ||
+        u[worker].order != ORDER_IDLE || u[worker].carry)
+        return mineral_attempt_rejected("ui-worker-selection", worker, home, patch);
+    /* Search all visible reachable patches for a safe point on the current
+     * four-pixel cursor lattice, strictly inside the patch's 16px radius. */
+    if (!path_grid_valid) return mineral_attempt_rejected("path-invalid-after-selection", worker, home, patch);
+    int click_x = -1, click_y = -1, click_rank = 0x7fffffff;
+    patch = -1; patch_distance = 0x7fffffff;
+    for (int i = 0; i < MAX_MINERALS; ++i) {
+        if (!currently_visible(m[i].x, m[i].y) || m[i].amount <= 0) continue;
+        int px = m[i].x / 16, py = m[i].y / 16, reachable = 0;
+        for (int y = py - 1; y <= py + 1; ++y)
+            for (int x = px - 1; x <= px + 1; ++x)
+                if (x >= 0 && y >= 0 && x < MAP_COLS && y < MAP_ROWS &&
+                    seen[x + y * MAP_COLS]) reachable = 1;
+        if (!reachable) continue;
+        int d = dist2(u[worker].x, u[worker].y, m[i].x, m[i].y);
+        if (d > patch_distance) continue;
+        for (int y = m[i].y - 15; y <= m[i].y + 15; ++y)
+            for (int x = m[i].x - 15; x <= m[i].x + 15; ++x) {
+                if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ||
+                    (x - cx) % 4 || (y - cy) % 4 ||
+                    dist2(x, y, m[i].x, m[i].y) >= 16 * 16 ||
+                    !mineral_click_clear(x, y)) continue;
+                int rank = dist2(x, y, m[i].x, m[i].y);
+                if (d < patch_distance || (d == patch_distance && rank < click_rank)) {
+                    patch = i; patch_distance = d; click_rank = rank;
+                    click_x = x; click_y = y;
+                }
+            }
+    }
+    if (patch < 0) return mineral_attempt_rejected("no-clear-clickpoint", worker, home, patch);
+    if (!move_cursor(click_x, click_y))
+        return mineral_attempt_rejected("ui-patch-position", worker, home, patch);
+    if (selected_count() != 1 || !u[worker].selected || !u[worker].alive ||
+        u[worker].order != ORDER_IDLE || u[worker].carry ||
+        selected_worker_mineral_target() != patch)
+        return mineral_attempt_rejected("ui-patch-priority", worker, home, patch);
+    int refinery = nearest_refinery(cx, cy);
+    if (refinery >= 0 && dist2(cx, cy, b[refinery].x, b[refinery].y) < 24 * 24)
+        return mineral_attempt_rejected("ui-refinery-priority", worker, home, patch);
+#ifdef SC64_SHARED_BUNKER
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (race_bunker_carrier_valid(i) && b[i].owner == SIDE &&
+            dist2(cx, cy, b[i].x, b[i].y) < 20 * 20) return mineral_attempt_rejected("ui-bunker-priority", worker, home, patch);
+#endif
+#ifdef SC64_TRANSPORT_RUNTIME
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (race_transport_carrier_valid(i) && u[i].owner == SIDE &&
+            dist2(cx, cy, u[i].x, u[i].y) < 18 * 18) return mineral_attempt_rejected("ui-carrier-priority", worker, home, patch);
+#endif
+#ifdef SC_FIELD_FEEDBACK
+    int hostile_x, hostile_y;
+    if (ui_hostile_at(cx, cy, &hostile_x, &hostile_y)) return mineral_attempt_rejected("ui-hostile-priority", worker, home, patch);
+#endif
+    KEY_TAP(KEY_A);
+    if (!u[worker].alive || u[worker].order != ORDER_MINE ||
+        u[worker].target != patch) return mineral_attempt_rejected("ui-order-not-accepted", worker, home, patch);
+    fprintf(trace, "{\"kind\":\"economy\",\"frame\":%u,\"action\":\"assign-idle-mineral\",\"worker\":%d,\"patch\":%d,\"home\":%d}\n",
+            (unsigned)frame, worker, patch, home);
     return 1;
 }
 
@@ -495,6 +743,27 @@ static void census(const char *label)
         race_p7.runtime.model.outcome,race_p7.runtime.fault,
         (unsigned)race_p7.runtime.switch_bits,(unsigned)race_p7.runtime.model.action_cursor[8],
         (unsigned)race_p7.runtime.model.action_cursor[9],(unsigned)race_p7.runtime.model.action_cursor[5]);
+    /* Read-only late-combat samples: retain each actor so movement, damage,
+       visibility and cached detection can be compared across checkpoints. */
+    if(frame>=45000) {
+        fprintf(trace,"{\"kind\":\"tactical-target\",\"frame\":%u,\"slot\":%d,\"hp\":%d,\"shield\":%d}\n",
+            (unsigned)frame,target,target>=0?b[target].hp:-1,target>=0?b[target].shield:-1);
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive) {
+            int eligible=u[i].owner==SIDE && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) &&
+                !IS_WORKER(u[i].type) && u[i].type!=U_OVERLORD && u[i].type!=U_CHRYSALIS &&
+                sc64_game_unit_selectable(u[i].type) && (!sc64_game_unit_actor_flags(u[i].type) ||
+                sc64_game_unit_has_flag(u[i].type,SC64_GAME_ACTOR_WEAPON));
+            int cloaked=0,detected=0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+            if(u[i].owner!=SIDE) {
+                cloaked=sc64_p7_observer_target_is_cloaked(i);
+                detected=sc64_p7_observer_detector_sees(i,7,SIDE);
+            }
+#endif
+            fprintf(trace,"{\"kind\":\"tactical-unit\",\"frame\":%u,\"slot\":%d,\"raw\":%d,\"source_owner\":%d,\"owner\":%d,\"xy\":[%d,%d],\"hp\":%d,\"shield\":%d,\"order\":%d,\"target\":%d,\"selected\":%d,\"combat_eligible\":%d,\"visible\":%d,\"cloaked\":%d,\"detected\":%d}\n",
+                (unsigned)frame,i,u[i].raw_type,u[i].raw_owner,u[i].owner,u[i].x,u[i].y,u[i].hp,u[i].shield,u[i].order,u[i].target,u[i].selected,eligible,currently_visible(u[i].x,u[i].y),cloaked,detected);
+        }
+    }
     fflush(trace);
 }
 
@@ -505,8 +774,13 @@ int main(int argc,char **argv)
     snprintf(mkdir_cmd,sizeof(mkdir_cmd),"mkdir -p '%s'", ".local/build/p7-controller");
     (void)system(mkdir_cmd);
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
-    fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":26,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n",P7_CONTROLLER_PROFILE);
+    fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":26,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\",\"observation_policy\":\"host world-state oracle; not limited to player-visible information\"}\n",P7_CONTROLLER_PROFILE);
     game_init();prior=0;
+    int dragoon=route_combat_type_eligible(U_DRAGOON),zealot=route_combat_type_eligible(U_ZEALOT),
+        scout=route_combat_type_eligible(U_SCOUT),observer=route_combat_type_eligible(U_P7_OBSERVER);
+    fprintf(trace,"{\"kind\":\"route-eligibility\",\"dragoon\":%d,\"zealot\":%d,\"scout\":%d,\"observer\":%d}\n",dragoon,zealot,scout,observer);
+    fflush(trace);
+    assert(dragoon&&zealot&&scout&&!observer);
     assert(screen==SCREEN_TITLE&&race_front.page==SC_FRONT_HOME);
     KEY_TAP(KEY_A);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);
     KEY_TAP(KEY_A);KEY_TAP(KEY_START);
@@ -522,11 +796,15 @@ int main(int argc,char **argv)
 
     unsigned next_checkpoint=1000;
     int locked_target_owner=-1;
-    int last_order=-10000,next_probe=300,next_gas=5000,next_production=5500,next_build=7000,next_pylon=5000;
+    int last_order=-10000,next_probe=300,next_gas=5000,next_production=5500,next_build=7000,next_pylon=5000,next_mineral=600;
     while(host_tick<RUN_LIMIT&&screen==SCREEN_PLAY&&!won&&!lost){
         if(frame>=next_probe&&probe_count()<10){
             (void)queue_probe();
             next_probe=frame+600;
+        }
+        if (frame >= next_mineral) {
+            (void)assign_idle_probe_to_minerals();
+            next_mineral = frame + 600;
         }
         if(frame>=next_gas){
             (void)assign_gas_worker();
@@ -609,6 +887,7 @@ int main(int argc,char **argv)
                         (unsigned)frame,target_x,target_y,ax,ay,path_grid_valid);
                 }
                 if((has_route||use_threat)&&issue_attack(command_x,command_y)){
+                    (void)escort_observer(command_x,command_y);
                     last_order=frame;
                     fprintf(trace,"{\"kind\":\"command\",\"frame\":%u,\"target\":\"%s\",\"target_slot\":%d,\"target_owner\":%d,\"path_distance\":%d,\"stalled_orders\":%d,\"target_xy\":[%d,%d],\"command_xy\":[%d,%d],\"route_steps\":%d,\"army_center\":[%d,%d],\"heroes_alive\":%d}\n",
                         (unsigned)frame,use_threat?"hero-threat":"nexus",use_threat?threat:t,target_owner,target_path,stalled_orders,target_x,target_y,command_x,command_y,route_steps,ax,ay,heroes_alive());

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 #ifndef SC64_TERRAN_LATE_RUNTIME
 #error "Compile with the late Terran runtime profile"
@@ -20,9 +21,9 @@ static void start_t8(void)
 
 static void assert_bad_load_rejected(const RaceSave *bad, const RaceSave *good)
 {
-    save_write(bad, sizeof(*bad), SAVE_VERSION);
+    write_candidate_record(bad);
     assert(!race_load_game());
-    save_write(good, sizeof(*good), SAVE_VERSION);
+    write_candidate_record(good);
     assert(race_load_game());
 }
 
@@ -88,7 +89,8 @@ static void test_late_save_accepts_and_rejects_repair_targets(void)
     u[worker].carry = 37;
     u[worker].work_timer = 4;
     assert(race_save_game());
-    RaceSave valid = race_data;
+    RaceSave valid;
+    fixture_capture_save(&valid);
     assert(race_terran_late_save_candidate_valid(&valid, race_cols, race_rows));
 
     /* A dead/foreign/organic target cannot be smuggled into a repair order. */
@@ -118,7 +120,7 @@ static void test_late_save_accepts_and_rejects_repair_targets(void)
     u[worker].target = MAX_UNITS + facility;
     assert(race_late_repair_target_building_valid(facility));
     assert(race_save_game());
-    valid = race_data;
+    fixture_capture_save(&valid);
     assert(race_terran_late_save_candidate_valid(&valid, race_cols, race_rows));
     RaceSave bad = valid;
     Building decoded;

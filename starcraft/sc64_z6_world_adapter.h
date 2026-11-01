@@ -214,6 +214,11 @@ static int sc64_z6_world_clear_selected(Sc64Z6WorldContext *ctx,
         if (ctx->deaths_by_source && u[i].raw_owner >= 0 && u[i].raw_owner < 12 &&
             ctx->deaths_by_source[u[i].raw_owner] != 0xffffffffu)
             ++ctx->deaths_by_source[u[i].raw_owner];
+#ifdef SC64_TRANSPORT_RUNTIME
+        /* The authored Kill Unit At Location can select a live Overlord.
+         * Resolve its passengers before invalidating or reusing its slot. */
+        if (race_transport_carrier_type(&u[i])) race_transport_destroy_cargo(i);
+#endif
         u[i].alive=0; u[i].selected=0; u[i].target=-1; u[i].order=ORDER_IDLE;
         invincible_units[i]=0; changed=1;
     }

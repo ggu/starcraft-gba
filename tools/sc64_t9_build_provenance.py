@@ -29,7 +29,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = "arm-none-eabi-"
 ROMS = {
-    "starcraft-terran": "build/StarCraft-Terran-GBA.gba",
+    "starcraft-terran": "build/StarCraft-Terran-Transport1-GBA.gba",
     "starcraft-terran-t9-arm-replay": "build/StarCraft-Terran-T9-ARM-Replay.gba",
 }
 HELD = ("build/test-sc64-t9-campaign-run", "build/t9-arm/t9-controller.json",

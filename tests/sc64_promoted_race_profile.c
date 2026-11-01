@@ -7,6 +7,12 @@
 #include "../starcraft/game.c"
 #include "sc64_save_candidate_fixture.h"
 
+#ifdef SC64_SHARED_TRANSPORT
+#define PROFILE_WIRE_TAG SC64_TRANSPORT_SAVE_VERSION
+#else
+#define PROFILE_WIRE_TAG SAVE_VERSION
+#endif
+
 #ifdef SC64_SKIRMISH_ROSTER
 #define PROFILE_ROSTER_TAG 0x80000000u
 #else
@@ -83,6 +89,20 @@ static const char *const profile_titles[] = {
 static const int profile_missions[] = {0, 1, 14, 15};
 static const char *const profile_titles[] = {
     "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM"
+};
+#elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P8_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_PROTOSS
+#define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
+#define PROFILE_RACE R_PROTOSS
+#define PROFILE_SAVE_GENERATION 44u
+#define PROFILE_OLD_SAVE_TAG 0x53435032u
+_Static_assert(SC64_RACE_SAVE_GENERATION == 44u, "P8 requires generation 44");
+_Static_assert(SAVE_VERSION == (0x5343505cu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG), "P8 save identity");
+_Static_assert(SC64_P8_GLOBAL_ID == 27, "P8 catalog identity");
+static const int profile_missions[] = {2,3,22,23,24,25,26,27};
+static const char *const profile_titles[] = {
+    "FIRST STRIKE", "INTO THE FLAMES", "HIGHER GROUND", "THE HUNT FOR TASSADAR",
+    "CHOOSING SIDES", "INTO THE DARKNESS", "HOMELAND", "THE TRIAL"
 };
 #elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P7_RUNTIME)
 #define PROFILE_FACTION SC64_FACTION_PROTOSS
@@ -291,21 +311,19 @@ static void reject_generation2_save(int mission, int legacy_container)
     for (int tick = 0; tick < 60; ++tick) game_update(0, 0);
     assert_unused_geysers_cleared();
     static RaceSave old;
-    static unsigned char envelope[sizeof(RaceSave)
-#ifdef SC64_IMPACT_EVENTS
-                                  + RACE_IMPACT_RECORD_MAX
-#endif
-                                  ];
+    static unsigned char envelope[16384];
     u32 length = 0;
     assert(race_save_game());
 #ifdef SC64_IMPACT_EVENTS
     fixture_capture_save(&old);
 #else
+#ifndef SC64_SHARED_TRANSPORT
     assert(save_read(&race_data, sizeof(race_data), SAVE_VERSION));
+#endif
     fixture_capture_save(&old);
 #endif
     assert(old.version == SAVE_VERSION);
-    assert(save_read_latest(envelope, (u32)sizeof(envelope), SAVE_VERSION, &length));
+    assert(save_read_latest(envelope, (u32)sizeof(envelope), PROFILE_WIRE_TAG, &length));
     assert(length >= offsetof(RaceSave, version) + sizeof(old.version));
     old.version = PROFILE_OLD_SAVE_TAG;
     if (legacy_container) {
@@ -313,11 +331,11 @@ static void reject_generation2_save(int mission, int legacy_container)
          * so neither can mask the historical container under test. */
         for (int i = 0; i < 2; ++i) {
             u32 current_length = 0;
-            if (!save_read_latest(envelope, (u32)sizeof(envelope), SAVE_VERSION,
+            if (!save_read_latest(envelope, (u32)sizeof(envelope), PROFILE_WIRE_TAG,
                                   &current_length)) break;
-            save_test_corrupt_latest(current_length, SAVE_VERSION);
+            save_test_corrupt_latest(current_length, PROFILE_WIRE_TAG);
         }
-        assert(!save_read_latest(envelope, (u32)sizeof(envelope), SAVE_VERSION, &length));
+        assert(!save_read_latest(envelope, (u32)sizeof(envelope), PROFILE_WIRE_TAG, &length));
         save_write(&old, sizeof(old), PROFILE_OLD_SAVE_TAG);
         RaceSave legacy;
         assert(save_read(&legacy, sizeof(legacy), PROFILE_OLD_SAVE_TAG));
@@ -326,10 +344,10 @@ static void reject_generation2_save(int mission, int legacy_container)
         /* Preserve the exact current envelope and replace only its payload
          * version, so the negative reaches the intended format validator. */
         memcpy(envelope + offsetof(RaceSave, version), &old.version, sizeof(old.version));
-        save_write(envelope, length, SAVE_VERSION);
+        save_write(envelope, length, PROFILE_WIRE_TAG);
         {
             static unsigned char readback[sizeof(envelope)]; u32 actual = 0;
-            assert(save_read_latest(readback, (u32)sizeof(readback), SAVE_VERSION, &actual));
+            assert(save_read_latest(readback, (u32)sizeof(readback), PROFILE_WIRE_TAG, &actual));
             assert(actual == length && memcmp(readback, envelope, length) == 0);
         }
 #ifdef SC64_IMPACT_EVENTS
@@ -492,9 +510,79 @@ static void test_all_skirmish_lineups(void)
     printf("Promoted race skirmish startup/save matrix: %d configurations passed\n", cases);
 }
 
+#ifdef SC64_P8_RUNTIME
+static void test_p8_source_permissions(void)
+{
+    campaign_start_from_menu(SC64_P8_GLOBAL_ID);
+    assert(race_p8_active());
+    for (int slot=0;slot<8;slot++) {
+        int owner=race_p8_source_owner((unsigned)slot);
+        if(owner<0 || owner>4) continue;
+        assert(!race_p8_source_product_available(owner,slot,71));
+        assert(!race_p8_source_product_available(owner,slot,170));
+    }
+    /* A checksummed candidate containing a forbidden queued product must be
+     * rejected before live state changes. */
+    assert(race_save_game());
+    static RaceSave bad;
+    fixture_capture_save(&bad);
+    int row=-1;
+    for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].owner==SIDE){row=i;break;}
+    assert(row>=0);
+    Building forged=b[row]; forged.queue_head=0; forged.queue_count=1; forged.queue[0]=U_P7_ARBITER;
+    assert(sc64_p7_typed_building_encode(&bad.buildings[row],&forged,(unsigned)race_cols*16u,(unsigned)race_rows*16u));
+    int saved_frame=frame,saved_minerals=minerals;
+    write_candidate_record(&bad);
+    assert(!race_load_game());
+    assert(frame==saved_frame && minerals==saved_minerals && b[row].queue_count==0);
+    assert(!race_p8_unit_product_available(SIDE,7,U_P7_ARBITER));
+    int producer=spawn_build(SIDE,B_P7_ARBITER_TRIBUNAL,u[0].x,u[0].y,0);
+    assert(producer>=0);
+    b[producer].raw_owner=7;
+    assert(!race_queue_unit(SIDE,producer,U_P7_ARBITER));
+    b[producer].queue[0]=U_P7_ARBITER; b[producer].queue_head=0; b[producer].queue_count=1;
+    assert(!race_save_game());
+    b[producer].queue_count=0; b[producer].alive=0;
+    assert(!race_p8_building_product_available(SIDE,7,B_P7_ARBITER_TRIBUNAL));
+    assert(race_p8_unit_product_available(SIDE,7,U_PROBE));
+    int w=-1;
+    for(int i=0;i<MAX_UNITS;i++) if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE){w=i;break;}
+    assert(w>=0);
+    const char *reason=ui_missing_tech(B_P7_ARBITER_TRIBUNAL,w);
+    assert(reason && !*reason);
+    int x=u[w].x,y=u[w].y;
+    assert(!race_build_request_valid(SIDE,w,B_P7_ARBITER_TRIBUNAL,&x,&y,0));
+    assert(!race_build_request_valid(SIDE,w,B_P7_ARBITER_TRIBUNAL,&x,&y,1));
+    /* Already placed source actors and trigger creation are not admission. */
+    assert(race_p8_active());
+    race_mode=1;
+    assert(race_p8_unit_product_available(SIDE,7,U_P7_ARBITER));
+    assert(race_p8_building_product_available(SIDE,7,B_P7_ARBITER_TRIBUNAL));
+}
+
+static void test_p7_journal_isolation(void)
+{
+    static const u8 old_record[] = {1,2,3,4,5,6,7,8};
+    u8 copy[sizeof(old_record)]; u32 len=0;
+    const u32 p7_tag=0x5343505bu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG;
+    assert(p7_tag != SAVE_VERSION);
+    game_init();
+    int old_screen=screen, old_frame=frame;
+    save_write(old_record,sizeof(old_record),p7_tag);
+    assert(!race_load_game());
+    assert(screen==old_screen && frame==old_frame);
+    assert(save_read_latest(copy,sizeof(copy),p7_tag,&len));
+    assert(len==sizeof(copy) && !memcmp(copy,old_record,sizeof(copy)));
+}
+#endif
+
 int main(void)
 {
     gba_init();
+#ifdef SC64_P8_RUNTIME
+    test_p7_journal_isolation();
+    test_p8_source_permissions();
+#endif
     assert(SC64_RACE_SAVE_GENERATION == PROFILE_SAVE_GENERATION);
     const unsigned mission_count = sizeof(profile_missions) / sizeof(profile_missions[0]);
     assert(sc64_catalog_playable_count(PROFILE_FACTION) == mission_count);

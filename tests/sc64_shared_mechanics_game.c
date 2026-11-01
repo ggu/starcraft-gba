@@ -266,6 +266,18 @@ static Unit saved_world_units[MAX_UNITS];
 static Building saved_world_buildings[MAX_BUILDINGS];
 static u8 saved_world_explored[SC64_GRID_STORAGE_BYTES];
 
+/* Match the active production journal format when injecting a candidate.
+ * Yamato + delayed impacts use a compact envelope, not a raw RaceSave tail. */
+static void write_candidate_record(void)
+{
+#if defined(SC64_IMPACT_EVENTS) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
+    race_data = saved_candidate;
+    assert(race_impact_save_write());
+#else
+    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+#endif
+}
+
 static void expect_candidate_rejected(void)
 {
     /* Make scalar and fog state differ from the candidate so a partial load
@@ -280,7 +292,7 @@ static void expect_candidate_rejected(void)
     int old_frame = frame, old_cx = cx, old_cy = cy;
     int old_mode = race_mode, old_human = race_human;
     int old_mission = race_selected_mission, old_completed = race_completed;
-    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    write_candidate_record();
     assert(!race_load_game());
     assert(memcmp(saved_world_units, u, sizeof(u)) == 0);
     assert(memcmp(saved_world_buildings, b, sizeof(b)) == 0);
@@ -310,7 +322,7 @@ static void test_burn_save_compatibility(void)
     assert(race_load_game());
     assert(b[building].hp == 200 && b[building].shield_remainder == 4 * 256 + 97);
     saved_candidate.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX] = 0;
-    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    write_candidate_record();
     assert(race_load_game());
     assert(b[building].hp == 200 && b[building].shield_remainder == NEUTRAL * 256);
     assert(race_save_game());
@@ -335,7 +347,7 @@ static void test_construction_save_compatibility(void)
            SC64_CONSTRUCTION_SAVE_MARKER);
     saved_candidate = race_data;
     saved_candidate.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = 0;
-    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    write_candidate_record();
     assert(race_load_game());
     assert(race_save_game());
     assert(race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] ==
@@ -375,8 +387,68 @@ static void test_construction_save_compatibility(void)
     expect_candidate_rejected();
 }
 
+#ifdef SC64_SAVE_UI_CONTEXT
+static void test_ui_save_context(int human)
+{
+    game_init();
+    race_mode=1; race_human=human; race_bots=1; race_skirmish_map=0;
+    race_skirmish_init(); screen=SCREEN_PLAY;
+    int building=spawn_build(SIDE, foundation_for_race(human),320,320,0);
+    assert(building>=0); selected_building=building; menu_cursor=3;
+#ifdef SC_FIELD_FEEDBACK
+    menu_last=2;
+#endif
+    assert(race_save_game()); saved_candidate=race_data;
+    selected_building=-1; menu_cursor=0;
+#ifdef SC_FIELD_FEEDBACK
+    menu_last=0;
+#endif
+    assert(race_load_game()); assert(selected_building==building && menu_cursor==3);
+#ifdef SC_FIELD_FEEDBACK
+    assert(menu_last==2);
+#endif
+    /* The candidate validator accepts a legacy zero and a now-dead but
+       in-range building; malformed extensions fail before commit. */
+    int absent=-1; for(int i=0;i<MAX_BUILDINGS;i++) if(!b[i].alive) { absent=i; break; }
+    assert(absent>=0);
+    assert(sc64_save_ui_valid(0,MAX_BUILDINGS));
+    saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=0;
+    write_candidate_record(); selected_building=building;
+    assert(race_load_game()); assert(selected_building==-1);
+    unsigned stale=sc64_save_ui_encode(absent,MAX_BUILDINGS,3,2);
+    assert(sc64_save_ui_valid(stale,MAX_BUILDINGS));
+    saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=(int)stale;
+    write_candidate_record(); assert(race_load_game()); assert(selected_building==-1);
+    const unsigned invalid[] = {0x12345678u,SC64_SAVE_UI_TAG | (MAX_BUILDINGS+1u),
+                                SC64_SAVE_UI_TAG | (64u<<8),SC64_SAVE_UI_TAG | (64u<<16)};
+    for (unsigned i=0;i<sizeof(invalid)/sizeof(invalid[0]);++i) {
+        assert(!sc64_save_ui_valid(invalid[i],MAX_BUILDINGS));
+        race_data=saved_candidate;
+        race_data.state[SC64_SAVE_UI_STATE_INDEX]=(int)invalid[i];
+        RaceLoadPlan plan={0};
+        assert(!race_load_preflight_candidate(&plan));
+        saved_candidate.state[SC64_SAVE_UI_STATE_INDEX]=(int)invalid[i];
+        expect_candidate_rejected();
+    }
+    /* Saving a stale selection succeeds and emits none. */
+    selected_building=absent; menu_cursor=3;
+    assert(race_save_game()); assert(race_load_game());
+    assert(selected_building==-1);
+    selected_building=MAX_BUILDINGS+5; menu_cursor=300;
+#ifdef SC_FIELD_FEEDBACK
+    menu_last=255;
+#endif
+    assert(race_save_game());
+    assert((unsigned)race_data.state[SC64_SAVE_UI_STATE_INDEX] == SC64_SAVE_UI_TAG);
+}
+#endif
+
 int main(void)
 {
+#ifdef SC64_SAVE_UI_FIXTURE_ONLY
+    for (int race=R_TER;race<=R_PROTOSS;++race) test_ui_save_context(race);
+    return 0;
+#endif
     for (int mode = 0; mode <= 1; ++mode) {
         test_construction_shared_in_both_modes(mode, R_TER);
         test_construction_shared_in_both_modes(mode, R_PROTOSS);
@@ -388,6 +460,9 @@ int main(void)
     }
     test_construction_save_compatibility();
     test_burn_save_compatibility();
+#ifdef SC64_SAVE_UI_CONTEXT
+    for (int race=R_TER;race<=R_PROTOSS;++race) test_ui_save_context(race);
+#endif
 #ifdef SC64_T6_RUNTIME
     test_burn_fraction_repair(0);
     test_burn_fraction_repair(1);

@@ -532,6 +532,56 @@ test_packet_arena_overlap_rejected(void)
 	assert(snapshot[i] == arena.words[i]);
 }
 
+/* The old packet-only predicate cannot establish that a destination exists,
+ * is large enough, and does not alias the candidate packet. */
+static void
+test_target_preflight(void)
+{
+    uint16_t source_words[SC64_ARENA_WORDS];
+    uint16_t target_storage[SC64_ARENA_WORDS + 2];
+    uint16_t target_before[SC64_ARENA_WORDS + 2];
+    uint8_t packet[SC64_CODEC_BYTES], packet_before[SC64_CODEC_BYTES];
+    uint8_t roundtrip[SC64_CODEC_BYTES];
+    Sc64Arena source = {source_words, SC64_ARENA_WORDS};
+    Sc64Arena target = {target_storage + 1, SC64_ARENA_WORDS};
+    Sc64Arena short_target = {target_storage + 1, SC64_ARENA_WORDS - 1};
+    Sc64Arena overflow_target = {(volatile uint16_t *)(uintptr_t)(UINTPTR_MAX - 1u), SC64_ARENA_WORDS};
+    assert(sc64_pool_init(&source));
+    uint8_t id, native;
+    assert(sc64_pool_acquire(&source,&id,&native));
+    assert(sc64_codec_encode(&source,packet,sizeof(packet)));
+    memcpy(packet_before,packet,sizeof(packet));
+    memset(target_storage,0x5a,sizeof(target_storage));
+    memcpy(target_before,target_storage,sizeof(target_storage));
+    assert(sc64_codec_validate(packet,sizeof(packet)));
+    assert(!sc64_codec_validate_target(0,packet,sizeof(packet)));
+    assert(!sc64_codec_validate_target(&short_target,packet,sizeof(packet)));
+    assert(!sc64_codec_validate_target(&overflow_target,packet,sizeof(packet)));
+    assert(!sc64_codec_validate_target(&target,packet,sizeof(packet)-1));
+    assert(sc64_codec_validate_target(&target,packet,sizeof(packet)));
+    assert(!memcmp(target_storage,target_before,sizeof(target_storage)));
+    assert(!memcmp(packet,packet_before,sizeof(packet)));
+    packet[2]|=0xe0u;
+    assert(!sc64_codec_validate_target(&target,packet,sizeof(packet)));
+    assert(!memcmp(target_storage,target_before,sizeof(target_storage)));
+    memcpy(packet,packet_before,sizeof(packet));
+    assert(sc64_codec_decode(&target,packet,sizeof(packet)));
+    assert(target_storage[0]==target_before[0] &&
+           target_storage[SC64_ARENA_WORDS+1]==target_before[SC64_ARENA_WORDS+1]);
+    assert(sc64_codec_encode(&target,roundtrip,sizeof(roundtrip)));
+    assert(!memcmp(packet,roundtrip,sizeof(packet)));
+
+    /* Place an otherwise valid packet inside the destination and snapshot the
+     * exact bytes: target preflight must reject without touching either. */
+    memcpy(target_storage+1,packet,sizeof(packet));
+    memcpy(target_before,target_storage,sizeof(target_storage));
+    const uint8_t *overlap=(const uint8_t *)(const void *)(target_storage+1);
+    assert(sc64_codec_validate(overlap,SC64_CODEC_BYTES));
+    assert(!sc64_codec_validate_target(&target,overlap,SC64_CODEC_BYTES));
+    assert(!memcmp(target_storage,target_before,sizeof(target_storage)));
+    assert(!memcmp(packet,packet_before,sizeof(packet)));
+}
+
 int
 main(void)
 {
@@ -540,6 +590,7 @@ main(void)
     test_arena_bounds_and_wide_fields();
     test_unallocated_previous_link_is_canonical();
     test_packet_arena_overlap_rejected();
+    test_target_preflight();
     test_codec_errors_and_roundtrip();
     test_randomized_field_roundtrips();
     puts("PASS C fixed pool, ordering oracle, bounded arena, strict halfword validation, codec field roundtrips and transactionality");

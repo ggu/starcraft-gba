@@ -1,0 +1,52 @@
+# Zero-offset contact experiment
+
+The measured prototype enabled `SC64_CONTACT_ZERO_OFFSET_REJECT` in the valid cached-candidate path. The final shared-path candidate applies the same rejection without that flag and produces the byte-identical measured Z7 ROM. After the existing collision, flight and burrow checks, a candidate at the mover's exact coordinates skips geometry only when speed is nonzero. The old squared distance is zero and all eight nonzero-speed steps have positive squared distance, so the existing non-increasing-distance predicate cannot add a blocked direction. Speed zero still uses the original geometry and may block; undescribable classes still use the original reference fallback. No memo key, invalidation, bucket, geometry table or storage limit changes. The final shared-path candidate passed the six profile links and default checks described below; review remains required.
+
+Measured source was `a3900a145bf7aa0979b0fc6e4873ba8470231be6`, based on `ec013c5`; source and generated inputs were frozen during tests and builds. The diagnostic distribution motivating the experiment is recorded on branch `codex/contact-geometry-diagnostic-20261101` at `619ffa0`.
+
+Focused actual-mask comparisons under ASan/UBSan passed with flag OFF and ON for table and arithmetic paths and both legacy and persistent buckets. The stacked fixture compares cached and uncached masks against eight original point queries at speeds 0, 1, 2, 14 and 15, including flying, ignored, transported, burrowed, valid out-of-table-radius and invalid-class cases. The independent exhaustive table/math/fallback oracle also passed. The existing Zerg dense-world collision oracle ran OFF and ON with byte-identical reports: 4,142,333 point checks, 637,282 active-mask checks, 130,330 inactive-mask checks, 171,024 stock checks, 1,200 passes and 71,721 mutations; zero mismatches and zero unhooked memo-world changes. These focused checks do not replace the cross-product gameplay qualification.
+
+Normal Z7 builds used identical flags except the opt-in macro. The OFF ROM SHA-256 `2fbc76b01c59f957912cc40b1fe79d28bb1b72088d94cacd0349dea3eb1d6efe` exactly matches the current 990 baseline; ON ROM SHA-256 `c60a58ccb1d5176504dd325d9a8074d0ccafd431afdaefa49f57b0f98eed5d57`, ELF `1df03802e45fb38554387e3f57c821aab3b1f0e73bb2233352416538813585ce`. IWRAM end rose `0x03004f10` to `0x03004f68`, leaving 152 bytes before the existing reserve guard; BSS stayed `0x0203d6f8`. Both guarded builds used literal `-g` and the same 109 verified pinned inputs. The walk-word, indexed-weapon and authored contact-table sidecars were frozen with `make -o`; their SHA-256 values were `e1a342f67257295ec6635150cf3574cf88d4248e7a0bae50dbd7e89ee10d83e5`, `b9ef81a285604a174f41c0652e0229ea22ef1a0c1c365bc4ffb51835b5c4991e`, and `e7993e3efec0582088f4b466368dbf3990cd4896602b01747d76515207b091ce`. Native tests, build and replay used `/tmp/sc64-native-build-20261031.lock` with over 2 GiB free inside it.
+
+The ON ROM ran the same physical-button strict trace through updates 50001–50900, compared to the retained current-baseline run. All 135 named checkpoints through update 50396 and all nine 100-update samples of named state, mode-4 frame and palette matched; route hit/build deltas matched (2242/77). This is sampled equivalence, not a full-state proof. No guest-state writes were used. The strict trace SHA-256 was `5121ed97ea0ea3d57697ce2c7fc57eac2082e3a457bb4ad98517f09ecf510489`.
+
+| Cycles per update | OFF mean / p95 | ON mean / p95 |
+| --- | ---: | ---: |
+| Main loop | 2,105,632.65 / 4,182,488 | 2,069,134.51 / 4,193,318 |
+| Update | 1,444,042.07 / 3,460,279 | 1,417,242.11 / 3,428,525 |
+| Orders | 846,134.31 / 2,854,556 | 819,447.50 / 2,828,578 |
+
+Mean main-loop cycles decreased 1.73%, while p95 increased 0.26%; update and orders means decreased 1.86% and 3.15%. Stage counters may overlap. This one bounded emulator window is not hardware FPS or full-mission evidence. The later full WIN and fresh-process save/resume result and the six guarded profile links are recorded below; these do not substitute for unsampled full-state or hardware evidence.
+
+Local ON result `/tmp/contact-zero-candidate-50000-20261101/result.json` SHA-256 `a8d180ae7438269b28db593fbd73b924dfb8cd59caf26c86c445064e3424d8a7`, samples SHA-256 `d0c5e2ef500f86703c377cc77a52f1dbfddbacc4090d4cf437592df722c70769`; baseline result `/tmp/contact-capacity-base-50000-20261101/result.json` SHA-256 `d3d79f8e1ce2a13a3a76209b2cac51e92ea0069fdcc94f9547a46d16635a41fa`. Replay script SHA-256 `9870ea6fbeb8489a87604ac3ad12d8089263c6edc428f2eb18ad7d2b13f73004`; lock wrapper `32851d347eb140a79c8040d7a9beff6cde3da3f1a41f0c001c2fe29d7ba97141`. Dense-oracle report SHA-256 `b4a41a4a4844f20b58d591dd68bc73e3d8c6c5b509e69cf46a416657b28a0198`. Temporary evidence and private inputs are not committed.
+
+## Full physical save and resume
+
+The same ON ROM `c60a58ccb1d5176504dd325d9a8074d0ccafd431afdaefa49f57b0f98eed5d57` subsequently passed a normal-menu physical run: UI at cut 12 matched the expected gameplay state, an ordinary save was exported, and a fresh process resumed it to WIN. The resume passed 302 named checkpoints, ending at update 179753 / frame 177804 with `won=1`, `lost=0`, `outcome=1`, `fault=0`. Its aggregate main-loop counters recorded 392,804,393,848 cycles over 179,753 updates (mean 2,185,245.27) and a 50,583,602-cycle peak; this is an emulator result, not hardware FPS. The sample scope is the named mission/model fields, entity counts and economy, not complete entity arrays. The clean source was frozen at `171526b457d30f10404a6aa2ff9e8bad82509857` (only this audit differs from measured code `a3900a1`), all 109 input pins and three sidecars were verified before and after, and the job held the native lock after checking free space. The physical driver used the actual candidate save; no state was forged.
+
+The local stage receipt `/tmp/contact-zero-full-physical-result.json` hashes to `62d8c700421d474f4d558364c0067e30c9d669dd46502ed24fd913b94818495c`, and the full resume result `/tmp/contact-zero-resume-cut12/result.json` to `a8043a00027c3a46818086cde787c4b935778beed2c454773a39f39ade9e9ce7`. The save and accompanying state metadata hash to `a9707ae835c65ec35be1b32ee6946ab2796940e79ebd0b3a2b5db4a50a52e32b` and `9010a85f6ac7634ba1356b134d7b5bc96dedfc74622e27fc7d18434adaa7b308` respectively; the full-run wrapper hashes to `8cb869a64ff244871355995ad2c0d2b9a9d73def2e59f0e9c9afc6a2d86c8ac4`. These temporary artifacts are not committed.
+
+## Comparable full-run baseline
+
+The retained baseline `/tmp/sc64-z7-promotion-resume-cut12/result.json` and candidate resume both ran 179753 updates with 302 checkpoints. The baseline recorded 396,688,290,660 cycles (mean 2,206,852.13, peak 50,561,315); the candidate recorded 392,804,393,848 (mean 2,185,245.27, peak 50,583,602): mean cycles fell about 0.979%, while the peak rose slightly. All 302 named observations matched after excluding the timing counters. Both exported save files have SHA-256 `a9707ae835c65ec35be1b32ee6946ab2796940e79ebd0b3a2b5db4a50a52e32b`. These emulator counters and checkpoint samples do not establish hardware FPS or full-array equivalence.
+
+## Shared-path profile links
+
+After the promotion merge `bdd306b90676347d76f43cb32f64735c2ec843ad`, the unconditional shared-path candidate at `c15177476601a5ef115f74f2918074478260cefa` produced a Z7 ROM byte-identical to the measured and full-resume-proven `c60a58ccb1d5176504dd325d9a8074d0ccafd431afdaefa49f57b0f98eed5d57`. All six requested ARM links passed the existing guards; no reserve or capacity was changed.
+
+| Profile | BSS end | IWRAM end |
+| --- | --- | --- |
+| Z7 | `0203d6f8` | `03004f68` |
+| Terran | `020370c0` | `03004b40` |
+| Z6 | `02037134` | `03004c10` |
+| P7 | `020382f4` | `03004a28` |
+| P8 | `02038cbc` | `03004a28` |
+| Showcase | `02036fe8` | `03004cc0` |
+
+The link receipt is `/tmp/contact-zero-final-matrix-20261101/result.json`. All 109 pinned inputs and five prepared sidecars were checked under the shared lock before and after the links, with over 2 GiB free.
+
+## Final source checks
+
+At exact source `aacad172a44442d45daab2a8416f0e1b41bb55fc`, an isolated unprepared checkout passed `python3 tools/check_source_tree.py`, `./dev doctor`, `./dev build` and `./dev test`; Python discovery reported 925 tests and 25 skips. The receipt `/tmp/contact-zero-unprepared-suite-20261101/result.json` hashes to `1805d5139f01c7fd24da48ce2c7800b8f55e12e50cc50ae436d54d43fac62b9a`.
+
+A separate run in the partially prepared build workspace failed three optional renderer roster dry-run subtests because `.local/sc64/backwater/generated/palette-remap.bin` was absent. The same three failures, with the same missing dependency, were reproduced on unchanged merged baseline `bdd306b` with the same 109 pinned inputs and five sidecars. The baseline targeted log `/tmp/contact-zero-bdd-optional.log` hashes to `64d27bff694643da829eb6ed8d79c62a6eebfce4696454dedbbc6f1bf153411f`. Neither the missing input nor the failures were hidden or treated as a pass.

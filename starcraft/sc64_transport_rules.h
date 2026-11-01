@@ -86,6 +86,43 @@ static inline int sc64_transport_space_required_raw(unsigned raw_type,
     return 1;
 }
 
+#ifdef SC64_SHARED_TRANSPORT
+/* Shared transport uses the same immutable capacity facts in every mode. */
+static inline int sc64_transport_unconditional_carrier_raw(unsigned raw_type)
+{
+    return raw_type == SC64_TRANSPORT_DROPSHIP_RAW ||
+           raw_type == SC64_TRANSPORT_SHUTTLE_RAW;
+}
+static inline int sc64_transport_shared_space_required_raw(unsigned raw_type,
+                                                           unsigned *out_space)
+{
+    unsigned value;
+    if (!out_space) return 0;
+    /* Pinned unitSpaceRequired numeric defaults for all source unit IDs.
+     * Unknown/out-of-range IDs do not become eligible passengers. */
+    if (raw_type >= 228u) return 0;
+    switch (raw_type) {
+    case 0: case 1: case 7: case 10: case 15: case 16: case 20:
+    case 32: case 34: case 37: case 40: case 41: case 50: case 51:
+    case 54: case 64: case 99: case 100: case 104: value = 1; break;
+    case 2: case 3: case 17: case 19: case 38: case 46: case 52:
+    case 53: case 61: case 65: case 67: case 74: case 75: case 77:
+    case 79: case 87: value = 2; break;
+    case 5: case 23: case 39: case 48: case 63: case 66: case 68:
+    case 76: case 78: case 81: case 83: case 103: value = 4; break;
+    default: value = SC64_TRANSPORT_SPACE_UNAVAILABLE; break;
+    }
+    *out_space = value;
+    return 1;
+}
+static inline unsigned sc64_transport_shared_space_provided_raw(unsigned raw_type)
+{
+    return raw_type == SC64_TRANSPORT_DROPSHIP_RAW ||
+           raw_type == SC64_TRANSPORT_SHUTTLE_RAW ||
+           raw_type == SC64_TRANSPORT_OVERLORD_RAW ? 8u : 0u;
+}
+#endif
+
 static inline int sc64_transport_passenger_eligible_raw(unsigned passenger_raw)
 {
     unsigned required;

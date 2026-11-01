@@ -2,6 +2,32 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## Protoss P8 candidate (2026-10-29)
+
+The explicit `protoss-p8` candidate (`SCP8`, generation 44) adds P8 to the
+canonical P1–P7 profile and binds the shared Protoss unit services (Carrier
+Interceptors, Arbiter cloak, detection, Shield Batteries); custom games and
+Showcase scenes bind the same services generically. Canonical Protoss stays
+P7. Its image changes to `9952b59e…` because it compiles that generic
+binding (8 more bytes of EWRAM, unchanged IWRAM and save size), and its P1,
+P2 and P7 campaign controller traces are byte-identical to the default
+branch's. One ordinary-input host controller run wins P8 at frame
+82,521 with no runtime faults, and is deterministic across runs. The
+input-only ARM replay of its 9,684-transition key tape matches all 85 host
+observations, state digests included, through the same win. A pause-menu
+save at frame 30,955, with a structure under construction, gives an SRAM
+record that is byte-identical on host and ARM. Loading it from the title
+screen in a fresh process continues to the same win: under the strict
+comparator it holds every observation of the uninterrupted replay from the
+documented resume tick, with no missing, duplicate or extra ticks.
+Whole-tape ARM guest timing averages 2,100,638 cycles per frame (about 8.0
+fps equivalent; frame rate is not qualified). The playable ROM links at
+`__bss_end=0x0203895c` and `__iwram_end=0x03004c48`. Executed build
+commands, raw dependency output and input hashes are recorded in the audit.
+The AI backend, transmission duration and trigger cadence are authored.
+These are emulator and host results only, with no hardware claim. See the
+[P8 candidate audit](audits/2026-10-29-p8-campaign/README.md).
+
 ## Current race-build continuation (2026-10-28)
 
 After worker-arrival construction, all three canonical race vectors pass a
@@ -6401,6 +6427,56 @@ kill census are authored, not native. There is no ordinary-input Z8 win, ARM
 replay, SRAM continuation or timing result. See the
 [audit](audits/2026-10-29-z8-playable/README.md).
 
+### Z9 candidate profile (2026-11-01, not qualified)
+
+`make zerg-z9` builds the Z1–Z8 candidate plus Z9 (`SCZ9`, generation 48).
+It binds the authenticated Z9 program (descriptor `38921cb2…`) through
+`starcraft/sc64_zerg_late_runtime_adapter.h`. The ROM links at BSS
+`0x0203df88` / IWRAM `0x03004bf0`. The default ROM and every existing Zerg
+ROM (`zerg`, `zerg-z3` to `zerg-z8`) are byte-identical to their base.
+
+`make test-zerg-z9` passes under ASan/UBSan. It launches Z9 through the
+ordinary menu and checks the binding and opening triggers. It then follows
+the crystal chain, with fixture state writes in place of a controller:
+- a Drone at the formation is removed and the countdown starts;
+- the countdown's expiry recreates the Drone with the crystal, which the
+  Drone carries;
+- delivery to location 1 is a Victory.
+
+Two pause-menu saves, one with the countdown running and one with the
+crystal carried, reload in a fresh game and continue identically. Corrupt
+candidates are rejected. The asset-free `make test-sc64-zerg-late-state`
+round-trips the 160-byte compact save on an authored program.
+
+The AI backend, countdown cadence, Transmission duration, camera snap and
+crystal carry are authored, not native. There is no ordinary-input Z9 win,
+ARM replay, SRAM continuation or timing result. See the
+[audit](audits/2026-11-01-z9-candidate/README.md).
+
+### Z10 candidate profile (2026-11-01, not qualified)
+
+`make zerg-z10` builds the Z1–Z9 candidate plus Z10 (`SCZA`, generation 49),
+binding the authenticated Z10 program (descriptor `97c32263…`) through the
+same late-Zerg adapter. The ROM links at BSS `0x0203df88` / IWRAM
+`0x03004bf0`. The default ROM, every existing Zerg ROM and the `zerg-z9`
+candidate are byte-identical to their base.
+
+`make test-zerg-z10` passes under ASan/UBSan. It reruns the Z9 fixture under
+the Z10 flags with unchanged digests. The Z10 fixture checks the binding and
+opening triggers, then follows the program with fixture state writes in
+place of a controller:
+- a guard death starts the guard's town through the Deaths row;
+- destroying the Temple creates the Drone and crystal through the Kill row;
+- delivery to location 4 is a Victory.
+
+Two pause-menu saves (all towns running, crystal carried) reload in a fresh
+game and continue identically. Corrupt candidates are rejected.
+
+The Kill and Deaths censuses, town AI, timed presentation and crystal carry
+are authored. There is no ordinary-input Z10 win, ARM replay, SRAM
+continuation or timing result. See the
+[audit](audits/2026-11-01-z10-candidate/README.md).
+
 ### Canonical skirmish controller qualification correction (2026-10-29)
 
 The match targets now expand the actual `TERRAN_ROM_FLAGS`, `ZERG_ROM_FLAGS`
@@ -8142,3 +8218,139 @@ Evidence, all on the private inputs prepared in this workspace:
 Walk poses are presentation only and are not saved. Turn rates, independent
 turret tracking and idle flyer animations are not modelled. No physical
 hardware or frame-rate claim is made.
+
+### Z7 public-base host controller witness (2026-10-31)
+
+On public base `232bc0f`, the Z7 canonical host controller uses the explicit
+early-gas policy and a 200,000-tick limit. A state-observing run won at host
+tick 179,764, with a valid fault-free terminal model, the native completion
+flags and no source-owner-4 buildings. Its corrected trace SHA-256 is
+`5121ed97ea0ea3d57697ce2c7fc57eac2082e3a457bb4ad98517f09ecf510489`. A
+fresh host process replayed its 14,344 held-key transitions and matched all
+303 recorded checkpoints without running the controller's planning code.
+The replay comparator did not qualify the run: host timing records are zero
+and no SRAM was supplied.
+
+The controller's path and placement queries can consult hidden occupancy
+and warm route caches. The host witness therefore is not a strict
+visibility-only policy proof. No normal ARM replay, fresh-process SRAM
+qualification, physical-hardware result, or menu promotion is claimed by
+this result. Historical Z7 traces that contain a `fired` field used it as
+an alias for `started`; the source model has no separate fired mask.
+
+
+### Normal-ROM Z7 replay driver (qualification pending)
+
+`tools/sc64_z7_normal_replay.py --physical` drives an unchanged normal Z7
+release ROM using emulator button inputs. The release deliberately omits
+the debugger scheduler. Physical mode disables all guest-memory writes in
+the backend; the tool does not replace `common/main.c` or write actors,
+resources, UI state or mission state. Scheduler replay remains available
+for separately identified builds that expose its controls. Given a validated
+winning host trace and a matching prepared normal product, run:
+
+```sh
+python3 tools/sc64_z7_normal_replay.py --physical \
+  --trace .local/qualification/strict-trace.json \
+  --rom build/StarCraft-Zerg-Z7-GBA.gba \
+  --elf build/starcraft-zerg-z7.elf \
+  --runner /absolute/path/to/runner-physical \
+  --output .local/qualification/z7-normal-full
+```
+
+Use a new output directory for every attempt. `--stop 1000` is a bounded
+diagnostic only. The driver validates terminal source fields, converts
+one-based host inputs to scheduler ticks, observes every retained checkpoint,
+checks all named Z7 model/action-array, entity-count and economy fields,
+checks the selected mission, and rejects input files changed during a run.
+It handles dense event windows without writing game state. It does not
+compare complete actor arrays.
+
+For the separate fresh-process save check, select a nonterminal retained host
+observation in play with neutral held keys, then supply the same explicit
+`--cut TICK` to each invocation. Add `--export-save --cut TICK` to the command
+above and use a new output directory. The driver inserts START, release, B,
+release after that observation and exports `saved.sav` and `saved-state.json`.
+Run again with a different output directory, `--cut TICK --save-input
+/path/to/saved.sav --saved-state /path/to/saved-state.json`. The second process
+loads with title L, verifies the mission and bounded persisted-world
+fingerprint and Z7 model fields immediately after that update, then releases L
+on the first remaining tape update. A first tape transition holding L cannot
+produce its required new press at that boundary and is rejected. The separate
+debug-scheduler resume retains its historical two-update mapping and has not
+been qualified by this physical-input check. Before export
+succeeds it validates the first journal record, its payload checksum, mission,
+frame and ELF-derived RaceSave size; the journal has no separate header checksum.
+The verifier explicitly supports the canonical Z7 Egg generation-36 save tag
+`0x53435a54` and requires the other slot to be erased. It rejects other save
+generations rather than inferring a tag from ELF DWARF. The saved summary binds
+the cut sample to the trace, ROM, ELF, runner and SRAM hashes; resume checks
+that binding and every retained cut field before starting the new process.
+It compares subsequent retained
+host observations, including the terminal win. The save and summary are
+hashed with the other inputs and checked for changes. A failure remains a
+failure; these source-level facilities do not establish a successful run.
+
+At the source checkpoint adding this driver, no current normal-ROM run has
+been performed. The strict state-observing controller witness at `fe63889`
+uses public engine parent `232bc0f` and wins at host tick 179764; its internal
+path and placement probes can inspect hidden occupancy and warm route
+caches. A separate input-only host tape consumes 14,344 key transitions and
+matches all 303 retained model/count/economy observations, including the
+victory, without controller probes. That is a scoped host parity result.
+The existing full replay verifier still reports it unqualified because the
+host emits unsupported zero timing records and SRAM is absent; those failures
+are retained rather than silently filtered out. Neither result establishes
+normal ARM timing, saved continuation, complete world-state equivalence,
+hardware performance or Z7 campaign promotion.
+
+The combined source checkpoint passes 70 focused Python replay and validator
+tests plus the source-boundary check. Those checks do not substitute for a
+fresh default native suite or optional profile qualification. Native ARM and
+SRAM work remains pending disk space; the Mac was below the retained 2 GiB
+prebuild guard. One earlier host compile began below that guard after it was
+mistaken for a RAM requirement; it completed before interruption. The attempt
+is retained, and all 109 fixed input content hashes matched afterward.
+No canonical menu, actor capacity or release ROM package is changed here.
+
+Physical replay also records the existing shipped main-loop timing counters when available. The reported rate includes presentation waits and UI updates in that replay; it is emulator main-loop evidence, not a physical-device FPS guarantee. Every timing histogram must account for exactly the observed update count.
+
+### Opt-in race save UI context: Z7 continuation witness (2026-10-31)
+
+The `SC64_SAVE_UI_CONTEXT` experiment uses RaceSave state word 31 for a
+versioned selected-building and command-menu preference record. Word 30 is
+already the generic Protoss service clock. The feature is not enabled in the
+canonical build flags. It retains the existing RaceSave size and validates the
+extension before applying the candidate world. A legacy zero word preserves
+the old reset behavior; a dead selected building restores as no selection.
+
+With public Z7 source `55751df`, the physical-resume boundary fix `63f63ee`
+and the opt-in UI prototype through `276137a`, a normal Z7 experimental ROM
+(SHA-256 `64bea52aad8a8535256e2386339c2a3e888e05af6bbe73de9bd9342721068e9b`)
+was replayed with the input-only host trace, using physical emulator buttons.
+The unchanged named model/count/economy checks passed at all 303 retained
+observations: 81 through the ordinary pause-save cut at host tick 30204, and
+222 after a fresh-process title load. The resumed run won at host tick 179764,
+frame 177804, with no Z7 fault. Its output stop was 149561 updates, including
+one title load update. The SRAM seed and replay inputs were hash-checked for
+changes. This is an emulator witness for this ROM, trace and bounded state
+comparison; it is not complete world equivalence, other missions, physical
+hardware, or a 30 FPS claim. The resumed loop averaged approximately 6.19 Hz
+in this emulator, including UI and presentation work.
+
+At the cut, the ordinary save's marked UI context encoded building 57 and
+menu cursor/last command 1. A fresh process restored these fields and the
+bounded saved world/model fingerprint. The original shipping ROM loaded the
+new record with its old UI reset behavior, and the experimental ROM likewise
+loaded an original zero-word SRAM record. Separately mutated, checksummed
+records demonstrated safe handling of a dead selected building and rejection
+of malformed marker, building index, cursor and last-command values at title.
+
+The shared fixture's manual candidate writer was corrected on the test-only
+branch to use the actual compact impact envelope where required. Its original
+construction and burn assertions, plus explicit UI extension load/rejection
+cases, passed for Terran, Zerg and Protoss production profile builds with the
+feature both disabled and enabled. Each enabled profile exercised all three
+human races. The 109 prepared build inputs were checked unchanged at those
+builds' preflight and postflight; these historical checks do not assert the
+continued availability of the original input paths.

@@ -1,0 +1,33 @@
+# P7 physical replay qualification
+
+The pinned host controller trace was produced by a policy using world-state observations; replay supplies its already recorded ordinary held-button transitions only. No guest input/debug memory or SRAM is injected. The initial plan required the 1,000-update prefix before a separately admitted full run; both completed as recorded below.
+
+* Trace: `ca2d6f422064a84340f588e760f17171b37dd1dffcd0632d7939315cfacdde89` (`p7-origin-corrected-trace.jsonl`, tested source `5d4376b`).
+* Existing P7 Transport1 ROM: `378ab490ea78915da2d0f6e190f0db5dff003a685e1f39e1c8444c69fb6bd795`; ELF: `17e8398093c91a2ef1a0922e2cdbc0e9391455abdf822ae2d7e5ddcd0e2001fb` (built from `96108b2`).
+* Existing physical K/U backend: `166c017b227d3611a751aa0cce7a4179cbe3077b025a9aa108d1dc2ed2e79a20`.
+* `0ff3ffb` versus `96108b2` is not a literal empty runtime/Make diff: Z7 flag and Z7/Z8-gated sight changes were merged. Source review finds those gates inactive for P7; binary equivalence had not yet been measured at preparation time; the qualified rebuild below resolves it.
+
+The parser checks the pinned trace hash, increasing zero-based input indices, 10-bit masks, opposing directions, nonredundant transitions and pressed edges, terminal verdict and exact host call bound. Host `input()` increments its counter even when terminal state causes it to skip `game_update`; the final neutral transition at call 49968 and the following call are not sent. Full replay stops after 49,968 actual updates, not 49,970 host calls; the skipped-call mapping requires physical confirmation, not an assumption of success.
+
+The launch observation is host call/update 12 with game frame 1. Host transition at index 999 advances game frame 962→963, so completed update 1000 is a bounded second comparison point. Other host checkpoint records do not contain call indices and are not automatically assigned to nearby transitions. P7 persistent, runtime, model, unit and compact-building fields are decoded using ELF DWARF and read-only symbols; full qualification checks actual result, source-owner Nexus state, three authored hero identities and scheduler outcome/fault/switch/timers. Snapshot fields and checkpoint comparisons are bounded; they are not whole-world equality. The driver and its helper sources and inputs are hashed before/after the run.
+
+At preparation time no ROM had been launched and no prefix or WIN was claimed. The subsequent runs used peer review, lock coordination, free-space and pinned-input preflight. P8 candidate status, the P6 missing-bank gap, all-mission and hardware-performance limitations remain unchanged.
+
+## Qualified physical replay
+
+At driver source `3cce180`, the ordinary physical-button prefix completed 1,000 updates: update 12 was game frame 1 and update 1000 was frame 963, with P7 campaign mode/mission identity, three authored heroes and expected four-Nexus census verified. Result SHA-256 `341148aafc5df000835b41d6fa2a1668621551a725dfb85376a726ed53d1889e`.
+
+A separate fresh physical run of the same fixed tape reached WIN after 49,968 actual updates, at game frame 48,739. The host controller recorded 49,970 calls: its neutral transition at index 49,968 and the following call occurred after RESULT, when `input()` increments the host count but skips `game_update`. The actual physical terminal state confirms this mapping: screen RESULT, won 1/lost 0, mission 26, campaign mode, outcome 1, fault 0, switch bit 0 set, started mask 752 (victory started, defeat bits clear), victory cursor 0, and action timers clear. Authored heroes raw 75/78/79 owned by source slot 2 were alive; source-owner-0 Nexus slots 34 and 74 were dead, while slot 109 owned by source slot 4 remained alive. Result SHA-256 `232303ea11935e653adacf2483409ff067447a07dcf2994bfd0723c8e8d9172c`.
+
+The normal P7 ROM was rebuilt without input regeneration from source tree `89ebdff834e652c7aff5d1d8013653039b4edcad` (the merged `0ff3ffb` tree) and matched the replay ROM byte-for-byte at SHA-256 `378ab490ea78915da2d0f6e190f0db5dff003a685e1f39e1c8444c69fb6bd795`. The replay used the original matching ELF and backend hashes above; the 109 pinned inputs, auxiliary entries, source and driver helpers were checked before and after under the shared lock. It did not inject guest state or SRAM. This proves the recorded physical input tape and named strict terminal state on that ROM, not whole-world equality, a fresh-save continuation, native-AI behavior, N64 parity or near-30 hardware performance.
+
+## Clean source checks
+
+Frozen source `27fc54b` passed source boundary, doctor, default build and full
+default tests in an unprepared worktree. Python discovery ran 935 tests with
+26 skips; the separate five- and eight-test groups and native checks passed.
+Source and pinned inputs stayed unchanged. The local logs are under
+`/tmp/sc64-p7-physical-clean-20261101/build/transport-*.log`. No hosted Actions
+run was used. Later merges that alter product runtime or flags need their own
+binary qualification; this historical pinned replay does not silently cover
+a different ROM.

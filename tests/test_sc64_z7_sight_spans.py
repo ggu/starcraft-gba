@@ -94,6 +94,45 @@ static int check_z7_lookup(void) {
 }
 #endif
 
+#ifdef SC64_Z7_VISIBILITY_ROW_CONTEXT
+static int check_prepared_rows(void) {
+    static const int centers[] = {-17,-1,0,1,15,16,31,1008,1023,1039};
+    Sc64Z7VisibilityRowContext ctx;
+    int radius, xi, yi, row;
+    if (sc64_z7_visibility_prepare_rows(&ctx,0,0,63) ||
+        sc64_z7_visibility_prepare_rows(&ctx,0,0,72) ||
+        sc64_z7_visibility_prepare_rows(&ctx,0,0,200)) return 1;
+    for (radius=64; radius<=176; radius+=16)
+        for (xi=0; xi<(int)(sizeof(centers)/sizeof(centers[0])); ++xi)
+            for (yi=0; yi<(int)(sizeof(centers)/sizeof(centers[0])); ++yi) {
+                int x=centers[xi], y=centers[yi], extent=(radius+23)/16;
+                if (!sc64_z7_visibility_prepare_rows(&ctx,x,y,radius)) return 1;
+                for (row=-14; row<MAP_ROWS+14; ++row) {
+                    int first,last,want_first=1,want_last=0;
+                    sc64_z7_visibility_prepared_row_span(&ctx,row,&first,&last);
+                    /* Full bounded-row squared-distance oracle: no width
+                     * table, label or interval formula from production. */
+                    if (row>=0 && row<MAP_ROWS &&
+                        row>=y/16-extent && row<=y/16+extent)
+                        for (int col=0; col<MAP_COLS; ++col) {
+                            int dx=col*16+8-x, dy=row*16+8-y;
+                            if (col>=x/16-extent && col<=x/16+extent &&
+                                dx*dx+dy*dy<=radius*radius) {
+                                if (want_first>want_last) want_first=col;
+                                want_last=col;
+                            }
+                        }
+                    if (first!=want_first || last!=want_last) {
+                        fprintf(stderr,"prepared row mismatch r=%d xy=%d,%d row=%d got=%d..%d want=%d..%d\n",
+                            radius,x,y,row,first,last,want_first,want_last);
+                        return 1;
+                    }
+                }
+            }
+    return 0;
+}
+#endif
+
 static unsigned short ref_count[MAP_CELLS];
 static u8 ref_visible[MAP_CELLS], ref_explored[MAP_CELLS];
 static unsigned short ref_mini_visible[24 * 24], ref_mini_explored[24 * 24];
@@ -335,6 +374,9 @@ int main(void) {
 #ifdef SC64_Z7_SIGHT_SPANS
     if (check_z7_lookup()) return 1;
 #endif
+#ifdef SC64_Z7_VISIBILITY_ROW_CONTEXT
+    if (check_prepared_rows()) return 1;
+#endif
     clear_world();
     step = run_radius_matrix();
     step = run_fallback_matrix(step);
@@ -372,6 +414,11 @@ class Z7SightSpansTests(unittest.TestCase):
                 ("scalar", [], 0),
                 ("legacy-spans", ["-DSC64_VISIBILITY_SPANS"], 0),
                 ("z7-spans", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS"], 1),
+                ("z7-phase", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
+                              "-DSC64_Z7_VISIBILITY_PHASE_REJECT"], 1),
+                ("z7-row-context", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
+                                    "-DSC64_Z7_VISIBILITY_PHASE_REJECT",
+                                    "-DSC64_Z7_VISIBILITY_ROW_CONTEXT"], 1),
             )
             for suffix, extra, expect_z7 in variants:
                 binary = Path(temp) / f"fixture-{suffix}"

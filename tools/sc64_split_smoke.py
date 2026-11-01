@@ -32,9 +32,9 @@ MISSIONS_PER_PAGE = 2
 FRONT_FIELDS: dict[str, int] = {}
 MAP_DIMS = ((64, 64), (64, 64))
 PROFILE_BUILD_PATHS = {
-    "terran": ("StarCraft-Terran-GBA.gba", "starcraft-terran.elf"),
-    "zerg": ("StarCraft-Zerg-Z6-GBA.gba", "starcraft-zerg-z6.elf"),
-    "protoss": ("StarCraft-Protoss-P7-GBA.gba", "starcraft-protoss-p7.elf"),
+    "terran": ("StarCraft-Terran-Transport1-GBA.gba", "starcraft-terran.elf"),
+    "zerg": ("StarCraft-Zerg-Z7-Transport1-GBA.gba", "starcraft-zerg-z7.elf"),
+    "protoss": ("StarCraft-Protoss-P7-Transport1-GBA.gba", "starcraft-protoss-p7.elf"),
     "protoss-p6": ("StarCraft-Protoss-P6-GBA.gba", "starcraft-protoss-p6.elf"),
 }
 

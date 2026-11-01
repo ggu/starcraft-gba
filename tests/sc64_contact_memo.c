@@ -39,7 +39,7 @@ static void sc64_contact_memo_invalidate(void);
 static int sc64_race_unit_flying(int t) { return t == U_WRAITH; }
 static int sc64_race_raw_unit(int t) { return t; }
 static unsigned sc64_game_unit_actor_flags(int t) { (void)t; return 0; }
-static int sc64_game_unit_collision_radius(int t) { (void)t; return 6; }
+static int sc64_game_unit_collision_radius(int t) { return t == 4 ? 20 : t == 5 ? 31 : 6; }
 static int race_p6_active(void) { return p6; }
 static int race_p6_combat_unit_burrowed(int slot)
 { return p6 && (u[slot].flags & 2u); }
@@ -138,8 +138,38 @@ static void test_eligibility_and_invalidation(void)
     p6=0;
 }
 
+/* Compare real cache and uncached masks with eight original point queries.
+ * Type 4 exercises an out-of-table radius, type 5 the invalid-class
+ * reference fallback in the actor-facts build. */
+static void test_stacked_masks(void)
+{
+    static const int speeds[] = {0, 1, 2, 14, 15};
+    static const int types[] = {U_MARINE, U_WRAITH, U_CHRYSALIS, 4, 5, U_BURROW};
+    for (unsigned ti=0; ti<sizeof(types)/sizeof(types[0]); ++ti)
+        for (unsigned flags=0; flags<4; ++flags) {
+            clear_world(); p6 = 1;
+            setunit(0, 64, 64, U_MARINE, 1);
+            setunit(1, 64, 64, types[ti], types[ti]); u[1].flags=flags;
+            setunit(2, 68, 64, U_MARINE, 1);
+            sc64_unit_buckets_begin();
+            for (unsigned si=0; si<sizeof(speeds)/sizeof(speeds[0]); ++si) {
+                int speed=speeds[si]; unsigned want=0;
+                for (int k=0; k<8; ++k)
+                    if (!unit_step_clear(&u[0], u[0].x+sc64_contact_dx[k]*speed,
+                                               u[0].y+sc64_contact_dy[k]*speed))
+                        want |= 1u << k;
+                sc64_contact_memo_invalidate();
+                same(uncached(&u[0],speed),want);
+                same(sc64_contact_blocked_mask(&u[0],speed),want);
+                same(sc64_contact_blocked_mask(&u[0],speed),want);
+            }
+            sc64_unit_buckets_end();
+        }
+    p6=0;
+}
+
 int main(void)
 {
-    test_geometry_and_key(); test_self_exclusion_and_lru(); test_eligibility_and_invalidation();
+    test_geometry_and_key(); test_self_exclusion_and_lru(); test_eligibility_and_invalidation(); test_stacked_masks();
     puts("contact memo contract: ok"); return 0;
 }

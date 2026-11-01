@@ -13,9 +13,14 @@
 
 #define RACE_IMPACT_RECORD_MAX 16368 /* common/gba.c SAVE_PAYLOAD_MAX */
 #define RACE_IMPACT_ROWS 32
+#ifdef SC64_SHARED_TRANSPORT
+#define SC64_TRANSPORT_TRAILER_BYTES 16
+#else
+#define SC64_TRANSPORT_TRAILER_BYTES 0
+#endif
 
 enum {
-    RACE_IMPACT_SAVE_ROOM = (RACE_IMPACT_RECORD_MAX - ((int)sizeof(RaceSave) - (int)SC64_BC_SAVE_EXTRA_BYTES) -
+    RACE_IMPACT_SAVE_ROOM = (RACE_IMPACT_RECORD_MAX - SC64_TRANSPORT_TRAILER_BYTES - ((int)sizeof(RaceSave) - (int)SC64_BC_SAVE_EXTRA_BYTES) -
                              (int)sizeof(Sc64ImpactSaveHeader)) /
                             (int)sizeof(Sc64ImpactEvent),
 #ifdef SC64_IMPACT_TEST_CAPACITY
@@ -47,7 +52,8 @@ _Static_assert(SC_RU_COUNT <= SC64_IMPACT_TYPE_LIMIT,
 typedef struct {
     RaceSave save;
     u8 impacts[sizeof(Sc64ImpactSaveHeader) +
-               RACE_IMPACT_SAVE_CAPACITY * sizeof(Sc64ImpactEvent)];
+               RACE_IMPACT_SAVE_CAPACITY * sizeof(Sc64ImpactEvent) +
+               SC64_TRANSPORT_TRAILER_BYTES];
 } RaceImpactRecord;
 _Static_assert(sizeof(RaceImpactRecord) <= RACE_IMPACT_RECORD_MAX + SC64_BC_SAVE_EXTRA_BYTES,
                "impact record exceeds one SRAM record");

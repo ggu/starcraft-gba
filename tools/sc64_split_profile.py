@@ -49,9 +49,9 @@ PROFILE_CYCLE_NAMES = (
 )
 REFINERY_TYPES = {3: "terran_refinery", 17: "protoss_assimilator", 20: "zerg_extractor"}
 PROFILE_BUILD_PATHS = {
-    "terran": ("StarCraft-Terran-GBA.gba", "starcraft-terran.elf"),
-    "zerg": ("StarCraft-Zerg-Z6-GBA.gba", "starcraft-zerg-z6.elf"),
-    "protoss": ("StarCraft-Protoss-P7-GBA.gba", "starcraft-protoss-p7.elf"),
+    "terran": ("StarCraft-Terran-Transport1-GBA.gba", "starcraft-terran.elf"),
+    "zerg": ("StarCraft-Zerg-Z7-Transport1-GBA.gba", "starcraft-zerg-z7.elf"),
+    "protoss": ("StarCraft-Protoss-P7-Transport1-GBA.gba", "starcraft-protoss-p7.elf"),
 }
 
 

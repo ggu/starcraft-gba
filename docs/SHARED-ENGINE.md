@@ -79,6 +79,45 @@ production, damage rules and actor lifecycle. A mode-specific adapter can be a
 valid staging step, but a feature is not fully shared until its engine contract,
 state ownership and required persistence work in every applicable product.
 
+## Shared Protoss unit services
+
+Carrier Interceptor training, flight and projectiles; Arbiter cloak;
+intrinsic cloak (Observer, Dark Templar, Zeratul); detection (Observer,
+powered Photon Cannon, Overlord, completed Spore Colony); and Shield Battery
+energy and recharge are engine behavior of those actors. They live in
+[`sc64_protoss_services.h`](../starcraft/sc64_protoss_services.h) and the P7
+service adapters, and they run wherever a mode supplies a binding:
+
+| Mode | Owner identity | Saved service clock | Placed-actor data |
+| --- | --- | --- | --- |
+| Custom games in products carrying these services | Slot 7 is the human side; slots 1–4 follow the other live owners. | Race save state word 30, tagged; older custom saves load with an empty clock and empty cache words. | None; a placed Battery keeps the engine's starting energy. |
+| P7 | The mission's source (CHK) slots. | P7's three reserved bytes. | P7's two authenticated Battery rows. |
+| P8 candidate | P8 source slots, from its canonical descriptor. | A clock in P8's payload. | P8 Battery rows, authenticated from its CHK. |
+| Other campaign missions | No binding. | — | — |
+
+Mission objectives, triggers, map authentication and source-owner tables stay
+with each mission's adapter; no mission-active check is widened. A served
+actor's identity uses its source type, falling back to its engine type when
+it has none, as elsewhere in the engine. Load preflight validates a candidate
+under its own mode and mission. Passive shield regeneration on the native
+shield clock stays with the missions that adopted it; it is not part of the
+Battery service.
+
+The canonical Protoss and explicit P8 candidate compile these services.
+Showcase retains its current capability set, including shared Battery mechanics;
+it does not enable the P7 Carrier and Interceptor service vector. Additional
+cross-product service coverage and its memory qualification remain open.
+
+[`tests/sc64_protoss_services_game.c`](../tests/sc64_protoss_services_game.c)
+(`make test-sc64-protoss-services`) runs the actual engine on the canonical
+Protoss and P8 compile vectors. It checks the bindings, that an
+unbound campaign mission runs none of the services, Carrier training, a
+stocked hangar and Interceptor launch against an enemy, Cannon detection of
+an Observer, Overlord detection of Zeratul, the Arbiter aura, Battery siting
+for every owner, recharge, and a custom-game save and reload of the clock,
+Battery energy and cache words, including rejected and older saves. On the
+Showcase vector it also checks that the scene-0 Carriers launch.
+
 ## Validation stage
 
 [`tests/test_sc64_engine_capabilities.py`](../tests/test_sc64_engine_capabilities.py)
