@@ -107,3 +107,43 @@ same 50 addressable eligible IDs as the authenticated comparison, with
 Raw 37 and 51 have flag 2, raw 131 has flag 3, and raw 0 and 36 have flag 0.
 The separate property JSON was used only to verify the set, not as generator
 input. No private table or vector is committed.
+
+## Candidate-row preparation slice
+
+At source head `dd25ac6198d80f3a3fbc69f71f987f5cbe7cfcac`, an HP-only
+preparation token records a candidate pointer, geometry and (when compiled)
+Scarab wire context. It decodes each unit, building and packed mineral after
+candidate normalization and checks the shared regeneration phase predicates.
+Accessors refuse a changed Scarab context. The caller must keep the plan and
+outputs outside route/save scratch and preserve the candidate bytes; the token
+does not enforce those alias and lifetime requirements. The existing live
+loader does not consume this token and remains fallible after its first live
+write. No tag, save envelope or product gate has been changed.
+
+With the host-only escape, the helper and Z5, Z7, P7 and Showcase profile
+fixtures passed under ASan/UBSan. A controlled ordinary host save supplies the
+candidate, whose decoded unit/building/mineral fields are compared to live
+snapshots. Invalid geometry and a separately encoded phase 80 are rejected
+without changing the token or live arrays. The four profiles did not define
+`SC64_SCARAB_NAMESPACE_STAGE`, so its context check has not been exercised.
+The known standalone P6 capacity failure was not rerun. The fresh P7
+feature-fact table and its target flags were checked separately; SHA-256
+`a9a01d7d70085ab0cbb4ea58a44d5781f980a6dc1c07c77393050a586cb8c441`.
+Source and pinned inputs were unchanged. No guest SRAM injection, full loader
+atomicity, HPRegen1 save/load, native hardware or performance result is
+claimed.
+
+Remaining fallible post-preflight work includes row decode during live commit,
+mission rebinds, battery live validation, Z8 apply-unpack and rebind, Nydus
+rebind and projectile arena restore. In particular, P6's candidate validator
+and later world-context/doodad binding are distinct operations; Z7 rebind
+mutates cache and bindings and reconciles products before its live check.
+Projectile packet validation shares packet preflight with the decoder, but the
+latter also checks arena validity and overlap, writes the arena, and returns a
+pool validation result. Nydus candidate resolution can use a currently bound
+source for the selected mission, so the eventual transaction plan must bind
+that decoding context as well. The route BFS, impact record, Carrier decoded
+rows and Z8 scheduler candidate reuse the route/save scratch union; pending
+impact data must be captured before its tail is reused, and no route reuse may
+clobber candidate bytes before commit. These are outstanding proof and
+implementation steps, not evidence of rollback safety.
