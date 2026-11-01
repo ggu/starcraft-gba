@@ -1,5 +1,7 @@
 # Opt-in bounded ranged approach routing
 
+Historical qualification follows. See the [current-release integration audit](../2026-11-01-range-work/README.md) for later source reconciliation, memory checks and activation blockers.
+
 `SC64_RANGE_WORK` is experimental and OFF in all normal products.
 `CANONICAL_RANGE_WORK_FLAGS=-DSC64_RANGE_WORK` opts the Terran, Zerg, P7 and
 Showcase builds into it. Default-off ROM bytes match main133 exactly.
