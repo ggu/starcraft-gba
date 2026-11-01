@@ -27,6 +27,39 @@
 #error "SC64_CONTACT_CACHE supersedes the collision class cache and steering list"
 #endif
 
+#ifdef SC64_DIAGNOSTIC_CONTACT_REPEAT
+/* Monotonic u32 counters since boot; sample deltas modulo 2^32. Only
+ * uncached mask invocations and validated geometry applications are counted;
+ * memo hits never enter this path. This instrumentation is not timing data. */
+enum { DIAG_CONTACT_UNCACHED_QUERIES, DIAG_CONTACT_GEOMETRY,
+       DIAG_CONTACT_NONZERO_GEOMETRY, DIAG_CONTACT_REPEAT_NONZERO,
+       DIAG_CONTACT_REPEAT_FIELDS };
+volatile u32 diag_contact_repeat[DIAG_CONTACT_REPEAT_FIELDS];
+typedef struct { int valid, radius, ox, oy; } Sc64ContactRepeatDiagnostic;
+static void __attribute__((noinline))
+sc64_contact_repeat_begin(Sc64ContactRepeatDiagnostic *state)
+{
+    state->valid = 0;
+    ++diag_contact_repeat[DIAG_CONTACT_UNCACHED_QUERIES];
+}
+static void __attribute__((noinline))
+sc64_contact_repeat_geometry(Sc64ContactRepeatDiagnostic *state,
+                             int radius, int ox, int oy)
+{
+    int nonzero = ox != 0 || oy != 0;
+    ++diag_contact_repeat[DIAG_CONTACT_GEOMETRY];
+    if (nonzero) {
+        ++diag_contact_repeat[DIAG_CONTACT_NONZERO_GEOMETRY];
+        if (state->valid && state->radius == radius && state->ox == ox && state->oy == oy)
+            ++diag_contact_repeat[DIAG_CONTACT_REPEAT_NONZERO];
+    }
+    state->valid = 1;
+    state->radius = radius;
+    state->ox = ox;
+    state->oy = oy;
+}
+#endif
+
 #define SC64_CONTACT_RADIUS_MASK 0x1fu
 #define SC64_CONTACT_IGNORE 0x1fu /* chrysalis or non-collidable candidate */
 #define SC64_CONTACT_BURROWABLE 0x20u
@@ -561,6 +594,10 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 #endif
     int mover_radius, mover_flying, mover_slot = (int)(q - u), p6;
     int minx, maxx, miny, maxy, row, col, reach;
+#ifdef SC64_DIAGNOSTIC_CONTACT_REPEAT
+    Sc64ContactRepeatDiagnostic diag_repeat;
+    sc64_contact_repeat_begin(&diag_repeat);
+#endif
     if (sc64_contact_mask_prepare(q, speed, &mask, &mover_radius, &mover_flying))
         return mask;
     p6 = sc64_contact_p6_active();
@@ -602,6 +639,9 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 limit_axis = radius + speed;
                 if (ox <= -limit_axis || ox >= limit_axis ||
                     oy <= -limit_axis || oy >= limit_axis) continue;
+#ifdef SC64_DIAGNOSTIC_CONTACT_REPEAT
+                sc64_contact_repeat_geometry(&diag_repeat, radius, ox, oy);
+#endif
 #ifdef SC64_CONTACT_MASK_TABLE
                 mask = sc64_contact_mask_apply_geometry(mask, radius, speed, ox, oy);
 #else
