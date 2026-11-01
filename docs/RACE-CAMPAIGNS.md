@@ -118,6 +118,16 @@ continues identically on host. Z8 has no ordinary-input win, ARM replay or
 timing yet and is not qualified. See the
 [Z8 candidate audit](audits/2026-10-29-z8-playable/README.md).
 
+Z9 runs in a separate `zerg-z9` candidate (`make zerg-z9`, code `SCZ9`,
+generation 48): the Z1–Z8 candidate plus Z9 as the ninth Zerg entry. Its
+authenticated 14-trigger program runs on the live game through the late-Zerg
+scheduler, which adds the countdown timer, Remove Unit and Deaths rows.
+Authored Protoss town AI and the Khaydarin Crystal carry also run there.
+Host fixtures cover the retrieval chain and two pause-menu save
+continuations, using fixture placements rather than ordinary input. Z9 has
+no ordinary-input win, ARM replay or timing and is not qualified. See the
+[Z9 candidate audit](audits/2026-11-01-z9-candidate/README.md).
+
 The current standalone Z7 release candidate uses the CONTACT movement path
 and omits debugger input queues; it keeps the generation-36 save identity.
 Its ARM link passes the existing RAM guards, and the CONTACT host replay

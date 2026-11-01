@@ -60,6 +60,9 @@ _Static_assert(SC_RB_COUNT <= 128, "P7 typed building type field uses seven bits
 #ifdef SC64_Z8_RUNTIME
 #include "sc64_z8_state.h"
 #endif
+#ifdef SC64_Z9_RUNTIME
+#include "sc64_zerg_late_state.h"
+#endif
 #ifdef SC64_P8_RUNTIME
 #include "sc64_p8_state.h"
 #endif
@@ -175,6 +178,9 @@ typedef struct {
 #ifdef SC64_Z8_RUNTIME
         Sc64Z8PersistentState z8;
 #endif
+#ifdef SC64_Z9_RUNTIME
+        Sc64ZlPersistentState zl;
+#endif
     };
 #elif defined(SC64_Z5_RUNTIME)
     Sc64Z5PersistentState z5;
@@ -265,6 +271,10 @@ _Static_assert(sizeof(Sc64Z6PersistentState) <= sizeof(Sc64Z5PersistentState),
 #ifdef SC64_Z8_RUNTIME
 _Static_assert(sizeof(Sc64Z8PersistentState) <= sizeof(Sc64Z5PersistentState),
                "Z8 must fit in the existing Z5 save payload");
+#endif
+#ifdef SC64_Z9_RUNTIME
+_Static_assert(sizeof(Sc64ZlPersistentState) <= sizeof(Sc64Z5PersistentState),
+               "Z9/Z10 must fit in the existing Z5 save payload");
 #endif
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 #ifdef SC64_P8_RUNTIME

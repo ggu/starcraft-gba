@@ -269,6 +269,55 @@ race_z8_save_candidate_world_valid(const RaceSave *candidate, int width, int hei
 }
 #endif
 
+#ifdef SC64_Z9_RUNTIME
+/* Z9/Z10 rebinding requires source identities to agree with live owners and
+ * runtime types; check the decoded candidate before any live pool changes. */
+static int
+race_zl_save_candidate_world_valid(const RaceSave *candidate, int width, int height)
+{
+    const Sc64RaceMap *map;
+    if (!candidate || width <= 0 || height <= 0 || candidate->state[2] < 0 ||
+        candidate->state[2] >= SC64_RACE_MAP_COUNT)
+        return 0;
+    map = &sc64_race_maps[candidate->state[2]];
+    if (!race_zl_map_shape_valid(map) || width != map->width || height != map->height)
+        return 0;
+    for (unsigned i = 0; i < MAX_UNITS; ++i) {
+        Unit unit;
+        if (!race_save_decode_unit(candidate, i, (unsigned)width * 16u,
+                                   (unsigned)height * 16u, &unit)) return 0;
+        if (!unit.alive) continue;
+        if (unit.raw_owner < 0 || unit.raw_owner >= SC64_Z8_OWNER_LIMIT ||
+            race_zl_source_owner((unsigned)unit.raw_owner) != unit.owner ||
+            unit.raw_type < 0 || sc64_race_unit_from_raw(unit.raw_type) != unit.type)
+            return 0;
+    }
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        Building building;
+        if (!race_save_decode_building(candidate, i, &building)) return 0;
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+        if (!race_colony_morph_state_valid_for(&building,SIDE,SC64_ZL_HUMAN_SLOT)) return 0;
+#endif
+        if (!building.alive) continue;
+        if (building.raw_owner < 0 || building.raw_owner >= SC64_Z8_OWNER_LIMIT ||
+            race_zl_source_owner((unsigned)building.raw_owner) != building.owner ||
+            building.raw_type < 0 || sc64_race_building_from_raw(building.raw_type) < 0)
+            return 0;
+    }
+    return 1;
+}
+
+/* The Z9/Z10 record is smaller than the shared Zerg payload; the rest must
+ * stay canonical zero. */
+static int race_zl_save_payload_tail_clear(const RaceSave *candidate)
+{
+    const u8 *payload = (const u8 *)&candidate->z5;
+    for (unsigned i = sizeof(Sc64ZlPersistentState); i < sizeof(candidate->z5); ++i)
+        if (payload[i]) return 0;
+    return 1;
+}
+#endif
+
 #ifdef SC64_ZP_FULL_STORAGE
 static int
 race_save_decode_mineral(const RaceSave *candidate, unsigned slot,
@@ -1543,6 +1592,9 @@ static int race_save_game(void) {
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active() && !race_z8_save_pack(&race_data.z8)) return 0;
 #endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active() && !race_zl_save_pack(&race_data.zl)) return 0;
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
@@ -1702,6 +1754,11 @@ static int race_save_game(void) {
             /* Z8 fills the shared payload; it is checked below. */
         } else
 #endif
+#ifdef SC64_Z9_RUNTIME
+        if (race_zl_active()) {
+            /* Z9/Z10 share the payload; checked below. */
+        } else
+#endif
         {
             const u8 *bytes = (const u8 *)&race_data.z6;
             for (unsigned i = 0; i < sizeof(race_data.z6); ++i)
@@ -1735,6 +1792,13 @@ static int race_save_game(void) {
     if (race_z8_active() &&
         !race_z8_save_unpack(&race_data.z8,
                              &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0))
+        return 0;
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active() &&
+        (!race_zl_save_payload_tail_clear(&race_data) ||
+         !race_zl_save_unpack(&race_data.zl,
+                              &sc64_zp_route_save_scratch.zl_candidate.scheduler, 0)))
         return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
@@ -1887,6 +1951,12 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_Z8_RUNTIME
        &&v[2]!=SC64_Z8_GLOBAL_ID
 #endif
+#ifdef SC64_Z9_RUNTIME
+       &&v[2]!=SC64_Z9_GLOBAL_ID
+#endif
+#ifdef SC64_Z10_RUNTIME
+       &&v[2]!=SC64_Z10_GLOBAL_ID
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
        &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
           v[2]>SC64_TERRAN_LATE_GLOBAL_T10)
@@ -1927,6 +1997,12 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_Z8_RUNTIME
         &&v[2]!=SC64_Z8_GLOBAL_ID
+#endif
+#ifdef SC64_Z9_RUNTIME
+        &&v[2]!=SC64_Z9_GLOBAL_ID
+#endif
+#ifdef SC64_Z10_RUNTIME
+        &&v[2]!=SC64_Z10_GLOBAL_ID
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
         &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
@@ -2748,6 +2824,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             /* Z8 fills the payload; its validation follows below. */
         } else
 #endif
+#ifdef SC64_Z9_RUNTIME
+        if (!v[0] && race_zl_mission_for(v[2])) {
+            /* Z9/Z10 share the payload; validation follows below. */
+        } else
+#endif
         {
         const u8 *bytes = (const u8 *)&race_data.z5;
         for (unsigned i = 0; i < sizeof(race_data.z5); ++i) if (bytes[i]) return 0;
@@ -2784,6 +2865,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             /* Z8 is validated separately below. */
         } else
 #endif
+#ifdef SC64_Z9_RUNTIME
+        if (!v[0] && race_zl_mission_for(v[2])) {
+            /* Z9/Z10 are validated separately below. */
+        } else
+#endif
         {
             const u8 *bytes = (const u8 *)&race_data.z6;
             for (unsigned i = 0; i < sizeof(race_data.z6); ++i)
@@ -2806,6 +2892,20 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
          !race_z8_save_unpack(&race_data.z8,
                               &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0)))
         return 0;
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (!v[0] && race_zl_mission_for(v[2])) {
+        /* Candidate checks run before the mission is selected; select it
+         * transiently so the shared source-owner tables resolve. */
+        int saved_mission = race_selected_mission, ok;
+        race_selected_mission = v[2];
+        ok = race_zl_save_candidate_world_valid(&race_data, width, height) &&
+             race_zl_save_payload_tail_clear(&race_data) &&
+             race_zl_save_unpack(&race_data.zl,
+                                 &sc64_zp_route_save_scratch.zl_candidate.scheduler, 0);
+        race_selected_mission = saved_mission;
+        if (!ok) return 0;
+    }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_TERRAN_LATE_RUNTIME
@@ -3348,6 +3448,16 @@ static int race_load_game(void) {
             !race_z8_rebind_loaded_world(&sc64_race_maps[SC64_Z8_GLOBAL_ID]))
             return 0;
     } else if (!race_z8_runtime_init(0)) {
+        return 0;
+    }
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) {
+        if (!race_zl_save_unpack(&race_data.zl,
+                                 &sc64_zp_route_save_scratch.zl_candidate.scheduler, 1) ||
+            !race_zl_rebind_loaded_world(&sc64_race_maps[race_selected_mission]))
+            return 0;
+    } else if (!race_zl_runtime_init(0)) {
         return 0;
     }
 #endif
