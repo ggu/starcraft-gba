@@ -1307,6 +1307,9 @@ static u16 bfs_queue[MAP_CELLS];
 static u16 bfs_queue[MAP_CELLS];
 #endif
 static void sc64_routes_reset(void);
+#ifdef SC64_RANGE_WORK
+static void sc64_range_route_forget_target(int target);
+#endif
 #else
 static int bfs_prev[MAP_CELLS], bfs_queue[MAP_CELLS];
 static u16 bfs_seen[MAP_CELLS], bfs_generation;
@@ -1327,6 +1330,12 @@ sc64_direct_firing_cache_invalidate(void)
 {
     sc64_direct_firing_cache.valid = 0;
 }
+#endif
+#ifdef SC64_RANGE_WORK
+#if !defined(SC64_DIRECT_FIRING_POINTS) || !defined(SC64_RACES) || \
+    !defined(SC64_IMPORTED_MISSION) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_RANGE_WORK requires imported race routing, packed route fields, and direct firing points"
+#endif
 #endif
 static int minerals, gas, supply_used, supply_cap, frame, mode, menu, train_type;
 static int geyser_count;
@@ -2288,6 +2297,9 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_RANGE_WORK
+    sc64_range_route_forget_target(i);
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_target_invalidate(i);
 #endif
@@ -2472,6 +2484,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_RANGE_WORK
+    sc64_range_route_forget_target(MAX_UNITS+i);
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_target_invalidate(MAX_UNITS+i);
 #endif
@@ -2998,6 +3013,11 @@ is_traversable(int col, int row, int from_cell)
 }
 
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_RANGE_WORK
+/* target_alive itself expects an in-range entity reference. */
+#define SC64_RANGE_TARGET_VALID(t) \
+    ((unsigned)(t) < (unsigned)(MAX_UNITS + MAX_BUILDINGS) && target_alive(t))
+#endif
 #include "sc64_routes.h"
 #endif
 #include "sc64_depot_goal.h"
@@ -7266,10 +7286,64 @@ sc64_direct_firing_waypoint(int x, int y, int tx, int ty,
 }
 
 static void __attribute__((noinline))
+#ifdef SC64_RANGE_WORK
+move_toward_weapon_range(Unit *q, int target, int tx, int ty,
+                         int minimum, int maximum)
+#else
 move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
+#endif
 {
     int may_plan = q->path_retry == 0 && q->path_timer <= 0;
     int nx, ny;
+#ifdef SC64_RANGE_WORK
+    if (maximum < 32 || sc64_race_unit_flying(q->type)) {
+        move_toward(q, tx, ty);
+        return;
+    }
+    if (!may_plan) {
+        move_toward(q, tx, ty);
+        return;
+    }
+    if (direct_path_clear(q->x, q->y, tx, ty)) {
+        move_toward(q, tx, ty);
+        return;
+    }
+    if (sc64_direct_firing_waypoint(q->x, q->y, tx, ty,
+                                    minimum, maximum, &nx, &ny)) {
+        q->path_x = nx; q->path_y = ny;
+        q->path_retry = 0; q->path_timer = 24;
+        move_toward(q, tx, ty);
+        return;
+    }
+    {
+        int next_col = -1, next_row = -1;
+        int status = sc64_range_route_next(target, tx, ty, minimum, maximum,
+                                           q->x / 16, q->y / 16,
+                                           &next_col, &next_row);
+        if (status == SC64_RANGE_ROUTE_FOUND ||
+            status == SC64_RANGE_ROUTE_STALE_GUIDANCE) {
+            /* A completed old seed at the current tile is not progress toward
+             * a moving target. Wait for the queued fresh snapshot instead of
+             * asking move_toward() for its synchronous point flood. */
+            if (status == SC64_RANGE_ROUTE_STALE_GUIDANCE &&
+                next_col == q->x / 16 && next_row == q->y / 16) {
+                q->path_x = q->x; q->path_y = q->y;
+                q->path_retry = 12; q->path_timer = 0;
+                return;
+            }
+            q->path_x = next_col * 16 + 8;
+            q->path_y = next_row * 16 + 8;
+            q->path_retry = 0; q->path_timer = 24;
+            move_toward(q, tx, ty);
+            return;
+        }
+        /* Pending, cancelled, and completed no-path jobs retry without
+         * invoking the synchronous whole-map route flood. */
+        q->path_x = q->x; q->path_y = q->y;
+        q->path_retry = 12; q->path_timer = 0;
+        return;
+    }
+#else
     move_toward(q, tx, ty);
     if (!may_plan || q->path_retry != 12 || maximum < 32 ||
         sc64_race_unit_flying(q->type)) return;
@@ -7277,6 +7351,7 @@ move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
         return;
     q->path_x = nx; q->path_y = ny;
     q->path_retry = 0; q->path_timer = 24;
+#endif
 }
 #endif
 #ifdef SC64_UNIT_FACING
@@ -7515,8 +7590,13 @@ tick_combat(Unit * q, int target)
         if (q->order==ORDER_TRANSPORTED && q->target>=MAX_UNITS) return;
 #endif
 #ifdef SC64_DIRECT_FIRING_POINTS
+#ifdef SC64_RANGE_WORK
+	move_toward_weapon_range(q, target, target_x(target), target_y(target),
+                                 minimum_range, range);
+#else
 	move_toward_weapon_range(q, target_x(target), target_y(target),
                                  minimum_range, range);
+#endif
 #else
 	move_toward(q, target_x(target), target_y(target));
 #endif
@@ -8918,6 +8998,9 @@ game_update(u16 held, u16 pressed)
 	interact();
 
     frame++;
+#ifdef SC64_RANGE_WORK
+    if (screen == SCREEN_PLAY) sc64_range_route_tick();
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) ++sc64_showcase_ticks;
 #endif

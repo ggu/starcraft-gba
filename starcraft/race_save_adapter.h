@@ -1940,6 +1940,11 @@ static int race_save_game(void) {
 #else
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);
 #endif
+#ifdef SC64_RANGE_WORK
+    /* Derived route work is not serialized; restart only after a successful
+     * publication so the saved and continuing worlds share a boundary. */
+    sc64_range_route_reset();
+#endif
     toast(7);return 1;
 }
 /* Candidate-only load outputs live outside the route/save scratch union. */
