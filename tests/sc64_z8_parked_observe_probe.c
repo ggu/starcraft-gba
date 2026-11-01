@@ -20,7 +20,7 @@ static unsigned held,ticks;
  * slot reuse. Watch after every ordinary game_update, including UI steps. */
 static int reserved_slot=-1, reserved_raw=-1, reserved_owner=-1;
 static int trip_admitted, reserve_active, trip_aborted, hatch_confirmed;
-static int hatch_x=-1,hatch_y=-1;
+static int hatch_x=-1,hatch_y=-1,hatch_pending,hatch_started;
 static int forward_identity_valid(void)
 {
  return reserved_slot>=0&&reserved_slot<MAX_UNITS&&u[reserved_slot].alive&&
@@ -64,7 +64,9 @@ static int macro_can_spend(int price)
 static int macro_ready_for_offense(void)
 {
  int n=0;
- for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==38&&!SC64_TRANSPORT_LOADED(&u[i]))n++;
+ for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_owner==3&&
+     u[i].raw_type==38&&!SC64_TRANSPORT_LOADED(&u[i])&&
+     u[i].x>=1600&&u[i].x<=1730&&u[i].y>=780&&u[i].y<=880)n++;
  return n>=6;
 }
 #endif
@@ -197,6 +199,22 @@ static int order(int slot,int row,int x,int y){
  else if(row>=MENU_BARRACKS&&row<=MENU_ENG_BAY)applied=screen==SCREEN_PLAY&&mode==MODE_NORMAL&&((u[slot].alive&&(u[slot].order==ORDER_BUILD||u[slot].order==ORDER_BUILD_PENDING))||!u[slot].alive);
  ok=applied==1;
 report:printf("ORDER frame%d slot%d selected%d selectedCount%d alive%d raw%d owner%d row%d requested%d,%d cursor%d,%d armed%d applied%d ok%d order%d target%d tx%d ty%d mode%d\n",frame,slot,selected_slot,selected_count(),u[slot].alive,u[slot].raw_type,u[slot].owner,row,x,y,cx,cy,armed,applied,ok,u[slot].order,u[slot].target,u[slot].tx,u[slot].ty,mode);return ok;}
+#ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+/* Abort a timed-out pending construction through the ordinary Stop menu.
+ * Keep the reservation if the UI action is not observed to cancel it. */
+static int forward_stop_pending(void)
+{
+ int slot=reserved_slot;
+ if(!forward_identity_valid()||!select_one(slot))return 0;
+ tap(KEY_B);
+ for(int n=0;menu_open&&menu_cursor!=MENU_STOP&&n<MENU_COUNT;n++)
+  tap(menu_cursor<MENU_STOP?KEY_DOWN:KEY_UP);
+ if(screen!=SCREEN_PLAY||won||lost||!menu_open||menu_cursor!=MENU_STOP||!forward_identity_valid())return 0;
+ tap(KEY_A);
+ return screen==SCREEN_PLAY&&!won&&!lost&&forward_identity_valid()&&
+        !SC64_BUILD_WORKER_ORDER(u[slot].order);
+}
+#endif
 static void hero_census(void){int i=10;printf("HERO_STATE frame%d alive%d owner%d raw_owner%d raw%d hp%d xy%d,%d order%d target%d tx%d ty%d\n",frame,u[i].alive,u[i].owner,u[i].raw_owner,u[i].raw_type,u[i].hp,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty);}
 #ifdef SC64_Z8_TRIAL_HERO_RETREAT
 /* Trial controller policy only: preserve the original hero after the opening
@@ -426,6 +444,16 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
 #endif
  order(55,MENU_ATTACK,880,1640);order(56,MENU_ATTACK,880,1640);int l[]={53,54,57};for(int j=0;j<3;j++)order(l[j],MENU_ATTACK,880,1640);order(16,MENU_MOVE,Z8_NORTH_DETECT_X,Z8_NORTH_DETECT_Y);for(int i=17;i<=22;i++)order(i,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(7,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(8,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(11,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(13,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);for(int j=5;j<=6;j++){select_one(j);int p=j==5?11:10;move_cursor(m[p].x,m[p].y);tap(KEY_A);printf("mine worker%d order%d target%d frame%d\n",j,u[j].order,u[j].target,frame);}queue_type(U_DRONE);queue_type(U_DRONE);}
 #ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+ /* Only clear a build policy after its actual foundation was seen and is
+  * now gone; an accepted job that is still walking is not a failure. */
+ {static int seen_pool,seen_evo,seen_den;
+  int live_pool=side_building(B_SPAWNING_POOL,0)>=0;
+  int live_evo=side_building(B_EVOLUTION_CHAMBER,0)>=0;
+  int live_den=side_building(B_HYDRALISK_DEN,0)>=0;
+  if(live_pool)seen_pool=1;else if(seen_pool){pool=0;seen_pool=0;printf("MACRO_REBUILD frame%d type=pool\n",frame);}
+  if(live_evo)seen_evo=1;else if(seen_evo){evo=0;seen_evo=0;printf("MACRO_REBUILD frame%d type=evo\n",frame);}
+  if(live_den)seen_den=1;else if(seen_den){den=0;seen_den=0;printf("MACRO_REBUILD frame%d type=den\n",frame);}
+ }
  if(!pool&&minerals>=200&&macro_can_spend(200))
   for(int i=0;i<MAX_UNITS;i++)if(macro_worker_available(i)){pool=build(i,B_SPAWNING_POOL,MENU_BARRACKS);break;}
  if(!evo&&minerals>=75&&macro_can_spend(75)&&side_building(B_SPAWNING_POOL,1)>=0)
@@ -460,7 +488,13 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
  if(trip_admitted&&!arrived&&forward_identity_valid()&&u[traveler].x>1800&&u[traveler].y>1750){
   arrived=1;printf("MACRO_TRIP_ARRIVED frame%d slot%d raw%d source%d xy%d,%d\n",frame,traveler,u[traveler].raw_type,u[traveler].raw_owner,u[traveler].x,u[traveler].y);
  }
- if(arrived&&!forward&&reserve_active&&minerals>=300&&forward_identity_valid()){
+ if(hatch_pending&&reserve_active&&forward_identity_valid()&&frame-hatch_started>=1800){
+  if(forward_stop_pending()){
+   printf("MACRO_TRIP_ABORT frame%d reason=pending_timeout_stopped\n",frame);
+   trip_aborted=1;hatch_pending=0;reserve_active=0;reserved_slot=-1;
+  } else printf("MACRO_STOP_UNCONFIRMED frame%d slot%d reserve%d\n",frame,reserved_slot,reserve_active);
+ }
+ if(arrived&&!forward&&!hatch_pending&&reserve_active&&minerals>=300&&forward_identity_valid()){
   static int attempts;
   int xx=-1,yy=-1,best=0x7fffffff;
   for(int y=1680;y<=1872;y+=16)for(int x=1248;x<=1520;x+=16)
@@ -472,7 +506,10 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
    int ok=order(traveler,MENU_DEPOT,xx,yy);
    printf("MACRO_HATCH_ATTEMPT frame%d attempt%d ok%d slot%d before%d/%d after%d/%d confirmed%d\n",frame,attempts,ok,traveler,before,gas_before,minerals,gas,hatch_confirmed);
    if(hatch_confirmed)forward=1;
-   else if(attempts>=3){trip_aborted=1;reserve_active=0;reserved_slot=-1;printf("MACRO_TRIP_ABORT frame%d reason=hatch_unconfirmed\n",frame);}
+   else if(ok&&forward_identity_valid()&&SC64_BUILD_WORKER_ORDER(u[traveler].order)){
+    hatch_pending=1;hatch_started=frame;
+    printf("MACRO_HATCH_PENDING frame%d slot%d order%d reserve%d\n",frame,traveler,u[traveler].order,reserve_active);
+   } else if(attempts>=3){trip_aborted=1;reserve_active=0;reserved_slot=-1;printf("MACRO_TRIP_ABORT frame%d reason=order_unaccepted\n",frame);}
   }
  }
  if(hatch_confirmed)forward=1;
