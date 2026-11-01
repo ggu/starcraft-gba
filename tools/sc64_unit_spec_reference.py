@@ -27,6 +27,18 @@ def checked_source(path: Path) -> tuple[str, str]:
     return data.decode('utf-8'), hashlib.sha256(data).hexdigest()
 
 
+def unit_flag_properties(source: str, count: int) -> list[dict[str, bool]]:
+    rows = extract_initializer(source, 'unitFlags')
+    if len(rows) != count:
+        raise ValueError(f'unitFlags: expected {count} rows, found {len(rows)}')
+    result = []
+    for row in rows:
+        names = {part.strip() for part in row.split('|')}
+        result.append({'is_building': 'Building' in names,
+                       'regenerates_hp': 'RegeneratesHP' in names})
+    return result
+
+
 def ensure_reference() -> None:
     actual = subprocess.run(
         ['git', '-C', str(REFERENCE), 'rev-parse', 'HEAD'],
@@ -267,12 +279,8 @@ def main() -> None:
     sizes = symbolic_rows(unit_src, 'unitSize', unit_count, size_ids)
     for idx, value in enumerate(sizes):
         units_by_id[idx]['size'] = value
-    building_flags = extract_initializer(unit_src, 'unitFlags')
-    if len(building_flags) != unit_count:
-        raise ValueError(f'unitFlags: expected {unit_count} rows, found {len(building_flags)}')
-    for idx, value in enumerate(building_flags):
-        units_by_id[idx]['is_building'] = any(part.strip() == 'Building'
-                                              for part in value.split('|'))
+    for idx, properties in enumerate(unit_flag_properties(unit_src, unit_count)):
+        units_by_id[idx].update(properties)
     builders = symbolic_rows(unit_src, 'whatBuilds', unit_count, unit_ids)
     for idx, value in enumerate(builders):
         units_by_id[idx]['what_builds'] = value

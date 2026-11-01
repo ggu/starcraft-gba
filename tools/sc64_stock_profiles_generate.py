@@ -21,7 +21,8 @@ def emit(facts_path: Path, output: Path) -> None:
         ' */',
         'enum { SC64_STOCK_UNIT_LIMIT = 228, SC64_STOCK_UNIT_ROWS = %d,' % len(units),
         '       SC64_STOCK_WEAPON_ROWS = %d };' % len(weapons),
-        'enum { SC64_STOCK_F_BUILDING = 1, SC64_STOCK_DMG_INDEPENDENT = 0,',
+        'enum { SC64_STOCK_F_BUILDING = 1, SC64_STOCK_F_REGENERATES_HP = 2,',
+        '       SC64_STOCK_DMG_INDEPENDENT = 0,',
         '       SC64_STOCK_DMG_EXPLOSIVE = 1, SC64_STOCK_DMG_CONCUSSIVE = 2,',
         '       SC64_STOCK_DMG_NORMAL = 3, SC64_STOCK_DMG_IGNORE_ARMOR = 4,',
         '       SC64_STOCK_DMG_NONE = 5, SC64_STOCK_DMG_UNKNOWN = 6 };',
@@ -36,7 +37,9 @@ def emit(facts_path: Path, output: Path) -> None:
         'static const Sc64StockUnitProfile sc64_stock_unit_profiles[SC64_STOCK_UNIT_ROWS] = {',
     ]
     for u in units:
-        flags = 1 if u['is_building'] else 0
+        if not all(type(u.get(key)) is bool for key in ('is_building', 'regenerates_hp')):
+            raise ValueError('unit facts require boolean is_building and regenerates_hp; re-extract the pinned reference')
+        flags = int(u['is_building']) | (int(u['regenerates_hp']) << 1)
         speed = int(round(float(u['top_speed']) * 1024))
         fields = (flags, u['ground_weapon']['id'], u['air_weapon']['id'],
                   u['ground_weapon_hits'], u['air_weapon_hits'], u['size']['id'],
