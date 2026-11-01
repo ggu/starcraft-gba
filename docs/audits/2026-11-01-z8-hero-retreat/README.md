@@ -96,3 +96,20 @@ This qualifies the observed northern interception, not redundant long-term
 defense or a mission win. The local log is
 `/tmp/sc64-z8-north-intercept-fced3c7-20261101.log`, SHA-256
 `d0773a8b17f8cf6d5e9d6d34004297b91a152e3ab57f566b03b9b9fac5f0c47e`.
+
+## Controller selection correction (unrun)
+
+Source inspection of the northern trial found a controller timing error:
+`select_one` spent up to 240 selection cycles trying to select a dead or
+enemy-owned slot. For the missing original Zerglings in slots 21 and 22,
+these attempts cannot succeed. The next trial rejects a non-live/non-human
+actor before issuing input and aborts if its source identity or ownership
+changes during selection. It preserves ordinary L-button selection for valid
+actors. It cannot distinguish replacement by an identical source identity in
+the same slot without a generation ID.
+
+This shortens previously futile UI sequences and can change all subsequent
+timing, economic and combat behavior; earlier results do not qualify it. The
+same northern and hero staging policy is retained to test this correction
+before choosing another retreat or offensive plan. It is a host controller
+fix only, and has not been compiled or run.

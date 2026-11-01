@@ -77,7 +77,23 @@ static void observe_transition(Observation before,Observation after){
 }
 static void step(u16 h){static int last=-1;Observation prior=observe_snapshot();game_update(h,h&~held);Observation after=observe_snapshot();observe_transition(prior,after);held=h;ticks++;if(screen==SCREEN_PLAY){detector_damage_census();original_escort_census();north_defense_census();}if(screen==SCREEN_PLAY&&frame>0&&frame%120==0&&frame!=last){last=frame;printf("HERO_SAMPLE frame%d alive%d owner%d raw%d hp%d xy%d,%d order%d target%d\n",frame,u[10].alive,u[10].owner,u[10].raw_type,u[10].hp,u[10].x,u[10].y,u[10].order,u[10].target);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==74)printf("EARLY_DT frame%d native%u slot%d hp%d shield%d xy%d,%d hidden%d distance48sq%d sight%d\n",frame,race_z8_sched.frames,i,u[i].hp,u[i].shield,u[i].x,u[i].y,race_z8_unit_hidden_from_side(i),dist2(u[i].x,u[i].y,u[48].x,u[48].y),currently_visible(u[i].x,u[i].y));const Sc64Z8Condition *cond=&sc64_z8_program_conditions[sc64_z8_program_triggers[17].first_condition];u32 count=0;int rc=sc64_z8_world_count(&race_z8_view,cond,SC64_Z8_HUMAN_SLOT,sc64_z8_rect(&race_z8_sched,cond->location),&count);printf("T17_CENSUS frame%d location%u rc%d count%u outcome%d\n",frame,cond->location,rc,count,race_z8_outcome());int ids[]={48,53,54,55,56,57};for(unsigned j=0;j<sizeof(ids)/sizeof(ids[0]);j++){int i=ids[j];printf("EARLY_SOUTH frame%d slot%d alive%d hp%d xy%d,%d order%d target%d tx%d ty%d\n",frame,i,u[i].alive,u[i].hp,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty);}}}
 static void tap(u16 k){step(k);step(0);}
-static int select_one(int slot){for(int n=0;n<MAX_UNITS&&screen==SCREEN_PLAY&&!won&&!lost;n++){tap(KEY_L);if(u[slot].alive&&u[slot].selected&&selected_count()==1)return 1;}return 0;}
+static int select_one(int slot)
+{
+ if(slot<0||slot>=MAX_UNITS||!u[slot].alive||u[slot].owner!=SIDE){
+  printf("SELECT_REJECT frame%d slot%d reason=not_live_human_actor\n",frame,slot);
+  return 0;
+ }
+ int raw=u[slot].raw_type,source_owner=u[slot].raw_owner;
+ for(int n=0;n<MAX_UNITS&&screen==SCREEN_PLAY&&!won&&!lost;n++){
+  tap(KEY_L);
+  if(!u[slot].alive||u[slot].owner!=SIDE||u[slot].raw_type!=raw||u[slot].raw_owner!=source_owner){
+   printf("SELECT_REJECT frame%d slot%d reason=actor_changed\n",frame,slot);
+   return 0;
+  }
+  if(u[slot].selected&&selected_count()==1)return 1;
+ }
+ return 0;
+}
 static int move_cursor(int x,int y){int guard=0;while((abs(cx-x)>2||abs(cy-y)>2)&&screen==SCREEN_PLAY&&!won&&!lost&&guard++<3000){u16 h=KEY_R;if(abs(cx-x)>2)h|=cx<x?KEY_RIGHT:KEY_LEFT;if(abs(cy-y)>2)h|=cy<y?KEY_DOWN:KEY_UP;step(h);}step(0);return guard<3000;}
 static int order(int slot,int row,int x,int y){
  int ok=0,selected_slot=-1,armed=-1,applied=-1;
