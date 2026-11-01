@@ -166,6 +166,8 @@ reference_mask(const Unit *q, int speed)
     return mask;
 }
 
+static void invalidate_fixture_memo(void);
+
 static void
 test_stale_snapshot_group_falls_back_per_member(void)
 {
@@ -181,6 +183,7 @@ test_stale_snapshot_group_falls_back_per_member(void)
      * The base index still visits its old cell, but its member geometry is
      * now different; the grouped query must inspect both current positions. */
     u[1].x = 31;
+    invalidate_fixture_memo();
     want = reference_mask(&u[0], 0);
     got = sc64_contact_blocked_mask(&u[0], 0);
     assert(want == 0xffu);
@@ -189,10 +192,83 @@ test_stale_snapshot_group_falls_back_per_member(void)
     /* The same fallback applies to an unhooked in-place type morph. */
     u[1].x = 15;
     u[1].type = U_DRONE;
+    invalidate_fixture_memo();
     want = reference_mask(&u[0], 0);
     got = sc64_contact_blocked_mask(&u[0], 0);
     assert(got == want);
 #endif
+}
+
+static void
+invalidate_fixture_memo(void)
+{
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    sc64_contact_memo_invalidate();
+#endif
+}
+
+/* The reference scans original actors rather than the group representation. */
+static void
+test_dense_keys_and_lifecycle_against_reference(void)
+{
+    static const int speeds[] = {0, 1, 2, 14, 15};
+    int state, i, j;
+    unsigned random = 0x739abcdu;
+    for (state = 0; state < 48; ++state) {
+        memset(u, 0, sizeof(u));
+        for (i = 0; i < 24; ++i) {
+            int type;
+            random = random * 1664525u + 1013904223u;
+            type = (random & 4u) ? U_ZERGLING : U_MARINE;
+            set_actor(i, type, 80 + ((random >> 4) & 3u), 80 + (state % 3), 1);
+        }
+        sc64_unit_buckets_begin();
+        assert(sc64_unit_bucket_active);
+        for (j = 0; j < (int)(sizeof(speeds)/sizeof(speeds[0])); ++j)
+            assert(sc64_contact_blocked_mask(&u[0], speeds[j]) == reference_mask(&u[0], speeds[j]));
+        /* Unhooked same-cell position and type changes exercise the stale
+         * group check; leave the fixture world and its bucket cell aligned. */
+        u[1].x += 1; u[2].type = U_ZERGLING; u[3].alive = 0;
+        invalidate_fixture_memo();
+        for (j = 0; j < (int)(sizeof(speeds)/sizeof(speeds[0])); ++j)
+            assert(sc64_contact_blocked_mask(&u[0], speeds[j]) == reference_mask(&u[0], speeds[j]));
+        u[3].alive = 1; u[3].x += 2; sc64_unit_bucket_move(&u[3]);
+        for (j = 0; j < (int)(sizeof(speeds)/sizeof(speeds[0])); ++j)
+            assert(sc64_contact_blocked_mask(&u[0], speeds[j]) == reference_mask(&u[0], speeds[j]));
+        sc64_unit_buckets_end();
+    }
+}
+
+static void
+test_available_invalid_class_fallback(void)
+{
+    int type;
+    for (type = 0; type < SC_RU_COUNT; ++type)
+        if (!(sc64_contact_class_for(type) & SC64_CONTACT_VALID)) break;
+    if (type == SC_RU_COUNT) {
+        puts("group invalid-class fixture unavailable in this profile");
+        return;
+    }
+    reset_world(0);
+    set_actor(1, type, 12, 10, 1);
+    set_actor(2, type, 12, 10, 1);
+    sc64_unit_buckets_begin();
+    assert(sc64_contact_blocked_mask(&u[0], 2) == reference_mask(&u[0], 2));
+    sc64_unit_buckets_end();
+}
+
+static void
+test_dirty_overflow_disables_index(void)
+{
+    reset_world(1);
+    sc64_unit_bucket_dirty_count = MAX_UNITS * 2;
+    set_actor(3, U_MARINE, WORLD_W - 1, WORLD_H - 1, 1);
+    sc64_unit_bucket_move(&u[3]);
+    assert(!sc64_unit_bucket_active);
+    assert(sc64_contact_blocked_mask(&u[0], 1) == reference_mask(&u[0], 1));
+    sc64_unit_bucket_dirty_count = 0;
+    sc64_unit_bucket_initialized = 0;
+    sc64_unit_buckets_end();
 }
 
 int
@@ -204,5 +280,8 @@ main(void)
     test_type_morph_rekey();
     test_representative_promotion_and_bucket_edges();
     test_stale_snapshot_group_falls_back_per_member();
+    test_dense_keys_and_lifecycle_against_reference();
+    test_dirty_overflow_disables_index();
+    test_available_invalid_class_fallback();
     return 0;
 }
