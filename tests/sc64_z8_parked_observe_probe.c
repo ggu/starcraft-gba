@@ -15,6 +15,59 @@
 #define Z8_HERO_RETREAT_Y 1680
 #endif
 static unsigned held,ticks;
+#ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+/* Controller-owned observations only; identity cannot detect same-identity
+ * slot reuse. Watch after every ordinary game_update, including UI steps. */
+static int reserved_slot=-1, reserved_raw=-1, reserved_owner=-1;
+static int trip_admitted, reserve_active, trip_aborted, hatch_confirmed;
+static int hatch_x=-1,hatch_y=-1;
+static int forward_identity_valid(void)
+{
+ return reserved_slot>=0&&reserved_slot<MAX_UNITS&&u[reserved_slot].alive&&
+        u[reserved_slot].owner==SIDE&&u[reserved_slot].type==U_DRONE&&
+        u[reserved_slot].raw_type==reserved_raw&&u[reserved_slot].raw_owner==reserved_owner;
+}
+static void forward_observe(void)
+{
+ static int last_minerals=-1,last_gas=-1,last_queue=-1;
+ static int was_alive[MAX_BUILDINGS],was_type[MAX_BUILDINGS],was_owner[MAX_BUILDINGS];
+ if(screen!=SCREEN_PLAY)return;
+ if(minerals!=last_minerals||gas!=last_gas||b[63].queue_count!=last_queue){
+  printf("MACRO_WALLET frame%d before%d/%d/q%d after%d/%d/q%d reserve%d\n",frame,last_minerals,last_gas,last_queue,minerals,gas,b[63].queue_count,reserve_active);
+  last_minerals=minerals;last_gas=gas;last_queue=b[63].queue_count;
+ }
+ for(int i=0;i<MAX_BUILDINGS;i++){
+  if(was_alive[i]!=(int)b[i].alive||was_type[i]!=b[i].type||was_owner[i]!=b[i].owner){
+   printf("MACRO_BUILDING frame%d slot%d was%d/%d/%d now%d/%d/%d raw%d source%d xy%d,%d progress%d\n",frame,i,was_alive[i],was_type[i],was_owner[i],b[i].alive,b[i].type,b[i].owner,b[i].raw_type,b[i].raw_owner,b[i].x,b[i].y,b[i].build_progress);
+   was_alive[i]=b[i].alive;was_type[i]=b[i].type;was_owner[i]=b[i].owner;
+  }
+ }
+ if(reserve_active&&hatch_x>=0){
+  for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HATCHERY&&
+      abs(b[i].x-hatch_x)<=2&&abs(b[i].y-hatch_y)<=2){
+   hatch_confirmed=1;reserve_active=0;
+   printf("MACRO_HATCH_CONFIRMED frame%d slot%d xy%d,%d progress%d\n",frame,i,b[i].x,b[i].y,b[i].build_progress);break;
+  }
+ }
+ if(reserved_slot>=0&&!hatch_confirmed&&!forward_identity_valid()){
+  printf("MACRO_TRAVELER_ABORT frame%d slot%d alive%d owner%d raw%d source%d order%d\n",frame,reserved_slot,u[reserved_slot].alive,u[reserved_slot].owner,u[reserved_slot].raw_type,u[reserved_slot].raw_owner,u[reserved_slot].order);
+  reserved_slot=-1;reserve_active=0;trip_aborted=1;
+ }
+}
+static int macro_worker_available(int i)
+{
+ return i!=reserved_slot&&build_worker_available(i,SIDE,U_DRONE)&&
+        u[i].order!=ORDER_NYDUS_ENTER;
+}
+static int macro_can_spend(int price)
+{ return !reserve_active || minerals-price>=300; }
+static int macro_ready_for_offense(void)
+{
+ int n=0;
+ for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==38&&!SC64_TRANSPORT_LOADED(&u[i]))n++;
+ return n>=6;
+}
+#endif
 #ifdef SC64_Z8_TRIAL_NORTH_INTERCEPT
 #define Z8_NORTH_DETECT_X 1640
 #define Z8_NORTH_DETECT_Y 832
@@ -85,7 +138,11 @@ static void observe_transition(Observation before,Observation after){
   if(after.outcome!=before.outcome)printf("SOURCE_OUTCOME_CHANGE frame%d before%d after%d passes_before%u passes_after%u\n",after.frame,before.outcome,after.outcome,before.passes,after.passes);
  }
 }
-static void step(u16 h){static int last=-1;Observation prior=observe_snapshot();game_update(h,h&~held);Observation after=observe_snapshot();observe_transition(prior,after);held=h;ticks++;if(screen==SCREEN_PLAY){detector_damage_census();original_escort_census();north_defense_census();}if(screen==SCREEN_PLAY&&frame>0&&frame%120==0&&frame!=last){last=frame;printf("HERO_SAMPLE frame%d alive%d owner%d raw%d hp%d xy%d,%d order%d target%d\n",frame,u[10].alive,u[10].owner,u[10].raw_type,u[10].hp,u[10].x,u[10].y,u[10].order,u[10].target);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==74)printf("EARLY_DT frame%d native%u slot%d hp%d shield%d xy%d,%d hidden%d distance48sq%d sight%d\n",frame,race_z8_sched.frames,i,u[i].hp,u[i].shield,u[i].x,u[i].y,race_z8_unit_hidden_from_side(i),dist2(u[i].x,u[i].y,u[48].x,u[48].y),currently_visible(u[i].x,u[i].y));const Sc64Z8Condition *cond=&sc64_z8_program_conditions[sc64_z8_program_triggers[17].first_condition];u32 count=0;int rc=sc64_z8_world_count(&race_z8_view,cond,SC64_Z8_HUMAN_SLOT,sc64_z8_rect(&race_z8_sched,cond->location),&count);printf("T17_CENSUS frame%d location%u rc%d count%u outcome%d\n",frame,cond->location,rc,count,race_z8_outcome());int ids[]={48,53,54,55,56,57};for(unsigned j=0;j<sizeof(ids)/sizeof(ids[0]);j++){int i=ids[j];printf("EARLY_SOUTH frame%d slot%d alive%d hp%d xy%d,%d order%d target%d tx%d ty%d\n",frame,i,u[i].alive,u[i].hp,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty);}}}
+static void step(u16 h){static int last=-1;Observation prior=observe_snapshot();game_update(h,h&~held);Observation after=observe_snapshot();observe_transition(prior,after);held=h;ticks++;
+#ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+ forward_observe();
+#endif
+ if(screen==SCREEN_PLAY){detector_damage_census();original_escort_census();north_defense_census();}if(screen==SCREEN_PLAY&&frame>0&&frame%120==0&&frame!=last){last=frame;printf("HERO_SAMPLE frame%d alive%d owner%d raw%d hp%d xy%d,%d order%d target%d\n",frame,u[10].alive,u[10].owner,u[10].raw_type,u[10].hp,u[10].x,u[10].y,u[10].order,u[10].target);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==74)printf("EARLY_DT frame%d native%u slot%d hp%d shield%d xy%d,%d hidden%d distance48sq%d sight%d\n",frame,race_z8_sched.frames,i,u[i].hp,u[i].shield,u[i].x,u[i].y,race_z8_unit_hidden_from_side(i),dist2(u[i].x,u[i].y,u[48].x,u[48].y),currently_visible(u[i].x,u[i].y));const Sc64Z8Condition *cond=&sc64_z8_program_conditions[sc64_z8_program_triggers[17].first_condition];u32 count=0;int rc=sc64_z8_world_count(&race_z8_view,cond,SC64_Z8_HUMAN_SLOT,sc64_z8_rect(&race_z8_sched,cond->location),&count);printf("T17_CENSUS frame%d location%u rc%d count%u outcome%d\n",frame,cond->location,rc,count,race_z8_outcome());int ids[]={48,53,54,55,56,57};for(unsigned j=0;j<sizeof(ids)/sizeof(ids[0]);j++){int i=ids[j];printf("EARLY_SOUTH frame%d slot%d alive%d hp%d xy%d,%d order%d target%d tx%d ty%d\n",frame,i,u[i].alive,u[i].hp,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty);}}}
 static void tap(u16 k){step(k);step(0);}
 static int select_one(int slot)
 {
@@ -94,6 +151,10 @@ static int select_one(int slot)
   return 0;
  }
  int raw=u[slot].raw_type,source_owner=u[slot].raw_owner;
+#ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+ if(screen==SCREEN_PLAY&&!won&&!lost&&u[slot].selected&&selected_count()==1&&selected_building<0)
+  return 1;
+#endif
  for(int n=0;n<MAX_UNITS&&screen==SCREEN_PLAY&&!won&&!lost;n++){
   tap(KEY_L);
   if(screen!=SCREEN_PLAY||won||lost)return 0;
@@ -273,7 +334,11 @@ static void nexus_push_tick(void)
 {
  /* These are fixed authored-map waypoints and ordinary attack orders. The
   * stage transition observes source Nexus liveness as a host-world oracle. */
- if(!nexus_push_phase&&frame>=5500){
+ if(!nexus_push_phase&&frame>=5500
+#ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+    &&macro_ready_for_offense()
+#endif
+   ){
   nexus_push_phase=1;
   printf("NEXUS_PUSH_BEGIN frame%d east_alive%d west_alive%d\n",frame,source_nexus_alive(2),source_nexus_alive(1));
 #ifdef SC64_Z8_TRIAL_BOXED_OFFENSE
@@ -360,10 +425,68 @@ int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY
  if(!retreat_original_hero())return 3;
 #endif
  order(55,MENU_ATTACK,880,1640);order(56,MENU_ATTACK,880,1640);int l[]={53,54,57};for(int j=0;j<3;j++)order(l[j],MENU_ATTACK,880,1640);order(16,MENU_MOVE,Z8_NORTH_DETECT_X,Z8_NORTH_DETECT_Y);for(int i=17;i<=22;i++)order(i,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(7,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(8,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(11,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);order(13,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);for(int j=5;j<=6;j++){select_one(j);int p=j==5?11:10;move_cursor(m[p].x,m[p].y);tap(KEY_A);printf("mine worker%d order%d target%d frame%d\n",j,u[j].order,u[j].target,frame);}queue_type(U_DRONE);queue_type(U_DRONE);}
+#ifdef SC64_Z8_TRIAL_FORWARD_RESERVATION
+ if(!pool&&minerals>=200&&macro_can_spend(200)&&macro_worker_available(5))
+  pool=build(5,B_SPAWNING_POOL,MENU_BARRACKS);
+ if(!evo&&minerals>=75&&macro_can_spend(75)&&side_building(B_SPAWNING_POOL,1)>=0)
+  for(int i=0;i<MAX_UNITS;i++)if(macro_worker_available(i)){evo=build(i,B_EVOLUTION_CHAMBER,MENU_ENG_BAY);break;}
+ if(!spore&&minerals>=50&&macro_can_spend(50)&&side_building(B_EVOLUTION_CHAMBER,1)>=0&&
+    b[65].alive&&building_complete(65)&&b[65].type==B_CREEP_COLONY)spore=morph_spore(65);
+ if(!den&&side_building(B_SPAWNING_POOL,1)>=0&&minerals>=100&&gas>=50&&macro_can_spend(100))
+  for(int i=0;i<MAX_UNITS;i++)if(macro_worker_available(i)){den=build(i,B_HYDRALISK_DEN,MENU_ACADEMY);break;}
+ if(frame>=3800&&extra_drone<2&&minerals>=50&&macro_can_spend(50)&&b[63].queue_count==0){
+  int before=minerals,gas_before=gas,queue_before=b[63].queue_count;
+  queue_type(U_DRONE);extra_drone++;
+  printf("MACRO_QUEUE_ATTEMPT frame%d type%d before%d/%d/q%d after%d/%d/q%d\n",frame,U_DRONE,before,gas_before,queue_before,minerals,gas,b[63].queue_count);
+ }
+ /* Admit a trip only after base prerequisites and Spore policy are complete;
+  * once admitted, preserve 300 minerals until a foundation or abort. */
+ if(frame>=4200&&extra_drone>=2&&!nydus&&!trip_aborted&&worker_count()>=4&&
+    side_building(B_SPAWNING_POOL,1)>=0&&side_building(B_EVOLUTION_CHAMBER,1)>=0&&
+    side_building(B_HYDRALISK_DEN,1)>=0&&spore){
+  for(int i=0;i<MAX_UNITS;i++)if(macro_worker_available(i)&&u[i].x>1500&&u[i].y<500){traveler=i;break;}
+  if(traveler>=0){
+   reserved_slot=traveler;reserved_raw=u[traveler].raw_type;reserved_owner=u[traveler].raw_owner;
+   if(select_one(traveler)&&forward_identity_valid()&&move_cursor(b[67].x,b[67].y)&&forward_identity_valid()){
+    tap(KEY_A);
+    if(forward_identity_valid()&&u[traveler].order==ORDER_NYDUS_ENTER&&u[traveler].target==67){
+     nydus=1;trip_admitted=1;reserve_active=1;
+     printf("MACRO_TRIP_ADMITTED frame%d slot%d raw%d owner%d reserve%d money%d/%d\n",frame,traveler,reserved_raw,reserved_owner,reserve_active,minerals,gas);
+    }
+   }
+   if(!nydus){printf("MACRO_TRIP_ABORT frame%d slot%d reason=order_unaccepted\n",frame,traveler);trip_aborted=1;reserved_slot=-1;reserve_active=0;}
+  }
+ }
+ if(trip_admitted&&!arrived&&forward_identity_valid()&&u[traveler].x>1800&&u[traveler].y>1750){
+  arrived=1;printf("MACRO_TRIP_ARRIVED frame%d slot%d raw%d source%d xy%d,%d\n",frame,traveler,u[traveler].raw_type,u[traveler].raw_owner,u[traveler].x,u[traveler].y);
+ }
+ if(arrived&&!forward&&reserve_active&&minerals>=300&&forward_identity_valid()){
+  static int attempts;
+  int xx=-1,yy=-1,best=0x7fffffff;
+  for(int y=1680;y<=1872;y+=16)for(int x=1248;x<=1520;x+=16)
+   if(race_can_site(SIDE,B_HATCHERY,x,y)&&can_place(B_HATCHERY,x,y)){
+    int d=dist2(x,y,1344,1808);if(d<best){best=d;xx=x;yy=y;}
+   }
+  if(xx>=0){
+   int before=minerals,gas_before=gas;hatch_x=xx;hatch_y=yy;attempts++;
+   int ok=order(traveler,MENU_DEPOT,xx,yy);
+   printf("MACRO_HATCH_ATTEMPT frame%d attempt%d ok%d slot%d before%d/%d after%d/%d confirmed%d\n",frame,attempts,ok,traveler,before,gas_before,minerals,gas,hatch_confirmed);
+   if(hatch_confirmed)forward=1;
+   else if(attempts>=3){trip_aborted=1;reserve_active=0;reserved_slot=-1;printf("MACRO_TRIP_ABORT frame%d reason=hatch_unconfirmed\n",frame);}
+  }
+ }
+ if(hatch_confirmed)forward=1;
+ if(hydra<5&&side_building(B_HYDRALISK_DEN,1)>=0&&minerals>=75&&gas>=25&&macro_can_spend(75)&&b[63].queue_count==0&&b[63].larva){
+  int before=minerals,gas_before=gas,queue_before=b[63].queue_count;
+  queue_type(U_HYDRALISK);hydra++;
+  printf("MACRO_QUEUE_ATTEMPT frame%d type%d before%d/%d/q%d after%d/%d/q%d\n",frame,U_HYDRALISK,before,gas_before,queue_before,minerals,gas,b[63].queue_count);
+ }
+#else
  if(!pool&&minerals>=200){pool=build(5,B_SPAWNING_POOL,MENU_BARRACKS);}if(!evo&&minerals>=75&&side_building(B_SPAWNING_POOL,1)>=0){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){evo=build(i,B_EVOLUTION_CHAMBER,MENU_ENG_BAY);break;}}if(!spore&&minerals>=50&&side_building(B_EVOLUTION_CHAMBER,1)>=0&&b[65].alive&&building_complete(65)&&b[65].type==B_CREEP_COLONY){spore=morph_spore(65);}if(!den&&side_building(B_SPAWNING_POOL,1)>=0&&minerals>=100&&gas>=50){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){den=build(i,B_HYDRALISK_DEN,MENU_ACADEMY);break;}}if(frame>=3800&&extra_drone<2&&minerals>=50&&b[63].queue_count==0){queue_type(U_DRONE);extra_drone++;}if(frame>=4200&&extra_drone>=2&&!nydus&&worker_count()>=4){for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==SIDE&&u[j].type==U_DRONE)printf(" WORKER slot%d order%d xy%d,%d carry%d hp%d\n",j,u[j].order,u[j].x,u[j].y,u[j].carry,u[j].hp);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE&&u[i].order!=ORDER_BUILD&&u[i].order!=ORDER_BUILD_PENDING&&u[i].x>1500&&u[i].y<500){traveler=i;break;}if(traveler>=0&&select_one(traveler)){move_cursor(b[67].x,b[67].y);tap(KEY_A);nydus=1;printf("NYDUS issued slot%d frame%d order%d target%d xy%d,%d\n",traveler,frame,u[traveler].order,u[traveler].target,u[traveler].x,u[traveler].y);}}
  if(nydus&&!arrived&&traveler>=0&&u[traveler].alive&&u[traveler].x>1800&&u[traveler].y>1750){arrived=1;printf("NYDUS arrived slot%d frame%d xy%d,%d\n",traveler,frame,u[traveler].x,u[traveler].y);}
  if(arrived&&!forward&&minerals>=300&&traveler>=0&&u[traveler].alive){int xx=-1,yy=-1,best=0x7fffffff;for(int y=1680;y<=1872;y+=16)for(int x=1248;x<=1520;x+=16)if(race_can_site(SIDE,B_HATCHERY,x,y)&&can_place(B_HATCHERY,x,y)){int d=dist2(x,y,1344,1808);if(d<best){best=d;xx=x;yy=y;}}if(xx>=0){int ok=order(traveler,MENU_DEPOT,xx,yy);forward=1;printf("FORWARD hatch issue%d frame%d site%d,%d worker%d order%d mode%d funds%d\n",ok,frame,xx,yy,traveler,u[traveler].order,mode,minerals);}}
  if(hydra<5&&side_building(B_HYDRALISK_DEN,1)>=0&&minerals>=75&&gas>=25&&b[63].queue_count==0&&b[63].larva){queue_type(U_HYDRALISK);hydra++;}if(Z8_NORTH_PURSUIT_ALLOWED&&frame>=8600&&!north_reloc){north_reloc=1;for(int i=11;i<=13;i+=2)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==38){int ok=order(i,MENU_ATTACK,1900,350);printf(" NORTH_PURSUIT slot%d ok%d frame%d\n",i,ok,frame);break;}}
+#endif
  if((frame>=6500&&reinf<3)){for(int i=68;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&u[i].x>1500&&u[i].y<900&&!reinf_track[i]){if(select_one(i)){move_cursor(b[67].x,b[67].y);tap(KEY_A);if(u[i].order==ORDER_NYDUS_ENTER){reinf_track[i]=1;reinf++;printf(" REINF_NYDUS slot%d frame%d\n",i,frame);}}break;}}
  for(int i=68;i<MAX_UNITS;i++)if(reinf_track[i]==1&&u[i].alive&&u[i].owner==SIDE&&u[i].x>1800&&u[i].y>1750){reinf_track[i]=2;int ok=order(i,MENU_MOVE,1256,1960);printf(" REINF_DEPLOY slot%d ok%d frame%d\n",i,ok,frame);}
  if(frame>=9000&&!south_reloc){south_reloc=1;int ids[]={48,53,54,55,56,57};for(unsigned k=0;k<sizeof(ids)/sizeof(ids[0]);k++){int v=ids[k];if(u[v].alive&&u[v].owner==SIDE&&(u[v].raw_type==42||u[v].raw_type==37||u[v].raw_type==38)){int ok=order(v,u[v].raw_type==42?MENU_MOVE:MENU_ATTACK,(v==48||v==55||v==56)?1328:1344,(v==48||v==55||v==56)?1848:1808);printf(" SOUTH_RELOC slot%d ok%d frame%d\n",v,ok,frame);}}}if(frame>=7600){for(int i=68;i<MAX_UNITS;i++)if(!deploy[i]&&u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&u[i].y<1000){deploy[i]=1;int ok=order(i,MENU_ATTACK,Z8_NORTH_ATTACK_X,Z8_NORTH_ATTACK_Y);printf(" deployed hydra%d ok%d frame%d alive%d\n",i,ok,frame,u[i].alive);break;}}if(frame>=10480&&frame%10==0){int ids[]={48,55,56,86,98,102};for(unsigned q=0;q<sizeof(ids)/sizeof(ids[0]);q++){int j=ids[q];printf(" DETAIL frame%d slot%d alive%d owner%d raw%d hp%d xy%d,%d order%d\n",frame,j,u[j].alive,u[j].owner,u[j].raw_type,u[j].hp,u[j].x,u[j].y,u[j].order);}for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].raw_type==74)printf(" RAID frame%d slot%d hp%d shield%d xy%d,%d hidden%d visible%d\n",frame,j,u[j].hp,u[j].shield,u[j].x,u[j].y,race_z8_unit_hidden_from_side(j),currently_visible(u[j].x,u[j].y));}if(frame>=10200&&frame%120==0){int d[]={48,53,54,55,56,57};for(unsigned q=0;q<sizeof(d)/sizeof(d[0]);q++){int i=d[q];printf(" SOUTH_STATE frame%d slot%d alive%d owner%d raw%d hp%d xy%d,%d order%d\n",frame,i,u[i].alive,u[i].owner,u[i].raw_type,u[i].hp,u[i].x,u[i].y,u[i].order);}for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==74)printf(" DT_STATE frame%d slot%d hp%d shield%d xy%d,%d hidden%d visible%d\n",frame,i,u[i].hp,u[i].shield,u[i].x,u[i].y,race_z8_unit_hidden_from_side(i),currently_visible(u[i].x,u[i].y));}
