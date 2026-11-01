@@ -21,7 +21,8 @@ canaries and packet, plus an ordinary decode/re-encode witness. The canonical
 P7 and P8 host fixtures passed an ordinary-save candidate check, including
 short-arena rejection and preserved world/services. The same P7 fixture,
 compiled against base `30858e34246418c6847d8c7e11a779b3ef701b12`, reached
-its expected short-arena rejection assertion, demonstrating the old gap.
+the assertion requiring short-arena rejection and failed there: the old
+preflight accepted that candidate, demonstrating the gap.
 The fixture's temporary baseline copy changed only its included source path.
 
 An unprepared clean source boundary, doctor, default build and full default
