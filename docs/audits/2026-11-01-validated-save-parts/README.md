@@ -37,5 +37,22 @@ checksum-valid partial tags. A host-only observer also checks the actual
 writers at each tag-byte store, including the contiguous HP writers; the
 default ARM stores have no observer. Both fixtures are built under HP alone
 and the combined HP/Scarab gates; this does not qualify a game envelope.
-These tests are unrun at this source stage. No hardware power-loss or game-level save/load qualification is
+Qualification on frozen component `35f5ed42e4fca14ff8e2c90692453d1ed899b361`
+used ASan/UBSan host builds under the shared native lock. The four focused
+HP-only and combined HP/Scarab fixtures and the existing Scarab-only selection
+regression passed. The current fixture against isolated prototype `ea8b0de`
+compiled and its `partial-tag-retry` case failed at the expected
+`save_write_parts_selected` assertion. An initial baseline compile omitted
+`audio_codec.h`; that failed log was retained, the unchanged header was added
+to the isolated closure, and the corrected compile produced the assertion.
+No guest SRAM was injected.
+
+An unprepared clean source boundary, doctor, default build and full default
+tests passed: 932 tests (26 skipped), plus groups of 5 and 8. Fresh default
+ROMs from the component and base `0ff3ffb` matched byte for byte, SHA-256
+`73c0deeeb36cca4cb8614248a7e60cadac11a0ec542f2ece31c37b171e2c56b8`.
+Sources and isolated test inputs were checked unchanged. This component is
+still default-off: no game namespace or loader integration is qualified. The
+zero-high-byte rule does not support foreign committed namespaces with that
+tag shape. No hardware power-loss or game-level save/load qualification is
 claimed.
