@@ -6093,3 +6093,5 @@ include tests/sc64-shared-transport/Makefile
 include tests/sc64-z8-clock/Makefile
 
 include tests/sc64-scarab-wallet/Makefile
+
+include tests/sc64-protoss-preflight/Makefile

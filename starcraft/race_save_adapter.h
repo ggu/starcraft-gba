@@ -2959,9 +2959,14 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 }
 
 static int race_load_preflight(RaceLoadPlan *plan) {
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+    signed char prior_binding = race_protoss_binding_override;
+    int prior_mission = race_protoss_override_mission;
+#endif
     int ok = race_load_preflight_candidate(plan);
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
-    race_protoss_unbind_candidate();
+    race_protoss_binding_override = prior_binding;
+    race_protoss_override_mission = prior_mission;
 #endif
     return ok;
 }
