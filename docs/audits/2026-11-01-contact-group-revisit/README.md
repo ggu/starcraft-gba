@@ -24,3 +24,11 @@ Scarab state changes, invalid facts, active-index overflow, and memo behavior.
 Compare the current normal disabled ROM byte-for-byte, check unchanged ARM
 memory guards and stack usage, and run source-matched physical inputs. No
 historic prototype speedup is claimed for the current engine.
+
+The source-only membership oracle calls the full-world race collision fallback
+with the same boundary, gatherer, noncolliding and immovable-mover rules; it
+does not traverse the candidate group links. The existing manual egg rekey
+case is only a helper check and does not establish the real update-orders egg
+dispatch; that lifecycle remains a qualification requirement. The optional
+invalid-class case reports unavailable when the profile has no representable
+invalid class, and is not evidence of coverage in that configuration.

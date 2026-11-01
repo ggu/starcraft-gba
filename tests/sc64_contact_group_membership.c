@@ -90,8 +90,10 @@ test_linked_death_and_load_are_dynamic(void)
     assert(sc64_contact_blocked_mask(&u[0], 0) == 0u);
 }
 
+/* Unit-level helper check only; the actual update_orders egg dispatch must be
+ * qualified separately before this candidate can be admitted. */
 static void
-test_type_morph_rekey(void)
+test_manual_type_morph_rekey(void)
 {
     reset_world(0);
     set_actor(1, U_Z7_EGG, 10, 10, 1);
@@ -160,9 +162,20 @@ reference_mask(const Unit *q, int speed)
     unsigned mask = 0;
     int k;
     for (k = 0; k < 8; ++k)
-        if (!sc64_unit_bucket_step_clear_reference(
-                q, q->x + dx[k] * speed, q->y + dy[k] * speed, 0))
-            mask |= 1u << k;
+        {
+            int nx = q->x + dx[k] * speed, ny = q->y + dy[k] * speed;
+            int clear;
+            if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H)
+                clear = 0;
+            else if (SC64_SCARAB_NONCOLLIDING(q) ||
+                     (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS)) ||
+                     (sc64_game_unit_actor_flags(q->type) &&
+                      !(sc64_game_unit_actor_flags(q->type) & SC64_GAME_ACTOR_MOVABLE)))
+                clear = 1;
+            else
+                clear = unit_step_clear_race_fallback(q, nx, ny);
+            if (!clear) mask |= 1u << k;
+        }
     return mask;
 }
 
@@ -277,7 +290,7 @@ main(void)
     test_birth_move_preserves_old_cell();
     test_reused_linked_slot_move();
     test_linked_death_and_load_are_dynamic();
-    test_type_morph_rekey();
+    test_manual_type_morph_rekey();
     test_representative_promotion_and_bucket_edges();
     test_stale_snapshot_group_falls_back_per_member();
     test_dense_keys_and_lifecycle_against_reference();
