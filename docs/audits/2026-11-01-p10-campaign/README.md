@@ -222,3 +222,11 @@ make test-sc64-protoss-p10 SC64_AUDIO_DIR=.local/sc64/audio-codec2/generated
 - Raynor's base cannot grow, and the Gantrithor has no attack (see above).
 - Performance and frame rate are not measured.
 - The candidate is not promoted. Canonical Protoss remains P7.
+
+## P9/P10 cursor preflight follow-up
+
+At source `6b0d91bff2a562dde09c930ff83dd9cb35857258`, source-aware cursor bounds are checked on P9 and P10 candidate states before load commit using the same pure predicates as live validation. HOST fixtures check the last valid and first invalid action cursor for each applicable runner and source trigger; they do not construct guest SRAM images. The P9 fixture's `--cursor-preflight` runs only this focused check, without claiming an ordinary-input victory.
+
+The focused P9 and P10 carried startup/save matrices each passed 234 skirmish configurations; the P10 mission HOST fixture and bounded P9 cursor check passed. P9 ARM ROM SHA-256 `c210f663ad1b04e0f3674700e8f3b2c2d4e09e2c43878f38e3856dab8da25d67`, ELF `f8cb3c84a45d402f9fc8c1f32da7b57a9ac5f7b69f70bcd59b7c256d0af0d773`, BSS/IWRAM ends `02038d7c`/`03004a48`; P10 ROM `21801b16b7e37a68667810072089740767a9a20b06a7086846557492edbb79f5`, ELF `d60f1e57904af581e75987839d75cbba0710d528897f0f51615652641baf5cae`, ends `0203913c`/`03004a50`. These are this candidate's profile-specific inputs and binary receipts, not current experimental ROM identity claims. No long P9 controller or P10 ordinary-input win was run.
+
+Clean unprepared source-boundary (1406 indexed files), doctor, default build and test passed under the native lock; Python reported 873 tests with 23 skipped, plus separate suites of 5 and 8 passing. Two earlier prepared-input dry-runs stopped before compilation because walk-pair and walk-word auxiliary inputs had not been marked old; their logs were retained. The successful run pinned these existing auxiliary inputs and did not regenerate shared assets. Evidence remains private under `/tmp/sc64-p10-cursor-final-6b0d-results/`.
