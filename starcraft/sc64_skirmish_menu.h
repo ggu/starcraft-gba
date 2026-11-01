@@ -51,13 +51,20 @@ static inline const Sc64SkirmishRecord *sc64_skirmish_menu_record(unsigned race,
     return (const Sc64SkirmishRecord *)0;
 }
 
+/* Reaver production is intentionally unavailable until its ammunition
+ * lifecycle is complete; do not offer its otherwise dead-end Support Bay. */
+static inline int sc64_skirmish_menu_supported(const Sc64SkirmishRecord *r)
+{
+    return r && !(r->race == SC64_SK_PROTOSS && r->raw_id == 171);
+}
+
 static inline unsigned sc64_skirmish_menu_count(unsigned race)
 {
     unsigned i, n = 10;
     if (race >= SC64_SK_RACE_COUNT) return 0;
     for (i = 0; i < sc64_skirmish_build_count(race); ++i) {
         const Sc64SkirmishRecord *r = sc64_skirmish_build_at(race, i);
-        if (!sc64_skirmish_menu_is_basic(race, r->raw_id)) ++n;
+        if (sc64_skirmish_menu_supported(r) && !sc64_skirmish_menu_is_basic(race, r->raw_id)) ++n;
     }
     return n;
 }
@@ -120,7 +127,7 @@ static inline int sc64_skirmish_menu_at(unsigned race, unsigned index,
     }
     for (i = 0; i < sc64_skirmish_build_count(race); ++i) {
         const Sc64SkirmishRecord *r = sc64_skirmish_build_at(race, i);
-        if (sc64_skirmish_menu_is_basic(race, r->raw_id)) continue;
+        if (!sc64_skirmish_menu_supported(r) || sc64_skirmish_menu_is_basic(race, r->raw_id)) continue;
         if (n++ != index) continue;
         out->record = r;
         out->label = sc64_skirmish_menu_label(r);

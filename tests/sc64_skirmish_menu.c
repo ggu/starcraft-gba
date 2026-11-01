@@ -63,7 +63,7 @@ static void check_menu_race(unsigned race)
 
     for (i = 0; i < sc64_skirmish_build_count(race); ++i) {
         const Sc64SkirmishRecord *r = sc64_skirmish_build_at(race, i);
-        if (!sc64_skirmish_menu_is_basic(race, r->raw_id)) ++expected;
+        if (r->raw_id != 171 && !sc64_skirmish_menu_is_basic(race, r->raw_id)) ++expected;
     }
     assert(sc64_skirmish_menu_count(race) == expected);
     for (i = 10; i < expected; ++i) {
@@ -73,7 +73,7 @@ static void check_menu_race(unsigned race)
         /* Independently derive the appended sequence from the authored catalog. */
         for (j = 0; j < sc64_skirmish_build_count(race); ++j) {
             const Sc64SkirmishRecord *r = sc64_skirmish_build_at(race, j);
-            if (sc64_skirmish_menu_is_basic(race, r->raw_id)) continue;
+            if (r->raw_id == 171 || sc64_skirmish_menu_is_basic(race, r->raw_id)) continue;
             if (ordinal++ == i) { expected_record = r; break; }
         }
         assert(expected_record && row.record == expected_record);
