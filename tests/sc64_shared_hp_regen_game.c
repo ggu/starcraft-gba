@@ -11,6 +11,9 @@
 static RaceSave hp_candidate_copy, hp_candidate_before;
 static Unit hp_world_units_before[MAX_UNITS];
 static Building hp_world_buildings_before[MAX_BUILDINGS];
+#ifdef SC64_ZP_FULL_STORAGE
+static Mineral hp_world_minerals_before[MAX_MINERALS];
+#endif
 static int fixture_encode_hp_unit(RaceSave *save,unsigned slot,const Unit *q,
                                   unsigned width,unsigned height)
 {
@@ -43,6 +46,9 @@ static void test_candidate_geometry_and_rows(void)
     hp_candidate_copy=race_data;hp_candidate_before=hp_candidate_copy;
     memcpy(hp_world_units_before,u,sizeof(u));
     memcpy(hp_world_buildings_before,b,sizeof(b));
+#ifdef SC64_ZP_FULL_STORAGE
+    memcpy(hp_world_minerals_before,m,sizeof(m));
+#endif
     RaceHpPreparedRows rows={0};
     assert(race_hp_prepare_rows(&hp_candidate_copy,&rows));
     assert(rows.candidate==&hp_candidate_copy && rows.width==(unsigned)race_cols &&
@@ -64,6 +70,17 @@ static void test_candidate_geometry_and_rows(void)
         assert(a.type==live->type && a.owner==live->owner && a.hp==live->hp &&
                a.maxhp==live->maxhp && a.x==live->x && a.y==live->y);
     }
+#ifdef SC64_ZP_FULL_STORAGE
+    for(unsigned i=0;i<MAX_MINERALS;++i) {
+        Mineral a;const Mineral *live=&hp_world_minerals_before[i];
+        assert(race_hp_prepared_mineral(&rows,i,&a));
+        assert(a.x==live->x && a.y==live->y && a.amount==live->amount);
+#ifdef SC64_IMPORTED_MISSION
+        assert(a.style==live->style);
+#endif
+    }
+    assert(!memcmp(hp_world_minerals_before,m,sizeof(m)));
+#endif
     assert(!memcmp(&hp_candidate_copy,&hp_candidate_before,sizeof(hp_candidate_copy)));
     assert(!memcmp(hp_world_units_before,u,sizeof(u)) && !memcmp(hp_world_buildings_before,b,sizeof(b)));
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
