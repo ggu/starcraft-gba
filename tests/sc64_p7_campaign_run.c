@@ -29,16 +29,24 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
     int cells=MAP_COLS*MAP_ROWS;
     static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
     static int prev[MAP_CELLS],queue[MAP_CELLS];
-    int sx=0,sy=0,n=0,best_origin=0x7fffffff, sumx=0,sumy=0;
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type!=U_PROBE){
-        sumx+=u[i].x;sumy+=u[i].y;++n;
-    }
-    if(n)for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type!=U_PROBE){
-        int d=dist2(u[i].x,u[i].y,sumx/n,sumy/n);
-        if(d<best_origin){best_origin=d;sx=u[i].x;sy=u[i].y;}
+    /* Match the eligible combat shortcut, but use the forward quartile
+     * rather than its centroid: an already-arrived formation can straddle a
+     * waypoint while its center keeps issuing the same eight cells. This is
+     * a host-world policy query; actual orders still use the normal UI. */
+    int candidates[MAX_UNITS],distances[MAX_UNITS],n=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+        !SC64_TRANSPORT_LOADED(&u[i])&&!SC64_SCARAB_CHILD(&u[i])&&
+        !IS_WORKER(u[i].type)&&u[i].type!=U_OVERLORD&&u[i].type!=U_CHRYSALIS&&
+        sc64_game_unit_selectable(u[i].type)&&sc64_game_unit_has_flag(u[i].type,SC64_GAME_ACTOR_WEAPON)) {
+        int d=dist2(u[i].x,u[i].y,tx,ty),at=n++;
+        while(at>0&&(d<distances[at-1]||(d==distances[at-1]&&i<candidates[at-1]))) {
+            distances[at]=distances[at-1];candidates[at]=candidates[at-1];--at;
+        }
+        distances[at]=d;candidates[at]=i;
     }
     if(!n||!path_grid_valid)return 0;
-    sx=limit(sx/16,0,MAP_COLS-1);sy=limit(sy/16,0,MAP_ROWS-1);
+    int origin=candidates[(n-1)/4],origin_x=u[origin].x,origin_y=u[origin].y;
+    int sx=limit(origin_x/16,0,MAP_COLS-1),sy=limit(origin_y/16,0,MAP_ROWS-1);
     int start=sx+sy*MAP_COLS,gx=limit(tx/16,0,MAP_COLS-1),gy=limit(ty/16,0,MAP_ROWS-1);
     int head=0,tail=0,best=-1,bestd=0x7fffffff;
     for(int i=0;i<cells;i++)prev[i]=-2;
@@ -72,6 +80,8 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
     int cell=path[pick];
     *wx=(cell%MAP_COLS)*16+8;*wy=(cell/MAP_COLS)*16+8;
     if(steps_out)*steps_out=distance-pick;
+    fprintf(trace,"{\"kind\":\"route-origin\",\"frame\":%u,\"slot\":%d,\"raw\":%d,\"xy\":[%d,%d],\"combat_count\":%d,\"rank\":%d,\"target\":[%d,%d],\"path_distance\":%d,\"waypoint\":[%d,%d]}\n",
+        (unsigned)frame,origin,u[origin].raw_type,origin_x,origin_y,n,(n-1)/4,tx,ty,distance,*wx,*wy);
     return 1;
 }
 
