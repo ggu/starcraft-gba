@@ -11,3 +11,18 @@ Fresh continuation matched calls 32445, 34925, 37805, 40546, 43841, 46208, 48852
 The prefix result SHA-256 is `de75fa85f0226b06e6bcc86b0808a61b30659a3005d50a9f2ad854cee7f3933b`; the full continuation result is `c70e6cc663a3683f6db46ee6d089296c016bbd52792aa3be24c0d702ce3ae28d`. Private traces, SRAM and other assets are not included here.
 
 This is an emulator physical-input and ordinary save/load qualification for the named binary and bounded observations, not a hardware FPS result or full N64 parity proof. The currently selected generic Reaver approximation does not provide the complete shared paid Scarab service; this receipt does not authorize P8 default promotion. The parser deliberately accepts only the specific neutral no-shot/no-impact envelope and rejects unsupported variable tails rather than treating them as valid.
+
+## Reproducing the tooling
+
+Use a legally prepared P8 profile closure and the exact matching ROM and ELF. The strict HOST witness includes the existing controller, so compile `tests/sc64_p8_strict_host_witness.c` with the canonical P8 controller recipe's flags and dependencies: inspect `make -n build/test-sc64-p8-campaign-run`, substitute the witness source and a new output path in that compile command, then run the resulting witness with `<trace.jsonl> 160000`. Do not treat the original controller's exit code alone as the strict victory receipt.
+
+The physical backend must implement the read-only K/U interface; use the paired ELF for layout and symbols. With private paths supplied explicitly, first export the neutral ordinary save and then start a fresh process:
+
+```sh
+python3 tools/sc64_p8_physical_replay.py --trace <trace.jsonl> --rom <p8.gba> --elf <p8.elf> --runner <physical-runner> --output <new-prefix-dir>
+python3 tools/sc64_p8_physical_replay.py --trace <trace.jsonl> --rom <p8.gba> --elf <p8.elf> --runner <physical-runner> --output <new-resume-dir> --resume <new-prefix-dir>/saved.sav --summary <new-prefix-dir>/saved-state.json
+```
+
+The parser is deliberately restricted to a fresh neutral P8 Transport1 journal without active Yamato shots, impact bytes or nonzero trailer. It is not a general save validator; an unsupported actual save fails closed.
+
+The clean unprepared qualification at source `08b1075af97a8f16ac6545ca5e9fd4314c3e76bf` passed source boundary (1496 indexed files), `./dev doctor`, `./dev build` and unchanged `./dev test` under the native lock. The Python suite reported 944 tests with 26 skipped, followed by suites of 5 and 8 passing tests. The clean default ROM SHA-256 was `c4562caf70e71b09a6ed6c0cf8adfd28cd85987083b0f4e7fa9ccd3bf1ec101a`; the qualified P8 ROM and ELF hashes above were unchanged. This clean run did not repeat the physical replay.
