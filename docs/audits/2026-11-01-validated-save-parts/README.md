@@ -27,6 +27,6 @@ maximum payload. It includes rejected/stale tokens, invalid lengths and
 pointers, duplicate/zero/unknown tags, semantic rejection of newer records,
 preserved predecessors and a tag-last interruption model around the span
 boundary. The existing selection fixture is also compiled under the HP gate.
-These tests are unrun; native work is queued behind the active physical
+These tests are unrun; native qualification must wait for the active physical
 replay. No hardware power-loss or game-level save/load qualification is
 claimed.
