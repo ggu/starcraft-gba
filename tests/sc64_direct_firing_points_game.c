@@ -927,6 +927,68 @@ static void test_range_cold_point_corridor(void)
     }
 }
 
+/* Independent pixel-by-pixel safety oracle for returned first legs. Failed
+ * searches are permitted: this checks the witness, not search completeness. */
+static unsigned range_oracle_rand(unsigned *state)
+{
+    *state = *state * 1664525u + 1013904223u;
+    return *state;
+}
+
+static void test_range_corridor_pixel_oracle(void)
+{
+    unsigned state = 0x71a935cdu, successes = 0, orientations = 0;
+    unsigned nonzero_min = 0, offcenter = 0;
+    int nx, ny;
+    setup_combat_scene();
+    for (unsigned trial = 0; trial < 4096u; ++trial) {
+        int x, y, gx, gy, tx, ty, minimum;
+        unsigned initial = trial % (SC64_RANGE_CORRIDOR_BUDGET + 1u);
+        unsigned spent;
+        memset(path_walkable, 0xff, sizeof(path_walkable));
+        path_grid_valid = 1;
+        for (int k = 0; k < 100; ++k) {
+            unsigned col = range_oracle_rand(&state) % (unsigned)MAP_COLS;
+            unsigned row = range_oracle_rand(&state) % (unsigned)MAP_ROWS;
+            SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
+        }
+        x = (int)(range_oracle_rand(&state) % (unsigned)(MAP_COLS * 16));
+        y = (int)(range_oracle_rand(&state) % (unsigned)(MAP_ROWS * 16));
+        gx = (int)(range_oracle_rand(&state) % (unsigned)(MAP_COLS * 16));
+        gy = (int)(range_oracle_rand(&state) % (unsigned)(MAP_ROWS * 16));
+        tx = (int)(range_oracle_rand(&state) % (unsigned)(MAP_COLS * 16));
+        ty = (int)(range_oracle_rand(&state) % (unsigned)(MAP_ROWS * 16));
+        minimum = (int)(range_oracle_rand(&state) % 161u);
+        SC64_GRID_SET(path_walkable, x / 16 + (y / 16) * MAP_COLS, 1);
+        sc64_range_corridor_budget = (u8)initial;
+        if (sc64_range_point_corridor(x, y, gx, gy, tx, ty, minimum, &nx, &ny)) {
+            int px = x, py = y;
+            int sx = nx > x ? 1 : nx < x ? -1 : 0;
+            int sy = ny > y ? 1 : ny < y ? -1 : 0;
+            assert(!(sx && sy));
+            assert(nx >= 0 && ny >= 0 && nx < MAP_COLS * 16 && ny < MAP_ROWS * 16);
+            for (;;) {
+                assert(px >= 0 && py >= 0 && px < MAP_COLS * 16 && py < MAP_ROWS * 16);
+                assert(SC64_GRID_GET(path_walkable, px / 16 + (py / 16) * MAP_COLS));
+                assert(dist2(px, py, tx, ty) >= minimum * minimum);
+                if (px == nx && py == ny) break;
+                px += sx; py += sy;
+            }
+            ++successes;
+            if (sx) orientations |= 1u;
+            if (sy) orientations |= 2u;
+            if (minimum) ++nonzero_min;
+            if ((x & 15) != 8 || (y & 15) != 8) ++offcenter;
+        }
+        spent = initial - sc64_range_corridor_budget;
+        assert(spent == sc64_range_corridor_last_checks);
+        assert(spent <= initial);
+    }
+    assert(successes >= 20 && orientations == 3u && nonzero_min && offcenter);
+    printf("range pixel oracle: %u first legs, orientations=%u, nonzero-min=%u, off-center=%u\n",
+           successes, orientations, nonzero_min, offcenter);
+}
+
 /* Exercise real slot reuse with an active copy, a snapshot and a separate
  * pending target. Reuse must not discard the unrelated pending request. */
 static void test_range_target_slot_reuse(void)
@@ -992,6 +1054,7 @@ int main(void)
     test_melee_and_explicit_move_are_unchanged();
 #ifdef SC64_RANGE_WORK
     test_range_cold_point_corridor();
+    test_range_corridor_pixel_oracle();
     test_range_cached_point_fields();
     test_range_work_scheduler_contracts();
     test_range_target_slot_reuse();

@@ -153,7 +153,7 @@ static int range_save_same_live(RangeSaveLiveMark a, RangeSaveLiveMark b)
 
 static void test_live_save_boundary_restarts_range_worker(void)
 {
-    const int attacker_x = 20 * 16 + 8, target_x = 42 * 16 + 8;
+    const int attacker_x = 1 * 16 + 8, target_x = 42 * 16 + 8;
     const int y = 30 * 16 + 8;
     int next_x = -1, next_y = -1;
     range_save_launch_skirmish();
