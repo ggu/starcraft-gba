@@ -37,6 +37,21 @@ static void test_actor_phase_owners_and_reuse(void)
     race_shared_hp_regen_tick();
     assert(u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
 }
+#ifdef SC64_P6_COMBAT_ENABLED
+static void test_p6_burrowed_regenerates(void)
+{
+    game_init();memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+    race_mode=0;race_selected_mission=SC64_P6_GLOBAL_ID;
+    assert(race_p6_active());
+    int slot=spawn_unit(ENEMY,U_ZERGLING,100,100);assert(slot>=0);
+    u[slot].raw_type=37;u[slot].flags|=2u;
+    assert(race_p6_combat_unit_burrowed(slot));
+    u[slot].hp=u[slot].maxhp-1;u[slot].shield_remainder=79;
+    race_shared_hp_regen_tick();
+    assert(race_p6_combat_unit_burrowed(slot));
+    assert(u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
+}
+#endif
 #ifdef SC64_Z5_RUNTIME
 static void test_z5_legacy_tick_disabled(void)
 {
@@ -99,6 +114,9 @@ int main(void)
     assert(u[marine].shield_remainder==79);
     test_actor_phase_owners_and_reuse();
     test_paused_and_live_update();
+#ifdef SC64_P6_COMBAT_ENABLED
+    test_p6_burrowed_regenerates();
+#endif
 #ifdef SC64_Z5_RUNTIME
     test_z5_legacy_tick_disabled();
 #endif
