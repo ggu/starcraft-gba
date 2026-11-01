@@ -57,7 +57,7 @@ demonstration that the position remains safe through later waves. The next
 policy needs an earlier northern detector/attacker interception and continued
 coverage of all three hive regions while pursuing both enemy Nexuses.
 
-## Northern interception follow-up (unrun)
+## Northern interception follow-up
 
 `tests/sc64_z8_north_intercept_probe.c` retains the ordinary hero retreat and
 first southern interception, but stages the northern Overlord at `(1640,832)`
@@ -74,4 +74,25 @@ enter detection earlier; its total detection residence would be similar.
 The previous northern engagement removed only about 48 shield points, so
 earlier vision alone does not establish lethal interception. Defender arrival,
 attack-move pursuit, survival, collision and paid economic development must
-all be observed in a fresh ordinary-input trial. No new result is claimed.
+all be observed in a fresh ordinary-input trial.
+
+The controller branch was rebased onto experimental engine `2a21677` before
+this run, including the admitted prepared visibility rows and caller binding
+fix. At frozen trial `fced3c7`, compilation and ordinary-input host execution
+passed ASan/UBSan without a report; the engine's source scheduler fault stayed
+zero. All pinned inputs were unchanged. The first southern raid and hero
+retreat retained their earlier timing. The next northern Templar, source
+identity 74/owner 1, spawned into slot 54 at 10448, became detected at 10569,
+lost its 80 shields and 40 HP, and was dead at 10643. T16 did not transition
+in this run. The actual formation included two original Ultralisks, two
+Hydralisks and surviving Zerglings; slots 21 and 22 contained enemy replacements,
+not the original Zerglings.
+
+The mission still lost: the original Kerrigan took damage at 12654, was dead
+after 12853 (prior HP 32, then -66), and T1 completed the hero-absence defeat
+at 12937/native 10349. The regular loop completed 8444 iterations and 13083
+ordinary update calls. A later northern raid was already present at the end.
+This qualifies the observed northern interception, not redundant long-term
+defense or a mission win. The local log is
+`/tmp/sc64-z8-north-intercept-fced3c7-20261101.log`, SHA-256
+`d0773a8b17f8cf6d5e9d6d34004297b91a152e3ab57f566b03b9b9fac5f0c47e`.
