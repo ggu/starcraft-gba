@@ -68,3 +68,42 @@ Unsupported completion identities and any profile or feature whose evidence
 is missing must be reported rather than inferred. The service stores phase per
 actor; the expected 80-update interval is not a global clock phase. No native
 compile or fixture result has been obtained for this composition.
+
+## Focused host results on the staged composition
+
+At frozen test head `22d88b9d873e597a7dd0b0fafde553fd016fd525`, the
+ASan/UBSan helper, Z5, canonical Z7, canonical P7 and Showcase host fixtures
+passed under the native lock. These use the host-only escape and do not enable
+any product. The controlled tests cover per-actor 80-update cadence and five
+owner slots, death/slot reuse, complete and incomplete colony phases, a
+nonregenerator, controlled campaign/skirmish bindings, a pause/live update,
+and the Z5 shared/legacy tick interaction. P7 and Showcase include the P6
+combat implementation and passed an actual P6 burrow-state check. Showcase
+also starts its real scene 5, unpauses and witnesses one live update. Shared
+transport fixtures establish a real Dropship/Zergling boarding order and valid
+carrier link, then retain it for 80 direct service ticks. These controlled
+fixture states are not natural-input campaign play or guest save/load proof.
+
+Exact standalone canonical P6 failed to compile at the existing minimum
+impact-save capacity assertion. A separate HP-off canonical P6 host compile
+failed the same assertion, so this is not introduced by the HP gate. The P6
+profile itself remains unqualified; the P7/Showcase P6 burrow checks do not
+prove its complete storage layout or budget. No assertion or capacity limit
+was relaxed. No post-result fault, ordinary HPRegen1 save/load, performance,
+ARM link, native hardware timing or full 50-identity coverage is claimed.
+Larva (raw 35) remains explicitly unsupported by the staged completion
+validator despite carrying the authenticated source property.
+
+The 109 pinned inputs and the walk, contact, weapon and two marker sidecars
+were checked unchanged. The P7 fact generator was built from this worktree's
+`tools/sc64_fact_tables_gen.c` and wrote a new ignored fact directory; its
+SHA-256 was `a9a01d7d70085ab0cbb4ea58a44d5781f980a6dc1c07c77393050a586cb8c441`,
+identical to the prior normal P7 fact table. That generator emits actor,
+sight and rectangle facts, not the stock regeneration bit. The staged service
+reads the tracked `sc64_stock_profiles.h` directly; its 234 rows contain the
+same 50 addressable eligible IDs as the authenticated comparison, with
+228-byte eligibility-vector SHA-256
+`29741f6688fb9ae03b6df2cc3eab0ccb5b308e7965307c521ea241e225691125`.
+Raw 37 and 51 have flag 2, raw 131 has flag 3, and raw 0 and 36 have flag 0.
+The separate property JSON was used only to verify the set, not as generator
+input. No private table or vector is committed.
