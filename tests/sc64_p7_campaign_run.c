@@ -18,6 +18,17 @@ static u16 prior;
 static unsigned host_tick;
 static int army_center(int *x,int *y);
 
+/* Imported actors have explicit flags; standard roster actors use zero flags
+ * and their shared ground/air damage facts for weapon eligibility. */
+static int route_combat_type_eligible(int type)
+{
+    unsigned flags=sc64_game_unit_actor_flags(type);
+    if(IS_WORKER(type)||type==U_OVERLORD||type==U_CHRYSALIS||
+       !sc64_game_unit_selectable(type))return 0;
+    return flags ? (flags & SC64_GAME_ACTOR_WEAPON)!=0 :
+        sc64_race_unit_damage_vs(type,0)>0||sc64_race_unit_damage_vs(type,1)>0;
+}
+
 /* This is deliberately a read-only controller-side route query.  The game
  * builds its walkability plane as part of ordinary simulation; if it is not
  * current/available, wait for the engine rather than rebuilding its cache
@@ -29,22 +40,25 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
     int cells=MAP_COLS*MAP_ROWS;
     static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
     static int prev[MAP_CELLS],queue[MAP_CELLS];
-    /* Use the explicit-weapon subset of the combat shortcut and the forward quartile
+    /* Use weapon-capable members of the combat shortcut and the forward quartile
      * rather than its centroid: an already-arrived formation can straddle a
      * waypoint while its center keeps issuing the same eight cells. This is
      * a host-world policy query; actual orders still use the normal UI. */
     int candidates[MAX_UNITS],distances[MAX_UNITS],n=0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
         !SC64_TRANSPORT_LOADED(&u[i])&&!SC64_SCARAB_CHILD(&u[i])&&
-        !IS_WORKER(u[i].type)&&u[i].type!=U_OVERLORD&&u[i].type!=U_CHRYSALIS&&
-        sc64_game_unit_selectable(u[i].type)&&sc64_game_unit_has_flag(u[i].type,SC64_GAME_ACTOR_WEAPON)) {
+        route_combat_type_eligible(u[i].type)) {
         int d=dist2(u[i].x,u[i].y,tx,ty),at=n++;
         while(at>0&&(d<distances[at-1]||(d==distances[at-1]&&i<candidates[at-1]))) {
             distances[at]=distances[at-1];candidates[at]=candidates[at-1];--at;
         }
         distances[at]=d;candidates[at]=i;
     }
-    if(!n||!path_grid_valid)return 0;
+    if(!n||!path_grid_valid) {
+        fprintf(trace,"{\"kind\":\"route-origin-reject\",\"frame\":%u,\"reason\":\"%s\",\"target\":[%d,%d]}\n",
+            (unsigned)frame,n?"path-grid-invalid":"no-eligible-combat",tx,ty);
+        return 0;
+    }
     int origin=candidates[(n-1)/4],origin_x=u[origin].x,origin_y=u[origin].y;
     int sx=limit(origin_x/16,0,MAP_COLS-1),sy=limit(origin_y/16,0,MAP_ROWS-1);
     int start=sx+sy*MAP_COLS,gx=limit(tx/16,0,MAP_COLS-1),gy=limit(ty/16,0,MAP_ROWS-1);
@@ -70,7 +84,11 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
             prev[next]=cell;queue[tail++]=next;
         }
     }
-    if(best<0)return 0;
+    if(best<0) {
+        fprintf(trace,"{\"kind\":\"route-origin-reject\",\"frame\":%u,\"reason\":\"no-reachable-route\",\"slot\":%d,\"xy\":[%d,%d],\"target\":[%d,%d]}\n",
+            (unsigned)frame,origin,origin_x,origin_y,tx,ty);
+        return 0;
+    }
     int path[MAP_CELLS],len=0;
     for(int c=best;c>=0&&len<cells;c=prev[c])path[len++]=c;
     if(!len)return 0;
@@ -758,6 +776,11 @@ int main(int argc,char **argv)
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
     fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":26,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\",\"observation_policy\":\"host world-state oracle; not limited to player-visible information\"}\n",P7_CONTROLLER_PROFILE);
     game_init();prior=0;
+    int dragoon=route_combat_type_eligible(U_DRAGOON),zealot=route_combat_type_eligible(U_ZEALOT),
+        scout=route_combat_type_eligible(U_SCOUT),observer=route_combat_type_eligible(U_P7_OBSERVER);
+    fprintf(trace,"{\"kind\":\"route-eligibility\",\"dragoon\":%d,\"zealot\":%d,\"scout\":%d,\"observer\":%d}\n",dragoon,zealot,scout,observer);
+    fflush(trace);
+    assert(dragoon&&zealot&&scout&&!observer);
     assert(screen==SCREEN_TITLE&&race_front.page==SC_FRONT_HOME);
     KEY_TAP(KEY_A);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);
     KEY_TAP(KEY_A);KEY_TAP(KEY_START);
