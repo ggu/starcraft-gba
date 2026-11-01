@@ -2,6 +2,9 @@
 #define SC64_RACE_ADAPTER_H
 
 #include "race_skirmish.h"
+#ifdef SC64_SHARED_HP_REGEN
+#include "sc64_shared_hp_regen.h"
+#endif
 #ifdef SC64_P3_PRODUCTION_EXIT
 #ifndef SC64_P3_RUNTIME
 #error "SC64_P3_PRODUCTION_EXIT requires the P3 campaign runtime"
@@ -994,10 +997,51 @@ static void __attribute__((noinline)) race_tick_building_damage(int slot)
     if (!after) destroy_building(slot,(int)sc64_building_burn_owner(packed));
 }
 
+#ifdef SC64_SHARED_HP_REGEN
+/* A phase belongs only to an authenticated, unshielded regenerating type.
+ * The runtime fields differ across profiles, so use a typed local rather than
+ * aliasing the compact u16 storage as an int pointer. */
+static int race_shared_hp_regen_raw(int raw, int expected_type, int building)
+{
+    const Sc64StockUnitProfile *p;
+    if (raw < 0 || raw >= SC64_STOCK_UNIT_LIMIT) return -1;
+    p = sc64_stock_unit_profile(raw);
+    if (!p || !(p->flags & SC64_STOCK_F_REGENERATES_HP) || p->shields ||
+        !!(p->flags & SC64_STOCK_F_BUILDING) != !!building) return -1;
+    if (building ? sc64_race_building_from_raw(raw) != expected_type :
+                   sc64_race_unit_from_raw(raw) != expected_type) return -1;
+    return raw;
+}
+static void __attribute__((noinline)) race_shared_hp_regen_tick(void)
+{
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i]; unsigned phase; int raw;
+        if (!q->alive || (unsigned)q->type >= SC_RU_COUNT || (unsigned)q->owner >= 5 ||
+            !sc64_race_unit_rule(q->type) || sc64_race_unit_rule(q->type)->shields) continue;
+        raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+        if (race_shared_hp_regen_raw(raw, q->type, 0) < 0) continue;
+        phase = (unsigned)q->shield_remainder;
+        if (sc64_shared_hp_regen_tick(&q->hp, q->maxhp, &phase, 1))
+            q->shield_remainder = phase;
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        Building *q = &b[i]; unsigned phase; int raw;
+        if (!q->alive || (unsigned)q->type >= SC_RB_COUNT || (unsigned)q->owner >= 5 ||
+            sc64_race_building_shields(q->type)) continue;
+        raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_building(q->type);
+        if (race_shared_hp_regen_raw(raw, q->type, 1) < 0) continue;
+        phase = (unsigned)q->shield_remainder;
+        if (sc64_shared_hp_regen_tick(&q->hp, q->maxhp, &phase,
+                                      !q->under_construction))
+            q->shield_remainder = phase;
+    }
+}
+#endif
+
 static void race_tick_state(void)
 {
     int i,used=0,cap=0;
-#ifdef SC64_Z5_RUNTIME
+#if defined(SC64_Z5_RUNTIME) && !defined(SC64_SHARED_HP_REGEN)
     int z5_regeneration_active = race_z5_active();
 #endif
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive &&
@@ -1025,7 +1069,7 @@ static void race_tick_state(void)
                 &u[i].carry, reactor, sc64_battlecruiser_source_tick_due());
         }
 #endif
-#ifdef SC64_Z5_RUNTIME
+#if defined(SC64_Z5_RUNTIME) && !defined(SC64_SHARED_HP_REGEN)
         if (z5_regeneration_active) {
             int raw_type = -1;
             if (u[i].type == U_ZERGLING)
