@@ -488,7 +488,11 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
  * journal is integrated; these constants do not change any reader/writer. */
 _Static_assert((SAVE_VERSION & 0x02000000u) != 0,
                "HP regeneration tag transform requires reserved bit");
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#define SC64_HP_REGEN_INNER_TAG (SC64_SCARAB_SAVE_VERSION ^ 0x02000000u)
+#else
 #define SC64_HP_REGEN_INNER_TAG (SAVE_VERSION ^ 0x02000000u)
+#endif
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_SHARED_TRANSPORT)
 #define SC64_HP_REGEN_PREDECESSOR_TAG SC64_SCARAB_TRANSPORT_SAVE_VERSION
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
