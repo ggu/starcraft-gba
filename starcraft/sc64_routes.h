@@ -434,11 +434,18 @@ enum {
 #define SC64_RANGE_WORK_BUDGET_PER_TICK 96u
 #endif
 
-typedef struct Sc64RangeRouteJob {
-    u16 target, tx, ty, minimum, maximum;
+/* The actor namespace is bounded by the game ingress check. The packed
+ * fields are accessed as fields, never through unaligned integer pointers. */
+typedef struct __attribute__((packed, aligned(2))) Sc64RangeRouteJob {
+    unsigned target : 9;
+    unsigned tx : 11;
+    unsigned ty : 11;
+    unsigned minimum : 13;
+    unsigned maximum : 13;
+    unsigned valid : 1;
     u16 last_request;
-    u8 valid;
 } Sc64RangeRouteJob;
+_Static_assert(sizeof(Sc64RangeRouteJob) == 10, "range job layout");
 
 static Sc64RangeWork sc64_range_route_work;
 static Sc64RangeRouteJob sc64_range_route_active;
@@ -884,7 +891,7 @@ static int sc64_range_route_next(int target, int tx, int ty,
     Sc64RangeRouteJob job = {0};
     int status, nx = -1, ny = -1;
     unsigned exits = 0;
-    if (!next_col || !next_row || target < 0 || target > 0xffff ||
+    if (!next_col || !next_row || target < 0 || target > 0x1ff ||
         tx < 0 || ty < 0 || tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16 ||
         minimum < 0 || maximum < minimum || maximum > 4096 ||
         col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS)
@@ -1159,6 +1166,8 @@ sc64_route_slot(int goal)
     if (partial_slot >= 0) slot = partial_slot;
 #endif
 #ifdef SC64_RANGE_WORK
+    /* Every usable slot can be pinned by an in-progress snapshot copy. */
+    if (slot < 0) return -1;
     if (slot == sc64_range_route_snapshot_slot) {
         sc64_range_route_snapshot_slot = -1;
         memset(&sc64_range_route_snapshot_key, 0,

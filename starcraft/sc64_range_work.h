@@ -33,9 +33,10 @@ typedef struct Sc64RangeWork {
     unsigned short cells, gradient_bytes, frontier_bytes, bit_bytes;
     unsigned short plane_bytes;
     unsigned short cursor, current_plane, next_count;
-    int cols, rows, target_x, target_y, min_range, max_range;
-    unsigned short summary_offset[5];
-    unsigned short seed_left, seed_top, seed_width, seed_height, seed_total;
+    unsigned short cols, rows, target_x, target_y, min_range, max_range;
+    /* A 128 x 128 map requires at most four 8-way summary levels. */
+    unsigned short summary_offset[4];
+    unsigned short seed_left, seed_top, seed_width, seed_total;
     unsigned short seed_col, seed_row;
     unsigned char summary_depth;
     unsigned char phase;
@@ -216,8 +217,7 @@ static int sc64_range_work_begin(Sc64RangeWork *work,
         if (right >= (unsigned)cols) right = (unsigned)cols - 1u;
         if (bottom >= (unsigned)rows) bottom = (unsigned)rows - 1u;
         work->seed_width = (unsigned short)(right - left + 1u);
-        work->seed_height = (unsigned short)(bottom - top + 1u);
-        work->seed_total = (unsigned short)(work->seed_width * work->seed_height);
+        work->seed_total = (unsigned short)(work->seed_width * (bottom - top + 1u));
     }
     work->seed_col = work->seed_left;
     work->seed_row = work->seed_top;
@@ -225,7 +225,7 @@ static int sc64_range_work_begin(Sc64RangeWork *work,
         unsigned level_bytes = walk_need, offset = walk_need;
         while (level_bytes > 1u) {
             level_bytes = sc64_range_work_ceil8(level_bytes);
-            if (work->summary_depth >= 5u) break;
+            if (work->summary_depth >= 4u) break;
             work->summary_offset[work->summary_depth++] = (unsigned short)offset;
             offset += level_bytes;
         }
@@ -249,7 +249,7 @@ static void sc64_range_work_reset(Sc64RangeWork *work)
     work->min_range = work->max_range = 0;
     memset(work->summary_offset, 0, sizeof(work->summary_offset));
     work->seed_left = work->seed_top = work->seed_width = 0;
-    work->seed_height = work->seed_total = 0;
+    work->seed_total = 0;
     work->seed_col = work->seed_row = 0;
     work->summary_depth = 0;
     work->phase = SC64_RANGE_WORK_IDLE;
