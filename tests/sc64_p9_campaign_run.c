@@ -743,6 +743,7 @@ static void check_candidate_cursor_bounds(void)
 int main(int argc,char **argv)
 {
     check_candidate_cursor_bounds();
+    if (argc == 2 && !strcmp(argv[1], "--cursor-preflight")) return 0;
     const char *path=argc>1?argv[1]:".local/traces/p9-controller.jsonl";
     unsigned limit_ticks=argc>2?(unsigned)strtoul(argv[2],0,10):P9_RUN_LIMIT;
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
