@@ -630,12 +630,17 @@ static void race_zl_ai_wave(unsigned town)
 {
     int tx = -1, ty = -1, sent = 0, guard = 0, want;
     s16 slot = (s16)race_zl_mission->town_slot[town];
-    /* Aim at a human hive cluster, else the first human unit. */
+    /* Aim at a human hive cluster, else any destructible human structure,
+     * else the first human unit, so waves keep pressing a beaten human. */
     for (int i = 0; i < MAX_BUILDINGS && tx < 0; ++i) if (b[i].alive &&
         b[i].owner == SIDE && (b[i].raw_type == SC64_ZL_RAW_HATCHERY ||
         b[i].raw_type == SC64_ZL_RAW_LAIR || b[i].raw_type == SC64_ZL_RAW_HIVE)) {
         tx = b[i].x; ty = b[i].y;
     }
+    for (int i = 0; i < MAX_BUILDINGS && tx < 0; ++i)
+        if (b[i].alive && b[i].owner == SIDE && !invincible_buildings[i]) {
+            tx = b[i].x; ty = b[i].y;
+        }
     for (int i = 0; i < MAX_UNITS && tx < 0; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type != U_CHRYSALIS) {
             tx = u[i].x; ty = u[i].y;
