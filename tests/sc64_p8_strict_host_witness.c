@@ -40,9 +40,10 @@ int main(int argc,char **argv)
         faults_ok && victory_count==1 && enabled && completed && conditions_ok;
     printf("P8_STRICT status=%s controller_rc=%d screen=%d won=%d lost=%d mode=%d mission=%d campaign_mission=%u outcome=%u phase=%u objectives=%u completed_mask=%u faults=%u,%u,%u victory_count=%u victory_trigger=%u enabled=%d trigger_done=%d conditions=%d frame=%d calls=%u\n",
         strict?"WIN":"NOT_WIN",controller_rc,screen,won,lost,race_mode,race_selected_mission,
-        race_campaign.mission,race_p8.runtime[SC64_P8_RUNNER_HUMAN].outcome,race_campaign.phase,
-        race_campaign.objective_flags,(unsigned)race_completed,race_p8.runtime[0].fault,
-        race_p8.runtime[1].fault,race_p8.runtime[2].fault,victory_count,victory_trigger,
+        (unsigned)race_campaign.mission,(unsigned)race_p8.runtime[SC64_P8_RUNNER_HUMAN].outcome,
+        (unsigned)race_campaign.phase,race_campaign.objective_flags,(unsigned)race_completed,
+        (unsigned)race_p8.runtime[0].fault,(unsigned)race_p8.runtime[1].fault,
+        (unsigned)race_p8.runtime[2].fault,victory_count,victory_trigger,
         enabled,completed,conditions_ok,frame,host_tick);
     return strict?0:1;
 }
