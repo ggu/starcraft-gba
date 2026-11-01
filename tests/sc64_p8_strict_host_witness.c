@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Ordinary-input P8 controller with a separate source-terminal witness.
  * The included controller retains its trace and pause-save behavior. */
 #define main sc64_p8_controller_main
