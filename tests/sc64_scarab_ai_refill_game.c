@@ -39,6 +39,32 @@ static void custom_bots(void)
     assert(!race_scarab_ai_enqueue_one(slots[0],ENEMY,-1));
     assert(!memcmp(&before,&u[slots[0]],sizeof(before))&&race_minerals[ENEMY]==bank);
 }
+#ifdef SC64_IMPORTED_SKIRMISH
+/* Initialize both actual imported maps, every human race and each bot count.
+ * Parents are seeded after setup; this is not natural Reaver production. */
+static void imported_map_owner_matrix(void)
+{
+    const int owners[]={ENEMY,RESCUABLE,4};
+    assert(SC64_SKIRMISH_IMPORTED_COUNT>=2);
+    for(int map=1;map<=2;map++)for(int human=0;human<3;human++)for(int bots=1;bots<=3;bots++) {
+        race_mode=1;race_skirmish_map=map;race_human=human;race_bots=bots;
+        for(int i=0;i<3;i++)race_bot_races[i]=(human+i)%3;
+        race_skirmish_init();
+        assert(race_mode&&race_skirmish_map==map&&race_human==human&&race_bots==bots);
+        int human_bank=minerals,slots[3];
+        for(int i=0;i<bots;i++) {
+            race_minerals[owners[i]]=200+i*100;
+            slots[i]=parent(owners[i],-1);
+        }
+        for(int i=0;i<bots;i++) {
+            assert(race_scarab_ai_enqueue_one(slots[i],owners[i],-1));
+            for(int j=0;j<bots;j++)
+                assert(race_minerals[owners[j]]==200+j*100-(j<=i?15:0));
+        }
+        assert(minerals==human_bank);
+    }
+}
+#endif
 static void campaign_banks(int mission,int source_a,int source_b,uint32_t *a,uint32_t *b)
 {
     memset(u,0,sizeof(u));race_mode=0;race_selected_mission=mission;
@@ -58,6 +84,9 @@ static void campaign_banks(int mission,int source_a,int source_b,uint32_t *a,uin
 int main(void)
 {
     gba_init();custom_bots();
+#ifdef SC64_IMPORTED_SKIRMISH
+    imported_map_owner_matrix();
+#endif
 #ifdef SC64_P7_RUNTIME
     campaign_banks(SC64_P7_GLOBAL_ID,0,4,&race_p7.source_minerals[0],&race_p7.source_minerals[4]);
 #endif
