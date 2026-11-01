@@ -360,6 +360,49 @@ set_p6(int on)
 #endif
 }
 
+/* Dense repeated offsets, changes in effective radius and intervening
+ * filtered/reference candidates must agree with the eight-step oracle. */
+static void
+consecutive_geometry_cases(void)
+{
+    static const int speeds[] = {0, 1, 2, 14, 15, 40};
+    int state, i, j;
+    for (state = 0; state < 2; ++state) {
+        memset(u, 0, sizeof(u));
+        set_p6(state);
+        for (i = 0; i < 12; ++i) {
+            u[i].alive = 1; u[i].type = U_MARINE; u[i].raw_type = -1;
+            u[i].order = ORDER_IDLE; u[i].x = 512 + (i ? 7 : 0); u[i].y = 512;
+        }
+        u[3].type = U_ZERGLING; /* potentially different effective radius */
+        u[4].type = U_CHRYSALIS; /* ignored candidate */
+        u[5].type = -1;          /* undescribable class -> reference path */
+#ifdef SC64_TRANSPORT_RUNTIME
+        u[6].order = ORDER_TRANSPORTED;
+#endif
+#ifdef SC64_P6_COMBAT_ENABLED
+        { int burrow = type_with_raw(37);
+          if (burrow >= 0) { u[7].type = burrow; u[7].raw_type = 37; u[7].flags |= 2; } }
+#endif
+#ifdef SC64_SCARAB_RUNTIME
+        u[8].type = U_SCARAB; u[8].carry = 0; /* hidden/noncolliding */
+#endif
+        sc64_unit_buckets_begin();
+        assert(sc64_unit_bucket_active);
+        note_linked();
+        for (j = 0; j < (int)(sizeof(speeds) / sizeof(speeds[0])); ++j)
+            check_mask(&u[0], speeds[j]);
+        /* Morph/reposition a linked slot within the pass. */
+        u[2].type = U_ZERGLING; u[2].x += 1; touch(2);
+#ifdef SC64_CONTACT_MEMO_ENABLED
+        sc64_contact_memo_invalidate();
+#endif
+        for (j = 0; j < (int)(sizeof(speeds) / sizeof(speeds[0])); ++j)
+            check_mask(&u[0], speeds[j]);
+        sc64_unit_buckets_end();
+    }
+}
+
 static void
 world_passes(void)
 {
@@ -479,6 +522,7 @@ int
 main(void)
 {
     stock_rates();
+    consecutive_geometry_cases();
     world_passes();
 #ifndef SC64_PERSISTENT_COLLISION
     dirty_overflow();

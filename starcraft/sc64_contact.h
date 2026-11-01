@@ -561,6 +561,9 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 #endif
     int mover_radius, mover_flying, mover_slot = (int)(q - u), p6;
     int minx, maxx, miny, maxy, row, col, reach;
+#ifdef SC64_CONTACT_CONSECUTIVE_GEOMETRY
+    int previous_valid = 0, previous_radius = 0, previous_ox = 0, previous_oy = 0;
+#endif
     if (sc64_contact_mask_prepare(q, speed, &mask, &mover_radius, &mover_flying))
         return mask;
     p6 = sc64_contact_p6_active();
@@ -602,6 +605,18 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 limit_axis = radius + speed;
                 if (ox <= -limit_axis || ox >= limit_axis ||
                     oy <= -limit_axis || oy >= limit_axis) continue;
+#ifdef SC64_CONTACT_CONSECUTIVE_GEOMETRY
+                /* Geometry only adds mask bits. An intervening reference
+                 * fallback can also only add bits; repeating the last
+                 * validated geometry therefore cannot add any new bit. */
+                if (speed != 0 && (ox != 0 || oy != 0) && previous_valid &&
+                    previous_radius == radius && previous_ox == ox && previous_oy == oy)
+                    continue;
+                previous_valid = 1;
+                previous_radius = radius;
+                previous_ox = ox;
+                previous_oy = oy;
+#endif
 #ifdef SC64_CONTACT_MASK_TABLE
                 mask = sc64_contact_mask_apply_geometry(mask, radius, speed, ox, oy);
 #else
