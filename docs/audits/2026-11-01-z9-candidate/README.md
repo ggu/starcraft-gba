@@ -95,7 +95,7 @@ Run at base `72b6de1f` (`codex/p8-playable-20261029`) plus this change.
   - BSS end `0x0203df88`, IWRAM end `0x03004bf0`, within the `0x0203e000` /
     `0x03005000` guards;
   - 120 bytes of BSS spare;
-  - ROM SHA-256 `db82a7f1…`, with the Z8 sprite bank and the inputs listed
+  - ROM SHA-256 `65bfcb14…`, with the Z8 sprite bank and the inputs listed
     below.
 - `make test-zerg-z9` (ASan/UBSan host fixture):
   - Z9 is launched through the ordinary campaign menu as the ninth Zerg
@@ -127,7 +127,42 @@ Run at base `72b6de1f` (`codex/p8-playable-20261029`) plus this change.
 
 ## Byte identity
 
-To be filled from the final run.
+The base (`72b6de1f`) and this branch were built with the same private
+inputs:
+- Z8 sprite bank `7785f228…`;
+- Z8 descriptor `5a494b71…`;
+- `SC64_AUDIO_DIR=.local/sc64/audio-codec2/generated`;
+- weapon-VFX bank `99efc112…`.
+
+With the new flags off, every ROM is identical:
+
+| ROM | SHA-256 (base and this branch) |
+| --- | --- |
+| default `StarCraft-GBA.gba` | `c4562caf70e71b09a6ed6c0cf8adfd28cd85987083b0f4e7fa9ccd3bf1ec101a` |
+| `zerg` / `zerg-z7` | `508b522323567d859b005c4495d6e8cd55b2e7e0d2914b230ce2bc124940a20d` |
+| `zerg-z3` | `30ffd7d06bcc3bd70b74f232ff37849b6625d3855458a26831ab24248288130e` |
+| `zerg-z4` | `600fb4924a0130f2efc4ba022418f2e3022d3632b2de912642a3d1ed6f916359` |
+| `zerg-z5` | `715ea46a843699d15ab8e9dfb179656a1e1849144eac3c0020e0834916bbf586` |
+| `zerg-z6` | `97df86b49472c7b72d6087fd237b3d85cffbff459c889f28085bc2b237b87d97` |
+| `zerg-z8` | `e4439f279d9cf26f5bbcc255592a9ddb053dd0c3030d4d18f8998f5635dd7e1a` |
+
+The new `zerg-z9` ROM is
+`65bfcb14744bfc2c3f27ac62af3552d34868e0cdbdad9db15bc6ceb719958f44`.
+
+`make test-zerg-z8` passes with its unchanged digest (`55b9880a`).
+
+`make test-zerg` was run on this change. Every component passes except
+`test-sc64-z7-canonical-save`: the contact-mask table, Z7 controller win,
+carried Z1–Z6, skirmish matrix, 234-configuration startup/save matrix, frame
+coverage and Scourge. The canonical-save fixture fails with the same
+`race_load_game()` assertion at base `72b6de1f` in this checkout.
+
+`./dev test` ran 942 Python tests plus the host fixtures, with 6 failures,
+all environmental and unrelated to this change:
+- Five renderer and unit-word checks compile against the shared
+  `.local/sc64/audio/generated` bank, which predates codec format 2. In a
+  fresh checkout the Protoss case also lacks its generated fact table.
+- One Z8 pack test expects a non-symlinked `.local/build`.
 
 ## Not qualified
 
@@ -136,6 +171,11 @@ To be filled from the final run.
 - **No input-only ARM replay and no fresh-process SRAM continuation.**
 - **No ARM frame timing.** With 371 map rows and three towns this is the
   heaviest Zerg map so far, and it is unmeasured.
+- **Idle limbo:** an idle human is not defeated within 30,000 updates (scratch
+  probe). The authored waves destroy the base but not the last Overlord, and
+  the human-owned Zerg Beacon (raw 194) also counts toward T0's Any Unit
+  census, as in every existing world adapter. Whether the native census
+  counts beacons is unverified.
 - **Sprite art:** the default bank is the Z8 bank. It carries every other
   Z9 actor, including the Archon, Shuttle, Arbiter, Carrier, Fleet Beacon and
   Arbiter Tribunal, but has no art for raw 173 or raw 219. The renderer draws
