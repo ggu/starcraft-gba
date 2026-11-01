@@ -23,7 +23,8 @@ defenders, economic opening and later relocation policy are retained. They
 may still fail later raid locations. The 20,000-iteration bound is retained;
 bound exhaustion is not a win.
 
-The branch remains based on the parked trial's phase-enabled source. No
+The first branch version used the parked trial's phase-enabled source. Later
+follow-ups explicitly identify their rebased engine below. No
 normal campaign menu, main branch, release or SD contents are changed.
 There is no Z8 victory or next-mission admission claim.
 
@@ -143,7 +144,7 @@ abandon a hive, expose the army or detector, or fail to acquire a valid path.
 No HP, damage, resource, source objective or AI permission is changed. An
 offensive order being accepted will not be treated as destruction or a win;
 the existing strict engine/source victory predicate and bound remain intact.
-This trial is uncompiled and unrun.
+At its initial source checkpoint this trial was uncompiled and unrun.
 
 The offensive trial's order helper rechecks the selected actor's live
 ownership/source identity and the armed mode after cursor travel, before
@@ -155,3 +156,22 @@ input updates: a target that dies or a victory reached during the tap can
 leave the order unconfirmed even when it was issued. It is not a generation
 identifier or proof that the attack caused a later death. Build-consumption
 observations retain their earlier separate rules.
+
+At frozen `90f361b`, the individual offensive trial compiled and ran under
+ASan/UBSan without a report, with source and input hashes unchanged. The hero's
+farther retreat was issued at 2493 and entered its 32-pixel arrival threshold
+at 3377. Eight individual attacks toward the eastern Nexus were observed
+applied from frames 5603 through 6316. Those were real movement orders: by
+6360 both original Ultralisk slots held enemy replacements and both original
+Hydralisks were dead near the approach. The last ordered Zergling was still
+alive at 6360 and dead by 7200. The uncommitted Lings 21 and 22 remained at
+their staging position at 6360. The observations establish army losses, not
+a pathfinding stall or a unique killing attacker.
+
+No eastern-Nexus-cleared event occurred. The strict result remained LOSS at
+13412/native 10729: T17's hive-region sequence began at 13393 and completed
+at 13412, with location-18 census one. Original Kerrigan remained alive at
+`(1897,1968)` with 328 HP. The log SHA-256 is
+`320e7a8a409ad198bc13f488dd362040a87071b6e08e072728f3bf109ee46b63`.
+The subsequent boxed-offense experiment is recorded separately; neither
+trial is a Z8 win or promotion.
