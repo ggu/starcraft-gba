@@ -42,7 +42,7 @@ all-phase oracles also passed on the focused activation source.
 The fresh ordinary physical-button prefix matched one named baseline
 observation, and the full fresh-save continuation matched all 302 named
 baseline observations. The full mean reduction was 1.275057% and peak
-reduction 0.404072%. The independently checked comparison result SHA-256 is
+reduction 0.404072%. The ON continuation result SHA-256 is
 `9d79c123676e092cafd706d82eef8f4ce18355f0bc3f87e6e5f0d84fb75eb7da`.
 These observations cover named state and do not establish a physical-device
 frame rate.
