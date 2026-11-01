@@ -1456,7 +1456,8 @@ static void sc64_range_route_forget_target(int target);
 static int bfs_prev[MAP_CELLS], bfs_queue[MAP_CELLS];
 static u16 bfs_seen[MAP_CELLS], bfs_generation;
 #endif
-static int path_grid_valid;
+/* Boolean cache state; a byte avoids padding before route/save scratch. */
+static u8 path_grid_valid;
 #if defined(SC64_DIRECT_FIRING_POINTS)
 #if !defined(SC64_RACES) || !defined(SC64_IMPORTED_MISSION)
 #error "SC64_DIRECT_FIRING_POINTS requires the imported race runtime"
