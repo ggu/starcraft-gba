@@ -48,6 +48,8 @@ static void test_real_egg_dispatch_and_pair(void)
     int hatch=spawn_build(SIDE,B_HATCHERY,160,160,0);
     assert(hatch>=0 && building_complete(hatch));b[hatch].larva=3;
     assert(spawn_build(SIDE,B_SPAWNING_POOL,224,160,0)>=0);
+    /* Match the existing Z7 production fixture's supply provider. */
+    assert(spawn_unit(SIDE,U_OVERLORD,96,96)>=0);
     watched_mover=spawn_unit(SIDE,U_MARINE,168,160);assert(watched_mover>=0);
     assert(race_queue_unit(SIDE,hatch,U_ZERGLING));
     int egg=-1;
