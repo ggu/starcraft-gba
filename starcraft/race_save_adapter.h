@@ -292,6 +292,17 @@ race_zl_save_candidate_world_valid(const RaceSave *candidate, int width, int hei
             unit.raw_type < 0 || sc64_race_unit_from_raw(unit.raw_type) != unit.type)
             return 0;
     }
+    /* Rebind checks this link after live pools are installed. Resolve it
+     * against the candidate first so a bad link cannot partially load. */
+    if (candidate->zl.crystal_carrier != SC64_ZL_NO_CARRIER) {
+        Unit carrier;
+        unsigned slot = candidate->zl.crystal_carrier;
+        if (slot >= MAX_UNITS ||
+            !race_save_decode_unit(candidate, slot, (unsigned)width * 16u,
+                                   (unsigned)height * 16u, &carrier) ||
+            !carrier.alive || carrier.owner != SIDE ||
+            carrier.raw_type != SC64_ZL_RAW_DRONE) return 0;
+    }
     for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
         Building building;
         if (!race_save_decode_building(candidate, i, &building)) return 0;
