@@ -12091,6 +12091,16 @@ static void race_scarab_ai_decide(void *context,unsigned index,unsigned owner,un
 }
 static void race_scarab_ai_active_update(void)
 {
+    if (won || lost) return;
+#ifdef SC64_P4_RUNTIME
+    if (race_p4_world_paused()) return;
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (race_p8_world_paused()) return;
+#endif
+#ifdef SC64_Z5_RUNTIME
+    if (race_z5_world_paused()) return;
+#endif
     if (!race_scarab_ai_roster_ready) {
         race_scarab_ai_build_roster();race_scarab_ai_roster_ready=1;
     }
