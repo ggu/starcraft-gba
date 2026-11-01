@@ -2386,6 +2386,17 @@ spawn_unit(int owner, int type, int x, int y)
         return -1;
     }
 #endif
+#if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
+    /* A birth can reuse a dead linked slot or occupy an unlinked slot while
+     * update_orders() is querying the current collision buckets.  Reconcile
+     * it before any subsequent actor can query, not on its first movement. */
+    if (sc64_unit_bucket_active) {
+        if (u[i].x < 0 || u[i].y < 0 || u[i].x >= WORLD_W || u[i].y >= WORLD_H)
+            sc64_unit_bucket_active = 0; /* use the full-world fallback */
+        else
+            sc64_unit_bucket_move(&u[i]);
+    }
+#endif
     if (owner == SIDE)
 	supply_used += unit_supply(type);
     return i;
