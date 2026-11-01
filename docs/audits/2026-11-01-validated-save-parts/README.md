@@ -35,8 +35,7 @@ preserved predecessors, every byte of tag invalidation/commit and interrupted
 payload stores around the span boundary, including successful retry from
 checksum-valid partial tags. A host-only observer also checks the actual
 writers at each tag-byte store, including the contiguous HP writers; the
-default ARM stores have no observer. The existing selection fixture is also
-compiled under the HP gate.
-These tests are unrun; native qualification must wait for the active physical
-replay. No hardware power-loss or game-level save/load qualification is
+default ARM stores have no observer. Both fixtures are built under HP alone
+and the combined HP/Scarab gates; this does not qualify a game envelope.
+These tests are unrun at this source stage. No hardware power-loss or game-level save/load qualification is
 claimed.

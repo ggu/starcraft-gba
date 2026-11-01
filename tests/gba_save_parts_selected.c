@@ -221,10 +221,16 @@ static void interrupted_record_model(void) {
         }
     }
 }
-int main(void) {
+int main(int argc,char **argv) {
     gba_init();
     for(unsigned i=0;i<sizeof(payload);++i)payload[i]=(u8)(i*73u+i/7u);
     payload[0]=0xa5;
+    if(argc==2 && !strcmp(argv[1],"partial-tag-retry")) {
+        interrupted_record_model();
+        puts("partial-tag retry model passed");
+        return 0;
+    }
+    assert(argc==1);
     const u32 lengths[]={2,4,17,137,SAVE_PAYLOAD_MAX};
     for(unsigned i=0;i<sizeof(lengths)/sizeof(lengths[0]);++i) {
         u32 n=lengths[i],splits[]={1,n/2,n-1};
