@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_z7_candidate_test_writer.h"
 
 #ifdef SC64_Z7_DERIVED_SAVE
 #define TEST_UNIT_ENCODE sc64_derived_unit_encode
@@ -86,7 +87,7 @@ static void reject_without_mutation(const RaceSave *bad)
     memcpy(gas,race_gas,sizeof(gas));
     memcpy(geysers_before,geysers,sizeof(geysers_before));
     clock=frame;
-    save_write(bad,sizeof(*bad),SAVE_VERSION);
+    sc64_z7_test_write_candidate(bad);
     assert(!race_load_game());
     assert(!memcmp(units,u,sizeof(u)));
     assert(!memcmp(buildings,b,sizeof(b)));
@@ -191,7 +192,7 @@ static void test_terminal_source_witnesses(const RaceSave *checkpoint)
 
     /* Exercise both terminal outcomes through the real world condition,
      * scheduler action callback, and campaign result wiring. */
-    save_write(checkpoint,sizeof(*checkpoint),SAVE_VERSION);
+    sc64_z7_test_write_candidate(checkpoint);
     assert(race_load_game());
     for (int i=0;i<MAX_BUILDINGS;++i)
         if (b[i].alive && b[i].owner==ENEMY && b[i].raw_owner==4) {
@@ -214,7 +215,7 @@ static void test_terminal_source_witnesses(const RaceSave *checkpoint)
     assert(race_z7_save_candidate_valid(&race_data,&race_data.z7,
                                         SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
 
-    save_write(checkpoint,sizeof(*checkpoint),SAVE_VERSION);
+    sc64_z7_test_write_candidate(checkpoint);
     assert(race_load_game());
     for (int i=0;i<MAX_UNITS;++i)
         if (u[i].alive && u[i].owner==SIDE && u[i].raw_owner==3)
@@ -567,7 +568,7 @@ static void test_paid_ai_egg_roundtrip(const RaceSave *checkpoint)
     unsigned before,producer=(unsigned)-1;
     RaceSave saved,bad;
     assert(checkpoint);
-    save_write(checkpoint,sizeof(*checkpoint),SAVE_VERSION);
+    sc64_z7_test_write_candidate(checkpoint);
     assert(race_load_game());
     for (unsigned i=0;i<MAX_BUILDINGS;++i)
         if (b[i].alive && b[i].owner==ENEMY && b[i].raw_owner==4 &&
@@ -594,7 +595,7 @@ static void test_paid_ai_egg_roundtrip(const RaceSave *checkpoint)
     assert(race_z7_save_candidate_valid(&saved,&saved.z7,
                                         SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
     test_ling_egg_capacity(&saved);
-    save_write(&saved,sizeof(saved),SAVE_VERSION);
+    sc64_z7_test_write_candidate(&saved);
     assert(race_load_game());
     assert(b[producer].queue_count==1);
 
@@ -939,7 +940,7 @@ static void test_z7_candidate_and_live_roundtrip(void)
     assert(sizeof(RaceSave)<=16368u);
     for (unsigned i=sizeof(good.z7);i<sizeof(good.z5);++i)
         assert(((const u8 *)&good.z7)[i]==0);
-    save_write(&good,sizeof(good),SAVE_VERSION);
+    sc64_z7_test_write_candidate(&good);
     assert(race_load_game());
     assert(sc64_z7_persistent_state_valid(&race_z7));
     assert(race_z7_live_world_valid());
