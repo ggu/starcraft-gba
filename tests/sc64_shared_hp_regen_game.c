@@ -37,6 +37,35 @@ static void test_actor_phase_owners_and_reuse(void)
     race_shared_hp_regen_tick();
     assert(u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
 }
+#ifdef SC64_SHARED_TRANSPORT
+static void test_valid_loaded_passenger_regenerates(void)
+{
+    /* Fixture setup places a captured Zergling with a same-owner Dropship;
+     * boarding and its persistent carrier link use the real transport path. */
+    game_init();race_mode=1;race_human=R_TER;race_bots=1;init_state();
+    assert(screen==SCREEN_PLAY && race_mode);
+    memset(u,0,sizeof(u));
+    assert(sc64_race_unit_from_raw(11)==U_DROPSHIP);
+    assert(sc64_race_unit_from_raw(37)==U_ZERGLING);
+    int carrier=spawn_unit(SIDE,U_DROPSHIP,100,100);
+    int passenger=spawn_unit(SIDE,U_ZERGLING,108,100);
+    assert(carrier>=0 && passenger>=0 && race_transport_carrier_valid(carrier));
+    assert(race_transport_request_board(passenger,carrier));
+    assert(u[passenger].order==ORDER_BOARD && u[passenger].target==carrier);
+    assert(race_transport_tick_unit(passenger));
+    assert(SC64_TRANSPORT_LOADED(&u[passenger]));
+    assert(u[passenger].target==carrier && race_transport_cargo_space(carrier)==1);
+    u[passenger].hp=u[passenger].maxhp-1;u[passenger].shield_remainder=0;
+    for(int tick=0;tick<80;++tick) {
+        assert(race_transport_tick_unit(passenger));
+        assert(SC64_TRANSPORT_LOADED(&u[passenger]) && u[passenger].target==carrier);
+        assert(race_transport_cargo_space(carrier)==1);
+        race_shared_hp_regen_tick();
+        if(tick<79) assert(u[passenger].hp==u[passenger].maxhp-1);
+    }
+    assert(u[passenger].hp==u[passenger].maxhp && u[passenger].shield_remainder==0);
+}
+#endif
 static void test_campaign_and_skirmish_bindings(void)
 {
     for(int custom=0;custom<=1;++custom) {
@@ -122,9 +151,6 @@ int main(void)
     u[z].shield_remainder=80;
     assert(!race_shared_hp_regen_unit_phase_valid(&u[z]));
     u[z].shield_remainder=79;
-#ifdef SC64_TRANSPORT_RUNTIME
-    u[z].order=ORDER_TRANSPORTED; /* hidden completed passenger remains eligible */
-#endif
     int zh=u[z].hp,eh=u[enemy].hp,mh=u[marine].hp,bh=b[colony].hp;
     b[colony].under_construction=1;
     b[colony].raw_type=sc64_race_raw_building(B_SUNKEN_COLONY);
@@ -141,6 +167,9 @@ int main(void)
     test_actor_phase_owners_and_reuse();
     test_paused_and_live_update();
     test_campaign_and_skirmish_bindings();
+#ifdef SC64_SHARED_TRANSPORT
+    test_valid_loaded_passenger_regenerates();
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     test_showcase_live_update();
 #endif
