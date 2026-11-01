@@ -863,6 +863,50 @@ static void test_range_cached_point_fields(void)
     assert(sc64_route_builds==builds);
 }
 
+/* Fill every idle cache slot with actual point floods, then claim scratch and
+ * ensure the two overlapping fields alone must be rebuilt after release. */
+static void test_range_idle_point_cache_capacity(void)
+{
+    int slots, reduced, nx, ny;
+    u32 builds;
+    setup_combat_scene(); clear_walk_grid(); sc64_routes_reset();
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    assert(sc64_route_configure());
+#endif
+    slots = SC64_ROUTE_ACTIVE_SLOTS;
+    reduced = sc64_range_route_reduced_slots();
+    assert(slots >= reduced && reduced > 0);
+    builds = sc64_route_builds;
+    for (int i = 0; i < slots; ++i) {
+        int goal = (i + 2) + 2 * MAP_COLS;
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+        assert(sc64_route_slot_for_origin(goal, -1, 0) >= 0);
+#else
+        assert(sc64_route_slot(goal) >= 0);
+#endif
+    }
+    assert(sc64_route_builds == builds + (u32)slots);
+    builds = sc64_route_builds;
+    for (int i = 0; i < slots; ++i) {
+        int goal = (i + 2) + 2 * MAP_COLS;
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+        assert(sc64_route_slot_for_origin(goal, -1, 0) >= 0);
+#else
+        assert(sc64_route_slot(goal) >= 0);
+#endif
+    }
+    assert(sc64_route_builds == builds);
+    assert(sc64_range_route_next(victim, 400, 400, 0, 64, 5, 5, &nx, &ny) == SC64_RANGE_ROUTE_PENDING);
+    assert(SC64_ROUTE_ACTIVE_SLOTS == slots);
+    sc64_range_route_tick();
+    assert(sc64_range_route_active.valid && SC64_ROUTE_ACTIVE_SLOTS == reduced);
+    for (int i = reduced; i < slots; ++i) assert(!sc64_route_valid[i]);
+    sc64_range_route_reset();
+    assert(SC64_ROUTE_ACTIVE_SLOTS == slots);
+    for (int i = reduced; i < slots; ++i) assert(!sc64_route_valid[i]);
+    sc64_routes_reset();
+}
+
 /* Cold reachable walls must start moving before the range flood completes;
  * a sealed wall or blocked target still waits for bounded range routing. */
 static void test_range_cold_point_corridor(void)
@@ -1055,6 +1099,7 @@ int main(void)
 #ifdef SC64_RANGE_WORK
     test_range_cold_point_corridor();
     test_range_corridor_pixel_oracle();
+    test_range_idle_point_cache_capacity();
     test_range_cached_point_fields();
     test_range_work_scheduler_contracts();
     test_range_target_slot_reuse();

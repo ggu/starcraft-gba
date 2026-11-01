@@ -144,9 +144,8 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #define SC64_ROUTE_SLOTS 8
 #endif
 #ifdef SC64_RANGE_WORK
-/* Two of the fourteen fixed maximum-map planes are transient range-query
- * storage. The remaining twelve planes are shared with normal route LRU
- * fields; a retained tagged range snapshot dynamically occupies one slot. */
+/* The last two maximum-map planes are borrowed while range work is active.
+ * When idle, ordinary route fields may use the entire existing pool. */
 #define SC64_RANGE_WORK_RESERVED_PLANES 2u
 #endif
 #ifdef SC64_RACES
@@ -220,6 +219,7 @@ static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
 #ifdef SC64_RANGE_WORK
 static void sc64_range_route_reset(void);
+static int sc64_range_route_usable_slots(void);
 #endif
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* Rebind field bases after map-shape changes. Return false for invalid or
@@ -251,10 +251,6 @@ static int sc64_route_configure(void)
     if (bytes == 0 || bytes > SC64_ROUTE_BYTES || bytes > SC64_ROUTE_POOL_BYTES)
         return 0;
     slots = SC64_ROUTE_POOL_BYTES / bytes;
-#ifdef SC64_RANGE_WORK
-    slots = (SC64_ROUTE_POOL_BYTES -
-             SC64_RANGE_WORK_RESERVED_PLANES * SC64_ROUTE_BYTES) / bytes;
-#endif
     if (slots > SC64_ROUTE_ACTIVE_MAX_SLOTS) slots = SC64_ROUTE_ACTIVE_MAX_SLOTS;
     if (slots == 0) return 0;
     if (sc64_route_config_cols == cols && sc64_route_config_rows == rows &&
@@ -273,13 +269,13 @@ static int sc64_route_configure(void)
     sc64_route_clock = 0;
     return 1;
 }
+#endif
+#ifdef SC64_RANGE_WORK
+#define SC64_ROUTE_ACTIVE_SLOTS sc64_range_route_usable_slots()
+#elif defined(SC64_ROUTE_ACTIVE_STRIDE)
 #define SC64_ROUTE_ACTIVE_SLOTS ((int)sc64_route_active_slots)
 #else
-#ifdef SC64_RANGE_WORK
-#define SC64_ROUTE_ACTIVE_SLOTS ((int)SC64_ROUTE_SLOTS - (int)SC64_RANGE_WORK_RESERVED_PLANES)
-#else
 #define SC64_ROUTE_ACTIVE_SLOTS SC64_ROUTE_SLOTS
-#endif
 #endif
 volatile u32 sc64_route_hits, sc64_route_builds;
 
@@ -471,6 +467,56 @@ typedef struct __attribute__((packed, aligned(2))) Sc64RangeRouteSnapshotKey {
 } Sc64RangeRouteSnapshotKey;
 _Static_assert(sizeof(Sc64RangeRouteSnapshotKey) == 8, "range snapshot layout");
 static Sc64RangeRouteSnapshotKey sc64_range_route_snapshot_key;
+
+/* Slot bases stay fixed for a map shape. The dynamic limit hides every slot
+ * that touches scratch storage while an active worker owns the planes. */
+static int sc64_range_route_reduced_slots(void)
+{
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    unsigned slots;
+    if (!sc64_route_active_bytes) return 0;
+    slots = (SC64_ROUTE_POOL_BYTES -
+             SC64_RANGE_WORK_RESERVED_PLANES * SC64_ROUTE_BYTES) /
+            sc64_route_active_bytes;
+    if (slots > sc64_route_active_slots) slots = sc64_route_active_slots;
+    return (int)slots;
+#else
+    return (int)SC64_ROUTE_SLOTS - (int)SC64_RANGE_WORK_RESERVED_PLANES;
+#endif
+}
+static int sc64_range_route_usable_slots(void)
+{
+    if (sc64_range_route_active.valid) return sc64_range_route_reduced_slots();
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    return (int)sc64_route_active_slots;
+#else
+    return SC64_ROUTE_SLOTS;
+#endif
+}
+
+/* Claim the planes before the worker writes any scratch byte.  A packed
+ * active-stride slot may cross the boundary, so discard it as well. */
+static void sc64_range_route_claim_planes(void)
+{
+    int first = sc64_range_route_reduced_slots();
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    int full = (int)sc64_route_active_slots;
+#else
+    int full = SC64_ROUTE_SLOTS;
+#endif
+    for (int i = first; i < full; ++i) {
+        sc64_route_valid[i] = 0;
+        sc64_route_age[i] = 0;
+    }
+    if (sc64_range_route_snapshot_slot >= first) {
+        sc64_range_route_snapshot_slot = -1;
+        memset(&sc64_range_route_snapshot_key, 0, sizeof(sc64_range_route_snapshot_key));
+    }
+    if (sc64_range_route_copy_slot >= first) {
+        sc64_range_route_copy_slot = -1;
+        sc64_range_route_copy_cursor = 0;
+    }
+}
 
 static Sc64RangeRouteJob sc64_range_route_active_key(void)
 {
@@ -892,6 +938,7 @@ static void sc64_range_route_tick(void)
     if (!sc64_range_route_active.valid) {
         Sc64RangeRouteJob next;
         if (!sc64_range_route_dequeue(&next)) return;
+        sc64_range_route_claim_planes();
         sc64_range_route_active.target = next.target;
         sc64_range_route_active.last_request = next.last_request;
         sc64_range_route_active.valid = next.valid;
