@@ -4,6 +4,9 @@
 #error "This trial requires canonical Z8 sight, spans and phase flags"
 #endif
 #include <stdio.h>
+#if defined(SC64_Z8_TRIAL_BOXED_OFFENSE) && !defined(SC64_Z8_TRIAL_NEXUS_PUSH)
+#error "boxed offense requires the Nexus push trial"
+#endif
 #ifdef SC64_Z8_TRIAL_NEXUS_PUSH
 #define Z8_HERO_RETREAT_X 1904
 #define Z8_HERO_RETREAT_Y 1968
@@ -161,6 +164,98 @@ static int source_nexus_alive(int owner)
   if(b[i].alive&&b[i].raw_type==154&&b[i].raw_owner==owner)return 1;
  return 0;
 }
+#ifdef SC64_Z8_TRIAL_BOXED_OFFENSE
+/* Test-only controller: use the ordinary box gesture and command menu.
+ * Observed identity is slot/raw type/source owner, not a generation token;
+ * same-identity slot reuse cannot be distinguished. */
+static void boxed_northern_attack(int x, int y)
+{
+ int raw[MAX_UNITS], source_owner[MAX_UNITS], slots[MAX_UNITS];
+ int expected_x[MAX_UNITS], expected_y[MAX_UNITS], can_attack[MAX_UNITS];
+ int count=0, armed=-1, direct_target=-1, click_x=-1, click_y=-1;
+ int observed=0, applied=0, changed=0, ineligible=0, unexpected=0;
+ int left=1600,top=780,right=1730,bottom=880;
+ unsigned guard=0;
+ if(screen!=SCREEN_PLAY||won||lost||mode!=MODE_NORMAL||menu_open)goto report;
+ if(nexus_push_phase==2){
+  static const int original[]={7,8,11,13,17,18,19,20,21,22};
+  int found=0;left=WORLD_W;top=WORLD_H;right=bottom=-1;
+  for(unsigned k=0;k<sizeof(original)/sizeof(original[0]);k++){
+   int i=original[k],r=u[i].raw_type;
+   if(!u[i].alive||u[i].owner!=SIDE||u[i].raw_owner!=3||
+      (r!=37&&r!=38&&r!=39)||SC64_TRANSPORT_LOADED(&u[i]))continue;
+   if(u[i].x<left)left=u[i].x;
+   if(u[i].x>right)right=u[i].x;
+   if(u[i].y<top)top=u[i].y;
+   if(u[i].y>bottom)bottom=u[i].y;
+   found++;
+  }
+  if(!found)goto report;
+  left=limit(left-4,0,WORLD_W-1);top=limit(top-4,0,WORLD_H-1);
+  right=limit(right+4,0,WORLD_W-1);bottom=limit(bottom+4,0,WORLD_H-1);
+ }
+ if(!move_cursor(left,top)||screen!=SCREEN_PLAY||won||lost)goto report;
+ step(KEY_L);
+ while((cx<right||cy<bottom)&&screen==SCREEN_PLAY&&!won&&!lost&&guard++<6000u){
+  u16 buttons=KEY_L;
+  if(cx<right)buttons|=KEY_RIGHT;
+  if(cy<bottom)buttons|=KEY_DOWN;
+  step(buttons);
+ }
+ step(0);
+ if(guard>=6000u||screen!=SCREEN_PLAY||won||lost||selected_building>=0)goto report;
+ for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){
+  int r=u[i].raw_type;
+  if(u[i].owner!=SIDE||u[i].raw_owner!=3||IS_WORKER(u[i].type)||
+     (r!=37&&r!=38&&r!=39&&r!=42)||SC64_TRANSPORT_LOADED(&u[i])){
+   printf("BOX_REJECT frame%d slot%d raw%d owner%d raw_owner%d\n",frame,i,r,u[i].owner,u[i].raw_owner);
+   goto report;
+  }
+  slots[count]=i;raw[count]=r;source_owner[count]=u[i].raw_owner;count++;
+ }
+ if(!count||selected_count()!=count)goto report;
+ tap(KEY_B);
+ for(int n=0;menu_open&&menu_cursor!=MENU_ATTACK&&n<MENU_COUNT;n++)
+  tap(menu_cursor<MENU_ATTACK?KEY_DOWN:KEY_UP);
+ if(screen!=SCREEN_PLAY||won||lost||!menu_open||menu_cursor!=MENU_ATTACK)goto report;
+ tap(KEY_A);armed=mode;
+ if(screen!=SCREEN_PLAY||won||lost||armed!=MODE_ATTACK||!move_cursor(x,y))goto report;
+ if(screen!=SCREEN_PLAY||won||lost||mode!=MODE_ATTACK||selected_count()!=count)goto report;
+ for(int k=0;k<count;k++){
+  int i=slots[k];
+  if(!u[i].alive||!u[i].selected||u[i].owner!=SIDE||u[i].raw_type!=raw[k]||
+     u[i].raw_owner!=source_owner[k]||SC64_TRANSPORT_LOADED(&u[i]))goto report;
+ }
+ click_x=cx;click_y=cy;
+#ifdef SC64_DIRECT_ATTACK
+ direct_target=sc64_direct_attack_find_target(click_x,click_y);
+#endif
+ for(int k=0;k<count;k++){
+  int i=slots[k];
+  expected_x[k]=count==1?click_x:limit(click_x+((k%5)-2)*8,8,WORLD_W-8);
+  expected_y[k]=count==1?click_y:limit(click_y+((k/5)-1)*8,8,WORLD_H-8);
+  can_attack[k]=direct_target<0?1:!!SC64_CAN_ATTACK_FROM_SOURCE(u[i].type,direct_target,u[i].owner,u[i].raw_owner);
+ }
+ tap(KEY_A);
+ if(screen!=SCREEN_PLAY||won||lost||mode!=MODE_NORMAL)goto report;
+ for(int k=0;k<count;k++){
+  int i=slots[k],ok=0;
+  if(!u[i].alive||u[i].owner!=SIDE||u[i].raw_type!=raw[k]||u[i].raw_owner!=source_owner[k])changed++;
+  else {
+   observed++;
+   if(!can_attack[k])ineligible++;
+   else if(direct_target>=0)ok=u[i].order==ORDER_ATTACK_TARGET&&u[i].target==direct_target;
+   else ok=u[i].order==ORDER_ATTACK_MOVE&&
+      ((u[i].tx==expected_x[k]&&u[i].ty==expected_y[k])||
+       (u[i].tx==click_x&&u[i].ty==click_y));
+   if(ok)applied++; else if(can_attack[k])unexpected++;
+  }
+  printf("BOX_ACTOR frame%d phase%d slot%d raw%d alive%d owner%d source_owner%d can_attack%d order%d target%d tx%d ty%d\n",frame,nexus_push_phase,i,raw[k],u[i].alive,u[i].owner,u[i].raw_owner,can_attack[k],u[i].order,u[i].target,u[i].tx,u[i].ty);
+ }
+report:
+ printf("BOX_ATTACK frame%d phase%d selected%d observed%d applied%d changed%d ineligible%d unexpected%d requested%d,%d click%d,%d target%d armed%d mode%d\n",frame,nexus_push_phase,count,observed,applied,changed,ineligible,unexpected,x,y,click_x,click_y,direct_target,armed,mode);
+}
+#endif
 static void push_original_northern_army(int x,int y)
 {
  static const int slots[]={7,8,11,13,17,18,19,20},raw[]={39,39,38,38,37,37,37,37};
@@ -181,14 +276,22 @@ static void nexus_push_tick(void)
  if(!nexus_push_phase&&frame>=5500){
   nexus_push_phase=1;
   printf("NEXUS_PUSH_BEGIN frame%d east_alive%d west_alive%d\n",frame,source_nexus_alive(2),source_nexus_alive(1));
+#ifdef SC64_Z8_TRIAL_BOXED_OFFENSE
+  boxed_northern_attack(1712,1208);
+#else
   push_original_northern_army(1712,1208);
+#endif
  }
  if(nexus_push_phase==1&&!source_nexus_alive(2)&&screen==SCREEN_PLAY&&!won&&!lost){
   nexus_push_phase=2;
   printf("NEXUS_PUSH_EAST_CLEARED frame%d west_alive%d\n",frame,source_nexus_alive(1));
   if(u[48].alive&&u[48].owner==SIDE&&u[48].raw_owner==3&&u[48].raw_type==42)
    (void)order(48,MENU_MOVE,500,1800);
+#ifdef SC64_Z8_TRIAL_BOXED_OFFENSE
+  boxed_northern_attack(400,1704);
+#else
   push_original_northern_army(400,1704);
+#endif
  }
 }
 #endif
