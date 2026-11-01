@@ -311,6 +311,25 @@ static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
     };
     if (type == B_NYDUS_CANAL) return &nydus_canal;
 #endif
+#ifdef SC64_Z9_RUNTIME
+    /* Pinned BWAPI raw-173 facts: 4x3 tiles, 64/48/63/47 source pixels. */
+    static const Sc64ZpBuildingFact khaydarin_formation = {
+        173,100000,0,1,250,0,1,256,4,3,64,48,63,47,3,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE|
+        SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_INVINCIBLE
+    };
+    if (type == B_ZL_KHAYDARIN_FORMATION) return &khaydarin_formation;
+#endif
+#ifdef SC64_Z10_RUNTIME
+    /* Pinned BWAPI raw-174 facts: 7x3 tiles, 112/48/111/47 source pixels,
+     * 1500 HP, armor 1. */
+    static const Sc64ZpBuildingFact protoss_temple = {
+        174,1500,0,1,250,0,1,256,7,3,112,48,111,47,3,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE|
+        SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_DRAWABLE
+    };
+    if (type == B_ZL_PROTOSS_TEMPLE) return &protoss_temple;
+#endif
 #ifdef SC64_Z5_ACTORS
     static const Sc64ZpBuildingFact z5_beacon =
         {195,100000,0,0,50,50,1,256,3,2,48,32,47,31,3,

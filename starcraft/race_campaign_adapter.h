@@ -72,6 +72,12 @@ race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
         return owner < 0 ? NEUTRAL : owner;
     }
 #endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) {
+        int owner = raw_owner < 0 ? -1 : race_zl_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active()) {
         int owner = raw_owner < 0 ? -1 : race_z7_source_owner((unsigned)raw_owner);
@@ -544,6 +550,12 @@ race_campaign_init(void)
 #ifdef SC64_Z8_RUNTIME
          && race_selected_mission != SC64_Z8_GLOBAL_ID
 #endif
+#ifdef SC64_Z9_RUNTIME
+         && race_selected_mission != SC64_Z9_GLOBAL_ID
+#endif
+#ifdef SC64_Z10_RUNTIME
+         && race_selected_mission != SC64_Z10_GLOBAL_ID
+#endif
          ) || !sc64_race_maps[race_selected_mission].width)
         race_selected_mission = sc64_frontend_first_mission(
 #ifdef SC64_CAMPAIGN_RACE
@@ -561,6 +573,11 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active() && !race_z8_map_shape_valid(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active() && !race_zl_map_shape_valid(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
@@ -697,6 +714,9 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_Z8_RUNTIME
         if (race_z8_active()) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_Z9_RUNTIME
+        if (race_zl_active()) owner = race_campaign_owner(map, i);
 #endif
 #ifdef SC64_Z4_RUNTIME
         if (race_selected_mission == SC64_RACE_MISSION_Z4) owner = race_campaign_owner(map, i);
@@ -919,6 +939,11 @@ race_campaign_init(void)
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
+#ifdef SC64_Z9_RUNTIME
+    if (!race_zl_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (race_p7_active() &&
         (!race_p7_runtime_init(map) || !race_p7_battery_initialize_source(map))) {
@@ -946,6 +971,12 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_Z8_RUNTIME
     case SC64_Z8_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_Z9_RUNTIME
+    case SC64_Z9_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_Z10_RUNTIME
+    case SC64_Z10_GLOBAL_ID: minerals = gas = 0; break;
 #endif
 #ifdef SC64_Z6_RUNTIME
     case SC64_Z6_GLOBAL_ID: minerals = gas = 0; break;
@@ -1295,6 +1326,21 @@ race_campaign_tick(void)
         return;
     }
 #endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) {
+        if (!race_zl_runtime_tick()) {
+            screen=SCREEN_PAUSE; toast(14); return;
+        }
+        if (race_zl_outcome()==SC64_Z8_OUTCOME_VICTORY) {
+            won=1; lost=0; race_campaign.phase=SC64_RACE_PHASE_COMPLETE;
+            race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;
+            race_completed |= 1 << mission;
+        } else if (race_zl_outcome()==SC64_Z8_OUTCOME_DEFEAT) {
+            won=0; lost=1; race_campaign.phase=SC64_RACE_PHASE_FAILED;
+        }
+        return;
+    }
+#endif
 #ifdef SC64_P8_RUNTIME
     if (mission == SC64_P8_GLOBAL_ID) {
         if (!race_p8_runtime_tick(race_campaign.elapsed_frames)) {
@@ -1552,6 +1598,13 @@ race_campaign_objective_text(void)
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active()) return "Destroy both Protoss Nexuses. Keep Kerrigan alive and the Dark Templar out of the hives.";
 #endif
+#ifdef SC64_Z10_RUNTIME
+    if (race_zl_active() && race_selected_mission == SC64_Z10_GLOBAL_ID)
+        return "Destroy the Protoss Temple, then bring the Khaydarin Crystal to the Temple's ruins.";
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return "Bring a Drone to the Khaydarin Crystal, then carry the Crystal back to the Hive Cluster.";
+#endif
 #ifdef SC64_P8_RUNTIME
     if (race_p8_active()) return "Free Tassadar from the Stasis Cell. Keep Fenix and the Hyperion alive.";
 #endif
@@ -1636,6 +1689,12 @@ race_campaign_victory_text(void)
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active()) return "THE TEMPLAR ARE BROKEN";
 #endif
+#ifdef SC64_Z10_RUNTIME
+    if (race_zl_active() && race_selected_mission == SC64_Z10_GLOBAL_ID) return "THE CIRCLE IS CLOSED";
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return "THE CRYSTAL IS OURS";
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active()) return "THE CULLING IS COMPLETE";
 #endif
@@ -1707,6 +1766,9 @@ race_campaign_failure_text(void)
 {
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active()) return "THE BROOD HAS FALLEN";
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return "THE BROOD HAS FALLEN";
 #endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active()) return "THE BROOD HAS FALLEN";

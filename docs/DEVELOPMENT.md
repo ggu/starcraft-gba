@@ -2634,6 +2634,20 @@ It does not regenerate shared banks or enable Z8 gameplay. See the
 [Z8 source foundation audit](audits/2026-10-27-z8-source-foundation/README.md)
 for explicit commands, provenance, supported data and remaining runtime work.
 
+## Z9/Z10 authenticated source descriptors
+
+`tools/sc64_zerg_late_pack.py pack --mission Z9` (or `Z10`) authenticates the
+retained scenario against a pinned per-mission contract. It writes a
+descriptor to a new ignored `.local/build/z9-*` or `.local/build/z10-*` path,
+and `verify` compares every row with the source. `make zerg-z9` renders the
+default `.local/build/z9-source/descriptor.json` into
+`build/generated/z9/sc64_z9_program_generated.h`. The candidate defaults to
+the Z8 sprite bank (`ZERG_Z9_BANK`). `make zerg-z10` does the same with
+`.local/build/z10-source/descriptor.json` and `ZERG_Z10_BANK`. Neither tool
+regenerates shared banks. See the
+[Z9](audits/2026-11-01-z9-candidate/README.md) and
+[Z10](audits/2026-11-01-z10-candidate/README.md) candidate audits.
+
 ## Experimental P7 menu and prevalidated tick
 
 After preparing the current private P6/P7 inputs, build separate Homeland
