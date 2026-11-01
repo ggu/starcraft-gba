@@ -37,6 +37,20 @@ static void test_actor_phase_owners_and_reuse(void)
     race_shared_hp_regen_tick();
     assert(u[slot].hp==u[slot].maxhp && u[slot].shield_remainder==0);
 }
+static void test_paused_and_live_update(void)
+{
+    /* Controlled host setup isolates the pause return and real update path. */
+    game_init();memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+    int slot=spawn_unit(SIDE,U_ZERGLING,100,100);assert(slot>=0);
+    u[slot].hp=u[slot].maxhp-1;u[slot].shield_remainder=79;
+    int hp=u[slot].hp;
+    screen=SCREEN_PAUSE;
+    for(int i=0;i<10;++i)game_update(0,0);
+    assert(screen==SCREEN_PAUSE && u[slot].hp==hp && u[slot].shield_remainder==79);
+    screen=SCREEN_PLAY;menu_open=0;help=0;won=0;lost=0;
+    game_update(0,0);
+    assert(u[slot].hp==hp+1 && u[slot].shield_remainder==0);
+}
 int main(void)
 {
     game_init();
@@ -70,5 +84,6 @@ int main(void)
     assert(b[colony].hp==bh+1 && b[colony].shield_remainder==0);
     assert(u[marine].shield_remainder==79);
     test_actor_phase_owners_and_reuse();
+    test_paused_and_live_update();
     return 0;
 }
