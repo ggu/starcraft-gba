@@ -87,6 +87,16 @@ int main(void)
 #ifdef SC64_IMPORTED_SKIRMISH
     imported_map_owner_matrix();
 #endif
+#ifdef SC64_Z8_RUNTIME
+    campaign_banks(SC64_Z8_GLOBAL_ID,1,2,&race_z8_ai_minerals[0],&race_z8_ai_minerals[1]);
+    {
+        int slot=parent(ENEMY,1); Unit before=u[slot];
+        race_selected_mission=-1;
+        assert(!race_scarab_ai_enqueue_one(slot,ENEMY,1));
+        assert(!memcmp(&before,&u[slot],sizeof(before)));
+        assert(race_z8_ai_minerals[0]==185 && race_z8_ai_minerals[1]==285);
+    }
+#endif
 #ifdef SC64_P7_RUNTIME
     campaign_banks(SC64_P7_GLOBAL_ID,0,4,&race_p7.source_minerals[0],&race_p7.source_minerals[4]);
 #endif

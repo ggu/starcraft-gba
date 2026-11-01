@@ -151,6 +151,17 @@ static Sc64ScarabWallet race_scarab_owner_bank(int slot)
 {
     Sc64ScarabWallet bank = {.limit = 65535};
     if (!race_scarab_parent_identity(slot)) return bank;
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) {
+        int source = u[slot].raw_owner;
+        if (source == SC64_Z8_HUMAN_SLOT && u[slot].owner == SIDE)
+            bank.engine = &minerals;
+        else if ((source == 1 || source == 2) && u[slot].owner == ENEMY &&
+                 race_z8_source_owner((unsigned)source) == ENEMY)
+            bank.source = &race_z8_ai_minerals[source - 1];
+        return bank;
+    }
+#endif
 #ifdef SC64_P8_RUNTIME
     if (race_p8_active()) return race_p8_scarab_wallet(&u[slot]);
 #endif
@@ -270,6 +281,11 @@ static int race_scarab_ai_enqueue_one(int slot,int expected_owner,int expected_s
         if (race_bot_index(expected_owner) < 0) return 0;
     } else {
         int supported=0;
+#ifdef SC64_Z8_RUNTIME
+        if (race_z8_active() && expected_owner==ENEMY &&
+            (expected_source_owner==1 || expected_source_owner==2) &&
+            race_z8_source_owner((unsigned)expected_source_owner)==ENEMY) supported=1;
+#endif
 #ifdef SC64_P8_RUNTIME
         if (race_p8_active() && expected_owner==ENEMY &&
             (expected_source_owner==0 || expected_source_owner==3)) supported=1;
