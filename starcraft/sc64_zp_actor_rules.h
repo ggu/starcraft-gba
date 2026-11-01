@@ -140,6 +140,18 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
     };
     if (type == U_P8_HYPERION) return &p8_hyperion;
 #endif
+#ifdef SC64_P10_DATA_ENABLED
+    /* Pinned BWAPI raw82 Hero_Gantrithor facts: 800 HP, 500 shields,
+       armor 4, 9-tile sight, L32/U32/R31/D31, flying, Large. It has no
+       weapon of its own; its Interceptors are not launched in P10. */
+    static const Sc64ZpActorFact p10_gantrithor = {
+        82,800,500,4,700,600,4200,288, 32,32,31,31,1,2,
+        0,0,0,0,0, 0,0,0,0,0,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+        SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN
+    };
+    if (type == U_P10_GANTRITHOR) return &p10_gantrithor;
+#endif
 #ifdef SC64_P6_ACTORS
 #ifdef SC64_P6_COMBAT_ENABLED
 #define SC64_P6_WEAPON_POLICY SC64_ZP_ACTOR_WEAPON
@@ -279,6 +291,16 @@ static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
     };
     if (type == B_Z6_ROBOTICS_SUPPORT_BAY) return &z6_support_bay;
     if (type == B_Z6_SHIELD_BATTERY) return &z6_shield_battery;
+#endif
+#if defined(SC64_P10_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
+    /* Pinned BWAPI raw-147 Special_Overmind_With_Shell facts: 5000 HP,
+       armor 1, 8-tile sight, 5x3 tiles, L80/U32/R79/D40, Large. */
+    static const Sc64ZpBuildingFact p10_overmind = {
+        147,5000,0,1,1,1,1,256,5,3,80,32,79,40,2,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE|
+        SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_DRAWABLE
+    };
+    if (type == B_P10_OVERMIND) return &p10_overmind;
 #endif
 #ifdef SC64_NYDUS_ENABLED
     /* Pinned BWAPI raw-134 facts; see sc64_nydus_rules.h. */

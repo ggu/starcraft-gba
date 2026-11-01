@@ -33,6 +33,8 @@ TARGETS = {
     "--zerg-z7-steering": ("StarCraft-Zerg-Z7-Steering-Probe-GBA", "starcraft-zerg-z7-steering-probe", "SCZS", "SC Z7 STEP36"),
     "--protoss": ("StarCraft-Protoss-P7-Transport1-GBA", "starcraft-protoss-p7", "SCP7", "SC PROTOSS7"),
     "--protoss-p8": ("StarCraft-Protoss-P8-Transport1-GBA", "starcraft-protoss-p8", "SCP8", "SC PROTOSS8"),
+    "--protoss-p9": ("StarCraft-Protoss-P9-Transport1-GBA", "starcraft-protoss-p9", "SCP9", "SC PROTOSS9"),
+    "--protoss-p10": ("StarCraft-Protoss-P10-Transport1-GBA", "starcraft-protoss-p10", "SCPA", "SC PROTOSS10"),
     "--protoss-p6": ("StarCraft-Protoss-P6-GBA", "starcraft-protoss-p6", "SCP6", "SC PROTOSS6"),
     "--protoss-p3": ("StarCraft-Protoss-GBA", "starcraft-protoss", "SCP3", "SC PROTOSS3"),
     "--protoss-p4": ("StarCraft-Protoss-P4-GBA", "starcraft-protoss-p4", "SCP4", "SC PROTOSS4"),

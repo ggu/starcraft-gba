@@ -9,6 +9,13 @@ static inline int sc64_zp_actor_default_hp(int type);
 static inline int sc64_zp_actor_default_shields(int type);
 
 #define SC64_P7_TYPED_UNIT_SAVE_BYTES 28
+/* Canonical shield bound. The row's shield field is 9 bits; P10's Gantrithor
+ * (500 shields) is the only actor above Zeratul's 400. */
+#ifdef SC64_P10_DATA_ENABLED
+#define SC64_P7_TYPED_UNIT_MAX_SHIELDS 511
+#else
+#define SC64_P7_TYPED_UNIT_MAX_SHIELDS 400
+#endif
 typedef struct { u8 bytes[SC64_P7_TYPED_UNIT_SAVE_BYTES]; }
     Sc64P7TypedUnitSave;
 _Static_assert(sizeof(Sc64P7TypedUnitSave) == 28,
@@ -57,7 +64,8 @@ static int sc64_p7_typed_unit_canonical(int type, int *maxhp, int *armor,
     if (!hp && rule) hp = rule->hp;
     shields = sc64_zp_actor_default_shields(type);
     if (!shields && rule) shields = rule->shields;
-    if (hp <= 0 || hp > 131071 || shields < 0 || shields > 400) return 0;
+    if (hp <= 0 || hp > 131071 || shields < 0 ||
+        shields > SC64_P7_TYPED_UNIT_MAX_SHIELDS) return 0;
     if (maxhp) *maxhp = hp;
     if (armor) *armor = sc64_race_unit_armor(type);
     if (maxshield) *maxshield = shields;

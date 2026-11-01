@@ -1,0 +1,163 @@
+main.o: common/main.c common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ common/demo_schedule.h
+gba.o: common/gba.c common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ common/audio_mixer.h common/audio_codec.h common/gba_present.h \
+ .local/sc64/audio/generated/sc64_audio_generated.h
+memory.o: common/memory.c common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h
+audio_bank.o: common/audio_bank.S
+game.o: starcraft/game.c starcraft/../common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ starcraft/sc64_engine_capabilities.h starcraft/sc64_bitgrid.h \
+ common/gba.h starcraft/sc64_map_math.h starcraft/sc64_construction_hp.h \
+ starcraft/sc64_building_damage.h starcraft/sc64_building_fire_vfx.h \
+ .local/sc64/building-fire/generated/sc64_building_fire_generated.h \
+ starcraft/sc64_order_marker_vfx.h \
+ .local/sc64/order-marker/generated/sc64_order_marker_generated.h \
+ starcraft/sc64_building_placement_vfx.h starcraft/sc64_minimap_terrain.h \
+ starcraft/sc64_weapon_vfx.h starcraft/sc64_weapon_source_runtime.h \
+ starcraft/sc64_weapon_source_vfx.h \
+ .local/sc64/weapon-vfx/generated/sc64_weapon_source_generated.h \
+ starcraft/sc64_tank_source_vfx.h starcraft/sc64_construction_vfx.h \
+ starcraft/sc64_death_vfx.h starcraft/sc64_p5.h starcraft/sc64_p5_state.h \
+ starcraft/sc64_p5_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h \
+ starcraft/sc64_p6.h starcraft/sc64_p6_state.h \
+ starcraft/sc64_p6_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h \
+ .local/sc64/p6/generated/sc64_p6_doodads_generated.h \
+ starcraft/sc64_psionic_storm.h starcraft/sc64_interceptor_motion.h \
+ starcraft/sc64_interceptor_pool_codec.h \
+ .local/sc64/backwater/generated/sc64_mission_generated.h \
+ starcraft/sc64_types.h \
+ .local/sc64/backwater/generated/sc64_assets_generated.h \
+ .local/sc64/zp-stage/generated/sc64_races_generated.h \
+ starcraft/sc64_frontend.h starcraft/campaign_catalog.h \
+ starcraft/sc64_briefing.h \
+ .local/sc64/skirmish/generated/sc64_skirmish_generated.h \
+ .local/sc64/backwater/generated/sc64_sprites_generated.h \
+ .local/sc64/protoss-p7/generated/sc64_race_sprites_generated.h \
+ starcraft/sc64_p8_sprite_adapter.h starcraft/sc64_construction_source.h \
+ starcraft/sc64_construction_animation.h \
+ .local/sc64/construction/generated/sc64_construction_sprites_generated.h \
+ starcraft/sc64_construction_source.h starcraft/sc64_death_source.h \
+ .local/sc64/death/generated/sc64_death_sprites_generated.h \
+ starcraft/sc64_death_source.h starcraft/sc64_unit_attack_source.h \
+ .local/sc64/attack-poses/generated/sc64_unit_attack_source_generated.h \
+ starcraft/sc64_display.h starcraft/sc64_backwater.h \
+ starcraft/sc64_types.h starcraft/race_rules.h \
+ starcraft/sc64_zp_actor_rules.h starcraft/sc64_p7_actor_rules.h \
+ starcraft/sc64_z5_actor_rules.h starcraft/sc64_p6_actor_rules.h \
+ starcraft/sc64_z6_actor_rules.h starcraft/sc64_stock_motion.h \
+ starcraft/sc64_stock_profiles.h starcraft/sc64_stock_combat.h \
+ starcraft/sc64_game_actor_facts.h starcraft/sc64_fact_tables.h \
+ starcraft/sc64_fact_table_format.h \
+ build/generated/p9-fact-v2/sc64_fact_tables_generated.h \
+ starcraft/sc64_p7_sight_policy.h starcraft/race_missions.h \
+ starcraft/sc64_p3_model.h starcraft/sc64_p3.h starcraft/sc64_p4.h \
+ starcraft/sc64_weapon_vfx_profiles.h starcraft/sc64_zp_building_types.h \
+ starcraft/sc64_race_save_types.h starcraft/sc64_compact_building_save.h \
+ starcraft/sc64_zp_unit_save.h starcraft/sc64_compact_mineral_save.h \
+ starcraft/sc64_p7_typed_unit_save.h \
+ starcraft/sc64_p7_typed_building_save.h starcraft/sc64_p7_state.h \
+ starcraft/sc64_p7_adapter.h starcraft/sc64_p7.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h \
+ starcraft/sc64_p8_state.h starcraft/sc64_p8_runtime.h \
+ starcraft/sc64_p9_state.h starcraft/sc64_impact_save_types.h \
+ starcraft/sc64_impact_events.h starcraft/sc64_collision.h \
+ starcraft/sc64_collision_legacy.h starcraft/sc64_contact.h \
+ starcraft/sc64_targets.h starcraft/sc64_font.h \
+ .local/sc64/interface/generated/sc64_font_generated.h \
+ starcraft/sc64_icons.h \
+ .local/sc64/interface/generated/sc64_icons_generated.h \
+ starcraft/sc64_chrome.h \
+ .local/sc64/interface/generated/sc64_chrome_generated.h \
+ .local/sc64/briefings/generated/sc64_briefing_generated.h \
+ starcraft/sc64_briefing.h starcraft/sc64_protoss_services.h \
+ starcraft/sc64_visibility.h starcraft/sc64_unit_walk.h \
+ starcraft/sc64_routes.h starcraft/sc64_depot_goal.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/limits.h \
+ starcraft/sc64_route_monotone_probe.h starcraft/sc64_transport_adapter.h \
+ starcraft/sc64_transport_rules.h starcraft/sc64_backwater_adapter.h \
+ starcraft/field_controls.h starcraft/ui_widgets.h starcraft/hud_icons.h \
+ .local/sc64/command-icons/generated/sc64_command_icons_generated.h \
+ starcraft/sc64_unit_facing.h \
+ .local/sc64/facing/generated/sc64_unit_facing_generated.h \
+ starcraft/sc64_weapon_vfx_render.h \
+ starcraft/sc64_tank_source_vfx_render.h \
+ .local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h \
+ starcraft/sc64_weapon_source_vfx_render.h \
+ starcraft/sc64_weapon_source_vfx_bounds.h \
+ starcraft/sc64_death_vfx_render.h starcraft/sc64_static_key.h \
+ starcraft/sc64_terrain_cache.h starcraft/sc64_obj_vram.h \
+ starcraft/sc64_static_dirty_rows.h starcraft/sc64_frontend_draw.h \
+ starcraft/game_audio.h \
+ .local/sc64/audio/generated/sc64_audio_generated.h \
+ starcraft/race_combat.h starcraft/sc64_p7_archon_adapter.h \
+ starcraft/sc64_p7_archon_rules.h starcraft/sc64_p7_geometry.h \
+ starcraft/sc64_siege_splash.h starcraft/sc64_siege_source_bounds.h \
+ starcraft/race_adapter.h starcraft/race_skirmish.h \
+ starcraft/sc64_p7_battery_rules.h starcraft/sc64_p7_power_geometry.h \
+ starcraft/sc64_p7_runtime_adapter.h starcraft/sc64_p7_world_adapter.h \
+ starcraft/sc64_resource_actions.h starcraft/sc64_p7_observer_adapter.h \
+ starcraft/sc64_p7_observer_rules.h starcraft/sc64_p7_sight_runtime.h \
+ starcraft/sc64_zero_bytes.h starcraft/sc64_p7_battery_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p7_battery_properties_generated.h \
+ starcraft/sc64_p7_projectile_adapter.h \
+ starcraft/sc64_p7_carrier_training.h \
+ starcraft/sc64_p7_interceptor_flight.h \
+ starcraft/sc64_interceptor_orders.h starcraft/race_campaign_adapter.h \
+ starcraft/sc64_p3_adapter.h starcraft/sc64_p4_adapter.h \
+ .local/sc64/p4/generated/sc64_p4_scenario_generated.h \
+ starcraft/sc64_p4_storm_adapter.h starcraft/sc64_p5_runtime_adapter.h \
+ starcraft/sc64_p5_world_adapter.h starcraft/sc64_p5_source_model.h \
+ starcraft/sc64_p5_count_snapshot.h starcraft/sc64_p6_combat_adapter.h \
+ starcraft/sc64_p6_combat.h starcraft/sc64_p6_world_adapter.h \
+ starcraft/sc64_z5_detection.h starcraft/sc64_p6_runtime_adapter.h \
+ starcraft/sc64_p6_count_snapshot.h starcraft/sc64_p6_render_adapter.h \
+ starcraft/sc64_p6_storm_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h \
+ starcraft/sc64_z8_game_bridge.h starcraft/sc64_z8_world_adapter.h \
+ starcraft/sc64_z8_triggers.h starcraft/sc64_z8_source.h \
+ starcraft/sc64_p8_runtime_adapter.h starcraft/sc64_p8_timed_service.h \
+ starcraft/sc64_p8_world_adapter.h starcraft/sc64_p8_source_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p8_scenario_generated.h \
+ starcraft/sc64_p8_game_bridge.h starcraft/sc64_p8_ai.h \
+ starcraft/sc64_p8_request_queue.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdbool.h \
+ starcraft/sc64_p8_ai_admission.h \
+ build/generated/p8-battery/sc64_p8_battery_properties_generated.h \
+ starcraft/sc64_p9_runtime_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p9_scenario_generated.h \
+ starcraft/sc64_p9_ai.h starcraft/race_save_adapter.h \
+ starcraft/sc64_construction_save.h starcraft/sc64_p6_save.h \
+ starcraft/sc64_p5_transport_save.h \
+ starcraft/sc64_p7_projectile_save_adapter.h \
+ starcraft/sc64_impact_adapter.h
+sc64_interceptor_motion.o: starcraft/sc64_interceptor_motion.c \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ starcraft/sc64_interceptor_motion_kernel.h \
+ starcraft/sc64_interceptor_direction_tables.h \
+ starcraft/sc64_interceptor_motion.h \
+ starcraft/sc64_interceptor_pool_codec.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h
+sc64_interceptor_pool_codec.o: starcraft/sc64_interceptor_pool_codec.c \
+ starcraft/sc64_interceptor_pool_codec.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h
+sc64_interceptor_orders.o: starcraft/sc64_interceptor_orders.c \
+ starcraft/sc64_interceptor_orders.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h

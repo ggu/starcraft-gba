@@ -2035,6 +2035,14 @@ $(eval $(call P8_ARM_ROM,replay-resume,-DP8_REPLAY_RESUME,Replay-Resume))
 .PHONY: sc64-p8-arm-replay
 sc64-p8-arm-replay: build/StarCraft-Protoss-P8-Replay.gba build/StarCraft-Protoss-P8-Replay-Prefix.gba build/StarCraft-Protoss-P8-Replay-Resume.gba
 
+# P9 candidate rules retain their original parse position.
+-include mk/protoss-p9/Makefile
+
+# Explicit P10 candidate, in its own fragment: this file is at the source
+# check's 512 KiB limit. Optional, so make fixtures that copy only this file
+# still parse it.
+-include mk/protoss-p10/Makefile
+
 build/test-sc64-p5-transport-on: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_P5_SHUTTLE_ENABLED $< -o $@
 build/test-sc64-p5-transport-off: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
