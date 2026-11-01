@@ -1,5 +1,5 @@
 # Opt-in range-worker qualification, using current Z7 canonical inputs.
-.PHONY: range-work-print-flags test-sc64-range-work-flags test-sc64-range-work-engine test-sc64-range-work-save-resume test-sc64-range-copy-alignment
+.PHONY: range-work-print-flags test-sc64-range-work-flags test-sc64-range-work-engine test-sc64-range-work-engine-default test-sc64-range-work-save-resume test-sc64-range-copy-alignment
 range-work-print-flags:
 	@printf '%s\n' 'terran=$(TERRAN_ROM_FLAGS)' 'zerg=$(ZERG_Z7_CANONICAL_FLAGS)' 'protoss=$(PROTOSS_P7_CANONICAL_FLAGS)' 'showcase=$(SHOWCASE_FLAGS)'
 test-sc64-range-work-flags:
@@ -8,6 +8,10 @@ build/test-sc64-range-work-engine: tests/sc64_direct_firing_points_game.c $(STAR
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) -DSC64_RANGE_WORK -DSC64_RANGE_WORK_BUDGET_PER_TICK=8 $< common/gba.c -o $@
 test-sc64-range-work-engine: build/test-sc64-range-work-engine
 	./build/test-sc64-range-work-engine
+build/test-sc64-range-work-engine-default: tests/sc64_direct_firing_points_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.h common/gba.c Makefile tests/sc64-range-work/Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) -DSC64_RANGE_WORK $< common/gba.c -o $@
+test-sc64-range-work-engine-default: build/test-sc64-range-work-engine-default
+	./build/test-sc64-range-work-engine-default
 build/test-sc64-range-work-save-resume: tests/sc64_range_work_save_resume.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.h common/gba.c Makefile tests/sc64-range-work/Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) -DSC64_RANGE_WORK -DSC64_RANGE_WORK_BUDGET_PER_TICK=8 $< common/gba.c -o $@
 test-sc64-range-work-save-resume: build/test-sc64-range-work-save-resume
