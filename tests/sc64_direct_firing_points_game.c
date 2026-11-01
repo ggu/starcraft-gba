@@ -474,6 +474,8 @@ static void test_range_work_scheduler_contracts(void)
        game_update pumps the scheduler. Target motion follows the 14-frame
        retry cadence for the whole wall-crossing run. */
     sc64_range_route_reset();
+    /* Synthetic scheduler targets must not participate in the live scene. */
+    for (int i = 70; i <= 102; ++i) memset(&u[i], 0, sizeof(u[i]));
     clear_walk_grid();
     for (int row = 0; row < MAP_ROWS; ++row)
         if (row != 20) SC64_GRID_SET(path_walkable, 24 + row * MAP_COLS, 0);
