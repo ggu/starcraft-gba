@@ -144,3 +144,14 @@ No HP, damage, resource, source objective or AI permission is changed. An
 offensive order being accepted will not be treated as destruction or a win;
 the existing strict engine/source victory predicate and bound remain intact.
 This trial is uncompiled and unrun.
+
+The offensive trial's order helper rechecks the selected actor's live
+ownership/source identity and the armed mode after cursor travel, before
+issuing A. It records the click coordinates and the ordinary direct-target
+selector's result, then verifies the same live actor's observed move/attack
+destination or direct target. A previous unrelated attack order no longer
+counts as applied. This is conservative state confirmation after the two
+input updates: a target that dies or a victory reached during the tap can
+leave the order unconfirmed even when it was issued. It is not a generation
+identifier or proof that the attack caused a later death. Build-consumption
+observations retain their earlier separate rules.

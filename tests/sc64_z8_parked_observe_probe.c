@@ -104,7 +104,9 @@ static int select_one(int slot)
 }
 static int move_cursor(int x,int y){int guard=0;while((abs(cx-x)>2||abs(cy-y)>2)&&screen==SCREEN_PLAY&&!won&&!lost&&guard++<3000){u16 h=KEY_R;if(abs(cx-x)>2)h|=cx<x?KEY_RIGHT:KEY_LEFT;if(abs(cy-y)>2)h|=cy<y?KEY_DOWN:KEY_UP;step(h);}step(0);return guard<3000;}
 static int order(int slot,int row,int x,int y){
- int ok=0,selected_slot=-1,armed=-1,applied=-1;
+ int ok=0,selected_slot=-1,armed=-1,applied=-1,click_x=-1,click_y=-1,direct_target=-1;
+ if(slot<0||slot>=MAX_UNITS){printf("ORDER_REJECT frame%d slot%d reason=invalid_slot\n",frame,slot);return 0;}
+ int raw=u[slot].raw_type,source_owner=u[slot].raw_owner;
  if(!select_one(slot))goto report;
  for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){selected_slot=i;break;}
  tap(KEY_B);for(int n=0;menu_open&&menu_cursor!=row&&n<MENU_COUNT;n++)tap(menu_cursor<row?KEY_DOWN:KEY_UP);
@@ -113,9 +115,21 @@ static int order(int slot,int row,int x,int y){
  if((row==MENU_MOVE&&armed!=MODE_MOVE)||(row==MENU_ATTACK&&armed!=MODE_ATTACK)||
     (row>=MENU_BARRACKS&&row<=MENU_ENG_BAY&&armed!=MODE_BUILD))goto report;
  if(!move_cursor(x,y))goto report;
+ if(screen!=SCREEN_PLAY||won||lost||mode!=armed||!u[slot].alive||u[slot].owner!=SIDE||
+    u[slot].raw_type!=raw||u[slot].raw_owner!=source_owner||!u[slot].selected||selected_count()!=1)goto report;
+ click_x=cx;click_y=cy;
+#ifdef SC64_DIRECT_ATTACK
+ if(row==MENU_ATTACK)direct_target=sc64_direct_attack_find_target(click_x,click_y);
+#endif
  tap(KEY_A);
- if(row==MENU_MOVE)applied=u[slot].alive&&((u[slot].order==ORDER_MOVE&&abs(u[slot].tx-cx)<=2&&abs(u[slot].ty-cy)<=2)||(u[slot].order==ORDER_IDLE&&dist2(u[slot].x,u[slot].y,cx,cy)<=25));
- else if(row==MENU_ATTACK)applied=u[slot].alive&&(u[slot].order==ORDER_ATTACK_MOVE||u[slot].order==ORDER_ATTACK_TARGET);
+ if(row==MENU_MOVE||row==MENU_ATTACK){
+  if(screen!=SCREEN_PLAY||won||lost||mode!=MODE_NORMAL||!u[slot].alive||u[slot].owner!=SIDE||
+     u[slot].raw_type!=raw||u[slot].raw_owner!=source_owner)goto report;
+  if(row==MENU_MOVE)applied=(u[slot].order==ORDER_MOVE&&abs(u[slot].tx-click_x)<=2&&abs(u[slot].ty-click_y)<=2)||
+                         (u[slot].order==ORDER_IDLE&&dist2(u[slot].x,u[slot].y,click_x,click_y)<=25);
+  else if(direct_target>=0)applied=u[slot].order==ORDER_ATTACK_TARGET&&u[slot].target==direct_target;
+  else applied=u[slot].order==ORDER_ATTACK_MOVE&&abs(u[slot].tx-click_x)<=2&&abs(u[slot].ty-click_y)<=2;
+ }
  else if(row>=MENU_BARRACKS&&row<=MENU_ENG_BAY)applied=screen==SCREEN_PLAY&&mode==MODE_NORMAL&&((u[slot].alive&&(u[slot].order==ORDER_BUILD||u[slot].order==ORDER_BUILD_PENDING))||!u[slot].alive);
  ok=applied==1;
 report:printf("ORDER frame%d slot%d selected%d selectedCount%d alive%d raw%d owner%d row%d requested%d,%d cursor%d,%d armed%d applied%d ok%d order%d target%d tx%d ty%d mode%d\n",frame,slot,selected_slot,selected_count(),u[slot].alive,u[slot].raw_type,u[slot].owner,row,x,y,cx,cy,armed,applied,ok,u[slot].order,u[slot].target,u[slot].tx,u[slot].ty,mode);return ok;}
