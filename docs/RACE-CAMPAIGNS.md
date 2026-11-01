@@ -13,8 +13,9 @@ target is the qualified P7 candidate. Explicit `protoss-p6` remains a separate
 P1–P6 product with its generation-30 save identity.
 `zerg-z4`, `zerg-z3` and `protoss-p3` remain explicit legacy builds with their original
 ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. The P7 candidate carries the P1–P6 campaign and the seventh menu entry. The
-explicit `protoss-p8` candidate adds P8 as an eighth entry, and explicit
-`protoss-p9` adds P9 as a ninth; explicit
+explicit `protoss-p8` candidate adds P8 as an eighth entry, explicit
+`protoss-p9` adds P9 as a ninth, and explicit `protoss-p10` adds P10 as a
+tenth; explicit
 `protoss-p5-shuttle` preserves the earlier five-entry product. The
 catalog records all 30 mission identifiers.
 
@@ -165,8 +166,19 @@ pause-menu SRAM save taken while a structure is under construction, loaded
 in a fresh process, continues to the same win on host and on ARM. P9's AI
 backend and trigger cadence are authored, and Defiler spells are not
 implemented. See the
-[P9 candidate audit](audits/2026-10-29-p9-campaign/README.md). P10 remains
-unavailable.
+[P9 candidate audit](audits/2026-10-29-p9-campaign/README.md).
+
+P10 **Eye of the Storm** has a separate, unpromoted `protoss-p10` candidate
+built on the P9 candidate. It is built with `make protoss-p10` and writes
+`StarCraft-Protoss-P10-GBA.gba` / `starcraft-protoss-p10.elf`, code `SCPA`,
+generation 47. Its start-up trigger creates Raynor's Terran base for the
+human and the rescuable Hyperion; destroying the Overmind wins, and losing
+Zeratul, the Gantrithor or the Hyperion loses. Host checks cover the
+start-up program, the victory and defeat triggers, and a pause-menu save that
+continues identically in a fresh process. No ordinary-input win and no ARM
+run exist yet. Raynor's base cannot train or build, the Gantrithor has no
+attack, and the AI backend is authored. See the
+[P10 candidate audit](audits/2026-11-01-p10-campaign/README.md).
 
 For P7, the canonical-render candidate passes its host startup/save fixtures,
 normal-input campaign win, 18-match skirmish matrix and menu-driven save/reload.

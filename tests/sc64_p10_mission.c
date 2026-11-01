@@ -105,9 +105,11 @@ static void census(const char *label)
         side_b += b[i].owner == SIDE; enemy_b += b[i].owner == ENEMY;
     }
     printf("p10 %s: frame=%d screen=%d won=%d lost=%d faults=%d side=%d/%d enemy=%d/%d "
-           "rescuable=%d minerals=%d gas=%d switches=0x%04x wait=0x%x digest=%u\n",
+           "rescuable=%d heroes=%d%d%d overmind=%d minerals=%d gas=%d switches=0x%04x "
+           "wait=0x%x digest=%u\n",
            label, frame, screen, won, lost, mission_unsupported_count, side, side_b,
-           enemy, enemy_b, rescuable, minerals, gas, race_p10.switches,
+           enemy, enemy_b, rescuable, find_raw(75) >= 0, find_raw(82) >= 0,
+           find_raw(28) >= 0, find_raw(147) >= 0, minerals, gas, race_p10.switches,
            race_p10.waiting_mask, state_digest());
 }
 
