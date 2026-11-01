@@ -24,7 +24,9 @@ can be rebased onto whatever P8 and P9 land as.
   (`starcraft-protoss-p10.elf`, title `SC PROTOSS10`, code `SCPA`) from the
   P9 candidate's flags plus `SC64_P10_DATA_ENABLED`, `SC64_P10_RUNTIME` and
   `SC64_P10_CAMPAIGN_ENTRY`, with fact tables generated for its roster in
-  `build/generated/p10-fact-v2`.
+  `build/generated/p10-fact-v2`. Its rules live in `mk/protoss-p10/Makefile`,
+  which the top-level Makefile includes: the top-level file is within a few
+  hundred bytes of `tools/check_source_tree.py`'s 512 KiB limit.
 - **Catalog and menu.** Catalog entry 29 ("EYE OF THE STORM") is playable
   after P9.
 - **Saves.** Generation 47; the record tag is `0x5343505f` with the profile's
