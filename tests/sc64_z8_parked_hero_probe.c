@@ -1,0 +1,98 @@
+#include <stdlib.h>
+#include "../starcraft/game.c"
+#include <stdio.h>
+static unsigned held,ticks;
+static unsigned char original_seen[6],original_gone[6];
+static void original_escort_census(void){static const int slots[]={48,53,54,55,56,57},raw[]={42,37,37,38,38,37};for(int k=0;k<6;k++){int i=slots[k];int match=u[i].alive&&u[i].owner==SIDE&&u[i].raw_owner==3&&u[i].raw_type==raw[k];if(!original_seen[k]){if(match)original_seen[k]=1;continue;}if(!original_gone[k]&&!match){original_gone[k]=1;printf("ORIGINAL_ESCORT_GONE frame%d slot%d expected_raw%d alive%d current_raw%d owner%d raw_owner%d\n",frame,i,raw[k],u[i].alive,u[i].raw_type,u[i].owner,u[i].raw_owner);}}}
+static void detector_damage_census(void){static int last=-1;int i=48;if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==42){if(last>=0&&u[i].hp<last){printf("DETECTOR_DAMAGE frame%d slot%d raw%d owner%d hp%d previous%d xy%d,%d\n",frame,i,u[i].raw_type,u[i].owner,u[i].hp,last,u[i].x,u[i].y);for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==ENEMY&&dist2(u[j].x,u[j].y,u[i].x,u[i].y)<512*512)printf("NEAR_HOSTILE frame%d slot%d raw%d owner%d hp%d xy%d,%d cd%d target%d order%d\n",frame,j,u[j].raw_type,u[j].owner,u[j].hp,u[j].x,u[j].y,u[j].cd,u[j].target,u[j].order);}last=u[i].hp;}else if(last>0){printf("DETECTOR_REMOVED frame%d slot%d last_hp%d\n",frame,i,last);last=0;}}
+static void step(u16 h){static int last=-1;game_update(h,h&~held);held=h;ticks++;if(screen==SCREEN_PLAY){detector_damage_census();original_escort_census();}if(screen==SCREEN_PLAY&&frame>0&&frame%120==0&&frame!=last){last=frame;printf("HERO_SAMPLE frame%d alive%d owner%d raw%d hp%d xy%d,%d order%d target%d\n",frame,u[10].alive,u[10].owner,u[10].raw_type,u[10].hp,u[10].x,u[10].y,u[10].order,u[10].target);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==74)printf("EARLY_DT frame%d native%u slot%d hp%d shield%d xy%d,%d hidden%d distance48sq%d sight%d\n",frame,race_z8_sched.frames,i,u[i].hp,u[i].shield,u[i].x,u[i].y,race_z8_unit_hidden_from_side(i),dist2(u[i].x,u[i].y,u[48].x,u[48].y),currently_visible(u[i].x,u[i].y));const Sc64Z8Condition *cond=&sc64_z8_program_conditions[sc64_z8_program_triggers[17].first_condition];u32 count=0;int rc=sc64_z8_world_count(&race_z8_view,cond,SC64_Z8_HUMAN_SLOT,sc64_z8_rect(&race_z8_sched,cond->location),&count);printf("T17_CENSUS frame%d location%u rc%d count%u outcome%d\n",frame,cond->location,rc,count,race_z8_outcome());int ids[]={48,53,54,55,56,57};for(unsigned j=0;j<sizeof(ids)/sizeof(ids[0]);j++){int i=ids[j];printf("EARLY_SOUTH frame%d slot%d alive%d hp%d xy%d,%d order%d target%d tx%d ty%d\n",frame,i,u[i].alive,u[i].hp,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty);}}}
+static void tap(u16 k){step(k);step(0);}
+static int select_one(int slot){for(int n=0;n<MAX_UNITS&&screen==SCREEN_PLAY&&!won&&!lost;n++){tap(KEY_L);if(u[slot].alive&&u[slot].selected&&selected_count()==1)return 1;}return 0;}
+static int move_cursor(int x,int y){int guard=0;while((abs(cx-x)>2||abs(cy-y)>2)&&screen==SCREEN_PLAY&&!won&&!lost&&guard++<3000){u16 h=KEY_R;if(abs(cx-x)>2)h|=cx<x?KEY_RIGHT:KEY_LEFT;if(abs(cy-y)>2)h|=cy<y?KEY_DOWN:KEY_UP;step(h);}step(0);return guard<3000;}
+static int order(int slot,int row,int x,int y){
+ int ok=0,selected_slot=-1,armed=-1,applied=-1;
+ if(!select_one(slot))goto report;
+ for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){selected_slot=i;break;}
+ tap(KEY_B);for(int n=0;menu_open&&menu_cursor!=row&&n<MENU_COUNT;n++)tap(menu_cursor<row?KEY_DOWN:KEY_UP);
+ if(!menu_open||menu_cursor!=row)goto report;
+ tap(KEY_A);armed=mode;
+ if((row==MENU_MOVE&&armed!=MODE_MOVE)||(row==MENU_ATTACK&&armed!=MODE_ATTACK)||
+    (row>=MENU_BARRACKS&&row<=MENU_ENG_BAY&&armed!=MODE_BUILD))goto report;
+ if(!move_cursor(x,y))goto report;
+ tap(KEY_A);
+ if(row==MENU_MOVE)applied=u[slot].alive&&((u[slot].order==ORDER_MOVE&&abs(u[slot].tx-cx)<=2&&abs(u[slot].ty-cy)<=2)||(u[slot].order==ORDER_IDLE&&dist2(u[slot].x,u[slot].y,cx,cy)<=25));
+ else if(row==MENU_ATTACK)applied=u[slot].alive&&(u[slot].order==ORDER_ATTACK_MOVE||u[slot].order==ORDER_ATTACK_TARGET);
+ else if(row>=MENU_BARRACKS&&row<=MENU_ENG_BAY)applied=screen==SCREEN_PLAY&&mode==MODE_NORMAL&&((u[slot].alive&&(u[slot].order==ORDER_BUILD||u[slot].order==ORDER_BUILD_PENDING))||!u[slot].alive);
+ ok=applied==1;
+report:printf("ORDER frame%d slot%d selected%d selectedCount%d alive%d raw%d owner%d row%d requested%d,%d cursor%d,%d armed%d applied%d ok%d order%d target%d tx%d ty%d mode%d\n",frame,slot,selected_slot,selected_count(),u[slot].alive,u[slot].raw_type,u[slot].owner,row,x,y,cx,cy,armed,applied,ok,u[slot].order,u[slot].target,u[slot].tx,u[slot].ty,mode);return ok;}
+static void hero_census(void){int i=10;printf("HERO_STATE frame%d alive%d owner%d raw_owner%d raw%d hp%d xy%d,%d order%d target%d tx%d ty%d\n",frame,u[i].alive,u[i].owner,u[i].raw_owner,u[i].raw_type,u[i].hp,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty);}
+static void dispatch_hero(void){
+ int i=10,entrance=67,issued=0,arrived=0;
+ hero_census();
+ if(!u[i].alive||u[i].owner!=SIDE||u[i].raw_owner!=3||u[i].raw_type!=51||!race_nydus_can_enter(i,entrance)||!select_one(i))goto done;
+ if(!move_cursor(b[entrance].x,b[entrance].y))goto done;
+ tap(KEY_A);issued=u[i].alive&&u[i].order==ORDER_NYDUS_ENTER&&u[i].target==entrance;
+ printf("HERO_NYDUS_ISSUE frame%d issued%d entrance%d entrance_xy%d,%d order%d target%d\n",frame,issued,entrance,b[entrance].x,b[entrance].y,u[i].order,u[i].target);
+ if(!issued)goto done;
+ for(int n=0;n<600&&screen==SCREEN_PLAY&&!won&&!lost&&u[i].alive;n++){if(u[i].x>1800&&u[i].y>1750){arrived=1;break;}step(0);}
+ printf("HERO_NYDUS_EXIT frame%d arrived%d xy%d,%d hp%d order%d\n",frame,arrived,u[i].x,u[i].y,u[i].hp,u[i].order);
+ if(arrived&&screen==SCREEN_PLAY&&!won&&!lost){int ok=order(i,MENU_ATTACK,900,1544);printf("HERO_ATTACK_MOVE frame%d ok%d xy%d,%d hp%d order%d target%d tx%d ty%d\n",frame,ok,u[i].x,u[i].y,u[i].hp,u[i].order,u[i].target,u[i].tx,u[i].ty);}
+done:hero_census();
+}
+/* Only inspect target coordinates while the ordinary visibility and detector
+ * gates both expose that actor. Selection and cursor state use real buttons. */
+static int visible_raid(int slot){return slot>=0&&slot<MAX_UNITS&&u[slot].alive&&u[slot].owner==ENEMY&&u[slot].raw_type==74&&!race_z8_unit_hidden_from_side(slot)&&currently_visible(u[slot].x,u[slot].y);}
+static void lower_visible_attack(int slot){
+ int start=frame,armed=0,issued=0,steps=0;
+ if(!visible_raid(slot)||!u[10].alive||u[10].raw_type!=51||!u[10].selected||selected_count()!=1)goto done;
+ tap(KEY_B);
+ for(int n=0;menu_open&&menu_cursor!=MENU_ATTACK&&n<MENU_COUNT&&visible_raid(slot);n++)tap(menu_cursor<MENU_ATTACK?KEY_DOWN:KEY_UP);
+ if(!menu_open||menu_cursor!=MENU_ATTACK||!visible_raid(slot))goto done;
+ tap(KEY_A);armed=mode==MODE_ATTACK;
+ while(armed&&visible_raid(slot)&&screen==SCREEN_PLAY&&!won&&!lost&&steps++<80){
+  int x=u[slot].x,y=u[slot].y;
+  if(dist2(cx,cy,x,y)<27*27){tap(KEY_A);issued=u[10].alive&&u[10].order==ORDER_ATTACK_TARGET&&u[10].target==slot;break;}
+  u16 h=KEY_R;if(abs(cx-x)>2)h|=cx<x?KEY_RIGHT:KEY_LEFT;if(abs(cy-y)>2)h|=cy<y?KEY_DOWN:KEY_UP;step(h);
+ }
+done:
+ printf("LOWER_REACTIVE start%d end%d slot%d armed%d issued%d visible%d cursor%d,%d hero_order%d hero_target%d steps%d\n",start,frame,slot,armed,issued,visible_raid(slot),cx,cy,u[10].order,u[10].target,steps);
+ if(mode==MODE_ATTACK||menu_open)tap(KEY_B);
+}
+static int side_building(int type,int complete){for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==type&&(!complete||building_complete(i)))return i;return -1;}
+static int build(int worker,int type,int row){int x=-1,y=-1,best=0x7fffffff;for(int yy=b[63].y-128;yy<=b[63].y+128;yy+=16)for(int xx=b[63].x-128;xx<=b[63].x+128;xx+=16)if(race_can_site(SIDE,type,xx,yy)&&can_place(type,xx,yy)){int d=dist2(u[worker].x,u[worker].y,xx,yy);if(d<best){best=d;x=xx;y=yy;}}if(x<0)return 0;int ok=order(worker,row,x,y);for(int retry=0;mode==MODE_BUILD&&retry<12;retry++){int fx=-1,fy=-1;for(int yy=b[63].y-128;yy<=b[63].y+128&&fx<0;yy+=16)for(int xx=b[63].x-128;xx<=b[63].x+128;xx+=16){int clear=1;for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&dist2(u[j].x,u[j].y,xx,yy)<64*64)clear=0;if(clear&&race_can_site(SIDE,type,xx,yy)&&can_place(type,xx,yy)){fx=xx;fy=yy;break;}}if(fx<0)break;move_cursor(fx,fy);tap(KEY_A);printf(" retry%d xy%d,%d mode%d frame%d\n",retry,fx,fy,mode,frame);}printf("build type%d worker%d site%d,%d issued%d frame%d money%d/%d order%d mode%d cursor%d,%d worker%d can%d race%d\n",type,worker,x,y,ok,frame,minerals,gas,u[worker].order,mode,cx,cy,field_ui_build_worker(type),can_place(type,cx,cy),race_can_site(SIDE,type,cx,cy));return ok;}
+static void queue_type(int type){move_cursor(b[63].x,b[63].y);tap(KEY_A);for(int i=0;i<8&&train_type!=type;i++)tap(KEY_R);if(selected_building==63&&train_type==type)tap(KEY_A);printf("queue type%d frame%d selected%d count%d mineral%d gas%d\n",type,frame,selected_building,b[63].queue_count,minerals,gas);}
+static int worker_count(void){int n=0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE)n++;return n;}
+static int morph_spore(int slot){
+ move_cursor(b[slot].x,b[slot].y);tap(KEY_A);
+ printf("spore selected%d expected%d frame%d\n",selected_building,slot,frame);
+ if(selected_building!=slot)return 0;
+ tap(KEY_B);for(int n=0;menu_open&&menu_cursor!=MENU_STOP+2&&n<MENU_COUNT;n++)tap(menu_cursor<MENU_STOP+2?KEY_DOWN:KEY_UP);
+ if(!menu_open||menu_cursor!=MENU_STOP+2)return 0;tap(KEY_A);
+ printf("spore morph frame%d money%d flags%u progress%d under%d\n",frame,minerals,b[slot].flags,b[slot].build_progress,b[slot].under_construction);
+ return !!(b[slot].flags&SC64_Z7_SPORE_MORPH_FLAG);
+}
+int main(void){game_init();tap(KEY_A);for(int i=0;i<3;i++)tap(KEY_RIGHT);tap(KEY_DOWN);tap(KEY_A);tap(KEY_START);
+ order(48,MENU_MOVE,900,1668);dispatch_hero();
+ /* Keep Kerrigan selected and stage the cursor near the lower approach. */
+ if(u[10].alive&&u[10].raw_type==51&&u[10].selected&&selected_count()==1){move_cursor(850,1700);printf("HERO_RESERVE frame%d selected%d cursor%d,%d order%d\n",frame,u[10].selected,cx,cy,u[10].order);}
+ int first_slot=-1,first_seen=0,first_clear=0,lower_attempted=0,opening_started=0;
+ int pool=0,den=0,evo=0,spore=0,hydra=0,deploy[240]={0}, traveler=-1,nydus=0,arrived=0,forward=0,extra_drone=0,south_reloc=0,reinf=0,pursue=0,north_reloc=0,reinf_track[240]={0};int trial_steps=0;for(;trial_steps<20000&&screen==SCREEN_PLAY&&!won&&!lost;trial_steps++){step(0);
+ if(!first_seen){for(int i=0;i<MAX_UNITS;i++)if(visible_raid(i)){first_seen=1;first_slot=i;printf("FIRST_VISIBLE frame%d slot%d xy%d,%d hero%d,%d cursor%d,%d\n",frame,i,u[i].x,u[i].y,u[10].x,u[10].y,cx,cy);break;}}
+ if(first_seen&&!first_clear&&(first_slot<0||!u[first_slot].alive||u[first_slot].raw_type!=74||u[first_slot].owner!=ENEMY)){first_clear=1;printf("FIRST_CLEARED frame%d slot%d\n",frame,first_slot);}
+ if(first_seen&&!first_clear&&!lower_attempted&&visible_raid(first_slot)&&u[first_slot].y>=1660){lower_attempted=1;lower_visible_attack(first_slot);}
+ if(!first_clear)continue;
+ if(!opening_started){opening_started=1;order(55,MENU_ATTACK,880,1640);order(56,MENU_ATTACK,880,1640);int l[]={53,54,57};for(int j=0;j<3;j++)order(l[j],MENU_ATTACK,880,1640);order(16,MENU_MOVE,1770,500);for(int i=17;i<=22;i++)order(i,MENU_ATTACK,1770,500);order(7,MENU_ATTACK,1770,500);order(8,MENU_ATTACK,1770,500);order(11,MENU_ATTACK,1770,500);order(13,MENU_ATTACK,1770,500);for(int j=5;j<=6;j++){select_one(j);int p=j==5?11:10;move_cursor(m[p].x,m[p].y);tap(KEY_A);printf("mine worker%d order%d target%d frame%d\n",j,u[j].order,u[j].target,frame);}queue_type(U_DRONE);queue_type(U_DRONE);}
+ if(!pool&&minerals>=200){pool=build(5,B_SPAWNING_POOL,MENU_BARRACKS);}if(!evo&&minerals>=75&&side_building(B_SPAWNING_POOL,1)>=0){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){evo=build(i,B_EVOLUTION_CHAMBER,MENU_ENG_BAY);break;}}if(!spore&&minerals>=50&&side_building(B_EVOLUTION_CHAMBER,1)>=0&&b[65].alive&&building_complete(65)&&b[65].type==B_CREEP_COLONY){spore=morph_spore(65);}if(!den&&side_building(B_SPAWNING_POOL,1)>=0&&minerals>=100&&gas>=50){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){den=build(i,B_HYDRALISK_DEN,MENU_ACADEMY);break;}}if(frame>=3800&&extra_drone<2&&minerals>=50&&b[63].queue_count==0){queue_type(U_DRONE);extra_drone++;}if(frame>=4200&&extra_drone>=2&&!nydus&&worker_count()>=4){for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==SIDE&&u[j].type==U_DRONE)printf(" WORKER slot%d order%d xy%d,%d carry%d hp%d\n",j,u[j].order,u[j].x,u[j].y,u[j].carry,u[j].hp);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE&&u[i].order!=ORDER_BUILD&&u[i].order!=ORDER_BUILD_PENDING&&u[i].x>1500&&u[i].y<500){traveler=i;break;}if(traveler>=0&&select_one(traveler)){move_cursor(b[67].x,b[67].y);tap(KEY_A);nydus=1;printf("NYDUS issued slot%d frame%d order%d target%d xy%d,%d\n",traveler,frame,u[traveler].order,u[traveler].target,u[traveler].x,u[traveler].y);}}
+ if(nydus&&!arrived&&traveler>=0&&u[traveler].alive&&u[traveler].x>1800&&u[traveler].y>1750){arrived=1;printf("NYDUS arrived slot%d frame%d xy%d,%d\n",traveler,frame,u[traveler].x,u[traveler].y);}
+ if(arrived&&!forward&&minerals>=300&&traveler>=0&&u[traveler].alive){int xx=-1,yy=-1,best=0x7fffffff;for(int y=1680;y<=1872;y+=16)for(int x=1248;x<=1520;x+=16)if(race_can_site(SIDE,B_HATCHERY,x,y)&&can_place(B_HATCHERY,x,y)){int d=dist2(x,y,1344,1808);if(d<best){best=d;xx=x;yy=y;}}if(xx>=0){int ok=order(traveler,MENU_DEPOT,xx,yy);forward=1;printf("FORWARD hatch issue%d frame%d site%d,%d worker%d order%d mode%d funds%d\n",ok,frame,xx,yy,traveler,u[traveler].order,mode,minerals);}}
+ if(hydra<5&&side_building(B_HYDRALISK_DEN,1)>=0&&minerals>=75&&gas>=25&&b[63].queue_count==0&&b[63].larva){queue_type(U_HYDRALISK);hydra++;}if(frame>=8600&&!north_reloc){north_reloc=1;for(int i=11;i<=13;i+=2)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==38){int ok=order(i,MENU_ATTACK,1900,350);printf(" NORTH_PURSUIT slot%d ok%d frame%d\n",i,ok,frame);break;}}
+ if((frame>=6500&&reinf<3)){for(int i=68;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&u[i].x>1500&&u[i].y<900&&!reinf_track[i]){if(select_one(i)){move_cursor(b[67].x,b[67].y);tap(KEY_A);if(u[i].order==ORDER_NYDUS_ENTER){reinf_track[i]=1;reinf++;printf(" REINF_NYDUS slot%d frame%d\n",i,frame);}}break;}}
+ for(int i=68;i<MAX_UNITS;i++)if(reinf_track[i]==1&&u[i].alive&&u[i].owner==SIDE&&u[i].x>1800&&u[i].y>1750){reinf_track[i]=2;int ok=order(i,MENU_MOVE,1256,1960);printf(" REINF_DEPLOY slot%d ok%d frame%d\n",i,ok,frame);}
+ if(frame>=9000&&!south_reloc){south_reloc=1;int ids[]={48,53,54,55,56,57};for(unsigned k=0;k<sizeof(ids)/sizeof(ids[0]);k++){int v=ids[k];if(u[v].alive&&u[v].owner==SIDE&&(u[v].raw_type==42||u[v].raw_type==37||u[v].raw_type==38)){int ok=order(v,u[v].raw_type==42?MENU_MOVE:MENU_ATTACK,(v==48||v==55||v==56)?1328:1344,(v==48||v==55||v==56)?1848:1808);printf(" SOUTH_RELOC slot%d ok%d frame%d\n",v,ok,frame);}}}if(frame>=7600){for(int i=68;i<MAX_UNITS;i++)if(!deploy[i]&&u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&u[i].y<1000){deploy[i]=1;int ok=order(i,MENU_ATTACK,1770,500);printf(" deployed hydra%d ok%d frame%d alive%d\n",i,ok,frame,u[i].alive);break;}}if(frame>=10480&&frame%10==0){int ids[]={48,55,56,86,98,102};for(unsigned q=0;q<sizeof(ids)/sizeof(ids[0]);q++){int j=ids[q];printf(" DETAIL frame%d slot%d alive%d owner%d raw%d hp%d xy%d,%d order%d\n",frame,j,u[j].alive,u[j].owner,u[j].raw_type,u[j].hp,u[j].x,u[j].y,u[j].order);}for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].raw_type==74)printf(" RAID frame%d slot%d hp%d shield%d xy%d,%d hidden%d visible%d\n",frame,j,u[j].hp,u[j].shield,u[j].x,u[j].y,race_z8_unit_hidden_from_side(j),currently_visible(u[j].x,u[j].y));}if(frame>=10200&&frame%120==0){int d[]={48,53,54,55,56,57};for(unsigned q=0;q<sizeof(d)/sizeof(d[0]);q++){int i=d[q];printf(" SOUTH_STATE frame%d slot%d alive%d owner%d raw%d hp%d xy%d,%d order%d\n",frame,i,u[i].alive,u[i].owner,u[i].raw_type,u[i].hp,u[i].x,u[i].y,u[i].order);}for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==74)printf(" DT_STATE frame%d slot%d hp%d shield%d xy%d,%d hidden%d visible%d\n",frame,i,u[i].hp,u[i].shield,u[i].x,u[i].y,race_z8_unit_hidden_from_side(i),currently_visible(u[i].x,u[i].y));}
+ if(frame>=10400&&!pursue){pursue=1;for(int i=55;i<=56;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==38){int ok=order(i,MENU_ATTACK,1240,1950);printf(" PURSUE hydra%d ok%d frame%d\n",i,ok,frame);}}if(frame>=8400&&frame%120==0){for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HATCHERY&&b[i].x<1500&&b[i].y>1500)printf(" FORWARD_FOUNDATION frame%d slot%d xy%d,%d hp%d under%d progress%d\n",frame,i,b[i].x,b[i].y,b[i].hp,b[i].under_construction,b[i].build_progress);}if(frame%600==0)printf("COLONY frame%d evo%d b65alive%d type%d raw%d hp%d under%d x%d y%d sporeIssued%d\n",frame,side_building(B_EVOLUTION_CHAMBER,1),b[65].alive,b[65].type,b[65].raw_type,b[65].hp,b[65].under_construction,b[65].x,b[65].y,spore);if(frame%600==0)printf("OBS frame%d money%d/%d pool%d den%d workers%d,%d q%d fault%d\n",frame,minerals,gas,side_building(B_SPAWNING_POOL,1),side_building(B_HYDRALISK_DEN,1),u[5].alive,u[6].alive,b[63].queue_count,race_z8_sched.fault);}
+ {const Sc64Z8Condition *cond=&sc64_z8_program_conditions[sc64_z8_program_triggers[17].first_condition];u32 count=0;int rc=sc64_z8_world_count(&race_z8_view,cond,SC64_Z8_HUMAN_SLOT,sc64_z8_rect(&race_z8_sched,cond->location),&count);printf("FINAL_T17 location%u rc%d count%u outcome%d\n",cond->location,rc,count,race_z8_outcome());}for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HATCHERY)printf(" HATCH%d frame%d xy%d,%d hp%d under%d progress%d\n",i,frame,b[i].x,b[i].y,b[i].hp,b[i].under_construction,b[i].build_progress);if(traveler>=0&&traveler<MAX_UNITS)printf(" TRAVELER%d alive%d hp%d xy%d,%d order%d target%d\n",traveler,u[traveler].alive,u[traveler].hp,u[traveler].x,u[traveler].y,u[traveler].order,u[traveler].target);else printf(" TRAVELER unavailable slot%d\n",traveler);printf("END frame%d native%u won%d lost%d screen%d money%d/%d pool%d den%d hydra%d fault%d hero alive%d hp%d xy%d,%d\n",frame,race_z8_sched.frames,won,lost,screen,minerals,gas,side_building(B_SPAWNING_POOL,1),side_building(B_HYDRALISK_DEN,1),hydra,race_z8_sched.fault,u[10].alive,u[10].hp,u[10].x,u[10].y);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==74)printf("END DT%d hp%d xy%d,%d\n",i,u[i].hp,u[i].x,u[i].y);
+ int outcome=race_z8_outcome(),fault=race_z8_sched.fault;
+ int victory=won&&!lost&&outcome==SC64_Z8_OUTCOME_VICTORY&&!fault;
+ const char *verdict=victory?"WIN":(lost&&outcome==SC64_Z8_OUTCOME_DEFEAT&&!fault)?"LOSS":fault?"FAULT":trial_steps>=20000?"BOUND":"OTHER";
+ printf("TRIAL_VERDICT status=%s won=%d lost=%d outcome=%d fault=%d frame=%d native=%u loop_steps=%d loop_bound=20000 ticks=%u\n",verdict,won,lost,outcome,fault,frame,race_z8_sched.frames,trial_steps,ticks);
+ return victory?0:1;}
