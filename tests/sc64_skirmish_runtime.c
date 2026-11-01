@@ -456,6 +456,13 @@ static void reaver_service_unavailable(void)
         if (r->raw_id==83) reaver=r;
     }
     assert(reaver && unit_raw(83)>=0 && building_raw(155)>=0 && building_raw(171)>=0);
+    const Sc64SkirmishRecord *bay=race_skirmish_build_record(SIDE,171);
+    assert(bay && !race_skirmish_requirements(SIDE,bay));
+    assert(!race_skirmish_record_available(bay) && !race_skirmish_choose_record(bay));
+    for(unsigned i=0;i<sc64_skirmish_menu_count(SC64_SK_PROTOSS);++i) {
+        Sc64SkirmishMenuRow row;assert(sc64_skirmish_menu_at(SC64_SK_PROTOSS,i,&row));
+        assert(!row.record || row.record->raw_id!=171);
+    }
     int factory=fixture_building_raw(SIDE,155,500,500);
     assert(factory>=0 && fixture_building_raw(SIDE,171,560,500)>=0);
     assert(fixture_building_raw(SIDE,156,500,440)>=0);
