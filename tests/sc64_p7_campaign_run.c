@@ -746,7 +746,7 @@ int main(int argc,char **argv)
     snprintf(mkdir_cmd,sizeof(mkdir_cmd),"mkdir -p '%s'", ".local/build/p7-controller");
     (void)system(mkdir_cmd);
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
-    fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":26,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n",P7_CONTROLLER_PROFILE);
+    fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":26,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\",\"observation_policy\":\"host world-state oracle; not limited to player-visible information\"}\n",P7_CONTROLLER_PROFILE);
     game_init();prior=0;
     assert(screen==SCREEN_TITLE&&race_front.page==SC_FRONT_HOME);
     KEY_TAP(KEY_A);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);
