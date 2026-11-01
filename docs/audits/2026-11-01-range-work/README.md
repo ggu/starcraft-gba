@@ -189,8 +189,9 @@ results ignored. No hosted Actions or SD writes were used. At this checkpoint th
 The clean, empty-input checks at `7fa1990f` pass: `./dev build`, `./dev test`,
 flag wiring and the source boundary. Python discovery runs 951 cases with
 26 optional skips; the additional 5- and 8-case suites and C fixtures also
-pass. Later changes add the executed probe/reader, documentation and a tested
-menu fixture; they do not change production runtime from `3c8bee1b`.
+pass. Tool/fixture/documentation changes through `c44bdba5` retain production runtime
+from `3c8bee1b`. The later lazy-scratch and save-boundary changes are recorded
+separately below.
 
 The checked-in reader at `2feec585` independently replays the same OFF/ON
 instrumented pair for 100 updates each with physical zero-button input and
@@ -292,3 +293,60 @@ campaigns or the near-30-fps goal. The known 28-update first-hit tradeoff in
 the scripted unit-target case remains documented. Crowded simulation/rendering
 costs require further optimization; campaign wins and hardware parity remain
 separate evidence.
+
+## Warm-cache save boundary and final merge qualification
+
+A final targeted test found a real regression still present at `4072d735`:
+if a matching ordinary point-route field is warm before saving, continuing
+play can use it while loading starts cold. At continuation update 13/frame 16,
+the reference tank moved to (24,486), while the loaded tank waited at (24,488).
+The earlier cold/partial-worker save tests did not cover that condition.
+
+`bd081491` (the `0cd5bf8b` fix) canonicalizes navigation only after successful
+publication: mark the grid invalid, invalidate the direct firing-point cache,
+and reset ordinary/range route metadata. It deliberately does not call the
+topology invalidator, which would discard serialized mining-worker home-depot
+assignments. Failed saves preserve warm ordinary fields, firing cache, active
+work, grid validity and committed worker homes. A successful save can require
+cold navigation work on resume, as loading already does; this is not a claim
+that saving has no transient cost.
+
+The genuinely warm-field 500-update continuation passes under Z7 worker quotas
+8 and 96 and a Terran-profile fixture at quota 8. The latter enables direct
+orders for its authored setup and exercises failed-save preservation. Both
+verify valid worker homes survive successful publication/loading. The current
+actual-engine witness fixture passes after its old successful-save cache-valid
+expectation is updated for the new ON boundary. These are selected-world and
+cache comparisons, not universal full-machine determinism proofs.
+
+Final production runtime is `bd081491d0b78885d8143cee0abf0202b27badcc`:
+
+- All six default-ON ARM links pass unchanged guards: T10, Z7, P7, Showcase,
+  Z9 and Z10. Tightest margins remain EWRAM 8 bytes for Z9/Z10 and IWRAM
+  128 bytes for Z7.
+- All 936 current-vector real-menu lineup cases pass again under sanitizers,
+  including 60 live updates and same-process save/load/resave.
+- All four normal products pass the public physical fresh-process 60+60
+  continuation command, with genuine SRAM, normal UI and every verdict true.
+- The clean default build/test, 952 Python cases (26 optional skips), further
+  5/8-case suites, default/opt-out flags and focused kernel/alias/engine checks
+  pass at `4072d735`. Its only subsequent production change is the separately
+  tested, guarded successful-save reset above; no unrelated broad rerun is
+  substituted for that regression proof.
+
+The source-level incremental activation review is positive subject to those
+checks, which pass. All normal race and Showcase products now share bounded
+range routing and lazy scratch ownership. No mission catalog, actor limit,
+persistent payload, save namespace, assets or controls are changed. Existing
+Transport1 save identities are retained. The source remains GPL-3.0-or-later,
+with private inputs, binaries, traces and saves kept out of the repository;
+all qualification runs locally with Actions disabled.
+
+This merge does not complete the larger goal: the normal campaign menus still
+contain T10/Z7/P7 (24 missions), and the authored 48/96-actor scenes exceed the
+near-30-fps target even with routing OFF. Stage profiling identifies order
+processing as the largest measured mean component in the sampled heavy scenes
+(e.g. about 533,240 cycles of a 1,168,022-cycle Z7 96-actor mean over updates
+100–500). Stage counters are nested and include authored instrumentation;
+this motivates focused movement/target/collision work, not a universal claim
+about all maps or an unmeasured renderer rewrite.
