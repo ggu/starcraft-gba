@@ -149,7 +149,7 @@ test_late_building(const LateBuildingCase *test)
     composite_source_sprite(expected, source, building.x, building.y + 12);
     assert(memcmp(actual, expected, sizeof(actual)) == 0);
 
-    /* Only a selected building shows vitals, below its source frame. */
+    /* Only a selected building shows its arc and vitals, below its source frame. */
     int screen_x = building.x - camx;
     int screen_y = building.y - camy + 12;
     int sprite_y = screen_y - source->canvas_h / 2 + source->offset_y;
@@ -167,6 +167,9 @@ test_late_building(const LateBuildingCase *test)
     selected_building = -1;
 
     gfx_begin(C_BLACK);
+    int rx = source->w / 2 + 2, ry = (rx * 3 + 2) / 5;
+    draw_selection_ellipse(screen_x, sprite_y + source->h + 1 - ry, rx, ry,
+                           selection_color(building.owner), 1);
     draw_actor_vitals(screen_x, sprite_y + source->h + 3,
                       source->w > 46 ? 46 : source->w, building.hp,
                       building.maxhp, building.shield,
