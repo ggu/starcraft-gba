@@ -1,9 +1,11 @@
-/* The N64 HUD's resource icons for the race HUD's top bar (SC64_HUD_ICONS).
+/* The N64 HUD's icons for the race HUD (SC64_HUD_ICONS).
  *
  * The mineral chunk, the gas icon the N64 draws for every race and the
- * player race's supply icon replace the MIN, GAS and SUP labels. They come
- * from the private header tools/sc64_command_icons.py writes from a verified
- * ROM, beside the command-card buttons (command_card.h). */
+ * player race's supply icon replace the MIN, GAS and SUP labels. The portrait
+ * and upgrade buttons, tinted as StarCraft tints its buttons, fill the
+ * selection panel (hud_panel.h) and the command card (command_card.h). They
+ * come from the private header tools/sc64_command_icons.py writes from a
+ * verified ROM. */
 #ifndef SC64_HUD_ICONS
 #error "hud_icons.h needs the imported HUD icons"
 #endif
@@ -25,3 +27,61 @@ card_supply_sprite(void)
 {
     return SC64_HUD_SPRITE_SUPPLY_TERRAN + race_human;
 }
+
+enum { CARD_CELL = 20 };
+
+/* The portrait of a raw unit id, or -1 when the ROM has no button-sized
+ * frame for it. */
+static int
+card_portrait(int raw)
+{
+    return raw >= 0 && raw < SC64_CMD_ICON_PORTRAITS && sc64_command_icon_size[raw][0] > 1 ? raw : -1;
+}
+
+static int
+card_building_icon(int type)
+{
+    return card_portrait(sc64_race_raw_building(type));
+}
+
+static int
+card_unit_icon(const Unit *q)
+{
+    return card_portrait(q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type));
+}
+
+static int
+card_weapons_icon(void)
+{
+    return race_human == R_ZERG ? SC64_CMD_ICON_ZERG_WEAPONS :
+        race_human == R_PROTOSS ? SC64_CMD_ICON_PROTOSS_WEAPONS : SC64_CMD_ICON_TERRAN_WEAPONS;
+}
+
+static int
+card_armor_icon(void)
+{
+    return race_human == R_ZERG ? SC64_CMD_ICON_ZERG_ARMOR :
+        race_human == R_PROTOSS ? SC64_CMD_ICON_PROTOSS_ARMOR : SC64_CMD_ICON_TERRAN_ARMOR;
+}
+
+/* An icon centred in the cell at x, y, one rectangle per run of a shade. */
+static void
+card_icon_draw(int icon, int x, int y, const u8 *ramp)
+{
+    int w = sc64_command_icon_size[icon][0], h = sc64_command_icon_size[icon][1];
+    int stride = (w + 3) / 4, row, col;
+    const unsigned char *bits = sc64_command_icon_bits + sc64_command_icon_offset[icon];
+    x += (CARD_CELL - w) / 2;
+    y += (CARD_CELL - h) / 2;
+    for (row = 0; row < h; row++, bits += stride) {
+        for (col = 0; col < w;) {
+            int s = bits[col >> 2] >> ((col & 3) * 2) & 3, start = col;
+            while (++col < w && (bits[col >> 2] >> ((col & 3) * 2) & 3) == s) {}
+            if (s) gfx_rect(x + start, y + row, col - start, 1, ramp[s - 1]);
+        }
+    }
+}
+
+static const u8 card_green[3] = {C_GREEN_DARK, C_GREEN, C_HIGHLIGHT};
+static const u8 card_gold[3] = {C_GOLD_DARK, C_GOLD, C_HIGHLIGHT};
+static const u8 card_grey[3] = {C_EDGE, C_DIM, C_SILVER};

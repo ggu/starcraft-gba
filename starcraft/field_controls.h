@@ -468,29 +468,6 @@ ui_structure_glyph(int x, int y)
     }
 }
 
-/* Public to game.c's shared HUD painter. The caller owns the 22px panel and
- * surrounding health/resource text; source IDs always come from the imported
- * raw identity, with the race adapter as a fallback for synthetic actors. */
-static int
-field_controls_draw_selected_icon(int center_x, int center_y, int size)
-{
-    int raw = -1;
-    if (selected_building >= 0 && selected_building < MAX_BUILDINGS &&
-        b[selected_building].alive) {
-        raw = b[selected_building].raw_type >= 0 ? b[selected_building].raw_type :
-              sc64_race_raw_building(b[selected_building].type);
-    } else {
-        int i;
-        for (i = 0; i < MAX_UNITS; ++i)
-            if (u[i].alive && u[i].selected && !SC64_TRANSPORT_LOADED(&u[i])) {
-                raw = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
-                break;
-            }
-    }
-    return raw >= 0 && raw < 228 && sc64_icon_draw_centered((unsigned)raw,
-                                                             center_x, center_y, size);
-}
-
 /* Source icon binding for the visible command row. All menu decisions and
  * costs remain in the existing rule paths; an unavailable source frame keeps
  * the compact procedural mark below. */
@@ -702,20 +679,6 @@ field_controls_hint(void)
     case UI_A_MINE: return "B COMMANDS  A MINE";
     case UI_A_MOVE: return "B COMMANDS  A MOVE";
     default: return 0;
-    }
-}
-
-/* The shorter hint beside a selected unit's hit points. */
-static const char *
-field_controls_unit_hint(void)
-{
-    switch (ui_action) {
-    case UI_A_ATTACK: return "A ATTACK B ORDERS";
-    case UI_A_SELECT: return "A SELECT B ORDERS";
-    case UI_A_GAS: return "A GAS B ORDERS";
-    case UI_A_MINE: return "A MINE B ORDERS";
-    case UI_A_MOVE: return "A MOVE B ORDERS";
-    default: return "B ORDERS SEL DROP";
     }
 }
 

@@ -224,9 +224,15 @@ and the pinned `references/sc64-maps` checkout. `./dev sc64 prepare --rom PATH -
 runs these importers automatically. The canonical `zerg` and `protoss`
 preparation profiles do too. Status and builds require all three interface
 headers and the briefing header. Race-engine builds also import the N64 HUD's
-resource icons on demand, with `tools/sc64_command_icons.py`, into ignored
-`.local/sc64/command-icons/generated/`. The default asset-free build and tests
-do not require the ROM, reference checkout or generated banks.
+resource icons and the tinted button icons on demand, with
+`tools/sc64_command_icons.py`, into ignored
+`.local/sc64/command-icons/generated/`. The selection panel
+(`starcraft/hud_panel.h`) draws its portraits, production queue and upgrades from
+those buttons. Its redraw key folds into one existing HUD key, so it adds no
+static RAM, and its progress bars move in 26 steps so a queue redraws the cached
+band a few dozen times per unit instead of every tick. The default asset-free
+build and tests do not require the ROM, reference checkout or generated banks;
+the default panel (`starcraft/field_ui.h`) draws its own marks in code.
 
 In the briefing, A reveals the current page and then advances; A on the final
 page deploys the mission. Left/Right browse pages, B returns to mission
