@@ -39,7 +39,7 @@ All orders are still ordinary key input through `game_update()`.
 
 ## Results
 
-Run at commit `TESTED_COMMIT`, on the #255 branch. Inputs were cloned from the 2026-10-31
+Run at commit `0030f7bb`, on the #255 branch. Inputs were cloned from the 2026-10-31
 pinned set into a private `.local`. The first row uses ASan and UBSan; the profile matrix
 uses scratch builds without sanitizers.
 
