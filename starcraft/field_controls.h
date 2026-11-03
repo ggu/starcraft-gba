@@ -468,29 +468,6 @@ ui_structure_glyph(int x, int y)
     }
 }
 
-/* Public to game.c's shared HUD painter. The caller owns the 22px panel and
- * surrounding health/resource text; source IDs always come from the imported
- * raw identity, with the race adapter as a fallback for synthetic actors. */
-static int
-field_controls_draw_selected_icon(int center_x, int center_y, int size)
-{
-    int raw = -1;
-    if (selected_building >= 0 && selected_building < MAX_BUILDINGS &&
-        b[selected_building].alive) {
-        raw = b[selected_building].raw_type >= 0 ? b[selected_building].raw_type :
-              sc64_race_raw_building(b[selected_building].type);
-    } else {
-        int i;
-        for (i = 0; i < MAX_UNITS; ++i)
-            if (u[i].alive && u[i].selected && !SC64_TRANSPORT_LOADED(&u[i])) {
-                raw = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
-                break;
-            }
-    }
-    return raw >= 0 && raw < 228 && sc64_icon_draw_centered((unsigned)raw,
-                                                             center_x, center_y, size);
-}
-
 /* Source icon binding for the visible command row. All menu decisions and
  * costs remain in the existing rule paths; an unavailable source frame keeps
  * the compact procedural mark below. */
@@ -705,20 +682,6 @@ field_controls_hint(void)
     }
 }
 
-/* The shorter hint beside a selected unit's hit points. */
-static const char *
-field_controls_unit_hint(void)
-{
-    switch (ui_action) {
-    case UI_A_ATTACK: return "A ATTACK B ORDERS";
-    case UI_A_SELECT: return "A SELECT B ORDERS";
-    case UI_A_GAS: return "A GAS B ORDERS";
-    case UI_A_MINE: return "A MINE B ORDERS";
-    case UI_A_MOVE: return "A MOVE B ORDERS";
-    default: return "B ORDERS SEL DROP";
-    }
-}
-
 /* What a structure row adds: its full name when the label shortens it,
  * else its supply, gas or production role. */
 static void
@@ -753,18 +716,25 @@ ui_title_costs(int x, const char *name, int cost, int gas_cost)
     if (gas_cost) gfx_num(x, 126, gas_cost, C_CYAN);
 }
 
+/* A's mark and B's back mark while a command is armed. */
+static void
+ui_armed_keys(int x, int y, int order)
+{
+    x = ui_key(x, y, "A", 0, C_DIM);
+    if (order >= 0) { ui_order_icon(order, x + 4, y + 3); x += 12; }
+    else { ui_glyph(UI_GLYPH_SELECT, x + 3, y + 3); x += 10; }
+    x = ui_key(x, y, "B", 0, C_DIM);
+    ui_glyph(UI_GLYPH_CROSS, x + 3, y + 3);
+}
+
 /* The HUD's top two rows while the order list is open, a structure is being
- * placed, or a move/attack is armed; 0 leaves the profile's own HUD. With
- * the command card, the command's button sits left of both rows. */
+ * placed, or a move/attack is armed; 0 leaves the selection panel. The
+ * command's button sits left of both rows. */
 static int
 field_controls_draw_hud(void)
 {
     const char *need;
-#ifdef SC64_COMMAND_ICONS
     const int x = 27;
-#else
-    const int x = 5;
-#endif
     if (menu_open) {
         static const char *const notes[MENU_STOP + 1] = {
             "WALK TO A POINT", "FIGHT ALONG THE WAY", 0, 0, 0, 0, 0,
@@ -775,6 +745,8 @@ field_controls_draw_hud(void)
         const char *label = race_menu_label(menu_cursor);
 #ifdef SC64_COMMAND_ICONS
         card_hud_icon(card_icon(menu_cursor));
+#else
+        ui_row_icon(menu_cursor, 14, 135);
 #endif
         ui_title_costs(x, label, cost, gas_cost);
         if (state == UI_SITE_OK && type >= 0) ui_structure_note(x, 137, type, label);
@@ -786,25 +758,18 @@ field_controls_draw_hud(void)
         int site_x = cx, site_y = cy, ground, problem;
         field_ui_site(menu, &site_x, &site_y);
         problem = ui_site_problem(menu, site_x, site_y, &need, &ground);
-#ifdef SC64_COMMAND_ICONS
         card_hud_icon(card_building_icon(menu));
-#endif
         ui_title_costs(x, sc64_race_building_name(menu), building_cost(menu), building_gas_cost(menu));
-        if (problem == UI_SITE_OK) gfx_text(x, 137, "A PLACE  B BACK", C_GREEN);
+        if (problem == UI_SITE_OK) ui_armed_keys(x, 137, -1);
         else ui_status(x, 137, problem, need, 0, building_cost(menu), building_gas_cost(menu));
         return 1;
     }
     if (mode == MODE_MOVE || mode == MODE_ATTACK) {
         int n = selected_count();
-#ifdef SC64_COMMAND_ICONS
         card_hud_icon(mode == MODE_MOVE ? SC64_CMD_ICON_MOVE : SC64_CMD_ICON_ATTACK);
-#endif
         gfx_text(x, 126, mode == MODE_MOVE ? "MOVE ORDER" : "ATTACK MOVE", field_controls_title_color());
-        if (n) {
-            gfx_num(x + 72, 126, n, C_WHITE);
-            gfx_text(x + 78 + ui_num_width(n), 126, n == 1 ? "UNIT" : "UNITS", C_DIM);
-        }
-        gfx_text(x, 137, mode == MODE_MOVE ? "A MOVE HERE  B BACK" : "A ATTACK HERE  B BACK", C_GOLD);
+        if (n) gfx_num(x + 72, 126, n, C_WHITE);
+        ui_armed_keys(x, 137, mode == MODE_MOVE ? MENU_MOVE : MENU_ATTACK);
         return 1;
     }
     return 0;

@@ -119,9 +119,8 @@ imports from the verified ROM into `.local/sc64/command-icons/generated/`
   armed.
 - The top bar draws the N64 mineral and gas icons and the player race's
   supply icon in place of MIN, GAS and SUP.
-- With units selected, the HUD shows the first unit's portrait, its name or
-  the group's size, and shield and health bars in place of the SH and HP
-  numbers.
+- The selection panel is shared with the other race ROMs: see the
+  [game guide](../starcraft/README.md).
 
 The card only changes drawing and D-pad routing: the list's row numbers,
 B, A repeating the last command, and every order and build path are

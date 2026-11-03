@@ -13,7 +13,7 @@ A compact Terran-versus-Zerg RTS skirmish for the shared 240×160 mode-4 rendere
 - START opens the pause screen, as does SELECT when nothing is selected. Choose Resume, Save, Load, or Restart with the D-pad and A, or use the shortcuts: B saves, L loads, R restarts, and START resumes. A save is confirmed on the pause screen.
 - On the title screen, choose New Mission or Load Saved Game with the D-pad and A; B or L also loads. On the result screen, A retries and B returns to the title.
 
-The bottom panel always names what A will do at the cursor (for example SELECT, MOVE, TRAIN, DESELECT, ATTACK, or PLACE), and the cursor changes with it: green arrows while a move is armed, a red reticle for attack-move or an enemy target, and a structure footprint during placement. Orders, attacks, and placements leave a short green, red, or gold marker where they were issued.
+The bottom panel shows the selection with marks and numbers. A selected Command Center or Barracks shows five queue slots: the unit in production is framed in gold with a progress bar below, the units waiting follow in order, and the next unit and its price sit beside them. The Engineering Bay shows both upgrades, their levels and any research progress. A unit shows its health and upgrades, and a group shows each type with its count. The row below shows a key cap with a mark for what the key does at the cursor (select, move, attack, train, deselect, mine or gas), and the cursor changes with it: green arrows while a move is armed, a red reticle for attack-move or an enemy target, and a structure footprint during placement. Orders, attacks, and placements leave a short green, red, or gold marker where they were issued.
 
 Box selection requires a ROM rebuilt from the updated source; an older copied ROM does not include it.
 
@@ -21,8 +21,16 @@ An optional build replaces menu scrolling with a hold-B command ring: aim, hold 
 
 In the optional race ROMs, the light-blue bar above a Protoss unit or building
 shows shields; the lower bar shows HP. An empty blue track means shields are
-depleted. The selection panel displays shields as `SH` separately from `HP`.
-Shields absorb damage first and regenerate independently of health.
+depleted. The selection panel shows shields in blue beside the green hit points,
+with the same two bars under the portrait. Shields absorb damage first and
+regenerate independently of health.
+
+In the optional race ROMs, the selection panel uses StarCraft 64's own tinted
+button icons. A selected building shows its production queue or research in
+slots with a progress bar, a Zerg hall shows its larva and nearby Eggs, a Bunker
+or transport shows its loaded units, and a group shows each type with its count.
+A timed mission's clock stays under the portrait. The objective appears when
+nothing is selected and on the pause screen.
 
 Destroyed units and buildings play a short death effect instead of vanishing.
 Infantry and Zerg ground units collapse and leave remains, vehicles and
@@ -43,7 +51,7 @@ This is an original-art RTS demake rather than a full StarCraft engine. It uses 
 
 It omits campaign triggers, air units, large tech trees, unit abilities, damage-type/size modifiers, pathing influence from other mobile units, multiplayer, and original game art/audio: shots, deaths, unit responses and refused orders (too few minerals or gas, or the supply limit) use short PSG tones. The optional imported StarCraft 64 profiles play the game's own samples instead, including the race advisor's refusal lines; see [Development](../docs/DEVELOPMENT.md#optional-starcraft-64-sound-effects-and-music). Firebat splash, upgrades, fog visibility, and Zerg wave behavior are compact approximations for a short handheld mission. Medics do not have a healing order yet.
 
-Combat effects use small authored weapon-family animations for the implemented attacks. They are presentation only: attacks still apply damage immediately, and the short effect timing does not reproduce the original game's projectile or IScript behavior. In Protoss profiles, unit and building overlays show shields in a separate blue bar above health, and the selection panel reports current shields for shielded actors.
+Combat effects use small authored weapon-family animations for the implemented attacks. They are presentation only: attacks still apply damage immediately, and the short effect timing does not reproduce the original game's projectile or IScript behavior. In Protoss profiles, unit and building overlays show shields in a separate blue bar above health, and the selection panel shows current shields in blue for shielded actors.
 
 The opening scenario averaged about 21.92 updates/second in a 240-tick mGBA ARM sample, with pathfinding hitches. Unit timers use a fixed step, so slowdown also slows in-game time. The renderer targets about 30 updates/second when update and drawing costs fit the frame budget. See the [validation record](../docs/VALIDATION.md); physical hardware performance has not been measured.
 

@@ -432,29 +432,55 @@ ui_portrait(int kind, int type)
     else ui_command_icon(type, 14, 135);
 }
 
+/* A key cap and a mark in the hint row; returns the x after it. */
+static int
+ui_hint(int x, const char *key, int glyph)
+{
+    x = ui_key(x, 150, key, 0, C_DIM);
+    ui_glyph(glyph, x + 3, 153);
+    return x + 10;
+}
+
+static int
+ui_next_product(int type)
+{
+    return type == B_COMMAND ? U_SCV : type == B_BARRACKS ? train_type : -1;
+}
+
+/* What A does here, as a mark, and the other keys that matter. */
 static void
 ui_hint_line(int a_action)
 {
-    static const char *const a_text[] = {
-        0, "SELECT", "DESELECT", "TRAIN", "ADD GAS WORKER", "GATHER GAS",
-        "ATTACK", "MOVE HERE", "ATTACK HERE", "PLACE", "ALL OF TYPE", "MOVE", "MINE"
-    };
     int x = 3;
     if (a_action == UI_A_TRAIN) {
-        x = ui_key(x, 150, "A", b[selected_building].type == B_COMMAND ? "TRAIN SCV" : "TRAIN", C_WHITE);
-        if (b[selected_building].type == B_BARRACKS) x = ui_key(x, 150, "R", "TYPE", C_DIM);
-        ui_key(x, 150, "L", "UNDO", C_DIM);
+        const Building *q = &b[selected_building];
+        x = ui_key(x, 150, "A", 0, C_DIM);
+        ui_unit_glyph(ui_next_product(q->type), x + 5, 154, C_TERRAN);
+        x += 13;
+        if (q->type == B_BARRACKS) {
+            x = ui_hint(x, "R", UI_GLYPH_CYCLE);
+            if (q->queue_count) x = ui_hint(x, "L", UI_GLYPH_CROSS);
+        }
         return;
     }
-    if (a_action) x = ui_key(x, 150, "A", a_text[a_action], a_action == UI_A_ATTACK ||
-                             a_action == UI_A_ATTACK_HERE ? C_RED : C_WHITE);
-    if (mode != MODE_NORMAL) { ui_key(x, 150, "B", "BACK", C_DIM); return; }
-#ifdef SC_COMMAND_RING
-    x = ui_key(x, 150, "B", "HOLD: RING", C_DIM);
-#else
-    x = ui_key(x, 150, "B", "ORDERS", C_DIM);
-#endif
-    if (x < 130) ui_key(x, 150, "R", "ARMY", C_DIM);
+    if (a_action == UI_A_ATTACK || a_action == UI_A_ATTACK_HERE || a_action == UI_A_MOVE ||
+        a_action == UI_A_MOVE_HERE) {
+        x = ui_key(x, 150, "A", 0, C_DIM);
+        ui_order_icon(a_action == UI_A_ATTACK || a_action == UI_A_ATTACK_HERE ? MENU_ATTACK : MENU_MOVE,
+                      x + 4, 153);
+        x += 12;
+    } else if (a_action == UI_A_SELECT || a_action == UI_A_PLACE)
+        x = ui_hint(x, "A", UI_GLYPH_SELECT);
+    else if (a_action == UI_A_GROUP) {
+        x = ui_hint(x, "A", UI_GLYPH_SELECT);
+        x = ui_hint(x - 3, "A", UI_GLYPH_SELECT);
+    } else if (a_action == UI_A_DESELECT) x = ui_hint(x, "A", UI_GLYPH_CROSS);
+    else if (a_action == UI_A_MINE) x = ui_hint(x, "A", UI_GLYPH_CRYSTAL);
+    else if (a_action == UI_A_ASSIGN_GAS || a_action == UI_A_GATHER_GAS) x = ui_hint(x, "A", UI_GLYPH_GAS);
+    if (mode != MODE_NORMAL) { ui_hint(x, "B", UI_GLYPH_CROSS); return; }
+    x = ui_hint(x, "B", UI_GLYPH_ORDERS);
+    x = ui_key(x, 150, "R", 0, C_DIM);
+    ui_unit_glyph(U_MARINE, x + 4, 154, C_TERRAN);
 }
 
 static void
@@ -479,6 +505,66 @@ ui_status(int x, int y, int problem, int type)
     gfx_text(x, y, text[problem], problem ? C_RED : C_GREEN);
 }
 
+/* An upgrade's mark and its level. */
+static void
+ui_upgrade(int x, int y, int command, int level)
+{
+    ui_order_icon(command, x, y);
+    gfx_num(x + 7, y - 3, level, C_WHITE);
+}
+
+/* A selected structure: its name and health, then what it is doing as marks
+ * and numbers. Five queue slots hold production in order; the first fills as
+ * it trains and is framed in gold. */
+static void
+ui_draw_building(const Building *q)
+{
+    enum { SLOT = 11, PITCH = 12, SLOTS_X = 30, SLOTS_Y = 134, BAR_Y = 145 };
+    int i, next = ui_next_product(q->type);
+    ui_portrait(1, q->type);
+    gfx_text(30, 125, ui_building_name(q->type), C_WHITE);
+    gfx_bar(124, 127, 54, 3, q->hp, q->maxhp, C_GREEN, C_RED_DARK);
+    ui_num_right(178, 134, q->hp, C_GREEN);
+    if (q->under_construction) {
+        gfx_bar(SLOTS_X, BAR_Y, 148, 2, q->build_progress, building_build_time(q->type), C_GOLD, C_SHADOW);
+        return;
+    }
+    if (next >= 0) {
+        for (i = 0; i < 5; i++) {
+            int x = SLOTS_X + i * PITCH;
+            gfx_rect(x, SLOTS_Y, SLOT, SLOT, i < q->queue_count ? C_FOG : C_SHADOW);
+            if (i < q->queue_count)
+                ui_unit_glyph(q->queue[(q->queue_head + i) % 5], x + 5, SLOTS_Y + 5, C_TERRAN);
+        }
+        if (q->queue_count) {
+            gfx_frame(SLOTS_X, SLOTS_Y, SLOT, SLOT, C_GOLD);
+            gfx_bar(SLOTS_X, BAR_Y, 5 * PITCH - 1, 2, q->queue_progress,
+                    unit_build_time(q->queue[q->queue_head]), C_GOLD, C_SHADOW);
+        }
+        /* The next unit and its price. */
+        gfx_rect(94, SLOTS_Y, SLOT, SLOT, C_FOG);
+        ui_unit_glyph(next, 99, SLOTS_Y + 5, C_TERRAN);
+        gfx_num(107, SLOTS_Y, unit_cost(next), minerals < unit_cost(next) ? C_RED : C_GOLD);
+        if (unit_gas_cost(next))
+            gfx_num(107 + ui_num_width(unit_cost(next)) + 4, SLOTS_Y, unit_gas_cost(next),
+                    gas < unit_gas_cost(next) ? C_RED : C_CYAN);
+    } else if (q->type == B_ENG_BAY) {
+        for (i = 0; i < 2; i++) {
+            int x = SLOTS_X + i * 24, busy = i ? armor_research : weapons_research;
+            gfx_rect(x, SLOTS_Y, SLOT, SLOT, C_FOG);
+            ui_order_icon(i ? MENU_ARMOR : MENU_WEAPONS, x + 5, SLOTS_Y + 5);
+            gfx_num(x + SLOT + 2, SLOTS_Y + 2, i ? armor_level : weapons_level, C_WHITE);
+            if (busy) {
+                gfx_frame(x, SLOTS_Y, SLOT, SLOT, C_GOLD);
+                gfx_bar(x, BAR_Y, SLOT, 2, busy, 600, C_GOLD, C_SHADOW);
+            }
+        }
+    } else if (q->type == B_DEPOT) {
+        ui_unit_glyph(U_MARINE, 36, SLOTS_Y + 5, C_TERRAN);
+        gfx_text(44, SLOTS_Y + 2, "+8", C_WHITE);
+    } else if (q->type == B_REFINERY) ui_glyph(UI_GLYPH_GAS, 36, SLOTS_Y + 5);
+}
+
 /* Bottom command band for the default profile. */
 static void
 field_ui_draw_hud(void)
@@ -489,8 +575,7 @@ field_ui_draw_hud(void)
     if (box_state == 2) {
         ui_portrait(2, MENU_MOVE);
         gfx_text(30, 126, "BOX SELECT", C_CYAN);
-        gfx_text(30, 136, "DRAG TO COVER UNITS", C_DIM);
-        ui_key(ui_key(3, 150, "L", "RELEASE: SELECT", C_WHITE), 150, "B", "CANCEL", C_DIM);
+        ui_hint(ui_hint(3, "L", UI_GLYPH_SELECT), "B", UI_GLYPH_CROSS);
         return;
     }
     if (menu_open) {
@@ -501,9 +586,8 @@ field_ui_draw_hud(void)
         if (cost) {
             int x = 30 + ui_text_width(ui_command_label[menu_cursor]) + 7;
             gfx_num(x, 125, cost, C_GOLD);
-            gfx_text(x + ui_num_width(cost) + 3, 125, "MIN", C_GOLD);
             if (menu_cursor == MENU_WEAPONS || menu_cursor == MENU_ARMOR)
-                gfx_text(x + ui_num_width(cost) + 24, 125, "+100 GAS", C_CYAN);
+                gfx_num(x + ui_num_width(cost) + 6, 125, 100, C_CYAN);
         }
         if (state == UI_SITE_OK)
             gfx_text(30, 136, ui_command_note[menu_cursor], C_DIM);
@@ -515,55 +599,21 @@ field_ui_draw_hud(void)
         else if (!(ui_built >> B_ENG_BAY & 1)) gfx_text(30, 136, "NEEDS ENGINEERING BAY", C_RED);
         else gfx_text(30, 136, (menu_cursor == MENU_WEAPONS ? weapons_research : armor_research) ?
                       "RESEARCHING" : "FULLY UPGRADED", C_GOLD);
-        ui_key(ui_key(ui_key(3, 150, "A", "CHOOSE", C_WHITE), 150, "B", "CLOSE", C_DIM),
-               150, "+", "SCROLL", C_DIM);
+        ui_hint(ui_hint(3, "A", UI_GLYPH_SELECT), "B", UI_GLYPH_CROSS);
         return;
     }
     if (mode == MODE_BUILD) {
         ui_portrait(1, menu);
         gfx_text(30, 125, ui_building_name(menu), C_WHITE);
         gfx_num(130, 125, building_cost(menu), C_GOLD);
-        gfx_text(130 + ui_num_width(building_cost(menu)) + 3, 125, "MIN", C_GOLD);
         ui_status(30, 136, ui_site, menu);
     } else if (mode == MODE_MOVE || mode == MODE_ATTACK) {
         ui_portrait(2, mode == MODE_MOVE ? MENU_MOVE : MENU_ATTACK);
         gfx_text(30, 125, mode == MODE_MOVE ? "MOVE ORDER" : "ATTACK MOVE",
                  mode == MODE_MOVE ? C_GREEN : C_RED);
         gfx_num(30, 136, n, C_WHITE);
-        i = 36 + ui_num_width(n);
-        gfx_text(i, 136, n == 1 ? "UNIT" : "UNITS", C_DIM);
-        gfx_text(i + (n == 1 ? 30 : 36), 136, mode == MODE_MOVE ? "TO THE CURSOR" : "FIGHT EN ROUTE",
-                 C_DIM);
     } else if (selected_building >= 0 && b[selected_building].alive) {
-        Building *q = &b[selected_building];
-        ui_portrait(1, q->type);
-        gfx_text(30, 125, ui_building_name(q->type), C_WHITE);
-        gfx_bar(30, 136, 40, 3, q->hp, q->maxhp, C_GREEN, C_RED_DARK);
-        if (q->under_construction) {
-            gfx_text(76, 134, "BUILDING", C_GOLD);
-            gfx_bar(126, 136, 40, 3, q->build_progress, building_build_time(q->type), C_GOLD, C_GOLD_DARK);
-        } else if (q->type == B_COMMAND || q->type == B_BARRACKS) {
-            int next = q->type == B_COMMAND ? U_SCV : train_type;
-            const char *name = q->type == B_COMMAND ? "SCV" : unit_name(next);
-            /* Next unit and its price, then five queue slots; the first fills
-             * as it trains. */
-            gfx_text(118, 125, name, C_CYAN);
-            ui_num_right(178, 125, unit_cost(next), minerals < unit_cost(next) ? C_RED : C_GOLD);
-            if (unit_gas_cost(next))
-                ui_num_right(178, 136, unit_gas_cost(next), gas < unit_gas_cost(next) ? C_RED : C_CYAN);
-            for (i = 0; i < 5; i++) {
-                int sx = 76 + i * 11;
-                gfx_rect(sx, 132, 10, 10, i < q->queue_count ? C_FOG : C_SHADOW);
-                if (i < q->queue_count) ui_unit_glyph(q->queue[(q->queue_head + i) % 5], sx + 5, 137, C_TERRAN);
-            }
-            if (q->queue_count)
-                gfx_bar(76, 143, 10, 2, q->queue_progress, unit_build_time(q->queue[q->queue_head]),
-                        C_GOLD, C_SHADOW);
-        } else if (q->type == B_REFINERY) gfx_text(30, 139, "GAS FOR UPGRADES", C_CYAN);
-        else if (q->type == B_ENG_BAY) {
-            gfx_text(76, 134, "WEAPONS", C_DIM); gfx_num(122, 134, weapons_level, C_WHITE);
-            gfx_text(134, 134, "ARMOR", C_DIM); gfx_num(168, 134, armor_level, C_WHITE);
-        }
+        ui_draw_building(&b[selected_building]);
     } else if (n) {
         int counts[4] = {0, 0, 0, 0}, first = -1, hp = 0, maxhp = 0;
         for (i = 0; i < MAX_UNITS; i++)
@@ -575,16 +625,19 @@ field_ui_draw_hud(void)
         ui_portrait(0, u[first].type);
         if (n == 1) {
             gfx_text(30, 125, unit_name(u[first].type), C_WHITE);
-            gfx_bar(30, 135, 50, 3, hp, maxhp, C_GREEN, C_RED_DARK);
-            gfx_num(86, 133, hp, C_GREEN);
-            if (IS_WORKER(u[first].type))
-                gfx_text(110, 133, u[first].order == ORDER_GAS ? "GAS" : SC64_BUILD_WORKER_ORDER(u[first].order) ?
-                         "BUILDING" : u[first].order == ORDER_MINE ? "MINING" : "IDLE", C_GOLD);
+            gfx_bar(30, 136, 50, 3, hp, maxhp, C_GREEN, C_RED_DARK);
+            gfx_num(84, 134, hp, C_GREEN);
+            if (u[first].type != U_MEDIC) ui_upgrade(110, 137, MENU_WEAPONS, weapons_level);
+            ui_upgrade(132, 137, MENU_ARMOR, armor_level);
+            if (IS_WORKER(u[first].type)) {
+                if (u[first].order == ORDER_GAS) ui_glyph(UI_GLYPH_GAS, 160, 137);
+                else if (u[first].order == ORDER_MINE) ui_glyph(UI_GLYPH_CRYSTAL, 160, 137);
+                else if (SC64_BUILD_WORKER_ORDER(u[first].order)) ui_building_glyph(B_DEPOT, 160, 137, C_TERRAN);
+            }
         } else {
             int x = 30;
-            gfx_text(30, 125, "GROUP", C_WHITE);
-            gfx_num(66, 125, n, C_GOLD);
-            gfx_bar(86, 127, 40, 3, hp, maxhp, C_GREEN, C_RED_DARK);
+            gfx_num(30, 125, n, C_GOLD);
+            gfx_bar(50, 127, 60, 3, hp, maxhp, C_GREEN, C_RED_DARK);
             for (i = 0; i < 4; i++) if (counts[i]) {
                 ui_unit_glyph(i, x + 4, 139, C_TERRAN);
                 gfx_num(x + 11, 136, counts[i], C_WHITE);

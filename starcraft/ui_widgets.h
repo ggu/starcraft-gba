@@ -101,6 +101,38 @@ ui_order_icon(int command, int x, int y)
     return 1;
 }
 
+/* Small marks for the HUD's key hints, centred on x,y and about 7x7. */
+enum { UI_GLYPH_SELECT, UI_GLYPH_CROSS, UI_GLYPH_ORDERS, UI_GLYPH_CYCLE, UI_GLYPH_CRYSTAL, UI_GLYPH_GAS };
+
+static void
+ui_glyph(int glyph, int x, int y)
+{
+    if (glyph == UI_GLYPH_SELECT) {
+        gfx_frame(x - 3, y - 3, 7, 7, C_HIGHLIGHT);
+        gfx_rect(x - 1, y - 3, 3, 1, C_PANEL);
+        gfx_rect(x - 1, y + 3, 3, 1, C_PANEL);
+    } else if (glyph == UI_GLYPH_CROSS) {
+        gfx_line(x - 3, y - 3, x + 3, y + 3, C_RED);
+        gfx_line(x - 3, y + 3, x + 3, y - 3, C_RED);
+    } else if (glyph == UI_GLYPH_ORDERS) {
+        int row, col;
+        for (row = -1; row <= 1; row++)
+            for (col = -1; col <= 1; col++)
+                gfx_rect(x + col * 3 - 1, y + row * 3 - 1, 2, 2, C_SILVER);
+    } else if (glyph == UI_GLYPH_CYCLE) {
+        gfx_rect(x - 3, y - 2, 6, 1, C_SILVER);
+        gfx_rect(x + 1, y - 3, 1, 3, C_SILVER);
+        gfx_rect(x - 2, y + 2, 6, 1, C_SILVER);
+        gfx_rect(x - 1, y + 1, 1, 3, C_SILVER);
+    } else if (glyph == UI_GLYPH_CRYSTAL) {
+        gfx_diamond(x, y, 3, 3, C_CYAN);
+        gfx_pixel(x, y - 1, C_WHITE);
+    } else {
+        gfx_rect(x - 2, y - 1, 5, 4, C_GREEN);
+        gfx_rect(x - 1, y - 3, 3, 2, C_GREEN_DARK);
+    }
+}
+
 /* mm:ss of a 30 Hz tick count, for the pause and result panels. */
 static void
 ui_clock(int x, int y, unsigned ticks, u8 color)

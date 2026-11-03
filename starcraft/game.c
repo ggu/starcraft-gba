@@ -11280,22 +11280,17 @@ draw_hud_resources(void)
 #endif
 }
 
-static void
-draw_hud_shields(int shield,int maximum)
-{
-#ifdef SC64_RACES
-    if (maximum>0) { gfx_text(129,126,"SH",C_CYAN); gfx_num(147,126,shield,C_CYAN); }
-#else
-    (void)shield; (void)maximum;
+#if defined(SC64_RACES) && defined(SC64_FIELD_CONTROLS)
+#define SC64_HUD_PANEL 1
+#include "hud_panel.h"
 #endif
-}
 
 static void draw_hud_commands_body(void);
 
 /* The minimap's black panel and edge are static, so with the maintained
  * raster they join the cached bottom band after every text that can reach
  * x >= 181; the per-frame opaque raster copy then covers the map area. */
-static void
+static void __attribute__((noinline))
 draw_hud_commands(void)
 {
     draw_hud_commands_body();
@@ -11318,71 +11313,33 @@ draw_hud_commands_body(void)
     field_ui_draw_hud();
     return;
 #endif
-    int hud_left=5;
-#if defined(SC64_RACES) && defined(SC64_FIELD_CONTROLS)
-    if(box_state!=2 && !menu_open && mode==MODE_NORMAL &&
-#ifdef SC64_COMMAND_ICONS
-       /* The command card's selection header draws unit portraits and keeps
-          the unit hint at x 52; only buildings take the source icon here. */
-       selected_building>=0 && b[selected_building].alive &&
-#endif
-       field_controls_draw_selected_icon(14,135,22))hud_left=30;
-#endif
     if (box_state == 2) {
         gfx_text(5, 126, "BOX SELECT", C_CYAN);
+#ifdef SC64_HUD_PANEL
+        ui_key(5, 137, "L", 0, C_DIM);
+        ui_glyph(UI_GLYPH_SELECT, 20, 140);
+        ui_key(27, 137, "B", 0, C_DIM);
+        ui_glyph(UI_GLYPH_CROSS, 42, 140);
+#else
         gfx_text(5, 137, "RELEASE L SELECT B CANCEL", C_GOLD);
+#endif
 #ifdef SC64_FIELD_CONTROLS
     } else if (field_controls_draw_hud()) { /* list, placement, armed orders */
 #endif
+#ifdef SC64_HUD_PANEL
+    } else if (hud_panel_selection(n)) {
+        hud_panel_clock();
+        return;
+    } else if (mode == MODE_NORMAL) {
+        hud_panel_idle_hints();
+#else
     } else if (selected_building >= 0 && b[selected_building].alive) {
 	Building *q = &b[selected_building];
-	#ifdef SC64_RACES
-        char title[64];
-        int title_width=q->shield>0?124-hud_left:165-hud_left;
-        sc64_font_ellipsis(sc64_race_building_name(q->type),title_width,title,sizeof(title));
-        sc64_font_text(hud_left,124,title_width,title,C_WHITE);
-        draw_hud_shields(q->shield,sc64_actor_max_shields(q->type,1));
-#else
 	gfx_text(5, 126, q->type == B_COMMAND ? "COMMAND CENTER" :
 		 q->type == B_BARRACKS ? "BARRACKS" : q->type == B_DEPOT ? "SUPPLY DEPOT" :
 		 q->type == B_REFINERY ? "REFINERY" : q->type == B_ACADEMY ? "ACADEMY" :
                  q->type == B_BUNKER ? "BUNKER" : q->type == B_INFESTED_COMMAND ? "INFESTED COMMAND" :
                  q->type == B_CREEP_COLONY ? "CREEP COLONY" : "ENGINEERING BAY", C_WHITE);
-#endif
-#ifdef SC64_RACES
-#ifdef SC64_Z6_TRANSPORT_ENABLED
-        if (race_z6_active() && race_z6.transport.ticks_remaining &&
-            race_z6.transport.producer_slot_plus1==(unsigned)selected_building+1u) {
-            gfx_text(5,137,"VENTRAL SACS",C_CYAN);
-            gfx_num(95,137,(race_z6.transport.ticks_remaining+29u)/30u,C_WHITE);
-            gfx_text(119,137,"SECONDS",C_GOLD);
-        } else
-#endif
-#ifdef SC64_BATTERY_SERVICE_ENABLED
-        if (!q->under_construction && sc64_race_raw_building(q->type)==172) {
-            gfx_text(hud_left,137,"EN",C_CYAN);
-            gfx_num(hud_left+18,137,q->queue_progress/256,C_WHITE);
-            sc64_font_text(85,135,94,race_battery_powered_live(selected_building) ?
-                           "B RECHARGE" : "UNPOWERED",C_GOLD);
-        } else
-#endif
-#ifdef SC64_SHARED_BUNKER
-        if (!q->under_construction && sc64_race_raw_building(q->type)==125) {
-            int cargo=race_bunker_cargo_space(selected_building);
-            gfx_text(hud_left,137,"LOAD",C_CYAN);
-            gfx_num(hud_left+30,137,cargo>0?cargo:0,C_WHITE);
-            gfx_text(hud_left+38,137,"/4",C_WHITE);
-            sc64_font_text(85,135,94,cargo>0?"B UNLOAD":"SELECT INFANTRY",C_GOLD);
-        } else
-#endif
-        if(!q->under_construction) {
-            char training[48];
-            sc64_font_ellipsis(unit_name(train_type),81-hud_left-12,training,sizeof(training));
-            gfx_text(hud_left,137,"A",C_GOLD);
-            sc64_font_text(hud_left+12,135,81-hud_left-12,training,C_WHITE);
-            sc64_font_text(85,135,94,"R Type L Cancel",C_GOLD);
-        } else gfx_text(hud_left,137,"UNDER CONSTRUCTION",C_GOLD);
-#else
 	if (q->under_construction)
 	    gfx_text(5, 137, "UNDER CONSTRUCTION", C_GOLD);
 	else if (q->type == B_BARRACKS) {
@@ -11394,82 +11351,23 @@ draw_hud_commands_body(void)
 	    gfx_text(5, 137, "A TRAIN SCV  L CANCEL QUEUE", C_GOLD);
 	else if (q->type == B_REFINERY)
 	    gfx_text(5, 137, "A ASSIGN WORKER TO GAS", C_CYAN);
-#endif
     } else if (n) {
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].selected) {
-#ifdef SC64_COMMAND_ICONS
-		card_selection_header(i, n);
-#else
-#ifdef SC64_RACES
-                char title[64];
-                int title_width=u[i].shield>0?124-hud_left:165-hud_left;
-                sc64_font_ellipsis(n>1?"Combat group":unit_name(u[i].type),title_width,title,sizeof(title));
-                sc64_font_text(hud_left,124,title_width,title,C_WHITE);
-                draw_hud_shields(u[i].shield,sc64_actor_max_shields(u[i].type,0));
-#else
                 gfx_text(5,126,n>1?"COMBAT GROUP":unit_name(u[i].type),C_WHITE);
-#endif
-		gfx_text(hud_left, 137, "HP", C_CYAN);
-		gfx_num(hud_left+19, 137, u[i].hp, C_GREEN);
-#endif
+		gfx_text(5, 137, "HP", C_CYAN);
+		gfx_num(24, 137, u[i].hp, C_GREEN);
 		if (IS_WORKER(u[i].type))
-#ifdef SC64_FIELD_CONTROLS
-		    gfx_text(hud_left+47, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :
-			     ui_action == UI_A_GAS ? "A GAS  B BUILD" :
-                             ui_action == UI_A_MINE ? "A MINE B BUILD" : "B BUILD", C_GOLD);
-#elif defined(SC_DEFAULT_UI)
-		    gfx_text(hud_left+47, 137, ui_action == UI_A_MINE ? "A MINE / B BUILD" : "B BUILD", C_GOLD);
-#else
-                    gfx_text(hud_left+47, 137, "B BUILD", C_GOLD);
-#endif
+                    gfx_text(52, 137, "B BUILD", C_GOLD);
 		else
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-                if (race_protoss_services_active() && u[i].type==U_P7_CARRIER) {
-                    gfx_text(hud_left+47,137,"IC",C_CYAN);
-                    gfx_num(hud_left+65,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
-                    gfx_text(hud_left+79,137,"HANGAR / FLIGHT WIP",C_GOLD);
-                } else
-#endif
-#ifdef SC64_Z6_CLOAK_ENABLED
-                if (race_z6_cloak_actor(&u[i])) {
-                    gfx_text(hud_left+47,137,"EN",C_CYAN); gfx_num(hud_left+65,137,u[i].carry/256,C_WHITE);
-                    gfx_text(hud_left+95,137,race_z6.cloak.active ? "CLOAKED" : "B SPELLS",C_GOLD);
-                } else
-#endif
-#ifdef SC64_P6_STORM_ENABLED
-                if (race_p6_active() && u[i].raw_type==79 && u[i].raw_owner==2) {
-                    gfx_text(hud_left+47,137,"EN",C_CYAN); gfx_num(hud_left+65,137,u[i].carry/256,C_WHITE);
-                    gfx_text(hud_left+95,137,"B STORM",C_GOLD);
-                } else
-#endif
-#ifdef SC64_Z5_CLOAK_ENABLED
-                if (race_z5_cloak_actor(&u[i])) {
-                    gfx_text(hud_left+47, 137, "EN", C_CYAN);
-                    gfx_num(hud_left+65, 137, u[i].carry / 256, C_WHITE);
-                    gfx_text(hud_left+95, 137, race_z5.cloak.active ? "CLOAKED" : "B CLOAK", C_GOLD);
-                } else
-#endif
-#ifdef SC64_TRANSPORT_RUNTIME
-#if defined(SC64_T5_RUNTIME) && !defined(SC64_SHARED_TRANSPORT)
-                if (u[i].type == U_DROPSHIP) {
-#else
-                if (race_transport_carrier_type(&u[i])) {
-#endif
-                    gfx_text(hud_left+47, 137, "CARGO", C_GOLD);
-                    gfx_num(hud_left+85, 137, race_transport_cargo_space(i), C_WHITE);
-                    gfx_text(hud_left+99, 137, "/8  B UNLOAD", C_GOLD);
-                } else
-#endif
 #ifdef SC_COMMAND_RING
-		    gfx_text(hud_left+47, 137, "HOLD B ORDERS", C_GOLD);
-#elif defined(SC64_FIELD_CONTROLS)
-		    gfx_text(hud_left+47, 137, field_controls_unit_hint(), C_GOLD);
+		    gfx_text(52, 137, "HOLD B ORDERS", C_GOLD);
 #else
-		    gfx_text(hud_left+47, 137, "A ORDER B COMMANDS", C_GOLD);
+		    gfx_text(52, 137, "A ORDER B COMMANDS", C_GOLD);
 #endif
 		break;
 	    }
+#endif
     } else {
 	gfx_text(5, 126, mode == MODE_BUILD ? "BUILD PLACEMENT" :
 #ifdef SC64_TERRAN_LATE_RUNTIME
@@ -11513,56 +11411,43 @@ draw_hud_commands_body(void)
                  "B COMMANDS  A SELECT / PLACE", C_GOLD);
     }
 #ifdef SC64_RACES
-    if(race_mode)gfx_text(5,149,"DESTROY ALL ENEMY BUILDINGS",C_GOLD);
+    hud_panel_clock();
+    if (box_state == 2 || menu_open || mode != MODE_NORMAL) return;
+    if(race_mode)hud_panel_objective("DESTROY ALL ENEMY BUILDINGS");
     else {
         static const char *const objective[4]={"POOL + DEN / CLEAR TERRAN BASE","DRONE: CARRY CHRYSALIS TO WARP","MEET FENIX / CLEAR ZERG BASE","PROTECT FENIX / KILL CEREBRATE"};
         if(race_selected_mission<4)
-            gfx_text(5,149,objective[race_selected_mission],C_GOLD);
+            hud_panel_objective(objective[race_selected_mission]);
 #ifdef SC64_UNIFIED
         else if(race_selected_mission==4)
-            gfx_text(5,149,"FIND RAYNOR / BUILD OUTPOST",C_GOLD);
+            hud_panel_objective("FIND RAYNOR / BUILD OUTPOST");
         else if(race_selected_mission==5)
-            gfx_text(5,149,"DESTROY INFESTED BASE",C_GOLD);
+            hud_panel_objective("DESTROY INFESTED BASE");
 #ifdef SC64_T3_ENABLED
-        else if(race_selected_mission==6) {
-            unsigned seconds=(race_t3.remaining_ticks+29u)/30u;
-            char timer[6]={(char)('0'+seconds/600u),(char)('0'+seconds/60u%10u),':',
-                (char)('0'+seconds/10u%6u),(char)('0'+seconds%10u),0};
-            gfx_text(5,149,race_t3.objective?"HOLD / KILL HATCHERY":"HOLD BASE",C_GOLD);
-            gfx_text(137,149,timer,C_WHITE);
-        }
+        else if(race_selected_mission==6)
+            hud_panel_objective(race_t3.objective?"HOLD / KILL HATCHERY":"HOLD BASE");
 #endif
 #ifdef SC64_T6_RUNTIME
         else if(race_t6_active())
-            gfx_text(5,149,"RAYNOR + 2 DROPSHIPS / NORAD II",C_GOLD);
+            hud_panel_objective("RAYNOR + 2 DROPSHIPS / NORAD II");
 #endif
 #ifdef SC64_Z3_ENABLED
         else if(race_selected_mission==14)
-            gfx_text(5,149,race_z3.sequence?"CHRYSALIS / MISSION REPORT":"PROTECT CHRYSALIS / CLEAR TERRAN",C_GOLD);
+            hud_panel_objective(race_z3.sequence?"CHRYSALIS / MISSION REPORT":"PROTECT CHRYSALIS / CLEAR TERRAN");
 #endif
 #ifdef SC64_Z4_RUNTIME
-        else if (race_selected_mission == 15) {
-            unsigned seconds = race_z4_hud_seconds();
-            char timer[6] = {(char)('0' + seconds / 600u),
-                (char)('0' + seconds / 60u % 10u), ':',
-                (char)('0' + seconds / 10u % 6u), (char)('0' + seconds % 10u), 0};
-            gfx_text(5, 149, "PROTECT / CLEAR COMMAND CENTERS", C_GOLD);
-            gfx_text(194, 149, timer, C_WHITE);
-        }
+        else if (race_selected_mission == 15)
+            hud_panel_objective("PROTECT / CLEAR COMMAND CENTERS");
 #endif
 #ifdef SC64_P3_RUNTIME
         else if(race_selected_mission==SC64_P3_GLOBAL_ID)
-            gfx_text(5,149,race_p3.sequence?"HIGHER GROUND / MISSION REPORT":"DESTROY BOTH ZERG COLONIES",C_GOLD);
+            hud_panel_objective(race_p3.sequence?"HIGHER GROUND / MISSION REPORT":"DESTROY BOTH ZERG COLONIES");
 #endif
 #ifdef SC64_P4_RUNTIME
         else if (race_selected_mission == SC64_P4_GLOBAL_ID)
-            gfx_text(5, 149, "RESCUE HEROES / REACH EXTRACTION", C_GOLD);
+            hud_panel_objective("RESCUE HEROES / REACH EXTRACTION");
 #endif
 #endif
-        if(race_selected_mission==3&&race_campaign.elapsed_frames<27000u) {
-            gfx_text(170,126,"ETA",C_CYAN);
-            gfx_num(194,126,(27000u-race_campaign.elapsed_frames+29u)/30u,C_WHITE);
-        }
     }
 #elif defined(SC64_TERRAN_CAMPAIGN)
     gfx_text(5, 149, campaign_mission ? "DESTROY INFESTED BASE" : "FIND RAYNOR / BUILD OUTPOST", C_GOLD);
@@ -11646,7 +11531,10 @@ sc64_hud_race_keys(int *values,int first)
             values[27]=(x>>3)|(y>>3)<<12;
         }
         values[28]=(int)((u32)minerals|((u32)gas<<16));
-    }
+    } else values[27]=hud_panel_key_slow(values[8]) && (frame&3) ?
+        sc64_hud_previous[27] : hud_panel_key(first,values[8]);
+    /* A group's panel draws stepped bars, so a hit on its first unit is not a change. */
+    if (values[8]>1) values[12]=0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if(first>=0 && race_protoss_services_active() && u[first].type==U_P7_CARRIER)
@@ -11843,6 +11731,9 @@ draw_hud(void)
 #else
     draw_hud_resources();
     draw_hud_commands();
+#endif
+#ifdef SC64_HUD_PANEL
+    hud_panel_bars();
 #endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_TERRAIN)
     u32 minimap_start = gba_clock();
