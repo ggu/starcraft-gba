@@ -246,6 +246,287 @@ test_skirmish_shield_only_changes_invalidate_cached_bottom(void)
 }
 #endif
 
+#ifdef SC64_HUD_PANEL
+static int
+hud_count_color(int x, int y, int w, int h, u8 color)
+{
+    int n = 0;
+    for (int py = y; py < y + h; py++)
+        for (int px = x; px < x + w; px++)
+            n += gfx_test_pixel(px, py) == color;
+    return n;
+}
+
+static int
+panel_bar_fill(void)
+{
+    return hud_count_color(HUD_COLUMN, HUD_BAR_Y, HUD_BAR_W, 1, C_GOLD);
+}
+
+static int
+panel_slot_lit(int i)
+{
+    int x = HUD_COLUMN + i * HUD_SLOT_PITCH;
+    return hud_count_color(x + 1, HUD_SLOT_Y + 1, CARD_CELL - 2, CARD_CELL - 2, C_GREEN) +
+        hud_count_color(x + 1, HUD_SLOT_Y + 1, CARD_CELL - 2, CARD_CELL - 2, C_GOLD);
+}
+
+/* A selected producer shows its queue as icons with a bar; the cached band
+ * follows what the panel draws, in steps and only for real changes. */
+static void
+test_panel_shows_building_queue(void)
+{
+    Building *q = &b[0];
+    int time = unit_build_time(U_SCV);
+    fixture();
+    race_human = R_TER;
+    train_type = U_SCV;
+    q->alive = 1; q->owner = SIDE; q->type = B_COMMAND;
+    q->raw_type = sc64_race_raw_building(B_COMMAND); q->raw_owner = 7;
+    q->hp = q->maxhp = 1500; q->x = q->y = 100;
+    selected_building = 0;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(0, 121, 25, 26, C_GREEN) > 0);
+    for (int i = 0; i < HUD_QUEUE_SLOTS; i++) assert(!panel_slot_lit(i));
+    assert(panel_bar_fill() == 0);
+    assert(hud_next_product(0) == U_SCV);
+    assert(hud_count_color(HUD_CHIP_X, HUD_SLOT_Y, CARD_CELL, CARD_CELL, C_GREEN) > 0);
+    assert(hud_count_color(HUD_CHIP_X + CARD_CELL, HUD_SLOT_Y, 20, 10, C_GOLD) > 0);
+
+    q->queue[0] = q->queue[1] = q->queue[2] = U_SCV;
+    q->queue_head = 0;
+    q->queue_count = 3;
+    expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
+    render_cached();
+    assert(panel_slot_lit(0) && panel_slot_lit(1) && panel_slot_lit(2));
+    assert(!panel_slot_lit(3) && !panel_slot_lit(4));
+    assert(gfx_test_pixel(HUD_COLUMN, HUD_SLOT_Y) == C_GOLD);
+    assert(gfx_test_pixel(HUD_COLUMN + HUD_SLOT_PITCH, HUD_SLOT_Y) != C_GOLD);
+
+    /* Progress is drawn over the cached band, so it never redraws the band
+       and still shows the current value on a cached frame. */
+    render_cached();
+    q->queue_progress = time / 2;
+    expect_mask_and_match(0);
+    render_cached();
+    assert(panel_bar_fill() == HUD_BAR_W * (time / 2) / time);
+    q->queue_progress = time / 4;
+    expect_mask_and_match(0);
+    render_cached();
+    assert(panel_bar_fill() == HUD_BAR_W * (time / 4) / time);
+    q->queue_progress = time / 2;
+
+    /* A swap of a waiting unit keeps count and progress but must still redraw. */
+    q->queue[2] = U_MARINE;
+    assert(probe_change_mask() & HUD_BOTTOM);
+    assert_cached_matches_full();
+
+    /* Hit points step: real damage redraws the panel, a scratch does not. */
+    q->hp = 1200;
+    expect_mask_and_match(HUD_BOTTOM);
+    render_cached();
+    q->hp = 1199;
+    assert(probe_change_mask() == 0);
+    q->hp = 1200;
+
+    /* The upgrade building shows both research slots and their progress. */
+    memset(q, 0, sizeof *q);
+    q->alive = 1; q->owner = SIDE; q->type = B_ENG_BAY;
+    q->raw_type = sc64_race_raw_building(B_ENG_BAY); q->raw_owner = 7;
+    q->hp = q->maxhp = 850; q->x = q->y = 100;
+    weapons_research = armor_research = 0;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(panel_slot_lit(0) && panel_slot_lit(1));
+    assert(gfx_test_pixel(HUD_COLUMN, HUD_SLOT_Y) != C_GOLD);
+    weapons_research = 300;
+    expect_mask_and_match(HUD_BOTTOM);
+    render_cached();
+    assert(gfx_test_pixel(HUD_COLUMN, HUD_SLOT_Y) == C_GOLD);
+    assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, CARD_CELL, 1, C_GOLD) == CARD_CELL / 2);
+    weapons_research = 450;
+    expect_mask_and_match(0);
+    render_cached();
+    assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, CARD_CELL, 1, C_GOLD) == CARD_CELL * 3 / 4);
+    weapons_research = 0;
+    weapons_level = 1;
+    expect_mask_and_match(HUD_BOTTOM);
+    weapons_level = 0;
+
+    /* Under construction there is one long bar and no queue. */
+    memset(q, 0, sizeof *q);
+    q->alive = 1; q->owner = SIDE; q->type = B_BARRACKS;
+    q->raw_type = sc64_race_raw_building(B_BARRACKS); q->raw_owner = 7;
+    q->hp = q->maxhp = 1000; q->x = q->y = 100;
+    q->under_construction = 1;
+    q->build_progress = building_build_time(B_BARRACKS) / 2;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, HUD_FULL_BAR_W, 1, C_GOLD) >= HUD_FULL_BAR_W / 2 - 6);
+    assert(hud_next_product(0) < 0);
+    q->build_progress += building_build_time(B_BARRACKS) / 4;
+    expect_mask_and_match(0);
+    render_cached();
+    assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, HUD_FULL_BAR_W, 1, C_GOLD) >= HUD_FULL_BAR_W * 3 / 4 - 6);
+
+    /* The bars stay off the band while a menu covers the panel. */
+    q->under_construction = 0;
+    menu_open = 1;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, HUD_FULL_BAR_W, HUD_BAR_H, C_GOLD) == 0);
+    menu_open = 0;
+    selected_building = -1;
+    memset(b, 0, sizeof(b));
+}
+
+/* A trains exactly the unit the panel offers. */
+static void
+test_panel_product_matches_a(void)
+{
+    static const struct { int race, type, stale_train, expected; } cases[] = {
+        {R_TER, B_COMMAND, U_MARINE, U_SCV},
+        {R_TER, B_BARRACKS, U_SCV, U_MARINE},
+        {R_PROTOSS, B_NEXUS, U_ZEALOT, U_PROBE},
+    };
+    for (unsigned n = 0; n < sizeof cases / sizeof cases[0]; n++) {
+        Building *q = &b[0];
+        fixture();
+        race_human = cases[n].race;
+        if (race_owner_identity(SIDE) != cases[n].race) continue;
+        minerals = 500;
+        supply_cap = 60; supply_used = 0;
+        q->alive = 1; q->owner = SIDE; q->type = cases[n].type;
+        q->raw_type = sc64_race_raw_building(cases[n].type); q->raw_owner = 7;
+        q->hp = q->maxhp = 1000; q->x = q->y = 100;
+        selected_building = 0;
+        cx = cy = 100;
+        train_type = cases[n].stale_train;
+        assert(hud_next_product(0) == cases[n].expected);
+        race_refusal = 0;
+        interact();
+        /* A resolves to the offered unit; a profile's supply rules may still refuse it. */
+        assert(train_type == cases[n].expected);
+        if (!race_refusal) assert(q->queue_count == 1 && q->queue[q->queue_head] == cases[n].expected);
+    }
+    selected_building = -1;
+    memset(b, 0, sizeof(b));
+}
+
+#ifdef SC64_SHARED_BUNKER
+/* A Bunker shows its passengers as icons in four slots. */
+static void
+test_panel_bunker_cargo(void)
+{
+    Building *q = &b[0];
+    fixture();
+    race_human = R_TER;
+    q->alive = 1; q->owner = SIDE; q->type = B_BUNKER;
+    q->raw_type = 125; q->raw_owner = 7;
+    q->hp = q->maxhp = 350; q->x = q->y = 100;
+    selected_building = 0;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(!panel_slot_lit(0));
+    assert(gfx_test_pixel(HUD_COLUMN, HUD_SLOT_Y) == C_EDGE);
+    u[0].alive = 1; u[0].owner = SIDE; u[0].type = U_MARINE;
+    u[0].raw_type = sc64_race_raw_unit(U_MARINE); u[0].raw_owner = 7;
+    u[0].hp = u[0].maxhp = 40;
+    u[0].order = ORDER_TRANSPORTED;
+    u[0].target = sc64_bunker_target_encode(MAX_UNITS, MAX_BUILDINGS, 0);
+    assert(race_bunker_cargo_space(0) == 1);
+    assert(probe_change_mask() & HUD_BOTTOM);
+    assert_cached_matches_full();
+    render_cached();
+    assert(panel_slot_lit(0) && !panel_slot_lit(1));
+    selected_building = -1;
+    memset(b, 0, sizeof(b));
+    memset(u, 0, sizeof(u));
+}
+#endif
+
+/* Armed orders and the box show key caps and marks instead of words. */
+static void
+test_panel_modes_use_marks(void)
+{
+    fixture();
+    race_human = R_TER;
+    u[0].alive = 1; u[0].owner = SIDE; u[0].selected = 1; u[0].type = U_MARINE;
+    u[0].raw_type = sc64_race_raw_unit(U_MARINE); u[0].raw_owner = 7;
+    u[0].hp = u[0].maxhp = 40;
+    mode = MODE_MOVE;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(27, 136, 10, 11, C_SILVER) > 0);
+    assert(hud_count_color(27, 136, 150, 9, C_GOLD) == 0);
+    mode = MODE_ATTACK;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(27, 136, 60, 11, C_RED) > 0);
+    assert(hud_count_color(27, 136, 150, 9, C_GOLD) == 0);
+    mode = MODE_NORMAL;
+    box_state = 2;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(5, 136, 150, 9, C_GOLD) == 0);
+    box_state = 0;
+    memset(u, 0, sizeof(u));
+}
+
+/* A timed mission keeps its clock under the portrait while a unit is selected. */
+#ifdef SC64_T3_ENABLED
+static void
+test_panel_keeps_mission_clock(void)
+{
+    fixture();
+    race_human = R_TER;
+    race_selected_mission = 6;
+    race_t3.remaining_ticks = 300;
+    u[0].alive = 1; u[0].owner = SIDE; u[0].selected = 1; u[0].type = U_MARINE;
+    u[0].raw_type = sc64_race_raw_unit(U_MARINE); u[0].raw_owner = 7;
+    u[0].hp = u[0].maxhp = 40;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(0, HUD_CLOCK_Y, 30, 8, C_WHITE) > 0);
+    memset(u, 0, sizeof(u));
+}
+#endif
+
+/* A group is its unit types with counts; a selection hides the objective. */
+static void
+test_panel_group_and_objective(void)
+{
+    fixture();
+    race_human = R_TER;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(5, 124, 170, 18, C_GOLD) > 0);
+    for (int i = 0; i < 3; i++) {
+        u[i].alive = 1; u[i].owner = SIDE; u[i].selected = 1;
+        u[i].type = i < 2 ? U_MARINE : U_FIREBAT;
+        u[i].raw_type = sc64_race_raw_unit(u[i].type); u[i].raw_owner = 7;
+        u[i].hp = u[i].maxhp = 40;
+    }
+    expect_mask_and_match(HUD_BOTTOM);
+    render_cached();
+    assert(hud_count_color(5, 148, 175, 11, C_GOLD) == 0);
+    assert(hud_count_color(HUD_COLUMN, HUD_PORTRAIT_Y, CARD_CELL, CARD_CELL, C_GREEN) > 0);
+    assert(hud_count_color(HUD_COLUMN + HUD_SLOT_PITCH, HUD_PORTRAIT_Y, CARD_CELL, CARD_CELL, C_GREEN) > 0);
+    assert(hud_count_color(HUD_COLUMN + 2 * HUD_SLOT_PITCH, HUD_PORTRAIT_Y, CARD_CELL, CARD_CELL, C_GREEN) == 0);
+    /* The group's bar steps; a small hit stays within a step and costs no redraw. */
+    u[0].hp = 38;
+    expect_mask_and_match(HUD_BOTTOM);
+    u[0].hp = 37;
+    expect_mask_and_match(0);
+    u[0].hp = 10;
+    expect_mask_and_match(HUD_BOTTOM);
+    u[2].selected = 0;
+    expect_mask_and_match(HUD_BOTTOM);
+    memset(u, 0, sizeof(u));
+}
+#endif
+
 static void
 test_mission_message_timer_and_minimap_stay_pixel_exact(void)
 {
@@ -766,6 +1047,18 @@ main(void)
 #endif
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     test_p3_sequence_invalidates_bottom_and_matches_redraw();
+#endif
+#ifdef SC64_HUD_PANEL
+    test_panel_shows_building_queue();
+    test_panel_product_matches_a();
+    test_panel_group_and_objective();
+    test_panel_modes_use_marks();
+#ifdef SC64_SHARED_BUNKER
+    test_panel_bunker_cargo();
+#endif
+#ifdef SC64_T3_ENABLED
+    test_panel_keeps_mission_clock();
+#endif
 #endif
 #ifdef SC64_RACES
     /* Keep the skirmish fixture last so it cannot change the campaign state

@@ -14,6 +14,7 @@ typedef struct { unsigned tick; int minerals,gas,drones,hydras,zerglings,overlor
 #define Z1_TICK_LIMIT 240000u
 /* Host capture only; physical-key replay streams the tape externally. */
 #define Z1_EVENT_CAPACITY 16384
+#define Z1_MINER_PATCH_ATTEMPTS 4
 static Z1Event events[Z1_EVENT_CAPACITY];
 static Z1Checkpoint checkpoints[256];
 static unsigned input_tick;
@@ -31,6 +32,9 @@ static int fail(const char *why);
 static void controller_frame(unsigned short held)
 {
     if(input_tick>=Z1_TICK_LIMIT){fail("host-tick limit reached; world clock stopped");exit(1);}
+    /* The next A on the result screen starts the following mission. A scripted
+       press sequence must not dismiss the result it is about to report. */
+    if(won||lost)return;
     unsigned short pressed=held&(unsigned short)~previous_held;
     if(held!=previous_held) {
         if(event_count<(int)(sizeof(events)/sizeof(events[0])))
@@ -70,6 +74,33 @@ static int wait_until(int (*predicate)(void),int ticks)
 static int has_second_overlord(void){return count_units(SIDE,U_OVERLORD)>=2;}
 static int has_pool(void){for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_SPAWNING_POOL&&!b[i].under_construction)return 1;return 0;}
 static int has_den(void){for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HYDRALISK_DEN&&!b[i].under_construction)return 1;return 0;}
+/* Under SC64_DIRECT_ATTACK, A within a visible hostile's pick radius issues a
+   single-target order: the group walks past anything shooting it. These are
+   Attack-Move commands, so aim at nearby open ground, as Z5 and Z6 do. Moving
+   the cursor advances the world, so recheck after it arrives. */
+static int cursor_for_attack_move(int x,int y)
+{
+#ifdef SC64_DIRECT_ATTACK
+    static const int dirs[8][2]={{1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}};
+    for(int retry=0;retry<4;retry++) {
+        int ax=x,ay=y;
+        if(sc64_direct_attack_find_target(x,y)>=0) {
+            int found=0;
+            for(int radius=32;radius<=96&&!found;radius+=16)for(int d=0;d<8&&!found;d++) {
+                int px=x+dirs[d][0]*radius,py=y+dirs[d][1]*radius;
+                if(px<0||py<0||px>=WORLD_W||py>=WORLD_H||
+                   sc64_direct_attack_find_target(px,py)>=0||!is_traversable(px/16,py/16,-1))continue;
+                ax=px;ay=py;found=1;
+            }
+        }
+        if(!cursor_near(ax,ay))return 0;
+        if(sc64_direct_attack_find_target(cx,cy)<0)return 1;
+    }
+    return 1;
+#else
+    return cursor_near(x,y);
+#endif
+}
 static int build_menu(int option,int x,int y)
 {
     /* B reopens on the last chosen row, so walk to the wanted row. */
@@ -232,25 +263,32 @@ static int assign_idle_miner(void)
 {
     static const int offsets[][2]={{0,0},{-8,0},{8,0},{0,-8},{0,8},
         {-8,-8},{8,-8},{-8,8},{8,8},{-12,0},{12,0},{0,-12},{0,12}};
-    int worker=-1,patch=-1,best=0x7fffffff;
+    int worker=-1,previous=-1;
     for(int i=0;i<MAX_UNITS;i++)
         if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE&&u[i].order==ORDER_IDLE)
             {worker=i;break;}
     if(worker<0)return 0;
-    for(int i=0;i<MAX_MINERALS;i++)if(m[i].amount>0&&currently_visible(m[i].x,m[i].y)) {
-        int d=dist2(u[worker].x,u[worker].y,m[i].x,m[i].y);
-        if(d<best){best=d;patch=i;}
-    }
-    if(patch<0)return 0;
     int guard=0;
     while(guard++<MAX_UNITS&&find_selected_worker()!=worker)press(KEY_L);
     if(find_selected_worker()!=worker)return 0;
-    for(unsigned i=0;i<sizeof(offsets)/sizeof(offsets[0]);i++) {
-        if(!u[worker].alive||!u[worker].selected||selected_count()!=1)return 0;
-        if(!cursor_near(m[patch].x+offsets[i][0],m[patch].y+offsets[i][1]))return 0;
-        if(selected_worker_mineral_target()!=patch)continue;
-        press(KEY_A);
-        return u[worker].alive&&u[worker].order==ORDER_MINE&&u[worker].target==patch;
+    /* Drones idled by a depleted patch park beside the next one. A over them
+       selects instead of mining, so try farther patches as well. */
+    for(int attempt=0;attempt<Z1_MINER_PATCH_ATTEMPTS;attempt++) {
+        int patch=-1,best=0x7fffffff;
+        int floor=previous<0?-1:dist2(u[worker].x,u[worker].y,m[previous].x,m[previous].y);
+        for(int i=0;i<MAX_MINERALS;i++)if(m[i].amount>0&&currently_visible(m[i].x,m[i].y)) {
+            int d=dist2(u[worker].x,u[worker].y,m[i].x,m[i].y);
+            if(d>floor&&d<best){best=d;patch=i;}
+        }
+        if(patch<0)return 0;
+        previous=patch;
+        for(unsigned i=0;i<sizeof(offsets)/sizeof(offsets[0]);i++) {
+            if(!u[worker].alive||!u[worker].selected||selected_count()!=1)return 0;
+            if(!cursor_near(m[patch].x+offsets[i][0],m[patch].y+offsets[i][1]))return 0;
+            if(selected_worker_mineral_target()!=patch)continue;
+            press(KEY_A);
+            return u[worker].alive&&u[worker].order==ORDER_MINE&&u[worker].target==patch;
+        }
     }
     return 0;
 }
@@ -304,7 +342,7 @@ static int attack_nearest(int x,int y,int ticks)
     press(KEY_B);
     while(menu_cursor!=MENU_ATTACK&&guard++<MENU_COUNT)press(menu_cursor<MENU_ATTACK?KEY_DOWN:KEY_UP);
     if(menu_cursor!=MENU_ATTACK)return 0;
-    press(KEY_A);if(!cursor_near(x,y))return 0;press(KEY_A);
+    press(KEY_A);if(!cursor_for_attack_move(x,y))return 0;press(KEY_A);
     for(int i=0;i<ticks&&screen==SCREEN_PLAY&&!won&&!lost;i++) {
         controller_frame(0);
         if(i%600==599&&order_local_defense()) {
@@ -317,6 +355,7 @@ static int attack_nearest(int x,int y,int ticks)
         if(i%900==899) {
             ensure_campaign_tech();
             assign_gas();
+            assign_idle_miner();
             int h=-1,den=0;
             for(int j=0;j<MAX_BUILDINGS;j++)if(b[j].alive&&b[j].owner==SIDE&&b[j].type==B_HATCHERY)h=j;
             for(int j=0;j<MAX_BUILDINGS;j++)if(b[j].alive&&b[j].owner==SIDE&&b[j].type==B_HYDRALISK_DEN&&!b[j].under_construction)den=1;
@@ -341,7 +380,7 @@ static int attack_nearest(int x,int y,int ticks)
         click(limit(cx+96,0,WORLD_W-1),limit(cy+96,0,WORLD_H-1));press(KEY_R);press(KEY_B);
         int guard=0;while(menu_cursor!=MENU_ATTACK&&guard++<MENU_COUNT)
             press(menu_cursor<MENU_ATTACK?KEY_DOWN:KEY_UP);
-        if(menu_cursor==MENU_ATTACK){press(KEY_A);if(cursor_near(x,y))press(KEY_A);}
+        if(menu_cursor==MENU_ATTACK){press(KEY_A);if(cursor_for_attack_move(x,y))press(KEY_A);}
     }
     return interrupted_for_defense?2:1;
 }
@@ -374,7 +413,7 @@ static int defend_hatch_with_army(int x,int y)
     while(menu_cursor!=MENU_ATTACK&&guard++<MENU_COUNT)press(menu_cursor<MENU_ATTACK?KEY_DOWN:KEY_UP);
     if(menu_cursor!=MENU_ATTACK)return 0;
     press(KEY_A);
-    return cursor_near(x,y)&&(press(KEY_A),1);
+    return cursor_for_attack_move(x,y)&&(press(KEY_A),1);
 }
 static void refresh_local_defense(void);
 /* After a costly engagement, fall back to the north-front rally and rebuild
@@ -406,7 +445,7 @@ static void regroup_hydras(int below,int target)
         }
         controller_frame(0);
         if(t%300==0)refresh_local_defense();
-        if(t%600==0)assign_gas();
+        if(t%600==0){assign_gas();assign_idle_miner();}
         if(!b[h].alive)break;
     }
     for(int t=0;t<900&&screen==SCREEN_PLAY&&!won&&!lost&&b[h].queue_count;t++)controller_frame(0);

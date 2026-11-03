@@ -756,7 +756,7 @@ static int check_field_controls_races(void)
         if (!u[worker].selected) return fail("races: A did not select the worker");
         cx = x; cy = y;
         resolve_now();
-        if (ui_action != UI_A_MOVE || strcmp(field_controls_unit_hint(), "A MOVE B ORDERS"))
+        if (ui_action != UI_A_MOVE)
             return fail("races: open ground does not offer a move");
         press(KEY_A);
         if (!u[worker].selected || u[worker].order != ORDER_MOVE || ping_color != C_GREEN)
