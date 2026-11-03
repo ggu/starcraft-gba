@@ -9567,6 +9567,61 @@ sc64_unit_energy(const Unit *q,int *maximum)
     return *maximum ? q->carry : 0;
 }
 
+/* StarCraft marks a selection with an ellipse at the actor's base, coloured
+ * by relationship: green for the player, yellow for neutral, red for others.
+ * This draws a one-pixel outline sized from the sprite, so it needs no source
+ * art. Buildings pass front_only: their art is already on screen (or in the
+ * static cache), so only the near arc is drawn, as if the rest were hidden. */
+#define SELECTION_RX_MAX 64
+#define SELECTION_RY_MAX 38
+
+static u8
+selection_color(int owner)
+{
+    return owner == SIDE ? C_GREEN : owner == NEUTRAL ? C_GOLD : C_RED;
+}
+
+static void
+selection_row(int left,int right,int row,u8 color)
+{
+    if (row >= 12 && row < 120) gfx_rect(left,row,right-left+1,1,color);
+}
+
+static void __attribute__((noinline))
+draw_selection_ellipse(int x,int y,int rx,int ry,u8 color,int front_only)
+{
+    u8 half[SELECTION_RY_MAX+2];
+    if (rx < 3) rx = 3;
+    if (rx > SELECTION_RX_MAX) rx = SELECTION_RX_MAX;
+    if (ry < 2) ry = 2;
+    if (ry > SELECTION_RY_MAX) ry = SELECTION_RY_MAX;
+    if (y-ry >= 120 || y+ry < 12 || x+rx < 0 || x-rx >= 240) return;
+    /* half[dy]: the widest a inside an ellipse of vertical radius ry+1/2,
+     * i.e. a^2*(2ry+1)^2 <= rx^2*((2ry+1)^2 - 4dy^2). Sampling row centres
+     * keeps the top and bottom rows flat instead of single-pixel points. */
+    int a = rx, d = 2*ry + 1;
+    for (int dy = 0; dy <= ry; ++dy) {
+        while (a > 0 && a*a*d*d > rx*rx*(d*d - 4*dy*dy)) --a;
+        half[dy] = (u8)a;
+    }
+    half[ry+1] = 0;
+    /* Each row joins its edge to the next row's so the outline has no gaps. */
+    for (int dy = 0; dy <= ry; ++dy) {
+        int hi = half[dy], lo = dy == ry ? 0 : half[dy+1] + 1;
+        if (lo > hi) lo = hi;
+        if (dy == ry) {
+            selection_row(x-hi,x+hi,y+dy,color);
+            if (!front_only) selection_row(x-hi,x+hi,y-dy,color);
+            continue;
+        }
+        selection_row(x+lo,x+hi,y+dy,color);
+        selection_row(x-hi,x-lo,y+dy,color);
+        if (front_only || !dy) continue;
+        selection_row(x+lo,x+hi,y-dy,color);
+        selection_row(x-hi,x-lo,y-dy,color);
+    }
+}
+
 /* StarCraft's selected-unit vitals, after OpenBW's draw_health_bars: a black
  * frame of 2-pixel cells split by 1-pixel dividers and filled in whole cells.
  * Shields stack above HP and energy sits below. Each strip keeps two shade
@@ -9683,7 +9738,7 @@ sc64_source_unit_attack_pose(const Unit *q)
 #endif
 
 static void
-draw_unit(Unit * q)
+draw_unit_pass(Unit * q, int selection_pass)
 {
     if (SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_HIDDEN(q)) return;
 #ifdef SC64_P6_COMBAT_ENABLED
@@ -9715,8 +9770,6 @@ draw_unit(Unit * q)
     if ((actor_flags & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(q)) return;
     if (actor_flags && !(actor_flags & SC64_GAME_ACTOR_DRAWABLE)) return;
 #endif
-    int walk = sc64_walk_track(q);
-    int body_y = y - SC64_WALK_LIFT(walk);
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
@@ -9727,12 +9780,13 @@ draw_unit(Unit * q)
     int facing_raw = q->raw_type >= 0 ? q->raw_type :
         sc64_race_raw_unit(q->type);
     /* Units missing from the race bank (e.g. the sieged Siege Tank) can still
-     * have per-direction art; its north frame also sizes the selection box. */
+     * have per-direction art; its north frame also sizes the selection. */
     if (!sprite && facing_raw >= 0)
         sprite = sc64_unit_facing_frames((unsigned short)facing_raw);
 #endif
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
-    const Sc64SpriteFrame *attack_pose=sc64_source_unit_attack_pose(q);
+    /* The selection stays sized from the standing art while a pose plays. */
+    const Sc64SpriteFrame *attack_pose=selection_pass?0:sc64_source_unit_attack_pose(q);
     if(attack_pose) sprite=attack_pose;
 #endif
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 4;
@@ -9742,6 +9796,18 @@ draw_unit(Unit * q)
 #else
     int sprite_x = x - 4, sprite_y = y - 4, sprite_w = 8, sprite_h = 8;
 #endif
+    if (selection_pass) {
+        /* Drawn for every selected unit before any unit, so no circle
+         * covers a neighbour. The ellipse's lower edge sits just below the
+         * sprite, and the sprite drawn later hides its far arc. */
+        int rx = (sprite_w + 3) / 2, ry = (rx * 3 + 2) / 5;
+        if (ry < 2) ry = 2;
+        draw_selection_ellipse(x, sprite_y + sprite_h + 1 - ry, rx, ry,
+                               selection_color(q->owner), 0);
+        return;
+    }
+    int walk = sc64_walk_track(q);
+    int body_y = y - SC64_WALK_LIFT(walk);
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_UNIT_FACING
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -9828,7 +9894,6 @@ draw_unit(Unit * q)
         draw_worker_cargo_badge(sprite_x + sprite_w + 2,
             sprite_y + sprite_h / 2, q->order == ORDER_GAS);
     if (!q->selected) return;
-    gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (actor_flags & SC64_GAME_ACTOR_INVINCIBLE) return;
 #endif
@@ -9840,6 +9905,12 @@ draw_unit(Unit * q)
         0,
 #endif
         sc64_actor_max_shields(q->type, 0), energy, maxenergy);
+}
+
+static void
+draw_unit(Unit * q)
+{
+    draw_unit_pass(q, 0);
 }
 
 #define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
@@ -10453,6 +10524,9 @@ draw_building_overlay(Building *q)
     }
 #endif
     if (selected_building >= 0 && q == &b[selected_building]) {
+        int rx = sprite_w / 2 + 2, ry = (rx * 3 + 2) / 5;
+        draw_selection_ellipse(x, sprite_y + sprite_h + 1 - ry, rx, ry,
+                               selection_color(q->owner), 1);
         int vitals_y = sprite_y + sprite_h + 3;
 #ifdef SC64_RACES
         if (q->under_construction) vitals_y += 3;
@@ -10868,6 +10942,9 @@ sc64_tile_background_done:
 #ifndef SC64_DEATH_VFX_DISABLED
     draw_death_vfx(1);
 #endif
+    for (i = 0; i < MAX_UNITS; i++)
+	if (u[i].alive && u[i].selected)
+	    draw_unit_pass(&u[i], 1);
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive)
 	    draw_unit(&u[i]);
