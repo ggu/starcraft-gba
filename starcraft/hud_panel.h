@@ -5,7 +5,11 @@
  * production queue or research with its progress bar, a unit's upgrades,
  * energy and cargo, a group by type. A key cap and a mark stand in for the old
  * hint text. The redraw key (hud_panel_key) folds into one existing HUD key,
- * and the panel adds no saved or static state. */
+ * and the panel adds no saved or static state.
+ *
+ * A panel redraw is costly, so it stays rare. Progress bars are drawn again
+ * each frame over the cached band (hud_panel_bars), which costs far less than
+ * redrawing the band for each step of the bar. */
 #ifndef SC64_HUD_ICONS
 #error "hud_panel.h needs the imported HUD icons"
 #endif
@@ -15,7 +19,7 @@ enum {
     HUD_NAME_Y = 121, HUD_NUMBER_Y = 122, HUD_SLOT_Y = 130, HUD_SLOT_PITCH = 21,
     HUD_QUEUE_SLOTS = 5, HUD_BAR_Y = 151, HUD_BAR_H = 4,
     HUD_BAR_W = HUD_QUEUE_SLOTS * HUD_SLOT_PITCH - 1,
-    HUD_FULL_BAR_W = HUD_RIGHT - HUD_COLUMN + 1, HUD_BAR_LEVELS = 26,
+    HUD_FULL_BAR_W = HUD_RIGHT - HUD_COLUMN + 1, HUD_BAR_LEVELS = HUD_BAR_W,
     HUD_CHIP_X = 137, HUD_CHIP_KEYS_Y = 151, HUD_HINT_Y = 141, HUD_GROUP_HINT_Y = 150,
     HUD_CLOCK_Y = 151, HUD_GROUP_CELLS = 7
 };
@@ -32,7 +36,7 @@ hud_level(int value, int maximum, int levels)
 /* Icons in production order. A queue shares one bar; separate research jobs
  * each fill their own, under their slot. */
 typedef struct {
-    int count, separate, level[2];
+    int count, separate, eggs, level[2];
     short icon[HUD_QUEUE_SLOTS];
 } HudJobs;
 
@@ -42,6 +46,8 @@ hud_job_level(HudJobs *jobs, int job, int value, int maximum)
     jobs->level[job] = hud_level(value, maximum, jobs->separate ? CARD_CELL : HUD_BAR_LEVELS);
 }
 
+static void hud_jobs_bars(const HudJobs *jobs);
+
 static int
 hud_research_building(int type)
 {
@@ -49,13 +55,21 @@ hud_research_building(int type)
 }
 
 #ifdef SC64_Z7_EGG_PRODUCTION
+static int
+hud_egg_hall(const Building *q)
+{
+    return race_z7_active() && sc64_race_is_zerg_townhall(q->type);
+}
+
 /* Z7 Hatcheries spawn Eggs instead of queueing. The ones beside this hall
- * are its queue, soonest first. */
+ * are its queue, soonest first. The search is too slow for every frame, so
+ * their bar is drawn and redrawn with the band. */
 static int
 hud_egg_jobs(const Building *q, HudJobs *jobs)
 {
     int i, remaining = 0;
-    if (!race_z7_active() || !sc64_race_is_zerg_townhall(q->type)) return 0;
+    if (!hud_egg_hall(q)) return 0;
+    jobs->eggs = 1;
     for (i = 0; i < MAX_UNITS && jobs->count < HUD_QUEUE_SLOTS; i++) {
         int left, duration;
         if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_Z7_EGG ||
@@ -77,11 +91,11 @@ hud_egg_jobs(const Building *q, HudJobs *jobs)
 #endif
 
 static void
-hud_building_jobs(int slot, HudJobs *jobs)
+hud_building_jobs(int slot, HudJobs *jobs, int with_eggs)
 {
     const Building *q = &b[slot];
     int i;
-    jobs->count = jobs->separate = jobs->level[0] = jobs->level[1] = 0;
+    jobs->count = jobs->separate = jobs->eggs = jobs->level[0] = jobs->level[1] = 0;
     if (q->queue_count > 0 && q->queue_count <= HUD_QUEUE_SLOTS) {
         int head = q->queue[q->queue_head];
         for (i = 0; i < q->queue_count; i++)
@@ -92,8 +106,9 @@ hud_building_jobs(int slot, HudJobs *jobs)
     }
     if (q->under_construction) return;
 #ifdef SC64_Z7_EGG_PRODUCTION
-    if (hud_egg_jobs(q, jobs)) return;
+    if (with_eggs && hud_egg_jobs(q, jobs)) return;
 #endif
+    (void)with_eggs;
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
     if (sc64_race_raw_building(q->type) == 118 && q->level) { /* a Physics Lab's one job */
         int duration = (int)sc64_battlecruiser_research_duration((unsigned)q->level);
@@ -285,9 +300,9 @@ hud_egg_level(const Unit *q)
 
 #define HUD_MIX(h, v) ((h) = ((h) ^ (u32)(v)) * 16777619u)
 
-/* Everything the panel draws that the shared keys do not already cover. Bars
- * are quantized, so a queue redraws the band a few dozen times per unit
- * instead of on every tick. */
+/* Everything in the band that the shared keys do not already cover. It runs
+ * on every render, so it stays cheap: the band's once-a-second refresh catches
+ * a custom game's product list changing with its tech. */
 static int __attribute__((noinline))
 hud_panel_key(int first, int selected)
 {
@@ -295,21 +310,25 @@ hud_panel_key(int first, int selected)
     int i;
     if (selected_building >= 0 && b[selected_building].alive) {
         const Building *q = &b[selected_building];
-        HudJobs jobs;
-        int next = hud_next_product(selected_building);
-        hud_building_jobs(selected_building, &jobs);
-        HUD_MIX(h, q->hp); HUD_MIX(h, q->maxhp); HUD_MIX(h, jobs.count);
-        HUD_MIX(h, jobs.level[0]); HUD_MIX(h, jobs.level[1]);
-        for (i = 0; i < jobs.count; i++) HUD_MIX(h, jobs.icon[i]);
-        HUD_MIX(h, q->queue_count); HUD_MIX(h, next);
-        HUD_MIX(h, weapons_level); HUD_MIX(h, armor_level);
-        if (q->under_construction)
-            HUD_MIX(h, hud_level(q->build_progress, building_build_time(q->type), HUD_BAR_LEVELS));
-        if (sc64_race_is_zerg_townhall(q->type)) HUD_MIX(h, q->larva);
-        if (next >= 0) {
-            const Sc64RaceUnitRule *rule = sc64_race_unit_rule(next);
-            if (rule) { HUD_MIX(h, minerals >= rule->minerals); HUD_MIX(h, gas >= rule->gas); }
+        const Sc64RaceUnitRule *rule = sc64_race_unit_rule(race_mode ? train_type : hud_next_product(selected_building));
+        /* Hit points step too, so a building under attack is not redrawn per hit. */
+        HUD_MIX(h, hud_level(q->hp, q->maxhp, 64)); HUD_MIX(h, q->maxhp);
+        HUD_MIX(h, q->queue_count); HUD_MIX(h, q->under_construction);
+        for (i = 0; i < q->queue_count && i < HUD_QUEUE_SLOTS; i++)
+            HUD_MIX(h, q->queue[(q->queue_head + i) % 5]);
+        if (!q->queue_count) {
+            HudJobs jobs;
+            hud_building_jobs(selected_building, &jobs, 1);
+            HUD_MIX(h, jobs.count);
+            if (jobs.eggs) HUD_MIX(h, jobs.level[0]);
+            for (i = 0; i < jobs.count; i++) HUD_MIX(h, jobs.icon[i]);
+            if (jobs.separate) {
+                HUD_MIX(h, weapons_research != 0); HUD_MIX(h, armor_research != 0);
+                HUD_MIX(h, weapons_level); HUD_MIX(h, armor_level);
+            }
         }
+        if (sc64_race_is_zerg_townhall(q->type)) HUD_MIX(h, q->larva);
+        if (rule) { HUD_MIX(h, minerals >= rule->minerals); HUD_MIX(h, gas >= rule->gas); }
 #ifdef SC64_BATTERY_SERVICE_ENABLED
         if (!q->under_construction && sc64_race_raw_building(q->type) == 172) {
             HUD_MIX(h, q->queue_progress / 256);
@@ -339,6 +358,16 @@ hud_panel_key(int first, int selected)
         HUD_MIX(h, hud_level(hp, maximum, 32));
     }
     return (int)h;
+}
+
+/* Keys that search every unit run on one tick in four. */
+static int
+hud_panel_key_slow(int selected)
+{
+#ifdef SC64_Z7_EGG_PRODUCTION
+    if (selected_building >= 0 && b[selected_building].alive && hud_egg_hall(&b[selected_building])) return 1;
+#endif
+    return selected > 1;
 }
 
 /* ---- Drawing ---------------------------------------------------------- */
@@ -495,6 +524,17 @@ hud_cargo_slots(int target, int x, int y, int slots)
 }
 
 static void
+hud_jobs_bars(const HudJobs *jobs)
+{
+    if (!jobs->separate) {
+        gfx_bar(HUD_COLUMN, HUD_BAR_Y, HUD_BAR_W, HUD_BAR_H, jobs->level[0], HUD_BAR_LEVELS, C_GOLD, C_SHADOW);
+        return;
+    }
+    gfx_bar(HUD_COLUMN, HUD_BAR_Y, CARD_CELL, HUD_BAR_H, jobs->level[0], CARD_CELL, C_GOLD, C_SHADOW);
+    gfx_bar(HUD_COLUMN + HUD_SLOT_PITCH, HUD_BAR_Y, CARD_CELL, HUD_BAR_H, jobs->level[1], CARD_CELL, C_GOLD, C_SHADOW);
+}
+
+static void
 hud_draw_jobs(const HudJobs *jobs)
 {
     int i;
@@ -504,13 +544,10 @@ hud_draw_jobs(const HudJobs *jobs)
             int busy = jobs->separate ? jobs->level[i] > 0 : !i;
             hud_slot(jobs->icon[i], x, HUD_SLOT_Y, busy ? card_gold : card_green);
             if (busy) gfx_frame(x, HUD_SLOT_Y, CARD_CELL, CARD_CELL, C_GOLD);
-            if (jobs->separate) {
-                hud_slot_number(x, HUD_SLOT_Y, i ? armor_level : weapons_level, C_WHITE);
-                gfx_bar(x, HUD_BAR_Y, CARD_CELL, HUD_BAR_H, jobs->level[i], CARD_CELL, C_GOLD, C_SHADOW);
-            }
+            if (jobs->separate) hud_slot_number(x, HUD_SLOT_Y, i ? armor_level : weapons_level, C_WHITE);
         } else if (!jobs->separate) hud_empty_slot(x, HUD_SLOT_Y);
     }
-    if (!jobs->separate) gfx_bar(HUD_COLUMN, HUD_BAR_Y, HUD_BAR_W, HUD_BAR_H, jobs->level[0], HUD_BAR_LEVELS, C_GOLD, C_SHADOW);
+    if (jobs->eggs) hud_jobs_bars(jobs);
 }
 
 static void
@@ -527,13 +564,8 @@ hud_draw_building(void)
         gfx_diamond(title_end + 7, HUD_NUMBER_Y + 3, 3, 2, C_ZERG);
         gfx_num(title_end + 12, HUD_NUMBER_Y, q->larva, C_WHITE);
     }
-    hud_building_jobs(selected_building, &jobs);
-    if (q->under_construction && !jobs.count) {
-        gfx_bar(HUD_COLUMN, HUD_BAR_Y, HUD_FULL_BAR_W, HUD_BAR_H,
-                hud_level(q->build_progress, building_build_time(q->type), HUD_BAR_LEVELS),
-                HUD_BAR_LEVELS, C_GOLD, C_SHADOW);
-        return;
-    }
+    hud_building_jobs(selected_building, &jobs, 1);
+    if (q->under_construction && !jobs.count) return; /* hud_panel_bars() shows its progress */
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (sc64_race_raw_building(q->type) == 172) {
         int powered = race_battery_powered_live(selected_building);
@@ -668,6 +700,27 @@ hud_panel_selection(int selected)
             return 1;
         }
     return 0;
+}
+
+/* A selected building's progress bars, over the band on every frame. */
+static void __attribute__((noinline))
+hud_panel_bars(void)
+{
+    const Building *q;
+    HudJobs jobs;
+    if (selected_building < 0 || !b[selected_building].alive || box_state == 2 || menu_open ||
+        mode == MODE_BUILD || mode == MODE_MOVE || mode == MODE_ATTACK) return;
+    q = &b[selected_building];
+    if (q->queue_count > 0) { /* the common case, without resolving its icons */
+        gfx_bar(HUD_COLUMN, HUD_BAR_Y, HUD_BAR_W, HUD_BAR_H, q->queue_progress,
+                unit_build_time(q->queue[q->queue_head]), C_GOLD, C_SHADOW);
+        return;
+    }
+    hud_building_jobs(selected_building, &jobs, 0);
+    if (jobs.count) hud_jobs_bars(&jobs);
+    else if (q->under_construction)
+        gfx_bar(HUD_COLUMN, HUD_BAR_Y, HUD_FULL_BAR_W, HUD_BAR_H, q->build_progress,
+                building_build_time(q->type), C_GOLD, C_SHADOW);
 }
 
 /* The field with nothing selected: the objective above the keys. */

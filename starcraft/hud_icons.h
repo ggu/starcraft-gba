@@ -64,22 +64,29 @@ card_armor_icon(void)
         race_human == R_PROTOSS ? SC64_CMD_ICON_PROTOSS_ARMOR : SC64_CMD_ICON_TERRAN_ARMOR;
 }
 
-/* An icon centred in the cell at x, y, one rectangle per run of a shade. */
+/* An icon centred in the cell at x, y: decoded once, then blitted. The panel
+ * draws seven of these on a redraw, and a rectangle per run of a shade cost
+ * most of a frame. Its colour 0 stays transparent. */
 static void
 card_icon_draw(int icon, int x, int y, const u8 *ramp)
 {
     int w = sc64_command_icon_size[icon][0], h = sc64_command_icon_size[icon][1];
     int stride = (w + 3) / 4, row, col;
     const unsigned char *bits = sc64_command_icon_bits + sc64_command_icon_offset[icon];
-    x += (CARD_CELL - w) / 2;
-    y += (CARD_CELL - h) / 2;
+    const u8 shade[4] = {0, ramp[0], ramp[1], ramp[2]};
+    /* A row decodes whole bytes, so it can run three pixels past its width. */
+    u8 pixels[CARD_CELL * CARD_CELL + 3];
     for (row = 0; row < h; row++, bits += stride) {
-        for (col = 0; col < w;) {
-            int s = bits[col >> 2] >> ((col & 3) * 2) & 3, start = col;
-            while (++col < w && (bits[col >> 2] >> ((col & 3) * 2) & 3) == s) {}
-            if (s) gfx_rect(x + start, y + row, col - start, 1, ramp[s - 1]);
+        u8 *out = pixels + row * w;
+        for (col = 0; col < stride; col++) {
+            unsigned v = bits[col];
+            *out++ = shade[v & 3];
+            *out++ = shade[v >> 2 & 3];
+            *out++ = shade[v >> 4 & 3];
+            *out++ = shade[v >> 6];
         }
     }
+    gfx_blit_sprite(x + (CARD_CELL - w) / 2, y + (CARD_CELL - h) / 2, w, h, pixels);
 }
 
 static const u8 card_green[3] = {C_GREEN_DARK, C_GREEN, C_HIGHLIGHT};

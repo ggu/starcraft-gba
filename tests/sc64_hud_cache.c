@@ -304,23 +304,31 @@ test_panel_shows_building_queue(void)
     assert(gfx_test_pixel(HUD_COLUMN, HUD_SLOT_Y) == C_GOLD);
     assert(gfx_test_pixel(HUD_COLUMN + HUD_SLOT_PITCH, HUD_SLOT_Y) != C_GOLD);
 
-    /* Inside one bar step nothing is redrawn; the next step is. */
-    q->queue_progress = time / HUD_BAR_LEVELS / 2;
-    expect_mask_and_match(0);
-    assert(panel_bar_fill() == 0);
-    q->queue_progress = time / 2;
-    expect_mask_and_match(HUD_BOTTOM);
+    /* Progress is drawn over the cached band, so it never redraws the band
+       and still shows the current value on a cached frame. */
     render_cached();
-    assert(panel_bar_fill() == HUD_BAR_W * (time / 2 * HUD_BAR_LEVELS / time) / HUD_BAR_LEVELS);
+    q->queue_progress = time / 2;
+    expect_mask_and_match(0);
+    render_cached();
+    assert(panel_bar_fill() == HUD_BAR_W * (time / 2) / time);
+    q->queue_progress = time / 4;
+    expect_mask_and_match(0);
+    render_cached();
+    assert(panel_bar_fill() == HUD_BAR_W * (time / 4) / time);
+    q->queue_progress = time / 2;
 
     /* A swap of a waiting unit keeps count and progress but must still redraw. */
     q->queue[2] = U_MARINE;
     assert(probe_change_mask() & HUD_BOTTOM);
     assert_cached_matches_full();
 
-    /* Taking damage redraws the panel's hit points. */
+    /* Hit points step: real damage redraws the panel, a scratch does not. */
     q->hp = 1200;
     expect_mask_and_match(HUD_BOTTOM);
+    render_cached();
+    q->hp = 1199;
+    assert(probe_change_mask() == 0);
+    q->hp = 1200;
 
     /* The upgrade building shows both research slots and their progress. */
     memset(q, 0, sizeof *q);
@@ -337,6 +345,10 @@ test_panel_shows_building_queue(void)
     render_cached();
     assert(gfx_test_pixel(HUD_COLUMN, HUD_SLOT_Y) == C_GOLD);
     assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, CARD_CELL, 1, C_GOLD) == CARD_CELL / 2);
+    weapons_research = 450;
+    expect_mask_and_match(0);
+    render_cached();
+    assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, CARD_CELL, 1, C_GOLD) == CARD_CELL * 3 / 4);
     weapons_research = 0;
     weapons_level = 1;
     expect_mask_and_match(HUD_BOTTOM);
@@ -354,7 +366,17 @@ test_panel_shows_building_queue(void)
     assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, HUD_FULL_BAR_W, 1, C_GOLD) >= HUD_FULL_BAR_W / 2 - 6);
     assert(hud_next_product(0) < 0);
     q->build_progress += building_build_time(B_BARRACKS) / 4;
-    expect_mask_and_match(HUD_BOTTOM);
+    expect_mask_and_match(0);
+    render_cached();
+    assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, HUD_FULL_BAR_W, 1, C_GOLD) >= HUD_FULL_BAR_W * 3 / 4 - 6);
+
+    /* The bars stay off the band while a menu covers the panel. */
+    q->under_construction = 0;
+    menu_open = 1;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(HUD_COLUMN, HUD_BAR_Y, HUD_FULL_BAR_W, HUD_BAR_H, C_GOLD) == 0);
+    menu_open = 0;
     selected_building = -1;
     memset(b, 0, sizeof(b));
 }

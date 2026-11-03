@@ -9,8 +9,8 @@
  * names the highlighted button. The icons come from a private header that
  * tools/sc64_command_icons.py writes from a verified ROM; menu_cursor keeps
  * the list's row numbers, so every command path is unchanged. Lists longer
- * than the card keep the framed text list. The resource bar's icons are in
- * hud_icons.h. */
+ * than the card keep the framed text list. The icon drawing and the resource
+ * bar's icons are in hud_icons.h. */
 #if !defined(SC64_COMMAND_ICONS) || !defined(SC64_HUD_ICONS)
 #error "command_card.h needs the imported command icons"
 #endif

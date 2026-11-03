@@ -11290,7 +11290,7 @@ static void draw_hud_commands_body(void);
 /* The minimap's black panel and edge are static, so with the maintained
  * raster they join the cached bottom band after every text that can reach
  * x >= 181; the per-frame opaque raster copy then covers the map area. */
-static void
+static void __attribute__((noinline))
 draw_hud_commands(void)
 {
     draw_hud_commands_body();
@@ -11524,7 +11524,8 @@ sc64_hud_race_keys(int *values,int first)
             values[27]=(x>>3)|(y>>3)<<12;
         }
         values[28]=(int)((u32)minerals|((u32)gas<<16));
-    } else values[27]=hud_panel_key(first,values[8]);
+    } else values[27]=hud_panel_key_slow(values[8]) && (frame&3) ?
+        sc64_hud_previous[27] : hud_panel_key(first,values[8]);
     /* A group's panel draws stepped bars, so a hit on its first unit is not a change. */
     if (values[8]>1) values[12]=0;
 #endif
@@ -11723,6 +11724,9 @@ draw_hud(void)
 #else
     draw_hud_resources();
     draw_hud_commands();
+#endif
+#ifdef SC64_HUD_PANEL
+    hud_panel_bars();
 #endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_TERRAIN)
     u32 minimap_start = gba_clock();

@@ -229,8 +229,8 @@ resource icons and the tinted button icons on demand, with
 `.local/sc64/command-icons/generated/`. The selection panel
 (`starcraft/hud_panel.h`) draws its portraits, production queue and upgrades from
 those buttons. Its redraw key folds into one existing HUD key, so it adds no
-static RAM, and its progress bars move in 26 steps so a queue redraws the cached
-band a few dozen times per unit instead of every tick. The default asset-free
+static RAM, and its progress bars are drawn again each frame over the cached
+band, so training a unit does not redraw the band. The default asset-free
 build and tests do not require the ROM, reference checkout or generated banks;
 the default panel (`starcraft/field_ui.h`) draws its own marks in code.
 
