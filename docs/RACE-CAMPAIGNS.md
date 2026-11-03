@@ -102,7 +102,10 @@ not been replayed. That run averaged about 8.4 frames/s
 in guest cycles, far below 30 fps. At that historical base `make test-zerg-z7` failed: carried Z1 and Z5 since PR #84, the Scourge fixture since PR #133, and
 carried Z6. See the [9ff7f7c ARM/SRAM audit](audits/2026-10-29-z7-current-arm-sram/README.md);
 the earlier frozen CONTACT win and its 3.69 frames/s are in the
-[mission/save audit](audits/2026-10-28-z7-arm-save-win/README.md). P7 is
+[mission/save audit](audits/2026-10-28-z7-arm-save-win/README.md). The carried
+Z1 and Z2 failures at `63665045` were controller defects, fixed in the [carried
+Z1](audits/2026-11-03-z1-carried-controller/README.md) and [carried
+Z2](audits/2026-11-03-z2-carried-controller/README.md) audits. P7 is
 now in the canonical Protoss profile. Its host campaign/save fixtures, 18-match
 skirmish matrix and menu-driven save/reload pass. The P7 controller itself was
 qualified on host; ARM replayed its recorded inputs, including an ordinary

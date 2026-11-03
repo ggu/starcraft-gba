@@ -7,6 +7,7 @@
 
 static u16 controller_previous;
 static unsigned long controller_ticks;
+static int controller_mission_started;
 typedef struct { unsigned long tick; u16 held; } RaceInputEvent;
 typedef struct { unsigned long tick; int screen, frame, won, lost, elapsed, flags, phase;
     int rescue_owner, rescue_alive, chrysalis_owner, chrysalis_alive;
@@ -90,6 +91,8 @@ static void race_trace_save(void)
 
 static void controller_frame(u16 held)
 {
+    /* A press on the result screen starts the next mission and resets won. */
+    if (controller_mission_started && (won || lost)) held = 0;
     if (held != controller_previous) {
         if (race_event_count < (int)(sizeof(race_events)/sizeof(race_events[0]))) {
             race_events[race_event_count].tick = controller_ticks;
@@ -115,7 +118,7 @@ static void controller_cursor(int x, int y)
     int guard = 0;
     /* Cursor speed is an even number of pixels, so exact comparison can
      * alternate forever when the requested coordinate has opposite parity. */
-    while ((abs(cx - x) > 3 || abs(cy - y) > 3) && guard++ < 3000) {
+    while ((abs(cx - x) > 3 || abs(cy - y) > 3) && !won && !lost && guard++ < 3000) {
         u16 h = 0; /* R selects a group, so do not hold it during orders. */
         if (abs(cx - x) > 3) { if (cx < x) h |= KEY_RIGHT; else h |= KEY_LEFT; }
         if (abs(cy - y) > 3) { if (cy < y) h |= KEY_DOWN; else h |= KEY_UP; }
@@ -123,6 +126,20 @@ static void controller_cursor(int x, int y)
     }
     controller_frame(0);
     if (guard >= 3000) fprintf(stderr, "cursor guard target=%d,%d actual=%d,%d\n",x,y,cx,cy);
+}
+
+/* R moves the cursor four pixels a frame. Leave an axis alone once it is within
+ * two pixels: stepping it anyway overshoots, and two axes overshooting together
+ * can cycle around a stopped unit between offsets like (3,1) and (-1,-3), whose
+ * squared distance of 10 never reaches the 8 this band guarantees. */
+static u16 controller_chase_keys(int x, int y)
+{
+    u16 held = KEY_R;
+    if (cx < x - 2) held |= KEY_RIGHT;
+    if (cx > x + 2) held |= KEY_LEFT;
+    if (cy < y - 2) held |= KEY_DOWN;
+    if (cy > y + 2) held |= KEY_UP;
+    return held;
 }
 
 /* Follow a moving worker with ordinary cursor input, then verify the UI
@@ -136,14 +153,8 @@ static int controller_select_worker(int worker)
     /* Click as close as the four-pixel cursor step allows so a nearby unit
      * cannot consume A before the moving worker. */
     while (u[worker].alive && dist2(cx, cy, u[worker].x, u[worker].y) > 2 * 2 + 2 * 2 &&
-           screen == SCREEN_PLAY && !won && !lost && steps++ < 120) {
-        u16 held = KEY_R;
-        if (cx < u[worker].x) held |= KEY_RIGHT;
-        if (cx > u[worker].x) held |= KEY_LEFT;
-        if (cy < u[worker].y) held |= KEY_DOWN;
-        if (cy > u[worker].y) held |= KEY_UP;
-        controller_frame(held);
-    }
+           screen == SCREEN_PLAY && !won && !lost && steps++ < 120)
+        controller_frame(controller_chase_keys(u[worker].x, u[worker].y));
     if (!u[worker].alive || dist2(cx, cy, u[worker].x, u[worker].y) > 2 * 2 + 2 * 2)
         return 0;
     controller_press(KEY_A);
@@ -195,14 +206,8 @@ static int controller_select_worker_box(int worker)
      * tracking its short mining walk. A stationary click can hit a nearby
      * Nexus instead. */
     while (u[worker].alive && dist2(cx, cy, u[worker].x, u[worker].y) > 8 &&
-           screen == SCREEN_PLAY && !won && !lost && steps++ < 200) {
-        u16 held = KEY_R;
-        if (cx < u[worker].x) held |= KEY_RIGHT;
-        if (cx > u[worker].x) held |= KEY_LEFT;
-        if (cy < u[worker].y) held |= KEY_DOWN;
-        if (cy > u[worker].y) held |= KEY_UP;
-        controller_frame(held);
-    }
+           screen == SCREEN_PLAY && !won && !lost && steps++ < 200)
+        controller_frame(controller_chase_keys(u[worker].x, u[worker].y));
     if (screen != SCREEN_PLAY || won || lost || !u[worker].alive ||
         dist2(cx, cy, u[worker].x, u[worker].y) > 8) return 0;
     controller_frame(KEY_L);
@@ -367,10 +372,23 @@ static int controller_move_selected(int x, int y)
     return mode == MODE_NORMAL;
 }
 
+/* Photon Cannon range is 112 pixels in race_tick_defenses(); the margin allows
+ * for a walk that bends away from the straight line it is sampled along. */
+static int enemy_cannon_covering_walk(int x0, int y0, int x1, int y1)
+{
+    int i, step;
+    for (i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == ENEMY && b[i].type == B_PHOTON_CANNON)
+            for (step = 0; step <= 8; ++step)
+                if (dist2(x0 + (x1 - x0) * step / 8, y0 + (y1 - y0) * step / 8,
+                          b[i].x, b[i].y) <= 128 * 128) return i;
+    return -1;
+}
+
 static int controller_mission(int mission)
 {
     int i, target = -1, p1_fenix_parked = 0, p1_reinforcement_attempted = 0;
-    controller_previous = 0; controller_ticks = 0;
+    controller_previous = 0; controller_ticks = 0; controller_mission_started = 0;
     race_event_count = 0; race_checkpoint_count = 0; race_event_overflow = 0;
     game_init();
     /* HOME → CAMPAIGN; choose the mission's faction, then mission and briefing. */
@@ -414,6 +432,7 @@ static int controller_mission(int mission)
     controller_press(KEY_A);
     controller_press(KEY_START);
     if (screen != SCREEN_PLAY || race_campaign.mission != mission) return 0;
+    controller_mission_started = 1;
     if (mission == SC64_RACE_MISSION_Z2) {
         int c = race_campaign.chrysalis_unit, drone = side_drone(), guard = 0;
         int other_drone = -1;
@@ -459,7 +478,18 @@ static int controller_mission(int mission)
         if (race_campaign.carrier_unit >= MAX_UNITS) return 0;
         for (guard = 0; guard < (int)(sizeof(escort_route)/sizeof(escort_route[0])) &&
              race_campaign.carrier_unit < MAX_UNITS && !won && !lost; ++guard) {
-            int carrier = race_campaign.carrier_unit;
+            int carrier = race_campaign.carrier_unit, cannon, clears = 0;
+            /* Two Photon Cannon hits kill the 40 HP Drone, and the chokepoint
+             * around leg 12 has no route outside their range. Clear the cannons
+             * covering the next walk while the carrier waits out of range. */
+            while ((cannon = enemy_cannon_covering_walk(u[carrier].x,u[carrier].y,
+                                                        escort_route[guard][2],escort_route[guard][3])) >= 0 &&
+                   clears++ < 3 && screen == SCREEN_PLAY && !won && !lost) {
+                controller_press(KEY_R);
+                if (!controller_attack_order(b[cannon].x,b[cannon].y)) return 0;
+                for (i = 0; i < 900 && b[cannon].alive && screen == SCREEN_PLAY && !won && !lost; ++i)
+                    controller_frame(0);
+            }
             controller_press(KEY_R);
             if (!controller_attack_order(escort_route[guard][0],escort_route[guard][1])) return 0;
             if (!controller_select_worker(carrier)) {
