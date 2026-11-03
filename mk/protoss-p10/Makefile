@@ -43,3 +43,45 @@ test-sc64-p10-mission: build/test-sc64-p10-mission
 	mkdir -p $(P10_HOST_DIR)
 	./build/test-sc64-p10-mission $(P10_HOST_DIR)
 test-sc64-protoss-p10: test-sc64-p10-mission test-sc64-p10-carried-profile
+
+# P10 ordinary-input qualification, built like the P8 and P9 ones.
+P10_ARM_DIR := build/p10-arm
+P10_ARM_TRACE := $(P10_ARM_DIR)/p10-controller.jsonl
+P10_REPLAY_TOOL := $(PYTHON) tools/sc64_p8_arm_replay.py --mission 29 --prefix P10
+build/test-sc64-p10-campaign-run: tests/sc64_p10_campaign_run.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+$(P10_ARM_TRACE): build/test-sc64-p10-campaign-run
+	mkdir -p $(P10_ARM_DIR)
+	./build/test-sc64-p10-campaign-run $@
+.PHONY: test-sc64-p10-controller
+test-sc64-p10-controller: $(P10_ARM_TRACE)
+$(P10_ARM_DIR)/sc64_p10_tape_generated.h: $(P10_ARM_TRACE) tools/sc64_p8_arm_replay.py mk/protoss-p10/Makefile
+	$(P10_REPLAY_TOOL) tape $< $@
+P10_REPLAY_DEPS = tests/sc64_p10_arm_replay.c $(P10_ARM_DIR)/sc64_p10_tape_generated.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile
+build/test-sc64-p10-replay: $(P10_REPLAY_DEPS) | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -I$(P10_ARM_DIR) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+build/test-sc64-p10-replay-prefix: $(P10_REPLAY_DEPS) | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -I$(P10_ARM_DIR) -DP10_REPLAY_PREFIX $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+build/test-sc64-p10-replay-resume: $(P10_REPLAY_DEPS) | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -I$(P10_ARM_DIR) -DP10_REPLAY_RESUME $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+.PHONY: test-sc64-p10-replay
+test-sc64-p10-replay: build/test-sc64-p10-replay build/test-sc64-p10-replay-prefix build/test-sc64-p10-replay-resume tools/sc64_p8_arm_replay.py
+	./build/test-sc64-p10-replay > $(P10_ARM_DIR)/host-full.txt
+	rm -f $(P10_ARM_DIR)/host-prefix.sav
+	./build/test-sc64-p10-replay-prefix $(P10_ARM_DIR)/host-prefix.sav > $(P10_ARM_DIR)/host-prefix.txt || true
+	./build/test-sc64-p10-replay-resume $(P10_ARM_DIR)/host-prefix.sav > $(P10_ARM_DIR)/host-resume.txt
+	$(P10_REPLAY_TOOL) compare --from-tick $$(sed -n 's/^#define P10_TAPE_RESUME_TICK \([0-9]*\)u$$/\1/p' $(P10_ARM_DIR)/sc64_p10_tape_generated.h) $(P10_ARM_DIR)/host-full.txt $(P10_ARM_DIR)/host-resume.txt
+test-sc64-protoss-p10: test-sc64-p10-controller test-sc64-p10-replay
+define P10_ARM_ROM
+build/starcraft-protoss-p10-$(1).elf: $$(P10_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
+	$$(CC) $$(CFLAGS) $$(PROTOSS_P10_FLAGS) -I$$(P10_ARM_DIR) $(2) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p10-$(1).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-Protoss-P10-$(3).gba: build/starcraft-protoss-p10-$(1).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC P10 RPLAY' SCPA
+endef
+$(eval $(call P10_ARM_ROM,replay,,Replay))
+$(eval $(call P10_ARM_ROM,replay-prefix,-DP10_REPLAY_PREFIX,Replay-Prefix))
+$(eval $(call P10_ARM_ROM,replay-resume,-DP10_REPLAY_RESUME,Replay-Resume))
+.PHONY: sc64-p10-arm-replay
+sc64-p10-arm-replay: build/StarCraft-Protoss-P10-Replay.gba build/StarCraft-Protoss-P10-Replay-Prefix.gba build/StarCraft-Protoss-P10-Replay-Resume.gba

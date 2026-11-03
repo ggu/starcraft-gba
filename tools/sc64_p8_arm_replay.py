@@ -291,8 +291,8 @@ def compare_ok(result: dict) -> bool:
 def main() -> None:
     global MISSION, PREFIX
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mission", type=int, choices=(27, 28), default=27)
-    parser.add_argument("--prefix", choices=("P8", "P9"), default="P8")
+    parser.add_argument("--mission", type=int, choices=(27, 28, 29), default=27)
+    parser.add_argument("--prefix", choices=("P8", "P9", "P10"), default="P8")
     sub = parser.add_subparsers(dest="command", required=True)
     tape = sub.add_parser("tape", help="write the probe's key-tape header")
     tape.add_argument("trace", type=pathlib.Path)

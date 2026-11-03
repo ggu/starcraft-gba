@@ -142,9 +142,6 @@ static int overmind(void)
     return -1;
 }
 
-/* The Gantrithor has no hangar service yet, so it stays home. */
-static int human_carrier(void){return -1;}
-
 static int under_construction(void)
 {
     int n=0;for(int i=0;i<MAX_BUILDINGS;i++)n+=b[i].alive&&b[i].owner==SIDE&&b[i].under_construction;
@@ -210,8 +207,8 @@ static int command_selected(int which,int x,int y)
     return 1;
 }
 
-/* Order the army by type groups: a double tap on a Zealot or Dragoon
- * selects that type on screen, which never includes Fenix, the Hyperion or
+/* Order the army by type groups: a double tap on a Marine or Firebat
+ * selects that type on screen, which never includes Zeratul, the Hyperion or
  * the Carrier (R's whole-army shortcut would). Units already carrying this
  * order are skipped; repeat for off-screen clusters. */
 static int army_force;  /* Nonzero: re-order every group. */
@@ -261,7 +258,7 @@ static int select_single(int slot)
     return u[slot].selected&&selected_count()==1;
 }
 
-/* Select at least the Probe under the cursor. Idle Probes stack on a spent
+/* Select at least the SCV under the cursor. Idle SCVs stack on a spent
  * patch, where a tap cannot pick one out, so any selection of workers there
  * will do: the mining order goes to every empty one. */
 static int select_workers_at(int slot)
@@ -277,9 +274,9 @@ static int select_workers_at(int slot)
 
 /* As in sc64_visible_worker_orders.h, issue mining through normal field
  * input only for idle empty workers and currently visible mineral patches.
- * Patches are spread by how many Probes already work them, so a group does not
+ * Patches are spread by how many SCVs already work them, so a group does not
  * drain one patch and go idle together. */
-static int order_idle_probes_to_visible_minerals(void)
+static int order_idle_scvs_to_visible_minerals(void)
 {
     static const int dx[]={0,8,-8,0,0,8,-8,8,-8};
     static const int dy[]={0,0,0,8,-8,8,8,-8,-8};
@@ -323,28 +320,6 @@ static int unit_order(int slot,int which,int x,int y)
 static int hero_command(int slot,int x,int y)
 { return unit_order(slot,MENU_MOVE,x,y); }
 
-/* The human Carrier's BUILD INTERCEPTOR row (shared Protoss service). */
-static int train_interceptors(int carrier,int wanted)
-{
-    int queued=0;
-    for(int k=0;k<wanted&&minerals>=SC64_P7_INTERCEPTOR_COST;k++){
-        if(!select_single(carrier))break;
-        /* A paid order can start training at once, moving from the
-         * parent's queue into its hangar count. */
-        int before=u[carrier].carry+(int)race_p7_carrier_training_child_count(carrier);
-        KEY_TAP(KEY_B);
-        for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=MENU_STOP+1;n++)KEY_TAP(KEY_DOWN);
-        if(!menu_open||menu_cursor!=MENU_STOP+1){close_menus();break;}
-        KEY_TAP(KEY_A);
-        close_menus();
-        if(u[carrier].carry+(int)race_p7_carrier_training_child_count(carrier)<=before)break;
-        ++queued;
-    }
-    if(queued)fprintf(trace,"{\"kind\":\"interceptors\",\"frame\":%u,\"queued\":%d,\"hangar\":%u}\n",
-        (unsigned)frame,queued,race_p7_carrier_training_child_count(carrier));
-    return queued;
-}
-
 static int live_units_owner(int owner)
 {
     int n=0;for(int i=0;i<MAX_UNITS;i++)n+=u[i].alive&&u[i].owner==owner;return n;
@@ -385,7 +360,7 @@ static int queue_probe(void)
     return 1;
 }
 
-/* Minerals production leaves unspent, so the save-time Pylon can start. */
+/* Minerals production leaves unspent, so the save-time Depot can start. */
 static int mineral_reserve;
 
 static int queue_combat_unit(void)
@@ -404,7 +379,11 @@ static int queue_combat_unit(void)
     }
     if(producer<0)return 0;
     close_menus();
-    move_cursor(b[producer].x,b[producer].y);KEY_TAP(KEY_A);
+    /* Marines crowd the Barracks, and a tap on one selects it instead. */
+    static const int tx[5]={0,-16,16,0,0},ty[5]={0,0,0,-16,16};
+    for(int k=0;k<5&&selected_building!=producer;k++){
+        move_cursor(b[producer].x+tx[k],b[producer].y+ty[k]);KEY_TAP(KEY_A);
+    }
     if(selected_building!=producer)return 0;
     for(int n=0;n<4&&train_type!=wanted;n++)KEY_TAP(KEY_R);
     if(train_type!=wanted)return 0;
@@ -420,7 +399,7 @@ static int free_builder(void)
 {
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&
         u[i].order==ORDER_MINE&&!u[i].carry)return i;
-    /* An idle Probe holding cargo cannot be sent back to minerals afterward. */
+    /* An idle SCV holding cargo cannot be sent back to minerals afterward. */
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&
         !SC64_BUILD_WORKER_ORDER(u[i].order)&&u[i].order!=ORDER_GAS&&!u[i].carry)return i;
     return -1;
@@ -449,7 +428,7 @@ static int site_ok(int type,int x,int y)
     return 1;
 }
 
-/* Place `type` through the Probe build menu at the nearest legal site. */
+/* Place `type` through the SCV build menu at the nearest legal site. */
 static int build_structure(int type,int menu_row,int min_r,int max_r,int fixed_x,int fixed_y)
 {
     int home=home_center(),best=0x7fffffff,site_x=fixed_x,site_y=fixed_y;
@@ -488,40 +467,6 @@ static int build_structure(int type,int menu_row,int min_r,int max_r,int fixed_x
         return 0;
     }
     fprintf(trace,"{\"kind\":\"build\",\"frame\":%u,\"type\":%d,\"site\":[%d,%d]}\n",(unsigned)frame,type,site_x,site_y);
-    return 1;
-}
-
-/* A Photon Cannon through the Probe menu's CANNON row (MENU_STOP+2): it
- * defends the base and detects cloaked raiders. */
-static int build_cannon(int near_x,int near_y)
-{
-    int best=0x7fffffff,site_x=-1,site_y=-1,worker=free_builder();
-    const Sc64RaceBuildingRule *rule=sc64_race_building_rule(B_PHOTON_CANNON);
-    if(!rule||minerals<(int)rule->minerals||worker<0)return 0;
-    for(int dy=-96;dy<=96;dy+=8)for(int dx=-96;dx<=96;dx+=8){
-        int x=near_x+dx,y=near_y+dy,d=dx*dx+dy*dy;
-        if(d<32*32||d>=best||x<48||x>=WORLD_W-48||y<48||y>=WORLD_H-48||
-           !race_can_site(SIDE,B_PHOTON_CANNON,x,y)||!can_place(B_PHOTON_CANNON,x,y)||
-           !site_ok(B_PHOTON_CANNON,x,y))continue;
-        best=d;site_x=x;site_y=y;
-    }
-    if(site_x<0)return 0;
-    close_menus();clear_selected_building();
-    move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
-    for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
-    if(!u[worker].selected||selected_count()!=1)return 0;
-    KEY_TAP(KEY_B);
-    for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=MENU_STOP+2;n++)KEY_TAP(KEY_DOWN);
-    if(!menu_open||menu_cursor!=MENU_STOP+2){close_menus();return 0;}
-    KEY_TAP(KEY_A);
-    if(mode!=MODE_BUILD||menu!=B_PHOTON_CANNON){close_menus();return 0;}
-    move_cursor(site_x,site_y);KEY_TAP(KEY_A);
-    if(mode!=MODE_NORMAL)close_menus();
-    if(!SC64_BUILD_WORKER_ORDER(u[worker].order)){
-        if(refused_count<64){refused_x[refused_count]=site_x;refused_y[refused_count++]=site_y;}
-        return 0;
-    }
-    fprintf(trace,"{\"kind\":\"build\",\"frame\":%u,\"type\":%d,\"site\":[%d,%d]}\n",(unsigned)frame,B_PHOTON_CANNON,site_x,site_y);
     return 1;
 }
 
@@ -564,8 +509,8 @@ static int remine_stuck_builder(void)
 }
 
 /* A builder can pick up cargo between being chosen and placing its building,
- * and an idle Probe holding cargo refuses the mineral order. Tapping the
- * Assimilator gives it a gas order, which drops the cargo; STOP then leaves it
+ * and an idle SCV holding cargo refuses the mineral order. Tapping the
+ * Refinery gives it a gas order, which drops the cargo; STOP then leaves it
  * idle and empty for the mining pass. */
 static int recover_loaded_probe(void)
 {
@@ -597,7 +542,7 @@ static int assign_gas_worker(void)
         if(u[i].order==ORDER_GAS)++gas_workers;
         else if(worker<0&&u[i].order==ORDER_MINE&&!u[i].carry)worker=i;
     }
-    /* Gas beyond what Dragoons can spend costs mineral income: STOP a Probe and
+    /* Gas beyond what Firebats can spend costs mineral income: STOP an SCV and
      * let the mining pass send it to a patch. */
     if(gas>=P10_GAS_BANK){
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_SCV&&
@@ -619,7 +564,6 @@ static int assign_gas_worker(void)
     return u[worker].order==ORDER_GAS;
 }
 
-static int launch_peak;  /* Most human Interceptors outside at once. */
 static void census(const char *label)
 {
     int cell=overmind(),z=hero(75),g=hero(82),h=hero(28);
@@ -627,7 +571,7 @@ static void census(const char *label)
     for(int i=0;i<MAX_UNITS;i++)enemy+=u[i].alive&&u[i].owner==ENEMY;
     for(int i=0;i<MAX_BUILDINGS;i++)enemy_b+=b[i].alive&&b[i].owner==ENEMY;
     fprintf(trace,"{\"kind\":\"checkpoint\",\"label\":\"%s\",\"frame\":%u,\"call_index\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,"
-        "\"side_units\":%d,\"army\":%d,\"probes\":%d,\"enemy_units\":%d,\"enemy_buildings\":%d,"
+        "\"side_units\":%d,\"army\":%d,\"scvs\":%d,\"enemy_units\":%d,\"enemy_buildings\":%d,"
         "\"overmind_hp\":%d,\"zeratul\":[%d,%d],\"gantrithor\":[%d,%d],\"hyperion\":[%d,%d],\"bank\":[%d,%d],\"supply\":[%d,%d],"
         "\"gateways\":%d,\"cursor\":[%d,%d]}\n",
         label,(unsigned)frame,host_tick,screen,won,lost,
@@ -674,7 +618,7 @@ int main(int argc,char **argv)
     int next_checkpoint=2000;
     int next_mine=30;
     int next_probe=60,next_supply=400,next_build=600,next_gas=3000,next_production=900;
-    int next_order=120,next_hero=240,next_carrier=3000,next_save_build=0,next_evade=600;
+    int next_order=120,next_hero=240,next_save_build=0,next_evade=600;
     int attacking=0,prior_distance=-1,stalls=0;
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
         static int stuck_reported;
@@ -687,7 +631,7 @@ int main(int argc,char **argv)
         int home=home_center();
         int f=hero(28),h=hero(82);
         /* Save while a structure is still warping in, so the record carries
-         * active construction: start a Pylon if nothing is, and fall back
+         * active construction: start a Depot if nothing is, and fall back
          * after a bounded wait. */
         mineral_reserve=!saved&&frame>=P10_SAVE_FRAME-600?150:0;
         if(!saved&&frame>=P10_SAVE_FRAME&&!under_construction()&&frame>=next_save_build){
@@ -703,7 +647,7 @@ int main(int argc,char **argv)
             close_menus();
             /* The menu reopens on the last chosen command: choose MOVE
              * ORDER (row 0), then cancel its targeting with B. Try a free
-             * Probe first, then any other unit that will select alone. */
+             * SCV first, then any other unit that will select alone. */
             for(int i=-1;i<MAX_UNITS&&menu_last!=0;i++){
                 int pick=i<0?free_builder():i;
                 if(pick<0||(i>=0&&pick==free_builder())||!select_single(pick))continue;
@@ -736,7 +680,7 @@ int main(int argc,char **argv)
             census("saved");
         }
         /* A hero with an enemy in Scarab range steps to the walkable spot
-         * near the Nexus farthest from every enemy; Protoss hit points do
+         * near the Command Center farthest from every enemy; shields and hit points do
          * not regenerate. */
         if(frame>=next_evade&&home>=0){
             int heroes[1]={f};
@@ -770,7 +714,7 @@ int main(int argc,char **argv)
         }
         if(frame>=next_mine){
             for(int k=0;k<3&&recover_loaded_probe();k++){}
-            (void)order_idle_probes_to_visible_minerals();
+            (void)order_idle_scvs_to_visible_minerals();
             next_mine=frame+300;
         }
         if(frame>=next_probe){(void)queue_probe();next_probe=frame+300;}
@@ -809,16 +753,6 @@ int main(int argc,char **argv)
             while(queued<6&&queue_combat_unit())++queued;
             next_production=frame+60;
         }
-        /* Fill the Carrier's hangar through its BUILD INTERCEPTOR row. */
-        if(frame>=next_carrier){
-            int c=human_carrier();
-            if(c>=0&&home>=0&&minerals>=SC64_P7_INTERCEPTOR_COST){
-                int have=(int)race_p7_carrier_training_child_count(c)+u[c].carry;
-                if(have<SC64_P7_CARRIER_CAPACITY)
-                    (void)train_interceptors(c,SC64_P7_CARRIER_CAPACITY-have);
-            }
-            next_carrier=frame+1200;
-        }
         /* Walk the Gantrithor the long way round the Spore Colonies, one order
          * per leg: the cursor crosses the map each time. */
         if(frame>=next_hero){
@@ -839,8 +773,10 @@ int main(int argc,char **argv)
             /* Guardians outrange idle Marines and shell them unanswered, so meet
              * anything that comes this close. */
             int threat=-1,bd=520*520;
+            /* Idle guards in the nearest town are not a threat until close. */
             for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY){
                 int d=dist2(u[i].x,u[i].y,b[home].x,b[home].y);
+                if(u[i].order==ORDER_IDLE&&d>=288*288)continue;
                 if(d<bd){bd=d;threat=i;}
             }
             /* A raid on the base recalls an attacking army. */
@@ -848,22 +784,20 @@ int main(int argc,char **argv)
             for(int i=0;i<MAX_UNITS;i++)raiders+=u[i].alive&&u[i].owner==ENEMY&&
                 dist2(u[i].x,u[i].y,b[home].x,b[home].y)<320*320;
             if(raiders>=2)attacking=0;
-            if(threat>=0&&!attacking){
+            /* Attack orders chase raiders into their towns, where the army dies
+             * a few at a time. Walk strays home before anything else. */
+            int strays=0;
+            for(int i=0;i<MAX_UNITS;i++)strays+=u[i].alive&&u[i].owner==SIDE&&
+                (u[i].type==U_MARINE||u[i].type==U_FIREBAT)&&u[i].order!=ORDER_MOVE&&
+                dist2(u[i].x,u[i].y,b[home].x,b[home].y)>440*440;
+            if(strays&&!attacking){
+                (void)army_command(MENU_MOVE,b[home].x+64,b[home].y+64);
+                next_order=frame+120;
+            } else if(threat>=0&&!attacking){
                 (void)army_command(MENU_ATTACK,u[threat].x,u[threat].y);
                 fprintf(trace,"{\"kind\":\"defend\",\"frame\":%u,\"target\":[%d,%d]}\n",
                     (unsigned)frame,u[threat].x,u[threat].y);
                 next_order=frame+120;
-            } else if(threat<0&&!attacking){
-                /* Attack orders chase raiders into their towns, where the army
-                 * dies a few at a time. Walk it home once the base is clear. */
-                int strays=0;
-                for(int i=0;i<MAX_UNITS;i++)strays+=u[i].alive&&u[i].owner==SIDE&&
-                    (u[i].type==U_MARINE||u[i].type==U_FIREBAT)&&u[i].order!=ORDER_MOVE&&
-                    dist2(u[i].x,u[i].y,b[home].x,b[home].y)>400*400;
-                if(strays){
-                    (void)army_command(MENU_MOVE,b[home].x+64,b[home].y+64);
-                    next_order=frame+120;
-                }
             }
         }
         if(frame>=next_order){
@@ -873,7 +807,7 @@ int main(int argc,char **argv)
             if(!attacking&&(army_count()>=P10_ATTACK_ARMY||
                (army_count()>=20&&frame>=P10_SAVE_FRAME&&minerals<100)))attacking=1;
             if(attacking&&cell>=0){
-                /* Route from the army unit nearest the Cell; new units at
+                /* Route from the army unit nearest the Overmind; new units at
                  * home would skew an average. A unit in a building pocket has
                  * no grid route, so try the next nearest ones. */
                 static u8 tried[MAX_UNITS],stuck[MAX_UNITS];
@@ -904,9 +838,7 @@ int main(int argc,char **argv)
                 if(front>=0)for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
                     (u[i].type==U_MARINE||u[i].type==U_FIREBAT)&&
                     dist2(u[i].x,u[i].y,u[front].x,u[front].y)<200*200){sx+=u[i].x;sy+=u[i].y;++n;}
-                /* Near the Stasis Cell the army has no detector for the
-                 * defenders its Arbiters cloak: Dragoons strike the Arbiters,
-                 * Zealots the Cell itself (a structure is never cloaked). */
+                /* Near the target, strike any Arbiter first. */
                 int arb=-1;
                 if(distance>=0&&distance<30&&n){
                     int ad=320*320;
@@ -920,8 +852,8 @@ int main(int argc,char **argv)
                 if(distance>=0&&prior_distance>=0&&distance+2>=prior_distance)++stalls;
                 else{stalls=0;if(distance>=0)prior_distance=distance;}
                 if(prior_distance<0)prior_distance=distance;
-                /* At the Cell, give every group a fresh order on the Cell or
-                 * its Arbiters; stale attack orders would otherwise stand. */
+                /* At the Overmind, give every group a fresh order on it; stale
+                 * attack orders would otherwise stand. */
                 army_force=distance<0||distance<12;
                 if(distance>=0&&distance<12){
                     army_only=U_MARINE;
@@ -934,12 +866,6 @@ int main(int argc,char **argv)
                     (void)army_command(MENU_ATTACK,wx,wy);
                 }
                 army_force=0;
-                {
-                    int c=human_carrier();
-                    if(c>=0&&race_p7_carrier_training_child_count(c)>=2&&
-                       !u[c].selected&&dist2(u[c].tx,u[c].ty,wx,wy)>96*96)
-                        (void)unit_order(c,MENU_ATTACK,wx,wy);
-                }
                 fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"route\":%d,\"army\":%d,\"stalls\":%d}\n",
                     (unsigned)frame,wx,wy,distance,army_count(),stalls);
                 /* The whole-army order also moved the heroes; send them home. */
@@ -947,12 +873,6 @@ int main(int argc,char **argv)
                 if(army_count()<8)attacking=0;
             }
             next_order=frame+(attacking?360:600);
-        }
-        {
-            int c=human_carrier(),out=0;
-            for(int i=0;c>=0&&i<MAX_UNITS;i++)out+=u[i].alive&&u[i].raw_type==73&&u[i].build==c&&
-                sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE;
-            if(out>launch_peak)launch_peak=out;
         }
         if(frame>=next_checkpoint){census("progress");next_checkpoint=frame+2000;}
         input(0);

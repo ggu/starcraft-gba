@@ -63,6 +63,9 @@ static int race_owner_fields_race(int owner, int race)
     return race == race_owner_identity(owner) ||
            (owner == SIDE && race == R_TER && race_p10_active());
 }
+#define SC64_P10_TERRAN_BUILDER(worker) (u[(worker)].type == U_SCV)
+#else
+#define SC64_P10_TERRAN_BUILDER(worker) 0
 #endif
 
 static int race_owner_minerals(int owner)
@@ -596,7 +599,11 @@ static int race_can_site(int owner, int type, int x, int y)
         const Sc64SkirmishRecord *record = race_skirmish_build_record(owner, sc64_race_raw_building(type));
         if (!r || !record || record->kind != SC64_SK_WORKER_BUILD ||
             !race_skirmish_requirements(owner, record)) return 0;
+#ifdef SC64_P10_RUNTIME
     } else if (!r || !race_owner_fields_race(owner, r->race) ||
+#else
+    } else if (!r || r->race != race ||
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         !race_owner_has_prereq(owner, prereq)) return 0;
 #else
@@ -954,7 +961,7 @@ static int race_builder_arrived(int worker)
     if (worker < 0 || worker >= MAX_UNITS || !u[worker].alive || u[worker].order != ORDER_BUILD) return 0;
     building = u[worker].target;
     if (building < 0 || building >= MAX_BUILDINGS || !b[building].alive) return 0;
-    if (race_owner_identity(u[worker].owner) == R_TER || u[worker].type == U_SCV) return 0;
+    if (race_owner_identity(u[worker].owner) == R_TER || SC64_P10_TERRAN_BUILDER(worker)) return 0;
     if (dist2(u[worker].x, u[worker].y, b[building].x, b[building].y) > 36 * 36) return 0;
     if (b[building].build_progress < 0) b[building].build_progress = 0;
     if (race_owner_identity(u[worker].owner) == R_ZERG) {
