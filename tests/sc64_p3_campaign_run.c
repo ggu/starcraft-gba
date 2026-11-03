@@ -79,13 +79,10 @@ static int side_construction_count(void)
 
 static int side_active_builders(void)
 {
-    int n = 0;
+    int count = 0;
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
-            u[i].order == ORDER_BUILD && u[i].target >= 0 &&
-            u[i].target < MAX_BUILDINGS && b[u[i].target].alive &&
-            b[u[i].target].under_construction) ++n;
-    return n;
+        if (u[i].alive && u[i].owner == SIDE && SC64_BUILD_WORKER_ORDER(u[i].order)) ++count;
+    return count;
 }
 
 static int side_probe_count(void)
@@ -148,12 +145,14 @@ static int site_on_protected_route(int x, int y)
     return 0;
 }
 
+/* An idle Probe still holding cargo cannot be sent back to minerals, so build
+ * with empty ones. */
 static int nearest_available_probe(int x, int y)
 {
     int worker = -1, best = 0x7fffffff;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
-            u[i].order != ORDER_BUILD) {
+            !u[i].carry && !SC64_BUILD_WORKER_ORDER(u[i].order)) {
             int d = dist2(u[i].x, u[i].y, x, y);
             int nx, ny;
             if (d < best && path_next_tile(u[i].x, u[i].y, x, y, &nx, &ny)) {
@@ -242,20 +241,19 @@ static void tap(u16 key)
     step(0);
 }
 
-/* Field controls reopen the order list on the last command. These
- * sequences were written for a list that opens on Move, so a fresh
- * open starts there (no extra input, so the run's timing is unchanged). */
-static void tap_b(void)
+/* B reopens the order list on the last command, so walk to the row by input. */
+static int open_menu_row(int row)
 {
-    int fresh = !menu_open && mode == MODE_NORMAL;
     tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+    for (int guard = 0; guard < 2 * MENU_COUNT && menu_open && menu_cursor != row; ++guard)
+        tap(menu_cursor < row ? KEY_DOWN : KEY_UP);
+    return menu_open && menu_cursor == row;
 }
 
 static void ensure_normal_ui(void)
 {
     for (int i = 0; i < 3 && (menu_open || mode != MODE_NORMAL); ++i) {
-        if (menu_open || mode != MODE_NORMAL) tap_b();
+        if (menu_open || mode != MODE_NORMAL) tap(KEY_B);
     }
     if (menu_open || mode != MODE_NORMAL) {
         fprintf(stderr, "controller UI did not normalize at frame=%d mode=%d menu_open=%d menu=%d\n",
@@ -274,7 +272,7 @@ static int snap4(int current, int target, int bound)
 
 static void move_cursor(int x, int y)
 {
-    if (menu_open) tap_b();
+    if (menu_open) tap(KEY_B);
     x = snap4(cx, x, WORLD_W);
     y = snap4(cy, y, WORLD_H);
     int ticks = 0;
@@ -335,8 +333,7 @@ static int select_group_for_control(void)
 static int attack_move_selected(int x, int y)
 {
     if (selected_count() <= 0 || selected_building >= 0) return 0;
-    tap_b();
-    tap(KEY_DOWN); /* ATTACK MOVE */
+    if (!open_menu_row(MENU_ATTACK)) { ensure_normal_ui(); return 0; }
     tap(KEY_A);
     move_cursor(x, y);
     tap(KEY_A);
@@ -382,11 +379,31 @@ static int nearest_side_building(void)
     return best;
 }
 
+/* Minerals left in reach of a Nexus, including one still under construction. */
+static int minerals_near_nexus(void)
+{
+    int total = 0;
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0)
+        for (int j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive && b[j].owner == SIDE &&
+            b[j].type == B_NEXUS && dist2(m[i].x, m[i].y, b[j].x, b[j].y) < 240 * 240) {
+            total += m[i].amount; break;
+        }
+    return total;
+}
+
+/* A placed building is paid for when its Probe arrives. */
+static int spendable_minerals(void)
+{
+    int planned_minerals, planned_gas;
+    race_pending_build_cost(SIDE, &planned_minerals, &planned_gas);
+    return minerals - planned_minerals;
+}
+
 static void queue_zealot(void)
 {
     for (int gateway = 0; gateway < MAX_BUILDINGS; ++gateway)
         if (b[gateway].alive && b[gateway].owner == SIDE && b[gateway].type == B_GATEWAY &&
-            !b[gateway].under_construction && b[gateway].queue_count < 4 && minerals >= 100 &&
+            !b[gateway].under_construction && b[gateway].queue_count < 4 && spendable_minerals() >= 100 &&
             race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) >= 4) {
             move_cursor(b[gateway].x, b[gateway].y);
             tap(KEY_A);
@@ -400,7 +417,7 @@ static void queue_dragoon(void)
     if (side_building(B_CYBERNETICS_CORE, 1) < 0) return;
     for (int gateway = 0; gateway < MAX_BUILDINGS; ++gateway)
         if (b[gateway].alive && b[gateway].owner == SIDE && b[gateway].type == B_GATEWAY &&
-            !b[gateway].under_construction && b[gateway].queue_count < 4 && minerals >= 125 &&
+            !b[gateway].under_construction && b[gateway].queue_count < 4 && spendable_minerals() >= 125 &&
             gas >= 50 && race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) >= 4) {
             move_cursor(b[gateway].x, b[gateway].y);
             tap(KEY_A);
@@ -437,27 +454,6 @@ static int find_build_site_near_nexus(int type, int *x_out, int *y_out)
     return found;
 }
 
-static int find_expansion_site(int *x_out, int *y_out)
-{
-    int home = nearest_side_building(), best = 0x7fffffff, found = 0;
-    if (home < 0) return 0;
-    collect_protected_routes(home);
-    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 &&
-        m[i].x < b[home].x - 256 && m[i].y > b[home].y - 320) {
-        for (int dy = -96; dy <= 96; dy += 16)
-            for (int dx = -96; dx <= 96; dx += 16) {
-                int x = m[i].x + dx, y = m[i].y + dy;
-                if (x < 32 || x >= WORLD_W - 32 || y < 32 || y >= WORLD_H - 32 ||
-                    !race_can_site(SIDE, B_NEXUS, x, y) || !can_place(B_NEXUS, x, y) ||
-                    site_near_protected_route(x, y))
-                    continue;
-                int d = dist2(b[home].x, b[home].y, x, y);
-                if (d < best) { best = d; *x_out = x; *y_out = y; found = 1; }
-            }
-    }
-    return found;
-}
-
 static int select_worker_at(int x, int y)
 {
     ensure_normal_ui();
@@ -476,8 +472,7 @@ static void ensure_gateway(void)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
             u[i].order != ORDER_BUILD) { worker = i; break; }
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap_b();
-    for (int i = 0; i < MENU_BARRACKS; ++i) tap(KEY_DOWN);
+    if (!open_menu_row(MENU_BARRACKS)) { ensure_normal_ui(); return; }
     tap(KEY_A); /* Protoss first building-menu entry is Gateway. */
     move_cursor(site_x, site_y);
     tap(KEY_A);
@@ -492,8 +487,7 @@ static void build_near_nexus(int type, int menu_row)
     worker = nearest_available_probe(site_x, site_y);
     if (worker >= 0) best = dist2(u[worker].x, u[worker].y, site_x, site_y);
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap_b();
-    for (int i = 0; i < menu_row; ++i) tap(KEY_DOWN);
+    if (!open_menu_row(menu_row)) { ensure_normal_ui(); return; }
     tap(KEY_A);
     move_cursor(site_x, site_y);
     tap(KEY_A);
@@ -534,8 +528,7 @@ static void build_on_site(int type, int menu_row, int site_x, int site_y)
         int nx, ny;
         if (!path_next_tile(u[worker].x, u[worker].y, site_x, site_y, &nx, &ny)) return;
     }
-    tap_b();
-    for (int i = 0; i < menu_row; ++i) tap(KEY_DOWN);
+    if (!open_menu_row(menu_row)) { ensure_normal_ui(); return; }
     tap(KEY_A);
     move_cursor(site_x, site_y);
     tap(KEY_A);
@@ -573,31 +566,9 @@ static void build_photon_cannon_near_nexus(void)
     if (best == 0x7fffffff) return;
     worker = nearest_available_probe(site_x, site_y);
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap_b();
-    for (int i = 0; i < 12 && menu_open && menu_cursor != MENU_STOP + 2; ++i)
-        tap(KEY_DOWN);
-    if (!menu_open || menu_cursor != MENU_STOP + 2 ||
-        !race_probe_cannon_command_available()) return;
+    if (!open_menu_row(MENU_STOP + 2) || !race_probe_cannon_command_available()) { ensure_normal_ui(); return; }
     tap(KEY_A);
     if (mode != MODE_BUILD || menu != B_PHOTON_CANNON) return;
-    move_cursor(site_x, site_y);
-    tap(KEY_A);
-}
-
-static void build_mineral_expansion(void)
-{
-    int site_x, site_y, worker;
-    if (side_building_count(B_NEXUS) >= 2 || minerals < 400 ||
-        !find_expansion_site(&site_x, &site_y)) return;
-    worker = nearest_available_probe(site_x, site_y);
-    if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap_b();
-    for (int i = 0; i < 12 && menu_open && menu_cursor != MENU_STOP + 1; ++i)
-        tap(KEY_DOWN);
-    if (!menu_open || menu_cursor != MENU_STOP + 1 ||
-        !race_nexus_command_available()) return;
-    tap(KEY_A);
-    if (mode != MODE_BUILD || menu != B_NEXUS) return;
     move_cursor(site_x, site_y);
     tap(KEY_A);
 }
@@ -644,11 +615,11 @@ static void assign_gas_probe(void)
             if (u[j].alive && u[j].owner == SIDE && u[j].type == U_PROBE &&
                 u[j].order == ORDER_GAS) {
                 if (kept++ < keep_gas) continue;
-                int patch = nearest_mineral(u[j].x, u[j].y);
-                if (patch < 0) return;
+                /* STOP idles the Probe; the mining pass then sends it to a patch. */
+                if (u[j].carry) continue;
                 select_box(u[j].x, u[j].y, 8);
-                tap_b(); tap(KEY_A); /* choose ordinary MOVE */
-                move_cursor(m[patch].x, m[patch].y);
+                if (selected_building >= 0 || find_selected_worker() < 0) return;
+                if (!open_menu_row(MENU_STOP)) { ensure_normal_ui(); return; }
                 tap(KEY_A);
                 return;
             }
@@ -672,16 +643,38 @@ static void assign_gas_probe(void)
                 }
             if (nearest >= 0 && u[nearest].order != ORDER_MOVE) {
                 select_box(u[nearest].x, u[nearest].y, 8);
-                tap_b(); tap(KEY_A); /* choose normal MOVE order */
+                if (!open_menu_row(MENU_MOVE)) { ensure_normal_ui(); return; }
+                tap(KEY_A);
                 move_cursor(b[i].x, b[i].y);
                 tap(KEY_A);
             }
         }
 }
 
+/* A Probe walking to a site reserves that building's cost until it arrives, so
+ * one that cannot reach the site starves everything else. Give up after this
+ * many frames. */
+#define PENDING_BUILD_PATIENCE 1500
+static int pending_build_since[MAX_UNITS];
+
 static int recover_stalled_builder(void)
 {
     ensure_normal_ui();
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || u[i].owner != SIDE || !SC64_PENDING_BUILD_ORDER(u[i].order)) {
+            pending_build_since[i] = 0;
+            continue;
+        }
+        if (!pending_build_since[i]) pending_build_since[i] = frame;
+        if (frame - pending_build_since[i] > PENDING_BUILD_PATIENCE) {
+            select_box(u[i].x, u[i].y, 8);
+            if (selected_building >= 0 || find_selected_worker() < 0) return 0;
+            if (!open_menu_row(MENU_STOP)) { ensure_normal_ui(); return 0; }
+            tap(KEY_A);
+            pending_build_since[i] = 0;
+            return 1;
+        }
+    }
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
             u[i].order == ORDER_BUILD && u[i].target >= 0 && u[i].target < MAX_BUILDINGS &&
@@ -693,10 +686,7 @@ static int recover_stalled_builder(void)
             int wx = u[i].x, wy = u[i].y;
             select_box(wx, wy, 8);
             if (selected_count() != 1 || selected_building >= 0) return 0;
-            tap_b();
-            for (int row = 0; row < MENU_COUNT && menu_open && menu_cursor != MENU_STOP; ++row)
-                tap(KEY_DOWN);
-            if (!menu_open || menu_cursor != MENU_STOP) return 0;
+            if (!open_menu_row(MENU_STOP)) { ensure_normal_ui(); return 0; }
             tap(KEY_A); /* ordinary STOP releases the unreachable builder */
             return 1;
         }
@@ -708,6 +698,8 @@ static void build_pylons_and_gateways(void)
     if (side_active_builders() >= 2) return;
     int free_supply = race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE);
     int before = side_construction_count();
+    /* Without nearest-depot delivery in this profile, Probes at a new Nexus would
+     * still carry cargo home across the map, so stay on the home patches. */
     /* Tech/economy structures unlock more production and are otherwise
        starved indefinitely by supply depots when the army grows quickly. */
     if (side_building(B_ASSIMILATOR, 0) < 0 && minerals >= 100) {
@@ -719,38 +711,13 @@ static void build_pylons_and_gateways(void)
         build_near_nexus(B_CYBERNETICS_CORE, MENU_ACADEMY);
         if (side_construction_count() > before) return;
     }
-    if (side_building(B_FORGE, 0) < 0 && minerals >= 150 &&
-        side_building(B_GATEWAY, 1) >= 0) {
-        build_near_nexus(B_FORGE, MENU_ENG_BAY);
-        if (side_construction_count() > before) return;
-    }
-#ifdef SC64_P4_STORM_ENABLED
-    /* The P4 carried roster outproduces the legacy P3 profile. Get a second
-       production lane online before filling the defensive cannon roster. */
-    if (side_building_count(B_GATEWAY) < 4 && minerals >= 150) {
-        build_near_nexus(B_GATEWAY, MENU_BARRACKS);
-        if (side_construction_count() > before) return;
-    }
-#endif
-    if (side_building(B_FORGE, 1) >= 0 && minerals >= 150 &&
-        side_building_count(B_PHOTON_CANNON) < 6) {
-        build_photon_cannon_near_nexus();
-        if (side_construction_count() > before) return;
-    }
-    if (free_supply <= 18 && minerals >= 100 && side_building_count(B_PYLON) < 20) {
+    /* The home patches hold about 10,000 minerals and later Probes must walk
+     * across the map, so spend on the army rather than spare production. */
+    if (free_supply <= 8 && minerals >= 100 && side_building_count(B_PYLON) < 20) {
         build_pylon_near_nexus();
         if (side_construction_count() > before) return;
     }
-    if (side_building_count(B_GATEWAY) < 3 && minerals >= 150) {
-        build_near_nexus(B_GATEWAY, MENU_BARRACKS);
-        if (side_construction_count() > before) return;
-    }
-    if (frame >= 12000 && owner_buildings(ENEMY) == 0 && owner_units(ENEMY) == 0 &&
-        side_building_count(B_NEXUS) < 2) {
-        build_mineral_expansion();
-        if (side_construction_count() > before) return;
-    }
-    if (side_building_count(B_GATEWAY) < 6 && minerals >= 150) {
+    if (side_building_count(B_GATEWAY) < 4 && minerals >= 150) {
         build_near_nexus(B_GATEWAY, MENU_BARRACKS);
         if (side_construction_count() > before) return;
     }
@@ -770,6 +737,56 @@ static void queue_probe(void)
             tap(KEY_A); /* selected Nexus queues its Probe normally */
             ++probe_total;
         }
+}
+
+/* Idle Probes do not find work: starting Probes wait for an order and a spent
+ * patch leaves its Probes standing on it. Send up to three each pass to the
+ * least-worked visible patches near a Nexus. */
+static void mine_idle_probes(void)
+{
+    for (int pass = 0; pass < 3 && screen == SCREEN_PLAY && !won && !lost; ++pass) {
+        int probe = -1, patch = -1, best = 0x7fffffff;
+        ensure_normal_ui();
+        for (int i = 0; i < MAX_UNITS && probe < 0; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+                u[i].order == ORDER_IDLE && !u[i].carry) probe = i;
+        if (probe < 0) return;
+        for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) {
+            int depot = 0x7fffffff, workers = 0;
+            for (int j = 0; j < MAX_BUILDINGS; ++j)
+                if (b[j].alive && b[j].owner == SIDE && b[j].type == B_NEXUS && !b[j].under_construction) {
+                    int d = dist2(m[i].x, m[i].y, b[j].x, b[j].y) / 256;
+                    if (d < depot) depot = d;
+                }
+            if (depot == 0x7fffffff) continue;
+            for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
+                u[j].order == ORDER_MINE && u[j].target == i) ++workers;
+            if (depot + workers * 256 < best) { best = depot + workers * 256; patch = i; }
+        }
+        if (patch < 0) return;
+        select_box(u[probe].x, u[probe].y, 12);
+        if (find_selected_worker() < 0 || selected_building >= 0) return;
+        for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].selected && !sc64_race_is_worker(u[i].type)) return;
+        /* A tap that lands on a unit standing at the patch selects it, so try
+         * around the patch until the order takes. */
+        for (int attempt = 0; attempt < 9 && u[probe].alive && u[probe].order != ORDER_MINE; ++attempt) {
+            static const int offsets[][2] = {{0,0},{-8,0},{8,0},{0,-8},{0,8},
+                                             {-12,-8},{12,-8},{-12,8},{12,8}};
+            move_cursor(m[patch].x + offsets[attempt][0], m[patch].y + offsets[attempt][1]);
+            tap(KEY_A);
+        }
+        /* Still refused: the last tap selected a Probe parked on the patch.
+         * Walk it clear so the patch can be tapped next pass. */
+        if (u[probe].alive && u[probe].order != ORDER_MINE && find_selected_worker() >= 0 &&
+            selected_building < 0 && open_menu_row(MENU_MOVE)) {
+            int home = nearest_side_building();
+            tap(KEY_A);
+            if (home >= 0) move_cursor(b[home].x, b[home].y + 48);
+            tap(KEY_A);
+            ensure_normal_ui();
+            return;
+        }
+    }
 }
 
 static void issue_defense_order(void)
@@ -880,11 +897,12 @@ int main(int argc, char **argv)
         if (frame >= next_build) {
             (void)recover_stalled_builder();
             build_pylons_and_gateways();
-            next_build = frame + 500;
+            next_build = frame + 240;
         }
         if (frame >= next_worker) {
+            mine_idle_probes();
             queue_probe();
-            next_worker = frame + 600;
+            next_worker = frame + 240;
         }
         if (frame >= next_gas) {
             assign_gas_probe();
@@ -902,13 +920,18 @@ int main(int argc, char **argv)
 #endif
         }
         if (frame >= next_order) {
-            if (owner_buildings(4) == 0 && owner_buildings(ENEMY) > 0)
-                assault_started = owner_army(SIDE) >= 28;
-            else if (!assault_started && frame >= 10000 && owner_army(SIDE) >= 10)
+            /* Strike together and regroup when spent: units fed in piecemeal die
+             * to the Sunken Colonies without clearing anything. The last enemy
+             * units need less, and a force that cannot rebuild goes in anyway. */
+            int army = owner_army(SIDE);
+            int strike = owner_units(ENEMY) + owner_units(4) < army ? 16 : 32;
+            if (assault_started && army < 10) assault_started = 0;
+            if (!assault_started && (army >= strike ||
+                                     (minerals_near_nexus() == 0 && minerals < 100 && army)))
                 assault_started = 1;
             if (assault_started) {
                 issue_sweep_order();
-                next_order = frame + 2200;
+                next_order = frame + 1200;
             } else {
                 issue_defense_order();
                 next_order = frame + 900;
