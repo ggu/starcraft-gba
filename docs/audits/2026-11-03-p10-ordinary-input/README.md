@@ -44,7 +44,7 @@ sits on far more minerals, so the route grows Raynor's base:
 
 ## Results
 
-The tape was run at commit `TESTED_COMMIT`, on base `d60e75eb` plus #253 and #254.
+The tape was run at commit `97f4fef6`, on base `d60e75eb` plus #253 and #254.
 Inputs were cloned from the 2026-10-31 pinned set into a private `.local`, with the
 codec-2 audio bank. Host runs use ASan and UBSan. ARM runs use mGBA 0.10.5, one
 isolated process per run, log mask 7, no debugger. Replays write no game state.
