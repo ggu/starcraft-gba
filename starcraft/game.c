@@ -11315,7 +11315,14 @@ draw_hud_commands_body(void)
 #endif
     if (box_state == 2) {
         gfx_text(5, 126, "BOX SELECT", C_CYAN);
+#ifdef SC64_HUD_PANEL
+        ui_key(5, 137, "L", 0, C_DIM);
+        ui_glyph(UI_GLYPH_SELECT, 20, 140);
+        ui_key(27, 137, "B", 0, C_DIM);
+        ui_glyph(UI_GLYPH_CROSS, 42, 140);
+#else
         gfx_text(5, 137, "RELEASE L SELECT B CANCEL", C_GOLD);
+#endif
 #ifdef SC64_FIELD_CONTROLS
     } else if (field_controls_draw_hud()) { /* list, placement, armed orders */
 #endif

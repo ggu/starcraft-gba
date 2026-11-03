@@ -71,13 +71,6 @@ card_icon(int i)
     return -1;
 }
 
-/* The highlighted command's button in the HUD, left of its name. */
-static void
-card_hud_icon(int icon)
-{
-    if (icon >= 0) card_icon_draw(icon, 3, 124, card_green);
-}
-
 static void
 field_controls_draw_command_card(void)
 {

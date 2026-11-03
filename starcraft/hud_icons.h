@@ -92,3 +92,10 @@ card_icon_draw(int icon, int x, int y, const u8 *ramp)
 static const u8 card_green[3] = {C_GREEN_DARK, C_GREEN, C_HIGHLIGHT};
 static const u8 card_gold[3] = {C_GOLD_DARK, C_GOLD, C_HIGHLIGHT};
 static const u8 card_grey[3] = {C_EDGE, C_DIM, C_SILVER};
+
+/* A button in the HUD's portrait cell, left of its name. */
+static void
+card_hud_icon(int icon)
+{
+    if (icon >= 0) card_icon_draw(icon, 3, 124, card_green);
+}

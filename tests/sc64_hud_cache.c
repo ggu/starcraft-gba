@@ -404,12 +404,94 @@ test_panel_product_matches_a(void)
         cx = cy = 100;
         train_type = cases[n].stale_train;
         assert(hud_next_product(0) == cases[n].expected);
+        race_refusal = 0;
         interact();
-        assert(q->queue_count == 1 && q->queue[q->queue_head] == cases[n].expected);
+        /* A resolves to the offered unit; a profile's supply rules may still refuse it. */
+        assert(train_type == cases[n].expected);
+        if (!race_refusal) assert(q->queue_count == 1 && q->queue[q->queue_head] == cases[n].expected);
     }
     selected_building = -1;
     memset(b, 0, sizeof(b));
 }
+
+#ifdef SC64_SHARED_BUNKER
+/* A Bunker shows its passengers as icons in four slots. */
+static void
+test_panel_bunker_cargo(void)
+{
+    Building *q = &b[0];
+    fixture();
+    race_human = R_TER;
+    q->alive = 1; q->owner = SIDE; q->type = B_BUNKER;
+    q->raw_type = 125; q->raw_owner = 7;
+    q->hp = q->maxhp = 350; q->x = q->y = 100;
+    selected_building = 0;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(!panel_slot_lit(0));
+    assert(gfx_test_pixel(HUD_COLUMN, HUD_SLOT_Y) == C_EDGE);
+    u[0].alive = 1; u[0].owner = SIDE; u[0].type = U_MARINE;
+    u[0].raw_type = sc64_race_raw_unit(U_MARINE); u[0].raw_owner = 7;
+    u[0].hp = u[0].maxhp = 40;
+    u[0].order = ORDER_TRANSPORTED;
+    u[0].target = sc64_bunker_target_encode(MAX_UNITS, MAX_BUILDINGS, 0);
+    assert(race_bunker_cargo_space(0) == 1);
+    assert(probe_change_mask() & HUD_BOTTOM);
+    assert_cached_matches_full();
+    render_cached();
+    assert(panel_slot_lit(0) && !panel_slot_lit(1));
+    selected_building = -1;
+    memset(b, 0, sizeof(b));
+    memset(u, 0, sizeof(u));
+}
+#endif
+
+/* Armed orders and the box show key caps and marks instead of words. */
+static void
+test_panel_modes_use_marks(void)
+{
+    fixture();
+    race_human = R_TER;
+    u[0].alive = 1; u[0].owner = SIDE; u[0].selected = 1; u[0].type = U_MARINE;
+    u[0].raw_type = sc64_race_raw_unit(U_MARINE); u[0].raw_owner = 7;
+    u[0].hp = u[0].maxhp = 40;
+    mode = MODE_MOVE;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(27, 136, 10, 11, C_SILVER) > 0);
+    assert(hud_count_color(27, 136, 150, 9, C_GOLD) == 0);
+    mode = MODE_ATTACK;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(27, 136, 60, 11, C_RED) > 0);
+    assert(hud_count_color(27, 136, 150, 9, C_GOLD) == 0);
+    mode = MODE_NORMAL;
+    box_state = 2;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(5, 136, 150, 9, C_GOLD) == 0);
+    box_state = 0;
+    memset(u, 0, sizeof(u));
+}
+
+/* A timed mission keeps its clock under the portrait while a unit is selected. */
+#ifdef SC64_T3_ENABLED
+static void
+test_panel_keeps_mission_clock(void)
+{
+    fixture();
+    race_human = R_TER;
+    race_selected_mission = 6;
+    race_t3.remaining_ticks = 300;
+    u[0].alive = 1; u[0].owner = SIDE; u[0].selected = 1; u[0].type = U_MARINE;
+    u[0].raw_type = sc64_race_raw_unit(U_MARINE); u[0].raw_owner = 7;
+    u[0].hp = u[0].maxhp = 40;
+    sc64_hud_valid = 0;
+    render_cached();
+    assert(hud_count_color(0, HUD_CLOCK_Y, 30, 8, C_WHITE) > 0);
+    memset(u, 0, sizeof(u));
+}
+#endif
 
 /* A group is its unit types with counts; a selection hides the objective. */
 static void
@@ -970,6 +1052,13 @@ main(void)
     test_panel_shows_building_queue();
     test_panel_product_matches_a();
     test_panel_group_and_objective();
+    test_panel_modes_use_marks();
+#ifdef SC64_SHARED_BUNKER
+    test_panel_bunker_cargo();
+#endif
+#ifdef SC64_T3_ENABLED
+    test_panel_keeps_mission_clock();
+#endif
 #endif
 #ifdef SC64_RACES
     /* Keep the skirmish fixture last so it cannot change the campaign state
