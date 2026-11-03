@@ -8394,3 +8394,39 @@ feature both disabled and enabled. Each enabled profile exercised all three
 human races. The 109 prepared build inputs were checked unchanged at those
 builds' preflight and postflight; these historical checks do not assert the
 continued availability of the original input paths.
+
+## Building queues in the selection panel (2026-11-03)
+
+Selecting a producer now shows its queue as icons with a progress bar in every
+race ROM and in the default profile. Race ROMs previously showed no queue. Most
+hint text became key caps and marks, and the objective shows only when nothing is
+selected. New host checks are in `tests/field_ui_run.c` (default) and
+`tests/sc64_hud_cache.c` (prepared race profiles).
+
+Frames were inspected on the Terran, Zerg Z7 and Protoss P7 ROMs and the default
+ROM, using libmgba 0.10.5 with scripted keys. These are emulator results; physical
+hardware was not measured.
+
+Cycles for one draw of the cached bottom band (`draw_hud_commands`, Terran custom
+game opening, median of 7, emulator, same scene on each build):
+
+| Selection | Base c146783d | This change |
+| --- | ---: | ---: |
+| None | 88,978 | 64,556 |
+| One SCV | 349,762 | 104,032 |
+| Idle Command Center | 484,285 | 179,870 |
+| Command Center, full queue | 480,617 | 231,236 |
+
+The first version of the panel drew each icon as a rectangle per run of a shade
+and cost about 460,000 cycles per redraw, roughly three times a second. Blitting
+decoded icons and drawing progress bars over the cached band removed that. The
+bar costs about 2,000 cycles per frame while a producer is selected, and the
+redraw key adds about 500 per render for one unit and 1,500 with a queue. A key
+that searches every unit
+(a group, or a Z7 hall) runs on one tick in four, so its bars can lag by up to
+three ticks.
+
+`.bss`, `.iwram` and `.data` match base c146783d byte for byte on Terran, Zerg Z7
+and Protoss P7. `update_orders` keeps its Z7 address. ROM grows by about 27 KB,
+mostly the 2-bit button icons. Z9 and Z10 cannot be built here without `z8-source`.
+
