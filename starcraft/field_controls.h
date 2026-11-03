@@ -248,7 +248,7 @@ ui_missing_tech(int type, int worker)
     unsigned need;
     int bit;
     (void)worker;
-    if (!r || r->race != race_owner_identity(SIDE) ||
+    if (!r || !race_owner_fields_race(SIDE, r->race) ||
         type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return "";
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (!race_late_building_product_available(SIDE, worker >= 0 ? u[worker].raw_owner : -1, type))
@@ -309,7 +309,7 @@ ui_row_kind(int i, int *type)
     }
     if (i == MENU_MOVE || i == MENU_ATTACK || i == MENU_STOP) return UI_ROW_ORDER;
     if (i == MENU_WEAPONS || i == MENU_ARMOR) return UI_ROW_RESEARCH;
-    if (i < MENU_STOP) { *type = base[race_human][i - MENU_BARRACKS]; return UI_ROW_BUILD; }
+    if (i < MENU_STOP) { *type = base[race_command_race()][i - MENU_BARRACKS]; return UI_ROW_BUILD; }
     label = race_menu_label(i);
     if (ui_same(label, "NEXUS")) *type = B_NEXUS;
     else if (ui_same(label, "CANNON")) *type = B_PHOTON_CANNON;
@@ -338,7 +338,7 @@ ui_row_kind(int i, int *type)
 static int
 ui_research_state(int i, const char **need)
 {
-    int lab = race_human == R_ZERG ? B_EVOLUTION_CHAMBER : race_human == R_PROTOSS ? B_FORGE : B_ENG_BAY;
+    int lab = race_command_race() == R_ZERG ? B_EVOLUTION_CHAMBER : race_command_race() == R_PROTOSS ? B_FORGE : B_ENG_BAY;
     if (!has_building(SIDE, lab)) { *need = sc64_race_building_name(lab); return UI_SITE_TECH; }
     if ((i == MENU_WEAPONS ? weapons_level : armor_level) >= 2) return UI_SITE_DONE;
     if (i == MENU_WEAPONS ? weapons_research : armor_research) return UI_SITE_BUSY;
@@ -453,10 +453,10 @@ ui_status(int x, int y, int problem, const char *need, const char *note, int cos
 static void
 ui_structure_glyph(int x, int y)
 {
-    if (race_human == R_ZERG) {
+    if (race_command_race() == R_ZERG) {
         gfx_diamond(x, y, 6, 4, C_ZERG);
         gfx_diamond(x, y, 3, 2, C_PURPLE);
-    } else if (race_human == R_PROTOSS) {
+    } else if (race_command_race() == R_PROTOSS) {
         gfx_rect(x - 4, y - 1, 9, 5, C_PROTOSS);
         gfx_rect(x - 4, y - 1, 9, 1, C_GOLD);
         gfx_diamond(x, y - 3, 2, 2, C_CYAN);
@@ -486,10 +486,10 @@ ui_source_icon_for_row(int i, int kind, int type)
     if (i == MENU_STOP) return SC64_ICON_STOP;
     if (kind == UI_ROW_RESEARCH) {
         if (i == MENU_WEAPONS)
-            return race_human == R_ZERG ? SC64_ICON_ZERG_WEAPONS :
-                   race_human == R_PROTOSS ? SC64_ICON_PROTOSS_WEAPONS : SC64_ICON_TERRAN_WEAPONS;
-        return race_human == R_ZERG ? SC64_ICON_ZERG_ARMOR :
-               race_human == R_PROTOSS ? SC64_ICON_PROTOSS_ARMOR : SC64_ICON_TERRAN_ARMOR;
+            return race_command_race() == R_ZERG ? SC64_ICON_ZERG_WEAPONS :
+                   race_command_race() == R_PROTOSS ? SC64_ICON_PROTOSS_WEAPONS : SC64_ICON_TERRAN_WEAPONS;
+        return race_command_race() == R_ZERG ? SC64_ICON_ZERG_ARMOR :
+               race_command_race() == R_PROTOSS ? SC64_ICON_PROTOSS_ARMOR : SC64_ICON_TERRAN_ARMOR;
     }
     if ((kind == UI_ROW_BUILD || kind == UI_ROW_MORPH) && type >= 0) {
         int raw = sc64_race_raw_building(type);
