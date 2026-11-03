@@ -666,6 +666,9 @@ int main(int argc,char **argv)
     int next_probe=60,next_supply=400,next_build=600,next_gas=3000,next_production=900;
     int next_order=120,next_hero=240,next_carrier=3000,next_save_build=0,next_evade=600;
     int attacking=0,prior_distance=-1,stalls=0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    int next_threat=600;
+#endif
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
         static int stuck_reported;
         if(menu_open&&!stuck_reported){
@@ -758,6 +761,23 @@ int main(int argc,char **argv)
             }
             next_evade=frame+150;
         }
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+        /* Reavers shell the base from out of sight, and idle units do not answer.
+         * Check for raiders before spending time on the economy. */
+        if(frame>=next_threat&&home>=0){
+            int threat=-1,best=520*520;
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].order!=ORDER_IDLE){
+                int d=dist2(u[i].x,u[i].y,b[home].x,b[home].y);
+                if(d<best){best=d;threat=i;}
+            }
+            if(threat>=0&&!attacking){
+                (void)army_command(MENU_ATTACK,u[threat].x,u[threat].y);
+                fprintf(trace,"{\"kind\":\"defend\",\"frame\":%u,\"target\":[%d,%d]}\n",
+                    (unsigned)frame,u[threat].x,u[threat].y);
+            }
+            next_threat=frame+120;
+        }
+#endif
         if(frame>=next_mine){
             for(int k=0;k<3&&recover_loaded_probe();k++){}
             (void)order_idle_probes_to_visible_minerals();
@@ -786,6 +806,13 @@ int main(int argc,char **argv)
             int cannons=count_type(B_PHOTON_CANNON,0);
             if(count_type(B_GATEWAY,0)<1)
                 (void)build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1);
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+            /* Raids arrive sooner on this economy. Take gas early: it recovers
+             * loaded Probes, and Dragoons follow. */
+            else if(!count_type(B_ASSIMILATOR,0))(void)build_assimilator();
+            else if(!count_type(B_CYBERNETICS_CORE,0)&&count_type(B_GATEWAY,1))
+                (void)build_structure(B_CYBERNETICS_CORE,MENU_ACADEMY,80,224,-1,-1);
+#endif
             /* Raids can destroy gas; Dragoons are the only ground answer to
              * the Arbiters, so rebuild it ahead of Cannons. */
             else if(frame>=9000&&!count_type(B_ASSIMILATOR,0))(void)build_assimilator();
@@ -834,17 +861,34 @@ int main(int argc,char **argv)
                 (void)army_command(MENU_MOVE,u[f].x,u[f].y);
             else if(home>=0){
                 int fx=b[home].x,fy=b[home].y+48;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+                /* Selecting a walking hero sends the cursor across the map, which
+                 * costs production. Order each one only when it has stopped. */
+                if(f>=0&&u[f].owner==SIDE&&u[f].order!=ORDER_MOVE&&dist2(u[f].x,u[f].y,fx,fy)>48*48)
+                    (void)hero_command(f,fx,fy);
+                if(h>=0&&u[h].owner==SIDE&&u[h].order!=ORDER_MOVE&&dist2(u[h].x,u[h].y,b[home].x,b[home].y)>96*96)
+                    (void)hero_command(h,b[home].x,b[home].y+24);
+#else
                 if(f>=0&&u[f].owner==SIDE&&dist2(u[f].x,u[f].y,fx,fy)>48*48)
                     (void)hero_command(f,fx,fy);
                 if(h>=0&&u[h].owner==SIDE&&dist2(u[h].x,u[h].y,b[home].x,b[home].y)>96*96)
                     (void)hero_command(h,b[home].x,b[home].y+24);
+#endif
             }
             next_hero=frame+180;
         }
         if(frame>=next_order&&home>=0){
-            int threat=-1,bd=360*360;
+            int threat=-1,bd=360*360,bd2=520*520;
+            (void)bd2;
             for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY){
                 int d=dist2(u[i].x,u[i].y,b[home].x,b[home].y);
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+                /* Idle guards in the nearest town are not a threat until close,
+                 * but a Reaver shelling the base reads as idle while it fires. */
+                if(d>=520*520||(u[i].order==ORDER_IDLE&&u[i].cd<=0&&d>=288*288))continue;
+                if(d<bd2){bd2=d;threat=i;}
+                continue;
+#endif
                 if(d<bd){bd=d;threat=i;}
             }
             /* A raid on the base recalls an attacking army. */
@@ -852,6 +896,18 @@ int main(int argc,char **argv)
             for(int i=0;i<MAX_UNITS;i++)raiders+=u[i].alive&&u[i].owner==ENEMY&&
                 dist2(u[i].x,u[i].y,b[home].x,b[home].y)<320*320;
             if(raiders>=2)attacking=0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+            /* Attack orders chase raiders into their towns, where the army dies
+             * a few at a time. Walk strays home before anything else. */
+            int strays=0;
+            for(int i=0;i<MAX_UNITS;i++)strays+=u[i].alive&&u[i].owner==SIDE&&
+                (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)&&u[i].order!=ORDER_MOVE&&
+                dist2(u[i].x,u[i].y,b[home].x,b[home].y)>440*440;
+            if(threat<0&&strays>=3&&!attacking){
+                (void)army_command(MENU_MOVE,b[home].x,b[home].y+96);
+                next_order=frame+300;
+            } else
+#endif
             if(threat>=0&&!attacking){
                 (void)army_command(MENU_ATTACK,u[threat].x,u[threat].y);
                 fprintf(trace,"{\"kind\":\"defend\",\"frame\":%u,\"target\":[%d,%d]}\n",

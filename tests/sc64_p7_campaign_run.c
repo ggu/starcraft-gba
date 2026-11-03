@@ -107,9 +107,12 @@ static void input(u16 held)
 {
     u16 pressed=(u16)(held & (u16)~prior);
     int changed=held!=prior;
+    /* Once the mission ends, later calls are not inputs: the trace stops at the
+     * deciding call, so a replay ends there too. */
+    if (screen==SCREEN_RESULT || won || lost) return;
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
-    if (screen!=SCREEN_RESULT && !won && !lost) game_update(held,pressed);
+    game_update(held,pressed);
     prior=held;
     ++host_tick;
     if(trace && changed) {
