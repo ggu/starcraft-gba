@@ -211,6 +211,9 @@ continues to the same win in a fresh process. The Gantrithor has no attack, and 
 AI backend is authored. See the
 [ordinary-input audit](audits/2026-11-03-p10-ordinary-input/README.md) and the
 [P10 candidate audit](audits/2026-11-01-p10-campaign/README.md).
+All ten Protoss missions have an ordinary-input win under the P10 flags, and an ARM
+replay of each matches its host run; P6 stalls for about 83 seconds of GBA time on its
+winning frame. See the [ten-mission audit](audits/2026-11-03-protoss-p1-p10-evidence/README.md).
 
 For P7, the canonical-render candidate passes its host startup/save fixtures,
 normal-input campaign win, 18-match skirmish matrix and menu-driven save/reload.

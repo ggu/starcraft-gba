@@ -23,7 +23,7 @@ PX_SOURCES = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft
 # $(1) name, $(2) controller source, $(3) extra source, $(4) mission, $(5) recipe writing $@.raw
 define PX_MISSION
 build/px-$(1)-controller: tests/$(2).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(PROTOSS_P10_INPUTS) common/gba.c $$(COMMON_HEADERS) mk/protoss-carried/Makefile | build
-	$$(PX_CLANG) $$< $(3) $$(PX_SOURCES) -o $$@
+	$$(PX_CLANG) -DPX_TAPE_TRACE $$< $(3) $$(PX_SOURCES) -o $$@
 $$(PX_DIR)/$(1)/trace.jsonl: build/px-$(1)-controller tools/sc64_protoss_tape.py
 	mkdir -p $$(PX_DIR)/$(1)
 	$(5)
