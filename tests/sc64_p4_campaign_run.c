@@ -1280,16 +1280,7 @@ int main(int argc, char **argv)
             } else if (!raynor_rescued && raynor >= 0) {
                 issued = issue_group_order(u[raynor].x, u[raynor].y, 0, 1);
             } else if (rescued && !heroes_released) {
-                if (escort_combat_count() <= 1 && rebuild_waves < 4 && minerals >= 1000 &&
-                    side_gateway_count() > 0 && side_probe_count() > 0) {
-                    /* The bank can pay for another wave: the heroes wait while
-                     * it clears more of the route. */
-                    ++rebuild_waves;
-                    controller_buildup_done = 0;
-                    controller_buildup_start_frame = frame;
-                    escape_group_ordered = 0;
-                    issued = 1;
-                } else if (escort_combat_count() <= 1) {
+                if (escort_combat_count() <= 1) {
                     /* Once every escort has fallen, advance only the two
                      * required heroes with ordinary Move orders. */
                     int tx = escape_x, ty = escape_y;
@@ -1336,6 +1327,9 @@ int main(int argc, char **argv)
                     int moved_t = issue_hero_escape_segment(tassadar, force);
                     raynor = source_unit(SC64_P4_RAW_RAYNOR_VULTURE);
                     int moved_r = issue_hero_escape_segment(raynor, force);
+                    /* Idle units do not step aside, so the escort parked on the
+                     * approach would wall the heroes out. Walk it past the exit. */
+                    (void)issue_group_order(escape_x + 120, escape_y + 16, 1, 0);
                     issued = moved_t || moved_r;
                     next_solo_hero_order = frame + 1200;
                 } else if (dist2(army_x, army_y, escape_x, escape_y) > 200 * 200) {
@@ -1344,6 +1338,17 @@ int main(int argc, char **argv)
                                                &tx, &ty);
                     issued = issue_group_order(tx, ty, 1, 0);
                 }
+            } else if (rescued && heroes_released && escort_combat_count() <= 1 &&
+                       rebuild_waves < 6 && minerals >= 800 && side_gateway_count() > 0 &&
+                       side_probe_count() > 0 && !heroes_final_advance) {
+                /* The bank can pay for another wave: bring the heroes home and let
+                 * it clear more of the route before they try the walk. */
+                ++rebuild_waves;
+                heroes_released = 0;
+                escape_group_ordered = 0;
+                controller_buildup_done = 0;
+                controller_buildup_start_frame = frame;
+                issued = 1;
             } else if (rescued && heroes_released && escort_combat_count() <= 1) {
                 /* If the escort is gone, preserve the source objective with
                  * direct ordinary Move orders for the two required heroes. */
