@@ -103,9 +103,9 @@ in guest cycles, far below 30 fps. At that historical base `make test-zerg-z7` f
 carried Z6. See the [9ff7f7c ARM/SRAM audit](audits/2026-10-29-z7-current-arm-sram/README.md);
 the earlier frozen CONTACT win and its 3.69 frames/s are in the
 [mission/save audit](audits/2026-10-28-z7-arm-save-win/README.md). The carried
-Z1 failure at `63665045` was a controller defect, fixed in the [carried Z1
-audit](audits/2026-11-03-z1-carried-controller/README.md); carried Z2 still fails
-under this vector. P7 is
+Z1 and Z2 failures at `63665045` were controller defects, fixed in the [carried
+Z1](audits/2026-11-03-z1-carried-controller/README.md) and [carried
+Z2](audits/2026-11-03-z2-carried-controller/README.md) audits. P7 is
 now in the canonical Protoss profile. Its host campaign/save fixtures, 18-match
 skirmish matrix and menu-driven save/reload pass. The P7 controller itself was
 qualified on host; ARM replayed its recorded inputs, including an ordinary
