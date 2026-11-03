@@ -150,6 +150,11 @@ ARM comparison is not a full-mission result. That link was not replayed in
 full. The `9ff7f7c` replay above uses the same feature vector with the
 probe's own main loop in place of `common/main.c`. See the [CONTACT
 release-candidate audit](audits/2026-10-28-z7-contact-release/README.md).
+After range routing changed the mission's timing, the controller needed a closer
+opening Hatchery and a mining-stall fallback; `make -k test-zerg-z7` passes
+again with a host win at tick 141,913. That new tape has no ARM replay, and the
+win depends on one pinned timing phase. See the [canonical controller
+audit](audits/2026-11-03-z7-canonical-controller/README.md).
 The current experimental P7 cache profile also replays the full winning tape
 on ARM with all 67 state records matching; see its
 [cache qualification](research/p7-fact-v2-qualification.md#full-arm-replay-of-the-current-cache-profile).
