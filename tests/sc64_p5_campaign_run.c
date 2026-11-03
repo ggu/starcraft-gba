@@ -689,8 +689,8 @@ int main(int argc, char **argv)
                        loaded_raw_count(SC64_P5_MODEL_RAW_ZEALOT, carrier) >= 2) {
                 /* Go north of the eastern Spore line, then descend the x1632
                  * channel between the x1520 and x1760 colonies into extraction.
-                 * The older y1792 approach stayed in Spore range for 300 frames
-                 * and left the Shuttle one hit from death on arrival. */
+                 * The older y1792 approach stays in Spore range long enough to
+                 * kill the Shuttle short of the landing point. */
                 static const int route_x[7] = {40,40,2040,2040,1632,1632,1696};
                 static const int route_y[7] = {755,40,40,1200,1200,1776,1792};
                 int tx = air_waypoint_stage < 7 ? route_x[air_waypoint_stage] : landing_x;
