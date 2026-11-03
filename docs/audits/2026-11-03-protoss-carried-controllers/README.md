@@ -50,7 +50,7 @@ only chooses when and where to act.
 
 ## Results
 
-Run at commit `CURRENT_COMMIT` on base `d60e75eb`, under ASan and UBSan, with
+Run at commit `caa22126` on base `d60e75eb`, under ASan and UBSan, with
 inputs cloned from the 2026-10-31 pinned set into a private `.local`:
 
 | Check | Result |
