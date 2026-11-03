@@ -174,6 +174,15 @@ static void log_south_combat_snapshot(unsigned frame, int slot)
     }
 }
 
+/* B reopens the order list on the last command, so walk to the row by input. */
+static int open_menu_row(int row)
+{
+    tap(KEY_B);
+    for (int guard = 0; guard < 2 * MENU_COUNT && menu_open && menu_cursor != row; ++guard)
+        tap(menu_cursor < row ? KEY_DOWN : KEY_UP);
+    return menu_open && menu_cursor == row;
+}
+
 static int objective_location(int *left, int *top, int *right, int *bottom)
 {
     return sc64_p6_location_runtime(15, MAP_COLS, MAP_ROWS,
@@ -194,6 +203,10 @@ static int location_waypoint(unsigned id, int sx, int sy, int *out_x, int *out_y
                 terrain_blocked(col, row) ||
                 !sc64_route_next(sx, sy, x, y, &nx, &ny)) continue;
             int d = dist2(x, y, (left + right) / 2, (top + bottom) / 2);
+            /* Group orders spread units around the target, so a point near the
+             * edge can leave them just outside the region. */
+            if (x - left < 24 || right - x < 24 || y - top < 24 || bottom - y < 24)
+                d += 1 << 20;
             if (d < best) { best = d; *out_x = x; *out_y = y; found = 1; }
         }
     return found;
@@ -524,9 +537,7 @@ static int issue_group_order(int x, int y, int attack_move)
     if (selected_building >= 0) { tap(KEY_L); tap(KEY_L); }
     tap(KEY_R);
     if (!selected_count()) return 0;
-    tap(KEY_B);
-    if (attack_move)
-        for (int i = 0; i < MENU_ATTACK; ++i) tap(KEY_DOWN);
+    (void)open_menu_row(attack_move ? MENU_ATTACK : MENU_MOVE);
     tap(KEY_A);
     if (mode != (attack_move ? MODE_ATTACK : MODE_MOVE)) {
         if (path_diagnostics)
@@ -567,7 +578,7 @@ static int issue_actor_move(int slot, int x, int y)
         }
     }
     if (!u[slot].selected || selected_count() != 1) return 0;
-    tap(KEY_B); tap(KEY_A);
+    (void)open_menu_row(MENU_MOVE); tap(KEY_A);
     if (mode != MODE_MOVE) return 0;
     move_cursor(x, y); tap(KEY_A);
     return u[slot].alive && u[slot].order == ORDER_MOVE;
@@ -579,7 +590,7 @@ static int issue_selected_actor_move(int slot, int x, int y)
         u[slot].owner != SIDE) return 0;
     if (!(u[slot].selected && selected_count() == 1))
         return issue_actor_move(slot, x, y);
-    tap(KEY_B); tap(KEY_A);
+    (void)open_menu_row(MENU_MOVE); tap(KEY_A);
     if (mode != MODE_MOVE) return 0;
     move_cursor(x, y); tap(KEY_A);
     return u[slot].alive && u[slot].order == ORDER_MOVE;
@@ -590,8 +601,7 @@ static int issue_actor_attack_move(int slot, int x, int y)
     if (!issue_actor_move(slot, x, y)) return 0;
     /* Re-selecting the actor through normal input preserves the engine's
      * selection semantics; issue_actor_move leaves its sole actor selected. */
-    tap(KEY_B);
-    for (int i = 0; i < MENU_ATTACK; ++i) tap(KEY_DOWN);
+    (void)open_menu_row(MENU_ATTACK);
     tap(KEY_A);
     if (mode != MODE_ATTACK) return 0;
     move_cursor(x, y); tap(KEY_A);
@@ -655,9 +665,7 @@ static int select_marine_group_near(int x,int y,int radius)
 static int issue_selected_order(int x, int y, int attack_move)
 {
     if (!selected_count()) return 0;
-    tap(KEY_B);
-    if (attack_move)
-        for (int i = 0; i < MENU_ATTACK; ++i) tap(KEY_DOWN);
+    (void)open_menu_row(attack_move ? MENU_ATTACK : MENU_MOVE);
     tap(KEY_A);
     if (mode != (attack_move ? MODE_ATTACK : MODE_MOVE)) return 0;
     move_cursor(x, y);
@@ -1308,7 +1316,7 @@ static int issue_move_at_frontline_cursor(int caster)
 {
     if(caster<0||caster>=MAX_UNITS||!u[caster].alive||
        !(u[caster].selected&&selected_count()==1))return 0;
-    tap(KEY_B);tap(KEY_A);
+    (void)open_menu_row(MENU_MOVE);tap(KEY_A);
     if(mode!=MODE_MOVE)return 0;
     tap(KEY_A);
     return u[caster].alive&&u[caster].order==ORDER_MOVE;
@@ -1566,8 +1574,7 @@ static int cast_storm_at_cluster(int caster, int x, int y, int escort_present,
     if (allow_single && u[caster].y > 1750) {
         tap(KEY_B | KEY_R);
     } else {
-        tap(KEY_B);
-        for (int i = 0; i < MENU_STOP + 1; ++i) tap(KEY_DOWN);
+        (void)open_menu_row(MENU_STOP + 1);
         tap(KEY_A);
     }
     if (mode != MODE_P4_STORM) {
@@ -1646,8 +1653,7 @@ static int stop_actor(int slot)
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive ||
         !select_actor_only(slot)) return 0;
     if (u[slot].order == ORDER_IDLE) return 1;
-    tap(KEY_B);
-    for (int i = 0; i < MENU_STOP; ++i) tap(KEY_DOWN);
+    (void)open_menu_row(MENU_STOP);
     tap(KEY_A);
     return u[slot].alive && u[slot].order == ORDER_IDLE;
 }
@@ -2884,6 +2890,19 @@ int main(int argc, char **argv)
                     fprintf(stderr, "P6 group toward %s frame=%u center=%d,%d target=%d,%d\n",
                             gate < 0 ? "Zeratul" : "source gate",
                             (unsigned)frame, army_x, army_y, target_x, target_y);
+                /* Group orders stop short of the target to spread the units, which
+                 * can leave them just outside the gate region. Walk one in alone. */
+                if (target_ready && gate >= 0 &&
+                    dist2(army_x, army_y, target_x, target_y) <= 48 * 48) {
+                    for (int k = 0; k < MAX_UNITS; ++k)
+                        if (u[k].alive && u[k].owner == SIDE && u[k].raw_type == 65) {
+                            (void)issue_actor_move(k, target_x, target_y);
+                            break;
+                        }
+                    next_order_frame = frame + 120;
+                    step(0);
+                    continue;
+                }
                 if (target_ready) {
                     int selected = select_zealot_group();
                     int ordered = selected ?
