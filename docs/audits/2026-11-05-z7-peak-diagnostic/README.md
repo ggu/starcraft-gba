@@ -69,3 +69,11 @@ the genuine seed hash is
 `182407d91e782c4e879e65047223a70a0ec5f83bbec0131d4e205debddbd0d39`.
 Detailed update-stage instrumentation was disabled. Logs and qualification
 receipts remain in the private worktree's `.local/peak-qualification` directory.
+
+A separate unprepared checkout at `23daca25` passed source boundary, doctor,
+default build and default test: 965 Python tests (26 skips), separate five- and
+eight-test suites, and the native fixtures. Its only `.local` directory was the
+authored build output; no imported `.local/sc64` inputs were present. The local
+combined log hashes to
+`5a72a71acd12177fe8e559cb4de45f002e03bafa1b076b9440228ca13ca9b6f6`.
+No production engine or optional unified implementation changes in this PR.
