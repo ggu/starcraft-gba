@@ -379,6 +379,9 @@ static void reject_generation2_save(int mission, int legacy_container)
         /* Preserve the exact current envelope and replace only its payload
          * version, so the negative reaches the intended format validator. */
         memcpy(envelope + offsetof(RaceSave, version), &old.version, sizeof(old.version));
+        /* This case tests an isolated bad generation, not fallback to the
+           older valid record that selected-journal loads must preserve. */
+        fixture_clear_candidate_records();
         save_write(envelope, length, PROFILE_WIRE_TAG);
         {
             static unsigned char readback[sizeof(envelope)]; u32 actual = 0;
@@ -457,8 +460,8 @@ static void reject_generation2_save(int mission, int legacy_container)
     assert(frame == old_frame && screen == old_screen && cx == old_x && cy == old_y);
     assert(minerals == old_ore && gas == old_gas);
     /* End this synthetic rejection case before the next ordinary save. */
+    fixture_finish_rejected_candidate();
     fixture_clear_record_tag(PROFILE_OLD_SAVE_TAG);
-    fixture_clear_candidate_records();
 }
 
 static void test_older_generation_rejection(int mission)
