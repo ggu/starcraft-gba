@@ -34,6 +34,7 @@ These are source-only profiles. The repository contains the engine, menu code, c
 
 ```sh
 ./dev sc64 prepare --rom "/path/to/StarCraft 64 ROM or ZIP" --profile terran
+./dev sc64 prepare-bc --rom "/path/to/StarCraft 64 ROM or ZIP"
 ./dev sc64 build --profile terran
 ./dev sc64 test --profile terran
 ./dev sc64 play --profile terran
@@ -687,7 +688,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Canonical profiles expose T1–T10, Z1–Z7 and P1–P10 (27/30). Each Protoss mission has a host win and a fixed-input ARM replay under the P10 flags, and P8 to P10 have fresh-process SRAM continuation there. P1–P7 have none under these flags; explicit P7's continuation is under its own flags. Explicit P6 retains its separate generation-30 product. Earlier P1–P5 ARM/cargo evidence remains scoped to P5. Zerg controllers complete all six chapters, with canonical Z6 ARM wins and Z5/Z6 save continuity. Terran ARM wins span all ten missions across frozen builds. Six campaign chapters and near-30-fps performance remain unfinished.
+- Canonical profiles expose T1–T10, Z1–Z7 and P1–P10 (27/30). Each Protoss mission has a host win and a fixed-input ARM replay under the P10 flags, P8 and P9 have fresh-process ARM SRAM continuation on the P10 default audit base, and P10 has a host continuation there plus an ARM continuation on an earlier base. P1–P7 have none under these flags; explicit P7's continuation is under its own flags. Explicit P6 retains its separate generation-30 product. Earlier P1–P5 ARM/cargo evidence remains scoped to P5. Zerg controllers complete all six chapters, with canonical Z6 ARM wins and Z5/Z6 save continuity. Terran ARM wins span all ten missions across frozen builds. Zerg 8–10 remain outside the canonical profile; engine, save qualification and performance gaps remain.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

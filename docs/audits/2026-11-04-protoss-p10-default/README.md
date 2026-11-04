@@ -68,7 +68,7 @@ Every ARM replay ended in the same win as its host run.
 - **Composition.** `make test-sc64-p7-campaign-composition`, a development profile, still
   fails at its P6 step.
 
-## Not run
+## Not run on the original audit base
 
 - **Fresh preparation.** The new prepare step was checked through its unit tests and by
   regenerating the three headers. `./dev sc64 prepare` wasn't run end to end, because this
@@ -83,3 +83,28 @@ Every ARM replay ended in the same win as its host run.
 Each result is one route run once. It shows the mission can be won with ordinary input, not
 that the route is reliable. The AI backends are authored, so native combat equivalence is
 not claimed.
+
+## Fresh setup and dependency qualification
+
+A separate clean worktree at `91996275` used the user-supplied USA ROM
+(SHA-256 `e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020`)
+and the pinned extractor at `09b57f787a247107d1de82b8c5eab2734667ea1d`.
+Both `./dev sc64 prepare --rom PATH --profile protoss` and the separately
+required `./dev sc64 prepare-bc --rom PATH` completed with fresh generated
+inputs. The first build exposed missing Make prerequisites for command icons,
+building fire and order markers. Adding them to the shared P7 canonical input
+list covers P7–P10. After deleting those three generated headers in this
+worktree, `make protoss` regenerated all three and built and verified the ROM.
+The carried-profile host startup/save matrix passed 234 configurations, and
+`test-sc64-p10-mission` passed. The 45 developer and six source-boundary tests
+also passed. These host checks do not establish P1–P7 mid-campaign SRAM
+continuation; the P10 ARM fresh-process continuation above remains evidence
+from its earlier base.
+
+After merging canonical `659bfa4e` into the qualification branch, `make protoss`
+and `make test-sc64-p10-carried-profile` passed again; the latter covered the
+same 234 host startup/save configurations. The production ROM SHA-256 was
+`2d3429de2748a19f5fe6c86b4a9debe7f4631a037b1108ec13522a4d2e524f61`, identical
+to the pre-merge qualification build. The P8–P10 scenario and three regenerated
+asset header hashes were unchanged across this combined-base check. This does
+not add a production-ROM replay or a new ARM SRAM continuation.

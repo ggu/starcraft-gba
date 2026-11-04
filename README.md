@@ -2,7 +2,7 @@
 
 This project is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
 
-Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. The canonical profiles expose Terran 1–10, Zerg 1–6, and Protoss 1–7: 23 of 30 campaign entries. P7 has a current canonical host win, an input-only ARM replay and fresh-process SRAM continuation. Explicit `protoss-p6` remains a separate generation-30 product. Earlier P1–P5 ARM evidence remains scoped to the preserved P5 build. See the [P7 qualification](docs/research/p7-canonical-candidate-qualification.md) and [P6 promotion audit](docs/audits/2026-10-27-p6-promotion/README.md).
+Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. The canonical profiles expose Terran 1–10, Zerg 1–7, and Protoss 1–10: 27 of 30 campaign entries. The [P10 default audit](docs/audits/2026-11-04-protoss-p10-default/README.md) records the mission replay evidence and remaining save, gameplay and performance limits.
 
 Performance remains below the 30-fps goal. A bounded P7 ARM sample measured mean full update-plus-draw costs of 2,155,200 cycles in the opening and 2,426,615 in the attack phase; it is not a mission-wide average. The current P6 route is also substantially below target; see the [P6 promotion audit](docs/audits/2026-10-27-p6-promotion/README.md) for its measured cycles and limits. The preserved P5 build measured about 26.6 fps equivalent on P1/P2 and 16.1–18.9 on P3–P5. Earlier Terran T7/T10 probe-entry traces measured about 22.4/18.8; see the [Terran audit](docs/audits/2026-10-26-terran-word-promotion/README.md) for scope. No physical GBA result is claimed. This adaptation uses a user-supplied, verified StarCraft 64 USA ROM and does not reproduce the N64 engine. Imported maps and graphics stay local.
 
@@ -44,6 +44,7 @@ This profile requires a legally obtained StarCraft 64 USA ROM that you are entit
 
 ```sh
 ./dev sc64 prepare --rom "/path/to/your/StarCraft 64 ROM or ZIP" --profile terran
+./dev sc64 prepare-bc --rom "/path/to/your/StarCraft 64 ROM or ZIP"
 ./dev sc64 build --profile terran
 ./dev sc64 test --profile terran
 ./dev sc64 play --profile terran
