@@ -1,6 +1,7 @@
 /* Host coverage for the hidden unified-profile showcase scenes.
  * Compile with SC64_SHOWCASE_ENABLED and the full P7 typed/rect profile. */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "../starcraft/game.c"
 
@@ -933,6 +934,9 @@ static int check_world_hud_boundaries(void)
 
 int main(void)
 {
+    const char *trace_path = getenv("SC64_SHOWCASE_TRACE_PATH");
+    FILE *trace = trace_path ? fopen(trace_path, "wb") : NULL;
+    if (trace_path && !trace) return fail("could not open trace");
     gba_init();
     if (check_world_hud_boundaries()) return 1;
 #ifdef SC64_UNIT_FACING
@@ -1027,6 +1031,17 @@ int main(void)
             if (!valid_world()) return fail("invalid actor state during scene simulation");
         }
         game_render();
+        if (trace) {
+            if (fwrite(&scene, sizeof(scene), 1, trace) != 1 ||
+                fwrite(&frame, sizeof(frame), 1, trace) != 1 ||
+                fwrite(u, sizeof(u), 1, trace) != 1 ||
+                fwrite(b, sizeof(b), 1, trace) != 1 ||
+                fwrite(visible, sizeof(visible), 1, trace) != 1) abort();
+            for (int y = 0; y < 160; ++y) for (int x = 0; x < 240; ++x) {
+                u16 pixel = gfx_test_pixel(x, y);
+                if (fwrite(&pixel, sizeof(pixel), 1, trace) != 1) abort();
+            }
+        }
 
         if (scene >= 2 && scene <= 4) {
             if (screen != SCREEN_RESULT || !lost || sc64_showcase_ticks != 150) {
@@ -1071,6 +1086,7 @@ int main(void)
     if (check_command_card()) return 1;
 #endif
 #endif
+    if (trace && fclose(trace) != 0) return fail("could not close trace");
     puts("Showcase menu, scene runtime, pause controls, and save isolation: ok");
     return 0;
 }
