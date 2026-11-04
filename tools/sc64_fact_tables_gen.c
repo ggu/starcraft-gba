@@ -102,9 +102,15 @@ int main(void)
          "0u)");
     printf("#define SC64_FACT_UNIT_COUNT %du\n", (int)SC_RU_COUNT);
     printf("#define SC64_FACT_BUILDING_COUNT %du\n", (int)SC_RB_COUNT);
+    puts("#ifdef SC64_GUARDIAN_COCOON_STAGE");
+    printf("_Static_assert(SC_RU_LEGACY_COUNT == %d && SC_RB_COUNT == %d,\n"
+           "               \"fact tables were generated for another roster\");\n",
+           (int)SC_RU_COUNT, (int)SC_RB_COUNT);
+    puts("#else");
     printf("_Static_assert(SC_RU_COUNT == %d && SC_RB_COUNT == %d,\n"
            "               \"fact tables were generated for another roster\");\n",
            (int)SC_RU_COUNT, (int)SC_RB_COUNT);
+    puts("#endif");
     printf("static const unsigned int sc64_fact_unit_table[%d] = {", (int)SC_RU_COUNT);
     for (t = 0; t < SC_RU_COUNT; ++t) {
         unsigned flags = sc64_game_unit_actor_flags(t);
