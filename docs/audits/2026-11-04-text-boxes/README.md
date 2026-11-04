@@ -6,7 +6,23 @@ ROM-derived text, art, frames, saves or traces.
 
 ## Status after merging the base
 
-This branch later merged `11fd1dd5`, which brought in worker cargo, the late Zerg art and a T8
+The branch last merged `1ffa7aad`, which brought in the skirmish opening and prepared save
+selection work. At merge commit `664ef0e1`:
+
+- **Pass:** `check_source_tree.py`, `./dev build`, the text box tests, the Z9 and Z10 tests, and
+  `test-sc64-p10-replay`.
+- **`make -k test`:** the same six failures as below, and nothing new.
+- **Guards:** `__bss_end` and `__iwram_end` match in all eight product ELFs, with boxes compiled
+  in and out. ROMs grow by 40,540 to 41,028 bytes.
+- **Boxes compiled in and out:** T1, T8, Z1, P2 and P10 agree, with traces identical apart from
+  P2's flag bits.
+
+The `Makefile` now has 10 bytes left under the source check's 512 KiB limit, after this branch
+shortened two of its variable names to fit. The next addition to it will need another home.
+
+The full Terran, Zerg and Protoss suites below were last run at the earlier merge.
+
+This branch had merged `11fd1dd5`, which brought in worker cargo, the late Zerg art and a T8
 controller repair. Run at merge commit `ea771cbd`:
 
 | Check | Result |
