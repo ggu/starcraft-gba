@@ -75,6 +75,9 @@ compile the same validator. Only the P10-flag replay was timed. Saving or loadin
 P6 also runs it, though neither was timed separately. The other nine missions don't run
 this validator.
 
+The [P6 save validator audit](../2026-11-04-p6-save-validator/README.md) fixes this. The
+table above is from before that fix.
+
 ## Reproduce
 
 With private inputs prepared and no shared input regenerated:

@@ -77,8 +77,12 @@ static int race_p6_save_candidate_valid(const RaceSave *candidate,
                                          unsigned width, unsigned height)
 {
     const Sc64RaceMap *map = &sc64_race_maps[SC64_P6_GLOBAL_ID];
+    /* Decoding is the expensive step, so each slot is decoded once: per row this
+     * cost over a minute of GBA time on every P6 save and load. */
+    struct { s16 raw_type, raw_owner, type, owner; } slots[MAX_UNITS];
     u8 seen_units[MAX_UNITS] = {0};
     u8 seen_buildings[MAX_BUILDINGS] = {0};
+    u8 unit_counts[8][SC_RU_COUNT] = {{0}};
     unsigned missing_units[SC64_P6_SOURCE_SLOT_COUNT] = {0};
     unsigned live = 0, queued = 0;
     if (!candidate || width != SC64_P6_MAP_COLS || height != SC64_P6_MAP_ROWS ||
@@ -108,6 +112,16 @@ static int race_p6_save_candidate_valid(const RaceSave *candidate,
             (candidate->campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
     } else return 0;
 
+    for (unsigned i = 0; i < MAX_UNITS; ++i) {
+        Unit saved;
+        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
+                                   &saved)) return 0;
+        slots[i].raw_type = (s16)saved.raw_type;
+        slots[i].raw_owner = (s16)saved.raw_owner;
+        slots[i].type = (s16)saved.type;
+        slots[i].owner = (s16)saved.owner;
+    }
+
     for (unsigned row = 0; row < map->unit_count; ++row) {
         const Sc64ImportedUnit *src = &map->units[row];
         unsigned raw = src->source_type;
@@ -119,12 +133,9 @@ static int race_p6_save_candidate_valid(const RaceSave *candidate,
             owner = race_p6_live_owner_for_source(src->owner);
             if (src->owner >= SC64_P6_SOURCE_SLOT_COUNT || owner < 0) return 0;
             for (unsigned i = 0; i < MAX_UNITS; ++i) {
-                Unit saved;
-                if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
-                                           &saved)) return 0;
-                if (!seen_units[i] && saved.raw_type == (int)raw &&
-                    saved.raw_owner == src->owner && saved.type == type &&
-                    race_p6_save_owner_allowed(src->owner, saved.owner)) {
+                if (!seen_units[i] && slots[i].raw_type == (int)raw &&
+                    slots[i].raw_owner == src->owner && slots[i].type == type &&
+                    race_p6_save_owner_allowed(src->owner, slots[i].owner)) {
                     seen_units[i] = 1;
                     found = 1; break;
                 }
@@ -199,6 +210,9 @@ static int race_p6_save_candidate_valid(const RaceSave *candidate,
             unsigned source;
             int raw = saved.raw_type;
             if (saved.type < 0 || saved.type >= SC_RU_COUNT) return 0;
+            if (raw >= 0 && saved.raw_owner >= 0 && saved.raw_owner < 8 &&
+                raw == sc64_race_raw_unit(saved.type))
+                ++unit_counts[saved.raw_owner][saved.type];
             if (raw < 0 || saved.raw_owner < 0) {
                 /* Normal human production is not a source-script actor and
                  * keeps canonical -1 provenance in this profile. */
@@ -226,20 +240,13 @@ static int race_p6_save_candidate_valid(const RaceSave *candidate,
     }
     for (unsigned source = 0; source < 8; ++source) {
         for (unsigned type = 0; type < SC_RU_COUNT; ++type) {
-            unsigned start = 0, saved_count = 0;
+            unsigned start = 0, saved_count = unit_counts[source][type];
             int raw = sc64_race_raw_unit((int)type);
+            if (!saved_count) continue;
             for (unsigned row = 0; row < map->unit_count; ++row) {
                 const Sc64ImportedUnit *src = &map->units[row];
                 if (src->owner == source && src->source_type == (unsigned)raw)
                     ++start;
-            }
-            if (raw < 0) continue;
-            for (unsigned i = 0; i < MAX_UNITS; ++i) {
-                Unit saved;
-                if (!race_save_decode_unit(candidate, i, width * 16u,
-                                           height * 16u, &saved)) return 0;
-                if (saved.alive && saved.raw_owner == (int)source &&
-                    saved.type == (int)type && saved.raw_type == raw) ++saved_count;
             }
             if (saved_count > start +
                 race_p6_save_started_creates(&candidate->p6, source,

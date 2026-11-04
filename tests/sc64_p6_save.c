@@ -135,6 +135,25 @@ static void test_initialized_world_save_after_unit_motion(void)
                                          SC64_P6_MAP_ROWS));
     assert(race_p5_transport_save_candidate_valid(&race_data, race_cols, race_rows));
     assert(race_save_invincible_padding_valid(&race_data));
+
+    /* A candidate may not hold more source actors of one type than the map and
+     * its started scripts can account for. The real world stays unchanged. */
+    {
+        int clones[MAX_UNITS], clone_count = 0, live = 0;
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (!u[i].alive) {
+                u[i] = u[actor];
+                clones[clone_count++] = i;
+                if (!race_save_game()) break;
+            }
+        assert(!race_p6_save_candidate_valid(&race_data, SC64_P6_MAP_COLS,
+                                              SC64_P6_MAP_ROWS));
+        /* The world still fits, so the count check rejected it, not the capacity. */
+        for (int i = 0; i < MAX_UNITS; ++i) live += u[i].alive != 0;
+        assert(live + (int)sc64_p6_remaining_creations(&race_p6.runtime) <= MAX_UNITS);
+        while (clone_count) memset(&u[clones[--clone_count]], 0, sizeof(u[0]));
+        assert(race_save_game());
+    }
     memset(u, 0, sizeof(u));
     if (!race_load_game()) {
         fprintf(stderr, "P6 load rejected after valid save: unit=%u campaign=%u p6=%u bind=%u\n",
