@@ -435,6 +435,12 @@ class Z7ArmReplayTest(unittest.TestCase):
             too_high_row = b"IMP1" + bytes([1, 0, 0, 0]) + struct.pack("<HHBB", 400, 3, 1, 1)
             self.assertTrue(replay.sram_check("full", plan,
                 sram((0, 1, base + too_high_row + trailer, True), tag=outer), None, profile)[1])
+            last_type = b"IMP1" + bytes([1, 0, 0, 0]) + struct.pack("<HHBB", 1, 3, 1, 41)
+            invalid_type = b"IMP1" + bytes([1, 0, 0, 0]) + struct.pack("<HHBB", 1, 3, 1, 42)
+            self.assertEqual(replay.sram_check("full", plan,
+                sram((0, 1, base + last_type + trailer, True), tag=outer), None, profile)[1], [])
+            self.assertTrue(replay.sram_check("full", plan,
+                sram((0, 1, base + invalid_type + trailer, True), tag=outer), None, profile)[1])
             too_high_trailer = struct.pack("<HBB", 1, 161, 0) + bytes(12)
             self.assertTrue(replay.sram_check("full", plan,
                 sram((0, 1, base + too_high_trailer, True), tag=outer), None, profile)[1])

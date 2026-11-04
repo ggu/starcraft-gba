@@ -461,7 +461,7 @@ def sram_check(mode: str, plan: dict, data: bytes | None,
                         for pos in range(8, len(extension), 6):
                             meta, damage, steps, source = struct.unpack_from("<HHBB", extension, pos)
                             if ((meta & 0x1ff) >= 400 or ((meta >> 9) & 7) >= 5 or
-                                (meta >> 12) > 7 or not steps or source >= 64):
+                                (meta >> 12) > 7 or not steps or source >= 42):
                                 valid = False
         elif valid:
             valid = r["payload_bytes"] == SAVE_PAYLOAD_BYTES
