@@ -1710,6 +1710,12 @@ static int race_p10_outcome(void);
 static void race_p10_note_unit_spawn(int slot, int owner, int type);
 static void race_p10_note_building_spawn(int slot, int owner, int type);
 static void race_p10_note_product_building(int building);
+static int race_command_race(void);
+static int race_owner_fields_race(int owner, int race);
+#else
+/* The race whose commands the selection offers. */
+#define race_command_race() race_human
+#define race_owner_fields_race(owner, race) ((race) == race_owner_identity(owner))
 #endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
        SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
@@ -5534,6 +5540,19 @@ selected_worker_mineral_target(void)
     return patch;
 }
 
+#ifdef SC64_P10_RUNTIME
+/* A Terran selection in P10 offers Raynor's base its own commands. */
+static int race_command_race(void)
+{
+    int worker;
+    if (!race_p10_active()) return race_human;
+    if (selected_building >= 0 && selected_building < MAX_BUILDINGS &&
+        sc64_race_building_rules[b[selected_building].type].race == R_TER) return R_TER;
+    worker = find_selected_worker();
+    return worker >= 0 && u[worker].type == U_SCV ? R_TER : race_human;
+}
+#endif
+
 /* Automatic construction selection must not steal an existing build order.
  * Explicit player orders may still interrupt construction normally. */
 static int
@@ -5716,7 +5735,7 @@ start_research(int type)
     int level = type == 0 ? weapons_level : armor_level;
     if (!has_building(SIDE,
 #ifdef SC64_RACES
-        race_human==R_ZERG?B_EVOLUTION_CHAMBER:race_human==R_PROTOSS?B_FORGE:
+        race_command_race()==R_ZERG?B_EVOLUTION_CHAMBER:race_command_race()==R_PROTOSS?B_FORGE:
 #endif
         B_ENG_BAY)) {
 	toast(8);
@@ -6201,7 +6220,7 @@ choose_command(int choice)
         {B_SPAWNING_POOL,B_HATCHERY,B_EXTRACTOR,B_HYDRALISK_DEN,B_EVOLUTION_CHAMBER},
         {B_GATEWAY,B_PYLON,B_ASSIMILATOR,B_CYBERNETICS_CORE,B_FORGE}};
     if(choice>=MENU_BARRACKS&&choice<=MENU_ENG_BAY) {
-        menu_open=0;mode=MODE_BUILD;menu=buildings[race_human][choice-MENU_BARRACKS];return;
+        menu_open=0;mode=MODE_BUILD;menu=buildings[race_command_race()][choice-MENU_BARRACKS];return;
     }
 #endif
     menu_open = 0;
@@ -6479,7 +6498,7 @@ static const char *race_menu_label(int i)
 #endif
         },
         {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
-    const char *const *labels=race_labels[race_human];
+    const char *const *labels=race_labels[race_command_race()];
 #ifdef SC64_SHARED_TRANSPORT
     if (i == MENU_STOP + 1 && race_shared_campaign_transport_menu_available())
         return "UNLOAD CARGO";
@@ -8723,9 +8742,9 @@ select_next_train_type(void)
 #endif
     static const int types[3][4]={{U_SCV,U_MARINE,U_FIREBAT,U_MEDIC},
         {U_DRONE,U_OVERLORD,U_ZERGLING,U_HYDRALISK},{U_PROBE,U_ZEALOT,U_DRAGOON,U_SCOUT}};
-    int n;for(n=0;n<4;n++)if(types[race_human][n]==train_type)break;
+    int n;for(n=0;n<4;n++)if(types[race_command_race()][n]==train_type)break;
     for(int step=1;step<=4;step++) {
-        int type=types[race_human][(n+step)%4];
+        int type=types[race_command_race()][(n+step)%4];
         if(selected_building<0||sc64_race_unit_rules[type].producer==b[selected_building].type) {
             train_type=type;return;
         }

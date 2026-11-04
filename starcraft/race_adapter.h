@@ -56,6 +56,18 @@ static int race_bot_index(int owner)
 static int race_owner_identity(int owner)
 { return owner >= 0 && owner < 5 ? race_player[owner] : -1; }
 
+/* P10's human also commands Raynor's Terran base. */
+#ifdef SC64_P10_RUNTIME
+static int race_owner_fields_race(int owner, int race)
+{
+    return race == race_owner_identity(owner) ||
+           (owner == SIDE && race == R_TER && race_p10_active());
+}
+#define SC64_P10_TERRAN_BUILDER(worker) (u[(worker)].type == U_SCV)
+#else
+#define SC64_P10_TERRAN_BUILDER(worker) 0
+#endif
+
 static int race_owner_minerals(int owner)
 {
     return owner == SIDE ? minerals : owner >= 0 && owner < 5 ? race_minerals[owner] : 0;
@@ -587,7 +599,11 @@ static int race_can_site(int owner, int type, int x, int y)
         const Sc64SkirmishRecord *record = race_skirmish_build_record(owner, sc64_race_raw_building(type));
         if (!r || !record || record->kind != SC64_SK_WORKER_BUILD ||
             !race_skirmish_requirements(owner, record)) return 0;
+#ifdef SC64_P10_RUNTIME
+    } else if (!r || !race_owner_fields_race(owner, r->race) ||
+#else
     } else if (!r || r->race != race ||
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         !race_owner_has_prereq(owner, prereq)) return 0;
 #else
@@ -678,7 +694,7 @@ static int race_queue_unit(int owner, int producer, int type)
     egg_job = race_z7_active() && owner >= 0 && owner < 5 &&
         race_owner_identity(owner) == R_ZERG && sc64_z7_egg_product_valid(type) &&
         (owner != ENEMY || type == U_ZERGLING);
-    if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) ||
+    if (!r || producer < 0 || producer >= MAX_BUILDINGS || !race_owner_fields_race(owner, r->race) ||
         (!building_complete(producer) && !(egg_job && race_z7_morphing_egg_hall(owner, producer)) &&
             !(race_mode && b[producer].alive && (b[producer].type == B_LAIR || b[producer].type == B_HIVE))) ||
         b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type,
@@ -687,7 +703,7 @@ static int race_queue_unit(int owner, int producer, int type)
         (!race_mode && !race_owner_has_prereq(owner, r->prereq))) return 0;
     if (!egg_job && b[producer].queue_count >= 5) return 0;
 #else
-    if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) ||
+    if (!r || producer < 0 || producer >= MAX_BUILDINGS || !race_owner_fields_race(owner, r->race) ||
         (!building_complete(producer) && !(race_mode && b[producer].alive &&
             (b[producer].type == B_LAIR || b[producer].type == B_HIVE))) ||
         b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type,
@@ -843,7 +859,7 @@ static int race_build_request_valid(int owner, int worker, int type,
         *x = geysers[geyser].x;
         *y = geysers[geyser].y;
     }
-    if (!r || r->race != race_owner_identity(owner) || worker < 0 || worker >= MAX_UNITS ||
+    if (!r || !race_owner_fields_race(owner, r->race) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner ||
         (race_mode ? (!sc64_race_is_worker(u[worker].type) ||
             sc64_race_unit_rule(u[worker].type)->race != r->race) : u[worker].type != r->worker) ||
@@ -945,7 +961,7 @@ static int race_builder_arrived(int worker)
     if (worker < 0 || worker >= MAX_UNITS || !u[worker].alive || u[worker].order != ORDER_BUILD) return 0;
     building = u[worker].target;
     if (building < 0 || building >= MAX_BUILDINGS || !b[building].alive) return 0;
-    if (race_owner_identity(u[worker].owner) == R_TER) return 0;
+    if (race_owner_identity(u[worker].owner) == R_TER || SC64_P10_TERRAN_BUILDER(worker)) return 0;
     if (dist2(u[worker].x, u[worker].y, b[building].x, b[building].y) > 36 * 36) return 0;
     if (b[building].build_progress < 0) b[building].build_progress = 0;
     if (race_owner_identity(u[worker].owner) == R_ZERG) {

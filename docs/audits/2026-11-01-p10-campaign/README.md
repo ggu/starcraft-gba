@@ -1,5 +1,10 @@
 # P10 "Eye of the Storm" candidate (2026-11-01)
 
+> Later work adds an ordinary-input win, ARM replay and fresh-process continuation,
+> and lets Raynor's base train and build. See the
+> [ordinary-input audit](../2026-11-03-p10-ordinary-input/README.md). The limits below
+> describe this candidate as first recorded.
+
 This audit records an explicit `protoss-p10` candidate: the P9 candidate
 (#155) plus P10 as the tenth Protoss campaign entry. It is a runtime and
 save integration with host checks only. **P10 is not qualified as winnable
