@@ -153,6 +153,15 @@ SCREEN_PLAY = 1
 # Pinned Z7 SRAM schema (generation 36, RaceSave), independent of any log.
 SAVE_TAG = 0x53435A54
 SAVE_PAYLOAD_BYTES = 16296
+# The probe reports the inner RaceSave identity; the journal carries the
+# transport namespace and a 16-byte trailer. Profiles are explicit so old
+# records never silently qualify as current ones.
+SAVE_PROFILES = {
+    "legacy": (SAVE_TAG, SAVE_TAG, False),
+    "transport1": (SAVE_TAG, SAVE_TAG | 0x04000000, True),
+    "cargo-transport1": (SAVE_TAG ^ 0x01000000,
+                         (SAVE_TAG ^ 0x01000000) | 0x04000000, True),
+}
 FIELD = re.compile(r"(\w+)=(-?\d+(?:,-?\d+)*)$")
 
 
@@ -416,16 +425,46 @@ def run_mgba(rom: pathlib.Path, out: pathlib.Path, timeout: float,
 
 
 def sram_check(mode: str, plan: dict, data: bytes | None,
-               seed: bytes | None) -> tuple[list[dict], list[str]]:
+               seed: bytes | None, save_profile: str = "legacy") -> tuple[list[dict], list[str]]:
     """Verify the SRAM a run must leave against the pinned Z7 schema."""
     if data is None:
         return [], ["SRAM not verified"]
     if len(data) != SAVE_BYTES:
         return [], [f"SRAM is {len(data)} bytes, expected {SAVE_BYTES}"]
     records, errors = save_records(data), []
+    inner_tag, outer_tag, transport = SAVE_PROFILES[save_profile]
     for r in records:
-        if not r["checksum_valid"] or r["tag"] != SAVE_TAG or \
-                r["payload_bytes"] != SAVE_PAYLOAD_BYTES or not r["sequence"]:
+        valid = r["checksum_valid"] and r["tag"] == outer_tag and r["sequence"]
+        if transport and valid:
+            off = r["slot"] * SAVE_SLOT_SIZE + 16
+            payload = data[off:off + r["payload_bytes"]]
+            valid = len(payload) >= SAVE_PAYLOAD_BYTES + 16
+            if valid:
+                valid = struct.unpack_from("<I", payload)[0] == inner_tag
+                trailer = payload[-16:]
+                producers = set()
+                for i in range(4):
+                    remaining, producer, researched = struct.unpack_from("<HBB", trailer, i * 4)
+                    if (remaining > 3000 or producer > 96 or researched > 1 or
+                        bool(remaining) != bool(producer) or (researched and remaining) or
+                        (producer and producer in producers)):
+                        valid = False
+                    if producer:
+                        producers.add(producer)
+                extension = payload[SAVE_PAYLOAD_BYTES:-16]
+                if extension:
+                    count = extension[4] if len(extension) >= 8 else 0
+                    valid = valid and (extension[:4] == b"IMP1" and extension[5:8] == b"\0\0\0"
+                                       and 1 <= count <= 8 and len(extension) == 8 + 6 * count)
+                    if valid:
+                        for pos in range(8, len(extension), 6):
+                            meta, damage, steps, source = struct.unpack_from("<HHBB", extension, pos)
+                            if ((meta & 0x1ff) >= 288 or ((meta >> 9) & 7) >= 5 or
+                                (meta >> 12) > 7 or not steps or source >= 64):
+                                valid = False
+        elif valid:
+            valid = r["payload_bytes"] == SAVE_PAYLOAD_BYTES
+        if not valid:
             errors.append(f"invalid SRAM record in slot {r['slot']}")
     sequences = sorted(r["sequence"] for r in records)
     won = plan["final"]["kind"] == "won"
@@ -449,7 +488,7 @@ def sram_check(mode: str, plan: dict, data: bytes | None,
 
 
 def loaded_check(plan: dict, loaded: dict, cut: int | None, prefix: str | None,
-                 seed: bytes | None, timed: bool) -> list[str]:
+                 seed: bytes | None, timed: bool, save_profile: str) -> list[str]:
     """LOADED must report the state the qualifying prefix saved into the seed.
 
     Load-tick semantics: the resume ROM holds L for one frame on the title
@@ -460,7 +499,7 @@ def loaded_check(plan: dict, loaded: dict, cut: int | None, prefix: str | None,
     records but not a game tick."""
     if prefix is None:
         return ["resume prefix log not supplied"]
-    base = evaluate(plan, "prefix", prefix, None, timed=timed, sram=seed)
+    base = evaluate(plan, "prefix", prefix, None, timed=timed, sram=seed, save_profile=save_profile)
     errors = [f"resume prefix: {f}" for f in base["failures"]]
     if base["cut"] is None or base["cut"] != cut:
         return errors + [f"resume cut {cut} is not the prefix cut {base['cut']}"]
@@ -474,7 +513,7 @@ def loaded_check(plan: dict, loaded: dict, cut: int | None, prefix: str | None,
 
 def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool = True,
              sram: bytes | None = None, seed: bytes | None = None,
-             prefix: str | None = None) -> dict:
+             prefix: str | None = None, save_profile: str = "legacy") -> dict:
     """Qualify one replay log. Every gate must pass; failures are listed."""
     records, failures = parse_records(text)
     singles, order, stop = records["singles"], records["order"], plan["stop"]
@@ -495,7 +534,7 @@ def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool =
         if count["DONE"] or count["LOADED"]:
             failures.append("prefix log has records of another mode")
         cut = fields.get("cut")
-        if fields and (fields["tag"] != SAVE_TAG or fields["payload_bytes"] != SAVE_PAYLOAD_BYTES):
+        if fields and (fields["tag"] != SAVE_PROFILES[save_profile][0] or fields["payload_bytes"] != SAVE_PAYLOAD_BYTES):
             failures.append(f"SAVED schema tag={fields['tag']} bytes={fields['payload_bytes']} "
                             f"is not the pinned Z7 schema")
         if type(cut) is not int or not 1 <= cut < stop:
@@ -518,7 +557,7 @@ def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool =
                 failures.append(f"expected one successful LOADED record after START, "
                                 f"found {count['LOADED']}")
             else:
-                failures += loaded_check(plan, loaded[0][2], cut, prefix, seed, timed)
+                failures += loaded_check(plan, loaded[0][2], cut, prefix, seed, timed, save_profile)
         elif count["LOADED"]:
             failures.append("full run has a LOADED record")
         if count["DONE"] != 1 or order[-1:] != ["DONE"] or count["SAVED"]:
@@ -550,9 +589,9 @@ def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool =
         failures += timing_errors
     elif records["cycles"]:
         failures.append("an untimed log carries timing records")
-    sram_records, sram_errors = sram_check(mode, plan, sram, seed)
+    sram_records, sram_errors = sram_check(mode, plan, sram, seed, save_profile)
     failures += sram_errors
-    return {"mode": mode, "lines": records["lines"], "cut": cut,
+    return {"mode": mode, "save_profile": save_profile, "lines": records["lines"], "cut": cut,
             "expected_observations": expected_checks, "compared_observations": compared,
             "mismatch_count": len(mismatches), "guest_timing": guest_timing,
             "timed": timed, "sram_records": sram_records,
@@ -587,6 +626,9 @@ def main() -> int:
     run.add_argument("--prefix-log", type=pathlib.Path,
                      help="resume: log of the prefix run that wrote the seed")
     run.add_argument("--timeout", type=float, default=6 * 3600)
+    for command in (check, run):
+        command.add_argument("--save-profile", choices=tuple(SAVE_PROFILES), default="legacy",
+                             help="expected Z7 journal namespace and envelope")
     args = parser.parse_args()
     for name in ("trace", "rom", "out", "log", "seed_sav", "sav", "prefix_log"):
         if getattr(args, name, None) is not None:
@@ -607,7 +649,8 @@ def main() -> int:
     if args.command == "compare":
         sram = args.sav.read_bytes() if args.sav else None
         result = evaluate(plan, args.mode, args.log.read_text(errors="replace"), args.cut,
-                          timed=not args.untimed, sram=sram, seed=seed, prefix=prefix)
+                          timed=not args.untimed, sram=sram, seed=seed, prefix=prefix,
+                          save_profile=args.save_profile)
         print(json.dumps(result, indent=2))
         return 0 if result["qualified"] else 1
     if not MGBA.exists():
@@ -619,7 +662,7 @@ def main() -> int:
     text, wall = run_mgba(args.rom, args.out, args.timeout, args.seed_sav, markers)
     sav = args.out / "saves" / "replay.sav"
     data = sav.read_bytes() if sav.exists() else None
-    result = evaluate(plan, args.mode, text, args.cut, sram=data, seed=seed, prefix=prefix)
+    result = evaluate(plan, args.mode, text, args.cut, sram=data, seed=seed, prefix=prefix, save_profile=args.save_profile)
     result.update({"trace_sha256": plan["trace_sha256"],
                    "rom_sha256": sha256(args.rom.read_bytes()), "wall_seconds": round(wall, 1),
                    "sram_sha256": sha256(data) if data else None,

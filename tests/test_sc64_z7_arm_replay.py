@@ -396,6 +396,49 @@ class Z7ArmReplayTest(unittest.TestCase):
         self.assertFails(self.resume(plan, moved, forged, 301, seed=seed, sram=done),
                          "resume prefix:")
 
+    def test_cargo_prefix_inner_tag_and_resume_seed(self):
+        plan = self.plan()
+        inner, outer, _ = replay.SAVE_PROFILES["cargo-transport1"]
+        base = struct.pack("<I", inner) + bytes(PAYLOAD - 4) + bytes(16)
+        seed = sram((0, 1, base, True), tag=outer)
+        prefix = self.prefix_log(plan, tag=inner)
+        result = replay.evaluate(plan, "prefix", prefix, None, sram=seed,
+                                 save_profile="cargo-transport1")
+        self.assertTrue(result["qualified"], result["failures"])
+        self.assertFalse(replay.evaluate(plan, "prefix", prefix, None, sram=seed)["qualified"])
+        wrong = self.prefix_log(plan, tag=outer)
+        self.assertFalse(replay.evaluate(plan, "prefix", wrong, None, sram=seed,
+                                         save_profile="cargo-transport1")["qualified"])
+        rows = self.rows(plan)
+        log = run_log(rows[2:], head=[LOADED], timing=("terminal", 600, 300), mode=2)
+        done = sram((0, 1, base, True), (1, 2, base, True), tag=outer)
+        result = replay.evaluate(plan, "resume", log, 301, seed=seed, sram=done,
+                                 prefix=prefix, save_profile="cargo-transport1")
+        self.assertTrue(result["qualified"], result["failures"])
+
+    def test_transport_save_profiles_and_impact_envelopes(self):
+        plan = {"final": {"kind": "won"}}
+        for profile in ("transport1", "cargo-transport1"):
+            inner, outer, _ = replay.SAVE_PROFILES[profile]
+            base = struct.pack("<I", inner) + bytes(PAYLOAD - 4)
+            trailer = bytes(16)
+            for impact in (b"", b"IMP1" + bytes([1, 0, 0, 0]) + struct.pack("<HHBB", 1, 3, 1, 1)):
+                data = sram((0, 1, base + impact + trailer, True), tag=outer)
+                self.assertEqual(replay.sram_check("full", plan, data, None, profile)[1], [])
+                self.assertTrue(replay.sram_check("full", plan, data, None, "legacy")[1])
+            bad_payloads = [
+                struct.pack("<I", inner ^ 1) + bytes(PAYLOAD - 4) + trailer,
+                base + b"IMP1" + bytes([1, 0, 0, 0]) + b"x" + trailer,
+                base + bytes([0, 0, 0, 2]) + bytes(12),
+                base + b"IMP1" + bytes([1, 0, 0, 0]) + struct.pack("<HHBB", 1, 3, 0, 1) + trailer,
+                base + bytes(15),
+            ]
+            for payload in bad_payloads:
+                data = sram((0, 1, payload, True), tag=outer)
+                self.assertTrue(replay.sram_check("full", plan, data, None, profile)[1])
+            bad_tag = sram((0, 1, base + trailer, True), tag=outer ^ 1)
+            self.assertTrue(replay.sram_check("full", plan, bad_tag, None, profile)[1])
+
     def test_save_records_verify_alternating_slot_checksums(self):
         records = replay.save_records(sram((0, 1, b"\x01" * 32, True), (1, 2, b"\x01" * 32, False)))
         self.assertEqual([(r["slot"], r["sequence"], r["checksum_valid"]) for r in records],
