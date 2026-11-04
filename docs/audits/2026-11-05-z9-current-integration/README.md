@@ -97,3 +97,10 @@ qualification is claimed here: final combined startup/carried-mission and
 clean default/unified checks are pending. The default still exposes 27/30
 missions. Z9 playability is demonstrated on the frozen source above; default
 promotion remains a separate decision after the applicable carried checks.
+
+The separate carried fixture at `daaf5be1` (latest-main opening adjustment
+included) subsequently passes all nine campaign normal-menu startup/save
+roundtrips and 234 skirmish configurations with generation 48. Its production
+sources, Makefiles and promoted-profile fixture match `455e54bf` byte-for-byte;
+only audit history differs. These are bounded startup/save checks, not carried
+mission wins. Ordinary-input Z1–Z8 controllers remain in progress separately.
