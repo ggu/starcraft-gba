@@ -95,6 +95,11 @@ static u32 state_digest(void)
         H(q->hp); H(q->shield); H(q->x); H(q->y); H(q->tx); H(q->ty);
         H(q->target); H(q->raw_type); H(q->raw_owner); H(q->cd);
         H(q->owner); H(q->type); H(q->order); H(q->carry);
+#ifdef PX_CARGO_DIGEST
+        /* Late-campaign continuation must also observe cargo kind/pending
+         * state and worker progress, as the dedicated P10 probe does. */
+        H(q->flags); H(q->work_timer); H(q->build);
+#endif
     }
     for (int i = 0; i < MAX_BUILDINGS; i++) {
         const Building *q = &b[i];
@@ -229,6 +234,8 @@ int main(int argc, char **argv)
 #ifdef PX_REPLAY_PREFIX
     host_sram_io(sram_path, 1);
 #endif
+    /* Optional separate output: never overwrite a resume seed implicitly. */
+    if (argc > 2) host_sram_io(argv[2], 1);
 #endif
     out_text("PX DONE"); out_field("cursor", (long)cursor); out_flush();
 #ifdef GBA_HOST

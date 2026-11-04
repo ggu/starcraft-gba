@@ -33,3 +33,19 @@ successful mission does not imply the unfinished 30 fps target is met.
 All native work uses the shared local flock and bounded storage. ROMs, generated
 data, saves and logs remain ignored/private. No Actions or SD writes are part
 of this qualification.
+
+## Initial current-source result
+
+At `474a0c9e`, the source-boundary check, script-report tests, Z9 game fixture,
+source-art coverage fixture and normal Z9 ROM/guard pass. The ordinary-input
+HOST controller wins at frame 79,409 / call 82,066 with zero mission faults,
+matching its historical route's endpoint. All 1,958 input hashes remain unchanged.
+ARM and fresh-process save qualification are pending.
+
+The next replay source enables `PX_CARGO_DIGEST` in late-campaign replay wrappers
+only, adding unit flags, work timer and build to the existing digest. Production
+mechanics and older P8/P9 digest schemas are unchanged. An optional second HOST
+argument exports complete final SRAM separately; it never overwrites a resume
+seed implicitly. This permits comparison of genuine full/prefix/resumed journals
+alongside sampled checkpoints, rather than treating digest equality as complete
+state equality.

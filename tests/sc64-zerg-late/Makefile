@@ -127,7 +127,7 @@ test-sc64-zerg-late-art: build/test-sc64-zerg-late-art
 # $(1) lower-case id, $(2) upper-case id, $(3) mission, $(4) ROM code.
 define ZERG_LATE_ARM_ROM
 build/starcraft-zerg-$(1)-$(5).elf: $$($(2)_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
-	$$(CC) $$(CFLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -I$$($(2)_ARM_DIR) -DPX_MISSION=$(3) -DPX_DIRECT_LOG $(6) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-$(1)-$(5).map -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -I$$($(2)_ARM_DIR) -DPX_MISSION=$(3) -DPX_DIRECT_LOG -DPX_CARGO_DIGEST $(6) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-$(1)-$(5).map -lgcc -o $$@
 	$$(SIZE) $$@
 build/StarCraft-Zerg-$(2)-$(7).gba: build/starcraft-zerg-$(1)-$(5).elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@
@@ -148,11 +148,11 @@ test-sc64-$(1)-controller: build/$(1)-arm/$(1)-controller.jsonl
 build/$(1)-arm/sc64_px_tape_generated.h: build/$(1)-arm/$(1)-controller.jsonl tools/sc64_p8_arm_replay.py
 	$$($(2)_TOOL) tape $$< $$@
 build/test-sc64-$(1)-replay: $$($(2)_REPLAY_DEPS) | build
-	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) $$< -o $$@
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST $$< -o $$@
 build/test-sc64-$(1)-replay-prefix: $$($(2)_REPLAY_DEPS) | build
-	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_REPLAY_PREFIX $$< -o $$@
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST -DPX_REPLAY_PREFIX $$< -o $$@
 build/test-sc64-$(1)-replay-resume: $$($(2)_REPLAY_DEPS) | build
-	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_REPLAY_RESUME $$< -o $$@
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST -DPX_REPLAY_RESUME $$< -o $$@
 .PHONY: test-sc64-$(1)-replay
 test-sc64-$(1)-replay: build/test-sc64-$(1)-replay build/test-sc64-$(1)-replay-prefix build/test-sc64-$(1)-replay-resume tools/sc64_p8_arm_replay.py
 	./build/test-sc64-$(1)-replay > build/$(1)-arm/host-full.txt
