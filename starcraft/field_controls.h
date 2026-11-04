@@ -110,7 +110,8 @@ field_ui_a_action(int selected)
         if (refinery >= 0 && dist2(cx, cy, b[refinery].x, b[refinery].y) < 24 * 24)
             return UI_A_GAS;
     }
-    if (selected_building >= 0 && b[selected_building].alive && field_ui_on_selected_building())
+    if (selected_building >= 0 && b[selected_building].alive && field_ui_on_selected_building() &&
+        race_building_trains(b[selected_building].type))
         return b[selected_building].under_construction ? UI_A_NONE : UI_A_TRAIN;
     if (selected && ui_hostile_at(cx, cy, &hx, &hy)) return UI_A_ATTACK;
     if (selected_worker_mineral_target() >= 0) return UI_A_MINE;

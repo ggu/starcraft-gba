@@ -414,6 +414,41 @@ test_panel_product_matches_a(void)
     memset(b, 0, sizeof(b));
 }
 
+/* A never refuses a building that cannot train, and every building that can
+ * train takes A: every product the panel offers or the queue would admit. */
+static void
+test_a_trains_only_at_producers(void)
+{
+    Building *q = &b[0];
+    for (int custom = 0; custom < 2; custom++)
+        for (int type = 0; type < SC_RB_COUNT; type++) {
+            fixture();
+            memset(b, 0, sizeof(b));
+            race_mode = custom;
+            q->alive = 1; q->owner = SIDE; q->type = type;
+            q->raw_type = sc64_race_raw_building(type); q->raw_owner = 7;
+            q->hp = q->maxhp = 1000; q->x = q->y = 100;
+            selected_building = 0;
+            cx = cy = 100;
+            assert((field_ui_a_action(0) == UI_A_TRAIN) == race_building_trains(type));
+            for (int unit = 0; unit < SC_RU_COUNT; unit++) {
+                int producer = race_skirmish_product_producer(unit);
+                train_type = unit;
+                if (hud_next_product(0) >= 0 ||
+                    (producer != 255 && sc64_race_producer_compatible(type, producer)))
+                    assert(race_building_trains(type));
+            }
+            if (!race_building_trains(type)) {
+                toast_timer = toast_id = 0;
+                interact();
+                assert(!toast_timer && !q->queue_count);
+            }
+        }
+    race_mode = 0;
+    selected_building = -1;
+    memset(b, 0, sizeof(b));
+}
+
 #ifdef SC64_SHARED_BUNKER
 /* A Bunker shows its passengers as icons in four slots. */
 static void
@@ -1051,6 +1086,7 @@ main(void)
 #ifdef SC64_HUD_PANEL
     test_panel_shows_building_queue();
     test_panel_product_matches_a();
+    test_a_trains_only_at_producers();
     test_panel_group_and_objective();
     test_panel_modes_use_marks();
 #ifdef SC64_SHARED_BUNKER
