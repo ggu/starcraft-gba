@@ -199,7 +199,9 @@ int main(int argc,char **argv)
             next_defend=frame+knob("Z9_DEF",200);
         }
         COST(1)
-        if(frame>=next_mine){(void)order_idle_drones(3);next_mine=frame+400;}
+        /* The unit pool fills before the bank empties: no need to chase idle
+           Drones across the field once there is plenty. */
+        if(frame>=next_mine){if(minerals<2000)(void)order_idle_drones(3);next_mine=frame+400;}
         COST(2)
         if(frame>=next_train){
             int done=0,hatch=-1;
