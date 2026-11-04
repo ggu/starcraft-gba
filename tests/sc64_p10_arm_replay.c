@@ -120,20 +120,13 @@ static void frame_with(u16 held)
 
 static void report(const char *kind, u32 tick)
 {
-    int side_units = 0, enemy_units = 0, enemy_buildings = 0, overmind = -1;
-    int zeratul = -1, gantrithor = -1, hyperion = -1;
-    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
-        if (u[i].owner == SIDE) ++side_units;
-        if (u[i].owner == ENEMY) ++enemy_units;
-        if (u[i].raw_type == 75) zeratul = u[i].hp;
-        if (u[i].raw_type == 82) gantrithor = u[i].hp;
-        if (u[i].raw_type == 28) hyperion = u[i].hp;
-    }
-    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
-        if (b[i].owner == ENEMY) ++enemy_buildings;
-        if (b[i].raw_type == 147) overmind = b[i].hp;
-    }
+    int overmind = -1, zeratul = -1;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].raw_type == 75) zeratul = u[i].hp;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].raw_type == 147) overmind = b[i].hp;
     out_text("P10 CHECK "); out_text(kind);
+    out_text(" digest="); out_unsigned(state_digest());
     out_field("tick", (long)tick);
     out_field("frame", (long)frame);
     out_field("screen", screen);
@@ -141,17 +134,12 @@ static void report(const char *kind, u32 tick)
     out_field("lost", lost);
     out_field("mission", race_selected_mission);
     out_field("faults", mission_unsupported_count);
-    out_field("side_units", side_units);
-    out_field("enemy_units", enemy_units);
-    out_field("enemy_buildings", enemy_buildings);
     out_field("overmind_hp", overmind);
     out_field("zeratul_hp", zeratul);
-    out_field("gantrithor_hp", gantrithor);
-    out_field("hyperion_hp", hyperion);
     out_field("minerals", minerals);
     out_field("gas", gas);
     out_field("switches", race_p10.switches);
-    out_text(" digest="); out_unsigned(state_digest());
+    out_text(" end=1");
     out_flush();
 }
 
