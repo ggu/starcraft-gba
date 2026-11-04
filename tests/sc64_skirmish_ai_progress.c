@@ -840,12 +840,18 @@ static int army_units(int owner, int *list, int max)
     return n;
 }
 
-static int cut_army(int owner, int keep, int *kept_slots)
+static int cut_army(int owner, int keep, int *kept_slots, int home_only)
 {
-    int kept = 0;
+    int kept = 0; RaceAiCensus c;
+    race_ai_census(owner, &c);
     for (int i = 0; i < MAX_UNITS; ++i) {
         if (!race_ai_movable_army(&u[i], owner)) continue;
-        if (kept < keep && u[i].type == U_MARINE) { kept_slots[kept++] = i; continue; }
+        if (kept < keep && u[i].type == U_MARINE && (!home_only ||
+            dist2(u[i].x,u[i].y,c.hx,c.hy) <= RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE)) {
+            kept_slots[kept++] = i;
+            if (home_only) { u[i].order=ORDER_IDLE; u[i].target=-1; u[i].tx=u[i].x; u[i].ty=u[i].y; }
+            continue;
+        }
         kill_unit(i);
     }
     /* Cancel queued army products so the army cannot refill at once. */
@@ -886,9 +892,12 @@ static int await_commit(int owner, const int *kept, int n, int limit, int *commi
  * passive human's base die through hit_target, so the match lasts. */
 static void defend_human(int owner)
 {
+    RaceAiCensus c;
+    race_ai_census(owner, &c);
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == owner && !sc64_race_is_worker(u[i].type) &&
-            dist2(u[i].x, u[i].y, race_base_x[0], race_base_y[0]) < 640 * 640) kill_unit(i);
+            dist2(u[i].x, u[i].y, race_base_x[0], race_base_y[0]) < 640 * 640 &&
+            dist2(u[i].x, u[i].y, c.hx, c.hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) kill_unit(i);
 }
 
 static int forced_commit(int scenario)
@@ -907,16 +916,18 @@ static int forced_commit(int scenario)
     while (screen == SCREEN_PLAY && !won && !lost &&
            frame < setup + (scenario == 1 ? 6000 : 0)) {
         if (scenario == 1 && frame >= setup) {
-            int marines = 0;
+            int marines = 0; RaceAiCensus home;
+            race_ai_census(owner, &home);
             for (int i = 0; i < MAX_UNITS; ++i)
-                if (race_ai_movable_army(&u[i], owner) && u[i].type == U_MARINE) ++marines;
+                if (race_ai_movable_army(&u[i], owner) && u[i].type == U_MARINE &&
+                    dist2(u[i].x,u[i].y,home.hx,home.hy) <= RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) ++marines;
             if (marines >= 3) { late_ready = 1; break; }
         }
         input(0);
         if (scenario == 1) defend_human(owner);
     }
     if (screen != SCREEN_PLAY || won || lost || (scenario == 1 && !late_ready)) goto done;
-    kept = cut_army(owner, 3, slots);
+    kept = cut_army(owner, 3, slots, scenario == 1);
     if (kept != 3) goto done;
     if (scenario == 0 || scenario == 2) exhaust_minerals(owner);
     if (scenario == 1) {
