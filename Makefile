@@ -4087,7 +4087,7 @@ $(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_polic
 build/test-sc64-z7-canonical-z6-controller-policy: tests/sc64_z6_campaign_run.c
 ZERG_Z7_CONTROLLER_TRACE ?= .local/sc64/zerg-z7-canonical-controller.jsonl
 ZERG_Z7_CONTROLLER_LIMIT ?= 200000
-ZERG_Z7_CONTROLLER_POLICY ?= --policy early-gas --policy-workers 6 --policy-reserve 50 --policy-hydras 8 --policy-second-first 0 --policy-retreat 0 --policy-home-radius 320 --home-army-r
+ZERG_Z7_CONTROLLER_POLICY ?= --policy early-gas --policy-workers 6 --policy-reserve 50 --policy-hydras 8 --policy-second-first 0 --policy-retreat 0 --policy-home-radius 320 --home-army-r --start-delay 33
 .PHONY: test-sc64-z7-last-seen test-sc64-z7-canonical-controller test-zerg-z7
 test-sc64-z7-last-seen: build/test-sc64-z7-canonical-last-seen
 	./build/test-sc64-z7-canonical-last-seen
