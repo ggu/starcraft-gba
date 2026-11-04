@@ -135,9 +135,14 @@ generation 48): the Z1–Z8 candidate plus Z9 as the ninth Zerg entry. Its
 authenticated 14-trigger program runs on the live game through the late-Zerg
 scheduler, which adds the countdown timer, Remove Unit and Deaths rows.
 Authored Protoss town AI and the Khaydarin Crystal carry also run there.
-Host fixtures cover the retrieval chain and two pause-menu save
-continuations, using fixture placements rather than ordinary input. Z9 has
-no ordinary-input win, ARM replay or timing and is not qualified. See the
+Its ordinary-input HOST route and full/prefix/fresh-process ARM continuation
+pass on the frozen integration, including worker-state digests and committed
+journal equality. All eight carried HOST routes and nine mission startup/save
+roundtrips pass with the expanded Z9 flags. Whole-tape ARM timing is about
+7.65 fps equivalent, below the 30-fps goal. This remains a separate candidate;
+carried ARM/save qualification and native AI gaps still limit default promotion.
+See the [current Z9 audit](audits/2026-11-05-z9-current-integration/README.md),
+[carried HOST audit](audits/2026-11-05-z9-carried-host/README.md), and historical
 [Z9 candidate audit](audits/2026-11-01-z9-candidate/README.md).
 
 Z10 runs in a separate `zerg-z10` candidate (`make zerg-z10`, code `SCZA`,

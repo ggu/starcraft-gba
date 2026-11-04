@@ -104,3 +104,17 @@ roundtrips and 234 skirmish configurations with generation 48. Its production
 sources, Makefiles and promoted-profile fixture match `455e54bf` byte-for-byte;
 only audit history differs. These are bounded startup/save checks, not carried
 mission wins. Ordinary-input Z1–Z8 controllers remain in progress separately.
+
+## Final merge checks
+
+At `d8d04bfa`, a separate unprepared checkout passes source-boundary, doctor,
+`./dev build` and `./dev test`: 966 Python tests (26 skipped), the separate
+5- and 8-test groups, and native fixtures. Prepared `make unified` and
+`make test-unified` pass with all 1,958 receipt input hashes unchanged.
+Subsequent integration adds the already-qualified carried controller recipes
+and audit, their build prerequisites, this documentation, and an aggregate
+`test-sc64-z9-carried-missions` target reproducing the eight documented routes.
+No production runtime changes follow the tested current-main integration.
+The carried results and five report-only metadata changes are scoped in the
+[separate audit](../2026-11-05-z9-carried-host/README.md). Default promotion and
+additional carried ARM qualification are still separate work.
