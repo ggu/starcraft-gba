@@ -51,7 +51,7 @@ Every ARM replay ended in the same win as its host run.
 | P7 `__bss_end` / `__iwram_end` | `0x0203838c` / `0x03004a28` |
 | `python3 -m unittest tests.test_sc64_dev` | Pass, 45 tests |
 | Split-race controller, skirmish rules and skirmish runtime fixtures, built with P10 flags by overriding `PROTOSS_ROM_FLAGS` | Pass |
-| Skirmish match matrix, built the same way | Pass, 18 configurations; the tool counts a human loss as a valid outcome |
+| Skirmish match matrix, built the same way | Pass, 18 configurations, all human losses, which the tool accepts. P7 flags give 17 losses and 1 win. The test controller isn't a winning strategy, so this doesn't rate skirmish balance |
 | P8, P9 and P10 scenario headers regenerated into a scratch path | Byte-identical to the pinned inputs |
 
 ## Known gaps
