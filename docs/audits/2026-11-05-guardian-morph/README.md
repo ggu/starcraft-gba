@@ -59,3 +59,36 @@ full runtime memory, double-journal payload size, graphics and linker guards
 must be measured for every intended product before activation. The 5/4 mapping
 and animation timing remain approximations requiring native comparison.
 No code, save semantics or default profile changes are implemented here.
+
+## Prototype observations
+
+The test-only adapter in `tests/sc64_guardian_wire_real.c` converts the staged
+runtime Cocoon to Overlord wire type with raw 59 and reconstructs it only when
+its test discriminator is staged. It is not connected to journal load/write.
+At `ab09d9e3` actual `game.c` profile fixtures passed warning-clean ASan/UBSan:
+T10 legacy/Cocoon ID 44 and 38-byte row, Z7 ID 42 and 35-byte row, P10 ID 53
+and 28-byte row, Showcase ID 49 and 28-byte row. All used Overlord ID 8. Each
+fixture checks full/damaged HP, owner/selection, timer bounds and malformed
+Cocoon fields, rejects legacy reconstruction and unconverted runtime rows.
+The P10 test used a separate copied fact header changing only the roster static
+assert from `SC_RU_COUNT` to `SC_RU_LEGACY_COUNT`; original SHA-256
+`bd13f2f29a5e49c4f97124c0ed627a5476eb98583f277eca4072d1d747df5a7e`,
+overlay `5f421804062e3c34143f565dac9337d78f211135ec847e9dfd4960e527fc0149`.
+The generated-input receipt itself was not modified. A generator fix and
+normal stage build are still required.
+
+The staged actor facts candidate `633b02f3` maps raw59 to 200 HP, armor 0,
+flying, no weapon and source dimensions 16/16/15/15 (eight GBA pixels).
+Pinned BWAPI `d727fed68558c506163048ea889131d8cbb33915` raw59 flags are Flyer
+and OrganicUnit and sight is four tiles; the candidate uses stationary,
+selectable/collidable/drawable engine actor flags. Warning-clean accessors passed
+on T10 at `bab84c9e`, and on Z7/P10/Showcase at `7025a459` after fixing the
+fixture to inspect raw sight without requiring an active Z7 mission. This does
+not prove native movement, sprite, targetability or actual mission sight state.
+
+OpenBW `increment_unit_counts` uses an Egg/Cocoon's queued product supply,
+not raw59's zero stock supply. Guardian and Mutalisk each use four doubled
+supply units, so the stage rule reserves four for this specific morph. OpenBW
+also treats morph-from-another-unit admission specially. Lifecycle owner/supply
+accounting, transport and pending-impact interactions still require real tests;
+no production morph command, journal tag, or ordinary menu is enabled.
