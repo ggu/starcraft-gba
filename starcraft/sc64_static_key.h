@@ -70,7 +70,7 @@ sc64_static_objects_key(void)
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         Building *q = &b[i];
         int x = q->x - camx, y = q->y - camy + 12;
-        int drawn = q->alive && x >= -20 && x <= 260 && y >= 2 && y <= 130 &&
+        int drawn = q->alive && building_art_in_view(q, x, y) &&
                     (q->owner == SIDE || currently_visible(q->x, q->y));
         /* Construction is dynamic; completion must refresh the cached art.
            Pack this discriminator into the existing drawn field, adding no RAM. */

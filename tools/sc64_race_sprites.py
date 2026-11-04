@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Generate private Zerg and Protoss unit sprites from a verified SC64 ROM.
 
 The generated C header and rendered PNG previews contain extracted game art
@@ -127,6 +128,11 @@ Z6_BUILDING_IDS = {'robotics_support_bay_z6': 171, 'shield_battery_z6': 172}
 
 # Z8's source Nydus Canal, isolated from earlier campaign sprite banks.
 Z8_BUILDING_IDS = {'nydus_canal_z8': 134}
+
+# Distinct source Init sprites for the late Zerg objective and pickup.
+# Kept behind the late runtime so earlier banks and products remain unchanged.
+ZERG_LATE_ART_IDS = {'khaydarin_formation_z9': 173,
+                     'protoss_temple_z10': 174, 'khaydarin_crystal_zl': 219}
 
 # P6-specific actor GRPs. The raw 1 Ghost, beacons, doors, and the existing
 # floor/wall traps are supplied by the base/T4/ZP/Z5 groups; only these three
@@ -370,7 +376,8 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
                  p7_building_selected: list[dict] | None = None,
                  race_building_selected: list[dict] | None = None,
                  prepack_unit_words: bool = False,
-                 z8_building_selected: list[dict] | None = None) -> None:
+                 z8_building_selected: list[dict] | None = None,
+                 zerg_late_selected: list[dict] | None = None) -> None:
     lines = [
         '/* Generated from the verified USA ROM; private local asset. */',
         '#ifndef SC64_RACE_SPRITES_GENERATED_H',
@@ -520,6 +527,13 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             for frame_index, frame in enumerate(item['frames']):
                 append_asset({'name': f'{item["name"]}_frame_{frame_index}', 'frame': frame})
         lines.append('#endif /* SC64_P7_ACTORS */')
+    if zerg_late_selected:
+        lines.append('#ifdef SC64_Z9_RUNTIME')
+        if {item['name'] for item in zerg_late_selected} == set(ZERG_LATE_ART_IDS):
+            lines.append('#define SC64_ZERG_LATE_ART_COMPLETE 1')
+        for item in zerg_late_selected:
+            append_asset(item)
+        lines.append('#endif /* SC64_Z9_RUNTIME */')
     lines += ['static inline const Sc64SpriteFrame *sc64_race_unit_sprite(unsigned short raw_type) {',
               '    switch (raw_type) {']
     seen = set()
@@ -570,6 +584,11 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
         for item in p7_selected:
             lines.append(f'    case {P7_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
         lines.append('#endif /* SC64_P7_ACTORS */')
+    if zerg_late_selected:
+        lines.append('#ifdef SC64_Z9_RUNTIME')
+        for item in zerg_late_selected:
+            lines.append(f'    case {ZERG_LATE_ART_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
+        lines.append('#endif /* SC64_Z9_RUNTIME */')
     lines += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif']
     if t4_selected:
         # A null sprite means "use the generic fallback" in game.c, so it
@@ -825,7 +844,10 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
              include_z6_buildings: bool = False,
              include_p7: bool = False,
              prepack_unit_words: bool = False,
-             include_z8_buildings: bool = False) -> dict:
+             include_z8_buildings: bool = False,
+             include_zerg_late_art: bool = False) -> dict:
+    if include_zerg_late_art and not include_z8_buildings:
+        raise ValueError("late Zerg art requires the Z8 bank")
     raw = rom.read_bytes()
     extractor = base.load_extractor(base.UPSTREAM)
     normalized = extractor.load_rom(str(rom))
@@ -943,6 +965,7 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     p7_refs = base.resolve_grp_indices(archive, P7_UNIT_IDS) if include_p7 else {}
     p7_building_refs = base.resolve_grp_indices(archive, P7_BUILDING_IDS) if include_p7 else {}
     z8_building_refs = base.resolve_grp_indices(archive, Z8_BUILDING_IDS) if include_z8_buildings else {}
+    zerg_late_refs = base.resolve_grp_indices(archive, ZERG_LATE_ART_IDS) if include_zerg_late_art else {}
     palette = base.decode_rgba5551_palette(base._entry_payload(archive, '00B/004'))
     entries = {entry.path: entry for entry in archive.entries()}
     selected, t4_selected, t4_building_selected, t6_selected = [], [], [], []
@@ -956,8 +979,9 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     p7_selected, p7_building_selected = [], []
     race_building_selected = []
     z8_building_selected = []
+    zerg_late_selected = []
     out.mkdir(parents=True, exist_ok=True)
-    def load_asset(name, ref, target):
+    def load_asset(name, ref, target, require_opaque_remap=False):
         grp_data = archive.read(entries[ref['bolt_path']])
         grp = base.parse_grp(grp_data)
         frame_index = image_init_frame(ref['image_id'], image_iscript,
@@ -967,6 +991,9 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
         frame = source_init_frame(ref['image_id'])
         if not any(frame['alpha']):
             raise ValueError(f'{name}: source Init frame {frame_index} is fully transparent')
+        if require_opaque_remap and any(alpha and remap[pixel] == 0
+                                        for pixel, alpha in zip(frame['pixels'], frame['alpha'])):
+            raise ValueError(f'{name}: opaque source pixels map to transparent color 0')
         png = out / f'{name}.png'
         base.encode_png(png, frame['width'], frame['height'], base.render_frame(frame, palette))
         target.append({'name': name, 'frame': frame})
@@ -982,6 +1009,11 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
                                 'preview': png.name})
     for name, ref in refs.items():
         load_asset(name, ref, selected)
+    for name, ref in zerg_late_refs.items():
+        load_asset(name, ref, zerg_late_selected, require_opaque_remap=True)
+    if include_zerg_late_art and (set(zerg_late_refs) != set(ZERG_LATE_ART_IDS) or
+            {int(ref["unit_id"]) for ref in zerg_late_refs.values()} != set(ZERG_LATE_ART_IDS.values())):
+        raise ValueError("late Zerg art did not resolve completely")
     cannon_ref = refs['photon_cannon']
     cannon_grp_data = archive.read(entries[cannon_ref['bolt_path']])
     cannon_grp = base.parse_grp(cannon_grp_data)
@@ -1188,7 +1220,7 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
                  zp_selected, zp_building_selected, z5_selected, z5_building_selected,
                  z6_selected, z5_doodad_selected, p6_selected, p6_doodad_selected,
                  z6_building_selected, p7_selected, p7_building_selected,
-                 race_building_selected, prepack_unit_words, z8_building_selected)
+                 race_building_selected, prepack_unit_words, z8_building_selected, zerg_late_selected)
     mapped_raw_types = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values()) | set(T4_BUILDING_IDS.values())
     actual_sprite_raw_types = ({int(ref['unit_id']) for ref in refs.values()} |
                                {int(ref['unit_id']) for ref in t4_refs.values()})
@@ -1279,6 +1311,10 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
         report['p7_assets_manifest_sha256'] = named_asset_manifest_sha256(
             manifest_assets, set(P7_SHARED_UNIT_IDS) | set(P7_UNIT_IDS) |
             set(P7_BUILDING_IDS))
+    if include_zerg_late_art:
+        report['zerg_late_raw_art_ids'] = ZERG_LATE_ART_IDS
+        report['zerg_late_art_manifest_sha256'] = named_asset_manifest_sha256(
+            manifest_assets, set(ZERG_LATE_ART_IDS))
     if include_z8_buildings:
         report['z8_raw_building_ids'] = Z8_BUILDING_IDS
         report['z8_building_assets_manifest_sha256'] = named_asset_manifest_sha256(
@@ -1315,6 +1351,8 @@ def main() -> int:
                         help='include SC64_P7_ACTORS Arbiter and Protoss structure source sprites')
     parser.add_argument('--include-z8-buildings', action='store_true',
                         help='include the SC64_Z8_RUNTIME Nydus Canal source frames')
+    parser.add_argument('--include-zerg-late-art', action='store_true',
+                        help='include Z9/Z10 formation, temple and crystal Init sprites (requires --include-z8-buildings)')
     parser.add_argument('--prepack-unit-words', action='store_true',
                         help='emit optional four-phase color/mask words for mapped raw unit IDs below 106')
     args = parser.parse_args()
@@ -1330,7 +1368,8 @@ def main() -> int:
                           include_z6_buildings=args.include_z6_buildings,
                           include_p7=args.include_p7_actors,
                           prepack_unit_words=args.prepack_unit_words,
-                          include_z8_buildings=args.include_z8_buildings)
+                          include_z8_buildings=args.include_z8_buildings,
+                          include_zerg_late_art=args.include_zerg_late_art)
     except (OSError, ValueError, RuntimeError, KeyError) as exc:
         print(f'sc64_race_sprites: {exc}', file=sys.stderr)
         return 1
