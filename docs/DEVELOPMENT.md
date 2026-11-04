@@ -594,8 +594,11 @@ What is imported:
   transcribing the decoded clips around the advisor block, then again from
   the generated bank. The
   header's `sc64_audio_advisor` lists their clip indices in the game's race
-  order (Terran, Zerg, Protoss), each as minerals, gas, supply, giving 510
-  clips in all.
+  order (Terran, Zerg, Protoss), each as minerals, gas, supply.
+- Advisor alerts are added by `sfxdata` id, and the header's `sc64_audio_alert`
+  lists them per race and line. `sc64_audio_alert` holds `SC64_AUDIO_ALERT_NONE`
+  where no clip is imported. See [Advisor alerts](#advisor-alerts). The bank then
+  holds 541 streams, about 192 KB more than the bank without them.
 - Music roles come from the resident N64 selector, which loads resource
   `0x1500 + track`: 0 is the menu theme; Terran, Zerg and Protoss play
   4/5, 8/9 and 12/13 in game, alternating as each ends; 2/3, 6/7 and 10/11 are
@@ -642,6 +645,46 @@ Engine design (`common/audio_mixer.h`, `common/gba.c`):
   bank generated before the advisor table stays silent for them. It never
   writes simulation state or uses the game RNG, at most two effects start per
   frame, and it ignores any tick discontinuity such as a load or restart.
+- Advisor alerts come from the same observer and use the advisor voice rules.
+  Their state lives in the VRAM arena after the event snapshot, so they add no
+  EWRAM. A bank generated before the alert table stays silent for them, and
+  profiles without a bank play a short PSG tone.
+
+### Advisor alerts
+
+When each alert fires was observed on the N64 ROM in ares, by matching captured
+audio against the decoded clips. Unless noted, this was Terran, in The Hammer
+Falls, with private save-state edits for resources; those edits are for
+observing only and are not gameplay evidence.
+
+| Alert | Terran id | N64 trigger as observed | Port trigger |
+| --- | --- | --- | --- |
+| Base is under attack | 117 | Fighting at a base off screen. Twelve plays, 14.2 to 15.6 s apart. | A player building's hit points and shields fall off screen. |
+| Your forces are under attack | 120 | Fighting off screen, after panning away: 13.4 s apart. None in the 40 s before the pan, with fighting on screen. | The same for a player unit. Shares the base line's 15 s limit. |
+| Research complete | 123 | Stim Packs finished. Zerg: id 122 when Burrow finished, in Z1. | Finished Yamato or reactor, transport or Ventral Sacs research. |
+| Upgrade complete | 131 | An Engineering Bay upgrade finished. | A running weapon or armor upgrade finished. |
+| Not enough energy | 156 | Comsat Scanner targeted without the energy, with on-screen text. | Storm, cloak or Yamato refused without the energy. |
+| Blocked placement | 159 | Each refused placement, including a site the SCV can't reach, with text. | Terran placement refused because the site can't be built on. |
+| Can't land there | 141 | A refused landing site, with text. | A refused landing order. |
+| Job's finished | 135 | Engineering Bay, Barracks, Academy and Comsat finished. | A Terran building or add-on finished, replacing its selection sound. |
+
+Zerg and Protoss alert clips are the ROM's neighboring ids, which run Zerg,
+Terran, Protoss like the refusal lines. Only Zerg research was heard on the N64,
+so the others are inferred from that order and from transcripts. How long the
+N64 waits between attack alerts, whether base and unit alerts share one wait and
+whether the wait is counted in game time are inferred from those repeats; the
+port uses one 450-tick limit.
+
+Not wired:
+
+- "Nuclear launch detected" (127) played in that mission, but the port has no
+  nuclear launch to report. "Nuclear missile ready" (133) was not triggered.
+- "Add-on complete" (125) did not play when a Comsat Station finished, and
+  "Abandoning auxiliary structure" (129) did not play when a Command Center
+  lifted off with one. "Landing sequence interrupted" (144) did not play on a
+  normal landing. When they fire is unknown.
+- Zerg and Protoss blocked placement: not triggered on the N64, so those
+  placements stay silent.
 
 Check the engine with `make test-audio` (asset-free, part of `./dev test`) and
 `make test-game-audio-unified` (part of `make test-unified`). Measured costs

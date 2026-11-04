@@ -4559,6 +4559,7 @@ test-game-audio-$(1): build/test-game-audio-$(1)-on build/test-game-audio-$(1)-o
 endef
 $(eval $(call GAME_AUDIO_PROFILE,default,,))
 $(eval $(call GAME_AUDIO_PROFILE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
+-include mk/game-audio/Makefile
 
 .PHONY: test-audio
 test-audio: build/test-audio-codec build/test-audio-mixer test-audio-codec-cross test-game-audio-default

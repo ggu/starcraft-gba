@@ -17,6 +17,8 @@ Source format (verified against the USA retail image):
   * The advisor refusals are sfxdata ids 146-154: "not enough minerals", then
     "not enough vespene gas", then "supply limit", each for Zerg, Terran and
     Protoss in that order (identified by transcribing the decoded PCM).
+  * Advisor alerts are further sfxdata ids in ALERT_SOUNDS: attacks, research,
+    upgrades, low energy and refused building or landing sites.
   * The resident N64 code selects music resource 0x1500+track. Track 0 is the
     menu theme; the in-game themes alternate per player race (Terran 4/5,
     Zerg 8/9, Protoss 12/13); the mission-end stingers are 2/3, 6/7 and
@@ -95,6 +97,18 @@ MUSIC_TRACKS = 16
 #   154 "You must construct additional pylons"
 ADVISOR_LINES = ("minerals", "gas", "supply")
 ADVISOR_SOUNDS = ((147, 150, 153), (146, 149, 152), (148, 151, 154))
+# Advisor alerts in the game's race order (Terran, Zerg, Protoss); ALERT_NONE
+# stays silent. Terran rows were matched in captured N64 audio at the trigger;
+# Zerg and Protoss rows follow the ROM's Zerg, Terran, Protoss clip order, which
+# the refusal lines above also use. docs/DEVELOPMENT.md lists what was observed.
+ALERT_NONE = 0xFFFF
+ALERT_LINES = ("base_attack", "forces_attack", "research", "upgrade", "energy",
+               "no_build", "no_land", "built")
+ALERT_SOUNDS = (
+    (117, 120, 123, 131, 156, 159, 141, 135),
+    (116, 119, 122, 130, 155, None, None, None),
+    (118, 121, 124, 132, 157, None, None, None),
+)
 # Roles come from the resident N64 music selector (see the module comment).
 MUSIC_ROLES = {
     0: "menu", 1: "unused-1", 2: "terran-result-a", 3: "terran-result-b",
@@ -621,6 +635,11 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
             raise ValueError(f"advisor sound {sound} is empty")
         if sound not in selected:
             selected.append(sound)
+    for sound in (sound for race in ALERT_SOUNDS for sound in race if sound is not None):
+        if lengths[sound] <= 8:
+            raise ValueError(f"alert sound {sound} is empty")
+        if sound not in selected:
+            selected.append(sound)
     selected.sort()
 
     clips: list[bytes] = []
@@ -681,6 +700,12 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
         "/* Advisor refusal clips per player race (Terran, Zerg, Protoss): minerals, gas, supply. */",
         f"#define SC64_AUDIO_ADVISOR_LINES {len(ADVISOR_LINES)}",
         c_array("sc64_audio_advisor", "u16", [bank_index[s] for s in advisor], len(ADVISOR_LINES)),
+        "/* Advisor alert clips per player race (Terran, Zerg, Protoss), one per line. */",
+        f"#define SC64_AUDIO_ALERT_LINES {len(ALERT_LINES)}",
+        f"#define SC64_AUDIO_ALERT_NONE {ALERT_NONE}",
+        c_array("sc64_audio_alert", "u16",
+                [ALERT_NONE if s is None else bank_index[s] for race in ALERT_SOUNDS for s in race],
+                len(ALERT_LINES)),
         "/* Byte offset of each imported track's stream. */",
         c_array("sc64_audio_music_offset", "u32", music_offset, 8),
         "/* Track lengths in 176-sample frames; zero when not imported. */",
@@ -709,6 +734,10 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
                                   "samples": sample_length[bank_index[sound]]}
                            for line, sound in zip(ADVISOR_LINES, sounds)}
                     for race, sounds in zip(("terran", "zerg", "protoss"), ADVISOR_SOUNDS)},
+        "alert": {race: {line: {"sound_id": sound, "sample": bank_index[sound],
+                                "samples": sample_length[bank_index[sound]]}
+                         for line, sound in zip(ALERT_LINES, sounds) if sound is not None}
+                  for race, sounds in zip(("terran", "zerg", "protoss"), ALERT_SOUNDS)},
     }
     (out_dir / "sc64_audio_manifest.json").write_text(json.dumps(report, indent=2) + "\n")
     return report

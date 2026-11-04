@@ -8,10 +8,12 @@
  * completed unit, a cleared construction flag a completed building, and a new
  * player selection or changed orders after input a selection or command
  * response, and a refusal cue from game.c (toast_refusal) the player race's
- * advisor line. It reads simulation state and never writes it, never touches the
- * game RNG and keeps its snapshot outside the save. Events are skipped after
- * any tick discontinuity (load, restart, pause), so a resumed game never
- * replays history.
+ * advisor line. Falling hit points on a player unit or building off screen are
+ * an under-attack alert at most once per GAME_AUDIO_ATTACK_ALERT_TICKS, and
+ * finished research and upgrades are alerts too. It reads simulation state and
+ * never writes it, never touches the game RNG and keeps its snapshot outside the
+ * save. Events are skipped after any tick discontinuity (load, restart, pause),
+ * so a resumed game never replays history.
  *
  * With an imported bank the events select StarCraft 64 samples through the
  * generated unit tables, advisor lines through sc64_audio_advisor, and music
@@ -24,7 +26,13 @@
 
 enum {
     GAME_AUDIO_ATTACK, GAME_AUDIO_DEATH, GAME_AUDIO_READY, GAME_AUDIO_WHAT,
-    GAME_AUDIO_YES, GAME_AUDIO_BUILT, GAME_AUDIO_ADVISOR, GAME_AUDIO_EVENT_KINDS
+    GAME_AUDIO_YES, GAME_AUDIO_BUILT, GAME_AUDIO_ADVISOR, GAME_AUDIO_ALERT, GAME_AUDIO_EVENT_KINDS
+};
+/* Order matches ALERT_LINES in tools/sc64_audio_pack.py. */
+enum {
+    GAME_AUDIO_ALERT_BASE, GAME_AUDIO_ALERT_FORCES, GAME_AUDIO_ALERT_RESEARCH,
+    GAME_AUDIO_ALERT_UPGRADE, GAME_AUDIO_ALERT_ENERGY, GAME_AUDIO_ALERT_NO_BUILD,
+    GAME_AUDIO_ALERT_NO_LAND, GAME_AUDIO_ALERT_BUILT, GAME_AUDIO_ALERT_KINDS
 };
 /* Per observed frame; StarCraft also caps simultaneous combat sounds. */
 #define GAME_AUDIO_EFFECTS_PER_FRAME 2
@@ -32,16 +40,38 @@ enum {
 /* Transport unloading raises the cooldown without firing. */
 #define GAME_AUDIO_SNAPSHOT_LOADED 0x200u
 #define GAME_AUDIO_SNAPSHOT_CONSTRUCTING 0x400u
+/* Hit points plus shields modulo the free snapshot bits. A rise is healing or
+ * repair, so a drop is up to half the range. Quantizing keeps large hits in
+ * range; small ones show once they cross a step. Units use bits 10-15 at four
+ * hit points a step, buildings bits 0-7 at sixteen. */
+#define GAME_AUDIO_UNIT_VITAL_SHIFT 10
+#define GAME_AUDIO_UNIT_VITAL_MASK 63u
+#define GAME_AUDIO_BUILDING_VITAL_MASK 255u
+/* Native repeats were 13.4 to 15.6 s apart under a sustained attack. */
+#define GAME_AUDIO_ATTACK_ALERT_TICKS 450
+#ifdef SC64_RACES
+#define GAME_AUDIO_VITAL(q) ((q)->hp + (q)->shield)
+#define GAME_AUDIO_SHIELDED(q) ((q)->shield > 0)
+#else
+#define GAME_AUDIO_VITAL(q) ((q)->hp)
+#define GAME_AUDIO_SHIELDED(q) 0
+#endif
+/* A morph restores full hit points on a smaller body, which is not damage. */
+#define GAME_AUDIO_HURT(q) ((q)->hp < (q)->maxhp || GAME_AUDIO_SHIELDED(q))
+/* Observer words after the snapshot: EWRAM has no room for them in the late campaigns. */
+enum { GAME_AUDIO_STATE_ATTACK_TICK, GAME_AUDIO_STATE_RESEARCH, GAME_AUDIO_STATE_UPGRADES, GAME_AUDIO_STATE_WORDS };
 
 #ifdef GBA_HOST
 u32 game_audio_events[GAME_AUDIO_EVENT_KINDS];
-static u16 game_audio_snapshot[MAX_UNITS + MAX_BUILDINGS];
+int game_audio_last_alert = -1;
+static u16 game_audio_snapshot[MAX_UNITS + MAX_BUILDINGS + GAME_AUDIO_STATE_WORDS];
 #define GAME_AUDIO_SNAPSHOT game_audio_snapshot
 #else
-_Static_assert(GBA_AUDIO_MIX_BYTES + (MAX_UNITS + MAX_BUILDINGS) * 2u <= GBA_AUDIO_ARENA_BYTES,
+_Static_assert(GBA_AUDIO_MIX_BYTES + (MAX_UNITS + MAX_BUILDINGS + GAME_AUDIO_STATE_WORDS) * 2u <= GBA_AUDIO_ARENA_BYTES,
                "audio snapshot exceeds the VRAM arena");
 #define GAME_AUDIO_SNAPSHOT ((volatile u16 *)(GBA_AUDIO_ARENA + GBA_AUDIO_MIX_BYTES))
 #endif
+#define GAME_AUDIO_STATE (GAME_AUDIO_SNAPSHOT + MAX_UNITS + MAX_BUILDINGS)
 
 /* Input edges come from the main loop's record of this tick's held keys, so
  * game_update() itself stays untouched (its inlining shapes IWRAM use). */
@@ -132,6 +162,13 @@ static void game_audio_emit(int kind, int raw)
         if (count) sound = sc64_audio_unit_sound[sc64_audio_unit_first[row + k] +
                                                  game_audio_variant++ % count];
     }
+#ifdef SC64_AUDIO_ALERT_LINES
+    /* The N64 says its own line when a Terran building or add-on finishes. */
+    if (kind == GAME_AUDIO_BUILT) {
+        int built = sc64_audio_alert[GAME_AUDIO_PLAYER_RACE * SC64_AUDIO_ALERT_LINES + GAME_AUDIO_ALERT_BUILT];
+        if (built != SC64_AUDIO_ALERT_NONE) sound = built;
+    }
+#endif
     /* Units without a sample in the bank stay silent rather than beep. */
     if (sound >= 0) audio_play_sample((u16)sound, priority[kind], speech ? 1 : 0);
     return;
@@ -148,11 +185,36 @@ static void game_audio_emit(int kind, int raw)
     }
 }
 
+/* An alert the bank has no clip for stays silent, as does an older bank. */
+static void game_audio_alert(int line)
+{
+#ifdef GBA_HOST
+    ++game_audio_events[GAME_AUDIO_ALERT];
+    game_audio_last_alert = line;
+#endif
+#ifdef SC64_AUDIO_IMPORTED
+#ifdef SC64_AUDIO_ALERT_LINES
+    _Static_assert(SC64_AUDIO_ALERT_LINES == GAME_AUDIO_ALERT_KINDS, "alert table and observer lines differ");
+    u16 sound = sc64_audio_alert[GAME_AUDIO_PLAYER_RACE * SC64_AUDIO_ALERT_LINES + line];
+    if (sound != SC64_AUDIO_ALERT_NONE) audio_play_sample(sound, 0, AUDIO_CLASS_ADVISOR);
+#endif
+    (void)line;
+    return;
+#else
+    audio_tone(line <= GAME_AUDIO_ALERT_FORCES ? 440 : 600, 8, 2);
+#endif
+}
+
 /* One refusal cue per observed frame; the mixer plays one advisor line at a
  * time, so presses while it speaks are dropped and the next one replays it. */
 static void game_audio_advisor(int cue)
 {
     int line = cue == 1 ? 0 : cue == 12 ? 1 : 2;  /* minerals, gas, supply */
+    if (cue >= TOAST_CUE_ENERGY) {
+        game_audio_alert(cue == TOAST_CUE_ENERGY ? GAME_AUDIO_ALERT_ENERGY :
+                         cue == TOAST_CUE_NO_BUILD ? GAME_AUDIO_ALERT_NO_BUILD : GAME_AUDIO_ALERT_NO_LAND);
+        return;
+    }
 #ifdef GBA_HOST
     ++game_audio_events[GAME_AUDIO_ADVISOR];
 #endif
@@ -166,6 +228,25 @@ static void game_audio_advisor(int cue)
 #else
     audio_tone(line == 0 ? 330 : line == 1 ? 294 : 262, 8, 2);
 #endif
+}
+
+#ifdef SC64_RACES
+static int race_audio_research_count(void);  /* After the campaign adapters, in game.c. */
+#endif
+
+/* Finished research and upgrades, as rises in the player's own counts. Only a
+ * running upgrade can finish, so mission scripts granting one stay silent. */
+static void game_audio_tech(int fresh)
+{
+    volatile u16 *state = GAME_AUDIO_STATE;
+#ifdef SC64_RACES
+    u32 research = (u32)race_audio_research_count();
+    if (!fresh && research > state[GAME_AUDIO_STATE_RESEARCH]) game_audio_alert(GAME_AUDIO_ALERT_RESEARCH);
+    state[GAME_AUDIO_STATE_RESEARCH] = (u16)research;
+#endif
+    u32 levels = (u32)(weapons_level + armor_level), previous = state[GAME_AUDIO_STATE_UPGRADES];
+    if (!fresh && levels > previous >> 1 && (previous & 1u)) game_audio_alert(GAME_AUDIO_ALERT_UPGRADE);
+    state[GAME_AUDIO_STATE_UPGRADES] = (u16)(levels << 1 | (weapons_research || armor_research ? 1u : 0u));
 }
 
 #ifdef SC64_AUDIO_IMPORTED
@@ -196,7 +277,7 @@ static void game_audio_observe(void)
     volatile u16 *snap = GAME_AUDIO_SNAPSHOT;
     int fresh, i;
     u32 selection = 0, orders = 0;
-    int first_selected = -1;
+    int first_selected = -1, attacked = 0;
     u16 held = GAME_AUDIO_HELD(), pressed = held & (u16)~game_audio_previous_held;
     int advisor = toast_advisor;
     game_audio_previous_held = held;
@@ -218,6 +299,7 @@ static void game_audio_observe(void)
     game_audio_last_frame = frame;
     game_audio_effects = 0;
     if (advisor && !fresh) game_audio_advisor(advisor);
+    game_audio_tech(fresh);
     for (i = 0; i < MAX_UNITS; i++) {
         const Unit *q = &u[i];
         u32 prev = snap[i];
@@ -225,6 +307,15 @@ static void game_audio_observe(void)
         u32 cd = q->cd > 255 ? 255u : (u32)q->cd;
         u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE | cd : 0;
         if (q->alive && SC64_TRANSPORT_LOADED(q)) now |= GAME_AUDIO_SNAPSHOT_LOADED;
+        if (q->alive) {
+            u32 vital = ((u32)GAME_AUDIO_VITAL(q) >> 2) & GAME_AUDIO_UNIT_VITAL_MASK;
+            u32 drop = ((prev >> GAME_AUDIO_UNIT_VITAL_SHIFT) - vital) & GAME_AUDIO_UNIT_VITAL_MASK;
+            now |= vital << GAME_AUDIO_UNIT_VITAL_SHIFT;
+            if (!fresh && drop && drop <= GAME_AUDIO_UNIT_VITAL_MASK / 2 && q->owner == SIDE &&
+                (prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !(prev & GAME_AUDIO_SNAPSHOT_LOADED) &&
+                GAME_AUDIO_HURT(q) && !game_audio_on_screen(q->x, q->y))
+                attacked |= 1;
+        }
         if (!fresh) {
             if ((prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !q->alive) {
                 if (game_audio_on_screen(q->x, q->y))
@@ -250,6 +341,19 @@ static void game_audio_observe(void)
         if (!q->alive && !prev) continue;
         u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE |
                   (q->under_construction ? GAME_AUDIO_SNAPSHOT_CONSTRUCTING : 0) : 0;
+        if (q->alive) {
+            u32 vital = ((u32)GAME_AUDIO_VITAL(q) >> 4) & GAME_AUDIO_BUILDING_VITAL_MASK;
+            u32 drop = (prev - vital) & GAME_AUDIO_BUILDING_VITAL_MASK;
+            now |= vital;
+            if (!fresh && drop && drop <= GAME_AUDIO_BUILDING_VITAL_MASK / 2 && q->owner == SIDE &&
+                (prev & GAME_AUDIO_SNAPSHOT_ALIVE) && GAME_AUDIO_HURT(q) &&
+#ifdef SC64_RACES
+                /* A burning Terran building loses hit points by itself. */
+                !(q->hp * 3 <= q->maxhp && race_building_can_burn(q)) &&
+#endif
+                !game_audio_on_screen(q->x, q->y))
+                attacked |= 2;
+        }
         if (!fresh) {
             if ((prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !q->alive) {
                 if (game_audio_on_screen(q->x, q->y))
@@ -274,5 +378,10 @@ static void game_audio_observe(void)
     }
     game_audio_selection = selection;
     game_audio_orders = orders;
+    /* Modular age: restarting or loading an earlier tick reads as long ago. */
+    if (attacked && (u16)((u32)frame - GAME_AUDIO_STATE[GAME_AUDIO_STATE_ATTACK_TICK]) >= GAME_AUDIO_ATTACK_ALERT_TICKS) {
+        GAME_AUDIO_STATE[GAME_AUDIO_STATE_ATTACK_TICK] = (u16)frame;
+        game_audio_alert(attacked & 2 ? GAME_AUDIO_ALERT_BASE : GAME_AUDIO_ALERT_FORCES);
+    }
 }
 #endif
