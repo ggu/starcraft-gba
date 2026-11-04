@@ -34,6 +34,10 @@ static RaceImpactRecord race_impact_record;
 #else
 static RaceSave race_data;
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#include "sc64_guardian_wire.h"
+static int race_guardian_stage_wire;
+#endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 #include "sc64_scarab_flight_bridge.h"
 /* Set only from the authenticated selected tag, before candidate decoding. */
@@ -59,7 +63,7 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
         ((unsigned)candidate->state[27] & 0xffff0000u)==0x42450000u)
         out->carry=(u16)candidate->units[slot][offsetof(Unit,carry)/sizeof(int)];
     return 1;
-#elif defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
+#elif defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_SCARAB_NAMESPACE_STAGE) && !defined(SC64_GUARDIAN_COCOON_STAGE)
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     return sc64_p7_typed_unit_decode(out, &candidate->units[slot], world_width, world_height);
 #elif defined(SC64_Z7_DERIVED_SAVE)
@@ -87,7 +91,11 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
         return 1;
     }
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    return sc64_guardian_wire_decode(&wire,out,race_guardian_stage_wire);
+#else
     *out=wire; return 1;
+#endif
 #endif
 }
 #endif
@@ -1308,7 +1316,9 @@ static int race_save_game(void) {
     memset(&race_data, 0, sizeof(race_data));
 #endif
     race_data.version=
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        SC64_GUARDIAN_SAVE_VERSION;
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
         SC64_SCARAB_SAVE_VERSION;
 #else
         SAVE_VERSION;
@@ -1318,7 +1328,19 @@ static int race_save_game(void) {
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_ZP_FULL_STORAGE
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    for (int i=0;i<MAX_UNITS;i++) {
+        Unit wire;
+        if (!sc64_guardian_wire_encode(&u[i],&wire,1)) return 0;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+        if (!sc64_p7_typed_unit_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
+        if (!sc64_derived_unit_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+#else
+        if (!sc64_zp_unit_save_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+#endif
+    }
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     for (int i=0;i<MAX_UNITS;i++) {
         Unit wire;
         if (!race_scarab_save_wire(&u[i],&wire) ||
@@ -1341,7 +1363,13 @@ static int race_save_game(void) {
 #endif
 #else
     for(int i=0;i<MAX_UNITS;i++)
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    {
+        Unit wire;
+        if (!sc64_guardian_wire_encode(&u[i],&wire,1) ||
+            !sc64_unit_save_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+    }
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     {
         Unit wire;
         if (!race_scarab_save_wire(&u[i],&wire) ||
@@ -1363,6 +1391,9 @@ static int race_save_game(void) {
 #endif
         race_data.units[i][j]=(s16)n;
     }
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    race_guardian_stage_wire=1;
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     race_scarab_stage_wire=1;
@@ -3330,6 +3361,14 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     RaceLoadPlan *plan=context;
     if (raw != (const void *)&race_impact_record) return 0;
     memset(plan,0,sizeof(*plan));
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    race_guardian_stage_wire = tag == SC64_GUARDIAN_TRANSPORT_SAVE_VERSION;
+    if (race_guardian_stage_wire) {
+        if (race_data.version != SC64_GUARDIAN_SAVE_VERSION) return 0;
+        race_data.version = SAVE_VERSION;
+        tag = SC64_TRANSPORT_SAVE_VERSION;
+    }
+#endif
 #ifdef SC64_SHARED_TRANSPORT
     if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION) return 0;
     plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
@@ -3366,7 +3405,11 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 }
 static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
 #ifdef SC64_SHARED_TRANSPORT
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
+#else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION};
+#endif
 #elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
     const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,SAVE_VERSION};
 #else
@@ -3535,7 +3578,7 @@ static int race_load_game(void) {
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16), &decoded)) return 0;
 #else
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE)
         if(!race_save_decode_unit(&race_data,(unsigned)i,(unsigned)(race_cols*16),
                                   (unsigned)(race_rows*16),&decoded)) return 0;
 #else
@@ -3545,7 +3588,7 @@ static int race_load_game(void) {
 #endif
 #endif
 #else
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE)
         if(!race_save_decode_unit(&race_data,(unsigned)i,(unsigned)(race_cols*16),
                                   (unsigned)(race_rows*16),&decoded)) return 0;
 #else

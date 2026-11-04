@@ -489,6 +489,15 @@ _Static_assert((SC64_PRE_CARGO_SAVE_VERSION & 0x01000000u) != 0,
 _Static_assert((SAVE_VERSION & 0x04000000u) == 0, "transport save namespace overlaps");
 #define SC64_TRANSPORT_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if !defined(GBA_HOST) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SCARAB_NAMESPACE_STAGE)
+#error "Guardian journal prototype is HOST-only and requires cargo and transport without Scarab stage"
+#endif
+_Static_assert((SAVE_VERSION & 0x10000000u) != 0 && (SC64_TRANSPORT_SAVE_VERSION & 0x10000000u) != 0,
+               "Guardian namespace overlaps source selector");
+#define SC64_GUARDIAN_SAVE_VERSION (SAVE_VERSION ^ 0x10000000u)
+#define SC64_GUARDIAN_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x10000000u)
+#endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || (!defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_LATE_TERRAN_STORAGE))
 #error "Scarab namespace stage requires an explicitly supported impact save profile"
