@@ -23,11 +23,24 @@ int main() {
  Actor a(67,200,200,12,10,11,13), b(19,228,200,16,16,15,15);
  api.unit_finder_insert(&a.u);api.unit_finder_insert(&b.u);
  state_functions::execute_movement_struct step{};step.position={202,200};
- assert(api.check_ground_unit_movement_unit_collision(&a.u,step)==&b.u);
- step.position={198,200};assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));
+ auto *first=api.check_ground_unit_movement_unit_collision(&a.u,step); assert(first==&b.u);
+ std::printf("approach,%d\n",first!=nullptr);
+ step.position={198,200};assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));std::puts("escape,0");
  a.s.flags=sprite_t::flag_hidden;step.position={202,200};assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));a.s.flags=0;
  a.u.status_flags=0;assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));a.u.status_flags=unit_t::status_flag_ground_unit;
  b.u.status_flags|=unit_t::status_flag_no_collide;assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));b.u.status_flags&=~unit_t::status_flag_no_collide;
  b.u.pathing_flags=0;assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));b.u.pathing_flags=1;
- std::puts("OpenBW leading-edge checks passed");
+ // Larva ignores ordinary non-buildings in both mover and candidate roles.
+ a.type.id=UnitTypes::Zerg_Larva; assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));
+ a.type.id=(UnitTypes)67; b.type.id=UnitTypes::Zerg_Larva; assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));
+ b.type.id=(UnitTypes)19;
+ // Gathering mover passes a non-gatherer; ReturnGas passes gathering actors too.
+ a.u.status_flags|=unit_t::status_flag_gathering; assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));
+ b.u.status_flags|=unit_t::status_flag_gathering; a.order.id=Orders::ReturnGas;
+ assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));
+ a.u.status_flags&=~unit_t::status_flag_gathering;b.u.status_flags&=~unit_t::status_flag_gathering;
+ // This low-level sweep does not itself discard a burrowed candidate.
+ b.u.status_flags|=unit_t::status_flag_burrowed;assert(api.check_ground_unit_movement_unit_collision(&a.u,step)==&b.u);
+ b.u.status_flags&=~unit_t::status_flag_burrowed;
+ std::fprintf(stderr,"OpenBW leading-edge and eligibility checks passed\n");
 }
