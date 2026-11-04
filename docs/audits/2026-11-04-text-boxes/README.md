@@ -4,6 +4,30 @@ Item 1 of the [N64 parity audit](https://github.com/ggu/starcraft-gba/pull/261).
 is in [In-mission text boxes](../../TEXT-BOXES.md). This page holds the evidence. It contains no
 ROM-derived text, art, frames, saves or traces.
 
+## Status after merging the base
+
+This branch later merged `11fd1dd5`, which brought in worker cargo, the late Zerg art and a T8
+controller repair. Run at merge commit `ea771cbd`:
+
+| Check | Result |
+| --- | --- |
+| `check_source_tree.py`, `./dev build` | Pass |
+| `make -k test` | The same six failures as below, and nothing new |
+| `test-sc64-text-box`, `test-sc64-text-box-game`, `test-sc64-zerg-late-art` | Pass |
+| Eight product ELFs, with boxes compiled in and out | `__bss_end` and `__iwram_end` match in all eight |
+| `test-sc64-terran-full-campaign` | Passes, and T8 now wins |
+| `test-zerg`, `test-zerg-z8`, `test-zerg-z9`, `test-zerg-z10` | Pass |
+| `test-sc64-protoss-px`, with modal boxes | All ten win |
+| T1, T8, Z1, Z7, P2, P10, with boxes compiled in and out | Same results; traces identical, apart from P2's flag bits |
+
+The merge changed some controller routes, so some of the win frames below are out of date. P10
+now wins at frame 145,833, for example. `make protoss` also now builds P10, so the Protoss P1 to P7
+row in the memory table has no new measurement. The ARM runs and the N64 checks were not repeated.
+Z9 and Z10 needed the private Z8 sprite bank regenerated with `--include-zerg-late-art`, which the
+merged base requires.
+
+Everything below this section was run at `d70f6622`, before that merge, unless it says otherwise.
+
 ## What the N64 does
 
 Observed on the N64 ROM in ares, using a private copy of the emulator and states. No debugger
@@ -91,7 +115,7 @@ That is 213 of 325 rows. A controller that wins doesn't take every path, so a ro
 isn't by itself a fault: defeat lines, for one, only open when a mission is lost. Not every
 closed row was checked by hand. In particular:
 
-- **T8 opened one.** Its controller is the run that doesn't win. See below.
+- **T8 opened one,** in a controller run that didn't win before the merge. See above.
 - **Z8, Z9 and Z10 are fixtures,** not controller wins. Z8's controller is still blocked.
 - **T4 opened 11 of 32,** in a run limited to 30,000 ticks.
 - **Hand-written missions** rest on conditions written for this work, so their closed rows have
@@ -189,9 +213,9 @@ bank, so `test-sc64-p6-canonical` and its dependents did not run.
 
 ## Known issues
 
-- **T8 doesn't win.** `test-sc64-t8-campaign-run` reaches its 200,000-tick limit without a win.
-  This doesn't come from boxes: the trace is byte-identical with boxes compiled out. It stops
-  `./dev sc64 test --profile terran` at that step, so T9 and T10 were run separately.
+- **T8 didn't win before the merge.** `test-sc64-t8-campaign-run` reached its 200,000-tick limit
+  at `d70f6622`. This didn't come from boxes: the trace was byte-identical with boxes compiled out.
+  It stopped the Terran suite at that step, so T9 and T10 were run separately then.
 - **The holds after a Transmission remain,** as noted in [the design](../../TEXT-BOXES.md). They
   run after the box closes. Removing them would match the N64 and change trigger timing in
   Z3 to Z6, Z8 to Z10, P3 to P8 and P10, so it would need new controller runs for those missions.
