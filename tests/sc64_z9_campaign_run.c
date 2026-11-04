@@ -91,14 +91,19 @@ int main(int argc,char **argv)
             }
             input(0);continue;
         }
+#ifdef Z9_SWEEP
+        {static int ll;if(getenv("Z9_ARMY")&&rush&&frame>=ll){ll=frame+atoi(getenv("Z9_ARMY"));int gx=road[leg][0],gy=road[leg][1];int ord[24]={0},t=0,sx=0,sy=0,nl=0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK){ord[u[i].order&23]++;t++;if(dist2(u[i].x,u[i].y,gx,gy)<300*300){sx+=u[i].x;sy+=u[i].y;nl++;}}
+        fprintf(stderr,"A f%u leg%d hy%d nearleg%d at(%d,%d) o:",(unsigned)frame,leg,t,nl,nl?sx/nl:0,nl?sy/nl:0);for(int k=0;k<24;k++)if(ord[k])fprintf(stderr," %d:%d",k,ord[k]);
+        int ne[256]={0},nb=0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&dist2(u[i].x,u[i].y,gx,gy)<340*340)ne[u[i].raw_type&255]++;for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==ENEMY&&b[i].raw_type==162&&dist2(b[i].x,b[i].y,gx,gy)<340*340)nb++;{int cell[16][16]={{0}};for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK)cell[u[i].y/128][u[i].x/128]++;fprintf(stderr," cells:");for(int y=0;y<16;y++)for(int x=0;x<16;x++)if(cell[y][x]>=2)fprintf(stderr," (%d,%d):%d",x*128,y*128,cell[y][x]);}fprintf(stderr," cannons%d foes:",nb);for(int k=0;k<256;k++)if(ne[k])fprintf(stderr," r%d:%d",k,ne[k]);fprintf(stderr,"\n");}}
+#endif
         /* The army advances along the road, leg by leg. */
         if(frame>=next_order){
             next_order=frame+150;
-            int home=hydras_near(road[0][0],road[0][1],300);
+            int home=count_units(SIDE,U_HYDRALISK);
             if(!rush&&home>=knob("Z9_GO",50)&&frame>=knob("Z9_GOF",8000)){rush=1;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d}\n",(unsigned)frame,home);}
             if(rush){
                 int n=0,sx=0,sy=0;
-                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&dist2(u[i].x,u[i].y,HOME_X,HOME_Y)>=300*300){
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK){
                     int c=0,x2=0,y2=0;
                     for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&u[k].type==U_HYDRALISK&&dist2(u[k].x,u[k].y,u[i].x,u[i].y)<240*240){++c;x2+=u[k].x;y2+=u[k].y;}
                     if(c>n){n=c;sx=x2;sy=y2;}
@@ -106,12 +111,17 @@ int main(int argc,char **argv)
                 if(n<knob("Z9_RETREAT",12)){rush=0;leg=0;}
                 else {
                     int gx,gy,ax2=sx/n,ay2=sy/n;
+                    /* A new clump starts from the leg it stands by. */
+                    int nearest=0,bd=0x7fffffff;
+                    for(int k=0;k<ROAD_LEGS;k++){int dd=dist2(ax2,ay2,road[k][0],road[k][1]);if(dd<bd){bd=dd;nearest=k;}}
+                    if(nearest<leg-2)leg=nearest;
                     while(leg<ROAD_LEGS-1){
                         int there=hydras_near(road[leg][0],road[leg][1],170);
                         if(there*100<n*knob("Z9_LEGP",50))break;
                         ++leg;
                     }
-                    gx=road[leg][0];gy=road[leg][1];
+                    /* A far order gives up, so a clump behind walks to the next leg. */
+                    {int to=leg<nearest+1?leg:nearest+1;gx=road[to][0];gy=road[to][1];}
                     group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=8;
                     (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,0);
                     group_area_x=-1;group_rounds=6;
@@ -126,7 +136,7 @@ int main(int argc,char **argv)
         if(!saved&&frame>=knob("Z9_SAVE",6000)){
             int pick=free_drone(-1,-1);
             if(under_construction()&&pick>=0){
-                if(pause_menu_save(path,pick)){saved=1;census("saved",leg);}
+                if(clear_menu_last(pick)&&pause_menu_save(path,pick)){saved=1;census("saved",leg);}
             } else if(frame>=next_save_build&&minerals>=75){
                 (void)build_near(B_CREEP_COLONY,MENU_Z7_CREEP,ax-40,ay+110,96);
                 next_save_build=frame+300;
@@ -183,7 +193,9 @@ int main(int argc,char **argv)
         }
         COST(4)
         if(frame>=next_hatch&&minerals>=knob("Z9_HMIN",500)&&drone_count()>=6&&count_buildings(B_HATCHERY,0)<hatch_goal){
-            static const int spots[][2]={{200,60},{110,120},{90,240},{180,300},{300,320},{420,340}};
+            /* South and east of the first hive, in the open: Hatcheries placed
+               behind it wall their own larvae in. */
+            static const int spots[][2]={{300,340},{440,360},{170,340},{560,180},{560,340},{300,500}};
             int k=count_buildings(B_HATCHERY,0)-1;
             if(k>=0&&k<6)(void)build_near(B_HATCHERY,MENU_DEPOT,spots[k][0],spots[k][1],120);
             next_hatch=frame+300;

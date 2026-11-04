@@ -7,6 +7,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef Z9_ABORT_AT
+#include <execinfo.h>
+#endif
 
 static FILE *trace;
 static u16 prior;
@@ -17,6 +20,11 @@ static void input(u16 held)
     /* Once the mission ends, later calls are not inputs: the trace stops at
      * the deciding call, so a replay ends there too. */
     if(screen==SCREEN_RESULT||won||lost)return;
+#ifdef Z9_ABORT_AT
+    if(host_tick==Z9_ABORT_AT){fprintf(stderr,"abort tick f%u screen %d menu %d mode %d cursor %d,%d held %x sel %d selb %d WORLD %d %d\n",(unsigned)frame,screen,menu_open,mode,cx,cy,held,selected_count(),selected_building,WORLD_W,WORLD_H);
+        void*bt[12];int nbt=backtrace(bt,12);for(int q=0;q<nbt;q++)fprintf(stderr,"BT %p\n",bt[q]);
+        fprintf(stderr,"MAIN %p\n",(void*)&game_update);exit(7);}
+#endif
     u16 pressed=(u16)(held&(u16)~prior);
     int changed=held!=prior;
     unsigned call_index=host_tick;
@@ -51,6 +59,9 @@ static void move_cursor(int x,int y)
         if(cy<y-2)held|=KEY_DOWN;else if(cy>y+2)held|=KEY_UP;
         input(held);
     }
+#ifdef Z9_ABORT_AT
+    if(guard>=12000u)fprintf(stderr,"cursor stuck f%u target %d,%d at %d,%d menu %d mode %d\n",(unsigned)frame,x,y,cx,cy,menu_open,mode);
+#endif
     input(0);
 }
 
@@ -183,9 +194,12 @@ static int order_idle_drones(int most)
 {
     static const int dx[]={0,8,-8,0,0,8,-8,8,-8};
     static const int dy[]={0,0,0,8,-8,8,8,-8,-8};
-    int assigned=0;
-    for(int w=0;w<MAX_UNITS&&screen==SCREEN_PLAY&&assigned<most;w++){
+    int assigned=0,tries=0;
+    /* A tap can pick an idle Drone that refuses the field, such as one holding
+       cargo, and each try restarts from it: stop after a few. */
+    for(int w=0;w<MAX_UNITS&&screen==SCREEN_PLAY&&assigned<most&&tries<16;w++){
         if(!u[w].alive||u[w].owner!=SIDE||u[w].type!=U_DRONE||u[w].order!=ORDER_IDLE||u[w].carry)continue;
+        ++tries;
         if(idle_reach&&dist2(u[w].x,u[w].y,cx,cy)>idle_reach*idle_reach)continue;
         /* Spread the Drones: a field worked by fewer of them wins over a closer
            one, and a Drone whose field runs out just stands there. */
@@ -374,6 +388,22 @@ static int box_select(int x0,int y0,int x1,int y1)
     }
     input(0);
     return selected_count();
+}
+
+/* The orders menu reopens on the last chosen command. Choose MOVE ORDER (row
+ * 0) with whatever a tap on `unit` selects, and cancel its targeting. */
+static int clear_menu_last(int unit)
+{
+    if(menu_last==0)return 1;
+    if(unit<0||!u[unit].alive)return 0;
+    close_menus();clear_selected_building();
+    move_cursor(u[unit].x,u[unit].y);KEY_TAP(KEY_A);
+    if(!selected_count()){close_menus();return 0;}
+    KEY_TAP(KEY_B);
+    for(int n=0;n<16&&menu_open&&menu_cursor!=0;n++)KEY_TAP(KEY_UP);
+    if(menu_open&&menu_cursor==0)KEY_TAP(KEY_A);
+    close_menus();
+    return menu_last==0;
 }
 
 /* One pause-menu save: return the unsaved UI state to its load-time form with
