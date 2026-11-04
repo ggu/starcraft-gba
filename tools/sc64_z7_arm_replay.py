@@ -154,8 +154,9 @@ SCREEN_PLAY = 1
 SAVE_TAG = 0x53435A54
 SAVE_PAYLOAD_BYTES = 16296
 # The probe reports the inner RaceSave identity; the journal carries the
-# transport namespace and a 16-byte trailer. Profiles are explicit so old
-# records never silently qualify as current ones.
+# transport namespace and a 16-byte trailer. The transport profiles pin the
+# canonical Z7 full-storage vector (240 units, 160 buildings). Profiles are
+# explicit so old records never silently qualify as current ones.
 SAVE_PROFILES = {
     "legacy": (SAVE_TAG, SAVE_TAG, False),
     "transport1": (SAVE_TAG, SAVE_TAG | 0x04000000, True),
@@ -445,7 +446,7 @@ def sram_check(mode: str, plan: dict, data: bytes | None,
                 producers = set()
                 for i in range(4):
                     remaining, producer, researched = struct.unpack_from("<HBB", trailer, i * 4)
-                    if (remaining > 3000 or producer > 96 or researched > 1 or
+                    if (remaining > 3000 or producer > 160 or researched > 1 or
                         bool(remaining) != bool(producer) or (researched and remaining) or
                         (producer and producer in producers)):
                         valid = False
@@ -459,7 +460,7 @@ def sram_check(mode: str, plan: dict, data: bytes | None,
                     if valid:
                         for pos in range(8, len(extension), 6):
                             meta, damage, steps, source = struct.unpack_from("<HHBB", extension, pos)
-                            if ((meta & 0x1ff) >= 288 or ((meta >> 9) & 7) >= 5 or
+                            if ((meta & 0x1ff) >= 400 or ((meta >> 9) & 7) >= 5 or
                                 (meta >> 12) > 7 or not steps or source >= 64):
                                 valid = False
         elif valid:

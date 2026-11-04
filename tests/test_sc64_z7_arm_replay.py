@@ -426,6 +426,18 @@ class Z7ArmReplayTest(unittest.TestCase):
                 data = sram((0, 1, base + impact + trailer, True), tag=outer)
                 self.assertEqual(replay.sram_check("full", plan, data, None, profile)[1], [])
                 self.assertTrue(replay.sram_check("full", plan, data, None, "legacy")[1])
+            # Last valid full-storage target and producer; each next value
+            # must be rejected, not clamped or treated as an older profile.
+            high_row = b"IMP1" + bytes([1, 0, 0, 0]) + struct.pack("<HHBB", 399, 3, 1, 1)
+            high_trailer = struct.pack("<HBB", 1, 160, 0) + bytes(12)
+            boundary = sram((0, 1, base + high_row + high_trailer, True), tag=outer)
+            self.assertEqual(replay.sram_check("full", plan, boundary, None, profile)[1], [])
+            too_high_row = b"IMP1" + bytes([1, 0, 0, 0]) + struct.pack("<HHBB", 400, 3, 1, 1)
+            self.assertTrue(replay.sram_check("full", plan,
+                sram((0, 1, base + too_high_row + trailer, True), tag=outer), None, profile)[1])
+            too_high_trailer = struct.pack("<HBB", 1, 161, 0) + bytes(12)
+            self.assertTrue(replay.sram_check("full", plan,
+                sram((0, 1, base + too_high_trailer, True), tag=outer), None, profile)[1])
             bad_payloads = [
                 struct.pack("<I", inner ^ 1) + bytes(PAYLOAD - 4) + trailer,
                 base + b"IMP1" + bytes([1, 0, 0, 0]) + b"x" + trailer,
