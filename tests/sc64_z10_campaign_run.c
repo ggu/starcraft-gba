@@ -160,6 +160,7 @@ int main(int argc,char **argv)
                     if(t>=0&&dist2(ax2,ay2,b[t].x,b[t].y)<knob("Z10_TR",240)*knob("Z10_TR",240)){gx=b[t].x;gy=b[t].y;force=1;}
                     group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=8;
                     (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,force);
+                    (void)group_command(U_MUTALISK,MENU_ATTACK,gx,gy,force);
                     group_area_x=-1;group_rounds=6;
                     fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d]}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2);
                     next_order=frame+knob("Z10_ORD",300);
@@ -209,6 +210,7 @@ int main(int argc,char **argv)
                     /* The first attacks come early: an army before the full economy. */
                     if(spare<14&&minerals>=100&&queued_units(U_OVERLORD)<3)type=U_OVERLORD;
                     else if(spare>=2&&drone_count()+queued_units(U_DRONE)<(hy>=knob("Z10_HFIRST",16)?drone_goal:knob("Z10_DR0",9))&&minerals>=50)type=U_DRONE;
+                    else if(count_buildings(B_SPIRE,1)&&minerals>=100&&gas>=100&&spare>=4&&count_units(SIDE,U_MUTALISK)<16)type=U_MUTALISK;
                     else if(count_buildings(B_HYDRALISK_DEN,1)&&minerals>=75&&gas>=25&&spare>=2&&count_units(SIDE,U_HYDRALISK)<hydra_cap)type=U_HYDRALISK;
                     else if(count_buildings(B_SPAWNING_POOL,1)&&minerals>=150&&frame>=2000&&spare>=2&&(!count_buildings(B_HYDRALISK_DEN,1)||gas<25))type=U_ZERGLING;
                     if(type<0||!train_at(i,type))break;
@@ -225,6 +227,14 @@ int main(int argc,char **argv)
                 (void)build_near(B_HYDRALISK_DEN,MENU_ACADEMY,ax-90,ay-90,128);
             else if(count_buildings(B_SPAWNING_POOL,1)&&!count_buildings(B_EXTRACTOR,0)&&minerals>=50&&drone_count()>=6)
                 (void)build_extractor_near(608,1712);
+            else if(count_buildings(B_LAIR,1)&&!count_buildings(B_SPIRE,0)&&minerals>=200&&gas>=150&&drone_count()>=5)
+                (void)build_near(B_SPIRE,MENU_ZP_SPIRE,ax+100,ay-100,128);
+            else if(count_buildings(B_SPAWNING_POOL,1)&&!count_buildings(B_LAIR,0)&&minerals>=150&&gas>=100){
+                for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HATCHERY&&building_complete(i)&&!b[i].queue_count){
+                    if(select_building(i)) (void)choose_row(MENU_ZP_LAIR);
+                    break;
+                }
+            }
             next_build=frame+240;
         }
         COST(4)
@@ -243,6 +253,7 @@ int main(int argc,char **argv)
             group_area_x=ax;group_area_y=ay-60;group_area_r=560;group_rounds=4;
             (void)group_command(U_HYDRALISK,MENU_ATTACK,road[0][0],road[0][1],0);
             (void)group_command(U_ZERGLING,MENU_ATTACK,road[0][0],road[0][1],0);
+            (void)group_command(U_MUTALISK,MENU_ATTACK,road[0][0],road[0][1],0);
             group_area_x=-1;group_rounds=6;
             next_rally=frame+500;
         }
@@ -251,6 +262,7 @@ int main(int argc,char **argv)
         if(rush&&frame>=next_stream){
             group_area_x=ax;group_area_y=ay-60;group_area_r=560;group_rounds=3;
             (void)group_command(U_HYDRALISK,MENU_ATTACK,road[0][0],road[0][1],0);
+            (void)group_command(U_MUTALISK,MENU_ATTACK,road[0][0],road[0][1],0);
             for(int k=0;k+1<=leg&&k<ROAD_LEGS-1;k+=2){
                 int to=k+2<leg?k+2:leg;
                 group_area_x=road[k][0];group_area_y=road[k][1];group_area_r=120;group_rounds=2;
