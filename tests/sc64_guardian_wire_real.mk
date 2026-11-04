@@ -33,7 +33,7 @@ guardian-fact-generator:
 	/tmp/guardian-fact-gen-on > /tmp/guardian-facts-on.h
 	cmp /tmp/guardian-facts-off.h /tmp/guardian-facts-on.h
 .PHONY: guardian-journal-real
-GUARD_JOURNAL_EXTRA = tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+GUARD_JOURNAL_EXTRA = tests/sc64_guardian_journal_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
 guardian-journal-real:
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-journal-terran
 	/tmp/guardian-journal-terran
