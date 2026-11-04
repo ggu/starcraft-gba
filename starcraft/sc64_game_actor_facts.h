@@ -30,6 +30,9 @@ static unsigned
 #endif
 sc64_game_unit_actor_flags(int type)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return SC64_GAME_ACTOR_SELECTABLE | SC64_GAME_ACTOR_COLLIDABLE | SC64_GAME_ACTOR_DRAWABLE;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     unsigned flags = sc64_zp_actor_flags(type);
     if (flags) return flags;
@@ -69,6 +72,9 @@ static int sc64_game_building_selectable(int type)
 static int
 sc64_game_unit_collision_radius(int type)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 8; /* source 16/16/15/15 at 2:1 scale */
+#endif
     int left, up, right, down;
     if (!sc64_zp_actor_bounds_source(type, &left, &up, &right, &down)) return 6;
     int width = left + right, height = up + down;
