@@ -159,11 +159,15 @@ int main(int argc,char **argv)
                     {int to=leg<nearest+1?leg:nearest+1;gx=road[to][0];gy=road[to][1];}
                     int cannon=road_cannon(ax2,ay2,knob("Z9_CREACH",280));
                     if(cannon>=0){gx=b[cannon].x;gy=b[cannon].y;}
+                    /* A Reaver's splash spends a crowd fastest: shoot those first. */
+                    int reaver=-1;
+                    {int rd=knob("Z9_RV",300);rd*=rd;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==83){int dd=dist2(u[i].x,u[i].y,ax2,ay2);if(dd<rd){rd=dd;reaver=i;}}}
+                    if(reaver>=0){gx=u[reaver].x;gy=u[reaver].y;}
                     group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=8;
-                    (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,cannon>=0);
+                    (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,cannon>=0||reaver>=0);
                     group_area_x=-1;group_rounds=6;
                     fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d]}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2);
-                    next_order=frame+knob("Z9_ORD",300);
+                    next_order=frame+(reaver>=0?knob("Z9_ORDR",60):knob("Z9_ORD",300));
                 }
             }
         }
