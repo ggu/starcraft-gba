@@ -3355,7 +3355,14 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
     if (((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u) return 0;
 #endif
+#ifdef SC64_DIAGNOSTIC_SAVE_VALIDATE
+    u32 start=gba_clock();
+    int accepted=race_load_preflight(plan);
+    sc64_diagnostic_save_validate(1,-1,gba_clock()-start,tag,len,accepted);
+    return accepted;
+#else
     return race_load_preflight(plan);
+#endif
 }
 static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
 #ifdef SC64_SHARED_TRANSPORT
@@ -3365,9 +3372,8 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,SAVE_VERSION};
 #endif
-    if (!save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
-                               race_worker_cargo_prepare_selected,plan,selection)) return 0;
-    return race_worker_cargo_prepare_selected(&race_impact_record,selection->length,selection->tag,plan);
+    return save_select_prepared(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
+                                race_worker_cargo_prepare_selected,plan,selection);
 }
 static int race_worker_cargo_previous(GbaSaveSelection *selection) {
     RaceLoadPlan plan;
