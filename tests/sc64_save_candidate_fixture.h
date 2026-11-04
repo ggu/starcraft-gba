@@ -8,6 +8,29 @@
 static Sc64ImpactEvent fixture_saved_impacts[RACE_IMPACT_CAPACITY];
 static u8 fixture_saved_impact_count;
 #endif
+#ifdef SC64_WORKER_CARGO_KIND
+/* Synthetic HOST records belong to independent malformed-candidate cases.
+ * Discard them explicitly between cases: the production first-write guard
+ * correctly refuses to overwrite a committed record with no valid predecessor. */
+static void fixture_clear_candidate_records(void)
+{
+#ifdef SC64_SHARED_TRANSPORT
+    const u32 tags[] = { SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
+                         SC64_TRANSPORT_SAVE_VERSION };
+#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+    const u32 tags[] = { SC64_LEGACY_SAVE_VERSION,
+                         SC64_WORKER_CARGO_LEGACY_SAVE_VERSION, SAVE_VERSION };
+#else
+    const u32 tags[] = { SC64_WORKER_CARGO_LEGACY_SAVE_VERSION, SAVE_VERSION };
+#endif
+    for (unsigned i = 0; i < sizeof(tags) / sizeof(tags[0]); ++i) {
+        save_test_corrupt_latest(0, tags[i]);
+        save_test_corrupt_latest(0, tags[i]);
+    }
+}
+#else
+#define fixture_clear_candidate_records() ((void)0)
+#endif
 static void fixture_capture_save(RaceSave *candidate)
 {
 #ifdef SC64_IMPACT_EVENTS
@@ -32,19 +55,7 @@ static void write_candidate_record(const RaceSave *candidate)
 #ifdef SC64_WORKER_CARGO_KIND
     /* Isolate this intentionally malformed candidate: an older valid record
      * would make the journal correctly fall back and mask rejection. */
-#ifdef SC64_SHARED_TRANSPORT
-    const u32 tags[] = { SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
-                         SC64_TRANSPORT_SAVE_VERSION };
-#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
-    const u32 tags[] = { SC64_LEGACY_SAVE_VERSION,
-                         SC64_WORKER_CARGO_LEGACY_SAVE_VERSION, SAVE_VERSION };
-#else
-    const u32 tags[] = { SC64_WORKER_CARGO_LEGACY_SAVE_VERSION, SAVE_VERSION };
-#endif
-    for (unsigned i = 0; i < sizeof(tags) / sizeof(tags[0]); ++i) {
-        save_test_corrupt_latest(0, tags[i]);
-        save_test_corrupt_latest(0, tags[i]);
-    }
+    fixture_clear_candidate_records();
     race_data = expected;
     assert(race_impact_save_write(NULL));
 #else

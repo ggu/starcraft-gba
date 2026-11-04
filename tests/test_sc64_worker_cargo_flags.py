@@ -21,7 +21,7 @@ def product_flags(value):
         path.write_text(
             "$(info terran=$(TERRAN_ROM_FLAGS))\n"
             "$(info zerg=$(ZERG_Z7_CANONICAL_FLAGS))\n"
-            "$(info protoss=$(PROTOSS_P7_CANONICAL_FLAGS))\n"
+            "$(info protoss=$(PROTOSS_P10_FLAGS))\n"
             "$(info showcase=$(SHOWCASE_FLAGS))\n"
             ".PHONY: cargo-print-flags\ncargo-print-flags:\n\t@:\n"
         )

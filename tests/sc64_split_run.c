@@ -143,6 +143,9 @@ static void check_invalid_save_rejection(void) {
     for (int i = 0; i < 3; ++i) assert(race_bot_races[i] == old_races[i]);
 
 #ifdef SC64_CAMPAIGN_RACE
+    /* Begin the independent cross-campaign rejection case with an empty
+       synthetic journal, after checking the first rejection's live state. */
+    fixture_clear_candidate_records();
     assert(race_save_game());
     int alien = -1;
     for (int i = 0; i < SC64_BASE_MISSION_COUNT; ++i)
