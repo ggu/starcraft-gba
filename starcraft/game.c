@@ -5596,6 +5596,18 @@ race_probe_cannon_command_available(void)
 }
 #endif
 
+#ifdef SC64_RACES
+/* Whether A means train on this building: the rules' producers, plus a custom
+ * game's catalog producers (the Infested Command Center has no rules flag). */
+static int
+race_building_trains(int type)
+{
+    const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
+    if (r && (r->flags & SC_RACE_F_PRODUCER)) return 1;
+    return race_mode && sc64_skirmish_product_count((unsigned)sc64_race_raw_building(type)) > 0;
+}
+#endif
+
 #ifdef SC_DEFAULT_UI
 #include "field_ui.h"
 #endif
@@ -6807,6 +6819,9 @@ interact(void)
         /* A trains only on the selected building; elsewhere it reselects,
          * and on empty ground it clears the selection. */
         && field_ui_on_selected_building()
+#endif
+#ifdef SC64_RACES
+        && race_building_trains(b[selected_building].type)
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
         && (!race_late_active() ||

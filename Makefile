@@ -1787,6 +1787,7 @@ test-races: build/test-race-rules build/test-race-engine build/test-race-campaig
 	./build/test-race-factions
 	./build/test-race-routes-rect
 test-races-controller: build/test-race-z1-controls build/test-race-campaign
+	./build/test-race-z1-controls --check-beacon
 	./build/test-race-z1-controls --trace .local/sc64/races/generated/z1-controller.json
 	./build/test-race-campaign --controller 1 --trace .local/sc64/races/generated/z2-controller.json
 	./build/test-race-campaign --controller 2 --trace .local/sc64/races/generated/p1-controller.json
@@ -4131,6 +4132,7 @@ test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-
 	mkdir -p .local/sc64/z7-carried
 	./build/test-sc64-z7-carried-z1 --check-site cancel
 	./build/test-sc64-z7-carried-z1 --check-site timeout
+	./build/test-sc64-z7-carried-z1 --check-beacon
 	./build/test-sc64-z7-carried-z1 --trace .local/sc64/z7-carried/z1.json
 	./build/test-sc64-z7-carried-z2 --controller 1 --trace .local/sc64/z7-carried/z2.json
 	./build/test-sc64-z7-carried-z3 --trace .local/sc64/z7-carried/z3.json
@@ -4686,6 +4688,7 @@ test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64
 	mkdir -p .local/sc64
 	./build/test-sc64-zerg-carried-z1 --check-site cancel
 	./build/test-sc64-zerg-carried-z1 --check-site timeout
+	./build/test-sc64-zerg-carried-z1 --check-beacon
 	./build/test-sc64-zerg-carried-z1 --trace .local/sc64/z6-carried-z1-controller.json
 	./build/test-sc64-zerg-carried-z2 --controller 1 --trace .local/sc64/z6-carried-z2-controller.json
 	./build/test-sc64-zerg-carried-z3 --trace .local/sc64/z6-carried-z3-controller.json
