@@ -4,24 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
-static int encode_wire(const Unit *in, Unit *out, int stage)
-{
-    if (!in || !out) return 0;
-    if (in->type != U_GUARDIAN_COCOON) { if (in->raw_type==59) return 0; *out=*in; return 1; }
-    if (!stage || in->raw_type!=59 || in->hp<1 || in->hp>200 || in->maxhp!=200 ||
-        in->target!=44 || in->work_timer<1 || in->work_timer>750 || in->build!=-1 ||
-        in->carry || in->flags || in->order || in->armor || in->shield || !in->alive) return 0;
-    *out=*in; out->type=U_OVERLORD; return 1;
-}
-static int decode_wire(const Unit *in, Unit *out, int stage)
-{
-    if (!in || !out) return 0;
-    if (in->raw_type!=59) { *out=*in; return 1; }
-    if (!stage || in->type!=U_OVERLORD) return 0;
-    Unit x=*in, check; x.type=U_GUARDIAN_COCOON;
-    if (!encode_wire(&x,&check,1)) return 0;
-    *out=x; return 1;
-}
+#include "../starcraft/sc64_guardian_wire.h"
 #if defined(SC64_ZP_FULL_STORAGE)
 #if defined(SC64_P7_TYPED_COMPACT_ENABLED)
 typedef Sc64P7TypedUnitSave Row;
@@ -63,11 +46,11 @@ int main(void)
     printf("legacy=%d cocoon=%d count=%d overlord=%d row=%zu\n",SC_RU_LEGACY_COUNT,U_GUARDIAN_COCOON,SC_RU_COUNT,U_OVERLORD,sizeof(row));
     for(int i=0;i<2;i++) {
       if(i){q.hp=37;q.work_timer=1;q.selected=0;q.owner=ENEMY;}
-      assert(encode_wire(&q,&wire,1));assert(ENC(&row,&wire,2048,2048));assert(DEC(&out,&row,2048,2048));
-      assert(decode_wire(&out,&again,1));assert(!memcmp(&q,&again,sizeof(q)));
-      assert(!decode_wire(&out,&again,0));assert(!ENC(&row,&q,2048,2048));
+      assert(sc64_guardian_wire_encode(&q,&wire,1));assert(ENC(&row,&wire,2048,2048));assert(DEC(&out,&row,2048,2048));
+      assert(sc64_guardian_wire_decode(&out,&again,1));assert(!memcmp(&q,&again,sizeof(q)));
+      assert(!sc64_guardian_wire_decode(&out,&again,0));assert(!ENC(&row,&q,2048,2048));
     }
-#define BAD(f,v) do { Unit b=q;b.f=(v);assert(!encode_wire(&b,&wire,1)); } while(0)
+#define BAD(f,v) do { Unit b=q;b.f=(v);assert(!sc64_guardian_wire_encode(&b,&wire,1)); } while(0)
     BAD(raw_type,44);BAD(target,43);BAD(work_timer,0);BAD(work_timer,751);
     BAD(build,0);BAD(carry,1);BAD(flags,1);BAD(order,1);BAD(maxhp,150);BAD(hp,0);BAD(hp,201);
 #undef BAD
