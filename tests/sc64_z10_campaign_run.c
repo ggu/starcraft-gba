@@ -128,7 +128,9 @@ int main(int argc,char **argv)
         if(frame>=next_order){
             next_order=frame+150;
             int home=count_units(SIDE,U_HYDRALISK);
-            if(!rush&&home>=(frame<knob("Z10_L2",30000)?knob("Z10_GO",70):knob("Z10_GO2",55))&&frame>=knob("Z10_GOF",8000)){rush=1;leg=0;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d}\n",(unsigned)frame,home);}
+            int live=0;for(int i=0;i<MAX_UNITS;i++)live+=u[i].alive!=0;
+            /* Attack when the shared actor pool prevents further recruitment. */
+            if(!rush&&(home>=(frame<knob("Z10_L2",30000)?knob("Z10_GO",70):knob("Z10_GO2",55)) || (home>=40 && live>=MAX_UNITS-1))&&frame>=knob("Z10_GOF",8000)){rush=1;leg=0;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d}\n",(unsigned)frame,home);}
             if(rush){
                 int n=0,sx=0,sy=0;
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK){
