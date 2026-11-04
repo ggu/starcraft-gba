@@ -115,6 +115,12 @@ int main(int argc,char **argv)
         if(menu_open)KEY_TAP(KEY_B);
         int mark=frame,ax=HOME_X,ay=HOME_Y;
         int carrier=crystal_drone();
+#ifdef Z9_SWEEP
+        {static int ll;if(getenv("Z9_RUNNER")&&crystal()>=0&&frame>=ll){ll=frame+atoi(getenv("Z9_RUNNER"));int c=crystal();
+          fprintf(stderr,"C f%u crystal(%d,%d) carrier %d",(unsigned)frame,u[c].x,u[c].y,carrier);if(carrier>=0)fprintf(stderr," at(%d,%d) o%d hp%d t(%d,%d)",u[carrier].x,u[carrier].y,u[carrier].order,u[carrier].hp,u[carrier].tx,u[carrier].ty);
+          int nd=-1,bd=1<<30;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){int d=dist2(u[i].x,u[i].y,u[c].x,u[c].y);if(d<bd){bd=d;nd=i;}}
+          fprintf(stderr," nearest drone %d at(%d,%d) hydras near %d\n",nd,nd>=0?u[nd].x:-1,nd>=0?u[nd].y:-1,hydras_near(u[c].x,u[c].y,300));}}
+#endif
         /* The crystal's Drone runs home along the road, however the army fares. */
         if(carrier>=0){
             int best=-1,bd=0x7fffffff;
@@ -131,11 +137,27 @@ int main(int argc,char **argv)
         fprintf(stderr,"A f%u leg%d hy%d nearleg%d at(%d,%d) o:",(unsigned)frame,leg,t,nl,nl?sx/nl:0,nl?sy/nl:0);for(int k=0;k<24;k++)if(ord[k])fprintf(stderr," %d:%d",k,ord[k]);
         int ne[256]={0},nb=0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&dist2(u[i].x,u[i].y,gx,gy)<340*340)ne[u[i].raw_type&255]++;for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==ENEMY&&b[i].raw_type==162&&dist2(b[i].x,b[i].y,gx,gy)<340*340)nb++;{int cell[16][16]={{0}};for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK)cell[u[i].y/128][u[i].x/128]++;fprintf(stderr," cells:");for(int y=0;y<16;y++)for(int x=0;x<16;x++)if(cell[y][x]>=2)fprintf(stderr," (%d,%d):%d",x*128,y*128,cell[y][x]);}fprintf(stderr," cannons%d foes:",nb);for(int k=0;k<256;k++)if(ne[k])fprintf(stderr," r%d:%d",k,ne[k]);fprintf(stderr,"\n");}}
 #endif
+        /* Once the army is past the first town, a Drone follows it down the road.
+           It waits a leg behind, so its next order must not wait for other jobs. */
+        if(rush&&leg>=knob("Z9_RUN",6)&&!race_zl_sched.countdown&&crystal()<0&&frame>=next_runner&&road_clear(leg)){
+            if(runner<0||!u[runner].alive||u[runner].type!=U_DRONE){runner=free_drone(-1,-1);runner_leg=0;}
+            if(runner>=0){
+                while(runner_leg<ROAD_LEGS&&dist2(u[runner].x,u[runner].y,road[runner_leg][0],road[runner_leg][1])<60*60)++runner_leg;
+                int to=runner_leg+knob("Z9_SKIP",1);
+                if(to>=leg&&leg<ROAD_LEGS-1)to=leg-1;
+                if(to>=ROAD_LEGS&&runner_leg<ROAD_LEGS)to=ROAD_LEGS-1;
+                if(to<runner_leg)to=runner_leg;
+                int tx=to<ROAD_LEGS?road[to][0]:930,ty=to<ROAD_LEGS?road[to][1]:1420;
+                if(u[runner].order==ORDER_IDLE||dist2(u[runner].tx,u[runner].ty,tx,ty)>24*24){(void)unit_order(runner,MENU_MOVE,tx,ty);close_menus();}
+            }
+            next_runner=frame+knob("Z9_RUNP",60);
+        }
+        if(frame-mark>=20){input(0);continue;}
         /* The army advances along the road, leg by leg. */
         if(frame>=next_order){
             next_order=frame+150;
             int home=count_units(SIDE,U_HYDRALISK);
-            if(!rush&&home>=knob("Z9_GO",50)&&frame>=knob("Z9_GOF",8000)){rush=1;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d}\n",(unsigned)frame,home);}
+            if(!rush&&home>=(frame<knob("Z9_L2",30000)?knob("Z9_GO",50):knob("Z9_GO2",60))&&frame>=knob("Z9_GOF",8000)){rush=1;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d}\n",(unsigned)frame,home);}
             if(rush){
                 int n=0,sx=0,sy=0;
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK){
@@ -156,12 +178,12 @@ int main(int argc,char **argv)
                         ++leg;
                     }
                     /* A far order gives up, so a clump behind walks to the next leg. */
-                    {int to=leg<nearest+1?leg:nearest+1;gx=road[to][0];gy=road[to][1];}
+                    int to_leg=leg<nearest+1?leg:nearest+1;gx=road[to_leg][0];gy=road[to_leg][1];
                     int cannon=road_cannon(ax2,ay2,knob("Z9_CREACH",280));
                     if(cannon>=0){gx=b[cannon].x;gy=b[cannon].y;}
                     /* A Reaver's splash spends a crowd fastest: shoot those first. */
                     int reaver=-1;
-                    {int rd=knob("Z9_RV",300);rd*=rd;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==83){int dd=dist2(u[i].x,u[i].y,ax2,ay2);if(dd<rd){rd=dd;reaver=i;}}}
+                    {int rd=knob("Z9_RV",300);rd*=rd;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==83&&dist2(u[i].x,u[i].y,road[to_leg][0],road[to_leg][1])<knob("Z9_RVL",260)*knob("Z9_RVL",260)){int dd=dist2(u[i].x,u[i].y,ax2,ay2);if(dd<rd){rd=dd;reaver=i;}}}
                     if(reaver>=0){gx=u[reaver].x;gy=u[reaver].y;}
                     group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=8;
                     (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,cannon>=0||reaver>=0);
@@ -270,19 +292,6 @@ int main(int argc,char **argv)
             next_stream=frame+knob("Z9_STREAM",800);
         }
         COST(8)
-        /* Once the army has cleared the gate, a Drone follows it down the road. */
-        if(rush&&leg>=knob("Z9_RUN",4)&&!race_zl_sched.countdown&&crystal()<0&&frame>=next_runner&&road_clear(leg)){
-            if(runner<0||!u[runner].alive||u[runner].type!=U_DRONE){runner=free_drone(-1,-1);runner_leg=0;}
-            if(runner>=0){
-                while(runner_leg<ROAD_LEGS&&dist2(u[runner].x,u[runner].y,road[runner_leg][0],road[runner_leg][1])<60*60)++runner_leg;
-                /* Stay a leg behind the army until it holds the far end. */
-                int to=runner_leg;
-                if(to>=leg&&leg<ROAD_LEGS-1)to=leg-1;
-                int tx=to<ROAD_LEGS?road[to][0]:930,ty=to<ROAD_LEGS?road[to][1]:1420;
-                if(dist2(u[runner].tx,u[runner].ty,tx,ty)>24*24||u[runner].order==ORDER_IDLE){(void)unit_order(runner,MENU_MOVE,tx,ty);close_menus();}
-            }
-            next_runner=frame+knob("Z9_RUNP",150);
-        }
         COST(9)
         }
         turn=0;
