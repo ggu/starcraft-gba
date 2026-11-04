@@ -18,7 +18,7 @@ controller repair. Run at merge commit `ea771cbd`:
 | `test-sc64-terran-full-campaign` | Passes, and T8 now wins |
 | `test-zerg`, `test-zerg-z8`, `test-zerg-z9`, `test-zerg-z10` | Pass |
 | `test-sc64-protoss-px`, with modal boxes | All ten win |
-| T1, T8, Z1, Z7, P2, P10, with boxes compiled in and out | Same results; traces identical, apart from P2's flag bits |
+| T1, T8, Z1, P2, P10, with boxes compiled in and out | Same results; traces identical, apart from P2's flag bits |
 
 The merge changed some controller routes, so some of the win frames below are out of date. P10
 now wins at frame 145,833, for example. `make protoss` also now builds P10, so the Protoss P1 to P7
