@@ -61,3 +61,14 @@ frame 38,489 with 55 and also reached leg 6. The attempt lost at frame 67,373 /
 68,546 calls, with zero faults and the Temple still standing. Neither attempt
 is a qualifying win; no game rules, enemy AI, resources or actor limits were
 changed for this strategy experiment.
+
+The Z10 human permission table admits Mutalisk and the Lair/Spire chain. The
+ordinary controller experiment `596ccb5e` used building menus and the normal
+larva training cycle for a mixed force. It lost at frame 67,954 / 69,175 calls,
+with zero faults. An observation-only reproduction confirmed a completed Lair
+by frame 15,624, a completed Spire by 23,255 and 20 live Mutalisks by 37,196.
+Its assault had already started at frame 16,188, before air production; thus
+this does not establish an effective mixed assault. At frame 49,627 the Lair
+and Spire were gone while 20 Mutalisks remained. The Guardian actor has no
+ordinary player morph service in this profile; no Guardian production claim is
+made. The engine, enemy AI and resource and actor limits were unchanged.
