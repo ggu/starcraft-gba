@@ -156,7 +156,7 @@ static int build_gateway_from_probe(int gateway_index)
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
             u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS) { worker = i; break; }
-    if (worker < 0 || minerals < 150 || gateway_index >= 2) return 0;
+    if (worker < 0 || minerals < 150 || gateway_index >= 4) return 0;
     int x = -1, y = -1;
     static const int spot[][2] = {
         {672,320}, {720,320}, {672,384}, {720,384},
@@ -466,9 +466,10 @@ static void wait_for_controller(void)
  * open starts there (no extra input, so the run's timing is unchanged). */
 static void tap_b(void)
 {
-    int fresh = !menu_open && mode == MODE_NORMAL;
+    int fresh = !menu_open && mode == MODE_NORMAL, guard = 0;
     tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+    /* The list reopens on the last command; these sequences count from Move. */
+    while (fresh && menu_open && menu_cursor != MENU_MOVE && guard++ < MENU_COUNT) tap(KEY_UP);
 }
 
 static int snap4(int current, int target, int bound)
@@ -539,6 +540,52 @@ static int select_actor(int slot)
  * Adaptive enemy reads only choose a target; all gameplay changes still pass
  * through game_update. The splash-risk threshold is intentionally cautious
  * because Storm also damages allied units. */
+/* Idle Probes do not find work: starting Probes wait for an order and a spent
+ * patch leaves its Probes standing on it. Send up to three each pass to the
+ * least-worked visible patches near a Nexus. */
+static int patch_retry_frame[MAX_MINERALS];
+static int rebuild_waves;
+
+static void mine_idle_probes(void)
+{
+    static const int offsets[][2] = {{0,0},{-8,0},{8,0},{0,-8},{0,8},
+                                     {-12,-8},{12,-8},{-12,8},{12,8}};
+    for (int pass = 0; pass < 3 && screen == SCREEN_PLAY && !won && !lost; ++pass) {
+        int probe = -1, patch = -1, best = 0x7fffffff;
+        for (int i = 0; i < MAX_UNITS && probe < 0; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+                u[i].order == ORDER_IDLE && !u[i].carry) probe = i;
+        if (probe < 0) return;
+        for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) {
+            int depot = 0x7fffffff, workers = 0;
+            for (int j = 0; j < MAX_BUILDINGS; ++j)
+                if (b[j].alive && b[j].owner == SIDE && b[j].type == B_NEXUS && !b[j].under_construction) {
+                    int d = dist2(m[i].x, m[i].y, b[j].x, b[j].y) / 256;
+                    if (d < depot) depot = d;
+                }
+            if (depot == 0x7fffffff || frame < patch_retry_frame[i]) continue;
+            for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
+                u[j].order == ORDER_MINE && u[j].target == i) ++workers;
+            if (depot + workers * 256 < best) { best = depot + workers * 256; patch = i; }
+        }
+        if (patch < 0) return;
+        /* The army crowds the Nexus. A box may take combat units too, but the
+         * mineral order goes to the workers only and leaves the rest alone. */
+        select_box(u[probe].x, u[probe].y, 12);
+        if (find_selected_worker() < 0 || selected_building >= 0) return;
+        for (int attempt = 0; attempt < 9 && u[probe].alive && u[probe].order != ORDER_MINE; ++attempt) {
+            move_cursor(m[patch].x + offsets[attempt][0], m[patch].y + offsets[attempt][1]);
+            tap(KEY_A);
+            /* A tap on a patch with a unit parked on it selects that unit
+             * instead. Leave that patch alone for a while. */
+            if (find_selected_worker() < 0) {
+                patch_retry_frame[patch] = frame + 1500;
+                return;
+            }
+        }
+    }
+}
+
 static int try_cast_storm(void)
 {
     int caster = -1, target_x = -1, target_y = -1, best_score = 0;
@@ -1054,6 +1101,13 @@ int main(int argc, char **argv)
         int tassadar_rescued = tassadar >= 0 && u[tassadar].owner == SIDE;
         int raynor_rescued = raynor >= 0 && u[raynor].owner == SIDE;
         int rescued = tassadar_rescued && raynor_rescued;
+        {
+            static int next_mine;
+            if (frame >= next_mine && !race_p4.source_paused) {
+                mine_idle_probes();
+                next_mine = frame + 240;
+            }
+        }
         if (frame >= next_storm_attempt && !race_p4.source_paused) {
             (void)try_cast_storm();
             next_storm_attempt = frame + 90;
@@ -1161,7 +1215,7 @@ int main(int argc, char **argv)
                     if (controller_buildup_pool_blocked_since < 0)
                         controller_buildup_pool_blocked_since = frame;
                 } else controller_buildup_pool_blocked_since = -1;
-                if (!controller_buildup_done && (combat >= 44 || elapsed >= 60000 ||
+                if (!controller_buildup_done && (combat >= 44 || elapsed >= (rebuild_waves ? 12000 : 60000) ||
                     (controller_buildup_pool_blocked_since >= 0 &&
                      frame - controller_buildup_pool_blocked_since >= 2700))) {
                     controller_buildup_done = 1;
@@ -1176,7 +1230,7 @@ int main(int argc, char **argv)
                     issued = queue_probe_at_nexus();
                     next_probe_queue_frame = frame + (issued ? 1800 : 600);
                 } else if (!controller_buildup_done && minerals >= 100 && supply_cap < supply_used + 4 &&
-                    pylon_builds_started < 12 && pylon_build_attempts < 24 &&
+                    pylon_builds_started < 24 && pylon_build_attempts < 48 &&
                            side_incomplete_pylon_count() == 0 &&
                            frame >= pylon_next_build_frame) {
                     ++pylon_build_attempts;
@@ -1200,7 +1254,7 @@ int main(int argc, char **argv)
                     ++core_build_attempts;
                     if (build_cybernetics_core_from_probe()) issued = 1;
                     core_next_build_frame = frame + (issued ? 600 : 1200);
-                } else if (!controller_buildup_done && gateway_builds_started < 2 &&
+                } else if (!controller_buildup_done && gateway_builds_started < 4 &&
                            minerals >= 150 && frame >= gateway_next_build_frame) {
                     int built = build_gateway_from_probe(gateway_builds_started);
                     if (built) {
@@ -1210,12 +1264,14 @@ int main(int argc, char **argv)
                     } else gateway_next_build_frame = frame + 2400;
                 } else if (!controller_buildup_done && combat < 44 && minerals >= 100 && slack > 0 &&
                            supply_used + 4 <= supply_cap && gateway >= 0) {
+                    /* Fill the shortest queue, so every Gateway keeps working. */
+                    int shortest = 5;
                     for (int i = 0; i < MAX_BUILDINGS; ++i)
                         if (b[i].alive && b[i].owner == SIDE && b[i].type == B_GATEWAY &&
-                            b[i].queue_count < 5 && building_complete(i) &&
+                            b[i].queue_count < shortest && building_complete(i) &&
                             race_site_powered(SIDE, b[i].x, b[i].y)) {
                             gateway = i;
-                            break;
+                            shortest = b[i].queue_count;
                         }
                     issued = queue_zealot_at_gateway(gateway);
                 }
@@ -1271,6 +1327,9 @@ int main(int argc, char **argv)
                     int moved_t = issue_hero_escape_segment(tassadar, force);
                     raynor = source_unit(SC64_P4_RAW_RAYNOR_VULTURE);
                     int moved_r = issue_hero_escape_segment(raynor, force);
+                    /* Idle units do not step aside, so the escort parked on the
+                     * approach would wall the heroes out. Walk it past the exit. */
+                    (void)issue_group_order(escape_x + 120, escape_y + 16, 1, 0);
                     issued = moved_t || moved_r;
                     next_solo_hero_order = frame + 1200;
                 } else if (dist2(army_x, army_y, escape_x, escape_y) > 200 * 200) {
@@ -1279,6 +1338,17 @@ int main(int argc, char **argv)
                                                &tx, &ty);
                     issued = issue_group_order(tx, ty, 1, 0);
                 }
+            } else if (rescued && heroes_released && escort_combat_count() <= 1 &&
+                       rebuild_waves < 6 && minerals >= 800 && side_gateway_count() > 0 &&
+                       side_probe_count() > 0 && !heroes_final_advance) {
+                /* The bank can pay for another wave: bring the heroes home and let
+                 * it clear more of the route before they try the walk. */
+                ++rebuild_waves;
+                heroes_released = 0;
+                escape_group_ordered = 0;
+                controller_buildup_done = 0;
+                controller_buildup_start_frame = frame;
+                issued = 1;
             } else if (rescued && heroes_released && escort_combat_count() <= 1) {
                 /* If the escort is gone, preserve the source objective with
                  * direct ordinary Move orders for the two required heroes. */
@@ -1322,6 +1392,9 @@ int main(int argc, char **argv)
             scheduled_order = frame + (rescued ?
                 (escort_combat_count() ? 1200 : 300) : 2400);
             if (!issued) scheduled_order = frame + 300;
+            /* One build or training order per pass: don't wait long between them. */
+            if (controller_buildup_started && !controller_buildup_done)
+                scheduled_order = frame + (issued ? 60 : 180);
         }
         step(0);
     }

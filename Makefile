@@ -4296,7 +4296,7 @@ build/test-sc64-p7-campaign-$(1): tests/$(2).c $$(STARCRAFT) $$(wildcard starcra
 	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(P7_CAMPAIGN_COMPOSITION_FLAGS) $$< common/gba.c -o $$@
 endef
 $(eval $(call P7_CAMPAIGN_CONTROLLER,early,race_campaign_run))
-$(eval $(call P7_CAMPAIGN_CONTROLLER,p3,sc64_p3_expansion_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p3,sc64_p3_campaign_run))
 $(eval $(call P7_CAMPAIGN_CONTROLLER,p4,sc64_p4_campaign_run))
 $(eval $(call P7_CAMPAIGN_CONTROLLER,p5,sc64_p5_campaign_run))
 $(eval $(call P7_CAMPAIGN_CONTROLLER,p6,sc64_p6_campaign_run))
@@ -4719,6 +4719,7 @@ test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign bui
 	./build/test-sc64-protoss-carried-p3 --trace .local/sc64/p4-carried-p3-controller.json
 	./build/test-sc64-protoss-carried-p5 --limit 180000 --attempt-tag canonical-p6-carried-p5
 test-protoss: test-sc64-protoss-carried-missions
+-include mk/protoss-carried/Makefile
 
 # The indexed and packed sprite paths must agree over the whole framebuffer,
 # including transparent lanes, alignment and both clipping configurations.
