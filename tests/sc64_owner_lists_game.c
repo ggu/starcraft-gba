@@ -5,11 +5,16 @@
 static void sc64_owner_lists_test_probe(void);
 #include "../starcraft/game.c"
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 
 static unsigned long long trace = 1469598103934665603ULL;
-static void record(int v) { trace = (trace ^ (unsigned)v) * 1099511628211ULL; }
+static int exact_trace;
+static void record(int v) {
+    trace = (trace ^ (unsigned)v) * 1099511628211ULL;
+    if (exact_trace && fwrite(&v, sizeof(v), 1, stdout) != 1) abort();
+}
 
 static void sc64_owner_lists_test_probe(void)
 {
@@ -50,6 +55,7 @@ static unsigned random_value(void)
 
 int main(void)
 {
+    exact_trace = getenv("SC64_OWNER_EXACT_TRACE") != NULL;
     game_init();
     memset(u, 0, sizeof(u));
     memset(b, 0, sizeof(b));
@@ -58,6 +64,13 @@ int main(void)
     b[MAX_BUILDINGS - 1].alive = 1; b[MAX_BUILDINGS - 1].owner = 4;
     update_orders();
     memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+#ifdef SC64_SCARAB_RUNTIME
+    /* Hidden units must not make an invalid owner poison the index. */
+    u[MAX_UNITS - 1].alive = 1; u[MAX_UNITS - 1].owner = 9;
+    u[MAX_UNITS - 1].type = U_SCARAB; u[MAX_UNITS - 1].carry = 0;
+    update_orders();
+    memset(u, 0, sizeof(u));
+#endif
     for (int tick = 0; tick < 10000; ++tick) {
         for (int j = 0; j < 4; ++j) {
             int i = random_value() % MAX_UNITS;
@@ -69,11 +82,15 @@ int main(void)
             b[i].owner = random_value() % 5;
         }
         int invalid = tick % 7 == 0;
+        int badunit = tick % 11 == 0;
+        int uowner = u[0].owner, ualive = u[0].alive, uorder = u[0].order, utype = u[0].type;
+        if (badunit) { u[0].alive = 1; u[0].owner = 9; u[0].order = ORDER_IDLE; u[0].type = 0; }
         int owner = b[0].owner, alive = b[0].alive;
         if (invalid) { b[0].alive = 1; b[0].owner = 9; }
         update_orders(); /* Test-only hook checks complete ordered membership. */
         if (invalid) { b[0].owner = owner; b[0].alive = alive; }
+        if (badunit) { u[0].owner = uowner; u[0].alive = ualive; u[0].order = uorder; u[0].type = utype; }
     }
-    printf("owner lists: 10000 rebuilds and queries; trace=%016llx\n", trace);
+    if (!exact_trace) printf("owner lists: 10000 rebuilds and queries; trace=%016llx\n", trace);
     return 0;
 }
