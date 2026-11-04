@@ -4149,6 +4149,8 @@ Z7_ARM_DIR := build/z7-arm
 Z7_ARM_TRACE ?= $(ZERG_Z7_CONTROLLER_TRACE)
 Z7_ARM_SAVE_MIN_TICK ?= 400000
 Z7_ARM_CUT_TICK ?= 0
+# Replay-probe instrumentation only; normal product vectors are unchanged.
+Z7_ARM_REPLAY_FLAGS ?=
 Z7_ARM_COMMON := $(filter-out common/main.c,$(COMMON))
 Z7_ARM_DEPS = tests/sc64_z7_arm_replay.c $(Z7_ARM_DIR)/sc64_z7_tape_generated.h $(Z7_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile
 $(Z7_ARM_DIR)/sc64_z7_tape_generated.h: $(Z7_ARM_TRACE) tools/sc64_z7_arm_replay.py
@@ -4156,7 +4158,7 @@ $(Z7_ARM_DIR)/sc64_z7_tape_generated.h: $(Z7_ARM_TRACE) tools/sc64_z7_arm_replay
 	$(PYTHON) tools/sc64_z7_arm_replay.py tape $< $@
 define Z7_ARM_REPLAY_ROM
 build/starcraft-zerg-z7-arm-$(1).elf: $$(Z7_ARM_DEPS) | build
-	$$(CC) $$(CFLAGS) $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$(Z7_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-arm-$(1).map -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$(Z7_ARM_REPLAY_FLAGS) $$(Z7_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-arm-$(1).map -lgcc -o $$@
 	$$(SIZE) $$@
 build/StarCraft-Zerg-Z7-ARM-$(1).gba: build/starcraft-zerg-z7-arm-$(1).elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@
@@ -4172,7 +4174,7 @@ sc64-z7-arm-resume: build/StarCraft-Zerg-Z7-ARM-resume-$(Z7_ARM_CUT_TICK).gba
 # before an emulator run. The prefix writes the save payload the resume reads.
 define Z7_HOST_REPLAY
 build/test-sc64-z7-replay-$(1): $$(Z7_ARM_DEPS) common/gba.c | build
-	$$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DGBA_HOST -Icommon $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$< common/gba.c -o $$@
+	$$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DGBA_HOST -Icommon $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$(Z7_ARM_REPLAY_FLAGS) $$< common/gba.c -o $$@
 endef
 $(eval $(call Z7_HOST_REPLAY,full,-DZ7_ARM_MODE=0))
 $(eval $(call Z7_HOST_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=$(Z7_ARM_SAVE_MIN_TICK)u))
