@@ -9,6 +9,53 @@ test-sc64-zerg-late-state: build/test-sc64-zerg-late-state
 	./build/test-sc64-zerg-late-state
 test-starcraft: test-sc64-zerg-late-state
 
+# Z8 ordinary-input qualification: the controller trace, its key tape, host
+# replays (full, save prefix, fresh-process resume) and the same probe as ARM ROMs.
+SC64_Z8_MISSION := 19
+Z8_ARM_DIR := build/z8-arm
+Z8_ARM_TRACE := $(Z8_ARM_DIR)/z8-controller.jsonl
+Z8_TOOL = $(PYTHON) tools/sc64_p8_arm_replay.py --mission $(SC64_Z8_MISSION) --prefix PX
+Z8_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+build/test-sc64-z8-campaign-run: tests/sc64_z8_campaign_run.c tests/sc64_zerg_late_controller.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z8_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z8_CANONICAL_FLAGS) $< -o $@
+$(Z8_ARM_TRACE): build/test-sc64-z8-campaign-run
+	mkdir -p $(Z8_ARM_DIR)
+	./build/test-sc64-z8-campaign-run $@
+.PHONY: test-sc64-z8-controller
+test-sc64-z8-controller: $(Z8_ARM_TRACE)
+$(Z8_ARM_DIR)/sc64_px_tape_generated.h: $(Z8_ARM_TRACE) tools/sc64_p8_arm_replay.py
+	$(Z8_TOOL) tape $< $@
+Z8_REPLAY_DEPS = tests/sc64_protoss_arm_replay.c $(Z8_ARM_DIR)/sc64_px_tape_generated.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z8_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile
+build/test-sc64-z8-replay: $(Z8_REPLAY_DEPS) | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z8_CANONICAL_FLAGS) -I$(Z8_ARM_DIR) -DPX_MISSION=$(SC64_Z8_MISSION) $< -o $@
+build/test-sc64-z8-replay-prefix: $(Z8_REPLAY_DEPS) | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z8_CANONICAL_FLAGS) -I$(Z8_ARM_DIR) -DPX_MISSION=$(SC64_Z8_MISSION) -DPX_REPLAY_PREFIX $< -o $@
+build/test-sc64-z8-replay-resume: $(Z8_REPLAY_DEPS) | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z8_CANONICAL_FLAGS) -I$(Z8_ARM_DIR) -DPX_MISSION=$(SC64_Z8_MISSION) -DPX_REPLAY_RESUME $< -o $@
+# The full tape must win; the prefix saves, and a fresh process that loads its
+# SRAM image must match the full replay from the save on.
+.PHONY: test-sc64-z8-replay
+test-sc64-z8-replay: build/test-sc64-z8-replay build/test-sc64-z8-replay-prefix build/test-sc64-z8-replay-resume tools/sc64_p8_arm_replay.py
+	./build/test-sc64-z8-replay > $(Z8_ARM_DIR)/host-full.txt
+	./build/test-sc64-z8-replay-prefix $(Z8_ARM_DIR)/host-prefix.sav > $(Z8_ARM_DIR)/host-prefix.txt || true
+	./build/test-sc64-z8-replay-resume $(Z8_ARM_DIR)/host-prefix.sav > $(Z8_ARM_DIR)/host-resume.txt
+	$(Z8_TOOL) compare --from-tick $$(sed -n 's/^#define PX_TAPE_RESUME_TICK \([0-9]*\)u$$/\1/p' $(Z8_ARM_DIR)/sc64_px_tape_generated.h) $(Z8_ARM_DIR)/host-full.txt $(Z8_ARM_DIR)/host-resume.txt
+.PHONY: test-sc64-zerg-z8
+test-sc64-zerg-z8: test-zerg-z8 test-sc64-z8-controller test-sc64-z8-replay
+define Z8_ARM_ROM
+build/starcraft-zerg-z8-$(1).elf: $$(Z8_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
+	$$(CC) $$(CFLAGS) $$(ZERG_Z8_CANONICAL_FLAGS) -I$$(Z8_ARM_DIR) -DPX_MISSION=$$(SC64_Z8_MISSION) $(2) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z8-$(1).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-Zerg-Z8-$(3).gba: build/starcraft-zerg-z8-$(1).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC Z8 REPLAY' SCZ8
+endef
+$(eval $(call Z8_ARM_ROM,replay,,Replay))
+$(eval $(call Z8_ARM_ROM,replay-prefix,-DPX_REPLAY_PREFIX,Replay-Prefix))
+$(eval $(call Z8_ARM_ROM,replay-resume,-DPX_REPLAY_RESUME,Replay-Resume))
+.PHONY: sc64-z8-arm-replay
+sc64-z8-arm-replay: build/StarCraft-Zerg-Z8-Replay.gba build/StarCraft-Zerg-Z8-Replay-Prefix.gba build/StarCraft-Zerg-Z8-Replay-Resume.gba
+
 # Z9 candidate: the Z8 vector plus the authenticated Z9 program, rendered by
 # `sc64_zerg_late_program_pack.py` from the private descriptor written by
 # `sc64_zerg_late_pack.py pack --mission Z9`. ZERG_Z9_BANK must hold every Z9
