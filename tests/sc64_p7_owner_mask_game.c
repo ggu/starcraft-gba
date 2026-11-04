@@ -297,6 +297,8 @@ int main(void)
             b[i].alive = 1;
             b[i].owner = rnd() % 5;
             b[i].raw_owner = (int)(rnd() % 12) - 2;
+            b[i].type = rnd() % SC_RB_COUNT;
+            b[i].under_construction = (rnd() & 1u) != 0;
             b[i].x = rnd() % WORLD_W;
             b[i].y = rnd() % WORLD_H;
         }
