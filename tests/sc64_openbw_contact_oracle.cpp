@@ -49,7 +49,18 @@ int main() {
  a.u.status_flags|=unit_t::status_flag_gathering; assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));
  b.u.status_flags|=unit_t::status_flag_gathering; a.order.id=Orders::ReturnGas;
  assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));
+ a.order.id=Orders::Move;b.order.id=Orders::WaitForGas;
+ assert(api.check_ground_unit_movement_unit_collision(&a.u,step)==&b.u);
  a.u.status_flags&=~unit_t::status_flag_gathering;b.u.status_flags&=~unit_t::status_flag_gathering;
+ // The special status ignores enemies but allows an allied owner.
+ b.u.owner=1;world->alliances[0][1]=0;b.u.status_flags|=unit_t::status_flag_400000;
+ assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));
+ world->alliances[0][1]=1;assert(api.check_ground_unit_movement_unit_collision(&a.u,step)==&b.u);
+ b.u.status_flags&=~unit_t::status_flag_400000;b.u.owner=0;
+ // The sweep relies on finder membership: a loaded flag alone is not a filter.
+ b.u.status_flags|=unit_t::status_flag_loaded;assert(api.check_ground_unit_movement_unit_collision(&a.u,step)==&b.u);
+ api.unit_finder_remove(&b.u);assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));
+ b.u.status_flags&=~unit_t::status_flag_loaded;api.unit_finder_insert(&b.u);
  // This low-level sweep does not itself discard a burrowed candidate.
  b.u.status_flags|=unit_t::status_flag_burrowed;assert(api.check_ground_unit_movement_unit_collision(&a.u,step)==&b.u);
  b.u.status_flags&=~unit_t::status_flag_burrowed;
