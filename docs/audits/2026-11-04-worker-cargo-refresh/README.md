@@ -1,31 +1,132 @@
 # Current-release worker cargo integration
 
-This draft integrates the persistent cargo work from `f6f4ff35` with release `6417737c`, which promotes the P10 default and repairs the T8 controller. The merge is `9027b95a`; the focused qualification is at `7adfef99`. The Make conflict retains the current generated icon/effect prerequisites and adds the cargo flag. No existing release or SD image is replaced by this draft.
+Workers retain mineral/gas identity through MOVE, ATTACK, STOP and construction
+travel, and can return their old load before starting a new gather order. SCVs
+and Probes retain cargo through construction; a Drone is consumed when its
+building commits. Repair still uses `carry` for a fractional repair remainder
+and discards resource cargo. This is not complete native worker-order parity.
 
-The optional cargo suite now includes the actual P10 product vector as well as explicit P7. The flag-expansion check follows the P10 default. The invalid-candidate fixture explicitly clears its synthetic HOST journal before the second independent split-profile rejection case: after a deliberately malformed committed record is rejected, the production first-write guard correctly refuses an ordinary overwrite. That guard and the rejection/unchanged-world assertions are preserved.
+The combined runtime tested here is `1ec3fadc5df079d7f38d0b73b85cf0b08c84b7f2`,
+on release `2a8b4ee4`, including the P10 default and Arbiter optimization. The
+cargo capability is shared by the current Terran, Zerg, Protoss and Showcase
+products and their applicable campaign/skirmish modes. Earlier explicit legacy
+profiles remain separate. No Unit or serialized-row growth is introduced; the
+P10 fixture payload is 16,332 bytes.
 
-With fresh prepared inputs cloned from the verified `6417737c` race package and the pinned extractor `09b57f787a247107d1de82b8c5eab2734667ea1d`, these checks passed locally under the native lock and free-space guard:
+## Save and fixture boundaries
 
-```sh
-python3 -m unittest tests.test_sc64_worker_cargo_flags
-make build/test-terran test-sc64-worker-gather-terran test-sc64-worker-gather-p10
-./build/test-terran
-```
+The cargo tag toggles `0x01000000` with XOR because that bit is already set in
+historical scenario tags. Transport and Battlecruiser features retain their own
+namespaces. Legacy/current selection validates a scratch candidate, and the
+selected-journal writer preserves the previous valid record. Migrated cargo
+whose kind cannot be inferred is marked unknown rather than paid as a guessed
+resource.
 
-The Terran and P10 checks cover ordinary worker inputs, resource identity, AI resumption and actual-codec current/legacy migration for all three human races. The P10 payload is 16,332 bytes. The split-profile run includes its malformed-candidate rejection cases. The first build stopped before compilation because the isolated tree lacked the pinned extractor; after copying that existing checkout, the focused build and runs passed. Inputs and outputs remain private.
+Malformed-candidate fixtures explicitly separate independent synthetic HOST
+journals after checking rejection and an unchanged world. They first assert
+that the production writer refuses the bad committed record. Foreign-record
+preservation is checked before teardown; wrong-generation negatives remove an
+older valid fallback before testing that separate case. These are fixture
+boundaries, not a weakened production overwrite guard.
 
-This is not current-base ARM, fresh-process SRAM, full-campaign or performance qualification. Earlier November 1 evidence belongs to its recorded source and inputs, and does not qualify this new integration. The branch remains unmerged while broader current-profile checks are completed.
+## Combined local qualification
 
-## Current namespace and fixture follow-up
+All checks use the existing pinned extractor
+`09b57f787a247107d1de82b8c5eab2734667ea1d` and verified copies of private inputs.
+No hosted Actions were dispatched.
 
-The broader run initially stopped at the next independent T3 malformed-record case, and P10's profile assertions still expected the pre-cargo namespace. T3 now explicitly checks that ordinary saving is refused before clearing each rejected HOST record. The profile checks include the literal cargo XOR bit while retaining their generation constants. Their isolated wrong-generation cases remove valid predecessors before testing rejection, so correct journal fallback cannot mask that separate negative. The P7 foreign-journal preservation check still verifies unchanged bytes before fixture teardown.
+- `./dev sc64 test --profile terran`: all ten Terran controllers and profile checks.
+- `make -k test-zerg-z7`: all seven carried Zerg missions and profile/save checks.
+- `make -k test-sc64-protoss-px`: all ten Protoss host wins and their continuations.
+- `make test-sc64-p10-carried-profile`: 234 startup/save configurations.
+- `make -k test-sc64-zerg-z8`: separate candidate win at frame 39,617 / call
+  40,335, zero mission faults, 24/24 host continuation observations matching.
+- Actual T10, Z7, P10 and Showcase renderer vectors pass the unmodified cargo
+  renderer fixture under ASan/UBSan, including kind, clipping, fog, nonworkers
+  and T6 repair handling.
+- A clean unprepared checkout passes source boundary, doctor, default build and
+  full tests: 953 Python tests (26 skipped), separate 5- and 8-test suites and
+  native fixtures. It remains independent of imported game assets.
+- All six normal ARM products (T10, Z7, P10, Showcase, Z9, Z10) link and pass
+  their applicable ROM/memory checks. Late Z9/Z10 BSS ends at `0x0203dff8`,
+  leaving eight bytes below the unchanged guard; IWRAM ends at `0x03004bf0`.
 
-At `3716f196`, the T3 save suite and P10 promoted-profile suite passed, including all 234 P10 host startup/save configurations. Independent cargo-enabled Battlecruiser flight, research and Yamato tests passed after four explicit between-case cleanup boundaries (`50f15ebc`); these checks used unchanged copies of all 1,734 recorded SC64 release inputs. Broader current-base ARM, migration, campaign and performance work remains required.
+The changed-route ARM replay and real SRAM gates now pass:
 
-## Full Terran and real P10-save follow-up
+| Route | Full observations | Save prefix | Fresh-process resume | Cut tick |
+| --- | ---: | ---: | ---: | ---: |
+| P8 | 95/95 | 32/32 | 64/64 | 31,374 |
+| P10 | 149/149 | 32/32 | 118/118 | 31,064 |
+| Z7 | 307/307 | 258/258 | 49/49 | 136,058 |
 
-At `ef4e6437`, `./dev sc64 test --profile terran` passed after the fixture fixes, including all ten Terran controllers. A genuine legacy P10 SRAM file was then produced through ordinary custom-game controls on the verified `6417737c` P10 ROM. Map 1, human Protoss and one Zerg opponent ran for 300 updates before a normal pause-menu save. Its SHA-256 is `76a533126c9da74472fed9f0ba36d2cfbd903acc84696f68e47bee3855543c75`.
+All three win. P8 uses a sampled gameplay checksum that omits worker flags,
+work timer and depot identity. The corrected P10 checksum includes those
+fields. Z7 compares its recorded scalar/trigger/checkpoint fields, not a full
+actor-bank checksum. The SRAM files are genuine ordinary pause-menu saves,
+loaded in fresh emulator processes; no guest-state writes or forged SRAM were
+used. These are defined replay/continuation checks, not exhaustive state parity.
 
-The cargo P10 build (`6ec70bb51d3cee4d7be867a393b0e9f641f351b6ffaf5033dfefe99ad14de61b`) loaded that unmodified file through HOME/L. Captured frame 301, nine actors, three buildings, resources and lobby fields matched. Re-saving published the cargo record in slot 1 at sequence 2 and left legacy slot 0 at sequence 1 byte-identical. A fresh process loaded the new save and matched the same captured fields after 60 uninterrupted candidate updates. The read-only physical-input backend issued no guest-memory writes or forged/tampered records. This case does not exercise carried gas or unknown cargo flags, and its captured fingerprint is not an exhaustive world comparison or campaign-save proof.
+P10's dedicated replay initially truncated long log lines before their checksum;
+that partial run is not qualified. Instrumentation-only commits `4f7b6df4` and
+`26c3f88f`, merged separately in PR #272, move its digest first, include worker
+cargo fields, shorten optional counters and require a complete end sentinel.
+All 23 comparator tests pass. Z7's reader initially expected the old flat save
+namespace. PR #273 adds explicit legacy/Transport1/cargo-Transport1 profiles,
+separate inner/outer tags, bounded impact records and the transport trailer;
+16 tests pass, including the current 240-unit / 160-building bounds. Its
+retained full ARM run was re-evaluated without repeating emulation.
 
-The current Z7 ordinary-input controller reaches its existing limit with five enemy buildings remaining and zero mission faults; baseline attribution and strategy diagnosis remain open. The P1–P10 carried routes and other current ARM guards are being qualified. These are merge holds, not grounds to raise limits or weaken success checks.
+The art integration is tested at `2f9ecf31`: all six normal products and the
+actual cargo-enabled late-art pixel/coverage/cache fixture pass, with 1,958
+frozen input hashes unchanged. The four regular product ROMs are byte-identical
+to the qualified `1ec3fadc` builds; ELFs differ, while global symbol tables
+match. The sole intentional change in the previous 1,796-file manifest is the
+complete late-Zerg sprite header. Current main's art and verifier repairs are
+included in the integration, so these normal-ROM ARM results remain applicable.
+
+Z7's full replay measures about 7.09 fps equivalent. Its resumed portion has a
+158,692,721-cycle peak (about 9.46 seconds). These replacement-loop measurements
+are far below the target and are not a physical GBA measurement. Performance
+optimization remains a separate active goal.
+
+## Production SRAM cases
+
+T10, Z7 and Showcase production ROMs pass ordinary-input 60-update play plus
+60-update fresh-process continuation cases. The P10 migration case starts with
+an unchanged legacy SRAM file produced by ordinary controls on release
+`6417737c`: map 1, human Protoss, one Zerg opponent, 300 updates then pause/save.
+Legacy SRAM SHA-256:
+`76a533126c9da74472fed9f0ba36d2cfbd903acc84696f68e47bee3855543c75`.
+
+The combined cargo P10 ROM
+`4c2e61f164e9244ba2957578b960aac5cd735fc4bc7fc7b4aabe9b9c4cbe4a72`
+loads that original file through HOME/L. Re-saving publishes slot 1 / sequence 2
+while preserving legacy slot 0 / sequence 1 byte-for-byte. A fresh process
+matches the captured continuation after 60 candidate updates. This one migration
+case does not exercise carried gas/unknown flags, P7-to-P10 campaign migration,
+or an exhaustive world comparison. No guest-memory writes or forged SRAM were
+used. The recorded input hashes remain unchanged.
+
+## Bounded ARM timing
+
+Same-source cargo OFF/ON comparisons use the existing synthetic crowd probe on
+default skirmish map 0. It adds/commands actors at boot and then runs AI. This is
+not Blood Bath, a loaded-worker scene or a whole match. Each case has 500 samples;
+initial hashes and all exposed non-timing counters/world hashes match. It does
+not compare every world field or framebuffer.
+
+| Probe | OFF mean frame cycles | ON mean frame cycles | Change |
+| --- | ---: | ---: | ---: |
+| Z7, 96 actors, three AIs | 1,169,230.79 | 1,171,483.19 | +0.193% |
+| P10, 48 actors, two AIs | 879,380.24 | 881,065.71 | +0.192% |
+
+The receipt SHA-256 is
+`f16ed5a7b485598db372dad9d054afb70858b2a00f404f8b186f5c26c6d3ab79`;
+2,121 copied input hashes were checked after each operation. The separate
+production-guard/SRAM run checked 1,796 inputs unchanged, and the campaign suite
+checked its 1,734-file SC64 manifest unchanged. Different manifests cover
+different input roots; these counts are not claimed as one identical set.
+
+These measurements do not establish 30 fps, physical GBA behavior, full native
+parity or qualification of the unpromoted Z9/Z10 missions. ROMs, generated banks,
+captures and saves remain private.
