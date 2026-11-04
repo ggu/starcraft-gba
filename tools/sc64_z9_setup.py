@@ -97,7 +97,8 @@ def prepare(root: Path, run: Callable[[list[str]], None]) -> None:
         generator = "sc64_z8_program_pack.py" if mission == "Z8" else "sc64_zerg_late_program_pack.py"
         run([py, str(root / "tools" / generator), str(descriptor), str(header)])
     run([py, str(root / "tools/sc64_race_sprites.py"), "--rom", str(rom),
-         "--base-only", "--include-zp-campaign-actors", "--include-z5-actors",
+         # P6 inherits T4 doors/traps: keep the generator's default T4 set.
+         "--include-zp-campaign-actors", "--include-z5-actors",
          "--include-z5-doodads", "--include-z6-actors", "--include-z6-buildings",
          "--include-p6-actors", "--include-p7-actors", "--include-z8-buildings",
          "--include-zerg-late-art", "--prepack-unit-words",

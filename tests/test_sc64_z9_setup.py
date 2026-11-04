@@ -66,6 +66,7 @@ class Z9Setup(unittest.TestCase):
         self.assertEqual(len(verifies), 2)
         self.assertFalse(any("pack" in c for c in calls))
         self.assertIn("--include-zerg-late-art", calls[-1])
+        self.assertNotIn("--base-only", calls[-1])  # P6 needs inherited T4 props.
         for mission in ("Z8", "Z9"):
             self.assertEqual(setup.paths(self.root, mission)[0].read_text(), "retained evidence")
 
