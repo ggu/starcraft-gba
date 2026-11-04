@@ -25,7 +25,11 @@
 enum {
     SC64_ZL_AI_PRODUCE_UPDATES = 240,
     /* The longest wave timer in any mission's table. */
+#ifdef SC64_Z10_ORDERED_AI_STAGE
+    SC64_ZL_AI_WAVE_TIMER_LIMIT = 13750,
+#else
     SC64_ZL_AI_WAVE_TIMER_LIMIT = 10625,
+#endif
     SC64_ZL_AI_HOME_GUARD = 4,
     /* Keep pool room for trigger-created actors and the human. */
     SC64_ZL_AI_RESERVE_UNITS = 24,

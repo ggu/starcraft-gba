@@ -23,6 +23,21 @@
  * are not shown or played. Only one of the two missions is active at once,
  * so they share the live state below. */
 #include "sc64_zerg_late_ai.h"
+#ifdef SC64_Z10_ORDERED_AI_STAGE
+/* Private tables are generated from the authenticated report. Each row is a
+ * source-ordered request and provisional wait; it is not a native interpreter. */
+typedef struct { u16 delay; u8 raw[6]; u8 count[6]; } Sc64Z10OrderedStep;
+#include "sc64_z10_ordered_ai_generated.h"
+static const Sc64Z10OrderedStep *const sc64_z10_steps[] = {
+    sc64_z10a_steps, sc64_z10d_steps, sc64_z10e_steps
+};
+static const u8 sc64_z10_step_counts[] = {
+    SC64_Z10A_COUNT, SC64_Z10D_COUNT, SC64_Z10E_COUNT
+};
+static const u8 sc64_z10_loop_starts[] = {
+    SC64_Z10A_LOOP, SC64_Z10D_LOOP, SC64_Z10E_LOOP
+};
+#endif
 #include "sc64_z9_program_generated.h"
 #ifdef SC64_Z10_RUNTIME
 #include "sc64_z10_program_generated.h"
@@ -550,9 +565,26 @@ static int race_zl_runtime_init(const Sc64RaceMap *map)
            sc64_zl_init(&race_zl_sched, m->program, &setup) && race_zl_bind(map);
 }
 
+#ifdef SC64_Z10_ORDERED_AI_STAGE
+static int race_zl_ordered_ai_valid(const Sc64ZlAiState *ai, int mission)
+{
+    if (!sc64_zl_ai_state_valid(ai)) return 0;
+    for (unsigned t=0; t<SC64_ZL_AI_TOWNS; ++t) {
+        if (mission == SC64_Z10_GLOBAL_ID) {
+            if (ai->wave[t] >= sc64_z10_step_counts[t] ||
+                ai->wave_timer[t] > sc64_z10_steps[t][ai->wave[t]].delay) return 0;
+        } else if (ai->wave_timer[t] > 10625u) return 0;
+    }
+    return 1;
+}
+#define RACE_ZL_AI_VALID(ai, mission) race_zl_ordered_ai_valid((ai), (mission))
+#else
+#define RACE_ZL_AI_VALID(ai, mission) sc64_zl_ai_state_valid((ai))
+#endif
+
 static int race_zl_save_pack(Sc64ZlPersistentState *out)
 {
-    if (!race_zl_mission || !sc64_zl_ai_state_valid(&race_zl_ai) ||
+    if (!race_zl_mission || !RACE_ZL_AI_VALID(&race_zl_ai, race_selected_mission) ||
         race_zl_camera_release || !race_zl_live_world_valid()) return 0;
     memset(out, 0, sizeof(*out));
     if (!sc64_zl_state_pack(out, &race_zl_sched, race_zl_mission->program)) return 0;
@@ -577,7 +609,7 @@ static int race_zl_save_unpack(const Sc64ZlPersistentState *in,
     if (!m) return 0;
     race_zl_setup(m, &setup);
     memcpy(&ai, in->ai, sizeof(ai));
-    if (!sc64_zl_ai_state_valid(&ai) ||
+    if (!RACE_ZL_AI_VALID(&ai, race_selected_mission) ||
         (in->crystal_carrier != SC64_ZL_NO_CARRIER && in->crystal_carrier >= MAX_UNITS))
         return 0;
     if (!sc64_zl_state_unpack(apply ? &race_zl_sched : 0, in, m->program,
@@ -654,6 +686,34 @@ static void race_zl_ai_wave(unsigned town)
             tx = u[i].x; ty = u[i].y;
         }
     if (tx < 0) return;
+#ifdef SC64_Z10_ORDERED_AI_STAGE
+    if (race_zl_mission->global_id == SC64_Z10_GLOBAL_ID) {
+        /* Reserve the first four idle combat actors once globally, then send
+         * requested types in source order. Missing actors are not fabricated;
+         * this attempt advances even when only a partial group was available. */
+        int guards[SC64_ZL_AI_HOME_GUARD], n_guard=0;
+        const Sc64Z10OrderedStep *step=&sc64_z10_steps[town][race_zl_ai.wave[town]];
+        for (int i=0; i<MAX_UNITS && n_guard<SC64_ZL_AI_HOME_GUARD; ++i)
+            if (u[i].alive && u[i].owner==ENEMY && u[i].raw_owner==slot &&
+                u[i].order==ORDER_IDLE && !sc64_race_is_worker(u[i].type) &&
+                sc64_race_unit_damage(u[i].type)>0) guards[n_guard++]=i;
+        for (unsigned group=0; group<6 && step->count[group]; ++group) {
+            int sent_type=0;
+            for (int i=0; i<MAX_UNITS && sent_type<step->count[group]; ++i) {
+                int guarded=0;
+                for (int g=0; g<n_guard; ++g) if (guards[g]==i) guarded=1;
+                if (guarded || !u[i].alive || u[i].owner!=ENEMY ||
+                    u[i].raw_owner!=slot || u[i].raw_type!=step->raw[group] ||
+                    u[i].order!=ORDER_IDLE || sc64_race_is_worker(u[i].type) ||
+                    sc64_race_unit_damage(u[i].type)<=0) continue;
+                u[i].order=ORDER_ATTACK_MOVE; u[i].target=-1;
+                u[i].tx=(s16)tx; u[i].ty=(s16)ty; u[i].path_x=u[i].path_y=0;
+                ++sent_type; ++race_campaign.enemy_units_sent;
+            }
+        }
+        return;
+    }
+#endif
     for (int i = 0; i < MAX_UNITS && sent < want; ++i) if (u[i].alive &&
         u[i].owner == ENEMY && u[i].raw_owner == slot && u[i].order == ORDER_IDLE &&
         !sc64_race_is_worker(u[i].type) && sc64_race_unit_damage(u[i].type) > 0) {
@@ -677,6 +737,16 @@ static void race_zl_ai_tick(void)
         if (!race_zl_mission->wave[t].units) continue;
         if (race_zl_ai.wave_timer[t]) --race_zl_ai.wave_timer[t];
         if (!race_zl_ai.wave_timer[t]) {
+#ifdef SC64_Z10_ORDERED_AI_STAGE
+            if (race_zl_mission->global_id == SC64_Z10_GLOBAL_ID) {
+                race_zl_ai_wave(t);
+                unsigned next=(unsigned)race_zl_ai.wave[t]+1u;
+                if (next>=sc64_z10_step_counts[t]) next=sc64_z10_loop_starts[t];
+                race_zl_ai.wave[t]=(u8)next;
+                race_zl_ai.wave_timer[t]=sc64_z10_steps[t][next].delay;
+                continue;
+            }
+#endif
             race_zl_ai.wave_timer[t] = race_zl_mission->wave[t].gap_updates;
             race_zl_ai_wave(t);
         }

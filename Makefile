@@ -4065,6 +4065,7 @@ test-zerg-z8: build/test-sc64-z8-game
 
 # Late Zerg (Z9/Z10) candidates and their fixtures.
 include tests/sc64-zerg-late/Makefile
+include mk/z10-ordered/Makefile
 
 # Preserve a named six-entry product alongside the existing `zerg` alias.
 .PHONY: verify-zerg-z6 zerg-z6
