@@ -154,6 +154,8 @@ int main(void)
     race_human = R_PROTOSS; race_bots = 0;
     race_skirmish_init(); screen = SCREEN_PLAY;
     {
+        /* Explicitly prepare power for this production fixture. */
+        assert(spawn_build(SIDE, B_PYLON, race_base_x[0] - 48, race_base_y[0], 0) >= 0);
         int gateway = spawn_build(SIDE, B_GATEWAY, 208, 160, 0);
         int zealot, probe;
         assert(gateway >= 0 && race_site_powered(SIDE, b[gateway].x, b[gateway].y));
