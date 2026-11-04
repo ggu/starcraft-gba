@@ -1,4 +1,7 @@
 /* Normal-menu skirmish openings in each product and every lobby combination. */
+#ifndef SC64_IMPORTED_SKIRMISH
+#define SC64_SKIRMISH_IMPORTED_COUNT 0
+#endif
 #define main sc64_skirmish_controller_unused_main
 #include "sc64_skirmish_campaign_run.c"
 #undef main
@@ -36,6 +39,6 @@ int main(void)
             ++cases;
         }
        }
-    assert(cases==234);printf("Normal-menu skirmish openings: %d configurations passed\n",cases);
+    assert(cases==117 * SC64_FRONT_MAP_COUNT);printf("Normal-menu skirmish openings: %d configurations passed\n",cases);
     return 0;
 }
