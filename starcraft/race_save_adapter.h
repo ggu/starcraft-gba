@@ -3372,9 +3372,8 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,SAVE_VERSION};
 #endif
-    if (!save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
-                               race_worker_cargo_prepare_selected,plan,selection)) return 0;
-    return race_worker_cargo_prepare_selected(&race_impact_record,selection->length,selection->tag,plan);
+    return save_select_prepared(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
+                                race_worker_cargo_prepare_selected,plan,selection);
 }
 static int race_worker_cargo_previous(GbaSaveSelection *selection) {
     RaceLoadPlan plan;
