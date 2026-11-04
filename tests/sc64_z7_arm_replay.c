@@ -24,7 +24,10 @@
  * argv[1] into the empty host SRAM before booting. Emulator evidence only;
  * no physical-hardware claim.
  */
-#if defined(Z7_PEAK_DIAGNOSTIC) && !defined(SC64_DIAGNOSTIC_UPDATE)
+#if defined(Z7_PEAK_DETAILED_STAGES) && !defined(Z7_PEAK_DIAGNOSTIC)
+#error "detailed peak stages require Z7_PEAK_DIAGNOSTIC"
+#endif
+#if defined(Z7_PEAK_DETAILED_STAGES) && !defined(SC64_DIAGNOSTIC_UPDATE)
 #define SC64_DIAGNOSTIC_UPDATE
 #endif
 #include "../starcraft/game.c"
@@ -127,14 +130,25 @@ static void report_peak(u16 held, u32 before_frame, int before_screen,
     out_text(" end=1"); out_flush();
     out_text("Z7D STAGES");
     out_field("call", (long)frames_run); out_field("tick", (long)diagnostic_tick);
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    out_field("detailed", 1);
+#else
+    out_field("detailed", 0);
+#endif
     peak_field("orders", advancing ? sc64_orders_cycles : 0);
     peak_field("sight", advancing ? sc64_sight_cycles : 0);
+#ifdef SC64_DIAGNOSTIC_UPDATE
     peak_field("mission", sc64_update_mission_cycles);
     peak_field("production", sc64_update_production_cycles);
     peak_field("state", sc64_update_race_state_cycles);
     peak_field("defenses", sc64_update_defenses_cycles);
     peak_field("research", sc64_update_research_cycles);
     peak_field("remainder", sc64_update_remainder_cycles);
+#else
+    peak_field("mission", 0); peak_field("production", 0);
+    peak_field("state", 0); peak_field("defenses", 0);
+    peak_field("research", 0); peak_field("remainder", 0);
+#endif
     out_text(" end=1"); out_flush();
 }
 #endif
@@ -151,9 +165,11 @@ static void frame_with(u16 held)
 #ifdef Z7_PEAK_DIAGNOSTIC
     u32 before_frame = (u32)frame;
     int before_screen = screen;
+#ifdef SC64_DIAGNOSTIC_UPDATE
     sc64_update_mission_cycles = sc64_update_production_cycles = 0;
     sc64_update_race_state_cycles = sc64_update_defenses_cycles = 0;
     sc64_update_research_cycles = sc64_update_remainder_cycles = 0;
+#endif
 #endif
     u32 start = gba_clock();
     demo_keys = held;

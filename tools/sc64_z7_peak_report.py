@@ -17,7 +17,7 @@ COMPONENTS = ('orders', 'sight', 'mission', 'production', 'state', 'defenses',
 FIELDS = {
     'PEAK': ('call', 'tick', 'phase', 'before', 'frame', 'screen0', 'screen',
              'held', 'total', 'update', 'advancing', 'end'),
-    'STAGES': ('call', 'tick', *COMPONENTS, 'end'),
+    'STAGES': ('call', 'tick', 'detailed', *COMPONENTS, 'end'),
     'STOP': ('calls', 'tick', 'end'),
 }
 
@@ -67,6 +67,9 @@ def summarize(text: str) -> dict:
         if set(pair) != {'PEAK', 'STAGES'} or pair['PEAK']['tick'] != pair['STAGES']['tick']:
             raise ValueError('unpaired diagnostic observation')
         row = dict(pair['PEAK'])
+        if pair['STAGES']['detailed'] > 1:
+            raise ValueError('invalid detailed stage indicator')
+        row['detailed_stages'] = bool(pair['STAGES']['detailed'])
         row['stages'] = {key: pair['STAGES'][key] for key in COMPONENTS}
         if row['phase'] == 2:
             context = 'HOME load'

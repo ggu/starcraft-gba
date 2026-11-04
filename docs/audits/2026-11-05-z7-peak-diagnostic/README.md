@@ -7,8 +7,12 @@ gameplay; it must not be attributed to pathfinding from the aggregate alone.
 `Z7_ARM_REPLAY_FLAGS=-DZ7_PEAK_DIAGNOSTIC` adds probe-only `Z7D PEAK` and
 `Z7D STAGES` records on new maxima. They identify the tape tick, probe call,
 input, screen/frame transition, update/render totals and existing coarse engine
-stage counters. Context 2 is HOME load, 3 the ordinary pause-menu save, and 1
-the recorded tape. Stage counters are reset before each measured call; order
+stage counters. The default diagnostic keeps the normal runtime and reads its
+existing order/sight counters. Adding `-DZ7_PEAK_DETAILED_STAGES` enables the
+extra update subscopes; a `detailed=1` marker distinguishes those from zero
+placeholders in the runtime-preserving variant. Context 2 is HOME load, 3 the
+ordinary pause-menu save, and 1 the recorded tape.
+Detailed stage counters are reset before each measured call; order
 and sight values are reported only for advancing in-play frames. Diagnostic
 writes affect counters and log output, not gameplay state or input selection.
 

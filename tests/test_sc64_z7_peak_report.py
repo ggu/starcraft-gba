@@ -11,7 +11,7 @@ SPEC.loader.exec_module(peak)
 
 def record(call=0, phase=2, advancing=0):
     a = f'Z7D PEAK call={call} tick=136058 phase={phase} before=0 frame=134787 screen0=0 screen=1 held=512 total=158000000 update=157000000 advancing={advancing} end=1'
-    b = f'Z7D STAGES call={call} tick=136058 orders=0 sight=0 mission=0 production=0 state=0 defenses=0 research=0 remainder=0 end=1'
+    b = f'Z7D STAGES call={call} tick=136058 detailed=0 orders=0 sight=0 mission=0 production=0 state=0 defenses=0 research=0 remainder=0 end=1'
     return a + '\n' + b
 
 
@@ -20,6 +20,7 @@ class PeakReportTests(unittest.TestCase):
         result = peak.summarize('[WARN] ' + record() + '\nZ7D STOP calls=1 tick=136059 end=1')
         self.assertEqual(result['max_total']['context'], 'HOME load')
         self.assertEqual(result['stop']['calls'], 1)
+        self.assertFalse(result['max_total']['detailed_stages'])
 
     def test_gameplay_context_and_standard_log_are_distinct(self):
         text = record(phase=1, advancing=1).replace('screen0=0', 'screen0=1')
