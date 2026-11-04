@@ -72,3 +72,14 @@ this does not establish an effective mixed assault. At frame 49,627 the Lair
 and Spire were gone while 20 Mutalisks remained. The Guardian actor has no
 ordinary player morph service in this profile; no Guardian production claim is
 made. The engine, enemy AI and resource and actor limits were unchanged.
+
+Controller `abdb1293` forwarded Mutalisk reinforcements along the same road and
+required ten live Mutalisks before assault. It lost at frame 107,479 / 109,235
+calls with no assault and zero faults. Observation-only census showed a full
+240-actor pool at frame 20,553 when the Spire completed, zero Mutalisks then,
+and only four by frame 28,082. The Spire was gone by frame 30,138; ten arrived
+at frame 35,455 after rebuilding, when Hydralisk count had fallen below the
+assault threshold. Controller `547c7a84` reserved composition space by limiting
+pre-air Hydralisks to 30. Its single attempt reached the unchanged 200,000-call
+limit at frame 197,630 / 200,027 calls, with no assault, win, loss or fault.
+These are failed or incomplete controller experiments, not qualification.
