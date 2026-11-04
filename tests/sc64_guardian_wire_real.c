@@ -43,6 +43,19 @@ typedef Sc64PackedUnitSave Row;
 #endif
 int main(void)
 {
+    assert(sc64_race_raw_unit(U_GUARDIAN_COCOON)==59);
+    assert(sc64_race_unit_rule(U_GUARDIAN_COCOON)->hp==200);
+    assert(sc64_race_unit_armor(U_GUARDIAN_COCOON)==0);
+    assert(sc64_race_unit_flying(U_GUARDIAN_COCOON));
+    assert(sc64_game_unit_actor_flags(U_GUARDIAN_COCOON)==(SC64_GAME_ACTOR_SELECTABLE|SC64_GAME_ACTOR_COLLIDABLE|SC64_GAME_ACTOR_DRAWABLE));
+    assert(sc64_race_unit_damage(U_GUARDIAN_COCOON)==0 && sc64_race_unit_damage_vs(U_GUARDIAN_COCOON,1)==0);
+    assert(sc64_race_unit_range(U_GUARDIAN_COCOON)==0 && sc64_race_unit_hits_vs(U_GUARDIAN_COCOON,0)==0);
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    assert(sc64_game_unit_collision_radius(U_GUARDIAN_COCOON)==8);
+#endif
+#ifdef SC64_Z7_SOURCE_SIGHT
+    assert(sc64_z7_source_unit_sight_pixels(U_GUARDIAN_COCOON)==128);
+#endif
     Unit q={0},wire,out,again; Row row;
     q.x=q.tx=q.path_x=30; q.y=q.ty=q.path_y=40; q.hp=q.maxhp=200;
     q.owner=SIDE;q.type=U_GUARDIAN_COCOON;q.raw_type=59;q.raw_owner=3;
