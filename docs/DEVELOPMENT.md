@@ -3140,3 +3140,28 @@ new source-fact table under a fresh ignored `build/generated/scarab-p7/run.*`
 directory; they do not prepare imported art or replace an existing fact table.
 These component checks do not enable Reaver production or qualify gameplay,
 SRAM continuation, physical hardware, or performance.
+
+## Optional late Zerg source art
+
+The Z9/Z10 candidate bank requires the source Init sprites for the Khaydarin
+Crystal Formation (raw 173), Protoss Temple (174) and Khaydarin Crystal (219).
+After preparing the Z8 bank's normal inputs from your own verified ROM, generate
+its private bank with the full Z8 option set plus `--include-zerg-late-art`:
+
+```sh
+python3 tools/sc64_race_sprites.py --rom "$VERIFIED_ROM" --remap "$PALETTE_REMAP" \
+  --include-zp-campaign-actors --include-z5-actors --include-z5-doodads \
+  --include-z6-actors --include-z6-buildings --include-p6-actors \
+  --include-p7-actors --prepack-unit-words --include-z8-buildings \
+  --include-zerg-late-art --out .local/sc64/zerg-z8/generated/sprites \
+  --header .local/sc64/zerg-z8/generated/sc64_race_sprites_generated.h
+make test-sc64-zerg-late-art zerg-z9 zerg-z10
+```
+
+The importer authenticates the ROM and requires all three source GRPs; an
+opaque pixel mapped to transparent palette index zero fails generation. Late
+builds reject an older bank without the completeness marker. The added sprites
+are compiled only for the Z9/Z10 runtime, and the generated header, previews,
+ROMs and manifests remain private. The pickup uses its composed source Init
+frame; its later source animation and deferred shadow rendering are not
+implemented. This art change does not qualify or promote a mission.
