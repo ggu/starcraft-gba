@@ -3,8 +3,8 @@
 This answers two questions left open by the
 [carried Z2 audit](../2026-11-03-z2-carried-controller/README.md): why P2 lost at
 tick 45,892, and why P1 depended on start timing. Both were controller defects on
-`d60e75eb`. The rebuilt routes in #253 fix them, so this change is stacked on #253
-and corrects what remained: Probes that stopped mining with tens of thousands of
+`d60e75eb`. The rebuilt routes in #253, since merged, fix them. This change corrects
+what remained: Probes that stopped mining with tens of thousands of
 minerals still on the map. The engine and generated inputs are unchanged.
 
 ## P2 at tick 45,892
@@ -81,7 +81,8 @@ cargo state.
 ## Start-timing sweep
 
 Wins out of 720 offsets in each column, in scratch builds without sanitizers. Offsets
-720 to 1,439 were not looked at while the changes were being written.
+720 to 1,439 were not looked at while the changes were being written. Every row was
+run on `a1ce4f01` and again after merging `88c17f15`, and the counts did not change.
 
 **Races vector (`make test-races-controller`):**
 
