@@ -160,6 +160,7 @@ SAVE_PAYLOAD_BYTES = 16296
 SAVE_PROFILES = {
     "legacy": (SAVE_TAG, SAVE_TAG, False),
     "transport1": (SAVE_TAG, SAVE_TAG | 0x04000000, True),
+    "z9-cargo-transport1": (0x52435A60, 0x56435A60, True),
     "cargo-transport1": (SAVE_TAG ^ 0x01000000,
                          (SAVE_TAG ^ 0x01000000) | 0x04000000, True),
 }
