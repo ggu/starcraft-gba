@@ -44,9 +44,15 @@ static int nearest_leg(int x,int y)
     return best;
 }
 
-static int hydras_near(int x,int y,int r)
+static int army_type(int type){return type==U_HYDRALISK||type==U_MUTALISK;}
+#define Z10_READY(ground,air,live,limit,goal) ((air)>=10 && ((ground)+(air)>=(goal) || ((ground)+(air)>=40 && (live)>=(limit)-1)))
+_Static_assert(Z10_READY(30,10,240,240,70), "mixed force can launch at pool capacity");
+_Static_assert(!Z10_READY(30,9,240,240,70), "air minimum remains required");
+_Static_assert(!Z10_READY(30,10,238,240,70), "pool-limited launch requires pool pressure");
+
+static int army_near(int x,int y,int r)
 {
-    int n=0;for(int i=0;i<MAX_UNITS;i++)n+=u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&dist2(u[i].x,u[i].y,x,y)<r*r;
+    int n=0;for(int i=0;i<MAX_UNITS;i++)n+=u[i].alive&&u[i].owner==SIDE&&army_type(u[i].type)&&dist2(u[i].x,u[i].y,x,y)<r*r;
     return n;
 }
 
@@ -127,15 +133,15 @@ int main(int argc,char **argv)
         if(frame-mark>=20){input(0);continue;}
         if(frame>=next_order){
             next_order=frame+150;
-            int home=count_units(SIDE,U_HYDRALISK);
+            int ground=count_units(SIDE,U_HYDRALISK), air=count_units(SIDE,U_MUTALISK), home=ground+air;
             int live=0;for(int i=0;i<MAX_UNITS;i++)live+=u[i].alive!=0;
             /* Attack when the shared actor pool prevents further recruitment. */
-            if(!rush&&count_units(SIDE,U_MUTALISK)>=10&&(home>=(frame<knob("Z10_L2",30000)?knob("Z10_GO",70):knob("Z10_GO2",55)) || (home>=40 && live>=MAX_UNITS-1))&&frame>=knob("Z10_GOF",8000)){rush=1;leg=0;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d,\"mutalisks\":%d}\n",(unsigned)frame,home,count_units(SIDE,U_MUTALISK));}
+            if(!rush&&Z10_READY(ground,air,live,MAX_UNITS,(frame<knob("Z10_L2",30000)?knob("Z10_GO",70):knob("Z10_GO2",55)))&&frame>=knob("Z10_GOF",8000)){rush=1;leg=0;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d,\"mutalisks\":%d}\n",(unsigned)frame,home,count_units(SIDE,U_MUTALISK));}
             if(rush){
                 int n=0,sx=0,sy=0;
-                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK){
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&army_type(u[i].type)){
                     int k2=0,x2=0,y2=0;
-                    for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&u[k].type==U_HYDRALISK&&dist2(u[k].x,u[k].y,u[i].x,u[i].y)<240*240){++k2;x2+=u[k].x;y2+=u[k].y;}
+                    for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&army_type(u[k].type)&&dist2(u[k].x,u[k].y,u[i].x,u[i].y)<240*240){++k2;x2+=u[k].x;y2+=u[k].y;}
                     if(k2>n){n=k2;sx=x2;sy=y2;}
                 }
                 if(n<knob("Z10_RETREAT",12)){rush=0;leg=0;}
@@ -144,7 +150,7 @@ int main(int argc,char **argv)
                     if(nearest<leg-2)leg=nearest;
                     int cannon=road_cannon(ax2,ay2,knob("Z10_CREACH",220));
                     while(leg<ROAD_LEGS-1&&cannon<0){
-                        int there=hydras_near(road[leg][0],road[leg][1],170);
+                        int there=army_near(road[leg][0],road[leg][1],170);
                         if(there*100<n*knob("Z10_LEGP",50))break;
                         ++leg;
                     }
