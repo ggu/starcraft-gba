@@ -625,7 +625,7 @@ PROTOSS_P7_SPRITE_HEADER := $(PROTOSS_P7_SPRITE_DIR)/sc64_race_sprites_generated
 # P7 has room for the steering pass and inline stock step in IWRAM. Keep the
 # P6 placement choices and historical P7 probes independent of this profile.
 PROTOSS_P7_CANONICAL_FLAGS = $(BC_FLAGS) -I$(PROTOSS_P7_SPRITE_DIR) $(filter-out -I$(P7_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) -I$(BC_P7_FACT_DIR) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(filter-out -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(PROTOSS_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) -DSC64_P7_ARBITER_AURA_ONCE $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS)
-PROTOSS_P7_CANONICAL_INPUTS = $(BC_INPUTS) $(filter-out .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p7/generated/sc64_race_sprites_generated.h,$(P7_ARBITER_INPUTS)) $(PROTOSS_P7_SPRITE_HEADER) $(BC_P7_FACT_HEADER) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
+PROTOSS_P7_CANONICAL_INPUTS = $(BC_INPUTS) $(COMMAND_ICON_HEADER) $(SC64_BUILDING_FIRE_HEADER) $(SC64_ORDER_MARKER_HEADER) $(filter-out .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p7/generated/sc64_race_sprites_generated.h,$(P7_ARBITER_INPUTS)) $(PROTOSS_P7_SPRITE_HEADER) $(BC_P7_FACT_HEADER) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 PROTOSS_ROM_FLAGS = $(PROTOSS_P7_CANONICAL_FLAGS)
 PROTOSS_CANONICAL_INPUTS = $(PROTOSS_P7_CANONICAL_INPUTS)
 TERRAN_FULL_INPUTS = $(BC_INPUTS) $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) $(UNIT_FACING_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
@@ -1943,7 +1943,7 @@ build/StarCraft-Protoss-P7-Transport1-GBA.gba: build/starcraft-protoss-p7.elf to
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS7' SCP7
 .PHONY: protoss-p7
-protoss-p7: verify-protoss
+protoss-p7: verify-protoss-p7
 
 # Explicit P8 candidate: the canonical P1-P7 profile plus The Trial of
 # Tassadar as an eighth entry. It has its own SCP8 code, generation-44 saves
@@ -2532,7 +2532,7 @@ build/starcraft-protoss.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard
 build/StarCraft-Protoss-GBA.gba: build/starcraft-protoss.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS3' SCP3
-verify-protoss: build/StarCraft-Protoss-P7-Transport1-GBA.gba
+verify-protoss: build/StarCraft-Protoss-P10-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss
 .PHONY: verify-protoss-p6
 verify-protoss-p6: build/StarCraft-Protoss-P6-GBA.gba
@@ -2556,7 +2556,7 @@ test-sc64-p4-census: build/test-sc64-p4-census
 	./build/test-sc64-p4-census
 
 
-test-protoss: build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller test-sc64-p4-census test-sc64-p4-create-prefix test-sc64-p5-canonical
+test-protoss-p7: build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller test-sc64-p4-census test-sc64-p4-create-prefix test-sc64-p5-canonical
 	./build/test-protoss
 	./build/test-sc64-protoss-promoted-profile
 	./build/test-sc64-protoss-canonical-storm
@@ -2597,7 +2597,7 @@ test-sc64-protoss-p7-canonical: build/test-sc64-protoss-canonical-p7-controller 
 	./build/test-sc64-protoss-canonical-p7-controller $(PROTOSS_P7_CONTROLLER_TRACE)
 	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(PROTOSS_P7_CONTROLLER_TRACE)
 
-test-protoss: test-sc64-p6-canonical test-sc64-protoss-p7-canonical test-sc64-p7-fact-v2-normal-input
+test-protoss-p7: test-sc64-p6-canonical test-sc64-protoss-p7-canonical test-sc64-p7-fact-v2-normal-input
 
 test-race-campaigns: test-terran test-zerg test-protoss
 verify-race-campaigns: verify-terran verify-zerg verify-protoss
@@ -4721,7 +4721,7 @@ test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign bui
 	./build/test-sc64-protoss-carried-campaign --controller 3 --trace .local/sc64/p3-carried-p2-controller.json
 	./build/test-sc64-protoss-carried-p3 --trace .local/sc64/p4-carried-p3-controller.json
 	./build/test-sc64-protoss-carried-p5 --limit 180000 --attempt-tag canonical-p6-carried-p5
-test-protoss: test-sc64-protoss-carried-missions
+test-protoss-p7: test-sc64-protoss-carried-missions
 -include mk/protoss-carried/Makefile
 
 # The indexed and packed sprite paths must agree over the whole framebuffer,
@@ -4962,7 +4962,7 @@ test-sc64-contact-mask-math: build/test-sc64-contact-mask-math
 	./build/test-sc64-contact-mask-math
 test: test-sc64-contact-mask-math
 test-zerg-z6: test-sc64-contact-cache-zerg
-test-protoss: test-sc64-contact-cache-protoss
+test-protoss-p7: test-sc64-contact-cache-protoss
 
 # Optional P7 ordinary-input performance replay; excluded from default targets.
 # Requires the same authenticated generated P7 data inputs as other P7 probes.
