@@ -285,9 +285,35 @@ static void observe_combat_build(void)
     }
 }
 
+/* Build the ordinary supply prerequisite before the first combat producer. */
+static int ensure_supply_prerequisite(void)
+{
+    int type, worker_type, worker=-1, x, y;
+    if(option_human==R_ZERG) return 1;
+    type=option_human==R_PROTOSS?B_PYLON:B_DEPOT;
+    worker_type=option_human==R_PROTOSS?U_PROBE:U_SCV;
+    for(int i=0;i<MAX_BUILDINGS;++i)
+        if(b[i].alive && b[i].owner==SIDE && b[i].type==type && building_complete(i)) return 1;
+    for(int i=0;i<MAX_UNITS;++i)
+        if(build_worker_available(i,SIDE,worker_type)){worker=i;break;}
+    if(worker<0 || !choose_build_site(type,&x,&y) || !select_unit(worker) ||
+       !choose_menu_command(MENU_DEPOT) || mode!=MODE_BUILD || menu!=type) return 0;
+    move_cursor(x,y);
+    if(screen!=SCREEN_PLAY || won || lost || mode!=MODE_BUILD ||
+       abs(cx-x)>1 || abs(cy-y)>1) return 0;
+    tap(KEY_A);
+    for(int tick=0;tick<6000 && screen==SCREEN_PLAY && !won && !lost;++tick) {
+        for(int i=0;i<MAX_BUILDINGS;++i)
+            if(b[i].alive && b[i].owner==SIDE && b[i].type==type && building_complete(i)) return 1;
+        input(0);
+    }
+    return 0;
+}
+
 static int build_barracks(void)
 {
     int worker = -1, x = -1, y = -1;
+    if (!ensure_supply_prerequisite()) return 0;
     int build_type = option_human == R_ZERG ? B_SPAWNING_POOL :
                      option_human == R_PROTOSS ? B_GATEWAY : B_BARRACKS;
     int worker_type = option_human == R_ZERG ? U_DRONE :
