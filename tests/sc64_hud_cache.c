@@ -293,6 +293,7 @@ test_panel_shows_building_queue(void)
     assert(hud_next_product(0) == U_SCV);
     assert(hud_count_color(HUD_CHIP_X, HUD_SLOT_Y, CARD_CELL, CARD_CELL, C_GREEN) > 0);
     assert(hud_count_color(HUD_CHIP_X + CARD_CELL, HUD_SLOT_Y, 20, 10, C_GOLD) > 0);
+    int idle_keys = hud_count_color(HUD_CHIP_X, HUD_CHIP_KEYS_Y, 60, 9, C_SILVER);
 
     q->queue[0] = q->queue[1] = q->queue[2] = U_SCV;
     q->queue_head = 0;
@@ -300,6 +301,8 @@ test_panel_shows_building_queue(void)
     expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
     render_cached();
     assert(panel_slot_lit(0) && panel_slot_lit(1) && panel_slot_lit(2));
+    /* L cancels on every producer with a queue, so its key cap appears here too. */
+    assert(hud_count_color(HUD_CHIP_X, HUD_CHIP_KEYS_Y, 60, 9, C_SILVER) > idle_keys);
     assert(!panel_slot_lit(3) && !panel_slot_lit(4));
     assert(gfx_test_pixel(HUD_COLUMN, HUD_SLOT_Y) == C_GOLD);
     assert(gfx_test_pixel(HUD_COLUMN + HUD_SLOT_PITCH, HUD_SLOT_Y) != C_GOLD);

@@ -320,6 +320,101 @@ queue_panel_tests(void)
     check(slot_empty(4), "it keeps five slots");
 }
 
+/* Key caps are the hint row's silver, so an added L cap shows up as more of it. */
+static int
+hint_row_caps(void)
+{
+    render();
+    return count_color(0, 149, 178, 9, C_SILVER);
+}
+
+/* L cancels on any producer with a queue and cycles on any building without. */
+static void
+queue_cancel_tests(void)
+{
+    static const struct { int type, product, refund; } cases[] = {
+        { B_COMMAND, U_SCV, 37 },
+        { B_BARRACKS, U_MARINE, 37 },
+    };
+    for (unsigned n = 0; n < sizeof cases / sizeof cases[0]; ++n) {
+        int slot, before, reserved, caps;
+        fixture();
+        minerals = 500;
+        supply_cap = 200;
+        train_type = U_MARINE;
+        slot = building_of(SIDE, cases[n].type);
+        select_building(slot);
+        reserved = reserved_supply();
+        caps = hint_row_caps();
+        tap(KEY_A);
+        tap(KEY_A);
+        check(b[slot].queue_count == 2, "producer queues two");
+        check(reserved_supply() == reserved + 2 * unit_supply(cases[n].product), "queue reserves supply");
+        check(hint_row_caps() > caps, "a queue shows the L mark");
+        b[slot].queue_progress = 7;
+        before = minerals;
+
+        /* A tap removes only the oldest, keeps the selection and restarts progress. */
+        tap(KEY_L);
+        check(b[slot].queue_count == 1, "L cancels the oldest queued unit");
+        check(minerals == before + cases[n].refund, "L refunds 75 percent");
+        check(reserved_supply() == reserved + unit_supply(cases[n].product), "L releases one reservation");
+        check(b[slot].queue_progress <= 1, "the next unit restarts"); /* this tick already counted */
+        check(selected_building == slot && !selected_count(), "L keeps the producer selected");
+        tap(KEY_L);
+        check(b[slot].queue_count == 0 && reserved_supply() == reserved, "L empties the queue");
+        check(selected_building == slot, "the last cancel keeps the producer selected");
+        check(hint_row_caps() == caps, "an empty queue drops the L mark");
+
+        /* Nothing left to cancel: the same tap cycles, and refunds nothing. */
+        before = minerals;
+        tap(KEY_L);
+        check(selected_building == -1 && selected_count() == 1, "L cycles once the queue is empty");
+        check(minerals == before, "cycling refunds nothing");
+    }
+
+    /* A drag from a producer with a queue selects, and leaves the queue alone. */
+    {
+        int barracks, before;
+        fixture();
+        minerals = 500;
+        barracks = building_of(SIDE, B_BARRACKS);
+        select_building(barracks);
+        tap(KEY_A);
+        before = minerals;
+        input(KEY_L);
+        for (int i = 0; i < 8; i++) input(KEY_L | KEY_RIGHT);
+        input(0);
+        check(b[barracks].queue_count == 1 && minerals == before, "a box drag does not cancel");
+    }
+
+    /* A building that cannot produce still cycles. */
+    {
+        int depot;
+        fixture();
+        depot = building_of(SIDE, B_DEPOT);
+        select_building(depot);
+        tap(KEY_L);
+        check(selected_building == -1 && selected_count() == 1, "L cycles on a building with no queue");
+    }
+
+    /* Only the player's own queue: never refund or cancel anyone else's. */
+    {
+        int barracks, before;
+        fixture();
+        barracks = building_of(SIDE, B_BARRACKS);
+        selected_building = barracks;
+        b[barracks].queue[0] = U_MARINE;
+        b[barracks].queue_head = 0;
+        b[barracks].queue_count = 1;
+        b[barracks].owner = NEUTRAL;
+        before = minerals;
+        tap(KEY_L);
+        check(b[barracks].queue_count == 1 && minerals == before, "L leaves a queue the player does not own");
+        check(selected_building == -1, "L cycles off a building the player does not own");
+    }
+}
+
 static void
 research_and_construction_panel_tests(void)
 {
@@ -782,13 +877,14 @@ main(void)
     render_smoke();
     selection_circle_tests();
     queue_panel_tests();
+    queue_cancel_tests();
     research_and_construction_panel_tests();
     panel_marks_tests();
     if (failures) return 1;
 #ifdef SC_COMMAND_RING
-    puts("Default menus and controls (ring build): deselect, smart move, smart attack, R tap, placement status order, snapping, title/pause/result, selection ellipses, queue panel: ok");
+    puts("Default menus and controls (ring build): deselect, smart move, smart attack, R tap, placement status order, snapping, title/pause/result, selection ellipses, queue panel, queue cancel: ok");
 #else
-    puts("Default menus and controls: deselect, smart move, smart attack, R tap, list memory, placement status order, snapping, title/pause/result, selection ellipses, queue panel: ok");
+    puts("Default menus and controls: deselect, smart move, smart attack, R tap, list memory, placement status order, snapping, title/pause/result, selection ellipses, queue panel, queue cancel: ok");
 #endif
     return 0;
 }

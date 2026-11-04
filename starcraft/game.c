@@ -5358,6 +5358,15 @@ reserved_supply(void)
     return n;
 }
 
+/* L cancels at the selected building only when the player owns a queue there;
+ * otherwise it cycles the selection. The HUD marks L by this same test. */
+static int
+queue_cancel_available(void)
+{
+    return selected_building >= 0 && b[selected_building].alive &&
+           b[selected_building].owner == SIDE && b[selected_building].queue_count > 0;
+}
+
 static void
 clear_selection(void)
 {
@@ -8600,6 +8609,12 @@ cancel_queue(int building)
     type = b[building].queue[b[building].queue_head];
     minerals += unit_cost(type) * 3 / 4;
     gas += unit_gas_cost(type) * 3 / 4;
+#ifdef SC64_RACES
+    /* race_queue_unit() spent a larva on this order. Three is a hall's limit,
+     * here and in the save validators, and it may have regrown since. */
+    if ((sc64_race_unit_rule(type)->flags & SC_RACE_F_LARVA) && b[building].larva < 3)
+        ++b[building].larva;
+#endif
     b[building].queue_head = (b[building].queue_head + 1) % 5;
     b[building].queue_count--;
     b[building].queue_progress = 0;
@@ -8823,8 +8838,7 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
             if (cx != box_anchor_x || cy != box_anchor_y) box_state = 2;
         } else {
             if (box_state == 2) select_box_units();
-            else if (selected_building >= 0 && b[selected_building].alive &&
-                     b[selected_building].type == B_BARRACKS) cancel_queue(selected_building);
+            else if (queue_cancel_available()) cancel_queue(selected_building);
             else cycle_selection();
             box_state = 0;
         }
