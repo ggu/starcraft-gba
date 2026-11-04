@@ -78,9 +78,9 @@ static void census(const char *label,int leg)
     int eb=0;
     for(int i=0;i<MAX_BUILDINGS;i++)eb+=b[i].alive&&b[i].owner==ENEMY;
     fprintf(trace,"{\"kind\":\"checkpoint\",\"label\":\"%s\",\"frame\":%u,\"call_index\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,"
-        "\"side_units\":%d,\"hydras\":%d,\"drones\":%d,\"enemy_units\":%d,\"enemy_buildings\":%d,\"leg\":%d,\"bank\":[%d,%d],"
+        "\"side_units\":%d,\"hydras\":%d,\"mutalisks\":%d,\"drones\":%d,\"enemy_units\":%d,\"enemy_buildings\":%d,\"leg\":%d,\"bank\":[%d,%d],"
         "\"supply\":[%d,%d],\"cursor\":[%d,%d],\"countdown\":0,\"towns\":%u,\"fault\":%u}\n",
-        label,(unsigned)frame,host_tick,screen,won,lost,count_units(SIDE,-1),count_units(SIDE,U_HYDRALISK),drone_count(),
+        label,(unsigned)frame,host_tick,screen,won,lost,count_units(SIDE,-1),count_units(SIDE,U_HYDRALISK),count_units(SIDE,U_MUTALISK),drone_count(),
         count_units(ENEMY,-1),eb,leg,minerals,gas,race_owner_supply(SIDE),race_owner_supply_cap(SIDE),cx,cy,
         (unsigned)race_zl_ai.started,(unsigned)race_zl_sched.core.fault);
     fflush(trace);
