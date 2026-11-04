@@ -92,6 +92,7 @@ static void corrupt_t3_payload_is_atomic(void) {
     assert(frame == saved_frame && u[0].x == saved_x);
     assert(memcmp(&race_t3, &saved_t3, sizeof(saved_t3)) == 0);
     assert(race_t3_buildings_killed == saved_kills);
+    fixture_finish_rejected_candidate();
 
     /* A valid alternate-objective state still requires evidence of a kill. */
     assert(race_save_game()); fixture_capture_save(&candidate);
@@ -105,6 +106,7 @@ static void corrupt_t3_payload_is_atomic(void) {
     assert(frame == saved_frame && u[0].x == saved_x);
     assert(memcmp(&race_t3, &saved_t3, sizeof(saved_t3)) == 0);
     assert(race_t3_buildings_killed == saved_kills);
+    fixture_finish_rejected_candidate();
 
     /* A checksummed payload cannot move the campaign clock independently. */
     assert(race_save_game()); fixture_capture_save(&candidate);
@@ -115,6 +117,7 @@ static void corrupt_t3_payload_is_atomic(void) {
     assert(frame == saved_frame && u[0].x == saved_x);
     assert(memcmp(&race_t3, &saved_t3, sizeof(saved_t3)) == 0);
     assert(race_t3_buildings_killed == saved_kills);
+    fixture_finish_rejected_candidate();
 
     /* Nor can it persist an outcome inconsistent with the game's result flags. */
     assert(race_save_game()); fixture_capture_save(&candidate);
@@ -134,6 +137,7 @@ static void corrupt_t3_payload_is_atomic(void) {
     assert(frame == saved_frame && u[0].x == saved_x);
     assert(memcmp(&race_t3, &saved_t3, sizeof(saved_t3)) == 0);
     assert(race_t3_buildings_killed == saved_kills);
+    fixture_finish_rejected_candidate();
 }
 
 static void previous_stage_save_is_rejected(void) {

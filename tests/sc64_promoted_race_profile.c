@@ -23,6 +23,12 @@
 #else
 #define PROFILE_BC_TAG 0u
 #endif
+#ifdef SC64_WORKER_CARGO_KIND
+#define PROFILE_CARGO_TAG 0x01000000u
+#else
+#define PROFILE_CARGO_TAG 0u
+#endif
+#define PROFILE_EXPECTED_SAVE(base) (((base) | PROFILE_ROSTER_TAG | PROFILE_BC_TAG) ^ PROFILE_CARGO_TAG)
 
 #if !defined(SC64_UNIFIED) || !defined(SC64_IMPORTED_SKIRMISH) || \
     !defined(SC64_CAMPAIGN_RACE)
@@ -97,7 +103,7 @@ static const char *const profile_titles[] = {
 #define PROFILE_SAVE_GENERATION 47u
 #define PROFILE_OLD_SAVE_TAG 0x53435032u
 _Static_assert(SC64_RACE_SAVE_GENERATION == 47u, "P10 requires generation 47");
-_Static_assert(SAVE_VERSION == (0x5343505fu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG), "P10 save identity");
+_Static_assert(SAVE_VERSION == PROFILE_EXPECTED_SAVE(0x5343505fu), "P10 save identity");
 _Static_assert(SC64_P10_GLOBAL_ID == 29, "P10 catalog identity");
 static const int profile_missions[] = {2,3,22,23,24,25,26,27,28,29};
 static const char *const profile_titles[] = {
@@ -112,7 +118,7 @@ static const char *const profile_titles[] = {
 #define PROFILE_SAVE_GENERATION 45u
 #define PROFILE_OLD_SAVE_TAG 0x53435032u
 _Static_assert(SC64_RACE_SAVE_GENERATION == 45u, "P9 requires generation 45");
-_Static_assert(SAVE_VERSION == (0x5343505du | PROFILE_ROSTER_TAG | PROFILE_BC_TAG), "P9 save identity");
+_Static_assert(SAVE_VERSION == PROFILE_EXPECTED_SAVE(0x5343505du), "P9 save identity");
 _Static_assert(SC64_P9_GLOBAL_ID == 28, "P9 catalog identity");
 static const int profile_missions[] = {2,3,22,23,24,25,26,27,28};
 static const char *const profile_titles[] = {
@@ -126,7 +132,7 @@ static const char *const profile_titles[] = {
 #define PROFILE_SAVE_GENERATION 44u
 #define PROFILE_OLD_SAVE_TAG 0x53435032u
 _Static_assert(SC64_RACE_SAVE_GENERATION == 44u, "P8 requires generation 44");
-_Static_assert(SAVE_VERSION == (0x5343505cu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG), "P8 save identity");
+_Static_assert(SAVE_VERSION == PROFILE_EXPECTED_SAVE(0x5343505cu), "P8 save identity");
 _Static_assert(SC64_P8_GLOBAL_ID == 27, "P8 catalog identity");
 static const int profile_missions[] = {2,3,22,23,24,25,26,27};
 static const char *const profile_titles[] = {
@@ -144,7 +150,7 @@ static const char *const profile_titles[] = {
 #endif
 _Static_assert(SC64_RACE_SAVE_GENERATION == 43u,
                "canonical P7 retains its qualified generation-43 save schema");
-_Static_assert(SAVE_VERSION == (0x5343505bu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG),
+_Static_assert(SAVE_VERSION == PROFILE_EXPECTED_SAVE(0x5343505bu),
                "canonical P7 keeps its generation-43 Protoss save identity");
 _Static_assert(SC64_P7_GLOBAL_ID == 26,
                "canonical Protoss P7 uses its stable global catalog identity");
@@ -164,7 +170,7 @@ static const char *const profile_titles[] = {
 #endif
 _Static_assert(SC64_RACE_SAVE_GENERATION == 30u,
                "canonical P6 retains its qualified generation-30 save schema");
-_Static_assert(SAVE_VERSION == (0x5343504eu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG),
+_Static_assert(SAVE_VERSION == PROFILE_EXPECTED_SAVE(0x5343504eu),
                "canonical P6 keeps its generation-30 Protoss save identity");
 _Static_assert(SC64_P6_GLOBAL_ID == 25,
                "canonical Protoss P6 uses its stable global catalog identity");
@@ -617,7 +623,7 @@ int main(void)
     assert(sc64_catalog_playable_count(PROFILE_FACTION) == mission_count);
     const u32 expected_base = PROFILE_OLD_SAVE_TAG + (PROFILE_SAVE_GENERATION - 2u);
     assert(SC64_BASE_SAVE_VERSION == expected_base);
-    assert(SAVE_VERSION == (expected_base | PROFILE_ROSTER_TAG | PROFILE_BC_TAG));
+    assert(SAVE_VERSION == PROFILE_EXPECTED_SAVE(expected_base));
     for (unsigned i = 0; i < mission_count; ++i) {
         assert(sc64_campaign_catalog[profile_missions[i]].id == profile_missions[i]);
         assert(sc64_campaign_catalog[profile_missions[i]].faction == PROFILE_FACTION);

@@ -28,8 +28,16 @@ static void fixture_clear_candidate_records(void)
         save_test_corrupt_latest(0, tags[i]);
     }
 }
+static void fixture_finish_rejected_candidate(void)
+{
+    /* The record is checksum-valid but semantically invalid. Keep the
+       production overwrite refusal covered before preparing the next case. */
+    assert(!race_save_game());
+    fixture_clear_candidate_records();
+}
 #else
 #define fixture_clear_candidate_records() ((void)0)
+#define fixture_finish_rejected_candidate() ((void)0)
 #endif
 static void fixture_capture_save(RaceSave *candidate)
 {
