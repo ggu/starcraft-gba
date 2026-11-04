@@ -41,3 +41,31 @@ shared native flock and free-space guard; do not use hosted Actions.
 
 These instrumented maxima locate a bottleneck. They are not an unbiased
 production timing baseline, a hardware result or proof of 30 fps.
+
+## Observed genuine resume
+
+At probe source `9a445077`, the uninstrumented resume ROM first reproduced the
+qualified normal probe byte-for-byte (`6e191f20f5b6acf0e6f2fe7f207ff93d633d91fb420c362bc78775f0b2861686`).
+The phase-only probe then loaded the genuine ordinary-input prefix at cut
+136058 and won at frame 173807. All 49 remaining scalar checkpoints passed,
+with the prefix journal record preserved and a new valid sequence-2 victory
+record written. This is the Z7 scalar replay schema, not exhaustive actor-state
+equality. All 1,800 copied input hashes remained unchanged; normal and
+diagnostic linker guards passed.
+
+The maximum was 158,692,483 guest cycles (9.459 seconds), at tape tick 175455,
+call 39397: frame 173806 to 173807, PLAY to RESULT, no held keys. This closely
+reproduces the earlier unlocalized 158,692,721-cycle peak. The result transition
+contains the campaign completion update and `save_game()` before publishing
+the result screen; these measurements do not isolate the save routine alone.
+The parser classifies this as a result transition even though its simulation
+frame advanced. The initial HOME load separately cost 119,025,133 cycles
+(7.094 seconds). Neither event should be described as a pathfinding spike or
+ordinary combat frame. Busy gameplay performance remains a separate problem.
+
+The diagnostic ROM hash is
+`b5bd39c6f94984b11c072e9c6ad1f6b9fc9a5a4c145bc14a53baed0124560feb`;
+the genuine seed hash is
+`182407d91e782c4e879e65047223a70a0ec5f83bbec0131d4e205debddbd0d39`.
+Detailed update-stage instrumentation was disabled. Logs and qualification
+receipts remain in the private worktree's `.local/peak-qualification` directory.

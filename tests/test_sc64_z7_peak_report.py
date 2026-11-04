@@ -33,6 +33,16 @@ class PeakReportTests(unittest.TestCase):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 peak.summarize(text)
 
+    def test_final_advancing_tick_is_a_result_transition(self):
+        # Real winning calls still advance the simulation before autosaving
+        # and publishing the result; advancing=1 alone is not active play.
+        text = record(phase=1, advancing=1).replace('screen0=0 screen=1', 'screen0=1 screen=3')
+        self.assertEqual(peak.summarize(text)['max_total']['context'], 'mission result transition')
+
+    def test_explicit_pause_save_context_takes_precedence(self):
+        text = record(phase=3).replace('screen0=0 screen=1', 'screen0=1 screen=2')
+        self.assertEqual(peak.summarize(text)['max_total']['context'], 'pause-menu save')
+
     def test_duplicate_and_mismatched_ticks_rejected(self):
         for text in (record() + '\n' + record(), record().replace('STAGES call=0 tick=136058', 'STAGES call=0 tick=136059')):
             with self.subTest(text=text), self.assertRaises(ValueError):

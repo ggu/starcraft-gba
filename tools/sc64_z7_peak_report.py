@@ -75,6 +75,10 @@ def summarize(text: str) -> dict:
             context = 'HOME load'
         elif row['phase'] == 3:
             context = 'pause-menu save'
+        elif row['screen0'] == 1 and row['screen'] == 3:
+            context = 'mission result transition'
+        elif row['screen0'] != row['screen']:
+            context = 'menu or mission transition'
         elif row['screen0'] != 1:
             context = 'menu or mission transition'
         elif row['advancing']:
