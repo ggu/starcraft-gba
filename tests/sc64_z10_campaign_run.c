@@ -130,7 +130,7 @@ int main(int argc,char **argv)
             int home=count_units(SIDE,U_HYDRALISK);
             int live=0;for(int i=0;i<MAX_UNITS;i++)live+=u[i].alive!=0;
             /* Attack when the shared actor pool prevents further recruitment. */
-            if(!rush&&(home>=(frame<knob("Z10_L2",30000)?knob("Z10_GO",70):knob("Z10_GO2",55)) || (home>=40 && live>=MAX_UNITS-1))&&frame>=knob("Z10_GOF",8000)){rush=1;leg=0;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d}\n",(unsigned)frame,home);}
+            if(!rush&&count_units(SIDE,U_MUTALISK)>=10&&(home>=(frame<knob("Z10_L2",30000)?knob("Z10_GO",70):knob("Z10_GO2",55)) || (home>=40 && live>=MAX_UNITS-1))&&frame>=knob("Z10_GOF",8000)){rush=1;leg=0;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d,\"mutalisks\":%d}\n",(unsigned)frame,home,count_units(SIDE,U_MUTALISK));}
             if(rush){
                 int n=0,sx=0,sy=0;
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK){
@@ -162,7 +162,7 @@ int main(int argc,char **argv)
                     (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,force);
                     (void)group_command(U_MUTALISK,MENU_ATTACK,gx,gy,force);
                     group_area_x=-1;group_rounds=6;
-                    fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d]}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2);
+                    fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d],\"mutalisks\":%d}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2,count_units(SIDE,U_MUTALISK));
                     next_order=frame+knob("Z10_ORD",300);
                 }
             }
@@ -267,6 +267,7 @@ int main(int argc,char **argv)
                 int to=k+2<leg?k+2:leg;
                 group_area_x=road[k][0];group_area_y=road[k][1];group_area_r=120;group_rounds=2;
                 (void)group_command(U_HYDRALISK,MENU_ATTACK,road[to][0],road[to][1],0);
+                (void)group_command(U_MUTALISK,MENU_ATTACK,road[to][0],road[to][1],0);
             }
             group_area_x=-1;group_rounds=6;
             next_stream=frame+knob("Z10_STREAM",800);
