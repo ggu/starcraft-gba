@@ -257,6 +257,7 @@ int main(void)
     {
         int hall = find_building(ENEMY, B_NEXUS);
         assert(hall >= 0);
+        assert(spawn_build(ENEMY, B_PYLON, race_base_x[1] + 48, race_base_y[1], 0) >= 0);
         b[hall].alive = 0;
         race_skirmish_outcome();
         assert(!won && !lost); /* the bot still has its Pylon */
