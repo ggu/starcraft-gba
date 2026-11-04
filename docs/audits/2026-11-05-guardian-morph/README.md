@@ -92,3 +92,26 @@ supply units, so the stage rule reserves four for this specific morph. OpenBW
 also treats morph-from-another-unit admission specially. Lifecycle owner/supply
 accounting, transport and pending-impact interactions still require real tests;
 no production morph command, journal tag, or ordinary menu is enabled.
+
+## Namespace and stage-off checks
+
+`tests/test_sc64_guardian_tag_registry.py` reads five pinned source revisions,
+including the Carrier/Defiler draft and ordered-Z10 candidate, and enumerates a
+conservative cross-product of all base generations 2–50 and the roster, BC,
+cargo, transport/Carrier and Scarab selector bits, including unsupported flag
+combinations. Its 5,056 historical values and 5,056 values with proposed XOR
+`0x10000000` are disjoint. This verifies those checked source definitions, not
+unpublished candidate namespaces; it does not enable journal admission.
+
+At `5cdc4b29`, ordinary stage-off `make race-campaigns showcase` produced ROMs
+byte-identical to detached base `9f596ad1`, with all 1,958 receipt inputs
+verified before and after each build. SHA-256: Terran
+`39e30ca9aa7e4b5a6b80b3625b5eb3db473b9aa0d72fbcd0ccb264142eb3f670`, Z7
+`0c98893676158019a5b643f52be2a80d1506a6fa52276fad6ca41342e5b4c117`, P10
+`2f2eae2eb64a9874adf47826bee8be0b1d9ce134a6955dc8ee9313783d7a0cb0`, and
+Showcase `2dbce71c6f06a98fd84baca366a581d79bf6fd84a181d2ef775eb0399a50ba8f`.
+The generator test `guardian-fact-generator` at `feab7649` produced identical
+stage-off and stage-on generated P10 headers, SHA-256
+`5a344c30921fed5c468343c9e32eaf41ff456ae818dc669709e8f280d633efcd`.
+Compared with the existing pinned header, the only output difference adds a
+stage-conditional roster assertion; feature guards and fact data are unchanged.
