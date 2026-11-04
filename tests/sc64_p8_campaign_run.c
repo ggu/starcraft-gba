@@ -14,6 +14,9 @@
 #define P8_RUN_LIMIT 160000u
 #endif
 /* One ordinary pause-menu save; the replay tools resume from this record. */
+#ifndef P8_ATTACK_ARMY
+#define P8_ATTACK_ARMY 40
+#endif
 #ifndef P8_SAVE_FRAME
 #define P8_SAVE_FRAME 30000
 #endif
@@ -71,6 +74,43 @@ static int waypoint_to(int sx,int sy,int tx,int ty,int *wx,int *wy,int *distance
     int pick=distance>WAYPOINT_STEPS?distance-WAYPOINT_STEPS:0;
     *wx=(path[pick]%MAP_COLS)*16+8;*wy=(path[pick]/MAP_COLS)*16+8;
     return 1;
+}
+
+/* The army unit with the shortest walk to (tx,ty), skipping units in skip[].
+ * Straight-line distance picks a unit on the far side of a cliff, and the whole
+ * army then waits for it. */
+static int nearest_by_route(int tx,int ty,const u8 *skip)
+{
+    static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
+    static short dist[MAP_CELLS];
+    static int queue[MAP_CELLS];
+    if(!path_grid_valid)return -1;
+    int head=0,tail=0,gx=limit(tx/16,0,MAP_COLS-1),gy=limit(ty/16,0,MAP_ROWS-1);
+    for(int i=0;i<MAP_COLS*MAP_ROWS;i++)dist[i]=-1;
+    /* The goal is a building, so seed the walkable cells around it. */
+    for(int r=-4;r<=4;r++)for(int c=-4;c<=4;c++){
+        int nc=gx+c,nr=gy+r;
+        if(nc<0||nr<0||nc>=MAP_COLS||nr>=MAP_ROWS)continue;
+        int cell=nc+nr*MAP_COLS;
+        if(SC64_GRID_GET(path_walkable,cell)){dist[cell]=0;queue[tail++]=cell;}
+    }
+    while(head<tail){
+        int cell=queue[head++],col=cell%MAP_COLS,row=cell/MAP_COLS;
+        for(int k=0;k<4;k++){
+            int nc=col+dx[k],nr=row+dy[k];
+            if(nc<0||nr<0||nc>=MAP_COLS||nr>=MAP_ROWS)continue;
+            int next=nc+nr*MAP_COLS;
+            if(dist[next]>=0||!SC64_GRID_GET(path_walkable,next))continue;
+            dist[next]=(short)(dist[cell]+1);queue[tail++]=next;
+        }
+    }
+    int best=-1,bd=0x7fffffff;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!skip[i]&&
+        (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)){
+        int d=dist[limit(u[i].x/16,0,MAP_COLS-1)+limit(u[i].y/16,0,MAP_ROWS-1)*MAP_COLS];
+        if(d>=0&&d<bd){bd=d;best=i;}
+    }
+    return best;
 }
 
 static int hero(int raw)
@@ -222,8 +262,24 @@ static int select_single(int slot)
     return u[slot].selected&&selected_count()==1;
 }
 
+/* Select at least the Probe under the cursor. Idle Probes stack on a spent
+ * patch, where a tap cannot pick one out, so any selection of workers there
+ * will do: the mining order goes to every empty one. */
+static int select_workers_at(int slot)
+{
+    if(slot<0||!u[slot].alive||u[slot].owner!=SIDE)return 0;
+    close_menus();
+    clear_selected_building();
+    move_cursor(u[slot].x,u[slot].y);KEY_TAP(KEY_A);
+    if(selected_building>=0||find_selected_worker()<0)return 0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected&&!sc64_race_is_worker(u[i].type))return 0;
+    return 1;
+}
+
 /* As in sc64_visible_worker_orders.h, issue mining through normal field
- * input only for idle empty workers and currently visible mineral patches. */
+ * input only for idle empty workers and currently visible mineral patches.
+ * Patches are spread by how many Probes already work them, so a group does not
+ * drain one patch and go idle together. */
 static int order_idle_probes_to_visible_minerals(void)
 {
     static const int dx[]={0,8,-8,0,0,8,-8,8,-8};
@@ -231,20 +287,22 @@ static int order_idle_probes_to_visible_minerals(void)
     int assigned=0;
     for(int w=0;w<MAX_UNITS && screen==SCREEN_PLAY;w++) {
         if(!u[w].alive || u[w].owner!=SIDE || u[w].type!=U_PROBE ||
-           u[w].order!=ORDER_IDLE || u[w].carry || !select_single(w)) continue;
+           u[w].order!=ORDER_IDLE || u[w].carry || !select_workers_at(w)) continue;
         int target=-1,best=0x7fffffff;
         for(int p=0;p<MAX_MINERALS;p++) if(m[p].amount>0 && currently_visible(m[p].x,m[p].y)) {
-            int d=dist2(u[w].x,u[w].y,m[p].x,m[p].y);
+            int workers=0;
+            for(int j=0;j<MAX_UNITS;j++)workers+=u[j].alive&&u[j].owner==SIDE&&u[j].order==ORDER_MINE&&u[j].target==p;
+            int d=dist2(u[w].x,u[w].y,m[p].x,m[p].y)/256+workers*64;
             if(d<best){best=d;target=p;}
         }
         if(target<0) continue;
         for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0]);k++) {
             int x=m[target].x+dx[k],y=m[target].y+dy[k];
             move_cursor(x,y);
-            if(abs(cx-x)>2 || abs(cy-y)>2 || !u[w].alive || !u[w].selected)continue;
+            if(abs(cx-x)>2 || abs(cy-y)>2 || find_selected_worker()<0)continue;
             if(field_ui_a_action(selected_count())!=UI_A_MINE)continue;
             KEY_TAP(KEY_A);
-            if(u[w].alive && u[w].order==ORDER_MINE && u[w].target==target)assigned++;
+            if(u[find_selected_worker()].order==ORDER_MINE)assigned++;
             break;
         }
     }
@@ -351,8 +409,9 @@ static int free_builder(void)
 {
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&
         u[i].order==ORDER_MINE&&!u[i].carry)return i;
+    /* An idle Probe holding cargo cannot be sent back to minerals afterward. */
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&
-        !SC64_BUILD_WORKER_ORDER(u[i].order)&&u[i].order!=ORDER_GAS)return i;
+        !SC64_BUILD_WORKER_ORDER(u[i].order)&&u[i].order!=ORDER_GAS&&!u[i].carry)return i;
     return -1;
 }
 
@@ -493,6 +552,30 @@ static int remine_stuck_builder(void)
     return u[worker].order==ORDER_MINE;
 }
 
+/* A builder can pick up cargo between being chosen and placing its building,
+ * and an idle Probe holding cargo refuses the mineral order. Tapping the
+ * Assimilator gives it a gas order, which drops the cargo; STOP then leaves it
+ * idle and empty for the mining pass. */
+static int recover_loaded_probe(void)
+{
+    int refinery=-1,worker=-1;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
+        b[i].type==B_ASSIMILATOR&&building_complete(i)){refinery=i;break;}
+    for(int i=0;i<MAX_UNITS&&worker<0;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&
+        u[i].order==ORDER_IDLE&&u[i].carry)worker=i;
+    if(refinery<0||worker<0||!select_workers_at(worker))return 0;
+    move_cursor(b[refinery].x,b[refinery].y);KEY_TAP(KEY_A);
+    if(u[worker].order!=ORDER_GAS)return 0;
+    KEY_TAP(KEY_B);
+    for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=MENU_STOP;n++)KEY_TAP(KEY_DOWN);
+    if(menu_open&&menu_cursor==MENU_STOP)KEY_TAP(KEY_A);
+    close_menus();
+    return u[worker].order==ORDER_IDLE;
+}
+
+#ifndef P8_GAS_BANK
+#define P8_GAS_BANK 300
+#endif
 static int assign_gas_worker(void)
 {
     int refinery=-1,gas_workers=0,worker=-1;
@@ -502,6 +585,19 @@ static int assign_gas_worker(void)
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE){
         if(u[i].order==ORDER_GAS)++gas_workers;
         else if(worker<0&&u[i].order==ORDER_MINE&&!u[i].carry)worker=i;
+    }
+    /* Gas beyond what Dragoons can spend costs mineral income: STOP a Probe and
+     * let the mining pass send it to a patch. */
+    if(gas>=P8_GAS_BANK){
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&
+            u[i].order==ORDER_GAS&&!u[i].carry&&select_workers_at(i)){
+            KEY_TAP(KEY_B);
+            for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=MENU_STOP;n++)KEY_TAP(KEY_DOWN);
+            if(menu_open&&menu_cursor==MENU_STOP)KEY_TAP(KEY_A);
+            close_menus();
+            return 1;
+        }
+        return 0;
     }
     if(gas_workers>=3||worker<0)return 0;
     close_menus();
@@ -570,6 +666,9 @@ int main(int argc,char **argv)
     int next_probe=60,next_supply=400,next_build=600,next_gas=3000,next_production=900;
     int next_order=120,next_hero=240,next_carrier=3000,next_save_build=0,next_evade=600;
     int attacking=0,prior_distance=-1,stalls=0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    int next_threat=600;
+#endif
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
         static int stuck_reported;
         if(menu_open&&!stuck_reported){
@@ -662,7 +761,28 @@ int main(int argc,char **argv)
             }
             next_evade=frame+150;
         }
-        if(frame>=next_mine){(void)order_idle_probes_to_visible_minerals();next_mine=frame+300;}
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+        /* Reavers shell the base from out of sight, and idle units do not answer.
+         * Check for raiders before spending time on the economy. */
+        if(frame>=next_threat&&home>=0){
+            int threat=-1,best=520*520;
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].order!=ORDER_IDLE){
+                int d=dist2(u[i].x,u[i].y,b[home].x,b[home].y);
+                if(d<best){best=d;threat=i;}
+            }
+            if(threat>=0&&!attacking){
+                (void)army_command(MENU_ATTACK,u[threat].x,u[threat].y);
+                fprintf(trace,"{\"kind\":\"defend\",\"frame\":%u,\"target\":[%d,%d]}\n",
+                    (unsigned)frame,u[threat].x,u[threat].y);
+            }
+            next_threat=frame+120;
+        }
+#endif
+        if(frame>=next_mine){
+            for(int k=0;k<3&&recover_loaded_probe();k++){}
+            (void)order_idle_probes_to_visible_minerals();
+            next_mine=frame+300;
+        }
         if(frame>=next_probe){(void)queue_probe();next_probe=frame+300;}
         if(frame>=next_supply){
             int pending=0;
@@ -685,6 +805,22 @@ int main(int argc,char **argv)
             static const int ax[6]={-40,40,-104,104,-120,-40},ay[6]={160,160,112,112,-80,-80};
             int cannons=count_type(B_PHOTON_CANNON,0);
             if(count_type(B_GATEWAY,0)<1)
+                (void)build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1);
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+            /* Raids arrive sooner on this economy. Take gas early: it recovers
+             * loaded Probes, and Dragoons follow. */
+            else if(!count_type(B_ASSIMILATOR,0))(void)build_assimilator();
+            else if(!count_type(B_CYBERNETICS_CORE,0)&&count_type(B_GATEWAY,1))
+                (void)build_structure(B_CYBERNETICS_CORE,MENU_ACADEMY,80,224,-1,-1);
+#endif
+            /* Raids can destroy gas; Dragoons are the only ground answer to
+             * the Arbiters, so rebuild it ahead of Cannons. */
+            else if(frame>=9000&&!count_type(B_ASSIMILATOR,0))(void)build_assimilator();
+            else if(frame>=9000&&!count_type(B_CYBERNETICS_CORE,0)&&count_type(B_GATEWAY,1))
+                (void)build_structure(B_CYBERNETICS_CORE,MENU_ACADEMY,80,224,-1,-1);
+            /* A large bank means production is the limit, however many Probes
+             * the raids have left. */
+            else if(minerals>=400&&count_type(B_GATEWAY,0)<6)
                 (void)build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1);
             else if(!count_type(B_FORGE,0))
                 (void)build_structure(B_FORGE,MENU_ENG_BAY,80,224,-1,-1);
@@ -725,17 +861,34 @@ int main(int argc,char **argv)
                 (void)army_command(MENU_MOVE,u[f].x,u[f].y);
             else if(home>=0){
                 int fx=b[home].x,fy=b[home].y+48;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+                /* Selecting a walking hero sends the cursor across the map, which
+                 * costs production. Order each one only when it has stopped. */
+                if(f>=0&&u[f].owner==SIDE&&u[f].order!=ORDER_MOVE&&dist2(u[f].x,u[f].y,fx,fy)>48*48)
+                    (void)hero_command(f,fx,fy);
+                if(h>=0&&u[h].owner==SIDE&&u[h].order!=ORDER_MOVE&&dist2(u[h].x,u[h].y,b[home].x,b[home].y)>96*96)
+                    (void)hero_command(h,b[home].x,b[home].y+24);
+#else
                 if(f>=0&&u[f].owner==SIDE&&dist2(u[f].x,u[f].y,fx,fy)>48*48)
                     (void)hero_command(f,fx,fy);
                 if(h>=0&&u[h].owner==SIDE&&dist2(u[h].x,u[h].y,b[home].x,b[home].y)>96*96)
                     (void)hero_command(h,b[home].x,b[home].y+24);
+#endif
             }
             next_hero=frame+180;
         }
         if(frame>=next_order&&home>=0){
-            int threat=-1,bd=360*360;
+            int threat=-1,bd=360*360,bd2=520*520;
+            (void)bd2;
             for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY){
                 int d=dist2(u[i].x,u[i].y,b[home].x,b[home].y);
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+                /* Idle guards in the nearest town are not a threat until close,
+                 * but a Reaver shelling the base reads as idle while it fires. */
+                if(d>=520*520||(u[i].order==ORDER_IDLE&&u[i].cd<=0&&d>=288*288))continue;
+                if(d<bd2){bd2=d;threat=i;}
+                continue;
+#endif
                 if(d<bd){bd=d;threat=i;}
             }
             /* A raid on the base recalls an attacking army. */
@@ -743,6 +896,18 @@ int main(int argc,char **argv)
             for(int i=0;i<MAX_UNITS;i++)raiders+=u[i].alive&&u[i].owner==ENEMY&&
                 dist2(u[i].x,u[i].y,b[home].x,b[home].y)<320*320;
             if(raiders>=2)attacking=0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+            /* Attack orders chase raiders into their towns, where the army dies
+             * a few at a time. Walk strays home before anything else. */
+            int strays=0;
+            for(int i=0;i<MAX_UNITS;i++)strays+=u[i].alive&&u[i].owner==SIDE&&
+                (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)&&u[i].order!=ORDER_MOVE&&
+                dist2(u[i].x,u[i].y,b[home].x,b[home].y)>440*440;
+            if(threat<0&&strays>=3&&!attacking){
+                (void)army_command(MENU_MOVE,b[home].x,b[home].y+96);
+                next_order=frame+300;
+            } else
+#endif
             if(threat>=0&&!attacking){
                 (void)army_command(MENU_ATTACK,u[threat].x,u[threat].y);
                 fprintf(trace,"{\"kind\":\"defend\",\"frame\":%u,\"target\":[%d,%d]}\n",
@@ -755,7 +920,7 @@ int main(int argc,char **argv)
             int cell=stasis_cell();
             /* Attack at 40 units, or with what there is once the bank can no
              * longer grow the army (the start base mines out). */
-            if(!attacking&&(army_count()>=40||
+            if(!attacking&&(army_count()>=P8_ATTACK_ARMY||
                (army_count()>=20&&frame>=P8_SAVE_FRAME&&minerals<100)))attacking=1;
             if(attacking&&cell>=0){
                 /* Route from the army unit nearest the Cell; new units at
@@ -766,14 +931,12 @@ int main(int argc,char **argv)
                 /* A front unit whose route stopped shrinking is stuck (for
                  * example behind a cliff); route from another one. */
                 if(stalls>=3&&last_front>=0){stuck[last_front]=1;stalls=0;prior_distance=-1;}
-                int sx=0,sy=0,n=0,front=-1,fd=0x7fffffff;
+                int sx=0,sy=0,n=0,front=-1;
                 for(int i=0;i<MAX_UNITS;i++){
                     tried[i]=stuck[i]&&u[i].alive;
                     if(!u[i].alive)stuck[i]=0;
-                    if(!u[i].alive||u[i].owner!=SIDE||tried[i]||(u[i].type!=U_ZEALOT&&u[i].type!=U_DRAGOON))continue;
-                    int d=dist2(u[i].x,u[i].y,b[cell].x,b[cell].y);
-                    if(d<fd){fd=d;front=i;}
                 }
+                front=nearest_by_route(b[cell].x,b[cell].y,tried);
                 int wx=b[cell].x,wy=b[cell].y,distance=-1;
                 for(int k=0;k<8&&front>=0;k++){
                     if(waypoint_to(u[front].x,u[front].y,b[cell].x,b[cell].y,&wx,&wy,&distance))break;

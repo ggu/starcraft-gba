@@ -51,7 +51,7 @@ static void hud_jobs_bars(const HudJobs *jobs);
 static int
 hud_research_building(int type)
 {
-    return type == (race_human == R_ZERG ? B_EVOLUTION_CHAMBER : race_human == R_PROTOSS ? B_FORGE : B_ENG_BAY);
+    return type == (race_command_race() == R_ZERG ? B_EVOLUTION_CHAMBER : race_command_race() == R_PROTOSS ? B_FORGE : B_ENG_BAY);
 }
 
 #ifdef SC64_Z7_EGG_PRODUCTION

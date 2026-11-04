@@ -107,6 +107,11 @@ static void input(u16 held)
 {
     u16 pressed=(u16)(held & (u16)~prior);
     int changed=held!=prior;
+#ifdef PX_TAPE_TRACE
+    /* A replay ROM ends at the deciding call, so its tape stops there too. The
+     * maintained trace keeps its neutral release after the win. */
+    if (screen==SCREEN_RESULT || won || lost) return;
+#endif
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
     if (screen!=SCREEN_RESULT && !won && !lost) game_update(held,pressed);

@@ -150,6 +150,11 @@ ARM comparison is not a full-mission result. That link was not replayed in
 full. The `9ff7f7c` replay above uses the same feature vector with the
 probe's own main loop in place of `common/main.c`. See the [CONTACT
 release-candidate audit](audits/2026-10-28-z7-contact-release/README.md).
+After range routing changed the mission's timing, the controller needed a closer
+opening Hatchery and a mining-stall fallback; `make -k test-zerg-z7` passes
+again with a host win at tick 141,913. That new tape has no ARM replay, and the
+win depends on one pinned timing phase. See the [canonical controller
+audit](audits/2026-11-03-z7-canonical-controller/README.md).
 The current experimental P7 cache profile also replays the full winning tape
 on ARM with all 67 state records matching; see its
 [cache qualification](research/p7-fact-v2-qualification.md#full-arm-replay-of-the-current-cache-profile).
@@ -177,7 +182,10 @@ SRAM save taken while a structure is under construction, loaded in a fresh
 process, continues to the same win on host and on ARM. P8's AI backend,
 transmission duration and trigger cadence are authored, and the AI does not
 use the Carrier, Arbiter or Battery services. See the
-[P8 candidate audit](audits/2026-10-29-p8-campaign/README.md).
+[P8 candidate audit](audits/2026-10-29-p8-campaign/README.md). The controller was
+repaired after shared ranged routing changed the mission, and P8 and P9 were
+requalified together; see the
+[P8 and P9 requalification](audits/2026-11-03-p8-p9-requalification/README.md).
 
 P9 **Shadow Hunters** has a separate, unpromoted `protoss-p9` candidate
 built on the P8 candidate. It is built with `make protoss-p9` and writes
@@ -188,7 +196,8 @@ Overlords and Spore Colonies detect. On the earlier qualified P9 candidate, one 
 wins P9 by killing both Cerebrates with Zeratul present. Its earlier input-only ARM
 replay of the key tape matches every host observation through the win. A
 pause-menu SRAM save taken while a structure is under construction, loaded
-in a fresh process, continues to the same win on host and on ARM for that earlier candidate; this current integration needs its own qualification. P9's AI
+in a fresh process, continues to the same win on host and on ARM for that earlier candidate. The
+[requalification](audits/2026-11-03-p8-p9-requalification/README.md) repeats all of this on the current integration, with the same controller. P9's AI
 backend and trigger cadence are authored, and Defiler spells are not
 implemented. See the
 [P9 candidate audit](audits/2026-10-29-p9-campaign/README.md).
@@ -200,10 +209,18 @@ generation 47 with the Transport1 namespace. No automatic legacy save import is 
 human and the rescuable Hyperion; destroying the Overmind wins, and losing
 Zeratul, the Gantrithor or the Hyperion loses. Host checks cover the
 start-up program, the victory and defeat triggers, and a pause-menu save that
-continues identically in a fresh process. No ordinary-input win and no ARM
-run exist yet. Raynor's base cannot train or build, the Gantrithor has no
-attack, and the AI backend is authored. See the
+continues identically in a fresh process. One ordinary-input host controller run
+wins P10 from Raynor's base, which can now train and build. The input-only ARM
+replay matches every host observation through the win, and a pause-menu SRAM save
+continues to the same win in a fresh process. The Gantrithor has no attack, and the
+AI backend is authored. See the
+[ordinary-input audit](audits/2026-11-03-p10-ordinary-input/README.md) and the
 [P10 candidate audit](audits/2026-11-01-p10-campaign/README.md).
+All ten Protoss missions have an ordinary-input win under the P10 flags, and an ARM
+replay of each matches its host run. See the
+[ten-mission audit](audits/2026-11-03-protoss-p1-p10-evidence/README.md), and the
+[P6 save validator audit](audits/2026-11-04-p6-save-validator/README.md) for the stall
+that audit found on P6's winning frame.
 
 For P7, the canonical-render candidate passes its host startup/save fixtures,
 normal-input campaign win, 18-match skirmish matrix and menu-driven save/reload.

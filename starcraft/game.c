@@ -1710,6 +1710,12 @@ static int race_p10_outcome(void);
 static void race_p10_note_unit_spawn(int slot, int owner, int type);
 static void race_p10_note_building_spawn(int slot, int owner, int type);
 static void race_p10_note_product_building(int building);
+static int race_command_race(void);
+static int race_owner_fields_race(int owner, int race);
+#else
+/* The race whose commands the selection offers. */
+#define race_command_race() race_human
+#define race_owner_fields_race(owner, race) ((race) == race_owner_identity(owner))
 #endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
        SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
@@ -5534,6 +5540,19 @@ selected_worker_mineral_target(void)
     return patch;
 }
 
+#ifdef SC64_P10_RUNTIME
+/* A Terran selection in P10 offers Raynor's base its own commands. */
+static int race_command_race(void)
+{
+    int worker;
+    if (!race_p10_active()) return race_human;
+    if (selected_building >= 0 && selected_building < MAX_BUILDINGS &&
+        sc64_race_building_rules[b[selected_building].type].race == R_TER) return R_TER;
+    worker = find_selected_worker();
+    return worker >= 0 && u[worker].type == U_SCV ? R_TER : race_human;
+}
+#endif
+
 /* Automatic construction selection must not steal an existing build order.
  * Explicit player orders may still interrupt construction normally. */
 static int
@@ -5574,6 +5593,18 @@ race_probe_cannon_command_available(void)
         found=1;
     }
     return found;
+}
+#endif
+
+#ifdef SC64_RACES
+/* Whether A means train on this building: the rules' producers, plus a custom
+ * game's catalog producers (the Infested Command Center has no rules flag). */
+static int
+race_building_trains(int type)
+{
+    const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
+    if (r && (r->flags & SC_RACE_F_PRODUCER)) return 1;
+    return race_mode && sc64_skirmish_product_count((unsigned)sc64_race_raw_building(type)) > 0;
 }
 #endif
 
@@ -5716,7 +5747,7 @@ start_research(int type)
     int level = type == 0 ? weapons_level : armor_level;
     if (!has_building(SIDE,
 #ifdef SC64_RACES
-        race_human==R_ZERG?B_EVOLUTION_CHAMBER:race_human==R_PROTOSS?B_FORGE:
+        race_command_race()==R_ZERG?B_EVOLUTION_CHAMBER:race_command_race()==R_PROTOSS?B_FORGE:
 #endif
         B_ENG_BAY)) {
 	toast(8);
@@ -6201,7 +6232,7 @@ choose_command(int choice)
         {B_SPAWNING_POOL,B_HATCHERY,B_EXTRACTOR,B_HYDRALISK_DEN,B_EVOLUTION_CHAMBER},
         {B_GATEWAY,B_PYLON,B_ASSIMILATOR,B_CYBERNETICS_CORE,B_FORGE}};
     if(choice>=MENU_BARRACKS&&choice<=MENU_ENG_BAY) {
-        menu_open=0;mode=MODE_BUILD;menu=buildings[race_human][choice-MENU_BARRACKS];return;
+        menu_open=0;mode=MODE_BUILD;menu=buildings[race_command_race()][choice-MENU_BARRACKS];return;
     }
 #endif
     menu_open = 0;
@@ -6479,7 +6510,7 @@ static const char *race_menu_label(int i)
 #endif
         },
         {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
-    const char *const *labels=race_labels[race_human];
+    const char *const *labels=race_labels[race_command_race()];
 #ifdef SC64_SHARED_TRANSPORT
     if (i == MENU_STOP + 1 && race_shared_campaign_transport_menu_available())
         return "UNLOAD CARGO";
@@ -6788,6 +6819,9 @@ interact(void)
         /* A trains only on the selected building; elsewhere it reselects,
          * and on empty ground it clears the selection. */
         && field_ui_on_selected_building()
+#endif
+#ifdef SC64_RACES
+        && race_building_trains(b[selected_building].type)
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
         && (!race_late_active() ||
@@ -8723,9 +8757,9 @@ select_next_train_type(void)
 #endif
     static const int types[3][4]={{U_SCV,U_MARINE,U_FIREBAT,U_MEDIC},
         {U_DRONE,U_OVERLORD,U_ZERGLING,U_HYDRALISK},{U_PROBE,U_ZEALOT,U_DRAGOON,U_SCOUT}};
-    int n;for(n=0;n<4;n++)if(types[race_human][n]==train_type)break;
+    int n;for(n=0;n<4;n++)if(types[race_command_race()][n]==train_type)break;
     for(int step=1;step<=4;step++) {
-        int type=types[race_human][(n+step)%4];
+        int type=types[race_command_race()][(n+step)%4];
         if(selected_building<0||sc64_race_unit_rules[type].producer==b[selected_building].type) {
             train_type=type;return;
         }
@@ -9570,10 +9604,21 @@ sc64_unit_energy(const Unit *q,int *maximum)
 /* StarCraft marks a selection with an ellipse at the actor's base, coloured
  * by relationship: green for the player, yellow for neutral, red for others.
  * This draws a one-pixel outline sized from the sprite, so it needs no source
- * art. Buildings pass front_only: their art is already on screen (or in the
- * static cache), so only the near arc is drawn, as if the rest were hidden. */
+ * art. Art covers a ring's far arc and sits behind its near arc. A unit draws
+ * its whole ring before any unit, and a directly drawn building draws the far
+ * arc before its art. Art in the static cache is already on screen, so its
+ * frame is passed as a cover: the far arc only fills the frame's transparent
+ * pixels, the same result without redrawing the art. */
 #define SELECTION_RX_MAX 64
 #define SELECTION_RY_MAX 38
+#define SELECTION_NEAR 1
+#define SELECTION_FAR 2
+#define SELECTION_RING (SELECTION_NEAR | SELECTION_FAR)
+
+typedef struct {
+    const u8 *pixels;
+    int x, y, w, h;
+} SelectionCover;
 
 static u8
 selection_color(int owner)
@@ -9587,8 +9632,24 @@ selection_row(int left,int right,int row,u8 color)
     if (row >= 12 && row < 120) gfx_rect(left,row,right-left+1,1,color);
 }
 
+static void
+selection_far_row(int left,int right,int row,u8 color,const SelectionCover *cover)
+{
+    if (!cover || row < cover->y || row >= cover->y + cover->h) {
+        selection_row(left,right,row,color);
+        return;
+    }
+    if (row < 12 || row >= 120) return;
+    const u8 *line = cover->pixels + (row - cover->y) * cover->w;
+    for (int col = left; col <= right; ++col) {
+        int art = col - cover->x;
+        if (art < 0 || art >= cover->w || !line[art]) gfx_pixel(col,row,color);
+    }
+}
+
 static void __attribute__((noinline))
-draw_selection_ellipse(int x,int y,int rx,int ry,u8 color,int front_only)
+draw_selection_ellipse(int x,int y,int rx,int ry,u8 color,int parts,
+                       const SelectionCover *cover)
 {
     u8 half[SELECTION_RY_MAX+2];
     if (rx < 3) rx = 3;
@@ -9610,15 +9671,17 @@ draw_selection_ellipse(int x,int y,int rx,int ry,u8 color,int front_only)
         int hi = half[dy], lo = dy == ry ? 0 : half[dy+1] + 1;
         if (lo > hi) lo = hi;
         if (dy == ry) {
-            selection_row(x-hi,x+hi,y+dy,color);
-            if (!front_only) selection_row(x-hi,x+hi,y-dy,color);
+            if (parts & SELECTION_NEAR) selection_row(x-hi,x+hi,y+dy,color);
+            if (parts & SELECTION_FAR) selection_far_row(x-hi,x+hi,y-dy,color,cover);
             continue;
         }
-        selection_row(x+lo,x+hi,y+dy,color);
-        selection_row(x-hi,x-lo,y+dy,color);
-        if (front_only || !dy) continue;
-        selection_row(x+lo,x+hi,y-dy,color);
-        selection_row(x-hi,x-lo,y-dy,color);
+        if (parts & SELECTION_NEAR) {
+            selection_row(x+lo,x+hi,y+dy,color);
+            selection_row(x-hi,x-lo,y+dy,color);
+        }
+        if (!(parts & SELECTION_FAR) || !dy) continue;
+        selection_far_row(x+lo,x+hi,y-dy,color,cover);
+        selection_far_row(x-hi,x-lo,y-dy,color,cover);
     }
 }
 
@@ -9803,7 +9866,7 @@ draw_unit_pass(Unit * q, int selection_pass)
         int rx = (sprite_w + 3) / 2, ry = (rx * 3 + 2) / 5;
         if (ry < 2) ry = 2;
         draw_selection_ellipse(x, sprite_y + sprite_h + 1 - ry, rx, ry,
-                               selection_color(q->owner), 0);
+                               selection_color(q->owner), SELECTION_RING, 0);
         return;
     }
     int walk = sc64_walk_track(q);
@@ -10332,19 +10395,11 @@ draw_minimap(void)
 #if defined(SC64_T4_SCENARIO_RUNTIME) && defined(SC64_HAS_SPRITES)
 #include "sc64_t4_prop_art.h"
 #endif
-static void
-draw_building_art(Building *q)
-{
-    int x = q->x - camx, y = q->y - camy + 12;
-    if (x < -20 || x > 260 || y < 2 || y > 130)
-        return;
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-    if (sc64_game_building_actor_flags(q->type) &&
-        !(sc64_game_building_actor_flags(q->type)&SC64_GAME_ACTOR_DRAWABLE)) return;
-#endif
-    int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
 #ifdef SC64_HAS_SPRITES
-    const Sc64SpriteFrame *sprite =
+static const Sc64SpriteFrame *
+building_art_sprite(const Building *q)
+{
+    return
 #ifdef SC64_RACES
 #ifdef SC64_T5_RUNTIME
 #ifdef SC64_T6_RUNTIME
@@ -10355,6 +10410,28 @@ draw_building_art(Building *q)
         q->raw_type>=0?sc64_race_building_art_sprite(q->raw_type):
 #endif
         mission_building_sprite(q->type);
+}
+#endif
+
+static int
+building_art_in_view(int x,int y)
+{
+    return x >= -20 && x <= 260 && y >= 2 && y <= 130;
+}
+
+static void
+draw_building_art(Building *q)
+{
+    int x = q->x - camx, y = q->y - camy + 12;
+    if (!building_art_in_view(x, y))
+        return;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (sc64_game_building_actor_flags(q->type) &&
+        !(sc64_game_building_actor_flags(q->type)&SC64_GAME_ACTOR_DRAWABLE)) return;
+#endif
+    int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
+#ifdef SC64_HAS_SPRITES
+    const Sc64SpriteFrame *sprite = building_art_sprite(q);
 #endif
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
@@ -10411,6 +10488,46 @@ draw_building_art(Building *q)
 }
 
 static void
+draw_building_ring(const Building *q,int x,int bottom,int sprite_w,int parts,
+                   const SelectionCover *cover)
+{
+    int rx = sprite_w / 2 + 2, ry = (rx * 3 + 2) / 5;
+    draw_selection_ellipse(x, bottom + 1 - ry, rx, ry,
+                           selection_color(q->owner), parts, cover);
+}
+
+#ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_HAS_SPRITES
+/* draw_building_art leaves these out of the static pass. */
+static int
+building_art_is_static(const Building *q)
+{
+#ifdef SC64_RACES
+    if (q->under_construction) return 0;
+#ifdef SC64_PHOTON_SOURCE_FRAMES
+    if (q->type==B_PHOTON_CANNON) return 0;
+#endif
+#endif
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (sc64_game_building_actor_flags(q->type) &&
+        !(sc64_game_building_actor_flags(q->type)&SC64_GAME_ACTOR_DRAWABLE)) return 0;
+#endif
+    return 1;
+}
+#endif
+#else
+/* The far arc of a directly drawn building, ahead of its art. */
+static void
+draw_building_far_arc(const Building *q)
+{
+    if (selected_building < 0 || q != &b[selected_building]) return;
+    if (q->owner != SIDE && !currently_visible(q->x, q->y)) return;
+    int x = q->x - camx, bottom = q->y - camy + 12 + 12;
+    draw_building_ring(q, x, bottom, 24, SELECTION_FAR, 0);
+}
+#endif
+
+static void
 draw_building_overlay(Building *q)
 {
     int x = q->x - camx, y = q->y - camy + 12;
@@ -10422,17 +10539,38 @@ draw_building_overlay(Building *q)
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
         return;
 #ifdef SC64_HAS_SPRITES
-    const Sc64SpriteFrame *sprite =
-#ifdef SC64_RACES
-        q->raw_type>=0?sc64_race_building_art_sprite(q->raw_type):
-#endif
-        mission_building_sprite(q->type);
+    const Sc64SpriteFrame *sprite = building_art_sprite(q);
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 12;
     int sprite_y = sprite ? y - sprite->canvas_h / 2 + sprite->offset_y : y - 12;
     int sprite_w = sprite ? sprite->w : 24;
     int sprite_h = sprite ? sprite->h : 24;
 #else
     int sprite_x = x - 12, sprite_y = y - 12, sprite_w = 24, sprite_h = 24;
+#endif
+    int selected = selected_building >= 0 && q == &b[selected_building];
+#ifdef SC64_IMPORTED_MISSION
+    /* This runs before the dynamic art below, which then covers the arc as
+     * direct drawing does. Only finished art is already in the static cache. */
+    if (selected) {
+        SelectionCover cover;
+        const SelectionCover *covered = 0;
+#ifdef SC64_HAS_SPRITES
+        if (sprite && building_art_in_view(x, y) && building_art_is_static(q)) {
+            cover.pixels = sprite->pixels;
+            cover.x = sprite_x; cover.y = sprite_y;
+            cover.w = sprite_w; cover.h = sprite_h;
+            covered = &cover;
+        }
+#endif
+        draw_building_ring(q, x, sprite_y + sprite_h, sprite_w,
+                           SELECTION_FAR, covered);
+#ifdef SC64_HAS_SPRITES
+        /* A building without source art keeps its few rectangles in the
+         * cache; redrawing them costs less than a mask would. */
+        if (!sprite)
+#endif
+            draw_building_art(q);
+    }
 #endif
 #ifdef SC64_RACES
 #if defined(SC64_PHOTON_SOURCE_FRAMES) && defined(SC64_HAS_SPRITES)
@@ -10523,10 +10661,8 @@ draw_building_overlay(Building *q)
             gfx_bar(x-12,sprite_y+sprite_h+3,24,2,progress,duration,C_CYAN,C_PANEL);
     }
 #endif
-    if (selected_building >= 0 && q == &b[selected_building]) {
-        int rx = sprite_w / 2 + 2, ry = (rx * 3 + 2) / 5;
-        draw_selection_ellipse(x, sprite_y + sprite_h + 1 - ry, rx, ry,
-                               selection_color(q->owner), 1);
+    if (selected) {
+        draw_building_ring(q, x, sprite_y + sprite_h, sprite_w, SELECTION_NEAR, 0);
         int vitals_y = sprite_y + sprite_h + 3;
 #ifdef SC64_RACES
         if (q->under_construction) vitals_y += 3;
@@ -10935,6 +11071,7 @@ sc64_tile_background_done:
     profile_stage_start = gba_clock();
 #else
         if (b[i].alive) {
+            draw_building_far_arc(&b[i]);
             draw_building_art(&b[i]);
             draw_building_overlay(&b[i]);
         }

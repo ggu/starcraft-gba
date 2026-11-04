@@ -655,6 +655,39 @@ smart_move_tests(void)
     check(screen == SCREEN_PLAY, "A resumes");
 }
 
+/* A far arc covered by art already on screen must match one drawn under it. */
+static void
+selection_cover_tests(void)
+{
+    enum { ART_W = 24, ART_H = 12 };
+    static const int spots[][2] = {
+        { 120, 60 }, { 0, 60 }, { 239, 60 }, { 120, 18 }, { 120, 116 },
+    };
+    static u8 art[ART_W * ART_H];
+    static u8 under[240 * 160];
+    for (int row = 0; row < ART_H; row++)
+        for (int col = 0; col < ART_W; col++)
+            art[row * ART_W + col] = (row % 5 == 4 || col % 7 == 6) ? 0 : C_STONE;
+    for (unsigned i = 0; i < sizeof(spots) / sizeof(spots[0]); i++) {
+        int x = spots[i][0], y = spots[i][1];
+        SelectionCover cover = { art, x - ART_W / 2, y - ART_H / 2, ART_W, ART_H };
+        gfx_begin(C_BLACK);
+        draw_selection_ellipse(x, y, 16, 10, C_GREEN, SELECTION_FAR, 0);
+        gfx_blit_sprite(cover.x, cover.y, ART_W, ART_H, art);
+        for (int py = 0; py < 160; py++)
+            for (int px = 0; px < 240; px++)
+                under[py * 240 + px] = gfx_test_pixel(px, py);
+        gfx_begin(C_BLACK);
+        gfx_blit_sprite(cover.x, cover.y, ART_W, ART_H, art);
+        draw_selection_ellipse(x, y, 16, 10, C_GREEN, SELECTION_FAR, &cover);
+        int same = 1;
+        for (int py = 0; py < 160; py++)
+            for (int px = 0; px < 240; px++)
+                same &= under[py * 240 + px] == gfx_test_pixel(px, py);
+        check(same, "a covered far arc matches one drawn under the art");
+    }
+}
+
 /* Selections are StarCraft ellipses at the actor's base, not boxes. */
 static void
 selection_circle_tests(void)
@@ -664,7 +697,7 @@ selection_circle_tests(void)
     check(selection_color(ENEMY) == C_RED, "enemy selection is red");
 
     gfx_begin(C_BLACK);
-    draw_selection_ellipse(120, 60, 10, 6, C_GREEN, 0);
+    draw_selection_ellipse(120, 60, 10, 6, C_GREEN, SELECTION_RING, 0);
     check(gfx_test_pixel(110, 60) == C_GREEN && gfx_test_pixel(130, 60) == C_GREEN,
           "ellipse reaches its horizontal radius");
     check(gfx_test_pixel(120, 54) == C_GREEN && gfx_test_pixel(120, 66) == C_GREEN,
@@ -678,9 +711,14 @@ selection_circle_tests(void)
                   "ellipse is symmetric");
     }
     gfx_begin(C_BLACK);
-    draw_selection_ellipse(120, 60, 10, 6, C_GREEN, 1);
+    draw_selection_ellipse(120, 60, 10, 6, C_GREEN, SELECTION_NEAR, 0);
     check(count_color(100, 40, 41, 20, C_GREEN) == 0 &&
-          gfx_test_pixel(120, 66) == C_GREEN, "front arc stays below centre");
+          gfx_test_pixel(120, 66) == C_GREEN, "near arc stays below centre");
+    gfx_begin(C_BLACK);
+    draw_selection_ellipse(120, 60, 10, 6, C_GREEN, SELECTION_FAR, 0);
+    check(count_color(100, 61, 41, 20, C_GREEN) == 0 &&
+          gfx_test_pixel(120, 54) == C_GREEN, "far arc stays above centre");
+    selection_cover_tests();
 
     fixture();
     int marine = slot_of(SIDE, U_MARINE);
@@ -716,7 +754,12 @@ selection_circle_tests(void)
           gfx_test_pixel(x - 14, y + 5) == C_GREEN &&
           gfx_test_pixel(x + 14, y + 5) == C_GREEN,
           "selected building has a green front arc");
-    check(gfx_test_pixel(x - 14, y + 4) != C_GREEN, "building arc has no far half");
+    /* The art spans x-12..x+12 from y-8, so it hides the top of the ring. */
+    check(gfx_test_pixel(x - 13, y + 4) == C_GREEN &&
+          gfx_test_pixel(x + 13, y + 4) == C_GREEN,
+          "selected building has a far arc beside its art");
+    check(count_color(x - 12, y - 3, 25, 1, C_GREEN) == 0,
+          "building art covers the far arc");
     selected_building = -1;
 }
 

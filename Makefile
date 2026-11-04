@@ -1787,6 +1787,7 @@ test-races: build/test-race-rules build/test-race-engine build/test-race-campaig
 	./build/test-race-factions
 	./build/test-race-routes-rect
 test-races-controller: build/test-race-z1-controls build/test-race-campaign
+	./build/test-race-z1-controls --check-beacon
 	./build/test-race-z1-controls --trace .local/sc64/races/generated/z1-controller.json
 	./build/test-race-campaign --controller 1 --trace .local/sc64/races/generated/z2-controller.json
 	./build/test-race-campaign --controller 2 --trace .local/sc64/races/generated/p1-controller.json
@@ -4087,7 +4088,7 @@ $(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_polic
 build/test-sc64-z7-canonical-z6-controller-policy: tests/sc64_z6_campaign_run.c
 ZERG_Z7_CONTROLLER_TRACE ?= .local/sc64/zerg-z7-canonical-controller.jsonl
 ZERG_Z7_CONTROLLER_LIMIT ?= 200000
-ZERG_Z7_CONTROLLER_POLICY ?= --policy early-gas --policy-workers 6 --policy-reserve 50 --policy-hydras 8 --policy-second-first 0 --policy-retreat 0 --policy-home-radius 320 --home-army-r
+ZERG_Z7_CONTROLLER_POLICY ?= --policy early-gas --policy-workers 6 --policy-reserve 50 --policy-hydras 8 --policy-second-first 0 --policy-retreat 0 --policy-home-radius 320 --home-army-r --start-delay 33
 .PHONY: test-sc64-z7-last-seen test-sc64-z7-canonical-controller test-zerg-z7
 test-sc64-z7-last-seen: build/test-sc64-z7-canonical-last-seen
 	./build/test-sc64-z7-canonical-last-seen
@@ -4131,6 +4132,7 @@ test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-
 	mkdir -p .local/sc64/z7-carried
 	./build/test-sc64-z7-carried-z1 --check-site cancel
 	./build/test-sc64-z7-carried-z1 --check-site timeout
+	./build/test-sc64-z7-carried-z1 --check-beacon
 	./build/test-sc64-z7-carried-z1 --trace .local/sc64/z7-carried/z1.json
 	./build/test-sc64-z7-carried-z2 --controller 1 --trace .local/sc64/z7-carried/z2.json
 	./build/test-sc64-z7-carried-z3 --trace .local/sc64/z7-carried/z3.json
@@ -4296,7 +4298,7 @@ build/test-sc64-p7-campaign-$(1): tests/$(2).c $$(STARCRAFT) $$(wildcard starcra
 	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(P7_CAMPAIGN_COMPOSITION_FLAGS) $$< common/gba.c -o $$@
 endef
 $(eval $(call P7_CAMPAIGN_CONTROLLER,early,race_campaign_run))
-$(eval $(call P7_CAMPAIGN_CONTROLLER,p3,sc64_p3_expansion_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p3,sc64_p3_campaign_run))
 $(eval $(call P7_CAMPAIGN_CONTROLLER,p4,sc64_p4_campaign_run))
 $(eval $(call P7_CAMPAIGN_CONTROLLER,p5,sc64_p5_campaign_run))
 $(eval $(call P7_CAMPAIGN_CONTROLLER,p6,sc64_p6_campaign_run))
@@ -4686,6 +4688,7 @@ test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64
 	mkdir -p .local/sc64
 	./build/test-sc64-zerg-carried-z1 --check-site cancel
 	./build/test-sc64-zerg-carried-z1 --check-site timeout
+	./build/test-sc64-zerg-carried-z1 --check-beacon
 	./build/test-sc64-zerg-carried-z1 --trace .local/sc64/z6-carried-z1-controller.json
 	./build/test-sc64-zerg-carried-z2 --controller 1 --trace .local/sc64/z6-carried-z2-controller.json
 	./build/test-sc64-zerg-carried-z3 --trace .local/sc64/z6-carried-z3-controller.json
@@ -4719,6 +4722,7 @@ test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign bui
 	./build/test-sc64-protoss-carried-p3 --trace .local/sc64/p4-carried-p3-controller.json
 	./build/test-sc64-protoss-carried-p5 --limit 180000 --attempt-tag canonical-p6-carried-p5
 test-protoss: test-sc64-protoss-carried-missions
+-include mk/protoss-carried/Makefile
 
 # The indexed and packed sprite paths must agree over the whole framebuffer,
 # including transparent lanes, alignment and both clipping configurations.

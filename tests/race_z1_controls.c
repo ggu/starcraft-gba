@@ -546,11 +546,43 @@ static int check_site(const char *kind)
     return 0;
 }
 
+/* --check-beacon: the mission's Zerg Beacon trains nothing, so A offers no
+   training there and refuses nothing; the Hatchery beside it still trains. */
+static int check_beacon(void)
+{
+    int beacon,mined,drones,hatch;
+    if(start_z1())return 1;
+    hatch=home_hatch;
+    for(int i=0;i<72;i++)controller_frame(KEY_LEFT);
+    for(int i=0;i<6;i++)controller_frame(KEY_UP);
+    controller_frame(0);
+    press(KEY_A);
+    beacon=selected_building;
+    if(beacon<0||b[beacon].type!=B_ZERG_BEACON)return fail("beacon check selected the Beacon");
+    if(field_ui_a_action(selected_count())==UI_A_TRAIN)return fail("beacon check: A offers training");
+    if(hud_next_product(beacon)>=0)return fail("beacon check: panel offers a product");
+    mined=minerals; drones=count_units(SIDE,U_DRONE);
+    for(int i=0;i<5;i++) {
+        press(KEY_A);
+        if(toast_timer&&toast_id==8)return fail("beacon check: A reported a missing prerequisite");
+    }
+    if(selected_building!=beacon||b[beacon].queue_count||minerals<mined||
+       count_units(SIDE,U_DRONE)!=drones)return fail("beacon check: A changed the world");
+    if(!select_hatchery())return fail("beacon check selected the Hatchery");
+    if(field_ui_a_action(selected_count())!=UI_A_TRAIN)return fail("beacon check: Hatchery offers no training");
+    select_train_type(U_DRONE);
+    press(KEY_A);
+    if(b[hatch].queue_count!=1||toast_id!=4)return fail("beacon check: Hatchery did not queue a Drone");
+    printf("Z1 Beacon check: ok at tick %u\n",input_tick);
+    return 0;
+}
+
 int main(int argc,char **argv)
 {
     int x,y,hatch,extractor=-1,site_x,site_y;
     if(argc==3&&strcmp(argv[1],"--trace")==0)trace_path=argv[2];
     else if(argc==3&&strcmp(argv[1],"--check-site")==0)return check_site(argv[2]);
+    else if(argc==2&&strcmp(argv[1],"--check-beacon")==0)return check_beacon();
     else if(argc!=1)return 64;
     if(start_z1())return 1;
     hatch=home_hatch;
