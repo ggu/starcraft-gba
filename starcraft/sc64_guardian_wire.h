@@ -11,10 +11,12 @@ static int sc64_guardian_wire_encode(const Unit *in, Unit *out, int staged)
         if (in->raw_type == 59) return 0;
         *out = *in; return 1;
     }
-    if (!staged || in->raw_type != 59 || in->hp < 1 || in->hp > 200 ||
-        in->maxhp != 200 || in->target != 44 || in->work_timer < 1 ||
-        in->work_timer > 750 || in->build != -1 || in->carry || in->flags ||
-        in->order != ORDER_IDLE || in->armor || in->shield || !in->alive)
+    if (!staged || in->raw_type != 59 || in->alive > 1 ||
+        (in->alive ? (in->hp < 1 || in->hp > 200 || in->work_timer < 1) :
+                     (in->hp > 0 || in->hp < -131072)) ||
+        in->maxhp != 200 || in->target != 44 || in->work_timer > 750 ||
+        in->build != -1 || in->carry || in->flags ||
+        in->order != ORDER_IDLE || in->armor || in->shield)
         return 0;
     *out = *in; out->type = U_OVERLORD; return 1;
 }

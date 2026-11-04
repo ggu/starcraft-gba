@@ -44,12 +44,14 @@ int main(void)
     q.owner=SIDE;q.type=U_GUARDIAN_COCOON;q.raw_type=59;q.raw_owner=3;
     q.alive=1;q.selected=1;q.build=-1;q.target=44;q.work_timer=750;
     printf("legacy=%d cocoon=%d count=%d overlord=%d row=%zu\n",SC_RU_LEGACY_COUNT,U_GUARDIAN_COCOON,SC_RU_COUNT,U_OVERLORD,sizeof(row));
-    for(int i=0;i<2;i++) {
-      if(i){q.hp=37;q.work_timer=1;q.selected=0;q.owner=ENEMY;}
+    for(int i=0;i<3;i++) {
+      if(i==1){q.hp=37;q.work_timer=1;q.selected=0;q.owner=ENEMY;}
+      if(i==2){q.alive=0;q.hp=-1;q.work_timer=0;}
       assert(sc64_guardian_wire_encode(&q,&wire,1));assert(ENC(&row,&wire,2048,2048));assert(DEC(&out,&row,2048,2048));
       assert(sc64_guardian_wire_decode(&out,&again,1));assert(!memcmp(&q,&again,sizeof(q)));
       assert(!sc64_guardian_wire_decode(&out,&again,0));assert(!ENC(&row,&q,2048,2048));
     }
+    q.alive=1;q.hp=37;q.work_timer=1;
 #define BAD(f,v) do { Unit b=q;b.f=(v);assert(!sc64_guardian_wire_encode(&b,&wire,1)); } while(0)
     BAD(raw_type,44);BAD(target,43);BAD(work_timer,0);BAD(work_timer,751);
     BAD(build,0);BAD(carry,1);BAD(flags,1);BAD(order,1);BAD(maxhp,150);BAD(hp,0);BAD(hp,201);
