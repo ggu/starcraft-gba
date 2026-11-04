@@ -18,6 +18,7 @@
  * private CHK and are not shown or played. Transmission uses an authored
  * duration, and CenterView snaps the camera. The three AI scripts run the
  * authored backend in sc64_z8_ai.h. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_z8_state.h"
 #include "sc64_z8_program_generated.h"
 #include "sc64_z8_ai.h"
@@ -37,7 +38,9 @@ enum {
     SC64_Z8_FRAME_MS = 42,
     /* Every Z8 Transmission subtracts its time from a sound length that is
      * not imported; this bounded authored value stands in for it. */
-    SC64_Z8_TRANSMISSION_MS = 4000,
+    /* The box is the pause, so the source's next action follows its dismissal
+     * on the next update. These rows carry a zero time in the source. */
+    SC64_Z8_TRANSMISSION_MS = 1,
     SC64_Z8_RAW_NEXUS = 154,
     /* Pinned OpenBW caps grounded-building detection at seven tiles.
      * Mobile detector sight comes from shared base source facts below. */
@@ -184,6 +187,7 @@ static int race_z8_timed(void *context, int phase, const Sc64Z8Action *action,
     if (phase != SC64_Z8_TIMED_START) return -1;
     if (action->opcode == 7u) {
         *duration_ms = SC64_Z8_TRANSMISSION_MS;
+        SC64_MISSION_TEXT_POST(action->opcode, action->string_id, action->unit);
         race_campaign_set_message(0);
         return 1;
     }
@@ -208,6 +212,8 @@ static int race_z8_present(void *context, const Sc64Z8Action *action,
     if (!action || owner >= SC64_Z8_OWNER_LIMIT ||
         (action->opcode != 8u && action->opcode != 9u && action->opcode != 12u &&
          action->opcode != 28u)) return -1;
+    if (owner == SC64_Z8_HUMAN_SLOT)
+        SC64_MISSION_TEXT_POST(action->opcode, action->string_id, action->unit);
     return 1;
 }
 

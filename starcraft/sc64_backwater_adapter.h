@@ -281,6 +281,13 @@ static void
 bw_message(void *context, int trigger, int action)
 {
     (void)context;
+#ifdef SC64_RACES
+    /* The source rows are one-shot, but this model's factory-reveal switch
+     * re-arms each tick a Marine stands at the building. TRIG 14 alone has
+     * several rows, as actions 5 to 9. */
+    if (race_mission_text_edge((unsigned)(trigger < 14 ? trigger : 14 + action - 5), 1))
+        race_mission_text_post_source((unsigned)trigger, (unsigned)action);
+#endif
     backwater_message_trigger = trigger;
     backwater_message_action = action;
     backwater_message_ticks = 180;

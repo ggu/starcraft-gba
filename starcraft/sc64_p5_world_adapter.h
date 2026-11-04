@@ -3,6 +3,7 @@
 
 /* P5 source operands resolved against the live fixed-size game arrays.  This
  * is a bounded authored callback, not a general CHK interpreter. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_p5_adapter.h"
 #include "sc64_p5_source_model.h"
 #include "sc64_resource_actions.h"
@@ -440,6 +441,7 @@ static int sc64_p5_world_action(void *context, const Sc64P5SourceAction *a)
     case 2: ctx->defeat_requested = 1; return 1;
     case 3: case 4: return 1; /* Preserve/wait are scheduler-owned. */
     case 7: case 8: case 9:
+        SC64_MISSION_TEXT_POST(a->opcode, a->string_id, a->unit);
         ctx->presentation_opcode = a->opcode;
         ctx->last_string_id = (u16)a->string_id;
         ctx->last_wav_id = (u16)a->wav_id;

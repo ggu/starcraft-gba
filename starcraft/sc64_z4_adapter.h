@@ -3,6 +3,7 @@
 
 #if defined(SC64_Z4_RUNTIME)
 
+#include "sc64_mission_text_hook.h"
 #include "sc64_z4.h"
 #include "sc64_z4_scenario_generated.h"
 
@@ -377,8 +378,9 @@ race_z4_dispatch_action(const Sc64Z4SourceAction *a, u16 *duration)
         *duration = (u16)race_z4_ceil_ticks(a->time);
         return 1;
     case 7: case 9:
-        /* Dialogue/WAV bytes are intentionally absent. Preserve action order
-         * with a documented 3-second presentation hold. */
+        /* The shared box presents the row. Preserve action order with a
+         * documented 3-second hold, which starts when the box is dismissed. */
+        SC64_MISSION_TEXT_POST(a->opcode, a->string_id, a->unit);
         *duration = SC64_Z4_TX_HOLD_TICKS;
         race_z4.message_ticks = *duration;
         return 1;

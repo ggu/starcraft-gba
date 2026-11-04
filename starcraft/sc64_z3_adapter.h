@@ -5,6 +5,7 @@
  * and their raw action sequence come from the verified local SC64 CHK audit;
  * enemy production and presentation duration below are explicitly engine
  * policies, not claims to execute the original opaque Force 2 AI script. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_z3.h"
 
 enum {
@@ -149,6 +150,10 @@ race_z3_release_small_wave(void)
 static void
 race_z3_apply_result(u16 events)
 {
+    /* TRIG 4's three win Transmissions follow the model's own sequence. */
+    if (events & SC64_Z3_EVENT_WIN_TX)
+        race_mission_text_post_source(4, race_z3.transmission);
+    if (events & SC64_Z3_EVENT_LOSS_MESSAGE) race_mission_text_post_source(5, 2);
     if (events & SC64_Z3_EVENT_WON) {
         race_campaign.phase = SC64_RACE_PHASE_COMPLETE;
         race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_PRIMARY;

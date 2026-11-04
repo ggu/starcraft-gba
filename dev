@@ -871,6 +871,8 @@ def prepare(rom: Path, profile: str) -> None:
              "--rom", str(private_rom)])
         run([sys.executable, str(ROOT / "tools/sc64_briefing_assets.py"),
              "--rom", str(private_rom)])
+        run([sys.executable, str(ROOT / "tools/sc64_mission_text_pack.py"),
+             "--rom", str(private_rom)])
         run([sys.executable, str(ROOT / "tools/sc64_icon_assets.py"),
              "--rom", str(private_rom)])
         run([sys.executable, str(ROOT / "tools/sc64_chrome_assets.py"),
@@ -1029,6 +1031,8 @@ def status(profile: str) -> int:
         paths.append(("Unit walk cycles", ROOT / WALK_HEADER))
         paths.append(("Campaign briefings and portraits", ROOT /
                       ".local/sc64/briefings/generated/sc64_briefing_generated.h"))
+        paths.append(("In-mission text boxes", ROOT /
+                      ".local/sc64/mission-text/generated/sc64_mission_text_generated.h"))
         for label, name in (("Original interface fonts", "sc64_font_generated.h"),
                             ("Original interface icons", "sc64_icons_generated.h"),
                             ("Original menu chrome", "sc64_chrome_generated.h")):

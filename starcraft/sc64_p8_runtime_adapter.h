@@ -17,6 +17,7 @@
  * census, owner, location and resource actions use the shared Z8 world
  * services over the live pools. Presentation strings stay in the private CHK
  * and are not displayed; Transmission uses an authored duration. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_p8_state.h"
 #include "sc64_p8_timed_service.h"
 #include "sc64_p8_game_bridge.h"
@@ -35,7 +36,9 @@ enum {
     /* Every P8 Transmission names blank.wav with modifier 9 (subtract) and
      * time 0, so its native duration is that sound's length. The sound
      * length is not imported; this bounded authored value stands in for it. */
-    SC64_P8_TRANSMISSION_MS = 4000
+    /* The box is the pause, so the source's next action follows its dismissal
+     * on the next update. These rows carry a zero time in the source. */
+    SC64_P8_TRANSMISSION_MS = 1
 };
 
 static Sc64P8PersistentState race_p8;
@@ -232,6 +235,7 @@ static int race_p8_timed_presentation(void *context, int phase,
     if (phase != SC64_P8_TIMED_START) return -1;
     if (action->opcode == 7u) {
         *duration_ms = SC64_P8_TRANSMISSION_MS;
+        SC64_MISSION_TEXT_POST(action->opcode, action->string_id, action->unit);
         race_campaign_set_message(0);
         return 1;
     }
@@ -257,6 +261,8 @@ static int race_p8_present(void *context, const Sc64Z8Action *action,
     if (!action || owner >= 8u ||
         (action->opcode != 8u && action->opcode != 9u && action->opcode != 12u))
         return -1;
+    if (owner == SC64_P8_HUMAN_SLOT)
+        SC64_MISSION_TEXT_POST(action->opcode, action->string_id, action->unit);
     return 1;
 }
 

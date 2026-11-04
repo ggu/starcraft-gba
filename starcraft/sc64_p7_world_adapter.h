@@ -3,6 +3,7 @@
 
 /* Source-specific callbacks for P7. This intentionally implements only the
  * opcodes present in the authenticated P7 table; it is not a CHK executor. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_p7_state.h"
 #include "sc64_p7_geometry.h"
 #include "sc64_resource_actions.h"
@@ -510,6 +511,7 @@ static int sc64_p7_world_action(void *context,const Sc64P7SourceAction *a)
     case SC64_P7_ACTION_TRANSMISSION: case SC64_P7_ACTION_PLAY_WAV:
     case SC64_P7_ACTION_DISPLAY_TEXT:
         if (a->string_id>65535u || a->wav_id>65535u) return 0;
+        SC64_MISSION_TEXT_POST(a->opcode, a->string_id, a->unit);
         ctx->presentation_opcode=a->opcode;
         ctx->last_string_id=(u16)a->string_id; ctx->last_wav_id=(u16)a->wav_id;
         return 1;

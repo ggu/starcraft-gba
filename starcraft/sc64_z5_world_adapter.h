@@ -4,6 +4,7 @@
 /* Z5's numeric trigger operands are resolved against the live engine arrays.
  * Scenario-only doodad state is supplied by the caller because THG2 is a
  * separately authenticated map section, not part of the TRIG scenario table. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_z5_adapter.h"
 #include "sc64_z5_state.h"
 #ifdef SC64_Z5_COUNT_SNAPSHOT
@@ -508,6 +509,7 @@ static int sc64_z5_world_action(void *context, const Sc64Z5SourceAction *a)
         if (a->opcode == 5) ctx->presentation_pause_requested=1;
         return 1; /* Preserve/wait handled by the source scheduler. */
     case 7: case 8: case 9:
+        SC64_MISSION_TEXT_POST(a->opcode, a->string_id, a->unit);
         ctx->last_string_id=(u16)a->string_id;
         ctx->last_wav_id=(u16)a->wav_id;
         ctx->presentation_opcode=a->opcode;

@@ -4,6 +4,7 @@
 #if defined(SC64_T5_RUNTIME) && defined(SC64_T4_RUNTIME) && \
     defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)
 
+#include "sc64_mission_text_hook.h"
 #include "sc64_t5_runtime.h"
 #include "sc64_t5_ai.h"
 #include "sc64_t4_queries.h"
@@ -671,6 +672,7 @@ race_t5_trigger_action(void *context, const Sc64T4Action *action,
     switch (action->opcode) {
     case 7: case 8: case 9: case 12:
         if (owner != SC64_T5_SOURCE_HUMAN) return 1;
+        SC64_MISSION_TEXT_POST(action->opcode, action->string_id, action->unit);
         if (action->time) {
             if (!sc64_t4_trigger_wait_duration(action->time,
                                                 &ctx->state->message_ticks)) return -1;

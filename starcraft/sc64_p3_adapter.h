@@ -5,6 +5,7 @@
 #error "Higher Ground runtime requires SC64_P3_RUNTIME, SC64_P3_ENABLED and SC64_UNIFIED"
 #endif
 
+#include "sc64_mission_text_hook.h"
 #include "sc64_p3_model.h"
 
 /* Engine-policy timings, in the engine's 30 Hz simulation ticks. The source
@@ -166,6 +167,9 @@ race_p3_release_guard_waves(void)
 static void
 race_p3_apply_result(u16 events)
 {
+    /* TRIG 2's two win Transmissions follow the model's own sequence. */
+    if (events & SC64_P3_EVENT_WIN_TRANSMISSION)
+        race_mission_text_post_source(2, race_p3.transmission);
     if (events & SC64_P3_EVENT_WON) {
         race_campaign.phase = SC64_RACE_PHASE_COMPLETE;
         race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_PRIMARY;

@@ -2,6 +2,7 @@
 #define SC64_T4_EFFECTS_ADAPTER_H
 
 #ifdef SC64_T4_SCENARIO_RUNTIME
+#include "sc64_mission_text_hook.h"
 #include "sc64_t4_runtime.h"
 #include "sc64_t4_queries.h"
 #include "sc64_t4_actions.h"
@@ -476,6 +477,7 @@ race_t4_trigger_action(void *context, const Sc64T4Action *action,
     switch (action->opcode) {
     case 7: case 8: case 9: case 12:
         if (owner != SIDE) return 1;
+        SC64_MISSION_TEXT_POST(action->opcode, action->string_id, action->unit);
         state->message = action->opcode;
         state->message_ticks = 90;
         return 1;

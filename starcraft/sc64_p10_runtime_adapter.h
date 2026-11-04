@@ -19,6 +19,7 @@
  * the shared Z8 world services over the live pools. Mission strings and
  * sounds stay in the private CHK and are not presented. Included after the
  * P9 runtime adapter. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_p10_scenario_generated.h"
 #include "sc64_p10_state.h"
 
@@ -30,7 +31,9 @@ enum {
     SC64_P10_PASS_UPDATES = 8, /* Authored trigger-pass cadence. */
     /* Every P10 Transmission plays a sound whose length is not imported;
      * this bounded authored duration stands in for it, as in P8. */
-    SC64_P10_TRANSMISSION_MS = 4000,
+    /* The box is the pause, so the source's next action follows its dismissal
+     * on the next update. These rows carry a zero time in the source. */
+    SC64_P10_TRANSMISSION_MS = 1,
     SC64_P10_ACTION_PENDING = 0, SC64_P10_ACTION_COMPLETE = 1,
     SC64_P10_ACTION_WON = 2, SC64_P10_ACTION_LOST = 3, SC64_P10_ACTION_BLOCKED = 4
 };
@@ -432,10 +435,16 @@ static int race_p10_action(unsigned runner, const Sc64P10SourceAction *a, int re
     case 4: return race_p10_timed(runner, a->time, resume);
     case 7:
         if (owner != SC64_P10_HUMAN_SLOT) return -1;
-        if (!resume && !(race_p10.waiting_mask & (1u << runner)))
+        if (!resume && !(race_p10.waiting_mask & (1u << runner))) {
             race_campaign_set_message(0);
+            SC64_MISSION_TEXT_POST(a->opcode, a->string_id, a->unit);
+        }
         return race_p10_timed(runner, SC64_P10_TRANSMISSION_MS, resume);
-    case 8: case 9: case 12: return SC64_P10_ACTION_COMPLETE; /* Not presented. */
+    case 8: case 12: return SC64_P10_ACTION_COMPLETE; /* Not presented. */
+    case 9:
+        if (owner == SC64_P10_HUMAN_SLOT)
+            SC64_MISSION_TEXT_POST(a->opcode, a->string_id, a->unit);
+        return SC64_P10_ACTION_COMPLETE;
     case 10: return race_p10_center_view(a, owner);
     case 11: return race_p10_create(a, owner);
     case 13:

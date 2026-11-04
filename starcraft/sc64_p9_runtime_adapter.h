@@ -17,6 +17,7 @@
  * Census and owner selection reuse the shared Z8 world services over the
  * live pools. Mission strings stay in the private CHK and are not shown.
  * Included after the P8 runtime adapter. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_p9_scenario_generated.h"
 #include "sc64_p9_state.h"
 
@@ -396,7 +397,11 @@ static int race_p9_action(unsigned runner, const Sc64P9SourceAction *a, int resu
         race_p9.wait_ms[runner] = (u16)a->time;
         race_p9.waiting_mask |= bit;
         return SC64_P9_ACTION_PENDING;
-    case 8: case 9: case 12: return SC64_P9_ACTION_COMPLETE; /* Not presented. */
+    case 8: case 12: return SC64_P9_ACTION_COMPLETE; /* Not presented. */
+    case 9:
+        if (owner == SC64_P9_HUMAN_SLOT)
+            SC64_MISSION_TEXT_POST(a->opcode, a->string_id, a->unit);
+        return SC64_P9_ACTION_COMPLETE;
     case 11: return race_p9_create(a, owner);
     case 13:
         if (a->modifier == 4u) race_p9.switches |= (u8)(1u << a->group2);

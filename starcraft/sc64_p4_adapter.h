@@ -13,6 +13,7 @@
 
 #if defined(SC64_P4_RUNTIME)
 
+#include "sc64_mission_text_hook.h"
 #include "sc64_p4.h"
 #include "sc64_p4_scenario_generated.h"
 
@@ -341,6 +342,7 @@ static int race_p4_dispatch(const Sc64P4SourceAction *a, u16 *duration)
     case 5: race_p4.source_paused = 1; return 1;
     case 6: race_p4.source_paused = 0; return 1;
     case 7: case 8: case 9:
+        SC64_MISSION_TEXT_POST(a->opcode, a->string_id, a->unit);
         *duration = SC64_P4_PRESENTATION_TICKS;
         race_p4.message_ticks = *duration;
         return 1;

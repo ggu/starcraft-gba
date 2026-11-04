@@ -1372,6 +1372,65 @@ static int skirmish_bot_index(int owner);
 #error "Briefings need source-font pixel wrapping; run make sc64-interface"
 #endif
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
+#ifdef SC64_MISSION_TEXT
+#include "sc64_mission_text.h"
+#include "sc64_mission_text_generated.h"
+#if SC64_MISSION_TEXT_SCHEMA_GENERATED != 2
+#error "Mission text needs its current private bank; run make sc64-mission-text"
+#endif
+/* Set by the product main loop. Hosts, probes and scheduled replays leave it
+ * clear: their input is keyed to simulation ticks, so a row is only counted and
+ * the world evolves exactly as it would across a dismissed box. */
+u8 sc64_mission_text_interactive SC64_MISSION_TEXT_STATE;
+static Sc64MissionText race_mission_text SC64_MISSION_TEXT_STATE;
+static __attribute__((noinline)) void race_mission_text_post_row(int row)
+{
+    if (!sc64_mission_text_interactive) {
+        if (race_mission_text.posted != 65535u) ++race_mission_text.posted;
+        return;
+    }
+    sc64_mission_text_post(&race_mission_text, sc64_mission_text_rows, row);
+}
+static __attribute__((noinline)) void race_mission_text_post_string(unsigned opcode, u32 string_id, unsigned unit)
+{
+    int mission = race_selected_mission;
+    if (race_mode || mission < 0 || mission >= SC64_MISSION_TEXT_MISSION_COUNT) return;
+    race_mission_text_post_row(sc64_mission_text_find_string(
+        sc64_mission_text_rows, sc64_mission_text_first[mission], sc64_mission_text_first[mission + 1],
+        opcode, string_id, unit));
+}
+static __attribute__((noinline)) void race_mission_text_post_source(unsigned trigger, unsigned action)
+{
+    int mission = race_selected_mission;
+    if (race_mode || mission < 0 || mission >= SC64_MISSION_TEXT_MISSION_COUNT) return;
+    race_mission_text_post_row(sc64_mission_text_find_source(
+        sc64_mission_text_rows, sc64_mission_text_first[mission], sc64_mission_text_first[mission + 1],
+        trigger, action));
+}
+/* Hand-written missions decide a row from world counts, so they keep one-shot
+ * latches. These are presentation state and are not saved: the first tick after
+ * a load re-reads the world and latches what is already true, without a box. */
+static u32 race_mission_text_latches SC64_MISSION_TEXT_STATE;
+static u8 race_mission_text_priming SC64_MISSION_TEXT_STATE;
+static u8 race_mission_text_prime_next SC64_MISSION_TEXT_STATE;
+static int race_mission_text_edge(unsigned bit, int condition)
+{
+    u32 mask = 1u << bit;
+    if ((race_mission_text_latches & mask) || !condition) return 0;
+    race_mission_text_latches |= mask;
+    return !race_mission_text_priming;
+}
+#define SC64_MISSION_TEXT_POST(opcode, string_id, unit) do { \
+        if ((opcode) == SC64_MISSION_TEXT_OPCODE_TRANSMISSION || \
+            (opcode) == SC64_MISSION_TEXT_OPCODE_DISPLAY) \
+            race_mission_text_post_string((opcode), (string_id), (unit)); \
+    } while (0)
+#define SC64_MISSION_TEXT_HOLDS_OUTCOME() sc64_mission_text_gated(&race_mission_text)
+#else
+#define race_mission_text_post_source(trigger, action) ((void)0)
+#define race_mission_text_edge(bit, condition) 0
+#define SC64_MISSION_TEXT_HOLDS_OUTCOME() 0
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 static u16 sc64_battlecruiser_tech_bits;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -4750,6 +4809,13 @@ load_game(void)
 #ifdef SC64_RACES
     int loaded = race_load_game();
     if (loaded) sc64_walk_reset_all();
+#ifdef SC64_MISSION_TEXT
+    if (loaded) { /* Saves never hold a box. */
+        sc64_mission_text_reset(&race_mission_text);
+        race_mission_text_latches = 0;
+        race_mission_text_prime_next = 1;
+    }
+#endif
 #ifdef SC64_UNIT_FACING
     if (loaded) sc64_facing_reset_all();
 #endif
@@ -5006,6 +5072,11 @@ static void
 init_state(void)
 {
     sc64_walk_reset_all();
+#ifdef SC64_MISSION_TEXT
+    sc64_mission_text_reset(&race_mission_text);
+    race_mission_text_latches = 0;
+    race_mission_text_priming = race_mission_text_prime_next = 0;
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     sc64_battlecruiser_tech_bits = 0;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -8873,6 +8944,30 @@ pause_action(u16 pressed)
 	init_state();
 }
 
+#ifndef SC64_MISSION_TEXT_HOLDS_OUTCOME
+#define SC64_MISSION_TEXT_HOLDS_OUTCOME() 0
+#endif
+#ifdef SC64_MISSION_TEXT
+/* The box owns the frame while any row is unread. An outcome reached in the
+ * same tick as its row waits here, so the row is read before the result. */
+#define SC64_MISSION_TEXT_FRAME_TAKEN 0xFFFFu
+static __attribute__((noinline)) u16 race_mission_text_gate(u16 held, u16 pressed)
+{
+    if (!sc64_mission_text_input(&race_mission_text, sc64_mission_text_rows,
+                                 sc64_mission_text_pool, held, &pressed))
+        return pressed;
+    if (race_mission_text.state == SC64_MISSION_TEXT_RESUME && (won || lost)) {
+        sc64_mission_text_reset(&race_mission_text);
+        if (won && !race_mode) race_completed |= 1 << race_selected_mission;
+        save_game();
+        reset_selection_gestures();
+        screen = SCREEN_RESULT;
+        result_timer = 0;
+    }
+    return SC64_MISSION_TEXT_FRAME_TAKEN;
+}
+#endif
+
 void
 game_update(u16 held, u16 pressed)
 {
@@ -8983,6 +9078,12 @@ game_update(u16 held, u16 pressed)
 	}
 	return;
     }
+#ifdef SC64_MISSION_TEXT
+    if (sc64_mission_text_gated(&race_mission_text)) {
+        pressed = race_mission_text_gate(held, pressed);
+        if (pressed == SC64_MISSION_TEXT_FRAME_TAKEN) return;
+    }
+#endif
 #ifdef SC64_Z5_RUNTIME
     /* Z5's source program contains PauseGame without an UnpauseGame. A
      * deliberate A press acknowledges that authored pause and resumes this
@@ -9017,7 +9118,7 @@ game_update(u16 held, u16 pressed)
 #endif
         update_imported_mission();
         update_exploration();
-        if (won || lost) {
+        if ((won || lost) && !SC64_MISSION_TEXT_HOLDS_OUTCOME()) {
             if (won) race_completed |= 1 << race_selected_mission;
             save_game();
             reset_selection_gestures();
@@ -9034,7 +9135,7 @@ game_update(u16 held, u16 pressed)
         ++frame;
         update_imported_mission();
         update_exploration();
-        if (won || lost) {
+        if ((won || lost) && !SC64_MISSION_TEXT_HOLDS_OUTCOME()) {
             if (won) race_completed |= 1 << race_selected_mission;
             save_game();
             reset_selection_gestures();
@@ -9331,7 +9432,7 @@ game_update(u16 held, u16 pressed)
 	    won = 1;
 #endif
     }
-    if (won || lost) {
+    if ((won || lost) && !SC64_MISSION_TEXT_HOLDS_OUTCOME()) {
 #ifdef SC64_RACES
         if(won&&!race_mode)race_completed|=1<<race_selected_mission;
         save_game();
@@ -11420,6 +11521,9 @@ draw_hud_resources(void)
 #if defined(SC64_RACES) && defined(SC64_FIELD_CONTROLS)
 #define SC64_HUD_PANEL 1
 #include "hud_panel.h"
+#ifdef SC64_MISSION_TEXT
+#include "sc64_mission_text_draw.h"
+#endif
 #endif
 
 static void draw_hud_commands_body(void);
@@ -11886,7 +11990,11 @@ draw_hud(void)
     sc64_hud_minimap_cycles = gba_clock() - minimap_start;
 #endif
 #ifdef SC64_RACES
-    if(!race_mode&&race_campaign.message_ticks) {
+    if(!race_mode&&race_campaign.message_ticks
+#ifdef SC64_MISSION_TEXT
+       &&!sc64_mission_text_showing(&race_mission_text)
+#endif
+       ) {
         gfx_rect(2,94,236,24,C_PANEL);
         const char *message=race_campaign_message_text();
         char line[39];int n=0;
@@ -11902,11 +12010,18 @@ draw_hud(void)
 #ifdef SC64_FIELD_CONTROLS
     if (menu_open) field_controls_draw_command_menu();
 #endif
-    if (toast_timer && toast_id >= 0 && (unsigned)toast_id < sizeof(toast_text) / sizeof(toast_text[0])) {
+    if (toast_timer && toast_id >= 0 && (unsigned)toast_id < sizeof(toast_text) / sizeof(toast_text[0])
+#ifdef SC64_MISSION_TEXT
+        && !sc64_mission_text_showing(&race_mission_text)
+#endif
+        ) {
 	gfx_rect(54, 105, 132, 12, C_PANEL);
 	gfx_frame(54, 105, 132, 12, C_EDGE);
 	gfx_text(59, 108, toast_text[toast_id], C_GOLD);
     }
+#ifdef SC64_MISSION_TEXT
+    if (sc64_mission_text_showing(&race_mission_text)) race_mission_text_draw();
+#endif
 #ifdef SC64_TILE_RENDERER
     /* Anything drawn over a band after this point forces a redraw next frame. */
     gfx_tile_band_top = gfx_tile_band_bottom = 0;
@@ -12894,4 +13009,8 @@ static int sc64_battlecruiser_source_tick_due(void)
     return (unsigned)frame % 5u != 0u;
 #endif
 }
+#endif
+
+#ifdef SC64_MISSION_TEXT_QUALIFY
+#include "sc64_mission_text_qualify.h"
 #endif

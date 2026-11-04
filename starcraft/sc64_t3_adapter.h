@@ -6,6 +6,7 @@
  * persist them. This adapter approximates T3's opening AI with the imported
  * guard force and a timed all-combat-unit assault; it does not execute the
  * original AI scripts or create trigger-authored reinforcement units. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_t3.h"
 
 enum {
@@ -131,6 +132,8 @@ race_t3_campaign_tick(void)
     if (events & SC64_T3_EVENT_ALTERNATE_OBJECTIVE) {
         race_campaign.objective_stage = 1;
         race_campaign_set_message(19);
+        race_mission_text_post_source(3, 0);
+        race_mission_text_post_source(3, 5);
     }
     /* The Force 2 opening grant supplies the authored Ore+Gas budget. After
      * that, queue one paid Zergling pair per five minutes while preserving
@@ -147,9 +150,18 @@ race_t3_campaign_tick(void)
         race_t3_release_attack_force(0);
         race_campaign_set_message(15);
     }
-    if (events & SC64_T3_EVENT_REMINDER_10_MIN) race_campaign_set_message(16);
-    if (events & SC64_T3_EVENT_REMINDER_5_MIN) race_campaign_set_message(17);
-    if (events & SC64_T3_EVENT_REMINDER_1_MIN) race_campaign_set_message(18);
+    if (events & SC64_T3_EVENT_REMINDER_10_MIN) {
+        race_campaign_set_message(16);
+        race_mission_text_post_source(1, 0);
+    }
+    if (events & SC64_T3_EVENT_REMINDER_5_MIN) {
+        race_campaign_set_message(17);
+        race_mission_text_post_source(2, 0);
+    }
+    if (events & SC64_T3_EVENT_REMINDER_1_MIN) {
+        race_campaign_set_message(18);
+        race_mission_text_post_source(9, 0);
+    }
 
     if (events & SC64_T3_EVENT_DEFEAT) {
         race_campaign.phase = SC64_RACE_PHASE_FAILED;
@@ -158,6 +170,8 @@ race_t3_campaign_tick(void)
         return;
     }
     if (events & SC64_T3_EVENT_VICTORY) {
+        /* TRIG 4 ends the mission on the Hatchery, TRIG 6 on the countdown. */
+        race_mission_text_post_source(race_t3.remaining_ticks ? 4u : 6u, 0);
         race_campaign.phase = SC64_RACE_PHASE_COMPLETE;
         race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_PRIMARY;
         race_completed |= 1 << race_campaign.mission;

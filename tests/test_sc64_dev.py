@@ -519,6 +519,10 @@ class OnboardingTests(unittest.TestCase):
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
+                elif script == 'sc64_mission_text_pack.py':
+                    output = local / 'mission-text/generated/sc64_mission_text_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only mission text fixture\n', encoding='ascii')
                 elif script == 'sc64_p4_pack.py':
                     emit(local / 'p4/manifest.json',
                          '{"schema":1,"mission":{"id":"P4","global_catalog_index":23,'
@@ -600,6 +604,7 @@ class OnboardingTests(unittest.TestCase):
                     '{"schema":1,"mission":{"id":"Z4","global_catalog_index":15,"source_map_path":"008/017"}}',
                 'build/StarCraft-Zerg-Z4-GBA.gba': 'rom',
                 dev.DEATH_SOURCE_HEADER: DEATH_SOURCE_HEADER,
+                '.local/sc64/mission-text/generated/sc64_mission_text_generated.h': 'fixture',
             }
             for relative, content in markers.items():
                 path = root / relative
@@ -1110,6 +1115,10 @@ class OnboardingTests(unittest.TestCase):
                         output = root / '.local/sc64/briefings/generated/sc64_briefing_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
                         output.write_text(BRIEFING_HEADER, encoding='ascii')
+                    elif script == 'sc64_mission_text_pack.py':
+                        output = root / '.local/sc64/mission-text/generated/sc64_mission_text_generated.h'
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        output.write_text('source-only mission text fixture\n', encoding='ascii')
                     elif script == 'sc64_skirmish_pack.py':
                         output = root / '.local/sc64/skirmish/generated/sc64_skirmish_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
@@ -1447,6 +1456,10 @@ class OnboardingTests(unittest.TestCase):
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
+                elif script == 'sc64_mission_text_pack.py':
+                    output = local / 'mission-text/generated/sc64_mission_text_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only mission text fixture\n', encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_unit_walk_frames.py':
@@ -1552,6 +1565,10 @@ class OnboardingTests(unittest.TestCase):
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
+                elif script == 'sc64_mission_text_pack.py':
+                    output = local / 'mission-text/generated/sc64_mission_text_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only mission text fixture\n', encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_unit_walk_frames.py':
@@ -1640,6 +1657,10 @@ class OnboardingTests(unittest.TestCase):
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
+                elif script == 'sc64_mission_text_pack.py':
+                    output = local / 'mission-text/generated/sc64_mission_text_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only mission text fixture\n', encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_unit_walk_frames.py':
@@ -1886,6 +1907,10 @@ class OnboardingTests(unittest.TestCase):
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
+                elif script == 'sc64_mission_text_pack.py':
+                    output = local / 'mission-text/generated/sc64_mission_text_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only mission text fixture\n', encoding='ascii')
                 elif script == 'sc64_skirmish_pack.py':
                     touch(local / 'skirmish/generated/sc64_skirmish_generated.h')
 

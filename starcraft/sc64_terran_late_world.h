@@ -4,6 +4,7 @@
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_T4_RUNTIME) && \
     defined(SC64_TERRAN_LATE_ACTORS)
 
+#include "sc64_mission_text_hook.h"
 #include "sc64_terran_late_mission_state.h"
 #include "sc64_terran_late_count_cache.h"
 #include "sc64_unit_availability.h"
@@ -908,6 +909,7 @@ race_late_trigger_action(void *context, const Sc64T4Action *action,
     switch (action->opcode) {
     case 7: case 8: case 9: case 12:
         if (!sc64_terran_late_is_human_context(source_owner)) return 1;
+        SC64_MISSION_TEXT_POST(action->opcode, action->string_id, action->unit);
         state->message = action->opcode;
         state->message_ticks = 90; /* Authored display duration; dialogue omitted. */
         return 1;

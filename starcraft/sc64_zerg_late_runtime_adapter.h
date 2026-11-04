@@ -22,6 +22,7 @@
  * at each function. Mission strings and sounds stay in the private CHK and
  * are not shown or played. Only one of the two missions is active at once,
  * so they share the live state below. */
+#include "sc64_mission_text_hook.h"
 #include "sc64_zerg_late_ai.h"
 #include "sc64_z9_program_generated.h"
 #ifdef SC64_Z10_RUNTIME
@@ -35,7 +36,8 @@ enum {
     /* Native Fastest speed-table entry, as Z8; applied once per native step. */
     SC64_ZL_FRAME_MS = 42,
     /* Authored stand-in for the unimported Transmission sound length. */
-    SC64_ZL_TRANSMISSION_MS = 4000,
+    /* See SC64_Z8_TRANSMISSION_MS: the box is the pause. */
+    SC64_ZL_TRANSMISSION_MS = 1,
     SC64_ZL_RAW_DRONE = 41,
     SC64_ZL_RAW_CRYSTAL = 219,
     SC64_ZL_RAW_HATCHERY = 131,
@@ -238,6 +240,7 @@ static int race_zl_timed(void *context, int phase, const Sc64Z8Action *action,
     if (phase != SC64_Z8_TIMED_START) return -1;
     if (action->opcode == 7u) {
         *duration_ms = SC64_ZL_TRANSMISSION_MS;
+        SC64_MISSION_TEXT_POST(action->opcode, action->string_id, action->unit);
         race_campaign_set_message(0);
         return 1;
     }
@@ -262,6 +265,8 @@ static int race_zl_present(void *context, const Sc64Z8Action *action,
     if (!action || owner >= SC64_Z8_OWNER_LIMIT ||
         (action->opcode != 8u && action->opcode != 9u && action->opcode != 12u &&
          action->opcode != 28u)) return -1;
+    if (owner == SC64_ZL_HUMAN_SLOT)
+        SC64_MISSION_TEXT_POST(action->opcode, action->string_id, action->unit);
     return 1;
 }
 

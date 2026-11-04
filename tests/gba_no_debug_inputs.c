@@ -6,6 +6,9 @@
 #error "This fixture must compile the physical-input-only main loop"
 #endif
 
+#ifdef SC64_MISSION_TEXT
+unsigned char sc64_mission_text_interactive; /* game.c owns it in a real build. */
+#endif
 #define main physical_input_main
 #include "../common/main.c"
 #undef main

@@ -13,6 +13,9 @@
 #define SC64_CAMPAIGN_RACE 1
 #define SC64_Z3_WINDOWED_SCHEDULE
 #endif
+#ifdef SC64_MISSION_TEXT
+unsigned char sc64_mission_text_interactive; /* game.c owns it in a real build. */
+#endif
 #define main scheduled_main
 #include "../common/main.c"
 #undef main

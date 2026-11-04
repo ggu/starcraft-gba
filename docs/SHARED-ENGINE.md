@@ -29,7 +29,7 @@ separate original-art/Backwater engine has identical building-construction or
 Siege Tank semantics. Compare those products before describing the contract as
 parity across every engine implementation.
 
-The compile-time flag contract covers three mechanics. Building burn is
+The compile-time flag contract covers these mechanics. Building burn is
 also unconditional in the shared race engine; its common presentation and
 save rules are documented in [BUILDING-DAMAGE.md](BUILDING-DAMAGE.md):
 
@@ -38,6 +38,7 @@ save rules are documented in [BUILDING-DAMAGE.md](BUILDING-DAMAGE.md):
 | Construction HP | New buildings start with partial health and accumulate the remaining HP/shields over construction; morph completion adjusts HP against the new maximum. | [`sc64_construction_hp.h`](../starcraft/sc64_construction_hp.h), used by the shared race adapter. |
 | Siege splash | Siege Tank weapon impacts apply the shared splash tiers and damage rules to eligible nearby actors. | [`sc64_siege_splash.h`](../starcraft/sc64_siege_splash.h) and its authored source bounds table. |
 | Shield Battery | Mapped Batteries provide paid construction, psi power, command-driven shield transfer, regeneration, cleanup and persisted recharge state. P7's authenticated source properties remain mission-specific. | [`sc64_battery_adapter.h`](../starcraft/sc64_battery_adapter.h), the common race adapter and candidate-only save validation. |
+| Mission text | A posted Transmission or DisplayTextMessage row opens a modal box, and the world stops until A has read the queue. Which rows exist is mission content. | [`sc64_mission_text.h`](../starcraft/sc64_mission_text.h), its panel in [`sc64_mission_text_draw.h`](../starcraft/sc64_mission_text_draw.h) and the gate in `game_update()`. See the [audit](audits/2026-11-04-mission-text/README.md). |
 
 `SC64_SHARED_ENGINE_FLAGS` supplies these mechanics through `RACES_FLAGS`. The
 required `SC64_ENGINE_CORE_REQUIRED` marker makes `game.c` reject a race-engine

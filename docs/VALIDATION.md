@@ -2,6 +2,16 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## In-mission text boxes (2026-11-04)
+
+Campaign missions stop for a modal box with a portrait, speaker and text, and A advances. ARM probes
+in mGBA show boxes in early and late missions of each race, with the world frozen under them and
+resuming after A. Every controller ends with the same result, tick and frame whether rows are counted
+or read through the real box. T8's controller doesn't win, and doesn't at base either. P8 and P10 lost
+their 4-second holds, and their new tapes still win, with ARM replays matching the host. ROM grew about
+25.5 KB, working RAM is unchanged and IWRAM grew 56 bytes. Nothing was run on a physical GBA. See the
+[audit](audits/2026-11-04-mission-text/README.md).
+
 ## Protoss P10 candidate (2026-11-01)
 
 The explicit `protoss-p10` candidate (`SCPA`, generation 47) adds P10 to the

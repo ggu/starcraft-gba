@@ -123,6 +123,27 @@ the fully revealed showcase arenas, each row is drawn in one call; otherwise
 the renderers split rows at tile boundaries and skip hidden tiles. Both paths
 produce the same pixels.
 
+## In-mission text boxes
+
+Every race-engine build shows the campaign's Transmission and DisplayTextMessage rows in
+a modal box. Refresh an older workspace with `./dev sc64 prepare --rom PATH --profile
+terran` (or `zerg` / `protoss`), or run the importer alone:
+
+```sh
+python3 tools/sc64_mission_text_pack.py
+```
+
+It writes `.local/sc64/mission-text/generated/`, which stays private. `make
+test-sc64-mission-text` checks the model with no game data, and `make
+test-sc64-mission-text-game` checks the box in the game loop. For ARM evidence, `make
+sc64-mission-text-arm` builds probe ROMs on each product's flags. Run one with
+`tools/sc64_mission_text_arm_probe.py`, keeping `--out` under `.local/` because it writes
+frames holding ROM-derived art and text.
+
+Host tests and scheduled replays count rows instead of opening a box, so existing key
+tapes stay valid. To put a host controller in front of the real box, add
+`-DSC64_MISSION_TEXT_QUALIFY`. See the [audit](audits/2026-11-04-mission-text/README.md).
+
 ## Tank firing effects and siege splash
 
 Canonical race builds and Showcase use source Tank muzzle and target-impact

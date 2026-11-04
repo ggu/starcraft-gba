@@ -83,6 +83,12 @@ __attribute__((noinline)) void demo_replay_dense_checkpoint(void) {
 int main(void) {
     gba_init();
     game_init();
+#ifdef SC64_MISSION_TEXT
+    {
+        extern u8 sc64_mission_text_interactive;
+        sc64_mission_text_interactive=1;
+    }
+#endif
     u16 previous=0;
 #ifndef GBA_NO_DEBUG_INPUTS
 #ifdef SC64_WINDOWED_SCHEDULE
@@ -125,6 +131,17 @@ int main(void) {
             held=schedule_keys;
         }
 #endif
+#endif
+#if defined(SC64_MISSION_TEXT) && !defined(GBA_NO_DEBUG_INPUTS)
+        /* A scheduled replay's keys are keyed to simulation ticks. */
+        {
+            extern u8 sc64_mission_text_interactive;
+#ifdef SC64_WINDOWED_SCHEDULE
+            if(schedule_enabled) sc64_mission_text_interactive=0;
+#else
+            if(schedule_count) sc64_mission_text_interactive=0;
+#endif
+        }
 #endif
         demo_keys=held;
         game_update(held, held & (u16)~previous);
