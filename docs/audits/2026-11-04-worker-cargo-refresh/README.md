@@ -51,20 +51,43 @@ No hosted Actions were dispatched.
   their applicable ROM/memory checks. Late Z9/Z10 BSS ends at `0x0203dff8`,
   leaving eight bytes below the unchanged guard; IWRAM ends at `0x03004bf0`.
 
-The P8 changed-route ARM full replay, physical SRAM prefix and fresh-process
-resume pass: 95/95, 32/32 and 64/64 host observations match, with cutoff tick
-31,374. Those retained logs also pass the stricter comparator from `26c3f88f`.
-Its sampled digest does not include worker flags/timers/depot identity, so this
-is not an exhaustive cargo-state comparison. P10 and Z7 ARM gates remain open.
+The changed-route ARM replay and real SRAM gates now pass:
 
-P10's dedicated replay initially truncated long log lines before their checksum.
-That partial run is not qualified. Instrumentation-only commits `4f7b6df4` and
-`26c3f88f` move its digest first, include worker flags/work timer/depot identity,
-shorten optional counters and require a complete end sentinel. The comparator
-rejects missing/invalid checksums and incomplete P10 observations; 23 asset-free
-comparator tests pass. Production game sources and the six normal ROM products
-remain identical to `1ec3fadc`; only replay source, its reader and tests changed.
-P10 is being re-run with this instrumentation before a merge decision.
+| Route | Full observations | Save prefix | Fresh-process resume | Cut tick |
+| --- | ---: | ---: | ---: | ---: |
+| P8 | 95/95 | 32/32 | 64/64 | 31,374 |
+| P10 | 149/149 | 32/32 | 118/118 | 31,064 |
+| Z7 | 307/307 | 258/258 | 49/49 | 136,058 |
+
+All three win. P8 uses a sampled gameplay checksum that omits worker flags,
+work timer and depot identity. The corrected P10 checksum includes those
+fields. Z7 compares its recorded scalar/trigger/checkpoint fields, not a full
+actor-bank checksum. The SRAM files are genuine ordinary pause-menu saves,
+loaded in fresh emulator processes; no guest-state writes or forged SRAM were
+used. These are defined replay/continuation checks, not exhaustive state parity.
+
+P10's dedicated replay initially truncated long log lines before their checksum;
+that partial run is not qualified. Instrumentation-only commits `4f7b6df4` and
+`26c3f88f`, merged separately in PR #272, move its digest first, include worker
+cargo fields, shorten optional counters and require a complete end sentinel.
+All 23 comparator tests pass. Z7's reader initially expected the old flat save
+namespace. PR #273 adds explicit legacy/Transport1/cargo-Transport1 profiles,
+separate inner/outer tags, bounded impact records and the transport trailer;
+16 tests pass, including the current 240-unit / 160-building bounds. Its
+retained full ARM run was re-evaluated without repeating emulation.
+
+The art integration is tested at `2f9ecf31`: all six normal products and the
+actual cargo-enabled late-art pixel/coverage/cache fixture pass, with 1,958
+frozen input hashes unchanged. The four regular product ROMs are byte-identical
+to the qualified `1ec3fadc` builds; ELFs differ, while global symbol tables
+match. The sole intentional change in the previous 1,796-file manifest is the
+complete late-Zerg sprite header. Current main's art and verifier repairs are
+included in the integration, so these normal-ROM ARM results remain applicable.
+
+Z7's full replay measures about 7.09 fps equivalent. Its resumed portion has a
+158,692,721-cycle peak (about 9.46 seconds). These replacement-loop measurements
+are far below the target and are not a physical GBA measurement. Performance
+optimization remains a separate active goal.
 
 ## Production SRAM cases
 
