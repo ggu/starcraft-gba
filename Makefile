@@ -6123,3 +6123,5 @@ include tests/sc64-protoss-preflight/Makefile
 include tests/sc64-range-work/Makefile
 
 include tests/sc64-worker-cargo/Makefile
+
+include tests/sc64-skirmish-opening/Makefile
