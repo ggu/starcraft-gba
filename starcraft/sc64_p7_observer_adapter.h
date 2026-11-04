@@ -326,6 +326,10 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
                           )) lists->buildings[lists->building_count++]=(u8)i;
 }
 
+#ifdef SC64_DIAGNOSTIC_SETUP
+volatile u32 sc64_optical_unit_cycles, sc64_optical_building_cycles, sc64_optical_refresh_count;
+#endif
+
 static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         const u8 powered_cannons[MAX_BUILDINGS], const Sc64P7DetectorLists *lists)
 {
@@ -347,6 +351,10 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         int cell=col+row*MAP_COLS;
         if(SC64_GRID_GET(visible,cell)) visible_owners|=1u<<7;
     }
+#ifdef SC64_DIAGNOSTIC_SETUP
+    u32 optical_diag_start=gba_clock();
+    ++sc64_optical_refresh_count;
+#endif
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
@@ -371,6 +379,10 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         if(dx*dx+dy*dy>radius*radius) continue;
         visible_owners|=candidate;
     }
+#ifdef SC64_DIAGNOSTIC_SETUP
+    sc64_optical_unit_cycles+=gba_clock()-optical_diag_start;
+    optical_diag_start=gba_clock();
+#endif
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive) {
         int source=RACE_PROTOSS_SLOT(&b[i]);
 #ifdef SC64_P7_SIGHT_AXIS_CULL
@@ -391,6 +403,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         if(dx*dx+dy*dy>radius*radius) continue;
         visible_owners|=candidate;
     }
+#ifdef SC64_DIAGNOSTIC_SETUP
+    sc64_optical_building_cycles+=gba_clock()-optical_diag_start;
+#endif
     for(int k=0;k<(lists?(int)lists->unit_count:MAX_UNITS);++k) {
         int i=lists?lists->units[k]:k;
         if(!(u[i].alive &&
@@ -494,6 +509,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
 #ifdef SC64_DIAGNOSTIC_SETUP
     u32 arbiter_diag_start=gba_clock();
     sc64_arbiter_detect_cycles=0;
+    sc64_optical_unit_cycles=sc64_optical_building_cycles=sc64_optical_refresh_count=0;
 #endif
     u8 powered_cannons[MAX_BUILDINGS];
     int powered_cannons_ready=0;
@@ -692,6 +708,7 @@ sc64_p7_arbiter_cache_process_due(void)
 {
 #ifdef SC64_DIAGNOSTIC_SETUP
     sc64_arbiter_reset_cycles=sc64_arbiter_aura_cycles=sc64_arbiter_update_cycles=sc64_arbiter_detect_cycles=0;
+    sc64_optical_unit_cycles=sc64_optical_building_cycles=sc64_optical_refresh_count=0;
 #endif
     /* The first ordinary play tick runs after map setup and target-index
        construction, before this tick's unit orders. Menu launch itself is
