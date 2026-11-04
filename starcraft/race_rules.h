@@ -139,8 +139,18 @@ enum {
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     U_SHARED_SHUTTLE,
 #endif
+    SC_RU_LEGACY_COUNT,
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    U_GUARDIAN_COCOON = SC_RU_LEGACY_COUNT,
+#endif
     SC_RU_COUNT
 };
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+_Static_assert(SC_RU_LEGACY_COUNT <= 64 && U_GUARDIAN_COCOON == SC_RU_LEGACY_COUNT &&
+               SC_RU_COUNT == SC_RU_LEGACY_COUNT + 1, "only staged Cocoon may exceed wire type width");
+#else
+_Static_assert(SC_RU_COUNT == SC_RU_LEGACY_COUNT, "legacy unit IDs changed");
+#endif
 enum {
     B_COMMAND, B_BARRACKS, B_DEPOT, B_REFINERY, B_ACADEMY, B_ENG_BAY,
     B_HATCHERY, B_BUNKER, B_INFESTED_COMMAND, B_CREEP_COLONY,
