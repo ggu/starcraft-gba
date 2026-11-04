@@ -687,17 +687,19 @@ int main(int argc, char **argv)
                 next_order_frame = frame + 30;
             } else if (loaded_raw_count(SC64_P5_RAW_HERO, carrier) > 0 &&
                        loaded_raw_count(SC64_P5_MODEL_RAW_ZEALOT, carrier) >= 2) {
-                /* Go north of the eastern Spore line, descend west of the
-                 * x1488 colony, then thread the y1792 gap into extraction. */
-                static const int route_x[9] = {40,40,2040,2040,1360,1360,1400,1400,1696};
-                static const int route_y[9] = {755,40,40,1200,1200,1600,1600,1792,1792};
-                int tx = air_waypoint_stage < 9 ? route_x[air_waypoint_stage] : landing_x;
-                int ty = air_waypoint_stage < 9 ? route_y[air_waypoint_stage] : landing_y;
-                if (air_waypoint_stage < 9 &&
+                /* Go north of the eastern Spore line, then descend the x1632
+                 * channel between the x1520 and x1760 colonies into extraction.
+                 * The older y1792 approach stays in Spore range long enough to
+                 * kill the Shuttle short of the landing point. */
+                static const int route_x[7] = {40,40,2040,2040,1632,1632,1696};
+                static const int route_y[7] = {755,40,40,1200,1200,1776,1792};
+                int tx = air_waypoint_stage < 7 ? route_x[air_waypoint_stage] : landing_x;
+                int ty = air_waypoint_stage < 7 ? route_y[air_waypoint_stage] : landing_y;
+                if (air_waypoint_stage < 7 &&
                     dist2(u[carrier].x, u[carrier].y, tx, ty) <= 8 * 8) {
                     ++air_waypoint_stage;
-                    tx = air_waypoint_stage < 9 ? route_x[air_waypoint_stage] : landing_x;
-                    ty = air_waypoint_stage < 9 ? route_y[air_waypoint_stage] : landing_y;
+                    tx = air_waypoint_stage < 7 ? route_x[air_waypoint_stage] : landing_x;
+                    ty = air_waypoint_stage < 7 ? route_y[air_waypoint_stage] : landing_y;
                 }
                 if (dist2(u[carrier].x, u[carrier].y, landing_x, landing_y) > 8 * 8 &&
                     (u[carrier].order != ORDER_MOVE ||

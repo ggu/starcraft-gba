@@ -8,6 +8,7 @@
 static u16 controller_previous;
 static unsigned long controller_ticks;
 static int controller_mission_started;
+static int controller_start_delay;
 typedef struct { unsigned long tick; u16 held; } RaceInputEvent;
 typedef struct { unsigned long tick; int screen, frame, won, lost, elapsed, flags, phase;
     int rescue_owner, rescue_alive, chrysalis_owner, chrysalis_alive;
@@ -176,24 +177,6 @@ static int controller_select_actor(int actor)
     return 0;
 }
 
-static int controller_train_at_building(int building, int count)
-{
-    int attempt, n;
-    static const int offsets[][2] = {{0,0},{-16,0},{16,0},{0,-16},{0,16},
-                                    {-16,-16},{16,-16},{-16,16},{16,16}};
-    if (building < 0 || building >= MAX_BUILDINGS || !building_complete(building) ||
-        b[building].owner != SIDE || count < 1 || count > 5) return 0;
-    for (attempt = 0; attempt < (int)(sizeof(offsets)/sizeof(offsets[0])); ++attempt) {
-        controller_cursor(b[building].x + offsets[attempt][0],
-                          b[building].y + offsets[attempt][1]);
-        controller_press(KEY_A);
-        if (selected_building == building) break;
-    }
-    if (selected_building != building) return 0;
-    for (n = 0; n < count; ++n) controller_press(KEY_A);
-    return b[building].queue_count == count;
-}
-
 /* A worker can stand inside the Nexus click target; an ordinary click then
  * selects the building. Use a moving L-button unit box for the construction
  * order so the Probe stays inside it while mining. */
@@ -225,64 +208,6 @@ static int controller_select_worker_box(int worker)
            selected_count() == 1 && u[worker].selected;
 }
 
-static int controller_build_pylon_near(int gateway)
-{
-    int probe = -1, i, slot;
-    static const int offsets[][2] = {{-96,0},{-64,-64},{-64,64},{0,96},
-                                    {0,-96},{96,0},{48,48},{-48,-48}};
-    if (gateway < 0 || gateway >= MAX_BUILDINGS || !b[gateway].alive || minerals < 100)
-        return -1;
-    for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
-        u[i].type == U_PROBE && u[i].order != ORDER_BUILD) { probe = i; break; }
-    if (probe < 0 || !controller_select_worker_box(probe)) return -1;
-    controller_press(KEY_B);
-    for (i = 0; i < MENU_COUNT && menu_cursor != MENU_DEPOT; ++i)
-        controller_press(KEY_DOWN);
-    if (!menu_open || menu_cursor != MENU_DEPOT) return -1;
-    controller_press(KEY_A);
-    if (mode != MODE_BUILD || menu != B_PYLON) return -1;
-    for (i = 0; i < (int)(sizeof(offsets)/sizeof(offsets[0])); ++i) {
-        int x = b[gateway].x + offsets[i][0], y = b[gateway].y + offsets[i][1];
-        controller_cursor(x, y);
-        controller_press(KEY_A);
-        if (mode == MODE_NORMAL) {
-            for (slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive &&
-                b[slot].owner == SIDE && b[slot].type == B_PYLON &&
-                dist2(b[slot].x, b[slot].y, x, y) < 32 * 32) return slot;
-            return -1;
-        }
-    }
-    return -1;
-}
-
-static int controller_p1_reinforce(void)
-{
-    int nexus = -1, gateway = -1, i, probe = -1, pylon;
-    if (race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) < 2 || minerals < 50)
-        return 0;
-    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE &&
-        building_complete(i)) {
-        if (b[i].type == B_NEXUS && nexus < 0) nexus = i;
-        if (b[i].type == B_GATEWAY && gateway < 0) gateway = i;
-    }
-    if (nexus < 0 || gateway < 0 || !controller_train_at_building(nexus, 1)) return 0;
-    for (i = 0; i < 700 && screen == SCREEN_PLAY && !won && !lost && b[nexus].queue_count;
-         ++i) controller_frame(0);
-    for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
-        u[i].type == U_PROBE && u[i].order != ORDER_BUILD) { probe = i; break; }
-    if (probe < 0) return 0;
-    pylon = controller_build_pylon_near(gateway);
-    if (pylon < 0) return 0;
-    for (i = 0; i < 1800 && screen == SCREEN_PLAY && !won && !lost &&
-         b[pylon].under_construction; ++i) controller_frame(0);
-    if (!building_complete(pylon) || !race_site_powered(SIDE, b[gateway].x, b[gateway].y) ||
-        race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) < 4 || minerals < 100 ||
-        !controller_train_at_building(gateway, 1)) return 0;
-    for (i = 0; i < 900 && screen == SCREEN_PLAY && !won && !lost && b[gateway].queue_count;
-         ++i) controller_frame(0);
-    return b[gateway].queue_count == 0;
-}
-
 /* Use an ordinary L-button drag to select the combat force while excluding
  * the protected objective actor. Geometry is read from live units solely to
  * place the cursor; selection and orders still go through game_update(). */
@@ -302,12 +227,31 @@ static int controller_select_combat_except(int excluded)
     top = top > 8 ? top - 8 : 0;
     right = right + 8 < WORLD_W ? right + 8 : WORLD_W - 1;
     bottom = bottom + 8 < WORLD_H ? bottom + 8 : WORLD_H - 1;
+    /* When the protected actor stands inside the box, give up the smallest part
+     * of the force: keep the side of him that holds the most units. */
+    if (excluded >= 0 && excluded < MAX_UNITS && u[excluded].alive &&
+        u[excluded].x >= left && u[excluded].x <= right &&
+        u[excluded].y >= top && u[excluded].y <= bottom) {
+        int west = 0, east = 0, north = 0, south = 0, ex = u[excluded].x, ey = u[excluded].y;
+        for (i = 0; i < MAX_UNITS; ++i) if (i != excluded && u[i].alive &&
+            u[i].owner == SIDE && !sc64_race_is_worker(u[i].type)) {
+            if (u[i].x < ex - 32) ++west;
+            if (u[i].x > ex + 32) ++east;
+            if (u[i].y < ey - 32) ++north;
+            if (u[i].y > ey + 32) ++south;
+        }
+        if (south >= north && south >= east && south >= west) top = ey + 24;
+        else if (north >= east && north >= west) bottom = ey - 24;
+        else if (east >= west) left = ex + 24;
+        else right = ex - 24;
+        if (left >= right || top >= bottom) return 0;
+    }
     controller_cursor(left, top);
     if (screen != SCREEN_PLAY || won || lost || abs(cx - left) > 3 || abs(cy - top) > 3)
         return 0;
     controller_frame(KEY_L);
     while (cx < right || cy < bottom) {
-        u16 held = KEY_L;
+        u16 held = KEY_L | KEY_R; /* R doubles cursor speed during the drag. */
         int old_x = cx, old_y = cy;
         if (screen != SCREEN_PLAY || won || lost || steps++ >= max_steps) {
             controller_frame(0);
@@ -322,12 +266,8 @@ static int controller_select_combat_except(int excluded)
         }
     }
     controller_frame(0);
-    if (screen != SCREEN_PLAY || won || lost || abs(cx - right) > 3 || abs(cy - bottom) > 3)
+    if (screen != SCREEN_PLAY || won || lost || abs(cx - right) > 4 || abs(cy - bottom) > 4)
         return 0;
-    if (selected_count() <= 1 || (excluded >= 0 && excluded < MAX_UNITS && u[excluded].selected))
-        fprintf(stderr, "P1 box bounds=%d,%d..%d,%d anchor=%d,%d end=%d,%d state=%d cursor=%d,%d selected=%d excluded=%d\n",
-                left, top, right, bottom, box_anchor_x, box_anchor_y,
-                box_end_x, box_end_y, box_state, cx, cy, selected_count(), excluded);
     return selected_count() > 0 &&
            (excluded < 0 || excluded >= MAX_UNITS || !u[excluded].selected);
 }
@@ -385,9 +325,400 @@ static int enemy_cannon_covering_walk(int x0, int y0, int x1, int y1)
     return -1;
 }
 
+/* Protoss base-building for the P1 and P2 routes. Live state only chooses when
+ * and where to act; every order is ordinary input through game_update(). The
+ * world clock stops while a command menu is open, so each order leaves the UI
+ * normal again. */
+static int controller_playing(void)
+{ return screen == SCREEN_PLAY && !won && !lost; }
+
+static void controller_normal_ui(void)
+{
+    int guard;
+    for (guard = 0; guard < 3 && controller_playing() && (menu_open || mode != MODE_NORMAL); ++guard)
+        controller_press(KEY_B);
+}
+
+/* Holding R doubles cursor speed; it only selects a group when pressed alone. */
+static void controller_cursor_fast(int x, int y)
+{
+    int guard = 0;
+    while ((abs(cx - x) > 3 || abs(cy - y) > 3) && controller_playing() && guard++ < 3000) {
+        u16 held = KEY_R;
+        if (abs(cx - x) > 3) held |= cx < x ? KEY_RIGHT : KEY_LEFT;
+        if (abs(cy - y) > 3) held |= cy < y ? KEY_DOWN : KEY_UP;
+        controller_frame(held);
+    }
+    controller_frame(0);
+}
+
+static int side_buildings_of(int type, int complete_only)
+{
+    int i, n = 0;
+    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE && b[i].type == type &&
+        (!complete_only || building_complete(i))) ++n;
+    return n;
+}
+
+static int side_units_of(int type)
+{
+    int i, n = 0;
+    for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE && u[i].type == type) ++n;
+    return n;
+}
+
+static int side_queued_of(int type)
+{
+    int i, j, n = 0;
+    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE)
+        for (j = 0; j < b[i].queue_count; ++j)
+            if (b[i].queue[(b[i].queue_head + j) % 5] == type) ++n;
+    return n;
+}
+
+static int side_army_size(int excluded)
+{
+    int i, n = 0;
+    for (i = 0; i < MAX_UNITS; ++i) if (i != excluded && u[i].alive && u[i].owner == SIDE &&
+        !sc64_race_is_worker(u[i].type)) ++n;
+    return n;
+}
+
+static int side_constructing(void)
+{
+    int i, n = 0;
+    for (i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].under_construction) ++n;
+    return n;
+}
+
+static int side_home_nexus(void)
+{
+    int i;
+    for (i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_NEXUS && building_complete(i)) return i;
+    return -1;
+}
+
+/* An idle Probe still holding cargo cannot be sent back to minerals, so build
+ * with empty ones. */
+static int side_free_probe(int x, int y)
+{
+    int i, best = -1, best_d = 0x7fffffff;
+    for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+        !SC64_BUILD_WORKER_ORDER(u[i].order) && u[i].order != ORDER_GAS && !u[i].carry) {
+        int d = dist2(u[i].x, u[i].y, x, y);
+        if (d < best_d) { best_d = d; best = i; }
+    }
+    return best;
+}
+
+/* A click near a mining Probe can land on the Nexus, so fall back to a drag.
+ * Idle Probes stack on a spent patch; any Probes selected there will do. */
+static int controller_select_probe(int probe)
+{
+    int i;
+    controller_normal_ui();
+    if (!controller_select_worker(probe) && !controller_select_worker_box(probe) &&
+        (selected_building >= 0 || find_selected_worker() < 0)) return 0;
+    for (i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].selected && !sc64_race_is_worker(u[i].type)) return 0;
+    return 1;
+}
+
+static int controller_open_menu_row(int row)
+{
+    int guard = 0;
+    controller_press(KEY_B);
+    while (menu_open && menu_cursor != row && guard++ < 2 * MENU_COUNT)
+        controller_press(menu_cursor < row ? KEY_DOWN : KEY_UP);
+    return menu_open && menu_cursor == row;
+}
+
+/* Buildings packed tightly wall in Gateway exits, so keep a wide lattice clear
+ * of the mineral line and of each other. */
+static int controller_find_site(int type, int *site_x, int *site_y)
+{
+    int home = side_home_nexus(), dx, dy, i, best = 0x7fffffff;
+    int spacing = type == B_PYLON ? 48 : 72;
+    if (home < 0) return 0;
+    for (dy = -512; dy <= 512; dy += 32)
+        for (dx = -512; dx <= 512; dx += 32) {
+            int x = b[home].x + dx, y = b[home].y + dy, d = dx * dx + dy * dy, clear = 1;
+            if (d >= best || d < 96 * 96 || x < 32 || x >= WORLD_W - 32 || y < 32 || y >= WORLD_H - 32 ||
+                !race_can_site(SIDE, type, x, y) || !can_place(type, x, y)) continue;
+            for (i = 0; i < MAX_MINERALS && clear; ++i)
+                if (m[i].amount > 0 && dist2(x, y, m[i].x, m[i].y) < 80 * 80) clear = 0;
+            for (i = 0; i < MAX_BUILDINGS && clear; ++i)
+                if (b[i].alive && dist2(x, y, b[i].x, b[i].y) < spacing * spacing) clear = 0;
+            if (clear) { best = d; *site_x = x; *site_y = y; }
+        }
+    return best != 0x7fffffff;
+}
+
+static int controller_place(int type, int row, int x, int y)
+{
+    int probe = side_free_probe(x, y), placed;
+    if (probe < 0 || !controller_select_probe(probe) || !controller_open_menu_row(row)) {
+        controller_normal_ui();
+        return 0;
+    }
+    controller_press(KEY_A);
+    if (mode != MODE_BUILD || menu != type) { controller_normal_ui(); return 0; }
+    controller_cursor_fast(x, y);
+    controller_press(KEY_A);
+    placed = mode == MODE_NORMAL;
+    controller_normal_ui();
+    return placed;
+}
+
+static int controller_build(int type, int row)
+{
+    int x, y;
+    return controller_find_site(type, &x, &y) && controller_place(type, row, x, y);
+}
+
+static int controller_build_assimilator(void)
+{
+    int home = side_home_nexus(), i, pick = -1, best = 0x7fffffff;
+    if (home < 0) return 0;
+    for (i = 0; i < geyser_count; ++i) {
+        int d = dist2(b[home].x, b[home].y, geysers[i].x, geysers[i].y);
+        if (d < best && d < 400 * 400 && race_can_site(SIDE, B_ASSIMILATOR, geysers[i].x, geysers[i].y) &&
+            can_place(B_ASSIMILATOR, geysers[i].x, geysers[i].y)) { best = d; pick = i; }
+    }
+    return pick >= 0 && controller_place(B_ASSIMILATOR, MENU_REFINERY, geysers[pick].x, geysers[pick].y);
+}
+
+static int side_walking_builders(void)
+{
+    int i, n = 0;
+    for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
+        SC64_BUILD_WORKER_ORDER(u[i].order)) ++n;
+    return n;
+}
+
+static int side_unpowered_gateway(void)
+{
+    int i;
+    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE && b[i].type == B_GATEWAY &&
+        building_complete(i) && !race_site_powered(SIDE, b[i].x, b[i].y)) return i;
+    return -1;
+}
+
+/* P1's rescued Gateway has no Pylon in range. */
+static int controller_power_gateway(int gateway)
+{
+    static const int offsets[][2] = {{-64,-64},{-64,64},{0,96},{0,-96},{-96,0},{96,0},{64,64},{64,-64}};
+    int i;
+    for (i = 0; i < (int)(sizeof(offsets)/sizeof(offsets[0])); ++i) {
+        int x = b[gateway].x + offsets[i][0], y = b[gateway].y + offsets[i][1];
+        if (race_can_site(SIDE, B_PYLON, x, y) && can_place(B_PYLON, x, y))
+            return controller_place(B_PYLON, MENU_DEPOT, x, y);
+    }
+    return 0;
+}
+
+/* A patch that runs dry leaves its Probes idle, and Probes stacked on one patch
+ * drain it quickly, so send up to three idle Probes to the least-worked patches
+ * near the Nexus on each pass. */
+static void controller_mine_idle_probes(void)
+{
+    static const int offsets[][2] = {{0,0},{-8,0},{8,0},{0,-8},{0,8},
+                                     {-12,-8},{12,-8},{-12,8},{12,8}};
+    int home = side_home_nexus(), pass;
+    if (home < 0) return;
+    for (pass = 0; pass < 3 && controller_playing(); ++pass) {
+        int i, j, probe = -1, patch = -1, best = 0x7fffffff, attempt;
+        for (i = 0; i < MAX_UNITS && probe < 0; ++i) if (u[i].alive && u[i].owner == SIDE &&
+            u[i].type == U_PROBE && u[i].order == ORDER_IDLE && !u[i].carry) probe = i;
+        if (probe < 0) return;
+        for (i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) {
+            int workers = 0, score = 0x7fffffff;
+            for (j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive && b[j].owner == SIDE &&
+                b[j].type == B_NEXUS && building_complete(j)) {
+                int depot = dist2(m[i].x, m[i].y, b[j].x, b[j].y) / 256;
+                if (depot < score) score = depot;
+            }
+            for (j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
+                u[j].order == ORDER_MINE && u[j].target == i) ++workers;
+            score += workers * 256;
+            if (score < best) { best = score; patch = i; }
+        }
+        if (patch < 0 || !controller_select_probe(probe)) return;
+        /* A tap that lands on a unit standing at the patch selects it instead,
+         * so try around the patch until the order takes. */
+        for (attempt = 0; attempt < 9 && controller_playing() && find_selected_worker() >= 0 &&
+             u[find_selected_worker()].order != ORDER_MINE; ++attempt) {
+            controller_cursor_fast(m[patch].x + offsets[attempt][0], m[patch].y + offsets[attempt][1]);
+            controller_press(KEY_A);
+        }
+        controller_normal_ui();
+    }
+}
+
+/* Keep two Probes on the Assimilator while gas is short, and return them to
+ * minerals once it has banked: Dragoons cost far more minerals than gas. */
+static void controller_staff_gas(void)
+{
+    int i, gas_workers = 0, refinery = -1, probe = -1;
+    for (i = 0; i < MAX_BUILDINGS && refinery < 0; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_ASSIMILATOR && building_complete(i)) refinery = i;
+    if (refinery < 0) return;
+    for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+        u[i].order == ORDER_GAS) {
+        ++gas_workers;
+        if (!u[i].carry) probe = i;
+    }
+    if (gas >= 600) {
+        /* STOP frees the Probe; the idle-Probe pass then sends it to a patch. */
+        if (probe < 0 || !controller_select_probe(probe) || !controller_open_menu_row(MENU_STOP)) {
+            controller_normal_ui();
+            return;
+        }
+        controller_press(KEY_A);
+        controller_normal_ui();
+        return;
+    }
+    if (gas_workers >= 2 || gas >= 300 || side_units_of(U_PROBE) < 6) return;
+    probe = side_free_probe(b[refinery].x, b[refinery].y);
+    if (probe < 0 || !controller_select_probe(probe)) return;
+    controller_cursor_fast(b[refinery].x, b[refinery].y);
+    controller_press(KEY_A);
+    controller_normal_ui();
+}
+
+static int controller_queue_unit(int building, int type)
+{
+    static const int offsets[][2] = {{0,0},{-16,0},{16,0},{0,-16},{0,16}};
+    int attempt, guard, before;
+    controller_normal_ui();
+    for (attempt = 0; attempt < 5 && selected_building != building && controller_playing(); ++attempt) {
+        controller_cursor_fast(b[building].x + offsets[attempt][0], b[building].y + offsets[attempt][1]);
+        controller_press(KEY_A);
+    }
+    if (selected_building != building) return 0;
+    /* A taps on the selected building train; R cycles the Gateway's product. */
+    if (b[building].type == B_GATEWAY)
+        for (guard = 0; guard < 4 && train_type != type; ++guard) controller_press(KEY_R);
+    before = b[building].queue_count;
+    if (b[building].type != B_GATEWAY || train_type == type) controller_press(KEY_A);
+    return b[building].queue_count > before;
+}
+
+/* One pass of the build order: Probes, Pylons when supply runs short, gas and
+ * a Cybernetics Core for Dragoons, then up to max_gateways producing. */
+static void controller_protoss_economy(int max_gateways, int probe_goal)
+{
+    int home = side_home_nexus(), i, free_supply, reserve = 0;
+    int planned_minerals, planned_gas;
+    if (home < 0 || !controller_playing()) return;
+    controller_mine_idle_probes();
+    controller_staff_gas();
+    free_supply = race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE);
+    if (side_units_of(U_PROBE) + side_queued_of(U_PROBE) < probe_goal && minerals >= 50 &&
+        free_supply >= 2 && b[home].queue_count < 2)
+        (void)controller_queue_unit(home, U_PROBE);
+    /* A placed building appears only when its Probe arrives. Wait for that, or
+     * the next pass orders the same building again. */
+    if (side_constructing() < 2 && !side_walking_builders() &&
+        side_free_probe(b[home].x, b[home].y) >= 0) {
+        int unpowered = side_unpowered_gateway();
+        if (unpowered >= 0 && minerals >= 100)
+            (void)controller_power_gateway(unpowered);
+        else if (free_supply <= 10 && minerals >= 100 && side_buildings_of(B_PYLON, 0) < 16)
+            (void)controller_build(B_PYLON, MENU_DEPOT);
+        else if (!side_buildings_of(B_GATEWAY, 0) && minerals >= 150)
+            (void)controller_build(B_GATEWAY, MENU_BARRACKS);
+        else if (!side_buildings_of(B_ASSIMILATOR, 0) && minerals >= 100 && side_units_of(U_PROBE) >= 5)
+            (void)controller_build_assimilator();
+        else if (!side_buildings_of(B_CYBERNETICS_CORE, 0) && minerals >= 200 &&
+                 side_buildings_of(B_GATEWAY, 1))
+            (void)controller_build(B_CYBERNETICS_CORE, MENU_ACADEMY);
+        else if (side_buildings_of(B_GATEWAY, 0) < max_gateways && minerals >= 150)
+            (void)controller_build(B_GATEWAY, MENU_BARRACKS);
+    }
+    /* Save for the Core rather than spending every 100 minerals on Zealots. */
+    if (side_buildings_of(B_GATEWAY, 1) && !side_buildings_of(B_CYBERNETICS_CORE, 0)) reserve = 200;
+    for (i = 0; i < MAX_BUILDINGS && controller_playing(); ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_GATEWAY && building_complete(i) &&
+            race_site_powered(SIDE, b[i].x, b[i].y) && b[i].queue_count < 2) {
+            /* Zealots cannot hit the Mutalisks, so save for Dragoons once they
+             * are available. */
+            int want_dragoon = side_buildings_of(B_CYBERNETICS_CORE, 1) && gas >= 50;
+            free_supply = race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE);
+            race_pending_build_cost(SIDE, &planned_minerals, &planned_gas);
+            if (free_supply < 4 ||
+                minerals - planned_minerals < (want_dragoon ? 125 : 100) + reserve) break;
+            (void)controller_queue_unit(i, want_dragoon ? U_DRAGOON : U_ZEALOT);
+        }
+    controller_normal_ui();
+}
+
+/* R retrains a selected producer instead of selecting the army. A short drag
+ * clears the producer through the ordinary box-select gesture. */
+static void controller_select_army(void)
+{
+    int steps;
+    controller_normal_ui();
+    if (selected_building >= 0) {
+        controller_frame(KEY_L);
+        for (steps = 0; steps < 6 && controller_playing(); ++steps)
+            controller_frame(KEY_L | KEY_RIGHT);
+        controller_frame(0);
+    }
+    controller_press(KEY_R);
+}
+
+/* Meet raiders that reach the base; otherwise hold the mineral line, which the
+ * AI's small attack waves reach first. */
+static void controller_defend_base(void)
+{
+    int home = side_home_nexus(), i, raider = -1, best = 360 * 360;
+    if (home < 0) return;
+    for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == ENEMY) {
+        int d = dist2(u[i].x, u[i].y, b[home].x, b[home].y);
+        if (d < best) { best = d; raider = i; }
+    }
+    controller_select_army();
+    if (selected_count() > 0)
+        (void)controller_attack_order(raider >= 0 ? u[raider].x : b[home].x,
+                                      raider >= 0 ? u[raider].y : b[home].y - 64);
+    controller_normal_ui();
+}
+
+/* The nearest enemy building to any unit of the force; force-wide nearest so
+ * that a straggler cannot pull the army back across the map. */
+static int controller_nearest_enemy_building(int excluded)
+{
+    int j, k, target = -1, closest = 0x7fffffff;
+    for (j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive && b[j].owner == ENEMY) {
+        for (k = 0; k < MAX_UNITS; ++k) if (k != excluded && u[k].alive && u[k].owner == SIDE &&
+            !sc64_race_is_worker(u[k].type)) {
+            int q = dist2(u[k].x, u[k].y, b[j].x, b[j].y);
+            if (q < closest) { closest = q; target = j; }
+        }
+    }
+    return target;
+}
+
+/* With no army left and nothing to rebuild it from, only Fenix can finish the
+ * mission. Holding him back would stall to the input limit. */
+static int controller_last_stand(void)
+{
+    int target = controller_nearest_enemy_building(-1);
+    if (target < 0 || side_queued_of(U_ZEALOT) || side_queued_of(U_DRAGOON) || side_constructing() ||
+        (minerals >= 100 && side_buildings_of(B_GATEWAY, 1) && side_unpowered_gateway() < 0))
+        return 0;
+    controller_select_army();
+    (void)controller_attack_order(b[target].x, b[target].y);
+    controller_normal_ui();
+    return 1;
+}
+
 static int controller_mission(int mission)
 {
-    int i, target = -1, p1_fenix_parked = 0, p1_reinforcement_attempted = 0;
+    int i, target = -1;
     controller_previous = 0; controller_ticks = 0; controller_mission_started = 0;
     race_event_count = 0; race_checkpoint_count = 0; race_event_overflow = 0;
     game_init();
@@ -433,6 +764,7 @@ static int controller_mission(int mission)
     controller_press(KEY_START);
     if (screen != SCREEN_PLAY || race_campaign.mission != mission) return 0;
     controller_mission_started = 1;
+    for (i = 0; i < controller_start_delay && controller_playing(); ++i) controller_frame(0);
     if (mission == SC64_RACE_MISSION_Z2) {
         int c = race_campaign.chrysalis_unit, drone = side_drone(), guard = 0;
         int other_drone = -1;
@@ -524,12 +856,45 @@ static int controller_mission(int mission)
         return won && !lost;
     }
     if (mission == SC64_RACE_MISSION_P2) {
-        /* Let the 900-second trigger run through ordinary game frames. */
-        for (i = 0; i < 900 * 30 + 10 && screen == SCREEN_PLAY && !lost; ++i) controller_frame(0);
-        if (lost || !(race_campaign.objective_flags & SC64_RACE_OBJECTIVE_FENIX_READY)) return 0;
-        for (i = 0; i < MAX_BUILDINGS; ++i)
-            if (b[i].alive && b[i].owner == ENEMY && b[i].raw_type == 151) { target = i; break; }
-        if (target < 0 || !controller_attack(b[target].x, b[target].y, 100000)) return 0;
+        /* Waiting out the 900-second trigger and attack-moving the escorts once
+         * only won while idle units could acquire targets through fog (#133).
+         * The town holds about 100 units and 14 Sunken Colonies, so build a base
+         * and army first, then press the assault with repeated attack orders.
+         * Fenix keeps to his arrival point because his death loses the mission. */
+        unsigned long next_economy = 0, next_order = 0;
+        int assaulting = 0;
+        while (controller_playing() && controller_ticks < 150000) {
+            int fenix = race_campaign.rescue_unit;
+            if (controller_ticks >= next_economy) {
+                controller_protoss_economy(4, 12);
+                next_economy = controller_ticks + 120;
+            }
+            if (!controller_playing()) break;
+            /* An earlier assault trades worse (sampled over 72 start offsets):
+             * the army is smaller and arrives well before the escorts do. */
+            if (controller_ticks >= 24000) assaulting = 1;
+            if (!assaulting && controller_ticks >= next_order) {
+                controller_defend_base();
+                next_order = controller_ticks + 600;
+            }
+            if (assaulting && controller_ticks >= next_order && fenix < MAX_UNITS &&
+                !side_army_size(fenix) && controller_last_stand()) {
+                next_order = controller_ticks + 900;
+            } else if (assaulting && controller_ticks >= next_order && side_army_size(-1) > 0) {
+                int fenix_side = fenix < MAX_UNITS && u[fenix].alive && u[fenix].owner == SIDE;
+                target = controller_nearest_enemy_building(fenix_side ? fenix : -1);
+                /* Fenix joins when an escort passes him. Until then R leaves
+                 * him out; afterwards a box selects around him. */
+                controller_normal_ui();
+                if (!fenix_side) controller_select_army();
+                else if (!controller_select_combat_except(fenix)) target = -1;
+                if (target >= 0 && selected_count() > 0)
+                    (void)controller_attack_order(b[target].x, b[target].y);
+                controller_normal_ui();
+                next_order = controller_ticks + 900;
+            }
+            controller_frame(0);
+        }
         return won && !lost;
     }
     if (mission == SC64_RACE_MISSION_P1) {
@@ -548,38 +913,60 @@ static int controller_mission(int mission)
                     b[k].y >= 848 && b[k].y <= 1200) ++remaining;
             if (remaining == 0 && u[race_campaign.rescue_unit].owner == SIDE) break;
         }
-        if (fenix >= MAX_UNITS || !u[fenix].alive || u[fenix].owner != SIDE ||
-            !controller_select_actor(fenix) || !controller_move_selected(780, 1180)) return 0;
-        for (i = 0; i < 3000 && screen == SCREEN_PLAY && !won && !lost &&
-             dist2(u[fenix].x, u[fenix].y, 780, 1180) > 24 * 24; ++i) controller_frame(0);
-        if (!u[fenix].alive || dist2(u[fenix].x, u[fenix].y, 780, 1180) > 24 * 24 ||
-            !controller_select_combat_except(fenix)) return 0;
-        p1_fenix_parked = 1;
+        if (fenix >= MAX_UNITS || !u[fenix].alive || u[fenix].owner != SIDE) return 0;
     }
     /* For the destruction missions, choose the closest extant enemy
      * structure to the surviving force and reissue a controller attack order
      * while it remains. State reads only select a route goal. */
+    if (mission == SC64_RACE_MISSION_P1) {
+        /* The rescue leaves the force over its supply cap, so nothing can be
+         * trained until the assault has spent some of it. Send the force first:
+         * idle units do not step aside for Fenix. Then walk him behind the Nexus,
+         * away from the ramp the Zerg raids come through. */
+        int fenix = race_campaign.rescue_unit, fenix_sent = 0;
+        while (controller_playing() && controller_ticks < 150000) {
+            int attacked;
+            int wait_ticks;
+            if (!side_army_size(fenix)) {
+                /* Rebuild from the base rather than conceding the mission. */
+                controller_protoss_economy(2, 6);
+                (void)controller_last_stand();
+                for (wait_ticks = 0; wait_ticks < 240 && controller_playing(); ++wait_ticks)
+                    controller_frame(0);
+                continue;
+            }
+            attacked = controller_nearest_enemy_building(fenix);
+            if (attacked < 0) break;
+            controller_normal_ui();
+            if (!controller_select_combat_except(fenix) ||
+                !controller_attack_order(b[attacked].x, b[attacked].y)) {
+                controller_normal_ui();
+                for (wait_ticks = 0; wait_ticks < 60 && controller_playing(); ++wait_ticks)
+                    controller_frame(0);
+                continue;
+            }
+            controller_normal_ui();
+            for (wait_ticks = 0; wait_ticks < 120 && controller_playing(); ++wait_ticks)
+                controller_frame(0);
+            if (!fenix_sent && controller_select_actor(fenix) &&
+                controller_move_selected(330, 1172)) fenix_sent = 1;
+            controller_normal_ui();
+            for (wait_ticks = 0; wait_ticks < 780 && controller_playing() && b[attacked].alive;
+                 ++wait_ticks) {
+                if (wait_ticks % 240 == 0) controller_protoss_economy(2, 6);
+                controller_frame(0);
+            }
+        }
+    } else
     for (i = 0; i < 100 && screen == SCREEN_PLAY && !won && !lost; ++i) {
         int j, k, closest = 0x7fffffff, alive_force = 0;
-        int protected_actor = mission == SC64_RACE_MISSION_P1 && p1_fenix_parked ?
-                              (int)race_campaign.rescue_unit : -1;
-        if (mission == SC64_RACE_MISSION_P1 && !p1_reinforcement_attempted &&
-            race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) >= 2 && minerals >= 50) {
-            int reinforced;
-            p1_reinforcement_attempted = 1;
-            reinforced = controller_p1_reinforce();
-            if (reinforced) fprintf(stderr, "P1 ordinary Nexus/Probe/Pylon/Gateway reinforcement completed at tick %lu\n",
-                                    controller_ticks);
-            if (!controller_select_combat_except(protected_actor)) return 0;
-        }
         for (j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
-            j != protected_actor && !sc64_race_is_worker(u[j].type)) ++alive_force;
+            !sc64_race_is_worker(u[j].type)) ++alive_force;
         if (!alive_force) break;
         target = -1;
         for (j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive && b[j].owner == ENEMY) {
             int d = 0x7fffffff;
-            for (k = 0; k < MAX_UNITS; ++k) if (k != protected_actor &&
-                u[k].alive && u[k].owner == SIDE &&
+            for (k = 0; k < MAX_UNITS; ++k) if (u[k].alive && u[k].owner == SIDE &&
                 !sc64_race_is_worker(u[k].type)) {
                 int q = dist2(u[k].x,u[k].y,b[j].x,b[j].y);
                 if (q < d) d = q;
@@ -587,20 +974,10 @@ static int controller_mission(int mission)
             if (d < closest) { closest = d; target = j; }
         }
         if (target < 0) break;
-        if (mission == SC64_RACE_MISSION_P1) {
-            int attacked = target, wait_ticks;
-            if (!controller_attack_order(b[attacked].x, b[attacked].y)) {
-                fprintf(stderr, "P1 attack order failed target=%d at=%d,%d mode=%d menu=%d cursor=%d,%d selected=%d ticks=%lu\n",
-                        attacked, b[attacked].x, b[attacked].y, mode,
-                        menu_open, cx, cy, selected_count(), controller_ticks);
-                return 0;
-            }
-            for (wait_ticks = 0; wait_ticks < 6000 && screen == SCREEN_PLAY && !won && !lost &&
-                 b[attacked].alive; ++wait_ticks) {
-                controller_frame(0);
-            }
-        } else if (!controller_attack(b[target].x, b[target].y, 6000)) return 0;
+        if (!controller_attack(b[target].x, b[target].y, 6000)) return 0;
     }
+    /* The campaign tick sees the last building die on a later update. */
+    for (i = 0; i < 90 && controller_playing(); ++i) controller_frame(0);
     return won && !lost;
 }
 
@@ -666,11 +1043,15 @@ int
 main(int argc, char **argv)
 {
     int i, c, f, actor;
-    if ((argc == 3 || argc == 5) && strcmp(argv[1], "--controller") == 0) {
-        int mission = atoi(argv[2]), controller_result;
+    if (argc >= 3 && strcmp(argv[1], "--controller") == 0) {
+        int mission = atoi(argv[2]), controller_result, arg;
         if (mission < 0 || mission >= 4) return 64;
-        if (argc == 5 && strcmp(argv[3], "--trace") != 0) return 64;
-        race_trace_path = argc == 5 ? argv[4] : NULL;
+        for (arg = 3; arg + 1 < argc; arg += 2) {
+            if (strcmp(argv[arg], "--trace") == 0) race_trace_path = argv[arg + 1];
+            else if (strcmp(argv[arg], "--start-delay") == 0) controller_start_delay = atoi(argv[arg + 1]);
+            else return 64;
+        }
+        if (arg != argc || controller_start_delay < 0) return 64;
         controller_result = controller_mission(mission);
         if (race_event_overflow) {
             race_trace_save();
