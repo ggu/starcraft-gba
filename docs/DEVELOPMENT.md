@@ -3149,7 +3149,9 @@ After preparing the Z8 bank's normal inputs from your own verified ROM, generate
 its private bank with the full Z8 option set plus `--include-zerg-late-art`:
 
 ```sh
-python3 tools/sc64_race_sprites.py --rom "$VERIFIED_ROM" --remap "$PALETTE_REMAP" \
+python3 tools/sc64_race_sprites.py \
+  --rom .local/sc64/rom/StarCraft64-USA.z64 \
+  --remap .local/sc64/backwater/generated/palette-remap.bin \
   --include-zp-campaign-actors --include-z5-actors --include-z5-doodads \
   --include-z6-actors --include-z6-buildings --include-p6-actors \
   --include-p7-actors --prepack-unit-words --include-z8-buildings \
