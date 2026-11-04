@@ -135,8 +135,9 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection);
 /* Select and retain a prepared winner. Unlike save_select_validated, scratch
  * contains the successful callback's possibly transformed payload on return.
- * The deterministic callback may alter only scratch and its prepared context;
- * it must not depend on callback order/count or alter SRAM/live state. Newest
+ * The deterministic callback may alter scratch and private preparation state
+ * (context or uncommitted globals), rebuilt from the current payload. It must
+ * not depend on callback order/count or alter SRAM/live state. Newest
  * valid candidates are tried first; an ambiguous half-range validates both.
  * The original committed record is rechecked before publishing the token. */
 int save_select_prepared(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
