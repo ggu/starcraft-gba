@@ -119,7 +119,8 @@ int main(void)
     assert(find_worker(ENEMY, U_PROBE) >= 0);
     assert(find_worker(RESCUABLE, U_SCV) >= 0);
     assert(race_owner_supply_cap(SIDE) >= 18); /* Hatchery + Overlord. */
-    assert(race_owner_supply_cap(ENEMY) >= 34); /* Nexus + Pylon. */
+    assert(race_owner_supply_cap(ENEMY) == 18); /* Nexus only. */
+    assert(race_owner_supply_cap(RESCUABLE) == 20); /* Command Center only. */
     /* Generated-map mineral lines use real source fields, not the
      * placeholder diamond drawn for an unknown style. */
     for (int i = 0; i < 16; ++i) {
