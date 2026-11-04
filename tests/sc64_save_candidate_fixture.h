@@ -29,8 +29,28 @@ static void write_candidate_record(const RaceSave *candidate)
     memcpy(live, race_impact_rows, sizeof(live));
     memcpy(race_impact_rows, fixture_saved_impacts, sizeof(fixture_saved_impacts));
     race_impact_count = fixture_saved_impact_count;
+#ifdef SC64_WORKER_CARGO_KIND
+    /* Isolate this intentionally malformed candidate: an older valid record
+     * would make the journal correctly fall back and mask rejection. */
+#ifdef SC64_SHARED_TRANSPORT
+    const u32 tags[] = { SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
+                         SC64_TRANSPORT_SAVE_VERSION };
+#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+    const u32 tags[] = { SC64_LEGACY_SAVE_VERSION,
+                         SC64_WORKER_CARGO_LEGACY_SAVE_VERSION, SAVE_VERSION };
+#else
+    const u32 tags[] = { SC64_WORKER_CARGO_LEGACY_SAVE_VERSION, SAVE_VERSION };
+#endif
+    for (unsigned i = 0; i < sizeof(tags) / sizeof(tags[0]); ++i) {
+        save_test_corrupt_latest(0, tags[i]);
+        save_test_corrupt_latest(0, tags[i]);
+    }
+    race_data = expected;
+    assert(race_impact_save_write(NULL));
+#else
     race_data = expected;
     assert(race_impact_save_write());
+#endif
     memcpy(race_impact_rows, live, sizeof(live));
     race_impact_count = live_count;
     assert(race_impact_save_read(decoded, &count));
