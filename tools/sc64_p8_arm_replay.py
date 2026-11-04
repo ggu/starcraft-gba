@@ -185,6 +185,19 @@ def checks(lines: list[str]) -> list[tuple[int, dict]]:
         fields = dict(re.findall(r"(\w+)=(-?\d+)", line))
         if "tick" not in fields:
             raise ObservationError(f"observation without a tick: {line}")
+        # Every real probe emits an unsigned state digest. Requiring a full
+        # token prevents two equally truncated logs from comparing as equal.
+        digest = re.search(r"(?:^|\s)digest=(\d+)(?=\s|$)", line)
+        if not digest or int(digest.group(1)) > 0xffffffff:
+            raise ObservationError(f"observation without a valid digest: {line}")
+        # P10's compact report terminates with a sentinel, so even a partial
+        # decimal digest or a truncation later in the line cannot pass.
+        if PREFIX == "P10":
+            required = {"digest", "tick", "frame", "screen", "won", "lost",
+                        "mission", "faults", "overmind_hp", "zeratul_hp",
+                        "minerals", "gas", "switches", "end"}
+            if not line.endswith(" end=1") or set(fields) != required:
+                raise ObservationError(f"incomplete P10 observation: {line}")
         fields["kind"] = line.split()[2]
         tick = int(fields["tick"])
         if tick in seen:

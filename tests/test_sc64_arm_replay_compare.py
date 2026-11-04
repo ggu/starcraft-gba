@@ -56,6 +56,32 @@ class StrictCompareTest(unittest.TestCase):
         result = self.assert_fails(FULL, FULL[:3] + [check("periodic", 3200, 55), FULL[3]])
         self.assertEqual(result["extra"], [3200])
 
+    def test_both_missing_digest_fail(self):
+        missing = [row.replace(" digest=0", "") for row in [check("won", 900)]]
+        self.assert_fails(missing, list(missing))
+
+    def test_malformed_digest_fails(self):
+        for value in ("", "12x", "4294967296", "-1"):
+            row = f"P8 CHECK won tick=900 frame=900 won=1 digest={value}"
+            self.assert_fails([row], [row])
+
+    def test_p10_requires_complete_sentinel(self):
+        old = replay.PREFIX
+        try:
+            replay.PREFIX = "P10"
+            complete = ("P10 CHECK won digest=4294967295 tick=900 frame=900 screen=3 "
+                        "won=1 lost=0 mission=29 faults=0 overmind_hp=0 zeratul_hp=3 "
+                        "minerals=8 gas=7 switches=3 end=1")
+            self.assertTrue(replay.compare_ok(replay.compare([complete], [complete], 0)))
+            for row in (complete.replace(" end=1", ""),
+                        complete.replace("digest=4294967295", "digest="),
+                        complete.replace(" end=1", " end="),
+                        complete.replace("digest=4294967295", "digest=12x"),
+                        complete.replace(" gas=7", "")):
+                self.assert_fails([row], [row])
+        finally:
+            replay.PREFIX = old
+
     def test_value_mismatch_fails(self):
         self.assert_fails(FULL, [FULL[0], check("periodic", 2000, 99)] + FULL[2:])
 
