@@ -160,6 +160,8 @@ static void expect_mask(unsigned expected, const u8 *powered)
     if (reference != expected) fprintf(stderr, "expected %u got %u\n", expected, reference);
     assert(reference == expected);
     assert(sc64_p7_arbiter_detected_mask(0, powered) == expected);
+    Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
+    assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == expected);
 }
 
 static void explicit_cases(void)
@@ -303,6 +305,8 @@ int main(void)
         Sc64P7PersistentState state_before = race_p7;
         unsigned want = sc64_p7_arbiter_detected_mask_reference(0, powered);
         unsigned got = sc64_p7_arbiter_detected_mask(0, powered);
+        Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
+        assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
         assert(got == want);
         positive += want != 0;
         assert(!memcmp(units_before, u, sizeof(u)) &&

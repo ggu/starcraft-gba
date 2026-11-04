@@ -1678,7 +1678,10 @@ static int assign_idle_workers_to_minerals(void)
         int worker=candidate;
         if(z7_worker_available_for_new_job(worker)&&
         !(u[worker].order==ORDER_BUILD_PENDING&&u[worker].target==B_EXTRACTOR)&&
-        u[worker].order!=ORDER_GAS&&u[worker].order!=ORDER_MOVE&&!u[worker].carry&&
+        u[worker].order!=ORDER_GAS&&u[worker].order!=ORDER_MOVE&&
+#ifndef SC64_WORKER_CARGO_KIND
+        !u[worker].carry&&
+#endif
         !(u[worker].order==ORDER_MINE&&z7_safe_mineral(u[worker].target,0,!local_remaining))) {
         int target=-1,best_load=0x7fffffff,best_distance=0x7fffffff;
         for(int j=0;j<MAX_MINERALS;j++) {
@@ -1734,7 +1737,11 @@ static int assign_idle_workers_to_minerals(void)
                selected idle Drone, never write selection or game state. */
             int actual=-1;
             if(selected_count()==1)for(int i=0;i<MAX_UNITS;i++)if(u[i].selected&&
-                z7_worker_available_for_new_job(i)&&u[i].order==ORDER_IDLE&&!u[i].carry)
+                z7_worker_available_for_new_job(i)&&u[i].order==ORDER_IDLE
+#ifndef SC64_WORKER_CARGO_KIND
+                &&!u[i].carry
+#endif
+                )
                 actual=i;
             if(actual<0) {
                 fprintf(stderr,"Z7 mineral select failed worker%d order%d target%d frame%d\n",

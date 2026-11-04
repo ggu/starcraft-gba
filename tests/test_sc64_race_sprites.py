@@ -12,7 +12,7 @@ from tools.sc64_race_sprites import (
     T4_BUILDING_IDS, T6_UNIT_IDS, LATE_UNIT_IDS, LATE_BUILDING_IDS,
     ZP_UNIT_IDS, ZP_BUILDING_IDS, Z5_UNIT_IDS, Z5_BUILDING_IDS, Z6_UNIT_IDS,
     Z5_DOODAD_IDS, Z6_BUILDING_IDS,
-    P7_UNIT_IDS, P7_BUILDING_IDS, P7_SHARED_UNIT_IDS, Z8_BUILDING_IDS,
+    P7_UNIT_IDS, P7_BUILDING_IDS, P7_SHARED_UNIT_IDS, Z8_BUILDING_IDS, ZERG_LATE_ART_IDS,
     P6_UNIT_IDS, P6_DOODAD_IDS,
     image_init_frame,
     compose_init_layers, partition_init_layers,
@@ -62,6 +62,37 @@ int main(void) {
 }
 ''')
             for flags in (['-DSC64_RACES'], ['-DSC64_RACES', '-DSC64_Z8_RUNTIME']):
+                subprocess.run(['clang', '-std=c11', '-Werror', *flags,
+                                str(root / 'check.c'), '-o', str(root / 'check')],
+                               check=True, capture_output=True)
+                subprocess.run([str(root / 'check')], check=True, capture_output=True)
+
+    def test_late_zerg_art_is_complete_and_runtime_gated(self):
+        frame = {'pixels': bytes((9,)), 'alpha': bytes((1,)), 'width': 1,
+                 'height': 1, 'x': 0, 'y': 0, 'frame_width': 1,
+                 'frame_height': 1}
+        self.assertEqual(set(ZERG_LATE_ART_IDS.values()), {173, 174, 219})
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = [{'name': name, 'frame': frame} for name in RACE_UNIT_IDS]
+            late = [{'name': name, 'frame': frame} for name in ZERG_LATE_ART_IDS]
+            write_header(root / 'late.h', base, bytes(range(256)), zerg_late_selected=late)
+            write_header(root / 'partial.h', base, bytes(range(256)), zerg_late_selected=late[:-1])
+            self.assertNotIn('SC64_ZERG_LATE_ART_COMPLETE', (root / 'partial.h').read_text())
+            (root / 'check.c').write_text('''#include <assert.h>
+#include "late.h"
+int main(void) {
+#ifdef SC64_Z9_RUNTIME
+ assert(SC64_ZERG_LATE_ART_COMPLETE == 1);
+ assert(sc64_race_unit_sprite(173)); assert(sc64_race_unit_sprite(174));
+ assert(sc64_race_unit_sprite(219));
+#else
+ assert(!sc64_race_unit_sprite(173)); assert(!sc64_race_unit_sprite(174));
+ assert(!sc64_race_unit_sprite(219));
+#endif
+ return 0;
+}''')
+            for flags in ([], ['-DSC64_Z9_RUNTIME']):
                 subprocess.run(['clang', '-std=c11', '-Werror', *flags,
                                 str(root / 'check.c'), '-o', str(root / 'check')],
                                check=True, capture_output=True)

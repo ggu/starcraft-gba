@@ -414,13 +414,18 @@ static int side_free_probe(int x, int y)
 }
 
 /* A click near a mining Probe can land on the Nexus, so fall back to a drag.
- * Idle Probes stack on a spent patch; any Probes selected there will do. */
+ * Idle Probes stack on a spent patch, where a tap takes the nearest of them. A
+ * drag there has no area and would clear the selection, so keep a stack mate. */
 static int controller_select_probe(int probe)
 {
-    int i;
+    int i, picked;
     controller_normal_ui();
-    if (!controller_select_worker(probe) && !controller_select_worker_box(probe) &&
-        (selected_building >= 0 || find_selected_worker() < 0)) return 0;
+    if (!controller_select_worker(probe)) {
+        picked = selected_building < 0 ? find_selected_worker() : -1;
+        if ((picked < 0 || dist2(u[picked].x, u[picked].y, u[probe].x, u[probe].y) > 4 * 4 ||
+             !u[picked].carry != !u[probe].carry) && !controller_select_worker_box(probe) &&
+            (selected_building >= 0 || find_selected_worker() < 0)) return 0;
+    }
     for (i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].selected && !sc64_race_is_worker(u[i].type)) return 0;
     return 1;
@@ -519,22 +524,43 @@ static int controller_power_gateway(int gateway)
     return 0;
 }
 
+/* A tap selects an own unit within 31 pixels or building within 26 before it can
+ * order a patch within 16, so a Probe parked beside a patch swallows every tap.
+ * Find a tap point clear of both, allowing for the cursor stopping 3 pixels off. */
+static int controller_patch_tap(int patch, int *tap_x, int *tap_y)
+{
+    static const int offsets[][2] = {{0,0},{-8,0},{8,0},{0,-8},{0,8},{-8,-8},{8,-8},
+                                     {-8,8},{8,8},{-12,0},{12,0},{0,-12},{0,12}};
+    int k, i;
+    for (k = 0; k < (int)(sizeof(offsets)/sizeof(offsets[0])); ++k) {
+        int x = m[patch].x + offsets[k][0], y = m[patch].y + offsets[k][1];
+        for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
+            dist2(x, y, u[i].x, u[i].y) < 34 * 34) break;
+        if (i < MAX_UNITS) continue;
+        for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE &&
+            dist2(x, y, b[i].x, b[i].y) < 29 * 29) break;
+        if (i < MAX_BUILDINGS) continue;
+        *tap_x = x; *tap_y = y;
+        return 1;
+    }
+    return 0;
+}
+
 /* A patch that runs dry leaves its Probes idle, and Probes stacked on one patch
  * drain it quickly, so send up to three idle Probes to the least-worked patches
  * near the Nexus on each pass. */
 static void controller_mine_idle_probes(void)
 {
-    static const int offsets[][2] = {{0,0},{-8,0},{8,0},{0,-8},{0,8},
-                                     {-12,-8},{12,-8},{-12,8},{12,8}};
     int home = side_home_nexus(), pass;
     if (home < 0) return;
     for (pass = 0; pass < 3 && controller_playing(); ++pass) {
-        int i, j, probe = -1, patch = -1, best = 0x7fffffff, attempt;
+        int i, j, probe = -1, patch = -1, best = 0x7fffffff, tap_x = 0, tap_y = 0;
         for (i = 0; i < MAX_UNITS && probe < 0; ++i) if (u[i].alive && u[i].owner == SIDE &&
             u[i].type == U_PROBE && u[i].order == ORDER_IDLE && !u[i].carry) probe = i;
         if (probe < 0) return;
         for (i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) {
-            int workers = 0, score = 0x7fffffff;
+            int workers = 0, score = 0x7fffffff, x, y;
+            if (!controller_patch_tap(i, &x, &y)) continue;
             for (j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive && b[j].owner == SIDE &&
                 b[j].type == B_NEXUS && building_complete(j)) {
                 int depot = dist2(m[i].x, m[i].y, b[j].x, b[j].y) / 256;
@@ -543,18 +569,30 @@ static void controller_mine_idle_probes(void)
             for (j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
                 u[j].order == ORDER_MINE && u[j].target == i) ++workers;
             score += workers * 256;
-            if (score < best) { best = score; patch = i; }
+            if (score < best) { best = score; patch = i; tap_x = x; tap_y = y; }
         }
         if (patch < 0 || !controller_select_probe(probe)) return;
-        /* A tap that lands on a unit standing at the patch selects it instead,
-         * so try around the patch until the order takes. */
-        for (attempt = 0; attempt < 9 && controller_playing() && find_selected_worker() >= 0 &&
-             u[find_selected_worker()].order != ORDER_MINE; ++attempt) {
-            controller_cursor_fast(m[patch].x + offsets[attempt][0], m[patch].y + offsets[attempt][1]);
-            controller_press(KEY_A);
-        }
+        controller_cursor_fast(tap_x, tap_y);
+        controller_press(KEY_A);
         controller_normal_ui();
     }
+}
+
+/* The mineral order refuses a loaded Probe and nothing returns its cargo, so a
+ * builder that was carrying stays idle for good. Tapping the Assimilator discards
+ * the cargo, and STOP frees the Probe for the next mining pass. */
+static void controller_free_loaded_probe(void)
+{
+    int i, refinery = -1, probe = -1;
+    for (i = 0; i < MAX_BUILDINGS && refinery < 0; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_ASSIMILATOR && building_complete(i)) refinery = i;
+    for (i = 0; i < MAX_UNITS && probe < 0; ++i) if (u[i].alive && u[i].owner == SIDE &&
+        u[i].type == U_PROBE && u[i].order == ORDER_IDLE && u[i].carry) probe = i;
+    if (refinery < 0 || probe < 0 || !controller_select_probe(probe)) return;
+    controller_cursor_fast(b[refinery].x, b[refinery].y);
+    controller_press(KEY_A);
+    if (controller_open_menu_row(MENU_STOP)) controller_press(KEY_A);
+    controller_normal_ui();
 }
 
 /* Keep two Probes on the Assimilator while gas is short, and return them to
@@ -613,6 +651,7 @@ static void controller_protoss_economy(int max_gateways, int probe_goal)
     int home = side_home_nexus(), i, free_supply, reserve = 0;
     int planned_minerals, planned_gas;
     if (home < 0 || !controller_playing()) return;
+    controller_free_loaded_probe();
     controller_mine_idle_probes();
     controller_staff_gas();
     free_supply = race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE);
