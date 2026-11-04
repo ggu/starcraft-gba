@@ -138,7 +138,16 @@ static void aura_union_oracle(void)
         assert(expected_aura[6] && expected_aura[7]); /* 63/64 cell boundary */
         assert(expected_aura[8]);  /* final row/column */
 
+        Unit prior[MAX_UNITS], scalar[MAX_UNITS];
+        Sc64P7PersistentState prior_p7=race_p7, scalar_p7;
+        memcpy(prior,u,sizeof(u));
+        sc64_p7_detector_lists_test_scalar=1;
         sc64_p7_arbiter_cache_source_tick();
+        memcpy(scalar,u,sizeof(u)); scalar_p7=race_p7;
+        memcpy(u,prior,sizeof(u)); race_p7=prior_p7;
+        sc64_p7_detector_lists_test_scalar=0;
+        sc64_p7_arbiter_cache_source_tick();
+        assert(!memcmp(scalar,u,sizeof(u)) && !memcmp(&scalar_p7,&race_p7,sizeof(race_p7)));
         for(int i=0;i<MAX_UNITS;++i) {
             unsigned expected=0;
             if(u[i].alive && expected_aura[i] &&
@@ -156,6 +165,42 @@ static void aura_union_oracle(void)
                         u[i].raw_type,u[i].owner,expected_aura[i],aura_cover_count[i]);
                 assert(u[i].weapon==(u16)expected);
             }
+        }
+        /* Differential lifecycle oracle: compare the complete actor records,
+         * buildings, persistent service state and due/initialized bits on
+         * every frame, including due and non-due clocks and index fallback. */
+        for(int step=0;step<24;++step) {
+            int slot=10+(int)(aura_random()%60u);
+            if(step%6==0) u[slot].alive=0;
+            else if(step%6==1) { u[slot].alive=1; u[slot].raw_type=SC64_P7_OBSERVER_RAW; u[slot].raw_owner=7; u[slot].owner=SIDE; }
+            else if(step%6==2) u[slot].order=ORDER_TRANSPORTED;
+            else if(step%6==3) { u[slot].order=ORDER_IDLE; u[slot].raw_owner=-1; }
+            else if(step%6==4) { u[slot].weapon=(u16)aura_random(); u[slot].raw_type=SC64_OVERLORD_RAW; }
+            else { u[slot].x=(int)(aura_random()%WORLD_W); u[slot].y=(int)(aura_random()%WORLD_H); }
+            if(step==2) { race_p7.reserved[1]=1; race_p7.reserved[2]=0; }
+            if(step==12) { race_p7.reserved[1]=0; race_p7.reserved[2]=0; sc64_p7_arbiter_cache_initialized=0; }
+            sc64_target_index_end();
+            if(step%7==0) u[slot].owner=5; /* force the index fallback */
+            sc64_target_index_begin();
+            Unit before[MAX_UNITS], scalar_after[MAX_UNITS];
+            Building buildings_before[MAX_BUILDINGS];
+            Sc64P7PersistentState state_before=race_p7, scalar_state;
+            int initialized_before=sc64_p7_arbiter_cache_initialized;
+            int due_before=sc64_p7_arbiter_cache_due;
+            memcpy(before,u,sizeof(u)); memcpy(buildings_before,b,sizeof(b));
+            sc64_p7_detector_lists_test_scalar=1;
+            sc64_p7_arbiter_cache_frame_tick(); sc64_p7_arbiter_cache_process_due();
+            memcpy(scalar_after,u,sizeof(u)); scalar_state=race_p7;
+            int scalar_initialized=sc64_p7_arbiter_cache_initialized;
+            int scalar_due=sc64_p7_arbiter_cache_due;
+            memcpy(u,before,sizeof(u)); race_p7=state_before;
+            sc64_p7_arbiter_cache_initialized=initialized_before;
+            sc64_p7_arbiter_cache_due=due_before;
+            sc64_p7_detector_lists_test_scalar=0;
+            sc64_p7_arbiter_cache_frame_tick(); sc64_p7_arbiter_cache_process_due();
+            assert(!memcmp(scalar_after,u,sizeof(u)) && !memcmp(buildings_before,b,sizeof(b)));
+            assert(!memcmp(&scalar_state,&race_p7,sizeof(race_p7)));
+            assert(scalar_initialized==sc64_p7_arbiter_cache_initialized && scalar_due==sc64_p7_arbiter_cache_due);
         }
     }
     assert(checked_candidates>0);
