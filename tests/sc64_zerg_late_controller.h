@@ -183,9 +183,12 @@ static int order_idle_drones(int most)
 {
     static const int dx[]={0,8,-8,0,0,8,-8,8,-8};
     static const int dy[]={0,0,0,8,-8,8,8,-8,-8};
-    int assigned=0;
-    for(int w=0;w<MAX_UNITS&&screen==SCREEN_PLAY&&assigned<most;w++){
+    int assigned=0,tries=0;
+    /* A tap can pick an idle Drone that refuses the field, such as one holding
+       cargo, and each try restarts from it: stop after a few. */
+    for(int w=0;w<MAX_UNITS&&screen==SCREEN_PLAY&&assigned<most&&tries<16;w++){
         if(!u[w].alive||u[w].owner!=SIDE||u[w].type!=U_DRONE||u[w].order!=ORDER_IDLE||u[w].carry)continue;
+        ++tries;
         if(idle_reach&&dist2(u[w].x,u[w].y,cx,cy)>idle_reach*idle_reach)continue;
         /* Spread the Drones: a field worked by fewer of them wins over a closer
            one, and a Drone whose field runs out just stands there. */
@@ -374,6 +377,22 @@ static int box_select(int x0,int y0,int x1,int y1)
     }
     input(0);
     return selected_count();
+}
+
+/* The orders menu reopens on the last chosen command. Choose MOVE ORDER (row
+ * 0) with whatever a tap on `unit` selects, and cancel its targeting. */
+static int clear_menu_last(int unit)
+{
+    if(menu_last==0)return 1;
+    if(unit<0||!u[unit].alive)return 0;
+    close_menus();clear_selected_building();
+    move_cursor(u[unit].x,u[unit].y);KEY_TAP(KEY_A);
+    if(!selected_count()){close_menus();return 0;}
+    KEY_TAP(KEY_B);
+    for(int n=0;n<16&&menu_open&&menu_cursor!=0;n++)KEY_TAP(KEY_UP);
+    if(menu_open&&menu_cursor==0)KEY_TAP(KEY_A);
+    close_menus();
+    return menu_last==0;
 }
 
 /* One pause-menu save: return the unsaved UI state to its load-time form with

@@ -115,3 +115,49 @@ build/test-sc64-z10-carried-z9: tests/sc64_z9_game.c $(STARCRAFT) $(wildcard sta
 test-zerg-z10: build/test-sc64-z10-game build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-game
+
+# Z9 and Z10 ordinary-input qualification, as Z8's above.
+# $(1) lower-case id, $(2) upper-case id, $(3) mission, $(4) ROM code.
+define ZERG_LATE_ARM_ROM
+build/starcraft-zerg-$(1)-$(5).elf: $$($(2)_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
+	$$(CC) $$(CFLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -I$$($(2)_ARM_DIR) -DPX_MISSION=$(3) $(6) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-$(1)-$(5).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-Zerg-$(2)-$(7).gba: build/starcraft-zerg-$(1)-$(5).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC $(2) REPLAY' $(4)
+endef
+define ZERG_LATE_QUALIFICATION
+$(2)_ARM_DIR := build/$(1)-arm
+$(2)_ARM_TRACE := build/$(1)-arm/$(1)-controller.jsonl
+$(2)_TOOL = $$(PYTHON) tools/sc64_p8_arm_replay.py --mission $(3) --prefix PX
+$(2)_REPLAY_DEPS = tests/sc64_protoss_arm_replay.c build/$(1)-arm/sc64_px_tape_generated.h $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) tests/sc64-zerg-late/Makefile
+build/test-sc64-$(1)-campaign-run: tests/sc64_$(1)_campaign_run.c tests/sc64_zerg_late_controller.h $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) $$< -o $$@
+build/$(1)-arm/$(1)-controller.jsonl: build/test-sc64-$(1)-campaign-run
+	mkdir -p build/$(1)-arm
+	./build/test-sc64-$(1)-campaign-run $$@
+.PHONY: test-sc64-$(1)-controller
+test-sc64-$(1)-controller: build/$(1)-arm/$(1)-controller.jsonl
+build/$(1)-arm/sc64_px_tape_generated.h: build/$(1)-arm/$(1)-controller.jsonl tools/sc64_p8_arm_replay.py
+	$$($(2)_TOOL) tape $$< $$@
+build/test-sc64-$(1)-replay: $$($(2)_REPLAY_DEPS) | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) $$< -o $$@
+build/test-sc64-$(1)-replay-prefix: $$($(2)_REPLAY_DEPS) | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_REPLAY_PREFIX $$< -o $$@
+build/test-sc64-$(1)-replay-resume: $$($(2)_REPLAY_DEPS) | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_REPLAY_RESUME $$< -o $$@
+.PHONY: test-sc64-$(1)-replay
+test-sc64-$(1)-replay: build/test-sc64-$(1)-replay build/test-sc64-$(1)-replay-prefix build/test-sc64-$(1)-replay-resume tools/sc64_p8_arm_replay.py
+	./build/test-sc64-$(1)-replay > build/$(1)-arm/host-full.txt
+	./build/test-sc64-$(1)-replay-prefix build/$(1)-arm/host-prefix.sav > build/$(1)-arm/host-prefix.txt || true
+	./build/test-sc64-$(1)-replay-resume build/$(1)-arm/host-prefix.sav > build/$(1)-arm/host-resume.txt
+	$$($(2)_TOOL) compare --from-tick $$$$(sed -n 's/^#define PX_TAPE_RESUME_TICK \([0-9]*\)u$$$$/\1/p' build/$(1)-arm/sc64_px_tape_generated.h) build/$(1)-arm/host-full.txt build/$(1)-arm/host-resume.txt
+.PHONY: test-sc64-zerg-$(1)
+test-sc64-zerg-$(1): test-zerg-$(1) test-sc64-$(1)-controller test-sc64-$(1)-replay
+$$(eval $$(call ZERG_LATE_ARM_ROM,$(1),$(2),$(3),$(4),replay,,Replay))
+$$(eval $$(call ZERG_LATE_ARM_ROM,$(1),$(2),$(3),$(4),replay-prefix,-DPX_REPLAY_PREFIX,Replay-Prefix))
+$$(eval $$(call ZERG_LATE_ARM_ROM,$(1),$(2),$(3),$(4),replay-resume,-DPX_REPLAY_RESUME,Replay-Resume))
+.PHONY: sc64-$(1)-arm-replay
+sc64-$(1)-arm-replay: build/StarCraft-Zerg-$(2)-Replay.gba build/StarCraft-Zerg-$(2)-Replay-Prefix.gba build/StarCraft-Zerg-$(2)-Replay-Resume.gba
+endef
+$(eval $(call ZERG_LATE_QUALIFICATION,z9,Z9,20,SCZ9))
