@@ -2102,6 +2102,9 @@ volatile u32 sc64_t5_rescue_cycles, sc64_t5_mine_cycles, sc64_t5_trigger_ai_cycl
 #endif
 #include "sc64_visibility.h"
 #endif
+#ifdef SC64_DIAGNOSTIC_SETUP
+volatile u32 sc64_setup_buckets, sc64_setup_lists, sc64_setup_index, sc64_setup_arbiter;
+#endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
 volatile u32 sc64_order_setup_cycles, sc64_order_query_cycles, sc64_order_move_cycles;
 #define SC64_ORDER_DIAG_ACCUM(counter, start) \
@@ -8164,8 +8167,15 @@ update_orders(void)
 #if !defined(SC64_SKIRMISH) && !defined(SC64_RACES)
     int cc;
 #endif
+#ifdef SC64_DIAGNOSTIC_SETUP
+    u32 setup_part_start = gba_clock();
+#endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     sc64_unit_buckets_begin();
+#endif
+#ifdef SC64_DIAGNOSTIC_SETUP
+    sc64_setup_buckets = gba_clock() - setup_part_start;
+    setup_part_start = gba_clock();
 #endif
 #ifdef SC64_RACES
     sc64_target_index_end();
@@ -8186,6 +8196,10 @@ update_orders(void)
     }
     target_lists_valid = 1;
 target_lists_unavailable:
+#ifdef SC64_DIAGNOSTIC_SETUP
+    sc64_setup_lists = gba_clock() - setup_part_start;
+    setup_part_start = gba_clock();
+#endif
 #ifdef SC64_OWNER_LIST_TEST
 #ifndef GBA_HOST
 #error "Owner-list assertion hook is host-test only"
@@ -8197,8 +8211,15 @@ target_lists_unavailable:
 #endif
 #ifdef SC64_RACES
     if (target_lists_valid) sc64_target_index_begin_owner_lists();
+#ifdef SC64_DIAGNOSTIC_SETUP
+    sc64_setup_index = gba_clock() - setup_part_start;
+    setup_part_start = gba_clock();
+#endif
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (race_protoss_services_active()) sc64_p7_arbiter_cache_process_due();
+#endif
+#ifdef SC64_DIAGNOSTIC_SETUP
+    sc64_setup_arbiter = gba_clock() - setup_part_start;
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     sc64_target_hostility_snapshot();
