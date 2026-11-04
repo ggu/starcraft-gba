@@ -19,3 +19,5 @@ void guardian_test_replace(int slot,const void *data,u32 len)
     for(u32 i=0;i<len;++i)p[16+i]=src[i];
     sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));
 }
+
+void guardian_test_reset(void) { memset(host_save,0,sizeof(host_save)); }

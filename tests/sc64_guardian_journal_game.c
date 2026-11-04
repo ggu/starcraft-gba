@@ -11,6 +11,7 @@ extern void guardian_test_retag(int,u32,u32);
 extern void guardian_test_sequence(int,u32);
 extern void guardian_test_corrupt(int);
 extern void guardian_test_replace(int,const void *,u32);
+extern void guardian_test_reset(void);
 static u8 envelope[sizeof(RaceImpactRecord)];
 static u8 snapshot[32768];
 
@@ -74,7 +75,7 @@ int main(void)
     guardian_test_restore(snapshot);guardian_test_retag(0,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_SAVE_VERSION);
     assert(race_worker_cargo_select(&plan,&selected));guardian_test_corrupt(selected.slot);
     assert(race_load_game());
-    clear_journal();
+    guardian_test_reset();
     q=&u[slot];q->alive=1;q->hp=120;q->work_timer=351;q->target=43;
     assert(!race_save_game());q->target=44;
     /* Actual engine damage/death, then a save/load of the dead row and slot reuse. */
