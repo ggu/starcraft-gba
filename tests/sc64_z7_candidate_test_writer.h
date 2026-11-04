@@ -18,7 +18,17 @@ static void sc64_z7_test_write_candidate(const RaceSave *candidate)
     assert(save_read_latest(envelope,sizeof(envelope),SC64_TRANSPORT_SAVE_VERSION,&length));
     assert(length>=sizeof(*candidate)+16u);
     memcpy(envelope,candidate,sizeof(*candidate));
+#ifdef SC64_WORKER_CARGO_KIND
+    /* Every injected case owns an isolated synthetic journal. Retain the
+     * production envelope first, then remove both candidate generations. */
+    save_test_corrupt_latest(0,SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
+    save_test_corrupt_latest(0,SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
+    save_test_corrupt_latest(0,SC64_TRANSPORT_SAVE_VERSION);
+    save_test_corrupt_latest(0,SC64_TRANSPORT_SAVE_VERSION);
+    assert(save_write_first(envelope,length,SC64_TRANSPORT_SAVE_VERSION));
+#else
     save_write(envelope,length,SC64_TRANSPORT_SAVE_VERSION);
+#endif
 #else
     save_write(candidate,sizeof(*candidate),SAVE_VERSION);
 #endif

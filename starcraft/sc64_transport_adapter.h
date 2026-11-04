@@ -183,6 +183,17 @@ static int race_transport_request_board(int passenger, int carrier)
     space = race_transport_passenger_space(&u[passenger]);
     if (used < 0 || space < 0 || used + space > SC64_TRANSPORT_DROPSHIP_SPACE)
         return 0;
+#ifdef SC64_WORKER_CARGO_KIND
+#ifdef SC64_T6_RUNTIME
+    /* Repair's Q8 remainder is not a resource bundle. */
+    if (u[passenger].order == ORDER_REPAIR) {
+        u[passenger].carry = 0;
+        u[passenger].work_timer = 0;
+        sc64_worker_cargo_clear(&u[passenger]);
+    }
+#endif
+    sc64_worker_gather_pending_set(&u[passenger], 0);
+#endif
     u[passenger].order = ORDER_BOARD;
     u[passenger].target = carrier;
     u[passenger].path_timer = u[passenger].path_retry = 0;

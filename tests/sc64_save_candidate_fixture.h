@@ -8,6 +8,42 @@
 static Sc64ImpactEvent fixture_saved_impacts[RACE_IMPACT_CAPACITY];
 static u8 fixture_saved_impact_count;
 #endif
+#ifdef SC64_WORKER_CARGO_KIND
+static void fixture_clear_record_tag(u32 tag)
+{
+    save_test_corrupt_latest(0, tag);
+    save_test_corrupt_latest(0, tag);
+}
+/* Synthetic HOST records belong to independent malformed-candidate cases.
+ * Discard them explicitly between cases: the production first-write guard
+ * correctly refuses to overwrite a committed record with no valid predecessor. */
+static void fixture_clear_candidate_records(void)
+{
+#ifdef SC64_SHARED_TRANSPORT
+    const u32 tags[] = { SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
+                         SC64_TRANSPORT_SAVE_VERSION };
+#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+    const u32 tags[] = { SC64_LEGACY_SAVE_VERSION,
+                         SC64_WORKER_CARGO_LEGACY_SAVE_VERSION, SAVE_VERSION };
+#else
+    const u32 tags[] = { SC64_WORKER_CARGO_LEGACY_SAVE_VERSION, SAVE_VERSION };
+#endif
+    for (unsigned i = 0; i < sizeof(tags) / sizeof(tags[0]); ++i) {
+        fixture_clear_record_tag(tags[i]);
+    }
+}
+static void fixture_finish_rejected_candidate(void)
+{
+    /* The record is checksum-valid but semantically invalid. Keep the
+       production overwrite refusal covered before preparing the next case. */
+    assert(!race_save_game());
+    fixture_clear_candidate_records();
+}
+#else
+#define fixture_clear_record_tag(tag) ((void)(tag))
+#define fixture_clear_candidate_records() ((void)0)
+#define fixture_finish_rejected_candidate() ((void)0)
+#endif
 static void fixture_capture_save(RaceSave *candidate)
 {
 #ifdef SC64_IMPACT_EVENTS
@@ -29,8 +65,16 @@ static void write_candidate_record(const RaceSave *candidate)
     memcpy(live, race_impact_rows, sizeof(live));
     memcpy(race_impact_rows, fixture_saved_impacts, sizeof(fixture_saved_impacts));
     race_impact_count = fixture_saved_impact_count;
+#ifdef SC64_WORKER_CARGO_KIND
+    /* Isolate this intentionally malformed candidate: an older valid record
+     * would make the journal correctly fall back and mask rejection. */
+    fixture_clear_candidate_records();
+    race_data = expected;
+    assert(race_impact_save_write(NULL));
+#else
     race_data = expected;
     assert(race_impact_save_write());
+#endif
     memcpy(race_impact_rows, live, sizeof(live));
     race_impact_count = live_count;
     assert(race_impact_save_read(decoded, &count));

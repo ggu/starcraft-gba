@@ -283,7 +283,11 @@ static int order_idle_scvs_to_visible_minerals(void)
     int assigned=0;
     for(int w=0;w<MAX_UNITS && screen==SCREEN_PLAY;w++) {
         if(!u[w].alive || u[w].owner!=SIDE || u[w].type!=U_SCV ||
-           u[w].order!=ORDER_IDLE || u[w].carry || !select_workers_at(w)) continue;
+           u[w].order!=ORDER_IDLE ||
+#ifndef SC64_WORKER_CARGO_KIND
+           u[w].carry ||
+#endif
+           !select_workers_at(w)) continue;
         /* Raynor's patches lie just past the base's sight: walk toward the
          * nearest one first, and never cross the map for a visible patch. */
         int target=-1,best=0x7fffffff,nearest=-1,near_d=0x7fffffff;
@@ -514,6 +518,10 @@ static int remine_stuck_builder(void)
  * idle and empty for the mining pass. */
 static int recover_loaded_probe(void)
 {
+#ifdef SC64_WORKER_CARGO_KIND
+    /* The normal mineral order accepts loaded workers; the mining pass handles them. */
+    return 0;
+#else
     int refinery=-1,worker=-1;
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
         b[i].type==B_REFINERY&&building_complete(i)){refinery=i;break;}
@@ -527,6 +535,7 @@ static int recover_loaded_probe(void)
     if(menu_open&&menu_cursor==MENU_STOP)KEY_TAP(KEY_A);
     close_menus();
     return u[worker].order==ORDER_IDLE;
+#endif
 }
 
 #ifndef P10_GAS_BANK

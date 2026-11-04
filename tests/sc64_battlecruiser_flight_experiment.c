@@ -52,6 +52,7 @@ int main(void)
     int saved_x=b[sf].x, saved_energy=minerals;
     assert(!race_load_game());
     assert(race_bc_facility_airborne(sf) && b[sf].x==saved_x && minerals==saved_energy);
+    fixture_finish_rejected_candidate();
     assert(race_save_game());
 #endif
     selected_building=sf;

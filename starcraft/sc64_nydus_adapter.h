@@ -431,6 +431,16 @@ static int race_nydus_issue_selected(int x, int y)
             race_nydus_can_enter(i, entrance)) {
             int ax, ay;
             if (!race_nydus_approach_point(i, entrance, &ax, &ay)) continue;
+#ifdef SC64_WORKER_CARGO_KIND
+#ifdef SC64_T6_RUNTIME
+            if (u[i].order == ORDER_REPAIR) {
+                u[i].carry = 0;
+                u[i].work_timer = 0;
+                sc64_worker_cargo_clear(&u[i]);
+            }
+#endif
+            sc64_worker_gather_pending_set(&u[i], 0);
+#endif
             u[i].order = ORDER_NYDUS_ENTER;
             u[i].target = entrance;
             u[i].tx = ax; u[i].ty = ay;

@@ -66,6 +66,7 @@ int main(void)
     assert(!race_load_game());
     assert(b[lab].queue_progress==original_remaining && !b[lab2].level &&
            minerals==original_ore && sc64_battlecruiser_tech_bits==original_bits);
+    fixture_finish_rejected_candidate();
     assert(race_save_game());
 #endif
     b[lab2].level=SC64_BC_TECH_YAMATO; b[lab2].queue_progress=2;
