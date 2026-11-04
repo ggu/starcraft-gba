@@ -1238,6 +1238,18 @@ static void save_validated_commit_tag(volatile u8 *p,u32 tag) {
 #endif
 #define SAVE_VALIDATED_IS_COMMITTED(p,tag) \
     (SAVE_VALIDATED_TAG_VALID(tag)&&valid_record(p,0,tag))
+#ifdef SC64_DIAGNOSTIC_SAVE_VALIDATE
+static int save_profile_validator(GbaSaveValidator validate,const void *scratch,
+        u32 len,u32 tag,void *context,int slot) {
+    u32 start=gba_clock();
+    int accepted=validate(scratch,len,tag,context);
+    sc64_diagnostic_save_validate(0,slot,gba_clock()-start,tag,len,accepted);
+    return accepted;
+}
+#define SAVE_PROFILE_VALIDATE() save_profile_validator(validate,scratch,len,tag,context,slot)
+#else
+#define SAVE_PROFILE_VALIDATE() validate(scratch,len,tag,context)
+#endif
 int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection) {
     volatile const u8 *base=(volatile const u8*)SRAM_BASE;
@@ -1253,7 +1265,7 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
         for(unsigned i=0;i<tag_count;i++)if(tags[i]==tag)allowed=1;
         if(!allowed||len>capacity||!valid_record(p,0,tag))continue;
         for(u32 i=0;i<len;i++)((u8*)scratch)[i]=p[16+i];
-        if(!validate(scratch,len,tag,context))continue;
+        if(!SAVE_PROFILE_VALIDATE())continue;
         if(best.slot>=0 && seq-best.sequence==0x80000000u)return 0;
         if(best.slot<0||(s32)(seq-best.sequence)>0)
             best=(GbaSaveSelection){tag,len,seq,sram_get32(p+8),slot};
@@ -1265,6 +1277,65 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
     for(u32 i=0;i<best.length;i++)((u8*)scratch)[i]=p[16+i];
     *selection=best;return 1;
 }
+#undef SAVE_PROFILE_VALIDATE
+
+/* Return -1 on a changed snapshot, 0 for semantic rejection, 1 for a prepared
+ * candidate. The header comparison precedes the copy; the selected original
+ * record's full checksum is checked again after preparation. */
+static int save_prepare_selection(void *scratch,const GbaSaveSelection *row,
+                                   GbaSaveValidator prepare,void *context) {
+    volatile const u8 *p=(volatile const u8*)SRAM_BASE+(unsigned)row->slot*SAVE_SLOT_SIZE;
+    if(sram_get32(p)!=row->tag || sram_get32(p+4)!=row->length ||
+       sram_get32(p+8)!=row->checksum || sram_get32(p+12)!=row->sequence)return -1;
+    for(u32 i=0;i<row->length;i++)((u8*)scratch)[i]=p[16+i];
+#ifdef SC64_DIAGNOSTIC_SAVE_VALIDATE
+    return save_profile_validator(prepare,scratch,row->length,row->tag,context,row->slot)!=0;
+#else
+    return prepare(scratch,row->length,row->tag,context)!=0;
+#endif
+}
+
+int save_select_prepared(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
+                         GbaSaveValidator prepare,void *context,GbaSaveSelection *selection) {
+    volatile const u8 *base=(volatile const u8*)SRAM_BASE;
+    GbaSaveSelection rows[2];unsigned count=0;int winner=-1;
+    if(!scratch||!capacity||!tags||!tag_count||tag_count>3||!prepare||!selection)return 0;
+    for(unsigned i=0;i<tag_count;i++) {
+        if(!SAVE_VALIDATED_TAG_VALID(tags[i]))return 0;
+        for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
+    }
+    for(int slot=0;slot<2;slot++) {
+        volatile const u8 *p=base+(unsigned)slot*SAVE_SLOT_SIZE;
+        u32 tag=sram_get32(p),len=sram_get32(p+4),seq=sram_get32(p+12);int allowed=0;
+        for(unsigned i=0;i<tag_count;i++)if(tags[i]==tag)allowed=1;
+        if(!allowed||len>capacity||!valid_record(p,0,tag))continue;
+        rows[count++]=(GbaSaveSelection){tag,len,seq,sram_get32(p+8),slot};
+    }
+    if(!count)return 0;
+    int ambiguous=count==2 && rows[1].sequence-rows[0].sequence==0x80000000u;
+    if(count==2 && !ambiguous && (s32)(rows[1].sequence-rows[0].sequence)>0) {
+        GbaSaveSelection swap=rows[0];rows[0]=rows[1];rows[1]=swap;
+    }
+    for(unsigned i=0;i<count;i++) {
+        int accepted=save_prepare_selection(scratch,&rows[i],prepare,context);
+        if(accepted<0)return 0;
+        if(!accepted)continue;
+        if(winner>=0)return 0; /* Both half-range candidates are semantically valid. */
+        winner=(int)i;
+        if(!ambiguous)break;
+    }
+    if(winner<0)return 0;
+    /* Only the half-range fallback may have inspected a rejected candidate
+     * after the winner. Rebuild that winner's scratch and context in that case. */
+    if(ambiguous && winner==0 &&
+       save_prepare_selection(scratch,&rows[0],prepare,context)!=1)return 0;
+    GbaSaveSelection best=rows[winner];
+    volatile const u8 *p=base+(unsigned)best.slot*SAVE_SLOT_SIZE;
+    if(!valid_record(p,best.length,best.tag)||sram_get32(p+12)!=best.sequence||
+       sram_get32(p+8)!=best.checksum)return 0;
+    *selection=best;return 1;
+}
+
 int save_select_transaction(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
                             GbaSaveValidator prepare,GbaSaveCommit commit,void *context,
                             GbaSaveSelection *selection) {

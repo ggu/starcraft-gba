@@ -1500,7 +1500,7 @@ static void race_skirmish_init(void)
 {
     static const int mdx[4] = { 56, 42, 56, 42 };
     static const int mdy[4] = { 24, 40, 8, 20 };
-    int i, j, owner, worker_type, townhall, supply_building;
+    int i, j, owner, worker_type, townhall;
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_reset();
 #endif
@@ -1570,13 +1570,11 @@ static void race_skirmish_init(void)
         owner = i == 0 ? SIDE : race_bot_owner_ids[i - 1];
         if (owner != SIDE) race_minerals[owner] = 200;
         switch (race_owner_identity(owner)) {
-        case R_ZERG: townhall = B_HATCHERY; supply_building = -1; worker_type = U_DRONE; break;
-        case R_PROTOSS: townhall = B_NEXUS; supply_building = B_PYLON; worker_type = U_PROBE; break;
-        default: townhall = B_COMMAND; supply_building = B_DEPOT; worker_type = U_SCV; break;
+        case R_ZERG: townhall = B_HATCHERY; worker_type = U_DRONE; break;
+        case R_PROTOSS: townhall = B_NEXUS; worker_type = U_PROBE; break;
+        default: townhall = B_COMMAND; worker_type = U_SCV; break;
         }
         spawn_build(owner, townhall, race_base_x[base], race_base_y[base], 0);
-        if (supply_building >= 0)
-            spawn_build(owner, supply_building, race_base_x[base] + ((base & 1) ? 48 : -48), race_base_y[base], 0);
         if (race_owner_identity(owner) == R_ZERG)
             spawn_unit(owner, U_OVERLORD, race_base_x[base] - 24, race_base_y[base] - 18);
         for (j = 0; j < 4; ++j) {
