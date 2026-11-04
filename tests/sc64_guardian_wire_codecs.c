@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <string.h>
 typedef uint8_t u8; typedef uint32_t u32;
+#define SC64_RACES 1
+typedef struct { int hp; } Sc64StockUnitProfile;
+static const Sc64StockUnitProfile *sc64_stock_unit_profile(int raw) { static const Sc64StockUnitProfile cocoon={200}; return raw==59?&cocoon:0; }
 enum { SC_RU_COUNT=64, SC_RB_COUNT=64, U_OVERLORD=8, U_COCOON=64, MAX_UNITS=240, MAX_BUILDINGS=160 };
 typedef struct { int hp, shields; } Sc64RaceUnitRule;
 static Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT];
