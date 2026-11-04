@@ -24,6 +24,9 @@
  * argv[1] into the empty host SRAM before booting. Emulator evidence only;
  * no physical-hardware claim.
  */
+#if defined(Z7_PEAK_DIAGNOSTIC) && !defined(SC64_DIAGNOSTIC_UPDATE)
+#define SC64_DIAGNOSTIC_UPDATE
+#endif
 #include "../starcraft/game.c"
 #include "sc64_z7_tape_generated.h"
 #ifdef GBA_HOST
@@ -52,6 +55,12 @@ static u16 previous_held;
 static u32 frames_run;
 static uint64_t cycles_total, cycles_update;
 static u32 cycles_peak, update_peak;
+#ifdef Z7_PEAK_DIAGNOSTIC
+/* Probe context only; never serialized or used to choose gameplay input.
+ * 0=boot, 1=recorded tape, 2=HOME load, 3=pause-menu save. */
+static u32 diagnostic_tick;
+static unsigned diagnostic_phase;
+#endif
 
 static void out_text(const char *s) { while (*s && line_len < sizeof(line) - 1) line[line_len++] = *s++; }
 static void out_u64(uint64_t v)
@@ -99,6 +108,37 @@ static u32 stack_untouched(void)
 }
 #endif
 
+#if defined(Z7_PEAK_DIAGNOSTIC) && !defined(GBA_HOST)
+static void peak_field(const char *name, u32 value)
+{
+    out_text(" "); out_text(name); out_text("="); out_u64(value);
+}
+static void report_peak(u16 held, u32 before_frame, int before_screen,
+                        u32 total, u32 update)
+{
+    int advancing = before_screen == SCREEN_PLAY && (u32)frame == before_frame + 1u;
+    out_text("Z7D PEAK");
+    out_field("call", (long)frames_run); out_field("tick", (long)diagnostic_tick);
+    out_field("phase", (long)diagnostic_phase);
+    out_field("before", (long)before_frame); out_field("frame", (long)frame);
+    out_field("screen0", before_screen); out_field("screen", screen);
+    out_field("held", held); peak_field("total", total);
+    peak_field("update", update); out_field("advancing", advancing);
+    out_text(" end=1"); out_flush();
+    out_text("Z7D STAGES");
+    out_field("call", (long)frames_run); out_field("tick", (long)diagnostic_tick);
+    peak_field("orders", advancing ? sc64_orders_cycles : 0);
+    peak_field("sight", advancing ? sc64_sight_cycles : 0);
+    peak_field("mission", sc64_update_mission_cycles);
+    peak_field("production", sc64_update_production_cycles);
+    peak_field("state", sc64_update_race_state_cycles);
+    peak_field("defenses", sc64_update_defenses_cycles);
+    peak_field("research", sc64_update_research_cycles);
+    peak_field("remainder", sc64_update_remainder_cycles);
+    out_text(" end=1"); out_flush();
+}
+#endif
+
 /* One frame of the shipped main-loop work, timed like common/main.c. */
 static void frame_with(u16 held)
 {
@@ -108,6 +148,13 @@ static void frame_with(u16 held)
     audio_update();
     game_render();
 #else
+#ifdef Z7_PEAK_DIAGNOSTIC
+    u32 before_frame = (u32)frame;
+    int before_screen = screen;
+    sc64_update_mission_cycles = sc64_update_production_cycles = 0;
+    sc64_update_race_state_cycles = sc64_update_defenses_cycles = 0;
+    sc64_update_research_cycles = sc64_update_remainder_cycles = 0;
+#endif
     u32 start = gba_clock();
     demo_keys = held;
     game_update(held, held & (u16)~previous_held);
@@ -117,6 +164,11 @@ static void frame_with(u16 held)
     u32 total = gba_clock() - start;
     cycles_total += total;
     cycles_update += update;
+#ifdef Z7_PEAK_DIAGNOSTIC
+    if ((total > cycles_peak || update > update_peak) &&
+        (diagnostic_phase == 2 || total >= 1000000u))
+        report_peak(held, before_frame, before_screen, total, update);
+#endif
     if (total > cycles_peak) cycles_peak = total;
     if (update > update_peak) update_peak = update;
 #endif
@@ -276,6 +328,9 @@ int main(void)
     u32 tick = 1;
 #if Z7_ARM_MODE == 2
     /* HOME's L loads the newest valid record; the tape resumes after the cut. */
+#ifdef Z7_PEAK_DIAGNOSTIC
+    diagnostic_phase = 2; diagnostic_tick = Z7_ARM_CUT_TICK;
+#endif
     frame_with(KEY_L);
     out_text(screen == SCREEN_PLAY && race_z7_active() && !race_z7.runtime.fault ?
              "Z7 LOADED ok" : "Z7 LOADED fail");
@@ -289,6 +344,21 @@ int main(void)
     tick = Z7_ARM_CUT_TICK + 1;
 #endif
     for (; tick <= Z7_TAPE_STOP_TICK; ++tick) {
+#ifdef Z7_PEAK_DIAGNOSTIC
+        diagnostic_phase = 1; diagnostic_tick = tick;
+#ifdef Z7_PEAK_FRAME_LIMIT
+        if (frames_run >= Z7_PEAK_FRAME_LIMIT) {
+            out_text("Z7D STOP"); out_field("calls", (long)frames_run);
+            out_field("tick", (long)tick); out_text(" end=1"); out_flush();
+            /* This diagnostic stop is deliberately not a qualifying DONE. */
+#ifdef GBA_HOST
+            return 0;
+#else
+            for (;;) {}
+#endif
+        }
+#endif
+#endif
         u16 held = tape_keys(tick);
         if (screen == SCREEN_RESULT || won || lost) {
             out_text("Z7 EARLY_END"); out_field("host_tick", (long)tick); out_flush();
@@ -301,6 +371,9 @@ int main(void)
         if (tick >= Z7_ARM_SAVE_MIN_TICK && idle_for_save(tick)) {
             report("cut", tick);
             report_cycles("cut", tick);
+#ifdef Z7_PEAK_DIAGNOSTIC
+            diagnostic_phase = 3;
+#endif
             frame_with(KEY_START); frame_with(0); frame_with(KEY_B); frame_with(0);
             out_text(screen == SCREEN_PAUSE && !race_z7.runtime.fault ? "Z7 SAVED ok" : "Z7 SAVED fail");
             out_field("cut", (long)tick); out_field("frame", (long)frame);
