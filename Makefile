@@ -3191,7 +3191,8 @@ test-sc64-p7-prevalidated: build/test-sc64-p7-runtime-reference build/test-sc64-
 	cmp build/sc64-p7-runtime-reference.txt build/sc64-p7-runtime-prevalidated.txt
 
 # Explicit opt-in P7 Arbiter host matrix. Existing profiles remain cache-off.
-P7_ARBITER_INPUTS := $(P7_BATTERY_INPUTS)
+CONTACT_MASK_TABLE_HEADER := build/generated/sc64_contact_mask_table_generated.h
+P7_ARBITER_INPUTS := $(P7_BATTERY_INPUTS) $(CONTACT_MASK_TABLE_HEADER)
 P7_ARBITER_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
 build/test-sc64-p7-arbiter-reference: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) $< common/gba.c -o $@
@@ -4467,7 +4468,7 @@ endif
 # Clip world art before it reaches either HUD band. Keep the infrequent
 # procedural diamond fallback in ROM so clipping retains the IWRAM reserve.
 SHOWCASE_INPUTS = $(BC_INPUTS) $(P7_ARBITER_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
-SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(SHOWCASE_CONTACT_BASE_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SHOWCASE_HUD_CACHE_FLAGS) $(SHOWCASE_TERRAIN_CACHE_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS)
+SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(SHOWCASE_CONTACT_BASE_FLAGS) $(if $(filter 1,$(SHOWCASE_CONTACT_CACHE)),-DSC64_CONTACT_MASK_TABLE -Ibuild/generated) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SHOWCASE_HUD_CACHE_FLAGS) $(SHOWCASE_TERRAIN_CACHE_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS)
 build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
@@ -4948,7 +4949,6 @@ test-sc64-p7-contact: test-sc64-contact-cache-p7
 
 # The optional CONTACT mask geometry kernel is generated authored math, not a
 # ROM-derived asset. This target has no imported/native input prerequisites.
-CONTACT_MASK_TABLE_HEADER = build/generated/sc64_contact_mask_table_generated.h
 $(CONTACT_MASK_TABLE_HEADER): tools/sc64_contact_mask_table_gen.py | build
 	$(PYTHON) $< --out $@
 build/test-sc64-contact-mask-table: tests/sc64_contact_mask_table_generated.c $(CONTACT_MASK_TABLE_HEADER) Makefile | build
