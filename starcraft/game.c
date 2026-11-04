@@ -1163,7 +1163,10 @@ static Building b[MAX_BUILDINGS];
 #endif
 /* Temporary ascending-index owner lists used only during update_orders(). */
 static int target_unit_head[5], target_building_head[5];
-static int target_unit_next[MAX_UNITS], target_building_next[MAX_BUILDINGS];
+/* Signed links retain -1 as the list terminator. */
+_Static_assert(MAX_UNITS <= 32768 && MAX_BUILDINGS <= 32768,
+               "target list indices must fit in s16");
+static s16 target_unit_next[MAX_UNITS], target_building_next[MAX_BUILDINGS];
 static int target_lists_valid;
 #if defined(SC64_RACES) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY))
 static u8 target_hostile_mask[5];

@@ -40,12 +40,12 @@ try:
                 raise
             segments += 1
     print('guest-cycle segments', segments + 1, flush=True)
-    totals = struct.unpack('<28Q', replay.read(symbols['totals'], 28*8))
-    peaks = struct.unpack('<28I', replay.read(symbols['peaks'], 28*4))
+    totals = struct.unpack('<31Q', replay.read(symbols['totals'], 31*8))
+    peaks = struct.unpack('<31I', replay.read(symbols['peaks'], 31*4))
     data = replay.read(symbols['checkpoints'], 1440)
     with open(a.out, 'x') as out:
         json.dump({'totals': totals, 'peaks': peaks,
-                   'segments': segments + 1, 'active_count': struct.unpack('<I',replay.read(symbols['active_count'],4))[0], 'active_full': struct.unpack('<Q',replay.read(symbols['active_full'],8))[0], 'active_peak': struct.unpack('<I',replay.read(symbols['active_peak'],4))[0], 'active_peak_tick': struct.unpack('<I',replay.read(symbols['active_peak_tick'],4))[0], 'active_totals': struct.unpack('<28Q',replay.read(symbols['active_totals'],224)), 'active_peaks': struct.unpack('<28I',replay.read(symbols['active_peaks'],112)), 'active_peak_ticks': struct.unpack('<28I',replay.read(symbols['active_peak_ticks'],112)), 'checkpoints': list(struct.iter_unpack('<4I', data))}, out, indent=2)
+                   'segments': segments + 1, 'active_count': struct.unpack('<I',replay.read(symbols['active_count'],4))[0], 'active_full': struct.unpack('<Q',replay.read(symbols['active_full'],8))[0], 'active_peak': struct.unpack('<I',replay.read(symbols['active_peak'],4))[0], 'active_peak_tick': struct.unpack('<I',replay.read(symbols['active_peak_tick'],4))[0], 'active_totals': struct.unpack('<31Q',replay.read(symbols['active_totals'],248)), 'active_peaks': struct.unpack('<31I',replay.read(symbols['active_peaks'],124)), 'active_peak_ticks': struct.unpack('<31I',replay.read(symbols['active_peak_ticks'],124)), 'checkpoints': list(struct.iter_unpack('<4I', data))}, out, indent=2)
     proc.stdin.write('q\n'); proc.stdin.flush()
 finally:
     if proc.poll() is None:
