@@ -29,14 +29,23 @@
 
 volatile u16 demo_keys;
 
+/* Z9 and Z10 leave too little working RAM for a line buffer on ARM: write
+ * straight into mGBA's debug buffer, which is what the flush copies to anyway. */
+#if defined(PX_DIRECT_LOG) && !defined(GBA_HOST)
+#define PX_LINE ((volatile char *)0x04FFF600)
+enum { PX_LINE_SIZE = 240 };
+#else
 static char line[240];
+#define PX_LINE line
+enum { PX_LINE_SIZE = sizeof(line) };
+#endif
 static unsigned line_len;
 static u16 previous_held;
 static u32 frames_run;
 static uint64_t cycles_total, cycles_update;
 static u32 cycles_peak;
 
-static void out_text(const char *s) { while (*s && line_len < sizeof(line) - 1) line[line_len++] = *s++; }
+static void out_text(const char *s) { while (*s && line_len < PX_LINE_SIZE - 1u) PX_LINE[line_len++] = *s++; }
 static void out_unsigned(unsigned long v)
 {
     char tmp[21]; int n = 0;
@@ -57,11 +66,13 @@ static void out_u64(uint64_t v)
 static void out_field(const char *name, long v) { out_text(" "); out_text(name); out_text("="); out_num(v); }
 static void out_flush(void)
 {
-    line[line_len] = 0;
+    PX_LINE[line_len] = 0;
 #ifdef GBA_HOST
     puts(line); fflush(stdout);
 #else
+#ifndef PX_DIRECT_LOG
     for (unsigned i = 0; i <= line_len; ++i) ((volatile char *)0x04FFF600)[i] = line[i];
+#endif
     *(volatile u16 *)0x04FFF700 = 0x100 | 2; /* warn: visible with log mask 7 */
 #endif
     line_len = 0;
@@ -84,6 +95,11 @@ static u32 state_digest(void)
         H(q->hp); H(q->shield); H(q->x); H(q->y); H(q->tx); H(q->ty);
         H(q->target); H(q->raw_type); H(q->raw_owner); H(q->cd);
         H(q->owner); H(q->type); H(q->order); H(q->carry);
+#ifdef PX_CARGO_DIGEST
+        /* Late-campaign continuation must also observe cargo kind/pending
+         * state and worker progress, as the dedicated P10 probe does. */
+        H(q->flags); H(q->work_timer); H(q->build);
+#endif
     }
     for (int i = 0; i < MAX_BUILDINGS; i++) {
         const Building *q = &b[i];
@@ -218,6 +234,8 @@ int main(int argc, char **argv)
 #ifdef PX_REPLAY_PREFIX
     host_sram_io(sram_path, 1);
 #endif
+    /* Optional separate output: never overwrite a resume seed implicitly. */
+    if (argc > 2) host_sram_io(argv[2], 1);
 #endif
     out_text("PX DONE"); out_field("cursor", (long)cursor); out_flush();
 #ifdef GBA_HOST
