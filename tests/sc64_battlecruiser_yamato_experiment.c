@@ -32,6 +32,7 @@ int main(void)
     assert(!race_load_game());
     assert(!memcmp(&saved_shot,&sc64_bc_shots[0],sizeof(saved_shot)) &&
            minerals==saved_minerals && u[a].carry==50*256);
+    fixture_finish_rejected_candidate();
     assert(race_save_game());
     while (sc64_bc_shots[0].age < 43) { ++frame; assert(race_bc_yamato_tick_caster(a)); }
     assert(sc64_bc_shots[0].age==43 && sc64_bc_shots[0].state==SC64_BC_SHOT_CHARGING);
@@ -91,6 +92,7 @@ int main(void)
     write_candidate_record(&bad_record);
     assert(!race_bc_shots_candidate_valid(&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H));
     assert(!race_load_game() && !memcmp(&sc64_bc_shots[1],&expected,sizeof(expected)));
+    fixture_finish_rejected_candidate();
     sc64_bc_shot_target_gone(sc64_bc_shots,(unsigned)t);
     assert(sc64_bc_shots[1].state==SC64_BC_SHOT_FLIGHT &&
            sc64_bc_shots[1].target==SC64_BC_SHOT_NO_TARGET);
