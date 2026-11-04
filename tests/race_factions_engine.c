@@ -119,7 +119,8 @@ int main(void)
     assert(find_worker(ENEMY, U_PROBE) >= 0);
     assert(find_worker(RESCUABLE, U_SCV) >= 0);
     assert(race_owner_supply_cap(SIDE) >= 18); /* Hatchery + Overlord. */
-    assert(race_owner_supply_cap(ENEMY) >= 34); /* Nexus + Pylon. */
+    assert(race_owner_supply_cap(ENEMY) == 18); /* Nexus only. */
+    assert(race_owner_supply_cap(RESCUABLE) == 20); /* Command Center only. */
     /* Generated-map mineral lines use real source fields, not the
      * placeholder diamond drawn for an unknown style. */
     for (int i = 0; i < 16; ++i) {
@@ -153,6 +154,8 @@ int main(void)
     race_human = R_PROTOSS; race_bots = 0;
     race_skirmish_init(); screen = SCREEN_PLAY;
     {
+        /* Explicitly prepare power for this production fixture. */
+        assert(spawn_build(SIDE, B_PYLON, race_base_x[0] - 48, race_base_y[0], 0) >= 0);
         int gateway = spawn_build(SIDE, B_GATEWAY, 208, 160, 0);
         int zealot, probe;
         assert(gateway >= 0 && race_site_powered(SIDE, b[gateway].x, b[gateway].y));
@@ -254,6 +257,7 @@ int main(void)
     {
         int hall = find_building(ENEMY, B_NEXUS);
         assert(hall >= 0);
+        assert(spawn_build(ENEMY, B_PYLON, race_base_x[1] + 48, race_base_y[1], 0) >= 0);
         b[hall].alive = 0;
         race_skirmish_outcome();
         assert(!won && !lost); /* the bot still has its Pylon */
