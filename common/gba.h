@@ -126,8 +126,22 @@ int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
  * again after selection. A token names the validated predecessor slot. */
 typedef struct { u32 tag, length, sequence, checksum; int slot; } GbaSaveSelection;
 typedef int (*GbaSaveValidator)(const void *data,u32 length,u32 tag,void *context);
+#ifdef SC64_DIAGNOSTIC_SAVE_VALIDATE
+/* Supplied by an isolated diagnostic probe; absent from normal products. */
+void sc64_diagnostic_save_validate(unsigned layer,int slot,u32 cycles,
+                                    u32 tag,u32 length,int accepted);
+#endif
 int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection);
+/* Select and retain a prepared winner. Unlike save_select_validated, scratch
+ * contains the successful callback's possibly transformed payload on return.
+ * The deterministic callback may alter scratch and private preparation state
+ * (context or uncommitted globals), rebuilt from the current payload. It must
+ * not depend on callback order/count or alter SRAM/live state. Newest
+ * valid candidates are tried first; an ambiguous half-range validates both.
+ * The original committed record is rechecked before publishing the token. */
+int save_select_prepared(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
+                         GbaSaveValidator prepare,void *context,GbaSaveSelection *selection);
 /* The validator prepares a scratch-only plan and may overwrite the payload.
  * It runs again on the reloaded winner before commit. Commit must not fail. */
 typedef void (*GbaSaveCommit)(void *context);
