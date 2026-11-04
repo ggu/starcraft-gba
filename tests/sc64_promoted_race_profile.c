@@ -35,7 +35,19 @@
 #error "Compile with a promoted unified Zerg or Protoss profile"
 #endif
 
-#if SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z7_RUNTIME)
+#if SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z9_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_ZERG
+#define PROFILE_FRONT_FACTION SC_FRONT_ZERG
+#define PROFILE_RACE R_ZERG
+#define PROFILE_SAVE_GENERATION 48u
+#define PROFILE_OLD_SAVE_TAG 0x53435a32u
+static const int profile_missions[] = {0, 1, 14, 15, 16, 17, 18, 19, 20};
+static const char *const profile_titles[] = {
+    "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM",
+    "THE AMERIGO", "THE DARK TEMPLAR", "THE CULLING", "EYE FOR AN EYE",
+    "THE INVASION OF AIUR"
+};
+#elif SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z7_RUNTIME)
 #define PROFILE_FACTION SC64_FACTION_ZERG
 #define PROFILE_FRONT_FACTION SC_FRONT_ZERG
 #define PROFILE_RACE R_ZERG
