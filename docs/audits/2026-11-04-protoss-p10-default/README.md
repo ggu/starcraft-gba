@@ -70,9 +70,8 @@ Every ARM replay ended in the same win as its host run.
 
 ## Not run on the original audit base
 
-- **Fresh preparation.** The new prepare step was checked through its unit tests and by
-  regenerating the three headers. `./dev sc64 prepare` wasn't run end to end, because this
-  worktree's inputs are cloned from the pinned set.
+- **Fresh preparation in the initial run.** That worktree used cloned pinned inputs;
+  the later fresh-setup qualification below runs preparation end to end.
 - **Smoke and profile tools.** `tools/sc64_split_smoke.py` and `tools/sc64_split_profile.py`
   now point at the P10 ROM, but they use the shared debugger port, so they didn't run.
 - **Production ROM.** ARM results are from a replay probe that shares the candidate flags
