@@ -900,13 +900,24 @@ static int forced_commit(int scenario)
     uint32_t reference = 0, resumed = 0;
     RaceAiCensus c;
     if (scenario < 0 || scenario > 3 || race_owner_identity(owner) != R_TER) return 0;
-    while (frame < setup && screen == SCREEN_PLAY && !won && !lost) {
+    /* The late condition needs three genuinely recruited survivors, not a
+     * particular combat phase at one exact frame. Keep defending the human as
+     * before, then wait at most 6000 more frames for the original setup. */
+    int late_ready = 0;
+    while (screen == SCREEN_PLAY && !won && !lost &&
+           frame < setup + (scenario == 1 ? 6000 : 0)) {
+        if (scenario == 1 && frame >= setup) {
+            int marines = 0;
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (race_ai_movable_army(&u[i], owner) && u[i].type == U_MARINE) ++marines;
+            if (marines >= 3) { late_ready = 1; break; }
+        }
         input(0);
         if (scenario == 1) defend_human(owner);
     }
-    if (screen != SCREEN_PLAY || won || lost) goto done;
+    if (screen != SCREEN_PLAY || won || lost || (scenario == 1 && !late_ready)) goto done;
     kept = cut_army(owner, 3, slots);
-    if (kept < 1) goto done;
+    if (kept != 3) goto done;
     if (scenario == 0 || scenario == 2) exhaust_minerals(owner);
     if (scenario == 1) {
         /* Only the 25-minute rule may apply: local minerals remain. */
@@ -919,21 +930,21 @@ static int forced_commit(int scenario)
     if (scenario == 2) {
         int ref_at, ref_n = 0;
         if (!save_through_pause()) goto done;
-        ref_at = await_commit(owner, slots, kept, 600, &ref_n);
+        ref_at = await_commit(owner, slots, 3, 600, &ref_n);
         while (frame < setup + 720 && screen == SCREEN_PLAY && !won && !lost) input(0);
         reference = world_hash();
         game_init(); previous = 0;
         input(KEY_L);
         if (screen != SCREEN_PLAY || !race_mode) goto done;
-        at = await_commit(owner, slots, kept, 600, &committed);
+        at = await_commit(owner, slots, 3, 600, &committed);
         while (frame < setup + 720 && screen == SCREEN_PLAY && !won && !lost) input(0);
         resumed = world_hash();
         ok = ref_at >= 0 && at == ref_at && committed == ref_n && reference == resumed;
     } else if (scenario == 3) {
-        at = await_commit(owner, slots, kept, 600, &committed);
+        at = await_commit(owner, slots, 3, 600, &committed);
         ok = at < 0;
     } else {
-        at = await_commit(owner, slots, kept, 600, &committed);
+        at = await_commit(owner, slots, 3, 600, &committed);
         ok = at >= 0;
     }
     ok = ok && supply > 0 && supply < 12;
