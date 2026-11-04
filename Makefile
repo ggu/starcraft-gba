@@ -1943,7 +1943,7 @@ build/StarCraft-Protoss-P7-Transport1-GBA.gba: build/starcraft-protoss-p7.elf to
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS7' SCP7
 .PHONY: protoss-p7
-protoss-p7: verify-protoss
+protoss-p7: verify-protoss-p7
 
 # Explicit P8 candidate: the canonical P1-P7 profile plus The Trial of
 # Tassadar as an eighth entry. It has its own SCP8 code, generation-44 saves
@@ -2532,7 +2532,7 @@ build/starcraft-protoss.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard
 build/StarCraft-Protoss-GBA.gba: build/starcraft-protoss.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS3' SCP3
-verify-protoss: build/StarCraft-Protoss-P7-Transport1-GBA.gba
+verify-protoss: build/StarCraft-Protoss-P10-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss
 .PHONY: verify-protoss-p6
 verify-protoss-p6: build/StarCraft-Protoss-P6-GBA.gba
@@ -2556,7 +2556,7 @@ test-sc64-p4-census: build/test-sc64-p4-census
 	./build/test-sc64-p4-census
 
 
-test-protoss: build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller test-sc64-p4-census test-sc64-p4-create-prefix test-sc64-p5-canonical
+test-protoss-p7: build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller test-sc64-p4-census test-sc64-p4-create-prefix test-sc64-p5-canonical
 	./build/test-protoss
 	./build/test-sc64-protoss-promoted-profile
 	./build/test-sc64-protoss-canonical-storm
@@ -2597,7 +2597,7 @@ test-sc64-protoss-p7-canonical: build/test-sc64-protoss-canonical-p7-controller 
 	./build/test-sc64-protoss-canonical-p7-controller $(PROTOSS_P7_CONTROLLER_TRACE)
 	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(PROTOSS_P7_CONTROLLER_TRACE)
 
-test-protoss: test-sc64-p6-canonical test-sc64-protoss-p7-canonical test-sc64-p7-fact-v2-normal-input
+test-protoss-p7: test-sc64-p6-canonical test-sc64-protoss-p7-canonical test-sc64-p7-fact-v2-normal-input
 
 test-race-campaigns: test-terran test-zerg test-protoss
 verify-race-campaigns: verify-terran verify-zerg verify-protoss
@@ -4721,7 +4721,7 @@ test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign bui
 	./build/test-sc64-protoss-carried-campaign --controller 3 --trace .local/sc64/p3-carried-p2-controller.json
 	./build/test-sc64-protoss-carried-p3 --trace .local/sc64/p4-carried-p3-controller.json
 	./build/test-sc64-protoss-carried-p5 --limit 180000 --attempt-tag canonical-p6-carried-p5
-test-protoss: test-sc64-protoss-carried-missions
+test-protoss-p7: test-sc64-protoss-carried-missions
 -include mk/protoss-carried/Makefile
 
 # The indexed and packed sprite paths must agree over the whole framebuffer,
@@ -4962,7 +4962,7 @@ test-sc64-contact-mask-math: build/test-sc64-contact-mask-math
 	./build/test-sc64-contact-mask-math
 test: test-sc64-contact-mask-math
 test-zerg-z6: test-sc64-contact-cache-zerg
-test-protoss: test-sc64-contact-cache-protoss
+test-protoss-p7: test-sc64-contact-cache-protoss
 
 # Optional P7 ordinary-input performance replay; excluded from default targets.
 # Requires the same authenticated generated P7 data inputs as other P7 probes.

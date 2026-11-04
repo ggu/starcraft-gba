@@ -1296,9 +1296,10 @@ qualification. Source staging alone does not establish a playable mission.
 ### Canonical Zerg and Protoss builds
 
 The standard Zerg build includes its first seven missions. The canonical Protoss
-target includes P1–P7 and has passed its canonical presentation, save, host
-campaign and bounded ARM continuation checks. Explicit `protoss-p6` still builds
-the separately identified P1–P6 generation-30 image. Prepare either profile
+target includes all ten Protoss missions. Explicit `protoss-p7` builds the P1–P7
+product that has passed its canonical presentation, save, host campaign and bounded
+ARM continuation checks, and explicit `protoss-p6` still builds the separately
+identified P1–P6 generation-30 image. Prepare either profile
 from your verified ROM, then use the standard commands. See the [canonical P7
 qualification](research/p7-canonical-candidate-qualification.md) for evidence
 and limits:
@@ -1315,10 +1316,11 @@ flags and save identity remain separate.
 ./dev sc64 play --profile zerg
 ```
 
-Replace `zerg` with `protoss` for the P7 candidate. The output pairs are
+Replace `zerg` with `protoss` for the ten-mission product. The output pairs are
 `build/StarCraft-Zerg-Z7-Transport1-GBA.gba` / `build/starcraft-zerg-z7.elf` and
-`build/StarCraft-Protoss-P7-Transport1-GBA.gba` / `build/starcraft-protoss-p7.elf`.
-Explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
+`build/StarCraft-Protoss-P10-Transport1-GBA.gba` / `build/starcraft-protoss-p10.elf`.
+Explicit `protoss-p7` builds `build/StarCraft-Protoss-P7-Transport1-GBA.gba` /
+`build/starcraft-protoss-p7.elf`, and explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
 `build/starcraft-protoss-p6.elf`.
 Explicit `zerg-z4` (`--profile zerg-z4`) preserves the earlier four-entry
 `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf` pair, its
@@ -1363,9 +1365,10 @@ candidate. The explicit P6 build remains available:
 ./dev sc64 test --profile protoss
 ```
 
-P7 preparation requires authenticated P4/P5/P6/P7 map and scenario inputs, P6
+Protoss preparation requires authenticated P4 to P10 map and scenario inputs, P6
 abilities and doodads, P7 Battery properties, and a complete packed P1–P7
-sprite bank. P7 uses generation 43 and rejects incompatible P6 generation-30
+sprite bank; P8 to P10 reuse that bank. Default Protoss uses generation 47 and rejects
+other generations. Explicit `protoss-p7` uses generation 43 and rejects incompatible P6 generation-30
 saves without converting or migrating them. `protoss-p6` preserves the separate
 generation-30 product and save directory. `protoss-p5-shuttle` preserves the earlier
 five-entry ROM and its separate saves. No P3/P4/P5 save conversion is performed.

@@ -26,6 +26,11 @@ build/StarCraft-Protoss-P10-Transport1-GBA.gba: build/starcraft-protoss-p10.elf 
 verify-protoss-p10: build/StarCraft-Protoss-P10-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss-p10
 protoss-p10: verify-protoss-p10
+# P10 is the default Protoss product; explicit protoss-p7 keeps its own identity.
+.PHONY: verify-protoss-p7 test-protoss test-protoss-p7
+verify-protoss-p7: build/StarCraft-Protoss-P7-Transport1-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p7
+test-protoss: test-protoss-p7 test-sc64-protoss-p10
 
 # P10 host checks: the P1-P10 carried-profile startup/save matrix, and the
 # P10 mission run (start-up program, objectives and a pause-menu save that

@@ -13,8 +13,11 @@ minimap change, whose current ARM measurements cover Protoss. The current
 full-profile ARM T10 result is below the 30-fps target, and no physical GBA
 result is claimed. The canonical `terran` profile includes all ten Terran
 missions. Canonical Zerg includes its first seven missions. The default Protoss
-target is the qualified P7 candidate. Explicit `protoss-p6` remains a separate
-P1–P6 product with its generation-30 save identity.
+target includes all ten Protoss missions; see the
+[promotion audit](audits/2026-11-04-protoss-p10-default/README.md) for what that does
+and doesn't establish. Explicit `protoss-p7` keeps the P1–P7 product and its save
+identity. Explicit `protoss-p6` remains a separate P1–P6 product with its
+generation-30 save identity.
 `zerg-z4`, `zerg-z3` and `protoss-p3` remain explicit legacy builds with their original
 ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. The P7 candidate carries the P1–P6 campaign and the seventh menu entry. The
 explicit `protoss-p8` candidate adds P8 as an eighth entry, explicit
@@ -41,7 +44,7 @@ campaign startup/save checks and the Outpost/Blood Bath race-and-AI matrix.
 
 Use `zerg` or `protoss` in place of `terran` for the other builds. `prepare` accepts a `.z64`, `.v64`, or `.n64` image, or a ZIP containing exactly one supported image. It verifies the image and uses the pinned `sc64-maps` extractor; the first preparation requires Git and network access to fetch that tool. `status` checks preparation and build outputs. Build and test do not need an emulator; `play` requires mGBA. See [Development](DEVELOPMENT.md) for tool requirements and [SC64 development notes](SC64.md) for import details.
 
-The default ROM targets are `build/StarCraft-Terran-Transport1-GBA.gba`, `build/StarCraft-Zerg-Z7-Transport1-GBA.gba`, and the P7 candidate `build/StarCraft-Protoss-P7-Transport1-GBA.gba`. Explicit `protoss-p6` retains `build/StarCraft-Protoss-P6-GBA.gba` and its generation-30 identity. Terran uses `.local/play/terran-transport1`; the candidate uses `.local/play/protoss-p7-transport1`; P6 uses `.local/play/protoss-p6`. Z7 uses `.local/play/zerg-z7-transport1`, explicit Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
+The default ROM targets are `build/StarCraft-Terran-Transport1-GBA.gba`, `build/StarCraft-Zerg-Z7-Transport1-GBA.gba`, and `build/StarCraft-Protoss-P10-Transport1-GBA.gba`. Explicit `protoss-p7` retains `build/StarCraft-Protoss-P7-Transport1-GBA.gba`, and explicit `protoss-p6` retains `build/StarCraft-Protoss-P6-GBA.gba` and its generation-30 identity. Terran uses `.local/play/terran-transport1`; default Protoss uses `.local/play/protoss-p10-transport1`; explicit P7 uses `.local/play/protoss-p7-transport1`; P6 uses `.local/play/protoss-p6`. Z7 uses `.local/play/zerg-z7-transport1`, explicit Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
 
 To build and test all three race campaigns, prepare `terran`, `zerg` and
 `protoss` with the same verified ROM, then run
@@ -168,7 +171,7 @@ average. Neither profile establishes native enemy-AI equivalence, arbitrary
 save-state coverage or physical-GBA behavior. Zerg 8–10 and Protoss 8–10
 remain unqualified in the canonical profiles.
 
-P8 **The Trial of Tassadar** has a separate, unpromoted `protoss-p8`
+P8 **The Trial of Tassadar** has a separate `protoss-p8`
 candidate. It carries the canonical P1–P7 profile, is built with
 `make protoss-p8` and writes `StarCraft-Protoss-P8-Transport1-GBA.gba` /
 `starcraft-protoss-p8.elf`, code `SCP8`, base generation 44 in the separate Transport1 namespace. P8 binds the shared
@@ -202,8 +205,8 @@ backend and trigger cadence are authored, and Defiler spells are not
 implemented. See the
 [P9 candidate audit](audits/2026-10-29-p9-campaign/README.md).
 
-P10 **Eye of the Storm** has a separate, unpromoted `protoss-p10` candidate
-built on the P9 candidate. It is built with `make protoss-p10` and writes
+P10 **Eye of the Storm** is in the default Protoss ROM, built on the P9 candidate. It is
+built with `make protoss` or `make protoss-p10` and writes
 `StarCraft-Protoss-P10-Transport1-GBA.gba` / `starcraft-protoss-p10.elf`, code `SCPA`,
 generation 47 with the Transport1 namespace. No automatic legacy save import is performed. Its start-up trigger creates Raynor's Terran base for the
 human and the rescuable Hyperion; destroying the Overmind wins, and losing
@@ -251,7 +254,8 @@ Zerg 3 **The New Dominion**, Zerg 4 **Agent of the Swarm**, and Protoss 3
 `StarCraft-Zerg-Z7-Transport1-GBA.gba` / `starcraft-zerg-z7.elf`, code `SCZ7`, base generation 36 in the separate Transport1 namespace. Explicit `zerg-z6` retains `SCZ6`, generation 32. The explicit legacy `zerg-z4` target retains `StarCraft-Zerg-Z4-GBA.gba` /
 `starcraft-zerg-z4.elf`, code `SCZ4`, generation 20. The explicit legacy `zerg-z3` target retains `StarCraft-Zerg-GBA.gba` /
 `starcraft-zerg.elf` (versioned `-Z3` names alias these), code `SCZ3`,
-generation 5. The P7 candidate uses `StarCraft-Protoss-P7-Transport1-GBA.gba` /
+generation 5. Default Protoss uses `StarCraft-Protoss-P10-Transport1-GBA.gba` /
+`starcraft-protoss-p10.elf`, code `SCPA`, generation 47 in the separate Transport1 namespace. Explicit `protoss-p7` uses `StarCraft-Protoss-P7-Transport1-GBA.gba` /
 `starcraft-protoss-p7.elf`, code `SCP7`, base generation 43 in the separate Transport1 namespace. Explicit `protoss-p6`
 retains `StarCraft-Protoss-P6-GBA.gba` / `starcraft-protoss-p6.elf`, code
 `SCP6`, generation 30. Explicit
@@ -680,7 +684,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Canonical profiles expose T1–T10, Z1–Z7 and P1–P7 (24/30). P7 has a current canonical host win, a fixed-input ARM replay and fresh-process SRAM continuation. Explicit P6 retains its separate generation-30 product. Earlier P1–P5 ARM/cargo evidence remains scoped to P5. Zerg controllers complete all six chapters, with canonical Z6 ARM wins and Z5/Z6 save continuity. Terran ARM wins span all ten missions across frozen builds. Six campaign chapters and near-30-fps performance remain unfinished.
+- Canonical profiles expose T1–T10, Z1–Z7 and P1–P10 (27/30). Each Protoss mission has a host win and a fixed-input ARM replay under the P10 flags, and P8 to P10 have fresh-process SRAM continuation there. P1–P7 have none under these flags; explicit P7's continuation is under its own flags. Explicit P6 retains its separate generation-30 product. Earlier P1–P5 ARM/cargo evidence remains scoped to P5. Zerg controllers complete all six chapters, with canonical Z6 ARM wins and Z5/Z6 save continuity. Terran ARM wins span all ten missions across frozen builds. Six campaign chapters and near-30-fps performance remain unfinished.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

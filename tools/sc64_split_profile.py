@@ -51,7 +51,7 @@ REFINERY_TYPES = {3: "terran_refinery", 17: "protoss_assimilator", 20: "zerg_ext
 PROFILE_BUILD_PATHS = {
     "terran": ("StarCraft-Terran-Transport1-GBA.gba", "starcraft-terran.elf"),
     "zerg": ("StarCraft-Zerg-Z7-Transport1-GBA.gba", "starcraft-zerg-z7.elf"),
-    "protoss": ("StarCraft-Protoss-P7-Transport1-GBA.gba", "starcraft-protoss-p7.elf"),
+    "protoss": ("StarCraft-Protoss-P10-Transport1-GBA.gba", "starcraft-protoss-p10.elf"),
 }
 
 
