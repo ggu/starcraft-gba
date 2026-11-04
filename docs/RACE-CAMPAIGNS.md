@@ -182,7 +182,10 @@ SRAM save taken while a structure is under construction, loaded in a fresh
 process, continues to the same win on host and on ARM. P8's AI backend,
 transmission duration and trigger cadence are authored, and the AI does not
 use the Carrier, Arbiter or Battery services. See the
-[P8 candidate audit](audits/2026-10-29-p8-campaign/README.md).
+[P8 candidate audit](audits/2026-10-29-p8-campaign/README.md). The controller was
+repaired after shared ranged routing changed the mission, and P8 and P9 were
+requalified together; see the
+[P8 and P9 requalification](audits/2026-11-03-p8-p9-requalification/README.md).
 
 P9 **Shadow Hunters** has a separate, unpromoted `protoss-p9` candidate
 built on the P8 candidate. It is built with `make protoss-p9` and writes
@@ -193,7 +196,8 @@ Overlords and Spore Colonies detect. On the earlier qualified P9 candidate, one 
 wins P9 by killing both Cerebrates with Zeratul present. Its earlier input-only ARM
 replay of the key tape matches every host observation through the win. A
 pause-menu SRAM save taken while a structure is under construction, loaded
-in a fresh process, continues to the same win on host and on ARM for that earlier candidate; this current integration needs its own qualification. P9's AI
+in a fresh process, continues to the same win on host and on ARM for that earlier candidate. The
+[requalification](audits/2026-11-03-p8-p9-requalification/README.md) repeats all of this on the current integration, with the same controller. P9's AI
 backend and trigger cadence are authored, and Defiler spells are not
 implemented. See the
 [P9 candidate audit](audits/2026-10-29-p9-campaign/README.md).
