@@ -10,6 +10,8 @@ extern void guardian_test_restore(const void *);
 extern void guardian_test_retag(int,u32,u32);
 extern void guardian_test_sequence(int,u32);
 extern void guardian_test_corrupt(int);
+extern void guardian_test_replace(int,const void *,u32);
+static u8 envelope[sizeof(RaceImpactRecord)];
 static u8 snapshot[32768];
 
 static void clear_journal(void)
@@ -32,6 +34,26 @@ int main(void)
     q=&u[slot];q->alive=0;q->hp=-2;q->work_timer=0;expected=*q;
     assert(race_save_game());q->type=U_OVERLORD;assert(race_load_game());assert(!memcmp(&u[slot],&expected,sizeof(expected)));
     guardian_test_snapshot(snapshot);
+    /* Checksum-valid but semantically invalid newest falls back to the
+     * older valid live Cocoon, without publishing its rejected plan. */
+    assert(race_worker_cargo_select(&plan,&selected));
+    u32 length=0;assert(save_read_latest(envelope,sizeof(envelope),SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,&length));
+    Unit bad=expected;bad.type=U_OVERLORD;bad.alive=1;bad.hp=30;bad.work_timer=1;bad.target=43;
+#if defined(SC64_ZP_FULL_STORAGE)
+#if defined(SC64_P7_TYPED_COMPACT_ENABLED)
+    assert(sc64_p7_typed_unit_encode(&race_data.units[slot],&bad,race_cols*16u,race_rows*16u));
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    assert(sc64_derived_unit_encode(&race_data.units[slot],&bad,race_cols*16u,race_rows*16u));
+#else
+    assert(sc64_zp_unit_save_encode(&race_data.units[slot],&bad,race_cols*16u,race_rows*16u));
+#endif
+#else
+    assert(sc64_unit_save_encode(&race_data.units[slot],&bad,race_cols*16u,race_rows*16u));
+#endif
+    memcpy(envelope+offsetof(RaceSave,units)+slot*sizeof(race_data.units[0]),&race_data.units[slot],sizeof(race_data.units[0]));
+    guardian_test_replace(selected.slot,envelope,length);
+    assert(race_load_game());assert(u[slot].alive && u[slot].hp==120 && u[slot].target==44);
+    guardian_test_restore(snapshot);
     /* Old authenticated namespace cannot reinterpret a Cocoon wire row. */
     guardian_test_retag(0,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
     guardian_test_retag(1,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
@@ -55,5 +77,13 @@ int main(void)
     clear_journal();
     q=&u[slot];q->alive=1;q->hp=120;q->work_timer=351;q->target=43;
     assert(!race_save_game());q->target=44;
-    puts("Guardian staged HOST journal roundtrip and dead row passed");return 0;
+    /* Actual engine damage/death, then a save/load of the dead row and slot reuse. */
+    supply_used=race_owner_supply(SIDE);hit_target(slot,500,U_MARINE,ENEMY);
+    assert(!u[slot].alive && u[slot].type==U_GUARDIAN_COCOON && u[slot].hp<=0);
+    expected=u[slot];assert(race_save_game());u[slot].type=U_OVERLORD;
+    assert(race_load_game());assert(!memcmp(&u[slot],&expected,sizeof(expected)));
+    int reuse=spawn_unit(SIDE,U_OVERLORD,400,400);assert(reuse==slot);
+    assert(u[slot].type==U_OVERLORD && u[slot].raw_type!=59);
+    assert(race_save_game());assert(race_load_game());assert(u[slot].type==U_OVERLORD);
+    puts("Guardian staged HOST journal and death/slot reuse passed");return 0;
 }

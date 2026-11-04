@@ -12,3 +12,10 @@ void guardian_test_retag(int slot,u32 tag,u32 inner)
 }
 void guardian_test_sequence(int slot,u32 seq) { sram_put32(host_save+(unsigned)slot*SAVE_SLOT_SIZE+12,seq); }
 void guardian_test_corrupt(int slot) { host_save[(unsigned)slot*SAVE_SLOT_SIZE+16]^=1; }
+
+void guardian_test_replace(int slot,const void *data,u32 len)
+{
+    volatile u8 *p=host_save+(unsigned)slot*SAVE_SLOT_SIZE;const u8 *src=data;
+    for(u32 i=0;i<len;++i)p[16+i]=src[i];
+    sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));
+}
