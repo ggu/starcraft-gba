@@ -102,9 +102,9 @@ updates. It remembers what fired in the high bits of the saved `objective_flags`
 no save bytes. Some source conditions are approximated:
 
 - Waits before these rows aren't timed, so a row can open a few seconds earlier than on the N64.
-- P1's row about a Gateway without power uses "no Pylons anywhere" for the source's region test.
+- One P1 row uses "no Pylons anywhere" for the source's region test.
 - P1's base-clear test uses the existing base rectangle.
-- Z2's "Chrysalis in danger" row opens when its carrier is lost. The source tests a region.
+- Z2's warning about the Chrysalis opens when its carrier is lost. The source tests a region.
 
 ## Differences from the N64
 
