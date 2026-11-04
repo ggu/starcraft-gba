@@ -54,7 +54,7 @@ int main(void)
     assert(sc64_game_unit_collision_radius(U_GUARDIAN_COCOON)==8);
 #endif
 #ifdef SC64_Z7_SOURCE_SIGHT
-    assert(sc64_z7_source_unit_sight_pixels(U_GUARDIAN_COCOON)==128);
+    assert(sc64_z7_source_unit_sight_raw(sc64_race_raw_unit(U_GUARDIAN_COCOON))==128);
 #endif
     Unit q={0},wire,out,again; Row row;
     q.x=q.tx=q.path_x=30; q.y=q.ty=q.path_y=40; q.hp=q.maxhp=200;
