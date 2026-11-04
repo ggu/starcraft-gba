@@ -211,7 +211,7 @@ int main(int argc,char **argv)
                     if(spare<14&&minerals>=100&&queued_units(U_OVERLORD)<3)type=U_OVERLORD;
                     else if(spare>=2&&drone_count()+queued_units(U_DRONE)<(hy>=knob("Z10_HFIRST",16)?drone_goal:knob("Z10_DR0",9))&&minerals>=50)type=U_DRONE;
                     else if(count_buildings(B_SPIRE,1)&&minerals>=100&&gas>=100&&spare>=4&&count_units(SIDE,U_MUTALISK)<16)type=U_MUTALISK;
-                    else if(count_buildings(B_HYDRALISK_DEN,1)&&minerals>=75&&gas>=25&&spare>=2&&count_units(SIDE,U_HYDRALISK)<hydra_cap)type=U_HYDRALISK;
+                    else if(count_buildings(B_HYDRALISK_DEN,1)&&minerals>=75&&gas>=25&&spare>=2&&count_units(SIDE,U_HYDRALISK)<(count_units(SIDE,U_MUTALISK)<10?30:hydra_cap))type=U_HYDRALISK;
                     else if(count_buildings(B_SPAWNING_POOL,1)&&minerals>=150&&frame>=2000&&spare>=2&&(!count_buildings(B_HYDRALISK_DEN,1)||gas<25))type=U_ZERGLING;
                     if(type<0||!train_at(i,type))break;
                     ++done;
