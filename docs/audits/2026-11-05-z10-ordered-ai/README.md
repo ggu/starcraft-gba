@@ -83,3 +83,12 @@ assault threshold. Controller `547c7a84` reserved composition space by limiting
 pre-air Hydralisks to 30. Its single attempt reached the unchanged 200,000-call
 limit at frame 197,630 / 200,027 calls, with no assault, win, loss or fault.
 These are failed or incomplete controller experiments, not qualification.
+
+Controller `f9c4f0b1` counts Hydralisks and Mutalisks consistently for assault
+readiness, cluster centroid, retreat and waypoint progress, retaining the
+original total thresholds and ten-air requirement. Compile-time assertions
+verify that 30 Hydralisks plus ten Mutalisks can launch at 240/240 actors,
+while nine air or an unpressured 238/240 pool does not satisfy that branch.
+The actual run launched at frame 38,644 with 55 combined units including 19
+Mutalisks, reached leg 6 at frame 45,881 and lost at frame 80,897 / 82,256 calls
+with zero faults and the Temple alive. This is not a qualifying win.
