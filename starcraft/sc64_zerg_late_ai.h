@@ -10,6 +10,12 @@
  * combat units at the human. Scripts mapped to no town (Z9's `VluA`) are
  * accepted with no effect; their native meaning is not established. Every
  * order is an ordinary engine order.
+ *
+ * Wave timing and size are moved toward the scripts' attack commands: each
+ * town's first attack, approximate gap and group. These are authored scalar
+ * approximations, not execution of the native programs; see
+ * docs/audits/2026-11-05-late-zerg-integration. A town whose scripts have no
+ * attack commands sends none. Attack-group behavior is not modeled.
  */
 #ifndef SC64_ZERG_LATE_AI_H
 #define SC64_ZERG_LATE_AI_H
@@ -18,11 +24,9 @@
 
 enum {
     SC64_ZL_AI_PRODUCE_UPDATES = 240,
-    SC64_ZL_AI_FIRST_WAVE_UPDATES = 4800,
-    SC64_ZL_AI_WAVE_UPDATES = 3000,
+    /* The longest wave timer in any mission's table. */
+    SC64_ZL_AI_WAVE_TIMER_LIMIT = 10625,
     SC64_ZL_AI_HOME_GUARD = 4,
-    SC64_ZL_AI_WAVE_BASE = 6,
-    SC64_ZL_AI_WAVE_MAX = 16,
     /* Keep pool room for trigger-created actors and the human. */
     SC64_ZL_AI_RESERVE_UNITS = 24,
     SC64_ZL_AI_NO_TOWN = 0xff
@@ -33,6 +37,14 @@ typedef struct {
     u8 owner;       /* source slot that runs it */
     u8 town;        /* index into the mission's town list, or NO_TOWN */
 } Sc64ZlAiScript;
+
+/* Provisional conversion used by this authored policy: five engine updates
+ * per four source wait units. Native wait/attack semantics need qualification. */
+typedef struct {
+    u16 first_updates;
+    u16 gap_updates;
+    u8 units;           /* 0: this town's scripts have no attack commands */
+} Sc64ZlAiWave;
 
 typedef struct {
     u8 started;                         /* bit t: town t is running */
@@ -56,18 +68,18 @@ sc64_zl_ai_state_valid(const Sc64ZlAiState *ai)
         if (!(ai->started & (1u << t)) &&
             (ai->wave[t] || ai->produce_index[t] || ai->wave_timer[t] ||
              ai->produce_timer[t])) return 0;
-        if (ai->wave_timer[t] > SC64_ZL_AI_FIRST_WAVE_UPDATES ||
+        if (ai->wave_timer[t] > SC64_ZL_AI_WAVE_TIMER_LIMIT ||
             ai->produce_timer[t] > SC64_ZL_AI_PRODUCE_UPDATES) return 0;
     }
     return 1;
 }
 
 static inline void
-sc64_zl_ai_start_town(Sc64ZlAiState *ai, unsigned town)
+sc64_zl_ai_start_town(Sc64ZlAiState *ai, unsigned town, const Sc64ZlAiWave *wave)
 {
     if (town >= SC64_ZL_AI_TOWNS || (ai->started & (1u << town))) return;
     ai->started |= (u8)(1u << town);
-    ai->wave_timer[town] = SC64_ZL_AI_FIRST_WAVE_UPDATES;
+    ai->wave_timer[town] = wave->first_updates;
     ai->produce_timer[town] = SC64_ZL_AI_PRODUCE_UPDATES;
 }
 

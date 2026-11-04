@@ -29,14 +29,23 @@
 
 volatile u16 demo_keys;
 
+/* Z9 and Z10 leave too little working RAM for a line buffer on ARM: write
+ * straight into mGBA's debug buffer, which is what the flush copies to anyway. */
+#if defined(PX_DIRECT_LOG) && !defined(GBA_HOST)
+#define PX_LINE ((volatile char *)0x04FFF600)
+enum { PX_LINE_SIZE = 240 };
+#else
 static char line[240];
+#define PX_LINE line
+enum { PX_LINE_SIZE = sizeof(line) };
+#endif
 static unsigned line_len;
 static u16 previous_held;
 static u32 frames_run;
 static uint64_t cycles_total, cycles_update;
 static u32 cycles_peak;
 
-static void out_text(const char *s) { while (*s && line_len < sizeof(line) - 1) line[line_len++] = *s++; }
+static void out_text(const char *s) { while (*s && line_len < PX_LINE_SIZE - 1u) PX_LINE[line_len++] = *s++; }
 static void out_unsigned(unsigned long v)
 {
     char tmp[21]; int n = 0;
@@ -57,11 +66,13 @@ static void out_u64(uint64_t v)
 static void out_field(const char *name, long v) { out_text(" "); out_text(name); out_text("="); out_num(v); }
 static void out_flush(void)
 {
-    line[line_len] = 0;
+    PX_LINE[line_len] = 0;
 #ifdef GBA_HOST
     puts(line); fflush(stdout);
 #else
+#ifndef PX_DIRECT_LOG
     for (unsigned i = 0; i <= line_len; ++i) ((volatile char *)0x04FFF600)[i] = line[i];
+#endif
     *(volatile u16 *)0x04FFF700 = 0x100 | 2; /* warn: visible with log mask 7 */
 #endif
     line_len = 0;

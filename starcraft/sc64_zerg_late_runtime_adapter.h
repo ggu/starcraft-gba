@@ -62,6 +62,7 @@ typedef struct {
     u8 active_mask;
     const Sc64Z8PermissionTable *permissions;
     u8 town_slot[SC64_ZL_AI_TOWNS];
+    Sc64ZlAiWave wave[SC64_ZL_AI_TOWNS];
     const Sc64ZlAiScript *scripts;
     u8 script_count;
     /* Kill census raw type (0 for none) and Deaths census slot mask. */
@@ -102,7 +103,10 @@ static const Sc64ZlMission race_z9_mission = {
     { NEUTRAL, -1, ENEMY, SIDE, ENEMY, -1, NEUTRAL, ENEMY, -1, -1, -1, NEUTRAL },
     &race_z9_program, sc64_z9_program_forces, SC64_Z9_PROGRAM_ACTIVE_MASK,
     &sc64_z9_program_permissions,
-    { 2, 7, 4 }, race_z9_ai_policy,
+    { 2, 7, 4 },
+    /* Zer9; Z9ly and Z9ry have no attack commands; Z9ro (Z9lo has none). */
+    { { 6253, 6563, 4 }, { 0, 0, 0 }, { 628, 3750, 7 } },
+    race_z9_ai_policy,
     sizeof(race_z9_ai_policy) / sizeof(race_z9_ai_policy[0]),
     0, 0
 };
@@ -139,7 +143,10 @@ static const Sc64ZlMission race_z10_mission = {
     { ENEMY, -1, ENEMY, SIDE, -1, -1, -1, ENEMY, -1, -1, -1, NEUTRAL },
     &race_z10_program, sc64_z10_program_forces, SC64_Z10_PROGRAM_ACTIVE_MASK,
     &sc64_z10_program_permissions,
-    { 2, 7, 0 }, race_z10_ai_policy,
+    { 2, 7, 0 },
+    /* Z10a (Z10b has none); Z10d (Z10c has none); Z10e. */
+    { { 6253, 9598, 10 }, { 6253, 10000, 4 }, { 10003, 10625, 4 } },
+    race_z10_ai_policy,
     sizeof(race_z10_ai_policy) / sizeof(race_z10_ai_policy[0]),
     174, 1u << 0
 };
@@ -333,7 +340,8 @@ static int race_zl_run_ai(void *context, const Sc64Z8Action *action,
     for (unsigned i = 0; i < m->script_count; ++i) {
         const Sc64ZlAiScript *s = &m->scripts[i];
         if (s->fourcc != action->group2 || s->owner != owner) continue;
-        if (s->town != SC64_ZL_AI_NO_TOWN) sc64_zl_ai_start_town(&race_zl_ai, s->town);
+        if (s->town != SC64_ZL_AI_NO_TOWN)
+            sc64_zl_ai_start_town(&race_zl_ai, s->town, &m->wave[s->town]);
         return 1;
     }
     return -1;
@@ -628,7 +636,7 @@ static void race_zl_ai_produce(unsigned town)
 
 static void race_zl_ai_wave(unsigned town)
 {
-    int tx = -1, ty = -1, sent = 0, guard = 0, want;
+    int tx = -1, ty = -1, sent = 0, guard = 0, want = race_zl_mission->wave[town].units;
     s16 slot = (s16)race_zl_mission->town_slot[town];
     /* Aim at a human hive cluster, else any destructible human structure,
      * else the first human unit, so waves keep pressing a beaten human. */
@@ -646,8 +654,6 @@ static void race_zl_ai_wave(unsigned town)
             tx = u[i].x; ty = u[i].y;
         }
     if (tx < 0) return;
-    want = SC64_ZL_AI_WAVE_BASE + 2 * (int)race_zl_ai.wave[town];
-    if (want > SC64_ZL_AI_WAVE_MAX) want = SC64_ZL_AI_WAVE_MAX;
     for (int i = 0; i < MAX_UNITS && sent < want; ++i) if (u[i].alive &&
         u[i].owner == ENEMY && u[i].raw_owner == slot && u[i].order == ORDER_IDLE &&
         !sc64_race_is_worker(u[i].type) && sc64_race_unit_damage(u[i].type) > 0) {
@@ -668,9 +674,10 @@ static void race_zl_ai_tick(void)
             race_zl_ai.produce_timer[t] = SC64_ZL_AI_PRODUCE_UPDATES;
             race_zl_ai_produce(t);
         }
+        if (!race_zl_mission->wave[t].units) continue;
         if (race_zl_ai.wave_timer[t]) --race_zl_ai.wave_timer[t];
         if (!race_zl_ai.wave_timer[t]) {
-            race_zl_ai.wave_timer[t] = SC64_ZL_AI_WAVE_UPDATES;
+            race_zl_ai.wave_timer[t] = race_zl_mission->wave[t].gap_updates;
             race_zl_ai_wave(t);
         }
     }
