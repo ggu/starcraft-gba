@@ -121,9 +121,12 @@ for exact profiles and limits.
 Z8 runs in a separate `zerg-z8` candidate (`make zerg-z8`, code `SCZ8`,
 generation 46): the Z1–Z7 candidate plus Z8 as the eighth Zerg entry. Its
 authenticated 39-trigger program, Nydus links, authored Protoss town AI and
-hero Dark Templar cloak run on the live game. A pause-menu save reloads and
-continues identically on host. Z8 has no ordinary-input win, ARM replay or
-timing yet and is not qualified. See the
+hero Dark Templar cloak run on the live game. An ordinary-input controller wins
+it on host, and an input-only ARM replay, pause-menu SRAM save and fresh-process
+continuation match that win in mGBA. The win is one route, and the candidate is
+not the default Zerg ROM. Its town AI was moved toward observed N64 wave timing
+and garrison counts but does not match them. See the
+[Z8 qualification audit](audits/2026-11-04-z8-qualification/README.md) and the
 [Z8 candidate audit](audits/2026-10-29-z8-playable/README.md).
 
 Z9 runs in a separate `zerg-z9` candidate (`make zerg-z9`, code `SCZ9`,
