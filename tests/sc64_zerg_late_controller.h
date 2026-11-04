@@ -7,9 +7,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef Z9_ABORT_AT
-#include <execinfo.h>
-#endif
 
 static FILE *trace;
 static u16 prior;
@@ -20,11 +17,6 @@ static void input(u16 held)
     /* Once the mission ends, later calls are not inputs: the trace stops at
      * the deciding call, so a replay ends there too. */
     if(screen==SCREEN_RESULT||won||lost)return;
-#ifdef Z9_ABORT_AT
-    if(host_tick==Z9_ABORT_AT){fprintf(stderr,"abort tick f%u screen %d menu %d mode %d cursor %d,%d held %x sel %d selb %d WORLD %d %d\n",(unsigned)frame,screen,menu_open,mode,cx,cy,held,selected_count(),selected_building,WORLD_W,WORLD_H);
-        void*bt[12];int nbt=backtrace(bt,12);for(int q=0;q<nbt;q++)fprintf(stderr,"BT %p\n",bt[q]);
-        fprintf(stderr,"MAIN %p\n",(void*)&game_update);exit(7);}
-#endif
     u16 pressed=(u16)(held&(u16)~prior);
     int changed=held!=prior;
     unsigned call_index=host_tick;
@@ -59,9 +51,6 @@ static void move_cursor(int x,int y)
         if(cy<y-2)held|=KEY_DOWN;else if(cy>y+2)held|=KEY_UP;
         input(held);
     }
-#ifdef Z9_ABORT_AT
-    if(guard>=12000u)fprintf(stderr,"cursor stuck f%u target %d,%d at %d,%d menu %d mode %d\n",(unsigned)frame,x,y,cx,cy,menu_open,mode);
-#endif
     input(0);
 }
 
