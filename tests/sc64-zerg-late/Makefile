@@ -169,3 +169,10 @@ sc64-$(1)-arm-replay: build/StarCraft-Zerg-$(2)-Replay.gba build/StarCraft-Zerg-
 endef
 $(eval $(call ZERG_LATE_QUALIFICATION,z9,Z9,20,SCZ9))
 $(eval $(call ZERG_LATE_QUALIFICATION,z10,Z10,21,SCZA))
+
+# Z9 carried-profile normal-menu startup and save matrix.
+build/test-sc64-z9-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z9-carried-profile
+test-sc64-z9-carried-profile: build/test-sc64-z9-carried-profile
+	./build/test-sc64-z9-carried-profile
