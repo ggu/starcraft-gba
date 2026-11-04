@@ -12,8 +12,9 @@
  * order is an ordinary engine order.
  *
  * Wave timing and size are moved toward the scripts' attack commands: each
- * town's first attack, average gap and average group, read as native steps
- * (docs/audits/2026-11-04-z9-qualification). A town whose scripts have no
+ * town's first attack, approximate gap and group. These are authored scalar
+ * approximations, not execution of the native programs; see
+ * docs/audits/2026-11-05-late-zerg-integration. A town whose scripts have no
  * attack commands sends none. Attack-group behavior is not modeled.
  */
 #ifndef SC64_ZERG_LATE_AI_H
@@ -37,7 +38,8 @@ typedef struct {
     u8 town;        /* index into the mission's town list, or NO_TOWN */
 } Sc64ZlAiScript;
 
-/* Five engine updates are four 42 ms native steps. */
+/* Provisional conversion used by this authored policy: five engine updates
+ * per four source wait units. Native wait/attack semantics need qualification. */
 typedef struct {
     u16 first_updates;
     u16 gap_updates;

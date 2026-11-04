@@ -161,3 +161,4 @@ $$(eval $$(call ZERG_LATE_ARM_ROM,$(1),$(2),$(3),$(4),replay-resume,-DPX_REPLAY_
 sc64-$(1)-arm-replay: build/StarCraft-Zerg-$(2)-Replay.gba build/StarCraft-Zerg-$(2)-Replay-Prefix.gba build/StarCraft-Zerg-$(2)-Replay-Resume.gba
 endef
 $(eval $(call ZERG_LATE_QUALIFICATION,z9,Z9,20,SCZ9))
+$(eval $(call ZERG_LATE_QUALIFICATION,z10,Z10,21,SCZA))

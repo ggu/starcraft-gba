@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Audit selected Z8 AI programs from the authenticated N64 BOLT leaf.
+"""Audit selected late-Zerg AI programs from the authenticated N64 BOLT leaf.
 
-This tool decodes only the bounded command set present in the three Z8 AI
+This tool decodes only the bounded command set present in the Z8–Z10 AI
 scripts. It reports command names and numeric operands, never bytes or extracted
 program files. Its opcode layout follows the pinned PC AIscript reference;
 equivalent N64 execution semantics are not established by this parser.
@@ -25,6 +25,11 @@ DEFAULT_ROM = ROOT / '.local/sc64/rom/StarCraft64-USA.z64'
 DEFAULT_OUT = ROOT / '.local/sc64/ai-catalog/z8-ai-policies.json'
 CATALOG_TOOL = ROOT / 'tools/sc64_ai_catalog.py'
 TARGET_IDS = ('Zer8', 'Ze8T', 'MvTe')
+MISSION_IDS = {
+    'Z8': TARGET_IDS,
+    'Z9': ('Zer9', 'Z9ly', 'Z9ry', 'Z9lo', 'Z9ro', 'VluA'),
+    'Z10': ('Z10a', 'Z10b', 'Z10c', 'Z10d', 'Z10e'),
+}
 PYMS_COMMIT = 'bfc5d3aad0b5614a5aff72c223f8efa00afddfa4'
 
 # Facts transcribed from the pinned PyMS AIBIN opcode names and parameter
@@ -33,6 +38,7 @@ COMMANDS: dict[int, tuple[str, tuple[int, ...]]] = {
     0: ('goto', (2,)),
     2: ('wait', (2,)),
     3: ('start_town', ()),
+    4: ('start_areatown', ()),
     6: ('build', (1, 2, 1)),
     7: ('upgrade', (1, 1, 1)),
     8: ('tech', (2, 1)),
@@ -53,6 +59,7 @@ COMMANDS: dict[int, tuple[str, tuple[int, ...]]] = {
     35: ('defaultbuild_off', ()),
     36: ('stop', ()),
     38: ('move_dt', ()),
+    42: ('value_area', ()),
     46: ('max_force', (2,)),
     56: ('start_campaign', ()),
 }
@@ -101,12 +108,13 @@ def decode_segment(data: bytes, start: int, end: int) -> list[dict]:
     return instructions
 
 
-def analyze_catalog(data: bytes, catalog: dict) -> dict:
-    """Summarize the three target programs; no raw instruction bytes escape."""
+def analyze_catalog(data: bytes, catalog: dict,
+                    target_ids: tuple[str, ...] = TARGET_IDS) -> dict:
+    """Summarize selected programs; no raw instruction bytes escape."""
     rows = {row['id']: row for row in catalog['entries']}
-    missing = sorted(set(TARGET_IDS) - rows.keys())
+    missing = sorted(set(target_ids) - rows.keys())
     if missing:
-        raise ValueError(f'missing required Z8 AI scripts: {", ".join(missing)}')
+        raise ValueError(f'missing required AI scripts: {", ".join(missing)}')
     starts = sorted({row['code_offset'] for row in catalog['entries'] if row['code_offset']})
     table_offset = catalog['header_table_offset']
     regions = {start: (start, next((x for x in starts if x > start), table_offset))
@@ -120,7 +128,7 @@ def analyze_catalog(data: bytes, catalog: dict) -> dict:
         return regions[start]
 
     summaries = []
-    for script_id in TARGET_IDS:
+    for script_id in target_ids:
         row = rows[script_id]
         start = row['code_offset']
         if start not in regions:
@@ -180,7 +188,10 @@ def analyze_catalog(data: bytes, catalog: dict) -> dict:
     }
 
 
-def audit(rom_path: Path, extractor_path: Path | None = None) -> dict:
+def audit(rom_path: Path, extractor_path: Path | None = None,
+          mission: str = 'Z8') -> dict:
+    if mission not in MISSION_IDS:
+        raise ValueError(f'unsupported AI mission: {mission}')
     catalog_tool = _load_catalog_tool()
     rom = catalog_tool.read_bounded_rom(rom_path)
     importer = catalog_tool.load_module(ROOT / 'tools/sc64_import.py',
@@ -217,7 +228,7 @@ def audit(rom_path: Path, extractor_path: Path | None = None) -> dict:
             'n64_execution_equivalence': 'unproven; see reference limitations',
             'raw_program_bytes_included': False,
         },
-        'analysis': analyze_catalog(payload, catalog),
+        'analysis': analyze_catalog(payload, catalog, MISSION_IDS[mission]),
     }
 
 
@@ -235,12 +246,13 @@ def private_output_path(path: Path) -> Path:
     return target
 
 
-def run(rom_path: Path, output: Path, extractor_path: Path | None = None) -> dict:
+def run(rom_path: Path, output: Path, extractor_path: Path | None = None,
+        mission: str = 'Z8') -> dict:
     output = private_output_path(output)
     if output == rom_path.resolve() or (output.exists() and rom_path.exists() and
                                         os.path.samefile(output, rom_path)):
         raise ValueError('AI program output must not overwrite or alias the input ROM')
-    result = audit(rom_path, extractor_path)
+    result = audit(rom_path, extractor_path, mission)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     return result
@@ -248,6 +260,8 @@ def run(rom_path: Path, output: Path, extractor_path: Path | None = None) -> dic
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mission', choices=tuple(MISSION_IDS), default='Z8',
+                        help='mission scripts to audit (default: Z8)')
     parser.add_argument('--rom', type=Path, default=DEFAULT_ROM,
                         help='user-supplied verified USA ROM')
     parser.add_argument('--out', type=Path, default=DEFAULT_OUT,
@@ -256,7 +270,7 @@ def main() -> None:
                         help='optional pinned extract_sc64_maps.py path')
     args = parser.parse_args()
     try:
-        result = run(args.rom, args.out, args.extractor)
+        result = run(args.rom, args.out, args.extractor, args.mission)
     except (OSError, RuntimeError, ValueError) as exc:
         parser.error(str(exc))
     counts = ', '.join(f"{row['id']}={row['instruction_count']} ops"
