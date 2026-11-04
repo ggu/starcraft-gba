@@ -456,6 +456,9 @@ static void reject_generation2_save(int mission, int legacy_container)
 #endif
     assert(frame == old_frame && screen == old_screen && cx == old_x && cy == old_y);
     assert(minerals == old_ore && gas == old_gas);
+    /* End this synthetic rejection case before the next ordinary save. */
+    fixture_clear_record_tag(PROFILE_OLD_SAVE_TAG);
+    fixture_clear_candidate_records();
 }
 
 static void test_older_generation_rejection(int mission)
@@ -593,6 +596,7 @@ static void test_p8_source_permissions(void)
     race_mode=1;
     assert(race_p8_unit_product_available(SIDE,7,U_P7_ARBITER));
     assert(race_p8_building_product_available(SIDE,7,B_P7_ARBITER_TRIBUNAL));
+    fixture_clear_candidate_records();
 }
 
 static void test_p7_journal_isolation(void)
@@ -608,6 +612,7 @@ static void test_p7_journal_isolation(void)
     assert(screen==old_screen && frame==old_frame);
     assert(save_read_latest(copy,sizeof(copy),p7_tag,&len));
     assert(len==sizeof(copy) && !memcmp(copy,old_record,sizeof(copy)));
+    fixture_clear_record_tag(p7_tag);
 }
 #endif
 

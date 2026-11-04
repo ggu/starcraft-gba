@@ -9,6 +9,11 @@ static Sc64ImpactEvent fixture_saved_impacts[RACE_IMPACT_CAPACITY];
 static u8 fixture_saved_impact_count;
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
+static void fixture_clear_record_tag(u32 tag)
+{
+    save_test_corrupt_latest(0, tag);
+    save_test_corrupt_latest(0, tag);
+}
 /* Synthetic HOST records belong to independent malformed-candidate cases.
  * Discard them explicitly between cases: the production first-write guard
  * correctly refuses to overwrite a committed record with no valid predecessor. */
@@ -24,8 +29,7 @@ static void fixture_clear_candidate_records(void)
     const u32 tags[] = { SC64_WORKER_CARGO_LEGACY_SAVE_VERSION, SAVE_VERSION };
 #endif
     for (unsigned i = 0; i < sizeof(tags) / sizeof(tags[0]); ++i) {
-        save_test_corrupt_latest(0, tags[i]);
-        save_test_corrupt_latest(0, tags[i]);
+        fixture_clear_record_tag(tags[i]);
     }
 }
 static void fixture_finish_rejected_candidate(void)
@@ -36,6 +40,7 @@ static void fixture_finish_rejected_candidate(void)
     fixture_clear_candidate_records();
 }
 #else
+#define fixture_clear_record_tag(tag) ((void)(tag))
 #define fixture_clear_candidate_records() ((void)0)
 #define fixture_finish_rejected_candidate() ((void)0)
 #endif
