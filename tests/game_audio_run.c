@@ -464,10 +464,10 @@ int main(int argc, char **argv)
 #ifndef GAME_AUDIO_OFF
     u32 total = 0;
     for (int k = 0; k < GAME_AUDIO_EVENT_KINDS; k++) total += events(k);
-    printf("events attack=%u death=%u ready=%u what=%u yes=%u built=%u advisor=%u\n",
+    printf("events attack=%u death=%u ready=%u what=%u yes=%u built=%u advisor=%u alert=%u\n",
            events(GAME_AUDIO_ATTACK), events(GAME_AUDIO_DEATH), events(GAME_AUDIO_READY),
            events(GAME_AUDIO_WHAT), events(GAME_AUDIO_YES), events(GAME_AUDIO_BUILT),
-           events(GAME_AUDIO_ADVISOR));
+           events(GAME_AUDIO_ADVISOR), events(GAME_AUDIO_ALERT));
     if (!total) return fail("long run produced no audio events");
 #endif
     return 0;
