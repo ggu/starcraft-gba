@@ -1238,6 +1238,18 @@ static void save_validated_commit_tag(volatile u8 *p,u32 tag) {
 #endif
 #define SAVE_VALIDATED_IS_COMMITTED(p,tag) \
     (SAVE_VALIDATED_TAG_VALID(tag)&&valid_record(p,0,tag))
+#ifdef SC64_DIAGNOSTIC_SAVE_VALIDATE
+static int save_profile_validator(GbaSaveValidator validate,const void *scratch,
+        u32 len,u32 tag,void *context,int slot) {
+    u32 start=gba_clock();
+    int accepted=validate(scratch,len,tag,context);
+    sc64_diagnostic_save_validate(0,slot,gba_clock()-start,tag,len,accepted);
+    return accepted;
+}
+#define SAVE_PROFILE_VALIDATE() save_profile_validator(validate,scratch,len,tag,context,slot)
+#else
+#define SAVE_PROFILE_VALIDATE() validate(scratch,len,tag,context)
+#endif
 int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection) {
     volatile const u8 *base=(volatile const u8*)SRAM_BASE;
@@ -1253,7 +1265,7 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
         for(unsigned i=0;i<tag_count;i++)if(tags[i]==tag)allowed=1;
         if(!allowed||len>capacity||!valid_record(p,0,tag))continue;
         for(u32 i=0;i<len;i++)((u8*)scratch)[i]=p[16+i];
-        if(!validate(scratch,len,tag,context))continue;
+        if(!SAVE_PROFILE_VALIDATE())continue;
         if(best.slot>=0 && seq-best.sequence==0x80000000u)return 0;
         if(best.slot<0||(s32)(seq-best.sequence)>0)
             best=(GbaSaveSelection){tag,len,seq,sram_get32(p+8),slot};
@@ -1265,6 +1277,7 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
     for(u32 i=0;i<best.length;i++)((u8*)scratch)[i]=p[16+i];
     *selection=best;return 1;
 }
+#undef SAVE_PROFILE_VALIDATE
 int save_select_transaction(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
                             GbaSaveValidator prepare,GbaSaveCommit commit,void *context,
                             GbaSaveSelection *selection) {

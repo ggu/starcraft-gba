@@ -90,6 +90,20 @@ static void out_flush(void)
     line_len = 0;
 }
 
+#ifdef SC64_DIAGNOSTIC_SAVE_VALIDATE
+void sc64_diagnostic_save_validate(unsigned layer,int slot,u32 cycles,
+                                    u32 tag,u32 length,int accepted)
+{
+    /* Layer 0 wraps the generic selector callback; layer 1 times the nested
+     * preflight, including its final direct call on the reloaded winner.
+     * Nested scopes must not be summed. No payload or live state is changed. */
+    out_text("Z7S VALIDATE"); out_field("layer",(long)layer);
+    out_field("slot",slot); out_text(" cycles="); out_u64(cycles);
+    out_text(" tag="); out_u64(tag); out_text(" length="); out_u64(length);
+    out_field("accepted",accepted); out_text(" end=1"); out_flush();
+}
+#endif
+
 #ifndef GBA_HOST
 /* Untouched-stack high-water mark: paint the unused IWRAM stack once. */
 enum { STACK_LOW = 0x03005000u, STACK_LIMIT = 0x03007e00u, STACK_GAP = 256u };

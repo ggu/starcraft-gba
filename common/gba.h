@@ -126,6 +126,11 @@ int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
  * again after selection. A token names the validated predecessor slot. */
 typedef struct { u32 tag, length, sequence, checksum; int slot; } GbaSaveSelection;
 typedef int (*GbaSaveValidator)(const void *data,u32 length,u32 tag,void *context);
+#ifdef SC64_DIAGNOSTIC_SAVE_VALIDATE
+/* Supplied by an isolated diagnostic probe; absent from normal products. */
+void sc64_diagnostic_save_validate(unsigned layer,int slot,u32 cycles,
+                                    u32 tag,u32 length,int accepted);
+#endif
 int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection);
 /* The validator prepares a scratch-only plan and may overwrite the payload.
