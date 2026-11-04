@@ -912,22 +912,44 @@ static int forced_commit(int scenario)
     /* The late condition needs three genuinely recruited survivors, not a
      * particular combat phase at one exact frame. Keep defending the human as
      * before, then wait at most 6000 more frames for the original setup. */
-    int late_ready = 0;
+    int late_ready = 0, parked[3] = {-1,-1,-1};
     while (screen == SCREEN_PLAY && !won && !lost &&
            frame < setup + (scenario == 1 ? 6000 : 0)) {
-        if (scenario == 1 && frame >= setup) {
-            int marines = 0; RaceAiCensus home;
+        if (scenario == 1) {
+            RaceAiCensus home; int count = 0;
             race_ai_census(owner, &home);
-            for (int i = 0; i < MAX_UNITS; ++i)
-                if (race_ai_movable_army(&u[i], owner) && u[i].type == U_MARINE &&
-                    dist2(u[i].x,u[i].y,home.hx,home.hy) <= RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) ++marines;
-            if (marines >= 3) { late_ready = 1; break; }
+            for (int k = 0; k < 3; ++k) {
+                int i = parked[k];
+                if (i >= 0 && (!u[i].alive || u[i].owner != owner || u[i].type != U_MARINE)) parked[k] = -1;
+            }
+            /* Fixture-only: hold three actually recruited home Marines by
+             * orders, without moving or creating them, until the late test. */
+            for (int i = 0; i < MAX_UNITS; ++i) {
+                if (!race_ai_movable_army(&u[i], owner) || u[i].type != U_MARINE ||
+                    dist2(u[i].x,u[i].y,home.hx,home.hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) continue;
+                int present = 0; for (int k=0;k<3;++k) if (parked[k]==i) present=1;
+                if (!present) for (int k=0;k<3;++k) if (parked[k]<0) { parked[k]=i; break; }
+            }
+            for (int k=0;k<3;++k) if (parked[k]>=0) {
+                Unit *q=&u[parked[k]]; q->order=ORDER_IDLE; q->target=-1; q->tx=q->x; q->ty=q->y; ++count;
+            }
+            if (frame >= setup && count == 3) { late_ready=1; break; }
         }
         input(0);
         if (scenario == 1) defend_human(owner);
     }
     if (screen != SCREEN_PLAY || won || lost || (scenario == 1 && !late_ready)) goto done;
-    kept = cut_army(owner, 3, slots, scenario == 1);
+    if (scenario == 1) {
+        for (int k=0;k<3;++k) slots[k]=parked[k];
+        for (int i=0;i<MAX_UNITS;++i) if (race_ai_movable_army(&u[i],owner)) {
+            int selected=0; for (int k=0;k<3;++k) if (slots[k]==i) selected=1;
+            if (!selected) kill_unit(i);
+        }
+        for (int i=0;i<MAX_BUILDINGS;++i)
+            if (b[i].alive && b[i].owner==owner && !sc64_race_is_worker(b[i].queue[b[i].queue_head]))
+                b[i].queue_count=0, b[i].queue_progress=0;
+        kept=3;
+    } else kept = cut_army(owner, 3, slots, 0);
     if (kept != 3) goto done;
     if (scenario == 0 || scenario == 2) exhaust_minerals(owner);
     if (scenario == 1) {
