@@ -123,6 +123,14 @@ build/test-sc64-zerg-late-art: tests/sc64_zerg_late_art.c $(STARCRAFT) $(wildcar
 test-sc64-zerg-late-art: build/test-sc64-zerg-late-art
 	./build/test-sc64-zerg-late-art
 
+# Z9 preparation must qualify its art without requiring Z10-only descriptors.
+build/test-sc64-z9-art: tests/sc64_zerg_late_art.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z9-art
+test-sc64-z9-art: build/test-sc64-z9-art
+	./build/test-sc64-z9-art
+test-sc64-zerg-z9: test-sc64-z9-art
+
 # Z9 and Z10 ordinary-input qualification, as Z8's above.
 # $(1) lower-case id, $(2) upper-case id, $(3) mission, $(4) ROM code.
 define ZERG_LATE_ARM_ROM

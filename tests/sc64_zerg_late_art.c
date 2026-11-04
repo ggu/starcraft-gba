@@ -6,8 +6,8 @@
 #include <string.h>
 #include "../starcraft/game.c"
 
-#if !defined(SC64_Z10_RUNTIME) || !defined(SC64_ZERG_LATE_ART_COMPLETE)
-#error "The complete late-Zerg sprite bank and Z10 flags are required"
+#if !defined(SC64_Z9_RUNTIME) || !defined(SC64_ZERG_LATE_ART_COMPLETE)
+#error "The complete late-Zerg sprite bank and Z9 or Z10 flags are required"
 #endif
 
 static void require_art(unsigned raw)
@@ -51,7 +51,9 @@ int main(void)
     assert(crystal==sc64_p8_unit_sprite_for_raw(219));
     assert(crystal!=sc64_race_unit_sprite(216));
     check_map_and_creates(SC64_Z9_GLOBAL_ID,sc64_z9_program_actions,SC64_Z9_PROGRAM_ACTION_COUNT);
+#ifdef SC64_Z10_RUNTIME
     check_map_and_creates(SC64_Z10_GLOBAL_ID,sc64_z10_program_actions,SC64_Z10_PROGRAM_ACTION_COUNT);
+#endif
     assert(!sc64_race_unit_sprite(101));
     gba_init(); game_init(); camx=camy=0;
     for (unsigned raw=173;raw<=174;++raw) {
@@ -80,6 +82,10 @@ int main(void)
     u[0].type=U_CHRYSALIS; u[0].raw_type=219; u[0].x=120; u[0].y=60;
     gfx_begin(C_BLACK); gfx_set_clip_y(12,120); draw_unit(&u[0]);
     check_pixels(crystal,120,72);
+#ifdef SC64_Z10_RUNTIME
     puts("Z9/Z10 map and created-actor source art and clipped draws pass");
+#else
+    puts("Z9 map and created-actor source art and clipped draws pass");
+#endif
     return 0;
 }
