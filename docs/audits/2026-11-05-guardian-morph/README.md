@@ -1,0 +1,61 @@
+# Guardian morph research (staged design, not implemented)
+
+Base source: `9f596ad1`. Pinned local stock profile records Guardian raw 44
+at 50 minerals, 100 gas, 600 source frames, 150 HP and four doubled supply;
+Cocoon raw 59 has 200 HP. The local catalog says Guardian morphs from raw 43
+Mutalisk and requires raw 137 Greater Spire. Campaign and skirmish have
+profile-dependent Guardian aliases; their existing IDs must remain unchanged.
+Skirmish already supports Lair/Hive and Spire/Greater Spire building morphs;
+campaign currently exposes only Lair and Spire. Guardian and Mutalisk sprite
+export mappings exist, but Cocoon sprite coverage is not established.
+
+## Primary implementation evidence
+
+OpenBW `4b046d5f65302b10cb0a745f0fecd37ec85b20a8`,
+[`bwgame.h`](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h):
+
+- `order_ZergUnitMorph` lines 6299–6334 transforms a Mutalisk in place into a
+  Cocoon, initializes the remaining time to the product's build time, counts
+  down per simulation tick, then waits for an animation signal to transform.
+- `cancel_building_unit` lines 2384–2420 fully refunds the queued product cost,
+  changes Cocoon back to Mutalisk in the same unit, clears remaining time and
+  enters birth animation. Building morph cancellation instead refunds 75%.
+- `reinitialize_unit_type` lines 2932–2969 changes HP proportionally to the new
+  maximum with integer truncation and a minimum of one. Thus damage during the
+  Cocoon affects both completion and cancellation HP; original HP is not simply
+  restored. These are OpenBW semantics, not installed N64 timing measurements.
+
+## Existing wire fields and collisions
+
+| Codec | Row size | `type` / `raw_type` | `order` | `build` | `work_timer` | `target` | `flags` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Z/P packed | 35 bytes | 6 / 9 bits | 4 | signed 10 | 16 | signed 10 | 16 |
+| Compact | 38 bytes | 6 / 9 bits | 4 | signed 10 | 16 | signed 10 | 16 |
+| Z7 derived | 29 bytes | 6 / 8 bits | 4 | signed 10 | 16 | signed 10 | 8 |
+| P7 typed | 28 bytes | 6 / 8 bits | 4 | biased 8 | 11 | biased 9 | 14 |
+| Legacy word array | `2 * RACE_UNIT_WORDS` bytes | signed 16 each | signed 16 | signed 16 | signed 16 | signed 16 | unsigned-recovered 16 |
+
+Derived HP uses type plus raw identity; P7 typed derives HP and armor from type
+alone. Existing flags include 0x02 burrow, 0x08 special actor state, 0x10
+invincibility and worker-specific 0x20/0x40/0x80 cargo and gather state. Other
+profile-specific meanings require a full scoped collision check. `build` is a
+worker depot/building reference, `work_timer` serves worker actions and other
+unit services, `target` is a combat/entity reference, and `order` drives common
+movement and combat. These are not globally spare fields.
+
+Proposed staged wire: append a dedicated Cocoon type after all existing enum
+entries, gated so earlier IDs do not shift; raw identity 59; canonical HP 200
+and armor from pinned facts; `work_timer` stores 1–750 engine ticks if the
+existing 5/4 build-time conversion is retained, and `target` stores the sole
+Guardian product identity under a Cocoon-only tagged contract. Idle order,
+zero cargo, valid owner, selection and in-bounds coordinates are checked. The
+Cocoon type itself disambiguates these fields; no worker, transported unit or
+ordinary combat actor may be reinterpreted. This needs codec-specific
+canonicalization including P7 typed, a distinct feature journal namespace,
+strict old-tag rejection or proven migration, and tests for malformed state.
+The exact feature tag must be allocated against the complete tag registry and
+transport/cargo variants; no numeric tag is reserved yet. Six-bit enum capacity,
+full runtime memory, double-journal payload size, graphics and linker guards
+must be measured for every intended product before activation. The 5/4 mapping
+and animation timing remain approximations requiring native comparison.
+No code, save semantics or default profile changes are implemented here.
