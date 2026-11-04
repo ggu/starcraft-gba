@@ -663,7 +663,7 @@ observing only and are not gameplay evidence.
 
 | Alert | Terran id | N64 trigger as observed | Port trigger |
 | --- | --- | --- | --- |
-| Base is under attack | 117 | Fighting at a base off screen. Twelve plays, 14.2 to 15.6 s apart. | A player building's hit points and shields fall off screen. |
+| Base is under attack | 117 | Fighting at a base off screen. Eleven plays, 14.2 to 15.6 s apart. | A player building's hit points and shields fall off screen. |
 | Your forces are under attack | 120 | Fighting off screen, after panning away: 13.4 s apart. None in the 40 s before the pan, with fighting on screen. | The same for a player unit. Shares the base line's 15 s limit. |
 | Research complete | 123 | Stim Packs finished. Zerg: id 122 when Burrow finished, in Z1. | Finished Yamato or reactor, transport or Ventral Sacs research. |
 | Upgrade complete | 131 | An Engineering Bay upgrade finished. | A running weapon or armor upgrade finished. |
