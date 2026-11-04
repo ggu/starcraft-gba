@@ -46,9 +46,13 @@ enum {
  * hit points a step, buildings bits 0-7 at sixteen. */
 #define GAME_AUDIO_UNIT_VITAL_SHIFT 10
 #define GAME_AUDIO_UNIT_VITAL_MASK 63u
+#define GAME_AUDIO_UNIT_VITAL_BITS (GAME_AUDIO_UNIT_VITAL_MASK << GAME_AUDIO_UNIT_VITAL_SHIFT)
 #define GAME_AUDIO_BUILDING_VITAL_MASK 255u
 /* Native repeats were 13.4 to 15.6 s apart under a sustained attack. */
 #define GAME_AUDIO_ATTACK_ALERT_TICKS 450
+/* Vitals are compared every eighth tick: this ROM-side pass over every actor
+ * is too much to spend each frame on a 15 s alert. */
+#define GAME_AUDIO_VITAL_TICK_MASK 7
 #ifdef SC64_RACES
 #define GAME_AUDIO_VITAL(q) ((q)->hp + (q)->shield)
 #define GAME_AUDIO_SHIELDED(q) ((q)->shield > 0)
@@ -272,12 +276,53 @@ static void game_audio_music(void)
 }
 #endif
 
+/* Refreshes every actor's stored vitals and raises the under-attack alert. All
+ * owners are stored, so a slot that changes hands has no stale value to compare. */
+static void game_audio_vitals(int fresh)
+{
+    volatile u16 *snap = GAME_AUDIO_SNAPSHOT;
+    int attacked = 0, i;
+    for (i = 0; i < MAX_UNITS; i++) {
+        const Unit *q = &u[i];
+        if (!q->alive) continue;
+        u32 prev = snap[i];
+        u32 vital = ((u32)GAME_AUDIO_VITAL(q) >> 2) & GAME_AUDIO_UNIT_VITAL_MASK;
+        u32 drop = ((prev >> GAME_AUDIO_UNIT_VITAL_SHIFT) - vital) & GAME_AUDIO_UNIT_VITAL_MASK;
+        if (!fresh && drop && drop <= GAME_AUDIO_UNIT_VITAL_MASK / 2 && q->owner == SIDE &&
+            !(prev & GAME_AUDIO_SNAPSHOT_LOADED) && GAME_AUDIO_HURT(q) &&
+            !game_audio_on_screen(q->x, q->y))
+            attacked |= 1;
+        snap[i] = (u16)((prev & ~GAME_AUDIO_UNIT_VITAL_BITS) | vital << GAME_AUDIO_UNIT_VITAL_SHIFT);
+    }
+    for (i = 0; i < MAX_BUILDINGS; i++) {
+        const Building *q = &b[i];
+        if (!q->alive) continue;
+        u32 prev = snap[MAX_UNITS + i];
+        u32 vital = ((u32)GAME_AUDIO_VITAL(q) >> 4) & GAME_AUDIO_BUILDING_VITAL_MASK;
+        u32 drop = (prev - vital) & GAME_AUDIO_BUILDING_VITAL_MASK;
+        if (!fresh && drop && drop <= GAME_AUDIO_BUILDING_VITAL_MASK / 2 && q->owner == SIDE &&
+            GAME_AUDIO_HURT(q) &&
+#ifdef SC64_RACES
+            /* A burning Terran building loses hit points by itself. */
+            !(q->hp * 3 <= q->maxhp && race_building_can_burn(q)) &&
+#endif
+            !game_audio_on_screen(q->x, q->y))
+            attacked |= 2;
+        snap[MAX_UNITS + i] = (u16)((prev & ~GAME_AUDIO_BUILDING_VITAL_MASK) | vital);
+    }
+    /* Modular age: restarting or loading an earlier tick reads as long ago. */
+    if (attacked && (u16)((u32)frame - GAME_AUDIO_STATE[GAME_AUDIO_STATE_ATTACK_TICK]) >= GAME_AUDIO_ATTACK_ALERT_TICKS) {
+        GAME_AUDIO_STATE[GAME_AUDIO_STATE_ATTACK_TICK] = (u16)frame;
+        game_audio_alert(attacked & 2 ? GAME_AUDIO_ALERT_BASE : GAME_AUDIO_ALERT_FORCES);
+    }
+}
+
 static void game_audio_observe(void)
 {
     volatile u16 *snap = GAME_AUDIO_SNAPSHOT;
     int fresh, i;
     u32 selection = 0, orders = 0;
-    int first_selected = -1, attacked = 0;
+    int first_selected = -1;
     u16 held = GAME_AUDIO_HELD(), pressed = held & (u16)~game_audio_previous_held;
     int advisor = toast_advisor;
     game_audio_previous_held = held;
@@ -305,22 +350,14 @@ static void game_audio_observe(void)
         u32 prev = snap[i];
         if (!q->alive && !prev) continue;
         u32 cd = q->cd > 255 ? 255u : (u32)q->cd;
-        u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE | cd : 0;
+        u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE | cd | (prev & GAME_AUDIO_UNIT_VITAL_BITS) : 0;
         if (q->alive && SC64_TRANSPORT_LOADED(q)) now |= GAME_AUDIO_SNAPSHOT_LOADED;
-        if (q->alive) {
-            u32 vital = ((u32)GAME_AUDIO_VITAL(q) >> 2) & GAME_AUDIO_UNIT_VITAL_MASK;
-            u32 drop = ((prev >> GAME_AUDIO_UNIT_VITAL_SHIFT) - vital) & GAME_AUDIO_UNIT_VITAL_MASK;
-            now |= vital << GAME_AUDIO_UNIT_VITAL_SHIFT;
-            if (!fresh && drop && drop <= GAME_AUDIO_UNIT_VITAL_MASK / 2 && q->owner == SIDE &&
-                (prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !(prev & GAME_AUDIO_SNAPSHOT_LOADED) &&
-                GAME_AUDIO_HURT(q) && !game_audio_on_screen(q->x, q->y))
-                attacked |= 1;
-        }
         if (!fresh) {
             if ((prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !q->alive) {
                 if (game_audio_on_screen(q->x, q->y))
                     game_audio_emit(GAME_AUDIO_DEATH, game_audio_unit_raw(q));
             } else if (!(prev & GAME_AUDIO_SNAPSHOT_ALIVE) && q->alive) {
+                now |= ((u32)GAME_AUDIO_VITAL(q) >> 2 & GAME_AUDIO_UNIT_VITAL_MASK) << GAME_AUDIO_UNIT_VITAL_SHIFT;
                 if (q->owner == SIDE) game_audio_emit(GAME_AUDIO_READY, game_audio_unit_raw(q));
             } else if (q->alive && cd > (prev & 0xffu) && !(prev & GAME_AUDIO_SNAPSHOT_LOADED) &&
                        game_audio_on_screen(q->x, q->y)) {
@@ -339,25 +376,14 @@ static void game_audio_observe(void)
         const Building *q = &b[i];
         u32 prev = snap[MAX_UNITS + i];
         if (!q->alive && !prev) continue;
-        u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE |
+        u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE | (prev & GAME_AUDIO_BUILDING_VITAL_MASK) |
                   (q->under_construction ? GAME_AUDIO_SNAPSHOT_CONSTRUCTING : 0) : 0;
-        if (q->alive) {
-            u32 vital = ((u32)GAME_AUDIO_VITAL(q) >> 4) & GAME_AUDIO_BUILDING_VITAL_MASK;
-            u32 drop = (prev - vital) & GAME_AUDIO_BUILDING_VITAL_MASK;
-            now |= vital;
-            if (!fresh && drop && drop <= GAME_AUDIO_BUILDING_VITAL_MASK / 2 && q->owner == SIDE &&
-                (prev & GAME_AUDIO_SNAPSHOT_ALIVE) && GAME_AUDIO_HURT(q) &&
-#ifdef SC64_RACES
-                /* A burning Terran building loses hit points by itself. */
-                !(q->hp * 3 <= q->maxhp && race_building_can_burn(q)) &&
-#endif
-                !game_audio_on_screen(q->x, q->y))
-                attacked |= 2;
-        }
         if (!fresh) {
             if ((prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !q->alive) {
                 if (game_audio_on_screen(q->x, q->y))
                     game_audio_emit(GAME_AUDIO_DEATH, game_audio_building_raw(q));
+            } else if (q->alive && !(prev & GAME_AUDIO_SNAPSHOT_ALIVE)) {
+                now |= (u32)GAME_AUDIO_VITAL(q) >> 4 & GAME_AUDIO_BUILDING_VITAL_MASK;
             } else if (q->alive && (prev & GAME_AUDIO_SNAPSHOT_CONSTRUCTING) &&
                        !q->under_construction && q->owner == SIDE) {
                 game_audio_emit(GAME_AUDIO_BUILT, game_audio_building_raw(q));
@@ -378,10 +404,6 @@ static void game_audio_observe(void)
     }
     game_audio_selection = selection;
     game_audio_orders = orders;
-    /* Modular age: restarting or loading an earlier tick reads as long ago. */
-    if (attacked && (u16)((u32)frame - GAME_AUDIO_STATE[GAME_AUDIO_STATE_ATTACK_TICK]) >= GAME_AUDIO_ATTACK_ALERT_TICKS) {
-        GAME_AUDIO_STATE[GAME_AUDIO_STATE_ATTACK_TICK] = (u16)frame;
-        game_audio_alert(attacked & 2 ? GAME_AUDIO_ALERT_BASE : GAME_AUDIO_ALERT_FORCES);
-    }
+    if (fresh || !(frame & GAME_AUDIO_VITAL_TICK_MASK)) game_audio_vitals(fresh);
 }
 #endif

@@ -38,6 +38,12 @@ static void observe_next(void)
     game_render();
 }
 
+/* Advance to the next tick on which the observer compares hit points. */
+static void observe_vitals(void)
+{
+    do observe_next(); while (frame & GAME_AUDIO_VITAL_TICK_MASK);
+}
+
 static void put_unit(int slot, int owner, int type, int x, int y)
 {
     memset(&u[slot], 0, sizeof u[slot]);
@@ -294,26 +300,26 @@ static int hooks(void)
     u[10].hp = u[11].hp = 30;
     b[0].alive = 1; b[0].owner = SIDE; b[0].type = B_DEPOT; b[0].x = 900; b[0].y = 700;
     b[0].hp = 300; b[0].maxhp = 500;
-    observe_next();
-    observe_next();
+    observe_vitals();
+    observe_vitals();
     for (int k = 0; k <= GAME_AUDIO_ATTACK_ALERT_TICKS; k++) observe_next();
     clear_events();
     u[11].hp = 20;
-    observe_next();
+    observe_vitals();
     if (events(GAME_AUDIO_ALERT)) return fail("on-screen damage alerted");
     u[10].hp = 20;
-    observe_next();
+    observe_vitals();
     if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_FORCES)
         return fail("off-screen unit damage");
     u[10].hp = 40;
-    observe_next();
+    observe_vitals();
     u[10].hp = 8;
-    observe_next();
+    observe_vitals();
     if (events(GAME_AUDIO_ALERT) != 1) return fail("sustained attack repeated inside the interval");
     for (int k = 0; k < GAME_AUDIO_ATTACK_ALERT_TICKS; k++) observe_next();
     if (events(GAME_AUDIO_ALERT) != 1) return fail("quiet interval alerted");
     b[0].hp = 200;
-    observe_next();
+    observe_vitals();
     if (events(GAME_AUDIO_ALERT) != 2 || game_audio_last_alert != GAME_AUDIO_ALERT_BASE)
         return fail("off-screen building damage");
     /* Healing and a morph to a full smaller body are not attacks. */
@@ -321,15 +327,15 @@ static int hooks(void)
     clear_events();
     b[0].hp = 400;
     u[10].hp = 40;
-    observe_next();
+    observe_vitals();
     u[10].hp = u[10].maxhp = 16;
-    observe_next();
+    observe_vitals();
     if (events(GAME_AUDIO_ALERT)) return fail("healing or a morph alerted");
     /* A discontinuity drops damage from before it. */
     u[10].hp = 4;
     frame += 40;
     game_render();
-    observe_next();
+    observe_vitals();
     if (events(GAME_AUDIO_ALERT)) return fail("damage across a discontinuity alerted");
 
     /* Finished upgrades alert once; a level with no running upgrade does not. */

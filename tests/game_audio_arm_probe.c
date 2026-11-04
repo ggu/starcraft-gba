@@ -65,6 +65,11 @@ static void observe_next(void)
     frame_wait();
 }
 
+static void observe_vitals(void)
+{
+    do observe_next(); while (frame & GAME_AUDIO_VITAL_TICK_MASK);
+}
+
 /* Asserts this line's clip was requested, then waits out the advisor voice. */
 static void expect(const char *name, int alert)
 {
@@ -106,10 +111,10 @@ static void run_race(int race)
 {
     race_human = race;
     fixture();
-    u[10].hp = 20; observe_next(); expect("forces", GAME_AUDIO_ALERT_FORCES);
+    u[10].hp = 20; observe_vitals(); expect("forces", GAME_AUDIO_ALERT_FORCES);
     for (int k = 0; k < GAME_AUDIO_ATTACK_ALERT_TICKS; ++k) observe_next();
     last_sample = last_kind = -1;
-    b[0].hp = 900; observe_next(); expect("base", GAME_AUDIO_ALERT_BASE);
+    b[0].hp = 900; observe_vitals(); expect("base", GAME_AUDIO_ALERT_BASE);
     weapons_research = 600; observe_next();
     weapons_research = 0; ++weapons_level; observe_next(); expect("upgrade", GAME_AUDIO_ALERT_UPGRADE);
     toast_advisor = TOAST_CUE_ENERGY; observe_next(); expect("energy", GAME_AUDIO_ALERT_ENERGY);
@@ -126,6 +131,7 @@ static void measure_observer(void)
     for (int i = 0; i < MAX_UNITS; ++i) { u[i] = u[10]; u[i].selected = 0; }
     for (int i = 0; i < MAX_BUILDINGS; ++i) b[i] = b[0];
     observe_next();
+    /* Whole eight-tick cycles, so the average includes the vitals comparison. */
     for (int k = 0; k < 120; ++k) {
         u32 start;
         ++frame;

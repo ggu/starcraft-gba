@@ -646,8 +646,12 @@ Engine design (`common/audio_mixer.h`, `common/gba.c`):
   writes simulation state or uses the game RNG, at most two effects start per
   frame, and it ignores any tick discontinuity such as a load or restart.
 - Advisor alerts come from the same observer and use the advisor voice rules.
-  Their state lives in the VRAM arena after the event snapshot, so they add no
-  EWRAM. A bank generated before the alert table stays silent for them, and
+  Hit points are compared every eighth tick, so an attack can be heard up to
+  about a quarter second late. Their state lives in the VRAM arena after the
+  event snapshot, so they add no EWRAM. With every slot of the Terran profile
+  alive and player-owned (192 units and 96 buildings, which no mission reaches),
+  the ARM probe measured 39,718 observer cycles per frame on average, against
+  28,755 with the hit-point checks and tech comparison removed. A bank generated before the alert table stays silent for them, and
   profiles without a bank play a short PSG tone.
 
 ### Advisor alerts
