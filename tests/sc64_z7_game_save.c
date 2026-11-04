@@ -100,6 +100,11 @@ static void reject_without_mutation(const RaceSave *bad)
     assert(!memcmp(gas,race_gas,sizeof(gas)));
     assert(!memcmp(geysers_before,geysers,sizeof(geysers_before)));
     assert(frame==clock);
+#ifdef SC64_WORKER_CARGO_KIND
+    /* A checksum-valid rejected candidate must not be overwritten by a
+     * production first-save; the next injected case clears the fixture. */
+    assert(!race_save_game());
+#endif
 }
 
 #ifdef SC64_Z7_DERIVED_SAVE
