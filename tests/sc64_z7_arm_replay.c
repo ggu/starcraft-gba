@@ -363,6 +363,7 @@ static int host_payload(const char *path, int write)
         if (ok) save_write(&data, sizeof(data), SAVE_VERSION);
     }
     return fclose(f) == 0 && ok;
+#endif
 }
 int main(int argc, char **argv)
 {
