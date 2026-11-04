@@ -1,5 +1,8 @@
 #ifndef SC64_DERIVED_SAVE_H
 #define SC64_DERIVED_SAVE_H
+#ifndef SC_RU_LEGACY_BOUND
+#define SC_RU_LEGACY_BOUND SC_RU_COUNT
+#endif
 /* Opt-in generation-38 rows. maxhp/armor are reconstructed
  * from the same profile facts used by constructors. Unit.weapon is omitted
  * only because no gameplay path reads it; this is semantic, not bitwise,
@@ -8,7 +11,7 @@
  * save generation or a compatible explicit migration. */
 #define SC64_DERIVED_UNIT_BYTES 29
 #define SC64_DERIVED_BUILDING_BYTES 25
-_Static_assert(SC_RU_COUNT <= 64 && SC_RB_COUNT <= 64,
+_Static_assert(SC_RU_LEGACY_BOUND <= 64 && SC_RB_COUNT <= 64,
                "derived save enums must fit their six-bit fields");
 typedef struct {
   u8 bytes[SC64_DERIVED_UNIT_BYTES];
@@ -80,7 +83,7 @@ static int sc64_derived_unit_encode(Sc64DerivedUnitSave *out, const Unit *q,
   unsigned k = 0;
   static const Unit zero = {0};
   if (!out || !q || !ww || !wh || ww > 2048 || wh > 2048 || q->type < 0 ||
-      q->type >= SC_RU_COUNT)
+      q->type >= SC_RU_LEGACY_BOUND || q->type >= 64)
     return 0;
   if (!memcmp(q, &zero, sizeof(*q))) {
     *out = z;

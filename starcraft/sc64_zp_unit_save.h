@@ -1,5 +1,8 @@
 #ifndef SC64_ZP_UNIT_SAVE_H
 #define SC64_ZP_UNIT_SAVE_H
+#ifndef SC_RU_LEGACY_BOUND
+#define SC_RU_LEGACY_BOUND SC_RU_COUNT
+#endif
 
 /* Proposed future ZP-profile Unit row. This is deliberately separate from
  * the accepted 38-byte codec: a future save generation must opt into it.
@@ -63,7 +66,7 @@ static int sc64_zp_unit_fields_valid(const Unit *q, unsigned world_width,
         q->hp < -SC64_ZP_PACKED_UNIT_HP_BIAS ||
         q->hp >= SC64_ZP_PACKED_UNIT_HP_BIAS || (q->alive && q->hp < 0) ||
         q->maxhp < 0 || q->maxhp > 131071 || q->owner < 0 || q->owner > 4 ||
-        q->type < 0 || q->type >= SC_RU_COUNT || SC_RU_COUNT > 64 ||
+        q->type < 0 || q->type >= SC_RU_LEGACY_BOUND || q->type >= 64 || SC_RU_LEGACY_BOUND > 64 ||
         (q->alive != 0 && q->alive != 1) ||
         (q->selected != 0 && q->selected != 1) || q->cd < 0 || q->cd > 65535 ||
         q->order < 0 || q->order > 15 || q->tx < 0 || q->tx > 2047 ||

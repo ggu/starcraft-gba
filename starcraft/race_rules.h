@@ -147,6 +147,8 @@ enum {
     SC_RU_COUNT = SC_RU_LEGACY_COUNT
 #endif
 };
+
+#define SC_RU_LEGACY_BOUND SC_RU_LEGACY_COUNT
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 _Static_assert(SC_RU_LEGACY_COUNT <= 64 && U_GUARDIAN_COCOON == SC_RU_LEGACY_COUNT &&
                SC_RU_COUNT == SC_RU_LEGACY_COUNT + 1, "only staged Cocoon may exceed wire type width");
