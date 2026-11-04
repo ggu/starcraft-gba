@@ -455,6 +455,9 @@ int main(void)
     report_cycles("terminal", tick);
     out_text("Z7 DONE"); out_field("cursor", (long)tape_cursor); out_flush();
 #ifdef GBA_HOST
+#if defined(Z7_CARGO_DIGEST) && Z7_ARM_MODE == 2
+    if (argc > 2 && !host_payload(argv[2], 1)) return 2;
+#endif
     return won ? 0 : 1;
 #else
     for (;;) frame_with(0);
