@@ -529,6 +529,9 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #include "sc64_sprites_generated.h"
 #ifdef SC64_RACES
 #include "sc64_race_sprites_generated.h"
+#if defined(SC64_Z9_RUNTIME) && !defined(SC64_ZERG_LATE_ART_COMPLETE)
+#error "Regenerate the Z8 sprite bank with --include-zerg-late-art"
+#endif
 #include "sc64_p8_sprite_adapter.h"
 #ifdef SC64_CONSTRUCTION_SOURCE_ART
 #include "sc64_construction_source.h"
@@ -10435,8 +10438,16 @@ building_art_sprite(const Building *q)
 #endif
 
 static int
-building_art_in_view(int x,int y)
+building_art_in_view(const Building *q, int x, int y)
 {
+#ifdef SC64_Z9_RUNTIME
+    /* The source Temple and Formation extend beyond the ordinary building
+     * anchor envelope. Keep partial sprites visible at the camera edges. */
+    if (q->raw_type == 173 || q->raw_type == 174)
+        return x > -56 && x < 296 && y > -28 && y < 160;
+#else
+    (void)q;
+#endif
     return x >= -20 && x <= 260 && y >= 2 && y <= 130;
 }
 
@@ -10444,7 +10455,7 @@ static void
 draw_building_art(Building *q)
 {
     int x = q->x - camx, y = q->y - camy + 12;
-    if (!building_art_in_view(x, y))
+    if (!building_art_in_view(q, x, y))
         return;
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (sc64_game_building_actor_flags(q->type) &&
@@ -10576,7 +10587,7 @@ draw_building_overlay(Building *q)
         SelectionCover cover;
         const SelectionCover *covered = 0;
 #ifdef SC64_HAS_SPRITES
-        if (sprite && building_art_in_view(x, y) && building_art_is_static(q)) {
+        if (sprite && building_art_in_view(q, x, y) && building_art_is_static(q)) {
             cover.pixels = sprite->pixels;
             cover.x = sprite_x; cover.y = sprite_y;
             cover.w = sprite_w; cover.h = sprite_h;
@@ -10758,7 +10769,7 @@ sc64_static_objects_key(void)
         Building *q = &b[i];
         int x = q->x - camx;
         int y = q->y - camy + 12;
-        int in_bounds = q->alive && x >= -20 && x <= 260 && y >= 2 && y <= 130;
+        int in_bounds = q->alive && building_art_in_view(q, x, y);
         values[n++] = q->alive
 #ifdef SC64_RACES
             | ((q->under_construction!=0)<<1)
