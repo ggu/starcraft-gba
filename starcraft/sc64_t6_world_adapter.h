@@ -1,6 +1,8 @@
 #ifndef SC64_T6_WORLD_ADAPTER_H
 #define SC64_T6_WORLD_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 /* The T6 world binding is deliberately opt-in.  It applies the verified
  * trigger program to the bounded GBA actor arrays; opaque AI scripts, source
  * strings, and exact native scheduler timing remain authored GBA policies. */
@@ -457,6 +459,7 @@ sc64_t6_world_presentation(void *context, const Sc64T4Action *action,
     switch (action->opcode) {
     case 7: case 8: case 9: case 12:
         if (trigger_owner != 0) return 1;
+        RACE_TEXT_BOX_ACTION(action->opcode, action->string_id);
         state->message = action->opcode;
         /* Source transcript duration/audio is not decoded; this fixed
          * ninety-tick display is an authored GBA presentation policy. */

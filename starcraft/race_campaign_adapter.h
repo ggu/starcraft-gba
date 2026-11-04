@@ -1,6 +1,8 @@
 #ifndef SC64_RACE_CAMPAIGN_ADAPTER_H
 #define SC64_RACE_CAMPAIGN_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 /* Mission-specific port rules for the first two Zerg and Protoss maps,
  * plus the existing Terran rules when SC64_UNIFIED is enabled. Source map/trigger evidence is the user-supplied verified
  * ROM, extracted with references/sc64-maps/extract_sc64_maps.py @
@@ -1153,6 +1155,95 @@ race_campaign_enemy_buildings_remain(void)
     return race_campaign_count_buildings(ENEMY) != 0;
 }
 
+#ifdef SC64_TEXT_BOXES
+/* Text rows of the hand-written missions that have no outcome or event of their
+ * own to hang on: the tutorial lines. Each source trigger fires once, which the
+ * high bits of the saved objective flags remember; the low eight are objectives.
+ * Conditions are the source's counts, or the nearest thing this engine keeps.
+ * The source's short Waits before these lines are not modelled. */
+#define RACE_TEXT_FIRED(bit) (1u << (8u + (bit)))
+
+static unsigned race_text_units(int raw)
+{
+    unsigned n = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE &&
+            (u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type)) == raw) ++n;
+    return n;
+}
+
+static unsigned race_text_buildings(int raw)
+{
+    unsigned n = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && !b[i].under_construction &&
+            (raw < 0 || (b[i].raw_type >= 0 ? b[i].raw_type :
+                         sc64_race_raw_building(b[i].type)) == raw)) ++n;
+    return n;
+}
+
+static int race_text_once(unsigned bit, int condition)
+{
+    if (!condition || (race_campaign.objective_flags & RACE_TEXT_FIRED(bit))) return 0;
+    race_campaign.objective_flags |= RACE_TEXT_FIRED(bit);
+    return 1;
+}
+
+static int race_text_fired(unsigned bit)
+{ return (race_campaign.objective_flags & RACE_TEXT_FIRED(bit)) != 0; }
+
+/* MRGN 6 "Protoss Base", in the half scale of the P1 rescue check below. */
+static int race_text_p1_base_clear(void)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == ENEMY && u[i].x >= 224 && u[i].x <= 784 &&
+            u[i].y >= 848 && u[i].y <= 1200) return 0;
+    return 1;
+}
+
+static __attribute__((noinline)) void race_campaign_text_tick(int mission)
+{
+    /* These only count actors, and a line can wait a few updates. */
+    if (race_campaign.elapsed_frames & 7u) return;
+    if (mission == SC64_RACE_MISSION_Z1) {
+        const unsigned drones = race_text_units(41), overlords = race_text_units(42);
+        const unsigned pools = race_text_buildings(142);
+        if (race_text_once(0, 1)) { RACE_TEXT_BOX_ROW(1, 2); RACE_TEXT_BOX_ROW(1, 3); RACE_TEXT_BOX_ROW(1, 4); }
+        if (race_text_once(1, drones >= 3)) RACE_TEXT_BOX_ROW(4, 1);
+        if (race_text_once(2, race_text_fired(1) && overlords <= 1 && minerals >= 100)) RACE_TEXT_BOX_ROW(5, 0);
+        if (race_text_once(3, overlords >= 2 && drones >= 2 && !pools)) RACE_TEXT_BOX_ROW(6, 1);
+        else if (race_text_once(4, race_text_fired(3) && !pools)) RACE_TEXT_BOX_ROW(7, 0);
+        else if (race_text_once(5, race_text_fired(4) && !pools && minerals >= 150)) RACE_TEXT_BOX_ROW(8, 0);
+        else if (race_text_once(6, race_text_fired(5) && !pools)) RACE_TEXT_BOX_ROW(9, 0);
+        else if (race_text_once(7, race_text_fired(6))) RACE_TEXT_BOX_ROW(10, 0);
+        if (race_text_once(8, pools >= 1)) { RACE_TEXT_BOX_ROW(11, 1); RACE_TEXT_BOX_ROW(11, 4); }
+#ifdef SC64_UNIFIED
+    } else if (mission == SC64_RACE_MISSION_T1) {
+        if (race_text_once(0, race_text_buildings(111) >= 1)) { RACE_TEXT_BOX_ROW(5, 2); RACE_TEXT_BOX_ROW(5, 4); }
+        if (race_text_once(1, race_campaign.elapsed_frames >= 8u * 30u)) RACE_TEXT_BOX_ROW(7, 0);
+#endif
+    } else if (mission == SC64_RACE_MISSION_P1) {
+        const int met = (race_campaign.objective_flags & SC64_RACE_OBJECTIVE_FENIX_MET) != 0;
+        const unsigned probes = race_text_units(64);
+        if (race_text_once(4, met)) RACE_TEXT_BOX_ROW(1, 2);
+        if (met && race_text_p1_base_clear()) {
+            if (race_text_once(0, !probes)) { RACE_TEXT_BOX_ROW(4, 0); RACE_TEXT_BOX_ROW(4, 4); }
+            if (race_text_once(1, probes >= 1)) { RACE_TEXT_BOX_ROW(7, 2); RACE_TEXT_BOX_ROW(7, 4); }
+        }
+        if (race_text_once(2, race_text_buildings(160) >= 1 && race_text_buildings(162) >= 1 &&
+                              !race_text_buildings(156))) {
+            RACE_TEXT_BOX_ROW(8, 2);
+            RACE_TEXT_BOX_ROW(8, 4);
+        }
+        if (race_text_once(3, race_text_buildings(-1) > 6)) RACE_TEXT_BOX_ROW(12, 1);
+    } else if (mission == SC64_RACE_MISSION_P2) {
+        if (race_text_once(0, 1)) RACE_TEXT_BOX_ROW(2, 4);
+        if (race_text_once(1, race_text_buildings(160) >= 1)) RACE_TEXT_BOX_ROW(6, 1);
+        if (race_text_once(2, race_text_buildings(172) >= 1)) RACE_TEXT_BOX_ROW(7, 1);
+    }
+}
+#endif
+
 #ifdef SC64_UNIFIED
 /* Reuse the already-ported Terran scenario rules rather than substituting
  * the Zerg/Protoss mission AI. T2's callbacks retain its CHK region/timer rules. */
@@ -1161,16 +1252,18 @@ static void race_terran_tick(void)
     if(race_selected_mission==SC64_RACE_MISSION_T2){backwater_update();}
     else {
         int i,j,raynor_alive=0,raynor_found=0,marines=0,barracks=0,command=0,men=0;
-        if(!mission_objective_stage&&frame>=30){minerals=40;race_minerals[SIDE]=40;mission_objective_stage=1;race_campaign_set_message(12);}
+        if(!mission_objective_stage&&frame>=30){RACE_TEXT_BOX_ROW(3,3);minerals=40;race_minerals[SIDE]=40;mission_objective_stage=1;race_campaign_set_message(12);}
         for(i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].type==U_RAYNOR&&u[i].owner==NEUTRAL)
             for(j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==SIDE&&dist2(u[i].x,u[i].y,u[j].x,u[j].y)<=20*20){
-                u[i].owner=SIDE;u[i].selected=0;race_campaign_set_message(13);break;}
+                RACE_TEXT_BOX_ROW(2,1);RACE_TEXT_BOX_ROW(2,5);u[i].owner=SIDE;u[i].selected=0;race_campaign_set_message(13);break;}
         for(i=0;i<MAX_UNITS;i++)if(u[i].alive){
             if(u[i].owner==SIDE)++men;
             if(u[i].type==U_RAYNOR){raynor_alive=1;raynor_found=u[i].owner==SIDE;}
             else if(u[i].owner==SIDE&&u[i].type==U_MARINE)++marines;}
         for(i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE){
             if(b[i].type==B_BARRACKS)++barracks;else if(b[i].type==B_COMMAND)++command;}
+        if(!raynor_alive)RACE_TEXT_BOX_ROW(4,3);
+        else if(!command&&!barracks&&marines<=9&&minerals<=399)RACE_TEXT_BOX_ROW(8,3);
         if(!raynor_alive||!men||(!command&&!barracks&&marines<=9&&minerals<=399))lost=1;
         if(raynor_found&&marines>=10&&barracks>=1)won=1;
     }
@@ -1189,6 +1282,9 @@ race_campaign_tick(void)
         race_campaign.phase == SC64_RACE_PHASE_FAILED) return;
     if (race_campaign.message_ticks) --race_campaign.message_ticks;
     ++race_campaign.elapsed_frames;
+#ifdef SC64_TEXT_BOXES
+    race_campaign_text_tick(mission);
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
         if (!race_late_tick()) screen = SCREEN_PAUSE;
@@ -1464,9 +1560,10 @@ race_campaign_tick(void)
                 u[i].owner == RESCUABLE && u[i].raw_type == 53) {
                 u[i].owner = SIDE; joined = 1;
             }
-            if (joined) race_campaign_set_message(9);
+            if (joined) { RACE_TEXT_BOX_ROW(2, 0); race_campaign_set_message(9); }
         }
         if (!race_campaign_unit_alive(c)) {
+            RACE_TEXT_BOX_ROW(6, 1);
             race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_CHRYSALIS_LOST;
             race_campaign.phase = SC64_RACE_PHASE_FAILED;
         } else {
@@ -1474,6 +1571,7 @@ race_campaign_tick(void)
             if (race_campaign.carrier_unit < MAX_UNITS) {
                 int carrier = race_campaign.carrier_unit;
                 if (!u[carrier].alive || u[carrier].owner != SIDE || u[carrier].type != U_DRONE) {
+                    RACE_TEXT_BOX_ROW(5, 0);
                     race_campaign.carrier_unit = 0xffffu;
                     q->owner = NEUTRAL;
                     race_campaign.objective_flags &= ~SC64_RACE_OBJECTIVE_CHRYSALIS_RECOVERED;
@@ -1500,6 +1598,7 @@ race_campaign_tick(void)
              * 1200..1232 source px, converted to the GBA's 16px scale. */
             if (q->owner == SIDE && q->x >= 1184 && q->x <= 1232 &&
                 q->y >= 1200 && q->y <= 1232) {
+                RACE_TEXT_BOX_ROW(1, 0);
                 race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_PRIMARY;
                 race_campaign.phase = SC64_RACE_PHASE_COMPLETE;
             }
@@ -1507,6 +1606,7 @@ race_campaign_tick(void)
     } else if (mission == SC64_RACE_MISSION_P1) {
         int fenix = race_campaign.rescue_unit;
         if (!race_campaign_unit_alive(fenix)) {
+            RACE_TEXT_BOX_ROW(3, 2);
             race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_FENIX_LOST;
             race_campaign.phase = SC64_RACE_PHASE_FAILED;
         } else {
@@ -1542,6 +1642,7 @@ race_campaign_tick(void)
                 }
             }
             if (f->owner == SIDE && !race_campaign_enemy_buildings_remain()) {
+                RACE_TEXT_BOX_ROW(5, 1);
                 race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_PRIMARY |
                                                   SC64_RACE_OBJECTIVE_SECONDARY;
                 race_campaign.phase = SC64_RACE_PHASE_COMPLETE;
@@ -1550,11 +1651,15 @@ race_campaign_tick(void)
     } else if (mission == SC64_RACE_MISSION_P2) {
         int fenix;
         if (race_campaign.elapsed_frames >= 900u * 30u &&
-            !(race_campaign.objective_flags & SC64_RACE_OBJECTIVE_FENIX_READY))
+            !(race_campaign.objective_flags & SC64_RACE_OBJECTIVE_FENIX_READY)) {
+            RACE_TEXT_BOX_ROW(5, 19);
+            RACE_TEXT_BOX_ROW(5, 22);
             race_campaign_spawn_p2_reinforcements();
+        }
         fenix = race_campaign.rescue_unit;
         if (race_campaign.objective_flags & SC64_RACE_OBJECTIVE_FENIX_READY) {
             if (!race_campaign_unit_alive(fenix)) {
+                RACE_TEXT_BOX_ROW(1, 2);
                 race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_FENIX_LOST;
                 race_campaign.phase = SC64_RACE_PHASE_FAILED;
             } else if (u[fenix].owner == RESCUABLE) {
@@ -1570,6 +1675,7 @@ race_campaign_tick(void)
             for (j = 0; j < MAX_BUILDINGS; ++j)
                 if (b[j].alive && b[j].owner == ENEMY && b[j].raw_type == 151) break;
             if (i == MAX_UNITS && j == MAX_BUILDINGS) {
+                RACE_TEXT_BOX_ROW(3, 3);
                 race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_CEREBRATE_DEAD;
                 race_campaign.phase = SC64_RACE_PHASE_COMPLETE;
             }
@@ -1802,6 +1908,7 @@ race_campaign_failure_text(void)
     return "MISSION FAILED";
 }
 
+#ifndef SC64_TEXT_BOXES
 static const char *
 race_campaign_message_text(void)
 {
@@ -1854,5 +1961,6 @@ race_campaign_message_text(void)
     return race_campaign.message < sizeof(messages) / sizeof(messages[0]) ?
         messages[race_campaign.message] : "";
 }
+#endif
 
 #endif

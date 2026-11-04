@@ -1,6 +1,8 @@
 #ifndef SC64_P4_ADAPTER_H
 #define SC64_P4_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 #if defined(SC64_P4_COUNT_CENSUS_ENABLED) && !defined(SC64_P4_RUNTIME)
 #error "SC64_P4_COUNT_CENSUS_ENABLED requires the P4 runtime"
 #endif
@@ -341,6 +343,7 @@ static int race_p4_dispatch(const Sc64P4SourceAction *a, u16 *duration)
     case 5: race_p4.source_paused = 1; return 1;
     case 6: race_p4.source_paused = 0; return 1;
     case 7: case 8: case 9:
+        RACE_TEXT_BOX_ACTION(a->opcode, a->string_id);
         *duration = SC64_P4_PRESENTATION_TICKS;
         race_p4.message_ticks = *duration;
         return 1;

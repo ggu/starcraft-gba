@@ -11,6 +11,8 @@
  * and at the end, with guest cycle counts from the GBA timers. Emulator
  * evidence only; no physical-hardware claim.
  */
+#include "../common/gba.h"
+#include "sc64_text_box_replay.h"
 #include "../starcraft/game.c"
 #include "sc64_t9_tape_generated.h"
 
@@ -190,6 +192,7 @@ int main(void)
             break;
         }
         frame_with(held);
+        TEXT_BOXES_DISMISS(frame_with);
         if (tick % 1000u == 0) report("periodic", tick);
         if (tick == T9_TAPE_STOP_TICK) report(won ? "won" : lost ? "lost" : "limit", tick);
     }

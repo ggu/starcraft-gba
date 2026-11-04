@@ -1,6 +1,8 @@
 #ifndef SC64_BACKWATER_ADAPTER_H
 #define SC64_BACKWATER_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 /* Adapter from the fixed CHK trigger interpreter to the small RTS engine.
  * Region rectangles come only from the private generated 008/00B header. */
 static int
@@ -281,6 +283,18 @@ static void
 bw_message(void *context, int trigger, int action)
 {
     (void)context;
+#ifdef SC64_TEXT_BOXES
+    /* This model can run triggers 10 to 12 again, but they fire once in the
+     * source. The saved flags' high bits remember them, as for hand-written rows. */
+    if (trigger >= 10 && trigger <= 12) {
+        unsigned fired = 1u << (8 + trigger - 10);
+        if (!(race_campaign.objective_flags & fired)) {
+            race_campaign.objective_flags |= fired;
+            RACE_TEXT_BOX_ROW(trigger, action);
+        }
+    } else
+#endif
+    RACE_TEXT_BOX_ROW(trigger, action);
     backwater_message_trigger = trigger;
     backwater_message_action = action;
     backwater_message_ticks = 180;
