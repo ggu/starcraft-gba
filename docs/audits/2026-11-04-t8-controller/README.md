@@ -6,7 +6,7 @@ The controller now anchors that double-tap on an idle Wraith. The route still us
 
 With the private 2026-10-31 verified inputs, canonical Terran flags, and ASan/UBSan, the T8 baseline failed as above; the candidate won at call 170,733, frame 165,826, with zero faults and the existing victory, hero and completion checks satisfied. The shared T10 controller also won. Logs are local at `/tmp/sc64-t8-baseline.log`, `/tmp/sc64-t8-candidate.log`, and `/tmp/sc64-t10-candidate.log`. The builds and runs were serialized with the shared native lock and a 2 GiB free-space guard.
 
-This is one host route, not an ARM replay, save continuation, performance measurement, physical hardware test, or proof of N64 equivalence. The complete Terran aggregate was not rerun here.
+This is one host route, not an ARM replay, save continuation, performance measurement, physical hardware test, or proof of N64 equivalence. The initial focused checks covered T8 and T10; the complete Terran aggregate was then run as recorded below.
 
 ## Combined release verification
 
