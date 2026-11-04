@@ -10,5 +10,11 @@ int main(void) {
  sc64_unit_buckets_begin();
  printf("approach,%d\n",!unit_step_clear(&u[0],101,100));
  printf("escape,%d\n",!unit_step_clear(&u[0],99,100));
- sc64_unit_buckets_end();return 0;
+ sc64_unit_buckets_end();
+ u[1].x=100;u[1].y=115;sc64_unit_buckets_begin();
+ printf("south,%d\n",!unit_step_clear(&u[0],100,101));sc64_unit_buckets_end();
+ u[1].x=105;u[1].y=100;sc64_unit_buckets_begin();
+ printf("overlap_closer,%d\n",!unit_step_clear(&u[0],101,100));
+ printf("overlap_escape,%d\n",!unit_step_clear(&u[0],99,100));sc64_unit_buckets_end();
+ return 0;
 }

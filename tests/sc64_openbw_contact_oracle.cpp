@@ -26,6 +26,17 @@ int main() {
  auto *first=api.check_ground_unit_movement_unit_collision(&a.u,step); assert(first==&b.u);
  std::printf("approach,%d\n",first!=nullptr);
  step.position={198,200};assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));std::puts("escape,0");
+ b.s.position={200,230};api.unit_finder_reinsert(&b.u);step.position={200,202};
+ assert(api.check_ground_unit_movement_unit_collision(&a.u,step)==&b.u);std::puts("south,1");
+ b.s.position={210,200};api.unit_finder_reinsert(&b.u);step.position={202,200};
+ assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));std::puts("overlap_closer,0");
+ step.position={198,200};assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));std::puts("overlap_escape,0");
+ b.s.position={228,200};api.unit_finder_reinsert(&b.u);step.position={202,200};
+ Actor c(19,200,230,16,16,15,15);api.unit_finder_insert(&c.u);
+ step.position={202,202};assert(api.check_ground_unit_movement_unit_collision(&a.u,step)==&b.u);std::puts("diagonal_x_first,1");
+ api.unit_finder_remove(&c.u);
+ c.s.position={228,200};api.unit_finder_insert(&c.u);step.position={202,200};
+ assert(api.check_ground_unit_movement_unit_collision(&a.u,step)==&c.u);std::puts("equal_edge_newer_first,1");api.unit_finder_remove(&c.u);
  a.s.flags=sprite_t::flag_hidden;step.position={202,200};assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));a.s.flags=0;
  a.u.status_flags=0;assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));a.u.status_flags=unit_t::status_flag_ground_unit;
  b.u.status_flags|=unit_t::status_flag_no_collide;assert(!api.check_ground_unit_movement_unit_collision(&a.u,step));b.u.status_flags&=~unit_t::status_flag_no_collide;
