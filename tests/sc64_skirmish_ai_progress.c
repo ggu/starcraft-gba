@@ -906,7 +906,7 @@ static int forced_commit(int scenario)
     }
     if (screen != SCREEN_PLAY || won || lost) goto done;
     kept = cut_army(owner, 3, slots);
-    if (kept != 3) goto done;
+    if (kept < 1) goto done;
     if (scenario == 0 || scenario == 2) exhaust_minerals(owner);
     if (scenario == 1) {
         /* Only the 25-minute rule may apply: local minerals remain. */
@@ -919,21 +919,21 @@ static int forced_commit(int scenario)
     if (scenario == 2) {
         int ref_at, ref_n = 0;
         if (!save_through_pause()) goto done;
-        ref_at = await_commit(owner, slots, 3, 600, &ref_n);
+        ref_at = await_commit(owner, slots, kept, 600, &ref_n);
         while (frame < setup + 720 && screen == SCREEN_PLAY && !won && !lost) input(0);
         reference = world_hash();
         game_init(); previous = 0;
         input(KEY_L);
         if (screen != SCREEN_PLAY || !race_mode) goto done;
-        at = await_commit(owner, slots, 3, 600, &committed);
+        at = await_commit(owner, slots, kept, 600, &committed);
         while (frame < setup + 720 && screen == SCREEN_PLAY && !won && !lost) input(0);
         resumed = world_hash();
         ok = ref_at >= 0 && at == ref_at && committed == ref_n && reference == resumed;
     } else if (scenario == 3) {
-        at = await_commit(owner, slots, 3, 600, &committed);
+        at = await_commit(owner, slots, kept, 600, &committed);
         ok = at < 0;
     } else {
-        at = await_commit(owner, slots, 3, 600, &committed);
+        at = await_commit(owner, slots, kept, 600, &committed);
         ok = at >= 0;
     }
     ok = ok && supply > 0 && supply < 12;
