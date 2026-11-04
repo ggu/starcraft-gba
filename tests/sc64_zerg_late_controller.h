@@ -168,11 +168,22 @@ static int queued_units(int type)
 
 static int drone_count(void){return count_units(SIDE,U_DRONE);}
 
+/* The late cargo-enabled profiles accept a loaded Drone's mineral order.
+ * Keep the previously qualified Z8 controller unchanged. */
+static int late_drone_mining_available(const Unit *q)
+{
+#if defined(SC64_WORKER_CARGO_KIND) && (defined(SC64_Z9_RUNTIME) || defined(SC64_Z10_RUNTIME))
+    (void)q; return 1;
+#else
+    return !q->carry;
+#endif
+}
+
 /* The selected idle Drone's slot plus one, or zero. */
 static int idle_drone_selected(void)
 {
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected&&u[i].owner==SIDE&&
-        u[i].type==U_DRONE&&u[i].order==ORDER_IDLE&&!u[i].carry)return i+1;
+        u[i].type==U_DRONE&&u[i].order==ORDER_IDLE&&late_drone_mining_available(&u[i]))return i+1;
     return 0;
 }
 
@@ -184,10 +195,9 @@ static int order_idle_drones(int most)
     static const int dx[]={0,8,-8,0,0,8,-8,8,-8};
     static const int dy[]={0,0,0,8,-8,8,8,-8,-8};
     int assigned=0,tries=0;
-    /* A tap can pick an idle Drone that refuses the field, such as one holding
-       cargo, and each try restarts from it: stop after a few. */
+    /* Limit retries when selection or the contextual field click fails. */
     for(int w=0;w<MAX_UNITS&&screen==SCREEN_PLAY&&assigned<most&&tries<16;w++){
-        if(!u[w].alive||u[w].owner!=SIDE||u[w].type!=U_DRONE||u[w].order!=ORDER_IDLE||u[w].carry)continue;
+        if(!u[w].alive||u[w].owner!=SIDE||u[w].type!=U_DRONE||u[w].order!=ORDER_IDLE||!late_drone_mining_available(&u[w]))continue;
         ++tries;
         if(idle_reach&&dist2(u[w].x,u[w].y,cx,cy)>idle_reach*idle_reach)continue;
         /* Spread the Drones: a field worked by fewer of them wins over a closer
