@@ -84,6 +84,7 @@ static u32 state_digest(void)
         H(q->hp); H(q->shield); H(q->x); H(q->y); H(q->tx); H(q->ty);
         H(q->target); H(q->raw_type); H(q->raw_owner); H(q->cd);
         H(q->owner); H(q->type); H(q->order); H(q->carry);
+        H(q->flags); H(q->work_timer); H(q->build);
     }
     for (int i = 0; i < MAX_BUILDINGS; i++) {
         const Building *q = &b[i];
