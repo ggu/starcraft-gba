@@ -176,3 +176,16 @@ build/test-sc64-z9-carried-profile: tests/sc64_promoted_race_profile.c tests/sc6
 .PHONY: test-sc64-z9-carried-profile
 test-sc64-z9-carried-profile: build/test-sc64-z9-carried-profile
 	./build/test-sc64-z9-carried-profile
+
+# Ordinary-input carried controllers linked with the complete Z9 vector.
+define Z9_CARRIED_CONTROLLER
+build/test-sc64-z9-carried-$(1): tests/$(2).c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $$< $(3) -o $$@
+endef
+$(eval $(call Z9_CARRIED_CONTROLLER,z1z2,race_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z3,sc64_z3_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z4,sc64_z4_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z5,sc64_z5_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z6,sc64_z6_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z7,sc64_z7_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z8,sc64_z8_campaign_run,))
