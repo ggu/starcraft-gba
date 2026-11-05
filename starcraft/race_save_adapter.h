@@ -126,9 +126,23 @@ static int race_save_decode_unit_authenticated(const RaceSave *candidate,unsigne
                                                 const Sc64StageSaveAuth *auth)
 {
     Unit decoded;
-    if (!candidate || !out || !sc64_stage_save_auth_matches(auth,candidate,candidate->version,0) ||
-        !race_save_decode_unit_raw_stage(candidate,slot,width,height,&decoded)) return 0;
-    if (decoded.type==SC64_SHARED_EGG_TYPE && !(auth->features & SC64_STAGE_SAVE_EGG)) return 0;
+    if (!candidate || !out || slot>=MAX_UNITS ||
+        !sc64_stage_save_auth_matches(auth,candidate,candidate->version,0)) return 0;
+    if (auth->features & SC64_STAGE_SAVE_EGG) {
+#if defined(SC64_ZP_FULL_STORAGE) && defined(SC64_P7_TYPED_COMPACT_ENABLED)
+        if (!sc64_p7_typed_unit_decode_for(&decoded,&candidate->units[slot],width,height,1)) return 0;
+#elif defined(SC64_ZP_FULL_STORAGE) && defined(SC64_Z7_DERIVED_SAVE)
+        if (!sc64_derived_unit_decode(&decoded,&candidate->units[slot],width,height)) return 0;
+#elif defined(SC64_ZP_FULL_STORAGE)
+        if (!sc64_zp_unit_save_decode_for(&decoded,&candidate->units[slot],width,height,1)) return 0;
+#elif defined(SC64_LATE_TERRAN_STORAGE)
+        if (!sc64_unit_save_decode_for(&decoded,&candidate->units[slot],width,height,1)) return 0;
+#else
+        if (!race_save_decode_unit_raw_stage(candidate,slot,width,height,&decoded)) return 0;
+#endif
+    } else if (!race_save_decode_unit_raw_stage(candidate,slot,width,height,&decoded)) return 0;
+    if (decoded.type==SC64_SHARED_EGG_TYPE &&
+        (!(auth->features & SC64_STAGE_SAVE_EGG) || (decoded.alive && decoded.raw_type!=36))) return 0;
     *out=decoded;return 1;
 }
 #endif

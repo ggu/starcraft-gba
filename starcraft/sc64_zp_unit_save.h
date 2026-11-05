@@ -57,16 +57,22 @@ static int sc64_zp_unit_is_zero(const Sc64ZpPackedUnitSave *row)
     return 1;
 }
 
-static int sc64_zp_unit_fields_valid(const Unit *q, unsigned world_width,
-                                     unsigned world_height)
+static int sc64_zp_unit_fields_valid_for(const Unit *q, unsigned world_width,
+                                     unsigned world_height,int egg_stage)
 {
+    (void)egg_stage;
     if (!q || !world_width || !world_height || world_width > 2048 ||
         world_height > 2048 || q->x < 0 || (unsigned)q->x >= world_width ||
         q->y < 0 || (unsigned)q->y >= world_height ||
         q->hp < -SC64_ZP_PACKED_UNIT_HP_BIAS ||
         q->hp >= SC64_ZP_PACKED_UNIT_HP_BIAS || (q->alive && q->hp < 0) ||
         q->maxhp < 0 || q->maxhp > 131071 || q->owner < 0 || q->owner > 4 ||
-        q->type < 0 || q->type >= SC_RU_LEGACY_BOUND || q->type >= 64 || SC_RU_LEGACY_BOUND > 64 ||
+        q->type < 0 || q->type >= 64 || SC_RU_LEGACY_BOUND > 64 ||
+        (q->type >= SC_RU_LEGACY_BOUND
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+         && !(egg_stage && q->type==SC64_SHARED_EGG_TYPE && q->raw_type==36 && q->alive==1)
+#endif
+         ) ||
         (q->alive != 0 && q->alive != 1) ||
         (q->selected != 0 && q->selected != 1) || q->cd < 0 || q->cd > 65535 ||
         q->order < 0 || q->order > 15 || q->tx < 0 || q->tx > 2047 ||
@@ -87,13 +93,13 @@ static int sc64_zp_unit_fields_valid(const Unit *q, unsigned world_width,
     return 1;
 }
 
-static int sc64_zp_unit_save_encode(Sc64ZpPackedUnitSave *row, const Unit *q,
+static int sc64_zp_unit_save_encode_for(Sc64ZpPackedUnitSave *row, const Unit *q,
                                     unsigned world_width,
-                                    unsigned world_height)
+                                    unsigned world_height,int egg_stage)
 {
     Sc64ZpPackedUnitSave encoded;
     unsigned bit = 0;
-    if (!row || !sc64_zp_unit_fields_valid(q, world_width, world_height)) return 0;
+    if (!row || !sc64_zp_unit_fields_valid_for(q, world_width, world_height,egg_stage)) return 0;
     memset(&encoded, 0, sizeof(encoded));
     static const Unit zero_unit = {0};
     if (memcmp(q, &zero_unit, sizeof(*q)) == 0) { *row = encoded; return 1; }
@@ -122,9 +128,9 @@ static int sc64_zp_unit_save_encode(Sc64ZpPackedUnitSave *row, const Unit *q,
     return 1;
 }
 
-static int sc64_zp_unit_save_decode(Unit *out, const Sc64ZpPackedUnitSave *row,
+static int sc64_zp_unit_save_decode_for(Unit *out, const Sc64ZpPackedUnitSave *row,
                                     unsigned world_width,
-                                    unsigned world_height)
+                                    unsigned world_height,int egg_stage)
 {
     Unit decoded;
     unsigned bit = 0;
@@ -132,7 +138,7 @@ static int sc64_zp_unit_save_decode(Unit *out, const Sc64ZpPackedUnitSave *row,
     if (!out || !row) return 0;
     memset(&decoded, 0, sizeof(decoded));
     if (sc64_zp_unit_is_zero(row)) {
-        if (!sc64_zp_unit_fields_valid(&decoded, world_width, world_height)) return 0;
+        if (!sc64_zp_unit_fields_valid_for(&decoded, world_width, world_height,egg_stage)) return 0;
         *out = decoded; return 1;
     }
 #define SC64_ZP_GET(w, dst) do { \
@@ -158,10 +164,18 @@ static int sc64_zp_unit_save_decode(Unit *out, const Sc64ZpPackedUnitSave *row,
     decoded.raw_owner = (int)v - 1; SC64_ZP_GET(16, decoded.flags);
     SC64_ZP_GET(11, decoded.shield_remainder);
 #undef SC64_ZP_GET
-    if (bit != 280 || !sc64_zp_unit_fields_valid(&decoded, world_width,
-                                                  world_height)) return 0;
+    if (bit != 280 || !sc64_zp_unit_fields_valid_for(&decoded, world_width,
+                                                  world_height,egg_stage)) return 0;
     *out = decoded;
     return 1;
 }
+
+/* Legacy entry points deliberately retain the old admission boundary. */
+static int sc64_zp_unit_fields_valid(const Unit *q,unsigned w,unsigned h)
+{ return sc64_zp_unit_fields_valid_for(q,w,h,0); }
+static int sc64_zp_unit_save_encode(Sc64ZpPackedUnitSave *r,const Unit *q,unsigned w,unsigned h)
+{ return sc64_zp_unit_save_encode_for(r,q,w,h,0); }
+static int sc64_zp_unit_save_decode(Unit *q,const Sc64ZpPackedUnitSave *r,unsigned w,unsigned h)
+{ return sc64_zp_unit_save_decode_for(q,r,w,h,0); }
 
 #endif

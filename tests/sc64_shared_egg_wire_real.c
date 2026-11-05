@@ -10,19 +10,27 @@
 typedef Sc64P7TypedUnitSave Row;
 #define ENC sc64_p7_typed_unit_encode
 #define DEC sc64_p7_typed_unit_decode
+#define ENC_STAGE(r,q,w,h) sc64_p7_typed_unit_encode_for(r,q,w,h,1)
+#define DEC_STAGE(q,r,w,h) sc64_p7_typed_unit_decode_for(q,r,w,h,1)
 #elif defined(SC64_Z7_DERIVED_SAVE)
 typedef Sc64DerivedUnitSave Row;
 #define ENC sc64_derived_unit_encode
 #define DEC sc64_derived_unit_decode
+#define ENC_STAGE(r,q,w,h) ENC(r,q,w,h)
+#define DEC_STAGE(q,r,w,h) DEC(q,r,w,h)
 #else
 typedef Sc64ZpPackedUnitSave Row;
 #define ENC sc64_zp_unit_save_encode
 #define DEC sc64_zp_unit_save_decode
+#define ENC_STAGE(r,q,w,h) sc64_zp_unit_save_encode_for(r,q,w,h,1)
+#define DEC_STAGE(q,r,w,h) sc64_zp_unit_save_decode_for(q,r,w,h,1)
 #endif
 #else
 typedef Sc64PackedUnitSave Row;
 #define ENC sc64_unit_save_encode
 #define DEC sc64_unit_save_decode
+#define ENC_STAGE(r,q,w,h) sc64_unit_save_encode_for(r,q,w,h,1)
+#define DEC_STAGE(q,r,w,h) sc64_unit_save_decode_for(q,r,w,h,1)
 #endif
 static int custom_owner(int owner,int raw_owner,void *ctx)
 { (void)ctx;return owner>=0 && owner<2 && raw_owner==-1; }
@@ -35,7 +43,13 @@ int main(void)
     q.target=U_DRONE;q.work_timer=1;q.build=-1;
     assert(sc64_shared_egg_wire_valid(&q,1,custom_owner,0));
     assert(!sc64_shared_egg_wire_valid(&q,0,custom_owner,0));
-    assert(ENC(&row,&q,2048,2048));assert(DEC(&out,&row,2048,2048));
+#ifndef SC64_Z7_EGG_PRODUCTION
+    assert(!ENC(&row,&q,2048,2048));
+#endif
+    assert(ENC_STAGE(&row,&q,2048,2048));assert(DEC_STAGE(&out,&row,2048,2048));
+#ifndef SC64_Z7_EGG_PRODUCTION
+    assert(!DEC(&out,&row,2048,2048));
+#endif
     assert(!memcmp(&q,&out,sizeof(q)));
     assert(sc64_shared_egg_wire_valid(&out,1,custom_owner,0));
     /* Candidate decoding has a legacy-only default; the explicit detached
