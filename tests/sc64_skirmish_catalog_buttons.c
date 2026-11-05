@@ -78,7 +78,10 @@ static void produce_by_buttons(int producer,unsigned raw)
     }
     assert(count_raw_units(raw)==before+1);
 }
-int main(int argc,char **argv)
+#ifndef SC64_CATALOG_BUTTONS_ENTRY
+#define SC64_CATALOG_BUTTONS_ENTRY main
+#endif
+int SC64_CATALOG_BUTTONS_ENTRY(int argc,char **argv)
 {
     int race=argc>1?atoi(argv[1]):R_TER;
     assert(race==R_TER || race==R_PROTOSS);
