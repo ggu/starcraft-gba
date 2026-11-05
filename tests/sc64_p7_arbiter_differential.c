@@ -39,6 +39,8 @@ static void aura_union_oracle(void)
                 remap_a=raw_slots[a]; remap_b=raw_slots[b]; break;
             }
     assert(remap_a>=0 && remap_b>=0);
+    assert(race_p7_source_owner(0)==race_p7_source_owner(4));
+    assert(remap_a==0 && remap_b==4);
 
     for(int trial=0;trial<80;++trial) {
         int expected_aura[MAX_UNITS]={0};
@@ -223,6 +225,32 @@ static void owner_bucket_fallback_oracle(void)
         sc64_p7_arbiter_cache_source_tick();
         assert(!memcmp(indexed,u,sizeof(u))); assert(!memcmp(&indexed_state,&race_p7,sizeof(race_p7)));
         assert(!memcmp(before_buildings,b,sizeof(b)));
+        if(trial==0) {
+            /* Rebuild the exact production owner lists and index from the
+             * original snapshot; it must match both direct and fallback. */
+            memcpy(u,before,sizeof(u)); memcpy(b,before_buildings,sizeof(b)); race_p7=before_state;
+            sc64_target_index_end();
+            for(int k=0;k<5;++k) target_unit_head[k]=target_building_head[k]=-1;
+            for(int k=MAX_UNITS-1;k>=0;--k) if(u[k].alive && !SC64_TRANSPORT_LOADED(&u[k]) && !SC64_SCARAB_HIDDEN(&u[k])) {
+                int owner=u[k].owner; assert(owner>=0 && owner<5);
+                target_unit_next[k]=target_unit_head[owner]; target_unit_head[owner]=k;
+            }
+            for(int k=MAX_BUILDINGS-1;k>=0;--k) if(b[k].alive) {
+                int owner=b[k].owner; assert(owner>=0 && owner<5);
+                target_building_next[k]=target_building_head[owner]; target_building_head[owner]=k;
+            }
+            sc64_target_index_begin_owner_lists(); assert(sc64_target_index_active);
+            sc64_p7_arbiter_cache_source_tick();
+            assert(!memcmp(indexed,u,sizeof(u))); assert(!memcmp(&indexed_state,&race_p7,sizeof(race_p7)));
+            /* Destroy/reuse the target with a changed owner, rebuild, and
+             * verify source authentication rejects the repurposed slot. */
+            memcpy(u,before,sizeof(u)); race_p7=before_state;
+            u[target].alive=0; sc64_target_index_end();
+            u[target].alive=1; u[target].owner=(live+1)%5; u[target].weapon=0;
+            sc64_target_index_begin(); assert(sc64_target_index_active);
+            sc64_p7_arbiter_cache_source_tick();
+            assert(!(u[target].weapon & SC64_P7_ARBITER_AURA));
+        }
         assert(fwrite(u,1,sizeof(u),stdout)==sizeof(u));
         assert(fwrite(b,1,sizeof(b),stdout)==sizeof(b));
         assert(fwrite(&race_p7,1,sizeof(race_p7),stdout)==sizeof(race_p7));
