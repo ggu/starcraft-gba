@@ -115,3 +115,16 @@ stage-off and stage-on generated P10 headers, SHA-256
 `5a344c30921fed5c468343c9e32eaf41ff456ae818dc669709e8f280d633efcd`.
 Compared with the existing pinned header, the only output difference adds a
 stage-conditional roster assertion; feature guards and fact data are unchanged.
+
+The HOST-only journal prototype now carries the staged Cocoon namespace; it is
+not enabled for guest builds. A Terran legacy save can load an Overlord row
+whose source raw ID is 44, so that pair cannot identify a staged Guardian.
+The candidate instead appends a distinct Guardian after the Cocoon only when
+neither existing Guardian alias is available. In the actual T10 profile these
+IDs are 44 and 45; the compact row has a six-bit type and the old bound rejected
+both. Only the stage build permits the latter through that leaf codec, and the
+journal decoder requires the authenticated stage tag and validates its raw ID,
+health, armor, orders, and target bounds. Existing Guardian aliases remain
+unchanged. Raw-44 scenario import, morph lifecycle, menus, guest admission,
+source art, and full actor/render qualification remain outside this prototype.
+The staged Guardian's gameplay facts still need complete lifecycle review.

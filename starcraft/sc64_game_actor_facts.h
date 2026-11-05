@@ -33,6 +33,11 @@ sc64_game_unit_actor_flags(int type)
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     if (type == U_GUARDIAN_COCOON) return SC64_GAME_ACTOR_SELECTABLE | SC64_GAME_ACTOR_COLLIDABLE | SC64_GAME_ACTOR_DRAWABLE;
 #endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    /* Pinned raw44 actor policy, shared with the Z6 Guardian fact row. */
+    if (type == U_GUARDIAN_STAGE) return SC64_GAME_ACTOR_SELECTABLE | SC64_GAME_ACTOR_MOVABLE |
+        SC64_GAME_ACTOR_COLLIDABLE | SC64_GAME_ACTOR_DRAWABLE | SC64_GAME_ACTOR_MEN | SC64_GAME_ACTOR_WEAPON;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     unsigned flags = sc64_zp_actor_flags(type);
     if (flags) return flags;

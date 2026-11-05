@@ -35,6 +35,15 @@ int main(void)
     guardian_test_retag(1,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
     q->raw_type=42;assert(race_load_game());assert(!memcmp(&u[slot],&legacy,sizeof(legacy)));
     guardian_test_reset();q=&u[slot];
+    q->type=U_GUARDIAN_STAGE;q->raw_type=44;q->hp=100;q->maxhp=150;
+    q->armor=2;q->target=-1;q->order=ORDER_IDLE;q->work_timer=0;
+    Unit staged=*q;assert(race_save_game());q->hp=1;
+    assert(race_load_game());assert(!memcmp(&u[slot],&staged,sizeof(staged)));
+    q=&u[slot];q->alive=0;q->hp=-1;staged=*q;assert(race_save_game());q->hp=1;
+    assert(race_load_game());assert(!memcmp(&u[slot],&staged,sizeof(staged)));
+    guardian_test_retag(0,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    guardian_test_retag(1,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    assert(!race_load_game());guardian_test_reset();q=&u[slot];
 #endif
     q->type=U_GUARDIAN_COCOON;q->raw_type=59;q->hp=120;q->maxhp=200;
     q->armor=0;q->order=ORDER_IDLE;q->target=44;q->build=-1;q->carry=0;q->flags=0;q->work_timer=351;
