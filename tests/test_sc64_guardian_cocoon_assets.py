@@ -2,6 +2,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from tools import sc64_guardian_cocoon_assets as assets
 
 class CocoonAssetBoundaryTest(unittest.TestCase):
@@ -11,12 +12,12 @@ class CocoonAssetBoundaryTest(unittest.TestCase):
                 assets.prepare(Path('unused-rom'), Path('unused-extractor'), Path(tmp) / 'output')
 
     def test_refuses_unpinned_extractor_before_reading_rom(self):
-        with tempfile.TemporaryDirectory(dir=assets.ROOT / '.local') as tmp:
+        with tempfile.TemporaryDirectory() as tmp, patch.object(assets, 'ROOT', Path(tmp)):
             extractor = Path(tmp) / 'extractor.py'
             extractor.write_text('not the pinned extractor')
             with self.assertRaisesRegex(ValueError, 'pinned source'):
-                assets.prepare(Path('unused-rom'), extractor, Path(tmp) / 'output')
-            self.assertFalse((Path(tmp) / 'output').exists())
+                assets.prepare(Path('unused-rom'), extractor, Path(tmp) / '.local' / 'output')
+            self.assertFalse((Path(tmp) / '.local' / 'output').exists())
 
 if __name__ == '__main__':
     unittest.main()
