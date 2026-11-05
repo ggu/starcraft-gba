@@ -7,3 +7,12 @@ ROM SHA-256 `e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020`; 
 From Single-Player, ordinary controls chose Scenario → Setup Custom → Melee, River Styx, Human Protoss and Computer Zerg. The screenshot at `04-11-19` displayed 50 minerals and 4/9 supply after gameplay loaded; this is a visible snapshot, not an established initial wallet timestamp. Selecting the central structure with A showed the named **Nexus**, 750/750 and supplies 9 (`04-11-27`). C-right opened its build grid (`04-11-37`); after a nonproductive A press, C-right again displayed a queue/progress indicator and supply 5/9 (`04-12-00`). At `04-12-28` the progress indicator had cleared while supply remained 5/9 and workers were visible. This supports a naturally completed Nexus production command in this session, but the resulting individual was not selected and its identity was not independently established. The wallet increased during autonomous mining, so these images do not establish a precise payment, birth time, or causal debit. A later ordinary selection identified **Mineral Field** with 1,396 minerals (`04-12-49`), but no controlled depletion interval was recorded.
 
 The fresh setup did not provide a readily accessible Reaver or Robotics Facility within this bounded session. Reaver starting ammunition, purchase, launch and impact remain unobserved. A future controlled run should reach those prerequisites through ordinary play or a documented legitimate unmodified save, then identify the Reaver and wallet/stock before and after each command, with explicit timestamps and fresh-process provenance. Do not treat the Nexus evidence as a Reaver proxy.
+
+## Current GBA rule comparison
+
+Parent independently inspected the named Nexus, queue and cleared-queue
+captures. At draft `19435672`, `starcraft/race_rules.h` sets Nexus maximum HP
+to 750, shields to 750 and supply provision to 18 half-supply units (9 HUD
+supply). These specific stock values agree with the named N64 Nexus display.
+This does not verify damage, armor, regeneration, build time, initial wallet,
+all other unit profiles or the engine's time conversion.
