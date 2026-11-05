@@ -139,3 +139,27 @@ guardian-candidate-validation:
 guardian-candidate-distinct:
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_candidate_distinct_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-candidate-distinct
 	$(GUARD_TEST_BIN_DIR)/guardian-candidate-distinct
+
+# Full Egg-first + Guardian + Scarab roster facts. These private tables test
+# actor facts only; unsupported typed/derived journals and guest remain fenced.
+GUARD_COMBINED_FACT_DIR ?= .local/guardian-combined-full-facts-stage
+GUARD_COMBINED_FACT_FLAGS = -DSC64_SHARED_EGG_CUSTOM_SERVICE -DSC64_SHARED_EGG_WIRE_HOST_STAGE -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_GUARDIAN_COCOON_STAGE -DSC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE -DSC64_SHARED_ACTOR_FULL_HOST_STAGE -DSC64_GUARDIAN_FULL_FACTS_STAGE
+.PHONY: guardian-combined-full-facts-p10 guardian-combined-full-facts-z7 guardian-combined-full-facts-distinct
+guardian-combined-full-facts-p10:
+	mkdir -p $(GUARD_COMBINED_FACT_DIR)/p10
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(GUARD_COMBINED_FACT_FLAGS) $(GUARD_FULL_P10_FLAGS) tools/sc64_fact_tables_gen.c -o $(GUARD_COMBINED_FACT_DIR)/p10/generator
+	$(GUARD_COMBINED_FACT_DIR)/p10/generator > $(GUARD_COMBINED_FACT_DIR)/p10/sc64_fact_tables_generated.h
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft -I$(GUARD_COMBINED_FACT_DIR)/p10 $(GUARD_COMBINED_FACT_FLAGS) $(GUARD_FULL_P10_FLAGS) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-combined-facts-p10
+	$(GUARD_TEST_BIN_DIR)/guardian-combined-facts-p10
+guardian-combined-full-facts-z7:
+	mkdir -p $(GUARD_COMBINED_FACT_DIR)/z7
+	$(CLANG) $(GUARD_HOST) -Istarcraft $(GUARD_COMBINED_FACT_FLAGS) $(filter-out -DSC64_FACT_TABLES,$(ZERG_Z7_CANONICAL_FLAGS)) tools/sc64_fact_tables_gen.c -o $(GUARD_COMBINED_FACT_DIR)/z7/generator
+	$(GUARD_COMBINED_FACT_DIR)/z7/generator > $(GUARD_COMBINED_FACT_DIR)/z7/sc64_fact_tables_generated.h
+	$(CLANG) $(GUARD_HOST) -Istarcraft -I$(GUARD_COMBINED_FACT_DIR)/z7 $(GUARD_COMBINED_FACT_FLAGS) $(filter-out -DSC64_FACT_TABLES,$(ZERG_Z7_CANONICAL_FLAGS)) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-combined-facts-z7
+	$(GUARD_TEST_BIN_DIR)/guardian-combined-facts-z7
+guardian-combined-full-facts-distinct:
+	mkdir -p $(GUARD_COMBINED_FACT_DIR)/distinct
+	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Icommon -Istarcraft -DGBA_HOST -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_FACT_SIGHT_TABLES $(GUARD_COMBINED_FACT_FLAGS) tools/sc64_fact_tables_gen.c -o $(GUARD_COMBINED_FACT_DIR)/distinct/generator
+	$(GUARD_COMBINED_FACT_DIR)/distinct/generator > $(GUARD_COMBINED_FACT_DIR)/distinct/sc64_fact_tables_generated.h
+	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Icommon -Istarcraft -I$(GUARD_COMBINED_FACT_DIR)/distinct -DGBA_HOST -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_FACT_SIGHT_TABLES $(GUARD_COMBINED_FACT_FLAGS) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-combined-facts-distinct
+	$(GUARD_TEST_BIN_DIR)/guardian-combined-facts-distinct
