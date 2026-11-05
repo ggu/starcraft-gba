@@ -94,7 +94,7 @@ static int z10_forward_group(int x,int y,int force)
              (group_area_x>=0&&dist2(u[i].x,u[i].y,group_area_x,group_area_y)>group_area_r*group_area_r)))bad=1;
         fprintf(stderr,"BOX frame=%u proposed=%d selected=%d rejected=%d bounds=%d/%d/%d/%d\n",(unsigned)frame,best,selected,bad,bx0,by0,bx1,by1);
         if(bad||selected<2){close_menus();break;}
-        if(command_selected(MENU_ATTACK,x,y))groups++;
+        if(command_selected(MENU_ATTACK,x,y)){groups++;fprintf(stderr,"BOXORDER frame=%u target=%d/%d selected=%d\n",(unsigned)frame,x,y,selected);}
     }
     return groups;
 }
@@ -384,6 +384,7 @@ int main(int argc,char **argv)
         COST(7)
         /* Fresh Hydralisks follow the army up the road in stages. */
         if(rush&&frame>=next_stream){
+            fprintf(stderr,"STREAM frame=%u leg=%d target=%d/%d\n",(unsigned)frame,leg,road[0][0],road[0][1]);
             group_area_x=ax;group_area_y=ay-60;group_area_r=560;group_rounds=3;
             (void)z10_forward_group(road[0][0],road[0][1],0);
             for(int k=0;k+1<=leg&&k<ROAD_LEGS-1;k+=2){
