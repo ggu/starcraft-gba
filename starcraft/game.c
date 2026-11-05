@@ -13631,26 +13631,46 @@ static int race_scarab_probe_motion_load(const Unit *q,Sc64ScarabSteer *s)
     Sc64ScarabChildFields f;unsigned bits;
     if (!q || !s || !race_scarab_child_fields_read(q->carry,q->work_timer,&f) ||
         f.phase!=SC64_SCARAB_CHILD_OUTSIDE || !f.life || q->x<0 || q->y<0 ||
-        (unsigned)q->weapon>3 || (unsigned)q->cd>65535u ||
-        (unsigned)q->path_timer>32767u || (unsigned)q->path_retry>32767u) return 0;
+#if defined(SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE) && defined(SC64_P7_TYPED_COMPACT_ENABLED)
+        ((unsigned)q->path_timer & 0x3000u) || (unsigned)q->path_retry>4095u ||
+#else
+        (unsigned)q->weapon>3 || (unsigned)q->path_timer>32767u ||
+        (unsigned)q->path_retry>32767u ||
+#endif
+        (unsigned)q->cd>65535u) return 0;
     bits=(unsigned)q->carry;
+#if defined(SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE) && defined(SC64_P7_TYPED_COMPACT_ENABLED)
+    unsigned motion=(unsigned)q->path_timer>>14, waypoint=(unsigned)q->path_timer&4095u;
+#else
+    unsigned motion=(unsigned)q->weapon, waypoint=(unsigned)q->path_timer;
+#endif
     *s=(Sc64ScarabSteer){.x=(s32)q->x*512+(int)((bits>>10)&511u),
         .y=(s32)q->y*512+(int)((bits>>19)&511u),.heading=(u8)q->cd,
-        .velocity=(u8)((unsigned)q->cd>>8),.turning=(u8)(q->weapon&1),
-        .age=(u8)(90u-f.life),.waypoint_x=q->path_timer,.waypoint_y=q->path_retry,
-        .waypoint_known=(u8)((q->weapon>>1)&1)};
+        .velocity=(u8)((unsigned)q->cd>>8),.turning=(u8)(motion&1),
+        .age=(u8)(90u-f.life),.waypoint_x=(int)waypoint,.waypoint_y=q->path_retry,
+        .waypoint_known=(u8)((motion>>1)&1)};
     return 1;
 }
 static int race_scarab_probe_motion_store(Unit *q,const Sc64ScarabSteer *s)
 {
     if (!q || !s || s->x<0 || s->y<0 || s->x/512>32767 || s->y/512>32767 ||
         s->turning>1 || s->waypoint_known>1 || s->waypoint_x<0 || s->waypoint_y<0 ||
+#if defined(SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE) && defined(SC64_P7_TYPED_COMPACT_ENABLED)
+        s->waypoint_x>4095 || s->waypoint_y>4095) return 0;
+#else
         s->waypoint_x>32767 || s->waypoint_y>32767) return 0;
+#endif
     q->x=(s16)(s->x/512);q->y=(s16)(s->y/512);
     q->carry=(q->carry&1023) | ((s->x&511)<<10) | ((s->y&511)<<19);
     q->cd=(u16)(s->heading|((unsigned)s->velocity<<8));
+#if defined(SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE) && defined(SC64_P7_TYPED_COMPACT_ENABLED)
+    q->path_timer=(u16)((unsigned)s->waypoint_x | ((unsigned)s->turning<<14) |
+                       ((unsigned)s->waypoint_known<<15));
+#else
     q->weapon=(u16)(s->turning|(s->waypoint_known<<1));
-    q->path_timer=(u16)s->waypoint_x;q->path_retry=(u16)s->waypoint_y;return 1;
+    q->path_timer=(u16)s->waypoint_x;
+#endif
+    q->path_retry=(u16)s->waypoint_y;return 1;
 }
 #endif
 static void __attribute__((noinline)) race_scarab_control_dispatch(int slot)
@@ -13666,7 +13686,13 @@ static void __attribute__((noinline)) race_scarab_control_dispatch(int slot)
         }
 #endif
         unsigned heading=(unsigned)q->cd&255u;
-        q->cd=(u16)(heading|(heading<<8));q->weapon=1;q->path_timer=0;q->path_retry=0;
+        q->cd=(u16)(heading|(heading<<8));
+#if defined(SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE) && defined(SC64_P7_TYPED_COMPACT_ENABLED)
+        q->path_timer=(u16)(1u<<14); /* keep weapon's Arbiter cache */
+#else
+        q->weapon=1;q->path_timer=0;
+#endif
+        q->path_retry=0;
     }
 #endif
     if (q->target>=0) {

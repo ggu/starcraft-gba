@@ -32,12 +32,24 @@ int main(int argc,char **argv)
     race_scarab_control_dispatch(child);
     assert(u[child].alive && u[child].order==2);
     race_scarab_control_dispatch(child);
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    /* Exercise real frame/cache processing while motion flags are live. */
+    for(int i=0;i<4;i++)game_update(0,0);
+    assert(u[child].alive && u[child].order==2 && SC64_P7_ARBITER_CACHE_VALID(u[child].weapon));
+    Sc64ScarabSteer world_motion;assert(race_scarab_probe_motion_load(&u[child],&world_motion));
+#endif
     Unit motion=u[child];
-    if (!(motion.order==2 && (motion.path_timer>24 || motion.path_retry>12)))
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+#define PROFILE_PREVIOUS_X(q) ((q).path_timer & 4095u)
+#else
+#define PROFILE_PREVIOUS_X(q) ((q).path_timer)
+#endif
+    if (!(motion.order==2 && (PROFILE_PREVIOUS_X(motion)>24 || motion.path_retry>12)))
         fprintf(stderr,"flight route unavailable: alive=%d order=%d x=%d y=%d tx=%d ty=%d path=%d,%d previous=%d,%d cd=%u carry=%d timer=%u target=%d\n",
             motion.alive,motion.order,motion.x,motion.y,motion.tx,motion.ty,motion.path_x,motion.path_y,
             motion.path_timer,motion.path_retry,(unsigned)motion.cd,motion.carry,(unsigned)motion.work_timer,motion.target);
-    assert(motion.order==2 && (motion.path_timer>24 || motion.path_retry>12));
+    assert(motion.order==2 && (PROFILE_PREVIOUS_X(motion)>24 || motion.path_retry>12));
+#undef PROFILE_PREVIOUS_X
     assert(spawn_build(SIDE,B_GREATER_SPIRE,390,390,0)>=0);
     int muta=spawn_unit(SIDE,U_MUTALISK,350,350);assert(muta>=0);
     assert(race_guardian_morph_start(muta));
