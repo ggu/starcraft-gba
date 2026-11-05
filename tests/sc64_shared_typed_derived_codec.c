@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
-typedef uint8_t u8; typedef uint32_t u32;
+typedef uint8_t u8; typedef uint16_t u16; typedef int16_t s16; typedef uint32_t u32;
 #define SC64_RACES 1
 #define SC64_SHARED_EGG_WIRE_HOST_STAGE 1
 #define SC64_SHARED_EGG_CUSTOM_CANDIDATE 1
@@ -22,7 +22,8 @@ static int sc64_zp_actor_default_hp(int t) { return t==U_OVERLORD?200:t==U_GUARD
 static int sc64_zp_actor_default_shields(int t) { (void)t; return 0; }
 static int sc64_race_unit_armor(int t) { return t==U_GUARDIAN_STAGE?2:0; }
 static int sc64_race_building_max_hp(int t) { (void)t; return 100; }
-typedef struct { int x,y,hp,maxhp,owner,type,alive,selected,cd,order,tx,ty,carry,build,work_timer,armor,weapon,target,path_timer,path_retry,path_x,path_y,shield,raw_type,raw_owner,flags,shield_remainder; } Unit;
+/* Field widths match the compact Z/P campaign Unit in game.c. */
+typedef struct { int hp,maxhp,carry,shield; s16 x,y,tx,ty,build,target,path_x,path_y,raw_type,raw_owner; u16 cd,work_timer,weapon,path_timer,path_retry,flags,shield_remainder; u8 owner,type,alive,selected,order,armor; } Unit;
 typedef struct { int x,y,hp,owner,type,alive,queue[5],queue_head,queue_count,queue_progress,build_progress,under_construction,level,shield,maxhp,raw_type,raw_owner,flags,larva,larva_timer,shield_remainder; } Building;
 #include "../starcraft/sc64_derived_save.h"
 #include "../starcraft/sc64_p7_typed_unit_save.h"
