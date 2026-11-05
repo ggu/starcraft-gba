@@ -404,9 +404,15 @@ sc64_z8_action_timed(unsigned opcode)
 /* Full persisted-state check for restore and the checked tick. A valid
  * state can only rest at a timed action: every other handler completes. */
 static inline int
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
 sc64_z8_state_valid_for(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p,int egg_stage)
+#else
+sc64_z8_state_valid(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p)
+#endif
 {
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
     (void)egg_stage;
+#endif
     if (!s || !sc64_z8_program_valid(p) || s->version != SC64_Z8_STATE_VERSION ||
         s->trigger_count != p->trigger_count ||
         s->location_count != p->location_count ||
@@ -472,8 +478,10 @@ sc64_z8_state_valid_for(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p,in
     }
     return 1;
 }
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
 static inline int sc64_z8_state_valid(const Sc64Z8SchedulerState *s,const Sc64Z8Program *p)
 { return sc64_z8_state_valid_for(s,p,0); }
+#endif
 
 
 /* Copy a saved image only after it passes the full validator; `out` is not

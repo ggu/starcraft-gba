@@ -211,11 +211,17 @@ sc64_zl_init(Sc64ZlSchedulerState *s, const Sc64ZlProgram *zp,
 
 /* Full persisted-state check, as sc64_z8_state_valid() plus the countdown. */
 static inline int
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
 sc64_zl_state_valid_for(const Sc64ZlSchedulerState *zs, const Sc64ZlProgram *zp, int egg_stage)
+#else
+sc64_zl_state_valid(const Sc64ZlSchedulerState *zs, const Sc64ZlProgram *zp)
+#endif
 {
     const Sc64Z8SchedulerState *s = zs ? &zs->core : 0;
     const Sc64Z8Program *p = zp ? &zp->rows : 0;
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
     (void)egg_stage;
+#endif
     if (!s || !sc64_zl_program_valid(zp) || s->version != SC64_ZL_STATE_VERSION ||
         zs->countdown > SC64_ZL_COUNTDOWN_LIMIT ||
         s->trigger_count != p->trigger_count ||
@@ -280,8 +286,10 @@ sc64_zl_state_valid_for(const Sc64ZlSchedulerState *zs, const Sc64ZlProgram *zp,
     }
     return 1;
 }
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
 static inline int sc64_zl_state_valid(const Sc64ZlSchedulerState *zs,const Sc64ZlProgram *zp)
 { return sc64_zl_state_valid_for(zs,zp,0); }
+#endif
 
 
 /* Returns 1 (true), 0 (false) or -1 (fault). */
