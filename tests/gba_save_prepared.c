@@ -110,6 +110,28 @@ int main(void) {
      memset(large,0xcc,sizeof(large));plan=(Prepared){0,-7,99};
      assert(save_select_prepared(large,sizeof(large),tags,3,prepare_once,&plan,&token));
      assert(token.length==4 && large[0]==0x3c && large[4]==0xcc && large[sizeof(large)-1]==0xcc);}
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+    /* The flight candidate has six distinct historic pairs. Validate both
+     * fallback and publication while preserving the six-tag bound. */
+    {
+        const u32 six[]={0x10203040u,0x20304050u,0x30405060u,
+                         0x40506070u,0x50607080u,0x60708090u};
+        const u32 seven[]={0x10203040u,0x20304050u,0x30405060u,
+                           0x40506070u,0x50607080u,0x60708090u,0x708090a0u};
+        const u32 duplicate_six[]={0x10203040u,0x20304050u,0x30405060u,
+                                   0x40506070u,0x50607080u,0x50607080u};
+        reset();record(0,six[0],10,0xa5);record(1,six[5],11,0);
+        plan=(Prepared){0,-7,99};token=sentinel;
+        assert(save_select_prepared(scratch,sizeof(scratch),six,6,prepare_once,&plan,&token));
+        assert(token.tag==six[0] && token.slot==0 && plan.calls==2);
+        const u8 next[]={0x50,0xa5,4,5};
+        assert(save_write_selected(next,sizeof(next),six[4],&token,six,6));
+        token=sentinel;plan=(Prepared){0,-7,99};
+        assert(!save_select_prepared(scratch,sizeof(scratch),seven,7,prepare_once,&plan,&token));
+        assert(!save_select_prepared(scratch,sizeof(scratch),duplicate_six,6,prepare_once,&plan,&token));
+        assert(!plan.calls && !memcmp(&token,&sentinel,sizeof(token)));
+    }
+#endif
     puts("prepared journal selection: raw-selector oracle, mutated plans, half-range fallback and predecessor checks passed");
     return 0;
 }

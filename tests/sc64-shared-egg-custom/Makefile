@@ -160,3 +160,9 @@ custom-shared-actor-flight-terran:
 	mkdir -p $(COMBINED_BIN_DIR)
 	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_GUARDIAN_COCOON_STAGE -DSC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE -DSC64_SHARED_ACTOR_FULL_HOST_STAGE -DSC64_SHARED_ACTOR_FLIGHT_HOST_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE -DSC64_SCARAB_HUMAN_CONTROL_PROBE $(TERRAN_ROM_FLAGS) tests/sc64_shared_actor_flight_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/shared-actor-flight
 	$(COMBINED_BIN_DIR)/shared-actor-flight $(SCARAB_PRIOR_SRAM)
+
+.PHONY: custom-shared-actor-six-tag-selector
+custom-shared-actor-six-tag-selector:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) -std=c11 -O1 -g0 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -DSC64_SHARED_ACTOR_FLIGHT_HOST_STAGE tests/gba_save_prepared.c -o $(COMBINED_BIN_DIR)/six-tag-selector
+	$(COMBINED_BIN_DIR)/six-tag-selector
