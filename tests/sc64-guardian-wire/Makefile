@@ -99,3 +99,9 @@ guardian-journal-slice-protoss:
 guardian-journal-slice-showcase:
 	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-showcase
 	$(GUARD_TEST_BIN_DIR)/guardian-journal-showcase
+.PHONY: guardian-campaign-construction
+# Constructed HOST world only. The paid building marker has no authenticated
+# journal namespace yet and this target does not qualify SRAM or guest use.
+guardian-campaign-construction:
+	$(CLANG) $(GUARD_HOST) -DSC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_campaign_construction_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-campaign-construction
+	$(GUARD_TEST_BIN_DIR)/guardian-campaign-construction

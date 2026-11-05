@@ -317,6 +317,11 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
     !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
 #error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
 #endif
+#if defined(SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || \
+     !defined(SC64_Z7_RUNTIME) || !defined(SC64_ZP_CAMPAIGN_ACTORS))
+#error "Guardian campaign construction remains an isolated HOST experiment"
+#endif
 #if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || \
      !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_RACES) || \
@@ -987,6 +992,9 @@ enum {
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     MENU_Z7_CREEP,
+#endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    MENU_ZP_QUEENS_NEST, MENU_ZP_HIVE, MENU_ZP_GREATER_SPIRE,
 #endif
     MENU_COUNT
 };
@@ -1891,6 +1899,12 @@ static int race_z6_transport_research_selected(void);
 static int race_z6_transport_start_research_selected(void);
 #endif
 #endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+static int race_guardian_campaign_allowed(int owner,int source,int raw);
+static int race_guardian_campaign_morph(int building,int target);
+static int race_guardian_campaign_cancel(int building);
+#define SC64_GUARDIAN_PAID_BUILDING_MORPH 0x2000u
+#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 static int race_guardian_morph_tick(int slot);
 static int race_guardian_selected_command(void);
@@ -2137,6 +2151,9 @@ static void sc64_p7_arbiter_cache_process_due(void);
 #endif
 #ifdef SC64_Z5_RUNTIME
 static int race_z5_active(void);
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+static int race_z5_source_owner(unsigned slot);
+#endif
 static int race_z5_world_paused(void);
 static int race_z5_is_door_type(int type);
 static int race_z5_building_collidable(int slot);
@@ -6626,6 +6643,19 @@ choose_command(int choice)
     }
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    if (!race_mode && choice>=MENU_ZP_QUEENS_NEST && choice<=MENU_ZP_GREATER_SPIRE) {
+        menu_open=0; mode=MODE_NORMAL;
+        if (race_human!=R_ZERG) { toast(8); return; }
+        if (choice==MENU_ZP_QUEENS_NEST) { mode=MODE_BUILD; menu=B_ZP_QUEENS_NEST; return; }
+        if (choice==MENU_ZP_HIVE && selected_building>=0 && selected_building<MAX_BUILDINGS &&
+            (b[selected_building].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH))
+            toast(race_guardian_campaign_cancel(selected_building)?0:8);
+        else toast(race_guardian_campaign_morph(selected_building,
+                   choice==MENU_ZP_HIVE ? B_HIVE : B_GREATER_SPIRE)?3:8);
+        return;
+    }
+#endif
     #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (choice == MENU_ZP_LAIR || choice == MENU_ZP_SPIRE) {
         menu_open = 0;
@@ -6767,6 +6797,9 @@ static int field_menu_count(void)
 #endif
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    if (race_human==R_ZERG) return MENU_COUNT;
+#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (race_human==R_ZERG) {
         return race_z7_creep_command_available()?MENU_COUNT:MENU_Z7_CREEP;
@@ -6921,6 +6954,12 @@ static const char *race_menu_label(int i)
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     if (i==MENU_STOP+1 && race_guardian_selected_command())
         return race_guardian_selected_command()==2 ? "CANCEL MORPH" : "MORPH GUARDIAN";
+#endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    if (i==MENU_ZP_QUEENS_NEST) return "QUEENS NEST";
+    if (i==MENU_ZP_HIVE) return selected_building>=0 && selected_building<MAX_BUILDINGS &&
+        (b[selected_building].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH) ? "CANCEL MORPH" : "UPGRADE TO HIVE";
+    if (i==MENU_ZP_GREATER_SPIRE) return "GREATER SPIRE";
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (i==MENU_STOP+1 && race_battery_command_available()) return "RECHARGE";
@@ -13095,6 +13134,9 @@ game_self_test(void)
 static unsigned race_shared_trigger_obligations(void);
 #endif
 #include "race_adapter.h"
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+#include "sc64_guardian_campaign_construction.h"
+#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #include "sc64_guardian_morph_adapter.h"
 #endif

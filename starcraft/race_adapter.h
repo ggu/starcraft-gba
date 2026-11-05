@@ -112,7 +112,12 @@ static int race_owner_supply_cap(int owner)
 {
     int i, total = 0;
     for (i = 0; i < MAX_BUILDINGS; ++i) if ((building_complete(i) ||
-        (race_mode && b[i].alive && (b[i].type == B_LAIR || b[i].type == B_HIVE))) && b[i].owner == owner) {
+        (race_mode && b[i].alive && (b[i].type == B_LAIR || b[i].type == B_HIVE))
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+        || (b[i].alive && b[i].under_construction && b[i].type==B_HIVE &&
+            (b[i].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH))
+#endif
+        ) && b[i].owner == owner) {
         const Sc64RaceBuildingRule *r = sc64_race_building_rule(b[i].type);
         if (r) total += r->supply_provided;
     }
@@ -943,6 +948,10 @@ static int race_build_request_valid(int owner, int worker, int type,
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (!race_zerg_campaign_product_available(owner, sc64_race_raw_building(type))) return 0;
 #endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    if (!race_mode && type==B_ZP_QUEENS_NEST &&
+        !race_guardian_campaign_allowed(owner,worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,138)) return 0;
+#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (type==B_CREEP_COLONY && race_colony_profile_allowed() &&
         !race_colony_product_allowed(owner,worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,type)) return 0;
@@ -1026,6 +1035,9 @@ static void __attribute__((noinline)) race_pending_build_tick(int worker)
     if (!sc64_race_pay_building(&bank, type)) goto cancel;
     slot = spawn_build(q->owner, type, x, y, 1);
     if (slot < 0) goto cancel;
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    if (!race_mode && type==B_ZP_QUEENS_NEST) b[slot].raw_owner=q->raw_owner;
+#endif
     /* No yield or callback can spend the wallet between validation and this
      * commit. A failed slot allocation leaves the real wallet untouched. */
     if (q->owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }
@@ -1203,7 +1215,11 @@ static void race_tick_state(void)
         race_tick_building_damage(i);
         if (!b[i].alive) continue;
         if(b[i].owner==SIDE&&(!b[i].under_construction ||
-            (race_mode && (b[i].type == B_LAIR || b[i].type == B_HIVE))))
+            (race_mode && (b[i].type == B_LAIR || b[i].type == B_HIVE))
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+            || (b[i].type==B_HIVE && (b[i].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH))
+#endif
+            ))
             cap+=sc64_race_building_rules[b[i].type].supply_provided;
         unsigned short max = sc64_race_building_shields(b[i].type);
         if (max && b[i].shield < max) {
@@ -1292,6 +1308,10 @@ static void race_complete_building(int i)
         b[i].maxhp = sc64_race_building_max_hp(deferred);
     }
     r = sc64_race_building_rule(b[i].type);
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    int paid_morph = (b[i].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH) != 0;
+    b[i].flags &= (u16)~SC64_GUARDIAN_PAID_BUILDING_MORPH;
+#endif
     b[i].under_construction = 0;
 #ifdef SC64_CONSTRUCTION_HP
     {
@@ -1310,9 +1330,17 @@ static void race_complete_building(int i)
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
     if (race_resource_depot_type(b[i].type)) race_depot_cache_clear_no_home();
 #endif
-    if (r && r->supply_provided && b[i].owner == SIDE) supply_cap += r->supply_provided;
+    if (r && r->supply_provided && b[i].owner == SIDE
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+        && !paid_morph
+#endif
+       ) supply_cap += r->supply_provided;
     if (sc64_race_is_zerg_townhall(b[i].type) &&
-        (!race_mode || b[i].type == B_HATCHERY)) b[i].larva = 3;
+        (!race_mode || b[i].type == B_HATCHERY)
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+        && !paid_morph
+#endif
+       ) b[i].larva = 3;
 }
 
 #ifdef SC64_CONSTRUCTION_HP

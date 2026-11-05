@@ -1,0 +1,79 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Constructed HOST world; this is not a guest or SRAM qualification. */
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#include "../starcraft/game.c"
+
+int main(void)
+{
+    game_init(); memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+    race_mode=0; race_human=R_ZERG; race_player[SIDE]=R_ZERG;
+    race_selected_mission=SC64_Z7_GLOBAL_ID;
+    race_z7_map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];
+    minerals=5000; gas=5000; selected_building=-1;
+    assert(race_guardian_campaign_allowed(SIDE,3,138));
+    assert(race_guardian_campaign_allowed(SIDE,3,133));
+    assert(race_guardian_campaign_allowed(SIDE,3,137));
+    assert(!race_guardian_campaign_allowed(SIDE,4,138));
+    assert(!race_guardian_campaign_allowed(ENEMY,3,138));
+    race_selected_mission=SC64_RACE_MISSION_Z4;
+    assert(!race_guardian_campaign_allowed(SIDE,3,138));
+    race_selected_mission=SC64_Z7_GLOBAL_ID;
+    int lair=spawn_build(SIDE,B_LAIR,200,200,0);
+    int drone=spawn_unit(SIDE,U_DRONE,260,200);
+    assert(lair>=0 && drone>=0 && b[lair].raw_owner==3 && u[drone].raw_owner==3);
+    assert(sc64_race_building_rule(B_ZP_QUEENS_NEST)->worker==U_DRONE);
+    assert(!strcmp(race_menu_label(MENU_ZP_QUEENS_NEST),"QUEENS NEST"));
+    choose_command(MENU_ZP_QUEENS_NEST);
+    assert(mode==MODE_BUILD && menu==B_ZP_QUEENS_NEST);
+    int x=0,y=0,found=0;
+    for (int yy=120;yy<=280 && !found;yy+=8) for(int xx=120;xx<=280;xx+=8) {
+        int tx=xx,ty=yy;
+        if (race_build_request_valid(SIDE,drone,B_ZP_QUEENS_NEST,&tx,&ty,0)) {
+            x=tx; y=ty; found=1; break;
+        }
+    }
+    assert(found);
+    int ore=minerals, vespene=gas;
+    assert(race_start_build(SIDE,drone,B_ZP_QUEENS_NEST,x,y));
+    assert(minerals==ore && gas==vespene); /* travel has not committed */
+    u[drone].x=x;u[drone].y=y;race_pending_build_tick(drone);
+    assert(minerals==ore-150 && gas==vespene-100 && !u[drone].alive);
+    int nest=-1;
+    for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].type==B_ZP_QUEENS_NEST) nest=i;
+    assert(nest>=0 && b[nest].raw_owner==3 && b[nest].under_construction);
+    race_complete_building(nest);
+    b[lair].larva=1; b[lair].larva_timer=123; b[lair].hp=900;
+    b[lair].shield_remainder=17; b[lair].queue_count=1;
+    ore=minerals;vespene=gas; selected_building=lair;
+    assert(!race_guardian_campaign_morph(lair,B_HIVE));
+    assert(minerals==ore && gas==vespene && b[lair].type==B_LAIR);
+    b[lair].queue_count=0;
+    choose_command(MENU_ZP_HIVE);
+    assert(b[lair].type==B_HIVE && b[lair].under_construction);
+    assert(minerals==ore-200 && gas==vespene-150);
+    assert(b[lair].hp==900 && b[lair].larva==1 && b[lair].larva_timer==123 && b[lair].shield_remainder==17);
+    assert(!strcmp(race_menu_label(MENU_ZP_HIVE),"CANCEL MORPH"));
+    b[lair].hp=800; choose_command(MENU_ZP_HIVE);
+    assert(b[lair].type==B_LAIR && !b[lair].under_construction && b[lair].hp==800);
+    assert(minerals==ore-50 && gas==vespene-38);
+    assert(b[lair].larva==1 && b[lair].larva_timer==123 && b[lair].shield_remainder==17);
+    assert(!race_guardian_campaign_cancel(lair));
+    assert(race_guardian_campaign_morph(lair,B_HIVE));
+    int cap=race_owner_supply_cap(SIDE);
+    race_complete_building(lair);
+    assert(b[lair].type==B_HIVE && !b[lair].under_construction);
+    assert(b[lair].larva==1 && b[lair].larva_timer==123 && b[lair].shield_remainder==17);
+    assert(race_owner_supply_cap(SIDE)==cap);
+    int spire=spawn_build(SIDE,B_SPIRE,350,200,0);assert(spire>=0);
+    selected_building=spire; ore=minerals;vespene=gas;
+    choose_command(MENU_ZP_GREATER_SPIRE);
+    assert(b[spire].type==B_GREATER_SPIRE && b[spire].under_construction);
+    assert(minerals==ore-100 && gas==vespene-150);
+    choose_command(MENU_ZP_HIVE);
+    assert(b[spire].type==B_SPIRE && !b[spire].under_construction);
+    assert(minerals==ore-25 && gas==vespene-38);
+    puts("Guardian campaign construction HOST stage passed");
+    return 0;
+}
