@@ -36,6 +36,10 @@ int main(void)
     }
     assert(found);
     int ore=minerals, vespene=gas;
+    u[drone].raw_owner=4;
+    assert(!race_start_build(SIDE,drone,B_ZP_QUEENS_NEST,x,y));
+    assert(minerals==ore && gas==vespene && u[drone].order!=ORDER_BUILD_PENDING);
+    u[drone].raw_owner=3;
     assert(race_start_build(SIDE,drone,B_ZP_QUEENS_NEST,x,y));
     assert(minerals==ore && gas==vespene); /* travel has not committed */
     u[drone].x=x;u[drone].y=y;race_pending_build_tick(drone);
@@ -55,6 +59,10 @@ int main(void)
     assert(!race_guardian_campaign_morph(lair,B_HIVE));
     assert(minerals==ore && gas==vespene && b[lair].type==B_LAIR);
     b[lair].queue_count=0;
+    b[lair].raw_owner=4;
+    assert(!race_guardian_campaign_morph(lair,B_HIVE));
+    assert(minerals==ore && gas==vespene && b[lair].type==B_LAIR);
+    b[lair].raw_owner=3;
     choose_command(MENU_ZP_HIVE);
     assert(b[lair].type==B_HIVE && b[lair].under_construction);
     assert(minerals==ore-200 && gas==vespene-150);
