@@ -404,8 +404,9 @@ sc64_z8_action_timed(unsigned opcode)
 /* Full persisted-state check for restore and the checked tick. A valid
  * state can only rest at a timed action: every other handler completes. */
 static inline int
-sc64_z8_state_valid(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p)
+sc64_z8_state_valid_for(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p,int egg_stage)
 {
+    (void)egg_stage;
     if (!s || !sc64_z8_program_valid(p) || s->version != SC64_Z8_STATE_VERSION ||
         s->trigger_count != p->trigger_count ||
         s->location_count != p->location_count ||
@@ -437,8 +438,11 @@ sc64_z8_state_valid(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p)
             } else {
                 const Sc64Z8Action *a = in->cursor < SC64_Z8_ACTION_SLOTS ?
                     sc64_z8_action_at(p, &p->triggers[i], in->cursor) : 0;
-                if (!a || (a->flags & 2) || !sc64_z8_action_timed(a->opcode))
-                    return 0;
+                if (!a || (a->flags & 2) || (!sc64_z8_action_timed(a->opcode)
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+                    && !(egg_stage && a->opcode==11 && a->location && !(f & SC64_Z8_INST_ARMED))
+#endif
+                    )) return 0;
                 if (f & SC64_Z8_INST_ARMED) armed_mask |= 1u << o;
             }
         }
@@ -468,6 +472,9 @@ sc64_z8_state_valid(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p)
     }
     return 1;
 }
+static inline int sc64_z8_state_valid(const Sc64Z8SchedulerState *s,const Sc64Z8Program *p)
+{ return sc64_z8_state_valid_for(s,p,0); }
+
 
 /* Copy a saved image only after it passes the full validator; `out` is not
  * touched on rejection. */

@@ -362,7 +362,11 @@ static int race_z8_save_pack(Sc64Z8PersistentState *out)
     if (!race_z8_map || !sc64_z8_ai_state_valid(&race_z8_ai) ||
         race_z8_camera_release || !race_z8_live_world_valid()) return 0;
     memset(out, 0, sizeof(*out));
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (!sc64_z8_state_pack_for(out,&race_z8_sched,&race_z8_program,1)) return 0;
+#else
     if (!sc64_z8_state_pack(out, &race_z8_sched, &race_z8_program)) return 0;
+#endif
     for (unsigned t = 0; t < SC64_Z8_AI_TOWNS; ++t) {
         out->ai_minerals[t] = race_z8_ai_minerals[t];
         out->ai_gas[t] = race_z8_ai_gas[t];
@@ -373,8 +377,8 @@ static int race_z8_save_pack(Sc64Z8PersistentState *out)
 
 /* Validate a candidate without touching live state; `scratch` is a
  * transient engine buffer. On success with `apply`, install it. */
-static int race_z8_save_unpack(const Sc64Z8PersistentState *in,
-                               Sc64Z8SchedulerState *scratch, int apply)
+static int race_z8_save_unpack_for(const Sc64Z8PersistentState *in,
+                               Sc64Z8SchedulerState *scratch, int apply,int egg_stage)
 {
     Sc64Z8Setup setup;
     Sc64Z8AiState ai;
@@ -383,8 +387,8 @@ static int race_z8_save_unpack(const Sc64Z8PersistentState *in,
     if (!sc64_z8_ai_state_valid(&ai)) return 0;
     for (unsigned t = 0; t < SC64_Z8_AI_TOWNS; ++t)
         if (in->ai_minerals[t] > 65535u || in->ai_gas[t] > 65535u) return 0;
-    if (!sc64_z8_state_unpack(apply ? &race_z8_sched : 0, in, &race_z8_program,
-                              &setup, scratch)) return 0;
+    if (!sc64_z8_state_unpack_for(apply ? &race_z8_sched : 0, in, &race_z8_program,
+                                  &setup, scratch,egg_stage)) return 0;
     if (!apply) return 1;
     race_z8_ai = ai;
     for (unsigned t = 0; t < SC64_Z8_AI_TOWNS; ++t) {
@@ -393,6 +397,9 @@ static int race_z8_save_unpack(const Sc64Z8PersistentState *in,
     }
     return 1;
 }
+
+static int race_z8_save_unpack(const Sc64Z8PersistentState *in,Sc64Z8SchedulerState *scratch,int apply)
+{ return race_z8_save_unpack_for(in,scratch,apply,0); }
 
 static int race_z8_rebind_loaded_world(const Sc64RaceMap *map)
 {

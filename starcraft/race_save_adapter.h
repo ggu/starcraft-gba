@@ -2116,8 +2116,14 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active() &&
-        !race_z8_save_unpack(&race_data.z8,
-                             &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0))
+        !race_z8_save_unpack_for(&race_data.z8,
+                             &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0,
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+                             race_data.version==SC64_SHARED_EGG_SAVE_VERSION
+#else
+                             0
+#endif
+                             ))
         return 0;
 #endif
 #ifdef SC64_Z9_RUNTIME
@@ -3404,8 +3410,14 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
          0
 #endif
          ) ||
-         !race_z8_save_unpack(&race_data.z8,
-                              &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0)))
+         !race_z8_save_unpack_for(&race_data.z8,
+                              &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0,
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+                              sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,race_data.version,SC64_STAGE_SAVE_EGG)
+#else
+                              0
+#endif
+                              )))
         return 0;
 #endif
 #ifdef SC64_Z9_RUNTIME
@@ -4098,8 +4110,14 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active()) {
-        if (!race_z8_save_unpack(&race_data.z8,
-                                 &sc64_zp_route_save_scratch.z8_candidate.scheduler, 1) ||
+        if (!race_z8_save_unpack_for(&race_data.z8,
+                                 &sc64_zp_route_save_scratch.z8_candidate.scheduler, 1,
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+                                 sc64_stage_save_auth_matches(&plan.egg_auth,&race_data,race_data.version,SC64_STAGE_SAVE_EGG)
+#else
+                                 0
+#endif
+                                 ) ||
             !race_z8_rebind_loaded_world(&sc64_race_maps[SC64_Z8_GLOBAL_ID]))
             return 0;
     } else if (!race_z8_runtime_init(0)) {
