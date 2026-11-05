@@ -5,6 +5,12 @@ Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
 
+Source-work checkpoint: the [shared production follow-up](audits/2026-11-06-shared-production-source-checkpoint/README.md)
+tracks unqualified paid Reaver tech progression, source-town wallet routing,
+typed Scarab velocity and optional Cocoon rendering. These branch changes have
+not been compiled while the disk is below the native-job reserve; they do not
+change release capability, campaign coverage or performance claims.
+
 Deliver one ROM per race, campaign/map selection, any human race against one to
 three independently selected AI races in custom games, and gameplay near 30 fps.
 Complete all 30 original campaign missions in stages. Use the owned N64 ROM and
