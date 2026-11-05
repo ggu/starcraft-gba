@@ -10227,6 +10227,19 @@ sc64_source_unit_attack_pose(const Unit *q)
 }
 #endif
 
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+#if !defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || !defined(SC64_HAS_SPRITES)
+#error "Cocoon render stage requires HOST, Guardian stage, and sprites"
+#endif
+#include "sc64_guardian_cocoon_render.h"
+#include "sc64_guardian_cocoon_bank_generated.h"
+static int sc64_cocoon_world_visible(int x,int y)
+{
+    return (unsigned)x < (unsigned)(MAP_COLS*16) &&
+        (unsigned)y < (unsigned)(MAP_ROWS*16) && currently_visible(x,y);
+}
+#endif
+
 static void
 draw_unit_pass(Unit * q, int selection_pass)
 {
@@ -10236,6 +10249,12 @@ draw_unit_pass(Unit * q, int selection_pass)
 #endif
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    if (q->type == U_GUARDIAN_COCOON) {
+        /* Include both the primary canvas and its displaced underlay. */
+        if (x < -64 || x > 304 || y < -80 || y > 180) return;
+    } else
+#endif
     if (x < -8 || x > 247 || y < 10 || y > 125)
 	return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
@@ -10283,6 +10302,16 @@ draw_unit_pass(Unit * q, int selection_pass)
     int sprite_y = sprite ? y - sprite->canvas_h / 2 + sprite->offset_y : y - 4;
     int sprite_w = sprite ? sprite->w : 8;
     int sprite_h = sprite ? sprite->h : 8;
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    const Sc64CocoonFrame *cocoon_frame=0;
+    if (q->type==U_GUARDIAN_COCOON) {
+        cocoon_frame=sc64_cocoon_resolve(&cocoon_bank,(unsigned)(q-u),q->work_timer);
+        if (!cocoon_frame) return; /* fail closed: never substitute another actor */
+        sprite_x=x-cocoon_frame->canvas_w/2+cocoon_frame->x;
+        sprite_y=y-cocoon_frame->canvas_h/2+cocoon_frame->y;
+        sprite_w=cocoon_frame->w;sprite_h=cocoon_frame->h;
+    }
+#endif
 #else
     int sprite_x = x - 4, sprite_y = y - 4, sprite_w = 8, sprite_h = 8;
 #endif
@@ -10298,6 +10327,12 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
     int walk = sc64_walk_track(q);
     int body_y = y - SC64_WALK_LIFT(walk);
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    if (cocoon_frame) {
+        (void)sc64_cocoon_draw(&cocoon_bank,(unsigned)(q-u),q->work_timer,
+            x,body_y,q->x,q->y-(y-body_y),q->owner==SIDE ? 0 : sc64_cocoon_world_visible);
+    } else {
+#endif
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_UNIT_FACING
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -10379,6 +10414,9 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
     y = feet;
     }
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    }
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
     if (sc64_worker_cargo_badge_kind(q) > 0)
         draw_worker_cargo_badge(sprite_x + sprite_w + 2,

@@ -63,3 +63,16 @@ guardian-frame-real:
 	/tmp/guardian-frame-protoss
 	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-showcase
 	/tmp/guardian-frame-showcase
+.PHONY: guardian-render-game-fake guardian-frame-render-real
+guardian-render-game-fake:
+	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -Itests/guardian-render-fake tests/sc64_guardian_render_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-render-game-fake
+	/tmp/guardian-render-game-fake
+guardian-frame-render-real:
+	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -I.local/sc64/guardian-cocoon/bank tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-render-terran
+	/tmp/guardian-frame-render-terran
+	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -I.local/sc64/guardian-cocoon/bank tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-render-zerg
+	/tmp/guardian-frame-render-zerg
+	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_FLAGS)) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -I.local/sc64/guardian-cocoon/bank tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-render-protoss
+	/tmp/guardian-frame-render-protoss
+	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -I.local/sc64/guardian-cocoon/bank tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-render-showcase
+	/tmp/guardian-frame-render-showcase
