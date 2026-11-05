@@ -144,6 +144,16 @@ static int SC64_TYPED_WIRE_RAW_CANONICAL(int type, int raw, int *maxhp,
     return SC64_TYPED_WIRE_CANONICAL(type,maxhp,armor,maxshield SC64_TYPED_WIRE_ARG);
 }
 
+/* This representation is valid only for the authenticated, unpublished
+ * typed feature-15 generation. Dead rows retain the original signed HP wire
+ * format and the original 8-bit cooldown restriction. */
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
+#define SC64_TYPED_LIVE_SCARAB(q) \
+    (egg_stage==15 && (q)->type==U_SCARAB && (q)->raw_type==85 && (q)->alive==1)
+#else
+#define SC64_TYPED_LIVE_SCARAB(q) 0
+#endif
+
 static int SC64_TYPED_WIRE_VALIDATE(const Unit *q,
                                            unsigned world_width,
                                            unsigned world_height SC64_TYPED_WIRE_PARAM)
@@ -170,7 +180,9 @@ static int SC64_TYPED_WIRE_VALIDATE(const Unit *q,
 #endif
         q->maxhp != maxhp || q->armor != armor ||
         (q->alive != 0 && q->alive != 1) ||
-        (q->selected != 0 && q->selected != 1) || q->cd < 0 || q->cd > 255 ||
+        (q->selected != 0 && q->selected != 1) || q->cd < 0 ||
+        q->cd > (SC64_TYPED_LIVE_SCARAB(q) ? 65535 : 255) ||
+        (SC64_TYPED_LIVE_SCARAB(q) && (q->hp < 1 || q->hp > 20)) ||
         q->order < 0 || q->order > 15 || q->tx < 0 || q->tx > 2047 ||
         q->ty < 0 || q->ty > 2047 ||
         q->carry < -65536 || q->carry >= 65536 || q->build < -2 ||
@@ -192,15 +204,19 @@ static int SC64_TYPED_WIRE_ENCODE(Sc64P7TypedUnitSave *row,
 {
     Sc64P7TypedUnitSave out;
     unsigned bit = 0;
+    u32 hp_wire, cd_wire;
     if (!row || !q || !ww || !wh || ww > 2048 || wh > 2048) return 0;
     memset(&out, 0, sizeof(out));
     static const Unit zero = {0};
     if (memcmp(q, &zero, sizeof(*q)) == 0) { *row = out; return 1; }
     if (!SC64_TYPED_WIRE_VALIDATE(q, ww, wh SC64_TYPED_WIRE_ARG)) return 0;
+    hp_wire = SC64_TYPED_LIVE_SCARAB(q) ?
+        (((u32)q->cd >> 8) << 5) | (u32)q->hp : (u32)(q->hp + 131072);
+    cd_wire = (u32)q->cd & 255u;
 #define PUT(w, v) do { if (!sc64_p7_typed_unit_put(&out, &bit, (w), (u32)(v))) return 0; } while (0)
-    PUT(11, q->x); PUT(11, q->y); PUT(18, q->hp + 131072);
+    PUT(11, q->x); PUT(11, q->y); PUT(18, hp_wire);
     PUT(3, q->owner); PUT(6, q->type); PUT(1, q->alive); PUT(1, q->selected);
-    PUT(8, q->cd); PUT(4, q->order); PUT(11, q->tx); PUT(11, q->ty);
+    PUT(8, cd_wire); PUT(4, q->order); PUT(11, q->tx); PUT(11, q->ty);
     PUT(17, q->carry + 65536); PUT(8, q->build + 2); PUT(11, q->work_timer);
     PUT(16, q->weapon); PUT(9, q->target + 1); PUT(5, q->path_timer);
     PUT(4, q->path_retry); PUT(11, q->path_x); PUT(11, q->path_y);
@@ -218,7 +234,7 @@ static int SC64_TYPED_WIRE_DECODE(Unit *out,
 {
     Unit q;
     unsigned bit = 0;
-    u32 v;
+    u32 v, hp_wire;
     int maxhp, armor, maxshield;
     if (!out || !row || !ww || !wh || ww > 2048 || wh > 2048) return 0;
     memset(&q, 0, sizeof(q));
@@ -226,7 +242,7 @@ static int SC64_TYPED_WIRE_DECODE(Unit *out,
 #define GET(w, dst) do { if (!sc64_p7_typed_unit_get(row, &bit, (w), &v)) return 0; (dst) = (int)v; } while (0)
     GET(11, q.x); GET(11, q.y);
     if (!sc64_p7_typed_unit_get(row, &bit, 18, &v)) return 0;
-    q.hp = (int)v - 131072;
+    hp_wire = v;
     GET(3, q.owner); GET(6, q.type); GET(1, q.alive); GET(1, q.selected);
     GET(8, q.cd); GET(4, q.order); GET(11, q.tx); GET(11, q.ty);
     if (!sc64_p7_typed_unit_get(row, &bit, 17, &v)) return 0;
@@ -237,6 +253,11 @@ static int SC64_TYPED_WIRE_DECODE(Unit *out,
     GET(11, q.path_y); GET(9, q.shield); GET(8, v); q.raw_type = (int)v - 1;
     GET(4, v); q.raw_owner = (int)v - 1; GET(14, q.flags);
     GET(11, q.shield_remainder);
+    if (SC64_TYPED_LIVE_SCARAB(&q)) {
+        if ((hp_wire >> 13) || !(hp_wire & 31u) || (hp_wire & 31u) > 20u) return 0;
+        q.hp = (int)(hp_wire & 31u);
+        q.cd |= (int)((hp_wire >> 5) << 8);
+    } else q.hp = (int)hp_wire - 131072;
     if (!sc64_p7_typed_unit_get(row, &bit, 1, &v) || v != 1 || bit != 224 ||
         !SC64_TYPED_WIRE_RAW_CANONICAL(q.type, q.raw_type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG)) return 0;
     q.maxhp = maxhp; q.armor = armor;
@@ -257,6 +278,7 @@ static int sc64_p7_typed_unit_decode(Unit *q,const Sc64P7TypedUnitSave *r,unsign
 { return sc64_p7_typed_unit_decode_for(q,r,w,h,0); }
 
 #endif /* SC64_SHARED_EGG_WIRE_HOST_STAGE */
+#undef SC64_TYPED_LIVE_SCARAB
 #undef SC64_TYPED_WIRE_CANONICAL
 #undef SC64_TYPED_WIRE_RAW_CANONICAL
 #undef SC64_TYPED_WIRE_VALIDATE

@@ -50,6 +50,38 @@ int main(void) {
     assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,4));
     assert(!sc64_p7_typed_unit_decode_for(&out,&t,100,100,0));
     assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,4));
+    /* Live typed Scarab stores full heading/velocity only in feature 15. */
+    const unsigned cds[]={0,0x0001,0x01fe,0x7f80,0xff00,0xffff};
+    for (unsigned i=0;i<sizeof(cds)/sizeof(cds[0]);++i) {
+        for (int hp=1;hp<=20;hp+=19) {
+            u.cd=(u16)cds[i]; u.hp=hp;
+            assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
+            assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,15));
+            assert(out.cd==u.cd && out.hp==u.hp);
+            assert(!sc64_p7_typed_unit_decode_for(&out,&t,100,100,7));
+        }
+    }
+    u.cd=0x1234; u.hp=20;
+    assert(!sc64_p7_typed_unit_encode_for(&t,&u,100,100,7));
+    assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
+    Sc64P7TypedUnitSave malformed=t;
+    malformed.bytes[(22+13)/8] |= (u8)(1u<<((22+13)%8));
+    memset(&out,0xa5,sizeof out); unchanged=out;
+    assert(!sc64_p7_typed_unit_decode_for(&out,&malformed,100,100,15));
+    assert(!memcmp(&out,&unchanged,sizeof out));
+    u.hp=0; assert(!sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
+    u.hp=21; assert(!sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
+    u.hp=20; u.cd=255;
+    assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,7));
+    assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,7) && out.cd==255 && out.hp==20);
+    assert(!sc64_p7_typed_unit_decode_for(&out,&t,100,100,15));
+    /* Dead hidden/training identities keep the entire signed HP field. */
+    u.alive=0; u.hp=-131072; u.cd=255;
+    assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
+    assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,15));
+    assert(!out.alive && out.hp==-131072 && out.cd==255);
+    u.cd=256; assert(!sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
+    u.alive=1;u.hp=20;u.cd=0;
     u.weapon=3;
     assert(!sc64_derived_unit_encode_for(&d,&u,100,100,4));
     assert(sc64_derived_unit_encode_for(&d,&u,100,100,12));
@@ -78,7 +110,7 @@ int main(void) {
     motion.type=U_SCARAB; motion.raw_type=85; motion.owner=1; motion.raw_owner=3;
     motion.hp=motion.maxhp=20; motion.alive=1; motion.carry=2<<8;
     motion.work_timer=10; motion.order=2; motion.build=-1; motion.target=-1;
-    motion.weapon=3; motion.path_timer=4000; motion.path_retry=3000; motion.shield=7;
+    motion.weapon=3; motion.cd=0xa55a; motion.path_timer=4000; motion.path_retry=3000; motion.shield=7;
     assert(sc64_scarab_waypoint_to_wire(&motion,&packed,2048,2048,15,SC64_SCARAB_WAYPOINT_DERIVED));
     assert(sc64_scarab_flight_to_wire(&packed,&packed,1,0));
     assert(sc64_derived_unit_encode_for(&d,&packed,2048,2048,15));
@@ -87,7 +119,8 @@ int main(void) {
     assert(sc64_scarab_waypoint_from_wire(&unpacked,&unpacked,2048,2048,15,SC64_SCARAB_WAYPOINT_DERIVED));
     assert(unpacked.path_timer==4000 && unpacked.path_retry==3000 && unpacked.weapon==3 &&
            unpacked.carry==motion.carry && unpacked.work_timer==motion.work_timer &&
-           unpacked.path_x==motion.path_x && unpacked.path_y==motion.path_y && unpacked.shield==motion.shield);
+           unpacked.path_x==motion.path_x && unpacked.path_y==motion.path_y && unpacked.shield==motion.shield &&
+           unpacked.cd==motion.cd);
     assert(sc64_scarab_waypoint_to_wire(&motion,&packed,2048,2048,15,SC64_SCARAB_WAYPOINT_TYPED));
     assert(sc64_scarab_flight_to_wire(&packed,&packed,1,0));
     assert(sc64_p7_typed_unit_encode_for(&t,&packed,2048,2048,15));
@@ -96,7 +129,8 @@ int main(void) {
     assert(sc64_scarab_waypoint_from_wire(&unpacked,&unpacked,2048,2048,15,SC64_SCARAB_WAYPOINT_TYPED));
     assert(unpacked.path_timer==4000 && unpacked.path_retry==3000 && unpacked.weapon==3 &&
            unpacked.carry==motion.carry && unpacked.work_timer==motion.work_timer &&
-           unpacked.path_x==motion.path_x && unpacked.path_y==motion.path_y && unpacked.shield==motion.shield);
+           unpacked.path_x==motion.path_x && unpacked.path_y==motion.path_y && unpacked.shield==motion.shield &&
+           unpacked.cd==motion.cd);
     u.raw_type=36; u.target=-1; u.work_timer=0;
     assert(sc64_derived_unit_encode(&d,&u,100,100));
     assert(sc64_derived_unit_decode(&out,&d,100,100) && out.raw_type==36);
