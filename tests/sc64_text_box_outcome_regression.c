@@ -45,7 +45,7 @@ int main(int argc,char **argv)
     assert(argc==2);victory=!strcmp(argv[1],"p2-victory");
     assert(victory || !strcmp(argv[1],"t1-defeat"));
     gba_init();if(victory)seed_p2_victory();else seed_t1_defeat();
-    assert(!journal_present());u32 completed_before=race_completed;
+    assert(!journal_present());u32 completed_before=race_completed; (void)completed_before;
     input(0);
     printf("case=%s queue=%u screen=%d won=%d lost=%d completed=%lu journal=%d frame=%d\n",
            argv[1],sc64_text_box_count(),screen,won,lost,(unsigned long)race_completed,
