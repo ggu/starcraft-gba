@@ -4,6 +4,8 @@
  * an ordinary HOME/menu/gameplay input delivered through game_update(). */
 #include "../common/gba.c"
 #include "../starcraft/game.c"
+#define Z10_COHORT_TRACE 1
+static void z10_cohort_observe(void);
 #include "sc64_zerg_late_controller.h"
 #include <assert.h>
 
@@ -38,6 +40,17 @@ static int z10_pending_products(int type)
 
 /* Controller-only roles: keep existing retreat-sized force at home. */
 static u8 z10_home_reserve[MAX_UNITS];
+static u8 z10_cohort_initial[MAX_UNITS];
+static void z10_cohort_observe(void)
+{
+    for(int i=0;i<MAX_UNITS;i++)if(z10_cohort_initial[i]&&
+        (!u[i].alive||u[i].owner!=SIDE||u[i].type!=U_HYDRALISK))z10_cohort_initial[i]=0;
+}
+static void z10_cohort_dump(void)
+{
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK)
+        fprintf(stderr,"COHORT frame=%u slot=%d original=%d reserve=%d x=%d y=%d order=%d target=%d/%d\n",(unsigned)frame,i,z10_cohort_initial[i],z10_home_reserve[i],u[i].x,u[i].y,u[i].order,u[i].tx,u[i].ty);
+}
 static void z10_reserve_home(void)
 {
     int need=knob("Z10_RETREAT",12),have=0;
@@ -209,12 +222,15 @@ int main(int argc,char **argv)
             if(!rush&&frame>=knob("Z10_GOF",8000)&&
                (home>=goal||(pool_limited&&home>=knob("Z10_GO2",55)))){
                 rush=1;leg=0;z10_reserve_home();
+                for(int i=0;i<MAX_UNITS;i++)z10_cohort_initial[i]=(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&!z10_home_reserve[i]);
+                z10_cohort_dump();
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE)
                     fprintf(stderr,"LAUNCHUNIT slot=%d type=%d reserve=%d x=%d y=%d order=%d\n",i,u[i].type,z10_home_reserve[i],u[i].x,u[i].y,u[i].order);
                 fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d,\"pending\":%d,\"free_slots\":%d,\"pool_limited\":%d}\n",(unsigned)frame,home,pending,free_slots,pool_limited);
             }
             if(rush){
                 int n=0,sx=0,sy=0;
+                z10_cohort_dump();
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&!z10_home_reserve[i]){
                     int k2=0,x2=0,y2=0;
                     for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&u[k].type==U_HYDRALISK&&!z10_home_reserve[k]&&dist2(u[k].x,u[k].y,u[i].x,u[i].y)<240*240){++k2;x2+=u[k].x;y2+=u[k].y;}

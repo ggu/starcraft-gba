@@ -22,6 +22,9 @@ static void input(u16 held)
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
     game_update(held,pressed);
+#ifdef Z10_COHORT_TRACE
+    z10_cohort_observe();
+#endif
     prior=held;
     ++host_tick;
     if(trace&&changed)
