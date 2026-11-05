@@ -182,5 +182,32 @@ int main(int argc,char **argv)
     guardian_test_retag(selected.slot,SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_FULL_SAVE_VERSION);
     assert(race_worker_cargo_select(&plan,&fallback) && fallback.slot!=selected.slot &&
            fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION);
+    /* Target slot reuse and loss of the Reaver must not redirect either the
+     * live child or an already-pending packet. Packet creation is injected. */
+    guardian_test_restore(sram);assert(race_load_game());minerals=100;
+    assert(race_scarab_enqueue(p,0));assert(race_scarab_production_tick(p,0)==SC64_SCARAB_ALLOCATED);
+    assert(race_scarab_parent_read(p,0,&parent,&counts));child=parent.active_slot;
+    for(int i=0;i<SC64_SCARAB_BUILD_TICKS;++i)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
+    assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
+    target=spawn_unit(ENEMY,U_ZERGLING,u[p].x,u[p].y+60);assert(target>=0);
+    race_scarab_probe_parent_attack(p,target);assert(u[child].target==target && u[child].order==1);
+    assert(race_scarab_probe_bullet_create(&u[child]));
+    assert(sc64_scarab_impact_unpack(&race_impact_rows[0],&packet));
+    int impact_x=packet.x,impact_y=packet.y,impact_owner=packet.owner;
+    hit_target(target,10000,U_REAVER,SIDE);assert(!u[target].alive);
+    assert(spawn_unit(ENEMY,U_ZERGLING,700,700)==target);
+    assert(u[child].target==-1 && sc64_scarab_impact_unpack(&race_impact_rows[0],&packet) && packet.target==-1);
+    hit_target(p,10000,U_ZERGLING,ENEMY);assert(!u[p].alive && u[child].alive);
+    assert(race_scarab_child_lookup(child,&owner,&phase) && owner==-1 && phase==SC64_SCARAB_CHILD_OUTSIDE);
+    assert(race_save_game());memset(u,0,sizeof(u));race_impact_reset();assert(race_load_game());
+    assert(u[child].alive && u[child].target==-1 && race_impact_count==1 &&
+           sc64_scarab_impact_unpack(&race_impact_rows[0],&packet) && packet.target==-1 &&
+           packet.x==impact_x && packet.y==impact_y && packet.owner==impact_owner && packet.ticks==6);
+    for (unsigned owner_bit=0;owner_bit<5;++owner_bit) {
+        guardian_test_restore(sram);assert(race_load_game());
+        sc64_scarab_probe_damage_upgrades=(u8)(1u<<owner_bit);
+        assert(race_save_game());sc64_scarab_probe_damage_upgrades=31;
+        assert(race_load_game() && sc64_scarab_probe_damage_upgrades==(1u<<owner_bit));
+    }
     puts("actual HOST paid unit/building launches, controlled arrival and target reuse passed");return 0;
 }
