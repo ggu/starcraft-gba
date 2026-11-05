@@ -21,6 +21,16 @@ int main(int argc,char **argv)
     Sc64ScarabParent parent;Sc64ScarabCounts counts;
     assert(race_scarab_parent_read(reaver,0,&parent,&counts));
     int child=parent.active_slot;assert(child>=0);
+    for(int i=0;i<SC64_SCARAB_BUILD_TICKS;i++)
+        assert(race_scarab_production_tick(reaver,0)==SC64_SCARAB_PROGRESS);
+    assert(race_scarab_production_tick(reaver,0)==SC64_SCARAB_COMPLETED);
+    int target=spawn_unit(ENEMY,U_ZERGLING,u[reaver].x,u[reaver].y+60);assert(target>=0);
+    race_scarab_probe_parent_attack(reaver,target);
+    assert(u[child].order==1 && u[child].target==target);
+    assert(race_scarab_flight_control_tick(child,0,0)==SC64_SCARAB_CONTROL_CONTINUE);
+    race_scarab_control_dispatch(child);
+    Unit motion=u[child];
+    assert(motion.order==2 && (motion.path_timer>24 || motion.path_retry>12));
     assert(spawn_build(SIDE,B_GREATER_SPIRE,390,390,0)>=0);
     int muta=spawn_unit(SIDE,U_MUTALISK,350,350);assert(muta>=0);
     assert(race_guardian_morph_start(muta));
@@ -30,14 +40,24 @@ int main(int argc,char **argv)
     assert(selected.tag==SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION &&
            plan.guardian_auth.inner==SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION &&
            plan.guardian_auth.features==15u);
+    guardian_test_snapshot(before);
+    guardian_test_retag(selected.slot,SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,
+                         SC64_SHARED_ACTOR_FULL_SAVE_VERSION);
+    GbaSaveSelection fallback;
+    assert(race_worker_cargo_select(&plan,&fallback));
+    assert(fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION && fallback.slot!=selected.slot);
+    guardian_test_restore(before);
     memset(u,0,sizeof(u));assert(race_load_game());
+    assert(u[child].cd==motion.cd && u[child].weapon==motion.weapon &&
+           u[child].path_timer==motion.path_timer && u[child].path_retry==motion.path_retry &&
+           u[child].path_x==motion.path_x && u[child].path_y==motion.path_y);
     assert(u[egg].alive && u[egg].type==SC64_SHARED_EGG_TYPE &&
            u[muta].alive && u[muta].type==U_GUARDIAN_COCOON &&
            u[child].alive && u[child].type==U_SCARAB);
     for(int i=0;i<SC64_GUARDIAN_TICKS;i++)assert(race_guardian_morph_tick(muta));
-    assert(u[muta].type==U_GUARDIAN_STAGE && u[muta].raw_type==44);
+    assert(sc64_race_raw_unit(u[muta].type)==44 && u[muta].raw_type==44);
     assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
-    assert(u[muta].type==U_GUARDIAN_STAGE && u[muta].raw_type==44 && u[egg].alive);
+    assert(sc64_race_raw_unit(u[muta].type)==44 && u[muta].raw_type==44 && u[egg].alive);
     puts("profile HOST selected journal: predecessor, paid Egg/Cocoon/Scarab and Guardian passed");
     return 0;
 }
