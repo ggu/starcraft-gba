@@ -330,9 +330,19 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
     (!defined(GBA_HOST) || !defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) || \
      !defined(SC64_GUARDIAN_COCOON_STAGE) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || \
      (!defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_FULL_STORAGE)) || \
-     defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_P7_TYPED_COMPACT_ENABLED) || \
+     ((defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_P7_TYPED_COMPACT_ENABLED)) && \
+      !defined(SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE)) || \
      defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE))
 #error "Full shared actor journal requires an isolated HOST compact-codec candidate"
+#endif
+/* Explicit HOST-only qualification of the real Z7 derived and P10 typed
+ * row codecs. The ordinary product and every guest vector remain fenced. */
+#if defined(SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) || \
+     !defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE) || !defined(SC64_ZP_FULL_STORAGE) || \
+     !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
+     (defined(SC64_Z7_DERIVED_SAVE) == defined(SC64_P7_TYPED_COMPACT_ENABLED)))
+#error "Profile codec journal requires one HOST derived/typed flight profile"
 #endif
 #if defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE) && \
     (!defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) || !defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) || \
@@ -644,6 +654,15 @@ _Static_assert((SC64_TRANSPORT_SAVE_VERSION & 0x40000000u) != 0,
 #ifdef SC64_SHARED_TRANSPORT
 #define SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION (SC64_GUARDIAN_TRANSPORT_SAVE_VERSION ^ 0x40000000u)
 #endif
+#endif
+#endif
+#ifdef SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE
+#if defined(SC64_Z7_DERIVED_SAVE)
+_Static_assert(SC64_CAMPAIGN_RACE == 1 && SC64_RACE_SAVE_GENERATION == 38u,
+               "derived actor candidate must use the exact Z7 generation");
+#else
+_Static_assert(SC64_CAMPAIGN_RACE == 2 && SC64_RACE_SAVE_GENERATION == 47u,
+               "typed actor candidate must use the exact P10 generation");
 #endif
 #endif
 #ifdef SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE

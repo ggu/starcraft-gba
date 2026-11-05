@@ -47,6 +47,14 @@ static RaceSave race_data;
 #include "sc64_scarab_flight_bridge.h"
 #include "sc64_scarab_fields.h"
 #endif
+#ifdef SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE
+#include "sc64_scarab_waypoint_bridge.h"
+#ifdef SC64_Z7_DERIVED_SAVE
+#define SC64_ACTOR_WAYPOINT_CODEC SC64_SCARAB_WAYPOINT_DERIVED
+#else
+#define SC64_ACTOR_WAYPOINT_CODEC SC64_SCARAB_WAYPOINT_TYPED
+#endif
+#endif
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
 #include "sc64_stage_save_auth.h"
 #define race_save_decode_unit race_save_decode_unit_raw_stage
@@ -205,7 +213,11 @@ static int race_guardian_decode_authenticated(const RaceSave *candidate,unsigned
     if (!sc64_p7_typed_unit_decode(&wire,&candidate->units[slot],width,height)) return 0;
 #endif
 #elif defined(SC64_Z7_DERIVED_SAVE)
+#ifdef SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE
+    if (!sc64_derived_unit_decode_for(&wire,&candidate->units[slot],width,height,auth->features)) return 0;
+#else
     if (!sc64_derived_unit_decode(&wire,&candidate->units[slot],width,height)) return 0;
+#endif
 #else
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
     if (!sc64_zp_unit_save_decode_for(&wire,&candidate->units[slot],width,height,codec_features)) return 0;
@@ -235,6 +247,11 @@ static int race_guardian_decode_authenticated(const RaceSave *candidate,unsigned
             !sc64_scarab_flight_from_wire(&decoded,&logical,1,0) ||
             ((((unsigned)logical.carry>>8)&3u)>1u &&
              !(auth->features & SC64_STAGE_SAVE_EXTENDED_EVENTS))) return 0;
+#ifdef SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE
+        if (auth->features==15u &&
+            !sc64_scarab_waypoint_from_wire(&logical,&logical,width,height,
+                                             auth->features,SC64_ACTOR_WAYPOINT_CODEC)) return 0;
+#endif
         decoded=logical;
     } else if (decoded.alive && sc64_race_raw_unit(decoded.type)==83) {
         int carry,timer;
@@ -1844,11 +1861,26 @@ static int race_save_game(void) {
         if (!sc64_guardian_wire_encode(&u[i],&wire,1)) return 0;
 #ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
         Unit scarab_wire;
+#ifdef SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE
+        if (wire.alive && (wire.type==U_SCARAB || wire.raw_type==85) &&
+            !sc64_scarab_waypoint_to_wire(&wire,&wire,(unsigned)(race_cols*16),
+                (unsigned)(race_rows*16),writer_auth.features,SC64_ACTOR_WAYPOINT_CODEC)) return 0;
+#endif
         if (!race_scarab_save_wire(&wire,&scarab_wire)) return 0;
         wire=scarab_wire;
         if (wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
+#ifdef SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE
+#ifdef SC64_Z7_DERIVED_SAVE
+        if (!sc64_derived_unit_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),
+                (unsigned)(race_rows*16),writer_auth.features)) return 0;
+#else
+        if (!sc64_p7_typed_unit_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),
+                (unsigned)(race_rows*16),(int)writer_auth.features)) return 0;
+#endif
+#else
         if (!sc64_zp_unit_save_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),
                 (unsigned)(race_rows*16),SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_SCARAB)) return 0;
+#endif
 #else
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
         if (race_mode && wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
