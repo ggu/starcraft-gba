@@ -159,6 +159,18 @@ class FactTablesTest(unittest.TestCase):
             self.assertNotEqual(built.returncode, 0)
             self.assertIn(b"full Guardian facts require a generated layout marker", built.stderr)
 
+    def test_shared_actor_facts_cannot_omit_full_fact_flag(self):
+        incomplete = ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_GUARDIAN_COCOON_STAGE",
+                      "SC64_SHARED_EGG_WIRE_HOST_STAGE", "SC64_SCARAB_RUNTIME",
+                      "SC64_SCARAB_STABLE_ROSTER_HOST_STAGE", "SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE",
+                      "SC64_SHARED_ACTOR_FULL_HOST_STAGE")
+        with tempfile.TemporaryDirectory(prefix="sc64-guardian-fact-required-") as directory:
+            table = generate(self.compiler, incomplete, directory, "incomplete")
+            built, _ = compile_program(self.compiler, CHECK, incomplete + ("SC64_FACT_TABLES",),
+                                       directory, "must-reject", ("-I", str(table)))
+            self.assertNotEqual(built.returncode, 0)
+            self.assertIn(b"shared actor facts require the full Guardian facts stage", built.stderr)
+
     def test_combined_guardian_flight_fingerprint_both_directions(self):
         combined = ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_GUARDIAN_COCOON_STAGE",
                     "SC64_SHARED_EGG_WIRE_HOST_STAGE", "SC64_GUARDIAN_FULL_FACTS_STAGE",

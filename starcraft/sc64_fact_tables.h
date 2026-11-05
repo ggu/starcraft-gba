@@ -10,6 +10,9 @@
 
 /* Old/legacy-only generated headers may predate all staged fingerprint
  * gates. A full staged roster must opt in explicitly and cover every row. */
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && !defined(SC64_GUARDIAN_FULL_FACTS_STAGE)
+#error "shared actor facts require the full Guardian facts stage"
+#endif
 #ifdef SC64_GUARDIAN_FULL_FACTS_STAGE
 #ifndef SC64_FACT_GUARDIAN_LAYOUT_VERSION
 #error "full Guardian facts require a generated layout marker"
