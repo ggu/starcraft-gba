@@ -37,3 +37,13 @@ shared-egg-actor-stage-facts: shared-egg-stage-facts
 	/tmp/shared-egg-actor-protoss
 	$(CLANG) $(EGG_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_actor_real.c $(EGG_EXTRA) -o /tmp/shared-egg-actor-showcase
 	/tmp/shared-egg-actor-showcase
+.PHONY: shared-egg-wire-stage-facts
+shared-egg-wire-stage-facts: shared-egg-stage-facts
+	$(CLANG) $(EGG_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_shared_egg_wire_real.c $(EGG_EXTRA) -o /tmp/shared-egg-wire-terran
+	/tmp/shared-egg-wire-terran
+	$(CLANG) $(EGG_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_wire_real.c $(EGG_EXTRA) -o /tmp/shared-egg-wire-zerg
+	/tmp/shared-egg-wire-zerg
+	$(CLANG) $(EGG_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(EGG_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_wire_real.c $(EGG_EXTRA) -o /tmp/shared-egg-wire-protoss
+	/tmp/shared-egg-wire-protoss
+	$(CLANG) $(EGG_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_wire_real.c $(EGG_EXTRA) -o /tmp/shared-egg-wire-showcase
+	/tmp/shared-egg-wire-showcase
