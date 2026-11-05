@@ -291,6 +291,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
     (!defined(GBA_HOST) || !defined(SC64_SHARED_EGG_HOST_STAGE) || \
      !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_Z9_RUNTIME) || \
      !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || \
+     !defined(SC64_SHARED_SCOURGE_COMBAT) || \
      !defined(SC64_ZP_FULL_STORAGE) || defined(SC64_P7_TYPED_COMPACT_ENABLED) || \
      defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
      defined(SC64_SCARAB_RUNTIME) || defined(SC64_P7_CARRIER_TRAINING_ENABLED) || \
@@ -12949,6 +12950,9 @@ game_self_test(void)
 #ifdef SC64_P8_RUNTIME
 #include "sc64_p8_availability_adapter.h"
 #endif
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static unsigned race_shared_trigger_obligations(void);
+#endif
 #include "race_adapter.h"
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #include "sc64_guardian_morph_adapter.h"
@@ -13075,6 +13079,16 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #endif
 #ifdef SC64_Z9_RUNTIME
 #include "sc64_zerg_late_runtime_adapter.h"
+#endif
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static unsigned race_shared_trigger_obligations(void)
+{
+    if (race_mode) return 0;
+    if (race_z8_active()) return sc64_stage_trigger_create_obligations(&race_z8_sched,&race_z8_program);
+    if (race_zl_active() && race_zl_mission)
+        return sc64_stage_trigger_create_obligations(&race_zl_sched.core,&race_zl_mission->program->rows);
+    return 0;
+}
 #endif
 #include "race_save_adapter.h"
 #ifdef SC64_IMPACT_EVENTS

@@ -188,6 +188,11 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
         q->selected = 0;
         return 1;
     }
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    /* A paid paired birth waits until the reserved second slot is available. */
+    if (!race_z7_active() && q->work_timer==1 &&
+        sc64_z7_egg_product_count(q->target)==2 && find_unit_slot()<0) return 1;
+#endif
     if (q->work_timer > 0) --q->work_timer;
     if (q->work_timer > 0) return 1;
 
@@ -803,6 +808,12 @@ static int race_queue_unit(int owner, int producer, int type)
     if ((r->flags & SC_RACE_F_LARVA) && b[producer].larva < 1) return 0;
     count = sc64_race_product_count(type);
 #ifdef SC64_SHARED_SCOURGE_COMBAT
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (!race_mode && !race_z7_active() && (race_z8_active() || race_zl_active())) {
+        unsigned pending=race_shared_trigger_obligations();
+        if (pending>MAX_UNITS || !race_product_slots_available((unsigned)count+pending)) return 0;
+    } else
+#endif
     if (!race_product_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED

@@ -269,13 +269,17 @@ sc64_z8_world_action(void *context, const Sc64Z8Action *a,
             rect->right < rect->left || rect->bottom < rect->top ||
             !w->services.create ||
             !sc64_z8_world_resolve_one(w, a->group1, trigger_owner, &owner)) return -1;
-        return w->services.create(w->services.create_context ?
+        {
+            int result=w->services.create(w->services.create_context ?
                                   w->services.create_context : w->services.context,
-                                  a, owner,
-                                  sc64_z8_create_count(a), a->group2,
+                                  a, owner, sc64_z8_create_count(a), a->group2,
                                   (unsigned)rect->left, (unsigned)rect->top,
-                                  (unsigned)rect->right, (unsigned)rect->bottom) == 1
-            ? 1 : -1;
+                                  (unsigned)rect->right, (unsigned)rect->bottom);
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+            if (result==0) return 0;
+#endif
+            return result==1 ? 1 : -1;
+        }
     case 16: /* Unknown native policy must remain an explicit failure. */
         if (!rect || !sc64_z8_ai_script_known(a->group2) ||
             !w->services.run_ai) return -1;

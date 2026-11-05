@@ -691,8 +691,12 @@ sc64_z8_action(Sc64Z8SchedulerState *s, const Sc64Z8Program *p,
         if (!a->location) return 1;
         /* fall through */
     case 8: case 9: case 12: case 26:
-        if (!ops || !ops->action ||
-            ops->action(context, a, owner, rect) != 1) break;
+        if (!ops || !ops->action) break;
+        r=ops->action(context,a,owner,rect);
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+        if (a->opcode==11 && r==0) return 0; /* bounded capacity defer */
+#endif
+        if (r!=1) break;
         return 1;
     default:
         break;
@@ -736,6 +740,30 @@ sc64_z8_execute(Sc64Z8SchedulerState *s, const Sc64Z8Program *p,
     }
     return 1;
 }
+
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+/* Only executing instances have committed actions. Already executed creates
+ * precede the cursor and are represented by live slots, not reservations. */
+static unsigned sc64_stage_trigger_create_obligations(const Sc64Z8SchedulerState *s,
+                                                       const Sc64Z8Program *p)
+{
+    unsigned total=0;
+    if (!s || !p || s->instance_count>SC64_Z8_INSTANCE_LIMIT) return ~0u;
+    for (unsigned i=0;i<s->instance_count;i++) {
+        const Sc64Z8Instance *in=&s->instances[i];
+        if (!(in->flags & SC64_Z8_INST_EXECUTING) || (in->flags & SC64_Z8_INST_DONE)) continue;
+        if (in->trigger>=p->trigger_count) return ~0u;
+        const Sc64Z8Trigger *t=&p->triggers[in->trigger];
+        if ((unsigned)t->first_action+t->action_count>p->action_count) return ~0u;
+        for (unsigned j=0;j<t->action_count;j++) {
+            const Sc64Z8Action *a=&p->actions[t->first_action+j];
+            if (a->index>=in->cursor && a->opcode==11 && a->location && !(a->flags&2))
+                total+=sc64_z8_create_count(a);
+        }
+    }
+    return total;
+}
+#endif
 
 /* One trigger pass (0x8008DAEC -> 0x8008D240 per owner). Owners run in
  * ascending slot order and each owner's instances in trigger order; every

@@ -27,3 +27,7 @@ test-shared-egg-z9-journal:
 test-shared-egg-z8-journal:
 	$(CLANG) $(SHARED_EGG_HOST_FLAGS) -DSC64_SHARED_EGG_WIRE_HOST_STAGE -DSC64_SHARED_EGG_JOURNAL_HOST_STAGE tests/sc64_shared_egg_z8_journal_game.c common/gba.c -o $(EGG_TEST_BIN_DIR)/sc64-shared-egg-z8-journal
 	$(EGG_TEST_BIN_DIR)/sc64-shared-egg-z8-journal
+.PHONY: test-shared-egg-capacity
+test-shared-egg-capacity:
+	$(CLANG) $(SHARED_EGG_HOST_FLAGS) -DSC64_SHARED_EGG_WIRE_HOST_STAGE -DSC64_SHARED_EGG_JOURNAL_HOST_STAGE tests/sc64_shared_egg_capacity_game.c common/gba.c -o $(EGG_TEST_BIN_DIR)/sc64-shared-egg-capacity
+	$(EGG_TEST_BIN_DIR)/sc64-shared-egg-capacity
