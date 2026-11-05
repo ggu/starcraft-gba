@@ -40,6 +40,8 @@ def extract(data):
         if not match:
             continue
         name, expr = match.groups()
+        if name == "SC64_IS_CARRIER_SAVE_VERSION" and expr == "(v) \\":
+            continue  # Boolean predicate, not an allocated journal tag.
         expr = expr.strip()
         if name == "SC64_RACE_SAVE_GENERATION" or name.endswith("SAVE_VERSION"):
             if name in LEGACY_NAMES:
@@ -118,6 +120,8 @@ class SharedEggTags(unittest.TestCase):
             extract("#define SC64_FUTURE_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)")
         with self.assertRaises(AssertionError):
             extract("#define SC64_FUTURE_SAVE_VERSION")
+        with self.assertRaises(AssertionError):
+            extract("#define SC64_FUTURE_SAVE_VERSION(v) 0")
         with self.assertRaises(AssertionError):
             catalog(["#define SC64_FUTURE_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)"])
         with self.assertRaises(AssertionError):
