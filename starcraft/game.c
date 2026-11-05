@@ -286,6 +286,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #endif
 /* Explicit, disabled-by-default integration for custom games. */
 #ifdef SC64_SHARED_EGG_CUSTOM_SERVICE
+#if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
+#error "Custom Egg service cannot combine with the legacy HOST Egg stages"
+#endif
 #define SC64_SHARED_EGG_WIRE_HOST_STAGE 1
 #define SC64_SHARED_EGG_CUSTOM_CANDIDATE 1
 #define SC64_SHARED_EGG_PRODUCER_HOST_STAGE 1

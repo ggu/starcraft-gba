@@ -46,3 +46,7 @@ custom-egg-facts:
 custom-egg-z7-legacy:
 	$(CLANG) $(CUSTOM_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_custom_z7_legacy.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-z7-legacy
 	$(COMBINED_BIN_DIR)/custom-egg-z7-legacy
+
+.PHONY: custom-egg-conflict-guards
+custom-egg-conflict-guards:
+	$(PYTHON) tests/check_sc64_shared_egg_custom_guards.py $(CLANG) $(CUSTOM_HOST) $(ZERG_Z9_CANONICAL_FLAGS)
