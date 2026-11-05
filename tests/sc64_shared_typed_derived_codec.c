@@ -1,0 +1,77 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Test-only stage discriminator and real codec calls; never guest SRAM. */
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+typedef uint8_t u8; typedef uint32_t u32;
+#define SC64_RACES 1
+#define SC64_SHARED_EGG_WIRE_HOST_STAGE 1
+#define SC64_SHARED_EGG_CUSTOM_CANDIDATE 1
+#define SC64_SHARED_ACTOR_FULL_HOST_STAGE 1
+#define SC64_SCARAB_STABLE_ROSTER_HOST_STAGE 1
+#define SC64_GUARDIAN_DISTINCT_STAGE 1
+#define SC64_SHARED_EGG_TYPE 40
+#define SC_RU_LEGACY_BOUND 40
+typedef struct { int hp; } Sc64StockUnitProfile;
+static const Sc64StockUnitProfile *sc64_stock_unit_profile(int raw) { static const Sc64StockUnitProfile cocoon={200}; static const Sc64StockUnitProfile guardian={150},scarab={20}; return raw==59?&cocoon:raw==44?&guardian:raw==85?&scarab:0; }
+enum { SC_RU_COUNT=64, SC_RB_COUNT=64, U_OVERLORD=8, U_COCOON=41, U_GUARDIAN_STAGE=42, U_SCARAB=43, MAX_UNITS=240, MAX_BUILDINGS=160 };
+typedef struct { int hp, shields; } Sc64RaceUnitRule;
+static Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT];
+static const Sc64RaceUnitRule *sc64_race_unit_rule(int t) { return t>=0&&t<SC_RU_COUNT ? &sc64_race_unit_rules[t] : 0; }
+static int sc64_zp_actor_default_hp(int t) { return t==U_OVERLORD?200:t==U_GUARDIAN_STAGE?150:t==U_SCARAB?20:0; }
+static int sc64_zp_actor_default_shields(int t) { (void)t; return 0; }
+static int sc64_race_unit_armor(int t) { return t==U_GUARDIAN_STAGE?2:0; }
+static int sc64_race_building_max_hp(int t) { (void)t; return 100; }
+typedef struct { int x,y,hp,maxhp,owner,type,alive,selected,cd,order,tx,ty,carry,build,work_timer,armor,weapon,target,path_timer,path_retry,path_x,path_y,shield,raw_type,raw_owner,flags,shield_remainder; } Unit;
+typedef struct { int x,y,hp,owner,type,alive,queue[5],queue_head,queue_count,queue_progress,build_progress,under_construction,level,shield,maxhp,raw_type,raw_owner,flags,larva,larva_timer,shield_remainder; } Building;
+#include "../starcraft/sc64_derived_save.h"
+#include "../starcraft/sc64_p7_typed_unit_save.h"
+
+int main(void) {
+    sc64_race_unit_rules[U_OVERLORD].hp=200;
+    sc64_race_unit_rules[U_GUARDIAN_STAGE].hp=150;
+    sc64_race_unit_rules[U_SCARAB].hp=20;
+    Unit u={0}, out, unchanged; u.x=u.y=u.tx=u.ty=u.path_x=u.path_y=10;
+    u.type=U_SCARAB; u.raw_type=85; u.hp=u.maxhp=20; u.alive=1;
+    u.owner=1; u.raw_owner=3; u.build=-1; u.target=-1;
+    Sc64DerivedUnitSave d, d_before; Sc64P7TypedUnitSave t;
+    memset(&d,0xa5,sizeof d); d_before=d;
+    assert(!sc64_derived_unit_encode_for(&d,&u,100,100,0));
+    assert(!memcmp(&d,&d_before,sizeof d));
+    assert(sc64_derived_unit_encode_for(&d,&u,100,100,4));
+    memset(&out,0xa5,sizeof out); unchanged=out;
+    assert(!sc64_derived_unit_decode_for(&out,&d,100,100,0));
+    assert(!memcmp(&out,&unchanged,sizeof out));
+    assert(sc64_derived_unit_decode_for(&out,&d,100,100,4));
+    assert(out.type==u.type && out.raw_type==85 && out.hp==20);
+    assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,4));
+    assert(!sc64_p7_typed_unit_decode_for(&out,&t,100,100,0));
+    assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,4));
+    u.weapon=3;
+    assert(!sc64_derived_unit_encode_for(&d,&u,100,100,4));
+    assert(sc64_derived_unit_encode_for(&d,&u,100,100,12));
+    assert(!sc64_derived_unit_decode_for(&out,&d,100,100,4));
+    assert(sc64_derived_unit_decode_for(&out,&d,100,100,12) && out.weapon==3);
+    u.weapon=4; assert(!sc64_derived_unit_encode_for(&d,&u,100,100,12));
+    u.weapon=0;
+    u.alive=0; u.hp=0;
+    assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,4));
+    assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,4) && !out.alive);
+    u.raw_type=36; assert(!sc64_derived_unit_encode_for(&d,&u,100,100,4));
+    assert(!sc64_p7_typed_unit_encode_for(&t,&u,100,100,4));
+    u.type=U_GUARDIAN_STAGE; u.raw_type=44; u.hp=u.maxhp=150; u.armor=2; u.alive=1;
+    assert(sc64_derived_unit_encode_for(&d,&u,100,100,2));
+    assert(!sc64_derived_unit_decode_for(&out,&d,100,100,0));
+    assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,2));
+    assert(!sc64_p7_typed_unit_decode_for(&out,&t,100,100,0));
+    u.type=U_OVERLORD; u.raw_type=59; u.hp=u.maxhp=200; u.armor=0; u.target=44; u.work_timer=750;
+    assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,2));
+    assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,2));
+    assert(out.raw_type==59 && out.maxhp==200 && out.armor==0);
+    u.raw_type=36; u.target=-1; u.work_timer=0;
+    assert(sc64_derived_unit_encode(&d,&u,100,100));
+    assert(sc64_derived_unit_decode(&out,&d,100,100) && out.raw_type==36);
+    assert(sc64_p7_typed_unit_encode(&t,&u,100,100));
+    assert(sc64_p7_typed_unit_decode(&out,&t,100,100) && out.raw_type==36);
+    return 0;
+}

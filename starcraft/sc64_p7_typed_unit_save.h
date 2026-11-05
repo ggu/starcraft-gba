@@ -3,6 +3,7 @@
 
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
 #define SC64_TYPED_WIRE_CANONICAL sc64_p7_typed_unit_canonical_for
+#define SC64_TYPED_WIRE_RAW_CANONICAL sc64_p7_typed_unit_canonical_raw_for
 #define SC64_TYPED_WIRE_VALIDATE sc64_p7_typed_unit_fields_valid_for
 #define SC64_TYPED_WIRE_ENCODE sc64_p7_typed_unit_encode_for
 #define SC64_TYPED_WIRE_DECODE sc64_p7_typed_unit_decode_for
@@ -10,6 +11,7 @@
 #define SC64_TYPED_WIRE_ARG , egg_stage
 #else
 #define SC64_TYPED_WIRE_CANONICAL sc64_p7_typed_unit_canonical
+#define SC64_TYPED_WIRE_RAW_CANONICAL sc64_p7_typed_unit_canonical_raw
 #define SC64_TYPED_WIRE_VALIDATE sc64_p7_typed_unit_fields_valid
 #define SC64_TYPED_WIRE_ENCODE sc64_p7_typed_unit_encode
 #define SC64_TYPED_WIRE_DECODE sc64_p7_typed_unit_decode
@@ -88,6 +90,14 @@ static int SC64_TYPED_WIRE_CANONICAL(int type, int *maxhp, int *armor,
         return 1;
     }
 #ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if ((egg_stage & 2) && type==U_GUARDIAN_STAGE && type<64) {
+        if (maxhp) *maxhp=150;
+        if (armor) *armor=2;
+        if (maxshield) *maxshield=0;
+        return 1;
+    }
+#endif
     if ((egg_stage & 4) && type==U_SCARAB && type<64) {
         if (maxhp) *maxhp=20;
         if (armor) *armor=0;
@@ -110,6 +120,23 @@ static int SC64_TYPED_WIRE_CANONICAL(int type, int *maxhp, int *armor,
     return 1;
 }
 
+/* Cocoon shares the old Overlord wire type but has its own source facts. */
+static int SC64_TYPED_WIRE_RAW_CANONICAL(int type, int raw, int *maxhp,
+                                         int *armor, int *maxshield SC64_TYPED_WIRE_PARAM)
+{
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+    if ((egg_stage & 2) && type == U_OVERLORD && raw == 59) {
+        if (maxhp) *maxhp = 200;
+        if (armor) *armor = 0;
+        if (maxshield) *maxshield = 0;
+        return 1;
+    }
+#else
+    (void)raw;
+#endif
+    return SC64_TYPED_WIRE_CANONICAL(type,maxhp,armor,maxshield SC64_TYPED_WIRE_ARG);
+}
+
 static int SC64_TYPED_WIRE_VALIDATE(const Unit *q,
                                            unsigned world_width,
                                            unsigned world_height SC64_TYPED_WIRE_PARAM)
@@ -120,11 +147,18 @@ static int SC64_TYPED_WIRE_VALIDATE(const Unit *q,
         q->y < 0 || (unsigned)q->y >= world_height ||
         q->hp < -131072 || q->hp >= 131072 || (q->alive && q->hp < 0) ||
         q->owner < 0 || q->owner > 4 || q->type < 0 ||
-        !SC64_TYPED_WIRE_CANONICAL(q->type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG) ||
+        !SC64_TYPED_WIRE_RAW_CANONICAL(q->type, q->raw_type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG) ||
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
         ((egg_stage & 1) && q->type==SC64_SHARED_EGG_TYPE && (q->raw_type!=36 || q->alive!=1)) ||
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+        ((egg_stage & 2) && q->type==U_GUARDIAN_STAGE && q->raw_type!=44) ||
+#endif
 #ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+        ((egg_stage & 4) && q->type==U_SCARAB && (q->raw_type!=85 || (!q->alive && q->hp>0))) ||
+#else
         ((egg_stage & 4) && q->type==U_SCARAB && (q->raw_type!=85 || q->alive!=1)) ||
+#endif
 #endif
 #endif
         q->maxhp != maxhp || q->armor != armor ||
@@ -197,7 +231,7 @@ static int SC64_TYPED_WIRE_DECODE(Unit *out,
     GET(4, v); q.raw_owner = (int)v - 1; GET(14, q.flags);
     GET(11, q.shield_remainder);
     if (!sc64_p7_typed_unit_get(row, &bit, 1, &v) || v != 1 || bit != 224 ||
-        !SC64_TYPED_WIRE_CANONICAL(q.type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG)) return 0;
+        !SC64_TYPED_WIRE_RAW_CANONICAL(q.type, q.raw_type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG)) return 0;
     q.maxhp = maxhp; q.armor = armor;
     if (!SC64_TYPED_WIRE_VALIDATE(&q, ww, wh SC64_TYPED_WIRE_ARG)) return 0;
     *out = q;
@@ -217,6 +251,7 @@ static int sc64_p7_typed_unit_decode(Unit *q,const Sc64P7TypedUnitSave *r,unsign
 
 #endif /* SC64_SHARED_EGG_WIRE_HOST_STAGE */
 #undef SC64_TYPED_WIRE_CANONICAL
+#undef SC64_TYPED_WIRE_RAW_CANONICAL
 #undef SC64_TYPED_WIRE_VALIDATE
 #undef SC64_TYPED_WIRE_ENCODE
 #undef SC64_TYPED_WIRE_DECODE
