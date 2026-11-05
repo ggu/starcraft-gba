@@ -19,7 +19,7 @@ int main(void)
       {SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION,EGG},
       {go ^ 0x40000000u,gi ^ 0x40000000u,EGG|GUARDIAN}
     };
-    int candidate;Sc64StageSaveAuth auth;
+    int candidate=0;Sc64StageSaveAuth auth;
     for(unsigned i=0;i<5;i++) {
         assert(sc64_stage_save_authenticate(&auth,&candidate,tags[i].outer,tags[i].inner,tags,5));
         assert(sc64_stage_save_auth_matches(&auth,&candidate,tags[i].inner,tags[i].features));

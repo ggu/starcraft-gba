@@ -6,7 +6,7 @@ int main(void)
 {
     enum { EGG=1, GUARDIAN=2 };
     const Sc64StageTagPair pairs[]={ {1,11,0},{2,12,EGG},{3,13,GUARDIAN},{4,14,EGG|GUARDIAN} };
-    Sc64StageSaveAuth auth;int candidate,other;
+    Sc64StageSaveAuth auth;int candidate=0,other=0;
     assert(sc64_stage_save_authenticate(&auth,&candidate,4,14,pairs,4));
     assert(sc64_stage_save_auth_matches(&auth,&candidate,14,EGG|GUARDIAN));
     assert(!sc64_stage_save_auth_matches(&auth,&other,14,EGG));
