@@ -268,7 +268,15 @@ int main(int argc,char **argv)
                       }
                       fprintf(stderr,"ASSAULT frame=%u leg=%d at=%d/%d target=%d/%d group=%d homehydras=%d nearest_overlord_dist2=%d foes:",(unsigned)frame,leg,ax2,ay2,gx,gy,n,home_hydras,nearest_overlord);
                       for(int k=0;k<256;k++)if(foes[k])fprintf(stderr," raw%d=%d",k,foes[k]);
-                      fprintf(stderr,"\n"); }
+                      fprintf(stderr,"\n");
+                      fprintf(stderr,"TECH frame=%u weapons=%d armor=%d weapons_research=%d armor_research=%d evolution=%d\n",(unsigned)frame,weapons_level,armor_level,weapons_research,armor_research,count_buildings(B_EVOLUTION_CHAMBER,1));
+                      for(int j=0;j<MAX_UNITS;j++)if(u[j].alive){
+                        if(u[j].owner==SIDE&&u[j].type==U_OVERLORD)
+                          fprintf(stderr,"DETECTOR frame=%u slot=%d rawowner=%d x=%d y=%d loaded=%d\n",(unsigned)frame,j,u[j].raw_owner,u[j].x,u[j].y,!!SC64_TRANSPORT_LOADED(&u[j]));
+                        if(u[j].owner==ENEMY&&dist2(u[j].x,u[j].y,ax2,ay2)<400*400)
+                          fprintf(stderr,"ELIG frame=%u slot=%d raw=%d rawowner=%d x=%d y=%d flags=%u visible=%d target_alive=%d z8hidden=%d can_attack=%d auto_allowed=%d\n",(unsigned)frame,j,u[j].raw_type,u[j].raw_owner,u[j].x,u[j].y,(unsigned)u[j].flags,currently_visible(u[j].x,u[j].y),target_alive(j),race_z8_unit_hidden_from_side(j),SC64_CAN_ATTACK_FROM(U_HYDRALISK,j,SIDE),sc64_auto_target_candidate_allowed(U_HYDRALISK,j,SIDE,SC64_ZL_HUMAN_SLOT));
+                      }
+                    }
 
                     next_order=frame+knob("Z10_ORD",300);
                 }
