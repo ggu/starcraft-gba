@@ -47,6 +47,9 @@ static int race_scarab_stage_wire;
 #include "sc64_stage_save_auth.h"
 #define race_save_decode_unit race_save_decode_unit_raw_stage
 #endif
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+#include "sc64_shared_egg_wire_host.h"
+#endif
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
@@ -241,6 +244,46 @@ race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *ou
 #else
     return sc64_building_save_decode(out, &candidate->buildings[slot]);
 #endif
+}
+#endif
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+/* Only detached custom candidates reach this first journal prototype. The
+ * live player's selected mission and owner table are never consulted. */
+static int race_shared_egg_custom_owner(int owner,int raw_owner,void *context)
+{
+    const RaceSave *candidate=context;
+    static const int owners[4]={SIDE,ENEMY,RESCUABLE,4};
+    if (!candidate || candidate->state[0]!=1 || candidate->state[4]<1 ||
+        candidate->state[4]>3 || raw_owner!=-1 || owner<0 || owner>=5 ||
+        candidate->players[owner]!=R_ZERG) return 0;
+    for (int i=0;i<=candidate->state[4];++i) if (owners[i]==owner) return 1;
+    return 0;
+}
+static int race_shared_egg_custom_candidate_valid(const RaceSave *candidate,
+                                                   unsigned width,unsigned height)
+{
+    unsigned free_slots=0,committed=0;
+    if (!candidate || candidate->state[0]!=1) return 0;
+    for (unsigned i=0;i<MAX_UNITS;i++) {
+        Unit q;
+        if (!race_save_decode_unit(candidate,i,width,height,&q)) return 0;
+        if (!q.alive) { ++free_slots; if(q.type==U_Z7_EGG)return 0; continue; }
+        if (q.type!=U_Z7_EGG) continue;
+        if (!sc64_shared_egg_wire_valid(&q,1,race_shared_egg_custom_owner,(void *)candidate)) return 0;
+        committed+=(unsigned)(sc64_z7_egg_product_count(q.target)-1);
+    }
+    for (unsigned i=0;i<MAX_BUILDINGS;i++) {
+        Building q;
+        if (!race_save_decode_building(candidate,i,&q)) return 0;
+        if (!q.alive) continue;
+        if (q.queue_count<0 || q.queue_count>5 || q.queue_head<0 || q.queue_head>=5) return 0;
+        for (int j=0;j<q.queue_count;j++) {
+            int type=q.queue[(q.queue_head+j)%5];
+            if (!sc64_race_unit_rule(type)) return 0;
+            committed+=(unsigned)sc64_race_product_count(type);
+        }
+    }
+    return committed<=free_slots;
 }
 #endif
 #ifdef SC64_SHARED_TRANSPORT
@@ -1237,7 +1280,11 @@ static int race_save_game(void) {
     /* No new Egg save format is admitted by this HOST-only experiment.
      * Include dead Egg identities: kill_unit retains actor identity. Raw 36
      * alone is not an Egg discriminator for an ordinary legacy actor. */
-    if (!race_z7_active() && race_shared_egg_context())
+    if (!race_z7_active() && race_shared_egg_context()
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+        && !race_mode /* custom candidates use the new authenticated tag */
+#endif
+       )
         for (int i=0;i<MAX_UNITS;++i)
             if (u[i].type==U_Z7_EGG) return 0;
 #endif
@@ -1355,7 +1402,9 @@ static int race_save_game(void) {
     memset(&race_data, 0, sizeof(race_data));
 #endif
     race_data.version=
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+        race_mode ? SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
+#elif defined(SC64_GUARDIAN_COCOON_STAGE)
         SC64_GUARDIAN_SAVE_VERSION;
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
         SC64_SCARAB_SAVE_VERSION;
@@ -1378,6 +1427,15 @@ static int race_save_game(void) {
 #else
         if (!sc64_zp_unit_save_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
 #endif
+    }
+#elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
+    for (int i=0;i<MAX_UNITS;i++) {
+        Unit wire=u[i];
+        /* Dead staged Eggs are empty slots, not identities to resurrect. */
+        if (race_mode && wire.type==U_Z7_EGG && wire.alive==0)
+            memset(&wire,0,sizeof(wire));
+        if (!sc64_zp_unit_save_encode(&race_data.units[i],&wire,
+                                     (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
     }
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     for (int i=0;i<MAX_UNITS;i++) {
@@ -2006,6 +2064,10 @@ static int race_save_game(void) {
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,(unsigned)race_rows*16u)) return 0;
 #endif
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (race_mode && !race_shared_egg_custom_candidate_valid(&race_data,
+                                    (unsigned)race_cols*16u,(unsigned)race_rows*16u)) return 0;
+#endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
 #ifdef SC64_WORKER_CARGO_KIND
@@ -2044,6 +2106,9 @@ static int race_save_game(void) {
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    Sc64StageSaveAuth egg_auth;
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
     int legacy_worker_cargo;
 #endif
@@ -2252,7 +2317,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_WORKER_CARGO_KIND
     if (!race_save_worker_cargo_prepare(&race_data,(unsigned)width*16u,
                                         (unsigned)height*16u,plan->legacy_worker_cargo)) return 0;
-    race_data.version = SAVE_VERSION;
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (!(plan->egg_auth.features & SC64_STAGE_SAVE_EGG))
+#endif
+        race_data.version = SAVE_VERSION;
 #endif
     if(v[8]<0||v[8]>=width*16||v[9]<0||v[9]>=height*16||v[11]<0||v[11]>2||
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
@@ -2279,8 +2347,14 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_SHARED_EGG_HOST_STAGE
         /* The candidate's own mode/mission, not the currently live world,
          * determines whether the existing strict Z7 Egg validator applies. */
-        if ((v[0] || v[2]!=SC64_Z7_GLOBAL_ID) &&
-            RACE_U(i,type)==U_Z7_EGG) return 0;
+        if ((v[0] || v[2]!=SC64_Z7_GLOBAL_ID) && RACE_U(i,type)==U_Z7_EGG) {
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+            if (!v[0] || !sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,
+                                     race_data.version,SC64_STAGE_SAVE_EGG)) return 0;
+#else
+            return 0;
+#endif
+        }
 #endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
@@ -2544,6 +2618,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     }
 #undef RACE_U
 #undef RACE_B
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if ((plan->egg_auth.features & SC64_STAGE_SAVE_EGG) &&
+        (!sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,race_data.version,SC64_STAGE_SAVE_EGG) ||
+         !race_shared_egg_custom_candidate_valid(&race_data,(unsigned)width*16u,(unsigned)height*16u))) return 0;
+#endif
 #ifdef SC64_SHARED_BUNKER
     if (!race_bunker_save_world_valid(&race_data, width, height)) return 0;
 #endif
@@ -3406,6 +3485,22 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     RaceLoadPlan *plan=context;
     if (raw != (const void *)&race_impact_record) return 0;
     memset(plan,0,sizeof(*plan));
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    const Sc64StageTagPair egg_tags[]={
+        {SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0},
+        {SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0},
+        {SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION,SC64_STAGE_SAVE_EGG}
+    };
+    /* save_select_prepared has already validated this slot's checksum. Bind
+     * the unchanged inner version to this exact outer tag before decoding. */
+    if (!sc64_stage_save_authenticate(&plan->egg_auth,&race_data,tag,race_data.version,
+                                      egg_tags,sizeof(egg_tags)/sizeof(egg_tags[0]))) return 0;
+    plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
+    u32 impact_tag=(plan->egg_auth.features & SC64_STAGE_SAVE_EGG) ?
+                    SC64_TRANSPORT_SAVE_VERSION : tag;
+    if (!race_impact_save_decode_selected(len,impact_tag,plan->impact_candidate,
+                                          &plan->impact_candidate_count)) return 0;
+#else
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     race_guardian_stage_wire = tag == SC64_GUARDIAN_TRANSPORT_SAVE_VERSION;
     if (race_guardian_stage_wire) {
@@ -3431,6 +3526,7 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #else
     if (race_data.version != (plan->legacy_worker_cargo ? SC64_WORKER_CARGO_LEGACY_SAVE_VERSION : SAVE_VERSION)) return 0;
 #endif
+#endif /* SC64_SHARED_EGG_JOURNAL_HOST_STAGE */
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 #if !defined(SC64_SHARED_TRANSPORT)
     if (tag==SC64_LEGACY_SAVE_VERSION) {
@@ -3450,7 +3546,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 }
 static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
 #ifdef SC64_SHARED_TRANSPORT
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
+#elif defined(SC64_GUARDIAN_COCOON_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION};

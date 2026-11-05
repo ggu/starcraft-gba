@@ -11,3 +11,7 @@ test-shared-egg-host:
 test-shared-egg-legacy-raw36:
 	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_egg_legacy_raw36.c common/gba.c -o $(EGG_TEST_BIN_DIR)/sc64-shared-egg-legacy-raw36
 	$(EGG_TEST_BIN_DIR)/sc64-shared-egg-legacy-raw36
+.PHONY: test-shared-egg-custom-journal
+test-shared-egg-custom-journal:
+	$(CLANG) $(SHARED_EGG_HOST_FLAGS) -DSC64_SHARED_EGG_WIRE_HOST_STAGE -DSC64_SHARED_EGG_JOURNAL_HOST_STAGE tests/sc64_shared_egg_journal_game.c common/gba.c -o $(EGG_TEST_BIN_DIR)/sc64-shared-egg-custom-journal
+	$(EGG_TEST_BIN_DIR)/sc64-shared-egg-custom-journal

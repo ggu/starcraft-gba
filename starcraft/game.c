@@ -287,6 +287,17 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
 #error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
 #endif
+#if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_SHARED_EGG_HOST_STAGE) || \
+     !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_Z9_RUNTIME) || \
+     !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || \
+     !defined(SC64_ZP_FULL_STORAGE) || defined(SC64_P7_TYPED_COMPACT_ENABLED) || \
+     defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+     defined(SC64_SCARAB_RUNTIME) || defined(SC64_P7_CARRIER_TRAINING_ENABLED) || \
+     defined(SC64_P4_RUNTIME) || defined(SC64_P5_RUNTIME) || \
+     defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT))
+#error "Egg journal prototype requires the isolated Z9 HOST vector without competing reservations"
+#endif
 #if defined(SC64_SHARED_EGG_HOST_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_Z8_RUNTIME) || \
      !defined(SC64_Z7_EGG_PRODUCTION))
