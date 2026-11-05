@@ -17,6 +17,8 @@ int main(void)
         assert(race_guardian_campaign_allowed(SIDE,3,138)==(mission[i]==15));
     }
     assert(race_guardian_early_source_owner(15,1)==ENEMY);
+    assert(sc64_early_zerg_permission_available(15,1,138));
+    assert(!race_guardian_campaign_allowed(ENEMY,1,138)); /* Terran origin */
     assert(race_guardian_early_source_owner(15,2)==4);
     assert(race_guardian_early_source_owner(15,0)<0);
     assert(race_guardian_early_source_owner(15,8)<0);
