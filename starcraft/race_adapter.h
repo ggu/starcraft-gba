@@ -2,6 +2,9 @@
 #define SC64_RACE_ADAPTER_H
 
 #include "race_skirmish.h"
+#if defined(SC64_EARLY_ZERG_PERMISSIONS) && defined(SC64_GUARDIAN_COCOON_STAGE)
+#include "sc64_early_zerg_permissions.h"
+#endif
 #ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
 #include "sc64_guardian_paid_building.h"
 #endif
