@@ -251,7 +251,7 @@ race_impact_save_write(void)
 {
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
-#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+#if defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)
     /* No appended actor has a registered impact wire representation yet. */
     for (unsigned i=0;i<race_impact_count;++i)
         if (race_impact_rows[i].source_type>=SC_RU_LEGACY_BOUND) return 0;
@@ -278,7 +278,12 @@ race_impact_save_write(void)
         sc64_impact_encode(race_impact_rows, race_impact_count,
                            (u8 *)&race_impact_record + offset);
 #if defined(SC64_SHARED_TRANSPORT) && defined(SC64_WORKER_CARGO_KIND)
-#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
+        SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,
+        SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION
+#elif defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
@@ -348,7 +353,12 @@ race_impact_save_write(void)
     sc64_sk_transport_encode((u8 *)&race_impact_record + sizeof(RaceSave) + bytes,
                              &race_skirmish_transport_candidate);
 #ifdef SC64_WORKER_CARGO_KIND
-#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
+        SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,
+        SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION
+#elif defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
@@ -497,7 +507,10 @@ static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *can
 static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth)
 {
     if (!sc64_stage_save_auth_matches(auth,&race_data,race_data.version,0) ||
-#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+        (auth->features & ~(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_SCARAB)) ||
+        tag!=(auth->features ? SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
+#elif defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
         (auth->features & ~(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG)) ||
         tag!=(auth->features ? SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
@@ -514,7 +527,7 @@ static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactE
               SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
 #endif
     if (!race_impact_save_decode_selected_impl(len,tag,candidate,count,auth->inner)) return 0;
-#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+#if defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)
     for (int i=0;i<*count;++i)
         if (candidate[i].source_type>=SC_RU_LEGACY_BOUND) return 0;
 #endif

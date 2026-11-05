@@ -303,7 +303,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #define SC64_SHARED_EGG_WIRE_HOST_STAGE 1
 #define SC64_SHARED_EGG_CUSTOM_CANDIDATE 1
 #define SC64_SHARED_EGG_PRODUCER_HOST_STAGE 1
-#if !defined(SC64_RACES) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || !defined(SC64_SHARED_SCOURGE_COMBAT) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SCARAB_NAMESPACE_STAGE)
+#if !defined(SC64_RACES) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || !defined(SC64_SHARED_SCOURGE_COMBAT) || (defined(SC64_GUARDIAN_COCOON_STAGE) && !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)) || defined(SC64_SCARAB_NAMESPACE_STAGE)
 #error "Custom Egg service requires authenticated custom transport without competing staged namespaces"
 #endif
 #endif
@@ -316,7 +316,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_SCARAB_STABLE_ROSTER_HOST_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_SCARAB_RUNTIME) || \
      !defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
-     defined(SC64_GUARDIAN_COCOON_STAGE))
+     (defined(SC64_GUARDIAN_COCOON_STAGE) && !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)))
 #error "Scarab stable roster is an isolated HOST candidate, not a journal service"
 #endif
 #if defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) && !defined(SC64_SCARAB_STABLE_ROSTER_HOST_STAGE)
@@ -325,6 +325,13 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE) && \
     (!defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) || !defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_FULL_STORAGE))
 #error "Shared actor journal is an isolated HOST Terran compact-codec candidate"
+#endif
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) || \
+     !defined(SC64_GUARDIAN_COCOON_STAGE) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || \
+     !defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_FULL_STORAGE) || \
+     defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE))
+#error "Full shared actor journal is an isolated HOST Terran compact-codec candidate"
 #endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE) && \
     !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
@@ -341,7 +348,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
      !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_RACES) || \
      !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_WORKER_CARGO_KIND) || \
      !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || \
-     defined(SC64_SCARAB_RUNTIME) || \
+     (defined(SC64_SCARAB_RUNTIME) && !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)) || \
      defined(SC64_SCARAB_NAMESPACE_STAGE))
 #error "Combined Guardian/Egg candidate requires the isolated HOST custom vector"
 #endif
@@ -4718,6 +4725,9 @@ sc64_source_building_vfx(const Building *q,int x1,int y1,int air)
 }
 #endif
 
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+#include "sc64_guardian_paid_building.h"
+#endif
 /* Weapon damage and environmental burn share one destruction lifecycle. */
 static void __attribute__((noinline))
 destroy_building(int slot, int source_owner)
@@ -4786,6 +4796,9 @@ destroy_building(int slot, int source_owner)
                 q->flags &= ~(SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG);
                 q->queue_progress=0;
             }
+#endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+            race_guardian_paid_morph_retire(q);
 #endif
 	    q->alive = 0;
 #ifdef SC64_BATTERY_SERVICE_ENABLED

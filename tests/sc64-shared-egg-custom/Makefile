@@ -133,3 +133,10 @@ custom-egg-scarab-prior-p10:
 	$(COMBINED_BIN_DIR)/p10/writer $(COMBINED_BIN_DIR)/p10/prior.sram
 	$(COMBINED_BIN_DIR)/p10/reader $(COMBINED_BIN_DIR)/p10/prior.sram
 $(eval $(call SCARAB_PRIOR_PROFILE,terran-matrix,$(TERRAN_ROM_FLAGS)))
+
+# Full selected candidate uses separate feature7 identity; HOST Terran only.
+.PHONY: custom-shared-actor-full-terran
+custom-shared-actor-full-terran:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_GUARDIAN_COCOON_STAGE -DSC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE -DSC64_SHARED_ACTOR_FULL_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_shared_actor_full_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/shared-actor-full
+	$(COMBINED_BIN_DIR)/shared-actor-full $(SCARAB_PRIOR_SRAM)

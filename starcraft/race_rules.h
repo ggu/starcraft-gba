@@ -140,14 +140,14 @@ enum {
     U_SHARED_SHUTTLE,
 #endif
     SC_RU_LEGACY_COUNT,
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) && !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)
     U_GUARDIAN_COCOON = SC_RU_LEGACY_COUNT,
 #if !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     U_GUARDIAN_STAGE,
 #endif
 #endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) && !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)
     U_SHARED_EGG_STAGE,
 #else
     U_SHARED_EGG_STAGE = SC_RU_LEGACY_COUNT,
@@ -156,12 +156,21 @@ enum {
 #ifdef SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE
     /* Layout-only identities, following the existing public Egg when present.
      * The old Guardian-first HOST experiment is a different format. */
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)
 #ifdef SC64_Z7_EGG_PRODUCTION
+    U_GUARDIAN_COCOON = SC_RU_LEGACY_COUNT,
+#else
+    U_GUARDIAN_COCOON,
+#endif
+#if !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    U_GUARDIAN_STAGE,
+#endif
+#elif defined(SC64_Z7_EGG_PRODUCTION)
     U_SHARED_LAYOUT_COCOON = SC_RU_LEGACY_COUNT,
 #else
     U_SHARED_LAYOUT_COCOON,
 #endif
-#if !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+#if !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     U_SHARED_LAYOUT_GUARDIAN,
 #endif
 #endif
@@ -180,6 +189,12 @@ enum {
 #endif
 };
 #define SC_RU_LEGACY_BOUND SC_RU_LEGACY_COUNT
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+#define U_SHARED_LAYOUT_COCOON U_GUARDIAN_COCOON
+#if !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+#define U_SHARED_LAYOUT_GUARDIAN U_GUARDIAN_STAGE
+#endif
+#endif
 #ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
 _Static_assert(U_SCARAB >= SC_RU_LEGACY_COUNT && U_SCARAB < 64,
                "stable Scarab must be an appended six-bit identity");
@@ -206,11 +221,15 @@ _Static_assert(U_SCARAB == U_SHARED_LAYOUT_COCOON + 1,
 _Static_assert(SC_RU_LEGACY_COUNT <= 64, "legacy unit IDs exceed six-bit bound");
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
+#ifndef SC64_SHARED_ACTOR_FULL_HOST_STAGE
 _Static_assert(U_GUARDIAN_COCOON == SC_RU_LEGACY_COUNT, "Cocoon append position changed");
+#endif
 #if !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
 #define SC64_GUARDIAN_DISTINCT_STAGE 1
+#ifndef SC64_SHARED_ACTOR_FULL_HOST_STAGE
 _Static_assert(U_GUARDIAN_STAGE == SC_RU_LEGACY_COUNT + 1 && U_GUARDIAN_STAGE < 64,
                "distinct Guardian requires a six-bit identity");
+#endif
 #endif
 #endif
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
@@ -218,7 +237,7 @@ _Static_assert(U_GUARDIAN_STAGE == SC_RU_LEGACY_COUNT + 1 && U_GUARDIAN_STAGE < 
 #define SC64_SHARED_EGG_TYPE U_Z7_EGG
 #else
 #define SC64_SHARED_EGG_TYPE U_SHARED_EGG_STAGE
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) && !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)
 #ifdef SC64_GUARDIAN_DISTINCT_STAGE
 _Static_assert(U_SHARED_EGG_STAGE == SC_RU_LEGACY_COUNT + 2, "Egg must follow both Guardian identities");
 #else
