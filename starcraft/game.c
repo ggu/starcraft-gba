@@ -6225,7 +6225,11 @@ static int __attribute__((noinline)) race_bunker_menu_available(void)
 enum {
     RACE_CONTEXT_SCARAB, RACE_CONTEXT_YAMATO, RACE_CONTEXT_BC_BUILDING,
     RACE_CONTEXT_BUNKER, RACE_CONTEXT_TRANSPORT, RACE_CONTEXT_TRANSPORT_TECH, RACE_CONTEXT_BATTERY,
-    RACE_CONTEXT_CARRIER, RACE_CONTEXT_COUNT
+    RACE_CONTEXT_CARRIER,
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+    RACE_CONTEXT_EGG,
+#endif
+    RACE_CONTEXT_COUNT
 };
 static int race_context_command_base(int context);
 #endif
@@ -6311,6 +6315,9 @@ static int race_context_command_width(int context)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     case RACE_CONTEXT_CARRIER: return race_p7_carrier_training_menu_available();
 #endif
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+    case RACE_CONTEXT_EGG: return race_z7_egg_cancel_available();
+#endif
     default: return 0;
     }
 }
@@ -6384,6 +6391,13 @@ choose_command(int choice)
 #ifdef SC64_RACES
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+        if (choice == race_context_command_base(RACE_CONTEXT_EGG) &&
+            race_z7_egg_cancel_available()) {
+            menu_open=0;mode=MODE_NORMAL;
+            toast(race_z7_egg_cancel_selected()?0:8);return;
+        }
+#endif
 #ifdef SC64_SHARED_TRANSPORT
         if (choice == race_context_command_base(RACE_CONTEXT_TRANSPORT_TECH) &&
             race_sk_transport_research_menu()) {
@@ -6814,6 +6828,10 @@ static const char *race_menu_label(int i)
 #endif
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+        if (i == race_context_command_base(RACE_CONTEXT_EGG) &&
+            race_z7_egg_cancel_available()) return "CANCEL EGG";
+#endif
 #ifdef SC64_SHARED_TRANSPORT
         if (i == race_context_command_base(RACE_CONTEXT_TRANSPORT_TECH) &&
             race_sk_transport_research_menu())

@@ -69,9 +69,12 @@ int main(void)
     assert(race_load_game());assert(u[a].type==SC64_EGG_ACTOR && u[a].work_timer==remaining);
     /* Set selection as HOST setup, then invoke the ordinary menu with input. */
     selected_building=-1;for(int i=0;i<MAX_UNITS;i++)u[i].selected=0;u[a].selected=1;
+    int cancel_row=race_context_command_base(RACE_CONTEXT_EGG);
+    assert(cancel_row<race_skirmish_command_count());
+    assert(!strcmp(race_menu_label(cancel_row),"CANCEL EGG"));
     before=minerals;press(KEY_B);assert(menu_open);
-    for(int i=0;i<MENU_STOP+1;i++)press(KEY_DOWN);
-    assert(menu_cursor==MENU_STOP+1);press(KEY_A);assert(!u[a].alive);
+    for(int i=0;i<cancel_row;i++)press(KEY_DOWN);
+    assert(menu_cursor==cancel_row);press(KEY_A);assert(!u[a].alive);
     assert(minerals==before+sc64_race_unit_rule(U_DRONE)->minerals);
     for(int i=0;i<remaining_z;i++)game_update(0,0);
     assert(u[z].alive && u[z].type==U_DRONE && u[bot].alive && u[bot].type==U_DRONE);
