@@ -60,6 +60,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   multiply and return code. It is not a validated game clock. The retraction is
   part of the evidence, rather than a basis for changing production timing.
 
+## Current Nydus regression qualification
+
+The [paid-target cleanup correction](audits/2026-11-06-nydus-paid-targets/README.md)
+reproduces and fixes an Egg product-ID/unit-slot collision during canal transit.
+Its full focused sanitizer fixture, six normal ROM/memory builds and prepared
+unified checks pass. A prepared-input default run exposed five renderer-fixture
+failures also present on unchanged main; the corrected complete-overlay oracle
+and current HUD compile dependencies pass both renderer modules. Final default
+checks are being rerun before merge. This does not enable shared Egg/Guardian/
+Scarab stages, prove native canal timing or change the 29/30 content count.
+
 ## Priority order
 
 Priorities are the maintainer's decisions after the [2026-11-06 GPT-6.1 Terra
