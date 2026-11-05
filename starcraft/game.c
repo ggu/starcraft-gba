@@ -319,6 +319,13 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
      defined(SC64_GUARDIAN_COCOON_STAGE))
 #error "Scarab stable roster is an isolated HOST candidate, not a journal service"
 #endif
+#if defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) && !defined(SC64_SCARAB_STABLE_ROSTER_HOST_STAGE)
+#error "Shared actor layout is an isolated stable-roster candidate"
+#endif
+#if defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE) && \
+    (!defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) || !defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_FULL_STORAGE))
+#error "Shared actor journal is an isolated HOST Terran compact-codec candidate"
+#endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE) && \
     !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
 #error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
@@ -615,6 +622,16 @@ _Static_assert((SC64_TRANSPORT_SAVE_VERSION & 0x40000000u) != 0,
 #define SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION (SC64_GUARDIAN_TRANSPORT_SAVE_VERSION ^ 0x40000000u)
 #endif
 #endif
+#endif
+#ifdef SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE
+/* Detached layout identity only: no reader/writer or guest service uses it. */
+_Static_assert((SAVE_VERSION & 0x02000000u) != 0 &&
+               (SC64_TRANSPORT_SAVE_VERSION & 0x02000000u) != 0,
+               "shared actor generation overlaps an existing tag");
+#define SC64_SHARED_ACTOR_SAVE_VERSION (SAVE_VERSION ^ 0x02000000u)
+#define SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x02000000u)
+_Static_assert((SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION ^ SC64_SHARED_ACTOR_SAVE_VERSION) == 0x04000000u,
+               "shared actor generation must retain transport identity");
 #endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16

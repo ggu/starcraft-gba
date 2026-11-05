@@ -1562,7 +1562,7 @@ static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,u
 #ifdef SC64_WORKER_CARGO_KIND
 static int race_worker_cargo_previous(GbaSaveSelection *selection);
 #endif
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE)
 static int race_scarab_stage_previous(GbaSaveSelection *selection);
 /* Dead rows are semantically empty. Validate the actor's identity/flight
  * fields first, then canonicalize only the serialization temporary. Live
@@ -1579,6 +1579,10 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
 }
 #endif
 static int race_save_game(void) {
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+    /* This first writer supports custom games only. */
+    if (!race_mode) return 0;
+#endif
 #ifdef SC64_SHARED_EGG_HOST_STAGE
     /* No new Egg save format is admitted by this HOST-only experiment.
      * Include dead Egg identities: kill_unit retains actor identity. Raw 36
@@ -1706,7 +1710,9 @@ static int race_save_game(void) {
     memset(&race_data, 0, sizeof(race_data));
 #endif
     race_data.version=
-#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+        SC64_SHARED_ACTOR_SAVE_VERSION;
+#elif defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
         race_mode ? SC64_GUARDIAN_EGG_SAVE_VERSION : SC64_GUARDIAN_SAVE_VERSION;
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
         race_mode ? SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
@@ -1748,9 +1754,14 @@ static int race_save_game(void) {
     const Sc64StageSaveAuth *guard_auth=&writer_auth;
 #endif
 #ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+    const Sc64StageTagPair writer_pair={SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,
+        SC64_SHARED_ACTOR_SAVE_VERSION,SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_SCARAB};
+#else
     const Sc64StageTagPair writer_pair = race_mode ?
         (Sc64StageTagPair){SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION,SC64_STAGE_SAVE_EGG} :
         (Sc64StageTagPair){SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0};
+#endif
     Sc64StageSaveAuth writer_auth;
     if (!sc64_stage_save_authenticate(&writer_auth,&race_data,writer_pair.outer,
                                       race_data.version,&writer_pair,1)) return 0;
@@ -1841,9 +1852,17 @@ static int race_save_game(void) {
     }
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     {
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+        Unit wire;
+        if (!race_scarab_save_wire(&u[i],&wire)) return 0;
+        if (wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
+        if (!sc64_unit_save_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),
+                                       (unsigned)(race_rows*16),SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_SCARAB)) return 0;
+#else
         Unit wire=u[i];
         if (race_mode && wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
         if (!sc64_unit_save_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16),race_mode)) return 0;
+#endif
     }
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     {
@@ -3970,6 +3989,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
         {SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0},
         {SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0},
         {SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION,SC64_STAGE_SAVE_EGG}
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+        ,{SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_SAVE_VERSION,SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_SCARAB}
+#endif
     };
     /* save_select_prepared has already validated this slot's checksum. Bind
      * the unchanged inner version to this exact outer tag before decoding. */
@@ -4041,7 +4063,11 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
         SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
 #elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
-    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+        ,SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION
+#endif
+    };
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #else
