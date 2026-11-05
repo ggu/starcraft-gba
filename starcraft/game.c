@@ -1588,6 +1588,18 @@ static int skirmish_bot_index(int owner);
 #error "Briefings need source-font pixel wrapping; run make sc64-interface"
 #endif
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+/* Source PUNI for the human Zerg slot denies Scourge (47) and Spire (141)
+ * in Z1 and Z5. Use the current controller, not an actor's original CHK
+ * owner: captured producers and workers obey their new player's permissions.
+ * This is an admission rule, not a restriction on loading existing actors. */
+static int race_zerg_campaign_product_available(int owner, int raw_product)
+{
+    return race_mode || owner != SIDE || race_human != R_ZERG ||
+        (race_selected_mission != 0 && race_selected_mission != 16) ||
+        (raw_product != 47 && raw_product != 141);
+}
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 static u16 sc64_battlecruiser_tech_bits;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -9149,7 +9161,7 @@ select_next_train_type(void)
 #ifdef SC64_RACES
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (race_human == R_ZERG) {
-#ifdef SC64_Z7_SCOURGE_COMBAT
+#if defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
         static const int zerg_types[] = {U_DRONE, U_OVERLORD, U_ZERGLING, U_HYDRALISK, U_MUTALISK
             , U_SCOURGE
         };
@@ -9165,9 +9177,10 @@ select_next_train_type(void)
         for (int step = 1; step <= 5; ++step) {
             int type = zerg_types[(n + step) % 5];
 #endif
-#ifdef SC64_Z7_SCOURGE_COMBAT
+#if defined(SC64_Z7_SCOURGE_COMBAT) && !defined(SC64_SHARED_SCOURGE_COMBAT)
             if (type == U_SCOURGE && !race_z7_active()) continue;
 #endif
+            if (!race_zerg_campaign_product_available(SIDE, sc64_race_raw_unit(type))) continue;
             if (selected_building < 0 || sc64_race_producer_compatible(
                     b[selected_building].type, sc64_race_unit_rules[type].producer)) {
                 train_type = type; return;

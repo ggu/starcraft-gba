@@ -6,6 +6,10 @@ Optional StarCraft 64 profiles add imported campaign scenarios and three-faction
 
 Performance remains below the 30-fps goal. A bounded P7 ARM sample measured mean full update-plus-draw costs of 2,155,200 cycles in the opening and 2,426,615 in the attack phase; it is not a mission-wide average. The current P6 route is also substantially below target; see the [P6 promotion audit](docs/audits/2026-10-27-p6-promotion/README.md) for its measured cycles and limits. The preserved P5 build measured about 26.6 fps equivalent on P1/P2 and 16.1–18.9 on P3–P5. Earlier Terran T7/T10 probe-entry traces measured about 22.4/18.8; see the [Terran audit](docs/audits/2026-10-26-terran-word-promotion/README.md) for scope. No physical GBA result is claimed. This adaptation uses a user-supplied, verified StarCraft 64 USA ROM and does not reproduce the N64 engine. Imported maps and graphics stay local.
 
+The [living project TODOs and priorities](docs/PROJECT-TODO.md) track campaign,
+skirmish, shared-engine, N64-reference and performance work, including the
+evidence still required before a feature or release is considered complete.
+
 ## Purpose and rights
 
 This independent research and hobby project explores real-time strategy engine design on the Game Boy Advance's resource-constrained hardware. It is not affiliated with, sponsored by, or endorsed by Blizzard Entertainment or Nintendo. References to their games, platforms, and trademarks identify the subject of the work or compatibility; they do not imply authorization.

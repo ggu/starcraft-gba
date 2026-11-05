@@ -249,6 +249,9 @@ ui_missing_tech(int type, int worker)
     unsigned need;
     int bit;
     (void)worker;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    if (!race_zerg_campaign_product_available(SIDE, sc64_race_raw_building(type))) return "";
+#endif
     if (!r || !race_owner_fields_race(SIDE, r->race) ||
         type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return "";
 #ifdef SC64_TERRAN_LATE_RUNTIME
