@@ -179,7 +179,7 @@ test-sc64-z9-carried-profile: build/test-sc64-z9-carried-profile
 
 # Ordinary-input carried controllers linked with the complete Z9 vector.
 define Z9_CARRIED_CONTROLLER
-build/test-sc64-z9-carried-$(1): tests/$(2).c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+build/test-sc64-z9-carried-$(1): tests/$(2).c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
 	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $$< $(3) -o $$@
 endef
 $(eval $(call Z9_CARRIED_CONTROLLER,z1z2,race_campaign_run,common/gba.c))
@@ -224,3 +224,17 @@ endef
 $(eval $(call Z9_Z7_CARRIED_REPLAY,full,-DZ7_ARM_MODE=0))
 $(eval $(call Z9_Z7_CARRIED_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=40000u))
 $(eval $(call Z9_Z7_CARRIED_REPLAY,resume,-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z9_Z7_CUT)u))
+# Keep the documented ordinary-input routes together; controller 0 of the
+# generic early-race runner is not the established Z1 route.
+.PHONY: test-sc64-z9-carried-missions
+test-sc64-z9-carried-missions: $(addprefix build/test-sc64-z9-carried-,z1 z1z2 z3 z4 z5 z6 z7 z8)
+	mkdir -p .local/sc64/z9-carried
+	./build/test-sc64-z9-carried-z1 --trace .local/sc64/z9-carried/z1.json
+	./build/test-sc64-z9-carried-z1z2 --controller 1 --trace .local/sc64/z9-carried/z2.json
+	./build/test-sc64-z9-carried-z3 --policy hybrid --trace .local/sc64/z9-carried/z3.json
+	./build/test-sc64-z9-carried-z4 --limit 150000 --trace .local/sc64/z9-carried/z4.json
+	./build/test-sc64-z9-carried-z5 --limit 60000 --trace .local/sc64/z9-carried/z5-diagnostic.json --attempt .local/sc64/z9-carried/z5-attempt.json --verified .local/sc64/z9-carried/z5.json
+	./build/test-sc64-z9-carried-z6 --trace .local/sc64/z9-carried/z6.json
+	./build/test-sc64-z9-carried-z7 $(ZERG_Z7_CONTROLLER_POLICY) --limit $(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/z9-carried/z7.json
+	./build/test-sc64-z9-carried-z8 .local/sc64/z9-carried/z8.jsonl
+test-sc64-zerg-z9: test-sc64-z9-carried-profile test-sc64-z9-carried-missions
