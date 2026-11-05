@@ -209,12 +209,14 @@ int main(int argc, char **argv)
     launch_t1();
     assert(sc64_text_box_count() == 0);
 
-    /* Direct saves cannot capture a box either: it is not in the record. */
+    /* Direct saves must refuse an unserialized box and preserve the earlier
+     * acknowledged pause-menu save. */
     run_to_box(120);
     assert(frame == opening_box_frame);
-    assert(save_game());
+    assert(!save_game());
+    assert(sc64_text_box_count() == 1 && frame == opening_box_frame);
     assert(load_game());
-    assert(sc64_text_box_count() == 0 && frame == opening_box_frame);
+    assert(sc64_text_box_count() == 0 && frame == box_frame);
 
     /* A skirmish posts nothing. */
     {

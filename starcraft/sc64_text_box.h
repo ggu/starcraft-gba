@@ -3,11 +3,11 @@
  * head, a speaker name and text. The mission stops until the player acknowledges
  * it, then the next queued box opens. See docs/TEXT-BOXES.md.
  *
- * Nothing here is saved or read by the simulation. A box opens after the update
+ * This transient state is not saved. A box opens after the update
  * that posted it, and game_update() takes no simulation step while one is up, so
- * every box is a pure insertion into the input stream: the world on either side
- * is the one the same inputs would produce with no box. No save can happen while
- * a box is up, since the pause menu cannot open. A load or new game clears it.
+ * queued outcomes are published only after every page is acknowledged. Saves
+ * are refused while text or an outcome is pending; a successful load or new
+ * game clears both. The posting simulation step is retained.
  *
  * Z9 and Z10 have no EWRAM to spare, so the queue lives in the unused padding
  * after the second mode-4 page. It is halfword-only, as VRAM requires. */
@@ -56,6 +56,18 @@ static u16 sc64_text_box_host_words[SC64_TEXT_BOX_WORDS_TOTAL];
  * while its own recorded A stays held across it, leaving its key stream intact. */
 #define SC64_TEXT_BOX_ACK_KEYS (KEY_A | KEY_START)
 
+/* Outcome publication can follow the posting tick without publishing a result
+ * or autosave ahead of its message. This uses 12 bounded EWRAM bytes, not the
+ * queue's VRAM padding, and does not change any serialized format. */
+typedef struct {
+    u32 completed;
+    u32 objective_flags;
+    u16 result; /* bit 0: won, bit 1: lost; zero means no pending outcome */
+    u16 phase;
+} Sc64TextBoxOutcome;
+_Static_assert(sizeof(Sc64TextBoxOutcome) == 12, "unexpected outcome state size");
+static Sc64TextBoxOutcome sc64_text_box_outcome;
+
 static inline unsigned sc64_text_box_count(void) { return SC64_TEXT_BOX_WORDS[SC64_TEXT_BOX_COUNT_WORD]; }
 static inline unsigned sc64_text_box_page(void) { return SC64_TEXT_BOX_WORDS[SC64_TEXT_BOX_PAGE_WORD]; }
 static inline unsigned sc64_text_box_front(void) { return SC64_TEXT_BOX_WORDS[SC64_TEXT_BOX_QUEUE_WORD]; }
@@ -63,6 +75,17 @@ static inline unsigned sc64_text_box_front(void) { return SC64_TEXT_BOX_WORDS[SC
 static inline void sc64_text_box_reset(void)
 {
     for (int i = 0; i < SC64_TEXT_BOX_WORDS_TOTAL; ++i) SC64_TEXT_BOX_WORDS[i] = 0;
+    sc64_text_box_outcome.completed = 0;
+    sc64_text_box_outcome.objective_flags = 0;
+    sc64_text_box_outcome.result = 0;
+    sc64_text_box_outcome.phase = 0;
+}
+
+static inline int sc64_text_box_contains(unsigned row)
+{
+    for (unsigned i = 0; i < sc64_text_box_count(); ++i)
+        if (SC64_TEXT_BOX_WORDS[SC64_TEXT_BOX_QUEUE_WORD + i] == row) return 1;
+    return 0;
 }
 
 /* Bounded: a full queue drops the new row rather than block a trigger. One
