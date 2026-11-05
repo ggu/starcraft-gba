@@ -44,6 +44,8 @@ def extract(data):
             continue  # Boolean predicate, not an allocated journal tag.
         expr = expr.strip()
         if name == "SC64_RACE_SAVE_GENERATION" or name.endswith("SAVE_VERSION"):
+            if not expr:
+                raise AssertionError("empty save version: " + line)
             if name in LEGACY_NAMES:
                 result.append(line.strip())
             elif name in STAGE_EXPRESSIONS and expr == STAGE_EXPRESSIONS[name]:
@@ -121,6 +123,8 @@ class SharedEggTags(unittest.TestCase):
             extract("#define SC64_FUTURE_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)")
         with self.assertRaises(AssertionError):
             extract("#define SC64_FUTURE_SAVE_VERSION")
+        with self.assertRaises(AssertionError):
+            extract("#define SAVE_VERSION")
         with self.assertRaises(AssertionError):
             extract("#define SC64_FUTURE_SAVE_VERSION(v) 0")
         with self.assertRaises(AssertionError):
