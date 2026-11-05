@@ -10,7 +10,9 @@
 static int journal_present(void)
 {
     static u8 bytes[16368]; u32 len=0;
-#ifdef SC64_SHARED_TRANSPORT
+#if defined(SC64_SHARED_TRANSPORT) && defined(SC64_GUARDIAN_COCOON_STAGE)
+    return save_read_latest(bytes,sizeof(bytes),SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,&len);
+#elif defined(SC64_SHARED_TRANSPORT)
     return save_read_latest(bytes,sizeof(bytes),SC64_TRANSPORT_SAVE_VERSION,&len);
 #else
     return save_read_latest(bytes,sizeof(bytes),SAVE_VERSION,&len);
