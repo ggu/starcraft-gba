@@ -52,6 +52,15 @@ static void read_predecessor(const char *path,int mission)
     assert(selected.tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION &&
            plan.egg_auth.inner==SC64_WORKER_CARGO_LEGACY_SAVE_VERSION &&
            plan.egg_auth.candidate==&race_data && plan.egg_auth.features==0);
+    /* A token from another candidate, or one whose bound inner version no
+     * longer agrees, cannot authorize even a detached row decode. */
+    Sc64StageSaveAuth wrong=plan.egg_auth;Unit decoded;
+    unsigned width=(unsigned)sc64_race_maps[mission].width*16u;
+    unsigned height=(unsigned)sc64_race_maps[mission].height*16u;
+    wrong.candidate=&plan;
+    assert(!race_save_decode_unit_authenticated(&race_data,0,width,height,&decoded,&wrong));
+    wrong=plan.egg_auth;wrong.inner^=1u;
+    assert(!race_save_decode_unit_authenticated(&race_data,0,width,height,&decoded,&wrong));
     /* A checksum-valid mismatched outer/inner pair cannot load or mutate SRAM
      * or the live unit/building world. This mutation is HOST fixture only. */
     guardian_test_retag(selected.slot,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION);
