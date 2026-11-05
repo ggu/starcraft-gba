@@ -595,6 +595,7 @@ DEATH_ART_DIR := .local/sc64/death/generated
 DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
 CANONICAL_DEATH_FLAGS ?= -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
 CANONICAL_DEATH_INPUTS = $(if $(filter -DSC64_DEATH_SOURCE_ART,$(CANONICAL_DEATH_FLAGS)),$(DEATH_ART_HEADER))
+TERRAN_PRODUCT_FLAGS = $(TERRAN_ROM_FLAGS) $(SC64_RELEASE_EGG_FLAGS)
 TERRAN_ROM_FLAGS = $(BC_FLAGS) $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= $(TEXT_BOX_FLAGS) -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS) $(CONTACT_ROM_PLACEMENT_FLAGS)
@@ -1807,7 +1808,7 @@ terran: verify-terran
 zerg: verify-zerg
 protoss: verify-protoss
 build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(TERRAN_ROM_FLAGS) $(SC64_RELEASE_EGG_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(TERRAN_PRODUCT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Terran-Transport1-GBA.gba: build/starcraft-terran.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -2652,9 +2653,9 @@ clean:
 build/test-sc64-t6-campaign-run: tests/sc64_t6_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_RUNTIME_FLAGS) -DSC64_T6_PROBE_ENTRY $< common/gba.c -o $@
 build/test-sc64-t8-campaign-run: tests/sc64_t8_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=11 $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_PRODUCT_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=11 $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-t10-campaign-run: tests/sc64_t10_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=13 $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_PRODUCT_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=13 $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
 
 # Explicit qualification builds expose the normal campaign menu, not probe entry.
 build/starcraft-terran-t6-controller.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.ld Makefile | build
@@ -2679,16 +2680,16 @@ test-sc64-terran-late-repair: build/test-sc64-terran-late-repair
 	./build/test-sc64-terran-late-repair
 
 build/test-sc64-t7-campaign-run: tests/sc64_t7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=10 $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_PRODUCT_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=10 $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
 
 build/test-sc64-t9-campaign-run: tests/sc64_t9_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=12 $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_PRODUCT_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=12 $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
 
 # Exercise the compact full-profile layout against the existing early mission
 # controllers and persistence tests, not only the late-mission fixtures.
 define TERRAN_FULL_TEST
 build/test-sc64-full-$(1): $(2) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) $(3) $$< common/gba.c starcraft/sc64_bc_body_art.c -o $$@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_PRODUCT_FLAGS) $(3) $$< common/gba.c starcraft/sc64_bc_body_art.c -o $$@
 endef
 $(eval $(call TERRAN_FULL_TEST,t1-run,tests/sc64_mission_run.c))
 build/test-sc64-full-t1-run build/test-sc64-full-t2-run: tests/sc64_visible_worker_orders.h

@@ -68,9 +68,10 @@ $(Z9_PROGRAM_HEADER): $(Z9_DESCRIPTOR) tools/sc64_zerg_late_program_pack.py tool
 ZERG_Z9_FEATURES = -DSC64_Z9_DATA_ENABLED -DSC64_Z9_RUNTIME -DSC64_Z9_CAMPAIGN_ENTRY -Ibuild/generated/z9
 ZERG_Z9_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z8_BANK),-I$(ZERG_Z9_BANK),$(ZERG_Z8_CANONICAL_FLAGS)) $(ZERG_Z9_FEATURES)
 ZERG_Z9_RELEASE_FLAGS = $(ZERG_Z9_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
+ZERG_Z9_PRODUCT_FLAGS = $(ZERG_Z9_RELEASE_FLAGS) $(SC64_RELEASE_EGG_FLAGS)
 ZERG_Z9_CANONICAL_INPUTS = $(filter-out $(ZERG_Z8_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z8_CANONICAL_INPUTS)) $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h $(Z9_PROGRAM_HEADER)
 build/starcraft-zerg-z9.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(ZERG_Z9_RELEASE_FLAGS) $(SC64_RELEASE_EGG_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z9.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(ZERG_Z9_PRODUCT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z9.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z9-Transport1-GBA.gba: build/starcraft-zerg-z9.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -96,9 +97,10 @@ $(Z10_PROGRAM_HEADER): $(Z10_DESCRIPTOR) tools/sc64_zerg_late_program_pack.py to
 ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -Ibuild/generated/z10
 ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES)
 ZERG_Z10_RELEASE_FLAGS = $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
+ZERG_Z10_PRODUCT_FLAGS = $(ZERG_Z10_RELEASE_FLAGS) $(SC64_RELEASE_EGG_FLAGS)
 ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z9_CANONICAL_INPUTS)) $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h $(Z10_PROGRAM_HEADER)
 build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(SC64_RELEASE_EGG_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(ZERG_Z10_PRODUCT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -135,7 +137,7 @@ test-sc64-zerg-z9: test-sc64-z9-art
 # $(1) lower-case id, $(2) upper-case id, $(3) mission, $(4) ROM code.
 define ZERG_LATE_ARM_ROM
 build/starcraft-zerg-$(1)-$(5).elf: $$($(2)_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
-	$$(CC) $$(CFLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -I$$($(2)_ARM_DIR) -DPX_MISSION=$(3) -DPX_DIRECT_LOG -DPX_CARGO_DIGEST $(6) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-$(1)-$(5).map -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(ZERG_$(2)_PRODUCT_FLAGS) -I$$($(2)_ARM_DIR) -DPX_MISSION=$(3) -DPX_DIRECT_LOG -DPX_CARGO_DIGEST $(6) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-$(1)-$(5).map -lgcc -o $$@
 	$$(SIZE) $$@
 build/StarCraft-Zerg-$(2)-$(7).gba: build/starcraft-zerg-$(1)-$(5).elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@
@@ -147,7 +149,7 @@ $(2)_ARM_TRACE := build/$(1)-arm/$(1)-controller.jsonl
 $(2)_TOOL = $$(PYTHON) tools/sc64_p8_arm_replay.py --mission $(3) --prefix PX
 $(2)_REPLAY_DEPS = tests/sc64_protoss_arm_replay.c build/$(1)-arm/sc64_px_tape_generated.h $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) tests/sc64-zerg-late/Makefile
 build/test-sc64-$(1)-campaign-run: tests/sc64_$(1)_campaign_run.c tests/sc64_zerg_late_controller.h $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
-	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) $$< -o $$@
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_PRODUCT_FLAGS) $$< -o $$@
 build/$(1)-arm/$(1)-controller.jsonl: build/test-sc64-$(1)-campaign-run
 	mkdir -p build/$(1)-arm
 	./build/test-sc64-$(1)-campaign-run $$@
@@ -156,11 +158,11 @@ test-sc64-$(1)-controller: build/$(1)-arm/$(1)-controller.jsonl
 build/$(1)-arm/sc64_px_tape_generated.h: build/$(1)-arm/$(1)-controller.jsonl tools/sc64_p8_arm_replay.py
 	$$($(2)_TOOL) tape $$< $$@
 build/test-sc64-$(1)-replay: $$($(2)_REPLAY_DEPS) | build
-	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST $$< -o $$@
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_PRODUCT_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST $$< -o $$@
 build/test-sc64-$(1)-replay-prefix: $$($(2)_REPLAY_DEPS) | build
-	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST -DPX_REPLAY_PREFIX $$< -o $$@
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_PRODUCT_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST -DPX_REPLAY_PREFIX $$< -o $$@
 build/test-sc64-$(1)-replay-resume: $$($(2)_REPLAY_DEPS) | build
-	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST -DPX_REPLAY_RESUME $$< -o $$@
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_PRODUCT_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST -DPX_REPLAY_RESUME $$< -o $$@
 .PHONY: test-sc64-$(1)-replay
 test-sc64-$(1)-replay: build/test-sc64-$(1)-replay build/test-sc64-$(1)-replay-prefix build/test-sc64-$(1)-replay-resume tools/sc64_p8_arm_replay.py
 	./build/test-sc64-$(1)-replay > build/$(1)-arm/host-full.txt
@@ -180,7 +182,7 @@ $(eval $(call ZERG_LATE_QUALIFICATION,z10,Z10,21,SCZA))
 
 # Z9 carried-profile normal-menu startup and save matrix.
 build/test-sc64-z9-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
-	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $< common/gba.c -o $@
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_PRODUCT_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z9-carried-profile
 test-sc64-z9-carried-profile: build/test-sc64-z9-carried-profile
 	./build/test-sc64-z9-carried-profile
@@ -188,7 +190,7 @@ test-sc64-z9-carried-profile: build/test-sc64-z9-carried-profile
 # Ordinary-input carried controllers linked with the complete Z9 vector.
 define Z9_CARRIED_CONTROLLER
 build/test-sc64-z9-carried-$(1): tests/$(2).c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
-	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $$< $(3) -o $$@
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_PRODUCT_FLAGS) $$< $(3) -o $$@
 endef
 $(eval $(call Z9_CARRIED_CONTROLLER,z1z2,race_campaign_run,common/gba.c))
 $(eval $(call Z9_CARRIED_CONTROLLER,z3,sc64_z3_campaign_run,common/gba.c))
@@ -204,9 +206,9 @@ Z9_Z8_REPLAY_DEPS = tests/sc64_protoss_arm_replay.c build/z8-carried/sc64_px_tap
 # The tape is generated from the retained input-only host controller trace.
 define Z9_Z8_CARRIED_REPLAY
 build/z9-z8-host-$(1): $$(Z9_Z8_REPLAY_DEPS) | build
-	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_Z9_CANONICAL_FLAGS) -Ibuild/z8-carried -DPX_MISSION=19 -DPX_CARGO_DIGEST $(2) $$< -o $$@
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_Z9_PRODUCT_FLAGS) -Ibuild/z8-carried -DPX_MISSION=19 -DPX_CARGO_DIGEST $(2) $$< -o $$@
 build/z9-z8-arm-$(1).elf: $$(Z9_Z8_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
-	$$(CC) $$(CFLAGS) $$(ZERG_Z9_CANONICAL_FLAGS) -Ibuild/z8-carried -DPX_MISSION=19 -DPX_CARGO_DIGEST $(2) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/z9-z8-arm-$(1).map -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(ZERG_Z9_PRODUCT_FLAGS) -Ibuild/z8-carried -DPX_MISSION=19 -DPX_CARGO_DIGEST $(2) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/z9-z8-arm-$(1).map -lgcc -o $$@
 	$$(SIZE) $$@
 build/Z9-Z8-$(1).gba: build/z9-z8-arm-$(1).elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@
@@ -221,9 +223,9 @@ Z9_Z7_REPLAY_DEPS = tests/sc64_z7_arm_replay.c build/z7-carried/sc64_z7_tape_gen
 Z9_Z7_CUT ?= 0
 define Z9_Z7_CARRIED_REPLAY
 build/z9-z7-host-$(1): $$(Z9_Z7_REPLAY_DEPS) | build
-	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_Z9_CANONICAL_FLAGS) -Ibuild/z7-carried -DZ7_CARGO_DIGEST $(2) $$< -o $$@
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_Z9_PRODUCT_FLAGS) -Ibuild/z7-carried -DZ7_CARGO_DIGEST $(2) $$< -o $$@
 build/z9-z7-arm-$(1).elf: $$(Z9_Z7_REPLAY_DEPS) $$(Z7_ARM_COMMON) common/gba.ld | build
-	$$(CC) $$(CFLAGS) $$(ZERG_Z9_CANONICAL_FLAGS) -Ibuild/z7-carried -DZ7_CARGO_DIGEST $(2) $$(Z7_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/z9-z7-arm-$(1).map -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(ZERG_Z9_PRODUCT_FLAGS) -Ibuild/z7-carried -DZ7_CARGO_DIGEST $(2) $$(Z7_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/z9-z7-arm-$(1).map -lgcc -o $$@
 	$$(SIZE) $$@
 build/Z9-Z7-$(1).gba: build/z9-z7-arm-$(1).elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@

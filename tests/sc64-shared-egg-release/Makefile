@@ -17,7 +17,7 @@ $(eval $(call RELEASE_EGG_CUSTOM_TEST,terran,$(TERRAN_ROM_FLAGS),))
 $(eval $(call RELEASE_EGG_CUSTOM_TEST,z7,$(ZERG_Z7_RELEASE_FLAGS),))
 $(eval $(call RELEASE_EGG_CUSTOM_TEST,z9,$(ZERG_Z9_RELEASE_FLAGS),))
 $(eval $(call RELEASE_EGG_CUSTOM_TEST,z10,$(ZERG_Z10_RELEASE_FLAGS),))
-$(eval $(call RELEASE_EGG_CUSTOM_TEST,p10,$(filter-out $(SC64_RELEASE_EGG_FLAGS),$(P10_EGG_FLAGS)),$(P10_EGG_FACT_HEADER)))
+$(eval $(call RELEASE_EGG_CUSTOM_TEST,p10,$(filter-out $(SC64_RELEASE_EGG_FLAGS),$(P10_PRODUCT_FLAGS)),$(P10_EGG_FACT_HEADER)))
 $(eval $(call RELEASE_EGG_CUSTOM_TEST,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: release-egg-z7-legacy release-egg-z9-journal release-egg-z10-journal release-egg-capacity release-egg-deferred
 release-egg-z7-legacy:
