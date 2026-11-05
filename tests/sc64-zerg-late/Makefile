@@ -122,3 +122,86 @@ build/test-sc64-zerg-late-art: tests/sc64_zerg_late_art.c $(STARCRAFT) $(wildcar
 .PHONY: test-sc64-zerg-late-art
 test-sc64-zerg-late-art: build/test-sc64-zerg-late-art
 	./build/test-sc64-zerg-late-art
+
+# Z9 and Z10 ordinary-input qualification, as Z8's above.
+# $(1) lower-case id, $(2) upper-case id, $(3) mission, $(4) ROM code.
+define ZERG_LATE_ARM_ROM
+build/starcraft-zerg-$(1)-$(5).elf: $$($(2)_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
+	$$(CC) $$(CFLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -I$$($(2)_ARM_DIR) -DPX_MISSION=$(3) -DPX_DIRECT_LOG -DPX_CARGO_DIGEST $(6) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-$(1)-$(5).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-Zerg-$(2)-$(7).gba: build/starcraft-zerg-$(1)-$(5).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC $(2) REPLAY' $(4)
+endef
+define ZERG_LATE_QUALIFICATION
+$(2)_ARM_DIR := build/$(1)-arm
+$(2)_ARM_TRACE := build/$(1)-arm/$(1)-controller.jsonl
+$(2)_TOOL = $$(PYTHON) tools/sc64_p8_arm_replay.py --mission $(3) --prefix PX
+$(2)_REPLAY_DEPS = tests/sc64_protoss_arm_replay.c build/$(1)-arm/sc64_px_tape_generated.h $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) tests/sc64-zerg-late/Makefile
+build/test-sc64-$(1)-campaign-run: tests/sc64_$(1)_campaign_run.c tests/sc64_zerg_late_controller.h $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) $$< -o $$@
+build/$(1)-arm/$(1)-controller.jsonl: build/test-sc64-$(1)-campaign-run
+	mkdir -p build/$(1)-arm
+	./build/test-sc64-$(1)-campaign-run $$@
+.PHONY: test-sc64-$(1)-controller
+test-sc64-$(1)-controller: build/$(1)-arm/$(1)-controller.jsonl
+build/$(1)-arm/sc64_px_tape_generated.h: build/$(1)-arm/$(1)-controller.jsonl tools/sc64_p8_arm_replay.py
+	$$($(2)_TOOL) tape $$< $$@
+build/test-sc64-$(1)-replay: $$($(2)_REPLAY_DEPS) | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST $$< -o $$@
+build/test-sc64-$(1)-replay-prefix: $$($(2)_REPLAY_DEPS) | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST -DPX_REPLAY_PREFIX $$< -o $$@
+build/test-sc64-$(1)-replay-resume: $$($(2)_REPLAY_DEPS) | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) -Ibuild/$(1)-arm -DPX_MISSION=$(3) -DPX_CARGO_DIGEST -DPX_REPLAY_RESUME $$< -o $$@
+.PHONY: test-sc64-$(1)-replay
+test-sc64-$(1)-replay: build/test-sc64-$(1)-replay build/test-sc64-$(1)-replay-prefix build/test-sc64-$(1)-replay-resume tools/sc64_p8_arm_replay.py
+	./build/test-sc64-$(1)-replay > build/$(1)-arm/host-full.txt
+	./build/test-sc64-$(1)-replay-prefix build/$(1)-arm/host-prefix.sav > build/$(1)-arm/host-prefix.txt || true
+	./build/test-sc64-$(1)-replay-resume build/$(1)-arm/host-prefix.sav > build/$(1)-arm/host-resume.txt
+	$$($(2)_TOOL) compare --from-tick $$$$(sed -n 's/^#define PX_TAPE_RESUME_TICK \([0-9]*\)u$$$$/\1/p' build/$(1)-arm/sc64_px_tape_generated.h) build/$(1)-arm/host-full.txt build/$(1)-arm/host-resume.txt
+.PHONY: test-sc64-zerg-$(1)
+test-sc64-zerg-$(1): test-zerg-$(1) test-sc64-$(1)-controller test-sc64-$(1)-replay
+$$(eval $$(call ZERG_LATE_ARM_ROM,$(1),$(2),$(3),$(4),replay,,Replay))
+$$(eval $$(call ZERG_LATE_ARM_ROM,$(1),$(2),$(3),$(4),replay-prefix,-DPX_REPLAY_PREFIX,Replay-Prefix))
+$$(eval $$(call ZERG_LATE_ARM_ROM,$(1),$(2),$(3),$(4),replay-resume,-DPX_REPLAY_RESUME,Replay-Resume))
+.PHONY: sc64-$(1)-arm-replay
+sc64-$(1)-arm-replay: build/StarCraft-Zerg-$(2)-Replay.gba build/StarCraft-Zerg-$(2)-Replay-Prefix.gba build/StarCraft-Zerg-$(2)-Replay-Resume.gba
+endef
+$(eval $(call ZERG_LATE_QUALIFICATION,z9,Z9,20,SCZ9))
+$(eval $(call ZERG_LATE_QUALIFICATION,z10,Z10,21,SCZA))
+
+# Z9 carried-profile normal-menu startup and save matrix.
+build/test-sc64-z9-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z9-carried-profile
+test-sc64-z9-carried-profile: build/test-sc64-z9-carried-profile
+	./build/test-sc64-z9-carried-profile
+
+# Ordinary-input carried controllers linked with the complete Z9 vector.
+define Z9_CARRIED_CONTROLLER
+build/test-sc64-z9-carried-$(1): tests/$(2).c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $$< $(3) -o $$@
+endef
+$(eval $(call Z9_CARRIED_CONTROLLER,z1z2,race_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z3,sc64_z3_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z4,sc64_z4_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z5,sc64_z5_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z6,sc64_z6_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z7,sc64_z7_campaign_run,common/gba.c))
+$(eval $(call Z9_CARRIED_CONTROLLER,z8,sc64_z8_campaign_run,))
+$(eval $(call Z9_CARRIED_CONTROLLER,z1,race_z1_controls,common/gba.c))
+
+# Keep the documented ordinary-input routes together; controller 0 of the
+# generic early-race runner is not the established Z1 route.
+.PHONY: test-sc64-z9-carried-missions
+test-sc64-z9-carried-missions: $(addprefix build/test-sc64-z9-carried-,z1 z1z2 z3 z4 z5 z6 z7 z8)
+	mkdir -p .local/sc64/z9-carried
+	./build/test-sc64-z9-carried-z1 --trace .local/sc64/z9-carried/z1.json
+	./build/test-sc64-z9-carried-z1z2 --controller 1 --trace .local/sc64/z9-carried/z2.json
+	./build/test-sc64-z9-carried-z3 --policy hybrid --trace .local/sc64/z9-carried/z3.json
+	./build/test-sc64-z9-carried-z4 --limit 150000 --trace .local/sc64/z9-carried/z4.json
+	./build/test-sc64-z9-carried-z5 --limit 60000 --trace .local/sc64/z9-carried/z5-diagnostic.json --attempt .local/sc64/z9-carried/z5-attempt.json --verified .local/sc64/z9-carried/z5.json
+	./build/test-sc64-z9-carried-z6 --trace .local/sc64/z9-carried/z6.json
+	./build/test-sc64-z9-carried-z7 $(ZERG_Z7_CONTROLLER_POLICY) --limit $(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/z9-carried/z7.json
+	./build/test-sc64-z9-carried-z8 .local/sc64/z9-carried/z8.jsonl
+test-sc64-zerg-z9: test-sc64-z9-carried-profile test-sc64-z9-carried-missions

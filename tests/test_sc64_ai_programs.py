@@ -1,4 +1,4 @@
-"""Asset-free tests for bounded Z8 AI program decoding."""
+"""Asset-free tests for bounded late-Zerg AI program decoding."""
 from __future__ import annotations
 
 import importlib.util
@@ -36,6 +36,19 @@ def catalog_for(code: bytes, starts: tuple[int, int, int]) -> tuple[bytes, dict]
 
 
 class Sc64AiProgramTests(unittest.TestCase):
+    def test_requested_mission_scripts_are_required_and_keep_requested_order(self):
+        code = bytes((4, 36, 42, 36))
+        rows = b''.join(struct.pack('<4sIII', name, offset, 1, 3)
+                        for name, offset in ((b'Z9ly', 4), (b'VluA', 6)))
+        payload = struct.pack('<I', 4 + len(code)) + code + rows + b'\0' * 4
+        catalog = catalog_tool.parse_catalog(payload)
+        result = programs.analyze_catalog(payload, catalog, ('VluA', 'Z9ly'))
+        self.assertEqual([p['id'] for p in result['programs']], ['VluA', 'Z9ly'])
+        self.assertEqual(result['programs'][0]['op_counts'], {'stop': 1, 'value_area': 1})
+        self.assertEqual(result['programs'][1]['op_counts'], {'start_areatown': 1, 'stop': 1})
+        with self.assertRaisesRegex(ValueError, 'missing required AI scripts: Zer9'):
+            programs.analyze_catalog(payload, catalog, ('Zer9', 'Z9ly'))
+
     def test_output_cannot_overwrite_owned_rom_or_its_hardlink(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
