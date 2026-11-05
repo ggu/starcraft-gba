@@ -8,6 +8,20 @@
 #include "sc64_fact_table_format.h"
 #include "sc64_fact_tables_generated.h"
 
+/* Old/legacy-only generated headers may predate all staged fingerprint
+ * gates. A full staged roster must opt in explicitly and cover every row. */
+#ifdef SC64_GUARDIAN_FULL_FACTS_STAGE
+#ifndef SC64_FACT_GUARDIAN_LAYOUT_VERSION
+#error "full Guardian facts require a generated layout marker"
+#elif defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && SC64_FACT_GUARDIAN_LAYOUT_VERSION != 2u
+#error "full Guardian facts require the Egg-first shared layout"
+#elif !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && SC64_FACT_GUARDIAN_LAYOUT_VERSION != 1u
+#error "full Guardian facts require the Guardian-first layout"
+#endif
+_Static_assert(SC64_FACT_UNIT_COUNT == SC_RU_COUNT,
+               "full Guardian facts must cover the complete roster");
+#endif
+
 /* Older unversioned generated headers are the original V1 actor/collision
  * format. Continue accepting them for FACT_TABLES-only builds. Features need
  * a new generated header and its feature bit. */

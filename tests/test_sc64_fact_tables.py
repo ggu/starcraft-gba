@@ -137,6 +137,28 @@ class FactTablesTest(unittest.TestCase):
                     self.assertNotEqual(built.returncode, 0)
                     self.assertIn(b"fact tables were generated", built.stderr)
 
+    def test_combined_guardian_facts_require_exact_layout_marker(self):
+        base = ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
+                "SC64_GUARDIAN_COCOON_STAGE", "SC64_SHARED_EGG_WIRE_HOST_STAGE",
+                "SC64_GUARDIAN_FULL_FACTS_STAGE")
+        combined = base + ("SC64_SCARAB_RUNTIME", "SC64_SCARAB_STABLE_ROSTER_HOST_STAGE",
+                           "SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE", "SC64_SHARED_ACTOR_FULL_HOST_STAGE")
+        with tempfile.TemporaryDirectory(prefix="sc64-guardian-fact-marker-") as directory:
+            old = generate(self.compiler, base, directory, "old-guardian")
+            built, _ = compile_program(self.compiler, CHECK, combined + ("SC64_FACT_TABLES",),
+                                       directory, "wrong-layout", ("-I", str(old)))
+            self.assertNotEqual(built.returncode, 0)
+            self.assertIn(b"full Guardian facts require the Egg-first shared layout", built.stderr)
+            current = generate(self.compiler, combined, directory, "combined")
+            header = current / "sc64_fact_tables_generated.h"
+            text = header.read_text()
+            self.assertIn("#define SC64_FACT_GUARDIAN_LAYOUT_VERSION 2u\n", text)
+            header.write_text(text.replace("#define SC64_FACT_GUARDIAN_LAYOUT_VERSION 2u\n", ""))
+            built, _ = compile_program(self.compiler, CHECK, combined + ("SC64_FACT_TABLES",),
+                                       directory, "missing-marker", ("-I", str(current)))
+            self.assertNotEqual(built.returncode, 0)
+            self.assertIn(b"full Guardian facts require a generated layout marker", built.stderr)
+
     def test_tables_reject_shared_scourge_mismatch_both_directions(self):
         base = CONFIGS["zp_z6_runtime"]
         shared = base + ("SC64_SHARED_SCOURGE_COMBAT",)
