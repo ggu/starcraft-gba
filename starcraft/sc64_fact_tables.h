@@ -13,7 +13,9 @@
 #ifdef SC64_GUARDIAN_FULL_FACTS_STAGE
 #ifndef SC64_FACT_GUARDIAN_LAYOUT_VERSION
 #error "full Guardian facts require a generated layout marker"
-#elif defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && SC64_FACT_GUARDIAN_LAYOUT_VERSION != 2u
+#elif defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE) && SC64_FACT_GUARDIAN_LAYOUT_VERSION != 3u
+#error "full Guardian facts require the shared flight layout"
+#elif defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && !defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE) && SC64_FACT_GUARDIAN_LAYOUT_VERSION != 2u
 #error "full Guardian facts require the Egg-first shared layout"
 #elif !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && SC64_FACT_GUARDIAN_LAYOUT_VERSION != 1u
 #error "full Guardian facts require the Guardian-first layout"

@@ -159,6 +159,30 @@ class FactTablesTest(unittest.TestCase):
             self.assertNotEqual(built.returncode, 0)
             self.assertIn(b"full Guardian facts require a generated layout marker", built.stderr)
 
+    def test_combined_guardian_flight_fingerprint_both_directions(self):
+        combined = ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_GUARDIAN_COCOON_STAGE",
+                    "SC64_SHARED_EGG_WIRE_HOST_STAGE", "SC64_GUARDIAN_FULL_FACTS_STAGE",
+                    "SC64_SCARAB_RUNTIME", "SC64_SCARAB_STABLE_ROSTER_HOST_STAGE",
+                    "SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE", "SC64_SHARED_ACTOR_FULL_HOST_STAGE")
+        flight = combined + ("SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE", "SC64_SCARAB_FLIGHT_CONTROL_PROBE",
+                             "SC64_SCARAB_PACKED_MOTION_PROBE", "SC64_SCARAB_AUTONOMOUS_PROBE",
+                             "SC64_SCARAB_WEAPON_PROBE", "SC64_SCARAB_HUMAN_CONTROL_PROBE")
+        with tempfile.TemporaryDirectory(prefix="sc64-guardian-flight-facts-") as directory:
+            for name, generated, used, message in (
+                ("old-to-flight", combined, flight, b"full Guardian facts require the shared flight layout"),
+                ("flight-to-old", flight, combined, b"full Guardian facts require the Egg-first shared layout")):
+                table = generate(self.compiler, generated, directory, name)
+                built, _ = compile_program(self.compiler, CHECK, used + ("SC64_FACT_TABLES",),
+                                           directory, name + "-check", ("-I", str(table)))
+                self.assertNotEqual(built.returncode, 0)
+                self.assertIn(message, built.stderr)
+            table = generate(self.compiler, flight, directory, "flight-capability")
+            missing = tuple(flag for flag in flight if flag != "SC64_SCARAB_AUTONOMOUS_PROBE")
+            built, _ = compile_program(self.compiler, CHECK, missing + ("SC64_FACT_TABLES",),
+                                       directory, "missing-autonomous", ("-I", str(table)))
+            self.assertNotEqual(built.returncode, 0)
+            self.assertIn(b"fact tables were generated with SC64_SCARAB_AUTONOMOUS_PROBE", built.stderr)
+
     def test_tables_reject_shared_scourge_mismatch_both_directions(self):
         base = CONFIGS["zp_z6_runtime"]
         shared = base + ("SC64_SHARED_SCOURGE_COMBAT",)
