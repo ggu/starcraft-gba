@@ -83,6 +83,9 @@ static void test_custom_owners(void)
     assert(race_owner_supply(SIDE)==ss && race_owner_supply(ENEMY)==bs+2);
     assert(!race_save_game()); /* dead Egg remains a forbidden legacy row */
     int reused=spawn_unit(SIDE,U_DRONE,100,100);assert(reused==a && u[a].type==U_DRONE);
+    /* Freeze unrelated harvesting orders so wallet isolation is not confused
+     * with normal resource deposits during the independent Egg timer. */
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive && u[i].type!=U_Z7_EGG)u[i].order=ORDER_IDLE;
     for(int i=0;i<timer;i++)update_orders();
     assert(u[z].alive && u[z].type==U_DRONE && u[z].raw_owner==b[bot].raw_owner);
     assert(race_minerals[ENEMY]==bot_ore-50);
