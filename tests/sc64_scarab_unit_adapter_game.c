@@ -46,6 +46,25 @@ static void queue_wait_cancel_and_retry(void)
     assert(race_scarab_cancel(p,0,0)); assert(minerals==85);
     assert(!race_scarab_cancel(p,0,0) && minerals==85);
 }
+static void ai_stock_is_paid_and_bounded(void)
+{
+    memset(u,0,sizeof(u)); minerals=100; race_minerals[ENEMY]=31;
+    int human=fresh_reaver(SIDE), ai=fresh_reaver(ENEMY);
+    assert(!race_scarab_ai_stock(human,0,0) && minerals==100);
+    assert(!race_scarab_ai_stock(ai,0,2) && race_minerals[ENEMY]==31);
+    assert(race_scarab_ai_stock(ai,0,1) && race_minerals[ENEMY]==16);
+    assert(race_scarab_ai_stock(ai,0,1) && race_minerals[ENEMY]==1);
+    assert(!race_scarab_ai_stock(ai,0,1) && race_minerals[ENEMY]==1);
+    race_minerals[ENEMY]=100;
+    for(int i=0;i<3;i++) assert(race_scarab_ai_stock(ai,0,1));
+    assert(race_minerals[ENEMY]==55);
+    assert(!race_scarab_ai_stock(ai,0,1) && race_minerals[ENEMY]==55);
+    Sc64ScarabParent state; Sc64ScarabCounts counts;
+    assert(race_scarab_parent_read(ai,0,&state,&counts) && state.queued==5);
+    assert(race_scarab_production_tick(ai,0)==SC64_SCARAB_ALLOCATED);
+    assert(race_scarab_parent_read(ai,0,&state,&counts));
+    assert(u[state.active_slot].owner==ENEMY && race_minerals[ENEMY]==55);
+}
 static void active_cancel_and_loss(void)
 {
     memset(u,0,sizeof(u)); race_minerals[ENEMY]=100; int p=fresh_reaver(ENEMY);
@@ -155,7 +174,7 @@ static void malformed_and_slot_reuse(void)
 int main(void)
 {
     gba_init(); game_init(); race_mode=1; race_human=R_PROTOSS; race_bots=1; init_state();
-    queue_wait_cancel_and_retry(); active_cancel_and_loss(); stop_signal_and_outside_parent_loss(); cancel_all_atomic(); ready_state_cancel(); malformed_and_slot_reuse();
+    queue_wait_cancel_and_retry(); ai_stock_is_paid_and_bounded(); active_cancel_and_loss(); stop_signal_and_outside_parent_loss(); cancel_all_atomic(); ready_state_cancel(); malformed_and_slot_reuse();
     puts("Scarab actual Unit adapter: paid queue, allocation, cancellation, loss and STOP signal pass");
     return 0;
 }

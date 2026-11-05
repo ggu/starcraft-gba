@@ -255,6 +255,15 @@ static int race_scarab_enqueue(int slot,int upgraded)
         !race_scarab_parent_write(slot,&p)) return 0;
     sc64_scarab_wallet_commit(bank,next); return 1;
 }
+/* Stock one paid entry per source tick. The caller supplies the control
+ * decision: neutral and human parents must not be stocked automatically.
+ * Queue and inventory limits, graph integrity and the owner's wallet are
+ * checked by the same transaction used for human orders. */
+static int race_scarab_ai_stock(int slot,int upgraded,int controlled_by_ai)
+{
+    if (controlled_by_ai != 1) return 0;
+    return race_scarab_enqueue(slot,upgraded);
+}
 /* Invoke only on a source tick. No automatic game-loop registration. */
 static int race_scarab_production_tick(int slot,int upgraded)
 {

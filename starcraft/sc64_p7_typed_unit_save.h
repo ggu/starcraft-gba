@@ -81,12 +81,20 @@ static int SC64_TYPED_WIRE_CANONICAL(int type, int *maxhp, int *armor,
     (void)egg_stage;
 #endif
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
-    if (egg_stage && type==SC64_SHARED_EGG_TYPE && type>=0 && type<64) {
+    if ((egg_stage & 1) && type==SC64_SHARED_EGG_TYPE && type>=0 && type<64) {
         if (maxhp) *maxhp=200;
         if (armor) *armor=10;
         if (maxshield) *maxshield=0;
         return 1;
     }
+#ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+    if ((egg_stage & 4) && type==U_SCARAB && type<64) {
+        if (maxhp) *maxhp=20;
+        if (armor) *armor=0;
+        if (maxshield) *maxshield=10;
+        return 1;
+    }
+#endif
 #endif
     if (type < 0 || type >= SC_RU_LEGACY_BOUND || type >= 64) return 0;
     rule = sc64_race_unit_rule(type);
@@ -114,7 +122,10 @@ static int SC64_TYPED_WIRE_VALIDATE(const Unit *q,
         q->owner < 0 || q->owner > 4 || q->type < 0 ||
         !SC64_TYPED_WIRE_CANONICAL(q->type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG) ||
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
-        (egg_stage && q->type==SC64_SHARED_EGG_TYPE && (q->raw_type!=36 || q->alive!=1)) ||
+        ((egg_stage & 1) && q->type==SC64_SHARED_EGG_TYPE && (q->raw_type!=36 || q->alive!=1)) ||
+#ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+        ((egg_stage & 4) && q->type==U_SCARAB && (q->raw_type!=85 || q->alive!=1)) ||
+#endif
 #endif
         q->maxhp != maxhp || q->armor != armor ||
         (q->alive != 0 && q->alive != 1) ||

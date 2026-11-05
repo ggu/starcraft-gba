@@ -251,6 +251,11 @@ race_impact_save_write(void)
 {
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+    /* No appended actor has a registered impact wire representation yet. */
+    for (unsigned i=0;i<race_impact_count;++i)
+        if (race_impact_rows[i].source_type>=SC_RU_LEGACY_BOUND) return 0;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     /* The fixed base stays legacy-sized. Only active Yamato rows consume
      * extension bytes; mask bits are in the already-versioned state word. */
@@ -279,8 +284,16 @@ race_impact_save_write(void)
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION : SC64_GUARDIAN_TRANSPORT_SAVE_VERSION)
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
-    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+        ,SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION
+#endif
+    };
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+#define SC64_GUARDIAN_WRITE_TAG SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION
+#else
 #define SC64_GUARDIAN_WRITE_TAG (race_data.version==SC64_SHARED_EGG_SAVE_VERSION ? SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
+#endif
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
@@ -341,8 +354,16 @@ race_impact_save_write(void)
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION : SC64_GUARDIAN_TRANSPORT_SAVE_VERSION)
 #elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
-    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+        ,SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION
+#endif
+    };
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+#define SC64_GUARDIAN_WRITE_TAG SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION
+#else
 #define SC64_GUARDIAN_WRITE_TAG (race_data.version==SC64_SHARED_EGG_SAVE_VERSION ? SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
+#endif
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
@@ -480,7 +501,11 @@ static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactE
         (auth->features & ~(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG)) ||
         tag!=(auth->features ? SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+        (auth->features & ~(SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_SCARAB)) ||
+#else
         (auth->features & ~SC64_STAGE_SAVE_EGG) ||
+#endif
         tag!=((auth->features & SC64_STAGE_SAVE_EGG) ?
               SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
 #else
@@ -488,7 +513,12 @@ static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactE
         tag!=((auth->features & SC64_STAGE_SAVE_GUARDIAN) ?
               SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
 #endif
-    return race_impact_save_decode_selected_impl(len,tag,candidate,count,auth->inner);
+    if (!race_impact_save_decode_selected_impl(len,tag,candidate,count,auth->inner)) return 0;
+#ifdef SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE
+    for (int i=0;i<*count;++i)
+        if (candidate[i].source_type>=SC_RU_LEGACY_BOUND) return 0;
+#endif
+    return 1;
 }
 #endif
 

@@ -46,8 +46,11 @@ int main(int argc,char **argv) {
     /* Replace the newest authenticated new-tag child with a syntactically
      * encodable dead outside row. The unchanged reader must reject it. */
     u32 len=0;assert(save_read_latest(&race_impact_record,sizeof(race_impact_record),SC64_SCARAB_SAVE_VERSION,&len));
-    race_scarab_stage_wire=1;Unit logical,wire;
-    assert(race_save_decode_unit(&race_data,(unsigned)c,race_cols*16u,race_rows*16u,&logical));
+    Sc64StageSaveAuth auth;
+    const Sc64StageTagPair pair={SC64_SCARAB_SAVE_VERSION,SC64_SCARAB_SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
+    assert(sc64_stage_save_authenticate(&auth,&race_data,SC64_SCARAB_SAVE_VERSION,race_data.version,&pair,1));
+    Unit logical,wire;
+    assert(race_scarab_decode_authenticated(&race_data,(unsigned)c,race_cols*16u,race_rows*16u,&logical,&auth));
     logical.alive=0;logical.carry=(p|(2<<8));logical.work_timer=50;logical.order=2;
     assert(sc64_scarab_flight_to_wire(&logical,&wire,1,0) && raw_encode((unsigned)c,&wire));
     assert(sc64_test_replace_payload(SC64_SCARAB_SAVE_VERSION,&race_impact_record,len));

@@ -86,7 +86,10 @@ static int SC64_ZP_WIRE_VALIDATE(const Unit *q, unsigned world_width,
         q->type < 0 || q->type >= 64 || SC_RU_LEGACY_BOUND > 64 ||
         (q->type >= SC_RU_LEGACY_BOUND
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
-         && !(egg_stage && q->type==SC64_SHARED_EGG_TYPE && q->raw_type==36 && q->alive==1)
+         && !((egg_stage & 1) && q->type==SC64_SHARED_EGG_TYPE && q->raw_type==36 && q->alive==1)
+#ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+         && !((egg_stage & 4) && q->type==U_SCARAB && q->raw_type==85 && q->alive==1)
+#endif
 #endif
          ) ||
         (q->alive != 0 && q->alive != 1) ||

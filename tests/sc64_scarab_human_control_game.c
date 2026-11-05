@@ -56,6 +56,14 @@ int main(int argc,char **argv)
 #endif
     int other=spawn_unit(SIDE,U_PROBE,130,130); assert(other>=0); u[other].selected=1;
     assert(race_scarab_human_selected()<0 && strcmp(race_menu_label(row),"BUILD SCARAB"));
+#ifdef SC64_SCARAB_AI_STOCK_PROBE
+    int ai=spawn_unit(ENEMY,U_REAVER,400,400); assert(ai>=0);
+    race_minerals[ENEMY]=31;
+    for (int n=0;n<20;n++) game_update(0,0);
+    assert(race_scarab_parent_read(ai,0,&parent,&counts));
+    assert(parent.queued==2 && parent.active_slot>=0 && race_minerals[ENEMY]==1);
+    assert(race_scarab_parent_read(p,0,&parent,&counts) && parent.queued==4 && minerals==40);
+#endif
     puts("real spawn, paid menu, source-tick training and rejection passed");
     return 0;
 }

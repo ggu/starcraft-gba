@@ -77,3 +77,42 @@ custom-egg-context-p10:
 custom-egg-context-showcase:
 	$(CLANG) $(CUSTOM_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-showcase
 	$(COMBINED_BIN_DIR)/custom-egg-context-showcase
+
+# Detached HOST candidate only; no Scarab journal tag or writer is admitted.
+.PHONY: custom-egg-scarab-detached-terran
+custom-egg-scarab-detached-terran:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_scarab_egg_detached_context.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-scarab-detached-terran
+	$(COMBINED_BIN_DIR)/custom-egg-scarab-detached-terran
+
+# Predecessor is the pinned base worktree; the current reader uses stable roster.
+SCARAB_PRIOR_ROOT ?= /tmp/sc64-shared-egg-release-publication-20261106
+.PHONY: custom-egg-scarab-prior-terran
+custom-egg-scarab-prior-terran:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(SCARAB_PRIOR_ROOT)/starcraft/game.c"' $(TERRAN_ROM_FLAGS) tests/sc64_scarab_prior_egg_compat.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/scarab-prior-writer
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_scarab_prior_egg_compat.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/scarab-current-reader
+	$(COMBINED_BIN_DIR)/scarab-prior-writer $(COMBINED_BIN_DIR)/prior-egg.sram
+	$(COMBINED_BIN_DIR)/scarab-current-reader $(COMBINED_BIN_DIR)/prior-egg.sram
+
+# HOST only: supply SRAM from a genuinely compiled prior writer.
+.PHONY: custom-egg-scarab-selected-terran
+custom-egg-scarab-selected-terran:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_SHARED_ACTOR_JOURNAL_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_scarab_egg_selected_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/scarab-selected-journal
+	$(COMBINED_BIN_DIR)/scarab-selected-journal $(SCARAB_PRIOR_SRAM)
+
+# Genuine predecessor writers: each reader compares every published unit ID,
+# raw mapping and name before accepting the old Egg/Reaver/Shuttle SRAM.
+define SCARAB_PRIOR_PROFILE
+.PHONY: custom-egg-scarab-prior-$(1)
+custom-egg-scarab-prior-$(1):
+	mkdir -p $(COMBINED_BIN_DIR)/$(1)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(SCARAB_PRIOR_ROOT)/starcraft/game.c"' $(2) tests/sc64_scarab_prior_egg_compat.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/$(1)/writer
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE $(2) tests/sc64_scarab_prior_egg_compat.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/$(1)/reader
+	$(COMBINED_BIN_DIR)/$(1)/writer $(COMBINED_BIN_DIR)/$(1)/prior.sram
+	$(COMBINED_BIN_DIR)/$(1)/reader $(COMBINED_BIN_DIR)/$(1)/prior.sram
+endef
+$(eval $(call SCARAB_PRIOR_PROFILE,z7,$(ZERG_Z7_CANONICAL_FLAGS)))
+$(eval $(call SCARAB_PRIOR_PROFILE,z9,$(ZERG_Z9_CANONICAL_FLAGS)))
+$(eval $(call SCARAB_PRIOR_PROFILE,showcase,$(SHOWCASE_FLAGS)))
