@@ -3,8 +3,7 @@
 A clean, private ares session on the owned USA ROM used ordinary controller
 input in Single-Player, Scenario, Setup Custom, Melee, Challenger (96×128),
 Human Terran versus one Zerg computer. The game-speed slider was explicitly
-set to its MIN endpoint. No save state, memory write, unlock modification or
-external keyboard automation was used. Inputs and screenshots remain private
+set to its MIN endpoint. No save-state loading, guest memory writes or unlock modifications were used. Inputs and screenshots remain private
 under `.local/n64-depot-probe` in the isolated investigation worktree.
 
 The Z+R Master Build Box selected Build Basic → Supply Depot; an SCV was
@@ -12,7 +11,9 @@ selected by the game, the valid green placement was accepted, and 100 minerals
 were spent. Later screenshots show the SCV working at a visible foundation
 while supply remained 4/10, and then the completed Depot with supply 4/18.
 This confirms one ordinary custom-game construction and the observed supply
-increase in this configuration.
+increase in this configuration. The GBA Depot rule also charges 100 minerals
+and grants 16 internal doubled-supply units, equivalent to the observed eight.
+The control sequence follows the [StarCraft 64 manual](https://nintendo64.pl/wp-content/uploads/StarCraft-64-USA.pdf).
 
 The total construction duration was **not measured**. Construction began between
 sparse captures, and emulator frame-advance pulses were not independently
