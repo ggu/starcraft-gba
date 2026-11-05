@@ -475,6 +475,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
        target actor while it is unfinished. */
     , [U_Z7_EGG] = { R_ZERG, 0, 255, 0, 0, 0, 0, 200, 0, 0 }
 #endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+    , [U_SHARED_EGG_STAGE] = { R_ZERG, 0, 255, 0, 0, 0, 0, 200, 0, 0 }
+#endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     , [U_P7_INTERCEPTOR] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 0, 25, 0, 300, 40, 40, 0 }
 #endif
@@ -830,6 +833,9 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #ifdef SC64_SCARAB_RUNTIME
         ,[U_SCARAB] = "SCARAB"
+#endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+        ,[U_SHARED_EGG_STAGE] = "EGG"
 #endif
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
         ,[U_SHARED_SHUTTLE] = "SHUTTLE"
@@ -1555,6 +1561,9 @@ static inline int sc64_race_unit_armor(int type)
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (type == U_Z7_EGG) return 10;
 #endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+    if (type == U_SHARED_EGG_STAGE) return 10;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return 2;
 #endif
@@ -1686,6 +1695,9 @@ static inline int sc64_race_raw_unit(int type)
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     case U_Z7_EGG: return 36;
+#endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+    case U_SHARED_EGG_STAGE: return 36;
 #endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case U_SCIENCE_VESSEL: return 9; case U_BATTLECRUISER: return 12;
