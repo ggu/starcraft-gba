@@ -143,5 +143,33 @@ int main(void)
     int reuse=spawn_unit(SIDE,U_OVERLORD,400,400);assert(reuse==slot);
     assert(u[slot].type==U_OVERLORD && u[slot].raw_type!=59);
     assert(race_save_game());assert(race_load_game());assert(u[slot].type==U_OVERLORD);
+    /* Two distinct namespaces: a bad newer Guardian slot must not lend its
+     * authorization to the older valid ordinary legacy Overlord. */
+    guardian_test_reset();q=&u[slot];assert(q->alive && q->type==U_OVERLORD);
+    Unit legacy_ordinary=*q;assert(race_save_game());
+    assert(race_worker_cargo_select(&plan,&selected));
+    guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    q->type=U_GUARDIAN_COCOON;q->raw_type=59;q->hp=q->maxhp=200;q->armor=0;
+    q->order=ORDER_IDLE;q->target=44;q->build=-1;q->carry=0;q->flags=0;q->work_timer=300;
+    assert(race_save_game());assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_GUARDIAN_TRANSPORT_SAVE_VERSION);
+    length=0;assert(save_read_latest(envelope,sizeof(envelope),SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,&length));
+    Unit invalid_wire;assert(sc64_guardian_wire_encode(q,&invalid_wire,1));invalid_wire.target=43;
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    assert(sc64_p7_typed_unit_encode(&race_data.units[slot],&invalid_wire,race_cols*16u,race_rows*16u));
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    assert(sc64_derived_unit_encode(&race_data.units[slot],&invalid_wire,race_cols*16u,race_rows*16u));
+#else
+    assert(sc64_zp_unit_save_encode(&race_data.units[slot],&invalid_wire,race_cols*16u,race_rows*16u));
+#endif
+#else
+    assert(sc64_unit_save_encode(&race_data.units[slot],&invalid_wire,race_cols*16u,race_rows*16u));
+#endif
+    memcpy(envelope+offsetof(RaceSave,units)+slot*sizeof(race_data.units[0]),&race_data.units[slot],sizeof(race_data.units[0]));
+    guardian_test_replace(selected.slot,envelope,length);
+    assert(race_load_game());assert(!memcmp(&u[slot],&legacy_ordinary,sizeof(legacy_ordinary)));
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_TRANSPORT_SAVE_VERSION && plan.guardian_auth.features==0);
     puts("Guardian staged HOST journal and death/slot reuse passed");return 0;
 }
