@@ -13457,8 +13457,8 @@ static void __attribute__((noinline)) race_scarab_human_parent_lost(int slot)
 #endif
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
 #ifdef SC64_SCARAB_WEAPON_PROBE
-/* Pending Scarab packets share the ordinary bounded impact rows. They remain
- * in-memory only until a checked save schema registers their marker. */
+/* Pending Scarab packets share ordinary bounded impact rows. Only the staged
+ * authenticated feature15 journal registers their marker for persistence. */
 enum { SC64_SCARAB_DEATH_DAMAGE_TICKS=5 };
 static void race_scarab_probe_bullet_reset(void) { sc64_scarab_probe_damage_upgrades=0; }
 static int race_scarab_probe_bullets_pending(void) {

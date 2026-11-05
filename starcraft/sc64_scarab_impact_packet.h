@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_SCARAB_IMPACT_PACKET_H
 #define SC64_SCARAB_IMPACT_PACKET_H
-/* In-memory only; never admitted by the impact save codec. The five payload
- * bytes hold x12,y12,target9,owner3,source-ticks3 and one reserved zero bit. */
+/* Feature15 HOST journals authenticate this marker explicitly; older save
+ * generations reject it. The five payload bytes hold x12,y12,target9,
+ * owner3,source-ticks3 and one reserved zero bit. */
 #define SC64_SCARAB_IMPACT_MARKER 0xfeu
 #define SC64_SCARAB_IMPACT_NO_TARGET 511u
 _Static_assert(SC64_IMPACT_TYPE_LIMIT <= SC64_SCARAB_IMPACT_MARKER,
