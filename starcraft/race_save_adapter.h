@@ -36,6 +36,7 @@ static RaceSave race_data;
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #include "sc64_guardian_wire.h"
+#include "sc64_stage_save_auth.h"
 static int race_guardian_stage_wire;
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
@@ -147,6 +148,33 @@ static int race_save_decode_unit_authenticated(const RaceSave *candidate,unsigne
 }
 #endif
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+/* Explicit detached-candidate decoder. This is not yet wired into journal
+ * selection: the caller must supply a token minted after slot authentication. */
+static int race_guardian_decode_authenticated(const RaceSave *candidate,unsigned slot,
+                                               unsigned width,unsigned height,Unit *out,
+                                               const Sc64StageSaveAuth *auth)
+{
+    Unit wire,decoded;
+    if (!candidate || !out || slot>=MAX_UNITS ||
+        !sc64_stage_save_auth_matches(auth,candidate,candidate->version,0)) return 0;
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    if (!sc64_p7_typed_unit_decode(&wire,&candidate->units[slot],width,height)) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    if (!sc64_derived_unit_decode(&wire,&candidate->units[slot],width,height)) return 0;
+#else
+    if (!sc64_zp_unit_save_decode(&wire,&candidate->units[slot],width,height)) return 0;
+#endif
+#else
+    if (!sc64_unit_save_decode(&wire,&candidate->units[slot],width,height)) return 0;
+#endif
+    if (!sc64_guardian_wire_decode(&wire,&decoded,
+                                    (auth->features & SC64_STAGE_SAVE_GUARDIAN)!=0)) return 0;
+    *out=decoded;return 1;
+}
+#endif
+
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_ZP_FULL_STORAGE)
 /* Codec-specific row writer; semantic conversion is performed by the caller. */
 static int race_scarab_zp_encode(RaceSave *candidate, unsigned slot,
