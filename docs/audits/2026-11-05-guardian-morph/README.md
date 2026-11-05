@@ -144,3 +144,20 @@ incoming target/impact references stay on the same slot. Owner/spatial indexes
 are keyed by unchanged owner and position. Tests that call `update_orders`
 exercise that loop and save continuation, not full game-frame, regeneration,
 render, animation, audio, or native motion behavior. Cocoon art is unresolved.
+
+The verified owned ROM maps raw 59 through flingy 3, sprite 137 and image 11
+to GRP `00D/00C` (48×48, 23 indexed frames). Its SHA-256 is
+`3257f8e06e504a6b2c4ea7f406de9375d15b183ca993dc994807ca82ade05a0d`.
+Image 11's script 8 Init starts with frames 9–14, then 0–8 and a loop, with
+wait and random-wait instructions. It references image 12 as an underlay at
+(0,42); image 12 shares the GRP and its script follows the main graphic. The
+private importer retains these instructions and all frames without asserting
+native timing or implementing the underlay. It requires the verified ROM and
+pinned extractor, writes only below this worktree's `.local`, and does not touch
+normal sprite banks. No Cocoon visual or animation is enabled by this work.
+
+On pre-modal source `826ebf49`, each of the four real HOST profile bindings
+passed a 750-call `game_update` continuation with periodic `game_render`,
+including save/load at update 375 and again after Guardian completion. This
+exercises the full host frame and render calls, not visual correctness, native
+timing, actual-input UI, guest execution, or the later modal-dialog changes.
