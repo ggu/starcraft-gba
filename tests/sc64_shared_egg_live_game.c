@@ -1,0 +1,48 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* HOST fixture: custom game setup, real input/menu, real journal; not guest SRAM. */
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#include "../starcraft/game.c"
+extern void guardian_test_reset(void);
+static void press(unsigned key)
+{
+    game_update((u16)key,(u16)key);game_update(0,0);
+}
+static int egg_for(int owner,int type,int exclude)
+{
+    for(int i=0;i<MAX_UNITS;i++) if(i!=exclude && u[i].alive && u[i].owner==owner &&
+        u[i].type==SC64_EGG_ACTOR && u[i].target==type) return i;
+    return -1;
+}
+int main(void)
+{
+    guardian_test_reset();game_init();race_mode=1;race_human=R_ZERG;race_bots=1;
+    race_skirmish_map=0;race_bot_races[0]=R_ZERG;init_state();assert(screen==SCREEN_PLAY);
+    int hall=-1,enemy=-1;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive && sc64_race_is_zerg_townhall(b[i].type)) {
+        if(b[i].owner==SIDE) hall=i;else if(b[i].owner==ENEMY)enemy=i;
+    }
+    assert(hall>=0 && enemy>=0);minerals=1000;gas=1000;
+    race_minerals[ENEMY]=1000;race_gas[ENEMY]=1000;b[hall].larva=3;b[enemy].larva=3;
+    selected_building=hall;cx=b[hall].x;cy=b[hall].y;train_type=U_DRONE;
+    int before=minerals;press(KEY_A);
+    int a=egg_for(SIDE,U_DRONE,-1);assert(a>=0 && minerals==before-sc64_race_unit_rule(U_DRONE)->minerals);
+    assert(u[a].raw_type==36 && u[a].raw_owner==-1);
+    press(KEY_A);int z=egg_for(SIDE,U_DRONE,a);assert(z>=0);
+    assert(race_queue_unit(ENEMY,enemy,U_DRONE));int bot=egg_for(ENEMY,U_DRONE,-1);assert(bot>=0 && u[bot].raw_owner==-1);
+    assert(race_save_game());int remaining=u[a].work_timer;assert(remaining>0);
+    for(int i=0;i<3;i++)game_update(0,0);
+    assert(u[a].work_timer==remaining-3 && u[z].work_timer==remaining-3);
+    assert(race_load_game());assert(u[a].type==SC64_EGG_ACTOR && u[a].work_timer==remaining);
+    /* Set selection as HOST setup, then invoke the ordinary menu with input. */
+    selected_building=-1;for(int i=0;i<MAX_UNITS;i++)u[i].selected=0;u[a].selected=1;
+    before=minerals;press(KEY_B);assert(menu_open);
+    for(int i=0;i<MENU_STOP+1;i++)press(KEY_DOWN);
+    assert(menu_cursor==MENU_STOP+1);press(KEY_A);assert(!u[a].alive);
+    assert(minerals==before+sc64_race_unit_rule(U_DRONE)->minerals);
+    for(int i=0;i<remaining;i++)game_update(0,0);
+    assert(u[z].alive && u[z].type==U_DRONE && u[bot].alive && u[bot].type==U_DRONE);
+    assert(race_save_game());assert(race_load_game());
+    puts("shared Egg paid input/menu, parallel birth and journal passed");return 0;
+}

@@ -320,6 +320,24 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
      !defined(SC64_Z7_EGG_PRODUCTION))
 #error "Shared Egg candidate is HOST-only and requires the Z9 Egg vector"
 #endif
+#if defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || \
+     !defined(SC64_SHARED_SCOURGE_COMBAT))
+#error "Shared Egg producer is an authenticated HOST-only custom candidate"
+#endif
+#if defined(SC64_Z7_EGG_PRODUCTION) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+#define SC64_EGG_RUNTIME 1
+#ifdef SC64_Z7_EGG_PRODUCTION
+#define SC64_EGG_ACTOR U_Z7_EGG
+#else
+#define SC64_EGG_ACTOR SC64_SHARED_EGG_TYPE
+#endif
+#ifdef SC64_Z7_RUNTIME
+#define SC64_EGG_IS_Z7() race_z7_active()
+#else
+#define SC64_EGG_IS_Z7() 0
+#endif
+#endif
 #if defined(SC64_Z7_EGG_PRODUCTION) && \
     (!defined(SC64_RACES) || !defined(SC64_Z7_RUNTIME))
 #error "Z7 Egg production requires the race and Z7 runtimes"
@@ -766,7 +784,7 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #include "sc64_skirmish_menu.h"
 #include "sc64_stock_motion.h"
 #include "sc64_stock_combat.h"
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
 #include "sc64_z7_egg_production.h"
 _Static_assert(SC_RU_COUNT <= 64,
                "Packed ZP actor type needs a six-bit enum");
@@ -1849,11 +1867,6 @@ static int race_z7_active(void);
 static int race_z7_source_owner(unsigned source_slot);
 static int race_z7_product_source_owner(int owner);
 static void race_z7_note_building_death(const Building *q);
-#ifdef SC64_Z7_EGG_PRODUCTION
-static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot);
-static int race_z7_egg_cancel_available(void);
-static int race_z7_egg_cancel_selected(void);
-#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 static int race_colony_profile_allowed(void);
 static int race_colony_product_allowed(int owner,int raw_owner,int type);
@@ -1864,6 +1877,11 @@ static int race_z7_spore_morph_command_available(void);
 static int race_colony_pre_building_tick(void);
 static int race_colony_post_building_tick(void);
 #endif
+#endif
+#ifdef SC64_EGG_RUNTIME
+static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot);
+static int race_z7_egg_cancel_available(void);
+static int race_z7_egg_cancel_selected(void);
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
 static int race_p6_combat_unit_burrowed(int slot);
@@ -2446,11 +2464,11 @@ unit_supply(int type)
 	type == U_FIREBAT ? 2 : type == U_MEDIC ? 2 : 2;
 }
 
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
 static inline int
 unit_slot_supply(const Unit *q)
 {
-    if (q && q->type == U_Z7_EGG)
+    if (q && q->type == SC64_EGG_ACTOR)
         return sc64_z7_egg_reserved_supply(q->target) > 0 ?
                sc64_z7_egg_reserved_supply(q->target) : 0;
     return q ? unit_supply(q->type) : 0;
@@ -3876,7 +3894,7 @@ __attribute__((optimize("Os")))
 sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                     SC64_P7_SOURCE_OWNER_PARAM)
 {
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     int egg_best = -1, egg_distance = max_distance * max_distance;
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
@@ -3926,8 +3944,8 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                     if (FAST_ABS(x - candidate_x) >= max_distance ||
                         FAST_ABS(y - candidate_y) >= max_distance) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-                    if (entity < MAX_UNITS && u[entity].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+                    if (entity < MAX_UNITS && u[entity].type == SC64_EGG_ACTOR) {
                         if (d < egg_distance &&
                             sc64_auto_target_candidate_allowed(
                                 attacker, entity, owner,
@@ -3949,7 +3967,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
             }
         }
     }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     return best >= 0 ? best : egg_best;
 #else
     return best;
@@ -3989,8 +4007,8 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                             attacker, entity, owner,
                             SC64_P7_SOURCE_OWNER_VALUE)) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-                    if (entity < MAX_UNITS && u[entity].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+                    if (entity < MAX_UNITS && u[entity].type == SC64_EGG_ACTOR) {
                         if (d < egg_distance) {
                             egg_distance = d;
                             egg_best = entity;
@@ -4006,7 +4024,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                 }
             }
     }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     return best >= 0 ? best : egg_best;
 #else
     return best;
@@ -4018,7 +4036,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
                    SC64_P7_SOURCE_OWNER_PARAM)
 {
     int i, best = -1, best_distance = max_distance * max_distance, d;
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     int egg_best = -1, egg_distance = max_distance * max_distance;
 #endif
     if (target_lists_valid) {
@@ -4029,8 +4047,8 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
                 if (!u[i].alive || FAST_ABS(x-u[i].x)>=max_distance || FAST_ABS(y-u[i].y)>=max_distance)continue;
                 if(!sc64_auto_target_candidate_allowed(attacker,i,owner,SC64_P7_SOURCE_OWNER_VALUE))continue;
                 d = dist2(x, y, u[i].x, u[i].y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-                if (u[i].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+                if (u[i].type == SC64_EGG_ACTOR) {
                     if (d < egg_distance) { egg_distance = d; egg_best = i; }
                     continue;
                 }
@@ -4054,7 +4072,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
                 }
             }
         }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
         return best >= 0 ? best : egg_best;
 #else
         return best;
@@ -4068,8 +4086,8 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
                     )
 	    continue;
 	d = dist2(x, y, u[i].x, u[i].y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-        if (u[i].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+        if (u[i].type == SC64_EGG_ACTOR) {
             if (d < egg_distance) { egg_distance = d; egg_best = i; }
             continue;
         }
@@ -4092,7 +4110,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
 	    best = MAX_UNITS + i;
 	}
     }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     return best >= 0 ? best : egg_best;
 #else
     return best;
@@ -5751,10 +5769,10 @@ issue_order(int order, int tx, int ty)
     selected_building = -1;
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE && u[i].selected) {
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
             /* The Egg's target field stores its paid product until birth. It
              * has no movement command; the selected-unit menu owns cancel. */
-            if (u[i].type == U_Z7_EGG) continue;
+            if (u[i].type == SC64_EGG_ACTOR) continue;
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
             if (sc64_game_unit_actor_flags(u[i].type) &&
@@ -6017,10 +6035,10 @@ stop_selected(void)
             int was_repair = 0;
 #endif
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
             /* STOP is not Egg cancellation: retain its paid product/timer so
              * the contextual CANCEL EGG action remains the only cancel path. */
-            if (u[i].type == U_Z7_EGG) continue;
+            if (u[i].type == SC64_EGG_ACTOR) continue;
 #endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
             if (sc64_race_raw_unit(u[i].type)==83) (void)race_scarab_stop_signal(i,0);
@@ -6410,7 +6428,7 @@ choose_command(int choice)
         toast(race_p7_carrier_training_queue_selected()?4:8); return;
     }
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) {
         menu_open = 0; mode = MODE_NORMAL;
         toast(race_z7_egg_cancel_selected() ? 0 : 8); return;
@@ -6641,7 +6659,7 @@ static int field_menu_count(void)
     if (race_battery_command_available()) return MENU_STOP+2;
     if (race_battery_build_available()) return MENU_STOP+4;
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     if (race_z7_egg_cancel_available()) return MENU_STOP + 2;
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
@@ -6748,7 +6766,7 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return "BUILD INTERCEPTOR";
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) return "CANCEL EGG";
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
@@ -8365,8 +8383,8 @@ target_lists_unavailable:
             continue;
         }
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
-        if (q->type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+        if (q->type == SC64_EGG_ACTOR) {
             (void)race_z7_egg_tick_unit(i);
             continue;
         }
