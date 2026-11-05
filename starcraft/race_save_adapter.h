@@ -47,7 +47,7 @@ static int race_scarab_stage_wire;
 #include "sc64_stage_save_auth.h"
 #define race_save_decode_unit race_save_decode_unit_raw_stage
 #endif
-#if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
+#if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
 #include "sc64_shared_egg_wire_host.h"
 #endif
 /* Decode a candidate unit without touching the live world. The compact
@@ -429,8 +429,8 @@ static int race_sk_transport_candidate_valid(const RaceSave *candidate)
     return 1;
 }
 #endif
-#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
-/* Combined candidate fixture is custom-only. Owner identity comes entirely
+#if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+/* The custom candidate owner identity comes entirely
  * from saved player state; ordinary legacy actors retain their raw owners. */
 static int race_combined_egg_owner(int owner,int raw_owner,void *context)
 {

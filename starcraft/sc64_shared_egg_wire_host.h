@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_SHARED_EGG_WIRE_HOST_H
 #define SC64_SHARED_EGG_WIRE_HOST_H
-#if !defined(GBA_HOST) || !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
-#error "Experimental Egg wire validation is HOST-only"
+#if !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || \
+    (!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE))
+#error "Egg wire validation requires the isolated Egg candidate"
 #endif
 /* This is an admission primitive, not an installed journal decoder. The
  * caller must authenticate the new stage tag and the candidate's owner map;

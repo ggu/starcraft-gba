@@ -13131,6 +13131,15 @@ static int race_guardian_decode_authenticated(const RaceSave *,unsigned,unsigned
 #define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth
 #define SC64_GCTX_ARG , guard_auth
 #define SC64_GUARD_DECODE(c,s,w,h,o) race_guardian_decode_authenticated(c,s,w,h,o,guard_auth)
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+/* Carry the authenticated journal candidate explicitly through every save
+ * validator, just as the Guardian candidate does.  Never use process-global
+ * decode state: prepared journal selection can retry an older slot. */
+#include "sc64_stage_save_auth.h"
+static int race_save_decode_unit_authenticated(const RaceSave *,unsigned,unsigned,unsigned,Unit *,const Sc64StageSaveAuth *);
+#define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth
+#define SC64_GCTX_ARG , guard_auth
+#define SC64_GUARD_DECODE(c,s,w,h,o) race_save_decode_unit_authenticated(c,s,w,h,o,guard_auth)
 #else
 #define SC64_GCTX_DECL
 #define SC64_GCTX_ARG
