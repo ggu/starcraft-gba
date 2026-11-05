@@ -82,6 +82,12 @@ int main(void)
     Unit expected=*q;clear_journal();assert(race_save_game());
     GbaSaveSelection selected={0};RaceLoadPlan plan;
     assert(race_worker_cargo_select(&plan,&selected));assert(selected.tag==SC64_GUARDIAN_TRANSPORT_SAVE_VERSION);
+    /* The authenticated payload cannot be presented under a different
+     * normalized impact tag, even if the candidate bytes are identical. */
+    Sc64ImpactEvent impact_probe[RACE_IMPACT_SAVE_CAPACITY ? RACE_IMPACT_SAVE_CAPACITY : 1];
+    int impact_count=-1;
+    assert(!race_impact_save_decode_selected_guardian(selected.length,
+        SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,impact_probe,&impact_count,&plan.guardian_auth));
     q->hp=1;q->work_timer=1;assert(race_load_game());assert(!memcmp(&u[slot],&expected,sizeof(expected)));
     q=&u[slot];q->alive=0;q->hp=-2;q->work_timer=0;expected=*q;
     assert(race_save_game());q->type=U_OVERLORD;assert(race_load_game());assert(!memcmp(&u[slot],&expected,sizeof(expected)));
