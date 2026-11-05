@@ -12,7 +12,14 @@
 int main(void)
 {
     static const int chain[] = {160, 164, 155, 171};
-    start_race(R_PROTOSS);
+    /* The shared journal supports custom games with one to three opponents;
+     * construct a supported world from the outset rather than changing its
+     * saved player count after the test has run. */
+    game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;
+    race_bot_races[0]=R_ZERG;init_state();
+    assert(screen==SCREEN_PLAY && race_mode && race_player[SIDE]==R_PROTOSS &&
+           race_bots==1 && race_player[ENEMY]==R_ZERG);
+    minerals=gas=5000;
     int worker = find_worker_raw(SIDE, 64), facility = -1;
     int type = unit_raw(83);
     const Sc64SkirmishRecord *reaver = 0;
