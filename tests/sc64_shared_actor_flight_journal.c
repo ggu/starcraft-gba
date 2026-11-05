@@ -114,5 +114,35 @@ int main(int argc,char **argv)
         assert(race_impact_count==(step>1));
         if (step>1) { assert(sc64_scarab_impact_unpack(&race_impact_rows[0],&packet));assert(packet.ticks==(unsigned)step-1); }
     }
+    /* Test each new element independently under the old authenticated pairs.
+     * These are deliberately retagged rejection probes; the fallback is the
+     * independently produced genuine predecessor, not a retagged fixture. */
+    static const struct {u32 outer,inner;} old_pairs[]={
+        {SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION},
+        {SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION},
+        {SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_SAVE_VERSION},
+        {SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_FULL_SAVE_VERSION}
+    };
+    for (int marker=0;marker<2;++marker) {
+        guardian_test_restore(sram);assert(race_load_game());
+        assert(!sc64_scarab_probe_damage_upgrades && !race_impact_count);
+        if (!marker) sc64_scarab_probe_damage_upgrades=1u<<SIDE;
+        else { u[p].target=-1;assert(race_scarab_probe_bullet_create(&u[p])); }
+        assert(race_save_game());assert(race_worker_cargo_select(&plan,&selected));
+        guardian_test_snapshot(before);
+        for (unsigned i=0;i<sizeof(old_pairs)/sizeof(old_pairs[0]);++i) {
+            guardian_test_restore(before);
+            guardian_test_retag(selected.slot,old_pairs[i].outer,old_pairs[i].inner);
+            assert(race_worker_cargo_select(&plan,&fallback));
+            assert(fallback.slot!=selected.slot && fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION);
+        }
+    }
+    guardian_test_corrupt(fallback.slot);guardian_test_snapshot(before);
+    memcpy(old_units,u,sizeof(u));memcpy(old_buildings,b,sizeof(b));
+    int saved_minerals=minerals,saved_gas=gas,saved_frame=frame;
+    assert(!race_load_game());guardian_test_snapshot(after);
+    assert(!memcmp(before,after,sizeof(before)) && !memcmp(old_units,u,sizeof(u)) &&
+           !memcmp(old_buildings,b,sizeof(b)) && minerals==saved_minerals &&
+           gas==saved_gas && frame==saved_frame);
     puts("actual HOST paid unit/building launches, controlled arrival and target reuse passed");return 0;
 }
