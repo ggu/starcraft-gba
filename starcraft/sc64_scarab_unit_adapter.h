@@ -13,6 +13,10 @@
 #include "sc64_scarab_fields.h"
 #include "sc64_scarab_lifecycle.h"
 #include "sc64_scarab_wallet.h"
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+#include "sc64_interceptor_direction_tables.h"
+static u8 sc64_interceptor_dir(s32 x, s32 y);
+#endif
 _Static_assert(MAX_UNITS <= SC64_SCARAB_FIELD_SLOT_LIMIT, "Scarab slot encoding must cover the actor pool");
 
 /* Included by the gated flight experiment, or explicitly by prepared fixtures,
@@ -228,10 +232,25 @@ static int race_scarab_launch_cb(void *ctx,int slot)
 {
     Sc64ScarabUnitContext *c=ctx; int p; unsigned phase;
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
-    if (!race_scarab_child_lookup(slot,&p,&phase) || p!=c->parent_slot || phase!=SC64_SCARAB_CHILD_INSIDE ||
-        !race_scarab_child_set(slot,(unsigned)p,SC64_SCARAB_CHILD_OUTSIDE,0,0)) return 0;
+    if (!race_scarab_child_lookup(slot,&p,&phase) || p!=c->parent_slot || phase!=SC64_SCARAB_CHILD_INSIDE) return 0;
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+    /* PC proxy releases 25 source pixels ahead of the parent. The engine has
+     * no persistent Reaver heading, so target direction is an approximation.
+     * Carry retains the source-Q8 remainder across order-1 initialization. */
+    int dx=u[p].tx-u[p].x,dy=u[p].ty-u[p].y;
+    if (!dx && !dy) return 0;
+    u8 heading=sc64_interceptor_dir(dx,dy);
+    Sc64InterceptorDirectionVector v=sc64_interceptor_direction_vector[heading];
+    s32 x=(s32)u[p].x*512+(s32)v.x*25;
+    s32 y=(s32)u[p].y*512+(s32)v.y*25;
+    if (x<0 || y<0 || x>=(s32)race_cols*16*512 || y>=(s32)race_rows*16*512) return 0;
+#endif
+    if (!race_scarab_child_set(slot,(unsigned)p,SC64_SCARAB_CHILD_OUTSIDE,0,0)) return 0;
     u[slot].order=1; /* bridge code for source order state 0 */
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+    u[slot].x=(s16)(x/512);u[slot].y=(s16)(y/512);
+    u[slot].carry|=((x&511)<<10)|((y&511)<<19);
+    u[slot].cd=heading;
     u[slot].target=u[p].target;u[slot].tx=u[p].tx;u[slot].ty=u[p].ty;
 #endif
     return 1;
