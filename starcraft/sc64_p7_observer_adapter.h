@@ -210,6 +210,15 @@ static unsigned sc64_p7_arbiter_pack(unsigned mask,unsigned timer,int aura,int t
 
 /* U_SCV is enum value zero. Only a byte-for-byte zero Unit row is unused. */
 #include "sc64_zero_bytes.h"
+#ifdef SC64_ARBITER_ATTRIBUTION
+#ifndef SC64_DIAGNOSTIC_SETUP
+#error "Arbiter attribution requires setup timing"
+#endif
+volatile u32 sc64_arbiter_attribution[10];
+#define SC64_ARB_COUNT(i) (++sc64_arbiter_attribution[(i)])
+#else
+#define SC64_ARB_COUNT(i) ((void)0)
+#endif
 static int sc64_p7_arbiter_cache_empty_unit(const void *actor)
 {
     return sc64_bytes_are_zero(actor, sizeof(Unit));
@@ -232,6 +241,21 @@ static int sc64_p7_arbiter_cache_empty_slot(unsigned slot)
 #endif
     return sc64_p7_arbiter_cache_empty_unit(&u[slot]);
 }
+
+#ifdef SC64_ARBITER_ATTRIBUTION
+static int sc64_arbiter_attribution_empty_slot(unsigned slot)
+{
+    u32 start=gba_clock();
+    int empty=sc64_p7_arbiter_cache_empty_slot(slot);
+    sc64_arbiter_attribution[3]+=gba_clock()-start;
+    SC64_ARB_COUNT(4);
+    if (empty) SC64_ARB_COUNT(5);
+    return empty;
+}
+#define SC64_ARB_EMPTY_SLOT(i) sc64_arbiter_attribution_empty_slot(i)
+#else
+#define SC64_ARB_EMPTY_SLOT(i) sc64_p7_arbiter_cache_empty_slot(i)
+#endif
 
 static int sc64_p7_observer_arbiter_aura_candidate(int target)
 {
@@ -391,6 +415,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     ++sc64_optical_refresh_count;
 #endif
     for(int k=0;k<(lists?(int)lists->optical_unit_count:MAX_UNITS);++k) {
+        SC64_ARB_COUNT(8);
         int i=lists?lists->optical_units[k]:k;
         if(!(u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -423,6 +448,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     optical_diag_start=gba_clock();
 #endif
     for(int k=0;k<(lists?(int)lists->optical_building_count:MAX_BUILDINGS);++k) {
+        SC64_ARB_COUNT(9);
         int i=lists?lists->optical_buildings[k]:k;
         if(!b[i].alive) continue;
         int source=RACE_PROTOSS_SLOT(&b[i]);
@@ -614,6 +640,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                     int cell=cx+cy*SC64_TARGET_GRID_COLS;
                     Sc64TargetIndex ent=sc64_target_head[owner][cell];
                     while(ent!=SC64_TARGET_NONE) {
+                        SC64_ARB_COUNT(1);
                         int slot=(int)ent;
                         if(slot<MAX_UNITS && slot!=(int)i &&
 #ifdef SC64_P7_ARBITER_AURA_ONCE
@@ -623,6 +650,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                            sc64_p7_arbiter_same_source((int)i,slot) &&
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
                            1) {
+                            SC64_ARB_COUNT(2);
                             int tl,tt,tr,tb;
                             if(sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[slot]),
                                     u[slot].x,u[slot].y,0,&tl,&tt,&tr,&tb) &&
@@ -644,7 +672,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                     }
                 }
         } else {
-            for (j=0;j<MAX_UNITS;++j) if (j!=i &&
+            for (j=0;j<MAX_UNITS;++j) if ((SC64_ARB_COUNT(1), j!=i) &&
 #ifdef SC64_P7_ARBITER_AURA_ONCE
                 !aura[j] &&
 #endif
@@ -652,6 +680,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 sc64_p7_arbiter_same_source((int)i,(int)j) &&
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
                 1) {
+                SC64_ARB_COUNT(2);
                 int tl,tt,tr,tb;
                 if(sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[j]),
                         u[j].x,u[j].y,0,&tl,&tt,&tr,&tb) &&
@@ -678,13 +707,15 @@ static void sc64_p7_arbiter_cache_source_tick(void)
         unsigned old=(unsigned)u[i].weapon;
         unsigned mask=0,timer=0;
         if (!u[i].alive) {
+            SC64_ARB_COUNT(6);
             /* The old value is already the exact dead-row result. Zero rows
              * still need the complete representation check below. */
             if (old != sc64_p7_arbiter_pack(0,0,0,0) &&
-                !sc64_p7_arbiter_cache_empty_slot(i))
+                !SC64_ARB_EMPTY_SLOT(i))
                 u[i].weapon=(u16)sc64_p7_arbiter_pack(0,0,0,0);
             continue;
         }
+        SC64_ARB_COUNT(7);
         int tracked=aura[i] || sc64_p7_observer_is_cloaked((unsigned)RACE_PROTOSS_RAW(&u[i]));
         int was_tracked=SC64_P7_ARBITER_CACHE_VALID(old) &&
                         (old&SC64_P7_ARBITER_TRACKED)!=0;
@@ -763,12 +794,14 @@ sc64_p7_arbiter_cache_process_due(void)
        construction, before this tick's unit orders. Menu launch itself is
        between simulation ticks; this is not a launch-time native refresh. */
     if (!sc64_p7_arbiter_cache_initialized) {
+        SC64_ARB_COUNT(0);
         sc64_p7_arbiter_cache_due=0;
         sc64_p7_arbiter_cache_source_tick();
         sc64_p7_arbiter_cache_initialized=1;
         return;
     }
     if (!sc64_p7_arbiter_cache_due) return;
+    SC64_ARB_COUNT(0);
     sc64_p7_arbiter_cache_due=0;
     sc64_p7_arbiter_cache_source_tick();
 }
