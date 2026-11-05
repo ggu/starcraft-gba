@@ -71,7 +71,7 @@ static int z10_forward_group(int x,int y,int force)
         if(anchor<0)break;
         close_menus();clear_selected_building();move_cursor(u[anchor].x,u[anchor].y);KEY_TAP(KEY_A);KEY_TAP(KEY_A);
         int bad=0,count=0;
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){count++;if(u[i].type!=U_HYDRALISK||ordered[i])bad=1;}
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){count++;if(u[i].type!=U_HYDRALISK||z10_home_reserve[i]||(group_area_x>=0&&dist2(u[i].x,u[i].y,group_area_x,group_area_y)>group_area_r*group_area_r))bad=1;}
         if(!count||bad){
             ordered[anchor]=1;
             if(select_single(anchor)&&command_selected(MENU_ATTACK,x,y))groups++;
@@ -104,7 +104,7 @@ static int nearest_leg(int x,int y)
 
 static int hydras_near(int x,int y,int r)
 {
-    int n=0;for(int i=0;i<MAX_UNITS;i++)n+=u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&dist2(u[i].x,u[i].y,x,y)<r*r;
+    int n=0;for(int i=0;i<MAX_UNITS;i++)n+=u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&!z10_home_reserve[i]&&dist2(u[i].x,u[i].y,x,y)<r*r;
     return n;
 }
 
@@ -210,9 +210,9 @@ int main(int argc,char **argv)
             }
             if(rush){
                 int n=0,sx=0,sy=0;
-                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK){
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&!z10_home_reserve[i]){
                     int k2=0,x2=0,y2=0;
-                    for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&u[k].type==U_HYDRALISK&&dist2(u[k].x,u[k].y,u[i].x,u[i].y)<240*240){++k2;x2+=u[k].x;y2+=u[k].y;}
+                    for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&u[k].type==U_HYDRALISK&&!z10_home_reserve[k]&&dist2(u[k].x,u[k].y,u[i].x,u[i].y)<240*240){++k2;x2+=u[k].x;y2+=u[k].y;}
                     if(k2>n){n=k2;sx=x2;sy=y2;}
                 }
                 if(n<knob("Z10_RETREAT",12)){rush=0;leg=0;}
@@ -235,7 +235,7 @@ int main(int argc,char **argv)
                     /* In reach, the Temple is the only target that matters. */
                     int t=temple();
                     if(t>=0&&dist2(ax2,ay2,b[t].x,b[t].y)<knob("Z10_TR",240)*knob("Z10_TR",240)){gx=b[t].x;gy=b[t].y;force=1;}
-                    group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=8;
+                    group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=MAX_UNITS;
                     (void)z10_forward_group(gx,gy,force);
                     group_area_x=-1;group_rounds=6;
                     fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d]}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2);
