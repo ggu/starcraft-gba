@@ -1,11 +1,42 @@
 # Shared custom-game Egg candidate
 
-This note records an **opt-in candidate**, not a release feature or a parity
-claim. The runtime and tests were frozen at
-`801eb1c21e1e755e8f1dc9f98dfcc6d5a20f3d85`; the comparison base was
-`4e949d3f51531d0138455698c2f4f70f6b973d71`. A documentation-only successor
-retains that runtime evidence only while the tested source and build inputs
-remain unchanged. No default product flag was enabled.
+Updated 2026-11-06. This is an **opt-in custom-game candidate**, not default
+activation or a claim of campaign, hardware or performance parity. The current
+qualified runtime is `6ba76f8e86b5bcc68a621457e071f333d5f8d007`. Earlier
+`801eb1c2` evidence is retained below with its exact scope and subsequent fixes.
+Publication adds documentation, owner fixtures and separate preview recipes;
+the qualified game and common-runtime Git objects remain unchanged.
+
+## Current qualification
+
+- Six normal product ROMs and unchanged RAM guards passed at the current
+  runtime. A clean asset-free build/test passed 999 Python tests, 26 skipped,
+  and the compiled suites. The normal rendering path includes the legacy
+  Overlord correction; it is not byte-identical to the older release.
+- All five opt-in GBA products built and verified: Terran, delivered Z9, P10,
+  Showcase and legacy Z7. Terran, P10 and Showcase ROMs match their earlier
+  801 versions. Z7 and Z9 use the corrected compatibility runtime. Z9 has
+  796 bytes of EWRAM linker slack to its reserve; Z7 has 120 bytes of IWRAM
+  linker slack. Those figures are not measured stack depth.
+- All five Egg-only HOST controller, journal and rendering bindings passed.
+  Additional test-only `04dc9506` fixtures on the same runtime passed gas
+  payments/refunds for all four active owners, both P10 Carrier/Egg reservation
+  orders and mixed command-row dispatch. Their setup is deliberately constructed.
+- Ordinary HOST inputs cover Zerg production/save/cancel/load/birth on Outpost
+  and Blood Bath with one to three configured AIs. Terran and Protoss startup
+  checks add twelve configurations. These are eighteen starts, not full matches.
+- The exact Terran opt-in ROM passed real ARM button input and fresh-process
+  SRAM continuation. A separate derived read-only runner also matched all
+  88 opaque source pixels of the selected Egg and showed its product/progress
+  HUD advancing, without changing guest clock or named state during reads.
+- Preview recipes were actually built for all five products and matched the
+  qualified ROM hashes. Their clean asset-free suite passed 1,000 Python tests,
+  26 skipped, plus compiled suites; the normal default ROM remained unchanged.
+  The publication verifier additionally rejects symbols below their RAM regions;
+  its boundary tests and verification of all five actual previews pass.
+
+See [preview commands](../../RACE-CAMPAIGNS.md). The Egg service stays off in normal targets.
+No ROMs, private data, screenshots or saves are distributed with this source.
 
 ## Capability and source review
 
@@ -195,11 +226,12 @@ after. Other product and guest qualification remains separate.
 
 ## Remaining work
 
-This evidence covers one ARM ROM and one custom-game configuration; it does
-not establish all map sizes, three human races, one to three AIs, bot Egg
-production, every save migration, physical hardware, or 30 fps. Other
-products still need actual guest input and fresh-process SRAM qualification.
-Z8–Z10 campaign activation needs its own scheduler and trigger reservations.
-The available Egg art proof is static: source Init and birth animations and
-shadow remain unfinished. Default-profile and full product-matrix
-qualification are separate gates before any promotion.
+Guest gameplay and fresh-process SRAM evidence still cover one Terran ROM
+and one custom configuration; the broader setup checks are HOST evidence.
+Other products need their own guest continuation, long-match/AI behavior and
+performance checks. Known predecessor Z6/Z7 generations are tested, not every
+historical save. Physical hardware and near-30-fps behavior remain unproven.
+Z8–Z10 campaign activation needs scheduler and trigger reservations. Egg Init,
+birth animation and shadow are not implemented; the selected Hatchery also
+does not list independent jobs. These remain work, despite the static-frame,
+selected-Egg HUD and normal/preview build checks above.
