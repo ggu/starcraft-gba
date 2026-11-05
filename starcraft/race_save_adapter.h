@@ -157,16 +157,40 @@ static int race_guardian_decode_authenticated(const RaceSave *candidate,unsigned
     Unit wire,decoded;
     if (!candidate || !out || slot>=MAX_UNITS ||
         !sc64_stage_save_auth_matches(auth,candidate,candidate->version,0)) return 0;
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+    int egg_stage=(auth->features & SC64_STAGE_SAVE_EGG)!=0;
+#else
+    int egg_stage=0;
+#endif
+    (void)egg_stage;
 #ifdef SC64_ZP_FULL_STORAGE
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+    if (!sc64_p7_typed_unit_decode_for(&wire,&candidate->units[slot],width,height,egg_stage)) return 0;
+#else
     if (!sc64_p7_typed_unit_decode(&wire,&candidate->units[slot],width,height)) return 0;
+#endif
 #elif defined(SC64_Z7_DERIVED_SAVE)
     if (!sc64_derived_unit_decode(&wire,&candidate->units[slot],width,height)) return 0;
 #else
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+    if (!sc64_zp_unit_save_decode_for(&wire,&candidate->units[slot],width,height,egg_stage)) return 0;
+#else
     if (!sc64_zp_unit_save_decode(&wire,&candidate->units[slot],width,height)) return 0;
 #endif
+#endif
+#else
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+    if (!sc64_unit_save_decode_for(&wire,&candidate->units[slot],width,height,egg_stage)) return 0;
 #else
     if (!sc64_unit_save_decode(&wire,&candidate->units[slot],width,height)) return 0;
+#endif
+#endif
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#ifndef SC64_Z7_EGG_PRODUCTION
+    if (wire.type==SC64_SHARED_EGG_TYPE && !egg_stage) return 0;
+#endif
+    if (wire.type==SC64_SHARED_EGG_TYPE && wire.alive && wire.raw_type!=36) return 0;
 #endif
     if (!sc64_guardian_wire_decode(&wire,&decoded,
                                     (auth->features & SC64_STAGE_SAVE_GUARDIAN)!=0)) return 0;
