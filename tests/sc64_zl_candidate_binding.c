@@ -18,7 +18,7 @@ int main(void)
     static Sc64ZlSchedulerState scratch;
     const Sc64ZlMission *mission=race_zl_mission_for(candidate.state[2]);
     assert(mission && race_zl_save_candidate_world_valid_for(&candidate,width,height,0));
-    assert(race_zl_unpack_candidate_for(&candidate.zl,&scratch,mission));
+    assert(race_zl_unpack_candidate_for(&candidate.zl,&scratch,mission,0));
     assert(race_selected_mission==SC64_Z7_GLOBAL_ID && race_mode==1);
     assert(race_load_game());assert(!race_mode && race_selected_mission==SC64_Z9_GLOBAL_ID);
     puts("detached Z9 candidate mission binding passed");return 0;

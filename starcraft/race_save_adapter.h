@@ -427,14 +427,14 @@ static int race_zl_candidate_map_valid(const Sc64RaceMap *map,const Sc64ZlMissio
 }
 static int race_zl_unpack_candidate_for(const Sc64ZlPersistentState *in,
                                          Sc64ZlSchedulerState *scratch,
-                                         const Sc64ZlMission *mission)
+                                         const Sc64ZlMission *mission,int egg_stage)
 {
     Sc64Z8Setup setup;Sc64ZlAiState ai;
     if (!in || !scratch || !mission) return 0;
     race_zl_setup(mission,&setup);memcpy(&ai,in->ai,sizeof(ai));
     if (!sc64_zl_ai_state_valid(&ai) ||
         (in->crystal_carrier!=SC64_ZL_NO_CARRIER && in->crystal_carrier>=MAX_UNITS)) return 0;
-    return sc64_zl_state_unpack(0,in,mission->program,&setup,scratch);
+    return sc64_zl_state_unpack_for(0,in,mission->program,&setup,scratch,egg_stage);
 }
 #endif
 /* Z9/Z10 rebinding requires source identities to agree with live owners and
@@ -2123,8 +2123,14 @@ static int race_save_game(void) {
 #ifdef SC64_Z9_RUNTIME
     if (race_zl_active() &&
         (!race_zl_save_payload_tail_clear(&race_data) ||
-         !race_zl_save_unpack(&race_data.zl,
-                              &sc64_zp_route_save_scratch.zl_candidate.scheduler, 0)))
+         !race_zl_save_unpack_for(&race_data.zl,
+                              &sc64_zp_route_save_scratch.zl_candidate.scheduler, 0,
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+                              race_data.version==SC64_SHARED_EGG_SAVE_VERSION
+#else
+                              0
+#endif
+                              )))
         return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
@@ -3410,7 +3416,8 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,race_data.version,SC64_STAGE_SAVE_EGG)) ||
             !race_zl_save_payload_tail_clear(&race_data) ||
             !race_zl_unpack_candidate_for(&race_data.zl,
-                &sc64_zp_route_save_scratch.zl_candidate.scheduler,mission)) return 0;
+                &sc64_zp_route_save_scratch.zl_candidate.scheduler,mission,
+                sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,race_data.version,SC64_STAGE_SAVE_EGG))) return 0;
 #else
         /* Legacy validation temporarily binds its selected mission. */
         int saved_mission = race_selected_mission, ok;
@@ -4101,8 +4108,14 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_Z9_RUNTIME
     if (race_zl_active()) {
-        if (!race_zl_save_unpack(&race_data.zl,
-                                 &sc64_zp_route_save_scratch.zl_candidate.scheduler, 1) ||
+        if (!race_zl_save_unpack_for(&race_data.zl,
+                                 &sc64_zp_route_save_scratch.zl_candidate.scheduler, 1,
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+                                 sc64_stage_save_auth_matches(&plan.egg_auth,&race_data,race_data.version,SC64_STAGE_SAVE_EGG)
+#else
+                                 0
+#endif
+                                 ) ||
             !race_zl_rebind_loaded_world(&sc64_race_maps[race_selected_mission]))
             return 0;
     } else if (!race_zl_runtime_init(0)) {

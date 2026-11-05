@@ -61,14 +61,14 @@ sc64_zl_moved_locations(const Sc64Z8Program *p, u8 out[SC64_ZL_SAVE_MOVED_LOCATI
 /* Pack a valid live state. Fails on any field the compact form cannot hold.
  * The AI bytes, wallets and carrier are owned by the caller. */
 static inline int
-sc64_zl_state_pack(Sc64ZlPersistentState *out, const Sc64ZlSchedulerState *zs,
-                   const Sc64ZlProgram *zp)
+sc64_zl_state_pack_for(Sc64ZlPersistentState *out, const Sc64ZlSchedulerState *zs,
+                   const Sc64ZlProgram *zp, int egg_stage)
 {
     const Sc64Z8SchedulerState *s = zs ? &zs->core : 0;
     const Sc64Z8Program *p = zp ? &zp->rows : 0;
     u8 moved[SC64_ZL_SAVE_MOVED_LOCATIONS];
     unsigned moved_count = sc64_zl_moved_locations(p, moved);
-    if (!out || !sc64_zl_state_valid(zs, zp) || moved_count == 0xffu ||
+    if (!out || !sc64_zl_state_valid_for(zs, zp, egg_stage) || moved_count == 0xffu ||
         s->instance_count > SC64_ZL_SAVE_INSTANCES) return 0;
     for (unsigned i = 0; i < s->instance_count; ++i)
         if (s->instances[i].cursor > 15u) return 0;
@@ -98,13 +98,16 @@ sc64_zl_state_pack(Sc64ZlPersistentState *out, const Sc64ZlSchedulerState *zs,
         out->moved[m] = m < moved_count ? s->locations[moved[m] - 1] : (Sc64Z8Rect){0};
     return 1;
 }
+static inline int sc64_zl_state_pack(Sc64ZlPersistentState *out,const Sc64ZlSchedulerState *zs,const Sc64ZlProgram *zp)
+{ return sc64_zl_state_pack_for(out,zs,zp,0); }
+
 
 /* Rebuild a full scheduler image in caller-provided scratch. `out` changes
  * only if the result validates; it may be null to validate only. */
 static inline int
-sc64_zl_state_unpack(Sc64ZlSchedulerState *out, const Sc64ZlPersistentState *in,
+sc64_zl_state_unpack_for(Sc64ZlSchedulerState *out, const Sc64ZlPersistentState *in,
                      const Sc64ZlProgram *zp, const Sc64Z8Setup *setup,
-                     Sc64ZlSchedulerState *scratch)
+                     Sc64ZlSchedulerState *scratch, int egg_stage)
 {
     Sc64ZlSchedulerState *const image = scratch;
     const Sc64Z8Program *p = zp ? &zp->rows : 0;
@@ -137,9 +140,12 @@ sc64_zl_state_unpack(Sc64ZlSchedulerState *out, const Sc64ZlPersistentState *in,
     image->core.second_counter = in->second_counter;
     for (unsigned m = 0; m < moved_count; ++m)
         image->core.locations[moved[m] - 1] = in->moved[m];
-    if (!sc64_zl_state_valid(image, zp)) return 0;
+    if (!sc64_zl_state_valid_for(image, zp, egg_stage)) return 0;
     if (out) *out = *image;
     return 1;
 }
+static inline int sc64_zl_state_unpack(Sc64ZlSchedulerState *out,const Sc64ZlPersistentState *in,const Sc64ZlProgram *zp,const Sc64Z8Setup *setup,Sc64ZlSchedulerState *scratch)
+{ return sc64_zl_state_unpack_for(out,in,zp,setup,scratch,0); }
+
 
 #endif /* SC64_ZERG_LATE_STATE_H */

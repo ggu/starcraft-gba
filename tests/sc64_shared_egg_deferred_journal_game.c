@@ -40,7 +40,13 @@ int main(void)
                            &race_zl_world_ops,&race_zl_view,outcomes));
     assert((in->flags & SC64_Z8_INST_EXECUTING) && in->cursor==0 && free_units()==1);
     assert(race_shared_trigger_obligations()==2);
-    assert(race_save_game());assert(race_load_game());
+    assert(race_save_game());u32 length=0;
+    assert(save_read_latest(saved.bytes,sizeof(saved.bytes),SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,&length));
+    edited=saved;edited.record.save.version=SAVE_VERSION;
+    clear_records();assert(save_write_first(edited.bytes,length,SC64_TRANSPORT_SAVE_VERSION));
+    expect_failed_load_preserves_world(); /* old tag cannot authenticate create cursor */
+    clear_records();assert(save_write_first(saved.bytes,length,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION));
+    assert(race_load_game());
     in=trigger_four();assert(in && (in->flags & SC64_Z8_INST_EXECUTING) && in->cursor==0);
     assert(free_units()==1 && race_shared_trigger_obligations()==2);
     hit_target(filler[0],9999,U_DRONE,ENEMY);hit_target(filler[1],9999,U_DRONE,ENEMY);
