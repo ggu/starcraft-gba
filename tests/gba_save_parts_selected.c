@@ -115,7 +115,7 @@ static void rejected_requests(void) {
     reject(payload,1,payload,1,tags[1],0,tags,2);
     reject(payload,1,payload,1,tags[1],&prior,0,2);
     reject(payload,1,payload,1,tags[1],&prior,tags,0);
-    reject(payload,1,payload,1,tags[1],&prior,tags,4);
+    reject(payload,1,payload,1,tags[1],&prior,tags,GBA_SAVE_MAX_ACCEPTED_TAGS+1);
     const u32 duplicate[]={tags[0],tags[1],tags[0]},zero[]={tags[0],tags[1],0};
     reject(payload,1,payload,1,tags[1],&prior,duplicate,3);
     reject(payload,1,payload,1,tags[1],&prior,zero,3);

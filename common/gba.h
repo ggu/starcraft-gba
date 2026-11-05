@@ -117,10 +117,12 @@ void save_write_migrating_feature(const void *data,u32 length,u32 tag,u32 legacy
 int save_read(void *data,u32 length,u32 tag);
 int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
 #if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN) || defined(SC64_WORKER_CARGO_KIND)
+#define GBA_SAVE_MAX_ACCEPTED_TAGS 5u
 /* Two-slot semantic selection. With SC64_SHARED_HP_REGEN, tags must have a
  * nonzero most-significant byte; that byte is the commit marker and zero
  * denotes an interrupted/uncommitted record. Other builds retain their
- * existing unrestricted nonzero-tag protocol.
+ * existing unrestricted nonzero-tag protocol. Callers may recognize up to
+ * GBA_SAVE_MAX_ACCEPTED_TAGS distinct versions; storage remains two slots.
  * The validator may inspect/copy its scratch
  * payload but must not alter SRAM or live state. The chosen bytes are copied
  * again after selection. A token names the validated predecessor slot. */
