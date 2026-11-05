@@ -50,9 +50,13 @@ int main(void)
     u[0].alive=0;u[3].type=U_Z7_EGG;u[3].target=U_ZERGLING;
     const Sc64Z8Action *create=&race_zl_mission->program->rows.actions[19];
     assert(create->opcode==11 && create->unit==SC64_ZL_RAW_DRONE);
-    assert(race_zl_create(0,create,SC64_ZL_HUMAN_SLOT,1,0,0,0,512,512)==0);
+    Sc64Z8Instance *executing=&race_zl_sched.core.instances[0];
+    u8 outcomes[SC64_Z8_OWNER_LIMIT]={0};
+    assert(sc64_zl_action(&race_zl_sched,race_zl_mission->program,executing,create,
+                          &race_zl_world_ops,&race_zl_view,outcomes)==0);
     assert(!u[0].alive);u[3].alive=0;
-    assert(race_zl_create(0,create,SC64_ZL_HUMAN_SLOT,1,0,0,0,512,512)==1);
+    assert(sc64_zl_action(&race_zl_sched,race_zl_mission->program,executing,create,
+                          &race_zl_world_ops,&race_zl_view,outcomes)==1);
     assert(u[0].alive && u[0].type==U_DRONE && u[0].owner==SIDE);
     puts("executing create obligations, defer and capacity boundary passed");return 0;
 }
