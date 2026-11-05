@@ -2824,6 +2824,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(v[20]<0||v[20]>SC64_SKIRMISH_IMPORTED_COUNT)return 0;
     for(int i=21;i<24;i++)if(v[i]<0||v[i]>2)return 0;
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
+#endif
 #ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
     for (int i=0;i<plan->impact_candidate_count;++i) {
         if (plan->impact_candidate[i].source_type==SC64_SCARAB_IMPACT_MARKER) {
@@ -2832,7 +2833,6 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                 !packet.ticks || packet.x>=width*32 || packet.y>=height*32) return 0;
         }
     }
-#endif
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
 #ifdef SC64_SHARED_BATTERY
