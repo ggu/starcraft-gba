@@ -3,6 +3,7 @@
 #define main sc64_skirmish_controller_unused_main
 #include "sc64_skirmish_campaign_run.c"
 #undef main
+#include <string.h>
 extern void guardian_test_reset(void);
 static int observe_egg(void)
 {
