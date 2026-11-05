@@ -30,6 +30,10 @@ int main(int argc,char **argv)
     assert(race_scarab_flight_control_tick(child,0,0)==SC64_SCARAB_CONTROL_CONTINUE);
     race_scarab_control_dispatch(child);
     Unit motion=u[child];
+    if (!(motion.order==2 && (motion.path_timer>24 || motion.path_retry>12)))
+        fprintf(stderr,"flight route unavailable: alive=%d order=%d x=%d y=%d tx=%d ty=%d path=%d,%d previous=%d,%d cd=%u carry=%d timer=%u target=%d\n",
+            motion.alive,motion.order,motion.x,motion.y,motion.tx,motion.ty,motion.path_x,motion.path_y,
+            motion.path_timer,motion.path_retry,(unsigned)motion.cd,motion.carry,(unsigned)motion.work_timer,motion.target);
     assert(motion.order==2 && (motion.path_timer>24 || motion.path_retry>12));
     assert(spawn_build(SIDE,B_GREATER_SPIRE,390,390,0)>=0);
     int muta=spawn_unit(SIDE,U_MUTALISK,350,350);assert(muta>=0);
