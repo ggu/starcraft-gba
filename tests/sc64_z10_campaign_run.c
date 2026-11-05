@@ -151,7 +151,16 @@ int main(int argc,char **argv)
         if(frame>=next_order){
             next_order=frame+150;
             int home=count_units(SIDE,U_HYDRALISK);
-            if(!rush&&home>=(frame<knob("Z10_L2",30000)?knob("Z10_GO",70):knob("Z10_GO2",55))&&frame>=knob("Z10_GOF",8000)){rush=1;leg=0;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d}\n",(unsigned)frame,home);}
+            int goal=frame<knob("Z10_L2",30000)?knob("Z10_GO",70):knob("Z10_GO2",55);
+            int free_slots=0;
+            for(int i=0;i<MAX_UNITS;i++)free_slots+=!u[i].alive;
+            int pending=z10_pending_products(U_HYDRALISK);
+            int pool_limited=home+pending+free_slots<goal;
+            if(!rush&&frame>=knob("Z10_GOF",8000)&&
+               (home>=goal||(pool_limited&&home>=knob("Z10_GO2",55)))){
+                rush=1;leg=0;
+                fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d,\"pending\":%d,\"free_slots\":%d,\"pool_limited\":%d}\n",(unsigned)frame,home,pending,free_slots,pool_limited);
+            }
             if(rush){
                 int n=0,sx=0,sy=0;
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK){
@@ -183,6 +192,16 @@ int main(int argc,char **argv)
                     (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,force);
                     group_area_x=-1;group_rounds=6;
                     fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d]}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2);
+                    { int nearest_overlord=-1,home_hydras=0,foes[256]={0};
+                      for(int i=0;i<MAX_UNITS;i++)if(u[i].alive){
+                          if(u[i].owner==SIDE&&u[i].type==U_OVERLORD){int d=dist2(u[i].x,u[i].y,ax2,ay2);if(nearest_overlord<0||d<nearest_overlord)nearest_overlord=d;}
+                          if(u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&dist2(u[i].x,u[i].y,HOME_X,HOME_Y)<300*300)home_hydras++;
+                          if(u[i].owner==ENEMY&&dist2(u[i].x,u[i].y,ax2,ay2)<400*400)foes[u[i].raw_type&255]++;
+                      }
+                      fprintf(stderr,"ASSAULT frame=%u leg=%d at=%d/%d target=%d/%d group=%d homehydras=%d nearest_overlord_dist2=%d foes:",(unsigned)frame,leg,ax2,ay2,gx,gy,n,home_hydras,nearest_overlord);
+                      for(int k=0;k<256;k++)if(foes[k])fprintf(stderr," raw%d=%d",k,foes[k]);
+                      fprintf(stderr,"\n"); }
+
                     next_order=frame+knob("Z10_ORD",300);
                 }
             }
