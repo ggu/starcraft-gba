@@ -13,11 +13,11 @@ int main(void)
     assert(save_read_latest(&envelope,sizeof(envelope),SC64_TRANSPORT_SAVE_VERSION,&length));
     assert(length>=sizeof(RaceSave));candidate=envelope.save;
     int width=race_cols,height=race_rows;
-    assert(race_zl_save_candidate_world_valid(&candidate,width,height));
+    assert(race_zl_save_candidate_world_valid_for(&candidate,width,height,0));
     race_selected_mission=SC64_Z7_GLOBAL_ID;race_mode=1;
     static Sc64ZlSchedulerState scratch;
     const Sc64ZlMission *mission=race_zl_mission_for(candidate.state[2]);
-    assert(mission && race_zl_save_candidate_world_valid(&candidate,width,height));
+    assert(mission && race_zl_save_candidate_world_valid_for(&candidate,width,height,0));
     assert(race_zl_unpack_candidate_for(&candidate.zl,&scratch,mission));
     assert(race_selected_mission==SC64_Z7_GLOBAL_ID && race_mode==1);
     assert(race_load_game());assert(!race_mode && race_selected_mission==SC64_Z9_GLOBAL_ID);

@@ -343,7 +343,11 @@ static int race_z8_live_world_valid(void)
         int raw = u[i].raw_type;
         if (u[i].raw_owner < 0 || u[i].raw_owner >= SC64_Z8_OWNER_LIMIT ||
             race_z8_source_owner((unsigned)u[i].raw_owner) != u[i].owner ||
-            raw < 0 || sc64_race_unit_from_raw(raw) != u[i].type) return 0;
+            raw < 0 || (sc64_race_unit_from_raw(raw) != u[i].type
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+            && !(raw==36 && u[i].type==U_Z7_EGG)
+#endif
+            )) return 0;
     }
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
         if (b[i].raw_owner < 0 || b[i].raw_owner >= SC64_Z8_OWNER_LIMIT ||
