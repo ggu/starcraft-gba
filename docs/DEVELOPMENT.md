@@ -261,6 +261,17 @@ adds transient frontend playback state only and does not change campaign save
 data.
 
 
+## In-mission text boxes
+
+The canonical race products show the N64 campaign's in-mission text boxes: a head, a speaker's
+name and text, with the mission stopped until A or Start. `./dev sc64 prepare` imports the
+rows, or `make sc64-text-boxes` refreshes them alone. See [In-mission text boxes](TEXT-BOXES.md)
+for how speakers map to heads, where each runtime posts a row and what differs from the N64.
+
+Host fixtures don't press a key, so under `GBA_HOST` a box closes as soon as it opens, unless
+a fixture defines `SC64_TEXT_BOX_HOST_MODAL`. A key-tape player includes
+`tests/sc64_text_box_replay.h` and calls `TEXT_BOXES_DISMISS()` after each tape frame.
+
 ## Source construction art
 
 Prepared imported race builds now use the source construction art, including

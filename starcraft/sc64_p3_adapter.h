@@ -1,6 +1,8 @@
 #ifndef SC64_P3_ADAPTER_H
 #define SC64_P3_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 #if !defined(SC64_P3_RUNTIME) || !defined(SC64_P3_ENABLED) || !defined(SC64_UNIFIED)
 #error "Higher Ground runtime requires SC64_P3_RUNTIME, SC64_P3_ENABLED and SC64_UNIFIED"
 #endif
@@ -189,6 +191,8 @@ race_p3_campaign_tick(void)
             input.complete_action = race_p3_action_ticks == 0;
         }
         events = sc64_p3_model_step(&race_p3, &input);
+        if ((events & SC64_P3_EVENT_WIN_TRANSMISSION) && race_p3.transmission)
+            RACE_TEXT_BOX_ROW(2, race_p3.transmission);
         /* The model may advance an action only after the adapter's hold has
          * elapsed. A new action starts at its full duration this update. */
         if (race_p3.sequence != SC64_P3_SEQ_NONE && input.complete_action)

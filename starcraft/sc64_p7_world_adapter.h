@@ -1,6 +1,8 @@
 #ifndef SC64_P7_WORLD_ADAPTER_H
 #define SC64_P7_WORLD_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 /* Source-specific callbacks for P7. This intentionally implements only the
  * opcodes present in the authenticated P7 table; it is not a CHK executor. */
 #include "sc64_p7_state.h"
@@ -510,6 +512,7 @@ static int sc64_p7_world_action(void *context,const Sc64P7SourceAction *a)
     case SC64_P7_ACTION_TRANSMISSION: case SC64_P7_ACTION_PLAY_WAV:
     case SC64_P7_ACTION_DISPLAY_TEXT:
         if (a->string_id>65535u || a->wav_id>65535u) return 0;
+        RACE_TEXT_BOX_ACTION(a->opcode, a->string_id);
         ctx->presentation_opcode=a->opcode;
         ctx->last_string_id=(u16)a->string_id; ctx->last_wav_id=(u16)a->wav_id;
         return 1;

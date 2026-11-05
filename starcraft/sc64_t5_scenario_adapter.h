@@ -1,6 +1,8 @@
 #ifndef SC64_T5_SCENARIO_ADAPTER_H
 #define SC64_T5_SCENARIO_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 #if defined(SC64_T5_RUNTIME) && defined(SC64_T4_RUNTIME) && \
     defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)
 
@@ -671,6 +673,7 @@ race_t5_trigger_action(void *context, const Sc64T4Action *action,
     switch (action->opcode) {
     case 7: case 8: case 9: case 12:
         if (owner != SC64_T5_SOURCE_HUMAN) return 1;
+        RACE_TEXT_BOX_ACTION(action->opcode, action->string_id);
         if (action->time) {
             if (!sc64_t4_trigger_wait_duration(action->time,
                                                 &ctx->state->message_ticks)) return -1;

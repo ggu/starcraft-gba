@@ -906,6 +906,8 @@ def prepare(rom: Path, profile: str) -> None:
              "--rom", str(private_rom)])
         run([sys.executable, str(ROOT / "tools/sc64_chrome_assets.py"),
              "--rom", str(private_rom)])
+        run([sys.executable, str(ROOT / "tools/sc64_text_box_assets.py"),
+             "--rom", str(private_rom)])
         if profile in ("zerg", "zerg-z6", "zerg-z7", "zerg-z6-probe", "zerg-z4",
                        "protoss", "protoss-p6", "protoss-p7", "protoss-p4-storm"):
             zerg = profile in ("zerg", "zerg-z6", "zerg-z7", "zerg-z6-probe", "zerg-z4")
@@ -1077,6 +1079,8 @@ def status(profile: str, *, include_built: bool = True) -> int:
         paths.append(("Unit walk cycles", ROOT / WALK_HEADER))
         paths.append(("Campaign briefings and portraits", ROOT /
                       ".local/sc64/briefings/generated/sc64_briefing_generated.h"))
+        paths.append(("Campaign text boxes", ROOT /
+                      ".local/sc64/text-box/generated/sc64_text_box_generated.h"))
         for label, name in (("Original interface fonts", "sc64_font_generated.h"),
                             ("Original interface icons", "sc64_icons_generated.h"),
                             ("Original menu chrome", "sc64_chrome_generated.h")):

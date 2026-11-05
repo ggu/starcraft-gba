@@ -1,6 +1,8 @@
 #ifndef SC64_TERRAN_LATE_WORLD_H
 #define SC64_TERRAN_LATE_WORLD_H
 
+#include "sc64_text_box_hook.h"
+
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_T4_RUNTIME) && \
     defined(SC64_TERRAN_LATE_ACTORS)
 
@@ -908,6 +910,7 @@ race_late_trigger_action(void *context, const Sc64T4Action *action,
     switch (action->opcode) {
     case 7: case 8: case 9: case 12:
         if (!sc64_terran_late_is_human_context(source_owner)) return 1;
+        RACE_TEXT_BOX_ACTION(action->opcode, action->string_id);
         state->message = action->opcode;
         state->message_ticks = 90; /* Authored display duration; dialogue omitted. */
         return 1;

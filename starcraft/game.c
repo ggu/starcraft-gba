@@ -10,6 +10,7 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#include "sc64_text_box_hook.h"
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_RACES)
 #error "Shared transport requires the race engine"
 #endif
@@ -1251,7 +1252,7 @@ enum {
  * keeps a live actor snapshot there. Use only the 2.5 KiB padding after the
  * second Mode-4 framebuffer page, before the projectile OBJ arena. */
 #define SC64_DEATH_VFX_VRAM_BASE 0x06013600u
-#define SC64_DEATH_VFX_VRAM_LIMIT 0x06014000u
+#define SC64_DEATH_VFX_VRAM_LIMIT 0x06013FE0u /* sc64_text_box.h holds the rest */
 _Static_assert(SC64_DEATH_VFX_VRAM_BASE >=
                GBA_AUDIO_ARENA + GBA_AUDIO_MIX_BYTES + (MAX_UNITS + MAX_BUILDINGS) * 2u,
                "death-VFX storage overlaps the imported game-audio snapshot");
@@ -4907,6 +4908,9 @@ load_game(void)
 #endif
 #ifdef SC64_RACES
     int loaded = race_load_game();
+#ifdef SC64_TEXT_BOXES
+    if (loaded) sc64_text_box_reset();
+#endif
     if (loaded) sc64_walk_reset_all();
 #ifdef SC64_UNIT_FACING
     if (loaded) sc64_facing_reset_all();
@@ -5163,6 +5167,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_TEXT_BOXES
+    sc64_text_box_reset();
+#endif
     sc64_walk_reset_all();
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     sc64_battlecruiser_tech_bits = 0;
@@ -5418,6 +5425,9 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+#ifdef SC64_TEXT_BOXES
+    sc64_text_box_reset();
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_bullet_reset();
 #endif
@@ -9202,8 +9212,17 @@ pause_action(u16 pressed)
 	init_state();
 }
 
+#ifdef SC64_TEXT_BOXES
+#include "sc64_text_box_runtime.h"
+/* The simulation step keeps its own body, unedited: GCC's inlining of the hot
+ * update path depends on its size, which steers IWRAM placement. */
+#define SC64_GAME_STEP game_update_step
+static __attribute__((noinline)) void
+#else
+#define SC64_GAME_STEP game_update
 void
-game_update(u16 held, u16 pressed)
+#endif
+SC64_GAME_STEP(u16 held, u16 pressed)
 {
 #ifdef SC64_IMPORTED_MISSION
     u32 profile_start, profile_orders_end, profile_sight_start;
@@ -12243,6 +12262,7 @@ draw_hud(void)
     sc64_hud_minimap_cycles = gba_clock() - minimap_start;
 #endif
 #ifdef SC64_RACES
+#ifndef SC64_TEXT_BOXES /* The source's own text boxes replace these authored lines. */
     if(!race_mode&&race_campaign.message_ticks) {
         gfx_rect(2,94,236,24,C_PANEL);
         const char *message=race_campaign_message_text();
@@ -12255,6 +12275,7 @@ draw_hud(void)
         line[n]=0;
         gfx_text(5,106,line,C_CYAN);
     }
+#endif
 #endif
 #ifdef SC64_FIELD_CONTROLS
     if (menu_open) field_controls_draw_command_menu();
@@ -12269,6 +12290,21 @@ draw_hud(void)
     gfx_tile_band_top = gfx_tile_band_bottom = 0;
 #endif
 }
+
+#ifdef SC64_TEXT_BOXES
+void
+game_update(u16 held, u16 pressed)
+{
+    if (sc64_text_box_count()) {
+        race_text_box_input(held, pressed);
+        return;
+    }
+    game_update_step(held, pressed);
+    race_text_box_host_acknowledge();
+}
+
+int game_text_box_up(void) { return sc64_text_box_count() != 0; }
+#endif
 
 #include "game_audio.h"
 
@@ -12340,6 +12376,9 @@ game_render(void)
 #endif
 	} else if (screen == SCREEN_RESULT)
 	    draw_result_screen();
+#ifdef SC64_TEXT_BOXES
+        if (sc64_text_box_count()) race_text_box_draw();
+#endif
     }
     gfx_end();
 }
