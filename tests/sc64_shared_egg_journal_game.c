@@ -64,6 +64,8 @@ static void expect_failed_load_preserves_world(void)
         help,won,lost,result_timer,selected_building,geyser_count,(int)race_front_transition,race_front_load_error};
     assert(!memcmp(values,after,sizeof(values)) && seed_before==seed && digest==world_digest());
 }
+
+#ifndef SC64_SHARED_EGG_NO_MAIN
 int main(void)
 {
     clear_records();start_custom();
@@ -164,3 +166,5 @@ int main(void)
     expect_failed_load_preserves_world();assert(!race_save_game());
     puts("HOST custom Egg journal roundtrip and atomic rejection passed");return 0;
 }
+
+#endif

@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* HOST-only actual Z9 Egg journal and malformed owner regression. */
-#define main shared_egg_custom_fixture_main
+#define SC64_SHARED_EGG_NO_MAIN
 #include "sc64_shared_egg_journal_game.c"
-#undef main
+#undef SC64_SHARED_EGG_NO_MAIN
 int main(void)
 {
     clear_records();launch_z9_from_normal_menu();
