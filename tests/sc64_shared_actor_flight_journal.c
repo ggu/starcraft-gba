@@ -119,12 +119,21 @@ int main(int argc,char **argv)
     assert(race_load_game());assert(sc64_scarab_probe_damage_upgrades==(1u<<SIDE));
     assert(!memcmp(&sc64_bc_shots[0],&expected_bc,sizeof(expected_bc)));
     assert(race_impact_count==1 && !memcmp(&race_impact_rows[0],&expected,sizeof(expected)));
+    guardian_test_snapshot(before);
     for (int step=6;step>0;--step) {
         while (!sc64_battlecruiser_source_tick_due()) { ++frame; }
         race_impact_tick();++frame;
         assert(race_impact_count==(step>1));
         if (step>1) { assert(sc64_scarab_impact_unpack(&race_impact_rows[0],&packet));assert(packet.ticks==(unsigned)step-1); }
     }
+    int upgraded_hp=b[building].hp;
+    guardian_test_restore(before);assert(race_load_game());
+    sc64_scarab_probe_damage_upgrades=0;
+    for (int step=6;step>0;--step) {
+        while (!sc64_battlecruiser_source_tick_due()) ++frame;
+        race_impact_tick();++frame;
+    }
+    assert(b[building].hp-upgraded_hp==25);
     /* Test each new element independently under the old authenticated pairs.
      * These are deliberately retagged rejection probes; the fallback is the
      * independently produced genuine predecessor, not a retagged fixture. */
