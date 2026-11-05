@@ -65,7 +65,8 @@ int main(void)
     for(int i=0;i<MAX_UNITS;i++)
         if(u[i].alive && u[i].type==U_Z7_EGG && u[i].target==U_MUTALISK) egg=i;
     assert(egg>=0 && u[egg].raw_owner==3);
-    while(u[egg].alive && u[egg].type==U_Z7_EGG) race_z7_egg_tick_unit(egg);
+    for (int tick=0;tick<750 && u[egg].alive && u[egg].type==U_Z7_EGG;++tick)
+        race_z7_egg_tick_unit(egg);
     assert(u[egg].alive && u[egg].type==U_MUTALISK && u[egg].raw_type==43 && u[egg].raw_owner==3);
     before_ore=minerals; before_gas=gas;
     assert(race_guardian_morph_start(egg));
