@@ -42,6 +42,30 @@ int main(int argc,char **argv)
     int muta=spawn_unit(SIDE,U_MUTALISK,350,350);assert(muta>=0);
     assert(race_guardian_morph_start(muta));
     assert(u[muta].type==U_GUARDIAN_COCOON && minerals==135 && gas==100);
+    /* Identify a rejected row without mutating the candidate. */
+    for(int i=0;i<MAX_UNITS;i++) {
+        Unit w,sw;
+        if (!sc64_guardian_wire_encode(&u[i],&w,1)) {
+            fprintf(stderr,"guardian wire rejected slot %d type %d raw %d\n",i,u[i].type,u[i].raw_type);break;
+        }
+        if (w.alive && (w.type==U_SCARAB || w.raw_type==85) &&
+            !sc64_scarab_waypoint_to_wire(&w,&w,(unsigned)(race_cols*16),(unsigned)(race_rows*16),15u,SC64_ACTOR_WAYPOINT_CODEC)) {
+            fprintf(stderr,"waypoint wire rejected slot %d\n",i);break;
+        }
+        if (!race_scarab_save_wire(&w,&sw)) { fprintf(stderr,"flight wire rejected slot %d\n",i);break; }
+        if(sw.type==SC64_SHARED_EGG_TYPE && !sw.alive)memset(&sw,0,sizeof(sw));
+#ifdef SC64_Z7_DERIVED_SAVE
+        Sc64DerivedUnitSave row;
+        if (!sc64_derived_unit_encode_for(&row,&sw,(unsigned)(race_cols*16),(unsigned)(race_rows*16),15)) {
+#else
+        Sc64P7TypedUnitSave row;
+        if (!sc64_p7_typed_unit_encode_for(&row,&sw,(unsigned)(race_cols*16),(unsigned)(race_rows*16),15)) {
+#endif
+            fprintf(stderr,"leaf wire rejected slot %d type %d raw %d hp %d maxhp %d cd %u shield %d flags %u path %d,%d timers %u,%u\n",
+                i,sw.type,sw.raw_type,sw.hp,sw.maxhp,(unsigned)sw.cd,sw.shield,(unsigned)sw.flags,
+                sw.path_x,sw.path_y,(unsigned)sw.path_timer,(unsigned)sw.path_retry);break;
+        }
+    }
     assert(race_save_game());RaceLoadPlan plan;GbaSaveSelection selected;
     assert(race_worker_cargo_select(&plan,&selected));
     assert(selected.tag==SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION &&
