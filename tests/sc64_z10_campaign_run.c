@@ -165,7 +165,7 @@ int main(int argc,char **argv)
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==SC64_Z10_GLOBAL_ID);
     census("launch",0);
     int next_observe=0;
-    int saved=0,turn=0,leg=0,rush=0,next_checkpoint=2000,next_mine=0,next_train=0,next_build=100,next_gas=400,next_hatch=100,next_rally=1500,next_order=0,next_save_build=0,next_stream=0,next_defend=0,next_runner=0,runner=-1,next_static=0;
+    int saved=0,turn=0,leg=0,rush=0,next_checkpoint=2000,next_mine=0,next_train=0,next_build=100,next_gas=400,next_hatch=100,next_rally=1500,next_order=0,next_save_build=0,next_stream=0,next_defend=0,next_runner=0,runner=-1,next_static=0,next_tech=0;
     const int drone_goal=knob("Z10_DRONES",16),hatch_goal=knob("Z10_HATCH",7),gas_drones=3,hydra_cap=knob("Z10_CAP",110);
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
         if(frame >= next_observe) {
@@ -352,6 +352,26 @@ int main(int argc,char **argv)
             else if(count_buildings(B_SPAWNING_POOL,1)&&!count_buildings(B_EXTRACTOR,0)&&minerals>=50&&drone_count()>=6)
                 (void)build_extractor_near(608,1712);
             next_build=frame+240;
+        }
+        COST(12)
+        /* Normal build and research commands; no direct upgrade state changes. */
+        if(frame>=next_tech){
+            int chamber=count_buildings(B_EVOLUTION_CHAMBER,1);
+            if(!count_buildings(B_EVOLUTION_CHAMBER,0)&&count_buildings(B_HYDRALISK_DEN,1)&&minerals>=150&&drone_count()>=5){
+                int bm=minerals,bg=gas,accepted=build_near(B_EVOLUTION_CHAMBER,MENU_ENG_BAY,ax+100,ay-140,128);
+                fprintf(trace,"{\"kind\":\"tech_build\",\"frame\":%u,\"accepted\":%d,\"before\":[%d,%d],\"after\":[%d,%d]}\n",(unsigned)frame,accepted,bm,bg,minerals,gas);
+            } else if(chamber&&minerals>=100&&gas>=100){
+                int which=weapons_level<2&&!weapons_research?MENU_WEAPONS:
+                          armor_level<2&&!armor_research?MENU_ARMOR:-1;
+                if(which>=0){
+                    int bm=minerals,bg=gas,bp=which==MENU_WEAPONS?weapons_research:armor_research;
+                    int menu_ok=choose_row(which);
+                    int ap=which==MENU_WEAPONS?weapons_research:armor_research;
+                    fprintf(trace,"{\"kind\":\"research\",\"frame\":%u,\"row\":%d,\"menu_ok\":%d,\"accepted\":%d,\"before\":[%d,%d],\"after\":[%d,%d]}\n",(unsigned)frame,which,menu_ok,ap>bp,bm,bg,minerals,gas);
+                    close_menus();
+                }
+            }
+            next_tech=frame+300;
         }
         COST(11)
         /* Build and morph ordinary creep colonies to defend the hive approach. */
