@@ -37,6 +37,11 @@
 /* Every macro that selects actor facts or enum values in race_rules.h, its
  * actor-rule headers and sc64_game_actor_facts.h. tests/test_sc64_fact_tables.py
  * checks this list against those headers' preprocessor conditions. */
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#define SC64_FACT_EGG_WIRE_GATE(X) X(SC64_SHARED_EGG_WIRE_HOST_STAGE)
+#else
+#define SC64_FACT_EGG_WIRE_GATE(X)
+#endif
 #define SC64_FACT_GATES(X) \
     X(SC64_RACES) X(SC64_UNIFIED) X(SC64_ZP_CAMPAIGN_ACTORS) \
     X(SC64_ZP_CAMPAIGN_STORAGE) X(SC64_Z3_ENABLED) X(SC64_P3_ENABLED) \
@@ -52,7 +57,7 @@
     X(SC64_P10_DATA_ENABLED) X(SC64_SKIRMISH_ROSTER) X(SC64_BATTLECRUISER_EXPERIMENT) \
     X(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) X(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) \
     X(SC64_SCARAB_RUNTIME) X(SC64_SHARED_TRANSPORT) X(SC64_Z9_RUNTIME) \
-    X(SC64_Z10_RUNTIME)
+    X(SC64_Z10_RUNTIME) SC64_FACT_EGG_WIRE_GATE(X)
 
 #define SC64_FACT_STR(x) #x
 #define SC64_FACT_XSTR(x) SC64_FACT_STR(x)
