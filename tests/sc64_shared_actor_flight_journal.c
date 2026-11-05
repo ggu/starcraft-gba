@@ -7,7 +7,20 @@ int main(int argc,char **argv)
 {
     assert(argc==2);FILE *f=fopen(argv[1],"rb");assert(f);
     assert(fread(sram,1,sizeof(sram),f)==sizeof(sram));assert(!fclose(f));
-    guardian_test_reset();game_init();guardian_test_restore(sram);assert(race_load_game());
+    guardian_test_reset();game_init();guardian_test_restore(sram);
+    if (!race_load_game()) {
+        u32 len=0;RaceLoadPlan diagnostic;
+        int read=save_read_latest(&race_impact_record,sizeof(race_impact_record),SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,&len);
+        int prep=read && race_worker_cargo_prepare_selected(&race_impact_record,len,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,&diagnostic);
+        fprintf(stderr,"old candidate read=%d prepared=%d length=%u\n",read,prep,(unsigned)len);
+        if(read && diagnostic.guardian_auth.candidate) {
+            const Sc64StageSaveAuth *guard_auth=&diagnostic.guardian_auth;
+            fprintf(stderr,"old candidate guardian=%d scarab=%d auth=%u\n",
+                race_guardian_candidate_valid(&race_data,1024,1024,guard_auth),
+                race_scarab_save_candidate_valid(&race_data,1024,1024,guard_auth),guard_auth->features);
+        }
+        return 1;
+    }
     int p=-1,egg=-1;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive) {
         if(u[i].type==U_REAVER && u[i].x==300)p=i;
         if(u[i].type==SC64_SHARED_EGG_TYPE)egg=i;
