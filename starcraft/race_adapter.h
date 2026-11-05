@@ -687,6 +687,9 @@ static int race_queue_unit(int owner, int producer, int type)
        existing product list until independent production is qualified there. */
     if (type == U_SCOURGE && !race_z7_active()) return 0;
 #endif
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    if (!race_zerg_campaign_product_available(owner, sc64_race_raw_unit(type))) return 0;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_airborne(producer)) return 0;
 #endif
@@ -830,6 +833,9 @@ static int race_build_request_valid(int owner, int worker, int type,
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     if (owner < 0 || owner > 4 || !x || !y) return 0;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    if (!race_zerg_campaign_product_available(owner, sc64_race_raw_building(type))) return 0;
+#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (type==B_CREEP_COLONY && race_colony_profile_allowed() &&
         !race_colony_product_allowed(owner,worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,type)) return 0;
