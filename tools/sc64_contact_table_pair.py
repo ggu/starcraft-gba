@@ -26,6 +26,7 @@ with open('/tmp/sc64-native-build-20261031.lock','a+') as lock:
    if shutil.disk_usage(root).free<2*1024**3:raise SystemExit('less than 2 GiB free')
    extra=['-DSC64_CONTACT_MASK_TABLE','-Ibuild/generated'] if mode=='table' else []
    exe=out/mode;trace=out/(mode+'.bin');cmd=['clang','-std=c11','-O1','-g','-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-variable','-fsanitize=address,undefined','-DGBA_HOST','-Icommon',*flags,*extra,source,*sources,'-o',str(exe)]
+   (out/(mode+'-argv.json')).write_text(json.dumps(cmd,indent=2)+'\n')
    subprocess.run(cmd,cwd=root,check=True,stdout=log,stderr=log);env=dict(os.environ,**{envname:str(trace)});subprocess.run([str(exe)],cwd=root,env=env,check=True,stdout=log,stderr=log)
  left=(out/'baseline.bin').read_bytes();right=(out/'table.bin').read_bytes();print('bytes',len(left),'equal',left==right,'sha256',hashlib.sha256(left).hexdigest());
- if left!=right:raise SystemExit(1)
+ if not left or left!=right:raise SystemExit(1)
