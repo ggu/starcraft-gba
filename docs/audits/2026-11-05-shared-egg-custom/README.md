@@ -134,6 +134,65 @@ RAM guards were checked under the native lock. Private receipts are
 `/tmp/sc64-custom-egg-fenced-qualification.log` and
 `/tmp/sc64-custom-egg-fenced-receipt.json`.
 
+## Pre-cargo campaign compatibility successor
+
+The custom candidate originally retained the selected predecessor's inner
+version so that its authentication context remained bound. The Z6 and Z7
+campaign validators nevertheless required the current version, so they
+rejected a genuine pre-cargo journal that the normal reader accepted. This
+was reproduced on `85cb8c32` with a clean `17dc9b3e` normal HOST writer
+compiled with the canonical Z7 flags and `-USC64_WORKER_CARGO_KIND`. The Z7
+fixture constructed and paid for a Drone Egg; the Z6 fixture saved the
+initial scenario. These are HOST-constructed states, not ordinary-input guest
+proof. The separate fresh normal reader loaded each file, and the opt-in
+reader rejected each. Their private SRAM hashes were respectively
+`d60a265c87aa75e3189bbfeecc850b127ae66af9d96f94d5596b13b37792cc74`
+and `4ef1264eaddcd38c09f021937be57b3699d25b13a21fae0adbc74ec2d6d3dad5`.
+
+At source successor `6ba76f8e86b5bcc68a621457e071f333d5f8d007`, the Z6 and
+Z7 load preflight permits the predecessor version only after successful cargo
+preparation and only when the selected context has the exact legacy outer
+and inner pair, zero staged features, and the same candidate pointer. It
+passes that expected version to the campaign validator; it does not rewrite
+the inner version behind the token. Save-time validation still requires the
+current version. An independent read-only review found no actionable issue
+in this scoped change; it did not execute tests.
+
+Fresh HOST readers at that successor restored both actual predecessor files,
+as well as newly generated equivalents from the same old writer. Tests also
+rejected wrong candidate pointers, changed token versions, and checksum-valid
+outer/inner mismatches. A malformed newer candidate fell back to the older
+pre-cargo slot, without changing the HOST SRAM; mismatch checks also compared
+the live unit and building arrays. The fixture is deliberately HOST-only:
+never import its constructed SRAM into a guest. To reproduce it, provide a
+clean matching `17dc9b3e` checkout and a new private output directory:
+
+```sh
+make -f tests/sc64-shared-egg-custom/Makefile pre-cargo-campaign-build \
+  PRE_CARGO_OLD_ROOT=/path/to/clean/17dc-checkout \
+  PRE_CARGO_OUT=/path/to/new/private-output
+```
+
+Run `campaign-old-writer`, `campaign-normal-reader`, and
+`campaign-optin-reader` from that output directory in separate processes for
+mission arguments `6` and `7`, passing each the same new HOST save path. The
+complete guarded run and hashes are in the private
+`/tmp/sc64-pre-cargo-egg-compat-v2/qualification.json` and `qualify.log`.
+
+At `6ba76f8e`, the five custom controller/render and Egg journal HOST
+vectors, Z7 ordinary-envelope campaign fixture, and compile-fence checks also
+passed. Opt-in Z7 and Z9 ARM ROM/header/RAM checks passed; their ROM hashes
+were `9779755a7c5343a6574682b28ee7e40d5090ded03211770b3560282a26a89860`
+and `66ac6e8cf5a66b8703cca31c293cc8e05eada66a7bba31c924e862fe465fca50`.
+These changed opt-in ROMs do not inherit the earlier Terran ARM playthrough
+as proof of their own gameplay. Service-off Z7 and Z9 ROMs rebuilt from
+`801eb1c2` and `6ba76f8e` were byte-identical for their respective profiles.
+The private ARM and service-off comparison receipts are
+`/tmp/sc64-pre-cargo-egg-compat-v2/arm/receipt.json` and
+`/tmp/sc64-pre-cargo-egg-compat-v2/normal-compare-receipt.json`. All runs
+were serialized and verified clean source and 1,959 pinned inputs before and
+after. Other product and guest qualification remains separate.
+
 ## Remaining work
 
 This evidence covers one ARM ROM and one custom-game configuration; it does
