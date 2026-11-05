@@ -13,9 +13,9 @@ test-sc64-terran-full-campaign: test-sc64-text-box-game
 TEXT_BOX_OUTCOME_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
 TEXT_BOX_OUTCOME_DEPS = tests/sc64_text_box_outcome_regression.c tests/sc64_text_box_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile mk/text-box-game/Makefile
 build/test-sc64-text-box-outcome-terran: $(TEXT_BOX_OUTCOME_DEPS) $(TERRAN_FULL_INPUTS) | build
-	$(CLANG) $(TEXT_BOX_OUTCOME_HOST_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
+	$(CLANG) $(TEXT_BOX_OUTCOME_HOST_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 build/test-sc64-text-box-outcome-protoss: $(TEXT_BOX_OUTCOME_DEPS) $(PROTOSS_P10_INPUTS) | build
-	$(CLANG) $(TEXT_BOX_OUTCOME_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+	$(CLANG) $(TEXT_BOX_OUTCOME_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 .PHONY: test-sc64-text-box-outcome-terran test-sc64-text-box-outcome-protoss test-sc64-text-box-outcomes
 test-sc64-text-box-outcome-terran: build/test-sc64-text-box-outcome-terran
 	./$< t1-defeat
