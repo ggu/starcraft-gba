@@ -603,8 +603,14 @@ static void sc64_p7_arbiter_cache_source_tick(void)
             int cols=(WORLD_W+63)/64, rows=(WORLD_H+63)/64;
             if (x0<0)x0=0; if(y0<0)y0=0;
             if(x1>=cols)x1=cols-1; if(y1>=rows)y1=rows-1;
+            /* Every aura target must have the Arbiter's compact owner. An
+             * active index was built from validated owner lists; retain the
+             * full traversal for malformed owner values. The raw-source
+             * checks below still distinguish collapsed source identities. */
+            int owner_first = (unsigned)u[i].owner < 5u ? u[i].owner : 0;
+            int owner_end = (unsigned)u[i].owner < 5u ? u[i].owner + 1 : 5;
             for (int cy=y0;cy<=y1;++cy) for(int cx=x0;cx<=x1;++cx)
-                for(int owner=0;owner<5;++owner) {
+                for(int owner=owner_first;owner<owner_end;++owner) {
                     int cell=cx+cy*SC64_TARGET_GRID_COLS;
                     Sc64TargetIndex ent=sc64_target_head[owner][cell];
                     while(ent!=SC64_TARGET_NONE) {
