@@ -377,7 +377,8 @@ static int race_z8_save_pack(Sc64Z8PersistentState *out)
 
 /* Validate a candidate without touching live state; `scratch` is a
  * transient engine buffer. On success with `apply`, install it. */
-static int #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static int
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
 race_z8_save_unpack_for(const Sc64Z8PersistentState *in,
                                Sc64Z8SchedulerState *scratch, int apply,int egg_stage)
 #else
