@@ -89,9 +89,31 @@ static void mixed_fallback(void)
     assert(race_worker_cargo_select(&plan,&selected));
     assert(selected.tag==SC64_TRANSPORT_SAVE_VERSION && plan.guardian_auth.features==0);
 }
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+/* One paid Carrier order and one paired Egg need two additional unit slots;
+ * an already-allocated training child would already occupy a live slot. */
+static void carrier_reservation(void)
+{
+    guardian_test_reset();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;
+    race_skirmish_map=0;race_bot_races[0]=R_ZERG;init_state();assert(screen==SCREEN_PLAY);
+    minerals=1000;int carrier=spawn_unit(SIDE,U_P7_CARRIER,100,100);assert(carrier>=0);
+    assert(race_p7_carrier_training_queue(carrier));
+    int egg=add_actor(SC64_SHARED_EGG_TYPE,36,U_ZERGLING,300,140);
+    u[egg].owner=ENEMY;u[egg].selected=0;
+    int last=-1,free_slots=0;
+    for(int i=0;i<MAX_UNITS;i++)free_slots+=!u[i].alive;
+    while(free_slots>1) {last=spawn_unit(ENEMY,U_DRONE,160,160);assert(last>=0);--free_slots;}
+    assert(last>=0 && !race_save_game());
+    hit_target(last,9999,U_MARINE,SIDE);
+    assert(race_save_game());
+}
+#endif
 int main(void)
 {
     exercise(0);exercise(SC64_STAGE_SAVE_GUARDIAN);exercise(SC64_STAGE_SAVE_EGG);
     exercise(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG);mixed_fallback();
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    carrier_reservation();
+#endif
     puts("Guardian/Egg real journal feature contexts passed");return 0;
 }
