@@ -31,7 +31,7 @@ int main(int argc,char **argv)
     assert(race_scarab_parent_read(p,0,&parent,&counts));int child=parent.active_slot;
     for(int i=0;i<SC64_SCARAB_BUILD_TICKS;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
     assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
-    int target=spawn_unit(ENEMY,U_ZERGLING,u[p].x+10,u[p].y);assert(target>=0);
+    int target=spawn_unit(ENEMY,U_ZERGLING,u[p].x,u[p].y+60);assert(target>=0);
     race_scarab_probe_parent_attack(p,target);assert(u[child].order==1 && u[child].target==target);
     assert(race_save_game());RaceLoadPlan plan;GbaSaveSelection selected;
     assert(race_worker_cargo_select(&plan,&selected));
@@ -46,6 +46,17 @@ int main(int argc,char **argv)
     assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
     assert(race_scarab_child_fields_read(u[child].carry,u[child].work_timer,&fields));
     assert(fields.life==90 && fields.no_collision==7 && u[child].order==2);
+    /* Advance the actual autonomous dispatcher to produce a route waypoint;
+     * unlike the earlier initialization checks this exercises nonzero packed
+     * motion, including both previous source-coordinate waypoint fields. */
+    race_scarab_control_dispatch(child);
+    assert(u[child].alive && u[child].order==2 &&
+           (u[child].path_timer>24 || u[child].path_retry>12));
+    Unit motion=u[child];assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
+    assert(u[child].x==motion.x && u[child].y==motion.y && u[child].carry==motion.carry &&
+           u[child].cd==motion.cd && u[child].weapon==motion.weapon &&
+           u[child].path_timer==motion.path_timer && u[child].path_retry==motion.path_retry &&
+           u[child].path_x==motion.path_x && u[child].path_y==motion.path_y);
     /* Drive the real FSM to its arrived phase with a controlled arrival signal. */
     assert(race_scarab_flight_control_tick(child,1,0)==SC64_SCARAB_CONTROL_ARRIVED);
     assert(u[child].order==4 && u[child].target==target);
