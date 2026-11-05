@@ -26,6 +26,8 @@ typedef struct { int x,y,hp,maxhp,owner,type,alive,selected,cd,order,tx,ty,carry
 typedef struct { int x,y,hp,owner,type,alive,queue[5],queue_head,queue_count,queue_progress,build_progress,under_construction,level,shield,maxhp,raw_type,raw_owner,flags,larva,larva_timer,shield_remainder; } Building;
 #include "../starcraft/sc64_derived_save.h"
 #include "../starcraft/sc64_p7_typed_unit_save.h"
+#include "../starcraft/sc64_scarab_flight_bridge.h"
+#include "../starcraft/sc64_scarab_waypoint_bridge.h"
 
 int main(void) {
     sc64_race_unit_rules[U_OVERLORD].hp=200;
@@ -68,6 +70,28 @@ int main(void) {
     assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,2));
     assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,2));
     assert(out.raw_type==59 && out.maxhp==200 && out.armor==0);
+    /* Compose both transforms and both real leaf codecs with large previous
+     * source waypoints and nonzero flight motion bits. */
+    Unit motion={0}, packed, unpacked;
+    motion.x=motion.y=motion.tx=motion.ty=10; motion.path_x=200; motion.path_y=180;
+    motion.type=U_SCARAB; motion.raw_type=85; motion.owner=1; motion.raw_owner=3;
+    motion.hp=motion.maxhp=20; motion.alive=1; motion.carry=2<<8;
+    motion.work_timer=10; motion.order=2; motion.build=-1; motion.target=-1;
+    motion.weapon=3; motion.path_timer=4000; motion.path_retry=3000;
+    assert(sc64_scarab_waypoint_to_wire(&motion,&packed,2048,2048,1));
+    assert(sc64_scarab_flight_to_wire(&packed,&packed,1,0));
+    assert(sc64_derived_unit_encode_for(&d,&packed,2048,2048,15));
+    assert(sc64_derived_unit_decode_for(&unpacked,&d,2048,2048,15));
+    assert(sc64_scarab_flight_from_wire(&unpacked,&unpacked,1,0));
+    assert(sc64_scarab_waypoint_from_wire(&unpacked,&unpacked,2048,2048,1));
+    assert(unpacked.path_timer==4000 && unpacked.path_retry==3000 && unpacked.weapon==3 &&
+           unpacked.carry==motion.carry && unpacked.work_timer==motion.work_timer);
+    assert(sc64_p7_typed_unit_encode_for(&t,&packed,2048,2048,15));
+    assert(sc64_p7_typed_unit_decode_for(&unpacked,&t,2048,2048,15));
+    assert(sc64_scarab_flight_from_wire(&unpacked,&unpacked,1,0));
+    assert(sc64_scarab_waypoint_from_wire(&unpacked,&unpacked,2048,2048,1));
+    assert(unpacked.path_timer==4000 && unpacked.path_retry==3000 && unpacked.weapon==3 &&
+           unpacked.carry==motion.carry && unpacked.work_timer==motion.work_timer);
     u.raw_type=36; u.target=-1; u.work_timer=0;
     assert(sc64_derived_unit_encode(&d,&u,100,100));
     assert(sc64_derived_unit_decode(&out,&d,100,100) && out.raw_type==36);
