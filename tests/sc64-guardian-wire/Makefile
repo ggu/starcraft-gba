@@ -163,3 +163,9 @@ guardian-combined-full-facts-distinct:
 	$(GUARD_COMBINED_FACT_DIR)/distinct/generator > $(GUARD_COMBINED_FACT_DIR)/distinct/sc64_fact_tables_generated.h
 	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Icommon -Istarcraft -I$(GUARD_COMBINED_FACT_DIR)/distinct -DGBA_HOST -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_FACT_SIGHT_TABLES $(GUARD_COMBINED_FACT_FLAGS) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-combined-facts-distinct
 	$(GUARD_TEST_BIN_DIR)/guardian-combined-facts-distinct
+# Explicit staged early-permission input; normal flags remain unchanged.
+GUARD_EARLY_PERMISSION_DIR ?= .local/guardian-early-permissions-stage
+.PHONY: guardian-early-permissions
+guardian-early-permissions:
+	$(CLANG) $(GUARD_HOST) -DSC64_EARLY_ZERG_PERMISSIONS -I$(GUARD_EARLY_PERMISSION_DIR) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_early_permissions_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-early-permissions
+	$(GUARD_TEST_BIN_DIR)/guardian-early-permissions
