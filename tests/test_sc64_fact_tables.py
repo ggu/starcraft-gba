@@ -165,7 +165,8 @@ class FactTablesTest(unittest.TestCase):
                       "SC64_SCARAB_STABLE_ROSTER_HOST_STAGE", "SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE",
                       "SC64_SHARED_ACTOR_FULL_HOST_STAGE")
         with tempfile.TemporaryDirectory(prefix="sc64-guardian-fact-required-") as directory:
-            table = generate(self.compiler, incomplete, directory, "incomplete")
+            table = generate(self.compiler, incomplete + ("SC64_GUARDIAN_FULL_FACTS_STAGE",),
+                             directory, "complete")
             built, _ = compile_program(self.compiler, CHECK, incomplete + ("SC64_FACT_TABLES",),
                                        directory, "must-reject", ("-I", str(table)))
             self.assertNotEqual(built.returncode, 0)
