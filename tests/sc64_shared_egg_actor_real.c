@@ -26,14 +26,15 @@ int main(void)
     /* Compare the actual full-world, bucket, and cached predicates at a
      * distance that the source Egg's radius 8 blocks but radius 6 misses. */
     for(int i=0;i<MAX_UNITS;i++)if(i!=slot)u[i].alive=0;
-    u[slot].x=507;u[slot].y=500;
-    int mover=spawn_unit(SIDE,U_DRONE,500,500);assert(mover>=0 && mover!=slot);
+    int x=WORLD_W/2,y=WORLD_H/2;assert(x>8 && x+8<WORLD_W && y>8 && y+8<WORLD_H);
+    u[slot].x=x+7;u[slot].y=y;
+    int mover=spawn_unit(SIDE,U_DRONE,x,y);assert(mover>=0 && mover!=slot);
     u[mover].order=ORDER_IDLE;
-    sc64_unit_buckets_begin();
-    assert(!unit_step_clear_race_fallback(&u[mover],501,500));
-    assert(!sc64_unit_bucket_step_clear_reference(&u[mover],501,500,0));
+    sc64_unit_buckets_begin();assert(sc64_unit_bucket_active);
+    assert(!unit_step_clear_race_fallback(&u[mover],x+1,y));
+    assert(!sc64_unit_bucket_step_clear_reference(&u[mover],x+1,y,0));
 #ifdef SC64_CONTACT_CACHE
-    assert(!sc64_contact_step_clear(&u[mover],501,500,0));
+    assert(!sc64_contact_step_clear(&u[mover],x+1,y,0));
 #endif
     sc64_unit_buckets_end();
     puts("Egg staged facts, selected HUD and live collision predicates passed");return 0;
