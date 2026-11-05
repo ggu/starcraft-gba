@@ -51,7 +51,7 @@ static void stock_by_buttons(int row)
     input(0);
 }
 
-static void write_progress(const char *path)
+static void write_controller_progress(const char *path)
 {
     setup_options();
     /* Explicit setup only: ample synthetic funds and initially idle workers.
@@ -84,7 +84,7 @@ static void write_progress(const char *path)
     printf("buttons built tech, produced Reaver and stocked Scarab; saved at tick %u\n",host_ticks);
 }
 
-static void read_progress(const char *path)
+static void read_controller_progress(const char *path)
 {
     FILE *f=fopen(path,"rb");assert(f && fread(controller_sram,1,sizeof(controller_sram),f)==sizeof(controller_sram));
     assert(!fclose(f));setup_options();guardian_test_restore(controller_sram);
@@ -103,7 +103,7 @@ static void read_progress(const char *path)
 int main(int argc,char **argv)
 {
     assert(argc==3);
-    if(!strcmp(argv[1],"write"))write_progress(argv[2]);
-    else {assert(!strcmp(argv[1],"read"));read_progress(argv[2]);}
+    if(!strcmp(argv[1],"write"))write_controller_progress(argv[2]);
+    else {assert(!strcmp(argv[1],"read"));read_controller_progress(argv[2]);}
     return 0;
 }
