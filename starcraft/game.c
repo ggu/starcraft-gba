@@ -10,7 +10,7 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_SERVICE)
 #include "sc64_stage_save_auth.h"
 #endif
 #include "sc64_text_box_hook.h"
@@ -284,7 +284,16 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_Z7_COLONY_DEFENSE_ENABLED) && !defined(SC64_Z7_RUNTIME)
 #error "Z7 colony defense requires the Z7 runtime"
 #endif
-#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && (!defined(GBA_HOST) || !defined(SC64_RACES))
+/* Explicit, disabled-by-default integration for custom games. */
+#ifdef SC64_SHARED_EGG_CUSTOM_SERVICE
+#define SC64_SHARED_EGG_WIRE_HOST_STAGE 1
+#define SC64_SHARED_EGG_CUSTOM_CANDIDATE 1
+#define SC64_SHARED_EGG_PRODUCER_HOST_STAGE 1
+#if !defined(SC64_RACES) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || !defined(SC64_SHARED_SCOURGE_COMBAT) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SCARAB_NAMESPACE_STAGE)
+#error "Custom Egg service requires authenticated custom transport without competing staged namespaces"
+#endif
+#endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_SERVICE)) || !defined(SC64_RACES))
 #error "Shared Egg wire identity is HOST-only and requires race rules"
 #endif
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
@@ -321,9 +330,10 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Shared Egg candidate is HOST-only and requires the Z9 Egg vector"
 #endif
 #if defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE) && \
-    (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || \
+    ((!defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && \
+      (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE))) || \
      !defined(SC64_SHARED_SCOURGE_COMBAT))
-#error "Shared Egg producer is an authenticated HOST-only custom candidate"
+#error "Shared Egg producer requires an authenticated custom candidate"
 #endif
 #if defined(SC64_Z7_EGG_PRODUCTION) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
 #define SC64_EGG_RUNTIME 1
@@ -2028,7 +2038,7 @@ static int race_impact_save_write(void);
 static int race_impact_save_read(Sc64ImpactEvent *candidate, int *count);
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_WORKER_CARGO_KIND)
 static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count);
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
 static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth);
 #endif
 #endif

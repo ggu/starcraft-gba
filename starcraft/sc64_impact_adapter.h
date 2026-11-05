@@ -278,6 +278,9 @@ race_impact_save_write(void)
         SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION : SC64_GUARDIAN_TRANSPORT_SAVE_VERSION)
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG (race_data.version==SC64_SHARED_EGG_SAVE_VERSION ? SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
@@ -337,7 +340,7 @@ race_impact_save_write(void)
         SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION : SC64_GUARDIAN_TRANSPORT_SAVE_VERSION)
-#elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
+#elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG (race_data.version==SC64_SHARED_EGG_SAVE_VERSION ? SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
@@ -379,7 +382,7 @@ race_impact_save_write(void)
 /* Decode an already-selected raw envelope in race_impact_record.  This may
  * rearrange that scratch record, but never reads SRAM or changes live state. */
 static int
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
 race_impact_save_decode_selected_impl(u32 len, u32 selected_tag,
                                  Sc64ImpactEvent *candidate, int *count,u32 authenticated_inner)
 #else
@@ -387,7 +390,7 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
                                  Sc64ImpactEvent *candidate, int *count)
 #endif
 {
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     (void)authenticated_inner;
 #endif
     int rows;
@@ -429,7 +432,7 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     if (len < base) return 0;
     if (!legacy) {
         if (race_data.version !=
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
             (authenticated_inner ? authenticated_inner : selected_tag) ||
 #else
             selected_tag ||
@@ -467,7 +470,7 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     return 1;
 }
 
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
 static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count)
 { return race_impact_save_decode_selected_impl(len,tag,candidate,count,0); }
 static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth)
@@ -476,6 +479,10 @@ static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactE
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
         (auth->features & ~(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG)) ||
         tag!=(auth->features ? SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+        (auth->features & ~SC64_STAGE_SAVE_EGG) ||
+        tag!=((auth->features & SC64_STAGE_SAVE_EGG) ?
+              SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
 #else
         (auth->features & ~SC64_STAGE_SAVE_GUARDIAN) ||
         tag!=((auth->features & SC64_STAGE_SAVE_GUARDIAN) ?

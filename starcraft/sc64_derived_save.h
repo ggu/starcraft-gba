@@ -53,8 +53,8 @@ static int sc64_derived_unit_hp(int type) {
   int z = sc64_zp_actor_default_hp(type);
   if (z)
     hp = z;
-#ifdef SC64_Z7_EGG_PRODUCTION
-  if (type == U_Z7_EGG)
+#ifdef SC64_EGG_RUNTIME
+  if (type == SC64_EGG_ACTOR)
     hp = 200;
 #endif
   return hp;
@@ -83,7 +83,11 @@ static int sc64_derived_unit_encode(Sc64DerivedUnitSave *out, const Unit *q,
   unsigned k = 0;
   static const Unit zero = {0};
   if (!out || !q || !ww || !wh || ww > 2048 || wh > 2048 || q->type < 0 ||
-      q->type >= SC_RU_LEGACY_BOUND || q->type >= 64)
+      (q->type >= SC_RU_LEGACY_BOUND
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+       && q->type != SC64_SHARED_EGG_TYPE
+#endif
+      ) || q->type >= 64)
     return 0;
   if (!memcmp(q, &zero, sizeof(*q))) {
     *out = z;
