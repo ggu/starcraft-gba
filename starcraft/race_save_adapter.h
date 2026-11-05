@@ -43,6 +43,10 @@ static int race_guardian_stage_wire;
 /* Set only from the authenticated selected tag, before candidate decoding. */
 static int race_scarab_stage_wire;
 #endif
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#include "sc64_stage_save_auth.h"
+#define race_save_decode_unit race_save_decode_unit_raw_stage
+#endif
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
@@ -98,6 +102,33 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
 #endif
 #endif
 }
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#undef race_save_decode_unit
+/* The ordinary decoder never admits the appended Egg identity. Existing
+ * Z7's Egg ID is legacy and remains subject to its own mission validator. */
+static int race_save_decode_unit(const RaceSave *candidate,unsigned slot,
+                                 unsigned width,unsigned height,Unit *out)
+{
+    Unit decoded;
+    if (!out || !race_save_decode_unit_raw_stage(candidate,slot,width,height,&decoded)) return 0;
+#ifndef SC64_Z7_EGG_PRODUCTION
+    if (decoded.type==U_SHARED_EGG_STAGE) return 0;
+#endif
+    *out=decoded;return 1;
+}
+/* Dedicated primitive for a detached, already authenticated candidate. It
+ * is deliberately not wired into journal selection or publication yet. */
+static int race_save_decode_unit_authenticated(const RaceSave *candidate,unsigned slot,
+                                                unsigned width,unsigned height,Unit *out,
+                                                const Sc64StageSaveAuth *auth)
+{
+    Unit decoded;
+    if (!candidate || !out || !sc64_stage_save_auth_matches(auth,candidate,candidate->version,0) ||
+        !race_save_decode_unit_raw_stage(candidate,slot,width,height,&decoded)) return 0;
+    if (decoded.type==SC64_SHARED_EGG_TYPE && !(auth->features & SC64_STAGE_SAVE_EGG)) return 0;
+    *out=decoded;return 1;
+}
+#endif
 #endif
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_ZP_FULL_STORAGE)
 /* Codec-specific row writer; semantic conversion is performed by the caller. */

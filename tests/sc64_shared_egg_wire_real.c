@@ -38,6 +38,37 @@ int main(void)
     assert(ENC(&row,&q,2048,2048));assert(DEC(&out,&row,2048,2048));
     assert(!memcmp(&q,&out,sizeof(q)));
     assert(sc64_shared_egg_wire_valid(&out,1,custom_owner,0));
+    /* Candidate decoding has a legacy-only default; the explicit detached
+     * context is required for a new appended Egg identity. */
+    static RaceSave candidate,other;
+    candidate.version=SC64_SHARED_EGG_SAVE_VERSION;candidate.units[0]=row;
+    Unit sentinel;memset(&sentinel,0x5a,sizeof(sentinel));out=sentinel;
+#ifndef SC64_Z7_EGG_PRODUCTION
+    assert(!race_save_decode_unit(&candidate,0,2048,2048,&out));
+    assert(!memcmp(&out,&sentinel,sizeof(out)));
+#else
+    assert(race_save_decode_unit(&candidate,0,2048,2048,&out)); /* old Z7 identity */
+#endif
+    Sc64StageSaveAuth auth;
+    const Sc64StageTagPair pairs[]={
+        {SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0},
+        {SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION,SC64_STAGE_SAVE_EGG}
+    };
+    out=sentinel;assert(!race_save_decode_unit_authenticated(&candidate,0,2048,2048,&out,0));
+    assert(!memcmp(&out,&sentinel,sizeof(out)));
+    assert(sc64_stage_save_authenticate(&auth,&candidate,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
+                                        candidate.version,pairs,2));
+    assert(race_save_decode_unit_authenticated(&candidate,0,2048,2048,&out,&auth));
+    assert(!memcmp(&out,&q,sizeof(q)));
+    out=sentinel;assert(!race_save_decode_unit_authenticated(&other,0,2048,2048,&out,&auth));
+    assert(!memcmp(&out,&sentinel,sizeof(out)));
+    candidate.version=SAVE_VERSION;out=sentinel;
+    assert(!race_save_decode_unit_authenticated(&candidate,0,2048,2048,&out,&auth));
+    assert(!memcmp(&out,&sentinel,sizeof(out)));
+    Unit ordinary=q;ordinary.type=U_OVERLORD;ordinary.target=-1;ordinary.work_timer=0;
+    ordinary.armor=0;assert(ENC(&row,&ordinary,2048,2048));candidate.units[0]=row;
+    assert(race_save_decode_unit(&candidate,0,2048,2048,&out));
+    assert(out.type==U_OVERLORD && out.raw_type==36);
 #define BAD(field,value) do { Unit bad=q;bad.field=(value);assert(!sc64_shared_egg_wire_valid(&bad,1,custom_owner,0)); } while(0)
     BAD(raw_type,59);BAD(raw_owner,3);BAD(type,U_OVERLORD);BAD(target,U_MARINE);
     BAD(work_timer,0);BAD(work_timer,2048);BAD(hp,0);BAD(hp,201);BAD(armor,0);
