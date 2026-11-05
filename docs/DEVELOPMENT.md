@@ -29,8 +29,8 @@ Preparation verifies retained Z8/Z9 descriptors before reusing them, regenerates
 their matching trigger headers, and builds the expanded source sprite bank.
 Status checks the programs against authenticated descriptors, including source
 ROM/CHK provenance. Outputs remain private under `.local/` and `build/`.
-The explicit candidate retains `.local/play/zerg-z9` for its saves; this does
-not migrate Z7 saves or change the canonical `zerg` alias. See the current
+Canonical `zerg` and explicit `zerg-z9` share `.local/play/zerg-z9`; this does
+not migrate or overwrite the separate Z7 saves. See the current
 [Z9 qualification audit](audits/2026-11-05-z9-current-integration/README.md) for
 the remaining carried ARM and performance limits.
 
@@ -1326,7 +1326,7 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss builds
 
-The standard Zerg build includes its first seven missions. The canonical Protoss
+The standard Zerg build includes its first nine missions. The canonical Protoss
 target includes all ten Protoss missions. Explicit `protoss-p7` builds the P1–P7
 product that has passed its canonical presentation, save, host campaign and bounded
 ARM continuation checks, and explicit `protoss-p6` still builds the separately
@@ -1348,7 +1348,7 @@ flags and save identity remain separate.
 ```
 
 Replace `zerg` with `protoss` for the ten-mission product. The output pairs are
-`build/StarCraft-Zerg-Z7-Transport1-GBA.gba` / `build/starcraft-zerg-z7.elf` and
+`build/StarCraft-Zerg-Z9-Transport1-GBA.gba` / `build/starcraft-zerg-z9.elf` and
 `build/StarCraft-Protoss-P10-Transport1-GBA.gba` / `build/starcraft-protoss-p10.elf`.
 Explicit `protoss-p7` builds `build/StarCraft-Protoss-P7-Transport1-GBA.gba` /
 `build/starcraft-protoss-p7.elf`, and explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
@@ -1361,18 +1361,18 @@ save identity; versioned `-Z3` names are aliases. `protoss-p3` preserves the
 legacy P3 real files, code and save path. Retain matching
 frozen ROM/ELF pairs for replay.
 
-The canonical Zerg test target runs ordinary-input controllers for all seven
+The canonical Zerg test target runs ordinary-input controllers for all nine
 chapters under the canonical flags, normal-menu startup/save fixtures and
 the skirmish matrix, including all 234 combinations
 of map, human race and independently selected AI races. The setup/save matrix
 does not prove a completed match for every combination. Build guards still
 enforce the same IWRAM and EWRAM reserves.
 
-Canonical Zerg uses `SCZ7`, base save generation 36 in the Transport1 namespace, the Z7 storage/runtime and
-query flags, a word-packed inherited sprite bank under
-`.local/sc64/zerg-z6/generated`, and the canonical drawing flags. Preparing
-`zerg` also generates the Z5/Z6/Z7 inputs and that bank. Its save directory,
-`.local/play/zerg-z7-transport1`, is separate from explicit Z6, Z4 and Z3 profiles.
+Canonical Zerg uses `SCZ9`, base save generation 48 in the Transport1 namespace,
+the Z9 runtime and expanded Z8 sprite bank. Preparing `zerg` prepares Z7 first,
+then authenticates and prepares Z8/Z9. Canonical Zerg and explicit `zerg-z9`
+share `.local/play/zerg-z9`. Explicit Z7 retains `SCZ7`, generation 36 and
+`.local/play/zerg-z7-transport1`; no SRAM is migrated.
 Explicit `zerg-z6` retains its SCZ6 generation-32 ROM and `.local/play/zerg-z6`;
 no SRAM is automatically imported. The P7
 candidate uses `SCP7`, base generation 43 in the Transport1 namespace and `.local/play/protoss-p7-transport1`; its all-chapter
