@@ -163,3 +163,25 @@ guardian-combined-full-facts-distinct:
 	$(GUARD_COMBINED_FACT_DIR)/distinct/generator > $(GUARD_COMBINED_FACT_DIR)/distinct/sc64_fact_tables_generated.h
 	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Icommon -Istarcraft -I$(GUARD_COMBINED_FACT_DIR)/distinct -DGBA_HOST -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_FACT_SIGHT_TABLES $(GUARD_COMBINED_FACT_FLAGS) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-combined-facts-distinct
 	$(GUARD_TEST_BIN_DIR)/guardian-combined-facts-distinct
+
+# Feature-15 packed Scarab motion capability: isolated private fact paths.
+GUARD_COMBINED_FLIGHT_FLAGS = -DSC64_SHARED_ACTOR_FLIGHT_HOST_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE -DSC64_SCARAB_HUMAN_CONTROL_PROBE
+.PHONY: guardian-combined-flight-facts-p10 guardian-combined-flight-facts-z7 guardian-combined-flight-facts-distinct
+guardian-combined-flight-facts-p10:
+	mkdir -p $(GUARD_COMBINED_FACT_DIR)/flight-p10
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(GUARD_COMBINED_FACT_FLAGS) $(GUARD_COMBINED_FLIGHT_FLAGS) $(GUARD_FULL_P10_FLAGS) tools/sc64_fact_tables_gen.c -o $(GUARD_COMBINED_FACT_DIR)/flight-p10/generator
+	$(GUARD_COMBINED_FACT_DIR)/flight-p10/generator > $(GUARD_COMBINED_FACT_DIR)/flight-p10/sc64_fact_tables_generated.h
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft -I$(GUARD_COMBINED_FACT_DIR)/flight-p10 $(GUARD_COMBINED_FACT_FLAGS) $(GUARD_COMBINED_FLIGHT_FLAGS) $(GUARD_FULL_P10_FLAGS) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-combined-flight-facts-p10
+	$(GUARD_TEST_BIN_DIR)/guardian-combined-flight-facts-p10
+guardian-combined-flight-facts-z7:
+	mkdir -p $(GUARD_COMBINED_FACT_DIR)/flight-z7
+	$(CLANG) $(GUARD_HOST) -Istarcraft $(GUARD_COMBINED_FACT_FLAGS) $(GUARD_COMBINED_FLIGHT_FLAGS) $(filter-out -DSC64_FACT_TABLES,$(ZERG_Z7_CANONICAL_FLAGS)) tools/sc64_fact_tables_gen.c -o $(GUARD_COMBINED_FACT_DIR)/flight-z7/generator
+	$(GUARD_COMBINED_FACT_DIR)/flight-z7/generator > $(GUARD_COMBINED_FACT_DIR)/flight-z7/sc64_fact_tables_generated.h
+	$(CLANG) $(GUARD_HOST) -Istarcraft -I$(GUARD_COMBINED_FACT_DIR)/flight-z7 $(GUARD_COMBINED_FACT_FLAGS) $(GUARD_COMBINED_FLIGHT_FLAGS) $(filter-out -DSC64_FACT_TABLES,$(ZERG_Z7_CANONICAL_FLAGS)) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-combined-flight-facts-z7
+	$(GUARD_TEST_BIN_DIR)/guardian-combined-flight-facts-z7
+guardian-combined-flight-facts-distinct:
+	mkdir -p $(GUARD_COMBINED_FACT_DIR)/flight-distinct
+	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Icommon -Istarcraft -DGBA_HOST -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_FACT_SIGHT_TABLES $(GUARD_COMBINED_FACT_FLAGS) $(GUARD_COMBINED_FLIGHT_FLAGS) tools/sc64_fact_tables_gen.c -o $(GUARD_COMBINED_FACT_DIR)/flight-distinct/generator
+	$(GUARD_COMBINED_FACT_DIR)/flight-distinct/generator > $(GUARD_COMBINED_FACT_DIR)/flight-distinct/sc64_fact_tables_generated.h
+	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Icommon -Istarcraft -I$(GUARD_COMBINED_FACT_DIR)/flight-distinct -DGBA_HOST -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_FACT_SIGHT_TABLES $(GUARD_COMBINED_FACT_FLAGS) $(GUARD_COMBINED_FLIGHT_FLAGS) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-combined-flight-facts-distinct
+	$(GUARD_TEST_BIN_DIR)/guardian-combined-flight-facts-distinct
