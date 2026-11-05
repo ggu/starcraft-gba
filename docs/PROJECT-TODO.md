@@ -106,6 +106,42 @@ P0 items are completion/behavior blockers, not permission to skip their memory,
 save, source-boundary or regression gates. N1 and P1 should proceed alongside
 campaign work; late cosmetic work should not displace them.
 
+## Playable-production gate after the feature15 audit
+
+Read-only review of staged source at `2e6bc51c` found that the passing HOST
+service fixture begins with a spawned Reaver. The actual custom menu still
+excludes Support Bay raw171 and product admission rejects Reaver raw83. Paid
+ammo controls exist only under staged flags; capacity/damage research is
+unwired. These fixtures do not qualify a normal playable tech tree.
+
+Make the next C2 milestone the actual opt-in Support Bay/Robotics Facility
+prerequisites, paid Reaver production, menu ammunition, scheduled launch/impact,
+and genuine save continuation. First supply the source-slot-aware wallet and
+capture policy: Z8 and late-Zerg AI towns have distinct banks, while current
+generic Scarab stocking falls back to a combat-owner wallet outside the unit
+production bank swap. P7/P8 source-bank paths do not establish those contexts.
+Keep unsupported admission closed until the complete path is implemented; do
+not count a catalog row or a spawned actor as a playable product.
+
+AI stocking is a separate disabled probe with an authored per-tick policy;
+normal Reavers begin empty there and do not stock without it. Current source
+hangar bytes do not establish N64 starting ammunition. Research acquisition,
+native replenishment/launch observation and campaign mechanics remain required.
+
+For S1/S3, typed motion also needs its full heading/velocity pair: typed cooldown
+is eight bits while live Scarab motion uses sixteen. A live-Scarab-only HP
+container representation is feasible but unimplemented; dead hidden/training
+rows need explicit handling. The full writer still selects ZP rows and feature7;
+actual typed/derived writer, guarded decode, reverse bridges, old-writer/fallback
+and full selected-journal proof remain unfinished. Component codec tests do not
+close these gates.
+
+On 2026-11-06 the shared disk reached ENOSPC, so new builds and file creation
+stopped. Main PR300 and its six-ROM/unified/default qualification are preserved;
+prototype branches remain guest-disabled. Resume native work only with the
+existing disk/output reserve. This dated infrastructure condition does not
+reduce the campaign, custom-game, shared-engine or near-30-fps objective.
+
 ## Next concrete milestones after the Terra audit
 
 1. Promote the now guest-qualified opt-in late Egg service into one common
