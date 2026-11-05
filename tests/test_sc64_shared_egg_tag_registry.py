@@ -17,9 +17,37 @@ GEN = re.compile(r"(\d+)u$")
 EXPR = re.compile(r"(?:[A-Z0-9_]+|\([A-Z0-9_]+ [|^] 0x[0-9a-fA-F]{8}u\))$")
 
 
+LEGACY_NAMES = frozenset((
+    "SC64_RACE_SAVE_GENERATION", "SC64_BASE_SAVE_VERSION",
+    "SC64_LEGACY_SAVE_VERSION", "SC64_PRE_CARGO_SAVE_VERSION",
+    "SC64_WORKER_CARGO_LEGACY_SAVE_VERSION",
+    "SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION", "SAVE_VERSION",
+    "SC64_TRANSPORT_SAVE_VERSION", "SC64_SCARAB_SAVE_VERSION",
+    "SC64_SCARAB_TRANSPORT_SAVE_VERSION", "SC64_SHARED_CARRIER_SAVE_VERSION",
+    "SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION",
+))
+# Proposed selectors are checked separately, never folded into the legacy set.
+STAGE_EXPRESSIONS = {
+    "SC64_GUARDIAN_SAVE_VERSION": "(SAVE_VERSION ^ 0x10000000u)",
+    "SC64_GUARDIAN_TRANSPORT_SAVE_VERSION": "(SC64_TRANSPORT_SAVE_VERSION ^ 0x10000000u)",
+}
+
+
 def extract(data):
-    return [s.strip() for s in data.splitlines() if re.match(
-        r"#define (?:SC64_RACE_SAVE_GENERATION|SC64_BASE_SAVE_VERSION|SC64_LEGACY_SAVE_VERSION|SC64_PRE_CARGO_SAVE_VERSION|SC64_WORKER_CARGO_LEGACY_SAVE_VERSION|SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION|SAVE_VERSION|SC64_TRANSPORT_SAVE_VERSION|SC64_SCARAB_SAVE_VERSION|SC64_SCARAB_TRANSPORT_SAVE_VERSION|SC64_SHARED_CARRIER_SAVE_VERSION|SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION)\b", s)]
+    result = []
+    for line in data.splitlines():
+        match = re.match(r"\s*#define\s+([A-Za-z_][A-Za-z_0-9]*)\s+(.*?)\s*$", line)
+        if not match:
+            continue
+        name, expr = match.groups()
+        if name == "SC64_RACE_SAVE_GENERATION" or name.endswith("SAVE_VERSION"):
+            if name in LEGACY_NAMES:
+                result.append(line.strip())
+            elif name in STAGE_EXPRESSIONS and expr == STAGE_EXPRESSIONS[name]:
+                pass
+            else:
+                raise AssertionError("unregistered save version: " + line)
+    return result
 
 
 def catalog(definitions):
@@ -76,6 +104,13 @@ class SharedEggTags(unittest.TestCase):
             self.assertFalse(left & right)
         print("Egg registry:", len(records), "source snapshots,", len(old),
               "base values; legacy, Guardian, Egg, combined are disjoint")
+
+    def test_unregistered_save_name_fails_closed(self):
+        with self.assertRaises(AssertionError):
+            extract("#define SC64_FUTURE_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)")
+        with self.assertRaises(AssertionError):
+            extract("#define SC64_GUARDIAN_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)")
+        self.assertEqual(extract("#define SC64_GUARDIAN_SAVE_VERSION (SAVE_VERSION ^ 0x10000000u)"), [])
 
     def test_unknowns_fail_closed(self):
         for line in ("#define SC64_BASE_SAVE_VERSION (0x53435030u - SC64_RACE_SAVE_GENERATION)",
