@@ -330,6 +330,12 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
     !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
 #error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
 #endif
+#if defined(SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || \
+     !defined(SC64_Z7_RUNTIME) || !defined(SC64_ZP_CAMPAIGN_ACTORS) || \
+     !defined(SC64_CONSTRUCTION_HP) || !defined(SC64_Z7_EGG_PRODUCTION))
+#error "Guardian campaign construction remains an isolated HOST experiment"
+#endif
 #if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || \
      !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_RACES) || \
@@ -1018,6 +1024,9 @@ enum {
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     MENU_Z7_CREEP,
+#endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    MENU_ZP_QUEENS_NEST, MENU_ZP_HIVE, MENU_ZP_GREATER_SPIRE,
 #endif
     MENU_COUNT
 };
@@ -1923,7 +1932,17 @@ static int race_z6_transport_start_research_selected(void);
 #endif
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_guardian_campaign_allowed(int owner,int source,int raw);
+#endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+static int race_guardian_campaign_morph(int building,int target);
+static int race_guardian_campaign_cancel(int building);
+#define SC64_GUARDIAN_PAID_BUILDING_MORPH 0x2000u
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
 static int race_guardian_morph_tick(int slot);
+static int race_guardian_selected_command(void);
+static int race_guardian_command_selected(int cancel);
 #endif
 #ifdef SC64_Z7_RUNTIME
 static Sc64Z7PersistentState race_z7;
@@ -1963,6 +1982,9 @@ static int race_z8_active(void);
 static int race_z8_map_shape_valid(const Sc64RaceMap *map);
 static int race_z8_source_owner(unsigned slot);
 static int race_z8_colony_product_available(int owner,int raw_owner,int type);
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_z8_guardian_product_allowed(int owner,int raw_owner,int raw);
+#endif
 static int race_z8_runtime_init(const Sc64RaceMap *map);
 static int race_z8_runtime_tick(void);
 static int race_z8_outcome(void);
@@ -1978,6 +2000,9 @@ static int race_zl_active(void);
 static int race_zl_map_shape_valid(const Sc64RaceMap *map);
 static int race_zl_source_owner(unsigned slot);
 static int race_zl_colony_product_available(int owner,int raw_owner,int type);
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_zl_guardian_product_allowed(int owner,int raw_owner,int raw);
+#endif
 static int race_zl_runtime_init(const Sc64RaceMap *map);
 static int race_zl_runtime_tick(void);
 static int race_zl_outcome(void);
@@ -2169,6 +2194,9 @@ static void sc64_p7_arbiter_cache_process_due(void);
 #endif
 #ifdef SC64_Z5_RUNTIME
 static int race_z5_active(void);
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_z5_source_owner(unsigned slot);
+#endif
 static int race_z5_world_paused(void);
 static int race_z5_is_door_type(int type);
 static int race_z5_building_collidable(int slot);
@@ -6296,6 +6324,9 @@ enum {
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
     RACE_CONTEXT_EGG,
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    RACE_CONTEXT_GUARDIAN,
+#endif
     RACE_CONTEXT_COUNT
 };
 static int race_context_command_base(int context);
@@ -6385,6 +6416,9 @@ static int race_context_command_width(int context)
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
     case RACE_CONTEXT_EGG: return race_z7_egg_cancel_available();
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    case RACE_CONTEXT_GUARDIAN: return race_guardian_selected_command() != 0;
+#endif
     default: return 0;
     }
 }
@@ -6458,6 +6492,14 @@ choose_command(int choice)
 #ifdef SC64_RACES
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        if (choice == race_context_command_base(RACE_CONTEXT_GUARDIAN) &&
+            race_guardian_selected_command()) {
+            int cancel = race_guardian_selected_command() == 2;
+            menu_open=0; mode=MODE_NORMAL;
+            toast(race_guardian_command_selected(cancel) ? 0 : 8); return;
+        }
+#endif
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
         if (choice == race_context_command_base(RACE_CONTEXT_EGG) &&
             race_z7_egg_cancel_available()) {
@@ -6496,6 +6538,13 @@ choose_command(int choice)
             return;
         }
         /* Fixed first-ten control rows deliberately retain their old IDs. */
+    }
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (choice == MENU_STOP + 1 && race_guardian_selected_command()) {
+        int cancel = race_guardian_selected_command() == 2;
+        menu_open=0; mode=MODE_NORMAL;
+        toast(race_guardian_command_selected(cancel) ? 0 : 8); return;
     }
 #endif
 #ifdef SC64_SHARED_TRANSPORT
@@ -6637,6 +6686,19 @@ choose_command(int choice)
     }
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    if (!race_mode && choice>=MENU_ZP_QUEENS_NEST && choice<=MENU_ZP_GREATER_SPIRE) {
+        menu_open=0; mode=MODE_NORMAL;
+        if (race_human!=R_ZERG) { toast(8); return; }
+        if (choice==MENU_ZP_QUEENS_NEST) { mode=MODE_BUILD; menu=B_ZP_QUEENS_NEST; return; }
+        if (choice==MENU_ZP_HIVE && selected_building>=0 && selected_building<MAX_BUILDINGS &&
+            (b[selected_building].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH))
+            toast(race_guardian_campaign_cancel(selected_building)?0:8);
+        else toast(race_guardian_campaign_morph(selected_building,
+                   choice==MENU_ZP_HIVE ? B_HIVE : B_GREATER_SPIRE)?3:8);
+        return;
+    }
+#endif
     #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (choice == MENU_ZP_LAIR || choice == MENU_ZP_SPIRE) {
         menu_open = 0;
@@ -6718,6 +6780,9 @@ static int race_skirmish_command_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (race_guardian_selected_command()) return MENU_STOP + 2;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6775,6 +6840,9 @@ static int field_menu_count(void)
 #endif
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    if (race_human==R_ZERG) return MENU_COUNT;
+#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (race_human==R_ZERG) {
         return race_z7_creep_command_available()?MENU_COUNT:MENU_Z7_CREEP;
@@ -6788,6 +6856,9 @@ static int field_menu_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (race_guardian_selected_command()) return MENU_STOP + 2;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6817,6 +6888,9 @@ static int field_menu_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (race_guardian_selected_command()) return MENU_STOP + 2;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6895,6 +6969,11 @@ static const char *race_menu_label(int i)
 #endif
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        if (i == race_context_command_base(RACE_CONTEXT_GUARDIAN) &&
+            race_guardian_selected_command())
+            return race_guardian_selected_command()==2 ? "CANCEL MORPH" : "MORPH GUARDIAN";
+#endif
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
         if (i == race_context_command_base(RACE_CONTEXT_EGG) &&
             race_z7_egg_cancel_available()) return "CANCEL EGG";
@@ -6915,6 +6994,16 @@ static const char *race_menu_label(int i)
 #endif
         return sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) ? row.label : "";
     }
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (i==MENU_STOP+1 && race_guardian_selected_command())
+        return race_guardian_selected_command()==2 ? "CANCEL MORPH" : "MORPH GUARDIAN";
+#endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    if (i==MENU_ZP_QUEENS_NEST) return "QUEENS NEST";
+    if (i==MENU_ZP_HIVE) return selected_building>=0 && selected_building<MAX_BUILDINGS &&
+        (b[selected_building].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH) ? "CANCEL MORPH" : "UPGRADE TO HIVE";
+    if (i==MENU_ZP_GREATER_SPIRE) return "GREATER SPIRE";
+#endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (i==MENU_STOP+1 && race_battery_command_available()) return "RECHARGE";
 #endif
@@ -13088,6 +13177,12 @@ game_self_test(void)
 static unsigned race_shared_trigger_obligations(void);
 #endif
 #include "race_adapter.h"
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#include "sc64_guardian_permissions.h"
+#endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+#include "sc64_guardian_campaign_construction.h"
+#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #include "sc64_guardian_morph_adapter.h"
 #endif

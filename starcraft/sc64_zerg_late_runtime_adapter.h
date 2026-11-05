@@ -207,6 +207,16 @@ static int race_zl_source_owner(unsigned slot)
     return m && slot < SC64_Z8_SOURCE_OWNER_LIMIT ? m->live_owner[slot] : -1;
 }
 
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_zl_guardian_product_allowed(int owner,int raw_owner,int raw)
+{
+    const Sc64ZlMission *m=race_zl_mission_for(race_selected_mission);
+    return m && !race_mode && (unsigned)owner<5u && (unsigned)raw_owner<8u &&
+        race_zl_source_owner((unsigned)raw_owner)==owner && (unsigned)raw<228u &&
+        sc64_z8_permission_available(m->permissions,(unsigned)raw_owner,(unsigned)raw);
+}
+#endif
+
 /* PUNI is source-slot scoped, as in Z8; only colony products use it. */
 static int race_zl_colony_product_available(int owner, int raw_owner, int type)
 {

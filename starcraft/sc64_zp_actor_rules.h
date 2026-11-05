@@ -255,7 +255,20 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
 static inline unsigned sc64_zp_actor_flags(int type)
 { const Sc64ZpActorFact *f = sc64_zp_actor_fact(type); return f ? f->flags : 0; }
 static inline int sc64_zp_actor_sight_source_pixels(int type)
-{ const Sc64ZpActorFact *f = sc64_zp_actor_fact(type); return f ? f->sight_px : 0; }
+{
+#ifdef SC64_GUARDIAN_FULL_FACTS_STAGE
+    /* Raw 59 Cocoon and raw 36 Egg have four-tile source sight; a distinct
+     * raw 44 Guardian has eleven. See the pinned Z7 source-sight table. */
+    if (type==U_GUARDIAN_COCOON) return 128;
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type==U_GUARDIAN_STAGE) return 352;
+#endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+    if (type==U_SHARED_EGG_STAGE) return 128;
+#endif
+#endif
+    const Sc64ZpActorFact *f = sc64_zp_actor_fact(type); return f ? f->sight_px : 0;
+}
 static inline int sc64_zp_actor_bounds_source(int type, int *left, int *up,
                                                int *right, int *down)
 {

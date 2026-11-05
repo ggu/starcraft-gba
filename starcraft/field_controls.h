@@ -331,6 +331,11 @@ ui_row_kind(int i, int *type)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     else if (ui_same(label, "SPIRE")) *type = B_SPIRE;
     else if (ui_same(label, "UPGRADE TO LAIR")) { *type = B_LAIR; return UI_ROW_MORPH; }
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+    else if (ui_same(label, "QUEENS NEST")) *type = B_ZP_QUEENS_NEST;
+    else if (ui_same(label, "UPGRADE TO HIVE")) { *type = B_HIVE; return UI_ROW_MORPH; }
+    else if (ui_same(label, "GREATER SPIRE")) { *type = B_GREATER_SPIRE; return UI_ROW_MORPH; }
+#endif
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     else if (ui_same(label, "CREEP COLONY")) *type = B_CREEP_COLONY;
