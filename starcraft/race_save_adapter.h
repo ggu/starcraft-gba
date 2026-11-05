@@ -3726,8 +3726,8 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
     u32 impact_tag=(plan->guardian_auth.features & SC64_STAGE_SAVE_GUARDIAN) ?
                     SC64_TRANSPORT_SAVE_VERSION : tag;
-    if (!race_impact_save_decode_selected(len,impact_tag,plan->impact_candidate,
-                                          &plan->impact_candidate_count)) return 0;
+    if (!race_impact_save_decode_selected_guardian(len,impact_tag,plan->impact_candidate,
+                                          &plan->impact_candidate_count,&plan->guardian_auth)) return 0;
 #else
 #ifdef SC64_SHARED_TRANSPORT
     if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION) return 0;

@@ -369,9 +369,17 @@ race_impact_save_write(void)
 /* Decode an already-selected raw envelope in race_impact_record.  This may
  * rearrange that scratch record, but never reads SRAM or changes live state. */
 static int
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+race_impact_save_decode_selected_impl(u32 len, u32 selected_tag,
+                                 Sc64ImpactEvent *candidate, int *count,u32 authenticated_inner)
+#else
 race_impact_save_decode_selected(u32 len, u32 selected_tag,
                                  Sc64ImpactEvent *candidate, int *count)
+#endif
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    (void)authenticated_inner;
+#endif
     int rows;
     *count = 0;
     if (len > (u32)sizeof(race_impact_record)) return 0;
@@ -410,7 +418,12 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
        ) return 0;
     if (len < base) return 0;
     if (!legacy) {
-        if (race_data.version != selected_tag ||
+        if (race_data.version !=
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+            (authenticated_inner ? authenticated_inner : selected_tag) ||
+#else
+            selected_tag ||
+#endif
             ((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u ||
             ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
             ((unsigned)race_data.state[28] & 7u) > 4u) return 0;
@@ -443,6 +456,16 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     *count = rows;
     return 1;
 }
+
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count)
+{ return race_impact_save_decode_selected_impl(len,tag,candidate,count,0); }
+static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth)
+{
+    if (!sc64_stage_save_auth_matches(auth,&race_data,race_data.version,0)) return 0;
+    return race_impact_save_decode_selected_impl(len,tag,candidate,count,auth->inner);
+}
+#endif
 
 /* Preserve the existing per-tag selection policy until semantic journal
  * migration is registered.  The decoder above is shared with that future

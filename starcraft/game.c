@@ -10,6 +10,9 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#include "sc64_stage_save_auth.h"
+#endif
 #include "sc64_text_box_hook.h"
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_RACES)
 #error "Shared transport requires the race engine"
@@ -1985,6 +1988,9 @@ static int race_impact_save_write(void);
 static int race_impact_save_read(Sc64ImpactEvent *candidate, int *count);
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_WORKER_CARGO_KIND)
 static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count);
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth);
+#endif
 #endif
 static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #endif
