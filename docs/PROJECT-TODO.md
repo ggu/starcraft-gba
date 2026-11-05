@@ -94,6 +94,18 @@ P0 items are completion/behavior blockers, not permission to skip their memory,
 save, source-boundary or regression gates. N1 and P1 should proceed alongside
 campaign work; late cosmetic work should not displace them.
 
+## Incremental audit decision
+
+The [incremental Terra review](audits/2026-11-06-n64-priority-audit/README.md)
+keeps S1/C2/S2 as the shared gameplay/persistence milestone, P1 in parallel,
+then S3/C3/K1 and B2 before narrower V1/V2 polish. It uses existing N64 evidence,
+not a fresh emulator session. Parent checked and rejected a stale opening-supply
+absence claim: that correction is already merged. Actual route-tail attribution
+now identifies one 12,001-cell reverse flood costing 2,264,933 cycles; optimize
+that stutter separately from recurring collision/steering cost. Detector-first
+remains rejected after measured regression. No experimental HOST result enables
+a normal product or establishes complete N64 parity.
+
 ## Next concrete milestones after the Terra audit
 
 1. Promote the now guest-qualified opt-in late Egg service into one common

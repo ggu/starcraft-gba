@@ -120,8 +120,13 @@ was not a saving. Do not promote this candidate or label it a speed improvement.
 
 Next performance work distinguishes the route-flood/blocked-gradient work at
 the movement spike and reduces measured collision/steering cost with exact
-oracles. The bounded movement diagnostic is prepared but has not run; its plan
-is not new runtime evidence. No uniform actor-update skip is justified.
+oracles. The later bounded movement diagnostic `199a2912` passed 90 sampled state/pixel
+checks, 958 active updates and three modal acknowledgments. At call 8347 a
+single reverse-field build enqueued 12,001 cells and cost 2,264,933 cycles,
+with no blocked-start gradient steps. Diagnostic overhead was 0.1326%; this
+rare event is a stutter target, not a recurring mean saving. See the
+[incremental audit](../2026-11-06-n64-priority-audit/README.md). No uniform
+actor-update skip is justified.
 
 ## Remaining work
 
