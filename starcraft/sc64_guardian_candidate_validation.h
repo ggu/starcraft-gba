@@ -94,6 +94,16 @@ static int race_guardian_candidate_valid(const RaceSave *candidate,unsigned widt
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit q;
         if (!SC64_GUARD_DECODE(candidate,i,width,height,&q)) return 0;
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+        /* Only the appended Guardian identity proves this is our staged
+         * product. Legacy Guardian aliases may be source-placed even when
+         * the map's PUNI forbids producing new Guardians. */
+        if (q.type==U_GUARDIAN_STAGE) {
+            if (!guardian || q.raw_type!=44 ||
+                !race_guardian_candidate_origin(candidate,q.owner,q.raw_owner,44)) return 0;
+            continue;
+        }
+#endif
         if (q.type!=U_GUARDIAN_COCOON && q.raw_type!=59) continue;
         if (!guardian || q.type!=U_GUARDIAN_COCOON || q.raw_type!=59 ||
             !race_guardian_candidate_origin(candidate,q.owner,q.raw_owner,44) ||

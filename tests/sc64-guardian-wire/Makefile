@@ -135,3 +135,7 @@ guardian-campaign-permissions:
 guardian-candidate-validation:
 	$(CLANG) $(GUARD_HOST) -DSC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_candidate_validation_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-candidate-validation
 	$(GUARD_TEST_BIN_DIR)/guardian-candidate-validation
+.PHONY: guardian-candidate-distinct
+guardian-candidate-distinct:
+	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_candidate_distinct_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-candidate-distinct
+	$(GUARD_TEST_BIN_DIR)/guardian-candidate-distinct

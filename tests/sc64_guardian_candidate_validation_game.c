@@ -90,5 +90,17 @@ int main(void)
     bad.hp=bad.maxhp;bad.under_construction=0;bad.flags=0x2080;
     put_building(&candidate,(unsigned)lair,&bad);
     assert(race_guardian_candidate_valid(&candidate,2048,2048,&auth));
+    /* A legacy source-placed Guardian remains legal even when Z5 source
+     * PUNI forbids producing a new one. It is not the appended identity. */
+    memset(&candidate,0,sizeof(candidate)); candidate.state[2]=SC64_Z5_GLOBAL_ID;
+    for(int i=0;i<5;++i) candidate.players[i]=R_ZERG;
+    bind_auth(&auth,&candidate,1);
+    race_mode=0;race_selected_mission=SC64_Z7_GLOBAL_ID;race_human=R_ZERG;
+    int existing=spawn_unit(SIDE,U_Z6_GUARDIAN,520,200); assert(existing>=0);
+    assert(u[existing].raw_type==44 && u[existing].raw_owner==3);
+    assert(!race_guardian_candidate_puni(sc64_z5_source_puni,3,44));
+    put_unit(&candidate,(unsigned)existing,&u[existing]);
+    race_mode=1;race_human=R_PROTOSS;race_selected_mission=SC64_RACE_MISSION_Z4;
+    assert(race_guardian_candidate_valid(&candidate,2048,2048,&auth));
     puts("Guardian detached candidate validation HOST stage passed");return 0;
 }
