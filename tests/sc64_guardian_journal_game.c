@@ -15,6 +15,38 @@ extern void guardian_test_reset(void);
 static u8 envelope[sizeof(RaceImpactRecord)];
 static u8 snapshot[32768];
 
+/* No rejected slot may publish a partial world or UI. HOST only. */
+static void assert_failed_load_atomic(void)
+{
+    static Unit old_units[MAX_UNITS];static Building old_buildings[MAX_BUILDINGS];
+    static u8 old_explored[sizeof(explored)],old_visible[sizeof(visible)];
+    static u8 old_minerals[sizeof(m)],old_geysers[sizeof(geysers)];
+    static u8 old_impacts[sizeof(race_impact_rows)],old_front[sizeof(race_front)];
+    static int old_players[5],old_ore[5],old_gas[5],old_bots[3];
+    Sc64SkTransportTech old_tech=race_skirmish_transport_tech;
+    memcpy(old_units,u,sizeof(u));memcpy(old_buildings,b,sizeof(b));
+    memcpy(old_explored,explored,sizeof(explored));memcpy(old_visible,visible,sizeof(visible));
+    memcpy(old_minerals,m,sizeof(m));memcpy(old_geysers,geysers,sizeof(geysers));
+    memcpy(old_impacts,race_impact_rows,sizeof(race_impact_rows));memcpy(old_front,&race_front,sizeof(race_front));
+    memcpy(old_players,race_player,sizeof(race_player));memcpy(old_ore,race_minerals,sizeof(race_minerals));
+    memcpy(old_gas,race_gas,sizeof(race_gas));memcpy(old_bots,race_bot_races,sizeof(race_bot_races));
+    u32 old_seed=seed;int old_count=race_impact_count;
+    int before[]={minerals,gas,supply_used,supply_cap,race_selected_mission,race_mode,race_human,
+        race_bots,race_completed,race_skirmish_map,frame,screen,mode,menu,menu_open,menu_cursor,
+        help,won,lost,result_timer,selected_building,geyser_count,(int)race_front_transition,race_front_load_error};
+    assert(!race_load_game());
+    assert(!memcmp(old_units,u,sizeof(u)) && !memcmp(old_buildings,b,sizeof(b)));
+    assert(!memcmp(old_explored,explored,sizeof(explored)) && !memcmp(old_visible,visible,sizeof(visible)));
+    assert(!memcmp(old_minerals,m,sizeof(m)) && !memcmp(old_geysers,geysers,sizeof(geysers)));
+    assert(!memcmp(old_impacts,race_impact_rows,sizeof(race_impact_rows)) && old_count==race_impact_count);
+    assert(!memcmp(old_front,&race_front,sizeof(race_front)) && !memcmp(&old_tech,&race_skirmish_transport_tech,sizeof(old_tech)));
+    assert(!memcmp(old_players,race_player,sizeof(race_player)) && !memcmp(old_ore,race_minerals,sizeof(race_minerals)));
+    assert(!memcmp(old_gas,race_gas,sizeof(race_gas)) && !memcmp(old_bots,race_bot_races,sizeof(race_bot_races)));
+    int after[]={minerals,gas,supply_used,supply_cap,race_selected_mission,race_mode,race_human,
+        race_bots,race_completed,race_skirmish_map,frame,screen,mode,menu,menu_open,menu_cursor,
+        help,won,lost,result_timer,selected_building,geyser_count,(int)race_front_transition,race_front_load_error};
+    assert(!memcmp(before,after,sizeof(before)) && old_seed==seed);
+}
 static void clear_journal(void)
 {
     const u32 tags[]={SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION};
@@ -43,7 +75,7 @@ int main(void)
     assert(race_load_game());assert(!memcmp(&u[slot],&staged,sizeof(staged)));
     guardian_test_retag(0,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
     guardian_test_retag(1,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
-    assert(!race_load_game());guardian_test_reset();q=&u[slot];
+    assert_failed_load_atomic();guardian_test_reset();q=&u[slot];
 #endif
     q->type=U_GUARDIAN_COCOON;q->raw_type=59;q->alive=1;q->hp=120;q->maxhp=200;
     q->armor=0;q->order=ORDER_IDLE;q->target=44;q->build=-1;q->carry=0;q->flags=0;q->work_timer=351;
@@ -77,11 +109,11 @@ int main(void)
     /* Old authenticated namespace cannot reinterpret a Cocoon wire row. */
     guardian_test_retag(0,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
     guardian_test_retag(1,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
-    Unit before=u[slot];assert(!race_load_game());assert(!memcmp(&before,&u[slot],sizeof(before)));
+    Unit before=u[slot];assert_failed_load_atomic();assert(!memcmp(&before,&u[slot],sizeof(before)));
     assert(!race_worker_cargo_select(&plan,&selected) && !plan.guardian_auth.candidate);guardian_test_restore(snapshot);
     /* Two valid half-range candidates remain ambiguous and cannot publish. */
     guardian_test_sequence(0,1);guardian_test_sequence(1,0x80000001u);
-    assert(!race_load_game());assert(!race_worker_cargo_select(&plan,&selected) && !plan.guardian_auth.candidate);guardian_test_restore(snapshot);
+    assert_failed_load_atomic();assert(!race_worker_cargo_select(&plan,&selected) && !plan.guardian_auth.candidate);guardian_test_restore(snapshot);
     /* Unknown committed neighbor is never overwritten by the stage writer. */
     guardian_test_retag(0,0x11223344u,SAVE_VERSION);guardian_test_snapshot(snapshot);
     assert(!race_save_game());u8 after[32768];guardian_test_snapshot(after);assert(!memcmp(snapshot,after,sizeof(after)));
