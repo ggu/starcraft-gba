@@ -461,7 +461,7 @@ static const Sc64NydusEndpointView *race_nydus_view_slot(
 }
 
 static int race_nydus_save_candidate_valid(const RaceSave *candidate, int width,
-                                           int height)
+                                           int height SC64_GCTX_DECL)
 {
     Sc64NydusEndpointView views[SC64_NYDUS_MAX_VIEWS];
     Sc64NydusSourcePair pairs[SC64_NYDUS_MAX_LINKS];
@@ -495,7 +495,7 @@ static int race_nydus_save_candidate_valid(const RaceSave *candidate, int width,
         const Sc64NydusEndpointView *in, *out;
         Sc64NydusPassengerView p;
         int partner;
-        if (!race_save_decode_unit(candidate, (unsigned)i, (unsigned)width * 16u,
+        if (!SC64_GUARD_DECODE(candidate, (unsigned)i, (unsigned)width * 16u,
                                    (unsigned)height * 16u, &q)) return 0;
         if (!q.alive || q.order != ORDER_NYDUS_ENTER) continue;
         if (!resolved || q.target < 0 || q.target >= MAX_BUILDINGS) return 0;

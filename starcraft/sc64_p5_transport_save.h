@@ -58,13 +58,13 @@ static int race_p5_saved_p7_recharge_valid(const RaceSave *candidate,
 /* Validate P5 cargo links from a decoded candidate without touching the live
  * world. The ordinary save validator checks every other actor/world field. */
 static int race_p5_transport_save_candidate_valid(const RaceSave *candidate,
-                                                   int width, int height)
+                                                   int width, int height SC64_GCTX_DECL)
 {
     u8 used[MAX_UNITS] = { 0 };
     if (!candidate || width < 1 || height < 1) return 0;
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit actor;
-        if (!race_save_decode_unit(candidate, (unsigned)i,
+        if (!SC64_GUARD_DECODE(candidate, (unsigned)i,
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &actor)) return 0;
         if (!actor.alive) continue;
@@ -114,7 +114,7 @@ static int race_p5_transport_save_candidate_valid(const RaceSave *candidate,
             (actor.flags & 2) || sc64_race_unit_flying(actor.type) ||
             !race_p5_transport_passenger_provenance_valid(&actor)) return 0;
         Unit carrier;
-        if (!race_save_decode_unit(candidate, (unsigned)actor.target,
+        if (!SC64_GUARD_DECODE(candidate, (unsigned)actor.target,
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &carrier)) return 0;
         if (!carrier.alive || carrier.type != U_P5_SHUTTLE ||

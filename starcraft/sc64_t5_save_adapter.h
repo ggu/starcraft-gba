@@ -170,7 +170,7 @@ race_t5_save_state_valid(const Sc64T5SaveState *state)
 }
 
 static int
-race_t5_save_mines_valid(const RaceSave *candidate, int width, int height)
+race_t5_save_mines_valid(const RaceSave *candidate, int width, int height SC64_GCTX_DECL)
 {
 #ifndef SC64_LATE_TERRAN_STORAGE
     (void)width;
@@ -179,7 +179,7 @@ race_t5_save_mines_valid(const RaceSave *candidate, int width, int height)
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
 #ifdef SC64_LATE_TERRAN_STORAGE
         Unit decoded;
-        if (!race_save_decode_unit(candidate, i, (unsigned)width * 16u,
+        if (!SC64_GUARD_DECODE(candidate, i, (unsigned)width * 16u,
                                    (unsigned)height * 16u,
                                    &decoded)) return 0;
 #define T5_MINE(field) decoded.field
@@ -262,7 +262,7 @@ race_t5_save_expand(Sc64T5RuntimeState *dst, const Sc64T5SaveState *src)
 }
 
 static int
-race_t5_save_candidate_valid(const RaceSave *candidate, int width, int height)
+race_t5_save_candidate_valid(const RaceSave *candidate, int width, int height SC64_GCTX_DECL)
 {
     const Sc64T5SaveState *state;
     if (!candidate || width != 96 || height != 96 ||
@@ -274,7 +274,7 @@ race_t5_save_candidate_valid(const RaceSave *candidate, int width, int height)
         candidate->campaign.phase > SC64_RACE_PHASE_FAILED) return 0;
     state = &candidate->t5;
     if (!race_t5_save_state_valid(state) ||
-        !race_t5_save_mines_valid(candidate, width, height) ||
+        !race_t5_save_mines_valid(candidate, width, height SC64_GCTX_ARG) ||
         state->message != candidate->campaign.message ||
         state->message_ticks != candidate->campaign.message_ticks ||
         candidate->campaign.objective_stage !=

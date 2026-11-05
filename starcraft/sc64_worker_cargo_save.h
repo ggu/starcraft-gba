@@ -10,12 +10,12 @@
  * second full save or per-actor migration bank is allocated. */
 static int
 race_save_worker_cargo_prepare(RaceSave *candidate, unsigned width,
-                                unsigned height, int legacy)
+                                unsigned height, int legacy SC64_GCTX_DECL)
 {
     if (!candidate || (legacy != 0 && legacy != 1)) return 0;
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit decoded;
-        if (!race_save_decode_unit(candidate,i,width,height,&decoded)) return 0;
+        if (!SC64_GUARD_DECODE(candidate,i,width,height,&decoded)) return 0;
         if (legacy && !sc64_worker_cargo_migrate_legacy(&decoded)) return 0;
         if (!sc64_worker_cargo_state_valid(&decoded)) return 0;
         if (!legacy) continue;

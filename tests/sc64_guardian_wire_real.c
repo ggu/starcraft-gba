@@ -42,7 +42,7 @@ int main(void)
     q.owner=SIDE;q.type=U_GUARDIAN_COCOON;q.raw_type=59;q.raw_owner=3;
     q.alive=1;q.selected=1;q.build=-1;q.target=44;q.work_timer=750;
     /* Actual codec rows with two independently authenticated candidates:
-     * the new decoder must not consult the old mutable Guardian flag. */
+     * the decoder must keep each candidate's authorization separate. */
     static RaceSave staged_candidate,legacy_candidate;
     Sc64StageSaveAuth staged_auth,legacy_auth;
     const Sc64StageTagPair tags[]={
@@ -54,16 +54,13 @@ int main(void)
     legacy_candidate.version=SAVE_VERSION;legacy_candidate.units[0]=row;
     assert(sc64_stage_save_authenticate(&staged_auth,&staged_candidate,tags[1].outer,tags[1].inner,tags,2));
     assert(sc64_stage_save_authenticate(&legacy_auth,&legacy_candidate,tags[0].outer,tags[0].inner,tags,2));
-    race_guardian_stage_wire=0;
     assert(race_guardian_decode_authenticated(&staged_candidate,0,2048,2048,&out,&staged_auth));
     assert(!memcmp(&out,&q,sizeof(q)));
-    race_guardian_stage_wire=1;
     Unit sentinel;memset(&sentinel,0x5a,sizeof(sentinel));out=sentinel;
     assert(!race_guardian_decode_authenticated(&legacy_candidate,0,2048,2048,&out,&legacy_auth));
     assert(!memcmp(&out,&sentinel,sizeof(out)));
     assert(!race_guardian_decode_authenticated(&legacy_candidate,0,2048,2048,&out,&staged_auth));
     assert(!memcmp(&out,&sentinel,sizeof(out)));
-    race_guardian_stage_wire=0;
     printf("legacy=%d cocoon=%d count=%d overlord=%d row=%zu\n",SC_RU_LEGACY_COUNT,U_GUARDIAN_COCOON,SC_RU_COUNT,U_OVERLORD,sizeof(row));
     for(int i=0;i<3;i++) {
       if(i==1){q.hp=37;q.work_timer=1;q.selected=0;q.owner=ENEMY;}

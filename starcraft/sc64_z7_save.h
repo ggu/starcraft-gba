@@ -181,12 +181,12 @@ static int race_z7_save_egg_valid(const Sc64RaceMap *map, const Unit *saved,
 
 static unsigned race_z7_save_live_enemy_ling_eggs(const RaceSave *candidate,
                                                     unsigned width,
-                                                    unsigned height)
+                                                    unsigned height SC64_GCTX_DECL)
 {
     unsigned count = 0;
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit saved;
-        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
+        if (!SC64_GUARD_DECODE(candidate, i, width * 16u, height * 16u,
                                    &saved)) return ~0u;
         if (saved.alive && saved.type == U_Z7_EGG && saved.raw_owner == 4 &&
             saved.target == U_ZERGLING) ++count;
@@ -242,7 +242,7 @@ static unsigned race_z7_save_remaining_script_creates(
 
 static int race_z7_save_candidate_valid(const RaceSave *candidate,
                                          const Sc64Z7PersistentState *state,
-                                         unsigned width, unsigned height)
+                                         unsigned width, unsigned height SC64_GCTX_DECL)
 {
     const Sc64RaceMap *map;
     u8 seen_units[(MAX_UNITS+7u)/8u]={0};
@@ -306,7 +306,7 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit saved;
         int unused;
-        if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved)) return 0;
+        if (!SC64_GUARD_DECODE(candidate,i,width*16u,height*16u,&saved)) return 0;
         unused=race_z7_save_unused_unit(&saved);
         unit_flags[i]=(u8)((saved.alive?1u:0u)|(unused?2u:0u)
 #ifdef SC64_Z7_EGG_PRODUCTION
@@ -351,7 +351,7 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
 
     for (unsigned i=0; i<MAX_UNITS; ++i) {
         Unit saved;
-        if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved) ||
+        if (!SC64_GUARD_DECODE(candidate,i,width*16u,height*16u,&saved) ||
             RACE_SAVE_INV_U(candidate,i)>1u) return 0;
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (saved.type == U_Z7_EGG || saved.raw_type == 36) {

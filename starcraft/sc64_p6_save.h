@@ -74,7 +74,7 @@ static unsigned race_p6_save_started_creates(const Sc64P6PersistentState *p6,
 }
 
 static int race_p6_save_candidate_valid(const RaceSave *candidate,
-                                         unsigned width, unsigned height)
+                                         unsigned width, unsigned height SC64_GCTX_DECL)
 {
     const Sc64RaceMap *map = &sc64_race_maps[SC64_P6_GLOBAL_ID];
     /* Decoding is the expensive step, so each slot is decoded once: per row this
@@ -114,7 +114,7 @@ static int race_p6_save_candidate_valid(const RaceSave *candidate,
 
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit saved;
-        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
+        if (!SC64_GUARD_DECODE(candidate, i, width * 16u, height * 16u,
                                    &saved)) return 0;
         slots[i].raw_type = (s16)saved.raw_type;
         slots[i].raw_owner = (s16)saved.raw_owner;
@@ -200,7 +200,7 @@ static int race_p6_save_candidate_valid(const RaceSave *candidate,
 
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit saved;
-        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
+        if (!SC64_GUARD_DECODE(candidate, i, width * 16u, height * 16u,
                                    &saved)) return 0;
 #ifdef SC64_P6_STORM_ENABLED
         if (saved.raw_type == SC64_P6_STORM_RAW_TASSADAR &&

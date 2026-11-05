@@ -179,7 +179,7 @@ static u32 race_z6_save_building_key(const Building *q)
 
 static int race_z6_save_candidate_valid(const RaceSave *candidate,
                                          const Sc64Z6PersistentState *state,
-                                         unsigned width, unsigned height)
+                                         unsigned width, unsigned height SC64_GCTX_DECL)
 {
     const Sc64RaceMap *map = &sc64_race_maps[SC64_Z6_GLOBAL_ID];
     u8 seen_units[(MAX_UNITS + 7) / 8] = {0};
@@ -223,7 +223,7 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
 #endif
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit decoded;
-        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
+        if (!SC64_GUARD_DECODE(candidate, i, width * 16u, height * 16u,
                                    &decoded) ||
             !race_z6_hallucination_unit_state_valid(&decoded,
                 race_z6_save_expected_owner(map, 2))) return 0;

@@ -78,10 +78,10 @@ int main(void)
     guardian_test_retag(0,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
     guardian_test_retag(1,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
     Unit before=u[slot];assert(!race_load_game());assert(!memcmp(&before,&u[slot],sizeof(before)));
-    assert(!race_guardian_stage_wire);guardian_test_restore(snapshot);
+    assert(!race_worker_cargo_select(&plan,&selected) && !plan.guardian_auth.candidate);guardian_test_restore(snapshot);
     /* Two valid half-range candidates remain ambiguous and cannot publish. */
     guardian_test_sequence(0,1);guardian_test_sequence(1,0x80000001u);
-    assert(!race_load_game());assert(!race_guardian_stage_wire);guardian_test_restore(snapshot);
+    assert(!race_load_game());assert(!race_worker_cargo_select(&plan,&selected) && !plan.guardian_auth.candidate);guardian_test_restore(snapshot);
     /* Unknown committed neighbor is never overwritten by the stage writer. */
     guardian_test_retag(0,0x11223344u,SAVE_VERSION);guardian_test_snapshot(snapshot);
     assert(!race_save_game());u8 after[32768];guardian_test_snapshot(after);assert(!memcmp(snapshot,after,sizeof(after)));

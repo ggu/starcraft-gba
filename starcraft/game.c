@@ -284,6 +284,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && (!defined(GBA_HOST) || !defined(SC64_RACES))
 #error "Shared Egg wire identity is HOST-only and requires race rules"
 #endif
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
+#error "Guardian and Scarab candidate context integration is not qualified"
+#endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
 #error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
 #endif
@@ -13057,6 +13060,18 @@ static unsigned race_shared_trigger_obligations(void);
 #undef race_protoss_later_battery_candidate_valid
 #include "sc64_p10_runtime_adapter.h"
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#include "sc64_stage_save_auth.h"
+static int race_guardian_decode_authenticated(const RaceSave *,unsigned,unsigned,unsigned,Unit *,const Sc64StageSaveAuth *);
+#define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth
+#define SC64_GCTX_ARG , guard_auth
+#define SC64_GUARD_DECODE(c,s,w,h,o) race_guardian_decode_authenticated(c,s,w,h,o,guard_auth)
+#else
+#define SC64_GCTX_DECL
+#define SC64_GCTX_ARG
+#define SC64_GUARD_DECODE(c,s,w,h,o) race_save_decode_unit(c,s,w,h,o)
+#endif
+
 #ifdef SC64_NYDUS_ENABLED
 static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
 static int race_save_decode_building(const RaceSave *, unsigned, Building *);
