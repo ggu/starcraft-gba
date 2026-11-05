@@ -94,6 +94,19 @@ static void test_cancel_same_phase_contact(void)
     unsigned expected=sc64_contact_blocked_mask_uncached(&u[mover],1);
     assert(before!=expected);assert(after==expected);
     sc64_unit_buckets_end();
+    /* Rebuild once for a second independent case, prime the memo with a
+     * live Egg, then morph it in place during the active bucket phase. */
+    b[hall].larva=1;assert(race_queue_unit(SIDE,hall,U_DRONE));
+    egg=find_egg(SIDE,U_DRONE,-1);assert(egg>=0);
+    u[egg].x=506;u[egg].y=500;u[egg].work_timer=1;
+    sc64_unit_buckets_begin();
+    before=sc64_contact_blocked_mask(&u[mover],1);
+    assert(before==sc64_contact_blocked_mask_uncached(&u[mover],1));
+    assert(race_z7_egg_tick_unit(egg));assert(u[egg].type==U_DRONE);
+    after=sc64_contact_blocked_mask(&u[mover],1);
+    expected=sc64_contact_blocked_mask_uncached(&u[mover],1);
+    assert(after==expected);
+    sc64_unit_buckets_end();
 }
 static void test_custom_owners(void)
 {

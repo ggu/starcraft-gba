@@ -259,6 +259,9 @@ static int race_shared_egg_cancel(int owner,int slot)
     Unit *q=&u[slot];
     if (!q->alive || q->owner!=owner || q->type!=U_Z7_EGG || q->raw_type!=36 ||
         !sc64_z7_egg_product_valid(q->target)) return 0;
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
     const Sc64RaceUnitRule *product=sc64_race_unit_rule(q->target);
     race_add_owner_resources(owner,product->minerals,product->gas);
     if (owner==SIDE) supply_used-=unit_slot_supply(q);
