@@ -30,6 +30,9 @@
 #if defined(Z7_PEAK_DETAILED_STAGES) && !defined(SC64_DIAGNOSTIC_UPDATE)
 #define SC64_DIAGNOSTIC_UPDATE
 #endif
+#if defined(GBA_HOST) && defined(Z7_CARGO_DIGEST)
+#include "../common/gba.c"
+#endif
 #include "../starcraft/game.c"
 #include "sc64_z7_tape_generated.h"
 #ifdef GBA_HOST
@@ -206,6 +209,24 @@ static void frame_with(u16 held)
     ++frames_run;
 }
 
+#ifdef Z7_CARGO_DIGEST
+static u32 z7_cargo_digest(void)
+{
+    u32 h=2166136261u;
+    for(int i=0;i<MAX_UNITS;++i) {
+        const Unit *q=&u[i];
+        h=(h^(u32)q->alive)*16777619u;
+        if(!q->alive) continue;
+#define Z7_HASH(v) do { u32 v_=(u32)(v); for(int j=0;j<4;++j) { h=(h^(v_&255u))*16777619u; v_>>=8; } } while(0)
+        Z7_HASH(i); Z7_HASH(q->owner); Z7_HASH(q->type); Z7_HASH(q->raw_type);
+        Z7_HASH(q->x); Z7_HASH(q->y); Z7_HASH(q->order); Z7_HASH(q->carry);
+        Z7_HASH(q->flags); Z7_HASH(q->work_timer); Z7_HASH(q->build);
+#undef Z7_HASH
+    }
+    return h;
+}
+#endif
+
 /* Same fields and meaning as the controller's source_checkpoint() rows. */
 static void report(const char *kind, u32 tick)
 {
@@ -258,6 +279,10 @@ static void report(const char *kind, u32 tick)
     out_field("minerals", minerals);
     out_field("gas", gas);
     out_flush();
+#ifdef Z7_CARGO_DIGEST
+    out_text("CARGO7 "); out_text(kind); out_field("tick", (long)tick);
+    out_text(" digest="); out_u64(z7_cargo_digest()); out_text(" end=1"); out_flush();
+#endif
 }
 
 static void report_cycles(const char *kind, u32 tick)
@@ -321,6 +346,13 @@ static int idle_for_save(u32 tick)
 #ifdef GBA_HOST
 static int host_payload(const char *path, int write)
 {
+#ifdef Z7_CARGO_DIGEST
+    FILE *f = fopen(path, write ? "wb" : "rb");
+    if (!f) return 0;
+    int ok = write ? fwrite(host_save, 1, sizeof(host_save), f) == sizeof(host_save) :
+                     fread(host_save, 1, sizeof(host_save), f) == sizeof(host_save);
+    return fclose(f) == 0 && ok;
+#else
     static RaceSave data;
     FILE *f = fopen(path, write ? "wb" : "rb");
     if (!f) return 0;
@@ -331,6 +363,7 @@ static int host_payload(const char *path, int write)
         if (ok) save_write(&data, sizeof(data), SAVE_VERSION);
     }
     return fclose(f) == 0 && ok;
+#endif
 }
 int main(int argc, char **argv)
 {
@@ -423,6 +456,9 @@ int main(void)
     report_cycles("terminal", tick);
     out_text("Z7 DONE"); out_field("cursor", (long)tape_cursor); out_flush();
 #ifdef GBA_HOST
+#if defined(Z7_CARGO_DIGEST) && Z7_ARM_MODE == 2
+    if (argc > 2 && !host_payload(argv[2], 1)) return 2;
+#endif
     return won ? 0 : 1;
 #else
     for (;;) frame_with(0);
