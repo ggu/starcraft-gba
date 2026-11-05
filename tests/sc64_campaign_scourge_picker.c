@@ -42,6 +42,12 @@ static void check_picker(int mission)
     assert(found && selected_building == hatch);
     assert(minerals == ore && gas == vespene && b[hatch].larva == larvae &&
            b[hatch].queue_count == queues);
+    for (int n = 0; n < 6 && train_type != U_SCOURGE; ++n)
+        select_next_train_type();
+    assert(train_type == U_SCOURGE);
+    assert(race_save_game());
+    train_type = U_DRONE;
+    assert(race_load_game() && train_type == U_SCOURGE);
     printf("campaign %d: source-permitted Scourge appears without spending\n", mission);
 }
 
