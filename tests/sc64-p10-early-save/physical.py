@@ -16,7 +16,11 @@ p.add_argument('--rom', type=pathlib.Path, required=True)
 p.add_argument('--elf', type=pathlib.Path, required=True)
 p.add_argument('--out', type=pathlib.Path, required=True)
 p.add_argument('--mission', type=int, choices=range(1, 8), required=True)
-p.add_argument('--continue-frames', type=int, default=120)
+def bounded_frames(value):
+    n = int(value)
+    if not 1 <= n <= 10000: raise argparse.ArgumentTypeError('must be between 1 and 10000')
+    return n
+p.add_argument('--continue-frames', type=bounded_frames, default=120)
 a = p.parse_args(); a.out.mkdir(parents=True, exist_ok=False)
 sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
 record = {'mission': a.mission, 'inputs': {str(x): sha(x) for x in (a.runner,a.rom,a.elf)}, 'trace': [], 'snapshots': {}}
@@ -32,7 +36,7 @@ def dismiss():
         tap(1)
     raise RuntimeError('modal limit')
 def advance(target):
-    for _ in range(10000):
+    for _ in range(20000):
         if g.u32('frame') >= target: return
         if modal(): dismiss()
         else: step()
@@ -76,5 +80,8 @@ except BaseException as exc:
     record['ok']=False;record['error']=repr(exc);traceback.print_exc()
 finally:
     if g: g.close()
+    record['inputs_unchanged'] = all(sha(path)==digest for path,digest in ((path,record['inputs'][str(path)]) for path in (a.runner,a.rom,a.elf)))
+    if not record['inputs_unchanged']:
+        record['ok']=False; record['error']='runner, ROM, or ELF changed during run'
     (a.out/'result.json').write_text(json.dumps(record,indent=2)+'\n')
 if not record['ok']: sys.exit(1)
