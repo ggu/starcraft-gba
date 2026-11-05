@@ -1196,10 +1196,11 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
 static int race_save_game(void) {
 #ifdef SC64_SHARED_EGG_HOST_STAGE
     /* No new Egg save format is admitted by this HOST-only experiment.
-     * Include dead rows: kill_unit intentionally retains actor identity. */
+     * Include dead Egg identities: kill_unit retains actor identity. Raw 36
+     * alone is not an Egg discriminator for an ordinary legacy actor. */
     if (!race_z7_active() && race_shared_egg_context())
         for (int i=0;i<MAX_UNITS;++i)
-            if (u[i].type==U_Z7_EGG || u[i].raw_type==36) return 0;
+            if (u[i].type==U_Z7_EGG) return 0;
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
     GbaSaveSelection cargo_previous;
@@ -2217,7 +2218,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         /* The candidate's own mode/mission, not the currently live world,
          * determines whether the existing strict Z7 Egg validator applies. */
         if ((v[0] || v[2]!=SC64_Z7_GLOBAL_ID) &&
-            (RACE_U(i,type)==U_Z7_EGG || RACE_U(i,raw_type)==36)) return 0;
+            RACE_U(i,type)==U_Z7_EGG) return 0;
 #endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;

@@ -78,6 +78,14 @@ static void setup_custom(void)
     race_bot_races[0]=R_ZERG;init_state();assert(screen==SCREEN_PLAY && race_mode);
     minerals=1000;gas=1000;race_minerals[ENEMY]=1000;race_gas[ENEMY]=1000;
 }
+static void test_legacy_raw36_ordinary_actor(void)
+{
+    setup_custom();int slot=spawn_unit(SIDE,U_OVERLORD,100,100);assert(slot>=0);
+    u[slot].raw_type=36;u[slot].raw_owner=-1;
+    fixture_clear_candidate_records();assert(race_save_game());
+    u[slot].raw_type=-1;assert(race_load_game());
+    assert(u[slot].alive && u[slot].type==U_OVERLORD && u[slot].raw_type==36);
+}
 static void test_cancel_same_phase_contact(void)
 {
     setup_custom(); int hall=hall_for(SIDE); assert(hall>=0); add_supply(SIDE,2);
@@ -168,6 +176,6 @@ static void test_pair_and_denials(void)
 }
 int main(void)
 {
-    test_late_z9();test_cancel_same_phase_contact();test_custom_owners();test_pair_and_denials();
+    test_late_z9();test_legacy_raw36_ordinary_actor();test_cancel_same_phase_contact();test_custom_owners();test_pair_and_denials();
     puts("shared Egg HOST lifecycle and save fence passed");return 0;
 }
