@@ -44,7 +44,12 @@ int main(void)
     for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].type==B_ZP_QUEENS_NEST) nest=i;
     assert(nest>=0 && b[nest].raw_owner==3 && b[nest].under_construction);
     race_complete_building(nest);
-    b[lair].larva=1; b[lair].larva_timer=123; b[lair].hp=900;
+    assert(spawn_unit(SIDE,U_OVERLORD,100,100)>=0);
+    b[lair].larva=2; b[lair].larva_timer=123; b[lair].hp=900;
+    assert(race_queue_unit(SIDE,lair,U_DRONE));
+    int egg=-1;
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].type==U_Z7_EGG) egg=i;
+    assert(egg>=0 && b[lair].larva==1);
     b[lair].shield_remainder=17; b[lair].queue_count=1;
     ore=minerals;vespene=gas; selected_building=lair;
     assert(!race_guardian_campaign_morph(lair,B_HIVE));
@@ -54,6 +59,14 @@ int main(void)
     assert(b[lair].type==B_HIVE && b[lair].under_construction);
     assert(minerals==ore-200 && gas==vespene-150);
     assert(b[lair].hp==900 && b[lair].larva==1 && b[lair].larva_timer==123 && b[lair].shield_remainder==17);
+    assert(u[egg].alive && u[egg].type==U_Z7_EGG && u[egg].target==U_DRONE);
+    /* Leaf codec shape only: no selected-journal or SRAM claim. */
+    Sc64PackedBuildingSave packed; Building restored;
+    assert(sc64_building_save_encode(&packed,&b[lair],2048,2048));
+    assert(sc64_building_save_decode(&restored,&packed));
+    assert(restored.type==B_HIVE && restored.under_construction && restored.flags==b[lair].flags &&
+           restored.hp==900 && restored.raw_type==133 && restored.raw_owner==3 &&
+           restored.larva==1 && restored.larva_timer==123 && restored.shield_remainder==17);
     assert(!strcmp(race_menu_label(MENU_ZP_HIVE),"CANCEL MORPH"));
     b[lair].hp=800; choose_command(MENU_ZP_HIVE);
     assert(b[lair].type==B_LAIR && !b[lair].under_construction && b[lair].hp==800);
@@ -63,7 +76,7 @@ int main(void)
     assert(race_guardian_campaign_morph(lair,B_HIVE));
     int cap=race_owner_supply_cap(SIDE);
     race_complete_building(lair);
-    assert(b[lair].type==B_HIVE && !b[lair].under_construction);
+    assert(b[lair].type==B_HIVE && !b[lair].under_construction && b[lair].hp==1500);
     assert(b[lair].larva==1 && b[lair].larva_timer==123 && b[lair].shield_remainder==17);
     assert(race_owner_supply_cap(SIDE)==cap);
     int spire=spawn_build(SIDE,B_SPIRE,350,200,0);assert(spire>=0);
