@@ -345,7 +345,11 @@ static int race_shared_egg_candidate_owner(int owner,int raw_owner,void *context
     const Sc64RaceMap *map=&sc64_race_maps[mission_id];
     if (map->owner_races[raw_owner]!=R_ZERG) return 0;
     if (mission_id==SC64_Z8_GLOBAL_ID) return race_z8_source_owner((unsigned)raw_owner)==owner;
-    if (mission_id==SC64_Z9_GLOBAL_ID) {
+    if (mission_id==SC64_Z9_GLOBAL_ID
+#ifdef SC64_Z10_RUNTIME
+        || mission_id==SC64_Z10_GLOBAL_ID
+#endif
+       ) {
         const Sc64ZlMission *mission=race_zl_mission_for(mission_id);
         return mission && mission->live_owner[raw_owner]==owner;
     }
@@ -364,7 +368,11 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
             int selected=candidate->state[21+i];
             if (selected<0 || selected>2 || candidate->players[owners[i+1]]!=selected) return 0;
         }
-    } else if (candidate->state[2]!=SC64_Z8_GLOBAL_ID && candidate->state[2]!=SC64_Z9_GLOBAL_ID) return 0;
+    } else if (candidate->state[2]!=SC64_Z8_GLOBAL_ID && candidate->state[2]!=SC64_Z9_GLOBAL_ID
+#ifdef SC64_Z10_RUNTIME
+               && candidate->state[2]!=SC64_Z10_GLOBAL_ID
+#endif
+              ) return 0;
     for (unsigned i=0;i<MAX_UNITS;i++) {
         Unit q;
         if (!SC64_GUARD_DECODE(candidate,i,width,height,&q)) return 0;
@@ -1534,7 +1542,7 @@ static int race_save_game(void) {
     if (!race_z7_active() && race_shared_egg_context()
 #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
         && !(race_mode || race_z8_active() ||
-             (race_zl_active() && race_selected_mission==SC64_Z9_GLOBAL_ID))
+             race_zl_active())
 #endif
        )
         for (int i=0;i<MAX_UNITS;++i)
@@ -1660,7 +1668,7 @@ static int race_save_game(void) {
         race_mode ? SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
 #elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
         (race_mode || race_z8_active() ||
-         (race_zl_active() && race_selected_mission==SC64_Z9_GLOBAL_ID)) ?
+         race_zl_active()) ?
         SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
         SC64_GUARDIAN_SAVE_VERSION;
@@ -2654,14 +2662,14 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_WORKER_CARGO_KIND
     if (!race_save_worker_cargo_prepare(&race_data,(unsigned)width*16u,
                                         (unsigned)height*16u,plan->legacy_worker_cargo SC64_GCTX_ARG)) return 0;
-#if !defined(SC64_GUARDIAN_COCOON_STAGE) && !defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+#if !defined(SC64_GUARDIAN_COCOON_STAGE) && !defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) && !defined(SC64_SHARED_EGG_LATE_SERVICE)
 #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
     if (!(plan->egg_auth.features & SC64_STAGE_SAVE_EGG))
 #endif
         race_data.version = SAVE_VERSION;
 #endif
 #endif
-#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) && (defined(SC64_Z6_RUNTIME) || defined(SC64_Z7_RUNTIME))
+#if (defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)) && (defined(SC64_Z6_RUNTIME) || defined(SC64_Z7_RUNTIME))
     /* The selected token remains bound to the unmodified inner version. Only
      * after cargo migration succeeds may this exact old authenticated pair
      * be interpreted as the predecessor of the current campaign generation. */
@@ -3608,7 +3616,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_Z6_RUNTIME
     if (!v[0] && v[2] == SC64_Z6_GLOBAL_ID) {
-#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
         if (!race_z6_save_candidate_valid_for(&race_data, &race_data.z6,
                                            (unsigned)width,
                                            (unsigned)height, campaign_expected_version SC64_GCTX_ARG)) return 0;
@@ -3656,7 +3664,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_Z7_RUNTIME
     if (!v[0] && v[2] == SC64_Z7_GLOBAL_ID) {
-#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
         if (!race_z7_save_candidate_valid_for(&race_data, &race_data.z7,
                 (unsigned)width, (unsigned)height, campaign_expected_version SC64_GCTX_ARG)) return 0;
 #else

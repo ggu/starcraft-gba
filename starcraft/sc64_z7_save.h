@@ -242,7 +242,7 @@ static unsigned race_z7_save_remaining_script_creates(
 }
 
 static int
-#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
 race_z7_save_candidate_valid_for(const RaceSave *candidate,
                                  const Sc64Z7PersistentState *state,
                                  unsigned width, unsigned height, u32 expected_version SC64_GCTX_DECL)
@@ -281,7 +281,7 @@ race_z7_save_candidate_valid(const RaceSave *candidate,
             &sc64_race_maps[SC64_Z7_GLOBAL_ID]) ||
         !sc64_z7_persistent_state_valid(state) ||
         candidate->version !=
-#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
         expected_version
 #else
         SAVE_VERSION
@@ -622,7 +622,7 @@ race_z7_save_candidate_valid(const RaceSave *candidate,
     return 1;
 }
 
-#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
 /* Save-time callers still require the current generation. Only prepared-load
  * preflight may pass a separately authenticated predecessor version. */
 static int race_z7_save_candidate_valid(const RaceSave *candidate,

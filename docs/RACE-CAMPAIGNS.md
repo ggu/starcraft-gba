@@ -716,3 +716,27 @@ flags and save layouts remain unchanged.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.
+
+## Opt-in late-campaign Egg preview
+
+After preparing the standard private Zerg profile inputs, build an isolated
+experimental product with:
+
+```sh
+make late-egg-preview-zerg
+make late-egg-preview-z10
+```
+
+These targets enable `SC64_SHARED_EGG_LATE_SERVICE` and write ROMs/ELFs under
+`build/late-egg-preview/build/`. Normal outputs and feature flags are unchanged.
+The Z9 product contains Zerg missions 1–9; the Z10 candidate contains 1–10,
+but an ordinary-input Z10 victory remains unqualified. Both retain the regular
+custom-game menu. This preview adds independent paid Eggs to Z8–Z10 where
+present, using the existing Z7 identity, real owner wallets and authenticated
+save context. Greater-Spire Guardian morphing remains unfinished.
+
+Do not combine this flag with the separate custom-Egg preview or competing
+Guardian/Scarab prototypes. Journals have product-specific generations; an old
+Z7-product save is not interchangeable with a Z9-product save. Qualification
+of matching predecessor records is separate from arbitrary historical-save
+compatibility. Preserve existing saves and use separate experimental filenames.
