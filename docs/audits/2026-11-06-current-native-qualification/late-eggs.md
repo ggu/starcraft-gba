@@ -91,9 +91,19 @@ Exact private opt-in runtime ROM hashes before publication recipes:
 ## Remaining gates
 
 All six normal service-off ROM hashes and RAM endpoints match the prior `6ba`
-qualification exactly at `7166def0`. This preserves those products; it does not
-activate the new service in them. Clean default and public preview recipe
-qualification are tracked with the publication result.
+qualification exactly at `7166def0`. A clean, asset-free doctor, source-boundary,
+`./dev build` and `./dev test` also pass there: 1,000 main Python tests, 26 skipped,
+plus the compiled and auxiliary suites. This preserves those products; it does
+not activate the new service in them.
+
+Publication `4f0d7080` preserves the same game/common/tests objects and adds the
+isolated preview recipes, verifier and documentation. Both public commands were
+actually built with pinned inputs: standard header/RAM checks pass, and both ROM
+hashes equal the guest-qualified f323 artifacts above. Indexed source-boundary
+checks pass for all 1,728 text files; local links and the existing RAM-boundary
+unit check pass. Independent Terra reviews found no material blocker. The full
+clean suite is scoped to `7166def0`; the new recipe/verifier qualification is
+scoped to `4f0d7080`, rather than presented as another full-suite run.
 
 Next: a common enabled release capability across applicable products, full
 campaign/custom regression and late-source permissions; Greater-Spire Guardian
