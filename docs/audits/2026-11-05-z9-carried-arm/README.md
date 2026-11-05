@@ -43,3 +43,32 @@ These checks establish the recorded routes and sampled states, not arbitrary
 save compatibility, all carried missions on ARM, physical hardware timing, or
 N64 gameplay parity. Z9 remains staged rather than a default promotion on
 this evidence alone.
+
+## Reproduction
+
+With the privately prepared Z9 inputs and retained host controller traces in
+`.local/carried-arm`, regenerate the immutable tapes and build the wrappers
+under the project's shared native lock and 2 GiB disk guard:
+
+```sh
+python3 tools/sc64_z7_arm_replay.py tape .local/carried-arm/z7.json build/z7-carried/sc64_z7_tape_generated.h
+python3 tools/sc64_p8_arm_replay.py --mission 19 --prefix PX tape .local/carried-arm/z8.jsonl build/z8-carried/sc64_px_tape_generated.h
+make -o build/z7-carried/sc64_z7_tape_generated.h Z9_Z7_CUT=136058 build/z9-z7-host-full build/z9-z7-host-prefix build/z9-z7-host-resume build/Z9-Z7-full.gba build/Z9-Z7-prefix.gba build/Z9-Z7-resume.gba
+make -o build/z8-carried/sc64_px_tape_generated.h build/z9-z8-host-full build/z9-z8-host-prefix build/z9-z8-host-resume build/Z9-Z8-full.gba build/Z9-Z8-prefix.gba build/Z9-Z8-resume.gba
+```
+
+For Z7, execute the host full, prefix (with output save path), and resume
+(with prefix save and distinct output save paths), then run the corresponding
+ARM ROMs through `tools/sc64_z7_arm_replay.py run` with `--save-profile
+z9-cargo-transport1`; resume also needs `--cut 136058`, `--seed-sav` and
+`--prefix-log` from the ARM prefix. Compare each host and ARM log using
+`python3 tools/sc64_z7_cargo_compare.py HOST_LOG ARM_LOG`; this rejects missing,
+malformed, duplicated or differently ordered digest records as well as digest
+mismatches. The verifier checks scalar cadence and the save envelope.
+
+For Z8, run the host full, prefix and resume wrappers in the same way; execute
+`tools/sc64_p8_arm_replay.py --mission 19 --prefix PX run --rom ROM --out DIR`,
+using `--sav-in` for the resume. Compare host and ARM logs with the same tool's
+`compare` command, adding `--from-tick 17374` for the resume. Compare the
+committed journal slots as described above; retain original backend saves and
+do not substitute a constructed SRAM image.
