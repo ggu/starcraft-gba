@@ -54,6 +54,8 @@ int main(int argc,char **argv)
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive && u[i].type==U_RAYNOR)u[i].alive=0;
     } else seed_t1_defeat();
     assert(journal_present()==successful_load);int completed_before=race_completed; (void)completed_before;
+    unsigned phase_before=race_campaign.phase, objectives_before=race_campaign.objective_flags;
+    (void)phase_before; (void)objectives_before;
     input(0);
     printf("case=%s queue=%u screen=%d won=%d lost=%d completed=%lu journal=%d frame=%d\n",
            argv[1],sc64_text_box_count(),screen,won,lost,(unsigned long)race_completed,
@@ -66,6 +68,7 @@ int main(int argc,char **argv)
 #else
     assert(screen==SCREEN_PLAY && !won && !lost && race_completed==completed_before &&
            journal_present()==successful_load);
+    assert(race_campaign.phase==phase_before && race_campaign.objective_flags==objectives_before);
     u32 frozen=world_digest();int frozen_frame=frame;
     assert(!save_game() && journal_present()==successful_load);
     if(failed_load) {
@@ -93,8 +96,8 @@ int main(int argc,char **argv)
                                         race_completed==completed_before && !journal_present() &&
                                         frame==frozen_frame && world_digest()==frozen);
     }
-    for(int n=0;n<4 && screen!=SCREEN_RESULT;n++)input(0);
-    assert(screen==SCREEN_RESULT && (victory?won:lost) && journal_present());
+    assert(frame==frozen_frame && screen==SCREEN_RESULT && (victory?won:lost) && journal_present());
+    assert(race_campaign.phase==(victory?SC64_RACE_PHASE_COMPLETE:SC64_RACE_PHASE_FAILED));
     if(victory)assert(race_completed & (1u<<race_selected_mission));
     return 0;
 #endif
