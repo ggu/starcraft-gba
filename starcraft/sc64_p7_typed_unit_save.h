@@ -1,5 +1,21 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_P7_TYPED_UNIT_SAVE_H
+
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#define SC64_TYPED_WIRE_CANONICAL sc64_p7_typed_unit_canonical_for
+#define SC64_TYPED_WIRE_VALIDATE sc64_p7_typed_unit_fields_valid_for
+#define SC64_TYPED_WIRE_ENCODE sc64_p7_typed_unit_encode_for
+#define SC64_TYPED_WIRE_DECODE sc64_p7_typed_unit_decode_for
+#define SC64_TYPED_WIRE_PARAM , int egg_stage
+#define SC64_TYPED_WIRE_ARG , egg_stage
+#else
+#define SC64_TYPED_WIRE_CANONICAL sc64_p7_typed_unit_canonical
+#define SC64_TYPED_WIRE_VALIDATE sc64_p7_typed_unit_fields_valid
+#define SC64_TYPED_WIRE_ENCODE sc64_p7_typed_unit_encode
+#define SC64_TYPED_WIRE_DECODE sc64_p7_typed_unit_decode
+#define SC64_TYPED_WIRE_PARAM
+#define SC64_TYPED_WIRE_ARG
+#endif
 #define SC64_P7_TYPED_UNIT_SAVE_H
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
@@ -56,12 +72,14 @@ static int sc64_p7_typed_unit_zero(const Sc64P7TypedUnitSave *r)
     return 1;
 }
 
-static int sc64_p7_typed_unit_canonical_for(int type, int *maxhp, int *armor,
-                                        int *maxshield,int egg_stage)
+static int SC64_TYPED_WIRE_CANONICAL(int type, int *maxhp, int *armor,
+                                        int *maxshield SC64_TYPED_WIRE_PARAM)
 {
     const Sc64RaceUnitRule *rule;
     int hp, shields;
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
     (void)egg_stage;
+#endif
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
     if (egg_stage && type==SC64_SHARED_EGG_TYPE && type>=0 && type<64) {
         if (maxhp) *maxhp=200;
@@ -84,9 +102,9 @@ static int sc64_p7_typed_unit_canonical_for(int type, int *maxhp, int *armor,
     return 1;
 }
 
-static int sc64_p7_typed_unit_fields_valid_for(const Unit *q,
+static int SC64_TYPED_WIRE_VALIDATE(const Unit *q,
                                            unsigned world_width,
-                                           unsigned world_height,int egg_stage)
+                                           unsigned world_height SC64_TYPED_WIRE_PARAM)
 {
     int maxhp, armor, maxshield;
     if (!q || !world_width || !world_height || world_width > 2048 ||
@@ -94,7 +112,7 @@ static int sc64_p7_typed_unit_fields_valid_for(const Unit *q,
         q->y < 0 || (unsigned)q->y >= world_height ||
         q->hp < -131072 || q->hp >= 131072 || (q->alive && q->hp < 0) ||
         q->owner < 0 || q->owner > 4 || q->type < 0 ||
-        !sc64_p7_typed_unit_canonical_for(q->type, &maxhp, &armor, &maxshield,egg_stage) ||
+        !SC64_TYPED_WIRE_CANONICAL(q->type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG) ||
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
         (egg_stage && q->type==SC64_SHARED_EGG_TYPE && (q->raw_type!=36 || q->alive!=1)) ||
 #endif
@@ -116,9 +134,9 @@ static int sc64_p7_typed_unit_fields_valid_for(const Unit *q,
     return 1;
 }
 
-static int sc64_p7_typed_unit_encode_for(Sc64P7TypedUnitSave *row,
+static int SC64_TYPED_WIRE_ENCODE(Sc64P7TypedUnitSave *row,
                                      const Unit *q, unsigned ww,
-                                     unsigned wh,int egg_stage)
+                                     unsigned wh SC64_TYPED_WIRE_PARAM)
 {
     Sc64P7TypedUnitSave out;
     unsigned bit = 0;
@@ -126,7 +144,7 @@ static int sc64_p7_typed_unit_encode_for(Sc64P7TypedUnitSave *row,
     memset(&out, 0, sizeof(out));
     static const Unit zero = {0};
     if (memcmp(q, &zero, sizeof(*q)) == 0) { *row = out; return 1; }
-    if (!sc64_p7_typed_unit_fields_valid_for(q, ww, wh,egg_stage)) return 0;
+    if (!SC64_TYPED_WIRE_VALIDATE(q, ww, wh SC64_TYPED_WIRE_ARG)) return 0;
 #define PUT(w, v) do { if (!sc64_p7_typed_unit_put(&out, &bit, (w), (u32)(v))) return 0; } while (0)
     PUT(11, q->x); PUT(11, q->y); PUT(18, q->hp + 131072);
     PUT(3, q->owner); PUT(6, q->type); PUT(1, q->alive); PUT(1, q->selected);
@@ -142,9 +160,9 @@ static int sc64_p7_typed_unit_encode_for(Sc64P7TypedUnitSave *row,
     return 1;
 }
 
-static int sc64_p7_typed_unit_decode_for(Unit *out,
+static int SC64_TYPED_WIRE_DECODE(Unit *out,
                                      const Sc64P7TypedUnitSave *row,
-                                     unsigned ww, unsigned wh,int egg_stage)
+                                     unsigned ww, unsigned wh SC64_TYPED_WIRE_PARAM)
 {
     Unit q;
     unsigned bit = 0;
@@ -168,14 +186,15 @@ static int sc64_p7_typed_unit_decode_for(Unit *out,
     GET(4, v); q.raw_owner = (int)v - 1; GET(14, q.flags);
     GET(11, q.shield_remainder);
     if (!sc64_p7_typed_unit_get(row, &bit, 1, &v) || v != 1 || bit != 224 ||
-        !sc64_p7_typed_unit_canonical_for(q.type, &maxhp, &armor, &maxshield,egg_stage)) return 0;
+        !SC64_TYPED_WIRE_CANONICAL(q.type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG)) return 0;
     q.maxhp = maxhp; q.armor = armor;
-    if (!sc64_p7_typed_unit_fields_valid_for(&q, ww, wh,egg_stage)) return 0;
+    if (!SC64_TYPED_WIRE_VALIDATE(&q, ww, wh SC64_TYPED_WIRE_ARG)) return 0;
     *out = q;
     return 1;
 #undef GET
 }
 
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
 static int sc64_p7_typed_unit_canonical(int t,int *hp,int *a,int *sh)
 { return sc64_p7_typed_unit_canonical_for(t,hp,a,sh,0); }
 static int sc64_p7_typed_unit_fields_valid(const Unit *q,unsigned w,unsigned h)
@@ -184,5 +203,13 @@ static int sc64_p7_typed_unit_encode(Sc64P7TypedUnitSave *r,const Unit *q,unsign
 { return sc64_p7_typed_unit_encode_for(r,q,w,h,0); }
 static int sc64_p7_typed_unit_decode(Unit *q,const Sc64P7TypedUnitSave *r,unsigned w,unsigned h)
 { return sc64_p7_typed_unit_decode_for(q,r,w,h,0); }
+
+#endif /* SC64_SHARED_EGG_WIRE_HOST_STAGE */
+#undef SC64_TYPED_WIRE_CANONICAL
+#undef SC64_TYPED_WIRE_VALIDATE
+#undef SC64_TYPED_WIRE_ENCODE
+#undef SC64_TYPED_WIRE_DECODE
+#undef SC64_TYPED_WIRE_PARAM
+#undef SC64_TYPED_WIRE_ARG
 
 #endif
