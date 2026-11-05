@@ -53,8 +53,8 @@ static int race_guardian_candidate_origin(const RaceSave *candidate,int owner,in
     int mission=candidate->state[2];
     if ((unsigned)mission>=SC64_RACE_MAP_COUNT || (unsigned)source>=8u) return 0;
     const Sc64RaceMap *map=&sc64_race_maps[mission];
-    if (!map->owner_races || map->owner_races[source]!=R_ZERG ||
-        !race_guardian_source_map_valid(map)) return 0;
+    /* The caller preflights this exact descriptor once per candidate. */
+    if (!map->owner_races || map->owner_races[source]!=R_ZERG) return 0;
 #ifdef SC64_Z7_RUNTIME
     if (mission==SC64_Z7_GLOBAL_ID)
         return race_guardian_candidate_puni(sc64_z7_source_puni,source,raw);
