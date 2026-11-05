@@ -14,6 +14,26 @@ end of this guide.
 
 ## Local-first verification
 
+The separate nine-mission Zerg candidate can prepare its inherited and later
+inputs from the same user-supplied ROM:
+
+```sh
+./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile zerg-z9
+./dev sc64 status --profile zerg-z9
+./dev sc64 build --profile zerg-z9
+./dev sc64 test --profile zerg-z9
+./dev sc64 play --profile zerg-z9
+```
+
+Preparation verifies retained Z8/Z9 descriptors before reusing them, regenerates
+their matching trigger headers, and builds the expanded source sprite bank.
+Status checks the programs against authenticated descriptors, including source
+ROM/CHK provenance. Outputs remain private under `.local/` and `build/`.
+The explicit candidate retains `.local/play/zerg-z9` for its saves; this does
+not migrate Z7 saves or change the canonical `zerg` alias. See the current
+[Z9 qualification audit](audits/2026-11-05-z9-current-integration/README.md) for
+the remaining carried ARM and performance limits.
+
 Core engine improvements belong to every applicable Showcase, skirmish and
 campaign build. See [Shared engine policy and migration status](SHARED-ENGINE.md)
 for the common capability contract and remaining mission-scoped services.
