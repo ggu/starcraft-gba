@@ -241,9 +241,16 @@ static unsigned race_z7_save_remaining_script_creates(
     return 0;
 }
 
-static int race_z7_save_candidate_valid(const RaceSave *candidate,
-                                         const Sc64Z7PersistentState *state,
-                                         unsigned width, unsigned height SC64_GCTX_DECL)
+static int
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+race_z7_save_candidate_valid_for(const RaceSave *candidate,
+                                 const Sc64Z7PersistentState *state,
+                                 unsigned width, unsigned height, u32 expected_version SC64_GCTX_DECL)
+#else
+race_z7_save_candidate_valid(const RaceSave *candidate,
+                             const Sc64Z7PersistentState *state,
+                             unsigned width, unsigned height SC64_GCTX_DECL)
+#endif
 {
     const Sc64RaceMap *map;
     u8 seen_units[(MAX_UNITS+7u)/8u]={0};
@@ -273,7 +280,13 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
         height!=SC64_Z7_MAP_ROWS || !race_z7_save_map_valid(
             &sc64_race_maps[SC64_Z7_GLOBAL_ID]) ||
         !sc64_z7_persistent_state_valid(state) ||
-        candidate->version!=SAVE_VERSION || candidate->state[0]!=0 ||
+        candidate->version !=
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+        expected_version
+#else
+        SAVE_VERSION
+#endif
+        || candidate->state[0]!=0 ||
         candidate->state[1]!=R_ZERG || candidate->state[2]!=SC64_Z7_GLOBAL_ID ||
         candidate->state[7]<0 || candidate->state[16]<0 ||
         candidate->state[16]>MAX_RACE_GEYSERS ||
@@ -609,5 +622,15 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
     return 1;
 }
 
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+/* Save-time callers still require the current generation. Only prepared-load
+ * preflight may pass a separately authenticated predecessor version. */
+static int race_z7_save_candidate_valid(const RaceSave *candidate,
+                                         const Sc64Z7PersistentState *state,
+                                         unsigned width, unsigned height SC64_GCTX_DECL)
+{
+    return race_z7_save_candidate_valid_for(candidate,state,width,height,SAVE_VERSION SC64_GCTX_ARG);
+}
+#endif
 #endif /* SC64_Z7_RUNTIME */
 #endif /* SC64_Z7_SAVE_H */

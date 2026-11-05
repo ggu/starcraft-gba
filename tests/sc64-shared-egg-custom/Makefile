@@ -50,3 +50,14 @@ custom-egg-z7-legacy:
 .PHONY: custom-egg-conflict-guards
 custom-egg-conflict-guards:
 	$(PYTHON) tests/check_sc64_shared_egg_custom_guards.py $(CLANG) $(CUSTOM_HOST) $(ZERG_Z9_CANONICAL_FLAGS)
+
+# PRE_CARGO_OLD_ROOT must name a clean 17dc9b3e checkout with matching assets.
+# Constructed HOST SRAM stays private; never import these files into a guest.
+PRE_CARGO_OLD_ROOT ?= /tmp/sc64-scourge-permissions-base
+PRE_CARGO_OUT ?= /tmp/sc64-pre-cargo-egg-compat
+PRE_CARGO_COMMON = $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable $(ZERG_Z7_CANONICAL_FLAGS)
+.PHONY: pre-cargo-campaign-build
+pre-cargo-campaign-build:
+	$(CLANG) $(PRE_CARGO_COMMON) -USC64_WORKER_CARGO_KIND -DSC64_COMPAT_WRITER '-DSC64_COMPAT_GAME_SOURCE="$(PRE_CARGO_OLD_ROOT)/starcraft/game.c"' tests/sc64_pre_cargo_campaign_compat.c tests/sc64_pre_cargo_compat_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $(PRE_CARGO_OUT)/campaign-old-writer
+	$(CLANG) $(PRE_CARGO_COMMON) tests/sc64_pre_cargo_campaign_compat.c tests/sc64_pre_cargo_compat_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $(PRE_CARGO_OUT)/campaign-normal-reader
+	$(CLANG) $(PRE_CARGO_COMMON) -DSC64_SHARED_EGG_CUSTOM_SERVICE tests/sc64_pre_cargo_campaign_compat.c tests/sc64_pre_cargo_compat_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $(PRE_CARGO_OUT)/campaign-optin-reader

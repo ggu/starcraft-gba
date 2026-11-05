@@ -2661,6 +2661,18 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         race_data.version = SAVE_VERSION;
 #endif
 #endif
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) && (defined(SC64_Z6_RUNTIME) || defined(SC64_Z7_RUNTIME))
+    /* The selected token remains bound to the unmodified inner version. Only
+     * after cargo migration succeeds may this exact old authenticated pair
+     * be interpreted as the predecessor of the current campaign generation. */
+    u32 campaign_expected_version=SAVE_VERSION;
+    if (plan->legacy_worker_cargo && plan->egg_auth.features==0 &&
+        plan->egg_auth.outer==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION &&
+        sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,
+                                    SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0) &&
+        race_data.version==SC64_WORKER_CARGO_LEGACY_SAVE_VERSION)
+        campaign_expected_version=SC64_WORKER_CARGO_LEGACY_SAVE_VERSION;
+#endif
     if(v[8]<0||v[8]>=width*16||v[9]<0||v[9]>=height*16||v[11]<0||v[11]>2||
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||
@@ -3596,9 +3608,15 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_Z6_RUNTIME
     if (!v[0] && v[2] == SC64_Z6_GLOBAL_ID) {
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+        if (!race_z6_save_candidate_valid_for(&race_data, &race_data.z6,
+                                           (unsigned)width,
+                                           (unsigned)height, campaign_expected_version SC64_GCTX_ARG)) return 0;
+#else
         if (!race_z6_save_candidate_valid(&race_data, &race_data.z6,
                                            (unsigned)width,
                                            (unsigned)height SC64_GCTX_ARG)) return 0;
+#endif
 #ifdef SC64_Z5_RUNTIME
         /* Z5 is the larger member; bytes outside the Z6 schema are canonical
          * zero so old union contents cannot survive a mission change. */
@@ -3638,8 +3656,13 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_Z7_RUNTIME
     if (!v[0] && v[2] == SC64_Z7_GLOBAL_ID) {
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+        if (!race_z7_save_candidate_valid_for(&race_data, &race_data.z7,
+                (unsigned)width, (unsigned)height, campaign_expected_version SC64_GCTX_ARG)) return 0;
+#else
         if (!race_z7_save_candidate_valid(&race_data, &race_data.z7,
                 (unsigned)width, (unsigned)height SC64_GCTX_ARG)) return 0;
+#endif
         const u8 *payload=(const u8 *)&race_data.z5;
         for (unsigned i=sizeof(race_data.z7); i<sizeof(race_data.z5); ++i)
             if (payload[i]) return 0;
