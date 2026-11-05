@@ -252,9 +252,6 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
     int minx = (nx - reach) >> 4, maxx = (nx + reach) >> 4;
     int miny = (ny - reach) >> 4, maxy = (ny + reach) >> 4;
     int row, col;
-#ifdef SC64_EGG_COLLISION_TRACE
-    fprintf(stderr,"egg bucket range nx=%d ny=%d reach=%d rect=%d,%d..%d,%d cols=%d rows=%d\n",nx,ny,reach,minx,miny,maxx,maxy,MAP_COLS,MAP_ROWS);
-#endif
     if (minx < 0) minx = 0;
     if (miny < 0) miny = 0;
     if (maxx >= MAP_COLS) maxx = MAP_COLS - 1;
@@ -311,9 +308,6 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 #endif
 #endif
                     int dx = u[i].x - nx, dy = u[i].y - ny;
-#ifdef SC64_EGG_COLLISION_TRACE
-                    fprintf(stderr,"egg candidate=%d type=%d radius=%d dx=%d dy=%d qx=%d qy=%d strict=%d\n",i,u[i].type,radius,dx,dy,q->x,q->y,strict);
-#endif
                     if (dx <= -radius || dx >= radius || dy <= -radius || dy >= radius) continue;
                     dx *= dx;
                     dy *= dy;
