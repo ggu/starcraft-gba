@@ -334,6 +334,12 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
      defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE))
 #error "Full shared actor journal requires an isolated HOST compact-codec candidate"
 #endif
+#if defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE) && \
+    (!defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) || !defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) || \
+     !defined(SC64_SCARAB_WEAPON_PROBE) || !defined(SC64_SCARAB_AUTONOMOUS_PROBE) || \
+     !defined(SC64_SCARAB_PACKED_MOTION_PROBE) || !defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE))
+#error "Shared flight candidate requires the complete HOST Scarab control probe"
+#endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE) && \
     !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
 #error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
@@ -647,6 +653,8 @@ _Static_assert((SAVE_VERSION & 0x02000000u) != 0 &&
 /* Feature=7 must never reinterpret the already used feature=5 HOST pair. */
 #define SC64_SHARED_ACTOR_FULL_SAVE_VERSION (SC64_SHARED_ACTOR_SAVE_VERSION ^ 0x08000000u)
 #define SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION (SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION ^ 0x08000000u)
+#define SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION (SC64_SHARED_ACTOR_FULL_SAVE_VERSION ^ 0x10000000u)
+#define SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION (SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION ^ 0x10000000u)
 _Static_assert((SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION ^ SC64_SHARED_ACTOR_SAVE_VERSION) == 0x04000000u,
                "shared actor generation must retain transport identity");
 _Static_assert((SAVE_VERSION & 0x08000000u) == 0 &&
@@ -654,6 +662,9 @@ _Static_assert((SAVE_VERSION & 0x08000000u) == 0 &&
                SC64_SHARED_ACTOR_FULL_SAVE_VERSION != SC64_SHARED_ACTOR_SAVE_VERSION &&
                SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION != SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,
                "full actor generation must not reinterpret the prior pair");
+_Static_assert((SAVE_VERSION & 0x10000000u) != 0 &&
+               (SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION ^ SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION) == 0x04000000u,
+               "flight generation must preserve its separate transport pair");
 #endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
@@ -2144,7 +2155,7 @@ static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #error "Scarab AI stocking probe requires the complete human control probe"
 #endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-#if !defined(SC64_SCARAB_NAMESPACE_STAGE) || !defined(SC64_SCARAB_WEAPON_PROBE)
+#if (!defined(SC64_SCARAB_NAMESPACE_STAGE) && !defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE)) || !defined(SC64_SCARAB_WEAPON_PROBE)
 #error "Scarab human control probe requires namespace and weapon probes"
 #endif
 static int race_scarab_parent_init(int slot);

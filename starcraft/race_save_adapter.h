@@ -158,7 +158,8 @@ static int race_save_decode_unit_authenticated(const RaceSave *candidate,unsigne
         Unit logical;
         if (!(auth->features & SC64_STAGE_SAVE_SCARAB) ||
             !sc64_scarab_flight_from_wire(&decoded,&logical,1,0) ||
-            (((unsigned)logical.carry>>8)&3u)>1u) return 0;
+            ((((unsigned)logical.carry>>8)&3u)>1u &&
+             !(auth->features & SC64_STAGE_SAVE_EXTENDED_EVENTS))) return 0;
         decoded=logical;
     } else if (decoded.alive && sc64_race_raw_unit(decoded.type)==83) {
         int carry,timer;
@@ -232,7 +233,8 @@ static int race_guardian_decode_authenticated(const RaceSave *candidate,unsigned
         Unit logical;
         if (!(auth->features & SC64_STAGE_SAVE_SCARAB) ||
             !sc64_scarab_flight_from_wire(&decoded,&logical,1,0) ||
-            (((unsigned)logical.carry>>8)&3u)>1u) return 0;
+            ((((unsigned)logical.carry>>8)&3u)>1u &&
+             !(auth->features & SC64_STAGE_SAVE_EXTENDED_EVENTS))) return 0;
         decoded=logical;
     } else if (decoded.alive && sc64_race_raw_unit(decoded.type)==83) {
         int carry,timer;
@@ -292,6 +294,14 @@ static int race_scarab_zp_encode(RaceSave *candidate, unsigned slot,
 #ifdef SC64_SCARAB_RUNTIME
 #include "sc64_scarab_fields.h"
 #include "sc64_scarab_lifecycle.h"
+static int race_scarab_candidate_child_fields(const Unit *q,Sc64ScarabChildFields *out)
+{
+#ifdef SC64_SCARAB_PACKED_MOTION_PROBE
+    return sc64_scarab_child_fields_unpack((int)((unsigned)q->carry&1023u),q->work_timer,out);
+#else
+    return sc64_scarab_child_fields_unpack(q->carry,q->work_timer,out);
+#endif
+}
 /* Read candidate rows only; never alias or mutate the live world. This is a
  * bounded graph check for the inactive Scarab prototype, not a save migration. */
 static int
@@ -308,11 +318,18 @@ race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsi
             if ((unsigned)q.owner>=5 || q.raw_owner < -1 || q.raw_owner > 255 || q.selected ||
                 q.build!=-1 || q.maxhp!=20 || q.hp<=0 || q.hp>20 ||
                 q.shield<0 || q.shield>10 ||
-                !sc64_scarab_child_fields_unpack(q.carry,q.work_timer,&child)) return 0;
+                !race_scarab_candidate_child_fields(&q,&child)) return 0;
             if (child.phase<2 && (child.life || child.no_collision ||
                                   q.order!=ORDER_IDLE || q.target!=-1)) return 0;
-            if (child.phase==2 && !sc64_scarab_flight_valid(
+            if (child.phase==2 &&
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+                !(q.order==1 && !child.life && !child.no_collision) &&
+#endif
+                !sc64_scarab_flight_valid(
                 &(Sc64ScarabFlight){(uint8_t)child.life,(uint8_t)child.no_collision})) return 0;
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+            if (child.phase>=2 && (q.order<1 || q.order>4)) return 0;
+#endif
             if (child.parent_slot!=SC64_SCARAB_FIELD_NO_SLOT) {
                 Unit parent;
                 if (child.parent_slot>=MAX_UNITS || child.parent_slot==i ||
@@ -332,7 +349,7 @@ race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsi
                 Unit child; Sc64ScarabChildFields cf;
                 if (!SC64_GUARD_DECODE(candidate,j,width,height,&child)) return 0;
                 if (!child.alive || child.type!=U_SCARAB) continue;
-                if (!sc64_scarab_child_fields_unpack(child.carry,child.work_timer,&cf)) return 0;
+                if (!race_scarab_candidate_child_fields(&child,&cf)) return 0;
                 if (cf.parent_slot!=i) continue;
                 if (cf.phase==0) {
                     unsigned hp;
@@ -1597,7 +1614,11 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
     if(!live || !wire || !sc64_scarab_flight_to_wire(live,wire,1,0)) return 0;
     if((live->type==U_SCARAB || live->raw_type==85) &&
        (((unsigned)live->carry>>8)&3u)>1u) {
-        if(live->alive)return 0;
+        if(live->alive) {
+#ifndef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+            return 0;
+#endif
+        } else
         memset(wire,0,sizeof(*wire));
     }
     return 1;
@@ -1735,7 +1756,9 @@ static int race_save_game(void) {
     memset(&race_data, 0, sizeof(race_data));
 #endif
     race_data.version=
-#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+        SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION;
+#elif defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)
         SC64_SHARED_ACTOR_FULL_SAVE_VERSION;
 #elif defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE)
         SC64_SHARED_ACTOR_SAVE_VERSION;
@@ -1755,7 +1778,10 @@ static int race_save_game(void) {
         SAVE_VERSION;
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
-#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+    const Sc64StageTagPair writer_pair={SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION,
+        SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION,SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_SCARAB|SC64_STAGE_SAVE_EXTENDED_EVENTS};
+#elif defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)
     const Sc64StageTagPair writer_pair={SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,
         SC64_SHARED_ACTOR_FULL_SAVE_VERSION,SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_SCARAB};
 #elif defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
@@ -4035,6 +4061,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
         {SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_SAVE_VERSION,SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_SCARAB},
 #endif
         {SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_FULL_SAVE_VERSION,SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_SCARAB}
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+        ,{SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION,SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_SCARAB|SC64_STAGE_SAVE_EXTENDED_EVENTS}
+#endif
     };
     if (!sc64_stage_save_authenticate(&plan->guardian_auth,&race_data,tag,race_data.version,
              combined_tags,sizeof(combined_tags)/sizeof(combined_tags[0]))) return 0;
@@ -4137,7 +4166,11 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
 #ifndef SC64_ZP_FULL_STORAGE
         SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,
 #endif
-        SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION};
+        SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+        ,SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION
+#endif
+    };
 #elif defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,

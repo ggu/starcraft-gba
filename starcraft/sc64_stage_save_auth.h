@@ -6,7 +6,8 @@
  * validate the journal checksum and sequence, then pass that slot's outer
  * tag and its detached payload's unmodified inner version. No field value
  * inside the payload alone can authorize a staged interpretation. */
-enum { SC64_STAGE_SAVE_EGG = 1u, SC64_STAGE_SAVE_GUARDIAN = 2u, SC64_STAGE_SAVE_SCARAB = 4u };
+enum { SC64_STAGE_SAVE_EGG = 1u, SC64_STAGE_SAVE_GUARDIAN = 2u,
+       SC64_STAGE_SAVE_SCARAB = 4u, SC64_STAGE_SAVE_EXTENDED_EVENTS = 8u };
 typedef struct {
     uint32_t outer,inner;
     unsigned features;

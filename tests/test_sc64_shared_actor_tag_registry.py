@@ -43,14 +43,20 @@ class SharedActorTags(unittest.TestCase):
                     value ^= selector
             feature5.add(value)
         feature7 = {tag ^ 0x08000000 for tag in feature5}
+        feature15 = {tag ^ 0x10000000 for tag in feature7}
         self.assertFalse(feature5 & feature7)
+        self.assertFalse(feature5 & feature15)
+        self.assertFalse(feature7 & feature15)
         self.assertFalse(old & feature5)
         self.assertFalse(old & feature7)
+        self.assertFalse(old & feature15)
         source = Path("starcraft/game.c").read_text()
         self.assertIn("#define SC64_SHARED_ACTOR_SAVE_VERSION (SAVE_VERSION ^ 0x02000000u)", source)
         self.assertIn("#define SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x02000000u)", source)
         self.assertIn("#define SC64_SHARED_ACTOR_FULL_SAVE_VERSION (SC64_SHARED_ACTOR_SAVE_VERSION ^ 0x08000000u)", source)
         self.assertIn("#define SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION (SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION ^ 0x08000000u)", source)
+        self.assertIn("#define SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION (SC64_SHARED_ACTOR_FULL_SAVE_VERSION ^ 0x10000000u)", source)
+        self.assertIn("#define SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION (SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION ^ 0x10000000u)", source)
         print(f"shared actor tag audit: {len(old)} old values, {len(combined)} new values, no overlap")
 
 
