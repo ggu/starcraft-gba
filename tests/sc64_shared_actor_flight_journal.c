@@ -53,7 +53,7 @@ int main(int argc,char **argv)
     assert(u[child].order==4 && u[child].target==target);
     /* A dead slot can be reused before this child dispatches again. */
     int tx=u[child].tx,ty=u[child].ty;
-    u[target].alive=0;
+    hit_target(target,10000,U_REAVER,SIDE);assert(!u[target].alive);
     assert(spawn_unit(ENEMY,U_ZERGLING,700,700)==target);
     assert(u[child].target==-1 && u[child].order==4 && u[child].tx==tx && u[child].ty==ty);
     assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
@@ -63,5 +63,20 @@ int main(int argc,char **argv)
     guardian_test_retag(selected.slot,SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_FULL_SAVE_VERSION);
     GbaSaveSelection fallback;assert(race_worker_cargo_select(&plan,&fallback));
     assert(fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION && fallback.slot!=selected.slot);
-    puts("actual HOST fresh and initialized Scarab flight saves, old-tag denial passed");return 0;
+    /* Independently launch from paid stock at a building and save after the
+     * same real FSM receives a controlled arrival signal. */
+    guardian_test_restore(sram);assert(race_load_game());minerals=100;
+    assert(race_scarab_enqueue(p,0));
+    assert(race_scarab_production_tick(p,0)==SC64_SCARAB_ALLOCATED);
+    assert(race_scarab_parent_read(p,0,&parent,&counts));child=parent.active_slot;
+    for(int i=0;i<SC64_SCARAB_BUILD_TICKS;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
+    assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
+    int building=spawn_build(ENEMY,B_HATCHERY,u[p].x+10,u[p].y,0);assert(building>=0);
+    race_scarab_probe_parent_attack(p,MAX_UNITS+building);
+    assert(u[child].order==1 && u[child].target==MAX_UNITS+building);
+    assert(race_scarab_flight_control_tick(child,0,0)==SC64_SCARAB_CONTROL_CONTINUE);
+    assert(race_scarab_flight_control_tick(child,1,0)==SC64_SCARAB_CONTROL_ARRIVED);
+    assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
+    assert(u[child].order==4 && u[child].target==MAX_UNITS+building);
+    puts("actual HOST paid unit/building launches, controlled arrival and target reuse passed");return 0;
 }
