@@ -121,6 +121,15 @@ must be preserved and interpretation scoped to validated morph state/new format.
 These branches are not merged or enabled guest services. P1 work now targets
 exact per-call collision traversal reuse; no new speed gain is established.
 
+PR [#299](https://github.com/ggu/starcraft-gba/pull/299) is merged as `ae01547d`:
+authenticated early permission preparation/accessor only, exact-tree qualified by
+local source/doctor/default build and all default tests (1,004 Python, 26 skipped,
+plus compiled suites). Normal flags remain unchanged. The updated
+[production checkpoint](audits/2026-11-06-n64-priority-audit/shared-production-progress.md)
+records selected combined feature7 HOST proofs, fresh/initialized feature15
+flight saves, the six-tag selector fix, early source-admission tests and remaining
+immutable pre-cargo/motion/impact/guest gates. These stages are still off on main.
+
 ## Next concrete milestones after the Terra audit
 
 1. Promote the now guest-qualified opt-in late Egg service into one common

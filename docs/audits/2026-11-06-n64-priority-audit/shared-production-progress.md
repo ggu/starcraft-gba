@@ -9,7 +9,7 @@ recorded separately in [the Nexus observation](protoss-nexus-reference.md).
 Branch `codex/guardian-shared-nov6` now validates actual source owner and PUNI
 before campaign morphing, preserving custom admission and denying unsupported
 campaign contexts. The frozen locked HOST sanitizer batch passes the Z7
-permission/menu cases, a real paid Egg naturally becoming a Mutalisk with its
+permission/menu cases, a real paid Egg becoming a Mutalisk through bounded direct component ticks with its
 inherited source owner before Guardian morph, damaged cancellation, and a
 source-like no-job Cocoon refund denial. A captured-Cocoon refund fixture is
 explicitly an adaptation policy, not an observed N64 rule.
@@ -79,3 +79,53 @@ other 82.5% incur extra scans before falling back. It is rejected before an ARM
 benchmark; this distribution is not a measured GBA slowdown or speed gain.
 The source and log are retained; exact fused candidate visitation is still an
 investigation, not a qualified optimization.
+
+## Subsequent combined proof and canonical preparation
+
+PR [#299](https://github.com/ggu/starcraft-gba/pull/299) is merged as
+`ae01547d`. It prepares authenticated early Z1–Z4 CHK/PUNI inputs and a bounded
+immutable accessor; normal flags and ROM behavior are unchanged. The entire
+merge tree matches exact qualified `539cc987`: local source boundary (1,732
+indexed text files), doctor, default build and complete default tests pass
+(1,004 Python tests, 26 skipped, plus compiled/auxiliary suites; 424 seconds).
+The source-only preparer and input evidence are documented on main in
+`docs/audits/2026-11-06-early-zerg-permissions/README.md`. It enables source-backed
+admission work, not an already enabled early-campaign Egg service.
+
+The separate early integration `0899c4e5` passes real-PUNI, immutable-owner and
+source-race HOST admission tests. Z1 Lair is denied without spending; paid Z4
+Lair and Queens Nest use the normal build paths and source slot 3. Guardian is
+correctly denied by all four early mission PUNI tables. No normal flag, selected
+early journal, guest or gameplay cadence is qualified by these fixtures.
+
+Combined full feature7 `b9e9d90b` passes selected HOST custom save/load for
+Terran genuine feature1 and feature5 predecessors and Z9 genuine feature1.
+It preserves Egg, paid Cocoon and inside-Reaver Scarab training state, then
+executes all 750 direct morph-component ticks to Guardian and saves/loads it.
+These are direct component ticks, not whole-world gameplay cadence. Wrong-newer
+fallback and sampled atomic rejection pass. No historical ZP feature5 writer
+existed, so its checksum-valid pair is denied rather than advertised as a
+migration. Completed distinct Guardians now have candidate-local provenance;
+legacy source-placed Guardian aliases retain their separate admission.
+
+Full-flight HOST `73c031ef` passes paid fresh-release and initialized Scarab
+flight save/load. Initial failures are retained: six accepted formats exceeded
+the common selector's five-tag cap. The explicit flight capability now uses six
+consistently in game/common translation units, with six-tag, duplicate, overflow,
+fallback/write tests. Normal products retain five. Actual ARM stack/code impact
+is unmeasured; larger local arrays are not a zero-memory-cost claim. This proof
+does not cover motion continuation, parent/target loss or slot reuse, pending
+impacts, upgrades, campaigns or actual GBA SRAM.
+
+Full context legacy cargo preparation was found to rewrite authenticated
+serialized rows. Scratch fix `6ff4d3df` passes detached temporary-normalization
+checks using exact old outer/inner tags, unchanged modern feature0 and unchanged
+candidate/output on malformed rejection. Genuine pre-cargo writer, complete
+selected restore and raw-envelope identity remain outstanding. This issue is
+separate from the diagnosed five-tag flight failure.
+
+Combined facts `09b32af5` pass P10/Z7/distinct roster reference checks and the
+complete eight-test fact suite, including missing/incorrect layout rejection.
+A feature15 fingerprint successor is queued; the earlier 3d stage's omitted
+construction-gate failure is retained and not counted as a full passing suite.
+No staged source here supplies a new frame-rate gain or enables a guest service.
