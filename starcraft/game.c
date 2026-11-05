@@ -9071,7 +9071,7 @@ select_next_train_type(void)
 #ifdef SC64_RACES
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (race_human == R_ZERG) {
-#ifdef SC64_Z7_SCOURGE_COMBAT
+#if defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
         static const int zerg_types[] = {U_DRONE, U_OVERLORD, U_ZERGLING, U_HYDRALISK, U_MUTALISK
             , U_SCOURGE
         };
@@ -9087,7 +9087,7 @@ select_next_train_type(void)
         for (int step = 1; step <= 5; ++step) {
             int type = zerg_types[(n + step) % 5];
 #endif
-#ifdef SC64_Z7_SCOURGE_COMBAT
+#if defined(SC64_Z7_SCOURGE_COMBAT) && !defined(SC64_SHARED_SCOURGE_COMBAT)
             if (type == U_SCOURGE && !race_z7_active()) continue;
 #endif
             if (selected_building < 0 || sc64_race_producer_compatible(
