@@ -15,6 +15,27 @@ static int egg_for(int owner,int type,int exclude)
         u[i].type==SC64_EGG_ACTOR && u[i].target==type) return i;
     return -1;
 }
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+/* Check both services share the same paid future-slot budget. */
+static void carrier_after_paid_egg(void)
+{
+    guardian_test_reset();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;
+    race_skirmish_map=0;race_bot_races[0]=R_ZERG;init_state();assert(screen==SCREEN_PLAY);
+    int hall=-1;for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].owner==ENEMY &&
+        sc64_race_is_zerg_townhall(b[i].type)) {hall=i;break;}
+    assert(hall>=0);race_minerals[ENEMY]=1000;race_gas[ENEMY]=1000;b[hall].larva=1;
+    assert(spawn_build(ENEMY,B_SPAWNING_POOL,b[hall].x+100,b[hall].y,0)>=0);
+    assert(race_queue_unit(ENEMY,hall,U_ZERGLING));assert(egg_for(ENEMY,U_ZERGLING,-1)>=0);
+    minerals=1000;int carrier=spawn_unit(SIDE,U_P7_CARRIER,100,100);assert(carrier>=0);
+    int free_slots=0,last=-1;for(int i=0;i<MAX_UNITS;i++) free_slots+=!u[i].alive;
+    while(free_slots>1) {last=spawn_unit(ENEMY,U_DRONE,160,160);assert(last>=0);--free_slots;}
+    assert(last>=0);int before=minerals;assert(!race_p7_carrier_training_queue(carrier));
+    assert(minerals==before && u[carrier].carry==0);
+    hit_target(last,9999,U_MARINE,SIDE);
+    assert(race_p7_carrier_training_queue(carrier));
+}
+#endif
+
 int main(void)
 {
     guardian_test_reset();game_init();race_mode=1;race_human=R_ZERG;race_bots=1;
@@ -47,5 +68,8 @@ int main(void)
     for(int i=0;i<remaining_z;i++)game_update(0,0);
     assert(u[z].alive && u[z].type==U_DRONE && u[bot].alive && u[bot].type==U_DRONE);
     assert(race_save_game());assert(race_load_game());
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    carrier_after_paid_egg();
+#endif
     puts("shared Egg paid input/menu, parallel birth and journal passed");return 0;
 }
