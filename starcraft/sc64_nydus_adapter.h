@@ -286,6 +286,17 @@ static void race_nydus_clear_unit_references(int passenger)
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
         if (i == passenger || !q->alive || q->target != passenger) continue;
+        /* Paid production actors keep a product identity in target, not a
+         * unit-slot reference. A numerically matching passenger must not
+         * cancel their job when it enters the canal. */
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+        if (q->type == SC64_SHARED_EGG_TYPE) continue;
+#elif defined(SC64_Z7_EGG_PRODUCTION)
+        if (q->type == U_Z7_EGG) continue;
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        if (q->type == U_GUARDIAN_COCOON) continue;
+#endif
         if (q->order == ORDER_ATTACK_TARGET
 #ifdef SC64_Z5_CONSUME_ENABLED
             || q->order == ORDER_Z5_CONSUME
