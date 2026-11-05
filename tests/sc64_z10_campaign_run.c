@@ -25,6 +25,17 @@ enum { HOME_X=704, HOME_Y=1896, RAW_TEMPLE=174, RAW_CRYSTAL=219, RAW_CANNON=162 
 static const int road[][2]={{560,1800},{424,1640},{408,1432},{408,1208},{488,1064},{568,920},{632,760},{664,600},{700,520}};
 enum { ROAD_LEGS=sizeof(road)/sizeof(road[0]) };
 
+/* Pending live Eggs are already paid products, in addition to producer queues. */
+static int z10_pending_products(int type)
+{
+    int n = queued_units(type);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE &&
+            u[i].type == SC64_SHARED_EGG_TYPE && u[i].target == type)
+            n += sc64_race_product_count(type);
+    return n;
+}
+
 static int crystal(void)
 {
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==RAW_CRYSTAL)return i;
@@ -90,9 +101,21 @@ int main(int argc,char **argv)
     launch_catalog_mission(SC64_Z10_GLOBAL_ID);
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==SC64_Z10_GLOBAL_ID);
     census("launch",0);
-    int saved=0,turn=0,leg=0,rush=0,next_checkpoint=2000,next_mine=0,next_train=0,next_build=100,next_gas=400,next_hatch=100,next_rally=1500,next_order=0,next_save_build=0,next_stream=0,next_defend=0,next_runner=0,runner=-1;
+    int next_observe=0;
+    int saved=0,turn=0,leg=0,rush=0,next_checkpoint=2000,next_mine=0,next_train=0,next_build=100,next_gas=400,next_hatch=100,next_rally=1500,next_order=0,next_save_build=0,next_stream=0,next_defend=0,next_runner=0,runner=-1,next_static=0;
     const int drone_goal=knob("Z10_DRONES",16),hatch_goal=knob("Z10_HATCH",7),gas_drones=3,hydra_cap=knob("Z10_CAP",110);
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
+        if(frame >= next_observe) {
+            fprintf(stderr,"OBS frame=%u town=%u switch10=%d bank=%d/%d",(unsigned)frame,(unsigned)race_zl_ai.started,sc64_z8_switch_get(&race_zl_sched.core,10),minerals,gas);
+            for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].owner==SIDE && (b[i].type==B_SUNKEN_COLONY||b[i].type==B_CREEP_COLONY))
+                fprintf(stderr," B%d:type%d,xy%d/%d,hp%d,under%d,flags%d",i,b[i].type,b[i].x,b[i].y,b[i].hp,b[i].under_construction,b[i].flags);
+            for(int i=0;i<MAX_UNITS;i++) if(u[i].alive && u[i].owner==ENEMY && dist2(u[i].x,u[i].y,HOME_X,HOME_Y)<520*520)
+                fprintf(stderr," E%d:raw%d,owner%d,hp%d,xy%d/%d",i,u[i].raw_type,u[i].raw_owner,u[i].hp,u[i].x,u[i].y);
+            int larvae=0,eggs=0,droneegg=0,overe=0,hydraegg=0,queue=0;
+            for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&sc64_race_is_zerg_townhall(b[i].type)){larvae+=b[i].larva;queue+=b[i].queue_count;}
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_Z7_EGG){eggs++;droneegg+=u[i].target==U_DRONE;overe+=u[i].target==U_OVERLORD;hydraegg+=u[i].target==U_HYDRALISK;}
+            fprintf(stderr," PROD supply=%d/%d den=%d larvae=%d queue=%d eggs=%d droneegg=%d overegg=%d hydraegg=%d overload=%d\n",race_owner_supply(SIDE),race_owner_supply_cap(SIDE),count_buildings(B_HYDRALISK_DEN,1),larvae,queue,eggs,droneegg,overe,hydraegg,count_units(SIDE,U_OVERLORD)); next_observe=frame+500;
+        }
 #ifdef Z10_SWEEP
         if(getenv("Z10_DUMP")&&frame>=next_checkpoint){
             int nh=0,nl=0,nq=0,nun=0;for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&sc64_race_is_zerg_townhall(b[i].type)){nh++;nl+=b[i].larva;nq+=b[i].queue_count;nun+=!building_complete(i);}
@@ -205,9 +228,9 @@ int main(int argc,char **argv)
                     int spare=race_owner_supply_cap(SIDE)-race_owner_supply(SIDE),type=-1;
                     int hy=count_units(SIDE,U_HYDRALISK);
                     /* The first attacks come early: an army before the full economy. */
-                    if(drone_count()+queued_units(U_DRONE)<(hy>=knob("Z10_HFIRST",16)?drone_goal:knob("Z10_DR0",9))&&minerals>=50)type=U_DRONE;
-                    else if(spare<14&&minerals>=100&&queued_units(U_OVERLORD)<3)type=U_OVERLORD;
-                    else if(count_buildings(B_HYDRALISK_DEN,1)&&minerals>=75&&gas>=25&&spare>=2&&count_units(SIDE,U_HYDRALISK)<hydra_cap)type=U_HYDRALISK;
+                    if(drone_count()+z10_pending_products(U_DRONE)<(hy>=knob("Z10_HFIRST",16)?drone_goal:knob("Z10_DR0",9))&&minerals>=50)type=U_DRONE;
+                    else if(spare<14&&minerals>=100&&z10_pending_products(U_OVERLORD)<3)type=U_OVERLORD;
+                    else if(count_buildings(B_HYDRALISK_DEN,1)&&minerals>=75&&gas>=25&&spare>=2&&count_units(SIDE,U_HYDRALISK)+z10_pending_products(U_HYDRALISK)<hydra_cap)type=U_HYDRALISK;
                     else if(count_buildings(B_SPAWNING_POOL,1)&&minerals>=150&&frame>=2000&&spare>=2&&(!count_buildings(B_HYDRALISK_DEN,1)||gas<25))type=U_ZERGLING;
                     if(type<0||!train_at(i,type))break;
                     ++done;
@@ -224,6 +247,23 @@ int main(int argc,char **argv)
             else if(count_buildings(B_SPAWNING_POOL,1)&&!count_buildings(B_EXTRACTOR,0)&&minerals>=50&&drone_count()>=6)
                 (void)build_extractor_near(608,1712);
             next_build=frame+240;
+        }
+        COST(11)
+        /* Build and morph ordinary creep colonies to defend the hive approach. */
+        if(frame>=next_static && count_buildings(B_SPAWNING_POOL,1)) {
+            int active=count_buildings(B_SUNKEN_COLONY,0),colony=-1,pending=0;
+            for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].owner==SIDE && b[i].type==B_CREEP_COLONY) {
+                if(b[i].flags&SC64_Z7_SUNKEN_MORPH_FLAG) active++;
+                else if(building_complete(i)) colony=i;
+                else pending++;
+            }
+            if(active<2 && colony>=0 && minerals>=50 && select_building(colony)) {
+                int accepted=choose_row(MENU_STOP+1);
+                fprintf(trace,"{\"kind\":\"defense\",\"frame\":%u,\"colony\":%d,\"accepted\":%d,\"flags\":%d}\n",(unsigned)frame,colony,accepted,b[colony].flags); close_menus();
+            } else if(active<2 && colony<0 && !pending && minerals>=75 && drone_count()>=3) {
+                (void)build_near(B_CREEP_COLONY,MENU_Z7_CREEP,ax-80,ay-140,110);
+            }
+            next_static=frame+240;
         }
         COST(4)
         if(frame>=next_hatch&&minerals>=knob("Z10_HMIN",500)&&drone_count()>=6&&count_buildings(B_HATCHERY,0)<hatch_goal&&
