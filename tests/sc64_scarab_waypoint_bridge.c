@@ -5,7 +5,13 @@
 #include "../common/gba.h"
 #include "../starcraft/sc64_scarab_steer_motion.h"
 enum { U_SCARAB=51 };
-typedef struct { int type,raw_type,carry,weapon,path_timer,path_retry,path_x,path_y; } Unit;
+/* Actual compact campaign runtime field types, including unsigned timers. */
+typedef struct {
+    int hp, maxhp, carry, shield;
+    s16 x, y, tx, ty, build, target, path_x, path_y, raw_type, raw_owner;
+    u16 cd, work_timer, weapon, path_timer, path_retry, flags, shield_remainder;
+    u8 owner, type, alive, selected, order, armor;
+} Unit;
 #include "../starcraft/sc64_scarab_waypoint_bridge.h"
 
 int main(void)
