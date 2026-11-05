@@ -111,10 +111,10 @@ int main(int argc,char **argv)
                 fprintf(stderr," B%d:type%d,xy%d/%d,hp%d,under%d,flags%d",i,b[i].type,b[i].x,b[i].y,b[i].hp,b[i].under_construction,b[i].flags);
             for(int i=0;i<MAX_UNITS;i++) if(u[i].alive && u[i].owner==ENEMY && dist2(u[i].x,u[i].y,HOME_X,HOME_Y)<520*520)
                 fprintf(stderr," E%d:raw%d,owner%d,hp%d,xy%d/%d",i,u[i].raw_type,u[i].raw_owner,u[i].hp,u[i].x,u[i].y);
-            int larvae=0,eggs=0,droneegg=0,overe=0,hydraegg=0,queue=0;
-            for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&sc64_race_is_zerg_townhall(b[i].type)){larvae+=b[i].larva;queue+=b[i].queue_count;}
+            int larvae=0,eggs=0,droneegg=0,overe=0,hydraegg=0,queue=0,halls=0,completehalls=0;
+            for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&sc64_race_is_zerg_townhall(b[i].type)){larvae+=b[i].larva;queue+=b[i].queue_count;halls++;completehalls+=building_complete(i);}
             for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_Z7_EGG){eggs++;droneegg+=u[i].target==U_DRONE;overe+=u[i].target==U_OVERLORD;hydraegg+=u[i].target==U_HYDRALISK;}
-            fprintf(stderr," PROD supply=%d/%d den=%d larvae=%d queue=%d eggs=%d droneegg=%d overegg=%d hydraegg=%d overload=%d\n",race_owner_supply(SIDE),race_owner_supply_cap(SIDE),count_buildings(B_HYDRALISK_DEN,1),larvae,queue,eggs,droneegg,overe,hydraegg,count_units(SIDE,U_OVERLORD)); next_observe=frame+500;
+            fprintf(stderr," PROD supply=%d/%d den=%d halls=%d completehalls=%d hatch=%d larvae=%d queue=%d eggs=%d droneegg=%d overegg=%d hydraegg=%d overload=%d\n",race_owner_supply(SIDE),race_owner_supply_cap(SIDE),count_buildings(B_HYDRALISK_DEN,1),halls,completehalls,count_buildings(B_HATCHERY,0),larvae,queue,eggs,droneegg,overe,hydraegg,count_units(SIDE,U_OVERLORD)); next_observe=frame+500;
         }
 #ifdef Z10_SWEEP
         if(getenv("Z10_DUMP")&&frame>=next_checkpoint){
@@ -232,7 +232,11 @@ int main(int argc,char **argv)
                     else if(spare<14&&minerals>=100&&z10_pending_products(U_OVERLORD)<3)type=U_OVERLORD;
                     else if(count_buildings(B_HYDRALISK_DEN,1)&&minerals>=75&&gas>=25&&spare>=2&&count_units(SIDE,U_HYDRALISK)+z10_pending_products(U_HYDRALISK)<hydra_cap)type=U_HYDRALISK;
                     else if(count_buildings(B_SPAWNING_POOL,1)&&minerals>=150&&frame>=2000&&spare>=2&&(!count_buildings(B_HYDRALISK_DEN,1)||gas<25))type=U_ZERGLING;
-                    if(type<0||!train_at(i,type))break;
+                    if(type<0)break;
+                    { int larva_before=b[i].larva, bank_before=minerals;
+                      int accepted=train_at(i,type);
+                      fprintf(stderr,"TRAIN frame=%u hall=%d type=%d accepted=%d larva=%d/%d minerals=%d/%d\n",(unsigned)frame,i,type,accepted,larva_before,b[i].larva,bank_before,minerals);
+                      if(!accepted)break; }
                     ++done;
                 }
             }
