@@ -106,6 +106,7 @@ int main(void) {
             ROOT / ".local/sc64/interface/generated/sc64_font_generated.h",
             ROOT / ".local/sc64/interface/generated/sc64_icons_generated.h",
             ROOT / ".local/sc64/interface/generated/sc64_chrome_generated.h",
+            ROOT / ".local/sc64/command-icons/generated/sc64_command_icons_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_mission_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_assets_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_sprites_generated.h",
@@ -123,6 +124,7 @@ int main(void) {
                 "-DSC64_HAS_SPRITES", f"-I{ROOT / '.local/sc64/backwater/generated'}",
                 f"-I{ROOT / '.local/sc64/briefings/generated'}",
                 f"-I{ROOT / '.local/sc64/interface/generated'}",
+                f"-I{ROOT / '.local/sc64/command-icons/generated'}",
                 "-DSC64_RACES", f"-I{PRIVATE_HEADER}",
                 # Match the shared production HUD/control capability pair.
                 "-DSC64_FIELD_CONTROLS", "-DSC64_HUD_ICONS",
