@@ -141,6 +141,12 @@ custom-shared-actor-full-terran:
 	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_GUARDIAN_COCOON_STAGE -DSC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE -DSC64_SHARED_ACTOR_FULL_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_shared_actor_full_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/shared-actor-full
 	$(COMBINED_BIN_DIR)/shared-actor-full $(SCARAB_PRIOR_SRAM)
 
+.PHONY: custom-shared-actor-full-z9
+custom-shared-actor-full-z9:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_GUARDIAN_COCOON_STAGE -DSC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE -DSC64_SHARED_ACTOR_FULL_HOST_STAGE $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_actor_full_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/shared-actor-full-z9
+	$(COMBINED_BIN_DIR)/shared-actor-full-z9 $(SCARAB_PRIOR_SRAM)
+
 # Independent old feature5 binary writes the exact predecessor consumed below.
 SCARAB_FEATURE5_ROOT ?= /tmp/sc64-scarab-feature5-prior-nov6
 .PHONY: custom-shared-actor-feature5-writer

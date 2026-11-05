@@ -1806,6 +1806,14 @@ static int race_save_game(void) {
     for (int i=0;i<MAX_UNITS;i++) {
         Unit wire;
         if (!sc64_guardian_wire_encode(&u[i],&wire,1)) return 0;
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+        Unit scarab_wire;
+        if (!race_scarab_save_wire(&wire,&scarab_wire)) return 0;
+        wire=scarab_wire;
+        if (wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
+        if (!sc64_zp_unit_save_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),
+                (unsigned)(race_rows*16),SC64_STAGE_SAVE_EGG|SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_SCARAB)) return 0;
+#else
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
         if (race_mode && wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
 #endif
@@ -1822,6 +1830,7 @@ static int race_save_game(void) {
         if (!sc64_zp_unit_save_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16),race_mode)) return 0;
 #else
         if (!sc64_zp_unit_save_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+#endif
 #endif
 #endif
     }

@@ -329,9 +329,10 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) || \
      !defined(SC64_GUARDIAN_COCOON_STAGE) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || \
-     !defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_FULL_STORAGE) || \
+     (!defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_FULL_STORAGE)) || \
+     defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_P7_TYPED_COMPACT_ENABLED) || \
      defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE))
-#error "Full shared actor journal is an isolated HOST Terran compact-codec candidate"
+#error "Full shared actor journal requires an isolated HOST compact-codec candidate"
 #endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE) && \
     !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
