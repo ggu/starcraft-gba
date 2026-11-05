@@ -43,6 +43,38 @@ int main(void)
     assert(race_minerals[ENEMY]==450 && race_gas[ENEMY]==400 && minerals==500 && gas==500);
     assert(race_guardian_morph_cancel(enemy_muta));
     assert(race_minerals[ENEMY]==500 && race_gas[ENEMY]==500);
+
+    /* A source-like preplaced Cocoon has no paid job. Current source import
+     * has no raw-59 mapping; future combined codecs must independently
+     * authenticate every paid row and never infer payment from raw 59. */
+    assert(sc64_race_unit_from_raw(59)<0);
+    int preplaced=spawn_unit(SIDE,U_GUARDIAN_COCOON,450,200);
+    assert(preplaced>=0); u[preplaced].raw_type=59;
+    int before_ore=minerals,before_gas=gas;
+    assert(!race_guardian_morph_cancel(preplaced));
+    assert(minerals==before_ore && gas==before_gas);
+    u[preplaced].alive=0;
+
+    /* Real paid Egg -> Mutalisk -> Guardian command: no source-owner field
+     * is synthesized by this fixture. */
+    int hall=spawn_build(SIDE,B_HATCHERY,100,200,0);
+    assert(hall>=0 && spawn_unit(SIDE,U_OVERLORD,100,100)>=0);
+    b[hall].larva=1;
+    assert(race_queue_unit(SIDE,hall,U_MUTALISK));
+    int egg=-1;
+    for(int i=0;i<MAX_UNITS;i++)
+        if(u[i].alive && u[i].type==U_Z7_EGG && u[i].target==U_MUTALISK) egg=i;
+    assert(egg>=0 && u[egg].raw_owner==3);
+    while(u[egg].alive && u[egg].type==U_Z7_EGG) race_z7_egg_tick_unit(egg);
+    assert(u[egg].alive && u[egg].type==U_MUTALISK && u[egg].raw_type==43 && u[egg].raw_owner==3);
+    before_ore=minerals; before_gas=gas;
+    assert(race_guardian_morph_start(egg));
+    assert(minerals==before_ore-50 && gas==before_gas-100 && u[egg].raw_owner==3);
+    /* Current-owner refund is an engine policy, not a measured N64 rule. */
+    u[egg].owner=ENEMY; int enemy_ore=race_minerals[ENEMY],enemy_gas=race_gas[ENEMY];
+    assert(race_guardian_morph_cancel(egg));
+    assert(race_minerals[ENEMY]==enemy_ore+50 && race_gas[ENEMY]==enemy_gas+100);
+    assert(minerals==before_ore-50 && gas==before_gas-100 && u[egg].raw_owner==3);
     puts("Guardian campaign source PUNI HOST stage passed");
     return 0;
 }

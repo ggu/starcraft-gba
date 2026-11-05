@@ -51,8 +51,28 @@ static int race_guardian_morph_start(int slot)
     /* Source PUNI is indexed by the actor's source owner, not the engine's
      * owner number. Earlier Zerg missions without authenticated mappings
      * fail closed; custom games keep their own catalog admission. */
-    if (!race_mode && race_human==R_ZERG &&
-        !race_guardian_campaign_allowed(q->owner,q->raw_owner,44)) return 0;
+    if (!race_mode) {
+        if (race_human==R_ZERG) {
+            if (!race_guardian_campaign_allowed(q->owner,q->raw_owner,44)) return 0;
+        } else {
+            /* Only campaign adapters with authenticated PUNI may admit a
+             * non-Zerg campaign's captured/AI Zerg actor. */
+            int supported=0;
+#ifdef SC64_P8_RUNTIME
+            supported |= race_p8_active();
+#endif
+#ifdef SC64_T5_RUNTIME
+            supported |= race_t5_active();
+#endif
+#ifdef SC64_T6_RUNTIME
+            supported |= race_t6_active();
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            supported |= race_late_active();
+#endif
+            if (!supported) return 0;
+        }
+    }
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (!race_zerg_campaign_product_available(q->owner,44)) return 0;
 #endif
