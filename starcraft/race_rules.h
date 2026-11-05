@@ -845,6 +845,9 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
         ,[U_GUARDIAN_COCOON] = "COCOON"
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+        ,[U_GUARDIAN_STAGE] = "GUARDIAN"
+#endif
 #endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
