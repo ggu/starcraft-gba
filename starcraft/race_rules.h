@@ -132,7 +132,7 @@ enum {
     /* P10 source raw 82, the Gantrithor hero Carrier. Appended likewise. */
     U_P10_GANTRITHOR,
 #endif
-#ifdef SC64_SCARAB_RUNTIME
+#if defined(SC64_SCARAB_RUNTIME) && !defined(SC64_SCARAB_STABLE_ROSTER_HOST_STAGE)
     /* Appended identity only: production and lifecycle are separate services. */
     U_SCARAB,
 #endif
@@ -153,13 +153,25 @@ enum {
     U_SHARED_EGG_STAGE = SC_RU_LEGACY_COUNT,
 #endif
 #endif
-#if defined(SC64_GUARDIAN_COCOON_STAGE) || (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
+#ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+    /* Keep every previously published unit identity stable. */
+#ifdef SC64_Z7_EGG_PRODUCTION
+    U_SCARAB = SC_RU_LEGACY_COUNT,
+#else
+    U_SCARAB,
+#endif
+#endif
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)) || defined(SC64_SCARAB_STABLE_ROSTER_HOST_STAGE)
     SC_RU_COUNT
 #else
     SC_RU_COUNT = SC_RU_LEGACY_COUNT
 #endif
 };
 #define SC_RU_LEGACY_BOUND SC_RU_LEGACY_COUNT
+#ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+_Static_assert(U_SCARAB >= SC_RU_LEGACY_COUNT && U_SCARAB < 64,
+               "stable Scarab must be an appended six-bit identity");
+#endif
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
 _Static_assert(SC_RU_LEGACY_COUNT <= 64, "legacy unit IDs exceed six-bit bound");
 #endif

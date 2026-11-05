@@ -77,3 +77,20 @@ custom-egg-context-p10:
 custom-egg-context-showcase:
 	$(CLANG) $(CUSTOM_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-showcase
 	$(COMBINED_BIN_DIR)/custom-egg-context-showcase
+
+# Detached HOST candidate only; no Scarab journal tag or writer is admitted.
+.PHONY: custom-egg-scarab-detached-terran
+custom-egg-scarab-detached-terran:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_scarab_egg_detached_context.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-scarab-detached-terran
+	$(COMBINED_BIN_DIR)/custom-egg-scarab-detached-terran
+
+# Predecessor is the pinned base worktree; the current reader uses stable roster.
+SCARAB_PRIOR_ROOT ?= /tmp/sc64-shared-egg-release-publication-20261106
+.PHONY: custom-egg-scarab-prior-terran
+custom-egg-scarab-prior-terran:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(SCARAB_PRIOR_ROOT)/starcraft/game.c"' $(TERRAN_ROM_FLAGS) tests/sc64_scarab_prior_egg_compat.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/scarab-prior-writer
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_scarab_prior_egg_compat.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/scarab-current-reader
+	$(COMBINED_BIN_DIR)/scarab-prior-writer $(COMBINED_BIN_DIR)/prior-egg.sram
+	$(COMBINED_BIN_DIR)/scarab-current-reader $(COMBINED_BIN_DIR)/prior-egg.sram

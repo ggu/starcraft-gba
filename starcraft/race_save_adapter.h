@@ -40,8 +40,12 @@ static RaceSave race_data;
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 #include "sc64_scarab_flight_bridge.h"
-/* Set only from the authenticated selected tag, before candidate decoding. */
-static int race_scarab_stage_wire;
+#include "sc64_stage_save_auth.h"
+#include "sc64_scarab_fields.h"
+#endif
+#ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+#include "sc64_scarab_flight_bridge.h"
+#include "sc64_scarab_fields.h"
 #endif
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
 #include "sc64_stage_save_auth.h"
@@ -91,13 +95,6 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
 #else
     if (!sc64_unit_save_decode(&wire, &candidate->units[slot], world_width, world_height)) return 0;
 #endif
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-    if (wire.type==U_SCARAB || wire.raw_type==85) {
-        if (!race_scarab_stage_wire || !sc64_scarab_flight_from_wire(&wire,out,1,0) ||
-            (((unsigned)out->carry>>8)&3u)>1u) return 0;
-        return 1;
-    }
-#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     return sc64_guardian_wire_decode(&wire,out,0);
 #else
@@ -131,15 +128,19 @@ static int race_save_decode_unit_authenticated(const RaceSave *candidate,unsigne
     Unit decoded;
     if (!candidate || !out || slot>=MAX_UNITS ||
         !sc64_stage_save_auth_matches(auth,candidate,candidate->version,0)) return 0;
-    if (auth->features & SC64_STAGE_SAVE_EGG) {
+    if (auth->features & (SC64_STAGE_SAVE_EGG
+#ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+                          | SC64_STAGE_SAVE_SCARAB
+#endif
+                         )) {
 #if defined(SC64_ZP_FULL_STORAGE) && defined(SC64_P7_TYPED_COMPACT_ENABLED)
-        if (!sc64_p7_typed_unit_decode_for(&decoded,&candidate->units[slot],width,height,1)) return 0;
+        if (!sc64_p7_typed_unit_decode_for(&decoded,&candidate->units[slot],width,height,(int)auth->features)) return 0;
 #elif defined(SC64_ZP_FULL_STORAGE) && defined(SC64_Z7_DERIVED_SAVE)
         if (!sc64_derived_unit_decode(&decoded,&candidate->units[slot],width,height)) return 0;
 #elif defined(SC64_ZP_FULL_STORAGE)
-        if (!sc64_zp_unit_save_decode_for(&decoded,&candidate->units[slot],width,height,1)) return 0;
+        if (!sc64_zp_unit_save_decode_for(&decoded,&candidate->units[slot],width,height,(int)auth->features)) return 0;
 #elif defined(SC64_LATE_TERRAN_STORAGE)
-        if (!sc64_unit_save_decode_for(&decoded,&candidate->units[slot],width,height,1)) return 0;
+        if (!sc64_unit_save_decode_for(&decoded,&candidate->units[slot],width,height,(int)auth->features)) return 0;
 #else
         if (!race_save_decode_unit_raw_stage(candidate,slot,width,height,&decoded)) return 0;
 #endif
@@ -152,6 +153,22 @@ static int race_save_decode_unit_authenticated(const RaceSave *candidate,unsigne
         return 0;
 #endif
     }
+#ifdef SC64_SCARAB_STABLE_ROSTER_HOST_STAGE
+    if (decoded.type==U_SCARAB || decoded.raw_type==85) {
+        Unit logical;
+        if (!(auth->features & SC64_STAGE_SAVE_SCARAB) ||
+            !sc64_scarab_flight_from_wire(&decoded,&logical,1,0) ||
+            (((unsigned)logical.carry>>8)&3u)>1u) return 0;
+        decoded=logical;
+    } else if (decoded.alive && sc64_race_raw_unit(decoded.type)==83) {
+        int carry,timer;
+        if ((decoded.raw_type!=-1 && decoded.raw_type!=83) ||
+            !sc64_scarab_parent_convert((auth->features & SC64_STAGE_SAVE_SCARAB) ?
+                SC64_SCARAB_PARENT_PACKED : SC64_SCARAB_PARENT_LEGACY,
+                83,decoded.carry,decoded.work_timer,&carry,&timer)) return 0;
+        decoded.carry=carry;decoded.work_timer=timer;
+    }
+#endif
     *out=decoded;return 1;
 #endif
 }
@@ -208,6 +225,33 @@ static int race_guardian_decode_authenticated(const RaceSave *candidate,unsigned
 }
 #endif
 
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+/* Decode into a temporary; the selected authenticated candidate stays byte
+ * identical, including during fallback to an older journal slot. */
+static int race_scarab_decode_authenticated(const RaceSave *candidate,unsigned slot,
+                                            unsigned width,unsigned height,Unit *out,
+                                            const Sc64StageSaveAuth *auth)
+{
+    Unit wire,decoded; int carry,timer;
+    if (!candidate || !out || slot>=MAX_UNITS ||
+        !sc64_stage_save_auth_matches(auth,candidate,candidate->version,0) ||
+        !race_save_decode_unit(candidate,slot,width,height,&wire)) return 0;
+    if (wire.type==U_SCARAB || wire.raw_type==85) {
+        if (!(auth->features & SC64_STAGE_SAVE_SCARAB) ||
+            !sc64_scarab_flight_from_wire(&wire,&decoded,1,0) ||
+            (((unsigned)decoded.carry>>8)&3u)>1u) return 0;
+        wire=decoded;
+    } else if (wire.alive && sc64_race_raw_unit(wire.type)==83) {
+        if ((wire.raw_type!=-1 && wire.raw_type!=83) ||
+            !sc64_scarab_parent_convert((auth->features & SC64_STAGE_SAVE_SCARAB) ?
+                SC64_SCARAB_PARENT_PACKED : SC64_SCARAB_PARENT_LEGACY,
+                83,wire.carry,wire.work_timer,&carry,&timer)) return 0;
+        wire.carry=carry; wire.work_timer=timer;
+    }
+    *out=wire; return 1;
+}
+#endif
+
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_ZP_FULL_STORAGE)
 /* Codec-specific row writer; semantic conversion is performed by the caller. */
 static int race_scarab_zp_encode(RaceSave *candidate, unsigned slot,
@@ -229,7 +273,7 @@ static int race_scarab_zp_encode(RaceSave *candidate, unsigned slot,
 /* Read candidate rows only; never alias or mutate the live world. This is a
  * bounded graph check for the inactive Scarab prototype, not a save migration. */
 static int
-race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsigned height)
+race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsigned height SC64_GCTX_DECL)
 {
     if (!candidate || !width || !height) return 0;
     for (unsigned i=0; i<MAX_UNITS; ++i) {
@@ -1692,6 +1736,17 @@ static int race_save_game(void) {
                                       race_data.version,&writer_pair,1)) return 0;
     const Sc64StageSaveAuth *guard_auth=&writer_auth;
 #endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#ifdef SC64_SHARED_TRANSPORT
+    const Sc64StageTagPair writer_pair={SC64_SCARAB_TRANSPORT_SAVE_VERSION,SC64_SCARAB_SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
+#else
+    const Sc64StageTagPair writer_pair={SC64_SCARAB_SAVE_VERSION,SC64_SCARAB_SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
+#endif
+    Sc64StageSaveAuth writer_auth;
+    if (!sc64_stage_save_authenticate(&writer_auth,&race_data,writer_pair.outer,
+                                      race_data.version,&writer_pair,1)) return 0;
+    const Sc64StageSaveAuth *guard_auth=&writer_auth;
+#endif
 #ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
     const Sc64StageTagPair writer_pair = race_mode ?
         (Sc64StageTagPair){SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION,SC64_STAGE_SAVE_EGG} :
@@ -1813,9 +1868,6 @@ static int race_save_game(void) {
         race_data.units[i][j]=(s16)n;
     }
 #endif
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-    race_scarab_stage_wire=1;
-#endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     for(int i=0;i<MAX_BUILDINGS;i++)
@@ -1903,7 +1955,7 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_SCARAB_RUNTIME
     if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,
-                                           (unsigned)race_rows*16u)) return 0;
+                                           (unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
     memcpy(race_data.players,race_player,sizeof(race_player));
 #ifdef SC64_SHARED_TRANSPORT
@@ -2395,7 +2447,7 @@ static int race_save_game(void) {
     if (!race_bc_shots_candidate_valid(&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H SC64_GCTX_ARG)) return 0;
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
-    if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,(unsigned)race_rows*16u)) return 0;
+    if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
 #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
     if (race_data.version==SC64_SHARED_EGG_SAVE_VERSION && !race_shared_egg_candidate_valid(&race_data,
@@ -2445,6 +2497,8 @@ typedef struct {
     int building_damage_marker;
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     Sc64StageSaveAuth guardian_auth;
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
+    Sc64StageSaveAuth scarab_auth;
 #endif
 #if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     Sc64StageSaveAuth egg_auth;
@@ -2489,6 +2543,8 @@ typedef struct {
 static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     const Sc64StageSaveAuth *guard_auth=&plan->guardian_auth;
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
+    const Sc64StageSaveAuth *guard_auth=&plan->scarab_auth;
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     const Sc64StageSaveAuth *guard_auth=&plan->egg_auth;
 #endif
@@ -3863,7 +3919,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_SCARAB_RUNTIME
     if (!race_scarab_save_candidate_valid(&race_data,(unsigned)width*16u,
-                                           (unsigned)height*16u)) return 0;
+                                           (unsigned)height*16u SC64_GCTX_ARG)) return 0;
 #endif
     plan->building_damage_marker = building_damage_marker;
     return 1;
@@ -4022,36 +4078,20 @@ static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *conte
     if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,
                                           &plan->impact_candidate_count)) return 0;
 #ifdef SC64_SHARED_TRANSPORT
-    if (tag != SC64_SCARAB_TRANSPORT_SAVE_VERSION) return 0;
-    tag = SC64_SCARAB_SAVE_VERSION;
+    const Sc64StageTagPair pairs[]={
+        {SC64_SCARAB_TRANSPORT_SAVE_VERSION,SC64_SCARAB_SAVE_VERSION,SC64_STAGE_SAVE_SCARAB}};
+#else
+    const Sc64StageTagPair pairs[]={
+        {SC64_LEGACY_SAVE_VERSION,SC64_LEGACY_SAVE_VERSION,0},
+        {SAVE_VERSION,SAVE_VERSION,0},
+        {SC64_SCARAB_SAVE_VERSION,SC64_SCARAB_SAVE_VERSION,SC64_STAGE_SAVE_SCARAB}};
 #endif
-    race_scarab_stage_wire=(tag==SC64_SCARAB_SAVE_VERSION);
+    if (!sc64_stage_save_authenticate(&plan->scarab_auth,&race_data,tag,race_data.version,
+                                      pairs,sizeof(pairs)/sizeof(pairs[0]))) return 0;
     int map=race_data.state[20], width=64, height=64;
     if (race_data.state[0]!=1 || map<0 || map>SC64_SKIRMISH_IMPORTED_COUNT) return 0;
     if (map) { width=sc64_skirmish_maps[map-1].width; height=sc64_skirmish_maps[map-1].height; }
     if (!sc64_race_storage_geometry_valid(width,height)) return 0;
-    for (unsigned i=0;i<MAX_UNITS;i++) {
-        Unit q;
-        if (!SC64_GUARD_DECODE(&race_data,i,(unsigned)width*16u,(unsigned)height*16u,&q)) return 0;
-        if (!q.alive) continue;
-        if ((q.type==U_SCARAB || q.raw_type==85) && !race_scarab_stage_wire) return 0;
-        if (sc64_race_raw_unit(q.type)==83) {
-            int c,t;
-            if (q.raw_type!=-1 && q.raw_type!=83) return 0;
-            if (!sc64_scarab_parent_convert(tag==SC64_SCARAB_SAVE_VERSION ?
-                    SC64_SCARAB_PARENT_PACKED : SC64_SCARAB_PARENT_LEGACY,
-                    83,q.carry,q.work_timer,&c,&t)) return 0;
-            q.carry=c; q.work_timer=t;
-#ifdef SC64_ZP_FULL_STORAGE
-            if (!race_scarab_zp_encode(&race_data,i,&q,(unsigned)width*16u,(unsigned)height*16u)) return 0;
-#else
-            if (!sc64_unit_save_encode(&race_data.units[i],&q,(unsigned)width*16u,(unsigned)height*16u)) return 0;
-#endif
-        }
-    }
-    /* A checked new envelope has the existing BC payload layout. Mission
-     * validators still expect the existing internal version token. */
-    if (tag==SC64_SCARAB_SAVE_VERSION) race_data.version=SAVE_VERSION;
     return race_load_preflight(plan);
 }
 static int race_scarab_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
@@ -4076,6 +4116,8 @@ static int race_load_game(void) {
     RaceLoadPlan plan = {0};
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     const Sc64StageSaveAuth *guard_auth=&plan.guardian_auth;
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
+    const Sc64StageSaveAuth *guard_auth=&plan.scarab_auth;
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     const Sc64StageSaveAuth *guard_auth=&plan.egg_auth;
 #endif

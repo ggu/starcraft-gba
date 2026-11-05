@@ -313,6 +313,12 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
 #error "Guardian and Scarab candidate context integration is not qualified"
 #endif
+#if defined(SC64_SCARAB_STABLE_ROSTER_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_SCARAB_RUNTIME) || \
+     !defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
+     defined(SC64_GUARDIAN_COCOON_STAGE))
+#error "Scarab stable roster is an isolated HOST candidate, not a journal service"
+#endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE) && \
     !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
 #error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
@@ -13166,6 +13172,12 @@ static int race_guardian_decode_authenticated(const RaceSave *,unsigned,unsigned
 #define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth
 #define SC64_GCTX_ARG , guard_auth
 #define SC64_GUARD_DECODE(c,s,w,h,o) race_guardian_decode_authenticated(c,s,w,h,o,guard_auth)
+#elif defined(SC64_SCARAB_NAMESPACE_STAGE)
+#include "sc64_stage_save_auth.h"
+static int race_scarab_decode_authenticated(const RaceSave *,unsigned,unsigned,unsigned,Unit *,const Sc64StageSaveAuth *);
+#define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth
+#define SC64_GCTX_ARG , guard_auth
+#define SC64_GUARD_DECODE(c,s,w,h,o) race_scarab_decode_authenticated(c,s,w,h,o,guard_auth)
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
 /* Carry the authenticated journal candidate explicitly through every save
  * validator, just as the Guardian candidate does.  Never use process-global
