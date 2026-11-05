@@ -44,7 +44,14 @@ static int race_impact_decode_flight(const u8 *in,u32 bytes,Sc64ImpactEvent *out
         if (e->source_type==SC64_SCARAB_IMPACT_MARKER) {
             Sc64ScarabImpact packet;
             if (!sc64_scarab_impact_unpack(e,&packet) || !packet.ticks) return -1;
-        } else if (!sc64_impact_event_valid(e,MAX_UNITS+MAX_BUILDINGS,5u,SC_RU_LEGACY_BOUND)) return -1;
+        } else {
+            unsigned limit=SC_RU_LEGACY_BOUND;
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+            if (e->source_type==U_GUARDIAN_STAGE && sc64_race_raw_unit(U_GUARDIAN_STAGE)==44)
+                limit=SC_RU_COUNT;
+#endif
+            if (!sc64_impact_event_valid(e,MAX_UNITS+MAX_BUILDINGS,5u,limit)) return -1;
+        }
     }
     return (int)n;
 }
@@ -283,8 +290,17 @@ race_impact_save_write(void)
         if (race_impact_rows[i].source_type>=SC_RU_LEGACY_BOUND) {
 #ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
             Sc64ScarabImpact packet;
-            if (!sc64_scarab_impact_unpack(&race_impact_rows[i],&packet) || !packet.ticks ||
-                packet.x>=race_cols*32 || packet.y>=race_rows*32) return 0;
+            if (race_impact_rows[i].source_type==SC64_SCARAB_IMPACT_MARKER) {
+                if (!sc64_scarab_impact_unpack(&race_impact_rows[i],&packet) || !packet.ticks ||
+                    packet.x>=race_cols*32 || packet.y>=race_rows*32) return 0;
+            }
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+            else if (race_impact_rows[i].source_type!=U_GUARDIAN_STAGE ||
+                     sc64_race_raw_unit(U_GUARDIAN_STAGE)!=44 ||
+                     !sc64_impact_event_valid(&race_impact_rows[i],MAX_UNITS+MAX_BUILDINGS,5u,SC_RU_COUNT)) return 0;
+#else
+            else return 0;
+#endif
 #else
             return 0;
 #endif
@@ -634,7 +650,11 @@ static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactE
         if (candidate[i].source_type>=SC_RU_LEGACY_BOUND) {
 #ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
             if (!(auth->features & SC64_STAGE_SAVE_EXTENDED_EVENTS) ||
-                candidate[i].source_type!=SC64_SCARAB_IMPACT_MARKER) return 0;
+                (candidate[i].source_type!=SC64_SCARAB_IMPACT_MARKER
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+                 && (candidate[i].source_type!=U_GUARDIAN_STAGE || sc64_race_raw_unit(U_GUARDIAN_STAGE)!=44)
+#endif
+                )) return 0;
 #else
             return 0;
 #endif

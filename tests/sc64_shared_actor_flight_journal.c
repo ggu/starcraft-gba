@@ -164,5 +164,23 @@ int main(int argc,char **argv)
     assert(!memcmp(before,after,sizeof(before)) && !memcmp(old_units,u,sizeof(u)) &&
            !memcmp(old_buildings,b,sizeof(b)) && minerals==saved_minerals &&
            gas==saved_gas && frame==saved_frame);
+    /* A distinct Guardian is the only additional ordinary impact source in
+     * feature15. Produce it through the paid morph and use real combat. */
+    guardian_test_restore(sram);assert(race_load_game());
+    int spire=spawn_build(SIDE,B_GREATER_SPIRE,390,390,0);assert(spire>=0);
+    int guardian=spawn_unit(SIDE,U_MUTALISK,350,350);assert(guardian>=0);
+    minerals=200;gas=200;assert(race_guardian_morph_start(guardian));
+    for(int i=0;i<SC64_GUARDIAN_TICKS;++i)assert(race_guardian_morph_tick(guardian));
+    assert(u[guardian].type==U_GUARDIAN_STAGE && u[guardian].raw_type==44);
+    int foe=spawn_unit(ENEMY,U_ZERGLING,390,350);assert(foe>=0);
+    tick_combat(&u[guardian],foe);
+    assert(race_impact_count==1 && race_impact_rows[0].source_type==U_GUARDIAN_STAGE);
+    expected=race_impact_rows[0];assert(race_save_game());race_impact_reset();
+    assert(race_load_game() && race_impact_count==1 &&
+           !memcmp(&expected,&race_impact_rows[0],sizeof(expected)));
+    assert(race_worker_cargo_select(&plan,&selected));guardian_test_snapshot(before);
+    guardian_test_retag(selected.slot,SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_FULL_SAVE_VERSION);
+    assert(race_worker_cargo_select(&plan,&fallback) && fallback.slot!=selected.slot &&
+           fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION);
     puts("actual HOST paid unit/building launches, controlled arrival and target reuse passed");return 0;
 }
