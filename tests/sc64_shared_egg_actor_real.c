@@ -43,6 +43,11 @@ int main(void)
            !!SC64_TRANSPORT_LOADED(&u[slot]),!!SC64_TRANSPORT_LOADED(&u[mover]),
            unit_step_clear_race_fallback(&u[mover],x+1,y),
            sc64_unit_bucket_step_clear_reference(&u[mover],x+1,y,0));fflush(stdout);
+    printf("worker=%d order=%d idle=%d mine=%d gas=%d scarab=%d strict=%d contact=%d\n",
+           !!IS_WORKER(u[mover].type),u[mover].order,ORDER_IDLE,ORDER_MINE,ORDER_GAS,
+           !!SC64_SCARAB_NONCOLLIDING(&u[slot]),
+           sc64_unit_bucket_step_clear_reference(&u[mover],x+1,y,1),
+           sc64_contact_step_clear(&u[mover],x+1,y,0));fflush(stdout);
     assert(!unit_step_clear_race_fallback(&u[mover],x+1,y));
     assert(!sc64_unit_bucket_step_clear_reference(&u[mover],x+1,y,0));
 #ifdef SC64_CONTACT_CACHE
