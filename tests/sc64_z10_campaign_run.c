@@ -271,7 +271,7 @@ int main(int argc,char **argv)
         }
         COST(4)
         if(frame>=next_hatch&&minerals>=knob("Z10_HMIN",500)&&drone_count()>=6&&count_buildings(B_HATCHERY,0)<hatch_goal&&
-           (count_buildings(B_HATCHERY,0)<knob("Z10_H0",2)||count_units(SIDE,U_HYDRALISK)>=knob("Z10_HFIRST",16))){
+           (count_buildings(B_HATCHERY,0)<knob("Z10_H0",4)||count_units(SIDE,U_HYDRALISK)>=knob("Z10_HFIRST",16))){
             /* North of the hive, in the open: walled-in Hatcheries trap their larvae. */
             static const int spots[][2]={{560,1880},{540,1740},{700,1740},{860,1740},{980,1700},{420,1800}};
             int k=count_buildings(B_HATCHERY,0)-1;
