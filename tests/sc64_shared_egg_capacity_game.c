@@ -44,5 +44,15 @@ int main(void)
     assert(race_queue_unit(SIDE,hall,U_DRONE));int remaining_ore=minerals,remaining_larva=b[hall].larva;
     assert(!race_queue_unit(SIDE,hall,U_DRONE));
     assert(minerals==remaining_ore && b[hall].larva==remaining_larva);
+    /* Real create callback must defer while a paid paired Egg owns the last
+     * free body, then create successfully once that commitment is removed. */
+    for(int i=0;i<MAX_UNITS;i++) {u[i].alive=1;u[i].owner=ENEMY;u[i].type=U_DRONE;}
+    u[0].alive=0;u[3].type=U_Z7_EGG;u[3].target=U_ZERGLING;
+    const Sc64Z8Action *create=&race_zl_mission->program->rows.actions[19];
+    assert(create->opcode==11 && create->unit==SC64_ZL_RAW_DRONE);
+    assert(race_zl_create(0,create,SC64_ZL_HUMAN_SLOT,1,0,0,0,512,512)==0);
+    assert(!u[0].alive);u[3].alive=0;
+    assert(race_zl_create(0,create,SC64_ZL_HUMAN_SLOT,1,0,0,0,512,512)==1);
+    assert(u[0].alive && u[0].type==U_DRONE && u[0].owner==SIDE);
     puts("executing create obligations, defer and capacity boundary passed");return 0;
 }
