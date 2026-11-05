@@ -6842,10 +6842,6 @@ static int field_menu_count(void)
 #ifdef SC64_RACES
 static const char *field_menu_base_label(int choice, const char *const *labels)
 {
-#ifdef SC64_GUARDIAN_COCOON_STAGE
-    if (choice==MENU_STOP+1 && race_guardian_selected_command())
-        return race_guardian_selected_command()==2 ? "CANCEL MORPH" : "MORPH GUARDIAN";
-#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return "BUILD INTERCEPTOR";
 #endif
@@ -6922,6 +6918,10 @@ static const char *race_menu_label(int i)
 #endif
         return sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) ? row.label : "";
     }
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (i==MENU_STOP+1 && race_guardian_selected_command())
+        return race_guardian_selected_command()==2 ? "CANCEL MORPH" : "MORPH GUARDIAN";
+#endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (i==MENU_STOP+1 && race_battery_command_available()) return "RECHARGE";
 #endif
