@@ -161,3 +161,12 @@ passed a 750-call `game_update` continuation with periodic `game_render`,
 including save/load at update 375 and again after Guardian completion. This
 exercises the full host frame and render calls, not visual correctness, native
 timing, actual-input UI, guest execution, or the later modal-dialog changes.
+
+The separate HOST-only Init-loop renderer candidate consumes two source layers:
+the primary frame and image-12 destination-dependent underlay. The importer
+projects the authenticated dark-table row onto the selected GBA palette and
+builds eight deterministic slot-selected, 751-entry frame timelines. Drawing
+performs a bounded lookup rather than replaying IScript or using game RNG; the
+source-to-runtime wait conversion is provisional. Preparation rejects unknown
+reachable instructions and caps the bank data estimate at 32 KiB. This does
+not implement cancel/death presentation, a game draw hook, or guest admission.
