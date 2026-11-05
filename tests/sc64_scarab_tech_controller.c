@@ -51,6 +51,15 @@ static void stock_by_buttons(int row)
     input(0);
 }
 
+static void pause_export(const char *path)
+{
+    tap(KEY_START);assert(screen==SCREEN_PAUSE);tap(KEY_B);
+    assert((pause_notice & 0xc0)==UI_NOTICE_SAVED);
+    guardian_test_snapshot(controller_sram);
+    FILE *f=fopen(path,"wb");assert(f && fwrite(controller_sram,1,sizeof(controller_sram),f)==sizeof(controller_sram));
+    assert(!fclose(f));
+}
+
 static void write_controller_progress(const char *path)
 {
     setup_options();
@@ -76,11 +85,7 @@ static void write_controller_progress(const char *path)
         assert(race_scarab_parent_read(parent,0,&p,&counts));
     }
     assert(counts.inside==1 && !p.queued);
-    tap(KEY_START);assert(screen==SCREEN_PAUSE);tap(KEY_B);
-    assert((pause_notice & 0xc0)==UI_NOTICE_SAVED);
-    guardian_test_snapshot(controller_sram);
-    FILE *f=fopen(path,"wb");assert(f && fwrite(controller_sram,1,sizeof(controller_sram),f)==sizeof(controller_sram));
-    assert(!fclose(f));
+    pause_export(path);
     printf("buttons built tech, produced Reaver and stocked Scarab; saved at tick %u\n",host_ticks);
 }
 
@@ -100,10 +105,55 @@ static void read_controller_progress(const char *path)
     puts("fresh HOST process loaded tech and paid ammunition and continued");
 }
 
+static int pending_scarab(void)
+{
+    for(unsigned i=0;i<race_impact_count;++i)
+        if(race_impact_rows[i].source_type==SC64_SCARAB_IMPACT_MARKER)return (int)i;
+    return -1;
+}
+
+static void attack_and_export(const char *path,const char *impact_path)
+{
+    read_controller_progress(path);
+    int parent=sole_reaver();assert(parent>=0 && select_unit(parent));
+    assert(choose_menu_command(1) && mode==MODE_ATTACK);
+    move_cursor(race_base_x[1],race_base_y[1]);
+    assert(screen==SCREEN_PLAY && !won && !lost && mode==MODE_ATTACK);
+    tap(KEY_A);assert(mode==MODE_NORMAL);
+    for(int i=0;i<20000 && pending_scarab()<0;++i) {
+        if(screen!=SCREEN_PLAY || won || lost || !u[parent].alive)break;
+        input(0);
+    }
+    if(pending_scarab()<0)
+        fprintf(stderr,"attack timeout: tick=%u frame=%d screen=%d won=%d lost=%d parent_alive=%d order=%d pos=%d,%d target=%d impacts=%u\n",
+                host_ticks,frame,screen,won,lost,u[parent].alive,u[parent].order,
+                u[parent].x,u[parent].y,u[parent].target,race_impact_count);
+    int index=pending_scarab();Sc64ScarabImpact packet;
+    assert(index>=0 && sc64_scarab_impact_unpack(&race_impact_rows[index],&packet) && packet.ticks>0);
+    pause_export(impact_path);
+    printf("button attack created pending Scarab target %d with %u ticks; saved at tick %u\n",packet.target,packet.ticks,host_ticks);
+}
+
+static void resume_impact(const char *path)
+{
+    FILE *f=fopen(path,"rb");assert(f && fread(controller_sram,1,sizeof(controller_sram),f)==sizeof(controller_sram));
+    assert(!fclose(f));setup_options();guardian_test_restore(controller_sram);
+    tap(KEY_START);assert(screen==SCREEN_PAUSE);tap(KEY_L);assert(screen==SCREEN_PLAY);
+    int index=pending_scarab();Sc64ScarabImpact packet;
+    assert(index>=0 && sc64_scarab_impact_unpack(&race_impact_rows[index],&packet) && packet.ticks>0);
+    for(int i=0;i<200 && pending_scarab()>=0;++i) {
+        assert(screen==SCREEN_PLAY && !won && !lost);input(0);
+    }
+    assert(pending_scarab()<0);
+    puts("fresh HOST process resumed the saved pending Scarab impact");
+}
+
 int main(int argc,char **argv)
 {
-    assert(argc==3);
-    if(!strcmp(argv[1],"write"))write_controller_progress(argv[2]);
-    else {assert(!strcmp(argv[1],"read"));read_controller_progress(argv[2]);}
+    assert(argc>=3);
+    if(!strcmp(argv[1],"write")) {assert(argc==3);write_controller_progress(argv[2]);}
+    else if(!strcmp(argv[1],"read")) {assert(argc==3);read_controller_progress(argv[2]);}
+    else if(!strcmp(argv[1],"attack")) {assert(argc==4);attack_and_export(argv[2],argv[3]);}
+    else {assert(argc==3 && !strcmp(argv[1],"resume"));resume_impact(argv[2]);}
     return 0;
 }
