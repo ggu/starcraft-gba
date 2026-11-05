@@ -510,6 +510,24 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
 #define SC64_SCARAB_TRANSPORT_SAVE_VERSION (SC64_SCARAB_SAVE_VERSION | 0x04000000u)
 #endif
 #endif
+/* HOST-only candidate namespaces. Authentication and journal admission are
+ * separate work; none of these selectors is wired into a save path here. */
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+_Static_assert((SAVE_VERSION & 0x40000000u) != 0,
+               "Egg tag selector overlaps an existing namespace");
+#define SC64_SHARED_EGG_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)
+#ifdef SC64_SHARED_TRANSPORT
+_Static_assert((SC64_TRANSPORT_SAVE_VERSION & 0x40000000u) != 0,
+               "Egg transport selector overlaps an existing namespace");
+#define SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x40000000u)
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#define SC64_GUARDIAN_EGG_SAVE_VERSION (SC64_GUARDIAN_SAVE_VERSION ^ 0x40000000u)
+#ifdef SC64_SHARED_TRANSPORT
+#define SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION (SC64_GUARDIAN_TRANSPORT_SAVE_VERSION ^ 0x40000000u)
+#endif
+#endif
+#endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
 #endif

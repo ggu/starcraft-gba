@@ -30,6 +30,10 @@ LEGACY_NAMES = frozenset((
 STAGE_EXPRESSIONS = {
     "SC64_GUARDIAN_SAVE_VERSION": "(SAVE_VERSION ^ 0x10000000u)",
     "SC64_GUARDIAN_TRANSPORT_SAVE_VERSION": "(SC64_TRANSPORT_SAVE_VERSION ^ 0x10000000u)",
+    "SC64_SHARED_EGG_SAVE_VERSION": "(SAVE_VERSION ^ 0x40000000u)",
+    "SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION": "(SC64_TRANSPORT_SAVE_VERSION ^ 0x40000000u)",
+    "SC64_GUARDIAN_EGG_SAVE_VERSION": "(SC64_GUARDIAN_SAVE_VERSION ^ 0x40000000u)",
+    "SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION": "(SC64_GUARDIAN_TRANSPORT_SAVE_VERSION ^ 0x40000000u)",
 }
 
 
@@ -132,6 +136,9 @@ class SharedEggTags(unittest.TestCase):
         with self.assertRaises(AssertionError):
             extract("#define SC64_GUARDIAN_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)")
         self.assertEqual(extract("#define SC64_GUARDIAN_SAVE_VERSION (SAVE_VERSION ^ 0x10000000u)"), [])
+        self.assertEqual(extract("#define SC64_SHARED_EGG_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)"), [])
+        with self.assertRaises(AssertionError):
+            extract("#define SC64_SHARED_EGG_SAVE_VERSION (SAVE_VERSION ^ 0x10000000u)")
 
     def test_unknowns_fail_closed(self):
         for line in ("#define SC64_BASE_SAVE_VERSION (0x53435030u - SC64_RACE_SAVE_GENERATION)",
