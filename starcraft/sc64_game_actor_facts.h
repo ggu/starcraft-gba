@@ -69,7 +69,7 @@ static int sc64_game_unit_selectable(int type)
 { unsigned f=sc64_game_unit_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
 static int sc64_game_building_selectable(int type)
 { unsigned f=sc64_game_building_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
 /* Unit broad-phase overlap used by the simple mover is a radius in GBA
  * pixels. The source box is in StarCraft pixels; half its widest axis gives
  * the actor's half-extent at the renderer's 2:1 scale. Keep the historical
@@ -80,18 +80,27 @@ sc64_game_unit_collision_radius(int type)
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     if (type == U_GUARDIAN_COCOON) return 8; /* source 16/16/15/15 at 2:1 scale */
 #endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return 11; /* source 22/22/21/21 at 2:1 scale */
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
     int left, up, right, down;
     if (!sc64_zp_actor_bounds_source(type, &left, &up, &right, &down)) return 6;
     int width = left + right, height = up + down;
     int source_extent = width > height ? width : height;
     int gba_extent = (source_extent + 3) / 4;
     return gba_extent > 6 ? gba_extent : 6;
+#else
+    return 6;
+#endif
 }
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
 static int
 sc64_game_building_bounds_source(int type, int *left, int *up, int *right, int *down)
 {
     return sc64_zp_building_bounds_source(type, left, up, right, down);
 }
+#endif
 #endif
 #endif
 #ifdef SC64_FACT_TABLES

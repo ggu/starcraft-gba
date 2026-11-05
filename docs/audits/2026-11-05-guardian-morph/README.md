@@ -128,3 +128,10 @@ health, armor, orders, and target bounds. Existing Guardian aliases remain
 unchanged. Raw-44 scenario import, morph lifecycle, menus, guest admission,
 source art, and full actor/render qualification remain outside this prototype.
 The staged Guardian's gameplay facts still need complete lifecycle review.
+
+The staged collision accessor uses source boxes 16/16/15/15 for Cocoon and
+22/22/21/21 for Guardian, yielding the engine's 8- and 11-pixel radii. This
+only changes staged actor mappings, not the general flyer collision policy.
+Terran Guardian sight uses the raw-44 source sight lookup (352 source pixels).
+Its flying motion uses the existing raw-44 stock-speed path, which does not
+model source acceleration, turning, upgrades, or IScript movement.

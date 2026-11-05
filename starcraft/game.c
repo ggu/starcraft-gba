@@ -3359,7 +3359,7 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
             if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
             int radius = 6;
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
             int mover_radius = sc64_game_unit_collision_radius(q->type);
             int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
             radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;

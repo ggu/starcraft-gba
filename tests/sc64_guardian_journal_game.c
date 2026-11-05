@@ -45,7 +45,7 @@ int main(void)
     guardian_test_retag(1,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
     assert(!race_load_game());guardian_test_reset();q=&u[slot];
 #endif
-    q->type=U_GUARDIAN_COCOON;q->raw_type=59;q->hp=120;q->maxhp=200;
+    q->type=U_GUARDIAN_COCOON;q->raw_type=59;q->alive=1;q->hp=120;q->maxhp=200;
     q->armor=0;q->order=ORDER_IDLE;q->target=44;q->build=-1;q->carry=0;q->flags=0;q->work_timer=351;
     Unit expected=*q;clear_journal();assert(race_save_game());
     GbaSaveSelection selected={0};RaceLoadPlan plan;
