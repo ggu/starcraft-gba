@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_P7_PROJECTILE_SAVE_ADAPTER_H
 #define SC64_P7_PROJECTILE_SAVE_ADAPTER_H
+#include "sc64_save_decode_context.h"
 #ifdef SC64_P7_PROJECTILES_ENABLED
 /* Candidate-only validation. No packet is decoded into live VRAM until the
  * complete save, actor links and mission state have passed preflight. */

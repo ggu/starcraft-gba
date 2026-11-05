@@ -1,5 +1,6 @@
 #ifndef SC64_Z6_TRANSPORT_SAVE_H
 #define SC64_Z6_TRANSPORT_SAVE_H
+#include "sc64_save_decode_context.h"
 #include "sc64_construction_save.h"
 #ifndef SC64_NYDUS_ORDER
 /* Standalone fixtures include this header without game.c's order enum. */

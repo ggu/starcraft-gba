@@ -15,6 +15,7 @@
  */
 #ifndef SC64_NYDUS_ADAPTER_H
 #define SC64_NYDUS_ADAPTER_H
+#include "sc64_save_decode_context.h"
 
 #ifdef SC64_NYDUS_ENABLED
 #if !defined(SC64_RACES) || !defined(SC64_ZP_CAMPAIGN_ACTORS) || \

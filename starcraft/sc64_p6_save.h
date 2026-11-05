@@ -1,5 +1,6 @@
 #ifndef SC64_P6_SAVE_H
 #define SC64_P6_SAVE_H
+#include "sc64_save_decode_context.h"
 
 /* Candidate-only P6 SRAM checks. Nothing here consults or mutates the live
  * Unit/Building arrays, so a rejected record leaves the current world intact. */

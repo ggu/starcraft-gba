@@ -1,5 +1,6 @@
 #ifndef SC64_Z6_SAVE_H
 #define SC64_Z6_SAVE_H
+#include "sc64_save_decode_context.h"
 
 /* Candidate-only validation for the Z6 large-map payload. This header is
  * shared save transaction passes the decoded campaign state explicitly.

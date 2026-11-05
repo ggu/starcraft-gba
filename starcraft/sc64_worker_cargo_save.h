@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_WORKER_CARGO_SAVE_H
 #define SC64_WORKER_CARGO_SAVE_H
+#include "sc64_save_decode_context.h"
 #ifndef SC64_WORKER_CARGO_KIND
 #error "worker cargo save preparation needs explicit cargo semantics"
 #endif

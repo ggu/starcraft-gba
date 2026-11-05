@@ -1,5 +1,6 @@
 #ifndef SC64_Z5_CONSUME_SAVE_H
 #define SC64_Z5_CONSUME_SAVE_H
+#include "sc64_save_decode_context.h"
 
 #ifdef SC64_Z5_CONSUME_ENABLED
 /* Validate decoded order links without reading or mutating the live world;

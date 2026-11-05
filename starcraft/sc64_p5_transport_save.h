@@ -1,5 +1,6 @@
 #ifndef SC64_P5_TRANSPORT_SAVE_H
 #define SC64_P5_TRANSPORT_SAVE_H
+#include "sc64_save_decode_context.h"
 #include "sc64_construction_save.h"
 
 #ifdef SC64_P5_SHUTTLE_ENABLED

@@ -1,5 +1,6 @@
 #ifndef SC64_Z7_SAVE_H
 #define SC64_Z7_SAVE_H
+#include "sc64_save_decode_context.h"
 
 /* Pure candidate validation for the seventh Zerg map.  This deliberately
  * authenticates the canonical imported map and decoded candidate rather than

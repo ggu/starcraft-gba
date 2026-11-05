@@ -1,5 +1,6 @@
 #ifndef SC64_TERRAN_LATE_SAVE_ADAPTER_H
 #define SC64_TERRAN_LATE_SAVE_ADAPTER_H
+#include "sc64_save_decode_context.h"
 
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_T4_RUNTIME) && \
     defined(SC64_TERRAN_LATE_ACTORS)
