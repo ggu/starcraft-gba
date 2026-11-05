@@ -55,29 +55,32 @@ static void z10_reserve_home(void)
     }
 }
 
-/* Double-select may include reserve units even when the anchor is elsewhere.
- * Validate the actual selection; fall back to one ordinary selected unit. */
+/* Choose a bounded safe box from live world positions, then validate the
+ * actual ordinary L-drag selection because actors move while input runs. */
 static int z10_forward_group(int x,int y,int force)
 {
-    static u8 ordered[MAX_UNITS];int groups=0;
-    for(int i=0;i<MAX_UNITS;i++)ordered[i]=z10_home_reserve[i]||
-        (group_area_x>=0&&dist2(u[i].x,u[i].y,group_area_x,group_area_y)>group_area_r*group_area_r)||
-        (!force&&((u[i].order==ORDER_ATTACK_MOVE&&dist2(u[i].tx,u[i].ty,x,y)<96*96)||u[i].order==ORDER_ATTACK_TARGET));
-    for(int round=0;round<group_rounds;round++){
-        int anchor=-1,bd=0x7fffffff;
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&!ordered[i]){
-            int d=dist2(u[i].x,u[i].y,x,y);if(d<bd){bd=d;anchor=i;}
+    int groups=0;
+    for(int round=0;round<6;round++){
+        int best=1,bx0=0,by0=0,bx1=0,by1=0;
+        for(int a=0;a<MAX_UNITS;a++)if(u[a].alive&&u[a].owner==SIDE&&u[a].type==U_HYDRALISK&&!z10_home_reserve[a]){
+            for(int direction=-1;direction<=1;direction+=2){
+                int x0=u[a].x+(direction<0?-64:-16), x1=x0+80;
+                int y0=u[a].y-24,y1=y0+48,count=0,bad=0;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].x>=x0&&u[i].x<=x1&&u[i].y>=y0&&u[i].y<=y1){
+                    if(u[i].type!=U_HYDRALISK||z10_home_reserve[i]||
+                       (group_area_x>=0&&dist2(u[i].x,u[i].y,group_area_x,group_area_y)>group_area_r*group_area_r)){bad=1;break;}
+                    if(force||!((u[i].order==ORDER_ATTACK_MOVE&&dist2(u[i].tx,u[i].ty,x,y)<96*96)||u[i].order==ORDER_ATTACK_TARGET))count++;
+                }
+                if(!bad&&count>best){best=count;bx0=x0;by0=y0;bx1=x1;by1=y1;}
+            }
         }
-        if(anchor<0)break;
-        close_menus();clear_selected_building();move_cursor(u[anchor].x,u[anchor].y);KEY_TAP(KEY_A);KEY_TAP(KEY_A);
-        int bad=0,count=0;
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){count++;if(u[i].type!=U_HYDRALISK||z10_home_reserve[i]||(group_area_x>=0&&dist2(u[i].x,u[i].y,group_area_x,group_area_y)>group_area_r*group_area_r))bad=1;}
-        if(!count||bad){
-            ordered[anchor]=1;
-            if(select_single(anchor)&&command_selected(MENU_ATTACK,x,y))groups++;
-            continue;
-        }
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected)ordered[i]=1;
+        if(best<2)break;
+        int selected=box_select(bx0,by0,bx1,by1),bad=0;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected&&
+            (u[i].type!=U_HYDRALISK||z10_home_reserve[i]||
+             (group_area_x>=0&&dist2(u[i].x,u[i].y,group_area_x,group_area_y)>group_area_r*group_area_r)))bad=1;
+        fprintf(stderr,"BOX frame=%u proposed=%d selected=%d rejected=%d bounds=%d/%d/%d/%d\n",(unsigned)frame,best,selected,bad,bx0,by0,bx1,by1);
+        if(bad||selected<2){close_menus();break;}
         if(command_selected(MENU_ATTACK,x,y))groups++;
     }
     return groups;
@@ -237,7 +240,7 @@ int main(int argc,char **argv)
                     /* In reach, the Temple is the only target that matters. */
                     int t=temple();
                     if(t>=0&&dist2(ax2,ay2,b[t].x,b[t].y)<knob("Z10_TR",240)*knob("Z10_TR",240)){gx=b[t].x;gy=b[t].y;force=1;}
-                    group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=MAX_UNITS;
+                    group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=8;
                     (void)z10_forward_group(gx,gy,force);
                     group_area_x=-1;group_rounds=6;
                     fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d]}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2);
