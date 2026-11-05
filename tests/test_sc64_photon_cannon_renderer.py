@@ -124,6 +124,8 @@ int main(void) {
                 f"-I{ROOT / '.local/sc64/briefings/generated'}",
                 f"-I{ROOT / '.local/sc64/interface/generated'}",
                 "-DSC64_RACES", f"-I{PRIVATE_HEADER}",
+                # Match the shared production HUD/control capability pair.
+                "-DSC64_FIELD_CONTROLS", "-DSC64_HUD_ICONS",
                 f"-I{ROOT / '.local/sc64/races/generated'}",
                 str(ROOT / "tests/sc64_photon_cannon_renderer.c"),
                 str(ROOT / "common/gba.c"), "-o", str(executable),

@@ -57,6 +57,8 @@ class UnitWordSpriteTests(unittest.TestCase):
             '-DGBA_HOST', '-DGBA_SPRITE_WORDS', '-DGBA_SCENE_CLIP', '-DGBA_WINDOW_BANDS',
             '-DSC64_IMPORTED_MISSION', '-DSC64_HAS_TERRAIN_ART', '-DSC64_HAS_SPRITES',
             '-DSC64_AUDIO_IMPORTED', '-DSC64_RACES', '-DSC64_CONSTRUCTION_SOURCE_ART',
+            # Shared HUD helpers are provided with the production controls.
+            '-DSC64_FIELD_CONTROLS', '-DSC64_HUD_ICONS',
             '-DSC64_UNIFIED', '-DSC64_IMPORTED_SKIRMISH', '-DSC64_Z3_ENABLED',
             '-DSC64_CAMPAIGN_RACE=1', '-DSC64_ROUTE_PACK3', '-DSC64_VISIBILITY_SPANS',
             '-DSC64_Z3_WINDOWED_SCHEDULE', '-DSC64_NO_FRAME_CLEAR', '-DGBA_PRESENT_DEADLINE',
