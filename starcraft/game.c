@@ -1036,6 +1036,15 @@ typedef struct {
 #endif
 #endif
 } Unit;
+#ifdef SC64_RACES
+/* Legacy saves can retain raw 36 on an Overlord. Its stored identity must
+ * remain distinct from a newly produced Egg when choosing visual assets. */
+static int sc64_unit_art_raw(const Unit *q)
+{
+    if (q->type == U_OVERLORD && q->raw_type == 36) return 42;
+    return q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+}
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 static int sc64_battlecruiser_source_tick_due(void);
 #endif
@@ -10405,12 +10414,11 @@ draw_unit_pass(Unit * q, int selection_pass)
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
-        q->raw_type>=0?sc64_p8_unit_sprite_for_raw(q->raw_type):
+        q->raw_type >= 0 ? sc64_p8_unit_sprite_for_raw(sc64_unit_art_raw(q)) :
 #endif
         mission_unit_sprite(q->type);
 #ifdef SC64_UNIT_FACING
-    int facing_raw = q->raw_type >= 0 ? q->raw_type :
-        sc64_race_raw_unit(q->type);
+    int facing_raw = sc64_unit_art_raw(q);
     /* Units missing from the race bank (e.g. the sieged Siege Tank) can still
      * have per-direction art; its north frame also sizes the selection. */
     if (!sprite && facing_raw >= 0)
@@ -10472,7 +10480,7 @@ draw_unit_pass(Unit * q, int selection_pass)
 #endif
     if (sprite) {
 #if defined(SC64_UNIT_WORD_SPRITES) && defined(SC64_RACE_UNIT_WORD_SPRITE_METADATA)
-        int sprite_raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+        int sprite_raw=sc64_unit_art_raw(q);
         const GbaSpriteWordFrame *word_sprite = sprite_raw >= 0 ?
             sc64_race_unit_words_sprite((unsigned short)sprite_raw,sprite) : 0;
         if (word_sprite)
