@@ -37,6 +37,21 @@
 /* Every macro that selects actor facts or enum values in race_rules.h, its
  * actor-rule headers and sc64_game_actor_facts.h. tests/test_sc64_fact_tables.py
  * checks this list against those headers' preprocessor conditions. */
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#define SC64_FACT_EGG_WIRE_GATE(X) X(SC64_SHARED_EGG_WIRE_HOST_STAGE)
+#else
+#define SC64_FACT_EGG_WIRE_GATE(X)
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#define SC64_FACT_GUARDIAN_GATE(X) X(SC64_GUARDIAN_COCOON_STAGE)
+#else
+#define SC64_FACT_GUARDIAN_GATE(X)
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+#define SC64_FACT_GUARDIAN_DISTINCT_GATE(X) X(SC64_GUARDIAN_DISTINCT_STAGE)
+#else
+#define SC64_FACT_GUARDIAN_DISTINCT_GATE(X)
+#endif
 #define SC64_FACT_GATES(X) \
     X(SC64_RACES) X(SC64_UNIFIED) X(SC64_ZP_CAMPAIGN_ACTORS) \
     X(SC64_ZP_CAMPAIGN_STORAGE) X(SC64_Z3_ENABLED) X(SC64_P3_ENABLED) \
@@ -52,7 +67,7 @@
     X(SC64_P10_DATA_ENABLED) X(SC64_SKIRMISH_ROSTER) X(SC64_BATTLECRUISER_EXPERIMENT) \
     X(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) X(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) \
     X(SC64_SCARAB_RUNTIME) X(SC64_SHARED_TRANSPORT) X(SC64_Z9_RUNTIME) \
-    X(SC64_Z10_RUNTIME)
+    X(SC64_Z10_RUNTIME) SC64_FACT_EGG_WIRE_GATE(X) SC64_FACT_GUARDIAN_GATE(X) SC64_FACT_GUARDIAN_DISTINCT_GATE(X)
 
 #define SC64_FACT_STR(x) #x
 #define SC64_FACT_XSTR(x) SC64_FACT_STR(x)
@@ -100,6 +115,16 @@ int main(void)
          "SC64_FACT_FEATURE_P7_RECT | "
 #endif
          "0u)");
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE)
+    /* Staged actors are outside the generated legacy fact table. */
+    printf("#define SC64_FACT_UNIT_COUNT %du\n", (int)SC_RU_LEGACY_COUNT);
+    printf("#define SC64_FACT_BUILDING_COUNT %du\n", (int)SC_RB_COUNT);
+    printf("_Static_assert(SC_RU_LEGACY_COUNT == %d && SC_RB_COUNT == %d,\n"
+           "               \"fact tables were generated for another roster\");\n",
+           (int)SC_RU_LEGACY_COUNT, (int)SC_RB_COUNT);
+    printf("static const unsigned int sc64_fact_unit_table[%d] = {", (int)SC_RU_LEGACY_COUNT);
+    for (t = 0; t < SC_RU_LEGACY_COUNT; ++t) {
+#else
     printf("#define SC64_FACT_UNIT_COUNT %du\n", (int)SC_RU_COUNT);
     printf("#define SC64_FACT_BUILDING_COUNT %du\n", (int)SC_RB_COUNT);
     printf("_Static_assert(SC_RU_COUNT == %d && SC_RB_COUNT == %d,\n"
@@ -107,6 +132,7 @@ int main(void)
            (int)SC_RU_COUNT, (int)SC_RB_COUNT);
     printf("static const unsigned int sc64_fact_unit_table[%d] = {", (int)SC_RU_COUNT);
     for (t = 0; t < SC_RU_COUNT; ++t) {
+#endif
         unsigned flags = sc64_game_unit_actor_flags(t);
         int radius = sc64_game_unit_collision_radius(t);
         int flying = sc64_race_unit_flying(t);

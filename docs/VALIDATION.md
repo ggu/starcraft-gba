@@ -4128,6 +4128,22 @@ Existing product prerequisites and unsupported abilities retain their documented
 limits. The gate is off in standard profiles pending full Z7 mission and
 fresh-process SRAM qualification.
 
+A separate shared-Egg HOST candidate checks the actual world and selected-unit
+HUD framebuffer against prepared source pixels. This proves its static frame
+dispatch, not native animation. The private source metadata identifies Egg
+image 21 as a non-directional 24-frame GRP: its Init script plays frames 20–23
+once, then loops frames 0–11. Its image 22 underlay follows the primary frame
+and uses destination-dependent modifier 10; the ordinary race sprite importer
+defers that shadow and selects only frame 20. The source SpecialState1 sequence
+uses frames 12–19 and order signals; the current immediate birth does not model
+it. Native timing and full shadow composition remain unqualified.
+
+The shared candidate's selected Egg can show its product and progress. Its
+custom-game Hatchery panel does not list nearby Egg jobs: the existing Z7-only
+panel infers them by proximity rather than a persisted producer identity, so
+that display cannot distinguish overlapping Hatcheries reliably. These are
+presentation gaps and do not establish guest activation or performance.
+
 
 The Egg ARM build (`c8c5945f…d27ab9`) links with IWRAM end `0x03004fe0`
 and BSS end `0x0203d9f0`. The hatch-processing body stays in ROM to preserve

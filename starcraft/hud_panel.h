@@ -277,8 +277,8 @@ hud_unit_hangar(int slot)
 static int
 hud_egg_product(const Unit *q)
 {
-#ifdef SC64_Z7_EGG_PRODUCTION
-    if (q->type == U_Z7_EGG) return q->target;
+#ifdef SC64_EGG_RUNTIME
+    if (q->type == SC64_EGG_ACTOR) return q->target;
 #endif
     (void)q;
     return -1;
@@ -287,7 +287,7 @@ hud_egg_product(const Unit *q)
 static int
 hud_egg_level(const Unit *q)
 {
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     int duration = sc64_z7_egg_duration(q->target);
     return hud_level(duration - q->work_timer, duration, CARD_CELL);
 #else
@@ -353,7 +353,7 @@ hud_panel_key(int first, int selected)
             if (u[i].alive && u[i].selected && u[i].owner == SIDE) {
                 hp += u[i].hp + u[i].shield;
                 maximum += u[i].maxhp + sc64_actor_max_shields(u[i].type, 0);
-                HUD_MIX(h, u[i].raw_type >= 0 ? u[i].raw_type : u[i].type);
+                HUD_MIX(h, sc64_unit_art_raw(&u[i]));
             }
         HUD_MIX(h, hud_level(hp, maximum, 32));
     }
@@ -659,7 +659,7 @@ hud_draw_group(int first)
     for (i = 0; i < MAX_UNITS; i++) {
         int raw, gain, top;
         if (!u[i].alive || !u[i].selected || u[i].owner != SIDE) continue;
-        raw = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
+        raw = sc64_unit_art_raw(&u[i]);
         gain = u[i].hp + u[i].shield;
         top = u[i].maxhp + sc64_actor_max_shields(u[i].type, 0);
         hp += gain; maximum += top;

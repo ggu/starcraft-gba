@@ -461,7 +461,13 @@ static int race_zl_create(void *opaque, const Sc64Z8Action *action,
     if (y + bottom >= (int)height) y = (int)height - bottom - 1;
     if (x < left || y < top) return -1;
     live_owner = m->live_owner[source_owner];
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (live_owner != SIDE) return -1;
+    if (!race_product_slots_available(1)) return 0;
+    if (find_unit_slot() < 0) return -1;
+#else
     if (live_owner != SIDE || find_unit_slot() < 0) return -1;
+#endif
     slot = spawn_unit(live_owner, type, x / 2, y / 2);
     if (slot < 0) return -1;
     u[slot].raw_type = (s16)raw;
@@ -520,7 +526,11 @@ static int race_zl_live_world_valid(void)
         int raw = u[i].raw_type;
         if (u[i].raw_owner < 0 || u[i].raw_owner >= SC64_Z8_OWNER_LIMIT ||
             race_zl_source_owner((unsigned)u[i].raw_owner) != u[i].owner ||
-            raw < 0 || sc64_race_unit_from_raw(raw) != u[i].type) return 0;
+            raw < 0 || (sc64_race_unit_from_raw(raw) != u[i].type
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+            && !(raw==36 && u[i].type==U_Z7_EGG)
+#endif
+            )) return 0;
     }
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
         if (b[i].raw_owner < 0 || b[i].raw_owner >= SC64_Z8_OWNER_LIMIT ||
@@ -559,7 +569,11 @@ static int race_zl_save_pack(Sc64ZlPersistentState *out)
     if (!race_zl_mission || !sc64_zl_ai_state_valid(&race_zl_ai) ||
         race_zl_camera_release || !race_zl_live_world_valid()) return 0;
     memset(out, 0, sizeof(*out));
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (!sc64_zl_state_pack_for(out, &race_zl_sched, race_zl_mission->program,1)) return 0;
+#else
     if (!sc64_zl_state_pack(out, &race_zl_sched, race_zl_mission->program)) return 0;
+#endif
     for (unsigned t = 0; t < SC64_ZL_AI_TOWNS; ++t) {
         if (race_zl_ai_minerals[t] > 65535u || race_zl_ai_gas[t] > 65535u) return 0;
         out->ai_minerals[t] = (u16)race_zl_ai_minerals[t];
@@ -572,8 +586,14 @@ static int race_zl_save_pack(Sc64ZlPersistentState *out)
 
 /* Validate a candidate without touching live state; `scratch` is a
  * transient engine buffer. On success with `apply`, install it. */
-static int race_zl_save_unpack(const Sc64ZlPersistentState *in,
+static int
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+race_zl_save_unpack_for(const Sc64ZlPersistentState *in,
+                               Sc64ZlSchedulerState *scratch, int apply, int egg_stage)
+#else
+race_zl_save_unpack(const Sc64ZlPersistentState *in,
                                Sc64ZlSchedulerState *scratch, int apply)
+#endif
 {
     Sc64Z8Setup setup;
     Sc64ZlAiState ai;
@@ -584,8 +604,11 @@ static int race_zl_save_unpack(const Sc64ZlPersistentState *in,
     if (!sc64_zl_ai_state_valid(&ai) ||
         (in->crystal_carrier != SC64_ZL_NO_CARRIER && in->crystal_carrier >= MAX_UNITS))
         return 0;
-    if (!sc64_zl_state_unpack(apply ? &race_zl_sched : 0, in, m->program,
-                              &setup, scratch)) return 0;
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (!sc64_zl_state_unpack_for(apply ? &race_zl_sched : 0, in, m->program,&setup,scratch,egg_stage)) return 0;
+#else
+    if (!sc64_zl_state_unpack(apply ? &race_zl_sched : 0, in, m->program,&setup,scratch)) return 0;
+#endif
     if (!apply) return 1;
     race_zl_ai = ai;
     for (unsigned t = 0; t < SC64_ZL_AI_TOWNS; ++t) {
@@ -595,6 +618,11 @@ static int race_zl_save_unpack(const Sc64ZlPersistentState *in,
     race_zl_crystal_carrier = in->crystal_carrier;
     return 1;
 }
+
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static int race_zl_save_unpack(const Sc64ZlPersistentState *in,Sc64ZlSchedulerState *scratch,int apply)
+{ return race_zl_save_unpack_for(in,scratch,apply,0); }
+#endif
 
 static int race_zl_rebind_loaded_world(const Sc64RaceMap *map)
 {

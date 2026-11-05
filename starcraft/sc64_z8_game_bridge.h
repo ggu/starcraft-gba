@@ -244,6 +244,9 @@ sc64_z8_game_create(void *opaque, const Sc64Z8Action *action,
         return -1;
 
     live_owner = context->live_owner_for_source[source_owner];
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (!race_product_slots_available(1)) return 0;
+#endif
     slot = find_unit_slot();
     if (slot < 0) return -1;
     slot = spawn_unit(live_owner, type, x / 2, y / 2);

@@ -1,5 +1,23 @@
 #ifndef SC64_COMPACT_UNIT_SAVE_H
 #define SC64_COMPACT_UNIT_SAVE_H
+#ifndef SC_RU_LEGACY_BOUND
+#define SC_RU_LEGACY_BOUND SC_RU_COUNT
+#endif
+
+/* Keep the ordinary codec signatures and code generation unchanged. */
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#define SC64_COMPACT_VALIDATE sc64_unit_save_fields_valid_for
+#define SC64_COMPACT_ENCODE sc64_unit_save_encode_for
+#define SC64_COMPACT_DECODE sc64_unit_save_decode_for
+#define SC64_COMPACT_STAGE_PARAM , int egg_stage
+#define SC64_COMPACT_STAGE_ARG , egg_stage
+#else
+#define SC64_COMPACT_VALIDATE sc64_unit_save_fields_valid
+#define SC64_COMPACT_ENCODE sc64_unit_save_encode
+#define SC64_COMPACT_DECODE sc64_unit_save_decode
+#define SC64_COMPACT_STAGE_PARAM
+#define SC64_COMPACT_STAGE_ARG
+#endif
 
 /* Lossless slot-preserving Unit row for the opt-in full-campaign save layout.
  * This header is included only where the RACES Unit definition is available.
@@ -60,16 +78,27 @@ sc64_packed_unit_is_zero(const Sc64PackedUnitSave *row)
 }
 
 static int
-sc64_unit_save_fields_valid(const Unit *q, unsigned world_width,
-                            unsigned world_height)
+SC64_COMPACT_VALIDATE(const Unit *q, unsigned world_width,
+                            unsigned world_height SC64_COMPACT_STAGE_PARAM)
 {
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+    (void)egg_stage;
+#endif
     if (!q || !world_width || !world_height || world_width > 2048 ||
         world_height > 2048 || q->x < 0 || (unsigned)q->x >= world_width ||
         q->y < 0 || (unsigned)q->y >= world_height ||
         q->hp < -SC64_PACKED_UNIT_HP_BIAS ||
         q->hp >= SC64_PACKED_UNIT_HP_BIAS || (q->alive && q->hp < 0) ||
         q->maxhp < 0 || q->maxhp > 131071 || q->owner < 0 || q->owner > 4 ||
-        q->type < 0 || q->type >= SC_RU_COUNT || SC_RU_COUNT > 64 ||
+        q->type < 0 || q->type >= 64 || SC_RU_LEGACY_BOUND > 64 ||
+        (q->type >= SC_RU_LEGACY_BOUND
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+         && q->type != U_GUARDIAN_STAGE
+#endif
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+         && !(egg_stage && q->type==SC64_SHARED_EGG_TYPE && q->raw_type==36 && q->alive==1)
+#endif
+         ) ||
         (q->alive != 0 && q->alive != 1) ||
         (q->selected != 0 && q->selected != 1) || q->cd < 0 || q->cd > 65535 ||
         q->order < 0 || q->order > 15 ||
@@ -94,12 +123,12 @@ sc64_unit_save_fields_valid(const Unit *q, unsigned world_width,
 }
 
 static int
-sc64_unit_save_encode(Sc64PackedUnitSave *row, const Unit *q,
-                      unsigned world_width, unsigned world_height)
+SC64_COMPACT_ENCODE(Sc64PackedUnitSave *row, const Unit *q,
+                      unsigned world_width, unsigned world_height SC64_COMPACT_STAGE_PARAM)
 {
     Sc64PackedUnitSave encoded;
     unsigned bit = 0;
-    if (!row || !sc64_unit_save_fields_valid(q, world_width, world_height)) return 0;
+    if (!row || !SC64_COMPACT_VALIDATE(q, world_width, world_height SC64_COMPACT_STAGE_ARG)) return 0;
     memset(&encoded, 0, sizeof(encoded));
     /* Keep the all-zero unused-slot representation canonical and reversible. */
     static const Unit zero_unit = {0};
@@ -134,8 +163,8 @@ sc64_unit_save_encode(Sc64PackedUnitSave *row, const Unit *q,
 }
 
 static int
-sc64_unit_save_decode(Unit *out, const Sc64PackedUnitSave *row,
-                      unsigned world_width, unsigned world_height)
+SC64_COMPACT_DECODE(Unit *out, const Sc64PackedUnitSave *row,
+                      unsigned world_width, unsigned world_height SC64_COMPACT_STAGE_PARAM)
 {
     Unit decoded;
     unsigned bit = 0;
@@ -143,7 +172,7 @@ sc64_unit_save_decode(Unit *out, const Sc64PackedUnitSave *row,
     if (!out || !row) return 0;
     memset(&decoded, 0, sizeof(decoded));
     if (sc64_packed_unit_is_zero(row)) {
-        if (!sc64_unit_save_fields_valid(&decoded, world_width, world_height)) return 0;
+        if (!SC64_COMPACT_VALIDATE(&decoded, world_width, world_height SC64_COMPACT_STAGE_ARG)) return 0;
         *out = decoded;
         return 1;
     }
@@ -170,11 +199,27 @@ sc64_unit_save_decode(Unit *out, const Sc64PackedUnitSave *row,
     decoded.raw_owner = (int)v - 1; SC64_UNIT_GET(16, decoded.flags);
     SC64_UNIT_GET(11, decoded.shield_remainder);
 #undef SC64_UNIT_GET
-    if (bit != 303 || !sc64_unit_save_fields_valid(&decoded, world_width,
-                                                    world_height)) return 0;
+    if (bit != 303 || !SC64_COMPACT_VALIDATE(&decoded, world_width,
+                                                    world_height SC64_COMPACT_STAGE_ARG)) return 0;
     if ((row->bytes[SC64_PACKED_UNIT_SAVE_BYTES - 1] & 0x80u) != 0) return 0;
     *out = decoded;
     return 1;
 }
+
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+static int sc64_unit_save_fields_valid(const Unit *q,unsigned w,unsigned h)
+{ return sc64_unit_save_fields_valid_for(q,w,h,0); }
+static int sc64_unit_save_encode(Sc64PackedUnitSave *r,const Unit *q,unsigned w,unsigned h)
+{ return sc64_unit_save_encode_for(r,q,w,h,0); }
+static int sc64_unit_save_decode(Unit *q,const Sc64PackedUnitSave *r,unsigned w,unsigned h)
+{ return sc64_unit_save_decode_for(q,r,w,h,0); }
+
+#endif /* SC64_SHARED_EGG_WIRE_HOST_STAGE */
+
+#undef SC64_COMPACT_VALIDATE
+#undef SC64_COMPACT_ENCODE
+#undef SC64_COMPACT_DECODE
+#undef SC64_COMPACT_STAGE_PARAM
+#undef SC64_COMPACT_STAGE_ARG
 
 #endif

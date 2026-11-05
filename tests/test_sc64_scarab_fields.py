@@ -6,7 +6,26 @@ import subprocess
 import tempfile
 import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+def legacy_unit_names(preprocessed):
+    matches = [body for body in re.findall(r'enum\s*\{([^{}]*)\}', preprocessed)
+               if re.search(r'\bSC_RU_COUNT\b', body)]
+    if len(matches) != 1:
+        raise ValueError('expected one unit count enum')
+    entries = [entry.strip() for entry in matches[0].split(',') if entry.strip()]
+    if (len(entries) < 3 or entries[-2] != 'SC_RU_LEGACY_COUNT' or
+            not re.fullmatch(r'SC_RU_COUNT\s*=\s*SC_RU_LEGACY_COUNT', entries[-1])):
+        raise ValueError('invalid legacy count sentinel')
+    names = entries[:-2]
+    if any(not re.fullmatch(r'U_[A-Z0-9_]+', name) for name in names) or len(set(names)) != len(names):
+        raise ValueError('invalid legacy unit identity')
+    return names
+
 class ScarabFieldsTest(unittest.TestCase):
+    def test_rejects_malformed_count(self):
+        with self.assertRaises(ValueError):
+            legacy_unit_names('enum { U_SCV, SC_RU_LEGACY_COUNT, SC_RU_COUNT = 99 };')
+
+
     def test_actual_unit_and_codecs(self):
         game = (ROOT / 'starcraft/game.c').read_text()
         end = game.index('} Unit;') + len('} Unit;')
@@ -47,13 +66,13 @@ class ScarabFieldsTest(unittest.TestCase):
                     probe = pathlib.Path(d) / 'ids.c'
                     probe.write_text(include)
                     pp = subprocess.check_output(['clang', '-E', '-P', '-I', str(ROOT / 'starcraft'), *defines, '-DSC64_SKIRMISH_ROSTER', '-DSC64_BATTLECRUISER_EXPERIMENT', str(probe)], text=True)
-                    enum = re.search(r'enum\s*\{([^{}]*\bSC_RU_COUNT\s*)\}', pp).group(1)
-                    names = re.findall(r'\bU_[A-Z0-9_]+\b', enum)
+                    names = legacy_unit_names(pp)
                     probe.write_text(include + '#include <stdio.h>\nint main(void) {\n' + ''.join('printf("%d,", ' + n + ');\n' for n in names) + 'printf("%d\\n", SC_RU_COUNT); return 0; }\n')
                     outputs = []
                     for extra in ([], ['-DSC64_SCARAB_RUNTIME']):
                         subprocess.run(['clang', '-std=c11', '-I', str(ROOT / 'starcraft'), *defines, '-DSC64_SKIRMISH_ROSTER', '-DSC64_BATTLECRUISER_EXPERIMENT', *extra, str(probe), '-o', str(binary)], check=True)
                         outputs.append(subprocess.check_output([str(binary)], text=True).strip().split(','))
+                    self.assertEqual([int(v) for v in outputs[0]], list(range(len(names))) + [len(names)])
                     self.assertEqual(outputs[0][:-1], outputs[1][:-1])
                     self.assertEqual(int(outputs[1][-1]), int(outputs[0][-1]) + 1)
                     for storage in ('compact', 'legacy'):

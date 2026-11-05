@@ -2,12 +2,12 @@
 #ifndef SC64_Z7_EGG_PRODUCTION_H
 #define SC64_Z7_EGG_PRODUCTION_H
 
-#ifdef SC64_Z7_EGG_PRODUCTION
+#if defined(SC64_Z7_EGG_PRODUCTION) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
 #ifndef SC64_RACES
 #error "Z7 Egg production requires SC64_RACES"
 #endif
-#ifndef SC64_Z7_RUNTIME
-#error "Z7 Egg production requires SC64_Z7_RUNTIME"
+#if !defined(SC64_Z7_RUNTIME) && !defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+#error "Egg production requires Z7 or the HOST shared producer"
 #endif
 
 /* Only ordinary Zerg larva products become Egg jobs. The Egg's own rules

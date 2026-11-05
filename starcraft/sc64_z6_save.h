@@ -1,5 +1,6 @@
 #ifndef SC64_Z6_SAVE_H
 #define SC64_Z6_SAVE_H
+#include "sc64_save_decode_context.h"
 
 /* Candidate-only validation for the Z6 large-map payload. This header is
  * shared save transaction passes the decoded campaign state explicitly.
@@ -177,9 +178,16 @@ static u32 race_z6_save_building_key(const Building *q)
 #define RACE_Z6_KEY_OWNER(k) ((int)(((k) >> 24) & 7u))
 #define RACE_Z6_KEY_ALIVE(k) ((int)(((k) >> 27) & 1u))
 
-static int race_z6_save_candidate_valid(const RaceSave *candidate,
-                                         const Sc64Z6PersistentState *state,
-                                         unsigned width, unsigned height)
+static int
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+race_z6_save_candidate_valid_for(const RaceSave *candidate,
+                                 const Sc64Z6PersistentState *state,
+                                 unsigned width, unsigned height, u32 expected_version SC64_GCTX_DECL)
+#else
+race_z6_save_candidate_valid(const RaceSave *candidate,
+                             const Sc64Z6PersistentState *state,
+                             unsigned width, unsigned height SC64_GCTX_DECL)
+#endif
 {
     const Sc64RaceMap *map = &sc64_race_maps[SC64_Z6_GLOBAL_ID];
     u8 seen_units[(MAX_UNITS + 7) / 8] = {0};
@@ -198,7 +206,13 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
         height != SC64_Z6_MAP_ROWS ||
         !race_z6_save_source_map_valid(map) ||
         !sc64_z6_persistent_state_valid(state) ||
-        candidate->version != SAVE_VERSION ||
+        candidate->version !=
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+        expected_version
+#else
+        SAVE_VERSION
+#endif
+        ||
         candidate->state[0] != 0 || candidate->state[1] != R_ZERG ||
         candidate->state[2] != SC64_Z6_GLOBAL_ID || candidate->state[7] < 0 ||
         candidate->state[16] < 0 || candidate->state[16] > MAX_RACE_GEYSERS ||
@@ -223,7 +237,7 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
 #endif
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit decoded;
-        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
+        if (!SC64_GUARD_DECODE(candidate, i, width * 16u, height * 16u,
                                    &decoded) ||
             !race_z6_hallucination_unit_state_valid(&decoded,
                 race_z6_save_expected_owner(map, 2))) return 0;
@@ -443,6 +457,16 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
     if (live + queued + race_z6_save_remaining_creates(state) > MAX_UNITS) return 0;
     return 1;
 }
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+/* Save-time callers still require the current generation. Only prepared-load
+ * preflight may pass a separately authenticated predecessor version. */
+static int race_z6_save_candidate_valid(const RaceSave *candidate,
+                                         const Sc64Z6PersistentState *state,
+                                         unsigned width, unsigned height SC64_GCTX_DECL)
+{
+    return race_z6_save_candidate_valid_for(candidate,state,width,height,SAVE_VERSION SC64_GCTX_ARG);
+}
+#endif
 #undef RACE_Z6_KEY_RAW
 #undef RACE_Z6_KEY_RAW_OWNER
 #undef RACE_Z6_KEY_TYPE

@@ -63,7 +63,7 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
        and switch below. Relational checks also handle INT_MIN/INT_MAX safely. */
     if (type < U_ZP_INFESTED_KERRIGAN || type >= SC_RU_COUNT) return 0;
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#if defined(SC64_Z7_EGG_PRODUCTION) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
     /* Pinned raw36 UnitType facts: 200 HP, 10 armor, 4-tile/128-source-px
        sight, L16/U16/R15/D15 bounds, Medium size, and no weapon or motion.
        Egg product identity/timing is kept separately in target/work_timer. */
@@ -73,7 +73,11 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE|
         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN
     };
+#ifdef SC64_Z7_EGG_PRODUCTION
     if (type == U_Z7_EGG) return &z7_egg;
+#else
+    if (type == U_SHARED_EGG_STAGE) return &z7_egg;
+#endif
 #endif
 #ifdef SC64_P7_ACTORS
     { const Sc64P7ActorFact *p7 = sc64_p7_actor_fact(type);
