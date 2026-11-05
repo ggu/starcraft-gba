@@ -112,13 +112,18 @@ impact and damage location agree and measure crowded-scene resource use.
 ## Existing direct N64 observation
 
 Three ordinary-input Blood Bath openings in ares observed Terran 4/10, Zerg
-4/9 and Protoss 4/9 visible supply; the compared older GBA initializer reports
-4/18, 4/9 and 4/17 ([opening evidence](../2026-11-05-n64-blood-bath-openings/README.md)).
-The observed supply mismatch is concrete for those setups, but viewport limits
-and transition timing do not establish full starting inventories or wallet.
-Collect repeated starting-frame records across maps/races before changing
-initializers; keep N64 captures and inputs private. No claimed N64 Scarab,
-Reaver purchase, weapon flight or save observation follows from those openings.
+4/9 and Protoss 4/9 visible supply ([opening evidence](../2026-11-05-n64-blood-bath-openings/README.md)).
+The earlier GBA comparison showing 4/18 and 4/17 for Terran and Protoss is
+historical: merged `7fee3810` removed the extra starting Depot and Pylon, and
+current `race_skirmish_init` at main `6b4a1932` retains that correction
+([supply adjustment and qualification](../2026-11-05-skirmish-opening-supply/README.md)).
+It spawns each town hall and four workers, plus a Zerg Overlord, and assigns
+200 starting minerals; it does not add the former Depot or Pylon. The scoped
+observed supply discrepancy is therefore already addressed, not a new fix to
+prioritize. Full native starting inventories, wallets and AI openings remain
+uncertain because the captured viewports and transition timing do not establish
+them. No N64 Scarab, Reaver purchase, weapon flight or save observation follows
+from those openings.
 
 ## Private evidence checked for this update
 
