@@ -32,15 +32,14 @@ static int race_guardian_campaign_puni(const unsigned char *puni,int source,int 
 
 static int race_guardian_campaign_allowed(int owner,int source,int raw)
 {
-    if (race_mode || (unsigned)owner>=5u || (unsigned)source>=8u || (unsigned)raw>=228u) return 0;
+    if (race_mode || (unsigned)owner>=5u || (unsigned)source>=8u || (unsigned)raw>=228u ||
+        (unsigned)race_selected_mission>=SC64_RACE_MAP_COUNT) return 0;
+    const Sc64RaceMap *map=&sc64_race_maps[race_selected_mission];
+    if (!map->owner_races || map->owner_races[source]!=R_ZERG) return 0;
 #ifdef SC64_EARLY_ZERG_PERMISSIONS
-    if (sc64_early_zerg_permission_source((unsigned)race_selected_mission)) {
-        int mapped=race_guardian_early_source_owner(race_selected_mission,source);
-        if (mapped!=owner) return 0; /* also checks immutable map bounds */
-        const Sc64RaceMap *map=&sc64_race_maps[race_selected_mission];
-        return map->owner_races && map->owner_races[source]==R_ZERG &&
+    if (sc64_early_zerg_permission_source((unsigned)race_selected_mission))
+        return race_guardian_early_source_owner(race_selected_mission,source)==owner &&
             sc64_early_zerg_permission_available((unsigned)race_selected_mission,(unsigned)source,(unsigned)raw);
-    }
 #endif
 #ifdef SC64_Z8_RUNTIME
     if (race_z8_active()) return race_z8_guardian_product_allowed(owner,source,raw);
