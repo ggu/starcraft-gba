@@ -61,6 +61,14 @@ int main(void) {
             assert(!sc64_p7_typed_unit_decode_for(&out,&t,100,100,7));
         }
     }
+    for (unsigned velocity=0; velocity<256; ++velocity) {
+        for (int hp=1; hp<=20; ++hp) {
+            u.hp=hp; u.cd=(u16)((velocity<<8)|0xa5u);
+            assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
+            assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,15));
+            assert(out.hp==hp && out.cd==u.cd);
+        }
+    }
     u.cd=0x1234; u.hp=20;
     assert(!sc64_p7_typed_unit_encode_for(&t,&u,100,100,7));
     assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
@@ -69,6 +77,17 @@ int main(void) {
     memset(&out,0xa5,sizeof out); unchanged=out;
     assert(!sc64_p7_typed_unit_decode_for(&out,&malformed,100,100,15));
     assert(!memcmp(&out,&unchanged,sizeof out));
+    for (unsigned hp=0; hp<=21; hp+=21) {
+        malformed=t;
+        for (unsigned bit=0; bit<5; ++bit) {
+            const unsigned at=22+bit;
+            malformed.bytes[at/8] = (u8)((malformed.bytes[at/8] & ~(1u<<(at%8))) |
+                                        (((hp>>bit)&1u)<<(at%8)));
+        }
+        memset(&out,0xa5,sizeof out); unchanged=out;
+        assert(!sc64_p7_typed_unit_decode_for(&out,&malformed,100,100,15));
+        assert(!memcmp(&out,&unchanged,sizeof out));
+    }
     u.hp=0; assert(!sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
     u.hp=21; assert(!sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
     u.hp=20; u.cd=255;
@@ -136,5 +155,9 @@ int main(void) {
     assert(sc64_derived_unit_decode(&out,&d,100,100) && out.raw_type==36);
     assert(sc64_p7_typed_unit_encode(&t,&u,100,100));
     assert(sc64_p7_typed_unit_decode(&out,&t,100,100) && out.raw_type==36);
+    Sc64P7TypedUnitSave legacy=t;
+    assert(sc64_p7_typed_unit_encode_for(&t,&u,100,100,15));
+    assert(!memcmp(&t,&legacy,sizeof(t)));
+    assert(sc64_p7_typed_unit_decode_for(&out,&t,100,100,15) && out.raw_type==36);
     return 0;
 }
