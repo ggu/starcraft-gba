@@ -290,8 +290,18 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
 #error "Guardian and Scarab candidate context integration is not qualified"
 #endif
-#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE) && \
+    !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
 #error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
+#endif
+#if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || \
+     !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_RACES) || \
+     !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_WORKER_CARGO_KIND) || \
+     !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || \
+     defined(SC64_SCARAB_RUNTIME) || \
+     defined(SC64_SCARAB_NAMESPACE_STAGE))
+#error "Combined Guardian/Egg candidate requires the isolated HOST custom vector"
 #endif
 #if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_SHARED_EGG_HOST_STAGE) || \

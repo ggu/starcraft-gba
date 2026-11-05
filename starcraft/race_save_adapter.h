@@ -47,7 +47,7 @@ static int race_scarab_stage_wire;
 #include "sc64_stage_save_auth.h"
 #define race_save_decode_unit race_save_decode_unit_raw_stage
 #endif
-#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+#if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
 #include "sc64_shared_egg_wire_host.h"
 #endif
 /* Decode a candidate unit without touching the live world. The compact
@@ -125,6 +125,9 @@ static int race_save_decode_unit_authenticated(const RaceSave *candidate,unsigne
                                                 unsigned width,unsigned height,Unit *out,
                                                 const Sc64StageSaveAuth *auth)
 {
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+    return race_guardian_decode_authenticated(candidate,slot,width,height,out,auth);
+#else
     Unit decoded;
     if (!candidate || !out || slot>=MAX_UNITS ||
         !sc64_stage_save_auth_matches(auth,candidate,candidate->version,0)) return 0;
@@ -144,6 +147,7 @@ static int race_save_decode_unit_authenticated(const RaceSave *candidate,unsigne
     if (decoded.type==SC64_SHARED_EGG_TYPE &&
         (!(auth->features & SC64_STAGE_SAVE_EGG) || (decoded.alive && decoded.raw_type!=36))) return 0;
     *out=decoded;return 1;
+#endif
 }
 #endif
 #endif
@@ -425,6 +429,63 @@ static int race_sk_transport_candidate_valid(const RaceSave *candidate)
     return 1;
 }
 #endif
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+/* Combined candidate fixture is custom-only. Owner identity comes entirely
+ * from saved player state; ordinary legacy actors retain their raw owners. */
+static int race_combined_egg_owner(int owner,int raw_owner,void *context)
+{
+    const RaceSave *candidate=context;static const int owners[4]={SIDE,ENEMY,RESCUABLE,4};
+    if (!candidate || candidate->state[0]!=1 || candidate->state[4]<1 ||
+        candidate->state[4]>3 || raw_owner!=-1 || owner<0 || owner>=5 ||
+        candidate->players[owner]!=R_ZERG) return 0;
+    for (int i=0;i<=candidate->state[4];i++) if (owners[i]==owner) return 1;
+    return 0;
+}
+static int race_combined_egg_candidate_valid(const RaceSave *candidate,unsigned width,
+                                               unsigned height SC64_GCTX_DECL)
+{
+    unsigned free_slots=0,committed=0;static const int owners[4]={SIDE,ENEMY,RESCUABLE,4};
+    if (!candidate || candidate->state[0]!=1 || candidate->state[1]<0 || candidate->state[1]>2 ||
+        candidate->state[4]<1 || candidate->state[4]>3 || candidate->players[SIDE]!=candidate->state[1]) return 0;
+    for (int i=0;i<candidate->state[4];i++) {
+        int selected=candidate->state[21+i];
+        if (selected<0 || selected>2 || candidate->players[owners[i+1]]!=selected) return 0;
+    }
+    for (unsigned i=0;i<MAX_UNITS;i++) {
+        Unit q;if (!SC64_GUARD_DECODE(candidate,i,width,height,&q)) return 0;
+        if (!q.alive) { ++free_slots; if(q.type==SC64_SHARED_EGG_TYPE)return 0; continue; }
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        /* The current training child already occupies a live slot; `carry`
+         * is only the additional paid queue, matching the existing service. */
+        if (q.type==U_P7_CARRIER && RACE_PROTOSS_RAW(&q)==SC64_P7_CARRIER_RAW) {
+            if (q.carry<0 || q.carry>=SC64_P7_CARRIER_QUEUE_LIMIT) return 0;
+            committed+=(unsigned)q.carry;
+        }
+#endif
+        if (q.type!=SC64_SHARED_EGG_TYPE) continue;
+        if (!sc64_shared_egg_wire_valid(&q,1,race_combined_egg_owner,(void *)candidate)) return 0;
+        int raw=sc64_race_raw_unit(q.target),admitted=0;
+        if (raw<0 || sc64_race_unit_from_raw(raw)!=q.target) return 0;
+        for (unsigned j=0;j<SC64_SKIRMISH_UNIT_COUNT;j++) {
+            const Sc64SkirmishRecord *product=&sc64_skirmish_unit_catalog[j];
+            if (product->raw_id==raw && product->kind==SC64_SK_TRAIN && product->race==R_ZERG) admitted=1;
+        }
+        if (!admitted) return 0;
+        committed+=(unsigned)(sc64_race_product_count(q.target)-1);
+    }
+    for (unsigned i=0;i<MAX_BUILDINGS;i++) {
+        Building q;if (!race_save_decode_building(candidate,i,&q)) return 0;
+        if (!q.alive) continue;
+        if (q.queue_count<0 || q.queue_count>5 || q.queue_head<0 || q.queue_head>=5) return 0;
+        for (int j=0;j<q.queue_count;j++) {
+            int type=q.queue[(q.queue_head+j)%5];if (!sc64_race_unit_rule(type)) return 0;
+            committed+=(unsigned)sc64_race_product_count(type);
+        }
+    }
+    return committed<=free_slots;
+}
+#endif
+
 #ifdef SC64_Z8_RUNTIME
 /* Z8's post-load world binding requires source identities to agree with
  * live owners and runtime types. Check the decoded candidate before any
@@ -1587,7 +1648,9 @@ static int race_save_game(void) {
     memset(&race_data, 0, sizeof(race_data));
 #endif
     race_data.version=
-#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+        race_mode ? SC64_GUARDIAN_EGG_SAVE_VERSION : SC64_GUARDIAN_SAVE_VERSION;
+#elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
         (race_mode || race_z8_active() ||
          (race_zl_active() && race_selected_mission==SC64_Z9_GLOBAL_ID)) ?
         SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
@@ -1599,8 +1662,15 @@ static int race_save_game(void) {
         SAVE_VERSION;
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+    const Sc64StageTagPair writer_pair=race_mode ?
+        (Sc64StageTagPair){SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_EGG_SAVE_VERSION,
+                           SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG} :
+        (Sc64StageTagPair){SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_SAVE_VERSION,SC64_STAGE_SAVE_GUARDIAN};
+#else
     const Sc64StageTagPair writer_pair={SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_SAVE_VERSION,SC64_STAGE_SAVE_GUARDIAN};
+#endif
     Sc64StageSaveAuth writer_auth;
     if (!sc64_stage_save_authenticate(&writer_auth,&race_data,writer_pair.outer,
                                       race_data.version,&writer_pair,1)) return 0;
@@ -1615,12 +1685,23 @@ static int race_save_game(void) {
     for (int i=0;i<MAX_UNITS;i++) {
         Unit wire;
         if (!sc64_guardian_wire_encode(&u[i],&wire,1)) return 0;
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+        if (race_mode && wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
+#endif
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+        if (!sc64_p7_typed_unit_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16),race_mode)) return 0;
+#else
         if (!sc64_p7_typed_unit_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+#endif
 #elif defined(SC64_Z7_DERIVED_SAVE)
         if (!sc64_derived_unit_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
 #else
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+        if (!sc64_zp_unit_save_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16),race_mode)) return 0;
+#else
         if (!sc64_zp_unit_save_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+#endif
 #endif
     }
 #elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
@@ -1658,8 +1739,13 @@ static int race_save_game(void) {
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     {
         Unit wire;
-        if (!sc64_guardian_wire_encode(&u[i],&wire,1) ||
-            !sc64_unit_save_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+        if (!sc64_guardian_wire_encode(&u[i],&wire,1)) return 0;
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+        if (race_mode && wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
+        if (!sc64_unit_save_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16),race_mode)) return 0;
+#else
+        if (!sc64_unit_save_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+#endif
     }
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     {
@@ -2272,6 +2358,10 @@ static int race_save_game(void) {
     if (race_data.version==SC64_SHARED_EGG_SAVE_VERSION && !race_shared_egg_candidate_valid(&race_data,
                                     (unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+    if (race_mode && !race_combined_egg_candidate_valid(&race_data,
+            (unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
+#endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
 #ifdef SC64_WORKER_CARGO_KIND
@@ -2834,6 +2924,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if ((plan->egg_auth.features & SC64_STAGE_SAVE_EGG) &&
         (!sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,race_data.version,SC64_STAGE_SAVE_EGG) ||
          !race_shared_egg_candidate_valid(&race_data,(unsigned)width*16u,(unsigned)height*16u SC64_GCTX_ARG))) return 0;
+#endif
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+    if ((plan->guardian_auth.features & SC64_STAGE_SAVE_EGG) &&
+        !race_combined_egg_candidate_valid(&race_data,(unsigned)width*16u,(unsigned)height*16u SC64_GCTX_ARG)) return 0;
 #endif
 #ifdef SC64_SHARED_BUNKER
     if (!race_bunker_save_world_valid(&race_data, width, height SC64_GCTX_ARG)) return 0;
@@ -3724,7 +3818,21 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (raw != (const void *)&race_impact_record) return 0;
     memset(plan,0,sizeof(*plan));
 #endif
-#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+#if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
+    const Sc64StageTagPair combined_tags[]={
+        {SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0},
+        {SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0},
+        {SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_SAVE_VERSION,SC64_STAGE_SAVE_GUARDIAN},
+        {SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION,SC64_STAGE_SAVE_EGG},
+        {SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_EGG_SAVE_VERSION,SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG}
+    };
+    if (!sc64_stage_save_authenticate(&plan->guardian_auth,&race_data,tag,race_data.version,
+             combined_tags,sizeof(combined_tags)/sizeof(combined_tags[0]))) return 0;
+    plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
+    u32 impact_tag=plan->guardian_auth.features ? SC64_TRANSPORT_SAVE_VERSION : tag;
+    if (!race_impact_save_decode_selected_guardian(len,impact_tag,plan->impact_candidate,
+                                          &plan->impact_candidate_count,&plan->guardian_auth)) return 0;
+#elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
     const Sc64StageTagPair egg_tags[]={
         {SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0},
         {SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0},
@@ -3790,7 +3898,11 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 }
 static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
 #ifdef SC64_SHARED_TRANSPORT
-#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
+        SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
+        SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
+#elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
