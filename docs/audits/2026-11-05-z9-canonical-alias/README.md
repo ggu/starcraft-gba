@@ -47,3 +47,12 @@ Earlier Z7/Z8 carried ARM replays and continuation evidence are scoped to the
 outcome fix. No all-nine current ARM replay claim is made. Native AI fidelity,
 arbitrary saves, physical hardware and 30-fps performance remain unqualified.
 Private traces, saves, ROMs, build logs and inputs remain ignored locally.
+
+A separate source-only checkout at `a54215f4` started with no prepared `.local`
+or `build` directory. `./dev build` and `./dev test` passed there: 989 Python
+tests (26 skipped), the secondary 5- and 8-test suites, and the asset-free
+native checks. Its default ROM SHA-256 was
+`9fe916dcb7bd5aeb06476601847e4feebf6df2b2a2499554f8c16248b689a858`.
+An earlier clean run stopped on one outdated test that still expected the
+canonical `--zerg` verifier to identify Z7; the test was corrected while
+retaining its explicit Z7 assertion, then the clean run above passed.
