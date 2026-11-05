@@ -48,11 +48,30 @@ int main(int argc,char **argv)
     /* Complete the paid Cocoon, publish the actual resulting Guardian, and
      * resume it before restoring the earlier pair for the fallback case. */
     guardian_test_snapshot(before);
-    u[muta].work_timer=1;assert(race_guardian_morph_tick(muta));
+    int remaining=u[muta].work_timer;assert(remaining==SC64_GUARDIAN_TICKS);
+    for (int i=0;i<remaining;++i) {
+        assert(race_guardian_morph_tick(muta));
+        if (i+1<remaining) assert(u[muta].type==U_GUARDIAN_COCOON);
+    }
     assert(u[muta].type==race_guardian_product_type() && u[muta].raw_type==44);
     assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
     assert(u[muta].alive && u[muta].type==race_guardian_product_type() && u[muta].raw_type==44);
     guardian_test_restore(before);assert(race_load_game());
+#ifdef SC64_ZP_FULL_STORAGE
+    /* No historical ZP feature5 writer exists. A checksum-valid fabricated
+     * pair must not be selected, even when a valid older Egg slot exists. */
+    guardian_test_retag(newest.slot,SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_SAVE_VERSION);
+    GbaSaveSelection unsupported;assert(race_worker_cargo_select(&plan,&unsupported));
+    assert(unsupported.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION && unsupported.slot!=newest.slot);
+    guardian_test_corrupt(unsupported.slot);guardian_test_snapshot(sram);
+    memcpy(old_units,u,sizeof(u));memcpy(old_buildings,b,sizeof(b));
+    int prior_ore=minerals,prior_gas=gas,prior_frame=frame;u32 prior_seed=seed;
+    assert(!race_load_game());guardian_test_snapshot(after);
+    assert(!memcmp(sram,after,sizeof(sram)) && !memcmp(old_units,u,sizeof(u)) &&
+           !memcmp(old_buildings,b,sizeof(b)) && minerals==prior_ore && gas==prior_gas &&
+           frame==prior_frame && seed==prior_seed);
+    guardian_test_restore(before);assert(race_load_game());
+#endif
     /* A valid checksum with a mismatched authenticated pair falls back to
      * the untouched real predecessor slot. */
     guardian_test_retag(newest.slot,SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
