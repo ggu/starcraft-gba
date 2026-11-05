@@ -51,11 +51,19 @@ static inline const Sc64SkirmishRecord *sc64_skirmish_menu_record(unsigned race,
     return (const Sc64SkirmishRecord *)0;
 }
 
-/* Reaver production is intentionally unavailable until its ammunition
- * lifecycle is complete; do not offer its otherwise dead-end Support Bay. */
+/* The full-service HOST probe exercises paid tech progression without
+ * advertising an unfinished actor in release products. */
+#if defined(SC64_SCARAB_TECH_PATH_HOST_PROBE) && \
+    (!defined(GBA_HOST) || !defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE))
+#error "Scarab tech-path probe requires the complete HOST flight stage"
+#endif
 static inline int sc64_skirmish_menu_supported(const Sc64SkirmishRecord *r)
 {
+#ifdef SC64_SCARAB_TECH_PATH_HOST_PROBE
+    return r != 0;
+#else
     return r && !(r->race == SC64_SK_PROTOSS && r->raw_id == 171);
+#endif
 }
 
 static inline unsigned sc64_skirmish_menu_count(unsigned race)

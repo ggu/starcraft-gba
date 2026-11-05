@@ -340,6 +340,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
      !defined(SC64_SCARAB_PACKED_MOTION_PROBE) || !defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE))
 #error "Shared flight candidate requires the complete HOST Scarab control probe"
 #endif
+#if defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE) && !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+#error "Shared flight save experiment currently requires the audited Yamato state word"
+#endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE) && \
     !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
 #error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
@@ -2137,7 +2140,11 @@ static int race_impact_save_read(Sc64ImpactEvent *candidate, int *count);
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_WORKER_CARGO_KIND)
 static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count);
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
-static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth);
+static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+    ,Sc64BcYamatoShot *bc_candidate
+#endif
+    );
 #endif
 #endif
 static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
@@ -2175,6 +2182,7 @@ static void __attribute__((noinline)) race_scarab_control_dispatch(int slot);
 static void race_scarab_probe_parent_attack(int slot,int target);
 static void race_scarab_probe_parent_tick(int slot);
 #ifdef SC64_SCARAB_WEAPON_PROBE
+static u8 sc64_scarab_probe_damage_upgrades;
 static void race_scarab_probe_bullet_resolve(const Sc64ImpactEvent *packet);
 static void race_scarab_probe_bullet_reset(void);
 static int race_scarab_probe_bullets_pending(void);
@@ -13380,6 +13388,9 @@ static unsigned race_shared_trigger_obligations(void)
     return 0;
 }
 #endif
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+#include "sc64_scarab_impact_packet.h"
+#endif
 #include "race_save_adapter.h"
 #ifdef SC64_IMPACT_EVENTS
 #include "sc64_impact_adapter.h"
@@ -13446,10 +13457,9 @@ static void __attribute__((noinline)) race_scarab_human_parent_lost(int slot)
 #endif
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
 #ifdef SC64_SCARAB_WEAPON_PROBE
-/* Pending Scarab packets share the ordinary bounded impact rows. They remain
- * in-memory only until a checked save schema registers their marker. */
+/* Pending Scarab packets share ordinary bounded impact rows. Only the staged
+ * authenticated feature15 journal registers their marker for persistence. */
 enum { SC64_SCARAB_DEATH_DAMAGE_TICKS=5 };
-static u8 sc64_scarab_probe_damage_upgrades;
 static void race_scarab_probe_bullet_reset(void) { sc64_scarab_probe_damage_upgrades=0; }
 static int race_scarab_probe_bullets_pending(void) {
     if(sc64_scarab_probe_damage_upgrades)return 1;

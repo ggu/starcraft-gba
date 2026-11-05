@@ -31,7 +31,7 @@ int main(int argc,char **argv)
     assert(race_scarab_parent_read(p,0,&parent,&counts));int child=parent.active_slot;
     for(int i=0;i<SC64_SCARAB_BUILD_TICKS;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
     assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
-    int target=spawn_unit(ENEMY,U_ZERGLING,u[p].x+10,u[p].y);assert(target>=0);
+    int target=spawn_unit(ENEMY,U_ZERGLING,u[p].x,u[p].y+60);assert(target>=0);
     race_scarab_probe_parent_attack(p,target);assert(u[child].order==1 && u[child].target==target);
     assert(race_save_game());RaceLoadPlan plan;GbaSaveSelection selected;
     assert(race_worker_cargo_select(&plan,&selected));
@@ -46,6 +46,17 @@ int main(int argc,char **argv)
     assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
     assert(race_scarab_child_fields_read(u[child].carry,u[child].work_timer,&fields));
     assert(fields.life==90 && fields.no_collision==7 && u[child].order==2);
+    /* Advance the actual autonomous dispatcher to produce a route waypoint;
+     * unlike the earlier initialization checks this exercises nonzero packed
+     * motion, including both previous source-coordinate waypoint fields. */
+    race_scarab_control_dispatch(child);
+    assert(u[child].alive && u[child].order==2 &&
+           (u[child].path_timer>24 || u[child].path_retry>12));
+    Unit motion=u[child];assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
+    assert(u[child].x==motion.x && u[child].y==motion.y && u[child].carry==motion.carry &&
+           u[child].cd==motion.cd && u[child].weapon==motion.weapon &&
+           u[child].path_timer==motion.path_timer && u[child].path_retry==motion.path_retry &&
+           u[child].path_x==motion.path_x && u[child].path_y==motion.path_y);
     /* Drive the real FSM to its arrived phase with a controlled arrival signal. */
     assert(race_scarab_flight_control_tick(child,1,0)==SC64_SCARAB_CONTROL_ARRIVED);
     assert(u[child].order==4 && u[child].target==target);
@@ -78,5 +89,125 @@ int main(int argc,char **argv)
     assert(race_scarab_flight_control_tick(child,1,0)==SC64_SCARAB_CONTROL_ARRIVED);
     assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
     assert(u[child].order==4 && u[child].target==MAX_UNITS+building);
+    /* The per-owner upgrade is injected by this probe; research is not wired. */
+    sc64_scarab_probe_damage_upgrades=(u8)(1u<<SIDE);
+    assert(race_scarab_probe_bullet_create(&u[child]));
+    assert(race_impact_count==1);Sc64ImpactEvent expected=race_impact_rows[0];
+    Sc64ScarabImpact packet;assert(sc64_scarab_impact_unpack(&expected,&packet) && packet.ticks==6);
+    /* A real reserved Yamato shot makes the compact tail contain one BC row,
+     * one impact packet and the transport trailer, all before selection. */
+    int bc=spawn_unit(ENEMY,U_BATTLECRUISER,u[p].x,u[p].y);assert(bc>=0);
+    u[bc].work_timer=64<<3;u[bc].carry=200*256;u[bc].cd=100;
+    sc64_battlecruiser_tech_bits|=(u16)(SC64_BC_TECH_YAMATO<<(2*ENEMY));
+    assert(race_bc_yamato_issue(bc,p));
+    Sc64BcYamatoShot expected_bc=sc64_bc_shots[0];assert(expected_bc.state);
+    assert(race_save_game());
+    static u8 raw_payload[sizeof(RaceImpactRecord)];u32 raw_length=0;
+    assert(save_read_latest(raw_payload,sizeof(raw_payload),SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION,&raw_length));
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION && selected.length==raw_length);
+    assert(!memcmp(raw_payload,&race_impact_record,raw_length));
+    assert(!memcmp(plan.bc_candidate,&expected_bc,sizeof(expected_bc)));
+    /* An invalid compact shot must also leave every candidate byte alone. */
+    static u8 invalid_payload[sizeof(RaceImpactRecord)];
+    memcpy(invalid_payload,raw_payload,raw_length);
+    invalid_payload[sizeof(RaceSave)-SC64_BC_SAVE_EXTRA_BYTES+offsetof(Sc64BcYamatoShot,phase)]|=0x80u;
+    memcpy(&race_impact_record,invalid_payload,raw_length);
+    assert(!race_worker_cargo_prepare_selected(&race_impact_record,raw_length,selected.tag,&plan));
+    assert(!memcmp(invalid_payload,&race_impact_record,raw_length));
+    race_impact_reset();memset(sc64_bc_shots,0,sizeof(sc64_bc_shots));sc64_scarab_probe_damage_upgrades=0;
+    assert(race_load_game());assert(sc64_scarab_probe_damage_upgrades==(1u<<SIDE));
+    assert(!memcmp(&sc64_bc_shots[0],&expected_bc,sizeof(expected_bc)));
+    assert(race_impact_count==1 && !memcmp(&race_impact_rows[0],&expected,sizeof(expected)));
+    guardian_test_snapshot(before);
+    for (int step=6;step>0;--step) {
+        while (!sc64_battlecruiser_source_tick_due()) { ++frame; }
+        race_impact_tick();++frame;
+        assert(race_impact_count==(step>1));
+        if (step>1) { assert(sc64_scarab_impact_unpack(&race_impact_rows[0],&packet));assert(packet.ticks==(unsigned)step-1); }
+    }
+    int upgraded_hp=b[building].hp;
+    guardian_test_restore(before);assert(race_load_game());
+    sc64_scarab_probe_damage_upgrades=0;
+    for (int step=6;step>0;--step) {
+        while (!sc64_battlecruiser_source_tick_due()) ++frame;
+        race_impact_tick();++frame;
+    }
+    assert(b[building].hp-upgraded_hp==25);
+    /* Test each new element independently under the old authenticated pairs.
+     * These are deliberately retagged rejection probes; the fallback is the
+     * independently produced genuine predecessor, not a retagged fixture. */
+    static const struct {u32 outer,inner;} old_pairs[]={
+        {SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION},
+        {SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION},
+        {SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_SAVE_VERSION},
+        {SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_FULL_SAVE_VERSION}
+    };
+    for (int marker=0;marker<2;++marker) {
+        guardian_test_restore(sram);assert(race_load_game());
+        assert(!sc64_scarab_probe_damage_upgrades && !race_impact_count);
+        if (!marker) sc64_scarab_probe_damage_upgrades=1u<<SIDE;
+        else { u[p].target=-1;assert(race_scarab_probe_bullet_create(&u[p])); }
+        assert(race_save_game());assert(race_worker_cargo_select(&plan,&selected));
+        guardian_test_snapshot(before);
+        for (unsigned i=0;i<sizeof(old_pairs)/sizeof(old_pairs[0]);++i) {
+            guardian_test_restore(before);
+            guardian_test_retag(selected.slot,old_pairs[i].outer,old_pairs[i].inner);
+            assert(race_worker_cargo_select(&plan,&fallback));
+            assert(fallback.slot!=selected.slot && fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION);
+        }
+    }
+    guardian_test_corrupt(fallback.slot);guardian_test_snapshot(before);
+    memcpy(old_units,u,sizeof(u));memcpy(old_buildings,b,sizeof(b));
+    int saved_minerals=minerals,saved_gas=gas,saved_frame=frame;
+    assert(!race_load_game());guardian_test_snapshot(after);
+    assert(!memcmp(before,after,sizeof(before)) && !memcmp(old_units,u,sizeof(u)) &&
+           !memcmp(old_buildings,b,sizeof(b)) && minerals==saved_minerals &&
+           gas==saved_gas && frame==saved_frame);
+    /* A distinct Guardian is the only additional ordinary impact source in
+     * feature15. Produce it through the paid morph and use real combat. */
+    guardian_test_restore(sram);assert(race_load_game());
+    int spire=spawn_build(SIDE,B_GREATER_SPIRE,390,390,0);assert(spire>=0);
+    int guardian=spawn_unit(SIDE,U_MUTALISK,350,350);assert(guardian>=0);
+    minerals=200;gas=200;assert(race_guardian_morph_start(guardian));
+    for(int i=0;i<SC64_GUARDIAN_TICKS;++i)assert(race_guardian_morph_tick(guardian));
+    assert(u[guardian].type==U_GUARDIAN_STAGE && u[guardian].raw_type==44);
+    int foe=spawn_unit(ENEMY,U_ZERGLING,390,350);assert(foe>=0);
+    tick_combat(&u[guardian],foe);
+    assert(race_impact_count==1 && race_impact_rows[0].source_type==U_GUARDIAN_STAGE);
+    expected=race_impact_rows[0];assert(race_save_game());race_impact_reset();
+    assert(race_load_game() && race_impact_count==1 &&
+           !memcmp(&expected,&race_impact_rows[0],sizeof(expected)));
+    assert(race_worker_cargo_select(&plan,&selected));guardian_test_snapshot(before);
+    guardian_test_retag(selected.slot,SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_FULL_SAVE_VERSION);
+    assert(race_worker_cargo_select(&plan,&fallback) && fallback.slot!=selected.slot &&
+           fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION);
+    /* Target slot reuse and loss of the Reaver must not redirect either the
+     * live child or an already-pending packet. Packet creation is injected. */
+    guardian_test_restore(sram);assert(race_load_game());minerals=100;
+    assert(race_scarab_enqueue(p,0));assert(race_scarab_production_tick(p,0)==SC64_SCARAB_ALLOCATED);
+    assert(race_scarab_parent_read(p,0,&parent,&counts));child=parent.active_slot;
+    for(int i=0;i<SC64_SCARAB_BUILD_TICKS;++i)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
+    assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
+    target=spawn_unit(ENEMY,U_ZERGLING,u[p].x,u[p].y+60);assert(target>=0);
+    race_scarab_probe_parent_attack(p,target);assert(u[child].target==target && u[child].order==1);
+    assert(race_scarab_probe_bullet_create(&u[child]));
+    assert(sc64_scarab_impact_unpack(&race_impact_rows[0],&packet));
+    int impact_x=packet.x,impact_y=packet.y,impact_owner=packet.owner;
+    hit_target(target,10000,U_REAVER,SIDE);assert(!u[target].alive);
+    assert(spawn_unit(ENEMY,U_ZERGLING,700,700)==target);
+    assert(u[child].target==-1 && sc64_scarab_impact_unpack(&race_impact_rows[0],&packet) && packet.target==-1);
+    hit_target(p,10000,U_ZERGLING,ENEMY);assert(!u[p].alive && u[child].alive);
+    assert(race_scarab_child_lookup(child,&owner,&phase) && owner==-1 && phase==SC64_SCARAB_CHILD_OUTSIDE);
+    assert(race_save_game());memset(u,0,sizeof(u));race_impact_reset();assert(race_load_game());
+    assert(u[child].alive && u[child].target==-1 && race_impact_count==1 &&
+           sc64_scarab_impact_unpack(&race_impact_rows[0],&packet) && packet.target==-1 &&
+           packet.x==impact_x && packet.y==impact_y && packet.owner==impact_owner && packet.ticks==6);
+    for (unsigned owner_bit=0;owner_bit<5;++owner_bit) {
+        guardian_test_restore(sram);assert(race_load_game());
+        sc64_scarab_probe_damage_upgrades=(u8)(1u<<owner_bit);
+        assert(race_save_game());sc64_scarab_probe_damage_upgrades=31;
+        assert(race_load_game() && sc64_scarab_probe_damage_upgrades==(1u<<owner_bit));
+    }
     puts("actual HOST paid unit/building launches, controlled arrival and target reuse passed");return 0;
 }

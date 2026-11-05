@@ -151,6 +151,45 @@ static Sc64ScarabWallet race_scarab_owner_bank(int slot)
 {
     Sc64ScarabWallet bank = {.limit = 65535};
     if (!race_scarab_parent_identity(slot)) return bank;
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) {
+        const Unit *parent=&u[slot];
+        if (race_z8_map!=&sc64_race_maps[SC64_Z8_GLOBAL_ID] || parent->raw_type!=83 ||
+            parent->raw_owner<0 || parent->raw_owner>=8 ||
+            race_z8_source_owner((unsigned)parent->raw_owner)!=parent->owner) return bank;
+        if (parent->owner==SIDE && parent->raw_owner==SC64_Z8_HUMAN_SLOT) {
+            bank.engine=&minerals; return bank;
+        }
+        if (parent->owner!=ENEMY) return bank;
+        for (unsigned town=0;town<SC64_Z8_AI_TOWNS;++town)
+            if (sc64_z8_ai_town_slot(town)==parent->raw_owner) {
+                bank.source=&race_z8_ai_minerals[town]; return bank;
+            }
+        return bank;
+    }
+#endif
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) {
+        const Unit *parent=&u[slot];
+        const Sc64ZlMission *mission=race_zl_mission_for(race_selected_mission);
+        int town_index=-1;
+        if (!mission || race_zl_mission!=mission || mission->global_id>=SC64_RACE_MAP_COUNT ||
+            race_zl_map!=&sc64_race_maps[mission->global_id] || parent->raw_type!=83 ||
+            parent->raw_owner<0 || parent->raw_owner>=8 ||
+            race_zl_source_owner((unsigned)parent->raw_owner)!=parent->owner) return bank;
+        if (parent->owner==SIDE && parent->raw_owner==SC64_ZL_HUMAN_SLOT) {
+            bank.engine=&minerals; return bank;
+        }
+        if (parent->owner!=ENEMY) return bank;
+        for (unsigned town=0;town<SC64_ZL_AI_TOWNS;++town)
+            if (mission->town_slot[town]==parent->raw_owner) {
+                if (town_index>=0) return bank; /* ambiguous ownership */
+                town_index=(int)town;
+            }
+        if (town_index>=0) bank.source=&race_zl_ai_minerals[town_index];
+        return bank;
+    }
+#endif
 #ifdef SC64_P8_RUNTIME
     if (race_p8_active()) return race_p8_scarab_wallet(&u[slot]);
 #endif
