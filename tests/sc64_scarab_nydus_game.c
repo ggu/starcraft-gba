@@ -22,11 +22,19 @@ int main(void)
     assert(race_scarab_production_tick(parent,0)==SC64_SCARAB_COMPLETED);
     race_scarab_probe_parent_attack(parent,passenger);
     assert(u[child].order==1 && u[child].target==passenger);
+    /* Inject a pending packet as a separate in-flight reference so transit
+     * exercises both the child and the already-launched impact queue. */
+    assert(race_scarab_probe_bullet_create(&u[child]));
+    Sc64ScarabImpact packet_before,packet_after;
+    assert(race_impact_count==1 && sc64_scarab_impact_unpack(&race_impact_rows[0],&packet_before));
     int tx=u[child].tx,ty=u[child].ty;
     for(int i=0;i<80 && u[passenger].order==ORDER_NYDUS_ENTER;++i)input(0);
     assert(u[passenger].alive && near_exit(passenger,ex));
     assert(u[child].alive && u[child].target==-1 && u[child].tx==tx && u[child].ty==ty);
     assert(u[child].order>=1 && u[child].order<=4);
+    assert(race_impact_count==1 && sc64_scarab_impact_unpack(&race_impact_rows[0],&packet_after));
+    assert(packet_after.target==-1 && packet_after.x==packet_before.x && packet_after.y==packet_before.y &&
+           packet_after.owner==packet_before.owner && packet_after.ticks>0 && packet_after.ticks<=packet_before.ticks);
     puts("Nydus transit invalidates outside Scarab target without resetting its FSM");
     return 0;
 }
