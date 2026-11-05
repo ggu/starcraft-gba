@@ -43,10 +43,27 @@ static int race_guardian_morph_start(int slot)
     if (slot<0 || slot>=MAX_UNITS) return 0;
     Unit *q=&u[slot];
     if (!q->alive || (unsigned)q->owner>=5u || race_owner_identity(q->owner)<0 ||
-        q->type!=U_MUTALISK ||
+        !race_owner_fields_race(q->owner,R_ZERG) || q->type!=U_MUTALISK ||
         (q->raw_type!=-1 && q->raw_type!=43) || q->flags ||
         SC64_TRANSPORT_LOADED(q) || q->hp<=0 || q->maxhp!=120 || q->hp>120 ||
         race_owner_minerals(q->owner)<50 || race_owner_gas(q->owner)<100) return 0;
+    int product=race_guardian_product_type();
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    if (!race_zerg_campaign_product_available(q->owner,44)) return 0;
+#endif
+#ifdef SC64_P8_RUNTIME
+    if (!race_p8_unit_product_available(q->owner,q->raw_owner,product)) return 0;
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (!race_t5_unit_product_available(q->owner,q->raw_owner,product)) return 0;
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (!race_t6_unit_product_available(q->owner,q->raw_owner,product)) return 0;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (!race_late_unit_product_available(q->owner,q->raw_owner,product)) return 0;
+#endif
+    (void)product;
     int has_spire=0;
     for (int i=0;i<MAX_BUILDINGS;++i)
         if (b[i].owner==q->owner && b[i].type==B_GREATER_SPIRE && building_complete(i)) {
@@ -87,5 +104,30 @@ static int race_guardian_morph_tick(int slot)
     int hp=sc64_guardian_scaled_hp(q->hp,200,150);
     race_guardian_transform(slot,race_guardian_product_type(),hp,150,44,-1,0);
     return 1;
+}
+/* A mixed selection offers cancellation first; a second command can morph
+ * remaining Mutalisks. Only the human's selected, live slots are touched. */
+static int race_guardian_selected_command(void)
+{
+    if (selected_building >= 0) return 0;
+    int morph=0;
+    for (int i=0;i<MAX_UNITS;++i) {
+        Unit *q=&u[i];
+        if (!q->alive || !q->selected || q->owner!=SIDE) continue;
+        if (q->type==U_GUARDIAN_COCOON) return 2;
+        if (q->type==U_MUTALISK && !SC64_TRANSPORT_LOADED(q)) morph=1;
+    }
+    return morph;
+}
+
+static int race_guardian_command_selected(int cancel)
+{
+    int count=0;
+    for (int i=0;i<MAX_UNITS;++i) {
+        Unit *q=&u[i];
+        if (!q->alive || !q->selected || q->owner!=SIDE) continue;
+        count += cancel ? race_guardian_morph_cancel(i) : race_guardian_morph_start(i);
+    }
+    return count;
 }
 #endif

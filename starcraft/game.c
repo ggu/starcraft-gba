@@ -1893,6 +1893,8 @@ static int race_z6_transport_start_research_selected(void);
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 static int race_guardian_morph_tick(int slot);
+static int race_guardian_selected_command(void);
+static int race_guardian_command_selected(int cancel);
 #endif
 #ifdef SC64_Z7_RUNTIME
 static Sc64Z7PersistentState race_z7;
@@ -6262,6 +6264,9 @@ enum {
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
     RACE_CONTEXT_EGG,
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    RACE_CONTEXT_GUARDIAN,
+#endif
     RACE_CONTEXT_COUNT
 };
 static int race_context_command_base(int context);
@@ -6351,6 +6356,9 @@ static int race_context_command_width(int context)
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
     case RACE_CONTEXT_EGG: return race_z7_egg_cancel_available();
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    case RACE_CONTEXT_GUARDIAN: return race_guardian_selected_command() != 0;
+#endif
     default: return 0;
     }
 }
@@ -6424,6 +6432,14 @@ choose_command(int choice)
 #ifdef SC64_RACES
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        if (choice == race_context_command_base(RACE_CONTEXT_GUARDIAN) &&
+            race_guardian_selected_command()) {
+            int cancel = race_guardian_selected_command() == 2;
+            menu_open=0; mode=MODE_NORMAL;
+            toast(race_guardian_command_selected(cancel) ? 0 : 8); return;
+        }
+#endif
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
         if (choice == race_context_command_base(RACE_CONTEXT_EGG) &&
             race_z7_egg_cancel_available()) {
@@ -6462,6 +6478,13 @@ choose_command(int choice)
             return;
         }
         /* Fixed first-ten control rows deliberately retain their old IDs. */
+    }
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (choice == MENU_STOP + 1 && race_guardian_selected_command()) {
+        int cancel = race_guardian_selected_command() == 2;
+        menu_open=0; mode=MODE_NORMAL;
+        toast(race_guardian_command_selected(cancel) ? 0 : 8); return;
     }
 #endif
 #ifdef SC64_SHARED_TRANSPORT
@@ -6684,6 +6707,9 @@ static int race_skirmish_command_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (race_guardian_selected_command()) return MENU_STOP + 2;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6754,6 +6780,9 @@ static int field_menu_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (race_guardian_selected_command()) return MENU_STOP + 2;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6783,6 +6812,9 @@ static int field_menu_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (race_guardian_selected_command()) return MENU_STOP + 2;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
 #endif
@@ -6810,6 +6842,10 @@ static int field_menu_count(void)
 #ifdef SC64_RACES
 static const char *field_menu_base_label(int choice, const char *const *labels)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (choice==MENU_STOP+1 && race_guardian_selected_command())
+        return race_guardian_selected_command()==2 ? "CANCEL MORPH" : "MORPH GUARDIAN";
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return "BUILD INTERCEPTOR";
 #endif
@@ -6861,6 +6897,11 @@ static const char *race_menu_label(int i)
 #endif
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        if (i == race_context_command_base(RACE_CONTEXT_GUARDIAN) &&
+            race_guardian_selected_command())
+            return race_guardian_selected_command()==2 ? "CANCEL MORPH" : "MORPH GUARDIAN";
+#endif
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
         if (i == race_context_command_base(RACE_CONTEXT_EGG) &&
             race_z7_egg_cancel_available()) return "CANCEL EGG";

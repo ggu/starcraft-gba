@@ -19,12 +19,25 @@ int main(void)
     int spire=spawn_build(SIDE,B_GREATER_SPIRE,200,200,0);assert(spire>=0);
     minerals=49;assert(!race_guardian_morph_start(slot));minerals=500;
     gas=99;assert(!race_guardian_morph_start(slot));gas=500;
-    assert(race_guardian_morph_start(slot));assert(q->type==U_GUARDIAN_COCOON);
+    assert(race_guardian_selected_command()==1);
+    int command=race_context_command_base(RACE_CONTEXT_GUARDIAN);
+    assert(!strcmp(race_menu_label(command),"MORPH GUARDIAN"));
+    choose_command(command);assert(q->type==U_GUARDIAN_COCOON);
+    assert(race_guardian_selected_command()==2);
+    assert(!strcmp(race_menu_label(command),"CANCEL MORPH"));
     assert(q->selected && q->hp==100 && q->work_timer==750);
     assert(minerals==450 && gas==400 && race_owner_supply(SIDE)==supply && supply_used==supply);
     hit_target(slot,20,U_MARINE,ENEMY);assert(q->alive && q->hp==80);
-    assert(race_guardian_morph_cancel(slot));assert(q->type==U_MUTALISK && q->hp==48 && q->selected);
+    choose_command(command);assert(q->type==U_MUTALISK && q->hp==48 && q->selected);
     assert(minerals==500 && gas==500 && race_owner_supply(SIDE)==supply && supply_used==supply);
+    /* The same selected-unit row is reachable in the campaign menu. */
+    race_mode=0;
+    assert(field_menu_count()>MENU_STOP+1);
+    assert(!strcmp(race_menu_label(MENU_STOP+1),"MORPH GUARDIAN"));
+    choose_command(MENU_STOP+1);assert(q->type==U_GUARDIAN_COCOON);
+    assert(!strcmp(race_menu_label(MENU_STOP+1),"CANCEL MORPH"));
+    choose_command(MENU_STOP+1);assert(q->type==U_MUTALISK);
+    race_mode=1;
     assert(race_guardian_morph_start(slot));assert(q->hp==80);
     for(int i=0;i<749;i++) update_orders();
     assert(q->alive && q->type==U_GUARDIAN_COCOON && q->work_timer==1);
@@ -48,6 +61,8 @@ int main(void)
     int bot=spawn_unit(ENEMY,U_MUTALISK,460,460);assert(bot>=0);
     race_minerals[ENEMY]=240;race_gas[ENEMY]=260;
     int player_ore=minerals,player_gas=gas,bot_supply=race_owner_supply(ENEMY);
+    assert(!race_guardian_morph_start(bot)); /* Protoss owner cannot produce Zerg. */
+    race_player[ENEMY]=R_ZERG;
     assert(race_guardian_morph_start(bot));
     assert(race_minerals[ENEMY]==190 && race_gas[ENEMY]==160);
     assert(minerals==player_ore && gas==player_gas && race_owner_supply(ENEMY)==bot_supply);
