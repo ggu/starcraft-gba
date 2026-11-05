@@ -36,6 +36,53 @@ static int z10_pending_products(int type)
     return n;
 }
 
+/* Controller-only roles: keep existing retreat-sized force at home. */
+static u8 z10_home_reserve[MAX_UNITS];
+static void z10_reserve_home(void)
+{
+    int need=knob("Z10_RETREAT",12),have=0;
+    for(int i=0;i<MAX_UNITS;i++){
+        if(z10_home_reserve[i]&&(!u[i].alive||u[i].owner!=SIDE||u[i].type!=U_HYDRALISK))z10_home_reserve[i]=0;
+        have+=z10_home_reserve[i]!=0;
+    }
+    while(have<need){
+        int best=-1,bd=300*300;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&!z10_home_reserve[i]){
+            int d=dist2(u[i].x,u[i].y,HOME_X,HOME_Y);if(d<bd){bd=d;best=i;}
+        }
+        if(best<0)break;
+        z10_home_reserve[best]=1;have++;
+    }
+}
+
+/* Double-select may include reserve units even when the anchor is elsewhere.
+ * Validate the actual selection; fall back to one ordinary selected unit. */
+static int z10_forward_group(int x,int y,int force)
+{
+    static u8 ordered[MAX_UNITS];int groups=0;
+    for(int i=0;i<MAX_UNITS;i++)ordered[i]=z10_home_reserve[i]||
+        (group_area_x>=0&&dist2(u[i].x,u[i].y,group_area_x,group_area_y)>group_area_r*group_area_r)||
+        (!force&&((u[i].order==ORDER_ATTACK_MOVE&&dist2(u[i].tx,u[i].ty,x,y)<96*96)||u[i].order==ORDER_ATTACK_TARGET));
+    for(int round=0;round<group_rounds;round++){
+        int anchor=-1,bd=0x7fffffff;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&!ordered[i]){
+            int d=dist2(u[i].x,u[i].y,x,y);if(d<bd){bd=d;anchor=i;}
+        }
+        if(anchor<0)break;
+        close_menus();clear_selected_building();move_cursor(u[anchor].x,u[anchor].y);KEY_TAP(KEY_A);KEY_TAP(KEY_A);
+        int bad=0,count=0;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){count++;if(u[i].type!=U_HYDRALISK||ordered[i])bad=1;}
+        if(!count||bad){
+            ordered[anchor]=1;
+            if(select_single(anchor)&&command_selected(MENU_ATTACK,x,y))groups++;
+            continue;
+        }
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected)ordered[i]=1;
+        if(command_selected(MENU_ATTACK,x,y))groups++;
+    }
+    return groups;
+}
+
 static int crystal(void)
 {
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==RAW_CRYSTAL)return i;
@@ -158,7 +205,7 @@ int main(int argc,char **argv)
             int pool_limited=home+pending+free_slots<goal;
             if(!rush&&frame>=knob("Z10_GOF",8000)&&
                (home>=goal||(pool_limited&&home>=knob("Z10_GO2",55)))){
-                rush=1;leg=0;
+                rush=1;leg=0;z10_reserve_home();
                 fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d,\"pending\":%d,\"free_slots\":%d,\"pool_limited\":%d}\n",(unsigned)frame,home,pending,free_slots,pool_limited);
             }
             if(rush){
@@ -189,7 +236,7 @@ int main(int argc,char **argv)
                     int t=temple();
                     if(t>=0&&dist2(ax2,ay2,b[t].x,b[t].y)<knob("Z10_TR",240)*knob("Z10_TR",240)){gx=b[t].x;gy=b[t].y;force=1;}
                     group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=8;
-                    (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,force);
+                    (void)z10_forward_group(gx,gy,force);
                     group_area_x=-1;group_rounds=6;
                     fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d]}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2);
                     { int nearest_overlord=-1,home_hydras=0,foes[256]={0};
@@ -226,7 +273,13 @@ int main(int argc,char **argv)
                 int d=dist2(u[i].x,u[i].y,HOME_X,HOME_Y-60);
                 if(d<fd){fd=d;foe=i;}
             }
-            if(foe>=0&&!rush){
+            if(foe>=0&&rush){
+                z10_reserve_home();
+                for(int i=0;i<MAX_UNITS;i++)if(z10_home_reserve[i]&&u[i].alive&&
+                    dist2(u[i].x,u[i].y,HOME_X,HOME_Y)<400*400){
+                    if(select_single(i)) (void)command_selected(MENU_ATTACK,u[foe].x,u[foe].y);
+                }
+            } else if(foe>=0){
                 group_area_x=ax;group_area_y=ay-60;group_area_r=600;group_rounds=2;
                 (void)group_command(U_HYDRALISK,MENU_ATTACK,u[foe].x,u[foe].y,1);
                 group_area_x=-1;group_rounds=6;
@@ -311,11 +364,11 @@ int main(int argc,char **argv)
         /* Fresh Hydralisks follow the army up the road in stages. */
         if(rush&&frame>=next_stream){
             group_area_x=ax;group_area_y=ay-60;group_area_r=560;group_rounds=3;
-            (void)group_command(U_HYDRALISK,MENU_ATTACK,road[0][0],road[0][1],0);
+            (void)z10_forward_group(road[0][0],road[0][1],0);
             for(int k=0;k+1<=leg&&k<ROAD_LEGS-1;k+=2){
                 int to=k+2<leg?k+2:leg;
                 group_area_x=road[k][0];group_area_y=road[k][1];group_area_r=120;group_rounds=2;
-                (void)group_command(U_HYDRALISK,MENU_ATTACK,road[to][0],road[to][1],0);
+                (void)z10_forward_group(road[to][0],road[to][1],0);
             }
             group_area_x=-1;group_rounds=6;
             next_stream=frame+knob("Z10_STREAM",800);
