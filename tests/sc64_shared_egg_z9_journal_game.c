@@ -19,6 +19,22 @@ int main(void)
     assert(race_load_game());
     assert(!race_mode && race_selected_mission==SC64_Z9_GLOBAL_ID);
     assert(u[egg].alive && u[egg].type==U_Z7_EGG && u[egg].raw_owner==source_owner && u[egg].work_timer==timer);
+    /* A genuinely paid paired Egg survives a real journal roundtrip and
+     * completes both bodies; the extra body consumes its reserved slot. */
+    assert(spawn_build(SIDE,B_SPAWNING_POOL,120,120,0)>=0);
+    assert(spawn_unit(SIDE,U_OVERLORD,95,95)>=0);b[hall].larva=2;
+    assert(race_queue_unit(SIDE,hall,U_ZERGLING));
+    int pair=-1,before=0;
+    for(int i=0;i<MAX_UNITS;i++) {
+        if(u[i].alive && u[i].owner==SIDE && u[i].type==U_ZERGLING) before++;
+        if(u[i].alive && u[i].type==U_Z7_EGG && u[i].target==U_ZERGLING) pair=i;
+    }
+    assert(pair>=0);int pair_timer=u[pair].work_timer;assert(race_save_game());
+    assert(race_load_game() && u[pair].work_timer==pair_timer);
+    for(int i=0;i<pair_timer;i++) update_orders();
+    int after=0;for(int i=0;i<MAX_UNITS;i++)
+        if(u[i].alive && u[i].owner==SIDE && u[i].type==U_ZERGLING) after++;
+    assert(after==before+2);
     edited=saved;Unit bad;
     assert(sc64_zp_unit_save_decode(&bad,&edited.record.save.units[egg],race_cols*16u,race_rows*16u));
     bad.raw_owner=-1;
