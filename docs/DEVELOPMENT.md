@@ -14,6 +14,26 @@ end of this guide.
 
 ## Local-first verification
 
+The separate nine-mission Zerg candidate can prepare its inherited and later
+inputs from the same user-supplied ROM:
+
+```sh
+./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile zerg-z9
+./dev sc64 status --profile zerg-z9
+./dev sc64 build --profile zerg-z9
+./dev sc64 test --profile zerg-z9
+./dev sc64 play --profile zerg-z9
+```
+
+Preparation verifies retained Z8/Z9 descriptors before reusing them, regenerates
+their matching trigger headers, and builds the expanded source sprite bank.
+Status checks the programs against authenticated descriptors, including source
+ROM/CHK provenance. Outputs remain private under `.local/` and `build/`.
+The explicit candidate retains `.local/play/zerg-z9` for its saves; this does
+not migrate Z7 saves or change the canonical `zerg` alias. See the current
+[Z9 qualification audit](audits/2026-11-05-z9-current-integration/README.md) for
+the remaining carried ARM and performance limits.
+
 Core engine improvements belong to every applicable Showcase, skirmish and
 campaign build. See [Shared engine policy and migration status](SHARED-ENGINE.md)
 for the common capability contract and remaining mission-scoped services.
@@ -240,6 +260,17 @@ selection, and Start skips straight to deployment. L retains quick-load. This
 adds transient frontend playback state only and does not change campaign save
 data.
 
+
+## In-mission text boxes
+
+The canonical race products show the N64 campaign's in-mission text boxes: a head, a speaker's
+name and text, with the mission stopped until A or Start. `./dev sc64 prepare` imports the
+rows, or `make sc64-text-boxes` refreshes them alone. See [In-mission text boxes](TEXT-BOXES.md)
+for how speakers map to heads, where each runtime posts a row and what differs from the N64.
+
+Host fixtures don't press a key, so under `GBA_HOST` a box closes as soon as it opens, unless
+a fixture defines `SC64_TEXT_BOX_HOST_MODAL`. A key-tape player includes
+`tests/sc64_text_box_replay.h` and calls `TEXT_BOXES_DISMISS()` after each tape frame.
 
 ## Source construction art
 
@@ -1343,9 +1374,10 @@ qualification. Source staging alone does not establish a playable mission.
 ### Canonical Zerg and Protoss builds
 
 The standard Zerg build includes its first seven missions. The canonical Protoss
-target includes P1–P7 and has passed its canonical presentation, save, host
-campaign and bounded ARM continuation checks. Explicit `protoss-p6` still builds
-the separately identified P1–P6 generation-30 image. Prepare either profile
+target includes all ten Protoss missions. Explicit `protoss-p7` builds the P1–P7
+product that has passed its canonical presentation, save, host campaign and bounded
+ARM continuation checks, and explicit `protoss-p6` still builds the separately
+identified P1–P6 generation-30 image. Prepare either profile
 from your verified ROM, then use the standard commands. See the [canonical P7
 qualification](research/p7-canonical-candidate-qualification.md) for evidence
 and limits:
@@ -1362,10 +1394,11 @@ flags and save identity remain separate.
 ./dev sc64 play --profile zerg
 ```
 
-Replace `zerg` with `protoss` for the P7 candidate. The output pairs are
+Replace `zerg` with `protoss` for the ten-mission product. The output pairs are
 `build/StarCraft-Zerg-Z7-Transport1-GBA.gba` / `build/starcraft-zerg-z7.elf` and
-`build/StarCraft-Protoss-P7-Transport1-GBA.gba` / `build/starcraft-protoss-p7.elf`.
-Explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
+`build/StarCraft-Protoss-P10-Transport1-GBA.gba` / `build/starcraft-protoss-p10.elf`.
+Explicit `protoss-p7` builds `build/StarCraft-Protoss-P7-Transport1-GBA.gba` /
+`build/starcraft-protoss-p7.elf`, and explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
 `build/starcraft-protoss-p6.elf`.
 Explicit `zerg-z4` (`--profile zerg-z4`) preserves the earlier four-entry
 `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf` pair, its
@@ -1410,9 +1443,10 @@ candidate. The explicit P6 build remains available:
 ./dev sc64 test --profile protoss
 ```
 
-P7 preparation requires authenticated P4/P5/P6/P7 map and scenario inputs, P6
+Protoss preparation requires authenticated P4 to P10 map and scenario inputs, P6
 abilities and doodads, P7 Battery properties, and a complete packed P1–P7
-sprite bank. P7 uses generation 43 and rejects incompatible P6 generation-30
+sprite bank; P8 to P10 reuse that bank. Default Protoss uses generation 47 and rejects
+other generations. Explicit `protoss-p7` uses generation 43 and rejects incompatible P6 generation-30
 saves without converting or migrating them. `protoss-p6` preserves the separate
 generation-30 product and save directory. `protoss-p5-shuttle` preserves the earlier
 five-entry ROM and its separate saves. No P3/P4/P5 save conversion is performed.
@@ -3184,3 +3218,30 @@ new source-fact table under a fresh ignored `build/generated/scarab-p7/run.*`
 directory; they do not prepare imported art or replace an existing fact table.
 These component checks do not enable Reaver production or qualify gameplay,
 SRAM continuation, physical hardware, or performance.
+
+## Optional late Zerg source art
+
+The Z9/Z10 candidate bank requires the source Init sprites for the Khaydarin
+Crystal Formation (raw 173), Protoss Temple (174) and Khaydarin Crystal (219).
+After preparing the Z8 bank's normal inputs from your own verified ROM, generate
+its private bank with the full Z8 option set plus `--include-zerg-late-art`:
+
+```sh
+python3 tools/sc64_race_sprites.py \
+  --rom .local/sc64/rom/StarCraft64-USA.z64 \
+  --remap .local/sc64/backwater/generated/palette-remap.bin \
+  --include-zp-campaign-actors --include-z5-actors --include-z5-doodads \
+  --include-z6-actors --include-z6-buildings --include-p6-actors \
+  --include-p7-actors --prepack-unit-words --include-z8-buildings \
+  --include-zerg-late-art --out .local/sc64/zerg-z8/generated/sprites \
+  --header .local/sc64/zerg-z8/generated/sc64_race_sprites_generated.h
+make test-sc64-zerg-late-art zerg-z9 zerg-z10
+```
+
+The importer authenticates the ROM and requires all three source GRPs; an
+opaque pixel mapped to transparent palette index zero fails generation. Late
+builds reject an older bank without the completeness marker. The added sprites
+are compiled only for the Z9/Z10 runtime, and the generated header, previews,
+ROMs and manifests remain private. The pickup uses its composed source Init
+frame; its later source animation and deferred shadow rendering are not
+implemented. This art change does not qualify or promote a mission.

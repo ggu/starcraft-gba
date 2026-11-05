@@ -160,6 +160,22 @@ static void expect_mask(unsigned expected, const u8 *powered)
     if (reference != expected) fprintf(stderr, "expected %u got %u\n", expected, reference);
     assert(reference == expected);
     assert(sc64_p7_arbiter_detected_mask(0, powered) == expected);
+    Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
+    assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == expected);
+}
+
+static void optical_source_masks(void)
+{
+    const int map[8]={-1,1,1,3,-1,0,4,0};
+    for(int source=-2;source<=9;++source) for(int owner=-1;owner<=6;++owner) {
+        unsigned expected=0;
+        if(source>=0 && source<8) {
+            int live=map[source];
+            if(live>=0 && live==owner) expected=1u<<(unsigned)source;
+        } else for(unsigned i=0;i<7;++i)
+            if(map[i]==owner) expected|=1u<<i;
+        assert(sc64_p7_optical_source_mask(source,owner,map)==expected);
+    }
 }
 
 static void explicit_cases(void)
@@ -242,6 +258,7 @@ static void explicit_cases(void)
 
 int main(void)
 {
+    optical_source_masks();
     memset(&race_p7, 0, sizeof(race_p7));
     race_mode = 0;
     race_selected_mission = SC64_P7_GLOBAL_ID;
@@ -280,6 +297,8 @@ int main(void)
             b[i].alive = 1;
             b[i].owner = rnd() % 5;
             b[i].raw_owner = (int)(rnd() % 12) - 2;
+            b[i].type = rnd() % SC_RB_COUNT;
+            b[i].under_construction = (rnd() & 1u) != 0;
             b[i].x = rnd() % WORLD_W;
             b[i].y = rnd() % WORLD_H;
         }
@@ -303,6 +322,8 @@ int main(void)
         Sc64P7PersistentState state_before = race_p7;
         unsigned want = sc64_p7_arbiter_detected_mask_reference(0, powered);
         unsigned got = sc64_p7_arbiter_detected_mask(0, powered);
+        Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
+        assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
         assert(got == want);
         positive += want != 0;
         assert(!memcmp(units_before, u, sizeof(u)) &&
@@ -316,11 +337,15 @@ int main(void)
             sc64_target_index_move(&u[moved]);
             want = sc64_p7_arbiter_detected_mask_reference(0, powered);
             assert(sc64_p7_arbiter_detected_mask(0, powered) == want);
+            sc64_p7_detector_lists_build(&lists);
+            assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
             u[moved].x = -1;
             sc64_target_index_move(&u[moved]);
             assert(!sc64_target_index_active);
             want = sc64_p7_arbiter_detected_mask_reference(0, powered);
             assert(sc64_p7_arbiter_detected_mask(0, powered) == want);
+            sc64_p7_detector_lists_build(&lists);
+            assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
         }
         sc64_target_index_end();
         assert(sc64_p7_arbiter_detected_mask(0, powered) == want);

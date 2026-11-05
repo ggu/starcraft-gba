@@ -39,6 +39,10 @@ race_t6_request_repair(void)
             u[i].target = MAX_UNITS + best;
             u[i].tx = b[best].x; u[i].ty = b[best].y;
             u[i].carry = u[i].work_timer = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+            sc64_worker_cargo_clear(&u[i]);
+            sc64_worker_gather_pending_set(&u[i], 0);
+#endif
             u[i].path_timer = u[i].path_retry = 0;
             ++issued;
         }
@@ -51,6 +55,10 @@ race_t6_repair_stop(Unit *worker)
 {
     worker->order = ORDER_IDLE; worker->target = -1;
     worker->carry = worker->work_timer = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+    sc64_worker_cargo_clear(worker);
+    sc64_worker_gather_pending_set(worker, 0);
+#endif
 }
 
 static int __attribute__((noinline))

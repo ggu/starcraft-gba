@@ -2,6 +2,8 @@
 #ifndef SC64_Z8_RUNTIME_ADAPTER_H
 #define SC64_Z8_RUNTIME_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 #if defined(SC64_Z8_RUNTIME)
 
 #if !defined(SC64_Z8_DATA_ENABLED) || !defined(SC64_Z7_RUNTIME) || \
@@ -183,6 +185,7 @@ static int race_z8_timed(void *context, int phase, const Sc64Z8Action *action,
     if (phase == SC64_Z8_TIMED_ELIGIBLE || phase == SC64_Z8_TIMED_FINISH) return 1;
     if (phase != SC64_Z8_TIMED_START) return -1;
     if (action->opcode == 7u) {
+        RACE_TEXT_BOX_STRING(action->string_id);
         *duration_ms = SC64_Z8_TRANSMISSION_MS;
         race_campaign_set_message(0);
         return 1;
@@ -208,6 +211,7 @@ static int race_z8_present(void *context, const Sc64Z8Action *action,
     if (!action || owner >= SC64_Z8_OWNER_LIMIT ||
         (action->opcode != 8u && action->opcode != 9u && action->opcode != 12u &&
          action->opcode != 28u)) return -1;
+    if (owner == SC64_Z8_HUMAN_SLOT) RACE_TEXT_BOX_ACTION(action->opcode, action->string_id);
     return 1;
 }
 
@@ -418,16 +422,42 @@ static void race_z8_ai_produce(unsigned town)
     s16 slot = (s16)sc64_z8_ai_town_slot(town);
     for (int i = 0; i < MAX_UNITS; ++i) used += u[i].alive != 0;
     if (used + SC64_Z8_AI_RESERVE_UNITS >= MAX_UNITS) return;
+    /* Stop at the garrison the N64 settles on with an idle human, by town. */
+    int have[4] = {0, 0, 0, 0};
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == ENEMY && u[i].raw_owner == slot) {
+        if (u[i].type == U_ZEALOT) ++have[0];
+        else if (u[i].type == U_DRAGOON) ++have[1];
+        else if (u[i].type == U_SCOUT) ++have[2];
+        else if (u[i].type == U_REAVER) ++have[3];
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == ENEMY && b[i].raw_owner == slot)
+        for (int q = 0; q < b[i].queue_count; ++q) {
+            int queued = b[i].queue[(b[i].queue_head + q) % 5];
+            if (queued == U_ZEALOT) ++have[0];
+            else if (queued == U_DRAGOON) ++have[1];
+            else if (queued == U_SCOUT) ++have[2];
+            else if (queued == U_REAVER) ++have[3];
+        }
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         int type = -1;
         if (!b[i].alive || b[i].owner != ENEMY || b[i].raw_owner != slot ||
             !building_complete(i) || b[i].queue_count) continue;
-        if (b[i].type == B_GATEWAY)
+        if (b[i].type == B_GATEWAY) {
             type = race_z8_ai.produce_index[town] & 1u ? U_DRAGOON : U_ZEALOT;
-        else if (b[i].type == B_STARGATE) type = U_SCOUT;
-        else if (b[i].type == B_ROBOTICS_FACILITY) type = U_REAVER;
-        if (type >= 0 && race_z8_ai_queue(town, i, type))
+            if (have[type == U_ZEALOT ? 0 : 1] >= sc64_z8_ai_garrison_cap(town, type == U_ZEALOT ? 0 : 1))
+                type = type == U_ZEALOT ? U_DRAGOON : U_ZEALOT;
+            if (have[type == U_ZEALOT ? 0 : 1] >= sc64_z8_ai_garrison_cap(town, type == U_ZEALOT ? 0 : 1))
+                type = -1;
+        }
+        else if (b[i].type == B_STARGATE && have[2] < sc64_z8_ai_garrison_cap(town, 2)) type = U_SCOUT;
+        else if (b[i].type == B_ROBOTICS_FACILITY && have[3] < sc64_z8_ai_garrison_cap(town, 3)) type = U_REAVER;
+        if (type >= 0 && race_z8_ai_queue(town, i, type)) {
             race_z8_ai.produce_index[town] = (u8)(race_z8_ai.produce_index[town] + 1u);
+            if (type == U_ZEALOT) ++have[0];
+            else if (type == U_DRAGOON) ++have[1];
+            else if (type == U_SCOUT) ++have[2];
+            else ++have[3];
+        }
     }
 }
 
@@ -445,8 +475,7 @@ static void race_z8_ai_wave(unsigned town)
         tx = u[i].x; ty = u[i].y;
     }
     if (tx < 0) return;
-    want = SC64_Z8_AI_WAVE_BASE + 2 * (int)race_z8_ai.wave[town];
-    if (want > SC64_Z8_AI_WAVE_MAX) want = SC64_Z8_AI_WAVE_MAX;
+    want = sc64_z8_ai_wave_units(town);
     for (int i = 0; i < MAX_UNITS && sent < want; ++i) if (u[i].alive &&
         u[i].owner == ENEMY && u[i].raw_owner == slot && u[i].order == ORDER_IDLE &&
         u[i].raw_type != SC64_Z8_RAW_HERO_DARK_TEMPLAR &&
@@ -470,8 +499,7 @@ static void race_z8_ai_tick(void)
         }
         if (race_z8_ai.wave_timer[t]) --race_z8_ai.wave_timer[t];
         if (!race_z8_ai.wave_timer[t]) {
-            race_z8_ai.wave_timer[t] = t ? SC64_Z8_AI_ZER8_WAVE_UPDATES :
-                                           SC64_Z8_AI_ZE8T_WAVE_UPDATES;
+            race_z8_ai.wave_timer[t] = (u16)sc64_z8_ai_gap_updates(t);
             race_z8_ai_wave(t);
         }
     }

@@ -2,6 +2,8 @@
 #ifndef SC64_P9_RUNTIME_ADAPTER_H
 #define SC64_P9_RUNTIME_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 #if defined(SC64_P9_RUNTIME)
 
 #if !defined(SC64_P9_DATA_ENABLED) || !defined(SC64_P8_RUNTIME) || \
@@ -396,7 +398,9 @@ static int race_p9_action(unsigned runner, const Sc64P9SourceAction *a, int resu
         race_p9.wait_ms[runner] = (u16)a->time;
         race_p9.waiting_mask |= bit;
         return SC64_P9_ACTION_PENDING;
-    case 8: case 9: case 12: return SC64_P9_ACTION_COMPLETE; /* Not presented. */
+    case 8: case 9: case 12:
+        if (owner == SC64_P9_HUMAN_SLOT) RACE_TEXT_BOX_ACTION(a->opcode, a->string_id);
+        return SC64_P9_ACTION_COMPLETE; /* Sounds and objectives are not presented. */
     case 11: return race_p9_create(a, owner);
     case 13:
         if (a->modifier == 4u) race_p9.switches |= (u8)(1u << a->group2);

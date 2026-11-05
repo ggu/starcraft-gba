@@ -80,6 +80,14 @@ __attribute__((noinline)) void demo_replay_dense_checkpoint(void) {
 #define DEMO_WINDOW_CHECKPOINT demo_replay_checkpoint
 #endif
 #endif
+#ifdef SC64_TEXT_BOXES
+int game_text_box_up(void);
+#ifdef SC64_WINDOWED_SCHEDULE
+#define SCHEDULE_ACTIVE schedule_enabled
+#else
+#define SCHEDULE_ACTIVE schedule_count
+#endif
+#endif
 int main(void) {
     gba_init();
     game_init();
@@ -109,6 +117,14 @@ int main(void) {
         u16 held=gba_keys();
 #ifndef GBA_NO_DEBUG_INPUTS
         held|=demo_inject_keys;
+#ifdef SC64_TEXT_BOXES
+        /* A box takes no simulation step, so its frames do not consume the tape. */
+        u32 text_box_up=SCHEDULE_ACTIVE&&game_text_box_up();
+        if(text_box_up) {
+            u16 key=(schedule_keys&KEY_A)?KEY_START:KEY_A;
+            held=(previous&key)?schedule_keys:(u16)(schedule_keys|key);
+        } else
+#endif
 #ifdef SC64_WINDOWED_SCHEDULE
         if(schedule_enabled) {
             held=demo_schedule_window_held(demo_schedule_events,schedule_count,
@@ -139,6 +155,9 @@ int main(void) {
         previous=held;
         demo_frame++;
 #ifndef GBA_NO_DEBUG_INPUTS
+#ifdef SC64_TEXT_BOXES
+        if(text_box_up) continue;
+#endif
 #ifdef SC64_WINDOWED_SCHEDULE
         if(schedule_enabled) {
             demo_schedule_tick++;

@@ -84,8 +84,9 @@ offsets tried. P3 and P5 have no offset option, so each has one run per profile.
 - `make test-sc64-p7-campaign-composition` still stops at its P3 step. That step
   runs `tests/sc64_p3_expansion_run.c`, a separate larger-bank expansion route
   this change does not touch, and it reaches the 180,000-frame limit.
-- P1 and P2 still lose some start offsets. Those I inspected were ordinary
-  attrition: the army runs out with a few buildings left and no minerals.
+- P1 and P2 still lose some start offsets. This audit first called those ordinary
+  attrition, but most came from Probes that stopped mining with minerals left on the
+  map. See [the Probe economy audit](../2026-11-04-protoss-probe-economy/README.md).
 
 ## Engine limits found, not changed
 
@@ -96,7 +97,8 @@ These shaped the routes and affect real players. They are follow-ups.
 - **Spent patches leave Probes idle.** Workers do not move to the next patch.
 - **An idle Probe holding cargo cannot be sent to mine.** The mineral command skips
   loaded workers, and nothing returns its cargo. Open draft #111 changes this area,
-  so it is not duplicated here; these routes build only with empty Probes.
+  so it is not duplicated here. These routes choose empty Probes to build, but a
+  Probe can still end up loaded; the Probe economy audit adds a workaround.
 - **Canonical Protoss delivers to the first Nexus.** `SC64_NEAREST_RESOURCE_DEPOT`
   is not in the Protoss profile, so Probes mining at an expansion carry cargo across
   the map. These routes therefore stay on their home patches.

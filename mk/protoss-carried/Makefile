@@ -14,8 +14,8 @@ test-sc64-protoss-carried-p4-p6: build/test-sc64-protoss-carried-p4 build/test-s
 	./build/test-sc64-protoss-carried-p6 --trace .local/sc64/carried-p6-controller.json
 test-sc64-protoss-carried-missions: test-sc64-protoss-carried-p4-p6
 
-# Every Protoss mission under the P10 flags, which is what a promoted ROM would
-# ship: controller, tape, host replay and an input-only ARM replay ROM for each.
+# Every Protoss mission under the P10 flags, which the default ROM ships: controller,
+# tape, host replay and an input-only ARM replay ROM for each.
 PX_DIR := build/protoss-px
 PX_TOOL = $(PYTHON) tools/sc64_p8_arm_replay.py --mission $(1) --prefix PX
 PX_CLANG = $(CLANG) -std=c11 -O1 -g -w -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_P10_FLAGS)
@@ -81,6 +81,7 @@ PX_SAVE_ROMS += build/StarCraft-Protoss-PX-$(1)-Prefix.gba build/StarCraft-Proto
 endef
 $(eval $(call PX_SAVE_MISSION,p8,27))
 $(eval $(call PX_SAVE_MISSION,p9,28))
+test-protoss: test-sc64-protoss-px
 .PHONY: test-sc64-protoss-px sc64-protoss-px-arm
 test-sc64-protoss-px: $(PX_HOST) $(PX_SAVE_HOST)
 	grep -L ' won=1 ' $(PX_HOST) | sed 's/^/no win: /'

@@ -8432,3 +8432,11 @@ three ticks.
 and Protoss P7. `update_orders` keeps its Z7 address. ROM grows by about 27 KB,
 mostly the 2-bit button icons. Z9 and Z10 cannot be built here without `z8-source`.
 
+
+## In-mission text boxes (2026-11-04)
+
+The canonical race products show the N64 campaign's in-mission text boxes. A box takes no
+simulation step, so each mission plays out identically with boxes compiled in or out. Recorded
+tapes didn't change, and `__bss_end` and `__iwram_end` are unchanged in all nine products. These
+are host and mGBA results, not physical hardware results. Commands, per-mission results and what
+didn't run are in [the audit](audits/2026-11-04-text-boxes/README.md).

@@ -1,6 +1,8 @@
 #ifndef SC64_P6_WORLD_ADAPTER_H
 #define SC64_P6_WORLD_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 /* Bounded P6 source-world callbacks. This is intentionally mission-specific:
  * opaque AI, door state, and actor-specific properties require explicit
  * host policies instead of silently succeeding. */
@@ -271,6 +273,7 @@ static int sc64_p6_world_action(void *context,const Sc64P6SourceAction *a)
     case SC64_P6_ACTION_TRANSMISSION: case SC64_P6_ACTION_PLAY_WAV:
     case SC64_P6_ACTION_DISPLAY_TEXT:
         if(a->string_id>65535u||a->wav_id>65535u)return 0;
+        RACE_TEXT_BOX_ACTION(a->opcode, a->string_id);
         ctx->presentation_opcode=a->opcode;
         ctx->last_string_id=(u16)a->string_id;ctx->last_wav_id=(u16)a->wav_id;
         return 1;

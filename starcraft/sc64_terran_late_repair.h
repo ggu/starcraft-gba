@@ -160,6 +160,10 @@ static int race_late_request_repair(void)
         worker->tx = unit_target ? u[target].x : b[target - MAX_UNITS].x;
         worker->ty = unit_target ? u[target].y : b[target - MAX_UNITS].y;
         worker->carry = worker->work_timer = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+        sc64_worker_cargo_clear(worker);
+        sc64_worker_gather_pending_set(worker, 0);
+#endif
         worker->path_timer = worker->path_retry = 0;
         ++issued;
     }
@@ -171,6 +175,10 @@ static void race_late_repair_stop(Unit *worker)
     worker->order = ORDER_IDLE;
     worker->target = -1;
     worker->carry = worker->work_timer = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+    sc64_worker_cargo_clear(worker);
+    sc64_worker_gather_pending_set(worker, 0);
+#endif
 }
 
 static int __attribute__((noinline)) race_late_repair_tick_unit(int slot)

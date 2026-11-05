@@ -9,6 +9,7 @@ test-scarab-save-selection: build/test-scarab-save-selection
 test: test-scarab-save-selection
 
 include tests/gba-save-parts/Makefile
+include mk/text-box/Makefile
 
 .PHONY: test-scarab-parent-migration
 build/test-scarab-parent-migration: tests/sc64_scarab_parent_migration.c starcraft/sc64_scarab_fields.h Makefile | build
@@ -298,7 +299,7 @@ endif
 # Every race-engine ROM uses the default profile's controls and menus
 # (starcraft/field_controls.h).
 SC64_INTERFACE_DIR := .local/sc64/interface/generated
-SC64_INTERFACE_INPUTS := $(addprefix $(SC64_INTERFACE_DIR)/,sc64_font_generated.h sc64_icons_generated.h sc64_chrome_generated.h)
+SC64_INTERFACE_INPUTS := $(addprefix $(SC64_INTERFACE_DIR)/,sc64_font_generated.h sc64_icons_generated.h sc64_chrome_generated.h) $(TEXT_BOX_HEADER)
 # The N64 HUD's resource icons (minerals, gas, each race's supply) and the
 # command-card buttons, imported from the verified ROM into a private header
 # (see tools/sc64_command_icons.py). Every race-engine ROM draws the resource
@@ -535,7 +536,7 @@ CANONICAL_WALK_WORDS_FLAGS = $(if $(filter 1,$(CANONICAL_WALK_WORDS)),-DSC64_WAL
 # Terran profile makes the same choice in sc64_contact.h). Probe builds that
 # measure the IWRAM placement do not use these flags.
 CONTACT_ROM_PLACEMENT_FLAGS ?= $(if $(filter -DSC64_CONTACT_CACHE,$(CONTACT_CACHE_FLAGS)),-DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM)
-TERRAN_CANONICAL_FLAGS ?= $(if $(filter -DSC64_ROUTE_PACK3,$(TERRAN_FULL_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) $(TERRAN_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS)
+TERRAN_CANONICAL_FLAGS ?= $(TEXT_BOX_FLAGS) $(if $(filter -DSC64_ROUTE_PACK3,$(TERRAN_FULL_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) $(TERRAN_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS)
 WEAPON_SOURCE_DIR := .local/sc64/weapon-vfx/generated
 WEAPON_SOURCE_HEADER := $(WEAPON_SOURCE_DIR)/sc64_weapon_source_generated.h
 ATTACK_POSE_DIR := .local/sc64/attack-poses/generated
@@ -587,13 +588,14 @@ CANONICAL_WEAPON_FLAGS ?= -DSC64_TANK_SOURCE_VFX -I.local/sc64/tank-vfx/generate
 # of clear corridors. Clearing this override opts out of the staged fix.
 CANONICAL_DIRECT_FIRING_FLAGS ?= -DSC64_DIRECT_FIRING_POINTS
 CANONICAL_RANGE_WORK_FLAGS ?= -DSC64_RANGE_WORK
+CANONICAL_WORKER_CARGO_FLAGS ?= -DSC64_WORKER_CARGO_KIND
 DEATH_ART_DIR := .local/sc64/death/generated
 DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
 CANONICAL_DEATH_FLAGS ?= -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
 CANONICAL_DEATH_INPUTS = $(if $(filter -DSC64_DEATH_SOURCE_ART,$(CANONICAL_DEATH_FLAGS)),$(DEATH_ART_HEADER))
-TERRAN_ROM_FLAGS = $(BC_FLAGS) $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS)
+TERRAN_ROM_FLAGS = $(BC_FLAGS) $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
-ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS) $(CONTACT_ROM_PLACEMENT_FLAGS)
+ZERG_CANONICAL_FLAGS ?= $(TEXT_BOX_FLAGS) -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS) $(CONTACT_ROM_PLACEMENT_FLAGS)
 # Explicit legacy Z1-Z4 product: SCZ4, save generation 20, unchanged flags.
 ZERG_Z4_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 # Canonical Z1-Z6: the Z6 storage/runtime/query vector, with a word-packed
@@ -608,7 +610,7 @@ ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
 PROTOSS_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
-PROTOSS_CANONICAL_FLAGS ?= $(PROTOSS_P3_CANONICAL_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL -DSC64_P4_COUNT_CENSUS_ENABLED $(PROTOSS_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS) $(CONTACT_ROM_PLACEMENT_FLAGS)
+PROTOSS_CANONICAL_FLAGS ?= $(TEXT_BOX_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL -DSC64_P4_COUNT_CENSUS_ENABLED $(PROTOSS_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS) $(CONTACT_ROM_PLACEMENT_FLAGS)
 P4_CREATE_PREFIX_FLAGS ?= -DSC64_P4_CREATE_PREFIX -DSC64_P4_VALIDATOR_HOT
 PROTOSS_P4_STORM_ROM_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P4_STORM_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
 PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
@@ -624,8 +626,8 @@ PROTOSS_P7_SPRITE_DIR := .local/sc64/protoss-p7/generated
 PROTOSS_P7_SPRITE_HEADER := $(PROTOSS_P7_SPRITE_DIR)/sc64_race_sprites_generated.h
 # P7 has room for the steering pass and inline stock step in IWRAM. Keep the
 # P6 placement choices and historical P7 probes independent of this profile.
-PROTOSS_P7_CANONICAL_FLAGS = $(BC_FLAGS) -I$(PROTOSS_P7_SPRITE_DIR) $(filter-out -I$(P7_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) -I$(BC_P7_FACT_DIR) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(filter-out -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(PROTOSS_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) -DSC64_P7_ARBITER_AURA_ONCE $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS)
-PROTOSS_P7_CANONICAL_INPUTS = $(BC_INPUTS) $(filter-out .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p7/generated/sc64_race_sprites_generated.h,$(P7_ARBITER_INPUTS)) $(PROTOSS_P7_SPRITE_HEADER) $(BC_P7_FACT_HEADER) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
+PROTOSS_P7_CANONICAL_FLAGS = $(BC_FLAGS) -I$(PROTOSS_P7_SPRITE_DIR) $(filter-out -I$(P7_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) -I$(BC_P7_FACT_DIR) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(filter-out -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(PROTOSS_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) -DSC64_P7_ARBITER_AURA_ONCE $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS)
+PROTOSS_P7_CANONICAL_INPUTS = $(BC_INPUTS) $(COMMAND_ICON_HEADER) $(SC64_BUILDING_FIRE_HEADER) $(SC64_ORDER_MARKER_HEADER) $(filter-out .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p7/generated/sc64_race_sprites_generated.h,$(P7_ARBITER_INPUTS)) $(PROTOSS_P7_SPRITE_HEADER) $(BC_P7_FACT_HEADER) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 PROTOSS_ROM_FLAGS = $(PROTOSS_P7_CANONICAL_FLAGS)
 PROTOSS_CANONICAL_INPUTS = $(PROTOSS_P7_CANONICAL_INPUTS)
 TERRAN_FULL_INPUTS = $(BC_INPUTS) $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) $(UNIT_FACING_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
@@ -1943,7 +1945,7 @@ build/StarCraft-Protoss-P7-Transport1-GBA.gba: build/starcraft-protoss-p7.elf to
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS7' SCP7
 .PHONY: protoss-p7
-protoss-p7: verify-protoss
+protoss-p7: verify-protoss-p7
 
 # Explicit P8 candidate: the canonical P1-P7 profile plus The Trial of
 # Tassadar as an eighth entry. It has its own SCP8 code, generation-44 saves
@@ -2532,7 +2534,7 @@ build/starcraft-protoss.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard
 build/StarCraft-Protoss-GBA.gba: build/starcraft-protoss.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS3' SCP3
-verify-protoss: build/StarCraft-Protoss-P7-Transport1-GBA.gba
+verify-protoss: build/StarCraft-Protoss-P10-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss
 .PHONY: verify-protoss-p6
 verify-protoss-p6: build/StarCraft-Protoss-P6-GBA.gba
@@ -2556,7 +2558,7 @@ test-sc64-p4-census: build/test-sc64-p4-census
 	./build/test-sc64-p4-census
 
 
-test-protoss: build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller test-sc64-p4-census test-sc64-p4-create-prefix test-sc64-p5-canonical
+test-protoss-p7: build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller test-sc64-p4-census test-sc64-p4-create-prefix test-sc64-p5-canonical
 	./build/test-protoss
 	./build/test-sc64-protoss-promoted-profile
 	./build/test-sc64-protoss-canonical-storm
@@ -2597,7 +2599,7 @@ test-sc64-protoss-p7-canonical: build/test-sc64-protoss-canonical-p7-controller 
 	./build/test-sc64-protoss-canonical-p7-controller $(PROTOSS_P7_CONTROLLER_TRACE)
 	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(PROTOSS_P7_CONTROLLER_TRACE)
 
-test-protoss: test-sc64-p6-canonical test-sc64-protoss-p7-canonical test-sc64-p7-fact-v2-normal-input
+test-protoss-p7: test-sc64-p6-canonical test-sc64-protoss-p7-canonical test-sc64-p7-fact-v2-normal-input
 
 test-race-campaigns: test-terran test-zerg test-protoss
 verify-race-campaigns: verify-terran verify-zerg verify-protoss
@@ -4018,7 +4020,7 @@ zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 # physical-input-only main-loop selection local to that standalone target.
 # Historical Z7 probes and their tests continue to use Z7_FULL_RENDER_FLAGS.
 ZERG_Z7_CONTACT_MASK_TABLE_HEADER = build/generated/sc64_contact_mask_table_generated.h
-ZERG_Z7_CANONICAL_FLAGS = -DSC64_Z7_VISIBILITY_ROW_CONTEXT -DSC64_Z7_VISIBILITY_PHASE_REJECT $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $(CANONICAL_DIRECT_FIRING_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS)
+ZERG_Z7_CANONICAL_FLAGS = -DSC64_Z7_VISIBILITY_ROW_CONTEXT -DSC64_Z7_VISIBILITY_PHASE_REJECT $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $(CANONICAL_DIRECT_FIRING_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS)
 ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS) $(ZERG_Z7_CONTACT_MASK_TABLE_HEADER)
 include tests/sc64-z7-promotion/Makefile
@@ -4148,6 +4150,8 @@ Z7_ARM_DIR := build/z7-arm
 Z7_ARM_TRACE ?= $(ZERG_Z7_CONTROLLER_TRACE)
 Z7_ARM_SAVE_MIN_TICK ?= 400000
 Z7_ARM_CUT_TICK ?= 0
+# Replay-probe instrumentation only; normal product vectors are unchanged.
+Z7_ARM_REPLAY_FLAGS ?=
 Z7_ARM_COMMON := $(filter-out common/main.c,$(COMMON))
 Z7_ARM_DEPS = tests/sc64_z7_arm_replay.c $(Z7_ARM_DIR)/sc64_z7_tape_generated.h $(Z7_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile
 $(Z7_ARM_DIR)/sc64_z7_tape_generated.h: $(Z7_ARM_TRACE) tools/sc64_z7_arm_replay.py
@@ -4155,7 +4159,7 @@ $(Z7_ARM_DIR)/sc64_z7_tape_generated.h: $(Z7_ARM_TRACE) tools/sc64_z7_arm_replay
 	$(PYTHON) tools/sc64_z7_arm_replay.py tape $< $@
 define Z7_ARM_REPLAY_ROM
 build/starcraft-zerg-z7-arm-$(1).elf: $$(Z7_ARM_DEPS) | build
-	$$(CC) $$(CFLAGS) $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$(Z7_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-arm-$(1).map -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$(Z7_ARM_REPLAY_FLAGS) $$(Z7_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-arm-$(1).map -lgcc -o $$@
 	$$(SIZE) $$@
 build/StarCraft-Zerg-Z7-ARM-$(1).gba: build/starcraft-zerg-z7-arm-$(1).elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@
@@ -4171,7 +4175,7 @@ sc64-z7-arm-resume: build/StarCraft-Zerg-Z7-ARM-resume-$(Z7_ARM_CUT_TICK).gba
 # before an emulator run. The prefix writes the save payload the resume reads.
 define Z7_HOST_REPLAY
 build/test-sc64-z7-replay-$(1): $$(Z7_ARM_DEPS) common/gba.c | build
-	$$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DGBA_HOST -Icommon $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$< common/gba.c -o $$@
+	$$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DGBA_HOST -Icommon $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$(Z7_ARM_REPLAY_FLAGS) $$< common/gba.c -o $$@
 endef
 $(eval $(call Z7_HOST_REPLAY,full,-DZ7_ARM_MODE=0))
 $(eval $(call Z7_HOST_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=$(Z7_ARM_SAVE_MIN_TICK)u))
@@ -4462,7 +4466,7 @@ endif
 # Clip world art before it reaches either HUD band. Keep the infrequent
 # procedural diamond fallback in ROM so clipping retains the IWRAM reserve.
 SHOWCASE_INPUTS = $(BC_INPUTS) $(P7_ARBITER_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
-SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(SHOWCASE_CONTACT_BASE_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SHOWCASE_HUD_CACHE_FLAGS) $(SHOWCASE_TERRAIN_CACHE_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS)
+SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(SHOWCASE_CONTACT_BASE_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SHOWCASE_HUD_CACHE_FLAGS) $(SHOWCASE_TERRAIN_CACHE_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS)
 build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
@@ -4722,7 +4726,7 @@ test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign bui
 	./build/test-sc64-protoss-carried-campaign --controller 3 --trace .local/sc64/p3-carried-p2-controller.json
 	./build/test-sc64-protoss-carried-p3 --trace .local/sc64/p4-carried-p3-controller.json
 	./build/test-sc64-protoss-carried-p5 --limit 180000 --attempt-tag canonical-p6-carried-p5
-test-protoss: test-sc64-protoss-carried-missions
+test-protoss-p7: test-sc64-protoss-carried-missions
 -include mk/protoss-carried/Makefile
 
 # The indexed and packed sprite paths must agree over the whole framebuffer,
@@ -4963,7 +4967,7 @@ test-sc64-contact-mask-math: build/test-sc64-contact-mask-math
 	./build/test-sc64-contact-mask-math
 test: test-sc64-contact-mask-math
 test-zerg-z6: test-sc64-contact-cache-zerg
-test-protoss: test-sc64-contact-cache-protoss
+test-protoss-p7: test-sc64-contact-cache-protoss
 
 # Optional P7 ordinary-input performance replay; excluded from default targets.
 # Requires the same authenticated generated P7 data inputs as other P7 probes.
@@ -6117,3 +6121,8 @@ include tests/sc64-scarab-wallet/Makefile
 include tests/sc64-protoss-preflight/Makefile
 
 include tests/sc64-range-work/Makefile
+
+include tests/sc64-worker-cargo/Makefile
+
+include tests/sc64-skirmish-opening/Makefile
+include mk/text-box-game/Makefile

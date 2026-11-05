@@ -104,6 +104,7 @@ int main(int argc, char **argv)
     assert(abs(cx - (old_x + 6)) <= 1 && abs(cy - old_y) <= 1);
 
 #ifndef CONTROLLER_BASELINE
+    assert(ensure_supply_prerequisite());
     int minerals_before = minerals, gas_before = gas;
 #endif
     assert(build_barracks());
