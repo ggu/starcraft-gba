@@ -47,3 +47,33 @@ full fallback/rejection transaction, or original N64 SRAM compatibility.
 Every one of the 1,959 copied private input hashes matched after the initial
 runs. No N64 gameplay observation, ARM link, runtime performance or common
 service qualification is claimed.
+
+## Later selected-journal and predecessor checkpoint
+
+At runtime checkpoint `f2edfa3a`, the HOST Terran compact candidate uses a
+separate selected outer/inner pair and feature mask 5 for Egg+Scarab. Starting
+from real predecessor `19435672` custom Egg/Reaver/Shuttle SRAM, it made a paid
+Scarab training child, selected the exact new pair, saved and reloaded the
+hidden child, then rejected a checksum-valid newer record with a mismatched
+inner version and fell back to the unmodified predecessor. After corrupting
+the predecessor slot, load failed with the sampled SRAM, unit/building arrays,
+resources, frame and RNG unchanged. This is a constructed HOST test, not a
+normal-input or guest proof. Outside children, Scarab impact packets and
+Guardian feature are deliberately rejected.
+
+A true prior-process writer/current-reader custom-game matrix compared every
+legacy unit ID, name and raw mapping before loading paid Egg, Reaver and
+Shuttle. Terran reported legacy/Egg IDs 44/44, Z7 42/40, Z9 49/47, Showcase
+49/49 and P10 53/53; old and new processes agreed in every listed case. P10
+generated separately scoped old/new actor fact tables. These are constructed
+custom sessions under their respective product codecs; they do not qualify
+late-campaign journals, Guardian, active-flight saves or ARM behavior.
+
+Feature mask 5's pair uses the detached `0x02000000` generation selector. The
+full feature mask 7 candidate has a distinct additional `0x08000000` selector;
+it is defined for collision analysis only and is not admitted by the writer
+or selected reader. A registry test checks 20,224 conservative old values and
+checks feature-5 and feature-7 outer/inner sets for non-overlap. The existing
+transport `0x04000000` distinction is retained. Final feature-7 admission
+requires candidate-local Guardian row/provenance and source-import collision
+validation, as well as combined lifecycle and compatibility checks.
