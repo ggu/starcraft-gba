@@ -630,8 +630,16 @@ _Static_assert((SAVE_VERSION & 0x02000000u) != 0 &&
                "shared actor generation overlaps an existing tag");
 #define SC64_SHARED_ACTOR_SAVE_VERSION (SAVE_VERSION ^ 0x02000000u)
 #define SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x02000000u)
+/* Feature=7 must never reinterpret the already used feature=5 HOST pair. */
+#define SC64_SHARED_ACTOR_FULL_SAVE_VERSION (SC64_SHARED_ACTOR_SAVE_VERSION ^ 0x08000000u)
+#define SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION (SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION ^ 0x08000000u)
 _Static_assert((SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION ^ SC64_SHARED_ACTOR_SAVE_VERSION) == 0x04000000u,
                "shared actor generation must retain transport identity");
+_Static_assert((SAVE_VERSION & 0x08000000u) == 0 &&
+               (SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION ^ SC64_SHARED_ACTOR_FULL_SAVE_VERSION) == 0x04000000u &&
+               SC64_SHARED_ACTOR_FULL_SAVE_VERSION != SC64_SHARED_ACTOR_SAVE_VERSION &&
+               SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION != SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION,
+               "full actor generation must not reinterpret the prior pair");
 #endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16

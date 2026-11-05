@@ -32,9 +32,25 @@ class SharedActorTags(unittest.TestCase):
         self.assertTrue(all(tag & new_selector for tag in old))
         combined = {tag ^ new_selector for tag in old}
         self.assertFalse(old & combined)
+        # Feature=5 and feature=7 are distinct even after considering every
+        # actual base, BC/roster/cargo selector and outer transport form.
+        base_selectors = (0x80000000, 0x20000000, 0x01000000, 0x04000000)
+        feature5 = set()
+        for base, enabled in itertools.product(bases, itertools.product((False, True), repeat=len(base_selectors))):
+            value = base ^ new_selector
+            for use, selector in zip(enabled, base_selectors):
+                if use:
+                    value ^= selector
+            feature5.add(value)
+        feature7 = {tag ^ 0x08000000 for tag in feature5}
+        self.assertFalse(feature5 & feature7)
+        self.assertFalse(old & feature5)
+        self.assertFalse(old & feature7)
         source = Path("starcraft/game.c").read_text()
         self.assertIn("#define SC64_SHARED_ACTOR_SAVE_VERSION (SAVE_VERSION ^ 0x02000000u)", source)
         self.assertIn("#define SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x02000000u)", source)
+        self.assertIn("#define SC64_SHARED_ACTOR_FULL_SAVE_VERSION (SC64_SHARED_ACTOR_SAVE_VERSION ^ 0x08000000u)", source)
+        self.assertIn("#define SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION (SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION ^ 0x08000000u)", source)
         print(f"shared actor tag audit: {len(old)} old values, {len(combined)} new values, no overlap")
 
 

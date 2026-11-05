@@ -116,3 +116,19 @@ endef
 $(eval $(call SCARAB_PRIOR_PROFILE,z7,$(ZERG_Z7_CANONICAL_FLAGS)))
 $(eval $(call SCARAB_PRIOR_PROFILE,z9,$(ZERG_Z9_CANONICAL_FLAGS)))
 $(eval $(call SCARAB_PRIOR_PROFILE,showcase,$(SHOWCASE_FLAGS)))
+
+# P10 facts must be generated separately for the predecessor and new roster.
+SCARAB_P10_PRIOR_FACT ?= build/scarab-prior-matrix/p10/facts-prior
+SCARAB_P10_NEW_FACT ?= build/scarab-prior-matrix/p10/facts-new
+SCARAB_P10_GEN_FLAGS = $(filter-out -DSC64_FACT_TABLES -I$(P10_FACT_V2_DIR),$(PROTOSS_P10_FLAGS))
+.PHONY: custom-egg-scarab-prior-p10
+custom-egg-scarab-prior-p10:
+	mkdir -p $(COMBINED_BIN_DIR)/p10 $(SCARAB_P10_PRIOR_FACT) $(SCARAB_P10_NEW_FACT)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SHARED_EGG_WIRE_HOST_STAGE $(SCARAB_P10_GEN_FLAGS) -Istarcraft tools/sc64_fact_tables_gen.c -o $(SCARAB_P10_PRIOR_FACT)/generator
+	$(SCARAB_P10_PRIOR_FACT)/generator > $(SCARAB_P10_PRIOR_FACT)/sc64_fact_tables_generated.h
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SHARED_EGG_WIRE_HOST_STAGE -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE $(SCARAB_P10_GEN_FLAGS) -Istarcraft tools/sc64_fact_tables_gen.c -o $(SCARAB_P10_NEW_FACT)/generator
+	$(SCARAB_P10_NEW_FACT)/generator > $(SCARAB_P10_NEW_FACT)/sc64_fact_tables_generated.h
+	$(CLANG) $(CUSTOM_HOST) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(SCARAB_PRIOR_ROOT)/starcraft/game.c"' $(patsubst -I$(P10_FACT_V2_DIR),-I$(SCARAB_P10_PRIOR_FACT),$(PROTOSS_P10_FLAGS)) tests/sc64_scarab_prior_egg_compat.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/p10/writer
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE $(patsubst -I$(P10_FACT_V2_DIR),-I$(SCARAB_P10_NEW_FACT),$(PROTOSS_P10_FLAGS)) tests/sc64_scarab_prior_egg_compat.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/p10/reader
+	$(COMBINED_BIN_DIR)/p10/writer $(COMBINED_BIN_DIR)/p10/prior.sram
+	$(COMBINED_BIN_DIR)/p10/reader $(COMBINED_BIN_DIR)/p10/prior.sram
