@@ -78,6 +78,23 @@ static void setup_custom(void)
     race_bot_races[0]=R_ZERG;init_state();assert(screen==SCREEN_PLAY && race_mode);
     minerals=1000;gas=1000;race_minerals[ENEMY]=1000;race_gas[ENEMY]=1000;
 }
+static void test_cancel_same_phase_contact(void)
+{
+    setup_custom(); int hall=hall_for(SIDE); assert(hall>=0); add_supply(SIDE,2);
+    b[hall].larva=1; assert(race_queue_unit(SIDE,hall,U_DRONE));
+    int egg=find_egg(SIDE,U_DRONE,-1); assert(egg>=0);
+    int mover=spawn_unit(SIDE,U_DRONE,500,500); assert(mover>=0);
+    for(int i=0;i<MAX_UNITS;i++)if(i!=egg && i!=mover)u[i].alive=0;
+    u[egg].x=506;u[egg].y=500;
+    sc64_unit_buckets_begin();
+    unsigned before=sc64_contact_blocked_mask(&u[mover],1);
+    assert(before==sc64_contact_blocked_mask_uncached(&u[mover],1));
+    assert(race_shared_egg_cancel(SIDE,egg));
+    unsigned after=sc64_contact_blocked_mask(&u[mover],1);
+    unsigned expected=sc64_contact_blocked_mask_uncached(&u[mover],1);
+    assert(before!=expected);assert(after==expected);
+    sc64_unit_buckets_end();
+}
 static void test_custom_owners(void)
 {
     setup_custom();int side=hall_for(SIDE),bot=hall_for(ENEMY);assert(side>=0 && bot>=0);
@@ -138,6 +155,6 @@ static void test_pair_and_denials(void)
 }
 int main(void)
 {
-    test_late_z9();test_custom_owners();test_pair_and_denials();
+    test_late_z9();test_cancel_same_phase_contact();test_custom_owners();test_pair_and_denials();
     puts("shared Egg HOST lifecycle and save fence passed");return 0;
 }
