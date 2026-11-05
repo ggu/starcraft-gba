@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#define SC64_EGG_COLLISION_TRACE 1
 #include "../starcraft/game.c"
 int main(void)
 {
