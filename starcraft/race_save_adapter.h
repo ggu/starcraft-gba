@@ -2403,7 +2403,7 @@ typedef struct {
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     Sc64StageSaveAuth guardian_auth;
 #endif
-#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+#if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     Sc64StageSaveAuth egg_auth;
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
@@ -2446,6 +2446,8 @@ typedef struct {
 static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     const Sc64StageSaveAuth *guard_auth=&plan->guardian_auth;
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+    const Sc64StageSaveAuth *guard_auth=&plan->egg_auth;
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
@@ -3998,6 +4000,8 @@ static int race_load_game(void) {
     RaceLoadPlan plan = {0};
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     const Sc64StageSaveAuth *guard_auth=&plan.guardian_auth;
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+    const Sc64StageSaveAuth *guard_auth=&plan.egg_auth;
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
     GbaSaveSelection selected;
