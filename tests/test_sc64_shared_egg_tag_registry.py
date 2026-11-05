@@ -85,10 +85,15 @@ class SharedEggTags(unittest.TestCase):
         bases, gens = set(), set()
         for ref, record in records.items():
             b, g = catalog(record["definitions"]); bases |= b; gens |= g
+            stage = record.get("stage_definitions", [])
+            self.assertEqual(extract("\n".join(stage)), [])
             if os.environ.get("SC64_EGG_REAUDIT"):
                 data = subprocess.check_output(["git", "show", ref + ":starcraft/game.c"])
                 self.assertEqual(hashlib.sha256(data).hexdigest(), record["sha256"])
                 self.assertEqual(extract(data.decode()), record["definitions"])
+                observed = [line.strip() for line in data.decode().splitlines()
+                            if re.match(r"\s*#define\s+(?:" + "|".join(STAGE_EXPRESSIONS) + r")\b", line)]
+                self.assertEqual(observed, stage)
         # Also fail closed if this checkout introduces unfamiliar expressions.
         b, g = catalog(extract(Path("starcraft/game.c").read_text()))
         self.assertTrue(b <= bases and g <= gens, "current source extends fixture; refresh and re-audit")
