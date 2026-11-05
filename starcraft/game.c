@@ -10232,7 +10232,11 @@ sc64_source_unit_attack_pose(const Unit *q)
 #error "Cocoon render stage requires HOST, Guardian stage, and sprites"
 #endif
 #include "sc64_guardian_cocoon_render.h"
+#ifdef SC64_GUARDIAN_TEST_BANK_HEADER
+#include SC64_GUARDIAN_TEST_BANK_HEADER
+#else
 #include "sc64_guardian_cocoon_bank_generated.h"
+#endif
 static int sc64_cocoon_world_visible(int x,int y)
 {
     return (unsigned)x < (unsigned)(MAP_COLS*16) &&

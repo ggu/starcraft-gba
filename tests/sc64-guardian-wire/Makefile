@@ -65,7 +65,7 @@ guardian-frame-real:
 	/tmp/guardian-frame-showcase
 .PHONY: guardian-render-game-fake guardian-frame-render-real
 guardian-render-game-fake:
-	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -Itests/guardian-render-fake tests/sc64_guardian_render_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-render-game-fake
+	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -DSC64_GUARDIAN_TEST_BANK_HEADER='"sc64_guardian_cocoon_fake_bank.h"' -Itests/guardian-render-fake tests/sc64_guardian_render_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-render-game-fake
 	/tmp/guardian-render-game-fake
 guardian-frame-render-real:
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -I.local/sc64/guardian-cocoon/bank tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-render-terran
