@@ -34,7 +34,8 @@ writer, not an ordinary-input guest or arbitrary-save proof.
 
 Separate genuine prior-writer/current-reader custom HOST cases pass all prior
 unit ID/name/raw mappings and paid Egg/Reaver/Shuttle loading for Terran, Z7,
-Z9 and Showcase. P10 remains outstanding. The Z9 case is a custom setup, not a
+Z9 and Showcase. The P10 case also passes at successor `987c0f09`, with separately
+generated exact old/new fact rosters and legacy bound/Egg IDs 53/53. The Z9 case is a custom setup, not a
 late-campaign journal. Current layout retains legacy bound/Egg IDs 44/44 Terran,
 42/40 Z7, 49/47 Z9 and 49/49 Showcase. Recipe-only successor 9160929e passes the
 source boundary at 1,743 indexed files. Scarabs outside the parent and pending
@@ -59,6 +60,10 @@ Scarab impact packets remain unsupported; Guardian feature 2 is not admitted.
 - Next tests are combined paid jobs, every applicable real codec/journal,
   predecessor/fallback/atomic rejection, active flight/impact, guest controls,
   actual fresh-process SRAM, RAM/stack and representative ARM performance.
+
+The `987c0f09` successor reserves a distinct feature-7 pair from feature 5
+and passes the historical/feature-5/feature-7 collision test. It still does not
+admit Guardian feature 2; that requires the combined row/source validator.
 
 No full campaign, complete skirmish roster or 30 fps conclusion follows from
 these finite fixtures. The shared service must reach all applicable race,
