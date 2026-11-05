@@ -206,6 +206,8 @@ int main(int argc,char **argv)
             if(!rush&&frame>=knob("Z10_GOF",8000)&&
                (home>=goal||(pool_limited&&home>=knob("Z10_GO2",55)))){
                 rush=1;leg=0;z10_reserve_home();
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE)
+                    fprintf(stderr,"LAUNCHUNIT slot=%d type=%d reserve=%d x=%d y=%d order=%d\n",i,u[i].type,z10_home_reserve[i],u[i].x,u[i].y,u[i].order);
                 fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d,\"pending\":%d,\"free_slots\":%d,\"pool_limited\":%d}\n",(unsigned)frame,home,pending,free_slots,pool_limited);
             }
             if(rush){
