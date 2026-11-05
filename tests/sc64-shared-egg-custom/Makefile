@@ -41,3 +41,8 @@ custom-egg-facts:
 	mkdir -p $(CUSTOM_FACT_DIR)
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft -DSC64_SHARED_EGG_WIRE_HOST_STAGE $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES) $(P9_CAMPAIGN_DEFINES) $(P10_CAMPAIGN_DEFINES)) $(SC64_RELEASE_TRANSPORT_FLAGS) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT tools/sc64_fact_tables_gen.c -o $(CUSTOM_FACT_DIR)/generator
 	$(CUSTOM_FACT_DIR)/generator > $(CUSTOM_FACT_DIR)/sc64_fact_tables_generated.h
+
+.PHONY: custom-egg-z7-legacy
+custom-egg-z7-legacy:
+	$(CLANG) $(CUSTOM_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_custom_z7_legacy.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-z7-legacy
+	$(COMBINED_BIN_DIR)/custom-egg-z7-legacy
