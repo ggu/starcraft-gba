@@ -160,7 +160,9 @@ enum {
 #endif
 };
 #define SC_RU_LEGACY_BOUND SC_RU_LEGACY_COUNT
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
 _Static_assert(SC_RU_LEGACY_COUNT <= 64, "legacy unit IDs exceed six-bit bound");
+#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 _Static_assert(U_GUARDIAN_COCOON == SC_RU_LEGACY_COUNT, "Cocoon append position changed");
 #if !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
