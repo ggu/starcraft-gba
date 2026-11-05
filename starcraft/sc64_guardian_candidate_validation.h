@@ -86,6 +86,11 @@ static int race_guardian_candidate_valid(const RaceSave *candidate,unsigned widt
     if (!candidate || !guard_auth || !sc64_stage_save_auth_matches(guard_auth,candidate,
         candidate->version,0u) || (unsigned)candidate->state[0]>1u) return 0;
     int guardian=(guard_auth->features & SC64_STAGE_SAVE_GUARDIAN)!=0;
+    if (guardian && !candidate->state[0]) {
+        int mission=candidate->state[2];
+        if ((unsigned)mission>=SC64_RACE_MAP_COUNT ||
+            !race_guardian_source_map_valid(&sc64_race_maps[mission])) return 0;
+    }
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit q;
         if (!SC64_GUARD_DECODE(candidate,i,width,height,&q)) return 0;

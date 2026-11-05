@@ -61,6 +61,11 @@ int main(void)
     assert(!memcmp(&candidate,&snapshot,sizeof(candidate)));
     Sc64StageSaveAuth wrong=auth; wrong.candidate=&snapshot;
     assert(!race_guardian_candidate_valid(&candidate,2048,2048,&wrong));
+    candidate.state[2]=SC64_RACE_MAP_COUNT;
+    memset(&candidate.units[muta],0,sizeof(candidate.units[muta]));
+    memset(&candidate.buildings[lair],0,sizeof(candidate.buildings[lair]));
+    assert(!race_guardian_candidate_valid(&candidate,2048,2048,&auth));
+    candidate=snapshot;
     assert(!memcmp(&candidate,&snapshot,sizeof(candidate)));
     Building bad=b[lair];bad.raw_owner=7;put_building(&candidate,(unsigned)lair,&bad);
     assert(!race_guardian_candidate_valid(&candidate,2048,2048,&auth));
