@@ -116,6 +116,7 @@ class SharedEggTags(unittest.TestCase):
               "base values; legacy, Guardian, Egg, combined are disjoint")
 
     def test_unregistered_save_name_fails_closed(self):
+        self.assertEqual(extract("#define SC64_IS_CARRIER_SAVE_VERSION(v) \\"), [])
         with self.assertRaises(AssertionError):
             extract("#define SC64_FUTURE_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)")
         with self.assertRaises(AssertionError):
