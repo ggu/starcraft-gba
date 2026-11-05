@@ -47,8 +47,14 @@ must combine progression, ammunition, attack and genuine fresh-process saves.
 
 ## Resume qualification
 
-Next run the existing full-service and journal regressions on the combined
-source, then validate the full product
+The existing full-service attack fixture also passes on `6a77f506`: paid
+ammunition commands, scheduled launch, pending-impact journal reload and resumed
+damage remain intact (`/tmp/sc64-full-service-6a77f506-qualification.log`). This is
+separate from the constructed tech-path fixture; it still begins with a spawned
+Reaver and does not combine the entire path through ordinary inputs.
+
+Next integrate the codecs and run the remaining combined journal regressions,
+then validate the full product
 matrix, real tech progression/attacks/SRAM on ARM, source permissions, stack/RAM
 and representative frame costs. Collect missing ordinary N64 production and
 weapon observations separately. No Actions runner is needed.
