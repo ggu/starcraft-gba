@@ -406,7 +406,7 @@
     ]
   },
   "3d209a64bd20fd2fa538fe1f6c0ff375c5d2e3db": {
-    "sha256": "03740dfe14b82027e9d1a6cfe813d1368532db14173df8b57a8be4eabac9562f",
+    "sha256": "27af0020be956f9d31710e8f861a8f1b11d77a36fb79a7e9a2e23d5af7cecb63",
     "definitions": [
       "#define SC64_RACE_SAVE_GENERATION 49u",
       "#define SC64_RACE_SAVE_GENERATION 48u",
