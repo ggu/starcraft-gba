@@ -27,7 +27,15 @@ int main(void)
         if(race_scarab_child_lookup(i,&owner,&phase) && owner==parent && phase==SC64_SCARAB_CHILD_INSIDE)child=i;
     }
     int target=spawn_unit(ENEMY,U_MARINE,180,128);
-    assert(child>=0 && target>=0 && issue_order(ORDER_ATTACK_MOVE,u[target].x,u[target].y));
+    assert(child>=0 && target>=0);
+    game_update(KEY_B,KEY_B);assert(menu_open);
+    for(int i=0;i<field_menu_count() && menu_cursor!=6;++i) {
+        game_update(KEY_DOWN,KEY_DOWN);game_update(0,0);
+    }
+    assert(menu_cursor==6 && !strcmp(race_menu_label(menu_cursor),"ATTACK"));
+    game_update(KEY_A,KEY_A);assert(!menu_open && mode==MODE_ATTACK);
+    game_update(0,0);cx=u[target].x;cy=u[target].y; /* Constructed cursor position. */
+    game_update(KEY_A,KEY_A);assert(mode==MODE_NORMAL);
     for(int i=0;i<200 && !race_scarab_probe_bullets_pending();++i)game_update(0,0);
     if (!race_scarab_probe_bullets_pending() || race_impact_count!=1 || !u[target].alive)
         fprintf(stderr,"attack state: parent alive=%d order=%d target=%d x=%d y=%d child alive=%d order=%d target=%d x=%d y=%d foe alive=%d hp=%d impacts=%u frame=%d\n",
