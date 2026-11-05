@@ -1,30 +1,31 @@
 include Makefile
+GUARD_TEST_BIN_DIR ?= /tmp
 .PHONY: guardian-real
 GUARD_HOST = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -DSC64_GUARDIAN_COCOON_STAGE
 GUARD_EXTRA = common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
 guardian-real:
-	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o /tmp/guardian-real-terran
-	/tmp/guardian-real-terran
-	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o /tmp/guardian-real-zerg
-	/tmp/guardian-real-zerg
-	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_FLAGS)) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o /tmp/guardian-real-protoss
-	/tmp/guardian-real-protoss
-	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o /tmp/guardian-real-showcase
-	/tmp/guardian-real-showcase
+	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-terran
+	$(GUARD_TEST_BIN_DIR)/guardian-real-terran
+	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-zerg
+	$(GUARD_TEST_BIN_DIR)/guardian-real-zerg
+	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_FLAGS)) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-protoss
+	$(GUARD_TEST_BIN_DIR)/guardian-real-protoss
+	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-showcase
+	$(GUARD_TEST_BIN_DIR)/guardian-real-showcase
 .PHONY: guardian-real-remaining
 guardian-real-remaining:
-	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_FLAGS)) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o /tmp/guardian-real-protoss
-	/tmp/guardian-real-protoss
-	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o /tmp/guardian-real-showcase
-	/tmp/guardian-real-showcase
+	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_FLAGS)) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-protoss
+	$(GUARD_TEST_BIN_DIR)/guardian-real-protoss
+	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-showcase
+	$(GUARD_TEST_BIN_DIR)/guardian-real-showcase
 .PHONY: guardian-real-zps
 guardian-real-zps:
-	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o /tmp/guardian-real-zerg
-	/tmp/guardian-real-zerg
-	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_FLAGS)) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o /tmp/guardian-real-protoss
-	/tmp/guardian-real-protoss
-	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o /tmp/guardian-real-showcase
-	/tmp/guardian-real-showcase
+	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-zerg
+	$(GUARD_TEST_BIN_DIR)/guardian-real-zerg
+	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_FLAGS)) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-protoss
+	$(GUARD_TEST_BIN_DIR)/guardian-real-protoss
+	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-showcase
+	$(GUARD_TEST_BIN_DIR)/guardian-real-showcase
 .PHONY: guardian-fact-generator
 guardian-fact-generator:
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES) $(P9_CAMPAIGN_DEFINES) $(P10_CAMPAIGN_DEFINES)) $(SC64_RELEASE_TRANSPORT_FLAGS) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT tools/sc64_fact_tables_gen.c -o /tmp/guardian-fact-gen-off
