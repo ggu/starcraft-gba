@@ -118,3 +118,12 @@ guardian-full-facts:
 	$(GUARD_FULL_FACT_DIR)/generator > $(GUARD_FULL_FACT_DIR)/sc64_fact_tables_generated.h
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft -I$(GUARD_FULL_FACT_DIR) $(GUARD_FULL_FACT_FLAGS) $(GUARD_FULL_P10_FLAGS) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-full-facts
 	$(GUARD_TEST_BIN_DIR)/guardian-full-facts
+# A second reference roster uses the appended, distinct Guardian identity.
+GUARD_FULL_DISTINCT_FLAGS = -DGBA_HOST -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_FACT_SIGHT_TABLES $(GUARD_FULL_FACT_FLAGS)
+.PHONY: guardian-full-facts-distinct
+guardian-full-facts-distinct:
+	mkdir -p $(GUARD_FULL_FACT_DIR)/distinct
+	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Icommon -Istarcraft $(GUARD_FULL_DISTINCT_FLAGS) tools/sc64_fact_tables_gen.c -o $(GUARD_FULL_FACT_DIR)/distinct/generator
+	$(GUARD_FULL_FACT_DIR)/distinct/generator > $(GUARD_FULL_FACT_DIR)/distinct/sc64_fact_tables_generated.h
+	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Icommon -Istarcraft -I$(GUARD_FULL_FACT_DIR)/distinct $(GUARD_FULL_DISTINCT_FLAGS) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-full-facts-distinct
+	$(GUARD_TEST_BIN_DIR)/guardian-full-facts-distinct
