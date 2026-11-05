@@ -50,6 +50,7 @@ static int race_guardian_campaign_morph(int building,int target)
     int found=0;
     if (!q->alive || q->owner!=SIDE || !building_complete(building) ||
         q->type!=source || q->raw_type!=sc64_race_raw_building(source) ||
+        q->maxhp!=sc64_race_building_max_hp(source) || q->hp<=0 || q->hp>q->maxhp ||
         q->queue_count || (q->flags & SC64_GUARDIAN_PAID_BUILDING_MORPH) ||
         !race_guardian_campaign_allowed(q->owner,q->raw_owner,sc64_race_raw_building(target))) return 0;
     for (int i=0;i<MAX_BUILDINGS;++i)
@@ -76,7 +77,9 @@ static int race_guardian_campaign_cancel(int building)
     if (!q->alive || q->owner!=SIDE || !q->under_construction ||
         !(q->flags & SC64_GUARDIAN_PAID_BUILDING_MORPH) ||
         (q->type!=B_HIVE && q->type!=B_GREATER_SPIRE) ||
-        q->raw_type!=sc64_race_raw_building(q->type)) return 0;
+        q->raw_type!=sc64_race_raw_building(q->type) || q->hp<=0 ||
+        q->maxhp!=sc64_race_building_max_hp(q->type) || q->hp>q->maxhp ||
+        q->build_progress<0 || q->build_progress>building_build_time(q->type)) return 0;
     const Sc64RaceBuildingRule *product=sc64_race_building_rule(q->type);
     int source=q->type==B_HIVE ? B_LAIR : B_SPIRE;
     int source_hp=sc64_race_building_max_hp(source);

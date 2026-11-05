@@ -319,7 +319,8 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #endif
 #if defined(SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || \
-     !defined(SC64_Z7_RUNTIME) || !defined(SC64_ZP_CAMPAIGN_ACTORS))
+     !defined(SC64_Z7_RUNTIME) || !defined(SC64_ZP_CAMPAIGN_ACTORS) || \
+     !defined(SC64_CONSTRUCTION_HP) || !defined(SC64_Z7_EGG_PRODUCTION))
 #error "Guardian campaign construction remains an isolated HOST experiment"
 #endif
 #if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) && \

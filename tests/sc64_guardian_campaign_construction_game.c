@@ -68,6 +68,9 @@ int main(void)
            restored.hp==900 && restored.raw_type==133 && restored.raw_owner==3 &&
            restored.larva==1 && restored.larva_timer==123 && restored.shield_remainder==17);
     assert(!strcmp(race_menu_label(MENU_ZP_HIVE),"CANCEL MORPH"));
+    b[lair].hp=0; int old_ore=minerals, old_gas=gas;
+    assert(!race_guardian_campaign_cancel(lair));
+    assert(minerals==old_ore && gas==old_gas && b[lair].type==B_HIVE);
     b[lair].hp=800; choose_command(MENU_ZP_HIVE);
     assert(b[lair].type==B_LAIR && !b[lair].under_construction && b[lair].hp==800);
     assert(minerals==ore-50 && gas==vespene-38);
