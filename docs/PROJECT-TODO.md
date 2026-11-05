@@ -21,7 +21,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 - Canonical branch: `codex/source-release`; production update `73cc74a5` merges
   the qualified source-permitted Scourge/Spire correction in PR #290.
-- Latest verified Mac package: `20261105-73cc74a5-campaigns`: Terran 1–10,
+  Current main `74922d57` also merges the save-context hardening in PR #293.
+- Latest verified Mac package: `20261105-74922d57-campaigns`: Terran 1–10,
   Zerg 1–9, Protoss 1–10, plus Showcase. Content coverage is **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
@@ -40,6 +41,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   identify an order-like byte decrement/reload gate and 36 numeric pre-handler
   IDs matching the pinned PC switch. Actor identities cannot be carried from
   the normal-JIT process into the separate interpreter run without new evidence.
+  A [same-process interpreter trace](audits/2026-11-05-n64-order-cadence/README.md)
+  now couples four typed worker timers to 126 consecutive countdown intervals.
   Named handler equivalence, STOP, an active-world clock and all-order/JIT
   cadence remain open. Offline code also shows a linked-list timer stagger,
   initialized with 10 and reloaded with 150; the list scope and world-step
@@ -105,15 +108,15 @@ evidence; corrected human opening supply does not establish all setup parity.
 
 | Work | State and next gate |
 | --- | --- |
-| [#289](https://github.com/ggu/starcraft-gba/pull/289), shared Egg HOST research | Draft. Its earlier checks remain scoped to that source. Separate combined candidate `855a661e` passed all four real HOST custom-journal profiles, including Carrier/Egg capacity, plus six exact StageOFF ROM/RAM comparisons against c96. A P10 fixture had erased the spawned cache field; preserving it resolved that failure. Test-only successor `61cd6ab1` fixes three test-integration blockers and passes clean default checks (999 Python tests, 26 skipped, plus compiled suites); runtime/build Git objects match 855. Integrated successor `acbc2169` now passes six normal ROM/RAM comparisons against the #290 baseline and all four constructed HOST journals under sanitizers; the clean default/source suite also passed (999 Python tests, 26 skipped, plus compiled suites). The four journal bindings are Terran/Z7/P10/Showcase; current delivered Z9 still needs its own staged combined journal proof. Independent review reproduced a legacy-tag Egg admission bypass in the Z7/custom HOST vector and traced the same missing discriminator in ordinary Z7-enabled custom saves. A separate shipping hardening patch and staged-auth fix are being qualified; the foundation remains held. A separate unqualified HOST producer checkpoint now binds paid queue/menu/cancel/birth across Terran, legacy Z7, current Z9, P10 and Showcase; behavior tests await the auth review. No live guest admission yet. |
+| [#289](https://github.com/ggu/starcraft-gba/pull/289), shared Egg HOST research | Draft. Foundation `acbc2169` passed clean default checks (999 Python tests, 26 skipped, plus compiled suites), six old-baseline normal ROM comparisons and four constructed journal bindings (Terran/Z7/P10/Showcase). Independent review found the legacy Egg context gap; correction `1c7e4e7a` passes combined and Guardian-only regressions, genuine old Z7 paid-Egg continuation and nine Z7/Z8/Z9 HOST checks. Separate producer `528cb913` passes five custom fixtures including current Z9 and a true Z7 mission fixture; selection/resources are fixture setup. Integrated candidate `4e949d3f` now passes the ordinary HOST player route in all five bindings: frontend, pointer selection, paid Drone Egg, save, menu cancellation, load and natural birth, using initial resources on one custom map. Its normal Z7/Z9 seven-case save regression also passes. Gas-bearing/bot refunds, mixed menu rows, broader modes, StageOFF/default/ARM and genuine guest SRAM remain open. No guest activation or all-campaign save claim. |
 | [#290](https://github.com/ggu/starcraft-gba/pull/290), Scourge picker | Merged as `73cc74a5`. Runtime/test head `b3d6f8ef` passed viable producer/worker/site sanitizer controls, selected-product journal checks, six new ROM/RAM builds, full clean-Git default tests (989 Python, 26 skipped, plus compiled suites) and fresh-process loading of an actual prior-code pre-cargo HOST journal. Documentation successor/merge preserve identical runtime/build/test objects. No arbitrary guest-save or hardware claim. |
-| Guardian candidate-local decoder | Guardian-only four-profile journals, broad failed-load snapshots and mixed old raw-36/newer-invalid fallback passed. Combined Egg/Guardian admission is not thereby qualified. |
+| [#293](https://github.com/ggu/starcraft-gba/pull/293), normal save-context hardening | Merged as `74922d57`; whole Git tree equals qualified `7123176e`. Normal Z7/Z9 custom and Z9 mission controls reject unsupported Eggs, preserve raw-36 Overlords and older-valid fallback, and retain a genuine prior Z7 paid-Egg journal. All six ROM/RAM checks and clean default checks pass (989 Python tests, 26 skipped, plus compiled suites); pins unchanged. A disk guard stopped the first six-build run before Z10; lossless archival permitted the complete retry. |
 | Z10 controller | Ordinary drag boxes fixed command latency; the rally fix removed actual recalls. Upgrades reached 2/2 and improved the force at road leg 6, but the mission still lost. Repeated Sunken rebuilding consumed the economy and failed its bounded prefix; do not extend that losing run. |
 | [#262](https://github.com/ggu/starcraft-gba/pull/262), queue cancellation | Held: Z1/Z3/Z4 and T5/T6 ordinary-controller regressions, plus current-control UX/refund review. |
 | [#265](https://github.com/ggu/starcraft-gba/pull/265), advisor alerts | Held: burn/combat suppression, one-shots, cooldown initialization, voice policy and current-combination qualification. |
 | [#212](https://github.com/ggu/starcraft-gba/pull/212), [#210](https://github.com/ggu/starcraft-gba/pull/210), Carrier/Defiler | Draft/conflicting: namespace collision with transport, missing genuine migration/current qualification; also audit guarded AI purchases. |
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Draft: renderer conflicts and missing current memory/paired ARM qualification. |
-| SD delivery | Latest verified Mac package is `73cc74a5`; last verified KODAK copy is f7. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
+| SD delivery | Latest verified Mac package is `74922d57`; last verified KODAK copy is f7. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
 
 ## Verification and maintenance
 
