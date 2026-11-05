@@ -5,7 +5,8 @@ import re
 from pathlib import Path
 
 CHECK = re.compile(r'Z7 CHECK (\w+) host_tick=(\d+)')
-CARGO = re.compile(r'CARGO7 (\w+) tick=(\d+) digest=(\d+) end=1(?:\s|$)')
+CARGO = re.compile(r'CARGO7 (checkpoint|cut|won|lost|limit) tick=(\d+) digest=(\d+) end=1')
+PREFIX = '[WARN] GBA Debug: '
 
 def read(path):
     checks, rows = [], []
@@ -13,7 +14,8 @@ def read(path):
         if match := CHECK.search(line):
             checks.append((match[1], int(match[2])))
         if 'CARGO7 ' in line:
-            match = CARGO.search(line)
+            record = line[len(PREFIX):] if line.startswith(PREFIX) else line
+            match = CARGO.fullmatch(record)
             if not match or int(match[3]) > 0xffffffff:
                 raise ValueError(f'malformed cargo record: {line}')
             rows.append((match[1], int(match[2]), int(match[3])))

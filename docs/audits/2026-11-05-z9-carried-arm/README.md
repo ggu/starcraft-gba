@@ -72,3 +72,8 @@ using `--sav-in` for the resume. Compare host and ARM logs with the same tool's
 `compare` command, adding `--from-tick 17374` for the resume. Compare the
 committed journal slots as described above; retain original backend saves and
 do not substitute a constructed SRAM image.
+
+The host Z7 replay helper reads the first 32 KiB of a supplied resume file and
+does not reject trailing bytes. These runs used the exact 32 KiB output of the
+ordinary prefix; the ARM verifier independently requires exactly 32 KiB for
+its seed and output. The helper alone is not a general save-file validator.
