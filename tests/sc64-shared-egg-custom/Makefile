@@ -61,3 +61,19 @@ pre-cargo-campaign-build:
 	$(CLANG) $(PRE_CARGO_COMMON) -USC64_WORKER_CARGO_KIND -DSC64_COMPAT_WRITER '-DSC64_COMPAT_GAME_SOURCE="$(PRE_CARGO_OLD_ROOT)/starcraft/game.c"' tests/sc64_pre_cargo_campaign_compat.c tests/sc64_pre_cargo_compat_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $(PRE_CARGO_OUT)/campaign-old-writer
 	$(CLANG) $(PRE_CARGO_COMMON) tests/sc64_pre_cargo_campaign_compat.c tests/sc64_pre_cargo_compat_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $(PRE_CARGO_OUT)/campaign-normal-reader
 	$(CLANG) $(PRE_CARGO_COMMON) -DSC64_SHARED_EGG_CUSTOM_SERVICE tests/sc64_pre_cargo_campaign_compat.c tests/sc64_pre_cargo_compat_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $(PRE_CARGO_OUT)/campaign-optin-reader
+.PHONY: custom-egg-context-terran custom-egg-context-z7 custom-egg-context-z9 custom-egg-context-p10 custom-egg-context-showcase
+custom-egg-context-terran:
+	$(CLANG) $(CUSTOM_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-terran
+	$(COMBINED_BIN_DIR)/custom-egg-context-terran
+custom-egg-context-z7:
+	$(CLANG) $(CUSTOM_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-z7
+	$(COMBINED_BIN_DIR)/custom-egg-context-z7
+custom-egg-context-z9:
+	$(CLANG) $(CUSTOM_HOST) $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-z9
+	$(COMBINED_BIN_DIR)/custom-egg-context-z9
+custom-egg-context-p10:
+	$(CLANG) $(CUSTOM_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(CUSTOM_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-p10
+	$(COMBINED_BIN_DIR)/custom-egg-context-p10
+custom-egg-context-showcase:
+	$(CLANG) $(CUSTOM_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-showcase
+	$(COMBINED_BIN_DIR)/custom-egg-context-showcase
