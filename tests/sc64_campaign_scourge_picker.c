@@ -80,9 +80,34 @@ static void check_denied(int mission)
     assert(!race_queue_unit(SIDE, hatch, U_SCOURGE));
     assert(minerals == ore && gas == vespene && b[hatch].larva == larvae &&
            b[hatch].queue_count == queues);
-    assert(ui_missing_tech(B_SPIRE, -1) != 0);
-    int x = 0, y = 0;
-    assert(!race_build_request_valid(SIDE, -1, B_SPIRE, &x, &y, 0));
+    int lair = spawn_build(SIDE, B_LAIR, 400, 400, 0);
+    int worker = spawn_unit(SIDE, U_DRONE, 450, 450);
+    assert(lair >= 0 && worker >= 0);
+    u[worker].raw_owner = 4; /* captured worker; live controller is SIDE */
+    int sx = -1, sy = -1;
+    race_selected_mission = SC64_RACE_MISSION_Z2;
+    for (int y = 16; y < WORLD_H - 16 && sx < 0; y += 16)
+        for (int x = 16; x < WORLD_W - 16; x += 16) {
+            int tx = x, ty = y;
+            if (race_build_request_valid(SIDE, worker, B_SPIRE, &tx, &ty, 0)) {
+                race_selected_mission = mission;
+                int site_ok = race_can_site(SIDE, B_SPIRE, x, y) &&
+                    can_place_except_worker(B_SPIRE, x, y, -1);
+                race_selected_mission = SC64_RACE_MISSION_Z2;
+                if (site_ok) { sx = x; sy = y; break; }
+            }
+        }
+    assert(sx >= 0 && ui_missing_tech(B_SPIRE, worker) == 0);
+    race_selected_mission = mission;
+    assert(ui_missing_tech(B_SPIRE, worker) && !*ui_missing_tech(B_SPIRE, worker));
+    assert(build_worker_available(worker, SIDE, -1));
+    int x = sx, y = sy, order = u[worker].order;
+    assert(!race_build_request_valid(SIDE, worker, B_SPIRE, &x, &y, 0));
+    assert(!race_start_build(SIDE, worker, B_SPIRE, sx, sy));
+    assert(minerals == ore && gas == vespene && u[worker].order == order);
+    race_selected_mission = SC64_RACE_MISSION_Z2;
+    assert(race_start_build(SIDE, worker, B_SPIRE, sx, sy));
+    race_selected_mission = mission;
     /* Captured actors preserve source provenance but obey the live controller. */
     b[hatch].raw_owner = 4;
     assert(!race_queue_unit(SIDE, hatch, U_SCOURGE));
