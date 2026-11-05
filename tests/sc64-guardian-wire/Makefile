@@ -167,5 +167,5 @@ guardian-combined-full-facts-distinct:
 GUARD_EARLY_PERMISSION_DIR ?= .local/guardian-early-permissions-stage
 .PHONY: guardian-early-permissions
 guardian-early-permissions:
-	$(CLANG) $(GUARD_HOST) -DSC64_EARLY_ZERG_PERMISSIONS -I$(GUARD_EARLY_PERMISSION_DIR) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_early_permissions_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-early-permissions
+	$(CLANG) $(GUARD_HOST) -DSC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE -DSC64_EARLY_ZERG_PERMISSIONS -I$(GUARD_EARLY_PERMISSION_DIR) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_early_permissions_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-early-permissions
 	$(GUARD_TEST_BIN_DIR)/guardian-early-permissions

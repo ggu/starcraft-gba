@@ -31,6 +31,38 @@ int main(void)
     candidate.state[2]=14;
     assert(!race_guardian_candidate_origin(&candidate,SIDE,3,138));
     assert(!race_guardian_candidate_origin(&candidate,SIDE,3,44));
+
+    /* Constructed HOST world: real paid Lair/Queen operations use source
+     * slots assigned by the Z7 spawn hook, then the real early PUNI tables. */
+    memset(u,0,sizeof(u));memset(b,0,sizeof(b));race_mode=0;race_human=R_ZERG;
+    race_player[SIDE]=R_ZERG;race_selected_mission=SC64_Z7_GLOBAL_ID;
+    race_z7_map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];minerals=1000;gas=1000;
+    int hall=spawn_build(SIDE,B_HATCHERY,200,200,0);
+    int pool=spawn_build(SIDE,B_SPAWNING_POOL,260,200,0);
+    int drone=spawn_unit(SIDE,U_DRONE,300,200);
+    assert(hall>=0 && pool>=0 && drone>=0 && b[hall].raw_owner==3 && u[drone].raw_owner==3);
+    race_selected_mission=0;int ore=minerals,vespene=gas;
+    assert(!race_start_lair_morph(hall));
+    assert(minerals==ore && gas==vespene && b[hall].type==B_HATCHERY);
+    race_selected_mission=15;
+    assert(race_start_lair_morph(hall));
+    assert(minerals==ore-150 && gas==vespene-100 && b[hall].type==B_LAIR);
+    race_complete_building(hall);
+    int x=0,y=0,found=0;
+    for(int yy=120;yy<=280 && !found;yy+=8) for(int xx=120;xx<=280;xx+=8) {
+        int tx=xx,ty=yy;
+        if(race_build_request_valid(SIDE,drone,B_ZP_QUEENS_NEST,&tx,&ty,0)) {
+            x=tx;y=ty;found=1;break;
+        }
+    }
+    assert(found);ore=minerals;vespene=gas;
+    assert(race_start_build(SIDE,drone,B_ZP_QUEENS_NEST,x,y));
+    assert(minerals==ore && gas==vespene);
+    u[drone].x=x;u[drone].y=y;race_pending_build_tick(drone);
+    assert(minerals==ore-150 && gas==vespene-100 && !u[drone].alive);
+    int nest=-1;
+    for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive && b[i].type==B_ZP_QUEENS_NEST) nest=i;
+    assert(nest>=0 && b[nest].raw_owner==3 && b[nest].under_construction);
     puts("Guardian early source PUNI and owner mapping HOST stage passed");
     return 0;
 }

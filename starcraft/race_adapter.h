@@ -950,6 +950,13 @@ static int race_build_request_valid(int owner, int worker, int type,
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (!race_zerg_campaign_product_available(owner, sc64_race_raw_building(type))) return 0;
 #endif
+#if defined(SC64_EARLY_ZERG_PERMISSIONS) && defined(SC64_GUARDIAN_COCOON_STAGE)
+    if (!race_mode && sc64_early_zerg_permission_source((unsigned)race_selected_mission)) {
+        int raw=sc64_race_raw_building(type);
+        if ((raw==138 || raw==141) && !race_guardian_campaign_allowed(owner,
+            worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,raw)) return 0;
+    }
+#endif
 #ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
     if (!race_mode && type==B_ZP_QUEENS_NEST &&
         !race_guardian_campaign_allowed(owner,worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,138)) return 0;
@@ -1068,6 +1075,10 @@ static int race_start_lair_morph(int building)
         !building_complete(building) || b[building].owner != SIDE ||
         b[building].type != B_HATCHERY || b[building].queue_count ||
         !race_owner_has_prereq(SIDE, r->prereq)) return 0;
+#if defined(SC64_EARLY_ZERG_PERMISSIONS) && defined(SC64_GUARDIAN_COCOON_STAGE)
+    if (!race_mode && sc64_early_zerg_permission_source((unsigned)race_selected_mission) &&
+        !race_guardian_campaign_allowed(SIDE,b[building].raw_owner,132)) return 0;
+#endif
     bank.minerals = (unsigned short)minerals;
     bank.gas = (unsigned short)gas;
     if (!sc64_race_pay_building(&bank, B_LAIR)) return 0;
