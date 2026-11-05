@@ -706,13 +706,17 @@ sc64_z8_action(Sc64Z8SchedulerState *s, const Sc64Z8Program *p,
         if (!a->location) return 1;
         /* fall through */
     case 8: case 9: case 12: case 26:
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
         if (!ops || !ops->action) break;
         r=ops->action(context,a,owner,rect);
-#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
         if (a->opcode==11 && r==0) return 0; /* bounded capacity defer */
-#endif
         if (r!=1) break;
         return 1;
+#else
+        if (!ops || !ops->action ||
+            ops->action(context, a, owner, rect) != 1) break;
+        return 1;
+#endif
     default:
         break;
     }
