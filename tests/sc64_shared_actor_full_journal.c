@@ -23,10 +23,14 @@ int main(int argc,char **argv)
         if(u[i].type==SC64_SHARED_EGG_TYPE)egg=i;
     }
     assert(p>=0 && egg>=0);minerals=100;
-    assert(race_scarab_enqueue(p,0));
-    assert(race_scarab_production_tick(p,0)==SC64_SCARAB_ALLOCATED);
     Sc64ScarabParent parent;Sc64ScarabCounts counts;
-    assert(race_scarab_parent_read(p,0,&parent,&counts));int child=parent.active_slot;
+    assert(race_scarab_parent_read(p,0,&parent,&counts));
+    if (!parent.queued) {
+        assert(race_scarab_enqueue(p,0));
+        assert(race_scarab_production_tick(p,0)==SC64_SCARAB_ALLOCATED);
+        assert(race_scarab_parent_read(p,0,&parent,&counts));
+    }
+    int child=parent.active_slot;
     assert(child>=0);
     int spire=spawn_build(SIDE,B_GREATER_SPIRE,390,390,0);assert(spire>=0);
     int muta=spawn_unit(SIDE,U_MUTALISK,350,350);assert(muta>=0);
@@ -41,12 +45,23 @@ int main(int argc,char **argv)
     memset(u,0,sizeof(u));assert(race_load_game());
     assert(u[p].alive && u[p].type==U_REAVER && u[child].alive && u[child].type==U_SCARAB && u[egg].alive && u[muta].alive && u[muta].type==U_GUARDIAN_COCOON);
     assert(race_scarab_parent_read(p,0,&parent,&counts) && parent.active_slot==child && parent.queued==1);
+    /* Complete the paid Cocoon, publish the actual resulting Guardian, and
+     * resume it before restoring the earlier pair for the fallback case. */
+    guardian_test_snapshot(before);
+    u[muta].work_timer=1;assert(race_guardian_morph_tick(muta));
+    assert(u[muta].type==race_guardian_product_type() && u[muta].raw_type==44);
+    assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
+    assert(u[muta].alive && u[muta].type==race_guardian_product_type() && u[muta].raw_type==44);
+    guardian_test_restore(before);assert(race_load_game());
     /* A valid checksum with a mismatched authenticated pair falls back to
      * the untouched real predecessor slot. */
     guardian_test_retag(newest.slot,SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
     GbaSaveSelection fallback;assert(race_worker_cargo_select(&plan,&fallback));
-    assert(fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION && fallback.slot!=newest.slot);
-    assert(race_load_game() && !u[child].alive && u[egg].alive);
+    assert((fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION ||
+            fallback.tag==SC64_SHARED_ACTOR_TRANSPORT_SAVE_VERSION) && fallback.slot!=newest.slot);
+    assert(race_load_game() && u[egg].alive);
+    if (fallback.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION) assert(!u[child].alive);
+    else assert(u[child].alive && u[child].type==U_SCARAB);
     guardian_test_corrupt(fallback.slot);guardian_test_snapshot(before);
     memcpy(old_units,u,sizeof(u));memcpy(old_buildings,b,sizeof(b));
     int ore=minerals,gas_before=gas,frame_before=frame;u32 seed_before=seed;

@@ -389,20 +389,6 @@ race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *ou
 #endif
 #ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
 #include "sc64_guardian_candidate_validation.h"
-/* Until completed-Guardian provenance is validated, this candidate supports
- * paid Cocoons but must not admit a newly appended completed Guardian. */
-static int race_full_guardian_candidate_valid(const RaceSave *candidate,unsigned width,unsigned height,
-                                               const Sc64StageSaveAuth *guard_auth)
-{
-    if (!race_guardian_candidate_valid(candidate,width,height,guard_auth)) return 0;
-#ifdef SC64_GUARDIAN_DISTINCT_STAGE
-    for (unsigned i=0;i<MAX_UNITS;++i) {
-        Unit q;
-        if (!SC64_GUARD_DECODE(candidate,i,width,height,&q) || q.type==U_GUARDIAN_STAGE) return 0;
-    }
-#endif
-    return 1;
-}
 #endif
 #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
 /* Candidate ownership is derived only from saved custom players or the
@@ -2530,7 +2516,7 @@ static int race_save_game(void) {
             (unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
 #ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
-    if (!race_full_guardian_candidate_valid(&race_data,(unsigned)race_cols*16u,
+    if (!race_guardian_candidate_valid(&race_data,(unsigned)race_cols*16u,
                                        (unsigned)race_rows*16u,guard_auth)) return 0;
 #endif
 #ifdef SC64_IMPACT_EVENTS
@@ -3998,7 +3984,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                                            (unsigned)height*16u SC64_GCTX_ARG)) return 0;
 #endif
 #ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
-    if (!race_full_guardian_candidate_valid(&race_data,(unsigned)width*16u,
+    if (!race_guardian_candidate_valid(&race_data,(unsigned)width*16u,
                                        (unsigned)height*16u,guard_auth)) return 0;
 #endif
     plan->building_damage_marker = building_damage_marker;

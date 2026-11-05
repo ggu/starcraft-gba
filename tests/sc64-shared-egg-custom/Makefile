@@ -140,3 +140,11 @@ custom-shared-actor-full-terran:
 	mkdir -p $(COMBINED_BIN_DIR)
 	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_GUARDIAN_COCOON_STAGE -DSC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE -DSC64_SHARED_ACTOR_FULL_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_shared_actor_full_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/shared-actor-full
 	$(COMBINED_BIN_DIR)/shared-actor-full $(SCARAB_PRIOR_SRAM)
+
+# Independent old feature5 binary writes the exact predecessor consumed below.
+SCARAB_FEATURE5_ROOT ?= /tmp/sc64-scarab-feature5-prior-nov6
+.PHONY: custom-shared-actor-feature5-writer
+custom-shared-actor-feature5-writer:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_SHARED_ACTOR_JOURNAL_HOST_STAGE '-DSC64_PRIOR_GAME="$(SCARAB_FEATURE5_ROOT)/starcraft/game.c"' '-DSC64_PRIOR_SCARAB_ADAPTER="$(SCARAB_FEATURE5_ROOT)/starcraft/sc64_scarab_unit_adapter.h"' $(TERRAN_ROM_FLAGS) tests/sc64_scarab_feature5_writer.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/feature5-writer
+	$(COMBINED_BIN_DIR)/feature5-writer $(SCARAB_PRIOR_SRAM) $(COMBINED_BIN_DIR)/feature5.sram
