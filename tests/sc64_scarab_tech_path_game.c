@@ -58,7 +58,8 @@ int main(void)
     for (int tick = 0; tick < 120; ++tick) race_scarab_production_tick(parent, 0);
     assert(race_scarab_parent_read(parent, 0, &p, &counts));
     assert(counts.inside == 1 && !p.queued);
-    assert(race_save_game() && race_load_game());
+    assert(race_save_game());
+    assert(race_load_game());
     assert(race_scarab_parent_read(parent, 0, &p, &counts));
     assert(counts.inside == 1 && !p.queued);
     puts("constructed paid tech progression, Reaver birth, ammunition and journal passed");
