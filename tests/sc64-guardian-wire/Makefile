@@ -77,3 +77,21 @@ guardian-frame-render-real:
 	/tmp/guardian-frame-render-protoss
 	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -I.local/sc64/guardian-cocoon/bank tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-render-showcase
 	/tmp/guardian-frame-render-showcase
+
+## Individually guarded profile slices.
+.PHONY: guardian-journal-slice-terran
+guardian-journal-slice-terran:
+	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-terran
+	$(GUARD_TEST_BIN_DIR)/guardian-journal-terran
+.PHONY: guardian-journal-slice-zerg
+guardian-journal-slice-zerg:
+	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-zerg
+	$(GUARD_TEST_BIN_DIR)/guardian-journal-zerg
+.PHONY: guardian-journal-slice-protoss
+guardian-journal-slice-protoss:
+	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_FLAGS)) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-protoss
+	$(GUARD_TEST_BIN_DIR)/guardian-journal-protoss
+.PHONY: guardian-journal-slice-showcase
+guardian-journal-slice-showcase:
+	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-showcase
+	$(GUARD_TEST_BIN_DIR)/guardian-journal-showcase
