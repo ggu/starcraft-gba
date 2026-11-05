@@ -146,6 +146,7 @@ int main(void)
     /* Two distinct namespaces: a bad newer Guardian slot must not lend its
      * authorization to the older valid ordinary legacy Overlord. */
     guardian_test_reset();q=&u[slot];assert(q->alive && q->type==U_OVERLORD);
+    q->raw_type=36; /* Existing ordinary/raw36 rows are valid legacy data. */
     Unit legacy_ordinary=*q;assert(race_save_game());
     assert(race_worker_cargo_select(&plan,&selected));
     guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
