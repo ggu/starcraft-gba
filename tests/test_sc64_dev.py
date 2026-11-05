@@ -192,6 +192,7 @@ verify_loader.exec_module(verify_roms)
 
 
 original_prepare = dev.prepare
+original_status = dev.status
 
 class OnboardingTests(unittest.TestCase):
     def test_construction_readiness_requires_glow_version_and_payload(self):
@@ -379,6 +380,12 @@ class OnboardingTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'Z9 requires prepared inputs'):
                     dev.build(profile)
                 run.assert_not_called()
+            for inherited, late_ready, expected in ((0, 0, 0), (1, 0, 1), (0, 1, 1)):
+                with patch.object(dev, 'status', return_value=inherited) as inherited_status, \
+                     patch.object(sc64_z9_setup, 'status', return_value=late_ready) as late_status:
+                    self.assertEqual(original_status(profile, include_built=False), expected)
+                inherited_status.assert_called_once_with('zerg-z7', include_built=False)
+                late_status.assert_called_once_with(dev.ROOT)
 
     def test_canonical_race_verifiers_use_current_mission_identities(self):
         self.assertEqual(verify_roms.TARGETS['--zerg'],
