@@ -31,7 +31,18 @@ int main(void)
     }
     assert(pair>=0);int pair_timer=u[pair].work_timer;assert(race_save_game());
     assert(race_load_game() && u[pair].work_timer==pair_timer);
-    for(int i=0;i<pair_timer;i++) update_orders();
+    for(int i=1;i<pair_timer;i++) race_z7_egg_tick_unit(pair);
+    assert(u[pair].type==U_Z7_EGG && u[pair].work_timer==1);
+    /* HOST-only saturation: a paid pair must wait without consuming its
+     * timer or losing its second body until a slot becomes free. */
+    int artificial=-1;
+    for(int i=0;i<MAX_UNITS;i++) if(!u[i].alive) {
+        u[i].alive=1;u[i].owner=ENEMY;u[i].type=U_DRONE;artificial=i;
+    }
+    assert(artificial>=0 && find_unit_slot()<0);
+    race_z7_egg_tick_unit(pair);
+    assert(u[pair].type==U_Z7_EGG && u[pair].work_timer==1);
+    u[artificial].alive=0;race_z7_egg_tick_unit(pair);
     int after=0;for(int i=0;i<MAX_UNITS;i++)
         if(u[i].alive && u[i].owner==SIDE && u[i].type==U_ZERGLING) after++;
     assert(after==before+2);
