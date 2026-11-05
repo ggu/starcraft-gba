@@ -30,7 +30,10 @@ must combine progression, ammunition, attack and genuine fresh-process saves.
 - Cocoon checkpoint `8ef2845e`: optional renderer, independent private-bank
   generator and test fixtures. No bank was generated and no game hook or normal
   flags were enabled. The deterministic wait approximation is not N64 timing.
-- Source-town Scarab wallet routing is being staged separately. A reassignment
+- Source-town Scarab wallet routing checkpoint `181f23e8` binds Z8 and Z9/Z10
+  ammunition purchases to their immutable scenario town slots, rejecting wrong
+  source/live owners, stale map bindings and ambiguous late town slots. The
+  focused wallet fixture is expanded but unrun. A reassignment
   between two valid source slots sharing one runtime owner cannot be detected
   from existing actor fields alone. Transfer/cancel/refund handling still needs
   an explicit integration test; do not claim capture safety from bank lookup.
@@ -44,3 +47,7 @@ failures before enabling any release capability. Then validate the full product
 matrix, real tech progression/attacks/SRAM on ARM, source permissions, stack/RAM
 and representative frame costs. Collect missing ordinary N64 production and
 weapon observations separately. No Actions runner is needed.
+
+The focused wallet recipe is `tests/sc64-scarab-wallet/Makefile`, target
+`test-scarab-source-wallet-z10`. The tech-path target is in
+`tests/sc64-shared-egg-custom/Makefile`; both use prepared private inputs.
