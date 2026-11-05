@@ -114,9 +114,8 @@ Reaver ammunition and Guardian production still need their own observations.
 
 The [staged production checkpoint](audits/2026-11-06-n64-priority-audit/shared-production-progress.md)
 records Guardian source-permission tests at `5859ea43` and the first selected
-Egg/Scarab HOST journal at `f2edfa3a`/`9160929e`. Five prior-writer actor-ID/custom
-SRAM cases pass, including P10 at `987c0f09`; the combined Guardian feature
-remains outstanding.
+Egg/Scarab HOST journal at `f2edfa3a`/`9160929e`. Prior-writer custom SRAM and full actor-ID metadata comparisons now pass for
+five profiles, including the fresh Terran all-ID receipt at `ce00ce79`. The combined Guardian feature remains outstanding.
 Actual P6 source flags collide with the prototype paid marker, so source data
 must be preserved and interpretation scoped to validated morph state/new format.
 These branches are not merged or enabled guest services. P1 work now targets
