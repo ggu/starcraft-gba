@@ -56,7 +56,14 @@ int main(void)
 #endif
     assert(!sc64_race_unit_sprite(101));
     gba_init(); game_init(); camx=camy=0;
-    for (unsigned raw=173;raw<=174;++raw) {
+#ifdef SC64_Z10_RUNTIME
+    const unsigned last_building_raw=174;
+#else
+    /* The Temple art is in the bank, but its building identity is Z10-only. */
+    const unsigned last_building_raw=173;
+    assert(sc64_race_building_from_raw(174)<0);
+#endif
+    for (unsigned raw=173;raw<=last_building_raw;++raw) {
         Building q; memset(&q,0,sizeof(q));
         q.alive=1; q.owner=SIDE; q.raw_type=(int)raw;
         int type=sc64_race_building_from_raw((int)raw); assert(type>=0);
@@ -70,9 +77,10 @@ int main(void)
         check_pixels(raw==173?formation:temple,-25,72);
         camx=0;
     }
-    /* The static cache must see edge entry/exit for the larger Temple. */
-    memset(b,0,sizeof(b)); b[0].alive=1; b[0].owner=SIDE; b[0].raw_type=174;
-    b[0].type=sc64_race_building_from_raw(174); b[0].y=60;
+    /* The static cache must see edge entry/exit for the larger source art. */
+    memset(b,0,sizeof(b)); b[0].alive=1; b[0].owner=SIDE;
+    b[0].raw_type=(int)last_building_raw;
+    b[0].type=sc64_race_building_from_raw((int)last_building_raw); b[0].y=60;
     camx=80; b[0].x=55; /* screen anchor -25, still partly visible */
     unsigned key=sc64_static_objects_key(); assert(sc64_static_objects_key()==key);
     b[0].x=20; assert(sc64_static_objects_key()!=key); /* anchor -60 */
