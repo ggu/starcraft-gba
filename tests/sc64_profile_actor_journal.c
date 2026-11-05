@@ -9,12 +9,13 @@ int main(int argc,char **argv)
     assert(argc==2);FILE *f=fopen(argv[1],"rb");assert(f);
     assert(fread(sram,1,sizeof(sram),f)==sizeof(sram));assert(!fclose(f));
     guardian_test_reset();game_init();guardian_test_restore(sram);assert(race_load_game());
-    int reaver=-1,egg=-1;
+    int reaver=-1,egg=-1,legacy=-1;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive) {
         if(u[i].type==U_REAVER)reaver=i;
         if(u[i].type==SC64_SHARED_EGG_TYPE)egg=i;
+        if(u[i].type==U_OVERLORD && u[i].raw_type==36)legacy=i;
     }
-    assert(reaver>=0 && egg>=0);
+    assert(reaver>=0 && egg>=0 && legacy>=0);
     minerals=200;gas=200;
     assert(race_scarab_enqueue(reaver,0));
     assert(race_scarab_production_tick(reaver,0)==SC64_SCARAB_ALLOCATED);
@@ -121,11 +122,13 @@ int main(int argc,char **argv)
            u[child].path_x==motion.path_x && u[child].path_y==motion.path_y);
     assert(u[egg].alive && u[egg].type==SC64_SHARED_EGG_TYPE &&
            u[muta].alive && u[muta].type==U_GUARDIAN_COCOON &&
-           u[child].alive && u[child].type==U_SCARAB);
+           u[child].alive && u[child].type==U_SCARAB &&
+           u[legacy].alive && u[legacy].type==U_OVERLORD && u[legacy].raw_type==36);
     for(int i=0;i<SC64_GUARDIAN_TICKS;i++)assert(race_guardian_morph_tick(muta));
     assert(sc64_race_raw_unit(u[muta].type)==44 && u[muta].raw_type==44);
     assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
-    assert(sc64_race_raw_unit(u[muta].type)==44 && u[muta].raw_type==44 && u[egg].alive);
+    assert(sc64_race_raw_unit(u[muta].type)==44 && u[muta].raw_type==44 && u[egg].alive &&
+           u[legacy].alive && u[legacy].type==U_OVERLORD && u[legacy].raw_type==36);
     puts("profile HOST selected journal: predecessor, paid Egg/Cocoon/Scarab and Guardian passed");
     return 0;
 }

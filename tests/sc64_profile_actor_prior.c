@@ -62,6 +62,8 @@ int main(int argc,char **argv)
         if(clear) {px=x;py=y;}
       }
     assert(px>=0 && py>=0);
+    int legacy=spawn_unit(SIDE,U_OVERLORD,100,100);assert(legacy>=0);
+    u[legacy].raw_type=36;u[legacy].raw_owner=-1;
     int reaver=spawn_unit(SIDE,U_REAVER,px,py);assert(reaver>=0);
     int shuttle_type=sc64_race_unit_from_raw(69);assert(shuttle_type>=0);
     int shuttle=spawn_unit(SIDE,shuttle_type,px+20,py);assert(shuttle>=0);

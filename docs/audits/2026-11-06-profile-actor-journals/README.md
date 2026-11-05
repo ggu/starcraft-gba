@@ -101,3 +101,22 @@ interactions. ARM builds, timing, RAM and stack, genuine fresh-process guest
 SRAM and applicable campaign/custom regression remain open. The normal and
 guest enablement fences must stay in place until the combined service passes
 those gates; Z8 ordinary-win and other campaign completion gates are unchanged.
+
+## Historical profile-format boundary
+
+The early feature-5 shared-actor journal fence in `b9e9d90b:starcraft/game.c`
+requires late Terran storage and excludes Z/P full storage. Feature-7's initial
+`d7572833` fence likewise permitted only Terran compact storage. The later Z/P
+feature-7 experiment (`b9e9d90b`) explicitly rejected both Z7 derived and P10
+typed codecs, and the same restrictions remained at the flight checkpoint
+`3477fc26` and the parent of `d5a0b69d`. Thus these source checkpoints provide
+no genuine feature-5 or feature-7 producer for either exact profile. This is
+source-history evidence for these commits and flags, not a claim about every
+possible private build. The explicit profile-codec candidate excludes those
+pairs from authentication, selection and impact-writer predecessor lists;
+other Z/P compact and Terran paths retain their existing feature-7 behavior.
+Adversarial retags in the HOST tests are rejection probes, not evidence of a
+historical writer. Genuine same-profile old producers are used for feature 0
+and feature 1, including a constructed ordinary Overlord whose raw identity is
+36. The pending reruns must pass before this candidate can claim the new
+feature-0 migration coverage.
