@@ -130,6 +130,14 @@ records selected combined feature7 HOST proofs, fresh/initialized feature15
 flight saves, the six-tag selector fix, early source-admission tests and remaining
 immutable pre-cargo/motion/impact/guest gates. These stages are still off on main.
 
+The immediate S1 regression gate is now the
+[paid-job Nydus fix](audits/2026-11-06-n64-priority-audit/shared-production-progress.md):
+`3ebed0e2` passes actual-engine HOST transit/birth and existing Nydus regressions
+after baseline `71b73c12` reproduces the collision. Its broader qualification is
+running; it is not merged. Scarab flight `9a3b6186` and fact guards `6100d2c4`
+have stronger finite HOST evidence, while pending impact, complete motion,
+Nydus/trigger interactions, typed/derived codecs and guest checks stay open.
+
 ## Next concrete milestones after the Terra audit
 
 1. Promote the now guest-qualified opt-in late Egg service into one common

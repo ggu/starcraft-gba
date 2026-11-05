@@ -129,3 +129,37 @@ complete eight-test fact suite, including missing/incorrect layout rejection.
 A feature15 fingerprint successor is queued; the earlier 3d stage's omitted
 construction-gate failure is retained and not counted as a full passing suite.
 No staged source here supplies a new frame-rate gain or enables a guest service.
+
+## Latest runtime review and Nydus gate
+
+Scarab checkpoint `9a3b6186` extends HOST flight proof to actual paid unit and
+building launches, controlled arrival signals, phase4 save/load, real target
+kill and same-slot spawn before the child tick, and ground-target save/load.
+It preserves target loss without retargeting the replacement occupant. The
+arrival signal is controlled, not natural navigation. Genuine pre-cargo
+`17dc9b3e` writer→current Terran custom reader now passes at `2e535c42`, with
+legacy gas normalization, fixed candidate bytes and unchanged SRAM. Other old
+campaign codecs and pending packets/upgrades remain unfinished.
+
+Full-facts `6100d2c4` passes feature7/15 P10 checks and ten fact regression tests,
+including mandatory full flag, missing/wrong layout, cross-version reuse and
+motion capability mismatch. P10/Z7/distinct private tables retain their exact
+profile scope; this is not guest execution or typed/derived save qualification.
+
+Independent review also reproduced a shared Nydus target alias: an idle paid
+Egg stores a product enum in `target`, while passenger-entry cleanup treated
+that number as a unit-slot reference. Baseline test `71b73c12` fails at paid Egg
+survival after ordinary-input transit. Fixed `3ebed0e2` passes the full existing
+Nydus sanitizer fixture, both transit directions, unmodified game-update birth,
+ordinary idle/move/attack reference cleanup and unrelated-target preservation.
+The canals and passenger slot/position are constructed HOST arrangements; Z7's
+authored source map has no canals. An earlier fixture attempt lacked a producer
+and failed before the bug; that log is retained and not counted as reproduction.
+The fix also protects staged Cocoon payload identity, but that branch has not
+received a separate actual-Cocoon Nydus fixture yet.
+
+Broader source/doctor/default/six-normal-ROM/unified checks for `3ebed0e2` are
+running in `/tmp/sc64-nydus-paid-targets-20261106` under the native lock. No merge
+or new ROM-delivery claim is made while they are pending. Scarab FSM orders also
+alias ordinary orders in Nydus cleanup; that separate identity-aware callback
+integration remains unfinished before guest flight qualification.
