@@ -461,11 +461,13 @@ static int race_zl_create(void *opaque, const Sc64Z8Action *action,
     if (y + bottom >= (int)height) y = (int)height - bottom - 1;
     if (x < left || y < top) return -1;
     live_owner = m->live_owner[source_owner];
-    if (live_owner != SIDE) return -1;
 #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (live_owner != SIDE) return -1;
     if (!race_product_slots_available(1)) return 0;
-#endif
     if (find_unit_slot() < 0) return -1;
+#else
+    if (live_owner != SIDE || find_unit_slot() < 0) return -1;
+#endif
     slot = spawn_unit(live_owner, type, x / 2, y / 2);
     if (slot < 0) return -1;
     u[slot].raw_type = (s16)raw;
