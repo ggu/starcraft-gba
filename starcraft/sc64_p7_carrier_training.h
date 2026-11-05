@@ -163,6 +163,13 @@ static int race_p7_carrier_training_slots_available(unsigned wanted)
     commitments += 3u - created;
     }
     for (int i = 0; i < MAX_UNITS; ++i) {
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+        if (u[i].alive && u[i].type == SC64_EGG_ACTOR) {
+            if (!sc64_z7_egg_product_valid(u[i].target)) return 0;
+            commitments += (unsigned)(sc64_z7_egg_product_count(u[i].target) - 1);
+            continue;
+        }
+#endif
         if (!u[i].alive || u[i].type != U_P7_CARRIER ||
             RACE_PROTOSS_RAW(&u[i]) != SC64_P7_CARRIER_RAW) continue;
         if (u[i].carry < 0 || u[i].carry >= SC64_P7_CARRIER_QUEUE_LIMIT)

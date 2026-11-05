@@ -835,16 +835,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_product_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
-    unsigned carrier_wanted=(unsigned)count;
-    for (int slot=0;slot<MAX_UNITS;++slot) if (u[slot].alive && u[slot].type==SC64_EGG_ACTOR) {
-        if (!sc64_z7_egg_product_valid(u[slot].target)) return 0;
-        carrier_wanted+=(unsigned)(sc64_z7_egg_product_count(u[slot].target)-1);
-    }
-    if (race_protoss_services_active() && !race_p7_carrier_training_slots_available(carrier_wanted)) return 0;
-#else
     if (race_protoss_services_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
-#endif
 #endif
 #ifdef SC64_P4_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
