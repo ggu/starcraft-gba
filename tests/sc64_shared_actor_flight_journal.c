@@ -78,5 +78,19 @@ int main(int argc,char **argv)
     assert(race_scarab_flight_control_tick(child,1,0)==SC64_SCARAB_CONTROL_ARRIVED);
     assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
     assert(u[child].order==4 && u[child].target==MAX_UNITS+building);
+    /* The per-owner upgrade is injected by this probe; research is not wired. */
+    sc64_scarab_probe_damage_upgrades=(u8)(1u<<SIDE);
+    assert(race_scarab_probe_bullet_create(&u[child]));
+    assert(race_impact_count==1);Sc64ImpactEvent expected=race_impact_rows[0];
+    Sc64ScarabImpact packet;assert(sc64_scarab_impact_unpack(&expected,&packet) && packet.ticks==6);
+    assert(race_save_game());race_impact_reset();sc64_scarab_probe_damage_upgrades=0;
+    assert(race_load_game());assert(sc64_scarab_probe_damage_upgrades==(1u<<SIDE));
+    assert(race_impact_count==1 && !memcmp(&race_impact_rows[0],&expected,sizeof(expected)));
+    for (int step=6;step>0;--step) {
+        while (!sc64_battlecruiser_source_tick_due()) { ++frame; }
+        race_impact_tick();++frame;
+        assert(race_impact_count==(step>1));
+        if (step>1) { assert(sc64_scarab_impact_unpack(&race_impact_rows[0],&packet));assert(packet.ticks==(unsigned)step-1); }
+    }
     puts("actual HOST paid unit/building launches, controlled arrival and target reuse passed");return 0;
 }

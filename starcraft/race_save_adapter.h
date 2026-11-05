@@ -1657,7 +1657,7 @@ static int race_save_game(void) {
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_live_products_valid()) return 0;
 #endif
-#ifdef SC64_SCARAB_WEAPON_PROBE
+#if defined(SC64_SCARAB_WEAPON_PROBE) && !defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE)
     if (race_scarab_probe_bullets_pending()) return 0;
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
@@ -2037,6 +2037,10 @@ static int race_save_game(void) {
     race_data.state[27] = 0x42450000 | sc64_battlecruiser_tech_bits;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_data.state[28] = 0x42440000 | sc64_bc_pause_offset;
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+    if (sc64_scarab_probe_damage_upgrades & ~31u) return 0;
+    race_data.state[28] |= (int)((unsigned)sc64_scarab_probe_damage_upgrades << 5);
+#endif
     memcpy(&race_data.state[29],&sc64_bc_spell_rng,sizeof(sc64_bc_spell_rng));
 #endif
 #endif
@@ -2815,6 +2819,15 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(v[20]<0||v[20]>SC64_SKIRMISH_IMPORTED_COUNT)return 0;
     for(int i=21;i<24;i++)if(v[i]<0||v[i]>2)return 0;
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+    for (int i=0;i<plan->impact_candidate_count;++i) {
+        if (plan->impact_candidate[i].source_type==SC64_SCARAB_IMPACT_MARKER) {
+            Sc64ScarabImpact packet;
+            if (!sc64_scarab_impact_unpack(&plan->impact_candidate[i],&packet) ||
+                !packet.ticks || packet.x>=width*32 || packet.y>=height*32) return 0;
+        }
+    }
+#endif
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
 #ifdef SC64_SHARED_BATTERY
@@ -4352,6 +4365,10 @@ static int race_load_game(void) {
     if (!race_load_preflight(&plan)) return 0;
 #endif
     const int *v = race_data.state;
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+    sc64_scarab_probe_damage_upgrades=(u8)((guard_auth->features & SC64_STAGE_SAVE_EXTENDED_EVENTS) ?
+                                              ((unsigned)v[28]>>5)&31u : 0u);
+#endif
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_SHARED_TRANSPORT
     race_skirmish_transport_tech = race_skirmish_transport_candidate;
