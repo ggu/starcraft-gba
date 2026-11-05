@@ -101,7 +101,14 @@ static int SC64_TYPED_WIRE_CANONICAL(int type, int *maxhp, int *armor,
     if ((egg_stage & 4) && type==U_SCARAB && type<64) {
         if (maxhp) *maxhp=20;
         if (armor) *armor=0;
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+        /* Feature-15 typed Scarab wire rows temporarily use shield bits as
+         * waypoint digits; the candidate bridge restores real shields before
+         * graph validation or publication. */
+        if (maxshield) *maxshield=(egg_stage==15 ? 511 : 10);
+#else
         if (maxshield) *maxshield=10;
+#endif
         return 1;
     }
 #endif
