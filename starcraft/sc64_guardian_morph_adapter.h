@@ -48,6 +48,11 @@ static int race_guardian_morph_start(int slot)
         SC64_TRANSPORT_LOADED(q) || q->hp<=0 || q->maxhp!=120 || q->hp>120 ||
         race_owner_minerals(q->owner)<50 || race_owner_gas(q->owner)<100) return 0;
     int product=race_guardian_product_type();
+    /* Source PUNI is indexed by the actor's source owner, not the engine's
+     * owner number. Earlier Zerg missions without authenticated mappings
+     * fail closed; custom games keep their own catalog admission. */
+    if (!race_mode && race_human==R_ZERG &&
+        !race_guardian_campaign_allowed(q->owner,q->raw_owner,44)) return 0;
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (!race_zerg_campaign_product_available(q->owner,44)) return 0;
 #endif

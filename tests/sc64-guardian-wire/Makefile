@@ -127,3 +127,7 @@ guardian-full-facts-distinct:
 	$(GUARD_FULL_FACT_DIR)/distinct/generator > $(GUARD_FULL_FACT_DIR)/distinct/sc64_fact_tables_generated.h
 	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Icommon -Istarcraft -I$(GUARD_FULL_FACT_DIR)/distinct $(GUARD_FULL_DISTINCT_FLAGS) -DSC64_FACT_TABLES tests/sc64_guardian_full_facts.c -o $(GUARD_TEST_BIN_DIR)/guardian-full-facts-distinct
 	$(GUARD_TEST_BIN_DIR)/guardian-full-facts-distinct
+.PHONY: guardian-campaign-permissions
+guardian-campaign-permissions:
+	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_campaign_permissions_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-campaign-permissions
+	$(GUARD_TEST_BIN_DIR)/guardian-campaign-permissions

@@ -3,43 +3,6 @@
 #define SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_H
 /* HOST construction experiment. The paid marker is not yet authenticated by
  * the selected-journal codecs; do not enable this as a guest save service. */
-static int race_guardian_campaign_puni(const unsigned char *puni,int source,int raw)
-{
-    if (!puni || (unsigned)source>=12u || (unsigned)raw>=228u) return 0;
-    unsigned cell=(unsigned)source*228u+(unsigned)raw;
-    return puni[2964u+cell] ? puni[2736u+(unsigned)raw]!=0 : puni[cell]!=0;
-}
-
-static int race_guardian_campaign_allowed(int owner,int source,int raw)
-{
-    if (race_mode || owner!=SIDE || source<0 || source>=8) return 0;
-#ifdef SC64_Z8_RUNTIME
-    if (race_z8_active()) {
-        int type=sc64_race_building_from_raw(raw);
-        return type>=0 && race_z8_colony_product_available(owner,source,type);
-    }
-#endif
-#ifdef SC64_Z9_RUNTIME
-    if (race_zl_active()) {
-        int type=sc64_race_building_from_raw(raw);
-        return type>=0 && race_zl_colony_product_available(owner,source,type);
-    }
-#endif
-#ifdef SC64_Z7_RUNTIME
-    if (race_z7_active()) return race_z7_source_owner((unsigned)source)==owner &&
-        race_guardian_campaign_puni(sc64_z7_source_puni,source,raw);
-#endif
-#ifdef SC64_Z6_RUNTIME
-    if (race_z6_active()) return race_z6_source_owner((unsigned)source)==owner &&
-        race_guardian_campaign_puni(sc64_z6_source_puni,source,raw);
-#endif
-#ifdef SC64_Z5_RUNTIME
-    if (race_z5_active()) return race_z5_source_owner((unsigned)source)==owner &&
-        race_guardian_campaign_puni(sc64_z5_source_puni,source,raw);
-#endif
-    return 0; /* Earlier campaign PUNI has not been authenticated here. */
-}
-
 static int race_guardian_campaign_morph(int building,int target)
 {
     if ((unsigned)building>=MAX_BUILDINGS ||

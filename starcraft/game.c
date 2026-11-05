@@ -1900,8 +1900,10 @@ static int race_z6_transport_research_selected(void);
 static int race_z6_transport_start_research_selected(void);
 #endif
 #endif
-#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+#ifdef SC64_GUARDIAN_COCOON_STAGE
 static int race_guardian_campaign_allowed(int owner,int source,int raw);
+#endif
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
 static int race_guardian_campaign_morph(int building,int target);
 static int race_guardian_campaign_cancel(int building);
 #define SC64_GUARDIAN_PAID_BUILDING_MORPH 0x2000u
@@ -1949,6 +1951,9 @@ static int race_z8_active(void);
 static int race_z8_map_shape_valid(const Sc64RaceMap *map);
 static int race_z8_source_owner(unsigned slot);
 static int race_z8_colony_product_available(int owner,int raw_owner,int type);
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_z8_guardian_product_allowed(int owner,int raw_owner,int raw);
+#endif
 static int race_z8_runtime_init(const Sc64RaceMap *map);
 static int race_z8_runtime_tick(void);
 static int race_z8_outcome(void);
@@ -1964,6 +1969,9 @@ static int race_zl_active(void);
 static int race_zl_map_shape_valid(const Sc64RaceMap *map);
 static int race_zl_source_owner(unsigned slot);
 static int race_zl_colony_product_available(int owner,int raw_owner,int type);
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_zl_guardian_product_allowed(int owner,int raw_owner,int raw);
+#endif
 static int race_zl_runtime_init(const Sc64RaceMap *map);
 static int race_zl_runtime_tick(void);
 static int race_zl_outcome(void);
@@ -2152,7 +2160,7 @@ static void sc64_p7_arbiter_cache_process_due(void);
 #endif
 #ifdef SC64_Z5_RUNTIME
 static int race_z5_active(void);
-#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+#ifdef SC64_GUARDIAN_COCOON_STAGE
 static int race_z5_source_owner(unsigned slot);
 #endif
 static int race_z5_world_paused(void);
@@ -13135,6 +13143,9 @@ game_self_test(void)
 static unsigned race_shared_trigger_obligations(void);
 #endif
 #include "race_adapter.h"
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#include "sc64_guardian_permissions.h"
+#endif
 #ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
 #include "sc64_guardian_campaign_construction.h"
 #endif

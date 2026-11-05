@@ -107,6 +107,15 @@ static int race_z8_source_owner(unsigned slot)
     return -1;
 }
 
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_z8_guardian_product_allowed(int owner,int raw_owner,int raw)
+{
+    return race_z8_active() && (unsigned)owner<5u && (unsigned)raw_owner<8u &&
+        race_z8_source_owner((unsigned)raw_owner)==owner && (unsigned)raw<228u &&
+        sc64_z8_permission_available(&sc64_z8_permission_table,(unsigned)raw_owner,(unsigned)raw);
+}
+#endif
+
 /* PUNI is source-slot scoped. Only colony products use this first shared
  * route; other production retains its existing profile behavior. */
 static int race_z8_colony_product_available(int owner,int raw_owner,int type)
