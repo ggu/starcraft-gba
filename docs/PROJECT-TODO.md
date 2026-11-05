@@ -3,6 +3,35 @@
 Updated: 2026-11-06. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
+## Prepared qualification awaiting disk space
+
+The next source checkpoints are backed up but **have not run native checks**:
+
+- Z7/P10 button controllers: branch `codex/profile-button-controller-nov6`,
+  local source `7dd97705`, publication `4647b8f0`. Reuse the full paid
+  tech/ammunition/real-enemy/fresh-process impact sequence on both actual codecs.
+- Historical-save matrix: branch `codex/guardian-typed-derived-nov6`,
+  local source `4f4e0b5a`, publication `e4b43e5b`. Exercise independently built
+  genuine feature0/1 writers and legacy raw36 Overlords. Exact derived/typed
+  candidate profiles fence unsupported feature5/7 contexts; no genuine writer
+  for those profile/feature combinations was found. Other proven compact and
+  Terran migration paths remain separate.
+- Arbiter/setup attribution: branch `codex/perf-e52-20261106`,
+  local source `4603c788`, publication `0b8cbf4c`. Measure aura, detection,
+  optical visibility and cache work with the paired state/pixel and overhead
+  checks before choosing an optimization. No performance gain is claimed.
+
+On 2026-11-06 free space again fell to about 116 MB and fresh file creation
+returned ENOSPC. Closed owned HOST executables were losslessly archived only
+after in-use checks and decompressed hash verification; ROMs, ELF files, logs,
+saves and sources were preserved. Native qualification is held for restored
+reserve. The bounded unshimmed N64 attempt reached menus and inspected bindings,
+but produced no construction or gameplay parity evidence.
+
+Resume the cross-profile controls and historical matrix first, then the larger
+performance measurement and ARM qualification. Existing release flags remain
+unchanged; these source checkpoints are not a ROM release or SD delivery.
+
 ## Goal and completion rules
 
 Source-work checkpoint: the [shared production follow-up](audits/2026-11-06-shared-production-source-checkpoint/README.md)
