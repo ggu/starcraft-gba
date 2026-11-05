@@ -462,7 +462,10 @@ static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *can
 { return race_impact_save_decode_selected_impl(len,tag,candidate,count,0); }
 static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth)
 {
-    if (!sc64_stage_save_auth_matches(auth,&race_data,race_data.version,0)) return 0;
+    if (!sc64_stage_save_auth_matches(auth,&race_data,race_data.version,0) ||
+        (auth->features & ~SC64_STAGE_SAVE_GUARDIAN) ||
+        tag!=((auth->features & SC64_STAGE_SAVE_GUARDIAN) ?
+              SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
     return race_impact_save_decode_selected_impl(len,tag,candidate,count,auth->inner);
 }
 #endif
