@@ -28,9 +28,13 @@ int main(void)
     assert(!race_guardian_morph_start(muta)); /* No authenticated early table. */
     assert(minerals==500 && gas==500 && u[muta].type==U_MUTALISK);
     race_selected_mission=SC64_Z7_GLOBAL_ID;
-    assert(race_guardian_morph_start(muta));
+    selected_building=-1; u[muta].selected=1;
+    assert(!strcmp(race_menu_label(MENU_STOP+1),"MORPH GUARDIAN"));
+    choose_command(MENU_STOP+1);
     assert(minerals==450 && gas==400 && u[muta].raw_owner==3 && u[muta].hp==100);
-    u[muta].hp=80; assert(race_guardian_morph_cancel(muta));
+    assert(!strcmp(race_menu_label(MENU_STOP+1),"CANCEL MORPH"));
+    u[muta].hp=80; choose_command(MENU_STOP+1);
+    assert(u[muta].type==U_MUTALISK);
     assert(minerals==500 && gas==500 && u[muta].raw_owner==3 && u[muta].hp==48);
     int enemy_spire=spawn_build(ENEMY,B_GREATER_SPIRE,350,200,0);
     int enemy_muta=spawn_unit(ENEMY,U_MUTALISK,400,200);

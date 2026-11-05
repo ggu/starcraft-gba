@@ -34,9 +34,9 @@ int main(void)
     race_mode=0;
     assert(field_menu_count()>MENU_STOP+1);
     assert(!strcmp(race_menu_label(MENU_STOP+1),"MORPH GUARDIAN"));
-    choose_command(MENU_STOP+1);assert(q->type==U_GUARDIAN_COCOON);
-    assert(!strcmp(race_menu_label(MENU_STOP+1),"CANCEL MORPH"));
+    /* This synthetic early mission has no authenticated PUNI: fail closed. */
     choose_command(MENU_STOP+1);assert(q->type==U_MUTALISK);
+    assert(minerals==500 && gas==500);
     race_mode=1;
     assert(race_guardian_morph_start(slot));assert(q->hp==80);
     for(int i=0;i<749;i++) update_orders();
