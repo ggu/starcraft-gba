@@ -56,8 +56,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Priority order
 
-Priorities are the maintainer's decisions after the GPT-6.1 Terra audit and
-current-code review. Parallel work is appropriate where source ownership and
+Priorities are the maintainer's decisions after the [2026-11-06 GPT-6.1 Terra
+audit](audits/2026-11-06-n64-priorities/README.md) and current-code review. This
+round used existing N64 evidence and current source; it ran no fresh emulator
+comparison. Parallel work is appropriate where source ownership and
 the serialized native-test lock permit it.
 
 | ID | Priority / state | TODO and reason | Completion evidence required |
@@ -76,6 +78,7 @@ the serialized native-test lock permit it.
 | K1 | P1 / open | Qualify complete supported custom games for all race combinations and 1–3 AIs. Validate building/unit progression, economy, targeting, victory and long-game stability. | Both maps, each human race, homogeneous and mixed AI races, actual tech progression and save/load. Track global pool/queue pressure and ensure human production is not silently starved. |
 | M1 | P1 / open | Keep expanded mechanics within GBA memory and global actor capacity. Z10 has reached the 240-actor pool, preventing its former 70-Hydralisk launch goal. | Unchanged safety reserves, ROM/EWRAM/IWRAM and stack checks, child/queue/trigger capacity accounting and sustained busy play. Document adaptation limits; do not present catalog capacity as native-scale simulation. |
 | B1 | P2 / open | Finish combat-rule and attack-event fidelity: fractional HP/shields, armor/size/upgrade effects, Firebat collateral, appear-at-target wind-up, shield-hit effects and specialized weapons. | Verify current code first; compare source/N64 events, not only appearance. Exercise allies, invincibility, shields, deaths and impact saturation with persistence and clipping. See [combat audit](ENGINE-FIDELITY-AUDIT.md). |
+| B2 | P1 / open | Unify shared projectile flight and source attack events. Current follow/bounce traces use fixed endpoints while damage stays bound to a live target; stationary/melee paths can apply damage before depicted wind-up. | Native moving-target/release observations; bounded shared flight/event state, consistent visual/damage impact, separate shots, verified bounce rules, death/slot reuse/overflow, genuine save continuation and crowded ARM cost across products. See [visual/combat audit](audits/2026-11-06-n64-priorities/visual-combat.md). |
 | V1 | P2 / open | Audit remaining source sprites, animations and placement/order effects, including each supported unit/building, damaged buildings, corpses, resource cargo and construction poses. | Paired N64/GBA observations, correct source frames/anchors/palette/timing, no missing assets, scene/HUD clipping and crowded effect/VRAM reuse checks. Existing fixes must be checked before reopening old reports. |
 | V2 | P2 / open | Improve blocky fog/terrain boundaries without violating RAM/VRAM budgets or making busy frames slower. | Current-source paired visual/performance evidence, both maps/cameras, explored versus visible semantics, sprite/audio/impact compatibility. Rework the held fog draft rather than enabling a losing renderer. |
 | Q1 | P2 / open | Resolve controls/advisor PR regressions and polish N64-informed UX: non-destructive deselection, queue cancellation/refunds, alert suppression, camera bookmarks, settings and results. | Ordinary-input campaign/controller matrix and updated replays, visible hints matching input, native alert/control observations where relevant, persistence and no paid-order surprises. |
@@ -94,13 +97,20 @@ campaign work; late cosmetic work should not displace them.
 2. Replace the Reaver fallback with one coherent paid Scarab lifecycle, including
    source-placed versus newly trained ammunition, AI stocking, flight/impact and
    saves. Keep partial prototypes gated; source splash may increase Z10 danger.
-3. In parallel, reduce measured busy-loop cost with paired state/pixel and
-   gameplay checks. The N64 order gate is a research lead, not permission to
+3. In parallel, re-profile current-source order/detection, movement and
+   rendering, then reduce measured busy-loop cost with paired state/pixel and
+   gameplay checks. Historical inclusive scopes are not promised savings. The N64
+   order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
 4. Retry Z10 through ordinary controls after the relevant mechanics are usable;
    qualify genuine save continuation and affected carried missions. Preserve the
    existing 29-mission coverage rather than tune difficulty around a substitute
-   weapon or injected victory.
+   weapon or injected victory. Independently qualify early Protoss campaign
+   save continuation under the combined P10 product.
+5. Use a separate bounded reference task for moving-target projectiles and
+   stationary/melee release events, then implement a coherent shared lifecycle
+   (B2). Construction finish effects, shield feedback and Egg animation follow
+   the gameplay and persistence blockers above.
 
 The custom Egg service is an explicit preview across all four delivered
 products, with legacy Z7 separately checked. Its static frame and selected-Egg
@@ -116,7 +126,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 
 | Work | State and next gate |
 | --- | --- |
-| [#295](https://github.com/ggu/starcraft-gba/pull/295), shared production preview | The [Egg-only custom candidate](audits/2026-11-05-shared-egg-custom/README.md) at `6ba76f8e` no longer depends on Guardian. Six normal ROM/RAM checks and clean default tests pass; all five opt-in GBA builds and HOST controller/journal/owner suites pass. The exact Terran ROM has physical-button ARM, genuine fresh-process SRAM and a separate static-frame/HUD visual check. Known pre-cargo Z6/Z7 reader regressions were reproduced and fixed without changing the authenticated inner token. Separate preview commands are available; default service remains off. Campaign integration, remaining guest products, long matches and performance are not thereby qualified. |
+| [#295](https://github.com/ggu/starcraft-gba/pull/295), shared production preview | Merged as `34c1b38f`; whole tree equals reviewed publication `b57351af`. The [Egg-only custom candidate](audits/2026-11-05-shared-egg-custom/README.md) at `6ba76f8e` no longer depends on Guardian. Six normal ROM/RAM checks and clean default tests pass; all five opt-in GBA builds and HOST controller/journal/owner suites pass. The exact Terran ROM has physical-button ARM, genuine fresh-process SRAM and a separate static-frame/HUD visual check. Known pre-cargo Z6/Z7 reader regressions were reproduced and fixed without changing the authenticated inner token. Separate preview commands are available; default service remains off. Campaign integration, remaining guest products, long matches and performance are not thereby qualified. |
 | [#290](https://github.com/ggu/starcraft-gba/pull/290), Scourge picker | Merged as `73cc74a5`. Runtime/test head `b3d6f8ef` passed viable producer/worker/site sanitizer controls, selected-product journal checks, six new ROM/RAM builds, full clean-Git default tests (989 Python, 26 skipped, plus compiled suites) and fresh-process loading of an actual prior-code pre-cargo HOST journal. Documentation successor/merge preserve identical runtime/build/test objects. No arbitrary guest-save or hardware claim. |
 | [#293](https://github.com/ggu/starcraft-gba/pull/293), normal save-context hardening | Merged as `74922d57`; whole Git tree equals qualified `7123176e`. Normal Z7/Z9 custom and Z9 mission controls reject unsupported Eggs, preserve raw-36 Overlords and older-valid fallback, and retain a genuine prior Z7 paid-Egg journal. All six ROM/RAM checks and clean default checks pass (989 Python tests, 26 skipped, plus compiled suites); pins unchanged. A disk guard stopped the first six-build run before Z10; lossless archival permitted the complete retry. |
 | Z10 controller | Ordinary drag boxes fixed command latency; the rally fix removed actual recalls. Upgrades reached 2/2 and improved the force at road leg 6, but the mission still lost. Repeated Sunken rebuilding consumed the economy and failed its bounded prefix; do not extend that losing run. |
