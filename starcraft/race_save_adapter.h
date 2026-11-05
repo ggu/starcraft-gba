@@ -2926,6 +2926,31 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             RACE_U(i,shield)<0||
             RACE_U(i,shield_remainder)<0||RACE_U(i,shield_remainder)>=1280)return 0;
         int target=RACE_U(i,target),order=RACE_U(i,order);
+#ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
+        if (SC64_SCARAB_CHILD(&candidate_unit)) {
+            Sc64ScarabChildFields scarab;
+            if (!race_scarab_candidate_child_fields(&candidate_unit,&scarab)) return 0;
+            if (scarab.phase>=2) {
+                if (!sc64_stage_save_auth_matches(guard_auth,&race_data,race_data.version,
+                        SC64_STAGE_SAVE_SCARAB|SC64_STAGE_SAVE_EXTENDED_EVENTS) ||
+                    candidate_unit.raw_type!=85 || candidate_unit.selected ||
+                    SC64_TRANSPORT_LOADED(&candidate_unit) ||
+                    target < -1 || target >= MAX_UNITS+MAX_BUILDINGS || target==i ||
+                    candidate_unit.tx<0 || candidate_unit.tx>=width*16 ||
+                    candidate_unit.ty<0 || candidate_unit.ty>=height*16 ||
+                    /* Flight waypoints use source coordinates (2x GBA). */
+                    candidate_unit.path_x<0 || candidate_unit.path_x>=width*32 ||
+                    candidate_unit.path_y<0 || candidate_unit.path_y>=height*32 ||
+                    order<1 || order>4 ||
+                    (order==1 ? (scarab.life || scarab.no_collision) : !scarab.life) ||
+                    (order==2 && !scarab.no_collision) ||
+                    (order==3 && scarab.no_collision)) return 0;
+                /* Ordinary worker/direct-order fields do not describe the
+                 * Scarab FSM. Its parent graph is checked separately below. */
+                continue;
+            }
+        }
+#endif
         if((order==ORDER_MINE&&(target<0||target>=MAX_MINERALS))||
            ((order==ORDER_GAS||order==ORDER_BUILD)&&(target<0||target>=MAX_BUILDINGS)))return 0;
 #ifdef SC64_P8_RUNTIME

@@ -31,7 +31,8 @@ int main(int argc,char **argv)
     assert(race_scarab_parent_read(p,0,&parent,&counts));int child=parent.active_slot;
     for(int i=0;i<SC64_SCARAB_BUILD_TICKS;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
     assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
-    assert(race_scarab_launch_child(p,0,child));assert(u[child].order==1);
+    int target=spawn_unit(ENEMY,U_ZERGLING,u[p].x+10,u[p].y);assert(target>=0);
+    race_scarab_probe_parent_attack(p,target);assert(u[child].order==1 && u[child].target==target);
     assert(race_save_game());RaceLoadPlan plan;GbaSaveSelection selected;
     assert(race_worker_cargo_select(&plan,&selected));
     assert(selected.tag==SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION &&
@@ -45,6 +46,18 @@ int main(int argc,char **argv)
     assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
     assert(race_scarab_child_fields_read(u[child].carry,u[child].work_timer,&fields));
     assert(fields.life==90 && fields.no_collision==7 && u[child].order==2);
+    /* Drive the real FSM to its arrived phase with a controlled arrival signal. */
+    assert(race_scarab_flight_control_tick(child,1,0)==SC64_SCARAB_CONTROL_ARRIVED);
+    assert(u[child].order==4 && u[child].target==target);
+    assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
+    assert(u[child].order==4 && u[child].target==target);
+    /* A dead slot can be reused before this child dispatches again. */
+    int tx=u[child].tx,ty=u[child].ty;
+    u[target].alive=0;
+    assert(spawn_unit(ENEMY,U_ZERGLING,700,700)==target);
+    assert(u[child].target==-1 && u[child].order==4 && u[child].tx==tx && u[child].ty==ty);
+    assert(race_save_game());memset(u,0,sizeof(u));assert(race_load_game());
+    assert(u[child].target==-1 && u[child].order==4 && u[child].tx==tx && u[child].ty==ty);
     guardian_test_restore(before);assert(race_load_game());
     /* Retagging a flight row as feature7 must not reinterpret the row. */
     guardian_test_retag(selected.slot,SC64_SHARED_ACTOR_FULL_TRANSPORT_SAVE_VERSION,SC64_SHARED_ACTOR_FULL_SAVE_VERSION);

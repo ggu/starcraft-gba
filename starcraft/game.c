@@ -4377,6 +4377,15 @@ sc64_direct_attack_clear_references(int entity)
     int i;
     for (i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
+#ifdef SC64_SCARAB_WEAPON_PROBE
+        /* Scarab orders are a separate FSM whose values overlap ordinary
+         * direct orders. Preserve its waypoint and FSM on target loss. */
+        if (SC64_SCARAB_CHILD(q)) {
+            if (q->alive && !SC64_SCARAB_HIDDEN(q) && q->target==entity)
+                q->target=-1;
+            continue;
+        }
+#endif
         if (q->alive && q->order == ORDER_ATTACK_TARGET && q->target == entity) {
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
             if (sc64_race_raw_unit(q->type)==12 && (q->work_timer&7)>0 && (q->work_timer&7)<=6) {
@@ -13449,6 +13458,10 @@ static int race_scarab_probe_bullets_pending(void) {
     return 0;
 }
 static void race_scarab_probe_target_invalidate(int target) {
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && SC64_SCARAB_CHILD(&u[i]) &&
+            !SC64_SCARAB_HIDDEN(&u[i]) && u[i].target==target)
+            u[i].target=-1; /* keep the last captured ground destination */
     for(unsigned i=0;i<race_impact_count;i++) {
         Sc64ScarabImpact packet;Sc64ImpactEvent *row=&race_impact_rows[i];
         if(sc64_scarab_impact_unpack(row,&packet) && packet.target==target)
