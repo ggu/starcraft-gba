@@ -28,7 +28,7 @@ enum { ROAD_LEGS=sizeof(road)/sizeof(road[0]) };
 /* Pending live Eggs are already paid products, in addition to producer queues. */
 static int z10_pending_products(int type)
 {
-    int n = queued_units(type);
+    int n = queued_units(type) * sc64_race_product_count(type);
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE &&
             u[i].type == SC64_SHARED_EGG_TYPE && u[i].target == type)
