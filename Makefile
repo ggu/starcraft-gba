@@ -6123,3 +6123,4 @@ include tests/sc64-worker-cargo/Makefile
 
 include tests/sc64-skirmish-opening/Makefile
 include mk/text-box-game/Makefile
+include tests/sc64-scourge-campaign/Makefile
