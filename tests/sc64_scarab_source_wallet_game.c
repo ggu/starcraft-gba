@@ -80,6 +80,21 @@ static void late_denials(int mission, int enemy_source, int bad_source,
 }
 #endif
 
+#ifdef SC64_Z9_RUNTIME
+static void late_third_town(int mission,int source)
+{
+    memset(u,0,sizeof(u));race_mode=0;race_selected_mission=mission;
+    race_minerals[ENEMY]=900;
+    uint32_t first=race_zl_ai_minerals[0],second=race_zl_ai_minerals[1];
+    race_zl_ai_minerals[2]=100;
+    int parent=reaver(ENEMY,source);
+    assert(race_scarab_enqueue(parent,0) && race_zl_ai_minerals[2]==85);
+    assert(race_zl_ai_minerals[0]==first && race_zl_ai_minerals[1]==second &&
+           race_minerals[ENEMY]==900);
+    assert(race_scarab_cancel(parent,0,0) && race_zl_ai_minerals[2]==100);
+}
+#endif
+
 int main(void)
 {
     gba_init();
@@ -103,6 +118,7 @@ int main(void)
     race_zl_mission=&race_z9_mission;race_zl_map=&sc64_race_maps[SC64_Z9_GLOBAL_ID];
     campaign_wallets(SC64_Z9_GLOBAL_ID,&race_zl_ai_minerals[0],
                      &race_zl_ai_minerals[1],2,7,SC64_ZL_HUMAN_SLOT,65535);
+    late_third_town(SC64_Z9_GLOBAL_ID,4);
     late_denials(SC64_Z9_GLOBAL_ID,2,0,&race_zl_ai_minerals[0],&race_zl_ai_minerals[1]);
     race_zl_mission=0;
     { Unit before=u[0];assert(!race_scarab_enqueue(0,0) && !memcmp(&before,&u[0],sizeof(before))); }
@@ -111,6 +127,7 @@ int main(void)
     race_zl_mission=&race_z10_mission;race_zl_map=&sc64_race_maps[SC64_Z10_GLOBAL_ID];
     campaign_wallets(SC64_Z10_GLOBAL_ID,&race_zl_ai_minerals[0],
                      &race_zl_ai_minerals[1],2,7,SC64_ZL_HUMAN_SLOT,65535);
+    late_third_town(SC64_Z10_GLOBAL_ID,0);
     late_denials(SC64_Z10_GLOBAL_ID,2,4,&race_zl_ai_minerals[0],&race_zl_ai_minerals[1]);
 #endif
     memset(u, 0, sizeof(u));
