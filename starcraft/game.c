@@ -284,6 +284,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && (!defined(GBA_HOST) || !defined(SC64_RACES))
 #error "Shared Egg wire identity is HOST-only and requires race rules"
 #endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
+#error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
+#endif
 #if defined(SC64_SHARED_EGG_HOST_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_Z8_RUNTIME) || \
      !defined(SC64_Z7_EGG_PRODUCTION))
@@ -497,6 +500,15 @@ _Static_assert((SC64_PRE_CARGO_SAVE_VERSION & 0x01000000u) != 0,
 #ifdef SC64_SHARED_TRANSPORT
 _Static_assert((SAVE_VERSION & 0x04000000u) == 0, "transport save namespace overlaps");
 #define SC64_TRANSPORT_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if !defined(GBA_HOST) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SCARAB_NAMESPACE_STAGE)
+#error "Guardian journal prototype is HOST-only and requires cargo and transport without Scarab stage"
+#endif
+_Static_assert((SAVE_VERSION & 0x10000000u) != 0 && (SC64_TRANSPORT_SAVE_VERSION & 0x10000000u) != 0,
+               "Guardian namespace overlaps source selector");
+#define SC64_GUARDIAN_SAVE_VERSION (SAVE_VERSION ^ 0x10000000u)
+#define SC64_GUARDIAN_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x10000000u)
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || (!defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_LATE_TERRAN_STORAGE))
@@ -1787,6 +1799,9 @@ static int race_z6_hallucination_cleanup_dead(Unit *q);
 static int race_z6_transport_research_selected(void);
 static int race_z6_transport_start_research_selected(void);
 #endif
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_guardian_morph_tick(int slot);
 #endif
 #ifdef SC64_Z7_RUNTIME
 static Sc64Z7PersistentState race_z7;
@@ -3377,7 +3392,7 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
             if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
             int radius = 6;
-#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
             int mover_radius = sc64_game_unit_collision_radius(q->type);
             int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
             radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
@@ -8001,7 +8016,7 @@ tick_combat(Unit * q, int target)
              * pixels from source bounds; retain the six-pixel fallback in
              * the standard roster and do not widen ranged/min-range weapons. */
             int contact_range=6;
-#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
             if (target<MAX_UNITS) {
                 int mover_radius=sc64_game_unit_collision_radius(q->type);
                 int target_radius=sc64_game_unit_collision_radius(u[target].type);
@@ -8300,6 +8315,12 @@ target_lists_unavailable:
         /* An engaged Carrier stops and launches instead of closing in. */
         if (q->type == U_P7_CARRIER && race_p7_interceptor_flight_carrier_order(i))
             continue;
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        if (q->type == U_GUARDIAN_COCOON) {
+            (void)race_guardian_morph_tick(i);
+            continue;
+        }
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (q->type == U_Z7_EGG) {
@@ -10235,6 +10256,23 @@ sc64_source_unit_attack_pose(const Unit *q)
 }
 #endif
 
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+#if !defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || !defined(SC64_HAS_SPRITES)
+#error "Cocoon render stage requires HOST, Guardian stage, and sprites"
+#endif
+#include "sc64_guardian_cocoon_render.h"
+#ifdef SC64_GUARDIAN_TEST_BANK_HEADER
+#include SC64_GUARDIAN_TEST_BANK_HEADER
+#else
+#include "sc64_guardian_cocoon_bank_generated.h"
+#endif
+static int sc64_cocoon_world_visible(int x,int y)
+{
+    return (unsigned)x < (unsigned)(MAP_COLS*16) &&
+        (unsigned)y < (unsigned)(MAP_ROWS*16) && currently_visible(x,y);
+}
+#endif
+
 static void
 draw_unit_pass(Unit * q, int selection_pass)
 {
@@ -10244,6 +10282,12 @@ draw_unit_pass(Unit * q, int selection_pass)
 #endif
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    if (q->type == U_GUARDIAN_COCOON) {
+        /* Include both the primary canvas and its displaced underlay. */
+        if (x < -64 || x > 304 || y < -80 || y > 180) return;
+    } else
+#endif
     if (x < -8 || x > 247 || y < 10 || y > 125)
 	return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
@@ -10291,6 +10335,16 @@ draw_unit_pass(Unit * q, int selection_pass)
     int sprite_y = sprite ? y - sprite->canvas_h / 2 + sprite->offset_y : y - 4;
     int sprite_w = sprite ? sprite->w : 8;
     int sprite_h = sprite ? sprite->h : 8;
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    const Sc64CocoonFrame *cocoon_frame=0;
+    if (q->type==U_GUARDIAN_COCOON) {
+        cocoon_frame=sc64_cocoon_resolve(&cocoon_bank,(unsigned)(q-u),q->work_timer);
+        if (!cocoon_frame) return; /* fail closed: never substitute another actor */
+        sprite_x=x-cocoon_frame->canvas_w/2+cocoon_frame->x;
+        sprite_y=y-cocoon_frame->canvas_h/2+cocoon_frame->y;
+        sprite_w=cocoon_frame->w;sprite_h=cocoon_frame->h;
+    }
+#endif
 #else
     int sprite_x = x - 4, sprite_y = y - 4, sprite_w = 8, sprite_h = 8;
 #endif
@@ -10306,6 +10360,12 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
     int walk = sc64_walk_track(q);
     int body_y = y - SC64_WALK_LIFT(walk);
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    if (cocoon_frame) {
+        (void)sc64_cocoon_draw(&cocoon_bank,(unsigned)(q-u),q->work_timer,
+            x,body_y,q->x,q->y-(y-body_y),q->owner==SIDE ? 0 : sc64_cocoon_world_visible);
+    } else {
+#endif
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_UNIT_FACING
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -10387,6 +10447,9 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
     y = feet;
     }
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    }
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
     if (sc64_worker_cargo_badge_kind(q) > 0)
         draw_worker_cargo_badge(sprite_x + sprite_w + 2,
@@ -12876,6 +12939,9 @@ game_self_test(void)
 #include "sc64_p8_availability_adapter.h"
 #endif
 #include "race_adapter.h"
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#include "sc64_guardian_morph_adapter.h"
+#endif
 #ifdef SC64_P7_OBSERVER_ENABLED
 #include "sc64_p7_runtime_adapter.h"
 #include "sc64_p7_observer_adapter.h"

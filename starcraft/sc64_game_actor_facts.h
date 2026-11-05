@@ -35,6 +35,13 @@ sc64_game_unit_actor_flags(int type)
         return SC64_GAME_ACTOR_SELECTABLE | SC64_GAME_ACTOR_COLLIDABLE |
                SC64_GAME_ACTOR_DRAWABLE | SC64_GAME_ACTOR_MEN;
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return SC64_GAME_ACTOR_SELECTABLE | SC64_GAME_ACTOR_COLLIDABLE | SC64_GAME_ACTOR_DRAWABLE;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return SC64_GAME_ACTOR_SELECTABLE | SC64_GAME_ACTOR_MOVABLE |
+        SC64_GAME_ACTOR_COLLIDABLE | SC64_GAME_ACTOR_DRAWABLE | SC64_GAME_ACTOR_MEN | SC64_GAME_ACTOR_WEAPON;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     unsigned flags = sc64_zp_actor_flags(type);
     if (flags) return flags;
@@ -66,7 +73,7 @@ static int sc64_game_unit_selectable(int type)
 { unsigned f=sc64_game_unit_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
 static int sc64_game_building_selectable(int type)
 { unsigned f=sc64_game_building_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
-#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE)
 /* Unit broad-phase overlap used by the simple mover is a radius in GBA
  * pixels. The source box is in StarCraft pixels; half its widest axis gives
  * the actor's half-extent at the renderer's 2:1 scale. Keep the historical
@@ -75,7 +82,13 @@ static int
 sc64_game_unit_collision_radius(int type)
 {
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
-    if (type == U_SHARED_EGG_STAGE) return 8; /* source L16/U16/R15/D15 */
+    if (type == U_SHARED_EGG_STAGE) return 8;
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 8;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return 11;
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     int left, up, right, down;

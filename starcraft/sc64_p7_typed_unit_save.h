@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_P7_TYPED_UNIT_SAVE_H
 #define SC64_P7_TYPED_UNIT_SAVE_H
+#ifndef SC_RU_LEGACY_BOUND
+#define SC_RU_LEGACY_BOUND SC_RU_COUNT
+#endif
 
 /* Generation-40 P7 row.  This codec is deliberately separate from both the
  * generation-22 ZP row and the Z7 derived row: the 16-bit weapon field remains
@@ -58,7 +61,7 @@ static int sc64_p7_typed_unit_canonical(int type, int *maxhp, int *armor,
 {
     const Sc64RaceUnitRule *rule;
     int hp, shields;
-    if (type < 0 || type >= SC_RU_COUNT) return 0;
+    if (type < 0 || type >= SC_RU_LEGACY_BOUND || type >= 64) return 0;
     rule = sc64_race_unit_rule(type);
     hp = sc64_zp_actor_default_hp(type);
     if (!hp && rule) hp = rule->hp;

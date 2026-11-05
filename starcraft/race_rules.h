@@ -139,26 +139,55 @@ enum {
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     U_SHARED_SHUTTLE,
 #endif
-#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
     SC_RU_LEGACY_COUNT,
-#ifndef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    U_GUARDIAN_COCOON = SC_RU_LEGACY_COUNT,
+#if !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    U_GUARDIAN_STAGE,
+#endif
+#endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    U_SHARED_EGG_STAGE,
+#else
     U_SHARED_EGG_STAGE = SC_RU_LEGACY_COUNT,
+#endif
+#endif
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
     SC_RU_COUNT
 #else
     SC_RU_COUNT = SC_RU_LEGACY_COUNT
 #endif
-#else
-    SC_RU_COUNT
-#endif
 };
+#define SC_RU_LEGACY_BOUND SC_RU_LEGACY_COUNT
+_Static_assert(SC_RU_LEGACY_COUNT <= 64, "legacy unit IDs exceed six-bit bound");
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+_Static_assert(U_GUARDIAN_COCOON == SC_RU_LEGACY_COUNT, "Cocoon append position changed");
+#if !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+#define SC64_GUARDIAN_DISTINCT_STAGE 1
+_Static_assert(U_GUARDIAN_STAGE == SC_RU_LEGACY_COUNT + 1 && U_GUARDIAN_STAGE < 64,
+               "distinct Guardian requires a six-bit identity");
+#endif
+#endif
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
 #ifdef SC64_Z7_EGG_PRODUCTION
 #define SC64_SHARED_EGG_TYPE U_Z7_EGG
 #else
 #define SC64_SHARED_EGG_TYPE U_SHARED_EGG_STAGE
-_Static_assert(U_SHARED_EGG_STAGE == SC_RU_LEGACY_COUNT && SC_RU_COUNT == SC_RU_LEGACY_COUNT + 1,
-               "only the staged Egg may extend legacy actor IDs");
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+_Static_assert(U_SHARED_EGG_STAGE == SC_RU_LEGACY_COUNT + 2, "Egg must follow both Guardian identities");
+#else
+_Static_assert(U_SHARED_EGG_STAGE == SC_RU_LEGACY_COUNT + 1, "Egg must follow Cocoon");
 #endif
+#else
+_Static_assert(U_SHARED_EGG_STAGE == SC_RU_LEGACY_COUNT, "Egg append position changed");
+#endif
+_Static_assert(U_SHARED_EGG_STAGE < 64, "staged Egg requires a six-bit identity");
+#endif
+#endif
+#if !defined(SC64_GUARDIAN_COCOON_STAGE) && (!defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_Z7_EGG_PRODUCTION))
+_Static_assert(SC_RU_COUNT == SC_RU_LEGACY_COUNT, "legacy unit IDs changed");
 #endif
 enum {
     B_COMMAND, B_BARRACKS, B_DEPOT, B_REFINERY, B_ACADEMY, B_ENG_BAY,
@@ -266,11 +295,7 @@ enum {
 };
 
 #ifdef SC64_SKIRMISH_ROSTER
-#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
 _Static_assert(SC_RU_LEGACY_COUNT <= 64, "legacy skirmish roster IDs must fit six-bit save capacity");
-#else
-_Static_assert(SC_RU_COUNT <= 64, "skirmish roster unit types remain within six-bit save capacity");
-#endif
 _Static_assert(SC_RB_COUNT <= 128, "skirmish roster building types remain within seven-bit save capacity");
 #endif
 
@@ -522,6 +547,12 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #endif
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     , [U_SHARED_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 4, 200, 0, 900, 80, 60, 0 }
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    , [U_GUARDIAN_COCOON] = { R_ZERG, 0, 255, 4, 0, 0, 0, 200, 0, 0 }
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    , [U_GUARDIAN_STAGE] = { R_ZERG, 0, 255, 4, 50, 100, 600, 150, 0, 0 }
+#endif
 #endif
 };
 
@@ -839,6 +870,12 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
         ,[U_SHARED_SHUTTLE] = "SHUTTLE"
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        ,[U_GUARDIAN_COCOON] = "COCOON"
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+        ,[U_GUARDIAN_STAGE] = "GUARDIAN"
+#endif
 #endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
@@ -1250,6 +1287,12 @@ static inline int sc64_race_building_max_hp(int type)
  * retains pixel ranges and simulation-frame cooldowns. */
 static inline int sc64_race_unit_damage(int type)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 0;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return 20;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return 20;
 #endif
@@ -1292,6 +1335,12 @@ static inline int sc64_race_unit_damage(int type)
 
 static inline int sc64_race_unit_range(int type)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 0;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return 256;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return 256;
 #endif
@@ -1331,6 +1380,12 @@ static inline int sc64_race_unit_range(int type)
 
 static inline int sc64_race_unit_cooldown(int type)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 0;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return 30;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return 30;
 #endif
@@ -1374,6 +1429,12 @@ static inline int sc64_race_unit_cooldown(int type)
 #endif
 static inline int sc64_race_unit_flying(int type)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 1;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return 1;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return 1;
 #endif
@@ -1400,6 +1461,9 @@ static inline int sc64_race_unit_flying(int type)
 static inline int sc64_race_unit_damage(int type);
 static inline int sc64_race_unit_can_attack_air(int type)
 {
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return 0;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return 0;
 #endif
@@ -1440,6 +1504,12 @@ static inline int sc64_race_unit_can_attack_target_class(int type, int flying)
  * expose the number of simultaneous blade hits so armor is applied per hit. */
 static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 0;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return target_flying ? 0 : 20;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return target_flying ? 0 : 20;
 #endif
@@ -1478,6 +1548,12 @@ static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_range_vs(int type, int target_flying)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 0;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return target_flying ? 0 : 256;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return target_flying ? 0 : 256;
 #endif
@@ -1512,6 +1588,12 @@ static inline int sc64_race_unit_range_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_cooldown_vs(int type, int target_flying)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 0;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return target_flying ? 0 : 30;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return target_flying ? 0 : 30;
 #endif
@@ -1542,6 +1624,12 @@ static inline int sc64_race_unit_cooldown_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_hits_vs(int type, int target_flying)
 {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    if (type == U_GUARDIAN_COCOON) return 0;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return target_flying ? 0 : 1;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return target_flying ? 0 : 1;
 #endif
@@ -1563,6 +1651,9 @@ static inline int sc64_race_unit_armor(int type)
 #endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
     if (type == U_SHARED_EGG_STAGE) return 10;
+#endif
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    if (type == U_GUARDIAN_STAGE) return 2;
 #endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return 2;
@@ -1641,6 +1732,12 @@ static inline int sc64_race_building_armor(int type)
 static inline int sc64_race_raw_unit(int type)
 {
     switch (type) {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    case U_GUARDIAN_COCOON: return 59;
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+    case U_GUARDIAN_STAGE: return 44;
+#endif
+#endif
     case U_MARINE: return 0; case U_SCV: return 7; case U_FIREBAT: return 32;
     case U_MEDIC: return 34;
 #ifdef SC64_T4_RUNTIME

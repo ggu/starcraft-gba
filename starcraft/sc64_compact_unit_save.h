@@ -1,5 +1,8 @@
 #ifndef SC64_COMPACT_UNIT_SAVE_H
 #define SC64_COMPACT_UNIT_SAVE_H
+#ifndef SC_RU_LEGACY_BOUND
+#define SC_RU_LEGACY_BOUND SC_RU_COUNT
+#endif
 
 /* Lossless slot-preserving Unit row for the opt-in full-campaign save layout.
  * This header is included only where the RACES Unit definition is available.
@@ -69,7 +72,12 @@ sc64_unit_save_fields_valid(const Unit *q, unsigned world_width,
         q->hp < -SC64_PACKED_UNIT_HP_BIAS ||
         q->hp >= SC64_PACKED_UNIT_HP_BIAS || (q->alive && q->hp < 0) ||
         q->maxhp < 0 || q->maxhp > 131071 || q->owner < 0 || q->owner > 4 ||
-        q->type < 0 || q->type >= SC_RU_COUNT || SC_RU_COUNT > 64 ||
+        q->type < 0 || q->type >= 64 || SC_RU_LEGACY_BOUND > 64 ||
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+        (q->type >= SC_RU_LEGACY_BOUND && q->type != U_GUARDIAN_STAGE) ||
+#else
+        q->type >= SC_RU_LEGACY_BOUND ||
+#endif
         (q->alive != 0 && q->alive != 1) ||
         (q->selected != 0 && q->selected != 1) || q->cd < 0 || q->cd > 65535 ||
         q->order < 0 || q->order > 15 ||

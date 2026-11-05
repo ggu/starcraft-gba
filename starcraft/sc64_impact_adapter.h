@@ -273,14 +273,20 @@ race_impact_save_write(void)
         sc64_impact_encode(race_impact_rows, race_impact_count,
                            (u8 *)&race_impact_record + offset);
 #if defined(SC64_SHARED_TRANSPORT) && defined(SC64_WORKER_CARGO_KIND)
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
+#else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG SC64_TRANSPORT_SAVE_VERSION
+#endif
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
     if (previous) {
         if (!save_write_selected(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                 SC64_TRANSPORT_SAVE_VERSION,previous,tags,2)) return 0;
+                                 SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                  SC64_TRANSPORT_SAVE_VERSION)) return 0;
+                                  SC64_GUARDIAN_WRITE_TAG)) return 0;
 #elif defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
@@ -321,12 +327,18 @@ race_impact_save_write(void)
     sc64_sk_transport_encode((u8 *)&race_impact_record + sizeof(RaceSave) + bytes,
                              &race_skirmish_transport_candidate);
 #ifdef SC64_WORKER_CARGO_KIND
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
+#else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG SC64_TRANSPORT_SAVE_VERSION
+#endif
     if (previous) {
         if (!save_write_selected(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                 SC64_TRANSPORT_SAVE_VERSION,previous,tags,2)) return 0;
+                                 SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                  SC64_TRANSPORT_SAVE_VERSION)) return 0;
+                                  SC64_GUARDIAN_WRITE_TAG)) return 0;
 #else
     save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes + SC64_TRANSPORT_TRAILER_BYTES,
                SC64_TRANSPORT_SAVE_VERSION);
