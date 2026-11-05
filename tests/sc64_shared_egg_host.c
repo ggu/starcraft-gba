@@ -63,11 +63,11 @@ static void test_late_z9(void)
     /* A late-mission paired birth must retain the authenticated source slot
      * on both bodies, not the transient producer context at completion. */
     assert(spawn_build(SIDE,B_SPAWNING_POOL,120,120,0)>=0);add_supply(SIDE,2);
-    b[hall].larva=1;int before=count_type(SIDE,U_ZERGLING);
+    b[hall].larva=1;int before_lings=count_type(SIDE,U_ZERGLING);
     assert(race_queue_unit(SIDE,hall,U_ZERGLING));int pair=find_egg(SIDE,U_ZERGLING,-1);assert(pair>=0);
     int timer=u[pair].work_timer;for(int i=0;i<timer;i++)update_orders();
     assert(u[pair].alive && u[pair].type==U_ZERGLING && u[pair].raw_owner==SC64_ZL_HUMAN_SLOT);
-    assert(count_type(SIDE,U_ZERGLING)==before+2);
+    assert(count_type(SIDE,U_ZERGLING)==before_lings+2);
     int matched=0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive && u[i].owner==SIDE &&
         u[i].type==U_ZERGLING && u[i].raw_owner==SC64_ZL_HUMAN_SLOT)matched++;
     assert(matched>=2);
