@@ -9,10 +9,13 @@ Source-work checkpoint: the [shared production follow-up](audits/2026-11-06-shar
 tracks paid Reaver tech progression, source-town wallet routing, typed Scarab
 velocity and optional Cocoon rendering. Space recovered and their focused HOST
 checks now pass. Button-driven tech/stock and separate-process HOST journal
-continuation also pass. The real-opponent Reaver attack extension produces no
-impact before match loss and is now an explicit investigation gate. Guest
-integration and the full persistence/product matrix remain open; these branch
-changes do not change release capability, campaign coverage or performance claims.
+continuation also pass. Real-opponent attack exposed and fixed a stale Scarab
+launch position; the final five-process HOST sequence reaches enemy damage after
+saved-impact continuation. Constructed Z7/P10 profile journals now preserve
+motion and the P10 Arbiter cache. Guest integration and the full historical-save/
+product matrix remain open. A current paired benchmark still costs about
+2.20 million cycles per busy loop; no speed gain is claimed. These branch changes
+do not change release capability or campaign coverage.
 
 Deliver one ROM per race, campaign/map selection, any human race against one to
 three independently selected AI races in custom games, and gameplay near 30 fps.

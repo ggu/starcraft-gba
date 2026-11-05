@@ -4,9 +4,20 @@
 #ifndef SC64_SCARAB_TECH_PATH_HOST_PROBE
 #error "Use the explicit full-service HOST tech-path probe"
 #endif
+static void observe_scarab_hit(int target,int damage,int source_type,int source_owner);
+#define SC64_TEST_HIT_OBSERVER(target,damage,type,owner) observe_scarab_hit(target,damage,type,owner)
 #define SC64_CATALOG_BUTTONS_ENTRY sc64_catalog_buttons_unused_main
 #include "sc64_skirmish_catalog_buttons.c"
 #undef SC64_CATALOG_BUTTONS_ENTRY
+
+static int hit_slot=-1,hit_hp,hit_raw,hit_owner;
+static void observe_scarab_hit(int target,int damage,int source_type,int source_owner)
+{
+    if (hit_slot<0 && target>=0 && target<MAX_UNITS && damage>0 &&
+        source_type==U_REAVER && source_owner==SIDE && u[target].alive) {
+        hit_slot=target;hit_hp=u[target].hp;hit_raw=u[target].raw_type;hit_owner=u[target].owner;
+    }
+}
 
 extern void guardian_test_snapshot(void *);
 extern void guardian_test_restore(const void *);
@@ -141,11 +152,38 @@ static void resume_impact(const char *path)
     tap(KEY_START);assert(screen==SCREEN_PAUSE);tap(KEY_L);assert(screen==SCREEN_PLAY);
     int index=pending_scarab();Sc64ScarabImpact packet;
     assert(index>=0 && sc64_scarab_impact_unpack(&race_impact_rows[index],&packet) && packet.ticks>0);
+    hit_slot=-1;int damaged=0;
     for(int i=0;i<200 && pending_scarab()>=0;++i) {
         assert(screen==SCREEN_PLAY && !won && !lost);input(0);
+        if (hit_slot>=0 && (!u[hit_slot].alive ||
+            (u[hit_slot].raw_type==hit_raw && u[hit_slot].owner==hit_owner && u[hit_slot].hp<hit_hp))) damaged=1;
     }
-    assert(pending_scarab()<0);
-    puts("fresh HOST process resumed the saved pending Scarab impact");
+    assert(pending_scarab()<0 && damaged);
+    printf("fresh HOST process resumed saved Scarab impact and damaged enemy slot %d\n",hit_slot);
+}
+
+/* Component regression, separate from the ordinary-input run: move an
+ * already-stocked parent and exercise the launch transaction directly. */
+static void check_launch_origin(const char *path)
+{
+    read_controller_progress(path);
+    int parent=sole_reaver(),child=-1;unsigned phase;int linked;
+    for(int i=0;i<MAX_UNITS;++i)
+        if(race_scarab_child_lookup(i,&linked,&phase) && linked==parent && phase==SC64_SCARAB_CHILD_INSIDE) child=i;
+    assert(child>=0);
+    u[parent].x=0;u[parent].tx=-10;u[parent].ty=u[parent].y;
+    Unit old_parent=u[parent],old_child=u[child];int bank=minerals;
+    assert(!race_scarab_launch_child(parent,0,child));
+    assert(!memcmp(&u[parent],&old_parent,sizeof(Unit)) && !memcmp(&u[child],&old_child,sizeof(Unit)) && minerals==bank);
+    u[parent].x=310;u[parent].tx=310;u[parent].ty=u[parent].y+60;
+    int py=u[parent].y;
+    assert(race_scarab_launch_child(parent,0,child));
+    assert(u[child].x==310 && u[child].y==py+12 &&
+           (((unsigned)u[child].carry>>19)&511u)==256u &&
+           u[child].owner==u[parent].owner && u[child].raw_owner==u[parent].raw_owner && minerals==bank);
+    race_scarab_control_dispatch(child);
+    assert((((unsigned)u[child].carry>>19)&511u)==256u);
+    puts("moved-parent launch preserved source fraction and atomic rejection");
 }
 
 int main(int argc,char **argv)
@@ -154,6 +192,7 @@ int main(int argc,char **argv)
     if(!strcmp(argv[1],"write")) {assert(argc==3);write_controller_progress(argv[2]);}
     else if(!strcmp(argv[1],"read")) {assert(argc==3);read_controller_progress(argv[2]);}
     else if(!strcmp(argv[1],"attack")) {assert(argc==4);attack_and_export(argv[2],argv[3]);}
+    else if(!strcmp(argv[1],"launch-check")) {assert(argc==3);check_launch_origin(argv[2]);}
     else {assert(argc==3 && !strcmp(argv[1],"resume"));resume_impact(argv[2]);}
     return 0;
 }
