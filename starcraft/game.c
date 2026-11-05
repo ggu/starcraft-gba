@@ -1770,6 +1770,9 @@ static int race_z6_transport_research_selected(void);
 static int race_z6_transport_start_research_selected(void);
 #endif
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_guardian_morph_tick(int slot);
+#endif
 #ifdef SC64_Z7_RUNTIME
 static Sc64Z7PersistentState race_z7;
 static int race_z7_active(void);
@@ -8270,6 +8273,12 @@ target_lists_unavailable:
         if (q->type == U_P7_CARRIER && race_p7_interceptor_flight_carrier_order(i))
             continue;
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        if (q->type == U_GUARDIAN_COCOON) {
+            (void)race_guardian_morph_tick(i);
+            continue;
+        }
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (q->type == U_Z7_EGG) {
             (void)race_z7_egg_tick_unit(i);
@@ -12740,6 +12749,9 @@ game_self_test(void)
 #include "sc64_p8_availability_adapter.h"
 #endif
 #include "race_adapter.h"
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#include "sc64_guardian_morph_adapter.h"
+#endif
 #ifdef SC64_P7_OBSERVER_ENABLED
 #include "sc64_p7_runtime_adapter.h"
 #include "sc64_p7_observer_adapter.h"
