@@ -67,6 +67,13 @@ int main(void)
     assert(b[lair].type==B_HIVE && b[lair].under_construction);
     assert(minerals==ore-200 && gas==vespene-150);
     assert(b[lair].hp==900 && b[lair].larva==1 && b[lair].larva_timer==123 && b[lair].shield_remainder==17);
+    Building retired=b[lair];
+    assert(race_guardian_paid_morph_active(&retired));
+    race_guardian_paid_morph_retire(&retired);
+    assert(!(retired.flags & SC64_GUARDIAN_PAID_BUILDING_MORPH));
+    Building unrelated=b[lair];unrelated.type=B_PYLON;unrelated.raw_type=205;unrelated.flags=0x2080;
+    race_guardian_paid_morph_retire(&unrelated);
+    assert(unrelated.flags==0x2080);
     assert(u[egg].alive && u[egg].type==U_Z7_EGG && u[egg].target==U_DRONE);
     /* Leaf codec shape only: no selected-journal or SRAM claim. */
     Sc64PackedBuildingSave packed; Building restored;
@@ -98,6 +105,10 @@ int main(void)
     choose_command(MENU_ZP_HIVE);
     assert(b[spire].type==B_SPIRE && !b[spire].under_construction);
     assert(minerals==ore-25 && gas==vespene-38);
+    int pylon=spawn_build(SIDE,B_PYLON,500,200,1);assert(pylon>=0);
+    b[pylon].raw_type=205;b[pylon].flags=0x2080;
+    race_complete_building(pylon);
+    assert(b[pylon].flags==0x2080); /* unrelated P6-style source bits survive */
     puts("Guardian campaign construction HOST stage passed");
     return 0;
 }

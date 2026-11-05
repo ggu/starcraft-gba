@@ -37,18 +37,15 @@ static int race_guardian_campaign_cancel(int building)
 {
     if ((unsigned)building>=MAX_BUILDINGS) return 0;
     Building *q=&b[building];
-    if (!q->alive || q->owner!=SIDE || !q->under_construction ||
-        !(q->flags & SC64_GUARDIAN_PAID_BUILDING_MORPH) ||
-        (q->type!=B_HIVE && q->type!=B_GREATER_SPIRE) ||
-        q->raw_type!=sc64_race_raw_building(q->type) || q->hp<=0 ||
+    if (q->owner!=SIDE || !race_guardian_paid_morph_active(q) || q->hp<=0 ||
         q->maxhp!=sc64_race_building_max_hp(q->type) || q->hp>q->maxhp ||
         q->build_progress<0 || q->build_progress>building_build_time(q->type)) return 0;
     const Sc64RaceBuildingRule *product=sc64_race_building_rule(q->type);
     int source=q->type==B_HIVE ? B_LAIR : B_SPIRE;
     int source_hp=sc64_race_building_max_hp(source);
+    race_guardian_paid_morph_retire(q);
     q->type=source; q->raw_type=sc64_race_raw_building(source);
     q->maxhp=source_hp; if (q->hp>source_hp) q->hp=source_hp;
-    q->flags &= (u16)~SC64_GUARDIAN_PAID_BUILDING_MORPH;
     q->under_construction=0; q->build_progress=0;
     race_add_owner_resources(q->owner,(product->minerals*3)/4,(product->gas*3)/4);
     invalidate_path_grid();

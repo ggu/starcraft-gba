@@ -2,6 +2,9 @@
 #define SC64_RACE_ADAPTER_H
 
 #include "race_skirmish.h"
+#ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
+#include "sc64_guardian_paid_building.h"
+#endif
 #ifdef SC64_P3_PRODUCTION_EXIT
 #ifndef SC64_P3_RUNTIME
 #error "SC64_P3_PRODUCTION_EXIT requires the P3 campaign runtime"
@@ -114,8 +117,7 @@ static int race_owner_supply_cap(int owner)
     for (i = 0; i < MAX_BUILDINGS; ++i) if ((building_complete(i) ||
         (race_mode && b[i].alive && (b[i].type == B_LAIR || b[i].type == B_HIVE))
 #ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
-        || (b[i].alive && b[i].under_construction && b[i].type==B_HIVE &&
-            (b[i].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH))
+        || (b[i].type==B_HIVE && race_guardian_paid_morph_active(&b[i]))
 #endif
         ) && b[i].owner == owner) {
         const Sc64RaceBuildingRule *r = sc64_race_building_rule(b[i].type);
@@ -1217,7 +1219,7 @@ static void race_tick_state(void)
         if(b[i].owner==SIDE&&(!b[i].under_construction ||
             (race_mode && (b[i].type == B_LAIR || b[i].type == B_HIVE))
 #ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
-            || (b[i].type==B_HIVE && (b[i].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH))
+            || (b[i].type==B_HIVE && race_guardian_paid_morph_active(&b[i]))
 #endif
             ))
             cap+=sc64_race_building_rules[b[i].type].supply_provided;
@@ -1309,8 +1311,8 @@ static void race_complete_building(int i)
     }
     r = sc64_race_building_rule(b[i].type);
 #ifdef SC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE
-    int paid_morph = (b[i].flags & SC64_GUARDIAN_PAID_BUILDING_MORPH) != 0;
-    b[i].flags &= (u16)~SC64_GUARDIAN_PAID_BUILDING_MORPH;
+    int paid_morph = race_guardian_paid_morph_active(&b[i]);
+    if (paid_morph) race_guardian_paid_morph_retire(&b[i]);
 #endif
     b[i].under_construction = 0;
 #ifdef SC64_CONSTRUCTION_HP

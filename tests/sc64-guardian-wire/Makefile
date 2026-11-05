@@ -131,3 +131,7 @@ guardian-full-facts-distinct:
 guardian-campaign-permissions:
 	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_campaign_permissions_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-campaign-permissions
 	$(GUARD_TEST_BIN_DIR)/guardian-campaign-permissions
+.PHONY: guardian-candidate-validation
+guardian-candidate-validation:
+	$(CLANG) $(GUARD_HOST) -DSC64_GUARDIAN_CAMPAIGN_CONSTRUCTION_STAGE $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_candidate_validation_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-candidate-validation
+	$(GUARD_TEST_BIN_DIR)/guardian-candidate-validation
