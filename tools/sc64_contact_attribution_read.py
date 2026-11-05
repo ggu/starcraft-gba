@@ -48,9 +48,9 @@ try:
                    'active_full': struct.unpack('<Q',replay.read(symbols['active_full'],8))[0],
                    'active_peak': struct.unpack('<I',replay.read(symbols['active_peak'],4))[0],
                    'active_peak_tick': struct.unpack('<I',replay.read(symbols['active_peak_tick'],4))[0],
-                   'attribution_totals': struct.unpack('<16Q',replay.read(symbols['active_totals'],128)),
-                   'attribution_peaks': struct.unpack('<16I',replay.read(symbols['active_peaks'],64)),
-                   'attribution_peak_ticks': struct.unpack('<16I',replay.read(symbols['active_peak_ticks'],64)),
+                   'attribution_totals': struct.unpack('<16Q',replay.read(symbols['active_totals'],128)) if 'active_totals' in symbols else [0]*16,
+                   'attribution_peaks': struct.unpack('<16I',replay.read(symbols['active_peaks'],64)) if 'active_peaks' in symbols else [0]*16,
+                   'attribution_peak_ticks': struct.unpack('<16I',replay.read(symbols['active_peak_ticks'],64)) if 'active_peak_ticks' in symbols else [0]*16,
                    'checkpoints': list(struct.iter_unpack('<4I', data))}, out, indent=2)
     proc.stdin.write('q\n'); proc.stdin.flush()
 finally:

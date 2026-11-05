@@ -13,7 +13,7 @@ if len(baseline['checkpoints']) != 90 or not baseline['active_count']:
 if any(baseline['attribution_totals']):
     raise SystemExit('baseline unexpectedly contains attribution counters')
 a = diagnostic['attribution_totals']
-if not (a[1] >= a[3] >= a[13] and a[10] == 8 * a[3] and a[11] <= a[10]):
+if not (a[1] >= a[3] > 0 and a[3] >= a[13] and a[10] == 8 * a[3] and a[11] <= a[10]):
     raise SystemExit('inconsistent query, mask, or selection counts')
 n = baseline['active_count']
 b = baseline['active_full'] / n
