@@ -29,10 +29,10 @@ int main(void)
     int target=spawn_unit(ENEMY,U_MARINE,180,128);
     assert(child>=0 && target>=0);
     game_update(KEY_B,KEY_B);assert(menu_open);
-    for(int i=0;i<field_menu_count() && menu_cursor!=6;++i) {
+    for(int i=0;i<field_menu_count() && menu_cursor!=1;++i) {
         game_update(KEY_DOWN,KEY_DOWN);game_update(0,0);
     }
-    assert(menu_cursor==6 && !strcmp(race_menu_label(menu_cursor),"ATTACK"));
+    assert(menu_cursor==1 && !strcmp(race_menu_label(menu_cursor),"ATTACK"));
     game_update(KEY_A,KEY_A);assert(!menu_open && mode==MODE_ATTACK);
     game_update(0,0);cx=u[target].x;cy=u[target].y; /* Constructed cursor position. */
     game_update(KEY_A,KEY_A);assert(mode==MODE_NORMAL);
