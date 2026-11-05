@@ -108,6 +108,32 @@ output paths for another run and deliberately refuses to overwrite SRAM.
 The test held the native lock and checked source, 1,959 input pins, ROM, ELF,
 runner, tape and free space before and after.
 
+## Compile-fence successor
+
+Source successor `116655c5b9c42a01294281d63ad161f4442c0700` rejects
+`SC64_SHARED_EGG_CUSTOM_SERVICE` when either the older
+`SC64_SHARED_EGG_HOST_STAGE` or `SC64_SHARED_EGG_JOURNAL_HOST_STAGE` is also
+selected. Those older stages can otherwise enable campaign contexts that the
+custom-only writer does not authorize. The named-error preprocessor checks
+cover each older flag alone and the pair on the Z9 HOST vector:
+
+```sh
+make -f tests/sc64-shared-egg-custom/Makefile custom-egg-conflict-guards
+```
+
+At that successor, the valid Terran opt-in ARM ROM was rebuilt with the same
+flags and pinned inputs and compared byte-for-byte with the `801eb1c2` ROM:
+both have SHA-256
+`a7975958e1af1ba74c3025183bf019f0f9278442812aa0ceb8c215e44c1db03b`.
+The linked `.text`, `.data` and `.iwram` bytes and addresses, and `.bss`
+address and size, also match. The ELF debug information differs after the
+source-line change. This supports carrying the preceding ARM runtime evidence
+for that exact flag vector; it does not add coverage for other builds. The
+three rejection checks, clean source, all 1,959 pinned inputs and unchanged
+RAM guards were checked under the native lock. Private receipts are
+`/tmp/sc64-custom-egg-fenced-qualification.log` and
+`/tmp/sc64-custom-egg-fenced-receipt.json`.
+
 ## Remaining work
 
 This evidence covers one ARM ROM and one custom-game configuration; it does
