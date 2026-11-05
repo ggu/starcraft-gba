@@ -26,7 +26,17 @@ int main(void)
     game_init(); race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;race_bot_races[0]=R_PROTOSS;
     init_state();assert(screen==SCREEN_PLAY);
     int slot=spawn_unit(SIDE,U_OVERLORD,400,400);assert(slot>=0);
-    Unit *q=&u[slot];q->type=U_GUARDIAN_COCOON;q->raw_type=59;q->hp=120;q->maxhp=200;
+    Unit *q=&u[slot];
+#if !defined(SC64_Z6_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    /* Legacy preflight accepts this raw/type mismatch. It cannot be used as
+     * an unescaped Guardian wire marker without changing a loadable save. */
+    q->raw_type=44;Unit legacy=*q;clear_journal();assert(race_save_game());
+    guardian_test_retag(0,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    guardian_test_retag(1,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    q->raw_type=42;assert(race_load_game());assert(!memcmp(&u[slot],&legacy,sizeof(legacy)));
+    guardian_test_reset();q=&u[slot];
+#endif
+    q->type=U_GUARDIAN_COCOON;q->raw_type=59;q->hp=120;q->maxhp=200;
     q->armor=0;q->order=ORDER_IDLE;q->target=44;q->build=-1;q->carry=0;q->flags=0;q->work_timer=351;
     Unit expected=*q;clear_journal();assert(race_save_game());
     GbaSaveSelection selected={0};RaceLoadPlan plan;
