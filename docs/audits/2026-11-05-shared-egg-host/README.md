@@ -42,3 +42,21 @@ make -f tests/sc64-shared-egg/Makefile EGG_TEST_BIN_DIR=OUTPUT \
 At `3d8ea7a3` those five targets passed with AddressSanitizer and UndefinedBehaviorSanitizer, with matching source and inputs before/after. Test-only successor `0c3621e5` passed a paid Zergling Egg save/load and paired completion; `ced27cb8` passed an actual queue boundary with two pending Z9 creates; `10b6f30b` passed a real Z9 create callback defer/retry; and `d5ab6775` passed a paid pair after save/load waiting at timer 1 under HOST-only artificial pool saturation. Local logs: `/tmp/sc64-egg-3d8.log`, `/tmp/sc64-egg-0c36.log`, `/tmp/sc64-egg-ced2.log`, `/tmp/sc64-egg-10b6.log`, and `/tmp/sc64-egg-d5ab.log`. Earlier `fabfa546` and `fa47cd5b` batches failed, respectively, from a fixture macro redefinition and a stale old-tag expectation; neither is a complete passing batch.
 
 Remaining gates include wider scheduler/production interleavings, Z8 callback capacity tests, four-product authenticated codec/journal integration, Guardian namespace coexistence, StageOFF equality against `c96c84b7`, memory/ROM budgets, and actual guest input and real SRAM continuation. No synthetic guest SRAM was used.
+
+## Authenticated deferred trigger continuation
+
+The earlier `3d8ea7a3` result did not prove Z9's separate action dispatcher or permit saving a deferred create cursor; source review identified both gaps. The final runtime candidate is `56af90a0`. Its staged scheduler pack, detached preflight and final apply accept an unarmed CreateUnit cursor only when the candidate-local Egg authentication is present; legacy wrappers continue to reject that cursor. A legacy-tag rewrite of the Z9 deferred record was rejected without publishing candidate state.
+
+The frozen seven-target batch passed at `56af90a0` with the same input receipt and lock/disk guard:
+
+```
+make -f tests/sc64-shared-egg/Makefile EGG_TEST_BIN_DIR=OUTPUT \
+  test-shared-egg-z8-deferred-journal test-shared-egg-deferred-journal \
+  test-shared-egg-capacity test-shared-egg-z9-journal \
+  test-shared-egg-z8-journal test-shared-egg-custom-journal \
+  test-zl-detached-candidate-binding
+```
+
+The Z9 test activates the actual source trigger while one free slot is committed to a legitimately paid paired Egg, verifies its create defers, saves and reloads the real journal, rejects a legacy-tag version, then kills two fixture-created units and resumes through the crystal create. The Z8 test executes the actual six-unit trigger after its source wait, saves and reloads while blocked, then frees six units and resumes. Those fixture-created units and capacity states exist only in HOST. Local receipt `/tmp/sc64-egg-56af.log` records matching pre/post source and input checks. `b2a9cb3e` failed before this fix because the scheduler rejected a deferred create cursor during save; its log remains `/tmp/sc64-egg-b2a9.log`.
+
+Paid outputs are slot commitments. An activated but unallocated trigger create is retryable: it may coexist with a valid save even when paid bodies plus all pending creates exceed current free slots. This is a staged capacity adaptation; native behavior and timing are not established. Legacy Z7 and the ordinary game profiles remain out of this experiment. Z8-specific legacy-tag rejection, broader interleavings and the four-product, Guardian, StageOFF and guest gates above remain open.
