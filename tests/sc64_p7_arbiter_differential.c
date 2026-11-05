@@ -260,7 +260,9 @@ static void owner_bucket_fallback_oracle(void)
 
 int main(void)
 {
-#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+#ifdef SC64_P10_RUNTIME
+    assert(SC64_RACE_SAVE_GENERATION==47u);
+#elif defined(SC64_P7_TYPED_COMPACT_ENABLED)
     assert(SC64_RACE_SAVE_GENERATION==40u);
 #else
     assert(SC64_RACE_SAVE_GENERATION==39u);
