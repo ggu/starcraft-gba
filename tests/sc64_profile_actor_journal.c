@@ -27,7 +27,10 @@ int main(int argc,char **argv)
     int target=spawn_unit(ENEMY,U_ZERGLING,u[reaver].x,u[reaver].y+60);assert(target>=0);
     race_scarab_probe_parent_attack(reaver,target);
     assert(u[child].order==1 && u[child].target==target);
-    assert(race_scarab_flight_control_tick(child,0,0)==SC64_SCARAB_CONTROL_CONTINUE);
+    /* Use the real order-1 dispatcher: it initializes motion scratch before
+     * the first flight-control tick (P10 constructor has a cache marker). */
+    race_scarab_control_dispatch(child);
+    assert(u[child].alive && u[child].order==2);
     race_scarab_control_dispatch(child);
     Unit motion=u[child];
     if (!(motion.order==2 && (motion.path_timer>24 || motion.path_retry>12)))
