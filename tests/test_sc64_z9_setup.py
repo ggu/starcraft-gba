@@ -91,7 +91,8 @@ class Z9Setup(unittest.TestCase):
         loader.exec_module(dev)
         self.assertIn("zerg-z9", dev.SC64_PROFILES)
         self.assertEqual(dev.SC64_TEST_TARGETS["zerg-z9"], "test-sc64-zerg-z9")
-        self.assertIn("Zerg-Z7", dev.GAMES["zerg"][1])
+        self.assertEqual(dev.GAMES["zerg"][1], dev.GAMES["zerg-z9"][1])
+        self.assertIn("Zerg-Z7", dev.GAMES["zerg-z7"][1])
         self.assertEqual(dev.PLAY_SAVE_PROFILES.get("zerg-z9", "zerg-z9"), "zerg-z9")
 
     def test_fresh_build_checks_inputs_without_requiring_an_existing_rom(self):
