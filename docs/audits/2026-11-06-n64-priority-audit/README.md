@@ -79,3 +79,16 @@ no engine, ROM, save format, SD contents or Actions settings.
 The [living backlog](../../PROJECT-TODO.md) keeps stable task IDs and the full
 completion goal. The earlier [N64 audit](../2026-11-06-n64-priorities/README.md)
 remains a historical snapshot; this update does not retroactively requalify it.
+
+## Follow-up: fresh ordinary-input N64 production
+
+After the source-only audit, a separate Terra session ran the owned N64 ROM
+in a fresh independent ares process on River Styx, Human Protoss versus Zerg.
+The named Nexus showed shield 750, HP 750 and supplies 9. An ordinary production
+command showed queue/progress and supply 4/9→5/9; later the indicator cleared
+with supply still 5/9. Parent independently inspected the three corresponding
+captures. The resulting unit was not selected, and active income prevents an
+exact debit or game-tick claim. This adds a bounded production observation;
+it does not close Scarab, Guardian, campaign or full-match parity.
+See [the fresh session and exact limits](protoss-nexus-reference.md).
+The emulator and driver were terminated/reaped and the serialized lock released.

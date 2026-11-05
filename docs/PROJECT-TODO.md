@@ -106,6 +106,12 @@ that stutter separately from recurring collision/steering cost. Detector-first
 remains rejected after measured regression. No experimental HOST result enables
 a normal product or establishes complete N64 parity.
 
+A later [fresh ordinary-input N64 session](audits/2026-11-06-n64-priority-audit/protoss-nexus-reference.md)
+on River Styx observed a named Nexus, queued production with 4/9→5/9 supply,
+and the progress indicator subsequently clearing. Parent inspected the captures.
+Resulting unit identity, exact debit and internal timing remain unverified;
+Reaver ammunition and Guardian production still need their own observations.
+
 ## Next concrete milestones after the Terra audit
 
 1. Promote the now guest-qualified opt-in late Egg service into one common
