@@ -374,6 +374,31 @@ race_z8_save_candidate_world_valid(const RaceSave *candidate, int width, int hei
 #endif
 
 #ifdef SC64_Z9_RUNTIME
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+/* Staged preflight binds source ownership and scheduler data to the saved
+ * mission descriptor without changing the live selected mission. */
+static int race_zl_candidate_map_valid(const Sc64RaceMap *map,const Sc64ZlMission *mission)
+{
+    if (!mission || !map || mission->global_id>=SC64_RACE_MAP_COUNT ||
+        map!=&sc64_race_maps[mission->global_id] || map->width!=mission->map_cols ||
+        map->height!=mission->map_rows || map->human_slot!=SC64_ZL_HUMAN_SLOT ||
+        map->unit_count!=mission->map_units || !map->owner_modes || !map->units ||
+        !race_zl_text_equal(map->mission_id,mission->mission_id)) return 0;
+    for (unsigned i=0;i<8;i++) if(map->owner_modes[i]!=mission->owner_modes[i]) return 0;
+    return 1;
+}
+static int race_zl_unpack_candidate_for(const Sc64ZlPersistentState *in,
+                                         Sc64ZlSchedulerState *scratch,
+                                         const Sc64ZlMission *mission)
+{
+    Sc64Z8Setup setup;Sc64ZlAiState ai;
+    if (!in || !scratch || !mission) return 0;
+    race_zl_setup(mission,&setup);memcpy(&ai,in->ai,sizeof(ai));
+    if (!sc64_zl_ai_state_valid(&ai) ||
+        (in->crystal_carrier!=SC64_ZL_NO_CARRIER && in->crystal_carrier>=MAX_UNITS)) return 0;
+    return sc64_zl_state_unpack(0,in,mission->program,&setup,scratch);
+}
+#endif
 /* Z9/Z10 rebinding requires source identities to agree with live owners and
  * runtime types; check the decoded candidate before any live pool changes. */
 static int
@@ -384,15 +409,21 @@ race_zl_save_candidate_world_valid(const RaceSave *candidate, int width, int hei
         candidate->state[2] >= SC64_RACE_MAP_COUNT)
         return 0;
     map = &sc64_race_maps[candidate->state[2]];
-    if (!race_zl_map_shape_valid(map) || width != map->width || height != map->height)
-        return 0;
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    const Sc64ZlMission *mission=race_zl_mission_for(candidate->state[2]);
+    if (!race_zl_candidate_map_valid(map,mission) || width!=map->width || height!=map->height) return 0;
+#define SC64_ZL_CANDIDATE_OWNER(slot) (mission->live_owner[(slot)])
+#else
+    if (!race_zl_map_shape_valid(map) || width != map->width || height != map->height) return 0;
+#define SC64_ZL_CANDIDATE_OWNER(slot) race_zl_source_owner(slot)
+#endif
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit unit;
         if (!race_save_decode_unit(candidate, i, (unsigned)width * 16u,
                                    (unsigned)height * 16u, &unit)) return 0;
         if (!unit.alive) continue;
         if (unit.raw_owner < 0 || unit.raw_owner >= SC64_Z8_OWNER_LIMIT ||
-            race_zl_source_owner((unsigned)unit.raw_owner) != unit.owner ||
+            SC64_ZL_CANDIDATE_OWNER((unsigned)unit.raw_owner) != unit.owner ||
             unit.raw_type < 0 || sc64_race_unit_from_raw(unit.raw_type) != unit.type)
             return 0;
     }
@@ -415,12 +446,13 @@ race_zl_save_candidate_world_valid(const RaceSave *candidate, int width, int hei
 #endif
         if (!building.alive) continue;
         if (building.raw_owner < 0 || building.raw_owner >= SC64_Z8_OWNER_LIMIT ||
-            race_zl_source_owner((unsigned)building.raw_owner) != building.owner ||
+            SC64_ZL_CANDIDATE_OWNER((unsigned)building.raw_owner) != building.owner ||
             building.raw_type < 0 || sc64_race_building_from_raw(building.raw_type) < 0)
             return 0;
     }
     return 1;
 }
+#undef SC64_ZL_CANDIDATE_OWNER
 
 /* The Z9/Z10 record is smaller than the shared Zerg payload; the rest must
  * stay canonical zero. */
@@ -3318,8 +3350,14 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_Z9_RUNTIME
     if (!v[0] && race_zl_mission_for(v[2])) {
-        /* Candidate checks run before the mission is selected; select it
-         * transiently so the shared source-owner tables resolve. */
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+        const Sc64ZlMission *mission=race_zl_mission_for(v[2]);
+        if (!race_zl_save_candidate_world_valid(&race_data,width,height) ||
+            !race_zl_save_payload_tail_clear(&race_data) ||
+            !race_zl_unpack_candidate_for(&race_data.zl,
+                &sc64_zp_route_save_scratch.zl_candidate.scheduler,mission)) return 0;
+#else
+        /* Legacy validation temporarily binds its selected mission. */
         int saved_mission = race_selected_mission, ok;
         race_selected_mission = v[2];
         ok = race_zl_save_candidate_world_valid(&race_data, width, height) &&
@@ -3328,6 +3366,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                                  &sc64_zp_route_save_scratch.zl_candidate.scheduler, 0);
         race_selected_mission = saved_mission;
         if (!ok) return 0;
+#endif
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
