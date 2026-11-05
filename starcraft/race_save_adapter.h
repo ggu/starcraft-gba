@@ -2646,12 +2646,16 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                                   (unsigned)(height * 16),
                                   &candidate_unit)) return 0;
 #endif
-#ifdef SC64_SHARED_EGG_HOST_STAGE
-        /* The candidate's own mode/mission, not the currently live world,
-         * determines whether the existing strict Z7 Egg validator applies. */
+#ifdef SC64_Z7_EGG_PRODUCTION
+        /* U_Z7_EGG is a legacy type only in the Z7 campaign. Every custom or
+         * later-mission instance needs its selected candidate's Egg token,
+         * regardless of whether the staged live producer is compiled. */
         if ((v[0] || v[2]!=SC64_Z7_GLOBAL_ID) && RACE_U(i,type)==U_Z7_EGG) {
 #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
             if (!sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,
+                                     race_data.version,SC64_STAGE_SAVE_EGG)) return 0;
+#elif defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
+            if (!sc64_stage_save_auth_matches(&plan->guardian_auth,&race_data,
                                      race_data.version,SC64_STAGE_SAVE_EGG)) return 0;
 #else
             return 0;

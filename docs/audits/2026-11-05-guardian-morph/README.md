@@ -170,3 +170,27 @@ performs a bounded lookup rather than replaying IScript or using game RNG; the
 source-to-runtime wait conversion is provisional. Preparation rejects unknown
 reachable instructions and caps the bank data estimate at 32 KiB. This does
 not implement cancel/death presentation, a game draw hook, or guest admission.
+
+## Independent review: legacy Egg context
+
+Review of `acbc2169` found that the Z7 codec's historical Egg identity could
+also be decoded from an ordinary custom-game journal. The selected candidate
+had no shared-Egg feature, so the combined semantic checks were skipped. The
+original constructed-journal matrix had missed this case. Normal Z7/Z9
+validators shared the missing mode discriminator; ordinary custom production
+did not create such Eggs, and its update path could remove a restored one.
+
+The correction checks the candidate's own mode and mission whenever legacy
+Z7 Egg production is compiled. Genuine Z7 campaign Eggs retain their existing
+validation. Other Eggs require the selected candidate's authenticated Egg
+feature; raw-36 Overlords remain ordinary Overlords. Normal shipping hardening
+is isolated at `7123176e`; this branch also retains explicit exceptions for the
+experimental authenticated journal formats.
+
+The new combined fixture covers rejection without live/SRAM mutation and
+older-valid fallback. A separate Guardian-only fixture exercises its writer
+and loader without assuming that an invalid newly written record can first be
+selected successfully. The first private Guardian-only probe made that wrong
+assumption and failed before its load assertion; that failed probe remains
+retained and does not count as a passing regression test. Qualification of
+this successor is recorded separately from the earlier `acbc2169` results.

@@ -6,6 +6,7 @@
 #include <string.h>
 #include "../starcraft/game.c"
 extern void guardian_test_reset(void);
+extern void guardian_test_snapshot(void *);
 extern void guardian_test_retag(int,u32,u32);
 extern void guardian_test_replace(int,const void *,u32);
 static int add_actor(int type,int raw,int target,int timer,int x)
@@ -117,6 +118,39 @@ static void mixed_fallback(void)
     assert(race_worker_cargo_select(&plan,&selected));
     assert(selected.tag==SC64_TRANSPORT_SAVE_VERSION && plan.guardian_auth.features==0);
 }
+/* Retag a real HOST-only staged journal as an ordinary shipping generation.
+ * A Z7 Egg type exists in the legacy enum, but a custom Egg requires the
+ * authenticated Egg namespace; row contents must not supply that authority. */
+static void reject_unauthenticated_legacy_egg(void)
+{
+    static u8 before[32768],after[32768];
+    start_custom();
+    assert(add_actor(SC64_SHARED_EGG_TYPE,36,U_DRONE,1,140)>=0);
+    assert(race_save_game());
+    RaceLoadPlan plan; GbaSaveSelection selected;
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION);
+    guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    guardian_test_snapshot(before);
+    assert_failed_load_atomic();
+    guardian_test_snapshot(after);assert(!memcmp(before,after,sizeof(before)));
+
+    /* An invalid newer legacy-tagged Egg must fall back to the older valid
+     * ordinary journal, without rewriting either SRAM record. */
+    start_custom();int old_slot=spawn_unit(SIDE,U_OVERLORD,100,100);assert(old_slot>=0);
+    u[old_slot].raw_type=36;Unit old=u[old_slot];assert(race_save_game());
+    assert(race_worker_cargo_select(&plan,&selected));
+    guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    assert(add_actor(SC64_SHARED_EGG_TYPE,36,U_DRONE,1,140)>=0);
+    assert(race_save_game());assert(race_worker_cargo_select(&plan,&selected));
+    guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    guardian_test_snapshot(before);assert(race_load_game());
+    guardian_test_snapshot(after);assert(!memcmp(before,after,sizeof(before)));
+    assert(!memcmp(&u[old_slot],&old,sizeof(old)));
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_TRANSPORT_SAVE_VERSION && plan.guardian_auth.features==0);
+}
+
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 /* One paid Carrier order and one paired Egg need two additional unit slots;
  * an already-allocated training child would already occupy a live slot. */
@@ -138,6 +172,7 @@ static void carrier_reservation(void)
 #endif
 int main(void)
 {
+    reject_unauthenticated_legacy_egg();
     exercise(0);exercise(SC64_STAGE_SAVE_GUARDIAN);exercise(SC64_STAGE_SAVE_EGG);
     exercise(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG);mixed_fallback();
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED

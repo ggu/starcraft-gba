@@ -3,6 +3,10 @@ GUARD_TEST_BIN_DIR ?= /tmp
 .PHONY: guardian-real
 GUARD_HOST = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -DSC64_GUARDIAN_COCOON_STAGE
 GUARD_EXTRA = common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+.PHONY: guardian-legacy-egg-context
+guardian-legacy-egg-context:
+	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_legacy_egg_context.c tests/sc64_guardian_journal_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $(GUARD_TEST_BIN_DIR)/guardian-legacy-egg-context
+	$(GUARD_TEST_BIN_DIR)/guardian-legacy-egg-context
 guardian-real:
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-terran
 	$(GUARD_TEST_BIN_DIR)/guardian-real-terran
