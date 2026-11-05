@@ -2154,8 +2154,8 @@ These generate the required maps, art, scenario, ability and transport headers
 under `.local/`; Z6 also generates its inherited Z5 sprite bank. Inspect
 readiness with `./dev sc64 status --profile zerg-z6` or the corresponding
 Protoss profile. The output ROMs are `build/StarCraft-Zerg-Z6-Probe-GBA.gba`
-and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and `protoss` names select the canonical seven-mission
-products; these explicit staged names keep their own files.
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and `protoss` names select the canonical nine- and
+ten-mission products; these explicit staged names keep their own files.
 
 ### Reproduce the canonical P6 host win
 

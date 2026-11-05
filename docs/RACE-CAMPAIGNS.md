@@ -177,8 +177,8 @@ reduces mean full costs from 2,155,200 to 2,113,065 cycles in 600 opening
 updates and from 2,426,615 to 2,233,602 cycles in 1,400 attack updates.
 Both remain below the 30-fps target. These are bounded samples, not a mission-wide
 average. Neither profile establishes native enemy-AI equivalence, arbitrary
-save-state coverage or physical-GBA behavior. Zerg 8–10 and Protoss 8–10
-remain unqualified in the canonical profiles.
+save-state coverage or physical-GBA behavior. Later canonical missions have
+separate qualification described below; Zerg 10 remains outside the profile.
 
 P8 **The Trial of Tassadar** has a separate `protoss-p8`
 candidate. It carries the canonical P1–P7 profile, is built with
