@@ -21,8 +21,8 @@ static void z10_damage_event(int slot,int damage,int source_type,int source_owne
 {
     const Unit *q=&u[slot];
     if(q->owner!=SIDE)return;
-    fprintf(stderr,"DAMAGE frame=%u slot=%d raw=%d rawowner=%d before=%d after=%d damage=%d source_type=%d source_raw=%d source_owner=%d class=%d flags=%d xy=%d/%d order=%d\n",
-        (unsigned)frame,slot,q->raw_type,q->raw_owner,q->hp+damage,q->hp,damage,
+    fprintf(stderr,"DAMAGE frame=%u slot=%d type=%d raw=%d mapped_raw=%d rawowner=%d before=%d after=%d damage=%d source_type=%d source_raw=%d source_owner=%d class=%d flags=%d xy=%d/%d order=%d\n",
+        (unsigned)frame,slot,q->type,q->raw_type,sc64_race_raw_unit(q->type),q->raw_owner,q->hp+damage,q->hp,damage,
         source_type,sc64_race_raw_unit(source_type),source_owner,damage_class,
         hit_flags,q->x,q->y,q->order);
 }
