@@ -2140,7 +2140,11 @@ static int race_impact_save_read(Sc64ImpactEvent *candidate, int *count);
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_WORKER_CARGO_KIND)
 static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count);
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
-static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth);
+static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+    ,Sc64BcYamatoShot *bc_candidate
+#endif
+    );
 #endif
 #endif
 static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);

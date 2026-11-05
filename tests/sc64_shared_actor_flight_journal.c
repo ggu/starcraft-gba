@@ -83,8 +83,30 @@ int main(int argc,char **argv)
     assert(race_scarab_probe_bullet_create(&u[child]));
     assert(race_impact_count==1);Sc64ImpactEvent expected=race_impact_rows[0];
     Sc64ScarabImpact packet;assert(sc64_scarab_impact_unpack(&expected,&packet) && packet.ticks==6);
-    assert(race_save_game());race_impact_reset();sc64_scarab_probe_damage_upgrades=0;
+    /* A real reserved Yamato shot makes the compact tail contain one BC row,
+     * one impact packet and the transport trailer, all before selection. */
+    int bc=spawn_unit(ENEMY,U_BATTLECRUISER,u[p].x,u[p].y);assert(bc>=0);
+    u[bc].work_timer=64<<3;u[bc].carry=200*256;u[bc].cd=100;
+    sc64_battlecruiser_tech_bits|=(u16)(SC64_BC_TECH_YAMATO<<(2*ENEMY));
+    assert(race_bc_yamato_issue(bc,p));
+    Sc64BcYamatoShot expected_bc=sc64_bc_shots[0];assert(expected_bc.state);
+    assert(race_save_game());
+    static u8 raw_payload[sizeof(RaceImpactRecord)];u32 raw_length=0;
+    assert(save_read_latest(raw_payload,sizeof(raw_payload),SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION,&raw_length));
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION && selected.length==raw_length);
+    assert(!memcmp(raw_payload,&race_impact_record,raw_length));
+    assert(!memcmp(plan.bc_candidate,&expected_bc,sizeof(expected_bc)));
+    /* An invalid compact shot must also leave every candidate byte alone. */
+    static u8 invalid_payload[sizeof(RaceImpactRecord)];
+    memcpy(invalid_payload,raw_payload,raw_length);
+    invalid_payload[sizeof(RaceSave)-SC64_BC_SAVE_EXTRA_BYTES+offsetof(Sc64BcYamatoShot,phase)]|=0x80u;
+    memcpy(&race_impact_record,invalid_payload,raw_length);
+    assert(!race_worker_cargo_prepare_selected(&race_impact_record,raw_length,selected.tag,&plan));
+    assert(!memcmp(invalid_payload,&race_impact_record,raw_length));
+    race_impact_reset();memset(sc64_bc_shots,0,sizeof(sc64_bc_shots));sc64_scarab_probe_damage_upgrades=0;
     assert(race_load_game());assert(sc64_scarab_probe_damage_upgrades==(1u<<SIDE));
+    assert(!memcmp(&sc64_bc_shots[0],&expected_bc,sizeof(expected_bc)));
     assert(race_impact_count==1 && !memcmp(&race_impact_rows[0],&expected,sizeof(expected)));
     for (int step=6;step>0;--step) {
         while (!sc64_battlecruiser_source_tick_due()) { ++frame; }

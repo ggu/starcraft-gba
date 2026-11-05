@@ -471,7 +471,11 @@ race_impact_save_write(void)
 static int
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
 race_impact_save_decode_selected_impl(u32 len, u32 selected_tag,
-                                 Sc64ImpactEvent *candidate, int *count,u32 authenticated_inner)
+                                 Sc64ImpactEvent *candidate, int *count,u32 authenticated_inner
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+                                 ,Sc64BcYamatoShot *bc_candidate
+#endif
+                                 )
 #else
 race_impact_save_decode_selected(u32 len, u32 selected_tag,
                                  Sc64ImpactEvent *candidate, int *count)
@@ -505,7 +509,13 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     const u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES;
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+    Sc64BcYamatoShot *shots=bc_candidate;
+    if (!shots) return 0;
+    memset(shots,0,sizeof(Sc64BcYamatoShot)*SC64_BC_SHOT_LIMIT);
+#else
     Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT] = {{0}};
+#endif
     u32 offset = base, mask = 0, impact_bytes;
     int legacy = selected_tag == SC64_LEGACY_SAVE_VERSION;
     if (selected_tag != SAVE_VERSION && !legacy
@@ -544,15 +554,20 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     } else if (race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
     impact_bytes = len - offset;
     if (impact_bytes > sizeof(race_impact_record.impacts)) return 0;
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+    const u8 *impact_in=(const u8 *)&race_impact_record+offset;
+#else
     memmove(race_impact_record.impacts, (u8 *)&race_impact_record + offset, impact_bytes);
     memcpy(race_data.battlecruiser_shots, shots, sizeof(shots));
+    const u8 *impact_in=race_impact_record.impacts;
+#endif
     if (!impact_bytes) return 1;
     rows =
 #ifdef SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE
         authenticated_inner==SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION ?
-        race_impact_decode_flight(race_impact_record.impacts,impact_bytes,candidate) :
+        race_impact_decode_flight(impact_in,impact_bytes,candidate) :
 #endif
-        sc64_impact_decode(race_impact_record.impacts, impact_bytes,
+        sc64_impact_decode(impact_in, impact_bytes,
                               RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
                               SC_RU_COUNT, candidate);
 #else
@@ -575,8 +590,19 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
 
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
 static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count)
-{ return race_impact_save_decode_selected_impl(len,tag,candidate,count,0); }
-static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth)
+{
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+    Sc64BcYamatoShot detached[SC64_BC_SHOT_LIMIT];
+    return race_impact_save_decode_selected_impl(len,tag,candidate,count,0,detached);
+#else
+    return race_impact_save_decode_selected_impl(len,tag,candidate,count,0);
+#endif
+}
+static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+    ,Sc64BcYamatoShot *bc_candidate
+#endif
+    )
 {
     if (!sc64_stage_save_auth_matches(auth,&race_data,race_data.version,0) ||
 #ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
@@ -598,7 +624,11 @@ static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactE
         tag!=((auth->features & SC64_STAGE_SAVE_GUARDIAN) ?
               SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
 #endif
-    if (!race_impact_save_decode_selected_impl(len,tag,candidate,count,auth->inner)) return 0;
+    if (!race_impact_save_decode_selected_impl(len,tag,candidate,count,auth->inner
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+        ,bc_candidate
+#endif
+        )) return 0;
 #if defined(SC64_SHARED_ACTOR_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)
     for (int i=0;i<*count;++i)
         if (candidate[i].source_type>=SC_RU_LEGACY_BOUND) {

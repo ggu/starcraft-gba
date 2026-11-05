@@ -1544,9 +1544,9 @@ static int race_skirmish_transport_save_valid(const RaceSave *candidate,
 #endif
 
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,unsigned wh SC64_GCTX_DECL)
+static int race_bc_shots_candidate_valid_rows(const RaceSave *candidate,const Sc64BcYamatoShot *shots,unsigned ww,unsigned wh SC64_GCTX_DECL)
 {
-    if (!candidate || !ww || !wh) return 0;
+    if (!candidate || !shots || !ww || !wh) return 0;
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit actor;
         if (!SC64_GUARD_DECODE(candidate,i,ww,wh,&actor)) return 0;
@@ -1558,7 +1558,7 @@ static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,u
              actor.order!=ORDER_ATTACK_MOVE && actor.order!=ORDER_ATTACK_TARGET)) return 0;
     }
     for (unsigned i=0;i<SC64_BC_SHOT_LIMIT;++i) {
-        const Sc64BcYamatoShot *shot=&candidate->battlecruiser_shots[i];
+        const Sc64BcYamatoShot *shot=&shots[i];
         static const Sc64BcYamatoShot zero={0};
         if (!shot->state) { if (memcmp(shot,&zero,sizeof(zero))) return 0; continue; }
         if (shot->state>SC64_BC_SHOT_FLIGHT ||
@@ -1600,13 +1600,15 @@ static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,u
                  (shot->target==SC64_BC_SHOT_NO_TARGET?-1:(int)shot->target))) return 0;
         } else if (shot->state!=SC64_BC_SHOT_FLIGHT) return 0;
         for (unsigned j=0;j<i;++j)
-            if (candidate->battlecruiser_shots[j].state && shot->state!=SC64_BC_SHOT_FLIGHT &&
-                candidate->battlecruiser_shots[j].state!=SC64_BC_SHOT_FLIGHT &&
+            if (shots[j].state && shot->state!=SC64_BC_SHOT_FLIGHT &&
+                shots[j].state!=SC64_BC_SHOT_FLIGHT &&
                 shot->caster!=SC64_BC_SHOT_NO_CASTER &&
-                candidate->battlecruiser_shots[j].caster==shot->caster) return 0;
+                shots[j].caster==shot->caster) return 0;
     }
     return 1;
 }
+static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,unsigned wh SC64_GCTX_DECL)
+{ return candidate && race_bc_shots_candidate_valid_rows(candidate,candidate->battlecruiser_shots,ww,wh SC64_GCTX_ARG); }
 #endif
 
 #ifdef SC64_WORKER_CARGO_KIND
@@ -2645,6 +2647,9 @@ typedef struct {
 #ifdef SC64_IMPACT_EVENTS
     Sc64ImpactEvent impact_candidate[RACE_IMPACT_SAVE_CAPACITY ? RACE_IMPACT_SAVE_CAPACITY : 1];
     int impact_candidate_count;
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+    Sc64BcYamatoShot bc_candidate[SC64_BC_SHOT_LIMIT];
+#endif
 #endif
 } RaceLoadPlan;
 
@@ -4058,7 +4063,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     }
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_IMPACT_EVENTS)
+    if (!race_bc_shots_candidate_valid_rows(&race_data,plan->bc_candidate,(unsigned)width*16u,(unsigned)height*16u SC64_GCTX_ARG)) return 0;
+#else
     if (!race_bc_shots_candidate_valid(&race_data,(unsigned)width*16u,(unsigned)height*16u SC64_GCTX_ARG)) return 0;
+#endif
 #endif
 #ifdef SC64_SCARAB_RUNTIME
     if (!race_scarab_save_candidate_valid(&race_data,(unsigned)width*16u,
@@ -4117,7 +4126,11 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
     u32 impact_tag=plan->guardian_auth.features ? SC64_TRANSPORT_SAVE_VERSION : tag;
     if (!race_impact_save_decode_selected_guardian(len,impact_tag,plan->impact_candidate,
-                                          &plan->impact_candidate_count,&plan->guardian_auth)) return 0;
+                                          &plan->impact_candidate_count,&plan->guardian_auth
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+                                          ,plan->bc_candidate
+#endif
+                                          )) return 0;
 #elif defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
     const Sc64StageTagPair combined_tags[]={
         {SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0},
@@ -4376,7 +4389,11 @@ static int race_load_game(void) {
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     sc64_battlecruiser_tech_bits = (u16)((unsigned)v[27] & 65535u);
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_IMPACT_EVENTS)
+    memcpy(sc64_bc_shots,plan.bc_candidate,sizeof(sc64_bc_shots));
+#else
     memcpy(sc64_bc_shots,race_data.battlecruiser_shots,sizeof(sc64_bc_shots));
+#endif
     sc64_bc_pause_offset=(u8)((unsigned)v[28]&7u);
     if ((unsigned)v[28]==0) sc64_bc_spell_rng=42u;
     else memcpy(&sc64_bc_spell_rng,&v[29],sizeof(sc64_bc_spell_rng));
