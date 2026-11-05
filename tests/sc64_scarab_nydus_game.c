@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Constructed Z7 HOST scenario: real Nydus transfer and Scarab references. */
-#define main nydus_original_main
-#include "sc64_nydus_game.c"
-#undef main
+#include "sc64_scarab_nydus_support.h"
 #include "../starcraft/sc64_scarab_unit_adapter.h"
 
 int main(void)
@@ -11,9 +9,9 @@ int main(void)
     int passenger=side_hydra(0);
     /* Place the passenger at the real entrance contact ring; ordinary input
      * issues the order and game_update performs the actual transfer. */
-    u[passenger].x=b[ent].x+32;u[passenger].y=b[ent].y;
     select_unit_normal(passenger);
     assert(command_enter(ent)==1);
+    u[passenger].x=b[ent].x+32;u[passenger].y=b[ent].y;
     int parent=spawn_unit(ENEMY,U_REAVER,u[passenger].x+50,u[passenger].y);
     assert(parent>=0 && race_scarab_parent_init(parent));
     race_minerals[ENEMY]=500;assert(race_scarab_enqueue(parent,0));
