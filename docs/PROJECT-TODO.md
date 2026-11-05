@@ -19,12 +19,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current baseline
 
-- Canonical branch: `codex/source-release`; production update `73cc74a5` merges
-  the qualified source-permitted Scourge/Spire correction in PR #290.
-  Current main `74922d57` also merges the save-context hardening in PR #293.
-- Latest verified Mac package: `20261105-74922d57-campaigns`: Terran 1–10,
+- Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
+  correction in #290 and save-context hardening in #293 are retained. #295
+  adds the explicit shared Egg preview; its normal product flag remains off.
+- Latest verified normal Mac package: `20261106-e9838086-campaigns`: Terran 1–10,
   Zerg 1–9, Protoss 1–10, plus Showcase. Content coverage is **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
+- Separate opt-in Mac package: `20261106-e9838086-custom-eggs-preview`.
+  Versioned filenames and manifests distinguish it from the normal products;
+  its shared Egg service applies to custom games, not Z8–Z10 production.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
   and 1–3 independently raced AIs. Larger roster and behavior gaps remain below.
 - The latest measured normal P7 window (`c96c84b7`) costs about **2,197,886 cycles per
@@ -113,7 +116,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 
 | Work | State and next gate |
 | --- | --- |
-| [#289](https://github.com/ggu/starcraft-gba/pull/289), shared production successor | The [Egg-only custom candidate](audits/2026-11-05-shared-egg-custom/README.md) at `6ba76f8e` no longer depends on Guardian. Six normal ROM/RAM checks and clean default tests pass; all five opt-in GBA builds and HOST controller/journal/owner suites pass. The exact Terran ROM has physical-button ARM, genuine fresh-process SRAM and a separate static-frame/HUD visual check. Known pre-cargo Z6/Z7 reader regressions were reproduced and fixed without changing the authenticated inner token. Separate preview commands are available; default service remains off. Campaign integration, remaining guest products, long matches and performance are not thereby qualified. |
+| [#295](https://github.com/ggu/starcraft-gba/pull/295), shared production preview | The [Egg-only custom candidate](audits/2026-11-05-shared-egg-custom/README.md) at `6ba76f8e` no longer depends on Guardian. Six normal ROM/RAM checks and clean default tests pass; all five opt-in GBA builds and HOST controller/journal/owner suites pass. The exact Terran ROM has physical-button ARM, genuine fresh-process SRAM and a separate static-frame/HUD visual check. Known pre-cargo Z6/Z7 reader regressions were reproduced and fixed without changing the authenticated inner token. Separate preview commands are available; default service remains off. Campaign integration, remaining guest products, long matches and performance are not thereby qualified. |
 | [#290](https://github.com/ggu/starcraft-gba/pull/290), Scourge picker | Merged as `73cc74a5`. Runtime/test head `b3d6f8ef` passed viable producer/worker/site sanitizer controls, selected-product journal checks, six new ROM/RAM builds, full clean-Git default tests (989 Python, 26 skipped, plus compiled suites) and fresh-process loading of an actual prior-code pre-cargo HOST journal. Documentation successor/merge preserve identical runtime/build/test objects. No arbitrary guest-save or hardware claim. |
 | [#293](https://github.com/ggu/starcraft-gba/pull/293), normal save-context hardening | Merged as `74922d57`; whole Git tree equals qualified `7123176e`. Normal Z7/Z9 custom and Z9 mission controls reject unsupported Eggs, preserve raw-36 Overlords and older-valid fallback, and retain a genuine prior Z7 paid-Egg journal. All six ROM/RAM checks and clean default checks pass (989 Python tests, 26 skipped, plus compiled suites); pins unchanged. A disk guard stopped the first six-build run before Z10; lossless archival permitted the complete retry. |
 | Z10 controller | Ordinary drag boxes fixed command latency; the rally fix removed actual recalls. Upgrades reached 2/2 and improved the force at road leg 6, but the mission still lost. Repeated Sunken rebuilding consumed the economy and failed its bounded prefix; do not extend that losing run. |
@@ -121,7 +124,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#265](https://github.com/ggu/starcraft-gba/pull/265), advisor alerts | Held: burn/combat suppression, one-shots, cooldown initialization, voice policy and current-combination qualification. |
 | [#212](https://github.com/ggu/starcraft-gba/pull/212), [#210](https://github.com/ggu/starcraft-gba/pull/210), Carrier/Defiler | Draft/conflicting: namespace collision with transport, missing genuine migration/current qualification; also audit guarded AI purchases. |
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Draft: renderer conflicts and missing current memory/paired ARM qualification. |
-| SD delivery | Latest verified Mac package is `74922d57`; last verified KODAK copy is f7. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
+| SD delivery | Latest verified normal Mac package is `e9838086`, with a separate custom Egg preview; last verified KODAK copy is f7. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
 
 ## Verification and maintenance
 
