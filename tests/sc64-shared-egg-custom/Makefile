@@ -164,5 +164,5 @@ custom-shared-actor-flight-terran:
 .PHONY: custom-shared-actor-six-tag-selector
 custom-shared-actor-six-tag-selector:
 	mkdir -p $(COMBINED_BIN_DIR)
-	$(CLANG) -std=c11 -O1 -g0 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -DSC64_SHARED_ACTOR_FLIGHT_HOST_STAGE tests/gba_save_prepared.c -o $(COMBINED_BIN_DIR)/six-tag-selector
+	$(CLANG) -std=c11 -O1 -g0 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Wno-misleading-indentation -fsanitize=address,undefined -DGBA_HOST -Icommon -DSC64_WORKER_CARGO_KIND -DSC64_SHARED_ACTOR_FLIGHT_HOST_STAGE tests/gba_save_prepared.c -o $(COMBINED_BIN_DIR)/six-tag-selector
 	$(COMBINED_BIN_DIR)/six-tag-selector
