@@ -11,7 +11,9 @@ extern void guardian_test_replace(int,const void *,u32);
 static int add_actor(int type,int raw,int target,int timer,int x)
 {
     int slot=spawn_unit(SIDE,U_OVERLORD,x,100);assert(slot>=0);
-    Unit *q=&u[slot];memset(q,0,sizeof(*q));
+    Unit *q=&u[slot];
+    /* Preserve the cache initialized by spawn, including P10 Arbiter state. */
+    u16 spawned_weapon=q->weapon;memset(q,0,sizeof(*q));q->weapon=spawned_weapon;
     q->alive=1;q->selected=1;q->owner=SIDE;q->type=type;q->raw_type=raw;q->raw_owner=-1;
     q->x=q->tx=q->path_x=x;q->y=q->ty=q->path_y=100;
     q->hp=q->maxhp=200;q->armor=type==SC64_SHARED_EGG_TYPE ? 10 : 0;
