@@ -53,3 +53,13 @@ guardian-lifecycle-real:
 	/tmp/guardian-lifecycle-protoss
 	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_lifecycle_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-lifecycle-showcase
 	/tmp/guardian-lifecycle-showcase
+.PHONY: guardian-frame-real
+guardian-frame-real:
+	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-terran
+	/tmp/guardian-frame-terran
+	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-zerg
+	/tmp/guardian-frame-zerg
+	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_FLAGS)) tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-protoss
+	/tmp/guardian-frame-protoss
+	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-showcase
+	/tmp/guardian-frame-showcase
