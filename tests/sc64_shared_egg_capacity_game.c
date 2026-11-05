@@ -26,5 +26,23 @@ int main(void)
     for(int i=0;i<MAX_UNITS;i++)u[i].alive=1;
     u[0].alive=0;u[1].alive=0;
     assert(race_product_slots_available(2));assert(!race_product_slots_available(3));
+    /* Actual queue admission at the boundary: two pending Z9 creates and
+     * three free bodies permit one Drone Egg, then deny the next purchase. */
+    int hall=-1;
+    for(int i=0;i<MAX_BUILDINGS;i++) if(building_complete(i) && b[i].owner==SIDE &&
+        sc64_race_is_zerg_townhall(b[i].type)){hall=i;break;}
+    assert(hall>=0);minerals=1000;gas=1000;b[hall].larva=3;
+    for(int i=0;i<MAX_UNITS;i++) {u[i].alive=1;u[i].owner=ENEMY;u[i].type=U_DRONE;}
+    u[0].alive=0;u[1].alive=0;u[2].alive=0;
+    u[3].owner=SIDE;u[3].type=U_OVERLORD;
+    race_zl_sched.core.instance_count=1;
+    race_zl_sched.core.instances[0].trigger=4;
+    race_zl_sched.core.instances[0].owner=SC64_ZL_HUMAN_SLOT;
+    race_zl_sched.core.instances[0].flags=SC64_Z8_INST_EXECUTING;
+    race_zl_sched.core.instances[0].cursor=0;
+    assert(race_shared_trigger_obligations()==2);
+    assert(race_queue_unit(SIDE,hall,U_DRONE));int remaining_ore=minerals,remaining_larva=b[hall].larva;
+    assert(!race_queue_unit(SIDE,hall,U_DRONE));
+    assert(minerals==remaining_ore && b[hall].larva==remaining_larva);
     puts("executing create obligations, defer and capacity boundary passed");return 0;
 }
