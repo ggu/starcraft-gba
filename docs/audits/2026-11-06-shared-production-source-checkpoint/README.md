@@ -26,6 +26,28 @@ must combine progression, ammunition, attack and genuine fresh-process saves.
 
 ## Other isolated source work
 
+### Button-driven tech progression and genuine HOST save continuation
+
+Controller `8e178e16` passes a stronger progression gate: one-AI custom setup
+through menus, button-built Pylon/Gateway/Core/Robotics/Support Bay, paid Reaver
+training, exact 15-mineral Scarab debit and completion through `game_update`.
+It pause-saves at tick 7,101, exports the genuine journal and starts a separate
+process that pause-loads and continues for 60 frames. Initial 5,000 mineral/gas
+funds and idle workers are declared fixture setup; no prerequisite structure,
+Reaver or target is spawned by the controller. This is HOST input qualification,
+not an unassisted economy opening or ARM proof. The SRAM hash is
+`9432ba321157357943d0c4ff1dcbd18682ae88a19e60663a79253142ce2eeacb`.
+
+The real-opponent attack extension at `3808c41a` **does not pass**. Its tech
+write/read pass, but no Scarab impact appears before match loss at game frame
+12,448. The Reaver remains alive with an attack-move order. Retain this as a
+playability gate and investigate routing, target acquisition and launch state;
+a constructed nearby-target test cannot substitute for fixing or qualifying
+the real custom-game path. Logs remain private at
+`/tmp/sc64-scarab-controller-8e1.log` and `/tmp/sc64-scarab-controller-380.log`.
+
+### Codec, renderer and source-wallet checkpoints
+
 - Typed codec checkpoint `727d4705`, expanded fixture `ba1edca8`: feature-15 live Scarabs preserve heading
   and velocity; dead rows preserve signed HP and reject unrepresentable
   cooldowns. The sanitizer fixture passes all 5,120 velocity/HP combinations,
@@ -76,3 +98,9 @@ it does not relax validation or normalize the candidate before saving.
 Private local logs: `/tmp/sc64-wallet-64207a16-prepared-qualification.log`,
 `/tmp/sc64-tech-path-6d0.log`, `/tmp/sc64-tech-save-debug-state.log` and
 `/tmp/sc64-typed-velocity-expanded.log`. All earlier failed logs remain retained.
+
+A bounded fresh N64 Pylon-reference attempt reached only the Episode I menu.
+Its controller shim did not produce the intended sequence; the owned process
+was terminated and its hashes/logs retained under the ignored private
+`pylon-completion-2zwm0rfp` session. No construction, cost, animation, timing or
+parity finding follows. No guest-memory writes or RAM snapshots were used.
