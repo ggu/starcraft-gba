@@ -139,8 +139,27 @@ enum {
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     U_SHARED_SHUTTLE,
 #endif
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+    SC_RU_LEGACY_COUNT,
+#ifndef SC64_Z7_EGG_PRODUCTION
+    U_SHARED_EGG_STAGE = SC_RU_LEGACY_COUNT,
     SC_RU_COUNT
+#else
+    SC_RU_COUNT = SC_RU_LEGACY_COUNT
+#endif
+#else
+    SC_RU_COUNT
+#endif
 };
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#ifdef SC64_Z7_EGG_PRODUCTION
+#define SC64_SHARED_EGG_TYPE U_Z7_EGG
+#else
+#define SC64_SHARED_EGG_TYPE U_SHARED_EGG_STAGE
+_Static_assert(U_SHARED_EGG_STAGE == SC_RU_LEGACY_COUNT && SC_RU_COUNT == SC_RU_LEGACY_COUNT + 1,
+               "only the staged Egg may extend legacy actor IDs");
+#endif
+#endif
 enum {
     B_COMMAND, B_BARRACKS, B_DEPOT, B_REFINERY, B_ACADEMY, B_ENG_BAY,
     B_HATCHERY, B_BUNKER, B_INFESTED_COMMAND, B_CREEP_COLONY,
@@ -247,7 +266,11 @@ enum {
 };
 
 #ifdef SC64_SKIRMISH_ROSTER
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+_Static_assert(SC_RU_LEGACY_COUNT <= 64, "legacy skirmish roster IDs must fit six-bit save capacity");
+#else
 _Static_assert(SC_RU_COUNT <= 64, "skirmish roster unit types remain within six-bit save capacity");
+#endif
 _Static_assert(SC_RB_COUNT <= 128, "skirmish roster building types remain within seven-bit save capacity");
 #endif
 
