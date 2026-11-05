@@ -22,5 +22,14 @@ test-scarab-source-wallet-$(1): $$(CANONICAL_LOOKUP_INPUTS)
 endef
 $(eval $(call SCARAB_SOURCE_WALLET_FIXTURE,p7,SCARAB_P7_BASE_FLAGS))
 $(eval $(call SCARAB_SOURCE_WALLET_FIXTURE,p8,SCARAB_WALLET_P8_FLAGS))
+
+# Z10 vector includes Z8, Z9 and Z10 runtime bindings. The fixture seeds
+# source balances and descriptors; it does not activate campaign gameplay.
+.PHONY: test-scarab-source-wallet-z10
+test-scarab-source-wallet-z10: $(CANONICAL_LOOKUP_INPUTS)
+	mkdir -p build/generated/scarab-source-wallet/z10
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME $(ZERG_Z10_CANONICAL_FLAGS) tests/sc64_scarab_source_wallet_game.c common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/generated/scarab-source-wallet/z10/game
+	build/generated/scarab-source-wallet/z10/game
+
 .PHONY: test-scarab-source-wallet
-test-scarab-source-wallet: test-scarab-source-wallet-p7 test-scarab-source-wallet-p8
+test-scarab-source-wallet: test-scarab-source-wallet-p7 test-scarab-source-wallet-p8 test-scarab-source-wallet-z10
