@@ -112,6 +112,15 @@ and the progress indicator subsequently clearing. Parent inspected the captures.
 Resulting unit identity, exact debit and internal timing remain unverified;
 Reaver ammunition and Guardian production still need their own observations.
 
+The [staged production checkpoint](audits/2026-11-06-n64-priority-audit/shared-production-progress.md)
+records Guardian source-permission tests at `5859ea43` and the first selected
+Egg/Scarab HOST journal at `f2edfa3a`/`9160929e`. Four prior-writer actor-ID/custom
+SRAM cases pass; P10 and the combined Guardian feature remain outstanding.
+Actual P6 source flags collide with the prototype paid marker, so source data
+must be preserved and interpretation scoped to validated morph state/new format.
+These branches are not merged or enabled guest services. P1 work now targets
+exact per-call collision traversal reuse; no new speed gain is established.
+
 ## Next concrete milestones after the Terra audit
 
 1. Promote the now guest-qualified opt-in late Egg service into one common

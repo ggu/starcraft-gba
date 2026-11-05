@@ -92,3 +92,7 @@ exact debit or game-tick claim. This adds a bounded production observation;
 it does not close Scarab, Guardian, campaign or full-match parity.
 See [the fresh session and exact limits](protoss-nexus-reference.md).
 The emulator and driver were terminated/reaped and the serialized lock released.
+
+The subsequent [shared production checkpoint](shared-production-progress.md)
+records tested source changes, real source-flag collisions and remaining
+combined-engine gates without representing staged HOST work as shipped ROMs.

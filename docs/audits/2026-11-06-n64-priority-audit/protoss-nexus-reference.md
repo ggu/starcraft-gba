@@ -16,3 +16,5 @@ to 750, shields to 750 and supply provision to 18 half-supply units (9 HUD
 supply). These specific stock values agree with the named N64 Nexus display.
 This does not verify damage, armor, regeneration, build time, initial wallet,
 all other unit profiles or the engine's time conversion.
+
+Parent preserved the closed session under ignored `.local/n64-ref/nexus-production-20261106/` with a private SHA-256 manifest for all 26 captured session files (about 14.5 MB). No private capture payload is part of this source report.
