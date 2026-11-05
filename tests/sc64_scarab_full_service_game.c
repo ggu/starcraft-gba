@@ -11,8 +11,7 @@ int main(void)
     assert(spawn_build(ENEMY,B_HATCHERY,500,500,0)>=0);
     minerals=100;
     int parent=spawn_unit(SIDE,U_REAVER,128,128);
-    int target=spawn_unit(ENEMY,U_MARINE,180,128);
-    assert(parent>=0 && target>=0);u[parent].selected=1;
+    assert(parent>=0);u[parent].selected=1;
     int row=(int)sc64_skirmish_menu_count((unsigned)race_human);
     game_update(KEY_B,KEY_B);assert(menu_open);
     menu_cursor=0;game_update(KEY_UP,KEY_UP);assert(menu_cursor==row);
@@ -27,7 +26,8 @@ int main(void)
         int owner;unsigned phase;
         if(race_scarab_child_lookup(i,&owner,&phase) && owner==parent && phase==SC64_SCARAB_CHILD_INSIDE)child=i;
     }
-    assert(child>=0 && issue_order(ORDER_ATTACK_MOVE,u[target].x,u[target].y));
+    int target=spawn_unit(ENEMY,U_MARINE,180,128);
+    assert(child>=0 && target>=0 && issue_order(ORDER_ATTACK_MOVE,u[target].x,u[target].y));
     for(int i=0;i<200 && !race_scarab_probe_bullets_pending();++i)game_update(0,0);
     if (!race_scarab_probe_bullets_pending() || race_impact_count!=1 || !u[target].alive)
         fprintf(stderr,"attack state: parent alive=%d order=%d target=%d x=%d y=%d child alive=%d order=%d target=%d x=%d y=%d foe alive=%d hp=%d impacts=%u frame=%d\n",
