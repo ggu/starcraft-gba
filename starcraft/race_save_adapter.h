@@ -2206,6 +2206,12 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                                   (unsigned)(height * 16),
                                   &candidate_unit)) return 0;
 #endif
+#ifdef SC64_Z7_EGG_PRODUCTION
+        /* The legacy Egg actor belongs to Z7 only. Other campaigns and
+         * custom games never produced it in the shipping format; do not
+         * accept an unauthenticated Egg as a normal actor there. */
+        if ((v[0] || v[2]!=SC64_Z7_GLOBAL_ID) && RACE_U(i,type)==U_Z7_EGG) return 0;
+#endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
         if(RACE_U(i,type)<0||RACE_U(i,type)>=SC_RU_COUNT||RACE_U(i,owner)<0||RACE_U(i,owner)>4||
