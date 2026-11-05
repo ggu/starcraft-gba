@@ -135,3 +135,12 @@ only changes staged actor mappings, not the general flyer collision policy.
 Terran Guardian sight uses the raw-44 source sight lookup (352 source pixels).
 Its flying motion uses the existing raw-44 stock-speed path, which does not
 model source acceleration, turning, upgrades, or IScript movement.
+
+The HOST-only lifecycle candidate uses the existing unit slot, order-loop
+clock and owner wallet. Morph start and cancellation do not implement mission
+availability or player controls. Identity changes invalidate the collision
+class and contact memo and reset facing and walk animation; owner, position and
+incoming target/impact references stay on the same slot. Owner/spatial indexes
+are keyed by unchanged owner and position. Tests that call `update_orders`
+exercise that loop and save continuation, not full game-frame, regeneration,
+render, animation, audio, or native motion behavior. Cocoon art is unresolved.

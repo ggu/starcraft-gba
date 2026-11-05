@@ -38,8 +38,21 @@ int main(void)
     int hp=u[enemy].hp;tick_combat(q,enemy);assert(u[enemy].hp<hp || race_impact_count>0);
     guardian_test_reset();assert(race_save_game());assert(race_load_game());
     q=&u[slot];q->type=U_MUTALISK;q->raw_type=43;q->maxhp=120;q->hp=120;q->armor=0;q->flags=0;
-    assert(race_guardian_morph_start(slot));supply_used=race_owner_supply(SIDE);
+    assert(u[enemy].alive);u[enemy].order=ORDER_ATTACK_TARGET;u[enemy].target=slot;
+    assert(race_guardian_morph_start(slot));
+    assert(u[enemy].order==ORDER_ATTACK_TARGET && u[enemy].target==slot);
+    supply_used=race_owner_supply(SIDE);
     hit_target(slot,500,U_MARINE,ENEMY);assert(!q->alive);
     assert(!race_guardian_morph_cancel(slot));int reuse=spawn_unit(SIDE,U_MUTALISK,400,400);assert(reuse==slot);
+    int enemy_spire=spawn_build(ENEMY,B_GREATER_SPIRE,220,220,0);assert(enemy_spire>=0);
+    int bot=spawn_unit(ENEMY,U_MUTALISK,460,460);assert(bot>=0);
+    race_minerals[ENEMY]=240;race_gas[ENEMY]=260;
+    int player_ore=minerals,player_gas=gas,bot_supply=race_owner_supply(ENEMY);
+    assert(race_guardian_morph_start(bot));
+    assert(race_minerals[ENEMY]==190 && race_gas[ENEMY]==160);
+    assert(minerals==player_ore && gas==player_gas && race_owner_supply(ENEMY)==bot_supply);
+    assert(race_guardian_morph_cancel(bot));
+    assert(race_minerals[ENEMY]==240 && race_gas[ENEMY]==260);
+    assert(minerals==player_ore && gas==player_gas && race_owner_supply(ENEMY)==bot_supply);
     puts("Guardian HOST lifecycle and journal continuation passed");return 0;
 }

@@ -24,6 +24,12 @@ static void race_guardian_transform(int slot, int type, int hp, int maxhp,
     q->order=ORDER_IDLE; q->target=target; q->tx=q->x; q->ty=q->y;
     q->carry=0; q->build=-1; q->work_timer=timer; q->flags=0; q->cd=0;
     q->path_timer=0; q->path_retry=0; q->path_x=q->x; q->path_y=q->y;
+    /* Same owner and position keep the spatial and target indexes valid.
+     * Incoming attacks remain bound to this slot; only animation state resets. */
+    sc64_walk_reset_slot(slot);
+#ifdef SC64_UNIT_FACING
+    sc64_facing_reset_slot(slot);
+#endif
 #ifdef SC64_COLLISION_CLASS_CACHE
     sc64_unit_collision_class_invalidate(slot);
 #endif
@@ -36,7 +42,8 @@ static int race_guardian_morph_start(int slot)
 {
     if (slot<0 || slot>=MAX_UNITS) return 0;
     Unit *q=&u[slot];
-    if (!q->alive || q->owner!=SIDE || q->type!=U_MUTALISK ||
+    if (!q->alive || (unsigned)q->owner>=5u || race_owner_identity(q->owner)<0 ||
+        q->type!=U_MUTALISK ||
         (q->raw_type!=-1 && q->raw_type!=43) || q->flags ||
         SC64_TRANSPORT_LOADED(q) || q->hp<=0 || q->maxhp!=120 || q->hp>120 ||
         race_owner_minerals(q->owner)<50 || race_owner_gas(q->owner)<100) return 0;
@@ -57,13 +64,15 @@ static int race_guardian_morph_cancel(int slot)
 {
     if (slot<0 || slot>=MAX_UNITS) return 0;
     Unit *q=&u[slot];
-    if (!q->alive || q->owner!=SIDE || q->type!=U_GUARDIAN_COCOON ||
+    if (!q->alive || (unsigned)q->owner>=5u || race_owner_identity(q->owner)<0 ||
+        q->type!=U_GUARDIAN_COCOON ||
         q->raw_type!=59 || q->target!=44 || q->maxhp!=200 || q->hp<=0 || q->hp>200 ||
         q->work_timer<1 || q->work_timer>SC64_GUARDIAN_TICKS) return 0;
     int hp=sc64_guardian_scaled_hp(q->hp,200,120);
     if (!hp) return 0;
+    int owner=q->owner;
     race_guardian_transform(slot,U_MUTALISK,hp,120,43,-1,0);
-    race_add_owner_resources(SIDE,50,100);
+    race_add_owner_resources(owner,50,100);
     return 1;
 }
 
