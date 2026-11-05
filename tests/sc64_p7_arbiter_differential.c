@@ -185,6 +185,51 @@ static void aura_union_oracle(void)
     puts("P7 Arbiter aura union oracle passed (80 randomized worlds)");
 }
 
+/* Compare the same world through the real index and its scalar fallback,
+ * then explicitly reject malformed index inputs. Both historical and
+ * candidate binaries emit the same complete actor/cache stream. */
+static void owner_bucket_fallback_oracle(void)
+{
+    int raw=-1, live=-1;
+    for (int k=0;k<8;++k) {
+        int owner=race_p7_source_owner((unsigned)k);
+        if(owner>=0 && owner<5) { raw=k; live=owner; break; }
+    }
+    assert(raw>=0);
+    for(int trial=0;trial<6;++trial) {
+        Unit before[MAX_UNITS], indexed[MAX_UNITS];
+        Building before_buildings[MAX_BUILDINGS];
+        Sc64P7PersistentState before_state, indexed_state;
+        memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+        memset(&race_p7,0,sizeof(race_p7)); memset(visible,0,sizeof(visible));
+        race_mode=0; race_selected_mission=SC64_P7_GLOBAL_ID;
+        race_p7.reserved[1]=150;
+        sc64_p7_arbiter_cache_initialized=0; sc64_p7_arbiter_cache_due=0;
+        int arb=make_actor(live,71,U_P7_ARBITER,raw,64,64);
+        int target=make_actor(live,65,U_ZEALOT,raw,65,64);
+        for(int owner=0;owner<5;++owner)
+            (void)make_actor(owner,65,U_ZEALOT,raw,66+owner,64);
+        if(trial==1) u[target].owner=-1;
+        if(trial==2) u[target].owner=5;
+        if(trial==3 || trial==4) { b[0].alive=1; b[0].owner=trial==3?-1:5; b[0].x=64; b[0].y=64; }
+        if(trial==5) u[target].x=-1;
+        sc64_target_index_begin();
+        assert(sc64_target_index_active==(trial==0));
+        memcpy(before,u,sizeof(u)); memcpy(before_buildings,b,sizeof(b)); before_state=race_p7;
+        sc64_p7_arbiter_cache_source_tick();
+        memcpy(indexed,u,sizeof(u)); indexed_state=race_p7;
+        memcpy(u,before,sizeof(u)); memcpy(b,before_buildings,sizeof(b)); race_p7=before_state;
+        sc64_target_index_active=0;
+        sc64_p7_arbiter_cache_source_tick();
+        assert(!memcmp(indexed,u,sizeof(u))); assert(!memcmp(&indexed_state,&race_p7,sizeof(race_p7)));
+        assert(!memcmp(before_buildings,b,sizeof(b)));
+        assert(fwrite(u,1,sizeof(u),stdout)==sizeof(u));
+        assert(fwrite(b,1,sizeof(b),stdout)==sizeof(b));
+        assert(fwrite(&race_p7,1,sizeof(race_p7),stdout)==sizeof(race_p7));
+        (void)arb;
+    }
+}
+
 int main(void)
 {
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
@@ -193,5 +238,6 @@ int main(void)
     assert(SC64_RACE_SAVE_GENERATION==39u);
 #endif
     aura_union_oracle();
+    owner_bucket_fallback_oracle();
     return 0;
 }
