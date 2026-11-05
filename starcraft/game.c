@@ -2076,6 +2076,9 @@ static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #if defined(SC64_SCARAB_WEAPON_PROBE) && (!defined(SC64_SCARAB_AUTONOMOUS_PROBE) || !defined(SC64_IMPACT_EVENTS))
 #error "Scarab weapon probe requires autonomous control and impact events"
 #endif
+#if defined(SC64_SCARAB_AI_STOCK_PROBE) && !defined(SC64_SCARAB_HUMAN_CONTROL_PROBE)
+#error "Scarab AI stocking probe requires the complete human control probe"
+#endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
 #if !defined(SC64_SCARAB_NAMESPACE_STAGE) || !defined(SC64_SCARAB_WEAPON_PROBE)
 #error "Scarab human control probe requires namespace and weapon probes"
@@ -13239,6 +13242,9 @@ static int race_scarab_human_enqueue(void)
 static void __attribute__((noinline)) race_scarab_human_parent_step(int slot)
 {
     race_scarab_probe_parent_tick(slot);
+#ifdef SC64_SCARAB_AI_STOCK_PROBE
+    (void)race_scarab_ai_stock(slot,0,u[slot].owner==ENEMY || u[slot].owner==4);
+#endif
     (void)race_scarab_production_tick(slot,0);
 }
 /* Retire hidden children before the generic parent slot is invalidated.
