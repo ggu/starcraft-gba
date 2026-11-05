@@ -283,9 +283,17 @@ static void __attribute__((noinline)) race_nydus_tick_world(void)
  * passenger. Unit-target orders here are attack and Consume. */
 static void race_nydus_clear_unit_references(int passenger)
 {
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    /* A disappearing passenger cannot become a new target after transit.
+     * Keep a launched Scarab's last destination and its own FSM intact. */
+    race_scarab_probe_target_invalidate(passenger);
+#endif
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
         if (i == passenger || !q->alive || q->target != passenger) continue;
+#ifdef SC64_SCARAB_WEAPON_PROBE
+        if (SC64_SCARAB_CHILD(q)) continue;
+#endif
         /* Paid production actors keep a product identity in target, not a
          * unit-slot reference. A numerically matching passenger must not
          * cancel their job when it enters the canal. */
