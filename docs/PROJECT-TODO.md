@@ -67,8 +67,9 @@ reproduces and fixes an Egg product-ID/unit-slot collision during canal transit.
 Its full focused sanitizer fixture, six normal ROM/memory builds and prepared
 unified checks pass. A prepared-input default run exposed five renderer-fixture
 failures also present on unchanged main; the corrected complete-overlay oracle
-and current HUD compile dependencies pass both renderer modules. Final default
-checks are being rerun before merge. This does not enable shared Egg/Guardian/
+and current HUD compile dependencies pass both renderer modules. Final default checks now pass at `da316b94` (1,004 Python tests, 13 skipped,
+plus compiled suites); engine/build source matches the six-ROM/unified-qualified
+`3ebed0e2`. This does not enable shared Egg/Guardian/
 Scarab stages, prove native canal timing or change the 29/30 content count.
 
 ## Priority order

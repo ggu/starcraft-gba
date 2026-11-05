@@ -52,6 +52,8 @@ and declare the dependency. Production engine/HUD code is unchanged.
 
 Both renderer test modules pass together: nine tests, one skipped, at `9e492abd`.
 The earlier flag-only attempt lacked the icon include/dependency and failed;
-that log is retained. Final source/doctor/default build and full test are being
-rerun after these test-only corrections. Do not call the final suite passed
-until its exact receipt is terminal.
+that log is retained. Final source boundary, doctor, default build and complete default test pass
+at `da316b94`: 1,004 Python tests with 13 skipped, plus compiled/auxiliary suites
+(358 seconds). The prepared workspace exercises more optional cases than the
+asset-free source-only runs. Engine/build source is unchanged from the six-ROM
+and unified-qualified `3ebed0e2`; subsequent changes are tests and documentation.
