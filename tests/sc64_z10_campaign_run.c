@@ -2,12 +2,41 @@
 /* Ordinary-input Z10 "Full Circle" campaign controller.
  * The controller may inspect live state to choose targets; every mutation is
  * an ordinary HOME/menu/gameplay input delivered through game_update(). */
+#ifdef Z10_DAMAGE_AUDIT
+static void z10_damage_event(int,int,int,int,int,int);
+static void z10_ai_queue_event(unsigned,int,int,int,unsigned,unsigned,unsigned,unsigned);
+#define SC64_TEST_UNIT_HP_DAMAGE_OBSERVER z10_damage_event
+#define SC64_TEST_AI_QUEUE_OBSERVER z10_ai_queue_event
+#endif
 #include "../common/gba.c"
 #include "../starcraft/game.c"
 #define Z10_COHORT_TRACE 1
 static void z10_cohort_observe(void);
 #include "sc64_zerg_late_controller.h"
 #include <assert.h>
+
+#ifdef Z10_DAMAGE_AUDIT
+static void z10_damage_event(int slot,int damage,int source_type,int source_owner,
+                              int damage_class,int hit_flags)
+{
+    const Unit *q=&u[slot];
+    if(q->owner!=SIDE)return;
+    fprintf(stderr,"DAMAGE frame=%u slot=%d raw=%d rawowner=%d before=%d after=%d damage=%d source_type=%d source_raw=%d source_owner=%d class=%d flags=%d xy=%d/%d order=%d\n",
+        (unsigned)frame,slot,q->raw_type,q->raw_owner,q->hp+damage,q->hp,damage,
+        source_type,sc64_race_raw_unit(source_type),source_owner,damage_class,
+        hit_flags,q->x,q->y,q->order);
+}
+
+static void z10_ai_queue_event(unsigned town,int producer,int type,int accepted,
+                               unsigned before_m,unsigned before_g,
+                               unsigned after_m,unsigned after_g)
+{
+    if(!accepted)return;
+    fprintf(stderr,"AIQUEUE frame=%u town=%u producer=%d rawowner=%d raw=%d before=%u/%u after=%u/%u queue=%d\n",
+        (unsigned)frame,town,producer,b[producer].raw_owner,sc64_race_raw_unit(type),
+        before_m,before_g,after_m,after_g,b[producer].queue_count);
+}
+#endif
 
 #ifndef SC64_Z10_RUNTIME
 #error "Compile this controller with the zerg-z10 profile flags"

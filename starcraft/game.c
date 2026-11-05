@@ -9,6 +9,10 @@ static void sc64_contact_memo_invalidate(void);
 #define SC64_CONTACT_MEMO_INVALIDATE() sc64_contact_memo_invalidate()
 #endif
 #include "../common/gba.h"
+#if (defined(SC64_TEST_UNIT_HP_DAMAGE_OBSERVER) || \
+     defined(SC64_TEST_AI_QUEUE_OBSERVER)) && !defined(GBA_HOST)
+#error "Damage/economy audit observers are HOST-only"
+#endif
 #include "sc64_engine_capabilities.h"
 #include "sc64_text_box_hook.h"
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_RACES)
@@ -4766,6 +4770,10 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
 	}
 	u[target].hp -= damage;
+#ifdef SC64_TEST_UNIT_HP_DAMAGE_OBSERVER
+        SC64_TEST_UNIT_HP_DAMAGE_OBSERVER(target,damage,source_type,source_owner,
+                                          stock_damage_class,hit_flags);
+#endif
 	if (u[target].hp <= 0) {
 #ifdef SC64_SCARAB_WEAPON_PROBE
             race_scarab_probe_target_invalidate(target);

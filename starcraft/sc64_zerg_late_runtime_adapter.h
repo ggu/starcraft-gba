@@ -636,6 +636,10 @@ static int race_zl_rebind_loaded_world(const Sc64RaceMap *map)
  * town's source wallet. */
 static int race_zl_ai_queue(unsigned town, int producer, int type)
 {
+#ifdef SC64_TEST_AI_QUEUE_OBSERVER
+    u32 audit_minerals = race_zl_ai_minerals[town];
+    u32 audit_gas = race_zl_ai_gas[town];
+#endif
     int saved_minerals = race_minerals[ENEMY], saved_gas = race_gas[ENEMY], ok;
     race_minerals[ENEMY] = (int)race_zl_ai_minerals[town];
     race_gas[ENEMY] = (int)race_zl_ai_gas[town];
@@ -644,6 +648,10 @@ static int race_zl_ai_queue(unsigned town, int producer, int type)
     race_zl_ai_gas[town] = (u32)race_gas[ENEMY];
     race_minerals[ENEMY] = saved_minerals;
     race_gas[ENEMY] = saved_gas;
+#ifdef SC64_TEST_AI_QUEUE_OBSERVER
+    SC64_TEST_AI_QUEUE_OBSERVER(town,producer,type,ok,audit_minerals,audit_gas,
+                                race_zl_ai_minerals[town],race_zl_ai_gas[town]);
+#endif
     return ok;
 }
 
