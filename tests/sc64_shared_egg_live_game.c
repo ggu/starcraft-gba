@@ -63,7 +63,8 @@ int main(void)
     assert(u[a].raw_type==36 && u[a].raw_owner==-1);
     press(KEY_A);int z=egg_for(SIDE,U_DRONE,a);assert(z>=0);
     assert(race_queue_unit(ENEMY,enemy,U_DRONE));int bot=egg_for(ENEMY,U_DRONE,-1);assert(bot>=0 && u[bot].raw_owner==-1);
-    assert(race_save_game());int remaining=u[a].work_timer, remaining_z=u[z].work_timer;assert(remaining>0 && remaining_z>0);
+    assert(race_save_game());int remaining=u[a].work_timer, remaining_z=u[z].work_timer, remaining_bot=u[bot].work_timer;
+    assert(remaining>0 && remaining_z>0 && remaining_bot>0);
     for(int i=0;i<3;i++)game_update(0,0);
     assert(u[a].work_timer==remaining-3 && u[z].work_timer==remaining_z-3);
     assert(race_load_game());assert(u[a].type==SC64_EGG_ACTOR && u[a].work_timer==remaining);
@@ -76,7 +77,8 @@ int main(void)
     for(int i=0;i<cancel_row;i++)press(KEY_DOWN);
     assert(menu_cursor==cancel_row);press(KEY_A);assert(!u[a].alive);
     assert(minerals==before+sc64_race_unit_rule(U_DRONE)->minerals);
-    for(int i=0;i<remaining_z;i++)game_update(0,0);
+    int wait=remaining_z>remaining_bot?remaining_z:remaining_bot;
+    for(int i=0;i<wait;i++)game_update(0,0);
     assert(u[z].alive && u[z].type==U_DRONE && u[bot].alive && u[bot].type==U_DRONE);
     assert(race_save_game());assert(race_load_game());
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
