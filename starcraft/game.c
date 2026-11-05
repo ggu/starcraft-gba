@@ -282,7 +282,8 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Z7 colony defense requires the Z7 runtime"
 #endif
 #if defined(SC64_SHARED_EGG_HOST_STAGE) && \
-    (!defined(GBA_HOST) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_Z7_EGG_PRODUCTION))
+    (!defined(GBA_HOST) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_Z8_RUNTIME) || \
+     !defined(SC64_Z7_EGG_PRODUCTION))
 #error "Shared Egg candidate is HOST-only and requires the Z9 Egg vector"
 #endif
 #if defined(SC64_Z7_EGG_PRODUCTION) && \
