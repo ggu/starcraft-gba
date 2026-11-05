@@ -4547,23 +4547,7 @@ build/test-audio-bank: tests/audio_bank.c common/audio_codec.h common/gba.h $(SC
 test-audio-bank: build/test-audio-bank
 	./build/test-audio-bank $(SC64_AUDIO_DIR)/sc64_audio_generated.bin $(SC64_AUDIO_DIR)/sc64_audio_manifest.json
 
-define GAME_AUDIO_PROFILE
-build/test-game-audio-$(1)-on: tests/game_audio_run.c $$(AUDIO_TEST_DEPS) $(3) | build
-	$$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
-build/test-game-audio-$(1)-off: tests/game_audio_run.c $$(AUDIO_TEST_DEPS) $(3) | build
-	$$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) -DGAME_AUDIO_OFF $$< common/gba.c -o $$@
-.PHONY: test-game-audio-$(1)
-test-game-audio-$(1): build/test-game-audio-$(1)-on build/test-game-audio-$(1)-off
-	./build/test-game-audio-$(1)-on hooks
-	./build/test-game-audio-$(1)-on > build/test-game-audio-$(1)-on.txt
-	./build/test-game-audio-$(1)-off > build/test-game-audio-$(1)-off.txt
-	cat build/test-game-audio-$(1)-on.txt
-	test "$$$$(grep '^state' build/test-game-audio-$(1)-on.txt)" = "$$$$(grep '^state' build/test-game-audio-$(1)-off.txt)"
-	@echo "game audio $(1): audio-on and audio-off state hashes match"
-endef
-$(eval $(call GAME_AUDIO_PROFILE,default,,))
-$(eval $(call GAME_AUDIO_PROFILE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
--include mk/game-audio/Makefile
+include mk/game-audio/Makefile
 
 .PHONY: test-audio
 test-audio: build/test-audio-codec build/test-audio-mixer test-audio-codec-cross test-game-audio-default
