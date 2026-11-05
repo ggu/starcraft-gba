@@ -3690,7 +3690,15 @@ move_toward(Unit * q, int tx, int ty)
 #endif
 	return;
     }
+#ifdef SC64_CONTACT_ATTRIBUTION
+    u32 contact_query_start = gba_clock();
+    int contact_step_clear = unit_step_clear(q, nx, ny);
+    SC64_CONTACT_DIAG_ADD(0, gba_clock() - contact_query_start);
+    SC64_CONTACT_DIAG_ADD(1, 1);
+    if (!contact_step_clear) {
+#else
     if (!unit_step_clear(q, nx, ny)) {
+#endif
 	static const s8 dx[8] = {1,1,0,-1,-1,-1,0,1};
 	static const s8 dy[8] = {0,1,1,1,0,-1,-1,-1};
 	int best = -1;
@@ -3705,12 +3713,27 @@ move_toward(Unit * q, int tx, int ty)
 	/* One bucket pass answers all eight unit_step_clear() offsets; the
 	 * selection order and tie-breaking below are unchanged. */
 	unsigned blocked = sc64_contact_blocked_mask(q, speed);
+#ifdef SC64_CONTACT_ATTRIBUTION
+        u32 select_start = gba_clock();
+#endif
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);
+#ifdef SC64_CONTACT_ATTRIBUTION
+            SC64_CONTACT_DIAG_ADD(10, 1);
+            if (cost < best_cost) {
+                SC64_CONTACT_DIAG_ADD(11, 1);
+                u32 terrain_start = gba_clock();
+                int traversable = is_traversable(sx / 16, sy / 16, from_cell);
+                SC64_CONTACT_DIAG_ADD(12, gba_clock() - terrain_start);
+                if (traversable && !(blocked & (1u << i))) { best = i; best_cost = cost; }
+            }
+#else
 	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
 		!(blocked & (1u << i))) { best = i; best_cost = cost; }
+#endif
 	}
+        SC64_CONTACT_DIAG_ADD(9, gba_clock() - select_start);
 #elif defined(SC64_COLLISION_STEER_LIST)
 	#if defined(SC64_Z7_RUNTIME)
 	best = sc64_steer_best_direction(q, speed, from_cell,

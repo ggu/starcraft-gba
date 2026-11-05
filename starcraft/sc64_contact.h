@@ -2,6 +2,18 @@
 #define SC64_CONTACT_H
 #include "sc64_scarab_presence.h"
 
+/* Diagnostic counters are cumulative unsigned values; the replay harness
+ * takes modular differences per update. They do not exist in normal builds. */
+#ifdef SC64_CONTACT_ATTRIBUTION
+#if !defined(SC64_CONTACT_CACHE) || !defined(SC64_CONTACT_MASK_TABLE)
+#error "Contact attribution requires the production contact table path"
+#endif
+volatile u32 sc64_contact_attribution[16];
+#define SC64_CONTACT_DIAG_ADD(i, v) (sc64_contact_attribution[(i)] += (u32)(v))
+#else
+#define SC64_CONTACT_DIAG_ADD(i, v) ((void)0)
+#endif
+
 /* SC64_CONTACT_CACHE: cached collision facts and one-pass blocked steering.
  *
  * The bucket collision query repeats the same type-derived fact lookups
@@ -565,8 +577,22 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 #endif
     int mover_radius, mover_flying, mover_slot = (int)(q - u), p6;
     int minx, maxx, miny, maxy, row, col, reach;
+#ifdef SC64_CONTACT_ATTRIBUTION
+    u32 diag_start = gba_clock();
+    int prepared = sc64_contact_mask_prepare(q, speed, &mask, &mover_radius, &mover_flying);
+    SC64_CONTACT_DIAG_ADD(2, gba_clock() - diag_start);
+    SC64_CONTACT_DIAG_ADD(3, 1);
+    if (prepared) {
+        SC64_CONTACT_DIAG_ADD(13, 1);
+        return mask;
+    }
+#else
     if (sc64_contact_mask_prepare(q, speed, &mask, &mover_radius, &mover_flying))
         return mask;
+#endif
+#ifdef SC64_CONTACT_ATTRIBUTION
+    diag_start = gba_clock();
+#endif
     p6 = sc64_contact_p6_active();
     reach = SC64_CONTACT_REACH(mover_flying) + speed;
     minx = (q->x - reach) >> 4; maxx = (q->x + reach) >> 4;
@@ -580,6 +606,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
             int i;
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i]) {
+                SC64_CONTACT_DIAG_ADD(5, 1);
                 const Unit *c = &u[i];
                 u8 cc;
                 int radius, ox, oy, limit_axis;
@@ -589,6 +616,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 if (i == mover_slot || !c->alive || (SC64_TRANSPORT_LOADED(c) || SC64_SCARAB_NONCOLLIDING(c))) continue;
                 cc = sc64_contact_class_for(c->type);
                 if (!(cc & SC64_CONTACT_VALID)) {
+                    SC64_CONTACT_DIAG_ADD(14, 1);
                     mask = sc64_contact_mask_reference(q, i, speed, mask,
                                                        mover_radius, mover_flying);
                     continue;
@@ -607,7 +635,14 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 if (ox <= -limit_axis || ox >= limit_axis ||
                     oy <= -limit_axis || oy >= limit_axis) continue;
 #ifdef SC64_CONTACT_MASK_TABLE
+#ifdef SC64_CONTACT_ATTRIBUTION
+                u32 table_start = gba_clock();
+                if (sc64_contact_mask_table_domain(radius, speed, ox, oy))
+                    SC64_CONTACT_DIAG_ADD(6, 1);
+                else SC64_CONTACT_DIAG_ADD(7, 1);
+#endif
                 mask = sc64_contact_mask_apply_geometry(mask, radius, speed, ox, oy);
+                SC64_CONTACT_DIAG_ADD(8, gba_clock() - table_start);
 #else
                 od2 = ox * ox + oy * oy;
                 pending = ~mask & 0xffu;
@@ -621,9 +656,13 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                     if (d2 < radius * radius && d2 <= od2) mask |= 1u << k;
                 }
 #endif
-                if (mask == 0xffu) return mask;
+                if (mask == 0xffu) {
+                    SC64_CONTACT_DIAG_ADD(4, gba_clock() - diag_start);
+                    return mask;
+                }
             }
         }
+    SC64_CONTACT_DIAG_ADD(4, gba_clock() - diag_start);
     return mask;
 }
 
