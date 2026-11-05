@@ -418,7 +418,7 @@ class Z7ArmReplayTest(unittest.TestCase):
 
     def test_transport_save_profiles_and_impact_envelopes(self):
         plan = {"final": {"kind": "won"}}
-        for profile in ("transport1", "cargo-transport1"):
+        for profile in ("transport1", "cargo-transport1", "z9-cargo-transport1"):
             inner, outer, _ = replay.SAVE_PROFILES[profile]
             base = struct.pack("<I", inner) + bytes(PAYLOAD - 4)
             trailer = bytes(16)

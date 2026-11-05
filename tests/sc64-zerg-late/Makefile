@@ -199,6 +199,39 @@ $(eval $(call Z9_CARRIED_CONTROLLER,z7,sc64_z7_campaign_run,common/gba.c))
 $(eval $(call Z9_CARRIED_CONTROLLER,z8,sc64_z8_campaign_run,))
 $(eval $(call Z9_CARRIED_CONTROLLER,z1,race_z1_controls,common/gba.c))
 
+# Z8 carried replay, compiled with the actual Z9 vector and strict cargo digest.
+Z9_Z8_REPLAY_DEPS = tests/sc64_protoss_arm_replay.c build/z8-carried/sc64_px_tape_generated.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile
+# The tape is generated from the retained input-only host controller trace.
+define Z9_Z8_CARRIED_REPLAY
+build/z9-z8-host-$(1): $$(Z9_Z8_REPLAY_DEPS) | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_Z9_CANONICAL_FLAGS) -Ibuild/z8-carried -DPX_MISSION=19 -DPX_CARGO_DIGEST $(2) $$< -o $$@
+build/z9-z8-arm-$(1).elf: $$(Z9_Z8_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
+	$$(CC) $$(CFLAGS) $$(ZERG_Z9_CANONICAL_FLAGS) -Ibuild/z8-carried -DPX_MISSION=19 -DPX_CARGO_DIGEST $(2) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/z9-z8-arm-$(1).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/Z9-Z8-$(1).gba: build/z9-z8-arm-$(1).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC Z9 Z8' SCZ9
+endef
+$(eval $(call Z9_Z8_CARRIED_REPLAY,full,))
+$(eval $(call Z9_Z8_CARRIED_REPLAY,prefix,-DPX_REPLAY_PREFIX))
+$(eval $(call Z9_Z8_CARRIED_REPLAY,resume,-DPX_REPLAY_RESUME))
+
+# Z7 carried replay: Z9 engine flags and a separate strict cargo digest line.
+Z9_Z7_REPLAY_DEPS = tests/sc64_z7_arm_replay.c build/z7-carried/sc64_z7_tape_generated.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile
+Z9_Z7_CUT ?= 0
+define Z9_Z7_CARRIED_REPLAY
+build/z9-z7-host-$(1): $$(Z9_Z7_REPLAY_DEPS) | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_Z9_CANONICAL_FLAGS) -Ibuild/z7-carried -DZ7_CARGO_DIGEST $(2) $$< -o $$@
+build/z9-z7-arm-$(1).elf: $$(Z9_Z7_REPLAY_DEPS) $$(Z7_ARM_COMMON) common/gba.ld | build
+	$$(CC) $$(CFLAGS) $$(ZERG_Z9_CANONICAL_FLAGS) -Ibuild/z7-carried -DZ7_CARGO_DIGEST $(2) $$(Z7_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/z9-z7-arm-$(1).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/Z9-Z7-$(1).gba: build/z9-z7-arm-$(1).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC Z9 Z7' SCZ9
+endef
+$(eval $(call Z9_Z7_CARRIED_REPLAY,full,-DZ7_ARM_MODE=0))
+$(eval $(call Z9_Z7_CARRIED_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=40000u))
+$(eval $(call Z9_Z7_CARRIED_REPLAY,resume,-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z9_Z7_CUT)u))
 # Keep the documented ordinary-input routes together; controller 0 of the
 # generic early-race runner is not the established Z1 route.
 .PHONY: test-sc64-z9-carried-missions
