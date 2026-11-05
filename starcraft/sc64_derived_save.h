@@ -8,7 +8,9 @@
  * only because no gameplay path reads it; this is semantic, not bitwise,
  * round-trip preservation. Decode sets it to canonical zero. Changing these
  * constructor facts or giving Unit.weapon a gameplay meaning requires a new
- * save generation or a compatible explicit migration. */
+ * save generation or a compatible explicit migration. The authenticated
+ * shared flight generation stores Scarab motion's two weapon bits in formerly
+ * zero padding; all earlier generations retain the old row interpretation. */
 #define SC64_DERIVED_UNIT_BYTES 29
 #define SC64_DERIVED_BUILDING_BYTES 25
 _Static_assert(SC_RU_LEGACY_BOUND <= 64 && SC_RB_COUNT <= 64,
@@ -77,22 +79,56 @@ static int sc64_derived_building_hp(int type) {
     return 0;
   return sc64_race_building_max_hp(type);
 }
-static int sc64_derived_unit_encode(Sc64DerivedUnitSave *out, const Unit *q,
-                                    unsigned ww, unsigned wh) {
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+/* A detached candidate's authenticated features select the appended wire IDs.
+ * The old entry points remain limited to the old roster. */
+static int sc64_derived_type_allowed_for(int type, int raw, unsigned features) {
+  if (type < 0 || type >= SC_RU_COUNT || type >= 64 || (features & ~15u))
+    return 0;
+  if (type < SC_RU_LEGACY_BOUND) return 1;
+  if (type == SC64_SHARED_EGG_TYPE) return (features & 1u) && raw == 36;
+#ifdef SC64_GUARDIAN_DISTINCT_STAGE
+  if (type == U_GUARDIAN_STAGE) return (features & 2u) && raw == 44;
+#endif
+  if (type == U_SCARAB) return (features & 4u) && raw == 85;
+  return 0;
+}
+#define SC64_DERIVED_ENCODE sc64_derived_unit_encode_for
+#define SC64_DERIVED_DECODE sc64_derived_unit_decode_for
+#define SC64_DERIVED_PARAM , unsigned features
+#else
+#define SC64_DERIVED_ENCODE sc64_derived_unit_encode
+#define SC64_DERIVED_DECODE sc64_derived_unit_decode
+#define SC64_DERIVED_PARAM
+#endif
+static int SC64_DERIVED_ENCODE(Sc64DerivedUnitSave *out, const Unit *q,
+                                    unsigned ww, unsigned wh SC64_DERIVED_PARAM) {
   Sc64DerivedUnitSave z = {{0}};
   unsigned k = 0;
   static const Unit zero = {0};
   if (!out || !q || !ww || !wh || ww > 2048 || wh > 2048 || q->type < 0 ||
+
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+      !sc64_derived_type_allowed_for(q->type, q->raw_type, features)
+#else
       (q->type >= SC_RU_LEGACY_BOUND
 #ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
        && q->type != SC64_SHARED_EGG_TYPE
 #endif
-      ) || q->type >= 64)
+      ) || q->type >= 64
+#endif
+      )
     return 0;
   if (!memcmp(q, &zero, sizeof(*q))) {
     *out = z;
     return 1;
   }
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+  /* Flight state uses the two formerly reserved bits only in the newly
+   * authenticated flight generation. Older rows retain zero padding. */
+  if (q->type == U_SCARAB && q->weapon &&
+      (!(features & 8u) || q->weapon > 3)) return 0;
+#endif
   if (q->x < 0 || (unsigned)q->x >= ww || q->y < 0 || (unsigned)q->y >= wh ||
       q->hp < -131072 || q->hp >= 131072 || (q->alive && q->hp < 0) ||
       q->maxhp != sc64_derived_unit_hp_for_raw(q->type,q->raw_type) || q->owner < 0 ||
@@ -140,18 +176,29 @@ static int sc64_derived_unit_encode(Sc64DerivedUnitSave *out, const Unit *q,
   P(8, q->flags);
   P(11, q->shield_remainder);
   P(1, 1u); /* Nonzero row marker; all-zero slots have their own encoding. */
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+  if ((features & 8u) && q->type == U_SCARAB) P(2, q->weapon);
+#endif
 #undef P
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+  if (k != (((features & 8u) && q->type == U_SCARAB) ? 228u : 226u))
+#else
   if (k != 226)
+#endif
     return 0;
   *out = z;
   return 1;
 }
-static int sc64_derived_unit_decode(Unit *out, const Sc64DerivedUnitSave *row,
-                                    unsigned ww, unsigned wh) {
+static int SC64_DERIVED_DECODE(Unit *out, const Sc64DerivedUnitSave *row,
+                                    unsigned ww, unsigned wh SC64_DERIVED_PARAM) {
   Unit q;
   u32 v;
   unsigned k = 0;
-  if (!out || !row || !ww || !wh || ww > 2048 || wh > 2048)
+  if (!out || !row || !ww || !wh || ww > 2048 || wh > 2048
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+      || (features & ~15u)
+#endif
+      )
     return 0;
   memset(&q, 0, sizeof(q));
   if (sc64_derived_zero(row->bytes, sizeof(row->bytes))) {
@@ -197,13 +244,28 @@ static int sc64_derived_unit_decode(Unit *out, const Sc64DerivedUnitSave *row,
   G(1, v);
   if (v != 1u)
     return 0;
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+  if ((features & 8u) && q.type == U_SCARAB) G(2, q.weapon);
+#endif
 #undef G
-  if (q.type < 0 || q.type >= SC_RU_COUNT)
+  if (q.type < 0 || q.type >= SC_RU_COUNT
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+      || !sc64_derived_type_allowed_for(q.type, q.raw_type, features)
+#endif
+      )
     return 0;
   q.maxhp = sc64_derived_unit_hp_for_raw(q.type,q.raw_type);
   q.armor = sc64_race_unit_armor(q.type);
+#ifndef SC64_SHARED_ACTOR_FULL_HOST_STAGE
   q.weapon = 0;
-  if (k != 226 || q.x < 0 ||
+#endif
+  if (k !=
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+      (((features & 8u) && q.type == U_SCARAB) ? 228u : 226u)
+#else
+      226u
+#endif
+      || q.x < 0 ||
       (unsigned)q.x >= ww || q.y < 0 || (unsigned)q.y >= wh || q.hp < -131072 ||
       q.hp >= 131072 || (q.alive && q.hp < 0) || q.maxhp <= 0 || q.owner > 4 ||
       q.type >= SC_RU_COUNT || q.alive > 1 || q.selected > 1 || q.order > 15 ||
@@ -218,6 +280,20 @@ static int sc64_derived_unit_decode(Unit *out, const Sc64DerivedUnitSave *row,
   *out = q;
   return 1;
 }
+
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+static int sc64_derived_unit_encode(Sc64DerivedUnitSave *out, const Unit *q,
+                                    unsigned ww, unsigned wh) {
+  return sc64_derived_unit_encode_for(out, q, ww, wh, 0);
+}
+static int sc64_derived_unit_decode(Unit *out, const Sc64DerivedUnitSave *row,
+                                    unsigned ww, unsigned wh) {
+  return sc64_derived_unit_decode_for(out, row, ww, wh, 0);
+}
+#endif
+#undef SC64_DERIVED_ENCODE
+#undef SC64_DERIVED_DECODE
+#undef SC64_DERIVED_PARAM
 
 static int sc64_derived_building_encode(Sc64DerivedBuildingSave *out,
                                         const Building *q, unsigned ww,
