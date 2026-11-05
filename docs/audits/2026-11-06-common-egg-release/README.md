@@ -76,6 +76,14 @@ Compared named fields include frame/mission, live units/buildings/queues,
 resource banks/fields, supply, `race_campaign`, P3–P7 persistent structs and P7
 projectile storage. The parent reviewed the portable probes under
 [tests/sc64-p10-early-save](../../../tests/sc64-p10-early-save/README.md).
+The public backend source now exactly matches the qualified read-only backend
+used by the probes (source SHA-256
+`ad37a62dd47112481a0efc52dfca56a681b09005914c7296234c8416498a1530`).
+Its only delta from the earlier public backend admits bounded palette/VRAM
+reads; MMIO and physical-mode writes remain denied. Existing private boundary
+and state/clock observations apply to that exact source, and no emulator
+rebuild or gameplay change is being claimed.
+
 Input artifact hashes are checked before/after; the normal controller transport
 and read-only VRAM modal observations do not write guest world state.
 

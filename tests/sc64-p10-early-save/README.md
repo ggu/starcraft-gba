@@ -34,3 +34,31 @@ recomputed for each tick at :68–121 and deactivated at :124–125. The snapsho
 active byte did not differ. These facts motivate comparing persistent mission
 state and a finite continuation rather than raw contexts; they do not prove
 that all excluded effects or other save points are safe.
+
+The required backend source is [tools/sc64_headless_replay.c](../../../tools/sc64_headless_replay.c),
+built against pinned mGBA 0.10.5 with debugger support (see its header). Its
+physical mode accepts only bounded controller input, stepping and reads, with
+SRAM import at boot and export to the explicitly selected output. Palette RAM
+and VRAM reads are allowed so the probe can observe modal state; MMIO reads
+and physical-mode guest writes remain denied. Use that source rather than an
+older backend that rejects VRAM. The source matches the previously qualified
+read-only backend used for these results; the backend is not an included
+proprietary asset or opaque replacement game ROM.
+
+For an existing pinned mGBA 0.10.5 core-only static build with debugger support,
+the macOS compile/link shape used by the qualified backend was:
+
+```sh
+clang -std=c11 -O2 -DM_CORE_GBA -DUSE_DEBUGGERS -DBUILD_STATIC \
+  -I/path/to/mgba/include -I/path/to/mgba-build/include \
+  tools/sc64_headless_replay.c /path/to/mgba-build/libmgba.a \
+  -framework CoreFoundation -o /tmp/sc64-physical-runner
+```
+
+The source revision used for those results was mGBA
+`26b7884bc25a5933960f3cdcd98bac1ae14d42e2`. Platform link dependencies can differ;
+this is the recorded macOS shape, not an installer or a request to fetch game
+inputs. The asset-free `test_sc64_headless_read_policy.py` compiles the actual
+classifier and checks region edges, ROM length, overflow, SRAM and MMIO denial.
+It complements the actual read/state/clock observations rather than proving
+whole-emulator correctness on its own.
