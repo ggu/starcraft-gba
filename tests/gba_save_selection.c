@@ -27,7 +27,76 @@ static int prepare_transaction(const void *data,u32 len,u32 tag,void *context){
  return valid && !(t->fail_rebuild && t->calls==3);
 }
 static void commit_transaction(void *context){Transaction *t=context;t->live=t->plan;}
+/* More recognized versions do not add slots or change the winner policy.
+ * Exercise every tag position, including the newly admitted fourth/fifth. */
+static void extended_tag_lists(void) {
+ const u32 versions[]={0x10203040u,0x20304050u,0x30405060u,0x40506070u,0x50607080u};
+ for(unsigned count=4;count<=5;count++) {
+  for(unsigned a=0;a<count;a++)for(unsigned z=0;z<count;z++)for(unsigned mask=0;mask<4;mask++) {
+   reset();record(0,versions[a],10,mask&1?0xa5:0);record(1,versions[z],11,mask&2?0xa5:0);
+   memcpy(before,host_save,sizeof(before));
+   int expected=mask&2?1:mask&1?0:-1;
+   GbaSaveSelection token={11,22,33,44,55},raw=token,prepared=token;
+   Transaction plan={0,99,0,0};
+   int ok=save_select_validated(scratch,sizeof(scratch),versions,count,validate,0,&raw);
+   assert(ok==(expected>=0));
+   assert(save_select_prepared(scratch,sizeof(scratch),versions,count,prepare_transaction,&plan,&prepared)==ok);
+   assert(!memcmp(&raw,&prepared,sizeof(raw)) && !memcmp(before,host_save,sizeof(before)));
+   assert(plan.live==99);
+   if(!ok) { assert(!memcmp(&raw,&token,sizeof(raw)));continue; }
+   assert(raw.slot==expected && plan.plan==(int)(raw.tag>>24) && scratch[0]==0);
+   plan=(Transaction){0,99,0,0};
+   assert(save_select_transaction(scratch,sizeof(scratch),versions,count,prepare_transaction,commit_transaction,&plan,&token));
+   assert(token.slot==expected && plan.live==(int)(raw.tag>>24));
+   const u8 payload[]={(u8)(versions[count-1]>>24),0xa5,4,5};
+   assert(save_write_selected(payload,sizeof(payload),versions[count-1],&raw,versions,count));
+   assert(!memcmp(before+(unsigned)expected*SAVE_SLOT_SIZE,host_save+(unsigned)expected*SAVE_SLOT_SIZE,SAVE_SLOT_SIZE));
+   GbaSaveSelection next={0};
+   assert(save_select_validated(scratch,sizeof(scratch),versions,count,validate,0,&next));
+   assert(next.slot==1-expected && next.sequence==raw.sequence+1 && next.tag==versions[count-1]);
+#ifdef SC64_SHARED_HP_REGEN
+   u8 contiguous[sizeof(host_save)];memcpy(contiguous,host_save,sizeof(contiguous));
+   memcpy(host_save,before,sizeof(before));
+   assert(save_write_parts_selected(payload,2,payload+2,2,versions[count-1],&raw,versions,count));
+   assert(!memcmp(contiguous,host_save,sizeof(contiguous)));
+#endif
+  }
+  reset();record(0,versions[0],1,0xa5);record(1,versions[count-1],0x80000001u,0xa5);
+  GbaSaveSelection sentinel={11,22,33,44,55},token=sentinel;
+  assert(!save_select_prepared(scratch,sizeof(scratch),versions,count,validate,0,&token));
+  assert(!memcmp(&sentinel,&token,sizeof(token)));
+  record(1,versions[count-1],0x80000001u,0);
+  assert(save_select_prepared(scratch,sizeof(scratch),versions,count,validate,0,&token) && token.slot==0);
+  reset();record(0,versions[count-1],0xffffffffu,0xa5);record(1,versions[0],1,0xa5);
+  assert(save_select_prepared(scratch,sizeof(scratch),versions,count,validate,0,&token) && token.slot==1);
+ }
+ /* Invalid tail entries/counts cannot publish a token or touch SRAM. */
+ u32 bad[6];memcpy(bad,versions,sizeof(versions));bad[5]=0x60708090u;
+ reset();record(0,versions[4],7,0xa5);memcpy(before,host_save,sizeof(before));
+ const u8 payload[]={0x50,0xa5,4,5};
+ GbaSaveSelection prior={0};assert(save_select_validated(scratch,sizeof(scratch),versions,5,validate,0,&prior));
+ for(unsigned invalid=0;invalid<3;invalid++) {
+  unsigned count=5;memcpy(bad,versions,sizeof(versions));
+  if(invalid==0)bad[4]=bad[0];else if(invalid==1)bad[4]=0;else count=6;
+  selection_unchanged_failure(bad,count,sizeof(scratch));
+  GbaSaveSelection token={11,22,33,44,55},sentinel=token;
+  assert(!save_select_prepared(scratch,sizeof(scratch),bad,count,validate,0,&token));
+  assert(!memcmp(&token,&sentinel,sizeof(token)));
+  assert(!save_write_selected(payload,sizeof(payload),versions[4],&prior,bad,count));
+#ifdef SC64_SHARED_HP_REGEN
+  assert(!save_write_parts_selected(payload,2,payload+2,2,versions[4],&prior,bad,count));
+#endif
+  assert(!memcmp(before,host_save,sizeof(before)));
+ }
+ record(1,0x66778899u,8,0xa5);memcpy(before,host_save,sizeof(before));
+ assert(!save_write_selected(payload,sizeof(payload),versions[4],&prior,versions,5));
+#ifdef SC64_SHARED_HP_REGEN
+ assert(!save_write_parts_selected(payload,2,payload+2,2,versions[4],&prior,versions,5));
+#endif
+ assert(!memcmp(before,host_save,sizeof(before)));
+}
 int main(void){gba_init();
+ extended_tag_lists();
  /* The last candidate inspected is older and destroys its raw scratch. The
   * winner must be reloaded and prepared again, not committed from that plan. */
  reset();record(0,tags[2],11,0xa5);record(1,tags[0],10,0xa5);
