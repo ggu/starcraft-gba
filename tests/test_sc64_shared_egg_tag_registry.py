@@ -36,10 +36,11 @@ STAGE_EXPRESSIONS = {
 def extract(data):
     result = []
     for line in data.splitlines():
-        match = re.match(r"\s*#define\s+([A-Za-z_][A-Za-z_0-9]*)\s+(.*?)\s*$", line)
+        match = re.match(r"\s*#define\s+([A-Za-z_][A-Za-z_0-9]*)(.*)$", line)
         if not match:
             continue
         name, expr = match.groups()
+        expr = expr.strip()
         if name == "SC64_RACE_SAVE_GENERATION" or name.endswith("SAVE_VERSION"):
             if name in LEGACY_NAMES:
                 result.append(line.strip())
@@ -54,6 +55,8 @@ def catalog(definitions):
     bases, gens = set(), set()
     for line in definitions:
         _, name, expr = line.split(None, 2)
+        if name not in LEGACY_NAMES:
+            raise AssertionError("unregistered legacy name: " + line)
         if name == "SC64_RACE_SAVE_GENERATION":
             match = GEN.fullmatch(expr)
             if not match or not 2 <= int(match[1]) <= 50:
@@ -108,6 +111,10 @@ class SharedEggTags(unittest.TestCase):
     def test_unregistered_save_name_fails_closed(self):
         with self.assertRaises(AssertionError):
             extract("#define SC64_FUTURE_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)")
+        with self.assertRaises(AssertionError):
+            extract("#define SC64_FUTURE_SAVE_VERSION")
+        with self.assertRaises(AssertionError):
+            catalog(["#define SC64_FUTURE_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)"])
         with self.assertRaises(AssertionError):
             extract("#define SC64_GUARDIAN_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)")
         self.assertEqual(extract("#define SC64_GUARDIAN_SAVE_VERSION (SAVE_VERSION ^ 0x10000000u)"), [])
