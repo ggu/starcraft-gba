@@ -16,6 +16,7 @@ int main(void)
     assert(race_guardian_campaign_puni(sc64_z7_source_puni,3,44));
     assert(!race_guardian_campaign_allowed(SIDE,-1,44));
     assert(!race_guardian_campaign_allowed(SIDE,4,44));
+    assert(!race_guardian_campaign_allowed(NEUTRAL,0,44)); /* non-Zerg source slot */
     assert(race_guardian_campaign_allowed(SIDE,3,44));
     assert(race_guardian_campaign_allowed(ENEMY,4,44));
     int spire=spawn_build(SIDE,B_GREATER_SPIRE,200,200,0);
