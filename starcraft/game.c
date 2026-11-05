@@ -284,6 +284,17 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_Z7_COLONY_DEFENSE_ENABLED) && !defined(SC64_Z7_RUNTIME)
 #error "Z7 colony defense requires the Z7 runtime"
 #endif
+/* Experimental late-campaign service. The staged journal and producer are
+ * enabled together: neither is safe alone for paid campaign Eggs. */
+#ifdef SC64_SHARED_EGG_LATE_SERVICE
+#if defined(SC64_SHARED_EGG_CUSTOM_SERVICE) || defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+#error "Late Egg service owns its component flags"
+#endif
+#define SC64_SHARED_EGG_HOST_STAGE 1
+#define SC64_SHARED_EGG_JOURNAL_HOST_STAGE 1
+#define SC64_SHARED_EGG_WIRE_HOST_STAGE 1
+#define SC64_SHARED_EGG_PRODUCER_HOST_STAGE 1
+#endif
 /* Explicit, disabled-by-default integration for custom games. */
 #ifdef SC64_SHARED_EGG_CUSTOM_SERVICE
 #if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
@@ -296,7 +307,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Custom Egg service requires authenticated custom transport without competing staged namespaces"
 #endif
 #endif
-#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_SERVICE)) || !defined(SC64_RACES))
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && !defined(SC64_SHARED_EGG_LATE_SERVICE)) || !defined(SC64_RACES))
 #error "Shared Egg wire identity is HOST-only and requires race rules"
 #endif
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
@@ -316,7 +327,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Combined Guardian/Egg candidate requires the isolated HOST custom vector"
 #endif
 #if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) && \
-    (!defined(GBA_HOST) || !defined(SC64_SHARED_EGG_HOST_STAGE) || \
+    ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_LATE_SERVICE)) || !defined(SC64_SHARED_EGG_HOST_STAGE) || \
      !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_Z9_RUNTIME) || \
      !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || \
      !defined(SC64_SHARED_SCOURGE_COMBAT) || \
@@ -328,12 +339,12 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Egg journal prototype requires the isolated Z9 HOST vector without competing reservations"
 #endif
 #if defined(SC64_SHARED_EGG_HOST_STAGE) && \
-    (!defined(GBA_HOST) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_Z8_RUNTIME) || \
+    ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_LATE_SERVICE)) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_Z8_RUNTIME) || \
      !defined(SC64_Z7_EGG_PRODUCTION))
 #error "Shared Egg candidate is HOST-only and requires the Z9 Egg vector"
 #endif
 #if defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE) && \
-    ((!defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && \
+    ((!defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && !defined(SC64_SHARED_EGG_LATE_SERVICE) && \
       (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE))) || \
      !defined(SC64_SHARED_SCOURGE_COMBAT))
 #error "Shared Egg producer requires an authenticated custom candidate"

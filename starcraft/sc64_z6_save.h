@@ -179,7 +179,7 @@ static u32 race_z6_save_building_key(const Building *q)
 #define RACE_Z6_KEY_ALIVE(k) ((int)(((k) >> 27) & 1u))
 
 static int
-#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
 race_z6_save_candidate_valid_for(const RaceSave *candidate,
                                  const Sc64Z6PersistentState *state,
                                  unsigned width, unsigned height, u32 expected_version SC64_GCTX_DECL)
@@ -207,7 +207,7 @@ race_z6_save_candidate_valid(const RaceSave *candidate,
         !race_z6_save_source_map_valid(map) ||
         !sc64_z6_persistent_state_valid(state) ||
         candidate->version !=
-#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
         expected_version
 #else
         SAVE_VERSION
@@ -457,7 +457,7 @@ race_z6_save_candidate_valid(const RaceSave *candidate,
     if (live + queued + race_z6_save_remaining_creates(state) > MAX_UNITS) return 0;
     return 1;
 }
-#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
 /* Save-time callers still require the current generation. Only prepared-load
  * preflight may pass a separately authenticated predecessor version. */
 static int race_z6_save_candidate_valid(const RaceSave *candidate,

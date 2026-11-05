@@ -30,10 +30,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   its shared Egg service applies to custom games, not Z8–Z10 production.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
   and 1–3 independently raced AIs. Larger roster and behavior gaps remain below.
-- The latest measured normal P7 window (`c96c84b7`) costs about **2,197,886 cycles per
-  full loop**, versus about **559,000 cycles** available at 30 fps. Intrusive
-  attribution identifies substantial setup/optical, movement and rendering
-  work. These are bounded emulator measurements, not hardware certification.
+- The [current-source P7 measurement](audits/2026-11-06-current-native-qualification/README.md)
+  at `72a71d22` costs about **2,200,226 cycles per advancing full loop**, versus
+  about **559,000 cycles** available at 30 fps. The paired diagnostic matches
+  90 sampled state/pixel checkpoints and adds 3.32% overhead; order/Arbiter
+  setup, movement and rendering remain major scopes. These replacement-main
+  emulator measurements are not hardware certification or a new speed gain.
+- A fresh ordinary-input N64 Blood Bath Zerg session displays Drone cost
+  **50 minerals / 1 supply**, then supply **4/9 → 7/9** and Cancel after a
+  command to three selected larvae. Birth, refund and exact timing/debit were
+  not observed; the same current-source report records the limits.
 - Shared transport is enabled in normal release vectors. Its availability,
   AI use and native behavior still need scoped checks; do not describe the
   entire service as absent based on older documents.
@@ -66,7 +72,7 @@ the serialized native-test lock permit it.
 | --- | --- | --- | --- |
 | C1 | P0 / in progress | A [paired 31k-call HOST trial](audits/2026-11-05-z10-damage-attribution/README.md) now attributes 12 lethal Drone hits and 63 lethal Hydralisk hits to the generic Reaver path. Trace/control and original-input sequence matched; all 99 observed AI unit purchases paid their expected costs. | Finish source attribution for generic placeholders, construction removals, target priorities and income; compare relevant native behavior. This HOST-stage result is not a guest win or proof that native ammunition alone changes Z10's outcome. |
 | C2 | P0 / open | Complete shared Reaver/Scarab behavior. Campaign Reavers currently use a generic 100-damage attack; custom Reaver purchase is blocked while the paid ammunition service remains staged. | Source/native ammunition and attack-event checks; paid training, capacity, launch, flight, terrain/target loss, splash, death/slot reuse, save/load and AI purchases across applicable products. No generic free shot as a substitute. |
-| S1 | P0 / in progress | Finish shared Egg/Guardian production. The opt-in custom Egg candidate now runs on ARM and resumes a real saved Egg; Z8–Z10 campaign production and Guardian gameplay remain unfinished. | All real profile codecs and journals, interleaved tag contexts, old raw-36 Overlords, bad-newer fallback, atomic rejection, paired births, trigger reservations and Carrier/Egg capacity boundaries. Then ARM/RAM/stack, ordinary controls and genuine SRAM continuation before common activation. |
+| S1 | P0 / in progress | Finish shared Egg/Guardian production. The [opt-in late service](audits/2026-11-06-current-native-qualification/late-eggs.md) now has four actual ARM campaign Egg/SRAM continuations; normal activation across products and Guardian gameplay remain unfinished. | All real profile codecs and journals, interleaved tag contexts, old raw-36 Overlords, bad-newer fallback, atomic rejection, paired births, trigger reservations and Carrier/Egg capacity boundaries. Then ARM/RAM/stack, ordinary controls and genuine SRAM continuation before common activation. |
 | S3 | P0 / open | Qualify saves throughout each combined campaign, including early Protoss missions under the P10 product. The P10 default audit reports no P1–P7 continuation; later single-save-point results do not close that gap. | Fresh-process ordinary save/load and continued wins across all campaign entries on current combined flags, with source-owned effects, actors, clocks and objectives preserved. Reproduce and fix each rejection; do not infer arbitrary-save support from one point. |
 | C3 | P0 / open | Finish Z10 through ordinary controls and retain all other 29 missions. Rally recall and inefficient selections were fixed in the controller, but no Z10 win exists. | Fresh ordinary-input win, Temple/crystal sequence, text/results, save prefix, fresh-process continuation and ARM replay on the integrated engine; rerun affected carried missions. Never inject a win, resources, units or SRAM. |
 | N1 | P1 / in progress | Validate N64 actor records, game clock and event cadence. This is a prerequisite for behavior-changing timing optimizations. | Explicit select/move/stop correlation for independent actors, fresh reset, owner/type/position validation, independent clock and writer-PC evidence. Bound read-only snapshots; no guest writes or MMIO side effects. |
@@ -90,10 +96,11 @@ campaign work; late cosmetic work should not displace them.
 
 ## Next concrete milestones after the Terra audit
 
-1. Carry the verified opt-in custom Egg service into Z8–Z10 with actual owner,
-   trigger-create and paid-job reservations and genuine campaign continuation.
-   Then connect the Greater-Spire-gated Guardian morph/cancel path. The custom
-   ARM proof and legacy save tests do not close those campaign obligations.
+1. Promote the now guest-qualified opt-in late Egg service into one common
+   enabled release capability across applicable products, with full campaign,
+   custom and source-permission checks. Its four bounded SRAM continuations do
+   not qualify arbitrary saves, full missions, every interleaving or performance.
+   Then connect Greater-Spire-gated Guardian morph/cancel and Cocoon lifecycle.
 2. Replace the Reaver fallback with one coherent paid Scarab lifecycle, including
    source-placed versus newly trained ammunition, AI stocking, flight/impact and
    saves. Keep partial prototypes gated; source splash may increase Z10 danger.
@@ -126,6 +133,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 
 | Work | State and next gate |
 | --- | --- |
+| [#297](https://github.com/ggu/starcraft-gba/pull/297), late-campaign Egg integration | Runtime `f32356c6`, test-only `7166def0`: opt-in Z8–Z10 producer/journal/owner/trigger reservation integration, eight sanitizer targets and four matching-product predecessor cases passed. Actual Z10-product Z8/Z9/Z10 and Z9-product Z9 pause-save/export/fresh-load/natural-birth cases passed. All six normal ROM hashes/RAM ends remain identical to `6ba`; clean default checks pass (1,000 Python tests, 26 skipped, plus compiled/auxiliary suites). Both public preview recipes reproduce the actual guest-qualified ROM hashes at publication `4f0d7080`. See [qualification and limits](audits/2026-11-06-current-native-qualification/late-eggs.md). Common normal activation, Guardian, full campaigns, stack and performance remain open. |
 | [#295](https://github.com/ggu/starcraft-gba/pull/295), shared production preview | Merged as `34c1b38f`; whole tree equals reviewed publication `b57351af`. The [Egg-only custom candidate](audits/2026-11-05-shared-egg-custom/README.md) at `6ba76f8e` no longer depends on Guardian. Six normal ROM/RAM checks and clean default tests pass; all five opt-in GBA builds and HOST controller/journal/owner suites pass. The exact Terran ROM has physical-button ARM, genuine fresh-process SRAM and a separate static-frame/HUD visual check. Known pre-cargo Z6/Z7 reader regressions were reproduced and fixed without changing the authenticated inner token. Separate preview commands are available; default service remains off. Campaign integration, remaining guest products, long matches and performance are not thereby qualified. |
 | [#290](https://github.com/ggu/starcraft-gba/pull/290), Scourge picker | Merged as `73cc74a5`. Runtime/test head `b3d6f8ef` passed viable producer/worker/site sanitizer controls, selected-product journal checks, six new ROM/RAM builds, full clean-Git default tests (989 Python, 26 skipped, plus compiled suites) and fresh-process loading of an actual prior-code pre-cargo HOST journal. Documentation successor/merge preserve identical runtime/build/test objects. No arbitrary guest-save or hardware claim. |
 | [#293](https://github.com/ggu/starcraft-gba/pull/293), normal save-context hardening | Merged as `74922d57`; whole Git tree equals qualified `7123176e`. Normal Z7/Z9 custom and Z9 mission controls reject unsupported Eggs, preserve raw-36 Overlords and older-valid fallback, and retain a genuine prior Z7 paid-Egg journal. All six ROM/RAM checks and clean default checks pass (989 Python tests, 26 skipped, plus compiled suites); pins unchanged. A disk guard stopped the first six-build run before Z10; lossless archival permitted the complete retry. |

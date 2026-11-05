@@ -16,7 +16,11 @@ static void press(unsigned key) { game_update((u16)key,(u16)key);game_update(0,0
 static void write_predecessor(const char *path,int mission)
 {
     game_init();int ordinal=sc64_catalog_playable_ordinal(SC64_FACTION_ZERG,mission);
-    assert((ordinal==5 || ordinal==6) && race_front.page==SC_FRONT_HOME);press(KEY_A);
+    assert((ordinal==5 || ordinal==6
+#ifdef SC64_Z9_RUNTIME
+            || ordinal==7 || ordinal==8
+#endif
+           ) && race_front.page==SC_FRONT_HOME);press(KEY_A);
     for(int i=0;i<ordinal/2;i++)press(KEY_RIGHT);
     if(ordinal&1)press(KEY_DOWN);press(KEY_A);assert(race_front.page==SC_FRONT_BRIEFING);press(KEY_START);
     assert(screen==SCREEN_PLAY && !race_mode && race_selected_mission==mission);
@@ -46,7 +50,7 @@ static void read_predecessor(const char *path,int mission)
     static unsigned char before[32768],after[32768];
     static Unit original_units[MAX_UNITS];static Building original_buildings[MAX_BUILDINGS];
     game_init();assert(sc64_test_sram_transfer(path,0));
-#ifdef SC64_SHARED_EGG_CUSTOM_SERVICE
+#if defined(SC64_SHARED_EGG_CUSTOM_SERVICE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
     RaceLoadPlan plan;GbaSaveSelection selected;
     assert(race_worker_cargo_select(&plan,&selected));
     assert(selected.tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION &&
@@ -70,14 +74,22 @@ static void read_predecessor(const char *path,int mission)
     assert(sc64_test_sram_transfer(path,0));
 #endif
     assert(race_load_game());verify_loaded(mission);
-#ifdef SC64_SHARED_EGG_CUSTOM_SERVICE
+#if defined(SC64_SHARED_EGG_CUSTOM_SERVICE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
     assert(race_worker_cargo_select(&plan,&selected));
     assert(plan.egg_auth.inner==SC64_WORKER_CARGO_LEGACY_SAVE_VERSION && race_data.version==plan.egg_auth.inner);
     /* Save a newer current candidate then make only its tag pair invalid.
      * Selection must fall back to the unchanged older pre-cargo slot. */
     assert(race_save_game());assert(race_worker_cargo_select(&plan,&selected));
-    assert(selected.tag==SC64_TRANSPORT_SAVE_VERSION);
-    guardian_test_retag(selected.slot,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+#ifdef SC64_SHARED_EGG_LATE_SERVICE
+    if (mission==SC64_Z8_GLOBAL_ID || mission==SC64_Z9_GLOBAL_ID) {
+        assert(selected.tag==SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION);
+        guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION);
+    } else
+#endif
+    {
+        assert(selected.tag==SC64_TRANSPORT_SAVE_VERSION);
+        guardian_test_retag(selected.slot,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    }
     guardian_test_snapshot(before);assert(race_load_game());verify_loaded(mission);guardian_test_snapshot(after);
     assert(!memcmp(before,after,sizeof(before)));
     assert(race_worker_cargo_select(&plan,&selected));
@@ -85,8 +97,8 @@ static void read_predecessor(const char *path,int mission)
            plan.egg_auth.inner==SC64_WORKER_CARGO_LEGACY_SAVE_VERSION &&
            plan.egg_auth.candidate==&race_data && race_data.version==plan.egg_auth.inner);
 #endif
-    printf("HOST pre-cargo Z%d normal restore%s PASS\n",mission==SC64_Z7_GLOBAL_ID?7:6,
-#ifdef SC64_SHARED_EGG_CUSTOM_SERVICE
+    printf("HOST pre-cargo mission %d normal restore%s PASS\n",mission,
+#if defined(SC64_SHARED_EGG_CUSTOM_SERVICE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
            ", mismatched-tag rejection and older-slot fallback"
 #else
            ""
@@ -96,8 +108,16 @@ static void read_predecessor(const char *path,int mission)
 #endif
 int main(int argc,char **argv)
 {
-    assert(argc==3);int n=atoi(argv[2]);assert(n==6 || n==7);
+    assert(argc==3);int n=atoi(argv[2]);assert(n==6 || n==7
+#ifdef SC64_Z9_RUNTIME
+        || n==8 || n==9
+#endif
+    );
     int mission=n==6?SC64_Z6_GLOBAL_ID:SC64_Z7_GLOBAL_ID;
+#ifdef SC64_Z9_RUNTIME
+    if(n==8) mission=SC64_Z8_GLOBAL_ID;
+    if(n==9) mission=SC64_Z9_GLOBAL_ID;
+#endif
 #ifdef SC64_COMPAT_WRITER
     write_predecessor(argv[1],mission);
 #else
