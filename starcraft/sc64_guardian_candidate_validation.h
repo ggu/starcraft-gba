@@ -37,8 +37,7 @@ static int race_guardian_candidate_puni(const unsigned char *puni,int source,int
 }
 /* Ownership after a legitimate transfer may differ from raw_owner. The
  * immutable source PUNI authenticates origin; the saved owner must be an
- * active controller. P8/Terran and early Zerg mission mappings are deliberately
- * rejected until their immutable candidate permission adapters are supplied. */
+ * active controller. Unsupported profile permission contexts fail closed. */
 static int race_guardian_candidate_origin(const RaceSave *candidate,int owner,int source,int raw)
 {
     static const int owners[4]={SIDE,ENEMY,RESCUABLE,4};
@@ -55,6 +54,13 @@ static int race_guardian_candidate_origin(const RaceSave *candidate,int owner,in
     const Sc64RaceMap *map=&sc64_race_maps[mission];
     /* The caller preflights this exact descriptor once per candidate. */
     if (!map->owner_races || map->owner_races[source]!=R_ZERG) return 0;
+#ifdef SC64_EARLY_ZERG_PERMISSIONS
+    if (sc64_early_zerg_permission_source((unsigned)mission)) {
+        int original=race_guardian_early_source_owner(mission,source);
+        return original>=0 && original<5 && original!=NEUTRAL &&
+            sc64_early_zerg_permission_available((unsigned)mission,(unsigned)source,(unsigned)raw);
+    }
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (mission==SC64_Z7_GLOBAL_ID)
         return race_guardian_candidate_puni(sc64_z7_source_puni,source,raw);
