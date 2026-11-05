@@ -28,6 +28,29 @@ static int sole_reaver(void)
     return found;
 }
 
+static void stock_by_buttons(int row)
+{
+    if(menu_open)tap(KEY_B);
+    tap(KEY_B);
+    for(int guard=0;menu_open && menu_cursor!=row && guard<32;++guard) {
+#ifdef SC64_COMMAND_ICONS
+        if(card_fits()) {
+            int slot=card_command_slot(menu_cursor),target_col=card_command_slot(row)%CARD_COLUMNS;
+            int length=field_menu_count()-(slot/CARD_COLUMNS)*CARD_COLUMNS;
+            if(length>CARD_COLUMNS)length=CARD_COLUMNS;
+            if(slot%CARD_COLUMNS!=target_col)tap(target_col>=length?KEY_UP:KEY_RIGHT);
+            else tap(KEY_DOWN);
+        } else
+#endif
+            tap(KEY_DOWN);
+    }
+    assert(menu_open && menu_cursor==row);
+    int before=minerals;
+    input(KEY_A); /* Menu input pauses simulation; observe the actual debit. */
+    assert(!menu_open && minerals==before-15);
+    input(0);
+}
+
 static void write_progress(const char *path)
 {
     setup_options();
@@ -46,7 +69,7 @@ static void write_progress(const char *path)
     Sc64ScarabParent p;Sc64ScarabCounts counts;
     assert(race_scarab_parent_read(parent,0,&p,&counts) && !p.queued && !counts.inside);
     int row=race_context_command_base(RACE_CONTEXT_SCARAB);
-    assert(!strcmp(race_menu_label(row),"BUILD SCARAB") && choose_menu_command(row));
+    assert(!strcmp(race_menu_label(row),"BUILD SCARAB"));stock_by_buttons(row);
     assert(race_scarab_parent_read(parent,0,&p,&counts) && p.queued==1);
     for(int i=0;i<1500 && !counts.inside;++i) {
         assert(screen==SCREEN_PLAY && !won && !lost);input(0);
