@@ -27,7 +27,8 @@ physical-hardware qualification.
 Six normal ARM ROMs build and pass existing guards at `48b39f40`: T10, Z7, P10,
 Showcase, Z9 and Z10. Their final compiler vectors are unchanged after test-only
 integration. Z9/Z10 end at EWRAM `0203dce4` and IWRAM `03004bf8`, leaving 796 bytes below
-the unchanged EWRAM guard. No reserve was reduced. The separate unprepared `664ab07a`
+the unchanged EWRAM guard. Available margin decreases from 808 to 796 bytes;
+the guard threshold was not weakened. The separate unprepared `664ab07a`
 checkout passes source, doctor, build and test: 988 Python tests, 26 skips,
 separate 5/8 groups and native fixtures. Its original-art GBA ROM is byte-identical
 to the previous qualified default (SHA-256 `9fe916dcb7bd5aeb06476601847e4feebf6df2b2a2499554f8c16248b689a858`).
