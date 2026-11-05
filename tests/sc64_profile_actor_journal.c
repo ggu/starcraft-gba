@@ -66,7 +66,32 @@ int main(int argc,char **argv)
                 sw.path_x,sw.path_y,(unsigned)sw.path_timer,(unsigned)sw.path_retry);break;
         }
     }
-    assert(race_save_game());RaceLoadPlan plan;GbaSaveSelection selected;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    for(int i=0;i<MAX_BUILDINGS;i++) {
+        Sc64P7TypedBuildingSave row;
+        if(!sc64_p7_typed_building_encode(&row,&b[i],(unsigned)(race_cols*16),(unsigned)(race_rows*16))) {
+            fprintf(stderr,"building row rejected slot %d type %d hp %d maxhp %d raw %d owner %d larva %d timer %d\n",
+                i,b[i].type,b[i].hp,b[i].maxhp,b[i].raw_type,b[i].owner,b[i].larva,b[i].larva_timer);break;
+        }
+    }
+    fprintf(stderr,"pre-save battery=%d research=%d\n",race_p7_battery_live_world_valid(),race_bc_research_live_valid());
+#endif
+    int saved=race_save_game();
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    if(!saved) {
+        const Sc64StageTagPair pair={SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION,
+                                    SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION,15u};
+        Sc64StageSaveAuth auth;
+        if(sc64_stage_save_authenticate(&auth,&race_data,pair.outer,race_data.version,&pair,1)) {
+            const Sc64StageSaveAuth *guard_auth=&auth;
+            fprintf(stderr,"post-save candidate state=%d scarab=%d guardian=%d transport=%d\n",race_data.state[0],
+                race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,(unsigned)race_rows*16u,guard_auth),
+                race_guardian_candidate_valid(&race_data,(unsigned)race_cols*16u,(unsigned)race_rows*16u,guard_auth),
+                race_sk_transport_candidate_valid(&race_data));
+        }
+    }
+#endif
+    assert(saved);RaceLoadPlan plan;GbaSaveSelection selected;
     assert(race_worker_cargo_select(&plan,&selected));
     assert(selected.tag==SC64_SHARED_ACTOR_FLIGHT_TRANSPORT_SAVE_VERSION &&
            plan.guardian_auth.inner==SC64_SHARED_ACTOR_FLIGHT_SAVE_VERSION &&
