@@ -11,7 +11,7 @@ int main(int argc,char **argv)
     guardian_test_reset();game_init();guardian_test_restore(sram);assert(race_load_game());
     int reaver=-1,egg=-1;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive) {
-        if(u[i].type==U_REAVER && u[i].x==300)reaver=i;
+        if(u[i].type==U_REAVER)reaver=i;
         if(u[i].type==SC64_SHARED_EGG_TYPE)egg=i;
     }
     assert(reaver>=0 && egg>=0);

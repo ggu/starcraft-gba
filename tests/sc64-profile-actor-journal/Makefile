@@ -13,13 +13,13 @@ PROFILE_P10_NEW = -DSC64_GUARDIAN_FULL_FACTS_STAGE $(patsubst -I$(P10_FACT_V2_DI
 .PHONY: profile-actor-z7 profile-actor-p10
 profile-actor-z7:
 	mkdir -p $(PROFILE_OUT)/z7
-	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(PROFILE_PRIOR_ROOT)/starcraft/game.c"' $(PROFILE_Z7) tests/sc64_scarab_prior_egg_compat.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/z7/writer
+	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(PROFILE_PRIOR_ROOT)/starcraft/game.c"' $(PROFILE_Z7) tests/sc64_profile_actor_prior.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/z7/writer
 	$(PROFILE_OUT)/z7/writer $(PROFILE_OUT)/z7/prior.sram
 	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) $(PROFILE_STAGE) $(PROFILE_Z7) tests/sc64_profile_actor_journal.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/z7/guardian
 	$(PROFILE_OUT)/z7/guardian $(PROFILE_OUT)/z7/prior.sram
 profile-actor-p10:
 	mkdir -p $(PROFILE_OUT)/p10
-	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(PROFILE_PRIOR_ROOT)/starcraft/game.c"' $(PROFILE_P10_OLD) tests/sc64_scarab_prior_egg_compat.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/p10/writer
+	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(PROFILE_PRIOR_ROOT)/starcraft/game.c"' $(PROFILE_P10_OLD) tests/sc64_profile_actor_prior.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/p10/writer
 	$(PROFILE_OUT)/p10/writer $(PROFILE_OUT)/p10/prior.sram
 	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) $(PROFILE_STAGE) $(PROFILE_P10_NEW) tests/sc64_profile_actor_journal.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/p10/guardian
 	$(PROFILE_OUT)/p10/guardian $(PROFILE_OUT)/p10/prior.sram
