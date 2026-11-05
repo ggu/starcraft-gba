@@ -16,8 +16,17 @@ $(P10_FACT_V2_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES) $(P9_CAMPAIGN_DEFINES) $(P10_CAMPAIGN_DEFINES)) $(SC64_RELEASE_TRANSPORT_FLAGS) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT tools/sc64_fact_tables_gen.c -o build/sc64-p10-fact-v2-gen
 	./build/sc64-p10-fact-v2-gen > $@.tmp
 	mv $@.tmp $@
-build/starcraft-protoss-p10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.ld Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
-	$(CC) $(CFLAGS) $(PROTOSS_P10_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p10.map -lgcc -o $@
+# The Egg actor changes the fact table. Keep the legacy P10 input intact.
+P10_EGG_FACT_DIR := build/generated/p10-shared-egg-fact
+P10_EGG_FACT_HEADER := $(P10_EGG_FACT_DIR)/sc64_fact_tables_generated.h
+P10_EGG_FLAGS = $(patsubst -I$(P10_FACT_V2_DIR),-I$(P10_EGG_FACT_DIR),$(PROTOSS_P10_FLAGS)) $(SC64_RELEASE_EGG_FLAGS)
+$(P10_EGG_FACT_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile mk/protoss-p10/Makefile
+	mkdir -p $(P10_EGG_FACT_DIR)
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft -DSC64_SHARED_EGG_WIRE_HOST_STAGE $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES) $(P9_CAMPAIGN_DEFINES) $(P10_CAMPAIGN_DEFINES)) $(SC64_RELEASE_TRANSPORT_FLAGS) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT tools/sc64_fact_tables_gen.c -o $(P10_EGG_FACT_DIR)/generator
+	$(P10_EGG_FACT_DIR)/generator > $@.tmp
+	mv $@.tmp $@
+build/starcraft-protoss-p10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(filter-out $(P10_FACT_V2_HEADER),$(PROTOSS_P10_INPUTS)) $(P10_EGG_FACT_HEADER) common/gba.ld Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
+	$(CC) $(CFLAGS) $(P10_EGG_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Protoss-P10-Transport1-GBA.gba: build/starcraft-protoss-p10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
