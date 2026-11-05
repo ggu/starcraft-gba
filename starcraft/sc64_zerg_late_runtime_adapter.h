@@ -2,6 +2,8 @@
 #ifndef SC64_ZERG_LATE_RUNTIME_ADAPTER_H
 #define SC64_ZERG_LATE_RUNTIME_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 #if defined(SC64_Z9_RUNTIME)
 
 #if !defined(SC64_Z9_DATA_ENABLED) || !defined(SC64_Z8_RUNTIME) || \
@@ -244,6 +246,7 @@ static int race_zl_timed(void *context, int phase, const Sc64Z8Action *action,
     if (phase == SC64_Z8_TIMED_ELIGIBLE || phase == SC64_Z8_TIMED_FINISH) return 1;
     if (phase != SC64_Z8_TIMED_START) return -1;
     if (action->opcode == 7u) {
+        RACE_TEXT_BOX_STRING(action->string_id);
         *duration_ms = SC64_ZL_TRANSMISSION_MS;
         race_campaign_set_message(0);
         return 1;
@@ -269,6 +272,7 @@ static int race_zl_present(void *context, const Sc64Z8Action *action,
     if (!action || owner >= SC64_Z8_OWNER_LIMIT ||
         (action->opcode != 8u && action->opcode != 9u && action->opcode != 12u &&
          action->opcode != 28u)) return -1;
+    if (owner == SC64_ZL_HUMAN_SLOT) RACE_TEXT_BOX_ACTION(action->opcode, action->string_id);
     return 1;
 }
 

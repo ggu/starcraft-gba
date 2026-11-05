@@ -20,6 +20,8 @@
 #ifdef GBA_HOST
 #include "../common/gba.c"
 #endif
+#include "../common/gba.h"
+#include "sc64_text_box_replay.h"
 #include "../starcraft/game.c"
 #include "sc64_px_tape_generated.h"
 #ifdef GBA_HOST
@@ -226,6 +228,7 @@ int main(int argc, char **argv)
         while (cursor < PX_TAPE_COUNT && (px_tape[cursor] >> 10) <= tick)
             held = (u16)(px_tape[cursor++] & 1023u);
         frame_with(held);
+        TEXT_BOXES_DISMISS(frame_with);
         if ((tick + 1u) % 1000u == 0) report("periodic", tick + 1u);
     }
     report(won ? "won" : lost ? "lost" : "limit", stop);

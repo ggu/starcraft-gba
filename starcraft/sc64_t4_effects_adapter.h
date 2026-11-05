@@ -1,6 +1,8 @@
 #ifndef SC64_T4_EFFECTS_ADAPTER_H
 #define SC64_T4_EFFECTS_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #include "sc64_t4_runtime.h"
 #include "sc64_t4_queries.h"
@@ -476,6 +478,7 @@ race_t4_trigger_action(void *context, const Sc64T4Action *action,
     switch (action->opcode) {
     case 7: case 8: case 9: case 12:
         if (owner != SIDE) return 1;
+        RACE_TEXT_BOX_ACTION(action->opcode, action->string_id);
         state->message = action->opcode;
         state->message_ticks = 90;
         return 1;

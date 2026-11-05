@@ -2,6 +2,8 @@
 #ifndef SC64_P10_RUNTIME_ADAPTER_H
 #define SC64_P10_RUNTIME_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 #if defined(SC64_P10_RUNTIME)
 
 #if !defined(SC64_P10_DATA_ENABLED) || !defined(SC64_P9_RUNTIME) || \
@@ -432,10 +434,14 @@ static int race_p10_action(unsigned runner, const Sc64P10SourceAction *a, int re
     case 4: return race_p10_timed(runner, a->time, resume);
     case 7:
         if (owner != SC64_P10_HUMAN_SLOT) return -1;
-        if (!resume && !(race_p10.waiting_mask & (1u << runner)))
+        if (!resume && !(race_p10.waiting_mask & (1u << runner))) {
+            RACE_TEXT_BOX_STRING(a->string_id);
             race_campaign_set_message(0);
+        }
         return race_p10_timed(runner, SC64_P10_TRANSMISSION_MS, resume);
-    case 8: case 9: case 12: return SC64_P10_ACTION_COMPLETE; /* Not presented. */
+    case 8: case 9: case 12:
+        if (owner == SC64_P10_HUMAN_SLOT) RACE_TEXT_BOX_ACTION(a->opcode, a->string_id);
+        return SC64_P10_ACTION_COMPLETE; /* Sounds and objectives are not presented. */
     case 10: return race_p10_center_view(a, owner);
     case 11: return race_p10_create(a, owner);
     case 13:

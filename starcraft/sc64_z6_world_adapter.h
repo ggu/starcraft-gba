@@ -1,6 +1,8 @@
 #ifndef SC64_Z6_WORLD_ADAPTER_H
 #define SC64_Z6_WORLD_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 /* Z6's source numeric rows resolved against the bounded live game arrays.
  * This is a mission adapter, not a general trigger interpreter. */
 #include "sc64_z6_adapter.h"
@@ -386,6 +388,7 @@ static int sc64_z6_world_action(void *context, const Sc64Z6SourceAction *a)
     case 4: case 13: return 1; /* Scheduler applies wait and switch state. */
     case 7: case 8: case 9:
         if(a->string_id>65535u||a->wav_id>65535u)return 0;
+        RACE_TEXT_BOX_ACTION(a->opcode, a->string_id);
         ctx->presentation_opcode=a->opcode;
         ctx->last_string_id=(u16)a->string_id;ctx->last_wav_id=(u16)a->wav_id;
         return 1; /* Text/audio playback belongs to the presentation layer. */

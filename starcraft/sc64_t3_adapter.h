@@ -1,6 +1,8 @@
 #ifndef SC64_T3_ADAPTER_H
 #define SC64_T3_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 /* Mission-specific controller bridge for 008/00C. The trigger state and
  * source-buildings-killed counter live in game.c so race_save_adapter.h can
  * persist them. This adapter approximates T3's opening AI with the imported
@@ -129,6 +131,8 @@ race_t3_campaign_tick(void)
         race_gas[ENEMY] = 5000;
     }
     if (events & SC64_T3_EVENT_ALTERNATE_OBJECTIVE) {
+        RACE_TEXT_BOX_ROW(3, 0);
+        RACE_TEXT_BOX_ROW(3, 5);
         race_campaign.objective_stage = 1;
         race_campaign_set_message(19);
     }
@@ -147,9 +151,13 @@ race_t3_campaign_tick(void)
         race_t3_release_attack_force(0);
         race_campaign_set_message(15);
     }
-    if (events & SC64_T3_EVENT_REMINDER_10_MIN) race_campaign_set_message(16);
-    if (events & SC64_T3_EVENT_REMINDER_5_MIN) race_campaign_set_message(17);
-    if (events & SC64_T3_EVENT_REMINDER_1_MIN) race_campaign_set_message(18);
+    /* TRIG 0's two opening lines, 1 second and then 15 seconds apart. The clock
+     * only ever counts up, so each comparison holds for one update. */
+    if (race_campaign.elapsed_frames == 30u) RACE_TEXT_BOX_ROW(0, 6);
+    if (race_campaign.elapsed_frames == 30u + 15u * 30u) RACE_TEXT_BOX_ROW(0, 8);
+    if (events & SC64_T3_EVENT_REMINDER_10_MIN) { RACE_TEXT_BOX_ROW(1, 0); race_campaign_set_message(16); }
+    if (events & SC64_T3_EVENT_REMINDER_5_MIN) { RACE_TEXT_BOX_ROW(2, 0); race_campaign_set_message(17); }
+    if (events & SC64_T3_EVENT_REMINDER_1_MIN) { RACE_TEXT_BOX_ROW(9, 0); race_campaign_set_message(18); }
 
     if (events & SC64_T3_EVENT_DEFEAT) {
         race_campaign.phase = SC64_RACE_PHASE_FAILED;
@@ -158,6 +166,9 @@ race_t3_campaign_tick(void)
         return;
     }
     if (events & SC64_T3_EVENT_VICTORY) {
+        /* TRIG 6 wins on the countdown, TRIG 4 by the Hatchery kill. */
+        if (race_t3.remaining_ticks) RACE_TEXT_BOX_ROW(4, 0);
+        else RACE_TEXT_BOX_ROW(6, 0);
         race_campaign.phase = SC64_RACE_PHASE_COMPLETE;
         race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_PRIMARY;
         race_completed |= 1 << race_campaign.mission;

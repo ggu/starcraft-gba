@@ -977,7 +977,24 @@ int main(void)
     memset(sc64_facing, 0x1b, sizeof(sc64_facing));
     static Unit rejected_save_world[MAX_UNITS];
     memcpy(rejected_save_world, u, sizeof(u));
+#if defined(SC64_SHARED_TRANSPORT) && defined(SC64_IMPACT_EVENTS)
+    /* The current journal wraps RaceSave in the variable-length impact and
+     * transport envelope. Verify the actual committed record before and after
+     * corrupting it, rather than silently targeting the old inner schema. */
+    static u8 saved_payload[sizeof(race_impact_record)];
+    u32 saved_length = 0, after_length = 0;
+    if (!save_read_latest(saved_payload, sizeof(saved_payload),
+                          SC64_TRANSPORT_SAVE_VERSION, &saved_length))
+        return fail("could not locate committed transport save");
+    fprintf(stderr, "Showcase committed save tag=%08lx length=%lu\n",
+            (unsigned long)SC64_TRANSPORT_SAVE_VERSION, (unsigned long)saved_length);
+    save_test_corrupt_latest(saved_length, SC64_TRANSPORT_SAVE_VERSION);
+    if (save_read_latest(saved_payload, sizeof(saved_payload),
+                         SC64_TRANSPORT_SAVE_VERSION, &after_length))
+        return fail("corrupt helper did not invalidate committed transport save");
+#else
     save_test_corrupt_latest(sizeof(race_data), SAVE_VERSION);
+#endif
     if (load_game() || sc64_facing[0] != 0x1b ||
         memcmp(rejected_save_world, u, sizeof(u)))
         return fail("rejected save changed presentation-facing state");

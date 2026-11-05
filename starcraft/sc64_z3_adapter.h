@@ -1,6 +1,8 @@
 #ifndef SC64_Z3_ADAPTER_H
 #define SC64_Z3_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 /* Bounded authored adapter for Zerg 3 / The New Dominion. The trigger gates
  * and their raw action sequence come from the verified local SC64 CHK audit;
  * enemy production and presentation duration below are explicitly engine
@@ -171,6 +173,9 @@ race_z3_campaign_tick(void)
             if (race_z3_action_ticks) --race_z3_action_ticks;
             if (!race_z3_action_ticks) {
                 events = sc64_z3_complete_action(&race_z3, 0);
+                if ((events & SC64_Z3_EVENT_WIN_TX) && race_z3.transmission)
+                    RACE_TEXT_BOX_ROW(4, race_z3.transmission);
+                if (events & SC64_Z3_EVENT_LOSS_MESSAGE) RACE_TEXT_BOX_ROW(5, 2);
                 race_z3_action_ticks = race_z3_action_duration(&race_z3);
             }
         } else {

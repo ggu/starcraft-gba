@@ -28,6 +28,7 @@ static unsigned long stock_checks, mutations, passes, p6_passes, failures;
 static unsigned long step_fail_inmap, step_fail_offmap, mask_fail, stock_fail;
 static unsigned long fail_flying_mover, fail_ground_mover;
 static u8 linked[MAX_UNITS];
+static FILE *contact_trace;
 
 #define REPORT_LIMIT 12
 
@@ -139,6 +140,12 @@ check_mask(const Unit *q, int speed)
                              q->y + sc64_contact_dy[k] * speed))
             want |= 1u << k;
     got = sc64_contact_blocked_mask(q, speed);
+    if (contact_trace) {
+        u32 record[] = {(u32)(q-u), (u32)q->x, (u32)q->y, (u32)q->type,
+                        (u32)q->raw_type, (u32)q->order, (u32)q->flags,
+                        (u32)speed, (u32)sc64_unit_bucket_active, want, got};
+        if (fwrite(record, sizeof(record), 1, contact_trace) != 1) abort();
+    }
     if (want != got) report_mask(q, speed, want, got, !sc64_unit_bucket_active);
     if (sc64_unit_bucket_active) ++mask_checks;
     else ++inactive_mask_checks;
@@ -478,6 +485,8 @@ stock_rates(void)
 int
 main(void)
 {
+    const char *trace_path = getenv("SC64_CONTACT_TRACE_PATH");
+    if (trace_path) { contact_trace = fopen(trace_path, "wb"); assert(contact_trace); }
     stock_rates();
     world_passes();
 #ifndef SC64_PERSISTENT_COLLISION
@@ -497,5 +506,6 @@ main(void)
     assert(sc64_contact_memo_oracle_passed());
 #endif
     assert(failures == 0);
+    if (contact_trace) assert(fclose(contact_trace) == 0);
     return 0;
 }

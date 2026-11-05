@@ -1,6 +1,8 @@
 #ifndef SC64_Z4_ADAPTER_H
 #define SC64_Z4_ADAPTER_H
 
+#include "sc64_text_box_hook.h"
+
 #if defined(SC64_Z4_RUNTIME)
 
 #include "sc64_z4.h"
@@ -377,8 +379,9 @@ race_z4_dispatch_action(const Sc64Z4SourceAction *a, u16 *duration)
         *duration = (u16)race_z4_ceil_ticks(a->time);
         return 1;
     case 7: case 9:
-        /* Dialogue/WAV bytes are intentionally absent. Preserve action order
-         * with a documented 3-second presentation hold. */
+        /* WAV bytes are intentionally absent. Preserve action order with a
+         * documented 3-second presentation hold. */
+        RACE_TEXT_BOX_STRING(a->string_id);
         *duration = SC64_Z4_TX_HOLD_TICKS;
         race_z4.message_ticks = *duration;
         return 1;

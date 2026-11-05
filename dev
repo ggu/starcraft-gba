@@ -49,7 +49,7 @@ PLAY_SAVE_PROFILES = {"terran": "terran-transport1", "zerg": "zerg-z7-transport1
                       "protoss-p4-storm": "protoss-p4-storm",
                       "protoss-p5-shuttle": "protoss-p5-shuttle"}
 SC64_PROFILES = ("wasteland", "backwater", "skirmish", "campaign", "races", "unified",
-                 "terran", "zerg", "zerg-z6", "zerg-z7", "zerg-z6-probe", "zerg-z4", "zerg-z3",
+                 "terran", "zerg", "zerg-z6", "zerg-z7", "zerg-z9", "zerg-z6-probe", "zerg-z4", "zerg-z3",
                  "protoss", "protoss-p7", "protoss-p3", "protoss-p4-storm", "protoss-p5-shuttle", "protoss-p6")
 SC64_TEST_TARGETS = {
     "unified": "test-unified", "races": "test-races",
@@ -63,6 +63,7 @@ SC64_TEST_TARGETS = {
     "protoss-p4-storm": "test-protoss-p4-storm",
     "zerg-z6": "test-zerg-z6",
     "zerg-z7": "test-zerg-z7",
+    "zerg-z9": "test-sc64-zerg-z9",
     "zerg-z6-probe": ("test-sc64-z6-runtime", "test-sc64-z6-save", "test-sc64-z6-profile",
                 "test-sc64-z6-frame-coverage", "test-sc64-z6-controller"),
     "protoss-p5-shuttle": ("test-sc64-p5-shuttle-runtime", "test-sc64-p5-campaign-run"),
@@ -614,6 +615,11 @@ def doctor(require_emulator: bool = False) -> int:
 
 
 def build(game: str) -> None:
+    if game == "zerg-z9":
+        if status(game, include_built=False):
+            raise RuntimeError("Z9 requires prepared inputs; run ./dev sc64 prepare --rom PATH --profile zerg-z9")
+        run(["make", GAMES[game][0]])
+        return
     if game == "terran" and not unit_word_sprite_input_ready(
             ROOT / ".local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h"):
         raise RuntimeError(
@@ -827,6 +833,12 @@ def prepare_bc(rom: Path) -> None:
 
 
 def prepare(rom: Path, profile: str) -> None:
+    if profile == "zerg-z9":
+        from tools.sc64_z9_setup import prepare as prepare_z9
+        prepare(rom, "zerg-z7")
+        prepare_z9(ROOT, run)
+        print("Prepared explicit Z9 candidate; canonical Zerg and existing saves retain their profiles.")
+        return
     rom = rom.expanduser().resolve()
     if not rom.is_file():
         raise RuntimeError(f"User-supplied ROM does not exist: {rom}")
@@ -893,6 +905,8 @@ def prepare(rom: Path, profile: str) -> None:
         run([sys.executable, str(ROOT / "tools/sc64_icon_assets.py"),
              "--rom", str(private_rom)])
         run([sys.executable, str(ROOT / "tools/sc64_chrome_assets.py"),
+             "--rom", str(private_rom)])
+        run([sys.executable, str(ROOT / "tools/sc64_text_box_assets.py"),
              "--rom", str(private_rom)])
         if profile in ("zerg", "zerg-z6", "zerg-z7", "zerg-z6-probe", "zerg-z4",
                        "protoss", "protoss-p6", "protoss-p7", "protoss-p4-storm"):
@@ -1033,7 +1047,16 @@ def prepare(rom: Path, profile: str) -> None:
     print(f"Prepared local StarCraft 64 data for profile '{profile}'. Generated files stay under .local/.")
 
 
-def status(profile: str) -> int:
+def status(profile: str, *, include_built: bool = True) -> int:
+    if profile == "zerg-z9":
+        from tools.sc64_z9_setup import status as status_z9
+        inherited = status("zerg-z7", include_built=False)
+        failed = bool(status_z9(ROOT) or inherited)
+        if include_built:
+            rom = ROOT / GAMES[profile][1]
+            print(f"{'READY  ' if rom.is_file() else 'MISSING'} Built ROM: {rom}")
+            failed |= not rom.is_file()
+        return int(failed)
     base = "wasteland" if profile == "wasteland" else "backwater"
     generated = ROOT / ".local/sc64" / ("generated" if base == "wasteland" else "backwater/generated")
     paths = [
@@ -1056,6 +1079,8 @@ def status(profile: str) -> int:
         paths.append(("Unit walk cycles", ROOT / WALK_HEADER))
         paths.append(("Campaign briefings and portraits", ROOT /
                       ".local/sc64/briefings/generated/sc64_briefing_generated.h"))
+        paths.append(("Campaign text boxes", ROOT /
+                      ".local/sc64/text-box/generated/sc64_text_box_generated.h"))
         for label, name in (("Original interface fonts", "sc64_font_generated.h"),
                             ("Original interface icons", "sc64_icons_generated.h"),
                             ("Original menu chrome", "sc64_chrome_generated.h")):
@@ -1118,7 +1143,8 @@ def status(profile: str) -> int:
         paths.append(("Source weapon effects", ROOT / WEAPON_SOURCE_HEADER))
         paths.append(("Source death art", ROOT / DEATH_SOURCE_HEADER))
     _, rom_rel = GAMES[profile]
-    paths.append(("Built ROM", ROOT / rom_rel))
+    if include_built:
+        paths.append(("Built ROM", ROOT / rom_rel))
     audio = ROOT / ".local/sc64/audio/generated/sc64_audio_generated.h"
     print(f"{'READY  ' if audio.is_file() else 'OPTIONAL'} Sound and music bank: {audio}")
     for label, path in paths:
