@@ -229,12 +229,12 @@ int main(int argc,char **argv)
                 fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d,\"pending\":%d,\"free_slots\":%d,\"pool_limited\":%d}\n",(unsigned)frame,home,pending,free_slots,pool_limited);
             }
             if(rush){
-                int n=0,sx=0,sy=0;
+                int n=0,sx=0,sy=0,best_leg=-1;
                 z10_cohort_dump();
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&!z10_home_reserve[i]){
                     int k2=0,x2=0,y2=0;
                     for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&u[k].type==U_HYDRALISK&&!z10_home_reserve[k]&&dist2(u[k].x,u[k].y,u[i].x,u[i].y)<240*240){++k2;x2+=u[k].x;y2+=u[k].y;}
-                    if(k2>n){n=k2;sx=x2;sy=y2;}
+                    if(k2>=knob("Z10_RETREAT",12)){int candidate=nearest_leg(x2/k2,y2/k2);if(candidate>best_leg||(candidate==best_leg&&k2>n)){best_leg=candidate;n=k2;sx=x2;sy=y2;}}
                 }
                 if(n<knob("Z10_RETREAT",12)){rush=0;leg=0;}
                 else {
@@ -385,7 +385,7 @@ int main(int argc,char **argv)
         /* Fresh Hydralisks follow the army up the road in stages. */
         if(rush&&frame>=next_stream){
             fprintf(stderr,"STREAM frame=%u leg=%d target=%d/%d\n",(unsigned)frame,leg,road[0][0],road[0][1]);
-            group_area_x=ax;group_area_y=ay-60;group_area_r=560;group_rounds=3;
+            group_area_x=ax;group_area_y=ay-60;group_area_r=150;group_rounds=3;
             (void)z10_forward_group(road[0][0],road[0][1],0);
             for(int k=0;k+1<=leg&&k<ROAD_LEGS-1;k+=2){
                 int to=k+2<leg?k+2:leg;
