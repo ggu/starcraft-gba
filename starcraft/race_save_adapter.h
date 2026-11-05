@@ -245,6 +245,14 @@ static int race_guardian_decode_authenticated(const RaceSave *candidate,unsigned
         decoded.carry=carry;decoded.work_timer=timer;
     }
 #endif
+#if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && defined(SC64_WORKER_CARGO_KIND)
+    /* Only this exact authenticated predecessor pair uses the historical
+     * cargo representation. Normalize the temporary, not the signed row. */
+    if (auth->outer==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION &&
+        auth->inner==SC64_WORKER_CARGO_LEGACY_SAVE_VERSION &&
+        auth->features==0 &&
+        !sc64_worker_cargo_migrate_legacy(&decoded)) return 0;
+#endif
     *out=decoded;return 1;
 }
 #endif

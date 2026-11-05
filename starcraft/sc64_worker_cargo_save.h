@@ -14,11 +14,24 @@ race_save_worker_cargo_prepare(RaceSave *candidate, unsigned width,
                                 unsigned height, int legacy SC64_GCTX_DECL)
 {
     if (!candidate || (legacy != 0 && legacy != 1)) return 0;
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+    if (legacy && (!guard_auth || guard_auth->candidate!=candidate ||
+        guard_auth->outer!=SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION ||
+        guard_auth->inner!=SC64_WORKER_CARGO_LEGACY_SAVE_VERSION ||
+        guard_auth->features!=0 ||
+        !sc64_stage_save_auth_matches(guard_auth,candidate,candidate->version,0))) return 0;
+#endif
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit decoded;
         if (!SC64_GUARD_DECODE(candidate,i,width,height,&decoded)) return 0;
+#ifndef SC64_SHARED_ACTOR_FULL_HOST_STAGE
         if (legacy && !sc64_worker_cargo_migrate_legacy(&decoded)) return 0;
+#endif
         if (!sc64_worker_cargo_state_valid(&decoded)) return 0;
+#ifdef SC64_SHARED_ACTOR_FULL_HOST_STAGE
+        /* The authenticated decoder has already normalized the temporary. */
+        continue;
+#endif
         if (!legacy) continue;
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_ZP_FULL_STORAGE
