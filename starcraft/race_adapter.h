@@ -165,6 +165,10 @@ static int race_z7_morphing_egg_hall(int owner, int producer)
            (b[producer].type == B_LAIR || b[producer].type == B_HIVE);
 }
 
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+static int __attribute__((noinline)) race_product_slots_available(unsigned wanted);
+#endif
+
 /* Egg rows are independent timers. The product and remaining clock live in
  * fields already serialized for every Unit, so no producer link or extra
  * mission state is needed. Morphing keeps the Egg slot and its HP fraction. */
@@ -195,6 +199,15 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
     /* A paid paired birth waits until the reserved second slot is available. */
     if (!SC64_EGG_IS_Z7() && q->work_timer==1 &&
         sc64_z7_egg_product_count(q->target)==2 && find_unit_slot()<0) return 1;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+    if (!SC64_EGG_IS_Z7() && q->work_timer==1 &&
+        sc64_z7_egg_product_count(q->target)==2) {
+        if (!race_product_slots_available(0)) return 1;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        if (race_protoss_services_active() && !race_p7_carrier_training_slots_available(0)) return 1;
+#endif
+    }
+#endif
 #endif
     if (q->work_timer > 0) --q->work_timer;
     if (q->work_timer > 0) return 1;

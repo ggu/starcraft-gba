@@ -25,7 +25,7 @@ static void carrier_after_paid_egg(void)
         sc64_race_is_zerg_townhall(b[i].type)) {hall=i;break;}
     assert(hall>=0);race_minerals[ENEMY]=1000;race_gas[ENEMY]=1000;b[hall].larva=1;
     assert(spawn_build(ENEMY,B_SPAWNING_POOL,b[hall].x+100,b[hall].y,0)>=0);
-    assert(race_queue_unit(ENEMY,hall,U_ZERGLING));assert(egg_for(ENEMY,U_ZERGLING,-1)>=0);
+    assert(race_queue_unit(ENEMY,hall,U_ZERGLING));int pair=egg_for(ENEMY,U_ZERGLING,-1);assert(pair>=0);
     minerals=1000;int carrier=spawn_unit(SIDE,U_P7_CARRIER,100,100);assert(carrier>=0);
     int free_slots=0,last=-1;for(int i=0;i<MAX_UNITS;i++) free_slots+=!u[i].alive;
     while(free_slots>1) {last=spawn_unit(ENEMY,U_DRONE,160,160);assert(last>=0);--free_slots;}
@@ -33,6 +33,14 @@ static void carrier_after_paid_egg(void)
     assert(minerals==before && u[carrier].carry==0);
     hit_target(last,9999,U_MARINE,SIDE);
     assert(race_p7_carrier_training_queue(carrier));
+    /* An unrelated allocation after admission must not steal the paid
+     * Carrier's last slot when the paired Egg reaches completion. */
+    int transient=spawn_unit(ENEMY,U_DRONE,160,160);assert(transient>=0);
+    u[pair].work_timer=1;assert(race_z7_egg_tick_unit(pair));
+    assert(u[pair].alive && u[pair].type==SC64_EGG_ACTOR && u[pair].work_timer==1);
+    hit_target(transient,9999,U_MARINE,SIDE);
+    assert(race_z7_egg_tick_unit(pair));assert(u[pair].alive && u[pair].type==U_ZERGLING);
+    assert(u[carrier].carry==1);
 }
 #endif
 
