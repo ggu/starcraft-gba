@@ -875,7 +875,7 @@ static int race_queue_unit(int owner, int producer, int type)
         u[slot].work_timer = (u16)sc64_z7_egg_duration(type);
         u[slot].raw_type = 36;
 #ifdef SC64_SHARED_EGG_HOST_STAGE
-        if (!race_z7_active()) u[slot].raw_owner = b[producer].raw_owner;
+        if (!race_z7_active()) u[slot].raw_owner = race_mode ? -1 : b[producer].raw_owner;
 #endif
         u[slot].maxhp = 200;
         u[slot].hp = 200;

@@ -263,13 +263,29 @@ static int race_shared_egg_custom_candidate_valid(const RaceSave *candidate,
                                                    unsigned width,unsigned height)
 {
     unsigned free_slots=0,committed=0;
-    if (!candidate || candidate->state[0]!=1) return 0;
+    static const int owners[4]={SIDE,ENEMY,RESCUABLE,4};
+    if (!candidate || candidate->state[0]!=1 || candidate->state[1]<0 ||
+        candidate->state[1]>2 || candidate->state[4]<1 || candidate->state[4]>3 ||
+        candidate->players[SIDE]!=candidate->state[1]) return 0;
+    for (int i=0;i<candidate->state[4];++i) {
+        int selected=candidate->state[21+i];
+        if (selected<0 || selected>2 || candidate->players[owners[i+1]]!=selected) return 0;
+    }
     for (unsigned i=0;i<MAX_UNITS;i++) {
         Unit q;
         if (!race_save_decode_unit(candidate,i,width,height,&q)) return 0;
         if (!q.alive) { ++free_slots; if(q.type==U_Z7_EGG)return 0; continue; }
         if (q.type!=U_Z7_EGG) continue;
         if (!sc64_shared_egg_wire_valid(&q,1,race_shared_egg_custom_owner,(void *)candidate)) return 0;
+        int raw=sc64_race_raw_unit(q.target),admitted=0;
+        if (raw<0 || sc64_race_unit_from_raw(raw)!=q.target) return 0;
+        for (unsigned j=0;j<SC64_SKIRMISH_UNIT_COUNT;j++) {
+            const Sc64SkirmishRecord *product=&sc64_skirmish_unit_catalog[j];
+            if (product->raw_id==raw && product->kind==SC64_SK_TRAIN && product->race==R_ZERG)
+                admitted=1;
+        }
+        /* Producer and prerequisites may have been lost after this was paid. */
+        if (!admitted) return 0;
         committed+=(unsigned)(sc64_z7_egg_product_count(q.target)-1);
     }
     for (unsigned i=0;i<MAX_BUILDINGS;i++) {
@@ -3483,8 +3499,14 @@ static int race_load_preflight(RaceLoadPlan *plan) {
  * callback only mutates the shared candidate and its load plan. */
 static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,void *context) {
     RaceLoadPlan *plan=context;
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (!plan) return 0;
+    memset(plan,0,sizeof(*plan));
+    if (raw != (const void *)&race_impact_record) return 0;
+#else
     if (raw != (const void *)&race_impact_record) return 0;
     memset(plan,0,sizeof(*plan));
+#endif
 #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
     const Sc64StageTagPair egg_tags[]={
         {SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0},
@@ -3563,6 +3585,11 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     int selected=save_select_prepared(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
                                       race_worker_cargo_prepare_selected,plan,selection);
     if (!selected) race_guardian_stage_wire=0;
+    return selected;
+#elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
+    int selected=save_select_prepared(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
+                                      race_worker_cargo_prepare_selected,plan,selection);
+    if (!selected) memset(plan,0,sizeof(*plan));
     return selected;
 #else
     return save_select_prepared(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
