@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Verify an opt-in custom Egg ROM and the normal GBA RAM reserve bounds."""
 import argparse
 from pathlib import Path
@@ -23,7 +24,8 @@ def ram_ends(text):
             ends[words[-1]] = int(words[0], 16)
     if set(ends) != {'__bss_end', '__iwram_end'}:
         raise ValueError('missing RAM end symbol')
-    if ends['__bss_end'] >= 0x0203e000 or ends['__iwram_end'] >= 0x03005000:
+    if (not 0x02000000 <= ends['__bss_end'] < 0x0203e000 or
+            not 0x03000000 <= ends['__iwram_end'] < 0x03005000):
         raise ValueError('GBA RAM reserve exhausted')
     return ends
 
