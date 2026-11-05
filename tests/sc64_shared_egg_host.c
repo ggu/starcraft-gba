@@ -60,6 +60,17 @@ static void test_late_z9(void)
     for(int i=30;i<duration;i++)update_orders();
     assert(u[a].alive && u[a].type==U_DRONE && u[a].raw_owner==SC64_ZL_HUMAN_SLOT);
     assert(u[z].alive && u[z].type==U_DRONE && u[z].raw_owner==SC64_ZL_HUMAN_SLOT);
+    /* A late-mission paired birth must retain the authenticated source slot
+     * on both bodies, not the transient producer context at completion. */
+    assert(spawn_build(SIDE,B_SPAWNING_POOL,120,120,0)>=0);add_supply(SIDE,2);
+    b[hall].larva=1;int before=count_type(SIDE,U_ZERGLING);
+    assert(race_queue_unit(SIDE,hall,U_ZERGLING));int pair=find_egg(SIDE,U_ZERGLING,-1);assert(pair>=0);
+    int timer=u[pair].work_timer;for(int i=0;i<timer;i++)update_orders();
+    assert(u[pair].alive && u[pair].type==U_ZERGLING && u[pair].raw_owner==SC64_ZL_HUMAN_SLOT);
+    assert(count_type(SIDE,U_ZERGLING)==before+2);
+    int matched=0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive && u[i].owner==SIDE &&
+        u[i].type==U_ZERGLING && u[i].raw_owner==SC64_ZL_HUMAN_SLOT)matched++;
+    assert(matched>=2);
 }
 static void setup_custom(void)
 {
@@ -111,6 +122,14 @@ static void test_pair_and_denials(void)
     for(int i=0;i<timer;i++)update_orders();
     assert(u[egg].alive && u[egg].type==U_ZERGLING && u[egg].raw_owner==source);
     assert(count_type(SIDE,U_ZERGLING)==before+2);
+    /* At the cap, ordinary positive-supply production must not debit; a
+     * zero-supply Overlord remains admissible to restore supply. */
+    while(race_owner_reserved_supply(SIDE)+2<=race_owner_supply_cap(SIDE))
+        assert(spawn_unit(SIDE,U_MUTALISK,100,100)>=0);
+    b[side].larva=2;ore=minerals;
+    assert(!race_queue_unit(SIDE,side,U_DRONE));assert(minerals==ore && b[side].larva==2);
+    assert(race_queue_unit(SIDE,side,U_OVERLORD));int provider=find_egg(SIDE,U_OVERLORD,-1);assert(provider>=0);
+    assert(race_shared_egg_cancel(SIDE,provider));assert(minerals==ore);
     /* Exhaust pool using real spawn allocation; admission must not debit. */
     while(spawn_unit(ENEMY,U_ZERGLING,900,900)>=0){}
     b[side].larva=1;ore=minerals;
