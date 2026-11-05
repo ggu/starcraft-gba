@@ -41,11 +41,19 @@ static void seed_p2_victory(void)
 
 int main(int argc,char **argv)
 {
-    int victory;
+    int victory, reset_case, failed_load, successful_load;
     assert(argc==2);victory=!strcmp(argv[1],"p2-victory");
-    assert(victory || !strcmp(argv[1],"t1-defeat"));
-    gba_init();if(victory)seed_p2_victory();else seed_t1_defeat();
-    assert(!journal_present());int completed_before=race_completed; (void)completed_before;
+    reset_case=!strcmp(argv[1],"t1-new-game");
+    failed_load=!strcmp(argv[1],"t1-failed-load");
+    successful_load=!strcmp(argv[1],"t1-load-success");
+    assert(victory || reset_case || failed_load || successful_load || !strcmp(argv[1],"t1-defeat"));
+    gba_init();
+    if(victory)seed_p2_victory();
+    else if(successful_load) {
+        launch_t1();assert(save_game());
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive && u[i].type==U_RAYNOR)u[i].alive=0;
+    } else seed_t1_defeat();
+    assert(journal_present()==successful_load);int completed_before=race_completed; (void)completed_before;
     input(0);
     printf("case=%s queue=%u screen=%d won=%d lost=%d completed=%lu journal=%d frame=%d\n",
            argv[1],sc64_text_box_count(),screen,won,lost,(unsigned long)race_completed,
@@ -56,9 +64,27 @@ int main(int argc,char **argv)
     if(victory)assert(race_completed & (1u<<race_selected_mission));
     return 0;
 #else
-    assert(screen==SCREEN_PLAY && !won && !lost && race_completed==completed_before && !journal_present());
+    assert(screen==SCREEN_PLAY && !won && !lost && race_completed==completed_before &&
+           journal_present()==successful_load);
     u32 frozen=world_digest();int frozen_frame=frame;
-    assert(!save_game() && !journal_present());
+    assert(!save_game() && journal_present()==successful_load);
+    if(failed_load) {
+        assert(!load_game());
+        assert(sc64_text_box_count() && sc64_text_box_outcome.result &&
+               screen==SCREEN_PLAY && frame==frozen_frame && world_digest()==frozen);
+    }
+    if(successful_load) {
+        assert(load_game());
+        assert(!sc64_text_box_count() && !sc64_text_box_outcome.result && !won && !lost);
+        input(0);assert(screen!=SCREEN_RESULT && !won && !lost);
+        return 0;
+    }
+    if(reset_case) {
+        game_init();
+        assert(!sc64_text_box_count() && !sc64_text_box_outcome.result && !journal_present());
+        input(0);assert(screen!=SCREEN_RESULT && !won && !lost);
+        return 0;
+    }
     for(int n=0;n<120;n++) {input(0);assert(frame==frozen_frame && world_digest()==frozen);}
     while(sc64_text_box_count()) {
         input(KEY_A);assert(sc64_text_box_count() && frame==frozen_frame && world_digest()==frozen);
