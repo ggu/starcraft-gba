@@ -29,6 +29,11 @@ int main(void)
     }
     assert(child>=0 && issue_order(ORDER_ATTACK_MOVE,u[target].x,u[target].y));
     for(int i=0;i<200 && !race_scarab_probe_bullets_pending();++i)game_update(0,0);
+    if (!race_scarab_probe_bullets_pending() || race_impact_count!=1 || !u[target].alive)
+        fprintf(stderr,"attack state: parent alive=%d order=%d target=%d x=%d y=%d child alive=%d order=%d target=%d x=%d y=%d foe alive=%d hp=%d impacts=%u frame=%d\n",
+                u[parent].alive,u[parent].order,u[parent].target,u[parent].x,u[parent].y,
+                u[child].alive,u[child].order,u[child].target,u[child].x,u[child].y,
+                u[target].alive,u[target].hp,race_impact_count,frame);
     assert(race_scarab_probe_bullets_pending() && race_impact_count==1 && u[target].alive);
     Sc64ScarabImpact packet;assert(sc64_scarab_impact_unpack(&race_impact_rows[0],&packet) && packet.ticks>0);
     assert(race_save_game());race_impact_reset();assert(race_load_game());
