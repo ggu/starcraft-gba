@@ -172,3 +172,12 @@ custom-shared-actor-legacy-cargo-terran:
 	mkdir -p $(COMBINED_BIN_DIR)
 	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_GUARDIAN_COCOON_STAGE -DSC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE -DSC64_SHARED_ACTOR_FULL_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_shared_actor_legacy_cargo_context.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/shared-actor-legacy-cargo
 	$(COMBINED_BIN_DIR)/shared-actor-legacy-cargo
+
+SCARAB_PRE_CARGO_ROOT ?= /tmp/sc64-scourge-permissions-base
+.PHONY: custom-shared-actor-prior-cargo-terran
+custom-shared-actor-prior-cargo-terran:
+	mkdir -p $(COMBINED_BIN_DIR)
+	$(CLANG) $(filter-out -DSC64_SHARED_EGG_CUSTOM_SERVICE,$(CUSTOM_HOST)) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(SCARAB_PRE_CARGO_ROOT)/starcraft/game.c"' $(TERRAN_ROM_FLAGS) -USC64_WORKER_CARGO_KIND tests/sc64_shared_actor_prior_cargo.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/pre-cargo-writer
+	$(CLANG) $(CUSTOM_HOST) -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_STABLE_ROSTER_HOST_STAGE -DSC64_SHARED_ACTOR_LAYOUT_HOST_STAGE -DSC64_GUARDIAN_COCOON_STAGE -DSC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE -DSC64_SHARED_ACTOR_FULL_HOST_STAGE $(TERRAN_ROM_FLAGS) tests/sc64_shared_actor_prior_cargo.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/pre-cargo-reader
+	$(COMBINED_BIN_DIR)/pre-cargo-writer $(COMBINED_BIN_DIR)/pre-cargo.sram
+	$(COMBINED_BIN_DIR)/pre-cargo-reader $(COMBINED_BIN_DIR)/pre-cargo.sram
