@@ -25,7 +25,9 @@ int main(void)
         gfx_end();
     }
     gfx_begin(20);gfx_set_clip_y(12,120);q->selected=1;
-    draw_unit_pass(q,1);assert(changed()>0); /* selection geometry uses 2x2 frame */
+    draw_unit_pass(q,1);assert(changed()>0);
+    /* Frame width 2 gives the clamped radius 3, not the fallback radius 5. */
+    assert(gfx_test_pixel(103,50)==C_GREEN && gfx_test_pixel(105,50)==20);
     gfx_begin(20);gfx_set_clip_y(12,120);q->selected=1;
     draw_unit_pass(q,0);assert(gfx_test_pixel(116,49)==3 && changed()>4); /* body + vitals */
     gfx_begin(20);gfx_set_clip_y(50,51);q->selected=0;
@@ -41,6 +43,7 @@ int main(void)
     draw_unit_pass(q,0);assert(gfx_test_pixel(7,49)==3); /* center is offscreen */
     camx=0;gfx_begin(20);gfx_set_clip_y(12,120);
     cocoon_bank.shadow_lut=0;draw_unit_pass(q,0);assert(changed()==0);
+    q->selected=1;draw_unit_pass(q,1);assert(changed()==0);q->selected=0;
     cocoon_bank.shadow_lut=fake_lut;q->work_timer=751;draw_unit_pass(q,0);assert(changed()==0);
     q->work_timer=750;screen=SCREEN_PLAY;game_render();
     puts("Guardian fake-bank actual game render passed");return 0;
