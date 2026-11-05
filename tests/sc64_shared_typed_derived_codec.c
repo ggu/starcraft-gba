@@ -73,7 +73,7 @@ int main(void) {
     /* Compose both transforms and both real leaf codecs with large previous
      * source waypoints and nonzero flight motion bits. */
     Unit motion={0}, packed, unpacked;
-    motion.x=motion.y=motion.tx=motion.ty=10; motion.path_x=200; motion.path_y=180;
+    motion.x=motion.y=motion.tx=motion.ty=10; motion.path_x=4000; motion.path_y=3000;
     motion.type=U_SCARAB; motion.raw_type=85; motion.owner=1; motion.raw_owner=3;
     motion.hp=motion.maxhp=20; motion.alive=1; motion.carry=2<<8;
     motion.work_timer=10; motion.order=2; motion.build=-1; motion.target=-1;
@@ -85,13 +85,15 @@ int main(void) {
     assert(sc64_scarab_flight_from_wire(&unpacked,&unpacked,1,0));
     assert(sc64_scarab_waypoint_from_wire(&unpacked,&unpacked,2048,2048,1));
     assert(unpacked.path_timer==4000 && unpacked.path_retry==3000 && unpacked.weapon==3 &&
-           unpacked.carry==motion.carry && unpacked.work_timer==motion.work_timer);
+           unpacked.carry==motion.carry && unpacked.work_timer==motion.work_timer &&
+           unpacked.path_x==motion.path_x && unpacked.path_y==motion.path_y);
     assert(sc64_p7_typed_unit_encode_for(&t,&packed,2048,2048,15));
     assert(sc64_p7_typed_unit_decode_for(&unpacked,&t,2048,2048,15));
     assert(sc64_scarab_flight_from_wire(&unpacked,&unpacked,1,0));
     assert(sc64_scarab_waypoint_from_wire(&unpacked,&unpacked,2048,2048,1));
     assert(unpacked.path_timer==4000 && unpacked.path_retry==3000 && unpacked.weapon==3 &&
-           unpacked.carry==motion.carry && unpacked.work_timer==motion.work_timer);
+           unpacked.carry==motion.carry && unpacked.work_timer==motion.work_timer &&
+           unpacked.path_x==motion.path_x && unpacked.path_y==motion.path_y);
     u.raw_type=36; u.target=-1; u.work_timer=0;
     assert(sc64_derived_unit_encode(&d,&u,100,100));
     assert(sc64_derived_unit_decode(&out,&d,100,100) && out.raw_type==36);
