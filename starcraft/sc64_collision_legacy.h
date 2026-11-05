@@ -226,7 +226,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
     int mover_radius, mover_flying, mover_collidable;
     (void)SC64_UNIT_COLLISION_CLASS((int)(q - u), q->type,
         &mover_radius, &mover_flying, &mover_collidable);
-#elif defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
+#elif defined(SC64_COLLISION_FACT_HOIST) && (defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE))
     /* These mover facts are immutable during this read-only collision query.
      * Resolve them once instead of repeating ROM fact lookups per candidate. */
     int mover_radius = sc64_game_unit_collision_radius(q->type);
@@ -238,12 +238,14 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 #endif
     /* Collisions are only tested between units with matching flight state.
      * Authored Z/P facts bound ground radii at 10 and flying radii at 19. */
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS)
 #if defined(SC64_COLLISION_CLASS_CACHE)
     const int reach = mover_flying ? 18 : 9;
 #else
     const int reach = sc64_race_unit_flying(q->type) ? 18 : 9;
 #endif
+#elif defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
+    const int reach = 7;
 #else
     const int reach = 5;
 #endif
@@ -263,7 +265,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 #ifdef SC64_P6_COMBAT_ENABLED
                     if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
 #if defined(SC64_COLLISION_CLASS_CACHE)
                     int candidate_radius, candidate_flying, candidate_collidable;
                     (void)SC64_UNIT_COLLISION_CLASS(i, u[i].type,

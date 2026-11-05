@@ -79,7 +79,7 @@ sc64_contact_class_compute(int type)
         collidable = !actor || (actor & SC64_GAME_ACTOR_COLLIDABLE) != 0;
     }
 #endif
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
     {
         int r = sc64_game_unit_collision_radius(type);
         if (r < 0 || r >= (int)SC64_CONTACT_IGNORE) return 0;
@@ -154,7 +154,7 @@ sc64_contact_candidate_reference(const Unit *q, int i, int nx, int ny,
 #ifdef SC64_P6_COMBAT_ENABLED
     if (race_p6_combat_unit_burrowed(i)) return 0;
 #endif
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
     {
         int candidate_radius = sc64_game_unit_collision_radius(c->type);
         radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
@@ -196,6 +196,8 @@ sc64_contact_mover(const Unit *q, int *radius, int *flying)
  * plain race predicate uses radius 6. */
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
 #define SC64_CONTACT_REACH(flying) ((flying) ? 18 : 9)
+#elif defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
+#define SC64_CONTACT_REACH(flying) 7 /* raw36 radius 8, strict inequality */
 #else
 #define SC64_CONTACT_REACH(flying) 5
 #endif

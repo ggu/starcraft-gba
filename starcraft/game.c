@@ -3359,7 +3359,7 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
             if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
             int radius = 6;
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
             int mover_radius = sc64_game_unit_collision_radius(q->type);
             int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
             radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
@@ -7983,7 +7983,7 @@ tick_combat(Unit * q, int target)
              * pixels from source bounds; retain the six-pixel fallback in
              * the standard roster and do not widen ranged/min-range weapons. */
             int contact_range=6;
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
             if (target<MAX_UNITS) {
                 int mover_radius=sc64_game_unit_collision_radius(q->type);
                 int target_radius=sc64_game_unit_collision_radius(u[target].type);

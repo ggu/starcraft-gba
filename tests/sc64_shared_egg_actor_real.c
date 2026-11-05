@@ -23,5 +23,18 @@ int main(void)
     selected_building=-1;menu_open=0;mode=MODE_NORMAL;box_state=0;
     assert(selected_count()==1 && !strcmp(unit_name(type),"EGG"));
     game_render();game_render();
-    puts("Egg staged actor facts and selected HUD both pages passed");return 0;
+    /* Compare the actual full-world, bucket, and cached predicates at a
+     * distance that the source Egg's radius 8 blocks but radius 6 misses. */
+    for(int i=0;i<MAX_UNITS;i++)if(i!=slot)u[i].alive=0;
+    u[slot].x=507;u[slot].y=500;
+    int mover=spawn_unit(SIDE,U_DRONE,500,500);assert(mover>=0 && mover!=slot);
+    u[mover].order=ORDER_IDLE;
+    sc64_unit_buckets_begin();
+    assert(!unit_step_clear_race_fallback(&u[mover],501,500));
+    assert(!sc64_unit_bucket_step_clear_reference(&u[mover],501,500,0));
+#ifdef SC64_CONTACT_CACHE
+    assert(!sc64_contact_step_clear(&u[mover],501,500,0));
+#endif
+    sc64_unit_buckets_end();
+    puts("Egg staged facts, selected HUD and live collision predicates passed");return 0;
 }
