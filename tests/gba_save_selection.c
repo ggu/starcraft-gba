@@ -71,13 +71,13 @@ static void extended_tag_lists(void) {
   assert(save_select_prepared(scratch,sizeof(scratch),versions,count,validate,0,&token) && token.slot==1);
  }
  /* Invalid tail entries/counts cannot publish a token or touch SRAM. */
- u32 bad[6];memcpy(bad,versions,sizeof(versions));bad[5]=0x60708090u;
+ u32 bad[GBA_SAVE_MAX_ACCEPTED_TAGS+1];memset(bad,0,sizeof(bad));memcpy(bad,versions,sizeof(versions));bad[5]=0x60708090u;
  reset();record(0,versions[4],7,0xa5);memcpy(before,host_save,sizeof(before));
  const u8 payload[]={0x50,0xa5,4,5};
  GbaSaveSelection prior={0};assert(save_select_validated(scratch,sizeof(scratch),versions,5,validate,0,&prior));
  for(unsigned invalid=0;invalid<3;invalid++) {
   unsigned count=5;memcpy(bad,versions,sizeof(versions));
-  if(invalid==0)bad[4]=bad[0];else if(invalid==1)bad[4]=0;else count=6;
+  if(invalid==0)bad[4]=bad[0];else if(invalid==1)bad[4]=0;else count=GBA_SAVE_MAX_ACCEPTED_TAGS+1;
   selection_unchanged_failure(bad,count,sizeof(scratch));
   GbaSaveSelection token={11,22,33,44,55},sentinel=token;
   assert(!save_select_prepared(scratch,sizeof(scratch),bad,count,validate,0,&token));
