@@ -30,15 +30,15 @@ int main(void)
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive && b[i].raw_type==SC64_Z8_RAW_NEXUS && b[i].owner!=SIDE)
         hit_target(MAX_UNITS+i,9999,U_DRONE,SIDE);
     Sc64Z8Instance *in=trigger_24();assert(in && !(in->flags&SC64_Z8_INST_DONE));
-    assert(sc64_z8_conditions(&race_z8_sched,&race_z8_program,in,&race_z8_world_ops,&race_z8_view)==1);
+    assert(sc64_z8_conditions(&race_z8_sched,&race_z8_program,in,&sc64_z8_world_ops,&race_z8_view)==1);
     u8 outcomes[SC64_Z8_OWNER_LIMIT]={0};
-    assert(sc64_z8_execute(&race_z8_sched,&race_z8_program,in,&race_z8_world_ops,&race_z8_view,outcomes));
+    assert(sc64_z8_execute(&race_z8_sched,&race_z8_program,in,&sc64_z8_world_ops,&race_z8_view,outcomes));
     assert(sc64_z8_release_wait(&race_z8_sched,SC64_Z8_HUMAN_SLOT));
-    assert(sc64_z8_execute(&race_z8_sched,&race_z8_program,in,&race_z8_world_ops,&race_z8_view,outcomes));
+    assert(sc64_z8_execute(&race_z8_sched,&race_z8_program,in,&sc64_z8_world_ops,&race_z8_view,outcomes));
     assert((in->flags&SC64_Z8_INST_EXECUTING) && in->cursor==1 && free_units()==1);
     assert(race_save_game() && race_load_game());in=trigger_24();assert(in && in->cursor==1);
     for(int i=0;i<6;i++)hit_target(filler[i],9999,U_DRONE,ENEMY);
     assert(free_units()>=7);
-    assert(sc64_z8_execute(&race_z8_sched,&race_z8_program,in,&race_z8_world_ops,&race_z8_view,outcomes));
+    assert(sc64_z8_execute(&race_z8_sched,&race_z8_program,in,&sc64_z8_world_ops,&race_z8_view,outcomes));
     assert(in->cursor>1);puts("Z8 deferred trigger journal continuation passed");return 0;
 }
