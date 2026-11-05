@@ -24,6 +24,37 @@ static void start_custom(void)
     race_skirmish_map=0;race_bot_races[0]=R_PROTOSS;init_state();
     assert(screen==SCREEN_PLAY && race_mode);
 }
+static void assert_failed_load_atomic(void)
+{
+    static Unit old_units[MAX_UNITS];static Building old_buildings[MAX_BUILDINGS];
+    static u8 old_explored[sizeof(explored)],old_visible[sizeof(visible)];
+    static u8 old_minerals[sizeof(m)],old_geysers[sizeof(geysers)];
+    static u8 old_impacts[sizeof(race_impact_rows)],old_front[sizeof(race_front)];
+    static int old_players[5],old_ore[5],old_gas[5],old_bots[3];
+    Sc64SkTransportTech old_tech=race_skirmish_transport_tech;
+    memcpy(old_units,u,sizeof(u));memcpy(old_buildings,b,sizeof(b));
+    memcpy(old_explored,explored,sizeof(explored));memcpy(old_visible,visible,sizeof(visible));
+    memcpy(old_minerals,m,sizeof(m));memcpy(old_geysers,geysers,sizeof(geysers));
+    memcpy(old_impacts,race_impact_rows,sizeof(race_impact_rows));memcpy(old_front,&race_front,sizeof(race_front));
+    memcpy(old_players,race_player,sizeof(race_player));memcpy(old_ore,race_minerals,sizeof(race_minerals));
+    memcpy(old_gas,race_gas,sizeof(race_gas));memcpy(old_bots,race_bot_races,sizeof(race_bot_races));
+    u32 old_seed=seed;int old_count=race_impact_count;
+    int before[]={minerals,gas,supply_used,supply_cap,race_selected_mission,race_mode,race_human,
+        race_bots,race_completed,race_skirmish_map,frame,screen,mode,menu,menu_open,menu_cursor,
+        help,won,lost,result_timer,selected_building,geyser_count,(int)race_front_transition,race_front_load_error};
+    assert(!race_load_game());
+    assert(!memcmp(old_units,u,sizeof(u)) && !memcmp(old_buildings,b,sizeof(b)));
+    assert(!memcmp(old_explored,explored,sizeof(explored)) && !memcmp(old_visible,visible,sizeof(visible)));
+    assert(!memcmp(old_minerals,m,sizeof(m)) && !memcmp(old_geysers,geysers,sizeof(geysers)));
+    assert(!memcmp(old_impacts,race_impact_rows,sizeof(race_impact_rows)) && old_count==race_impact_count);
+    assert(!memcmp(old_front,&race_front,sizeof(race_front)) && !memcmp(&old_tech,&race_skirmish_transport_tech,sizeof(old_tech)));
+    assert(!memcmp(old_players,race_player,sizeof(race_player)) && !memcmp(old_ore,race_minerals,sizeof(race_minerals)));
+    assert(!memcmp(old_gas,race_gas,sizeof(race_gas)) && !memcmp(old_bots,race_bot_races,sizeof(race_bot_races)));
+    int after[]={minerals,gas,supply_used,supply_cap,race_selected_mission,race_mode,race_human,
+        race_bots,race_completed,race_skirmish_map,frame,screen,mode,menu,menu_open,menu_cursor,
+        help,won,lost,result_timer,selected_building,geyser_count,(int)race_front_transition,race_front_load_error};
+    assert(!memcmp(before,after,sizeof(before)) && old_seed==seed);
+}
 static void exercise(unsigned features)
 {
     start_custom();int ordinary=spawn_unit(SIDE,U_OVERLORD,100,100);assert(ordinary>=0);
@@ -48,12 +79,7 @@ static void exercise(unsigned features)
     if(features==(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG)) {
         /* A checksum-valid outer/inner mismatch cannot publish either actor. */
         guardian_test_retag(selected.slot,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_EGG_SAVE_VERSION);
-        static Unit before_units[MAX_UNITS];static Building before_buildings[MAX_BUILDINGS];
-        memcpy(before_units,u,sizeof(u));memcpy(before_buildings,b,sizeof(b));
-        int old_minerals=minerals,old_gas=gas,old_screen=screen,old_mode=race_mode;
-        assert(!race_load_game());
-        assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)));
-        assert(minerals==old_minerals && gas==old_gas && screen==old_screen && race_mode==old_mode);
+        assert_failed_load_atomic();
         assert(!race_worker_cargo_select(&plan,&selected) && !plan.guardian_auth.candidate);
     }
 }
