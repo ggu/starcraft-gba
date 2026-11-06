@@ -71,6 +71,48 @@ static void z5_fractional_regen(void)
     assert(sc64_pr_q8_actor_hp(i,&hp) && hp==(unsigned)u[i].maxhp*256u && !u[i].shield_remainder);
 }
 #endif
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+static void colony_morph_fraction(int target,unsigned initial,unsigned expected)
+{
+    unsigned hp;
+    game_init();race_mode=0;race_selected_mission=SC64_Z7_GLOBAL_ID;init_state();
+    assert(race_colony_profile_allowed() && race_human==R_ZERG);
+    memset(u,0,sizeof u);memset(b,0,sizeof b);
+    int pool=spawn_build(SIDE,B_SPAWNING_POOL,300,300,0);
+    int chamber=spawn_build(SIDE,B_EVOLUTION_CHAMBER,340,300,0);
+    int colony=spawn_build(SIDE,B_CREEP_COLONY,380,300,0);
+    assert(pool>=0 && chamber>=0 && colony>=0);
+    /* Explicit fixture ownership matches Z7's source slot; no save or
+     * ordinary-input construction claim is made by this HOST scene. */
+    b[pool].raw_owner=b[chamber].raw_owner=b[colony].raw_owner=3;
+    assert(b[colony].raw_type==143 && b[colony].maxhp==400);
+    assert(sc64_pr_q8_commit_hp(MAX_UNITS+colony,initial));
+    minerals=1000;gas=0;
+    assert(race_colony_start_morph(colony,target));
+    assert(minerals==950 && b[colony].under_construction);
+    for(int tick=0;tick<SC64_Z7_SUNKEN_MORPH_TICKS;++tick) {
+        assert(race_colony_pre_building_tick());
+        race_tick_buildings();
+        assert(race_colony_post_building_tick());
+        assert(b[colony].alive);
+        if(tick+1<SC64_Z7_SUNKEN_MORPH_TICKS) {
+            assert(b[colony].under_construction && b[colony].type==B_CREEP_COLONY);
+            assert(sc64_pr_q8_actor_hp(MAX_UNITS+colony,&hp) && hp==initial);
+        }
+    }
+    assert(!b[colony].under_construction && b[colony].type==target);
+    assert(!(b[colony].flags&(SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG)) &&
+           !b[colony].queue_progress && !b[colony].shield_remainder);
+    assert(sc64_pr_q8_actor_hp(MAX_UNITS+colony,&hp) && hp==expected);
+}
+static void colony_morphs(void)
+{
+    colony_morph_fraction(B_SUNKEN_COLONY,100u*256u+128u,256u);
+    colony_morph_fraction(B_SUNKEN_COLONY,101u*256u+128u,256u+128u);
+    colony_morph_fraction(B_SUNKEN_COLONY,399u*256u+128u,299u*256u+128u);
+    colony_morph_fraction(B_SPORE_COLONY,100u*256u+128u,100u*256u+128u);
+}
+#endif
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_T6_RUNTIME)
 static void late_unit_repair(void)
 {
@@ -102,6 +144,9 @@ int main(void)
     gba_init();burn_and_construction();
 #ifdef SC64_Z5_RUNTIME
     z5_fractional_regen();
+#endif
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    colony_morphs();
 #endif
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_T6_RUNTIME)
     late_unit_repair();
