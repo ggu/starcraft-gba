@@ -563,3 +563,32 @@ The failure is retained; no timer behavior was observed. Requeued using the
 actual P10 production vector and source list, without weakening validators.
 The 50-mineral opening patch is likewise queued on that P10 vector's existing
 normal-menu opening matrix. Neither run has produced a result yet.
+
+### P10 input recovery and current validation status
+
+The first P10 hardware compiles stopped before runtime: first missing the
+derived weapon-index include path, then missing cover-encoded data and managed
+walk words. All failed logs are retained. Four exact inputs were recovered
+from historical P10/modal/stack receipts, not regenerated or substituted:
+cover assets `8caa5d35…`, race maps `1d4e8999…`, skirmish maps `bfdaeedf…`,
+walk words `e1a342f6…`. Hash copies are in isolated first-include overlays and
+managed walk paths; old banks remain unchanged and production flags intact.
+Timer and 50-mineral opening checks are requeued; no runtime pass is claimed.
+The incompatible generic opening waiter was canceled before compilation.
+
+Queue candidate now passes the full clean asset-free default suite as well as
+focused tests. P10 enabled-service checks and psi campaign/ARM/visual gates
+still precede promotion. A real B-menu advisor-cue loss is reproduced: the
+audio observer clears a cue before its same-frame early return. A scoped
+fix and no-repeat/discontinuity tests are in progress.
+
+Delivered e983 P10 audio is verified directly against the KODAK copy hashes:
+it embeds advisor blob `bd0adfd0…` and the advisor table. The missing-advisor-
+bank hypothesis does not explain that delivered ROM; investigate event hooks
+and mixing. Current test codec2 streams/index tables also validate, but are
+a different paired bank. Neither fact proves correct warp/death sound choice.
+
+The monotone-shortcut rejection is specifically the proposed new Z7 enablement.
+Canonical P10 already enables that flag; do not silently remove it or treat
+Z7 divergence as proof of a P10 defect. Its runtime effects remain a separate
+audit, and full-field optimization flags are distinct from that shortcut.
