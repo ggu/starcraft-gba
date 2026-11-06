@@ -8,8 +8,9 @@ Historical audits remain evidence snapshots; they are not the current task list.
 Source-work checkpoint: the [shared production follow-up](audits/2026-11-06-shared-production-source-checkpoint/README.md)
 tracks paid Reaver tech progression, source-town wallet routing, typed Scarab
 velocity and optional Cocoon rendering. Space recovered and their focused HOST
-checks now pass. Ordinary-input/guest integration and the full persistence and
-product matrix remain open; these branch changes do not change release
+checks now pass. Staged P10 and Z7 HOST controllers also complete paid Reaver
+progression and attack with fresh-process impact continuation; guest integration
+and the full persistence and product matrix remain open. These branch changes do not change release
 capability, campaign coverage or performance claims.
 
 Deliver one ROM per race, campaign/map selection, any human race against one to

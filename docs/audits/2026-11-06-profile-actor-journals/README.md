@@ -93,11 +93,42 @@ codec test also passed; log `/tmp/sc64-profile-8acb-regressions.log`.
 
 Full-button Z7 and P10 gameplay and longer save/resume are not established by
 these fixtures. Qualification still needs actual new-state/full-world cadence,
-old profile-specific 0/5/7 predecessor and malformed-newer fallback coverage
-where those formats were actually supported,
-legacy raw-36 Overlords in selected journals, source-created actor and flag
-preflight, ownership/capture/target/death/reuse and pending-impact/transport
+additional genuinely supported historical generations and mixed-context
+fallback coverage, source-created actor and flag preflight, ownership/capture/target/death/reuse and pending-impact/transport
 interactions. ARM builds, timing, RAM and stack, genuine fresh-process guest
 SRAM and applicable campaign/custom regression remain open. The normal and
 guest enablement fences must stay in place until the combined service passes
 those gates; Z8 ordinary-win and other campaign completion gates are unchanged.
+
+## Historical profile-format boundary
+
+The early feature-5 shared-actor journal fence in `b9e9d90b:starcraft/game.c`
+requires late Terran storage and excludes Z/P full storage. Feature-7's initial
+`d7572833` fence likewise permitted only Terran compact storage. The later Z/P
+feature-7 experiment (`b9e9d90b`) explicitly rejected both Z7 derived and P10
+typed codecs, and the same restrictions remained at the flight checkpoint
+`3477fc26` and the parent of `d5a0b69d`. Thus these source checkpoints provide
+no genuine feature-5 or feature-7 producer for either exact profile. This is
+source-history evidence for these commits and flags, not a claim about every
+possible private build. The explicit profile-codec candidate excludes those
+pairs from authentication, selection and impact-writer predecessor lists;
+other Z/P compact and Terran paths retain their existing feature-7 behavior.
+Adversarial retags in the HOST tests are rejection probes, not evidence of a
+historical writer. Genuine same-profile old producers are used for feature 0
+and feature 1, including a constructed ordinary Overlord whose raw identity is
+36.
+
+At exact source `4f4e0b5a8de05d03278b2376972b28e4f1df56ed`, four separate
+HOST targets passed with ASan/UBSan under the shared lock: `profile-actor-zero-z7`,
+`profile-actor-zero-p10`, `profile-actor-z7`, and `profile-actor-p10`, using
+`tests/sc64-profile-actor-journal/Makefile`. Each compiled an independent old
+writer against the same profile generation. The feature-0 tests loaded the
+constructed raw-36 Overlord, wrote/loaded feature 15, and checked fallback to
+the genuine old record for a checksum-valid mismatched pair and for fully
+retagged, rechecksummed feature-5 and feature-7 pairs. They also checked that
+when the old valid slot is corrupted, rejection leaves test SRAM, live units,
+buildings, frame and resources unchanged. The feature-1 tests preserved both
+that Overlord and an Egg while exercising the selected combined journal. These
+are constructed HOST records, not actual guest SRAM or evidence of historical
+feature-5/7 producers. Logs are in `/tmp/sc64-history-4f4e0b5a/`; all 1,959
+pinned input hashes matched before and after the batch.

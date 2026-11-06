@@ -16,3 +16,14 @@ profile-button-$(1):
 endef
 $(eval $(call PROFILE_BUTTON_CONTROLLER,z7,$(PROFILE_Z7)))
 $(eval $(call PROFILE_BUTTON_CONTROLLER,p10,$(PROFILE_BUTTON_P10)))
+
+define PROFILE_AI_OWNERS
+.PHONY: profile-ai-owners-$(1)
+profile-ai-owners-$(1):
+	mkdir -p $(PROFILE_BUTTON_OUT)/$(1)
+	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) $(3) -DSC64_SCARAB_AI_STOCK_PROBE $(2) tests/sc64_scarab_ai_owners_game.c $(PROFILE_EXTRA) -o $(PROFILE_BUTTON_OUT)/$(1)/ai-owners
+	$(PROFILE_BUTTON_OUT)/$(1)/ai-owners
+endef
+$(eval $(call PROFILE_AI_OWNERS,terran,$(TERRAN_ROM_FLAGS),$(filter-out -DSC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE,$(PROFILE_STAGE))))
+$(eval $(call PROFILE_AI_OWNERS,z7,$(PROFILE_Z7),$(PROFILE_STAGE)))
+$(eval $(call PROFILE_AI_OWNERS,p10,$(PROFILE_BUTTON_P10),$(PROFILE_STAGE)))

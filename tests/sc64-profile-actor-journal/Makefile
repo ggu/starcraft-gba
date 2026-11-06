@@ -23,3 +23,20 @@ profile-actor-p10:
 	$(PROFILE_OUT)/p10/writer $(PROFILE_OUT)/p10/prior.sram
 	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) $(PROFILE_STAGE) $(PROFILE_P10_NEW) tests/sc64_profile_actor_journal.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/p10/guardian
 	$(PROFILE_OUT)/p10/guardian $(PROFILE_OUT)/p10/prior.sram
+
+# Independent feature-0 writers: same product generation, no custom Egg stage.
+# The reader's hostile retags exercise rejection only; they are not writers.
+PROFILE_ZERO_HOST = $(filter-out -DSC64_SHARED_EGG_CUSTOM_SERVICE,$(PROFILE_HOST))
+.PHONY: profile-actor-zero-z7 profile-actor-zero-p10
+profile-actor-zero-z7:
+	mkdir -p $(PROFILE_OUT)/zero-z7
+	$(CLANG) $(PROFILE_ZERO_HOST) $(PROFILE_BC) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(PROFILE_PRIOR_ROOT)/starcraft/game.c"' $(PROFILE_Z7) tests/sc64_profile_legacy_zero_journal.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/zero-z7/writer
+	$(PROFILE_OUT)/zero-z7/writer $(PROFILE_OUT)/zero-z7/prior.sram
+	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) $(PROFILE_STAGE) $(PROFILE_Z7) tests/sc64_profile_legacy_zero_journal.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/zero-z7/reader
+	$(PROFILE_OUT)/zero-z7/reader $(PROFILE_OUT)/zero-z7/prior.sram
+profile-actor-zero-p10:
+	mkdir -p $(PROFILE_OUT)/zero-p10
+	$(CLANG) $(PROFILE_ZERO_HOST) $(PROFILE_BC) -DSC64_PRIOR_WRITER '-DSC64_PRIOR_GAME="$(PROFILE_PRIOR_ROOT)/starcraft/game.c"' $(PROTOSS_P10_FLAGS) tests/sc64_profile_legacy_zero_journal.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/zero-p10/writer
+	$(PROFILE_OUT)/zero-p10/writer $(PROFILE_OUT)/zero-p10/prior.sram
+	$(CLANG) $(PROFILE_HOST) $(PROFILE_BC) $(PROFILE_STAGE) $(PROFILE_P10_NEW) tests/sc64_profile_legacy_zero_journal.c $(PROFILE_EXTRA) -o $(PROFILE_OUT)/zero-p10/reader
+	$(PROFILE_OUT)/zero-p10/reader $(PROFILE_OUT)/zero-p10/prior.sram

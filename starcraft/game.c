@@ -13439,7 +13439,10 @@ static void __attribute__((noinline)) race_scarab_human_parent_step(int slot)
 {
     race_scarab_probe_parent_tick(slot);
 #ifdef SC64_SCARAB_AI_STOCK_PROBE
-    (void)race_scarab_ai_stock(slot,0,u[slot].owner==ENEMY || u[slot].owner==4);
+    /* Custom opponents include RESCUABLE's slot and exclude closed slots.
+     * Campaign control remains separately scoped by its existing probe. */
+    (void)race_scarab_ai_stock(slot,0,race_mode ? race_bot_index(u[slot].owner)>=0 :
+                                           u[slot].owner==ENEMY || u[slot].owner==4);
 #endif
     (void)race_scarab_production_tick(slot,0);
 }

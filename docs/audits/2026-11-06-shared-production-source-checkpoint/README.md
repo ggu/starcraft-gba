@@ -21,8 +21,29 @@ the outset, preserving enemy units and unchanged validators. The fixture
 controls initial resources and worker positions, and advances component
 schedulers. It is not an ordinary-button, full-world, fresh-process SRAM or N64
 gameplay proof. The existing
-full-service attack test remains separate; the eventual ordinary-input gate
-must combine progression, ammunition, attack and genuine fresh-process saves.
+full-service attack test remains separate.
+
+The combined source at `a32d87f0` passes staged P10 typed and Z7 derived HOST
+ordinary-button controllers. With explicitly granted starting resources and
+initially idle workers, each builds the Pylon, Gateway, Cybernetics Core,
+Robotics Facility and Support Bay, trains a Reaver and pays for its Scarab.
+After a fresh-process load, it attacks an existing enemy, saves a pending
+impact, then loads it in another process and verifies enemy HP loss. The
+separate moved-parent test checks launch position, fractional motion and
+atomic out-of-map rejection. Logs are
+`/tmp/sc64-profile-button-a32-20261106/{p10,z7}.log`. This exercises custom
+games under HOST flags, not guest execution or native N64 behavior.
+
+The staged custom AI owner fix selects only active opponent slots for paid
+stocking, including the second AI slot; the existing campaign policy is
+unchanged. The constructed-wallet fixture checks all prepared maps, one to
+three opponents, neutral/human/inactive slots and insufficient funds under
+Terran, Z7 and P10 flags. The Terran receipt is
+`/tmp/sc64-profile-aiowners-fbb-20261106/terran.log`; Z7 and P10 receipts are
+`/tmp/sc64-profile-aiowners-51a-20261106/{z7,p10}.log`. These are direct
+source-tick tests, not AI build-order or native behavior evidence. The first
+Terran compile used an incompatible profile codec flag and failed its compile
+fence; the corrected recipe excludes that flag and preserves the failed log.
 
 ## Other isolated source work
 
@@ -30,7 +51,8 @@ must combine progression, ammunition, attack and genuine fresh-process saves.
   and velocity; dead rows preserve signed HP and reject unrepresentable
   cooldowns. The sanitizer fixture passes all 5,120 velocity/HP combinations,
   malformed transactional rejection and legacy raw-36 Overlord byte identity.
-  Selected journal integration and ARM qualification remain open.
+  Staged P10/Z7 selected journals and ordinary-button HOST continuations now
+  pass separately; ARM and the remaining profile qualification remain open.
 - Cocoon checkpoint `8ef2845e`: optional renderer, independent private-bank
   generator and test fixtures. No bank was generated and no game hook or normal
   flags were enabled. Three timeline tests and the sanitizer pixel/layering/
@@ -53,8 +75,7 @@ damage remain intact (`/tmp/sc64-full-service-6a77f506-qualification.log`). This
 separate from the constructed tech-path fixture; it still begins with a spawned
 Reaver and does not combine the entire path through ordinary inputs.
 
-Next integrate the codecs and run the remaining combined journal regressions,
-then validate the full product
+Next run the remaining combined journal regressions, then validate the full product
 matrix, real tech progression/attacks/SRAM on ARM, source permissions, stack/RAM
 and representative frame costs. Collect missing ordinary N64 production and
 weapon observations separately. No Actions runner is needed.
