@@ -342,3 +342,9 @@ respectively. This is an idle-human opening/warm simulation, not a completed
 match or busy-battle qualification. Logs and unchanged input manifests are in
 `build/z7-host-sram-contract/custom-full-flood-v2/`; the reusable fixture is
 `tests/sc64_z7_custom_full_flood_trace.c`.
+
+A second busy-window control/full-field pair was run under the shared lock after
+the possible outside-lock preview. It passed the same strict sample checks and
+reproduced the earlier guest-cycle means and unchanged 392 field builds exactly.
+The original run and its protocol deviation remain recorded above; the repeat
+artifacts are in `build/z7-host-sram-contract/full-flood-repeat-*-run/`.
