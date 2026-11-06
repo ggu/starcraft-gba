@@ -373,10 +373,13 @@ class Z7ArmReplayTest(unittest.TestCase):
         log = run_log(rows[2:], head=[LOADED], timing=("terminal", 600, 300), mode=2)
         default = self.resume(plan, untimed_prefix, log, 301, seed=seed, sram=done)
         self.assertFails(default, "resume prefix: expected one cut timing record")
+        self.assertTrue(default["prefix_timed"])
         valid = self.resume(plan, untimed_prefix, log, 301, seed=seed, sram=done,
                             prefix_timed=False)
         self.assertTrue(valid["qualified"], valid["failures"])
         self.assertIsNotNone(valid["guest_timing"])
+        self.assertTrue(valid["timed"])
+        self.assertFalse(valid["prefix_timed"])
         wrong_mode = self.resume(plan, timed_prefix, log, 301, seed=seed, sram=done,
                                  prefix_timed=False)
         self.assertFails(wrong_mode, "resume prefix: an untimed log carries timing records")
@@ -384,6 +387,20 @@ class Z7ArmReplayTest(unittest.TestCase):
         invalid = self.resume(plan, untimed_prefix, log, 301, seed=invalid_seed, sram=done,
                               prefix_timed=False)
         self.assertFails(invalid, "resume prefix: invalid SRAM record")
+
+    def test_resume_rejects_prefix_without_cut_observation(self):
+        plan = self.plan()
+        rows = self.rows(plan)
+        prefix = "\n".join(
+            line for line in self.prefix_log(plan).splitlines()
+            if not ("Z7 CHECK" in line and "host_tick=301" in line)
+            and not line.startswith("Z7 CYCLES ")
+        ) + "\n"
+        log = run_log(rows[2:], head=[LOADED], timing=("terminal", 600, 300), mode=2)
+        result = self.resume(plan, prefix, log, 301, prefix_timed=False,
+                             seed=sram((0, 1, PAUSE, True)),
+                             sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True)))
+        self.assertFails(result, "resume prefix: missing cut observation at tick 301")
 
     def test_resume_loaded_state_must_equal_the_saved_cut(self):
         plan = self.plan()

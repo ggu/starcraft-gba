@@ -40,3 +40,7 @@ loaded-state, timeline and journal checks. The retained baseline was rechecked
 with this option and passed. Tests also reject timing records in an explicitly
 untimed prefix and reject a corrupt seed. The original rejected result remains
 in the isolated local evidence directory.
+
+Resume JSON records `prefix_timed` separately from the resumed run's `timed`
+field. Its `guest_timing` describes only the resumed run; an untimed prefix
+provides no prefix or combined full-mission timing measurement.

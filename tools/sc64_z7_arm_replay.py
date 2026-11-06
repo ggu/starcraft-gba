@@ -505,7 +505,9 @@ def loaded_check(plan: dict, loaded: dict, cut: int | None, prefix: str | None,
     errors = [f"resume prefix: {f}" for f in base["failures"]]
     if base["cut"] is None or base["cut"] != cut:
         return errors + [f"resume cut {cut} is not the prefix cut {base['cut']}"]
-    saved = parse_records(prefix)[0]["checks"][cut]
+    saved = parse_records(prefix)[0]["checks"].get(cut)
+    if saved is None:
+        return errors + [f"resume prefix: missing cut observation at tick {cut}"]
     for field in ("frame", "started", "minerals", "gas"):
         if loaded[field] != saved[field]:
             errors.append(f"LOADED {field}={loaded[field]} is not the saved cut "
@@ -599,7 +601,10 @@ def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool =
     return {"mode": mode, "save_profile": save_profile, "lines": records["lines"], "cut": cut,
             "expected_observations": expected_checks, "compared_observations": compared,
             "mismatch_count": len(mismatches), "guest_timing": guest_timing,
-            "timed": timed, "sram_records": sram_records,
+            "timed": timed,
+            "prefix_timed": ((timed if prefix_timed is None else prefix_timed)
+                             if mode == "resume" else None),
+            "sram_records": sram_records,
             "failures": failures[:80], "failure_count": len(failures),
             "qualified": not failures}
 
