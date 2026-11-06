@@ -76,3 +76,12 @@ The custom replay ROM hashes were
 Source and input manifests matched before and after. This is a sampled emulator
 continuation, not full-state or physical-hardware proof; canonical busy timing
 remains pending.
+
+The delivered advisor bank was also checked against the verified ROM and ELF.
+All eight header-defined tables (sample and music offsets/lengths, unit voice
+index tables and advisor indices) matched ROM bytes at their ELF symbol
+addresses. The bank verifier decoded all 523 streams with no errors and matched
+15,860,008 decoded PCM bytes to SHA-256
+`95cd32bed0f45677d176e9afb32a1e8e9dfad0301e45314208f52559e490eb57`.
+This establishes header/blob consistency, not whether live events trigger the
+right sound or whether physical playback is audible.
