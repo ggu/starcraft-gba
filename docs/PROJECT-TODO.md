@@ -40,6 +40,17 @@ Historical audits remain evidence snapshots; they are not the current task list.
   source owners separately from 5 custom live owners, and prove record/impact
   budgets before adding typed-state payload. No new gameplay research enabled.
 
+### Campaign-controller qualification after queue cancellation
+
+Open PR #262 documented that Z1/Z3/Z4/T5/T6 controller helpers use L as a
+selection escape. After merged #305, L can cancel their paid producer queues.
+The old wins are historical source/controller evidence, not fresh qualification
+of those missions on #305+. Adapt only unintended deselection gestures to the
+existing SELECT pattern and rerun the affected ordinary-input controllers;
+do not revert production cancellation or replace real box/cancel gestures.
+This is a test-controller compatibility issue until current-source gameplay
+causality is checked; no native campaign parity or new win is inferred.
+
 ## Goal and completion rules
 
 Source-work checkpoint: the [shared production follow-up](audits/2026-11-06-shared-production-source-checkpoint/README.md)
