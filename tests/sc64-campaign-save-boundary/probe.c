@@ -5,15 +5,25 @@
 #include <stdio.h>
 #include <string.h>
 #include SC64_BOUNDARY_GAME
+#include "../../starcraft/sc64_z7_legacy_envelope_probe.h"
 extern void guardian_test_snapshot(void *dst);
 extern void guardian_test_restore(const void *src);
 static unsigned char boundary_seed[32768], boundary_before[32768], boundary_after[32768];
+static int boundary_z7_map_valid(const void *map)
+{ return race_z7_save_map_valid((const Sc64RaceMap *)map); }
 int main(int argc,char **argv)
 {
     assert(argc==2);
     FILE *f=fopen(argv[1],"rb");assert(f);
     assert(fread(boundary_seed,1,sizeof(boundary_seed),f)==sizeof(boundary_seed));
     assert(fgetc(f)==EOF && !ferror(f));assert(!fclose(f));
+    const Sc64Z7LegacyMapAuthority authority={&sc64_race_maps[SC64_Z7_GLOBAL_ID],boundary_z7_map_valid};
+    Sc64Z7LegacyEnvelopeProbe metadata;
+    assert(sc64_z7_v36_probe_context(boundary_seed,SC64_Z7_V36_SLOT_BYTES,
+           &sc64_race_maps[SC64_Z7_GLOBAL_ID],&authority,&metadata));
+    assert(!sc64_z7_v36_probe_context(boundary_seed,SC64_Z7_V36_SLOT_BYTES,
+           &sc64_race_maps[SC64_Z7_GLOBAL_ID-1],&authority,&metadata));
+    fprintf(stderr,"BOUNDARY genuine Z7 envelope and immutable map metadata matched; actor rows unvalidated\n");
     gba_init();game_init();guardian_test_restore(boundary_seed);guardian_test_snapshot(boundary_before);
     u32 tag,length,sequence;
     memcpy(&tag,boundary_seed,4);memcpy(&length,boundary_seed+4,4);
