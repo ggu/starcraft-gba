@@ -153,6 +153,10 @@ static void fallback_and_arguments(void)
     reset();legacy_record(0,0xffffffffu);memcpy(legacy,model.bytes,sizeof legacy);
     assert(gba_fj_write_parts(&io,payload,256,0,0,0x56465a60,0,&previous)==GBA_FJ_OK);
     assert(previous.sequence==1); /* Wrap skips zero. */
+    legacy_record(0,0x80000001u); /* Ancient legacy counter cannot regain priority. */
+    memcpy(legacy,model.bytes,sizeof legacy);
+    assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_OK&&
+           gba_fj_same_record(&selected,&previous));
     assert(gba_fj_write_parts(&io,payload,256,0,0,0x56465a60,&previous,&written)==GBA_FJ_OK);
     memcpy(snapshot,model.bytes,sizeof snapshot);
     uint32_t metadata=gba_fj_metadata(written.index);
