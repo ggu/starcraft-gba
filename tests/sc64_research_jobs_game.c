@@ -53,7 +53,12 @@ int main(void)
     assert(!sc64_pr_job_begin_custom(&q,1,SC64_PR_AIR_WEAPONS,&levels,&ore,&gas,
         3,1,1,1,0,1,0,0,0)); /* human legacy floor must not affect an AI */
     assert(!memcmp(&q,&saved,sizeof q));
-    /* Exercise both public wrappers and direct race adapter entry points. */
+    /* Put an actual staged active job in the live array, then exercise
+     * both public wrappers and direct race adapter entry points. */
+    assert(sc64_pr_job_begin_custom(&q,1,SC64_PR_AIR_WEAPONS,&levels,&ore,&gas,
+        3,1,1,1,0,0,0,0,0));
+    b[0]=q;
+    assert(b[0].level && b[0].queue_progress);
     static u8 previous_sram[32768];
     memset(host_save,0xa5,sizeof host_save);
     memcpy(previous_sram,host_save,sizeof host_save);
