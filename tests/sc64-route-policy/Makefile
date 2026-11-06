@@ -32,4 +32,3 @@ test-starcraft: test-sc64-route-policies
 test-sc64-route-flood-split: $(addprefix build/test-sc64-route-policy-split-,$(ROUTE_POLICY_VARIANTS)) build/test-sc64-route-policy-split-visit-newcell
 	@$(foreach variant,$(ROUTE_POLICY_VARIANTS),./build/test-sc64-route-policy-split-$(variant) &&) ./build/test-sc64-route-policy-split-visit-newcell
 test-starcraft: test-sc64-route-flood-split
-
