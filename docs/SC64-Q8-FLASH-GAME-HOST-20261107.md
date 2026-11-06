@@ -1,6 +1,6 @@
 # Actual-game Q8 Flash HOST experiment
 
-This is an unqualified, explicit HOST-only experiment. It does not change the
+This is an explicit HOST-only experiment with scoped checks below, not a production-qualified backend. It does not change the
 normal SRAM backend, enable an ARM ROM, establish hardware flash behavior, or
 claim automatic save-type migration. `SC64_Q8_FLASH_HOST_STAGE` requires the
 existing typed P10, Q8 and active-job flags, excludes the campaign journal, and
@@ -18,9 +18,9 @@ independent commit-sector model. The Flash device is explicitly supplied by
 the HOST harness and does not alter `common/gba.c`'s normal SRAM path.
 
 Predecessor selection reads the actual records and applies their original
-version-specific game validation. This first scope rejects any live shielded
-actor with nonzero legacy shield phase rather than assuming 320 or 1280 as its
-unit. It preserves eligible Terran building burn debt and owner in their
+version-specific game validation. The later [phase migration](SC64-Q8-FLASH-PHASE-MIGRATION-20261107.md)
+accepts unit phases after the existing authenticated Battery normalization and
+converts only shielded legacy building phases from 1/320 to 1/1280. It preserves eligible Terran building burn debt and owner in their
 existing field, and does not reinterpret non-shield aliases. Campaign/Z5
 regeneration and fractional-only repair orders are not admitted. A
 checksum-valid but unsupported sole predecessor cannot silently become a new
@@ -91,3 +91,7 @@ Independent readback checked the final receipt and logs, all 593 pinned
 source-input hashes, the 587 corresponding prepared paths present in this
 worktree, and the normal P10 ROM hash above. The final receipt SHA-256 is
 `3ac3e97ab534d0897c796f6aa8ab22d6d446e4fed15efb795a894c42a2e94f63`.
+
+The later phase-migration checkpoint supersedes only the initial nonzero-phase
+refusal. The original 3982 results above remain historical; current migration
+checks and limits are in the linked phase audit.
