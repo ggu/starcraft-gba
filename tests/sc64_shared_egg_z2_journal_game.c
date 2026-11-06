@@ -1,11 +1,18 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Constructed Z2 HOST state with synthetic, deliberately limited PUNI data.
- * No guest inputs, private permissions or campaign-win claim. */
+ * Constructed Z2 HOST state; permissions are synthetic unless explicitly
+ * compiled against the verified private PUNI bank. No campaign-win claim. */
 #define SC64_SHARED_EGG_NO_MAIN
 #include "sc64_shared_egg_journal_game.c"
 #undef SC64_SHARED_EGG_NO_MAIN
 #ifndef SC64_SHARED_EGG_Z2_HOST_STAGE
 #error "Z2 Egg fixture requires the isolated stage"
+#endif
+#ifdef SC64_Z2_ACTUAL_PERMISSIONS
+#define Z2_DENIED_PRODUCT U_ZP_ULTRALISK
+#define Z2_PERMISSION_LABEL "verified actual"
+#else
+#define Z2_DENIED_PRODUCT U_DRONE
+#define Z2_PERMISSION_LABEL "synthetic"
 #endif
 int fixture_export_host_save(const char *path);
 int fixture_import_host_save(const char *path);
@@ -39,7 +46,7 @@ int main(int argc,char **argv)
         int before=zerglings(),timer=u[egg].work_timer; assert(timer>0);
         for(int i=0;i<timer;++i)race_z7_egg_tick_unit(egg);
         assert(zerglings()==before+2 && fixture_host_save_equals(argv[2]));
-        puts("Z2 synthetic-permission fresh-process paired birth passed");return 0;
+        puts("Z2 " Z2_PERMISSION_LABEL "-permission fresh-process paired birth passed");return 0;
     }
     start_z2();
     int hall=hall_for_owner(SIDE);assert(hall>=0);
@@ -51,7 +58,8 @@ int main(int argc,char **argv)
     assert(spawn_build(SIDE,B_SPAWNING_POOL,b[hall].x+80,b[hall].y+80,0)>=0);
     assert(race_owner_has_prereq(SIDE,SC_PR_SPAWNING_POOL));
     int before=minerals,source=b[hall].raw_owner;
-    assert(!race_queue_unit(SIDE,hall,U_DRONE)); /* synthetic denial */
+    assert(!sc64_early_zerg_permission_available(SC64_RACE_MISSION_Z2,source,sc64_race_raw_unit(Z2_DENIED_PRODUCT)));
+    assert(!race_queue_unit(SIDE,hall,Z2_DENIED_PRODUCT));
     assert(minerals==before && b[hall].larva==2);
     b[hall].raw_owner=99;assert(!race_queue_unit(SIDE,hall,U_ZERGLING));
     assert(minerals==before && b[hall].larva==2);b[hall].raw_owner=source;
@@ -60,7 +68,7 @@ int main(int argc,char **argv)
     assert(u[egg].target==U_ZERGLING && u[egg].raw_owner==source && u[egg].work_timer>0);
     assert(race_save_game());u32 length=0;
     assert(save_read_latest(saved.bytes,sizeof(saved.bytes),SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,&length));
-    if(argc==3) {assert(fixture_export_host_save(argv[2]));puts("Z2 synthetic-permission producer saved");return 0;}
+    if(argc==3) {assert(fixture_export_host_save(argv[2]));puts("Z2 " Z2_PERMISSION_LABEL "-permission producer saved");return 0;}
     assert(race_shared_egg_candidate_owner(SIDE,source,&race_data));
     assert(!race_shared_egg_candidate_owner(SIDE,-1,&race_data));
     assert(!race_shared_egg_candidate_owner(ENEMY,source,&race_data));
@@ -68,11 +76,12 @@ int main(int argc,char **argv)
     int count=zerglings(),timer=u[egg].work_timer;
     for(int i=0;i<timer;++i)race_z7_egg_tick_unit(egg);
     assert(zerglings()==count+2);
-    /* A valid tagged row cannot substitute a synthetic PUNI-denied product,
+    /* A valid tagged row cannot substitute a PUNI-denied product,
      * even when owner, checksum and ordinary Egg shape remain valid. */
     edited=saved;Unit denied;
     assert(sc64_zp_unit_save_decode(&denied,&edited.record.save.units[egg],race_cols*16u,race_rows*16u));
-    denied.target=U_DRONE;denied.work_timer=sc64_z7_egg_duration(U_DRONE);
+    denied.target=Z2_DENIED_PRODUCT;denied.work_timer=sc64_z7_egg_duration(Z2_DENIED_PRODUCT);
+    assert(sc64_shared_egg_wire_valid(&denied,1,race_shared_egg_candidate_owner,&edited.record.save));
     assert(sc64_zp_unit_save_encode(&edited.record.save.units[egg],&denied,race_cols*16u,race_rows*16u));
     clear_records();assert(save_write_first(edited.bytes,length,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION));
     expect_failed_load_preserves_world();
@@ -82,5 +91,5 @@ int main(int argc,char **argv)
     assert(sc64_zp_unit_save_encode(&edited.record.save.units[egg],&forged,race_cols*16u,race_rows*16u));
     clear_records();assert(save_write_first(edited.bytes,length,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION));
     expect_failed_load_preserves_world();
-    puts("Z2 synthetic-permission paid paired Egg journal passed");return 0;
+    puts("Z2 " Z2_PERMISSION_LABEL "-permission paid paired Egg journal passed");return 0;
 }
