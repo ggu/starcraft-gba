@@ -274,6 +274,50 @@ static void explicit_cases(void)
     expect_mask(0, powered);
 }
 
+#ifdef SC64_P7_DETECTOR_BINDING_HOIST
+static void detector_binding_hoist_cases(void)
+{
+    int saved_override=race_protoss_binding_override;
+    for (int binding=SC64_PROTOSS_BIND_NONE; binding<=SC64_PROTOSS_BIND_LATER; ++binding) {
+        race_protoss_binding_override=(signed char)binding;
+        int live_binding=race_protoss_service_binding();
+        int human=sc64_p7_optical_human_slot();
+        assert(live_binding==binding);
+        for (int source=-2;source<=9;++source) for (int owner=-1;owner<=5;++owner) {
+            int raw_slot=race_protoss_binding_slot(binding,owner,source);
+            assert(sc64_p7_detector_bound_slot(binding,human,owner,source)==
+                   sc64_p7_detector_current_slot(owner,raw_slot));
+        }
+        for(unsigned slot=0;slot<8;++slot)
+            assert(race_protoss_binding_source_owner(binding,slot)==race_protoss_source_owner(slot));
+    }
+    race_protoss_binding_override=(signed char)saved_override;
+}
+#endif
+
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+/* Lists are rebuilt after movement, ownership, completion and lifecycle
+ * changes. Their indexed and scalar results must agree for each snapshot. */
+static void detector_snapshot_cases(void)
+{
+    Sc64P7DetectorLists lists; u8 powered[MAX_BUILDINGS]={0};
+    reset_case(); observer(1,-1,ENEMY);
+    for (int step=0;step<7;++step) {
+        if (step==1) u[1].x+=64;
+        if (step==2) { u[1].owner=SIDE; u[1].raw_owner=0; }
+        if (step==3) { b[0].alive=1; b[0].type=B_PHOTON_CANNON;
+            b[0].raw_type=SC64_P7_CANNON_RAW; b[0].owner=SIDE;
+            b[0].raw_owner=0; b[0].under_construction=1; }
+        if (step==4) { b[0].under_construction=0; powered[0]=1; }
+        if (step==5) u[1].alive=0;
+        if (step==6) b[0].alive=0;
+        sc64_p7_detector_lists_build(&lists);
+        assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==
+               sc64_p7_arbiter_detected_mask_reference(0,powered));
+    }
+}
+#endif
+
 int main(void)
 {
     optical_source_masks();
@@ -281,6 +325,12 @@ int main(void)
     race_mode = 0;
     race_selected_mission = SC64_P7_GLOBAL_ID;
     explicit_cases();
+#ifdef SC64_P7_DETECTOR_BINDING_HOIST
+    detector_binding_hoist_cases();
+#endif
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+    detector_snapshot_cases();
+#endif
     unsigned positive = 0;
     for (int run = 0; run < 2000; ++run) {
 #ifdef SC64_PROTOSS_LATER_BINDINGS
