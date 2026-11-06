@@ -155,6 +155,16 @@ static int warp_load_prime(void)
             sc64_race_building_rule(b[i].type) &&
             sc64_race_building_rule(b[i].type)->race == R_PROTOSS) { slot = i; break; }
     if (slot < 0 || !save_game()) return fail("load prime setup save");
+    int worker = -1, sx, sy;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE) { worker = i; break; }
+    if (worker < 0 || !race_skirmish_site_for(SIDE, B_PYLON, &sx, &sy)) return fail("failed build setup");
+    minerals = 5000; gas = 1000;
+    if (!race_start_build(SIDE, worker, B_PYLON, sx, sy)) return fail("failed build admission setup");
+    u[worker].x = sx; u[worker].y = sy; minerals = 0; clear_events();
+    race_pending_build_tick(worker);
+    if (game_audio_pending_warp >= 0 || events(GAME_AUDIO_WARP_START))
+        return fail("unfunded foundation queued cue");
     game_audio_snapshot[MAX_UNITS + slot] = GAME_AUDIO_SNAPSHOT_ALIVE | GAME_AUDIO_SNAPSHOT_CONSTRUCTING;
     game_audio_pending_warp = 156; /* queued before a successful load */
     game_audio_last_frame = frame - 1; clear_events();
