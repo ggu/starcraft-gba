@@ -29,6 +29,8 @@ static void unit_test(int raw,int radius)
     assert(sc64_p7_observer_sight_radius_runtime(type,0)==radius);
 #endif
     sc64_update_exploration();check_single_circle(520,520,radius);
+    for(int cell=0;cell<MAP_COLS*MAP_ROWS;cell++)
+        assert(!!SC64_GRID_GET(visible,cell)==!!SC64_GRID_GET(explored,cell));
     u[0].x+=3;u[0].y+=5;sc64_update_exploration();check_single_circle(523,525,radius);
     u[0].alive=0;sc64_update_exploration();
     assert(!SC64_GRID_GET(visible,32+32*MAP_COLS));

@@ -1017,12 +1017,14 @@ sc64_update_exploration(void)
         int type = active ? u[i].type : 0;
         if (sc64_visibility_same(old, active, x, y, type))
             continue;
+#ifndef SC64_SOURCE_SIGHT_ALL_RACES
         if (old->active && active && old->type == type &&
             old->x / 16 == x / 16 && old->y / 16 == y / 16) {
             /* Exploration is tile-centered, so sub-tile motion adds nothing. */
         } else if (active) {
             sc64_explore_unit(x, y, type);
         }
+#endif
         if (old->active && active && old->type == type &&
             old->x - x > -16 && old->x - x < 16 &&
             old->y - y > -16 && old->y - y < 16) {
@@ -1057,10 +1059,14 @@ sc64_update_exploration(void)
             sc64_adjust_building_visibility(old->x, old->y, old->type, -1);
         if (active) {
 #ifdef SC64_BUILDING_VISIBILITY_KEY
+#ifndef SC64_SOURCE_SIGHT_ALL_RACES
             sc64_explore_building(x, y, sight_key);
+#endif
             sc64_adjust_building_visibility(x, y, sight_key, 1);
 #else
+#ifndef SC64_SOURCE_SIGHT_ALL_RACES
             sc64_explore_building(x, y, type);
+#endif
             sc64_adjust_building_visibility(x, y, type, 1);
 #endif
         }
