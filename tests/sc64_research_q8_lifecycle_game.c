@@ -31,8 +31,10 @@ static void burn_and_construction(void)
     assert(sc64_pr_q8_actor_hp(bt,&q8) && q8==100u*256u-296u);
     /* Burn-aware full repair helper works on the same authoritative debt. */
     b[t].hp=b[t].maxhp;
+    unsigned burn_phase=(unsigned)b[t].shield_remainder;
     sc64_building_burn_full_repair((unsigned)b[t].hp,(unsigned)b[t].maxhp,
-                                   (unsigned *)&b[t].shield_remainder);
+                                   &burn_phase);
+    b[t].shield_remainder=(int)burn_phase;
     assert(sc64_pr_q8_actor_hp(bt,&q8) && q8==(unsigned)b[t].maxhp*256u);
 
     int n=spawn_build(SIDE,B_NEXUS,400,400,1);assert(n>=0);
