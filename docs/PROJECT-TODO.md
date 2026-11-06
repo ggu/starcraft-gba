@@ -11,19 +11,27 @@ Historical audits remain evidence snapshots; they are not the current task list.
   legacy larva restore is covered. Clean default suite, P10 enabled gesture
   and all four guarded ARM links passed. Separate Egg/Carrier/Scarab services
   retain their own lifecycles. No SD update yet.
-- **Validated but not merged:** the 50-mineral start passed the P10 normal-menu
-  matrix of 234 map/race/1-3-AI combinations, with all active banks and zero gas
-  checked; 187 private includes unchanged. Branch rebased to merged #305 at
-  `06d3a84`; clean default build/test validation is running.
+- **Merged:** [native opening bank #306](https://github.com/ggu/starcraft-gba/pull/306)
+  at `9668df744139afaef7ad9b98d630feb5ad5aae99`. Unified race custom games
+  start every active owner with 50 minerals/zero gas. The P10 normal-menu
+  matrix passed 234 configurations; 187 private includes were unchanged.
+  After rebase onto #305, clean default boundary/build/full test passed
+  (529.93 seconds). Independent source review found no actionable issue.
+  Campaign banks and the separate legacy skirmish adapter are unchanged.
+  No SD update or measured mineral-per-second improvement is claimed.
 - **Mining defect confirmed in a controlled fixture:** using P10 worker code,
   an adjacent Probe/mine/depot setup collects at call 1, deposits at 2, collects
   again at 23 and deposits at 24. The post-pickup 45 timer is ignored during
   return and replaced by 20 at deposit. This demonstrates ordering, not a real
-  map's per-second rate or native N64 duration. Timing/retarget fix remains open.
+  map's per-second rate or native N64 duration. A bounded depleted-field
+  continuation candidate is under test; the timing correction remains open.
 - **Power:** actual P10 request/arrival, no-debit refusal, producer pause/resume
   and Cannon pause/resume pass; four normal ARM links pass. Campaign controller
-  comparisons remain open (P3 candidate lost; baseline comparison is queued).
-  A separate clipped geometry-overlay probe is default-off/unqualified.
+  comparisons found P7/P10 candidate wins, but P3 candidate lost while its
+  unchanged baseline won. This trajectory regression blocks promotion pending
+  diagnosis; the power mask must not be weakened merely to make the tape win.
+  A separate clipped geometry-overlay probe is default-off; focused framebuffer
+  checks passed, but dense-Pylon ARM timing and native visual parity remain open.
 - **Audio:** same-frame B-menu minerals/gas cue loss is reproduced and a scoped
   fix passes default and P10 imported-audio tests. Warp-start/death sound mapping
   and physical playback remain unverified; no blanket sound fix is claimed.
