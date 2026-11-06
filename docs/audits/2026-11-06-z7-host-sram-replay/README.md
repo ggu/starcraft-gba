@@ -309,3 +309,25 @@ existing guards with unchanged BSS ends. Z7 IWRAM ended at `03004f88` versus
 receipts and logs are under `build/z7-host-sram-contract/normal-full-flood-links/`
 and `host-full-flood-traces/`. Real guest performance and wider gameplay
 qualification remain open.
+
+The same four diagnostic configurations then ran the qualified 1,000-call
+post-load busy window. All retained strict seed, tape and sampled state/display
+checks; each had 975 advancing and 25 nonadvancing calls. The route counters
+were unchanged at 3,576 hits and 392 builds. Baseline advancing mean guest
+cycles were 2,512,864 without and 2,364,512 with the full-field flags (5.90%
+lower); with the five renderer-cache flags they were 2,446,063 and 2,294,810
+(6.18% lower). All stack paint checks left 7,160 of 11,416 bytes untouched in
+this bounded run. Diagnostic ROM hashes, control then full-field, were
+`87074fb09faf88e4cf666300359cc488fb1c12538808d99e10fc2577adb9ac3e`,
+`d8964cebc0d6fee345ea7a10e1bd1866cf915dc5ba58095a5a948be8f2206a73`,
+`5cc8bd0e08f146ab7495dc21ca0a57ea767ce91ff0e29caafbf3eca0bfa1bce3`, and
+`86bdeef0e4bc317622c9eb99b6bcba32c4e73a4d03816a45d3b9f449cc54fe1c`.
+
+The runs held the shared native lock. A separate approximately 0.1-second HOST
+preview may have overlapped outside that lock; this is a serialization protocol
+deviation. These figures are emulator guest cycles rather than wall-clock
+measurements. They describe one sampled busy window with diagnostic overhead,
+not physical hardware or a general frame-rate guarantee. The mean still greatly
+exceeds the nominal 30-fps cycle budget. Results and source/input manifests are
+retained under `build/z7-host-sram-contract/full-flood*/`; default flags remain
+unchanged pending broader gameplay, memory and performance qualification.
