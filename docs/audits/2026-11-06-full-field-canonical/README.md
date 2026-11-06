@@ -21,8 +21,8 @@ or busy-battle proof. Frozen input and source manifests matched before/after.
 Private logs remain under `build/z7-host-sram-contract/host-full-flood-traces/`
 and `custom-full-flood-v2/`; no private inputs or captures are committed.
 
-Normal Z7–Z10 link guards, fresh guest continuation and guest cycle measurements
-for this exact canonical source are still being checked. No 30-fps or physical
+Fresh guest continuation and guest cycle measurements for this exact canonical
+source are still being checked. No 30-fps or physical
 hardware claim follows from the HOST results.
 
 All eight normal release-vector control/candidate links for Z7–Z10 passed the
@@ -39,8 +39,7 @@ The links used the current format-2 audio header/blob pair with SHA-256
 An independent stack-qualification receipt pins that same pair. It is different
 from the older advisor-bank header/blob in the Nov 5 Z9 prepared-input receipt;
 these results do not establish that the two sound banks are interchangeable or
-that every game event selects the intended sound. Current-bank stream and
-header verification is pending.
+that every game event selects the intended sound. Current-bank stream and header verification is recorded below.
 
 The current format-2 bank subsequently passed the existing
 `sc64_audio_pack.py --verify-bank` check: it decoded all 514 populated SFX and
