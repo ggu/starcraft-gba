@@ -166,28 +166,28 @@ older KODAK package. Source merges do not update an already copied ROM.
   sanitizer tests, interrupted writes/partial tag erases, stale-winner rejection
   and semantic fallback. It is not connected to game saving; Flash hardware
   timing, bank/sector behavior, real power cuts, memory and integration remain
-  open. No save format or release behavior changes with this experiment.
-  Draft #336 now wires human campaign policy into actual P1–P10
+  open. [Standalone integration #344](https://github.com/ggu/starcraft-gba/pull/344)
+  connects the transport and journal in a [test-only proof](audits/2026-11-07-flash-integrated/README.md):
+  HOST models and unforced mGBA exercised full 28,656-byte slots and preserved
+  the legacy 32 KiB; clean default checks passed. Game backend enablement,
+  cartridge hardware behavior and real SRAM migration remain unqualified.
+  No save format or release behavior changes with this experiment.
+  Draft #336 now also wires human campaign policy into actual P1–P10
   initialization, Forge/Core menus, payment, update and refunds (runtime
-  `13953e82`, identical adapter extracted at `c59e0687`). Review closed a
-  generic-menu upgrade bypass in staged custom and campaign contexts; genuine
-  old completed/pending generic jobs remain floors. Focused campaign/custom
-  sanitizer fixtures pass with 593 input hashes unchanged, and research-off
-  normal P10 reproduces the qualified `8e9f0a0a` bytes. The campaign flag is HOST-only
-  and refuses persistence: campaign jobs/journals, enemy controller bindings,
-  exact shields/HP, ordinary play and full product checks remain open. The
-  source-only check passes without changing its allowlist or size limit.
-  See [the runtime stage](audits/2026-11-07-campaign-research-runtime/README.md)
-  on [draft #336](https://github.com/ggu/starcraft-gba/pull/336); no normal flag
-  is enabled.
-  Combined source `5dcffb5e`, after detector #342, passes both campaign/custom
-  HOST sanitizer suites, a normal P10 link identical to release `317cc67d...`,
-  and clean boundary/doctor/build/full default tests (442.83 seconds; 1,023
-  primary Python tests, 26 skips, plus compiled/auxiliary checks). All 593
-  prepared hashes and both checkout heads stayed unchanged. This closes that
-  combined disabled/default check; feature-on production, persistence, exact
-  combat and ordinary gameplay gates remain open. The confirmed device target
-  is P10 custom, and no release research flags changed.
+  `13953e82`). A source-cap bypass through generic research commands was
+  repaired for staged custom and campaign play; genuine old completed/pending
+  generic jobs remain floors. After detector #342, combined source `5dcffb5e`
+  passes both campaign/custom sanitizer fixtures and normal research-off P10
+  reproduces the release `317cc67d...` ROM. A clean checkout also passes
+  boundary, doctor, build and full default tests (442.83 seconds; 1,023 primary
+  Python tests, 26 skips, plus compiled/auxiliary checks), with 593 prepared
+  hashes and both checkout heads unchanged. Audit successor `847dbaae` records
+  the terminal results on draft #336. This closes that combined disabled/default
+  check, not the current feature-on production or runtime gates. This campaign
+  flag is HOST-only and refuses persistence: campaign job journals, enemy
+  controller bindings, exact shields/HP, ordinary play and full product checks
+  remain open. The implementation/audit is on [draft #336](https://github.com/ggu/starcraft-gba/pull/336),
+  not enabled on main. Source layout/checks and final composition continue there.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
@@ -233,6 +233,16 @@ older KODAK package. Source merges do not update an already copied ROM.
   movement and textured dark boundaries were seen, but no identifiable world
   cell was proven outside all unit/Nexus sight after discovery. Terrain and
   resource memory remain unverified; do not infer them from a camera pan.
+- **Read-only native discovery:** the separate
+  [observer branch](https://github.com/ggu/starcraft-gba/tree/codex/n64-actor-readonly-observer-20261107)
+  records one bounded Terran custom attempt at runtime `d03052c2`: two 8 MiB
+  cache-aware samples and three frames within a 64 MiB output cap. Root rechecked
+  21 input/output hashes and viewed the initial/final frames. Natural mining
+  (66 to 98 minerals) confounds the attempted Move, and sampled CPU clock is
+  zero. Five weak candidates, four spaced 312 bytes apart, are not authenticated
+  actors or cadence. No movement/STOP, independent clock, writer-PC or timing
+  optimization follows. Reusable-wrapper admission and cleanup review is separate
+  from the recorded run; no new gameplay behavior is enabled.
 - **Early Egg continuation stage:** branch
   [`codex/shared-egg-next-20261107`](https://github.com/ggu/starcraft-gba/tree/codex/shared-egg-next-20261107)
   at `f7176304` adds a HOST-only Z1 admission/validation slice. A real paid Egg
@@ -243,6 +253,13 @@ older KODAK package. Source merges do not update an already copied ROM.
   No ARM, ordinary-input win, Z2–Z6, transfer or common activation proof follows.
   The constructed late captured-Hatchery concern was not promoted: no reachable
   transfer path was found, and relaxing only admission would leave saves invalid.
+  The [Z2 successor branch](https://github.com/ggu/starcraft-gba/tree/codex/shared-egg-early-next-20261107)
+  at `fd9f56ea` adds an opt-in HOST slice using the exact recovered private PUNI
+  bank. Runtime `2ac2eabe` passes paid paired birth, fresh-process persistence,
+  checksum-valid denied-product rejection and fallback to a genuine `aa8f43c5`
+  old-tag Z2 save. Root rechecked all 592 dependencies, the permission hash and
+  both save hashes. This is constructed HOST evidence; normal activation, ARM,
+  Z3–Z6, trigger reservations, transfers and broader saves remain open.
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
   already active in other products; the separate monotone shortcut remains off.
   Eight release links, route oracles, clean default checks and 18 HOST warm
