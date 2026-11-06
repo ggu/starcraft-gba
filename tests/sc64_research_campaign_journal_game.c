@@ -3,8 +3,13 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef SC64_CAMPAIGN_BASELINE_WRITER
+#include <gba.c>
+#include <game.c>
+#else
 #include "../common/gba.c"
 #include "../starcraft/game.c"
+#endif
 static void transfer(const char *path,int write_out) {
     FILE *f=fopen(path,write_out?"wb":"rb"); assert(f);
     if (write_out) assert(fwrite(host_save,1,sizeof host_save,f)==sizeof host_save);
@@ -34,6 +39,10 @@ int main(int argc,char **argv) {
         minerals=gas=1000;
         assert(sc64_pr_stage_begin_slot(f,SC64_PR_GROUND_WEAPONS));
         assert(minerals==900&&gas==900);
+        u8 before[sizeof host_save]; memcpy(before,host_save,sizeof before);
+        b[f].queue[0]=ENEMY;
+        assert(!race_save_game() && !memcmp(before,host_save,sizeof before));
+        b[f].queue[0]=SIDE;
         assert(race_save_game());
         if (!strcmp(argv[1],"custom-write")) {
             assert(sram_get32(host_save)==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION ||
@@ -43,10 +52,10 @@ int main(int argc,char **argv) {
 #else
         assert(0 && "new writer requires campaign journal");
 #endif
-    } else if (!strcmp(argv[1],"old-load") || !strcmp(argv[1],"fallback")) {
+    } else if (!strcmp(argv[1],"old-load") || !strcmp(argv[1],"fallback") || !strcmp(argv[1],"reject")) {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
         transfer(argv[2],0);
-        if (!strcmp(argv[1],"fallback")) {
+        if (!strcmp(argv[1],"fallback") || !strcmp(argv[1],"reject")) {
             int slot=-1;
             for(int i=0;i<2;++i) if(sram_get32(host_save+i*SAVE_SLOT_SIZE)==SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION) slot=i;
             assert(slot>=0); u8 *row=host_save+slot*SAVE_SLOT_SIZE;
@@ -56,6 +65,15 @@ int main(int argc,char **argv) {
             sram_put32(row+8,hash_bytes(row+16,n));
         }
         u8 unchanged[sizeof host_save]; memcpy(unchanged,host_save,sizeof unchanged);
+        if (!strcmp(argv[1],"reject")) {
+            int old_minerals=minerals,old_gas=gas,old_mission=race_selected_mission;
+            Sc64ProtossResearchLevels old_levels=sc64_experimental_research_levels;
+            assert(!race_load_game());
+            assert(minerals==old_minerals && gas==old_gas && race_selected_mission==old_mission &&
+                   !memcmp(&old_levels,&sc64_experimental_research_levels,sizeof old_levels));
+            assert(!memcmp(unchanged,host_save,sizeof unchanged));
+            puts("campaign journal atomic reject: PASS"); return 0;
+        }
         assert(race_load_game()); assert(!memcmp(unchanged,host_save,sizeof unchanged));
         assert(minerals==1000&&gas==1000);
         for(int i=0;i<MAX_BUILDINGS;++i) { Sc64PrPaidReceipt paid; assert(!sc64_pr_stage_receipt(i,&paid)); }
