@@ -37,7 +37,7 @@ window with explicit state/workload/palette scope; and run the repository's
 source boundary, default build/tests and applicable prepared-profile checks.
 Retain any failures. Compare the latest main source again before integration;
 release only after the requested broader state, visual, memory and performance
-evidence is satisfied. No tests or builds have run on this candidate yet.
+evidence is satisfied.
 
 The base Makefile defined but omitted the `split-visit-newcell` route-policy
 fixture and `bounded-newcell`, `full-newcell`, and `active-newcell` depot
@@ -50,5 +50,31 @@ that `SC64_ROUTE_MONOTONE_PROBE` remains absent.
 The existing route-policy fixture definitions are moved verbatim into a
 literal included Makefile to preserve the unchanged top-level source-size
 limit. The source-only vector test checks Z7–Z10 on, partial and off settings
-and keeps the separate monotone shortcut absent. These changes remain untested
-until the combined-source qualification runs.
+and keeps the separate monotone shortcut absent. The focused combined-source checks below cover these changes.
+
+
+## Combined-source checkpoint (2026-11-06)
+
+On candidate `54243fbb`, based on main `e3919ec0`, the source boundary,
+late-vector test, all four listed sanitized new-cell fixtures, and word-clear
+checks passed. All eight normal Z7–Z10 ARM control/candidate links passed their
+existing guards using the delivered advisor header and blob. The 564 private
+input hashes and relevant source hashes matched before and after each run.
+
+A normal-menu HOST matrix covered two maps, all three human races, and one,
+two, or three AI opponents. Each of the 18 openings had 41 matching sampled
+selected-state, indexed framebuffer and palette fingerprints between control
+and candidate. These are opening/warm simulation samples, not complete games
+or hardware measurements.
+
+The original fresh Z7 recorded tape did not win on this combined source:
+both control and candidate lost at call 19,505, and the strict original
+validator rejected each. The emitted replay logs and 19,504 per-call selected
+state/display fingerprints were byte-identical, as were final save journals.
+The fingerprint trace SHA-256 was
+`77816805ac7597448035e9e6bbf64b5f13096011bb4caae8ebe099c93e5469b9`; the
+replay-log SHA-256 was
+`d99971b872ede04b484fb78d963502489a74ada842f959766c404d33f5d3f54b`.
+The full-tape comparison correctly reports truncation; matching nonwin parity
+does not satisfy the fresh campaign-win or fresh guest-continuation gates.
+No current-source performance improvement or promotion is claimed.
