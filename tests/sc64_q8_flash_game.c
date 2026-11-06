@@ -37,19 +37,28 @@ static void start(void)
 static void create_paid_fractional(void)
 {
     int p=spawn_build(SIDE,B_PYLON,240,240,0),f=spawn_build(SIDE,B_FORGE,240,240,0);
-    int a=spawn_unit(SIDE,U_DRAGOON,300,300);assert(p>=0&&f>=0&&a>=0);
+    int a=spawn_unit(SIDE,U_DRAGOON,300,300),s=spawn_unit(SIDE,U_DRAGOON,340,300);
+    unsigned hp,shield;assert(p>=0&&f>=0&&a>=0&&s>=0);
     assert(sc64_pr_stage_begin_slot(f,SC64_PR_GROUND_WEAPONS));
-    assert(sc64_pr_q8_commit_hp(a,(unsigned)u[a].maxhp*256u-128u));
-    assert(sc64_pr_q8_commit_shield(a,(unsigned)u[a].shield*256u-128u));
+    u[a].shield=0;u[a].shield_remainder=0;
+    /* Actual shared Ignore Armor packets create both persisted fractions. */
+    hit_target_impl_ex(a,128,U_MARINE,ENEMY,SC64_STOCK_DMG_IGNORE_ARMOR,SC64_HIT_PACKET_Q8);
+    hit_target_impl_ex(s,128,U_MARINE,ENEMY,SC64_STOCK_DMG_IGNORE_ARMOR,SC64_HIT_PACKET_Q8);
+    assert(sc64_pr_q8_actor_hp(a,&hp)&&hp==(unsigned)u[a].maxhp*256u-128u);
+    assert(sc64_pr_q8_actor_shield(s,&shield)&&shield==80u*256u-128u);
 }
 static void verify_loaded(void)
 {
-    int a=-1,f=-1;unsigned hp,shield;
-    for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].type==U_DRAGOON)a=i;
+    int a=-1,s=-1,f=-1;unsigned hp,shield;
+    for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].type==U_DRAGOON) {
+        if(u[i].x==300)a=i;else if(u[i].x==340)s=i;
+    }
     for(int i=0;i<MAX_BUILDINGS;++i)if(b[i].alive&&b[i].type==B_FORGE&&b[i].level)f=i;
-    assert(a>=0&&f>=0&&minerals==900&&gas==900);
+    assert(a>=0&&s>=0&&f>=0&&minerals==900&&gas==900);
     assert(sc64_pr_q8_actor_hp(a,&hp)&&hp==(unsigned)u[a].maxhp*256u-128u);
-    assert(sc64_pr_q8_actor_shield(a,&shield)&&shield==80u*256u-128u);
+    assert(sc64_pr_q8_actor_shield(s,&shield)&&shield==80u*256u-128u);
+    hit_target_impl_ex(a,128,U_MARINE,ENEMY,SC64_STOCK_DMG_IGNORE_ARMOR,SC64_HIT_PACKET_Q8);
+    assert(sc64_pr_q8_actor_hp(a,&hp)&&hp==(unsigned)u[a].maxhp*256u-256u);
     Sc64PrPaidReceipt paid;assert(sc64_pr_stage_receipt(f,&paid)&&paid.payer==SIDE);
     unsigned left=b[f].queue_progress;assert(left);
     for(unsigned i=0;i<left;++i)sc64_pr_stage_tick();

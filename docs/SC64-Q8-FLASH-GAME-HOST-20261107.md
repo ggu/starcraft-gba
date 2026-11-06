@@ -46,8 +46,9 @@ epoch, even when that old record is not admissible to this custom reader.
 Read selection may still fall back to a supported intact older record.
 
 The authored HOST fixture builds a real no-feature predecessor and exercises
-fresh-process migration, active paid Forge job plus fractional Dragoon HP and
-shields, completion after load, read-only legacy bytes, checksum-valid bad-new
+fresh-process migration, active paid Forge job plus actual shared damage packets
+producing fractional Dragoon HP and shields, a further hit and completion
+after load, read-only legacy bytes, checksum-valid bad-new
 fallback and atomic rejection, and nonzero legacy phase rejection. Until the
 strict native run succeeds, these are intended tests, not recorded results.
 No private inputs or saved data are included in this source change. Full

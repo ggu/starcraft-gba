@@ -66,7 +66,10 @@ static int race_q8_flash_candidate_fractions(RaceLoadPlan *plan,int old)
         Unit q;const Sc64StockUnitProfile *stock;int raw;
         if (!sc64_p7_typed_unit_decode(&q,&race_data.units[i],2048,2048)) return 0;
         if (!q.alive) {if(plan->q8_debt[i])return 0;continue;}
-        if (q.hp<=0 || q.order==ORDER_REPAIR) return 0;
+        if (q.hp<=0) return 0;
+#ifdef SC64_T6_RUNTIME
+        if (q.order==ORDER_REPAIR) return 0;
+#endif
         raw=q.raw_type>=0?q.raw_type:sc64_race_raw_unit(q.type);
         stock=sc64_stock_unit_profile(raw);if(!stock)return 0;
         if (stock->shields && (q.shield<0 || (unsigned)q.shield>stock->shields ||
@@ -164,7 +167,11 @@ static int race_q8_flash_write(const void *data,u32 length)
     for(int i=0;i<MAX_UNITS;++i) {
         unsigned debt=sc64_pr_hp_debt[i];
         if(!u[i].alive) {if(debt)return 0;}
-        else if(u[i].order==ORDER_REPAIR || !sc64_pr_q8_actor_hp(i,&ignored) ||
+        else if(
+#ifdef SC64_T6_RUNTIME
+                u[i].order==ORDER_REPAIR ||
+#endif
+                !sc64_pr_q8_actor_hp(i,&ignored) ||
                 !sc64_pr_q8_actor_shield(i,&ignored)) return 0;
         tail[SC64_Q8_FLASH_TAIL_HEADER+i]=(u8)debt;
     }
