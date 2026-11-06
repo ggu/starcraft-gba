@@ -91,3 +91,28 @@ the available race, skirmish and terrain headers lack the required cover
 encoding. An otherwise generated P7 BC fact header also differed from an older
 recorded receipt. The original full-suite failure remains the full-suite
 result; these targeted checks do not replace it.
+
+A separate bounded **diagnostic**, not a production or hardware FPS test,
+replayed the first 9,020 calls of the retained mission-18 Z7 ordinary-input
+tape and measured calls 8,021–9,020. The tape SHA-256 was
+`42e9a86021b3a16f6f67d2e19f3e475c4c98096799ce1abdc652f9117359696a`.
+The private probe was linked from a generated copy of the current source with
+read-only workload observation and diagnostic counters, and ran on the
+receipt-matched 0.10.5 mGBA runner. Probe and input hashes were unchanged during
+the pair. Both variants matched all 90 sampled state/display hashes and the
+recorded workload and modal counts; those hashes are sampled evidence, not a
+full state or byte-for-byte framebuffer comparison.
+
+The measured window had 965 advancing PLAY calls, 35 nonadvancing PLAY calls,
+zero text-box/modal calls, and minimum counts of 21 friendly units, 85 enemy
+units, five friendly buildings and 54 enemy buildings. Resources were
+1,399 minerals/150 gas at the start and 1,482/150 at the end. Advancing-call
+mean/peak cycles were 1,298,955/12,898,972 baseline and
+1,236,870/12,623,268 candidate. Nonadvancing mean/peak cycles were
+2,545,321/3,291,038 baseline and 2,516,515/3,339,019 candidate. For all
+1,000 calls, the 50th- and 10th-highest cycle counts were 1,665,516/2,818,446
+baseline and 1,538,656/2,788,389 candidate. Snapshot work is outside the timed
+call but may affect pacing. These measurements cover only this early window;
+they cannot establish later busy-scene, hardware, or all-mode performance.
+Private probe artifacts and logs are in `build/late-render-z7-early-v3` and
+`build/late-render-z7-probe-v3-*` in the isolated workspace.
