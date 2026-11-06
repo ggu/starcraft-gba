@@ -207,7 +207,8 @@ The clean canonical source-only HOST SRAM/replay patch passed source boundary,
 HOST save/selection targets, replay-validator tests, default build and full
 `./dev test` (449.68 seconds). These checks are independent of the experimental
 actor branches and their known private-input/default-suite failures. The focused
-patch is open as [PR #303](https://github.com/ggu/starcraft-gba/pull/303); no experimental runtime flags are included.
+patch merged as [PR #303](https://github.com/ggu/starcraft-gba/pull/303) at
+`f8d890077fa03ef16bf73dfe2639ead0c28e5d38`; no experimental runtime flags are included.
 
 Official ares v148 source inspection (tag commit
 `0aafd85789215e84e1e43415c07d4c88461b7899`) found internal emulated-controller
