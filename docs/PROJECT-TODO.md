@@ -17,6 +17,46 @@ A HOST fixture, catalog entry, source-data table or successful campaign shortcut
 does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
+## Current integration priorities
+
+- **Usable upgrades and saving (U3):** [draft #349](https://github.com/ggu/starcraft-gba/pull/349)
+  now has one ordinary-input P10 custom emulator witness: natural paid Forge
+  research saves through normal controls, fresh-title loads with the same
+  wallet/job, and completes naturally. The unforced mGBA ROM uses actual
+  Flash commands with no polling workaround; its new 128 KiB virgin backing
+  was initialized through the normal VFile API. The first unbacked attempt
+  failed because the added emulator bank contained zeros, and is preserved.
+  This is not cartridge, audio continuity, fractional-damage persistence or
+  all-mode qualification. The source-reviewed transaction owns/quiesces audio
+  and IME/DMA and restores them on all ordinary return paths. It remains off.
+- **Compose the save work before deployment:** [draft #348](https://github.com/ggu/starcraft-gba/pull/348)
+  now also passes 39 HOST process steps for all 1,280 unit and 320 building
+  phases, 47 advancing updates, 12 genuine old exports and alias/burn
+  preservation. Old unit SH12 normalization and old building 320-scale
+  conversion are distinct. That phase branch is not yet combined with #349.
+  All six Q8/jobs/Flash resource probes link at 417dea6c; Z9/Z10 retain only
+  196 bytes of static EWRAM guard margin. The later transaction adds 72 BSS
+  bytes on P10; its other five vectors still need remeasurement. Static
+  frames are not a full stack/high-water bound. Combine and requalify all
+  profile/mode codecs, campaigns, race combinations, repair/Z5 aliases,
+  genuine saved games, failure/recovery and hardware before normal enablement.
+- **Egg rollout (S1):** selector checkpoint 55412d5d passes 19 steps,
+  including six canonical off and six on ARM links, scope contracts and
+  Z7/Z6 HOST old/fresh journal coexistence. Tightest EWRAM guard margin is
+  780 bytes. These are selector previews; early-campaign stages remain
+  HOST-only, and ordinary custom Egg save/birth plus all early guest paths
+  are still open. Normal product flags and release draft #298 are unchanged.
+- **Native evidence (N1):** a packed diagnostic now records all 447 loaded
+  host images within the unchanged byte budget. A first-command SIGXFSZ
+  records kernel/dispatch host addresses, not an authenticated writing
+  thread, descriptor/path, actor or game clock. No new native frames/RAM
+  or gameplay comparison was obtained. A bounded write-recorder design
+  remains source-only; do not infer native parity or change timing from it.
+
+The playable Mac package is still `d3535af6`; these new experimental branches
+have not been copied to KODAK. The full campaign 29/30 and near-30-fps gates
+below remain open. Keep source-only public artifacts and local Actions policy.
+
 ## Current real-device feedback and integration
 
 The November 6 report is confirmed as **Protoss10 custom gameplay** from the
@@ -468,11 +508,11 @@ the serialized native-test lock permit it.
 | P1 | P1 / open | Reduce representative busy-frame cost toward 30 fps. Small isolated gains do not close the current gap. | Exact-source normal/diagnostic pairs on P7/P10 and 1-/3-AI custom games, advancing combat frames, ordinary input and modal handling. Measure update/render and worst-frame distribution; require material improvement without mode regressions. Confirm on GBA hardware. |
 | C4 | P1 / open | Replace campaign AI scalar approximations where verified source/native behavior differs. Late-Zerg waves use averaged groups/gaps; arrival, rebuilding and transport tactics are not equivalent to script commands. | Source script interpretation plus N64 observations of actual production, wallets, launch groups, targeting and rebuilds. Reproduce a concrete mismatch before changing AI; retain mission objective semantics. |
 | U1 | P1 / partial | Scourge/Spire source restrictions and shared picker correction are merged in #290. Continue the broader campaign PUNI/UPGR/TECx audit, especially P10. | Preserve current controlling ownership, nonspending denial and full supported custom catalog. Apply remaining source permissions with per-owner tests and save compatibility; do not infer complete availability parity from this one product fix. |
-| U3 | P1 / in progress | Deliver usable shared Forge/Core research. #318 is disabled save groundwork; verified family IDs and campaign-policy extraction remain separate work. | Authenticated owner and payer identity; source initial/max levels; atomic paid producer jobs, power/cancel/death/capture/reset behavior, active-job saves and legacy migration; weapon/armor/shield/range effects on every relevant path; ordinary building menus and cross-product campaign/custom/Showcase checks. |
+| U3 | P0 / in progress | Deliver usable shared Forge/Core research. #318 is disabled save groundwork; verified family IDs and campaign-policy extraction remain separate work. | Authenticated owner and payer identity; source initial/max levels; atomic paid producer jobs, power/cancel/death/capture/reset behavior, active-job saves and legacy migration; weapon/armor/shield/range effects on every relevant path; ordinary building menus and cross-product campaign/custom/Showcase checks. |
 | U2 | P1 / open | Integrate Carrier/Interceptor behavior for supported ordinary units and P10 Gantrithor. The current Gantrithor can move but does not launch Interceptors. | Paid children, flight, target/parent death, capture/owner changes, reload, capacity and full profile save matrix; P10 hero and custom-game ordinary controls. Resolve held Carrier namespace and merge conflicts first. |
 | S2 | P1 / open | Maintain one shared capability and persistence contract across products. Transport is present; actor mappings, research restrictions, repair, detection, morphs and remaining abilities still need a current matrix. | Per-product and per-mode inventory from actual flags/call sites, source-owned permissions, lifecycle/death/capture checks and every applicable save codec. No Showcase-only engine fix or mission-objective predicate used as a service gate. |
 | K1 | P1 / open | Qualify complete supported custom games for all race combinations and 1–3 AIs. Validate building/unit progression, economy, targeting, victory and long-game stability. | Both maps, each human race, homogeneous and mixed AI races, actual tech progression and save/load. Track global pool/queue pressure and ensure human production is not silently starved. |
-| M1 | P1 / open | Keep expanded mechanics within GBA memory and global actor capacity. Z10 has reached the 240-actor pool, preventing its former 70-Hydralisk launch goal. | Unchanged safety reserves, ROM/EWRAM/IWRAM and stack checks, child/queue/trigger capacity accounting and sustained busy play. Document adaptation limits; do not present catalog capacity as native-scale simulation. |
+| M1 | P0 / in progress | Keep expanded mechanics within GBA memory and global actor capacity. Z10 has reached the 240-actor pool, preventing its former 70-Hydralisk launch goal. | Unchanged safety reserves, ROM/EWRAM/IWRAM and stack checks, child/queue/trigger capacity accounting and sustained busy play. Document adaptation limits; do not present catalog capacity as native-scale simulation. |
 | B1 | P2 / open | Finish combat-rule and attack-event fidelity: fractional HP/shields, armor/size/upgrade effects, Firebat collateral, appear-at-target wind-up, shield-hit effects and specialized weapons. | Verify current code first; compare source/N64 events, not only appearance. Exercise allies, invincibility, shields, deaths and impact saturation with persistence and clipping. See [combat audit](ENGINE-FIDELITY-AUDIT.md). |
 | B2 | P1 / open | Unify shared projectile flight and source attack events. Current follow/bounce traces use fixed endpoints while damage stays bound to a live target; stationary/melee paths can apply damage before depicted wind-up. | Native moving-target/release observations; bounded shared flight/event state, consistent visual/damage impact, separate shots, verified bounce rules, death/slot reuse/overflow, genuine save continuation and crowded ARM cost across products. See [visual/combat audit](audits/2026-11-06-n64-priorities/visual-combat.md). |
 | V1 | P2 / open | Audit remaining source sprites, animations and placement/order effects, including each supported unit/building, damaged buildings, corpses, resource cargo and construction poses. | Paired N64/GBA observations, correct source frames/anchors/palette/timing, no missing assets, scene/HUD clipping and crowded effect/VRAM reuse checks. Existing fixes must be checked before reopening old reports. |
