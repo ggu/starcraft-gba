@@ -128,6 +128,22 @@ Fresh recovery results (qualification remains incomplete):
   seven routes and costs 10.11M cycles. Prioritize orders/pathfinding rebuild
   causes ahead of further renderer tweaks, without reducing actors, AI cadence,
   route slots or sight. This remains an after-load diagnostic, not global FPS.
+- An opt-in test of the existing exact monotone path witness passed independent
+  FIFO-dispatch tests, including the actual packed 128x128 Z7 14-plane (12 when
+  two are reserved) configuration and blocked endpoints/partial fallback. In
+  the same 1,000-call guest window, baseline advancing mean fell from 2,512,864
+  to 1,679,145 cycles (-33.18%); with the five render-cache flags, 2,446,063 to
+  1,612,046 (-34.10%). All ten sampled state/indexed-frame/palette checks, tape
+  observations, cargo digests, seed and unchanged journal checks matched.
+  Route builds fell 392 to 26 (movement 385 to 20), and valid-slot replacements
+  365 to five. This changes derived cache state as intended. The worst advancing
+  call still costs 8.12M cycles, and the mean is about three times the nominal
+  30-fps budget. These are narrow diagnostic measurements, not release speed.
+  Guarded diagnostic IWRAM ends at 0x03004fe8 in the uncached variant, only 24
+  bytes below the boundary; bounded stack watermark is not all-path/IRQ proof.
+  Flags remain off pending normal release links and uninterrupted campaign,
+  early/warm custom 1/3-bot, save/load and representative ARM qualification.
+  See the [measured source branch](https://github.com/ggu/starcraft-gba/tree/codex/z7-host-sram-replay-20261106).
 - The fitting shared-actor stack diagnostic completed real custom START/B save
   and fresh HOME-L continuation with matching candidate/diagnostic SRAM and
   named states. At least 9,740 of 11,208 painted bytes remained untouched in the
@@ -143,6 +159,12 @@ Fresh recovery results (qualification remains incomplete):
   Retagging/truncation cannot migrate it; implement an authenticated predecessor
   decoder and explicit campaign policy. This corrects the earlier unproven
   hypothesis that the custom Egg validator alone explained error 89.
+  The exact producer source and all 418 retained source/input manifest entries
+  are verified. Its packed RaceSave is 16,296 bytes plus a 16-byte trailer, with
+  35-byte unit and 28-byte building rows; the candidate has 29/25-byte rows.
+  Existing 32,768-byte scratch may hold detached old and new records together
+  without increasing EWRAM, but aliasing/admission and authenticated decoding
+  must be implemented and qualified before any migration is enabled.
 - The current Z8 controller pair reproduced fault-free losses: common service
   at frame 11,048 and service-off at 21,782. The first sampled state difference
   is an additional Egg, consistent with the intended lifecycle, not proof of a
@@ -240,7 +262,11 @@ frontend now links against the pinned source/MoltenVK and ran one neutral boot,
 but produced no frame before its original callback timeout. Exact source
 inspection explains that inactive VI returns without calling screen->frame;
 callbacks and run steps must be separately bounded and recorded. A corrected
-probe is being prepared; there is still no new N64 visual/parity result.
+probe now produces a genuine 640x240 nonblack Expansion Pak / Rumble Pak
+startup image with paraLLEl-RDP enabled. Startup gaps and 1x1 null-scanout frames
+are recorded separately, not treated as game frames. This establishes useful
+capture plumbing, not campaign/skirmish/engine parity or timing. Ordinary input
+and a bounded title/menu/custom capture are the next reference gates.
 
 All checks remain local; GitHub Actions is still disabled. No experimental
 release flags or campaign coverage were promoted. The later verified KODAK copy
