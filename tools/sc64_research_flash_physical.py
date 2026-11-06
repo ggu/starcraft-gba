@@ -71,7 +71,9 @@ def validate_inputs(a):
         ancestor = ancestor.parent
     if not ancestor.is_dir() or shutil.disk_usage(ancestor).free < RESERVE:
         raise ValueError('output filesystem has less than 4 GiB free')
-    inputs = (a.rom, a.elf, a.runner, a.tape, a.resume_tape)
+    inputs = (a.rom, a.elf, a.runner, a.tape, a.resume_tape, a.blank_flash)
+    if a.blank_flash.read_bytes() != bytes([255])*131072:
+        raise ValueError('initial flash must be an erased 128 KiB device')
     pins = {str(p): sha(p) for p in inputs}
     if pins[str(a.runner)] != RUNNER_SHA:
         raise ValueError('runner does not match the audited physical backend')
@@ -100,11 +102,11 @@ def run_worker(a):
     if any(k not in sym or k not in sizes for k in required): raise ValueError('missing observed symbols')
     layout=dwarf_struct_layout(a.elf,'Building'); stride,off=layout
     if sizes['b']%stride or off.arrays.get('queue')!=(5,1,False): raise ValueError('unexpected building ABI')
-    pins={str(p):sha(p) for p in (a.rom,a.elf,a.runner,a.tape,a.resume_tape)}
+    pins={str(p):sha(p) for p in (a.rom,a.elf,a.runner,a.tape,a.resume_tape,a.blank_flash)}
     events=transitions(a.tape); resume=transitions(a.resume_tape)
     saved=a.output/'physical.sav';first=a.output/'first';first.mkdir();proc=None
     try:
-        proc,rsp,log=physical.start(a.runner,a.rom,first,sym,sizes,save_output=saved)
+        proc,rsp,log=physical.start(a.runner,a.rom,first,sym,sizes,save_input=a.blank_flash,save_output=saved)
         rsp.play_to(3044,events); paid=snapshot(rsp,sym,sizes,layout)
         if paid['screen']!=1 or paid['lost'] or paid['bots']!=1 or not any(j['owner']==0 and j['family_plus_one']==3 and j['queue'][:2]==[0,1] for j in paid['jobs']):
             raise RuntimeError(f'ordinary tape did not reach the paid job: {paid}')
@@ -235,7 +237,7 @@ def supervise(a, worker=run_worker):
 
 def main(argv=None):
     ap=argparse.ArgumentParser(description='Physical replay; owns the shared native lock. Do not wrap in another lock.')
-    for name in ('rom','elf','runner','tape','resume_tape','output'):
+    for name in ('rom','elf','runner','tape','resume_tape','blank_flash','output'):
         ap.add_argument('--'+name.replace('_','-'),type=Path,required=True)
     return supervise(ap.parse_args(argv))
 
