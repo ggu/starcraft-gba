@@ -61,6 +61,10 @@ static u16 previous_held;
 static u32 frames_run;
 static uint64_t cycles_total, cycles_update;
 static u32 cycles_peak, update_peak;
+#ifdef Z7_HOST_FRAME_TRACE
+#include <stdlib.h>
+#include "sc64_z7_host_frame_trace.h"
+#endif
 #ifdef Z7_PEAK_DIAGNOSTIC
 /* Probe context only; never serialized or used to choose gameplay input.
  * 0=boot, 1=recorded tape, 2=HOME load, 3=pause-menu save. */
@@ -170,6 +174,10 @@ static void report_peak(u16 held, u32 before_frame, int before_screen,
 }
 #endif
 
+#ifdef Z7_BUSY_DIAGNOSTIC
+#include "sc64_z7_busy_probe.h"
+#endif
+
 /* One frame of the shipped main-loop work, timed like common/main.c. */
 static void frame_with(u16 held)
 {
@@ -188,6 +196,9 @@ static void frame_with(u16 held)
     sc64_update_research_cycles = sc64_update_remainder_cycles = 0;
 #endif
 #endif
+#ifdef Z7_BUSY_DIAGNOSTIC
+    if (busy_tick) busy_before();
+#endif
     u32 start = gba_clock();
     demo_keys = held;
     game_update(held, held & (u16)~previous_held);
@@ -195,6 +206,9 @@ static void frame_with(u16 held)
     audio_update();
     game_render();
     u32 total = gba_clock() - start;
+#ifdef Z7_BUSY_DIAGNOSTIC
+    if (busy_tick) busy_after(total); else busy_load_cycles=total;
+#endif
     cycles_total += total;
     cycles_update += update;
 #ifdef Z7_PEAK_DIAGNOSTIC
@@ -207,6 +221,9 @@ static void frame_with(u16 held)
 #endif
     previous_held = held;
     ++frames_run;
+#ifdef Z7_HOST_FRAME_TRACE
+    host_trace_frame();
+#endif
 }
 
 #ifdef Z7_CARGO_DIGEST
@@ -374,6 +391,12 @@ int main(int argc, char **argv)
     if (argc < 2) { fputs("usage: replay SAVE_PAYLOAD\n", stderr); return 2; }
 #endif
     (void)argc; (void)argv;
+#ifdef Z7_HOST_FRAME_TRACE
+    const char *trace_path=getenv("SC64_HOST_FRAME_TRACE");
+    if(!trace_path || !(host_frame_trace=fopen(trace_path,"wb"))) {
+        fputs("HOST frame trace path is required\n",stderr);return 2;
+    }
+#endif
 #else
 int main(void)
 {
@@ -425,6 +448,9 @@ int main(void)
         }
 #endif
 #endif
+#ifdef Z7_BUSY_DIAGNOSTIC
+        busy_tick = tick;
+#endif
         u16 held = tape_keys(tick);
         if (screen == SCREEN_RESULT || won || lost) {
             out_text("Z7 EARLY_END"); out_field("host_tick", (long)tick); out_flush();
@@ -432,6 +458,9 @@ int main(void)
         }
         frame_with(held);
         report_due(tick);
+#ifdef Z7_BUSY_DIAGNOSTIC
+        if (busy_calls == Z7_BUSY_CALLS) { busy_report(); for (;;) {} }
+#endif
         if (tick % 50000u == 0) report_cycles("periodic", tick);
 #if Z7_ARM_MODE == 1
         if (tick >= Z7_ARM_SAVE_MIN_TICK && idle_for_save(tick)) {
@@ -461,6 +490,11 @@ int main(void)
 #ifdef GBA_HOST
 #if defined(Z7_CARGO_DIGEST) && Z7_ARM_MODE == 2
     if (argc > 2 && !host_payload(argv[2], 1)) return 2;
+#endif
+#ifdef Z7_HOST_FRAME_TRACE
+    if(fclose(host_frame_trace))return 2;
+    const char *save_path=getenv("SC64_HOST_FULL_SRAM");
+    if(!save_path || !host_payload(save_path,1))return 2;
 #endif
     return won ? 0 : 1;
 #else
