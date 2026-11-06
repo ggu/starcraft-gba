@@ -52,3 +52,11 @@ Zerg sprite banks, and one private-output safety test encountered the isolated
 workspace's `.local/build` symlink. The full test log is retained locally at
 `build/late-render-default-checks/test.log`. The symlink has since been replaced
 with an isolated directory; targeted rechecks and input repair remain pending.
+
+Input provenance limit: the frozen Z7 vector used a Z6 sprite bank with
+SHA-256 `c912a42a84134190e934f4ba4cb7e6f2075b3cf31f7188a3c3a40cfd9800a320`.
+A prior prepared-input receipt records a different bank,
+`ff145afa6ceec577b2d862176d7b983c66b98b179998654ffc18058034f537ac`.
+The host comparisons establish equivalence for the frozen art actually used;
+they do not establish historical-bank identity or complete stock-art coverage.
+Recover and authenticate the required current banks before performance replay.
