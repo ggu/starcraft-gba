@@ -82,3 +82,12 @@ is authenticated as mission 18, but the diagnostic renderer probe's fixed
 9,020-tick limit does not cover its late busy portion. A current-codec
 fresh-process continuation and suitably bounded paired measurements remain
 open.
+
+Targeted follow-up after input recovery: the private-output symlink safety test
+passed with a real isolated `.local/build` directory. The Z4 and canonical
+Zerg profile-roster subtests passed with recovered sprite banks. The Terran
+and Protoss roster subtests still failed compile-time CV5 cover guards because
+the available race, skirmish and terrain headers lack the required cover
+encoding. An otherwise generated P7 BC fact header also differed from an older
+recorded receipt. The original full-suite failure remains the full-suite
+result; these targeted checks do not replace it.
