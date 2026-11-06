@@ -77,6 +77,10 @@ replay-log SHA-256 was
 `d99971b872ede04b484fb78d963502489a74ada842f959766c404d33f5d3f54b`.
 The full-tape comparison correctly reports truncation; matching nonwin parity
 does not satisfy the fresh campaign-win or fresh guest-continuation gates.
+The same loss and byte-identical emitted logs and per-call selected-state/display
+traces with flags disabled show that enabling this flag group did not cause the
+observed failure in this replay. The baseline had 55 strict-validator failures;
+the cause and broader campaign behavior remain unqualified.
 No promotion is claimed.
 
 
