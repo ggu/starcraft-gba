@@ -25,10 +25,15 @@ struct Probe final : ares::Platform {
   std::shared_ptr<mia::Pak> systemPak, gamePak;
   ares::Node::Input::Button a, start;
   std::atomic<unsigned> mask{0};
-  std::atomic<unsigned long long> polls{0}, aPolls{0}, startPolls{0}, audioCalls{0};
+  std::atomic<unsigned long long> polls{0}, aPolls{0}, startPolls{0}, aPressedPolls{0}, startPressedPolls{0}, audioCalls{0};
   std::atomic<unsigned> step{0};
   struct Frame { unsigned step,width,height; std::vector<std::uint32_t> pixels; };
   std::vector<Frame> frames;
+  struct Callback { unsigned step,width,height; bool nonblack; };
+  std::vector<Callback> observations;
+  struct InputEvent { unsigned step,button,pressed; };
+  std::vector<InputEvent> inputEvents;
+  unsigned eligible=0;
   std::vector<std::string> statuses;
   std::size_t frameBytes=0;
   std::mutex mutex;
@@ -54,9 +59,11 @@ struct Probe final : ares::Platform {
     ++polls;
     if(auto button=node->cast<ares::Node::Input::Button>()) {
       unsigned m=mask.load();
-      if(button==a) ++aPolls;
-      if(button==start) ++startPolls;
-      button->setValue((button==a && (m&1)) || (button==start && (m&2)));
+      if(button==a) { ++aPolls; if(m&1) ++aPressedPolls; }
+      if(button==start) { ++startPolls; if(m&2) ++startPressedPolls; }
+      bool pressed=(button==a && (m&1)) || (button==start && (m&2));
+      if(button==a || button==start) { std::lock_guard lock(mutex); if(inputEvents.size()>=4096) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),button==a?1u:2u,pressed?1u:0u}); }
+      button->setValue(pressed);
     } else if(auto axis=node->cast<ares::Node::Input::Axis>()) axis->setValue(0);
   }
   auto audio(ares::Node::Audio::Stream stream) -> void override {
@@ -70,6 +77,15 @@ struct Probe final : ares::Platform {
     if(!data || !w || !h || w>1920 || h>1080 || pitch<w*4u || pitch>32768u) {
       failed=true; failure="invalid frame bounds"; cv.notify_all(); return;
     }
+    if(observations.size()>=4096) { failed=true; failure="callback metadata budget exceeded"; cv.notify_all(); return; }
+    bool nonblack=false;
+    for(unsigned y=0;y<h && !nonblack;++y) {
+      auto row=reinterpret_cast<const std::uint32_t*>(reinterpret_cast<const unsigned char*>(data)+static_cast<std::size_t>(y)*pitch);
+      for(unsigned x=0;x<w;++x) if(row[x]&0x00ffffffu) { nonblack=true; break; }
+    }
+    observations.push_back({step.load(),w,h,nonblack}); ++callbacks;
+    if(w==1 && h==1) { cv.notify_all(); return; }
+    if((eligible++ % 20)!=0) return;
     auto bytes=static_cast<std::size_t>(w)*h*sizeof(std::uint32_t);
     if(frames.size()>=32) { ++discarded; return; }
     if(frameBytes+bytes>64u*1024u*1024u) { failed=true; failure="frame byte budget exceeded"; cv.notify_all(); return; }
@@ -77,7 +93,7 @@ struct Probe final : ares::Platform {
     for(unsigned y=0;y<h;++y) std::memcpy(f.pixels.data()+static_cast<std::size_t>(y)*w,
       reinterpret_cast<const unsigned char*>(data)+static_cast<std::size_t>(y)*pitch,w*4u);
     frameBytes+=bytes; frames.push_back(std::move(f));
-    ++callbacks; cv.notify_all();
+    cv.notify_all();
   }
 };
 
@@ -85,7 +101,7 @@ int main(int argc,char** argv) {
   if(argc!=5) { std::cerr<<"usage: probe ROM OUTPUT_DIR neutral|tap FRAMES\n"; return 2; }
   std::string scenario=argv[3];
   char* end=nullptr; long frames=std::strtol(argv[4],&end,10);
-  if((scenario!="neutral" && scenario!="tap") || !end || *end || frames<1 || frames>240) return 2;
+  if((scenario!="neutral" && scenario!="tap") || !end || *end || frames<1 || frames>600) return 2;
   std::filesystem::path out=argv[2];
   if(!std::filesystem::is_directory(out) || !std::filesystem::is_directory(out/"saves") ||
      !std::filesystem::is_directory(out/"systems")) return 2;
@@ -127,12 +143,12 @@ int main(int argc,char** argv) {
   steps<<"run,mask,polls,a_polls,start_polls,audio_calls,callbacks\n";
   long completed=0;
   for(long i=0;i<frames;++i) {
-    unsigned mask=scenario=="tap" ? ((i>=10 && i<12)?2u:(i>=20 && i<22)?1u:0u) : 0u;
+    unsigned mask=scenario=="tap" ? ((i>=80 && i<90)?2u:(i>=100 && i<105)?1u:0u) : 0u;
     p.mask=mask; p.step=i;
     root->run(); ++completed;
     std::lock_guard lock(p.mutex);
     steps<<i<<','<<mask<<','<<p.polls.load()<<','<<p.aPolls.load()<<','<<p.startPolls.load()<<','<<p.audioCalls.load()<<','<<p.callbacks<<'\n';
-    if(p.failed || p.callbacks>=32) break;
+    if(p.failed || p.frames.size()>=32) break;
   }
   {
     std::unique_lock lock(p.mutex);
@@ -140,9 +156,13 @@ int main(int argc,char** argv) {
   }
   root->unload(); root.reset(); // joins the upstream screen thread before reading frames
   std::lock_guard lock(p.mutex);
-  std::ofstream status(out/"status.log");
+  std::ofstream status(out/"status.log"), observations(out/"callbacks.csv");
+  std::ofstream inputs(out/"inputs.csv"); inputs<<"observed_step,button,pressed\n";
+  for(auto &e:p.inputEvents) inputs<<e.step<<','<<e.button<<','<<e.pressed<<'\n';
+  observations<<"callback,observed_step,width,height,nonblack\n";
+  for(std::size_t i=0;i<p.observations.size();++i) { auto &o=p.observations[i]; observations<<i<<','<<o.step<<','<<o.width<<','<<o.height<<','<<o.nonblack<<'\n'; }
   for(auto& text:p.statuses) status<<text<<'\n';
-  status<<"requested_steps="<<frames<<" completed_steps="<<completed<<" polls="<<p.polls.load()<<" a_polls="<<p.aPolls.load()<<" start_polls="<<p.startPolls.load()<<" audio_calls="<<p.audioCalls.load()<<" callbacks_copied="<<p.callbacks<<" callbacks_discarded="<<p.discarded<<" gpu_ready="<<p.gpuReady<<" failure="<<p.failure<<'\n';
+  status<<"requested_steps="<<frames<<" completed_steps="<<completed<<" polls="<<p.polls.load()<<" a_polls="<<p.aPolls.load()<<" start_polls="<<p.startPolls.load()<<" a_pressed_polls="<<p.aPressedPolls.load()<<" start_pressed_polls="<<p.startPressedPolls.load()<<" audio_calls="<<p.audioCalls.load()<<" callbacks_total="<<p.callbacks<<" frames_copied="<<p.frames.size()<<" callbacks_discarded="<<p.discarded<<" gpu_ready="<<p.gpuReady<<" failure="<<p.failure<<'\n';
   if(p.failed || !p.gpuReady || p.frames.empty()) { std::cerr<<"renderer or callback failure: "<<p.failure<<" callbacks="<<p.callbacks<<"\n"; return 6; }
   for(std::size_t i=0;i<p.frames.size();++i) {
     auto& f=p.frames[i]; auto bytes=f.pixels.size()*sizeof(std::uint32_t);
@@ -151,6 +171,6 @@ int main(int argc,char** argv) {
     if(!frame) return 5;
     meta<<i<<','<<f.step<<','<<f.width<<','<<f.height<<','<<bytes<<'\n';
   }
-  meta.flush(); steps.flush(); if(!meta || !steps || !status) return 5;
+  meta.flush(); steps.flush(); if(!meta || !steps || !status || !observations || !inputs) return 5;
   return 0;
 }
