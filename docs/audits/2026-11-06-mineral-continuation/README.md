@@ -4,7 +4,7 @@ The November 6 hardware report is confirmed as Protoss10 custom gameplay.
 The shared worker order loop stopped when a mineral field was exhausted.
 This candidate lets an established mineral job choose another nearby field
 without discarding its last cargo or restarting deliberately stopped workers.
-It is not merged or delivered yet.
+It is under review and has not been delivered yet.
 
 ## Behavior and bounded scope
 
@@ -38,7 +38,23 @@ scenes invoking the real order handler, not normal-button campaign wins or
 physical-device performance evidence. The 187 private header/blob inputs
 rehash unchanged from the preceding P10 cycle diagnostic.
 
-Normal guarded Terran/Z7/P10/Showcase ARM links, a baseline-failure witness,
-and clean asset-free default build/test checks are queued. Do not promote
-before their results are recorded. Native mineral timing, per-field queues,
+On the combined source `5dcc16c8` rebased onto #308, actual P10 depletion,
+real-travel and advisor sample-request tests pass with the delivered bank
+(header `73754a6165...`, blob `bd0adfd0ce...`). Clean source-boundary, doctor,
+default build and full default test pass (307.16 seconds). All six normal
+Terran/Z7/P10/Showcase/Z9/Z10 ARM vectors link within unchanged guards; these
+are links, not dynamic-stack or performance proof. The smallest IWRAM guard
+headroom is 120 bytes (Z7), and smallest EWRAM headroom is 796 bytes
+(Z9/Z10). RAM guards and actor limits were not weakened.
+
+The old `271db94` game.c baseline compiles but fails the new retarget
+assertion after returning its final cargo. The earlier 9606485 full default
+suite also passed (456.87 seconds); its wrapper then stopped at a conservative
+restore guard because the tests created new output directories. Those outputs
+were preserved and the original private directories restored without overwrite.
+The combined rerun completed and restored normally. The 187 original include
+hashes and the separately copied advisor pair remain unchanged; that include
+receipt is not a claim to enumerate every compiler dependency.
+
+Native mineral timing, per-field queues, pending exact-target continuation,
 new-map pacing and hardware 30-fps behavior remain separate work.
