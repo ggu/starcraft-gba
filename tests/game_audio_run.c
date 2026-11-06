@@ -185,7 +185,7 @@ static int warp_lifecycle(void)
 {
     fixture();
     game_audio_effects = GAME_AUDIO_EFFECTS_PER_FRAME; /* previous frame was saturated */
-#ifdef SC64_AUDIO_WARP_CUES
+#ifdef SC64_AUDIO_IMPORTED
     u32 samples_before = audio_host_samples;
 #endif
     int slot = spawn_build(SIDE, B_PYLON, 60, 60, 1);
@@ -205,11 +205,19 @@ static int warp_lifecycle(void)
 #endif
     observe_next();
     if (events(GAME_AUDIO_WARP_START) != 1) return fail("warp start repeated");
+#ifdef SC64_AUDIO_IMPORTED
+    samples_before = audio_host_samples;
+#endif
     b[slot].under_construction = 0; observe_next();
     if (events(GAME_AUDIO_WARP_DONE) != 1 || events(GAME_AUDIO_BUILT)) return fail("warp completion");
 #ifdef SC64_AUDIO_WARP_CUES
     if (audio_host_samples != samples_before + 1 || audio_host_last_sample != sc64_audio_warp[1])
         return fail("warp completion sample");
+#elif defined(SC64_AUDIO_IMPORTED)
+    int row = 156 * SC64_AUDIO_KIND_COUNT + SC64_AUDIO_WHAT;
+    if (!sc64_audio_unit_count[row] || audio_host_samples != samples_before + 1 ||
+        audio_host_last_sample != sc64_audio_unit_sound[sc64_audio_unit_first[row]])
+        return fail("legacy warp completion fallback sample");
 #endif
     observe_next();
     if (events(GAME_AUDIO_WARP_DONE) != 1) return fail("warp completion repeated");
