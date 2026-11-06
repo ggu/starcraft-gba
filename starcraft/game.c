@@ -9100,8 +9100,17 @@ cancel_queue(int building)
     if (building < 0 || building >= MAX_BUILDINGS || !b[building].queue_count)
 	return;
     type = b[building].queue[b[building].queue_head];
-    minerals += unit_cost(type) * 3 / 4;
-    gas += unit_gas_cost(type) * 3 / 4;
+    minerals += unit_cost(type);
+    gas += unit_gas_cost(type);
+#ifdef SC64_RACES
+    /* Legacy Zerg producer queues consume one larva at admission. A paid
+     * Egg is a separate actor with its own cancellation path. */
+    {
+        const Sc64RaceUnitRule *rule = sc64_race_unit_rule(type);
+        if (rule && (rule->flags & SC_RACE_F_LARVA) && b[building].larva < 3)
+            ++b[building].larva;
+    }
+#endif
     b[building].queue_head = (b[building].queue_head + 1) % 5;
     b[building].queue_count--;
     b[building].queue_progress = 0;
@@ -9326,8 +9335,10 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
             if (cx != box_anchor_x || cy != box_anchor_y) box_state = 2;
         } else {
             if (box_state == 2) select_box_units();
-            else if (selected_building >= 0 && b[selected_building].alive &&
-                     b[selected_building].type == B_BARRACKS) cancel_queue(selected_building);
+            else if (selected_building >= 0 && selected_building < MAX_BUILDINGS &&
+                     b[selected_building].alive && b[selected_building].owner == SIDE &&
+                     (b[selected_building].queue_count ||
+                      b[selected_building].type == B_BARRACKS)) cancel_queue(selected_building);
             else cycle_selection();
             box_state = 0;
         }
@@ -12870,7 +12881,7 @@ game_self_test(void)
     if (b[3].queue_count != 1 || minerals != 950)
         return 10;
     cancel_queue(3);
-    if (b[3].queue_count || minerals != 987)
+    if (b[3].queue_count || minerals != 1000)
         return 11;
     supply_cap = 36;
     queue_unit(3, U_MARINE);
