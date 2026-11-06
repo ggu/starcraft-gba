@@ -229,7 +229,12 @@ older KODAK package. Source merges do not update an already copied ROM.
   Drone birth; the genuine unretagged 32 KiB image is unchanged after loading.
   Malformed producer nondebit and checksum-valid forged-owner atomic rejection
   pass, alongside staged Z8/Z9/capacity fixtures with 592 hashes unchanged.
-  No ARM, ordinary-input win, Z2–Z6, transfer or common activation proof follows.
+  A separate [Z2 HOST slice](audits/2026-11-07-z2-egg-host/README.md)
+  uses the verified owned-ROM permission bank: paid paired Egg birth after a
+  fresh-process load, a denied-product new-tag rejection, and fallback to a
+  genuine current-main old-tag save pass. The setup is constructed, not an
+  ordinary-input win. Normal flags, ARM, Z3–Z6, trigger reservations, ownership
+  transfers, the full profile matrix and common activation remain open.
   The constructed late captured-Hatchery concern was not promoted: no reachable
   transfer path was found, and relaxing only admission would leave saves invalid.
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
