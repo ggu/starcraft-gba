@@ -50,7 +50,7 @@ KODAK package below. Source merges do not update an already copied ROM.
   resource/fog presentation, giant death effects and death sounds, AI difficulty
   options, and a direct native defeat-condition witness. Current custom defeat
   counts the final live owned building, rather than only the final townhall.
-- **Performance:** full-flood route changes have current-source state/frame,
+- **Performance:** full-flood route changes have pre-#306 source state/frame,
   guest continuation and guarded-link evidence, plus an earlier ~6% busy-scene
   mean-cycle reduction. Their qualification bank differs from the delivered
   advisor bank. Normal release enablement and the 30-fps target remain open;
