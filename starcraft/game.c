@@ -8515,6 +8515,29 @@ static inline int race_bc_order_dispatch_needed(const Unit *q,int slot,int recha
 }
 #endif
 
+#if defined(SC64_RARE_ACTOR_DISPATCH_PROBE) && defined(SC64_SCARAB_AUTONOMOUS_PROBE) && defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) && defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE) && defined(SC64_GUARDIAN_COCOON_STAGE)
+static int __attribute__((noinline)) sc64_rare_actor_dispatch(int slot)
+{
+    Unit *q = &u[slot];
+    if (q->type == U_REAVER) {
+        if (sc64_battlecruiser_source_tick_due()) race_scarab_human_parent_step(slot);
+        return 0;
+    }
+    if (SC64_SCARAB_CHILD(q)) {
+        if (sc64_battlecruiser_source_tick_due()) race_scarab_control_dispatch(slot);
+        return 1;
+    }
+#ifdef SC64_EGG_RUNTIME
+    if (q->type == SC64_EGG_ACTOR) {
+        (void)race_z7_egg_tick_unit(slot);
+        return 1;
+    }
+#endif
+    (void)race_guardian_morph_tick(slot);
+    return 1;
+}
+#endif
+
 #if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(GBA_HOST)
 static void __attribute__((noinline,long_call))
 #else
@@ -8600,6 +8623,13 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+#if defined(SC64_RARE_ACTOR_DISPATCH_PROBE) && defined(SC64_SCARAB_AUTONOMOUS_PROBE) && defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) && defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE) && defined(SC64_GUARDIAN_COCOON_STAGE)
+        if ((q->type == U_REAVER || SC64_SCARAB_CHILD(q) || q->type == U_GUARDIAN_COCOON
+#ifdef SC64_EGG_RUNTIME
+             || q->type == SC64_EGG_ACTOR
+#endif
+            ) && sc64_rare_actor_dispatch(i)) continue;
+#else
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
         if (sc64_race_raw_unit(q->type)==83 && sc64_battlecruiser_source_tick_due()) {
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
@@ -8615,6 +8645,7 @@ target_lists_unavailable:
 #endif
             continue; /* the child adapter owns orders */
         }
+#endif /* rare actor dispatch probe */
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         if (SC64_CARRIER_CHILD_SCRIPTED(q)) continue;
 #endif
@@ -8623,13 +8654,13 @@ target_lists_unavailable:
         if (q->type == U_P7_CARRIER && race_p7_interceptor_flight_carrier_order(i))
             continue;
 #endif
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_GUARDIAN_COCOON_STAGE) && !(defined(SC64_RARE_ACTOR_DISPATCH_PROBE) && defined(SC64_SCARAB_AUTONOMOUS_PROBE) && defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) && defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE))
         if (q->type == U_GUARDIAN_COCOON) {
             (void)race_guardian_morph_tick(i);
             continue;
         }
 #endif
-#ifdef SC64_EGG_RUNTIME
+#if defined(SC64_EGG_RUNTIME) && !(defined(SC64_RARE_ACTOR_DISPATCH_PROBE) && defined(SC64_SCARAB_AUTONOMOUS_PROBE) && defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) && defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE) && defined(SC64_GUARDIAN_COCOON_STAGE))
         if (q->type == SC64_EGG_ACTOR) {
             (void)race_z7_egg_tick_unit(i);
             continue;
