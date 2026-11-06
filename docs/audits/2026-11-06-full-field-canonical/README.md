@@ -50,3 +50,15 @@ SHA-256 `9979d9b99ca3888eec879904fcc42c2e0742b702634c622136cdb608b185eb10`
 for 15,649,120 decoded bytes. No bank problems were reported. This verifies
 internal header/blob/manifest consistency; it does not verify the game's choice
 of clips for events or establish equivalence to the older advisor bank.
+
+The earlier delivered Protoss 10 ROM is a different audio configuration. Its
+ROM and ELF were read-only checked against the November 6 card-copy receipt:
+SHA-256 `206847219fc46ea92526e950e5b1f5623acf6a66360fb232eb08a9b8d956e1d6`
+and `852c6bb2966be97696d1bee6ab7621e035b2526b3cc4d49628ce78165cb49336`.
+The ROM contains the entire advisor-bank blob with SHA-256
+`bd0adfd0ce83c0bb054d40c8f6bc69d91a55ca0f846f7ada56d48d98d7f72427`
+at byte offset 458,092, matching its ELF blob symbol. That ELF also contains
+an advisor lookup table. Thus the absence of advisor entries from the separate
+codec2 test bank does not explain missing advisor sounds in the delivered ROM.
+Correct cue triggering, clip selection and audible hardware playback remain
+separate questions.
