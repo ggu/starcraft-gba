@@ -24,6 +24,8 @@ namespace ares::Nintendo64 {
 struct Probe final : ares::Platform {
   std::shared_ptr<mia::Pak> systemPak, gamePak;
   ares::Node::Input::Button a, start, down;
+  ares::Node::Input::Axis xAxis, yAxis;
+  std::atomic<int> axisX{0}, axisY{0};
   std::atomic<unsigned> mask{0};
   std::atomic<unsigned long long> polls{0}, aPolls{0}, startPolls{0}, aPressedPolls{0}, startPressedPolls{0}, audioCalls{0};
   std::atomic<unsigned> step{0};
@@ -31,7 +33,7 @@ struct Probe final : ares::Platform {
   std::vector<Frame> frames;
   struct Callback { unsigned step,width,height; bool nonblack; };
   std::vector<Callback> observations;
-  struct InputEvent { unsigned step,button,pressed; };
+  struct InputEvent { unsigned step,button; int pressed; };
   std::vector<InputEvent> inputEvents;
   unsigned eligible=0;
   std::vector<std::string> statuses;
@@ -64,7 +66,11 @@ struct Probe final : ares::Platform {
       bool pressed=(button==a && (m&1)) || (button==start && (m&2)) || (button==down && (m&4));
       if(button==a || button==start || button==down) { std::lock_guard lock(mutex); if(inputEvents.size()>=65536) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),button==a?1u:(button==start?2u:4u),pressed?1u:0u}); }
       button->setValue(pressed);
-    } else if(auto axis=node->cast<ares::Node::Input::Axis>()) axis->setValue(0);
+    } else if(auto axis=node->cast<ares::Node::Input::Axis>()) {
+      int value=axis==xAxis?axisX.load():(axis==yAxis?axisY.load():0);
+      if(axis==xAxis || axis==yAxis) { std::lock_guard lock(mutex); if(inputEvents.size()>=65536) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),axis==xAxis?8u:16u,value}); }
+      axis->setValue(value);
+    }
   }
   auto audio(ares::Node::Audio::Stream stream) -> void override {
     ++audioCalls;
@@ -85,7 +91,9 @@ struct Probe final : ares::Platform {
     }
     observations.push_back({step.load(),w,h,nonblack}); ++callbacks;
     if(w==1 && h==1) { cv.notify_all(); return; }
-    if((eligible++ % 240)!=0) return;
+    auto observed=step.load();
+    bool special=observed==7015 || observed==7038;
+    if((eligible++ % 360)!=0 && !special) return;
     auto bytes=static_cast<std::size_t>(w)*h*sizeof(std::uint32_t);
     if(frames.size()>=32) { ++discarded; return; }
     if(frameBytes+bytes>64u*1024u*1024u) { failed=true; failure="frame byte budget exceeded"; cv.notify_all(); return; }
@@ -101,7 +109,7 @@ int main(int argc,char** argv) {
   if(argc!=5) { std::cerr<<"usage: probe ROM OUTPUT_DIR neutral|tap FRAMES\n"; return 2; }
   std::string scenario=argv[3];
   char* end=nullptr; long frames=std::strtol(argv[4],&end,10);
-  if((scenario!="neutral" && scenario!="tap" && scenario!="start" && scenario!="mission" && scenario!="advance") || !end || *end || frames<1 || frames>7200) return 2;
+  if((scenario!="neutral" && scenario!="tap" && scenario!="start" && scenario!="mission" && scenario!="advance" && scenario!="calibrate") || !end || *end || frames<1 || frames>9000) return 2;
   std::filesystem::path out=argv[2];
   if(!std::filesystem::is_directory(out) || !std::filesystem::is_directory(out/"saves") ||
      !std::filesystem::is_directory(out/"systems")) return 2;
@@ -136,7 +144,11 @@ int main(int argc,char** argv) {
     if(button->name()=="Start") p.start=button;
     if(button->name()=="Down") p.down=button;
   }
-  if(!p.a || !p.start || !p.down) return 4;
+  for(auto axis:pad->find<ares::Node::Input::Axis>()) {
+    if(axis->name()=="X-Axis") p.xAxis=axis;
+    if(axis->name()=="Y-Axis") p.yAxis=axis;
+  }
+  if(!p.a || !p.start || !p.down || !p.xAxis || !p.yAxis) return 4;
   root->power();
   std::ofstream meta(out/"frames.csv",std::ios::binary), steps(out/"steps.csv",std::ios::binary);
   if(!meta || !steps) return 5;
@@ -145,11 +157,12 @@ int main(int argc,char** argv) {
   long completed=0;
   for(long i=0;i<frames;++i) {
     unsigned mask=scenario=="tap" ? ((i>=80 && i<90)?2u:(i>=100 && i<105)?1u:0u) : 0u;
-    if((scenario=="start" || scenario=="mission" || scenario=="advance") && ((i>=700 && i<710)||(i>=1000 && i<1010)||(i>=1300 && i<1310)||(i>=1600 && i<1610))) mask=2u;
-    if((scenario=="mission" || scenario=="advance") && ((i>=3900 && i<3910)||(i>=4000 && i<4010))) mask=4u;
-    if((scenario=="mission" || scenario=="advance") && i>=4100 && i<4110) mask=1u;
-    if(scenario=="advance" && ((i>=5000 && i<5010)||(i>=5600 && i<5610)||(i>=6200 && i<6210)||(i>=6800 && i<6810))) mask=2u;
-    p.mask=mask; p.step=i;
+    if((scenario=="start" || scenario=="mission" || scenario=="advance" || scenario=="calibrate") && ((i>=700 && i<710)||(i>=1000 && i<1010)||(i>=1300 && i<1310)||(i>=1600 && i<1610))) mask=2u;
+    if((scenario=="mission" || scenario=="advance" || scenario=="calibrate") && ((i>=3900 && i<3910)||(i>=4000 && i<4010))) mask=4u;
+    if((scenario=="mission" || scenario=="advance" || scenario=="calibrate") && i>=4100 && i<4110) mask=1u;
+    if((scenario=="advance" || scenario=="calibrate") && ((i>=5000 && i<5010)||(i>=5600 && i<5610)||(i>=6200 && i<6210)||(i>=6800 && i<6810))) mask=2u;
+    p.axisX=(scenario=="calibrate" && i>=7020 && i<7036)?-24000:0;
+    p.axisY=0; p.mask=mask; p.step=i;
     root->run(); ++completed;
     std::lock_guard lock(p.mutex);
     steps<<i<<','<<mask<<','<<p.polls.load()<<','<<p.aPolls.load()<<','<<p.startPolls.load()<<','<<p.audioCalls.load()<<','<<p.callbacks<<'\n';
