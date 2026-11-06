@@ -77,4 +77,29 @@ replay-log SHA-256 was
 `d99971b872ede04b484fb78d963502489a74ada842f959766c404d33f5d3f54b`.
 The full-tape comparison correctly reports truncation; matching nonwin parity
 does not satisfy the fresh campaign-win or fresh guest-continuation gates.
-No current-source performance improvement or promotion is claimed.
+No promotion is claimed.
+
+
+## Reachable custom-game guest window
+
+On the same e391 combined source and delivered advisor bank, ordinary physical
+button input started map 1 with Zerg human and Terran, Zerg and Protoss AI.
+At frame 4,001 the human remained passive and the world had 46 units and 17
+buildings. START/B saved a 32 KiB journal; a fresh process loaded it with L and
+reproduced the uninterrupted 500-update continuation, including selected
+persisted-world fingerprint and exact advancement. The control and candidate
+journals matched (SHA-256
+`7ffbfb8f5ae36fb73ab57f3f5b8fd5039bb6df43e82e3b93d08c7edeca3ac0c4`).
+By frame 4,501 there were 48 units and 21 buildings.
+
+A separate same-seed paired guest-cycle probe advanced all 500 updates in play;
+screen and mode matched each update, and six sampled selected-state/workload
+fingerprints matched. The control averaged 627,566.596 emulated cycles per
+update and the candidate 611,691.662, a 2.53% reduction in this window; peaks
+were 3,984,361 and 3,102,721 respectively. These are mGBA cycle observations
+on this specific passive-human custom opening, not a hardware FPS result. The
+physical backend limits reads to RAM and ROM, so this guest probe did not
+compare the indexed framebuffer or palette. An initial attempt to read video
+registers was rejected before timing and retained as a diagnostic failure; the
+separate HOST custom matrix above supplies sampled display equality only.
+The Z7 winning and wider gameplay/pixel/performance gates remain open.
