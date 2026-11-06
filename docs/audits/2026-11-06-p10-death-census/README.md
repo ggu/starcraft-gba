@@ -62,3 +62,29 @@ repeat for a Pylon or another representative building. Preserve native control
 and lifecycle, and compare the real timeline and presentation before proposing
 any resize. The table dimensions show why the report is plausible, but they do
 not justify changing source art or effect timing on their own.
+
+## Bounded ordinary-input capture plan
+
+Use a fresh isolated native session and private save/settings area, the verified
+ROM and emulator, and the documented controller-input shim. Navigate visibly
+through Single-Player → Scenario → Setup Custom → Melee and confirm the map and
+roster on screen. Start a Protoss-versus-Terran game and use ordinary selection
+and attack commands to bring a Probe and an SCV into combat; if one death cannot
+be obtained within the declared session cap, retain that failed attempt and use
+a second fresh session rather than creating or moving actors through memory.
+Capture enough consecutive frames to include the selected live body, the first
+visible death frame and the complete effect. Confirm the actor identity from
+visible selection/HUD and action sequence; retain the held-input transitions,
+process/ROM hashes and private capture timestamps. Do not treat input polls or
+screenshot timestamps as N64 simulation ticks.
+
+Repeat the corresponding ordinary-input scene on a normal guarded GBA build
+with the same race pairing and actor type, with separate private saves. Record
+which viewport, scaling and capture path were used. For each death, report the
+visible body and effect bounding boxes, their ratio, and screen-space calibration
+from the actual captures; also report clipping/occlusion and the range across
+frames. Compare a Pylon/building only in a separate observed death. A large
+source canvas is not itself a visible-pixel measurement, and differences in
+viewport or N64 runtime scaling require calibration before drawing conclusions.
+Keep screenshots and any proprietary input artifacts outside the source tree.
+No such native death capture has been performed by this census.
