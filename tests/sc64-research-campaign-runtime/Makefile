@@ -22,3 +22,5 @@ test-sc64-research-campaign-journal-p10:
 	./build/research-campaign-runtime/journal-p10 load build/research-campaign-runtime/journal-p10.sav
 	./build/research-campaign-runtime/journal-p10 custom-write build/research-campaign-runtime/custom-p10.sav
 	./build/research-campaign-runtime/journal-p10 custom-load build/research-campaign-runtime/custom-p10.sav
+	./build/research-campaign-runtime/journal-p10 core-write build/research-campaign-runtime/core-p10.sav
+	./build/research-campaign-runtime/journal-p10 core-load build/research-campaign-runtime/core-p10.sav

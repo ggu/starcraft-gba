@@ -30,15 +30,16 @@ int main(int argc,char **argv) {
 #else
         minerals=gas=1000; assert(race_save_game()); transfer(argv[2],1);
 #endif
-    } else if (!strcmp(argv[1],"write") || !strcmp(argv[1],"over-old") || !strcmp(argv[1],"custom-write")) {
+    } else if (!strcmp(argv[1],"write") || !strcmp(argv[1],"over-old") || !strcmp(argv[1],"custom-write") || !strcmp(argv[1],"core-write")) {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
         if (!strcmp(argv[1],"over-old")) { transfer(argv[2],0); assert(race_load_game()); }
 
+        int core=!strcmp(argv[1],"core-write");
         int p=spawn_build(SIDE,B_PYLON,240,240,0);
-        int f=spawn_build(SIDE,B_FORGE,240,240,0); assert(p>=0&&f>=0);
+        int f=spawn_build(SIDE,core?B_CYBERNETICS_CORE:B_FORGE,240,240,0); assert(p>=0&&f>=0);
         minerals=gas=1000;
-        assert(sc64_pr_stage_begin_slot(f,SC64_PR_GROUND_WEAPONS));
-        assert(minerals==900&&gas==900);
+        assert(sc64_pr_stage_begin_slot(f,core?SC64_PR_SINGULARITY:SC64_PR_GROUND_WEAPONS));
+        assert(minerals==(core?850:900)&&gas==minerals);
         u8 before[sizeof host_save]; memcpy(before,host_save,sizeof before);
         b[f].queue[0]=ENEMY;
         assert(!race_save_game() && !memcmp(before,host_save,sizeof before));
@@ -68,7 +69,10 @@ int main(int argc,char **argv) {
         if (!strcmp(argv[1],"reject")) {
             int old_minerals=minerals,old_gas=gas,old_mission=race_selected_mission;
             Sc64ProtossResearchLevels old_levels=sc64_experimental_research_levels;
+            static Unit old_units[MAX_UNITS]; static Building old_buildings[MAX_BUILDINGS];
+            memcpy(old_units,u,sizeof old_units); memcpy(old_buildings,b,sizeof old_buildings);
             assert(!race_load_game());
+            assert(!memcmp(old_units,u,sizeof old_units) && !memcmp(old_buildings,b,sizeof old_buildings));
             assert(minerals==old_minerals && gas==old_gas && race_selected_mission==old_mission &&
                    !memcmp(&old_levels,&sc64_experimental_research_levels,sizeof old_levels));
             assert(!memcmp(unchanged,host_save,sizeof unchanged));
@@ -80,17 +84,18 @@ int main(int argc,char **argv) {
 #else
         assert(0 && "consumer requires campaign journal");
 #endif
-    } else if (!strcmp(argv[1],"load") || !strcmp(argv[1],"custom-load")) {
+    } else if (!strcmp(argv[1],"load") || !strcmp(argv[1],"custom-load") || !strcmp(argv[1],"core-load")) {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
         transfer(argv[2],0); assert(race_load_game());
         int f=-1; for(int i=0;i<MAX_BUILDINGS;++i) {
             Sc64PrPaidReceipt paid;
             if(sc64_pr_stage_receipt(i,&paid)) { assert(f<0);f=i;assert(paid.payer==SIDE); }
         }
-        assert(f>=0&&minerals==900&&gas==900);
+        int core=!strcmp(argv[1],"core-load");
+        assert(f>=0&&minerals==(core?850:900)&&gas==minerals);
         unsigned remaining=b[f].queue_progress; assert(remaining>0);
         for(unsigned i=0;i<remaining;++i) sc64_pr_stage_tick();
-        assert(!b[f].level && sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]==1);
+        assert(!b[f].level && sc64_experimental_research_levels.level[SIDE][core?SC64_PR_SINGULARITY:SC64_PR_GROUND_WEAPONS]==1);
 #else
         assert(0 && "consumer requires campaign journal");
 #endif
