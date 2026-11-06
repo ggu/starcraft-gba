@@ -86,3 +86,8 @@ No private inputs or saved data are included in this source change. Full
 profile coverage, current normal/ARM qualification, old 0x47 campaign
 compatibility, persistent repair and Z5 aliases, all fault cuts, source
 shield-timing parity, and real-device timing/geometry remain open.
+
+Independent readback checked the final receipt and logs, all 593 pinned
+source-input hashes, the 587 corresponding prepared paths present in this
+worktree, and the normal P10 ROM hash above. The final receipt SHA-256 is
+`3ac3e97ab534d0897c796f6aa8ab22d6d446e4fed15efb795a894c42a2e94f63`.
