@@ -5,6 +5,7 @@
 #include <mia/mia.hpp>
 #include <atomic>
 #include <poll.h>
+#include <sys/resource.h>
 #include <algorithm>
 #include <unistd.h>
 #include <chrono>
@@ -22,6 +23,7 @@
 #include <vector>
 #include "input_mapping.h"
 #include "observer_read.h"
+#include "observer_file_budget.h"
 
 namespace ares::Nintendo64 {
   auto load(Node::System&, string) -> bool;
@@ -108,7 +110,7 @@ struct Probe final : ares::Platform {
     bool special=observed==6400 || observed==6540 || observed==6580 || observed==6650 || observed==6850 || observed==6900;
     (void)special;
     auto bytes=static_cast<std::size_t>(w)*h*sizeof(std::uint32_t);
-    if(frames.size()>=32) { ++discarded; return; }
+    if(frames.size()>=3) { ++discarded; return; }
     if(frameBytes+bytes>2u*1024u*1024u) { failed=true; failure="frame byte budget exceeded"; cv.notify_all(); return; }
     Frame f{step.load(),w,h,{}}; f.pixels.resize(static_cast<std::size_t>(w)*h);
     for(unsigned y=0;y<h;++y) std::memcpy(f.pixels.data()+static_cast<std::size_t>(y)*w,
@@ -179,7 +181,7 @@ int main(int argc,char** argv) {
   std::ofstream commands(out/"commands.csv"); commands<<"begin,steps,mask,x,y,capture\n";
   std::cout<<"READY"<<std::endl;
   while(completed<frames && std::chrono::steady_clock::now()<deadline) {
-    {std::lock_guard lock(p.mutex); if(p.frames.size()>=32) break;}
+    {std::lock_guard lock(p.mutex); if(p.frames.size()>=3) break;}
     std::string line; auto commandDeadline=std::min(deadline,std::chrono::steady_clock::now()+std::chrono::seconds(30));
     while(line.size()<128) {
       auto remaining=std::chrono::duration_cast<std::chrono::milliseconds>(commandDeadline-std::chrono::steady_clock::now()).count();
@@ -198,7 +200,7 @@ int main(int argc,char** argv) {
     for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
     if(capture==2) {
       using namespace ares::Nintendo64;
-      if(snapshots>=2 || rdram.ram.size!=8u*1024u*1024u || cpu.recompiler.enabled || ares::Nintendo64::system.homebrewMode) return 8;
+      if(snapshots>=3 || rdram.ram.size!=8u*1024u*1024u || cpu.recompiler.enabled || ares::Nintendo64::system.homebrewMode) return 8;
       std::vector<std::uint8_t> bytes(rdram.ram.size);
       auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull);
         auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);
@@ -210,7 +212,9 @@ int main(int argc,char** argv) {
       auto ram=[](u32 a) { return (std::uint8_t)rdram.ram.read<Byte>(a,RBusDevice::ARES_DEBUGGER); };
       if(!sc64_read_ram(0,bytes.size(),rdram.ram.size,bytes.data(),hit,cached,ram)) return 8;
       char name[32];std::snprintf(name,sizeof(name),"ram-%03u.bin",snapshots++);
-      std::ofstream file(out/name,std::ios::binary);file.write((const char*)bytes.data(),bytes.size());file.close();if(!file) return 5;
+      if(!sc64_observer_file_limit(SC64_OBSERVER_RAM_FILE)) return 8;
+      std::ofstream file(out/name,std::ios::binary);file.write((const char*)bytes.data(),bytes.size());file.close();
+      if(!sc64_observer_file_limit(SC64_OBSERVER_SMALL_FILE) || !file) return 5;
       std::ofstream ledger(out/"ram.csv",std::ios::app);ledger<<name<<','<<completed<<','<<cpu.ipu.pc<<','<<cpu.clock<<','<<bytes.size()<<'\n';ledger.close();if(!ledger) return 5;
       std::cout<<"RAM "<<name<<' '<<completed<<std::endl;continue;
     }

@@ -47,7 +47,7 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector)
  oldmask=signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGINT,signal.SIGTERM})
  try:
   def setup():
-   resource.setrlimit(resource.RLIMIT_FSIZE,(8*1024**2,8*1024**2))
+   resource.setrlimit(resource.RLIMIT_FSIZE,(2*1024**2,8*1024**2))
    signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
   child=subprocess.Popen(cmd,cwd=cwd,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,bufsize=0,preexec_fn=setup,start_new_session=True)
@@ -64,7 +64,7 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector)
       except BrokenPipeError:sel.unregister(key.fileobj)
     elif data:
      written[key.data]+=len(data)
-     if written[key.data]>(1024**2 if key.data=='output' else 2*1024**2):
+     if written[key.data]>(256*1024 if key.data=='output' else 512*1024):
       result['log_budget_exceeded']=True;break
      if key.data=='output':log.write(data);log.flush();sys.stdout.buffer.write(data);sys.stdout.buffer.flush()
      else:err.write(data);err.flush()
@@ -95,14 +95,14 @@ def main(argv=None):
   if a.output.exists() or not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance or output changed while queued')
   a.output.mkdir(parents=True);[(a.output/x).mkdir() for x in ('input','saves','systems')];copy=a.output/'input/game.z64';shutil.copyfile(a.rom,copy)
   if sha(copy)!=ROM_SHA:raise SystemExit('ROM copy mismatch')
-  sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
+  sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('observer_file_budget.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
   resources=[a.source/'ares/ares/resource/resource.cpp',a.source/'ares/ares/resource/resource.hpp',a.source/'mia/resource/resource.cpp',a.source/'mia/resource/resource.hpp'];inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
   cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV}
   with (a.output/'bridge.log').open('wb') as log,(a.output/'stderr.log').open('wb') as err:
    relay(cmd,a.output.resolve(),{**os.environ,'DYLD_LIBRARY_PATH':str(a.moltenvk.resolve().parent)},log,err,result)
   result['unchanged']=clean(a.source) and sha(a.rom)==ROM_SHA and sha(copy)==ROM_SHA and sha(a.moltenvk)==VK_SHA and sha(a.binary)==binary==BINARY_SHA and all(sha(pathlib.Path(k))==v for k,v in inputs.items())
-  files=sorted(a.output.glob('live-*.argb'));result['frames']={x.name:sha(x) for x in files};result['frame_bytes']=sum(x.stat().st_size for x in files);result['ok']=result['returncode']==0 and result['unchanged'] and len(files)<=32 and result['frame_bytes']<=2*1024**2
-  ram=sorted(a.output.glob('ram-*.bin'));result['ram']={x.name:sha(x) for x in ram};result['ram_bytes']=sum(x.stat().st_size for x in ram);result['ok']=result['ok'] and len(ram)==2 and all(x.stat().st_size==8*1024**2 for x in ram) and result['ram_bytes']<=16*1024**2
+  files=sorted(a.output.glob('live-*.argb'));result['frames']={x.name:sha(x) for x in files};result['frame_bytes']=sum(x.stat().st_size for x in files);result['ok']=result['returncode']==0 and result['unchanged'] and len(files)<=3 and result['frame_bytes']<=2*1024**2
+  ram=sorted(a.output.glob('ram-*.bin'));result['ram']={x.name:sha(x) for x in ram};result['ram_bytes']=sum(x.stat().st_size for x in ram);result['ok']=result['ok'] and len(ram)==3 and all(x.stat().st_size==8*1024**2 for x in ram) and result['ram_bytes']<=24*1024**2
   for name in ('ram.csv','commands.csv','inputs.csv','callbacks.csv','status.log'):result[name+'_sha256']=sha(a.output/name) if (a.output/name).is_file() else None
   result['output_bytes']=sum(x.stat().st_size for x in a.output.rglob('*') if x.is_file() and not x.is_symlink());result['ok']=result['ok'] and result['output_bytes']<=63*1024**2 and not result.get('log_budget_exceeded',False)
   (a.output/'manifest.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({'ok':result['ok'],'returncode':result['returncode'],'frames':len(files)}),flush=True)
