@@ -2,7 +2,12 @@
 #ifndef GBA_FLASH_JOURNAL_H
 #define GBA_FLASH_JOURNAL_H
 #include <stdint.h>
+#ifdef GBA_HOST
 #include <string.h>
+#else
+#include <stddef.h>
+int memcmp(const void *,const void *,size_t);
+#endif
 
 /* Experimental transport-independent layout. It does not enable Flash in a
  * normal ROM. A backend must enforce bank bounds, erase/program completion,
