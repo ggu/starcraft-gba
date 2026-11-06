@@ -150,6 +150,31 @@ int main(void)
     game_update(0,0);
     assert(!sc64_pr_paid[forge].live && !b[forge].queue_progress &&
            sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]==1);
+    /* Selected-weapon family, legacy floors, owner isolation and range. */
+    weapons_level=1; armor_level=1;
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]=2;
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_AIR_WEAPONS]=3;
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_ARMOR]=2;
+    assert(sc64_pr_stage_weapon_level(SIDE,66)==2); /* Dragoon, both targets */
+    assert(sc64_pr_stage_weapon_level(SIDE,73)==3); /* Scout air family */
+    assert(sc64_pr_stage_weapon_level(SIDE,62)==1); /* Probe 60 remains legacy */
+    assert(sc64_pr_stage_weapon_level(1,66)==0); /* owner does not borrow SIDE */
+    Sc64StockAttack attack;
+    assert(sc64_stock_attack_select(66,0,&attack) && attack.weapon_id==66);
+    assert(sc64_stock_attack_damage_per_impact(&attack,sc64_pr_stage_weapon_level(SIDE,attack.weapon_id)) >
+           sc64_stock_attack_damage_per_impact(&attack,weapons_level));
+    Unit target={0}; target.alive=1; target.owner=SIDE; target.type=U_ZEALOT; target.raw_type=65;
+    assert(sc64_pr_stage_unit_armor_level(&target)==2);
+    target.owner=1; assert(sc64_pr_stage_unit_armor_level(&target)==0);
+    target.owner=SIDE; target.type=U_DRAGOON; target.raw_type=66;
+    assert(sc64_pr_stage_dragoon_bonus(&target)==0);
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_SINGULARITY]=1;
+    assert(sc64_pr_stage_dragoon_bonus(&target)==32);
+    target.raw_type=17; assert(sc64_pr_stage_dragoon_bonus(&target)==0);
+    memset(&u[0],0,sizeof u[0]); u[0].alive=1; u[0].owner=SIDE;
+    u[0].type=U_ZEALOT; u[0].raw_type=65; u[0].hp=100; u[0].shield=0;
+    hit_target_impl_ex(0,10,U_MARINE,ENEMY,SC64_STOCK_DMG_NORMAL,0);
+    assert(u[0].hp==92); /* one typed armor bonus, never added to legacy */
     puts("research job staged admission, lifecycle, menu and save refusal: ok");
     return 0;
 }

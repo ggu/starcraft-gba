@@ -13,6 +13,9 @@ static void sc64_contact_memo_invalidate(void);
 #include "sc64_save_tag_namespace.h"
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
 #include "sc64_protoss_research_padding.h"
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+#include "sc64_stock_upgrade_families.h"
+#endif
 static Sc64ProtossResearchLevels sc64_experimental_research_levels;
 #endif
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_SERVICE)
@@ -2807,6 +2810,45 @@ static int sc64_pr_stage_owner_active(unsigned owner)
 }
 /* Prerequisite structures need to be complete and owned by the same active
  * custom controller. Their own power status is not inferred as a requirement. */
+/* HOST-only ordinary combat family selection. Untyped weapons and actors
+ * retain the existing generic human bonus; it is never added twice. */
+static int sc64_pr_stage_weapon_level(int owner,int raw_weapon)
+{
+    int base=owner==SIDE ? weapons_level : 0, id=sc64_stock_weapon_upgrade_id(raw_weapon), family;
+    if (base<0 || base>2 || owner<0 || owner>=SC64_PR_CUSTOM_OWNERS ||
+        !sc64_pr_stage_owner_active((unsigned)owner) ||
+        !sc64_pr_levels_valid(&sc64_experimental_research_levels,SC64_PR_CUSTOM_OWNERS)) return base;
+    if (id==13) family=SC64_PR_GROUND_WEAPONS;
+    else if (id==14) family=SC64_PR_AIR_WEAPONS;
+    else return base;
+    return (int)sc64_pr_effective_level((unsigned)family,
+        sc64_experimental_research_levels.level[owner][family],(unsigned)base,0);
+}
+static int sc64_pr_stage_unit_armor_level(const Unit *q)
+{
+    int base=q->owner==SIDE ? armor_level : 0;
+    int raw=q->raw_type>=0 ? q->raw_type : sc64_race_raw_unit(q->type);
+    int id=sc64_stock_armor_upgrade_id(raw), family;
+    if (base<0 || base>2 || q->owner<0 || q->owner>=SC64_PR_CUSTOM_OWNERS ||
+        !sc64_pr_stage_owner_active((unsigned)q->owner) ||
+        !sc64_pr_levels_valid(&sc64_experimental_research_levels,SC64_PR_CUSTOM_OWNERS)) return base;
+    if (id==5) family=SC64_PR_GROUND_ARMOR;
+    else if (id==6) family=SC64_PR_AIR_ARMOR;
+    else return base;
+    return (int)sc64_pr_effective_level((unsigned)family,
+        sc64_experimental_research_levels.level[q->owner][family],0,(unsigned)base);
+}
+/* Pinned OpenBW grants the standard raw-66 Dragoon +64 source pixels
+ * (32 at this engine's half scale) on either weapon target. Hero raw IDs
+ * retain their existing behavior until their independent rule is integrated. */
+static int sc64_pr_stage_dragoon_bonus(const Unit *q)
+{
+    int raw=q->raw_type>=0 ? q->raw_type : sc64_race_raw_unit(q->type);
+    if (q->type!=U_DRAGOON || raw!=66 || q->owner<0 || q->owner>=SC64_PR_CUSTOM_OWNERS ||
+        !sc64_pr_stage_owner_active((unsigned)q->owner) ||
+        !sc64_pr_levels_valid(&sc64_experimental_research_levels,SC64_PR_CUSTOM_OWNERS)) return 0;
+    return sc64_experimental_research_levels.level[q->owner][SC64_PR_SINGULARITY] ? 32 : 0;
+}
 static int sc64_pr_stage_has_raw(unsigned owner, int raw)
 {
     for (int i=0;i<MAX_BUILDINGS;++i) {
@@ -4993,7 +5035,12 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
                     sc64_race_raw_unit(u[target].type);
             const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
             damage=sc64_stock_hp_damage_after_armor(damage,
-                u[target].armor+(u[target].owner==SIDE?armor_level:0),
+                u[target].armor+
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+                sc64_pr_stage_unit_armor_level(&u[target]),
+#else
+                (u[target].owner==SIDE?armor_level:0),
+#endif
                 stock_damage_class,stock?stock->size:SC64_STOCK_SIZE_LARGE);
         } else
 #endif
@@ -7946,6 +7993,11 @@ unit_range(int type)
 	return 10;
     return 0;
 }
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+#define SC64_PR_ACQUIRE_RANGE(q) (unit_range((q)->type)+sc64_pr_stage_dragoon_bonus(q))
+#else
+#define SC64_PR_ACQUIRE_RANGE(q) unit_range((q)->type)
+#endif
 
 static int
 unit_damage(int type)
@@ -8431,8 +8483,15 @@ tick_combat(Unit * q, int target)
             if (range<contact_range) range=contact_range;
         }
         damage=sc64_stock_attack_damage_per_impact(&stock_attack,
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+                     sc64_pr_stage_weapon_level(q->owner,stock_attack.weapon_id));
+#else
                      q->owner==SIDE?weapons_level:0);
+#endif
     }
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (stock_weapon) range+=sc64_pr_stage_dragoon_bonus(q);
+#endif
 #ifdef SC64_SHARED_BUNKER
     if (q->order==ORDER_TRANSPORTED && q->target>=MAX_UNITS) range+=32;
 #endif
@@ -8825,7 +8884,7 @@ target_lists_unavailable:
             && q->owner == SIDE
 #endif
             ) {
-            target = nearest_enemy_typed(q->x,q->y,q->owner,unit_range(q->type)+1
+            target = nearest_enemy_typed(q->x,q->y,q->owner,SC64_PR_ACQUIRE_RANGE(q)+1
 #ifdef SC64_RACES
                 +18
 #endif
@@ -8974,7 +9033,7 @@ target_lists_unavailable:
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
             target = nearest_enemy_typed(q->x,q->y,q->owner,
 #ifdef SC64_RACES
-                unit_range(q->type)>64?unit_range(q->type)+18:
+                SC64_PR_ACQUIRE_RANGE(q)>64?SC64_PR_ACQUIRE_RANGE(q)+18:
 #endif
                 64,q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
             if (target >= 0) tick_combat(q, target);
