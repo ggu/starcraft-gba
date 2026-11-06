@@ -2,6 +2,7 @@
 #define SC64_RACE_ADAPTER_H
 
 #include "race_skirmish.h"
+#include "sc64_p7_power_geometry.h"
 #ifdef SC64_P3_PRODUCTION_EXIT
 #ifndef SC64_P3_RUNTIME
 #error "SC64_P3_PRODUCTION_EXIT requires the P3 campaign runtime"
@@ -13,7 +14,6 @@
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_battery_rules.h"
-#include "sc64_p7_power_geometry.h"
 #endif
 
 #ifdef SC64_T5_RUNTIME
@@ -429,7 +429,7 @@ static int race_site_powered(int owner, int x, int y)
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].type == B_PYLON && b[i].owner == owner && building_complete(i) &&
-            dist2(x, y, b[i].x, b[i].y) <= 144 * 144) return 1;
+            sc64_p7_in_psi_range(x - b[i].x, y - b[i].y)) return 1;
     return 0;
 }
 
