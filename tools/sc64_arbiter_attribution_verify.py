@@ -13,7 +13,7 @@ if len(baseline['checkpoints']) != 90 or not baseline['active_count']:
 if any(baseline['attribution_totals']):
     raise SystemExit('baseline unexpectedly contains attribution counters')
 a = diagnostic['attribution_totals']
-if not (a[8] > 0 and a[12] >= a[13] and a[9] >= a[10]):
+if not (a[8] > 0 and a[12] >= a[13] and a[9] >= a[10] and a[18] >= a[19] and a[18] + a[20] == a[7]):
     raise SystemExit('inconsistent due, aura, or zero-slot counts')
 n = baseline['active_count']
 b = baseline['active_full'] / n

@@ -214,7 +214,10 @@ static unsigned sc64_p7_arbiter_pack(unsigned mask,unsigned timer,int aura,int t
 #ifndef SC64_DIAGNOSTIC_SETUP
 #error "Arbiter attribution requires setup timing"
 #endif
-volatile u32 sc64_arbiter_attribution[10];
+volatile u32 sc64_arbiter_attribution[13];
+/* Diagnostic-only LRU census; a prefix hit also predicts the smaller LRU. */
+static int sc64_arbiter_census_cells[8];
+static unsigned sc64_arbiter_census_count;
 #define SC64_ARB_COUNT(i) (++sc64_arbiter_attribution[(i)])
 #else
 #define SC64_ARB_COUNT(i) ((void)0)
@@ -404,6 +407,23 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
                                   &target_l,&target_t,&target_r,&target_b))
         return 0;
 #endif
+#ifdef SC64_ARBITER_ATTRIBUTION
+    {
+        int cell=col+row*MAP_COLS;
+        unsigned k=0;
+        while(k<sc64_arbiter_census_count && sc64_arbiter_census_cells[k]!=cell) ++k;
+        if(k<sc64_arbiter_census_count) {
+            SC64_ARB_COUNT(10);
+            if(k<4) SC64_ARB_COUNT(11);
+        } else {
+            SC64_ARB_COUNT(12);
+            if(sc64_arbiter_census_count<8) ++sc64_arbiter_census_count;
+            k=sc64_arbiter_census_count-1;
+        }
+        while(k) { sc64_arbiter_census_cells[k]=sc64_arbiter_census_cells[k-1]; --k; }
+        sc64_arbiter_census_cells[0]=cell;
+    }
+#endif
     /* Calculate all non-human source visibility in one actor/building pass;
        slot 7 uses the engine's authenticated SIDE visibility grid. */
     {
@@ -575,6 +595,9 @@ volatile u32 sc64_arbiter_reset_cycles, sc64_arbiter_aura_cycles, sc64_arbiter_u
 static void sc64_p7_arbiter_cache_source_tick(void)
 {
     unsigned i,j;
+#ifdef SC64_ARBITER_ATTRIBUTION
+    sc64_arbiter_census_count=0;
+#endif
 #ifdef SC64_DIAGNOSTIC_SETUP
     u32 arbiter_diag_start=gba_clock();
     sc64_arbiter_detect_cycles=0;

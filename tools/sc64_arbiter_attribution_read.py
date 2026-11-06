@@ -48,9 +48,9 @@ try:
                    'active_full': struct.unpack('<Q',replay.read(symbols['active_full'],8))[0],
                    'active_peak': struct.unpack('<I',replay.read(symbols['active_peak'],4))[0],
                    'active_peak_tick': struct.unpack('<I',replay.read(symbols['active_peak_tick'],4))[0],
-                   'attribution_totals': struct.unpack('<18Q',replay.read(symbols['active_totals'],144)) if 'active_totals' in symbols else [0]*18,
-                   'attribution_peaks': struct.unpack('<18I',replay.read(symbols['active_peaks'],72)) if 'active_peaks' in symbols else [0]*18,
-                   'attribution_peak_ticks': struct.unpack('<18I',replay.read(symbols['active_peak_ticks'],72)) if 'active_peak_ticks' in symbols else [0]*18,
+                   'attribution_totals': struct.unpack('<21Q',replay.read(symbols['active_totals'],168)) if 'active_totals' in symbols else [0]*21,
+                   'attribution_peaks': struct.unpack('<21I',replay.read(symbols['active_peaks'],84)) if 'active_peaks' in symbols else [0]*21,
+                   'attribution_peak_ticks': struct.unpack('<21I',replay.read(symbols['active_peak_ticks'],84)) if 'active_peak_ticks' in symbols else [0]*21,
                    'checkpoints': list(struct.iter_unpack('<4I', data))}, out, indent=2)
     proc.stdin.write('q\n'); proc.stdin.flush()
 finally:
