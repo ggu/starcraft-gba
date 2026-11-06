@@ -146,6 +146,39 @@ static int empty_slot_transitions(void)
 static int hooks(void)
 {
 #ifndef SC64_RACES
+    /* The command menu pauses simulation; A must still play the immediate
+     * insufficient-minerals advisor on the same rendered frame. */
+    fixture();
+    b[0].alive = 1; b[0].owner = SIDE; b[0].type = B_ENG_BAY;
+    minerals = 0; gas = 1000;
+    tick(KEY_B); tick(0);
+    if (!menu_open) return fail("research menu did not open");
+    for (int i=0; menu_cursor != MENU_WEAPONS && i<field_menu_count(); ++i) {
+        tick(KEY_DOWN); tick(0);
+    }
+    if (menu_cursor != MENU_WEAPONS) return fail("research row navigation");
+    clear_events();
+    tick(KEY_A);
+    if (toast_id != 1 || events(GAME_AUDIO_ADVISOR) != 1)
+        return fail("same-frame research refusal advisor");
+    tick(0);
+    if (events(GAME_AUDIO_ADVISOR) != 1) return fail("research refusal advisor repeated");
+    minerals = 1000; gas = 0;
+    tick(KEY_B); tick(0);
+    for (int i=0; menu_cursor != MENU_WEAPONS && i<field_menu_count(); ++i) {
+        tick(KEY_DOWN); tick(0);
+    }
+    if (menu_cursor != MENU_WEAPONS) return fail("research gas row navigation");
+    tick(KEY_A);
+    if (toast_id != 12 || events(GAME_AUDIO_ADVISOR) != 2) {
+        fprintf(stderr, "gas refusal: toast=%d events=%u cursor=%d menu=%d screen=%d frame=%d\n",
+                toast_id, events(GAME_AUDIO_ADVISOR), menu_cursor, menu_open, screen, frame);
+        return fail("same-frame research gas advisor");
+    }
+    game_render();
+    if (events(GAME_AUDIO_ADVISOR) != 2) return fail("same-frame redraw repeated advisor");
+#endif
+#ifndef SC64_RACES
     /* The opening skirmish brings the enemy squad on screen: its shots and
      * deaths are heard. */
     previous_held = 0;
