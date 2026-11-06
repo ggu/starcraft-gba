@@ -17,6 +17,50 @@ A HOST fixture, catalog entry, source-data table or successful campaign shortcut
 does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
+## Current real-device feedback and integration
+
+The November 6 report is confirmed as **Protoss10 custom gameplay** from the
+KODAK package below. Source merges do not update an already copied ROM.
+
+- **Merged, not yet redelivered:** #304 aligns B-menu icon-row highlights and
+  costs; #305 enables L cancellation/full refund for friendly ordinary producer
+  queues (separate Egg/Carrier/Scarab services keep their lifecycles); #306
+  starts all active owners in unified custom games at 50 minerals/zero gas.
+  These changes have clean local default checks; queue cancellation also has
+  P10 enabled gesture and four guarded ARM link witnesses. No Actions run.
+- **Workers:** the post-pickup wait is bypassed/overwritten; this is a confirmed
+  order-loop defect, not a measured wall-clock income rate. A shared bounded
+  depleted-field continuation candidate passed authored P10 sanitizer cases;
+  real-travel, baseline-failure, normal ARM and full default gates remain open.
+- **Power:** shaped mask/request/arrival/production/Cannon checks and guarded
+  links pass. P7/P10 adaptive controllers win, while P3's unchanged baseline
+  wins and the power candidate loses. Diagnose the changed strategy/trajectory
+  before promotion; do not weaken source geometry to make a tape pass.
+- **Audio:** same-frame B-menu refusal events can be lost while simulation is
+  paused. A focused fix is under qualification. The actual delivered advisor
+  bank is authenticated; an event-count test with an older bank lacking the
+  advisor table does not prove sample playback. Warp-start and death cue
+  selection remain separate gaps.
+- **Research and UI:** Forge/Core typed research is not usable yet. Authenticated
+  source facts and unwired service fixtures are groundwork; selected-building
+  menus, payment/completion, source-owner combat routing and safe journals
+  must integrate together. Category navigation and the default-off power-field
+  overlay still need ordinary-input, framebuffer and dense-scene checks.
+- **Other feedback still open:** native mineral-field queues/timing, remembered
+  resource/fog presentation, giant death effects and death sounds, AI difficulty
+  options, and a direct native defeat-condition witness. Current custom defeat
+  counts the final live owned building, rather than only the final townhall.
+- **Performance:** full-flood route changes have current-source state/frame,
+  guest continuation and guarded-link evidence, plus an earlier ~6% busy-scene
+  mean-cycle reduction. Their qualification bank differs from the delivered
+  advisor bank. Normal release enablement and the 30-fps target remain open;
+  neither HOST wall time nor a successful link closes hardware performance.
+
+Priority: finish and merge the independent worker/audio fixes with their stated
+checks, then prepare a coherent versioned release using the verified advisor
+bank. Continue typed research/power and native campaign/performance validation
+without advertising unwired components as gameplay features.
+
 ## Current baseline
 
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
