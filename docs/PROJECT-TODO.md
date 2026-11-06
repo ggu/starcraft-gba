@@ -27,6 +27,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Latest qualified and queued work
 
+Resume checkpoint (2026-11-06): free space recovered to 154 GiB. The former
+`/tmp` qualification worktrees and runner were removed during cleanup; published
+source branches are being restored into persistent isolated checkouts. Historical
+test results below remain historical evidence, not fresh reruns. Recheck retained
+private input hashes before rebuilding; do not regenerate pinned inputs merely
+to replace a missing test prerequisite. ARM qualification and the repaired
+late-Zerg baseline/candidate pixel oracle are the next local jobs, serialized
+under the existing native-build lock. No flags have been promoted.
+
+A fresh bounded owned-N64 launch was stopped after ScreenCaptureKit again
+returned error -3811 before gameplay could be inspected. No reference input,
+RAM snapshot, native event timing or new N64 parity result was obtained. The
+failed launch record remains local in `pylon-resume-20261106-140958`.
+
 Read-only review follow-up (2026-11-06; no new build or runtime proof):
 
 - Before running the late-Zerg cache trial, make its runner fail on any compilation or test failure and require all four results. Compare deterministic baseline/candidate indexed frames and palettes directly; the existing same-flag reference cannot detect every shared rendering error. Add identity-checked Z9 and custom scenes plus lifecycle-driven fog/minimap transitions; the carried Z7 fixture does not prove those paths.
