@@ -116,3 +116,13 @@ call but may affect pacing. These measurements cover only this early window;
 they cannot establish later busy-scene, hardware, or all-mode performance.
 Private probe artifacts and logs are in `build/late-render-z7-early-v3` and
 `build/late-render-z7-probe-v3-*` in the isolated workspace.
+
+A current recovered-bank HOST attempt replayed the authentic tape to tick
+136,058 and used START/B to save. Baseline and candidate logs and 32-KiB save
+images matched each other, and all 258 expected observations matched the source
+tape. This is **not a qualified busy-scene seed**: the generic replay validator
+rejected HOST-only zero timing records and an all-zero second SRAM slot as an
+invalid record. The host backend's static SRAM starts zero-filled; no SRAM
+bytes were changed to make the check pass. A valid erased-cartridge environment
+and fresh guest load/continuation parity are required before this path can be
+used for timing. Artifacts are retained in `build/late-render-z7-busy-host`.
