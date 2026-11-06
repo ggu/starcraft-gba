@@ -47,3 +47,11 @@ candidate emitted identical traces through that loss, but no new campaign-win
 claim or validator waiver follows. Exact guest pixels, broader campaign and
 busy skirmish coverage, runtime stack, physical hardware behavior and the
 near-30-fps objective remain open.
+
+The prepared-input oracles have the optional `test-sc64-z9-bulk-grid` target;
+`SC64_BULK_GRID_TEST_FLAGS` can prepend an independently verified include bank.
+An initial target invocation tried to regenerate a prepared header and failed
+because this isolated checkout does not contain the private extractor. The
+underlying two direct exact-vector tests had already passed; the failure log
+was retained, and a rerun marks the verified input files old to prevent make
+from regenerating them.
