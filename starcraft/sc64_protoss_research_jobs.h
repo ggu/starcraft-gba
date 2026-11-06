@@ -10,6 +10,23 @@
 #error "Research job integration stage is HOST-only and requires the research journal"
 #endif
 
+/* Immutable quote contract for journal namespace 0x45. A policy change must
+ * allocate a new namespace and retain this decoder for existing records. */
+static int sc64_pr_quote_v45(unsigned family,unsigned level,Sc64ProtossResearchQuote *out)
+{
+    static const uint16_t base[]={100,150,100,100,200,150};
+    static const uint16_t factor[]={75,75,50,75,100,0};
+    unsigned max, cost, source_time;
+    if (!out || family>=SC64_PR_FAMILY_COUNT) return 0;
+    max=family==SC64_PR_SINGULARITY ? 1u : 3u;
+    if (level>=max) return 0;
+    cost=base[family]+factor[family]*level;
+    source_time=family==SC64_PR_SINGULARITY ? 2500u : 4000u+480u*level;
+    out->mineral=(uint16_t)cost; out->gas=(uint16_t)cost;
+    out->ticks=(uint16_t)((source_time*5u+3u)/4u); out->max_level=(uint8_t)max;
+    return 1;
+}
+
 /* level = family + 1; queue[0] = compact payer; queue[1] = target level.
  * queue_count/head and the remaining entries must be zero. These are live
  * staged fields only, not an authenticated persisted encoding. Campaign
@@ -62,7 +79,7 @@ static int sc64_pr_job_begin_custom(Building *producer, unsigned owner,
     if ((legacy_weapons_pending && (family == SC64_PR_GROUND_WEAPONS || family == SC64_PR_AIR_WEAPONS)) ||
         (legacy_armor_pending && (family == SC64_PR_GROUND_ARMOR || family == SC64_PR_AIR_ARMOR))) return 0;
     level = sc64_pr_effective_level(family, levels->level[owner][family], legacy_weapons, legacy_armor);
-    if (level >= max_level || !sc64_pr_quote(family, level, &quote) ||
+    if (level >= max_level || !sc64_pr_quote_v45(family, level, &quote) ||
         *minerals < quote.mineral || *gas < quote.gas) return 0;
     *minerals -= quote.mineral; *gas -= quote.gas;
     producer->level = family + 1; producer->queue[0] = owner;
@@ -91,7 +108,7 @@ static int sc64_pr_job_valid_custom(const Building *p, unsigned payer,
         (legacy_armor_pending && (family == SC64_PR_GROUND_ARMOR || family == SC64_PR_AIR_ARMOR))) return 0;
     if (!target || !sc64_pr_job_family_producer(family,p->type) ||
         sc64_pr_effective_level(family,levels->level[payer][family],legacy_weapons,legacy_armor) != target-1 ||
-        !sc64_pr_quote(family,target-1,&quote) || p->queue_progress > quote.ticks) return 0;
+        !sc64_pr_quote_v45(family,target-1,&quote) || p->queue_progress > quote.ticks) return 0;
     return 1;
 }
 
@@ -128,7 +145,7 @@ static int sc64_pr_job_receipt_valid(const Building *p, unsigned payer,
         p->level!=(int)paid->family+1 || !p->queue_progress ||
         !sc64_pr_job_family_producer(paid->family,p->type) ||
         (p->raw_type>=0 && p->raw_type!=sc64_race_raw_building(p->type)) ||
-        !sc64_pr_quote(paid->family,paid->target-1,&quote) ||
+        !sc64_pr_quote_v45(paid->family,paid->target-1,&quote) ||
         p->queue_progress>quote.ticks || paid->mineral!=quote.mineral || paid->gas!=quote.gas) return 0;
     return 1;
 }
@@ -143,7 +160,7 @@ static int sc64_pr_job_reconstruct_v45(const Building *p, Sc64PrPaidReceipt *out
     if (!p || !out || p->level<1 || p->level>SC64_PR_FAMILY_COUNT) return 0;
     family=(unsigned)p->level-1; payer=(unsigned)p->queue[0]; target=(unsigned)p->queue[1];
     if (payer>=SC64_PR_CUSTOM_OWNERS || !target ||
-        !sc64_pr_quote(family,target-1,&quote)) return 0;
+        !sc64_pr_quote_v45(family,target-1,&quote)) return 0;
     paid=(Sc64PrPaidReceipt){quote.mineral,quote.gas,1,(uint8_t)payer,(uint8_t)family,(uint8_t)target};
     if (!sc64_pr_job_receipt_valid(p,payer,&paid)) return 0;
     *out=paid;

@@ -2890,7 +2890,7 @@ static int sc64_pr_stage_begin_slot(int slot,unsigned family)
     level=sc64_pr_effective_level(family,sc64_experimental_research_levels.level[owner][family],
                                   (unsigned)legacy_w,(unsigned)legacy_a);
     max=family==SC64_PR_SINGULARITY ? 1u : 3u;
-    if (level>=max || !sc64_pr_quote(family,level,&quote)) return 0;
+    if (level>=max || !sc64_pr_quote_v45(family,level,&quote)) return 0;
     if (level>=1 && family==SC64_PR_SHIELDS && !sc64_pr_stage_has_raw(owner,164)) return 0;
     if (level>=1 && (family==SC64_PR_GROUND_ARMOR || family==SC64_PR_GROUND_WEAPONS) &&
         !sc64_pr_stage_has_raw(owner,165)) return 0;
@@ -2939,7 +2939,7 @@ static int sc64_pr_stage_menu_quote(int row,Sc64ProtossResearchQuote *quote)
     if (family<0 || weapons_level<0 || weapons_level>2 || armor_level<0 || armor_level>2) return 0;
     level=sc64_pr_effective_level((unsigned)family,sc64_experimental_research_levels.level[SIDE][family],
                                   (unsigned)weapons_level,(unsigned)armor_level);
-    return sc64_pr_quote((unsigned)family,level,quote);
+    return sc64_pr_quote_v45((unsigned)family,level,quote);
 }
 static int sc64_pr_stage_cancel_slot(int slot, int destroyed)
 {

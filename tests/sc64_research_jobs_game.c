@@ -21,6 +21,16 @@ static Sc64PrPaidReceipt test_receipt(int slot)
 int main(void)
 {
     Building q, saved;
+    static const unsigned base[]={100,150,100,100,200,150};
+    static const unsigned factor[]={75,75,50,75,100,0};
+    for (unsigned f=0;f<SC64_PR_FAMILY_COUNT;++f) for (unsigned l=0;l<3;++l) {
+        Sc64ProtossResearchQuote q45;
+        if (f==SC64_PR_SINGULARITY && l) { assert(!sc64_pr_quote_v45(f,l,&q45)); continue; }
+        assert(sc64_pr_quote_v45(f,l,&q45));
+        assert(q45.mineral==base[f]+factor[f]*l && q45.gas==q45.mineral);
+        assert(q45.ticks==(f==SC64_PR_SINGULARITY?3125:5000+600*l));
+        assert(q45.max_level==(f==SC64_PR_SINGULARITY?1:3));
+    }
     Sc64ProtossResearchLevels levels;
     int ore=1000, local_gas=1000;
     memset(&q,0,sizeof q); memset(&levels,0,sizeof levels);
