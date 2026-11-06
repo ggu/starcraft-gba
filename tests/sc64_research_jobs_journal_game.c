@@ -50,7 +50,9 @@ int main(int argc,char **argv)
         destroy_building(gate,ENEMY);
         int live_forge=spawn_build(SIDE,B_FORGE,240,240,0);
         assert(live_forge==gate && !b[gate].queue_count && b[gate].queue[0]==U_ZEALOT);
-        int archive=spawn_build(SIDE,B_P7_TEMPLAR_ARCHIVES,240,240,0);
+        int archive_type=sc64_race_building_from_raw(165);
+        assert(archive_type>=0);
+        int archive=spawn_build(SIDE,archive_type,240,240,0);
         assert(archive>=0 && sc64_race_raw_building(b[archive].type)==165);
         int gate2=spawn_build(SIDE,B_GATEWAY,240,240,0);
         assert(gate2>=0 && race_queue_unit(SIDE,gate2,U_ZEALOT));
