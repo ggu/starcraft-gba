@@ -250,3 +250,25 @@ Do not promote the shortcut or cache flags from this experiment alone; broader
 uninterrupted gameplay, full-state/pixel, startup, memory and multi-mode proof
 remain open. Artifacts are retained locally under
 `build/z7-host-sram-contract/monotone*-run/` and `monotone/`.
+
+### Fresh-start replay rejects the shortcut
+
+The bounded post-load observation above does not establish equivalence. A later
+same-source HOST replay started from erased SRAM and applied the complete retained
+ordinary Z7 input tape. The control reached the recorded win at call 175,455 and
+passed all 307 recorded observations. With `SC64_ROUTE_MONOTONE_PROBE` enabled,
+the run diverged and ended in a loss at call 16,030; its strict comparison failed
+with only 41 of 307 observations reached. Per-call diagnostic fingerprints first
+differed in the actor arrays at call 817 (game frame 765), while the selected
+world and displayed indexed-pixel/palette fingerprints still matched at that
+call. Fingerprints are diagnostic hashes, not complete state proof. The first
+mismatching route query and underlying cause have not yet been established.
+
+This uninterrupted result supersedes the positive bounded timing as a release
+candidate: **do not enable or ship this shortcut**. The original successful
+control and failed shortcut outputs are retained under
+`build/z7-host-sram-contract/host-full-traces/`; these private artifacts are not
+part of the source tree. Normal uninstrumented ARM links for both variants of
+Z7, Z8, Z9 and Z10 passed their existing memory guards, but linking does not
+establish gameplay equivalence; Z7 shortcut IWRAM headroom was only 24 bytes.
+The default remains unchanged.
