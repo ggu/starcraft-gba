@@ -556,3 +556,10 @@ Canonical full-field links now pass all eight release vectors; the current
 audio header/blob are a paired codec2 set with a manifest and independent
 receipt, distinct from the older advisor pair. Header-offset/stream/PCM bank
 verification is queued; provenance does not establish correct event selection.
+
+Collection diagnostic validation status: the first generic race compile failed
+because adding cargo-kind alone selected unsupported impact-codec declarations.
+The failure is retained; no timer behavior was observed. Requeued using the
+actual P10 production vector and source list, without weakening validators.
+The 50-mineral opening patch is likewise queued on that P10 vector's existing
+normal-menu opening matrix. Neither run has produced a result yet.
