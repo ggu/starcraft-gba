@@ -150,4 +150,34 @@ static int sc64_pr_job_cancel_custom(Building *p, unsigned payer, Sc64PrPaidRece
     paid->live=0;
     return 1;
 }
+/* Detached custom candidate audit only. It reads no live globals and does
+ * not authorize a journal tag or publish a receipt. A later decoder must
+ * supply the candidate's own context, not the currently running match. */
+static int sc64_pr_job_candidate_valid_custom(const Building *rows, unsigned count,
+    const Sc64ProtossResearchLevels *levels, const int players[5], unsigned bots,
+    unsigned legacy_weapons, unsigned legacy_armor, int pending_weapons, int pending_armor)
+{
+    uint8_t seen[SC64_PR_CUSTOM_OWNERS][SC64_PR_FAMILY_COUNT]={{0}};
+    if (!rows || !levels || !players || count>MAX_BUILDINGS || bots<1 || bots>3 ||
+        legacy_weapons>2 || legacy_armor>2 || !sc64_pr_levels_valid(levels,SC64_PR_CUSTOM_OWNERS)) return 0;
+    for (unsigned i=0;i<count;++i) {
+        const Building *q=&rows[i]; unsigned owner, family;
+        if (q->type!=B_FORGE && q->type!=B_CYBERNETICS_CORE) continue;
+        if (!q->level && !q->queue_progress && !q->queue[0] && !q->queue[1] &&
+            !q->queue[2] && !q->queue[3] && !q->queue[4]) continue;
+        owner=(unsigned)q->owner;
+        if (owner>=SC64_PR_CUSTOM_OWNERS ||
+            !(owner==SIDE || (owner==ENEMY && bots>=1) ||
+              (owner==RESCUABLE && bots>=2) || (owner==4 && bots>=3)) ||
+            players[owner]!=R_PROTOSS || q->level<1 || q->level>SC64_PR_FAMILY_COUNT ||
+            (q->raw_type>=0 && q->raw_type!=sc64_race_raw_building(q->type))) return 0;
+        family=(unsigned)q->level-1;
+        if (seen[owner][family]++ ||
+            !sc64_pr_job_valid_custom(q,owner,levels,owner==SIDE?legacy_weapons:0,
+                owner==SIDE?legacy_armor:0,owner==SIDE&&pending_weapons,
+                owner==SIDE&&pending_armor)) return 0;
+    }
+    return 1;
+}
+
 #endif

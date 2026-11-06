@@ -139,6 +139,19 @@ int main(void)
     assert(!strcmp(race_menu_label(0),"GROUND WEAPONS"));
     game_update(0,0); game_update(KEY_A,KEY_A);
     assert(!menu_open && sc64_pr_paid[forge].live && minerals==900 && gas==900);
+    /* Detached validator uses explicit candidate context; no SRAM publication. */
+    assert(sc64_pr_job_candidate_valid_custom(b,MAX_BUILDINGS,&sc64_experimental_research_levels,
+        race_player,(unsigned)race_bots,0,0,0,0));
+    int spare=-1; for(int i=0;i<MAX_BUILDINGS;i++) if(!b[i].alive && i!=forge) { spare=i; break; }
+    assert(spare>=0); Building old_spare=b[spare]; b[spare]=b[forge];
+    assert(!sc64_pr_job_candidate_valid_custom(b,MAX_BUILDINGS,&sc64_experimental_research_levels,
+        race_player,(unsigned)race_bots,0,0,0,0)); /* duplicate */
+    b[spare]=old_spare; saved=b[forge]; b[forge].queue[0]=NEUTRAL;
+    assert(!sc64_pr_job_candidate_valid_custom(b,MAX_BUILDINGS,&sc64_experimental_research_levels,
+        race_player,(unsigned)race_bots,0,0,0,0)); /* forged payer */
+    b[forge]=saved;
+    assert(!sc64_pr_job_candidate_valid_custom(b,MAX_BUILDINGS,&sc64_experimental_research_levels,
+        race_player,(unsigned)race_bots,0,0,1,0)); /* legacy pending */
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     /* Bit transport only: the writer/loader remain unconditionally refused. */
     Sc64P7TypedBuildingSave row; Building decoded;
