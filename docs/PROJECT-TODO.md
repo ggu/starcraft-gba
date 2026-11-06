@@ -3,6 +3,35 @@
 Updated: 2026-11-06. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
+## Current hardware-feedback status (supersedes earlier queue snapshots)
+
+- **Merged:** [queue cancellation #305](https://github.com/ggu/starcraft-gba/pull/305)
+  at `271db94afdf6d04da9a4490e2add306af5dc85c9`. Friendly ordinary producer
+  queues now cancel on L, refund full unit costs and release reserved supply;
+  legacy larva restore is covered. Clean default suite, P10 enabled gesture
+  and all four guarded ARM links passed. Separate Egg/Carrier/Scarab services
+  retain their own lifecycles. No SD update yet.
+- **Validated but not merged:** the 50-mineral start passed the P10 normal-menu
+  matrix of 234 map/race/1-3-AI combinations, with all active banks and zero gas
+  checked; 187 private includes unchanged. Branch rebased to merged #305 at
+  `06d3a84`; clean default build/test validation is running.
+- **Mining defect confirmed in a controlled fixture:** using P10 worker code,
+  an adjacent Probe/mine/depot setup collects at call 1, deposits at 2, collects
+  again at 23 and deposits at 24. The post-pickup 45 timer is ignored during
+  return and replaced by 20 at deposit. This demonstrates ordering, not a real
+  map's per-second rate or native N64 duration. Timing/retarget fix remains open.
+- **Power:** actual P10 request/arrival, no-debit refusal, producer pause/resume
+  and Cannon pause/resume pass; four normal ARM links pass. Campaign controller
+  comparisons remain open (P3 candidate lost; baseline comparison is queued).
+  A separate clipped geometry-overlay probe is default-off/unqualified.
+- **Audio:** same-frame B-menu minerals/gas cue loss is reproduced and a scoped
+  fix passes default and P10 imported-audio tests. Warp-start/death sound mapping
+  and physical playback remain unverified; no blanket sound fix is claimed.
+- **Research:** authenticated native costs/times/family associations exist;
+  usable UI/combat/save integration remains incomplete. Preserve 8 campaign
+  source owners separately from 5 custom live owners, and prove record/impact
+  budgets before adding typed-state payload. No new gameplay research enabled.
+
 ## Goal and completion rules
 
 Source-work checkpoint: the [shared production follow-up](audits/2026-11-06-shared-production-source-checkpoint/README.md)
