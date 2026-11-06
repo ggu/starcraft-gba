@@ -21,8 +21,8 @@ or busy-battle proof. Frozen input and source manifests matched before/after.
 Private logs remain under `build/z7-host-sram-contract/host-full-flood-traces/`
 and `custom-full-flood-v2/`; no private inputs or captures are committed.
 
-Fresh guest continuation and guest cycle measurements for this exact canonical
-source are still being checked. No 30-fps or physical
+Fresh guest continuation is recorded below; guest cycle measurements for this
+exact canonical source remain to be checked. No 30-fps or physical
 hardware claim follows from the HOST results.
 
 All eight normal release-vector control/candidate links for Z7–Z10 passed the
@@ -64,3 +64,15 @@ separate questions.
 The codec2 bank's 1,368 unit/kind first-and-count entries and 1,163 voice
 references also passed bounds checks against its 501 sample streams; 13 of 16
 music slots are populated. This check does not establish semantic clip mapping.
+
+A fresh guest process then loaded the genuine ordinary-button Z7 journal via
+HOME-L and followed the original input from cut 136,058 to the recorded win.
+Control and full-field ROMs both passed strict resume validation and matched all
+50 HOST/guest cargo checkpoints; their final guest SRAM SHA-256 values were both
+`de1d039ed52756d98114ea31a644693ed73e394ab212200f8f8b41b8674cb5ba`.
+The custom replay ROM hashes were
+`5810967c7619d541c85f911477ac0c5abfff93bf6efbae6371110f0dc0556373` and
+`1eabdb89c2cfaced44c3f953ef5ebd11e32de6fd470df64ce4ddbfcddd377613`.
+Source and input manifests matched before and after. This is a sampled emulator
+continuation, not full-state or physical-hardware proof; canonical busy timing
+remains pending.
