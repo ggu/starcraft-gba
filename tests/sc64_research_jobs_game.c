@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "../common/gba.c"
 #include "../starcraft/game.c"
 #ifndef SC64_EXPERIMENTAL_RESEARCH_JOBS
 #error "requires host research job integration stage"
@@ -52,6 +53,14 @@ int main(void)
     assert(!sc64_pr_job_begin_custom(&q,1,SC64_PR_AIR_WEAPONS,&levels,&ore,&gas,
         3,1,1,1,0,1,0,0,0)); /* human legacy floor must not affect an AI */
     assert(!memcmp(&q,&saved,sizeof q));
-    puts("research job staged actual Building admission and tick: ok");
+    /* Exercise both public wrappers and direct race adapter entry points. */
+    static u8 previous_sram[32768];
+    memset(host_save,0xa5,sizeof host_save);
+    memcpy(previous_sram,host_save,sizeof host_save);
+    assert(!save_game() && !race_save_game());
+    assert(!memcmp(previous_sram,host_save,sizeof host_save));
+    assert(!load_game() && !race_load_game());
+    assert(!memcmp(previous_sram,host_save,sizeof host_save));
+    puts("research job staged actual Building admission, tick and save refusal: ok");
     return 0;
 }

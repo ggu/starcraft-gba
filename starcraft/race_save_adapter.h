@@ -1553,6 +1553,11 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
 }
 #endif
 static int race_save_game(void) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    /* This HOST-only stage has no authenticated active-job wire format.
+     * Refuse all writes, including direct calls that bypass save_game(). */
+    return 0;
+#endif
 #ifdef SC64_SHARED_EGG_HOST_STAGE
     /* No new Egg save format is admitted by this HOST-only experiment.
      * Include dead Egg identities: kill_unit retains actor identity. Raw 36
@@ -4125,6 +4130,11 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 }
 #endif
 static int race_load_game(void) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    /* No old or research-journal candidate may publish ambiguous staged
+     * building fields until active-job decoding is separately validated. */
+    return 0;
+#endif
     RaceLoadPlan plan = {0};
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     const Sc64StageSaveAuth *guard_auth=&plan.guardian_auth;
