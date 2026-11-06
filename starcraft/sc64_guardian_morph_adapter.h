@@ -118,6 +118,9 @@ static int race_guardian_morph_cancel(int slot)
     return 1;
 }
 
+#ifdef SC64_GUARDIAN_MORPH_NOINLINE_PROBE
+__attribute__((noinline))
+#endif
 static int race_guardian_morph_tick(int slot)
 {
     if (slot<0 || slot>=MAX_UNITS) return 0;
