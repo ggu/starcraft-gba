@@ -2,6 +2,18 @@
 #ifndef SC64_ENGINE_CAPABILITIES_H
 #define SC64_ENGINE_CAPABILITIES_H
 
+/* Opt-in selector: product recipes do not enable this capability by default. */
+#ifdef SC64_SHARED_EGG_SERVICE
+#if defined(SC64_SHARED_EGG_CUSTOM_SERVICE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
+#error "Shared Egg service owns its context selection"
+#endif
+#ifdef SC64_Z9_RUNTIME
+#define SC64_SHARED_EGG_LATE_SERVICE 1
+#else
+#define SC64_SHARED_EGG_CUSTOM_SERVICE 1
+#endif
+#endif
+
 /* Mechanics belong to the engine, not the selected mission or menu.
  * This contract is checked by game.c and by probes of real Make expansions.
  * Storage placement, asset banks and mission objectives are separate concerns.
