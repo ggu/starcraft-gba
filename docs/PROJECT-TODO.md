@@ -592,3 +592,15 @@ The monotone-shortcut rejection is specifically the proposed new Z7 enablement.
 Canonical P10 already enables that flag; do not silently remove it or treat
 Z7 divergence as proof of a P10 defect. Its runtime effects remain a separate
 audit, and full-field optimization flags are distinct from that shortcut.
+
+Queue cancellation is now [draft PR #305](https://github.com/ggu/starcraft-gba/pull/305),
+with full clean default-suite and focused tests documented and P10 enabled-
+profile/release gates still pending. Independent parent source review found no
+actionable issue; do not mark it merged or on KODAK.
+
+Audio follow-up: same-frame advisor fix has a source-reviewed candidate and
+actual B-menu reproduction. The gas fixture was corrected to navigate from
+the remembered menu row rather than assume row zero. Separately, the building
+observer currently emits a completion event but no new-construction/warp-start
+event; matching the native warp sound requires the correct sound/event mapping
+and bounded native audio observation, not merely verifying the bank contents.
