@@ -505,7 +505,9 @@ def loaded_check(plan: dict, loaded: dict, cut: int | None, prefix: str | None,
     errors = [f"resume prefix: {f}" for f in base["failures"]]
     if base["cut"] is None or base["cut"] != cut:
         return errors + [f"resume cut {cut} is not the prefix cut {base['cut']}"]
-    saved = parse_records(prefix)[0]["checks"][cut]
+    saved = parse_records(prefix)[0]["checks"].get(cut)
+    if saved is None:
+        return errors + [f"resume prefix: missing cut observation at tick {cut}"]
     for field in ("frame", "started", "minerals", "gas"):
         if loaded[field] != saved[field]:
             errors.append(f"LOADED {field}={loaded[field]} is not the saved cut "
@@ -515,7 +517,8 @@ def loaded_check(plan: dict, loaded: dict, cut: int | None, prefix: str | None,
 
 def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool = True,
              sram: bytes | None = None, seed: bytes | None = None,
-             prefix: str | None = None, save_profile: str = "legacy") -> dict:
+             prefix: str | None = None, save_profile: str = "legacy",
+             prefix_timed: bool | None = None) -> dict:
     """Qualify one replay log. Every gate must pass; failures are listed."""
     records, failures = parse_records(text)
     singles, order, stop = records["singles"], records["order"], plan["stop"]
@@ -559,7 +562,9 @@ def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool =
                 failures.append(f"expected one successful LOADED record after START, "
                                 f"found {count['LOADED']}")
             else:
-                failures += loaded_check(plan, loaded[0][2], cut, prefix, seed, timed, save_profile)
+                failures += loaded_check(plan, loaded[0][2], cut, prefix, seed,
+                                         timed if prefix_timed is None else prefix_timed,
+                                         save_profile)
         elif count["LOADED"]:
             failures.append("full run has a LOADED record")
         if count["DONE"] != 1 or order[-1:] != ["DONE"] or count["SAVED"]:
@@ -596,7 +601,10 @@ def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool =
     return {"mode": mode, "save_profile": save_profile, "lines": records["lines"], "cut": cut,
             "expected_observations": expected_checks, "compared_observations": compared,
             "mismatch_count": len(mismatches), "guest_timing": guest_timing,
-            "timed": timed, "sram_records": sram_records,
+            "timed": timed,
+            "prefix_timed": ((timed if prefix_timed is None else prefix_timed)
+                             if mode == "resume" else None),
+            "sram_records": sram_records,
             "failures": failures[:80], "failure_count": len(failures),
             "qualified": not failures}
 
@@ -629,6 +637,8 @@ def main() -> int:
                      help="resume: log of the prefix run that wrote the seed")
     run.add_argument("--timeout", type=float, default=6 * 3600)
     for command in (check, run):
+        command.add_argument("--prefix-untimed", action="store_true",
+                             help="resume: validate the prefix independently as untimed HOST evidence")
         command.add_argument("--save-profile", choices=tuple(SAVE_PROFILES), default="legacy",
                              help="expected Z7 journal namespace and envelope")
     args = parser.parse_args()
@@ -645,6 +655,8 @@ def main() -> int:
     plan = load_trace(args.trace)
     if args.mode == "resume" and (args.cut is None or args.prefix_log is None):
         parser.error("resume needs --cut and --prefix-log")
+    if args.prefix_untimed and args.mode != "resume":
+        parser.error("--prefix-untimed requires --mode resume")
     seed = args.seed_sav.read_bytes() if args.seed_sav else None
     prefix_raw = args.prefix_log.read_bytes() if args.prefix_log else None
     prefix = prefix_raw.decode(errors="replace") if prefix_raw is not None else None
@@ -652,7 +664,8 @@ def main() -> int:
         sram = args.sav.read_bytes() if args.sav else None
         result = evaluate(plan, args.mode, args.log.read_text(errors="replace"), args.cut,
                           timed=not args.untimed, sram=sram, seed=seed, prefix=prefix,
-                          save_profile=args.save_profile)
+                          save_profile=args.save_profile,
+                          prefix_timed=False if args.prefix_untimed else None)
         print(json.dumps(result, indent=2))
         return 0 if result["qualified"] else 1
     if not MGBA.exists():
@@ -664,7 +677,9 @@ def main() -> int:
     text, wall = run_mgba(args.rom, args.out, args.timeout, args.seed_sav, markers)
     sav = args.out / "saves" / "replay.sav"
     data = sav.read_bytes() if sav.exists() else None
-    result = evaluate(plan, args.mode, text, args.cut, sram=data, seed=seed, prefix=prefix, save_profile=args.save_profile)
+    result = evaluate(plan, args.mode, text, args.cut, sram=data, seed=seed, prefix=prefix,
+                      save_profile=args.save_profile,
+                      prefix_timed=False if args.prefix_untimed else None)
     result.update({"trace_sha256": plan["trace_sha256"],
                    "rom_sha256": sha256(args.rom.read_bytes()), "wall_seconds": round(wall, 1),
                    "sram_sha256": sha256(data) if data else None,

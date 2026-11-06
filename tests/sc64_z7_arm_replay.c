@@ -287,6 +287,10 @@ static void report(const char *kind, u32 tick)
 
 static void report_cycles(const char *kind, u32 tick)
 {
+#ifdef GBA_HOST
+    /* The host does not measure guest cycles. Do not emit timing records. */
+    (void)kind; (void)tick;
+#else
     out_text("Z7 CYCLES "); out_text(kind);
     out_field("host_tick", (long)tick);
     out_field("frames", (long)frames_run);
@@ -294,11 +298,10 @@ static void report_cycles(const char *kind, u32 tick)
     out_text(" update="); out_u64(cycles_update);
     out_field("peak", (long)cycles_peak);
     out_field("update_peak", (long)update_peak);
-#ifndef GBA_HOST
     out_field("stack_painted", (long)(stack_paint_end - STACK_LOW));
     out_field("stack_untouched", (long)stack_untouched());
-#endif
     out_flush();
+#endif
 }
 
 static u32 tape_cursor, check_cursor;

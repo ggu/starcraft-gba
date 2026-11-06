@@ -8,6 +8,12 @@
 static u16 host_fb[2][19200];
 u8 gba_vram_scratch[GBA_VRAM_SCRATCH_BYTES] __attribute__((aligned(4)));
 static u8 host_save[32768];
+/* A fresh emulated cartridge has erased SRAM. Initialize once at process
+ * startup, not in gba_init: subsequent game boots must preserve saves, and
+ * callers may stage an existing image before the first gba_init. */
+__attribute__((constructor)) static void host_save_initialize(void) {
+ for (unsigned i=0;i<sizeof(host_save);++i) host_save[i]=0xff;
+}
 static u16 host_palette[256];
 #endif
 #define REG16(a) (*(volatile u16 *)(a))
