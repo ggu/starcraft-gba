@@ -20,3 +20,9 @@ and replay records matched, and the frozen source/input manifest was unchanged.
 The recorded tape therefore remains valid through this queue change in this
 HOST comparison. These fingerprints are not complete-state proof; other
 scenarios, normal links, guest continuation and cycle measurements remain open.
+
+Four HOST custom games on this source launched through normal menus with a
+Zerg human, both maps and one or three mixed AI opponents. Each advanced 4,000
+calls, and all 41 sampled actor/world/route and indexed-frame/full-palette
+fingerprints matched between control and candidate. The human remained idle;
+these are opening/warm simulation checks, not completed or busy battles.
