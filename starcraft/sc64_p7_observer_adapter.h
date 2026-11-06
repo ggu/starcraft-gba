@@ -448,12 +448,19 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
     for(int k=0;k<(lists?(int)lists->optical_unit_count:MAX_UNITS);++k) {
         int i=lists?lists->optical_units[k]:k;
-        if(!(u[i].alive &&
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+        /* List entries were checked when this tick's snapshot was built. */
+        if (!lists && !(u[i].alive &&
+#else
+        if (!(u[i].alive &&
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
             !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
             !SC64_TRANSPORT_LOADED(&u[i]))) continue;
+#ifndef SC64_P7_DETECTOR_SNAPSHOT_FAST
         int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
+#endif
 #ifdef SC64_P7_SIGHT_AXIS_CULL
         int dx=cx-u[i].x,dy=cy-u[i].y;
         if(dx < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dx > SC64_P7_SIGHT_UNIT_AXIS_BOUND ||
@@ -463,6 +470,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
         unsigned candidate=lists?lists->optical_unit_masks[k]:0;
         if(!lists) {
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+            int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
+#endif
             if(source>=0&&source<8) {
                 int live=race_protoss_source_owner((unsigned)source);
                 if(live>=0&&live==u[i].owner) candidate=1u<<(unsigned)source;
@@ -483,8 +493,12 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
     for(int k=0;k<(lists?(int)lists->optical_building_count:MAX_BUILDINGS);++k) {
         int i=lists?lists->optical_buildings[k]:k;
-        if(!b[i].alive) continue;
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+        if (!lists && !b[i].alive) continue;
+#else
+        if (!b[i].alive) continue;
         int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
+#endif
 #ifdef SC64_P7_SIGHT_AXIS_CULL
         int dx=cx-b[i].x,dy=cy-b[i].y;
         if(dx < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dx > SC64_P7_SIGHT_BUILDING_AXIS_BOUND ||
@@ -494,6 +508,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
         unsigned candidate=lists?lists->optical_building_masks[k]:0;
         if(!lists) {
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+            int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
+#endif
             if(source>=0&&source<8) {
                 int live=race_protoss_source_owner((unsigned)source);
                 if(live>=0&&live==b[i].owner) candidate=1u<<(unsigned)source;
