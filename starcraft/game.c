@@ -300,6 +300,13 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_SHARED_EGG_Z4_HOST_STAGE) && !defined(SC64_Z4_RUNTIME)
 #error "Z4 Egg staging requires the actual Z4 runtime"
 #endif
+#if defined(SC64_SHARED_EGG_Z6_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_SHARED_EGG_LATE_SERVICE) || !defined(SC64_Z6_RUNTIME) || !defined(SC64_MID_ZERG_PERMISSIONS))
+#error "Z6 Egg staging requires HOST late service, Z6 runtime and authenticated permissions"
+#endif
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+#include "sc64_mid_zerg_permissions.h"
+#endif
 /* Bounded Z1 admission experiment; no release product enables it. */
 #if defined(SC64_SHARED_EGG_Z1_HOST_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_SHARED_EGG_LATE_SERVICE))

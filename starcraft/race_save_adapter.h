@@ -352,6 +352,9 @@ static int race_shared_egg_custom_owner(int owner,int raw_owner,void *context)
     for (int i=0;i<=candidate->state[4];++i) if (owners[i]==owner) return 1;
     return 0;
 }
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+static unsigned race_z6_save_remaining_creates(const Sc64Z6PersistentState *state);
+#endif
 static int race_shared_egg_candidate_owner(int owner,int raw_owner,void *context)
 {
     const RaceSave *candidate=context;
@@ -383,6 +386,12 @@ static int race_shared_egg_candidate_owner(int owner,int raw_owner,void *context
 #ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
     if (mission_id==SC64_RACE_MISSION_Z4)
         return race_z4_source_owner((unsigned)raw_owner)==owner;
+#endif
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+    if (mission_id==SC64_Z6_GLOBAL_ID) {
+        int mapped=(unsigned)raw_owner==map->human_slot ? SIDE : map->owner_modes[raw_owner];
+        return mapped==owner;
+    }
 #endif
     if (mission_id==SC64_Z8_GLOBAL_ID) return race_z8_source_owner((unsigned)raw_owner)==owner;
     if (mission_id==SC64_Z9_GLOBAL_ID
@@ -421,6 +430,9 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
 #ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
                candidate->state[2]!=SC64_RACE_MISSION_Z4 &&
 #endif
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+               candidate->state[2]!=SC64_Z6_GLOBAL_ID &&
+#endif
                candidate->state[2]!=SC64_Z8_GLOBAL_ID && candidate->state[2]!=SC64_Z9_GLOBAL_ID
 #ifdef SC64_Z10_RUNTIME
                && candidate->state[2]!=SC64_Z10_GLOBAL_ID
@@ -451,6 +463,11 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
             !sc64_early_zerg_permission_available(SC64_RACE_MISSION_Z4,
                                                    (unsigned)q.raw_owner,(unsigned)raw)) return 0;
 #endif
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+        if (!candidate->state[0] && candidate->state[2]==SC64_Z6_GLOBAL_ID &&
+            !sc64_mid_zerg_permission_available(SC64_Z6_GLOBAL_ID,
+                                                 (unsigned)q.raw_owner,(unsigned)raw)) return 0;
+#endif
         if (candidate->state[0]) {
             int admitted=0;
             for (unsigned j=0;j<SC64_SKIRMISH_UNIT_COUNT;j++) {
@@ -474,6 +491,10 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
             committed+=(unsigned)sc64_race_product_count(type);
         }
     }
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+    if (!candidate->state[0] && candidate->state[2]==SC64_Z6_GLOBAL_ID)
+        committed+=race_z6_save_remaining_creates(&candidate->z6);
+#endif
     return committed<=free_slots;
 }
 /* Preserve the narrow HOST test helper while mission admission expands. */
@@ -1623,6 +1644,9 @@ static int race_save_game(void) {
 #ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
              || race_selected_mission==SC64_RACE_MISSION_Z4
 #endif
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+             || race_selected_mission==SC64_Z6_GLOBAL_ID
+#endif
              )
 #endif
        )
@@ -1760,6 +1784,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
          || race_selected_mission==SC64_RACE_MISSION_Z4
+#endif
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+         || race_selected_mission==SC64_Z6_GLOBAL_ID
 #endif
          ) ?
         SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
