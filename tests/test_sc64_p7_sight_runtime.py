@@ -94,6 +94,16 @@ class SightRuntimeTest(unittest.TestCase):
         onrun = self.command("wrapper-on-run", [str(on)])
         self.assertIn("checks=142", onrun.stdout)
         self.assertIn("production fact-table wrapper exact", onrun.stdout)
+        # Existing generated fact payloads keep their ABI; shared source sight
+        # must override the old generic radii in both cached and uncached paths.
+        for cached in (False, True):
+            name = "shared-cached" if cached else "shared-uncached"
+            gates = GATES + ("SC64_SOURCE_SIGHT_ALL_RACES",)
+            if cached:
+                gates += ("SC64_FACT_TABLES", "SC64_FACT_SIGHT_TABLES")
+            binary = self.work / name
+            self.compile(name + "-build", FIXTURE, gates, binary, gen_dir if cached else None)
+            self.assertIn("checks=142", self.command(name + "-run", [str(binary)]).stdout)
 
     def test_sight_feature_requires_fact_tables(self):
         self.compile("missing-fact-gate", FIXTURE,

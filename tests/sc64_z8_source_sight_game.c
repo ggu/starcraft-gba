@@ -120,13 +120,23 @@ static void test_z8_facts_and_visibility(void)
 
     race_selected_mission=SC64_Z6_GLOBAL_ID;
     assert(!race_z8_active() && !race_z7_active());
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    assert(SC64_SOURCE_SIGHT_SPANS_ACTIVE());
+    assert(sc64_actor_unit_sight_pixels(U_OVERLORD)==288);
+#else
     assert(!SC64_SOURCE_SIGHT_SPANS_ACTIVE());
     assert(sc64_actor_unit_sight_pixels(U_OVERLORD)==0);
+#endif
     race_selected_mission=SC64_Z7_GLOBAL_ID;
     assert(sc64_actor_unit_sight_pixels(U_OVERLORD)==288);
     race_mode=1;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    assert(SC64_SOURCE_SIGHT_SPANS_ACTIVE());
+    assert(sc64_actor_unit_sight_pixels(U_OVERLORD)==288);
+#else
     assert(!SC64_SOURCE_SIGHT_SPANS_ACTIVE());
     assert(sc64_actor_unit_sight_pixels(U_OVERLORD)==0);
+#endif
 }
 
 static void test_z8_detector_boundaries(void)
