@@ -108,6 +108,7 @@ static void carrier_return_repair(void)
     memset(invincible_units,0,sizeof invincible_units);
     memset(invincible_buildings,0,sizeof invincible_buildings);
     int carrier=actor(SIDE,72,200,200),victim=actor(ENEMY,0,300,200);
+    u[victim].raw_owner=0;
     assert(race_p7_carrier_training_stock(carrier,1)==1);
     int child=-1;for(int n=0;n<MAX_UNITS;++n)
         if(u[n].alive&&u[n].type==U_P7_INTERCEPTOR&&u[n].build==carrier)child=n;
@@ -115,6 +116,9 @@ static void carrier_return_repair(void)
     u[child].shield=0;u[child].armor=10;
     hit_target_impl(child,1,U_MARINE,ENEMY,SC64_STOCK_DMG_NORMAL);
     assert(hp_q8(child)==40*256-128);
+    /* Hold the Carrier so it does not immediately relaunch the repaired
+     * child during the same source update in which docking occurs. */
+    u[carrier].order=ORDER_MOVE;
     for(unsigned n=0;n<600 && sc64_p7_carrier_child_state(&u[child])!=SC64_P7_INTERCEPTOR_INSIDE;++n) {
         if(frame%5!=4)race_p7_interceptor_flight_source_tick();
         race_p7_interceptor_flight_frame_move();++frame;
@@ -138,6 +142,8 @@ static void p6_fractional_splash(void)
 }
 int main(void)
 {
+    printf("Q8 stage sizes: save=%zu impact-record=%zu debt=%zu\n",
+           sizeof(RaceSave),sizeof(RaceImpactRecord),sizeof sc64_pr_hp_debt);
     gba_init();shield_and_hp_packets();shared_special_routes();buildings_and_lifetime();
     carrier_return_repair();p6_fractional_splash();
     puts("actual shared fractional damage, plasma armor, splash, regen and lifecycle HOST stage: PASS");return 0;
