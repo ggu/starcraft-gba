@@ -616,13 +616,19 @@ static int prefix(const char *path)
             ticks[n]=t;holds[n]=held;frames[n]=before;++n;
         }
     }
-    fclose(f); unsigned pos=0,held=0;
+    fclose(f); unsigned pos=0,held=0; int roster_set=0;
     for (unsigned t=0;t<816;++t) {
         if(pos<n && ticks[pos]==t) { if((unsigned)frame!=frames[pos]) return 0; held=holds[pos++]; }
+        /* The retained prefix chose two bots. Choose one through the same
+         * custom menu before its first A starts the match. */
+        if (!roster_set && held==KEY_A && screen==SCREEN_TITLE &&
+            race_front.page==SC_FRONT_SKIRMISH && race_front.row==1 && race_front.race==R_PROTOSS) {
+            KEY_TAP(KEY_DOWN); KEY_TAP(KEY_LEFT); KEY_TAP(KEY_UP); roster_set=1;
+        }
         input((u16)held);
     }
     fprintf(stderr,"PREFIX_CHECK pos=%u n=%u screen=%d mode=%d race=%d bots=%d frame=%d\n",pos,n,screen,race_mode,race_human,race_bots,frame);
-    return pos==n && screen==SCREEN_PLAY && race_mode && race_human==R_PROTOSS && race_bots==1;
+    return roster_set && pos==n && screen==SCREEN_PLAY && race_mode && race_human==R_PROTOSS && race_bots==1;
 }
 int main(int argc,char **argv)
 {
