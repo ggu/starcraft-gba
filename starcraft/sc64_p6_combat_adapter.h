@@ -518,7 +518,7 @@ race_p6_combat_apply_explosive(int target, unsigned damage, unsigned divisor,
             SC64_TRANSPORT_LOADED(q)) return 0;
         raw = race_p6_combat_raw_unit(q); type = q->type;
         hp = q->hp; shield = q->shield;
-        armor = q->armor + (q->owner == SIDE ? armor_level : 0);
+        armor = q->armor + sc64_unit_armor_upgrade_level(q);
         has_shields = shield > 0;
     } else {
         Building *q = &b[target - MAX_UNITS];

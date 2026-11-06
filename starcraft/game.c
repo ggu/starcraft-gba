@@ -3008,6 +3008,18 @@ static int sc64_pr_stage_blocks_legacy(int type)
 
 #endif
 
+/* Every integer damage adapter must use the same target upgrade before its
+ * existing armor/size calculation, including adapters that compensate an
+ * already-resolved packet before entering the shared death/accounting path. */
+static inline int sc64_unit_armor_upgrade_level(const Unit *q)
+{
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    return sc64_pr_stage_unit_armor_level(q);
+#else
+    return q->owner == SIDE ? armor_level : 0;
+#endif
+}
+
 static int
 spawn_build(int owner, int type, int x, int y, int constructing)
 {
@@ -5068,12 +5080,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
                     sc64_race_raw_unit(u[target].type);
             const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
             damage=sc64_stock_hp_damage_after_armor(damage,
-                u[target].armor+
-#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
-                sc64_pr_stage_unit_armor_level(&u[target]),
-#else
-                (u[target].owner==SIDE?armor_level:0),
-#endif
+                u[target].armor+sc64_unit_armor_upgrade_level(&u[target]),
                 stock_damage_class,stock?stock->size:SC64_STOCK_SIZE_LARGE);
         } else
 #endif
@@ -5085,7 +5092,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
             ) {
             int armor = u[target].armor +
-                (u[target].owner == SIDE ? armor_level : 0);
+                sc64_unit_armor_upgrade_level(&u[target]);
             int raw = u[target].raw_type >= 0 ? u[target].raw_type :
                       sc64_race_raw_unit(u[target].type);
             damage = sc64_race_t4_ghost_hp_damage(raw, damage, armor);
@@ -5095,12 +5102,12 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
             int raw = u[target].raw_type >= 0 ? u[target].raw_type :
                       sc64_race_raw_unit(u[target].type);
             damage = sc64_t5_explosive_hp_damage(raw, damage,
-                     u[target].armor + (u[target].owner == SIDE ? armor_level : 0));
+                     u[target].armor + sc64_unit_armor_upgrade_level(&u[target]));
         }
 #endif
         else
 #endif
-	damage -= u[target].armor + (u[target].owner == SIDE ? armor_level : 0);
+	damage -= u[target].armor + sc64_unit_armor_upgrade_level(&u[target]);
 #ifndef SC64_T4_RUNTIME
 	if (damage < 1)
 	    damage = 1;
@@ -13737,7 +13744,7 @@ static int race_scarab_probe_target_info(int ref,int *raw,int *x,int *y,int *own
 static void race_scarab_probe_hit(int target,unsigned packet_q8,int owner) {
     int *shield,armor,shield_loss,hp_loss;unsigned absorbed,armor_q8;
     if(sc64_siege_hidden_or_immune(target))return;
-    if(target<MAX_UNITS) {shield=&u[target].shield;armor=u[target].armor+(u[target].owner==SIDE?armor_level:0);}
+    if(target<MAX_UNITS) {shield=&u[target].shield;armor=u[target].armor+sc64_unit_armor_upgrade_level(&u[target]);}
     else {shield=&b[target-MAX_UNITS].shield;armor=sc64_race_building_armor(b[target-MAX_UNITS].type);}
     if(packet_q8<128u)packet_q8=128u;
     absorbed=*shield>0?(packet_q8<(unsigned)*shield*256u?packet_q8:(unsigned)*shield*256u):0;

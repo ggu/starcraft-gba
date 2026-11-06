@@ -70,7 +70,7 @@ race_p7_archon_damage_one(int target,unsigned packet_q8,int source_owner)
         Unit *q=&u[target];
         if (!q->alive || invincible_units[target] || SC64_TRANSPORT_LOADED(q)) return 0;
         hp=q->hp; shield=q->shield;
-        armor=q->armor+(q->owner==SIDE?armor_level:0);
+        armor=q->armor+sc64_unit_armor_upgrade_level(q);
     } else {
         int slot=target-MAX_UNITS;
         Building *q=&b[slot];
@@ -136,6 +136,9 @@ race_p7_archon_splash_attack(Unit *attacker,int primary)
     int impact_x=target_x(primary)*2,impact_y=target_y(primary)*2;
     unsigned upgrade=attacker->owner==SIDE && weapons_level>0 ?
                      (unsigned)weapons_level : 0u;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    upgrade=(unsigned)sc64_pr_stage_weapon_level(attacker->owner,70);
+#endif
     unsigned slots=0;
     for (int i=0;i<MAX_UNITS;++i) {
         Unit *candidate=&u[i];
