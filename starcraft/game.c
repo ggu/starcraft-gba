@@ -2203,6 +2203,7 @@ static int race_owner_minerals(int owner), race_owner_gas(int owner);
 static int race_save_game(void),race_load_game(void);
 static void race_campaign_init(void),race_campaign_tick(void);
 #endif
+#include "field_menu_repeat.h"
 static int screen, menu_open, menu_cursor, help, won, lost, result_timer;
 static int cx, cy, camx, camy, toast_timer, toast_id, enemy_timer, wave;
 /* Transient controller gesture, deliberately outside the persistent save. */
@@ -4444,6 +4445,9 @@ sc64_direct_attack_issue_target(int target)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
         if (sc64_race_raw_unit(q->type)==12) q->work_timer&=~7;
 #endif
+        if (IS_WORKER(q->type) &&
+            (q->order == ORDER_MINE || q->order == ORDER_GAS))
+            q->work_timer = 0;
 #ifdef SC64_WORKER_CARGO_KIND
         sc64_worker_gather_pending_set(q, 0);
 #endif
@@ -5313,6 +5317,7 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+    field_menu_repeat_reset();
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #endif
@@ -5574,6 +5579,7 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+    field_menu_repeat_reset();
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #endif
@@ -5835,6 +5841,9 @@ issue_order(int order, int tx, int ty)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
             if (sc64_race_raw_unit(u[i].type)==12) u[i].work_timer&=~7;
 #endif
+            if (IS_WORKER(u[i].type) &&
+                (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
+                u[i].work_timer = 0;
 	    u[i].order = order;
 #ifdef SC64_WORKER_CARGO_KIND
             sc64_worker_gather_pending_set(&u[i], 0);
@@ -6055,6 +6064,9 @@ start_build(int type)
 	minerals += cost;
 	return;
     }
+    if (IS_WORKER(u[i].type) &&
+        (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
+        u[i].work_timer = 0;
     u[i].order = ORDER_BUILD;
     u[i].target = slot;
     u[i].tx = px;
@@ -6089,6 +6101,9 @@ stop_selected(void)
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
             if (sc64_race_raw_unit(u[i].type)==83) (void)race_scarab_stop_signal(i,0);
 #endif
+            if (IS_WORKER(u[i].type) &&
+                (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
+                u[i].work_timer = 0;
 	    u[i].order = ORDER_IDLE;
 #ifdef SC64_WORKER_CARGO_KIND
             sc64_worker_gather_pending_set(&u[i], 0);
@@ -7184,6 +7199,7 @@ interact(void)
 	int refinery = nearest_refinery(cx, cy);
 	if (worker >= 0 && refinery >= 0 && dist2(cx, cy, b[refinery].x, b[refinery].y) < 24 * 24) {
 	    sc64_worker_reset_repair_for_gather(&u[worker]);
+	    u[worker].work_timer = 0;
 	    u[worker].order = ORDER_GAS;
 	    u[worker].target = refinery;
 #ifdef SC64_WORKER_CARGO_KIND
@@ -7288,6 +7304,7 @@ interact(void)
 		}
 	    if (worker >= 0) {
                 sc64_worker_reset_repair_for_gather(&u[worker]);
+		u[worker].work_timer = 0;
 		u[worker].order = ORDER_GAS;
 		u[worker].target = selected_building;
 #ifdef SC64_WORKER_CARGO_KIND
@@ -7507,6 +7524,15 @@ worker_continue_minerals(Unit *q)
     return 1;
 }
 
+/* A resource wait advances only while the worker is at its target. Existing
+ * saved nonzero timers remain remaining work; no new persistent state. */
+static int
+worker_gather_ready(Unit *q)
+{
+    if (!q->work_timer) q->work_timer = q->order == ORDER_MINE ? 45 : 60;
+    return --q->work_timer == 0;
+}
+
 #if defined(SC64_NEAREST_RESOURCE_DEPOT) || defined(SC64_WORKER_CARGO_KIND)
 /* Leave combat orders in fast RAM. Keeping the less frequent worker return
  * state machine in ROM prevents GCC's inlining decision from placing the
@@ -7588,7 +7614,7 @@ race_update_resource_worker(Unit *q)
             sc64_worker_cargo_clear(q);
 #endif
             q->build = -1;
-            q->work_timer = 20;
+            q->work_timer = 0;
         }
         return;
     }
@@ -7606,8 +7632,8 @@ race_update_resource_worker(Unit *q)
     if (dist2(q->x, q->y, tx, ty) >
         (q->order == ORDER_GAS ? 24 * 24 : 7 * 7)) {
         move_toward(q, tx, ty);
-    } else if (q->work_timer > 0) {
-        --q->work_timer;
+    } else if (!worker_gather_ready(q)) {
+        return;
     } else if (q->order == ORDER_MINE) {
 #ifdef SC64_WORKER_CARGO_KIND
         int collected = m[q->target].amount < 8 ? m[q->target].amount : 8;
@@ -7622,13 +7648,11 @@ race_update_resource_worker(Unit *q)
 #endif
         }
         if (q->carry > 0) q->build = -1;
-        q->work_timer = 45;
         if (collected <= 0) q->order = ORDER_IDLE;
 #else
         q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
         m[q->target].amount -= q->carry;
         if (q->carry > 0) q->build = -1;
-        q->work_timer = 45;
         if (q->carry <= 0) q->order = ORDER_IDLE;
 #endif
     } else {
@@ -7637,7 +7661,6 @@ race_update_resource_worker(Unit *q)
         if (IS_WORKER(q->type)) q->flags = (q->flags & ~SC64_WORKER_CARGO_MASK) | SC64_WORKER_CARGO_GAS;
 #endif
         q->build = -1;
-        q->work_timer = 60;
     }
 }
 #endif
@@ -8690,7 +8713,7 @@ target_lists_unavailable:
 #ifdef SC64_TERRAN_LATE_RUNTIME
                     if (race_late_active()) q->build = -1;
 #endif
-		    q->work_timer = 20;
+		    q->work_timer = 0;
 		}
 	    } else if (dist2(q->x, q->y, tx, ty) >
 #ifdef SC64_RACES
@@ -8700,15 +8723,14 @@ target_lists_unavailable:
 #endif
             ) {
 		move_toward(q, tx, ty);
-	    } else if (q->work_timer > 0) {
-		q->work_timer--;
+	    } else if (!worker_gather_ready(q)) {
+                continue;
 	    } else if (q->order == ORDER_MINE) {
 		q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
 		m[q->target].amount -= q->carry;
 #ifdef SC64_TERRAN_LATE_RUNTIME
                 if (race_late_active()) q->build = -1;
 #endif
-		q->work_timer = 45;
 		if (q->carry <= 0)
 		    q->order = ORDER_IDLE;
 	    } else {
@@ -8722,7 +8744,6 @@ target_lists_unavailable:
 		#else
 		q->carry = 4;
 		#endif
-		q->work_timer = 60;
 	    }
 	    continue;
 	}
@@ -9721,6 +9742,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     }
 #endif
     if (menu_open) reset_selection_gestures();
+    else field_menu_repeat_reset();
 #ifdef SC_COMMAND_RING
     if (command_ring_input(held, pressed)) return;
 #endif
@@ -9742,15 +9764,17 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
 	}
     }
+    if (!menu_open) field_menu_repeat_reset();
     if (menu_open) {
+        u16 menu_pressed = field_menu_repeat_keys(held, pressed);
 	reset_selection_gestures();
 #ifdef SC64_COMMAND_ICONS
-	if (!field_card_navigate(pressed))
+	if (!field_card_navigate(menu_pressed))
 #endif
 	{
-	    if (pressed & KEY_UP)
+	    if (menu_pressed & KEY_UP)
 		menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
-	    if (pressed & KEY_DOWN)
+	    if (menu_pressed & KEY_DOWN)
 		menu_cursor = (menu_cursor + 1) % field_menu_count();
 	}
 	if (pressed & KEY_A)

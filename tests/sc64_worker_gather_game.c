@@ -127,7 +127,7 @@ test_gas_cargo_retarget_and_credit(int race, int worker_type,
     assert(u[worker].carry == 6 &&
            (u[worker].flags & SC64_WORKER_CARGO_KIND_MASK) == SC64_WORKER_CARGO_GAS);
     u[worker].x = m[patch].x; u[worker].y = m[patch].y;
-    one_tick();
+    for (int i = 0; i < 45; ++i) one_tick();
     assert(u[worker].carry == 5 && m[patch].amount == 0);
     assert(!(u[worker].flags & SC64_WORKER_CARGO_KIND_MASK)); /* mineral kind */
     assert(minerals == 0 && gas == 0);
@@ -152,7 +152,7 @@ test_gas_cargo_retarget_and_credit(int race, int worker_type,
     assert(u[worker].carry == 4);
 #endif
     u[worker].x = 320; u[worker].y = 320;
-    one_tick();
+    for (int i = 0; i < 60; ++i) one_tick();
     assert(u[worker].carry == 8);
     assert((u[worker].flags & SC64_WORKER_CARGO_KIND_MASK) == SC64_WORKER_CARGO_GAS);
     assert(minerals == 0 && gas == 0);
@@ -212,9 +212,11 @@ test_build_clears_pending(int race, int worker_type, int building_type)
     u[worker].carry = 8;
     u[worker].order = ORDER_MINE;
     u[worker].target = 0;
+    u[worker].work_timer = 12;
     u[worker].flags |= SC64_WORKER_CARGO_GAS | SC64_WORKER_GATHER_PENDING;
     minerals = gas = 2000;
     assert(race_start_build(SIDE, worker, building_type, 480, 480));
+    assert(u[worker].work_timer == 0);
     assert(u[worker].order == ORDER_BUILD_PENDING);
     assert(minerals == 2000 && gas == 2000);
     assert(u[worker].carry == 8);
@@ -278,8 +280,10 @@ test_direct_attack_clears_pending(void)
     u[worker].carry = 6;
     u[worker].order = ORDER_MINE;
     u[worker].target = 0;
+    u[worker].work_timer = 12;
     u[worker].flags |= SC64_WORKER_CARGO_GAS | SC64_WORKER_GATHER_PENDING;
     assert(sc64_direct_attack_issue_target(enemy) == 1);
+    assert(u[worker].work_timer == 0);
     assert(u[worker].order == ORDER_ATTACK_TARGET);
     assert(u[worker].carry == 6);
     assert((u[worker].flags & SC64_WORKER_CARGO_KIND_MASK) == SC64_WORKER_CARGO_GAS);
@@ -373,8 +377,6 @@ test_automatic_no_depot_hold(void)
     assert(u[worker].x!=x || u[worker].y!=y);
     u[worker].x=300; u[worker].y=300;
     u[worker].work_timer=2;
-    one_tick();
-    assert(u[worker].carry==0 && sc64_worker_gather_pending(&u[worker]));
     one_tick();
     assert(u[worker].carry==0 && sc64_worker_gather_pending(&u[worker]));
     one_tick();

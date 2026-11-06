@@ -1030,6 +1030,8 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
 #endif
     }
 #endif
+    if (u[worker].order == ORDER_MINE || u[worker].order == ORDER_GAS)
+        u[worker].work_timer = 0;
 #ifdef SC64_WORKER_CARGO_KIND
     sc64_worker_gather_pending_set(&u[worker], 0);
 #endif
