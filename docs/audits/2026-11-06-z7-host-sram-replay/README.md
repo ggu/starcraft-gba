@@ -70,3 +70,43 @@ full-state or framebuffer/palette comparison. The reported guest timing covers
 the resume only and is not a modal-separated tail analysis or proof of
 30-fps behavior. Busy-scene pixel, memory and performance qualification remains
 open; no cache flag was promoted.
+
+## Bounded post-cut busy diagnostic
+
+An opt-in ARM diagnostic (`Z7_BUSY_DIAGNOSTIC` on the resume replay fixture)
+loaded the unchanged, qualified seed with HOME L and replayed exactly the next
+1,000 recorded calls, ticks 136,059–137,058. It reads game state, the indexed
+front framebuffer and the full background palette after the timed call; it
+does not write game state or SRAM. Those reads and diagnostic bookkeeping
+can affect subsequent frame pacing. Both diagnostic ELFs linked with the normal
+reserve guards: baseline BSS/IWRAM ends `0203d78c`/`03004f88`, candidate
+`020369ac`/`03004f50`. Each run used the native mGBA backend, a 120-second
+cap and the shared native lock. Wall times were 11.4 and 10.8 seconds.
+
+Each variant matched both recorded tape observations and both HOST cargo-digest
+checkpoints in this window, and the loaded SRAM image remained byte-identical
+to the qualified seed. Ten sampled 32-bit hashes matched between variants for
+selected unit/building/fog state and for the full indexed frame plus 256-entry
+background palette. These hashes are sampled evidence, not a byte-for-byte
+capture or proof of all state and pixels. Source/input manifests were stable.
+The opt-in replay and `tools/sc64_z7_busy_compare.py` retain strict parsing,
+seed and timeline checks; private ROMs, tapes, saves and logs are not committed.
+
+The window contained 975 advancing PLAY and 25 nonadvancing PLAY calls; no
+text-box/modal call occurred. Before and after, screen was PLAY throughout;
+mode was normal for 968 calls and build for 32. Minimum counts were 48 friendly
+and 169 non-side units, seven friendly and three non-side buildings. Resources
+changed from 1,322 minerals/15,990 gas after the first call to 871/15,925 after
+the last. The gameplay frame advanced from 134,787 before the first call to
+135,762 after the last.
+
+Advancing-call mean/peak cycles were 2,512,225/10,106,794 baseline and
+2,446,291/10,087,988 candidate. Nonadvancing-call mean/peak cycles were
+2,771,470/3,076,203 baseline and 2,660,158/3,059,425 candidate. Across all
+1,000 calls, the 50th- and 10th-highest cycle counts were 6,132,061/6,446,624
+baseline and 5,921,123/6,446,764 candidate. The advancing mean in this one
+instrumented workload is well above the nominal roughly 559,241 cycles per
+30-fps frame; this is not a physical-hardware result or an all-mode benchmark.
+The result does not establish all-state/pixel equivalence or justify promoting
+the cache flags. Detailed local artifacts are under
+`build/z7-host-sram-contract/busy/`.
