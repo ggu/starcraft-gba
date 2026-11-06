@@ -3085,9 +3085,18 @@ terrain_blocked(int col, int row)
 #endif
 }
 
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+extern volatile u32 sc64_route_diag_invalidater;
+#endif
 static void
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+__attribute__((noinline))
+#endif
 invalidate_path_grid(void)
 {
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+    sc64_route_diag_invalidater=(u32)__builtin_return_address(0);
+#endif
     path_grid_valid = 0;
 #ifdef SC64_DIRECT_FIRING_POINTS
     sc64_direct_firing_cache_invalidate();
@@ -3325,11 +3334,22 @@ is_traversable(int col, int row, int from_cell)
 _Static_assert(MAX_BUILDINGS < 0x8000, "depot slot keys must fit the tagged route namespace");
 
 /* Breadth-first on the bounded walk grid; return the first tile toward goal. */
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+static int __attribute__((noinline))
+#else
 static int GBA_HOT
+#endif
 path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 {
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+    sc64_route_diag_outer=(u32)__builtin_return_address(0);
+    int diag_result=sc64_route_next(x, y, tx, ty, next_x, next_y);
+    sc64_route_diag_outer=0;
+    return diag_result;
+#else
     return sc64_route_next(x, y, tx, ty, next_x, next_y);
+#endif
 #else
     static const int dx[4] = {1, -1, 0, 0};
     static const int dy[4] = {0, 0, 1, -1};
@@ -3399,7 +3419,14 @@ static int __attribute__((noinline))
 worker_depot_next(int x, int y, int home, int *next_x, int *next_y)
 {
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+    sc64_route_diag_outer=(u32)__builtin_return_address(0);
+    int diag_result=sc64_route_depot_next(x, y, home, b[home].x, b[home].y, next_x, next_y);
+    sc64_route_diag_outer=0;
+    return diag_result;
+#else
     return sc64_route_depot_next(x, y, home, b[home].x, b[home].y, next_x, next_y);
+#endif
 #else
     static const int dx[4] = { 1, -1, 0, 0 };
     static const int dy[4] = { 0, 0, 1, -1 };

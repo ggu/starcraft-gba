@@ -213,6 +213,27 @@ static u8 sc64_route_field[SC64_ROUTE_SLOTS][SC64_ROUTE_BYTES];
 /* Legacy fields retain distances for the original blocked-start behavior. */
 static u16 sc64_route_field[SC64_ROUTE_SLOTS][MAP_CELLS];
 #endif
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+/* Diagnostic-only bounded ring; host drains after each ordinary update. */
+typedef struct { u32 frame, caller, cycles, epoch, invalidater; u16 key, evicted; u8 slot, valid, kind, reason; } Sc64RouteDiagEvent;
+volatile Sc64RouteDiagEvent sc64_route_diag_events[16];
+volatile u32 sc64_route_diag_count, sc64_route_diag_epoch, sc64_route_diag_outer, sc64_route_diag_invalidater;
+#define SC64_ROUTE_DIAG_INVALIDATE() (++sc64_route_diag_epoch)
+#define SC64_ROUTE_DIAG_BEGIN(k,which) \
+    u32 diag_start=gba_clock(), diag_caller=(u32)__builtin_return_address(0); \
+    u32 diag_epoch=sc64_route_diag_epoch; u16 diag_key=(u16)(k), diag_old=sc64_route_goal[slot]; \
+    u8 diag_valid=sc64_route_valid[slot], diag_kind=(which)
+#define SC64_ROUTE_DIAG_FINISH() do { \
+    u32 n=sc64_route_diag_count; volatile Sc64RouteDiagEvent *e=&sc64_route_diag_events[n&15u]; \
+    e->frame=(u32)frame; e->caller=sc64_route_diag_outer ? sc64_route_diag_outer : diag_caller; e->cycles=gba_clock()-diag_start; e->epoch=diag_epoch; e->invalidater=sc64_route_diag_invalidater; \
+    e->key=diag_key; e->evicted=diag_old; e->slot=(u8)slot; e->valid=diag_valid; e->kind=diag_kind; \
+    e->reason=(u8)((diag_valid ? (diag_old==diag_key ? 2 : 1) : 0) | ((sc64_route_valid[slot]&3u)<<4)); sc64_route_diag_count=n+1; \
+} while(0)
+#else
+#define SC64_ROUTE_DIAG_INVALIDATE() ((void)0)
+#define SC64_ROUTE_DIAG_BEGIN(k,which) ((void)0)
+#define SC64_ROUTE_DIAG_FINISH() ((void)0)
+#endif
 static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
 
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
@@ -240,7 +261,7 @@ static int sc64_route_configure(void)
             sc64_route_active_bytes = 0;
             sc64_route_active_slots = 0;
             for (i = 0; i < SC64_ROUTE_ACTIVE_MAX_SLOTS; ++i) sc64_route_field[i] = 0;
-            memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+            memset(sc64_route_valid, 0, sizeof(sc64_route_valid)); SC64_ROUTE_DIAG_INVALIDATE();
             memset(sc64_route_age, 0, sizeof(sc64_route_age));
             sc64_route_clock = 0;
         }
@@ -264,7 +285,7 @@ static int sc64_route_configure(void)
     sc64_route_active_slots = slots;
     for (i = 0; i < slots; ++i) sc64_route_field[i] = sc64_route_pool + i * bytes;
     for (; i < SC64_ROUTE_ACTIVE_MAX_SLOTS; ++i) sc64_route_field[i] = 0;
-    memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+    memset(sc64_route_valid, 0, sizeof(sc64_route_valid)); SC64_ROUTE_DIAG_INVALIDATE();
     memset(sc64_route_age, 0, sizeof(sc64_route_age));
     sc64_route_clock = 0;
     return 1;
@@ -335,7 +356,7 @@ static void sc64_route_age_request(void)
 {
     int i;
     if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) {
-        memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+        memset(sc64_route_valid, 0, sizeof(sc64_route_valid)); SC64_ROUTE_DIAG_INVALIDATE();
         memset(sc64_route_age, 0, sizeof(sc64_route_age));
         sc64_route_clock = 0;
     }
@@ -399,7 +420,7 @@ sc64_routes_reset(void)
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
     (void)sc64_route_configure();
 #endif
-    memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+    memset(sc64_route_valid, 0, sizeof(sc64_route_valid)); SC64_ROUTE_DIAG_INVALIDATE();
 #ifdef SC64_RANGE_WORK
     sc64_range_route_reset();
 #endif
@@ -1261,6 +1282,7 @@ sc64_route_slot(int goal)
                sizeof(sc64_range_route_snapshot_key));
     }
 #endif
+SC64_ROUTE_DIAG_BEGIN(goal, 0);
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
@@ -1387,6 +1409,7 @@ sc64_route_slot(int goal)
     sc64_route_valid[slot] = 1;
 #endif
     sc64_route_builds++;
+    SC64_ROUTE_DIAG_FINISH();
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     sc64_route_probe_host_flood((unsigned)tail);
 #endif
@@ -1876,6 +1899,7 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
                sizeof(sc64_range_route_snapshot_key));
     }
 #endif
+SC64_ROUTE_DIAG_BEGIN(key, 1);
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
@@ -1975,6 +1999,7 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
 #endif
     sc64_route_valid[slot] = complete ? 1 : 2;
     sc64_route_builds++;
+    SC64_ROUTE_DIAG_FINISH();
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     sc64_route_probe_host_flood((unsigned)tail);
 #endif
