@@ -3344,6 +3344,7 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 #ifdef SC64_IMPORTED_MISSION
 #ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
     sc64_route_diag_outer=(u32)__builtin_return_address(0);
+    sc64_route_diag_origin=(u32)(limit(x / 16, 0, MAP_COLS - 1) + limit(y / 16, 0, MAP_ROWS - 1) * MAP_COLS);
     int diag_result=sc64_route_next(x, y, tx, ty, next_x, next_y);
     sc64_route_diag_outer=0;
     return diag_result;

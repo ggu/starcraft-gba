@@ -215,9 +215,9 @@ static u16 sc64_route_field[SC64_ROUTE_SLOTS][MAP_CELLS];
 #endif
 #ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
 /* Diagnostic-only bounded ring; host drains after each ordinary update. */
-typedef struct { u32 frame, caller, cycles, epoch, invalidater; u16 key, evicted; u8 slot, valid, kind, reason; } Sc64RouteDiagEvent;
+typedef struct { u32 frame, caller, cycles, epoch, invalidater; u16 key, evicted; u8 slot, valid, kind, reason; u16 origin, visited, expanded, reached; } Sc64RouteDiagEvent;
 volatile Sc64RouteDiagEvent sc64_route_diag_events[16];
-volatile u32 sc64_route_diag_count, sc64_route_diag_epoch, sc64_route_diag_outer, sc64_route_diag_invalidater;
+volatile u32 sc64_route_diag_count, sc64_route_diag_epoch, sc64_route_diag_outer, sc64_route_diag_invalidater, sc64_route_diag_origin, sc64_route_diag_expanded;
 #define SC64_ROUTE_DIAG_INVALIDATE() (++sc64_route_diag_epoch)
 #define SC64_ROUTE_DIAG_BEGIN(k,which) \
     u32 diag_start=gba_clock(), diag_caller=(u32)__builtin_return_address(0); \
@@ -226,7 +226,7 @@ volatile u32 sc64_route_diag_count, sc64_route_diag_epoch, sc64_route_diag_outer
 #define SC64_ROUTE_DIAG_FINISH() do { \
     u32 n=sc64_route_diag_count; volatile Sc64RouteDiagEvent *e=&sc64_route_diag_events[n&15u]; \
     e->frame=(u32)frame; e->caller=sc64_route_diag_outer ? sc64_route_diag_outer : diag_caller; e->cycles=gba_clock()-diag_start; e->epoch=diag_epoch; e->invalidater=sc64_route_diag_invalidater; \
-    e->key=diag_key; e->evicted=diag_old; e->slot=(u8)slot; e->valid=diag_valid; e->kind=diag_kind; \
+    e->origin=(u16)sc64_route_diag_origin; e->visited=(u16)tail; e->expanded=(u16)sc64_route_diag_expanded; e->reached=(u16)(sc64_route_diag_origin < MAP_CELLS && sc64_route_get(slot,sc64_route_diag_origin)!=SC64_ROUTE_UNREACHABLE); e->key=diag_key; e->evicted=diag_old; e->slot=(u8)slot; e->valid=diag_valid; e->kind=diag_kind; \
     e->reason=(u8)((diag_valid ? (diag_old==diag_key ? 2 : 1) : 0) | ((sc64_route_valid[slot]&3u)<<4)); sc64_route_diag_count=n+1; \
 } while(0)
 #else
@@ -1202,6 +1202,9 @@ sc64_route_flood(int slot, int head, int *tail, int origin,
         }
 #endif
     }
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+    sc64_route_diag_expanded=(u32)head;
+#endif
     *tail = qtail;
     return complete;
 }
@@ -1900,6 +1903,9 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     }
 #endif
 SC64_ROUTE_DIAG_BEGIN(key, 1);
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+    sc64_route_diag_origin=(u32)origin;
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
@@ -1992,6 +1998,9 @@ SC64_ROUTE_DIAG_BEGIN(key, 1);
     for (i=0;i<tail;++i) SC64_GRID_SET(path_walkable,bfs_queue[i],1);
 #endif
     sc64_route_goal[slot] = key;
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+    sc64_route_diag_expanded=(u32)head;
+#endif
 #ifdef SC64_ROUTE_DECAY_FREQ
     sc64_route_age[slot] = sc64_route_age_pack(1u, sc64_route_clock);
 #else
