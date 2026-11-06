@@ -477,8 +477,8 @@ static int controller_select_building(int slot)
         return 0;
     if (!controller_normalize_field()) return 0;
     /* Field interaction treats A as producer-queue input while a building
-       remains selected, so clear that selection with the ordinary L cycle
-       before clicking the requested building. */
+       remains selected, so clear that selection with SELECT before clicking
+       the requested building. */
     if (selected_building >= 0) tap(KEY_SELECT);
     move_cursor(b[slot].x, b[slot].y);
     tap(KEY_A);
