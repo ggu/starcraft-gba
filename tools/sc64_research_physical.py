@@ -8,6 +8,7 @@ boot/exit; it never writes guest memory and never injects gameplay state.
 import argparse
 import fcntl
 import os
+import resource
 import shutil
 import signal
 import sys
@@ -58,6 +59,8 @@ RUNNER_SHA = '4199fe903b18c77e0833db1860c4968509cfc82e506bc6f2f9be7582b720fae2'
 WALL_SECONDS = 180
 OUTPUT_LIMIT = 64 * 1024 * 1024
 RESERVE = 4 * 1024 ** 3
+CLEANUP_SECONDS = 3
+POLL_SECONDS = 0.2
 
 
 def validate_inputs(a):
@@ -131,22 +134,14 @@ def run_worker(a):
             try: proc.wait(timeout=3)
             except subprocess.TimeoutExpired: proc.kill();proc.wait()
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(description='Physical replay; owns the shared native lock. Do not wrap in another lock.')
-    for name in ('rom','elf','runner','tape','resume_tape','output'):
-        ap.add_argument('--'+name.replace('_','-'), type=Path, required=True)
-    ap.add_argument('--internal-worker', action='store_true', help=argparse.SUPPRESS)
-    a = ap.parse_args(argv)
-    if a.internal_worker:
-        try:
-            fd=int(os.environ.get('SC64_RESEARCH_PROBE_LOCK_FD','-1'))
-            actual=os.fstat(fd); expected=os.stat(LOCK_PATH)
-            if (actual.st_dev,actual.st_ino)!=(expected.st_dev,expected.st_ino):
-                raise ValueError('wrong lock file')
-            fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except (ValueError,OSError):
-            ap.error('internal worker requires the held shared lock')
-        return run_worker(a)
+def output_filesystem(path):
+    ancestor=path
+    while not ancestor.exists() and ancestor!=ancestor.parent:
+        ancestor=ancestor.parent
+    return ancestor
+
+
+def supervise(a, worker=run_worker):
     deadline=time.monotonic()+WALL_SECONDS
     try:
         pins=validate_inputs(a)
@@ -156,48 +151,80 @@ def main(argv=None):
                     fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
                     break
                 except BlockingIOError:
-                    if time.monotonic()>=deadline-3:
+                    if time.monotonic()>=deadline-CLEANUP_SECONDS:
                         raise TimeoutError('shared native lock timed out')
-                    time.sleep(min(0.2,max(0,deadline-3-time.monotonic())))
+                    time.sleep(min(POLL_SECONDS,max(0,deadline-CLEANUP_SECONDS-time.monotonic())))
             if validate_inputs(a)!=pins:
                 raise ValueError('input changed while waiting for lock')
-            if time.monotonic()>=deadline-3:
+            if time.monotonic()>=deadline-CLEANUP_SECONDS:
                 raise TimeoutError('physical replay exceeded wall limit before launch')
-            env=os.environ.copy();env['SC64_RESEARCH_PROBE_LOCK_FD']=str(lock.fileno())
-            args=[sys.executable,str(Path(__file__).resolve()),'--internal-worker']
-            for name in ('rom','elf','runner','tape','resume_tape','output'):
-                args += ['--'+name.replace('_','-'),str(getattr(a,name))]
-            proc=None
+            child=os.fork()
+            if child==0:
+                try:
+                    os.setsid()
+                    resource.setrlimit(resource.RLIMIT_FSIZE,(OUTPUT_LIMIT,OUTPUT_LIMIT))
+                    result=worker(a)
+                    sys.stdout.flush();sys.stderr.flush()
+                    os._exit(0 if result is None else int(result))
+                except BaseException:
+                    import traceback
+                    traceback.print_exc()
+                    os._exit(1)
+            status=None
             def terminate(signum,_frame):
                 raise SystemExit(128+signum)
             oldterm=signal.signal(signal.SIGTERM,terminate)
             try:
-                proc=subprocess.Popen(args,env=env,start_new_session=True,pass_fds=(lock.fileno(),))
-                while proc.poll() is None:
+                while True:
+                    pid,status=os.waitpid(child,os.WNOHANG)
+                    if pid: break
+                    status=None
                     if output_bytes(a.output)>OUTPUT_LIMIT:
-                        raise ValueError('output exceeds 64 MiB')
-                    if time.monotonic()>=deadline-3:
+                        raise ValueError('aggregate output exceeds 64 MiB')
+                    if shutil.disk_usage(output_filesystem(a.output)).free<RESERVE:
+                        raise ValueError('output filesystem has less than 4 GiB free')
+                    if time.monotonic()>=deadline-CLEANUP_SECONDS:
                         raise TimeoutError('physical replay exceeded wall limit')
-                    time.sleep(0.2)
+                    time.sleep(POLL_SECONDS)
                 if output_bytes(a.output)>OUTPUT_LIMIT:
-                    raise ValueError('output exceeds 64 MiB')
-                return proc.returncode
+                    raise ValueError('aggregate output exceeds 64 MiB')
+                if shutil.disk_usage(output_filesystem(a.output)).free<RESERVE:
+                    raise ValueError('output filesystem has less than 4 GiB free')
+                return os.waitstatus_to_exitcode(status)
             finally:
-                if proc is not None:
-                    # Kill only our session, even if the worker exited first.
-                    try: os.killpg(proc.pid,signal.SIGTERM)
+                # The child creates a session before launching its descendants.
+                # If it has not done so yet, target only the owned child PID.
+                try: os.killpg(child,signal.SIGTERM)
+                except ProcessLookupError:
+                    try: os.kill(child,signal.SIGTERM)
                     except ProcessLookupError: pass
-                    try: proc.wait(timeout=max(0,min(1,deadline-time.monotonic())))
-                    except subprocess.TimeoutExpired: pass
-                    try: os.killpg(proc.pid,signal.SIGKILL)
+                until=min(deadline,time.monotonic()+min(1,CLEANUP_SECONDS/2))
+                if status is None:
+                    while time.monotonic()<until:
+                        pid,status=os.waitpid(child,os.WNOHANG)
+                        if pid: break
+                        status=None;time.sleep(min(POLL_SECONDS,0.05))
+                try: os.killpg(child,signal.SIGKILL)
+                except ProcessLookupError:
+                    try: os.kill(child,signal.SIGKILL)
                     except ProcessLookupError: pass
-                    if proc.poll() is None:
-                        try: proc.wait(timeout=max(0,deadline-time.monotonic()))
-                        except subprocess.TimeoutExpired: pass
+                if status is None:
+                    while time.monotonic()<deadline:
+                        try: pid,status=os.waitpid(child,os.WNOHANG)
+                        except ChildProcessError: break
+                        if pid: break
+                        status=None;time.sleep(min(POLL_SECONDS,0.01))
                 signal.signal(signal.SIGTERM,oldterm)
     except (OSError,ValueError,TimeoutError) as exc:
         print(str(exc),file=sys.stderr)
         return 124 if isinstance(exc,TimeoutError) else 2
+
+
+def main(argv=None):
+    ap=argparse.ArgumentParser(description='Physical replay; owns the shared native lock. Do not wrap in another lock.')
+    for name in ('rom','elf','runner','tape','resume_tape','output'):
+        ap.add_argument('--'+name.replace('_','-'),type=Path,required=True)
+    return supervise(ap.parse_args(argv))
 
 
 if __name__=='__main__': sys.exit(main())

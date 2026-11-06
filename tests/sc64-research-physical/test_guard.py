@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import hashlib
+import fcntl
+import os
+import time
 import importlib.util
 from pathlib import Path
 import sys
@@ -38,9 +41,43 @@ class GuardTests(unittest.TestCase):
             with patch.object(m,'OUTPUT_LIMIT',10):
                 self.assertGreater(m.output_bytes(root),m.OUTPUT_LIMIT)
 
-    def test_worker_cannot_bypass_lock(self):
-        with patch.dict(m.os.environ,{'SC64_RESEARCH_PROBE_LOCK_FD':'-1'}):
-            with self.assertRaises(SystemExit):
-                m.main(['--internal-worker','--rom','r','--elf','e','--runner','x','--tape','t','--resume-tape','u','--output','o'])
+    def test_internal_worker_option_does_not_exist(self):
+        with self.assertRaises(SystemExit):
+            m.main(['--internal-worker','--rom','r','--elf','e','--runner','x','--tape','t','--resume-tape','u','--output','o'])
+
+    def test_bounded_wait_and_hung_descendant_cleanup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            class Args: pass
+            a=Args()
+            for name in ('rom','elf','runner','tape','resume_tape'):
+                path=root/name;path.write_bytes(name.encode());setattr(a,name,path)
+            a.output=root/'output'
+            lock_path=str(root/'lock')
+            runner_hash=hashlib.sha256(b'runner').hexdigest()
+            with patch.object(m,'LOCK_PATH',lock_path),patch.object(m,'RUNNER_SHA',runner_hash), \
+                 patch.object(m,'WALL_SECONDS',0.6),patch.object(m,'CLEANUP_SECONDS',0.2), \
+                 patch.object(m,'POLL_SECONDS',0.02):
+                with open(lock_path,'a') as held:
+                    fcntl.flock(held,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                    start=time.monotonic();self.assertEqual(m.supervise(a),124)
+                    self.assertLess(time.monotonic()-start,1.5)
+                    self.assertFalse(a.output.exists())
+                readfd,writefd=os.pipe()
+                def hung(_a):
+                    os.close(readfd)
+                    if os.fork()==0:
+                        while True:time.sleep(10)
+                    while True:time.sleep(10)
+                try:
+                    start=time.monotonic();self.assertEqual(m.supervise(a,hung),124)
+                    self.assertLess(time.monotonic()-start,1.5)
+                    os.close(writefd);writefd=-1
+                    import select
+                    self.assertTrue(select.select([readfd],[],[],1)[0])
+                    self.assertEqual(os.read(readfd,1),b'')
+                finally:
+                    os.close(readfd)
+                    if writefd>=0:os.close(writefd)
 
 if __name__=='__main__':unittest.main()
