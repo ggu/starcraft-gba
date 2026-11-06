@@ -1643,7 +1643,9 @@ static void race_skirmish_init(void)
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
     death_vfx_reset();
     memset(geysers, 0, sizeof(geysers));
-    minerals = 200; gas = 0; geyser_count = 4;
+    /* Native Melee opens with 50 minerals; give every active player the
+     * same starting bank. This is independent of mining/AI difficulty. */
+    minerals = 50; gas = 0; geyser_count = 4;
     for (i = 0; i < 4; ++i) {
         int sx = (i == 0 || i == 3) ? -1 : 1;
         int sy = (i == 0 || i == 2) ? 1 : -1;
@@ -1681,7 +1683,7 @@ static void race_skirmish_init(void)
     for (i = 0; i < 1 + race_bots && i < 4; ++i) {
         int base = i;
         owner = i == 0 ? SIDE : race_bot_owner_ids[i - 1];
-        if (owner != SIDE) race_minerals[owner] = 200;
+        if (owner != SIDE) race_minerals[owner] = 50;
         switch (race_owner_identity(owner)) {
         case R_ZERG: townhall = B_HATCHERY; worker_type = U_DRONE; break;
         case R_PROTOSS: townhall = B_NEXUS; worker_type = U_PROBE; break;
