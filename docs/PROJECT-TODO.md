@@ -60,7 +60,9 @@ older KODAK package. Source merges do not update an already copied ROM.
   source frames require a paired native presentation check, not guessed scale.
 - **Performance:** a final combined-source advisor-bank full-flood candidate
   passed focused oracles, eight Z7–Z10 guarded links and 18 custom opening/warm
-  comparisons. Current full campaign/replay and cycle gates remain open. The
+  comparisons. A current Z9 custom save/fresh-load pair also matched 500
+  advancing updates on both variants; this is a passive opening, not a match
+  win. Current campaign-winning and cycle gates remain open. The
   earlier ~6% busy-scene mean-cycle improvement is historical evidence, not
   a newly shipped speed gain or a claim of 30 fps. Actions remains disabled;
   these checks run locally.
