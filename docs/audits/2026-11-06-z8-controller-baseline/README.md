@@ -20,3 +20,33 @@ A sparse observer reproduced the enabled baseline input trace byte for byte. The
 At frame 10,789 the baseline interceptor counted an Overlord and a Zergling, and its selection attempt returned without acting after 62 game frames. At frame 10,852 it counted 11 nearby friendly non-Drones, including two Overlords and a map revealer, and selected the more-than-ten branch that ordered attack-move to the guard. Subsequent command sequences occupied 26–57 frames. The combatant-count trial instead counted one Zergling at frame 10,787; its direct-target sequence occupied 84 frames, followed by further sequences of 81 and 94 frames. The raid still had 40 HP at frame 10,954. Its observer matched that candidate's input trace byte for byte. These observations implicate the controller's command timing and selection, but do not establish every attack acceptance, cooldown or targeting condition.
 
 Private logs, observer source and hashes, the failed patch, exact compile commands and input manifests are retained in `.local/qualification/z8-pair` of the isolated qualification checkout. The baseline enabled input trace SHA-256 is `51251bd1acadfe1e2ded1a2bad6858b9cd3699df9a83fa4ad8718749ad3ab1e6`; the combined enabled and count-only trace is `4891b48e93a2d316782f0e086782e69b25ee0fc4334dabfc6f58da5ac846f52f`. Observer and baseline trace identity checks establish unchanged recorded input/state checkpoints, not exhaustive world identity. A future controller experiment should verify order acceptance and defensive placement with ordinary inputs and qualify a full win, save continuation and ARM replay; a delayed loss does not close the gate.
+
+## Further bounded defense trials
+
+Two additional single-change ordinary-input HOST controllers were tested on the
+same `ab9b35c` source checkout and the same enabled Z9 product vector. Each was
+compiled with the existing ASan/UBSan flags, ran under the shared native lock,
+and preserved all 272 recorded private input hashes. Engine rules, resources,
+enemy stats, mission triggers and outcomes were not changed.
+
+| Trial | Only controller change | Outcome | Calls | Fault |
+| --- | --- | --- | ---: | ---: |
+| Attack post | Pre-raid Hydralisk repost uses attack-move rather than move | loss at frame 11,048 | 11,309 | 0 |
+| Earlier interception post | Northeast guard moves from (1950,330) to (1840,430) | loss at frame 11,048 | 11,290 | 0 |
+
+Neither change is retained in the controller. The changed post also altered
+earlier gameplay (final Drone count 11 versus 14); it cannot isolate only the
+second raid's engagement. The current engine already gives idle non-worker
+actors a within-range acquisition path in `SC64_IMPORTED_MISSION`; the older
+controller comment saying idle units ignore raids is not a general engine fact.
+Thus this evidence does not justify adding idle autoattack or claiming it is
+missing. Next observation should capture actual accepted orders, weapon reach,
+cooldowns and target/detection eligibility during the second raid before
+another strategy or engine change. A full ordinary-input Z8 win remains open.
+
+Exact failed sources, compile logs, full traces, input manifests and machine
+readable final states remain local in `.local/qualification/z8-attack-post`,
+`z8-intercept-post` and `z8-controller-followup-results.json`. Their trace
+SHA-256 values are `99b5afbbb3252b7697966989309b21dec925c362b99a3513788b0357e3a5c18a`
+and `301d50bd68dda798153d99f560444bcca020d98d62651ec4d3f358bed94ef01e`.
+These are HOST losses, not ARM wins or N64 gameplay observations.
