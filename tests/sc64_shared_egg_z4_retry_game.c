@@ -26,10 +26,14 @@ static void prepare_retry(void)
     race_z4.model.action_cursor[SC64_Z4_TRIGGER_STARTUP]=6;
     race_z4.action_ticks[SC64_Z4_TRIGGER_STARTUP]=1;
     race_z4.countdown_active=1;race_z4.countdown_ticks=100;
-    Sc64Z4Output out={0};out.action_count=1;
+    race_z4.model.fired|=1u<<SC64_Z4_TRIGGER_FORCE_START;
+    race_z4.model.action_cursor[SC64_Z4_TRIGGER_FORCE_START]=1;
+    Sc64Z4Output out={0};out.action_count=2;
     out.actions[0].trigger=SC64_Z4_TRIGGER_STARTUP;out.actions[0].action_index=5;
+    out.actions[1].trigger=SC64_Z4_TRIGGER_FORCE_START;out.actions[1].action_index=0;
     assert(race_z4_dispatch_events(&out));
     assert(race_z4.faults==(1u<<(24u+SC64_Z4_TRIGGER_STARTUP)));
+    assert(race_z4.action_ticks[SC64_Z4_TRIGGER_FORCE_START]==1 && race_z4.ai_script_mask);
     memcpy(u,original,sizeof(u));assert(race_z4_runtime_state_valid(&race_z4));
 }
 int main(int argc,char **argv)
@@ -38,6 +42,18 @@ int main(int argc,char **argv)
     if(!strcmp(argv[1],"write")) {
         prepare_retry();assert(race_save_game());assert(fixture_export_host_save(argv[2]));
         puts("Z4 pending-create writer passed");return 0;
+    }
+    if(!strcmp(argv[1],"terminalwrite")) {
+        prepare_retry();race_z4.model.outcome=SC64_Z4_WON;
+        race_z4.model.fired|=1u<<SC64_Z4_TRIGGER_COMMAND_CENTER_WIN;
+        assert(race_z4_runtime_state_valid(&race_z4));assert(race_save_game());
+        assert(fixture_export_host_save(argv[2]));puts("Z4 pending terminal writer passed");return 0;
+    }
+    if(!strcmp(argv[1],"terminalread")) {
+        game_init();assert(fixture_import_host_save(argv[2]));assert(race_load_game());
+        assert(!won && race_z4.model.outcome==SC64_Z4_WON && race_z4.faults);
+        assert(race_z4_campaign_tick());assert(won && !race_z4.faults);
+        puts("Z4 pending terminal fresh retry passed");return 0;
     }
     if(!strcmp(argv[1],"legacy")) {
         prepare_retry();assert(race_save_game());u32 length=0;
