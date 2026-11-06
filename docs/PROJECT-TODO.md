@@ -41,6 +41,33 @@ returned error -3811 before gameplay could be inspected. No reference input,
 RAM snapshot, native event timing or new N64 parity result was obtained. The
 failed launch record remains local in `pylon-resume-20261106-140958`.
 
+Fresh recovery results (qualification remains incomplete):
+
+- Terran's explicit shared-actor ARM candidate linked with the unchanged linker
+  guards. Z7 failed IWRAM by 696 bytes: staged end `0x030052b8`, limit
+  `0x03005000`; the same derived profile without the stage ends at
+  `0x03004f68`. The growth is in hot simulation paths, so no guard reduction or
+  unmeasured hot-code relocation was accepted. Per-function stack reports are
+  not dynamic stack proof. P10's historical fact-header reconstruction did not
+  match its required hash and was not substituted; any new table needs fresh
+  qualification.
+- The late-Zerg art bank and Z8/Z9 authored program headers were recovered with
+  exact recorded hashes. The repaired renderer runner fails on compilation or
+  oracle errors and compares indexed frames plus palettes across binaries.
+  Z7 and identity-checked Z9 campaign fixtures passed both reference checks and
+  paired equality (91 captures each), with frozen source/input hashes unchanged.
+  Expanded Z7 custom fixtures found six full-clear mismatches in both baseline
+  and candidate despite matching paired traces. Preserve both gates and diagnose
+  that disagreement before promotion; no ARM speed improvement is established.
+- The current Z8 controller pair reproduced fault-free losses: common service
+  at frame 11,048 and service-off at 21,782. The first sampled state difference
+  is an additional Egg, consistent with the intended lifecycle, not proof of a
+  defect. Defense/command telemetry is next; no enemy or objective tuning and
+  no new qualified campaign win follows from these results.
+- The user confirmed the screen is unlocked. After reconnecting, native text
+  access worked but screenshot capture timed out; N64 gameplay comparison is
+  still unavailable. Disk remains above 149 GiB free during these checks.
+
 Read-only review follow-up (2026-11-06; no new build or runtime proof):
 
 - Before running the late-Zerg cache trial, make its runner fail on any compilation or test failure and require all four results. Compare deterministic baseline/candidate indexed frames and palettes directly; the existing same-flag reference cannot detect every shared rendering error. Add identity-checked Z9 and custom scenes plus lifecycle-driven fog/minimap transitions; the carried Z7 fixture does not prove those paths.
