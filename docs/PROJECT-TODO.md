@@ -34,9 +34,13 @@ older KODAK package. Source merges do not update an already copied ROM.
   Normal ARM vectors link with the delivered advisor bank and unchanged
   guards. The four package builds retain at least 664 bytes to the IWRAM
   boundary and 796 bytes to the EWRAM boundary. The new four-ROM
-  Mac package `StarCraft-GBA-2026-11-06-94bc32f8` has verified 32-MiB ROMs,
+  Mac package `StarCraft-GBA-2026-11-06-738223a4` has verified 32-MiB ROMs,
   headers, checksums, a player testing guide and 392 compiler-reported dependency
-  hashes. Its Zerg9 includes #313; other three ROMs match the cf33 package.
+  hashes for the previous four-build package. The current package assembles
+  the exact measured/guarded #315 Zerg9 candidate with the unchanged qualified
+  Terran/P10/Showcase binaries; it does not claim four new merged-head builds.
+  All common/StarCraft source hashes match the recorded candidate sources.
+  Other three ROMs still match the cf33 package.
   **KODAK still has the older e9838086 package** until a new physical copy is
   recorded; the card is not currently mounted.
 - **Controller cleanup #310:** producer selection escapes use SELECT, keeping
@@ -56,7 +60,11 @@ older KODAK package. Source merges do not update an already copied ROM.
   integrate together. A separate default-off research journal experiment now
   passes synthetic actual-engine P10/Z9 save/load, fallback and maximum
   impact/Yamato combinations, plus six guarded ARM links. It is not in releases;
-  genuine-record admission, review, stack and gameplay integration remain open.
+  genuine 94bc-produced P10/Z9 campaign/custom records also load in separate
+  experimental consumer processes. New-match/restart resets were repaired.
+  Review caught a research/roster outer-tag collision. A separate namespace
+  correction passes its inventory and genuine-record consumer checks; final
+  build/review qualification, stack and gameplay integration remain open.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** warp-start/death sounds, large death effects, remembered
@@ -76,8 +84,17 @@ older KODAK package. Source merges do not update an already copied ROM.
   from the final package, so campaign qualification must pin actual selected
   inputs, not just similar compile flags. The near-30-fps goal remains open.
   Current profiling correlates order spikes with synchronous route-field
-  builds; caller attribution is the next bounded diagnostic. Actions stays
-  disabled; these checks run locally.
+  builds. **#315 merged** enables the existing packed terrain-grid builder
+  for Z7–Z10, preserving its scalar toggle. Eight normal guarded links,
+  33 complete-grid cases, actual Z5 door/save-load parity, four HOST display
+  oracles and 18 custom openings pass. In the exact-package Z9 500-update
+  comparison, mean cycles fell a further 0.895% and the observed maximum
+  18.5%; selected persisted-state fingerprints matched every update. This
+  remains one passive-human opening, without guest pixels, a current campaign
+  win or hardware FPS proof. The prepared Mac package above includes the
+  exact qualified #315 Z9 binary.
+  See [the scoped grid audit](audits/2026-11-06-late-zerg-bulk-path-grid/README.md).
+  Actions stays disabled; these checks run locally.
 
 Priority: deliver the verified normal package when KODAK is connected, reduce
 measured route/order tails and repair current campaign/winning-replay gaps.
@@ -89,7 +106,7 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-06-94bc32f8`:
+- Latest verified normal Mac package: `StarCraft-GBA-2026-11-06-738223a4`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The older KODAK package
   is `20261106-e9838086-campaigns`. Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
@@ -258,7 +275,8 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#265](https://github.com/ggu/starcraft-gba/pull/265), advisor alerts | Held: burn/combat suppression, one-shots, cooldown initialization, voice policy and current-combination qualification. |
 | [#212](https://github.com/ggu/starcraft-gba/pull/212), [#210](https://github.com/ggu/starcraft-gba/pull/210), Carrier/Defiler | Draft/conflicting: namespace collision with transport, missing genuine migration/current qualification; also audit guarded AI purchases. |
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Draft: renderer conflicts and missing current memory/paired ARM qualification. |
-| SD delivery | Latest verified normal Mac package is `e9838086`, with a separate custom Egg preview; last verified KODAK copy is f7. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
+| [#315](https://github.com/ggu/starcraft-gba/pull/315), late-Zerg packed grid | Merged as `738223a4`; scoped tests and emulator timing are recorded above. The latest Mac package includes the exact qualified Z9 candidate. Strict current Z7 winning validation, broader campaign/skirmish and hardware qualification remain open. |
+| SD delivery | Latest verified normal Mac package is `738223a4` (qualified #315 Z9 plus unchanged 94bc Terran/P10/Showcase), with a player testing guide and read-back manifest; last verified KODAK package is `e9838086` plus the separate custom Egg preview. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
 
 ## Verification and maintenance
 
