@@ -9,7 +9,13 @@ static void release(void) { tick(0); }
 int main(void)
 {
     gba_init(); game_init(); race_mode=1; race_human=R_PROTOSS;
-    race_bots=1; race_bot_races[0]=R_TER; race_skirmish_map=0; init_state();
+    race_bots=1; race_bot_races[0]=R_TER; race_skirmish_map=0;
+#ifdef SC64_COMMAND_ICONS
+    /* Showcase custom roster exceeds the card capacity; use a real P7
+     * mission context with the same ordinary Nexus selection. */
+    race_mode=0; race_selected_mission=26;
+#endif
+    init_state();
     int producer=-1;
     for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].owner==SIDE && b[i].type==B_NEXUS) { producer=i; break; }
     assert(producer>=0); selected_building=producer; previous=0;
