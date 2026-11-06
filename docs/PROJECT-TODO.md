@@ -243,7 +243,10 @@ older KODAK package. Source merges do not update an already copied ROM.
   play and N64 behavior remain open. A [Z6 HOST stage](audits/2026-11-07-z6-egg-host/README.md)
   adds authenticated PUNI, persisted future-create reservations and fresh
   Egg/old-save checks; broader scheduler and standalone-profile gates remain
-  open. Z5 permissions and trigger handling need separate integration.
+  open. The [Z5 source census](audits/2026-11-07-z5-egg-applicability/README.md)
+  found no ordinary producer/Drone seed in its initial roster or authored
+  create/transfer actions, and a genuine old-tag save passed a 180-update fresh
+  HOST continuation. This is not all-save, ARM or N64 qualification.
   The constructed late captured-Hatchery concern was not promoted: no reachable
   transfer path was found, and relaxing only admission would leave saves invalid.
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags

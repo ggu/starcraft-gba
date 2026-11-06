@@ -41,8 +41,15 @@ edited state, or whether a prior save was produced by a different build.
 
 Treat Z5 as not applicable to new ordinary Egg admission within this scoped
 closure; do not introduce a positive producer fixture by injecting one or
-borrow another source's PUNI. Preserve the existing old-tag loader and actor
-semantics. A genuine unretagged current-main Z5 save followed by a fresh staged
-reader and ordinary continuation is still required before claiming legacy
-compatibility; this source-only audit did not run that test, change validators,
-or enable any new tag or normal profile flag.
+borrow another source's PUNI. Preserve existing old-tag loader and actor
+semantics. An unmodified `aa8f43c5` engine produced a genuine, unretagged Z5
+old-tag save, SHA-256
+`87fb2aff023d7234339f1df74f1ffe2dc179870cd6e7dba79a4c815214596010`.
+At `df5da990`, a fresh HOST reader with the Z6 Egg stage selected the old tag
+without an Egg token, loaded Z5, and completed 180 advancing ordinary no-input
+updates; the 32 KiB save image remained byte-identical. All 594 prepared inputs
+and the old save hash were unchanged, with native work serialized under the
+shared lock and a 4 GiB reserve. No pause acknowledgment was needed in that
+window. This is a bounded initial-world continuation, not a mission completion,
+all old saves, an ARM test, or native parity. No Z5 validator, new tag or
+normal profile flag was changed.
