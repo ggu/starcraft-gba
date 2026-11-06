@@ -72,7 +72,13 @@ static unsigned sc64_p7_arbiter_detected_mask_reference(int target,
     unsigned detected=0;
     for (unsigned source=0;source<8;++source) {
         int seen=(source==7 && SC64_GRID_GET(visible,col+row*MAP_COLS));
-        for (int i=0;i<MAX_UNITS && !seen;++i) if (u[i].alive &&
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+        /* The human slot uses the already-computed SIDE visibility grid. */
+        int scan_optical = source != 7;
+#else
+        int scan_optical = 1;
+#endif
+        for (int i=0;i<MAX_UNITS && !seen && scan_optical;++i) if (u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
             !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
@@ -81,9 +87,15 @@ static unsigned sc64_p7_arbiter_detected_mask_reference(int target,
             int dx=cx-u[i].x,dy=cy-u[i].y,r=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
             if (dx*dx+dy*dy<=r*r) seen=1;
         }
-        for (int i=0;i<MAX_BUILDINGS && !seen;++i) if (b[i].alive &&
+        for (int i=0;i<MAX_BUILDINGS && !seen && scan_optical;++i) if (b[i].alive &&
             reference_matches(binding,source,b[i].owner,b[i].raw_owner,1)) {
-            int dx=cx-b[i].x,dy=cy-b[i].y,r=sc64_p7_observer_sight_radius_runtime(b[i].type,1);
+            int dx=cx-b[i].x,dy=cy-b[i].y,r=sc64_p7_observer_sight_radius_runtime(
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+                sc64_shared_building_visibility_key(&b[i]),
+#else
+                b[i].type,
+#endif
+                1);
             if (dx*dx+dy*dy<=r*r) seen=1;
         }
         if (!seen) continue;
