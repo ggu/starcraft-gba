@@ -502,8 +502,8 @@ hud_product_chip(int slot, int next)
             gfx_num(x + CARD_CELL + 2, y + 11, rule->gas, gas < rule->gas ? C_RED : C_CYAN);
     }
     if (hud_product_choice(slot, next)) x = hud_hint(x, HUD_CHIP_KEYS_Y, "R", UI_GLYPH_CYCLE);
-    /* tick_game cancels on L only for Barracks; elsewhere L cycles the selection. */
-    if (b[slot].queue_count && b[slot].type == B_BARRACKS) hud_hint(x, HUD_CHIP_KEYS_Y, "L", UI_GLYPH_CROSS);
+    if (b[slot].owner == SIDE && b[slot].queue_count)
+        hud_hint(x, HUD_CHIP_KEYS_Y, "L", UI_GLYPH_CROSS);
 }
 
 /* Loaded units as icons, for a Bunker or a transport. */
