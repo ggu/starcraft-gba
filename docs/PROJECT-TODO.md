@@ -54,17 +54,22 @@ older KODAK package. Source merges do not update an already copied ROM.
   this is an order-loop defect, not a measured wall-clock income rate. The
   retarget fix does not add native field queues, change durations, or replace
   the exact-target cancellation policy for new pending trips.
-- **Research and UI remain open:** authenticated Forge/Core facts and unwired
-  services are groundwork, not usable typed upgrades. Building-context menus,
-  payment/completion, source-owner combat routing and safe journals must
-  integrate together. A separate default-off research journal experiment now
-  passes synthetic actual-engine P10/Z9 save/load, fallback and maximum
-  impact/Yamato combinations, plus six guarded ARM links. It is not in releases;
-  genuine 94bc-produced P10/Z9 campaign/custom records also load in separate
-  experimental consumer processes. New-match/restart resets were repaired.
-  Review caught a research/roster outer-tag collision. A separate namespace
-  correction passes its inventory and genuine-record consumer checks; final
-  build/review qualification, stack and gameplay integration remain open.
+- **Research groundwork #318 merged, gameplay open:** the default-off
+  completed-level journal uses a distinct namespace and validated building-row
+  padding without reducing impact capacity. Review repaired a new-match reset
+  leak, roster-tag collision and unsupported-layout admission. Genuine 94bc
+  P10/Z9 campaign/custom predecessor journals load in separate consumers;
+  earlier feature-on sanitizer and six-profile link evidence remains scoped to
+  that base. Current combined-source flag-off Z9 exactly matches the qualified
+  package. The clean full default suite passes at `04745b48` (1,008 Python
+  tests, 26 skips); its prior missing-header fixture failure is preserved.
+  **No Forge/Core menus, paid jobs or combat effects are enabled.** Current
+  feature-on integration, source-owner policy, active-job persistence, legacy
+  migration, runtime stack and gameplay qualification remain open. See the
+  [wire audit](audits/2026-11-06-research-wire/README.md).
+  A separate gameplay branch has verified all 228 armor and 130 native weapon
+  upgrade-family IDs against authenticated N64 tables. These facts and the
+  private P1–P10 policy generator are groundwork, not usable upgrades.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** warp-start/death sounds, large death effects, remembered
@@ -72,6 +77,13 @@ older KODAK package. Source merges do not update an already copied ROM.
   behavior remain open. Current custom defeat counts the last live owned
   building. Delivered death pixels/timelines were authenticated; their large
   source frames require a paired native presentation check, not guessed scale.
+- **Native construction reference #317 merged:** fresh ordinary-input N64
+  custom gameplay selected a Probe, opened the Pylon menu, placed its green
+  preview and captured the blue-white warp orb. Completion, power boundaries,
+  sound and an actual delivered-GBA render comparison remain open. The
+  authored cyan rectangle is only a GBA fallback; it does not establish the
+  source-art path's active appearance. See the
+  [scoped native audit](audits/2026-11-06-protoss-native-reference/README.md).
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
   already active in other products; the separate monotone shortcut remains off.
   Eight release links, route oracles, clean default checks and 18 HOST warm
@@ -176,6 +188,7 @@ the serialized native-test lock permit it.
 | P1 | P1 / open | Reduce representative busy-frame cost toward 30 fps. Small isolated gains do not close the current gap. | Exact-source normal/diagnostic pairs on P7/P10 and 1-/3-AI custom games, advancing combat frames, ordinary input and modal handling. Measure update/render and worst-frame distribution; require material improvement without mode regressions. Confirm on GBA hardware. |
 | C4 | P1 / open | Replace campaign AI scalar approximations where verified source/native behavior differs. Late-Zerg waves use averaged groups/gaps; arrival, rebuilding and transport tactics are not equivalent to script commands. | Source script interpretation plus N64 observations of actual production, wallets, launch groups, targeting and rebuilds. Reproduce a concrete mismatch before changing AI; retain mission objective semantics. |
 | U1 | P1 / partial | Scourge/Spire source restrictions and shared picker correction are merged in #290. Continue the broader campaign PUNI/UPGR/TECx audit, especially P10. | Preserve current controlling ownership, nonspending denial and full supported custom catalog. Apply remaining source permissions with per-owner tests and save compatibility; do not infer complete availability parity from this one product fix. |
+| U3 | P1 / in progress | Deliver usable shared Forge/Core research. #318 is disabled save groundwork; verified family IDs and campaign-policy extraction remain separate work. | Authenticated owner and payer identity; source initial/max levels; atomic paid producer jobs, power/cancel/death/capture/reset behavior, active-job saves and legacy migration; weapon/armor/shield/range effects on every relevant path; ordinary building menus and cross-product campaign/custom/Showcase checks. |
 | U2 | P1 / open | Integrate Carrier/Interceptor behavior for supported ordinary units and P10 Gantrithor. The current Gantrithor can move but does not launch Interceptors. | Paid children, flight, target/parent death, capture/owner changes, reload, capacity and full profile save matrix; P10 hero and custom-game ordinary controls. Resolve held Carrier namespace and merge conflicts first. |
 | S2 | P1 / open | Maintain one shared capability and persistence contract across products. Transport is present; actor mappings, research restrictions, repair, detection, morphs and remaining abilities still need a current matrix. | Per-product and per-mode inventory from actual flags/call sites, source-owned permissions, lifecycle/death/capture checks and every applicable save codec. No Showcase-only engine fix or mission-objective predicate used as a service gate. |
 | K1 | P1 / open | Qualify complete supported custom games for all race combinations and 1–3 AIs. Validate building/unit progression, economy, targeting, victory and long-game stability. | Both maps, each human race, homogeneous and mixed AI races, actual tech progression and save/load. Track global pool/queue pressure and ensure human production is not silently starved. |
@@ -276,6 +289,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#212](https://github.com/ggu/starcraft-gba/pull/212), [#210](https://github.com/ggu/starcraft-gba/pull/210), Carrier/Defiler | Draft/conflicting: namespace collision with transport, missing genuine migration/current qualification; also audit guarded AI purchases. |
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Draft: renderer conflicts and missing current memory/paired ARM qualification. |
 | [#315](https://github.com/ggu/starcraft-gba/pull/315), late-Zerg packed grid | Merged as `738223a4`; scoped tests and emulator timing are recorded above. The latest Mac package includes the exact qualified Z9 candidate. Strict current Z7 winning validation, broader campaign/skirmish and hardware qualification remain open. |
+| [#318](https://github.com/ggu/starcraft-gba/pull/318), research journal groundwork | Merged as `f34004af`, default-off. Full default suite and current flag-off composition passed; feature-on current-base and functional research qualification remain open. Normal package bytes are unchanged. |
 | SD delivery | Latest verified normal Mac package is `738223a4` (qualified #315 Z9 plus unchanged 94bc Terran/P10/Showcase), with a player testing guide and read-back manifest; last verified KODAK package is `e9838086` plus the separate custom Egg preview. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
 
 ## Verification and maintenance
