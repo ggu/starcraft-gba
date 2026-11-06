@@ -69,7 +69,34 @@ int main(int argc,char **argv)
     assert(race_save_game());file_write(argv[2],host_save,sizeof host_save);
 #else
     memset(device.bytes,0xff,sizeof device.bytes);
-    if(!strcmp(argv[1],"migrate")) {
+    if(!strcmp(argv[1],"reject-build-phase")) {
+        /* Deliberately forge a checksum-valid ambiguous old building phase;
+         * this negative is not represented as a genuine producer output. */
+        static u8 prior[131072];static Unit old_units[MAX_UNITS];
+        static Building old_buildings[MAX_BUILDINGS];u8 old_debt[sizeof sc64_pr_hp_debt];
+        file_read(argv[2],device.bytes,32768);GbaFlashJournalRecord rec;
+        assert(gba_fj_probe(&flash_io,0,&rec)==GBA_FJ_OK);
+        assert(rec.length<=sizeof race_impact_record);
+        assert(gba_fj_read_payload(&flash_io,&rec,0,&race_impact_record,rec.length)==GBA_FJ_OK);
+        int changed=0;
+        for(unsigned i=0;i<MAX_BUILDINGS&&!changed;++i) {
+            Building q;assert(race_battery_save_building(&race_data,i,&q));
+            if(q.alive&&q.type==B_FORGE) {
+                q.shield_remainder=320;
+                assert(race_battery_save_encode_building(&race_data,i,2048,2048,&q));changed=1;
+            }
+        }
+        assert(changed);u32 meta=gba_fj_metadata(0);
+        memcpy(device.bytes+meta+16,&race_impact_record,rec.length);
+        gba_fj_put32(device.bytes+meta+8,gba_fj_hash(2166136261u,device.bytes+meta+16,rec.length));
+        memcpy(prior,device.bytes,sizeof prior);memcpy(old_units,u,sizeof u);
+        memcpy(old_buildings,b,sizeof b);memcpy(old_debt,sc64_pr_hp_debt,sizeof old_debt);
+        int old_minerals=minerals,old_gas=gas;
+        assert(!race_load_game()&&!race_save_game());
+        assert(!memcmp(prior,device.bytes,sizeof prior)&&!memcmp(old_units,u,sizeof u)&&
+               !memcmp(old_buildings,b,sizeof b)&&!memcmp(old_debt,sc64_pr_hp_debt,sizeof old_debt)&&
+               minerals==old_minerals&&gas==old_gas);
+    } else if(!strcmp(argv[1],"migrate")) {
         static u8 old[32768];file_read(argv[2],old,sizeof old);memcpy(device.bytes,old,sizeof old);
         assert(race_load_game());phase_verify(buildings,base,0);
         assert(race_save_game() && !memcmp(old,device.bytes,sizeof old));

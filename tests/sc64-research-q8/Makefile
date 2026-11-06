@@ -42,9 +42,11 @@ test-sc64-research-q8-storm-z9:
 	./build/research-q8/storm-z9
 
 # Explicit HOST-only actual-game Flash experiment. No normal ROM activation.
-Q8_BASELINE_ROOT ?= .
-.PHONY: test-sc64-q8-flash-host-p10
-test-sc64-q8-flash-host-p10:
+Q8_BASELINE_ROOT ?= .local/q8-flash-baseline
+.PHONY: test-sc64-q8-flash-host-p10 check-sc64-q8-flash-baseline
+check-sc64-q8-flash-baseline:
+	python3 tests/sc64-research-q8/check_flash_baseline.py "$(Q8_BASELINE_ROOT)"
+test-sc64-q8-flash-host-p10: check-sc64-q8-flash-baseline
 	@mkdir -p build/research-q8-flash
 	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT -DSC64_Q8_FLASH_HOST_STAGE tests/sc64_q8_flash_game.c common/gba_flash1m.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash/consumer
 	$(CLANG) -I$(Q8_BASELINE_ROOT)/common -I$(Q8_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_Q8_FLASH_BASELINE tests/sc64_q8_flash_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash/old-producer
@@ -57,7 +59,7 @@ test-sc64-q8-flash-host-p10:
 	./build/research-q8-flash/consumer read-old-phase build/research-q8-flash/old-phase.sav
 
 .PHONY: build-sc64-q8-flash-phase
-build-sc64-q8-flash-phase:
+build-sc64-q8-flash-phase: check-sc64-q8-flash-baseline
 	@mkdir -p build/research-q8-flash-phase
 	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT -DSC64_Q8_FLASH_HOST_STAGE tests/sc64_q8_flash_phase_game.c common/gba_flash1m.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash-phase/consumer
 	$(CLANG) -I$(Q8_BASELINE_ROOT)/common -I$(Q8_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_Q8_FLASH_BASELINE tests/sc64_q8_flash_phase_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash-phase/old-producer
