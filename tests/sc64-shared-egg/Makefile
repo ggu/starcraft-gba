@@ -134,3 +134,7 @@ test-z6-egg-actual-journal:
 test-z6-egg-synthetic-journal:
 	$(CLANG) $(filter-out -DSC64_Z6_ACTUAL_PERMISSIONS -I$(SC64_MID_PERMISSIONS_DIR),$(Z6_EGG_HOST_FLAGS)) -Itests/fixtures/mid-zerg-synthetic tests/sc64_shared_egg_z6_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z6-egg-synthetic
 	$(EGG_TEST_BIN_DIR)/sc64-z6-egg-synthetic
+.PHONY: test-z6-egg-capacity
+test-z6-egg-capacity:
+	$(CLANG) $(Z6_EGG_HOST_FLAGS) tests/sc64_shared_egg_z6_capacity_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z6-egg-capacity
+	$(EGG_TEST_BIN_DIR)/sc64-z6-egg-capacity
