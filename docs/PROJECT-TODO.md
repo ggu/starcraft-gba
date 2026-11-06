@@ -127,15 +127,39 @@ older KODAK package. Source merges do not update an already copied ROM.
   EWRAM bytes. These static margins do not prove runtime stack or hardware safety.
   The combat-only feature-off P10 control reproduces the exact latest normal
   binary `b1b5edcc...`; final combined default/full-product checks remain open.
+  **Ordinary P10 custom checkpoint now passes on the prototype:** source
+  `90d84f3e` used title/field buttons to choose one AI, gather resources, build
+  a Pylon/Assimilator/Forge and pay for Ground Weapons. The exact guarded P10
+  ARM guest exported a genuine 0x45 save; a fresh guest loaded it through title
+  L and completed level one without loss. The ARM and HOST save bytes match
+  (`ddb79ad3...`), and root independently rechecked the pinned runner, ROM,
+  ELF, tapes, save bytes and all 589 prepared inputs. The runtime remains
+  `8a96f995`; test-only checkpoint source is on
+  `codex/research-ordinary-controller-20261107`. This is one emulated custom
+  checkpoint, not a hardware test, match win, full-state oracle or other-product
+  ordinary-gameplay qualification. A reusable replay guard is under review.
   **Normal release flags remain off.** Exact shields/fractional HP, remaining
-  special/projectile routes, campaign context/source policy, stack/performance
-  and ordinary-input research/save/play qualification remain required.
+  special/projectile routes, campaign context/source policy, stack/performance,
+  other-product ordinary gameplay and full default/production checks remain
+  required. Static compiler stack inspection on
+  `codex/research-stack-budget-20261107` reproduces both qualified P10/Z9 raw
+  binaries; inspected structural paths sum to about 4,348/4,528 bytes, with
+  unresolved indirect/assembly/interrupt paths. This is not stack high-water
+  or a complete safety bound.
   The separately reviewed human-binding stage at `344e48de` passes pure and
   actual P1–P10 initialization/wallet/P1 rescue fixtures. P1–P9 human source
   identity is 7; P10 is 1. Retained actor origin is not the current controller or
   payer. This helper is unused; it requires authenticated explicit context and
   proves neither enemy wallet routing nor candidate-loader admission. See
   [the scoped human-binding audit](audits/2026-11-07-research-human-binding/README.md).
+  A separate larger-save investigation on
+  `codex/flash-journal-geometry-20261107` preserves the first 32 KiB as read-only
+  legacy journals and models two new slots with isolated commit sectors and
+  28,656-byte payload capacity. The independently reviewed HOST model passes
+  sanitizer tests, interrupted writes/partial tag erases, stale-winner rejection
+  and semantic fallback. It is not connected to game saving; Flash hardware
+  timing, bank/sector behavior, real power cuts, memory and integration remain
+  open. No save format or release behavior changes with this experiment.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
