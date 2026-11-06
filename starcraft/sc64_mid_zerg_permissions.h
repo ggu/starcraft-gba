@@ -4,7 +4,14 @@
 #ifndef SC64_MID_ZERG_PERMISSIONS
 #error "Mid Zerg permissions require explicitly prepared private inputs"
 #endif
+#ifdef SC64_MID_ZERG_PERMISSION_TEST_FIXTURE
+#ifndef GBA_HOST
+#error "Synthetic permission fixtures are HOST-only"
+#endif
+#include "sc64_mid_zerg_permissions_fixture.h"
+#else
 #include "sc64_mid_zerg_permissions_generated.h"
+#endif
 /* This is immutable source PUNI, not a current-controller binding. */
 static int sc64_mid_zerg_permission_available(unsigned mission,unsigned source,unsigned raw)
 {
