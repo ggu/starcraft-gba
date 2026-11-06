@@ -107,6 +107,10 @@ static void wait_frames(int n)
 static void tap(u16 key)
 { step(key); step(0); }
 
+/* L cancels a selected producer queue; SELECT leaves it untouched. */
+static void cycle_unit(void)
+{ if (selected_building >= 0) tap(KEY_SELECT); tap(KEY_L); }
+
 static int normal_field(void)
 {
     for (int i = 0; i < 2 && (menu_open || mode != MODE_NORMAL); ++i) tap(KEY_B);
@@ -224,10 +228,10 @@ static int reachable_building_contact(int actor, int sx, int sy, int slot, int *
 static int select_unit(int slot)
 {
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || u[slot].owner != SIDE || !normal_field()) return 0;
-    if (selected_building >= 0) tap(KEY_L);
+    if (selected_building >= 0) tap(KEY_SELECT);
     for (int n = 0; n <= MAX_UNITS && host_ticks < (u32)run_limit; ++n) {
         if (u[slot].selected && selected_count() == 1 && selected_building < 0) return 1;
-        tap(KEY_L);
+        cycle_unit();
     }
     return 0;
 }
@@ -252,7 +256,7 @@ static int click_select_unit(int slot)
 static int select_building(int slot)
 {
     if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive || b[slot].owner != SIDE || !normal_field()) return 0;
-    if (selected_building >= 0) tap(KEY_L);
+    if (selected_building >= 0) tap(KEY_SELECT);
     move_cursor(b[slot].x, b[slot].y); tap(KEY_A);
     return selected_building == slot && selected_count() == 0;
 }
@@ -273,6 +277,7 @@ static int group_to(int x, int y, int attack_move)
         if (u[i].y<t)t=u[i].y; if(u[i].y>bot)bot=u[i].y;
     }
     if (r<l || bot<t) return 0;
+    if (selected_building >= 0) tap(KEY_SELECT);
     move_cursor(clamp_world(l-8,WORLD_W),clamp_world(t-8,WORLD_H)); step(KEY_L);
     int ex=snap4(cx,clamp_world(r+8,WORLD_W),WORLD_W), ey=snap4(cy,clamp_world(bot+8,WORLD_H),WORLD_H);
     for(int n=0;n<1200&&(cx!=ex||cy!=ey);n++) { u16 h=KEY_L|KEY_R; if(cx<ex)h|=KEY_RIGHT;if(cx>ex)h|=KEY_LEFT;if(cy<ey)h|=KEY_DOWN;if(cy>ey)h|=KEY_UP;step(h); }

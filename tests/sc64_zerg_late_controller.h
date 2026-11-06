@@ -59,22 +59,10 @@ static void close_menus(void)
     for(int k=0;k<4&&(menu_open||mode!=MODE_NORMAL);k++)KEY_TAP(KEY_B);
 }
 
-/* A selected building stays selected until an L box closes elsewhere. */
+/* SELECT leaves the producer without canceling its paid queue. */
 static void clear_selected_building(void)
 {
-    if(selected_building<0)return;
-    int x=b[selected_building].x+96,y=b[selected_building].y+96;
-    x=limit(x,32,WORLD_W-64);y=limit(y,32,WORLD_H-64);
-    move_cursor(x,y);input(KEY_L);
-    unsigned guard=0;
-    int ex=cx+16,ey=cy+16;
-    while((cx<ex||cy<ey)&&guard++<64){
-        u16 held=KEY_L;
-        if(cx<ex)held|=KEY_RIGHT;
-        if(cy<ey)held|=KEY_DOWN;
-        input(held);
-    }
-    input(0);
+    if(selected_building>=0) KEY_TAP(KEY_SELECT);
 }
 
 static int choose_row(int row)

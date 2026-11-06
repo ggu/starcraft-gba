@@ -225,6 +225,13 @@ static void tap(u16 key)
     step(0);
 }
 
+/* L cancels a selected producer queue; SELECT leaves it untouched. */
+static void cycle_unit(void)
+{
+    if (selected_building >= 0) tap(KEY_SELECT);
+    tap(KEY_L);
+}
+
 static int snap4(int current, int target, int bound)
 {
     int delta = target - current;
@@ -296,9 +303,8 @@ static void select_box(int x, int y, int radius)
 
 static void select_army(void)
 {
-    /* R selects the ordinary combat group. A corner box first clears a
-     * selected producer so R cannot be interpreted as train-type cycling. */
-    if (selected_building >= 0) select_box(0, 0, 8);
+    /* Clear a producer without canceling its queue before selecting combat. */
+    if (selected_building >= 0) tap(KEY_SELECT);
     tap(KEY_R);
 }
 
@@ -537,7 +543,7 @@ static void assign_idle_miner(void)
     /* Stacked Drones may not be independently selectable. Accept the actual
      * selected eligible Drone, never substitute an index or write selection. */
     for (int guard = 0; guard < MAX_UNITS; ++guard) {
-        tap(KEY_L);
+        cycle_unit();
         int actual = find_selected_worker();
         if (selected_count() == 1 && actual >= 0 && u[actual].alive &&
             u[actual].owner == SIDE && u[actual].type == U_DRONE &&
@@ -686,7 +692,7 @@ int main(int argc, char **argv)
         for (int i = 0; i < MAX_UNITS; ++i)
             if (u[i].alive && u[i].owner == SIDE && u[i].type == U_OVERLORD) { overlord = i; break; }
         if (overlord >= 0) {
-            for (int guard = 0; guard < MAX_UNITS && !u[overlord].selected; ++guard) tap(KEY_L);
+            for (int guard = 0; guard < MAX_UNITS && !u[overlord].selected; ++guard) cycle_unit();
             if (u[overlord].selected && choose_menu_row(MENU_MOVE) && mode == MODE_MOVE) {
                 move_cursor(objective_x, objective_y + 64);
                 tap(KEY_A);

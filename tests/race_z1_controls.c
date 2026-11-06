@@ -54,6 +54,8 @@ static void controller_frame(unsigned short held)
     }
 }
 static void press(unsigned short key) { controller_frame(key); controller_frame(0); }
+/* Leave a producer with SELECT; L is reserved for unit cycling. */
+static void cycle_unit(void) { if(selected_building>=0)press(KEY_SELECT); press(KEY_L); }
 static int abs_i(int x){return x<0?-x:x;}
 static int cursor_near(int x,int y)
 {
@@ -129,11 +131,10 @@ static int select_worker(int require_far)
 {
     int i=choose_worker(require_far),guard=0;
     if(i<0)return 0;
-    /* L tap advances the current selection. Starting at a selected Hatchery,
-       it clears that selection and selects the first visible unit; cycling
-       uses only controller input and puts the cursor directly on each unit. */
+    /* SELECT leaves a producer without canceling its queue; L then cycles
+       visible units through ordinary controller input. */
     while(guard++<MAX_UNITS) {
-        press(KEY_L);
+        cycle_unit();
         int selected=find_selected_worker();
         if(selected>=0) {
             int nearest=0x7fffffff;
@@ -251,7 +252,7 @@ static void assign_gas(void)
     }
     if(worker<0)return;
     int guard=0;
-    while(guard++<MAX_UNITS&&find_selected_worker()!=worker)press(KEY_L);
+    while(guard++<MAX_UNITS&&find_selected_worker()!=worker)cycle_unit();
     if(find_selected_worker()!=worker){fprintf(stderr,"gas select failed id%d selected%d\n",worker,find_selected_worker());return;}
     /* StarCraft's context action assigns the selected worker to this
        completed refinery regardless of its current position. */
@@ -269,7 +270,7 @@ static int assign_idle_miner(void)
             {worker=i;break;}
     if(worker<0)return 0;
     int guard=0;
-    while(guard++<MAX_UNITS&&find_selected_worker()!=worker)press(KEY_L);
+    while(guard++<MAX_UNITS&&find_selected_worker()!=worker)cycle_unit();
     if(find_selected_worker()!=worker)return 0;
     /* Drones idled by a depleted patch park beside the next one. A over them
        selects instead of mining, so try farther patches as well. */
@@ -326,7 +327,7 @@ static int nearest_enemy_building(int *x,int *y)
 static int issue_home_defense(int x,int y)
 {
     int guard=0;
-    press(KEY_L); /* controller cycles off the Hatchery to a unit */
+    if (selected_building >= 0) press(KEY_SELECT); /* leave the Hatchery queue intact */
     press(KEY_R); /* R selects all combat units */
     press(KEY_B);
     while(menu_cursor!=MENU_ATTACK&&guard++<MENU_COUNT)press(menu_cursor<MENU_ATTACK?KEY_DOWN:KEY_UP);
@@ -390,7 +391,7 @@ static int attack_with_hydras(int x,int y)
     /* Cycle selection off the Hatchery and onto a Hydra; using a single
        selected unit avoids sending the defensive Zerglings out of position. */
     while(guard++<MAX_UNITS) {
-        press(KEY_L);
+        cycle_unit();
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
             u[i].type==U_HYDRALISK&&u[i].order==ORDER_IDLE&&u[i].selected){first=i;break;}
         if(first>=0)break;
@@ -407,7 +408,7 @@ static int attack_with_hydras(int x,int y)
 static int defend_hatch_with_army(int x,int y)
 {
     int guard=0;
-    press(KEY_L); /* move off the Hatchery; R then selects only combat units */
+    if (selected_building >= 0) press(KEY_SELECT); /* leave the Hatchery queue intact */
     press(KEY_R);
     press(KEY_B);
     while(menu_cursor!=MENU_ATTACK&&guard++<MENU_COUNT)press(menu_cursor<MENU_ATTACK?KEY_DOWN:KEY_UP);

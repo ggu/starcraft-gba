@@ -519,6 +519,7 @@ static void move_cursor(int x,int y)
 static int box_select(int left,int top,int right,int bottom)
 {
     cancel_ui_mode();
+    if(selected_building>=0)tap(KEY_SELECT);
     move_cursor(left,top); step(KEY_L);
     unsigned guard=0;
     while((cx<right||cy<bottom)&&screen==SCREEN_PLAY&&!won&&!lost&&guard++<6000u) {
@@ -562,6 +563,10 @@ static int deselect_with_local_box(void)
 {
     if(selected_count()==0&&selected_building<0)return 1;
     cancel_ui_mode();
+    if(selected_building>=0) {
+        tap(KEY_SELECT);
+        return screen==SCREEN_PLAY&&!won&&!lost&&selected_count()==0&&selected_building<0;
+    }
     for(int radius=0;radius<=256;radius+=16)
         for(int dy=-radius;dy<=radius;dy+=16)
             for(int dx=-radius;dx<=radius;dx+=16) {
