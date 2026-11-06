@@ -6136,3 +6136,11 @@ test-sc64-creation-provenance-t3: build/test-sc64-creation-provenance-t3
 	./build/test-sc64-creation-provenance-t3
 
 include tests/sc64-menu-repeat/Makefile
+
+# Pure per-hit Q8 source arithmetic; no imported inputs or runtime enablement.
+build/test-sc64-shield-damage-q8: tests/sc64_shield_damage_q8.c starcraft/sc64_shield_damage_q8.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-shield-damage-q8
+test-sc64-shield-damage-q8: build/test-sc64-shield-damage-q8
+	./build/test-sc64-shield-damage-q8
+test: test-sc64-shield-damage-q8
