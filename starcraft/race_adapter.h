@@ -837,9 +837,12 @@ static int race_queue_unit(int owner, int producer, int type)
         int source=b[producer].raw_owner;
 #ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
         if (race_selected_mission==0) {
-            /* Only an authenticated source slot can own the paid Egg. */
-            source=race_creation_source_owner(owner,source);
-            if (source<0) return 0;
+            /* Retain only the descriptor-authenticated producer source;
+             * transfer admission requires a separate saved-control proof. */
+            const Sc64RaceMap *map=&sc64_race_maps[0];
+            if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
+                ((unsigned)source==map->human_slot ? SIDE : map->owner_modes[source])!=owner)
+                return 0;
         } else
 #endif
         if ((unsigned)source>=8u ||
@@ -961,11 +964,7 @@ static int race_queue_unit(int owner, int producer, int type)
         u[slot].work_timer = (u16)sc64_z7_egg_duration(type);
         u[slot].raw_type = 36;
 #if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
-        if (!SC64_EGG_IS_Z7()) u[slot].raw_owner = race_mode ? -1 :
-#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
-            race_selected_mission==0 ? race_creation_source_owner(owner,b[producer].raw_owner) :
-#endif
-            b[producer].raw_owner;
+        if (!SC64_EGG_IS_Z7()) u[slot].raw_owner = race_mode ? -1 : b[producer].raw_owner;
 #endif
         u[slot].maxhp = 200;
         u[slot].hp = 200;
