@@ -3,7 +3,7 @@
 """Run the experimental ares frontend with an isolated ROM copy and save path."""
 import argparse,hashlib,json,os,pathlib,shutil,subprocess,sys
 P=argparse.ArgumentParser();P.add_argument('--binary',type=pathlib.Path,required=True);P.add_argument('--source',type=pathlib.Path,required=True);P.add_argument('--moltenvk',type=pathlib.Path,required=True);P.add_argument('--rom',type=pathlib.Path,required=True);P.add_argument('--output',type=pathlib.Path,required=True);P.add_argument('--scenario',choices=('neutral','tap'),required=True);P.add_argument('--frames',type=int,default=24);a=P.parse_args()
-if not 1<=a.frames<=32:P.error('frames must be 1..32')
+if not 1<=a.frames<=240:P.error('frames must be 1..240')
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 if subprocess.check_output(['git','-C',str(a.source),'rev-parse','HEAD'],text=True).strip()!='0aafd85789215e84e1e43415c07d4c88461b7899':raise SystemExit('wrong source revision')
 if subprocess.check_output(['git','-C',str(a.source),'status','--porcelain'],text=True).strip():raise SystemExit('source checkout is dirty')
@@ -32,6 +32,8 @@ finally:
  r['generated_resources_unchanged']={str(p.relative_to(a.source)):sha(p) for p in resources}==r['generated_resource_sha256']
  r['upstream_tracked_unchanged']=(subprocess.check_output(['git','-C',str(a.source),'rev-parse','HEAD'],text=True).strip()==r['source_commit'] and not subprocess.check_output(['git','-C',str(a.source),'status','--porcelain'],text=True).strip())
  files=sorted(a.output.glob('frame-*.argb'));r['output_bytes']=sum(p.stat().st_size for p in files);r['frame_sha256']={p.name:sha(p) for p in files};r['frames_csv_sha256']=sha(a.output/'frames.csv') if (a.output/'frames.csv').is_file() else None
- r['ok']=r.get('returncode')==0 and r['original_rom_unchanged'] and r['copied_rom_unchanged'] and r['binary_unchanged'] and r['moltenvk_unchanged'] and r['probe_source_unchanged'] and r['generated_resources_unchanged'] and r['upstream_tracked_unchanged'] and len(files)==a.frames and r['output_bytes']<=64*1024**2
+ r['steps_csv_sha256']=sha(a.output/'steps.csv') if (a.output/'steps.csv').is_file() else None
+ r['status_log_sha256']=sha(a.output/'status.log') if (a.output/'status.log').is_file() else None
+ r['ok']=r.get('returncode')==0 and r['original_rom_unchanged'] and r['copied_rom_unchanged'] and r['binary_unchanged'] and r['moltenvk_unchanged'] and r['probe_source_unchanged'] and r['generated_resources_unchanged'] and r['upstream_tracked_unchanged'] and 1<=len(files)<=32 and r['output_bytes']<=64*1024**2
  (a.output/'manifest.json').write_text(json.dumps(r,indent=2)+'\n');print(json.dumps({'ok':r['ok'],'returncode':r.get('returncode'),'frames':len(files),'bytes':r['output_bytes']}))
 sys.exit(0 if r['ok'] else 1)

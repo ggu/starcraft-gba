@@ -25,11 +25,16 @@ struct Probe final : ares::Platform {
   std::shared_ptr<mia::Pak> systemPak, gamePak;
   ares::Node::Input::Button a, start;
   std::atomic<unsigned> mask{0};
-  std::atomic<unsigned long long> polls{0}, aPolls{0}, startPolls{0};
+  std::atomic<unsigned long long> polls{0}, aPolls{0}, startPolls{0}, audioCalls{0};
+  std::atomic<unsigned> step{0};
+  struct Frame { unsigned step,width,height; std::vector<std::uint32_t> pixels; };
+  std::vector<Frame> frames;
+  std::vector<std::string> statuses;
+  std::size_t frameBytes=0;
   std::mutex mutex;
   std::condition_variable cv;
   std::vector<std::uint32_t> pixels;
-  unsigned width=0, height=0, callbacks=0;
+  unsigned width=0, height=0, callbacks=0, discarded=0;
   bool failed=false, gpuReady=false;
   std::string failure;
 
@@ -41,6 +46,7 @@ struct Probe final : ares::Platform {
   auto status(string_view message) -> void override {
     std::string text{message.data(), message.size()};
     std::lock_guard lock(mutex);
+    statuses.push_back(text);
     if(text.find("Vulkan Enabled: using paraLLEl-RDP") != std::string::npos) gpuReady=true;
     if(text.find("No RDP rendering support") != std::string::npos) { failed=true; failure=text; cv.notify_all(); }
   }
@@ -54,6 +60,7 @@ struct Probe final : ares::Platform {
     } else if(auto axis=node->cast<ares::Node::Input::Axis>()) axis->setValue(0);
   }
   auto audio(ares::Node::Audio::Stream stream) -> void override {
+    ++audioCalls;
     if(stream->channels()>8) { std::lock_guard lock(mutex); failed=true; failure="audio channel limit"; cv.notify_all(); return; }
     double samples[8]{};
     while(stream->pending()) stream->read(samples);
@@ -63,10 +70,13 @@ struct Probe final : ares::Platform {
     if(!data || !w || !h || w>1920 || h>1080 || pitch<w*4u || pitch>32768u) {
       failed=true; failure="invalid frame bounds"; cv.notify_all(); return;
     }
-    if(!pixels.empty()) { failed=true; failure="unconsumed frame"; cv.notify_all(); return; }
-    width=w; height=h; pixels.resize(static_cast<std::size_t>(w)*h);
-    for(unsigned y=0;y<h;++y) std::memcpy(pixels.data()+static_cast<std::size_t>(y)*w,
+    auto bytes=static_cast<std::size_t>(w)*h*sizeof(std::uint32_t);
+    if(frames.size()>=32) { ++discarded; return; }
+    if(frameBytes+bytes>64u*1024u*1024u) { failed=true; failure="frame byte budget exceeded"; cv.notify_all(); return; }
+    Frame f{step.load(),w,h,{}}; f.pixels.resize(static_cast<std::size_t>(w)*h);
+    for(unsigned y=0;y<h;++y) std::memcpy(f.pixels.data()+static_cast<std::size_t>(y)*w,
       reinterpret_cast<const unsigned char*>(data)+static_cast<std::size_t>(y)*pitch,w*4u);
+    frameBytes+=bytes; frames.push_back(std::move(f));
     ++callbacks; cv.notify_all();
   }
 };
@@ -75,7 +85,7 @@ int main(int argc,char** argv) {
   if(argc!=5) { std::cerr<<"usage: probe ROM OUTPUT_DIR neutral|tap FRAMES\n"; return 2; }
   std::string scenario=argv[3];
   char* end=nullptr; long frames=std::strtol(argv[4],&end,10);
-  if((scenario!="neutral" && scenario!="tap") || !end || *end || frames<1 || frames>32) return 2;
+  if((scenario!="neutral" && scenario!="tap") || !end || *end || frames<1 || frames>240) return 2;
   std::filesystem::path out=argv[2];
   if(!std::filesystem::is_directory(out) || !std::filesystem::is_directory(out/"saves") ||
      !std::filesystem::is_directory(out/"systems")) return 2;
@@ -111,26 +121,36 @@ int main(int argc,char** argv) {
   }
   if(!p.a || !p.start) return 4;
   root->power();
-  std::ofstream meta(out/"frames.csv",std::ios::binary);
-  if(!meta) return 5;
-  meta<<"run,mask,polls,a_polls,start_polls,callback,width,height,bytes\n";
-  std::uint64_t total=0;
+  std::ofstream meta(out/"frames.csv",std::ios::binary), steps(out/"steps.csv",std::ios::binary);
+  if(!meta || !steps) return 5;
+  meta<<"callback,observed_step,width,height,bytes\n";
+  steps<<"run,mask,polls,a_polls,start_polls,audio_calls,callbacks\n";
+  long completed=0;
   for(long i=0;i<frames;++i) {
     unsigned mask=scenario=="tap" ? ((i>=10 && i<12)?2u:(i>=20 && i<22)?1u:0u) : 0u;
-    p.mask=mask;
-    unsigned prior; { std::lock_guard lock(p.mutex); prior=p.callbacks; }
-    root->run();
-    std::unique_lock lock(p.mutex);
-    if(!p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.callbacks>prior;})) { std::cerr<<"frame callback timeout\n"; return 6; }
-    if(p.failed || !p.gpuReady || p.callbacks!=prior+1) { std::cerr<<"renderer or callback failure: "<<p.failure<<"\n"; return 6; }
-    auto bytes=p.pixels.size()*sizeof(std::uint32_t); total+=bytes;
-    if(total>64u*1024u*1024u) return 6;
-    char name[32]; std::snprintf(name,sizeof(name),"frame-%03ld.argb",i);
-    std::ofstream frame(out/name,std::ios::binary); frame.write(reinterpret_cast<const char*>(p.pixels.data()),bytes);
-    if(!frame) return 5;
-    meta<<i<<','<<mask<<','<<p.polls.load()<<','<<p.aPolls.load()<<','<<p.startPolls.load()<<','<<p.callbacks<<','<<p.width<<','<<p.height<<','<<bytes<<'\n';
-    p.pixels.clear();
+    p.mask=mask; p.step=i;
+    root->run(); ++completed;
+    std::lock_guard lock(p.mutex);
+    steps<<i<<','<<mask<<','<<p.polls.load()<<','<<p.aPolls.load()<<','<<p.startPolls.load()<<','<<p.audioCalls.load()<<','<<p.callbacks<<'\n';
+    if(p.failed || p.callbacks>=32) break;
   }
-  meta.flush(); if(!meta) return 5;
+  {
+    std::unique_lock lock(p.mutex);
+    if(!p.failed && p.callbacks==0) p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.callbacks>0;});
+  }
+  root->unload(); root.reset(); // joins the upstream screen thread before reading frames
+  std::lock_guard lock(p.mutex);
+  std::ofstream status(out/"status.log");
+  for(auto& text:p.statuses) status<<text<<'\n';
+  status<<"requested_steps="<<frames<<" completed_steps="<<completed<<" polls="<<p.polls.load()<<" a_polls="<<p.aPolls.load()<<" start_polls="<<p.startPolls.load()<<" audio_calls="<<p.audioCalls.load()<<" callbacks_copied="<<p.callbacks<<" callbacks_discarded="<<p.discarded<<" gpu_ready="<<p.gpuReady<<" failure="<<p.failure<<'\n';
+  if(p.failed || !p.gpuReady || p.frames.empty()) { std::cerr<<"renderer or callback failure: "<<p.failure<<" callbacks="<<p.callbacks<<"\n"; return 6; }
+  for(std::size_t i=0;i<p.frames.size();++i) {
+    auto& f=p.frames[i]; auto bytes=f.pixels.size()*sizeof(std::uint32_t);
+    char name[32]; std::snprintf(name,sizeof(name),"frame-%03zu.argb",i);
+    std::ofstream frame(out/name,std::ios::binary); frame.write(reinterpret_cast<const char*>(f.pixels.data()),bytes);
+    if(!frame) return 5;
+    meta<<i<<','<<f.step<<','<<f.width<<','<<f.height<<','<<bytes<<'\n';
+  }
+  meta.flush(); steps.flush(); if(!meta || !steps || !status) return 5;
   return 0;
 }
