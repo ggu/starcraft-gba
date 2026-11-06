@@ -19,12 +19,29 @@ static void transfer(const char *path,int write_out) {
 int main(int argc,char **argv) {
     assert(argc==3); gba_init(); game_init(); race_mode=0;
     race_selected_mission=SC64_RACE_MISSION_P1;
+    if (!strncmp(argv[1],"z-",2)) race_selected_mission=SC64_RACE_MISSION_Z1;
     if (!strncmp(argv[1],"custom-",7)) {
         race_mode=1; race_human=R_PROTOSS; race_bots=1;
         race_bot_races[0]=R_PROTOSS; race_skirmish_map=0;
     }
     init_state();
-    if (!strcmp(argv[1],"old-write")) {
+    if (!strcmp(argv[1],"z-old-write") || !strcmp(argv[1],"z-write")) {
+        assert(race_selected_mission==SC64_RACE_MISSION_Z1 && race_human==R_ZERG);
+        minerals=765; gas=432;
+        assert(race_save_game()); transfer(argv[2],1);
+    } else if (!strcmp(argv[1],"z-load") || !strcmp(argv[1],"z-over-old")) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+        transfer(argv[2],0); assert(race_load_game());
+        assert(race_selected_mission==SC64_RACE_MISSION_Z1 && race_human==R_ZERG &&
+               minerals==765 && gas==432);
+        for (unsigned o=0;o<SC64_PR_CAMPAIGN_OWNERS;++o)
+            for (unsigned f=0;f<SC64_PR_FAMILY_COUNT;++f)
+                assert(sc64_experimental_research_levels.level[o][f]==0);
+        if (!strcmp(argv[1],"z-over-old")) { assert(race_save_game()); transfer(argv[2],1); }
+#else
+        assert(0 && "consumer requires campaign journal");
+#endif
+    } else if (!strcmp(argv[1],"old-write")) {
 #if defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL)
         assert(0 && "old writer must have no research flags");
 #else

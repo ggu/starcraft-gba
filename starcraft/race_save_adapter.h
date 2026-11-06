@@ -1617,6 +1617,24 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
         if (jobs_tag==1 || candidate->state[11]<0 || candidate->state[11]>2 ||
             candidate->state[12]<0 || candidate->state[12]>2 ||
             !sc64_pr_levels_valid(levels,SC64_PR_CAMPAIGN_OWNERS)) return 0;
+        if (candidate->state[1]!=R_PROTOSS) {
+            if ((candidate->state[1]!=R_TER && candidate->state[1]!=R_ZERG) ||
+                candidate->state[2]<0 || candidate->state[2]>=SC64_RACE_MAP_COUNT) return 0;
+            const Sc64RaceMap *map=&sc64_race_maps[candidate->state[2]];
+            if (!map->mission_id || map->human_slot>=8 ||
+                map->mission_id[0]!=(candidate->state[1]==R_TER ? 'T' : 'Z') ||
+                map->owner_races[map->human_slot]!=candidate->state[1]) return 0;
+            for (unsigned owner=0;owner<SC64_PR_CAMPAIGN_OWNERS;++owner)
+                for (unsigned family=0;family<SC64_PR_FAMILY_COUNT;++family)
+                    if (levels->level[owner][family]) return 0;
+            for (unsigned i=0;i<MAX_BUILDINGS;++i) {
+                Building q;
+                if (!race_save_decode_building(candidate,i,&q)) return 0;
+                if ((q.type==B_FORGE || q.type==B_CYBERNETICS_CORE) &&
+                    (q.level || q.queue_progress || q.queue_count)) return 0;
+            }
+            return 1;
+        }
         for (unsigned family=0;family<SC64_PR_FAMILY_COUNT;++family) {
             Sc64PrCampaignRule rule;
             if (!race_research_campaign_candidate_rule(candidate,family,&rule) ||
@@ -4186,7 +4204,7 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (tag==SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION) plan->research_jobs_tag=2;
     /* Old campaign records did not initialize typed levels. Preserve any
      * old typed levels while restoring the authenticated scenario floor. */
-    if (race_data.state[0]==0 && plan->research_jobs_tag==0) {
+    if (race_data.state[0]==0 && race_data.state[1]==R_PROTOSS && plan->research_jobs_tag==0) {
         for (unsigned family=0;family<SC64_PR_FAMILY_COUNT;++family) {
             Sc64PrCampaignRule rule;
             if (!race_research_campaign_candidate_rule(&race_data,family,&rule)) return 0;
