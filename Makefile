@@ -3020,39 +3020,7 @@ test-sc64-p7-observer-rules: build/test-sc64-p7-observer-rules
 	./build/test-sc64-p7-observer-rules
 test-starcraft: test-sc64-p7-observer-rules
 
-# Optional route policies stay off in ROM defaults. Exercise each independently
-# and together, with and without the borrowed visitation grid.
-ROUTE_POLICY_TEST_FLAGS = -Icommon -DGBA_HOST -DSC64_RACES -DSC64_LARGE_MAPS -DSC64_ROUTE_PACK3
-define route_policy_fixture
-build/test-sc64-route-policy-$(1): tests/race_routes_partial.c starcraft/sc64_routes.h starcraft/sc64_depot_goal.h starcraft/sc64_bitgrid.h common/gba.h Makefile | build
-	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I. $$(ROUTE_POLICY_TEST_FLAGS) $(2) $$< -o $$@
-endef
-$(eval $(call route_policy_fixture,baseline,))
-$(eval $(call route_policy_fixture,visit,-DSC64_ROUTE_VISIT_GRID))
-$(eval $(call route_policy_fixture,partial,-DSC64_ROUTE_PARTIAL_FLOOD))
-$(eval $(call route_policy_fixture,frequency,-DSC64_ROUTE_DECAY_FREQ))
-$(eval $(call route_policy_fixture,partial-frequency,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ))
-$(eval $(call route_policy_fixture,partial-visit,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_VISIT_GRID))
-$(eval $(call route_policy_fixture,frequency-visit,-DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_VISIT_GRID))
-$(eval $(call route_policy_fixture,partial-frequency-visit,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_VISIT_GRID))
-$(eval $(call route_policy_fixture,split-baseline,-DSC64_ROUTE_FLOOD_SPLIT))
-$(eval $(call route_policy_fixture,split-visit,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_VISIT_GRID))
-$(eval $(call route_policy_fixture,split-visit-newcell,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_NEW_CELL))
-$(eval $(call route_policy_fixture,split-partial,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_PARTIAL_FLOOD))
-$(eval $(call route_policy_fixture,split-frequency,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_DECAY_FREQ))
-$(eval $(call route_policy_fixture,split-partial-frequency,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ))
-$(eval $(call route_policy_fixture,split-partial-visit,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_VISIT_GRID))
-$(eval $(call route_policy_fixture,split-frequency-visit,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_VISIT_GRID))
-$(eval $(call route_policy_fixture,split-partial-frequency-visit,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_VISIT_GRID))
-ROUTE_POLICY_VARIANTS = baseline visit partial frequency partial-frequency partial-visit frequency-visit partial-frequency-visit
-.PHONY: test-sc64-route-policies
-test-sc64-route-policies: $(addprefix build/test-sc64-route-policy-,$(ROUTE_POLICY_VARIANTS))
-	@$(foreach variant,$(ROUTE_POLICY_VARIANTS),./build/test-sc64-route-policy-$(variant) &&) true
-test-starcraft: test-sc64-route-policies
-.PHONY: test-sc64-route-flood-split
-test-sc64-route-flood-split: $(addprefix build/test-sc64-route-policy-split-,$(ROUTE_POLICY_VARIANTS))
-	@$(foreach variant,$(ROUTE_POLICY_VARIANTS),./build/test-sc64-route-policy-split-$(variant) &&) true
-test-starcraft: test-sc64-route-flood-split
+include tests/sc64-route-policy/Makefile
 
 # Asset-free component-reachability oracle with VISIT_GRID's borrowed walkability
 # bits. Run byte-grid and packed-grid variants with exact restoration checks.
@@ -4031,7 +3999,7 @@ zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 # physical-input-only main-loop selection local to that standalone target.
 # Historical Z7 probes and their tests continue to use Z7_FULL_RENDER_FLAGS.
 ZERG_Z7_CONTACT_MASK_TABLE_HEADER = build/generated/sc64_contact_mask_table_generated.h
-ZERG_Z7_CANONICAL_FLAGS = -DSC64_Z7_VISIBILITY_ROW_CONTEXT -DSC64_Z7_VISIBILITY_PHASE_REJECT $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $(CANONICAL_DIRECT_FIRING_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS)
+ZERG_Z7_CANONICAL_FLAGS = -DSC64_Z7_VISIBILITY_ROW_CONTEXT -DSC64_Z7_VISIBILITY_PHASE_REJECT $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $(CANONICAL_DIRECT_FIRING_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS)
 ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS) $(ZERG_Z7_CONTACT_MASK_TABLE_HEADER)
 include tests/sc64-z7-promotion/Makefile
@@ -5551,7 +5519,7 @@ $(eval $(call DEPOT_ROUTE_FIXTURE,active-newcell,-DSC64_ROUTE_PACK3 -DSC64_ROUTE
 $(eval $(call DEPOT_ROUTE_FIXTURE,bounded-rect,-DRACE_TEST_COLS=80 -DRACE_TEST_ROWS=48 -DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
 $(eval $(call DEPOT_ROUTE_FIXTURE,bounded-large,-DRACE_TEST_COLS=128 -DRACE_TEST_ROWS=128 -DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
 $(eval $(call DEPOT_ROUTE_FIXTURE,bounded-readonly,-DSC64_ROUTE_PACK3 -DSC64_TEST_READONLY_GRID -DSC64_DEPOT_BOUNDED))
-DEPOT_ROUTE_CASES := pack3 split partial visit combined large128 t4 active base rect legacy bounded-pack3 bounded-nibble bounded-partial bounded-visit bounded-rect bounded-large bounded-readonly
+DEPOT_ROUTE_CASES := pack3 split partial visit combined large128 t4 active base rect legacy bounded-pack3 bounded-nibble bounded-partial bounded-visit bounded-newcell full-newcell active-newcell bounded-rect bounded-large bounded-readonly
 .PHONY: test-sc64-depot-routes test-sc64-depot-approach-default
 test: test-sc64-depot-routes test-sc64-depot-approach-default
 test-sc64-depot-routes: $(addprefix build/test-sc64-depot-routes-,$(DEPOT_ROUTE_CASES))
