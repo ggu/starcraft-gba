@@ -65,3 +65,11 @@ of an accepted direct order, rather than assuming the weapon does not fire.
 Local observer sources and logs are retained in `z8-order-observer`; no gameplay
 state was written by the observer. The range statement above is corrected to
 distinguish imported source pixels from the halved runtime coordinate scale.
+
+Retaining any already accepted direct friendly combat order against the raid was
+also tested alone, without changing mission rules. That controller lost earlier,
+at frame 11,009 / call 11,264, fault zero; it retained 17 combat units and 14
+Drones. The compiled ASan/UBSan run preserved all 272 input hashes. Thus the
+observed target replacement is not, by itself, a qualified fix; this trial is
+rejected too. Exact source and trace remain in `z8-retain-target`. No production
+controller or engine edits follow from these failed strategy experiments.
