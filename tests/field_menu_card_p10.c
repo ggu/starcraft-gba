@@ -1,11 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* P10 custom-game command card, driven through game_update input edges. */
+/* Custom-game commands driven through game_update input edges. */
 #include <assert.h>
 #include <stdio.h>
 #include "../starcraft/game.c"
-#ifndef SC64_COMMAND_ICONS
-#error "This fixture exercises the imported P10 command card"
-#endif
 static u16 previous;
 static void tick(u16 held) { game_update(held, held & (u16)~previous); previous=held; }
 static void release(void) { tick(0); }
@@ -16,7 +13,9 @@ int main(void)
     int producer=-1;
     for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].owner==SIDE && b[i].type==B_NEXUS) { producer=i; break; }
     assert(producer>=0); selected_building=producer; previous=0;
-    tick(KEY_B); assert(menu_open && card_fits() && selected_building==producer);
+    tick(KEY_B); assert(menu_open && selected_building==producer);
+#ifdef SC64_COMMAND_ICONS
+    assert(card_fits());
     int initial=card_command_slot(menu_cursor); assert(initial==0);
     release(); tick(KEY_DOWN); assert(card_command_slot(menu_cursor)==3);
     for(int i=0;i<17;i++) tick(KEY_DOWN);
@@ -36,11 +35,27 @@ int main(void)
     release(); tick(KEY_DOWN); assert(card_command_slot(menu_cursor)==0);
     release(); tick(KEY_B); assert(!menu_open);
     release(); tick(KEY_B); assert(menu_open && card_command_slot(menu_cursor)==0);
+#else
+    assert(menu_cursor==0);
+    release(); tick(KEY_DOWN); assert(menu_cursor==1);
+    for(int i=0;i<17;i++) tick(KEY_DOWN);
+    assert(menu_cursor==1);
+    tick(KEY_DOWN); assert(menu_cursor==2);
+    tick(KEY_UP); assert(menu_cursor==1);
+    release(); tick(KEY_LEFT); assert(menu_cursor==1);
+    for(int i=0;i<18;i++) tick(KEY_LEFT);
+    assert(menu_cursor==1);
+    release(); tick(KEY_UP); assert(menu_cursor==0);
+    release(); tick(KEY_UP); assert(menu_cursor==field_menu_count()-1);
+    release(); tick(KEY_DOWN); assert(menu_cursor==0);
+    release(); tick(KEY_B); assert(!menu_open);
+    release(); tick(KEY_B); assert(menu_open && menu_cursor==0);
+#endif
     release(); tick(KEY_A); assert(!menu_open);
     for(int i=0;i<25;i++) tick(KEY_A);
     assert(!menu_open);
     field_menu_repeat_direction=KEY_DOWN; field_menu_repeat_age=17;
     init_state(); assert(!field_menu_repeat_direction && !field_menu_repeat_age);
-    puts("P10 custom producer command card repeat and edges: ok");
+    puts("custom producer menu repeat and edges: ok");
     return 0;
 }
