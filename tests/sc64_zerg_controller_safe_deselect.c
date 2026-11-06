@@ -1,5 +1,6 @@
 /* Isolated controller helper regression: authored setup, ordinary input only
  * after selection. Not a mission replay or campaign completion claim. */
+#include "../common/gba.c"
 #define main worker_fixture_main
 #include "sc64_worker_gather_game.c"
 #undef main
@@ -11,6 +12,7 @@ int main(void)
     int worker=spawn_unit(SIDE,U_DRONE,120,120);
     assert(worker>=0);
     set_depot(0,SIDE,B_HATCHERY,128,128);
+    race_bots=1; set_depot(1,ENEMY,B_COMMAND,500,500);
     b[0].queue[0]=U_DRONE; b[0].queue_count=1; b[0].larva=1;
     selected_building=0; minerals=500; gas=0;
     clear_selected_building();
