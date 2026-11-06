@@ -94,3 +94,14 @@ optional ordinary-controller recipe is now
 `tests/sc64-research-ordinary/Makefile`; existing historical evidence retains its
 original recipe name. Full combined default/feature-on qualification remains
 open, and no normal flag is enabled.
+
+At source `2137cc29913795406d8c05c3a99bc277f778702f`, a fresh asset-free
+checkout passed boundary, doctor, `./dev build` and the full `./dev test` suite
+(445.22 seconds; 1,023 primary Python tests, 26 skipped, plus compiled/auxiliary
+checks). Source remained unchanged. A prepared `make unified` also passed with
+the current audio bank and 593 hashes unchanged. The broader unified and Terran
+full-campaign graphs lack private preparation files in this copied input bundle;
+they are not claimed as passing. Receipts are in the clean worktree's
+`.local/research-default/` and this worktree's `.local/research-campaign-runtime/`.
+These checks predate shared detector optimization #342 and do not qualify a
+future combined feature-on integration. Normal research remains disabled.
