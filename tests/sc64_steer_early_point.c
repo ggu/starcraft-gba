@@ -33,10 +33,11 @@ static void check_winner(Unit *q, int speed, int blocked_x, int blocked_y)
             want=i;cost=d;
         }
     }
-    Unit before=*q;
+    static Unit before_units[MAX_UNITS];
     unsigned cached_before=sc64_contact_blocked_mask(q,speed);
+    memcpy(before_units,u,sizeof(before_units));
     got=sc64_steer_early_point(q,speed,from,blocked_x,blocked_y);
-    assert(!memcmp(&before,q,sizeof(before)));
+    assert(!memcmp(before_units,u,sizeof(before_units)));
     assert(sc64_contact_blocked_mask(q,speed)==cached_before);
     if(got==-2) {
         unsigned blocked=sc64_contact_blocked_mask(q,speed); cost=0x7fffffff;got=-1;
