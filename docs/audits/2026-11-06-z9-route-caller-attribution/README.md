@@ -82,3 +82,52 @@ normal-vector mean and tail cycles on this window and other busy/sparse
 ordinary-input scenes. Reject it if equivalence, memory guards or net/tail
 behavior regress. Do not skip topology invalidation or increase cache slots
 based solely on these observations.
+
+## Path-grid rebuild and bulk-grid trial
+
+A follow-up on the same exact packaged input adds two diagnostic-only
+counters around the complete `build_path_grid` function, including terrain and
+building overlays. The 500-call selected persisted-state/screen/mode stream
+matched the exact delivered-ROM control. The diagnostic ROM SHA-256 was
+`4d0eadcdde38c9395911add7d0779eca19278c955702adac2b751d94b19de8c4`;
+BSS/IWRAM ends were `0203debc/03004918`, with existing guards intact. Its
+mean elapsed cycles were 611,274 versus the 611,692 control (−0.068% net),
+which reflects instrumentation and placement variation rather than a speedup.
+Source and all 392 package dependencies remained hash-verified.
+
+Four grid rebuilds totaled 3,612,663 inclusive cycles. Calls 223, 255, 373
+and 402 spent 900,184, 902,118, 903,979 and 906,382 cycles respectively in
+the grid rebuild; call 256 had none. These values are nested within the orders
+and other intervals, and timer/IRQ costs may overlap. They identify a material
+part of the previously unclassified spike; they do not establish the cost of
+all other work in those calls.
+
+The exact shipped Z9 vector lacks `SC64_BULK_TERRAIN_GRID` and walking-word
+sprite optimization; normal Terran, early Zerg, Protoss and Showcase vectors
+include the existing path-grid capability. These are separate capabilities.
+For imported race and custom maps, the scalar `terrain_blocked` lookup and
+`sc64_base_blocked_map` both select bit 0 of the corresponding retained map;
+procedural and Showcase cases use the scalar fallback. The existing complete
+grid ASan/UBSan fixture passed 33 scalar-versus-packed map/overlay cases using
+the actual package's hash-verified generated inputs, including supported
+campaign and custom maps and the procedural arena. This matters because a
+previous prepared bank differed in map-blocking bytes from this package.
+
+A separate normal-vector pair changed only `SC64_BULK_TERRAIN_GRID`, with
+all diagnostic guards off. Control ROM SHA-256 exactly matched the shipped
+`d86f1e23...`; the bulk-only ROM SHA-256 was
+`c5e50ced4e434f8ae916a0f8c8c7113092d86b708ce3437c49589a1c9e218f47`.
+Both linked within guards with identical BSS/IWRAM ends
+`0203dce4/03004b20`. All 500 selected persisted-state fingerprints, frame
+advances, screens and modes matched from the freshly produced ordinary-input
+seed; the package control reproduced the prior per-call cycle stream. Mean
+elapsed cycles were 611,691.662 control and 606,218.422 bulk (−0.895%). The
+largest observed call fell from 3,102,721 to 2,527,936 (−18.5%). These are
+emulator results for one passive-human custom opening, not hardware FPS or
+complete game/campaign qualification. The physical backend cannot compare the
+guest framebuffer or palette; these checks do not establish full transient
+state or visual equality. No production flag is changed by this diagnostic
+branch. Before proposing default enablement, qualify exact full state and
+composited pixels on representative campaign and skirmish inputs, both pages,
+scroll/fog/overlays, all applicable late-Zerg guarded release links and broader
+busy/sparse performance, while retaining the known strict Z7 campaign failure.

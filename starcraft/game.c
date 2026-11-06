@@ -3127,6 +3127,9 @@ static const u8 *sc64_base_blocked_map(void)
 }
 #endif
 
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+volatile u32 sc64_diag_grid_builds, sc64_diag_grid_cycles;
+#endif
 #if (defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 /* Rebuilds follow map/door changes. Keep the larger span visibility path in
  * IWRAM and this occasional full-grid rebuild in ROM within the same reserve. */
@@ -3137,6 +3140,9 @@ static void GBA_HOT
 build_path_grid(void)
 {
     int col, row, i;
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+    u32 diag_grid_start=gba_clock();
+#endif
 #if defined(SC64_BULK_TERRAIN_GRID) && defined(SC64_RACES) && \
     defined(SC64_IMPORTED_MISSION) && \
     (defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE))
@@ -3214,6 +3220,10 @@ build_path_grid(void)
                     SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
     }
     path_grid_valid = 1;
+#ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
+    sc64_diag_grid_cycles += gba_clock()-diag_grid_start;
+    ++sc64_diag_grid_builds;
+#endif
 }
 
 static int
