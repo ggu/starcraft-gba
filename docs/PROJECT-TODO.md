@@ -94,10 +94,23 @@ older KODAK package. Source merges do not update an already copied ROM.
   cost precedence; the authenticated 30-map regeneration still marks all 180
   selected mission/family price policies supported. The new facts header is
   unused by the engine. These are groundwork, not usable upgrades.
-  The separate `codex/shared-research-engine-20261107` branch stages HOST-only
-  producer jobs using actual Building fields, refusing save/load until a
-  format is authenticated. It is not in main, not tested or enabled in a ROM;
-  current-controller binding, persistence, UI and combat integration remain open.
+  The separate `codex/shared-research-current-20261107` branch has passing
+  constructed P10/Z9 HOST fixtures for actual producer fields, quoted payment,
+  power pause, completion, cancellation/refund, slot reuse, custom owner wallets,
+  real custom-menu admission and ordinary weapon/range integration. Source
+  prerequisites distinguish level-one Shields from its later Core requirement.
+  Detached candidate checks reject duplicate jobs, forged payers, incompatible
+  legacy jobs and inactive/non-Protoss owners' typed levels. These stages are
+  **not in main or enabled in a ROM**. Active-job journal work is isolated on
+  `codex/shared-research-journal-host-20261107`; the reserved namespace alone
+  does not authorize a writer. Exact shield damage, complete combat integration,
+  authenticated persistence and ordinary gameplay remain open.
+  The separately reviewed human-binding stage at `344e48de` passes pure and
+  actual P1–P10 initialization/wallet/P1 rescue fixtures. P1–P9 human source
+  identity is 7; P10 is 1. Retained actor origin is not the current controller or
+  payer. This helper is unused; it requires authenticated explicit context and
+  proves neither enemy wallet routing nor candidate-loader admission. See
+  [the scoped human-binding audit](audits/2026-11-07-research-human-binding/README.md).
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
@@ -159,10 +172,24 @@ movement cost instead centers on contact-mask and step-clear work (about
 158k/88k diagnostic cycles, nested scopes with 4.121% observer overhead).
 Inspect those recurring operations before more rare-path cache changes. These
 experiments are source-only branches, not shipped speed gains.
-The separate default-off `codex/contact-mask-optimization-20261107` prototype
-tries the cheapest terrain-valid steering offset before building the full
-collision mask. Its independent winner oracle and current-main cycle comparison
-have not run; neither correctness nor a speed gain is established.
+The contact-mask prototype was **rejected for promotion** after its current-main
+comparison. Its independent winner oracle passed 225,890 cases; dense OFF/ON
+queries and mutation checks passed, and sampled state, fog and full displayed
+pixels/palettes matched in the ordinary-input P7 window. Nevertheless its mean
+cost rose from 2,294,431 to 2,346,897 cycles across 958 advancing observations
+(2.29% slower). The source-only experiment is preserved on
+`codex/contact-early-current-20261107` at `ded29e3d`; no speed gain shipped.
+
+The shared sight candidate on `codex/custom-fog-sight-audit` addresses a concrete
+P10 custom bug: ordinary Probe sight falls back to 56 GBA pixels instead of the
+authenticated stock radius of 128, and Nexus sight to 112 instead of 176.
+All 228 checked-in sight bytes match the owned N64 units table. The candidate
+also aligns explored cells with actual visibility, incomplete/morphing sight and
+the detector policy. Review caught P10's source-slot-1 human binding and retained
+rescue-origin cases; final common-flag, owner/detector, six-profile and performance
+qualification is pending. This is **unmerged work**, not a delivered fog fix.
+Exact N64 border geometry, remembered resources and initial masks on other maps
+are separate questions; larger nominal sight does not prove those behaviors.
 
 Priority: deliver the verified normal package when KODAK is connected, implement
 usable shared Forge/Core research, reduce measured recurring collision work,
