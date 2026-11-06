@@ -10,6 +10,10 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#include "sc64_protoss_research_padding.h"
+static Sc64ProtossResearchLevels sc64_experimental_research_levels;
+#endif
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_SERVICE)
 #include "sc64_stage_save_auth.h"
 #endif
@@ -5564,6 +5568,9 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
+#endif
 #ifdef SC64_TEXT_BOXES
     sc64_text_box_reset();
 #endif

@@ -8,6 +8,22 @@
 #include "sc64_save_ui_context.h"
 _Static_assert(MAX_BUILDINGS <= 254, "UI save index exceeds one-byte encoding");
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#if !defined(SC64_RACES) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SCARAB_NAMESPACE_STAGE)
+#error "experimental research journal requires normal shared transport profiles"
+#endif
+#define SC64_RESEARCH_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x80000000u)
+_Static_assert(SC64_RESEARCH_TRANSPORT_SAVE_VERSION != SC64_TRANSPORT_SAVE_VERSION &&
+               SC64_RESEARCH_TRANSPORT_SAVE_VERSION != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
+               "research journal tag collision");
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+#define SC64_PR_ROW_WIDTH 25u
+#define SC64_PR_USED_BITS 3u
+#else
+#define SC64_PR_ROW_WIDTH 28u
+#define SC64_PR_USED_BITS 1u
+#endif
+#endif
 #define SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX 25
 #define SC64_BUILDING_DAMAGE_SAVE_MARKER 0x42443031
 #ifdef SC64_SHARED_BATTERY
@@ -2405,6 +2421,12 @@ static int race_save_game(void) {
     if (race_mode && !race_combined_egg_candidate_valid(&race_data,
             (unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    if ((race_mode!=0 && race_mode!=1) ||
+        !sc64_pr_padding_write((u8 *)race_data.buildings, MAX_BUILDINGS, SC64_PR_ROW_WIDTH,
+                               SC64_PR_USED_BITS, race_mode ? 5u : 8u,
+                               &sc64_experimental_research_levels)) return 0;
+#endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
 #ifdef SC64_WORKER_CARGO_KIND
@@ -2440,9 +2462,15 @@ static int race_save_game(void) {
 #endif
     toast(7);return 1;
 }
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+_Static_assert(sizeof(race_data.buildings[0]) == SC64_PR_ROW_WIDTH, "unsupported research building row");
+#endif
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    Sc64ProtossResearchLevels research_levels;
+#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     Sc64StageSaveAuth guardian_auth;
 #endif
@@ -3944,7 +3972,11 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
                                           &plan->impact_candidate_count,&plan->guardian_auth)) return 0;
 #else
 #ifdef SC64_SHARED_TRANSPORT
-    if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION) return 0;
+    if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+        && tag != SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#endif
+       ) return 0;
     plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
 #else
     if (tag != SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_SAVE_VERSION
@@ -3954,13 +3986,25 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
        ) return 0;
     plan->legacy_worker_cargo=(tag!=SAVE_VERSION);
 #endif
-    if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,&plan->impact_candidate_count)) return 0;
+    if (!race_impact_save_decode_selected(len,
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+        tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION ? SC64_TRANSPORT_SAVE_VERSION :
+#endif
+        tag,plan->impact_candidate,&plan->impact_candidate_count)) return 0;
 #if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) && !defined(SC64_SHARED_TRANSPORT)
     if (race_data.version != tag) return 0;
 #else
     if (race_data.version != (plan->legacy_worker_cargo ? SC64_WORKER_CARGO_LEGACY_SAVE_VERSION : SAVE_VERSION)) return 0;
 #endif
 #endif /* SC64_SHARED_EGG_JOURNAL_HOST_STAGE */
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    if (tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION) {
+        if ((race_data.state[0]!=0 && race_data.state[0]!=1) ||
+            !sc64_pr_padding_read((u8 *)race_data.buildings,MAX_BUILDINGS,SC64_PR_ROW_WIDTH,
+                                  SC64_PR_USED_BITS,race_data.state[0] ? 5u : 8u,
+                                  &plan->research_levels)) return 0;
+    }
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 #if !defined(SC64_SHARED_TRANSPORT)
     if (tag==SC64_LEGACY_SAVE_VERSION) {
@@ -3989,7 +4033,11 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #else
-    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION};
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+        ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#endif
+    };
 #endif
 #elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
     const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,SAVE_VERSION};
@@ -4136,6 +4184,9 @@ static int race_load_game(void) {
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
 #endif
     if (!race_load_preflight(&plan)) return 0;
+#endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    sc64_experimental_research_levels=plan.research_levels;
 #endif
     const int *v = race_data.state;
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];

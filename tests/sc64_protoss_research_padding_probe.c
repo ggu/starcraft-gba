@@ -4,6 +4,7 @@
 #include "sc64_p7_typed_codec.c"
 #undef main
 #include "../starcraft/sc64_protoss_research_padding_probe.h"
+#include "../starcraft/sc64_protoss_research_padding.h"
 static uint8_t source[4480],wire[4480],normalized[4480],before[4480];
 static const uint32_t oldtags[]={0x10203040u,0x20304050u};
 #define NEWTAG 0x30405060u
@@ -25,6 +26,12 @@ static void one(Sc64PrPadFormat fmt,size_t rows,int alive,unsigned owners) {
  else assert(!sc64_p7_typed_building_decode(&decoded,(const Sc64P7TypedBuildingSave *)(const void *)wire,2048,2048));
  assert(sc64_pr_pad_transform(normalized,n,&out,wire,n,0,owners,fmt,rows,NEWTAG,NEWTAG,oldtags,2,0));
  assert(!memcmp(&lv,&out,sizeof(lv)) && !memcmp(source,normalized,n));
+ memcpy(normalized,source,n);
+ assert(sc64_pr_padding_write(normalized,rows,w,used,owners,&lv));
+ assert(!memcmp(normalized,wire,n));
+ memset(&out,0,sizeof(out));
+ assert(sc64_pr_padding_read(normalized,rows,w,used,owners,&out));
+ assert(!memcmp(&lv,&out,sizeof(lv)) && !memcmp(source,normalized,n));
  for(size_t i=0;i<rows;i++) {
   if(fmt==SC64_PR_PAD_COMPACT) assert(sc64_building_save_decode(&decoded,(const Sc64PackedBuildingSave *)(const void *)(normalized+i*w)));
   else assert(sc64_p7_typed_building_decode(&decoded,(const Sc64P7TypedBuildingSave *)(const void *)(normalized+i*w),2048,2048));
@@ -39,7 +46,10 @@ static void one(Sc64PrPadFormat fmt,size_t rows,int alive,unsigned owners) {
  size_t r=96/(8-used); unsigned bit=used+96%(8-used);
  wire[r*w+w-1]|=(uint8_t)(1u<<bit);
  assert(!sc64_pr_pad_transform(normalized,n,&out,wire,n,0,owners,fmt,rows,NEWTAG,NEWTAG,oldtags,2,0));
- assert(!memcmp(before,normalized,n)); wire[r*w+w-1]&=(uint8_t)~(1u<<bit);
+ assert(!memcmp(before,normalized,n));
+ memcpy(normalized,wire,n); memcpy(source,normalized,n); memset(&out,0xa5,sizeof(out));
+ assert(!sc64_pr_padding_read(normalized,rows,w,used,owners,&out));
+ assert(!memcmp(source,normalized,n)); wire[r*w+w-1]&=(uint8_t)~(1u<<bit);
  /* Custom contexts cannot accept owner 5's first bit. */
  if(owners==5) { size_t k=60; r=k/(8-used); bit=used+k%(8-used); wire[r*w+w-1]|=(uint8_t)(1u<<bit);
   assert(!sc64_pr_pad_transform(normalized,n,&out,wire,n,0,owners,fmt,rows,NEWTAG,NEWTAG,oldtags,2,0)); wire[r*w+w-1]&=(uint8_t)~(1u<<bit); }

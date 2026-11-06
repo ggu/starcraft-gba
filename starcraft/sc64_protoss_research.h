@@ -5,7 +5,6 @@
 #ifndef SC64_PROTOSS_RESEARCH_H
 #define SC64_PROTOSS_RESEARCH_H
 #include <stdint.h>
-#include <string.h>
 
 enum { SC64_PR_CUSTOM_OWNERS=5, SC64_PR_CAMPAIGN_OWNERS=8,
        SC64_PR_FAMILY_COUNT=6, SC64_PR_LEVEL_WIRE_BYTES=12 };
@@ -47,7 +46,7 @@ static inline int sc64_pr_levels_encode(uint8_t out[SC64_PR_LEVEL_WIRE_BYTES],
                                          const Sc64ProtossResearchLevels *levels, unsigned owners)
 {
     if (!out || !sc64_pr_levels_valid(levels,owners)) return 0;
-    memset(out,0,SC64_PR_LEVEL_WIRE_BYTES);
+    for (unsigned i=0;i<SC64_PR_LEVEL_WIRE_BYTES;++i) out[i]=0;
     for (unsigned o=0;o<SC64_PR_CAMPAIGN_OWNERS;++o)
         for (unsigned f=0;f<SC64_PR_FAMILY_COUNT;++f) {
             unsigned n=o*SC64_PR_FAMILY_COUNT+f;
