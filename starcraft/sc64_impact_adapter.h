@@ -312,7 +312,7 @@ race_impact_save_write(void)
 #endif
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
-#ifdef SC64_Q8_FLASH_HOST_STAGE
+#if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     (void)previous; (void)tags;
     if (!race_q8_flash_write(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;
 #else
@@ -399,7 +399,7 @@ race_impact_save_write(void)
 #define SC64_GUARDIAN_WRITE_TAG SC64_TRANSPORT_SAVE_VERSION
 #endif
 #endif
-#ifdef SC64_Q8_FLASH_HOST_STAGE
+#if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     (void)previous; (void)tags;
     if (!race_q8_flash_write(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;
 #else

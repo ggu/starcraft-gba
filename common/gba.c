@@ -245,7 +245,11 @@ static const u16 colors[32]={
  RGB(12,1,2),RGB(2,3,5),RGB(8,11,12),RGB(31,31,18)
 };
 /* Cartridge backup signature used by emulator/flash-cart save-type detection. */
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+__attribute__((used,aligned(4))) const char gba_save_signature[]="FLASH1M_V103";
+#else
 __attribute__((used)) const char gba_save_signature[]="SRAM_V113";
+#endif
 #if defined(SC64_AUDIO_IMPORTED) && !defined(GBA_HOST)
 static void audio_hw_init(void);
 #endif

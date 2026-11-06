@@ -142,6 +142,9 @@ static int race_q8_flash_snapshot_accept(void *context,const GbaFlashJournalIo *
 }
 static int race_q8_flash_begin(void)
 {
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+    if(screen!=SCREEN_PAUSE) return 0;
+#endif
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();RaceLoadPlan scratch;
     int result;memset(&sc64_q8_flash_snapshot,0,sizeof sc64_q8_flash_snapshot);
     if (!race_q8_flash_write_ownership(io)) return 0;
@@ -153,6 +156,10 @@ static int race_q8_flash_begin(void)
      * a new epoch: the user has not authorized losing its selection. */
     if(result==GBA_FJ_NONE)
         for(unsigned i=0;i<4;++i) if(sc64_q8_flash_snapshot.seen[i]) return 0;
+    #ifdef SC64_Q8_FLASH_ARM_PROBE
+    /* Explicitly refuse automatic legacy migration. */
+    if(result==GBA_FJ_OK && sc64_q8_flash_previous.index<2) return 0;
+#endif
     sc64_q8_flash_has_previous=result==GBA_FJ_OK;
     return 1;
 }
@@ -212,6 +219,9 @@ static int race_q8_flash_write(const void *data,u32 length)
 }
 static int race_q8_flash_select(RaceLoadPlan *plan)
 {
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+    if(screen!=SCREEN_PAUSE) return 0;
+#endif
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();
     Sc64Q8FlashSnapshot snapshot={0};GbaFlashJournalRecord selected,checked;
     snapshot.plan=plan;
