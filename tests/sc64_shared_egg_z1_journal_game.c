@@ -6,8 +6,27 @@
 #ifndef SC64_SHARED_EGG_Z1_HOST_STAGE
 #error "Z1 Egg fixture requires the isolated stage"
 #endif
-int main(void)
+int fixture_export_host_save(const char *path);
+int fixture_import_host_save(const char *path);
+int fixture_host_save_equals(const char *path);
+int main(int argc,char **argv)
 {
+    assert(argc==1 || (argc==3 && (!strcmp(argv[1],"write") || !strcmp(argv[1],"read"))));
+    if(argc==3 && !strcmp(argv[1],"read")) {
+        game_init();assert(fixture_import_host_save(argv[2]));
+        assert(race_load_game() && !race_mode && race_selected_mission==SC64_RACE_MISSION_Z1);
+        int egg=egg_for_owner(SIDE,-1),hall=hall_for_owner(SIDE);
+        const Sc64RaceMap *map=&sc64_race_maps[SC64_RACE_MISSION_Z1];
+        assert(egg>=0 && hall>=0 && u[egg].target==U_DRONE &&
+               u[egg].raw_owner==map->human_slot &&
+               u[egg].work_timer==sc64_z7_egg_duration(U_DRONE));
+        assert(minerals==950 && gas==1000 && b[hall].larva==1);
+        int timer=u[egg].work_timer;
+        for(int i=0;i<timer;i++)race_z7_egg_tick_unit(egg);
+        assert(u[egg].alive && u[egg].type==U_DRONE && u[egg].raw_owner==map->human_slot);
+        assert(fixture_host_save_equals(argv[2]));
+        puts("Z1 fresh-process Egg load and birth passed");return 0;
+    }
     clear_records();game_init();held_keys=0;
     int ordinal=sc64_catalog_playable_ordinal(SC64_FACTION_ZERG,SC64_RACE_MISSION_Z1);
     assert(ordinal>=0);press(KEY_A);
@@ -31,6 +50,10 @@ int main(void)
     assert(race_save_game());
     u32 length=0;
     assert(save_read_latest(saved.bytes,sizeof(saved.bytes),SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,&length));
+    if(argc==3) {
+        assert(fixture_export_host_save(argv[2]));
+        puts("Z1 HOST producer saved paid Egg");return 0;
+    }
     assert(race_shared_egg_candidate_owner(SIDE,source,&race_data));
     assert(!race_shared_egg_candidate_owner(SIDE,-1,&race_data));
     assert(!race_shared_egg_candidate_owner(SIDE,8,&race_data));
