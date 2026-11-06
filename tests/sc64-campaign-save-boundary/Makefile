@@ -16,3 +16,9 @@ campaign-envelope-metadata:
 	mkdir -p $(BOUNDARY_OUT)
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined tests/sc64-campaign-save-boundary/envelope.c -o $(BOUNDARY_OUT)/envelope
 	$(BOUNDARY_OUT)/envelope "$(BOUNDARY_SEED)"
+.PHONY: campaign-legacy-rows
+campaign-legacy-rows:
+	test -f "$(BOUNDARY_SEED)"
+	mkdir -p $(BOUNDARY_OUT)
+	$(CLANG) $(BOUNDARY_HOST_FLAGS) $(filter-out -DSC64_SHARED_ACTOR_ARM_QUALIFICATION,$(ARMQ_STAGE)) $(ARMQ_PROFILE) $(BC_FLAGS) $(ZERG_Z7_RELEASE_FLAGS) -DSC64_Z7_DERIVED_SAVE -DSC64_Z7_LEGACY_ROWS_HOST_PROBE tests/sc64-campaign-save-boundary/rows.c tests/sc64_guardian_journal_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $(BOUNDARY_OUT)/rows
+	$(BOUNDARY_OUT)/rows "$(BOUNDARY_SEED)"
