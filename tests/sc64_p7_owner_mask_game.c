@@ -274,6 +274,29 @@ static void explicit_cases(void)
     expect_mask(0, powered);
 }
 
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+static void optical_cell_memo_cases(void)
+{
+    Sc64P7DetectorLists lists; u8 powered[MAX_BUILDINGS]={0};
+    reset_case(); observer(1,0,race_p7_source_owner(0));
+    u[2]=u[0]; u[2].x+=3; u[2].y+=2; u[2].raw_type=37; u[2].type=U_ZERGLING;
+    SC64_GRID_SET(visible,u[0].x/16+(u[0].y/16)*MAP_COLS,1);
+    sc64_p7_detector_lists_build(&lists);
+    for (int pass=0;pass<4;++pass) {
+        int target=pass&1 ? 2 : 0;
+        assert(sc64_p7_arbiter_detected_mask_lists(target,powered,&lists)==
+               sc64_p7_arbiter_detected_mask_reference(target,powered));
+    }
+    /* A new tick rebuilds after movement, ownership and visibility changes. */
+    u[1].owner=SIDE; u[1].raw_owner=0; u[1].x+=64;
+    SC64_GRID_CLEAR(visible);
+    sc64_p7_detector_lists_build(&lists);
+    for (int target=0;target<=2;target+=2)
+        assert(sc64_p7_arbiter_detected_mask_lists(target,powered,&lists)==
+               sc64_p7_arbiter_detected_mask_reference(target,powered));
+}
+#endif
+
 int main(void)
 {
     optical_source_masks();
@@ -281,6 +304,9 @@ int main(void)
     race_mode = 0;
     race_selected_mission = SC64_P7_GLOBAL_ID;
     explicit_cases();
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+    optical_cell_memo_cases();
+#endif
     unsigned positive = 0;
     for (int run = 0; run < 2000; ++run) {
 #ifdef SC64_PROTOSS_LATER_BINDINGS
