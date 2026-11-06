@@ -162,8 +162,9 @@ The earlier disk interruption and background-I/O observations are historical;
 free space has recovered. No personal data or unrelated service was changed.
 ScreenCaptureKit still fails before N64 reference input; the owned emulator
 sessions exited and supplied no new gameplay proof.
-All checks remain local; GitHub Actions is still disabled. No release flags,
-normal ROM package, campaign coverage or SD delivery changed.
+All checks remain local; GitHub Actions is still disabled. No experimental
+release flags or campaign coverage were promoted. The later verified KODAK copy
+of existing playable packages is recorded in the delivery row below.
 
 ## Current baseline
 
@@ -291,7 +292,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#265](https://github.com/ggu/starcraft-gba/pull/265), advisor alerts | Held: burn/combat suppression, one-shots, cooldown initialization, voice policy and current-combination qualification. |
 | [#212](https://github.com/ggu/starcraft-gba/pull/212), [#210](https://github.com/ggu/starcraft-gba/pull/210), Carrier/Defiler | Draft/conflicting: namespace collision with transport, missing genuine migration/current qualification; also audit guarded AI purchases. |
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Draft: renderer conflicts and missing current memory/paired ARM qualification. |
-| SD delivery | Latest verified normal Mac package is `e9838086`, with a separate custom Egg preview; last verified KODAK copy is f7. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
+| SD delivery | On 2026-11-06, copied and SHA-256 read-back verified all four normal `e9838086` ROMs at `Games/Development/StarCraft-2026-11-06/` on KODAK. Its `Experimental-Eggs/` contains the two `4f0d7080` late-Egg Zerg previews (Z9 and unproven Z10 candidate). Controls, checksums and copy manifest are included; existing ROMs/saves were preserved. Today's actor/memory/render probes were not deployed. Local copy receipt: `.local/qualification/20261106-kodak-copy-receipt.json`. |
 
 ## Verification and maintenance
 
