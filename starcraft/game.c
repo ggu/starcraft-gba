@@ -5123,7 +5123,13 @@ save_game(void)
     if (sc64_showcase_scene >= 0) return 0;
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+    if(!gba_flash_game_transaction_begin())return 0;
+    int saved=race_save_game();
+    gba_flash_game_transaction_end();return saved;
+#else
     return race_save_game();
+#endif
 #else
     data.version = SAVE_VERSION;
     memcpy(data.units, u, sizeof(u));
@@ -5182,7 +5188,13 @@ load_game(void)
     if (sc64_showcase_scene >= 0) return 0;
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+    if(!gba_flash_game_transaction_begin())return 0;
+#endif
     int loaded = race_load_game();
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+    gba_flash_game_transaction_end();
+#endif
 #ifdef SC64_TEXT_BOXES
     if (loaded) sc64_text_box_reset();
 #endif
