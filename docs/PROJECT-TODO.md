@@ -267,8 +267,10 @@ race combinations. Public evidence is on
 
 The conservative detector-owner union was rejected after matching sampled
 state/pixels but worsening mean cost 0.552%; every observed union was 0x91.
-The same-tick snapshot shortcut saves 1.492% in that one scene, with sampled
-state/pixels matching, and remains default-off pending broader qualification.
+The combined shared snapshot and binding-hoist shortcuts save 2.782% in that
+one scene, with sampled state/pixels matching; a separate one-AI custom opening
+also matches sampled state/pixels. Six normal ARM links pass unchanged guards.
+See the [scoped detector audit](audits/2026-11-07-detector-snapshot-optimization/README.md).
 A 16-entry per-tick optical-cell memo also loses 0.332%, with only 8.74% observed
 hits. Follow-up classified 3,538 compulsory and only 64 conflict misses,
 so hash tuning cannot materially help that workload. The memo is rejected;
