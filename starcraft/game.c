@@ -2780,6 +2780,8 @@ spawn_unit(int owner, int type, int x, int y)
     return i;
 }
 
+static void game_audio_foundation(const Building *q);
+
 static int
 spawn_build(int owner, int type, int x, int y, int constructing)
 {
@@ -2942,6 +2944,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     if (owner == SIDE && type == B_COMMAND && !constructing) supply_cap += 20;
 #endif
     invalidate_path_grid();
+    if (constructing) game_audio_foundation(&b[i]);
     return i;
 }
 
@@ -5050,6 +5053,8 @@ save_game(void)
 #endif
 }
 
+static void game_audio_prime(void);
+
 static int
 load_game(void)
 {
@@ -5061,7 +5066,7 @@ load_game(void)
 #ifdef SC64_TEXT_BOXES
     if (loaded) sc64_text_box_reset();
 #endif
-    if (loaded) sc64_walk_reset_all();
+    if (loaded) { sc64_walk_reset_all(); game_audio_prime(); }
 #ifdef SC64_UNIT_FACING
     if (loaded) sc64_facing_reset_all();
 #endif
@@ -5196,6 +5201,7 @@ load_game(void)
 #endif
     update_exploration();
     toast(0);
+    game_audio_prime();
     return 1;
 #endif
 }
@@ -5318,6 +5324,7 @@ static void
 init_state(void)
 {
     field_menu_repeat_reset();
+    game_audio_prime();
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #endif

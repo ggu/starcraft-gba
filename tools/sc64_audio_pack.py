@@ -93,6 +93,7 @@ MUSIC_TRACKS = 16
 #   152 "Spawn more Overlords"
 #   148 "You have not enough minerals"   151 "You require more vespene gas"
 #   154 "You must construct additional pylons"
+WARP_SOUNDS = (528, 529)  # OpenBW foundation creation and timer-zero cues.
 ADVISOR_LINES = ("minerals", "gas", "supply")
 ADVISOR_SOUNDS = ((147, 150, 153), (146, 149, 152), (148, 151, 154))
 # Roles come from the resident N64 music selector (see the module comment).
@@ -616,7 +617,7 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
                 if lengths[sound] > 8 and sound not in selected:
                     selected.append(sound)
     advisor = [sound for race in ADVISOR_SOUNDS for sound in race]
-    for sound in advisor:
+    for sound in advisor + list(WARP_SOUNDS):
         if lengths[sound] <= 8:
             raise ValueError(f"advisor sound {sound} is empty")
         if sound not in selected:
@@ -678,6 +679,8 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
         c_array("sc64_audio_unit_first", "u16", unit_first),
         c_array("sc64_audio_unit_count", "u8", unit_count, 24),
         c_array("sc64_audio_unit_sound", "u16", flat or [0]),
+        "#define SC64_AUDIO_WARP_CUES 2",
+        c_array("sc64_audio_warp", "u16", [bank_index[s] for s in WARP_SOUNDS], 2),
         "/* Advisor refusal clips per player race (Terran, Zerg, Protoss): minerals, gas, supply. */",
         f"#define SC64_AUDIO_ADVISOR_LINES {len(ADVISOR_LINES)}",
         c_array("sc64_audio_advisor", "u16", [bank_index[s] for s in advisor], len(ADVISOR_LINES)),
