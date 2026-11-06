@@ -30,3 +30,13 @@ test-sc64-research-q8-lifecycle-terran:
 	@mkdir -p build/research-q8
 	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(TERRAN_ROM_FLAGS) $(Q8_LIFECYCLE_FLAGS) $(Q8_LIFECYCLE_SOURCES) -o build/research-q8/lifecycle-terran
 	./build/research-q8/lifecycle-terran
+
+.PHONY: test-sc64-research-q8-storm-p10 test-sc64-research-q8-storm-z9
+test-sc64-research-q8-storm-p10:
+	@mkdir -p build/research-q8
+	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) $(Q8_LIFECYCLE_FLAGS) tests/sc64_research_q8_storm_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8/storm-p10
+	./build/research-q8/storm-p10
+test-sc64-research-q8-storm-z9:
+	@mkdir -p build/research-q8
+	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(ZERG_Z9_CANONICAL_FLAGS) $(Q8_LIFECYCLE_FLAGS) tests/sc64_research_q8_storm_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8/storm-z9
+	./build/research-q8/storm-z9
