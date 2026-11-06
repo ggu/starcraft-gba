@@ -1,5 +1,13 @@
 .DEFAULT_GOAL := all
 
+# Fresh HOST cartridge SRAM matches the erased mGBA save backend.
+.PHONY: test-gba-host-save-boot
+build/test-gba-host-save-boot: tests/gba_host_save_boot.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -Icommon $< -o $@
+test-gba-host-save-boot: build/test-gba-host-save-boot
+	./build/test-gba-host-save-boot
+test-starcraft: test-gba-host-save-boot
+
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
 build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build
