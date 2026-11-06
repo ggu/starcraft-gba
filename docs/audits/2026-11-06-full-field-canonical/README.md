@@ -41,3 +41,12 @@ from the older advisor-bank header/blob in the Nov 5 Z9 prepared-input receipt;
 these results do not establish that the two sound banks are interchangeable or
 that every game event selects the intended sound. Current-bank stream and
 header verification is pending.
+
+The current format-2 bank subsequently passed the existing
+`sc64_audio_pack.py --verify-bank` check: it decoded all 514 populated SFX and
+music streams from the header-defined offsets and lengths, checked stream
+boundaries, alignment, padding and guard, and reproduced the manifest PCM
+SHA-256 `9979d9b99ca3888eec879904fcc42c2e0742b702634c622136cdb608b185eb10`
+for 15,649,120 decoded bytes. No bank problems were reported. This verifies
+internal header/blob/manifest consistency; it does not verify the game's choice
+of clips for events or establish equivalence to the older advisor bank.
