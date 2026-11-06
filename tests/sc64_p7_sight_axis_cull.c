@@ -39,9 +39,9 @@ int main(void)
     b[0].alive=1; b[0].owner=ENEMY; b[0].raw_owner=0;
     for(int type=0;type<SC_RB_COUNT;++type) {
         int r=sc64_p7_observer_sight_radius_runtime(type,1);
-        assert(r>=0&&r<=160);
+        assert(r>=0&&r<=SC64_P7_SIGHT_BUILDING_AXIS_BOUND);
         if(r>building_max){building_max=r;building_max_type=type;}
-        int ds[]={-161,-160,-r-1,-r,-1,0,1,r,r+1,160,161};
+        int ds[]={-177,-176,-161,-160,-r-1,-r,-1,0,1,r,r+1,160,161,176,177};
         int cx=(MAP_COLS/2)*16+8,cy=(MAP_ROWS/2)*16+8;
         for(unsigned x=0;x<sizeof(ds)/sizeof(ds[0]);++x)
             for(unsigned y=0;y<sizeof(ds)/sizeof(ds[0]);++y) {
