@@ -373,6 +373,12 @@ ui_row_state(int i, int *cost, int *gas_cost, const char **need)
     if (kind == UI_ROW_ORDER)
         return selected_count() || selected_building >= 0 ? UI_SITE_OK : UI_SITE_UNITS;
     if (kind == UI_ROW_RESEARCH) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+        if (sc64_pr_stage_owner_active(SIDE)) {
+            *need = "SELECT LAB";
+            return UI_SITE_TECH;
+        }
+#endif
         *cost = *gas_cost = 100;
         return ui_research_state(i, need);
     }

@@ -6505,6 +6505,9 @@ static void
 start_research(int type)
 {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    /* Retain genuine old completed/pending jobs as migration floors, but
+     * never sell new generic Protoss bonuses alongside producer families. */
+    if (sc64_pr_stage_owner_active(SIDE)) { toast(8); return; }
     if ((race_mode
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
          || sc64_pr_stage_owner_active(SIDE)

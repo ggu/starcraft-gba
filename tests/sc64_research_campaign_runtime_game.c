@@ -43,6 +43,33 @@ static int authored_producer(int type)
     assert(sc64_pr_stage_menu_selected());
     return forge;
 }
+static void legacy_menu_denied(void)
+{
+    int forge=selected_building;
+    Sc64ProtossResearchLevels levels=sc64_experimental_research_levels;
+    selected_building=-1;
+    for(int i=0;i<MAX_UNITS;++i)u[i].selected=0;
+    for(int choice=MENU_WEAPONS;choice<=MENU_ARMOR;++choice) {
+        int bank=minerals,vespene=gas;
+        menu_open=0;
+#ifdef SC_FIELD_FEEDBACK
+        menu_last=0;
+#endif
+        game_update(KEY_B,KEY_B);assert(menu_open);
+        for(int row=0;row<choice;++row){game_update(0,0);game_update(KEY_DOWN,KEY_DOWN);}
+        assert(menu_cursor==choice);
+#ifdef SC64_FIELD_CONTROLS
+        int ore=9,vesp=9;const char *need=0;
+        assert(ui_row_state(choice,&ore,&vesp,&need)==UI_SITE_TECH);
+        assert(!ore&&!vesp&&!strcmp(need,"SELECT LAB"));
+#endif
+        game_update(0,0);game_update(KEY_A,KEY_A);
+        assert(!weapons_research&&!armor_research&&!weapons_level&&!armor_level);
+        assert(minerals==bank&&gas==vespene);
+        assert(!memcmp(&levels,&sc64_experimental_research_levels,sizeof levels));
+    }
+    selected_building=forge;
+}
 static void real_menu_and_lifecycle(void)
 {
     game_init();race_mode=0;race_selected_mission=SC64_RACE_MISSION_P1;init_state();
@@ -58,6 +85,7 @@ static void real_menu_and_lifecycle(void)
     unsigned initial=sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS];
     assert(sc64_pr_campaign_quote(&rule,SC64_PR_GROUND_WEAPONS,initial,&quote));
     int forge=authored_producer(B_FORGE);
+    legacy_menu_denied();
     assert(sc64_pr_stage_menu_quote(0,&quote));
     game_update(KEY_B,KEY_B);assert(menu_open&&field_menu_count()==4);
     game_update(0,0);game_update(KEY_A,KEY_A);
@@ -85,6 +113,7 @@ static void real_menu_and_lifecycle(void)
     Building old=b[forge];bank=minerals;
     assert(!sc64_pr_stage_begin_slot(forge,SC64_PR_GROUND_WEAPONS));
     assert(!memcmp(&old,&b[forge],sizeof old)&&bank==minerals);
+    legacy_menu_denied();
     /* No campaign active-job save format is allocated by this stage. */
     memset(host_save,0xa5,sizeof host_save);static unsigned char prior[32768];
     memcpy(prior,host_save,sizeof prior);
@@ -106,6 +135,7 @@ static void resets_and_rejections(void)
     /* Starting a custom game clears campaign initial/completed levels. */
     race_mode=1;race_human=R_PROTOSS;race_bots=1;race_bot_races[0]=R_TER;init_state();
     assert(sc64_pr_stage_owner_active(SIDE));
+    (void)authored_producer(B_FORGE);legacy_menu_denied();
     for(unsigned o=0;o<SC64_PR_CAMPAIGN_OWNERS;++o)for(unsigned f=0;f<SC64_PR_FAMILY_COUNT;++f)
         assert(!sc64_experimental_research_levels.level[o][f]);
 }
