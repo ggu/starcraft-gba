@@ -50,9 +50,35 @@ static void check_winner(Unit *q, int speed, int blocked_x, int blocked_y)
     }
     assert(got==want);
 }
+static void authored_cases(void)
+{
+    memset(u,0,sizeof(u));
+    u[0].alive=1;u[0].type=U_MARINE;u[0].raw_type=-1;u[0].x=136;u[0].y=136;
+    u[1].alive=1;u[1].type=U_MARINE;u[1].raw_type=-1;u[1].x=137;u[1].y=136;
+    int from=u[0].x/16+(u[0].y/16)*MAP_COLS;
+    path_grid_valid=1; memset(path_walkable,0,sizeof(path_walkable));
+    sc64_unit_buckets_begin();
+    u[0].path_x=128;u[0].path_y=128;
+    assert(!scalar_clear(&u[0],137,136));
+    assert(sc64_steer_early_point(&u[0],32,from,137,136)==-1);
+    check_winner(&u[0],32,137,136);
+    memset(path_walkable,0xff,sizeof(path_walkable));
+    u[0].path_x=36;u[0].path_y=36;
+    /* The blocked original step is snapped to one pixel while the steering
+     * offsets are two pixels: north-west remains the unique cheapest. */
+    assert(sc64_steer_early_point(&u[0],2,from,137,136)==5);
+    check_winner(&u[0],2,137,136);
+    u[0].path_x=u[0].x;u[0].path_y=u[0].y;
+    /* Four cardinal directions tie. Lowest-index east is blocked, so the
+     * candidate must fall back and let the exact selector decide. */
+    assert(sc64_steer_early_point(&u[0],2,from,137,136)==-2);
+    check_winner(&u[0],2,137,136);
+    sc64_unit_buckets_end();
+}
 int main(void)
 {
     unsigned long checks=0;
+    authored_cases();
     for(int state=0;state<120;state++) {
         build_world(state);set_p6(state&1);
         memset(path_walkable,(state%3)==0?0:0xff,sizeof(path_walkable));path_grid_valid=1;
