@@ -214,6 +214,7 @@ bw_give(void *context, int from, int to, int type, int location)
                                      b[i].type == B_CREEP_COLONY ? 143 : -1,
                                      type) &&
             bw_inside(b[i].x, b[i].y, location)) {
+            if (!SC64_PR_ALLOW_BUILDING_TRANSFER(i,new_owner)) continue;
             b[i].owner = new_owner;
             if (new_owner == SIDE && b[i].type == B_COMMAND) supply_cap += 20;
             if (old_owner == SIDE && b[i].type == B_COMMAND) supply_cap -= 20;
@@ -345,6 +346,7 @@ bw_auto_rescue(void)
     for (i = 0; i < MAX_BUILDINGS; i++)
         if (b[i].alive && b[i].owner == RESCUABLE &&
             bw_near_side(b[i].x, b[i].y)) {
+            if (!SC64_PR_ALLOW_BUILDING_TRANSFER(i,SIDE)) continue;
             b[i].owner = SIDE;
             if (b[i].type == B_COMMAND) supply_cap += 20;
             if (b[i].type == B_DEPOT && !b[i].under_construction) supply_cap += 16;

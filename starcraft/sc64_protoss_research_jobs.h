@@ -5,6 +5,7 @@
  * Included after the actual Building definition and race building enums. */
 #ifndef SC64_PROTOSS_RESEARCH_JOBS_H
 #define SC64_PROTOSS_RESEARCH_JOBS_H
+#include <limits.h>
 #if !defined(GBA_HOST) || !defined(SC64_RACES) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL)
 #error "Research job integration stage is HOST-only and requires the research journal"
 #endif
@@ -107,4 +108,29 @@ static int sc64_pr_job_tick_custom(Building *p, unsigned payer,
     p->level=0; p->queue[0]=0; p->queue[1]=0;
     return 1;
 }
+/* Refund from the paid quote, to the original authenticated payer only.
+ * The 3/4 destruction fraction is pinned PC-source behavior; N64 behavior
+ * remains unverified. Any overflow, stale owner or malformed job is a
+ * fail-closed no-op. Wallet limit must match the authenticated owner bank. */
+static int sc64_pr_job_cancel_custom(Building *p, unsigned payer,
+    const Sc64ProtossResearchLevels *levels, unsigned legacy_weapons, unsigned legacy_armor,
+    int legacy_weapons_pending, int legacy_armor_pending, int destroyed,
+    int *minerals, int *gas, int wallet_limit)
+{
+    Sc64ProtossResearchQuote quote;
+    int ore, vespene;
+    if (!minerals || !gas || minerals == gas || wallet_limit < 0 ||
+        *minerals < 0 || *gas < 0 || *minerals > wallet_limit || *gas > wallet_limit ||
+        (destroyed != 0 && destroyed != 1) ||
+        !sc64_pr_job_valid_custom(p,payer,levels,legacy_weapons,legacy_armor,
+                                  legacy_weapons_pending,legacy_armor_pending) ||
+        !sc64_pr_quote((unsigned)p->level-1,(unsigned)p->queue[1]-1,&quote)) return 0;
+    ore=destroyed ? (int)quote.mineral*3/4 : (int)quote.mineral;
+    vespene=destroyed ? (int)quote.gas*3/4 : (int)quote.gas;
+    if (ore > wallet_limit-*minerals || vespene > wallet_limit-*gas) return 0;
+    *minerals+=ore; *gas+=vespene;
+    p->level=0; p->queue[0]=0; p->queue[1]=0; p->queue_progress=0;
+    return 1;
+}
+
 #endif

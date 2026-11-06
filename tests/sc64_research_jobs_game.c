@@ -67,6 +67,39 @@ int main(void)
     assert(!memcmp(previous_sram,host_save,sizeof host_save));
     assert(!load_game() && !race_load_game());
     assert(!memcmp(previous_sram,host_save,sizeof host_save));
-    puts("research job staged actual Building admission, tick and save refusal: ok");
+
+    race_mode=1; race_bots=1; race_player[1]=R_PROTOSS;
+    memset(&sc64_experimental_research_levels,0,sizeof sc64_experimental_research_levels);
+    race_minerals[1]=ore; race_gas[1]=gas;
+    assert(!sc64_pr_stage_transfer_allowed(0,SIDE));
+    assert(sc64_pr_stage_cancel_slot(0,0));
+    assert(race_minerals[1]==ore+100 && race_gas[1]==gas+100);
+    assert(!b[0].level && !b[0].queue_progress);
+    assert(!sc64_pr_stage_cancel_slot(0,0));
+    assert(race_minerals[1]==ore+100 && race_gas[1]==gas+100);
+
+    assert(sc64_pr_job_begin_custom(&b[0],1,SC64_PR_AIR_WEAPONS,
+        &sc64_experimental_research_levels,&race_minerals[1],&race_gas[1],
+        3,1,1,1,0,0,0,0,0));
+    int before_ore=race_minerals[1], before_gas=race_gas[1];
+    b[0].owner=SIDE; saved=b[0];
+    destroy_building(0,SIDE); /* wrong payer: preserve the producer and both banks */
+    assert(!memcmp(&b[0],&saved,sizeof saved));
+    assert(race_minerals[1]==before_ore && race_gas[1]==before_gas);
+    b[0].owner=1; race_minerals[1]=65535; saved=b[0];
+    destroy_building(0,SIDE); /* one overflowing resource blocks the whole transaction */
+    assert(!memcmp(&b[0],&saved,sizeof saved));
+    assert(race_minerals[1]==65535 && race_gas[1]==before_gas);
+    race_minerals[1]=before_ore;
+    destroy_building(0,SIDE);
+    assert(!b[0].alive && !b[0].level && !b[0].queue_progress);
+    assert(race_minerals[1]==before_ore+75 && race_gas[1]==before_gas+75);
+    destroy_building(0,SIDE);
+    assert(race_minerals[1]==before_ore+75 && race_gas[1]==before_gas+75);
+    b[0].level=1; b[0].queue_progress=1; b[0].queue[0]=1; b[0].queue[1]=1;
+    saved=b[0];
+    assert(spawn_build(SIDE,B_PYLON,100,100,0)==-1);
+    assert(!memcmp(&b[0],&saved,sizeof saved));
+    puts("research job staged admission, lifecycle and save refusal: ok");
     return 0;
 }

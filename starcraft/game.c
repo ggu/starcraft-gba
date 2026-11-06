@@ -1216,6 +1216,12 @@ typedef struct {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
 #include "sc64_protoss_research_jobs.h"
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+static int sc64_pr_stage_transfer_allowed(int slot,int new_owner);
+#define SC64_PR_ALLOW_BUILDING_TRANSFER(slot,owner) sc64_pr_stage_transfer_allowed((slot),(owner))
+#else
+#define SC64_PR_ALLOW_BUILDING_TRANSFER(slot,owner) 1
+#endif
 typedef struct {
     int x, y, amount;
 #ifdef SC64_IMPORTED_MISSION
@@ -1721,13 +1727,13 @@ static void race_bc_facility_flight_tick(void);
 static int race_bc_lab_start(int slot, unsigned kind);
 static int race_bc_lab_cancel(int slot, int destroyed);
 static int race_bc_before_building_transfer(int slot,int new_owner);
-#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) race_bc_before_building_transfer((slot),(owner))
+#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) (SC64_PR_ALLOW_BUILDING_TRANSFER((slot),(owner)) && race_bc_before_building_transfer((slot),(owner)))
 #else
-#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) 1
+#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) SC64_PR_ALLOW_BUILDING_TRANSFER((slot),(owner))
 #endif
 #endif
 #ifndef SC64_BC_ALLOW_BUILDING_TRANSFER
-#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) 1
+#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) SC64_PR_ALLOW_BUILDING_TRANSFER((slot),(owner))
 #endif
 #ifdef SC64_SHARED_TRANSPORT
 _Static_assert(MAX_BUILDINGS <= 255, "transport research producer index exceeds one byte");
@@ -2785,12 +2791,50 @@ spawn_unit(int owner, int type, int x, int y)
 
 static void game_audio_foundation(const Building *q);
 
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+/* HOST-only fail-closed lifecycle bridge. Campaign ownership is unsupported. */
+static int sc64_pr_stage_job_marked(const Building *q)
+{ return q && (q->type==B_FORGE || q->type==B_CYBERNETICS_CORE) && (q->level || q->queue_progress); }
+static int sc64_pr_stage_owner_active(unsigned owner)
+{
+    if (!race_mode || race_bots < 1 || race_bots > 3) return 0;
+    if (!(owner==SIDE || (owner==ENEMY && race_bots>=1) ||
+          (owner==RESCUABLE && race_bots>=2) || (owner==4 && race_bots>=3))) return 0;
+    return race_player[owner]==R_PROTOSS;
+}
+static int sc64_pr_stage_cancel_slot(int slot, int destroyed)
+{
+    Building *q; unsigned owner; int *ore, *vespene;
+    if (slot < 0 || slot >= MAX_BUILDINGS) return 0;
+    q=&b[slot]; if (!sc64_pr_stage_job_marked(q)) return 0;
+    owner=(unsigned)q->queue[0];
+    if (owner>=SC64_PR_CUSTOM_OWNERS || !sc64_pr_stage_owner_active(owner)) return 0;
+    ore=owner==SIDE ? &minerals : &race_minerals[owner];
+    vespene=owner==SIDE ? &gas : &race_gas[owner];
+    return sc64_pr_job_cancel_custom(q,owner,&sc64_experimental_research_levels,
+        owner==SIDE ? (unsigned)weapons_level : 0,
+        owner==SIDE ? (unsigned)armor_level : 0,
+        owner==SIDE && weapons_research,owner==SIDE && armor_research,
+        destroyed,ore,vespene,65535);
+}
+static int sc64_pr_stage_transfer_allowed(int slot,int new_owner)
+{
+    if (slot<0 || slot>=MAX_BUILDINGS) return 0;
+    if (!sc64_pr_stage_job_marked(&b[slot])) return 1;
+    return b[slot].owner==new_owner;
+}
+#endif
+
 static int
 spawn_build(int owner, int type, int x, int y, int constructing)
 {
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    /* Never overwrite an unresolved staged job left in a dead slot. */
+    if (sc64_pr_stage_job_marked(&b[i])) return -1;
+#endif
 #ifdef SC64_RANGE_WORK
     sc64_range_route_forget_target(MAX_UNITS+i);
 #endif
@@ -4679,6 +4723,10 @@ destroy_building(int slot, int source_owner)
 {
     Building *q = &b[slot];
     if (!q->alive) return;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    /* Refuse the transition if payer/refund cannot be authenticated. */
+    if (sc64_pr_stage_job_marked(q) && !sc64_pr_stage_cancel_slot(slot,1)) return;
+#endif
 #ifdef SC64_SHARED_TRANSPORT
     race_sk_transport_producer_destroyed(slot);
 #endif
