@@ -3,11 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 #include "../common/gba_flash1m.h"
-typedef struct { uint8_t bytes[131072];unsigned bank,state,cmd,busy,stuck,bad,stall_program,toggle; } Model;
+typedef struct { uint8_t bytes[131072];unsigned bank,state,cmd,busy,stuck,bad,stall_program,toggle,program_count,stall_after; } Model;
 static uint8_t rd(void *c,uint16_t p) { Model *m=c;if(m->stuck){m->toggle^=0x40;return (uint8_t)(0x1f|m->toggle);}if(m->busy){--m->busy;m->toggle^=0x40;return (uint8_t)(0x1f|m->toggle);}return m->bytes[m->bank*65536u+p]; }
 static void wr(void *c,uint16_t p,uint8_t v) {
  Model *m=c;if(m->stuck||m->busy){m->bad++;return;}
- if(m->state==0 && m->cmd==0xa0){unsigned a=m->bank*65536u+p;assert((m->bytes[a]&v)==v);m->bytes[a]&=v;m->cmd=0;if(m->stall_program)m->stuck=1;else m->busy=2;return;}
+ if(m->state==0 && m->cmd==0xa0){unsigned a=m->bank*65536u+p;assert((m->bytes[a]&v)==v);m->bytes[a]&=v;m->cmd=0;++m->program_count;if(m->stall_program || (m->stall_after && m->program_count==m->stall_after))m->stuck=1;else m->busy=2;return;}
  if(m->state==0 && m->cmd==0xb0){if(p==0&&v<2)m->bank=v;else m->bad++;m->cmd=0;return;}
  if(m->state==0){if(p==0x5555&&v==0xaa)m->state=1;else m->bad++;return;}
  if(m->state==1){if(p==0x2aaa&&v==0x55)m->state=2;else{m->bad++;m->state=0;}return;}

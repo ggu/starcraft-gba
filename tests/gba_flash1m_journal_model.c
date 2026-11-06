@@ -25,5 +25,23 @@ int main(void) {
  assert(gba_fj_write_parts(&io,payload,sizeof payload,0,0,0x56465a60,0,0,&a,&b)==GBA_FJ_OK);
  assert(b.index==3 && gba_fj_select(&io,0,0,&winner)==GBA_FJ_OK && gba_fj_same_record(&b,&winner));
  assert(!memcmp(model.bytes,legacy,sizeof legacy) && !model.bad && !flash.fault);
+ /* A fault after selected byte programs may have physically changed that
+  * byte. Reboot the model and accept only the previous or a fully committed
+  * successor; old bytes must stay untouched in either case. */
+ static uint8_t snapshot[GBA_FJ_BYTES];memcpy(snapshot,model.bytes,sizeof snapshot);
+ const unsigned cuts[]={1,10,256,4096,28000,28660,28670,28675};
+ for(unsigned i=0;i<sizeof cuts/sizeof cuts[0];++i) {
+  memcpy(model.bytes,snapshot,sizeof snapshot);model.bank=model.state=model.cmd=0;
+  model.busy=model.stuck=model.bad=model.toggle=model.program_count=0;
+  model.stall_after=cuts[i];flash.fault=0;
+  int result=gba_fj_write_parts(&io,payload,sizeof payload,0,0,0x56465a60,0,0,&b,&a);
+  assert(result==GBA_FJ_WRITE_ERROR || result==GBA_FJ_OK);
+  model.bank=model.state=model.cmd=model.busy=model.stuck=model.toggle=0;
+  model.stall_after=0;flash.fault=0;
+  assert(gba_fj_select(&io,0,0,&winner)==GBA_FJ_OK);
+  assert(gba_fj_same_record(&winner,&b) ||
+         (winner.index==2 && winner.sequence==b.sequence+1 && winner.length==sizeof payload && winner.checksum==b.checksum));
+  assert(!memcmp(model.bytes,legacy,sizeof legacy));
+ }
  puts("strict Flash transport + full journal: two slots and legacy preserved PASS");return 0;
 }
