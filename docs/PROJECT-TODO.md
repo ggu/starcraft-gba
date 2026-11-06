@@ -31,17 +31,19 @@ older KODAK package. Source merges do not update an already copied ROM.
   Egg/Carrier/Scarab lifecycles are unchanged; the visual field overlay is off.
 - **Validation and package:** clean local full default suites passed. Actual
   P10 gather, open/wall travel, advisor sample-request and power fixtures pass.
-  Six normal ARM vectors link with the delivered advisor bank and unchanged
-  guards (minimum IWRAM margin 120 bytes, EWRAM 796 bytes). The new four-ROM
-  Mac package `StarCraft-GBA-2026-11-06-cf33a125` has verified 32-MiB ROMs,
-  headers, checksums and 392 compiler-reported dependency hashes. Later
-  `e3919ec` is test/audit-only. **KODAK still has the older e9838086 package**
-  until a new physical copy is recorded; the card is not currently mounted.
+  Normal ARM vectors link with the delivered advisor bank and unchanged
+  guards. The four package builds retain at least 664 bytes to the IWRAM
+  boundary and 796 bytes to the EWRAM boundary. The new four-ROM
+  Mac package `StarCraft-GBA-2026-11-06-94bc32f8` has verified 32-MiB ROMs,
+  headers, checksums, a player testing guide and 392 compiler-reported dependency
+  hashes. Its Zerg9 includes #313; other three ROMs match the cf33 package.
+  **KODAK still has the older e9838086 package** until a new physical copy is
+  recorded; the card is not currently mounted.
 - **Controller cleanup #310:** producer selection escapes use SELECT, keeping
   intentional L cancellation and moved drags. Fresh HOST T5/Z3 wins on the
   worker source and combined power P3/P7/P10 wins are scoped in their audits.
-  Current Z7 under the actual Z9 vector does not win at its documented bound
-  with either unchanged or updated controls. Z4/T6 also remain unqualified;
+  Current Z7 attempts under the tested Z9 inputs do not win at the documented
+  bound with either unchanged or updated controls. Z4/T6 also remain unqualified;
   existing Z8 and persistence gaps below are not closed. Historical win totals
   and old tapes must not be reported as current-source certification.
 - **Mining pace remains open:** the post-pickup wait is bypassed/overwritten;
@@ -51,25 +53,35 @@ older KODAK package. Source merges do not update an already copied ROM.
 - **Research and UI remain open:** authenticated Forge/Core facts and unwired
   services are groundwork, not usable typed upgrades. Building-context menus,
   payment/completion, source-owner combat routing and safe journals must
-  integrate together. Category navigation and the power-field overlay still
-  need ordinary-input, framebuffer and dense-scene checks.
+  integrate together. A separate default-off research journal experiment now
+  passes synthetic actual-engine P10/Z9 save/load, fallback and maximum
+  impact/Yamato combinations, plus six guarded ARM links. It is not in releases;
+  genuine-record admission, review, stack and gameplay integration remain open.
+  Category navigation and the power-field overlay still need ordinary-input,
+  framebuffer and dense-scene checks.
 - **Other feedback:** warp-start/death sounds, large death effects, remembered
   resource/fog presentation, AI difficulty choices and direct native defeat
   behavior remain open. Current custom defeat counts the last live owned
   building. Delivered death pixels/timelines were authenticated; their large
   source frames require a paired native presentation check, not guessed scale.
-- **Performance:** a final combined-source advisor-bank full-flood candidate
-  passed focused oracles, eight Z7–Z10 guarded links and 18 custom opening/warm
-  comparisons. A current Z9 custom save/fresh-load pair also matched 500
-  advancing updates on both variants; this is a passive opening, not a match
-  win. Current campaign-winning and cycle gates remain open. The
-  earlier ~6% busy-scene mean-cycle improvement is historical evidence, not
-  a newly shipped speed gain or a claim of 30 fps. Actions remains disabled;
-  these checks run locally.
+- **Performance #313 merged:** late-Zerg uses the existing full-field flags
+  already active in other products; the separate monotone shortcut remains off.
+  Eight release links, route oracles, clean default checks and 18 HOST warm
+  comparisons passed. A reachable Z9 custom save/fresh-load pair matched 500
+  updates and measured 2.53% fewer emulated cycles in one passive three-AI
+  opening. Exact packaged-ROM profiling reproduced the candidate's 611,692
+  mean cycles/update and 3,102,721 peak; neither is a hardware FPS claim.
+  The strict Z7 winning validator still fails equally in the compared builds;
+  it was not weakened. Some earlier prepared-bank campaign map bytes differ
+  from the final package, so campaign qualification must pin actual selected
+  inputs, not just similar compile flags. The near-30-fps goal remains open.
+  Current profiling correlates order spikes with synchronous route-field
+  builds; caller attribution is the next bounded diagnostic. Actions stays
+  disabled; these checks run locally.
 
-Priority: deliver the verified normal package when KODAK is connected, finish
-scoped performance qualification, and repair current campaign/winning-replay
-gaps. Continue typed research and native visual/audio comparison with explicit
+Priority: deliver the verified normal package when KODAK is connected, reduce
+measured route/order tails and repair current campaign/winning-replay gaps.
+Continue typed research and native visual/audio comparison with explicit
 save/source-owner and timing evidence; do not advertise unwired components.
 
 ## Current baseline
@@ -77,7 +89,7 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-06-cf33a125`:
+- Latest verified normal Mac package: `StarCraft-GBA-2026-11-06-94bc32f8`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The older KODAK package
   is `20261106-e9838086-campaigns`. Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
