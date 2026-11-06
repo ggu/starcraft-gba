@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import resource
 import shutil
+import signal
 import subprocess
 import tempfile
 from tools.sc64_zp_scenario_pack import parse_source
@@ -27,16 +28,27 @@ def run(source: Path, bank: Path) -> int:
     def limits():
         resource.setrlimit(resource.RLIMIT_FSIZE,(67108864,67108864))
         os.setsid()
+    def bounded(command: list[str]) -> bytes:
+        child=subprocess.Popen(command,cwd=ROOT,stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,preexec_fn=limits)
+        try:
+            stdout,stderr=child.communicate(timeout=120)
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid,signal.SIGKILL)
+            child.communicate()
+            raise
+        if child.returncode:
+            raise subprocess.CalledProcessError(child.returncode,command,stdout,stderr)
+        return stdout
     with open(LOCK,'w') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
         if shutil.disk_usage(ROOT).free<4*1024**3: raise RuntimeError('less than 4 GiB free')
         if any(digest(p)!=h for p,h in inputs.items()): raise ValueError('input changed before run')
         with tempfile.TemporaryDirectory(prefix='mid-zerg-oracle-',dir=ROOT/'.local') as temp:
             exe=Path(temp)/'oracle'
-            subprocess.run(['clang','-std=c11','-O1','-fsanitize=address,undefined',
-                            '-I'+str(bank),str(fixture),'-o',str(exe)],
-                           cwd=ROOT,check=True,timeout=120,preexec_fn=limits)
-            observed=subprocess.check_output([str(exe)],cwd=ROOT,timeout=120,preexec_fn=limits)
+            bounded(['clang','-std=c11','-O1','-fsanitize=address,undefined',
+                     '-I'+str(bank),str(fixture),'-o',str(exe)])
+            observed=bounded([str(exe)])
             expected=bytearray()
             for mission in ('Z5','Z6'):
                 puni=parse_source(source,mission)['puni']
