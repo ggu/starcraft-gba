@@ -289,6 +289,11 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_Z7_COLONY_DEFENSE_ENABLED) && !defined(SC64_Z7_RUNTIME)
 #error "Z7 colony defense requires the Z7 runtime"
 #endif
+/* Bounded Z1 admission experiment; no release product enables it. */
+#if defined(SC64_SHARED_EGG_Z1_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_SHARED_EGG_LATE_SERVICE))
+#error "Z1 Egg admission requires the HOST late-service qualification vector"
+#endif
 /* Experimental late-campaign service. The staged journal and producer are
  * enabled together: neither is safe alone for paid campaign Eggs. */
 #ifdef SC64_SHARED_EGG_LATE_SERVICE

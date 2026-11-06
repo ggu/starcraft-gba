@@ -176,7 +176,11 @@ static int race_owner_reserved_supply(int owner)
  * and custom games. No menu or guest capability is enabled here. */
 static int race_shared_egg_context(void)
 {
-    return race_mode || race_z8_active() || race_zl_active();
+    return race_mode || race_z8_active() || race_zl_active()
+#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
+        || (!race_mode && race_selected_mission==0) /* Z1 */
+#endif
+        ;
 }
 #define SC64_EGG_CONTEXT() (SC64_EGG_IS_Z7() || race_shared_egg_context())
 #elif defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
@@ -831,6 +835,13 @@ static int race_queue_unit(int owner, int producer, int type)
 #ifdef SC64_SHARED_EGG_HOST_STAGE
     if (egg_job && !SC64_EGG_IS_Z7() && !race_mode) {
         int source=b[producer].raw_owner;
+#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
+        if (race_selected_mission==0) {
+            /* Only an authenticated source slot can own the paid Egg. */
+            source=race_creation_source_owner(owner,source);
+            if (source<0) return 0;
+        } else
+#endif
         if ((unsigned)source>=8u ||
             (race_z8_active() ? race_z8_source_owner((unsigned)source) :
                                 race_zl_source_owner((unsigned)source)) != owner) return 0;
@@ -950,7 +961,11 @@ static int race_queue_unit(int owner, int producer, int type)
         u[slot].work_timer = (u16)sc64_z7_egg_duration(type);
         u[slot].raw_type = 36;
 #if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
-        if (!SC64_EGG_IS_Z7()) u[slot].raw_owner = race_mode ? -1 : b[producer].raw_owner;
+        if (!SC64_EGG_IS_Z7()) u[slot].raw_owner = race_mode ? -1 :
+#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
+            race_selected_mission==0 ? race_creation_source_owner(owner,b[producer].raw_owner) :
+#endif
+            b[producer].raw_owner;
 #endif
         u[slot].maxhp = 200;
         u[slot].hp = 200;

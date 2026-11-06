@@ -362,6 +362,12 @@ static int race_shared_egg_candidate_owner(int owner,int raw_owner,void *context
         candidate->players[owner]!=R_ZERG || mission_id<0 || mission_id>=SC64_RACE_MAP_COUNT) return 0;
     const Sc64RaceMap *map=&sc64_race_maps[mission_id];
     if (map->owner_races[raw_owner]!=R_ZERG) return 0;
+#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
+    if (mission_id==SC64_RACE_MISSION_Z1) {
+        int mapped=(unsigned)raw_owner==map->human_slot ? SIDE : map->owner_modes[raw_owner];
+        return mapped==owner;
+    }
+#endif
     if (mission_id==SC64_Z8_GLOBAL_ID) return race_z8_source_owner((unsigned)raw_owner)==owner;
     if (mission_id==SC64_Z9_GLOBAL_ID
 #ifdef SC64_Z10_RUNTIME
@@ -386,7 +392,11 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
             int selected=candidate->state[21+i];
             if (selected<0 || selected>2 || candidate->players[owners[i+1]]!=selected) return 0;
         }
-    } else if (candidate->state[2]!=SC64_Z8_GLOBAL_ID && candidate->state[2]!=SC64_Z9_GLOBAL_ID
+    } else if (
+#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
+               candidate->state[2]!=SC64_RACE_MISSION_Z1 &&
+#endif
+               candidate->state[2]!=SC64_Z8_GLOBAL_ID && candidate->state[2]!=SC64_Z9_GLOBAL_ID
 #ifdef SC64_Z10_RUNTIME
                && candidate->state[2]!=SC64_Z10_GLOBAL_ID
 #endif
@@ -1685,8 +1695,11 @@ static int race_save_game(void) {
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
         race_mode ? SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
 #elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
-        (race_mode || race_z8_active() ||
-         race_zl_active()) ?
+        (race_mode || race_z8_active() || race_zl_active()
+#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
+         || race_selected_mission==SC64_RACE_MISSION_Z1
+#endif
+         ) ?
         SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
         SC64_GUARDIAN_SAVE_VERSION;
