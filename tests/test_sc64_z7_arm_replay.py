@@ -185,6 +185,10 @@ class Z7ArmReplayTest(unittest.TestCase):
                                   sram=sram((0, 1, WIN, True)))
         self.assertTrue(untimed["qualified"], untimed["failures"])
         self.assertIsNone(untimed["guest_timing"])
+        false_timing = replay.evaluate(plan, "full", run_log(rows), None, timed=False,
+                                      sram=sram((0, 1, WIN, True)))
+        self.assertFails(false_timing, "an untimed log carries timing records")
+        self.assertIsNone(false_timing["guest_timing"])
 
     def test_malformed_unknown_and_duplicate_records_fail(self):
         plan = self.plan()
