@@ -3621,6 +3621,35 @@ sc64_steer_best_direction(Unit *q, int speed, int from_cell,
 }
 #endif
 
+#if defined(SC64_STEER_EARLY_POINT_EXPERIMENT) && !defined(SC64_CONTACT_CACHE)
+#error "early steering point experiment requires contact cache"
+#endif
+#ifdef SC64_STEER_EARLY_POINT_EXPERIMENT
+/* Return the exact best direction when a single point test proves it, -1
+ * when no terrain candidate exists, or -2 to retain the full mask path. */
+static int __attribute__((noinline))
+sc64_steer_early_point(const Unit *q, int speed, int from_cell,
+                       int blocked_x, int blocked_y)
+{
+    int best = -1, best_cost = 0x7fffffff;
+    for (int i = 0; i < 8; ++i) {
+        int sx = q->x + sc64_contact_dx[i] * speed;
+        int sy = q->y + sc64_contact_dy[i] * speed;
+        int cost = dist2(sx, sy, q->path_x, q->path_y);
+        if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell)) {
+            best = i; best_cost = cost;
+        }
+    }
+    if (best < 0) return -1;
+    {
+        int sx = q->x + sc64_contact_dx[best] * speed;
+        int sy = q->y + sc64_contact_dy[best] * speed;
+        if (sx == blocked_x && sy == blocked_y) return -2;
+        return unit_step_clear(q, sx, sy) ? best : -2;
+    }
+}
+#endif
+
 static void GBA_HOT
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
 __attribute__((optimize("Os")))
@@ -3712,6 +3741,11 @@ move_toward(Unit * q, int tx, int ty)
 #if defined(SC64_CONTACT_CACHE)
 	/* One bucket pass answers all eight unit_step_clear() offsets; the
 	 * selection order and tie-breaking below are unchanged. */
+#ifdef SC64_STEER_EARLY_POINT_EXPERIMENT
+        best = sc64_steer_early_point(q, speed, from_cell, nx, ny);
+        if (best == -2) {
+            best = -1;
+#endif
 	unsigned blocked = sc64_contact_blocked_mask(q, speed);
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
@@ -3719,6 +3753,9 @@ move_toward(Unit * q, int tx, int ty)
 	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
 		!(blocked & (1u << i))) { best = i; best_cost = cost; }
 	}
+#ifdef SC64_STEER_EARLY_POINT_EXPERIMENT
+        }
+#endif
 #elif defined(SC64_COLLISION_STEER_LIST)
 	#if defined(SC64_Z7_RUNTIME)
 	best = sc64_steer_best_direction(q, speed, from_cell,
