@@ -17,15 +17,28 @@ static void seed_all_chapters(void)
         if (!map->mission_id || map->mission_id[0]!='P') continue;
         game_init(); race_mode=0; race_selected_mission=id; init_state();
         assert(sc64_pr_stage_owner_active(SIDE));
+        race_data.state[0]=0; race_data.state[1]=R_PROTOSS; race_data.state[2]=id;
         for (unsigned owner=1;owner<5;++owner) assert(!sc64_pr_stage_owner_active(owner));
         for (unsigned family=0;family<SC64_PR_FAMILY_COUNT;++family) {
-            Sc64PrCampaignRule rule;
+            Sc64PrCampaignRule rule, detached;
             assert(sc64_pr_stage_campaign_rule(family,&rule));
+            assert(race_research_campaign_candidate_rule(&race_data,family,&detached));
+            assert(detached.initial==rule.initial && detached.maximum==rule.maximum &&
+                   detached.cost_supported==rule.cost_supported &&
+                   detached.binding.payer_key==rule.binding.payer_key);
+            int saved=race_selected_mission;
+            race_selected_mission=(id+1)%SC64_RACE_MAP_COUNT;
+            assert(race_research_campaign_candidate_rule(&race_data,family,&detached));
+            assert(detached.binding.chapter==rule.binding.chapter && detached.initial==rule.initial);
+            race_selected_mission=saved;
             assert(rule.binding.current_controller_key==map->human_slot);
             assert(sc64_experimental_research_levels.level[SIDE][family]==rule.initial);
             for (unsigned owner=1;owner<SC64_PR_CAMPAIGN_OWNERS;++owner)
                 assert(!sc64_experimental_research_levels.level[owner][family]);
         }
+        race_data.state[0]=1;
+        Sc64PrCampaignRule rejected;
+        assert(!race_research_campaign_candidate_rule(&race_data,0,&rejected));
         ++chapters;
     }
     assert(chapters==10);

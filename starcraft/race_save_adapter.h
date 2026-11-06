@@ -13,6 +13,44 @@ _Static_assert(MAX_BUILDINGS <= 254, "UI save index exceeds one-byte encoding");
 #error "experimental research journal requires normal shared transport profiles"
 #endif
 #define SC64_RESEARCH_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH(SC64_TRANSPORT_SAVE_VERSION)
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+/* Resolve the candidate's immutable mission roles without consulting or
+ * changing the currently running mission. The ordinary load preflight still
+ * authenticates the rest of the map and actor state before publication. */
+static int race_research_campaign_candidate_rule(const RaceSave *candidate,
+    unsigned family, Sc64PrCampaignRule *rule)
+{
+    int8_t roles[8];
+    Sc64PrCampaignPolicyView view=sc64_pr_campaign_generated_view();
+    if (!candidate || candidate->state[0]!=0 || candidate->state[1]!=R_PROTOSS ||
+        candidate->state[2]<0 || candidate->state[2]>=SC64_RACE_MAP_COUNT) return 0;
+    int mission=candidate->state[2];
+    const Sc64RaceMap *map=&sc64_race_maps[mission];
+    for (unsigned source=0;source<8;++source) {
+        int owner=map->owner_modes[source];
+#ifdef SC64_P3_RUNTIME
+        if (mission==SC64_P3_GLOBAL_ID) {
+            owner=source==SC64_P3_HUMAN_SLOT ? SIDE :
+                  source==SC64_P3_FORCE2_SLOT ? ENEMY :
+                  source==SC64_P3_FORCE3_SLOT ? 4 : NEUTRAL;
+        }
+#endif
+#ifdef SC64_P4_RUNTIME
+        if (mission==SC64_RACE_MISSION_P4) owner=race_p4_source_owner(source);
+#endif
+#ifdef SC64_P5_RUNTIME
+        if (mission==SC64_RACE_MISSION_P5) owner=race_p5_source_owner(source);
+#endif
+#ifdef SC64_P6_RUNTIME
+        if (mission==SC64_P6_GLOBAL_ID) owner=race_p6_source_owner(source);
+#endif
+        roles[source]=(int8_t)(owner<0 ? NEUTRAL : owner);
+    }
+    return sc64_pr_campaign_rule(&view,0,map->mission_id,map->human_slot,roles,
+                                 SIDE,family,rule);
+}
+#endif
+
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
 #define SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH_JOBS(SC64_TRANSPORT_SAVE_VERSION)
 _Static_assert(SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION != SC64_RESEARCH_TRANSPORT_SAVE_VERSION &&
