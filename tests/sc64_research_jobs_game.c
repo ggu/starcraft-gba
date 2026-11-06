@@ -139,6 +139,16 @@ int main(void)
     assert(!strcmp(race_menu_label(0),"GROUND WEAPONS"));
     game_update(0,0); game_update(KEY_A,KEY_A);
     assert(!menu_open && sc64_pr_paid[forge].live && minerals==900 && gas==900);
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    /* Bit transport only: the writer/loader remain unconditionally refused. */
+    Sc64P7TypedBuildingSave row; Building decoded;
+    assert(sc64_p7_typed_building_encode(&row,&b[forge],(unsigned)WORLD_W,(unsigned)WORLD_H));
+    assert(sc64_p7_typed_building_decode(&decoded,&row,(unsigned)WORLD_W,(unsigned)WORLD_H));
+    assert(decoded.owner==b[forge].owner && decoded.type==b[forge].type &&
+           decoded.level==b[forge].level && decoded.queue_count==0 && decoded.queue_head==0 &&
+           decoded.queue[0]==b[forge].queue[0] && decoded.queue[1]==b[forge].queue[1] &&
+           decoded.queue_progress==b[forge].queue_progress);
+#endif
     int paid_ore=minerals, paid_gas=gas; start_research(0);
     assert(!weapons_research && minerals==paid_ore && gas==paid_gas);
     unsigned remaining=b[forge].queue_progress;
