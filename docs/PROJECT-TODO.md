@@ -154,8 +154,11 @@ Fresh recovery results (qualification remains incomplete):
   Two further single-change HOST trials (attack-move repost and an earlier
   northeast guard position) also lost at frame 11,048, fault-free. No controller
   change was retained. Idle actors already have within-range acquisition in this
-  product; next capture accepted orders, cooldowns, reach and detection during
-  the second raid. No enemy/objective tuning or new qualified win follows.
+  product. A read-only per-eight-frame observer reproduced the baseline trace
+  byte for byte and confirmed Hydra firing/cooldowns, 64 runtime-pixel reach
+  (128 source pixels) and depletion of the raider's 80 shields before HP loss.
+  Retaining accepted direct-target orders alone also lost, at frame 11,009;
+  no controller or engine change is retained. No qualified win follows.
 - The user confirmed the screen is unlocked. After reconnecting, native text
   access worked but screenshot capture timed out; N64 gameplay comparison is
   still unavailable. A subsequent native-screenshot attempt could not bind the
@@ -232,7 +235,12 @@ and platform video callbacks, but no turnkey supported headless CLI. A separate
 source-integrated frontend is a research path, not a working N64 reference
 runner. Vulkan/paraLLEl availability, threaded video synchronization and cadence
 must be verified before any screenshot or gameplay parity claims. No OS event
-shim or guest RAM writes are part of that proposed harness.
+shim or guest RAM writes are part of that proposed harness. An isolated opt-in
+frontend now links against the pinned source/MoltenVK and ran one neutral boot,
+but produced no frame before its original callback timeout. Exact source
+inspection explains that inactive VI returns without calling screen->frame;
+callbacks and run steps must be separately bounded and recorded. A corrected
+probe is being prepared; there is still no new N64 visual/parity result.
 
 All checks remain local; GitHub Actions is still disabled. No experimental
 release flags or campaign coverage were promoted. The later verified KODAK copy
