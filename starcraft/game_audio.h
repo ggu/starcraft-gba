@@ -56,6 +56,9 @@ extern volatile u16 demo_keys;
 static u16 game_audio_previous_held;
 
 static int game_audio_last_frame = -1, game_audio_last_screen = -1;
+static u8 game_audio_needs_prime;
+static int game_audio_foundation_frame = -1;
+static void game_audio_prime(void) { game_audio_needs_prime = 1; game_audio_foundation_frame = -1; }
 static u32 game_audio_selection, game_audio_orders;
 static u8 game_audio_effects;
 #ifdef SC64_AUDIO_IMPORTED
@@ -158,6 +161,21 @@ static void game_audio_emit(int kind, int raw)
     }
 }
 
+/* Called only after a real foundation allocation; no per-slot generation state. */
+static void game_audio_foundation(const Building *q)
+{
+#if defined(SC64_RACES) && !defined(GAME_AUDIO_OFF)
+    const Sc64RaceBuildingRule *rule = sc64_race_building_rule(q->type);
+    if (game_audio_needs_prime || screen != SCREEN_PLAY || q->owner != SIDE ||
+        !rule || rule->race != R_PROTOSS || !game_audio_on_screen(q->x, q->y) ||
+        game_audio_foundation_frame == frame) return;
+    game_audio_foundation_frame = frame;
+    game_audio_emit(GAME_AUDIO_WARP_START, game_audio_building_raw(q));
+#else
+    (void)q;
+#endif
+}
+
 /* One refusal cue per observed frame; the mixer plays one advisor line at a
  * time, so presses while it speaks are dropped and the next one replays it. */
 static void game_audio_advisor(int cue)
@@ -207,9 +225,6 @@ static void game_audio_observe(void)
     int fresh, i;
     u32 selection = 0, orders = 0;
     int first_selected = -1;
-#ifdef SC64_RACES
-    int warp_started = 0;
-#endif
     u16 held = GAME_AUDIO_HELD(), pressed = held & (u16)~game_audio_previous_held;
     int advisor = toast_advisor;
     game_audio_previous_held = held;
@@ -225,17 +240,18 @@ static void game_audio_observe(void)
 #endif
     int same_play_frame = screen == SCREEN_PLAY && game_audio_last_screen == SCREEN_PLAY &&
                           frame == game_audio_last_frame;
-    fresh = screen != SCREEN_PLAY || game_audio_last_screen != SCREEN_PLAY ||
+    fresh = game_audio_needs_prime || screen != SCREEN_PLAY || game_audio_last_screen != SCREEN_PLAY ||
             frame != game_audio_last_frame + 1;
     game_audio_last_screen = screen;
     if (screen != SCREEN_PLAY) return;
-    if (frame == game_audio_last_frame) {
+    if (frame == game_audio_last_frame && !game_audio_needs_prime) {
         /* Menus can issue an explicit refusal without advancing simulation.
          * Consume that new cue now, without rescanning frame-based events. */
         if (same_play_frame && advisor) game_audio_advisor(advisor);
         return;
     }
     game_audio_last_frame = frame;
+    game_audio_needs_prime = 0;
     game_audio_effects = 0;
     if (advisor && !fresh) game_audio_advisor(advisor);
     for (i = 0; i < MAX_UNITS; i++) {
@@ -275,15 +291,6 @@ static void game_audio_observe(void)
                 if (game_audio_on_screen(q->x, q->y))
                     game_audio_emit(GAME_AUDIO_DEATH, game_audio_building_raw(q));
             }
-#ifdef SC64_RACES
-            else if (!(prev & GAME_AUDIO_SNAPSHOT_ALIVE) && q->alive && q->under_construction &&
-                     q->owner == SIDE && !warp_started && game_audio_on_screen(q->x, q->y) &&
-                     sc64_race_building_rule(q->type) &&
-                     sc64_race_building_rule(q->type)->race == R_PROTOSS) {
-                game_audio_emit(GAME_AUDIO_WARP_START, game_audio_building_raw(q));
-                warp_started = 1;
-            }
-#endif
             else if (q->alive && (prev & GAME_AUDIO_SNAPSHOT_ALIVE) &&
                      (prev & GAME_AUDIO_SNAPSHOT_CONSTRUCTING) && !q->under_construction && q->owner == SIDE) {
 #ifdef SC64_RACES

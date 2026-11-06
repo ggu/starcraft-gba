@@ -144,50 +144,68 @@ static int empty_slot_transitions(void)
 }
 
 #ifdef SC64_RACES
+static int warp_load_prime(void)
+{
+    gba_init(); game_init(); race_mode = 1; race_human = R_PROTOSS;
+    race_bots = 1; race_bot_races[0] = R_TER; race_skirmish_map = 0;
+    init_state(); screen = SCREEN_PLAY; game_render();
+    int slot = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE &&
+            sc64_race_building_rule(b[i].type) &&
+            sc64_race_building_rule(b[i].type)->race == R_PROTOSS) { slot = i; break; }
+    if (slot < 0 || !save_game()) return fail("load prime setup save");
+    game_audio_snapshot[MAX_UNITS + slot] = GAME_AUDIO_SNAPSHOT_ALIVE | GAME_AUDIO_SNAPSHOT_CONSTRUCTING;
+    game_audio_last_frame = frame - 1; clear_events();
+    if (!load_game()) return fail("load prime real load");
+    game_render();
+    if (events(GAME_AUDIO_WARP_DONE) || events(GAME_AUDIO_WARP_START)) return fail("coincident load replayed cue");
+    clear_events();
+    game_audio_snapshot[MAX_UNITS + slot] = GAME_AUDIO_SNAPSHOT_ALIVE | GAME_AUDIO_SNAPSHOT_CONSTRUCTING;
+    game_audio_last_frame = frame; game_audio_prime(); game_render();
+    if (events(GAME_AUDIO_WARP_DONE)) return fail("same-frame prime replayed cue");
+    return 0;
+}
+
 static int warp_lifecycle(void)
 {
     fixture();
-    b[0].alive = 1; b[0].owner = SIDE; b[0].type = B_PYLON;
-    b[0].raw_type = 156; b[0].x = b[0].y = 60; b[0].under_construction = 1;
-    observe_next();
-    if (events(GAME_AUDIO_WARP_START) != 1) return fail("friendly visible warp start");
-    observe_next();
+    int slot = spawn_build(SIDE, B_PYLON, 60, 60, 1);
+    if (slot < 0 || events(GAME_AUDIO_WARP_START) != 1) return fail("friendly visible warp start");
+    observe_next(); observe_next();
     if (events(GAME_AUDIO_WARP_START) != 1) return fail("warp start repeated");
-    b[0].under_construction = 0; observe_next();
+    b[slot].under_construction = 0; observe_next();
     if (events(GAME_AUDIO_WARP_DONE) != 1 || events(GAME_AUDIO_BUILT)) return fail("warp completion");
     observe_next();
     if (events(GAME_AUDIO_WARP_DONE) != 1) return fail("warp completion repeated");
-    b[0].alive = 0; observe_next(); clear_events();
-    b[0].alive = 1; b[0].under_construction = 1; observe_next();
-    if (events(GAME_AUDIO_WARP_START) != 1) return fail("reused slot start");
-    b[0].alive = 0; observe_next();
+    b[slot].alive = 0; clear_events();
+    if (spawn_build(SIDE, B_PYLON, 60, 60, 1) != slot || events(GAME_AUDIO_WARP_START) != 1)
+        return fail("same-frame reused slot start");
+    b[slot].alive = 0; observe_next();
     if (events(GAME_AUDIO_WARP_DONE)) return fail("cancel generated completion");
-    clear_events(); b[0].alive = 1; b[0].owner = ENEMY; observe_next();
-    if (events(GAME_AUDIO_WARP_START)) return fail("enemy start");
-    b[0].alive = 0; observe_next(); clear_events();
-    b[0].alive = 1; b[0].owner = SIDE; b[0].x = WORLD_W - 48; observe_next();
-    if (events(GAME_AUDIO_WARP_START)) return fail("offscreen start");
-    b[0].alive = 0; observe_next(); clear_events();
-    b[0].alive = 1; b[0].x = 60; frame += 3; game_render(); observe_next();
-    if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE)) return fail("load replayed warp");
-    b[0].under_construction = 0; frame += 3; game_render(); observe_next();
-    if (events(GAME_AUDIO_WARP_DONE)) return fail("load replayed completion");
-    clear_events(); b[0].alive = 0; observe_next(); clear_events();
-    b[0].alive = 1; b[0].raw_type = 109; b[0].type = B_DEPOT; b[0].under_construction = 1;
-    observe_next(); b[0].under_construction = 0; observe_next();
+    clear_events();
+    slot = spawn_build(ENEMY, B_PYLON, 60, 60, 1);
+    if (slot < 0 || events(GAME_AUDIO_WARP_START)) return fail("enemy start");
+    b[slot].alive = 0; observe_next(); clear_events();
+    slot = spawn_build(SIDE, B_PYLON, WORLD_W - 48, 60, 1);
+    if (slot < 0 || events(GAME_AUDIO_WARP_START)) return fail("offscreen start");
+    b[slot].alive = 0; observe_next(); clear_events();
+    slot = spawn_build(SIDE, B_DEPOT, 60, 60, 1); observe_next();
+    b[slot].under_construction = 0; observe_next();
     if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE) || events(GAME_AUDIO_BUILT) != 1)
         return fail("Terran completion changed");
-    b[0].alive = 0; observe_next(); clear_events();
-    b[0].alive = 1; b[0].raw_type = 131; b[0].type = B_HATCHERY; b[0].under_construction = 1;
-    observe_next(); b[0].under_construction = 0; observe_next();
+    b[slot].alive = 0; observe_next(); clear_events();
+    slot = spawn_build(SIDE, B_HATCHERY, 60, 60, 1); observe_next();
+    b[slot].under_construction = 0; observe_next();
     if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE) || events(GAME_AUDIO_BUILT) != 1)
         return fail("Zerg completion changed");
-    b[0].alive = 0; observe_next(); clear_events();
-    b[0].alive = 1; b[0].type = B_PYLON; b[0].raw_type = 156; b[0].under_construction = 1;
-    b[1] = b[0]; observe_next();
-    if (events(GAME_AUDIO_WARP_START) != 1) return fail("simultaneous warp starts not bounded");
+    b[slot].alive = 0; observe_next(); clear_events();
+    if (spawn_build(SIDE, B_PYLON, 60, 60, 1) < 0 ||
+        spawn_build(SIDE, B_PYLON, 80, 60, 1) < 0 || events(GAME_AUDIO_WARP_START) != 1)
+        return fail("simultaneous warp starts not bounded");
     return 0;
 }
+
 #endif
 
 static int hooks(void)
@@ -240,7 +258,7 @@ static int hooks(void)
 
     if (empty_slot_transitions()) return 1;
 #ifdef SC64_RACES
-    if (warp_lifecycle()) return 1;
+    if (warp_lifecycle() || warp_load_prime()) return 1;
 #endif
 
     /* The observer's shot contract: a raised cooldown on a visible unit. */
