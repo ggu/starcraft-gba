@@ -149,4 +149,58 @@ static int sc64_z7_v36_probe_commitments(const Sc64Z7LegacyEnvelopeProbe *meta,c
     q.overcommitted=(q.queued+q.egg_extra+q.scripted>q.free_slots);
     *out=q;return 1;
 }
+/* A detached row projection, not a RaceSave or an admissible world. It is
+ * deliberately HOST-only: repeated envelope checks prioritize diagnostics
+ * over guest timing. The valid flag is set only after the final recheck. */
+typedef struct {
+    Sc64DerivedUnitSave units[SC64_Z7_V36_UNIT_ROWS];
+    Sc64DerivedBuildingSave buildings[SC64_Z7_V36_BUILDING_ROWS];
+    Sc64Z7LegacyCommitmentProbe commitments;
+    unsigned valid;
+} Sc64Z7LegacyRowProjectionProbe;
+_Static_assert(sizeof(Sc64Z7LegacyRowProjectionProbe)+
+               (SC64_Z7_V36_SLOT_BYTES-SC64_Z7_V36_HEADER_BYTES)<=32768u,
+               "diagnostic predecessor plus row projection exceeds route scratch");
+static int sc64_z7_v36_probe_project_rows(const Sc64Z7LegacyEnvelopeProbe *meta,const Sc64RaceMap *map,
+                                         const Sc64Z7LegacyMapAuthority *authority,
+                                         Sc64Z7LegacyRowProjectionProbe *out)
+{
+    Sc64Z7LegacyCommitmentProbe commitments;
+    if (!out) return 0;
+    if (meta && meta->slot && !sc64_z7_v36_row_output_disjoint(meta->slot,out,sizeof(*out))) return 0;
+    /* A rejected attempt must never leave a stale prior projection marked valid. */
+    out->valid=0;
+    if (!meta || !meta->slot ||
+        !sc64_z7_v36_probe_commitments(meta,map,authority,&commitments)) return 0;
+    /* Pass one establishes lossless representability before touching output. */
+    for(unsigned i=0;i<SC64_Z7_V36_UNIT_ROWS;++i) {
+        Unit old,roundtrip;Sc64DerivedUnitSave row;
+        if (!sc64_z7_v36_probe_unit(meta,map,authority,i,&old) ||
+            !sc64_derived_unit_encode_for(&row,&old,2048,2048,0) ||
+            !sc64_derived_unit_decode_for(&roundtrip,&row,2048,2048,0) ||
+            memcmp(&old,&roundtrip,sizeof(old))) return 0;
+    }
+    for(unsigned i=0;i<SC64_Z7_V36_BUILDING_ROWS;++i) {
+        Building old,roundtrip;Sc64DerivedBuildingSave row;
+        if (!sc64_z7_v36_probe_building(meta,map,authority,i,&old) ||
+            !sc64_derived_building_encode(&row,&old,2048,2048) ||
+            !sc64_derived_building_decode(&roundtrip,&row) ||
+            memcmp(&old,&roundtrip,sizeof(old))) return 0;
+    }
+    /* Scratch may be partially written only if the source changes after pass
+     * one; valid remains zero, and no live world or SRAM is ever the output. */
+    memset(out,0,sizeof(*out));
+    for(unsigned i=0;i<SC64_Z7_V36_UNIT_ROWS;++i) {
+        Unit old;
+        if (!sc64_z7_v36_probe_unit(meta,map,authority,i,&old) ||
+            !sc64_derived_unit_encode_for(&out->units[i],&old,2048,2048,0)) return 0;
+    }
+    for(unsigned i=0;i<SC64_Z7_V36_BUILDING_ROWS;++i) {
+        Building old;
+        if (!sc64_z7_v36_probe_building(meta,map,authority,i,&old) ||
+            !sc64_derived_building_encode(&out->buildings[i],&old,2048,2048)) return 0;
+    }
+    if (!sc64_z7_v36_row_context(meta,map,authority)) return 0;
+    out->commitments=commitments;out->valid=1;return 1;
+}
 #endif
