@@ -52,12 +52,36 @@ Raw committed 0x47 legacy history likewise prevents creating a new custom
 epoch, even when that old record is not admissible to this custom reader.
 Read selection may still fall back to a supported intact older record.
 
-The authored HOST fixture builds a real no-feature predecessor and exercises
-fresh-process migration, active paid Forge job plus actual shared damage packets
-producing fractional Dragoon HP and shields, a further hit and completion
-after load, read-only legacy bytes, checksum-valid bad-new
-fallback and atomic rejection, and nonzero legacy phase rejection. Until the
-strict native run succeeds, these are intended tests, not recorded results.
+At source/test commit `3982a8f81101fefe7d3ebf88c44451b759ecaf7e`, the
+authored HOST fixture passed with ASan and UBSan configured to halt and with
+diagnostic output scanned. A separate producer compiled exact baseline
+`8127f7af1abe1ad9b5a911f7ea3554bcc691fba7` without research or Q8 flags and
+exported a genuine 0x43 SRAM record. Fresh processes exercised migration,
+an active paid Forge job plus actual shared damage packets producing
+fractional Dragoon HP and shields, a further hit and job completion after
+load, and preservation of the first 32 KiB. The same run passed checksum-valid
+bad-new fallback and sole-record rejection, an encodable invalid mining target,
+nonzero legacy shield phase rejection, unknown committed tags with bad checksum
+or length, mixed 0x47 write refusal, and a pre-erase ownership-change negative.
+
+The migrated 128 KiB model image hashes to
+`35f4c1c1378fa080846a201ee44a0479a8b962b42ecb7a791252f73b49ac4e5a`;
+its preserved first 32 KiB hash is
+`7aed3701fedf0d3c47b73d40db686925edfd6eeac20c7309f99796bc84d95fe7`.
+The separately written new image hashes to
+`1d06a637435acba27d05e7ec1821bdf8332dc1ed79cdbdd1d9000fa80e519e13`.
+These private test artifacts are not committed. The 593 verified inputs and
+baseline source were unchanged; the exact commands and results are in local
+`.local/q8-flash-game/final-results.json` and `final-*.log`. The asset-free
+P10 scope test, source boundary, and exhaustive current tag inventory also
+passed. With the experiment disabled, a normal guarded P10 ARM link and fixed
+header ROM matched the reference SHA-256
+`317cc67d8f48b6771b3ebf4497c52b290466de49d097133b7b1bfdea65b34cd9`.
+
+Earlier checkpoint `52b8d0c9` was cancelled while queued after a raw ownership
+defect was identified; no child ran. The later `5e31fdce` strict build failed
+because P10 does not define the unguarded `ORDER_REPAIR` identifier; the
+failure is retained in `strict-v2.log` and was corrected before the final run.
 No private inputs or saved data are included in this source change. Full
 profile coverage, current normal/ARM qualification, old 0x47 campaign
 compatibility, persistent repair and Z5 aliases, all fault cuts, source
