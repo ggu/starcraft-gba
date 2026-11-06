@@ -18,3 +18,5 @@ test-sc64-research-campaign-journal-p10:
 	./build/research-campaign-runtime/journal-p10 fallback build/research-campaign-runtime/old-p10.sav
 	./build/research-campaign-runtime/journal-p10 write build/research-campaign-runtime/journal-p10.sav
 	./build/research-campaign-runtime/journal-p10 load build/research-campaign-runtime/journal-p10.sav
+	./build/research-campaign-runtime/journal-p10 custom-write build/research-campaign-runtime/custom-p10.sav
+	./build/research-campaign-runtime/journal-p10 custom-load build/research-campaign-runtime/custom-p10.sav

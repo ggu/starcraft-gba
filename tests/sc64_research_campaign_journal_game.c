@@ -13,14 +13,19 @@ static void transfer(const char *path,int write_out) {
 }
 int main(int argc,char **argv) {
     assert(argc==3); gba_init(); game_init(); race_mode=0;
-    race_selected_mission=SC64_RACE_MISSION_P1; init_state();
+    race_selected_mission=SC64_RACE_MISSION_P1;
+    if (!strncmp(argv[1],"custom-",7)) {
+        race_mode=1; race_human=R_PROTOSS; race_bots=1;
+        race_bot_races[0]=R_PROTOSS; race_skirmish_map=0;
+    }
+    init_state();
     if (!strcmp(argv[1],"old-write")) {
 #if defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL)
         assert(0 && "old writer must have no research flags");
 #else
         minerals=gas=1000; assert(race_save_game()); transfer(argv[2],1);
 #endif
-    } else if (!strcmp(argv[1],"write") || !strcmp(argv[1],"over-old")) {
+    } else if (!strcmp(argv[1],"write") || !strcmp(argv[1],"over-old") || !strcmp(argv[1],"custom-write")) {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
         if (!strcmp(argv[1],"over-old")) { transfer(argv[2],0); assert(race_load_game()); }
 
@@ -29,7 +34,12 @@ int main(int argc,char **argv) {
         minerals=gas=1000;
         assert(sc64_pr_stage_begin_slot(f,SC64_PR_GROUND_WEAPONS));
         assert(minerals==900&&gas==900);
-        assert(race_save_game()); transfer(argv[2],1);
+        assert(race_save_game());
+        if (!strcmp(argv[1],"custom-write")) {
+            assert(sram_get32(host_save)==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION ||
+                   sram_get32(host_save+SAVE_SLOT_SIZE)==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION);
+        }
+        transfer(argv[2],1);
 #else
         assert(0 && "new writer requires campaign journal");
 #endif
@@ -52,7 +62,7 @@ int main(int argc,char **argv) {
 #else
         assert(0 && "consumer requires campaign journal");
 #endif
-    } else if (!strcmp(argv[1],"load")) {
+    } else if (!strcmp(argv[1],"load") || !strcmp(argv[1],"custom-load")) {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
         transfer(argv[2],0); assert(race_load_game());
         int f=-1; for(int i=0;i<MAX_BUILDINGS;++i) {

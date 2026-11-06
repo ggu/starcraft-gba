@@ -1626,7 +1626,7 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
                 if (levels->level[owner][family]) return 0;
         }
         for (unsigned i=0;i<MAX_BUILDINGS;++i) {
-            Building q; Sc64PrCampaignRule rule;
+            Building q; Sc64PrCampaignRule rule; Sc64ProtossResearchQuote source, frozen;
             if (!race_save_decode_building(candidate,i,&q)) return 0;
             if (q.type!=B_FORGE && q.type!=B_CYBERNETICS_CORE) continue;
             if (!q.level && !q.queue_progress && !q.queue_count) continue;
@@ -1635,7 +1635,10 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
             unsigned family=(unsigned)q.level-1;
             if ((seen & (1u<<family)) ||
                 !race_research_campaign_candidate_rule(candidate,family,&rule) ||
-                !rule.cost_supported || q.queue[1]>rule.maximum ||
+                !rule.cost_supported || q.queue[1]<1 || q.queue[1]>rule.maximum ||
+                !sc64_pr_campaign_quote(&rule,family,(unsigned)q.queue[1]-1,&source) ||
+                !sc64_pr_quote_v45(family,(unsigned)q.queue[1]-1,&frozen) ||
+                source.mineral!=frozen.mineral || source.gas!=frozen.gas || source.ticks!=frozen.ticks ||
                 !sc64_pr_job_valid_custom(&q,SIDE,levels,(unsigned)candidate->state[11],
                    (unsigned)candidate->state[12],candidate->state[13]!=0,candidate->state[14]!=0)) return 0;
             seen |= 1u<<family;
