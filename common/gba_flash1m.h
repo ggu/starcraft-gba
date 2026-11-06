@@ -13,6 +13,7 @@ typedef struct {
  void (*write)(void *,uint16_t,uint8_t);
  uint32_t polls;
  unsigned fault; /* sticky after an uncertain timeout; no automatic reset */
+ uint32_t settle_reads; /* model-specific delay; zero for ordinary DQ6 devices */
 } GbaFlash1m;
 int gba_flash1m_read(GbaFlash1m *,uint32_t,void *,uint32_t);
 int gba_flash1m_program(GbaFlash1m *,uint32_t,const void *,uint32_t);
