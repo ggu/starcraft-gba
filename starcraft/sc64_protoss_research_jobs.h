@@ -108,29 +108,45 @@ static int sc64_pr_job_tick_custom(Building *p, unsigned payer,
     p->level=0; p->queue[0]=0; p->queue[1]=0;
     return 1;
 }
-/* Refund from the paid quote, to the original authenticated payer only.
- * The 3/4 destruction fraction is pinned PC-source behavior; N64 behavior
- * remains unverified. Any overflow, stale owner or malformed job is a
- * fail-closed no-op. Wallet limit must match the authenticated owner bank. */
-static int sc64_pr_job_cancel_custom(Building *p, unsigned payer,
-    const Sc64ProtossResearchLevels *levels, unsigned legacy_weapons, unsigned legacy_armor,
-    int legacy_weapons_pending, int legacy_armor_pending, int destroyed,
-    int *minerals, int *gas, int wallet_limit)
+/* Volatile HOST-only receipt; it is never inferred from a decoded row. */
+typedef struct {
+    uint16_t mineral, gas;
+    uint8_t live, payer, family, target;
+} Sc64PrPaidReceipt;
+
+/* Settlement validates paid metadata rather than current completed levels:
+ * a later external level change must not steal or duplicate the refund. */
+static int sc64_pr_job_receipt_valid(const Building *p, unsigned payer,
+                                    const Sc64PrPaidReceipt *paid)
 {
     Sc64ProtossResearchQuote quote;
-    int ore, vespene;
-    if (!minerals || !gas || minerals == gas || wallet_limit < 0 ||
-        *minerals < 0 || *gas < 0 || *minerals > wallet_limit || *gas > wallet_limit ||
-        (destroyed != 0 && destroyed != 1) ||
-        !sc64_pr_job_valid_custom(p,payer,levels,legacy_weapons,legacy_armor,
-                                  legacy_weapons_pending,legacy_armor_pending) ||
-        !sc64_pr_quote((unsigned)p->level-1,(unsigned)p->queue[1]-1,&quote)) return 0;
-    ore=destroyed ? (int)quote.mineral*3/4 : (int)quote.mineral;
-    vespene=destroyed ? (int)quote.gas*3/4 : (int)quote.gas;
-    if (ore > wallet_limit-*minerals || vespene > wallet_limit-*gas) return 0;
-    *minerals+=ore; *gas+=vespene;
-    p->level=0; p->queue[0]=0; p->queue[1]=0; p->queue_progress=0;
+    if (!p || !paid || !paid->live || payer>=SC64_PR_CUSTOM_OWNERS ||
+        paid->payer!=payer || paid->family>=SC64_PR_FAMILY_COUNT || !paid->target ||
+        !p->alive || p->under_construction || p->owner!=(int)payer ||
+        p->queue_count || p->queue_head || p->queue[0]!=(int)payer ||
+        p->queue[1]!=(int)paid->target || p->queue[2] || p->queue[3] || p->queue[4] ||
+        p->level!=(int)paid->family+1 || !p->queue_progress ||
+        !sc64_pr_job_family_producer(paid->family,p->type) ||
+        !sc64_pr_quote(paid->family,paid->target-1,&quote) ||
+        p->queue_progress>quote.ticks || paid->mineral!=quote.mineral || paid->gas!=quote.gas) return 0;
     return 1;
 }
 
+/* The 3/4 destruction fraction is pinned PC-source behavior; N64 remains
+ * unverified. Refund the recorded original payment once, or mutate nothing. */
+static int sc64_pr_job_cancel_custom(Building *p, unsigned payer, Sc64PrPaidReceipt *paid,
+    int destroyed, int *minerals, int *gas, int wallet_limit)
+{
+    int ore, vespene;
+    if (!minerals || !gas || minerals == gas || wallet_limit < 0 ||
+        *minerals < 0 || *gas < 0 || *minerals > wallet_limit || *gas > wallet_limit ||
+        (destroyed != 0 && destroyed != 1) || !sc64_pr_job_receipt_valid(p,payer,paid)) return 0;
+    ore=destroyed ? (int)paid->mineral*3/4 : (int)paid->mineral;
+    vespene=destroyed ? (int)paid->gas*3/4 : (int)paid->gas;
+    if (ore > wallet_limit-*minerals || vespene > wallet_limit-*gas) return 0;
+    *minerals+=ore; *gas+=vespene;
+    p->level=0; p->queue[0]=0; p->queue[1]=0; p->queue_progress=0;
+    paid->live=0;
+    return 1;
+}
 #endif
