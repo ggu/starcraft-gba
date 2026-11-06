@@ -10,5 +10,13 @@ The prior source `31a5ddf8` passed the Z7 full HOST tape, bounded 1/3-AI custom
 openings on both maps, fresh guest continuation and normal Z7–Z10 memory-guard
 links. Those results do not establish equivalence on this newer source: L input
 can now cancel a selected producer's queue, so the original tape must be
-replayed and checked again. Current-source replay, link and performance results
+replayed and checked again. Current-source link, guest and performance results
 are pending; no promotion or physical-hardware claim is made here.
+
+On `271db94a`, both fresh HOST Z7 full-tape builds reached the recorded win and
+passed all 307 strict observations. All 175,455 per-call selected actor/world
+and displayed indexed-frame/full-palette fingerprints matched; final journals
+and replay records matched, and the frozen source/input manifest was unchanged.
+The recorded tape therefore remains valid through this queue change in this
+HOST comparison. These fingerprints are not complete-state proof; other
+scenarios, normal links, guest continuation and cycle measurements remain open.
