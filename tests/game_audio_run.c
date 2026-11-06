@@ -192,6 +192,12 @@ static int warp_lifecycle(void)
     if (slot < 0 || events(GAME_AUDIO_WARP_START)) return fail("foundation cue did not queue");
     observe_next();
     if (events(GAME_AUDIO_WARP_START) != 1) return fail("previous budget suppressed warp start");
+#if defined(SC64_AUDIO_IMPORTED) && !defined(SC64_AUDIO_WARP_CUES)
+    if (game_audio_effects != 0) return fail("silent legacy warp spent effect budget");
+    game_audio_emit(GAME_AUDIO_DEATH, 156);
+    game_audio_emit(GAME_AUDIO_DEATH, 156);
+    if (events(GAME_AUDIO_DEATH) != 2) return fail("legacy warp suppressed another effect");
+#endif
 #ifdef SC64_AUDIO_WARP_CUES
     if (audio_host_samples != samples_before + 1 || audio_host_last_sample != sc64_audio_warp[0])
         return fail("warp start sample");

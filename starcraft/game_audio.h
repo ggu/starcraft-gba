@@ -113,6 +113,15 @@ static int game_audio_on_screen(int x, int y)
 
 static void game_audio_emit(int kind, int raw)
 {
+#if defined(SC64_AUDIO_IMPORTED) && !defined(SC64_AUDIO_WARP_CUES)
+    /* Older banks have no start clip; silence must not spend effect budget. */
+    if (kind == GAME_AUDIO_WARP_START) {
+#ifdef GBA_HOST
+        ++game_audio_events[kind];
+#endif
+        return;
+    }
+#endif
     int speech = kind == GAME_AUDIO_READY || kind == GAME_AUDIO_WHAT || kind == GAME_AUDIO_YES;
     if (!speech) {
         if (game_audio_effects >= GAME_AUDIO_EFFECTS_PER_FRAME) return;
