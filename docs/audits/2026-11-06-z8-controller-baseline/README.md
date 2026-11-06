@@ -15,7 +15,7 @@ The two program headers were recovered from the retained descriptors with their 
 
 The count-only and combined enabled traces were byte-identical. These trials reject the combined change as a controller fix; no strategy or engine change from them is retained. The two service trajectories differ. At the first observed per-call difference, call 1,528/frame 1,481, the enabled run contained an extra friendly Egg with both resource banks equal. That expected production representation difference is not by itself a defect.
 
-A sparse observer reproduced the enabled baseline input trace byte for byte. The first raid spawned at frame 1,845 and was dead by frame 2,566. The second appeared at frame 10,555 and was visible by frame 10,852; at frame 11,032 it had 29 of 40 HP, and the mission was lost 16 frames later. The nearby Overlord remained alive. At frame 10,852 the two Hydralisks were about 201–205 pixels from the raid, beyond their 128-pixel range; six Zerglings had 15-pixel melee range. The existence of eight defenders near the guard therefore did not ensure early fire.
+A sparse observer reproduced the enabled baseline input trace byte for byte. The first raid spawned at frame 1,845 and was dead by frame 2,566. The second appeared at frame 10,555 and was visible by frame 10,852; at frame 11,032 it had 29 of 40 HP, and the mission was lost 16 frames later. The nearby Overlord remained alive. At frame 10,852 the two Hydralisks were about 201–205 pixels from the raid, beyond their 64-pixel runtime range (128 source pixels); six Zerglings had 15-pixel melee range. The existence of eight defenders near the guard therefore did not ensure early fire.
 
 At frame 10,789 the baseline interceptor counted an Overlord and a Zergling, and its selection attempt returned without acting after 62 game frames. At frame 10,852 it counted 11 nearby friendly non-Drones, including two Overlords and a map revealer, and selected the more-than-ten branch that ordered attack-move to the guard. Subsequent command sequences occupied 26–57 frames. The combatant-count trial instead counted one Zergling at frame 10,787; its direct-target sequence occupied 84 frames, followed by further sequences of 81 and 94 frames. The raid still had 40 HP at frame 10,954. Its observer matched that candidate's input trace byte for byte. These observations implicate the controller's command timing and selection, but do not establish every attack acceptance, cooldown or targeting condition.
 
@@ -50,3 +50,18 @@ readable final states remain local in `.local/qualification/z8-attack-post`,
 SHA-256 values are `99b5afbbb3252b7697966989309b21dec925c362b99a3513788b0357e3a5c18a`
 and `301d50bd68dda798153d99f560444bcca020d98d62651ec4d3f358bed94ef01e`.
 These are HOST losses, not ARM wins or N64 gameplay observations.
+
+A subsequent read-only observer sampled the original enabled controller every
+eight advancing frames during the second raid. Its full trace was byte-identical
+to the retained baseline (`51251bd1…`), and all 272 private inputs were unchanged.
+It establishes that the two local Hydralisks have runtime range 64 (not 128),
+10 base damage and active cooldowns while firing: the raid initially retains
+40 HP because it also has 80 shields. Its shields fall to zero before HP falls
+to 33. Both Hydralisks hold an accepted direct target of raid slot 25 at frame
+10,952, but later controller orders replace that target with attack-move to
+the old guard point by frame 11,008. They return to idle at frame 11,016 while
+the raider continues toward the defeat rectangle. This supports testing retention
+of an accepted direct order, rather than assuming the weapon does not fire.
+Local observer sources and logs are retained in `z8-order-observer`; no gameplay
+state was written by the observer. The range statement above is corrected to
+distinguish imported source pixels from the halved runtime coordinate scale.
