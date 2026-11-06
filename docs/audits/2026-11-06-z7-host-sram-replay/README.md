@@ -40,3 +40,33 @@ loaded-state, timeline and journal checks. The retained baseline was rechecked
 with this option and passed. Tests also reject timing records in an explicitly
 untimed prefix and reject a corrupt seed. The original rejected result remains
 in the isolated local evidence directory.
+
+With the repaired backend, both ordinary-input HOST prefixes strictly passed
+all 258 expected tape observations and produced byte-identical, valid 32-KiB
+journals, SHA-256
+`182407d91e782c4e879e65047223a70a0ec5f83bbec0131d4e205debddbd0d39`.
+The cut was tick 136,058 and the saved frame was 134,787. Both independent
+HOST HOME-L continuations passed 49/49 resumed observations, with identical
+logs and continuation journals.
+
+Fresh mGBA ARM baseline and cache-candidate replay ROMs then loaded those
+unaltered journals using the guest HOME-L input and continued the original
+tape to its win. Each passed the strict resume and journal validator, 49/49
+expected resumed observations, and all 50 corresponding HOST/ARM cargo-digest
+records. The baseline's originally rejected validator result is retained; it
+was revalidated with the explicit independently untimed prefix option. The
+candidate ran with that option from the start. Both ARM links retained the
+normal reserve guards; their BSS/IWRAM ends were `0203d554`/`03004f88` and
+`02036774`/`03004f50` respectively. Each guest run was capped at 360 seconds;
+the baseline took 265.3 seconds and candidate 261.4 seconds wall time.
+Relevant source, generated-input, tape, seed and ROM hashes were recorded and
+unchanged during each paired run. Local logs and validators are under
+`build/z7-host-sram-contract/`.
+
+This qualifies the button-produced seed and sampled continuation for the
+specified baseline/candidate ROMs. The 32-bit cargo digest covers selected
+live-unit fields, and the controller records are sampled: neither is a
+full-state or framebuffer/palette comparison. The reported guest timing covers
+the resume only and is not a modal-separated tail analysis or proof of
+30-fps behavior. Busy-scene pixel, memory and performance qualification remains
+open; no cache flag was promoted.
