@@ -1,3 +1,5 @@
+#include "observer_sigxfsz.h"
+#include <fcntl.h>
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Experimental frontend: bounded read-only RDRAM; no guest writes or host-input API.
 #include <ares/ares.hpp>
@@ -128,6 +130,8 @@ int main(int argc,char** argv) {
   std::filesystem::path out=argv[2];
   if(!std::filesystem::is_directory(out) || !std::filesystem::is_directory(out/"saves") ||
      !std::filesystem::is_directory(out/"systems")) return 2;
+  int diagnostic_fd=::open((out/"sigxfsz.bin").c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);
+  if(diagnostic_fd<0 || !sc64_observer_signal_install(diagnostic_fd)) return 2;
   Probe p; ares::platform=&p;
   auto saves=std::filesystem::absolute(out/"saves").string()+"/";
   auto systems=std::filesystem::absolute(out/"systems").string()+"/";
