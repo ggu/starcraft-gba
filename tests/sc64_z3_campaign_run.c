@@ -126,6 +126,13 @@ static void tap(u16 key)
     step(0);
 }
 
+/* L cancels a selected producer queue; SELECT leaves it untouched. */
+static void cycle_unit(void)
+{
+    if (selected_building >= 0) tap(KEY_SELECT);
+    tap(KEY_L);
+}
+
 /* Navigate the remembered command row using ordinary controller inputs. */
 static void tap_b(void)
 {
@@ -181,6 +188,7 @@ static void select_units_box(int x, int y, int radius)
 {
     move_cursor(x - radius, y - radius);
     if (screen != SCREEN_PLAY || won || lost) return;
+    if (selected_building >= 0) tap(KEY_SELECT);
     step(KEY_L);
     move_cursor_held(x + radius, y + radius, KEY_L | KEY_R);
     step(0);
@@ -319,7 +327,7 @@ static void assign_idle_miner(void)
     /* Stacked Drones may not be independently selectable. Accept the actual
      * selected eligible Drone, never substitute an index or write selection. */
     for (int guard = 0; guard < MAX_UNITS; ++guard) {
-        tap(KEY_L);
+        cycle_unit();
         int actual = find_selected_worker();
         if (selected_count() == 1 && actual >= 0 && u[actual].alive &&
             u[actual].owner == SIDE && u[actual].type == U_DRONE &&
@@ -393,7 +401,7 @@ static void advance_air_tech(void)
     if(sx<0)return;
     int worker=-1;
     for(int n=0;n<MAX_UNITS;++n) {
-        tap(KEY_L); int v=find_selected_worker();
+        cycle_unit(); int v=find_selected_worker();
         if(selected_count()==1 && v>=0 && u[v].alive && u[v].owner==SIDE &&
            u[v].type==U_DRONE && u[v].order!=ORDER_GAS && u[v].order!=ORDER_BUILD &&
            !SC64_PENDING_BUILD_ORDER(u[v].order)) {worker=v;break;}
@@ -516,7 +524,7 @@ static void issue_selected_attack_order_at(int x, int y)
 static int select_single_hydra(int x,int y,int radius,int inside)
 {
     for(int n=0;n<MAX_UNITS;++n) {
-        tap(KEY_L);
+        cycle_unit();
         if(selected_count()!=1)continue;
         for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].selected&&u[i].owner==SIDE&&
             u[i].type==U_HYDRALISK &&
@@ -535,7 +543,7 @@ static void issue_attack_order(void)
     for(int sent=0;sent<16 && screen==SCREEN_PLAY && !won && !lost;++sent) {
         int found=0;
         for(int n=0;n<MAX_UNITS;++n) {
-            tap(KEY_L);
+            cycle_unit();
             if(selected_count()!=1)continue;
             for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].owner==SIDE&&u[i].selected&&
                 u[i].type==U_MUTALISK&&u[i].order==ORDER_IDLE) {found=1;break;}

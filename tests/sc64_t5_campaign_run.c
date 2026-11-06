@@ -303,6 +303,13 @@ static void tap(u16 key)
     step(0);
 }
 
+/* L cancels a selected producer queue; SELECT leaves it untouched. */
+static void cycle_unit(void)
+{
+    if (selected_building >= 0) tap(KEY_SELECT);
+    tap(KEY_L);
+}
+
 /* Field controls reopen the order list on the last command. Navigate
  * back to Move with normal inputs for callers that start from that row. */
 static void tap_b(void)
@@ -369,6 +376,7 @@ static int select_human_group(void)
     left = clamp_world(left - 8, WORLD_W); top = clamp_world(top - 8, WORLD_H);
     right = clamp_world(right + 8, WORLD_W); bottom = clamp_world(bottom + 8, WORLD_H);
     move_cursor(left, top);
+    if (selected_building >= 0) tap(KEY_SELECT);
     step(KEY_L);
     int end_x = snap4_local(cx, right, WORLD_W);
     int end_y = snap4_local(cy, bottom, WORLD_H);
@@ -424,7 +432,7 @@ static int controller_order_actor(int slot, int x, int y, int attack_move)
         if (u[slot].selected && selected_count() == 1 && selected_building < 0) {
             selected = 1; break;
         }
-        tap(KEY_L);
+        cycle_unit();
     }
     if (!selected) {
         fprintf(stderr, "T5 single selection failed slot=%d selected=%d count=%d building=%d\n",
@@ -452,13 +460,13 @@ static int controller_select_unit(int slot)
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || u[slot].owner != SIDE)
         return 0;
     if (!controller_normalize_field()) return 0;
-    if (selected_building >= 0) tap(KEY_L);
+    if (selected_building >= 0) tap(KEY_SELECT);
     if (selected_building >= 0) return 0;
     for (int retry = 0; retry <= MAX_UNITS && screen == SCREEN_PLAY &&
          !won && !lost && host_ticks < (u32)run_limit; ++retry) {
         if (u[slot].selected && selected_count() == 1 && selected_building < 0)
             return 1;
-        tap(KEY_L);
+        cycle_unit();
     }
     return 0;
 }
@@ -469,9 +477,9 @@ static int controller_select_building(int slot)
         return 0;
     if (!controller_normalize_field()) return 0;
     /* Field interaction treats A as producer-queue input while a building
-       remains selected, so clear that selection with the ordinary L cycle
-       before clicking the requested building. */
-    if (selected_building >= 0) tap(KEY_L);
+       remains selected, so clear that selection with SELECT before clicking
+       the requested building. */
+    if (selected_building >= 0) tap(KEY_SELECT);
     move_cursor(b[slot].x, b[slot].y);
     tap(KEY_A);
     return selected_building == slot && selected_count() == 0;
@@ -1424,10 +1432,9 @@ static int controller_select_visible_type_group(int type, int after_slot,
     if (out_count) *out_count = 0;
     if (out_seed) *out_seed = -1;
     if (!controller_normalize_field()) return 0;
-    /* L on a selected Barracks cancels its queue without clearing selection.
-       A normal drag box clears any producer first, after which the usual
-       double-tap on the isolated seed groups this type. */
-    if (selected_building >= 0 && !select_human_group()) return 0;
+    /* Leave a producer without touching its paid queue before selecting units. */
+    if (selected_building >= 0) tap(KEY_SELECT);
+    if (selected_building >= 0) return 0;
     for (int i = after_slot + 1; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == type &&
             !SC64_TRANSPORT_LOADED(&u[i])) { seed = i; break; }
@@ -1547,6 +1554,7 @@ static int controller_select_type_box_group(int type, int *out_count)
             return 0;
         }
     move_cursor(left, top);
+    if (selected_building >= 0) tap(KEY_SELECT);
     step(KEY_L);
     int end_x = snap4_local(cx, right, WORLD_W);
     int end_y = snap4_local(cy, bottom, WORLD_H);
