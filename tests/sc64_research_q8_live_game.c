@@ -54,6 +54,12 @@ static void shield_and_hp_packets(void)
     hit_target_impl_ex(v,128,U_MARINE,ENEMY,SC64_STOCK_DMG_NORMAL,SC64_HIT_PACKET_Q8);
     assert(u[v].shield==9 && u[v].shield_remainder==643);
     race_tick_state();assert(u[v].shield==9 && u[v].shield_remainder==671);
+    for(unsigned phase=0;phase<1280;++phase) {
+        u[v].shield=3;u[v].shield_remainder=(u16)phase;
+        hit_target_impl_ex(v,128,U_MARINE,ENEMY,SC64_STOCK_DMG_NORMAL,SC64_HIT_PACKET_Q8);
+        unsigned expected=3*1280+phase-640;
+        assert(u[v].shield==(int)(expected/1280) && u[v].shield_remainder==expected%1280);
+    }
     Unit before=u[v];unsigned debt=sc64_pr_hp_debt[v];u[v].flags|=16;before.flags|=16;
     hit_target_impl(v,20,U_MARINE,ENEMY,SC64_STOCK_DMG_NORMAL);
     assert(!memcmp(&before,&u[v],sizeof before)&&debt==sc64_pr_hp_debt[v]);
@@ -130,8 +136,10 @@ static void carrier_return_repair(void)
 static void p6_fractional_splash(void)
 {
     game_init();race_mode=0;
+    int selected=-1;
     for(int n=0;n<SC64_RACE_MAP_COUNT;++n)
-        if(!strcmp(sc64_race_maps[n].mission_id,"P6"))race_selected_mission=n;
+        if(sc64_race_maps[n].mission_id && !strcmp(sc64_race_maps[n].mission_id,"P6"))selected=n;
+    assert(selected>=0);race_selected_mission=selected;
     init_state();assert(race_p6_active());
     memset(u,0,sizeof u);memset(b,0,sizeof b);
     memset(invincible_units,0,sizeof invincible_units);
