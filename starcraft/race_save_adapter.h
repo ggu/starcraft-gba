@@ -2820,6 +2820,12 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                                     SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0) &&
         race_data.version==SC64_WORKER_CARGO_LEGACY_SAVE_VERSION)
         campaign_expected_version=SC64_WORKER_CARGO_LEGACY_SAVE_VERSION;
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+    if (!v[0] && v[2]==SC64_Z6_GLOBAL_ID &&
+        sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,
+                                     SC64_SHARED_EGG_SAVE_VERSION,SC64_STAGE_SAVE_EGG))
+        campaign_expected_version=SC64_SHARED_EGG_SAVE_VERSION;
+#endif
 #endif
     if(v[8]<0||v[8]>=width*16||v[9]<0||v[9]>=height*16||v[11]<0||v[11]>2||
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
