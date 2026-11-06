@@ -9,13 +9,14 @@ import sys
 import tempfile
 
 
-def check(root: Path, facts_path: Path) -> None:
+def check(root: Path, facts_path: Path, upgrade_families: bool = False) -> None:
     facts = json.loads(facts_path.read_text(encoding='utf-8'))
     units = {u['id']: u for u in facts['units'] if u['id'] < 228}
     weapons = {w['id']: w for w in facts['weapons']}
     with tempfile.TemporaryDirectory(prefix='sc64-stock-profiles-') as temp:
         binary = Path(temp) / 'dump'
         subprocess.run(['clang', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
+                        *(['-DSC64_STOCK_UPGRADE_DUMP'] if upgrade_families else []),
                         'tests/sc64_stock_profiles_dump.c', '-o', str(binary)],
                        cwd=root, check=True)
         lines = subprocess.check_output([str(binary)], cwd=root, text=True).splitlines()
@@ -26,13 +27,19 @@ def check(root: Path, facts_path: Path) -> None:
                             'tests/sc64_raynor_stock_fixture.c', '-o', str(fixture)],
                            cwd=root, check=True)
             subprocess.run([str(fixture)], cwd=root, check=True)
-    unit_rows, weapon_rows = {}, {}
+    unit_rows, weapon_rows, armor_rows, family_rows = {}, {}, {}, {}
     for line in lines:
         row = line.split(',')
         if row[0] == 'U':
             unit_rows[int(row[1])] = list(map(int, row[2:]))
-        else:
+        elif row[0] == 'W':
             weapon_rows[int(row[1])] = list(map(int, row[2:]))
+        elif row[0] == 'A':
+            armor_rows[int(row[1])] = int(row[2])
+        elif row[0] == 'F':
+            family_rows[int(row[1])] = int(row[2])
+        else:
+            raise AssertionError(f'unrecognized stock dump row: {line}')
     if set(unit_rows) != set(units):
         raise AssertionError(f'raw unit coverage mismatch: {len(unit_rows)} vs {len(units)}')
     if set(weapon_rows) != set(weapons):
@@ -71,11 +78,19 @@ def check(root: Path, facts_path: Path) -> None:
     print(f'checked {len(unit_rows)} raw unit IDs ({building_count} buildings) '
           f'and {len(weapon_rows)} weapon rows')
     print(f'checked {len(expected_construction)} constructible building IDs including morphs')
+    if upgrade_families:
+        if armor_rows != {i: u['armor_upgrade']['id'] for i, u in units.items()}:
+            raise AssertionError('armor upgrade families differ from pinned source')
+        if family_rows != {i: w['upgrade_type']['id'] for i, w in weapons.items()}:
+            raise AssertionError('weapon upgrade families differ from pinned source')
+        print(f'checked {len(armor_rows)} armor and {len(family_rows)} weapon upgrade families')
 
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     p.add_argument('--facts', type=Path, required=True)
+    p.add_argument('--upgrade-families', action='store_true',
+                   help='Also compare every typed research family with extracted facts')
     args = p.parse_args()
-    check(args.root.resolve(), args.facts.resolve())
+    check(args.root.resolve(), args.facts.resolve(), args.upgrade_families)
