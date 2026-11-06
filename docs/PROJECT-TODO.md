@@ -50,9 +50,14 @@ Fresh recovery results (qualification remains incomplete):
   unmeasured hot-code relocation was accepted. Per-function stack reports are
   not dynamic stack proof. P10's historical flight fact-header was recovered
   with the exact required `8d569be8...` hash. The earlier rejected output used
-  the non-flight recipe; it was not substituted. Fresh controller checks pass
-  through paid ammunition and fresh-process impact continuation; the journal
-  matrix and P10 ARM qualification are still pending.
+  the non-flight recipe; it was not substituted. Fresh controller and journal
+  migration checks pass. P10's ARM candidate links at IWRAM `0x03004d90` and
+  BSS `0x020391e4`, within unchanged guards. Guest SRAM, campaign saves, dynamic
+  stack use and hardware speed remain unqualified. See the
+  [ARM recovery audit](audits/2026-11-06-shared-actor-arm-resume/README.md).
+  A separate Guardian noinline probe saved 176 IWRAM bytes but still failed by
+  520; a broader rare-actor dispatch experiment saved 440 bytes but still failed
+  by 256. Both remain opt-in experiments, with no release activation.
 - The late-Zerg art bank and Z8/Z9 authored program headers were recovered with
   exact recorded hashes. The repaired renderer runner fails on compilation or
   oracle errors and compares indexed frames plus palettes across binaries.
@@ -63,10 +68,16 @@ Fresh recovery results (qualification remains incomplete):
   error: drawing mutates walk/facing state, so one static reference cannot cover
   four successive draws. Independent per-render references now start from the
   same animation state and compare post-render walk/facing too. The corrected
-  Z7/Z9 custom baseline/candidate pairs pass (384 captures each, all available
-  maps/human races and 1/3 AI rosters). Adding the 2-AI cases, final production
-  dispatch parity, default checks and ARM measurements remain pending; no ARM
-  speed improvement is established.
+  Z7/Z9 custom baseline/candidate pairs pass with production-dispatch parity
+  (576 captures each, all available maps/human races and 1/2/3 AI rosters).
+  Initial normal ARM baseline/candidate links also pass all four guards, but
+  those tests used a frozen older Z7 sprite bank. They prove that input set's
+  equivalence, not historical-bank identity or complete art fidelity. Exact
+  receipt-matched Z4/Z6/canonical-Z7 banks have since been recovered in isolated
+  directories; affected visual and ARM checks are being rerun before timing.
+  Source/doctor/default build passed. The full 1,004-test Python run had five
+  prepared-input/symlink-safety failures; targeted repair is in progress and no
+  full-suite pass is claimed. No ARM speed improvement is established.
 - The current Z8 controller pair reproduced fault-free losses: common service
   at frame 11,048 and service-off at 21,782. The first sampled state difference
   is an additional Egg, consistent with the intended lifecycle, not proof of a
@@ -78,7 +89,10 @@ Fresh recovery results (qualification remains incomplete):
   No enemy/objective tuning or new qualified campaign win follows.
 - The user confirmed the screen is unlocked. After reconnecting, native text
   access worked but screenshot capture timed out; N64 gameplay comparison is
-  still unavailable. Disk remains above 149 GiB free during these checks.
+  still unavailable. A subsequent native-screenshot attempt could not bind the
+  emulator through CUA (error -3811), so no keys were sent; that owned session
+  was stopped and confirmed terminal. Disk remained above 146 GiB during these
+  checks. GitHub's source-check workflow is verified `disabled_manually`.
 
 Read-only review follow-up (2026-11-06; no new build or runtime proof):
 
