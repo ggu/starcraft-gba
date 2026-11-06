@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import hashlib, importlib.util, os, signal, subprocess, sys, tempfile, unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 ROOT=Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location('actor_observer',ROOT/'experiments/ares-headless/actor_observer.py')
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
@@ -34,6 +34,11 @@ class WrapperTest(unittest.TestCase):
    with patch.object(m.shutil,'disk_usage',side_effect=usage):
     with self.assertRaises(ValueError):m.check_reserve(target)
    self.assertEqual(seen,[Path(d)])
+ def test_already_exited_child_is_not_signalled(self):
+  child=MagicMock();child.poll.return_value=0
+  child.stdin=child.stdout=child.stderr=None
+  m.terminate_child(child)
+  child.terminate.assert_not_called();child.kill.assert_not_called();child.wait.assert_not_called()
  def test_cleanup_on_selector_error_and_signal(self):
   for mode in ('error','interrupt','term'):
    with self.subTest(mode=mode), tempfile.TemporaryDirectory() as d:

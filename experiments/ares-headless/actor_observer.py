@@ -27,22 +27,20 @@ def check_reserve(path):
 def clean(source):
  return subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()==REV and not subprocess.check_output(['git','-C',str(source),'status','--porcelain'],text=True).strip()
 
-def terminate_group(child):
+def terminate_child(child):
  if child is None:return
- try:os.killpg(child.pid,signal.SIGTERM)
- except ProcessLookupError:pass
- try:child.wait(timeout=1)
- except subprocess.TimeoutExpired:pass
- try:os.killpg(child.pid,signal.SIGKILL)
- except ProcessLookupError:pass
  if child.poll() is None:
-  try:child.wait(timeout=2)
-  except subprocess.TimeoutExpired:raise RuntimeError('observer did not terminate')
+  child.terminate()
+  try:child.wait(timeout=1)
+  except subprocess.TimeoutExpired:
+   if child.poll() is None:child.kill()
+   try:child.wait(timeout=2)
+   except subprocess.TimeoutExpired:raise RuntimeError('observer did not terminate')
  for stream in (child.stdin,child.stdout,child.stderr):
   if stream is not None:stream.close()
 
 def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector):
- """Own one process group; cleanup also runs on selector errors and signals."""
+ """Own one child; cleanup also runs on selector errors and signals."""
  child=None;sel=None;started=time.monotonic()
  def terminate(signum,_frame):raise SystemExit(128+signum)
  oldterm=signal.signal(signal.SIGTERM,terminate)
@@ -77,7 +75,7 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector)
   signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGINT,signal.SIGTERM})
   try:
    if sel is not None:sel.close()
-   terminate_group(child)
+   terminate_child(child)
   finally:
    signal.signal(signal.SIGTERM,oldterm)
    signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
