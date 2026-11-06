@@ -138,7 +138,10 @@ int main(void)
     assert(!menu_open && sc64_pr_paid[forge].live && minerals==900 && gas==900);
     int paid_ore=minerals, paid_gas=gas; start_research(0);
     assert(!weapons_research && minerals==paid_ore && gas==paid_gas);
-    unsigned remaining=b[forge].queue_progress; b[pylon].alive=0;
+    unsigned remaining=b[forge].queue_progress;
+    b[forge].raw_type=1; sc64_pr_stage_tick();
+    assert(b[forge].queue_progress==remaining && sc64_pr_paid[forge].live);
+    b[forge].raw_type=-1; b[pylon].alive=0;
     game_update(0,0); assert(b[forge].queue_progress==remaining);
     b[pylon].alive=1; b[forge].queue_progress=1;
     game_update(0,0);

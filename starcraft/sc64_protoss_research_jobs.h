@@ -127,6 +127,7 @@ static int sc64_pr_job_receipt_valid(const Building *p, unsigned payer,
         p->queue[1]!=(int)paid->target || p->queue[2] || p->queue[3] || p->queue[4] ||
         p->level!=(int)paid->family+1 || !p->queue_progress ||
         !sc64_pr_job_family_producer(paid->family,p->type) ||
+        (p->raw_type>=0 && p->raw_type!=sc64_race_raw_building(p->type)) ||
         !sc64_pr_quote(paid->family,paid->target-1,&quote) ||
         p->queue_progress>quote.ticks || paid->mineral!=quote.mineral || paid->gas!=quote.gas) return 0;
     return 1;
