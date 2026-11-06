@@ -473,3 +473,12 @@ Terra source review found no issue; source boundary and default build pass.
 (440.15 seconds), plus source boundary/default build and independent review.
 This is a source/UI fix; the next ROM rebuild must include it. No SD copy was
 performed for this patch.
+
+## New native opening reference
+
+The [callback-runner opening comparison](audits/2026-11-06-n64-api-opening-comparison/README.md)
+records directly observed Marine 40 HP, SCV 60 HP and Supply Depot cost 100,
+which agree with current GBA source, plus native 40 minerals and 10/18 opening
+supply. This is source-value agreement, not same-scene GBA runtime or timing
+proof. Setup Custom, paid production, gas and race-specific animations remain
+the next native comparison targets.
