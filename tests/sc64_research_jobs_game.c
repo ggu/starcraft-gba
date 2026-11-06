@@ -96,6 +96,16 @@ int main(void)
     assert(race_minerals[1]==before_ore+75 && race_gas[1]==before_gas+75);
     destroy_building(0,SIDE);
     assert(race_minerals[1]==before_ore+75 && race_gas[1]==before_gas+75);
+    /* Human wallet uses the full signed-int range, unlike compact AI banks. */
+    memset(&q,0,sizeof q); q.alive=1; q.owner=SIDE; q.type=B_FORGE;
+    race_human=R_PROTOSS; race_player[SIDE]=R_PROTOSS; minerals=gas=1000;
+    assert(sc64_pr_job_begin_custom(&q,SIDE,SC64_PR_SHIELDS,
+        &sc64_experimental_research_levels,&minerals,&gas,3,1,1,1,0,0,0,0,0));
+    b[1]=q; minerals=INT_MAX; int human_gas=gas; saved=b[1];
+    assert(!sc64_pr_stage_cancel_slot(1,0));
+    assert(!memcmp(&b[1],&saved,sizeof saved) && minerals==INT_MAX && gas==human_gas);
+    minerals=70000; assert(sc64_pr_stage_cancel_slot(1,0));
+    assert(minerals==70200 && gas==human_gas+200);
     b[0].level=1; b[0].queue_progress=1; b[0].queue[0]=1; b[0].queue[1]=1;
     saved=b[0];
     assert(spawn_build(SIDE,B_PYLON,100,100,0)==-1);

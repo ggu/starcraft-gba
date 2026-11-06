@@ -2815,7 +2815,7 @@ static int sc64_pr_stage_cancel_slot(int slot, int destroyed)
         owner==SIDE ? (unsigned)weapons_level : 0,
         owner==SIDE ? (unsigned)armor_level : 0,
         owner==SIDE && weapons_research,owner==SIDE && armor_research,
-        destroyed,ore,vespene,65535);
+        destroyed,ore,vespene,owner==SIDE ? INT_MAX : 65535);
 }
 static int sc64_pr_stage_transfer_allowed(int slot,int new_owner)
 {
