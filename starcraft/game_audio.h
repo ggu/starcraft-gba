@@ -210,11 +210,18 @@ static void game_audio_observe(void)
 #ifdef SC64_AUDIO_IMPORTED
     game_audio_music();
 #endif
+    int same_play_frame = screen == SCREEN_PLAY && game_audio_last_screen == SCREEN_PLAY &&
+                          frame == game_audio_last_frame;
     fresh = screen != SCREEN_PLAY || game_audio_last_screen != SCREEN_PLAY ||
             frame != game_audio_last_frame + 1;
     game_audio_last_screen = screen;
     if (screen != SCREEN_PLAY) return;
-    if (frame == game_audio_last_frame) return;
+    if (frame == game_audio_last_frame) {
+        /* Menus can issue an explicit refusal without advancing simulation.
+         * Consume that new cue now, without rescanning frame-based events. */
+        if (same_play_frame && advisor) game_audio_advisor(advisor);
+        return;
+    }
     game_audio_last_frame = frame;
     game_audio_effects = 0;
     if (advisor && !fresh) game_audio_advisor(advisor);
