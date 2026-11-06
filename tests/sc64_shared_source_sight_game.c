@@ -23,15 +23,15 @@ static void check_single_circle(int x,int y,int radius)
 static void unit_test(int raw,int radius)
 {
     reset_sight(); int type=sc64_race_unit_from_raw(raw); if(type<0) { fprintf(stderr,"unmapped unit %d\n",raw); return; }
-    u[0].alive=1;u[0].owner=SIDE;u[0].type=type;u[0].raw_type=raw;u[0].x=520;u[0].y=520;
+    u[0].alive=1;u[0].owner=SIDE;u[0].type=type;u[0].raw_type=raw;u[0].x=523;u[0].y=525;
     assert(sc64_actor_unit_sight_pixels(type)==radius*2);
 #ifdef SC64_P7_OBSERVER_ENABLED
     assert(sc64_p7_observer_sight_radius_runtime(type,0)==radius);
 #endif
-    sc64_update_exploration();check_single_circle(520,520,radius);
+    sc64_update_exploration();check_single_circle(523,525,radius);
     for(int cell=0;cell<MAP_COLS*MAP_ROWS;cell++)
         assert(!!SC64_GRID_GET(visible,cell)==!!SC64_GRID_GET(explored,cell));
-    u[0].x+=3;u[0].y+=5;sc64_update_exploration();check_single_circle(523,525,radius);
+    u[0].x+=3;u[0].y+=5;sc64_update_exploration();check_single_circle(526,530,radius);
     u[0].alive=0;sc64_update_exploration();
     assert(!SC64_GRID_GET(visible,32+32*MAP_COLS));
     assert(SC64_GRID_GET(explored,32+32*MAP_COLS));
