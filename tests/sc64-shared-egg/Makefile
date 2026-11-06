@@ -119,3 +119,7 @@ test-z4-egg-actual-journal:
 .PHONY: test-z4-egg-retry-build
 test-z4-egg-retry-build:
 	$(CLANG) $(Z4_EGG_HOST_FLAGS) tests/sc64_shared_egg_z4_retry_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z4-egg-retry
+.PHONY: test-z4-egg-synthetic-journal
+test-z4-egg-synthetic-journal:
+	$(CLANG) $(filter-out -DSC64_Z4_ACTUAL_PERMISSIONS -I$(SC64_EARLY_PERMISSIONS_DIR),$(Z4_EGG_HOST_FLAGS)) -Itests/fixtures/early-zerg-z4-synthetic tests/sc64_shared_egg_z4_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z4-egg-synthetic
+	$(EGG_TEST_BIN_DIR)/sc64-z4-egg-synthetic

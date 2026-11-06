@@ -55,6 +55,15 @@ int main(int argc,char **argv)
         assert(race_z4_campaign_tick());assert(won && !race_z4.faults);
         puts("Z4 pending terminal fresh retry passed");return 0;
     }
+    if(!strcmp(argv[1],"malformed")) {
+        prepare_retry();assert(race_save_game());u32 length=0;
+        assert(save_read_latest(saved.bytes,sizeof(saved.bytes),SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,&length));
+        edited=saved;edited.record.save.z4.faults=1u<<(24u+SC64_Z4_TRIGGER_FORCE_START);
+        clear_records();assert(save_write_first(edited.bytes,length,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION));
+        Sc64Z4RuntimeState prior=race_z4;u32 digest=world_digest();
+        assert(!race_load_game() && !memcmp(&prior,&race_z4,sizeof(prior)) && world_digest()==digest);
+        puts("Z4 wrong-action pending marker rejected atomically");return 0;
+    }
     if(!strcmp(argv[1],"legacy")) {
         prepare_retry();int egg=egg_for_owner(SIDE,-1);assert(egg>=0);
         u[egg].alive=0;u[egg].type=U_DRONE;
@@ -80,6 +89,12 @@ int main(int argc,char **argv)
     assert(!strcmp(argv[1],"read"));game_init();assert(fixture_import_host_save(argv[2]));
     assert(race_load_game());assert(race_z4.faults==(1u<<(24u+SC64_Z4_TRIGGER_STARTUP)));
     unsigned cursor=race_z4.model.action_cursor[SC64_Z4_TRIGGER_STARTUP];
+    memcpy(original,u,sizeof(u));
+    for(int i=0;i<MAX_UNITS;++i)if(!u[i].alive) {u[i].alive=1;u[i].type=U_DRONE;}
+    assert(race_z4_campaign_tick());
+    assert(race_z4.faults==(1u<<(24u+SC64_Z4_TRIGGER_STARTUP)) &&
+           race_z4.model.action_cursor[SC64_Z4_TRIGGER_STARTUP]==cursor);
+    memcpy(u,original,sizeof(u));
     int before=0;for(int i=0;i<MAX_UNITS;++i)before+=u[i].alive && u[i].raw_type==101;
     assert(race_z4_campaign_tick());assert(!race_z4.faults);
     int after=0;for(int i=0;i<MAX_UNITS;++i)after+=u[i].alive && u[i].raw_type==101;
