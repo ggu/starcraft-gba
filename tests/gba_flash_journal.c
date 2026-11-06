@@ -82,6 +82,9 @@ static void ordinary_and_full(void)
 static void power_cuts(void)
 {
     GbaFlashJournalRecord previous,written,selected;
+    uint8_t changed[256],changed_tail[400];
+    for(unsigned i=0;i<sizeof changed;++i)changed[i]=payload[i]^0x55;
+    for(unsigned i=0;i<sizeof changed_tail;++i)changed_tail[i]=tail[i]^0xa5;
     reset();legacy_record(0,41);legacy_record(1,42);memcpy(legacy,model.bytes,sizeof legacy);
     assert(gba_fj_write_parts(&io,payload,256,tail,sizeof tail,0x56465a60,0,&previous)==GBA_FJ_OK);
     assert(gba_fj_write_parts(&io,payload,256,tail,sizeof tail,0x56465a60,&previous,&written)==GBA_FJ_OK);
@@ -90,10 +93,15 @@ static void power_cuts(void)
     for(int cut=0;cut<=operations;++cut){
         memcpy(model.bytes,snapshot,sizeof snapshot);model.budget=cut;model.mutations=0;
         memset(&written,0xa5,sizeof written);GbaFlashJournalRecord untouched=written;
-        int status=gba_fj_write_parts(&io,payload,256,tail,sizeof tail,0x56465a60,&previous,&written);
+        int status=gba_fj_write_parts(&io,changed,sizeof changed,changed_tail,sizeof changed_tail,0x56465a60,&previous,&written);
         model.budget=-1;
         assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_OK);
-        if(status==GBA_FJ_OK)assert(selected.sequence==45&&selected.index==2);
+        if(status==GBA_FJ_OK){
+            uint8_t got[256];
+            assert(selected.sequence==45&&selected.index==2);
+            assert(gba_fj_read_payload(&io,&selected,0,got,sizeof got)==GBA_FJ_OK);
+            assert(!memcmp(got,changed,sizeof got));
+        }
         else{
             assert(status==GBA_FJ_WRITE_ERROR&&!memcmp(&written,&untouched,sizeof written));
             assert(gba_fj_same_record(&selected,&previous));
@@ -112,6 +120,32 @@ static void power_cuts(void)
     assert(gba_fj_write_parts(&io,payload,256,0,0,0x56465a60,&previous,&written)==GBA_FJ_WRITE_ERROR);
     assert(model.mutations==1&&!memcmp(model.bytes,snapshot,sizeof snapshot));model.bad_commit_erase=0;
     printf("power-cut boundaries %d; partial-tag erasures 1024: PASS\n",operations+1);
+}
+static void erased_tag_bytes(void)
+{
+    GbaFlashJournalRecord previous,written,selected;
+    uint8_t changed[32];memset(changed,0x69,sizeof changed);
+    reset();legacy_record(0,41);memcpy(legacy,model.bytes,sizeof legacy);
+    assert(gba_fj_write_parts(&io,payload,64,0,0,0x56465a60,0,&previous)==GBA_FJ_OK);
+    memcpy(snapshot,model.bytes,sizeof snapshot);
+    /* A tag containing erased bytes can become fully valid before the last
+     * redundant FF byte is visited. An interrupted call may then report an
+     * error while a complete new record is already committed. Either the
+     * previous record or that exact complete successor is an atomic result. */
+    for(int cut=0;cut<=8+16+(int)sizeof changed+4;++cut){
+        memcpy(model.bytes,snapshot,sizeof snapshot);model.budget=cut;
+        memset(&written,0xa5,sizeof written);GbaFlashJournalRecord untouched=written;
+        int status=gba_fj_write_parts(&io,changed,sizeof changed,0,0,0xffffff00u,&previous,&written);
+        model.budget=-1;
+        assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_OK);
+        if(!gba_fj_same_record(&selected,&previous)){
+            assert(selected.index==3&&selected.sequence==43&&selected.tag==0xffffff00u&&
+                   selected.length==sizeof changed&&
+                   selected.checksum==gba_fj_hash(2166136261u,changed,sizeof changed));
+        }
+        if(status!=GBA_FJ_OK)assert(!memcmp(&written,&untouched,sizeof written));
+        assert_legacy_unchanged();
+    }
 }
 static void fallback_and_arguments(void)
 {
@@ -142,7 +176,7 @@ int main(void)
 {
     for(unsigned i=0;i<sizeof payload;++i)payload[i]=(uint8_t)(i*37u+3u);
     for(unsigned i=0;i<sizeof tail;++i)tail[i]=(uint8_t)(i*13u+7u);
-    ordinary_and_full();power_cuts();fallback_and_arguments();
+    ordinary_and_full();power_cuts();erased_tag_bytes();fallback_and_arguments();
     puts("isolated Flash journal model: full payload, legacy preservation and fallback PASS");
     return 0;
 }
