@@ -77,3 +77,8 @@ coverage of every T/Z mission or a claim that every inert legacy producer row
 has been tested. The v7 P10 and v8 Terran/Z9 receipts are retained locally in
 `journal-v7.json`/`.log` and `journal-v8.json`/`.log`, respectively; the 593
 private inputs and both source heads were unchanged in each run.
+
+For the separate fractional-HP persistence question, see the
+[existing-journal capacity audit](SC64-JOURNAL-DEBT-CAPACITY-AUDIT-20261107.md).
+The 400-byte runtime sidecar proposal does not by itself establish space for a
+fixed tail in every legal legacy-sized journal record.
