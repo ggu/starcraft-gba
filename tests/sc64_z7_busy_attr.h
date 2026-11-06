@@ -11,10 +11,19 @@ static uint64_t attr_sum[Z7_ATTR_STAGES], attr_build_update, attr_no_build_updat
 static u32 attr_peak[Z7_ATTR_STAGES], attr_hits_before, attr_builds_before;
 static u32 attr_hits, attr_builds, attr_build_frames, attr_no_build_frames, attr_max_builds;
 static u32 attr_top[10][6]; /* total, tick, update, render, route builds, route hits */
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+static u32 attr_usable_min=~0u, attr_usable_max;
+#endif
 
 __attribute__((noinline,section(".text"))) static void attr_before(void)
 {
     attr_hits_before=sc64_route_hits;attr_builds_before=sc64_route_builds;
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+    if(!busy_calls)route_class_begin();
+    unsigned usable=(unsigned)sc64_range_route_usable_slots();
+    if(usable<attr_usable_min)attr_usable_min=usable;
+    if(usable>attr_usable_max)attr_usable_max=usable;
+#endif
 }
 __attribute__((noinline,section(".text"))) static void
 attr_after(u32 total,u32 update,u32 audio,u32 render)
@@ -38,6 +47,15 @@ attr_after(u32 total,u32 update,u32 audio,u32 render)
 }
 __attribute__((noinline,section(".text"))) static void attr_report(void)
 {
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+    out_text("Z7C CLASS");out_field("movement",route_class_movement);
+    out_field("component",route_class_component);out_field("depot",route_class_depot);
+    out_field("empty",route_class_empty);out_field("evicted",route_class_evicted);
+    out_field("resets",route_class_resets);out_field("wraps",route_class_wraps);
+    out_field("distinct",route_class_distinct);out_field("repeated",route_class_repeated);
+    out_field("untracked",route_class_untracked);out_field("usable_min",attr_usable_min);
+    out_field("usable_max",attr_usable_max);out_flush();
+#endif
     out_text("Z7A ROUTE");out_field("slots",SC64_ROUTE_SLOTS);out_field("hits",attr_hits);
     out_field("builds",attr_builds);out_field("build_frames",attr_build_frames);
     out_field("no_build_frames",attr_no_build_frames);out_field("max_builds",attr_max_builds);

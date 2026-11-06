@@ -217,6 +217,9 @@ static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
 
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+#include "sc64_route_build_class_diagnostic.h"
+#endif
 #ifdef SC64_RANGE_WORK
 static void sc64_range_route_reset(void);
 static int sc64_range_route_usable_slots(void);
@@ -335,6 +338,9 @@ static void sc64_route_age_request(void)
 {
     int i;
     if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) {
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+        route_class_wrap_note();
+#endif
         memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
         memset(sc64_route_age, 0, sizeof(sc64_route_age));
         sc64_route_clock = 0;
@@ -396,6 +402,9 @@ static void GBA_HOT sc64_route_put(int slot, int cell, int direction)
 static void
 sc64_routes_reset(void)
 {
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+    route_class_reset_note();
+#endif
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
     (void)sc64_route_configure();
 #endif
@@ -1261,6 +1270,9 @@ sc64_route_slot(int goal)
                sizeof(sc64_range_route_snapshot_key));
     }
 #endif
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+    route_class_note(slot,(u16)goal,0);
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
@@ -1400,6 +1412,14 @@ sc64_route_slot(int goal)
 static int GBA_HOT sc64_route_slot(int goal)
 {
     return sc64_route_slot_for_origin(goal, -1, 0);
+}
+#endif
+
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+__attribute__((noinline,section(".text"))) static int route_class_component_slot(int source)
+{
+    int slot;route_class_component_context=1;slot=sc64_route_slot(source);
+    route_class_component_context=0;return slot;
 }
 #endif
 
@@ -1876,6 +1896,9 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
                sizeof(sc64_range_route_snapshot_key));
     }
 #endif
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+    route_class_note(slot,key,1);
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
@@ -2113,7 +2136,13 @@ sc64_route_cells_connected(const int *starts, int start_count,
         /* No cached field covers this component: build one from this open
          * source and inspect every requested destination before any further
          * allocation can evict it. */
-        if (slot < 0) slot = sc64_route_slot(source);
+        if (slot < 0) {
+#ifdef SC64_ROUTE_BUILD_CLASS_DIAGNOSTIC
+            slot = route_class_component_slot(source);
+#else
+            slot = sc64_route_slot(source);
+#endif
+        }
         if (slot < 0) return -1;
         if (hint_slots && hint_roots && hint_next) {
             int h = (*hint_next)++ % SC64_ROUTE_COMPONENT_HINTS;

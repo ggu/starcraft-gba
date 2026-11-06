@@ -163,3 +163,36 @@ state, pixels, memory and tails. Do not infer that enlarging route capacity is
 correct or useful from this aggregate alone. Detailed pair and attribution logs
 remain under `build/z7-host-sram-contract/attribution*-run/` in the isolated
 workspace; private ROMs, saves and captures are not committed.
+
+## Route-build source classification
+
+A second diagnostic-only classification used the identical seed, tape window,
+source and attribution control. Both normal/cache variants passed the same
+strict load, observation, cargo, SRAM and ten sampled state/framebuffer-palette
+hash checks. The classifier added 312 bytes of EWRAM and no IWRAM growth;
+link guards remained enabled. The same-source control/classification ROM
+SHA-256 values were:
+
+| Variant | Control | Classification |
+| --- | --- | --- |
+| Baseline | `8233ec55f073abe0072e878d98a0dbe0b088b29ca82d2491caf8b64ab449c4d7` | `42f39935c17abd838b4f61538c522ef0bfde2899097e29432daf9ca770d00c47` |
+| Cache candidate | `32bef07159369b63d1e694cabebcbcc29a8354e4ee2e32314b52e281bf9543eb` | `99373e79057afcc2fa29a303a5c08d648b0d77f07ef8e3200a675f686776f2b2` |
+
+Both variants classified the 392 completed builds as 385 movement-goal,
+zero component-reachability and seven depot builds. Twenty distinct
+route/depot keys were observed, followed by 372 repeats; the bounded 128-key
+tracker did not overflow. A build selected an invalid/unused slot 27 times and
+replaced a valid slot 365 times. There was one explicit route reset and no
+route-age wrap. All pre-call usable-slot observations were 14; this does not
+establish that the range-work reservation never changed *within* a call.
+The classification overhead was approximately -0.004% in each one-pair
+advancing-call comparison, an observed difference rather than a general bound.
+
+Movement misses dominate this window, so the pre-existing exact monotone probe
+is a concrete opt-in candidate. Before considering any promotion it requires
+independent blocked/partial/target-goal path tests, Z7's actual 14-slot vector,
+and a measured same-source paired replay with state/pixel, memory and tail
+checks. Valid-slot replacement and repeated keys also merit cache-policy
+investigation, but do not prove that changing capacity is safe or beneficial.
+The immediate-post-load window may contain cold-cache effects. Classification
+artifacts remain local under `build/z7-host-sram-contract/route-*-run/`.
