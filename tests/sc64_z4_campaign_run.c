@@ -366,31 +366,38 @@ static int queued_count(int type)
     return n;
 }
 
-static int train_type_step_count(int current, int wanted)
-{
-    static const int types[5] = {U_DRONE, U_OVERLORD, U_ZERGLING, U_HYDRALISK, U_MUTALISK};
-    int from = -1, to = -1;
-    for (int i = 0; i < 5; ++i) {
-        if (types[i] == current) from = i;
-        if (types[i] == wanted) to = i;
-    }
-    return from < 0 || to < 0 ? -1 : (to - from + 5) % 5;
-}
-
 static int queue_unit_type(int wanted)
 {
     int before = queued_count(wanted);
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         if (!b[i].alive || b[i].owner != SIDE || b[i].under_construction ||
             !sc64_race_is_zerg_townhall(b[i].type) || b[i].queue_count >= 4) continue;
-        int cycle = train_type_step_count(train_type, wanted);
-        if (cycle < 0) return 0;
         move_cursor(b[i].x, b[i].y);
         tap(KEY_A); /* Select the actual Hatchery/Lair/Hive. */
         if (selected_building != i) continue;
-        for (int n = 0; n < cycle; ++n) tap(KEY_R);
-        tap(KEY_A); /* Queue the selected unit through the normal producer. */
-        if (queued_count(wanted) > before) return 1;
+        /* The normal picker skips unavailable products and may include
+         * Scourge. Observe its actual selection rather than predicting a
+         * fixed-size cycle or setting train_type directly. */
+        int visited[8], count = 0;
+        while (train_type != wanted && count < 8) {
+            int seen = 0;
+            for (int n = 0; n < count; ++n) if (visited[n] == train_type) seen = 1;
+            if (seen) break;
+            visited[count++] = train_type;
+            tap(KEY_R);
+        }
+        int selected_product = train_type;
+        if (selected_product == wanted) tap(KEY_A);
+        int after = queued_count(wanted);
+        if (trace) {
+            trace_prefix();
+            fprintf(trace, "{\"kind\":\"product\",\"host_tick\":%u,\"frame\":%d,"
+                    "\"producer\":%d,\"wanted\":%d,\"selected\":%d,\"cycles\":%d,"
+                    "\"queued_before\":%d,\"queued_after\":%d}\n",
+                    (unsigned)host_ticks, frame, i, wanted, selected_product, count, before, after);
+            fflush(trace);
+        }
+        if (after > before) return 1;
     }
     return 0;
 }
