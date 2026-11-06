@@ -348,3 +348,16 @@ the possible outside-lock preview. It passed the same strict sample checks and
 reproduced the earlier guest-cycle means and unchanged 392 field builds exactly.
 The original run and its protocol deviation remain recorded above; the repeat
 artifacts are in `build/z7-host-sram-contract/full-flood-repeat-*-run/`.
+
+A fresh-process guest HOME-L continuation also passed for both full-field
+configurations, using the same genuine 32 KiB save produced by ordinary HOST
+buttons and the original input timeline from cut 136,058 through the recorded
+Z7 win. Each strict comparison passed and each guest matched all 50 HOST cargo
+checkpoints; their final guest SRAM files matched SHA-256
+`de1d039ed52756d98114ea31a644693ed73e394ab212200f8f8b41b8674cb5ba`.
+Control and full-field guest ROM hashes were
+`698edbd4d89832ab3935e1b7b51b4d68735a270a6d04a1c74f7dde526f571753` and
+`9580dc2cf2f3e61f6c9d0a15eacaef164514131de6aab037b7e9539bc13ea9e5`.
+All before/after source and input hashes matched. These are custom replay ROMs
+and sampled state checks, not normal-ROM or hardware proof. Logs remain under
+`build/z7-host-sram-contract/full-flood-resume/`.
