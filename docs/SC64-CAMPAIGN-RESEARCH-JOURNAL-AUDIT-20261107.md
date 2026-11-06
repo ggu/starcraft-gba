@@ -59,3 +59,21 @@ record has been qualified. Further independent review, broader campaign and
 malformed-row coverage, actual ordinary-play continuation, combat and fractional
 state persistence, and guarded GBA resource qualification remain necessary.
 No actor or impact cap or existing memory guard is changed by this experiment.
+
+An independent review found that the first version rejected unrelated Terran
+and Zerg campaign saves. At runtime commit `2e4ce4e50bf65e699cd55039a8b3c9a87aa89fbb`,
+those campaigns use a separate inactive-feature path: the candidate's T/Z
+mission and descriptor human race must agree, every typed level must be zero,
+and Forge/Core rows must not contain job-like state. The normal map and actor
+preflight still applies. Old non-Protoss records do not receive a Protoss
+scenario floor.
+
+At test commit `db99319086ac2adbdb459a7391ab09d7289a4c96`, T1 under the
+Terran HOST vector and Z1 under the Z9 HOST vector each passed a genuine 847d
+`0x43` predecessor export, fresh experimental load, migrated save and fresh
+reload, as well as a new inactive save/fresh load. Each rejected a nonzero
+research level without mutating SRAM. These are authored HOST fixtures, not
+coverage of every T/Z mission or a claim that every inert legacy producer row
+has been tested. The v7 P10 and v8 Terran/Z9 receipts are retained locally in
+`journal-v7.json`/`.log` and `journal-v8.json`/`.log`, respectively; the 593
+private inputs and both source heads were unchanged in each run.
