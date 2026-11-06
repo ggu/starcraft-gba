@@ -64,7 +64,7 @@ static int race_q8_flash_candidate_fractions(RaceLoadPlan *plan,int old)
     if (!plan || race_data.state[0]!=1 || race_data.state[1]!=R_PROTOSS) return 0;
     for (int i=0;i<MAX_UNITS;++i) {
         Unit q;const Sc64StockUnitProfile *stock;int raw;
-        if (!sc64_p7_typed_unit_decode(&q,&race_data.units[i],2048,2048)) return 0;
+        if (!race_save_decode_unit(&race_data,(unsigned)i,2048,2048,&q)) return 0;
         if (!q.alive) {if(plan->q8_debt[i])return 0;continue;}
         if (q.hp<=0) return 0;
 #ifdef SC64_T6_RUNTIME
