@@ -67,6 +67,9 @@ older KODAK package. Source merges do not update an already copied ROM.
   without deleting cargo. P10 all-race/resource/debit/travel/interruption
   fixtures, the public cargo target, a genuine old-writer/new-reader timer
   journal, clean default checks, six guarded links and one P3 HOST win pass.
+  Empty explicit mineral trips now also continue to an eligible nearby field
+  if their destination is depleted en route; see the
+  [pending-trip audit](audits/2026-11-07-pending-mineral-retarget/README.md).
   Native field queues and exact gathering rates remain open: the retained
   durations are not an N64 timing claim. Old nonzero N now collects on N,
   versus the former N+1. See [the scoped cycle audit](audits/2026-11-07-worker-gather-cycle/README.md).
@@ -109,16 +112,57 @@ older KODAK package. Source merges do not update an already copied ROM.
   HOST fresh-process tests now pass genuine normal 0x43, predecessor 0x44,
   new active-job 0x45 and mixed journals; checksum-invalid and semantic-invalid
   newer records fall back to the untouched 0x43 predecessor. All 589 pinned
-  inputs remained unchanged. This does not qualify ordinary input, Z9 journals
-  or GBA memory: the HOST receipt array alone exceeds Z9's reserve.
-  Exact shield damage, complete combat integration,
-  authenticated persistence and ordinary gameplay remain open.
+  inputs remained unchanged. That checkpoint did not qualify Z9 journals or
+  GBA memory: its HOST receipt array exceeded Z9's reserve.
+  **Current bounded stage: [draft #336](https://github.com/ggu/starcraft-gba/pull/336)**,
+  branch `codex/bounded-research-20261107`, tested runtime `8a96f995`:
+  both per-building receipt arrays are removed. Canonical producer fields and
+  a frozen version-specific 0x45 quote contract reconstruct the payer/price.
+  P10/Z9 lifecycle tests, P10 ordinary/splash armor and real Archon/Interceptor
+  weapon-event fixtures pass with 589 inputs unchanged. Genuine 0x43/0x44,
+  new 0x45, mixed journals and damaged-newer fallback pass in fresh P10 consumers;
+  a separate Z9 bounded-source repeat also passes all combinations and four
+  fallback cases with 592 inputs unchanged (test/audit branch
+  `codex/research-z9-bounded-journal-20261107`, `f58cab3e`).
+  All six experimental ARM profiles link with the actual active-job journal
+  enabled and unchanged guards; root verified all six ELF/map hashes and
+  margins. Z9/Z10 retain 732 EWRAM bytes; Z7 retains 1,024 IWRAM and 2,900
+  EWRAM bytes. These static margins do not prove runtime stack or hardware safety.
+  The combat-only feature-off P10 control reproduces the exact latest normal
+  binary `b1b5edcc...`; final combined default/full-product checks remain open.
+  **Ordinary P10 custom checkpoint now passes on the prototype:** source
+  `90d84f3e` used title/field buttons to choose one AI, gather resources, build
+  a Pylon/Assimilator/Forge and pay for Ground Weapons. The exact guarded P10
+  ARM guest exported a genuine 0x45 save; a fresh guest loaded it through title
+  L and completed level one without loss. The ARM and HOST save bytes match
+  (`ddb79ad3...`), and root independently rechecked the pinned runner, ROM,
+  ELF, tapes, save bytes and all 589 prepared inputs. The runtime remains
+  `8a96f995`; test-only checkpoint source is on
+  `codex/research-ordinary-controller-20261107`. This is one emulated custom
+  checkpoint, not a hardware test, match win, full-state oracle or other-product
+  ordinary-gameplay qualification. A reusable replay guard is under review.
+  **Normal release flags remain off.** Exact shields/fractional HP, remaining
+  special/projectile routes, campaign context/source policy, stack/performance,
+  other-product ordinary gameplay and full default/production checks remain
+  required. Static compiler stack inspection on
+  `codex/research-stack-budget-20261107` reproduces both qualified P10/Z9 raw
+  binaries; inspected structural paths sum to about 4,348/4,528 bytes, with
+  unresolved indirect/assembly/interrupt paths. This is not stack high-water
+  or a complete safety bound.
   The separately reviewed human-binding stage at `344e48de` passes pure and
   actual P1–P10 initialization/wallet/P1 rescue fixtures. P1–P9 human source
   identity is 7; P10 is 1. Retained actor origin is not the current controller or
   payer. This helper is unused; it requires authenticated explicit context and
   proves neither enemy wallet routing nor candidate-loader admission. See
   [the scoped human-binding audit](audits/2026-11-07-research-human-binding/README.md).
+  A separate larger-save investigation on
+  `codex/flash-journal-geometry-20261107` preserves the first 32 KiB as read-only
+  legacy journals and models two new slots with isolated commit sectors and
+  28,656-byte payload capacity. The independently reviewed HOST model passes
+  sanitizer tests, interrupted writes/partial tag erases, stale-winner rejection
+  and semantic fallback. It is not connected to game saving; Flash hardware
+  timing, bank/sector behavior, real power cuts, memory and integration remain
+  open. No save format or release behavior changes with this experiment.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
@@ -146,6 +190,15 @@ older KODAK package. Source merges do not update an already copied ROM.
   The [P1/source follow-up](audits/2026-11-06-p1-rescue-native/README.md)
   separately records the unproven rescue-passive transfer breadth; no native P1
   rescue was observed, and the custom-game report does not establish that bug.
+- **Native Forge #335 merged:** two fresh ordinary-input N64 custom sessions
+  show Forge 150, Assimilator 100, a blue power overlay during placement,
+  a green Forge preview, and its subsequent warp/structure. Root checked
+  binary/ROM/capture/log hashes against recorded source revisions and viewed
+  the placement/warp/structure captures. Research menu, selected completion,
+  admission, cancellation and power/prerequisite-loss policy remain unobserved.
+  The experimental interactive frontend now permits 14,000 total steps while
+  retaining its 180-second wall cap and other bounds; the GBA engine is unchanged.
+  See [the native Forge audit](audits/2026-11-07-native-forge/README.md).
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
   already active in other products; the separate monotone shortcut remains off.
   Eight release links, route oracles, clean default checks and 18 HOST warm

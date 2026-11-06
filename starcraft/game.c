@@ -7860,6 +7860,11 @@ race_update_resource_worker(Unit *q)
     int home, tx, ty;
 #ifdef SC64_WORKER_CARGO_KIND
     int explicit_trip = sc64_worker_gather_pending(q);
+    /* A field can empty while an explicitly ordered empty worker is en
+     * route. Preserve that order if another known, reachable field is near. */
+    if (explicit_trip && q->order == ORDER_MINE && !q->carry &&
+        q->target >= 0 && q->target < MAX_MINERALS && m[q->target].amount <= 0)
+        (void)worker_continue_minerals(q);
 #endif
     if (sc64_worker_gather_pending(q) || !sc64_worker_cargo_matches_order(q)) {
         if ((q->order == ORDER_GAS &&
