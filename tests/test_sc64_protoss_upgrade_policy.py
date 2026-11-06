@@ -28,6 +28,24 @@ class PolicyTest(unittest.TestCase):
         del sections[b'PUPx']; self.assertEqual(policy(sections)[0][7][1],(3,0))
         settings[5]=0
         self.assertEqual(policy(sections)[2],[0,1,1,1,1,1])
+    def test_cost_selectors_apply_sequentially(self):
+        base = bytearray(598)
+        expanded = bytearray(794)
+        for ident in (5, 6, 13, 14, 15, 33):
+            base[ident] = expanded[ident] = 1
+        sections = {b'VER ': struct.pack('<H', 59), b'UPGS': base,
+                    b'UPGx': expanded, b'UPGR': section(46),
+                    b'PTEC': bytes(38 * 24)}
+        self.assertEqual(policy(sections)[2], [1] * 6)
+        base[5] = 0
+        self.assertEqual(policy(sections)[2], [0, 1, 1, 1, 1, 1])
+        base[5], expanded[5] = 1, 0
+        self.assertEqual(policy(sections)[2], [0, 1, 1, 1, 1, 1])
+        base[5] = 2
+        with self.assertRaises(ValueError): policy(sections)
+        base[5], expanded[5] = 1, 2
+        with self.assertRaises(ValueError): policy(sections)
+
     def test_catalog_identity_and_entry_coverage(self):
         catalog=validate_catalog(list(reversed(MISSIONS)))
         self.assertEqual(catalog[('T',1)], next(p for n,p,_ in MISSIONS if n=='T1'))

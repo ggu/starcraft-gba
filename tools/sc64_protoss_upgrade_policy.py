@@ -62,14 +62,19 @@ def policy(sections):
     settings = sections[b'UPGS']
     if len(settings) != 598:
         raise ValueError('invalid UPGS length')
-    count = 46
+    default_costs = [settings[i] for i in UPGRADES]
+    if any(value not in (0, 1) for value in default_costs):
+        raise ValueError('invalid upgrade setting selector')
     if b'UPGx' in sections:
-        settings = sections[b'UPGx']; count = 61
+        settings = sections[b'UPGx']
         if len(settings) != 794:
             raise ValueError('invalid UPGx length')
-    if any(settings[i] not in (0, 1) for i in UPGRADES):
-        raise ValueError('invalid upgrade setting selector')
-    default_costs = [settings[i] for i in UPGRADES]
+        expanded_defaults = [settings[i] for i in UPGRADES]
+        if any(value not in (0, 1) for value in expanded_defaults):
+            raise ValueError('invalid upgrade setting selector')
+        # A default expansion selector leaves any base override in place.
+        default_costs = [int(base and expanded) for base, expanded in
+                         zip(default_costs, expanded_defaults)]
     # OpenBW reads these optional expansion chunks after base chunks.
     base = decode_restrictions(sections[b'UPGR'], 46, UPGRADES)
     tech = decode_restrictions(sections[b'PTEC'], 24, TECHS, True)
