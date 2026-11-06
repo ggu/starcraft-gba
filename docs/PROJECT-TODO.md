@@ -270,6 +270,9 @@ older KODAK package. Source merges do not update an already copied ROM.
   HOST continuation. This is not all-save, ARM or N64 qualification.
   The constructed late captured-Hatchery concern was not promoted: no reachable
   transfer path was found, and relaxing only admission would leave saves invalid.
+  The [integrated HOST matrix](audits/2026-11-07-early-egg-integration/README.md)
+  passed 41 strict-sanitizer, fresh/old-save and source-boundary steps at
+  `59179efc`; normal product activation and ARM/ordinary-play gates remain open.
   The Z2 successor `fd9f56ea` used runtime `2ac2eabe`; root independently
   rechecked all 592 dependencies, the permission hash and both save hashes.
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
