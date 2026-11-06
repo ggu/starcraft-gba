@@ -2,6 +2,7 @@
 import hashlib
 import fcntl
 import os
+import signal
 import time
 import importlib.util
 from pathlib import Path
@@ -79,5 +80,37 @@ class GuardTests(unittest.TestCase):
                 finally:
                     os.close(readfd)
                     if writefd>=0:os.close(writefd)
+
+    def test_immediate_parent_term_cleans_owned_child(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            class Args: pass
+            a=Args()
+            for name in ('rom','elf','runner','tape','resume_tape'):
+                path=root/name;path.write_bytes(name.encode());setattr(a,name,path)
+            a.output=root/'output'
+            readfd,writefd=os.pipe(); real_fork=os.fork
+            def fork_and_term():
+                pid=real_fork()
+                if pid: os.kill(os.getpid(),signal.SIGTERM)
+                return pid
+            def hung(_a):
+                os.close(readfd)
+                while True:time.sleep(10)
+            try:
+                with patch.object(m,'LOCK_PATH',str(root/'lock')), \
+                     patch.object(m,'RUNNER_SHA',hashlib.sha256(b'runner').hexdigest()), \
+                     patch.object(m.os,'fork',side_effect=fork_and_term), \
+                     patch.object(m,'WALL_SECONDS',1),patch.object(m,'CLEANUP_SECONDS',0.2), \
+                     patch.object(m,'POLL_SECONDS',0.02):
+                    with self.assertRaises(SystemExit) as caught:m.supervise(a,hung)
+                    self.assertEqual(caught.exception.code,128+signal.SIGTERM)
+                os.close(writefd);writefd=-1
+                import select
+                self.assertTrue(select.select([readfd],[],[],1)[0])
+                self.assertEqual(os.read(readfd,1),b'')
+            finally:
+                os.close(readfd)
+                if writefd>=0:os.close(writefd)
 
 if __name__=='__main__':unittest.main()
