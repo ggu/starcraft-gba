@@ -27,6 +27,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Latest qualified and queued work
 
+Read-only review follow-up (2026-11-06; no new build or runtime proof):
+
+- Before running the late-Zerg cache trial, make its runner fail on any compilation or test failure and require all four results. Compare deterministic baseline/candidate indexed frames and palettes directly; the existing same-flag reference cannot detect every shared rendering error. Add identity-checked Z9 and custom scenes plus lifecycle-driven fog/minimap transitions; the carried Z7 fixture does not prove those paths.
+- The explicit ARM shared-actor candidate remains experimental: race_save_adapter.h rejects campaign-mode saves under the full staged codec. Preserve that safety gate until authenticated campaign writing and reservation are implemented and qualified; custom-only tests cannot close campaign persistence.
+- Cocoon art/rendering is still HOST-only. ARM links alone cannot establish correct Cocoon visuals. Per-function stack-usage files and linker margins also do not prove nested runtime stack safety; retain actual ARM stack, ROM-size/header, unchanged-normal-build and guest SRAM checks.
+- Local free space remains about 116 MiB after rechecking, and shell temporary-file creation failed with ENOSPC. Native qualification and N64 capture remain pending; no release or SD update follows from these reviews.
+
+
 After space recovered, the following local sanitizer checks passed:
 
 - Combined source `a32d87f`: full P10-typed and Z7-derived button-controlled
