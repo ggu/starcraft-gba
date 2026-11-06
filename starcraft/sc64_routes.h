@@ -226,7 +226,7 @@ volatile u32 sc64_route_diag_count, sc64_route_diag_epoch, sc64_route_diag_outer
 #define SC64_ROUTE_DIAG_FINISH() do { \
     u32 n=sc64_route_diag_count; volatile Sc64RouteDiagEvent *e=&sc64_route_diag_events[n&15u]; \
     e->frame=(u32)frame; e->caller=sc64_route_diag_outer ? sc64_route_diag_outer : diag_caller; e->cycles=gba_clock()-diag_start; e->epoch=diag_epoch; e->invalidater=sc64_route_diag_invalidater; \
-    e->origin=(u16)sc64_route_diag_origin; e->visited=(u16)tail; e->expanded=(u16)sc64_route_diag_expanded; e->reached=(u16)(sc64_route_diag_origin < MAP_CELLS && sc64_route_get(slot,sc64_route_diag_origin)!=SC64_ROUTE_UNREACHABLE); e->key=diag_key; e->evicted=diag_old; e->slot=(u8)slot; e->valid=diag_valid; e->kind=diag_kind; \
+    e->origin=(u16)sc64_route_diag_origin; e->visited=(u16)tail; e->expanded=(u16)sc64_route_diag_expanded; e->reached=(u16)((sc64_route_diag_origin < MAP_CELLS && sc64_route_get(slot,sc64_route_diag_origin)!=SC64_ROUTE_UNREACHABLE) | ((sc64_route_diag_origin < MAP_CELLS && SC64_GRID_GET(path_walkable,sc64_route_diag_origin)) << 1)); if (sc64_route_diag_origin < MAP_CELLS) { int dc=(int)sc64_route_diag_origin, dx=dc%MAP_COLS, dy=dc/MAP_COLS; int ns[4]={dx>0?dc-1:-1,dx+1<MAP_COLS?dc+1:-1,dy>0?dc-MAP_COLS:-1,dy+1<MAP_ROWS?dc+MAP_COLS:-1}; for(int j=0;j<4;++j) if(ns[j]>=0) { if(SC64_GRID_GET(path_walkable,ns[j])) e->reached|=(u16)(1u<<(2+j)); if(sc64_route_get(slot,ns[j])!=SC64_ROUTE_UNREACHABLE) e->reached|=(u16)(1u<<(6+j)); } } e->key=diag_key; e->evicted=diag_old; e->slot=(u8)slot; e->valid=diag_valid; e->kind=diag_kind; \
     e->reason=(u8)((diag_valid ? (diag_old==diag_key ? 2 : 1) : 0) | ((sc64_route_valid[slot]&3u)<<4)); sc64_route_diag_count=n+1; \
 } while(0)
 #else
