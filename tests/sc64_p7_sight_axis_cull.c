@@ -63,7 +63,11 @@ int main(void)
         assert(same_result(160,0,bu,160));
         assert(same_result(161,0,bu,160));
     }
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    assert(actor_max==176&&building_max==176);
+#else
     assert(actor_max==176&&building_max==160);
+#endif
     assert(same_result(176,0,176,176));
     assert(same_result(160,0,160,160));
     assert(same_result(176,176,176,176));
