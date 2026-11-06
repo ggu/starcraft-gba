@@ -21,6 +21,41 @@ static Sc64Q8FlashSnapshot sc64_q8_flash_snapshot;
 static GbaFlashJournalRecord sc64_q8_flash_previous;
 static int sc64_q8_flash_has_previous;
 
+/* The journal selector deliberately filters invalid checksums and lengths
+ * before calling a semantic validator. Inspect raw ownership separately,
+ * including committed records that the selector cannot see. */
+static int race_q8_flash_write_ownership(const GbaFlashJournalIo *io)
+{
+    u8 word[4];
+    if(!io || !io->read) return 0;
+    for(unsigned i=0;i<2;++i) {
+        if(!io->read(io->context,gba_fj_base(i),word,sizeof word))return 0;
+        u32 tag=gba_fj_u32(word);
+        if(tag!=0xffffffffu && (tag&0xff000000u) &&
+           (tag&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_CAMPAIGN_JOBS_NAMESPACE) return 0;
+    }
+    for(unsigned i=2;i<4;++i) {
+        u8 commit[4],metadata[4];
+        if(!io->read(io->context,gba_fj_base(i),commit,sizeof commit) ||
+           !io->read(io->context,gba_fj_metadata(i),metadata,sizeof metadata))return 0;
+        u32 tag=gba_fj_u32(commit),inner=gba_fj_u32(metadata);
+        if(tag!=0xffffffffu && tag!=SC64_Q8_FLASH_TAG) return 0;
+        if(inner!=0xffffffffu && inner!=SC64_Q8_FLASH_TAG) return 0;
+    }
+    return 1;
+}
+typedef struct {const GbaFlashJournalIo *inner;int checked;} Sc64Q8FlashGuard;
+static int race_q8_flash_guard_read(void *ctx,u32 at,void *out,u32 size)
+{Sc64Q8FlashGuard *g=ctx;return g->inner->read(g->inner->context,at,out,size);}
+static int race_q8_flash_guard_program(void *ctx,u32 at,const void *data,u32 size)
+{Sc64Q8FlashGuard *g=ctx;return g->inner->program(g->inner->context,at,data,size);}
+static int race_q8_flash_guard_erase(void *ctx,u32 at)
+{
+    Sc64Q8FlashGuard *g=ctx;
+    if(!g->checked) {if(!race_q8_flash_write_ownership(g->inner))return 0;g->checked=1;}
+    return g->inner->erase_sector(g->inner->context,at);
+}
+
 /* Detached rows only: no references to live actor state or wallets. Old
  * shield phases are accepted only when zero, where 320- and 1280-unit
  * interpretations agree. Non-shield aliases are not interpreted here. */
@@ -106,6 +141,7 @@ static int race_q8_flash_begin(void)
 {
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();RaceLoadPlan scratch;
     int result;memset(&sc64_q8_flash_snapshot,0,sizeof sc64_q8_flash_snapshot);
+    if (!race_q8_flash_write_ownership(io)) return 0;
     sc64_q8_flash_snapshot.plan=&scratch;
     result=gba_fj_select(io,race_q8_flash_capture,&sc64_q8_flash_snapshot,&sc64_q8_flash_previous);
     sc64_q8_flash_snapshot.plan=0;
@@ -122,7 +158,8 @@ static int race_q8_flash_write(const void *data,u32 length)
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();
     u8 tail[SC64_Q8_FLASH_TAIL_BYTES];GbaFlashJournalRecord written;
     unsigned ignored;
-    if (!io || !data || !length || race_mode!=1 || race_human!=R_PROTOSS) return 0;
+    if (!io || !io->read || !io->program || !io->erase_sector || !data || !length ||
+        race_mode!=1 || race_human!=R_PROTOSS) return 0;
     gba_fj_put32(tail,SC64_Q8_FLASH_TAIL_MAGIC);gba_fj_put32(tail+4,SC64_Q8_FLASH_DEBTS);
     for(int i=0;i<MAX_UNITS;++i) {
         unsigned debt=sc64_pr_hp_debt[i];
@@ -139,7 +176,9 @@ static int race_q8_flash_write(const void *data,u32 length)
                 !sc64_pr_q8_actor_shield(MAX_UNITS+i,&ignored)) return 0;
         tail[SC64_Q8_FLASH_TAIL_HEADER+MAX_UNITS+i]=(u8)debt;
     }
-    return gba_fj_write_parts(io,data,length,tail,sizeof tail,SC64_Q8_FLASH_TAG,
+    Sc64Q8FlashGuard guard={io,0};
+    GbaFlashJournalIo guarded={&guard,race_q8_flash_guard_read,race_q8_flash_guard_erase,race_q8_flash_guard_program};
+    return gba_fj_write_parts(&guarded,data,length,tail,sizeof tail,SC64_Q8_FLASH_TAG,
         race_q8_flash_snapshot_accept,&sc64_q8_flash_snapshot,
         sc64_q8_flash_has_previous?&sc64_q8_flash_previous:0,&written)==GBA_FJ_OK;
 }

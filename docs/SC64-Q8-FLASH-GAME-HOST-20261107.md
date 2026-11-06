@@ -36,6 +36,15 @@ writer's reselect therefore cannot overwrite the newly serialized payload.
 New or changed records abort reselect. This does not claim cryptographic
 payment authenticity or solve concurrent FNV collisions.
 
+Because checksum/length-invalid records are hidden from semantic selection,
+the write path also reads raw commit and metadata tags before selection and
+again immediately before the first sector erase. Unknown new-slot ownership,
+including bad-length and bad-checksum records, fails closed; an unrecognized
+or partially programmed tag is not assumed to belong to this experiment.
+Raw committed 0x47 legacy history likewise prevents creating a new custom
+epoch, even when that old record is not admissible to this custom reader.
+Read selection may still fall back to a supported intact older record.
+
 The authored HOST fixture builds a real no-feature predecessor and exercises
 fresh-process migration, active paid Forge job plus fractional Dragoon HP and
 shields, completion after load, read-only legacy bytes, checksum-valid bad-new

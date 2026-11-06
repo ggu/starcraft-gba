@@ -101,6 +101,36 @@ int main(int argc,char **argv)
         memcpy(prior,device.bytes,sizeof prior);memcpy(old_units,u,sizeof u);memcpy(old_buildings,b,sizeof b);
         assert(!race_load_game() && !race_save_game());
         assert(!memcmp(prior,device.bytes,sizeof prior) && !memcmp(old_units,u,sizeof u) && !memcmp(old_buildings,b,sizeof b));
+    } else if(!strcmp(argv[1],"unknown-hash") || !strcmp(argv[1],"unknown-length") ||
+              !strcmp(argv[1],"mixed-47")) {
+        static u8 prior[131072];
+        memset(device.bytes,0xff,sizeof device.bytes);file_read(argv[2],device.bytes,32768);
+        if(!strcmp(argv[1],"mixed-47")) {
+            u32 at=16384u,tag=SC64_SAVE_TAG_CAMPAIGN_JOBS(SC64_TRANSPORT_SAVE_VERSION);
+            gba_fj_put32(device.bytes+at,tag);gba_fj_put32(device.bytes+at+4,0);
+        } else {
+            u32 at=gba_fj_base(2),meta=gba_fj_metadata(2);
+            u32 tag=(SC64_TRANSPORT_SAVE_VERSION&~SC64_SAVE_TAG_NAMESPACE_MASK)|0x00460000u;
+            gba_fj_put32(device.bytes+at,tag);gba_fj_put32(device.bytes+meta,tag);
+            gba_fj_put32(device.bytes+meta+4,!strcmp(argv[1],"unknown-length")?0u:1u);
+            gba_fj_put32(device.bytes+meta+8,0u);gba_fj_put32(device.bytes+meta+12,2u);
+        }
+        memcpy(prior,device.bytes,sizeof prior);
+        /* Read the supported predecessor, but refuse to overwrite or hide
+         * an unsupported committed layout when writing a new epoch. */
+        assert(race_load_game());assert(!race_save_game());
+        assert(!memcmp(prior,device.bytes,sizeof prior));
+    } else if(!strcmp(argv[1],"race-ownership")) {
+        static u8 prior[131072];u8 payload=0;
+        memset(device.bytes,0xff,sizeof device.bytes);file_read(argv[2],device.bytes,32768);
+        assert(race_q8_flash_begin());
+        u32 at=gba_fj_base(2),meta=gba_fj_metadata(2);
+        u32 tag=(SC64_TRANSPORT_SAVE_VERSION&~SC64_SAVE_TAG_NAMESPACE_MASK)|0x00460000u;
+        gba_fj_put32(device.bytes+at,tag);gba_fj_put32(device.bytes+meta,tag);
+        gba_fj_put32(device.bytes+meta+4,0);
+        memcpy(prior,device.bytes,sizeof prior);
+        assert(!race_q8_flash_write(&payload,1));
+        assert(!memcmp(prior,device.bytes,sizeof prior));
     } else if(!strcmp(argv[1],"reject-new")) {
         static u8 prior[131072];static Unit old_units[MAX_UNITS];static Building old_buildings[MAX_BUILDINGS];
         file_read(argv[2],device.bytes,sizeof device.bytes);GbaFlashJournalRecord rec;
