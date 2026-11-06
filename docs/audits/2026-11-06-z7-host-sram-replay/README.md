@@ -289,3 +289,23 @@ blocked multi-root tie, exhausted witness budget with FIFO fallback and recency
 wrap. They do not override the failed complete replay. The diagnostic snapshots
 and query logs remain local under `build/z7-host-sram-contract/host-debug-snapshot/`
 and `host-route-trace/`; the temporary query instrumentation is not shipped.
+
+### Full-field implementation experiment
+
+A separate opt-in experiment enables the existing `SC64_ROUTE_WORD_CLEAR`,
+`SC64_ROUTE_VISIT_GRID`, and `SC64_ROUTE_NEW_CELL` flags without the rejected
+monotone shortcut. These retain complete field allocation and route-cache policy.
+In a fresh HOST Z7 replay, control and this candidate both won and passed all
+307 recorded observations. All 175,455 per-call selected actor/world and
+displayed indexed-pixel/full-palette fingerprints matched; final journal and
+replay records also matched. Fingerprints do not establish full-state identity.
+Source and input manifests were unchanged. This is one campaign replay, not
+proof across other missions or modes.
+
+Normal release-vector Z7–Z10 control and flag-enabled ARM links all passed their
+existing guards with unchanged BSS ends. Z7 IWRAM ended at `03004f88` versus
+`03004eb0`; Z8–Z10 ended at `03004bf8` versus `03004b28`, `03004b20` and
+`03004b28`, respectively. No defaults have changed. The locally retained
+receipts and logs are under `build/z7-host-sram-contract/normal-full-flood-links/`
+and `host-full-flood-traces/`. Real guest performance and wider gameplay
+qualification remain open.
