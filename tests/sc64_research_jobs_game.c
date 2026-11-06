@@ -150,6 +150,10 @@ int main(void)
     assert(!sc64_pr_job_candidate_valid_custom(b,MAX_BUILDINGS,&sc64_experimental_research_levels,
         race_player,(unsigned)race_bots,0,0,0,0)); /* forged payer */
     b[forge]=saved;
+    sc64_experimental_research_levels.level[4][SC64_PR_SHIELDS]=1;
+    assert(!sc64_pr_job_candidate_valid_custom(b,MAX_BUILDINGS,&sc64_experimental_research_levels,
+        race_player,(unsigned)race_bots,0,0,0,0)); /* inactive owner level */
+    sc64_experimental_research_levels.level[4][SC64_PR_SHIELDS]=0;
     assert(!sc64_pr_job_candidate_valid_custom(b,MAX_BUILDINGS,&sc64_experimental_research_levels,
         race_player,(unsigned)race_bots,0,0,1,0)); /* legacy pending */
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED

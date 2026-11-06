@@ -160,6 +160,12 @@ static int sc64_pr_job_candidate_valid_custom(const Building *rows, unsigned cou
     uint8_t seen[SC64_PR_CUSTOM_OWNERS][SC64_PR_FAMILY_COUNT]={{0}};
     if (!rows || !levels || !players || count>MAX_BUILDINGS || bots<1 || bots>3 ||
         legacy_weapons>2 || legacy_armor>2 || !sc64_pr_levels_valid(levels,SC64_PR_CUSTOM_OWNERS)) return 0;
+    for (unsigned owner=0;owner<SC64_PR_CUSTOM_OWNERS;++owner) {
+        int active=owner==SIDE || (owner==ENEMY && bots>=1) ||
+                   (owner==RESCUABLE && bots>=2) || (owner==4 && bots>=3);
+        for (unsigned family=0;family<SC64_PR_FAMILY_COUNT;++family)
+            if (levels->level[owner][family] && (!active || players[owner]!=R_PROTOSS)) return 0;
+    }
     for (unsigned i=0;i<count;++i) {
         const Building *q=&rows[i]; unsigned owner, family;
         if (q->type!=B_FORGE && q->type!=B_CYBERNETICS_CORE) continue;
