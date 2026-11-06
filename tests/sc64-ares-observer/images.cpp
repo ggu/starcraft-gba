@@ -24,6 +24,6 @@ int main(){
    assert(!strcmp(name,_dyld_get_image_name(i)));at+=18+n;
   }assert(at==total);}
 
- printf("dyld images=%u status=%u written=%u\n",h[1],status,written);
+ printf("dyld images=%u status=%u written=%u bytes=%lld\n",h[1],status,written,(long long)total);
  close(fd);unlink(path);dlclose(vk);return 0;
 }
