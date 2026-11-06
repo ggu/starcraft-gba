@@ -1,7 +1,7 @@
 # Late-Zerg full-field candidate
 
-This isolated candidate is based on `9668df74`, including the unified custom
-starting-bank correction. Its only production change adds the existing
+This isolated candidate is based on `cf33a125`, including the unified custom starting-bank,
+worker, audio and source-shaped power changes. Its only production change adds the existing
 `CANONICAL_ROUTE_INDEX_FLAGS` and `CANONICAL_ROUTE_NEW_CELL_FLAGS` to
 `ZERG_Z7_CANONICAL_FLAGS`. Z8 inherits that vector, and Z9 and Z10 inherit it
 in turn. At normal defaults this selects word clearing, the visited grid and
@@ -46,3 +46,9 @@ to those lists. Qualification must explicitly run those four sanitized fixtures
 and the existing word-clear checks before promotion.
 The vector check should also inspect Z7–Z10 for both toggle settings and assert
 that `SC64_ROUTE_MONOTONE_PROBE` remains absent.
+
+The existing route-policy fixture definitions are moved verbatim into a
+literal included Makefile to preserve the unchanged top-level source-size
+limit. The source-only vector test checks Z7–Z10 on, partial and off settings
+and keeps the separate monotone shortcut absent. These changes remain untested
+until the combined-source qualification runs.
