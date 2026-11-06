@@ -274,6 +274,43 @@ static void explicit_cases(void)
     expect_mask(0, powered);
 }
 
+#ifdef SC64_P7_DETECTOR_OWNER_FILTER
+/* Exercise empty, ambiguous and current-controller source unions against the
+ * independent scalar oracle. Rebuild the union after every actor mutation. */
+static void detector_union_cases(void)
+{
+    Sc64P7DetectorLists lists; u8 powered[MAX_BUILDINGS]={0};
+    reset_case();
+    sc64_p7_detector_lists_build(&lists);
+    assert(!lists.possible_detector_sources);
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==
+           sc64_p7_arbiter_detected_mask_reference(0,powered));
+    observer(1,-1,ENEMY);
+    sc64_p7_detector_lists_build(&lists);
+    assert(lists.possible_detector_sources==255u);
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==
+           sc64_p7_arbiter_detected_mask_reference(0,powered));
+    /* Capture preserves origin but current SIDE is rebound to the human slot. */
+    u[1].owner=SIDE; u[1].raw_owner=0;
+    SC64_GRID_SET(visible,u[0].x/16+(u[0].y/16)*MAP_COLS,1);
+    sc64_p7_detector_lists_build(&lists);
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==
+           sc64_p7_arbiter_detected_mask_reference(0,powered));
+    /* Dead and unfinished structures remain conservative, not excluded on
+     * speculative power/placement assumptions. */
+    b[0].alive=1; b[0].raw_type=SC64_P7_CANNON_RAW;
+    b[0].type=B_PHOTON_CANNON; b[0].owner=ENEMY; b[0].raw_owner=-1;
+    b[0].under_construction=1;
+    sc64_p7_detector_lists_build(&lists);
+    assert(lists.possible_detector_sources==255u);
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==
+           sc64_p7_arbiter_detected_mask_reference(0,powered));
+    b[0].alive=0; u[1].alive=0;
+    sc64_p7_detector_lists_build(&lists);
+    assert(!lists.possible_detector_sources);
+}
+#endif
+
 int main(void)
 {
     optical_source_masks();
@@ -281,6 +318,9 @@ int main(void)
     race_mode = 0;
     race_selected_mission = SC64_P7_GLOBAL_ID;
     explicit_cases();
+#ifdef SC64_P7_DETECTOR_OWNER_FILTER
+    detector_union_cases();
+#endif
     unsigned positive = 0;
     for (int run = 0; run < 2000; ++run) {
 #ifdef SC64_PROTOSS_LATER_BINDINGS
