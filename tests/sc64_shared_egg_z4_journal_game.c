@@ -33,6 +33,7 @@ static void start_z4(void)
     press(KEY_A);press(KEY_START);
     assert(screen==SCREEN_PLAY && !race_mode && race_selected_mission==SC64_RACE_MISSION_Z4);
 }
+#ifndef SC64_Z4_EGG_NO_MAIN
 int main(int argc,char **argv)
 {
     assert(argc==1 || (argc==3 && (!strcmp(argv[1],"write") || !strcmp(argv[1],"read") || !strcmp(argv[1],"legacy"))));
@@ -107,3 +108,4 @@ int main(int argc,char **argv)
     expect_failed_load_preserves_world();
     puts("Z4 " Z4_PERMISSION_LABEL "-permission paid paired Egg journal passed");return 0;
 }
+#endif

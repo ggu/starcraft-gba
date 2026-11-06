@@ -264,6 +264,29 @@ race_z4_property_valid(unsigned raw_index)
            p[16] == 0 && p[17] == 0 && p[18] == 0 && p[19] == 0;
 }
 
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+/* Defer only when extra bodies promised by paid paired Eggs are the reason
+ * this creation would exceed the common pool. Other capacity behavior stays
+ * with the original Z4 callback. */
+static int race_z4_paired_egg_conflict(void)
+{
+    unsigned free_slots=0,queued=0,paired=0;
+    for (int i=0;i<MAX_UNITS;++i) {
+        if (!u[i].alive) ++free_slots;
+        else if (u[i].type==SC64_EGG_ACTOR && sc64_z7_egg_product_valid(u[i].target))
+            paired+=(unsigned)(sc64_z7_egg_product_count(u[i].target)-1);
+    }
+    for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) {
+        if (b[i].queue_count<0 || b[i].queue_count>5 || b[i].queue_head<0 || b[i].queue_head>=5) return 0;
+        for (int j=0;j<b[i].queue_count;++j) {
+            int type=b[i].queue[(b[i].queue_head+j)%5];
+            if (!sc64_race_unit_rule(type)) return 0;
+            queued+=(unsigned)sc64_race_product_count(type);
+        }
+    }
+    return paired && free_slots>=1u+queued && free_slots<1u+queued+paired;
+}
+#endif
 static int
 race_z4_create_action(const Sc64Z4SourceAction *a)
 {
@@ -286,7 +309,7 @@ race_z4_create_action(const Sc64Z4SourceAction *a)
 #ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
     /* A free body already promised to a paid Egg or queue is not available.
      * Zero asks the staged dispatcher to retry this exact action. */
-    if (!race_product_slots_available(1)) return 0;
+    if (race_z4_paired_egg_conflict()) return 0;
 #endif
     int slot = spawn_unit(owner, type, x, y);
     if (slot < 0) return -SC64_Z4_FAULT_CAPACITY;

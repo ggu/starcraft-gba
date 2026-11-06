@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Constructed HOST Z4 capacity witness; no native trigger-parity claim. */
-#define main sc64_z4_egg_journal_main
+#define SC64_Z4_EGG_NO_MAIN
 #include "sc64_shared_egg_z4_journal_game.c"
-#undef main
+#undef SC64_Z4_EGG_NO_MAIN
 static Unit original[MAX_UNITS];
 static void prepare_retry(void)
 {
