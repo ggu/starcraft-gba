@@ -25,6 +25,53 @@ A HOST fixture, catalog entry, source-data table or successful campaign shortcut
 does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
+## Latest qualified and queued work
+
+After space recovered, the following local sanitizer checks passed:
+
+- Combined source `a32d87f`: full P10-typed and Z7-derived button-controlled
+  Reaver tech/training/ammunition, real-opponent attack and genuine fresh-process
+  pending-impact continuation with confirmed enemy damage. Initial ample funds
+  and idle workers remain declared HOST setup, not an unassisted economy proof.
+- `4f4e0b5a`: independently compiled genuine feature0/1 predecessor writers,
+  legacy raw36 Overlord, malformed newer-slot fallback and atomic load rejection.
+  Unsupported feature5/7 cases are fully retagged adversarial records, not
+  historical producer claims. Their exact-profile fences preserve other genuine
+  compact/Terran migrations.
+- `51a78266`/`fbb8511b`: paid AI stocking selects active custom bot slots,
+  including the second slot and excluding closed slots. Terran/Z7/P10 fixtures
+  cover every prepared map, 1–3 bots, human/neutral/inactive owners and insufficient
+  funds. This corrects eligibility; it does not qualify AI build orders or native
+  replenishment policy. Consolidated source and receipts are at `e9c3af3b`.
+
+The repeated source-tick optical-cell cache proposal was rejected: only
+409/3,947 refreshes (10.36%) reused a cell in the verified paired window.
+The busy current-normal loop still averages about 2.20 million cycles. No
+performance gain or 30 fps qualification follows from attribution timers.
+
+Next qualification order:
+
+1. Link the separate default-off ARM candidate (`fdb7e27a`,
+   `codex/shared-actor-arm-qualification-nov6`) for Terran/Z7/P10, then check
+   ROM, EWRAM/IWRAM, unchanged reserves, stack and actual guest/SRAM behavior.
+   No ARM links have run for this capability.
+2. Test the existing render-cache flags on late Zerg. They are already enabled
+   in P10 but absent from Z7/Z8/Z9/Z10. The four-build HOST dual-page oracle is
+   prepared, unrun; then use actual Zerg replay windows for paired cycle/pixel
+   and memory proof before any flag promotion.
+3. Continue AI/research/source-owner and campaign mechanics, preserve carried
+   missions and finish Z10 normally. Repair native capture/input access and
+   collect the still-missing N64 gameplay comparisons.
+
+Free space again fell from 17+ GiB to about 116 MiB while native builds were
+idle. A read-only I/O sample showed Apple cloud and Photos services writing;
+that does not prove the entire loss of free space. No personal data or unrelated
+service was changed. ARM/render qualification is held at the disk guard.
+The N64 local-event input adapter compiled, but ScreenCaptureKit failed before
+reference input; the owned emulator exited and supplied no new gameplay proof.
+All checks remain local; GitHub Actions is still disabled. No release flags,
+normal ROM package, campaign coverage or SD delivery changed.
+
 ## Current baseline
 
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
