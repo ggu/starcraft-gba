@@ -17,6 +17,11 @@ test-sc64-research-campaign-journal-p10:
 	./build/research-campaign-runtime/journal-p10 old-load build/research-campaign-runtime/old-p10.sav
 	./build/research-campaign-runtime/journal-p10 over-old build/research-campaign-runtime/old-p10.sav
 	./build/research-campaign-runtime/journal-p10 fallback build/research-campaign-runtime/old-p10.sav
+	$(CLANG) -I$(SC64_CAMPAIGN_BASELINE_ROOT)/common -I$(SC64_CAMPAIGN_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_FLAGS) -DSC64_SOURCE_SIGHT_ALL_RACES -DSC64_CAMPAIGN_BASELINE_WRITER -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL tests/sc64_research_campaign_journal_game.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o build/research-campaign-runtime/journal-p10-44
+	./build/research-campaign-runtime/journal-p10-44 old-write build/research-campaign-runtime/old-44-p10.sav
+	./build/research-campaign-runtime/journal-p10 old-load build/research-campaign-runtime/old-44-p10.sav
+	./build/research-campaign-runtime/journal-p10 over-old build/research-campaign-runtime/old-44-p10.sav
+	./build/research-campaign-runtime/journal-p10 fallback build/research-campaign-runtime/old-44-p10.sav
 	./build/research-campaign-runtime/journal-p10 write build/research-campaign-runtime/journal-p10.sav
 	./build/research-campaign-runtime/journal-p10 reject build/research-campaign-runtime/journal-p10.sav
 	./build/research-campaign-runtime/journal-p10 load build/research-campaign-runtime/journal-p10.sav
@@ -24,3 +29,5 @@ test-sc64-research-campaign-journal-p10:
 	./build/research-campaign-runtime/journal-p10 custom-load build/research-campaign-runtime/custom-p10.sav
 	./build/research-campaign-runtime/journal-p10 core-write build/research-campaign-runtime/core-p10.sav
 	./build/research-campaign-runtime/journal-p10 core-load build/research-campaign-runtime/core-p10.sav
+	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror tests/sc64_save_tag_namespace.c -o build/research-campaign-runtime/tag-inventory
+	./build/research-campaign-runtime/tag-inventory

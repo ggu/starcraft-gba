@@ -28,7 +28,15 @@ int main(int argc,char **argv) {
 #if defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL)
         assert(0 && "old writer must have no research flags");
 #else
-        minerals=gas=1000; assert(race_save_game()); transfer(argv[2],1);
+        minerals=gas=1000; assert(race_save_game());
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+        assert(sram_get32(host_save)==SC64_RESEARCH_TRANSPORT_SAVE_VERSION ||
+               sram_get32(host_save+SAVE_SLOT_SIZE)==SC64_RESEARCH_TRANSPORT_SAVE_VERSION);
+#else
+        assert(sram_get32(host_save)==SC64_TRANSPORT_SAVE_VERSION ||
+               sram_get32(host_save+SAVE_SLOT_SIZE)==SC64_TRANSPORT_SAVE_VERSION);
+#endif
+        transfer(argv[2],1);
 #endif
     } else if (!strcmp(argv[1],"write") || !strcmp(argv[1],"over-old") || !strcmp(argv[1],"custom-write") || !strcmp(argv[1],"core-write")) {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
