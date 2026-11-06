@@ -78,12 +78,24 @@ static void mixed_test(void)
         if(step==2)b[1].alive=0;
     }
 }
+static void save_roundtrip(void)
+{
+    static u8 expected_visible[sizeof visible], expected_explored[sizeof explored];
+    game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;race_skirmish_map=0;init_state();
+    sc64_update_exploration();
+    memcpy(expected_visible,visible,sizeof visible);memcpy(expected_explored,explored,sizeof explored);
+    assert(save_game());
+    SC64_GRID_CLEAR(visible);SC64_GRID_CLEAR(explored);sc64_visibility_reset();
+    assert(load_game());
+    assert(memcmp(expected_visible,visible,sizeof visible)==0);
+    assert(memcmp(expected_explored,explored,sizeof explored)==0);
+}
 int main(void)
 {
     gba_init();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;race_skirmish_map=0;init_state();
     unit_test(7,112);unit_test(41,112);unit_test(64,128);unit_test(65,112);unit_test(84,144);unit_test(12,176);
     building_test(154,176);building_test(156,128);building_test(160,160);building_test(162,176);building_test(106,160);building_test(131,144);
-    mixed_test();
+    mixed_test();save_roundtrip();
     reset_sight();b[0].alive=1;b[0].owner=ENEMY;b[0].type=B_NEXUS;b[0].raw_type=154;b[0].x=b[0].y=520;
 #ifdef SC64_P7_OBSERVER_ENABLED
     int c=(520+168)/16,r=520/16;
