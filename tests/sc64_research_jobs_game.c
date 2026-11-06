@@ -148,6 +148,22 @@ int main(void)
            decoded.level==b[forge].level && decoded.queue_count==0 && decoded.queue_head==0 &&
            decoded.queue[0]==b[forge].queue[0] && decoded.queue[1]==b[forge].queue[1] &&
            decoded.queue_progress==b[forge].queue_progress);
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    Sc64DerivedBuildingSave row; Building decoded;
+    assert(sc64_derived_building_encode(&row,&b[forge],(unsigned)WORLD_W,(unsigned)WORLD_H));
+    assert(sc64_derived_building_decode(&decoded,&row));
+    assert(decoded.owner==b[forge].owner && decoded.type==b[forge].type &&
+           decoded.level==b[forge].level && decoded.queue_count==0 && decoded.queue_head==0 &&
+           decoded.queue[0]==b[forge].queue[0] && decoded.queue[1]==b[forge].queue[1] &&
+           decoded.queue_progress==b[forge].queue_progress);
+#elif defined(SC64_ZP_CAMPAIGN_STORAGE)
+    Sc64PackedBuildingSave row; Building decoded;
+    assert(sc64_building_save_encode(&row,&b[forge],(unsigned)WORLD_W,(unsigned)WORLD_H));
+    assert(sc64_building_save_decode(&decoded,&row));
+    assert(decoded.owner==b[forge].owner && decoded.type==b[forge].type &&
+           decoded.level==b[forge].level && decoded.queue_count==0 && decoded.queue_head==0 &&
+           decoded.queue[0]==b[forge].queue[0] && decoded.queue[1]==b[forge].queue[1] &&
+           decoded.queue_progress==b[forge].queue_progress);
 #endif
     int paid_ore=minerals, paid_gas=gas; start_research(0);
     assert(!weapons_research && minerals==paid_ore && gas==paid_gas);
