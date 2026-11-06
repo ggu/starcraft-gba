@@ -19,6 +19,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include "input_mapping.h"
 
 namespace ares::Nintendo64 {
   auto load(Node::System&, string) -> bool;
@@ -27,7 +28,7 @@ namespace ares::Nintendo64 {
 
 struct Probe final : ares::Platform {
   std::shared_ptr<mia::Pak> systemPak, gamePak;
-  ares::Node::Input::Button a, start, down, cLeft, right, r;
+  ares::Node::Input::Button a, start, down, cLeft, cRight, cUp, cDown, right, r;
   ares::Node::Input::Axis xAxis, yAxis;
   std::atomic<int> axisX{0}, axisY{0};
   std::atomic<unsigned> mask{0};
@@ -68,8 +69,11 @@ struct Probe final : ares::Platform {
       unsigned m=mask.load();
       if(button==a) { ++aPolls; if(m&1) ++aPressedPolls; }
       if(button==start) { ++startPolls; if(m&2) ++startPressedPolls; }
-      bool pressed=(button==a && (m&1)) || (button==start && (m&2)) || (button==down && (m&4)) || (button==cLeft && (m&8)) || (button==right && (m&16)) || (button==r && (m&32));
-      if(button==a || button==start || button==down || button==cLeft || button==right || button==r) { std::lock_guard lock(mutex); if(inputEvents.size()>=131072) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),button==a?1u:(button==start?2u:(button==down?4u:(button==cLeft?32u:(button==right?64u:128u)))),pressed?1:0}); }
+      unsigned id=button==a?1u:button==start?2u:button==down?4u:
+          button==cLeft?32u:button==right?64u:button==r?128u:
+          button==cRight?256u:button==cUp?512u:button==cDown?1024u:0u;
+      bool pressed=sc64_button_pressed(id,m);
+      if(id) { std::lock_guard lock(mutex); if(inputEvents.size()>=131072) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),id,pressed?1:0}); }
       button->setValue(pressed);
     } else if(auto axis=node->cast<ares::Node::Input::Axis>()) {
       int value=axis==xAxis?axisX.load():(axis==yAxis?axisY.load():0);
@@ -150,6 +154,9 @@ int main(int argc,char** argv) {
     if(button->name()=="Start") p.start=button;
     if(button->name()=="Down") p.down=button;
     if(button->name()=="C-Left") p.cLeft=button;
+    if(button->name()=="C-Right") p.cRight=button;
+    if(button->name()=="C-Up") p.cUp=button;
+    if(button->name()=="C-Down") p.cDown=button;
     if(button->name()=="Right") p.right=button;
     if(button->name()=="R") p.r=button;
   }
@@ -157,7 +164,7 @@ int main(int argc,char** argv) {
     if(axis->name()=="X-Axis") p.xAxis=axis;
     if(axis->name()=="Y-Axis") p.yAxis=axis;
   }
-  if(!p.a || !p.start || !p.down || !p.cLeft || !p.right || !p.r || !p.xAxis || !p.yAxis) return 4;
+  if(!p.a || !p.start || !p.down || !p.cLeft || !p.cRight || !p.cUp || !p.cDown || !p.right || !p.r || !p.xAxis || !p.yAxis) return 4;
   root->power();
   std::ofstream meta(out/"frames.csv",std::ios::binary), steps(out/"steps.csv",std::ios::binary);
   if(!meta || !steps) return 5;
@@ -180,7 +187,7 @@ int main(int argc,char** argv) {
     }
     if(line.empty() || line.size()>=128 || std::chrono::steady_clock::now()>=commandDeadline || totalIdle>=60000) break;
     std::istringstream in(line); int count,mask,x,y,capture; std::string extra;
-    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || mask<0 || (mask & ~63) || x < -32767 || x>32767 || y < -32767 || y>32767 || capture<0 || capture>1) { std::cerr<<"invalid command\n"; return 7; }
+    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || mask<0 || (mask & ~511) || x < -32767 || x>32767 || y < -32767 || y>32767 || capture<0 || capture>1) { std::cerr<<"invalid command\n"; return 7; }
     commands<<completed<<','<<count<<','<<mask<<','<<x<<','<<y<<','<<capture<<'\n'; commands.flush();
     unsigned previous; {std::lock_guard lock(p.mutex); previous=p.frames.size();}
     for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture && i==count-1) p.forceCapture=true; root->run(); ++completed; }
