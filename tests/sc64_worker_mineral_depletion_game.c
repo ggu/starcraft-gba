@@ -71,7 +71,7 @@ static void pending_trip_depletes(void)
 {
     reset_scene(R_PROTOSS,R_TER);
     int traveler=spawn_unit(SIDE,U_PROBE,112,112);
-    int finisher=spawn_unit(SIDE,U_PROBE,320,320);
+    int finisher=spawn_unit(SIDE,U_PROBE,240,240);
     assert(traveler>=0 && finisher>=0);
     set_depot(0,SIDE,B_NEXUS,112,112);
     m[2].x=320; m[2].y=320; m[2].amount=8;
@@ -79,6 +79,7 @@ static void pending_trip_depletes(void)
     u[traveler].selected=1; tap_a(320,320);
     assert(u[traveler].order==ORDER_MINE && u[traveler].target==2 &&
            sc64_worker_gather_pending(&u[traveler]));
+    u[finisher].x=320; u[finisher].y=320;
     u[finisher].order=ORDER_MINE; u[finisher].target=2; u[finisher].work_timer=1;
     one_tick();
     assert(m[2].amount==0 && u[finisher].carry==8 && u[traveler].target==2);
