@@ -48,12 +48,7 @@ static int number(const char **cursor, unsigned base, uint32_t *out) {
     if (!count) return 0;
     *cursor = p; *out = n; return 1;
 }
-static int in_readable_memory(uint32_t address, uint32_t length, size_t rom_size) {
-    return length && ((address >= 0x02000000 && address < 0x02040000 && length <= 0x02040000 - address) ||
-                      (address >= 0x03000000 && address < 0x03008000 && length <= 0x03008000 - address) ||
-                      (address >= 0x08000000 && address < 0x0a000000 && length <= 0x0a000000 - address &&
-                       (uint64_t)(address - 0x08000000) + length <= rom_size));
-}
+#include "sc64_headless_read_bounds.h"
 static int export_sram(struct mCore *core, const char *path) {
     void *data = NULL;
     size_t size = core->savedataClone(core, &data);
@@ -116,11 +111,11 @@ int main(int argc, char **argv) {
         line[--size]='\0';
         const char *p=line+1; uint32_t address=0, length=0;
         if (line[0] == 'm' && number(&p,16,&address) && *p++ == ',' &&
-            number(&p,10,&length) && !*p && length <= 512 && in_readable_memory(address,length,core->romSize(core))) {
+            number(&p,10,&length) && !*p && length <= 512 && sc64_headless_read_allowed(address,length,core->romSize(core))) {
             for (unsigned i = 0; i < length; ++i)
                 printf("%02x", (unsigned) core->rawRead8(core, address + i, -1) & 255);
             putchar('\n');
-        } else if (!physical && line[0] == 'M' && number(&p,16,&address) && *p++ == ',' &&
+        } else if (sc64_headless_write_allowed(physical) && line[0] == 'M' && number(&p,16,&address) && *p++ == ',' &&
                    number(&p,10,&length) && *p++ == ':' && length && length <= 512) {
             const char *data = p-1; int valid = strlen(p) == 2u * length;
             for (unsigned i = 0; valid && i < length; ++i)

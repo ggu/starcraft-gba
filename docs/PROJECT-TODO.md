@@ -29,20 +29,26 @@ older KODAK package. Source merges do not update an already copied ROM.
   to eligible nearby known fields; #311 uses the source-shaped Pylon field
   for placement, production and cached/uncached Cannon power. Separate
   Egg/Carrier/Scarab lifecycles are unchanged; the visual field overlay is off.
-- **Validation and package:** clean local full default suites passed. Actual
-  P10 gather, open/wall travel, advisor sample-request and power fixtures pass.
-  Normal ARM vectors link with the delivered advisor bank and unchanged
-  guards. The four package builds retain at least 664 bytes to the IWRAM
-  boundary and 796 bytes to the EWRAM boundary. The new four-ROM
-  Mac package `StarCraft-GBA-2026-11-06-738223a4` has verified 32-MiB ROMs,
-  headers, checksums, a player testing guide and 392 compiler-reported dependency
-  hashes for the previous four-build package. The current package assembles
-  the exact measured/guarded #315 Zerg9 candidate with the unchanged qualified
-  Terran/P10/Showcase binaries; it does not claim four new merged-head builds.
-  All common/StarCraft source hashes match the recorded candidate sources.
-  Other three ROMs still match the cf33 package.
+- **Validation and package:** the normal Mac package is now
+  `StarCraft-GBA-2026-11-06-2ce266e3`, using the six-link-qualified #323
+  creation fallback and unchanged release flags. Four qualified canonical
+  ELFs were reused after production-vector and common/StarCraft/mk source
+  equivalence checks against merged `2ce266e3`; 390 current dependencies
+  were hashed before/after. ROM headers, logo, SRAM signature, positive
+  linker margins and all 22 packaged-file checksums passed read-back.
+  The four products retain minimum IWRAM/EWRAM margins of 664/796 bytes.
+  These are not runtime stack, hardware or frame-rate qualification.
   **KODAK still has the older e9838086 package** until a new physical copy is
-  recorded; the card is not currently mounted.
+  recorded; the card is not currently mounted. Earlier Mac packages remain.
+- **Creation provenance #323 merged:** shared foundations and ordinary
+  products fill missing source-owner slots only from a verified creator or
+  uniquely mapped human controller. Existing rescued actors retain their
+  origin and existing mission hooks take precedence. P1's real source-backed
+  rescue→Nexus Probe→Forge HOST fixture and P3/P4/T3 cases pass with explicit
+  authored setup; all six normal ARM links pass unchanged guards. P5's fixed
+  reverse-map hook, source-dependent constructor initialization, dynamic
+  target tests and universal controller identity remain open. See the
+  [scoped creation audit](audits/2026-11-06-creation-provenance/README.md).
 - **Controller cleanup #310:** producer selection escapes use SELECT, keeping
   intentional L cancellation and moved drags. Fresh HOST T5/Z3 wins on the
   worker source and combined power P3/P7/P10 wins are scoped in their audits.
@@ -54,17 +60,22 @@ older KODAK package. Source merges do not update an already copied ROM.
   this is an order-loop defect, not a measured wall-clock income rate. The
   retarget fix does not add native field queues, change durations, or replace
   the exact-target cancellation policy for new pending trips.
-- **Research and UI remain open:** authenticated Forge/Core facts and unwired
-  services are groundwork, not usable typed upgrades. Building-context menus,
-  payment/completion, source-owner combat routing and safe journals must
-  integrate together. A separate default-off research journal experiment now
-  passes synthetic actual-engine P10/Z9 save/load, fallback and maximum
-  impact/Yamato combinations, plus six guarded ARM links. It is not in releases;
-  genuine 94bc-produced P10/Z9 campaign/custom records also load in separate
-  experimental consumer processes. New-match/restart resets were repaired.
-  Review caught a research/roster outer-tag collision. A separate namespace
-  correction passes its inventory and genuine-record consumer checks; final
-  build/review qualification, stack and gameplay integration remain open.
+- **Research groundwork #318 merged, gameplay open:** the default-off
+  completed-level journal uses a distinct namespace and validated building-row
+  padding without reducing impact capacity. Review repaired a new-match reset
+  leak, roster-tag collision and unsupported-layout admission. Genuine 94bc
+  P10/Z9 campaign/custom predecessor journals load in separate consumers;
+  earlier feature-on sanitizer and six-profile link evidence remains scoped to
+  that base. Current combined-source flag-off Z9 exactly matches the qualified
+  package. The clean full default suite passes at `04745b48` (1,008 Python
+  tests, 26 skips); its prior missing-header fixture failure is preserved.
+  **No Forge/Core menus, paid jobs or combat effects are enabled.** Current
+  feature-on integration, source-owner policy, active-job persistence, legacy
+  migration, runtime stack and gameplay qualification remain open. See the
+  [wire audit](audits/2026-11-06-research-wire/README.md).
+  A separate gameplay branch has verified all 228 armor and 130 native weapon
+  upgrade-family IDs against authenticated N64 tables. These facts and the
+  private all-30-campaign policy generator are groundwork, not usable upgrades.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** warp-start/death sounds, large death effects, remembered
@@ -72,6 +83,13 @@ older KODAK package. Source merges do not update an already copied ROM.
   behavior remain open. Current custom defeat counts the last live owned
   building. Delivered death pixels/timelines were authenticated; their large
   source frames require a paired native presentation check, not guessed scale.
+- **Native construction reference #317 merged:** fresh ordinary-input N64
+  custom gameplay selected a Probe, opened the Pylon menu, placed its green
+  preview and captured the blue-white warp orb. Completion, power boundaries,
+  sound and an actual delivered-GBA render comparison remain open. The
+  authored cyan rectangle is only a GBA fallback; it does not establish the
+  source-art path's active appearance. See the
+  [scoped native audit](audits/2026-11-06-protoss-native-reference/README.md).
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
   already active in other products; the separate monotone shortcut remains off.
   Eight release links, route oracles, clean default checks and 18 HOST warm
@@ -91,10 +109,21 @@ older KODAK package. Source merges do not update an already copied ROM.
   comparison, mean cycles fell a further 0.895% and the observed maximum
   18.5%; selected persisted-state fingerprints matched every update. This
   remains one passive-human opening, without guest pixels, a current campaign
-  win or hardware FPS proof. The prepared Mac package above includes the
-  exact qualified #315 Z9 binary.
+  win or hardware FPS proof. The current Mac package includes this optimization through the
+  later #323 release binary; these earlier timings are not a post-#323
+  measurement.
   See [the scoped grid audit](audits/2026-11-06-late-zerg-bulk-path-grid/README.md).
   Actions stays disabled; these checks run locally.
+
+The optical early-mask experiment remains off: it saved only 0.627% mean
+cycles and 0.032% peak in the measured P10 window. Further movement attribution
+found one 12,001-cell point flood dominating the peak, but only five floods in
+1,000 calls. Its blocked origin has two reachable neighbors; neither a static
+connectivity rejection nor an unreachable-route claim is justified. Recurring
+movement cost instead centers on contact-mask and step-clear work (about
+158k/88k diagnostic cycles, nested scopes with 4.121% observer overhead).
+Inspect those recurring operations before more rare-path cache changes. These
+experiments are source-only branches, not shipped speed gains.
 
 Priority: deliver the verified normal package when KODAK is connected, reduce
 measured route/order tails and repair current campaign/winning-replay gaps.
@@ -106,7 +135,7 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-06-738223a4`:
+- Latest verified normal Mac package: `StarCraft-GBA-2026-11-06-2ce266e3`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The older KODAK package
   is `20261106-e9838086-campaigns`. Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
@@ -121,10 +150,23 @@ save/source-owner and timing evidence; do not advertise unwired components.
   90 sampled state/pixel checkpoints and adds 3.32% overhead; order/Arbiter
   setup, movement and rendering remain major scopes. These replacement-main
   emulator measurements are not hardware certification or a new speed gain.
-- A fresh ordinary-input N64 Blood Bath Zerg session displays Drone cost
-  **50 minerals / 1 supply**, then supply **4/9 → 7/9** and Cancel after a
-  command to three selected larvae. Birth, refund and exact timing/debit were
-  not observed; the same current-source report records the limits.
+- The [pre-#323 P10 busy profile](audits/2026-11-06-current-p10-busy/README.md)
+  uses the exact delivered ROM, reproduced byte-identically from merged
+  `c27bb48c`, with 392 dependencies verified. Its P7 physical-input window
+  averages 2,253,117 cycles across 958 advancing calls, against about 559,000
+  available at 30 fps. Eleven selected-state/displayed-frame/palette samples
+  match; no every-frame or hardware claim follows. A guarded diagnostic
+  (2.643% observer overhead) attributes about 464,761 cycles to Arbiter due
+  processing on average, while movement dominates the worst sampled spike
+  (2,673,153 cycles). Profile mean and tail separately; do not alter cadence
+  or predict savings by adding nested scopes. #320 adds the bounded read-only
+  video observation and durable bounds checks, with no release optimization.
+- The pre-#323 `ff94a2ea` P10 package has seven bounded early P1–P7
+  save/load checks plus a P1 mid-mission save at frame 3793 with matching
+  selected-state controller-tail continuation and unchanged SRAM. The old
+  tape still does not win, including 1,000 extra neutral advancing frames.
+  This is not complete-state or continued-win proof, and the successor #323
+  binary needs its own dynamic qualification. S3 remains open.
 - Shared transport is enabled in normal release vectors. Its availability,
   AI use and native behavior still need scoped checks; do not describe the
   entire service as absent based on older documents.
@@ -170,12 +212,13 @@ the serialized native-test lock permit it.
 | C1 | P0 / in progress | A [paired 31k-call HOST trial](audits/2026-11-05-z10-damage-attribution/README.md) now attributes 12 lethal Drone hits and 63 lethal Hydralisk hits to the generic Reaver path. Trace/control and original-input sequence matched; all 99 observed AI unit purchases paid their expected costs. | Finish source attribution for generic placeholders, construction removals, target priorities and income; compare relevant native behavior. This HOST-stage result is not a guest win or proof that native ammunition alone changes Z10's outcome. |
 | C2 | P0 / open | Complete shared Reaver/Scarab behavior. Campaign Reavers currently use a generic 100-damage attack; custom Reaver purchase is blocked while the paid ammunition service remains staged. | Source/native ammunition and attack-event checks; paid training, capacity, launch, flight, terrain/target loss, splash, death/slot reuse, save/load and AI purchases across applicable products. No generic free shot as a substitute. |
 | S1 | P0 / in progress | Finish shared Egg/Guardian production. The [opt-in late service](audits/2026-11-06-current-native-qualification/late-eggs.md) now has four actual ARM campaign Egg/SRAM continuations; normal activation across products and Guardian gameplay remain unfinished. | All real profile codecs and journals, interleaved tag contexts, old raw-36 Overlords, bad-newer fallback, atomic rejection, paired births, trigger reservations and Carrier/Egg capacity boundaries. Then ARM/RAM/stack, ordinary controls and genuine SRAM continuation before common activation. |
-| S3 | P0 / open | Qualify saves throughout each combined campaign, including early Protoss missions under the P10 product. The P10 default audit reports no P1–P7 continuation; later single-save-point results do not close that gap. | Fresh-process ordinary save/load and continued wins across all campaign entries on current combined flags, with source-owned effects, actors, clocks and objectives preserved. Reproduce and fix each rejection; do not infer arbitrary-save support from one point. |
+| S3 | P0 / open | Qualify saves throughout each combined campaign, including early Protoss missions under the P10 product. [One early physical P1–P7 save point each](audits/2026-11-06-early-protoss-save/README.md) now reloads with matching selected-state continuation on the pre-#323 `ff94a2ea` P10 ROM; P1 also has a matching mid-mission controller-tail continuation, but its historical tape no longer wins on the packaged product; P2/P7 remain especially early and no winning continuation is established. | Fresh-process ordinary save/load and continued wins across all campaign entries on current combined flags, with source-owned effects, actors, clocks and objectives preserved. Reproduce and fix each rejection; do not infer arbitrary-save support from one point. |
 | C3 | P0 / open | Finish Z10 through ordinary controls and retain all other 29 missions. Rally recall and inefficient selections were fixed in the controller, but no Z10 win exists. | Fresh ordinary-input win, Temple/crystal sequence, text/results, save prefix, fresh-process continuation and ARM replay on the integrated engine; rerun affected carried missions. Never inject a win, resources, units or SRAM. |
 | N1 | P1 / in progress | Validate N64 actor records, game clock and event cadence. This is a prerequisite for behavior-changing timing optimizations. | Explicit select/move/stop correlation for independent actors, fresh reset, owner/type/position validation, independent clock and writer-PC evidence. Bound read-only snapshots; no guest writes or MMIO side effects. |
 | P1 | P1 / open | Reduce representative busy-frame cost toward 30 fps. Small isolated gains do not close the current gap. | Exact-source normal/diagnostic pairs on P7/P10 and 1-/3-AI custom games, advancing combat frames, ordinary input and modal handling. Measure update/render and worst-frame distribution; require material improvement without mode regressions. Confirm on GBA hardware. |
 | C4 | P1 / open | Replace campaign AI scalar approximations where verified source/native behavior differs. Late-Zerg waves use averaged groups/gaps; arrival, rebuilding and transport tactics are not equivalent to script commands. | Source script interpretation plus N64 observations of actual production, wallets, launch groups, targeting and rebuilds. Reproduce a concrete mismatch before changing AI; retain mission objective semantics. |
 | U1 | P1 / partial | Scourge/Spire source restrictions and shared picker correction are merged in #290. Continue the broader campaign PUNI/UPGR/TECx audit, especially P10. | Preserve current controlling ownership, nonspending denial and full supported custom catalog. Apply remaining source permissions with per-owner tests and save compatibility; do not infer complete availability parity from this one product fix. |
+| U3 | P1 / in progress | Deliver usable shared Forge/Core research. #318 is disabled save groundwork; verified family IDs and campaign-policy extraction remain separate work. | Authenticated owner and payer identity; source initial/max levels; atomic paid producer jobs, power/cancel/death/capture/reset behavior, active-job saves and legacy migration; weapon/armor/shield/range effects on every relevant path; ordinary building menus and cross-product campaign/custom/Showcase checks. |
 | U2 | P1 / open | Integrate Carrier/Interceptor behavior for supported ordinary units and P10 Gantrithor. The current Gantrithor can move but does not launch Interceptors. | Paid children, flight, target/parent death, capture/owner changes, reload, capacity and full profile save matrix; P10 hero and custom-game ordinary controls. Resolve held Carrier namespace and merge conflicts first. |
 | S2 | P1 / open | Maintain one shared capability and persistence contract across products. Transport is present; actor mappings, research restrictions, repair, detection, morphs and remaining abilities still need a current matrix. | Per-product and per-mode inventory from actual flags/call sites, source-owned permissions, lifecycle/death/capture checks and every applicable save codec. No Showcase-only engine fix or mission-objective predicate used as a service gate. |
 | K1 | P1 / open | Qualify complete supported custom games for all race combinations and 1–3 AIs. Validate building/unit progression, economy, targeting, victory and long-game stability. | Both maps, each human race, homogeneous and mixed AI races, actual tech progression and save/load. Track global pool/queue pressure and ensure human production is not silently starved. |
@@ -275,8 +318,9 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#265](https://github.com/ggu/starcraft-gba/pull/265), advisor alerts | Held: burn/combat suppression, one-shots, cooldown initialization, voice policy and current-combination qualification. |
 | [#212](https://github.com/ggu/starcraft-gba/pull/212), [#210](https://github.com/ggu/starcraft-gba/pull/210), Carrier/Defiler | Draft/conflicting: namespace collision with transport, missing genuine migration/current qualification; also audit guarded AI purchases. |
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Draft: renderer conflicts and missing current memory/paired ARM qualification. |
-| [#315](https://github.com/ggu/starcraft-gba/pull/315), late-Zerg packed grid | Merged as `738223a4`; scoped tests and emulator timing are recorded above. The latest Mac package includes the exact qualified Z9 candidate. Strict current Z7 winning validation, broader campaign/skirmish and hardware qualification remain open. |
-| SD delivery | Latest verified normal Mac package is `738223a4` (qualified #315 Z9 plus unchanged 94bc Terran/P10/Showcase), with a player testing guide and read-back manifest; last verified KODAK package is `e9838086` plus the separate custom Egg preview. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
+| [#315](https://github.com/ggu/starcraft-gba/pull/315), late-Zerg packed grid | Merged as `738223a4`; scoped tests and emulator timing are recorded above. The later #323 package retains this capability, with a different binary; its speed has not been remeasured. Strict current Z7 winning validation, broader campaign/skirmish and hardware qualification remain open. |
+| [#318](https://github.com/ggu/starcraft-gba/pull/318), research journal groundwork | Merged as `f34004af`, default-off. Full default suite and current flag-off composition passed; feature-on current-base and functional research qualification remain open. The default-off groundwork alone did not change package bytes; #323 is included in the newer normal package. |
+| SD delivery | Latest verified normal Mac package is `2ce266e3` (qualified #323 canonical ELFs), with a player testing guide and read-back manifest; last verified KODAK package is `e9838086` plus the separate custom Egg preview. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
 
 ## Verification and maintenance
 
