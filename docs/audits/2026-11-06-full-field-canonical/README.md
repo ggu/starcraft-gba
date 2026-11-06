@@ -24,3 +24,20 @@ and `custom-full-flood-v2/`; no private inputs or captures are committed.
 Normal Z7–Z10 link guards, fresh guest continuation and guest cycle measurements
 for this exact canonical source are still being checked. No 30-fps or physical
 hardware claim follows from the HOST results.
+
+All eight normal release-vector control/candidate links for Z7–Z10 passed the
+existing guards on the canonical runtime. BSS ends were unchanged. IWRAM ends
+were `03004f88`→`03004eb0` for Z7, `03004bf8`→`03004b28` for Z8,
+`03004bf8`→`03004b20` for Z9 and `03004bf8`→`03004b28` for Z10. Missing
+Make prerequisites in the isolated copy were filled only from hash-matched
+retained receipts; earlier failed preflights remain in the local logs. All 563
+files in the expanded copied-input receipt rehashed unchanged after linking.
+
+The links used the current format-2 audio header/blob pair with SHA-256
+`11bb06f8006f8e6e9bdad8bd730fd3022fa2afc0c341b917ca5a25f8c0f04a21` /
+`3243919d7292e3db3dc27b8f47dbc948e521b3c49bb7378f2b451c99b518b163`.
+An independent stack-qualification receipt pins that same pair. It is different
+from the older advisor-bank header/blob in the Nov 5 Z9 prepared-input receipt;
+these results do not establish that the two sound banks are interchangeable or
+that every game event selects the intended sound. Current-bank stream and
+header verification is pending.
