@@ -294,6 +294,9 @@ ui_row_kind(int i, int *type)
         {B_GATEWAY, B_PYLON, B_ASSIMILATOR, B_CYBERNETICS_CORE, B_FORGE}};
     const char *label;
     *type = -1;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) return UI_ROW_SPECIAL;
+#endif
     /* Custom games use catalog row kinds directly. The campaign menu below
      * keeps its legacy label mapping and compile-profile-specific rows. */
     if (race_mode) {
@@ -357,6 +360,15 @@ ui_row_state(int i, int *cost, int *gas_cost, const char **need)
     int type, kind = ui_row_kind(i, &type);
     *cost = *gas_cost = 0;
     *need = "";
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) {
+        Sc64ProtossResearchQuote quote;
+        if (i==3) return sc64_pr_paid[selected_building].live ? UI_SITE_OK : UI_SITE_DONE;
+        if (!sc64_pr_stage_menu_quote(i,&quote)) return UI_SITE_DONE;
+        *cost=quote.mineral; *gas_cost=quote.gas;
+        return minerals<*cost ? UI_SITE_MINERALS : gas<*gas_cost ? UI_SITE_GAS : UI_SITE_OK;
+    }
+#endif
     if (kind == UI_ROW_ORDER)
         return selected_count() || selected_building >= 0 ? UI_SITE_OK : UI_SITE_UNITS;
     if (kind == UI_ROW_RESEARCH) {

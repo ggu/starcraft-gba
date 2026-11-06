@@ -120,6 +120,30 @@ int main(void)
     b[0].level=1; b[0].queue_progress=1; b[0].queue[0]=1; b[0].queue[1]=1;
     saved=b[0]; assert(spawn_build(SIDE,B_PYLON,100,100,0)==-1);
     assert(!memcmp(&b[0],&saved,sizeof saved));
-    puts("research job staged admission, lifecycle and save refusal: ok");
+
+    /* Fresh constructed custom state, then actual B/A menu input and update. */
+    gba_init(); game_init(); race_mode=1; race_human=R_PROTOSS;
+    race_bots=1; race_bot_races[0]=R_PROTOSS; race_skirmish_map=0; init_state();
+    int pylon=spawn_build(SIDE,B_PYLON,240,240,0);
+    int forge=spawn_build(SIDE,B_FORGE,240,240,0);
+    assert(pylon>=0 && forge>=0);
+    for(int i=0;i<MAX_UNITS;i++) u[i].selected=0;
+    selected_building=forge; minerals=gas=1000; menu_open=0;
+#ifdef SC_FIELD_FEEDBACK
+    menu_last=0;
+#endif
+    game_update(KEY_B,KEY_B); assert(menu_open && field_menu_count()==4);
+    assert(!strcmp(race_menu_label(0),"GROUND WEAPONS"));
+    game_update(0,0); game_update(KEY_A,KEY_A);
+    assert(!menu_open && sc64_pr_paid[forge].live && minerals==900 && gas==900);
+    int paid_ore=minerals, paid_gas=gas; start_research(0);
+    assert(!weapons_research && minerals==paid_ore && gas==paid_gas);
+    unsigned remaining=b[forge].queue_progress; b[pylon].alive=0;
+    game_update(0,0); assert(b[forge].queue_progress==remaining);
+    b[pylon].alive=1; b[forge].queue_progress=1;
+    game_update(0,0);
+    assert(!sc64_pr_paid[forge].live && !b[forge].queue_progress &&
+           sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]==1);
+    puts("research job staged admission, lifecycle, menu and save refusal: ok");
     return 0;
 }

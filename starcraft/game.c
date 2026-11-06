@@ -2859,6 +2859,30 @@ static int sc64_pr_stage_begin_slot(int slot,unsigned family)
     sc64_pr_paid[slot]=paid;
     return 1;
 }
+static int sc64_pr_stage_menu_selected(void)
+{
+    int slot=selected_building;
+    if (slot<0 || slot>=MAX_BUILDINGS || !sc64_pr_stage_owner_active(SIDE) ||
+        !b[slot].alive || b[slot].under_construction || b[slot].owner!=SIDE ||
+        (b[slot].type!=B_FORGE && b[slot].type!=B_CYBERNETICS_CORE)) return 0;
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].selected) return 0;
+    return 1;
+}
+static int sc64_pr_stage_menu_family(int row)
+{
+    static const uint8_t forge[]={SC64_PR_GROUND_WEAPONS,SC64_PR_GROUND_ARMOR,SC64_PR_SHIELDS};
+    static const uint8_t core[]={SC64_PR_AIR_WEAPONS,SC64_PR_AIR_ARMOR,SC64_PR_SINGULARITY};
+    if (!sc64_pr_stage_menu_selected() || row<0 || row>=3) return -1;
+    return b[selected_building].type==B_FORGE ? forge[row] : core[row];
+}
+static int sc64_pr_stage_menu_quote(int row,Sc64ProtossResearchQuote *quote)
+{
+    int family=sc64_pr_stage_menu_family(row); unsigned level;
+    if (family<0 || weapons_level<0 || weapons_level>2 || armor_level<0 || armor_level>2) return 0;
+    level=sc64_pr_effective_level((unsigned)family,sc64_experimental_research_levels.level[SIDE][family],
+                                  (unsigned)weapons_level,(unsigned)armor_level);
+    return sc64_pr_quote((unsigned)family,level,quote);
+}
 static int sc64_pr_stage_cancel_slot(int slot, int destroyed)
 {
     Building candidate; Sc64PrPaidReceipt paid; unsigned owner; int ore,vespene;
@@ -2880,6 +2904,44 @@ static int sc64_pr_stage_transfer_allowed(int slot,int new_owner)
     if (!sc64_pr_stage_job_marked(&b[slot]) && !sc64_pr_paid[slot].live) return 1;
     return b[slot].owner==new_owner;
 }
+/* HOST-only ticks fail closed on any malformed/duplicate live receipt. */
+static void sc64_pr_stage_tick(void)
+{
+    for (int i=0;i<MAX_BUILDINGS;++i) {
+        Sc64PrPaidReceipt *p=&sc64_pr_paid[i];
+        if (!sc64_pr_stage_job_marked(&b[i]) && !p->live) continue;
+        if (!p->live || !sc64_pr_stage_owner_active(p->payer) ||
+            !sc64_pr_job_receipt_valid(&b[i],p->payer,p)) return;
+        for (int j=0;j<i;++j)
+            if (sc64_pr_paid[j].live && sc64_pr_paid[j].payer==p->payer &&
+                sc64_pr_paid[j].family==p->family) return;
+    }
+    for (int i=0;i<MAX_BUILDINGS;++i) if (sc64_pr_paid[i].live) {
+        Sc64PrPaidReceipt *p=&sc64_pr_paid[i]; unsigned o=p->payer, family=p->family;
+        unsigned level=(unsigned)p->target-1;
+        int lw=o==SIDE ? weapons_level : 0, la=o==SIDE ? armor_level : 0;
+        int pw=o==SIDE && weapons_research, pa=o==SIDE && armor_research;
+        if (!race_site_powered((int)o,b[i].x,b[i].y)) continue;
+        if (family==SC64_PR_SHIELDS && !sc64_pr_stage_has_raw(o,164)) continue;
+        if (level>=1 && (family==SC64_PR_GROUND_ARMOR || family==SC64_PR_GROUND_WEAPONS) &&
+            !sc64_pr_stage_has_raw(o,165)) continue;
+        if (level>=1 && (family==SC64_PR_AIR_ARMOR || family==SC64_PR_AIR_WEAPONS) &&
+            !sc64_pr_stage_has_raw(o,169)) continue;
+        if (lw<0 || lw>2 || la<0 || la>2) continue;
+        if (sc64_pr_job_tick_custom(&b[i],o,&sc64_experimental_research_levels,
+                                    (unsigned)lw,(unsigned)la,pw,pa,1)==1) p->live=0;
+    }
+}
+static int sc64_pr_stage_blocks_legacy(int type)
+{
+    for (int i=0;i<MAX_BUILDINGS;++i) if (sc64_pr_paid[i].live && sc64_pr_paid[i].payer==SIDE) {
+        unsigned f=sc64_pr_paid[i].family;
+        if ((!type && (f==SC64_PR_GROUND_WEAPONS || f==SC64_PR_AIR_WEAPONS)) ||
+            (type && (f==SC64_PR_GROUND_ARMOR || f==SC64_PR_AIR_ARMOR))) return 1;
+    }
+    return 0;
+}
+
 #endif
 
 static int
@@ -6266,6 +6328,9 @@ stop_selected(void)
 static void
 start_research(int type)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (race_mode && sc64_pr_stage_blocks_legacy(type)) { toast(10); return; }
+#endif
     int *progress = type == 0 ? &weapons_research : &armor_research;
     int level = type == 0 ? weapons_level : armor_level;
     if (!has_building(SIDE,
@@ -6521,6 +6586,14 @@ static int race_carrier_command_base(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) {
+        int family=sc64_pr_stage_menu_family(choice), ok;
+        if (choice==3) ok=sc64_pr_stage_cancel_slot(selected_building,0);
+        else ok=family>=0 && sc64_pr_stage_begin_slot(selected_building,(unsigned)family);
+        menu_open=0; mode=MODE_NORMAL; toast(ok ? 4 : 8); return;
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_mode && choice==race_carrier_command_base() && race_p7_carrier_training_menu_available()) {
         menu_open=0; mode=MODE_NORMAL;
@@ -6833,6 +6906,9 @@ static int race_skirmish_command_count(void)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) return 4;
+#endif
     if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
@@ -6903,6 +6979,9 @@ static int field_menu_count(void)
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) return 4;
+#endif
     if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
@@ -6932,6 +7011,9 @@ static int field_menu_count(void)
 #elif defined(SC64_RACES)
 static int field_menu_count(void)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) return 4;
+#endif
     if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
@@ -6983,6 +7065,14 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) {
+        static const char *const names[]={"GROUND ARMOR","AIR ARMOR","GROUND WEAPONS",
+            "AIR WEAPONS","SHIELDS","SINGULARITY"};
+        int family=sc64_pr_stage_menu_family(i);
+        return i==3 ? "CANCEL RESEARCH" : family>=0 ? names[family] : "";
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_mode && i==race_carrier_command_base() && race_p7_carrier_training_menu_available())
         return "BUILD INTERCEPTOR";
@@ -10038,6 +10128,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
 #endif
     tick_research();
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (race_mode) sc64_pr_stage_tick();
+#endif
 #ifdef SC64_T5_RUNTIME
     race_t5_tech_tick();
 #endif
