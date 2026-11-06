@@ -506,3 +506,13 @@ the next native comparison targets.
   GBA source gives every active player 200 minerals and zero gas. No native
   value or mismatch is assumed yet. Wasteland's restricted build grid does not
   establish unrestricted custom-game building availability.
+
+## Hardware feedback priority override
+
+Audit the user's actual **Protoss10 custom game** first. The full
+[hardware-feedback list](audits/2026-11-06-p10-hardware-feedback/README.md)
+tracks power geometry/boundaries, ordinary queue cancellation, missing paid
+research, depleted-field worker retargeting, economy timing, death art/audio,
+menu categories, warp sound, fog/resource memory, AI difficulty and defeat.
+Power/cancellation are the first source fixes; all new claims need tests and
+native comparisons where specified. Original campaign/save/30-fps goals remain.
