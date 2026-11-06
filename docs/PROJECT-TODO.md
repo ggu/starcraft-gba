@@ -20,61 +20,73 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 ## Current real-device feedback and integration
 
 The November 6 report is confirmed as **Protoss10 custom gameplay** from the
-KODAK package below. Source merges do not update an already copied ROM.
+older KODAK package. Source merges do not update an already copied ROM.
 
-- **Merged, not yet redelivered:** #304 aligns B-menu icon-row highlights and
-  costs; #305 enables L cancellation/full refund for friendly ordinary producer
-  queues (separate Egg/Carrier/Scarab services keep their lifecycles); #306
-  starts all active owners in unified custom games at 50 minerals/zero gas.
-  These changes have clean local default checks; queue cancellation also has
-  P10 enabled gesture and four guarded ARM link witnesses. No Actions run.
-- **Workers:** the post-pickup wait is bypassed/overwritten; this is a confirmed
-  order-loop defect, not a measured wall-clock income rate. A shared bounded
-  depleted-field continuation candidate passed authored P10 sanitizer cases;
-  real-travel, baseline-failure, normal ARM and full default gates remain open.
-- **Power:** shaped mask/request/arrival/production/Cannon checks and guarded
-  links pass. P7/P10 adaptive controllers win, while P3's unchanged baseline
-  wins and the power candidate loses. Diagnose the changed strategy/trajectory
-  before promotion; do not weaken source geometry to make a tape pass.
-- **Audio:** same-frame B-menu refusal events can be lost while simulation is
-  paused. A focused fix is under qualification. The actual delivered advisor
-  bank is authenticated; an event-count test with an older bank lacking the
-  advisor table does not prove sample playback. Warp-start and death cue
-  selection remain separate gaps.
-- **Research and UI:** Forge/Core typed research is not usable yet. Authenticated
-  source facts and unwired service fixtures are groundwork; selected-building
-  menus, payment/completion, source-owner combat routing and safe journals
-  must integrate together. Category navigation and the default-off power-field
-  overlay still need ordinary-input, framebuffer and dense-scene checks.
-- **Other feedback still open:** native mineral-field queues/timing, remembered
-  resource/fog presentation, giant death effects and death sounds, AI difficulty
-  options, and a direct native defeat-condition witness. Current custom defeat
-  counts the final live owned building, rather than only the final townhall.
-- **Performance:** full-flood route changes have pre-#306 source state/frame,
-  guest continuation and guarded-link evidence, plus an earlier ~6% busy-scene
-  mean-cycle reduction. Their qualification bank differs from the delivered
-  advisor bank. Normal release enablement and the 30-fps target remain open;
-  neither HOST wall time nor a successful link closes hardware performance.
+- **Merged shared fixes:** #304 aligns B-menu icon-row highlights and prices;
+  #305 enables ordinary producer L cancellation/full unit refunds; #306 gives
+  all active unified-custom players 50 minerals/zero gas; #308 preserves
+  paused-menu resource refusal cues; #309 continues established mineral jobs
+  to eligible nearby known fields; #311 uses the source-shaped Pylon field
+  for placement, production and cached/uncached Cannon power. Separate
+  Egg/Carrier/Scarab lifecycles are unchanged; the visual field overlay is off.
+- **Validation and package:** clean local full default suites passed. Actual
+  P10 gather, open/wall travel, advisor sample-request and power fixtures pass.
+  Six normal ARM vectors link with the delivered advisor bank and unchanged
+  guards (minimum IWRAM margin 120 bytes, EWRAM 796 bytes). The new four-ROM
+  Mac package `StarCraft-GBA-2026-11-06-cf33a125` has verified 32-MiB ROMs,
+  headers, checksums and 392 compiler-reported dependency hashes. Later
+  `e3919ec` is test/audit-only. **KODAK still has the older e9838086 package**
+  until a new physical copy is recorded; the card is not currently mounted.
+- **Controller cleanup #310:** producer selection escapes use SELECT, keeping
+  intentional L cancellation and moved drags. Fresh HOST T5/Z3 wins on the
+  worker source and combined power P3/P7/P10 wins are scoped in their audits.
+  Current Z7 under the actual Z9 vector does not win at its documented bound
+  with either unchanged or updated controls. Z4/T6 also remain unqualified;
+  existing Z8 and persistence gaps below are not closed. Historical win totals
+  and old tapes must not be reported as current-source certification.
+- **Mining pace remains open:** the post-pickup wait is bypassed/overwritten;
+  this is an order-loop defect, not a measured wall-clock income rate. The
+  retarget fix does not add native field queues, change durations, or replace
+  the exact-target cancellation policy for new pending trips.
+- **Research and UI remain open:** authenticated Forge/Core facts and unwired
+  services are groundwork, not usable typed upgrades. Building-context menus,
+  payment/completion, source-owner combat routing and safe journals must
+  integrate together. Category navigation and the power-field overlay still
+  need ordinary-input, framebuffer and dense-scene checks.
+- **Other feedback:** warp-start/death sounds, large death effects, remembered
+  resource/fog presentation, AI difficulty choices and direct native defeat
+  behavior remain open. Current custom defeat counts the last live owned
+  building. Delivered death pixels/timelines were authenticated; their large
+  source frames require a paired native presentation check, not guessed scale.
+- **Performance:** a final combined-source advisor-bank full-flood candidate
+  passed focused oracles, eight Z7–Z10 guarded links and 18 custom opening/warm
+  comparisons. A current Z9 custom save/fresh-load pair also matched 500
+  advancing updates on both variants; this is a passive opening, not a match
+  win. Current campaign-winning and cycle gates remain open. The
+  earlier ~6% busy-scene mean-cycle improvement is historical evidence, not
+  a newly shipped speed gain or a claim of 30 fps. Actions remains disabled;
+  these checks run locally.
 
-Priority: finish and merge the independent worker/audio fixes with their stated
-checks, then prepare a coherent versioned release using the verified advisor
-bank. Continue typed research/power and native campaign/performance validation
-without advertising unwired components as gameplay features.
+Priority: deliver the verified normal package when KODAK is connected, finish
+scoped performance qualification, and repair current campaign/winning-replay
+gaps. Continue typed research and native visual/audio comparison with explicit
+save/source-owner and timing evidence; do not advertise unwired components.
 
 ## Current baseline
 
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `20261106-e9838086-campaigns`: Terran 1–10,
-  Zerg 1–9, Protoss 1–10, plus Showcase. Content coverage is **29/30**;
+- Latest verified normal Mac package: `StarCraft-GBA-2026-11-06-cf33a125`:
+  Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The older KODAK package
+  is `20261106-e9838086-campaigns`. Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
 - Separate opt-in Mac package: `20261106-e9838086-custom-eggs-preview`.
   Versioned filenames and manifests distinguish it from the normal products;
   its shared Egg service applies to custom games, not Z8–Z10 production.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
   and 1–3 independently raced AIs. Larger roster and behavior gaps remain below.
-- The [current-source P7 measurement](audits/2026-11-06-current-native-qualification/README.md)
+- The [earlier P7 measurement](audits/2026-11-06-current-native-qualification/README.md)
   at `72a71d22` costs about **2,200,226 cycles per advancing full loop**, versus
   about **559,000 cycles** available at 30 fps. The paired diagnostic matches
   90 sampled state/pixel checkpoints and adds 3.32% overhead; order/Arbiter
