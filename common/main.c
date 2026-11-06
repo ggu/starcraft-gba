@@ -88,7 +88,30 @@ int game_text_box_up(void);
 #define SCHEDULE_ACTIVE schedule_count
 #endif
 #endif
+#ifdef SC64_ARM_STACK_PAINT_QUALIFICATION
+#if defined(GBA_HOST) || !defined(SC64_SHARED_ACTOR_ARM_QUALIFICATION)
+#error "Stack paint is restricted to the staged ARM qualification build"
+#endif
+/* System stack only. IRQ/BIOS stack and the live-frame gap are unmeasured. */
+volatile u32 sc64_stack_paint_sp, sc64_stack_paint_end, sc64_stack_paint_status;
+static __attribute__((noinline)) void sc64_stack_paint_qualification(void) {
+    const u32 low=0x03005000u, limit=0x03007e00u, gap=512u;
+    u32 sp;
+    __asm__ volatile("mov %0, sp" : "=r"(sp));
+    sc64_stack_paint_sp=sp;
+    if ((*(volatile u16 *)0x04000208u)!=0 || sp>limit || sp<low+gap || (sp&3u)) {
+        sc64_stack_paint_status=1; return;
+    }
+    u32 end=(sp-gap)&~3u;
+    for (volatile u32 *p=(volatile u32 *)low; (u32)p<end; ++p) *p=0xa55a3cc3u;
+    sc64_stack_paint_end=end;
+    sc64_stack_paint_status=2;
+}
+#endif
 int main(void) {
+#ifdef SC64_ARM_STACK_PAINT_QUALIFICATION
+    sc64_stack_paint_qualification();
+#endif
     gba_init();
     game_init();
     u16 previous=0;
