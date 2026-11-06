@@ -19,6 +19,7 @@ UNIT_H = Path('bwapi/include/BWAPI/UnitType.h')
 UNIT_SIZE_H = Path('bwapi/include/BWAPI/UnitSizeType.h')
 WEAPON_H = Path('bwapi/include/BWAPI/WeaponType.h')
 DAMAGE_H = Path('bwapi/include/BWAPI/DamageType.h')
+UPGRADE_H = Path('bwapi/include/BWAPI/UpgradeType.h')
 
 
 def checked_source(path: Path) -> tuple[str, str]:
@@ -231,11 +232,13 @@ def main() -> None:
     unit_size_h, unit_size_h_hash = checked_source(UNIT_SIZE_H)
     weapon_h, weapon_h_hash = checked_source(WEAPON_H)
     damage_h, damage_h_hash = checked_source(DAMAGE_H)
+    upgrade_h, upgrade_h_hash = checked_source(UPGRADE_H)
 
     unit_ids = enum_values(unit_h, 'Enum')
     weapon_ids = enum_values(weapon_h, 'Enum')
     damage_ids = enum_values(damage_h, 'Enum')
     size_ids = enum_values(unit_size_h, 'Enum')
+    upgrade_ids = enum_values(upgrade_h, 'Enum')
     unit_count = unit_ids['MAX']
     weapon_count = weapon_ids['MAX']
     unit_names = string_rows(unit_src, 'typeNames', unit_count)
@@ -276,6 +279,8 @@ def main() -> None:
     builders = symbolic_rows(unit_src, 'whatBuilds', unit_count, unit_ids)
     for idx, value in enumerate(builders):
         units_by_id[idx]['what_builds'] = value
+    for idx, value in enumerate(symbolic_rows(unit_src, 'armorUpgrade', unit_count, upgrade_ids)):
+        units_by_id[idx]['armor_upgrade'] = value
 
     weapon_fields = {
         'damage_amount': 'defaultWpnDamageAmt',
@@ -295,16 +300,18 @@ def main() -> None:
     for idx, value in enumerate(symbolic_rows(
             weapon_src, 'damageType', weapon_count, damage_ids)):
         weapons_by_id[idx]['damage_type'] = value
+    for idx, value in enumerate(symbolic_rows(weapon_src, 'upgrade', weapon_count, upgrade_ids)):
+        weapons_by_id[idx]['upgrade_type'] = value
 
     source_tables = {
         'UnitType.cpp': {
             name: initializer_line(unit_src, name)
             for name in ('typeNames', *unit_fields.values(), 'groundWeapon', 'airWeapon',
-                         'unitSize', 'unitFlags', 'whatBuilds')
+                         'unitSize', 'unitFlags', 'whatBuilds', 'armorUpgrade')
         },
         'WeaponType.cpp': {
             name: initializer_line(weapon_src, name)
-            for name in ('typeNames', *weapon_fields.values(), 'damageType')
+            for name in ('typeNames', *weapon_fields.values(), 'damageType', 'upgrade')
         },
     }
 
@@ -319,7 +326,7 @@ def main() -> None:
                 for path, digest in ((UNIT_CPP, unit_hash), (WEAPON_CPP, weapon_hash),
                                      (UNIT_H, unit_h_hash), (UNIT_SIZE_H, unit_size_h_hash),
                                      (WEAPON_H, weapon_h_hash),
-                                     (DAMAGE_H, damage_h_hash))
+                                     (DAMAGE_H, damage_h_hash), (UPGRADE_H, upgrade_h_hash))
             },
             'method': 'independent local parser of pinned BWAPI C++ initializer and enum declarations',
             'table_start_lines': source_tables,
