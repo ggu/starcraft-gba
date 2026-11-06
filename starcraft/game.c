@@ -2203,6 +2203,7 @@ static int race_owner_minerals(int owner), race_owner_gas(int owner);
 static int race_save_game(void),race_load_game(void);
 static void race_campaign_init(void),race_campaign_tick(void);
 #endif
+#include "field_menu_repeat.h"
 static int screen, menu_open, menu_cursor, help, won, lost, result_timer;
 static int cx, cy, camx, camy, toast_timer, toast_id, enemy_timer, wave;
 /* Transient controller gesture, deliberately outside the persistent save. */
@@ -5313,6 +5314,7 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+    field_menu_repeat_reset();
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #endif
@@ -5574,6 +5576,7 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+    field_menu_repeat_reset();
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #endif
@@ -9721,6 +9724,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     }
 #endif
     if (menu_open) reset_selection_gestures();
+    else field_menu_repeat_reset();
 #ifdef SC_COMMAND_RING
     if (command_ring_input(held, pressed)) return;
 #endif
@@ -9742,15 +9746,17 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
 	}
     }
+    if (!menu_open) field_menu_repeat_reset();
     if (menu_open) {
+        u16 menu_pressed = field_menu_repeat_keys(held, pressed);
 	reset_selection_gestures();
 #ifdef SC64_COMMAND_ICONS
-	if (!field_card_navigate(pressed))
+	if (!field_card_navigate(menu_pressed))
 #endif
 	{
-	    if (pressed & KEY_UP)
+	    if (menu_pressed & KEY_UP)
 		menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
-	    if (pressed & KEY_DOWN)
+	    if (menu_pressed & KEY_DOWN)
 		menu_cursor = (menu_cursor + 1) % field_menu_count();
 	}
 	if (pressed & KEY_A)

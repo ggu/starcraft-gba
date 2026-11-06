@@ -6134,3 +6134,5 @@ build/test-sc64-creation-provenance-t3: tests/sc64_creation_provenance_t3.c $(ST
 .PHONY: test-sc64-creation-provenance-t3
 test-sc64-creation-provenance-t3: build/test-sc64-creation-provenance-t3
 	./build/test-sc64-creation-provenance-t3
+
+include tests/sc64-menu-repeat/Makefile
