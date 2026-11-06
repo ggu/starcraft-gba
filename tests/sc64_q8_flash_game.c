@@ -46,6 +46,15 @@ static void create_paid_fractional(void)
     hit_target_impl_ex(s,128,U_MARINE,ENEMY,SC64_STOCK_DMG_IGNORE_ARMOR,SC64_HIT_PACKET_Q8);
     assert(sc64_pr_q8_actor_hp(a,&hp)&&hp==(unsigned)u[a].maxhp*256u-128u);
     assert(sc64_pr_q8_actor_shield(s,&shield)&&shield==80u*256u-128u);
+    /* The row codec can encode values the detached preflight rejects. Never
+     * write a new Flash record for those invalid live Q8 states. */
+    static u8 prior[131072];memcpy(prior,device.bytes,sizeof prior);
+    int old_hp=u[a].hp;u8 old_debt=sc64_pr_hp_debt[a];
+    u[a].hp=0;sc64_pr_hp_debt[a]=0;
+    assert(!race_save_game() && !memcmp(prior,device.bytes,sizeof prior));
+    u[a].hp=u[a].maxhp+1;
+    assert(!race_save_game() && !memcmp(prior,device.bytes,sizeof prior));
+    u[a].hp=old_hp;sc64_pr_hp_debt[a]=old_debt;
 }
 static void verify_loaded(void)
 {

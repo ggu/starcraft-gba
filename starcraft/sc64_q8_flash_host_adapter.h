@@ -160,7 +160,7 @@ static int race_q8_flash_write(const void *data,u32 length)
 {
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();
     u8 tail[SC64_Q8_FLASH_TAIL_BYTES];GbaFlashJournalRecord written;
-    unsigned ignored;
+    unsigned hp,ignored;
     if (!io || !io->read || !io->program || !io->erase_sector || !data || !length ||
         race_mode!=1 || race_human!=R_PROTOSS) return 0;
     gba_fj_put32(tail,SC64_Q8_FLASH_TAIL_MAGIC);gba_fj_put32(tail+4,SC64_Q8_FLASH_DEBTS);
@@ -171,15 +171,17 @@ static int race_q8_flash_write(const void *data,u32 length)
 #ifdef SC64_T6_RUNTIME
                 u[i].order==ORDER_REPAIR ||
 #endif
-                !sc64_pr_q8_actor_hp(i,&ignored) ||
+                u[i].maxhp<=0 || (unsigned)u[i].maxhp>UINT32_MAX/256u ||
+                !sc64_pr_q8_actor_hp(i,&hp) || !hp || hp>(unsigned)u[i].maxhp*256u ||
                 !sc64_pr_q8_actor_shield(i,&ignored)) return 0;
         tail[SC64_Q8_FLASH_TAIL_HEADER+i]=(u8)debt;
     }
     for(int i=0;i<MAX_BUILDINGS;++i) {
         unsigned debt=sc64_pr_hp_debt[MAX_UNITS+i];
         if(!b[i].alive) {if(debt)return 0;}
-        else if((race_building_can_burn(&b[i]) && debt) ||
-                !sc64_pr_q8_actor_hp(MAX_UNITS+i,&ignored) ||
+        else if((race_building_can_burn(&b[i]) && debt) || b[i].maxhp<=0 ||
+                (unsigned)b[i].maxhp>UINT32_MAX/256u ||
+                !sc64_pr_q8_actor_hp(MAX_UNITS+i,&hp) || !hp || hp>(unsigned)b[i].maxhp*256u ||
                 !sc64_pr_q8_actor_shield(MAX_UNITS+i,&ignored)) return 0;
         tail[SC64_Q8_FLASH_TAIL_HEADER+MAX_UNITS+i]=(u8)debt;
     }
