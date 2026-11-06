@@ -1227,12 +1227,18 @@ typedef struct {
 #if !defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS)
 #error "Campaign research is an unfinished HOST-only stage"
 #endif
-#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+#if defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) && !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL)
+#error "Campaign research journal requires the active-job journal"
+#endif
+#if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && !defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL)
 #error "Campaign research has no authenticated active-job journal yet"
 #endif
 #include "sc64_protoss_upgrade_policy_generated.h"
 #define SC64_PR_AUTHENTICATED_CAMPAIGN_POLICY 1
 #include "sc64_research_campaign_policy.h"
+#endif
+#if defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) && (!defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS))
+#error "Campaign research journal is a HOST-only campaign experiment"
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
 static int sc64_pr_stage_transfer_allowed(int slot,int new_owner);
