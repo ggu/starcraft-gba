@@ -60,3 +60,25 @@ A prior prepared-input receipt records a different bank,
 The host comparisons establish equivalence for the frozen art actually used;
 they do not establish historical-bank identity or complete stock-art coverage.
 Recover and authenticate the required current banks before performance replay.
+
+Subsequently, the Z4, Z6 and canonical Z7 banks were recovered in isolated
+storage and matched the prior receipts (`d33024e0…`, `b8162b34…`, and
+`ff145afa…` respectively). The full paired host checks were repeated. Campaign
+traces: Z7 `9c0aa4cee9b3a5e2a169b4e7baa616ec7ef0e730fb6a2555ee1fd2c1aaf4dbba`,
+Z9 `5d9ef885a8c4f72025e44c6cf5143144736f281724acc2d10d8822d365b93b9c`.
+The 576-capture custom trace for both binaries of both profiles was
+`d5b7e4cbfc94d8090646ee1030990d60a6999f714c245c1258be5912ef8bc0e7`.
+Each binary passed its reference oracle, both paired traces matched, and frozen
+input manifests matched before and after. These are still constructed host
+checks, not gameplay or performance qualification.
+
+Normal ARM baseline and cache-candidate ELFs linked successfully under each
+profile's release vector with the recovered banks, without bypassing link
+reserve guards. Z7 BSS/IWRAM ends were `0203d46c`/`03004f88` baseline and
+`02036694`/`03004f50` candidate; Z9 were `0203dce4`/`03004bf8` baseline and
+`02036f04`/`03004bc8` candidate. Link outputs alone do not establish scratch
+ownership, runtime correctness, or speed. The retained ordinary-input Z7 tape
+is authenticated as mission 18, but the diagnostic renderer probe's fixed
+9,020-tick limit does not cover its late busy portion. A current-codec
+fresh-process continuation and suitably bounded paired measurements remain
+open.
