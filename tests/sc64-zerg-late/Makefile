@@ -254,3 +254,17 @@ build/test-sc64-skirmish-match-zerg-z9: tests/sc64_skirmish_campaign_run.c $(STA
 test-sc64-z9-canonical-skirmish: build/test-sc64-skirmish-match-zerg-z9
 	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller $< --output .local/sc64/skirmish/zerg-z9-matches
 test-sc64-zerg-z9: test-sc64-z9-canonical-skirmish
+
+# Optional prepared-input path-grid parity: the Z5 fixture also exercises
+# authored door actions and save/load. Extra include paths can select a
+# separately verified cover bank without modifying the prepared inputs.
+SC64_BULK_GRID_TEST_FLAGS ?=
+Z9_BULK_GRID_DEPS = $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile
+build/test-sc64-z9-bulk-grid: tests/sc64_terrain_grid_pack_game.c $(Z9_BULK_GRID_DEPS) | build
+	$(CLANG) $(Z8_HOST_FLAGS) -Wno-unused-parameter $(SC64_BULK_GRID_TEST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_BULK_TERRAIN_GRID -DSC64_BULK_TERRAIN_GRID_TEST $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+build/test-sc64-z9-bulk-z5: tests/sc64_z5_bulk_grid.c tests/sc64_z5_runtime.c $(Z9_BULK_GRID_DEPS) | build
+	$(CLANG) $(Z8_HOST_FLAGS) -Wno-unused-parameter $(SC64_BULK_GRID_TEST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_BULK_TERRAIN_GRID -DSC64_BULK_TERRAIN_GRID_TEST $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z9-bulk-grid
+test-sc64-z9-bulk-grid: build/test-sc64-z9-bulk-grid build/test-sc64-z9-bulk-z5
+	./build/test-sc64-z9-bulk-grid
+	./build/test-sc64-z9-bulk-z5
