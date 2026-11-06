@@ -43,3 +43,15 @@ test-sc64-research-campaign-journal-z9:
 	./build/research-campaign-runtime/journal-z9 z-load build/research-campaign-runtime/old-z9.sav
 	./build/research-campaign-runtime/journal-z9 z-write build/research-campaign-runtime/new-z9.sav
 	./build/research-campaign-runtime/journal-z9 z-load build/research-campaign-runtime/new-z9.sav
+
+.PHONY: test-sc64-research-campaign-journal-terran
+test-sc64-research-campaign-journal-terran:
+	@mkdir -p build/research-campaign-runtime
+	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) -I$(SC64_PR_POLICY_DIR) $(TERRAN_ROM_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL tests/sc64_research_campaign_journal_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-campaign-runtime/journal-terran
+	$(CLANG) -I$(SC64_CAMPAIGN_BASELINE_ROOT)/common -I$(SC64_CAMPAIGN_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(TERRAN_ROM_FLAGS) -DSC64_CAMPAIGN_BASELINE_WRITER tests/sc64_research_campaign_journal_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-campaign-runtime/journal-terran-old
+	./build/research-campaign-runtime/journal-terran-old t-old-write build/research-campaign-runtime/old-terran.sav
+	./build/research-campaign-runtime/journal-terran t-load build/research-campaign-runtime/old-terran.sav
+	./build/research-campaign-runtime/journal-terran t-over-old build/research-campaign-runtime/old-terran.sav
+	./build/research-campaign-runtime/journal-terran t-load build/research-campaign-runtime/old-terran.sav
+	./build/research-campaign-runtime/journal-terran t-write build/research-campaign-runtime/new-terran.sav
+	./build/research-campaign-runtime/journal-terran t-load build/research-campaign-runtime/new-terran.sav
