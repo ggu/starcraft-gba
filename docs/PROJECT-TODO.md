@@ -254,8 +254,8 @@ older KODAK package. Source merges do not update an already copied ROM.
   uses the verified owned-ROM permission bank: paid paired Egg birth after a
   fresh-process load, a denied-product new-tag rejection, and fallback to a
   genuine current-main old-tag save pass. The setup is constructed, not an
-  ordinary-input win. Normal flags, ARM, Z3–Z6, trigger reservations, ownership
-  transfers, the full profile matrix and common activation remain open.
+  ordinary-input win. Normal flags, ARM, remaining trigger reservations,
+  ownership transfers, the full profile matrix and common activation remain open.
   A separate [Z3 HOST stage](audits/2026-11-07-z3-egg-host/README.md)
   passed actual-bank admission, denied-product validation, fresh paired birth,
   genuine old-tag fallback and a cross-owner slot boundary. Z4 CreateUnit
@@ -270,13 +270,8 @@ older KODAK package. Source merges do not update an already copied ROM.
   HOST continuation. This is not all-save, ARM or N64 qualification.
   The constructed late captured-Hatchery concern was not promoted: no reachable
   transfer path was found, and relaxing only admission would leave saves invalid.
-  The [Z2 successor branch](https://github.com/ggu/starcraft-gba/tree/codex/shared-egg-early-next-20261107)
-  at `fd9f56ea` adds an opt-in HOST slice using the exact recovered private PUNI
-  bank. Runtime `2ac2eabe` passes paid paired birth, fresh-process persistence,
-  checksum-valid denied-product rejection and fallback to a genuine `aa8f43c5`
-  old-tag Z2 save. Root rechecked all 592 dependencies, the permission hash and
-  both save hashes. This is constructed HOST evidence; normal activation, ARM,
-  Z3–Z6, trigger reservations, transfers and broader saves remain open.
+  The Z2 successor `fd9f56ea` used runtime `2ac2eabe`; root independently
+  rechecked all 592 dependencies, the permission hash and both save hashes.
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
   already active in other products; the separate monotone shortcut remains off.
   Eight release links, route oracles, clean default checks and 18 HOST warm
