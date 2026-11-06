@@ -105,3 +105,19 @@ they are not claimed as passing. Receipts are in the clean worktree's
 `.local/research-default/` and this worktree's `.local/research-campaign-runtime/`.
 These checks predate shared detector optimization #342 and do not qualify a
 future combined feature-on integration. Normal research remains disabled.
+
+After merging the detector engine, combined source
+`5dcffb5ec758ac7d3589566d45eb089687cb6af7` passed the campaign and custom
+HOST sanitizer fixtures again (17.39/17.32 seconds). The normal research-off
+P10 production link passed and exactly reproduced the headed release ROM
+`317cc67d8f48b6771b3ebf4497c52b290466de49d097133b7b1bfdea65b34cd9`.
+A separate clean checkout of that same source passed boundary, doctor, build
+and the complete default test suite (442.83 seconds; 1,023 primary Python tests,
+26 skipped, plus compiled/auxiliary checks). All 593 prepared hashes and both
+checkout heads remained unchanged throughout. The terminal receipt is
+`.local/research-campaign-runtime/post-detector/results.json`; no job remains
+pending from that qualification. This closes the combined disabled/default
+check, not the current feature-on six-profile, campaign persistence, combat,
+stack or ordinary-play gates. The user's device report is specifically P10
+custom gameplay; neither campaign-only evidence nor this disabled normal ROM
+establishes that Forge/Core upgrades have shipped.

@@ -180,6 +180,14 @@ older KODAK package. Source merges do not update an already copied ROM.
   See [the runtime stage](audits/2026-11-07-campaign-research-runtime/README.md)
   on [draft #336](https://github.com/ggu/starcraft-gba/pull/336); no normal flag
   is enabled.
+  Combined source `5dcffb5e`, after detector #342, passes both campaign/custom
+  HOST sanitizer suites, a normal P10 link identical to release `317cc67d...`,
+  and clean boundary/doctor/build/full default tests (442.83 seconds; 1,023
+  primary Python tests, 26 skips, plus compiled/auxiliary checks). All 593
+  prepared hashes and both checkout heads stayed unchanged. This closes that
+  combined disabled/default check; feature-on production, persistence, exact
+  combat and ordinary gameplay gates remain open. The confirmed device target
+  is P10 custom, and no release research flags changed.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
