@@ -180,6 +180,9 @@ static int race_shared_egg_context(void)
 #ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
         || (!race_mode && race_selected_mission==0) /* Z1 */
 #endif
+#ifdef SC64_SHARED_EGG_Z2_HOST_STAGE
+        || (!race_mode && race_selected_mission==1) /* Z2 */
+#endif
         ;
 }
 #define SC64_EGG_CONTEXT() (SC64_EGG_IS_Z7() || race_shared_egg_context())
@@ -842,6 +845,16 @@ static int race_queue_unit(int owner, int producer, int type)
             const Sc64RaceMap *map=&sc64_race_maps[0];
             if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
                 ((unsigned)source==map->human_slot ? SIDE : map->owner_modes[source])!=owner)
+                return 0;
+        } else
+#endif
+#ifdef SC64_SHARED_EGG_Z2_HOST_STAGE
+        if (race_selected_mission==1) {
+            const Sc64RaceMap *map=&sc64_race_maps[1];
+            int raw_product=sc64_race_raw_unit(type);
+            if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
+                ((unsigned)source==map->human_slot ? SIDE : map->owner_modes[source])!=owner ||
+                raw_product<0 || !sc64_early_zerg_permission_available(1u,(unsigned)source,(unsigned)raw_product))
                 return 0;
         } else
 #endif
