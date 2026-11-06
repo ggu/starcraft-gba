@@ -331,3 +331,14 @@ not physical hardware or a general frame-rate guarantee. The mean still greatly
 exceeds the nominal 30-fps cycle budget. Results and source/input manifests are
 retained under `build/z7-host-sram-contract/full-flood*/`; default flags remain
 unchanged pending broader gameplay, memory and performance qualification.
+
+The full-field flags also matched control in four bounded HOST custom openings:
+normal menu launch, Zerg human, both available maps, and one or three mixed AI
+opponents. Each advanced 4,000 gameplay calls without a terminal result; 41
+selected actor/world/route-field and indexed-frame/full-palette fingerprints
+matched per configuration. At frame 4,001 the human had five units and one
+building; three-AI games had 35 and 41 AI units and 22 and 17 AI buildings,
+respectively. This is an idle-human opening/warm simulation, not a completed
+match or busy-battle qualification. Logs and unchanged input manifests are in
+`build/z7-host-sram-contract/custom-full-flood-v2/`; the reusable fixture is
+`tests/sc64_z7_custom_full_flood_trace.c`.
