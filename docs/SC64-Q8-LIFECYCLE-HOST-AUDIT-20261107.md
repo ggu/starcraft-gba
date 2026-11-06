@@ -51,3 +51,11 @@ in-place morph stages and possible fractional-health-dependent selection
 remain separate qualification work. No generic Medic healing route was found
 in the inspected engine; this observation does not establish parity for an
 unimplemented ability.
+
+Correction: the original lifecycle fixture used an invalid cast from a packed
+16-bit building remainder to an `unsigned *`. UBSan reported a misaligned
+4-byte store even though its default recoverable mode returned exit status 0.
+Consequently the original lifecycle sanitizer run is not clean evidence. The
+separately reported kernel result was not that fixture. A later fixture uses a
+local unsigned value and assigns it back; the corrected tests must be assessed
+from their own strict `UBSAN_OPTIONS=halt_on_error=1` receipts.
