@@ -1223,6 +1223,17 @@ typedef struct {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
 #include "sc64_protoss_research_jobs.h"
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+#if !defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS)
+#error "Campaign research is an unfinished HOST-only stage"
+#endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+#error "Campaign research has no authenticated active-job journal yet"
+#endif
+#include "sc64_protoss_upgrade_policy_generated.h"
+#define SC64_PR_AUTHENTICATED_CAMPAIGN_POLICY 1
+#include "sc64_research_campaign_policy.h"
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
 static int sc64_pr_stage_transfer_allowed(int slot,int new_owner);
 #define SC64_PR_ALLOW_BUILDING_TRANSFER(slot,owner) sc64_pr_stage_transfer_allowed((slot),(owner))
@@ -2226,6 +2237,9 @@ static int race_owner_minerals(int owner), race_owner_gas(int owner);
 #endif
 static int race_save_game(void),race_load_game(void);
 static void race_campaign_init(void),race_campaign_tick(void);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+static int race_campaign_owner(const Sc64RaceMap *map, int raw_owner);
+#endif
 #endif
 #include "field_menu_repeat.h"
 static int screen, menu_open, menu_cursor, help, won, lost, result_timer;
@@ -2807,7 +2821,32 @@ spawn_unit(int owner, int type, int x, int y)
 static void game_audio_foundation(const Building *q);
 
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
-/* HOST-only fail-closed lifecycle bridge. Campaign ownership is unsupported. */
+/* Default-off lifecycle bridge. The separate HOST campaign flag admits only
+ * an authenticated current human controller; normal journals stay unchanged. */
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+/* This live context is derived from the canonical selected map and its runtime
+ * role resolver. Actor raw origin is intentionally absent from payer identity.
+ * Detached save contexts are not admitted by this HOST experiment. */
+static int sc64_pr_stage_campaign_rule(unsigned family, Sc64PrCampaignRule *out)
+{
+    int8_t roles[8]; Sc64PrCampaignPolicyView view=sc64_pr_campaign_generated_view();
+    if (race_mode || race_selected_mission<0 || race_selected_mission>=SC64_RACE_MAP_COUNT) return 0;
+    const Sc64RaceMap *map=&sc64_race_maps[race_selected_mission];
+    for (unsigned source=0;source<8;++source)
+        roles[source]=(int8_t)race_campaign_owner(map,(int)source);
+    return sc64_pr_campaign_rule(&view,0,map->mission_id,map->human_slot,roles,SIDE,family,out);
+}
+static int sc64_pr_stage_campaign_initialize(void)
+{
+    Sc64ProtossResearchLevels candidate={0}; Sc64PrCampaignRule rule;
+    for (unsigned family=0;family<SC64_PR_FAMILY_COUNT;++family) {
+        if (!sc64_pr_stage_campaign_rule(family,&rule)) return 0;
+        candidate.level[SIDE][family]=rule.initial;
+    }
+    sc64_experimental_research_levels=candidate;
+    return 1;
+}
+#endif
 static int sc64_pr_stage_job_marked(const Building *q)
 { return q && (q->type==B_FORGE || q->type==B_CYBERNETICS_CORE) && (q->level || q->queue_progress); }
 static int sc64_pr_stage_receipt(int slot, Sc64PrPaidReceipt *paid)
@@ -2817,7 +2856,13 @@ static int sc64_pr_stage_receipt(int slot, Sc64PrPaidReceipt *paid)
 }
 static int sc64_pr_stage_owner_active(unsigned owner)
 {
-    if (!race_mode || race_bots < 1 || race_bots > 3) return 0;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+    if (!race_mode) {
+        Sc64PrCampaignRule rule;
+        return owner==SIDE && sc64_pr_stage_campaign_rule(0,&rule);
+    }
+#endif
+    if (race_mode!=1 || race_bots < 1 || race_bots > 3) return 0;
     if (!(owner==SIDE || (owner==ENEMY && race_bots>=1) ||
           (owner==RESCUABLE && race_bots>=2) || (owner==4 && race_bots>=3))) return 0;
     return race_player[owner]==R_PROTOSS;
@@ -2890,6 +2935,14 @@ static int sc64_pr_stage_begin_slot(int slot,unsigned family)
     level=sc64_pr_effective_level(family,sc64_experimental_research_levels.level[owner][family],
                                   (unsigned)legacy_w,(unsigned)legacy_a);
     max=family==SC64_PR_SINGULARITY ? 1u : 3u;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+    if (!race_mode) {
+        Sc64PrCampaignRule rule;
+        if (!sc64_pr_stage_campaign_rule(family,&rule) ||
+            !sc64_pr_campaign_quote(&rule,family,level,&quote)) return 0;
+        max=rule.maximum;
+    }
+#endif
     if (level>=max || !sc64_pr_quote_v45(family,level,&quote)) return 0;
     if (level>=1 && family==SC64_PR_SHIELDS && !sc64_pr_stage_has_raw(owner,164)) return 0;
     if (level>=1 && (family==SC64_PR_GROUND_ARMOR || family==SC64_PR_GROUND_WEAPONS) &&
@@ -2939,6 +2992,13 @@ static int sc64_pr_stage_menu_quote(int row,Sc64ProtossResearchQuote *quote)
     if (family<0 || weapons_level<0 || weapons_level>2 || armor_level<0 || armor_level>2) return 0;
     level=sc64_pr_effective_level((unsigned)family,sc64_experimental_research_levels.level[SIDE][family],
                                   (unsigned)weapons_level,(unsigned)armor_level);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+    if (!race_mode) {
+        Sc64PrCampaignRule rule;
+        return sc64_pr_stage_campaign_rule((unsigned)family,&rule) &&
+               sc64_pr_campaign_quote(&rule,(unsigned)family,level,quote);
+    }
+#endif
     return sc64_pr_quote_v45((unsigned)family,level,quote);
 }
 static int sc64_pr_stage_cancel_slot(int slot, int destroyed)
@@ -2985,6 +3045,14 @@ static void sc64_pr_stage_tick(void)
         Sc64PrPaidReceipt p;
         if (!sc64_pr_stage_job_marked(&b[i])) continue;
         if (!sc64_pr_stage_receipt(i,&p) || !sc64_pr_stage_owner_active(p.payer)) return;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+        if (!race_mode) {
+            Sc64PrCampaignRule rule;
+            if (!sc64_pr_stage_campaign_rule(p.family,&rule) || !rule.cost_supported ||
+                sc64_experimental_research_levels.level[SIDE][p.family]<rule.initial ||
+                p.target>rule.maximum) return;
+        }
+#endif
         for (int j=0;j<i;++j) if (sc64_pr_stage_job_marked(&b[j])) {
             Sc64PrPaidReceipt earlier;
             if (!sc64_pr_stage_receipt(j,&earlier) ||
@@ -5634,6 +5702,9 @@ init_state(void)
     death_vfx_reset();
     sc64_visibility_reset();
     race_campaign_init();
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+    if (!race_mode) (void)sc64_pr_stage_campaign_initialize();
+#endif
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
 #ifdef SC64_FIELD_CONTROLS
     /* A restart jumps frame back, so the cached A action must resolve afresh. */
@@ -6434,7 +6505,11 @@ static void
 start_research(int type)
 {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
-    if (race_mode && sc64_pr_stage_blocks_legacy(type)) { toast(10); return; }
+    if ((race_mode
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+         || sc64_pr_stage_owner_active(SIDE)
+#endif
+        ) && sc64_pr_stage_blocks_legacy(type)) { toast(10); return; }
 #endif
     int *progress = type == 0 ? &weapons_research : &armor_research;
     int level = type == 0 ? weapons_level : armor_level;
@@ -10251,7 +10326,11 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
     tick_research();
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
-    if (race_mode) sc64_pr_stage_tick();
+    if (race_mode
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+        || sc64_pr_stage_owner_active(SIDE)
+#endif
+       ) sc64_pr_stage_tick();
 #endif
 #ifdef SC64_T5_RUNTIME
     race_t5_tech_tick();
