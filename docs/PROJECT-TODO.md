@@ -482,3 +482,27 @@ which agree with current GBA source, plus native 40 minerals and 10/18 opening
 supply. This is source-value agreement, not same-scene GBA runtime or timing
 proof. Setup Custom, paid production, gas and race-specific animations remain
 the next native comparison targets.
+
+## Current qualification queue
+
+- Full-flood clean busy repeat reproduces the original emulated-cycle result
+  and parity checks. Keep the earlier possible overlap documented. The full
+  fresh guest HOME-L continuation pair is running; neither candidate pass nor
+  canonical promotion is claimed until both complete.
+- Bounded ordinary-menu custom HOST comparisons cover both maps with one and
+  three mixed-race AIs. The human remains idle (five Zerg units/one building);
+  at frame 4,001, the three-AI cases have 35/41 AI units and 22/17 buildings.
+  Forty-one sampled state/route/display fingerprints per game match. These
+  are warm openings, not completed games or busy battles.
+- A separate clean canonical `31a5ddf8` qualification worktree now has verified
+  private inputs and source-only replay fixtures. Branch diagnostics do not
+  substitute for requalification of this actual release source.
+- The detached old-save projection passes the Z7 mission validator when given
+  its genuine old inner version, but current full preflight still rejects the
+  generation mismatch. A version-scoped migration context and Battlecruiser
+  feature semantics remain required; no real load/install gate is changed.
+- Native Scenario / Setup Custom is now reached through ordinary buttons.
+  Compare its initial mineral bank before changing GBA custom starts: current
+  GBA source gives every active player 200 minerals and zero gas. No native
+  value or mismatch is assumed yet. Wasteland's restricted build grid does not
+  establish unrestricted custom-game building availability.
