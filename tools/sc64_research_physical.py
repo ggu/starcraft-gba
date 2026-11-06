@@ -6,6 +6,12 @@ The input tape is private. The backend may import/export real 32 KiB SRAM at
 boot/exit; it never writes guest memory and never injects gameplay state.
 """
 import argparse
+import fcntl
+import os
+import shutil
+import signal
+import sys
+import time
 import hashlib
 import json
 from pathlib import Path
@@ -47,11 +53,45 @@ def snapshot(rsp, sym, sizes, layout):
             'jobs':jobs,'levels':levels}
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    for name in ('rom','elf','runner','tape','resume_tape','output'):
-        ap.add_argument('--'+name.replace('_','-'), type=Path, required=True)
-    a=ap.parse_args(); a.output.mkdir(parents=True,exist_ok=False)
+LOCK_PATH = '/tmp/sc64-native-build-20261031.lock'
+RUNNER_SHA = '4199fe903b18c77e0833db1860c4968509cfc82e506bc6f2f9be7582b720fae2'
+WALL_SECONDS = 180
+OUTPUT_LIMIT = 64 * 1024 * 1024
+RESERVE = 4 * 1024 ** 3
+
+
+def validate_inputs(a):
+    if a.output.exists():
+        raise ValueError('output already exists')
+    ancestor = a.output.parent
+    while not ancestor.exists() and ancestor != ancestor.parent:
+        ancestor = ancestor.parent
+    if not ancestor.is_dir() or shutil.disk_usage(ancestor).free < RESERVE:
+        raise ValueError('output filesystem has less than 4 GiB free')
+    inputs = (a.rom, a.elf, a.runner, a.tape, a.resume_tape)
+    pins = {str(p): sha(p) for p in inputs}
+    if pins[str(a.runner)] != RUNNER_SHA:
+        raise ValueError('runner does not match the audited physical backend')
+    return pins
+
+
+def output_bytes(path):
+    total = 0
+    if not path.exists():
+        return 0
+    for root, dirs, files in os.walk(path, followlinks=False):
+        for name in files:
+            p = Path(root) / name
+            if not p.is_symlink():
+                total += p.stat().st_size
+                if total > OUTPUT_LIMIT:
+                    return total
+    return total
+
+
+def run_worker(a):
+    validate_inputs(a)
+    a.output.mkdir(parents=True,exist_ok=False)
     sym,sizes=symbols(a.elf),symbol_sizes(a.elf)
     required=('b','frame','screen','race_bots','minerals','gas','lost','sc64_experimental_research_levels')
     if any(k not in sym or k not in sizes for k in required): raise ValueError('missing observed symbols')
@@ -91,4 +131,73 @@ def main():
             try: proc.wait(timeout=3)
             except subprocess.TimeoutExpired: proc.kill();proc.wait()
 
-if __name__=='__main__': main()
+def main(argv=None):
+    ap = argparse.ArgumentParser(description='Physical replay; owns the shared native lock. Do not wrap in another lock.')
+    for name in ('rom','elf','runner','tape','resume_tape','output'):
+        ap.add_argument('--'+name.replace('_','-'), type=Path, required=True)
+    ap.add_argument('--internal-worker', action='store_true', help=argparse.SUPPRESS)
+    a = ap.parse_args(argv)
+    if a.internal_worker:
+        try:
+            fd=int(os.environ.get('SC64_RESEARCH_PROBE_LOCK_FD','-1'))
+            actual=os.fstat(fd); expected=os.stat(LOCK_PATH)
+            if (actual.st_dev,actual.st_ino)!=(expected.st_dev,expected.st_ino):
+                raise ValueError('wrong lock file')
+            fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except (ValueError,OSError):
+            ap.error('internal worker requires the held shared lock')
+        return run_worker(a)
+    deadline=time.monotonic()+WALL_SECONDS
+    try:
+        pins=validate_inputs(a)
+        with open(LOCK_PATH,'a') as lock:
+            while True:
+                try:
+                    fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic()>=deadline-3:
+                        raise TimeoutError('shared native lock timed out')
+                    time.sleep(min(0.2,max(0,deadline-3-time.monotonic())))
+            if validate_inputs(a)!=pins:
+                raise ValueError('input changed while waiting for lock')
+            if time.monotonic()>=deadline-3:
+                raise TimeoutError('physical replay exceeded wall limit before launch')
+            env=os.environ.copy();env['SC64_RESEARCH_PROBE_LOCK_FD']=str(lock.fileno())
+            args=[sys.executable,str(Path(__file__).resolve()),'--internal-worker']
+            for name in ('rom','elf','runner','tape','resume_tape','output'):
+                args += ['--'+name.replace('_','-'),str(getattr(a,name))]
+            proc=None
+            def terminate(signum,_frame):
+                raise SystemExit(128+signum)
+            oldterm=signal.signal(signal.SIGTERM,terminate)
+            try:
+                proc=subprocess.Popen(args,env=env,start_new_session=True,pass_fds=(lock.fileno(),))
+                while proc.poll() is None:
+                    if output_bytes(a.output)>OUTPUT_LIMIT:
+                        raise ValueError('output exceeds 64 MiB')
+                    if time.monotonic()>=deadline-3:
+                        raise TimeoutError('physical replay exceeded wall limit')
+                    time.sleep(0.2)
+                if output_bytes(a.output)>OUTPUT_LIMIT:
+                    raise ValueError('output exceeds 64 MiB')
+                return proc.returncode
+            finally:
+                if proc is not None:
+                    # Kill only our session, even if the worker exited first.
+                    try: os.killpg(proc.pid,signal.SIGTERM)
+                    except ProcessLookupError: pass
+                    try: proc.wait(timeout=max(0,min(1,deadline-time.monotonic())))
+                    except subprocess.TimeoutExpired: pass
+                    try: os.killpg(proc.pid,signal.SIGKILL)
+                    except ProcessLookupError: pass
+                    if proc.poll() is None:
+                        try: proc.wait(timeout=max(0,deadline-time.monotonic()))
+                        except subprocess.TimeoutExpired: pass
+                signal.signal(signal.SIGTERM,oldterm)
+    except (OSError,ValueError,TimeoutError) as exc:
+        print(str(exc),file=sys.stderr)
+        return 124 if isinstance(exc,TimeoutError) else 2
+
+
+if __name__=='__main__': sys.exit(main())
