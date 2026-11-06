@@ -7,7 +7,7 @@
 #include <signal.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <ucontext.h>
+#include <sys/ucontext.h>
 #include <mach/arm/_structs.h>
 /* Fixed-size host diagnostic, never a guest PC or a file identity. */
 struct Sc64ObserverSignalRecord {
@@ -30,7 +30,7 @@ static void sc64_observer_signal_handler(int sig, siginfo_t *info, void *context
 }
 static int sc64_observer_signal_install(int fd)
 {
-    struct sigaction action = {0};
+    struct sigaction action = {};
     if (fd<0) return 0;
     sc64_observer_signal_fd=fd;
     action.sa_sigaction=sc64_observer_signal_handler;
