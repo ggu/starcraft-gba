@@ -270,21 +270,13 @@ race_z4_property_valid(unsigned raw_index)
  * with the original Z4 callback. */
 static int race_z4_paired_egg_conflict(void)
 {
-    unsigned free_slots=0,queued=0,paired=0;
+    unsigned free_slots=0,paired=0;
     for (int i=0;i<MAX_UNITS;++i) {
         if (!u[i].alive) ++free_slots;
         else if (u[i].type==SC64_EGG_ACTOR && sc64_z7_egg_product_valid(u[i].target))
             paired+=(unsigned)(sc64_z7_egg_product_count(u[i].target)-1);
     }
-    for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) {
-        if (b[i].queue_count<0 || b[i].queue_count>5 || b[i].queue_head<0 || b[i].queue_head>=5) return 0;
-        for (int j=0;j<b[i].queue_count;++j) {
-            int type=b[i].queue[(b[i].queue_head+j)%5];
-            if (!sc64_race_unit_rule(type)) return 0;
-            queued+=(unsigned)sc64_race_product_count(type);
-        }
-    }
-    return paired && free_slots>=1u+queued && free_slots<1u+queued+paired;
+    return paired && free_slots<=paired;
 }
 #endif
 static int
@@ -307,7 +299,7 @@ race_z4_create_action(const Sc64Z4SourceAction *a)
      * which the pinned handler defines as a one-unit default. */
     if (find_unit_slot() < 0) return -SC64_Z4_FAULT_CAPACITY;
 #ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
-    /* A free body already promised to a paid Egg or queue is not available.
+    /* A free body already promised to a paid paired Egg is not available.
      * Zero asks the staged dispatcher to retry this exact action. */
     if (race_z4_paired_egg_conflict()) return 0;
 #endif

@@ -16,6 +16,8 @@ static void prepare_retry(void)
         if(left){--left;continue;}u[i].alive=1;u[i].type=U_DRONE;u[i].owner=SIDE;
     }
     assert(!race_product_slots_available(1) && race_z4_paired_egg_conflict());
+    b[hall].queue_count=1;b[hall].queue_head=0;b[hall].queue[0]=U_DRONE;
+    assert(race_z4_paired_egg_conflict());b[hall].queue_count=0;
     u[egg].target=U_DRONE;assert(!race_z4_paired_egg_conflict());u[egg].target=U_ZERGLING;
     int last=find_unit_slot();assert(last>=0);u[last].alive=1;
     const Sc64Z4SourceAction *create=&sc64_z4_source_actions[
