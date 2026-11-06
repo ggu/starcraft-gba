@@ -3050,8 +3050,8 @@ test-sc64-route-policies: $(addprefix build/test-sc64-route-policy-,$(ROUTE_POLI
 	@$(foreach variant,$(ROUTE_POLICY_VARIANTS),./build/test-sc64-route-policy-$(variant) &&) true
 test-starcraft: test-sc64-route-policies
 .PHONY: test-sc64-route-flood-split
-test-sc64-route-flood-split: $(addprefix build/test-sc64-route-policy-split-,$(ROUTE_POLICY_VARIANTS))
-	@$(foreach variant,$(ROUTE_POLICY_VARIANTS),./build/test-sc64-route-policy-split-$(variant) &&) true
+test-sc64-route-flood-split: $(addprefix build/test-sc64-route-policy-split-,$(ROUTE_POLICY_VARIANTS)) build/test-sc64-route-policy-split-visit-newcell
+	@$(foreach variant,$(ROUTE_POLICY_VARIANTS),./build/test-sc64-route-policy-split-$(variant) &&) ./build/test-sc64-route-policy-split-visit-newcell
 test-starcraft: test-sc64-route-flood-split
 
 # Asset-free component-reachability oracle with VISIT_GRID's borrowed walkability
@@ -5551,7 +5551,7 @@ $(eval $(call DEPOT_ROUTE_FIXTURE,active-newcell,-DSC64_ROUTE_PACK3 -DSC64_ROUTE
 $(eval $(call DEPOT_ROUTE_FIXTURE,bounded-rect,-DRACE_TEST_COLS=80 -DRACE_TEST_ROWS=48 -DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
 $(eval $(call DEPOT_ROUTE_FIXTURE,bounded-large,-DRACE_TEST_COLS=128 -DRACE_TEST_ROWS=128 -DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
 $(eval $(call DEPOT_ROUTE_FIXTURE,bounded-readonly,-DSC64_ROUTE_PACK3 -DSC64_TEST_READONLY_GRID -DSC64_DEPOT_BOUNDED))
-DEPOT_ROUTE_CASES := pack3 split partial visit combined large128 t4 active base rect legacy bounded-pack3 bounded-nibble bounded-partial bounded-visit bounded-rect bounded-large bounded-readonly
+DEPOT_ROUTE_CASES := pack3 split partial visit combined large128 t4 active base rect legacy bounded-pack3 bounded-nibble bounded-partial bounded-visit bounded-newcell full-newcell active-newcell bounded-rect bounded-large bounded-readonly
 .PHONY: test-sc64-depot-routes test-sc64-depot-approach-default
 test: test-sc64-depot-routes test-sc64-depot-approach-default
 test-sc64-depot-routes: $(addprefix build/test-sc64-depot-routes-,$(DEPOT_ROUTE_CASES))

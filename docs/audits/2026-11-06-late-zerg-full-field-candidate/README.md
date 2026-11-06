@@ -39,10 +39,10 @@ Retain any failures. Compare the latest main source again before integration;
 release only after the requested broader state, visual, memory and performance
 evidence is satisfied. No tests or builds have run on this candidate yet.
 
-The current Makefile defines but does not include the `split-visit-newcell`
-route-policy fixture or the `bounded-newcell`, `full-newcell`, and
-`active-newcell` depot fixtures in its aggregate test lists. Qualification must
-build and run those four sanitized fixtures explicitly, along with the existing
-word-clear checks; an ordinary default test run alone does not cover them.
+The base Makefile defined but omitted the `split-visit-newcell` route-policy
+fixture and `bounded-newcell`, `full-newcell`, and `active-newcell` depot
+fixtures from aggregate tests. This candidate adds all four asset-free fixtures
+to those lists. Qualification must explicitly run those four sanitized fixtures
+and the existing word-clear checks before promotion.
 The vector check should also inspect Z7–Z10 for both toggle settings and assert
 that `SC64_ROUTE_MONOTONE_PROBE` remains absent.
