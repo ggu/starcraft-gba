@@ -7,7 +7,7 @@ ROM_SHA='e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 VK_SHA='432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 REV='0aafd85789215e84e1e43415c07d4c88461b7899'
 # Qualified independently from the historical non-diagnostic binary.
-BINARY_SHA='d7489355c49ab38c9b561e738e3da23591550984e27ee1f2364164b78216699b'
+BINARY_SHA=None
 LOCK='/tmp/sc64-native-build-20261031.lock'
 VK_PATH=pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
 
@@ -96,7 +96,7 @@ def main(argv=None):
   if a.output.exists() or not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance or output changed while queued')
   a.output.mkdir(parents=True);[(a.output/x).mkdir() for x in ('input','saves','systems')];copy=a.output/'input/game.z64';shutil.copyfile(a.rom,copy)
   if sha(copy)!=ROM_SHA:raise SystemExit('ROM copy mismatch')
-  sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('observer_file_budget.h').resolve(),pathlib.Path(__file__).with_name('observer_sigxfsz.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
+  sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('observer_file_budget.h').resolve(),pathlib.Path(__file__).with_name('observer_sigxfsz.h').resolve(),pathlib.Path(__file__).with_name('observer_images.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
   resources=[a.source/'ares/ares/resource/resource.cpp',a.source/'ares/ares/resource/resource.hpp',a.source/'mia/resource/resource.cpp',a.source/'mia/resource/resource.hpp'];inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
   cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV}
   with (a.output/'bridge.log').open('wb') as log,(a.output/'stderr.log').open('wb') as err:
@@ -104,8 +104,8 @@ def main(argv=None):
   result['unchanged']=clean(a.source) and sha(a.rom)==ROM_SHA and sha(copy)==ROM_SHA and sha(a.moltenvk)==VK_SHA and sha(a.binary)==binary==BINARY_SHA and all(sha(pathlib.Path(k))==v for k,v in inputs.items())
   files=sorted(a.output.glob('live-*.argb'));result['frames']={x.name:sha(x) for x in files};result['frame_bytes']=sum(x.stat().st_size for x in files);result['ok']=result['returncode']==0 and result['unchanged'] and len(files)<=3 and result['frame_bytes']<=2*1024**2
   ram=sorted(a.output.glob('ram-*.bin'));result['ram']={x.name:sha(x) for x in ram};result['ram_bytes']=sum(x.stat().st_size for x in ram);result['ok']=result['ok'] and len(ram)==3 and all(x.stat().st_size==8*1024**2 for x in ram) and result['ram_bytes']<=24*1024**2
-  for name in ('ram.csv','commands.csv','inputs.csv','callbacks.csv','status.log','sigxfsz.bin'):result[name+'_sha256']=sha(a.output/name) if (a.output/name).is_file() else None
-  diagnostic=a.output/'sigxfsz.bin';result['ok']=result['ok'] and diagnostic.is_file() and diagnostic.stat().st_size in (0,40)
+  for name in ('ram.csv','commands.csv','inputs.csv','callbacks.csv','status.log','sigxfsz.bin','images.bin'):result[name+'_sha256']=sha(a.output/name) if (a.output/name).is_file() else None
+  diagnostic=a.output/'sigxfsz.bin';images=a.output/'images.bin';result['ok']=result['ok'] and diagnostic.is_file() and diagnostic.stat().st_size in (0,40) and images.is_file() and images.stat().st_size<=12+128*528
   result['output_bytes']=sum(x.stat().st_size for x in a.output.rglob('*') if x.is_file() and not x.is_symlink());result['ok']=result['ok'] and result['output_bytes']<=63*1024**2 and not result.get('log_budget_exceeded',False)
   (a.output/'manifest.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({'ok':result['ok'],'returncode':result['returncode'],'frames':len(files)}),flush=True)
   return 0 if result['ok'] else 1

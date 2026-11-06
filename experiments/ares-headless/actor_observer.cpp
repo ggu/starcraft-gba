@@ -1,4 +1,5 @@
 #include "observer_sigxfsz.h"
+#include "observer_images.h"
 #include <fcntl.h>
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Experimental frontend: bounded read-only RDRAM; no guest writes or host-input API.
@@ -183,6 +184,8 @@ int main(int argc,char** argv) {
   steps<<"run,mask,polls,a_polls,start_polls,audio_calls,callbacks\n";
   long completed=0; unsigned totalIdle=0, snapshots=0; auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(175);
   std::ofstream commands(out/"commands.csv"); commands<<"begin,steps,mask,x,y,capture\n";
+  int images_fd=::open((out/"images.bin").c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);
+  if(images_fd<0 || !sc64_observer_images_write(images_fd) || ::close(images_fd)!=0) return 2;
   std::cout<<"READY"<<std::endl;
   while(completed<frames && std::chrono::steady_clock::now()<deadline) {
     {std::lock_guard lock(p.mutex); if(p.frames.size()>=3) break;}
