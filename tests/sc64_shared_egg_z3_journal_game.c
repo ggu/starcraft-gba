@@ -116,5 +116,20 @@ int main(int argc,char **argv)
     assert(sc64_zp_unit_save_encode(&edited.record.save.units[egg],&forged,race_cols*16u,race_rows*16u));
     clear_records();assert(save_write_first(edited.bytes,length,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION));
     expect_failed_load_preserves_world();
+    /* The Z3 paid Terran producer must not consume the final free body
+     * already reserved for a paired Egg, even though owners differ. */
+    int barracks=-1;
+    for(int i=0;i<MAX_BUILDINGS;++i) {
+        b[i].queue_count=0;b[i].queue_head=0;
+        if(building_complete(i) && b[i].owner==ENEMY && b[i].type==B_BARRACKS) barracks=i;
+    }
+    assert(barracks>=0);race_minerals[ENEMY]=1000;race_gas[ENEMY]=1000;
+    for(int i=0;i<MAX_UNITS;++i) {u[i].alive=1;u[i].owner=ENEMY;u[i].type=U_OVERLORD;}
+    u[0].alive=0;u[1].type=U_Z7_EGG;u[1].target=U_ZERGLING;
+    assert(race_product_slots_available(0) && !race_product_slots_available(1));
+    int ore=race_minerals[ENEMY];assert(!race_queue_unit(ENEMY,barracks,U_MARINE));
+    assert(race_minerals[ENEMY]==ore && b[barracks].queue_count==0);
+    u[1].target=U_DRONE;assert(race_product_slots_available(1));
+    assert(race_queue_unit(ENEMY,barracks,U_MARINE));
     puts("Z3 " Z3_PERMISSION_LABEL "-permission paid paired Egg journal passed");return 0;
 }
