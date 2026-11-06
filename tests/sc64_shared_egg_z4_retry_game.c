@@ -17,12 +17,16 @@ static void prepare_retry(void)
     }
     assert(!race_product_slots_available(1) && race_z4_paired_egg_conflict());
     b[hall].queue_count=1;b[hall].queue_head=0;b[hall].queue[0]=U_DRONE;
-    assert(race_z4_paired_egg_conflict());b[hall].queue_count=0;
+    assert(race_z4_paired_egg_conflict());
+    int extra=-1;for(int i=0;i<MAX_UNITS;++i)if(!original[i].alive && u[i].alive){extra=i;break;}
+    assert(extra>=0);u[extra].alive=0;
+    assert(race_z4_paired_egg_conflict());u[egg].target=U_DRONE;
+    assert(!race_z4_paired_egg_conflict());u[egg].target=U_ZERGLING;u[extra].alive=1;
+    b[hall].queue_count=0;
     u[egg].target=U_DRONE;assert(!race_z4_paired_egg_conflict());u[egg].target=U_ZERGLING;
     int last=find_unit_slot();assert(last>=0);u[last].alive=1;
     const Sc64Z4SourceAction *create=&sc64_z4_source_actions[
         sc64_z4_source_triggers[SC64_Z4_TRIGGER_STARTUP].first_action+5];
-    assert(!race_z4_paired_egg_conflict());
     assert(race_z4_create_action(create)==-SC64_Z4_FAULT_CAPACITY);u[last].alive=0;
     memset(&race_z4,0,sizeof(race_z4));race_z4.model.fired=1u<<SC64_Z4_TRIGGER_STARTUP;
     race_z4.model.action_cursor[SC64_Z4_TRIGGER_STARTUP]=6;

@@ -270,13 +270,21 @@ race_z4_property_valid(unsigned raw_index)
  * with the original Z4 callback. */
 static int race_z4_paired_egg_conflict(void)
 {
-    unsigned free_slots=0,paired=0;
+    unsigned free_slots=0,paired=0,queued=0;
     for (int i=0;i<MAX_UNITS;++i) {
         if (!u[i].alive) ++free_slots;
         else if (u[i].type==SC64_EGG_ACTOR && sc64_z7_egg_product_valid(u[i].target))
             paired+=(unsigned)(sc64_z7_egg_product_count(u[i].target)-1);
     }
-    return paired && free_slots<=paired;
+    for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) {
+        if (b[i].queue_count<0 || b[i].queue_count>5 || b[i].queue_head<0 || b[i].queue_head>=5) return paired!=0;
+        for (int j=0;j<b[i].queue_count;++j) {
+            int type=b[i].queue[(b[i].queue_head+j)%5];
+            if (!sc64_race_unit_rule(type)) return paired!=0;
+            queued+=(unsigned)sc64_race_product_count(type);
+        }
+    }
+    return paired && free_slots<1u+queued+paired;
 }
 #endif
 static int
