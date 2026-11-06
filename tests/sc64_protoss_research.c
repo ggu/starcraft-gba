@@ -26,11 +26,17 @@ int main(void)
     assert(sc64_pr_begin(2,1,1,&ore,&gas,&remaining));
     assert(ore==750 && gas==750 && remaining==5600);
     levels.level[4][5]=1; levels.level[3][4]=3;
-    assert(sc64_pr_levels_encode(wire,&levels)); memset(&candidate,0,sizeof candidate);
-    assert(sc64_pr_levels_decode(&candidate,wire) && !memcmp(&levels,&candidate,sizeof levels));
-    before=candidate; wire[7]|=0x80;
-    assert(!sc64_pr_levels_decode(&candidate,wire) && !memcmp(&candidate,&before,sizeof before));
+    assert(sc64_pr_levels_encode(wire,&levels,SC64_PR_CUSTOM_OWNERS)); memset(&candidate,0,sizeof candidate);
+    assert(sc64_pr_levels_decode(&candidate,wire,SC64_PR_CUSTOM_OWNERS) && !memcmp(&levels,&candidate,sizeof levels));
+    before=candidate; wire[7]|=0x80; /* nonzero unused custom owner */
+    assert(!sc64_pr_levels_decode(&candidate,wire,SC64_PR_CUSTOM_OWNERS) && !memcmp(&candidate,&before,sizeof before));
     wire[7]&=0x0f; wire[7]=(uint8_t)((wire[7]&0xf3u)|0x08u); /* owner4 singularity = 2 */
-    assert(!sc64_pr_levels_decode(&candidate,wire) && !memcmp(&candidate,&before,sizeof before));
+    assert(!sc64_pr_levels_decode(&candidate,wire,SC64_PR_CUSTOM_OWNERS) && !memcmp(&candidate,&before,sizeof before));
+    memset(&levels,0,sizeof levels); levels.level[0][2]=1; levels.level[4][2]=3; levels.level[7][5]=1;
+    assert(sc64_pr_levels_encode(wire,&levels,SC64_PR_CAMPAIGN_OWNERS));
+    assert(sc64_pr_levels_decode(&candidate,wire,SC64_PR_CAMPAIGN_OWNERS));
+    assert(candidate.level[0][2]==1 && candidate.level[4][2]==3 && candidate.level[7][5]==1);
+    before=candidate;
+    assert(!sc64_pr_levels_decode(&candidate,wire,SC64_PR_CUSTOM_OWNERS) && !memcmp(&candidate,&before,sizeof before));
     return 0;
 }

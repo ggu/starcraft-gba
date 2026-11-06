@@ -7,10 +7,11 @@
 #include <stdint.h>
 #include <string.h>
 
-enum { SC64_PR_OWNER_COUNT=5, SC64_PR_FAMILY_COUNT=6, SC64_PR_LEVEL_WIRE_BYTES=8 };
+enum { SC64_PR_CUSTOM_OWNERS=5, SC64_PR_CAMPAIGN_OWNERS=8,
+       SC64_PR_FAMILY_COUNT=6, SC64_PR_LEVEL_WIRE_BYTES=12 };
 enum { SC64_PR_GROUND_ARMOR, SC64_PR_AIR_ARMOR, SC64_PR_GROUND_WEAPONS,
        SC64_PR_AIR_WEAPONS, SC64_PR_SHIELDS, SC64_PR_SINGULARITY };
-typedef struct { uint8_t level[SC64_PR_OWNER_COUNT][SC64_PR_FAMILY_COUNT]; } Sc64ProtossResearchLevels;
+typedef struct { uint8_t level[SC64_PR_CAMPAIGN_OWNERS][SC64_PR_FAMILY_COUNT]; } Sc64ProtossResearchLevels;
 typedef struct { uint16_t mineral, gas, ticks; uint8_t max_level; } Sc64ProtossResearchQuote;
 
 /* Source 00C/006 SHA-256 5c7a104f...; 5:4 timing is the project's policy,
@@ -30,23 +31,24 @@ static inline int sc64_pr_quote(unsigned family, unsigned level, Sc64ProtossRese
     return 1;
 }
 
-static inline int sc64_pr_levels_valid(const Sc64ProtossResearchLevels *levels)
+static inline int sc64_pr_levels_valid(const Sc64ProtossResearchLevels *levels, unsigned owners)
 {
-    if (!levels) return 0;
-    for (unsigned o=0;o<SC64_PR_OWNER_COUNT;++o)
+    if (!levels || (owners!=SC64_PR_CUSTOM_OWNERS && owners!=SC64_PR_CAMPAIGN_OWNERS)) return 0;
+    for (unsigned o=0;o<SC64_PR_CAMPAIGN_OWNERS;++o)
         for (unsigned f=0;f<SC64_PR_FAMILY_COUNT;++f)
-            if (levels->level[o][f]>(f==SC64_PR_SINGULARITY?1u:3u)) return 0;
+            if ((o>=owners && levels->level[o][f]) ||
+                levels->level[o][f]>(f==SC64_PR_SINGULARITY?1u:3u)) return 0;
     return 1;
 }
 
-/* Stable compact levels, two bits each. Remaining high four bits are zero.
+/* Stable compact levels, two bits each. Context determines valid owner count.
  * Producer-bound active jobs need a separately authenticated building codec. */
 static inline int sc64_pr_levels_encode(uint8_t out[SC64_PR_LEVEL_WIRE_BYTES],
-                                         const Sc64ProtossResearchLevels *levels)
+                                         const Sc64ProtossResearchLevels *levels, unsigned owners)
 {
-    if (!out || !sc64_pr_levels_valid(levels)) return 0;
+    if (!out || !sc64_pr_levels_valid(levels,owners)) return 0;
     memset(out,0,SC64_PR_LEVEL_WIRE_BYTES);
-    for (unsigned o=0;o<SC64_PR_OWNER_COUNT;++o)
+    for (unsigned o=0;o<SC64_PR_CAMPAIGN_OWNERS;++o)
         for (unsigned f=0;f<SC64_PR_FAMILY_COUNT;++f) {
             unsigned n=o*SC64_PR_FAMILY_COUNT+f;
             out[n>>2]|=(uint8_t)(levels->level[o][f]<<((n&3u)*2u));
@@ -54,16 +56,16 @@ static inline int sc64_pr_levels_encode(uint8_t out[SC64_PR_LEVEL_WIRE_BYTES],
     return 1;
 }
 static inline int sc64_pr_levels_decode(Sc64ProtossResearchLevels *out,
-                                        const uint8_t in[SC64_PR_LEVEL_WIRE_BYTES])
+                                        const uint8_t in[SC64_PR_LEVEL_WIRE_BYTES], unsigned owners)
 {
     Sc64ProtossResearchLevels candidate;
-    if (!out || !in || (in[7]&0xf0u)) return 0;
-    for (unsigned o=0;o<SC64_PR_OWNER_COUNT;++o)
+    if (!out || !in) return 0;
+    for (unsigned o=0;o<SC64_PR_CAMPAIGN_OWNERS;++o)
         for (unsigned f=0;f<SC64_PR_FAMILY_COUNT;++f) {
             unsigned n=o*SC64_PR_FAMILY_COUNT+f;
             candidate.level[o][f]=(uint8_t)((in[n>>2]>>((n&3u)*2u))&3u);
         }
-    if (!sc64_pr_levels_valid(&candidate)) return 0;
+    if (!sc64_pr_levels_valid(&candidate,owners)) return 0;
     *out=candidate; return 1;
 }
 
