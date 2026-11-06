@@ -368,6 +368,10 @@ typedef struct {
 #ifdef SC64_P7_OPTICAL_CELL_MEMO
     u16 optical_cells[16];
     u8 optical_masks[16];
+#ifdef SC64_DIAGNOSTIC_SETUP
+    u16 diagnostic_seen_cells[8];
+    u8 diagnostic_seen_count;
+#endif
 #endif
 } Sc64P7DetectorLists;
 #ifdef SC64_P7_OPTICAL_CELL_MEMO
@@ -396,6 +400,9 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
     lists->optical_unit_count=lists->optical_building_count=0;
 #ifdef SC64_P7_OPTICAL_CELL_MEMO
     memset(lists->optical_cells,0,sizeof(lists->optical_cells));
+#ifdef SC64_DIAGNOSTIC_SETUP
+    lists->diagnostic_seen_count=0;
+#endif
 #endif
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -433,6 +440,7 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
 volatile u32 sc64_optical_unit_cycles, sc64_optical_building_cycles, sc64_optical_refresh_count;
 #ifdef SC64_P7_OPTICAL_CELL_MEMO
 volatile u32 sc64_optical_memo_hits, sc64_optical_memo_misses;
+volatile u32 sc64_optical_memo_compulsory, sc64_optical_memo_conflicts, sc64_optical_memo_unknown;
 #endif
 #endif
 
@@ -477,7 +485,20 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
 #ifdef SC64_P7_OPTICAL_CELL_MEMO
 #ifdef SC64_DIAGNOSTIC_SETUP
-    if (lists) { if (memo_hit) ++sc64_optical_memo_hits; else ++sc64_optical_memo_misses; }
+    if (lists) {
+        int seen=0;
+        for (unsigned k=0;k<lists->diagnostic_seen_count;++k)
+            if (lists->diagnostic_seen_cells[k]==memo_key) { seen=1; break; }
+        if (memo_hit) ++sc64_optical_memo_hits;
+        else {
+            ++sc64_optical_memo_misses;
+            if (seen) ++sc64_optical_memo_conflicts;
+            else if (lists->diagnostic_seen_count<8) ++sc64_optical_memo_compulsory;
+            else ++sc64_optical_memo_unknown;
+        }
+        if (!seen && lists->diagnostic_seen_count<8)
+            lists->diagnostic_seen_cells[lists->diagnostic_seen_count++]=(u16)memo_key;
+    }
 #endif
     if (memo_hit) goto optical_visibility_ready;
 #endif
@@ -665,6 +686,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
     sc64_optical_unit_cycles=sc64_optical_building_cycles=sc64_optical_refresh_count=0;
 #ifdef SC64_P7_OPTICAL_CELL_MEMO
     sc64_optical_memo_hits=sc64_optical_memo_misses=0;
+    sc64_optical_memo_compulsory=sc64_optical_memo_conflicts=sc64_optical_memo_unknown=0;
 #endif
 #endif
     u8 powered_cannons[MAX_BUILDINGS];
@@ -874,6 +896,7 @@ sc64_p7_arbiter_cache_process_due(void)
     sc64_optical_unit_cycles=sc64_optical_building_cycles=sc64_optical_refresh_count=0;
 #ifdef SC64_P7_OPTICAL_CELL_MEMO
     sc64_optical_memo_hits=sc64_optical_memo_misses=0;
+    sc64_optical_memo_compulsory=sc64_optical_memo_conflicts=sc64_optical_memo_unknown=0;
 #endif
 #endif
     /* The first ordinary play tick runs after map setup and target-index
