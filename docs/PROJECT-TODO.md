@@ -240,7 +240,10 @@ older KODAK package. Source merges do not update an already copied ROM.
   genuine old-tag fallback and a cross-owner slot boundary. Z4 CreateUnit
   reservation has a [bounded HOST retry experiment](audits/2026-11-07-z4-egg-host/README.md)
   with source-tag and fresh-process tests; standalone profile, ARM, ordinary
-  play and N64 behavior remain open. Z5/Z6 require separate trigger audits.
+  play and N64 behavior remain open. A [Z6 HOST stage](audits/2026-11-07-z6-egg-host/README.md)
+  adds authenticated PUNI, persisted future-create reservations and fresh
+  Egg/old-save checks; broader scheduler and standalone-profile gates remain
+  open. Z5 permissions and trigger handling need separate integration.
   The constructed late captured-Hatchery concern was not promoted: no reachable
   transfer path was found, and relaxing only admission would leave saves invalid.
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
