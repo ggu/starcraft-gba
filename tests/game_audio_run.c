@@ -143,6 +143,44 @@ static int empty_slot_transitions(void)
     return 0;
 }
 
+#ifdef SC64_RACES
+static int warp_lifecycle(void)
+{
+    fixture();
+    b[0].alive = 1; b[0].owner = SIDE; b[0].type = B_PYLON;
+    b[0].raw_type = 156; b[0].x = b[0].y = 60; b[0].under_construction = 1;
+    observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("friendly visible warp start");
+    observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("warp start repeated");
+    b[0].under_construction = 0; observe_next();
+    if (events(GAME_AUDIO_WARP_DONE) != 1 || events(GAME_AUDIO_BUILT)) return fail("warp completion");
+    observe_next();
+    if (events(GAME_AUDIO_WARP_DONE) != 1) return fail("warp completion repeated");
+    b[0].alive = 0; observe_next(); clear_events();
+    b[0].alive = 1; b[0].under_construction = 1; observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("reused slot start");
+    b[0].alive = 0; observe_next();
+    if (events(GAME_AUDIO_WARP_DONE)) return fail("cancel generated completion");
+    clear_events(); b[0].alive = 1; b[0].owner = ENEMY; observe_next();
+    if (events(GAME_AUDIO_WARP_START)) return fail("enemy start");
+    b[0].alive = 0; observe_next(); clear_events();
+    b[0].alive = 1; b[0].owner = SIDE; b[0].x = WORLD_W - 48; observe_next();
+    if (events(GAME_AUDIO_WARP_START)) return fail("offscreen start");
+    b[0].alive = 0; observe_next(); clear_events();
+    b[0].alive = 1; b[0].x = 60; frame += 3; game_render(); observe_next();
+    if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE)) return fail("load replayed warp");
+    b[0].under_construction = 0; frame += 3; game_render(); observe_next();
+    if (events(GAME_AUDIO_WARP_DONE)) return fail("load replayed completion");
+    clear_events(); b[0].alive = 0; observe_next(); clear_events();
+    b[0].alive = 1; b[0].raw_type = 109; b[0].type = B_DEPOT; b[0].under_construction = 1;
+    observe_next(); b[0].under_construction = 0; observe_next();
+    if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE) || events(GAME_AUDIO_BUILT) != 1)
+        return fail("non-Protoss completion changed");
+    return 0;
+}
+#endif
+
 static int hooks(void)
 {
 #ifndef SC64_RACES
@@ -192,6 +230,9 @@ static int hooks(void)
 #endif
 
     if (empty_slot_transitions()) return 1;
+#ifdef SC64_RACES
+    if (warp_lifecycle()) return 1;
+#endif
 
     /* The observer's shot contract: a raised cooldown on a visible unit. */
     fixture();

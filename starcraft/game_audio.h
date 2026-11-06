@@ -24,7 +24,8 @@
 
 enum {
     GAME_AUDIO_ATTACK, GAME_AUDIO_DEATH, GAME_AUDIO_READY, GAME_AUDIO_WHAT,
-    GAME_AUDIO_YES, GAME_AUDIO_BUILT, GAME_AUDIO_ADVISOR, GAME_AUDIO_EVENT_KINDS
+    GAME_AUDIO_YES, GAME_AUDIO_BUILT, GAME_AUDIO_ADVISOR,
+    GAME_AUDIO_WARP_START, GAME_AUDIO_WARP_DONE, GAME_AUDIO_EVENT_KINDS
 };
 /* Per observed frame; StarCraft also caps simultaneous combat sounds. */
 #define GAME_AUDIO_EFFECTS_PER_FRAME 2
@@ -118,11 +119,17 @@ static void game_audio_emit(int kind, int raw)
     ++game_audio_events[kind];
 #endif
 #ifdef SC64_AUDIO_IMPORTED
-    static const u8 bank_kind[GAME_AUDIO_EVENT_KINDS] = {
+    static const u8 bank_kind[] = {
         SC64_AUDIO_ATTACK, SC64_AUDIO_DEATH, SC64_AUDIO_READY, SC64_AUDIO_WHAT,
         SC64_AUDIO_YES, SC64_AUDIO_BUILT
     };
-    static const u8 priority[GAME_AUDIO_EVENT_KINDS] = { 1, 3, 2, 2, 2, 2 };
+    static const u8 priority[] = { 1, 3, 2, 2, 2, 2 };
+    if (kind == GAME_AUDIO_WARP_START || kind == GAME_AUDIO_WARP_DONE) {
+#ifdef SC64_AUDIO_WARP_CUES
+        audio_play_sample(sc64_audio_warp[kind == GAME_AUDIO_WARP_DONE], 2, 0);
+#endif
+        return;
+    }
     int sound = -1;
     if (raw >= 0 && raw < SC64_AUDIO_UNIT_COUNT) {
         int row = raw * SC64_AUDIO_KIND_COUNT, k = bank_kind[kind];
@@ -197,6 +204,9 @@ static void game_audio_observe(void)
     int fresh, i;
     u32 selection = 0, orders = 0;
     int first_selected = -1;
+#ifdef SC64_RACES
+    int warp_started = 0;
+#endif
     u16 held = GAME_AUDIO_HELD(), pressed = held & (u16)~game_audio_previous_held;
     int advisor = toast_advisor;
     game_audio_previous_held = held;
@@ -261,9 +271,24 @@ static void game_audio_observe(void)
             if ((prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !q->alive) {
                 if (game_audio_on_screen(q->x, q->y))
                     game_audio_emit(GAME_AUDIO_DEATH, game_audio_building_raw(q));
-            } else if (q->alive && (prev & GAME_AUDIO_SNAPSHOT_CONSTRUCTING) &&
-                       !q->under_construction && q->owner == SIDE) {
-                game_audio_emit(GAME_AUDIO_BUILT, game_audio_building_raw(q));
+            }
+#ifdef SC64_RACES
+            else if (!(prev & GAME_AUDIO_SNAPSHOT_ALIVE) && q->alive && q->under_construction &&
+                     q->owner == SIDE && !warp_started && game_audio_on_screen(q->x, q->y) &&
+                     sc64_race_building_rule(q->type) &&
+                     sc64_race_building_rule(q->type)->race == R_PROTOSS) {
+                game_audio_emit(GAME_AUDIO_WARP_START, game_audio_building_raw(q));
+                warp_started = 1;
+            }
+#endif
+            else if (q->alive && (prev & GAME_AUDIO_SNAPSHOT_ALIVE) &&
+                     (prev & GAME_AUDIO_SNAPSHOT_CONSTRUCTING) && !q->under_construction && q->owner == SIDE) {
+#ifdef SC64_RACES
+                if (sc64_race_building_rule(q->type) && sc64_race_building_rule(q->type)->race == R_PROTOSS)
+                    game_audio_emit(GAME_AUDIO_WARP_DONE, game_audio_building_raw(q));
+                else
+#endif
+                    game_audio_emit(GAME_AUDIO_BUILT, game_audio_building_raw(q));
             }
         }
         snap[MAX_UNITS + i] = (u16)now;
