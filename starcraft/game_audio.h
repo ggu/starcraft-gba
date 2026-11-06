@@ -127,8 +127,11 @@ static void game_audio_emit(int kind, int raw)
     if (kind == GAME_AUDIO_WARP_START || kind == GAME_AUDIO_WARP_DONE) {
 #ifdef SC64_AUDIO_WARP_CUES
         audio_play_sample(sc64_audio_warp[kind == GAME_AUDIO_WARP_DONE], 2, 0);
-#endif
         return;
+#else
+        if (kind == GAME_AUDIO_WARP_START) return;
+        kind = GAME_AUDIO_BUILT; /* Older imported banks keep their fallback. */
+#endif
     }
     int sound = -1;
     if (raw >= 0 && raw < SC64_AUDIO_UNIT_COUNT) {

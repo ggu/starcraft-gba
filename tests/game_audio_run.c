@@ -176,7 +176,16 @@ static int warp_lifecycle(void)
     b[0].alive = 1; b[0].raw_type = 109; b[0].type = B_DEPOT; b[0].under_construction = 1;
     observe_next(); b[0].under_construction = 0; observe_next();
     if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE) || events(GAME_AUDIO_BUILT) != 1)
-        return fail("non-Protoss completion changed");
+        return fail("Terran completion changed");
+    b[0].alive = 0; observe_next(); clear_events();
+    b[0].alive = 1; b[0].raw_type = 131; b[0].type = B_HATCHERY; b[0].under_construction = 1;
+    observe_next(); b[0].under_construction = 0; observe_next();
+    if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE) || events(GAME_AUDIO_BUILT) != 1)
+        return fail("Zerg completion changed");
+    b[0].alive = 0; observe_next(); clear_events();
+    b[0].alive = 1; b[0].type = B_PYLON; b[0].raw_type = 156; b[0].under_construction = 1;
+    b[1] = b[0]; observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("simultaneous warp starts not bounded");
     return 0;
 }
 #endif
