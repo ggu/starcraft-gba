@@ -55,6 +55,12 @@ static void create_paid_fractional(void)
     u[a].hp=u[a].maxhp+1;
     assert(!race_save_game() && !memcmp(prior,device.bytes,sizeof prior));
     u[a].hp=old_hp;sc64_pr_hp_debt[a]=old_debt;
+    /* The packed row admits target -1, but the actual outer preflight must
+     * reject a mining order without a valid resource target. */
+    int old_order=u[a].order,old_target=u[a].target;
+    u[a].order=ORDER_MINE;u[a].target=-1;
+    assert(!race_save_game() && !memcmp(prior,device.bytes,sizeof prior));
+    u[a].order=old_order;u[a].target=old_target;
 }
 static void verify_loaded(void)
 {
@@ -139,7 +145,7 @@ int main(int argc,char **argv)
         assert(race_load_game());assert(!race_save_game());
         assert(!memcmp(prior,device.bytes,sizeof prior));
     } else if(!strcmp(argv[1],"race-ownership")) {
-        static u8 prior[131072];u8 payload=0;
+        static u8 prior[131072];
         memset(device.bytes,0xff,sizeof device.bytes);file_read(argv[2],device.bytes,32768);
         assert(race_q8_flash_begin());
         u32 at=gba_fj_base(2),meta=gba_fj_metadata(2);
@@ -147,7 +153,8 @@ int main(int argc,char **argv)
         gba_fj_put32(device.bytes+at,tag);gba_fj_put32(device.bytes+meta,tag);
         gba_fj_put32(device.bytes+meta+4,0);
         memcpy(prior,device.bytes,sizeof prior);
-        assert(!race_q8_flash_write(&payload,1));
+        Sc64Q8FlashGuard guard={&flash_io,0};
+        assert(!race_q8_flash_guard_erase(&guard,gba_fj_base(2)));
         assert(!memcmp(prior,device.bytes,sizeof prior));
     } else if(!strcmp(argv[1],"reject-new")) {
         static u8 prior[131072];static Unit old_units[MAX_UNITS];static Building old_buildings[MAX_BUILDINGS];

@@ -36,6 +36,13 @@ writer's reselect therefore cannot overwrite the newly serialized payload.
 New or changed records abort reselect. This does not claim cryptographic
 payment authenticity or solve concurrent FNV collisions.
 
+Before writing, the serialized base and staged fractions also pass the same
+detached game preflight as the reader. That preflight clears research padding
+and rearranges the variable shot/impact area, so the writer saves the bounded
+suffix, restores it and the checked research bits, then compares the whole
+payload's FNV checksum before allowing erase. No second complete payload is
+allocated; FNV consistency is not collision-resistant authentication.
+
 Because checksum/length-invalid records are hidden from semantic selection,
 the write path also reads raw commit and metadata tags before selection and
 again immediately before the first sector erase. Unknown new-slot ownership,

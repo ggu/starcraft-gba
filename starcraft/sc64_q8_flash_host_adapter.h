@@ -160,6 +160,13 @@ static int race_q8_flash_write(const void *data,u32 length)
 {
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();
     u8 tail[SC64_Q8_FLASH_TAIL_BYTES];GbaFlashJournalRecord written;
+    /* The actual decoder normalizes research padding and rearranges only the
+     * bounded dynamic shot/impact suffix. Restore both and check the full
+     * FNV checksum before erase; this is not collision-resistant proof. */
+    u8 suffix[SC64_BC_SAVE_EXTRA_BYTES+sizeof(Sc64ImpactSaveHeader)+
+              RACE_IMPACT_SAVE_CAPACITY*sizeof(Sc64ImpactEvent)+SC64_TRANSPORT_TRAILER_BYTES];
+    const u32 suffix_start=(u32)sizeof(RaceSave)-SC64_BC_SAVE_EXTRA_BYTES;
+    RaceLoadPlan plan;u32 suffix_length,original_hash;
     unsigned hp,ignored;
     if (!io || !io->read || !io->program || !io->erase_sector || !data || !length ||
         race_mode!=1 || race_human!=R_PROTOSS) return 0;
@@ -185,6 +192,18 @@ static int race_q8_flash_write(const void *data,u32 length)
                 !sc64_pr_q8_actor_shield(MAX_UNITS+i,&ignored)) return 0;
         tail[SC64_Q8_FLASH_TAIL_HEADER+MAX_UNITS+i]=(u8)debt;
     }
+    if(data!=(const void *)&race_impact_record || length<suffix_start ||
+       length>sizeof(race_impact_record) || length-suffix_start>sizeof suffix) return 0;
+    suffix_length=length-suffix_start;
+    memcpy(suffix,(const u8 *)data+suffix_start,suffix_length);
+    original_hash=gba_fj_hash(2166136261u,data,length);
+    if(!race_worker_cargo_prepare_selected(data,length,SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION,&plan)) return 0;
+    memcpy(plan.q8_debt,tail+SC64_Q8_FLASH_TAIL_HEADER,SC64_Q8_FLASH_DEBTS);
+    if(!race_q8_flash_candidate_fractions(&plan,0))return 0;
+    if(!sc64_pr_padding_write((u8 *)race_data.buildings,MAX_BUILDINGS,SC64_PR_ROW_WIDTH,
+                              SC64_PR_USED_BITS,5u,&plan.research_levels)) return 0;
+    memcpy((u8 *)&race_impact_record+suffix_start,suffix,suffix_length);
+    if(gba_fj_hash(2166136261u,data,length)!=original_hash) return 0;
     Sc64Q8FlashGuard guard={io,0};
     GbaFlashJournalIo guarded={&guard,race_q8_flash_guard_read,race_q8_flash_guard_erase,race_q8_flash_guard_program};
     return gba_fj_write_parts(&guarded,data,length,tail,sizeof tail,SC64_Q8_FLASH_TAG,
