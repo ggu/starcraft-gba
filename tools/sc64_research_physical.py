@@ -158,23 +158,30 @@ def supervise(a, worker=run_worker):
                 raise ValueError('input changed while waiting for lock')
             if time.monotonic()>=deadline-CLEANUP_SECONDS:
                 raise TimeoutError('physical replay exceeded wall limit before launch')
-            child=os.fork()
-            if child==0:
-                try:
-                    os.setsid()
-                    resource.setrlimit(resource.RLIMIT_FSIZE,(OUTPUT_LIMIT,OUTPUT_LIMIT))
-                    result=worker(a)
-                    sys.stdout.flush();sys.stderr.flush()
-                    os._exit(0 if result is None else int(result))
-                except BaseException:
-                    import traceback
-                    traceback.print_exc()
-                    os._exit(1)
-            status=None
             def terminate(signum,_frame):
                 raise SystemExit(128+signum)
+            oldmask=signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGTERM})
             oldterm=signal.signal(signal.SIGTERM,terminate)
+            child=None
+            status=None
             try:
+                child=os.fork()
+                if child==0:
+                    try:
+                        os.setsid()
+                        signal.signal(signal.SIGTERM,oldterm)
+                        signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
+                        resource.setrlimit(resource.RLIMIT_FSIZE,(OUTPUT_LIMIT,OUTPUT_LIMIT))
+                        result=worker(a)
+                        sys.stdout.flush();sys.stderr.flush()
+                        os._exit(0 if result is None else int(result))
+                    except BaseException:
+                        import traceback
+                        traceback.print_exc()
+                        os._exit(1)
+                # A pending SIGTERM can now raise only after child is recorded
+                # and this try/finally is active.
+                signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
                 while True:
                     pid,status=os.waitpid(child,os.WNOHANG)
                     if pid: break
@@ -192,29 +199,33 @@ def supervise(a, worker=run_worker):
                     raise ValueError('output filesystem has less than 4 GiB free')
                 return os.waitstatus_to_exitcode(status)
             finally:
-                # The child creates a session before launching its descendants.
-                # If it has not done so yet, target only the owned child PID.
-                try: os.killpg(child,signal.SIGTERM)
-                except ProcessLookupError:
-                    try: os.kill(child,signal.SIGTERM)
-                    except ProcessLookupError: pass
-                until=min(deadline,time.monotonic()+min(1,CLEANUP_SECONDS/2))
-                if status is None:
-                    while time.monotonic()<until:
-                        pid,status=os.waitpid(child,os.WNOHANG)
-                        if pid: break
-                        status=None;time.sleep(min(POLL_SECONDS,0.05))
-                try: os.killpg(child,signal.SIGKILL)
-                except ProcessLookupError:
-                    try: os.kill(child,signal.SIGKILL)
-                    except ProcessLookupError: pass
-                if status is None:
-                    while time.monotonic()<deadline:
-                        try: pid,status=os.waitpid(child,os.WNOHANG)
-                        except ChildProcessError: break
-                        if pid: break
-                        status=None;time.sleep(min(POLL_SECONDS,0.01))
+                signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGTERM})
+                if child is not None and child>0:
+                    # The child creates a session before launching its descendants.
+                    # If it has not done so yet, target only the owned child PID.
+                    try: os.killpg(child,signal.SIGTERM)
+                    except ProcessLookupError:
+                        try: os.kill(child,signal.SIGTERM)
+                        except ProcessLookupError: pass
+                    until=min(deadline,time.monotonic()+min(1,CLEANUP_SECONDS/2))
+                    if status is None:
+                        while time.monotonic()<until:
+                            pid,status=os.waitpid(child,os.WNOHANG)
+                            if pid: break
+                            status=None;time.sleep(min(POLL_SECONDS,0.05))
+                    try: os.killpg(child,signal.SIGKILL)
+                    except ProcessLookupError:
+                        try: os.kill(child,signal.SIGKILL)
+                        except ProcessLookupError: pass
+                    if status is None:
+                        while time.monotonic()<deadline:
+                            try: pid,status=os.waitpid(child,os.WNOHANG)
+                            except ChildProcessError: break
+                            if pid: break
+                            status=None;time.sleep(min(POLL_SECONDS,0.01))
                 signal.signal(signal.SIGTERM,oldterm)
+                signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
+
     except (OSError,ValueError,TimeoutError) as exc:
         print(str(exc),file=sys.stderr)
         return 124 if isinstance(exc,TimeoutError) else 2
