@@ -374,6 +374,12 @@ static int race_shared_egg_candidate_owner(int owner,int raw_owner,void *context
         return mapped==owner;
     }
 #endif
+#ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
+    if (mission_id==SC64_RACE_MISSION_Z3) {
+        int mapped=(unsigned)raw_owner==map->human_slot ? SIDE : map->owner_modes[raw_owner];
+        return mapped==owner;
+    }
+#endif
     if (mission_id==SC64_Z8_GLOBAL_ID) return race_z8_source_owner((unsigned)raw_owner)==owner;
     if (mission_id==SC64_Z9_GLOBAL_ID
 #ifdef SC64_Z10_RUNTIME
@@ -405,6 +411,9 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
 #ifdef SC64_SHARED_EGG_Z2_HOST_STAGE
                candidate->state[2]!=SC64_RACE_MISSION_Z2 &&
 #endif
+#ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
+               candidate->state[2]!=SC64_RACE_MISSION_Z3 &&
+#endif
                candidate->state[2]!=SC64_Z8_GLOBAL_ID && candidate->state[2]!=SC64_Z9_GLOBAL_ID
 #ifdef SC64_Z10_RUNTIME
                && candidate->state[2]!=SC64_Z10_GLOBAL_ID
@@ -423,6 +432,11 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
          * remain subject to their original decoder and are not reclassified. */
         if (!candidate->state[0] && candidate->state[2]==SC64_RACE_MISSION_Z2 &&
             !sc64_early_zerg_permission_available(SC64_RACE_MISSION_Z2,
+                                                   (unsigned)q.raw_owner,(unsigned)raw)) return 0;
+#endif
+#ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
+        if (!candidate->state[0] && candidate->state[2]==SC64_RACE_MISSION_Z3 &&
+            !sc64_early_zerg_permission_available(SC64_RACE_MISSION_Z3,
                                                    (unsigned)q.raw_owner,(unsigned)raw)) return 0;
 #endif
         if (candidate->state[0]) {
@@ -1591,6 +1605,9 @@ static int race_save_game(void) {
 #ifdef SC64_SHARED_EGG_Z2_HOST_STAGE
              || race_selected_mission==SC64_RACE_MISSION_Z2
 #endif
+#ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
+             || race_selected_mission==SC64_RACE_MISSION_Z3
+#endif
              )
 #endif
        )
@@ -1722,6 +1739,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_SHARED_EGG_Z2_HOST_STAGE
          || race_selected_mission==SC64_RACE_MISSION_Z2
+#endif
+#ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
+         || race_selected_mission==SC64_RACE_MISSION_Z3
 #endif
          ) ?
         SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;

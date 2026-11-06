@@ -105,3 +105,8 @@ SC64_EARLY_PERMISSIONS_DIR ?= .local/sc64/early-permissions
 test-z2-egg-actual-journal:
 	$(CLANG) $(LATE_EGG_HOST_FLAGS) -DSC64_SHARED_EGG_Z2_HOST_STAGE -DSC64_EARLY_ZERG_PERMISSIONS -DSC64_Z2_ACTUAL_PERMISSIONS -I$(SC64_EARLY_PERMISSIONS_DIR) tests/sc64_shared_egg_z2_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z2-egg-actual
 	$(EGG_TEST_BIN_DIR)/sc64-z2-egg-actual
+
+.PHONY: test-z3-egg-actual-journal
+test-z3-egg-actual-journal:
+	$(CLANG) $(LATE_EGG_HOST_FLAGS) -DSC64_SHARED_EGG_Z3_HOST_STAGE -DSC64_EARLY_ZERG_PERMISSIONS -DSC64_Z3_ACTUAL_PERMISSIONS -I$(SC64_EARLY_PERMISSIONS_DIR) tests/sc64_shared_egg_z3_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z3-egg-actual
+	$(EGG_TEST_BIN_DIR)/sc64-z3-egg-actual

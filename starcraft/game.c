@@ -290,11 +290,11 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Z7 colony defense requires the Z7 runtime"
 #endif
 /* Z2 remains HOST-only and requires an explicitly supplied source-PUNI bank. */
-#if defined(SC64_SHARED_EGG_Z2_HOST_STAGE) && \
+#if (defined(SC64_SHARED_EGG_Z2_HOST_STAGE) || defined(SC64_SHARED_EGG_Z3_HOST_STAGE)) && \
     (!defined(GBA_HOST) || !defined(SC64_SHARED_EGG_LATE_SERVICE) || !defined(SC64_EARLY_ZERG_PERMISSIONS))
 #error "Z2 Egg admission requires the HOST late-service and early permission bank"
 #endif
-#ifdef SC64_SHARED_EGG_Z2_HOST_STAGE
+#if defined(SC64_SHARED_EGG_Z2_HOST_STAGE) || defined(SC64_SHARED_EGG_Z3_HOST_STAGE)
 #include "sc64_early_zerg_permissions.h"
 #endif
 /* Bounded Z1 admission experiment; no release product enables it. */
