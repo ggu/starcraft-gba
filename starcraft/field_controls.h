@@ -363,7 +363,8 @@ ui_row_state(int i, int *cost, int *gas_cost, const char **need)
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     if (sc64_pr_stage_menu_selected()) {
         Sc64ProtossResearchQuote quote;
-        if (i==3) return sc64_pr_paid[selected_building].live ? UI_SITE_OK : UI_SITE_DONE;
+        if (i==3) { Sc64PrPaidReceipt paid;
+            return sc64_pr_stage_receipt(selected_building,&paid) ? UI_SITE_OK : UI_SITE_DONE; }
         if (!sc64_pr_stage_menu_quote(i,&quote)) return UI_SITE_DONE;
         *cost=quote.mineral; *gas_cost=quote.gas;
         return minerals<*cost ? UI_SITE_MINERALS : gas<*gas_cost ? UI_SITE_GAS : UI_SITE_OK;
