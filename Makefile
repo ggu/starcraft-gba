@@ -6118,3 +6118,19 @@ build/test-sc64-headless-read-bounds: tests/sc64_headless_read_bounds.c tools/sc
 test-sc64-headless-read-bounds: build/test-sc64-headless-read-bounds
 	./build/test-sc64-headless-read-bounds
 test: test-sc64-headless-read-bounds
+
+build/test-sc64-creation-provenance-p3: tests/sc64_creation_provenance.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_P3_PRODUCTION_EXIT -Icommon $(P3_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-creation-provenance-p3
+test-sc64-creation-provenance-p3: build/test-sc64-creation-provenance-p3
+	./build/test-sc64-creation-provenance-p3
+build/test-sc64-creation-provenance-p4: tests/sc64_creation_provenance.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_P3_PRODUCTION_EXIT -Icommon $(P4_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-creation-provenance-p4
+test-sc64-creation-provenance-p4: build/test-sc64-creation-provenance-p4
+	./build/test-sc64-creation-provenance-p4
+build/test-sc64-creation-provenance-t3: tests/sc64_creation_provenance_t3.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T3_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-creation-provenance-t3
+test-sc64-creation-provenance-t3: build/test-sc64-creation-provenance-t3
+	./build/test-sc64-creation-provenance-t3

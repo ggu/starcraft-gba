@@ -21,6 +21,39 @@ static int race_t5_active(void);
 static int race_t5_starport_has_control_tower(int producer);
 #endif
 
+/* Existing imported actors retain origin raw_owner on some rescue paths. Only
+ * assign a new actor after authenticating the creator against the active map.
+ * Generic/custom owners already use compact identities, so leave raw unset. */
+static int race_campaign_owner(const Sc64RaceMap *map, int raw_owner);
+static int race_creation_source_owner(int owner, int creator_raw)
+{
+    const Sc64RaceMap *map;
+    int candidate = -1;
+    if (race_mode || owner < SIDE || owner > 4 || race_selected_mission < 0 ||
+        race_selected_mission >= SC64_RACE_MAP_COUNT) return -1;
+    map = &sc64_race_maps[race_selected_mission];
+    if (!map->owner_modes || map->human_slot >= 8u) return -1;
+    if (creator_raw >= 0 && creator_raw < 8 &&
+        race_campaign_owner(map, creator_raw) == owner) return creator_raw;
+    /* A rescued human-controlled actor may retain its original raw slot.
+     * Claim the descriptor human slot only when it is the unique SIDE mapping. */
+    if (owner != SIDE || race_campaign_owner(map, map->human_slot) != SIDE) return -1;
+    for (int i = 0; i < 8; ++i) if (race_campaign_owner(map, i) == SIDE) {
+        if (candidate >= 0) return -1;
+        candidate = i;
+    }
+    return candidate == map->human_slot ? candidate : -1;
+}
+
+static int race_spawn_product(int owner, int type, int x, int y, int source_owner)
+{
+    int slot = spawn_unit(owner, type, x, y);
+    /* Mission-specific spawn hooks have priority over this shared fallback. */
+    if (slot >= 0 && source_owner >= 0 && u[slot].raw_owner < 0)
+        u[slot].raw_owner = source_owner;
+    return slot;
+}
+
 /* Live owner-independent race adapter. Include from game.c after engine
  * helpers and before the frame/update hooks that call these functions. */
 static const int race_bot_owner_ids[3] = { ENEMY, RESCUABLE, 4 };
@@ -1024,8 +1057,13 @@ static void __attribute__((noinline)) race_pending_build_tick(int worker)
     bank.minerals = (unsigned short)race_owner_minerals(q->owner);
     bank.gas = (unsigned short)race_owner_gas(q->owner);
     if (!sc64_race_pay_building(&bank, type)) goto cancel;
-    slot = spawn_build(q->owner, type, x, y, 1);
-    if (slot < 0) goto cancel;
+    {
+        int source_owner = race_creation_source_owner(q->owner, q->raw_owner);
+        slot = spawn_build(q->owner, type, x, y, 1);
+        if (slot < 0) goto cancel;
+        if (source_owner >= 0 && b[slot].raw_owner < 0)
+            b[slot].raw_owner = source_owner;
+    }
     /* No yield or callback can spend the wallet between validation and this
      * commit. A failed slot allocation leaves the real wallet untouched. */
     if (q->owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }
@@ -1541,8 +1579,9 @@ static void race_tick_buildings(void)
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
                 }
-                int first_slot = spawn_unit(owner, type, first_x, first_y);
-                if (first_slot < 0 || spawn_unit(owner, type, second_x, second_y) < 0) {
+                int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
+                int first_slot = race_spawn_product(owner, type, first_x, first_y, source_owner);
+                if (first_slot < 0 || race_spawn_product(owner, type, second_x, second_y, source_owner) < 0) {
                     /* Capacity was checked before planning and no world state
                      * changes between the paired spawns; this is defensive. */
                     if (first_slot >= 0) u[first_slot].alive = 0;
@@ -1556,7 +1595,8 @@ static void race_tick_buildings(void)
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
                 }
-                spawned = spawn_unit(owner, type, first_x, first_y);
+                spawned = race_spawn_product(owner, type, first_x, first_y,
+                                             race_creation_source_owner(owner, b[i].raw_owner));
                 if (spawned < 0) {
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
@@ -1580,12 +1620,15 @@ static void race_tick_buildings(void)
             int free_slots=0;
             for(int slot=0;slot<MAX_UNITS;slot++)if(!u[slot].alive)free_slots++;
             if(free_slots<2){b[i].queue_progress=frames-1;continue;}
-            if (spawn_unit(owner, type, x, y) < 0 || spawn_unit(owner, type, x + 8, y) < 0) {
+            int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
+            if (race_spawn_product(owner, type, x, y, source_owner) < 0 ||
+                race_spawn_product(owner, type, x + 8, y, source_owner) < 0) {
                 b[i].queue_progress = frames - 1;
                 continue;
             }
         } else {
-            int spawned = spawn_unit(owner, type, x, y);
+            int spawned = race_spawn_product(owner, type, x, y,
+                                             race_creation_source_owner(owner, b[i].raw_owner));
             if (spawned >= 0 && sc64_race_is_worker(type)) {
                 int patch = nearest_mineral(x,y);
 #ifndef SC64_IMPORTED_SKIRMISH
