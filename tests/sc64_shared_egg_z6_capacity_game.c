@@ -16,12 +16,12 @@ int main(void)
     unsigned free=0;for(int i=0;i<MAX_UNITS;++i)free+=!u[i].alive;
     assert(free>pending+2);
     for(int i=0;i<MAX_UNITS && free>pending+1;++i) if(!u[i].alive) {
-        u[i].alive=1;u[i].type=U_DRONE;u[i].owner=SIDE;u[i].raw_owner=-1;--free;
+        u[i].alive=1;u[i].type=U_OVERLORD;u[i].owner=SIDE;u[i].raw_owner=-1;--free;
     }
     int ore=minerals,larva=b[hall].larva;
     assert(!race_queue_unit(SIDE,hall,U_ZERGLING));
     assert(minerals==ore && b[hall].larva==larva);
-    int extra=-1;for(int i=MAX_UNITS-1;i>=0;--i) if(u[i].alive && u[i].type==U_DRONE && u[i].raw_owner==-1){extra=i;break;}
+    int extra=-1;for(int i=MAX_UNITS-1;i>=0;--i) if(u[i].alive && u[i].type==U_OVERLORD && u[i].raw_owner==-1){extra=i;break;}
     assert(extra>=0);u[extra].alive=0;
     assert(race_queue_unit(SIDE,hall,U_ZERGLING));int egg=egg_for_owner(SIDE,-1);assert(egg>=0);
     u[egg].work_timer=1;int blocked=-1;
@@ -30,5 +30,10 @@ int main(void)
     assert(race_z7_egg_tick_unit(egg) && u[egg].type==U_Z7_EGG && u[egg].work_timer==1);
     u[blocked].alive=0;assert(race_z7_egg_tick_unit(egg));
     assert(u[egg].alive && u[egg].type==U_ZERGLING);
+    /* The authored callback still has a reserved body after the pair birth. */
+    const Sc64Z6SourceAction *create=0;
+    for(unsigned i=0;i<SC64_Z6_SOURCE_ACTION_COUNT;++i)
+        if(sc64_z6_source_actions[i].opcode==11) {create=&sc64_z6_source_actions[i];break;}
+    assert(create && sc64_z6_world_create(&race_z6_world,create));
     puts("Z6 future CreateUnit and paired Egg capacity boundary passed");return 0;
 }
