@@ -48,6 +48,10 @@ int main(void)
     assert(!sc64_pr_job_begin_custom(&q,0,SC64_PR_AIR_WEAPONS,&levels,&ore,&gas,
         3,1,1,1,1,1,0,0,0)); /* duplicate */
     assert(!memcmp(&q,&saved,sizeof q));
+    q.owner=1; saved=q;
+    assert(!sc64_pr_job_begin_custom(&q,1,SC64_PR_AIR_WEAPONS,&levels,&ore,&gas,
+        3,1,1,1,0,1,0,0,0)); /* human legacy floor must not affect an AI */
+    assert(!memcmp(&q,&saved,sizeof q));
     puts("research job staged actual Building admission and tick: ok");
     return 0;
 }

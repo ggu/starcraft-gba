@@ -55,7 +55,9 @@ static int sc64_pr_job_begin_custom(Building *producer, unsigned owner,
         producer->queue[0] || producer->queue[1] || producer->queue[2] ||
         producer->queue[3] || producer->queue[4] ||
         !sc64_pr_levels_valid(levels, SC64_PR_CUSTOM_OWNERS) ||
-        legacy_weapons > 2 || legacy_armor > 2) return 0;
+        legacy_weapons > 2 || legacy_armor > 2 ||
+        (owner != SIDE && (legacy_weapons || legacy_armor ||
+                           legacy_weapons_pending || legacy_armor_pending))) return 0;
     if ((legacy_weapons_pending && (family == SC64_PR_GROUND_WEAPONS || family == SC64_PR_AIR_WEAPONS)) ||
         (legacy_armor_pending && (family == SC64_PR_GROUND_ARMOR || family == SC64_PR_AIR_ARMOR))) return 0;
     level = sc64_pr_effective_level(family, levels->level[owner][family], legacy_weapons, legacy_armor);
@@ -80,7 +82,8 @@ static int sc64_pr_job_valid_custom(const Building *p, unsigned payer,
         p->under_construction || p->owner != (int)payer || p->queue_count || p->queue_head ||
         p->queue[0] != (int)payer || p->queue[2] || p->queue[3] || p->queue[4] ||
         p->level < 1 || p->level > SC64_PR_FAMILY_COUNT || !p->queue_progress ||
-        !sc64_pr_levels_valid(levels, SC64_PR_CUSTOM_OWNERS) || legacy_weapons > 2 || legacy_armor > 2) return 0;
+        !sc64_pr_levels_valid(levels, SC64_PR_CUSTOM_OWNERS) || legacy_weapons > 2 || legacy_armor > 2 ||
+        (payer != SIDE && (legacy_weapons || legacy_armor))) return 0;
     family = (unsigned)p->level - 1; target = (unsigned)p->queue[1];
     if (!target || !sc64_pr_job_family_producer(family,p->type) ||
         sc64_pr_effective_level(family,levels->level[payer][family],legacy_weapons,legacy_armor) != target-1 ||
