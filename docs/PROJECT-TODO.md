@@ -163,6 +163,16 @@ older KODAK package. Source merges do not update an already copied ROM.
   and semantic fallback. It is not connected to game saving; Flash hardware
   timing, bank/sector behavior, real power cuts, memory and integration remain
   open. No save format or release behavior changes with this experiment.
+  Draft #336 now also wires human campaign policy into actual P1–P10
+  initialization, Forge/Core menus, payment, update and refunds (runtime
+  `13953e82`). A source-cap bypass through generic research commands was
+  repaired for staged custom and campaign play; genuine old completed/pending
+  generic jobs remain floors. Campaign/custom sanitizer fixtures pass, and
+  research-off normal P10 reproduces current `8e9f0a0a` bytes. This campaign
+  flag is HOST-only and refuses persistence: campaign job journals, enemy
+  controller bindings, exact shields/HP, ordinary play and full product checks
+  remain open. The implementation/audit is on [draft #336](https://github.com/ggu/starcraft-gba/pull/336),
+  not enabled on main. Source layout/checks and final composition continue there.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
@@ -199,6 +209,25 @@ older KODAK package. Source merges do not update an already copied ROM.
   The experimental interactive frontend now permits 14,000 total steps while
   retaining its 180-second wall cap and other bounds; the GBA engine is unchanged.
   See [the native Forge audit](audits/2026-11-07-native-forge/README.md).
+- **Native fog input #340 merged:** the experimental N64 bridge now exposes
+  distinct C-Right/Up/Down inputs alongside D-pad Right, with a public mapping
+  test. The initial missing-Move-command failure, subsequent delivery check and
+  one preplanned scouting/return run are retained in the
+  [native fog audit](audits/2026-11-07-native-fog-memory/README.md). Root checked
+  source/binary/capture/log hashes and viewed the captures. Rocky coastal
+  movement and textured dark boundaries were seen, but no identifiable world
+  cell was proven outside all unit/Nexus sight after discovery. Terrain and
+  resource memory remain unverified; do not infer them from a camera pan.
+- **Early Egg continuation stage:** branch
+  [`codex/shared-egg-next-20261107`](https://github.com/ggu/starcraft-gba/tree/codex/shared-egg-next-20261107)
+  at `f7176304` adds a HOST-only Z1 admission/validation slice. A real paid Egg
+  survives the actual journal into a fresh HOST process and completes natural
+  Drone birth; the genuine unretagged 32 KiB image is unchanged after loading.
+  Malformed producer nondebit and checksum-valid forged-owner atomic rejection
+  pass, alongside staged Z8/Z9/capacity fixtures with 592 hashes unchanged.
+  No ARM, ordinary-input win, Z2–Z6, transfer or common activation proof follows.
+  The constructed late captured-Hatchery concern was not promoted: no reachable
+  transfer path was found, and relaxing only admission would leave saves invalid.
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
   already active in other products; the separate monotone shortcut remains off.
   Eight release links, route oracles, clean default checks and 18 HOST warm
@@ -223,6 +252,30 @@ older KODAK package. Source merges do not update an already copied ROM.
   of the current menu/mining/audio source.
   See [the scoped grid audit](audits/2026-11-06-late-zerg-bulk-path-grid/README.md).
   Actions stays disabled; these checks run locally.
+
+Current-source P10 combat profiling at `8e9f0a0a` uses the same ordinary P7
+input tape and current audio bank. The 1,000-call pair contains 958 advancing
+calls, 42 nonadvancing calls and three modal acknowledgments; timelines and 11
+sampled selected-state/fog/full displayed indexed framebuffer/palette hashes
+match. Control mean is 2,372,998 emulated cycles per advancing loop. The nested
+diagnostic adds 2.359% overhead; its setup/aura/Arbiter-cache/detector-refresh
+means are 667,526 / 151,884 / 390,148 / 207,680 and overlap, so they are not
+independent promised savings. Movement averages 357,258 and dominates the
+observed worst order spike. This is one scene, not hardware FPS or all custom
+race combinations. Public evidence is on
+[`codex/arbiter-perf-current-20261107`](https://github.com/ggu/starcraft-gba/tree/codex/arbiter-perf-current-20261107).
+
+The conservative detector-owner union was rejected after matching sampled
+state/pixels but worsening mean cost 0.552%; every observed union was 0x91.
+The same-tick snapshot shortcut saves 1.492% in that one scene, with sampled
+state/pixels matching, and remains default-off pending broader qualification.
+A 16-entry per-tick optical-cell memo also loses 0.332%, with only 8.74% observed
+hits. Follow-up classified 3,538 compulsory and only 64 conflict misses,
+so hash tuning cannot materially help that workload. The memo is rejected;
+these measurements do not authorize changing update cadence. These small/negative results do not close
+the near-30-fps gap. Prioritize measured setup and movement work over repeated
+blind cache variants. Additional prototype evidence is on
+[`codex/detector-snapshot-perf-20261107`](https://github.com/ggu/starcraft-gba/tree/codex/detector-snapshot-perf-20261107).
 
 The optical early-mask experiment remains off: it saved only 0.627% mean
 cycles and 0.032% peak in the measured P10 window. Further movement attribution
