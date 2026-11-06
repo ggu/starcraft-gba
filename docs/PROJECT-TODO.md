@@ -166,7 +166,12 @@ older KODAK package. Source merges do not update an already copied ROM.
   sanitizer tests, interrupted writes/partial tag erases, stale-winner rejection
   and semantic fallback. It is not connected to game saving; Flash hardware
   timing, bank/sector behavior, real power cuts, memory and integration remain
-  open. No save format or release behavior changes with this experiment.
+  open. [Standalone integration #344](https://github.com/ggu/starcraft-gba/pull/344)
+  connects the transport and journal in a [test-only proof](audits/2026-11-07-flash-integrated/README.md):
+  HOST models and unforced mGBA exercised full 28,656-byte slots and preserved
+  the legacy 32 KiB; clean default checks passed. Game backend enablement,
+  cartridge hardware behavior and real SRAM migration remain unqualified.
+  No save format or release behavior changes with this experiment.
   Draft #336 now also wires human campaign policy into actual P1–P10
   initialization, Forge/Core menus, payment, update and refunds (runtime
   `13953e82`). A source-cap bypass through generic research commands was
