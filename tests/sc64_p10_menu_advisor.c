@@ -4,6 +4,9 @@
 #define main sc64_game_audio_other_main
 #include "game_audio_run.c"
 #undef main
+#if !defined(SC64_AUDIO_ADVISOR_LINES) || SC64_AUDIO_ADVISOR_LINES != 3
+#error "P10 advisor witness requires the delivered three-line advisor bank"
+#endif
 static void research_row(void)
 {
     tick(KEY_B); tick(0);
@@ -29,12 +32,17 @@ int main(void)
     minerals=0; gas=1000; previous_held=0;
     tick(0); clear_events(); research_row();
     int old_frame=frame;
+    u32 before_samples=audio_host_samples;
     tick(KEY_A);
     assert(frame==old_frame && toast_id==1 && events(GAME_AUDIO_ADVISOR)==1);
+    assert(audio_host_samples==before_samples+1 &&
+           audio_host_last_sample==sc64_audio_advisor[R_PROTOSS*SC64_AUDIO_ADVISOR_LINES]);
     game_render(); assert(events(GAME_AUDIO_ADVISOR)==1);
     tick(0); minerals=1000; gas=0; research_row(); old_frame=frame;
-    tick(KEY_A);
+    before_samples=audio_host_samples; tick(KEY_A);
     assert(frame==old_frame && toast_id==12 && events(GAME_AUDIO_ADVISOR)==2);
+    assert(audio_host_samples==before_samples+1 &&
+           audio_host_last_sample==sc64_audio_advisor[R_PROTOSS*SC64_AUDIO_ADVISOR_LINES+1]);
     game_render(); assert(events(GAME_AUDIO_ADVISOR)==2);
     puts("PASS P10 custom menu advisor cues");
     return 0;
