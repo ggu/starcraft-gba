@@ -71,8 +71,12 @@ static int race_late_repair_target_unit_valid(int slot)
 {
     if (!race_late_active() || slot < 0 || slot >= MAX_UNITS || !u[slot].alive ||
         !race_late_repair_unit_type_mechanical(u[slot].type)) return 0;
+    int hp=u[slot].hp;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if (hp==u[slot].maxhp && sc64_pr_hp_debt[slot]) --hp;
+#endif
     return race_late_repair_unit_fields_valid(u[slot].raw_type, u[slot].owner,
-                 u[slot].alive, u[slot].hp, u[slot].maxhp,
+                 u[slot].alive, hp, u[slot].maxhp,
                  SC64_TRANSPORT_LOADED(&u[slot]));
 }
 
@@ -220,6 +224,9 @@ static int __attribute__((noinline)) race_late_repair_tick_unit(int slot)
     int fractional_only = !unit_target && old_hp == maxhp &&
         race_building_can_burn(&b[target_slot]) &&
         (b[target_slot].shield_remainder & 255);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if (unit_target && old_hp==maxhp && sc64_pr_hp_debt[target_slot]) fractional_only=1;
+#endif
     /* Price and accrue the remaining fraction as one integer HP; this is an
      * approximation within the existing integer repair and payment model. */
     if (fractional_only) --repair_hp;
@@ -228,9 +235,17 @@ static int __attribute__((noinline)) race_late_repair_tick_unit(int slot)
                                &minerals, &gas, &costs);
     if (!fractional_only || repair_hp == maxhp) *hp = repair_hp;
     if (!unit_target && repair_hp == maxhp &&
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+        fractional_only &&
+#else
         (fractional_only || repair_hp > old_hp) &&
+#endif
         race_building_can_burn(&b[target_slot]))
         b[target_slot].shield_remainder &= ~255;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if (unit_target && repair_hp==maxhp && fractional_only)
+        sc64_pr_hp_debt[target_slot]=0;
+#endif
     worker->work_timer = timer;
     if (!keep) race_late_repair_stop(worker);
     return 1;

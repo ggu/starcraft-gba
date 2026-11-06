@@ -11,8 +11,15 @@ static void sc64_contact_memo_invalidate(void);
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
 #include "sc64_save_tag_namespace.h"
+#if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && \
+    (!defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE)))
+#error "Active research journal requires the HOST-only research job stage"
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
 #include "sc64_protoss_research_padding.h"
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+#include "sc64_stock_upgrade_families.h"
+#endif
 static Sc64ProtossResearchLevels sc64_experimental_research_levels;
 #endif
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_SERVICE)
@@ -1213,6 +1220,38 @@ typedef struct {
 #endif
 } Building;
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+#include "sc64_protoss_research_jobs.h"
+#endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+#if !defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS)
+#error "Campaign research is an unfinished HOST-only stage"
+#endif
+#if defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) && !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL)
+#error "Campaign research journal requires the active-job journal"
+#endif
+#if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && !defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL)
+#error "Campaign research has no authenticated active-job journal yet"
+#endif
+#include "sc64_protoss_upgrade_policy_generated.h"
+#define SC64_PR_AUTHENTICATED_CAMPAIGN_POLICY 1
+#include "sc64_research_campaign_policy.h"
+#endif
+#if defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) && (!defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS))
+#error "Campaign research journal is a HOST-only campaign experiment"
+#endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+static int sc64_pr_stage_transfer_allowed(int slot,int new_owner);
+#define SC64_PR_ALLOW_BUILDING_TRANSFER(slot,owner) sc64_pr_stage_transfer_allowed((slot),(owner))
+#else
+#define SC64_PR_ALLOW_BUILDING_TRANSFER(slot,owner) 1
+#endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+#if !defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_RACES) || defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL)
+#error "Q8 research combat requires HOST jobs without unqualified fraction persistence"
+#endif
+static u8 sc64_pr_hp_debt[MAX_UNITS+MAX_BUILDINGS];
+#endif
 typedef struct {
     int x, y, amount;
 #ifdef SC64_IMPORTED_MISSION
@@ -1282,6 +1321,14 @@ static void sc64_facing_reset_slot(int slot);
 static int race_p6_combat_unit_burrowed(int slot);
 #endif
 static Building b[MAX_BUILDINGS];
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+static int sc64_pr_stage_fault;
+#ifdef GBA_HOST
+static int sc64_pr_stage_fault_slot;
+static Building sc64_pr_stage_fault_building;
+static Sc64PrPaidReceipt sc64_pr_stage_fault_receipt;
+#endif
+#endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
 #include "sc64_collision.h"
 #endif
@@ -1718,13 +1765,13 @@ static void race_bc_facility_flight_tick(void);
 static int race_bc_lab_start(int slot, unsigned kind);
 static int race_bc_lab_cancel(int slot, int destroyed);
 static int race_bc_before_building_transfer(int slot,int new_owner);
-#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) race_bc_before_building_transfer((slot),(owner))
+#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) (SC64_PR_ALLOW_BUILDING_TRANSFER((slot),(owner)) && race_bc_before_building_transfer((slot),(owner)))
 #else
-#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) 1
+#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) SC64_PR_ALLOW_BUILDING_TRANSFER((slot),(owner))
 #endif
 #endif
 #ifndef SC64_BC_ALLOW_BUILDING_TRANSFER
-#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) 1
+#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) SC64_PR_ALLOW_BUILDING_TRANSFER((slot),(owner))
 #endif
 #ifdef SC64_SHARED_TRANSPORT
 _Static_assert(MAX_BUILDINGS <= 255, "transport research producer index exceeds one byte");
@@ -2007,7 +2054,7 @@ static int race_owner_fields_race(int owner, int race);
 #define race_owner_fields_race(owner, race) ((race) == race_owner_identity(owner))
 #endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
-       SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
+       SC64_HIT_SKIP_HALLUCINATION_SCALE=4, SC64_HIT_PACKET_Q8=8 };
 #ifdef SC64_SIEGE_SPLASH
 static void hit_target_impl_ex(int,int,int,int,int,int);
 static void race_siege_splash_attack(Unit *,int,int);
@@ -2202,6 +2249,9 @@ static int race_owner_minerals(int owner), race_owner_gas(int owner);
 #endif
 static int race_save_game(void),race_load_game(void);
 static void race_campaign_init(void),race_campaign_tick(void);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+static int race_campaign_owner(const Sc64RaceMap *map, int raw_owner);
+#endif
 #endif
 #include "field_menu_repeat.h"
 static int screen, menu_open, menu_cursor, help, won, lost, result_timer;
@@ -2644,6 +2694,9 @@ spawn_unit(int owner, int type, int x, int y)
     invincible_units[i] = 0;
 #endif
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    sc64_pr_hp_debt[i]=0;
+#endif
     u[i].x = x;
     u[i].y = y;
     u[i].owner = owner;
@@ -2782,12 +2835,33 @@ spawn_unit(int owner, int type, int x, int y)
 
 static void game_audio_foundation(const Building *q);
 
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+#include "sc64_research_runtime_adapter.h"
+#endif
+
+/* Every integer damage adapter must use the same target upgrade before its
+ * existing armor/size calculation, including adapters that compensate an
+ * already-resolved packet before entering the shared death/accounting path. */
+static inline int sc64_unit_armor_upgrade_level(const Unit *q)
+{
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    return sc64_pr_stage_unit_armor_level(q);
+#else
+    return q->owner == SIDE ? armor_level : 0;
+#endif
+}
+
 static int
 spawn_build(int owner, int type, int x, int y, int constructing)
 {
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    /* Skip an unresolved dead slot without starving other free slots. */
+    while (i<MAX_BUILDINGS && (b[i].alive || sc64_pr_stage_job_marked(&b[i]))) ++i;
+    if (i>=MAX_BUILDINGS) return -1;
+#endif
 #ifdef SC64_RANGE_WORK
     sc64_range_route_forget_target(MAX_UNITS+i);
 #endif
@@ -2854,6 +2928,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     b[i].maxhp=sc64_race_building_max_hp(type);
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     { int hp = sc64_zp_building_default_hp(type); if (hp) b[i].maxhp = hp; }
+#endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    sc64_pr_hp_debt[MAX_UNITS+i]=0;
 #endif
     b[i].shield=sc64_race_building_shields(type);
     b[i].raw_type=b[i].raw_owner=-1;b[i].flags=b[i].shield_remainder=0;
@@ -4676,6 +4753,21 @@ destroy_building(int slot, int source_owner)
 {
     Building *q = &b[slot];
     if (!q->alive) return;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    /* Death always proceeds. An unauthenticated payer gets no credit and
+     * leaves a sticky HOST fault so the unresolved state cannot be saved. */
+    if (sc64_pr_stage_job_marked(q) && !sc64_pr_stage_destroy_slot(slot)) {
+#ifdef GBA_HOST
+        if (!sc64_pr_stage_fault) {
+            sc64_pr_stage_fault_slot=slot;
+            sc64_pr_stage_fault_building=*q;
+            memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
+        }
+#endif
+        sc64_pr_stage_fault=1;
+        q->level=0; q->queue_progress=0; q->queue[0]=q->queue[1]=0;
+    }
+#endif
 #ifdef SC64_SHARED_TRANSPORT
     race_sk_transport_producer_destroyed(slot);
 #endif
@@ -4750,6 +4842,9 @@ destroy_building(int slot, int source_owner)
     (void)source_owner;
 }
 
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+#include "sc64_research_q8_live.h"
+#endif
 static void
 hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
                    int stock_damage_class, int hit_flags)
@@ -4759,6 +4854,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
 
     int tx, ty;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if(target<0||target>=MAX_UNITS+MAX_BUILDINGS||damage<=0)return;
+#endif
 #ifndef SC64_RACES
     (void)stock_damage_class;
 #endif
@@ -4806,6 +4904,15 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
     int flags=target<MAX_UNITS?u[target].flags:b[target-MAX_UNITS].flags;
     if(flags&16)return;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if (!(hit_flags & SC64_HIT_PRECOMPUTED_HP)) {
+        unsigned packet;
+        if(damage<0 || (!(hit_flags&SC64_HIT_PACKET_Q8) && (unsigned)damage>UINT32_MAX/256u))return;
+        packet=hit_flags&SC64_HIT_PACKET_Q8?(unsigned)damage:(unsigned)damage*256u;
+        if(!sc64_pr_q8_resolve(target,packet,stock_damage_class,source_type,source_owner,&damage))return;
+        hit_flags|=SC64_HIT_PRECOMPUTED_HP;
+    }
+#endif
     int *shield=target<MAX_UNITS?&u[target].shield:&b[target-MAX_UNITS].shield;
     if (!(hit_flags & SC64_HIT_PRECOMPUTED_HP)) {
         int absorbed=*shield<damage?*shield:damage;*shield-=absorbed;damage-=absorbed;
@@ -4822,7 +4929,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
                     sc64_race_raw_unit(u[target].type);
             const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
             damage=sc64_stock_hp_damage_after_armor(damage,
-                u[target].armor+(u[target].owner==SIDE?armor_level:0),
+                u[target].armor+sc64_unit_armor_upgrade_level(&u[target]),
                 stock_damage_class,stock?stock->size:SC64_STOCK_SIZE_LARGE);
         } else
 #endif
@@ -4834,7 +4941,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
             ) {
             int armor = u[target].armor +
-                (u[target].owner == SIDE ? armor_level : 0);
+                sc64_unit_armor_upgrade_level(&u[target]);
             int raw = u[target].raw_type >= 0 ? u[target].raw_type :
                       sc64_race_raw_unit(u[target].type);
             damage = sc64_race_t4_ghost_hp_damage(raw, damage, armor);
@@ -4844,12 +4951,12 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
             int raw = u[target].raw_type >= 0 ? u[target].raw_type :
                       sc64_race_raw_unit(u[target].type);
             damage = sc64_t5_explosive_hp_damage(raw, damage,
-                     u[target].armor + (u[target].owner == SIDE ? armor_level : 0));
+                     u[target].armor + sc64_unit_armor_upgrade_level(&u[target]));
         }
 #endif
         else
 #endif
-	damage -= u[target].armor + (u[target].owner == SIDE ? armor_level : 0);
+	damage -= u[target].armor + sc64_unit_armor_upgrade_level(&u[target]);
 #ifndef SC64_T4_RUNTIME
 	if (damage < 1)
 	    damage = 1;
@@ -5325,8 +5432,18 @@ init_state(void)
 {
     field_menu_repeat_reset();
     game_audio_prime();
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    memset(sc64_pr_hp_debt,0,sizeof sc64_pr_hp_debt);
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    sc64_pr_stage_fault=0;
+#ifdef GBA_HOST
+    sc64_pr_stage_fault_slot=-1; memset(&sc64_pr_stage_fault_building,0,sizeof(sc64_pr_stage_fault_building));
+    memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
+#endif
+#endif
 #endif
 #ifdef SC64_TEXT_BOXES
     sc64_text_box_reset();
@@ -5359,6 +5476,9 @@ init_state(void)
     death_vfx_reset();
     sc64_visibility_reset();
     race_campaign_init();
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+    if (!race_mode) (void)sc64_pr_stage_campaign_initialize();
+#endif
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
 #ifdef SC64_FIELD_CONTROLS
     /* A restart jumps frame back, so the cached A action must resolve afresh. */
@@ -5589,6 +5709,13 @@ game_init(void)
     field_menu_repeat_reset();
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    sc64_pr_stage_fault=0;
+#ifdef GBA_HOST
+    sc64_pr_stage_fault_slot=-1; memset(&sc64_pr_stage_fault_building,0,sizeof(sc64_pr_stage_fault_building));
+    memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
+#endif
+#endif
 #endif
 #ifdef SC64_TEXT_BOXES
     sc64_text_box_reset();
@@ -6151,6 +6278,16 @@ stop_selected(void)
 static void
 start_research(int type)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    /* Retain genuine old completed/pending jobs as migration floors, but
+     * never sell new generic Protoss bonuses alongside producer families. */
+    if (sc64_pr_stage_owner_active(SIDE)) { toast(8); return; }
+    if ((race_mode
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+         || sc64_pr_stage_owner_active(SIDE)
+#endif
+        ) && sc64_pr_stage_blocks_legacy(type)) { toast(10); return; }
+#endif
     int *progress = type == 0 ? &weapons_research : &armor_research;
     int level = type == 0 ? weapons_level : armor_level;
     if (!has_building(SIDE,
@@ -6406,6 +6543,14 @@ static int race_carrier_command_base(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) {
+        int family=sc64_pr_stage_menu_family(choice), ok;
+        if (choice==3) ok=sc64_pr_stage_cancel_slot(selected_building,0);
+        else ok=family>=0 && sc64_pr_stage_begin_slot(selected_building,(unsigned)family);
+        menu_open=0; mode=MODE_NORMAL; toast(ok ? 4 : 8); return;
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_mode && choice==race_carrier_command_base() && race_p7_carrier_training_menu_available()) {
         menu_open=0; mode=MODE_NORMAL;
@@ -6718,6 +6863,9 @@ static int race_skirmish_command_count(void)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) return 4;
+#endif
     if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
@@ -6788,6 +6936,9 @@ static int field_menu_count(void)
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) return 4;
+#endif
     if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
@@ -6817,6 +6968,9 @@ static int field_menu_count(void)
 #elif defined(SC64_RACES)
 static int field_menu_count(void)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) return 4;
+#endif
     if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
@@ -6868,6 +7022,14 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) {
+        static const char *const names[]={"GROUND ARMOR","AIR ARMOR","GROUND WEAPONS",
+            "AIR WEAPONS","SHIELDS","SINGULARITY"};
+        int family=sc64_pr_stage_menu_family(i);
+        return i==3 ? "CANCEL RESEARCH" : family>=0 ? names[family] : "";
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_mode && i==race_carrier_command_base() && race_p7_carrier_training_menu_available())
         return "BUILD INTERCEPTOR";
@@ -7746,6 +7908,11 @@ unit_range(int type)
 	return 10;
     return 0;
 }
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+#define SC64_PR_ACQUIRE_RANGE(q) (unit_range((q)->type)+sc64_pr_stage_dragoon_bonus(q))
+#else
+#define SC64_PR_ACQUIRE_RANGE(q) unit_range((q)->type)
+#endif
 
 static int
 unit_damage(int type)
@@ -8231,8 +8398,15 @@ tick_combat(Unit * q, int target)
             if (range<contact_range) range=contact_range;
         }
         damage=sc64_stock_attack_damage_per_impact(&stock_attack,
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+                     sc64_pr_stage_weapon_level(q->owner,stock_attack.weapon_id));
+#else
                      q->owner==SIDE?weapons_level:0);
+#endif
     }
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (stock_weapon) range+=sc64_pr_stage_dragoon_bonus(q);
+#endif
 #ifdef SC64_SHARED_BUNKER
     if (q->order==ORDER_TRANSPORTED && q->target>=MAX_UNITS) range+=32;
 #endif
@@ -8625,7 +8799,7 @@ target_lists_unavailable:
             && q->owner == SIDE
 #endif
             ) {
-            target = nearest_enemy_typed(q->x,q->y,q->owner,unit_range(q->type)+1
+            target = nearest_enemy_typed(q->x,q->y,q->owner,SC64_PR_ACQUIRE_RANGE(q)+1
 #ifdef SC64_RACES
                 +18
 #endif
@@ -8774,7 +8948,7 @@ target_lists_unavailable:
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
             target = nearest_enemy_typed(q->x,q->y,q->owner,
 #ifdef SC64_RACES
-                unit_range(q->type)>64?unit_range(q->type)+18:
+                SC64_PR_ACQUIRE_RANGE(q)>64?SC64_PR_ACQUIRE_RANGE(q)+18:
 #endif
                 64,q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
             if (target >= 0) tick_combat(q, target);
@@ -9928,6 +10102,13 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
 #endif
     tick_research();
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (race_mode
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
+        || sc64_pr_stage_owner_active(SIDE)
+#endif
+       ) sc64_pr_stage_tick();
+#endif
 #ifdef SC64_T5_RUNTIME
     race_t5_tech_tick();
 #endif
@@ -13436,9 +13617,14 @@ static int race_scarab_probe_target_info(int ref,int *raw,int *x,int *y,int *own
 /* The engine stores integer HP/shields, so fractional residue cannot survive
  * this call. Keep all source division and armor work in Q8 until that boundary. */
 static void race_scarab_probe_hit(int target,unsigned packet_q8,int owner) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if(target<0 || target>=MAX_UNITS+MAX_BUILDINGS || packet_q8>INT_MAX)return;
+    hit_target_impl_ex(target,(int)packet_q8,U_REAVER,owner,SC64_STOCK_DMG_NORMAL,
+                        SC64_HIT_PACKET_Q8|SC64_HIT_ALLOW_SPLASH_BURROW);
+#else
     int *shield,armor,shield_loss,hp_loss;unsigned absorbed,armor_q8;
     if(sc64_siege_hidden_or_immune(target))return;
-    if(target<MAX_UNITS) {shield=&u[target].shield;armor=u[target].armor+(u[target].owner==SIDE?armor_level:0);}
+    if(target<MAX_UNITS) {shield=&u[target].shield;armor=u[target].armor+sc64_unit_armor_upgrade_level(&u[target]);}
     else {shield=&b[target-MAX_UNITS].shield;armor=sc64_race_building_armor(b[target-MAX_UNITS].type);}
     if(packet_q8<128u)packet_q8=128u;
     absorbed=*shield>0?(packet_q8<(unsigned)*shield*256u?packet_q8:(unsigned)*shield*256u):0;
@@ -13450,6 +13636,7 @@ static void race_scarab_probe_hit(int target,unsigned packet_q8,int owner) {
     if(shield_loss)*shield-=shield_loss;
     if(hp_loss)hit_target_impl_ex(target,hp_loss,U_REAVER,owner,SC64_STOCK_DMG_NORMAL,
                                  SC64_HIT_PRECOMPUTED_HP|SC64_HIT_ALLOW_SPLASH_BURROW);
+#endif
 }
 static void race_scarab_probe_bullet_resolve(const Sc64ImpactEvent *row) {
     Sc64ScarabImpact packet;

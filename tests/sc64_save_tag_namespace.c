@@ -11,11 +11,23 @@ static void check(uint32_t base) {
   uint32_t old=(base&0x00ffffffu)|(bits<<24);
   assert(SC64_SAVE_TAG_BASE_VALID(old));
   uint32_t research=SC64_SAVE_TAG_RESEARCH(old);
+  uint32_t jobs=SC64_SAVE_TAG_RESEARCH_JOBS(old);
+  uint32_t campaign=SC64_SAVE_TAG_CAMPAIGN_JOBS(old);
+  assert((campaign&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_CAMPAIGN_JOBS_NAMESPACE);
+  assert((campaign&0xff00ffffu)==(old&0xff00ffffu));
+  assert((jobs&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_RESEARCH_JOBS_NAMESPACE);
+  assert((jobs&0xff00ffffu)==(old&0xff00ffffu));
+  assert(jobs!=research);
   assert((research&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_RESEARCH_NAMESPACE);
   assert((research&0xff00ffffu)==(old&0xff00ffffu));
   for(unsigned other=0;other<256;other++) {
    uint32_t existing=(base&0x00ffffffu)|(other<<24);
    assert(research!=existing);
+   assert(jobs!=existing);
+   assert(jobs!=SC64_SAVE_TAG_RESEARCH(existing));
+   assert(campaign!=existing);
+   assert(campaign!=SC64_SAVE_TAG_RESEARCH(existing));
+   assert(campaign!=SC64_SAVE_TAG_RESEARCH_JOBS(existing));
   }
  }
 }

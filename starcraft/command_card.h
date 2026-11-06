@@ -20,6 +20,9 @@ enum { CARD_COLUMNS = 3, CARD_ROWS = 5, CARD_PITCH = 21 };
 static int
 card_fits(void)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_menu_selected()) return 0;
+#endif
     return field_menu_count() <= CARD_COLUMNS * CARD_ROWS;
 }
 
