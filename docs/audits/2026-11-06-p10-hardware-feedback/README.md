@@ -11,7 +11,7 @@ campaign, custom and Showcase products and retain save/memory qualification.
 | P0 | Cannot cancel producer queues | L-release is Barracks-only despite shared ordinary queues. A narrow all-friendly-producer fix with refund/ring/no-repeat tests is staged; Egg/Carrier/Scarab lifecycles remain separate. Not yet passing/merged. |
 | P1 | Forge / Cybernetics Core upgrades absent | Forge ground weapons/armor exist in fixed B rows, not selected-Forge actions. Cyber Core paid upgrades are missing from that path. Add discoverable building-context research with typed payment/level/completion/save state, not free stat changes. |
 | P1 | Workers stop on depleted minerals | Shared worker loop explicitly idles. Retarget an established gathering trip to a reachable explored nearby field while preserving final cargo. Keep STOP/idle workers idle and preserve explicit-order/unknown-cargo semantics. |
-| P1 | Mineral collection feels too fast / slow controls | Gather/return use simulation updates plus travel. Open command menu pauses economy. Measure deposited amounts per simulation time and wall time/frame drops before changing rates. Contention and saturation remain to audit. |
+| P1 | Mineral collection feels too fast / slow controls | The 45-tick timer is set after collection, bypassed during loaded return, then replaced by 20 at deposit: it is not a proven gather delay. A collection-cycle diagnostic is authored but not yet run. Open menu pauses economy. Measure actual deposit cycles, contention and wall time before changing rates. |
 | P1 | Deaths all large explosions / wrong sounds | Source death families and imported-art path exist, with authored primitive fallback for missing art. Audit actual P10 bank mappings, extent/phase and per-unit audio against native deaths; do not label the complaint fixed based on flags. |
 | P1 | Long slow B lists | Latest highlight alignment is merged, but menu hierarchy is unchanged. Prototype horizontal Orders / Build / Research or building-context categories with stable command IDs, clear controls and all tech options reachable. Verify native command-grid behavior. |
 | P1 | Missing Protoss warp placement/building audio | Current N64 harness discards audio. Capture bounded PCM and compare event timing plus source sound IDs before adding sound calls. Keep sounds shared across modes. |
@@ -38,3 +38,9 @@ Terra: power/cancellation/research source slice and native Protoss power/warp
 comparison. Parent: worker retarget, resource/death source audit and integration.
 Performance guest/canonical checks continue independently under the same native
 lock. No newly reported item is marked fixed or deployed by this audit.
+
+Pinned OpenBW `order_MiningMinerals` waits on its source timer before giving
+cargo. That supports investigating the ordering discrepancy, but does not by
+itself set the GBA duration or prove N64 timing. The new standalone diagnostic
+is on `codex/mineral-retarget-20261106` at `1211e73`; it is explicitly unwired,
+not yet compiled, and not a gameplay fix.

@@ -516,3 +516,10 @@ research, depleted-field worker retargeting, economy timing, death art/audio,
 menu categories, warp sound, fog/resource memory, AI difficulty and defeat.
 Power/cancellation are the first source fixes; all new claims need tests and
 native comparisons where specified. Original campaign/save/30-fps goals remain.
+
+Worker timing audit correction: the post-collection 45 timer is bypassed by
+loaded return and overwritten with 20 at deposit. Do not describe it as an
+actual gather delay. Run `1211e73`'s focused collection-cycle diagnostic before
+fixing timing/retarget semantics; both must preserve final cargo and STOP.
+Canonical 31a full-field fresh HOST replay now also passes 307/307 observations
+and all per-call state/display fingerprints to win. No flag promotion yet.
