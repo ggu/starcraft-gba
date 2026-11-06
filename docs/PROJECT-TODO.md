@@ -56,8 +56,15 @@ Fresh recovery results (qualification remains incomplete):
   stack use and hardware speed remain unqualified. See the
   [ARM recovery audit](audits/2026-11-06-shared-actor-arm-resume/README.md).
   A separate Guardian noinline probe saved 176 IWRAM bytes but still failed by
-  520; a broader rare-actor dispatch experiment saved 440 bytes but still failed
-  by 256. Both remain opt-in experiments, with no release activation.
+  520; rare-actor extraction alone also remained oversized. The isolated combined
+  rare-actor/Egg dispatch plus existing `GBA_DIAMOND_ROM` option links all three
+  products: Z7 ends at `0x03004f10` (240 bytes below the boundary), Terran at
+  `0x030047f8`, P10 at `0x03004bb8`. Its Z7/P10 HOST controller, journal and gfx
+  checks pass, as does the Reaver type-domain check across all three profiles.
+  This remains an opt-in probe, not a release: ordinary guest/SRAM behavior,
+  diamond-heavy/Cocoon/HUD timing and system/IRQ stack qualification are open.
+  See the [placement probe](audits/2026-11-06-rare-actor-iwram-probe/README.md)
+  and [stack review](audits/2026-11-06-shared-actor-stack-review/README.md).
 - The late-Zerg art bank and Z8/Z9 authored program headers were recovered with
   exact recorded hashes. The repaired renderer runner fails on compilation or
   oracle errors and compares indexed frames plus palettes across binaries.
@@ -70,14 +77,26 @@ Fresh recovery results (qualification remains incomplete):
   same animation state and compare post-render walk/facing too. The corrected
   Z7/Z9 custom baseline/candidate pairs pass with production-dispatch parity
   (576 captures each, all available maps/human races and 1/2/3 AI rosters).
-  Initial normal ARM baseline/candidate links also pass all four guards, but
-  those tests used a frozen older Z7 sprite bank. They prove that input set's
-  equivalence, not historical-bank identity or complete art fidelity. Exact
-  receipt-matched Z4/Z6/canonical-Z7 banks have since been recovered in isolated
-  directories; affected visual and ARM checks are being rerun before timing.
+  Initial runs used an older frozen Z7 bank; those results are retained with
+  that scope. Exact receipt-matched Z4/Z6/canonical-Z7 banks were then recovered
+  in isolated directories. All affected campaign/custom HOST pairs and four
+  normal ARM links pass again with authenticated banks and unchanged manifests.
   Source/doctor/default build passed. The full 1,004-test Python run had five
-  prepared-input/symlink-safety failures; targeted repair is in progress and no
-  full-suite pass is claimed. No ARM speed improvement is established.
+  prepared-input/symlink-safety failures. Targeted Zerg roster and safety checks
+  now pass; Terran/Protoss cover-encoded inputs remain missing. No full-suite
+  pass is claimed. The [renderer audit](https://github.com/ggu/starcraft-gba/blob/codex/late-zerg-render-oracle-20261106/docs/audits/2026-11-06-z7-render-cache-trial/README.md)
+  records the complete scope and private input provenance.
+- A bounded current Z7 early diagnostic (calls 8,021–9,020) matches 90 sampled
+  state/display checkpoints, workload endpoints/minima and mode counts across
+  variants. Its 965 advancing-PLAY calls average 1,298,955 cycles without the
+  cache flags and 1,236,870 with them (about 4.8% less); 35 nonadvancing calls
+  are reported separately. Snapshot work occurs outside the timed calls and
+  may affect pacing. This is sampled early diagnostic evidence, not a full,
+  late/busy, normal-main or physical 30-fps result. A busy HOST button-save trial
+  reached cut 136,058 with matching journals and 258 observations, but the
+  verifier rejected the zero-filled unused SRAM slot and zero timing records.
+  That seed was not edited or promoted. Correct backend initialization or a
+  genuine guest save, fresh-process load and continuation parity are required.
 - The current Z8 controller pair reproduced fault-free losses: common service
   at frame 11,048 and service-off at 21,782. The first sampled state difference
   is an additional Egg, consistent with the intended lifecycle, not proof of a
@@ -91,15 +110,15 @@ Fresh recovery results (qualification remains incomplete):
   access worked but screenshot capture timed out; N64 gameplay comparison is
   still unavailable. A subsequent native-screenshot attempt could not bind the
   emulator through CUA (error -3811), so no keys were sent; that owned session
-  was stopped and confirmed terminal. Disk remained above 146 GiB during these
-  checks. GitHub's source-check workflow is verified `disabled_manually`.
+  was stopped and confirmed terminal. The disk blocker is resolved and reserve
+  guards stayed enabled. GitHub's workflow is verified `disabled_manually`.
 
-Read-only review follow-up (2026-11-06; no new build or runtime proof):
+Earlier review findings (resolutions and remaining scope are above):
 
-- Before running the late-Zerg cache trial, make its runner fail on any compilation or test failure and require all four results. Compare deterministic baseline/candidate indexed frames and palettes directly; the existing same-flag reference cannot detect every shared rendering error. Add identity-checked Z9 and custom scenes plus lifecycle-driven fog/minimap transitions; the carried Z7 fixture does not prove those paths.
+- The runner's false-pass risks were corrected: failed compilation/tests now fail the run; baseline/candidate indexed frames and palettes are compared directly; real Z9/custom identities and lifecycle-driven fog/minimap transitions are covered by the bounded fixtures. These do not establish full gameplay or speed.
 - The explicit ARM shared-actor candidate remains experimental: race_save_adapter.h rejects campaign-mode saves under the full staged codec. Preserve that safety gate until authenticated campaign writing and reservation are implemented and qualified; custom-only tests cannot close campaign persistence.
 - Cocoon art/rendering is still HOST-only. ARM links alone cannot establish correct Cocoon visuals. Per-function stack-usage files and linker margins also do not prove nested runtime stack safety; retain actual ARM stack, ROM-size/header, unchanged-normal-build and guest SRAM checks.
-- Local free space remains about 116 MiB after rechecking, and shell temporary-file creation failed with ENOSPC. Native qualification and N64 capture remain pending; no release or SD update follows from these reviews.
+- The earlier ENOSPC interruption is resolved. Qualification resumed from published sources in persistent isolated checkouts; no release or SD update follows merely from the recovery.
 
 
 After space recovered, the following local sanitizer checks passed:
@@ -126,24 +145,23 @@ performance gain or 30 fps qualification follows from attribution timers.
 
 Next qualification order:
 
-1. Link the separate default-off ARM candidate (`fdb7e27a`,
-   `codex/shared-actor-arm-qualification-nov6`) for Terran/Z7/P10, then check
-   ROM, EWRAM/IWRAM, unchanged reserves, stack and actual guest/SRAM behavior.
-   No ARM links have run for this capability.
-2. Test the existing render-cache flags on late Zerg. They are already enabled
-   in P10 but absent from Z7/Z8/Z9/Z10. The four-build HOST dual-page oracle is
-   prepared, unrun; then use actual Zerg replay windows for paired cycle/pixel
-   and memory proof before any flag promotion.
+1. Qualify the isolated fitting shared-actor probe beyond linking: real guest
+   controls and fresh SRAM, system and IRQ stack use, diamond-heavy/Cocoon/HUD
+   timing, campaign-save policy and complete art. Preserve the unchanged guards;
+   all three probe links and bounded HOST gates are prerequisites, not promotion.
+2. Qualify render-cache flags on representative current early and busy Zerg
+   windows. HOST pairs and ARM links pass; the bounded early cycle diagnostic is
+   preliminary. Repair/replace the rejected busy seed through real save behavior,
+   validate fresh guest continuation, then measure paired cycles, state/palette/
+   pixels and tails before promotion. P10 already has these flags; Z7–Z10 do not.
 3. Continue AI/research/source-owner and campaign mechanics, preserve carried
    missions and finish Z10 normally. Repair native capture/input access and
    collect the still-missing N64 gameplay comparisons.
 
-Free space again fell from 17+ GiB to about 116 MiB while native builds were
-idle. A read-only I/O sample showed Apple cloud and Photos services writing;
-that does not prove the entire loss of free space. No personal data or unrelated
-service was changed. ARM/render qualification is held at the disk guard.
-The N64 local-event input adapter compiled, but ScreenCaptureKit failed before
-reference input; the owned emulator exited and supplied no new gameplay proof.
+The earlier disk interruption and background-I/O observations are historical;
+free space has recovered. No personal data or unrelated service was changed.
+ScreenCaptureKit still fails before N64 reference input; the owned emulator
+sessions exited and supplied no new gameplay proof.
 All checks remain local; GitHub Actions is still disabled. No release flags,
 normal ROM package, campaign coverage or SD delivery changed.
 
