@@ -318,7 +318,7 @@ static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
 #ifdef SC64_Z9_RUNTIME
     /* Pinned BWAPI raw-173 facts: 4x3 tiles, 64/48/63/47 source pixels. */
     static const Sc64ZpBuildingFact khaydarin_formation = {
-        173,100000,0,1,250,0,1,256,4,3,64,48,63,47,3,
+        173,100000,0,1,250,0,1,320,4,3,64,48,63,47,3,
         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE|
         SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_INVINCIBLE
     };

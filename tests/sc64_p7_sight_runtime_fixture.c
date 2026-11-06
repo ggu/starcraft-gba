@@ -16,6 +16,11 @@ static int reference_radius(int type,int building)
     int source_pixels=building?sc64_zp_building_sight_source_pixels(type):
                                sc64_zp_actor_sight_source_pixels(type);
     if(source_pixels>0) return source_pixels/2;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    if (building && type<0 && type>=-SC_RB_COUNT) return 64;
+    int raw=building?sc64_race_raw_building(type):sc64_race_raw_unit(type);
+    if(raw>=0 && raw<228) return sc64_source_sight_tiles[raw]*16;
+#endif
     if(building)
         return (type==B_COMMAND||sc64_race_is_zerg_townhall(type)||
                 type==B_NEXUS)?112:64;
