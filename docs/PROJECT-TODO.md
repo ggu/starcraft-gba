@@ -172,22 +172,35 @@ older KODAK package. Source merges do not update an already copied ROM.
   the legacy 32 KiB; clean default checks passed. Game backend enablement,
   cartridge hardware behavior and real SRAM migration remain unqualified.
   No save format or release behavior changes with this experiment.
-  Draft #336 now also wires human campaign policy into actual P1–P10
-  initialization, Forge/Core menus, payment, update and refunds (runtime
-  `13953e82`). A source-cap bypass through generic research commands was
-  repaired for staged custom and campaign play; genuine old completed/pending
-  generic jobs remain floors. After detector #342, combined source `5dcffb5e`
-  passes both campaign/custom sanitizer fixtures and normal research-off P10
-  reproduces the release `317cc67d...` ROM. A clean checkout also passes
-  boundary, doctor, build and full default tests (442.83 seconds; 1,023 primary
-  Python tests, 26 skips, plus compiled/auxiliary checks), with 593 prepared
-  hashes and both checkout heads unchanged. Audit successor `847dbaae` records
-  the terminal results on draft #336. This closes that combined disabled/default
-  check, not the current feature-on production or runtime gates. This campaign
-  flag is HOST-only and refuses persistence: campaign job journals, enemy
-  controller bindings, exact shields/HP, ordinary play and full product checks
-  remain open. The implementation/audit is on [draft #336](https://github.com/ggu/starcraft-gba/pull/336),
-  not enabled on main. Source layout/checks and final composition continue there.
+  **November 7 continuation:** [draft #336](https://github.com/ggu/starcraft-gba/pull/336)
+  has a combined descendant at `8127f7af`, merged with main `fb2e414f`.
+  A separate HOST campaign journal uses `0x47`: authored P1 Forge/Core jobs,
+  genuine exact-847d predecessors, malformed-newer fallback and inactive
+  Terran/Zerg saves have fresh-process fixtures. The Q8 combat configuration
+  is separate and refuses that active-job journal: passing both configurations
+  does not establish a saved fractional-combat game. Its actual-engine fixtures
+  cover shield armor/spill, fractional HP, Siege/Archon/Interceptor/Scarab hits,
+  Storm, construction, burn, repairs and colony morph HP clamps. A test-only
+  misaligned pointer cast initially produced recoverable UBSan diagnostics;
+  it is corrected, and strict reruns stop/scan for all sanitizer diagnostics.
+  The strict combined run passed all focused cases and clean boundary/doctor/
+  build/full default checks (447.810 seconds) at `8127f7af`; normal P10 again
+  matched the current `317cc67d...` release byte for byte. All 593 prepared
+  inputs, isolated Scarab facts and tested heads stayed unchanged. Audit-only
+  successor `ca767732` records 17 successful commands, prior failures and
+  limits. Full optional unified/Terran graphs still lack private preparation;
+  current feature-on ARM and simultaneous saved fractional combat are not claimed.
+  Normal research flags remain off. Fractional-state persistence, legacy
+  phase conversion, current-controller/enemy policy, feature-on ARM/RAM/stack,
+  ordinary saved gameplay and hardware performance remain release gates.
+  A fixed 400-byte tail cannot cover all worst-case larger records. Corrected
+  profile accounting shows Terran's actual 288-byte tail fits its 296-byte
+  measured slack by eight bytes; this is not a working codec. P10 typed rows
+  have promising bounded encodings, while the straightforward ZP joint-rank
+  scheme remains short of bits. A HOST-only bridge from the existing Flash
+  transport to the actual game codec is being implemented separately; it is
+  not enabled or qualified. See the current draft's [combined audit](https://github.com/ggu/starcraft-gba/blob/codex/bounded-research-20261107/docs/SC64-RESEARCH-Q8-COMBINED-AUDIT-20261107.md) and
+  [wire feasibility branch](https://github.com/ggu/starcraft-gba/tree/codex/q8-inline-wire-audit-20261107).
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
@@ -195,6 +208,10 @@ older KODAK package. Source merges do not update an already copied ROM.
   behavior remain open. Current custom defeat counts the last live owned
   building. Delivered death pixels/timelines were authenticated; their large
   source frames require a paired native presentation check, not guessed scale.
+  The [source-only geometry audit](audits/2026-11-07-custom-death-geometry/README.md)
+  found correct unit-specific routing in the inspected examples. Probe's
+  selected body rectangle is 16×15 versus peak cropped death frame 51×53;
+  these are frame rectangles, not alpha-exact bounds or native scale proof.
 - **Protoss construction audio #329 merged:** explicit foundation and
   completion cues use the separate source-indexed 528/529 clips. Load/new-match
   priming prevents replay; old banks preserve completion fallback without
@@ -243,6 +260,16 @@ older KODAK package. Source merges do not update an already copied ROM.
   actors or cadence. No movement/STOP, independent clock, writer-PC or timing
   optimization follows. Reusable-wrapper admission and cleanup review is separate
   from the recorded run; no new gameplay behavior is enabled.
+- **Early Egg combined HOST qualification:** [draft #346](https://github.com/ggu/starcraft-gba/pull/346)
+  consolidates Z1–Z4/Z6 staging and the Z5 N/A source census with main
+  `fb2e414f`. At `59179efc`, all 41 focused steps passed with strict
+  sanitizer scans, fresh-process pairs and five genuine old-save readers;
+  root independently checked all logs, the 594 private inputs, old saves and
+  receipt hash. Z4's persisted CreateUnit retry remains an explicit GBA
+  capacity policy. Synthetic denial fixtures are explicitly synthetic;
+  normal build flags are unchanged. This does not activate #298 or qualify
+  full default/unified/ARM, ordinary campaign wins, arbitrary old saves,
+  Z8/Z10 campaign gates or hardware performance.
 - **Early Egg continuation stage:** branch
   [`codex/shared-egg-next-20261107`](https://github.com/ggu/starcraft-gba/tree/codex/shared-egg-next-20261107)
   at `f7176304` adds a HOST-only Z1 admission/validation slice. A real paid Egg
