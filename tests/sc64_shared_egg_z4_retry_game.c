@@ -33,7 +33,7 @@ static void prepare_retry(void)
     out.actions[1].trigger=SC64_Z4_TRIGGER_FORCE_START;out.actions[1].action_index=0;
     assert(race_z4_dispatch_events(&out));
     assert(race_z4.faults==(1u<<(24u+SC64_Z4_TRIGGER_STARTUP)));
-    assert(race_z4.action_ticks[SC64_Z4_TRIGGER_FORCE_START]==1 && race_z4.ai_script_mask);
+    assert(race_z4.action_ticks[SC64_Z4_TRIGGER_FORCE_START]==1 && race_minerals[ENEMY]==9000);
     memcpy(u,original,sizeof(u));assert(race_z4_runtime_state_valid(&race_z4));
 }
 int main(int argc,char **argv)
@@ -56,13 +56,22 @@ int main(int argc,char **argv)
         puts("Z4 pending terminal fresh retry passed");return 0;
     }
     if(!strcmp(argv[1],"legacy")) {
-        prepare_retry();assert(race_save_game());u32 length=0;
+        prepare_retry();int egg=egg_for_owner(SIDE,-1);assert(egg>=0);
+        u[egg].alive=0;u[egg].type=U_DRONE;
+        assert(race_save_game());u32 length=0;
         assert(save_read_latest(saved.bytes,sizeof(saved.bytes),SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,&length));
         game_init();assert(fixture_import_host_save(argv[2]));
         RaceLoadPlan plan;GbaSaveSelection older,winner;
         assert(race_worker_cargo_select(&plan,&older) && older.tag==SC64_TRANSPORT_SAVE_VERSION);
         edited=saved;edited.record.save.version=SAVE_VERSION;
         const u32 known[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
+        /* Prove the same old-tag candidate is valid with the marker cleared. */
+        edited.record.save.z4.faults=0;
+        assert(save_write_selected(edited.bytes,length,SC64_TRANSPORT_SAVE_VERSION,&older,known,3));
+        assert(race_worker_cargo_select(&plan,&winner) && winner.slot!=older.slot);
+        assert(fixture_import_host_save(argv[2]));
+        assert(race_worker_cargo_select(&plan,&older));
+        edited.record.save.z4.faults=1u<<(24u+SC64_Z4_TRIGGER_STARTUP);
         assert(save_write_selected(edited.bytes,length,SC64_TRANSPORT_SAVE_VERSION,&older,known,3));
         assert(race_worker_cargo_select(&plan,&winner) && winner.slot==older.slot);
         assert(race_load_game() && !race_z4.faults && race_z4_active());
