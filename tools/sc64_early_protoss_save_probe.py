@@ -98,17 +98,28 @@ def main(argv=None):
         '--rom',str(a.rom),'--elf',str(a.elf),'--runner',str(a.runner),
         '--output',str(a.output),'--mission',str(a.mission),'--play',str(a.play),
         '--continue-updates',str(a.continue_updates)]
-  proc=subprocess.Popen(args,env=env,start_new_session=True,pass_fds=(lock.fileno(),))
-  try:return proc.wait(timeout=240)
-  except subprocess.TimeoutExpired:
-   try:os.killpg(proc.pid,signal.SIGTERM)
-   except ProcessLookupError:pass
-   try:proc.wait(timeout=5)
+  proc=None;completed=False
+  def terminate(signum,_frame): raise SystemExit(128+signum)
+  previous_term=signal.signal(signal.SIGTERM,terminate)
+  try:
+   proc=subprocess.Popen(args,env=env,start_new_session=True,pass_fds=(lock.fileno(),))
+   try:
+    code=proc.wait(timeout=240);completed=True;return code
    except subprocess.TimeoutExpired:
-    try:os.killpg(proc.pid,signal.SIGKILL)
+    print('physical probe timed out after 240 seconds',file=sys.stderr)
+    return 124
+  finally:
+   if proc is not None and not completed:
+    try:os.killpg(proc.pid,signal.SIGTERM)
     except ProcessLookupError:pass
     try:proc.wait(timeout=5)
     except subprocess.TimeoutExpired:pass
-   print('physical probe timed out after 240 seconds',file=sys.stderr)
-   return 124
+    # The leader can exit before its emulator child. Signal the entire owned
+    # session again so an interrupted parent cannot leave that child running.
+    try:os.killpg(proc.pid,signal.SIGKILL)
+    except ProcessLookupError:pass
+    if proc.poll() is None:
+     try:proc.wait(timeout=5)
+     except subprocess.TimeoutExpired:pass
+   signal.signal(signal.SIGTERM,previous_term)
 if __name__=='__main__':sys.exit(main())

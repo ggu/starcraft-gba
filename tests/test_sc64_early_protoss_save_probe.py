@@ -51,9 +51,19 @@ class ProbeSafety(unittest.TestCase):
     self.assertEqual(probe.main(self.args+['--internal-worker']),7)
    run.assert_called_once()
  def test_timeout_stops_only_owned_child_group(self):
-  proc=mock.Mock(pid=1234);proc.wait.side_effect=[subprocess.TimeoutExpired('child',240),-15]
+  proc=mock.Mock(pid=1234);proc.poll.return_value=-15;proc.wait.side_effect=[subprocess.TimeoutExpired('child',240),-15]
   with mock.patch.object(probe.subprocess,'Popen',return_value=proc) as start, mock.patch.object(probe.os,'killpg') as kill:
    self.assertEqual(probe.main(self.args),124)
    self.assertTrue(start.call_args.kwargs['start_new_session']);self.assertTrue(start.call_args.kwargs['pass_fds'])
-   kill.assert_called_once_with(1234,probe.signal.SIGTERM);self.assertFalse(self.output.exists())
+   self.assertEqual(kill.call_args_list,[mock.call(1234,probe.signal.SIGTERM),mock.call(1234,probe.signal.SIGKILL)]);self.assertFalse(self.output.exists())
+ def test_interrupted_wait_cleans_owned_group(self):
+  proc=mock.Mock(pid=2345);proc.poll.return_value=-15;proc.wait.side_effect=[KeyboardInterrupt(),-15]
+  with mock.patch.object(probe.subprocess,'Popen',return_value=proc), mock.patch.object(probe.os,'killpg') as kill:
+   with self.assertRaises(KeyboardInterrupt):probe.main(self.args)
+   self.assertEqual(kill.call_args_list,[mock.call(2345,probe.signal.SIGTERM),mock.call(2345,probe.signal.SIGKILL)])
+ def test_terminated_wait_cleans_owned_group(self):
+  proc=mock.Mock(pid=3456);proc.poll.return_value=-15;proc.wait.side_effect=[SystemExit(143),-15]
+  with mock.patch.object(probe.subprocess,'Popen',return_value=proc), mock.patch.object(probe.os,'killpg') as kill:
+   with self.assertRaises(SystemExit):probe.main(self.args)
+   self.assertEqual(kill.call_args_list,[mock.call(3456,probe.signal.SIGTERM),mock.call(3456,probe.signal.SIGKILL)])
 if __name__=='__main__':unittest.main()
