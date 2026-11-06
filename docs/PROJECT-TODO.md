@@ -118,7 +118,13 @@ Fresh recovery results (qualification remains incomplete):
   434,913; HUD: 152,747). Nested scopes must not be added. Route counters show
   3,576 hits and 392 builds; 299/975 advancing calls build at least once, maximum
   seven builds. Build-bearing updates average about 3.83M versus 0.92M otherwise;
-  this is correlation, not isolated build cost. The worst sampled tick builds
+  this is correlation, not isolated build cost. Further same-source classification
+  matched all prior checks and counted 385 movement builds, zero component-
+  reachability builds and seven depot builds; 27 used empty slots and 365
+  replaced valid slots. There were 20 bounded distinct keys and 372 repeats,
+  with no tracking overflow; one full reset, no age wrap, and 14 usable slots.
+  Test the existing exact monotone shortcut against independent FIFO references
+  and the same guest window before considering any default change. The worst sampled tick builds
   seven routes and costs 10.11M cycles. Prioritize orders/pathfinding rebuild
   causes ahead of further renderer tweaks, without reducing actors, AI cadence,
   route slots or sight. This remains an after-load diagnostic, not global FPS.
@@ -130,7 +136,13 @@ Fresh recovery results (qualification remains incomplete):
   journal is rejected with load error 89. Preserve both safety gates. The full
   30-mission persistence audit identifies campaign context, actor origin,
   reservations and atomic migration as required work; the exact error-89
-  rejecting predicate remains unproven.
+  rejecting predicate is now reproduced at save selection: the genuine
+  predecessor tag is `0x56435a54` with a 16,312-byte payload, whereas this staged
+  Z7-derived selector accepts different authenticated namespaces and has a
+  14,632-byte scratch limit. Both tag and length reject before prepare/preflight.
+  Retagging/truncation cannot migrate it; implement an authenticated predecessor
+  decoder and explicit campaign policy. This corrects the earlier unproven
+  hypothesis that the custom Egg validator alone explained error 89.
 - The current Z8 controller pair reproduced fault-free losses: common service
   at frame 11,048 and service-off at 21,782. The first sampled state difference
   is an additional Egg, consistent with the intended lifecycle, not proof of a
@@ -139,7 +151,11 @@ Fresh recovery results (qualification remains incomplete):
   Count-only, target-only and combined controller trials failed to win; the
   failed changes were reverted and evidence retained. See the
   [Z8 bounded audit](audits/2026-11-06-z8-controller-baseline/README.md).
-  No enemy/objective tuning or new qualified campaign win follows.
+  Two further single-change HOST trials (attack-move repost and an earlier
+  northeast guard position) also lost at frame 11,048, fault-free. No controller
+  change was retained. Idle actors already have within-range acquisition in this
+  product; next capture accepted orders, cooldowns, reach and detection during
+  the second raid. No enemy/objective tuning or new qualified win follows.
 - The user confirmed the screen is unlocked. After reconnecting, native text
   access worked but screenshot capture timed out; N64 gameplay comparison is
   still unavailable. A subsequent native-screenshot attempt could not bind the
