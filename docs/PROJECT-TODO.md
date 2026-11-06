@@ -529,3 +529,30 @@ before in-map actions; GBA custom source starts each active player at **200**.
 Correct starting rules separately from mining timing, with source/runtime tests
 and explicit bot-policy evidence. Producer cancel candidate now also separates
 full unit refunds from partial building-construction refunds; not merged yet.
+
+## Hardware fixes now staged (not merged/deployed)
+
+- `135a45dd`, `codex/hardware-feedback-20261106`: broader friendly ordinary
+  queue cancellation, full unit mineral/gas refund, ring-wrap/no-repeat and
+  legacy larva restore checks. Focused default/controller and race-handler
+  tests pass; full default suite and actual-profile qualification remain.
+- `codex/protoss-psi-boundary-nov6`: shared power predicate uses the existing
+  source-shaped mask; boundary/ownership/completed-Pylon and no-debit refusal
+  tests are queued. Pylon overlay remains separate unfinished UI work.
+- `5276485`, `codex/skirmish-start-bank-20261106`: custom starts changed from
+  200 to 50 minerals for every active player, independently of difficulty or
+  gather timing. Existing normal-menu opening tests updated for 50/zero gas;
+  validation queued, no deployment. Native human Terran and Protoss starts
+  both directly show 50. The pinned OpenBW setup default is also 50.
+- `1211e73`, `codex/mineral-retarget-20261106`: collection-cycle diagnostic
+  now queued on actual shared race worker code with frozen private includes.
+  It is a diagnostic, not a timing/retarget fix, and has not run yet.
+
+Native Protoss resources subsequently increase without an in-map mine command,
+so keep automatic opening-worker assignments. Do not conflate that observation
+with stopped/depleted workers, or change opening orders from PC assumptions.
+
+Canonical full-field links now pass all eight release vectors; the current
+audio header/blob are a paired codec2 set with a manifest and independent
+receipt, distinct from the older advisor pair. Header-offset/stream/PCM bank
+verification is queued; provenance does not establish correct event selection.
