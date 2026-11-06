@@ -69,4 +69,42 @@ static void check_custom(void) {
     sc64_experimental_research_levels.level[5][0]=1;
     assert(!race_save_game()); assert(!memcmp(prior_sram,host_save,sizeof(prior_sram)));
 }
-int main(void) { gba_init(); check_campaign(); check_custom(); puts("experimental research campaign and custom journal: PASS"); return 0; }
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+static void check_yamato(void) {
+    for (int shot_count=1;shot_count<=2;shot_count++) {
+        game_init(); race_mode=1; race_human=R_TER; race_bots=1; init_state();
+        memset(host_save,0,sizeof(host_save));
+        int caster[2],target[2]; int bc=sc64_race_unit_from_raw(12), marine=sc64_race_unit_from_raw(0);
+        assert(bc>=0 && marine>=0);
+        for(int i=0;i<shot_count;i++) {
+            caster[i]=spawn_unit(ENEMY,bc,500,500+i*100); target[i]=spawn_unit(SIDE,marine,640,500+i*100);
+            assert(caster[i]>=0 && target[i]>=0);
+            u[caster[i]].work_timer=64<<3;u[caster[i]].carry=200*256;
+        }
+        sc64_battlecruiser_tech_bits=(u16)(SC64_BC_TECH_YAMATO<<(2*ENEMY));
+        for(int i=0;i<shot_count;i++)assert(race_bc_yamato_issue(caster[i],target[i]));
+        if(!sc64_battlecruiser_source_tick_due())++frame;
+        for(int i=0;i<shot_count;i++)assert(race_bc_yamato_tick_caster(caster[i]));
+        int impact_count=shot_count==1?5:2;
+        race_impact_reset();
+        for(int i=0;i<impact_count;i++)race_impact_launch(target[0],1,1,ENEMY,0,bc,20u+i);
+        assert(race_impact_count==impact_count);
+        Sc64ImpactEvent impacts[8]; Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT];
+        memcpy(impacts,race_impact_rows,impact_count*sizeof(*impacts)); memcpy(shots,sc64_bc_shots,sizeof(shots));
+        sc64_experimental_research_levels.level[0][0]=2;
+        assert(race_save_game());
+        u32 len=sram_get32(host_save+4);
+        assert(len==(u32)sizeof(RaceSave)-SC64_BC_SAVE_EXTRA_BYTES+shot_count*sizeof(Sc64BcYamatoShot)+sc64_impact_save_bytes(impact_count)+SC64_TRANSPORT_TRAILER_BYTES);
+        memset(sc64_bc_shots,0,sizeof(sc64_bc_shots)); race_impact_reset();
+        assert(race_load_game());
+        assert(!memcmp(shots,sc64_bc_shots,sizeof(shots)) && race_impact_count==impact_count);
+        assert(!memcmp(impacts,race_impact_rows,impact_count*sizeof(*impacts)));
+        assert(sc64_experimental_research_levels.level[0][0]==2);
+    }
+}
+#endif
+int main(void) { gba_init(); check_campaign(); check_custom();
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+check_yamato();
+#endif
+puts("experimental research campaign and custom journal: PASS"); return 0; }
