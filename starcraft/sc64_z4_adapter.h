@@ -572,6 +572,9 @@ race_z4_campaign_tick(void)
     for (unsigned i=0;i<SC64_Z4_TRIGGER_COUNT;++i) {
         u32 bit=1u << (24u+i);
         if (!(race_z4.faults & bit)) continue;
+        /* Once an action is pending, a subsequently full pool keeps it
+         * pending rather than turning a transient wait into a lost action. */
+        if (find_unit_slot()<0) continue;
         unsigned cursor=race_z4.model.action_cursor[i];
         const Sc64Z4SourceAction *action=&sc64_z4_source_actions[
             sc64_z4_source_triggers[i].first_action+cursor-1u];
