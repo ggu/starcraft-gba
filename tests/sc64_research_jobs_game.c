@@ -218,7 +218,8 @@ int main(void)
     assert(!weapons_research && minerals==paid_ore && gas==paid_gas);
     unsigned remaining=b[forge].queue_progress;
     b[forge].raw_type=1; sc64_pr_stage_tick();
-    assert(b[forge].queue_progress==remaining && test_receipt(forge).live);
+    assert(b[forge].queue_progress==remaining && sc64_pr_stage_job_marked(&b[forge]) &&
+           !test_receipt(forge).live);
     b[forge].raw_type=-1; b[pylon].alive=0;
     game_update(0,0); assert(b[forge].queue_progress==remaining);
     b[pylon].alive=1; b[forge].queue_progress=1;
