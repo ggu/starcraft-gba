@@ -119,7 +119,8 @@ static int gba_fj_same_record(const GbaFlashJournalRecord *a,
 }
 static int gba_fj_write_parts(const GbaFlashJournalIo *io,
     const void *data,uint32_t length,const void *tail,uint32_t tail_length,
-    uint32_t tag,const GbaFlashJournalRecord *previous,GbaFlashJournalRecord *out)
+    uint32_t tag,GbaFlashJournalAccept accept,void *context,
+    const GbaFlashJournalRecord *previous,GbaFlashJournalRecord *out)
 {
     GbaFlashJournalRecord selected,check,written;
     uint8_t header[16],commit[4],bytes[64];
@@ -129,13 +130,13 @@ static int gba_fj_write_parts(const GbaFlashJournalIo *io,
        (!tail&&tail_length)||length>GBA_FJ_PAYLOAD_MAX||
        tail_length>GBA_FJ_PAYLOAD_MAX-length||!tag||tag==0xffffffffu||!out)
         return GBA_FJ_ARGUMENT;
-    if(previous){
-        status=gba_fj_probe(io,previous->index,&selected);
-        if(status<0)return status;
-        if(status!=GBA_FJ_OK||!gba_fj_same_record(previous,&selected))return GBA_FJ_STALE;
-    }else{
-        status=gba_fj_select(io,0,0,&selected);if(status<0)return status;
-    }
+    /* The same semantic policy used by the caller's selection is required.
+     * An intact old slot is not a current consistency token after a later
+     * successful write. Preserve the selected winner before choosing a target. */
+    status=gba_fj_select(io,accept,context,&selected);
+    if(status<0)return status;
+    if(previous&&(status!=GBA_FJ_OK||!gba_fj_same_record(previous,&selected)))
+        return GBA_FJ_STALE;
     if(previous||status==GBA_FJ_OK){
         sequence=selected.sequence+1u;if(!sequence)sequence=1;
         index=selected.index==2 ? 3u : 2u;

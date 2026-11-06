@@ -68,12 +68,12 @@ static void ordinary_and_full(void)
     GbaFlashJournalRecord previous,written,selected;
     reset();legacy_record(0,41);legacy_record(1,42);memcpy(legacy,model.bytes,sizeof legacy);
     assert(gba_fj_select(&io,accept_payload,0,&previous)==GBA_FJ_OK&&previous.index==1);
-    assert(gba_fj_write_parts(&io,payload,16368,tail,sizeof tail,0x56465a60,&previous,&written)==GBA_FJ_OK);
+    assert(gba_fj_write_parts(&io,payload,16368,tail,sizeof tail,0x56465a60,accept_payload,0,&previous,&written)==GBA_FJ_OK);
     assert(written.index==2&&written.sequence==43&&written.length==16768);
     uint8_t got[400];assert(gba_fj_read_payload(&io,&written,16368,got,sizeof got)==GBA_FJ_OK);
     assert(!memcmp(got,tail,sizeof got));assert_legacy_unchanged();
     previous=written;
-    assert(gba_fj_write_parts(&io,payload,sizeof payload,0,0,0x56465a60,&previous,&written)==GBA_FJ_OK);
+    assert(gba_fj_write_parts(&io,payload,sizeof payload,0,0,0x56465a60,accept_payload,0,&previous,&written)==GBA_FJ_OK);
     assert(written.index==3&&written.sequence==44&&written.length==GBA_FJ_PAYLOAD_MAX);
     assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_OK&&gba_fj_same_record(&selected,&written));
     assert_legacy_unchanged();
@@ -86,14 +86,14 @@ static void power_cuts(void)
     for(unsigned i=0;i<sizeof changed;++i)changed[i]=payload[i]^0x55;
     for(unsigned i=0;i<sizeof changed_tail;++i)changed_tail[i]=tail[i]^0xa5;
     reset();legacy_record(0,41);legacy_record(1,42);memcpy(legacy,model.bytes,sizeof legacy);
-    assert(gba_fj_write_parts(&io,payload,256,tail,sizeof tail,0x56465a60,0,&previous)==GBA_FJ_OK);
-    assert(gba_fj_write_parts(&io,payload,256,tail,sizeof tail,0x56465a60,&previous,&written)==GBA_FJ_OK);
+    assert(gba_fj_write_parts(&io,payload,256,tail,sizeof tail,0x56465a60,accept_payload,0,0,&previous)==GBA_FJ_OK);
+    assert(gba_fj_write_parts(&io,payload,256,tail,sizeof tail,0x56465a60,accept_payload,0,&previous,&written)==GBA_FJ_OK);
     previous=written;memcpy(snapshot,model.bytes,sizeof snapshot);
     int operations=8+16+256+(int)sizeof tail+4;
     for(int cut=0;cut<=operations;++cut){
         memcpy(model.bytes,snapshot,sizeof snapshot);model.budget=cut;model.mutations=0;
         memset(&written,0xa5,sizeof written);GbaFlashJournalRecord untouched=written;
-        int status=gba_fj_write_parts(&io,changed,sizeof changed,changed_tail,sizeof changed_tail,0x56465a60,&previous,&written);
+        int status=gba_fj_write_parts(&io,changed,sizeof changed,changed_tail,sizeof changed_tail,0x56465a60,accept_payload,0,&previous,&written);
         model.budget=-1;
         assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_OK);
         if(status==GBA_FJ_OK){
@@ -117,7 +117,7 @@ static void power_cuts(void)
         assert(gba_fj_same_record(&selected,&previous));
     }
     memcpy(model.bytes,snapshot,sizeof snapshot);model.bad_commit_erase=1;model.mutations=0;
-    assert(gba_fj_write_parts(&io,payload,256,0,0,0x56465a60,&previous,&written)==GBA_FJ_WRITE_ERROR);
+    assert(gba_fj_write_parts(&io,payload,256,0,0,0x56465a60,accept_payload,0,&previous,&written)==GBA_FJ_WRITE_ERROR);
     assert(model.mutations==1&&!memcmp(model.bytes,snapshot,sizeof snapshot));model.bad_commit_erase=0;
     printf("power-cut boundaries %d; partial-tag erasures 1024: PASS\n",operations+1);
 }
@@ -126,7 +126,7 @@ static void erased_tag_bytes(void)
     GbaFlashJournalRecord previous,written,selected;
     uint8_t changed[32];memset(changed,0x69,sizeof changed);
     reset();legacy_record(0,41);memcpy(legacy,model.bytes,sizeof legacy);
-    assert(gba_fj_write_parts(&io,payload,64,0,0,0x56465a60,0,&previous)==GBA_FJ_OK);
+    assert(gba_fj_write_parts(&io,payload,64,0,0,0x56465a60,accept_payload,0,0,&previous)==GBA_FJ_OK);
     memcpy(snapshot,model.bytes,sizeof snapshot);
     /* A tag containing erased bytes can become fully valid before the last
      * redundant FF byte is visited. An interrupted call may then report an
@@ -135,7 +135,7 @@ static void erased_tag_bytes(void)
     for(int cut=0;cut<=8+16+(int)sizeof changed+4;++cut){
         memcpy(model.bytes,snapshot,sizeof snapshot);model.budget=cut;
         memset(&written,0xa5,sizeof written);GbaFlashJournalRecord untouched=written;
-        int status=gba_fj_write_parts(&io,changed,sizeof changed,0,0,0xffffff00u,&previous,&written);
+        int status=gba_fj_write_parts(&io,changed,sizeof changed,0,0,0xffffff00u,accept_payload,0,&previous,&written);
         model.budget=-1;
         assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_OK);
         if(!gba_fj_same_record(&selected,&previous)){
@@ -147,17 +147,47 @@ static void erased_tag_bytes(void)
         assert_legacy_unchanged();
     }
 }
+static void stale_winner_and_semantic_fallback(void)
+{
+    GbaFlashJournalRecord old,current,written,selected;
+    reset();legacy_record(0,41);memcpy(legacy,model.bytes,sizeof legacy);
+    assert(gba_fj_select(&io,accept_payload,0,&old)==GBA_FJ_OK);
+    assert(gba_fj_write_parts(&io,payload,64,0,0,0x56465a60,accept_payload,0,&old,&current)==GBA_FJ_OK);
+    memcpy(snapshot,model.bytes,sizeof snapshot);model.mutations=0;
+    memset(&written,0xa5,sizeof written);GbaFlashJournalRecord sentinel=written;
+    assert(gba_fj_write_parts(&io,payload,64,0,0,0x56465a60,accept_payload,0,&old,&written)==GBA_FJ_STALE);
+    assert(!model.mutations&&!memcmp(model.bytes,snapshot,sizeof snapshot)&&
+           !memcmp(&written,&sentinel,sizeof written));
+    old=current;
+    assert(gba_fj_write_parts(&io,payload,64,0,0,0x56465a60,accept_payload,0,&old,&current)==GBA_FJ_OK);
+    memcpy(snapshot,model.bytes,sizeof snapshot);model.mutations=0;
+    assert(gba_fj_write_parts(&io,payload,64,0,0,0x56465a60,accept_payload,0,&old,&written)==GBA_FJ_STALE);
+    assert(!model.mutations&&!memcmp(model.bytes,snapshot,sizeof snapshot));
+    /* A checksum-valid but semantically rejected newer slot is replaceable,
+     * using exactly the policy that selected the older admissible record. */
+    uint32_t metadata=gba_fj_metadata(current.index);
+    model.bytes[metadata+16]=0xee;
+    gba_fj_put32(model.bytes+metadata+8,gba_fj_hash(2166136261u,model.bytes+metadata+16,current.length));
+    assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_OK&&gba_fj_same_record(&selected,&old));
+    assert(gba_fj_write_parts(&io,payload,64,0,0,0x56465a60,accept_payload,0,&selected,&written)==GBA_FJ_OK);
+    assert(written.index==current.index);assert_legacy_unchanged();
+    /* The no-token route must apply semantic policy too. */
+    metadata=gba_fj_metadata(written.index);model.bytes[metadata+16]=0xee;
+    gba_fj_put32(model.bytes+metadata+8,gba_fj_hash(2166136261u,model.bytes+metadata+16,written.length));
+    assert(gba_fj_write_parts(&io,payload,64,0,0,0x56465a60,accept_payload,0,0,&written)==GBA_FJ_OK);
+    assert(written.index==current.index);assert_legacy_unchanged();
+}
 static void fallback_and_arguments(void)
 {
     GbaFlashJournalRecord previous,written,selected,sentinel;
     reset();legacy_record(0,0xffffffffu);memcpy(legacy,model.bytes,sizeof legacy);
-    assert(gba_fj_write_parts(&io,payload,256,0,0,0x56465a60,0,&previous)==GBA_FJ_OK);
+    assert(gba_fj_write_parts(&io,payload,256,0,0,0x56465a60,accept_payload,0,0,&previous)==GBA_FJ_OK);
     assert(previous.sequence==1); /* Wrap skips zero. */
     legacy_record(0,0x80000001u); /* Ancient legacy counter cannot regain priority. */
     memcpy(legacy,model.bytes,sizeof legacy);
     assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_OK&&
            gba_fj_same_record(&selected,&previous));
-    assert(gba_fj_write_parts(&io,payload,256,0,0,0x56465a60,&previous,&written)==GBA_FJ_OK);
+    assert(gba_fj_write_parts(&io,payload,256,0,0,0x56465a60,accept_payload,0,&previous,&written)==GBA_FJ_OK);
     memcpy(snapshot,model.bytes,sizeof snapshot);
     uint32_t metadata=gba_fj_metadata(written.index);
     model.bytes[metadata+16]^=1;
@@ -167,20 +197,20 @@ static void fallback_and_arguments(void)
     assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_OK&&gba_fj_same_record(&selected,&previous));
     memcpy(model.bytes,snapshot,sizeof snapshot);model.mutations=0;
     GbaFlashJournalRecord stale=previous;stale.sequence++;
-    assert(gba_fj_write_parts(&io,payload,16,0,0,0x56465a60,&stale,&selected)==GBA_FJ_STALE);
+    assert(gba_fj_write_parts(&io,payload,16,0,0,0x56465a60,accept_payload,0,&stale,&selected)==GBA_FJ_STALE);
     assert(!model.mutations&&!memcmp(model.bytes,snapshot,sizeof snapshot));
     memset(&sentinel,0xa5,sizeof sentinel);selected=sentinel;model.fail_read=1;
     assert(gba_fj_select(&io,accept_payload,0,&selected)==GBA_FJ_IO_ERROR);
     assert(!memcmp(&selected,&sentinel,sizeof selected));model.fail_read=0;
-    assert(gba_fj_write_parts(&io,payload,GBA_FJ_PAYLOAD_MAX,tail,1,0x56465a60,&previous,&selected)==GBA_FJ_ARGUMENT);
-    assert(gba_fj_write_parts(&io,payload,1,0,0,0xffffffffu,&previous,&selected)==GBA_FJ_ARGUMENT);
+    assert(gba_fj_write_parts(&io,payload,GBA_FJ_PAYLOAD_MAX,tail,1,0x56465a60,accept_payload,0,&previous,&selected)==GBA_FJ_ARGUMENT);
+    assert(gba_fj_write_parts(&io,payload,1,0,0,0xffffffffu,accept_payload,0,&previous,&selected)==GBA_FJ_ARGUMENT);
     assert(!model.mutations&&!memcmp(model.bytes,snapshot,sizeof snapshot));assert_legacy_unchanged();
 }
 int main(void)
 {
     for(unsigned i=0;i<sizeof payload;++i)payload[i]=(uint8_t)(i*37u+3u);
     for(unsigned i=0;i<sizeof tail;++i)tail[i]=(uint8_t)(i*13u+7u);
-    ordinary_and_full();power_cuts();erased_tag_bytes();fallback_and_arguments();
+    ordinary_and_full();power_cuts();erased_tag_bytes();stale_winner_and_semantic_fallback();fallback_and_arguments();
     puts("isolated Flash journal model: full payload, legacy preservation and fallback PASS");
     return 0;
 }
