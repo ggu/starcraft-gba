@@ -365,6 +365,9 @@ typedef struct {
     u8 optical_units[MAX_UNITS], optical_unit_masks[MAX_UNITS];
     u8 optical_buildings[MAX_BUILDINGS], optical_building_masks[MAX_BUILDINGS];
     unsigned unit_count, building_count, optical_unit_count, optical_building_count;
+#ifdef SC64_P7_DETECTOR_OWNER_FILTER
+    unsigned possible_detector_sources;
+#endif
 } Sc64P7DetectorLists;
 
 /* The source-owner mapping and actor visibility inputs do not change within
@@ -379,6 +382,9 @@ static unsigned sc64_p7_optical_source_mask(int source, int owner, const int map
     return result;
 }
 
+#if defined(SC64_P7_DETECTOR_OWNER_FILTER) && defined(SC64_DIAGNOSTIC_SETUP)
+volatile u32 sc64_detector_filter_built, sc64_detector_filter_mask;
+#endif
 static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
 {
     int map[8], human_slot=sc64_p7_optical_human_slot();
@@ -415,6 +421,26 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
                           || RACE_PROTOSS_RAW(&b[i])==SC64_SPORE_COLONY_RAW
 #endif
                           )) lists->buildings[lists->building_count++]=(u8)i;
+#ifdef SC64_P7_DETECTOR_OWNER_FILTER
+    /* A conservative union: every known detector contributes its current
+     * source bit, and any ambiguous source admits all bits. Lists and this
+     * mask are built together and used only within this source tick. */
+    lists->possible_detector_sources=0;
+    for (unsigned k=0;k<lists->unit_count;++k) {
+        int i=lists->units[k];
+        int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
+        lists->possible_detector_sources |= (unsigned)source<8u ? 1u<<(unsigned)source : 255u;
+    }
+    for (unsigned k=0;k<lists->building_count;++k) {
+        int i=lists->buildings[k];
+        int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
+        lists->possible_detector_sources |= (unsigned)source<8u ? 1u<<(unsigned)source : 255u;
+    }
+#ifdef SC64_DIAGNOSTIC_SETUP
+    sc64_detector_filter_built=1;
+    sc64_detector_filter_mask=lists->possible_detector_sources;
+#endif
+#endif
 }
 
 #ifdef SC64_DIAGNOSTIC_SETUP
@@ -427,6 +453,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     unsigned visible_owners=0,detected=0;
     int x,y,col,row,cx,cy, human_slot=sc64_p7_optical_human_slot();
     if(target<0||target>=MAX_UNITS||!u[target].alive) return 0;
+#ifdef SC64_P7_DETECTOR_OWNER_FILTER
+    if (lists && !lists->possible_detector_sources) return 0;
+#endif
     x=u[target].x; y=u[target].y; col=x/16; row=y/16;
     if(col<0||row<0||col>=MAP_COLS||row>=MAP_ROWS) return 0;
     cx=col*16+8; cy=row*16+8;
@@ -462,6 +491,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         int dx=cx-u[i].x,dy=cy-u[i].y;
 #endif
         unsigned candidate=lists?lists->optical_unit_masks[k]:0;
+#ifdef SC64_P7_DETECTOR_OWNER_FILTER
+        if (lists) candidate &= lists->possible_detector_sources;
+#endif
         if(!lists) {
             if(source>=0&&source<8) {
                 int live=race_protoss_source_owner((unsigned)source);
@@ -493,6 +525,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         int dx=cx-b[i].x,dy=cy-b[i].y;
 #endif
         unsigned candidate=lists?lists->optical_building_masks[k]:0;
+#ifdef SC64_P7_DETECTOR_OWNER_FILTER
+        if (lists) candidate &= lists->possible_detector_sources;
+#endif
         if(!lists) {
             if(source>=0&&source<8) {
                 int live=race_protoss_source_owner((unsigned)source);
@@ -620,6 +655,9 @@ static void sc64_p7_arbiter_cache_source_tick(void)
 #ifdef SC64_DIAGNOSTIC_SETUP
     u32 arbiter_diag_start=gba_clock();
     sc64_arbiter_detect_cycles=0;
+#ifdef SC64_P7_DETECTOR_OWNER_FILTER
+    sc64_detector_filter_built=0; sc64_detector_filter_mask=0;
+#endif
     sc64_optical_unit_cycles=sc64_optical_building_cycles=sc64_optical_refresh_count=0;
 #endif
     u8 powered_cannons[MAX_BUILDINGS];
@@ -826,6 +864,9 @@ sc64_p7_arbiter_cache_process_due(void)
 {
 #ifdef SC64_DIAGNOSTIC_SETUP
     sc64_arbiter_reset_cycles=sc64_arbiter_aura_cycles=sc64_arbiter_update_cycles=sc64_arbiter_detect_cycles=0;
+#ifdef SC64_P7_DETECTOR_OWNER_FILTER
+    sc64_detector_filter_built=0; sc64_detector_filter_mask=0;
+#endif
     sc64_optical_unit_cycles=sc64_optical_building_cycles=sc64_optical_refresh_count=0;
 #endif
     /* The first ordinary play tick runs after map setup and target-index
