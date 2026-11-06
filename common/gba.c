@@ -1551,6 +1551,11 @@ volatile u32 audio_irq_cycles,audio_irq_peak,audio_irq_frames;
 /* audio_music_clear: the mixer zeroed one music half when music stopped;
  * the other half still holds the last frame and is zeroed next VBlank. */
 static u8 audio_half,audio_music_clear;
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+/* Only audio_hw_init claims the channels in this engine; any future
+ * DMA/timer ownership handoff must clear this before touching them. */
+static u8 audio_flash_owned;
+#endif
 /* Thumb, from ROM: the IWRAM reserve is too small for the mixer. */
 static void __attribute__((noinline)) audio_vblank(void){
  u32 start=gba_clock();
@@ -1594,6 +1599,9 @@ static void audio_hw_init(void){
  REG16(0x04000004)|=0x0008;
  REG16(0x04000200)=0x0001;
  REG16(0x04000208)=1;
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+ audio_flash_owned=1;
+#endif
 }
 #endif
 #else
@@ -1624,7 +1632,13 @@ static GbaFlashAudioTransaction flash_audio={
  0,0,0,0,0,0,0
 #endif
 };
-static int flash_audio_stop(void *p){(void)p;return gba_flash_audio_stop(&flash_audio);}
+static int flash_audio_stop(void *p){
+ (void)p;
+#ifdef SC64_AUDIO_IMPORTED
+ flash_audio.imported=audio_flash_owned;
+#endif
+ return gba_flash_audio_stop(&flash_audio);
+}
 static void flash_audio_restore(void *p){
  (void)p;
 #ifdef SC64_AUDIO_IMPORTED
