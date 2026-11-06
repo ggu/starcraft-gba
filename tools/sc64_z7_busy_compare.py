@@ -71,6 +71,10 @@ def main():
  parser.add_argument('--output',type=pathlib.Path,required=True)
  parser.add_argument('--timeout',type=int,default=120)
  args=parser.parse_args()
+ for name in ('trace','baseline_rom','candidate_rom','baseline_seed','candidate_seed',
+              'baseline_prefix','candidate_prefix','baseline_host_resume','candidate_host_resume',
+              'inputs_manifest','output'):
+  setattr(args,name,getattr(args,name).resolve())
  if not 1 <= args.timeout <= 120: parser.error('timeout must be 1..120 seconds')
  if args.output.exists() and any(args.output.iterdir()): parser.error('output must be empty')
  args.output.mkdir(parents=True,exist_ok=True)
