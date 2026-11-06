@@ -62,3 +62,6 @@ an advisor lookup table. Thus the absence of advisor entries from the separate
 codec2 test bank does not explain missing advisor sounds in the delivered ROM.
 Correct cue triggering, clip selection and audible hardware playback remain
 separate questions.
+The codec2 bank's 1,368 unit/kind first-and-count entries and 1,163 voice
+references also passed bounds checks against its 501 sample streams; 13 of 16
+music slots are populated. This check does not establish semantic clip mapping.
