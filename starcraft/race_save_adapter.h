@@ -1715,8 +1715,14 @@ static int race_save_game(void) {
             if (u[i].type==U_Z7_EGG) return 0;
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
+#ifdef SC64_Q8_FLASH_HOST_STAGE
+    if (!race_mode || race_human!=R_PROTOSS || !race_q8_flash_begin()) return 0;
+    GbaSaveSelection cargo_previous={0};
+    int cargo_have_previous=0;
+#else
     GbaSaveSelection cargo_previous;
     int cargo_have_previous=race_worker_cargo_previous(&cargo_previous);
+#endif
 #endif
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_live_products_valid()) return 0;
@@ -2638,6 +2644,9 @@ _Static_assert(SC64_PR_PAD_TUPLE_VALID(MAX_BUILDINGS,SC64_PR_ROW_WIDTH,SC64_PR_U
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_Q8_FLASH_HOST_STAGE
+    u8 q8_debt[MAX_UNITS+MAX_BUILDINGS];
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     Sc64ProtossResearchLevels research_levels;
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
@@ -4233,6 +4242,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     return race_load_preflight(plan);
 #endif
 }
+#ifdef SC64_Q8_FLASH_HOST_STAGE
+#include "sc64_q8_flash_host_adapter.h"
+#endif
 static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
 #ifdef SC64_SHARED_TRANSPORT
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
@@ -4353,11 +4365,15 @@ static int race_load_game(void) {
     const Sc64StageSaveAuth *guard_auth=&plan.egg_auth;
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
+#ifdef SC64_Q8_FLASH_HOST_STAGE
+    if (!race_q8_flash_select(&plan)) return 0;
+#else
     GbaSaveSelection selected;
     if (!race_worker_cargo_select(&plan,&selected)) return 0;
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     if (!race_research_jobs_candidate_scan(&race_data,&plan.research_levels,
                                            plan.research_jobs_tag)) return 0;
+#endif
 #endif
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     GbaSaveSelection selected;
@@ -4791,6 +4807,9 @@ static int race_load_game(void) {
 #endif
     sc64_visibility_reset();update_exploration();reset_selection_gestures();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+#ifdef SC64_Q8_FLASH_HOST_STAGE
+    memcpy(sc64_pr_hp_debt,plan.q8_debt,sizeof sc64_pr_hp_debt);
+#endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }
 #endif

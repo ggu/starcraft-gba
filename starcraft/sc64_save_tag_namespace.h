@@ -12,8 +12,11 @@
 /* Reserved for the HOST-only campaign job experiment. 0x46 is used by the
  * independent Flash journal prototype and is deliberately left separate. */
 #define SC64_SAVE_TAG_CAMPAIGN_JOBS_NAMESPACE 0x00470000u
+/* Private HOST Flash/Q8 experiment; never accepted by ordinary SRAM builds. */
+#define SC64_SAVE_TAG_Q8_FLASH_NAMESPACE 0x00480000u
 #define SC64_SAVE_TAG_BASE_VALID(tag) (((tag)&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_BASE_NAMESPACE)
 #define SC64_SAVE_TAG_RESEARCH(tag) (((tag)&~SC64_SAVE_TAG_NAMESPACE_MASK)|SC64_SAVE_TAG_RESEARCH_NAMESPACE)
 #define SC64_SAVE_TAG_RESEARCH_JOBS(tag) (((tag)&~SC64_SAVE_TAG_NAMESPACE_MASK)|SC64_SAVE_TAG_RESEARCH_JOBS_NAMESPACE)
 #define SC64_SAVE_TAG_CAMPAIGN_JOBS(tag) (((tag)&~SC64_SAVE_TAG_NAMESPACE_MASK)|SC64_SAVE_TAG_CAMPAIGN_JOBS_NAMESPACE)
+#define SC64_SAVE_TAG_Q8_FLASH(tag) (((tag)&~SC64_SAVE_TAG_NAMESPACE_MASK)|SC64_SAVE_TAG_Q8_FLASH_NAMESPACE)
 #endif
