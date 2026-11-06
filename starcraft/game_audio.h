@@ -57,8 +57,8 @@ static u16 game_audio_previous_held;
 
 static int game_audio_last_frame = -1, game_audio_last_screen = -1;
 static u8 game_audio_needs_prime;
-static int game_audio_foundation_frame = -1;
-static void game_audio_prime(void) { game_audio_needs_prime = 1; game_audio_foundation_frame = -1; }
+static int game_audio_pending_warp = -1;
+static void game_audio_prime(void) { game_audio_needs_prime = 1; game_audio_pending_warp = -1; }
 static u32 game_audio_selection, game_audio_orders;
 static u8 game_audio_effects;
 #ifdef SC64_AUDIO_IMPORTED
@@ -168,9 +168,8 @@ static void game_audio_foundation(const Building *q)
     const Sc64RaceBuildingRule *rule = sc64_race_building_rule(q->type);
     if (game_audio_needs_prime || screen != SCREEN_PLAY || q->owner != SIDE ||
         !rule || rule->race != R_PROTOSS || !game_audio_on_screen(q->x, q->y) ||
-        game_audio_foundation_frame == frame) return;
-    game_audio_foundation_frame = frame;
-    game_audio_emit(GAME_AUDIO_WARP_START, game_audio_building_raw(q));
+        game_audio_pending_warp >= 0) return;
+    game_audio_pending_warp = game_audio_building_raw(q);
 #else
     (void)q;
 #endif
@@ -253,6 +252,9 @@ static void game_audio_observe(void)
     game_audio_last_frame = frame;
     game_audio_needs_prime = 0;
     game_audio_effects = 0;
+    if (!fresh && game_audio_pending_warp >= 0)
+        game_audio_emit(GAME_AUDIO_WARP_START, game_audio_pending_warp);
+    game_audio_pending_warp = -1;
     if (advisor && !fresh) game_audio_advisor(advisor);
     for (i = 0; i < MAX_UNITS; i++) {
         const Unit *q = &u[i];

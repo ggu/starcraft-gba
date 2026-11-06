@@ -156,6 +156,7 @@ static int warp_load_prime(void)
             sc64_race_building_rule(b[i].type)->race == R_PROTOSS) { slot = i; break; }
     if (slot < 0 || !save_game()) return fail("load prime setup save");
     game_audio_snapshot[MAX_UNITS + slot] = GAME_AUDIO_SNAPSHOT_ALIVE | GAME_AUDIO_SNAPSHOT_CONSTRUCTING;
+    game_audio_pending_warp = 156; /* queued before a successful load */
     game_audio_last_frame = frame - 1; clear_events();
     if (!load_game()) return fail("load prime real load");
     game_render();
@@ -164,23 +165,30 @@ static int warp_load_prime(void)
     game_audio_snapshot[MAX_UNITS + slot] = GAME_AUDIO_SNAPSHOT_ALIVE | GAME_AUDIO_SNAPSHOT_CONSTRUCTING;
     game_audio_last_frame = frame; game_audio_prime(); game_render();
     if (events(GAME_AUDIO_WARP_DONE)) return fail("same-frame prime replayed cue");
+    game_audio_pending_warp = 156; clear_events(); init_state();
+    screen = SCREEN_PLAY; game_render();
+    if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE)) return fail("new match replayed cue");
     return 0;
 }
 
 static int warp_lifecycle(void)
 {
     fixture();
+    game_audio_effects = GAME_AUDIO_EFFECTS_PER_FRAME; /* previous frame was saturated */
     int slot = spawn_build(SIDE, B_PYLON, 60, 60, 1);
-    if (slot < 0 || events(GAME_AUDIO_WARP_START) != 1) return fail("friendly visible warp start");
-    observe_next(); observe_next();
+    if (slot < 0 || events(GAME_AUDIO_WARP_START)) return fail("foundation cue did not queue");
+    observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("previous budget suppressed warp start");
+    observe_next();
     if (events(GAME_AUDIO_WARP_START) != 1) return fail("warp start repeated");
     b[slot].under_construction = 0; observe_next();
     if (events(GAME_AUDIO_WARP_DONE) != 1 || events(GAME_AUDIO_BUILT)) return fail("warp completion");
     observe_next();
     if (events(GAME_AUDIO_WARP_DONE) != 1) return fail("warp completion repeated");
     b[slot].alive = 0; clear_events();
-    if (spawn_build(SIDE, B_PYLON, 60, 60, 1) != slot || events(GAME_AUDIO_WARP_START) != 1)
-        return fail("same-frame reused slot start");
+    if (spawn_build(SIDE, B_PYLON, 60, 60, 1) != slot) return fail("same-frame reused slot");
+    observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("same-frame reused slot start");
     b[slot].alive = 0; observe_next();
     if (events(GAME_AUDIO_WARP_DONE)) return fail("cancel generated completion");
     clear_events();
@@ -201,8 +209,9 @@ static int warp_lifecycle(void)
         return fail("Zerg completion changed");
     b[slot].alive = 0; observe_next(); clear_events();
     if (spawn_build(SIDE, B_PYLON, 60, 60, 1) < 0 ||
-        spawn_build(SIDE, B_PYLON, 80, 60, 1) < 0 || events(GAME_AUDIO_WARP_START) != 1)
-        return fail("simultaneous warp starts not bounded");
+        spawn_build(SIDE, B_PYLON, 80, 60, 1) < 0) return fail("simultaneous setup");
+    observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("simultaneous warp starts not bounded");
     return 0;
 }
 
