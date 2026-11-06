@@ -6111,3 +6111,10 @@ include mk/sc64-custom-egg-preview/Makefile
 include mk/sc64-late-egg-preview/Makefile
 
 include tests/sc64-psi/Makefile
+
+build/test-sc64-headless-read-bounds: tests/sc64_headless_read_bounds.c tools/sc64_headless_read_bounds.h Makefile | build
+	$(CLANG) -std=c11 -O1 -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-headless-read-bounds
+test-sc64-headless-read-bounds: build/test-sc64-headless-read-bounds
+	./build/test-sc64-headless-read-bounds
+test: test-sc64-headless-read-bounds
