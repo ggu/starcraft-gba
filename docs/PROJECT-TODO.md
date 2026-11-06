@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-06. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-07. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -30,13 +30,16 @@ older KODAK package. Source merges do not update an already copied ROM.
   for placement, production and cached/uncached Cannon power. Separate
   Egg/Carrier/Scarab lifecycles are unchanged; the visual field overlay is off.
 - **Validation and package:** the normal Mac package is now
-  `StarCraft-GBA-2026-11-06-2ce266e3`, using the six-link-qualified #323
-  creation fallback and unchanged release flags. Four qualified canonical
-  ELFs were reused after production-vector and common/StarCraft/mk source
-  equivalence checks against merged `2ce266e3`; 390 current dependencies
-  were hashed before/after. ROM headers, logo, SRAM signature, positive
-  linker margins and all 22 packaged-file checksums passed read-back.
-  The four products retain minimum IWRAM/EWRAM margins of 664/796 bytes.
+  `StarCraft-GBA-2026-11-07-c96fc5e2`, combining #323, #328, #329 and #330
+  with unchanged release flags. Four qualified canonical ELFs were reused
+  after strict production-source and fresh-main vector equivalence checks
+  against merged `c96fc5e2`. Per-translation-unit dependencies and selected
+  inputs yielded 975 hashes unchanged before/after the six-profile matrix.
+  The combined source passed clean default checks (1,023 Python tests,
+  26 skips, plus compiled checks) and focused audio/menu/mining fixtures.
+  ROM headers, logos, SRAM signatures and all 40 packaged-file checksums
+  passed independent read-back. The four packaged products retain minimum
+  IWRAM/EWRAM margins of 664/780 bytes; the extra Z7 link retains 336 IWRAM bytes.
   These are not runtime stack, hardware or frame-rate qualification.
   **KODAK still has the older e9838086 package** until a new physical copy is
   recorded; the card is not currently mounted. Earlier Mac packages remain.
@@ -56,10 +59,22 @@ older KODAK package. Source merges do not update an already copied ROM.
   bound with either unchanged or updated controls. Z4/T6 also remain unqualified;
   existing Z8 and persistence gaps below are not closed. Historical win totals
   and old tapes must not be reported as current-source certification.
-- **Mining pace remains open:** the post-pickup wait is bypassed/overwritten;
-  this is an order-loop defect, not a measured wall-clock income rate. The
-  retarget fix does not add native field queues, change durations, or replace
-  the exact-target cancellation policy for new pending trips.
+- **Mining ordering #328 merged:** workers now spend the configured 45/60
+  stationary updates before mineral/gas pickup, rather than bypassing a timer
+  set after pickup. Both shared and legacy paths clear interrupted progress
+  without deleting cargo. P10 all-race/resource/debit/travel/interruption
+  fixtures, the public cargo target, a genuine old-writer/new-reader timer
+  journal, clean default checks, six guarded links and one P3 HOST win pass.
+  Native field queues and exact gathering rates remain open: the retained
+  durations are not an N64 timing claim. Old nonzero N now collects on N,
+  versus the former N+1. See [the scoped cycle audit](audits/2026-11-07-worker-gather-cycle/README.md).
+- **Menu navigation #330 merged:** a fresh D-pad tap moves immediately;
+  a single held direction repeats after 18 updates, then every five.
+  A/B remain edge-triggered, transient state resets, and no saved fields change.
+  Actual P10 custom uses the text list; only card-eligible contexts use the
+  icon grid. Focused list/card fixtures, clean default checks and six guarded
+  links pass. The current Mac package includes both fixes; category grouping
+  and real-device feedback verification remain open.
 - **Research groundwork #318 merged, gameplay open:** the default-off
   completed-level journal uses a distinct namespace and validated building-row
   padding without reducing impact capacity. Review repaired a new-match reset
@@ -79,17 +94,26 @@ older KODAK package. Source merges do not update an already copied ROM.
   cost precedence; the authenticated 30-map regeneration still marks all 180
   selected mission/family price policies supported. The new facts header is
   unused by the engine. These are groundwork, not usable upgrades.
+  The separate `codex/shared-research-engine-20261107` branch stages HOST-only
+  producer jobs using actual Building fields, refusing save/load until a
+  format is authenticated. It is not in main, not tested or enabled in a ROM;
+  current-controller binding, persistence, UI and combat integration remain open.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
-- **Other feedback:** warp-start/death sounds, large death effects, remembered
+- **Other feedback:** death sounds, large death effects, remembered
   resource/fog presentation, AI difficulty choices and direct native defeat
   behavior remain open. Current custom defeat counts the last live owned
   building. Delivered death pixels/timelines were authenticated; their large
   source frames require a paired native presentation check, not guessed scale.
-  The warp-audio audit identifies separate source-indexed clips 528/529 absent
-  from the delivered bank and no foundation-start trigger. The candidate adds
-  a queued creation cue and explicit load/new-match priming; it remains unmerged
-  pending bank, actual sample-request, lifecycle and normal-product qualification.
+- **Protoss construction audio #329 merged:** explicit foundation and
+  completion cues use the separate source-indexed 528/529 clips. Load/new-match
+  priming prevents replay; old banks preserve completion fallback without
+  spending effect budget on an unsupported start. The new bank preserves all
+  510 previous SFX and 13 music streams, adding only the two clips. Combined
+  new/old-bank fixtures, ordinary-input Protoss custom sample requests,
+  clean default checks and six guarded links pass. The new package includes
+  that bank. Native audibility, exact event timing and physical GBA sound
+  remain unverified; see [the audio audit](audits/2026-11-06-protoss-warp-audio/README.md).
 - **Native construction reference #317 merged:** fresh ordinary-input N64
   custom gameplay selected a Probe, opened the Pylon menu, placed its green
   preview and captured the blue-white warp orb. **#326 merged** adds a fresh
@@ -121,8 +145,8 @@ older KODAK package. Source merges do not update an already copied ROM.
   18.5%; selected persisted-state fingerprints matched every update. This
   remains one passive-human opening, without guest pixels, a current campaign
   win or hardware FPS proof. The current Mac package includes this optimization through the
-  later #323 release binary; these earlier timings are not a post-#323
-  measurement.
+  later combined release binary; these earlier timings are not measurements
+  of the current menu/mining/audio source.
   See [the scoped grid audit](audits/2026-11-06-late-zerg-bulk-path-grid/README.md).
   Actions stays disabled; these checks run locally.
 
@@ -135,10 +159,14 @@ movement cost instead centers on contact-mask and step-clear work (about
 158k/88k diagnostic cycles, nested scopes with 4.121% observer overhead).
 Inspect those recurring operations before more rare-path cache changes. These
 experiments are source-only branches, not shipped speed gains.
+The separate default-off `codex/contact-mask-optimization-20261107` prototype
+tries the cheapest terrain-valid steering offset before building the full
+collision mask. Its independent winner oracle and current-main cycle comparison
+have not run; neither correctness nor a speed gain is established.
 
-Priority: deliver the verified normal package when KODAK is connected, reduce
-measured route/order tails and repair current campaign/winning-replay gaps.
-Continue typed research and native visual/audio comparison with explicit
+Priority: deliver the verified normal package when KODAK is connected, implement
+usable shared Forge/Core research, reduce measured recurring collision work,
+and repair current campaign/winning-replay gaps. Continue native visual/audio comparison with explicit
 save/source-owner and timing evidence; do not advertise unwired components.
 
 ## Current baseline
@@ -146,7 +174,7 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-06-2ce266e3`:
+- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-c96fc5e2`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The older KODAK package
   is `20261106-e9838086-campaigns`. Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
@@ -331,7 +359,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Draft: renderer conflicts and missing current memory/paired ARM qualification. |
 | [#315](https://github.com/ggu/starcraft-gba/pull/315), late-Zerg packed grid | Merged as `738223a4`; scoped tests and emulator timing are recorded above. The later #323 package retains this capability, with a different binary; its speed has not been remeasured. Strict current Z7 winning validation, broader campaign/skirmish and hardware qualification remain open. |
 | [#318](https://github.com/ggu/starcraft-gba/pull/318), research journal groundwork | Merged as `f34004af`, default-off. Full default suite and current flag-off composition passed; feature-on current-base and functional research qualification remain open. The default-off groundwork alone did not change package bytes; #323 is included in the newer normal package. |
-| SD delivery | Latest verified normal Mac package is `2ce266e3` (qualified #323 canonical ELFs), with a player testing guide and read-back manifest; last verified KODAK package is `e9838086` plus the separate custom Egg preview. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
+| SD delivery | Latest verified normal Mac package is `c96fc5e2` (combined menu/mining/audio source), with a player testing guide and independent 40-file read-back; last verified KODAK package is `e9838086` plus the separate custom Egg preview. Card detection/copy is pending. Never claim the newer build is on the card without read-back verification. |
 
 ## Verification and maintenance
 
