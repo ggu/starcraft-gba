@@ -148,11 +148,24 @@ static void p6_fractional_splash(void)
     assert(race_p6_combat_apply_explosive(v,10,4,U_P6_INFESTED_TERRAN,ENEMY));
     assert(hp_q8(v)==100*256-192); /* (2.5 - 1 armor) * 1/2. */
 }
+#ifdef SC64_SCARAB_WEAPON_PROBE
+static void scarab_fractional_impact(void)
+{
+    reset_world();int v=actor(SIDE,65,500,500);
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_SHIELDS]=3;
+    u[v].shield=1;u[v].shield_remainder=640;
+    race_scarab_probe_hit(v,6*256,ENEMY);
+    assert(hp_q8(v)==100*256-128 && !u[v].shield && !u[v].shield_remainder);
+}
+#endif
 int main(void)
 {
     printf("Q8 stage sizes: save=%zu impact-record=%zu debt=%zu\n",
            sizeof(RaceSave),sizeof(RaceImpactRecord),sizeof sc64_pr_hp_debt);
     gba_init();shield_and_hp_packets();shared_special_routes();buildings_and_lifetime();
     carrier_return_repair();p6_fractional_splash();
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    scarab_fractional_impact();
+#endif
     puts("actual shared fractional damage, plasma armor, splash, regen and lifecycle HOST stage: PASS");return 0;
 }
