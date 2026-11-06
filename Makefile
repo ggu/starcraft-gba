@@ -6140,3 +6140,5 @@ include tests/sc64-menu-repeat/Makefile
 include tests/sc64-shared-source-sight/Makefile
 
 include tests/sc64-research-human-binding/Makefile
+
+include tests/sc64-research-campaign-policy/Makefile
