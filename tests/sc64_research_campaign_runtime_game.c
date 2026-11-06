@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "../common/gba.c"
 #include "../starcraft/game.c"
 #ifndef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
 #error "requires the isolated campaign HOST stage"
@@ -66,7 +67,7 @@ static void real_menu_and_lifecycle(void)
     unsigned remaining=b[forge].queue_progress;
     assert(remaining>1);game_update(0,0);assert(b[forge].queue_progress==remaining-1);
     /* The old generic job cannot run alongside the typed family. */
-    int bank=minerals;research(0);assert(!weapons_research&&minerals==bank);
+    int bank=minerals;start_research(0);assert(!weapons_research&&minerals==bank);
     assert(sc64_pr_stage_cancel_slot(forge,0));assert(minerals==1000&&gas==1000);
     assert(sc64_pr_stage_begin_slot(forge,SC64_PR_GROUND_WEAPONS));
     remaining=b[forge].queue_progress;
