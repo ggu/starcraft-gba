@@ -150,15 +150,21 @@ static int sc64_pr_job_cancel_custom(Building *p, unsigned payer, Sc64PrPaidRece
     paid->live=0;
     return 1;
 }
-/* Detached custom candidate audit only. It reads no live globals and does
- * not authorize a journal tag or publish a receipt. A later decoder must
- * supply the candidate's own context, not the currently running match. */
-static int sc64_pr_job_candidate_valid_custom(const Building *rows, unsigned count,
+/* Detached custom candidate audit. The caller supplies only candidate
+ * context and may feed decoded rows one at a time; no live globals or full
+ * second Building array are needed. This does not itself authenticate a tag. */
+typedef struct {
+    const Sc64ProtossResearchLevels *levels;
+    const int *players;
+    unsigned bots, legacy_weapons, legacy_armor;
+    int pending_weapons, pending_armor;
+    uint8_t seen[SC64_PR_CUSTOM_OWNERS][SC64_PR_FAMILY_COUNT];
+} Sc64PrCandidateScan;
+static int sc64_pr_candidate_scan_init(Sc64PrCandidateScan *scan,
     const Sc64ProtossResearchLevels *levels, const int players[5], unsigned bots,
     unsigned legacy_weapons, unsigned legacy_armor, int pending_weapons, int pending_armor)
 {
-    uint8_t seen[SC64_PR_CUSTOM_OWNERS][SC64_PR_FAMILY_COUNT]={{0}};
-    if (!rows || !levels || !players || count>MAX_BUILDINGS || bots<1 || bots>3 ||
+    if (!scan || !levels || !players || bots<1 || bots>3 ||
         legacy_weapons>2 || legacy_armor>2 || !sc64_pr_levels_valid(levels,SC64_PR_CUSTOM_OWNERS)) return 0;
     for (unsigned owner=0;owner<SC64_PR_CUSTOM_OWNERS;++owner) {
         int active=owner==SIDE || (owner==ENEMY && bots>=1) ||
@@ -166,23 +172,41 @@ static int sc64_pr_job_candidate_valid_custom(const Building *rows, unsigned cou
         for (unsigned family=0;family<SC64_PR_FAMILY_COUNT;++family)
             if (levels->level[owner][family] && (!active || players[owner]!=R_PROTOSS)) return 0;
     }
-    for (unsigned i=0;i<count;++i) {
-        const Building *q=&rows[i]; unsigned owner, family;
-        if (q->type!=B_FORGE && q->type!=B_CYBERNETICS_CORE) continue;
-        if (!q->level && !q->queue_progress && !q->queue[0] && !q->queue[1] &&
-            !q->queue[2] && !q->queue[3] && !q->queue[4]) continue;
-        owner=(unsigned)q->owner;
-        if (owner>=SC64_PR_CUSTOM_OWNERS ||
-            !(owner==SIDE || (owner==ENEMY && bots>=1) ||
-              (owner==RESCUABLE && bots>=2) || (owner==4 && bots>=3)) ||
-            players[owner]!=R_PROTOSS || q->level<1 || q->level>SC64_PR_FAMILY_COUNT ||
-            (q->raw_type>=0 && q->raw_type!=sc64_race_raw_building(q->type))) return 0;
-        family=(unsigned)q->level-1;
-        if (seen[owner][family]++ ||
-            !sc64_pr_job_valid_custom(q,owner,levels,owner==SIDE?legacy_weapons:0,
-                owner==SIDE?legacy_armor:0,owner==SIDE&&pending_weapons,
-                owner==SIDE&&pending_armor)) return 0;
-    }
+    memset(scan,0,sizeof(*scan)); scan->levels=levels; scan->players=players;
+    scan->bots=bots; scan->legacy_weapons=legacy_weapons; scan->legacy_armor=legacy_armor;
+    scan->pending_weapons=pending_weapons; scan->pending_armor=pending_armor;
+    return 1;
+}
+static int sc64_pr_candidate_scan_row(Sc64PrCandidateScan *scan,const Building *q)
+{
+    unsigned owner,family;
+    if (!scan || !q || !scan->levels || !scan->players) return 0;
+    if (q->type!=B_FORGE && q->type!=B_CYBERNETICS_CORE) return 1;
+    if (!q->level && !q->queue_progress && !q->queue[0] && !q->queue[1] &&
+        !q->queue[2] && !q->queue[3] && !q->queue[4]) return 1;
+    owner=(unsigned)q->owner;
+    if (owner>=SC64_PR_CUSTOM_OWNERS ||
+        !(owner==SIDE || (owner==ENEMY && scan->bots>=1) ||
+          (owner==RESCUABLE && scan->bots>=2) || (owner==4 && scan->bots>=3)) ||
+        scan->players[owner]!=R_PROTOSS || q->level<1 || q->level>SC64_PR_FAMILY_COUNT ||
+        (q->raw_type>=0 && q->raw_type!=sc64_race_raw_building(q->type))) return 0;
+    family=(unsigned)q->level-1;
+    if (scan->seen[owner][family] ||
+        !sc64_pr_job_valid_custom(q,owner,scan->levels,owner==SIDE?scan->legacy_weapons:0,
+            owner==SIDE?scan->legacy_armor:0,owner==SIDE&&scan->pending_weapons,
+            owner==SIDE&&scan->pending_armor)) return 0;
+    scan->seen[owner][family]=1;
+    return 1;
+}
+static int sc64_pr_job_candidate_valid_custom(const Building *rows, unsigned count,
+    const Sc64ProtossResearchLevels *levels, const int players[5], unsigned bots,
+    unsigned legacy_weapons, unsigned legacy_armor, int pending_weapons, int pending_armor)
+{
+    Sc64PrCandidateScan scan;
+    if (!rows || count>MAX_BUILDINGS ||
+        !sc64_pr_candidate_scan_init(&scan,levels,players,bots,legacy_weapons,legacy_armor,
+                                     pending_weapons,pending_armor)) return 0;
+    for (unsigned i=0;i<count;++i) if (!sc64_pr_candidate_scan_row(&scan,&rows[i])) return 0;
     return 1;
 }
 
