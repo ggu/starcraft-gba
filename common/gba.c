@@ -1610,33 +1610,27 @@ void gfx_dump_ppm(const char* path){FILE*f=fopen(path,"wb");if(!f)return;fprintf
 
 #ifdef SC64_Q8_FLASH_ARM_PROBE
 #include "gba_flash_transaction.h"
-static struct {u16 timer_data,timer_control,sound;int audio;} flash_audio_state;
+#include "gba_flash_audio_transaction.h"
 static u16 flash_read_ime(void *p){(void)p;return REG16(0x04000208);}
 static void flash_write_ime(void *p,u16 v){(void)p;REG16(0x04000208)=v;}
-static int flash_audio_stop(void *p){
- (void)p;u16 d1=REG16(0x040000c6),d2=REG16(0x040000d2);
- flash_audio_state.audio=0;
+static u16 flash_reg_read(void *p,u32 a){(void)p;return REG16(a);}
+static void flash_reg_write16(void *p,u32 a,u16 v){(void)p;REG16(a)=v;}
+static void flash_reg_write32(void *p,u32 a,u32 v){(void)p;REG32(a)=v;}
+static GbaFlashAudioTransaction flash_audio={
+ 0,flash_reg_read,flash_reg_write16,flash_reg_write32,
 #ifdef SC64_AUDIO_IMPORTED
- /* Audio owns both FIFO channels, or neither. Unknown DMA is never touched. */
- if(d1==0xb640 && d2==0xb640 && REG16(0x04000102)==0x0080){
-  flash_audio_state.audio=1;flash_audio_state.timer_data=(u16)(65536u-280896u/AUDIO_FRAME_SAMPLES);
-  flash_audio_state.timer_control=REG16(0x04000102);flash_audio_state.sound=REG16(0x04000082);
-  REG16(0x04000102)=0;REG32(0x040000c4)=0;REG32(0x040000d0)=0;return 1;
- }
+ (u32)AUDIO_MIX_BUFFER,(u32)AUDIO_MUSIC_BUFFER,(u16)(65536u-280896u/AUDIO_FRAME_SAMPLES),0,0,1,0
+#else
+ 0,0,0,0,0,0,0
 #endif
- return !(d1&0x8000) && !(d2&0x8000);
-}
+};
+static int flash_audio_stop(void *p){(void)p;return gba_flash_audio_stop(&flash_audio);}
 static void flash_audio_restore(void *p){
  (void)p;
 #ifdef SC64_AUDIO_IMPORTED
- if(flash_audio_state.audio){
-  /* FIFO DMA source addresses are write-only; restart at a known buffer boundary. */
-  audio_half=0;REG16(0x04000082)=flash_audio_state.sound|0x8800;
-  REG32(0x040000bc)=(u32)AUDIO_MIX_BUFFER;REG32(0x040000c4)=0xb6400000u;
-  REG32(0x040000c8)=(u32)AUDIO_MUSIC_BUFFER;REG32(0x040000d0)=0xb6400000u;
-  REG16(0x04000100)=flash_audio_state.timer_data;REG16(0x04000102)=flash_audio_state.timer_control;
- }
+ if(flash_audio.active)audio_half=0;
 #endif
+ gba_flash_audio_restore(&flash_audio);
 }
 static GbaFlashTransaction flash_transaction={0,flash_read_ime,flash_write_ime,flash_audio_stop,flash_audio_restore,0,0};
 int gba_flash_game_transaction_begin(void){return gba_flash_transaction_begin(&flash_transaction);}
