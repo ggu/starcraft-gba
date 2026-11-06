@@ -523,3 +523,9 @@ actual gather delay. Run `1211e73`'s focused collection-cycle diagnostic before
 fixing timing/retarget semantics; both must preserve final cargo and STOP.
 Canonical 31a full-field fresh HOST replay now also passes 307/307 observations
 and all per-call state/display fingerprints to win. No flag promotion yet.
+
+Native Melee/Challenger now directly shows human starting minerals **50**
+before in-map actions; GBA custom source starts each active player at **200**.
+Correct starting rules separately from mining timing, with source/runtime tests
+and explicit bot-policy evidence. Producer cancel candidate now also separates
+full unit refunds from partial building-construction refunds; not merged yet.

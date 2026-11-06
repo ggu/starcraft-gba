@@ -44,3 +44,18 @@ cargo. That supports investigating the ordering discrepancy, but does not by
 itself set the GBA duration or prove N64 timing. The new standalone diagnostic
 is on `codex/mineral-retarget-20261106` at `1211e73`; it is explicitly unwired,
 not yet compiled, and not a gameplay fix.
+
+## Additional confirmed findings
+
+Fresh native Melee / Challenger (human Terran versus computer Zerg) shows
+50 minerals at the earliest sampled map and the next sample, before in-map
+commands. Current GBA custom setup gives 200 to every active player. The
+native human starting bank is directly observed; the native bot bank is not.
+This starting-rule discrepancy is separate from mining-cycle throughput.
+Do not infer new timer constants from the starting bank.
+
+Ordinary queue cancellation also needs a full refund rather than preserving
+the current 75-percent refund: pinned OpenBW `cancel_build_queue` uses the
+full-unit-cost refund, separately from partial construction refunds. Terra's
+candidate now reflects that distinction, but focused tests/native confirmation
+and merge are still pending.
