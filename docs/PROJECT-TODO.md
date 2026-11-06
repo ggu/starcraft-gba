@@ -141,9 +141,19 @@ Fresh recovery results (qualification remains incomplete):
   30-fps budget. These are narrow diagnostic measurements, not release speed.
   Guarded diagnostic IWRAM ends at 0x03004fe8 in the uncached variant, only 24
   bytes below the boundary; bounded stack watermark is not all-path/IRQ proof.
-  Flags remain off pending normal release links and uninterrupted campaign,
+  All eight normal Z7-Z10 control/shortcut ARM links pass, but flags remain off
+  after the full-replay outcome failure below. Uninterrupted campaign,
   early/warm custom 1/3-bot, save/load and representative ARM qualification.
   See the [measured source branch](https://github.com/ggu/starcraft-gba/tree/codex/z7-host-sram-replay-20261106).
+  **Full fresh-start replay rejects promotion:** the control passed 307/307
+  recorded observations and won at input tick 175,455; the unchanged tape on
+  the shortcut variant lost at tick 16,030. The first selected actor-state
+  fingerprint difference is call 817 (world/display hashes still matched then).
+  The narrow post-load speed result does not qualify this change. Preserve all
+  failed evidence and keep the flag disabled. Trace the first differing route
+  output and cache/reuse state; standalone FIFO witness tests cannot prove that
+  changing field allocation/eviction preserves the existing stateful dispatcher.
+  Do not remove state checks or change controller inputs to conceal divergence.
 - The fitting shared-actor stack diagnostic completed real custom START/B save
   and fresh HOME-L continuation with matching candidate/diagnostic SRAM and
   named states. At least 9,740 of 11,208 painted bytes remained untouched in the
