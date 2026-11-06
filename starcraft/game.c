@@ -2256,6 +2256,9 @@ volatile u32 sc64_setup_buckets, sc64_setup_lists, sc64_setup_index, sc64_setup_
 #endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
 volatile u32 sc64_order_setup_cycles, sc64_order_query_cycles, sc64_order_move_cycles;
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+volatile u32 sc64_leaf_step_calls,sc64_leaf_step_cycles,sc64_leaf_direct_calls,sc64_leaf_direct_cycles,sc64_leaf_route_calls,sc64_leaf_route_cycles,sc64_leaf_contact_calls,sc64_leaf_contact_cycles,sc64_leaf_block_calls,sc64_leaf_block_cycles,sc64_leaf_gradient_steps,sc64_leaf_mono_calls,sc64_leaf_mono_cycles,sc64_leaf_field_reads;
+#endif
 #define SC64_ORDER_DIAG_ACCUM(counter, start) \
     do { (counter) += gba_clock() - (start); } while (0)
 #endif
@@ -3345,7 +3348,13 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 #ifdef SC64_DIAGNOSTIC_ROUTE_CALLERS
     sc64_route_diag_outer=(u32)__builtin_return_address(0);
     sc64_route_diag_origin=(u32)(limit(x / 16, 0, MAP_COLS - 1) + limit(y / 16, 0, MAP_ROWS - 1) * MAP_COLS);
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+    u32 leaf_start=gba_clock(); ++sc64_leaf_route_calls;
+#endif
     int diag_result=sc64_route_next(x, y, tx, ty, next_x, next_y);
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+    sc64_leaf_route_cycles+=gba_clock()-leaf_start;
+#endif
     sc64_route_diag_outer=0;
     return diag_result;
 #else
@@ -3484,7 +3493,7 @@ formation_route_pair(int sx, int sy, int slot_x, int slot_y, int tx, int ty,
 /* Cheap direct routing handles the open map. Run the full BFS only when the
  * straight corridor intersects terrain or a structure. */
 static int GBA_HOT
-direct_path_clear(int x, int y, int tx, int ty)
+direct_path_clear_impl(int x, int y, int tx, int ty)
 {
     /* Movement advances both axes, then the remaining axis. Testing a
      * sampled straight line accepts a different route and can repeatedly
@@ -3510,6 +3519,12 @@ direct_path_clear(int x, int y, int tx, int ty)
     }
     return 1;
 }
+
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+static int direct_path_clear(int x,int y,int tx,int ty) { u32 t=gba_clock(); ++sc64_leaf_direct_calls; int r=direct_path_clear_impl(x,y,tx,ty); sc64_leaf_direct_cycles+=gba_clock()-t; return r; }
+#else
+#define direct_path_clear direct_path_clear_impl
+#endif
 
 #ifdef SC64_RACES
 static int __attribute__((noinline))
@@ -3550,7 +3565,7 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
 #endif
 
 static int GBA_HOT
-unit_step_clear(const Unit *q, int nx, int ny)
+unit_step_clear_impl(const Unit *q, int nx, int ny)
 {
     if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) return 0;
     if (SC64_SCARAB_NONCOLLIDING(q)) return 1;
@@ -3584,6 +3599,12 @@ unit_step_clear(const Unit *q, int nx, int ny)
     return 1;
 #endif
 }
+
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+static int unit_step_clear(const Unit *q,int x,int y) { u32 t=gba_clock(); ++sc64_leaf_step_calls; int r=unit_step_clear_impl(q,x,y); sc64_leaf_step_cycles+=gba_clock()-t; return r; }
+#else
+static int unit_step_clear(const Unit *q,int x,int y) { return unit_step_clear_impl(q,x,y); }
+#endif
 
 #ifdef SC64_RACES
 /* Keep fact lookup and endpoint arithmetic in ROM: large campaign profiles
@@ -3739,7 +3760,13 @@ move_toward(Unit * q, int tx, int ty)
 #if defined(SC64_CONTACT_CACHE)
 	/* One bucket pass answers all eight unit_step_clear() offsets; the
 	 * selection order and tie-breaking below are unchanged. */
-	unsigned blocked = sc64_contact_blocked_mask(q, speed);
+	#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+        u32 leaf_contact_start=gba_clock(); ++sc64_leaf_contact_calls;
+#endif
+        unsigned blocked = sc64_contact_blocked_mask(q, speed);
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+        sc64_leaf_contact_cycles+=gba_clock()-leaf_contact_start;
+#endif
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);

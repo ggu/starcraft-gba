@@ -378,6 +378,9 @@ static void sc64_route_age_touch(int slot, int increment)
 #ifdef SC64_RACES
 static int GBA_HOT sc64_route_get(int slot, int cell)
 {
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+    ++sc64_leaf_field_reads;
+#endif
 #ifdef SC64_ROUTE_PACK3
     u32 bit = (u32)cell * 3u;
     unsigned byte = bit >> 3, shift = bit & 7u;
@@ -1554,7 +1557,7 @@ sc64_route_step_slot(int origin, int goal)
 /* Inflated structure cells are rare actor origins. Keep their gradient walk in
  * ROM so the hot route query stays small; selection/ties remain identical. */
 static int __attribute__((noinline))
-sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out_row)
+sc64_route_blocked_start_impl(int slot,int col,int row,int goal,int *out_col,int *out_row)
 {
     static const s8 dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
     int i,best=-1,cost=0x7fffffff;
@@ -1574,6 +1577,9 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
             else if(d==3)candidate+=MAP_COLS;
             else candidate-=MAP_COLS;
             ++distance;
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+            ++sc64_leaf_gradient_steps;
+#endif
         }
         if(distance<cost){cost=distance;best=i;}
     }
@@ -1581,6 +1587,14 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
     *out_col=col+dx[best];*out_row=row+dy[best];
     return 1;
 }
+#endif
+
+#if defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+static int sc64_route_blocked_start(int s,int c,int r,int g,int *x,int *y) { u32 t=gba_clock(); ++sc64_leaf_block_calls; int z=sc64_route_blocked_start_impl(s,c,r,g,x,y); sc64_leaf_block_cycles+=gba_clock()-t; return z; }
+#else
+#define sc64_route_blocked_start sc64_route_blocked_start_impl
+#endif
 #endif
 
 #if defined(SC64_RANGE_WORK) && defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
@@ -1647,7 +1661,7 @@ sc64_route_preferred_l_clear(int start_col, int start_row,
 
 #ifdef SC64_ROUTE_MONOTONE_ENABLED
 static int __attribute__((noinline))
-sc64_route_monotone_next_step(int origin, int goal, int tx, int ty,
+sc64_route_monotone_next_step_impl(int origin, int goal, int tx, int ty,
                               int *next_x, int *next_y)
 {
     int i, predecessor = -1, status, cols = MAP_COLS, rows = MAP_ROWS;
@@ -1689,6 +1703,14 @@ sc64_route_monotone_next_step(int origin, int goal, int tx, int ty,
     }
     return 1;
 }
+#endif
+
+#ifdef SC64_ROUTE_MONOTONE_ENABLED
+#ifdef SC64_DIAGNOSTIC_MOVE_LEAVES
+static int sc64_route_monotone_next_step(int a,int b,int c,int d,int *x,int *y) { u32 t=gba_clock(); ++sc64_leaf_mono_calls; int z=sc64_route_monotone_next_step_impl(a,b,c,d,x,y); sc64_leaf_mono_cycles+=gba_clock()-t; return z; }
+#else
+#define sc64_route_monotone_next_step sc64_route_monotone_next_step_impl
+#endif
 #endif
 
 static int GBA_HOT
