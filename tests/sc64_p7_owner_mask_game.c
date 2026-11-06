@@ -171,7 +171,9 @@ static void expect_mask(unsigned expected, const u8 *powered)
     unsigned reference = sc64_p7_arbiter_detected_mask_reference(0, powered);
     if (reference != expected) fprintf(stderr, "expected %u got %u\n", expected, reference);
     assert(reference == expected);
-    assert(sc64_p7_arbiter_detected_mask(0, powered) == expected);
+    unsigned actual = sc64_p7_arbiter_detected_mask(0, powered);
+    if (actual != expected) fprintf(stderr, "actual %u expected %u target=(%d,%d) visible=%d\n", actual,expected,u[0].x,u[0].y,SC64_GRID_GET(visible,u[0].x/16+(u[0].y/16)*MAP_COLS));
+    assert(actual == expected);
     Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
     assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == expected);
 }

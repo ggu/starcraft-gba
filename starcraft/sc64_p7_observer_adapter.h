@@ -422,6 +422,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
             } else for(unsigned owner=0;owner<7;++owner)
                 if(race_protoss_source_owner(owner)==u[i].owner) candidate|=1u<<owner;
         }
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+        candidate &= ~(1u << 7); /* Human optical sight comes only from SIDE grid. */
+#endif
         if(!(candidate & ~visible_owners)) continue;
         int radius=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
         if(dx*dx+dy*dy>radius*radius) continue;
@@ -450,6 +453,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
             } else for(unsigned owner=0;owner<7;++owner)
                 if(race_protoss_source_owner(owner)==b[i].owner) candidate|=1u<<owner;
         }
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+        candidate &= ~(1u << 7); /* Human optical sight comes only from SIDE grid. */
+#endif
         if(!(candidate & ~visible_owners)) continue;
         int radius=sc64_p7_observer_sight_radius_runtime(
 #ifdef SC64_SOURCE_SIGHT_ALL_RACES
