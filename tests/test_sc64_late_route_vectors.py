@@ -35,5 +35,25 @@ class LateZergRouteVectors(unittest.TestCase):
                     self.assertNotIn('-DSC64_ROUTE_MONOTONE_PROBE', flags, name)
 
 
+    def test_bulk_path_grid_default_and_toggle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / 'vectors.mk'
+            fixture.write_text(''.join(
+                f'$(info Z{n}:$(ZERG_Z{n}_RELEASE_FLAGS))\n' for n in (7, 8, 9, 10)
+            ) + '.PHONY: vector-fixture\nvector-fixture:\n\t@:\n')
+            for option, expected in ((None, 1), ('0', 0), ('1', 1)):
+                cmd = ['make', '-s', '-f', 'Makefile', '-f', str(fixture)]
+                if option is not None:
+                    cmd.append(f'CANONICAL_PATH_GRID={option}')
+                result = subprocess.run(cmd + ['vector-fixture'], cwd=ROOT, text=True,
+                                        capture_output=True, check=True)
+                lines = dict(line.split(':', 1) for line in result.stdout.splitlines()
+                             if line.startswith(('Z7:', 'Z8:', 'Z9:', 'Z10:')))
+                self.assertEqual(set(lines), {'Z7', 'Z8', 'Z9', 'Z10'})
+                for name, value in lines.items():
+                    self.assertEqual(value.split().count('-DSC64_BULK_TERRAIN_GRID'),
+                                     expected, name)
+
+
 if __name__ == '__main__':
     unittest.main()
