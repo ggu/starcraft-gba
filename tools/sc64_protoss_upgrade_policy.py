@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate private campaign upgrade/technology policy from the owned USA ROM.
+"""Generate private all-campaign Protoss upgrade/technology policy from the owned USA ROM.
 
 Uses the pinned OpenBW version-59/63 UMS chunk precedence as a reference,
 not a claim of observed N64 behavior. No extracted source asset is written.
@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.sc64_sprites import load_extractor
 from tools.sc64_zp_scenario_pack import parse_chk_sections
+from tools.sc64_races_pack import MISSIONS
 
 ROM_SHA256 = 'e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 EXTRACTOR_SHA256 = '6a84761a9a8074fcc393527a7b17cea194084e8ab49176ff82fa3bef8e1b1dc2'
@@ -65,8 +66,9 @@ def policy(sections):
         settings = sections[b'UPGx']; count = 61
         if len(settings) != 794:
             raise ValueError('invalid UPGx length')
-    if any(settings[i] != 1 for i in UPGRADES):
-        raise ValueError('custom upgrade prices/times not supported')
+    if any(settings[i] not in (0, 1) for i in UPGRADES):
+        raise ValueError('invalid upgrade setting selector')
+    default_costs = [settings[i] for i in UPGRADES]
     # OpenBW reads these optional expansion chunks after base chunks.
     base = decode_restrictions(sections[b'UPGR'], 46, UPGRADES)
     tech = decode_restrictions(sections[b'PTEC'], 24, TECHS, True)
@@ -74,24 +76,74 @@ def policy(sections):
         base = decode_restrictions(sections[b'PUPx'], 61, UPGRADES)
     if b'PTEx' in sections:
         tech = decode_restrictions(sections[b'PTEx'], 44, TECHS, True)
-    return base, tech
+    return base, tech, default_costs
 
 
-def emit(rows, hashes):
+def validate_catalog(catalog):
+    """Return explicit T/Z/P and 1..10 indexing independent of packer order."""
+    result = {}
+    paths = set()
+    for name, path, _title in catalog:
+        if len(name) < 2 or name[0] not in 'TZP' or not name[1:].isdigit():
+            raise ValueError('invalid campaign identity')
+        number = int(name[1:])
+        if number not in range(1, 11) or name != name[0] + str(number):
+            raise ValueError('invalid campaign number')
+        key = (name[0], number)
+        if key in result or path in paths:
+            raise ValueError('duplicate campaign identity or path')
+        result[key] = path
+        paths.add(path)
+    if set(result) != {(race, number) for race in 'TZP' for number in range(1, 11)}:
+        raise ValueError('incomplete campaign catalog')
+    return result
+
+
+def collect(archive, catalog):
+    """Require a unique matching archive entry for every catalog identity."""
+    paths = set(catalog.values())
+    entries = {}
+    for entry in archive.entries():
+        if entry.path in paths:
+            if entry.path in entries:
+                raise ValueError('duplicate campaign archive entry')
+            entries[entry.path] = entry
+    if set(entries) != paths:
+        raise ValueError('missing campaign archive entry')
+    result = {}
+    for key, path in catalog.items():
+        data = archive.read(entries[path])
+        result[key] = (policy(parse_chk_sections(data)), digest(data), path)
+    return result
+
+
+def emit(rows):
     lines = ['/* Private ROM-derived numeric policy; do not commit. */',
              '#ifndef SC64_PROTOSS_UPGRADE_POLICY_GENERATED_H',
              '#define SC64_PROTOSS_UPGRADE_POLICY_GENERATED_H',
+             '/* Race index: T=0 Z=1 P=2; mission index: chapter minus one; raw owner: 0..7. */',
              '/* Upgrade pairs are maximum, initial; order: ground armor, air armor, ground weapons, air weapons, shields, Singularity. */',
-             '/* Tech pairs are available, researched; order: Storm, Hallucination, Recall, Stasis, Archon Warp. */']
-    for name, index in (('sc64_pr_campaign_upgrades', 0), ('sc64_pr_campaign_tech', 1)):
-        count = 6 if index == 0 else 5
-        lines.append(f'static const unsigned char {name}[10][8][{count}][2] = {{')
-        for mission, row in enumerate(rows):
-            lines.append('  { /* P%d, CHK SHA-256 %s */' % (mission + 1, hashes[mission]))
-            for owner in row[index]:
-                lines.append('    {' + ','.join('{%d,%d}' % pair for pair in owner) + '},')
+             '/* Tech pairs are available, researched; order: Storm, Hallucination, Recall, Stasis, Archon Warp. */',
+             '/* Cost support is 1 only for source-default pricing/time; 0 means unsupported override, not a default price. */']
+    for name, index, count in (('sc64_pr_campaign_upgrades', 0, 6), ('sc64_pr_campaign_tech', 1, 5)):
+        lines.append(f'static const unsigned char {name}[3][10][8][{count}][2] = {{')
+        for race in 'TZP':
+            lines.append('  {')
+            for number in range(1, 11):
+                row, sha, path = rows[(race, number)]
+                lines.append(f'    {{ /* {race}{number} {path} CHK SHA-256 {sha} */')
+                for owner in row[index]:
+                    lines.append('      {' + ','.join('{%d,%d}' % pair for pair in owner) + '},')
+                lines.append('    },')
             lines.append('  },')
         lines.append('};')
+    lines.append('static const unsigned char sc64_pr_campaign_cost_supported[3][10][6] = {')
+    for race in 'TZP':
+        lines.append('  {')
+        for number in range(1, 11):
+            lines.append('    {' + ','.join(str(x) for x in rows[(race, number)][0][2]) + '},')
+        lines.append('  },')
+    lines.append('};')
     return '\n'.join(lines + ['#endif', ''])
 
 
@@ -109,22 +161,13 @@ def main():
         p.error('ROM or extractor authentication failed')
     extractor = load_extractor(a.extractor)
     archive = extractor.BoltArchive(extractor.load_rom(str(a.rom)))
-    entries = {}
-    for entry in archive.entries():
-        if entry.path in {f'008/{i:03X}' for i in range(0x1e, 0x28)}:
-            if entry.path in entries:
-                p.error('duplicate campaign map')
-            entries[entry.path] = entry
-    rows, hashes = [], []
-    for i in range(0x1e, 0x28):
-        path = f'008/{i:03X}'
-        if path not in entries:
-            p.error(f'missing campaign map {path}')
-        data = archive.read(entries[path]); hashes.append(digest(data))
-        rows.append(policy(parse_chk_sections(data)))
+    try:
+        rows = collect(archive, validate_catalog(MISSIONS))
+    except (KeyError, ValueError) as exc:
+        p.error(str(exc))
     a.output.parent.mkdir(parents=True, exist_ok=True)
     with a.output.open('x') as f:
-        f.write(emit(rows, hashes))
+        f.write(emit(rows))
     print(f'wrote private policy: {a.output}')
 
 if __name__ == '__main__':
