@@ -94,8 +94,14 @@ static int gba_fj_select(const GbaFlashJournalIo *io,GbaFlashJournalAccept accep
         int status=gba_fj_probe(io,index,&candidate);if(status<0)return status;
         if(status!=GBA_FJ_OK)continue;
         if(accept){status=accept(context,io,&candidate);if(status<0)return status;if(!status)continue;}
-        if(!have||gba_fj_newer(candidate.sequence,best.sequence)||
-           (candidate.sequence==best.sequence&&candidate.index>best.index)){
+        /* This is one-way migration. Once an admissible new-layout record
+         * exists, its epoch precedes comparisons against permanently retained
+         * legacy counters; ancient counters must not win after sequence wrap. */
+        int newer_epoch=have&&candidate.index>=2&&best.index<2;
+        int same_epoch=!have||((candidate.index>=2)==(best.index>=2));
+        if(!have||newer_epoch||(same_epoch&&
+           (gba_fj_newer(candidate.sequence,best.sequence)||
+            (candidate.sequence==best.sequence&&candidate.index>best.index)))){
             best=candidate;have=1;
         }
     }
