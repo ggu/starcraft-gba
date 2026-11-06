@@ -92,3 +92,9 @@ test-late-egg-custom-input:
 test-z1-egg-host-journal:
 	$(CLANG) $(LATE_EGG_HOST_FLAGS) -DSC64_SHARED_EGG_Z1_HOST_STAGE tests/sc64_shared_egg_z1_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z1-egg-journal
 	$(EGG_TEST_BIN_DIR)/sc64-z1-egg-journal
+
+# Synthetic permission test; not a qualification of the private PUNI bank.
+.PHONY: test-z2-egg-synthetic-journal
+test-z2-egg-synthetic-journal:
+	$(CLANG) $(LATE_EGG_HOST_FLAGS) -DSC64_SHARED_EGG_Z2_HOST_STAGE -DSC64_EARLY_ZERG_PERMISSIONS -Itests/fixtures/early-zerg-synthetic tests/sc64_shared_egg_z2_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z2-egg-synthetic
+	$(EGG_TEST_BIN_DIR)/sc64-z2-egg-synthetic
