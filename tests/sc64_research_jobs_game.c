@@ -216,6 +216,31 @@ int main(void)
         sc64_experimental_research_levels.level[SIDE][SC64_PR_SINGULARITY]=1;
         tick_combat(&u[0],1); assert(u[0].cd>0);
     }
+    /* Exercise each custom bot slot and keep other wallets untouched. */
+    static const int bot_owner[3]={ENEMY,RESCUABLE,4};
+    for(int bots=1;bots<=3;++bots) {
+        memset(b,0,sizeof b); memset(sc64_pr_paid,0,sizeof sc64_pr_paid);
+        memset(&sc64_experimental_research_levels,0,sizeof sc64_experimental_research_levels);
+        race_mode=1; race_bots=bots; minerals=4321; gas=5432;
+        for(int j=0;j<3;++j) { int o=bot_owner[j]; race_player[o]=R_PROTOSS;
+            race_minerals[o]=1000+o; race_gas[o]=2000+o; }
+        int owner=bot_owner[bots-1];
+        b[0].alive=1; b[0].owner=owner; b[0].type=B_CYBERNETICS_CORE; b[0].raw_type=-1;
+        b[0].x=b[0].y=100;
+        b[1].alive=1; b[1].owner=owner; b[1].type=B_PYLON; b[1].raw_type=-1;
+        b[1].x=b[1].y=100;
+        assert(sc64_pr_stage_begin_slot(0,SC64_PR_AIR_WEAPONS));
+        for(int j=0;j<3;++j) { int o=bot_owner[j];
+            assert(race_minerals[o]==1000+o-(o==owner?100:0));
+            assert(race_gas[o]==2000+o-(o==owner?100:0)); }
+        assert(minerals==4321 && gas==5432);
+        assert(sc64_pr_stage_cancel_slot(0,0));
+        assert(race_minerals[owner]==1000+owner && race_gas[owner]==2000+owner);
+    }
+    race_bots=1; b[0].owner=4; b[1].owner=4;
+    assert(!sc64_pr_stage_begin_slot(0,SC64_PR_AIR_WEAPONS));
+    b[0].owner=NEUTRAL; b[1].owner=NEUTRAL;
+    assert(!sc64_pr_stage_begin_slot(0,SC64_PR_AIR_WEAPONS));
     puts("research job staged admission, lifecycle, menu and save refusal: ok");
     return 0;
 }
