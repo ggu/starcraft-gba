@@ -42,3 +42,8 @@ egg-selector-z7-host:
 	mkdir -p $(EGG_SELECTOR_ROOT)/host
 	$(CLANG) -std=c11 -O1 -g0 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -I.local/hardware-feedback/verified-cover $(ZERG_Z7_RELEASE_FLAGS) -DSC64_SHARED_EGG_SERVICE tests/sc64_shared_egg_custom_z7_legacy.c tests/sc64_guardian_journal_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $(EGG_SELECTOR_ROOT)/host/z7-selector
 	$(EGG_SELECTOR_ROOT)/host/z7-selector
+.PHONY: egg-selector-custom-input
+egg-selector-custom-input:
+	mkdir -p $(EGG_SELECTOR_ROOT)/host
+	$(CLANG) -std=c11 -O1 -g0 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -I.local/hardware-feedback/verified-cover $(ZERG_Z7_RELEASE_FLAGS) -DSC64_SHARED_EGG_SERVICE tests/sc64_egg_custom_input.c common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $(EGG_SELECTOR_ROOT)/host/custom-input
+	$(EGG_SELECTOR_ROOT)/host/custom-input $(EGG_SELECTOR_ROOT)/host/custom-input.json
