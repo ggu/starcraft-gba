@@ -23,6 +23,6 @@ int main(void) {
  assert(!gba_flash1m_program(&f,65534,"\xff",1));assert(m.bytes[65534]==0x12 && m.bank==0);
  assert(gba_flash1m_erase_sector(&f,61440));assert(m.bytes[65534]==0xff && m.bytes[65536]==0x56 && m.bank==0);
  assert(!gba_flash1m_erase_sector(&f,1));assert(!gba_flash1m_read(&f,131071,r,2));assert(!gba_flash1m_program(&f,131072,v,1));
- m.stall_program=1;unsigned prev=m.bad;assert(!gba_flash1m_program(&f,0,v,1));assert(m.bad==prev && f.fault); assert(!gba_flash1m_read(&f,0,r,1)); assert(m.bad==prev); /* no commands issued after timeout */
+ uint8_t collision=0x5f; assert(gba_flash1m_program(&f,8192,&collision,1)); assert(m.bytes[8192]==0x5f); m.stall_program=1;unsigned prev=m.bad;assert(!gba_flash1m_program(&f,0,&collision,1));assert(m.bad==prev && f.fault); assert(!gba_flash1m_read(&f,0,r,1)); assert(m.bad==prev); /* no commands issued after timeout */
  puts("flash bank crossing, erase isolation, 1-to-0, bounds and timeout passed");return 0;
 }
