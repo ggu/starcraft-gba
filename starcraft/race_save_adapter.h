@@ -2399,9 +2399,15 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_Z6_RUNTIME
     if (race_z6_active()) {
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+        if (!race_z6_save_candidate_valid_for(&race_data, &race_data.z6,
+                                          (unsigned)race_cols,(unsigned)race_rows,
+                                          race_data.version SC64_GCTX_ARG)) return 0;
+#else
         if (!race_z6_save_candidate_valid(&race_data, &race_data.z6,
                                           (unsigned)race_cols,
                                           (unsigned)race_rows SC64_GCTX_ARG)) return 0;
+#endif
 #ifdef SC64_Z5_RUNTIME
         {
             const u8 *payload = (const u8 *)&race_data.z6;

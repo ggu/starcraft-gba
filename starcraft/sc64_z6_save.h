@@ -223,6 +223,13 @@ race_z6_save_candidate_valid(const RaceSave *candidate,
         candidate->players[ENEMY] != R_PROTOSS ||
         candidate->campaign.phase > SC64_RACE_PHASE_FAILED ||
         !race_save_invincible_padding_valid(candidate)) return 0;
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+    /* Only the authenticated new-tag candidate can interpret raw 36 as a
+     * paid Egg. The shared validator binds owner, product, timer and all
+     * remaining scripted CreateUnit commitments before the census below. */
+    if (expected_version==SC64_SHARED_EGG_SAVE_VERSION &&
+        !race_shared_egg_candidate_valid(candidate,width*16u,height*16u SC64_GCTX_ARG)) return 0;
+#endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
     if (state->transport.ticks_remaining) {
         unsigned slot = (unsigned)state->transport.producer_slot_plus1 - 1u;
@@ -401,6 +408,10 @@ race_z6_save_candidate_valid(const RaceSave *candidate,
         if (!saved.alive) continue;
         if (saved.owner < SIDE || saved.owner > 4 || RACE_SAVE_INV_U(candidate, i) > 1)
             return 0;
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+        if (expected_version==SC64_SHARED_EGG_SAVE_VERSION &&
+            saved.type==U_Z7_EGG && saved.raw_type==36) { ++live; continue; }
+#endif
         if (saved.raw_type == -1 && saved.raw_owner == -1) {
             if (saved.owner != SIDE) return 0;
         } else {
