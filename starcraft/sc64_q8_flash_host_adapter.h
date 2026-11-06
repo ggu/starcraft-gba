@@ -61,7 +61,13 @@ static int race_q8_flash_guard_erase(void *ctx,u32 at)
  * interpretations agree. Non-shield aliases are not interpreted here. */
 static int race_q8_flash_candidate_fractions(RaceLoadPlan *plan,int old)
 {
-    if (!plan || race_data.state[0]!=1 || race_data.state[1]!=R_PROTOSS) return 0;
+    if (!plan || race_data.state[0]!=1) return 0;
+#ifdef SC64_Q8_FLASH_ALL_CUSTOM_HOST
+    if (!sc64_q8_flash_custom_roster_valid(race_data.state[1],race_data.state[4],
+                                           race_data.players,&race_data.state[21])) return 0;
+#else
+    if (race_data.state[1]!=R_PROTOSS) return 0;
+#endif
     for (int i=0;i<MAX_UNITS;++i) {
         Unit q;const Sc64StockUnitProfile *stock;int raw;
         if (!race_save_decode_unit(&race_data,(unsigned)i,2048,2048,&q)) return 0;

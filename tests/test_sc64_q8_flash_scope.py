@@ -18,6 +18,11 @@ class Scope(unittest.TestCase):
         self.assertEqual(self.preprocess([]).returncode, 0)
         self.assertEqual(self.preprocess(FLAGS + ["SC64_Q8_FLASH_HOST_STAGE"]).returncode, 0)
 
+    def test_all_custom_flag_is_explicit_host_only(self):
+        self.assertEqual(self.preprocess(FLAGS + ["SC64_Q8_FLASH_HOST_STAGE",
+                                                   "SC64_Q8_FLASH_ALL_CUSTOM_HOST"]).returncode, 0)
+        self.assertNotEqual(self.preprocess(["SC64_Q8_FLASH_ALL_CUSTOM_HOST"]).returncode, 0)
+
     def test_non_p10_and_campaign_rejected(self):
         for flags in ([x for x in FLAGS if x != "SC64_P10_RUNTIME"],
                       FLAGS + ["SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL"]):
