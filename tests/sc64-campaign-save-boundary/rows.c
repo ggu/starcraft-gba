@@ -11,6 +11,9 @@
 static _Alignas(Unit) unsigned char old_slot[SC64_Z7_V36_SLOT_BYTES];
 static unsigned char old_copy[SC64_Z7_V36_SLOT_BYTES], forged_copy[SC64_Z7_V36_SLOT_BYTES];
 static Sc64Z7LegacyRowProjectionProbe projection,projection_before;
+static RaceSave detached_world,detached_before;
+_Static_assert(offsetof(RaceSave,battlecruiser_shots)-offsetof(RaceSave,minerals_map)==16296u-12884u,
+               "common v36/candidate tail is not layout-identical");
 static int z7_map(const void *map) { return race_z7_save_map_valid((const Sc64RaceMap *)map); }
 static void set_unit_wire_type(unsigned slot,unsigned type)
 {
@@ -177,6 +180,38 @@ int main(int argc,char **argv)
     assert(!sc64_z7_v36_probe_unit(&meta,map,&authority,(unsigned)sample,&decoded));
     memcpy(old_slot,old_copy,sizeof(old_slot));
     assert(!memcmp(old_slot,old_copy,sizeof(old_slot)));
+    /* Test-only detached world assembled from the exact old common tail and
+     * lossless projected rows. Its old inner version remains unchanged; no
+     * selector, serializer or live world is altered. This exercises only the
+     * existing Z7 mission validator, not the full load preflight. */
+    assert(sc64_z7_v36_probe_context(old_slot,sizeof(old_slot),map,&authority,&meta));
+    assert(sc64_z7_v36_probe_project_rows(&meta,map,&authority,&projection));
+    memset(&detached_world,0,sizeof(detached_world));
+    detached_world.version=sc64_z7_v36_read32(old_slot+16);
+    memcpy(detached_world.units,projection.units,sizeof(projection.units));
+    memcpy(detached_world.buildings,projection.buildings,sizeof(projection.buildings));
+    memcpy((uint8_t *)&detached_world+offsetof(RaceSave,minerals_map),
+           old_slot+16+12884,16296u-12884u);
+    assert(detached_world.version==SC64_Z7_V36_INNER && detached_world.state[27]==0);
+    Sc64StageSaveAuth auth;const Sc64StageTagPair old_pair={SC64_Z7_V36_OUTER,SC64_Z7_V36_INNER,0};
+    assert(sc64_stage_save_authenticate(&auth,&detached_world,SC64_Z7_V36_OUTER,
+           detached_world.version,&old_pair,1));
+    detached_before=detached_world;
+    assert(race_z7_save_candidate_valid_for(&detached_world,&detached_world.z7,
+           SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS,SC64_Z7_V36_INNER,&auth));
+    assert(!memcmp(&detached_world,&detached_before,sizeof(detached_world)));
+    { Unit forged=original;int found=0;
+      for(int raw=0;raw<228 && !found;++raw) {
+          if(raw==original.raw_type || sc64_race_unit_from_raw(raw)==original.type) continue;
+          forged.raw_type=raw;
+          found=sc64_derived_unit_encode_for(&detached_world.units[sample],&forged,2048,2048,0);
+      }
+      assert(found);detached_before=detached_world;
+      assert(!race_z7_save_candidate_valid_for(&detached_world,&detached_world.z7,
+             SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS,SC64_Z7_V36_INNER,&auth));
+      assert(!memcmp(&detached_world,&detached_before,sizeof(detached_world))); }
+    assert(!memcmp(old_slot,old_copy,sizeof(old_slot)));
+    puts("detached legacy projection passed Z7 mission validator; forged actor rejected without mutation");
     printf("decoded units=%d alive=%u eggs=%u buildings=%d; derived-encodable units=%u buildings=%u; live weapon nonzero=%u\n",
            MAX_UNITS,alive,eggs,MAX_BUILDINGS,encode_units,encode_buildings,weapon_nonzero);
     printf("exact derived row roundtrips: units=%u/%d buildings=%u/%d\n",exact_units,MAX_UNITS,exact_buildings,MAX_BUILDINGS);
