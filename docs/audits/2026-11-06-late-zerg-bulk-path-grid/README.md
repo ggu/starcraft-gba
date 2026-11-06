@@ -51,7 +51,8 @@ near-30-fps objective remain open.
 The prepared-input oracles have the optional `test-sc64-z9-bulk-grid` target;
 `SC64_BULK_GRID_TEST_FLAGS` can prepend an independently verified include bank.
 An initial target invocation tried to regenerate a prepared header and failed
-because this isolated checkout does not contain the private extractor. The
-underlying two direct exact-vector tests had already passed; the failure log
-was retained, and a rerun marks the verified input files old to prevent make
-from regenerating them.
+because this isolated checkout does not contain the private extractor. The underlying two direct exact-vector tests had already passed. A rerun
+marking verified inputs old passed both named-target tests with unchanged input
+hashes. The first wrapper recorded exit 2, but its detailed output was
+unintentionally overwritten by the rerun; the observed failure was a missing
+`references/sc64-maps/extract_sc64_maps.py` during header regeneration.
