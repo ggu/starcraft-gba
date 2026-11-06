@@ -56,12 +56,18 @@ static int race_q8_flash_guard_erase(void *ctx,u32 at)
     return g->inner->erase_sector(g->inner->context,at);
 }
 
-/* Detached rows only: no references to live actor state or wallets. Old
- * shield phases are accepted only when zero, where 320- and 1280-unit
- * interpretations agree. Non-shield aliases are not interpreted here. */
+/* Detached rows only. The shared Battery preflight has already normalized
+ * markerless unit phases to SH12 (1/1280). Legacy buildings still use 1/320
+ * independently of that unit marker; only their shield-capable rows change.
+ * The new Flash tag already carries Q8/1/1280 building state. */
 static int race_q8_flash_candidate_fractions(RaceLoadPlan *plan,int old)
 {
     if (!plan || race_data.state[0]!=1 || race_data.state[1]!=R_PROTOSS) return 0;
+#ifdef SC64_SHARED_BATTERY
+    if (old && race_data.state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]!=SC64_SHIELD_PHASE_SAVE_MARKER) return 0;
+#else
+    if (old) return 0; /* No authenticated unit-phase normalization path. */
+#endif
     for (int i=0;i<MAX_UNITS;++i) {
         Unit q;const Sc64StockUnitProfile *stock;int raw;
         if (!race_save_decode_unit(&race_data,(unsigned)i,2048,2048,&q)) return 0;
@@ -73,7 +79,7 @@ static int race_q8_flash_candidate_fractions(RaceLoadPlan *plan,int old)
         raw=q.raw_type>=0?q.raw_type:sc64_race_raw_unit(q.type);
         stock=sc64_stock_unit_profile(raw);if(!stock)return 0;
         if (stock->shields && (q.shield<0 || (unsigned)q.shield>stock->shields ||
-            q.shield_remainder>=1280 || (old && q.shield_remainder) ||
+            q.shield_remainder>=1280 ||
             ((unsigned)q.shield==stock->shields && q.shield_remainder))) return 0;
     }
     for (int i=0;i<MAX_BUILDINGS;++i) {
@@ -84,9 +90,15 @@ static int race_q8_flash_candidate_fractions(RaceLoadPlan *plan,int old)
         raw=q.raw_type>=0?q.raw_type:sc64_race_raw_building(q.type);
         stock=sc64_stock_unit_profile(raw);if(!stock)return 0;
         if (race_building_can_burn(&q) && plan->q8_debt[MAX_UNITS+i]) return 0;
-        if (stock->shields && (q.shield<0 || (unsigned)q.shield>stock->shields ||
-            q.shield_remainder>=1280 || (old && q.shield_remainder) ||
-            ((unsigned)q.shield==stock->shields && q.shield_remainder))) return 0;
+        if (stock->shields) {
+            if(q.shield<0 || (unsigned)q.shield>stock->shields ||
+               q.shield_remainder<0 || q.shield_remainder>=(old?320:1280) ||
+               ((unsigned)q.shield==stock->shields && q.shield_remainder)) return 0;
+            if(old && q.shield_remainder) {
+                q.shield_remainder*=4;
+                if(!race_battery_save_encode_building(&race_data,(unsigned)i,2048,2048,&q)) return 0;
+            }
+        }
     }
     return 1;
 }

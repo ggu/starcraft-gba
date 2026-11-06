@@ -80,6 +80,7 @@ static void verify_loaded(void)
     assert(!b[f].level&&sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]==1);
 }
 #endif
+#ifndef SC64_Q8_FLASH_NO_FIXTURE_MAIN
 int main(int argc,char **argv)
 {
     assert(argc==3);start();
@@ -119,12 +120,14 @@ int main(int argc,char **argv)
         assert(race_load_game() && !memcmp(legacy,device.bytes,sizeof legacy));
         assert(minerals==1000 && gas==1000);
         for(unsigned i=0;i<sizeof sc64_pr_hp_debt;++i)assert(!sc64_pr_hp_debt[i]);
-    } else if(!strcmp(argv[1],"reject-old-phase")) {
-        static u8 prior[131072];static Unit old_units[MAX_UNITS];static Building old_buildings[MAX_BUILDINGS];
+    } else if(!strcmp(argv[1],"read-old-phase")) {
+        static u8 prior[32768];
         memset(device.bytes,0xff,sizeof device.bytes);file_read(argv[2],device.bytes,32768);
-        memcpy(prior,device.bytes,sizeof prior);memcpy(old_units,u,sizeof u);memcpy(old_buildings,b,sizeof b);
-        assert(!race_load_game() && !race_save_game());
-        assert(!memcmp(prior,device.bytes,sizeof prior) && !memcmp(old_units,u,sizeof u) && !memcmp(old_buildings,b,sizeof b));
+        memcpy(prior,device.bytes,sizeof prior);
+        assert(race_load_game());int a=-1;
+        for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].type==U_DRAGOON)a=i;
+        assert(a>=0 && u[a].shield==79 && u[a].shield_remainder==1);
+        assert(race_save_game() && !memcmp(prior,device.bytes,sizeof prior));
     } else if(!strcmp(argv[1],"unknown-hash") || !strcmp(argv[1],"unknown-length") ||
               !strcmp(argv[1],"mixed-47")) {
         static u8 prior[131072];
@@ -170,3 +173,4 @@ int main(int argc,char **argv)
 #endif
     puts("Q8 Flash actual game process: PASS");return 0;
 }
+#endif
