@@ -31,12 +31,13 @@ int main(void)
     assert(sc64_pr_job_begin_custom(&q,0,SC64_PR_GROUND_WEAPONS,&levels,&ore,&gas,
         3,1,1,1,0,1,0,0,0));
     assert(ore==850 && gas==850 && q.queue[1]==2 && q.queue_progress==5600);
-    assert(sc64_pr_job_valid_custom(&q,0,&levels,1,0));
-    assert(sc64_pr_job_tick_custom(&q,0,&levels,1,0,0)==0 && q.queue_progress==5600);
+    assert(sc64_pr_job_valid_custom(&q,0,&levels,1,0,0,0));
+    assert(sc64_pr_job_tick_custom(&q,0,&levels,1,0,0,0,0)==0 && q.queue_progress==5600);
+    assert(sc64_pr_job_tick_custom(&q,0,&levels,1,0,1,0,1)==-1 && q.queue_progress==5600);
     q.owner=1;
-    assert(sc64_pr_job_tick_custom(&q,0,&levels,1,0,1)==-1 && q.queue_progress==5600);
+    assert(sc64_pr_job_tick_custom(&q,0,&levels,1,0,0,0,1)==-1 && q.queue_progress==5600);
     q.owner=0; q.queue_progress=1;
-    assert(sc64_pr_job_tick_custom(&q,0,&levels,1,0,1)==1);
+    assert(sc64_pr_job_tick_custom(&q,0,&levels,1,0,0,0,1)==1);
     assert(levels.level[0][SC64_PR_GROUND_WEAPONS]==2 && !q.level && !q.queue_progress);
     assert(sc64_pr_effective_level(SC64_PR_AIR_WEAPONS,0,1,0)==1);
     assert(sc64_pr_effective_level(SC64_PR_SHIELDS,0,1,2)==0);

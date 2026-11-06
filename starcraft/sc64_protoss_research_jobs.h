@@ -74,7 +74,7 @@ static int sc64_pr_job_begin_custom(Building *producer, unsigned owner,
  * owner's wallet. No mutation occurs for malformed or ambiguous state. */
 static int sc64_pr_job_valid_custom(const Building *p, unsigned payer,
     const Sc64ProtossResearchLevels *levels, unsigned legacy_weapons,
-    unsigned legacy_armor)
+    unsigned legacy_armor, int legacy_weapons_pending, int legacy_armor_pending)
 {
     Sc64ProtossResearchQuote quote;
     unsigned family, target;
@@ -83,8 +83,11 @@ static int sc64_pr_job_valid_custom(const Building *p, unsigned payer,
         p->queue[0] != (int)payer || p->queue[2] || p->queue[3] || p->queue[4] ||
         p->level < 1 || p->level > SC64_PR_FAMILY_COUNT || !p->queue_progress ||
         !sc64_pr_levels_valid(levels, SC64_PR_CUSTOM_OWNERS) || legacy_weapons > 2 || legacy_armor > 2 ||
-        (payer != SIDE && (legacy_weapons || legacy_armor))) return 0;
+        (payer != SIDE && (legacy_weapons || legacy_armor ||
+                           legacy_weapons_pending || legacy_armor_pending))) return 0;
     family = (unsigned)p->level - 1; target = (unsigned)p->queue[1];
+    if ((legacy_weapons_pending && (family == SC64_PR_GROUND_WEAPONS || family == SC64_PR_AIR_WEAPONS)) ||
+        (legacy_armor_pending && (family == SC64_PR_GROUND_ARMOR || family == SC64_PR_AIR_ARMOR))) return 0;
     if (!target || !sc64_pr_job_family_producer(family,p->type) ||
         sc64_pr_effective_level(family,levels->level[payer][family],legacy_weapons,legacy_armor) != target-1 ||
         !sc64_pr_quote(family,target-1,&quote) || p->queue_progress > quote.ticks) return 0;
@@ -93,9 +96,11 @@ static int sc64_pr_job_valid_custom(const Building *p, unsigned payer,
 
 /* Power loss pauses. Completion increments only the authenticated family. */
 static int sc64_pr_job_tick_custom(Building *p, unsigned payer,
-    Sc64ProtossResearchLevels *levels, unsigned legacy_weapons, unsigned legacy_armor, int powered)
+    Sc64ProtossResearchLevels *levels, unsigned legacy_weapons, unsigned legacy_armor,
+    int legacy_weapons_pending, int legacy_armor_pending, int powered)
 {
-    if (!sc64_pr_job_valid_custom(p,payer,levels,legacy_weapons,legacy_armor)) return -1;
+    if (!sc64_pr_job_valid_custom(p,payer,levels,legacy_weapons,legacy_armor,
+                                  legacy_weapons_pending,legacy_armor_pending)) return -1;
     if (!powered) return 0;
     if (--p->queue_progress) return 0;
     levels->level[payer][(unsigned)p->level-1] = (uint8_t)p->queue[1];
