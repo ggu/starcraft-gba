@@ -16,7 +16,9 @@ update were 611,691.662 control versus 606,218.422 candidate (−0.895%); the
 largest call fell from 3,102,721 to 2,527,936 (−18.5%). These are specific
 emulator observations, not hardware FPS, full-state proof or a complete game.
 The control was the exact delivered ROM SHA-256 `d86f1e23...`; the candidate
-was `c5e50ced...`. The guest backend cannot inspect framebuffer or palette.
+was `c5e50ced...`. The guest run did not compare framebuffer or palette; the
+backend allows bounded palette and VRAM reads but not the DISPCNT read that
+the attempted front-page observer required.
 
 Using isolated, hash-verified package cover and advisor inputs:
 

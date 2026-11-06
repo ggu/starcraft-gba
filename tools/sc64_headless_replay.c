@@ -49,7 +49,11 @@ static int number(const char **cursor, unsigned base, uint32_t *out) {
     *cursor = p; *out = n; return 1;
 }
 static int in_readable_memory(uint32_t address, uint32_t length, size_t rom_size) {
-    return length && ((address >= 0x02000000 && address < 0x02040000 && length <= 0x02040000 - address) ||
+    /* Only DISPCNT is added: frame-page selection, read-only. */
+    return length && ((address >= 0x04000000 && address < 0x04000002 && length <= 0x04000002 - address) ||
+                      (address >= 0x05000000 && address < 0x05000400 && length <= 0x05000400 - address) ||
+                      (address >= 0x06000000 && address < 0x06018000 && length <= 0x06018000 - address) ||
+                      (address >= 0x02000000 && address < 0x02040000 && length <= 0x02040000 - address) ||
                       (address >= 0x03000000 && address < 0x03008000 && length <= 0x03008000 - address) ||
                       (address >= 0x08000000 && address < 0x0a000000 && length <= 0x0a000000 - address &&
                        (uint64_t)(address - 0x08000000) + length <= rom_size));

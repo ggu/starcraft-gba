@@ -102,8 +102,9 @@ fingerprints matched. The control averaged 627,566.596 emulated cycles per
 update and the candidate 611,691.662, a 2.53% reduction in this window; peaks
 were 3,984,361 and 3,102,721 respectively. These are mGBA cycle observations
 on this specific passive-human custom opening, not a hardware FPS result. The
-physical backend limits reads to RAM and ROM, so this guest probe did not
-compare the indexed framebuffer or palette. An initial attempt to read video
-registers was rejected before timing and retained as a diagnostic failure; the
+physical backend allows bounded palette and VRAM reads but does not allow the
+DISPCNT read used to identify the displayed page. This guest probe did not
+compare framebuffer or palette. The rejected register read was retained as a
+diagnostic failure; the
 separate HOST custom matrix above supplies sampled display equality only.
 The Z7 winning and wider gameplay/pixel/performance gates remain open.
