@@ -355,6 +355,10 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
 #ifdef SC64_DIAGNOSTIC_SETUP
 volatile u32 sc64_optical_unit_cycles, sc64_optical_building_cycles, sc64_optical_refresh_count;
 #endif
+#ifdef SC64_DIAGNOSTIC_OPTICAL_MASK
+volatile u32 sc64_optical_mask_unit_checks, sc64_optical_mask_unit_skips;
+volatile u32 sc64_optical_mask_building_checks, sc64_optical_mask_building_skips;
+#endif
 
 static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         const u8 powered_cannons[MAX_BUILDINGS], const Sc64P7DetectorLists *lists)
@@ -388,6 +392,15 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
             !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
             !SC64_TRANSPORT_LOADED(&u[i]))) continue;
+#ifdef SC64_DIAGNOSTIC_OPTICAL_MASK
+        if (lists) {
+            ++sc64_optical_mask_unit_checks;
+            if (!(lists->optical_unit_masks[k] & ~visible_owners)) ++sc64_optical_mask_unit_skips;
+        }
+#endif
+#ifdef SC64_P7_OPTICAL_MASK_EARLY
+        if (lists && !(lists->optical_unit_masks[k] & ~visible_owners)) continue;
+#endif
         int source=RACE_PROTOSS_SLOT(&u[i]);
 #ifdef SC64_P7_SIGHT_AXIS_CULL
         int dx=cx-u[i].x,dy=cy-u[i].y;
@@ -416,6 +429,15 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     for(int k=0;k<(lists?(int)lists->optical_building_count:MAX_BUILDINGS);++k) {
         int i=lists?lists->optical_buildings[k]:k;
         if(!b[i].alive) continue;
+#ifdef SC64_DIAGNOSTIC_OPTICAL_MASK
+        if (lists) {
+            ++sc64_optical_mask_building_checks;
+            if (!(lists->optical_building_masks[k] & ~visible_owners)) ++sc64_optical_mask_building_skips;
+        }
+#endif
+#ifdef SC64_P7_OPTICAL_MASK_EARLY
+        if (lists && !(lists->optical_building_masks[k] & ~visible_owners)) continue;
+#endif
         int source=RACE_PROTOSS_SLOT(&b[i]);
 #ifdef SC64_P7_SIGHT_AXIS_CULL
         int dx=cx-b[i].x,dy=cy-b[i].y;
