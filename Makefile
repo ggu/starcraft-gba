@@ -5248,13 +5248,16 @@ build/test-sc64-route-monotone: tests/sc64_route_monotone.c starcraft/sc64_route
 	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) $< -o $@
 build/test-sc64-route-monotone-active: tests/sc64_route_monotone.c starcraft/sc64_routes.h starcraft/sc64_depot_goal.h starcraft/sc64_route_monotone_probe.h starcraft/sc64_map_math.h Makefile | build
 	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) -DTEST_ACTIVE $< -o $@
+build/test-sc64-route-monotone-z7: tests/sc64_route_monotone.c starcraft/sc64_routes.h starcraft/sc64_depot_goal.h starcraft/sc64_route_monotone_probe.h starcraft/sc64_map_math.h Makefile | build
+	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) -DTEST_Z7 $< -o $@
 build/test-sc64-route-monotone-partial: tests/sc64_route_monotone.c starcraft/sc64_routes.h starcraft/sc64_depot_goal.h starcraft/sc64_route_monotone_probe.h starcraft/sc64_map_math.h Makefile | build
 	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) -DTEST_PARTIAL $< -o $@
 .PHONY: test-sc64-route-monotone
-test-sc64-route-monotone: build/test-sc64-route-monotone build/test-sc64-route-monotone-active build/test-sc64-route-monotone-partial
+test-sc64-route-monotone: build/test-sc64-route-monotone build/test-sc64-route-monotone-active build/test-sc64-route-monotone-partial build/test-sc64-route-monotone-z7
 	./build/test-sc64-route-monotone
 	./build/test-sc64-route-monotone-active
 	./build/test-sc64-route-monotone-partial
+	./build/test-sc64-route-monotone-z7
 test: test-sc64-route-monotone
 
 # Shared mechanics are checked using the real production compile vectors.

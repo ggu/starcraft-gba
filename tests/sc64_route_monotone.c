@@ -26,6 +26,17 @@ static int race_cols = 64, race_rows = 64;
 #define MAP_COLS race_cols
 #define MAP_ROWS race_rows
 #define MAP_CELLS (128 * 128)
+#elif defined(TEST_Z7)
+#define SC64_LARGE_MAPS
+#define SC64_ZP_CAMPAIGN_STORAGE
+#define SC64_IMPORTED_MISSION
+#define SC64_DIRECT_FIRING_POINTS
+#define SC64_RANGE_WORK
+#define SC64_DEPOT_BOUNDED
+#define SC64_GRID_STORAGE_BYTES ((MAP_CELLS + 7) / 8)
+#define SC64_ROUTE_FLOOD_SPLIT
+#define SC64_ROUTE_DECAY_FREQ
+enum { MAP_COLS = 128, MAP_ROWS = 128, MAP_CELLS = MAP_COLS * MAP_ROWS };
 #else
 #if defined(TEST_PARTIAL)
 #define SC64_ROUTE_PARTIAL_FLOOD
@@ -46,7 +57,7 @@ static int limit(int value, int low, int high)
     return value < low ? low : value > high ? high : value;
 }
 
-#if defined(TEST_ACTIVE)
+#if defined(TEST_ACTIVE) || defined(TEST_Z7)
 static u8 path_walkable[(MAP_CELLS + 7) / 8];
 #define SC64_GRID_GET(grid, cell) (((grid)[(cell) >> 3] >> ((cell) & 7u)) & 1u)
 #define SC64_GRID_SET(grid, cell, value) do { \
@@ -86,7 +97,7 @@ static int grid_get(int col, int row)
 
 static void grid_fill(int value)
 {
-#if defined(TEST_ACTIVE)
+#if defined(TEST_ACTIVE) || defined(TEST_Z7)
     memset(path_walkable, value ? 0xff : 0, sizeof(path_walkable));
     /* Ignore padding and cells outside the current active map shape. */
     for (int row = 0; row < MAP_ROWS; ++row)
@@ -243,9 +254,27 @@ static void test_dispatch_oracle(void)
 #endif
 }
 
+/* Use the independent FIFO oracle for blocked endpoints and target pixels
+ * in every configuration, including partial-field fallback. */
+static void test_blocked_target_cases(void)
+{
+    for (int scenario = 0; scenario < 4; ++scenario) {
+        reset_world(); grid_fill(1);
+        if (scenario == 0) grid_set(18, 13, 0);
+        if (scenario == 1) grid_set(5, 6, 0);
+        if (scenario == 2) {
+            for (int y=12;y<=14;++y) for (int x=17;x<=19;++x)
+                if (x!=18 || y!=13) grid_set(x,y,0);
+        }
+        check_dispatch(5 * 16 + 8, 6 * 16 + 8,
+                       (scenario == 3 ? 5 : 18) * 16 + 11,
+                       (scenario == 3 ? 6 : 13) * 16 + 3);
+    }
+}
+
 static void test_random_worlds(void)
 {
-#if defined(TEST_ACTIVE)
+#if defined(TEST_ACTIVE) || defined(TEST_Z7)
     const unsigned worlds = 32;
 #else
     const unsigned worlds = 160;
@@ -428,12 +457,46 @@ int main(void)
 #endif
 #endif
     test_dispatch_oracle();
+    test_blocked_target_cases();
     test_random_worlds();
     test_cache_precedence();
 #ifndef TEST_PARTIAL
     test_budget_and_canaries();
 #endif
     test_active_geometry();
+#ifdef TEST_Z7
+    /* Z7 stores 14 packed route planes; an active range job borrows two.
+     * Compare the public step against the FIFO oracle in both states. */
+    _Static_assert(SC64_ROUTE_SLOTS == 14, "Z7 route plane count changed");
+    assert(sc64_range_route_usable_slots() == 14);
+    reset_world(); grid_fill(1);
+    sc64_range_route_active.valid = 1;
+    sc64_range_route_claim_planes();
+    assert(sc64_range_route_usable_slots() == 12);
+    check_dispatch(5 * 16 + 8, 6 * 16 + 8, 40 * 16 + 8, 37 * 16 + 8);
+    sc64_routes_reset();
+    assert(sc64_range_route_usable_slots() == 14);
+    for (int reserved = 0; reserved < 2; ++reserved) {
+        for (int scenario = 0; scenario < 4; ++scenario) {
+            reset_world(); grid_fill(1);
+            if (reserved) {
+                sc64_range_route_active.valid = 1;
+                sc64_range_route_claim_planes();
+                assert(sc64_range_route_usable_slots() == 12);
+            }
+            if (scenario == 0) grid_set(40, 37, 0); /* blocked goal */
+            if (scenario == 1) grid_set(5, 6, 0);   /* blocked origin */
+            if (scenario == 2) { /* no route to a fully enclosed target */
+                for (int y=36;y<=38;++y) for (int x=39;x<=41;++x)
+                    if (x!=40 || y!=37) grid_set(x,y,0);
+            }
+            check_dispatch(5 * 16 + 8, 6 * 16 + 8,
+                           (scenario == 3 ? 5 : 40) * 16 + 11,
+                           (scenario == 3 ? 6 : 37) * 16 + 3);
+        }
+    }
+    sc64_routes_reset();
+#endif
     printf("route monotone dispatch OK active=%d builds=%u hits=%u\n",
            SC64_ROUTE_ACTIVE_SLOTS, (unsigned)sc64_route_builds,
            (unsigned)sc64_route_hits);

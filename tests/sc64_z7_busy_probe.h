@@ -7,7 +7,8 @@
 static u32 busy_tick, busy_calls, busy_advancing, busy_text_before, busy_text_after;
 static u32 busy_screen_before[4], busy_screen_after[4], busy_mode_before[4], busy_mode_after[4];
 static u32 busy_counts[3], busy_peaks[3], busy_top[50];
-static uint64_t busy_cycles[3];
+static uint64_t busy_cycles[3], busy_first100_cycles, busy_later900_cycles;
+static u32 busy_load_cycles, busy_first100_peak;
 static u32 busy_min[4] = {~0u, ~0u, ~0u, ~0u};
 static u32 busy_first[10], busy_last[10], busy_samples[10][3];
 static int busy_pre_frame, busy_pre_screen, busy_pre_mode, busy_pre_text;
@@ -28,6 +29,8 @@ static void busy_after(u32 cycles)
     unsigned cat=(busy_pre_screen==SCREEN_PLAY && !busy_pre_text) ?
         ((frame>busy_pre_frame) ? 0u : 2u) : 1u;
     ++busy_calls; if(frame>busy_pre_frame)++busy_advancing;
+    if(busy_calls<=100u){busy_first100_cycles+=cycles;if(cycles>busy_first100_peak)busy_first100_peak=cycles;}
+    else busy_later900_cycles+=cycles;
     if(busy_pre_text)++busy_text_before;
     if(sc64_text_box_count())++busy_text_after;
     if((unsigned)busy_pre_screen<4)++busy_screen_before[busy_pre_screen];
@@ -61,6 +64,11 @@ static void busy_after(u32 cycles)
 }
 static void busy_report(void)
 {
+    out_text("Z7B STARTUP");out_field("load",busy_load_cycles);
+    out_text(" first100_sum=");out_u64(busy_first100_cycles);out_field("first100_peak",busy_first100_peak);
+    out_text(" later900_sum=");out_u64(busy_later900_cycles);out_flush();
+    out_text("Z7B STACK");out_field("painted",(long)(stack_paint_end-STACK_LOW));
+    out_field("untouched",(long)stack_untouched());out_flush();
     out_text("Z7B COUNTS");out_field("calls",busy_calls);out_field("advancing",busy_advancing);
     out_field("text_before",busy_text_before);out_field("text_after",busy_text_after);
     for(unsigned i=0;i<3;++i){out_text(" n");out_u64(i);out_text("=");out_u64(busy_counts[i]);out_text(" sum");out_u64(i);out_text("=");out_u64(busy_cycles[i]);out_text(" peak");out_u64(i);out_text("=");out_u64(busy_peaks[i]);}

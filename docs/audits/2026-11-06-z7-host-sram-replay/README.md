@@ -196,3 +196,57 @@ checks. Valid-slot replacement and repeated keys also merit cache-policy
 investigation, but do not prove that changing capacity is safe or beneficial.
 The immediate-post-load window may contain cold-cache effects. Classification
 artifacts remain local under `build/z7-host-sram-contract/route-*-run/`.
+
+## Opt-in exact monotone route shortcut
+
+The existing `SC64_ROUTE_MONOTONE_PROBE` is absent from the measured Z7 release
+vector; this trial adds it only to private diagnostic builds. It uses the
+existing bounded exact-shortest-step witness and falls back to the original
+field builder when it cannot prove the same FIFO step. No route-slot, AI,
+cadence or default-flag changes were made.
+
+The independent FIFO dispatch tests passed in the existing regular, active
+stride and partial-field configurations and in a new packed 128×128 Z7
+configuration with 14 route planes and 12 usable during range reservation.
+Explicit blocked-origin, blocked-target, enclosed-target and off-center/same-cell
+target cases run against the independent FIFO oracle; the partial-field variant
+confirms the monotone witness is excluded. These tests are not a proof of every
+campaign or scene.
+
+Four same-source diagnostic ROMs replayed the qualified seed and identical
+1,000-call post-cut window. For each render-cache configuration the sole route
+feature difference was the monotone flag. All four runs retained the strict
+seed/load, unchanged-SRAM, two tape observations and two HOST cargo-digest
+checks, with 975 advancing PLAY calls, 25 nonadvancing calls and zero text
+modals. Workload, modes and all ten sampled selected-state and indexed-frame/
+full-palette hashes matched across control and shortcut. Source/input manifests
+were unchanged. Those sampled hashes do not establish complete state or pixel
+identity. ROM SHA-256 values were:
+
+| Render configuration | Control | Monotone shortcut |
+| --- | --- | --- |
+| Baseline | `87074fb09faf88e4cf666300359cc488fb1c12538808d99e10fc2577adb9ac3e` | `1b6f8b0c772d0c28db9695dc7d074c7ba56def70a19d1e523dbdc12f0b56144d` |
+| Five-cache candidate | `5cc8bd0e08f146ab7495dc21ca0a57ea767ce91ff0e29caafbf3eca0bfa1bce3` | `62a02b649c89848aa9c8c515064e64e42b4ffd7d4bd30cca852bca351c3abfa3` |
+
+Baseline advancing-call mean cycles fell from 2,512,864 to 1,679,145 (33.18%);
+the five-cache figures fell from 2,446,063 to 1,612,046 (34.10%). Route
+builds fell 392→26: movement builds 385→20 and depot builds 7→6. Valid-slot
+replacements fell 365→5. For baseline, the 50th/10th-highest of all 1,000 calls
+fell from 6,128,377/6,445,229 to 1,986,551/3,924,456 cycles, and the advancing
+peak fell from 10,109,657 to 8,119,711. The HOME-L call was 68,458,162 versus
+68,456,892 cycles; this is one load call, not complete boot timing. First-100
+call totals were 280,519,785 versus 185,020,094 cycles. Diagnostics and
+post-call state/pixel hashing may affect pacing; these are emulated diagnostic
+measurements, not physical hardware performance.
+
+All reserve guards stayed enabled. BSS ends were unchanged by the shortcut;
+IWRAM ends changed from `03004f88` to `03004fe8` in the baseline and from
+`03004f50` to `03004fb0` in the five-cache variant. The baseline is only 24
+bytes below the existing IWRAM guard. Stack painting found 7,160 untouched of
+11,416 painted bytes in each of these bounded runs; this is not a worst-case
+stack proof. The ~1.68-million-cycle baseline mean remains about three times
+the nominal 30-fps budget, and the immediate-post-load window can be cold.
+Do not promote the shortcut or cache flags from this experiment alone; broader
+uninterrupted gameplay, full-state/pixel, startup, memory and multi-mode proof
+remain open. Artifacts are retained locally under
+`build/z7-host-sram-contract/monotone*-run/` and `monotone/`.

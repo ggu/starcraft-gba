@@ -213,7 +213,7 @@ static void frame_with(u16 held)
     u32 finish = gba_clock();
     u32 total = finish - start;
 #ifdef Z7_BUSY_DIAGNOSTIC
-    if (busy_tick) busy_after(total);
+    if (busy_tick) busy_after(total); else busy_load_cycles=total;
 #endif
 #ifdef Z7_BUSY_ATTRIBUTION
     if (busy_tick) attr_after(total,update,render_start-start-update,finish-render_start);
