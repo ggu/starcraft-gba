@@ -88,8 +88,11 @@ static void adapter_scene(const char *mission)
     pulse(effects(mission),u[v].x,u[v].y,2);
     assert(tick(mission));
     assert(hp(v)==before-(SC64_STORM_DAMAGE_PER_PULSE*256u-384u)&&!shield(v));
+    before=hp(v);assert(sc64_pr_q8_commit_shield(v,128));
+    pulse(effects(mission),u[v].x,u[v].y,1);assert(tick(mission));
+    assert(hp(v)==before-SC64_STORM_DAMAGE_PER_PULSE*256u&&shield(v)==128);
     /* Overlapping pulses hit once; a later lethal pair accounts death once. */
-    assert(sc64_pr_q8_commit_hp(v,128));
+    assert(sc64_pr_q8_commit_hp(v,128)&&sc64_pr_q8_commit_shield(v,0));
     int before_supply=supply_used,cost=u[v].owner==SIDE?unit_supply(u[v].type):0;
     pulse(effects(mission),u[v].x,u[v].y,2);
     assert(tick(mission));assert(!u[v].alive&&!u[v].hp&&!sc64_pr_hp_debt[v]);
@@ -115,6 +118,24 @@ static void p6_trap(void)
     puts("P6 trap fractional Storm and phase alias: PASS");
 }
 #endif
+#ifdef SC64_Z6_STORM_ENABLED
+static void z6_hallucination(void)
+{
+    start("Z6");int owner=race_z6_source_owner(2);
+    int v=spawn_unit(owner,U_TASSADAR,64,64);assert(v>=0);
+    u[v].raw_type=79;u[v].raw_owner=2;
+    assert(race_z6_hallucination_mark_slot((unsigned)v));isolate(v);
+    unsigned before=(unsigned)u[v].maxhp*256u-64u;
+    assert(sc64_pr_q8_commit_hp(v,before)&&sc64_pr_q8_commit_shield(v,14*256+128));
+    pulse(&race_z6.storm,u[v].x,u[v].y,2);assert(race_z6_storm_tick());
+    assert(hp(v)==before-(28*256-(14*256+128))&&!shield(v));
+    assert(sc64_pr_q8_commit_hp(v,128));
+    pulse(&race_z6.storm,u[v].x,u[v].y,1);assert(race_z6_storm_tick());
+    assert(!u[v].alive&&!u[v].hp&&!sc64_pr_hp_debt[v]);
+    assert(!(u[v].flags&SC64_Z6_HALLUCINATION_FLAG)&&!u[v].work_timer);
+    puts("Z6 one-packet hallucination and death cleanup: PASS");
+}
+#endif
 int main(void)
 {
     gba_init();
@@ -125,7 +146,7 @@ int main(void)
     adapter_scene("P6");p6_trap();
 #endif
 #ifdef SC64_Z6_STORM_ENABLED
-    adapter_scene("Z6");
+    adapter_scene("Z6");z6_hallucination();
 #endif
     assert(scenes==Q8_STORM_EXPECTED_SCENES);
     return 0;
