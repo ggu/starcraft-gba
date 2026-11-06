@@ -3628,6 +3628,14 @@ sc64_steer_best_direction(Unit *q, int speed, int from_cell,
 #error "early steering point experiment requires contact cache"
 #endif
 #ifdef SC64_STEER_EARLY_POINT_EXPERIMENT
+#ifdef SC64_STEER_EARLY_DIAG
+/* Diagnostic-only: calls, no terrain candidate, known-blocked point,
+ * scalar-blocked point, scalar-clear point. Not a production counter. */
+static volatile u32 sc64_steer_early_counts[5];
+#define SC64_STEER_EARLY_COUNT(i) (++sc64_steer_early_counts[(i)])
+#else
+#define SC64_STEER_EARLY_COUNT(i) ((void)0)
+#endif
 /* Return the exact best direction when a single point test proves it, -1
  * when no terrain candidate exists, or -2 to retain the full mask path. */
 static int __attribute__((noinline))
@@ -3635,6 +3643,7 @@ sc64_steer_early_point(const Unit *q, int speed, int from_cell,
                        int blocked_x, int blocked_y)
 {
     int best = -1, best_cost = 0x7fffffff;
+    SC64_STEER_EARLY_COUNT(0);
     for (int i = 0; i < 8; ++i) {
         int sx = q->x + sc64_contact_dx[i] * speed;
         int sy = q->y + sc64_contact_dy[i] * speed;
@@ -3643,12 +3652,17 @@ sc64_steer_early_point(const Unit *q, int speed, int from_cell,
             best = i; best_cost = cost;
         }
     }
-    if (best < 0) return -1;
+    if (best < 0) { SC64_STEER_EARLY_COUNT(1); return -1; }
     {
         int sx = q->x + sc64_contact_dx[best] * speed;
         int sy = q->y + sc64_contact_dy[best] * speed;
-        if (sx == blocked_x && sy == blocked_y) return -2;
-        return unit_step_clear(q, sx, sy) ? best : -2;
+        if (sx == blocked_x && sy == blocked_y) {
+            SC64_STEER_EARLY_COUNT(2); return -2;
+        }
+        if (!unit_step_clear(q, sx, sy)) {
+            SC64_STEER_EARLY_COUNT(3); return -2;
+        }
+        SC64_STEER_EARLY_COUNT(4); return best;
     }
 }
 #endif
