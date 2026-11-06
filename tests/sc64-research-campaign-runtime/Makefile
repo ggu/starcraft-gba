@@ -7,9 +7,12 @@ test-sc64-research-campaign-runtime-p10:
 	./build/research-campaign-runtime/p10
 
 # Explicit HOST experiment. Exports and reloads real 32 KiB journal bytes.
-SC64_CAMPAIGN_BASELINE_ROOT ?= .
+SC64_CAMPAIGN_BASELINE_ROOT ?= .local/research-journal-baseline
+.PHONY: check-sc64-research-campaign-baseline
+check-sc64-research-campaign-baseline:
+	python3 tests/sc64-research-campaign-runtime/check_baseline.py "$(SC64_CAMPAIGN_BASELINE_ROOT)"
 .PHONY: test-sc64-research-campaign-journal-p10
-test-sc64-research-campaign-journal-p10:
+test-sc64-research-campaign-journal-p10: check-sc64-research-campaign-baseline
 	@mkdir -p build/research-campaign-runtime
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) -I$(SC64_PR_POLICY_DIR) $(PROTOSS_P10_FLAGS) -DSC64_SOURCE_SIGHT_ALL_RACES -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL tests/sc64_research_campaign_journal_game.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o build/research-campaign-runtime/journal-p10
 	$(CLANG) -I$(SC64_CAMPAIGN_BASELINE_ROOT)/common -I$(SC64_CAMPAIGN_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_FLAGS) -DSC64_SOURCE_SIGHT_ALL_RACES -DSC64_CAMPAIGN_BASELINE_WRITER tests/sc64_research_campaign_journal_game.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o build/research-campaign-runtime/journal-p10-old
@@ -33,7 +36,7 @@ test-sc64-research-campaign-journal-p10:
 	./build/research-campaign-runtime/tag-inventory
 
 .PHONY: test-sc64-research-campaign-journal-z9
-test-sc64-research-campaign-journal-z9:
+test-sc64-research-campaign-journal-z9: check-sc64-research-campaign-baseline
 	@mkdir -p build/research-campaign-runtime
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) -I$(SC64_PR_POLICY_DIR) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL tests/sc64_research_campaign_journal_game.c -o build/research-campaign-runtime/journal-z9
 	$(CLANG) -I$(SC64_CAMPAIGN_BASELINE_ROOT)/common -I$(SC64_CAMPAIGN_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_CAMPAIGN_BASELINE_WRITER tests/sc64_research_campaign_journal_game.c -o build/research-campaign-runtime/journal-z9-old
@@ -45,7 +48,7 @@ test-sc64-research-campaign-journal-z9:
 	./build/research-campaign-runtime/journal-z9 z-load build/research-campaign-runtime/new-z9.sav
 
 .PHONY: test-sc64-research-campaign-journal-terran
-test-sc64-research-campaign-journal-terran:
+test-sc64-research-campaign-journal-terran: check-sc64-research-campaign-baseline
 	@mkdir -p build/research-campaign-runtime
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) -I$(SC64_PR_POLICY_DIR) $(TERRAN_ROM_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL tests/sc64_research_campaign_journal_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-campaign-runtime/journal-terran
 	$(CLANG) -I$(SC64_CAMPAIGN_BASELINE_ROOT)/common -I$(SC64_CAMPAIGN_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(TERRAN_ROM_FLAGS) -DSC64_CAMPAIGN_BASELINE_WRITER tests/sc64_research_campaign_journal_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-campaign-runtime/journal-terran-old
