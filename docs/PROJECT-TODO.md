@@ -207,7 +207,15 @@ The clean canonical source-only HOST SRAM/replay patch passed source boundary,
 HOST save/selection targets, replay-validator tests, default build and full
 `./dev test` (449.68 seconds). These checks are independent of the experimental
 actor branches and their known private-input/default-suite failures. The focused
-patch is being prepared for review; no experimental runtime flags are included.
+patch is open as [PR #303](https://github.com/ggu/starcraft-gba/pull/303); no experimental runtime flags are included.
+
+Official ares v148 source inspection (tag commit
+`0aafd85789215e84e1e43415c07d4c88461b7899`) found internal emulated-controller
+and platform video callbacks, but no turnkey supported headless CLI. A separate
+source-integrated frontend is a research path, not a working N64 reference
+runner. Vulkan/paraLLEl availability, threaded video synchronization and cadence
+must be verified before any screenshot or gameplay parity claims. No OS event
+shim or guest RAM writes are part of that proposed harness.
 
 All checks remain local; GitHub Actions is still disabled. No experimental
 release flags or campaign coverage were promoted. The later verified KODAK copy
