@@ -1,3 +1,4 @@
+#define SC64_OBSERVER_STOP_ON_SIGXFSZ 1
 #include "observer_sigxfsz.h"
 #include "observer_images.h"
 #include <fcntl.h>

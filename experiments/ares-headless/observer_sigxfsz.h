@@ -26,6 +26,10 @@ static void sc64_observer_signal_handler(int sig, siginfo_t *info, void *context
         r.host_sp=(uint64_t)__darwin_arm_thread_state64_get_sp(uc->uc_mcontext->__ss);
     }
     if (sc64_observer_signal_fd>=0) (void)pwrite(sc64_observer_signal_fd,&r,sizeof r,0);
+#ifdef SC64_OBSERVER_STOP_ON_SIGXFSZ
+    /* Stop this owned process; never resume guest execution in the supervisor. */
+    (void)kill(getpid(),SIGSTOP);
+#endif
     _exit(128+sig);
 }
 static int sc64_observer_signal_install(int fd)

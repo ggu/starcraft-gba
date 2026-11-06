@@ -7,7 +7,7 @@ ROM_SHA='e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 VK_SHA='432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 REV='0aafd85789215e84e1e43415c07d4c88461b7899'
 # Qualified independently from the historical non-diagnostic binary.
-BINARY_SHA='d1c845e1c383a9ffb5ca641129a8ce6f249a5ccd3712daf3f6e3969590f95b13'
+BINARY_SHA=None
 LOCK='/tmp/sc64-native-build-20261031.lock'
 VK_PATH=pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
 
@@ -40,6 +40,43 @@ def terminate_child(child):
  for stream in (child.stdin,child.stdout,child.stderr):
   if stream is not None:stream.close()
 
+def stopped_child(child):
+ try:
+  event=os.waitid(os.P_PID,child.pid,os.WSTOPPED|os.WNOHANG|os.WNOWAIT)
+  return event is not None and event.si_pid==child.pid and event.si_status==signal.SIGSTOP
+ except ChildProcessError:return False
+
+def inspect_stopped_child(child,cwd,remaining,result):
+ """Inspect only the owned stopped child; never send SIGCONT."""
+ result['signal_stop']=True
+ if remaining<=2:
+  result['fd_inspection']='deadline';return
+ path=pathlib.Path(cwd)/'stopped-fds.txt'
+ oldmask=signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGINT,signal.SIGTERM})
+ def limit():
+  resource.setrlimit(resource.RLIMIT_FSIZE,(65536,65536))
+  signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
+ helper=None
+ try:
+  with path.open('xb') as out:
+   helper=subprocess.Popen(['/usr/sbin/lsof','-nP','-a','-p',str(child.pid),'-F','pftasn'],
+     stdin=subprocess.DEVNULL,stdout=out,stderr=subprocess.STDOUT,preexec_fn=limit,
+     start_new_session=True)
+   signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
+   try:rc=helper.wait(timeout=min(2,max(0.1,remaining-2)))
+   except subprocess.TimeoutExpired:result['fd_inspection']='timeout'
+   else:
+    result['fd_inspection']='complete' if rc==0 else 'failed_or_capped'
+    result['fd_inspection_returncode']=rc
+ except OSError:result['fd_inspection']='error'
+ finally:
+  signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGINT,signal.SIGTERM})
+  try:
+   if helper is not None and helper.poll() is None:
+    helper.kill()
+    helper.wait(timeout=2)
+  finally:signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
+
 def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector):
  """Own one child; cleanup also runs on selector errors and signals."""
  child=None;sel=None;started=time.monotonic()
@@ -56,7 +93,10 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector)
   sel=selector_factory();sel.register(sys.stdin.buffer,selectors.EVENT_READ,'input');sel.register(child.stdout,selectors.EVENT_READ,'output');sel.register(child.stderr,selectors.EVENT_READ,'error')
   deadline=started+180;written={'output':0,'error':0}
   while child.poll() is None and time.monotonic()<deadline:
-   for key,_ in sel.select(min(1,max(0,deadline-time.monotonic()))):
+   if stopped_child(child):
+    inspect_stopped_child(child,cwd,deadline-time.monotonic(),result)
+    break
+   for key,_ in sel.select(min(0.1,max(0,deadline-time.monotonic()))):
     data=os.read(key.fileobj.fileno(),4096)
     if key.data=='input':
      if not data:sel.unregister(key.fileobj);child.stdin.close()
@@ -71,11 +111,13 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector)
      else:err.write(data);err.flush()
     else:sel.unregister(key.fileobj)
    if result.get('log_budget_exceeded'):break
-  if child.poll() is None and not result.get('log_budget_exceeded'):result['timeout']=True
+  if child.poll() is None and not result.get('log_budget_exceeded') and not result.get('signal_stop'):result['timeout']=True
  finally:
   signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGINT,signal.SIGTERM})
   try:
    if sel is not None:sel.close()
+   if child is not None and result.get('signal_stop') and child.poll() is None:
+    child.kill()  # SIGKILL works on a stopped process; no guest resume.
    terminate_child(child)
   finally:
    signal.signal(signal.SIGTERM,oldterm)
@@ -104,7 +146,7 @@ def main(argv=None):
   result['unchanged']=clean(a.source) and sha(a.rom)==ROM_SHA and sha(copy)==ROM_SHA and sha(a.moltenvk)==VK_SHA and sha(a.binary)==binary==BINARY_SHA and all(sha(pathlib.Path(k))==v for k,v in inputs.items())
   files=sorted(a.output.glob('live-*.argb'));result['frames']={x.name:sha(x) for x in files};result['frame_bytes']=sum(x.stat().st_size for x in files);result['ok']=result['returncode']==0 and result['unchanged'] and len(files)<=3 and result['frame_bytes']<=2*1024**2
   ram=sorted(a.output.glob('ram-*.bin'));result['ram']={x.name:sha(x) for x in ram};result['ram_bytes']=sum(x.stat().st_size for x in ram);result['ok']=result['ok'] and len(ram)==3 and all(x.stat().st_size==8*1024**2 for x in ram) and result['ram_bytes']<=24*1024**2
-  for name in ('ram.csv','commands.csv','inputs.csv','callbacks.csv','status.log','sigxfsz.bin','images.bin'):result[name+'_sha256']=sha(a.output/name) if (a.output/name).is_file() else None
+  for name in ('ram.csv','commands.csv','inputs.csv','callbacks.csv','status.log','sigxfsz.bin','images.bin','stopped-fds.txt'):result[name+'_sha256']=sha(a.output/name) if (a.output/name).is_file() else None
   diagnostic=a.output/'sigxfsz.bin';images=a.output/'images.bin';result['ok']=result['ok'] and diagnostic.is_file() and diagnostic.stat().st_size in (0,40) and images.is_file() and images.stat().st_size<=12+128*528
   result['output_bytes']=sum(x.stat().st_size for x in a.output.rglob('*') if x.is_file() and not x.is_symlink());result['ok']=result['ok'] and result['output_bytes']<=63*1024**2 and not result.get('log_budget_exceeded',False)
   (a.output/'manifest.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({'ok':result['ok'],'returncode':result['returncode'],'frames':len(files)}),flush=True)
