@@ -175,6 +175,21 @@ int main(void)
     u[0].type=U_ZEALOT; u[0].raw_type=65; u[0].hp=100; u[0].shield=0;
     hit_target_impl_ex(0,10,U_MARINE,ENEMY,SC64_STOCK_DMG_NORMAL,0);
     assert(u[0].hp==92); /* one typed armor bonus, never added to legacy */
+    /* Drive the ordinary attack path at a distance reached only by the
+     * source-derived Singularity increment, for both ground and air. */
+    assert(sc64_stock_attack_select(66,0,&attack));
+    int base_range=(attack.weapon->max_range+1)/2;
+    for(int air=0;air<2;++air) {
+        memset(&u[0],0,sizeof u[0]); memset(&u[1],0,sizeof u[1]);
+        u[0].alive=1; u[0].owner=SIDE; u[0].type=U_DRAGOON; u[0].raw_type=66;
+        u[0].x=300; u[0].y=300; u[0].hp=100; u[0].target=1;
+        u[1].alive=1; u[1].owner=ENEMY; u[1].type=air ? U_SCOUT : U_MARINE;
+        u[1].raw_type=air ? 70 : 0; u[1].x=300+base_range+16; u[1].y=300; u[1].hp=1000;
+        sc64_experimental_research_levels.level[SIDE][SC64_PR_SINGULARITY]=0;
+        tick_combat(&u[0],1); assert(!u[0].cd);
+        sc64_experimental_research_levels.level[SIDE][SC64_PR_SINGULARITY]=1;
+        tick_combat(&u[0],1); assert(u[0].cd>0);
+    }
     puts("research job staged admission, lifecycle, menu and save refusal: ok");
     return 0;
 }
