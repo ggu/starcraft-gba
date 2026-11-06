@@ -68,7 +68,7 @@ Private receipts/failures are `.local/research-campaign-runtime/`.
 To reproduce with independently authenticated prepared inputs:
 
 ```sh
-make -f Makefile -f tests/sc64-research-campaign-policy/runtime.mk \
+make -f Makefile -f tests/sc64-research-campaign-runtime/Makefile \
   SC64_RESEARCH_COVER_DIR=<prepared-cover-dir> \
   SC64_PR_POLICY_DIR=<authenticated-private-policy-dir> \
   SC64_AUDIO_DIR=<prepared-audio-dir> test-sc64-research-campaign-runtime-p10
