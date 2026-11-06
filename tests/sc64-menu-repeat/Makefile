@@ -27,4 +27,4 @@ build/test-field-menu-repeat-showcase: build/field-menu-repeat-showcase.o $(SC64
 test-field-menu-repeat-showcase: build/test-field-menu-repeat-showcase
 	./build/test-field-menu-repeat-showcase
 
--include build/field-menu-repeat-p10.d build/field-menu-repeat-showcase.d
+-include $(wildcard build/field-menu-repeat-p10.d build/field-menu-repeat-showcase.d)
