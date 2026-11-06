@@ -49,7 +49,7 @@ Z7/Z9/Z10/P10 records.
 For a live P10 typed unit, canonical type reconstructs `maxhp`; the outer
 journal validator requires `0 < hp <= maxhp`. The earlier actual P10 HOST
 census at `f2387939` found 53 admitted types, maximum canonical HP 850.
-The prototype keeps all 28 other row bytes/bits unchanged except the existing
+The prototype keeps all other row bits unchanged except the existing
 18-bit HP field, uses the alive bit to distinguish live Q8 HP/debt from the
 old biased signed dead-row HP, and exercises all 256 debts at each type's
 maximum plus a negative dead-HP row. This is a plausible starting point for
@@ -69,7 +69,7 @@ the all-zero sentinel must remain unambiguous. Treating type's usual max HP as
 universal would narrow previously accepted max-HP states unless every old
 record is handled losslessly by an escape path with a worst-case bound.
 
-The same joint rank is a possible compact-building building block: the
+The same joint rank is a possible compact-building approach: the
 existing 18+17 HP/max-HP bits plus seven padding bits give 42 bits; a live
 41-bit rank would leave one bit per row. On a 160-row Z profile, 96 such bits
 can retain research, leaving 64 bits for a hypothetical global unit extension.
