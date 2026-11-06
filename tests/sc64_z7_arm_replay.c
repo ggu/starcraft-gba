@@ -173,6 +173,9 @@ static void report_peak(u16 held, u32 before_frame, int before_screen,
 #ifdef Z7_BUSY_DIAGNOSTIC
 #include "sc64_z7_busy_probe.h"
 #endif
+#ifdef Z7_BUSY_ATTRIBUTION
+#include "sc64_z7_busy_attr.h"
+#endif
 
 /* One frame of the shipped main-loop work, timed like common/main.c. */
 static void frame_with(u16 held)
@@ -195,15 +198,25 @@ static void frame_with(u16 held)
 #ifdef Z7_BUSY_DIAGNOSTIC
     if (busy_tick) busy_before();
 #endif
+#ifdef Z7_BUSY_ATTRIBUTION
+    if (busy_tick) attr_before();
+#endif
     u32 start = gba_clock();
     demo_keys = held;
     game_update(held, held & (u16)~previous_held);
     u32 update = gba_clock() - start;
     audio_update();
+#ifdef Z7_BUSY_ATTRIBUTION
+    u32 render_start = gba_clock();
+#endif
     game_render();
-    u32 total = gba_clock() - start;
+    u32 finish = gba_clock();
+    u32 total = finish - start;
 #ifdef Z7_BUSY_DIAGNOSTIC
     if (busy_tick) busy_after(total);
+#endif
+#ifdef Z7_BUSY_ATTRIBUTION
+    if (busy_tick) attr_after(total,update,render_start-start-update,finish-render_start);
 #endif
     cycles_total += total;
     cycles_update += update;
@@ -446,7 +459,12 @@ int main(void)
         frame_with(held);
         report_due(tick);
 #ifdef Z7_BUSY_DIAGNOSTIC
-        if (busy_calls == Z7_BUSY_CALLS) { busy_report(); for (;;) {} }
+        if (busy_calls == Z7_BUSY_CALLS) {
+#ifdef Z7_BUSY_ATTRIBUTION
+            attr_report();
+#endif
+            busy_report(); for (;;) {}
+        }
 #endif
         if (tick % 50000u == 0) report_cycles("periodic", tick);
 #if Z7_ARM_MODE == 1

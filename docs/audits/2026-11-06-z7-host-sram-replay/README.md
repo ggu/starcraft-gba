@@ -110,3 +110,56 @@ instrumented workload is well above the nominal roughly 559,241 cycles per
 The result does not establish all-state/pixel equivalence or justify promoting
 the cache flags. Detailed local artifacts are under
 `build/z7-host-sram-contract/busy/`.
+
+## Same-source coarse attribution of that window
+
+An additional opt-in `Z7_BUSY_ATTRIBUTION` probe and its busy-only control were
+built from the same source, recovered inputs and release vectors, differing in
+the attribution macro. The four linked diagnostic ROM SHA-256 values were:
+
+| Variant | Control | Attribution |
+| --- | --- | --- |
+| Baseline | `284f951c953a17de11a7633a5e6105fd850fc533b3c11cd4e5bf65b4d7c3872e` | `f410341ff2083f95adffc131a39337be5e62dc1dfca0da0ffdf2cf937d6a3d11` |
+| Cache candidate | `b8a617f0f6a5d27e933dcae556d0974f1a342827aba04b1a78be223d8ece8978` | `ea0475038b614cdd5eaa7ba0a4034c525c5f2aa87820b863821503a4b4ce530c` |
+
+All four runs used the validated seed above and the identical 1,000-input
+window. Both pairs passed strict seed/load, unchanged-SRAM, recorded-observation
+and cargo-digest checks. Their counts, workload endpoints and minima, and ten
+sampled selected-state and indexed-frame/full-palette hashes matched across
+control and attribution. Source/input manifests were unchanged during each
+run. The extra collection uses ROM-placed, noinline diagnostic functions and
+existing engine counters; the link reserve guards stayed enabled. Attribution
+BSS/IWRAM ends were `0203d92c`/`03004f88` baseline and `02036b4c`/`03004f50`
+candidate. The same-source controls matched the earlier busy-probe ends.
+
+Observed advancing-call means were 2,512,225 cycles for baseline control and
+2,513,001 for baseline attribution (+0.03%); the candidate figures were
+2,446,291 and 2,446,201 (approximately -0.004%). These are one paired sample,
+not a general bound on instrumentation overhead. In the baseline attribution
+run, advancing-call means were 1,812,688 cycles for update and 700,185 for
+render including presentation; nested update orders averaged 1,520,699, while
+nested map and HUD averaged 434,913 and 152,747. These scopes overlap and must
+not be added together.
+
+The actual Z7 vector selects 14 maximum route slots; range-work may reserve two
+of those planes. Existing engine counters reported 3,576 hits and 392 completed
+route-field builds across the 1,000 calls. Among 975 advancing calls, 299 had at
+least one build; the maximum was seven in one call. Update cycles averaged
+3,827,509 on build calls versus 921,517 on the 676 calls without a build. The
+slowest call, tick 136,592, took 10,106,676 cycles including 9,429,660 update
+cycles and seven field builds. The cache candidate had the same route counts.
+This is correlation, not isolated build cost: the shared build counter includes
+ordinary goal and depot fields, and source-reachability work can call the same
+ordinary builder. These data do not establish miss, eviction, invalidation or
+caller proportions; the window immediately follows a fresh load and may include
+cold-cache effects.
+
+An existing bounded monotone shortest-step shortcut is an exact candidate for
+further study, not a promoted change: the audited Terran/Zerg/P7 implementation
+has independent FIFO-oracle tests, and this Z7 vector does not enable it. First
+classify actual build sources, destinations and topology invalidations, then
+measure any opt-in shortcut against the same seed and input with equivalent
+state, pixels, memory and tails. Do not infer that enlarging route capacity is
+correct or useful from this aggregate alone. Detailed pair and attribution logs
+remain under `build/z7-host-sram-contract/attribution*-run/` in the isolated
+workspace; private ROMs, saves and captures are not committed.
