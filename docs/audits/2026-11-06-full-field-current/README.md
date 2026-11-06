@@ -10,14 +10,14 @@ The prior source `31a5ddf8` passed the Z7 full HOST tape, bounded 1/3-AI custom
 openings on both maps, fresh guest continuation and normal Z7–Z10 memory-guard
 links. Those results do not establish equivalence on this newer source: L input
 can now cancel a selected producer's queue, so the original tape must be
-replayed and checked again. Current-source guest and performance results are pending; no promotion or physical-hardware claim is made here.
+replayed and checked again. Current-source guest results are recorded below; performance results are pending; no promotion or physical-hardware claim is made here.
 
 On `271db94a`, both fresh HOST Z7 full-tape builds reached the recorded win and
 passed all 307 strict observations. All 175,455 per-call selected actor/world
 and displayed indexed-frame/full-palette fingerprints matched; final journals
 and replay records matched, and the frozen source/input manifest was unchanged.
 The recorded tape therefore remains valid through this queue change in this
-HOST comparison. These fingerprints are not complete-state proof; other scenarios, guest continuation and cycle measurements remain open.
+HOST comparison. These fingerprints are not complete-state proof; other scenarios and cycle measurements remain open.
 
 Four HOST custom games on this source launched through normal menus with a
 Zerg human, both maps and one or three mixed AI opponents. Each advanced 4,000
@@ -33,3 +33,15 @@ source/input manifests and all 564 files in the copied private-input receipt
 matched before and after. These links used the separately verified codec2
 audio pair `11bb06f8…`/`3243919d…`; the delivered P10 ROM used the distinct
 advisor-enabled pair, so these links do not establish equivalence across banks.
+
+Fresh guest processes loaded the genuine ordinary-button Z7 journal via HOME-L
+and followed the retained timeline from cut 136,058 to the recorded win. Both
+control and full-field guest replays passed strict validation and all 50
+HOST/guest cargo checkpoints. Their final SRAM hashes both matched
+`de1d039ed52756d98114ea31a644693ed73e394ab212200f8f8b41b8674cb5ba`;
+custom replay ROM hashes were
+`52ed8157a2863cc17cce84bcb8ee219c23dc7f4112db290299307606a6c73867` and
+`058eadba330e151a96adab97e8758ae47e78c6a1977352472ffcde41dc334ae6`.
+Frozen source and inputs matched before and after. This is a sampled emulator
+continuation with the codec2 bank, not complete-state, advisor-bank or physical
+hardware proof. Current-source busy timing remains pending.
