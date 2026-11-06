@@ -92,11 +92,45 @@ Fresh recovery results (qualification remains incomplete):
   cache flags and 1,236,870 with them (about 4.8% less); 35 nonadvancing calls
   are reported separately. Snapshot work occurs outside the timed calls and
   may affect pacing. This is sampled early diagnostic evidence, not a full,
-  late/busy, normal-main or physical 30-fps result. A busy HOST button-save trial
-  reached cut 136,058 with matching journals and 258 observations, but the
-  verifier rejected the zero-filled unused SRAM slot and zero timing records.
-  That seed was not edited or promoted. Correct backend initialization or a
-  genuine guest save, fresh-process load and continuation parity are required.
+  late/busy, normal-main or physical 30-fps result. The initial busy HOST seed
+  was correctly rejected for zero-filled unused SRAM and fake zero timing;
+  that failed evidence remains retained. The HOST backend now starts erased
+  once per process and preserves SRAM across soft boots. A newly generated
+  ordinary-button seed (cut 136,058, journal SHA `182407d91e782c4e879e65047223a70a0ec5f83bbec0131d4e205debddbd0d39`)
+  passes 258/258 observations. Fresh actual ARM baseline/candidate loads each
+  pass 49/49 resumed observations and 50/50 selected-unit CARGO7 digests through
+  the recorded win. The HOST prefix is explicitly untimed; it establishes no
+  combined mission timing or full-state equivalence.
+- The genuine busy paired diagnostic (calls 136,059–137,058) contains 975
+  advancing PLAY calls, 25 nonadvancing calls and no text/modal calls, with
+  at least 48 friendly and 169 other units. Ten sampled indexed-frame/palette
+  and selected-state hashes match. Advancing means are 2,512,225 cycles baseline
+  and 2,446,291 candidate (about 2.6% less), still far above the roughly 559,000
+  cycle 30-fps budget. Snapshots outside the timed segment affect pacing; sampled
+  hashes are not all-frame/full-state proof, and reported top-tail order samples
+  are not exact p95/p99. Keep flags experimental. Same-source control and coarse
+  update/render/route attribution builds are now the next measurement, with the
+  actual 14 route slots unchanged. The subsequent same-source four-ROM
+  control/attribution run matches all ten sampled state/display hashes and
+  workload checks. Measured attribution overhead is about +0.03% baseline and
+  -0.004% candidate in this window. Baseline advancing means: update 1,812,688
+  cycles (orders nested within it: 1,520,699), render/present 700,185 (map nested:
+  434,913; HUD: 152,747). Nested scopes must not be added. Route counters show
+  3,576 hits and 392 builds; 299/975 advancing calls build at least once, maximum
+  seven builds. Build-bearing updates average about 3.83M versus 0.92M otherwise;
+  this is correlation, not isolated build cost. The worst sampled tick builds
+  seven routes and costs 10.11M cycles. Prioritize orders/pathfinding rebuild
+  causes ahead of further renderer tweaks, without reducing actors, AI cadence,
+  route slots or sight. This remains an after-load diagnostic, not global FPS.
+- The fitting shared-actor stack diagnostic completed real custom START/B save
+  and fresh HOME-L continuation with matching candidate/diagnostic SRAM and
+  named states. At least 9,740 of 11,208 painted bytes remained untouched in the
+  bounded load/resume path; this is not an IRQ/BIOS/all-path stack bound. New
+  campaign saving still reports SAVE FAILED, and the genuine older campaign
+  journal is rejected with load error 89. Preserve both safety gates. The full
+  30-mission persistence audit identifies campaign context, actor origin,
+  reservations and atomic migration as required work; the exact error-89
+  rejecting predicate remains unproven.
 - The current Z8 controller pair reproduced fault-free losses: common service
   at frame 11,048 and service-off at 21,782. The first sampled state difference
   is an additional Egg, consistent with the intended lifecycle, not proof of a
@@ -151,10 +185,17 @@ Next qualification order:
    all three probe links and bounded HOST gates are prerequisites, not promotion.
 2. Qualify render-cache flags on representative current early and busy Zerg
    windows. HOST pairs and ARM links pass; the bounded early cycle diagnostic is
-   preliminary. Repair/replace the rejected busy seed through real save behavior,
-   validate fresh guest continuation, then measure paired cycles, state/palette/
-   pixels and tails before promotion. P10 already has these flags; Z7–Z10 do not.
-3. Continue AI/research/source-owner and campaign mechanics, preserve carried
+   preliminary. Genuine busy save/ARM continuation and sampled paired cycles now
+   pass, but the gain is only about 2.6%. Attribute the remaining update/render
+   cost with same-source controls, quantify instrumentation overhead and route
+   builds/hits, then optimize the measured dominant work. Require equivalent
+   workload and state/display checks before promotion. P10 already has these
+   flags; Z7–Z10 do not.
+3. Implement authenticated campaign persistence for the full actor codec across
+   all 30 mission contexts, including source-placed and paid actors, owner
+   transfer, pending births/reservations, predecessor migrations and atomic
+   rejection. Do not weaken custom-only validators to admit campaign records.
+4. Continue AI/research/source-owner and campaign mechanics, preserve carried
    missions and finish Z10 normally. Repair native capture/input access and
    collect the still-missing N64 gameplay comparisons.
 
@@ -162,6 +203,12 @@ The earlier disk interruption and background-I/O observations are historical;
 free space has recovered. No personal data or unrelated service was changed.
 ScreenCaptureKit still fails before N64 reference input; the owned emulator
 sessions exited and supplied no new gameplay proof.
+The clean canonical source-only HOST SRAM/replay patch passed source boundary,
+HOST save/selection targets, replay-validator tests, default build and full
+`./dev test` (449.68 seconds). These checks are independent of the experimental
+actor branches and their known private-input/default-suite failures. The focused
+patch is being prepared for review; no experimental runtime flags are included.
+
 All checks remain local; GitHub Actions is still disabled. No experimental
 release flags or campaign coverage were promoted. The later verified KODAK copy
 of existing playable packages is recorded in the delivery row below.
