@@ -1,6 +1,10 @@
 #ifndef SC64_P6_STORM_ADAPTER_H
 #define SC64_P6_STORM_ADAPTER_H
 
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+#include "sc64_research_q8_storm.h"
+#endif
+
 #if !defined(SC64_P6_RUNTIME) || !defined(SC64_P6_STORM_ENABLED)
 #error "P6 Storm adapter requires SC64_P6_RUNTIME and SC64_P6_STORM_ENABLED"
 #endif
@@ -181,14 +185,22 @@ static int race_p6_storm_tick(int user_paused)
             target_class = (u8)sc64_psionic_storm_target_class(
                 sc64_race_unit_flying(u[i].type),
                 !!(actor_flags & SC64_GAME_ACTOR_BUILDING));
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            if(!sc64_pr_q8_storm_read(i,&hp_q8,&shields_q8))return 0;
+#else
             hp_q8 = u[i].hp * SC64_STORM_ENERGY_ONE;
             shields_q8 = u[i].shield * SC64_STORM_ENERGY_ONE;
+#endif
             if (!sc64_psionic_storm_apply_hit(target_class,
                     invincible_units[i] || (u[i].flags & 16) ||
                     (actor_flags & SC64_GAME_ACTOR_INVINCIBLE), &hit[i],
                     &hp_q8, &shields_q8)) continue;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            if(!sc64_pr_q8_storm_commit(i,hp_q8,shields_q8))return 0;
+#else
             u[i].hp = hp_q8 / SC64_STORM_ENERGY_ONE;
             u[i].shield = shields_q8 / SC64_STORM_ENERGY_ONE;
+#endif
             if (u[i].hp <= 0) {
                 /* P6 source-death accounting must run while source identity is intact. */
                 race_p6_note_unit_death(&u[i]);
@@ -212,12 +224,20 @@ static int race_p6_storm_tick(int user_paused)
                 dy < -SC64_STORM_RADIUS_GBA_PX || dy > SC64_STORM_RADIUS_GBA_PX ||
                 dx*dx+dy*dy > SC64_STORM_RADIUS_GBA_PX*SC64_STORM_RADIUS_GBA_PX)
                 continue;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            if(!sc64_pr_q8_storm_read(MAX_UNITS+i,&hp_q8,&shield_q8))return 0;
+#else
             hp_q8=q->hp*SC64_STORM_ENERGY_ONE; shield_q8=q->shield*SC64_STORM_ENERGY_ONE;
+#endif
             if (!sc64_psionic_storm_apply_hit(
                     SC64_STORM_TARGET_GROUND|SC64_STORM_TARGET_NONBUILDING,
                     invincible_buildings[i] || (q->flags&16u), &hit_props[i],
                     &hp_q8,&shield_q8)) continue;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            if(!sc64_pr_q8_storm_commit(MAX_UNITS+i,hp_q8,shield_q8))return 0;
+#else
             q->hp=hp_q8/SC64_STORM_ENERGY_ONE; q->shield=shield_q8/SC64_STORM_ENERGY_ONE;
+#endif
             if (q->hp<=0) {
                 race_p6_note_building_death(q); q->hp=0; q->alive=0;
                 invalidate_path_grid();

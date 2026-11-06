@@ -1,6 +1,10 @@
 #ifndef SC64_Z6_STORM_ADAPTER_H
 #define SC64_Z6_STORM_ADAPTER_H
 
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+#include "sc64_research_q8_storm.h"
+#endif
+
 #if !defined(SC64_Z6_RUNTIME) || !defined(SC64_Z6_STORM_ENABLED)
 #error "Z6 Storm adapter requires SC64_Z6_RUNTIME and SC64_Z6_STORM_ENABLED"
 #endif
@@ -137,8 +141,12 @@ static int race_z6_storm_tick(void)
             target_class = (u8)sc64_psionic_storm_target_class(
                 sc64_race_unit_flying(u[i].type),
                 !!(actor_flags & SC64_GAME_ACTOR_BUILDING));
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            if(!sc64_pr_q8_storm_read(i,&hp_q8,&shields_q8))return 0;
+#else
             hp_q8 = u[i].hp * SC64_STORM_ENERGY_ONE;
             shields_q8 = u[i].shield * SC64_STORM_ENERGY_ONE;
+#endif
             if (!sc64_psionic_storm_apply_hit(target_class,
                     invincible_units[i] || (u[i].flags & 16) ||
                     (actor_flags & SC64_GAME_ACTOR_INVINCIBLE), &hit[i],
@@ -151,8 +159,12 @@ static int race_z6_storm_tick(void)
                 (void)sc64_psionic_storm_apply_hit(target_class,0,&extra_hit,
                                                   &hp_q8,&shields_q8);
             }
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            if(!sc64_pr_q8_storm_commit(i,hp_q8,shields_q8))return 0;
+#else
             u[i].hp = hp_q8 / SC64_STORM_ENERGY_ONE;
             u[i].shield = shields_q8 / SC64_STORM_ENERGY_ONE;
+#endif
             if (u[i].hp <= 0) {
                 /* Z6 source-death accounting must run while source identity is intact. */
                 race_z6_note_unit_death(&u[i]);
