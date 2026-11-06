@@ -59,3 +59,31 @@ the current 75-percent refund: pinned OpenBW `cancel_build_queue` uses the
 full-unit-cost refund, separately from partial construction refunds. Terra's
 candidate now reflects that distinction, but focused tests/native confirmation
 and merge are still pending.
+
+
+## Mining follow-up: measured defect and safe timing plan
+
+The P10 production-vector synthetic adjacent Probe/resource/depot diagnostic
+collects on handler call 1, deposits on 2, collects again on 23 and deposits
+on 24. Its intended post-pickup timer 45 is bypassed while loaded and replaced
+by 20 at deposit. This establishes an ordering defect, not wall-clock mineral
+income or a native N64 measurement. The 50-mineral opening bank is separately
+merged in #306; that change does not repair steady-state income.
+
+A no-new-field timing design is available for review: counter 0 arms the gather
+wait at the resource, values above 1 decrement, and 1 performs pickup/reset.
+Deposit resets to 0. That covers initial, repeated and implicitly admitted
+orders without repurposing cargo bits or adding save bytes. OpenBW pinned
+revision `4b046d5f65302b10cb0a745f0fecd37ec85b20a8`, `bwgame.h`
+`order_MiningMinerals` sets 75 and `order_HarvestGas` sets 37. The existing
+project 5:4 conversion would yield 94/47 GBA update intervals, counting pickup
+D intervals after the arming call. These are source-derived proxies, not a
+calibrated N64 clock. Native per-patch queues and refinery hide/exit behavior
+are still absent; individual worker delays alone cannot establish native
+multi-worker mineral rates.
+
+Before promotion: cover both worker loops, loaded/empty/in-transit states,
+explicit cross-kind/unknown cargo, depletion, no depot, and real save/reload
+at counters 0/1/D; state the one-cycle interpretation of legacy nonzero
+20/45/60 counters. Run normal product ARM guards and real campaign/custom
+pacing witnesses. No timing behavior change is currently enabled.
