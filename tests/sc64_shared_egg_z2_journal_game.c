@@ -8,7 +8,7 @@
 #error "Z2 Egg fixture requires the isolated stage"
 #endif
 #ifdef SC64_Z2_ACTUAL_PERMISSIONS
-#define Z2_DENIED_PRODUCT U_ZP_ULTRALISK
+#define Z2_DENIED_PRODUCT U_QUEEN
 #define Z2_PERMISSION_LABEL "verified actual"
 #else
 #define Z2_DENIED_PRODUCT U_DRONE
