@@ -130,3 +130,7 @@ Z6_EGG_HOST_FLAGS = $(LATE_EGG_HOST_FLAGS) -DSC64_SHARED_EGG_Z6_HOST_STAGE -DSC6
 test-z6-egg-actual-journal:
 	$(CLANG) $(Z6_EGG_HOST_FLAGS) tests/sc64_shared_egg_z6_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z6-egg-actual
 	$(EGG_TEST_BIN_DIR)/sc64-z6-egg-actual
+.PHONY: test-z6-egg-synthetic-journal
+test-z6-egg-synthetic-journal:
+	$(CLANG) $(filter-out -DSC64_Z6_ACTUAL_PERMISSIONS -I$(SC64_MID_PERMISSIONS_DIR),$(Z6_EGG_HOST_FLAGS)) -Itests/fixtures/mid-zerg-synthetic tests/sc64_shared_egg_z6_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z6-egg-synthetic
+	$(EGG_TEST_BIN_DIR)/sc64-z6-egg-synthetic
