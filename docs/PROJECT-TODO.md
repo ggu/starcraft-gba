@@ -69,7 +69,7 @@ older KODAK package. Source merges do not update an already copied ROM.
   [wire audit](audits/2026-11-06-research-wire/README.md).
   A separate gameplay branch has verified all 228 armor and 130 native weapon
   upgrade-family IDs against authenticated N64 tables. These facts and the
-  private P1–P10 policy generator are groundwork, not usable upgrades.
+  private all-30-campaign policy generator are groundwork, not usable upgrades.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** warp-start/death sounds, large death effects, remembered
@@ -133,6 +133,21 @@ save/source-owner and timing evidence; do not advertise unwired components.
   90 sampled state/pixel checkpoints and adds 3.32% overhead; order/Arbiter
   setup, movement and rendering remain major scopes. These replacement-main
   emulator measurements are not hardware certification or a new speed gain.
+- The [current P10 busy profile](audits/2026-11-06-current-p10-busy/README.md)
+  uses the exact delivered ROM, reproduced byte-identically from merged
+  `c27bb48c`, with 392 dependencies verified. Its P7 physical-input window
+  averages 2,253,117 cycles across 958 advancing calls, against about 559,000
+  available at 30 fps. Eleven selected-state/displayed-frame/palette samples
+  match; no every-frame or hardware claim follows. A guarded diagnostic
+  (2.643% observer overhead) attributes about 464,761 cycles to Arbiter due
+  processing on average, while movement dominates the worst sampled spike
+  (2,673,153 cycles). Profile mean and tail separately; do not alter cadence
+  or predict savings by adding nested scopes. #320 adds the bounded read-only
+  video observation and durable bounds checks, with no release optimization.
+- A genuine ordinary-input P1 save under the exact normal P10 package passed
+  fresh-process load and a 120-update continuation at one early save point,
+  with the journal unchanged. This is not a continued win or arbitrary-save
+  qualification; P2 and the wider early-Protoss save matrix remain open.
 - A fresh ordinary-input N64 Blood Bath Zerg session displays Drone cost
   **50 minerals / 1 supply**, then supply **4/9 → 7/9** and Cancel after a
   command to three selected larvae. Birth, refund and exact timing/debit were
