@@ -109,14 +109,17 @@ int main(void)
     b[3].x=b[3].y=200;
     b[4].alive=1; b[4].owner=SIDE; b[4].type=B_PYLON; b[4].raw_type=-1;
     b[4].x=b[4].y=200;
-    assert(!sc64_pr_stage_begin_slot(3,SC64_PR_SHIELDS));
+    assert(sc64_pr_stage_begin_slot(3,SC64_PR_SHIELDS)); /* level 1 needs no Core */
+    assert(sc64_pr_stage_cancel_slot(3,0) && minerals==1000 && gas==1000);
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_SHIELDS]=1;
+    assert(!sc64_pr_stage_begin_slot(3,SC64_PR_SHIELDS)); /* level 2 needs Core */
     b[5].alive=1; b[5].owner=SIDE; b[5].type=B_CYBERNETICS_CORE; b[5].raw_type=-1;
     assert(sc64_pr_stage_begin_slot(3,SC64_PR_SHIELDS));
     minerals=INT_MAX; int human_gas=gas; saved=b[3];
     assert(!sc64_pr_stage_cancel_slot(3,0));
     assert(!memcmp(&b[3],&saved,sizeof saved) && minerals==INT_MAX && gas==human_gas);
     minerals=70000; assert(sc64_pr_stage_cancel_slot(3,0));
-    assert(minerals==70200 && gas==human_gas+200);
+    assert(minerals==70300 && gas==human_gas+300);
     b[0].level=1; b[0].queue_progress=1; b[0].queue[0]=1; b[0].queue[1]=1;
     saved=b[0]; assert(spawn_build(SIDE,B_PYLON,100,100,0)==-1);
     assert(!memcmp(&b[0],&saved,sizeof saved));

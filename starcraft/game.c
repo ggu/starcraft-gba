@@ -2835,7 +2835,7 @@ static int sc64_pr_stage_begin_slot(int slot,unsigned family)
                                   (unsigned)legacy_w,(unsigned)legacy_a);
     max=family==SC64_PR_SINGULARITY ? 1u : 3u;
     if (level>=max || !sc64_pr_quote(family,level,&quote)) return 0;
-    if (family==SC64_PR_SHIELDS && !sc64_pr_stage_has_raw(owner,164)) return 0;
+    if (level>=1 && family==SC64_PR_SHIELDS && !sc64_pr_stage_has_raw(owner,164)) return 0;
     if (level>=1 && (family==SC64_PR_GROUND_ARMOR || family==SC64_PR_GROUND_WEAPONS) &&
         !sc64_pr_stage_has_raw(owner,165)) return 0;
     if (level>=1 && (family==SC64_PR_AIR_ARMOR || family==SC64_PR_AIR_WEAPONS) &&
@@ -2922,7 +2922,7 @@ static void sc64_pr_stage_tick(void)
         int lw=o==SIDE ? weapons_level : 0, la=o==SIDE ? armor_level : 0;
         int pw=o==SIDE && weapons_research, pa=o==SIDE && armor_research;
         if (!race_site_powered((int)o,b[i].x,b[i].y)) continue;
-        if (family==SC64_PR_SHIELDS && !sc64_pr_stage_has_raw(o,164)) continue;
+        if (level>=1 && family==SC64_PR_SHIELDS && !sc64_pr_stage_has_raw(o,164)) continue;
         if (level>=1 && (family==SC64_PR_GROUND_ARMOR || family==SC64_PR_GROUND_WEAPONS) &&
             !sc64_pr_stage_has_raw(o,165)) continue;
         if (level>=1 && (family==SC64_PR_AIR_ARMOR || family==SC64_PR_AIR_WEAPONS) &&
