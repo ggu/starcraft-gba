@@ -80,3 +80,17 @@ fractional HP/shields and specialized attacks, all-product default/feature-on
 checks, runtime stack/IRQ, ordinary campaign play and performance. Normal flags
 remain off. The broader goal remains 29/30 content with incomplete campaign,
 custom-game, persistence, fidelity and near-30-fps qualification.
+
+Publication successor `c59e0687` extracts the identical live adapter body into
+`sc64_research_runtime_adapter.h` and gives optional test recipes ordinary
+`Makefile` paths. This keeps the existing source-only file-type and 512 KiB
+limits intact rather than relaxing the validator. Root compared the extracted
+body byte for byte. Campaign and existing custom HOST sanitizer suites were
+repeated successfully at that source (19.17/18.29 seconds), with all 593 inputs
+unchanged. The normal research-off P10 link was repeated and again matched
+`4daff951...` byte for byte; its compiler intermediate limit was 256 MiB.
+`tools/check_source_tree.py` passes for all 1,845 indexed text sources. The
+optional ordinary-controller recipe is now
+`tests/sc64-research-ordinary/Makefile`; existing historical evidence retains its
+original recipe name. Full combined default/feature-on qualification remains
+open, and no normal flag is enabled.
