@@ -20,12 +20,17 @@ static void cycle(int race, int worker_type, int depot_type, int refinery_type, 
         for(int i=0; i<duration-1; ++i) {
             one_tick();
             assert(!u[w].carry && minerals==(is_gas?0:trip*8) && gas==(is_gas?trip*8:0));
+            if (!is_gas) assert(m[2].amount==100-trip*8);
         }
         one_tick(); assert(u[w].carry==8 && u[w].work_timer==0);
+        if (!is_gas) assert(m[2].amount==100-(trip+1)*8);
         assert(minerals==(is_gas?0:trip*8) && gas==(is_gas?trip*8:0));
         one_tick(); assert(!u[w].carry && u[w].work_timer==0);
         assert(minerals==(is_gas?0:(trip+1)*8) && gas==(is_gas?(trip+1)*8:0));
     }
+    /* Progress is frozen during travel. */
+    u[w].work_timer=9; u[w].x=256; one_tick(); assert(u[w].work_timer==9);
+    u[w].x=128; u[w].y=96;
     /* A legacy saved partial wait resumes without an extra initialization. */
     u[w].work_timer=2; one_tick(); assert(u[w].work_timer==1 && !u[w].carry);
     one_tick(); assert(u[w].carry==8 && !u[w].work_timer);

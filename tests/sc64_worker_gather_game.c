@@ -127,7 +127,7 @@ test_gas_cargo_retarget_and_credit(int race, int worker_type,
     assert(u[worker].carry == 6 &&
            (u[worker].flags & SC64_WORKER_CARGO_KIND_MASK) == SC64_WORKER_CARGO_GAS);
     u[worker].x = m[patch].x; u[worker].y = m[patch].y;
-    one_tick();
+    for (int i = 0; i < 45; ++i) one_tick();
     assert(u[worker].carry == 5 && m[patch].amount == 0);
     assert(!(u[worker].flags & SC64_WORKER_CARGO_KIND_MASK)); /* mineral kind */
     assert(minerals == 0 && gas == 0);
@@ -152,7 +152,7 @@ test_gas_cargo_retarget_and_credit(int race, int worker_type,
     assert(u[worker].carry == 4);
 #endif
     u[worker].x = 320; u[worker].y = 320;
-    one_tick();
+    for (int i = 0; i < 60; ++i) one_tick();
     assert(u[worker].carry == 8);
     assert((u[worker].flags & SC64_WORKER_CARGO_KIND_MASK) == SC64_WORKER_CARGO_GAS);
     assert(minerals == 0 && gas == 0);
@@ -373,8 +373,6 @@ test_automatic_no_depot_hold(void)
     assert(u[worker].x!=x || u[worker].y!=y);
     u[worker].x=300; u[worker].y=300;
     u[worker].work_timer=2;
-    one_tick();
-    assert(u[worker].carry==0 && sc64_worker_gather_pending(&u[worker]));
     one_tick();
     assert(u[worker].carry==0 && sc64_worker_gather_pending(&u[worker]));
     one_tick();
