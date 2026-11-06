@@ -35,7 +35,32 @@ static void start_z2(void)
 }
 int main(int argc,char **argv)
 {
-    assert(argc==1 || (argc==3 && (!strcmp(argv[1],"write") || !strcmp(argv[1],"read"))));
+    assert(argc==1 || (argc==3 && (!strcmp(argv[1],"write") || !strcmp(argv[1],"read") || !strcmp(argv[1],"legacy"))));
+    if(argc==3 && !strcmp(argv[1],"legacy")) {
+        game_init();assert(fixture_import_host_save(argv[2]));
+        RaceLoadPlan plan;GbaSaveSelection older,winner;
+        assert(race_worker_cargo_select(&plan,&older));
+        assert(older.tag==SC64_TRANSPORT_SAVE_VERSION && race_load_game());
+        assert(!race_mode && race_selected_mission==SC64_RACE_MISSION_Z2);
+        int hall=hall_for_owner(SIDE);assert(hall>=0);
+        minerals=1000;gas=1000;b[hall].larva=2;
+        assert(spawn_unit(SIDE,U_OVERLORD,80,80)>=0);
+        assert(spawn_build(SIDE,B_SPAWNING_POOL,b[hall].x+80,b[hall].y+80,0)>=0);
+        assert(race_queue_unit(SIDE,hall,U_ZERGLING));int egg=egg_for_owner(SIDE,-1);assert(egg>=0);
+        assert(race_save_game());u32 length=0;
+        assert(save_read_latest(saved.bytes,sizeof(saved.bytes),SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,&length));
+        edited=saved;Unit denied;
+        assert(sc64_zp_unit_save_decode(&denied,&edited.record.save.units[egg],race_cols*16u,race_rows*16u));
+        denied.target=Z2_DENIED_PRODUCT;denied.work_timer=sc64_z7_egg_duration(Z2_DENIED_PRODUCT);
+        assert(sc64_shared_egg_wire_valid(&denied,1,race_shared_egg_candidate_owner,&edited.record.save));
+        assert(sc64_zp_unit_save_encode(&edited.record.save.units[egg],&denied,race_cols*16u,race_rows*16u));
+        const u32 known[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
+        assert(save_write_selected(edited.bytes,length,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,&older,known,3));
+        assert(race_worker_cargo_select(&plan,&winner) && winner.slot==older.slot);
+        assert(race_load_game() && !race_mode && race_selected_mission==SC64_RACE_MISSION_Z2);
+        assert(egg_for_owner(SIDE,-1)<0);
+        puts("Z2 genuine old-tag save restored after denied newer Egg");return 0;
+    }
     if(argc==3 && !strcmp(argv[1],"read")) {
         game_init();assert(fixture_import_host_save(argv[2]));
         assert(race_load_game() && !race_mode && race_selected_mission==SC64_RACE_MISSION_Z2);
