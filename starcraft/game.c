@@ -1,3 +1,14 @@
+/* Explicit, non-shipping ARM qualification vector. The candidate still uses
+ * its authenticated staged tags; this capability never enables by default. */
+#if defined(SC64_SHARED_ACTOR_ARM_QUALIFICATION) && \
+    (defined(GBA_HOST) || !defined(__arm__) || \
+     !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_SHARED_EGG_CUSTOM_SERVICE) || \
+     !defined(SC64_SCARAB_STABLE_ROSTER_HOST_STAGE) || !defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) || \
+     !defined(SC64_GUARDIAN_COCOON_STAGE) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || \
+     !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) || !defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE) || \
+     !defined(SC64_SCARAB_TECH_PATH_HOST_PROBE) || !defined(SC64_SCARAB_AI_STOCK_PROBE))
+#error "Shared actor ARM qualification requires the complete non-HOST vector"
+#endif
 #if defined(SC64_CONTACT_MEMO_ORACLE) && \
     (!defined(GBA_HOST) || \
      !defined(SC64_CONTACT_CACHE))
@@ -314,7 +325,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Guardian and Scarab candidate context integration is not qualified"
 #endif
 #if defined(SC64_SCARAB_STABLE_ROSTER_HOST_STAGE) && \
-    (!defined(GBA_HOST) || !defined(SC64_SCARAB_RUNTIME) || \
+    ((!defined(GBA_HOST) && !defined(SC64_SHARED_ACTOR_ARM_QUALIFICATION)) || !defined(SC64_SCARAB_RUNTIME) || \
      !defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
      (defined(SC64_GUARDIAN_COCOON_STAGE) && !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE)))
 #error "Scarab stable roster is an isolated HOST candidate, not a journal service"
@@ -327,7 +338,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Shared actor journal is an isolated HOST Terran compact-codec candidate"
 #endif
 #if defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) && \
-    (!defined(GBA_HOST) || !defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) || \
+    ((!defined(GBA_HOST) && !defined(SC64_SHARED_ACTOR_ARM_QUALIFICATION)) || !defined(SC64_SHARED_ACTOR_LAYOUT_HOST_STAGE) || \
      !defined(SC64_GUARDIAN_COCOON_STAGE) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || \
      (!defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_FULL_STORAGE)) || \
      ((defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_P7_TYPED_COMPACT_ENABLED)) && \
@@ -338,7 +349,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 /* Explicit HOST-only qualification of the real Z7 derived and P10 typed
  * row codecs. The ordinary product and every guest vector remain fenced. */
 #if defined(SC64_SHARED_ACTOR_PROFILE_CODEC_HOST_STAGE) && \
-    (!defined(GBA_HOST) || !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) || \
+    ((!defined(GBA_HOST) && !defined(SC64_SHARED_ACTOR_ARM_QUALIFICATION)) || !defined(SC64_SHARED_ACTOR_FULL_HOST_STAGE) || \
      !defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE) || !defined(SC64_ZP_FULL_STORAGE) || \
      !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
      (defined(SC64_Z7_DERIVED_SAVE) == defined(SC64_P7_TYPED_COMPACT_ENABLED)))
@@ -364,7 +375,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Guardian campaign construction remains an isolated HOST experiment"
 #endif
 #if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) && \
-    (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    ((!defined(GBA_HOST) && !defined(SC64_SHARED_ACTOR_ARM_QUALIFICATION)) || !defined(SC64_GUARDIAN_COCOON_STAGE) || \
      !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_RACES) || \
      !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_WORKER_CARGO_KIND) || \
      !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || \
@@ -618,7 +629,7 @@ _Static_assert((SAVE_VERSION & 0x04000000u) == 0, "transport save namespace over
 #define SC64_TRANSPORT_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
-#if !defined(GBA_HOST) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SCARAB_NAMESPACE_STAGE)
+#if (!defined(GBA_HOST) && !defined(SC64_SHARED_ACTOR_ARM_QUALIFICATION)) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SCARAB_NAMESPACE_STAGE)
 #error "Guardian journal prototype is HOST-only and requires cargo and transport without Scarab stage"
 #endif
 _Static_assert((SAVE_VERSION & 0x10000000u) != 0 && (SC64_TRANSPORT_SAVE_VERSION & 0x10000000u) != 0,

@@ -54,7 +54,7 @@ static inline const Sc64SkirmishRecord *sc64_skirmish_menu_record(unsigned race,
 /* The full-service HOST probe exercises paid tech progression without
  * advertising an unfinished actor in release products. */
 #if defined(SC64_SCARAB_TECH_PATH_HOST_PROBE) && \
-    (!defined(GBA_HOST) || !defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE))
+    ((!defined(GBA_HOST) && !defined(SC64_SHARED_ACTOR_ARM_QUALIFICATION)) || !defined(SC64_SHARED_ACTOR_FLIGHT_HOST_STAGE))
 #error "Scarab tech-path probe requires the complete HOST flight stage"
 #endif
 static inline int sc64_skirmish_menu_supported(const Sc64SkirmishRecord *r)
