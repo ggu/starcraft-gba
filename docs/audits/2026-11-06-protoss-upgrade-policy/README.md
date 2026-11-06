@@ -32,4 +32,14 @@ Pinned OpenBW `bwgame.h:3501–3535` refunds full cost on cancel and three quart
 
 Finally wire source-identified upgrade families into weapon/armor/shield/range calculations and special paths, not inferred flight or attack target. The stock-family parser and optional separate source header described in [the family audit](../2026-11-06-research-family-facts/README.md) now supply verified IDs; runtime routes still need to consume them. Scenario cap/initial state, typed jobs, owner banks, combat and UI need cross-profile ordinary-input and save/load tests before promotion. The 5:4 simulation conversion is an existing approximation, not verified N64 duration.
 
+The pinned BWAPI `UpgradeType.cpp` `upgradeInternalReqs::requirements` table
+at revision `d727fed68558c506163048ea889131d8cbb33915` distinguishes additional
+level-two/three prerequisites: ground weapons/armor require Templar Archives,
+air weapons/armor require Fleet Beacon, and Plasma Shields require Cybernetics
+Core. The producer table separately assigns shields and ground upgrades to
+Forge, and air upgrades/Singularity Charge to Cybernetics Core. These PC table
+facts must be respected by admission; they are not native N64 observations or
+implemented gameplay. In particular, do not infer shields' prerequisites from
+ground armor merely because both are researched at a Forge.
+
 The expanded private header uses `[race][chapter-1][raw_owner][family]`, with T=0, Z=1, P=2, and a separate `[race][chapter-1][family]` default-cost support flag. The catalog is validated as exactly T1–T10, Z1–Z10 and P1–P10 with unique source paths; duplicate/missing archive entries fail. P1–P10 decoded pairs and CHK hashes were compared against the preceding P-only generator and matched exactly. These are scenario policy facts for Protoss families in all campaign maps; they do not implement Terran/Zerg upgrade families or custom-game permissions.
