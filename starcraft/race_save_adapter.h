@@ -418,6 +418,13 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
         if (!sc64_shared_egg_wire_valid(&q,1,race_shared_egg_candidate_owner,(void *)candidate)) return 0;
         int raw=sc64_race_raw_unit(q.target);
         if (raw<0 || sc64_race_unit_from_raw(raw)!=q.target) return 0;
+#ifdef SC64_SHARED_EGG_Z2_HOST_STAGE
+        /* Only tagged active Eggs use this admission rule. Old-tag actors
+         * remain subject to their original decoder and are not reclassified. */
+        if (!candidate->state[0] && candidate->state[2]==SC64_RACE_MISSION_Z2 &&
+            !sc64_early_zerg_permission_available(SC64_RACE_MISSION_Z2,
+                                                   (unsigned)q.raw_owner,(unsigned)raw)) return 0;
+#endif
         if (candidate->state[0]) {
             int admitted=0;
             for (unsigned j=0;j<SC64_SKIRMISH_UNIT_COUNT;j++) {
@@ -427,8 +434,7 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
             }
             if (!admitted) return 0;
         }
-        /* A paid Egg may outlive its producer and prerequisites. Mission
-         * unit PUNI admission is not yet enforced by the producer. */
+        /* A paid Egg may outlive its producer and prerequisites. */
         committed+=(unsigned)(sc64_z7_egg_product_count(q.target)-1);
     }
     for (unsigned i=0;i<MAX_BUILDINGS;i++) {

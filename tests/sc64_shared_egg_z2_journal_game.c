@@ -68,6 +68,14 @@ int main(int argc,char **argv)
     int count=zerglings(),timer=u[egg].work_timer;
     for(int i=0;i<timer;++i)race_z7_egg_tick_unit(egg);
     assert(zerglings()==count+2);
+    /* A valid tagged row cannot substitute a synthetic PUNI-denied product,
+     * even when owner, checksum and ordinary Egg shape remain valid. */
+    edited=saved;Unit denied;
+    assert(sc64_zp_unit_save_decode(&denied,&edited.record.save.units[egg],race_cols*16u,race_rows*16u));
+    denied.target=U_DRONE;denied.work_timer=sc64_z7_egg_duration(U_DRONE);
+    assert(sc64_zp_unit_save_encode(&edited.record.save.units[egg],&denied,race_cols*16u,race_rows*16u));
+    clear_records();assert(save_write_first(edited.bytes,length,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION));
+    expect_failed_load_preserves_world();
     edited=saved;Unit forged;
     assert(sc64_zp_unit_save_decode(&forged,&edited.record.save.units[egg],race_cols*16u,race_rows*16u));
     forged.raw_owner=-1;
