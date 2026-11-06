@@ -154,6 +154,18 @@ Fresh recovery results (qualification remains incomplete):
   output and cache/reuse state; standalone FIFO witness tests cannot prove that
   changing field allocation/eviction preserves the existing stateful dispatcher.
   Do not remove state checks or change controller inputs to conceal divergence.
+- The first monotone divergence is now isolated to an observable cache side
+  effect: a ranged cached-point query at call 817 finds the full field in the
+  control and no field after a shortcut skipped allocation. A small actual
+  dispatcher fixture reproduces this; it is not a flaw in the independent
+  FIFO witness alone. The replacement candidate preserves allocations and
+  uses the existing WORD_CLEAR / VISIT_GRID / NEW_CELL full-flood flags.
+  All eight normal Z7-Z10 links pass without guard changes or BSS growth;
+  IWRAM headroom improves. The fresh 175,455-call HOST control/candidate both
+  win with 307/307 strict observations, equal final journal and every-call
+  selected-state/world plus full displayed indexed-frame/palette fingerprints.
+  These hashes are diagnostic evidence, not exhaustive state proof. Measure
+  the paired guest busy window next; no default flags are promoted yet.
 - The fitting shared-actor stack diagnostic completed real custom START/B save
   and fresh HOME-L continuation with matching candidate/diagnostic SRAM and
   named states. At least 9,740 of 11,208 painted bytes remained untouched in the
@@ -280,8 +292,10 @@ are recorded separately, not treated as game frames. This establishes useful
 capture plumbing and ordinary boot, not campaign/skirmish/engine parity or
 native hardware timing. Observed button polls are logged, but the earlier
 Start/A schedule ran before menu input could visibly respond; it proves no
-menu transition. Next enter a mission/custom game through ordinary emulated
-buttons, capture real gameplay and verify the relevant mechanics visually.
+menu transition. Ordinary emulated buttons now reach the Wasteland map with 40 minerals and
+10/18 supply; selecting a Marine shows 40 HP. These are direct visual
+observations on a fresh boot, without guest memory or savestate edits.
+Continue worker selection/build grid and custom-game mechanics comparisons.
 Processed framebuffer geometry/aspect and emulator renderer equivalence also
 remain separate from asset or behavior parity.
 
@@ -437,3 +451,12 @@ evidence; corrected human opening supply does not establish all setup parity.
 - The full goal remains open until campaigns, supported skirmishes, shared
   mechanics, near-30-fps behavior and reference/hardware checks are proven
   together on the delivered builds.
+
+## Current user-requested UI cleanup
+
+The B-menu framed list uses 22-pixel rows/18-pixel source icons but reused a
+nine-pixel text-list highlight, and displayed costs six pixels above labels.
+The shared renderer fix is committed on `codex/command-menu-row-alignment-20261106`
+(`c1da667`): full 21-pixel row highlight plus price/label baseline alignment.
+Visual QA across all races and scrolled rows is queued under the native lock;
+no release/SD update or validation pass is claimed yet.
