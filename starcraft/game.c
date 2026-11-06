@@ -2171,6 +2171,9 @@ static int race_skirmish_record_available(const Sc64SkirmishRecord *record);
 static int race_skirmish_worker(int type);
 static int race_skirmish_product_available(const Sc64SkirmishRecord *record, void *context);
 static int race_can_site(int owner,int type,int x,int y);
+#ifdef SC64_PSI_FIELD_OVERLAY_PROBE
+static int race_skirmish_power_required(int type);
+#endif
 static int race_site_powered(int owner,int x,int y);
 static int race_builder_arrived(int worker);
 static void race_pending_build_tick(int worker);

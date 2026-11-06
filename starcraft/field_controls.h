@@ -599,6 +599,34 @@ ui_footprint_big(int type)
     return type == B_COMMAND || type == B_HATCHERY || type == B_NEXUS || type == B_LAIR;
 }
 
+#ifdef SC64_PSI_FIELD_OVERLAY_PROBE
+/* A bounded screen-space sampling of the exact owner Pylon predicate.
+ * This is an experimental grid visualization, not an N64 art reconstruction. */
+enum { UI_PSI_COLS=15, UI_PSI_ROWS=7, UI_PSI_CELL=16 };
+static void __attribute__((noinline))
+ui_psi_overlay_mask(u8 mask[UI_PSI_ROWS][UI_PSI_COLS])
+{
+    for (int y=0;y<UI_PSI_ROWS;++y)
+        for (int x=0;x<UI_PSI_COLS;++x)
+            mask[y][x]=(u8)race_site_powered(SIDE,camx+x*UI_PSI_CELL+8,
+                                             camy+y*UI_PSI_CELL+8);
+}
+
+static void __attribute__((noinline))
+ui_draw_psi_overlay(void)
+{
+    u8 mask[UI_PSI_ROWS][UI_PSI_COLS];
+    ui_psi_overlay_mask(mask);
+    for (int y=0;y<UI_PSI_ROWS;++y) for (int x=0;x<UI_PSI_COLS;++x) if (mask[y][x]) {
+        int px=x*UI_PSI_CELL, py=12+y*UI_PSI_CELL;
+        if (y && !mask[y-1][x]) gfx_pixel(px+8,py,C_CYAN);
+        if (y+1<UI_PSI_ROWS && !mask[y+1][x]) gfx_pixel(px+8,py+15,C_CYAN);
+        if (x && !mask[y][x-1]) gfx_pixel(px,py+8,C_CYAN);
+        if (x+1<UI_PSI_COLS && !mask[y][x+1]) gfx_pixel(px+15,py+8,C_CYAN);
+    }
+}
+#endif
+
 /* Ground marker, the placement footprint and the armed-order cursors, drawn
  * over the race cursor. */
 static void
@@ -620,6 +648,12 @@ field_controls_draw_cursor(int x, int y)
     if (mode == MODE_BUILD && box_state != 2) {
         int site_x = cx, site_y = cy, ground, problem, big = ui_footprint_big(menu);
         const char *need;
+#ifdef SC64_PSI_FIELD_OVERLAY_PROBE
+        const Sc64RaceBuildingRule *r=sc64_race_building_rule(menu);
+        if (r && ((r->flags & SC_RACE_F_REQUIRES_POWER) ||
+                  (race_mode && race_skirmish_power_required(menu))))
+            ui_draw_psi_overlay();
+#endif
         field_ui_site(menu, &site_x, &site_y);
         problem = ui_site_problem(menu, site_x, site_y, &need, &ground);
         {
