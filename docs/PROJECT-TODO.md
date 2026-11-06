@@ -468,5 +468,8 @@ Nine actual shared-engine previews (first/fourth/final scrolled row across
 Terran/Zerg/Protoss) rendered under ASan/UBSan and were visually inspected.
 A serialized repeated render preserved 129 private include inputs. Independent
 Terra source review found no issue; source boundary and default build pass.
-[PR #304](https://github.com/ggu/starcraft-gba/pull/304) is draft pending the
-running full local suite. This is a source/UI fix, not a new SD deployment.
+[PR #304](https://github.com/ggu/starcraft-gba/pull/304) merged at
+`31a5ddf8d3734427ebfef151acfb683d0db54a03` after the full local suite passed
+(440.15 seconds), plus source boundary/default build and independent review.
+This is a source/UI fix; the next ROM rebuild must include it. No SD copy was
+performed for this patch.
