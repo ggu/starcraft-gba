@@ -110,3 +110,12 @@ test-z2-egg-actual-journal:
 test-z3-egg-actual-journal:
 	$(CLANG) $(LATE_EGG_HOST_FLAGS) -DSC64_SHARED_EGG_Z3_HOST_STAGE -DSC64_EARLY_ZERG_PERMISSIONS -DSC64_Z3_ACTUAL_PERMISSIONS -I$(SC64_EARLY_PERMISSIONS_DIR) tests/sc64_shared_egg_z3_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z3-egg-actual
 	$(EGG_TEST_BIN_DIR)/sc64-z3-egg-actual
+
+Z4_EGG_HOST_FLAGS = $(LATE_EGG_HOST_FLAGS) -DSC64_Z4_DATA_ENABLED -DSC64_Z4_ENABLED -DSC64_Z4_RUNTIME -DSC64_Z4_CAMPAIGN_ENTRY -I.local/sc64/z4/generated -DSC64_SHARED_EGG_Z4_HOST_STAGE -DSC64_EARLY_ZERG_PERMISSIONS -DSC64_Z4_ACTUAL_PERMISSIONS -I$(SC64_EARLY_PERMISSIONS_DIR)
+.PHONY: test-z4-egg-actual-journal
+test-z4-egg-actual-journal:
+	$(CLANG) $(Z4_EGG_HOST_FLAGS) tests/sc64_shared_egg_z4_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z4-egg-actual
+	$(EGG_TEST_BIN_DIR)/sc64-z4-egg-actual
+.PHONY: test-z4-egg-retry-build
+test-z4-egg-retry-build:
+	$(CLANG) $(Z4_EGG_HOST_FLAGS) tests/sc64_shared_egg_z4_retry_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z4-egg-retry

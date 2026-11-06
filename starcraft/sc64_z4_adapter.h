@@ -81,7 +81,12 @@ race_z4_action_duration_limit(unsigned trigger, unsigned index)
 static int
 race_z4_runtime_state_valid(const Sc64Z4RuntimeState *s)
 {
-    if (!s || !sc64_z4_state_valid(&s->model) || s->faults ||
+    if (!s || !sc64_z4_state_valid(&s->model) ||
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        (s->faults & ~0x7f000000u) ||
+#else
+        s->faults ||
+#endif
         (s->switch_bits & (u8)~1u) || s->countdown_active > 1 ||
         s->countdown_ticks > SC64_Z4_MISSION_COUNTDOWN * SC64_Z4_TICKS_PER_SECOND ||
         (!s->countdown_active && s->countdown_ticks) ||
@@ -103,7 +108,11 @@ race_z4_runtime_state_valid(const Sc64Z4RuntimeState *s)
             if (s->hatch_effects != 3u) return 0;
         } else {
             if ((hatch_cursor >= 4u) != !!(s->hatch_effects & 1u)) return 0;
-            if ((hatch_cursor >= 7u) != !!(s->hatch_effects & 2u)) return 0;
+            if ((hatch_cursor >= 7u) != !!(s->hatch_effects & 2u)
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+                && !(hatch_cursor==7u && (s->faults & (1u << (24u+SC64_Z4_TRIGGER_HATCH))) && !(s->hatch_effects & 2u))
+#endif
+               ) return 0;
         }
     }
     for (unsigned i = 0; i < SC64_Z4_TRIGGER_COUNT; ++i) {
@@ -113,7 +122,15 @@ race_z4_runtime_state_valid(const Sc64Z4RuntimeState *s)
             u8 cursor = s->model.action_cursor[i];
             u16 limit = race_z4_action_duration_limit(i, cursor - 1u);
             if (!limit || s->action_ticks[i] > limit) return 0;
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+            if ((s->faults & (1u << (24u+i))) &&
+                (s->action_ticks[i]!=1 || sc64_z4_source_actions[
+                    sc64_z4_source_triggers[i].first_action+cursor-1u].opcode!=11)) return 0;
+#endif
         }
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        else if (s->faults & (1u << (24u+i))) return 0;
+#endif
     }
     if (s->message_ticks > SC64_Z4_TX_HOLD_TICKS) return 0;
     if (s->message_ticks) {
@@ -266,6 +283,11 @@ race_z4_create_action(const Sc64Z4SourceAction *a)
      * defaults); modifier is the opcode-11 count and is zero on the source,
      * which the pinned handler defines as a one-unit default. */
     if (find_unit_slot() < 0) return -SC64_Z4_FAULT_CAPACITY;
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+    /* A free body already promised to a paid Egg or queue is not available.
+     * Zero asks the staged dispatcher to retry this exact action. */
+    if (!race_product_slots_available(1)) return 0;
+#endif
     int slot = spawn_unit(owner, type, x, y);
     if (slot < 0) return -SC64_Z4_FAULT_CAPACITY;
     u[slot].raw_type = a->unit;
@@ -479,6 +501,13 @@ race_z4_dispatch_events(const Sc64Z4Output *out)
         const Sc64Z4SourceAction *action = &sc64_z4_source_actions[first + event->action_index];
         if (action->trigger != trig || action->index != event->action_index) return 0;
         result = race_z4_dispatch_action(action, &duration);
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        if (result==0 && action->opcode==11) {
+            race_z4.faults |= 1u << (24u+trig);
+            race_z4.action_ticks[trig]=1;
+            continue;
+        }
+#endif
         if (result <= 0) {
             unsigned fault = (unsigned)(-result);
             if (!fault || fault > 10) fault = SC64_Z4_FAULT_BAD_ACTION;
@@ -515,11 +544,33 @@ race_z4_campaign_tick(void)
         race_z4.faults |= 1u << (SC64_Z4_FAULT_BAD_STATE - 1u);
         return 0;
     }
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+    u8 retried=0;
+    for (unsigned i=0;i<SC64_Z4_TRIGGER_COUNT;++i) {
+        u32 bit=1u << (24u+i);
+        if (!(race_z4.faults & bit)) continue;
+        unsigned cursor=race_z4.model.action_cursor[i];
+        const Sc64Z4SourceAction *action=&sc64_z4_source_actions[
+            sc64_z4_source_triggers[i].first_action+cursor-1u];
+        u16 duration=0;int result=race_z4_dispatch_action(action,&duration);
+        if (result<0) {race_z4.faults |= 1u << ((unsigned)(-result)-1u);return 0;}
+        if (result>0) {race_z4.faults &= ~bit;race_z4.action_ticks[i]=duration;retried|=(u8)(1u<<i);}
+    }
+    if (race_z4.model.outcome!=SC64_Z4_RUNNING) {
+        if (!(race_z4.faults & 0x7f000000u))
+            race_z4_apply_result(race_z4.model.outcome==SC64_Z4_WON ? SC64_Z4_EVENT_WON : SC64_Z4_EVENT_LOST);
+        return 1;
+    }
+#else
     if (race_z4.model.outcome != SC64_Z4_RUNNING) return 1;
+#endif
     if (race_z4.message_ticks) --race_z4.message_ticks;
     if (race_z4.countdown_active && race_z4.countdown_ticks)
         --race_z4.countdown_ticks;
     for (unsigned i = 0; i < SC64_Z4_TRIGGER_COUNT; ++i) {
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        if ((race_z4.faults & (1u << (24u+i))) || (retried & (1u<<i))) continue;
+#endif
         if (race_z4.action_ticks[i] && !--race_z4.action_ticks[i])
             completed |= (u8)(1u << i);
     }
@@ -558,7 +609,11 @@ race_z4_campaign_tick(void)
     }
     if (out.events & SC64_Z4_EVENT_TRIGGER_HATCH)
         race_campaign.objective_stage = 1;
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+    if (!(race_z4.faults & 0x7f000000u)) race_z4_apply_result(out.events);
+#else
     race_z4_apply_result(out.events);
+#endif
     return 1;
 }
 

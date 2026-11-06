@@ -380,6 +380,10 @@ static int race_shared_egg_candidate_owner(int owner,int raw_owner,void *context
         return mapped==owner;
     }
 #endif
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+    if (mission_id==SC64_RACE_MISSION_Z4)
+        return race_z4_source_owner((unsigned)raw_owner)==owner;
+#endif
     if (mission_id==SC64_Z8_GLOBAL_ID) return race_z8_source_owner((unsigned)raw_owner)==owner;
     if (mission_id==SC64_Z9_GLOBAL_ID
 #ifdef SC64_Z10_RUNTIME
@@ -414,6 +418,9 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
 #ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
                candidate->state[2]!=SC64_RACE_MISSION_Z3 &&
 #endif
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+               candidate->state[2]!=SC64_RACE_MISSION_Z4 &&
+#endif
                candidate->state[2]!=SC64_Z8_GLOBAL_ID && candidate->state[2]!=SC64_Z9_GLOBAL_ID
 #ifdef SC64_Z10_RUNTIME
                && candidate->state[2]!=SC64_Z10_GLOBAL_ID
@@ -437,6 +444,11 @@ static int race_shared_egg_candidate_valid(const RaceSave *candidate,
 #ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
         if (!candidate->state[0] && candidate->state[2]==SC64_RACE_MISSION_Z3 &&
             !sc64_early_zerg_permission_available(SC64_RACE_MISSION_Z3,
+                                                   (unsigned)q.raw_owner,(unsigned)raw)) return 0;
+#endif
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        if (!candidate->state[0] && candidate->state[2]==SC64_RACE_MISSION_Z4 &&
+            !sc64_early_zerg_permission_available(SC64_RACE_MISSION_Z4,
                                                    (unsigned)q.raw_owner,(unsigned)raw)) return 0;
 #endif
         if (candidate->state[0]) {
@@ -1608,6 +1620,9 @@ static int race_save_game(void) {
 #ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
              || race_selected_mission==SC64_RACE_MISSION_Z3
 #endif
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+             || race_selected_mission==SC64_RACE_MISSION_Z4
+#endif
              )
 #endif
        )
@@ -1742,6 +1757,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
          || race_selected_mission==SC64_RACE_MISSION_Z3
+#endif
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+         || race_selected_mission==SC64_RACE_MISSION_Z4
 #endif
          ) ?
         SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
@@ -3219,13 +3237,21 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         const Sc64Z4RuntimeState *z4 = &race_data.z4;
         unsigned outcome = z4->model.outcome;
         unsigned phase = race_data.campaign.phase;
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        unsigned pending=z4->faults & 0x7f000000u;
+        if (pending && race_data.version!=SC64_SHARED_EGG_SAVE_VERSION) return 0;
+#endif
         if (!race_z4_runtime_state_valid(z4) || v[1] != R_ZERG ||
             race_data.players[SIDE] != R_ZERG || race_data.players[ENEMY] != R_TER ||
             race_data.players[4] != R_TER || race_data.campaign.mission != 15 ||
             race_data.campaign.elapsed_frames != (u32)v[7] ||
             race_data.campaign.objective_stage !=
                 !!(z4->model.fired & SC64_Z4_EVENT_TRIGGER_HATCH)) return 0;
-        if (outcome == SC64_Z4_RUNNING) {
+        if (outcome == SC64_Z4_RUNNING
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+            || pending
+#endif
+           ) {
             if (v[18] || v[19] || phase != SC64_RACE_PHASE_ACTIVE ||
                 (race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
         } else if (outcome == SC64_Z4_WON) {

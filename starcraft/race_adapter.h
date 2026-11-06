@@ -25,6 +25,9 @@ static int race_t5_starport_has_control_tower(int producer);
  * assign a new actor after authenticating the creator against the active map.
  * Generic/custom owners already use compact identities, so leave raw unset. */
 static int race_campaign_owner(const Sc64RaceMap *map, int raw_owner);
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+static int race_z4_source_owner(unsigned source_slot);
+#endif
 static int race_creation_source_owner(int owner, int creator_raw)
 {
     const Sc64RaceMap *map;
@@ -185,6 +188,9 @@ static int race_shared_egg_context(void)
 #endif
 #ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
         || (!race_mode && race_selected_mission==14) /* Z3 */
+#endif
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        || (!race_mode && race_selected_mission==15) /* Z4 */
 #endif
         ;
 }
@@ -868,6 +874,16 @@ static int race_queue_unit(int owner, int producer, int type)
             if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
                 ((unsigned)source==map->human_slot ? SIDE : map->owner_modes[source])!=owner ||
                 raw_product<0 || !sc64_early_zerg_permission_available(14u,(unsigned)source,(unsigned)raw_product))
+                return 0;
+        } else
+#endif
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        if (race_selected_mission==15) {
+            const Sc64RaceMap *map=&sc64_race_maps[15];
+            int raw_product=sc64_race_raw_unit(type);
+            if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
+                race_z4_source_owner((unsigned)source)!=owner || raw_product<0 ||
+                !sc64_early_zerg_permission_available(15u,(unsigned)source,(unsigned)raw_product))
                 return 0;
         } else
 #endif
