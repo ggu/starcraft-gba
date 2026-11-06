@@ -312,11 +312,16 @@ race_impact_save_write(void)
 #endif
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
+#ifdef SC64_Q8_FLASH_HOST_STAGE
+    (void)previous; (void)tags;
+    if (!race_q8_flash_write(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;
+#else
     if (previous) {
         if (!save_write_selected(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
                                  SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
                                   SC64_GUARDIAN_WRITE_TAG)) return 0;
+#endif
 #elif defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
@@ -394,11 +399,16 @@ race_impact_save_write(void)
 #define SC64_GUARDIAN_WRITE_TAG SC64_TRANSPORT_SAVE_VERSION
 #endif
 #endif
+#ifdef SC64_Q8_FLASH_HOST_STAGE
+    (void)previous; (void)tags;
+    if (!race_q8_flash_write(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;
+#else
     if (previous) {
         if (!save_write_selected(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
                                  SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
                                   SC64_GUARDIAN_WRITE_TAG)) return 0;
+#endif
 #else
     save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes + SC64_TRANSPORT_TRAILER_BYTES,
                SC64_TRANSPORT_SAVE_VERSION);

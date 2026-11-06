@@ -11,6 +11,16 @@ static void sc64_contact_memo_invalidate(void);
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
 #include "sc64_save_tag_namespace.h"
+#ifdef SC64_Q8_FLASH_HOST_STAGE
+#include "../common/gba_flash_journal.h"
+#if !defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) || defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) || !defined(SC64_P7_TYPED_COMPACT_ENABLED)
+#error "Q8 Flash stage requires HOST P10 typed custom jobs and excludes campaign"
+#endif
+/* Supplied explicitly by the isolated HOST test harness. */
+extern const GbaFlashJournalIo *sc64_q8_flash_host_io(void);
+static int race_q8_flash_begin(void);
+static int race_q8_flash_write(const void *data,u32 length);
+#endif
 #if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && \
     (!defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE)))
 #error "Active research journal requires the HOST-only research job stage"
@@ -1247,7 +1257,7 @@ static int sc64_pr_stage_transfer_allowed(int slot,int new_owner);
 #define SC64_PR_ALLOW_BUILDING_TRANSFER(slot,owner) 1
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
-#if !defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_RACES) || defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL)
+#if !defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_RACES) || (defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && !defined(SC64_Q8_FLASH_HOST_STAGE))
 #error "Q8 research combat requires HOST jobs without unqualified fraction persistence"
 #endif
 static u8 sc64_pr_hp_debt[MAX_UNITS+MAX_BUILDINGS];

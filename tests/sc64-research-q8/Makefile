@@ -40,3 +40,20 @@ test-sc64-research-q8-storm-z9:
 	@mkdir -p build/research-q8
 	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(ZERG_Z9_CANONICAL_FLAGS) $(Q8_LIFECYCLE_FLAGS) -DQ8_STORM_EXPECTED_SCENES=1 tests/sc64_research_q8_storm_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8/storm-z9
 	./build/research-q8/storm-z9
+
+# Explicit HOST-only actual-game Flash experiment. No normal ROM activation.
+Q8_BASELINE_ROOT ?= .
+.PHONY: test-sc64-q8-flash-host-p10
+test-sc64-q8-flash-host-p10:
+	@mkdir -p build/research-q8-flash
+	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT -DSC64_Q8_FLASH_HOST_STAGE tests/sc64_q8_flash_game.c common/gba_flash1m.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash/consumer
+	$(CLANG) -I$(Q8_BASELINE_ROOT)/common -I$(Q8_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_Q8_FLASH_BASELINE tests/sc64_q8_flash_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash/old-producer
+	./build/research-q8-flash/old-producer old-write build/research-q8-flash/old.sav
+	./build/research-q8-flash/old-producer old-phase-write build/research-q8-flash/old-phase.sav
+	./build/research-q8-flash/consumer reject-old-phase build/research-q8-flash/old-phase.sav
+	./build/research-q8-flash/consumer migrate build/research-q8-flash/old.sav
+	./build/research-q8-flash/consumer read build/research-q8-flash/old.sav
+	./build/research-q8-flash/consumer fallback build/research-q8-flash/old.sav
+	./build/research-q8-flash/consumer write build/research-q8-flash/new.sav
+	./build/research-q8-flash/consumer read build/research-q8-flash/new.sav
+	./build/research-q8-flash/consumer reject-new build/research-q8-flash/new.sav
