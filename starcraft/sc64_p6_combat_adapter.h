@@ -529,6 +529,12 @@ race_p6_combat_apply_explosive(int target, unsigned damage, unsigned divisor,
         has_shields = shield > 0;
     }
     if (hp <= 0 || shield < 0 || armor < 0) return 0;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if(damage>(unsigned)INT_MAX/256u || (divisor!=1 && divisor!=2 && divisor!=4))return 0;
+    hit_target_impl_ex(target,(int)(damage*256u/divisor),source_type,source_owner,
+                        SC64_STOCK_DMG_EXPLOSIVE,SC64_HIT_PACKET_Q8);
+    return 1;
+#else
     model.hp_q8 = (u32)hp * 256u;
     model.shields_q8 = (u32)shield * 256u;
     model.armor_q8 = (u32)armor * 256u;
@@ -548,6 +554,7 @@ race_p6_combat_apply_explosive(int target, unsigned damage, unsigned divisor,
     if (adjusted < 1) adjusted = 1;
     hit_target(target, adjusted, source_type, source_owner);
     return 1;
+#endif
 }
 
 static int

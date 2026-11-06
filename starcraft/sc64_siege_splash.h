@@ -144,11 +144,16 @@ static void race_siege_splash_attack(Unit *source,int primary,int base_damage) {
   int flags=SC64_HIT_PRECOMPUTED_HP|SC64_HIT_SKIP_HALLUCINATION_SCALE;
   int shield_loss=0,hp_damage;
   if(primary<MAX_UNITS&&sc64_siege_burrowed(primary))flags|=SC64_HIT_ALLOW_SPLASH_BURROW;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+  hit_target_impl_ex(primary,base_damage*256,source->type,source->owner,
+      SC64_STOCK_DMG_EXPLOSIVE,(flags&~(SC64_HIT_PRECOMPUTED_HP|SC64_HIT_SKIP_HALLUCINATION_SCALE))|SC64_HIT_PACKET_Q8);
+#else
   hp_damage=sc64_siege_resolve(primary,(unsigned)base_damage*256u,&shield_loss);
 #ifdef SC64_RACES
   if(primary<MAX_UNITS)u[primary].shield-=shield_loss;else b[primary-MAX_UNITS].shield-=shield_loss;
 #endif
   hit_target_impl_ex(primary,hp_damage,source->type,source->owner,-1,flags);
+#endif
   return;
  }
  for(int target=0;target<MAX_UNITS+MAX_BUILDINGS;target++) {
@@ -169,12 +174,17 @@ static void race_siege_splash_attack(Unit *source,int primary,int base_damage) {
    if(tier!=SC64_SIEGE_SPLASH_INNER)continue;
    flags|=SC64_HIT_ALLOW_SPLASH_BURROW;
   }
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+  hit_target_impl_ex(target,(int)packet,source->type,source->owner,
+      SC64_STOCK_DMG_EXPLOSIVE,(flags&~(SC64_HIT_PRECOMPUTED_HP|SC64_HIT_SKIP_HALLUCINATION_SCALE))|SC64_HIT_PACKET_Q8);
+#else
   hp_damage=sc64_siege_resolve(target,packet,&shield_loss);
 #ifdef SC64_RACES
   if(target<MAX_UNITS)u[target].shield-=shield_loss;
   else b[target-MAX_UNITS].shield-=shield_loss;
 #endif
   hit_target_impl_ex(target,hp_damage,source->type,source->owner,-1,flags);
+#endif
  }
 }
 #endif

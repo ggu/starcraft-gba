@@ -1240,6 +1240,12 @@ static int sc64_pr_stage_transfer_allowed(int slot,int new_owner);
 #else
 #define SC64_PR_ALLOW_BUILDING_TRANSFER(slot,owner) 1
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+#if !defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_RACES) || defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL)
+#error "Q8 research combat requires HOST jobs without unqualified fraction persistence"
+#endif
+static u8 sc64_pr_hp_debt[MAX_UNITS+MAX_BUILDINGS];
+#endif
 typedef struct {
     int x, y, amount;
 #ifdef SC64_IMPORTED_MISSION
@@ -2042,7 +2048,7 @@ static int race_owner_fields_race(int owner, int race);
 #define race_owner_fields_race(owner, race) ((race) == race_owner_identity(owner))
 #endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
-       SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
+       SC64_HIT_SKIP_HALLUCINATION_SCALE=4, SC64_HIT_PACKET_Q8=8 };
 #ifdef SC64_SIEGE_SPLASH
 static void hit_target_impl_ex(int,int,int,int,int,int);
 static void race_siege_splash_attack(Unit *,int,int);
@@ -2682,6 +2688,9 @@ spawn_unit(int owner, int type, int x, int y)
     invincible_units[i] = 0;
 #endif
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    sc64_pr_hp_debt[i]=0;
+#endif
     u[i].x = x;
     u[i].y = y;
     u[i].owner = owner;
@@ -2913,6 +2922,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     b[i].maxhp=sc64_race_building_max_hp(type);
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     { int hp = sc64_zp_building_default_hp(type); if (hp) b[i].maxhp = hp; }
+#endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    sc64_pr_hp_debt[MAX_UNITS+i]=0;
 #endif
     b[i].shield=sc64_race_building_shields(type);
     b[i].raw_type=b[i].raw_owner=-1;b[i].flags=b[i].shield_remainder=0;
@@ -4824,6 +4836,9 @@ destroy_building(int slot, int source_owner)
     (void)source_owner;
 }
 
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+#include "sc64_research_q8_live.h"
+#endif
 static void
 hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
                    int stock_damage_class, int hit_flags)
@@ -4833,6 +4848,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
 
     int tx, ty;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if(target<0||target>=MAX_UNITS+MAX_BUILDINGS||damage<=0)return;
+#endif
 #ifndef SC64_RACES
     (void)stock_damage_class;
 #endif
@@ -4880,6 +4898,15 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
     int flags=target<MAX_UNITS?u[target].flags:b[target-MAX_UNITS].flags;
     if(flags&16)return;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if (!(hit_flags & SC64_HIT_PRECOMPUTED_HP)) {
+        unsigned packet;
+        if(damage<0 || (!(hit_flags&SC64_HIT_PACKET_Q8) && (unsigned)damage>UINT32_MAX/256u))return;
+        packet=hit_flags&SC64_HIT_PACKET_Q8?(unsigned)damage:(unsigned)damage*256u;
+        if(!sc64_pr_q8_resolve(target,packet,stock_damage_class,source_type,source_owner,&damage))return;
+        hit_flags|=SC64_HIT_PRECOMPUTED_HP;
+    }
+#endif
     int *shield=target<MAX_UNITS?&u[target].shield:&b[target-MAX_UNITS].shield;
     if (!(hit_flags & SC64_HIT_PRECOMPUTED_HP)) {
         int absorbed=*shield<damage?*shield:damage;*shield-=absorbed;damage-=absorbed;
@@ -5399,6 +5426,9 @@ init_state(void)
 {
     field_menu_repeat_reset();
     game_audio_prime();
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    memset(sc64_pr_hp_debt,0,sizeof sc64_pr_hp_debt);
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS

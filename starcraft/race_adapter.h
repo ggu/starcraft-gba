@@ -1225,6 +1225,9 @@ static void race_tick_state(void)
         if (r->shields && u[i].shield < r->shields) {
             unsigned short value = (unsigned short)u[i].shield;
             unsigned short rem = (unsigned short)u[i].shield_remainder;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            sc64_pr_q8_regen(&value,r->shields,&rem);
+#else
 #ifdef SC64_BATTERY_SERVICE_ENABLED
             if (race_battery_active()) {
                 unsigned shield_value=value, shield_rem=rem;
@@ -1235,6 +1238,7 @@ static void race_tick_state(void)
             } else
 #endif
                 sc64_race_shield_tick_30fps(&value, r->shields, &rem);
+#endif
             u[i].shield = value;
             u[i].shield_remainder = rem;
         }
@@ -1249,7 +1253,11 @@ static void race_tick_state(void)
         if (max && b[i].shield < max) {
             unsigned short value = (unsigned short)b[i].shield;
             unsigned short rem = (unsigned short)b[i].shield_remainder;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            sc64_pr_q8_regen(&value,max,&rem);
+#else
             sc64_race_shield_tick_30fps(&value, max, &rem);
+#endif
             b[i].shield = value;
             b[i].shield_remainder = rem;
         }

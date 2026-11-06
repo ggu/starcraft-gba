@@ -78,6 +78,12 @@ race_p7_archon_damage_one(int target,unsigned packet_q8,int source_owner)
         hp=q->hp; shield=q->shield; armor=sc64_race_building_armor(q->type);
     }
     if (hp<0 || shield<0 || armor<0) return 0;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if(!packet_q8 || packet_q8>INT_MAX)return 0;
+    hit_target_impl_ex(target,(int)packet_q8,U_P7_ARCHON,source_owner,
+                        SC64_STOCK_DMG_NORMAL,SC64_HIT_PACKET_Q8);
+    return 1;
+#else
     model.hp_q8=(u32)hp*256u;
     model.shields_q8=(u32)shield*256u;
     model.armor_q8=(u32)armor*256u;
@@ -97,6 +103,7 @@ race_p7_archon_damage_one(int target,unsigned packet_q8,int source_owner)
     if (adjusted<1) adjusted=1;
     hit_target(target,adjusted,U_P7_ARCHON,source_owner);
     return 1;
+#endif
 }
 
 /* P7 source players 0 and 4 can both map to one live ENEMY slot. Enemy_Splash
