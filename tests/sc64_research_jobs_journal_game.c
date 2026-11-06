@@ -6,6 +6,14 @@
 #include <string.h>
 #include "../common/gba.c"
 #include "../starcraft/game.c"
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+static Sc64PrPaidReceipt test_receipt(int slot)
+{
+    Sc64PrPaidReceipt result={0};
+    (void)sc64_pr_stage_receipt(slot,&result);
+    return result;
+}
+#endif
 
 static void start_custom(void)
 {
@@ -66,7 +74,7 @@ int main(int argc,char **argv)
 #endif
         game_update(KEY_B,KEY_B); assert(menu_open);
         game_update(0,0); game_update(KEY_A,KEY_A);
-        assert(sc64_pr_paid[forge].live && minerals==900 && gas==900);
+        assert(test_receipt(forge).live && minerals==900 && gas==900);
         assert(race_save_game()); write_sram(argv[2]);
 #else
         assert(0 && "new producer requires job journal");
@@ -75,14 +83,14 @@ int main(int argc,char **argv)
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
         read_sram(argv[2]); assert(race_load_game());
         int found=-1;
-        for(int i=0;i<MAX_BUILDINGS;++i) if(sc64_pr_paid[i].live) { assert(found<0); found=i; }
-        assert(found>=0 && sc64_pr_paid[found].payer==SIDE &&
-               sc64_pr_paid[found].family==SC64_PR_GROUND_WEAPONS &&
+        for(int i=0;i<MAX_BUILDINGS;++i) if(test_receipt(i).live) { assert(found<0); found=i; }
+        assert(found>=0 && test_receipt(found).payer==SIDE &&
+               test_receipt(found).family==SC64_PR_GROUND_WEAPONS &&
                minerals==900 && gas==900 && b[found].queue_progress>0);
         unsigned before=b[found].queue_progress; sc64_pr_stage_tick();
         assert(b[found].queue_progress==before-1);
         assert(sc64_pr_stage_cancel_slot(found,0));
-        assert(minerals==1000 && gas==1000 && !sc64_pr_paid[found].live);
+        assert(minerals==1000 && gas==1000 && !test_receipt(found).live);
 #else
         assert(0 && "new consumer requires job journal");
 #endif
@@ -92,7 +100,7 @@ int main(int argc,char **argv)
         assert(weapons_level==1 && armor_level==2);
         int live=-1,dead=-1;
         for(int i=0;i<MAX_BUILDINGS;++i) {
-            assert(!sc64_pr_paid[i].live);
+            assert(!test_receipt(i).live);
             if (b[i].type==B_FORGE && b[i].queue[0]==U_ZEALOT && !b[i].queue_count && !b[i].level) {
                 if (b[i].alive) live=i; else dead=i;
             }

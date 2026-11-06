@@ -1,4 +1,8 @@
-# Host-only producer job integration stage
+# Experimental producer research and journal
+
+The current bounded-receipt branch derives settlement metadata from each validated active 0x45 row and its versioned quote. It remains experimental and is not enabled in normal ROMs; guarded ARM links and complete gameplay qualification are pending. The entries below record successive historical stages and their results; statements about earlier save refusal, receipt arrays or missing hooks describe those checkpoints, not the current branch.
+
+## Historical stages
 
 This is unfinished, default-off work and cannot be enabled in a ROM. The flag `SC64_EXPERIMENTAL_RESEARCH_JOBS` rejects non-HOST compilation and requires the existing experimental journal. It is connected to an experimental HOST-only custom producer menu and update tick, but not to combat. While the flag is enabled, both direct race save/load and their public wrappers refuse all operations before reading or writing SRAM; no test or native result is claimed here.
 

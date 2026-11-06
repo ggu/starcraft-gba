@@ -6,6 +6,14 @@
 #include <string.h>
 #include "../common/gba.c"
 #include "../starcraft/game.c"
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+static Sc64PrPaidReceipt test_receipt(int slot)
+{
+    Sc64PrPaidReceipt result={0};
+    (void)sc64_pr_stage_receipt(slot,&result);
+    return result;
+}
+#endif
 #ifndef SC64_EXPERIMENTAL_RESEARCH_JOBS
 #error "requires host research job integration stage"
 #endif
@@ -57,14 +65,14 @@ int main(void)
     /* Actual custom roster and producer admission, not caller-supplied flags. */
     race_mode=1; race_bots=1; race_player[1]=R_PROTOSS;
     memset(&sc64_experimental_research_levels,0,sizeof sc64_experimental_research_levels);
-    memset(b,0,sizeof b); memset(sc64_pr_paid,0,sizeof sc64_pr_paid);
+    memset(b,0,sizeof b);
     b[0].alive=1; b[0].owner=1; b[0].type=B_CYBERNETICS_CORE;
     b[0].raw_type=-1; b[0].x=100; b[0].y=100;
     b[1].alive=1; b[1].owner=1; b[1].type=B_PYLON;
     b[1].raw_type=-1; b[1].x=100; b[1].y=100;
     race_minerals[1]=race_gas[1]=1000;
     assert(sc64_pr_stage_begin_slot(0,SC64_PR_AIR_WEAPONS));
-    assert(race_minerals[1]==900 && race_gas[1]==900 && sc64_pr_paid[0].live);
+    assert(race_minerals[1]==900 && race_gas[1]==900 && test_receipt(0).live);
     b[2]=b[0]; b[2].level=0; b[2].queue[0]=b[2].queue[1]=0; b[2].queue_progress=0;
     saved=b[2]; assert(!sc64_pr_stage_begin_slot(2,SC64_PR_AIR_WEAPONS));
     assert(!memcmp(&b[2],&saved,sizeof saved) && race_minerals[1]==900 && race_gas[1]==900);
@@ -80,7 +88,7 @@ int main(void)
     sc64_experimental_research_levels.level[1][SC64_PR_AIR_WEAPONS]=1;
     assert(sc64_pr_stage_cancel_slot(0,0));
     assert(race_minerals[1]==1000 && race_gas[1]==1000);
-    assert(!b[0].level && !b[0].queue_progress && !sc64_pr_paid[0].live);
+    assert(!b[0].level && !b[0].queue_progress && !test_receipt(0).live);
     assert(!sc64_pr_stage_cancel_slot(0,0));
     assert(race_minerals[1]==1000 && race_gas[1]==1000);
     /* Level two air research requires a completed same-owner Fleet Beacon. */
@@ -93,7 +101,7 @@ int main(void)
      * representable 3/4 credit, once. */
     b[0].hp=1; b[0].maxhp=1000; b[0].shield=0; race_minerals[1]=65535;
     hit_target_impl_ex(MAX_UNITS,10,U_MARINE,SIDE,SC64_STOCK_DMG_NORMAL,0);
-    assert(!b[0].alive && b[0].hp<=0 && !b[0].level && !sc64_pr_paid[0].live);
+    assert(!b[0].alive && b[0].hp<=0 && !b[0].level && !test_receipt(0).live);
     assert(race_minerals[1]==65535 && race_gas[1]==before_gas+75);
     destroy_building(0,SIDE);
     assert(race_minerals[1]==65535 && race_gas[1]==before_gas+75);
@@ -103,8 +111,8 @@ int main(void)
     int bad_ore=race_minerals[1], bad_gas=race_gas[1];
     b[2].hp=1; b[2].maxhp=1000; b[2].shield=0; b[2].owner=SIDE;
     hit_target_impl_ex(MAX_UNITS+2,10,U_MARINE,SIDE,SC64_STOCK_DMG_NORMAL,0);
-    assert(!b[2].alive && b[2].hp<=0 && sc64_pr_stage_fault && !sc64_pr_paid[2].live);
-    assert(sc64_pr_stage_fault_slot==2 && sc64_pr_stage_fault_receipt.live &&
+    assert(!b[2].alive && b[2].hp<=0 && sc64_pr_stage_fault && !test_receipt(2).live);
+    assert(sc64_pr_stage_fault_slot==2 &&
            sc64_pr_stage_fault_building.owner==SIDE);
     assert(race_minerals[1]==bad_ore && race_gas[1]==bad_gas);
     assert(!save_game() && !race_save_game() && !load_game() && !race_load_game());
@@ -152,7 +160,7 @@ int main(void)
     game_update(KEY_B,KEY_B); assert(menu_open && field_menu_count()==4);
     assert(!strcmp(race_menu_label(0),"GROUND WEAPONS"));
     game_update(0,0); game_update(KEY_A,KEY_A);
-    assert(!menu_open && sc64_pr_paid[forge].live && minerals==900 && gas==900);
+    assert(!menu_open && test_receipt(forge).live && minerals==900 && gas==900);
     /* Detached validator uses explicit candidate context; no SRAM publication. */
     assert(sc64_pr_job_candidate_valid_custom(b,MAX_BUILDINGS,&sc64_experimental_research_levels,
         race_player,(unsigned)race_bots,0,0,0,0));
@@ -200,12 +208,12 @@ int main(void)
     assert(!weapons_research && minerals==paid_ore && gas==paid_gas);
     unsigned remaining=b[forge].queue_progress;
     b[forge].raw_type=1; sc64_pr_stage_tick();
-    assert(b[forge].queue_progress==remaining && sc64_pr_paid[forge].live);
+    assert(b[forge].queue_progress==remaining && test_receipt(forge).live);
     b[forge].raw_type=-1; b[pylon].alive=0;
     game_update(0,0); assert(b[forge].queue_progress==remaining);
     b[pylon].alive=1; b[forge].queue_progress=1;
     game_update(0,0);
-    assert(!sc64_pr_paid[forge].live && !b[forge].queue_progress &&
+    assert(!test_receipt(forge).live && !b[forge].queue_progress &&
            sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]==1);
     /* Selected-weapon family, legacy floors, owner isolation and range. */
     weapons_level=1; armor_level=1;
@@ -250,7 +258,7 @@ int main(void)
     /* Exercise each custom bot slot and keep other wallets untouched. */
     static const int bot_owner[3]={ENEMY,RESCUABLE,4};
     for(int bots=1;bots<=3;++bots) {
-        memset(b,0,sizeof b); memset(sc64_pr_paid,0,sizeof sc64_pr_paid);
+        memset(b,0,sizeof b);
         memset(&sc64_experimental_research_levels,0,sizeof sc64_experimental_research_levels);
         race_mode=1; race_bots=bots; minerals=4321; gas=5432;
         for(int j=0;j<3;++j) { int o=bot_owner[j]; race_player[o]=R_PROTOSS;

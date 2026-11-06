@@ -12,7 +12,7 @@ static void sc64_contact_memo_invalidate(void);
 #include "sc64_engine_capabilities.h"
 #include "sc64_save_tag_namespace.h"
 #if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && \
-    (!defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || !defined(GBA_HOST))
+    (!defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE)))
 #error "Active research journal requires the HOST-only research job stage"
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
@@ -1299,10 +1299,12 @@ static int race_p6_combat_unit_burrowed(int slot);
 #endif
 static Building b[MAX_BUILDINGS];
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
-static Sc64PrPaidReceipt sc64_pr_paid[MAX_BUILDINGS];
-static int sc64_pr_stage_fault, sc64_pr_stage_fault_slot;
+static int sc64_pr_stage_fault;
+#ifdef GBA_HOST
+static int sc64_pr_stage_fault_slot;
 static Building sc64_pr_stage_fault_building;
 static Sc64PrPaidReceipt sc64_pr_stage_fault_receipt;
+#endif
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
 #include "sc64_collision.h"
@@ -2808,6 +2810,11 @@ static void game_audio_foundation(const Building *q);
 /* HOST-only fail-closed lifecycle bridge. Campaign ownership is unsupported. */
 static int sc64_pr_stage_job_marked(const Building *q)
 { return q && (q->type==B_FORGE || q->type==B_CYBERNETICS_CORE) && (q->level || q->queue_progress); }
+static int sc64_pr_stage_receipt(int slot, Sc64PrPaidReceipt *paid)
+{
+    return slot>=0 && slot<MAX_BUILDINGS &&
+           sc64_pr_job_reconstruct_v45(&b[slot],paid);
+}
 static int sc64_pr_stage_owner_active(unsigned owner)
 {
     if (!race_mode || race_bots < 1 || race_bots > 3) return 0;
@@ -2868,7 +2875,7 @@ static int sc64_pr_stage_has_raw(unsigned owner, int raw)
 }
 static int sc64_pr_stage_begin_slot(int slot,unsigned family)
 {
-    Building *q, candidate; Sc64PrPaidReceipt paid; Sc64ProtossResearchQuote quote;
+    Building *q, candidate; Sc64ProtossResearchQuote quote;
     unsigned owner, level, max; int ore,vespene, legacy_w,legacy_a,pending_w,pending_a;
     if (sc64_pr_stage_fault || slot<0 || slot>=MAX_BUILDINGS || family>=SC64_PR_FAMILY_COUNT) return 0;
     q=&b[slot]; owner=(unsigned)q->owner;
@@ -2890,11 +2897,11 @@ static int sc64_pr_stage_begin_slot(int slot,unsigned family)
     if (level>=1 && (family==SC64_PR_AIR_ARMOR || family==SC64_PR_AIR_WEAPONS) &&
         !sc64_pr_stage_has_raw(owner,169)) return 0;
     for (int i=0;i<MAX_BUILDINGS;++i) {
-        if (!sc64_pr_stage_job_marked(&b[i]) && !sc64_pr_paid[i].live) continue;
-        if (!sc64_pr_paid[i].live ||
-            !sc64_pr_stage_owner_active(sc64_pr_paid[i].payer) ||
-            !sc64_pr_job_receipt_valid(&b[i],sc64_pr_paid[i].payer,&sc64_pr_paid[i])) return 0;
-        if (sc64_pr_paid[i].payer==owner && sc64_pr_paid[i].family==family) return 0;
+        Sc64PrPaidReceipt existing;
+        if (!sc64_pr_stage_job_marked(&b[i])) continue;
+        if (!sc64_pr_stage_receipt(i,&existing) ||
+            !sc64_pr_stage_owner_active(existing.payer)) return 0;
+        if (existing.payer==owner && existing.family==family) return 0;
     }
     ore=owner==SIDE ? minerals : race_minerals[owner];
     vespene=owner==SIDE ? gas : race_gas[owner];
@@ -2906,10 +2913,8 @@ static int sc64_pr_stage_begin_slot(int slot,unsigned family)
     }
     if (!sc64_pr_job_begin_custom(&candidate,owner,family,&sc64_experimental_research_levels,
         &ore,&vespene,max,1,1,1,0,(unsigned)legacy_w,(unsigned)legacy_a,pending_w,pending_a)) return 0;
-    paid=(Sc64PrPaidReceipt){quote.mineral,quote.gas,1,(uint8_t)owner,(uint8_t)family,(uint8_t)(level+1)};
     *q=candidate; if (owner==SIDE) { minerals=ore; gas=vespene; }
     else { race_minerals[owner]=ore; race_gas[owner]=vespene; }
-    sc64_pr_paid[slot]=paid;
     return 1;
 }
 static int sc64_pr_stage_menu_selected(void)
@@ -2940,7 +2945,8 @@ static int sc64_pr_stage_cancel_slot(int slot, int destroyed)
 {
     Building candidate; Sc64PrPaidReceipt paid; unsigned owner; int ore,vespene;
     if (slot<0 || slot>=MAX_BUILDINGS) return 0;
-    paid=sc64_pr_paid[slot]; owner=paid.payer;
+    if (!sc64_pr_stage_receipt(slot,&paid)) return 0;
+    owner=paid.payer;
     if (!paid.live || owner>=SC64_PR_CUSTOM_OWNERS || !sc64_pr_stage_owner_active(owner)) return 0;
     ore=owner==SIDE ? minerals : race_minerals[owner];
     vespene=owner==SIDE ? gas : race_gas[owner]; candidate=b[slot];
@@ -2948,14 +2954,14 @@ static int sc64_pr_stage_cancel_slot(int slot, int destroyed)
                                   owner==SIDE ? INT_MAX : 65535)) return 0;
     b[slot]=candidate; if (owner==SIDE) { minerals=ore; gas=vespene; }
     else { race_minerals[owner]=ore; race_gas[owner]=vespene; }
-    sc64_pr_paid[slot]=paid;
     return 1;
 }
 static int sc64_pr_stage_destroy_slot(int slot)
 {
     Building candidate; Sc64PrPaidReceipt paid; unsigned owner; int ore,vespene;
     if (slot<0 || slot>=MAX_BUILDINGS) return 0;
-    paid=sc64_pr_paid[slot]; owner=paid.payer;
+    if (!sc64_pr_stage_receipt(slot,&paid)) return 0;
+    owner=paid.payer;
     if (!paid.live || owner>=SC64_PR_CUSTOM_OWNERS || !sc64_pr_stage_owner_active(owner)) return 0;
     ore=owner==SIDE ? minerals : race_minerals[owner];
     vespene=owner==SIDE ? gas : race_gas[owner]; candidate=b[slot];
@@ -2963,43 +2969,47 @@ static int sc64_pr_stage_destroy_slot(int slot)
                                    owner==SIDE ? INT_MAX : 65535)) return 0;
     b[slot]=candidate; if (owner==SIDE) { minerals=ore; gas=vespene; }
     else { race_minerals[owner]=ore; race_gas[owner]=vespene; }
-    sc64_pr_paid[slot]=paid; return 1;
+    return 1;
 }
 static int sc64_pr_stage_transfer_allowed(int slot,int new_owner)
 {
     if (slot<0 || slot>=MAX_BUILDINGS) return 0;
-    if (!sc64_pr_stage_job_marked(&b[slot]) && !sc64_pr_paid[slot].live) return 1;
+    if (!sc64_pr_stage_job_marked(&b[slot])) return 1;
     return b[slot].owner==new_owner;
 }
-/* HOST-only ticks fail closed on any malformed/duplicate live receipt. */
+/* Validate all rows and duplicate keys before advancing any job. */
 static void sc64_pr_stage_tick(void)
 {
     if (sc64_pr_stage_fault) return;
     for (int i=0;i<MAX_BUILDINGS;++i) {
-        Sc64PrPaidReceipt *p=&sc64_pr_paid[i];
-        if (!sc64_pr_stage_job_marked(&b[i]) && !p->live) continue;
-        if (!p->live || !sc64_pr_stage_owner_active(p->payer) ||
-            !sc64_pr_job_receipt_valid(&b[i],p->payer,p)) return;
-        for (int j=0;j<i;++j)
-            if (sc64_pr_paid[j].live && sc64_pr_paid[j].payer==p->payer &&
-                sc64_pr_paid[j].family==p->family) return;
+        Sc64PrPaidReceipt p;
+        if (!sc64_pr_stage_job_marked(&b[i])) continue;
+        if (!sc64_pr_stage_receipt(i,&p) || !sc64_pr_stage_owner_active(p.payer)) return;
+        for (int j=0;j<i;++j) if (sc64_pr_stage_job_marked(&b[j])) {
+            Sc64PrPaidReceipt earlier;
+            if (!sc64_pr_stage_receipt(j,&earlier) ||
+                (earlier.payer==p.payer && earlier.family==p.family)) return;
+        }
     }
-    for (int i=0;i<MAX_BUILDINGS;++i) if (sc64_pr_paid[i].live) {
-        Sc64PrPaidReceipt *p=&sc64_pr_paid[i]; unsigned o=p->payer;
+    for (int i=0;i<MAX_BUILDINGS;++i) if (sc64_pr_stage_job_marked(&b[i])) {
+        Sc64PrPaidReceipt p; unsigned o;
+        if (!sc64_pr_stage_receipt(i,&p)) return;
+        o=p.payer;
         int lw=o==SIDE ? weapons_level : 0, la=o==SIDE ? armor_level : 0;
         int pw=o==SIDE && weapons_research, pa=o==SIDE && armor_research;
-        /* Source admission checks prerequisites; a paid job does not
-         * recheck them each tick. Disabled/power state remains separate. */
         if (!race_site_powered((int)o,b[i].x,b[i].y)) continue;
         if (lw<0 || lw>2 || la<0 || la>2) continue;
-        if (sc64_pr_job_tick_custom(&b[i],o,&sc64_experimental_research_levels,
-                                    (unsigned)lw,(unsigned)la,pw,pa,1)==1) p->live=0;
+        (void)sc64_pr_job_tick_custom(&b[i],o,&sc64_experimental_research_levels,
+                                      (unsigned)lw,(unsigned)la,pw,pa,1);
     }
 }
 static int sc64_pr_stage_blocks_legacy(int type)
 {
-    for (int i=0;i<MAX_BUILDINGS;++i) if (sc64_pr_paid[i].live && sc64_pr_paid[i].payer==SIDE) {
-        unsigned f=sc64_pr_paid[i].family;
+    for (int i=0;i<MAX_BUILDINGS;++i) if (sc64_pr_stage_job_marked(&b[i])) {
+        Sc64PrPaidReceipt p; unsigned f;
+        if (!sc64_pr_stage_receipt(i,&p)) return 1;
+        if (p.payer!=SIDE) continue;
+        f=p.family;
         if ((!type && (f==SC64_PR_GROUND_WEAPONS || f==SC64_PR_AIR_WEAPONS)) ||
             (type && (f==SC64_PR_GROUND_ARMOR || f==SC64_PR_AIR_ARMOR))) return 1;
     }
@@ -3016,7 +3026,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 	return -1;
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     /* Skip an unresolved dead slot without starving other free slots. */
-    while (i<MAX_BUILDINGS && (b[i].alive || sc64_pr_stage_job_marked(&b[i]) || sc64_pr_paid[i].live)) ++i;
+    while (i<MAX_BUILDINGS && (b[i].alive || sc64_pr_stage_job_marked(&b[i]))) ++i;
     if (i>=MAX_BUILDINGS) return -1;
 #endif
 #ifdef SC64_RANGE_WORK
@@ -4910,16 +4920,16 @@ destroy_building(int slot, int source_owner)
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     /* Death always proceeds. An unauthenticated payer gets no credit and
      * leaves a sticky HOST fault so the unresolved state cannot be saved. */
-    if ((sc64_pr_stage_job_marked(q) || sc64_pr_paid[slot].live) &&
-        !sc64_pr_stage_destroy_slot(slot)) {
+    if (sc64_pr_stage_job_marked(q) && !sc64_pr_stage_destroy_slot(slot)) {
+#ifdef GBA_HOST
         if (!sc64_pr_stage_fault) {
             sc64_pr_stage_fault_slot=slot;
             sc64_pr_stage_fault_building=*q;
-            sc64_pr_stage_fault_receipt=sc64_pr_paid[slot];
+            memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
         }
+#endif
         sc64_pr_stage_fault=1;
         q->level=0; q->queue_progress=0; q->queue[0]=q->queue[1]=0;
-        memset(&sc64_pr_paid[slot],0,sizeof(sc64_pr_paid[slot]));
     }
 #endif
 #ifdef SC64_SHARED_TRANSPORT
@@ -5579,9 +5589,11 @@ init_state(void)
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
-    memset(sc64_pr_paid,0,sizeof(sc64_pr_paid)); sc64_pr_stage_fault=0;
+    sc64_pr_stage_fault=0;
+#ifdef GBA_HOST
     sc64_pr_stage_fault_slot=-1; memset(&sc64_pr_stage_fault_building,0,sizeof(sc64_pr_stage_fault_building));
     memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
+#endif
 #endif
 #endif
 #ifdef SC64_TEXT_BOXES
@@ -5846,9 +5858,11 @@ game_init(void)
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
-    memset(sc64_pr_paid,0,sizeof(sc64_pr_paid)); sc64_pr_stage_fault=0;
+    sc64_pr_stage_fault=0;
+#ifdef GBA_HOST
     sc64_pr_stage_fault_slot=-1; memset(&sc64_pr_stage_fault_building,0,sizeof(sc64_pr_stage_fault_building));
     memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
+#endif
 #endif
 #endif
 #ifdef SC64_TEXT_BOXES

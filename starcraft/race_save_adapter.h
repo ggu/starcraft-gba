@@ -1564,7 +1564,7 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
  * an old tag never gains the new job interpretation. `paid_out`, when used,
  * is detached HOST-only scratch and is published only after selection. */
 static int race_research_jobs_candidate_scan(const RaceSave *candidate,
-    const Sc64ProtossResearchLevels *levels, int jobs_tag, Sc64PrPaidReceipt *paid_out)
+    const Sc64ProtossResearchLevels *levels, int jobs_tag)
 {
     Sc64PrCandidateScan scan;
     if (!candidate || !levels || candidate->state[0]!=1 ||
@@ -1573,9 +1573,8 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
         !sc64_pr_candidate_scan_init(&scan,levels,candidate->players,(unsigned)candidate->state[4],
             (unsigned)candidate->state[11],(unsigned)candidate->state[12],
             candidate->state[13]!=0,candidate->state[14]!=0)) return 0;
-    if (paid_out) memset(paid_out,0,sizeof(*paid_out)*MAX_BUILDINGS);
     for (unsigned i=0;i<MAX_BUILDINGS;++i) {
-        Building q; Sc64ProtossResearchQuote quote;
+        Building q;
         if (!race_save_decode_building(candidate,i,&q)) return 0;
         if (q.type!=B_FORGE && q.type!=B_CYBERNETICS_CORE) continue;
         if (!jobs_tag) {
@@ -1584,12 +1583,7 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
             continue;
         }
         if (!sc64_pr_candidate_scan_row(&scan,&q)) return 0;
-        if (paid_out && q.level) {
-            unsigned f=(unsigned)q.level-1, target=(unsigned)q.queue[1];
-            if (!target || !sc64_pr_quote(f,target-1,&quote)) return 0;
-            paid_out[i]=(Sc64PrPaidReceipt){quote.mineral,quote.gas,1,(uint8_t)q.owner,
-                                            (uint8_t)f,(uint8_t)target};
-        }
+
     }
     return 1;
 }
@@ -2475,16 +2469,14 @@ static int race_save_game(void) {
             (unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
-    if (!race_research_jobs_candidate_scan(&race_data,&sc64_experimental_research_levels,1,0)) return 0;
+    if (!race_research_jobs_candidate_scan(&race_data,&sc64_experimental_research_levels,1)) return 0;
     for (unsigned i=0;i<MAX_BUILDINGS;++i) {
         Building decoded;
         if (!race_save_decode_building(&race_data,i,&decoded)) return 0;
-        if (sc64_pr_stage_job_marked(&b[i]) || sc64_pr_paid[i].live) {
-            unsigned payer=sc64_pr_paid[i].payer;
-            if (!sc64_pr_paid[i].live || payer>=SC64_PR_CUSTOM_OWNERS ||
-                !sc64_pr_stage_owner_active(payer) ||
-                !sc64_pr_job_receipt_valid(&b[i],payer,&sc64_pr_paid[i]) ||
-                !sc64_pr_job_receipt_valid(&decoded,payer,&sc64_pr_paid[i])) return 0;
+        if (sc64_pr_stage_job_marked(&b[i])) {
+            Sc64PrPaidReceipt paid;
+            if (!sc64_pr_stage_receipt(i,&paid) || !sc64_pr_stage_owner_active(paid.payer) ||
+                !sc64_pr_job_receipt_valid(&decoded,paid.payer,&paid)) return 0;
         }
     }
 #endif
@@ -2541,7 +2533,6 @@ typedef struct {
     Sc64ProtossResearchLevels research_levels;
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     u8 research_jobs_tag;
-    Sc64PrPaidReceipt research_paid[MAX_BUILDINGS]; /* HOST-only detached scratch */
 #endif
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
@@ -4092,7 +4083,7 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     plan->research_jobs_tag=(u8)(tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION);
     if (!race_research_jobs_candidate_scan(&race_data,&plan->research_levels,
-                                           plan->research_jobs_tag,0)) return 0;
+                                           plan->research_jobs_tag)) return 0;
 #endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 #if !defined(SC64_SHARED_TRANSPORT)
@@ -4232,7 +4223,7 @@ static int race_load_game(void) {
     if (!race_worker_cargo_select(&plan,&selected)) return 0;
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     if (!race_research_jobs_candidate_scan(&race_data,&plan.research_levels,
-                                           plan.research_jobs_tag,plan.research_paid)) return 0;
+                                           plan.research_jobs_tag)) return 0;
 #endif
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     GbaSaveSelection selected;
@@ -4666,9 +4657,6 @@ static int race_load_game(void) {
 #endif
     sc64_visibility_reset();update_exploration();reset_selection_gestures();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
-#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
-    memcpy(sc64_pr_paid,plan.research_paid,sizeof(sc64_pr_paid));
-#endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }
 #endif

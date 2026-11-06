@@ -6,7 +6,7 @@
 #ifndef SC64_PROTOSS_RESEARCH_JOBS_H
 #define SC64_PROTOSS_RESEARCH_JOBS_H
 #include <limits.h>
-#if !defined(GBA_HOST) || !defined(SC64_RACES) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL)
+#if (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE)) || !defined(SC64_RACES) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL)
 #error "Research job integration stage is HOST-only and requires the research journal"
 #endif
 
@@ -108,7 +108,7 @@ static int sc64_pr_job_tick_custom(Building *p, unsigned payer,
     p->level=0; p->queue[0]=0; p->queue[1]=0;
     return 1;
 }
-/* Volatile HOST-only receipt; it is never inferred from a decoded row. */
+/* Bounded temporary settlement value reconstructed from the active row. */
 typedef struct {
     uint16_t mineral, gas;
     uint8_t live, payer, family, target;
@@ -130,6 +130,23 @@ static int sc64_pr_job_receipt_valid(const Building *p, unsigned payer,
         (p->raw_type>=0 && p->raw_type!=sc64_race_raw_building(p->type)) ||
         !sc64_pr_quote(paid->family,paid->target-1,&quote) ||
         p->queue_progress>quote.ticks || paid->mineral!=quote.mineral || paid->gas!=quote.gas) return 0;
+    return 1;
+}
+
+/* Version 0x45 fixes the custom quote table as part of its wire contract.
+ * Reconstruct only from a validated active row, never from current levels:
+ * an unrelated later level change must not alter the original refund. */
+static int sc64_pr_job_reconstruct_v45(const Building *p, Sc64PrPaidReceipt *out)
+{
+    Sc64ProtossResearchQuote quote; Sc64PrPaidReceipt paid;
+    unsigned family, payer, target;
+    if (!p || !out || p->level<1 || p->level>SC64_PR_FAMILY_COUNT) return 0;
+    family=(unsigned)p->level-1; payer=(unsigned)p->queue[0]; target=(unsigned)p->queue[1];
+    if (payer>=SC64_PR_CUSTOM_OWNERS || !target ||
+        !sc64_pr_quote(family,target-1,&quote)) return 0;
+    paid=(Sc64PrPaidReceipt){quote.mineral,quote.gas,1,(uint8_t)payer,(uint8_t)family,(uint8_t)target};
+    if (!sc64_pr_job_receipt_valid(p,payer,&paid)) return 0;
+    *out=paid;
     return 1;
 }
 
