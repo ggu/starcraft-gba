@@ -238,7 +238,9 @@ older KODAK package. Source merges do not update an already copied ROM.
   A separate [Z3 HOST stage](audits/2026-11-07-z3-egg-host/README.md)
   passed actual-bank admission, denied-product validation, fresh paired birth,
   genuine old-tag fallback and a cross-owner slot boundary. Z4 CreateUnit
-  reservation and persistent retry require separate proof.
+  reservation has a [bounded HOST retry experiment](audits/2026-11-07-z4-egg-host/README.md)
+  with source-tag and fresh-process tests; standalone profile, ARM, ordinary
+  play and N64 behavior remain open. Z5/Z6 require separate trigger audits.
   The constructed late captured-Hatchery concern was not promoted: no reachable
   transfer path was found, and relaxing only admission would leave saves invalid.
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
