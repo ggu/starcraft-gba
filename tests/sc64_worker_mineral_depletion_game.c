@@ -65,6 +65,56 @@ static void unavailable_fields(void)
 #endif
     one_tick(); assert(u[w].target==4 && u[w].order==ORDER_MINE);
 }
+/* A real selected Probe order is still pending when another Probe collects
+ * the final cargo. Retarget through the same known/reachable-field policy. */
+static void pending_trip_depletes(void)
+{
+    reset_scene(R_PROTOSS,R_TER);
+    int traveler=spawn_unit(SIDE,U_PROBE,112,112);
+    int finisher=spawn_unit(SIDE,U_PROBE,240,240);
+    assert(traveler>=0 && finisher>=0);
+    set_depot(0,SIDE,B_NEXUS,112,112);
+    m[2].x=320; m[2].y=320; m[2].amount=8;
+    m[3].x=336; m[3].y=320; m[3].amount=24;
+    u[traveler].selected=1; tap_a(320,320);
+    assert(u[traveler].order==ORDER_MINE && u[traveler].target==2 &&
+           sc64_worker_gather_pending(&u[traveler]));
+    u[finisher].x=320; u[finisher].y=320;
+    u[finisher].order=ORDER_MINE; u[finisher].target=2; u[finisher].work_timer=1;
+    one_tick();
+    assert(m[2].amount==0 && u[finisher].carry==8 && u[traveler].target==2);
+    one_tick();
+    assert(u[traveler].order==ORDER_MINE && u[traveler].target==3 &&
+           sc64_worker_gather_pending(&u[traveler]) && m[3].amount==24);
+    /* Stop remains authoritative after the retarget. */
+    stop_selected(); one_tick();
+    assert(u[traveler].order==ORDER_IDLE && !sc64_worker_gather_pending(&u[traveler]));
+
+    /* A hidden replacement must not be chosen by an empty pending worker. */
+    reset_scene(R_PROTOSS,R_TER);
+    traveler=spawn_unit(SIDE,U_PROBE,112,112); assert(traveler>=0);
+    set_depot(0,SIDE,B_NEXUS,112,112);
+    m[2].x=320; m[2].y=320; m[2].amount=8;
+    m[3].x=336; m[3].y=320; m[3].amount=24;
+    u[traveler].selected=1;
+    tap_a(320,320); assert(sc64_worker_gather_pending(&u[traveler]));
+    m[2].amount=0; SC64_GRID_CLEAR(visible); SC64_GRID_CLEAR(explored);
+    one_tick();
+    assert(u[traveler].order==ORDER_IDLE && u[traveler].target==2 &&
+           !u[traveler].carry);
+    /* Even an eligible replacement must not alter a loaded cross-resource trip. */
+    reset_scene(R_PROTOSS,R_TER);
+    traveler=spawn_unit(SIDE,U_PROBE,112,112); assert(traveler>=0);
+    set_depot(0,SIDE,B_NEXUS,112,112);
+    m[2].x=320; m[2].y=320; m[2].amount=8;
+    m[3].x=336; m[3].y=320; m[3].amount=24;
+    u[traveler].selected=1; u[traveler].carry=6;
+    u[traveler].flags|=SC64_WORKER_CARGO_GAS;
+    tap_a(320,320); assert(sc64_worker_gather_pending(&u[traveler]));
+    m[2].amount=0; one_tick();
+    assert(u[traveler].order==ORDER_IDLE && u[traveler].target==2 &&
+           u[traveler].carry==6 && sc64_worker_cargo_is_gas(&u[traveler]));
+}
 int main(void)
 {
     assert(existing_worker_gather_main()==0);
@@ -72,6 +122,7 @@ int main(void)
     continuation_scene(R_ZERG,U_DRONE,B_HATCHERY);
     continuation_scene(R_PROTOSS,U_PROBE,B_NEXUS);
     unavailable_fields();
+    pending_trip_depletes();
     puts("mineral depletion continuation fixtures: PASS");
     return 0;
 }

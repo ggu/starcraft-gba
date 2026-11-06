@@ -67,6 +67,9 @@ older KODAK package. Source merges do not update an already copied ROM.
   without deleting cargo. P10 all-race/resource/debit/travel/interruption
   fixtures, the public cargo target, a genuine old-writer/new-reader timer
   journal, clean default checks, six guarded links and one P3 HOST win pass.
+  Empty explicit mineral trips now also continue to an eligible nearby field
+  if their destination is depleted en route; see the
+  [pending-trip audit](audits/2026-11-07-pending-mineral-retarget/README.md).
   Native field queues and exact gathering rates remain open: the retained
   durations are not an N64 timing claim. Old nonzero N now collects on N,
   versus the former N+1. See [the scoped cycle audit](audits/2026-11-07-worker-gather-cycle/README.md).
