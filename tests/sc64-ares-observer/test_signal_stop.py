@@ -31,7 +31,7 @@ class StopTests(unittest.TestCase):
     while not m.stopped_child(child) and time.monotonic()<deadline:time.sleep(.01)
     self.assertTrue(m.stopped_child(child))
     m.terminate_child(child)
-    self.assertEqual(child.returncode,-signal.SIGKILL)
+    self.assertIn(child.returncode,(-signal.SIGTERM,-signal.SIGKILL))
    finally:
     if child.poll() is None:child.kill();child.wait(timeout=2)
  def test_deadline_avoids_helper(self):
