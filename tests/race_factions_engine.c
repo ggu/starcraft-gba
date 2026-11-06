@@ -102,11 +102,92 @@ static void test_defense_target_query(void)
     }
 }
 
+static void tap_l(void)
+{
+    game_update(KEY_L, KEY_L);
+    game_update(0, 0);
+}
+
+/* L on a selected producer undoes what race_queue_unit() took: 75% of the one
+ * price, the larva if there was one, and the reserved supply. */
+static void test_queue_cancel(void)
+{
+    race_mode = 1; race_human = R_ZERG; race_bots = 1;
+    race_skirmish_init(); screen = SCREEN_PLAY;
+    {
+        int hatch = find_building(SIDE, B_HATCHERY), before, reserved;
+        assert(hatch >= 0);
+        assert(spawn_build(SIDE, B_SPAWNING_POOL, b[hatch].x + 64, b[hatch].y, 0) >= 0);
+        race_add_owner_resources(SIDE, 1000, 200);
+        selected_building = hatch;
+
+        /* A Zergling order: two bodies, one price, one larva. */
+        b[hatch].larva = 2;
+        before = minerals; reserved = race_owner_reserved_supply(SIDE);
+        assert(race_queue_unit(SIDE, hatch, U_ZERGLING));
+        assert(b[hatch].larva == 1 && minerals == before - 50);
+        assert(race_owner_reserved_supply(SIDE) == reserved + 2);
+        tap_l();
+        assert(!b[hatch].queue_count && selected_building == hatch);
+        assert(b[hatch].larva == 2);
+        assert(minerals == before - 50 + 37);
+        assert(race_owner_reserved_supply(SIDE) == reserved);
+
+        /* The oldest order goes first, and only that order's larva returns. */
+        before = minerals;
+        assert(race_queue_unit(SIDE, hatch, U_DRONE));
+        assert(race_queue_unit(SIDE, hatch, U_ZERGLING));
+        assert(b[hatch].larva == 0);
+        tap_l();
+        assert(b[hatch].queue_count == 1 && b[hatch].queue[b[hatch].queue_head] == U_ZERGLING);
+        assert(b[hatch].larva == 1 && minerals == before - 100 + 37);
+
+        /* A hall that has regrown to three keeps the limit the saves check. */
+        b[hatch].larva = 3;
+        tap_l();
+        assert(!b[hatch].queue_count && b[hatch].larva == 3);
+
+        /* With nothing left to cancel, the same tap cycles and refunds nothing. */
+        before = minerals;
+        tap_l();
+        assert(selected_building < 0 && selected_count() == 1 && minerals == before);
+    }
+
+    race_human = R_PROTOSS; race_bots = 1;
+    race_skirmish_init(); screen = SCREEN_PLAY;
+    {
+        int nexus = find_building(SIDE, B_NEXUS), pylon = find_building(SIDE, B_PYLON), gateway, before, vespene;
+        assert(nexus >= 0 && pylon >= 0);
+        race_add_owner_resources(SIDE, 1000, 200);
+
+        /* A Nexus has no larva, and its worker order cancels like any other. */
+        selected_building = nexus;
+        before = minerals;
+        assert(race_queue_unit(SIDE, nexus, U_PROBE));
+        tap_l();
+        assert(!b[nexus].queue_count && minerals == before - 50 + 37 && selected_building == nexus);
+
+        /* Gas is refunded at the same rate, truncated like minerals. */
+        gateway = spawn_build(SIDE, B_GATEWAY, b[pylon].x + 32, b[pylon].y, 0);
+        assert(gateway >= 0);
+        assert(spawn_build(SIDE, B_CYBERNETICS_CORE, b[pylon].x - 32, b[pylon].y, 0) >= 0);
+        selected_building = gateway;
+        before = minerals; vespene = gas;
+        assert(race_queue_unit(SIDE, gateway, U_DRAGOON));
+        tap_l();
+        assert(!b[gateway].queue_count && selected_building == gateway);
+        assert(minerals == before - 125 + 93 && gas == vespene - 50 + 37);
+    }
+    race_mode = 0;
+    clear_selection();
+}
+
 int main(void)
 {
     gba_init();
     game_init();
     test_defense_target_query();
+    test_queue_cancel();
 
     /* Mixed-race starts give each owner its actual worker, town hall, and
      * race-specific supply. The extra owners cycle through Z/T/P. */

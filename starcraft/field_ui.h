@@ -457,10 +457,8 @@ ui_hint_line(int a_action)
         x = ui_key(x, 150, "A", 0, C_DIM);
         ui_unit_glyph(ui_next_product(q->type), x + 5, 154, C_TERRAN);
         x += 13;
-        if (q->type == B_BARRACKS) {
-            x = ui_hint(x, "R", UI_GLYPH_CYCLE);
-            if (q->queue_count) x = ui_hint(x, "L", UI_GLYPH_CROSS);
-        }
+        if (q->type == B_BARRACKS) x = ui_hint(x, "R", UI_GLYPH_CYCLE);
+        if (queue_cancel_available()) ui_hint(x, "L", UI_GLYPH_CROSS);
         return;
     }
     if (a_action == UI_A_ATTACK || a_action == UI_A_ATTACK_HERE || a_action == UI_A_MOVE ||

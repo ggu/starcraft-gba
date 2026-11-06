@@ -24,7 +24,7 @@ Press **Start** or **Select** to pause. From the pause screen, **B** saves, **L*
 
 - **D-pad:** move the cursor; hold **R** for faster movement, including during a box drag.
 - **A:** select a unit/building or confirm an order. A single tap acts immediately. Tap A twice quickly (within about 0.4 seconds) on the same friendly unit to select all living friendly units of the same type currently on screen. Offscreen units are not included. Building selection and contextual commands keep their existing behavior.
-- **L:** tap to cycle friendly units; hold with the D-pad to drag a selection box, then release to select living friendly units inside. A drag works from ground or a selected building. **B** cancels the box and preserves the previous selection; **A** is ignored while dragging. A committed drag cancels a pending move/build mode and returns to normal command mode. On a selected Barracks, tap **L** to cancel the oldest queued unit.
+- **L:** tap to cycle friendly units; hold with the D-pad to drag a selection box, then release to select living friendly units inside. A drag works from ground or a selected building. **B** cancels the box and preserves the previous selection; **A** is ignored while dragging. A committed drag cancels a pending move/build mode and returns to normal command mode. On a selected producer with a queue, tap **L** to cancel the oldest queued unit.
 - **R:** tap to select the combat group; on a selected Barracks it cycles the training type. Holding **R** while dragging only speeds cursor movement; release the box and tap **R** separately to select the combat group.
 - **B:** open the command menu; select Attack Move for combat or Barracks for construction.
 
