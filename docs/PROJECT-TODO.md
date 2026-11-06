@@ -165,7 +165,13 @@ Fresh recovery results (qualification remains incomplete):
   win with 307/307 strict observations, equal final journal and every-call
   selected-state/world plus full displayed indexed-frame/palette fingerprints.
   These hashes are diagnostic evidence, not exhaustive state proof. Measure
-  the paired guest busy window next; no default flags are promoted yet.
+  Paired guest busy measurement also matches all prior checks and reduces
+  advancing means by 5.90% without render caches and 6.18% with them, while
+  keeping 392 builds and 3,576 hits. These are emulated cycles. A possible brief
+  outside-lock HOST preview overlap is recorded as a protocol deviation;
+  preserve that run and repeat under clean serialization. Normal guest
+  save/load continuation and representative early/warm custom 1/3-bot checks
+  are still queued. No default flags are promoted.
 - The fitting shared-actor stack diagnostic completed real custom START/B save
   and fresh HOME-L continuation with matching candidate/diagnostic SRAM and
   named states. At least 9,740 of 11,208 painted bytes remained untouched in the
@@ -458,5 +464,9 @@ The B-menu framed list uses 22-pixel rows/18-pixel source icons but reused a
 nine-pixel text-list highlight, and displayed costs six pixels above labels.
 The shared renderer fix is committed on `codex/command-menu-row-alignment-20261106`
 (`c1da667`): full 21-pixel row highlight plus price/label baseline alignment.
-Visual QA across all races and scrolled rows is queued under the native lock;
-no release/SD update or validation pass is claimed yet.
+Nine actual shared-engine previews (first/fourth/final scrolled row across
+Terran/Zerg/Protoss) rendered under ASan/UBSan and were visually inspected.
+A serialized repeated render preserved 129 private include inputs. Independent
+Terra source review found no issue; source boundary and default build pass.
+[PR #304](https://github.com/ggu/starcraft-gba/pull/304) is draft pending the
+running full local suite. This is a source/UI fix, not a new SD deployment.
