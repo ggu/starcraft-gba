@@ -92,7 +92,7 @@ struct Probe final : ares::Platform {
     observations.push_back({step.load(),w,h,nonblack}); ++callbacks;
     if(w==1 && h==1) { cv.notify_all(); return; }
     auto observed=step.load();
-    bool special=observed==6000 || observed==6400 || observed==6540 || observed==6580 || observed==6650 || observed==7000;
+    bool special=observed==6400 || observed==6540 || observed==6580 || observed==6650 || observed==6850 || observed==6900;
     if((eligible++ % 360)!=0 && !special) return;
     auto bytes=static_cast<std::size_t>(w)*h*sizeof(std::uint32_t);
     if(frames.size()>=32) { ++discarded; return; }
@@ -109,7 +109,7 @@ int main(int argc,char** argv) {
   if(argc!=5) { std::cerr<<"usage: probe ROM OUTPUT_DIR neutral|tap FRAMES\n"; return 2; }
   std::string scenario=argv[3];
   char* end=nullptr; long frames=std::strtol(argv[4],&end,10);
-  if((scenario!="neutral" && scenario!="tap" && scenario!="start" && scenario!="mission" && scenario!="advance" && scenario!="calibrate" && scenario!="select" && scenario!="select2" && scenario!="select3" && scenario!="select4" && scenario!="build" && scenario!="grid" && scenario!="custom" && scenario!="customstart" && scenario!="protosssetup" && scenario!="protossstart" && scenario!="protossselect") || !end || *end || frames<1 || frames>9000) return 2;
+  if((scenario!="neutral" && scenario!="tap" && scenario!="start" && scenario!="mission" && scenario!="advance" && scenario!="calibrate" && scenario!="select" && scenario!="select2" && scenario!="select3" && scenario!="select4" && scenario!="build" && scenario!="grid" && scenario!="custom" && scenario!="customstart" && scenario!="protosssetup" && scenario!="protossstart" && scenario!="protossselect" && scenario!="probe2" && scenario!="probe3") || !end || *end || frames<1 || frames>9000) return 2;
   std::filesystem::path out=argv[2];
   if(!std::filesystem::is_directory(out) || !std::filesystem::is_directory(out/"saves") ||
      !std::filesystem::is_directory(out/"systems")) return 2;
@@ -159,23 +159,24 @@ int main(int argc,char** argv) {
   long completed=0;
   for(long i=0;i<frames;++i) {
     unsigned mask=scenario=="tap" ? ((i>=80 && i<90)?2u:(i>=100 && i<105)?1u:0u) : 0u;
-    if((scenario=="custom" || scenario=="customstart" || scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect" || scenario=="start" || scenario=="mission" || scenario=="advance" || scenario=="calibrate" || scenario=="select" || scenario=="select2" || scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid") && ((i>=700 && i<710)||(i>=1000 && i<1010)||(i>=1300 && i<1310)||(i>=1600 && i<1610))) mask=2u;
+    if((scenario=="custom" || scenario=="customstart" || scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect" || scenario=="probe2" || scenario=="probe3" || scenario=="start" || scenario=="mission" || scenario=="advance" || scenario=="calibrate" || scenario=="select" || scenario=="select2" || scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid") && ((i>=700 && i<710)||(i>=1000 && i<1010)||(i>=1300 && i<1310)||(i>=1600 && i<1610))) mask=2u;
     if((scenario=="mission" || scenario=="advance" || scenario=="calibrate" || scenario=="select" || scenario=="select2" || scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid") && ((i>=3900 && i<3910)||(i>=4000 && i<4010))) mask=4u;
     if((scenario=="mission" || scenario=="advance" || scenario=="calibrate" || scenario=="select" || scenario=="select2" || scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid") && i>=4100 && i<4110) mask=1u;
     if((scenario=="advance" || scenario=="calibrate" || scenario=="select" || scenario=="select2" || scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid") && ((i>=5000 && i<5010)||(i>=5600 && i<5610)||(i>=6200 && i<6210)||(i>=6800 && i<6810))) mask=2u;
     if((scenario=="select" || scenario=="select2" || scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid") && i>=7070 && i<7080) mask=1u;
     if((scenario=="build" || scenario=="grid") && i>=7200 && i<7210) mask=8u;
     if(scenario=="grid" && i>=7350 && i<7360) mask=4u;
-    if((scenario=="custom" || scenario=="customstart" || scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect") && i>=3900 && i<3910) mask=16u;
-    if((scenario=="custom" || scenario=="customstart" || scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect") && i>=4100 && i<4110) mask=1u;
+    if((scenario=="custom" || scenario=="customstart" || scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect" || scenario=="probe2" || scenario=="probe3") && i>=3900 && i<3910) mask=16u;
+    if((scenario=="custom" || scenario=="customstart" || scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect" || scenario=="probe2" || scenario=="probe3") && i>=4100 && i<4110) mask=1u;
     if(scenario=="customstart" && i>=4700 && i<4710) mask=2u;
-    if((scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect") && ((i>=4500 && i<4510)||(i>=4600 && i<4610))) mask=4u;
-    if((scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect") && i>=4800 && i<4810) mask=16u;
-    if((scenario=="protossstart" || scenario=="protossselect") && i>=5200 && i<5210) mask=2u;
-    if(scenario=="protossselect" && i>=6550 && i<6560) mask=1u;
+    if((scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect" || scenario=="probe2" || scenario=="probe3") && ((i>=4500 && i<4510)||(i>=4600 && i<4610))) mask=4u;
+    if((scenario=="protosssetup" || scenario=="protossstart" || scenario=="protossselect" || scenario=="probe2" || scenario=="probe3") && i>=4800 && i<4810) mask=16u;
+    if((scenario=="protossstart" || scenario=="protossselect" || scenario=="probe2" || scenario=="probe3") && i>=5200 && i<5210) mask=2u;
+    if((scenario=="protossselect" || scenario=="probe2" || scenario=="probe3") && i>=6550 && i<6560) mask=1u;
+    if((scenario=="probe2" || scenario=="probe3") && i>=6800 && i<6810) mask=8u;
     p.axisX=((scenario=="calibrate" && i>=7020 && i<7036)||(scenario=="select" && i>=7020 && i<7033)||(scenario=="select2" && i>=7020 && i<7030)||(scenario=="select3" && i>=7020 && i<7042)||((scenario=="select4" || scenario=="build" || scenario=="grid") && i>=7020 && i<7039))?-24000:0;
-    if(scenario=="protossselect" && i>=6500 && i<6506) p.axisX=-24000;
-    p.axisY=((scenario=="select" || scenario=="select2" || scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid") && i>=7045 && i<((scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid")?7052:7049))?-24000:0; if(scenario=="protossselect" && i>=6520 && i<6530) p.axisY=-24000; p.mask=mask; p.step=i;
+    if((scenario=="protossselect" || scenario=="probe2" || scenario=="probe3") && i>=6500 && i<(scenario=="probe3"?6504:(scenario=="probe2"?6505:6506))) p.axisX=-24000;
+    p.axisY=((scenario=="select" || scenario=="select2" || scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid") && i>=7045 && i<((scenario=="select3" || scenario=="select4" || scenario=="build" || scenario=="grid")?7052:7049))?-24000:0; if((scenario=="protossselect" || scenario=="probe2" || scenario=="probe3") && i>=6520 && i<((scenario=="probe2" || scenario=="probe3")?6527:6530)) p.axisY=-24000; p.mask=mask; p.step=i;
     root->run(); ++completed;
     std::lock_guard lock(p.mutex);
     steps<<i<<','<<mask<<','<<p.polls.load()<<','<<p.aPolls.load()<<','<<p.startPolls.load()<<','<<p.audioCalls.load()<<','<<p.callbacks<<'\n';
