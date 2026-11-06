@@ -362,6 +362,29 @@ class Z7ArmReplayTest(unittest.TestCase):
     def resume(self, plan, prefix, log, cut, **kw):
         return replay.evaluate(plan, "resume", log, cut, prefix=prefix, **kw)
 
+    def test_timed_resume_accepts_only_explicitly_untimed_valid_prefix(self):
+        plan = self.plan()
+        rows = self.rows(plan)
+        seed = sram((0, 1, PAUSE, True))
+        done = sram((0, 1, PAUSE, True), (1, 2, WIN, True))
+        timed_prefix = self.prefix_log(plan)
+        untimed_prefix = "\n".join(line for line in timed_prefix.splitlines()
+                                   if not line.startswith("Z7 CYCLES ")) + "\n"
+        log = run_log(rows[2:], head=[LOADED], timing=("terminal", 600, 300), mode=2)
+        default = self.resume(plan, untimed_prefix, log, 301, seed=seed, sram=done)
+        self.assertFails(default, "resume prefix: expected one cut timing record")
+        valid = self.resume(plan, untimed_prefix, log, 301, seed=seed, sram=done,
+                            prefix_timed=False)
+        self.assertTrue(valid["qualified"], valid["failures"])
+        self.assertIsNotNone(valid["guest_timing"])
+        wrong_mode = self.resume(plan, timed_prefix, log, 301, seed=seed, sram=done,
+                                 prefix_timed=False)
+        self.assertFails(wrong_mode, "resume prefix: an untimed log carries timing records")
+        invalid_seed = sram((0, 1, PAUSE, False))
+        invalid = self.resume(plan, untimed_prefix, log, 301, seed=invalid_seed, sram=done,
+                              prefix_timed=False)
+        self.assertFails(invalid, "resume prefix: invalid SRAM record")
+
     def test_resume_loaded_state_must_equal_the_saved_cut(self):
         plan = self.plan()
         rows = self.rows(plan)
