@@ -163,6 +163,15 @@ older KODAK package. Source merges do not update an already copied ROM.
   and semantic fallback. It is not connected to game saving; Flash hardware
   timing, bank/sector behavior, real power cuts, memory and integration remain
   open. No save format or release behavior changes with this experiment.
+  Actual human campaign research is now a separate HOST-only stage at
+  `13953e82`: P1–P10 initialization seeds source levels; the live producer
+  menu/payment/tick/refund routes honor authenticated scenario policy. Review
+  closed a generic-menu upgrade bypass in both staged custom and campaign
+  contexts. Focused campaign/custom sanitizer tests and a byte-identical
+  current normal P10 control pass with 593 hashes unchanged. Campaign job
+  journals and enemy controller bindings remain unsupported; this flag refuses
+  persistence and cannot be combined with the custom active-job journal flag.
+  See [the runtime stage](audits/2026-11-07-campaign-research-runtime/README.md).
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
