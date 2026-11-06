@@ -102,7 +102,12 @@ race_t6_repair_tick_unit(int slot)
     int keep = sc64_t6_repair_step(&hp, structure->maxhp,
                                   &worker->carry, &timer, &minerals, &gas, &costs);
     if (!fractional_only || hp == structure->maxhp) structure->hp = hp;
-    if (hp == structure->maxhp && (fractional_only || hp > old_hp) &&
+    if (hp == structure->maxhp &&
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+        fractional_only &&
+#else
+        (fractional_only || hp > old_hp) &&
+#endif
         race_building_can_burn(structure))
         structure->shield_remainder &= ~255;
     worker->work_timer = timer;
