@@ -90,7 +90,19 @@ static void pending_trip_depletes(void)
     stop_selected(); one_tick();
     assert(u[traveler].order==ORDER_IDLE && !sc64_worker_gather_pending(&u[traveler]));
 
-    /* A hidden replacement must not be chosen, including while carrying gas. */
+    /* A hidden replacement must not be chosen by an empty pending worker. */
+    reset_scene(R_PROTOSS,R_TER);
+    traveler=spawn_unit(SIDE,U_PROBE,112,112); assert(traveler>=0);
+    set_depot(0,SIDE,B_NEXUS,112,112);
+    m[2].x=320; m[2].y=320; m[2].amount=8;
+    m[3].x=336; m[3].y=320; m[3].amount=24;
+    u[traveler].selected=1;
+    tap_a(320,320); assert(sc64_worker_gather_pending(&u[traveler]));
+    m[2].amount=0; SC64_GRID_CLEAR(visible); SC64_GRID_CLEAR(explored);
+    one_tick();
+    assert(u[traveler].order==ORDER_IDLE && u[traveler].target==2 &&
+           !u[traveler].carry);
+    /* Even an eligible replacement must not alter a loaded cross-resource trip. */
     reset_scene(R_PROTOSS,R_TER);
     traveler=spawn_unit(SIDE,U_PROBE,112,112); assert(traveler>=0);
     set_depot(0,SIDE,B_NEXUS,112,112);
@@ -99,8 +111,7 @@ static void pending_trip_depletes(void)
     u[traveler].selected=1; u[traveler].carry=6;
     u[traveler].flags|=SC64_WORKER_CARGO_GAS;
     tap_a(320,320); assert(sc64_worker_gather_pending(&u[traveler]));
-    m[2].amount=0; SC64_GRID_CLEAR(visible); SC64_GRID_CLEAR(explored);
-    one_tick();
+    m[2].amount=0; one_tick();
     assert(u[traveler].order==ORDER_IDLE && u[traveler].target==2 &&
            u[traveler].carry==6 && sc64_worker_cargo_is_gas(&u[traveler]));
 }
