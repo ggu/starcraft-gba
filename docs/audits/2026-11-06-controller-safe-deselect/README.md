@@ -17,3 +17,7 @@ On source `74859aa3`, fresh adaptive ordinary-input controllers were compiled wi
 The logs, exact compile arguments, fresh traces and results are retained in the isolated checkout's ignored `.local/controller-review/z9-*` files. These are host controller outcomes, not physical replay, ARM performance, or N64 parity evidence. Z3 and Z4 remain unqualified.
 
 For comparison only, the earlier non-Z9 vector's unchanged `ab70bdd` Z3 controller lost at frame 52,127; the updated early-vector controller reached its 180,000-frame limit. The difference is an observed outcome, not a win or evidence that the earlier vector represents the shipped build. Both early-vector runs preserved the frozen inputs.
+
+## Current source after worker recovery
+
+After rebasing the controller changes onto `5f3876801c7c34762499007a91995cd122dec9da`, the same verified Z9 inputs and fresh controller runs produced a Z3 win at frame 136,588 and a Z4 limit at frame 150,000 with one force-3 command center remaining. Both host builds and runs used ASan/UBSan, and the five profile-specific inputs and 194 previously frozen prepared inputs were unchanged. The previous section records historical `ab70bdd` results only; they are not results for this source. Z4 remains unqualified. The current-source logs, arguments and traces are retained as `.local/controller-review/z9-current-z{3,4}-*` in the isolated checkout.
