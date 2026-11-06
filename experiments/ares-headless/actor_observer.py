@@ -6,8 +6,8 @@ import argparse,fcntl,hashlib,json,os,pathlib,resource,selectors,shutil,signal,s
 ROM_SHA='e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 VK_SHA='432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 REV='0aafd85789215e84e1e43415c07d4c88461b7899'
-# Set only after separately qualifying the instrumented binary.
-BINARY_SHA=None
+# Qualified independently from the historical non-diagnostic binary.
+BINARY_SHA='d7489355c49ab38c9b561e738e3da23591550984e27ee1f2364164b78216699b'
 LOCK='/tmp/sc64-native-build-20261031.lock'
 VK_PATH=pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
 
