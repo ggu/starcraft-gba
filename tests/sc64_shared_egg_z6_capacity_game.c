@@ -16,7 +16,7 @@ int main(void)
     unsigned free=0;for(int i=0;i<MAX_UNITS;++i)free+=!u[i].alive;
     assert(free>pending+2);
     for(int i=0;i<MAX_UNITS && free>pending+1;++i) if(!u[i].alive) {
-        u[i].alive=1;u[i].type=U_DRONE;u[i].owner=SIDE;--free;
+        u[i].alive=1;u[i].type=U_DRONE;u[i].owner=SIDE;u[i].raw_owner=-1;--free;
     }
     int ore=minerals,larva=b[hall].larva;
     assert(!race_queue_unit(SIDE,hall,U_ZERGLING));
