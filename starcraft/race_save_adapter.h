@@ -53,6 +53,13 @@ static int race_research_campaign_candidate_rule(const RaceSave *candidate,
 
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
 #define SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH_JOBS(SC64_TRANSPORT_SAVE_VERSION)
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+#define SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_CAMPAIGN_JOBS(SC64_TRANSPORT_SAVE_VERSION)
+_Static_assert(SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION != SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION &&
+               SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION != SC64_RESEARCH_TRANSPORT_SAVE_VERSION &&
+               SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION != SC64_TRANSPORT_SAVE_VERSION,
+               "campaign research journal tag collision");
+#endif
 _Static_assert(SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION != SC64_RESEARCH_TRANSPORT_SAVE_VERSION &&
                SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION != SC64_TRANSPORT_SAVE_VERSION &&
                SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
@@ -1604,6 +1611,39 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
 static int race_research_jobs_candidate_scan(const RaceSave *candidate,
     const Sc64ProtossResearchLevels *levels, int jobs_tag)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+    if (candidate && candidate->state[0]==0) {
+        unsigned seen=0;
+        if (jobs_tag==1 || candidate->state[11]<0 || candidate->state[11]>2 ||
+            candidate->state[12]<0 || candidate->state[12]>2 ||
+            !sc64_pr_levels_valid(levels,SC64_PR_CAMPAIGN_OWNERS)) return 0;
+        for (unsigned family=0;family<SC64_PR_FAMILY_COUNT;++family) {
+            Sc64PrCampaignRule rule;
+            if (!race_research_campaign_candidate_rule(candidate,family,&rule) ||
+                levels->level[SIDE][family]<rule.initial ||
+                levels->level[SIDE][family]>rule.maximum) return 0;
+            for (unsigned owner=1;owner<SC64_PR_CAMPAIGN_OWNERS;++owner)
+                if (levels->level[owner][family]) return 0;
+        }
+        for (unsigned i=0;i<MAX_BUILDINGS;++i) {
+            Building q; Sc64PrCampaignRule rule;
+            if (!race_save_decode_building(candidate,i,&q)) return 0;
+            if (q.type!=B_FORGE && q.type!=B_CYBERNETICS_CORE) continue;
+            if (!q.level && !q.queue_progress && !q.queue_count) continue;
+            if (jobs_tag!=2 || q.owner!=SIDE || q.level<1 || q.level>SC64_PR_FAMILY_COUNT ||
+                (q.raw_type>=0 && q.raw_type!=sc64_race_raw_building(q.type))) return 0;
+            unsigned family=(unsigned)q.level-1;
+            if ((seen & (1u<<family)) ||
+                !race_research_campaign_candidate_rule(candidate,family,&rule) ||
+                !rule.cost_supported || q.queue[1]>rule.maximum ||
+                !sc64_pr_job_valid_custom(&q,SIDE,levels,(unsigned)candidate->state[11],
+                   (unsigned)candidate->state[12],candidate->state[13]!=0,candidate->state[14]!=0)) return 0;
+            seen |= 1u<<family;
+        }
+        return 1;
+    }
+    if (jobs_tag==2) return 0;
+#endif
     Sc64PrCandidateScan scan;
     if (!candidate || !levels || candidate->state[0]!=1 ||
         candidate->state[4]<1 || candidate->state[4]>3 ||
@@ -1629,7 +1669,11 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 
 static int race_save_game(void) {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
-    if (race_mode!=1 || sc64_pr_stage_fault) return 0;
+    if (sc64_pr_stage_fault || (race_mode!=1
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+        && race_mode!=0
+#endif
+       )) return 0;
 #endif
 #if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) && !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL)
     /* This HOST-only stage has no authenticated active-job wire format.
@@ -2507,7 +2551,13 @@ static int race_save_game(void) {
             (unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
-    if (!race_research_jobs_candidate_scan(&race_data,&sc64_experimental_research_levels,1)) return 0;
+    if (!race_research_jobs_candidate_scan(&race_data,&sc64_experimental_research_levels,
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+                                            race_mode ? 1 : 2
+#else
+                                            1
+#endif
+                                           )) return 0;
     for (unsigned i=0;i<MAX_BUILDINGS;++i) {
         Building decoded;
         if (!race_save_decode_building(&race_data,i,&decoded)) return 0;
@@ -4079,6 +4129,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
         && tag != SC64_RESEARCH_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
         && tag != SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+        && tag != SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION
+#endif
 #endif
 #endif
        ) return 0;
@@ -4096,6 +4149,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
         (tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
          || tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+         || tag==SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION
+#endif
 #endif
         ) ? SC64_TRANSPORT_SAVE_VERSION :
 #endif
@@ -4110,6 +4166,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
         || tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+        || tag==SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION
+#endif
 #endif
        ) {
         if ((race_data.state[0]!=0 && race_data.state[0]!=1) ||
@@ -4120,6 +4179,19 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     plan->research_jobs_tag=(u8)(tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+    if (tag==SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION) plan->research_jobs_tag=2;
+    /* Old campaign records did not initialize typed levels. Preserve any
+     * old typed levels while restoring the authenticated scenario floor. */
+    if (race_data.state[0]==0 && plan->research_jobs_tag==0) {
+        for (unsigned family=0;family<SC64_PR_FAMILY_COUNT;++family) {
+            Sc64PrCampaignRule rule;
+            if (!race_research_campaign_candidate_rule(&race_data,family,&rule)) return 0;
+            if (plan->research_levels.level[SIDE][family]<rule.initial)
+                plan->research_levels.level[SIDE][family]=rule.initial;
+        }
+    }
+#endif
     if (!race_research_jobs_candidate_scan(&race_data,&plan->research_levels,
                                            plan->research_jobs_tag)) return 0;
 #endif
@@ -4156,6 +4228,9 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
         ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
         ,SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+        ,SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION
+#endif
 #endif
 #endif
     };
