@@ -17,7 +17,7 @@ with open('/tmp/sc64-native-build-20261031.lock','w') as lock:
  if sha(copy)!=rom:raise SystemExit('ROM copy mismatch')
  sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('interactive.cpp').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
  resources=[a.source/'ares/ares/resource/resource.cpp',a.source/'ares/ares/resource/resource.hpp',a.source/'mia/resource/resource.cpp',a.source/'mia/resource/resource.hpp'];inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
- cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','9000']; started=time.monotonic();result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':rom,'moltenvk_sha256':vk,'source_commit':rev}
+ cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','14000']; started=time.monotonic();result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':rom,'moltenvk_sha256':vk,'source_commit':rev}
  with (a.output/'bridge.log').open('wb') as log,(a.output/'stderr.log').open('wb') as err:
   child=subprocess.Popen(cmd,cwd=a.output.resolve(),env={**os.environ,'DYLD_LIBRARY_PATH':str(a.moltenvk.resolve().parent)},stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=err,bufsize=0)
   sel=selectors.DefaultSelector();sel.register(sys.stdin.buffer,selectors.EVENT_READ,'input');sel.register(child.stdout,selectors.EVENT_READ,'output');deadline=started+180
