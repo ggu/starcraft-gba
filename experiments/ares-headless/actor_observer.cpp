@@ -198,7 +198,7 @@ int main(int argc,char** argv) {
     for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
     if(capture==2) {
       using namespace ares::Nintendo64;
-      if(snapshots>=2 || rdram.ram.size!=8u*1024u*1024u || cpu.recompiler.enabled || system.homebrewMode) return 8;
+      if(snapshots>=2 || rdram.ram.size!=8u*1024u*1024u || cpu.recompiler.enabled || ares::Nintendo64::system.homebrewMode) return 8;
       std::vector<std::uint8_t> bytes(rdram.ram.size);
       auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull);
         auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);
