@@ -13,6 +13,13 @@ _Static_assert(MAX_BUILDINGS <= 254, "UI save index exceeds one-byte encoding");
 #error "experimental research journal requires normal shared transport profiles"
 #endif
 #define SC64_RESEARCH_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH(SC64_TRANSPORT_SAVE_VERSION)
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+#define SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH_JOBS(SC64_TRANSPORT_SAVE_VERSION)
+_Static_assert(SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION != SC64_RESEARCH_TRANSPORT_SAVE_VERSION &&
+               SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION != SC64_TRANSPORT_SAVE_VERSION &&
+               SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
+               "active research journal tag collision");
+#endif
 _Static_assert(SC64_SAVE_TAG_BASE_VALID(SC64_TRANSPORT_SAVE_VERSION),
                "transport tag leaves the historical 0x43 namespace");
 _Static_assert(SC64_RESEARCH_TRANSPORT_SAVE_VERSION != SC64_TRANSPORT_SAVE_VERSION &&
@@ -1552,8 +1559,47 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
     return 1;
 }
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+/* Decode only into one bounded row. Context is from the detached candidate;
+ * an old tag never gains the new job interpretation. `paid_out`, when used,
+ * is detached HOST-only scratch and is published only after selection. */
+static int race_research_jobs_candidate_scan(const RaceSave *candidate,
+    const Sc64ProtossResearchLevels *levels, int jobs_tag, Sc64PrPaidReceipt *paid_out)
+{
+    Sc64PrCandidateScan scan;
+    if (!candidate || !levels || candidate->state[0]!=1 ||
+        candidate->state[4]<1 || candidate->state[4]>3 ||
+        candidate->state[11]<0 || candidate->state[12]<0 ||
+        !sc64_pr_candidate_scan_init(&scan,levels,candidate->players,(unsigned)candidate->state[4],
+            (unsigned)candidate->state[11],(unsigned)candidate->state[12],
+            candidate->state[13]!=0,candidate->state[14]!=0)) return 0;
+    if (paid_out) memset(paid_out,0,sizeof(*paid_out)*MAX_BUILDINGS);
+    for (unsigned i=0;i<MAX_BUILDINGS;++i) {
+        Building q; Sc64ProtossResearchQuote quote;
+        if (!race_save_decode_building(candidate,i,&q)) return 0;
+        if (q.type!=B_FORGE && q.type!=B_CYBERNETICS_CORE) continue;
+        if (!jobs_tag) {
+            /* Legacy rows may not be reinterpreted or silently discarded. */
+            if (q.level || q.queue_progress || q.queue_count) return 0;
+            continue;
+        }
+        if (!sc64_pr_candidate_scan_row(&scan,&q)) return 0;
+        if (paid_out && q.level) {
+            unsigned f=(unsigned)q.level-1, target=(unsigned)q.queue[1];
+            if (!target || !sc64_pr_quote(f,target-1,&quote)) return 0;
+            paid_out[i]=(Sc64PrPaidReceipt){quote.mineral,quote.gas,1,(uint8_t)q.owner,
+                                            (uint8_t)f,(uint8_t)target};
+        }
+    }
+    return 1;
+}
+#endif
+
 static int race_save_game(void) {
-#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+    if (race_mode!=1 || sc64_pr_stage_fault) return 0;
+#endif
+#if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) && !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL)
     /* This HOST-only stage has no authenticated active-job wire format.
      * Refuse all writes, including direct calls that bypass save_game(). */
     return 0;
@@ -2428,6 +2474,20 @@ static int race_save_game(void) {
     if (race_mode && !race_combined_egg_candidate_valid(&race_data,
             (unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+    if (!race_research_jobs_candidate_scan(&race_data,&sc64_experimental_research_levels,1,0)) return 0;
+    for (unsigned i=0;i<MAX_BUILDINGS;++i) {
+        Building decoded;
+        if (!race_save_decode_building(&race_data,i,&decoded)) return 0;
+        if (sc64_pr_stage_job_marked(&b[i]) || sc64_pr_paid[i].live) {
+            unsigned payer=sc64_pr_paid[i].payer;
+            if (!sc64_pr_paid[i].live || payer>=SC64_PR_CUSTOM_OWNERS ||
+                !sc64_pr_stage_owner_active(payer) ||
+                !sc64_pr_job_receipt_valid(&b[i],payer,&sc64_pr_paid[i]) ||
+                !sc64_pr_job_receipt_valid(&decoded,payer,&sc64_pr_paid[i])) return 0;
+        }
+    }
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     if ((race_mode!=0 && race_mode!=1) ||
         !sc64_pr_padding_write((u8 *)race_data.buildings, MAX_BUILDINGS, SC64_PR_ROW_WIDTH,
@@ -2479,6 +2539,10 @@ typedef struct {
     int building_damage_marker;
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     Sc64ProtossResearchLevels research_levels;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+    u8 research_jobs_tag;
+    Sc64PrPaidReceipt research_paid[MAX_BUILDINGS]; /* HOST-only detached scratch */
+#endif
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     Sc64StageSaveAuth guardian_auth;
@@ -3984,6 +4048,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
         && tag != SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+        && tag != SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#endif
 #endif
        ) return 0;
     plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
@@ -3997,7 +4064,11 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
     if (!race_impact_save_decode_selected(len,
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
-        tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION ? SC64_TRANSPORT_SAVE_VERSION :
+        (tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+         || tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#endif
+        ) ? SC64_TRANSPORT_SAVE_VERSION :
 #endif
         tag,plan->impact_candidate,&plan->impact_candidate_count)) return 0;
 #if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) && !defined(SC64_SHARED_TRANSPORT)
@@ -4007,12 +4078,21 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
 #endif /* SC64_SHARED_EGG_JOURNAL_HOST_STAGE */
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
-    if (tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION) {
+    if (tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+        || tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#endif
+       ) {
         if ((race_data.state[0]!=0 && race_data.state[0]!=1) ||
             !sc64_pr_padding_read((u8 *)race_data.buildings,MAX_BUILDINGS,SC64_PR_ROW_WIDTH,
                                   SC64_PR_USED_BITS,race_data.state[0] ? 5u : 8u,
                                   &plan->research_levels)) return 0;
     }
+#endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+    plan->research_jobs_tag=(u8)(tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION);
+    if (!race_research_jobs_candidate_scan(&race_data,&plan->research_levels,
+                                           plan->research_jobs_tag,0)) return 0;
 #endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 #if !defined(SC64_SHARED_TRANSPORT)
@@ -4045,6 +4125,9 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
         ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+        ,SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#endif
 #endif
     };
 #endif
@@ -4130,7 +4213,10 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 }
 #endif
 static int race_load_game(void) {
-#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+    if (sc64_pr_stage_fault) return 0;
+#endif
+#if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) && !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL)
     /* No old or research-journal candidate may publish ambiguous staged
      * building fields until active-job decoding is separately validated. */
     return 0;
@@ -4144,6 +4230,10 @@ static int race_load_game(void) {
 #ifdef SC64_WORKER_CARGO_KIND
     GbaSaveSelection selected;
     if (!race_worker_cargo_select(&plan,&selected)) return 0;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+    if (!race_research_jobs_candidate_scan(&race_data,&plan.research_levels,
+                                           plan.research_jobs_tag,plan.research_paid)) return 0;
+#endif
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     GbaSaveSelection selected;
     if (!race_scarab_stage_select(&plan,&selected)) return 0;
@@ -4576,6 +4666,9 @@ static int race_load_game(void) {
 #endif
     sc64_visibility_reset();update_exploration();reset_selection_gestures();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+    memcpy(sc64_pr_paid,plan.research_paid,sizeof(sc64_pr_paid));
+#endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }
 #endif

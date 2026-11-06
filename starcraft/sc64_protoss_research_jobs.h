@@ -120,7 +120,7 @@ static int sc64_pr_job_receipt_valid(const Building *p, unsigned payer,
                                     const Sc64PrPaidReceipt *paid)
 {
     Sc64ProtossResearchQuote quote;
-    if (!p || !paid || !paid->live || payer>=SC64_PR_CUSTOM_OWNERS ||
+    if (!p || !paid || paid->live!=1 || payer>=SC64_PR_CUSTOM_OWNERS ||
         paid->payer!=payer || paid->family>=SC64_PR_FAMILY_COUNT || !paid->target ||
         !p->alive || p->under_construction || p->owner!=(int)payer ||
         p->queue_count || p->queue_head || p->queue[0]!=(int)payer ||
@@ -150,6 +150,24 @@ static int sc64_pr_job_cancel_custom(Building *p, unsigned payer, Sc64PrPaidRece
     paid->live=0;
     return 1;
 }
+/* Destruction must not be vetoed by a full bank. Each resource saturates at
+ * its established representation limit; malformed receipts are no-ops. */
+static int sc64_pr_job_destroy_custom(Building *p,unsigned payer,Sc64PrPaidReceipt *paid,
+    int *minerals,int *gas,int wallet_limit)
+{
+    int ore,vespene,room;
+    if (!minerals || !gas || minerals==gas || wallet_limit<0 ||
+        *minerals<0 || *gas<0 || *minerals>wallet_limit || *gas>wallet_limit ||
+        !sc64_pr_job_receipt_valid(p,payer,paid)) return 0;
+    ore=(int)paid->mineral*3/4; vespene=(int)paid->gas*3/4;
+    room=wallet_limit-*minerals; if (ore>room) ore=room;
+    room=wallet_limit-*gas; if (vespene>room) vespene=room;
+    *minerals+=ore; *gas+=vespene;
+    p->level=0; p->queue[0]=0; p->queue[1]=0; p->queue_progress=0;
+    paid->live=0;
+    return 1;
+}
+
 /* Detached custom candidate audit. The caller supplies only candidate
  * context and may feed decoded rows one at a time; no live globals or full
  * second Building array are needed. This does not itself authenticate a tag. */
@@ -182,8 +200,9 @@ static int sc64_pr_candidate_scan_row(Sc64PrCandidateScan *scan,const Building *
     unsigned owner,family;
     if (!scan || !q || !scan->levels || !scan->players) return 0;
     if (q->type!=B_FORGE && q->type!=B_CYBERNETICS_CORE) return 1;
-    if (!q->level && !q->queue_progress && !q->queue[0] && !q->queue[1] &&
-        !q->queue[2] && !q->queue[3] && !q->queue[4]) return 1;
+    /* A reused producer can retain inert queue entries from its previous
+     * occupant. Preserve them until a successful new job admission. */
+    if (!q->level && !q->queue_progress && !q->queue_count) return 1;
     owner=(unsigned)q->owner;
     if (owner>=SC64_PR_CUSTOM_OWNERS ||
         !(owner==SIDE || (owner==ENEMY && scan->bots>=1) ||

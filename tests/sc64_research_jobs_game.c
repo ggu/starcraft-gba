@@ -88,23 +88,38 @@ int main(void)
     assert(!memcmp(&b[0],&saved,sizeof saved));
     sc64_experimental_research_levels.level[1][SC64_PR_AIR_WEAPONS]=0;
     assert(sc64_pr_stage_begin_slot(0,SC64_PR_AIR_WEAPONS));
-    int before_ore=race_minerals[1], before_gas=race_gas[1];
-    b[0].owner=SIDE; saved=b[0];
+    int before_gas=race_gas[1];
+    /* Saturated AI minerals cannot veto a lethal hit; gas still receives its
+     * representable 3/4 credit, once. */
+    b[0].hp=1; b[0].maxhp=1000; b[0].shield=0; race_minerals[1]=65535;
+    hit_target_impl_ex(MAX_UNITS,10,U_MARINE,SIDE,SC64_STOCK_DMG_NORMAL,0);
+    assert(!b[0].alive && b[0].hp<=0 && !b[0].level && !sc64_pr_paid[0].live);
+    assert(race_minerals[1]==65535 && race_gas[1]==before_gas+75);
     destroy_building(0,SIDE);
+    assert(race_minerals[1]==65535 && race_gas[1]==before_gas+75);
+    /* A malformed payer never receives credit, but cannot block death. */
+    race_minerals[1]=race_gas[1]=1000;
+    assert(sc64_pr_stage_begin_slot(2,SC64_PR_AIR_WEAPONS));
+    int bad_ore=race_minerals[1], bad_gas=race_gas[1];
+    b[2].hp=1; b[2].maxhp=1000; b[2].shield=0; b[2].owner=SIDE;
+    hit_target_impl_ex(MAX_UNITS+2,10,U_MARINE,SIDE,SC64_STOCK_DMG_NORMAL,0);
+    assert(!b[2].alive && b[2].hp<=0 && sc64_pr_stage_fault && !sc64_pr_paid[2].live);
+    assert(sc64_pr_stage_fault_slot==2 && sc64_pr_stage_fault_receipt.live &&
+           sc64_pr_stage_fault_building.owner==SIDE);
+    assert(race_minerals[1]==bad_ore && race_gas[1]==bad_gas);
+    assert(!save_game() && !race_save_game() && !load_game() && !race_load_game());
+    b[0].level=1; b[0].queue_progress=1; b[0].queue[0]=1; b[0].queue[1]=1;
+    saved=b[0]; int next_slot=spawn_build(SIDE,B_PYLON,100,100,0);
+    assert(next_slot>=0 && next_slot!=0);
     assert(!memcmp(&b[0],&saved,sizeof saved));
-    assert(race_minerals[1]==before_ore && race_gas[1]==before_gas);
-    b[0].owner=1; race_minerals[1]=65535; saved=b[0];
-    destroy_building(0,SIDE);
-    assert(!memcmp(&b[0],&saved,sizeof saved));
-    assert(race_minerals[1]==65535 && race_gas[1]==before_gas);
-    race_minerals[1]=before_ore; destroy_building(0,SIDE);
-    assert(!b[0].alive && !b[0].level && !b[0].queue_progress && !sc64_pr_paid[0].live);
-    assert(race_minerals[1]==before_ore+75 && race_gas[1]==before_gas+75);
-    destroy_building(0,SIDE);
-    assert(race_minerals[1]==before_ore+75 && race_gas[1]==before_gas+75);
+    /* A real new-match reset clears the HOST diagnostic and receipts. */
+    race_mode=1; race_human=R_PROTOSS; race_bots=1;
+    race_bot_races[0]=R_PROTOSS; race_skirmish_map=0; init_state();
+    assert(!sc64_pr_stage_fault);
 
     /* Human wallet uses signed-int range; shields require an owned Core. */
     race_human=R_PROTOSS; race_player[SIDE]=R_PROTOSS; minerals=gas=1000;
+    memset(&b[3],0,sizeof b[3]); memset(&b[4],0,sizeof b[4]); memset(&b[5],0,sizeof b[5]);
     b[3].alive=1; b[3].owner=SIDE; b[3].type=B_FORGE; b[3].raw_type=-1;
     b[3].x=b[3].y=200;
     b[4].alive=1; b[4].owner=SIDE; b[4].type=B_PYLON; b[4].raw_type=-1;
@@ -115,15 +130,14 @@ int main(void)
     assert(!sc64_pr_stage_begin_slot(3,SC64_PR_SHIELDS)); /* level 2 needs Core */
     b[5].alive=1; b[5].owner=SIDE; b[5].type=B_CYBERNETICS_CORE; b[5].raw_type=-1;
     assert(sc64_pr_stage_begin_slot(3,SC64_PR_SHIELDS));
+    unsigned shield_remaining=b[3].queue_progress;
+    b[5].alive=0; sc64_pr_stage_tick();
+    assert(b[3].queue_progress==shield_remaining-1);
     minerals=INT_MAX; int human_gas=gas; saved=b[3];
     assert(!sc64_pr_stage_cancel_slot(3,0));
     assert(!memcmp(&b[3],&saved,sizeof saved) && minerals==INT_MAX && gas==human_gas);
     minerals=70000; assert(sc64_pr_stage_cancel_slot(3,0));
     assert(minerals==70300 && gas==human_gas+300);
-    b[0].level=1; b[0].queue_progress=1; b[0].queue[0]=1; b[0].queue[1]=1;
-    saved=b[0]; assert(spawn_build(SIDE,B_PYLON,100,100,0)==-1);
-    assert(!memcmp(&b[0],&saved,sizeof saved));
-
     /* Fresh constructed custom state, then actual B/A menu input and update. */
     gba_init(); game_init(); race_mode=1; race_human=R_PROTOSS;
     race_bots=1; race_bot_races[0]=R_PROTOSS; race_skirmish_map=0; init_state();
