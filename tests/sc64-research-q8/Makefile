@@ -34,9 +34,9 @@ test-sc64-research-q8-lifecycle-terran:
 .PHONY: test-sc64-research-q8-storm-p10 test-sc64-research-q8-storm-z9
 test-sc64-research-q8-storm-p10:
 	@mkdir -p build/research-q8
-	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) $(Q8_LIFECYCLE_FLAGS) tests/sc64_research_q8_storm_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8/storm-p10
+	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) $(Q8_LIFECYCLE_FLAGS) -DQ8_STORM_EXPECTED_SCENES=2 tests/sc64_research_q8_storm_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8/storm-p10
 	./build/research-q8/storm-p10
 test-sc64-research-q8-storm-z9:
 	@mkdir -p build/research-q8
-	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(ZERG_Z9_CANONICAL_FLAGS) $(Q8_LIFECYCLE_FLAGS) tests/sc64_research_q8_storm_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8/storm-z9
+	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(ZERG_Z9_CANONICAL_FLAGS) $(Q8_LIFECYCLE_FLAGS) -DQ8_STORM_EXPECTED_SCENES=1 tests/sc64_research_q8_storm_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8/storm-z9
 	./build/research-q8/storm-z9

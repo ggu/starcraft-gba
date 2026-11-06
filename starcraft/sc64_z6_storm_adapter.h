@@ -3,6 +3,9 @@
 
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
 #include "sc64_research_q8_storm.h"
+#define SC64_Z6_STORM_APPLY(klass,inv,hit,hp,shields) sc64_pr_q8_storm_hit((klass),(inv),(hit),(hp),(shields),race_z6_hallucination_actor(&u[i]))
+#else
+#define SC64_Z6_STORM_APPLY sc64_psionic_storm_apply_hit
 #endif
 
 #if !defined(SC64_Z6_RUNTIME) || !defined(SC64_Z6_STORM_ENABLED)
@@ -147,18 +150,20 @@ static int race_z6_storm_tick(void)
             hp_q8 = u[i].hp * SC64_STORM_ENERGY_ONE;
             shields_q8 = u[i].shield * SC64_STORM_ENERGY_ONE;
 #endif
-            if (!sc64_psionic_storm_apply_hit(target_class,
+            if (!SC64_Z6_STORM_APPLY(target_class,
                     invincible_units[i] || (u[i].flags & 16) ||
                     (actor_flags & SC64_GAME_ACTOR_INVINCIBLE), &hit[i],
                     &hp_q8, &shields_q8)) continue;
             /* A hallucination takes twice the pulse's Ignore Armor damage.
              * Reuse shield-first clamping for its second half, while `hit`
              * still prevents another overlapping Storm pulse this tick. */
+#ifndef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
             if (race_z6_hallucination_actor(&u[i]) && hp_q8 > 0) {
                 u8 extra_hit=0;
                 (void)sc64_psionic_storm_apply_hit(target_class,0,&extra_hit,
                                                   &hp_q8,&shields_q8);
             }
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
             if(!sc64_pr_q8_storm_commit(i,hp_q8,shields_q8))return 0;
 #else
@@ -200,5 +205,7 @@ static void race_z6_storm_draw(void)
         gfx_line(x, y-2, x, y+2, C_WHITE);
     }
 }
+
+#undef SC64_Z6_STORM_APPLY
 
 #endif

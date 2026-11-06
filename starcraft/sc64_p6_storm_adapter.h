@@ -3,6 +3,9 @@
 
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
 #include "sc64_research_q8_storm.h"
+#define SC64_P6_STORM_APPLY(klass,inv,hit,hp,shields) sc64_pr_q8_storm_hit((klass),(inv),(hit),(hp),(shields),0)
+#else
+#define SC64_P6_STORM_APPLY sc64_psionic_storm_apply_hit
 #endif
 
 #if !defined(SC64_P6_RUNTIME) || !defined(SC64_P6_STORM_ENABLED)
@@ -191,7 +194,7 @@ static int race_p6_storm_tick(int user_paused)
             hp_q8 = u[i].hp * SC64_STORM_ENERGY_ONE;
             shields_q8 = u[i].shield * SC64_STORM_ENERGY_ONE;
 #endif
-            if (!sc64_psionic_storm_apply_hit(target_class,
+            if (!SC64_P6_STORM_APPLY(target_class,
                     invincible_units[i] || (u[i].flags & 16) ||
                     (actor_flags & SC64_GAME_ACTOR_INVINCIBLE), &hit[i],
                     &hp_q8, &shields_q8)) continue;
@@ -229,7 +232,7 @@ static int race_p6_storm_tick(int user_paused)
 #else
             hp_q8=q->hp*SC64_STORM_ENERGY_ONE; shield_q8=q->shield*SC64_STORM_ENERGY_ONE;
 #endif
-            if (!sc64_psionic_storm_apply_hit(
+            if (!SC64_P6_STORM_APPLY(
                     SC64_STORM_TARGET_GROUND|SC64_STORM_TARGET_NONBUILDING,
                     invincible_buildings[i] || (q->flags&16u), &hit_props[i],
                     &hp_q8,&shield_q8)) continue;
@@ -269,5 +272,7 @@ static void race_p6_storm_draw(void)
         gfx_line(x, y-2, x, y+2, C_WHITE);
     }
 }
+
+#undef SC64_P6_STORM_APPLY
 
 #endif

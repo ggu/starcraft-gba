@@ -2,9 +2,11 @@
 /* Authored damage scenes on actual campaign adapters; no saved Q8 state. */
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "../common/gba.c"
 #include "../starcraft/game.c"
+static unsigned scenes;
 static void start(const char *mission)
 {
     int selected=-1;
@@ -92,7 +94,7 @@ static void adapter_scene(const char *mission)
     pulse(effects(mission),u[v].x,u[v].y,2);
     assert(tick(mission));assert(!u[v].alive&&!u[v].hp&&!sc64_pr_hp_debt[v]);
     assert(supply_used==before_supply-cost);
-    printf("%s fractional Storm, overlap and death: PASS\n",mission);
+    ++scenes;printf("%s fractional Storm, overlap and death: PASS\n",mission);
 }
 #ifdef SC64_P6_STORM_ENABLED
 static void p6_trap(void)
@@ -100,7 +102,7 @@ static void p6_trap(void)
     start("P6");int slot=-1;
     for(int n=0;n<MAX_BUILDINGS;++n) {
         int raw=b[n].raw_type;
-        if(b[n].alive&&(raw==203||raw==209||raw==210||raw==211||raw==213)&&
+        if(b[n].alive&&raw==SC64_P6_RAW_WALL_MISSILE_TRAP&&
            !invincible_buildings[n]&&!(b[n].flags&16)&&b[n].maxhp>30){slot=n;break;}
     }
     assert(slot>=0);unsigned before=(unsigned)b[slot].maxhp*256u-64u;
@@ -125,5 +127,6 @@ int main(void)
 #ifdef SC64_Z6_STORM_ENABLED
     adapter_scene("Z6");
 #endif
+    assert(scenes==Q8_STORM_EXPECTED_SCENES);
     return 0;
 }
