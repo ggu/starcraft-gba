@@ -1594,6 +1594,7 @@ int audio_music_track(void){return -1;}
 #endif
 
 #ifdef GBA_HOST
+u16 gfx_test_palette(int index){return (unsigned)index<256?host_palette[index]:0;}
 u8 gfx_test_pixel(int x,int y){if((unsigned)x>=240||(unsigned)y>=160)return 0;u16 v=pixels[y*120+x/2];return (u8)(x&1?v>>8:v);}
 void gfx_dump_ppm(const char* path){FILE*f=fopen(path,"wb");if(!f)return;fprintf(f,"P6\n240 160\n255\n");for(int i=0;i<38400;i++){u16 a=host_fb[front][i/2];u8 idx=(i&1)?a>>8:a&255;u16 v=host_palette[idx];u8 rgb[3]={(u8)((v&31)*255/31),(u8)(((v>>5)&31)*255/31),(u8)(((v>>10)&31)*255/31)};fwrite(rgb,1,3,f);}fclose(f);}
 #endif

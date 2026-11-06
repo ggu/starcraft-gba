@@ -238,5 +238,6 @@ void gfx_host_frame_rgb(u16 *rgb38400);
 void gfx_dump_ppm(const char *path);
 void save_test_corrupt_latest(u32 length,u32 tag);
 u8 gfx_test_pixel(int x,int y);
+u16 gfx_test_palette(int index);
 #endif
 #endif

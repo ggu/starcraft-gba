@@ -3,6 +3,7 @@
  * in this fixture. It tests rendering only, not controller completion. */
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "../starcraft/game.c"
 
@@ -10,6 +11,7 @@ enum { FB_WIDTH = 240, FB_HEIGHT = 160, FB_SIZE = FB_WIDTH * FB_HEIGHT };
 static u8 reference_pixels[FB_SIZE];
 static u8 candidate_pixels[FB_SIZE];
 static u8 transition_references[7][FB_SIZE];
+static FILE *trace_file;
 
 static void
 capture(u8 *out)
@@ -17,6 +19,14 @@ capture(u8 *out)
     for (int y = 0; y < FB_HEIGHT; ++y)
         for (int x = 0; x < FB_WIDTH; ++x)
             out[y * FB_WIDTH + x] = gfx_test_pixel(x, y);
+    if (trace_file) {
+        assert(fwrite(out, 1, FB_SIZE, trace_file) == FB_SIZE);
+        for (int i = 0; i < 256; ++i) {
+            u16 p = gfx_test_palette(i);
+            assert(fputc(p & 255, trace_file) != EOF);
+            assert(fputc(p >> 8, trace_file) != EOF);
+        }
+    }
 }
 
 static void
@@ -37,10 +47,19 @@ draw_scene_contents(void)
 #ifdef SC_FIELD_FEEDBACK
     field_ui_refresh(); /* as game_render does before drawing the scene */
 #endif
+#ifdef GBA_SCENE_CLIP
+    gfx_set_clip_y(12, 120);
+#endif
     draw_map();
+#ifdef GBA_SCENE_CLIP
+    gfx_set_clip_y(0, 160);
+#endif
     draw_hud();
     if (screen == SCREEN_PAUSE) draw_pause();
     else if (screen == SCREEN_RESULT) draw_result_screen(); /* production dispatch, including the outro */
+#ifdef SC64_TEXT_BOXES
+    if (sc64_text_box_count()) race_text_box_draw();
+#endif
 }
 
 static void
@@ -48,6 +67,7 @@ draw_full_clear_reference(u8 *out)
 {
     reset_render_caches();
     gfx_begin(C_BLACK);
+    game_audio_observe();
     draw_scene_contents();
     gfx_end();
     capture(out);
@@ -101,7 +121,10 @@ setup_profile(void)
 {
     game_init();
     race_mode = 0;
-#if defined(SC64_Z7_RUNTIME)
+#if defined(SC64_FRAME_TEST_Z9)
+    race_human = R_ZERG;
+    race_selected_mission = SC64_Z9_GLOBAL_ID;
+#elif defined(SC64_Z7_RUNTIME)
     race_human = R_ZERG;
     race_selected_mission = SC64_Z7_GLOBAL_ID;
 #elif defined(SC64_Z6_RUNTIME)
@@ -133,6 +156,11 @@ setup_profile(void)
 #endif
 #endif
     init_state();
+#if defined(SC64_FRAME_TEST_Z9)
+    assert(race_selected_mission == SC64_Z9_GLOBAL_ID && race_zl_active());
+#elif defined(SC64_Z7_RUNTIME)
+    assert(race_selected_mission == SC64_Z7_GLOBAL_ID && race_z7_active());
+#endif
     screen = SCREEN_PLAY;
     mode = MODE_NORMAL;
     menu_open = 0;
@@ -188,9 +216,6 @@ test_camera_fog_and_overlays(void)
         {WORLD_W - 120, WORLD_H - 54}, {263, 187}
     };
     setup_profile();
-    for (int i = 0; i < MAX_MINERALS; ++i)
-        if (m[i].amount > 0)
-            SC64_GRID_SET(explored, (m[i].x / 16) + (m[i].y / 16) * MAP_COLS, 1);
     update_exploration();
 
     for (unsigned i = 0; i < sizeof(cameras) / sizeof(cameras[0]); ++i) {
@@ -202,15 +227,16 @@ test_camera_fog_and_overlays(void)
     }
 
     cx = cy = 512;
-    SC64_GRID_CLEAR(visible);
-    SC64_GRID_CLEAR(explored);
-    for (int y = 20; y < 36; ++y)
-        for (int x = 18; x < 42; ++x)
-            SC64_GRID_SET(explored, x + y * MAP_COLS, 1);
-    failures += compare_game_render("fog", 0);
-
-    SC64_GRID_CLEAR(visible);
+    /* Exercise visibility through the normal exploration lifecycle so the
+     * minimap change tracking sees the same transitions as production. */
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE) {
+            u[i].x = 512; u[i].y = 512;
+        }
     update_exploration();
+    failures += compare_game_render("fog lifecycle", 0);
+    failures += compare_game_render("fog lifecycle", 1);
+
     u[0].selected = 1;
     mode = MODE_BUILD;
     box_state = 2;
@@ -363,11 +389,93 @@ test_consecutive_viewport_edge_frames(void)
     return failures;
 }
 
+#if defined(SC64_FRAME_TEST_CUSTOM)
+/* Constructed custom starts, not ordinary-input play or a performance test. */
+static int
+custom_frames(const char *label)
+{
+    int failures = 0;
+    u8 initial_walk[sizeof(SC64_WALK_BITS)];
+    static u8 references[4][FB_SIZE];
+    u8 reference_walk[4][sizeof(SC64_WALK_BITS)];
+    memcpy(initial_walk, SC64_WALK_BITS, sizeof(initial_walk));
+    /* Full-clear drawing advances presentation-only walk/facing state. Build
+     * an independent reference sequence, then replay it from the same state. */
+    for (int i = 0; i < 4; ++i) {
+        draw_full_clear_reference(references[i]);
+        memcpy(reference_walk[i], SC64_WALK_BITS, sizeof(initial_walk));
+    }
+    memcpy(SC64_WALK_BITS, initial_walk, sizeof(initial_walk));
+    poison_both_pages();
+    reset_render_caches();
+    for (int i = 0; i < 4; ++i) {
+#ifdef SC64_FRAME_NO_CACHE_DIAGNOSTIC
+        reset_render_caches();
+#endif
+        game_render(); capture(candidate_pixels);
+        if (memcmp(reference_walk[i], SC64_WALK_BITS, sizeof(initial_walk))) {
+            fprintf(stderr, "%s page %d walk/facing state differs\n", label, i);
+            ++failures;
+        }
+        if (memcmp(references[i], candidate_pixels, FB_SIZE)) {
+            fprintf(stderr, "%s page %d differs\n", label, i);
+            ++failures;
+        }
+    }
+    return failures;
+}
+
+static int
+test_custom_matrix(void)
+{
+    int failures = 0;
+    for (int map = 0; map <= SC64_SKIRMISH_IMPORTED_COUNT; ++map)
+        for (int human = 0; human < 3; ++human)
+            for (int bots = 1; bots <= 3; ++bots) {
+                game_init(); race_mode = 1; race_human = human;
+                race_skirmish_map = map; race_bots = bots;
+                for (int i = 0; i < bots; ++i)
+                    race_bot_races[i] = (human + i + 1) % 3;
+                init_state();
+                assert(screen == SCREEN_PLAY && race_mode && race_human == human &&
+                       race_skirmish_map == map && race_bots == bots);
+                for (int i = 0; i < bots; ++i)
+                    assert(race_bot_races[i] == (human + i + 1) % 3);
+                printf("constructed custom map=%d human=%d bots=%d roster=",map,human,bots);
+                for (int i = 0; i < bots; ++i) printf("%s%d",i ? "," : "",race_bot_races[i]);
+                putchar('\n');
+                for (int i = 0; i < 4; ++i) game_update(0, 0);
+                failures += custom_frames("custom start");
+                cx = WORLD_W / 2; cy = WORLD_H / 2;
+                game_update(0, 0);
+                failures += custom_frames("custom scroll");
+                screen = SCREEN_PAUSE;
+                failures += custom_frames("custom pause");
+                screen = SCREEN_PLAY;
+                assert(race_save_game());
+                assert(race_load_game());
+                assert(race_mode && race_human == human && race_skirmish_map == map && race_bots == bots);
+                failures += custom_frames("custom reload HUD");
+            }
+    return failures;
+}
+#endif
+
 int
 main(void)
 {
     int failures;
+    const char *trace_path = getenv("SC64_FRAME_TRACE");
+    if (trace_path) { trace_file = fopen(trace_path, "wb"); assert(trace_file); }
+#if defined(SC64_FRAME_TEST_Z9)
+    puts("constructed host scene: Z9 campaign");
+#elif defined(SC64_Z7_RUNTIME)
+    puts("constructed host scene: Z7 campaign");
+#endif
     gba_init();
+#if defined(SC64_FRAME_TEST_CUSTOM)
+    failures = test_custom_matrix();
+#else
     failures = test_camera_fog_and_overlays();
     failures += test_scene_transitions();
     failures += test_mutation_save_load_and_restart();
@@ -376,7 +484,9 @@ main(void)
 #if defined(SC64_P6_RUNTIME)
     failures += test_p6_doodad_action_cold_warm();
 #endif
+#endif
     if (failures) fprintf(stderr, "Race no-clear coverage failures: %d\n", failures);
     else puts("Race framebuffer coverage: all full-clear comparisons match");
+    if (trace_file && fclose(trace_file)) return 1;
     return failures != 0;
 }
