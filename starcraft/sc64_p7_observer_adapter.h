@@ -365,7 +365,16 @@ typedef struct {
     u8 optical_units[MAX_UNITS], optical_unit_masks[MAX_UNITS];
     u8 optical_buildings[MAX_BUILDINGS], optical_building_masks[MAX_BUILDINGS];
     unsigned unit_count, building_count, optical_unit_count, optical_building_count;
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+    u16 optical_cells[16];
+    u8 optical_masks[16];
+#endif
 } Sc64P7DetectorLists;
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+typedef Sc64P7DetectorLists Sc64P7DetectorSnapshot;
+#else
+typedef const Sc64P7DetectorLists Sc64P7DetectorSnapshot;
+#endif
 
 /* The source-owner mapping and actor visibility inputs do not change within
  * one cache source tick. Preserve the invalid-source fallback's comparison
@@ -385,6 +394,9 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
     for(unsigned i=0;i<8;++i) map[i]=race_protoss_source_owner(i);
     lists->unit_count=lists->building_count=0;
     lists->optical_unit_count=lists->optical_building_count=0;
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+    memset(lists->optical_cells,0,sizeof(lists->optical_cells));
+#endif
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
@@ -419,13 +431,19 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
 
 #ifdef SC64_DIAGNOSTIC_SETUP
 volatile u32 sc64_optical_unit_cycles, sc64_optical_building_cycles, sc64_optical_refresh_count;
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+volatile u32 sc64_optical_memo_hits, sc64_optical_memo_misses;
+#endif
 #endif
 
 static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
-        const u8 powered_cannons[MAX_BUILDINGS], const Sc64P7DetectorLists *lists)
+        const u8 powered_cannons[MAX_BUILDINGS], Sc64P7DetectorSnapshot *lists)
 {
     unsigned visible_owners=0,detected=0;
     int x,y,col,row,cx,cy, human_slot=sc64_p7_optical_human_slot();
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+    unsigned memo_key=0, memo_index=0; int memo_hit=0;
+#endif
     if(target<0||target>=MAX_UNITS||!u[target].alive) return 0;
     x=u[target].x; y=u[target].y; col=x/16; row=y/16;
     if(col<0||row<0||col>=MAP_COLS||row>=MAP_ROWS) return 0;
@@ -441,10 +459,27 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     {
         int cell=col+row*MAP_COLS;
         if(human_slot>=0 && SC64_GRID_GET(visible,cell)) visible_owners|=1u<<(unsigned)human_slot;
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+        /* Visibility depends on the cell center and an immutable same-tick
+         * actor/owner/grid snapshot. Detector geometry remains per-target. */
+        if (lists) {
+            memo_key=(unsigned)cell+1u;
+            memo_index=((unsigned)cell ^ ((unsigned)cell>>4)) & 15u;
+            if (lists->optical_cells[memo_index]==memo_key) {
+                visible_owners=lists->optical_masks[memo_index]; memo_hit=1;
+            }
+        }
+#endif
     }
 #ifdef SC64_DIAGNOSTIC_SETUP
     u32 optical_diag_start=gba_clock();
     ++sc64_optical_refresh_count;
+#endif
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+#ifdef SC64_DIAGNOSTIC_SETUP
+    if (lists) { if (memo_hit) ++sc64_optical_memo_hits; else ++sc64_optical_memo_misses; }
+#endif
+    if (memo_hit) goto optical_visibility_ready;
 #endif
     for(int k=0;k<(lists?(int)lists->optical_unit_count:MAX_UNITS);++k) {
         int i=lists?lists->optical_units[k]:k;
@@ -516,6 +551,13 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     }
 #ifdef SC64_DIAGNOSTIC_SETUP
     sc64_optical_building_cycles+=gba_clock()-optical_diag_start;
+#endif
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+    if (lists) {
+        lists->optical_cells[memo_index]=(u16)memo_key;
+        lists->optical_masks[memo_index]=(u8)visible_owners;
+    }
+optical_visibility_ready:
 #endif
     for(int k=0;k<(lists?(int)lists->unit_count:MAX_UNITS);++k) {
         int i=lists?lists->units[k]:k;
@@ -621,6 +663,9 @@ static void sc64_p7_arbiter_cache_source_tick(void)
     u32 arbiter_diag_start=gba_clock();
     sc64_arbiter_detect_cycles=0;
     sc64_optical_unit_cycles=sc64_optical_building_cycles=sc64_optical_refresh_count=0;
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+    sc64_optical_memo_hits=sc64_optical_memo_misses=0;
+#endif
 #endif
     u8 powered_cannons[MAX_BUILDINGS];
     int powered_cannons_ready=0;
@@ -827,6 +872,9 @@ sc64_p7_arbiter_cache_process_due(void)
 #ifdef SC64_DIAGNOSTIC_SETUP
     sc64_arbiter_reset_cycles=sc64_arbiter_aura_cycles=sc64_arbiter_update_cycles=sc64_arbiter_detect_cycles=0;
     sc64_optical_unit_cycles=sc64_optical_building_cycles=sc64_optical_refresh_count=0;
+#ifdef SC64_P7_OPTICAL_CELL_MEMO
+    sc64_optical_memo_hits=sc64_optical_memo_misses=0;
+#endif
 #endif
     /* The first ordinary play tick runs after map setup and target-index
        construction, before this tick's unit orders. Menu launch itself is
