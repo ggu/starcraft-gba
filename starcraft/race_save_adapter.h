@@ -1569,8 +1569,11 @@ static int race_save_game(void) {
      * alone is not an Egg discriminator for an ordinary legacy actor. */
     if (!race_z7_active() && race_shared_egg_context()
 #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
-        && !(race_mode || race_z8_active() ||
-             race_zl_active())
+        && !(race_mode || race_z8_active() || race_zl_active()
+#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
+             || race_selected_mission==SC64_RACE_MISSION_Z1
+#endif
+             )
 #endif
        )
         for (int i=0;i<MAX_UNITS;++i)
