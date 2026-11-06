@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Run the experimental ares frontend with an isolated ROM copy and save path."""
 import argparse,hashlib,json,os,pathlib,shutil,subprocess,sys
-P=argparse.ArgumentParser();P.add_argument('--binary',type=pathlib.Path,required=True);P.add_argument('--source',type=pathlib.Path,required=True);P.add_argument('--moltenvk',type=pathlib.Path,required=True);P.add_argument('--rom',type=pathlib.Path,required=True);P.add_argument('--output',type=pathlib.Path,required=True);P.add_argument('--scenario',choices=('neutral','tap','start','mission','advance','calibrate'),required=True);P.add_argument('--frames',type=int,default=24);a=P.parse_args()
+P=argparse.ArgumentParser();P.add_argument('--binary',type=pathlib.Path,required=True);P.add_argument('--source',type=pathlib.Path,required=True);P.add_argument('--moltenvk',type=pathlib.Path,required=True);P.add_argument('--rom',type=pathlib.Path,required=True);P.add_argument('--output',type=pathlib.Path,required=True);P.add_argument('--scenario',choices=('neutral','tap','start','mission','advance','calibrate','select','select2','select3','select4','build','grid'),required=True);P.add_argument('--frames',type=int,default=24);a=P.parse_args()
 if not 1<=a.frames<=9000:P.error('frames must be 1..9000')
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 if subprocess.check_output(['git','-C',str(a.source),'rev-parse','HEAD'],text=True).strip()!='0aafd85789215e84e1e43415c07d4c88461b7899':raise SystemExit('wrong source revision')
