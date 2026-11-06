@@ -4444,6 +4444,9 @@ sc64_direct_attack_issue_target(int target)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
         if (sc64_race_raw_unit(q->type)==12) q->work_timer&=~7;
 #endif
+        if (IS_WORKER(q->type) &&
+            (q->order == ORDER_MINE || q->order == ORDER_GAS))
+            q->work_timer = 0;
 #ifdef SC64_WORKER_CARGO_KIND
         sc64_worker_gather_pending_set(q, 0);
 #endif
@@ -6058,6 +6061,9 @@ start_build(int type)
 	minerals += cost;
 	return;
     }
+    if (IS_WORKER(u[i].type) &&
+        (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
+        u[i].work_timer = 0;
     u[i].order = ORDER_BUILD;
     u[i].target = slot;
     u[i].tx = px;
