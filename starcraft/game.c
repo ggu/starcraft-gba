@@ -13611,6 +13611,11 @@ static int race_scarab_probe_target_info(int ref,int *raw,int *x,int *y,int *own
 /* The engine stores integer HP/shields, so fractional residue cannot survive
  * this call. Keep all source division and armor work in Q8 until that boundary. */
 static void race_scarab_probe_hit(int target,unsigned packet_q8,int owner) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    if(target<0 || target>=MAX_UNITS+MAX_BUILDINGS || packet_q8>INT_MAX)return;
+    hit_target_impl_ex(target,(int)packet_q8,U_REAVER,owner,SC64_STOCK_DMG_NORMAL,
+                        SC64_HIT_PACKET_Q8|SC64_HIT_ALLOW_SPLASH_BURROW);
+#else
     int *shield,armor,shield_loss,hp_loss;unsigned absorbed,armor_q8;
     if(sc64_siege_hidden_or_immune(target))return;
     if(target<MAX_UNITS) {shield=&u[target].shield;armor=u[target].armor+sc64_unit_armor_upgrade_level(&u[target]);}
@@ -13625,6 +13630,7 @@ static void race_scarab_probe_hit(int target,unsigned packet_q8,int owner) {
     if(shield_loss)*shield-=shield_loss;
     if(hp_loss)hit_target_impl_ex(target,hp_loss,U_REAVER,owner,SC64_STOCK_DMG_NORMAL,
                                  SC64_HIT_PRECOMPUTED_HP|SC64_HIT_ALLOW_SPLASH_BURROW);
+#endif
 }
 static void race_scarab_probe_bullet_resolve(const Sc64ImpactEvent *row) {
     Sc64ScarabImpact packet;

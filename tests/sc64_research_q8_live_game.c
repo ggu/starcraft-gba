@@ -101,8 +101,44 @@ static void buildings_and_lifetime(void)
     sc64_pr_hp_debt[v]=128;init_state();
     for(unsigned n=0;n<sizeof sc64_pr_hp_debt;++n)assert(!sc64_pr_hp_debt[n]);
 }
+static void carrier_return_repair(void)
+{
+    game_init();race_mode=0;race_selected_mission=SC64_P7_GLOBAL_ID;init_state();
+    memset(u,0,sizeof u);memset(b,0,sizeof b);
+    memset(invincible_units,0,sizeof invincible_units);
+    memset(invincible_buildings,0,sizeof invincible_buildings);
+    int carrier=actor(SIDE,72,200,200),victim=actor(ENEMY,0,300,200);
+    assert(race_p7_carrier_training_stock(carrier,1)==1);
+    int child=-1;for(int n=0;n<MAX_UNITS;++n)
+        if(u[n].alive&&u[n].type==U_P7_INTERCEPTOR&&u[n].build==carrier)child=n;
+    assert(child>=0&&race_p7_flight_release(carrier,victim));
+    u[child].shield=0;u[child].armor=10;
+    hit_target_impl(child,1,U_MARINE,ENEMY,SC64_STOCK_DMG_NORMAL);
+    assert(hp_q8(child)==40*256-128);
+    for(unsigned n=0;n<600 && sc64_p7_carrier_child_state(&u[child])!=SC64_P7_INTERCEPTOR_INSIDE;++n) {
+        if(frame%5!=4)race_p7_interceptor_flight_source_tick();
+        race_p7_interceptor_flight_frame_move();++frame;
+    }
+    assert(sc64_p7_carrier_child_state(&u[child])==SC64_P7_INTERCEPTOR_INSIDE);
+    assert(hp_q8(child)==40*256 && u[child].shield==40 && !u[child].shield_remainder);
+    assert(race_p7_flight_release(carrier,victim)&&hp_q8(child)==40*256);
+}
+static void p6_fractional_splash(void)
+{
+    game_init();race_mode=0;
+    for(int n=0;n<SC64_RACE_MAP_COUNT;++n)
+        if(!strcmp(sc64_race_maps[n].mission_id,"P6"))race_selected_mission=n;
+    init_state();assert(race_p6_active());
+    memset(u,0,sizeof u);memset(b,0,sizeof b);
+    memset(invincible_units,0,sizeof invincible_units);
+    memset(invincible_buildings,0,sizeof invincible_buildings);
+    int v=actor(SIDE,65,500,500);u[v].shield=0;
+    assert(race_p6_combat_apply_explosive(v,10,4,U_P6_INFESTED_TERRAN,ENEMY));
+    assert(hp_q8(v)==100*256-192); /* (2.5 - 1 armor) * 1/2. */
+}
 int main(void)
 {
     gba_init();shield_and_hp_packets();shared_special_routes();buildings_and_lifetime();
+    carrier_return_repair();p6_fractional_splash();
     puts("actual shared fractional damage, plasma armor, splash, regen and lifecycle HOST stage: PASS");return 0;
 }
