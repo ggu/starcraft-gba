@@ -16,6 +16,10 @@ int main(void)
 {
     int actor_max=0,actor_max_type=-1,building_max=0,building_max_type=-1;
     memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    /* Known raw slot zero is meaningful only under an active P7 binding. */
+    race_mode=0; race_selected_mission=SC64_P7_GLOBAL_ID;
+#endif
     u[0].alive=1; u[0].owner=ENEMY; u[0].raw_owner=0;
     const int invalid[]={INT_MIN,INT_MAX,-1,SC_RU_COUNT,SC_RB_COUNT};
     for(int type=0;type<SC_RU_COUNT;++type) {
