@@ -1,8 +1,11 @@
 #ifndef SC64_VISIBILITY_H
 #define SC64_VISIBILITY_H
 #include "sc64_scarab_presence.h"
-#ifdef SC64_Z8_RUNTIME
+#if defined(SC64_Z8_RUNTIME) || defined(SC64_SOURCE_SIGHT_ALL_RACES)
 #include "sc64_source_sight_tiles.h"
+#endif
+#if defined(SC64_SOURCE_SIGHT_ALL_RACES) && !defined(SC64_RACES)
+#error "shared source sight requires SC64_RACES"
 #endif
 
 #if defined(SC64_Z7_SIGHT_SPANS) && \
@@ -21,10 +24,12 @@
  * gives every human actor its BWAPI sight radius, so it uses them whenever
  * the 56/72 spans are enabled. */
 #if defined(SC64_Z7_SIGHT_SPANS) || \
-    (defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS))
+    ((defined(SC64_T4_RUNTIME) || defined(SC64_SOURCE_SIGHT_ALL_RACES)) && defined(SC64_VISIBILITY_SPANS))
 #define SC64_SOURCE_SIGHT_SPANS 1
 #ifdef SC64_Z7_SIGHT_SPANS
-#if defined(SC64_Z9_RUNTIME)
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+#define SC64_SOURCE_SIGHT_SPANS_ACTIVE() 1
+#elif defined(SC64_Z9_RUNTIME)
 #define SC64_SOURCE_SIGHT_SPANS_ACTIVE() \
     (race_z7_active() || race_z8_active() || race_zl_active())
 #elif defined(SC64_Z8_RUNTIME)
@@ -40,7 +45,26 @@
 #endif
 #endif
 
-#if defined(SC64_T4_RUNTIME) && !defined(SC64_Z7_SOURCE_SIGHT)
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+/* Unfinished non-morphing structures reveal four source tiles. Morphing
+ * structures retain their predecessor's source sight until completion. */
+static int sc64_shared_building_visibility_key(const Building *q)
+{
+    if (!q || !q->alive || !q->under_construction) return q ? q->type : 0;
+    if (q->type == B_LAIR) return B_HATCHERY;
+    if (q->type == B_HIVE) return B_LAIR;
+    if (q->type == B_GREATER_SPIRE) return B_SPIRE;
+    if (q->type == B_SUNKEN_COLONY || q->type == B_SPORE_COLONY) return B_CREEP_COLONY;
+    if (q->type == B_CREEP_COLONY) {
+        if (q->raw_type == sc64_race_raw_building(B_SUNKEN_COLONY)) return B_CREEP_COLONY;
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+        if (q->flags & (SC64_Z7_SUNKEN_MORPH_FLAG | SC64_Z7_SPORE_MORPH_FLAG)) return B_CREEP_COLONY;
+#endif
+    }
+    return -(q->type + 1);
+}
+#define SC64_BUILDING_VISIBILITY_KEY(q) sc64_shared_building_visibility_key(q)
+#elif defined(SC64_T4_RUNTIME) && !defined(SC64_Z7_SOURCE_SIGHT)
 /* BW gives an unfinished grounded building four tiles of sight unless it is
  * morphing; the Terran runtime has no in-place building morphs. The snapshot
  * stores that state as -(type+1), so removal uses the same radius even if
@@ -114,6 +138,17 @@ static void sc64_minimap_explored_add(int cell);
 #define SC64_MINIMAP_VISIBLE_ADD(cell) (++sc64_minimap_visible[sc64_minimap_cell(cell)])
 #define SC64_MINIMAP_VISIBLE_REMOVE(cell) (--sc64_minimap_visible[sc64_minimap_cell(cell)])
 #define SC64_MINIMAP_EXPLORED_ADD(cell) (++sc64_minimap_explored[sc64_minimap_cell(cell)])
+#endif
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+/* A cell that is currently seen is necessarily remembered after sight leaves. */
+#define SC64_SIGHT_RECORD_VISIBLE(cell) do { \
+    if (!SC64_GRID_GET(explored, (cell))) { \
+        SC64_GRID_SET(explored, (cell), 1); \
+        SC64_MINIMAP_EXPLORED_ADD(cell); \
+    } \
+} while (0)
+#else
+#define SC64_SIGHT_RECORD_VISIBLE(cell) ((void)0)
 #endif
 static Sc64VisibilitySnapshot sc64_unit_visibility[MAX_UNITS];
 static Sc64VisibilitySnapshot sc64_building_visibility[MAX_BUILDINGS];
@@ -195,7 +230,7 @@ sc64_visibility_source_change(int cell, int add)
     unsigned count = sc64_visibility_source_count(cell);
     if (add) {
         if (!count) {
-            SC64_MINIMAP_VISIBLE_ADD(cell);
+            SC64_MINIMAP_VISIBLE_ADD(cell); SC64_SIGHT_RECORD_VISIBLE(cell);
             SC64_GRID_SET(visible, cell, 1);
         }
         ++count;
@@ -249,7 +284,7 @@ sc64_visibility_same(const Sc64VisibilitySnapshot *old, int active,
         (old->x == x && old->y == y && old->type == type));
 }
 
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SOURCE_SIGHT_ALL_RACES)
 static int __attribute__((noinline))
 sc64_actor_unit_sight_pixels(int type)
 {
@@ -270,7 +305,10 @@ sc64_actor_unit_sight_pixels(int type)
     if (race_zl_active()) return sc64_source_sight_raw_pixels(sc64_race_raw_unit(type));
 #endif
 #ifdef SC64_T4_RUNTIME
-    return sc64_race_t4_sight_source_pixels(type);
+    { int pixels = sc64_race_t4_sight_source_pixels(type); if (pixels) return pixels; }
+#endif
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    return sc64_source_sight_raw_pixels(sc64_race_raw_unit(type));
 #else
     return 0;
 #endif
@@ -303,7 +341,11 @@ sc64_actor_building_sight_pixels(int type)
 #ifndef SC64_Z7_SOURCE_SIGHT
     if (type < 0) return 4 * 32;
 #endif
-    return sc64_race_t4_building_sight_source_pixels(type);
+    { int pixels = sc64_race_t4_building_sight_source_pixels(type); if (pixels) return pixels; }
+#endif
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    if (type < 0) return 4 * 32;
+    return sc64_source_sight_raw_pixels(sc64_race_raw_building(type));
 #else
     return 0;
 #endif
@@ -354,8 +396,9 @@ sc64_t4_adjust_visibility_source(int x, int y, int radius, int delta)
                     sc64_visibility_source_change(cell, delta > 0);
 #else
                     if (delta > 0) {
-                        if (!sc64_visible_sources[cell])
-                            SC64_MINIMAP_VISIBLE_ADD(cell);
+                        if (!sc64_visible_sources[cell]) {
+                            SC64_MINIMAP_VISIBLE_ADD(cell); SC64_SIGHT_RECORD_VISIBLE(cell);
+                        }
                         if (sc64_visible_sources[cell] != 0xff) ++sc64_visible_sources[cell];
                     } else if (sc64_visible_sources[cell]) {
                         --sc64_visible_sources[cell];
@@ -372,7 +415,7 @@ sc64_t4_adjust_visibility_source(int x, int y, int radius, int delta)
 static void GBA_HOT
 sc64_explore_unit(int x, int y, int type)
 {
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SOURCE_SIGHT_ALL_RACES)
     int source_pixels=sc64_actor_unit_sight_pixels(type);
     if(source_pixels>0) {
         sc64_t4_explore_with_radius(x,y,source_pixels/32);
@@ -402,7 +445,7 @@ sc64_explore_unit(int x, int y, int type)
 static void GBA_HOT
 sc64_explore_building(int x, int y, int type)
 {
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SOURCE_SIGHT_ALL_RACES)
     int source_pixels=sc64_actor_building_sight_pixels(type);
     if(source_pixels>0) {
         sc64_t4_explore_with_radius(x,y,source_pixels/32);
@@ -426,7 +469,7 @@ sc64_explore_building(int x, int y, int type)
 static void GBA_HOT
 sc64_adjust_unit_visibility(int x, int y, int type, int delta)
 {
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SOURCE_SIGHT_ALL_RACES)
     int source_pixels=sc64_actor_unit_sight_pixels(type);
     if (source_pixels>0) {
         sc64_t4_adjust_visibility_source(x,y,source_pixels/2,delta);
@@ -452,8 +495,9 @@ sc64_adjust_unit_visibility(int x, int y, int type, int delta)
                     sc64_visibility_source_change(cell, delta > 0);
 #else
                     if (delta > 0) {
-                        if (sc64_visible_sources[cell] == 0)
-                            SC64_MINIMAP_VISIBLE_ADD(cell);
+                        if (sc64_visible_sources[cell] == 0) {
+                            SC64_MINIMAP_VISIBLE_ADD(cell); SC64_SIGHT_RECORD_VISIBLE(cell);
+                        }
                         if (sc64_visible_sources[cell] != 0xFF)
                             sc64_visible_sources[cell]++;
                     } else if (sc64_visible_sources[cell] > 0) {
@@ -544,7 +588,7 @@ sc64_visibility_apply_count_span(int first_cell, int last_cell, int add)
             unsigned low = sc64_visible_sources[cell];
             if (!low && !(sc64_visible_sources_high[(unsigned)cell >> 3] &
                           (1u << ((unsigned)cell & 7)))) {
-                SC64_MINIMAP_VISIBLE_ADD(cell);
+                SC64_MINIMAP_VISIBLE_ADD(cell); SC64_SIGHT_RECORD_VISIBLE(cell);
                 SC64_GRID_SET(visible, cell, 1);
             }
             if (low == 255u)
@@ -586,8 +630,9 @@ sc64_visibility_apply_span(int row, int first, int last, int add)
     for (col = first; col <= last; ++col) {
         int cell = col + row * MAP_COLS;
         if (add) {
-            if (sc64_visible_sources[cell] == 0)
-                SC64_MINIMAP_VISIBLE_ADD(cell);
+            if (sc64_visible_sources[cell] == 0) {
+                SC64_MINIMAP_VISIBLE_ADD(cell); SC64_SIGHT_RECORD_VISIBLE(cell);
+            }
             if (sc64_visible_sources[cell] != 0xFF)
                 sc64_visible_sources[cell]++;
         } else if (sc64_visible_sources[cell] > 0) {
@@ -793,7 +838,7 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                                     sc64_visibility_halfwidth_72;
     }
 #else
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SOURCE_SIGHT_ALL_RACES)
 #ifdef SC64_SOURCE_SIGHT_SPANS
     int source_pixels = sc64_actor_unit_sight_pixels(type);
     if (source_pixels>0) {
@@ -895,8 +940,9 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                     sc64_visibility_source_change(cell, new_in);
 #else
                     if (new_in) {
-                        if (sc64_visible_sources[cell] == 0)
-                            SC64_MINIMAP_VISIBLE_ADD(cell);
+                        if (sc64_visible_sources[cell] == 0) {
+                            SC64_MINIMAP_VISIBLE_ADD(cell); SC64_SIGHT_RECORD_VISIBLE(cell);
+                        }
                         if (sc64_visible_sources[cell] != 0xFF)
                             sc64_visible_sources[cell]++;
                     } else if (sc64_visible_sources[cell] > 0) {
@@ -914,7 +960,7 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
 static void GBA_HOT
 sc64_adjust_building_visibility(int x, int y, int type, int delta)
 {
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SOURCE_SIGHT_ALL_RACES)
     int source_pixels=sc64_actor_building_sight_pixels(type);
     if(source_pixels>0) {
         sc64_t4_adjust_visibility_source(x,y,source_pixels/2,delta);
@@ -939,8 +985,9 @@ sc64_adjust_building_visibility(int x, int y, int type, int delta)
                     sc64_visibility_source_change(cell, delta > 0);
 #else
                     if (delta > 0) {
-                        if (sc64_visible_sources[cell] == 0)
-                            SC64_MINIMAP_VISIBLE_ADD(cell);
+                        if (sc64_visible_sources[cell] == 0) {
+                            SC64_MINIMAP_VISIBLE_ADD(cell); SC64_SIGHT_RECORD_VISIBLE(cell);
+                        }
                         if (sc64_visible_sources[cell] != 0xFF)
                             sc64_visible_sources[cell]++;
                     } else if (sc64_visible_sources[cell] > 0) {

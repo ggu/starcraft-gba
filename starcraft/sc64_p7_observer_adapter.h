@@ -13,7 +13,13 @@
 /* Current roster maxima after source-pixel conversion, including fallbacks.
  * The optional cull is conservative; the exact radius/circle test follows it.
  * tests/sc64_p7_sight_axis_cull.c checks all types and the boundary geometry. */
-enum { SC64_P7_SIGHT_UNIT_AXIS_BOUND=176, SC64_P7_SIGHT_BUILDING_AXIS_BOUND=160 };
+enum { SC64_P7_SIGHT_UNIT_AXIS_BOUND=176,
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+       SC64_P7_SIGHT_BUILDING_AXIS_BOUND=176
+#else
+       SC64_P7_SIGHT_BUILDING_AXIS_BOUND=160
+#endif
+};
 #include "sc64_p7_observer_rules.h"
 #include "sc64_p7_geometry.h"
 #include "sc64_p7_sight_runtime.h"
@@ -72,9 +78,21 @@ static int sc64_p7_observer_owner_sees_cell(int source_owner, int live_owner,
         int dx = cx - b[i].x, dy = cy - b[i].y;
         if (dx < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dx > SC64_P7_SIGHT_BUILDING_AXIS_BOUND ||
             dy < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dy > SC64_P7_SIGHT_BUILDING_AXIS_BOUND) continue;
-        int radius = sc64_p7_observer_sight_radius_runtime(b[i].type, 1);
+        int radius = sc64_p7_observer_sight_radius_runtime(
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+            sc64_shared_building_visibility_key(&b[i]),
 #else
-        int radius = sc64_p7_observer_sight_radius_runtime(b[i].type, 1);
+            b[i].type,
+#endif
+            1);
+#else
+        int radius = sc64_p7_observer_sight_radius_runtime(
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+            sc64_shared_building_visibility_key(&b[i]),
+#else
+            b[i].type,
+#endif
+            1);
         int dx = cx - b[i].x, dy = cy - b[i].y;
 #endif
         if (dx * dx + dy * dy <= radius * radius) return 1;
@@ -433,7 +451,13 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
                 if(race_protoss_source_owner(owner)==b[i].owner) candidate|=1u<<owner;
         }
         if(!(candidate & ~visible_owners)) continue;
-        int radius=sc64_p7_observer_sight_radius_runtime(b[i].type,1);
+        int radius=sc64_p7_observer_sight_radius_runtime(
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+            sc64_shared_building_visibility_key(&b[i]),
+#else
+            b[i].type,
+#endif
+            1);
         if(dx*dx+dy*dy>radius*radius) continue;
         visible_owners|=candidate;
     }
