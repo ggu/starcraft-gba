@@ -138,3 +138,6 @@ test-z6-egg-synthetic-journal:
 test-z6-egg-capacity:
 	$(CLANG) $(Z6_EGG_HOST_FLAGS) tests/sc64_shared_egg_z6_capacity_game.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z6-egg-capacity
 	$(EGG_TEST_BIN_DIR)/sc64-z6-egg-capacity
+.PHONY: test-z5-egg-legacy-reader-build
+test-z5-egg-legacy-reader-build:
+	$(CLANG) $(Z6_EGG_HOST_FLAGS) tests/sc64_z5_egg_legacy_continuation.c tests/sc64_shared_egg_journal_shim.c -o $(EGG_TEST_BIN_DIR)/sc64-z5-egg-legacy-reader
