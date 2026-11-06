@@ -263,10 +263,17 @@ but produced no frame before its original callback timeout. Exact source
 inspection explains that inactive VI returns without calling screen->frame;
 callbacks and run steps must be separately bounded and recorded. A corrected
 probe now produces a genuine 640x240 nonblack Expansion Pak / Rumble Pak
-startup image with paraLLEl-RDP enabled. Startup gaps and 1x1 null-scanout frames
+startup image and then a readable Single-Player / Terran / Episode I main menu
+with paraLLEl-RDP enabled. The root reviewer visually inspected both captures.
+Startup gaps and 1x1 null-scanout frames
 are recorded separately, not treated as game frames. This establishes useful
-capture plumbing, not campaign/skirmish/engine parity or timing. Ordinary input
-and a bounded title/menu/custom capture are the next reference gates.
+capture plumbing and ordinary boot, not campaign/skirmish/engine parity or
+native hardware timing. Observed button polls are logged, but the earlier
+Start/A schedule ran before menu input could visibly respond; it proves no
+menu transition. Next enter a mission/custom game through ordinary emulated
+buttons, capture real gameplay and verify the relevant mechanics visually.
+Processed framebuffer geometry/aspect and emulator renderer equivalence also
+remain separate from asset or behavior parity.
 
 All checks remain local; GitHub Actions is still disabled. No experimental
 release flags or campaign coverage were promoted. The later verified KODAK copy
