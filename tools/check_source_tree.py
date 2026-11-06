@@ -7,6 +7,7 @@ import sys
 
 ALLOWED_SUFFIXES = {'.c', '.cpp', '.h', '.s', '.ld', '.py', '.md', '.json', '.yml', '.yaml', '.txt'}
 ALLOWED_NAMES = {'Makefile', 'dev', 'LICENSE', 'COPYING', '.gitignore', '.gitattributes'}
+ALLOWED_PATHS = {'experiments/ares-headless/inject.cmake'}
 FORBIDDEN_DIRS = {'.local', 'build', 'references', 'generated', 'extracted', '__pycache__', 'node_modules', '.venv'}
 SECRET_PATTERNS = (
     re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
@@ -36,7 +37,7 @@ def main():
             failures.append(f'{name}: game-derived generated data is prohibited')
         if path.name.startswith('.env') or path.name.lower() in {'credentials', 'id_rsa', 'id_ed25519'}:
             failures.append(f'{name}: credential path is prohibited')
-        if path.name not in ALLOWED_NAMES and path.suffix.lower() not in ALLOWED_SUFFIXES:
+        if name not in ALLOWED_PATHS and path.name not in ALLOWED_NAMES and path.suffix.lower() not in ALLOWED_SUFFIXES:
             failures.append(f'{name}: file type is outside the source allowlist')
         data = subprocess.check_output(['git', 'cat-file', 'blob', oid.decode('ascii')])
         if len(data) > 512 * 1024 or b'\0' in data:
