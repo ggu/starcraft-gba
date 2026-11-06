@@ -60,9 +60,9 @@ static int sc64_p7_detector_current_slot(int live_owner, int source_slot)
     return source_slot;
 }
 
-/* Owner-specific optical visibility query. The world maintains a single
- * SIDE grid, so only source slot 7 can reuse it. Other P7 owners are evaluated
- * on demand using the same cell-center circles as sc64_visibility.h. */
+/* Owner-specific optical visibility query. The world maintains one SIDE
+ * grid, bound to the authenticated human source slot. Other source owners are
+ * evaluated on demand using the same cell-center circles as sc64_visibility.h. */
 static int sc64_p7_observer_source_matches(int raw_owner, int live_owner,
                                            int source_raw_owner,
                                            int source_live_owner)
@@ -436,8 +436,8 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
                                   &target_l,&target_t,&target_r,&target_b))
         return 0;
 #endif
-    /* Calculate all non-human source visibility in one actor/building pass;
-       slot 7 uses the engine's authenticated SIDE visibility grid. */
+    /* Calculate non-human source visibility in one actor/building pass;
+       the authenticated human slot uses the SIDE visibility grid. */
     {
         int cell=col+row*MAP_COLS;
         if(human_slot>=0 && SC64_GRID_GET(visible,cell)) visible_owners|=1u<<(unsigned)human_slot;
@@ -960,11 +960,18 @@ static int sc64_p7_observer_can_attack_from(int attacker, int target,
                                             int source_owner)
 {
     if (!SC64_CAN_ATTACK_FROM(attacker, target, live_owner)) return 0;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    source_owner = sc64_p7_detector_current_slot(live_owner,
+        race_protoss_query_slot(source_owner,live_owner));
+#endif
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (!race_protoss_services_active() || !sc64_p7_observer_target_is_cloaked(target)) return 1;
     return sc64_p7_observer_detector_sees(target,source_owner,live_owner);
 #else
-    if (!race_protoss_services_active() || source_owner >= 8 ||
+    if (!race_protoss_services_active() ||
+#ifndef SC64_SOURCE_SIGHT_ALL_RACES
+        source_owner >= 8 ||
+#endif
         !sc64_p7_observer_is_cloaked(
             (unsigned)sc64_p7_observer_target_raw_type(target))) return 1;
     return sc64_p7_observer_target_allowed(
