@@ -66,16 +66,19 @@ older KODAK package. Source merges do not update an already copied ROM.
   leak, roster-tag collision and unsupported-layout admission. Genuine 94bc
   P10/Z9 campaign/custom predecessor journals load in separate consumers;
   earlier feature-on sanitizer and six-profile link evidence remains scoped to
-  that base. Current combined-source flag-off Z9 exactly matches the qualified
-  package. The clean full default suite passes at `04745b48` (1,008 Python
-  tests, 26 skips); its prior missing-header fixture failure is preserved.
+  that base. At the #318 integration point, flag-off Z9 matched the then-qualified
+  package; this does not describe the later #323 binary. The clean full default
+  suite passes at `5b733f16` (1,023 Python tests, 26 skips, plus compiled checks);
+  the prior missing-header fixture failure is preserved.
   **No Forge/Core menus, paid jobs or combat effects are enabled.** Current
   feature-on integration, source-owner policy, active-job persistence, legacy
   migration, runtime stack and gameplay qualification remain open. See the
   [wire audit](audits/2026-11-06-research-wire/README.md).
-  A separate gameplay branch has verified all 228 armor and 130 native weapon
-  upgrade-family IDs against authenticated N64 tables. These facts and the
-  private all-30-campaign policy generator are groundwork, not usable upgrades.
+  **#327 merged** verified family facts for all 228 armor and 130 native weapon
+  IDs, with a private all-30-campaign policy generator. Review fixed base/expansion
+  cost precedence; the authenticated 30-map regeneration still marks all 180
+  selected mission/family price policies supported. The new facts header is
+  unused by the engine. These are groundwork, not usable upgrades.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** warp-start/death sounds, large death effects, remembered
@@ -83,13 +86,21 @@ older KODAK package. Source merges do not update an already copied ROM.
   behavior remain open. Current custom defeat counts the last live owned
   building. Delivered death pixels/timelines were authenticated; their large
   source frames require a paired native presentation check, not guessed scale.
+  The warp-audio audit identifies separate source-indexed clips 528/529 absent
+  from the delivered bank and no foundation-start trigger. The candidate adds
+  a queued creation cue and explicit load/new-match priming; it remains unmerged
+  pending bank, actual sample-request, lifecycle and normal-product qualification.
 - **Native construction reference #317 merged:** fresh ordinary-input N64
   custom gameplay selected a Probe, opened the Pylon menu, placed its green
-  preview and captured the blue-white warp orb. Completion, power boundaries,
+  preview and captured the blue-white warp orb. **#326 merged** adds a fresh
+  completed-Pylon observation with supply 4/9 to 4/17. Power boundaries,
   sound and an actual delivered-GBA render comparison remain open. The
   authored cyan rectangle is only a GBA fallback; it does not establish the
   source-art path's active appearance. See the
   [scoped native audit](audits/2026-11-06-protoss-native-reference/README.md).
+  The [P1/source follow-up](audits/2026-11-06-p1-rescue-native/README.md)
+  separately records the unproven rescue-passive transfer breadth; no native P1
+  rescue was observed, and the custom-game report does not establish that bug.
 - **Performance #313 merged:** late-Zerg uses the existing full-field flags
   already active in other products; the separate monotone shortcut remains off.
   Eight release links, route oracles, clean default checks and 18 HOST warm
