@@ -1213,6 +1213,9 @@ typedef struct {
 #endif
 } Building;
 #endif
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+#include "sc64_protoss_research_jobs.h"
+#endif
 typedef struct {
     int x, y, amount;
 #ifdef SC64_IMPORTED_MISSION

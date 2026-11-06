@@ -1,0 +1,102 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Host-only integration stage for producer-bound custom research. This is not
+ * a save format and must not be enabled in a ROM before job/tag admission,
+ * lifecycle hooks, UI, combat and ordinary-play qualification are complete.
+ * Included after the actual Building definition and race building enums. */
+#ifndef SC64_PROTOSS_RESEARCH_JOBS_H
+#define SC64_PROTOSS_RESEARCH_JOBS_H
+#if !defined(GBA_HOST) || !defined(SC64_RACES) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL)
+#error "Research job integration stage is HOST-only and requires the research journal"
+#endif
+
+/* level = family + 1; queue[0] = compact payer; queue[1] = target level.
+ * queue_count/head and the remaining entries must be zero. These are live
+ * staged fields only, not an authenticated persisted encoding. Campaign
+ * current-controller binding is intentionally unsupported here: raw origin
+ * remains trigger provenance and is not a controller identity. */
+static int sc64_pr_job_family_producer(unsigned family, int type)
+{
+    if (family == SC64_PR_GROUND_ARMOR || family == SC64_PR_GROUND_WEAPONS ||
+        family == SC64_PR_SHIELDS) return type == B_FORGE;
+    if (family == SC64_PR_AIR_ARMOR || family == SC64_PR_AIR_WEAPONS ||
+        family == SC64_PR_SINGULARITY) return type == B_CYBERNETICS_CORE;
+    return 0;
+}
+
+/* Existing generic levels remain floors for both corresponding typed families;
+ * a pending old job blocks new jobs of that group. No shields or range are
+ * invented, and loading an old save does not seed or convert the new levels. */
+static unsigned sc64_pr_effective_level(unsigned family, unsigned typed,
+                                        unsigned legacy_weapons, unsigned legacy_armor)
+{
+    unsigned floor = 0;
+    if (family == SC64_PR_GROUND_WEAPONS || family == SC64_PR_AIR_WEAPONS)
+        floor = legacy_weapons;
+    if (family == SC64_PR_GROUND_ARMOR || family == SC64_PR_AIR_ARMOR)
+        floor = legacy_armor;
+    return typed > floor ? typed : floor;
+}
+
+/* Caller supplies independently checked custom owner activity, power,
+ * prerequisite, scenario maximum and a complete scan for duplicate jobs. */
+static int sc64_pr_job_begin_custom(Building *producer, unsigned owner,
+    unsigned family, Sc64ProtossResearchLevels *levels, int *minerals, int *gas,
+    unsigned max_level, int owner_active, int powered, int prerequisite,
+    int duplicate, unsigned legacy_weapons, unsigned legacy_armor,
+    int legacy_weapons_pending, int legacy_armor_pending)
+{
+    Sc64ProtossResearchQuote quote;
+    unsigned level;
+    if (!producer || !levels || !minerals || !gas || minerals == gas || owner >= SC64_PR_CUSTOM_OWNERS ||
+        family >= SC64_PR_FAMILY_COUNT || !owner_active || !powered || !prerequisite || duplicate ||
+        !producer->alive || producer->under_construction || producer->owner != (int)owner ||
+        !sc64_pr_job_family_producer(family, producer->type) || producer->queue_count ||
+        producer->queue_head || producer->queue_progress || producer->level ||
+        producer->queue[0] || producer->queue[1] || producer->queue[2] ||
+        producer->queue[3] || producer->queue[4] ||
+        !sc64_pr_levels_valid(levels, SC64_PR_CUSTOM_OWNERS) ||
+        legacy_weapons > 2 || legacy_armor > 2) return 0;
+    if ((legacy_weapons_pending && (family == SC64_PR_GROUND_WEAPONS || family == SC64_PR_AIR_WEAPONS)) ||
+        (legacy_armor_pending && (family == SC64_PR_GROUND_ARMOR || family == SC64_PR_AIR_ARMOR))) return 0;
+    level = sc64_pr_effective_level(family, levels->level[owner][family], legacy_weapons, legacy_armor);
+    if (level >= max_level || !sc64_pr_quote(family, level, &quote) ||
+        *minerals < quote.mineral || *gas < quote.gas) return 0;
+    *minerals -= quote.mineral; *gas -= quote.gas;
+    producer->level = family + 1; producer->queue[0] = owner;
+    producer->queue[1] = level + 1; producer->queue_progress = quote.ticks;
+    return 1;
+}
+
+/* Validate before every tick or refund. If ownership changed, callers must
+ * suspend and resolve the original authenticated payer; never use the new
+ * owner's wallet. No mutation occurs for malformed or ambiguous state. */
+static int sc64_pr_job_valid_custom(const Building *p, unsigned payer,
+    const Sc64ProtossResearchLevels *levels, unsigned legacy_weapons,
+    unsigned legacy_armor)
+{
+    Sc64ProtossResearchQuote quote;
+    unsigned family, target;
+    if (!p || !levels || payer >= SC64_PR_CUSTOM_OWNERS || !p->alive ||
+        p->under_construction || p->owner != (int)payer || p->queue_count || p->queue_head ||
+        p->queue[0] != (int)payer || p->queue[2] || p->queue[3] || p->queue[4] ||
+        p->level < 1 || p->level > SC64_PR_FAMILY_COUNT || !p->queue_progress ||
+        !sc64_pr_levels_valid(levels, SC64_PR_CUSTOM_OWNERS) || legacy_weapons > 2 || legacy_armor > 2) return 0;
+    family = (unsigned)p->level - 1; target = (unsigned)p->queue[1];
+    if (!target || !sc64_pr_job_family_producer(family,p->type) ||
+        sc64_pr_effective_level(family,levels->level[payer][family],legacy_weapons,legacy_armor) != target-1 ||
+        !sc64_pr_quote(family,target-1,&quote) || p->queue_progress > quote.ticks) return 0;
+    return 1;
+}
+
+/* Power loss pauses. Completion increments only the authenticated family. */
+static int sc64_pr_job_tick_custom(Building *p, unsigned payer,
+    Sc64ProtossResearchLevels *levels, unsigned legacy_weapons, unsigned legacy_armor, int powered)
+{
+    if (!sc64_pr_job_valid_custom(p,payer,levels,legacy_weapons,legacy_armor)) return -1;
+    if (!powered) return 0;
+    if (--p->queue_progress) return 0;
+    levels->level[payer][(unsigned)p->level-1] = (uint8_t)p->queue[1];
+    p->level=0; p->queue[0]=0; p->queue[1]=0;
+    return 1;
+}
+#endif
