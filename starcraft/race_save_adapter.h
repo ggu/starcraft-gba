@@ -12,7 +12,9 @@ _Static_assert(MAX_BUILDINGS <= 254, "UI save index exceeds one-byte encoding");
 #if !defined(SC64_RACES) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SCARAB_NAMESPACE_STAGE)
 #error "experimental research journal requires normal shared transport profiles"
 #endif
-#define SC64_RESEARCH_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x80000000u)
+#define SC64_RESEARCH_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH(SC64_TRANSPORT_SAVE_VERSION)
+_Static_assert(SC64_SAVE_TAG_BASE_VALID(SC64_TRANSPORT_SAVE_VERSION),
+               "transport tag leaves the historical 0x43 namespace");
 _Static_assert(SC64_RESEARCH_TRANSPORT_SAVE_VERSION != SC64_TRANSPORT_SAVE_VERSION &&
                SC64_RESEARCH_TRANSPORT_SAVE_VERSION != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
                "research journal tag collision");
@@ -2464,6 +2466,8 @@ static int race_save_game(void) {
 }
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
 _Static_assert(sizeof(race_data.buildings[0]) == SC64_PR_ROW_WIDTH, "unsupported research building row");
+_Static_assert(SC64_PR_PAD_TUPLE_VALID(MAX_BUILDINGS,SC64_PR_ROW_WIDTH,SC64_PR_USED_BITS),
+               "unsupported research journal building layout");
 #endif
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {

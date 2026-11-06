@@ -10,6 +10,7 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#include "sc64_save_tag_namespace.h"
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
 #include "sc64_protoss_research_padding.h"
 static Sc64ProtossResearchLevels sc64_experimental_research_levels;
@@ -544,6 +545,8 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 /* The original-art skirmish owns its menus; see field_ui.h. */
 #define SC_DEFAULT_UI 1
 #endif
+_Static_assert(SC64_SAVE_TAG_BASE_VALID(SC64_BASE_SAVE_VERSION),
+               "base save tag leaves the historical 0x43 namespace");
 /* Roster-enabled saves contain identities absent from ordinary profiles.
  * Preserve every existing tag while reserving a separate high-bit namespace.
  * Fail at compile time if a future base tag claims that namespace. */

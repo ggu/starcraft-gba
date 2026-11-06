@@ -20,3 +20,14 @@ research-compat-p10:
 research-compat-z9:
 	@mkdir -p build/compat
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(ZERG_Z9_CANONICAL_FLAGS) $(COMPAT_FLAGS) -DSC64_RESEARCH_TEST_Z9 tests/sc64_research_compat_game.c -o build/compat/z9
+.PHONY: test-sc64-save-tag-namespace
+test-sc64-save-tag-namespace:
+	@mkdir -p build/research-wire
+	$(CLANG) -std=c11 -O2 -Wall -Wextra -Werror tests/sc64_save_tag_namespace.c -o build/research-wire/save-tag-namespace
+	./build/research-wire/save-tag-namespace
+.PHONY: test-sc64-research-layout-compile
+test-sc64-research-layout-compile:
+	@mkdir -p build/research-wire
+	$(CLANG) -std=c11 -Wall -Wextra -Werror -fsyntax-only tests/sc64_research_layout_compile.c
+	@if $(CLANG) -std=c11 -Wall -Wextra -Werror -fsyntax-only -DSC64_TEST_UNSUPPORTED_LAYOUT tests/sc64_research_layout_compile.c >build/research-wire/layout-negative.log 2>&1; then cat build/research-wire/layout-negative.log; exit 1; fi
+	@grep -q 'unsupported research journal building layout' build/research-wire/layout-negative.log
