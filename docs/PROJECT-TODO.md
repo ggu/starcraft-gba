@@ -48,22 +48,34 @@ Fresh recovery results (qualification remains incomplete):
   `0x03005000`; the same derived profile without the stage ends at
   `0x03004f68`. The growth is in hot simulation paths, so no guard reduction or
   unmeasured hot-code relocation was accepted. Per-function stack reports are
-  not dynamic stack proof. P10's historical fact-header reconstruction did not
-  match its required hash and was not substituted; any new table needs fresh
-  qualification.
+  not dynamic stack proof. P10's historical flight fact-header was recovered
+  with the exact required `8d569be8...` hash. The earlier rejected output used
+  the non-flight recipe; it was not substituted. Fresh controller checks pass
+  through paid ammunition and fresh-process impact continuation; the journal
+  matrix and P10 ARM qualification are still pending.
 - The late-Zerg art bank and Z8/Z9 authored program headers were recovered with
   exact recorded hashes. The repaired renderer runner fails on compilation or
   oracle errors and compares indexed frames plus palettes across binaries.
   Z7 and identity-checked Z9 campaign fixtures passed both reference checks and
   paired equality (91 captures each), with frozen source/input hashes unchanged.
-  Expanded Z7 custom fixtures found six full-clear mismatches in both baseline
-  and candidate despite matching paired traces. Preserve both gates and diagnose
-  that disagreement before promotion; no ARM speed improvement is established.
+  Expanded custom fixtures initially found six full-clear mismatches in both
+  baseline and candidate despite matching paired traces. This was a fixture
+  error: drawing mutates walk/facing state, so one static reference cannot cover
+  four successive draws. Independent per-render references now start from the
+  same animation state and compare post-render walk/facing too. The corrected
+  Z7/Z9 custom baseline/candidate pairs pass (384 captures each, all available
+  maps/human races and 1/3 AI rosters). Adding the 2-AI cases, final production
+  dispatch parity, default checks and ARM measurements remain pending; no ARM
+  speed improvement is established.
 - The current Z8 controller pair reproduced fault-free losses: common service
   at frame 11,048 and service-off at 21,782. The first sampled state difference
   is an additional Egg, consistent with the intended lifecycle, not proof of a
-  defect. Defense/command telemetry is next; no enemy or objective tuning and
-  no new qualified campaign win follows from these results.
+  defect. Trace-identical telemetry found defenders initially outside weapon
+  range and selection/chasing commands consuming substantial simulation time.
+  Count-only, target-only and combined controller trials failed to win; the
+  failed changes were reverted and evidence retained. See the
+  [Z8 bounded audit](audits/2026-11-06-z8-controller-baseline/README.md).
+  No enemy/objective tuning or new qualified campaign win follows.
 - The user confirmed the screen is unlocked. After reconnecting, native text
   access worked but screenshot capture timed out; N64 gameplay comparison is
   still unavailable. Disk remains above 149 GiB free during these checks.
