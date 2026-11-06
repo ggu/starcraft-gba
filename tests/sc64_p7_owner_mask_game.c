@@ -188,7 +188,7 @@ static void optical_source_masks(void)
             if(live>=0 && live==owner) expected=1u<<(unsigned)source;
         } else for(unsigned i=0;i<7;++i)
             if(map[i]==owner) expected|=1u<<i;
-        assert(sc64_p7_optical_source_mask(source,owner,map)==expected);
+        assert(sc64_p7_optical_source_mask(source,owner,map,7)==expected);
     }
 }
 

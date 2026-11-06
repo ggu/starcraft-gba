@@ -90,6 +90,34 @@ static void all_mapped_stock_sight(void)
     assert(sc64_actor_building_sight_pixels(B_ZL_KHAYDARIN_FORMATION)==320);
 #endif
 }
+#if defined(SC64_P7_OBSERVER_ENABLED) && defined(SC64_P10_RUNTIME)
+static void p10_owner_detection(void)
+{
+    int map[8];u8 powered[MAX_BUILDINGS]={0};
+    race_mode=0;race_selected_mission=SC64_P10_GLOBAL_ID;
+    assert(sc64_p7_optical_human_slot()==1);
+    for(unsigned i=0;i<8;i++)map[i]=race_protoss_source_owner(i);
+    assert(map[1]==SIDE && map[7]>=0 && map[7]!=SIDE);
+    assert(sc64_p7_optical_source_mask(-1,map[7],map,1)&(1u<<7));
+    reset_sight();
+    u[0].alive=1;u[0].type=U_MARINE;u[0].raw_type=0;u[0].owner=map[0];u[0].raw_owner=0;u[0].x=u[0].y=520;
+    u[1].alive=1;u[1].type=U_P7_OBSERVER;u[1].raw_type=84;u[1].owner=SIDE;u[1].raw_owner=1;u[1].x=u[1].y=520;
+    u[2]=u[1];u[2].owner=map[7];u[2].raw_owner=7;
+    int cell=32+32*MAP_COLS;
+    assert(!sc64_p7_observer_owner_sees_cell(1,SIDE,cell));
+    assert(sc64_p7_observer_owner_sees_cell(7,map[7],cell));
+    assert(sc64_p7_arbiter_detected_mask(0,powered)==(1u<<7));
+    Sc64P7DetectorLists lists;sc64_p7_detector_lists_build(&lists);
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==(1u<<7));
+    SC64_GRID_SET(visible,cell,1);
+    assert(sc64_p7_observer_owner_sees_cell(1,SIDE,cell));
+    assert(sc64_p7_arbiter_detected_mask(0,powered)==((1u<<1)|(1u<<7)));
+    sc64_p7_detector_lists_build(&lists);
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==((1u<<1)|(1u<<7)));
+    u[2].raw_owner=-1;sc64_p7_detector_lists_build(&lists);
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)&(1u<<7));
+}
+#endif
 static void save_roundtrip(void)
 {
     static u8 expected_visible[sizeof visible], expected_explored[sizeof explored];
@@ -108,6 +136,9 @@ int main(void)
     unit_test(7,112);unit_test(41,112);unit_test(64,128);unit_test(65,112);unit_test(84,144);unit_test(12,176);
     building_test(154,176);building_test(156,128);building_test(160,160);building_test(162,176);building_test(106,160);building_test(131,144);
     mixed_test();all_mapped_stock_sight();save_roundtrip();
+#if defined(SC64_P7_OBSERVER_ENABLED) && defined(SC64_P10_RUNTIME)
+    p10_owner_detection();
+#endif
     reset_sight();b[0].alive=1;b[0].owner=ENEMY;b[0].type=B_NEXUS;b[0].raw_type=154;b[0].x=b[0].y=520;
 #ifdef SC64_P7_OBSERVER_ENABLED
     int c=(520+168)/16,r=520/16;
