@@ -3,7 +3,11 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef SC64_BOUNDARY_GAME
+#include SC64_BOUNDARY_GAME
+#else
 #include "../../starcraft/game.c"
+#endif
 #include "../../starcraft/sc64_zp_unit_save.h"
 #include "../../starcraft/sc64_compact_building_save.h"
 #include "../../starcraft/sc64_z7_legacy_envelope_probe.h"
@@ -12,6 +16,13 @@ static _Alignas(Unit) unsigned char old_slot[SC64_Z7_V36_SLOT_BYTES];
 static unsigned char old_copy[SC64_Z7_V36_SLOT_BYTES], forged_copy[SC64_Z7_V36_SLOT_BYTES];
 static Sc64Z7LegacyRowProjectionProbe projection,projection_before;
 static RaceSave detached_world,detached_before;
+#ifdef SC64_PREVIEW_FULL_PREFLIGHT
+static RaceSave detached_valid;
+static Unit live_units_before[MAX_UNITS];
+static Building live_buildings_before[MAX_BUILDINGS];
+static unsigned char preview_sram_before[32768],preview_sram_after[32768];
+extern void guardian_test_snapshot(void *dst);
+#endif
 _Static_assert(offsetof(RaceSave,battlecruiser_shots)-offsetof(RaceSave,minerals_map)==16296u-12884u,
                "common v36/candidate tail is not layout-identical");
 static int z7_map(const void *map) { return race_z7_save_map_valid((const Sc64RaceMap *)map); }
@@ -200,6 +211,9 @@ int main(int argc,char **argv)
     assert(race_z7_save_candidate_valid_for(&detached_world,&detached_world.z7,
            SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS,SC64_Z7_V36_INNER,&auth));
     assert(!memcmp(&detached_world,&detached_before,sizeof(detached_world)));
+#ifdef SC64_PREVIEW_FULL_PREFLIGHT
+    detached_valid=detached_world;
+#endif
     { Unit forged=original;int found=0;
       for(int raw=0;raw<228 && !found;++raw) {
           if(raw==original.raw_type || sc64_race_unit_from_raw(raw)==original.type) continue;
@@ -211,6 +225,35 @@ int main(int argc,char **argv)
              SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS,SC64_Z7_V36_INNER,&auth));
       assert(!memcmp(&detached_world,&detached_before,sizeof(detached_world))); }
     assert(!memcmp(old_slot,old_copy,sizeof(old_slot)));
+#ifdef SC64_PREVIEW_FULL_PREFLIGHT
+    /* Test-only preview deliberately skips record selection: it supplies the
+     * exact predecessor pair to a detached plan and asks the existing full
+     * preflight which boundary it reaches. This cannot admit a real record. */
+    { RaceLoadPlan plan={0};int preflight;
+      gba_init();game_init();race_mode=1;race_human=R_ZERG;race_bots=1;
+      race_skirmish_map=0;race_bot_races[0]=R_PROTOSS;init_state();
+      assert(screen==SCREEN_PLAY && race_mode==1);
+      int old_screen=screen,old_mode=race_mode,old_frame=frame;
+      int old_minerals=minerals,old_gas=gas;
+      guardian_test_snapshot(preview_sram_before);
+      race_data=detached_valid;
+      assert(sc64_stage_save_authenticate(&plan.guardian_auth,&race_data,SC64_Z7_V36_OUTER,
+             race_data.version,&old_pair,1));
+      plan.egg_auth=plan.guardian_auth;
+      memcpy(live_units_before,u,sizeof(u));memcpy(live_buildings_before,b,sizeof(b));
+      fprintf(stderr,"BOUNDARY BEGIN detached full preflight preview\n");
+      preflight=race_load_preflight(&plan);
+      fprintf(stderr,"BOUNDARY full_preflight=%d old_inner=%08lx current_inner=%08lx\n",
+              preflight,(unsigned long)SC64_Z7_V36_INNER,(unsigned long)SAVE_VERSION);
+      assert(!preflight && SAVE_VERSION!=SC64_Z7_V36_INNER);
+      assert(!memcmp(live_units_before,u,sizeof(u)) && !memcmp(live_buildings_before,b,sizeof(b)));
+      assert(screen==old_screen && race_mode==old_mode && frame==old_frame &&
+             minerals==old_minerals && gas==old_gas);
+      guardian_test_snapshot(preview_sram_after);
+      assert(!memcmp(preview_sram_before,preview_sram_after,sizeof(preview_sram_before)));
+      assert(!memcmp(old_slot,old_copy,sizeof(old_slot)));
+    }
+#endif
     puts("detached legacy projection passed Z7 mission validator; forged actor rejected without mutation");
     printf("decoded units=%d alive=%u eggs=%u buildings=%d; derived-encodable units=%u buildings=%u; live weapon nonzero=%u\n",
            MAX_UNITS,alive,eggs,MAX_BUILDINGS,encode_units,encode_buildings,weapon_nonzero);

@@ -22,3 +22,10 @@ campaign-legacy-rows:
 	mkdir -p $(BOUNDARY_OUT)
 	$(CLANG) $(BOUNDARY_HOST_FLAGS) $(filter-out -DSC64_SHARED_ACTOR_ARM_QUALIFICATION,$(ARMQ_STAGE)) $(ARMQ_PROFILE) $(BC_FLAGS) $(ZERG_Z7_RELEASE_FLAGS) -DSC64_Z7_DERIVED_SAVE -DSC64_Z7_LEGACY_ROWS_HOST_PROBE tests/sc64-campaign-save-boundary/rows.c tests/sc64_guardian_journal_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $(BOUNDARY_OUT)/rows
 	$(BOUNDARY_OUT)/rows "$(BOUNDARY_SEED)"
+.PHONY: campaign-legacy-preflight-preview
+campaign-legacy-preflight-preview:
+	test -f "$(BOUNDARY_SEED)"
+	mkdir -p $(BOUNDARY_OUT)
+	python3 tests/sc64-campaign-save-boundary/instrument.py $(BOUNDARY_DIAG_ROOT)
+	$(CLANG) $(BOUNDARY_HOST_FLAGS) $(filter-out -DSC64_SHARED_ACTOR_ARM_QUALIFICATION,$(ARMQ_STAGE)) $(ARMQ_PROFILE) $(BC_FLAGS) $(ZERG_Z7_RELEASE_FLAGS) -DSC64_Z7_DERIVED_SAVE -DSC64_Z7_LEGACY_ROWS_HOST_PROBE -DSC64_PREVIEW_FULL_PREFLIGHT '-DSC64_BOUNDARY_GAME="$(abspath $(BOUNDARY_DIAG_ROOT))/starcraft/game.c"' tests/sc64-campaign-save-boundary/rows.c tests/sc64_guardian_journal_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $(BOUNDARY_OUT)/preflight-preview
+	$(BOUNDARY_OUT)/preflight-preview "$(BOUNDARY_SEED)"
