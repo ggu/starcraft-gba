@@ -57,7 +57,8 @@ def policy(sections):
     if len(version) != 2 or struct.unpack('<H', version)[0] not in (59, 63):
         raise ValueError('unsupported CHK version')
     # This compact policy supports only default upgrade costs/times. OpenBW
-    # reads UPGx after UPGS; reject overrides rather than misprice a job.
+    # reads UPGx after UPGS; flag overrides as unsupported rather than
+    # silently pricing a job with defaults.
     settings = sections[b'UPGS']
     if len(settings) != 598:
         raise ValueError('invalid UPGS length')
