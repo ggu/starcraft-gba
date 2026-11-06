@@ -47,7 +47,9 @@ def inspect(source: Path) -> dict:
             'unit_backed_doodads':sum(q['unit_backed'] for q in doodads),
             'doodad_producer_or_worker':props,'action_rows':len(actions),
             'create_with_properties':counts[11],'create_unit':counts[44],
-            'give_units':len(give),'created_producer_or_worker':created_seeds,
+            'give_units':len(give),'run_ai_script':counts[15],
+            'run_ai_script_at_location':counts[16],
+            'created_producer_or_worker':created_seeds,
             'created_raw_types':dict(sorted(Counter(a['unit'] for a in creates).items())),
             'source3_larva_products':{str(x):allowed(3,x) for x in LARVA_PRODUCTS},
             'source3_hatch_family':{str(x):allowed(3,x) for x in (131,132,133)}}

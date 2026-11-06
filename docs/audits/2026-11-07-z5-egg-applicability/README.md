@@ -14,8 +14,8 @@ manifest and checks input hashes before and after.
   unit-backed doodads; none is a Drone or one of those producers.
 - All 155 retained action rows contain 13 CreateUnitWithProperties actions,
   creating only raw 0 (three), 37 (seven), 101 (two) and 218 (one); there are
-  no CreateUnit (44) or GiveUnitsToPlayer (48) actions. MoveUnit and
-  SetDoodadState do not create or transfer a producer. The listed create
+  no CreateUnit (44), GiveUnitsToPlayer (48), or RunAIScript (15/16) actions.
+  MoveUnit and SetDoodadState do not create or transfer a producer. The listed create
   actions therefore do not seed a Drone or Hatchery/Lair/Hive either.
 - Source slot 3 is the selected human Zerg controller. Its effective PUNI
   denies the inspected ordinary larva products 37, 38, 41, 42, 43, 45, 46
