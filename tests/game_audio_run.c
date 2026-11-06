@@ -175,14 +175,26 @@ static int warp_lifecycle(void)
 {
     fixture();
     game_audio_effects = GAME_AUDIO_EFFECTS_PER_FRAME; /* previous frame was saturated */
+#ifdef SC64_AUDIO_WARP_CUES
+    u32 samples_before = audio_host_samples;
+#endif
     int slot = spawn_build(SIDE, B_PYLON, 60, 60, 1);
     if (slot < 0 || events(GAME_AUDIO_WARP_START)) return fail("foundation cue did not queue");
     observe_next();
     if (events(GAME_AUDIO_WARP_START) != 1) return fail("previous budget suppressed warp start");
+#ifdef SC64_AUDIO_WARP_CUES
+    if (audio_host_samples != samples_before + 1 || audio_host_last_sample != sc64_audio_warp[0])
+        return fail("warp start sample");
+    samples_before = audio_host_samples;
+#endif
     observe_next();
     if (events(GAME_AUDIO_WARP_START) != 1) return fail("warp start repeated");
     b[slot].under_construction = 0; observe_next();
     if (events(GAME_AUDIO_WARP_DONE) != 1 || events(GAME_AUDIO_BUILT)) return fail("warp completion");
+#ifdef SC64_AUDIO_WARP_CUES
+    if (audio_host_samples != samples_before + 1 || audio_host_last_sample != sc64_audio_warp[1])
+        return fail("warp completion sample");
+#endif
     observe_next();
     if (events(GAME_AUDIO_WARP_DONE) != 1) return fail("warp completion repeated");
     b[slot].alive = 0; clear_events();
