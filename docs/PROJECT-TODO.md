@@ -31,8 +31,9 @@ older KODAK package. Source merges do not update an already copied ROM.
   Egg/Carrier/Scarab lifecycles are unchanged; the visual field overlay is off.
 - **Validation and package:** clean local full default suites passed. Actual
   P10 gather, open/wall travel, advisor sample-request and power fixtures pass.
-  Six normal ARM vectors link with the delivered advisor bank and unchanged
-  guards (minimum IWRAM margin 120 bytes, EWRAM 796 bytes). The new four-ROM
+  Normal ARM vectors link with the delivered advisor bank and unchanged
+  guards. The four package builds retain at least 664 bytes to the IWRAM
+  boundary and 796 bytes to the EWRAM boundary. The new four-ROM
   Mac package `StarCraft-GBA-2026-11-06-94bc32f8` has verified 32-MiB ROMs,
   headers, checksums, a player testing guide and 392 compiler-reported dependency
   hashes. Its Zerg9 includes #313; other three ROMs match the cf33 package.
