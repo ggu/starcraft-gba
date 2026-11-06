@@ -6138,3 +6138,5 @@ test-sc64-creation-provenance-t3: build/test-sc64-creation-provenance-t3
 include tests/sc64-menu-repeat/Makefile
 
 include tests/sc64-shared-source-sight/Makefile
+
+include tests/sc64-research-human-binding/Makefile
