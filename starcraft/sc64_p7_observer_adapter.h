@@ -112,21 +112,12 @@ static int sc64_p7_observer_target_raw_type(int target)
 static int sc64_p7_observer_pylon_powers(int cannon, int source_owner,
                                           int live_owner)
 {
-#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) &&
         b[i].type == B_PYLON &&
         sc64_p7_observer_source_matches(RACE_PROTOSS_SLOT(&b[i]), b[i].owner,
                                         source_owner, live_owner) &&
         sc64_p7_in_psi_range(b[cannon].x-b[i].x,b[cannon].y-b[i].y))
         return 1;
-#else
-    for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) &&
-        b[i].type == B_PYLON &&
-        sc64_p7_observer_source_matches(RACE_PROTOSS_SLOT(&b[i]), b[i].owner,
-                                        source_owner, live_owner) &&
-        dist2(b[cannon].x, b[cannon].y, b[i].x, b[i].y) <= 144 * 144)
-        return 1;
-#endif
     return 0;
 }
 
