@@ -51,6 +51,15 @@ static int sc64_p7_optical_human_slot(void)
 #endif
 }
 
+static int sc64_p7_detector_current_slot(int live_owner, int source_slot)
+{
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    int human_slot = sc64_p7_optical_human_slot();
+    if (live_owner == SIDE && human_slot >= 0) return human_slot;
+#endif
+    return source_slot;
+}
+
 /* Owner-specific optical visibility query. The world maintains a single
  * SIDE grid, so only source slot 7 can reuse it. Other P7 owners are evaluated
  * on demand using the same cell-center circles as sc64_visibility.h. */
@@ -61,8 +70,17 @@ static int sc64_p7_observer_source_matches(int raw_owner, int live_owner,
     /* A known querying slot must never absorb another source player's
        unknown or collapsed live-owner records. Unknown query provenance alone
        triggers the documented legacy live-owner fallback. */
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    int human_slot = sc64_p7_optical_human_slot();
+    if (source_raw_owner >= 0 && source_raw_owner < 8) {
+        if (race_protoss_source_owner((unsigned)source_raw_owner) != source_live_owner) return 0;
+        if (source_raw_owner == human_slot) return live_owner == SIDE;
+        return live_owner == source_live_owner && raw_owner == source_raw_owner;
+    }
+#else
     if (source_raw_owner >= 0 && source_raw_owner < 8)
         return raw_owner == source_raw_owner;
+#endif
     return live_owner == source_live_owner;
 }
 
@@ -72,9 +90,13 @@ static int sc64_p7_observer_owner_sees_cell(int source_owner, int live_owner,
 {
     int col = cell % MAP_COLS, row = cell / MAP_COLS;
     int cx = col * 16 + 8, cy = row * 16 + 8;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    if (source_owner >= 0 && source_owner < 8 &&
+        race_protoss_source_owner((unsigned)source_owner) != live_owner) return 0;
+#endif
     if ((source_owner >= 0 && source_owner == sc64_p7_optical_human_slot()) ||
         (source_owner < 0 && live_owner == SIDE))
-        return SC64_GRID_GET(visible, cell);
+        return live_owner == SIDE && SC64_GRID_GET(visible, cell);
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
@@ -368,14 +390,14 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
         !SC64_TRANSPORT_LOADED(&u[i])) {
-        unsigned mask=sc64_p7_optical_source_mask(RACE_PROTOSS_SLOT(&u[i]),u[i].owner,map,human_slot);
+        unsigned mask=sc64_p7_optical_source_mask(sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i])),u[i].owner,map,human_slot);
         if(mask) {
             unsigned n=lists->optical_unit_count++;
             lists->optical_units[n]=(u8)i; lists->optical_unit_masks[n]=(u8)mask;
         }
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive) {
-        unsigned mask=sc64_p7_optical_source_mask(RACE_PROTOSS_SLOT(&b[i]),b[i].owner,map,human_slot);
+        unsigned mask=sc64_p7_optical_source_mask(sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i])),b[i].owner,map,human_slot);
         if(mask) {
             unsigned n=lists->optical_building_count++;
             lists->optical_buildings[n]=(u8)i; lists->optical_building_masks[n]=(u8)mask;
@@ -431,7 +453,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
             !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
             !SC64_TRANSPORT_LOADED(&u[i]))) continue;
-        int source=RACE_PROTOSS_SLOT(&u[i]);
+        int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
 #ifdef SC64_P7_SIGHT_AXIS_CULL
         int dx=cx-u[i].x,dy=cy-u[i].y;
         if(dx < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dx > SC64_P7_SIGHT_UNIT_AXIS_BOUND ||
@@ -462,7 +484,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     for(int k=0;k<(lists?(int)lists->optical_building_count:MAX_BUILDINGS);++k) {
         int i=lists?lists->optical_buildings[k]:k;
         if(!b[i].alive) continue;
-        int source=RACE_PROTOSS_SLOT(&b[i]);
+        int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
 #ifdef SC64_P7_SIGHT_AXIS_CULL
         int dx=cx-b[i].x,dy=cy-b[i].y;
         if(dx < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dx > SC64_P7_SIGHT_BUILDING_AXIS_BOUND ||
@@ -503,7 +525,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         RACE_PROTOSS_RAW(&u[i])==SC64_P7_OBSERVER_RAW)) continue;
-        int source=RACE_PROTOSS_SLOT(&u[i]);
+        int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         int ol,ot,or_,ob;
         int distance=-1;
@@ -526,7 +548,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         int i=lists?lists->buildings[k]:k;
         if(!(b[i].alive && RACE_PROTOSS_RAW(&b[i])==SC64_P7_CANNON_RAW &&
              building_complete(i) && powered_cannons[i])) continue;
-        int source=RACE_PROTOSS_SLOT(&b[i]);
+        int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         int cl,ct,cr,cb;
         int distance=-1;
@@ -553,7 +575,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         int i=lists?lists->units[k]:k;
         if(!(u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
              RACE_PROTOSS_RAW(&u[i])==SC64_OVERLORD_RAW)) continue;
-        int source=RACE_PROTOSS_SLOT(&u[i]);
+        int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
         int ol,ot,or_,ob,distance=-1;
         if(sc64_p7_actor_rect_source(SC64_OVERLORD_RAW,u[i].x,u[i].y,0,
                                      &ol,&ot,&or_,&ob))
@@ -567,7 +589,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         int i=lists?lists->buildings[k]:k;
         if(!(b[i].alive && RACE_PROTOSS_RAW(&b[i])==SC64_SPORE_COLONY_RAW &&
              building_complete(i))) continue;
-        int source=RACE_PROTOSS_SLOT(&b[i]);
+        int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
         int sl,st,sr,sb,distance=-1;
         if(sc64_p7_actor_rect_source(SC64_SPORE_COLONY_RAW,b[i].x,b[i].y,1,
                                      &sl,&st,&sr,&sb))
@@ -747,12 +769,13 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 if (!powered_cannons_ready) {
                     memset(powered_cannons,0,sizeof(powered_cannons));
                     for(j=0;j<MAX_BUILDINGS;++j) if(b[j].alive &&
-                        RACE_PROTOSS_RAW(&b[j])==SC64_P7_CANNON_RAW && building_complete((int)j) &&
-                        RACE_PROTOSS_SLOT(&b[j])>=0 && RACE_PROTOSS_SLOT(&b[j])<8) {
-                        int live=race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&b[j]));
-                        if(live==b[j].owner)
-                            powered_cannons[j]=(u8)sc64_p7_observer_pylon_powers((int)j,
-                                RACE_PROTOSS_SLOT(&b[j]),live);
+                        RACE_PROTOSS_RAW(&b[j])==SC64_P7_CANNON_RAW && building_complete((int)j)) {
+                        int source=sc64_p7_detector_current_slot(b[j].owner,RACE_PROTOSS_SLOT(&b[j]));
+                        if(source>=0 && source<8) {
+                            int live=race_protoss_source_owner((unsigned)source);
+                            if(live==b[j].owner)
+                                powered_cannons[j]=(u8)sc64_p7_observer_pylon_powers((int)j,source,live);
+                        }
                     }
                     sc64_p7_detector_lists_build(&detector_lists);
                     powered_cannons_ready=1;
@@ -878,6 +901,7 @@ static int sc64_p7_observer_detector_sees(int target, int source_owner,
 {
     int target_raw = sc64_p7_observer_target_raw_type(target);
     source_owner = race_protoss_query_slot(source_owner, live_owner);
+    source_owner = sc64_p7_detector_current_slot(live_owner,source_owner);
     if (target_raw < 0 || !sc64_p7_observer_target_optically_visible(
             target, source_owner, live_owner)) return 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED

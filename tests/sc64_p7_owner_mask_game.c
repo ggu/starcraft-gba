@@ -49,6 +49,10 @@ static int reference_matches(int binding,unsigned source,int live,int raw,int un
 {
     int slot=reference_slot(binding,live,raw), mapped=reference_owner(binding,source);
     if (mapped<0 || mapped!=live) return 0;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    /* P7, P8 and generic cases in this oracle all bind the human to slot 7. */
+    if (source==7 && live==SIDE) return 1;
+#endif
     if (slot>=0 && slot<8) return slot==(int)source;
     return unknown_ok && source<7;
 }
