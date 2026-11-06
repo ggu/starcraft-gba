@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Actual game processes and unmodified baseline writer; authored scenes. */
-#define main sc64_unused_flash_fixture_main
+#define SC64_Q8_FLASH_NO_FIXTURE_MAIN
 #include "sc64_q8_flash_game.c"
-#undef main
 #include <stdlib.h>
 #define PHASE_UNITS 160
 #define PHASE_BUILDINGS 100
