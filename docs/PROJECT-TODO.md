@@ -30,16 +30,18 @@ older KODAK package. Source merges do not update an already copied ROM.
   for placement, production and cached/uncached Cannon power. Separate
   Egg/Carrier/Scarab lifecycles are unchanged; the visual field overlay is off.
 - **Validation and package:** the normal Mac package is now
-  `StarCraft-GBA-2026-11-07-c96fc5e2`, combining #323, #328, #329 and #330
-  with unchanged release flags. Four qualified canonical ELFs were reused
+  `StarCraft-GBA-2026-11-07-062acff7`, adding shared stock sight #333 to
+  the earlier #323/#328/#329/#330 package. Four qualified canonical ELFs were reused
   after strict production-source and fresh-main vector equivalence checks
-  against merged `c96fc5e2`. Per-translation-unit dependencies and selected
-  inputs yielded 975 hashes unchanged before/after the six-profile matrix.
+  against merged `062acff7`. Per-translation-unit dependencies and selected
+  inputs yielded 976 hashes unchanged before/after the six-profile matrix.
   The combined source passed clean default checks (1,023 Python tests,
-  26 skips, plus compiled checks) and focused audio/menu/mining fixtures.
-  ROM headers, logos, SRAM signatures and all 40 packaged-file checksums
+  26 skips, plus compiled checks), focused sight/save/detector checks and
+  ordinary-input GBA visual/performance pairs. Earlier audio/menu/mining
+  qualification remains scoped in its audits; it was not all repeated here.
+  ROM headers, logos, SRAM signatures and all 32 packaged-file checksums
   passed independent read-back. The four packaged products retain minimum
-  IWRAM/EWRAM margins of 664/780 bytes; the extra Z7 link retains 336 IWRAM bytes.
+  IWRAM/EWRAM margins of 1,464/780 bytes; the extra Z7 link retains 1,168 IWRAM bytes.
   These are not runtime stack, hardware or frame-rate qualification.
   **KODAK still has the older e9838086 package** until a new physical copy is
   recorded; the card is not currently mounted. Earlier Mac packages remain.
@@ -103,7 +105,13 @@ older KODAK package. Source merges do not update an already copied ROM.
   legacy jobs and inactive/non-Protoss owners' typed levels. These stages are
   **not in main or enabled in a ROM**. Active-job journal work is isolated on
   `codex/shared-research-journal-host-20261107`; the reserved namespace alone
-  does not authorize a writer. Exact shield damage, complete combat integration,
+  does not authorize a ROM writer. At runtime `c98542e2`, constructed P10
+  HOST fresh-process tests now pass genuine normal 0x43, predecessor 0x44,
+  new active-job 0x45 and mixed journals; checksum-invalid and semantic-invalid
+  newer records fall back to the untouched 0x43 predecessor. All 589 pinned
+  inputs remained unchanged. This does not qualify ordinary input, Z9 journals
+  or GBA memory: the HOST receipt array alone exceeds Z9's reserve.
+  Exact shield damage, complete combat integration,
   authenticated persistence and ordinary gameplay remain open.
   The separately reviewed human-binding stage at `344e48de` passes pure and
   actual P1–P10 initialization/wallet/P1 rescue fixtures. P1–P9 human source
@@ -180,16 +188,24 @@ cost rose from 2,294,431 to 2,346,897 cycles across 958 advancing observations
 (2.29% slower). The source-only experiment is preserved on
 `codex/contact-early-current-20261107` at `ded29e3d`; no speed gain shipped.
 
-The shared sight candidate on `codex/custom-fog-sight-audit` addresses a concrete
-P10 custom bug: ordinary Probe sight falls back to 56 GBA pixels instead of the
-authenticated stock radius of 128, and Nexus sight to 112 instead of 176.
-All 228 checked-in sight bytes match the owned N64 units table. The candidate
-also aligns explored cells with actual visibility, incomplete/morphing sight and
-the detector policy. Review caught P10's source-slot-1 human binding and retained
-rescue-origin cases; final common-flag, owner/detector, six-profile and performance
-qualification is pending. This is **unmerged work**, not a delivered fog fix.
+**Shared sight #333 merged as `062acff7`:** normal Probe sight now uses 128
+GBA pixels instead of the generic 56, and Nexus 176 instead of 112. All 228
+checked-in sight bytes match the owned N64 units table. Common race flags apply
+the fix across campaign/custom/Showcase. It aligns explored cells with actual
+visibility, incomplete/morphing sight and the detector policy, including P10's
+source-slot-1 human and retained rescue origins. Focused checks, full clean suite
+and six unchanged guards passed at `ed0dc4ba`; root verified 976 input hashes.
+The same-correct-sight scalar/span replay matched sampled state, fog and full
+displayed pixels/palettes in 958 advancing observations; spans used 19.85% fewer
+mean cycles than scalar code. Against older incorrect short sight, mean cost is
+3.42% higher numerically (world visibility intentionally differs). This is a
+correctness/cost tradeoff, not a shipped overall speedup or 30-fps result.
+An ordinary-button GBA visual pair shows the larger revealed terrain at tick
+800, with matching observed frames and minerals at four checkpoints. Root
+checked all eight captures. The normal Mac package includes this correction.
 Exact N64 border geometry, remembered resources and initial masks on other maps
 are separate questions; larger nominal sight does not prove those behaviors.
+See [the source sight audit](audits/2026-11-07-custom-fog-sight/README.md).
 
 Priority: deliver the verified normal package when KODAK is connected, implement
 usable shared Forge/Core research, reduce measured recurring collision work,
@@ -201,7 +217,7 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-c96fc5e2`:
+- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-062acff7`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The older KODAK package
   is `20261106-e9838086-campaigns`. Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
@@ -269,8 +285,9 @@ Scarab stages, prove native canal timing or change the 29/30 content count.
 
 Priorities are the maintainer's decisions after the [2026-11-06 GPT-6.1 Terra
 audit](audits/2026-11-06-n64-priorities/README.md) and current-code review. This
-round used existing N64 evidence and current source; it ran no fresh emulator
-comparison. Parallel work is appropriate where source ownership and
+prioritization used existing N64 evidence and current source. Later focused
+N64 observations and GBA comparisons are scoped in the audits linked above.
+Parallel work is appropriate where source ownership and
 the serialized native-test lock permit it.
 
 | ID | Priority / state | TODO and reason | Completion evidence required |
