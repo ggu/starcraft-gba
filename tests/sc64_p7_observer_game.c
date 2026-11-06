@@ -116,5 +116,13 @@ int main(void)
     assert(sc64_p7_observer_detector_sees(target,4,ENEMY));
     b[pylon].raw_owner = 0;
     assert(!sc64_p7_observer_detector_sees(target,4,ENEMY));
+    b[pylon].raw_owner = 4;
+    b[cannon].y = b[pylon].y + 79;
+    assert(sc64_p7_observer_pylon_powers(cannon,4,ENEMY));
+    b[cannon].y = b[pylon].y + 80;
+    assert(!sc64_p7_observer_pylon_powers(cannon,4,ENEMY));
+    b[cannon].y = b[pylon].y + 64;
+    b[cannon].x = b[pylon].x + 96;
+    assert(!sc64_p7_observer_pylon_powers(cannon,4,ENEMY));
     return 0;
 }
