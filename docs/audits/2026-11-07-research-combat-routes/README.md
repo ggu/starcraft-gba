@@ -20,6 +20,14 @@ damage pulse. It distinguishes ground from air upgrades, different owners, and
 the human legacy floor from an opponent's typed level. Independent read-only
 review found no actionable defect in these changed integer paths.
 
+At audit-only successor `b0261e89`, the normal feature-off P10 release vector
+rebuilt the exact qualified 32 MiB ROM, SHA-256
+`b1b5edcc37c162028951d8a2ad0f8f5e57f54ef6904734b4d9c547980323061d`.
+The guarded ARM link and independent binary read-back passed in 21.50 seconds,
+with the same 40 private inputs unchanged. This confirms that P10's disabled
+prototype does not alter the packaged binary; it is not feature-on, other-product
+or runtime stack qualification. Private receipts are `.local/research-combat/`.
+
 Run the prepared-input check with
 `make -f Makefile -f tests/sc64-research-combat/Makefile test-sc64-research-combat-routes`.
 The private qualification selected the authenticated current audio bank.
