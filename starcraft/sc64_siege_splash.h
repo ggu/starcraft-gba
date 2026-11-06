@@ -94,7 +94,7 @@ static int sc64_siege_resolve(int target,unsigned packet_q8,int *shield_loss) {
   Unit *v=&u[target];
   const Sc64StockUnitProfile *sp;
   shields=v->shield;
-  armor=v->armor+(v->owner==SIDE?armor_level:0);
+  armor=v->armor+sc64_unit_armor_upgrade_level(v);
   sp=sc64_stock_unit_profile(v->raw_type>=0?v->raw_type:sc64_race_raw_unit(v->type));
   size=sp?sp->size:SC64_STOCK_SIZE_LARGE;
  } else {
