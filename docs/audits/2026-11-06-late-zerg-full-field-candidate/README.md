@@ -1,7 +1,7 @@
 # Late-Zerg full-field candidate
 
-This isolated candidate is based on `cf33a125`, including the unified custom starting-bank,
-worker, audio and source-shaped power changes. Its only production change adds the existing
+This isolated candidate is based on `e3919ec0`, including the unified custom starting-bank,
+worker, audio and source-shaped power changes and the controller-only cleanup. Its only production change adds the existing
 `CANONICAL_ROUTE_INDEX_FLAGS` and `CANONICAL_ROUTE_NEW_CELL_FLAGS` to
 `ZERG_Z7_CANONICAL_FLAGS`. Z8 inherits that vector, and Z9 and Z10 inherit it
 in turn. At normal defaults this selects word clearing, the visited grid and
