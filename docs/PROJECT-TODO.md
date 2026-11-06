@@ -30,19 +30,23 @@ older KODAK package. Source merges do not update an already copied ROM.
   for placement, production and cached/uncached Cannon power. Separate
   Egg/Carrier/Scarab lifecycles are unchanged; the visual field overlay is off.
 - **Validation and package:** the normal Mac package is now
-  `StarCraft-GBA-2026-11-07-062acff7`, adding shared stock sight #333 to
-  the earlier #323/#328/#329/#330 package. Four qualified canonical ELFs were reused
-  after strict production-source and fresh-main vector equivalence checks
-  against merged `062acff7`. Per-translation-unit dependencies and selected
-  inputs yielded 976 hashes unchanged before/after the six-profile matrix.
-  The combined source passed clean default checks (1,023 Python tests,
-  26 skips, plus compiled checks), focused sight/save/detector checks and
-  ordinary-input GBA visual/performance pairs. Earlier audio/menu/mining
-  qualification remains scoped in its audits; it was not all repeated here.
-  ROM headers, logos, SRAM signatures and all 32 packaged-file checksums
-  passed independent read-back. The four packaged products retain minimum
-  IWRAM/EWRAM margins of 1,464/780 bytes; the extra Z7 link retains 1,168 IWRAM bytes.
-  These are not runtime stack, hardware or frame-rate qualification.
+  `StarCraft-GBA-2026-11-07-d3535af6`, adding pending mineral-trip continuation
+  #339 and shared detector optimization #342 to the earlier stock-sight,
+  menu/mining/audio/power package. Four qualified canonical ELFs were reused
+  after confirming production sources/build definitions match merged
+  `d3535af6`. The six normal links froze 908 selected source/private/toolchain
+  hashes against the previously qualified input bundle; root independently
+  rechecked all 908 and all six ELF/map hashes. The packaged P10 is exactly
+  the binary used in the combat and one-AI custom comparisons, with sampled
+  state/fog/full displayed framebuffer/palette parity and 2.782% fewer mean
+  cycles in the one combat window. Clean default checks (1,023 Python tests,
+  26 skips, plus compiled checks) and prepared unified build pass. Broader
+  unified/Terran full-campaign checks lack documented private preparation
+  files and are not claimed. Earlier audio/menu/mining qualification remains
+  scoped in its audits; it was not all repeated here.
+  Headers, logos, SRAM signatures and all 19 payload/metadata checksums passed
+  read-back. Four-product minimum IWRAM/EWRAM margins remain 1,464/780 bytes;
+  extra Z7 retains 1,168 IWRAM bytes. No hardware FPS or stack claim follows.
   **KODAK still has the older e9838086 package** until a new physical copy is
   recorded; the card is not currently mounted. Earlier Mac packages remain.
 - **Creation provenance #323 merged:** shared foundations and ordinary
@@ -168,7 +172,7 @@ older KODAK package. Source merges do not update an already copied ROM.
   `13953e82`). A source-cap bypass through generic research commands was
   repaired for staged custom and campaign play; genuine old completed/pending
   generic jobs remain floors. Campaign/custom sanitizer fixtures pass, and
-  research-off normal P10 reproduces current `8e9f0a0a` bytes. This campaign
+  research-off normal P10 reproduces the qualified `8e9f0a0a` bytes. This campaign
   flag is HOST-only and refuses persistence: campaign job journals, enemy
   controller bindings, exact shields/HP, ordinary play and full product checks
   remain open. The implementation/audit is on [draft #336](https://github.com/ggu/starcraft-gba/pull/336),

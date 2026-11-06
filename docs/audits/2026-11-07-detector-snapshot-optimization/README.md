@@ -13,3 +13,25 @@ The production source `10bda18e` is based on `fd30c5ff` and enables both shortcu
 The unrelated detector-owner union and optical-cell memo remain rejected/default-off: both slowed this workload. The broader 30-fps and all-campaign/race qualification goals remain open.
 
 At runtime `10bda18e`, a clean separate checkout without private inputs passed source-boundary, `./dev doctor`, `./dev build` and `./dev test`; Python discovery reported 1,023 tests and 26 skips, and the complete `./dev test` took 448.1 seconds. Prepared `make unified` also passed using the current warp-audio bank, with 595 copied inputs unchanged. The broader `test-unified` graph could not be executed from the frozen package bundle: its default BC cover directory is absent, and after using the verified cover overlay and marking the existing hash-pinned generated files old, the graph still requires the missing P5 sprite header. The Terran full-campaign test graph similarly requires the missing Terran-late `sc64_races_generated.h` after that overlay. No private inputs were generated or fetched to fill those gaps, and neither broader check is claimed as passing. The targeted P10/Z9 source-sight fixtures and six normal links above are the available prepared-profile evidence.
+
+
+## Qualified Mac package
+
+The private local package `StarCraft-GBA-2026-11-07-d3535af6` reuses the four
+qualified normal ELFs after a zero-diff production-source/build-definition
+comparison against merged `d3535af6`. Root independently read back the 908
+selected inputs, all six ELF/map pairs and exact measured P10 ROM equality.
+All four 32 MiB ROMs pass logo/header/title/code/SRAM checks, and the 19
+payload/metadata files match their checksum list. The local README explains
+product selection, scope and the Protoss custom retest. No SD write occurred.
+
+| Product | SHA-256 |
+| --- | --- |
+| Terran | `00b01425480fb1b01cd4720ce36fe9eba274dc34cde2de351e8909ff743d70f8` |
+| Zerg Z9 | `aee95a66560b5fc5de7ae7dff8d906cd6035ba62eb50c6051ea6a1301b6d1549` |
+| Protoss P10 | `317cc67d8f48b6771b3ebf4497c52b290466de49d097133b7b1bfdea65b34cd9` |
+| Showcase | `8f5bc974319a40ab6abaaff99222db2b4bb16cade5e1f1eb28321ef66f6f34a5` |
+
+These are the normal products: experimental typed research and early shared
+Egg stages remain disabled. The content count remains 29/30, with full current
+campaign, native parity, long custom games and near-30-fps qualification open.
