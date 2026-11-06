@@ -80,3 +80,18 @@ power-loss behavior, or prove flashcart compatibility. Any alternative compact
 encoding must preserve all previously accepted actor, impact, transport, and
 Yamato states, existing guards, and old-tag fallback, and requires independent
 codec, resource, and hardware qualification.
+
+## Profile-sized tail correction
+
+The 400-byte comparison above is a fixed universal-tail experiment. It does
+**not** establish that every affected profile lacks space for its own
+one-byte-per-actor sidecar. The Terran production profile has 192 unit slots
+and 96 building slots, so its profile-sized tail is 288 bytes. Its 296-byte
+worst-case slack fits that tail with eight bytes remaining. This arithmetic
+still requires a new format, existing-record migration, bounded scratch and
+resource verification, and actual serializer and fallback tests; no such
+integration is qualified here. The other five measured profiles have 240 unit
+and 160 building slots. Showcase has room for their 400-byte tail; Z7, Z9,
+Z10 and P10 do not in the maximum-state examples above. Thus, do not summarize
+this result as five profiles being unable to persist actor fractions: it
+establishes only that five cannot accept the **same fixed 400-byte append**.
