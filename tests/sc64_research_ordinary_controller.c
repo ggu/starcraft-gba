@@ -621,6 +621,7 @@ static int prefix(const char *path)
         if(pos<n && ticks[pos]==t) { if((unsigned)frame!=frames[pos]) return 0; held=holds[pos++]; }
         input((u16)held);
     }
+    fprintf(stderr,"PREFIX_CHECK pos=%u n=%u screen=%d mode=%d race=%d bots=%d frame=%d\n",pos,n,screen,race_mode,race_human,race_bots,frame);
     return pos==n && screen==SCREEN_PLAY && race_mode && race_human==R_PROTOSS && race_bots==1;
 }
 int main(int argc,char **argv)
