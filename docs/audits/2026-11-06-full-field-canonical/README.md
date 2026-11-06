@@ -21,8 +21,8 @@ or busy-battle proof. Frozen input and source manifests matched before/after.
 Private logs remain under `build/z7-host-sram-contract/host-full-flood-traces/`
 and `custom-full-flood-v2/`; no private inputs or captures are committed.
 
-Fresh guest continuation is recorded below; guest cycle measurements for this
-exact canonical source remain to be checked. No 30-fps or physical
+Fresh guest continuation and bounded guest cycle measurements for this exact
+canonical source are recorded below. No 30-fps or physical
 hardware claim follows from the HOST results.
 
 All eight normal release-vector control/candidate links for Z7–Z10 passed the
@@ -85,3 +85,16 @@ addresses. The bank verifier decoded all 523 streams with no errors and matched
 `95cd32bed0f45677d176e9afb32a1e8e9dfad0301e45314208f52559e490eb57`.
 This establishes header/blob consistency, not whether live events trigger the
 right sound or whether physical playback is audible.
+
+The bounded guest busy pair was repeated on the exact `31a5ddf8` runtime with
+only test-harness observation, without production attribution hooks. Both
+variants passed seed/tape checks and all sampled workload, selected-state,
+indexed-frame and palette comparisons. Of 1,000 calls, 975 advanced gameplay
+and 25 did not; no text modal was observed. Mean advancing guest cycles changed
+from 2,512,181 to 2,364,928 (5.86% lower), and advancing peaks from 10,106,704
+to 8,650,188. The diagnostic ROM hashes were
+`642fbc113c54419ab4677d01560a2f2b6bfada86d25de467a3f4b95d651d001f` and
+`fa62c957305975ea94c7e8e14039d93218a844057873ebcfd044fb39f7121d88`.
+This sample remains far above the nominal 30-fps budget; it is not a physical
+hardware or general workload result. The subsequent `271db94a` queue change
+requires its own qualification before any current-source promotion.
