@@ -10,3 +10,13 @@ test-sc64-research-z9:
 	@mkdir -p build/research-wire
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_RESEARCH_TEST_Z9 tests/sc64_research_journal_game.c -o build/research-wire/host-z9
 	./build/research-wire/host-z9
+# Compile the same fixture in separate source trees. Supply COMPAT_FLAGS as
+# -DSC64_RESEARCH_COMPAT_PRODUCER for the baseline and as
+# -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL for the consumer.
+.PHONY: research-compat-p10 research-compat-z9
+research-compat-p10:
+	@mkdir -p build/compat
+	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_FLAGS) $(COMPAT_FLAGS) tests/sc64_research_compat_game.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o build/compat/p10
+research-compat-z9:
+	@mkdir -p build/compat
+	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(ZERG_Z9_CANONICAL_FLAGS) $(COMPAT_FLAGS) -DSC64_RESEARCH_TEST_Z9 tests/sc64_research_compat_game.c -o build/compat/z9

@@ -5310,6 +5310,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
+#endif
 #ifdef SC64_TEXT_BOXES
     sc64_text_box_reset();
 #endif

@@ -69,6 +69,31 @@ static void check_custom(void) {
     sc64_experimental_research_levels.level[5][0]=1;
     assert(!race_save_game()); assert(!memcmp(prior_sram,host_save,sizeof(prior_sram)));
 }
+static void press_key(u16 key) { game_update(key,key);game_update(0,0); }
+static void assert_research_clear(void) {
+    Sc64ProtossResearchLevels zero={0};
+    assert(!memcmp(&zero,&sc64_experimental_research_levels,sizeof(zero)));
+}
+static void check_new_match_reset(void) {
+    start_campaign();memset(host_save,0,sizeof(host_save));
+    sc64_experimental_research_levels.level[7][4]=2;
+    assert(race_save_game());memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
+    assert(race_load_game() && sc64_experimental_research_levels.level[7][4]==2);
+    /* Use ordinary front-end input to start a fresh custom match in the same process. */
+    screen=SCREEN_TITLE;race_frontend_reset();
+    press_key(KEY_DOWN);press_key(KEY_A);assert(race_front.page==SC_FRONT_SKIRMISH);
+    press_key(KEY_A);press_key(KEY_A);assert(screen==SCREEN_PLAY && race_mode);
+    assert_research_clear();assert(race_save_game());
+    /* Pause-menu R restarts the current match, without restarting the process. */
+    sc64_experimental_research_levels.level[4][2]=3;
+    screen=SCREEN_PAUSE;press_key(KEY_R);assert(screen==SCREEN_PLAY);assert_research_clear();
+    /* Start a new campaign through its ordinary front-end. */
+    sc64_experimental_research_levels.level[0][0]=2;
+    screen=SCREEN_TITLE;race_frontend_reset();
+    press_key(KEY_A);assert(race_front.page==SC_FRONT_MISSION);
+    press_key(KEY_A);assert(race_front.page==SC_FRONT_BRIEFING);
+    press_key(KEY_START);assert(screen==SCREEN_PLAY && !race_mode);assert_research_clear();
+}
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
 static void check_yamato(void) {
     for (int shot_count=1;shot_count<=2;shot_count++) {
@@ -103,7 +128,7 @@ static void check_yamato(void) {
     }
 }
 #endif
-int main(void) { gba_init(); check_campaign(); check_custom();
+int main(void) { gba_init(); check_campaign(); check_custom(); check_new_match_reset();
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
 check_yamato();
 #endif
