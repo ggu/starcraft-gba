@@ -61,6 +61,10 @@ static u16 previous_held;
 static u32 frames_run;
 static uint64_t cycles_total, cycles_update;
 static u32 cycles_peak, update_peak;
+#ifdef Z7_HOST_FRAME_TRACE
+#include <stdlib.h>
+#include "sc64_z7_host_frame_trace.h"
+#endif
 #ifdef Z7_PEAK_DIAGNOSTIC
 /* Probe context only; never serialized or used to choose gameplay input.
  * 0=boot, 1=recorded tape, 2=HOME load, 3=pause-menu save. */
@@ -230,6 +234,9 @@ static void frame_with(u16 held)
 #endif
     previous_held = held;
     ++frames_run;
+#ifdef Z7_HOST_FRAME_TRACE
+    host_trace_frame();
+#endif
 }
 
 #ifdef Z7_CARGO_DIGEST
@@ -397,6 +404,12 @@ int main(int argc, char **argv)
     if (argc < 2) { fputs("usage: replay SAVE_PAYLOAD\n", stderr); return 2; }
 #endif
     (void)argc; (void)argv;
+#ifdef Z7_HOST_FRAME_TRACE
+    const char *trace_path=getenv("SC64_HOST_FRAME_TRACE");
+    if(!trace_path || !(host_frame_trace=fopen(trace_path,"wb"))) {
+        fputs("HOST frame trace path is required\n",stderr);return 2;
+    }
+#endif
 #else
 int main(void)
 {
@@ -495,6 +508,11 @@ int main(void)
 #ifdef GBA_HOST
 #if defined(Z7_CARGO_DIGEST) && Z7_ARM_MODE == 2
     if (argc > 2 && !host_payload(argv[2], 1)) return 2;
+#endif
+#ifdef Z7_HOST_FRAME_TRACE
+    if(fclose(host_frame_trace))return 2;
+    const char *save_path=getenv("SC64_HOST_FULL_SRAM");
+    if(!save_path || !host_payload(save_path,1))return 2;
 #endif
     return won ? 0 : 1;
 #else

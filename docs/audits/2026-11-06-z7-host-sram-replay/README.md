@@ -272,3 +272,20 @@ part of the source tree. Normal uninstrumented ARM links for both variants of
 Z7, Z8, Z9 and Z10 passed their existing memory guards, but linking does not
 establish gameplay equivalence; Z7 shortcut IWRAM headroom was only 24 bytes.
 The default remains unchanged.
+
+At the first differing call, raw HOST snapshots show the actor arrays identical
+at call 816 and differences in the path coordinates of units 96 and 98 at call
+817. Instrumenting the ordinary ranged cached-point lookup identified its first
+different result: from `(952,1754)` toward `(1032,1672)`, the control had a
+valid point field for goal cell 13376 and returned `(952,1736)`; the shortcut
+had no such field and returned no cached point. The ranged caller can then use a
+different waypoint. This is an observable consequence of skipping field
+allocation, independent of whether the shortcut's immediate movement step
+matches FIFO. A small Z7 route test reproduces that cache-observer difference;
+it records a known incompatibility and is not a release acceptance test.
+
+Four sanitized route-test variants pass, including the new observation fixture,
+blocked multi-root tie, exhausted witness budget with FIFO fallback and recency
+wrap. They do not override the failed complete replay. The diagnostic snapshots
+and query logs remain local under `build/z7-host-sram-contract/host-debug-snapshot/`
+and `host-route-trace/`; the temporary query instrumentation is not shipped.

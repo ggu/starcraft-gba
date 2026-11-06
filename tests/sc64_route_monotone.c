@@ -270,6 +270,11 @@ static void test_blocked_target_cases(void)
                        (scenario == 3 ? 5 : 18) * 16 + 11,
                        (scenario == 3 ? 6 : 13) * 16 + 3);
     }
+    /* Two equally near goal seeds preserve reverse-FIFO tie ordering. */
+    reset_world(); grid_fill(1);
+    grid_set(18, 13, 0); grid_set(17, 13, 0);
+    assert(grid_get(17, 12) && grid_get(17, 14));
+    check_dispatch(5 * 16 + 8, 13 * 16 + 8, 18 * 16 + 11, 13 * 16 + 3);
 }
 
 static void test_random_worlds(void)
@@ -449,6 +454,27 @@ static void test_active_geometry(void)
 #endif
 }
 
+#ifdef TEST_Z7
+/* A minimal reproduction of the observed gameplay regression: a monotone
+ * move returns the correct immediate step but does not populate the point
+ * field subsequently consulted by ranged combat. This test records the
+ * difference, and must not be interpreted as approving the shortcut. */
+static void test_shortcut_changes_range_cache_observation(void)
+{
+    const int x=952,y=1754,tx=1032,ty=1672;
+    int nx=0,ny=0;
+    u32 builds;
+    reset_world(); grid_fill(1); builds=sc64_route_builds;
+    assert(sc64_route_next(x,y,tx,ty,&nx,&ny));
+    assert(sc64_route_builds == builds);
+    assert(!sc64_range_cached_point_step(x,y,tx,ty,&nx,&ny));
+    reset_world(); grid_fill(1);
+    assert(sc64_route_slot((tx/16)+(ty/16)*MAP_COLS) >= 0);
+    assert(sc64_range_cached_point_step(x,y,tx,ty,&nx,&ny));
+    assert(nx==952 && ny==1736);
+}
+#endif
+
 int main(void)
 {
 #ifdef TEST_PARTIAL
@@ -465,6 +491,7 @@ int main(void)
 #endif
     test_active_geometry();
 #ifdef TEST_Z7
+    test_shortcut_changes_range_cache_observation();
     /* Z7 stores 14 packed route planes; an active range job borrows two.
      * Compare the public step against the FIFO oracle in both states. */
     _Static_assert(SC64_ROUTE_SLOTS == 14, "Z7 route plane count changed");
@@ -495,6 +522,29 @@ int main(void)
                            (scenario == 3 ? 6 : 37) * 16 + 3);
         }
     }
+    /* A wide detour makes the 512-iteration monotone witness exhaust its
+     * budget. Public dispatch must fall back to the same independent FIFO
+     * answer, including when the route-age clock is at its wrap boundary. */
+    reset_world(); grid_fill(1);
+    for (int x=0; x<=61; ++x) grid_set(x,30,0);
+    int predecessor=-1; sc64_route_probe_stats stats;
+    assert(sc64_route_monotone_probe(path_walkable, MAP_COLS, MAP_ROWS,
+        MAP_CELLS, bfs_queue, sizeof(bfs_queue), 2+2*MAP_COLS,
+        60+60*MAP_COLS, 512, &predecessor, &stats) == SC64_ROUTE_PROBE_BUDGET);
+    sc64_routes_reset();
+    u32 before_builds=sc64_route_builds;
+    unsigned before_budget=sc64_route_probe_diag.budget;
+    check_dispatch(2*16+8,2*16+8,60*16+8,60*16+8);
+    assert(sc64_route_probe_diag.budget > before_budget);
+    assert(sc64_route_builds == before_builds + 1);
+    /* At wrap the witness deliberately declines, and the FIFO fallback resets
+     * route ages before building the exact same step. */
+    sc64_routes_reset(); sc64_route_clock=SC64_ROUTE_RECENCY_MASK;
+    before_builds=sc64_route_builds; before_budget=sc64_route_probe_diag.budget;
+    check_dispatch(2*16+8,2*16+8,60*16+8,60*16+8);
+    assert(sc64_route_probe_diag.budget == before_budget);
+    assert(sc64_route_builds == before_builds + 1);
+    assert(sc64_route_clock == 1u);
     sc64_routes_reset();
 #endif
     printf("route monotone dispatch OK active=%d builds=%u hits=%u\n",
