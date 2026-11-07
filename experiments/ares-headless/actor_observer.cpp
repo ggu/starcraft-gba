@@ -4,6 +4,7 @@
 #include "visual_capture.h"
 #include "observer_read.h"
 #include "hybrid_contract.h"
+#include "hybrid_snapshot_contract.h"
 #include <fcntl.h>
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Hybrid frontend: official same-process state restoration; no arbitrary guest-memory writes or host-input API.
@@ -130,7 +131,7 @@ int main(int argc,char** argv) {
   if(argc!=5) { std::cerr<<"usage: probe ROM OUTPUT_DIR neutral|tap FRAMES\n"; return 2; }
   std::string scenario=argv[3];
   char* end=nullptr; long frames=std::strtol(argv[4],&end,10);
-  if((scenario!="interactive" && scenario!="neutral" && scenario!="tap" && scenario!="start" && scenario!="mission" && scenario!="advance" && scenario!="calibrate" && scenario!="select" && scenario!="select2" && scenario!="select3" && scenario!="select4" && scenario!="build" && scenario!="grid" && scenario!="custom" && scenario!="customstart" && scenario!="protosssetup" && scenario!="protossstart" && scenario!="protossselect" && scenario!="probe2" && scenario!="probe3") || !end || *end || frames<1 || frames>14000) return 2;
+  if((scenario!="interactive" && scenario!="snapshot" && scenario!="neutral" && scenario!="tap" && scenario!="start" && scenario!="mission" && scenario!="advance" && scenario!="calibrate" && scenario!="select" && scenario!="select2" && scenario!="select3" && scenario!="select4" && scenario!="build" && scenario!="grid" && scenario!="custom" && scenario!="customstart" && scenario!="protosssetup" && scenario!="protossstart" && scenario!="protossselect" && scenario!="probe2" && scenario!="probe3") || !end || *end || frames<1 || frames>14000) return 2;
   std::filesystem::path out=argv[2];
   if(!std::filesystem::is_directory(out) || !std::filesystem::is_directory(out/"saves") ||
      !std::filesystem::is_directory(out/"systems")) return 2;
@@ -190,7 +191,7 @@ int main(int argc,char** argv) {
   if(!meta || !steps) return 5;
   meta<<"callback,observed_step,width,height,bytes\n";
   steps<<"run,mask,polls,a_polls,start_polls,audio_calls,callbacks\n";
-  long completed=0; unsigned totalIdle=0; bool transitioned=false, view_equal=false; auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(175);
+  long completed=0; unsigned totalIdle=0, snapshotCount=0; bool transitioned=false, view_equal=false; auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(175);
   std::ofstream commands(out/"commands.csv"); commands<<"begin,steps,mask,x,y,capture\n";
   int images_fd=::open((out/"images.bin").c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);
   if(images_fd<0 || !sc64_observer_images_write(images_fd) || ::close(images_fd)!=0) return 2;
@@ -209,7 +210,7 @@ int main(int argc,char** argv) {
     }
     if(line.empty() || line.size()>=128 || std::chrono::steady_clock::now()>=commandDeadline || totalIdle>=60000) break;
     std::istringstream in(line); int count,mask,x,y,capture; std::string extra;
-    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !sc64_hybrid_capture_allowed(capture) || (capture==2 && (transitioned || completed+count!=4200))) { std::cerr<<"invalid command\n"; return 7; }
+    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !(sc64_hybrid_capture_allowed(capture) || (scenario=="snapshot" && capture==3)) || (capture==3 && !sc64_hybrid_snapshot_allowed(scenario=="snapshot",transitioned,view_equal,ares::Nintendo64::cpu.recompiler.enabled,ares::Nintendo64::rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,ares::Nintendo64::rdram.ram.size,snapshotCount)) || (capture==2 && (transitioned || completed+count!=4200))) { std::cerr<<"invalid command\n"; return 7; }
     commands<<completed<<','<<count<<','<<mask<<','<<x<<','<<y<<','<<capture<<'\n'; commands.flush();
     unsigned previous; {std::lock_guard lock(p.mutex); previous=p.frames.size();}
     for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
@@ -232,6 +233,18 @@ int main(int argc,char** argv) {
       bool post_ok=read_view(after);std::cout<<"POST_CACHE_OK "<<post_ok<<std::endl;view_equal=sc64_hybrid_views_equal(pre_ok,before.data(),post_ok,after.data(),before.size());
       if(!view_equal){std::cerr<<"post-transition cache conflict or view mismatch\n";return 8;}
       transitioned=true;std::cout<<"HYBRID "<<completed<<" view_equal=1\n";continue;
+    }
+    if(capture==3) {
+      using namespace ares::Nintendo64;
+      if(!sc64_hybrid_snapshot_allowed(scenario=="snapshot",transitioned,view_equal,cpu.recompiler.enabled,rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,rdram.ram.size,snapshotCount)) return 8;
+      std::vector<std::uint8_t> scratch(rdram.ram.size);
+      auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull); bool hx=x.hit(a),hy=y.hit(a);return hx&&hy?-1:hx||hy?1:0; };
+      auto cached=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);return (std::uint8_t)(x.hit(a)?x.bytes[(a&15u)^3u]:y.bytes[(a&15u)^3u]); };
+      auto ram=[](u32 a) { return (std::uint8_t)rdram.ram.read<Byte>(a,RBusDevice::ARES_DEBUGGER); };
+      if(!sc64_read_ram(0,scratch.size(),rdram.ram.size,scratch.data(),hit,cached,ram)) { std::cerr<<"snapshot cache conflict\n";return 8; }
+      char name[32];std::snprintf(name,sizeof(name),"ram-%03u.bin",snapshotCount);
+      std::ofstream file(out/name,std::ios::binary);file.write(reinterpret_cast<const char*>(scratch.data()),scratch.size());file.close();if(!file)return 5;
+      std::cout<<"RAM "<<snapshotCount<<" "<<completed<<" "<<scratch.size()<<std::endl; ++snapshotCount;continue;
     }
     if(!capture) { std::cout<<"OK "<<completed<<std::endl; continue; }
     std::unique_lock lock(p.mutex);
