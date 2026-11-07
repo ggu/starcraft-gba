@@ -5,6 +5,9 @@
 #include "../starcraft/game.c"
 #include "../starcraft/sc64_scarab_flight_bridge.h"
 #include "../starcraft/sc64_scarab_fields.h"
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+#include "../starcraft/sc64_compound_flash_envelope.h"
+#endif
 #if !defined(GBA_HOST) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SCARAB_RUNTIME) || defined(SC64_SCARAB_NAMESPACE_STAGE)
 #error "Use the isolated cargo/Scarab row composition fixture"
 #endif
@@ -29,6 +32,11 @@ int main(void)
 {
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
     Sc64StageSaveAuth auth;const Sc64StageSaveAuth *guard_auth=&auth;
+    u8 header[SC64_CF_HEADER];Sc64CompoundFlashHeader parsed;
+    Sc64CompoundFlashHeader expected={1,0,SC64_Z10_GLOBAL_ID,SC64_CF_FEATURES,16368,1,400,400,240};
+    sc64_cf_write(header,&expected);assert(sc64_cf_parse(header,17440,&expected,&parsed));
+    header[12]|=0x80;assert(!sc64_cf_parse(header,17440,&expected,&parsed));
+    sc64_cf_write(header,&expected);assert(!sc64_cf_parse(header,17439,&expected,&parsed));
 #endif
     Unit worker,child,wire,decoded,restored;int carry,timer;
     gba_init();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;race_skirmish_init();
