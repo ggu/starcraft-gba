@@ -82,7 +82,10 @@ test-sc64-q8-flash-custom-races:
 	./build/research-q8-flash/custom-races read zerg build/research-q8-flash/custom-zerg.sav
 
 # The supervising caller holds the shared native lock and freezes inputs.
-.PHONY: test-sc64-q8-flash-custom-matrix
+.PHONY: test-sc64-q8-flash-custom-matrix build-sc64-q8-flash-legacy-rosters
 Q8_CUSTOM_MATRIX_OUT ?= build/research-q8-flash/custom-matrix
-test-sc64-q8-flash-custom-matrix: test-sc64-q8-flash-custom-races
-	$(PYTHON) tools/sc64_q8_flash_custom_matrix.py --fixture build/research-q8-flash/custom-races --output $(Q8_CUSTOM_MATRIX_OUT)
+build-sc64-q8-flash-legacy-rosters: check-sc64-q8-flash-baseline
+	@mkdir -p build/research-q8-flash
+	$(CLANG) -I$(Q8_BASELINE_ROOT)/common -I$(Q8_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_Q8_FLASH_BASELINE tests/sc64_q8_flash_legacy_roster_writer.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash/legacy-rosters
+test-sc64-q8-flash-custom-matrix: test-sc64-q8-flash-custom-races build-sc64-q8-flash-legacy-rosters
+	$(PYTHON) tools/sc64_q8_flash_custom_matrix.py --fixture build/research-q8-flash/custom-races --legacy-fixture build/research-q8-flash/legacy-rosters --output $(Q8_CUSTOM_MATRIX_OUT)

@@ -110,7 +110,8 @@ int main(int argc,char **argv)
                              (unsigned)((race_letter(bots[last])+1)%3));
         }
         file_write(path,device.bytes,sizeof device.bytes);
-    } else if(!strcmp(argv[1],"read")) {
+    } else if(!strcmp(argv[1],"read") || !strcmp(argv[1],"read-legacy")) {
+        int legacy=!strcmp(argv[1],"read-legacy");
         static const int owners[3]={ENEMY,RESCUABLE,4};
         file_read(path,device.bytes,sizeof device.bytes);assert(race_load_game());
         assert(race_mode==1 && race_human==human && race_player[SIDE]==human &&
@@ -120,18 +121,18 @@ int main(int argc,char **argv)
         int type=human==R_TER?U_SCV:human==R_ZERG?U_DRONE:U_PROBE,found=-1;
         for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].type==type&&u[i].x==300)found=i;
         unsigned hp;assert(found>=0 && sc64_pr_q8_actor_hp(found,&hp));
-        assert(hp==(unsigned)u[found].maxhp*256u-128u);
+        assert(hp==(unsigned)u[found].maxhp*256u-(legacy?256u:128u));
         if(human==R_TER) {
             int building=-1;for(int i=0;i<MAX_BUILDINGS;++i)
                 if(b[i].alive && b[i].type==B_COMMAND && b[i].x==360)building=i;
             assert(building>=0 && race_building_can_burn(&b[building]));
             unsigned bhp;assert(sc64_pr_q8_actor_hp(MAX_UNITS+building,&bhp));
-            assert(bhp==(unsigned)b[building].maxhp*256u-128u &&
-                   ((unsigned)b[building].shield_remainder&255u)==128u &&
+            assert(bhp==(unsigned)b[building].maxhp*256u-(legacy?256u:128u) &&
+                   ((unsigned)b[building].shield_remainder&255u)==(legacy?0u:128u) &&
                    !sc64_pr_hp_debt[MAX_UNITS+building]);
         }
         int payer=first_proto_bot(bots);
-        if(payer>=0) {
+        if(payer>=0 && !legacy) {
             int forge=-1;Sc64PrPaidReceipt paid;
             for(int i=0;i<MAX_BUILDINGS;++i)
                 if(b[i].alive && b[i].owner==payer && b[i].type==B_FORGE && b[i].x==440)forge=i;
