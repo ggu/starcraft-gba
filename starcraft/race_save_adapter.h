@@ -1724,6 +1724,7 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 static int race_save_game(void) {
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
     const Sc64StageSaveAuth *guard_auth=0; /* Until a compound writer is admitted. */
+    return 0;
 #endif
 #if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE)
     return 0; /* no sidecar wire format yet, for any candidate */
@@ -4410,6 +4411,9 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 }
 #endif
 static int race_load_game(void) {
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    return 0; /* No compound envelope reader has been admitted yet. */
+#endif
 #if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE)
     return 0; /* title state cannot identify an incoming campaign candidate */
 #endif

@@ -87,6 +87,18 @@ int main(void)
     /* A copied token cannot authorize a different candidate. */
     RaceSave other=row_candidate;Unit rejected;
     assert(!race_compound_scarab_decode(&other,2,2048,2048,&rejected,&auth));
+    restored.raw_owner=-1;
+    Sc64ScarabChildFields outside={1,2,20,0};
+    assert(sc64_scarab_child_fields_pack(&outside,&restored.carry,&timer));
+    restored.carry|=7<<10;restored.work_timer=(u16)timer;restored.order=2;
+    assert(sc64_scarab_flight_to_wire(&restored,&wire,1,0) && row_encode(2,&wire));
+    assert(race_save_worker_cargo_prepare(&row_candidate,2048,2048,0 SC64_GCTX_ARG));
+    assert(race_scarab_save_candidate_valid(&row_candidate,2048,2048 SC64_GCTX_ARG));
+    assert(race_compound_scarab_decode(&row_candidate,2,2048,2048,&decoded,&auth));
+    assert(decoded.carry==restored.carry && decoded.work_timer==restored.work_timer);
+    auth.features=0;
+    assert(!race_compound_scarab_decode(&row_candidate,2,2048,2048,&decoded,&auth));
+    assert(!race_save_game() && !race_load_game());
 #endif
     puts("actual cargo preparation and detached Scarab graph: PASS");return 0;
 }
