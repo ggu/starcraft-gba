@@ -621,6 +621,29 @@ HOT_MODE4 void gfx_blit16(int x,int y,const u8 *src) {
    volatile u32 *d=(volatile u32*)(pixels+(y+row)*120+x/2);
    d[0]=s[0];d[1]=s[1];d[2]=s[2];d[3]=s[3];
   }
+#ifdef SC64_ODD_TILE_WORD_PROBE
+ } else if(x>=0&&x<=224&&(x&1)&&!((uintptr_t)src&3)) {
+  /* Preserve the neighboring edge pixels while assembling the interior from
+     aligned source words. This path is deliberately opt-in pending timing. */
+  for(int row=top;row<bottom;row++) {
+   const u32 *s=(const u32*)(const void*)(src+row*16);
+   u32 a=s[0],b=s[1],c=s[2],e=s[3];
+   volatile u16 *d=pixels+(y+row)*120+x/2;
+   *d=(u16)((*d&255u)|((a&255u)<<8)); ++d;
+   if((x&3)==1) {
+    *d++=(u16)(a>>8);
+    volatile u32 *wide=(volatile u32*)(void*)d;
+    wide[0]=(a>>24)|(b<<8); wide[1]=(b>>24)|(c<<8); wide[2]=(c>>24)|(e<<8);
+    d=(volatile u16*)(void*)(wide+3);
+   } else {
+    volatile u32 *wide=(volatile u32*)(void*)d;
+    wide[0]=(a>>8)|(b<<24); wide[1]=(b>>8)|(c<<24); wide[2]=(c>>8)|(e<<24);
+    d=(volatile u16*)(void*)(wide+3);
+    *d++=(u16)(e>>8);
+   }
+   *d=(u16)((*d&0xff00u)|(e>>24));
+  }
+#endif
  } else if(x>=0&&x<=224&&(x&3)==2&&!((uintptr_t)src&3)) {
   /* Camera offsets are commonly two pixels off a word boundary. Align the
      destination with a leading pixel pair, then join adjacent source words
