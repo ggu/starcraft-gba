@@ -178,11 +178,17 @@ static void expect_mask(unsigned expected, const u8 *powered)
     unsigned actual = sc64_p7_arbiter_detected_mask(0, powered);
     if (actual != expected) fprintf(stderr, "actual %u expected %u target=(%d,%d) visible=%d\n", actual,expected,u[0].x,u[0].y,SC64_GRID_GET(visible,u[0].x/16+(u[0].y/16)*MAP_COLS));
     assert(actual == expected);
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    sc64_target_index_begin();
+#endif
     Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
     lists.optical_grid_phase=1;
 #endif
     assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == expected);
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    sc64_target_index_end();
+#endif
 }
 
 static void optical_source_masks(void)
@@ -314,6 +320,9 @@ static void detector_snapshot_cases(void)
         if (step==4) { b[0].under_construction=0; powered[0]=1; }
         if (step==5) u[1].alive=0;
         if (step==6) b[0].alive=0;
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+        sc64_target_index_begin();
+#endif
         sc64_p7_detector_lists_build(&lists);
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
     lists.optical_grid_phase=1;
