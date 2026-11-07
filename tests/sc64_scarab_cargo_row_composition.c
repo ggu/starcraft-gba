@@ -70,7 +70,7 @@ int main(void)
 #endif
     assert(row_encode(0,&worker) && row_encode(1,&reaver));
     assert(sc64_scarab_flight_to_wire(&child,&wire,1,0) && row_encode(2,&wire));
-    assert(race_save_worker_cargo_prepare(&row_candidate,2048,2048,0));
+    assert(race_save_worker_cargo_prepare(&row_candidate,2048,2048,0 SC64_GCTX_ARG));
     assert(row_decode(2,&decoded) && sc64_scarab_flight_from_wire(&decoded,&restored,1,0));
 #ifndef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
     assert(row_encode(2,&restored));
