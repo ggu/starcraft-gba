@@ -30,6 +30,15 @@ class SnapshotWrapperTest(unittest.TestCase):
     w=csv.writer(f);w.writerow(header);w.writerows(entries)
    self.assertTrue(m.planned_witness(p,rows))
    (p/'registers.csv').write_text('truncated\n');self.assertFalse(m.planned_witness(p,rows))
+   bad=[row[:] for row in entries];bad[1][1]='9999'
+   with (p/'registers.csv').open('w',newline='') as f:
+    w=csv.writer(f);w.writerow(header);w.writerows(bad)
+   self.assertFalse(m.planned_witness(p,rows))
+   bad=[row[:] for row in entries];bad[0][32]='not-a-register'
+   with (p/'registers.csv').open('w',newline='') as f:
+    w=csv.writer(f);w.writerow(header);w.writerows(bad)
+   self.assertFalse(m.planned_witness(p,rows))
+   (p/'registers.csv').write_text('x'*8193);self.assertFalse(m.planned_witness(p,rows))
    with (p/'registers.csv').open('w',newline='') as f:
     w=csv.writer(f);w.writerow(header);w.writerows(entries)
    good=(p/'frames.csv').read_text()
