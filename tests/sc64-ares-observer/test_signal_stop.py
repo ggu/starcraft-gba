@@ -1,4 +1,4 @@
-import importlib.util, pathlib, signal, subprocess, tempfile, time, unittest
+import importlib.util, os, pathlib, signal, subprocess, sys, tempfile, time, unittest
 from unittest.mock import patch
 root=pathlib.Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location('observer',root/'experiments/ares-headless/actor_observer.py')
@@ -34,6 +34,15 @@ class StopTests(unittest.TestCase):
     self.assertIn(child.returncode,(-signal.SIGTERM,-signal.SIGKILL))
    finally:
     if child.poll() is None:child.kill();child.wait(timeout=2)
+ def test_hung_inspector_killed_and_reaped(self):
+  real=subprocess.Popen;helpers=[]
+  def spawn(_args,**kw):
+   p=real([sys.executable,'-c','import time;time.sleep(60)'],**kw);helpers.append(p);return p
+  with tempfile.TemporaryDirectory() as d, patch.object(m.subprocess,'Popen',side_effect=spawn):
+   result={};m.inspect_stopped_child(type('Child',(),{'pid':os.getpid()})(),d,2.2,result)
+   self.assertEqual(result['fd_inspection'],'timeout');self.assertEqual(len(helpers),1)
+   self.assertIsNotNone(helpers[0].poll())
+   with self.assertRaises(ProcessLookupError):os.kill(helpers[0].pid,0)
  def test_deadline_avoids_helper(self):
   result={};m.inspect_stopped_child(None,'.',1,result)
   self.assertEqual(result['fd_inspection'],'deadline')
