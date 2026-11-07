@@ -45,7 +45,14 @@ static int race_q8_flash_write_ownership(const GbaFlashJournalIo *io)
         if(tag!=0xffffffffu && (tag&0xff000000u) &&
            (tag&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_CAMPAIGN_JOBS_NAMESPACE) return 0;
 #else
-        (void)tag;
+        /* SRAM commits its most-significant tag byte last. An erased or
+         * uncommitted tag is harmless; never supersede a committed foreign
+         * legacy namespace merely because its length or checksum is bad. */
+        if(tag!=0xffffffffu && (tag&0xff000000u) &&
+           tag!=SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION &&
+           tag!=SC64_TRANSPORT_SAVE_VERSION && tag!=SC64_RESEARCH_TRANSPORT_SAVE_VERSION &&
+           tag!=SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION &&
+           tag!=SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION) return 0;
 #endif
     }
     for(unsigned i=2;i<4;++i) {

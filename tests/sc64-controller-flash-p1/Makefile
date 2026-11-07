@@ -19,6 +19,9 @@ test-controller-flash-p1:
 	$(CONTROLLER_FLASH_OUT)/test fallback $(CONTROLLER_FLASH_OUT)/p1.sav
 	$(CONTROLLER_FLASH_OUT)/test only-bad $(CONTROLLER_FLASH_OUT)/p1.sav
 	$(CONTROLLER_FLASH_OUT)/test unknown-new $(CONTROLLER_FLASH_OUT)/p1.sav
+	$(CONTROLLER_FLASH_OUT)/test legacy-foreign-hash $(CONTROLLER_FLASH_OUT)/p1.sav
+	$(CONTROLLER_FLASH_OUT)/test legacy-foreign-length $(CONTROLLER_FLASH_OUT)/p1.sav
+	$(CONTROLLER_FLASH_OUT)/test legacy-known-malformed $(CONTROLLER_FLASH_OUT)/p1.sav
 	$(CONTROLLER_FLASH_OUT)/test legacy $(CONTROLLER_FLASH_LEGACY) $(CONTROLLER_FLASH_OUT)/p1-migrated.sav
 	$(CONTROLLER_FLASH_OUT)/test legacy-read $(CONTROLLER_FLASH_OUT)/p1-migrated.sav
 	$(CONTROLLER_FLASH_OUT)/test fallback-legacy $(CONTROLLER_FLASH_OUT)/p1-migrated.sav
