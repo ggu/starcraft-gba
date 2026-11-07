@@ -6,11 +6,13 @@
 
 int main(void)
 {
-    int parent=-1, child=-1, origin, prior_owner;
+    int parent=-1, child=-1, target=-1, origin, prior_owner;
     launch_z10_from_normal_menu();
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].type==U_REAVER &&
         u[i].owner==ENEMY && sc64_controller_unit(i)==7) { parent=i; break; }
-    assert(parent>=0);origin=u[parent].raw_owner;prior_owner=u[parent].owner;
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].owner==SIDE && !invincible_units[i]) { target=i;break; }
+    assert(parent>=0 && target>=0);origin=u[parent].raw_owner;prior_owner=u[parent].owner;
+    { int hp=u[target].hp; tick_combat(&u[parent],target); assert(u[target].hp==hp); }
     assert(sc64_controller_transfer_unit(parent,2));
     assert(sc64_controller_unit(parent)==2 && u[parent].raw_owner==origin && u[parent].owner==prior_owner);
     assert(sc64_controller_transfer_unit(parent,7));
