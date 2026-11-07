@@ -234,6 +234,7 @@ static int sc64_p7_observer_rect_distance_rects(int al,int at,int ar,int ab,
 
 /* The caller validates the Arbiter rectangle once before reusing target
  * rectangles here. The clipped finder-square policy is unchanged. */
+#if !defined(SC64_AURA_SQUARE_HOIST_PROBE) || defined(GBA_HOST)
 static int sc64_p7_arbiter_finder_square_rect(int arbiter,int tl,int tt,
                                               int tr,int tb)
 {
@@ -245,6 +246,7 @@ static int sc64_p7_arbiter_finder_square_rect(int arbiter,int tl,int tt,
     --tr; --tb;
     return tl<right && tr>=left && tt<bottom && tb>=top;
 }
+#endif
 #endif
 
 /* Generation-39 cache layout in the otherwise-unused Unit.weapon word:
