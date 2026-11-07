@@ -1,9 +1,10 @@
 #define SC64_OBSERVER_STOP_ON_SIGXFSZ 1
 #include "observer_sigxfsz.h"
 #include "observer_images.h"
+#include "visual_capture.h"
 #include <fcntl.h>
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Experimental frontend: bounded read-only RDRAM; no guest writes or host-input API.
+// Visual-only frontend: no RDRAM snapshots, guest writes, or host-input API.
 #include <ares/ares.hpp>
 #include <n64/n64.hpp>
 #include <mia/mia.hpp>
@@ -26,7 +27,6 @@
 #include <sstream>
 #include <vector>
 #include "input_mapping.h"
-#include "observer_read.h"
 #include "observer_file_budget.h"
 
 namespace ares::Nintendo64 {
@@ -153,7 +153,7 @@ int main(int argc,char** argv) {
      !ares::Nintendo64::option("Supersampling","false") ||
      !ares::Nintendo64::option("Enable GPU acceleration","true") ||
      !ares::Nintendo64::option("Homebrew Mode","false") ||
-     !ares::Nintendo64::option("Recompiler","false") ||
+     !ares::Nintendo64::option("Recompiler","true") ||
      !ares::Nintendo64::option("Expansion Pak","true")) return 3;
   ares::Node::System root;
   if(!ares::Nintendo64::load(root,"[Nintendo] Nintendo 64 (NTSC)")) return 4;
@@ -182,12 +182,13 @@ int main(int argc,char** argv) {
   }
   if(!p.a || !p.b || !p.start || !p.down || !p.cLeft || !p.cRight || !p.cUp || !p.cDown || !p.right || !p.r || !p.xAxis || !p.yAxis) return 4;
   root->power();
-  if(ares::Nintendo64::cpu.recompiler.enabled || ares::Nintendo64::system.homebrewMode) { std::cerr<<"unsafe CPU or homebrew configuration\n"; return 3; }
+  if(!ares::Nintendo64::cpu.recompiler.enabled || !ares::Nintendo64::rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode) { std::cerr<<"unsafe CPU or homebrew configuration\n"; return 3; }
+  const bool cpu_jit=ares::Nintendo64::cpu.recompiler.enabled, rsp_jit=ares::Nintendo64::rsp.recompiler.enabled, homebrew=ares::Nintendo64::system.homebrewMode;
   std::ofstream meta(out/"frames.csv",std::ios::binary), steps(out/"steps.csv",std::ios::binary);
   if(!meta || !steps) return 5;
   meta<<"callback,observed_step,width,height,bytes\n";
   steps<<"run,mask,polls,a_polls,start_polls,audio_calls,callbacks\n";
-  long completed=0; unsigned totalIdle=0, snapshots=0; auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(175);
+  long completed=0; unsigned totalIdle=0; auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(175);
   std::ofstream commands(out/"commands.csv"); commands<<"begin,steps,mask,x,y,capture\n";
   int images_fd=::open((out/"images.bin").c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);
   if(images_fd<0 || !sc64_observer_images_write(images_fd) || ::close(images_fd)!=0) return 2;
@@ -206,31 +207,10 @@ int main(int argc,char** argv) {
     }
     if(line.empty() || line.size()>=128 || std::chrono::steady_clock::now()>=commandDeadline || totalIdle>=60000) break;
     std::istringstream in(line); int count,mask,x,y,capture; std::string extra;
-    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_observer_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || capture<0 || capture>2) { std::cerr<<"invalid command\n"; return 7; }
+    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_observer_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !sc64_visual_capture_allowed(capture)) { std::cerr<<"invalid command\n"; return 7; }
     commands<<completed<<','<<count<<','<<mask<<','<<x<<','<<y<<','<<capture<<'\n'; commands.flush();
     unsigned previous; {std::lock_guard lock(p.mutex); previous=p.frames.size();}
     for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
-    if(capture==2) {
-      using namespace ares::Nintendo64;
-      if(snapshots>=3 || rdram.ram.size!=8u*1024u*1024u || cpu.recompiler.enabled || ares::Nintendo64::system.homebrewMode) return 8;
-      std::vector<std::uint8_t> bytes(rdram.ram.size);
-      auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull);
-        auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);
-        bool hx=x.hit(a),hy=y.hit(a);return hx&&hy ? -1 : hx||hy ? 1 : 0; };
-      auto cached=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull);
-        auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);
-        /* Exact pinned DataCache::Line::read<Byte> byte indexing. */
-        return (std::uint8_t)(x.hit(a)?x.bytes[(a&15u)^3u]:y.bytes[(a&15u)^3u]); };
-      auto ram=[](u32 a) { return (std::uint8_t)rdram.ram.read<Byte>(a,RBusDevice::ARES_DEBUGGER); };
-      if(!sc64_read_ram(0,bytes.size(),rdram.ram.size,bytes.data(),hit,cached,ram)) return 8;
-      char name[32];std::snprintf(name,sizeof(name),"ram-%03u.bin",snapshots++);
-      if(!sc64_observer_file_limit(SC64_OBSERVER_RAM_FILE)) return 8;
-      std::ofstream file(out/name,std::ios::binary);file.write((const char*)bytes.data(),bytes.size());file.close();
-      if(!sc64_observer_file_limit(initial_file_limit.rlim_cur) || !file) return 5;
-      std::ofstream ledger(out/"ram.csv",std::ios::app);ledger<<name<<','<<completed<<','<<cpu.ipu.pc<<','<<cpu.clock<<','<<bytes.size()<<'\n';ledger.close();if(!ledger) return 5;
-      std::cout<<"RAM "<<name<<' '<<completed<<std::endl;continue;
-    }
-    if(!capture) { std::cout<<"OK "<<completed<<std::endl; continue; }
     std::unique_lock lock(p.mutex);
     p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.frames.size()>previous;});
     if(p.failed || p.frames.size()>previous+1) { std::cerr<<"snapshot failure\n"; return 6; }
@@ -257,6 +237,7 @@ int main(int argc,char** argv) {
   observations<<"callback,observed_step,width,height,nonblack\n";
   for(std::size_t i=0;i<p.observations.size();++i) { auto &o=p.observations[i]; observations<<i<<','<<o.step<<','<<o.width<<','<<o.height<<','<<o.nonblack<<'\n'; }
   for(auto& text:p.statuses) status<<text<<'\n';
+  status<<"frontend=visual_only cpu_recompiler="<<cpu_jit<<" rsp_recompiler="<<rsp_jit<<" homebrew="<<homebrew<<"\n";
   status<<"requested_steps="<<frames<<" completed_steps="<<completed<<" polls="<<p.polls.load()<<" a_polls="<<p.aPolls.load()<<" start_polls="<<p.startPolls.load()<<" a_pressed_polls="<<p.aPressedPolls.load()<<" start_pressed_polls="<<p.startPressedPolls.load()<<" audio_calls="<<p.audioCalls.load()<<" callbacks_total="<<p.callbacks<<" frames_copied="<<p.frames.size()<<" callbacks_discarded="<<p.discarded<<" gpu_ready="<<p.gpuReady<<" failure="<<p.failure<<'\n';
   if(p.failed || !p.gpuReady || p.frames.empty()) { std::cerr<<"renderer or callback failure: "<<p.failure<<" callbacks="<<p.callbacks<<"\n"; return 6; }
   for(std::size_t i=0;i<p.frames.size();++i) {
