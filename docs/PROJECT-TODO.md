@@ -19,48 +19,45 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
-- **Recent qualification:** normal HUD page reuse merged in #352 at `f1fbf106`; the verified package is `StarCraft-GBA-2026-11-07-f1fbf106`. Z9/Z10 gain 12,464 EWRAM bytes (780 to 13,244); their 2,072-byte IWRAM margin is unchanged. Six ordinary OFF/ON physical pairs cover two custom maps and late campaign scenes with matching state/frame/palette through genuine 32 KiB save and fresh load; selected-context persistence remains open. The other four raw OFF/ON controls are identical. Default checks passed (1,023 Python tests, 26 skips, plus compiled checks) and 12 links passed. [Scope and limits](audits/2026-11-07-zerg-late-hud-page/README.md). KODAK was absent; no SD copy occurred. Historical package references below predate this package. The research/Flash custom-roster matrix has HOST coverage of 234 current records and 234 genuine predecessor records; the ordinary-input ARM matrix has only its initial 12 cases, not the full 234. The separate Scarab stage remains unqualified for release. These results do not enable experimental research or close campaign, hardware, timing, or performance gates.
-- **[Hybrid N64 control](audits/2026-11-07-n64-hybrid-control/README.md):** an official same-process JIT state was restored into interpreter mode with equal cache-aware RAM views; two pure-JIT control snapshots are visually close but differ by one in each differing byte. This feasibility result does not establish actor identity, clock, fresh-reset interpreter timing, or hardware parity.
-
-- **Usable upgrades and saving (U3):** the combined experimental source
-  `8be82458` now includes #348 phase migration, #349 ARM transaction and explicit
-  HOST-only Terran/Zerg custom-roster admission. Its ordinary P10 custom tape
-  naturally pays for Forge research, saves through pause/B, fresh-title loads
-  through L with the same wallet/job, and completes level one. The real Flash
-  command backend has no guest-state writes or polling workaround. The feature-off
-  P10 control still exactly matches the playable `317cc67d…` ROM. This is one
-  emulated custom witness, not cartridge/audio/fractional-damage or all-mode
-  qualification. Clean asset-free boundary/doctor/build/full-test checks pass
-  (1,026 Python tests, 26 expected skips, plus compiled checks). The first
-  supervisory postcondition incorrectly rejected an authored generated math
-  table; the corrected full test rerun passes, with the failed attempt retained.
-  Normal release flags remain off.
-- **Memory before deployment:** all six combined Q8/jobs/Flash ARM probes link
-  under unchanged guards. EWRAM margins are P10 19,324 B, Terran 28,336 B,
-  Showcase 28,676 B, Z7 2,292 B, and Z9/Z10 only 132 B. A separate optional HUD
-  framebuffer-page probe at `9f185cfd` passes four guarded OFF/ON links and four
-  poisoned-page HOST diagnostics (22 full-clear comparisons each). It saves
-  **12,456 net bytes** in both Z9/Z10, increasing their margin to 12,588 B with
-  unchanged 1,936 B IWRAM margin. The corrected Z9 ordinary custom comparison
-  matches OFF/ON state, full displayed frame and palette for 3,056 input ticks
-  and again after fresh load; both guests write identical valid Flash saves.
-  Restored named state matches uninterrupted play, including wallet/job/timer.
-  Fresh-versus-uninterrupted pixels still differ after 60 neutral updates,
-  despite matching named state/palette and exact OFF/ON frame pairs. Raw views
-  show Forge selection/ring/HUD retained uninterrupted but cleared after load;
-  the tested loader resets that UI context and the compared world omits it.
-  This localizes an existing presentation-contract gap, without attributing
-  every map pixel. Define/qualify saved UI and presentation, then Z10/campaign
-  scenes; see the [scoped HUD audit](audits/2026-11-07-zerg-hud-memory/README.md).
-  The strict cross-path gate stays failed; normal flags and hardware/FPS claims
-  remain unchanged.
-- **Migration and roster gates:** the composed phase checker passes 39 process
-  steps covering all 1,280 unit and 320 legacy building phases, 47 advancing
-  updates, genuine old exports and alias/burn preservation. Actual checksum-valid
-  malformed human/bot records are refused through the real loader. The explicit
-  all-custom-roster extension remains HOST-only. Campaigns, all controller/race
-  combinations, repair/Z5 aliases, genuine saves, failure/recovery, runtime stack
-  and hardware remain required before normal enablement.
+- **Normal package and HUD:** #352 merged normal Z9/Z10 HUD page reuse at
+  `f1fbf106`; the verified Mac package is
+  `StarCraft-GBA-2026-11-07-f1fbf106`. Z9/Z10 EWRAM margin rises by 12,464 B
+  from 780 to 13,244 B; IWRAM remains 2,072 B. Six ordinary OFF/ON physical
+  pairs cover two custom maps and late campaign scenes, with matching named
+  state, full frame and palette through genuine 32 KiB saves and fresh loads.
+  Four other raw OFF/ON controls are identical. Default checks passed (1,023
+  Python tests, 26 skips, plus compiled checks), as did 12 links. KODAK was
+  absent and no SD copy occurred. See the [HUD audit](audits/2026-11-07-zerg-late-hud-page/README.md).
+- **Usable upgrades and saving (U3):** the separate combined research/Q8/Flash
+  experiment remains disabled in normal products. Its ordinary P10 custom tape
+  pays for Forge research, saves, fresh-loads the same wallet/job and completes
+  level one. The real Flash backend uses no guest-state writes or polling
+  workaround; the feature-off P10 control matches the `317cc67d…` ROM. This is
+  an emulated witness, not cartridge or all-mode qualification. HOST coverage
+  includes 234 custom roster records and 234 genuine predecessor records; an
+  initial bounded subset of ordinary-input ARM roster cases passes, with the
+  remaining matrix still in progress. Campaigns, controller/race combinations,
+  repair/Z5 aliases, real failure recovery, runtime stack and hardware remain
+  release gates. The separate Scarab stage is not release-qualified.
+- **Experimental memory and presentation:** at combined research source
+  `8be82458`, the older six ARM probes linked with Z9/Z10 EWRAM margin 132 B;
+  this is distinct from the current normal #352 product margins above. In an
+  earlier optional combined-feature Z9 comparison, OFF/ON state and full frame
+  matched through fresh load, but fresh-versus-uninterrupted pixels differed
+  after 60 neutral updates: the tested loader cleared selected Forge UI context.
+  That historical strict cross-path presentation check remains unresolved; it
+  does not invalidate the merged normal HUD OFF/ON qualification. See the
+  [experimental HUD audit](audits/2026-11-07-zerg-hud-memory/README.md).
+- **Migration:** the composed phase checker passes 39 process steps covering all
+  1,280 unit and 320 legacy building phases, 47 advancing updates, genuine old
+  exports and alias/burn preservation. Checksum-valid malformed human/bot
+  records are refused through the real loader. These checks do not alone qualify
+  every campaign, roster, hardware failure or save transition.
+- **[Hybrid N64 control](audits/2026-11-07-n64-hybrid-control/README.md):** an
+  official same-process JIT state was restored into interpreter mode with equal
+  cache-aware RAM views. Two pure-JIT control snapshots are visually close but
+  differ by one in each differing byte. This feasibility result establishes no
+  actor identity, clock, fresh-reset interpreter timing or hardware parity.
 - **Egg rollout (S1):** the selector probe now has one actual ordinary-input
   Z7-ROM custom guest save/load/birth witness at runtime `6bbc678f`. Natural Pool
   construction and a 50-mineral Zergling purchase produce an Egg; its genuine
