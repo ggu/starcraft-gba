@@ -80,6 +80,7 @@ static void verify_loaded(void)
     assert(!b[f].level&&sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]==1);
 }
 #endif
+#ifndef SC64_Q8_FLASH_NO_FIXTURE_MAIN
 int main(int argc,char **argv)
 {
     assert(argc==3);start();
@@ -170,3 +171,5 @@ int main(int argc,char **argv)
 #endif
     puts("Q8 Flash actual game process: PASS");return 0;
 }
+
+#endif /* SC64_Q8_FLASH_NO_FIXTURE_MAIN */

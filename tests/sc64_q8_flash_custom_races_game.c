@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Authored HOST producer/consumer boundary witness; not guest input. */
-#define main q8_flash_original_fixture_main
+#define SC64_Q8_FLASH_NO_FIXTURE_MAIN
 #include "sc64_q8_flash_game.c"
-#undef main
 int main(int argc,char **argv)
 {
     assert(argc==4);int human=!strcmp(argv[2],"terran")?R_TER:R_ZERG;

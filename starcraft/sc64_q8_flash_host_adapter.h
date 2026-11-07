@@ -179,7 +179,13 @@ static int race_q8_flash_write(const void *data,u32 length)
     RaceLoadPlan plan;u32 suffix_length,original_hash;
     unsigned hp,ignored;
     if (!io || !io->read || !io->program || !io->erase_sector || !data || !length ||
-        race_mode!=1 || race_human!=R_PROTOSS) return 0;
+        race_mode!=1 ||
+#ifdef SC64_Q8_FLASH_ALL_CUSTOM_HOST
+        !sc64_q8_flash_custom_roster_valid(race_human,race_bots,race_player,race_bot_races)
+#else
+        race_human!=R_PROTOSS
+#endif
+       ) return 0;
     gba_fj_put32(tail,SC64_Q8_FLASH_TAIL_MAGIC);gba_fj_put32(tail+4,SC64_Q8_FLASH_DEBTS);
     for(int i=0;i<MAX_UNITS;++i) {
         unsigned debt=sc64_pr_hp_debt[i];
