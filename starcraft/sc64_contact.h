@@ -258,11 +258,17 @@ static const s8 sc64_contact_dx[8] = {1,1,0,-1,-1,-1,0,1};
 static const s8 sc64_contact_dy[8] = {0,1,1,1,0,-1,-1,-1};
 
 /* Offsets that leave the world are blocked before any candidate is read. */
+#ifdef SC64_CONTACT_BOUNDS_PROBE
+#include "sc64_contact_bounds_probe.h"
+#endif
 static unsigned __attribute__((noinline))
 sc64_contact_bounds_mask(const Unit *q, int speed)
 {
     unsigned mask = 0;
     int k;
+#ifdef SC64_CONTACT_BOUNDS_PROBE
+    if (sc64_contact_bounds_fast(q->x,q->y,speed,WORLD_W,WORLD_H,&mask)) return mask;
+#endif
     for (k = 0; k < 8; ++k) {
         int sx = q->x + sc64_contact_dx[k] * speed, sy = q->y + sc64_contact_dy[k] * speed;
         if (sx < 0 || sy < 0 || sx >= WORLD_W || sy >= WORLD_H) mask |= 1u << k;
