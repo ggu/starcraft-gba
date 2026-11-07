@@ -215,7 +215,7 @@ int main(int argc,char** argv) {
     for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
     if(capture==2) {
       using namespace ares::Nintendo64;
-      if(transitioned || completed!=4200 || !cpu.recompiler.enabled || !rsp.recompiler.enabled || system.homebrewMode || rdram.ram.size!=8u*1024u*1024u) return 8;
+      if(transitioned || completed!=4200 || !cpu.recompiler.enabled || !rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode || rdram.ram.size!=8u*1024u*1024u) return 8;
       auto read_view=[&](std::vector<std::uint8_t>& bytes) {
         auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull); bool hx=x.hit(a),hy=y.hit(a);return hx&&hy?-1:hx||hy?1:0; };
         auto cached=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);return (std::uint8_t)(x.hit(a)?x.bytes[(a&15u)^3u]:y.bytes[(a&15u)^3u]); };
@@ -226,9 +226,9 @@ int main(int argc,char** argv) {
       bool pre_ok=read_view(before);std::cout<<"PRE_CACHE_OK "<<pre_ok<<std::endl;if(!pre_ok){std::cerr<<"pre-transition cache conflict\n";return 8;}
       auto state=root->serialize(true);
       if(!state || state.size()>16u*1024u*1024u || !ares::Nintendo64::option("Recompiler","false"))return 8;
-      serializer same_state(state.data(),state.size());
+      nall::serializer same_state(state.data(),state.size());
       {std::lock_guard lock(p.mutex);p.gpuReady=false;}
-      if(!root->unserialize(same_state) || cpu.recompiler.enabled || rsp.recompiler.enabled || system.homebrewMode || rdram.ram.size!=before.size())return 8;
+      if(!root->unserialize(same_state) || cpu.recompiler.enabled || rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode || rdram.ram.size!=before.size())return 8;
       bool post_ok=read_view(after);std::cout<<"POST_CACHE_OK "<<post_ok<<std::endl;view_equal=sc64_hybrid_views_equal(pre_ok,before.data(),post_ok,after.data(),before.size());
       if(!view_equal){std::cerr<<"post-transition cache conflict or view mismatch\n";return 8;}
       transitioned=true;std::cout<<"HYBRID "<<completed<<" view_equal=1\n";continue;
