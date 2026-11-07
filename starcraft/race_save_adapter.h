@@ -351,7 +351,11 @@ race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsi
                 !race_scarab_save_child_fields(&q,&child)) return 0;
             if (child.phase<2 && (child.life || child.no_collision ||
                                   q.order!=ORDER_IDLE || q.target!=-1)) return 0;
-            if (child.phase==2 && !sc64_scarab_flight_valid(
+            if (child.phase==2 &&
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+                !(q.order==SC64_SCARAB_FSM_FRESH_RELEASE && !child.life && !child.no_collision) &&
+#endif
+                !sc64_scarab_flight_valid(
                 &(Sc64ScarabFlight){(uint8_t)child.life,(uint8_t)child.no_collision})) return 0;
             if (child.parent_slot!=SC64_SCARAB_FIELD_NO_SLOT) {
                 Unit parent;
