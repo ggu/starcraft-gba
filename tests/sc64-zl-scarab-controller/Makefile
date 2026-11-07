@@ -76,5 +76,9 @@ test-zl-scarab-compound-flash:
 	  -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT \
 	  -DSC64_Q8_FLASH_HOST_STAGE $(ZERG_Z10_CANONICAL_FLAGS) tests/sc64_compound_flash_z10_game.c \
 	  $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) common/gba_flash1m.c -o $(ZL_SCARAB_OUT)/compound
-	$(ZL_SCARAB_OUT)/compound write $(ZL_SCARAB_OUT)/z10-training.flash
-	$(ZL_SCARAB_OUT)/compound read $(ZL_SCARAB_OUT)/z10-training.flash
+	$(ZL_SCARAB_OUT)/compound write-training $(ZL_SCARAB_OUT)/z10-training.flash
+	$(ZL_SCARAB_OUT)/compound read-training $(ZL_SCARAB_OUT)/z10-training.flash
+	$(ZL_SCARAB_OUT)/compound write-inside $(ZL_SCARAB_OUT)/z10-inside.flash
+	$(ZL_SCARAB_OUT)/compound read-inside $(ZL_SCARAB_OUT)/z10-inside.flash
+	$(ZL_SCARAB_OUT)/compound write-outside $(ZL_SCARAB_OUT)/z10-outside.flash
+	$(ZL_SCARAB_OUT)/compound read-outside $(ZL_SCARAB_OUT)/z10-outside.flash
