@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Bounded read-only actor observer; commands are steps mask x y capture."""
-import argparse,csv,fcntl,hashlib,json,os,pathlib,resource,selectors,shutil,signal,subprocess,sys,time,struct
+import argparse,csv,fcntl,hashlib,json,os,pathlib,resource,selectors,shutil,signal,subprocess,sys,time,struct,re
 
 COMMAND_SHA='b8b7c209961bbbfa9ecaf568f433d9d463a11f0736bed12e91d05cb140a0b00a'
 EXPECTED_STEPS=4322
@@ -130,7 +130,8 @@ def planned_witness(path,expected):
    if pc!=0xffffffff8000c390 or hi!=0xffffffff or lo&7 or lo&0xe0000000 not in (0x80000000,0xa0000000) or (lo&0x1fffffff)>8*1024**2-256 or not 4201<=step<EXPECTED_STEPS or reserved:return False
   if len(raw)+len(eraw)+len(sraw)>256*1024:return False
   status=(path/'status.log').read_text()
-  if f'stack_count={len(sraw)//288} ' not in status or ' stack_failed=0' not in status:return False
+  stack_status=re.search(r'(?m)^stack_count=(\d+) stack_skipped=(\d+) stack_failed=0$',status)
+  if not stack_status or int(stack_status.group(1))!=len(sraw)//288:return False
   if f'entry_count={len(eraw)//56} entry_overflow=0' not in status:return False
   if f'store_baseline_verified=1 store_count={len(raw)//48} store_overflow=0' not in status:return False
   return (f'completed_steps={EXPECTED_STEPS} ' in status and 'frontend=hybrid_snapshot_stack jit_before_cpu=1 jit_before_rsp=1 homebrew=0 hybrid_transition=1 exact_view_equal=1 cpu_after=0 rsp_after=0' in status and 'gpu_ready=1 ' in status)

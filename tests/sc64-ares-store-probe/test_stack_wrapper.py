@@ -34,6 +34,7 @@ class SnapshotWrapperTest(unittest.TestCase):
    (p/'stack.bin').write_bytes(stack)
    with (p/'status.log').open('a') as f:f.write('stack_count=1 stack_skipped=0 stack_failed=0\n')
    self.assertTrue(m.planned_witness(p,rows))
+   status=(p/'status.log').read_text();(p/'status.log').write_text(status.replace('stack_skipped=0','stack_skipped=?'));self.assertFalse(m.planned_witness(p,rows));(p/'status.log').write_text(status)
    (p/'stack.bin').write_bytes(b'');self.assertFalse(m.planned_witness(p,rows))
    (p/'stack.bin').write_bytes(stack)
    (p/'entries.bin').write_bytes(b'');self.assertFalse(m.planned_witness(p,rows))
