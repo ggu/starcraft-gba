@@ -19,6 +19,38 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
+  now composes P1 research, Q8 damage debt and current-controller sidecars in
+  an explicit HOST-only Flash format. Fresh-process tests retain an actually
+  rescued Nexus's origin 1/current controller 7, a paid Forge job and fractional
+  HP; the job completes after reload. Genuine 0x43/44 empty and 0x47 paid
+  predecessors migrate without retagging or changing legacy bytes. Semantic
+  fallback, failed-load/no-device mutation and writer scratch recovery pass.
+  Independent review caught and rechecked a malformed foreign legacy-tag
+  ownership gap. End-to-end stale-epoch/descriptor tests, Z10 Scarab composition,
+  ARM, hardware and other campaigns remain open. Normal upgrades stay off.
+- **Reachable custom-game performance now measured:** the released `70e9800f…`
+  P10 ROM runs map 1 with human Protoss and independently selected Terran,
+  Zerg and Protoss AIs through a natural 4,000-update opening. All next 500
+  measured updates advance without modal/terminal states. The passive human
+  has four units/one building; the AIs have 41 units/16 buildings at warmup end.
+  Mean elapsed cycles are 623,589, p50 568,588, p95 815,012 and maximum
+  2,247,514. Orders consume 1,663,094 cycles in the worst update; map work is
+  comparatively stable. **Next performance task: attribute those orders spikes
+  to actual leaves before changing routing/cadence.** This is one opening,
+  not combat, all race/map combinations or hardware/30-fps qualification.
+  A separate bounds-mask probe saves 0.58% mean in the P7 combat window but
+  worsens the peak by 4.72%; keep it disabled. An algebraic steering probe
+  also remains rejected after its ARM code grew. See the
+  [current custom/performance audit](https://github.com/ggu/starcraft-gba/blob/1f4f9ca9/docs/audits/2026-11-07-contact-bounds-probe/README.md).
+- **Nydus/BC building-capacity contract corrected:** the selected compact
+  codec already carries seven building-type bits. The stale six-bit Nydus
+  assertion is corrected for that selection; the legacy derived codec retains
+  its six-bit guard. Full BC plus Z10 now compiles and fresh-loads type 64
+  through the actual HOST journal, with worker cargo and Nydus retained.
+  Six current normal links match all previous ROM bytes and guards, and clean
+  default/unified checks pass. This does not enable any staged feature or
+  change a wire format. See the [contract audit](audits/2026-11-07-nydus-wide-contract/README.md).
 - **Campaign ownership before enabling upgrades/ammunition:** [draft #355](https://github.com/ggu/starcraft-gba/pull/355)
   now has separate current-controller identity for the explicitly scoped P1
   and Z9/Z10 HOST paths. Actual P1 rescue/production and late-Zerg town wallet,
@@ -65,6 +97,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Applying the stores reconstructs the intermediate record exactly, but five
   final bytes remain unexplained; the trace is not a complete history. STOP,
   a second controlled actor, fresh reset and clock/cadence evidence remain open.
+  A later bounded run records 157 function-entry events, including the selected
+  Probe's order arguments, and confirms actual order/position caller paths.
+  Its RAM, frames and all 606 stores match the earlier controls. Nearby globals
+  are now traced as spatial scratch, not a game clock; see the
+  [caller/scratch audit](https://github.com/ggu/starcraft-gba/blob/5d1943fd4a608023fea0df0da2747df42496a48e/docs/audits/2026-11-07-n64-dispatch-candidates/README.md).
   See [draft #354](https://github.com/ggu/starcraft-gba/pull/354) and the
   [scoped store audit](https://github.com/ggu/starcraft-gba/blob/70108527831f1737fc1bfb7cd9299f03c3bc67f0/docs/audits/2026-11-07-n64-store-observer-design/README.md).
 - **Normal package and HUD:** #352 merged normal Z9/Z10 HUD page reuse at
@@ -596,7 +633,7 @@ the serialized native-test lock permit it.
 | U1 | P1 / partial | Scourge/Spire source restrictions and shared picker correction are merged in #290. Continue the broader campaign PUNI/UPGR/TECx audit, especially P10. | Preserve current controlling ownership, nonspending denial and full supported custom catalog. Apply remaining source permissions with per-owner tests and save compatibility; do not infer complete availability parity from this one product fix. |
 | U3 | P0 / in progress | Deliver usable shared Forge/Core research. #318 is disabled save groundwork; verified family IDs and campaign-policy extraction remain separate work. | Authenticated owner and payer identity; source initial/max levels; atomic paid producer jobs, power/cancel/death/capture/reset behavior, active-job saves and legacy migration; weapon/armor/shield/range effects on every relevant path; ordinary building menus and cross-product campaign/custom/Showcase checks. |
 | U2 | P1 / open | Integrate Carrier/Interceptor behavior for supported ordinary units and P10 Gantrithor. The current Gantrithor can move but does not launch Interceptors. | Paid children, flight, target/parent death, capture/owner changes, reload, capacity and full profile save matrix; P10 hero and custom-game ordinary controls. Resolve held Carrier namespace and merge conflicts first. |
-| S2 | P0 / open | Maintain one shared capability and persistence contract across products. Transport is present; controller identity, ammunition, research, repair, detection and morphs need composed codecs. Full late-Zerg/BC/Nydus flag composition exposes a six-bit building-type guard; do not remove features or truncate types to fit. | Per-product and per-mode inventory from actual flags/call sites, lossless versioned representations, source-owned permissions, lifecycle/death/capture checks and every applicable save codec. No Showcase-only engine fix or mission-objective predicate used as a service gate. |
+| S2 | P0 / in progress | Maintain one shared capability and persistence contract across products. The stale Nydus guard now follows the selected codec's existing seven-bit capacity; no wire or cap change. P1 HOST research/controller saving is composed in #361. Ammunition, remaining controller contexts, repair, detection and morphs still need shared persistence. | Per-product and per-mode inventory from actual flags/call sites, lossless versioned representations, source-owned permissions, lifecycle/death/capture checks and every applicable save codec. No Showcase-only engine fix or mission-objective predicate used as a service gate. |
 | K1 | P1 / open | Qualify complete supported custom games for all race combinations and 1–3 AIs. Validate building/unit progression, economy, targeting, victory and long-game stability. | Both maps, each human race, homogeneous and mixed AI races, actual tech progression and save/load. Track global pool/queue pressure and ensure human production is not silently starved. |
 | M1 | P0 / in progress | Keep expanded mechanics within GBA memory and global actor capacity. Z10 has reached the 240-actor pool, preventing its former 70-Hydralisk launch goal. | Unchanged safety reserves, ROM/EWRAM/IWRAM and stack checks, child/queue/trigger capacity accounting and sustained busy play. Document adaptation limits; do not present catalog capacity as native-scale simulation. |
 | B1 | P2 / open | Finish combat-rule and attack-event fidelity: fractional HP/shields, armor/size/upgrade effects, Firebat collateral, appear-at-target wind-up, shield-hit effects and specialized weapons. | Verify current code first; compare source/N64 events, not only appearance. Exercise allies, invincibility, shields, deaths and impact saturation with persistence and clipping. See [combat audit](ENGINE-FIDELITY-AUDIT.md). |
@@ -688,6 +725,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#349](https://github.com/ggu/starcraft-gba/pull/349), combined research Flash experiment | Draft head `0b913a66`: all 234 early ordinary-input custom ARM roster cases pass, plus HOST current/predecessor rosters and a paid Forge save/load/completion on runtime `d7e7554e`. Those early roster saves have zero research/debt. Later six-profile composition retains the exact P10 probe binary. Clean default checks at `340ecd44` pass (1,034 Python, 26 skips, plus compiled checks); focused later controller additions pass separately. Campaign/controller coverage, aliases, failure recovery, stack and hardware remain open; normal flags off. |
 | Shared HUD memory | Normal late-Zerg page reuse is merged in #352 and packaged at `f1fbf106`, adding 12,464 B of EWRAM margin on current Z9/Z10. The separate research probe's named-state save continuation passes, but its cross-load selected Forge/HUD presentation differs; that experimental presentation gate remains failed. Do not confuse the failed research composition with the qualified normal page reuse. |
 | [#355](https://github.com/ggu/starcraft-gba/pull/355), current campaign controller | HOST-only P1/Z9/Z10 stage with distinct current controller and retained origin. Actual rescue/production and town wallet/wave/transfer fixtures pass; flag-off normal P10 matches. Save/load is refused; persistence and remaining campaigns/consumers remain open. |
+| [#361](https://github.com/ggu/starcraft-gba/pull/361), P1 controller Flash | Draft head `449560c0`, qualified HOST runtime `30e5e782`. Actual P1 rescued origin/current identity, paid research and fractional HP survive fresh-process Flash load; genuine 43/44/47 migration, malformed/foreign record fallback and writer ownership/scratch tests pass. Stale-epoch end-to-end, Z10 Scarabs, ARM, hardware and other campaigns remain open. |
 | [#356](https://github.com/ggu/starcraft-gba/pull/356), paid Z10 Scarab | HOST-only controller/wallet composition exercises actual-map child travel and a real 100-damage impact. Custom/P1 comparators pass; follow-up [#358](https://github.com/ggu/starcraft-gba/pull/358) passes scripted reserve-pressure, paid wait/cancel/resume and Drone/Crystal creation checks. Arbitrary routing, codec composition, saves, ARM gameplay and ordinary Z10 victory remain open. The earlier [integration plan](audits/2026-11-07-z10-scarab-stage/README.md) remains historical context. |
 | [#359](https://github.com/ggu/starcraft-gba/pull/359), shared Arbiter aura optimization | Merged as `34c101e0`. Combined finder-bound and source-binding hoists save 1.804% mean elapsed cycles in one qualified P10 combat window, preserving the observed timeline/pixels/state and RAM guards. Six current normal links, clean default checks and prepared unified build pass; optional full unified/Terran checks lack a prepared private header. Packaged on Mac; no global 30-fps or hardware claim. |
 | [#354](https://github.com/ggu/starcraft-gba/pull/354), bounded N64 observer | Draft. Controlled Probe selection/movement and unique-record evidence is followed by a qualified post-store run with 606 verified events and unchanged RAM/frame controls. Movement order/target/position writer instructions are identified for this capture. Intermediate record reconstruction matches, five final bytes do not. Full writer coverage, independent clock/cadence, STOP and another actor remain open. |
