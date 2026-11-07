@@ -23,9 +23,9 @@ int main(int argc,char **argv)
     assert(argc==3);gba_init();game_init();race_mode=0;
     race_selected_mission=SC64_RACE_MISSION_P1;init_state();
     file_read(argv[2],device.bytes,sizeof device.bytes);assert(race_load_game());
-    GbaFlashJournalRecord a,b,*newer;
-    assert(gba_fj_probe(&flash_io,2,&a)==GBA_FJ_OK && gba_fj_probe(&flash_io,3,&b)==GBA_FJ_OK);
-    newer=gba_fj_newer(a.sequence,b.sequence)?&a:&b;
+    GbaFlashJournalRecord a,record_b,*newer;
+    assert(gba_fj_probe(&flash_io,2,&a)==GBA_FJ_OK && gba_fj_probe(&flash_io,3,&record_b)==GBA_FJ_OK);
+    newer=gba_fj_newer(a.sequence,record_b.sequence)?&a:&record_b;
     static Unit units[MAX_UNITS];static Building buildings[MAX_BUILDINGS];
     static u8 controllers[MAX_UNITS],building_controllers[MAX_BUILDINGS],debts[MAX_UNITS+MAX_BUILDINGS],before[131072];
     Sc64ProtossResearchLevels levels=sc64_experimental_research_levels;
@@ -36,7 +36,7 @@ int main(int argc,char **argv)
     flash_io.read=fault_read;flash_io.erase_sector=fault_erase;flash_io.program=fault_program;
     sc64_q8_flash_has_previous=0;
     if(!strcmp(argv[1],"stale-selected") || !strcmp(argv[1],"stale-epoch")) {
-        GbaFlashJournalRecord *victim=!strcmp(argv[1],"stale-selected")?newer:(newer==&a?&b:&a);
+        GbaFlashJournalRecord *victim=!strcmp(argv[1],"stale-selected")?newer:(newer==&a?&record_b:&a);
         mutate_at=gba_fj_metadata(victim->index)+12;mode=1;assert(!race_save_game());
         assert(fired && !memcmp(after_external,device.bytes,sizeof after_external));
     } else if(!strcmp(argv[1],"save-read")) {
