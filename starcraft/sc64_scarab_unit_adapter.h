@@ -218,6 +218,12 @@ static int race_scarab_allocate(void *ctx,int *slot)
 {
     Sc64ScarabUnitContext *c=ctx; int predicted=find_unit_slot(),carry,timer;
     Sc64ScarabChildFields f={(unsigned)c->parent_slot,SC64_SCARAB_CHILD_TRAINING,0,0};
+#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
+    /* Reserve the authored human/script room as well as every existing paid
+     * ordinary or paired product. Recheck after enqueue: free slots can fall
+     * before the training child is actually allocated. */
+    if (race_zl_active() && !race_product_slots_available(SC64_ZL_AI_RESERVE_UNITS+1u)) return 0;
+#endif
     if(predicted<0 || predicted>=SC64_SCARAB_FIELD_SLOT_LIMIT ||
        !sc64_scarab_child_fields_pack(&f,&carry,&timer)) return 0;
     int i=spawn_unit(u[c->parent_slot].owner,U_SCARAB,u[c->parent_slot].x,u[c->parent_slot].y);
@@ -361,6 +367,9 @@ static int race_scarab_cancel(int slot,int upgraded,unsigned index)
 {
     Sc64ScarabParent p; Sc64ScarabCounts counts; Sc64ScarabUnitContext c={slot};
     Sc64ScarabWallet bank; int next;
+#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
+    if (race_zl_active() && !race_product_slots_available(SC64_ZL_AI_RESERVE_UNITS+1u)) return 0;
+#endif
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts) ||
         !sc64_scarab_wallet_read(bank=race_scarab_owner_bank(slot),&next)) return 0;
     if (!sc64_scarab_cancel(&p,counts,upgraded,&race_scarab_ops,&c,index,&next,

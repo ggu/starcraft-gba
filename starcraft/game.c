@@ -33,7 +33,7 @@ static int race_q8_flash_write(const void *data,u32 length);
 #error "Active research journal requires the HOST-only research job stage"
 #endif
 #if defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) && \
-    (!defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) || !defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) || !defined(SC64_Z9_RUNTIME))
+    (!defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) || !defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_SHARED_SCOURGE_COMBAT))
 #error "Zerg late Scarab controller stage requires both HOST stages and Z9 runtime"
 #endif
 #if defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) && (!defined(GBA_HOST) || !defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) || !defined(SC64_RACES))
