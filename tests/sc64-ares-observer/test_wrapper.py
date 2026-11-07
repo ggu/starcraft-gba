@@ -14,7 +14,8 @@ class WrapperTest(unittest.TestCase):
 
  def test_real_child_inherits_selected_limits(self):
   for mode,expected in [('strict',(2*1024**2,8*1024**2)),('metal-compatible',(8*1024**2,8*1024**2))]:
-   with self.subTest(mode=mode), tempfile.TemporaryDirectory() as d, open(os.devnull,'r') as source, tempfile.TemporaryFile() as log, tempfile.TemporaryFile() as err:
+   readfd,writefd=os.pipe();os.close(writefd)
+   with self.subTest(mode=mode), tempfile.TemporaryDirectory() as d, os.fdopen(readfd,'r') as source, tempfile.TemporaryFile() as log, tempfile.TemporaryFile() as err:
     result={};target=Path(d)/'limits'
     code="import resource,sys;open(sys.argv[1],'w').write(repr(resource.getrlimit(resource.RLIMIT_FSIZE)))"
     with patch.object(m.sys,'stdin',source):m.relay([sys.executable,'-c',code,str(target)],d,os.environ.copy(),log,err,result,mode=mode)
