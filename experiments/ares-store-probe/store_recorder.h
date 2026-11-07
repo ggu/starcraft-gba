@@ -9,12 +9,21 @@ struct Sc64StoreEvent {
  std::uint16_t width, base_index;
 };
 static_assert(sizeof(Sc64StoreEvent)==48,"store-event ABI");
+struct Sc64EntryEvent {std::uint64_t pc,ra,a0,a1,a2,a3;std::uint32_t opcode,step;};
+static_assert(sizeof(Sc64EntryEvent)==56,"entry-event ABI");
 struct Sc64StoreRecorder {
  static constexpr unsigned limit=4096;
  static constexpr std::uint32_t begin=0x2ffd10, end=begin+312, ram_size=8u*1024u*1024u;
  Sc64StoreEvent events[limit]{};
+ static constexpr unsigned entry_limit=1024;Sc64EntryEvent entries[entry_limit]{};unsigned entry_count=0;bool entry_enabled=false,entry_overflow=false;
  std::uint64_t pc=0,base=0;std::uint32_t opcode=0,step=0;unsigned count=0;bool armed=false,active=false,overflow=false;
- void instruction_begin(std::uint64_t p,std::uint32_t op,std::uint64_t b) {if(!armed)return;pc=p;opcode=op;base=b;active=true;}
+ void instruction_begin(std::uint64_t p,std::uint32_t op,std::uint64_t b,std::uint64_t ra=0,std::uint64_t a0=0,std::uint64_t a1=0,std::uint64_t a2=0,std::uint64_t a3=0) {
+  if(!armed)return;pc=p;opcode=op;base=b;active=true;
+  if(entry_enabled && (p==0xffffffff8000c390ull || p==0xffffffff80122904ull)) {
+   if(entry_count==entry_limit)entry_overflow=true;
+   else entries[entry_count++]={p,ra,a0,a1,a2,a3,op,step};
+  }
+ }
  void instruction_end(){active=false;}
  void committed(std::uint64_t va,std::uint32_t pa,unsigned width,std::uint64_t data) {
   if(!armed || !active || (width!=1 && width!=2 && width!=4 && width!=8) || pa>=ram_size || width>ram_size-pa || pa>=end || pa+width<=begin)return;
@@ -23,7 +32,7 @@ struct Sc64StoreRecorder {
   events[count++]={pc,va,masked,base,opcode,pa,step,static_cast<std::uint16_t>(width),static_cast<std::uint16_t>((opcode>>21)&31)};
  }
 };
-static_assert(sizeof(Sc64StoreEvent)*Sc64StoreRecorder::limit+64<=256u*1024u,"store output budget");
+static_assert(sizeof(Sc64StoreEvent)*Sc64StoreRecorder::limit+sizeof(Sc64EntryEvent)*Sc64StoreRecorder::entry_limit+64<=256u*1024u,"store output budget");
 inline std::uint32_t sc64_store_be32(const std::uint8_t *p) {return (std::uint32_t(p[0])<<24)|(std::uint32_t(p[1])<<16)|(std::uint32_t(p[2])<<8)|p[3];}
 inline bool sc64_store_baseline_valid(const std::uint8_t *p,std::size_t n) {
  if(!p || n!=Sc64StoreRecorder::ram_size)return false;

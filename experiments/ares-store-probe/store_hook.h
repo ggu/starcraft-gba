@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstddef>
 /* Host-only sink supplied by the observer; these calls never access guest memory. */
-extern "C" void sc64_store_instruction_begin(std::uint64_t pc,std::uint32_t opcode,std::uint64_t base);
+extern "C" void sc64_store_instruction_begin(std::uint64_t pc,std::uint32_t opcode,std::uint64_t base,std::uint64_t ra,std::uint64_t a0,std::uint64_t a1,std::uint64_t a2,std::uint64_t a3);
 extern "C" void sc64_store_instruction_end();
 extern "C" void sc64_store_committed(std::uint64_t vaddr,std::uint32_t paddr,unsigned width,std::uint64_t data);
 #endif

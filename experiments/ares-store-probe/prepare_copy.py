@@ -3,7 +3,7 @@
 """Prepare a separate source copy only; never compile or modify the pinned input."""
 import argparse, hashlib, pathlib, shutil, subprocess
 REV='0aafd85789215e84e1e43415c07d4c88461b7899'
-PATCH='22520a3f4929433375259caa6497dcce2a8c85600a011bdfebf01cdfe0e0d0c7'
+PATCH='ff4a9a803a3cdfc55f42ae1202790833e75f426669b36ad48511d6cd3a04a368'
 INPUTS={'ares/n64/cpu/cpu.cpp':'be3919fa2232299733b811ed6052bd4020ddeb3a6e8261052c3417b2dedea3c8',
         'ares/n64/cpu/memory.cpp':'55f833718501d018d7e81e089a1ca53a9891154b8952cc2ec1b5126fda632c74'}
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()

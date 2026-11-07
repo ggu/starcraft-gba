@@ -6,7 +6,7 @@
 +#endif
 @@ -168,0 +172,3 @@
 +#ifdef SC64_OBSERVER_CPU_STORE
-+  sc64_store_instruction_begin(ipu.pc, *data, ipu.r[(*data >> 21) & 31].u64);
++  sc64_store_instruction_begin(ipu.pc,*data,ipu.r[(*data >> 21) & 31].u64,ipu.r[31].u64,ipu.r[4].u64,ipu.r[5].u64,ipu.r[6].u64,ipu.r[7].u64);
 +#endif
 @@ -169,0 +176,3 @@
 +#ifdef SC64_OBSERVER_CPU_STORE
