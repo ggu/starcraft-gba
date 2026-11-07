@@ -92,6 +92,11 @@ test-zl-scarab-compound-flash:
 	$(ZL_SCARAB_OUT)/compound only-bad-flight $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound write-two $(ZL_SCARAB_OUT)/z10-two.flash
 	$(ZL_SCARAB_OUT)/compound fallback-bad $(ZL_SCARAB_OUT)/z10-two.flash
+	@for phase in marker commit-erase data-erase meta header base tail tag verify; do \
+	  $(ZL_SCARAB_OUT)/compound game-cut-$$phase $(ZL_SCARAB_OUT)/z10-two.flash && \
+	  $(ZL_SCARAB_OUT)/compound game-retry $(ZL_SCARAB_OUT)/z10-two.flash.$$phase.cut && \
+	  $(ZL_SCARAB_OUT)/compound game-check $(ZL_SCARAB_OUT)/z10-two.flash.$$phase.cut.recovered || exit $$?; \
+	done
 	$(ZL_SCARAB_OUT)/compound stale-shot $(ZL_SCARAB_OUT)/unused
 	$(ZL_SCARAB_OUT)/compound stale-marker $(ZL_SCARAB_OUT)/unused
 	$(ZL_SCARAB_OUT)/compound cut-write $(ZL_SCARAB_OUT)/z10-cut.flash

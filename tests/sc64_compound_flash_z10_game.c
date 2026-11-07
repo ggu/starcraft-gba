@@ -9,7 +9,8 @@
 #undef main
 static Model device;
 static GbaFlash1m flash={&device,rd,wr,20,0,0};
-static int erases,programs,fail_prefix,inject_reselect,injected;
+static int erases,programs,fail_prefix,inject_reselect,injected,fault_triggered;
+static const char *fault_phase;
 static u8 external_after[131072];
 static int cf_read(void *c,uint32_t p,void *v,uint32_t n)
 {
@@ -19,10 +20,36 @@ static int cf_read(void *c,uint32_t p,void *v,uint32_t n)
         memcpy(external_after,device.bytes,sizeof external_after);injected=1;
     }
 #endif
+    if(fault_phase && !strcmp(fault_phase,"verify") && !fault_triggered && programs>=12 &&
+       p==gba_fj_metadata(2) && n==16){fault_triggered=1;return 0;}
     return gba_flash1m_read(c,p,v,n);
 }
-static int cf_program(void *c,uint32_t p,const void *v,uint32_t n){++programs;if(fail_prefix && n==SC64_CF_HEADER && (p==gba_fj_metadata(2)+16 || p==gba_fj_metadata(3)+16))return 0;return gba_flash1m_program(c,p,v,n);}
-static int cf_erase(void *c,uint32_t p){++erases;return gba_flash1m_erase_sector(c,p);}
+static int cf_program(void *c,uint32_t p,const void *v,uint32_t n)
+{
+    ++programs;
+    if(fail_prefix && n==SC64_CF_HEADER && (p==gba_fj_metadata(2)+16 || p==gba_fj_metadata(3)+16))return 0;
+    if(fault_phase && !fault_triggered) {
+        u32 meta=gba_fj_metadata(2),base=gba_fj_base(2),partial=0;
+        if(!strcmp(fault_phase,"marker") && p==base+SC64_CFR_MARKER_OFFSET && n==1)partial=1;
+        else if(!strcmp(fault_phase,"meta") && p==meta && n==16)partial=8;
+        else if(!strcmp(fault_phase,"header") && p==meta+16 && n==SC64_CF_HEADER)partial=16;
+        else if(!strcmp(fault_phase,"base") && p==meta+16+SC64_CF_HEADER && n>64)partial=64;
+        else if(!strcmp(fault_phase,"tail") && n==SC64_CF_SIDE)partial=64;
+        else if(!strcmp(fault_phase,"tag") && p==base && n==4)partial=2;
+        if(partial){fault_triggered=1;assert(gba_flash1m_program(c,p,v,partial));return 0;}
+    }
+    return gba_flash1m_program(c,p,v,n);
+}
+static int cf_erase(void *c,uint32_t p)
+{
+    ++erases;
+    if(fault_phase && !fault_triggered &&
+       ((!strcmp(fault_phase,"commit-erase") && p==gba_fj_base(2)) ||
+        (!strcmp(fault_phase,"data-erase") && p==gba_fj_base(2)+GBA_FJ_SECTOR))) {
+        fault_triggered=1;assert(gba_flash1m_erase_sector(c,p));return 0;
+    }
+    return gba_flash1m_erase_sector(c,p);
+}
 static GbaFlashJournalIo io={&flash,cf_read,cf_erase,cf_program};
 const GbaFlashJournalIo *sc64_q8_flash_host_io(void){return &io;}
 static void copy_file(const char *path,int writing)
@@ -313,6 +340,22 @@ int main(int argc,char **argv)
             FlightSnapshot original=flight_snapshot(parent);side_file(argv[2],".before",&original,sizeof original,1);
             FlightOutcome outcome=flight_finish(&original);side_file(argv[2],".after",&outcome,sizeof outcome,1);
         }
+    } else if(!strncmp(argv[1],"game-cut-",9)) {
+        const char *phase=argv[1]+9;game_init();copy_file(argv[2],0);assert(race_load_game());
+        static u8 winner[GBA_FJ_SLOT];memcpy(winner,device.bytes+gba_fj_base(3),sizeof winner);
+        live_capture(&before_live);erases=programs=0;fault_phase=phase;
+        assert(!race_save_game() && fault_triggered);fault_phase=0;live_unchanged();
+        assert(!memcmp(winner,device.bytes+gba_fj_base(3),sizeof winner));
+        char path[1024];assert(snprintf(path,sizeof path,"%s.%s.cut",argv[2],phase)>0);copy_file(path,1);
+    } else if(!strcmp(argv[1],"game-retry")) {
+        game_init();copy_file(argv[2],0);assert(race_load_game());live_capture(&before_live);
+        assert(race_save_game());live_unchanged();
+        char path[1024];assert(snprintf(path,sizeof path,"%s.recovered",argv[2])>0);copy_file(path,1);
+    } else if(!strcmp(argv[1],"game-check")) {
+        game_init();copy_file(argv[2],0);assert(race_load_game() && race_selected_mission==SC64_Z10_GLOBAL_ID);
+        int found=0;for(int i=0;i<MAX_UNITS;++i)if(u[i].alive && u[i].type==U_REAVER &&
+            u[i].raw_owner==0 && sc64_controller_unit(i)==7 && sc64_scarab_stage_payer[i]==13)++found;
+        assert(found==1 && race_zl_ai_minerals[1]==0);
     } else if(!strcmp(argv[1],"stale-marker")) {
         launch_z10_from_normal_menu();memset(device.bytes,0xff,sizeof device.bytes);
         /* Physically reachable partial owner marker; data and commit blank. */
