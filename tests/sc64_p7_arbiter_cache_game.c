@@ -5,6 +5,19 @@
 #include <string.h>
 #include "../starcraft/game.c"
 
+#if defined(SC64_AURA_HOISTS_DISABLED)
+#if defined(SC64_AURA_SOURCE_HOIST_PROBE) || defined(SC64_AURA_SQUARE_HOIST_PROBE)
+#error "Aura opt-out must select both scalar paths"
+#endif
+#elif defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#ifndef SC64_AURA_SOURCE_HOIST_PROBE
+#error "Shared Arbiter source hoist must be enabled"
+#endif
+#if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && !defined(SC64_AURA_SQUARE_HOIST_PROBE)
+#error "Shared Arbiter square hoist must follow geometry support"
+#endif
+#endif
+
 static int make_actor(int live_owner,unsigned raw,int type,int owner,int x,int y)
 {
     int n=spawn_unit(live_owner,type,x,y);

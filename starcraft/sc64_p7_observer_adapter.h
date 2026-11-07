@@ -1,6 +1,15 @@
 #ifndef SC64_P7_OBSERVER_ADAPTER_H
 #define SC64_P7_OBSERVER_ADAPTER_H
 
+/* Exact aura hoists are shared by every product using this service. Keep an
+ * explicit opt-out for baseline and regression comparisons. */
+#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(SC64_AURA_HOISTS_DISABLED)
+#define SC64_AURA_SOURCE_HOIST_PROBE 1
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+#define SC64_AURA_SQUARE_HOIST_PROBE 1
+#endif
+#endif
+
 /* Shared source-tick snapshot invariants for optical detection. */
 #define SC64_P7_DETECTOR_BINDING_HOIST 1
 #define SC64_P7_DETECTOR_SNAPSHOT_FAST 1
