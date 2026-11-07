@@ -38,6 +38,12 @@ static void observe_next(void)
     game_render();
 }
 
+/* Advance to the next tick on which the observer compares hit points. */
+static void observe_vitals(void)
+{
+    do observe_next(); while (frame & GAME_AUDIO_VITAL_TICK_MASK);
+}
+
 static void put_unit(int slot, int owner, int type, int x, int y)
 {
     memset(&u[slot], 0, sizeof u[slot]);
@@ -433,6 +439,116 @@ static int hooks(void)
     observe_next();
     if (events(GAME_AUDIO_ADVISOR) || toast_advisor) return fail("discontinuity kept an advisor cue");
 
+    /* Off-screen damage alerts at most once per interval; on-screen damage is silent. */
+    fixture();
+    put_unit(10, SIDE, U_MARINE, 900, 900);
+    put_unit(11, SIDE, U_MARINE, 60, 60);
+    u[10].hp = u[11].hp = 30;
+    b[0].alive = 1; b[0].owner = SIDE; b[0].type = B_DEPOT; b[0].x = 900; b[0].y = 700;
+    b[0].hp = 300; b[0].maxhp = 500;
+    observe_vitals();
+    observe_vitals();
+    for (int k = 0; k <= GAME_AUDIO_ATTACK_ALERT_TICKS; k++) observe_next();
+    clear_events();
+    u[11].hp = 20;
+    observe_vitals();
+    if (events(GAME_AUDIO_ALERT)) return fail("on-screen damage alerted");
+    u[10].hp = 20;
+    observe_vitals();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_FORCES)
+        return fail("off-screen unit damage");
+    u[10].hp = 40;
+    observe_vitals();
+    u[10].hp = 8;
+    observe_vitals();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("sustained attack repeated inside the interval");
+    for (int k = 0; k < GAME_AUDIO_ATTACK_ALERT_TICKS; k++) observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("quiet interval alerted");
+    b[0].hp = 200;
+    observe_vitals();
+    if (events(GAME_AUDIO_ALERT) != 2 || game_audio_last_alert != GAME_AUDIO_ALERT_BASE)
+        return fail("off-screen building damage");
+    /* Healing and a morph to a full smaller body are not attacks. */
+    for (int k = 0; k <= GAME_AUDIO_ATTACK_ALERT_TICKS; k++) observe_next();
+    clear_events();
+    b[0].hp = 400;
+    u[10].hp = 40;
+    observe_vitals();
+    u[10].hp = u[10].maxhp = 16;
+    observe_vitals();
+    if (events(GAME_AUDIO_ALERT)) return fail("healing or a morph alerted");
+    /* A discontinuity drops damage from before it. */
+    u[10].hp = 4;
+    frame += 40;
+    game_render();
+    observe_vitals();
+    if (events(GAME_AUDIO_ALERT)) return fail("damage across a discontinuity alerted");
+
+    /* Finished upgrades alert once; a level with no running upgrade does not. */
+    weapons_research = 600;
+    observe_next();
+    clear_events();
+    weapons_research = 0;
+    ++weapons_level;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_UPGRADE)
+        return fail("finished upgrade");
+    observe_next();
+    ++armor_level;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("granted upgrade alerted");
+
+#ifdef SC64_SHARED_TRANSPORT
+    /* The player's finished research alerts once; an enemy's does not. */
+    clear_events();
+    race_skirmish_transport_tech.owner[sc64_sk_transport_owner_index(ENEMY)].researched = 1;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT)) return fail("enemy research alerted");
+    race_skirmish_transport_tech.owner[sc64_sk_transport_owner_index(SIDE)].researched = 1;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_RESEARCH)
+        return fail("finished research");
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("research alert repeated");
+#endif
+
+    /* Refused sites and low energy use their cues, then clear. */
+    clear_events();
+    toast_advisor = TOAST_CUE_NO_BUILD;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_NO_BUILD)
+        return fail("blocked placement");
+    toast_advisor = TOAST_CUE_NO_LAND;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 2 || game_audio_last_alert != GAME_AUDIO_ALERT_NO_LAND)
+        return fail("blocked landing");
+    toast_advisor = TOAST_CUE_ENERGY;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 3 || game_audio_last_alert != GAME_AUDIO_ALERT_ENERGY)
+        return fail("low energy");
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 3 || events(GAME_AUDIO_ADVISOR)) return fail("alert cue repeated");
+#if defined(SC64_AUDIO_IMPORTED) && defined(SC64_AUDIO_ALERT_LINES)
+    if (GAME_AUDIO_PLAYER_RACE == 0 &&
+        audio_host_last_sample != sc64_audio_alert[GAME_AUDIO_ALERT_ENERGY])
+        return fail("race energy line");
+#endif
+
+    /* A placement on impossible ground takes the cue through the real command path. */
+    fixture();
+    put_unit(12, SIDE, U_SCV, 60, 60);
+    u[12].selected = 1;
+    minerals = gas = 5000;
+    observe_next();
+    observe_next();
+    clear_events();
+    cx = cy = 2;
+    if (can_place(B_DEPOT, cx, cy)) return fail("fixture site is placeable");
+    start_build(B_DEPOT);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_NO_BUILD)
+        return fail("blocked placement cue");
+
     /* A tick discontinuity (load or restart) and pauses never replay history. */
     put_unit(7, ENEMY, U_ZERGLING, 50, 50);
     observe_next();
@@ -494,10 +610,14 @@ int main(int argc, char **argv)
 #ifndef GAME_AUDIO_OFF
     u32 total = 0;
     for (int k = 0; k < GAME_AUDIO_EVENT_KINDS; k++) total += events(k);
-    printf("events attack=%u death=%u ready=%u what=%u yes=%u built=%u advisor=%u\n",
+    printf("events attack=%u death=%u ready=%u what=%u yes=%u built=%u advisor=%u alert=%u\n",
            events(GAME_AUDIO_ATTACK), events(GAME_AUDIO_DEATH), events(GAME_AUDIO_READY),
            events(GAME_AUDIO_WHAT), events(GAME_AUDIO_YES), events(GAME_AUDIO_BUILT),
-           events(GAME_AUDIO_ADVISOR));
+           events(GAME_AUDIO_ADVISOR), events(GAME_AUDIO_ALERT));
+    printf("alerts base=%u forces=%u research=%u upgrade=%u energy=%u no_build=%u no_land=%u built=%u\n",
+           game_audio_alert_lines[0], game_audio_alert_lines[1], game_audio_alert_lines[2],
+           game_audio_alert_lines[3], game_audio_alert_lines[4], game_audio_alert_lines[5],
+           game_audio_alert_lines[6], game_audio_alert_lines[7]);
     if (!total) return fail("long run produced no audio events");
 #endif
     return 0;
