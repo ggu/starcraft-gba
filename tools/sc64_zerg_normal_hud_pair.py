@@ -41,7 +41,7 @@ def valid_sram(p):
  found=[]
  for off in (0,16384):
   tag=int.from_bytes(data[off:off+4],'little');n=int.from_bytes(data[off+4:off+8],'little');check=int.from_bytes(data[off+8:off+12],'little');seq=int.from_bytes(data[off+12:off+16],'little')
-  if not tag or tag==0xffffffff or not 0<n<=16368 or not seq:continue
+  if not tag or tag==0xffffffff or not tag&0xff000000 or (tag>>16)&255!=0x43 or not 0<n<=16368 or not seq:continue
   h=2166136261
   for byte in data[off+16:off+16+n]:h=((h^byte)*16777619)&0xffffffff
   if h==check:found.append({'slot':off//16384,'tag':tag,'length':n,'sequence':seq})
