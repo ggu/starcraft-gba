@@ -2266,8 +2266,18 @@ volatile u32 sc64_t5_rescue_cycles, sc64_t5_mine_cycles, sc64_t5_trigger_ai_cycl
 #ifdef SC64_DIAGNOSTIC_SETUP
 volatile u32 sc64_setup_buckets, sc64_setup_lists, sc64_setup_index, sc64_setup_arbiter;
 #endif
+#if defined(SC64_DIAGNOSTIC_COMBAT_LEAVES) && !defined(SC64_DIAGNOSTIC_ORDERS)
+#error "combat leaf diagnostics require orders diagnostics"
+#endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
 volatile u32 sc64_order_setup_cycles, sc64_order_query_cycles, sc64_order_move_cycles;
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+static int sc64_combat_leaf_active;
+volatile u32 sc64_combat_direct_count, sc64_combat_direct_cycles;
+volatile u32 sc64_combat_step_count, sc64_combat_step_cycles;
+volatile u32 sc64_combat_contact_count, sc64_combat_contact_cycles;
+volatile u32 sc64_combat_route_count, sc64_combat_route_cycles;
+#endif
 #define SC64_ORDER_DIAG_ACCUM(counter, start) \
     do { (counter) += gba_clock() - (start); } while (0)
 #endif
@@ -3347,6 +3357,13 @@ static int GBA_HOT
 path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 {
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+    if (sc64_combat_leaf_active) {
+        u32 start=gba_clock(); int result; ++sc64_combat_route_count;
+        result=sc64_route_next(x,y,tx,ty,next_x,next_y);
+        sc64_combat_route_cycles+=gba_clock()-start; return result;
+    }
+#endif
     return sc64_route_next(x, y, tx, ty, next_x, next_y);
 #else
     static const int dx[4] = {1, -1, 0, 0};
@@ -3473,6 +3490,9 @@ formation_route_pair(int sx, int sy, int slot_x, int slot_y, int tx, int ty,
 
 /* Cheap direct routing handles the open map. Run the full BFS only when the
  * straight corridor intersects terrain or a structure. */
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+#define direct_path_clear direct_path_clear_combat_leaf_impl
+#endif
 static int GBA_HOT
 direct_path_clear(int x, int y, int tx, int ty)
 {
@@ -3500,6 +3520,19 @@ direct_path_clear(int x, int y, int tx, int ty)
     }
     return 1;
 }
+
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+#undef direct_path_clear
+static int direct_path_clear(int x, int y, int tx, int ty)
+{
+    u32 start; int result;
+    if (!sc64_combat_leaf_active) return direct_path_clear_combat_leaf_impl(x,y,tx,ty);
+    start=gba_clock(); ++sc64_combat_direct_count;
+    result=direct_path_clear_combat_leaf_impl(x,y,tx,ty);
+    sc64_combat_direct_cycles+=gba_clock()-start;
+    return result;
+}
+#endif
 
 #ifdef SC64_RACES
 static int __attribute__((noinline))
@@ -3539,6 +3572,9 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
 }
 #endif
 
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+#define unit_step_clear unit_step_clear_combat_leaf_impl
+#endif
 static int GBA_HOT
 unit_step_clear(const Unit *q, int nx, int ny)
 {
@@ -3574,6 +3610,19 @@ unit_step_clear(const Unit *q, int nx, int ny)
     return 1;
 #endif
 }
+
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+#undef unit_step_clear
+static int unit_step_clear(const Unit *q, int nx, int ny)
+{
+    u32 start; int result;
+    if (!sc64_combat_leaf_active) return unit_step_clear_combat_leaf_impl(q,nx,ny);
+    start=gba_clock(); ++sc64_combat_step_count;
+    result=unit_step_clear_combat_leaf_impl(q,nx,ny);
+    sc64_combat_step_cycles+=gba_clock()-start;
+    return result;
+}
+#endif
 
 #ifdef SC64_RACES
 /* Keep fact lookup and endpoint arithmetic in ROM: large campaign profiles
@@ -3729,7 +3778,14 @@ move_toward(Unit * q, int tx, int ty)
 #if defined(SC64_CONTACT_CACHE)
 	/* One bucket pass answers all eight unit_step_clear() offsets; the
 	 * selection order and tie-breaking below are unchanged. */
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+        u32 combat_contact_start=sc64_combat_leaf_active ? gba_clock() : 0;
+        if (sc64_combat_leaf_active) ++sc64_combat_contact_count;
+#endif
 	unsigned blocked = sc64_contact_blocked_mask(q, speed);
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+        if (sc64_combat_leaf_active) sc64_combat_contact_cycles+=gba_clock()-combat_contact_start;
+#endif
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);
@@ -8455,6 +8511,12 @@ update_orders(void)
     sc64_order_setup_cycles = 0;
     sc64_order_query_cycles = 0;
     sc64_order_move_cycles = 0;
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+    sc64_combat_direct_count=sc64_combat_direct_cycles=0;
+    sc64_combat_step_count=sc64_combat_step_cycles=0;
+    sc64_combat_contact_count=sc64_combat_contact_cycles=0;
+    sc64_combat_route_count=sc64_combat_route_cycles=0;
+#endif
 #endif
 #if !defined(SC64_SKIRMISH) && !defined(SC64_RACES)
     int cc;
@@ -9899,7 +9961,13 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_sync_references();
 #endif
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+    sc64_combat_leaf_active=1;
+#endif
     update_orders();
+#ifdef SC64_DIAGNOSTIC_COMBAT_LEAVES
+    sc64_combat_leaf_active=0;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (sc64_battlecruiser_source_tick_due())
         for (int i=0;i<SC64_BC_SHOT_LIMIT;++i)
