@@ -35,6 +35,20 @@ int main(int argc,char **argv)
         unsigned hp_before;assert(sc64_pr_q8_actor_hp(target,&hp_before) && hp_before>128);
         hit_target_impl_ex(target,128,U_MARINE,ENEMY,SC64_STOCK_DMG_IGNORE_ARMOR,SC64_HIT_PACKET_Q8);
         assert(sc64_pr_hp_debt[target]==128);
+        if(!strcmp(argv[1],"write-outside") || !strcmp(argv[1],"write-moving")) {
+            int sx=-1,sy=-1;
+            for(int y=64;y<WORLD_H-64 && sx<0;y+=16)for(int x=64;x<WORLD_W-112;x+=16) {
+                int clear=1;
+                for(int k=0;k<=48;k+=4)if(terrain_blocked((x+k)/16,y/16))clear=0;
+                for(int j=0;j<MAX_BUILDINGS && clear;++j)if(b[j].alive)
+                    for(int k=0;k<=48;k+=4)if(dist2(x+k,y,b[j].x,b[j].y)<40*40){clear=0;break;}
+                for(int j=0;j<MAX_UNITS && clear;++j)if(j!=parent && j!=target && u[j].alive)
+                    for(int k=0;k<=48;k+=4)if(dist2(x+k,y,u[j].x,u[j].y)<36*36){clear=0;break;}
+                if(clear && direct_path_clear(x,y,x+48,y)){sx=x;sy=y;break;}
+            }
+            assert(sx>=0);u[parent].x=sx;u[parent].y=sy;u[parent].cd=0;
+            u[target].x=sx+48;u[target].y=sy;
+        }
         race_zl_ai_minerals[1]=15;assert(race_scarab_ai_restock_stage(parent));
         race_scarab_human_parent_step(parent);
         Sc64ScarabParent p;Sc64ScarabCounts counts;
@@ -49,18 +63,6 @@ int main(int argc,char **argv)
             assert(race_scarab_parent_read(parent,0,&p,&counts) && counts.inside==1);
         }
         if(!strcmp(argv[1],"write-outside") || !strcmp(argv[1],"write-moving")) {
-            int sx=-1,sy=-1;
-            for(int y=64;y<WORLD_H-64 && sx<0;y+=16)for(int x=64;x<WORLD_W-112;x+=16) {
-                int clear=1;
-                for(int k=0;k<=48;k+=4)if(terrain_blocked((x+k)/16,y/16))clear=0;
-                for(int j=0;j<MAX_BUILDINGS && clear;++j)if(b[j].alive)
-                    for(int k=0;k<=48;k+=4)if(dist2(x+k,y,b[j].x,b[j].y)<40*40){clear=0;break;}
-                for(int j=0;j<MAX_UNITS && clear;++j)if(j!=parent && j!=target && u[j].alive)
-                    for(int k=0;k<=48;k+=4)if(dist2(x+k,y,u[j].x,u[j].y)<36*36){clear=0;break;}
-                if(clear && direct_path_clear(x,y,x+48,y)){sx=x;sy=y;break;}
-            }
-            assert(sx>=0);u[parent].x=sx;u[parent].y=sy;u[parent].cd=0;
-            u[target].x=sx+48;u[target].y=sy;
             tick_combat(&u[parent],target);
             assert(race_scarab_parent_read(parent,0,&p,&counts) && counts.outside==1);
             if(!strcmp(argv[1],"write-moving")) {
