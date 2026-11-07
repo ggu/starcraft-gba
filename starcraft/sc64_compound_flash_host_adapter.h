@@ -9,6 +9,12 @@ typedef struct {GbaFlashJournalRecord records[4];u8 seen[4],accepted[4];RaceLoad
 static Sc64CfSnapshot sc64_cf_snapshot;
 static GbaFlashJournalRecord sc64_cf_previous;
 static int sc64_cf_has_previous;
+#ifdef SC64_CF_TEST_DIAGNOSTICS
+static int sc64_cf_test_stage;
+#define SC64_CF_TEST_STAGE(n) (sc64_cf_test_stage=(n))
+#else
+#define SC64_CF_TEST_STAGE(n) ((void)0)
+#endif
 static Sc64CompoundFlashHeader sc64_cf_expected(u32 base)
 { return (Sc64CompoundFlashHeader){1,0,SC64_Z10_GLOBAL_ID,SC64_CF_FEATURES,base,1,MAX_UNITS+MAX_BUILDINGS,MAX_UNITS+MAX_BUILDINGS,MAX_UNITS}; }
 /* Until genuine predecessors have a qualified decoder, require an entirely
@@ -131,6 +137,7 @@ static int sc64_cf_reselect(void *ctx,const GbaFlashJournalIo *io,const GbaFlash
 }
 static int race_q8_flash_begin(void)
 {
+    SC64_CF_TEST_STAGE(1);
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();RaceLoadPlan scratch;int status;
     memset(&sc64_cf_snapshot,0,sizeof sc64_cf_snapshot);
     if(!sc64_cf_ownership(io))return 0;
@@ -161,6 +168,7 @@ static int sc64_cf_guard_erase(void *v,u32 p)
 {Sc64CfGuard *g=v;if(!g->checked){if(!sc64_cf_ownership(g->inner))return 0;g->checked=1;}return g->inner->erase_sector(g->inner->context,p);}
 static int race_q8_flash_write(const void *data,u32 length)
 {
+    SC64_CF_TEST_STAGE(2);
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();
     u8 header[SC64_CF_HEADER],side[SC64_CF_SIDE];RaceLoadPlan plan;
     u8 suffix[SC64_BC_SAVE_EXTRA_BYTES+sizeof(Sc64ImpactSaveHeader)+
@@ -193,6 +201,7 @@ static int race_q8_flash_write(const void *data,u32 length)
     for(unsigned i=0;i<MAX_BUILDINGS;++i)
         padding[i]=((u8 *)race_data.buildings)[i*SC64_PR_ROW_WIDTH+SC64_PR_ROW_WIDTH-1];
     valid=race_worker_cargo_prepare_selected(data,length,SC64_COMPOUND_FLASH_TAG,&plan);
+    SC64_CF_TEST_STAGE(valid?3:4);
     if(valid) {
         u32 cursor=0;
         memcpy(plan.q8_debt,side+cursor,sizeof plan.q8_debt);cursor+=sizeof plan.q8_debt;
@@ -200,6 +209,7 @@ static int race_q8_flash_write(const void *data,u32 length)
         memcpy(plan.controller_buildings,side+cursor,sizeof plan.controller_buildings);cursor+=sizeof plan.controller_buildings;
         memcpy(plan.scarab_payers,side+cursor,sizeof plan.scarab_payers);
         valid=sc64_cf_validate(&plan);
+        SC64_CF_TEST_STAGE(valid?5:6);
     }
     for(unsigned i=0;i<MAX_BUILDINGS;++i)
         ((u8 *)race_data.buildings)[i*SC64_PR_ROW_WIDTH+SC64_PR_ROW_WIDTH-1]=padding[i];

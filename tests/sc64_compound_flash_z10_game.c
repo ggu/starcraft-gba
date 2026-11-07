@@ -78,7 +78,11 @@ int main(int argc,char **argv)
             }
         } else assert(!strcmp(argv[1],"write-training") || !strcmp(argv[1],"write-inside"));
         memset(device.bytes,0xff,sizeof device.bytes);
-        assert(race_save_game());copy_file(argv[2],1);
+        int saved=race_save_game();
+#ifdef SC64_CF_TEST_DIAGNOSTICS
+        fprintf(stderr,"save=%d stage=%d pending=%d\n",saved,sc64_cf_test_stage,race_scarab_probe_bullets_pending());
+#endif
+        assert(saved);copy_file(argv[2],1);
     } else if(!strncmp(argv[1],"read-",5)) {
         game_init();copy_file(argv[2],0);assert(race_load_game());
         int found=0;
