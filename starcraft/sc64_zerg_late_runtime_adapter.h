@@ -472,6 +472,9 @@ static int race_zl_create(void *opaque, const Sc64Z8Action *action,
     if (slot < 0) return -1;
     u[slot].raw_type = (s16)raw;
     u[slot].raw_owner = (s16)source_owner;
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+    if (sc64_controller_valid((int)source_owner,live_owner)) sc64_current_unit[slot] = (u8)source_owner;
+#endif
     if (raw == SC64_ZL_RAW_CRYSTAL) {
         invincible_units[slot] = 1;
         u[slot].selected = 0;
@@ -655,7 +658,12 @@ static void race_zl_ai_produce(unsigned town)
     if (used + SC64_ZL_AI_RESERVE_UNITS >= MAX_UNITS) return;
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         int type = -1;
-        if (!b[i].alive || b[i].owner != ENEMY || b[i].raw_owner != slot ||
+        if (!b[i].alive || b[i].owner != ENEMY ||
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+            sc64_controller_building(i) != slot ||
+#else
+            b[i].raw_owner != slot ||
+#endif
             !building_complete(i) || b[i].queue_count) continue;
         if (b[i].type == B_GATEWAY)
             type = race_zl_ai.produce_index[town] & 1u ? U_DRAGOON : U_ZEALOT;

@@ -1692,6 +1692,9 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 #endif
 
 static int race_save_game(void) {
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+    if (race_zl_active()) return 0; /* no sidecar wire format yet */
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     if (sc64_pr_stage_fault || (race_mode!=1
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
@@ -4359,6 +4362,9 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 }
 #endif
 static int race_load_game(void) {
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+    if (race_zl_active()) return 0; /* never reconstruct from retained origin */
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     if (sc64_pr_stage_fault) return 0;
 #endif

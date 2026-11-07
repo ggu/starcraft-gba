@@ -45,9 +45,15 @@ static int race_creation_source_owner(int owner, int creator_raw)
     return candidate == map->human_slot ? candidate : -1;
 }
 
-static int race_spawn_product(int owner, int type, int x, int y, int source_owner)
+static int race_spawn_product(int owner, int type, int x, int y, int source_owner, int producer)
 {
     int slot = spawn_unit(owner, type, x, y);
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+    int controller = sc64_controller_building(producer);
+    if (slot >= 0 && sc64_controller_valid(controller,owner)) sc64_current_unit[slot] = (u8)controller;
+#else
+    (void)producer;
+#endif
     /* Mission-specific spawn hooks have priority over this shared fallback. */
     if (slot >= 0 && source_owner >= 0 && u[slot].raw_owner < 0)
         u[slot].raw_owner = source_owner;
@@ -1063,6 +1069,10 @@ static void __attribute__((noinline)) race_pending_build_tick(int worker)
         int source_owner = race_creation_source_owner(q->owner, q->raw_owner);
         slot = spawn_build(q->owner, type, x, y, 1);
         if (slot < 0) goto cancel;
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+        { int controller=sc64_controller_unit(worker);
+          if (sc64_controller_valid(controller,q->owner)) sc64_current_building[slot]=(u8)controller; }
+#endif
         if (source_owner >= 0 && b[slot].raw_owner < 0)
             b[slot].raw_owner = source_owner;
     }
@@ -1632,8 +1642,8 @@ static void race_tick_buildings(void)
                     continue;
                 }
                 int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
-                int first_slot = race_spawn_product(owner, type, first_x, first_y, source_owner);
-                if (first_slot < 0 || race_spawn_product(owner, type, second_x, second_y, source_owner) < 0) {
+                int first_slot = race_spawn_product(owner, type, first_x, first_y, source_owner, i);
+                if (first_slot < 0 || race_spawn_product(owner, type, second_x, second_y, source_owner, i) < 0) {
                     /* Capacity was checked before planning and no world state
                      * changes between the paired spawns; this is defensive. */
                     if (first_slot >= 0) u[first_slot].alive = 0;
@@ -1648,7 +1658,7 @@ static void race_tick_buildings(void)
                     continue;
                 }
                 spawned = race_spawn_product(owner, type, first_x, first_y,
-                                             race_creation_source_owner(owner, b[i].raw_owner));
+                                             race_creation_source_owner(owner, b[i].raw_owner), i);
                 if (spawned < 0) {
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
@@ -1673,14 +1683,14 @@ static void race_tick_buildings(void)
             for(int slot=0;slot<MAX_UNITS;slot++)if(!u[slot].alive)free_slots++;
             if(free_slots<2){b[i].queue_progress=frames-1;continue;}
             int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
-            if (race_spawn_product(owner, type, x, y, source_owner) < 0 ||
-                race_spawn_product(owner, type, x + 8, y, source_owner) < 0) {
+            if (race_spawn_product(owner, type, x, y, source_owner, i) < 0 ||
+                race_spawn_product(owner, type, x + 8, y, source_owner, i) < 0) {
                 b[i].queue_progress = frames - 1;
                 continue;
             }
         } else {
             int spawned = race_spawn_product(owner, type, x, y,
-                                             race_creation_source_owner(owner, b[i].raw_owner));
+                                             race_creation_source_owner(owner, b[i].raw_owner), i);
             if (spawned >= 0 && sc64_race_is_worker(type)) {
                 int patch = nearest_mineral(x,y);
 #ifndef SC64_IMPORTED_SKIRMISH

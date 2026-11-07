@@ -861,6 +861,9 @@ race_campaign_init(void)
             }
             u[slot].raw_type = raw;
             u[slot].raw_owner = src->owner;
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+            if (sc64_controller_valid(src->owner, owner)) sc64_current_unit[slot] = (u8)src->owner;
+#endif
             u[slot].flags = src->flags;
             /* Mission identity aliases (notably early Raynor) must retain
              * their objective enum while using the actual source unit's
@@ -896,6 +899,9 @@ race_campaign_init(void)
             }
             b[slot].raw_type = raw;
             b[slot].raw_owner = src->owner;
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+            if (sc64_controller_valid(src->owner, owner)) sc64_current_building[slot] = (u8)src->owner;
+#endif
             b[slot].flags = src->flags;
             if (src->hp_percent && src->hp_percent <= 100)
                 b[slot].hp = b[slot].maxhp * src->hp_percent / 100;
