@@ -1,6 +1,18 @@
 #ifndef SC64_P7_OBSERVER_ADAPTER_H
 #define SC64_P7_OBSERVER_ADAPTER_H
 
+/* Exact aura hoists are shared by every product using this service. Keep an
+ * explicit opt-out for baseline and regression comparisons. */
+#ifdef SC64_AURA_HOISTS_DISABLED
+#undef SC64_AURA_SOURCE_HOIST_PROBE
+#undef SC64_AURA_SQUARE_HOIST_PROBE
+#elif defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#define SC64_AURA_SOURCE_HOIST_PROBE 1
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+#define SC64_AURA_SQUARE_HOIST_PROBE 1
+#endif
+#endif
+
 /* Shared source-tick snapshot invariants for optical detection. */
 #define SC64_P7_DETECTOR_BINDING_HOIST 1
 #define SC64_P7_DETECTOR_SNAPSHOT_FAST 1
@@ -217,6 +229,10 @@ static int sc64_p7_observer_rect_distance(unsigned raw_a, int x_a, int y_a,
     return (int)sc64_p7_observer_xy_length((unsigned)dx,(unsigned)dy);
 }
 
+#if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && defined(SC64_AURA_SQUARE_HOIST_PROBE)
+#include "sc64_aura_square_probe.h"
+#endif
+
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
 /* Exact continuation of rect_distance after both source rectangles have
  * passed the same actor-rectangle validation as the legacy helper. */
@@ -230,6 +246,7 @@ static int sc64_p7_observer_rect_distance_rects(int al,int at,int ar,int ab,
 
 /* The caller validates the Arbiter rectangle once before reusing target
  * rectangles here. The clipped finder-square policy is unchanged. */
+#if !defined(SC64_AURA_SQUARE_HOIST_PROBE) || defined(GBA_HOST)
 static int sc64_p7_arbiter_finder_square_rect(int arbiter,int tl,int tt,
                                               int tr,int tb)
 {
@@ -241,6 +258,7 @@ static int sc64_p7_arbiter_finder_square_rect(int arbiter,int tl,int tt,
     --tr; --tb;
     return tl<right && tr>=left && tt<bottom && tb>=top;
 }
+#endif
 #endif
 
 /* Generation-39 cache layout in the otherwise-unused Unit.weapon word:
@@ -334,6 +352,7 @@ static int sc64_p7_arbiter_finder_square(int arbiter,int target)
     return tl<right && tr>=left && tt<bottom && tb>=top;
 }
 
+#if !defined(SC64_AURA_SOURCE_HOIST_PROBE) || defined(GBA_HOST)
 static int sc64_p7_arbiter_same_source(int arbiter,int target)
 {
     int raw=RACE_PROTOSS_SLOT(&u[arbiter]);
@@ -344,6 +363,15 @@ static int sc64_p7_arbiter_same_source(int arbiter,int target)
     return race_protoss_source_owner((unsigned)raw)==u[arbiter].owner &&
            race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[target]))==u[target].owner;
 }
+#endif
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+/* The outer Arbiter loop has already checked this exact source-to-live-owner
+ * binding. Neither binding nor owners can change during the aura traversal. */
+static inline int sc64_p7_arbiter_same_validated_source(int target,int source,int owner)
+{
+    return u[target].owner==owner && RACE_PROTOSS_SLOT(&u[target])==source;
+}
+#endif
 
 static int sc64_p7_arbiter_aura_cloaks(int target)
 {
@@ -707,10 +735,17 @@ static void sc64_p7_arbiter_cache_source_tick(void)
         RACE_PROTOSS_SLOT(&u[i])>=0 && RACE_PROTOSS_SLOT(&u[i])<8 && !(u[i].flags&8u) &&
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[i]))==u[i].owner) {
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+        int aura_source=RACE_PROTOSS_SLOT(&u[i]), aura_owner=u[i].owner;
+#endif
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         int al,at,ar,ab;
         if(!sc64_p7_actor_rect_source(71u,u[i].x,u[i].y,0,
                                       &al,&at,&ar,&ab)) continue;
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+        Sc64AuraSquare square=sc64_aura_square_make(u[i].x,u[i].y,
+                                  SC64_P7_MAP_COLS*32,SC64_P7_MAP_ROWS*32);
+#endif
 #endif
         if (sc64_target_index_active) {
             /* Target index cells are 64 GBA pixels. 160 source pixels is
@@ -738,14 +773,22 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                            !aura[slot] &&
 #endif
                            sc64_p7_observer_arbiter_aura_candidate(slot) &&
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+                           sc64_p7_arbiter_same_validated_source(slot,aura_source,aura_owner) &&
+#else
                            sc64_p7_arbiter_same_source((int)i,slot) &&
+#endif
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
                            1) {
                             int tl,tt,tr,tb;
                             if(sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[slot]),
                                     u[slot].x,u[slot].y,0,&tl,&tt,&tr,&tb) &&
-                               sc64_p7_arbiter_finder_square_rect((int)i,
-                                    tl,tt,tr,tb)) {
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+                               sc64_aura_square_contains(&square,tl,tt,tr,tb)
+#else
+                               sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)
+#endif
+                               ) {
                                 int d=sc64_p7_observer_rect_distance_rects(
                                     al,at,ar,ab,tl,tt,tr,tb);
                                 if(d>=0&&d<=160)aura[slot]=1;
@@ -767,13 +810,22 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 !aura[j] &&
 #endif
                 sc64_p7_observer_arbiter_aura_candidate((int)j) &&
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+                sc64_p7_arbiter_same_validated_source((int)j,aura_source,aura_owner) &&
+#else
                 sc64_p7_arbiter_same_source((int)i,(int)j) &&
+#endif
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
                 1) {
                 int tl,tt,tr,tb;
                 if(sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[j]),
                         u[j].x,u[j].y,0,&tl,&tt,&tr,&tb) &&
-                   sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)) {
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+                   sc64_aura_square_contains(&square,tl,tt,tr,tb)
+#else
+                   sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)
+#endif
+                               ) {
                     int d=sc64_p7_observer_rect_distance_rects(
                         al,at,ar,ab,tl,tt,tr,tb);
                     if(d>=0&&d<=160)aura[j]=1;
