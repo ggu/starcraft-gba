@@ -33,6 +33,22 @@ def video(g):
     palette=g.rsp.read(0x05000000,512)
     return (display,sha_bytes(pixels),sha_bytes(palette))
 def sha_bytes(b):return hashlib.sha256(b).hexdigest()
+def research_job(state):
+    fields=world.BUILDING_FIELDS
+    owner=1+fields.index('owner');family=1+fields.index('level');timer=1+fields.index('queue_progress')
+    matches=[(row[0],row[timer]) for row in state['buildings']
+             if row[owner]==0 and row[family]==3 and row[timer]>0]
+    if len(matches)!=1:raise ValueError('expected one paid human ground-weapons job')
+    return matches[0]
+def validate_flash_image(path):
+    data=path.read_bytes()
+    if len(data)!=131072 or data[:32768]!=bytes([255])*32768:raise ValueError('unexpected legacy Flash region')
+    commit=int.from_bytes(data[32768:32772],'little');meta=36864
+    tag=int.from_bytes(data[meta:meta+4],'little');length=int.from_bytes(data[meta+4:meta+8],'little')
+    if commit!=tag or (tag>>16)&255!=0x48 or not 0<length<=28656:raise ValueError('missing committed Flash record')
+    value=2166136261
+    for byte in data[meta+16:meta+16+length]:value=((value^byte)*16777619)&0xffffffff
+    if value!=int.from_bytes(data[meta+8:meta+12],'little'):raise ValueError('Flash payload checksum mismatch')
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
@@ -98,7 +114,8 @@ def main():
                     saves=[a.output/label/'guest.sav' for label in ('off','on')]
                     save_equal=sha(saves[0])==sha(saves[1])
                     if not save_equal:raise ValueError('guest Flash images differ')
-                    saved=states[0]
+                    for save in saves:validate_flash_image(save)
+                    saved=states[0];saved_job=research_job(saved)
                     for g in reversed(games):g.close()
                     games=[]
                     for label,rom,elf,save in [('off',a.off_rom,a.off_elf,saves[0]),('on',a.on_rom,a.on_elf,saves[1])]:
@@ -111,7 +128,11 @@ def main():
                     for g in games:g.rsp.play_to(2,resume)
                     restored=[g.state() for g in games];v=[video(g) for g in games]
                     if restored[0]!=restored[1] or v[0]!=v[1] or restored[0]['screen']!=world.SCREEN_PLAY:raise ValueError('fresh load/render mismatch')
-                    if restored[0]['frame']<saved['frame']:raise ValueError('fresh load did not restore frame')
+                    loaded=restored[0];loaded_job=research_job(loaded)
+                    if (loaded['frame']!=saved['frame']+1 or
+                        (loaded['minerals'],loaded['gas'])!=(saved['minerals'],saved['gas']) or
+                        loaded_job!=(saved_job[0],saved_job[1]-1)):
+                        raise ValueError('fresh load did not restore the saved paid job and wallet')
                 elif last['screen']!=world.SCREEN_PLAY:raise ValueError('custom game no longer playing')
                 check();report={'pins':pins,'ticks':a.ticks,'counts':counts,'paired_every_tick_sha256':digest.hexdigest(),
                     'flash_images_equal':save_equal,'cycles':[{'mean':sum(v)/len(v),'max':max(v)} for v in elapsed],
