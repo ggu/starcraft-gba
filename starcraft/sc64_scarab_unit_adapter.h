@@ -164,6 +164,9 @@ static int race_scarab_parent_write(int slot, const Sc64ScarabParent *p)
 static int race_scarab_controller_transfer_allowed(int slot)
 {
     Sc64ScarabParent parent; Sc64ScarabCounts counts;
+    /* A child is bound to its parent's payer until retired; even a transfer
+     * between two collapsed ENEMY source towns would break that binding. */
+    if (slot>=0 && slot<MAX_UNITS && u[slot].alive && u[slot].type==U_SCARAB) return 0;
     if (!race_scarab_parent_identity(slot)) return 1;
     if (sc64_controller_unit(slot)<0 || !race_scarab_parent_read(slot,0,&parent,&counts) ||
         parent.queued || parent.active_slot>=0 || counts.inside || counts.outside) return 0;
