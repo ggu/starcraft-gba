@@ -2261,6 +2261,7 @@ volatile u32 sc64_setup_buckets, sc64_setup_lists, sc64_setup_index, sc64_setup_
 #ifdef SC64_DIAGNOSTIC_ORDERS
 volatile u32 sc64_order_setup_cycles, sc64_order_query_cycles, sc64_order_move_cycles;
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+static int sc64_leaf_active;
 volatile u32 sc64_leaf_grid_count, sc64_leaf_grid_cycles, sc64_leaf_point_count, sc64_leaf_point_cycles, sc64_leaf_point_nodes, sc64_leaf_depot_count, sc64_leaf_depot_cycles, sc64_leaf_depot_nodes, sc64_leaf_contact_count, sc64_leaf_contact_cycles, sc64_leaf_depot_search_count, sc64_leaf_depot_search_cycles, sc64_leaf_mineral_search_count, sc64_leaf_mineral_search_cycles;
 #endif
 #define SC64_ORDER_DIAG_ACCUM(counter, start) \
@@ -3145,7 +3146,7 @@ static void GBA_HOT
 build_path_grid(void)
 {
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
-    u32 leaf_grid_start = gba_clock(); ++sc64_leaf_grid_count;
+    u32 leaf_grid_start = sc64_leaf_active ? gba_clock() : 0; if (sc64_leaf_active) ++sc64_leaf_grid_count;
 #endif
     int col, row, i;
 #if defined(SC64_BULK_TERRAIN_GRID) && defined(SC64_RACES) && \
@@ -3226,7 +3227,7 @@ build_path_grid(void)
     }
     path_grid_valid = 1;
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
-    sc64_leaf_grid_cycles += gba_clock() - leaf_grid_start;
+    if (sc64_leaf_active) sc64_leaf_grid_cycles += gba_clock() - leaf_grid_start;
 #endif
 }
 
@@ -3728,11 +3729,11 @@ move_toward(Unit * q, int tx, int ty)
 	/* One bucket pass answers all eight unit_step_clear() offsets; the
 	 * selection order and tie-breaking below are unchanged. */
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
-        u32 leaf_contact_start = gba_clock(); ++sc64_leaf_contact_count;
+        u32 leaf_contact_start = sc64_leaf_active ? gba_clock() : 0; if (sc64_leaf_active) ++sc64_leaf_contact_count;
 #endif
 	unsigned blocked = sc64_contact_blocked_mask(q, speed);
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
-        sc64_leaf_contact_cycles += gba_clock() - leaf_contact_start;
+        if (sc64_leaf_active) sc64_leaf_contact_cycles += gba_clock() - leaf_contact_start;
 #endif
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
@@ -7477,6 +7478,10 @@ race_nearest_resource_depot(Unit *worker)
     worker->build = best >= 0 ? best : -2;
     return best;
 }
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+#undef race_nearest_resource_depot
+static int race_nearest_resource_depot(Unit *q) { u32 t; int result; if (!sc64_leaf_active) return race_nearest_resource_depot_leaf_impl(q); t = gba_clock(); ++sc64_leaf_depot_search_count; result = race_nearest_resource_depot_leaf_impl(q); sc64_leaf_depot_search_cycles += gba_clock() - t; return result; }
+#endif
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
 /* The legacy model has one home depot. Late campaign expansion bases need
@@ -7502,10 +7507,6 @@ static int __attribute__((noinline)) race_late_worker_home(Unit *worker)
     worker->build = best;
     return best;
 }
-#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
-#undef race_nearest_resource_depot
-static int race_nearest_resource_depot(Unit *q) { u32 t = gba_clock(); int result; ++sc64_leaf_depot_search_count; result = race_nearest_resource_depot_leaf_impl(q); sc64_leaf_depot_search_cycles += gba_clock() - t; return result; }
-#endif
 #endif
 #ifndef SC64_SKIRMISH
 static void
@@ -7561,7 +7562,7 @@ worker_continue_minerals(Unit *q)
 
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
 #undef worker_continue_minerals
-static int worker_continue_minerals(Unit *q) { u32 t = gba_clock(); int result; ++sc64_leaf_mineral_search_count; result = worker_continue_minerals_leaf_impl(q); sc64_leaf_mineral_search_cycles += gba_clock() - t; return result; }
+static int worker_continue_minerals(Unit *q) { u32 t; int result; if (!sc64_leaf_active) return worker_continue_minerals_leaf_impl(q); t = gba_clock(); ++sc64_leaf_mineral_search_count; result = worker_continue_minerals_leaf_impl(q); sc64_leaf_mineral_search_cycles += gba_clock() - t; return result; }
 #endif
 /* A resource wait advances only while the worker is at its target. Existing
  * saved nonzero timers remain remaining work; no new persistent state. */
@@ -9906,7 +9907,13 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_sync_references();
 #endif
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+    sc64_leaf_active = 1;
+#endif
     update_orders();
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+    sc64_leaf_active = 0;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (sc64_battlecruiser_source_tick_due())
         for (int i=0;i<SC64_BC_SHOT_LIMIT;++i)

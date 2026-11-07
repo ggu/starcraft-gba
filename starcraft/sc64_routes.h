@@ -1262,7 +1262,7 @@ sc64_route_slot(int goal)
     }
 #endif
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
-    u32 leaf_build_start = gba_clock(); ++sc64_leaf_point_count;
+    u32 leaf_build_start = sc64_leaf_active ? gba_clock() : 0; if (sc64_leaf_active) ++sc64_leaf_point_count;
 #endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
@@ -1391,7 +1391,7 @@ sc64_route_slot(int goal)
 #endif
     sc64_route_builds++;
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
-    sc64_leaf_point_cycles += gba_clock() - leaf_build_start; sc64_leaf_point_nodes += (u32)tail;
+    if (sc64_leaf_active) { sc64_leaf_point_cycles += gba_clock() - leaf_build_start; sc64_leaf_point_nodes += (u32)tail; }
 #endif
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     sc64_route_probe_host_flood((unsigned)tail);
@@ -1883,7 +1883,7 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     }
 #endif
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
-    u32 leaf_build_start = gba_clock(); ++sc64_leaf_depot_count;
+    u32 leaf_build_start = sc64_leaf_active ? gba_clock() : 0; if (sc64_leaf_active) ++sc64_leaf_depot_count;
 #endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
@@ -1985,7 +1985,7 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     sc64_route_valid[slot] = complete ? 1 : 2;
     sc64_route_builds++;
 #ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
-    sc64_leaf_depot_cycles += gba_clock() - leaf_build_start; sc64_leaf_depot_nodes += (u32)tail;
+    if (sc64_leaf_active) { sc64_leaf_depot_cycles += gba_clock() - leaf_build_start; sc64_leaf_depot_nodes += (u32)tail; }
 #endif
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     sc64_route_probe_host_flood((unsigned)tail);
