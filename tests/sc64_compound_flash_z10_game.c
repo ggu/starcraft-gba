@@ -74,6 +74,10 @@ int main(int argc,char **argv)
                     ++frame;if(sc64_battlecruiser_source_tick_due())race_scarab_control_dispatch(child);
                 }
                 fprintf(stderr,"moving child=%d alive=%d xy=%d,%d start=%d,%d order=%d target=%d carry=%d timer=%d impacts=%u\n",child,u[child].alive,u[child].x,u[child].y,x,y,u[child].order,u[child].target,u[child].carry,u[child].work_timer,race_impact_count);
+                Unit wire;Sc64ZpPackedUnitSave row;
+                assert(sc64_scarab_flight_to_wire(&u[child],&wire,1,0));
+                fprintf(stderr,"moving waypoint x=%u y=%u narrow-encode=%d\n",wire.path_timer,wire.path_retry,sc64_zp_unit_save_encode(&row,&wire,(unsigned)race_cols*16,(unsigned)race_rows*16));
+                assert((wire.path_timer>24 || wire.path_retry>12) && !sc64_zp_unit_save_encode(&row,&wire,(unsigned)race_cols*16,(unsigned)race_rows*16));
                 assert(u[child].alive && (u[child].x!=x || u[child].y!=y) && !race_impact_count);
             }
         } else assert(!strcmp(argv[1],"write-training") || !strcmp(argv[1],"write-inside"));
