@@ -17,7 +17,7 @@ import subprocess
 import sys
 import sc64_skirmish_sram_continuation as world
 LOCK='/tmp/sc64-native-build-20261031.lock';RESERVE=4*1024**3;LIMIT=64*1024**2
-RUNNER='4199fe903b18c77e0833db1860c4968509cfc82e506bc6f2f9be7582b720fae2'
+RUNNER='f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d'
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def alarm(_signal,_frame):raise TimeoutError('normal HUD pair monitored deadline')
 def video(g):
