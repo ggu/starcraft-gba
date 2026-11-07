@@ -255,20 +255,6 @@ static int sc64_cf_recovery_write(const GbaFlashJournalIo *io,const u8 *prefix,u
     if(status==GBA_FJ_OK) {
         sequence=selected.sequence+1u;if(!sequence)sequence=1;
         index=selected.index==2?3u:2u;
-    } else {
-        /* If an interrupted first commit already has a complete proven v3
-         * payload, finish that prior commit before touching its only copy. */
-        for(unsigned i=2;i<4;++i)if(sc64_cf_snapshot.has_proof[i] &&
-            sc64_cf_snapshot.classes[i]!=SC64_CFR_COMMITTED) {
-            u8 raw[4];u32 base=gba_fj_base(i);
-            if(!io->read(io->context,base,raw,4) || (gba_fj_u32(raw)&SC64_COMPOUND_FLASH_TAG)!=SC64_COMPOUND_FLASH_TAG ||
-               !sc64_cf_finish_marker(io,i))return 0;
-            gba_fj_put32(commit,SC64_COMPOUND_FLASH_TAG);
-            if(!io->program(io->context,base,commit,4) || gba_fj_probe(io,i,&checked)!=GBA_FJ_OK ||
-               !gba_fj_same_record(&checked,&sc64_cf_snapshot.proven[i]))return 0;
-            selected=checked;sequence=selected.sequence+1u;if(!sequence)sequence=1;
-            index=i==2?3u:2u;break;
-        }
     }
     int state=sc64_cf_snapshot.classes[index];
     if(state==SC64_CFR_FOREIGN)return 0;
