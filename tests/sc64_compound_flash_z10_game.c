@@ -42,8 +42,9 @@ int main(int argc,char **argv)
         for(int i=0;i<MAX_UNITS;++i)if(u[i].alive && u[i].type==U_REAVER &&
             u[i].raw_owner==0 && sc64_controller_unit(i)==7) {
             Sc64ScarabParent p;Sc64ScarabCounts counts;
-            assert(race_scarab_parent_read(i,0,&p,&counts) && p.active_slot>=0 &&
-                   sc64_scarab_stage_payer[i]==13 && race_zl_ai_minerals[1]==0);
+            int ok=race_scarab_parent_read(i,0,&p,&counts);
+            fprintf(stderr,"loaded slot=%d ok=%d active=%d carry=%d timer=%d payer=%u town1=%u controller=%d\n",i,ok,ok?p.active_slot:-9,u[i].carry,u[i].work_timer,sc64_scarab_stage_payer[i],race_zl_ai_minerals[1],sc64_controller_unit(i));
+            assert(ok && p.active_slot>=0 && sc64_scarab_stage_payer[i]==13 && race_zl_ai_minerals[1]==0);
             assert(!sc64_controller_transfer_unit(i,2));found++;
         }
         assert(found==1);
