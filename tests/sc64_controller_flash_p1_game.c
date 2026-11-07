@@ -60,15 +60,18 @@ int main(int argc,char **argv)
         int f=-1;for(int i=0;i<MAX_BUILDINGS;++i)if(b[i].alive&&b[i].type==B_FORGE&&b[i].level)f=i;
         assert(f>=0 && sc64_controller_building(f)==7);
         Sc64PrPaidReceipt paid;assert(sc64_pr_stage_receipt(f,&paid)&&paid.payer==SIDE);
-    } else if(!strcmp(argv[1],"legacy-foreign-hash") || !strcmp(argv[1],"legacy-foreign-length") || !strcmp(argv[1],"legacy-known-malformed")) {
+    } else if(!strcmp(argv[1],"legacy-foreign-hash") || !strcmp(argv[1],"legacy-foreign-length") || !strcmp(argv[1],"legacy-foreign-empty") || !strcmp(argv[1],"legacy-known-malformed")) {
         file_read(argv[2],device.bytes,sizeof device.bytes);
         u32 tag=SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION;
         if(strcmp(argv[1],"legacy-known-malformed")) tag=(tag&~SC64_SAVE_TAG_NAMESPACE_MASK)|0x004a0000u;
         gba_fj_put32(device.bytes,tag);
         gba_fj_put32(device.bytes+4,!strcmp(argv[1],"legacy-foreign-length")?0u:1u);
         gba_fj_put32(device.bytes+8,0u);gba_fj_put32(device.bytes+12,1u);device.bytes[16]=42;
-        static u8 legacy_before[32768],full_before[131072];memcpy(legacy_before,device.bytes,sizeof legacy_before);
-        assert(race_load_game());memcpy(full_before,device.bytes,sizeof full_before);
+        static u8 legacy_before[32768],full_before[131072];
+        if(!strcmp(argv[1],"legacy-foreign-empty")) memset(device.bytes+32768,0xff,sizeof device.bytes-32768);
+        memcpy(legacy_before,device.bytes,sizeof legacy_before);
+        if(strcmp(argv[1],"legacy-foreign-empty")) assert(race_load_game());
+        memcpy(full_before,device.bytes,sizeof full_before);
         if(!strcmp(argv[1],"legacy-known-malformed")) {
             assert(race_save_game() && !memcmp(legacy_before,device.bytes,sizeof legacy_before));
         } else assert(!race_save_game() && !memcmp(full_before,device.bytes,sizeof full_before));
