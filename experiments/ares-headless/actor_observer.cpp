@@ -2,9 +2,11 @@
 #include "observer_sigxfsz.h"
 #include "observer_images.h"
 #include "visual_capture.h"
+#include "observer_read.h"
+#include "hybrid_contract.h"
 #include <fcntl.h>
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Visual-only frontend: no RDRAM snapshots, guest writes, or host-input API.
+// Hybrid frontend: same-process official state only; no guest writes or host-input API.
 #include <ares/ares.hpp>
 #include <n64/n64.hpp>
 #include <mia/mia.hpp>
@@ -188,7 +190,7 @@ int main(int argc,char** argv) {
   if(!meta || !steps) return 5;
   meta<<"callback,observed_step,width,height,bytes\n";
   steps<<"run,mask,polls,a_polls,start_polls,audio_calls,callbacks\n";
-  long completed=0; unsigned totalIdle=0; auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(175);
+  long completed=0; unsigned totalIdle=0; bool transitioned=false, view_equal=false; auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(175);
   std::ofstream commands(out/"commands.csv"); commands<<"begin,steps,mask,x,y,capture\n";
   int images_fd=::open((out/"images.bin").c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);
   if(images_fd<0 || !sc64_observer_images_write(images_fd) || ::close(images_fd)!=0) return 2;
@@ -207,10 +209,30 @@ int main(int argc,char** argv) {
     }
     if(line.empty() || line.size()>=128 || std::chrono::steady_clock::now()>=commandDeadline || totalIdle>=60000) break;
     std::istringstream in(line); int count,mask,x,y,capture; std::string extra;
-    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !sc64_visual_capture_allowed(capture)) { std::cerr<<"invalid command\n"; return 7; }
+    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !sc64_hybrid_capture_allowed(capture) || (capture==2 && (transitioned || completed+count!=4200))) { std::cerr<<"invalid command\n"; return 7; }
     commands<<completed<<','<<count<<','<<mask<<','<<x<<','<<y<<','<<capture<<'\n'; commands.flush();
     unsigned previous; {std::lock_guard lock(p.mutex); previous=p.frames.size();}
     for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
+    if(capture==2) {
+      using namespace ares::Nintendo64;
+      if(transitioned || completed!=4200 || !cpu.recompiler.enabled || !rsp.recompiler.enabled || system.homebrewMode || rdram.ram.size!=8u*1024u*1024u) return 8;
+      auto read_view=[&](std::vector<std::uint8_t>& bytes) {
+        auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull); bool hx=x.hit(a),hy=y.hit(a);return hx&&hy?-1:hx||hy?1:0; };
+        auto cached=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);return (std::uint8_t)(x.hit(a)?x.bytes[(a&15u)^3u]:y.bytes[(a&15u)^3u]); };
+        auto ram=[](u32 a) { return (std::uint8_t)rdram.ram.read<Byte>(a,RBusDevice::ARES_DEBUGGER); };
+        return sc64_read_ram(0,bytes.size(),rdram.ram.size,bytes.data(),hit,cached,ram);
+      };
+      std::vector<std::uint8_t> before(rdram.ram.size),after(rdram.ram.size);
+      bool pre_ok=read_view(before);std::cout<<"PRE_CACHE_OK "<<pre_ok<<std::endl;if(!pre_ok){std::cerr<<"pre-transition cache conflict\n";return 8;}
+      auto state=root->serialize(true);
+      if(!state || state.size()>16u*1024u*1024u || !ares::Nintendo64::option("Recompiler","false"))return 8;
+      serializer same_state(state.data(),state.size());
+      {std::lock_guard lock(p.mutex);p.gpuReady=false;}
+      if(!root->unserialize(same_state) || cpu.recompiler.enabled || rsp.recompiler.enabled || system.homebrewMode || rdram.ram.size!=before.size())return 8;
+      bool post_ok=read_view(after);std::cout<<"POST_CACHE_OK "<<post_ok<<std::endl;view_equal=sc64_hybrid_views_equal(pre_ok,before.data(),post_ok,after.data(),before.size());
+      if(!view_equal){std::cerr<<"post-transition cache conflict or view mismatch\n";return 8;}
+      transitioned=true;std::cout<<"HYBRID "<<completed<<" view_equal=1\n";continue;
+    }
     if(!capture) { std::cout<<"OK "<<completed<<std::endl; continue; }
     std::unique_lock lock(p.mutex);
     p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.frames.size()>previous;});
@@ -238,9 +260,9 @@ int main(int argc,char** argv) {
   observations<<"callback,observed_step,width,height,nonblack\n";
   for(std::size_t i=0;i<p.observations.size();++i) { auto &o=p.observations[i]; observations<<i<<','<<o.step<<','<<o.width<<','<<o.height<<','<<o.nonblack<<'\n'; }
   for(auto& text:p.statuses) status<<text<<'\n';
-  status<<"frontend=visual_only cpu_recompiler="<<cpu_jit<<" rsp_recompiler="<<rsp_jit<<" homebrew="<<homebrew<<"\n";
+  status<<"frontend=hybrid_authentic jit_before_cpu="<<cpu_jit<<" jit_before_rsp="<<rsp_jit<<" homebrew="<<homebrew<<" hybrid_transition="<<transitioned<<" exact_view_equal="<<view_equal<<" cpu_after="<<ares::Nintendo64::cpu.recompiler.enabled<<" rsp_after="<<ares::Nintendo64::rsp.recompiler.enabled<<"\n";
   status<<"requested_steps="<<frames<<" completed_steps="<<completed<<" polls="<<p.polls.load()<<" a_polls="<<p.aPolls.load()<<" start_polls="<<p.startPolls.load()<<" a_pressed_polls="<<p.aPressedPolls.load()<<" start_pressed_polls="<<p.startPressedPolls.load()<<" audio_calls="<<p.audioCalls.load()<<" callbacks_total="<<p.callbacks<<" frames_copied="<<p.frames.size()<<" callbacks_discarded="<<p.discarded<<" gpu_ready="<<p.gpuReady<<" failure="<<p.failure<<'\n';
-  if(p.failed || !p.gpuReady || p.frames.empty()) { std::cerr<<"renderer or callback failure: "<<p.failure<<" callbacks="<<p.callbacks<<"\n"; return 6; }
+  if(p.failed || !p.gpuReady || p.frames.empty() || !transitioned || !view_equal || ares::Nintendo64::cpu.recompiler.enabled || ares::Nintendo64::rsp.recompiler.enabled) { std::cerr<<"renderer or callback failure: "<<p.failure<<" callbacks="<<p.callbacks<<"\n"; return 6; }
   for(std::size_t i=0;i<p.frames.size();++i) {
     auto& f=p.frames[i]; auto bytes=f.pixels.size()*sizeof(std::uint32_t);
     meta<<i<<','<<f.step<<','<<f.width<<','<<f.height<<','<<bytes<<'\n';

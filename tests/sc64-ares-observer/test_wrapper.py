@@ -21,14 +21,14 @@ class WrapperTest(unittest.TestCase):
     with patch.object(m.sys,'stdin',source):m.relay([sys.executable,'-c',code,str(target)],d,os.environ.copy(),log,err,result,mode=mode)
     self.assertEqual(target.read_text(),repr(expected));self.assertEqual(result['returncode'],0)
  def test_grid_witness_rejects_partial_and_wrong_checkpoint(self):
-  with tempfile.TemporaryDirectory() as d, patch.object(m,'EXPECTED_STEPS',3), patch.object(m,'EXPECTED_FRAME_STEPS',(0,1,2)):
-   p=Path(d);data=b'1 0 0 0 1\n'*3;rows=m.planned_rows(data)
+  with tempfile.TemporaryDirectory() as d, patch.object(m,'EXPECTED_STEPS',3), patch.object(m,'EXPECTED_FRAME_STEPS',(0,2)), patch.object(m,'HYBRID_STEP',2):
+   p=Path(d);data=b'1 0 0 0 1\n1 0 0 0 2\n1 0 0 0 1\n';rows=m.planned_rows(data)
    (p/'commands.csv').write_text('begin,steps,mask,x,y,capture\n'+''.join(','.join(map(str,r))+'\n' for r in rows))
-   (p/'status.log').write_text('frontend=visual_only cpu_recompiler=1 rsp_recompiler=1 homebrew=0\ncompleted_steps=3 gpu_ready=1 ')
-   (p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,0,1,1,4\n1,1,1,1,4\n2,2,1,1,4\n')
-   for i in range(3):(p/f'live-{i:03}.argb').write_bytes(b'1234')
-   self.assertTrue(m.planned_witness(p,rows));(p/'live-002.argb').unlink();self.assertFalse(m.planned_witness(p,rows))
-   (p/'live-002.argb').write_bytes(b'1234');(p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,0,1,1,4\n1,1,1,1,4\n2,3,1,1,4\n')
+   (p/'status.log').write_text('frontend=hybrid_authentic jit_before_cpu=1 jit_before_rsp=1 homebrew=0 hybrid_transition=1 exact_view_equal=1 cpu_after=0 rsp_after=0\ncompleted_steps=3 gpu_ready=1 ')
+   (p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,0,1,1,4\n1,2,1,1,4\n')
+   for i in range(2):(p/f'live-{i:03}.argb').write_bytes(b'1234')
+   self.assertTrue(m.planned_witness(p,rows));(p/'live-001.argb').unlink();self.assertFalse(m.planned_witness(p,rows))
+   (p/'live-001.argb').write_bytes(b'1234');(p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,0,1,1,4\n1,3,1,1,4\n')
    self.assertFalse(m.planned_witness(p,rows))
  def test_owned_guard_rejects_growth_and_low_disk(self):
   with tempfile.TemporaryDirectory() as d:

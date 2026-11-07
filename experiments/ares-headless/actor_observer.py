@@ -3,14 +3,15 @@
 """Bounded read-only actor observer; commands are steps mask x y capture."""
 import argparse,csv,fcntl,hashlib,json,os,pathlib,resource,selectors,shutil,signal,subprocess,sys,time
 
-COMMAND_SHA='78e482b7bbc84a58ecb980e845902838833e7b1ad3e8f59bd230890c21ca15a2'
-EXPECTED_STEPS=8617
-EXPECTED_FRAME_STEPS=(8536,8576,8616)
+COMMAND_SHA='b1943362dd674102b852c5c62d0de329a54cb32d28942bf564e39a26495c0205'
+EXPECTED_STEPS=4230
+HYBRID_STEP=4200
+EXPECTED_FRAME_STEPS=(4209,4229)
 ROM_SHA='e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 VK_SHA='432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 REV='0aafd85789215e84e1e43415c07d4c88461b7899'
 # Qualified independently from the historical non-diagnostic binary.
-BINARY_SHA='cfc176b57285df0ea2a8ffa7effc6d6aca9aef69e26e866e62ce66340142fc6f'
+BINARY_SHA=None
 LOCK='/tmp/sc64-native-build-20261031.lock'
 VK_PATH=pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
 
@@ -91,9 +92,9 @@ def planned_rows(data):
   fields=[int(x) for x in line.split()]
   if len(fields)!=5:raise ValueError('invalid command')
   count,mask,x,y,capture=fields
-  if not 1<=count<=1000 or mask<0 or mask&~1023 or not -32767<=x<=32767 or not -32767<=y<=32767 or capture not in (0,1):raise ValueError('invalid command')
+  if not 1<=count<=1000 or mask<0 or mask&~1023 or not -32767<=x<=32767 or not -32767<=y<=32767 or capture not in (0,1,2):raise ValueError('invalid command')
   rows.append([step,*fields]);step+=count
- if step!=EXPECTED_STEPS or tuple(row[0]+row[1]-1 for row in rows if row[-1])!=EXPECTED_FRAME_STEPS:raise ValueError('unexpected grid plan')
+ if step!=EXPECTED_STEPS or tuple(row[0]+row[1]-1 for row in rows if row[-1]==1)!=EXPECTED_FRAME_STEPS or [row[0]+row[1] for row in rows if row[-1]==2]!=[HYBRID_STEP]:raise ValueError('unexpected grid plan')
  return rows
 
 def planned_witness(path,expected):
@@ -102,9 +103,9 @@ def planned_witness(path,expected):
   if commands[0]!=['begin','steps','mask','x','y','capture'] or [[int(v) for v in x] for x in commands[1:]]!=expected:return False
   with (path/'frames.csv').open(newline='') as f:frames=list(csv.DictReader(f))
   if tuple(int(x['observed_step']) for x in frames)!=EXPECTED_FRAME_STEPS:return False
-  if [x.name for x in sorted(path.glob('live-*.argb'))]!=['live-000.argb','live-001.argb','live-002.argb']:return False
+  if [x.name for x in sorted(path.glob('live-*.argb'))]!=['live-000.argb','live-001.argb']:return False
   status=(path/'status.log').read_text()
-  return (f'completed_steps={EXPECTED_STEPS} ' in status and 'frontend=visual_only cpu_recompiler=1 rsp_recompiler=1 homebrew=0' in status and 'gpu_ready=1 ' in status)
+  return (f'completed_steps={EXPECTED_STEPS} ' in status and 'frontend=hybrid_authentic jit_before_cpu=1 jit_before_rsp=1 homebrew=0 hybrid_transition=1 exact_view_equal=1 cpu_after=0 rsp_after=0' in status and 'gpu_ready=1 ' in status)
  except (OSError,ValueError,KeyError,IndexError):return False
 
 def owned_guard(path):
@@ -184,9 +185,9 @@ def main(argv=None):
   if a.output.exists() or not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance or output changed while queued')
   a.output.mkdir(parents=True);[(a.output/x).mkdir() for x in ('input','saves','systems')];copy=a.output/'input/game.z64';shutil.copyfile(a.rom,copy)
   if sha(copy)!=ROM_SHA:raise SystemExit('ROM copy mismatch')
-  sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('observer_file_budget.h').resolve(),pathlib.Path(__file__).with_name('observer_sigxfsz.h').resolve(),pathlib.Path(__file__).with_name('observer_images.h').resolve(),pathlib.Path(__file__).with_name('visual_capture.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
+  sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('observer_file_budget.h').resolve(),pathlib.Path(__file__).with_name('observer_sigxfsz.h').resolve(),pathlib.Path(__file__).with_name('observer_images.h').resolve(),pathlib.Path(__file__).with_name('visual_capture.h').resolve(),pathlib.Path(__file__).with_name('hybrid_contract.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
   resources=[a.source/'ares/ares/resource/resource.cpp',a.source/'ares/ares/resource/resource.hpp',a.source/'mia/resource/resource.cpp',a.source/'mia/resource/resource.hpp'];inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
-  cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'command_sha256':COMMAND_SHA,'expected_steps':EXPECTED_STEPS,'expected_frame_steps':EXPECTED_FRAME_STEPS,'frontend_role':'visual_only_jit','ram_capture_enabled':False,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':0,'ram_each_bytes':0,'ram_total_bytes':0,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
+  cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'command_sha256':COMMAND_SHA,'expected_steps':EXPECTED_STEPS,'expected_frame_steps':EXPECTED_FRAME_STEPS,'frontend_role':'authentic_same_process_jit_to_interpreter','ram_capture_enabled':False,'cache_view_bytes':8*1024**2,'in_memory_state_max_bytes':16*1024**2,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':0,'ram_each_bytes':0,'ram_total_bytes':0,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
   readfd,writefd=os.pipe()
   try:os.write(writefd,command_data)
   finally:os.close(writefd)
