@@ -13533,7 +13533,19 @@ static unsigned race_shared_trigger_obligations(void);
 #undef race_protoss_later_battery_candidate_valid
 #include "sc64_p10_runtime_adapter.h"
 #endif
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_SCARAB_RUNTIME) || \
+     !defined(SC64_WORKER_CARGO_KIND) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
+     defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE))
+#error "Compound Scarab context requires the isolated HOST cargo stage"
+#endif
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+#include "sc64_stage_save_auth.h"
+static int race_compound_scarab_decode(const RaceSave *,unsigned,unsigned,unsigned,Unit *,const Sc64StageSaveAuth *);
+#define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth
+#define SC64_GCTX_ARG , guard_auth
+#define SC64_GUARD_DECODE(c,s,w,h,o) race_compound_scarab_decode(c,s,w,h,o,guard_auth)
+#elif defined(SC64_GUARDIAN_COCOON_STAGE)
 #include "sc64_stage_save_auth.h"
 static int race_guardian_decode_authenticated(const RaceSave *,unsigned,unsigned,unsigned,Unit *,const Sc64StageSaveAuth *);
 #define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth

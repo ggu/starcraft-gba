@@ -27,6 +27,9 @@ static int row_decode(unsigned slot,Unit *unit)
 }
 int main(void)
 {
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    Sc64StageSaveAuth auth;const Sc64StageSaveAuth *guard_auth=&auth;
+#endif
     Unit worker,child,wire,decoded,restored;int carry,timer;
     gba_init();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;race_skirmish_init();
     int w=spawn_unit(SIDE,U_SCV,100,100),c=spawn_unit(ENEMY,U_SCARAB,120,100);
@@ -60,13 +63,30 @@ int main(void)
     assert(sc64_scarab_child_fields_pack(&inside,&child.carry,&timer));child.work_timer=(u16)timer;
     child.hp=20;child.maxhp=20;child.build=-1;child.target=-1;child.order=ORDER_IDLE;
     memset(&row_candidate,0,sizeof row_candidate);
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    row_candidate.version=SAVE_VERSION;
+    const Sc64StageTagPair pair={0x4a0001u,SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
+    assert(sc64_stage_save_authenticate(&auth,&row_candidate,pair.outer,pair.inner,&pair,1));
+#endif
     assert(row_encode(0,&worker) && row_encode(1,&reaver));
     assert(sc64_scarab_flight_to_wire(&child,&wire,1,0) && row_encode(2,&wire));
     assert(race_save_worker_cargo_prepare(&row_candidate,2048,2048,0));
     assert(row_decode(2,&decoded) && sc64_scarab_flight_from_wire(&decoded,&restored,1,0));
+#ifndef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
     assert(row_encode(2,&restored));
-    assert(race_scarab_save_candidate_valid(&row_candidate,2048,2048));
-    restored.raw_owner=7;assert(row_encode(2,&restored));
-    assert(!race_scarab_save_candidate_valid(&row_candidate,2048,2048));
+#endif
+    assert(race_scarab_save_candidate_valid(&row_candidate,2048,2048 SC64_GCTX_ARG));
+    restored.raw_owner=7;
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    assert(sc64_scarab_flight_to_wire(&restored,&wire,1,0) && row_encode(2,&wire));
+#else
+    assert(row_encode(2,&restored));
+#endif
+    assert(!race_scarab_save_candidate_valid(&row_candidate,2048,2048 SC64_GCTX_ARG));
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    /* A copied token cannot authorize a different candidate. */
+    RaceSave other=row_candidate;Unit rejected;
+    assert(!race_compound_scarab_decode(&other,2,2048,2048,&rejected,&auth));
+#endif
     puts("actual cargo preparation and detached Scarab graph: PASS");return 0;
 }
