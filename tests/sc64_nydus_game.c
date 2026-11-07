@@ -689,7 +689,7 @@ static void fresh_boot_load_resolves_through_hook(void)
 int main(void)
 {
     _Static_assert(ORDER_NYDUS_ENTER <= 15, "packed unit order field is four bits");
-    _Static_assert(SC_RB_COUNT <= 64, "packed building type field is six bits");
+    _Static_assert(SC_RB_COUNT <= 128, "compact building type field is seven bits");
     ordinary_reference_cleanup();
     paid_egg_survives_transit(0);
     paid_egg_survives_transit(1);
