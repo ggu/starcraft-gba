@@ -82,3 +82,5 @@ test-zl-scarab-compound-flash:
 	$(ZL_SCARAB_OUT)/compound read-inside $(ZL_SCARAB_OUT)/z10-inside.flash
 	$(ZL_SCARAB_OUT)/compound write-outside $(ZL_SCARAB_OUT)/z10-outside.flash
 	$(ZL_SCARAB_OUT)/compound read-outside $(ZL_SCARAB_OUT)/z10-outside.flash
+	$(ZL_SCARAB_OUT)/compound write-moving $(ZL_SCARAB_OUT)/z10-moving.flash
+	$(ZL_SCARAB_OUT)/compound read-moving $(ZL_SCARAB_OUT)/z10-moving.flash

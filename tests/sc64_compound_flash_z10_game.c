@@ -31,6 +31,10 @@ int main(int argc,char **argv)
             if(target<0 && u[i].alive && u[i].owner==SIDE && u[i].type==U_ZERGLING && !invincible_units[i])target=i;
         }
         assert(parent>=0 && target>=0 && u[parent].raw_owner==0 && sc64_controller_transfer_unit(parent,7));
+        /* A real shared packet creates a half-HP debt on a normal live actor. */
+        unsigned hp_before;assert(sc64_pr_q8_actor_hp(target,&hp_before) && hp_before>128);
+        hit_target_impl_ex(target,128,U_MARINE,ENEMY,SC64_STOCK_DMG_IGNORE_ARMOR,SC64_HIT_PACKET_Q8);
+        assert(sc64_pr_hp_debt[target]==128);
         race_zl_ai_minerals[1]=15;assert(race_scarab_ai_restock_stage(parent));
         race_scarab_human_parent_step(parent);
         Sc64ScarabParent p;Sc64ScarabCounts counts;
@@ -44,7 +48,7 @@ int main(int argc,char **argv)
             }
             assert(race_scarab_parent_read(parent,0,&p,&counts) && counts.inside==1);
         }
-        if(!strcmp(argv[1],"write-outside")) {
+        if(!strcmp(argv[1],"write-outside") || !strcmp(argv[1],"write-moving")) {
             int sx=-1,sy=-1;
             for(int y=64;y<WORLD_H-64 && sx<0;y+=16)for(int x=64;x<WORLD_W-112;x+=16) {
                 int clear=1;
@@ -57,6 +61,16 @@ int main(int argc,char **argv)
             u[target].x=sx+48;u[target].y=sy;
             tick_combat(&u[parent],target);
             assert(race_scarab_parent_read(parent,0,&p,&counts) && counts.outside==1);
+            if(!strcmp(argv[1],"write-moving")) {
+                int child=-1;
+                for(int i=0;i<MAX_UNITS;++i){int owner;unsigned phase;
+                    if(race_scarab_child_lookup(i,&owner,&phase) && owner==parent && phase==SC64_SCARAB_CHILD_OUTSIDE){child=i;break;}}
+                assert(child>=0);int x=u[child].x,y=u[child].y;
+                for(int i=0;i<30 && u[child].alive && u[child].x==x && u[child].y==y;++i) {
+                    ++frame;if(sc64_battlecruiser_source_tick_due())race_scarab_control_dispatch(child);
+                }
+                assert(u[child].alive && (u[child].x!=x || u[child].y!=y) && !race_impact_count);
+            }
         } else assert(!strcmp(argv[1],"write-training") || !strcmp(argv[1],"write-inside"));
         memset(device.bytes,0xff,sizeof device.bytes);
         assert(race_save_game());copy_file(argv[2],1);
@@ -71,9 +85,11 @@ int main(int argc,char **argv)
             assert(ok && sc64_scarab_stage_payer[i]==13 && race_zl_ai_minerals[1]==0);
             if(!strcmp(argv[1],"read-training"))assert(p.active_slot>=0);
             else if(!strcmp(argv[1],"read-inside"))assert(counts.inside==1);
-            else if(!strcmp(argv[1],"read-outside"))assert(counts.outside==1);
+            else if(!strcmp(argv[1],"read-outside") || !strcmp(argv[1],"read-moving"))assert(counts.outside==1);
             else assert(0);
-            assert(!sc64_controller_transfer_unit(i,2));found++;
+            assert(!sc64_controller_transfer_unit(i,2));
+            int fractional=0;for(int j=0;j<MAX_UNITS;++j)if(u[j].alive && sc64_pr_hp_debt[j]==128)++fractional;
+            assert(fractional>=1);found++;
         }
         assert(found==1);
     } else assert(0);
