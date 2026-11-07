@@ -1692,7 +1692,7 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 #endif
 
 static int race_save_game(void) {
-#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+#if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE)
     return 0; /* no sidecar wire format yet, for any candidate */
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
@@ -1725,6 +1725,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    if (race_mode!=0 || race_selected_mission!=SC64_RACE_MISSION_P1 || race_human!=R_PROTOSS || !race_q8_flash_begin()) return 0;
+#else
     if (race_mode!=1 ||
 #if defined(SC64_Q8_FLASH_ALL_CUSTOM_HOST) || defined(SC64_Q8_FLASH_ALL_CUSTOM_ARM_PROBE)
         !sc64_q8_flash_custom_roster_valid(race_human,race_bots,race_player,race_bot_races) ||
@@ -1732,6 +1735,7 @@ static int race_save_game(void) {
         race_human!=R_PROTOSS ||
 #endif
         !race_q8_flash_begin()) return 0;
+#endif
     GbaSaveSelection cargo_previous={0};
     int cargo_have_previous=0;
 #else
@@ -2661,6 +2665,9 @@ typedef struct {
     int building_damage_marker;
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     u8 q8_debt[MAX_UNITS+MAX_BUILDINGS];
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    u8 controller_units[MAX_UNITS], controller_buildings[MAX_BUILDINGS];
+#endif
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     Sc64ProtossResearchLevels research_levels;
@@ -4365,7 +4372,7 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 }
 #endif
 static int race_load_game(void) {
-#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+#if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE)
     return 0; /* title state cannot identify an incoming campaign candidate */
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
@@ -4830,6 +4837,10 @@ static int race_load_game(void) {
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     memcpy(sc64_pr_hp_debt,plan.q8_debt,sizeof sc64_pr_hp_debt);
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    memcpy(sc64_current_unit,plan.controller_units,sizeof sc64_current_unit);
+    memcpy(sc64_current_building,plan.controller_buildings,sizeof sc64_current_building);
+#endif
 #endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }

@@ -3,11 +3,21 @@
  * The normal SRAM journal and ARM builds never include this file. */
 #ifndef SC64_Q8_FLASH_HOST_ADAPTER_H
 #define SC64_Q8_FLASH_HOST_ADAPTER_H
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+#define SC64_Q8_FLASH_TAG SC64_SAVE_TAG_CONTROLLER_FLASH(SC64_TRANSPORT_SAVE_VERSION)
+#else
 #define SC64_Q8_FLASH_TAG SC64_SAVE_TAG_Q8_FLASH(SC64_TRANSPORT_SAVE_VERSION)
+#endif
 #define SC64_Q8_FLASH_TAIL_MAGIC 0x31465051u /* QPF1 */
 #define SC64_Q8_FLASH_TAIL_HEADER 8u
 #define SC64_Q8_FLASH_DEBTS (MAX_UNITS+MAX_BUILDINGS)
-#define SC64_Q8_FLASH_TAIL_BYTES (SC64_Q8_FLASH_TAIL_HEADER+SC64_Q8_FLASH_DEBTS)
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+#define SC64_CONTROLLER_FLASH_MAGIC 0x314c5443u /* CTL1 */
+#define SC64_CONTROLLER_FLASH_BYTES (8u+MAX_UNITS+MAX_BUILDINGS)
+#else
+#define SC64_CONTROLLER_FLASH_BYTES 0u
+#endif
+#define SC64_Q8_FLASH_TAIL_BYTES (SC64_Q8_FLASH_TAIL_HEADER+SC64_Q8_FLASH_DEBTS+SC64_CONTROLLER_FLASH_BYTES)
 _Static_assert(SC64_Q8_FLASH_TAG!=SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION &&
                SC64_Q8_FLASH_TAG!=SC64_RESEARCH_TRANSPORT_SAVE_VERSION &&
                SC64_Q8_FLASH_TAG!=SC64_TRANSPORT_SAVE_VERSION,"Q8 Flash tag collision");
@@ -31,8 +41,19 @@ static int race_q8_flash_write_ownership(const GbaFlashJournalIo *io)
     for(unsigned i=0;i<2;++i) {
         if(!io->read(io->context,gba_fj_base(i),word,sizeof word))return 0;
         u32 tag=gba_fj_u32(word);
+#ifndef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
         if(tag!=0xffffffffu && (tag&0xff000000u) &&
            (tag&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_CAMPAIGN_JOBS_NAMESPACE) return 0;
+#else
+        /* SRAM commits its most-significant tag byte last. An erased or
+         * uncommitted tag is harmless; never supersede a committed foreign
+         * legacy namespace merely because its length or checksum is bad. */
+        if(tag!=0xffffffffu && (tag&0xff000000u) &&
+           tag!=SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION &&
+           tag!=SC64_TRANSPORT_SAVE_VERSION && tag!=SC64_RESEARCH_TRANSPORT_SAVE_VERSION &&
+           tag!=SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION &&
+           tag!=SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION) return 0;
+#endif
     }
     for(unsigned i=2;i<4;++i) {
         u8 commit[4],metadata[4];
@@ -56,18 +77,56 @@ static int race_q8_flash_guard_erase(void *ctx,u32 at)
     return g->inner->erase_sector(g->inner->context,at);
 }
 
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+/* Candidate context only; never consult the live mission or publish globals. */
+static int race_controller_flash_candidate(RaceLoadPlan *plan,int old)
+{
+    const Sc64RaceMap *map; int human, count=0;
+    if (!plan || race_data.state[0]!=0 || race_data.state[1]!=R_PROTOSS ||
+        race_data.state[2]!=SC64_RACE_MISSION_P1) return 0;
+    map=&sc64_race_maps[SC64_RACE_MISSION_P1];
+    if (!map->owner_modes || !map->units || !map->mission_id ||
+        map->mission_id[0]!='P' || map->mission_id[1]!='1' || map->mission_id[2] ||
+        map->human_slot>=8) return 0;
+    human=map->human_slot;
+    for (int j=0;j<8;++j) if(map->owner_modes[j]==SIDE) ++count;
+    if(map->owner_modes[human]!=SIDE || count!=1) return 0;
+    for(int i=0;i<MAX_UNITS+MAX_BUILDINGS;++i) {
+        int alive,owner;u8 *value;
+        if(i<MAX_UNITS) { Unit q;if(!race_save_decode_unit(&race_data,(unsigned)i,2048,2048,&q)) return 0;
+            alive=q.alive;owner=q.owner;value=&plan->controller_units[i]; }
+        else { Building q;int j=i-MAX_UNITS;if(!race_save_decode_building(&race_data,(unsigned)j,&q)) return 0;
+            alive=q.alive;owner=q.owner;value=&plan->controller_buildings[j]; }
+        if(!alive) { if(old) *value=255; else if(*value!=255) return 0; continue; }
+        if(owner<0 || owner>=5) return 0;
+        if(old) {
+            int match=-1,n=0;
+            for(int j=0;j<8;++j) if(map->owner_modes[j]==owner) { match=j;++n; }
+            *value=(u8)(n==1?match:255);
+        }
+        if(*value!=255 && (*value>=8 || map->owner_modes[*value]!=owner)) return 0;
+        if(owner==SIDE && *value!=(u8)human) return 0;
+    }
+    return 1;
+}
+#endif
+
 /* Detached rows only. The shared Battery preflight has already normalized
  * markerless unit phases to SH12 (1/1280). Legacy buildings still use 1/320
  * independently of that unit marker; only their shield-capable rows change.
  * The new Flash tag already carries Q8/1/1280 building state. */
 static int race_q8_flash_candidate_fractions(RaceLoadPlan *plan,int old)
 {
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    if (!plan || race_data.state[0]!=0 || race_data.state[2]!=SC64_RACE_MISSION_P1 || race_data.state[1]!=R_PROTOSS) return 0;
+#else
     if (!plan || race_data.state[0]!=1) return 0;
 #if defined(SC64_Q8_FLASH_ALL_CUSTOM_HOST) || defined(SC64_Q8_FLASH_ALL_CUSTOM_ARM_PROBE)
     if (!sc64_q8_flash_custom_roster_valid(race_data.state[1],race_data.state[4],
                                            race_data.players,&race_data.state[21])) return 0;
 #else
     if (race_data.state[1]!=R_PROTOSS) return 0;
+#endif
 #endif
 #ifdef SC64_SHARED_BATTERY
     if (old && race_data.state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]!=SC64_SHIELD_PHASE_SAVE_MARKER) return 0;
@@ -119,20 +178,41 @@ static int race_q8_flash_prepare_record(RaceLoadPlan *plan,const GbaFlashJournal
         base_length-=SC64_Q8_FLASH_TAIL_BYTES;
     } else if(tag!=SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION &&
               tag!=SC64_TRANSPORT_SAVE_VERSION && tag!=SC64_RESEARCH_TRANSPORT_SAVE_VERSION &&
-              tag!=SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION) return 0;
+              tag!=SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+              && tag!=SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION
+#endif
+              ) return 0;
     if (base_length>sizeof(race_impact_record)) return 0;
     if (gba_fj_read_payload(io,record,0,&race_impact_record,base_length)!=GBA_FJ_OK) return -1;
     /* 0x48 explicitly wraps the 0x45 game representation. Only this local
      * decoder dispatch is translated; the stored tag is never rewritten. */
     if (!race_worker_cargo_prepare_selected(&race_impact_record,base_length,
-           is_new?SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION:tag,plan)) return 0;
+           is_new?
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+           SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION
+#else
+           SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#endif
+           :tag,plan)) return 0;
     if (is_new) {
         if (gba_fj_read_payload(io,record,base_length,header,sizeof header)!=GBA_FJ_OK ||
             gba_fj_read_payload(io,record,base_length+sizeof header,plan->q8_debt,SC64_Q8_FLASH_DEBTS)!=GBA_FJ_OK) return -1;
         if (gba_fj_u32(header)!=SC64_Q8_FLASH_TAIL_MAGIC ||
             gba_fj_u32(header+4)!=SC64_Q8_FLASH_DEBTS) return 0;
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+        u32 at=base_length+SC64_Q8_FLASH_TAIL_HEADER+SC64_Q8_FLASH_DEBTS;
+        if (gba_fj_read_payload(io,record,at,header,sizeof header)!=GBA_FJ_OK) return -1;
+        if (gba_fj_u32(header)!=SC64_CONTROLLER_FLASH_MAGIC ||
+            gba_fj_u32(header+4)!=MAX_UNITS+MAX_BUILDINGS) return 0;
+        if (gba_fj_read_payload(io,record,at+8,plan->controller_units,MAX_UNITS)!=GBA_FJ_OK ||
+            gba_fj_read_payload(io,record,at+8+MAX_UNITS,plan->controller_buildings,MAX_BUILDINGS)!=GBA_FJ_OK) return -1;
+#endif
     }
     if (!race_q8_flash_candidate_fractions(plan,!is_new)) return 0;
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    if (!race_controller_flash_candidate(plan,!is_new)) return 0;
+#endif
     GbaFlashJournalRecord checked;
     int status=gba_fj_probe(io,record->index,&checked);
     if(status<0)return -1;
@@ -144,7 +224,12 @@ static int race_q8_flash_capture(void *context,const GbaFlashJournalIo *io,
     Sc64Q8FlashSnapshot *s=context;int accepted;
     if (!s || record->index>=4 || s->seen[record->index]) return -1;
     /* Never erase an unrelated committed new-layout record. */
-    if(record->index>=2 && record->tag!=SC64_Q8_FLASH_TAG) return -1;
+    if(record->index>=2 && record->tag!=SC64_Q8_FLASH_TAG)
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+        return 0; /* Load fallback only; write ownership refuses this slot. */
+#else
+        return -1;
+#endif
     accepted=race_q8_flash_prepare_record(s->plan,io,record);
     if(accepted<0)return -1;
     s->seen[record->index]=1;s->record[record->index]=*record;
@@ -167,6 +252,12 @@ static int race_q8_flash_begin(void)
     result=gba_fj_select(io,race_q8_flash_capture,&sc64_q8_flash_snapshot,&sc64_q8_flash_previous);
     sc64_q8_flash_snapshot.plan=0;
     if(result<0)return 0;
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    /* A supported older P1 must not authorize a new epoch over a different
+     * checksum-valid legacy campaign we cannot interpret in this stage. */
+    for(unsigned i=0;i<2;++i)
+        if(sc64_q8_flash_snapshot.seen[i] && !sc64_q8_flash_snapshot.accepted[i]) return 0;
+#endif
     /* A checksum-valid but unsupported predecessor must not silently become
      * a new epoch: the user has not authorized losing its selection. */
     if(result==GBA_FJ_NONE)
@@ -191,11 +282,15 @@ static int race_q8_flash_write(const void *data,u32 length)
     RaceLoadPlan plan;u32 suffix_length,original_hash;
     unsigned hp,ignored;
     if (!io || !io->read || !io->program || !io->erase_sector || !data || !length ||
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+        race_mode!=0 || race_selected_mission!=SC64_RACE_MISSION_P1 || race_human!=R_PROTOSS
+#else
         race_mode!=1 ||
 #if defined(SC64_Q8_FLASH_ALL_CUSTOM_HOST) || defined(SC64_Q8_FLASH_ALL_CUSTOM_ARM_PROBE)
         !sc64_q8_flash_custom_roster_valid(race_human,race_bots,race_player,race_bot_races)
 #else
         race_human!=R_PROTOSS
+#endif
 #endif
        ) return 0;
     gba_fj_put32(tail,SC64_Q8_FLASH_TAIL_MAGIC);gba_fj_put32(tail+4,SC64_Q8_FLASH_DEBTS);
@@ -220,18 +315,64 @@ static int race_q8_flash_write(const void *data,u32 length)
                 !sc64_pr_q8_actor_shield(MAX_UNITS+i,&ignored)) return 0;
         tail[SC64_Q8_FLASH_TAIL_HEADER+MAX_UNITS+i]=(u8)debt;
     }
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    { u32 at=SC64_Q8_FLASH_TAIL_HEADER+SC64_Q8_FLASH_DEBTS;
+      gba_fj_put32(tail+at,SC64_CONTROLLER_FLASH_MAGIC);
+      gba_fj_put32(tail+at+4,MAX_UNITS+MAX_BUILDINGS);
+      for(int i=0;i<MAX_UNITS;++i) tail[at+8+i]=u[i].alive?sc64_current_unit[i]:255;
+      for(int i=0;i<MAX_BUILDINGS;++i) tail[at+8+MAX_UNITS+i]=b[i].alive?sc64_current_building[i]:255;
+    }
+#endif
     if(data!=(const void *)&race_impact_record || length<suffix_start ||
        length>sizeof(race_impact_record) || length-suffix_start>sizeof suffix) return 0;
     suffix_length=length-suffix_start;
     memcpy(suffix,(const u8 *)data+suffix_start,suffix_length);
     original_hash=gba_fj_hash(2166136261u,data,length);
-    if(!race_worker_cargo_prepare_selected(data,length,SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION,&plan)) return 0;
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    /* Preflight can normalize rows before rejecting. Preserve the original
+     * wire bytes on every path, including semantic failure. */
+    u8 padding[MAX_BUILDINGS];int valid;
+    for(unsigned i=0;i<MAX_BUILDINGS;++i)
+        padding[i]=((u8 *)race_data.buildings)[i*SC64_PR_ROW_WIDTH+SC64_PR_ROW_WIDTH-1];
+    valid=race_worker_cargo_prepare_selected(data,length,SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION,&plan);
+    if(valid) {
+        u32 at=SC64_Q8_FLASH_TAIL_HEADER+SC64_Q8_FLASH_DEBTS+8u;
+        memcpy(plan.q8_debt,tail+SC64_Q8_FLASH_TAIL_HEADER,SC64_Q8_FLASH_DEBTS);
+        memcpy(plan.controller_units,tail+at,MAX_UNITS);
+        memcpy(plan.controller_buildings,tail+at+MAX_UNITS,MAX_BUILDINGS);
+        valid=race_q8_flash_candidate_fractions(&plan,0) && race_controller_flash_candidate(&plan,0);
+    }
+    for(unsigned i=0;i<MAX_BUILDINGS;++i)
+        ((u8 *)race_data.buildings)[i*SC64_PR_ROW_WIDTH+SC64_PR_ROW_WIDTH-1]=padding[i];
+    memcpy((u8 *)&race_impact_record+suffix_start,suffix,suffix_length);
+    if(!valid || gba_fj_hash(2166136261u,data,length)!=original_hash) return 0;
+#else
+    if(!race_worker_cargo_prepare_selected(data,length,
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+          SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION,
+#else
+          SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION,
+#endif
+          &plan)) return 0;
     memcpy(plan.q8_debt,tail+SC64_Q8_FLASH_TAIL_HEADER,SC64_Q8_FLASH_DEBTS);
     if(!race_q8_flash_candidate_fractions(&plan,0))return 0;
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    { u32 at=SC64_Q8_FLASH_TAIL_HEADER+SC64_Q8_FLASH_DEBTS+8u;
+      memcpy(plan.controller_units,tail+at,MAX_UNITS);
+      memcpy(plan.controller_buildings,tail+at+MAX_UNITS,MAX_BUILDINGS);
+      if(!race_controller_flash_candidate(&plan,0))return 0; }
+#endif
     if(!sc64_pr_padding_write((u8 *)race_data.buildings,MAX_BUILDINGS,SC64_PR_ROW_WIDTH,
-                              SC64_PR_USED_BITS,5u,&plan.research_levels)) return 0;
+                              SC64_PR_USED_BITS,
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+                              8u,
+#else
+                              5u,
+#endif
+                              &plan.research_levels)) return 0;
     memcpy((u8 *)&race_impact_record+suffix_start,suffix,suffix_length);
     if(gba_fj_hash(2166136261u,data,length)!=original_hash) return 0;
+#endif
     Sc64Q8FlashGuard guard={io,0};
     GbaFlashJournalIo guarded={&guard,race_q8_flash_guard_read,race_q8_flash_guard_erase,race_q8_flash_guard_program};
     return gba_fj_write_parts(&guarded,data,length,tail,sizeof tail,SC64_Q8_FLASH_TAG,
