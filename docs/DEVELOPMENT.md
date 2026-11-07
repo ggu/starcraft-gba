@@ -629,7 +629,7 @@ What is imported:
 - Advisor alerts are added by `sfxdata` id, and the header's `sc64_audio_alert`
   lists them per race and line. `sc64_audio_alert` holds `SC64_AUDIO_ALERT_NONE`
   where no clip is imported. See [Advisor alerts](#advisor-alerts). The bank then
-  holds 541 streams, about 192 KB more than the bank without them.
+  is about 192 KB larger than without them (543 streams with the warp cues).
 - Music roles come from the resident N64 selector, which loads resource
   `0x1500 + track`: 0 is the menu theme; Terran, Zerg and Protoss play
   4/5, 8/9 and 12/13 in game, alternating as each ends; 2/3, 6/7 and 10/11 are
@@ -682,7 +682,8 @@ Engine design (`common/audio_mixer.h`, `common/gba.c`):
   event snapshot, so they add no EWRAM. With every slot of the Terran profile
   alive and player-owned (192 units and 96 buildings, which no mission reaches),
   the ARM probe measured 39,718 observer cycles per frame on average, against
-  28,755 with the hit-point checks and tech comparison removed. A bank generated before the alert table stays silent for them, and
+  28,755 with the hit-point checks and tech comparison removed (before the warp
+  cues were merged; with them, 42,947). A bank generated before the alert table stays silent for them, and
   profiles without a bank play a short PSG tone.
 
 ### Advisor alerts
