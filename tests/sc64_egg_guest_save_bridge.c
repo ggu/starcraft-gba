@@ -11,6 +11,14 @@ int sc64_validator_import_sram(const char *path)
     fclose(f);
     return n == sizeof(host_save) && end == EOF && !failed;
 }
+int sc64_validator_fresh_envelope(u32 outer, u32 inner)
+{
+    if (sram_get32(host_save) != outer || sram_get32(host_save + 16) != inner ||
+        sram_get32(host_save + 12) != 1) return 0;
+    for (unsigned i = SAVE_SLOT_SIZE; i < sizeof(host_save); ++i)
+        if (host_save[i] != 0xff) return 0;
+    return 1;
+}
 int sc64_validator_export_sram(const char *path)
 {
     FILE *f = fopen(path, "wb");
