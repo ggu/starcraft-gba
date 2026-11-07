@@ -19,6 +19,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Recent qualification:** normal HUD page reuse merged in #352 at `f1fbf106`; the verified package is `StarCraft-GBA-2026-11-07-f1fbf106`. Z9/Z10 gain 12,464 EWRAM bytes (780 to 13,244); their 2,072-byte IWRAM margin is unchanged. Six ordinary OFF/ON physical pairs cover two custom maps and late campaign scenes with matching state/frame/palette through genuine 32 KiB save and fresh load; selected-context persistence remains open. The other four raw OFF/ON controls are identical. Default checks passed (1,023 Python tests, 26 skips, plus compiled checks) and 12 links passed. [Scope and limits](audits/2026-11-07-zerg-late-hud-page/README.md). KODAK was absent; no SD copy occurred. Historical package references below predate this package. The research/Flash custom-roster matrix has HOST coverage of 234 current records and 234 genuine predecessor records; the ordinary-input ARM matrix has only its initial 12 cases, not the full 234. The separate Scarab stage remains unqualified for release. These results do not enable experimental research or close campaign, hardware, timing, or performance gates.
+- **[Hybrid N64 control](audits/2026-11-07-n64-hybrid-control/README.md):** an official same-process JIT state was restored into interpreter mode with equal cache-aware RAM views; two pure-JIT control snapshots are visually close but differ by one in each differing byte. This feasibility result does not establish actor identity, clock, fresh-reset interpreter timing, or hardware parity.
+
 - **Usable upgrades and saving (U3):** the combined experimental source
   `8be82458` now includes #348 phase migration, #349 ARM transaction and explicit
   HOST-only Terran/Zerg custom-roster admission. Its ordinary P10 custom tape
@@ -78,7 +81,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   visual context, not power-boundary, remembered-fog, damage or timing parity.
   This frontend rejects RAM capture; N1 actor/clock/cadence gates remain open.
 
-The playable Mac package is still `d3535af6`; these new experimental branches
+The playable Mac package is now `f1fbf106`; these new experimental branches
 have not been copied to KODAK. The full campaign 29/30 and near-30-fps gates
 below remain open. Keep source-only public artifacts and local Actions policy.
 
@@ -94,7 +97,7 @@ older KODAK package. Source merges do not update an already copied ROM.
   to eligible nearby known fields; #311 uses the source-shaped Pylon field
   for placement, production and cached/uncached Cannon power. Separate
   Egg/Carrier/Scarab lifecycles are unchanged; the visual field overlay is off.
-- **Validation and package:** the normal Mac package is now
+- **Earlier validation and package:** the prior normal Mac package was
   `StarCraft-GBA-2026-11-07-d3535af6`, adding pending mineral-trip continuation
   #339 and shared detector optimization #342 to the earlier stock-sight,
   menu/mining/audio/power package. Four qualified canonical ELFs were reused
@@ -449,7 +452,7 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-062acff7`:
+- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-f1fbf106`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The older KODAK package
   is `20261106-e9838086-campaigns`. Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
