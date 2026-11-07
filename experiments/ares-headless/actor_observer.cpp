@@ -6,7 +6,7 @@
 #include "hybrid_contract.h"
 #include <fcntl.h>
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Hybrid frontend: same-process official state only; no guest writes or host-input API.
+// Hybrid frontend: official same-process state restoration; no arbitrary guest-memory writes or host-input API.
 #include <ares/ares.hpp>
 #include <n64/n64.hpp>
 #include <mia/mia.hpp>
