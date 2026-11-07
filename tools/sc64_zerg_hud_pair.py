@@ -82,6 +82,9 @@ def main():
     pins={str(p.resolve()):sha(p) for p in paths}
     receipt=json.loads(a.build_receipt.read_text())
     if not receipt.get('unchanged') or not receipt.get('vectors_verified',{}).get(a.profile):raise ValueError('missing verified paired build receipt')
+    required={'hud-ab-test-roles'} | {f'hud-ab-{p}-{v}' for p in ('z9','z10') for v in ('off','on')} | {f'hud-ab-host-{p}-{v}' for p in ('z9','z10') for v in ('off','on')}
+    results=receipt.get('results',[])
+    if {row.get('name') for row in results if row.get('rc')==0}!=required or len(results)!=len(required):raise ValueError('paired build/host checks incomplete or failed')
     if subprocess.check_output(['git','rev-parse','--short=8','HEAD'],text=True).strip()!=receipt.get('head') or subprocess.run(['git','diff','--quiet','HEAD','--']).returncode:raise ValueError('source does not match build receipt')
     verify_build_roles(receipt,a.profile,a.off_rom,a.off_elf,a.on_rom,a.on_elf)
     if sha(a.off_rom)==sha(a.on_rom) or sha(a.off_elf)==sha(a.on_elf):raise ValueError('paired variants unexpectedly identical')
