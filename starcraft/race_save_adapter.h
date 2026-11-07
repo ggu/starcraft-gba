@@ -4575,7 +4575,7 @@ static int race_load_game(void) {
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16), &decoded)) return 0;
 #else
-#if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
         if(!SC64_GUARD_DECODE(&race_data,(unsigned)i,(unsigned)(race_cols*16),
                                   (unsigned)(race_rows*16),&decoded)) return 0;
 #else
@@ -4585,7 +4585,7 @@ static int race_load_game(void) {
 #endif
 #endif
 #else
-#if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
         if(!SC64_GUARD_DECODE(&race_data,(unsigned)i,(unsigned)(race_cols*16),
                                   (unsigned)(race_rows*16),&decoded)) return 0;
 #else
