@@ -50,5 +50,23 @@ int main(void)
                restored.carry==child.carry && restored.work_timer==child.work_timer &&
                restored.build==-1 && sc64_worker_cargo_state_valid(&restored));
     }
-    puts("actual worker cargo and Scarab row composition: PASS");return 0;
+    /* Exercise the real cargo candidate preparation and Scarab graph
+     * validator on one detached row set. This is not journal admission. */
+    int parent=spawn_unit(ENEMY,U_REAVER,140,100);assert(parent>=0);
+    Unit reaver=u[parent];Sc64ScarabParentFields pf={0,SC64_SCARAB_FIELD_NO_SLOT,0,0};
+    assert(sc64_scarab_parent_fields_pack(&pf,&reaver.carry,&timer));reaver.work_timer=(u16)timer;
+    reaver.raw_type=83;reaver.raw_owner=-1;
+    Sc64ScarabChildFields inside={1,1,0,0};
+    assert(sc64_scarab_child_fields_pack(&inside,&child.carry,&timer));child.work_timer=(u16)timer;
+    child.hp=20;child.maxhp=20;child.build=-1;child.target=-1;child.order=ORDER_IDLE;
+    memset(&row_candidate,0,sizeof row_candidate);
+    assert(row_encode(0,&worker) && row_encode(1,&reaver));
+    assert(sc64_scarab_flight_to_wire(&child,&wire,1,0) && row_encode(2,&wire));
+    assert(race_save_worker_cargo_prepare(&row_candidate,2048,2048,0));
+    assert(row_decode(2,&decoded) && sc64_scarab_flight_from_wire(&decoded,&restored,1,0));
+    assert(row_encode(2,&restored));
+    assert(race_scarab_save_candidate_valid(&row_candidate,2048,2048));
+    restored.raw_owner=7;assert(row_encode(2,&restored));
+    assert(!race_scarab_save_candidate_valid(&row_candidate,2048,2048));
+    puts("actual cargo preparation and detached Scarab graph: PASS");return 0;
 }
