@@ -11,6 +11,9 @@ static void sc64_contact_memo_invalidate(void);
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
 #include "sc64_save_tag_namespace.h"
+#if defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) && (!defined(GBA_HOST) || !defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) || !defined(SC64_RACES))
+#error "Scarab AI restock requires the HOST-only race lifecycle probe"
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
 #include "sc64_protoss_research_padding.h"
 static Sc64ProtossResearchLevels sc64_experimental_research_levels;
@@ -4995,6 +4998,10 @@ hit_stock_building_target(const Building *source,int target,int damage)
 static int
 save_game(void)
 {
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    /* The stage's payer witness has no authenticated save representation. */
+    return 0;
+#endif
 #ifdef SC64_TEXT_BOXES
     /* Neither a queued message nor a deferred result is serialized. */
     if (sc64_text_box_count() || sc64_text_box_outcome.result) return 0;
@@ -5058,6 +5065,10 @@ static void game_audio_prime(void);
 static int
 load_game(void)
 {
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    /* No saved record authenticates the stage's payer witnesses yet. */
+    return 0;
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) return 0;
 #endif
@@ -13348,6 +13359,9 @@ static int race_scarab_human_enqueue(void)
 static void __attribute__((noinline)) race_scarab_human_parent_step(int slot)
 {
     race_scarab_probe_parent_tick(slot);
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    (void)race_scarab_ai_restock_stage(slot);
+#endif
     (void)race_scarab_production_tick(slot,0);
 }
 /* Retire hidden children before the generic parent slot is invalidated.

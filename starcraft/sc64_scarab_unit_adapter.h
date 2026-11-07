@@ -13,6 +13,14 @@
 #include "sc64_scarab_fields.h"
 #include "sc64_scarab_lifecycle.h"
 #include "sc64_scarab_wallet.h"
+#if defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) && (!defined(GBA_HOST) || !defined(SC64_SCARAB_HUMAN_CONTROL_PROBE))
+#error "Scarab AI restock is a HOST-only lifecycle experiment"
+#endif
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+/* HOST-only ownership witness; not part of any save format. A pending or
+ * completed child stays bound to its original compact controller. */
+static u8 sc64_scarab_stage_payer[MAX_UNITS];
+#endif
 _Static_assert(MAX_UNITS <= SC64_SCARAB_FIELD_SLOT_LIMIT, "Scarab slot encoding must cover the actor pool");
 
 /* Included by the gated flight experiment, or explicitly by prepared fixtures,
@@ -116,6 +124,9 @@ static int race_scarab_parent_init(int parent_slot)
             child.parent_slot==(unsigned)parent_slot) return 0;
     }
     if (!sc64_scarab_parent_fields_pack(&f,&carry,&timer)) return 0;
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    sc64_scarab_stage_payer[parent_slot]=0;
+#endif
     u[parent_slot].carry=carry; u[parent_slot].work_timer=(u16)timer;
     return 1;
 }
@@ -151,6 +162,18 @@ static Sc64ScarabWallet race_scarab_owner_bank(int slot)
 {
     Sc64ScarabWallet bank = {.limit = 65535};
     if (!race_scarab_parent_identity(slot)) return bank;
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    /* Campaign enemies can share a combat owner but have different wallets;
+     * their current source controller has not been authenticated here. */
+    if (race_mode!=1 || race_bots<1 || race_bots>3 ||
+        (u[slot].raw_type!=-1 && u[slot].raw_type!=83)) return bank;
+    int stage_owner=u[slot].owner, active=stage_owner==SIDE;
+    for(int i=0;i<race_bots;++i) if(race_bot_owner_ids[i]==stage_owner) active=1;
+    if(!active || stage_owner<0 || stage_owner>=5 || race_player[stage_owner]!=R_PROTOSS ||
+       (sc64_scarab_stage_payer[slot] && sc64_scarab_stage_payer[slot]!=(u8)(stage_owner+1))) return bank;
+    bank.engine=stage_owner==SIDE ? &minerals : &race_minerals[stage_owner];
+    return bank;
+#endif
 #ifdef SC64_P8_RUNTIME
     if (race_p8_active()) return race_p8_scarab_wallet(&u[slot]);
 #endif
@@ -253,8 +276,24 @@ static int race_scarab_enqueue(int slot,int upgraded)
     if (!sc64_scarab_enqueue(&p,counts,upgraded,&next) ||
         !sc64_scarab_wallet_value_valid(next) || (unsigned)next > bank.limit ||
         !race_scarab_parent_write(slot,&p)) return 0;
-    sc64_scarab_wallet_commit(bank,next); return 1;
+    sc64_scarab_wallet_commit(bank,next);
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    sc64_scarab_stage_payer[slot]=(u8)(u[slot].owner+1);
+#endif
+    return 1;
 }
+
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+/* Explicit approximation, not an N64 cadence claim: at most one paid request
+ * while no work is queued, at the caller's existing source-tick cadence. */
+static int race_scarab_ai_restock_stage(int slot)
+{
+    Sc64ScarabParent parent;Sc64ScarabCounts counts;
+    if (!race_scarab_parent_identity(slot) || u[slot].owner==SIDE ||
+        !race_scarab_parent_read(slot,0,&parent,&counts) || parent.queued) return 0;
+    return race_scarab_enqueue(slot,0);
+}
+#endif
 /* Invoke only on a source tick. No automatic game-loop registration. */
 static int race_scarab_production_tick(int slot,int upgraded)
 {
