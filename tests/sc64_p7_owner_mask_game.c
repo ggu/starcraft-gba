@@ -176,10 +176,16 @@ static void expect_mask(unsigned expected, const u8 *powered)
     if (reference != expected) fprintf(stderr, "expected %u got %u\n", expected, reference);
     assert(reference == expected);
     unsigned actual = sc64_p7_arbiter_detected_mask(0, powered);
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+    unsigned scalar_visible=sc64_optical_test_visible;
+#endif
     if (actual != expected) fprintf(stderr, "actual %u expected %u target=(%d,%d) visible=%d\n", actual,expected,u[0].x,u[0].y,SC64_GRID_GET(visible,u[0].x/16+(u[0].y/16)*MAP_COLS));
     assert(actual == expected);
     Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
     assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == expected);
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+    assert(sc64_optical_test_visible==scalar_visible);
+#endif
 }
 
 static void optical_source_masks(void)
@@ -318,6 +324,26 @@ static void detector_snapshot_cases(void)
 }
 #endif
 
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+static void completion_cases(void)
+{
+    Sc64P7DetectorLists lists;u8 powered[MAX_BUILDINGS]={0};
+    reset_case();sc64_p7_detector_lists_build(&lists);
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    assert(!(lists.possible_optical_sources & (1u<<7)));
+#endif
+    unsigned initial=sc64_optical_test_initial;
+    unsigned scalar=sc64_p7_arbiter_detected_mask(0,powered),visible0=sc64_optical_test_visible;
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==scalar && sc64_optical_test_visible==visible0);
+    assert(sc64_optical_test_initial>initial);
+    reset_case();observer(1,0,race_p7_source_owner(0));observer(2,4,race_p7_source_owner(4));
+    sc64_p7_detector_lists_build(&lists);assert((lists.possible_optical_sources & 0x11u)==0x11u);
+    unsigned early=sc64_optical_test_early;scalar=sc64_p7_arbiter_detected_mask(0,powered);visible0=sc64_optical_test_visible;
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==scalar && sc64_optical_test_visible==visible0);
+    assert(sc64_optical_test_early>early);
+}
+#endif
+
 int main(void)
 {
     optical_source_masks();
@@ -325,6 +351,9 @@ int main(void)
     race_mode = 0;
     race_selected_mission = SC64_P7_GLOBAL_ID;
     explicit_cases();
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+    completion_cases();
+#endif
 #ifdef SC64_P7_DETECTOR_BINDING_HOIST
     detector_binding_hoist_cases();
 #endif
@@ -390,8 +419,14 @@ int main(void)
         Sc64P7PersistentState state_before = race_p7;
         unsigned want = sc64_p7_arbiter_detected_mask_reference(0, powered);
         unsigned got = sc64_p7_arbiter_detected_mask(0, powered);
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+        unsigned scalar_visible=sc64_optical_test_visible;
+#endif
         Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
         assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+        assert(sc64_optical_test_visible==scalar_visible);
+#endif
         assert(got == want);
         positive += want != 0;
         assert(!memcmp(units_before, u, sizeof(u)) &&
@@ -419,6 +454,9 @@ int main(void)
         assert(sc64_p7_arbiter_detected_mask(0, powered) == want);
     }
     assert(positive > 0);
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+    assert(sc64_optical_test_early>0 && sc64_optical_test_initial>0);
+#endif
     printf("owner mask oracle: 2000 cases, %u positive masks\n", positive);
     return 0;
 }

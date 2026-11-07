@@ -397,6 +397,9 @@ typedef struct {
     u8 optical_units[MAX_UNITS], optical_unit_masks[MAX_UNITS];
     u8 optical_buildings[MAX_BUILDINGS], optical_building_masks[MAX_BUILDINGS];
     unsigned unit_count, building_count, optical_unit_count, optical_building_count;
+#ifdef SC64_OPTICAL_COMPLETION_PROBE
+    unsigned possible_optical_sources;
+#endif
 } Sc64P7DetectorLists;
 
 /* The source-owner mapping and actor visibility inputs do not change within
@@ -436,6 +439,9 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
 #endif
     lists->unit_count=lists->building_count=0;
     lists->optical_unit_count=lists->optical_building_count=0;
+#ifdef SC64_OPTICAL_COMPLETION_PROBE
+    lists->possible_optical_sources=0;
+#endif
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
@@ -450,6 +456,9 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
         if(mask) {
             unsigned n=lists->optical_unit_count++;
             lists->optical_units[n]=(u8)i; lists->optical_unit_masks[n]=(u8)mask;
+#ifdef SC64_OPTICAL_COMPLETION_PROBE
+            lists->possible_optical_sources|=mask;
+#endif
         }
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive) {
@@ -462,8 +471,15 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
         if(mask) {
             unsigned n=lists->optical_building_count++;
             lists->optical_buildings[n]=(u8)i; lists->optical_building_masks[n]=(u8)mask;
+#ifdef SC64_OPTICAL_COMPLETION_PROBE
+            lists->possible_optical_sources|=mask;
+#endif
         }
     }
+#if defined(SC64_OPTICAL_COMPLETION_PROBE) && defined(SC64_SOURCE_SIGHT_ALL_RACES)
+    /* The human source is read only from the authoritative SIDE grid. */
+    if(human_slot>=0) lists->possible_optical_sources &= ~(1u<<(unsigned)human_slot);
+#endif
     for(int i=0;i<MAX_UNITS;++i)
         if(u[i].alive && (RACE_PROTOSS_RAW(&u[i])==SC64_P7_OBSERVER_RAW
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
@@ -480,6 +496,12 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
 
 #ifdef SC64_DIAGNOSTIC_SETUP
 volatile u32 sc64_optical_unit_cycles, sc64_optical_building_cycles, sc64_optical_refresh_count;
+#endif
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+#ifndef GBA_HOST
+#error "optical completion test counters are host-only"
+#endif
+static unsigned sc64_optical_test_visible,sc64_optical_test_early,sc64_optical_test_initial;
 #endif
 
 static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
@@ -506,6 +528,12 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #ifdef SC64_DIAGNOSTIC_SETUP
     u32 optical_diag_start=gba_clock();
     ++sc64_optical_refresh_count;
+#endif
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+    if (lists && !(lists->possible_optical_sources & ~visible_owners)) ++sc64_optical_test_initial;
+#endif
+#ifdef SC64_OPTICAL_COMPLETION_PROBE
+    if (!lists || (lists->possible_optical_sources & ~visible_owners))
 #endif
     for(int k=0;k<(lists?(int)lists->optical_unit_count:MAX_UNITS);++k) {
         int i=lists?lists->optical_units[k]:k;
@@ -547,10 +575,21 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         int radius=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
         if(dx*dx+dy*dy>radius*radius) continue;
         visible_owners|=candidate;
+#ifdef SC64_OPTICAL_COMPLETION_PROBE
+        if (lists && !(lists->possible_optical_sources & ~visible_owners)) {
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+            ++sc64_optical_test_early;
+#endif
+            break;
+        }
+#endif
     }
 #ifdef SC64_DIAGNOSTIC_SETUP
     sc64_optical_unit_cycles+=gba_clock()-optical_diag_start;
     optical_diag_start=gba_clock();
+#endif
+#ifdef SC64_OPTICAL_COMPLETION_PROBE
+    if (!lists || (lists->possible_optical_sources & ~visible_owners))
 #endif
     for(int k=0;k<(lists?(int)lists->optical_building_count:MAX_BUILDINGS);++k) {
         int i=lists?lists->optical_buildings[k]:k;
@@ -591,9 +630,20 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
             1);
         if(dx*dx+dy*dy>radius*radius) continue;
         visible_owners|=candidate;
+#ifdef SC64_OPTICAL_COMPLETION_PROBE
+        if (lists && !(lists->possible_optical_sources & ~visible_owners)) {
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+            ++sc64_optical_test_early;
+#endif
+            break;
+        }
+#endif
     }
 #ifdef SC64_DIAGNOSTIC_SETUP
     sc64_optical_building_cycles+=gba_clock()-optical_diag_start;
+#endif
+#ifdef SC64_OPTICAL_COMPLETION_TEST
+    sc64_optical_test_visible=visible_owners;
 #endif
     for(int k=0;k<(lists?(int)lists->unit_count:MAX_UNITS);++k) {
         int i=lists?lists->units[k]:k;
