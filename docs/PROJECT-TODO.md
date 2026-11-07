@@ -19,45 +19,45 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
-- **Usable upgrades and saving (U3):** the combined experimental source
-  `8be82458` now includes #348 phase migration, #349 ARM transaction and explicit
-  HOST-only Terran/Zerg custom-roster admission. Its ordinary P10 custom tape
-  naturally pays for Forge research, saves through pause/B, fresh-title loads
-  through L with the same wallet/job, and completes level one. The real Flash
-  command backend has no guest-state writes or polling workaround. The feature-off
-  P10 control still exactly matches the playable `317cc67d…` ROM. This is one
-  emulated custom witness, not cartridge/audio/fractional-damage or all-mode
-  qualification. Clean asset-free boundary/doctor/build/full-test checks pass
-  (1,026 Python tests, 26 expected skips, plus compiled checks). The first
-  supervisory postcondition incorrectly rejected an authored generated math
-  table; the corrected full test rerun passes, with the failed attempt retained.
-  Normal release flags remain off.
-- **Memory before deployment:** all six combined Q8/jobs/Flash ARM probes link
-  under unchanged guards. EWRAM margins are P10 19,324 B, Terran 28,336 B,
-  Showcase 28,676 B, Z7 2,292 B, and Z9/Z10 only 132 B. A separate optional HUD
-  framebuffer-page probe at `9f185cfd` passes four guarded OFF/ON links and four
-  poisoned-page HOST diagnostics (22 full-clear comparisons each). It saves
-  **12,456 net bytes** in both Z9/Z10, increasing their margin to 12,588 B with
-  unchanged 1,936 B IWRAM margin. The corrected Z9 ordinary custom comparison
-  matches OFF/ON state, full displayed frame and palette for 3,056 input ticks
-  and again after fresh load; both guests write identical valid Flash saves.
-  Restored named state matches uninterrupted play, including wallet/job/timer.
-  Fresh-versus-uninterrupted pixels still differ after 60 neutral updates,
-  despite matching named state/palette and exact OFF/ON frame pairs. Raw views
-  show Forge selection/ring/HUD retained uninterrupted but cleared after load;
-  the tested loader resets that UI context and the compared world omits it.
-  This localizes an existing presentation-contract gap, without attributing
-  every map pixel. Define/qualify saved UI and presentation, then Z10/campaign
-  scenes; see the [scoped HUD audit](audits/2026-11-07-zerg-hud-memory/README.md).
-  The strict cross-path gate stays failed; normal flags and hardware/FPS claims
-  remain unchanged.
-- **Migration and roster gates:** the composed phase checker passes 39 process
-  steps covering all 1,280 unit and 320 legacy building phases, 47 advancing
-  updates, genuine old exports and alias/burn preservation. Actual checksum-valid
-  malformed human/bot records are refused through the real loader. The explicit
-  all-custom-roster extension remains HOST-only. Campaigns, all controller/race
-  combinations, repair/Z5 aliases, genuine saves, failure/recovery, runtime stack
-  and hardware remain required before normal enablement.
+- **Normal package and HUD:** #352 merged normal Z9/Z10 HUD page reuse at
+  `f1fbf106`; the verified Mac package is
+  `StarCraft-GBA-2026-11-07-f1fbf106`. Z9/Z10 EWRAM margin rises by 12,464 B
+  from 780 to 13,244 B; IWRAM remains 2,072 B. Six ordinary OFF/ON physical
+  pairs cover two custom maps and late campaign scenes, with matching named
+  state, full frame and palette through genuine 32 KiB saves and fresh loads.
+  Four other raw OFF/ON controls are identical. Default checks passed (1,023
+  Python tests, 26 skips, plus compiled checks), as did 12 links. KODAK was
+  absent and no SD copy occurred. See the [HUD audit](audits/2026-11-07-zerg-late-hud-page/README.md).
+- **Usable upgrades and saving (U3):** the separate combined research/Q8/Flash
+  experiment remains disabled in normal products. Its ordinary P10 custom tape
+  pays for Forge research, saves, fresh-loads the same wallet/job and completes
+  level one. The real Flash backend uses no guest-state writes or polling
+  workaround; the feature-off P10 control matches the `317cc67d…` ROM. This is
+  an emulated witness, not cartridge or all-mode qualification. HOST coverage
+  includes 234 custom roster records and 234 genuine predecessor records; an
+  initial bounded subset of ordinary-input ARM roster cases passes, with the
+  remaining matrix still in progress. Campaigns, controller/race combinations,
+  repair/Z5 aliases, real failure recovery, runtime stack and hardware remain
+  release gates. The separate Scarab stage is not release-qualified.
+- **Experimental memory and presentation:** at combined research source
+  `8be82458`, the older six ARM probes linked with Z9/Z10 EWRAM margin 132 B;
+  this is distinct from the current normal #352 product margins above. In an
+  earlier optional combined-feature Z9 comparison, OFF/ON state and full frame
+  matched through fresh load, but fresh-versus-uninterrupted pixels differed
+  after 60 neutral updates: the tested loader cleared selected Forge UI context.
+  That historical strict cross-path presentation check remains unresolved; it
+  does not invalidate the merged normal HUD OFF/ON qualification. See the
+  [experimental HUD audit](audits/2026-11-07-zerg-hud-memory/README.md).
+- **Migration:** the composed phase checker passes 39 process steps covering all
+  1,280 unit and 320 legacy building phases, 47 advancing updates, genuine old
+  exports and alias/burn preservation. Checksum-valid malformed human/bot
+  records are refused through the real loader. These checks do not alone qualify
+  every campaign, roster, hardware failure or save transition.
+- **[Hybrid N64 control](audits/2026-11-07-n64-hybrid-control/README.md):** an
+  official same-process JIT state was restored into interpreter mode with equal
+  cache-aware RAM views. Two pure-JIT control snapshots are visually close but
+  differ by one in each differing byte. This feasibility result establishes no
+  actor identity, clock, fresh-reset interpreter timing or hardware parity.
 - **Egg rollout (S1):** the selector probe now has one actual ordinary-input
   Z7-ROM custom guest save/load/birth witness at runtime `6bbc678f`. Natural Pool
   construction and a 50-mineral Zergling purchase produce an Egg; its genuine
@@ -78,7 +78,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   visual context, not power-boundary, remembered-fog, damage or timing parity.
   This frontend rejects RAM capture; N1 actor/clock/cadence gates remain open.
 
-The playable Mac package is still `d3535af6`; these new experimental branches
+The playable Mac package is now `f1fbf106`; these new experimental branches
 have not been copied to KODAK. The full campaign 29/30 and near-30-fps gates
 below remain open. Keep source-only public artifacts and local Actions policy.
 
@@ -94,7 +94,7 @@ older KODAK package. Source merges do not update an already copied ROM.
   to eligible nearby known fields; #311 uses the source-shaped Pylon field
   for placement, production and cached/uncached Cannon power. Separate
   Egg/Carrier/Scarab lifecycles are unchanged; the visual field overlay is off.
-- **Validation and package:** the normal Mac package is now
+- **Earlier validation and package:** the prior normal Mac package was
   `StarCraft-GBA-2026-11-07-d3535af6`, adding pending mineral-trip continuation
   #339 and shared detector optimization #342 to the earlier stock-sight,
   menu/mining/audio/power package. Four qualified canonical ELFs were reused
@@ -449,7 +449,7 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-062acff7`:
+- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-f1fbf106`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The older KODAK package
   is `20261106-e9838086-campaigns`. Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
