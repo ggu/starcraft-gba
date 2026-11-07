@@ -53,6 +53,7 @@ def main():
  for name in ('off_rom','off_elf','on_rom','on_elf','runner','blank','receipt','output'):ap.add_argument('--'+name.replace('_','-'),type=Path,required=True)
  ap.add_argument('--profile',choices=('z9','z10'),required=True);ap.add_argument('--mode',choices=('custom','campaign'),required=True)
  ap.add_argument('--driver-head',required=True);ap.add_argument('--deadline',type=int,default=600)
+ ap.add_argument('--map-id',type=int,choices=(0,1),default=0)
  a=ap.parse_args();paths=(a.off_rom,a.off_elf,a.on_rom,a.on_elf,a.runner,a.blank,a.receipt)
  if a.output.exists() or not 1<=a.deadline<=1200:ap.error('invalid output/deadline')
  if sha(a.runner)!=RUNNER or a.blank.read_bytes()!=bytes([255])*32768:ap.error('runner or erased SRAM differs')
@@ -94,6 +95,10 @@ def main():
     if a.mode=='custom':
      tap(128);tap(1)
      if front('page')!=world.FRONT_SKIRMISH:raise ValueError('not in custom lobby')
+     for _ in range(2):
+      if front('map')==a.map_id:break
+      tap(16)
+     if front('map')!=a.map_id:raise ValueError('requested map unavailable')
      tap(128)
      for _ in range(3):
       if front('race')==1:break
@@ -121,7 +126,7 @@ def main():
      if front('page')!=3:raise ValueError('briefing not reached')
      tap(8)
     state=snap(games[0]);target=20 if a.profile=='z9' else 21
-    if state['screen']!=world.SCREEN_PLAY or (a.mode=='custom' and (state['race_mode'],state['race_human'],state['race_bots'])!=(1,1,1)) or (a.mode=='campaign' and (state['race_mode']!=0 or state['race_selected_mission']!=target)):raise ValueError('requested scene did not start')
+    if state['screen']!=world.SCREEN_PLAY or (a.mode=='custom' and (state['race_mode'],state['race_human'],state['race_bots'],state['race_skirmish_map'])!=(1,1,1,a.map_id)) or (a.mode=='campaign' and (state['race_mode']!=0 or state['race_selected_mission']!=target)):raise ValueError('requested scene did not start')
     # Advance and handle visible text with ordinary A taps; do not inspect enemies.
     for _ in range(600):
      if int.from_bytes(games[0].rsp.read(0x06013fe0,2),'little'):tap(1)
@@ -156,7 +161,7 @@ def main():
     selection_reset_observed=saved[0]['selected_building']>=0 and loaded[0]['selected_building']==-1
     step(0)
     for _ in range(60):step(0)
-    check();report={'source':a.driver_head,'compiled_source':receipt['head'],'profile':a.profile,'mode':a.mode,'pins':pins,'sram_sha256':sha(saves[0]),'records':records_valid,'saved_ui':{k:saved[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'loaded_ui':{k:loaded[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'selection_reset_observed':selection_reset_observed,'saved_named_world_equal_before_release':True,
+    check();report={'source':a.driver_head,'compiled_source':receipt['head'],'profile':a.profile,'mode':a.mode,'map_id':a.map_id if a.mode=='custom' else None,'pins':pins,'sram_sha256':sha(saves[0]),'records':records_valid,'saved_ui':{k:saved[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'loaded_ui':{k:loaded[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'selection_reset_observed':selection_reset_observed,'saved_named_world_equal_before_release':True,
             'derived_cross_path_equal':{k:saved[0][k]==loaded[0][k] for k in ('visible_sha256','explored_sha256','camx','camy')},'steps':len(records),'cycles_scope':'all physical updates, including menus and nonadvancing',
             'cycles':[{'mean':sum(c)/len(c),'max':max(c)} for c in cycles],'comparisons':records,'scope':'physical input, full displayed indexed frame/palette and named world/UI at each step; cross-path selection reset recorded, not equated'}
     (a.output/'result.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({'steps':len(records),'saved_ui':report['saved_ui'],'loaded_ui':report['loaded_ui']}))
