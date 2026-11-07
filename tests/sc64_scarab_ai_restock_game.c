@@ -9,6 +9,7 @@ int main(void)
     setup();
     race_bots=2; race_player[SIDE]=R_PROTOSS;
     race_player[ENEMY]=R_PROTOSS; race_player[RESCUABLE]=R_PROTOSS;
+    race_bot_races[0]=R_PROTOSS; race_bot_races[1]=R_PROTOSS;
     minerals=100; race_minerals[ENEMY]=100; race_minerals[RESCUABLE]=80;
     int ai=spawn_unit(ENEMY,U_REAVER,128,128);
     int human=spawn_unit(SIDE,U_REAVER,140,128);
@@ -30,15 +31,23 @@ int main(void)
     race_minerals[ENEMY]=14;
     assert(!race_scarab_ai_restock_stage(ai) && race_minerals[ENEMY]==14);
     race_minerals[ENEMY]=100;
+    race_bot_races[0]=R_ZERG; /* Stale active roster cannot authorize payment. */
+    assert(!race_scarab_ai_restock_stage(ai) && race_minerals[ENEMY]==100);
+    race_bot_races[0]=R_PROTOSS;
     race_mode=0; /* collapsed campaign owner cannot choose a source-town wallet */
     assert(!race_scarab_ai_restock_stage(ai) && race_minerals[ENEMY]==100);
     race_mode=1;
-    assert(!save_game() && !load_game()); /* unsaved payer witness stays HOST-only */
+    assert(!save_game() && !load_game() && !race_save_game() && !race_load_game());
     race_scarab_human_parent_step(ai); /* actual hooked source-tick body */
     assert(race_minerals[ENEMY]==85 && race_scarab_parent_read(ai,0,&parent,&counts));
     assert(parent.queued==1 && parent.active_slot>=0);
     for(int i=0;i<106;++i) race_scarab_human_parent_step(ai);
     assert(race_scarab_parent_read(ai,0,&parent,&counts) && counts.inside>=1);
+    hit_target(ai,10000,U_MARINE,SIDE); /* real death path retires owned children */
+    assert(!u[ai].alive);
+    int reused=spawn_unit(RESCUABLE,U_REAVER,128,128);
+    assert(reused==ai && race_scarab_ai_restock_stage(reused));
+    assert(race_minerals[RESCUABLE]==65 && race_minerals[ENEMY]==85);
     puts("HOST Scarab custom payer and bounded AI restock stage passed");
     return 0;
 }

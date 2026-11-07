@@ -167,8 +167,9 @@ static Sc64ScarabWallet race_scarab_owner_bank(int slot)
      * their current source controller has not been authenticated here. */
     if (race_mode!=1 || race_bots<1 || race_bots>3 ||
         (u[slot].raw_type!=-1 && u[slot].raw_type!=83)) return bank;
-    int stage_owner=u[slot].owner, active=stage_owner==SIDE;
-    for(int i=0;i<race_bots;++i) if(race_bot_owner_ids[i]==stage_owner) active=1;
+    int stage_owner=u[slot].owner, active=stage_owner==SIDE && race_human==R_PROTOSS;
+    for(int i=0;i<race_bots;++i)
+        if(race_bot_owner_ids[i]==stage_owner && race_bot_races[i]==R_PROTOSS) active=1;
     if(!active || stage_owner<0 || stage_owner>=5 || race_player[stage_owner]!=R_PROTOSS ||
        (sc64_scarab_stage_payer[slot] && sc64_scarab_stage_payer[slot]!=(u8)(stage_owner+1))) return bank;
     bank.engine=stage_owner==SIDE ? &minerals : &race_minerals[stage_owner];
