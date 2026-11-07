@@ -55,6 +55,8 @@ int main(int argc,char **argv)
                 for(int k=0;k<=48;k+=4)if(terrain_blocked((x+k)/16,y/16))clear=0;
                 for(int j=0;j<MAX_BUILDINGS && clear;++j)if(b[j].alive)
                     for(int k=0;k<=48;k+=4)if(dist2(x+k,y,b[j].x,b[j].y)<40*40){clear=0;break;}
+                for(int j=0;j<MAX_UNITS && clear;++j)if(j!=parent && j!=target && u[j].alive)
+                    for(int k=0;k<=48;k+=4)if(dist2(x+k,y,u[j].x,u[j].y)<36*36){clear=0;break;}
                 if(clear && direct_path_clear(x,y,x+48,y)){sx=x;sy=y;break;}
             }
             assert(sx>=0);u[parent].x=sx;u[parent].y=sy;u[parent].cd=0;
@@ -69,6 +71,7 @@ int main(int argc,char **argv)
                 for(int i=0;i<30 && u[child].alive && u[child].x==x && u[child].y==y;++i) {
                     ++frame;if(sc64_battlecruiser_source_tick_due())race_scarab_control_dispatch(child);
                 }
+                fprintf(stderr,"moving child=%d alive=%d xy=%d,%d start=%d,%d order=%d target=%d carry=%d timer=%d impacts=%u\n",child,u[child].alive,u[child].x,u[child].y,x,y,u[child].order,u[child].target,u[child].carry,u[child].work_timer,race_impact_count);
                 assert(u[child].alive && (u[child].x!=x || u[child].y!=y) && !race_impact_count);
             }
         } else assert(!strcmp(argv[1],"write-training") || !strcmp(argv[1],"write-inside"));
