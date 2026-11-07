@@ -211,6 +211,16 @@ int main(void)
     for(unsigned i=0;i<sizeof payload;++i)payload[i]=(uint8_t)(i*37u+3u);
     for(unsigned i=0;i<sizeof tail;++i)tail[i]=(uint8_t)(i*13u+7u);
     ordinary_and_full();power_cuts();erased_tag_bytes();stale_winner_and_semantic_fallback();fallback_and_arguments();
+    {
+        GbaFlashJournalRecord written;uint8_t header[32],saved[96];
+        memset(header,0x31,sizeof header);reset();
+        assert(gba_fj_write_three(&io,header,sizeof header,payload,48,tail,16,
+                                  0x56465a60,accept_payload,0,0,&written)==GBA_FJ_OK);
+        assert(written.length==sizeof saved && gba_fj_read_payload(&io,&written,0,saved,sizeof saved)==GBA_FJ_OK);
+        assert(!memcmp(saved,header,32) && !memcmp(saved+32,payload,48) && !memcmp(saved+80,tail,16));
+        assert(gba_fj_write_three(&io,header,32,payload,GBA_FJ_PAYLOAD_MAX,tail,16,
+                                  0x56465a60,accept_payload,0,0,&written)==GBA_FJ_ARGUMENT);
+    }
     puts("isolated Flash journal model: full payload, legacy preservation and fallback PASS");
     return 0;
 }
