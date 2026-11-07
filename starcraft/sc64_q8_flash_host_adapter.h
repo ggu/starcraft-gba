@@ -63,7 +63,7 @@ static int race_q8_flash_guard_erase(void *ctx,u32 at)
 static int race_q8_flash_candidate_fractions(RaceLoadPlan *plan,int old)
 {
     if (!plan || race_data.state[0]!=1) return 0;
-#ifdef SC64_Q8_FLASH_ALL_CUSTOM_HOST
+#if defined(SC64_Q8_FLASH_ALL_CUSTOM_HOST) || defined(SC64_Q8_FLASH_ALL_CUSTOM_ARM_PROBE)
     if (!sc64_q8_flash_custom_roster_valid(race_data.state[1],race_data.state[4],
                                            race_data.players,&race_data.state[21])) return 0;
 #else
@@ -192,7 +192,7 @@ static int race_q8_flash_write(const void *data,u32 length)
     unsigned hp,ignored;
     if (!io || !io->read || !io->program || !io->erase_sector || !data || !length ||
         race_mode!=1 ||
-#ifdef SC64_Q8_FLASH_ALL_CUSTOM_HOST
+#if defined(SC64_Q8_FLASH_ALL_CUSTOM_HOST) || defined(SC64_Q8_FLASH_ALL_CUSTOM_ARM_PROBE)
         !sc64_q8_flash_custom_roster_valid(race_human,race_bots,race_player,race_bot_races)
 #else
         race_human!=R_PROTOSS

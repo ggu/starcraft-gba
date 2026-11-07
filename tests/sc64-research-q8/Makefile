@@ -80,3 +80,8 @@ test-sc64-q8-flash-custom-races:
 	./build/research-q8-flash/custom-races read terran build/research-q8-flash/custom-terran.sav
 	./build/research-q8-flash/custom-races write zerg build/research-q8-flash/custom-zerg.sav
 	./build/research-q8-flash/custom-races read zerg build/research-q8-flash/custom-zerg.sav
+
+# The supervising caller holds the shared native lock and freezes inputs.
+.PHONY: test-sc64-q8-flash-custom-matrix
+test-sc64-q8-flash-custom-matrix: test-sc64-q8-flash-custom-races
+	$(PYTHON) tools/sc64_q8_flash_custom_matrix.py --fixture build/research-q8-flash/custom-races --output build/research-q8-flash/custom-matrix

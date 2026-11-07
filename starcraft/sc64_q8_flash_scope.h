@@ -15,4 +15,9 @@
 #if defined(SC64_Q8_FLASH_ALL_CUSTOM_HOST) && (!defined(SC64_Q8_FLASH_HOST_STAGE) || !defined(GBA_HOST) || defined(SC64_Q8_FLASH_ARM_PROBE))
 #error "All-races Flash admission is a separate HOST-only experiment"
 #endif
+#if defined(SC64_Q8_FLASH_ALL_CUSTOM_ARM_PROBE) && \
+    (!defined(SC64_Q8_FLASH_ARM_PROBE) || defined(GBA_HOST) || \
+     defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ALL_CUSTOM_HOST))
+#error "All-races ARM Flash admission requires the explicit ARM transaction probe"
+#endif
 #endif
