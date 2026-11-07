@@ -142,6 +142,42 @@ static unsigned sc64_p7_arbiter_detected_mask_reference(int target,
     return detected;
 }
 
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+/* Reference uses the snapshot's same captured bindings but walks the original
+ * unit/building lists, independently of the spatial index. */
+static unsigned optical_linear_mask(const Sc64P7DetectorLists *l,int cx,int cy,int human,unsigned result)
+{
+    for(unsigned k=0;k<l->optical_unit_count;k++) { int i=l->optical_units[k];unsigned bits=l->optical_unit_masks[i];int dx=cx-u[i].x,dy=cy-u[i].y;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+        if(human>=0)bits&=~(1u<<(unsigned)human);
+#endif
+        int radius=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
+        if(dx*dx+dy*dy<=radius*radius)result|=bits;
+    }
+    for(unsigned k=0;k<l->optical_building_count;k++) { int i=l->optical_buildings[k];unsigned bits=l->optical_building_masks[i];int dx=cx-b[i].x,dy=cy-b[i].y;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+        if(human>=0)bits&=~(1u<<(unsigned)human);
+        int radius=sc64_p7_observer_sight_radius_runtime(sc64_shared_building_visibility_key(&b[i]),1);
+#else
+        int radius=sc64_p7_observer_sight_radius_runtime(b[i].type,1);
+#endif
+        if(dx*dx+dy*dy<=radius*radius)result|=bits;
+    }
+#ifndef SC64_SOURCE_SIGHT_ALL_RACES
+    (void)human;
+#endif
+    return result;
+}
+static void optical_grid_all_bits(const Sc64P7DetectorLists *l,int target)
+{
+    if(!l->optical_grid_safe || !sc64_target_index_active || !u[target].alive ||
+       u[target].x<0 || u[target].y<0 || u[target].x>=WORLD_W || u[target].y>=WORLD_H) return;
+    int col=u[target].x/16,row=u[target].y/16,cx=col*16+8,cy=row*16+8,human=sc64_p7_optical_human_slot();
+    unsigned base=human>=0 && SC64_GRID_GET(visible,col+row*MAP_COLS) ? 1u<<(unsigned)human : 0;
+    assert(sc64_p7_optical_grid_mask(l,cx,cy,human,base)==optical_linear_mask(l,cx,cy,human,base));
+}
+#endif
+
 static unsigned seed = 0x18bd0123u;
 static unsigned rnd(void) { seed = seed * 1664525u + 1013904223u; return seed; }
 
@@ -183,7 +219,7 @@ static void expect_mask(unsigned expected, const u8 *powered)
 #endif
     Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
-    lists.optical_grid_phase=1;
+    lists.optical_grid_phase=1; optical_grid_all_bits(&lists,0);
 #endif
     assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == expected);
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
@@ -325,7 +361,7 @@ static void detector_snapshot_cases(void)
 #endif
         sc64_p7_detector_lists_build(&lists);
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
-    lists.optical_grid_phase=1;
+    lists.optical_grid_phase=1; optical_grid_all_bits(&lists,0);
 #endif
         assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==
                sc64_p7_arbiter_detected_mask_reference(0,powered));
@@ -407,7 +443,7 @@ int main(void)
         unsigned got = sc64_p7_arbiter_detected_mask(0, powered);
         Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
-    lists.optical_grid_phase=1;
+    lists.optical_grid_phase=1; optical_grid_all_bits(&lists,0);
 #endif
         assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
         assert(got == want);
@@ -425,7 +461,7 @@ int main(void)
             assert(sc64_p7_arbiter_detected_mask(0, powered) == want);
             sc64_p7_detector_lists_build(&lists);
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
-    lists.optical_grid_phase=1;
+    lists.optical_grid_phase=1; optical_grid_all_bits(&lists,0);
 #endif
             assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
             u[moved].x = -1;
@@ -435,7 +471,7 @@ int main(void)
             assert(sc64_p7_arbiter_detected_mask(0, powered) == want);
             sc64_p7_detector_lists_build(&lists);
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
-    lists.optical_grid_phase=1;
+    lists.optical_grid_phase=1; optical_grid_all_bits(&lists,0);
 #endif
             assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
         }
