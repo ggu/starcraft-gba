@@ -1693,7 +1693,7 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 
 static int race_save_game(void) {
 #ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
-    if (race_zl_active()) return 0; /* no sidecar wire format yet */
+    return 0; /* no sidecar wire format yet, for any candidate */
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     if (sc64_pr_stage_fault || (race_mode!=1
@@ -4363,7 +4363,7 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 #endif
 static int race_load_game(void) {
 #ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
-    if (race_zl_active()) return 0; /* never reconstruct from retained origin */
+    return 0; /* title state cannot identify an incoming campaign candidate */
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     if (sc64_pr_stage_fault) return 0;
