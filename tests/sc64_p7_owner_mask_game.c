@@ -369,6 +369,43 @@ static void detector_snapshot_cases(void)
 }
 #endif
 
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+static void optical_grid_boundaries_and_phase(void)
+{
+    static const int offsets[]={-177,-176,-175,0,175,176,177};
+    u8 powered[MAX_BUILDINGS]={0};
+    for (int edge=0;edge<4;++edge) for (unsigned j=0;j<sizeof(offsets)/sizeof(offsets[0]);++j) {
+        reset_case();int x=edge==0?0:edge==1?WORLD_W-1:WORLD_W/2;
+        int y=edge==2?0:edge==3?WORLD_H-1:WORLD_H/2;
+        u[0].x=x;u[0].y=y;observer(1,0,race_p7_source_owner(0));
+        int cx=x/16*16+8,cy=y/16*16+8;
+        u[1].x=limit(cx+offsets[j],0,WORLD_W-1);u[1].y=limit(cy-offsets[j],0,WORLD_H-1);
+        sc64_target_index_begin();Sc64P7DetectorLists lists;sc64_p7_detector_lists_build(&lists);lists.optical_grid_phase=1;
+        optical_grid_all_bits(&lists,0);
+        assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==sc64_p7_arbiter_detected_mask_reference(0,powered));
+        sc64_target_index_end();
+    }
+    reset_case();observer(1,0,race_p7_source_owner(0));sc64_target_index_begin();
+    assert(sc64_target_index_active);u[1].x=-1;sc64_target_index_move(&u[1]);assert(!sc64_target_index_active);
+    Sc64P7DetectorLists lists;sc64_p7_detector_lists_build(&lists);lists.optical_grid_phase=1;
+    unsigned before=sc64_optical_grid_test_hits;
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==sc64_p7_arbiter_detected_mask_reference(0,powered));
+    assert(sc64_optical_grid_test_hits==before);
+    reset_case();observer(1,0,race_p7_source_owner(0));u[1].owner=5;sc64_target_index_begin();assert(!sc64_target_index_active);
+    sc64_p7_detector_lists_build(&lists);lists.optical_grid_phase=1;before=sc64_optical_grid_test_hits;
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==sc64_p7_arbiter_detected_mask_reference(0,powered));assert(sc64_optical_grid_test_hits==before);
+    /* A stale index cannot be used outside the authorized source tick. */
+    reset_case();observer(1,0,race_p7_source_owner(0));sc64_target_index_begin();assert(sc64_target_index_active);
+    u[1].x+=128;sc64_p7_detector_lists_build(&lists);assert(!lists.optical_grid_phase);before=sc64_optical_grid_test_hits;
+    assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==sc64_p7_arbiter_detected_mask_reference(0,powered));assert(sc64_optical_grid_test_hits==before);
+    sc64_target_index_end();
+    /* The real orders pass authorizes the index before any unit movement. */
+    reset_case();observer(1,0,race_p7_source_owner(0));sc64_p7_arbiter_cache_due=1;
+    before=sc64_optical_grid_test_hits;update_orders();
+    assert(sc64_optical_grid_test_hits>before && !sc64_target_index_active);
+}
+#endif
+
 int main(void)
 {
     optical_source_masks();
@@ -376,6 +413,9 @@ int main(void)
     race_mode = 0;
     race_selected_mission = SC64_P7_GLOBAL_ID;
     explicit_cases();
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    optical_grid_boundaries_and_phase();
+#endif
 #ifdef SC64_P7_DETECTOR_BINDING_HOIST
     detector_binding_hoist_cases();
 #endif
