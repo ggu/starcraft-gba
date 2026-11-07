@@ -2,8 +2,7 @@
 
 At source `6bbc678f`, the selector remained opt-in and the frozen Z7 product
 was driven through ordinary physical buttons in the pinned mGBA runner. The
-real custom lobby selected Zerg against one AI; the HOST tape selected a
-Terran opponent, whose guest race was not independently sampled. The controller used
+real custom lobby selected Zerg against one Terran AI. The controller used
 ordinary mining, built a Spawning Pool with a Drone, selected a Hatchery,
 paid for a Zergling Egg, and used START/B to save. No guest RAM or registers
 were injected and no HOST save was used as guest input. The fresh process
@@ -25,6 +24,17 @@ mineral fields, frame, human race, map, bot count and supply; it is not full tra
 state or pixel equality. The saved record does not preserve separate numeric
 before/after payment snapshots; the successful executable assertions above
 are the retained evidence for the debit and larva transition.
+
+A subsequent read-only inspection of the same guest-exported journal closes
+the saved-roster evidence gap without another guest run. Using the exact paired
+ELF's DWARF layout, `RaceSave.state` begins at payload offset 15652 and its
+five `players` integers at 15780. The selected valid journal has
+`state[0..4] = {1,1,0,0,1}`, `state[21] = 0`, and
+`players = {1,0,-1,-1,-1}`. The custom owner mapping and the candidate's
+own roster validation associate the human with owner 0/Zerg (1) and its sole
+bot with owner 1/Terran (0). The 16312-byte payload checksum independently
+recomputes to `23e1f7fe`. This is authenticated saved-journal roster evidence,
+not an additional live-register sample; the image hash below is unchanged.
 
 The single job acquired the shared native lock, maintained the 4 GiB reserve,
 used a 256 MiB per-file limit, a polled 64 MiB output threshold, and 600-second
