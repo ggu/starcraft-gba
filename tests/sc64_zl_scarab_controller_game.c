@@ -33,11 +33,11 @@ int main(void)
     assert(origin==0 && sc64_controller_transfer_unit(parent,7));
     assert(sc64_controller_unit(parent)==7 && u[parent].raw_owner==0 && u[parent].owner==prior_owner);
     u[parent].x=500;u[parent].y=500;u[parent].cd=0;
-    u[target].x=512;u[target].y=500;
+    u[target].x=504;u[target].y=500;
     u[target].hp=u[target].maxhp=200;u[target].shield=0;u[target].armor=0;
     { int raw,x,y,owner,hp=u[target].hp;
       assert(race_scarab_probe_target_info(target,&raw,&x,&y,&owner) && owners_hostile(prior_owner,owner));
-      assert((sc64_race_unit_range_vs(u[parent].type,0)+1)/2>=12);
+      assert((sc64_race_unit_range_vs(u[parent].type,0)+1)/2>=4);
       tick_combat(&u[parent],target);assert(u[target].hp==hp); }
     assert(sc64_controller_transfer_unit(parent,2));
     assert(sc64_controller_unit(parent)==2 && u[parent].raw_owner==origin && u[parent].owner==prior_owner);
