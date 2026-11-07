@@ -23,7 +23,8 @@ def alarm(_signal,_frame):raise TimeoutError('normal HUD pair monitored deadline
 def video(g):
  d=int.from_bytes(g.rsp.read(0x04000000,2),'little')
  if d&7!=4 or d&0x1000:raise ValueError('unsupported display mode or OBJ')
- return [d,hashlib.sha256(g.rsp.read(0x06000000+((d>>4)&1)*0xa000,38400)).hexdigest(),hashlib.sha256(g.rsp.read(0x05000000,512)).hexdigest()]
+ pixels=g.rsp.read(0x06000000+((d>>4)&1)*0xa000,38400);palette=g.rsp.read(0x05000000,512)
+ return [d,hashlib.sha256(pixels).hexdigest(),hashlib.sha256(palette).hexdigest()],pixels,palette
 def snap(g):
  s=g.state()
  for key in ('selected_building','menu_open','menu_cursor','mode','toast_timer','toast_id','race_selected_mission','cx','cy','camx','camy'):
@@ -76,9 +77,12 @@ def main():
     def step(key):
      for i,g in enumerate(games):
       before_clock=g.rsp.clock();g.step(key);cycles[i].append(g.rsp.clock()-before_clock)
-     states=[snap(g) for g in games];images=[video(g) for g in games]
+     states=[snap(g) for g in games];captured=[video(g) for g in games];images=[c[0] for c in captured]
      diag.update(stage='step',key=key,states=states,views=images)
-     if states[0]!=states[1] or images[0]!=images[1]:raise ValueError('OFF/ON state or displayed frame mismatch')
+     if states[0]!=states[1] or images[0]!=images[1]:
+      for label,(_,pixels,palette) in zip(('off','on'),captured):
+       (a.output/(label+'-mismatch.pixels')).write_bytes(pixels);(a.output/(label+'-mismatch.palette')).write_bytes(palette)
+      raise ValueError('OFF/ON state or displayed frame mismatch')
      records.append({'frame':states[0]['frame'],'screen':states[0]['screen'],'view':images[0],'selected_building':states[0]['selected_building'],'menu_open':states[0]['menu_open']})
      if len(records)%50==0:check()
      if sum(p.stat().st_size for p in a.output.rglob('*') if p.is_file())>LIMIT:raise ValueError('output limit')
