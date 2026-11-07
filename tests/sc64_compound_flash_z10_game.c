@@ -81,6 +81,15 @@ int main(int argc,char **argv)
         int saved=race_save_game();
 #ifdef SC64_CF_TEST_DIAGNOSTICS
         fprintf(stderr,"save=%d stage=%d pending=%d\n",saved,sc64_cf_test_stage,race_scarab_probe_bullets_pending());
+        if(!saved && sc64_cf_test_stage==1) {
+            Sc64StageSaveAuth a;const Sc64StageSaveAuth *guard_auth=&a;
+            Sc64StageTagPair pair={SC64_COMPOUND_FLASH_TAG,SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
+            assert(sc64_stage_save_authenticate(&a,&race_data,pair.outer,race_data.version,&pair,1));
+            int graph=race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16,(unsigned)race_rows*16 SC64_GCTX_ARG);
+            int zl=race_zl_save_candidate_world_valid(&race_data,race_cols,race_rows SC64_GCTX_ARG);
+            int cargo=race_save_worker_cargo_prepare(&race_data,(unsigned)race_cols*16,(unsigned)race_rows*16,0 SC64_GCTX_ARG);
+            fprintf(stderr,"graph=%d cargo=%d zl=%d\n",graph,cargo,zl);
+        }
 #endif
         assert(saved);copy_file(argv[2],1);
     } else if(!strncmp(argv[1],"read-",5)) {
