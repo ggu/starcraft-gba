@@ -187,20 +187,32 @@ int main(int argc,char **argv)
         sc64_bc_shots[0].caster=(u16)caster;sc64_bc_shots[0].target=(u16)dead;
         live_capture(&before_live);erases=programs=0;assert(!race_save_game());
         assert(!erases && !programs);live_unchanged();
-    } else if(!strcmp(argv[1],"only-bad") || !strcmp(argv[1],"fallback-bad")) {
+    } else if(!strcmp(argv[1],"retained-v1")) {
+        launch_z10_from_normal_menu();copy_file(argv[2],0);GbaFlashJournalRecord r;
+        assert(gba_fj_probe(&io,2,&r)==GBA_FJ_OK && sc64_cf_u16(device.bytes+gba_fj_metadata(2)+20)==1);
+        static u8 prior[131072];memcpy(prior,device.bytes,sizeof prior);live_capture(&before_live);erases=programs=0;
+        assert(!race_load_game());live_unchanged();
+        assert(!race_save_game() && !erases && !programs && !memcmp(prior,device.bytes,sizeof prior));live_unchanged();
+    } else if(!strcmp(argv[1],"only-bad") || !strcmp(argv[1],"only-bad-flight") || !strcmp(argv[1],"fallback-bad")) {
         launch_z10_from_normal_menu();copy_file(argv[2],0);
         GbaFlashJournalRecord a,b,*r;int sa=gba_fj_probe(&io,2,&a),sb=gba_fj_probe(&io,3,&b);
         assert(sa==GBA_FJ_OK);r=(sb==GBA_FJ_OK && gba_fj_newer(b.sequence,a.sequence))?&b:&a;
         u32 at=gba_fj_metadata(r->index)+16,base=gba_fj_u32(device.bytes+at+16);
         u32 controls=at+SC64_CF_HEADER+base+MAX_UNITS+MAX_BUILDINGS;unsigned j;
         for(j=0;j<MAX_UNITS+MAX_BUILDINGS && device.bytes[controls+j]==255;++j){}
-        assert(j<MAX_UNITS+MAX_BUILDINGS);device.bytes[controls+j]=254;
+        assert(j<MAX_UNITS+MAX_BUILDINGS);
+        if(!strcmp(argv[1],"only-bad-flight")) {
+            for(j=0;j<MAX_UNITS && device.bytes[controls+j]!=255;++j){}
+            assert(j<MAX_UNITS);u32 flight=controls+(MAX_UNITS+MAX_BUILDINGS)+MAX_UNITS;
+            device.bytes[flight+j*4]=1; /* nonzero waypoint in an empty slot */
+        } else device.bytes[controls+j]=254;
         gba_fj_put32(device.bytes+gba_fj_metadata(r->index)+8,gba_fj_hash(2166136261u,device.bytes+at,r->length));
         static u8 prior[131072];memcpy(prior,device.bytes,sizeof prior);live_capture(&before_live);erases=programs=0;
-        if(!strcmp(argv[1],"only-bad")) {assert(!race_load_game());live_unchanged();}
+        if(strcmp(argv[1],"fallback-bad")) {assert(!race_load_game());live_unchanged();}
         else {int old;side_file(argv[2],".old",&old,sizeof old,0);assert(race_load_game() && minerals==old);}
         assert(!memcmp(prior,device.bytes,sizeof prior) && !erases && !programs);
-        assert(!race_save_game() && !memcmp(prior,device.bytes,sizeof prior) && !erases && !programs);
+        live_capture(&before_live);
+        assert(!race_save_game() && !memcmp(prior,device.bytes,sizeof prior) && !erases && !programs);live_unchanged();
     } else if(!strcmp(argv[1],"foreign-v1") || !strcmp(argv[1],"foreign-header")) {
         launch_z10_from_normal_menu();copy_file(argv[2],0);
         GbaFlashJournalRecord r;assert(gba_fj_probe(&io,2,&r)==GBA_FJ_OK);

@@ -87,8 +87,14 @@ test-zl-scarab-compound-flash:
 	$(ZL_SCARAB_OUT)/compound foreign-v1 $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound foreign-header $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound only-bad $(ZL_SCARAB_OUT)/z10-training.flash
+	$(ZL_SCARAB_OUT)/compound only-bad-flight $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound write-two $(ZL_SCARAB_OUT)/z10-two.flash
 	$(ZL_SCARAB_OUT)/compound fallback-bad $(ZL_SCARAB_OUT)/z10-two.flash
 	$(ZL_SCARAB_OUT)/compound stale-shot $(ZL_SCARAB_OUT)/unused
 	$(ZL_SCARAB_OUT)/compound cut-write $(ZL_SCARAB_OUT)/z10-cut.flash
 	$(ZL_SCARAB_OUT)/compound cut-read $(ZL_SCARAB_OUT)/z10-cut.flash
+
+# An actual prior v1 HOST image must be supplied separately; never retag it.
+.PHONY: test-zl-scarab-compound-v1-fence
+test-zl-scarab-compound-v1-fence:
+	$(ZL_SCARAB_OUT)/compound retained-v1 $(COMPOUND_V1_IMAGE)
