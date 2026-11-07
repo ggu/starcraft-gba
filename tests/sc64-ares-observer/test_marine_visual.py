@@ -39,6 +39,11 @@ class WrapperTest(unittest.TestCase):
    (p/'frames.csv').write_text(good.replace('640,240','1,240',1));self.assertFalse(m.planned_witness(p,rows))
    (p/'frames.csv').write_text(good);(p/'live-002.argb').write_bytes(b'bad');self.assertFalse(m.planned_witness(p,rows))
 
+ def test_aggregate_frame_gate_requires_three(self):
+  self.assertTrue(m.qualified_frame_count([1,2,3],3*614400))
+  self.assertFalse(m.qualified_frame_count([1,2],2*614400))
+  self.assertFalse(m.qualified_frame_count([1,2,3],2*1024**2+1))
+
  def test_owned_guard_rejects_growth_and_low_disk(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);f=p/'large'

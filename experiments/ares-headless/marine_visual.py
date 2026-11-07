@@ -96,6 +96,9 @@ def planned_rows(data):
  if step!=EXPECTED_STEPS or tuple(row[0]+row[1]-1 for row in rows if row[-1])!=EXPECTED_FRAME_STEPS:raise ValueError('unexpected pure-JIT control plan')
  return rows
 
+def qualified_frame_count(files, frame_bytes):
+ return len(files)==3 and frame_bytes<=2*1024**2
+
 def planned_witness(path,expected):
  try:
   with (path/'commands.csv').open(newline='') as f:commands=list(csv.reader(f))
@@ -195,7 +198,7 @@ def main(argv=None):
   with os.fdopen(readfd,'rb') as source,(a.output/'bridge.log').open('wb') as log,(a.output/'stderr.log').open('wb') as err:
    relay(cmd,a.output.resolve(),{**os.environ,'DYLD_LIBRARY_PATH':str(a.moltenvk.resolve().parent)},log,err,result,mode=a.file_limit_mode,input_stream=source)
   result['unchanged']=clean(a.source) and sha(a.rom)==ROM_SHA and sha(copy)==ROM_SHA and sha(a.moltenvk)==VK_SHA and sha(a.binary)==binary==BINARY_SHA and all(sha(pathlib.Path(k))==v for k,v in inputs.items())
-  files=sorted(a.output.glob('live-*.argb'));result['frames']={x.name:sha(x) for x in files};result['frame_bytes']=sum(x.stat().st_size for x in files);result['ok']=result['returncode']==0 and result['unchanged'] and len(files)==2 and result['frame_bytes']<=2*1024**2
+  files=sorted(a.output.glob('live-*.argb'));result['frames']={x.name:sha(x) for x in files};result['frame_bytes']=sum(x.stat().st_size for x in files);result['ok']=result['returncode']==0 and result['unchanged'] and qualified_frame_count(files,result['frame_bytes'])
   ram=sorted(a.output.glob('ram-*.bin'));result['ram']={x.name:sha(x) for x in ram};result['ram_bytes']=sum(x.stat().st_size for x in ram);result['ok']=result['ok'] and len(ram)==0 and result['ram_bytes']==0
   for name in ('ram.csv','commands.csv','inputs.csv','callbacks.csv','status.log','sigxfsz.bin','images.bin','stopped-fds.txt'):result[name+'_sha256']=sha(a.output/name) if (a.output/name).is_file() else None
   diagnostic=a.output/'sigxfsz.bin';images=a.output/'images.bin';result['ok']=result['ok'] and diagnostic.is_file() and diagnostic.stat().st_size in (0,40) and images.is_file() and images.stat().st_size<=12+128*528
