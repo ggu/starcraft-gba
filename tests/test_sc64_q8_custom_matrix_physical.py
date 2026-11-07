@@ -76,6 +76,21 @@ class MatrixTest(unittest.TestCase):
                     except RuntimeError:pass
             with self.assertRaises(ChildProcessError):os.waitpid(pid,os.WNOHANG)
 
+    def test_worker_cannot_ack_with_live_child(self):
+        pid=os.fork()
+        if pid==0:
+            child=os.fork()
+            if child==0:
+                signal.pause();os._exit(0)
+            try:
+                try:matrix.require_no_children();rc=1
+                except RuntimeError:rc=0
+            finally:
+                os.kill(child,signal.SIGKILL);os.waitpid(child,0)
+            os._exit(rc)
+        _,status=os.waitpid(pid,0)
+        self.assertTrue(os.WIFEXITED(status) and os.WEXITSTATUS(status)==0)
+
     def test_supervisor_reaps_its_worker(self):
         pid=os.fork()
         if pid==0:
