@@ -36,6 +36,12 @@ static int race_q8_flash_write(const void *data,u32 length);
     (!defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) || !defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_SHARED_SCOURGE_COMBAT))
 #error "Zerg late Scarab controller stage requires both HOST stages and Z9 runtime"
 #endif
+#if defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) || \
+     !defined(SC64_Q8_FLASH_HOST_STAGE) || !defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) || \
+     !defined(SC64_Z10_RUNTIME) || defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE))
+#error "Compound Flash Z10 stage requires the complete isolated HOST context"
+#endif
 #if defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) && (!defined(GBA_HOST) || !defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) || !defined(SC64_RACES))
 #error "Scarab AI restock requires the HOST-only race lifecycle probe"
 #endif
@@ -2181,6 +2187,11 @@ static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #if defined(SC64_SCARAB_PACKED_MOTION_PROBE) && !defined(SC64_SCARAB_FLIGHT_CONTROL_PROBE)
 #error "Packed motion probe requires flight control"
 #endif
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+/* Declared before the save adapter so a future detached plan can publish it
+ * only after the complete journal candidate has been validated. */
+static u8 sc64_scarab_stage_payer[MAX_UNITS];
+#endif
 #if defined(SC64_SCARAB_AUTONOMOUS_PROBE) && (!defined(SC64_SCARAB_PACKED_MOTION_PROBE) || !defined(SC64_SIEGE_SPLASH))
 #error "Autonomous Scarab probe requires packed motion and source bounds"
 #endif
@@ -2188,7 +2199,7 @@ static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #error "Scarab weapon probe requires autonomous control and impact events"
 #endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-#if !defined(SC64_SCARAB_NAMESPACE_STAGE) || !defined(SC64_SCARAB_WEAPON_PROBE)
+#if (!defined(SC64_SCARAB_NAMESPACE_STAGE) && !defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE)) || !defined(SC64_SCARAB_WEAPON_PROBE)
 #error "Scarab human control probe requires namespace and weapon probes"
 #endif
 static int race_scarab_parent_init(int slot);
@@ -13533,7 +13544,19 @@ static unsigned race_shared_trigger_obligations(void);
 #undef race_protoss_later_battery_candidate_valid
 #include "sc64_p10_runtime_adapter.h"
 #endif
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_SCARAB_RUNTIME) || \
+     !defined(SC64_WORKER_CARGO_KIND) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
+     defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE))
+#error "Compound Scarab context requires the isolated HOST cargo stage"
+#endif
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+#include "sc64_stage_save_auth.h"
+static int race_compound_scarab_decode(const RaceSave *,unsigned,unsigned,unsigned,Unit *,const Sc64StageSaveAuth *);
+#define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth
+#define SC64_GCTX_ARG , guard_auth
+#define SC64_GUARD_DECODE(c,s,w,h,o) race_compound_scarab_decode(c,s,w,h,o,guard_auth)
+#elif defined(SC64_GUARDIAN_COCOON_STAGE)
 #include "sc64_stage_save_auth.h"
 static int race_guardian_decode_authenticated(const RaceSave *,unsigned,unsigned,unsigned,Unit *,const Sc64StageSaveAuth *);
 #define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth

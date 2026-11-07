@@ -122,8 +122,8 @@ static int gba_fj_same_record(const GbaFlashJournalRecord *a,
     return a->index==b->index&&a->tag==b->tag&&a->length==b->length&&
            a->checksum==b->checksum&&a->sequence==b->sequence;
 }
-static int gba_fj_write_parts(const GbaFlashJournalIo *io,
-    const void *data,uint32_t length,const void *tail,uint32_t tail_length,
+static int gba_fj_write_three(const GbaFlashJournalIo *io,
+    const void *prefix,uint32_t prefix_length,const void *data,uint32_t length,const void *tail,uint32_t tail_length,
     uint32_t tag,GbaFlashJournalAccept accept,void *context,
     const GbaFlashJournalRecord *previous,GbaFlashJournalRecord *out)
 {
@@ -132,8 +132,9 @@ static int gba_fj_write_parts(const GbaFlashJournalIo *io,
     uint32_t sequence=1,index=2,hash=2166136261u,verify=2166136261u;
     int status;
     if(!io||!io->read||!io->erase_sector||!io->program||!data||!length||
-       (!tail&&tail_length)||length>GBA_FJ_PAYLOAD_MAX||
-       tail_length>GBA_FJ_PAYLOAD_MAX-length||!tag||tag==0xffffffffu||!out)
+       (!prefix&&prefix_length)||(!tail&&tail_length)||prefix_length>GBA_FJ_PAYLOAD_MAX||
+       length>GBA_FJ_PAYLOAD_MAX-prefix_length||
+       tail_length>GBA_FJ_PAYLOAD_MAX-prefix_length-length||!tag||tag==0xffffffffu||!out)
         return GBA_FJ_ARGUMENT;
     /* The same semantic policy used by the caller's selection is required.
      * An intact old slot is not a current consistency token after a later
@@ -146,9 +147,10 @@ static int gba_fj_write_parts(const GbaFlashJournalIo *io,
         sequence=selected.sequence+1u;if(!sequence)sequence=1;
         index=selected.index==2 ? 3u : 2u;
     }
+    if(prefix_length)hash=gba_fj_hash(hash,prefix,prefix_length);
     hash=gba_fj_hash(hash,data,length);
     if(tail_length)hash=gba_fj_hash(hash,tail,tail_length);
-    written=(GbaFlashJournalRecord){index,tag,length+tail_length,hash,sequence};
+    written=(GbaFlashJournalRecord){index,tag,prefix_length+length+tail_length,hash,sequence};
     gba_fj_put32(header,tag);gba_fj_put32(header+4,written.length);
     gba_fj_put32(header+8,hash);gba_fj_put32(header+12,sequence);
     /* Erase the isolated commit sector before touching any old metadata. */
@@ -162,8 +164,9 @@ static int gba_fj_write_parts(const GbaFlashJournalIo *io,
     for(uint32_t sector=GBA_FJ_SECTOR;sector<GBA_FJ_SLOT;sector+=GBA_FJ_SECTOR)
         if(!io->erase_sector(io->context,base+sector))return GBA_FJ_WRITE_ERROR;
     if(!io->program(io->context,meta,header,sizeof header)||
-       !io->program(io->context,meta+16,data,length)||
-       (tail_length&&!io->program(io->context,meta+16+length,tail,tail_length)))
+       (prefix_length&&!io->program(io->context,meta+16,prefix,prefix_length))||
+       !io->program(io->context,meta+16+prefix_length,data,length)||
+       (tail_length&&!io->program(io->context,meta+16+prefix_length+length,tail,tail_length)))
         return GBA_FJ_WRITE_ERROR;
     if(!io->read(io->context,meta,bytes,sizeof header))return GBA_FJ_IO_ERROR;
     if(memcmp(bytes,header,sizeof header))return GBA_FJ_WRITE_ERROR;
@@ -179,5 +182,12 @@ static int gba_fj_write_parts(const GbaFlashJournalIo *io,
     if(status<0)return status;
     if(status!=GBA_FJ_OK||!gba_fj_same_record(&written,&check))return GBA_FJ_WRITE_ERROR;
     *out=written;return GBA_FJ_OK;
+}
+static int gba_fj_write_parts(const GbaFlashJournalIo *io,
+    const void *data,uint32_t length,const void *tail,uint32_t tail_length,
+    uint32_t tag,GbaFlashJournalAccept accept,void *context,
+    const GbaFlashJournalRecord *previous,GbaFlashJournalRecord *out)
+{
+    return gba_fj_write_three(io,0,0,data,length,tail,tail_length,tag,accept,context,previous,out);
 }
 #endif

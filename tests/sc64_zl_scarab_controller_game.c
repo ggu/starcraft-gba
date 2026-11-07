@@ -3,6 +3,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include "../starcraft/game.c"
+#if defined(SC64_Q8_FLASH_HOST_STAGE) && defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) && !defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
+/* This live-composition fixture deliberately has no journal device. */
+const GbaFlashJournalIo *sc64_q8_flash_host_io(void) { return 0; }
+#endif
 
 static unsigned held_keys;
 static void input(unsigned held)

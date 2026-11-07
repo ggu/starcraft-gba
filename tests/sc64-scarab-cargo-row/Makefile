@@ -14,3 +14,9 @@ test-scarab-cargo-row-z10:
 	@mkdir -p $(SCARAB_CARGO_OUT)
 	$(CLANG) $(SCARAB_CARGO_FLAGS) $(ZERG_Z10_CANONICAL_FLAGS) tests/sc64_scarab_cargo_row_composition.c common/gba.c -o $(SCARAB_CARGO_OUT)/z10
 	$(SCARAB_CARGO_OUT)/z10
+
+.PHONY: test-scarab-cargo-context-z10
+test-scarab-cargo-context-z10:
+	@mkdir -p $(SCARAB_CARGO_OUT)
+	$(CLANG) $(SCARAB_CARGO_FLAGS) -DSC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE $(ZERG_Z10_CANONICAL_FLAGS) tests/sc64_scarab_cargo_row_composition.c common/gba.c -o $(SCARAB_CARGO_OUT)/context-z10
+	$(SCARAB_CARGO_OUT)/context-z10

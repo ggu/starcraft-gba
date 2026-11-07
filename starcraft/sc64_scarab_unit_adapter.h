@@ -16,11 +16,6 @@
 #if defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) && (!defined(GBA_HOST) || !defined(SC64_SCARAB_HUMAN_CONTROL_PROBE))
 #error "Scarab AI restock is a HOST-only lifecycle experiment"
 #endif
-#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
-/* HOST-only ownership witness; not part of any save format. A pending or
- * completed child stays bound to its original compact controller. */
-static u8 sc64_scarab_stage_payer[MAX_UNITS];
-#endif
 _Static_assert(MAX_UNITS <= SC64_SCARAB_FIELD_SLOT_LIMIT, "Scarab slot encoding must cover the actor pool");
 
 /* Included by the gated flight experiment, or explicitly by prepared fixtures,

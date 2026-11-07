@@ -5,6 +5,9 @@
 #include "../starcraft/game.c"
 #include "../starcraft/sc64_scarab_flight_bridge.h"
 #include "../starcraft/sc64_scarab_fields.h"
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+#include "../starcraft/sc64_compound_flash_envelope.h"
+#endif
 #if !defined(GBA_HOST) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SCARAB_RUNTIME) || defined(SC64_SCARAB_NAMESPACE_STAGE)
 #error "Use the isolated cargo/Scarab row composition fixture"
 #endif
@@ -27,6 +30,16 @@ static int row_decode(unsigned slot,Unit *unit)
 }
 int main(void)
 {
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    Sc64StageSaveAuth auth;const Sc64StageSaveAuth *guard_auth=&auth;
+    u8 flight[MAX_UNITS*4u]={0};
+    u8 header[SC64_CF_HEADER];Sc64CompoundFlashHeader parsed;
+    Sc64CompoundFlashHeader expected={1,0,SC64_Z10_GLOBAL_ID,SC64_CF_FEATURES,16368,1,400,400,240,960};
+    sc64_cf_write(header,&expected);assert(sc64_cf_parse(header,18400,&expected,&parsed));
+    header[12]|=0x80;assert(!sc64_cf_parse(header,18400,&expected,&parsed));
+    sc64_cf_write(header,&expected);assert(!sc64_cf_parse(header,18399,&expected,&parsed));
+    sc64_cf_put16(header+4,1);assert(!sc64_cf_parse(header,18400,&expected,&parsed));
+#endif
     Unit worker,child,wire,decoded,restored;int carry,timer;
     gba_init();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;race_skirmish_init();
     int w=spawn_unit(SIDE,U_SCV,100,100),c=spawn_unit(ENEMY,U_SCARAB,120,100);
@@ -60,13 +73,43 @@ int main(void)
     assert(sc64_scarab_child_fields_pack(&inside,&child.carry,&timer));child.work_timer=(u16)timer;
     child.hp=20;child.maxhp=20;child.build=-1;child.target=-1;child.order=ORDER_IDLE;
     memset(&row_candidate,0,sizeof row_candidate);
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    row_candidate.version=SAVE_VERSION;
+    const Sc64StageTagPair pair={0x4a0001u,SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
+    assert(sc64_stage_save_authenticate(&auth,&row_candidate,pair.outer,pair.inner,&pair,1));
+    auth.flight=flight;auth.flight_count=MAX_UNITS;
+#endif
     assert(row_encode(0,&worker) && row_encode(1,&reaver));
     assert(sc64_scarab_flight_to_wire(&child,&wire,1,0) && row_encode(2,&wire));
-    assert(race_save_worker_cargo_prepare(&row_candidate,2048,2048,0));
+    assert(race_save_worker_cargo_prepare(&row_candidate,2048,2048,0 SC64_GCTX_ARG));
     assert(row_decode(2,&decoded) && sc64_scarab_flight_from_wire(&decoded,&restored,1,0));
+#ifndef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
     assert(row_encode(2,&restored));
-    assert(race_scarab_save_candidate_valid(&row_candidate,2048,2048));
-    restored.raw_owner=7;assert(row_encode(2,&restored));
-    assert(!race_scarab_save_candidate_valid(&row_candidate,2048,2048));
+#endif
+    assert(race_scarab_save_candidate_valid(&row_candidate,2048,2048 SC64_GCTX_ARG));
+    restored.raw_owner=7;
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    assert(sc64_scarab_flight_to_wire(&restored,&wire,1,0) && row_encode(2,&wire));
+#else
+    assert(row_encode(2,&restored));
+#endif
+    assert(!race_scarab_save_candidate_valid(&row_candidate,2048,2048 SC64_GCTX_ARG));
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    /* A copied token cannot authorize a different candidate. */
+    RaceSave other=row_candidate;Unit rejected;
+    assert(!race_compound_scarab_decode(&other,2,2048,2048,&rejected,&auth));
+    restored.raw_owner=-1;
+    Sc64ScarabChildFields outside={1,2,20,0};
+    assert(sc64_scarab_child_fields_pack(&outside,&restored.carry,&timer));
+    restored.carry|=7<<10;restored.work_timer=(u16)timer;restored.order=2;
+    assert(sc64_scarab_flight_to_wire(&restored,&wire,1,0) && row_encode(2,&wire));
+    assert(race_save_worker_cargo_prepare(&row_candidate,2048,2048,0 SC64_GCTX_ARG));
+    assert(race_scarab_save_candidate_valid(&row_candidate,2048,2048 SC64_GCTX_ARG));
+    assert(race_compound_scarab_decode(&row_candidate,2,2048,2048,&decoded,&auth));
+    assert(decoded.carry==restored.carry && decoded.work_timer==restored.work_timer);
+    auth.features=0;
+    assert(!race_compound_scarab_decode(&row_candidate,2,2048,2048,&decoded,&auth));
+    assert(!race_save_game() && !race_load_game());
+#endif
     puts("actual cargo preparation and detached Scarab graph: PASS");return 0;
 }
