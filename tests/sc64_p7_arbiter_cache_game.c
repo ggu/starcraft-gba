@@ -92,8 +92,37 @@ static void geometry_hoist_differential(void)
 }
 #endif
 
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+static void aura_source_hoist_differential(void)
+{
+    Unit a=u[0],b0=u[1]; signed char old_override=race_protoss_binding_override;
+    int checked=0;
+    for(int binding=SC64_PROTOSS_BIND_GENERIC;binding<=SC64_PROTOSS_BIND_LATER;binding++) {
+#ifndef SC64_PROTOSS_LATER_BINDINGS
+        if(binding==SC64_PROTOSS_BIND_LATER) continue;
+#endif
+        race_protoss_binding_override=(signed char)binding;
+        for(int owner=-2;owner<=6;owner++)for(int raw=-2;raw<=9;raw++) {
+            u[0].owner=owner;u[0].raw_owner=raw;
+            int source=RACE_PROTOSS_SLOT(&u[0]);
+            if(source<0||source>=8||race_protoss_source_owner((unsigned)source)!=u[0].owner)continue;
+            for(int target_owner=-2;target_owner<=6;target_owner++)for(int target_raw=-2;target_raw<=9;target_raw++) {
+                u[1].owner=target_owner;u[1].raw_owner=target_raw;
+                assert(sc64_p7_arbiter_same_source(0,1)==
+                       sc64_p7_arbiter_same_validated_source(1,source,u[0].owner));
+                checked++;
+            }
+        }
+    }
+    assert(checked>0);u[0]=a;u[1]=b0;race_protoss_binding_override=old_override;
+}
+#endif
+
 int main(void)
 {
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+    aura_source_hoist_differential();
+#endif
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     assert(SC64_RACE_SAVE_GENERATION==40u);
 #else

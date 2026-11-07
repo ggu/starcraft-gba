@@ -334,6 +334,7 @@ static int sc64_p7_arbiter_finder_square(int arbiter,int target)
     return tl<right && tr>=left && tt<bottom && tb>=top;
 }
 
+#if !defined(SC64_AURA_SOURCE_HOIST_PROBE) || defined(GBA_HOST)
 static int sc64_p7_arbiter_same_source(int arbiter,int target)
 {
     int raw=RACE_PROTOSS_SLOT(&u[arbiter]);
@@ -344,6 +345,15 @@ static int sc64_p7_arbiter_same_source(int arbiter,int target)
     return race_protoss_source_owner((unsigned)raw)==u[arbiter].owner &&
            race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[target]))==u[target].owner;
 }
+#endif
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+/* The outer Arbiter loop has already checked this exact source-to-live-owner
+ * binding. Neither binding nor owners can change during the aura traversal. */
+static inline int sc64_p7_arbiter_same_validated_source(int target,int source,int owner)
+{
+    return u[target].owner==owner && RACE_PROTOSS_SLOT(&u[target])==source;
+}
+#endif
 
 static int sc64_p7_arbiter_aura_cloaks(int target)
 {
@@ -707,6 +717,9 @@ static void sc64_p7_arbiter_cache_source_tick(void)
         RACE_PROTOSS_SLOT(&u[i])>=0 && RACE_PROTOSS_SLOT(&u[i])<8 && !(u[i].flags&8u) &&
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[i]))==u[i].owner) {
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+        int aura_source=RACE_PROTOSS_SLOT(&u[i]), aura_owner=u[i].owner;
+#endif
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         int al,at,ar,ab;
         if(!sc64_p7_actor_rect_source(71u,u[i].x,u[i].y,0,
@@ -738,7 +751,11 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                            !aura[slot] &&
 #endif
                            sc64_p7_observer_arbiter_aura_candidate(slot) &&
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+                           sc64_p7_arbiter_same_validated_source(slot,aura_source,aura_owner) &&
+#else
                            sc64_p7_arbiter_same_source((int)i,slot) &&
+#endif
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
                            1) {
                             int tl,tt,tr,tb;
@@ -767,7 +784,11 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 !aura[j] &&
 #endif
                 sc64_p7_observer_arbiter_aura_candidate((int)j) &&
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+                sc64_p7_arbiter_same_validated_source((int)j,aura_source,aura_owner) &&
+#else
                 sc64_p7_arbiter_same_source((int)i,(int)j) &&
+#endif
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
                 1) {
                 int tl,tt,tr,tb;
