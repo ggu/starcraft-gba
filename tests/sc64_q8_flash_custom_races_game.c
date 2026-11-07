@@ -2,6 +2,35 @@
  * Authored HOST producer/consumer boundary witness; not guest input. */
 #define SC64_Q8_FLASH_NO_FIXTURE_MAIN
 #include "sc64_q8_flash_game.c"
+/* Alter a real serialized row and repair its checksum. This is a negative
+ * HOST fixture, not a compatibility producer or a guest-generated save. */
+static void reject_bad_roster(unsigned offset,unsigned value)
+{
+    static u8 good[131072],bad[131072],debts[MAX_UNITS+MAX_BUILDINGS];
+    static Unit units[MAX_UNITS];static Building buildings[MAX_BUILDINGS];
+    static int players[5],ore[5],vespene[5];
+    GbaFlashJournalRecord record;
+    assert(gba_fj_probe(&flash_io,2,&record)==GBA_FJ_OK && record.tag==SC64_Q8_FLASH_TAG);
+    assert(offset+sizeof(u32)<=sizeof(RaceSave) && record.length>sizeof(RaceSave));
+    memcpy(good,device.bytes,sizeof good);
+    u32 payload=gba_fj_metadata(2)+16u;
+    gba_fj_put32(device.bytes+payload+offset,value);
+    gba_fj_put32(device.bytes+gba_fj_metadata(2)+8u,
+                 gba_fj_hash(2166136261u,device.bytes+payload,record.length));
+    assert(gba_fj_probe(&flash_io,2,&record)==GBA_FJ_OK);
+    memcpy(bad,device.bytes,sizeof bad);memcpy(units,u,sizeof u);memcpy(buildings,b,sizeof b);
+    memcpy(debts,sc64_pr_hp_debt,sizeof debts);memcpy(players,race_player,sizeof players);
+    memcpy(ore,race_minerals,sizeof ore);memcpy(vespene,race_gas,sizeof vespene);
+    int saved_minerals=minerals,saved_gas=gas,saved_mode=race_mode,saved_human=race_human;
+    assert(!race_load_game());
+    assert(!race_save_game()); /* sole invalid committed record cannot start a new epoch */
+    assert(!memcmp(bad,device.bytes,sizeof bad) && !memcmp(units,u,sizeof u) &&
+           !memcmp(buildings,b,sizeof b) && !memcmp(debts,sc64_pr_hp_debt,sizeof debts) &&
+           !memcmp(players,race_player,sizeof players) && !memcmp(ore,race_minerals,sizeof ore) &&
+           !memcmp(vespene,race_gas,sizeof vespene) && minerals==saved_minerals && gas==saved_gas &&
+           race_mode==saved_mode && race_human==saved_human);
+    memcpy(device.bytes,good,sizeof good);
+}
 int main(int argc,char **argv)
 {
     assert(argc==4);int human=!strcmp(argv[2],"terran")?R_TER:R_ZERG;
@@ -32,6 +61,8 @@ int main(int argc,char **argv)
         race_data.players[SIDE]=side;race_data.state[21]=(bot+1)%3;
         assert(!race_q8_flash_candidate_fractions(&plan,0));
         race_data.state[21]=bot;
+        reject_bad_roster((unsigned)offsetof(RaceSave,players)+SIDE*sizeof(int),R_PROTOSS);
+        reject_bad_roster((unsigned)offsetof(RaceSave,state)+21u*sizeof(int),(unsigned)((bot+1)%3));
         file_write(argv[3],device.bytes,sizeof device.bytes);
     } else if(!strcmp(argv[1],"read")) {
         file_read(argv[3],device.bytes,sizeof device.bytes);assert(race_load_game());
