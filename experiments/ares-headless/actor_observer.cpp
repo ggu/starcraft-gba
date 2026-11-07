@@ -211,6 +211,7 @@ int main(int argc,char** argv) {
     commands<<completed<<','<<count<<','<<mask<<','<<x<<','<<y<<','<<capture<<'\n'; commands.flush();
     unsigned previous; {std::lock_guard lock(p.mutex); previous=p.frames.size();}
     for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
+    if(!capture) { std::cout<<"OK "<<completed<<std::endl; continue; }
     std::unique_lock lock(p.mutex);
     p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.frames.size()>previous;});
     if(p.failed || p.frames.size()>previous+1) { std::cerr<<"snapshot failure\n"; return 6; }
