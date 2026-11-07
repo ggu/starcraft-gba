@@ -19,3 +19,7 @@ $(eval $(call HUD_AB_LINK,z9,off,Z9,))
 $(eval $(call HUD_AB_LINK,z9,on,Z9,-DSC64_HUD_VRAM_BANDS))
 $(eval $(call HUD_AB_LINK,z10,off,Z10,))
 $(eval $(call HUD_AB_LINK,z10,on,Z10,-DSC64_HUD_VRAM_BANDS))
+
+.PHONY: hud-ab-test-roles
+hud-ab-test-roles:
+	$(PYTHON) tests/sc64-zerg-hud-ab/test_roles.py
