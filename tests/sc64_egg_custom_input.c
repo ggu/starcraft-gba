@@ -3,6 +3,7 @@
 #define main sc64_skirmish_controller_unused_main
 #include "sc64_skirmish_campaign_run.c"
 #undef main
+extern int sc64_validator_export_sram(const char *path);
 
 static int live_egg(void)
 {
@@ -14,7 +15,7 @@ static int live_egg(void)
 
 int main(int argc, char **argv)
 {
-    if (argc != 2 || !(trace = fopen(argv[1], "w"))) return 2;
+    if (argc != 3 || !(trace = fopen(argv[1], "w"))) return 2;
     fputs("{\"profile\":\"z7-custom-egg\",\"events\":[\n", trace);
     option_map = 0; option_human = R_ZERG; option_bots = 1;
     option_bot_races[0] = R_TER; match_limit = 30000;
@@ -50,6 +51,8 @@ int main(int argc, char **argv)
     if (screen != SCREEN_PAUSE) goto fail;
     tap(KEY_B);
     if ((pause_notice & 0xc0) != UI_NOTICE_SAVED || live_egg() != egg) goto fail;
+    /* HOST-only fixture for offline reader tests; never use this as guest SRAM. */
+    if (!sc64_validator_export_sram(argv[2])) goto fail;
     trace_record("{\"kind\":\"save\",\"host_tick\":%u,\"frame\":%d,\"slot\":%d,\"timer\":%d}", host_ticks, frame, egg, u[egg].work_timer);
     tap(KEY_START);
     while (screen == SCREEN_PLAY && !won && !lost && host_ticks < match_limit && live_egg() >= 0) input(0);

@@ -11,3 +11,10 @@ int sc64_validator_import_sram(const char *path)
     fclose(f);
     return n == sizeof(host_save) && end == EOF && !failed;
 }
+int sc64_validator_export_sram(const char *path)
+{
+    FILE *f = fopen(path, "wb");
+    if (!f) return 0;
+    int ok = fwrite(host_save, 1, sizeof(host_save), f) == sizeof(host_save);
+    return fclose(f) == 0 && ok;
+}

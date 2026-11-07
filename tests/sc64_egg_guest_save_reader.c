@@ -26,8 +26,8 @@ int main(int argc, char **argv)
         }
     }
     if (eggs != 1 || zerglings != 0 || race_owner_supply(SIDE) > race_owner_supply_cap(SIDE)) return 1;
-    printf("{\"version\":%u,\"frame\":%d,\"egg_slot\":%d,\"egg_timer\":%d,\"supply\":%d,\"supply_cap\":%d,\"minerals\":%d,\"gas\":%d,\"bots\":%d}\n",
+    printf("{\"version\":%u,\"frame\":%d,\"egg_slot\":%d,\"egg_timer\":%d,\"egg_type\":%d,\"zergling_type\":%d,\"side\":%d,\"supply\":%d,\"supply_cap\":%d,\"minerals\":%d,\"gas\":%d,\"bots\":%d}\n",
            (unsigned)race_data.version, frame, slot, u[slot].work_timer,
-           race_owner_supply(SIDE), race_owner_supply_cap(SIDE), minerals, gas, race_bots);
+           SC64_EGG_ACTOR, U_ZERGLING, SIDE, race_owner_supply(SIDE), race_owner_supply_cap(SIDE), minerals, gas, race_bots);
     return 0;
 }
