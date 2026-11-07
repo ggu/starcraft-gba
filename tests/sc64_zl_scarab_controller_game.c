@@ -95,6 +95,7 @@ int main(void)
         assert(sc64_controller_unit(parent)==2);
         if (u[target].hp<200) { damage_seen=1;break; }
     }
+    fprintf(stderr,"impact packet=%d damage=%d hp=%d alive=%d childxy=%d,%d targetxy=%d,%d order=%d pending=%u carry=%d frame=%d\n",launched_packet,damage_seen,u[target].hp,u[child].alive,u[child].x,u[child].y,u[target].x,u[target].y,u[child].order,race_impact_count,u[child].carry,frame);
     assert(launched_packet && damage_seen && u[target].hp==100 && !u[child].alive);
     hit_target(parent,10000,U_MARINE,SIDE);
     assert(!u[parent].alive && sc64_controller_unit(parent)==-1);
