@@ -32,7 +32,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   transfers to towns 7 and 2, the correct 15-mineral debits, refused unsettled
   transfers, and child identity. A paid child travels through an actual-map
   clear corridor, deals 100 damage through the real impact path and retires;
-  custom/P1 comparators pass. This is not an ordinary campaign win, arbitrary
+  custom/P1 comparators pass. Follow-up [draft #358](https://github.com/ggu/starcraft-gba/pull/358)
+  preserves the existing 24 scripted/human unit slots plus committed products
+  at payment and allocation. HOST pressure tests cover refusal, paid wait,
+  cancellation/resumption and actual Drone/Crystal creation. This is not an ordinary campaign win, arbitrary
   routing, native AI purchase cadence, persistence or ARM qualification. Keep
   normal features off until those gates and shared codec composition pass.
 - **Performance target now measured:** an exact normal P10 `317cc67d…` replay
@@ -45,18 +48,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   0.433% in this window. Combined with a source-binding hoist, the candidate
   saves 1.804%, with unchanged P10 RAM guards, all 1,000 observed frame/mode
   transitions and 11 sampled full frames/palettes/state matching. Shared
-  promotion is undergoing its six-product and default-suite checks; it is
-  not yet merged. None of this closes the near-30-fps or hardware gate.
+  promotion is merged in [#359](https://github.com/ggu/starcraft-gba/pull/359),
+  with six current guarded links, clean default checks and a prepared unified
+  build. It is in the Mac package `StarCraft-GBA-2026-11-07-34c101e0`;
+  KODAK is not mounted and has not received this package. None of this closes
+  the near-30-fps or hardware gate.
 - **N64 evidence:** the controlled Probe run now correlates visible individual
   selection, a unique Nexus-to-Probe reference and rightward movement fields
   in one record. This is scoped evidence for that capture, not a portable
   full ABI. A later register observer preserves all three RAM views and both
   frames byte-for-byte, but GP and raw CPU clock are zero at the bookends.
-  They cannot establish a writer or independent game clock. Next: bounded
-  read-only CPU store observation; STOP, a second controlled actor, fresh
-  reset and clock/cadence evidence remain open. See [draft #354](https://github.com/ggu/starcraft-gba/pull/354).
+  They cannot establish an independent game clock. A separately qualified
+  post-store observer now records 606 CPU stores, including verified writer
+  instructions for this record's movement order, target and position. All
+  three RAM views and both frames match the earlier controls byte-for-byte.
+  Applying the stores reconstructs the intermediate record exactly, but five
+  final bytes remain unexplained; the trace is not a complete history. STOP,
+  a second controlled actor, fresh reset and clock/cadence evidence remain open.
+  See [draft #354](https://github.com/ggu/starcraft-gba/pull/354) and the
+  [scoped store audit](https://github.com/ggu/starcraft-gba/blob/70108527831f1737fc1bfb7cd9299f03c3bc67f0/docs/audits/2026-11-07-n64-store-observer-design/README.md).
 - **Normal package and HUD:** #352 merged normal Z9/Z10 HUD page reuse at
-  `f1fbf106`; the verified Mac package is
+  `f1fbf106`; its retained Mac package is
   `StarCraft-GBA-2026-11-07-f1fbf106`. Z9/Z10 EWRAM margin rises by 12,464 B
   from 780 to 13,244 B; IWRAM remains 2,072 B. Six ordinary OFF/ON physical
   pairs cover two custom maps and late campaign scenes, with matching named
@@ -492,11 +504,16 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-f1fbf106`:
+- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-34c101e0`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The last recorded KODAK
   package was `20261106-e9838086-campaigns`; its present contents are unverified.
   Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
+  P10 and Showcase include the shared aura optimization; T10/Z9/Z10 retain
+  their qualified `f1fbf106` ROM bytes. All five 32 MiB headers, SRAM markers
+  and package checksums pass read-back. Research/Flash, paid Scarab and Egg
+  experiments remain excluded. The package README has Protoss-custom device
+  checks for power, construction audio, menus, cancellation and mining.
 - Separate opt-in Mac package: `20261106-e9838086-custom-eggs-preview`.
   Versioned filenames and manifests distinguish it from the normal products;
   its shared Egg service applies to custom games, not Z8–Z10 production.
@@ -671,9 +688,9 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#349](https://github.com/ggu/starcraft-gba/pull/349), combined research Flash experiment | Draft head `0b913a66`: all 234 early ordinary-input custom ARM roster cases pass, plus HOST current/predecessor rosters and a paid Forge save/load/completion on runtime `d7e7554e`. Those early roster saves have zero research/debt. Later six-profile composition retains the exact P10 probe binary. Clean default checks at `340ecd44` pass (1,034 Python, 26 skips, plus compiled checks); focused later controller additions pass separately. Campaign/controller coverage, aliases, failure recovery, stack and hardware remain open; normal flags off. |
 | Shared HUD memory | Normal late-Zerg page reuse is merged in #352 and packaged at `f1fbf106`, adding 12,464 B of EWRAM margin on current Z9/Z10. The separate research probe's named-state save continuation passes, but its cross-load selected Forge/HUD presentation differs; that experimental presentation gate remains failed. Do not confuse the failed research composition with the qualified normal page reuse. |
 | [#355](https://github.com/ggu/starcraft-gba/pull/355), current campaign controller | HOST-only P1/Z9/Z10 stage with distinct current controller and retained origin. Actual rescue/production and town wallet/wave/transfer fixtures pass; flag-off normal P10 matches. Save/load is refused; persistence and remaining campaigns/consumers remain open. |
-| [#356](https://github.com/ggu/starcraft-gba/pull/356), paid Z10 Scarab | HOST-only controller/wallet composition now exercises actual-map child travel and a real 100-damage impact. Custom and P1 comparators pass. Reservation pressure, arbitrary routing, codec composition, saves, ARM gameplay and ordinary Z10 victory remain release gates. The earlier [integration plan](audits/2026-11-07-z10-scarab-stage/README.md) remains historical context. |
-| Shared Arbiter aura optimization | Combined finder-bound and source-binding hoists save 1.804% mean elapsed cycles in one qualified P10 combat window, preserving the observed timeline/pixels/state and RAM guards. Promotion checks are in progress; no global 30-fps or hardware claim. |
-| [#354](https://github.com/ggu/starcraft-gba/pull/354), bounded N64 observer | Draft. A controlled Probe capture now has visible selection/movement plus a unique selected-record reference; a second observer preserves all RAM/frame bookends. Zero GP/raw CPU clock values do not establish clock or writer identity. The isolated post-store hook has passing asset-free fixtures; linked-core/native qualification remains open. |
+| [#356](https://github.com/ggu/starcraft-gba/pull/356), paid Z10 Scarab | HOST-only controller/wallet composition exercises actual-map child travel and a real 100-damage impact. Custom/P1 comparators pass; follow-up [#358](https://github.com/ggu/starcraft-gba/pull/358) passes scripted reserve-pressure, paid wait/cancel/resume and Drone/Crystal creation checks. Arbitrary routing, codec composition, saves, ARM gameplay and ordinary Z10 victory remain open. The earlier [integration plan](audits/2026-11-07-z10-scarab-stage/README.md) remains historical context. |
+| [#359](https://github.com/ggu/starcraft-gba/pull/359), shared Arbiter aura optimization | Merged as `34c101e0`. Combined finder-bound and source-binding hoists save 1.804% mean elapsed cycles in one qualified P10 combat window, preserving the observed timeline/pixels/state and RAM guards. Six current normal links, clean default checks and prepared unified build pass; optional full unified/Terran checks lack a prepared private header. Packaged on Mac; no global 30-fps or hardware claim. |
+| [#354](https://github.com/ggu/starcraft-gba/pull/354), bounded N64 observer | Draft. Controlled Probe selection/movement and unique-record evidence is followed by a qualified post-store run with 606 verified events and unchanged RAM/frame controls. Movement order/target/position writer instructions are identified for this capture. Intermediate record reconstruction matches, five final bytes do not. Full writer coverage, independent clock/cadence, STOP and another actor remain open. |
 | [#297](https://github.com/ggu/starcraft-gba/pull/297), late-campaign Egg integration | Runtime `f32356c6`, test-only `7166def0`: opt-in Z8–Z10 producer/journal/owner/trigger reservation integration, eight sanitizer targets and four matching-product predecessor cases passed. Actual Z10-product Z8/Z9/Z10 and Z9-product Z9 pause-save/export/fresh-load/natural-birth cases passed. All six normal ROM hashes/RAM ends remain identical to `6ba`; clean default checks pass (1,000 Python tests, 26 skipped, plus compiled/auxiliary suites). Both public preview recipes reproduce the actual guest-qualified ROM hashes at publication `4f0d7080`. See [qualification and limits](audits/2026-11-06-current-native-qualification/late-eggs.md). Common normal activation, Guardian, full campaigns, stack and performance remain open. |
 | [#295](https://github.com/ggu/starcraft-gba/pull/295), shared production preview | Merged as `34c1b38f`; whole tree equals reviewed publication `b57351af`. The [Egg-only custom candidate](audits/2026-11-05-shared-egg-custom/README.md) at `6ba76f8e` no longer depends on Guardian. Six normal ROM/RAM checks and clean default tests pass; all five opt-in GBA builds and HOST controller/journal/owner suites pass. The exact Terran ROM has physical-button ARM, genuine fresh-process SRAM and a separate static-frame/HUD visual check. Known pre-cargo Z6/Z7 reader regressions were reproduced and fixed without changing the authenticated inner token. Separate preview commands are available; default service remains off. Campaign integration, remaining guest products, long matches and performance are not thereby qualified. |
 | [#290](https://github.com/ggu/starcraft-gba/pull/290), Scourge picker | Merged as `73cc74a5`. Runtime/test head `b3d6f8ef` passed viable producer/worker/site sanitizer controls, selected-product journal checks, six new ROM/RAM builds, full clean-Git default tests (989 Python, 26 skipped, plus compiled suites) and fresh-process loading of an actual prior-code pre-cargo HOST journal. Documentation successor/merge preserve identical runtime/build/test objects. No arbitrary guest-save or hardware claim. |
@@ -685,7 +702,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Draft: renderer conflicts and missing current memory/paired ARM qualification. |
 | [#315](https://github.com/ggu/starcraft-gba/pull/315), late-Zerg packed grid | Merged as `738223a4`; scoped tests and emulator timing are recorded above. The later #323 package retains this capability, with a different binary; its speed has not been remeasured. Strict current Z7 winning validation, broader campaign/skirmish and hardware qualification remain open. |
 | [#318](https://github.com/ggu/starcraft-gba/pull/318), research journal groundwork | Merged as `f34004af`, default-off. Full default suite and current flag-off composition passed; feature-on current-base and functional research qualification remain open. The default-off groundwork alone did not change package bytes; #323 is included in the newer normal package. |
-| SD delivery | Latest verified normal Mac package is `StarCraft-GBA-2026-11-07-f1fbf106` (T10, Z9, P10, Showcase; optional Z10 preview). The last recorded KODAK copy is `e9838086` plus the separate custom Egg preview; present contents are unverified. Never claim a newer build is on the card without a physical copy and read-back verification. |
+| SD delivery | Latest verified normal Mac package is `StarCraft-GBA-2026-11-07-34c101e0` (T10, Z9, P10, Showcase; optional Z10 preview), with Protoss-custom testing instructions. KODAK is not mounted; its last recorded copy is `e9838086` plus the separate custom Egg preview, and present contents are unverified. Never claim a newer build is on the card without a physical copy and read-back verification. |
 
 ## Verification and maintenance
 
