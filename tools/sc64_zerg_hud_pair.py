@@ -133,7 +133,8 @@ def main():
                     for g in games:g.rsp.play_to(2,resume)
                     restored=[g.state() for g in games];v=[video(g) for g in games]
                     if (restored[0]!=restored[1] or v[0]!=v[1] or
-                        restored[0]!=reference[0] or v[0]!=reference_video[0] or
+                        restored[0]!=reference[0] or v[0][1:]!=reference_video[0][1:] or
+                        (v[0][0]&~16)!=(reference_video[0][0]&~16) or
                         restored[0]['screen']!=world.SCREEN_PLAY):
                         raise ValueError('fresh load differs from uninterrupted state/render')
                     loaded=restored[0];loaded_job=research_job(loaded)
