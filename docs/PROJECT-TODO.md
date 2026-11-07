@@ -27,7 +27,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   predecessors migrate without retagging or changing legacy bytes. Semantic
   fallback, failed-load/no-device mutation and writer scratch recovery pass.
   Independent review caught and rechecked a malformed foreign legacy-tag
-  ownership gap. End-to-end stale-epoch/descriptor tests, Z10 Scarab composition,
+  ownership gap. A follow-up on `codex/controller-flash-z10-20261107` at `b13deb13`
+  also passes actual P1 stale-descriptor/competing-epoch and read-failure
+  cases without erase/program or live-state publication. The separate HOST-only
+  compound-format stage now saves paid Z10 training, inside and fresh-release
+  outside children and reloads them in separate processes, retaining source
+  origin, current town, payer and fractional HP (`1af50e56`/`018cca6e`). Moving
+  flight, malformed/fallback and predecessor-format checks are still in progress;
   ARM, hardware and other campaigns remain open. Normal upgrades stay off.
 - **Reachable custom-game performance now measured:** the released `70e9800f…`
   P10 ROM runs map 1 with human Protoss and independently selected Terran,
@@ -36,10 +42,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   has four units/one building; the AIs have 41 units/16 buildings at warmup end.
   Mean elapsed cycles are 623,589, p50 568,588, p95 815,012 and maximum
   2,247,514. Orders consume 1,663,094 cycles in the worst update; map work is
-  comparatively stable. **Next performance task: attribute those orders spikes
-  to actual leaves before changing routing/cadence.** This is one opening,
+  comparatively stable. A diagnostic replay at `15b01778` now attributes the worst orders spike
+  chiefly to nearest-depot searches after topology invalidates workers' cached
+  homes: 1,512,250 nested search cycles within 1,689,397 diagnostic orders
+  cycles. Diagnostic mean overhead is 3.96%; nested scopes cannot be summed.
+  An owner-list candidate at `2fed51b4` preserves all 500 observed transitions
+  and ten sampled full frames, palettes and selected-state/workload snapshots.
+  Mean cycles fall 3.87%, p99 26.35% and maximum 22.40%; original worst-frame
+  orders fall 42.34%. Actual in-pass construction invalidation and next-pass
+  rebuild tests pass. Shared-default six-profile/save/default qualification is
+  the next gate, not another routing or cadence change. This is one opening,
   not combat, all race/map combinations or hardware/30-fps qualification.
-  A separate bounds-mask probe saves 0.58% mean in the P7 combat window but
+  A separate reachability-only probe is rejected after only 0.09% mean
+  improvement and 0.30% worst-orders improvement. The bounds-mask probe saves 0.58% mean in the P7 combat window but
   worsens the peak by 4.72%; keep it disabled. An algebraic steering probe
   also remains rejected after its ARM code grew. See the
   [current custom/performance audit](https://github.com/ggu/starcraft-gba/blob/1f4f9ca9/docs/audits/2026-11-07-contact-bounds-probe/README.md).
@@ -102,6 +117,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Its RAM, frames and all 606 stores match the earlier controls. Nearby globals
   are now traced as spatial scratch, not a game clock; see the
   [caller/scratch audit](https://github.com/ggu/starcraft-gba/blob/5d1943fd4a608023fea0df0da2747df42496a48e/docs/audits/2026-11-07-n64-dispatch-candidates/README.md).
+  Subsequent stack and bounded-counter observers preserve all prior RAM,
+  frames, stores and entries exactly. Eight selected-actor stack records support
+  the caller chain. The counter observer at `52a79f9f` captures 36 stores from
+  verified PC `80023954`, decrementing `800a5acc` from 66 to 31 and reproducing
+  both later counter views. This establishes a CPU-written periodic countdown,
+  not an independent game clock. A same-binary ordinary Start pause/resume
+  experiment is in progress; pause/resume UI and counter behavior must both be
+  observed before interpreting it. STOP, independent actors and fresh reset
+  remain open.
   See [draft #354](https://github.com/ggu/starcraft-gba/pull/354) and the
   [scoped store audit](https://github.com/ggu/starcraft-gba/blob/70108527831f1737fc1bfb7cd9299f03c3bc67f0/docs/audits/2026-11-07-n64-store-observer-design/README.md).
 - **Normal package and HUD:** #352 merged normal Z9/Z10 HUD page reuse at
@@ -169,7 +193,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   visual context, not power-boundary, remembered-fog, damage or timing parity.
   This frontend rejects RAM capture; N1 actor/clock/cadence gates remain open.
 
-The playable Mac package is now `f1fbf106`; these new experimental branches
+The latest prepared Mac package is `StarCraft-GBA-2026-11-07-34c101e0`; main
+through #362 produces the same normal ROM bytes. These new experimental branches
 have not been copied to KODAK. The full campaign 29/30 and near-30-fps gates
 below remain open. Keep source-only public artifacts and local Actions policy.
 
