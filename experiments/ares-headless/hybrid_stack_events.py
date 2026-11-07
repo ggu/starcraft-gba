@@ -12,7 +12,7 @@ ROM_SHA='e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 VK_SHA='432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 REV='0aafd85789215e84e1e43415c07d4c88461b7899'
 # Qualified independently from the historical non-diagnostic binary.
-BINARY_SHA=None
+BINARY_SHA='a3d4e86bf48bf95610cf98b1e7b941f2407c04c794ba08b3de9ab1988fe26a22'
 LOCK='/tmp/sc64-native-build-20261031.lock'
 VK_PATH=pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
 
