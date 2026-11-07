@@ -27,6 +27,9 @@ int main(void)
       assert(race_zl_ai_minerals[0]==m0 && race_zl_ai_minerals[1]==m1); }
     sc64_current_building[building]=255;
     assert(sc64_controller_building(building)==-1);
+    { u32 m0=race_zl_ai_minerals[0], m1=race_zl_ai_minerals[1];
+      assert(!race_zl_ai_queue(1,building,U_ZEALOT));
+      assert(race_zl_ai_minerals[0]==m0 && race_zl_ai_minerals[1]==m1); }
     produced=race_spawn_product_from(ENEMY,U_ZEALOT,b[building].x,b[building].y,-1,building);
     assert(produced>=0 && sc64_controller_unit(produced)==-1);
     assert(!race_save_game() && !race_load_game());
