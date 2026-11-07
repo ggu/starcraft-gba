@@ -113,6 +113,10 @@ int main(void)
     assert(moved && launched_packet && damage_seen && u[target].hp==100 && !u[child].alive);
     hit_target(parent,10000,U_MARINE,SIDE);
     assert(!u[parent].alive && sc64_controller_unit(parent)==-1);
+    /* The authored isolation freed earlier slots; occupy them so this
+     * explicit reuse case exercises the retired parent's slot. */
+    while (find_unit_slot()>=0 && find_unit_slot()<parent)
+        assert(spawn_unit(ENEMY,U_ZERGLING,128,128)>=0);
     int reused=spawn_unit(ENEMY,U_REAVER,128,128);assert(reused==parent);
     assert(sc64_controller_unit(reused)==-1 && !race_scarab_ai_restock_stage(reused));
     assert(!race_save_game() && !race_load_game());
