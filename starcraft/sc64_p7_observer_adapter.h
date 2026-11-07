@@ -460,7 +460,9 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
             lists->optical_units[n]=(u8)i;
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
             lists->optical_unit_masks[i]=(u8)mask;
-            if (SC64_SCARAB_HIDDEN(&u[i])) lists->optical_grid_safe=0;
+            int cell;
+            if (SC64_SCARAB_HIDDEN(&u[i]) || (unsigned)u[i].owner>=5u ||
+                !sc64_target_cell_for(u[i].x,u[i].y,&cell)) lists->optical_grid_safe=0;
 #else
             lists->optical_unit_masks[n]=(u8)mask;
 #endif
@@ -478,6 +480,9 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
             lists->optical_buildings[n]=(u8)i;
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
             lists->optical_building_masks[i]=(u8)mask;
+            int cell;
+            if ((unsigned)b[i].owner>=5u || !sc64_target_cell_for(b[i].x,b[i].y,&cell))
+                lists->optical_grid_safe=0;
 #else
             lists->optical_building_masks[n]=(u8)mask;
 #endif
@@ -595,7 +600,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     ++sc64_optical_refresh_count;
 #endif
 #if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
-    if (lists && lists->optical_grid_safe && lists->optical_grid_phase && sc64_target_index_active)
+    if (lists && lists->optical_grid_safe && lists->optical_grid_phase && sc64_target_index_active &&
+        x>=0 && y>=0 && x<WORLD_W && y<WORLD_H && WORLD_W>0 && WORLD_H>0 &&
+        (WORLD_W+63)/64<=SC64_TARGET_GRID_COLS && (WORLD_H+63)/64<=SC64_TARGET_GRID_ROWS)
         visible_owners=sc64_p7_optical_grid_mask(lists,cx,cy,human_slot,visible_owners);
     else {
 #endif
