@@ -179,6 +179,9 @@ static void expect_mask(unsigned expected, const u8 *powered)
     if (actual != expected) fprintf(stderr, "actual %u expected %u target=(%d,%d) visible=%d\n", actual,expected,u[0].x,u[0].y,SC64_GRID_GET(visible,u[0].x/16+(u[0].y/16)*MAP_COLS));
     assert(actual == expected);
     Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    lists.optical_grid_phase=1;
+#endif
     assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == expected);
 }
 
@@ -312,6 +315,9 @@ static void detector_snapshot_cases(void)
         if (step==5) u[1].alive=0;
         if (step==6) b[0].alive=0;
         sc64_p7_detector_lists_build(&lists);
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    lists.optical_grid_phase=1;
+#endif
         assert(sc64_p7_arbiter_detected_mask_lists(0,powered,&lists)==
                sc64_p7_arbiter_detected_mask_reference(0,powered));
     }
@@ -391,6 +397,9 @@ int main(void)
         unsigned want = sc64_p7_arbiter_detected_mask_reference(0, powered);
         unsigned got = sc64_p7_arbiter_detected_mask(0, powered);
         Sc64P7DetectorLists lists; sc64_p7_detector_lists_build(&lists);
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    lists.optical_grid_phase=1;
+#endif
         assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
         assert(got == want);
         positive += want != 0;
@@ -406,6 +415,9 @@ int main(void)
             want = sc64_p7_arbiter_detected_mask_reference(0, powered);
             assert(sc64_p7_arbiter_detected_mask(0, powered) == want);
             sc64_p7_detector_lists_build(&lists);
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    lists.optical_grid_phase=1;
+#endif
             assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
             u[moved].x = -1;
             sc64_target_index_move(&u[moved]);
@@ -413,12 +425,18 @@ int main(void)
             want = sc64_p7_arbiter_detected_mask_reference(0, powered);
             assert(sc64_p7_arbiter_detected_mask(0, powered) == want);
             sc64_p7_detector_lists_build(&lists);
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    lists.optical_grid_phase=1;
+#endif
             assert(sc64_p7_arbiter_detected_mask_lists(0, powered, &lists) == want);
         }
         sc64_target_index_end();
         assert(sc64_p7_arbiter_detected_mask(0, powered) == want);
     }
     assert(positive > 0);
+#ifdef SC64_OPTICAL_GRID_TEST
+    assert(sc64_optical_grid_test_hits>0);
+#endif
     printf("owner mask oracle: 2000 cases, %u positive masks\n", positive);
     return 0;
 }

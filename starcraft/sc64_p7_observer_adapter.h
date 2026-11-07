@@ -397,6 +397,9 @@ typedef struct {
     u8 optical_units[MAX_UNITS], optical_unit_masks[MAX_UNITS];
     u8 optical_buildings[MAX_BUILDINGS], optical_building_masks[MAX_BUILDINGS];
     unsigned unit_count, building_count, optical_unit_count, optical_building_count;
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    int optical_grid_safe, optical_grid_phase;
+#endif
 } Sc64P7DetectorLists;
 
 /* The source-owner mapping and actor visibility inputs do not change within
@@ -436,6 +439,11 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
 #endif
     lists->unit_count=lists->building_count=0;
     lists->optical_unit_count=lists->optical_building_count=0;
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    memset(lists->optical_unit_masks,0,sizeof(lists->optical_unit_masks));
+    memset(lists->optical_building_masks,0,sizeof(lists->optical_building_masks));
+    lists->optical_grid_safe=1; lists->optical_grid_phase=0;
+#endif
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
@@ -449,7 +457,13 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
         unsigned mask=sc64_p7_optical_source_mask(source,u[i].owner,map,human_slot);
         if(mask) {
             unsigned n=lists->optical_unit_count++;
-            lists->optical_units[n]=(u8)i; lists->optical_unit_masks[n]=(u8)mask;
+            lists->optical_units[n]=(u8)i;
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+            lists->optical_unit_masks[i]=(u8)mask;
+            if (SC64_SCARAB_HIDDEN(&u[i])) lists->optical_grid_safe=0;
+#else
+            lists->optical_unit_masks[n]=(u8)mask;
+#endif
         }
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive) {
@@ -461,7 +475,12 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
         unsigned mask=sc64_p7_optical_source_mask(source,b[i].owner,map,human_slot);
         if(mask) {
             unsigned n=lists->optical_building_count++;
-            lists->optical_buildings[n]=(u8)i; lists->optical_building_masks[n]=(u8)mask;
+            lists->optical_buildings[n]=(u8)i;
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+            lists->optical_building_masks[i]=(u8)mask;
+#else
+            lists->optical_building_masks[n]=(u8)mask;
+#endif
         }
     }
     for(int i=0;i<MAX_UNITS;++i)
@@ -480,6 +499,74 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
 
 #ifdef SC64_DIAGNOSTIC_SETUP
 volatile u32 sc64_optical_unit_cycles, sc64_optical_building_cycles, sc64_optical_refresh_count;
+#endif
+
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+_Static_assert(SC64_P7_SIGHT_BUILDING_AXIS_BOUND <= SC64_P7_SIGHT_UNIT_AXIS_BOUND,
+               "optical grid window must cover building sight");
+#ifdef SC64_OPTICAL_GRID_TEST
+#ifndef GBA_HOST
+#error "optical grid test counter is host-only"
+#endif
+static unsigned sc64_optical_grid_test_hits;
+#endif
+/* Called only before orders can move actors. The owner index is conservative;
+ * the original inclusive axis and circle tests still decide visibility. */
+static unsigned __attribute__((noinline))
+sc64_p7_optical_grid_mask(const Sc64P7DetectorLists *lists, int cx, int cy,
+                          int human_slot, unsigned visible_owners)
+{
+#ifdef SC64_OPTICAL_GRID_TEST
+    ++sc64_optical_grid_test_hits;
+#endif
+    int x0=(cx-SC64_P7_SIGHT_UNIT_AXIS_BOUND)/64;
+    int x1=(cx+SC64_P7_SIGHT_UNIT_AXIS_BOUND)/64;
+    int y0=(cy-SC64_P7_SIGHT_UNIT_AXIS_BOUND)/64;
+    int y1=(cy+SC64_P7_SIGHT_UNIT_AXIS_BOUND)/64;
+    int cols=(WORLD_W+63)/64, rows=(WORLD_H+63)/64;
+    if(x0<0)x0=0; if(y0<0)y0=0;
+    if(x1>=cols)x1=cols-1; if(y1>=rows)y1=rows-1;
+    for(int y=y0;y<=y1;++y) for(int x=x0;x<=x1;++x) for(int owner=0;owner<5;++owner) {
+        Sc64TargetIndex e=sc64_target_head[owner][x+y*SC64_TARGET_GRID_COLS];
+        while(e!=SC64_TARGET_NONE) {
+            int slot=(int)e,dx,dy,radius; unsigned candidate;
+            if(slot<MAX_UNITS) {
+                candidate=lists->optical_unit_masks[slot];
+                dx=cx-u[slot].x;dy=cy-u[slot].y;
+                if(dx < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dx > SC64_P7_SIGHT_UNIT_AXIS_BOUND ||
+                   dy < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dy > SC64_P7_SIGHT_UNIT_AXIS_BOUND) goto next;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+                if(human_slot>=0) candidate&=~(1u<<(unsigned)human_slot);
+#endif
+                if(!(candidate&~visible_owners)) goto next;
+                radius=sc64_p7_observer_sight_radius_runtime(u[slot].type,0);
+            } else {
+                int i=slot-MAX_UNITS;
+                candidate=lists->optical_building_masks[i];
+                dx=cx-b[i].x;dy=cy-b[i].y;
+                if(dx < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dx > SC64_P7_SIGHT_BUILDING_AXIS_BOUND ||
+                   dy < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dy > SC64_P7_SIGHT_BUILDING_AXIS_BOUND) goto next;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+                if(human_slot>=0) candidate&=~(1u<<(unsigned)human_slot);
+#endif
+                if(!(candidate&~visible_owners)) goto next;
+                radius=sc64_p7_observer_sight_radius_runtime(
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+                    sc64_shared_building_visibility_key(&b[i]),
+#else
+                    b[i].type,
+#endif
+                    1);
+            }
+            if(dx*dx+dy*dy<=radius*radius) visible_owners|=candidate;
+next:       e=sc64_target_next[slot];
+        }
+    }
+#ifndef SC64_SOURCE_SIGHT_ALL_RACES
+    (void)human_slot;
+#endif
+    return visible_owners;
+}
 #endif
 
 static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
@@ -507,6 +594,11 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     u32 optical_diag_start=gba_clock();
     ++sc64_optical_refresh_count;
 #endif
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    if (lists && lists->optical_grid_safe && lists->optical_grid_phase && sc64_target_index_active)
+        visible_owners=sc64_p7_optical_grid_mask(lists,cx,cy,human_slot,visible_owners);
+    else {
+#endif
     for(int k=0;k<(lists?(int)lists->optical_unit_count:MAX_UNITS);++k) {
         int i=lists?lists->optical_units[k]:k;
 #ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
@@ -529,7 +621,11 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #else
         int dx=cx-u[i].x,dy=cy-u[i].y;
 #endif
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+        unsigned candidate=lists?lists->optical_unit_masks[i]:0;
+#else
         unsigned candidate=lists?lists->optical_unit_masks[k]:0;
+#endif
         if(!lists) {
 #ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
             int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
@@ -567,7 +663,11 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #else
         int dx=cx-b[i].x,dy=cy-b[i].y;
 #endif
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+        unsigned candidate=lists?lists->optical_building_masks[i]:0;
+#else
         unsigned candidate=lists?lists->optical_building_masks[k]:0;
+#endif
         if(!lists) {
 #ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
             int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
@@ -594,6 +694,9 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
     }
 #ifdef SC64_DIAGNOSTIC_SETUP
     sc64_optical_building_cycles+=gba_clock()-optical_diag_start;
+#endif
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+    }
 #endif
     for(int k=0;k<(lists?(int)lists->unit_count:MAX_UNITS);++k) {
         int i=lists?lists->units[k]:k;
@@ -880,6 +983,10 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                         }
                     }
                     sc64_p7_detector_lists_build(&detector_lists);
+#if defined(SC64_OPTICAL_GRID_PROBE) && defined(SC64_P7_SIGHT_AXIS_CULL)
+                    /* Source-tick callback runs before the unit orders loop. */
+                    detector_lists.optical_grid_phase=1;
+#endif
                     powered_cannons_ready=1;
                 }
 #ifdef SC64_DIAGNOSTIC_SETUP
