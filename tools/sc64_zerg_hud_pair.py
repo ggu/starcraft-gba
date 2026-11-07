@@ -38,16 +38,26 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ('off_rom','off_elf','on_rom','on_elf','runner','tape','output'):
         ap.add_argument('--'+name.replace('_','-'),type=Path,required=True)
+    ap.add_argument('--blank-flash',type=Path)
+    ap.add_argument('--resume-tape',type=Path)
     ap.add_argument('--ticks',type=int,default=2500)
     ap.add_argument('--deadline',type=int,default=600)
     a=ap.parse_args()
     if not 1<=a.ticks<=5000 or not 1<=a.deadline<=1200:ap.error('ticks/deadline out of bounds')
+    if bool(a.blank_flash)!=bool(a.resume_tape):ap.error('blank Flash and resume tape must be supplied together')
     paths=(a.off_rom,a.off_elf,a.on_rom,a.on_elf,a.runner,a.tape)
-    expected_runner='4199fe903b18c77e0833db1860c4968509cfc82e506bc6f2f9be7582b720fae2'
+    if a.blank_flash:
+        if a.blank_flash.read_bytes()!=bytes([255])*131072:ap.error('Flash backing must be erased')
+        paths+=a.blank_flash,a.resume_tape
+    expected_runner=('75b8ba5f71919802a981516ffef05baf29866256f97b7f67f46276171d9690e2' if a.blank_flash else '4199fe903b18c77e0833db1860c4968509cfc82e506bc6f2f9be7582b720fae2')
     expected_tape='d6bb9e46f9011a8af8c32eb62942ab8d611974b5592df85e5788358900c32df5'
     if a.output.exists():raise ValueError('output already exists')
     pins={str(p.resolve()):sha(p) for p in paths}
     if sha(a.runner)!=expected_runner or sha(a.tape)!=expected_tape:raise ValueError('unapproved runner/tape')
+    if a.resume_tape and sha(a.resume_tape)!='389a025f68e66c1cd723338109ab4dcd1d51467317937ded2ecd7a073580329f':raise ValueError('unapproved resume tape')
+    if a.blank_flash:
+        import sc64_headless_flash_physical as flash_physical
+        sys.modules['sc64_headless_physical']=flash_physical
     events=[]
     for line in a.tape.read_text().splitlines():
         x=json.loads(line)
@@ -64,7 +74,7 @@ def main():
             games=[]
             try:
                 for label,rom,elf in [('off',a.off_rom,a.off_elf),('on',a.on_rom,a.on_elf)]:
-                    folder=a.output/label;folder.mkdir();games.append(world.PhysicalGame(a.runner,rom,elf,folder))
+                    folder=a.output/label;folder.mkdir();games.append(world.PhysicalGame(a.runner,rom,elf,folder,save_input=a.blank_flash,save_output=(folder/'guest.sav') if a.blank_flash else None))
                 counts={'advancing':0,'other':0};digest=hashlib.sha256();held=0;idx=0;elapsed=[[],[]]
                 for tick in range(a.ticks):
                     if tick%100==0:check()
@@ -80,10 +90,32 @@ def main():
                     digest.update(json.dumps([tick,states[0]['frame'],views[0]],separators=(',',':')).encode())
                     if sum(p.stat().st_size for p in a.output.rglob('*') if p.is_file())>LIMIT:raise ValueError('aggregate output threshold')
                 last=states[0]
-                if last['screen']!=world.SCREEN_PLAY or last['race_mode']!=1 or last['race_human']!=2 or last['race_bots']!=1 or counts['advancing']<1000:raise ValueError('custom scene did not reach expected advancing state')
+                if last['race_mode']!=1 or last['race_human']!=2 or last['race_bots']!=1 or counts['advancing']<1000:raise ValueError('custom scene did not reach expected advancing state')
+                save_equal=None
+                if a.blank_flash:
+                    if a.ticks!=3048 or last['screen']!=world.SCREEN_PAUSE:raise ValueError('save checkpoint not reached')
+                    for g in games:g.rsp.export_sram()
+                    saves=[a.output/label/'guest.sav' for label in ('off','on')]
+                    save_equal=sha(saves[0])==sha(saves[1])
+                    if not save_equal:raise ValueError('guest Flash images differ')
+                    saved=states[0]
+                    for g in reversed(games):g.close()
+                    games=[]
+                    for label,rom,elf,save in [('off',a.off_rom,a.off_elf,saves[0]),('on',a.on_rom,a.on_elf,saves[1])]:
+                        folder=a.output/(label+'-fresh');folder.mkdir()
+                        games.append(world.PhysicalGame(a.runner,rom,elf,folder,save_input=save))
+                    resume=[]
+                    for line in a.resume_tape.read_text().splitlines():
+                        x=json.loads(line)
+                        if x.get('kind')=='input':resume.append((x['call_index'],x['held']))
+                    for g in games:g.rsp.play_to(2,resume)
+                    restored=[g.state() for g in games];v=[video(g) for g in games]
+                    if restored[0]!=restored[1] or v[0]!=v[1] or restored[0]['screen']!=world.SCREEN_PLAY:raise ValueError('fresh load/render mismatch')
+                    if restored[0]['frame']<saved['frame']:raise ValueError('fresh load did not restore frame')
+                elif last['screen']!=world.SCREEN_PLAY:raise ValueError('custom game no longer playing')
                 check();report={'pins':pins,'ticks':a.ticks,'counts':counts,'paired_every_tick_sha256':digest.hexdigest(),
-                    'cycles':[{'mean':sum(v)/len(v),'max':max(v)} for v in elapsed],
-                    'scope':'ordinary custom tape; full displayed indexed frame and palette plus named state every tick; no save or campaign proof'}
+                    'flash_images_equal':save_equal,'cycles':[{'mean':sum(v)/len(v),'max':max(v)} for v in elapsed],
+                    'scope':'ordinary custom tape; full displayed indexed frame and palette plus named state every prefix tick; optional fresh Flash load; no campaign proof'}
                 (a.output/'result.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report),flush=True)
             finally:
                 for g in reversed(games):
