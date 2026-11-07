@@ -195,11 +195,11 @@ static int race_q8_flash_prepare_record(RaceLoadPlan *plan,const GbaFlashJournal
             gba_fj_u32(header+4)!=SC64_Q8_FLASH_DEBTS) return 0;
 #ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
         u32 at=base_length+SC64_Q8_FLASH_TAIL_HEADER+SC64_Q8_FLASH_DEBTS;
-        if (gba_fj_read_payload(io,record,at,header,sizeof header)!=GBA_FJ_OK ||
-            gba_fj_u32(header)!=SC64_CONTROLLER_FLASH_MAGIC ||
-            gba_fj_u32(header+4)!=MAX_UNITS+MAX_BUILDINGS ||
-            gba_fj_read_payload(io,record,at+8,plan->controller_units,MAX_UNITS)!=GBA_FJ_OK ||
-            gba_fj_read_payload(io,record,at+8+MAX_UNITS,plan->controller_buildings,MAX_BUILDINGS)!=GBA_FJ_OK) return 0;
+        if (gba_fj_read_payload(io,record,at,header,sizeof header)!=GBA_FJ_OK) return -1;
+        if (gba_fj_u32(header)!=SC64_CONTROLLER_FLASH_MAGIC ||
+            gba_fj_u32(header+4)!=MAX_UNITS+MAX_BUILDINGS) return 0;
+        if (gba_fj_read_payload(io,record,at+8,plan->controller_units,MAX_UNITS)!=GBA_FJ_OK ||
+            gba_fj_read_payload(io,record,at+8+MAX_UNITS,plan->controller_buildings,MAX_BUILDINGS)!=GBA_FJ_OK) return -1;
 #endif
     }
     if (!race_q8_flash_candidate_fractions(plan,!is_new)) return 0;
@@ -245,6 +245,12 @@ static int race_q8_flash_begin(void)
     result=gba_fj_select(io,race_q8_flash_capture,&sc64_q8_flash_snapshot,&sc64_q8_flash_previous);
     sc64_q8_flash_snapshot.plan=0;
     if(result<0)return 0;
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    /* A supported older P1 must not authorize a new epoch over a different
+     * checksum-valid legacy campaign we cannot interpret in this stage. */
+    for(unsigned i=0;i<2;++i)
+        if(sc64_q8_flash_snapshot.seen[i] && !sc64_q8_flash_snapshot.accepted[i]) return 0;
+#endif
     /* A checksum-valid but unsupported predecessor must not silently become
      * a new epoch: the user has not authorized losing its selection. */
     if(result==GBA_FJ_NONE)
