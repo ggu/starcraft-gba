@@ -34,7 +34,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   outside children and reloads them in separate processes, retaining source
   origin, current town, payer and fractional HP (`1af50e56`/`018cca6e`). Moving
   flight, malformed/fallback and predecessor-format checks are still in progress;
-  ARM, hardware and other campaigns remain open. Normal upgrades stay off.
+  A moving-flight test exposed that the row codec stores five/four-bit route
+  timers while live Scarabs retain full waypoint coordinates there. An explicit
+  bounded compound flight section is being implemented; no truncation or old
+  format reinterpretation is permitted. ARM, hardware and other campaigns
+  remain open. Normal upgrades stay off.
 - **Reachable custom-game performance now measured:** the released `70e9800f…`
   P10 ROM runs map 1 with human Protoss and independently selected Terran,
   Zerg and Protoss AIs through a natural 4,000-update opening. All next 500
@@ -122,10 +126,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the caller chain. The counter observer at `52a79f9f` captures 36 stores from
   verified PC `80023954`, decrementing `800a5acc` from 66 to 31 and reproducing
   both later counter views. This establishes a CPU-written periodic countdown,
-  not an independent game clock. A same-binary ordinary Start pause/resume
-  experiment is in progress; pause/resume UI and counter behavior must both be
-  observed before interpreting it. STOP, independent actors and fresh reset
-  remain open.
+  not an independent game clock. The first same-binary ordinary Start test
+  visibly reaches GAME PAUSED; its two paused RAM views retain counter 30
+  with no watched stores between them. A second Start opens Options, so resume
+  is not established. The corrected visible-menu intervention is separately
+  gated; see the [scoped pause audit](https://github.com/ggu/starcraft-gba/blob/27ee0f2c/docs/audits/2026-11-07-n64-counter-pause-plan/README.md).
+  STOP, independent actors and fresh reset remain open.
   See [draft #354](https://github.com/ggu/starcraft-gba/pull/354) and the
   [scoped store audit](https://github.com/ggu/starcraft-gba/blob/70108527831f1737fc1bfb7cd9299f03c3bc67f0/docs/audits/2026-11-07-n64-store-observer-design/README.md).
 - **Normal package and HUD:** #352 merged normal Z9/Z10 HUD page reuse at
