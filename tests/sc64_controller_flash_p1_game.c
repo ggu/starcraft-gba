@@ -60,6 +60,27 @@ int main(int argc,char **argv)
         int f=-1;for(int i=0;i<MAX_BUILDINGS;++i)if(b[i].alive&&b[i].type==B_FORGE&&b[i].level)f=i;
         assert(f>=0 && sc64_controller_building(f)==7);
         Sc64PrPaidReceipt paid;assert(sc64_pr_stage_receipt(f,&paid)&&paid.payer==SIDE);
+    } else if(!strcmp(argv[1],"unknown-new") || !strcmp(argv[1],"fallback-legacy")) {
+        file_read(argv[2],device.bytes,sizeof device.bytes);
+        GbaFlashJournalRecord r2,r3,*newer=0;
+        int s2=gba_fj_probe(&flash_io,2,&r2),s3=gba_fj_probe(&flash_io,3,&r3);
+        if(s2==GBA_FJ_OK)newer=&r2;
+        if(s3==GBA_FJ_OK && (!newer || gba_fj_newer(r3.sequence,newer->sequence)))newer=&r3;
+        assert(newer);u32 meta=gba_fj_metadata(newer->index);
+        if(!strcmp(argv[1],"unknown-new")) {
+            u32 unknown=(newer->tag&~SC64_SAVE_TAG_NAMESPACE_MASK)|0x004a0000u;
+            gba_fj_put32(device.bytes+gba_fj_base(newer->index),unknown);gba_fj_put32(device.bytes+meta,unknown);
+        } else {
+            u32 tail=newer->length-SC64_CONTROLLER_FLASH_BYTES;
+            device.bytes[meta+16+tail+8]=254;
+            gba_fj_put32(device.bytes+meta+8,gba_fj_hash(2166136261u,device.bytes+meta+16,newer->length));
+        }
+        static u8 frozen_unknown[131072];memcpy(frozen_unknown,device.bytes,sizeof frozen_unknown);
+        assert(race_load_game() && race_selected_mission==SC64_RACE_MISSION_P1);
+        if(!strcmp(argv[1],"unknown-new")) assert(minerals==900 && !race_save_game());
+        else {int f=-1;for(int i=0;i<MAX_BUILDINGS;++i)if(b[i].alive&&b[i].type==B_FORGE&&b[i].level)f=i;
+              assert(f>=0 && sc64_controller_building(f)==7);}
+        assert(!memcmp(frozen_unknown,device.bytes,sizeof frozen_unknown));
     } else if(!strcmp(argv[1],"fallback") || !strcmp(argv[1],"only-bad")) {
         file_read(argv[2],device.bytes,sizeof device.bytes);
         GbaFlashJournalRecord r2,r3,*newer,*older;
