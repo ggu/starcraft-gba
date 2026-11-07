@@ -171,5 +171,9 @@ int main(void)
             oracle_queries, oracle_blocked, oracle_builds, oracle_fallbacks);
     assert(oracle_blocked > 0 && oracle_fallbacks > 0 && oracle_queries > oracle_blocked);
 #endif
+#ifdef SC64_STEER_COST_DELTA_ORACLE
+    assert(sc64_steer_delta_oracle_checks>0);
+    printf("steering delta actual blocked decisions: %u\n",sc64_steer_delta_oracle_checks);
+#endif
     return 0;
 }

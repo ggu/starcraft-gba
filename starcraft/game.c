@@ -3626,6 +3626,13 @@ sc64_steer_best_direction(Unit *q, int speed, int from_cell,
 
 #if defined(SC64_CONTACT_CACHE) && defined(SC64_STEER_COST_DELTA_PROBE)
 #include "sc64_steer_cost_delta.h"
+#ifdef SC64_STEER_COST_DELTA_ORACLE
+#ifndef GBA_HOST
+#error "Steering delta oracle is HOST only"
+#endif
+#include <assert.h>
+static unsigned sc64_steer_delta_oracle_checks;
+#endif
 #endif
 
 static void GBA_HOT
@@ -3735,6 +3742,19 @@ move_toward(Unit * q, int tx, int ty)
 	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
 		!(blocked & (1u << i))) { best = i; best_cost = cost; }
 	}
+#ifdef SC64_STEER_COST_DELTA_ORACLE
+        {
+            int reference=-1, reference_cost=0x7fffffff;
+            for (int k=0;k<8;k++) {
+                int sx=q->x+dx[k]*speed, sy=q->y+dy[k]*speed;
+                int c=dist2(sx,sy,q->path_x,q->path_y);
+                if (c<reference_cost && is_traversable(sx/16,sy/16,from_cell) &&
+                    !(blocked&(1u<<k))) { reference=k; reference_cost=c; }
+            }
+            assert(reference==best);
+            ++sc64_steer_delta_oracle_checks;
+        }
+#endif
 #elif defined(SC64_COLLISION_STEER_LIST)
 	#if defined(SC64_Z7_RUNTIME)
 	best = sc64_steer_best_direction(q, speed, from_cell,
