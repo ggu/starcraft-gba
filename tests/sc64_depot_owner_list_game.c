@@ -59,5 +59,6 @@ int main(void)
     /* Ownership transfer is modeled after its production invalidation hook. */
     b[a].owner=ENEMY;invalidate_path_grid();assert(!sc64_depot_owner_lists_valid);build_path_grid();u[w].build=-1;compare(&u[w]);assert(u[w].build==d);
     target_lists_valid=0;sc64_depot_owner_lists_valid=1;u[w].build=-1;compare(&u[w]);assert(u[w].build==d);
+    list_snapshot();u[w].owner=-1;u[w].build=-1;compare(&u[w]);assert(u[w].build==-2);
     puts("owner-list nearest depot parity: tie, spawn, death, completion, morph, transfer, fallback");return 0;
 }
