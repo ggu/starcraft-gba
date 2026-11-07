@@ -66,7 +66,10 @@ Z9_PROGRAM_HEADER := build/generated/z9/sc64_z9_program_generated.h
 $(Z9_PROGRAM_HEADER): $(Z9_DESCRIPTOR) tools/sc64_zerg_late_program_pack.py tools/sc64_zerg_late_pack.py tools/sc64_z8_program_pack.py | build
 	$(PYTHON) tools/sc64_zerg_late_program_pack.py $< $@
 ZERG_Z9_FEATURES = -DSC64_Z9_DATA_ENABLED -DSC64_Z9_RUNTIME -DSC64_Z9_CAMPAIGN_ENTRY -Ibuild/generated/z9
-ZERG_Z9_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z8_BANK),-I$(ZERG_Z9_BANK),$(ZERG_Z8_CANONICAL_FLAGS)) $(ZERG_Z9_FEATURES)
+# Reuse the two Mode-4 page bands instead of retaining 12,480 HUD bytes in
+# EWRAM. Z10 inherits this vector; set empty only for paired comparisons.
+ZERG_Z9_HUD_PAGE_FLAGS ?= -DSC64_HUD_VRAM_BANDS
+ZERG_Z9_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z8_BANK),-I$(ZERG_Z9_BANK),$(ZERG_Z8_CANONICAL_FLAGS)) $(ZERG_Z9_FEATURES) $(ZERG_Z9_HUD_PAGE_FLAGS)
 ZERG_Z9_RELEASE_FLAGS = $(ZERG_Z9_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z9_CANONICAL_INPUTS = $(filter-out $(ZERG_Z8_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z8_CANONICAL_INPUTS)) $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h $(Z9_PROGRAM_HEADER)
 build/starcraft-zerg-z9.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.ld Makefile | build
@@ -246,3 +249,25 @@ test-sc64-z9-carried-missions: $(addprefix build/test-sc64-z9-carried-,z1 z1z2 z
 	./build/test-sc64-z9-carried-z7 $(ZERG_Z7_CONTROLLER_POLICY) --limit $(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/z9-carried/z7.json
 	./build/test-sc64-z9-carried-z8 .local/sc64/z9-carried/z8.jsonl
 test-sc64-zerg-z9: test-sc64-z9-carried-profile test-sc64-z9-carried-missions
+
+# Full ordinary-input skirmish matches under the actual canonical Z9 vector.
+build/test-sc64-skirmish-match-zerg-z9: tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h Makefile tests/sc64-zerg-late/Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z9_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z9-canonical-skirmish
+test-sc64-z9-canonical-skirmish: build/test-sc64-skirmish-match-zerg-z9
+	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller $< --output .local/sc64/skirmish/zerg-z9-matches
+test-sc64-zerg-z9: test-sc64-z9-canonical-skirmish
+
+# Optional prepared-input path-grid parity: the Z5 fixture also exercises
+# authored door actions and save/load. Extra include paths can select a
+# separately verified cover bank without modifying the prepared inputs.
+SC64_BULK_GRID_TEST_FLAGS ?=
+Z9_BULK_GRID_DEPS = $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile
+build/test-sc64-z9-bulk-grid: tests/sc64_terrain_grid_pack_game.c $(Z9_BULK_GRID_DEPS) | build
+	$(CLANG) $(Z8_HOST_FLAGS) -Wno-unused-parameter $(SC64_BULK_GRID_TEST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_BULK_TERRAIN_GRID -DSC64_BULK_TERRAIN_GRID_TEST $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+build/test-sc64-z9-bulk-z5: tests/sc64_z5_bulk_grid.c tests/sc64_z5_runtime.c $(Z9_BULK_GRID_DEPS) | build
+	$(CLANG) $(Z8_HOST_FLAGS) -Wno-unused-parameter $(SC64_BULK_GRID_TEST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_BULK_TERRAIN_GRID -DSC64_BULK_TERRAIN_GRID_TEST $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z9-bulk-grid
+test-sc64-z9-bulk-grid: build/test-sc64-z9-bulk-grid build/test-sc64-z9-bulk-z5
+	./build/test-sc64-z9-bulk-grid
+	./build/test-sc64-z9-bulk-z5

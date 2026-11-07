@@ -8,6 +8,12 @@
 static u16 host_fb[2][19200];
 u8 gba_vram_scratch[GBA_VRAM_SCRATCH_BYTES] __attribute__((aligned(4)));
 static u8 host_save[32768];
+/* A fresh emulated cartridge has erased SRAM. Initialize once at process
+ * startup, not in gba_init: subsequent game boots must preserve saves, and
+ * callers may stage an existing image before the first gba_init. */
+__attribute__((constructor)) static void host_save_initialize(void) {
+ for (unsigned i=0;i<sizeof(host_save);++i) host_save[i]=0xff;
+}
 static u16 host_palette[256];
 #endif
 #define REG16(a) (*(volatile u16 *)(a))
@@ -1254,7 +1260,7 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection) {
     volatile const u8 *base=(volatile const u8*)SRAM_BASE;
     GbaSaveSelection best={0,0,0,0,-1};
-    if(!scratch||!capacity||!tags||!tag_count||tag_count>3||!validate||!selection)return 0;
+    if(!scratch||!capacity||!tags||!tag_count||tag_count>GBA_SAVE_MAX_ACCEPTED_TAGS||!validate||!selection)return 0;
     for(unsigned i=0;i<tag_count;i++) {
         if(!SAVE_VALIDATED_TAG_VALID(tags[i]))return 0;
         for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
@@ -1299,7 +1305,7 @@ int save_select_prepared(void *scratch,u32 capacity,const u32 *tags,unsigned tag
                          GbaSaveValidator prepare,void *context,GbaSaveSelection *selection) {
     volatile const u8 *base=(volatile const u8*)SRAM_BASE;
     GbaSaveSelection rows[2];unsigned count=0;int winner=-1;
-    if(!scratch||!capacity||!tags||!tag_count||tag_count>3||!prepare||!selection)return 0;
+    if(!scratch||!capacity||!tags||!tag_count||tag_count>GBA_SAVE_MAX_ACCEPTED_TAGS||!prepare||!selection)return 0;
     for(unsigned i=0;i<tag_count;i++) {
         if(!SAVE_VALIDATED_TAG_VALID(tags[i]))return 0;
         for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
@@ -1351,7 +1357,7 @@ int save_write_selected(const void *data,u32 len,u32 tag,const GbaSaveSelection 
                         const u32 *tags,unsigned tag_count) {
     volatile u8 *base=(volatile u8*)SRAM_BASE;
     int new_allowed=0,old_allowed=0;
-    if(!data||!len||len>SAVE_PAYLOAD_MAX||!SAVE_VALIDATED_TAG_VALID(tag)||!previous||!tags||!tag_count||tag_count>3||
+    if(!data||!len||len>SAVE_PAYLOAD_MAX||!SAVE_VALIDATED_TAG_VALID(tag)||!previous||!tags||!tag_count||tag_count>GBA_SAVE_MAX_ACCEPTED_TAGS||
        previous->slot<0||previous->slot>1||!previous->tag||!previous->length||!previous->sequence)return 0;
     for(unsigned i=0;i<tag_count;i++) {
         if(!SAVE_VALIDATED_TAG_VALID(tags[i]))return 0;
@@ -1407,7 +1413,7 @@ int save_write_parts_selected(const void *data,u32 len,const void *tail,u32 tail
     volatile u8 *base=(volatile u8*)SRAM_BASE;
     int new_allowed=0,old_allowed=0;
     if(!data||!tail||!len||!tail_len||len>SAVE_PAYLOAD_MAX||tail_len>SAVE_PAYLOAD_MAX-len||
-       !SAVE_VALIDATED_TAG_VALID(tag)||!previous||!tags||!tag_count||tag_count>3||previous->slot<0||previous->slot>1||
+       !SAVE_VALIDATED_TAG_VALID(tag)||!previous||!tags||!tag_count||tag_count>GBA_SAVE_MAX_ACCEPTED_TAGS||previous->slot<0||previous->slot>1||
        !previous->tag||!previous->length||!previous->sequence)return 0;
     for(unsigned i=0;i<tag_count;i++) {
         if(!SAVE_VALIDATED_TAG_VALID(tags[i]))return 0;

@@ -6,6 +6,38 @@ import json
 from pathlib import Path
 
 
+def emit_upgrade_families(facts_path: Path, output: Path) -> None:
+    """Keep research-only IDs separate so ordinary stock profiles stay identical."""
+    facts = json.loads(facts_path.read_text(encoding='utf-8'))
+    lines = [
+        '/* SPDX-License-Identifier: GPL-3.0-or-later */',
+        '#ifndef SC64_STOCK_UPGRADE_FAMILIES_H',
+        '#define SC64_STOCK_UPGRADE_FAMILIES_H',
+        '/* Default upgrade IDs, independently parsed from pinned BWAPI',
+        ' * d727fed68558c506163048ea889131d8cbb33915. Not N64 equivalence proof.',
+        ' * Weapon families follow the selected weapon, not target flight. */',
+        'enum { SC64_STOCK_UPGRADE_NONE = 61 };',
+    ]
+    for key, field, symbol, count in (('units', 'armor_upgrade', 'armor', 234),
+                                      ('weapons', 'upgrade_type', 'weapon', 132)):
+        rows = facts[key]
+        if (len(rows) != count or any(type(row['id']) is not int for row in rows)
+                or [row['id'] for row in rows] != list(range(count))):
+            raise ValueError('upgrade family rows must be complete and ordered')
+        values = [row[field]['id'] for row in rows]
+        if any(type(v) is not int or not 0 <= v <= 62 for v in values):
+            raise ValueError('invalid source upgrade ID')
+        lines.append(f'static const unsigned char sc64_stock_{symbol}_upgrade_ids[{len(rows)}] = {{')
+        for row, value in zip(rows, values):
+            lines.append(f"    [{row['id']}] = {value}, /* {row['name']} */")
+        lines.extend(['};', f'static inline int sc64_stock_{symbol}_upgrade_id(int raw)',
+                      '{ return raw >= 0 && raw < %d ? sc64_stock_%s_upgrade_ids[raw] : SC64_STOCK_UPGRADE_NONE; }'
+                      % (228 if key == 'units' else len(rows), symbol)])
+    lines.extend(['#endif', ''])
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text('\n'.join(lines), encoding='utf-8')
+
+
 def emit(facts_path: Path, output: Path) -> None:
     facts = json.loads(facts_path.read_text(encoding='utf-8'))
     units = facts['units']
@@ -75,5 +107,9 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--facts', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--upgrade-output', type=Path,
+                   help='Optional separate research-family facts header')
     a = p.parse_args()
     emit(a.facts, a.output)
+    if a.upgrade_output:
+        emit_upgrade_families(a.facts, a.upgrade_output)

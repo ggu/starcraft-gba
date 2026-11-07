@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_P7_PROJECTILE_SAVE_ADAPTER_H
 #define SC64_P7_PROJECTILE_SAVE_ADAPTER_H
+#include "sc64_save_decode_context.h"
 #ifdef SC64_P7_PROJECTILES_ENABLED
 /* Candidate-only validation. No packet is decoded into live VRAM until the
  * complete save, actor links and mission state have passed preflight. */
 static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
-                                                    unsigned ww,unsigned wh)
+                                                    unsigned ww,unsigned wh SC64_GCTX_DECL)
 {
     const u8 *packet;
     int count;
@@ -19,7 +20,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
     int p7=race_protoss_services_active();
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit actor;
-        if (!race_save_decode_unit(candidate,i,ww,wh,&actor)) return 0;
+        if (!SC64_GUARD_DECODE(candidate,i,ww,wh,&actor)) return 0;
         if ((actor.type==U_P7_INTERCEPTOR)!=(RACE_PROTOSS_RAW(&actor)==73)) return 0;
         if (actor.alive && actor.type==U_P7_INTERCEPTOR &&
             (!p7 || RACE_PROTOSS_SLOT(&actor)<0 || RACE_PROTOSS_SLOT(&actor)>=8 ||
@@ -54,7 +55,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
         if (row.state==2 && (row.script_phase!=1 || row.remaining_time>254)) return 0;
         if (row.owner_ref!=255) {
             Unit shooter;
-            if (!race_save_decode_unit(candidate,row.owner_ref,ww,wh,&shooter) ||
+            if (!SC64_GUARD_DECODE(candidate,row.owner_ref,ww,wh,&shooter) ||
                 !shooter.alive || shooter.type!=U_P7_INTERCEPTOR ||
                 RACE_PROTOSS_RAW(&shooter)!=73 || RACE_PROTOSS_SLOT(&shooter)!=row.raw_source_owner ||
                 shooter.owner!=race_protoss_source_owner(row.raw_source_owner)) return 0;
@@ -62,7 +63,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
         if (row.target_ref!=511) {
             if (row.target_ref<MAX_UNITS) {
                 Unit target;
-                if (!race_save_decode_unit(candidate,row.target_ref,ww,wh,&target) ||
+                if (!SC64_GUARD_DECODE(candidate,row.target_ref,ww,wh,&target) ||
                     !target.alive || SC64_TRANSPORT_LOADED(&target)) return 0;
             } else {
                 Building target;

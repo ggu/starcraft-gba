@@ -9,7 +9,13 @@ static void
 input(u16 held)
 {
     u16 pressed = held & (u16)~previous_held;
+#ifdef SC64_QUEUE_GESTURE_ONLY
+    /* This isolated race-vector fixture exercises the shared input handler
+     * without running unrelated imported-mission objectives on fake actors. */
+    update_selection_box(held, pressed, cx, cy);
+#else
     game_update(held, pressed);
+#endif
     previous_held = held;
 }
 
@@ -228,6 +234,63 @@ drag_suppression_and_cancel_tests(void)
     input(0);
     if (selection_mask() != 1 || menu_open || selected_building != -1 || mode != MODE_ATTACK)
         return 6;
+    return 0;
+}
+
+static int
+queue_cancel_tests(void)
+{
+    /* Other friendly producers use the same paid queue. Cancellation is
+     * delivered on L release, refunds the front item once, and preserves
+     * the remaining ring entry. */
+    fixture();
+    put_unit(0, SIDE, U_MARINE, 80, 80, 1, 1);
+    b[0].owner = SIDE; b[0].type = B_COMMAND; b[0].alive = 1;
+    b[0].queue_head = 4; b[0].queue_count = 2;
+    b[0].queue[4] = U_SCV; b[0].queue[0] = U_SCV;
+    b[0].queue_progress = 5; selected_building = 0;
+    input(KEY_L);
+    if (b[0].queue_count != 2 || minerals != 500) return 20;
+    input(0);
+    if (b[0].queue_count != 1 || b[0].queue_head != 0 ||
+        b[0].queue[0] != U_SCV || b[0].queue_progress > 1 ||
+        minerals != 550 || selected_building != 0) {
+        fprintf(stderr, "queue count=%d head=%d next=%d progress=%d minerals=%d selection=%d\n",
+                b[0].queue_count, b[0].queue_head, b[0].queue[0], b[0].queue_progress,
+                minerals, selected_building);
+        return 21;
+    }
+    input(0);
+    if (b[0].queue_count != 1 || minerals != 550) return 22;
+
+#ifdef SC64_RACES
+    fixture();
+    put_unit(0, SIDE, U_PROBE, 80, 80, 1, 1);
+    b[0].owner = SIDE; b[0].type = B_GATEWAY; b[0].alive = 1;
+    b[0].queue[0] = U_DRAGOON; b[0].queue_count = 1;
+    selected_building = 0;
+    tap(KEY_L);
+    if (b[0].queue_count || minerals != 500 + unit_cost(U_DRAGOON) ||
+        gas != unit_gas_cost(U_DRAGOON)) return 23;
+
+    fixture();
+    put_unit(0, SIDE, U_DRONE, 80, 80, 1, 1);
+    b[0].owner = SIDE; b[0].type = B_HATCHERY; b[0].alive = 1;
+    b[0].queue[0] = U_DRONE; b[0].queue_count = 1; b[0].larva = 1;
+    selected_building = 0;
+    tap(KEY_L);
+    if (b[0].queue_count || b[0].larva != 2 ||
+        minerals != 500 + unit_cost(U_DRONE)) return 25;
+#endif
+
+    fixture();
+    put_unit(0, SIDE, U_MARINE, 80, 80, 1, 1);
+    b[0].owner = ENEMY; b[0].type = B_BARRACKS; b[0].alive = 1;
+    b[0].queue[0] = U_MARINE; b[0].queue_count = 1;
+    selected_building = 0;
+    tap(KEY_L);
+    if (b[0].queue_count != 1 || minerals != 500) return 24;
+
     return 0;
 }
 
@@ -505,6 +568,8 @@ main(void)
     if (result) return fail(result, "normalized box bounds, filtering, or empty box");
     result = drag_suppression_and_cancel_tests();
     if (result) return fail(10 + result, "A/R suppression or B cancellation");
+    result = queue_cancel_tests();
+    if (result) return fail(50 + result, "friendly queue cancellation");
     result = tap_tests();
     if (result) return fail(20 + result, "tap-L cycle or Barracks queue cancel");
     result = double_tap_selection_tests();

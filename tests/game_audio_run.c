@@ -149,8 +149,151 @@ static int empty_slot_transitions(void)
     return 0;
 }
 
+#ifdef SC64_RACES
+static int warp_load_prime(void)
+{
+    gba_init(); game_init(); race_mode = 1; race_human = R_PROTOSS;
+    race_bots = 1; race_bot_races[0] = R_TER; race_skirmish_map = 0;
+    init_state(); screen = SCREEN_PLAY; game_render();
+    int slot = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE &&
+            sc64_race_building_rule(b[i].type) &&
+            sc64_race_building_rule(b[i].type)->race == R_PROTOSS) { slot = i; break; }
+    if (slot < 0 || !save_game()) return fail("load prime setup save");
+    int worker = -1, sx, sy;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE) { worker = i; break; }
+    if (worker < 0 || !race_skirmish_site_for(SIDE, B_PYLON, &sx, &sy)) return fail("failed build setup");
+    minerals = 5000; gas = 1000;
+    if (!race_start_build(SIDE, worker, B_PYLON, sx, sy)) return fail("failed build admission setup");
+    u[worker].x = sx; u[worker].y = sy; minerals = 0; clear_events();
+    race_pending_build_tick(worker);
+    if (game_audio_pending_warp >= 0 || events(GAME_AUDIO_WARP_START))
+        return fail("unfunded foundation queued cue");
+    game_audio_snapshot[MAX_UNITS + slot] = GAME_AUDIO_SNAPSHOT_ALIVE | GAME_AUDIO_SNAPSHOT_CONSTRUCTING;
+    game_audio_pending_warp = 156; /* queued before a successful load */
+    game_audio_last_frame = frame - 1; clear_events();
+    if (!load_game()) return fail("load prime real load");
+    game_render();
+    if (events(GAME_AUDIO_WARP_DONE) || events(GAME_AUDIO_WARP_START)) return fail("coincident load replayed cue");
+    clear_events();
+    game_audio_snapshot[MAX_UNITS + slot] = GAME_AUDIO_SNAPSHOT_ALIVE | GAME_AUDIO_SNAPSHOT_CONSTRUCTING;
+    game_audio_last_frame = frame; game_audio_prime(); game_render();
+    if (events(GAME_AUDIO_WARP_DONE)) return fail("same-frame prime replayed cue");
+    game_audio_pending_warp = 156; clear_events(); init_state();
+    screen = SCREEN_PLAY; game_render();
+    if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE)) return fail("new match replayed cue");
+    return 0;
+}
+
+static int warp_lifecycle(void)
+{
+    fixture();
+    game_audio_effects = GAME_AUDIO_EFFECTS_PER_FRAME; /* previous frame was saturated */
+#ifdef SC64_AUDIO_IMPORTED
+    u32 samples_before = audio_host_samples;
+#endif
+    int slot = spawn_build(SIDE, B_PYLON, 60, 60, 1);
+    if (slot < 0 || events(GAME_AUDIO_WARP_START)) return fail("foundation cue did not queue");
+    observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("previous budget suppressed warp start");
+#if defined(SC64_AUDIO_IMPORTED) && !defined(SC64_AUDIO_WARP_CUES)
+    if (game_audio_effects != 0) return fail("silent legacy warp spent effect budget");
+    game_audio_emit(GAME_AUDIO_DEATH, 156);
+    game_audio_emit(GAME_AUDIO_DEATH, 156);
+    if (events(GAME_AUDIO_DEATH) != 2) return fail("legacy warp suppressed another effect");
+#endif
+#ifdef SC64_AUDIO_WARP_CUES
+    if (audio_host_samples != samples_before + 1 || audio_host_last_sample != sc64_audio_warp[0])
+        return fail("warp start sample");
+    samples_before = audio_host_samples;
+#endif
+    observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("warp start repeated");
+#ifdef SC64_AUDIO_IMPORTED
+    samples_before = audio_host_samples;
+#endif
+    b[slot].under_construction = 0; observe_next();
+    if (events(GAME_AUDIO_WARP_DONE) != 1 || events(GAME_AUDIO_BUILT)) return fail("warp completion");
+#ifdef SC64_AUDIO_WARP_CUES
+    if (audio_host_samples != samples_before + 1 || audio_host_last_sample != sc64_audio_warp[1])
+        return fail("warp completion sample");
+#elif defined(SC64_AUDIO_IMPORTED)
+    int row = 156 * SC64_AUDIO_KIND_COUNT + SC64_AUDIO_WHAT;
+    if (!sc64_audio_unit_count[row] || audio_host_samples != samples_before + 1 ||
+        audio_host_last_sample != sc64_audio_unit_sound[sc64_audio_unit_first[row]])
+        return fail("legacy warp completion fallback sample");
+#endif
+    observe_next();
+    if (events(GAME_AUDIO_WARP_DONE) != 1) return fail("warp completion repeated");
+    b[slot].alive = 0; clear_events();
+    if (spawn_build(SIDE, B_PYLON, 60, 60, 1) != slot) return fail("same-frame reused slot");
+    observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("same-frame reused slot start");
+    b[slot].alive = 0; observe_next();
+    if (events(GAME_AUDIO_WARP_DONE)) return fail("cancel generated completion");
+    clear_events();
+    slot = spawn_build(ENEMY, B_PYLON, 60, 60, 1);
+    if (slot < 0 || events(GAME_AUDIO_WARP_START)) return fail("enemy start");
+    b[slot].alive = 0; observe_next(); clear_events();
+    slot = spawn_build(SIDE, B_PYLON, WORLD_W - 48, 60, 1);
+    if (slot < 0 || events(GAME_AUDIO_WARP_START)) return fail("offscreen start");
+    b[slot].alive = 0; observe_next(); clear_events();
+    slot = spawn_build(SIDE, B_DEPOT, 60, 60, 1); observe_next();
+    b[slot].under_construction = 0; observe_next();
+    if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE) || events(GAME_AUDIO_BUILT) != 1)
+        return fail("Terran completion changed");
+    b[slot].alive = 0; observe_next(); clear_events();
+    slot = spawn_build(SIDE, B_HATCHERY, 60, 60, 1); observe_next();
+    b[slot].under_construction = 0; observe_next();
+    if (events(GAME_AUDIO_WARP_START) || events(GAME_AUDIO_WARP_DONE) || events(GAME_AUDIO_BUILT) != 1)
+        return fail("Zerg completion changed");
+    b[slot].alive = 0; observe_next(); clear_events();
+    if (spawn_build(SIDE, B_PYLON, 60, 60, 1) < 0 ||
+        spawn_build(SIDE, B_PYLON, 80, 60, 1) < 0) return fail("simultaneous setup");
+    observe_next();
+    if (events(GAME_AUDIO_WARP_START) != 1) return fail("simultaneous warp starts not bounded");
+    return 0;
+}
+
+#endif
+
 static int hooks(void)
 {
+#ifndef SC64_RACES
+    /* The command menu pauses simulation; A must still play the immediate
+     * insufficient-minerals advisor on the same rendered frame. */
+    fixture();
+    b[0].alive = 1; b[0].owner = SIDE; b[0].type = B_ENG_BAY;
+    minerals = 0; gas = 1000;
+    tick(KEY_B); tick(0);
+    if (!menu_open) return fail("research menu did not open");
+    for (int i=0; menu_cursor != MENU_WEAPONS && i<field_menu_count(); ++i) {
+        tick(KEY_DOWN); tick(0);
+    }
+    if (menu_cursor != MENU_WEAPONS) return fail("research row navigation");
+    clear_events();
+    tick(KEY_A);
+    if (toast_id != 1 || events(GAME_AUDIO_ADVISOR) != 1)
+        return fail("same-frame research refusal advisor");
+    tick(0);
+    if (events(GAME_AUDIO_ADVISOR) != 1) return fail("research refusal advisor repeated");
+    minerals = 1000; gas = 0;
+    tick(KEY_B); tick(0);
+    for (int i=0; menu_cursor != MENU_WEAPONS && i<field_menu_count(); ++i) {
+        tick(KEY_DOWN); tick(0);
+    }
+    if (menu_cursor != MENU_WEAPONS) return fail("research gas row navigation");
+    tick(KEY_A);
+    if (toast_id != 12 || events(GAME_AUDIO_ADVISOR) != 2) {
+        fprintf(stderr, "gas refusal: toast=%d events=%u cursor=%d menu=%d screen=%d frame=%d\n",
+                toast_id, events(GAME_AUDIO_ADVISOR), menu_cursor, menu_open, screen, frame);
+        return fail("same-frame research gas advisor");
+    }
+    game_render();
+    if (events(GAME_AUDIO_ADVISOR) != 2) return fail("same-frame redraw repeated advisor");
+#endif
 #ifndef SC64_RACES
     /* The opening skirmish brings the enemy squad on screen: its shots and
      * deaths are heard. */
@@ -165,6 +308,9 @@ static int hooks(void)
 #endif
 
     if (empty_slot_transitions()) return 1;
+#ifdef SC64_RACES
+    if (warp_lifecycle() || warp_load_prime()) return 1;
+#endif
 
     /* The observer's shot contract: a raised cooldown on a visible unit. */
     fixture();
@@ -468,6 +614,10 @@ int main(int argc, char **argv)
            events(GAME_AUDIO_ATTACK), events(GAME_AUDIO_DEATH), events(GAME_AUDIO_READY),
            events(GAME_AUDIO_WHAT), events(GAME_AUDIO_YES), events(GAME_AUDIO_BUILT),
            events(GAME_AUDIO_ADVISOR), events(GAME_AUDIO_ALERT));
+    printf("alerts base=%u forces=%u research=%u upgrade=%u energy=%u no_build=%u no_land=%u built=%u\n",
+           game_audio_alert_lines[0], game_audio_alert_lines[1], game_audio_alert_lines[2],
+           game_audio_alert_lines[3], game_audio_alert_lines[4], game_audio_alert_lines[5],
+           game_audio_alert_lines[6], game_audio_alert_lines[7]);
     if (!total) return fail("long run produced no audio events");
 #endif
     return 0;

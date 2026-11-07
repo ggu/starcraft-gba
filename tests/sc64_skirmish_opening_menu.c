@@ -23,7 +23,8 @@ static void check_owner(int owner, int race)
     assert(workers==4 && halls==1 && extra==0 && overlords==(race==R_ZERG));
     assert(race_owner_supply(owner)==8);
     assert(race_owner_supply_cap(owner)==(race==R_TER?20:18));
-    assert((owner==SIDE?minerals:race_minerals[owner])==200);
+    assert((owner==SIDE?minerals:race_minerals[owner])==50);
+    assert((owner==SIDE?gas:race_gas[owner])==0);
 }
 int main(void)
 {

@@ -211,6 +211,77 @@ static void kill_building(int slot)
     assert(!b[slot].alive);
 }
 
+/* Constructed reference rows verify that ordinary target cleanup still applies.
+ * Paid jobs are checked independently through an actual input-driven transit. */
+static void ordinary_reference_cleanup(void)
+{
+    launch_with_canals();
+    int passenger=side_hydra(0);
+    int a=spawn_unit(SIDE,U_DRONE,120,120);
+    int bslot=spawn_unit(SIDE,U_DRONE,136,120);
+    int c=spawn_unit(SIDE,U_HYDRALISK,152,120);
+    int other=spawn_unit(SIDE,U_DRONE,168,120);
+    assert(a>=0 && bslot>=0 && c>=0 && other>=0);
+    u[a].order=ORDER_IDLE; u[a].target=passenger;
+    u[bslot].order=ORDER_MOVE; u[bslot].target=passenger;
+    u[c].order=ORDER_ATTACK_TARGET; u[c].target=passenger;
+    u[other].order=ORDER_IDLE; u[other].target=passenger+1;
+    race_nydus_clear_unit_references(passenger);
+    assert(u[a].target==-1 && u[bslot].target==-1);
+    assert(u[c].target==-1 && u[c].order==ORDER_IDLE);
+    assert(u[other].target==passenger+1);
+}
+
+/* Z7 has no authored canal links. We construct linked canals and arrange the
+ * passenger slot/position, then use a real paid producer and normal controls.
+ * The slot equals the Egg's product enum solely to expose the alias. */
+static void paid_egg_survives_transit(int reverse)
+{
+    launch_with_canals();
+    int old=side_hydra(0), passenger=U_DRONE;
+    assert(passenger>=0 && passenger<MAX_UNITS);
+    if(old!=passenger) { Unit tmp=u[passenger];u[passenger]=u[old];u[old]=tmp; }
+    sc64_unit_buckets_end(); sc64_target_index_end();
+    assert(u[passenger].alive && u[passenger].owner==SIDE && u[passenger].type==U_HYDRALISK);
+    select_unit_normal(passenger);
+    int entrance=reverse?ex:ent,exit=reverse?ent:ex,px,py;
+    assert(race_nydus_approach_point(passenger,entrance,&px,&py));
+    u[passenger].x=px; u[passenger].y=py;
+    sc64_unit_buckets_end(); sc64_target_index_end();
+    int hall=-1;
+    for(int i=0;i<MAX_BUILDINGS;++i)
+        if(b[i].alive && b[i].owner==SIDE && building_complete(i) &&
+           sc64_race_producer_compatible(b[i].type,B_HATCHERY)) { hall=i;break; }
+    if(hall<0) {
+        int site=open_site(b[entrance].x+400,b[entrance].y+300);
+        hall=spawn_build(SIDE,B_HATCHERY,site%WORLD_W,site/WORLD_W,0);
+    }
+    assert(hall>=0 && building_complete(hall)); b[hall].larva=3;
+    /* Fixture funds/supply enable a genuine pay-and-reserve production call. */
+    minerals=5000;
+    for(int i=0;i<4;++i) assert(spawn_unit(SIDE,U_OVERLORD,96+i*16,96)>=0);
+    int before=minerals, reserved=race_owner_reserved_supply(SIDE);
+    assert(race_queue_unit(SIDE,hall,U_DRONE));
+    assert(minerals==before-sc64_race_unit_rule(U_DRONE)->minerals);
+    assert(race_owner_reserved_supply(SIDE)==reserved+sc64_z7_egg_reserved_supply(U_DRONE));
+    int egg=-1;
+    for(int i=0;i<MAX_UNITS;++i)
+        if(u[i].alive && u[i].type==U_Z7_EGG && u[i].target==U_DRONE) { egg=i;break; }
+    assert(egg>=0 && egg!=passenger && u[egg].order==ORDER_IDLE);
+    int timer=u[egg].work_timer;
+    cx=b[entrance].x;cy=b[entrance].y;
+    input(KEY_A);input(0);
+    for(int f=0;f<60 && !near_exit(passenger,exit);++f) input(0);
+    assert(near_exit(passenger,exit) && u[passenger].order==ORDER_IDLE);
+    /* Baseline fails here or on the next tick: reference cleanup treats the
+     * product enum as a unit reference and destroys the paid job. */
+    assert(u[egg].alive && u[egg].type==U_Z7_EGG && u[egg].target==U_DRONE);
+    assert(u[egg].work_timer>0 && u[egg].work_timer<=timer);
+    for(int f=0;f<timer+10 && u[egg].alive && u[egg].type==U_Z7_EGG;++f) input(0);
+    assert(u[egg].alive && u[egg].type==U_DRONE);
+    printf("paid Egg survives %s transit and hatches\n",reverse?"reverse":"forward");
+}
+
 /* One passenger: ordinary command, approach, atomic transfer, retained
  * selection, cleared attack references, unchanged counts, visible exit. */
 static void single_passenger_transits(void)
@@ -618,7 +689,10 @@ static void fresh_boot_load_resolves_through_hook(void)
 int main(void)
 {
     _Static_assert(ORDER_NYDUS_ENTER <= 15, "packed unit order field is four bits");
-    _Static_assert(SC_RB_COUNT <= 64, "packed building type field is six bits");
+    _Static_assert(SC_RB_COUNT <= 128, "compact building type field is seven bits");
+    ordinary_reference_cleanup();
+    paid_egg_survives_transit(0);
+    paid_egg_survives_transit(1);
     single_passenger_transits();
     strict_exit_placement_rejects_overlap_escape();
     eligibility_and_unavailable_destination();

@@ -59,28 +59,32 @@ the human's runner.
 
 ## How it works
 
-**The simulation doesn't know.** `game_update()` becomes a small wrapper. While a box is up,
-a frame goes to the box and the simulation takes no step. Otherwise the old function runs,
-under a new name and with its body unedited. That matters because any edit to the old body can
-change GCC's inlining and move `update_orders` into IWRAM.
+**The posting tick is retained.** `game_update()` wraps an out-of-line simulation step.
+While a box is up, input goes to the box and the simulation takes no step. Result finishing
+is shared by the normal and mission-pause paths; compiler placement and memory guards are
+checked for each product.
 
-**A box is a pure insertion.** Rows queue during an update, and the box opens after it. A
-box's own frames change no game state, so the inputs on either side produce the world they
-would have produced with no box. The trade-off: other actions in the same update, such as a
-camera move that follows a Transmission, have already happened when the box opens.
+**Outcomes wait for acknowledgment.** Rows can queue during an update that also reaches
+Victory or Defeat. The posting tick remains, but its public won/lost flags, campaign phase,
+objective/completion flags, result screen and autosave are deferred until every queued page
+is acknowledged. Closing the last page publishes the result without a simulation step.
+Other actions in the posting tick, such as a camera move following a Transmission, may
+already have happened; this does not provide action-by-action source-script suspension.
 
 **A press arms and a release advances.** This keeps a dismissing press out of the battlefield.
 It also means the frame after a box sees the same previous keys as the frame before it, which
 is what keeps a key tape exact. Start also advances, as it does on the N64, which lets a tape
 holding A across a box dismiss it without releasing that A.
 
-**No RAM grew.** `__bss_end` and `__iwram_end` match the base in all nine products. Z9 and Z10
-have 8 bytes of EWRAM to spare, so the queue lives in the last 32 bytes of the padding after
-the second mode-4 page, `0x06013FE0`. It holds up to 13 rows. A full queue drops the new row,
-which never blocks a trigger. The optional death-effect VRAM storage now stops short of it.
+**Bounded state.** The queue uses the last 32 bytes of padding after the second mode-4 page,
+`0x06013FE0`. It holds up to 13 rows; a full queue drops a new row. The optional death-effect
+VRAM storage stops short of it. Deferred outcome publication adds 12 EWRAM bytes. Six normal
+product builds pass the unchanged guards; Z9/Z10 retain 796 bytes below the EWRAM limit.
 
-**Saves.** A box is never saved. The pause menu can't open while one is up, so no ordinary
-save captures one. A load or new game clears the queue. The save layout doesn't change.
+**Saves.** The queue and deferred outcome are not serialized. `save_game()` refuses while
+either is pending, including direct callers and autosave paths. A successful load or new
+game clears them; a failed load preserves them. The save layout does not change. This cannot
+reconstruct unread text already omitted by a save made with the earlier implementation.
 
 ## Trigger points
 
@@ -112,8 +116,9 @@ no save bytes. Some source conditions are approximated:
   N64 fits every row on one page, and here 47 rows need more than one.
 - **Trigger timing after a box.** The port keeps its existing holds after a Transmission: 4
   seconds in Z8, Z9, Z10, P8 and P10, and about 3 seconds in the older runtimes. On the N64 the
-  action waits only for the box, so the next action runs as soon as it closes. Keeping the holds
-  is what keeps every recorded tape valid. See [the audit](audits/2026-11-04-text-boxes/README.md).
+  observed Z1 chained action continues when its box closes. Removing the authored holds is
+  a separate scheduler/controller qualification; this outcome fix retains them. Broader native
+  timing remains to be measured. See [the audit](audits/2026-11-04-text-boxes/README.md).
 - **The top-right resource display.** The N64 hides it while a box is up. The GBA keeps its HUD.
 - **Background.** The N64 box is translucent. Mode 4 can't blend, so this one is a solid panel.
 
@@ -133,11 +138,14 @@ closes at once, unless a fixture defines `SC64_TEXT_BOX_HOST_MODAL`.
 ```sh
 make test-sc64-text-box
 make test-sc64-text-box-game
+make test-sc64-text-box-outcomes
 make sc64-text-box-arm
 ```
 
 The first needs no game data and runs in `./dev test`. The second needs the prepared Terran
-inputs and runs in `./dev sc64 test --profile terran`. The third builds ARM probes, which run
+inputs and runs in `./dev sc64 test --profile terran`. The outcome target also needs prepared
+P10 inputs; its separate Terran and Protoss subtargets stay in their own product suites.
+The ARM target builds probes, which run
 under mGBA through `tools/sc64_p8_arm_replay.py --prefix PX run`. To refresh the private data:
 
 ```sh
@@ -145,3 +153,6 @@ make sc64-text-boxes
 ```
 
 `./dev sc64 prepare` runs the same importer.
+
+The [outcome-publication audit](audits/2026-11-05-modal-outcome/README.md) records the
+actual-engine regressions, load/save boundaries, normal ROM guards and bounded ARM UI checks.

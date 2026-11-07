@@ -25,7 +25,7 @@ GAMES = {
     "skirmish": ("skirmish", "build/StarCraft64-Skirmish-GBA.gba"),
     "campaign": ("campaign", "build/StarCraft64-Terran-Campaign-GBA.gba"),
     "terran": ("terran", "build/StarCraft-Terran-Transport1-GBA.gba"),
-    "zerg": ("zerg", "build/StarCraft-Zerg-Z7-Transport1-GBA.gba"),
+    "zerg": ("zerg", "build/StarCraft-Zerg-Z9-Transport1-GBA.gba"),
     "zerg-z6": ("zerg-z6", "build/StarCraft-Zerg-Z6-GBA.gba"),
     "zerg-z7": ("zerg-z7", "build/StarCraft-Zerg-Z7-Transport1-GBA.gba"),
     # Explicit candidates; each keeps its own .local/play/<profile> saves.
@@ -41,7 +41,7 @@ GAMES = {
     "zerg-z6-probe": ("zerg-z6-probe", "build/StarCraft-Zerg-Z6-Probe-GBA.gba"),
     "protoss-p5-shuttle": ("protoss-p5-shuttle", "build/StarCraft-Protoss-P5-Shuttle-GBA.gba"),
 }
-PLAY_SAVE_PROFILES = {"terran": "terran-transport1", "zerg": "zerg-z7-transport1", "zerg-z6": "zerg-z6", "zerg-z7": "zerg-z7-transport1",
+PLAY_SAVE_PROFILES = {"terran": "terran-transport1", "zerg": "zerg-z9", "zerg-z9": "zerg-z9", "zerg-z6": "zerg-z6", "zerg-z7": "zerg-z7-transport1",
                       "zerg-z6-probe": "zerg-z6", "zerg-z4": "zerg-z4", "zerg-z3": "zerg",
                       "protoss": "protoss-p10-transport1", "protoss-p7": "protoss-p7-transport1",
                       "protoss-p6": "protoss-p6",
@@ -615,7 +615,7 @@ def doctor(require_emulator: bool = False) -> int:
 
 
 def build(game: str) -> None:
-    if game == "zerg-z9":
+    if game in ("zerg", "zerg-z9"):
         if status(game, include_built=False):
             raise RuntimeError("Z9 requires prepared inputs; run ./dev sc64 prepare --rom PATH --profile zerg-z9")
         run(["make", GAMES[game][0]])
@@ -833,11 +833,11 @@ def prepare_bc(rom: Path) -> None:
 
 
 def prepare(rom: Path, profile: str) -> None:
-    if profile == "zerg-z9":
+    if profile in ("zerg", "zerg-z9"):
         from tools.sc64_z9_setup import prepare as prepare_z9
         prepare(rom, "zerg-z7")
         prepare_z9(ROOT, run)
-        print("Prepared explicit Z9 candidate; canonical Zerg and existing saves retain their profiles.")
+        print("Prepared Z9 inputs; the separate Z7 save profile is unchanged.")
         return
     rom = rom.expanduser().resolve()
     if not rom.is_file():
@@ -1048,7 +1048,7 @@ def prepare(rom: Path, profile: str) -> None:
 
 
 def status(profile: str, *, include_built: bool = True) -> int:
-    if profile == "zerg-z9":
+    if profile in ("zerg", "zerg-z9"):
         from tools.sc64_z9_setup import status as status_z9
         inherited = status("zerg-z7", include_built=False)
         failed = bool(status_z9(ROOT) or inherited)

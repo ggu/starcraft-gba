@@ -58,6 +58,8 @@ class BcPipelineTests(unittest.TestCase):
 
     def test_capability_bundle_has_nine_gates_and_isolated_overlay(self):
         text = (ROOT / 'Makefile').read_text()
+        self.assertIn('include config/contact-table/Makefile', text.splitlines())
+        text += '\n' + (ROOT / 'config/contact-table/Makefile').read_text()
         line = next(line for line in text.splitlines() if line.startswith('BC_FLAGS :='))
         self.assertEqual(line.count(' -DSC64_'), 9)
         self.assertIn('-DSC64_BATTLECRUISER_PRODUCTION_EXPERIMENT', line)

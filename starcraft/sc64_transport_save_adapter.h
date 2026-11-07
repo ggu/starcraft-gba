@@ -1,5 +1,6 @@
 #ifndef SC64_TRANSPORT_SAVE_ADAPTER_H
 #define SC64_TRANSPORT_SAVE_ADAPTER_H
+#include "sc64_save_decode_context.h"
 #include "sc64_construction_save.h"
 #ifndef SC64_NYDUS_ORDER
 /* Standalone fixtures include this header without game.c's order enum. */
@@ -9,7 +10,7 @@
 #ifdef SC64_T5_RUNTIME
 /* Validate compact cargo references before any live world state changes. */
 static int race_transport_save_candidate_valid(const RaceSave *candidate,
-                                               int width, int height)
+                                               int width, int height SC64_GCTX_DECL)
 {
     u8 used[MAX_UNITS] = { 0 };
     u8 attached[MAX_BUILDINGS] = { 0 };
@@ -38,7 +39,7 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
 #ifdef SC64_LATE_TERRAN_STORAGE
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit actor;
-        if (!race_save_decode_unit(candidate, (unsigned)i,
+        if (!SC64_GUARD_DECODE(candidate, (unsigned)i,
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &actor)) return 0;
         if (!actor.alive) continue;
@@ -81,7 +82,7 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
         unsigned space;
         if (carrier < 0 || carrier >= MAX_UNITS || carrier == i) return 0;
         Unit ship;
-        if (!race_save_decode_unit(candidate, (unsigned)carrier,
+        if (!SC64_GUARD_DECODE(candidate, (unsigned)carrier,
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &ship)) return 0;
         int raw = actor.raw_type, type = actor.type;
@@ -110,7 +111,7 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
         if (order==ORDER_RECHARGE) {
             Unit actor;
             if (!race_battery_save_unit(candidate,(unsigned)i,(unsigned)width*16u,
-                                        (unsigned)height*16u,&actor) ||
+                                        (unsigned)height*16u,&actor SC64_GCTX_ARG) ||
                 !race_battery_saved_recharge_valid(candidate,&actor)) return 0;
             continue;
         }

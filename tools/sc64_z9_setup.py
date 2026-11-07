@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Preparation and readiness checks for the explicit nine-mission candidate.
+"""Preparation and readiness checks for the nine-mission Zerg product.
 
 The dev wrapper prepares its inherited Z7 inputs first. This layer authenticates
 the two later source scenarios and builds the additional private bank/programs.
-It does not change the canonical Zerg alias or migrate existing saves.
+It does not migrate existing saves.
 """
 from __future__ import annotations
 

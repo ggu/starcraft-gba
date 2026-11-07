@@ -47,7 +47,7 @@ card_building_icon(int type)
 static int
 card_unit_icon(const Unit *q)
 {
-    return card_portrait(q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type));
+    return card_portrait(sc64_unit_art_raw(q));
 }
 
 static int

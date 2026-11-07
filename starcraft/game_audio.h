@@ -26,7 +26,8 @@
 
 enum {
     GAME_AUDIO_ATTACK, GAME_AUDIO_DEATH, GAME_AUDIO_READY, GAME_AUDIO_WHAT,
-    GAME_AUDIO_YES, GAME_AUDIO_BUILT, GAME_AUDIO_ADVISOR, GAME_AUDIO_ALERT, GAME_AUDIO_EVENT_KINDS
+    GAME_AUDIO_YES, GAME_AUDIO_BUILT, GAME_AUDIO_ADVISOR,
+    GAME_AUDIO_WARP_START, GAME_AUDIO_WARP_DONE, GAME_AUDIO_ALERT, GAME_AUDIO_EVENT_KINDS
 };
 /* Order matches ALERT_LINES in tools/sc64_audio_pack.py. */
 enum {
@@ -68,6 +69,7 @@ enum { GAME_AUDIO_STATE_ATTACK_TICK, GAME_AUDIO_STATE_RESEARCH, GAME_AUDIO_STATE
 #ifdef GBA_HOST
 u32 game_audio_events[GAME_AUDIO_EVENT_KINDS];
 int game_audio_last_alert = -1;
+u32 game_audio_alert_lines[GAME_AUDIO_ALERT_KINDS];
 static u16 game_audio_snapshot[MAX_UNITS + MAX_BUILDINGS + GAME_AUDIO_STATE_WORDS];
 #define GAME_AUDIO_SNAPSHOT game_audio_snapshot
 #else
@@ -89,6 +91,9 @@ extern volatile u16 demo_keys;
 static u16 game_audio_previous_held;
 
 static int game_audio_last_frame = -1, game_audio_last_screen = -1;
+static u8 game_audio_needs_prime;
+static int game_audio_pending_warp = -1;
+static void game_audio_prime(void) { game_audio_needs_prime = 1; game_audio_pending_warp = -1; }
 static u32 game_audio_selection, game_audio_orders;
 static u8 game_audio_effects;
 #ifdef SC64_AUDIO_IMPORTED
@@ -143,6 +148,15 @@ static int game_audio_on_screen(int x, int y)
 
 static void game_audio_emit(int kind, int raw)
 {
+#if defined(SC64_AUDIO_IMPORTED) && !defined(SC64_AUDIO_WARP_CUES)
+    /* Older banks have no start clip; silence must not spend effect budget. */
+    if (kind == GAME_AUDIO_WARP_START) {
+#ifdef GBA_HOST
+        ++game_audio_events[kind];
+#endif
+        return;
+    }
+#endif
     int speech = kind == GAME_AUDIO_READY || kind == GAME_AUDIO_WHAT || kind == GAME_AUDIO_YES;
     if (!speech) {
         if (game_audio_effects >= GAME_AUDIO_EFFECTS_PER_FRAME) return;
@@ -152,11 +166,20 @@ static void game_audio_emit(int kind, int raw)
     ++game_audio_events[kind];
 #endif
 #ifdef SC64_AUDIO_IMPORTED
-    static const u8 bank_kind[GAME_AUDIO_EVENT_KINDS] = {
+    static const u8 bank_kind[] = {
         SC64_AUDIO_ATTACK, SC64_AUDIO_DEATH, SC64_AUDIO_READY, SC64_AUDIO_WHAT,
         SC64_AUDIO_YES, SC64_AUDIO_BUILT
     };
-    static const u8 priority[GAME_AUDIO_EVENT_KINDS] = { 1, 3, 2, 2, 2, 2 };
+    static const u8 priority[] = { 1, 3, 2, 2, 2, 2 };
+    if (kind == GAME_AUDIO_WARP_START || kind == GAME_AUDIO_WARP_DONE) {
+#ifdef SC64_AUDIO_WARP_CUES
+        audio_play_sample(sc64_audio_warp[kind == GAME_AUDIO_WARP_DONE], 2, 0);
+        return;
+#else
+        if (kind == GAME_AUDIO_WARP_START) return;
+        kind = GAME_AUDIO_BUILT; /* Older imported banks keep their fallback. */
+#endif
+    }
     int sound = -1;
     if (raw >= 0 && raw < SC64_AUDIO_UNIT_COUNT) {
         int row = raw * SC64_AUDIO_KIND_COUNT, k = bank_kind[kind];
@@ -195,6 +218,7 @@ static void game_audio_alert(int line)
 #ifdef GBA_HOST
     ++game_audio_events[GAME_AUDIO_ALERT];
     game_audio_last_alert = line;
+    ++game_audio_alert_lines[line];
 #endif
 #ifdef SC64_AUDIO_IMPORTED
 #ifdef SC64_AUDIO_ALERT_LINES
@@ -206,6 +230,20 @@ static void game_audio_alert(int line)
     return;
 #else
     audio_tone(line <= GAME_AUDIO_ALERT_FORCES ? 440 : 600, 8, 2);
+#endif
+}
+
+/* Called only after a real foundation allocation; no per-slot generation state. */
+static void game_audio_foundation(const Building *q)
+{
+#if defined(SC64_RACES) && !defined(GAME_AUDIO_OFF)
+    const Sc64RaceBuildingRule *rule = sc64_race_building_rule(q->type);
+    if (game_audio_needs_prime || screen != SCREEN_PLAY || q->owner != SIDE ||
+        !rule || rule->race != R_PROTOSS || !game_audio_on_screen(q->x, q->y) ||
+        game_audio_pending_warp >= 0) return;
+    game_audio_pending_warp = game_audio_building_raw(q);
+#else
+    (void)q;
 #endif
 }
 
@@ -336,13 +374,24 @@ static void game_audio_observe(void)
 #ifdef SC64_AUDIO_IMPORTED
     game_audio_music();
 #endif
-    fresh = screen != SCREEN_PLAY || game_audio_last_screen != SCREEN_PLAY ||
+    int same_play_frame = screen == SCREEN_PLAY && game_audio_last_screen == SCREEN_PLAY &&
+                          frame == game_audio_last_frame;
+    fresh = game_audio_needs_prime || screen != SCREEN_PLAY || game_audio_last_screen != SCREEN_PLAY ||
             frame != game_audio_last_frame + 1;
     game_audio_last_screen = screen;
     if (screen != SCREEN_PLAY) return;
-    if (frame == game_audio_last_frame) return;
+    if (frame == game_audio_last_frame && !game_audio_needs_prime) {
+        /* Menus can issue an explicit refusal without advancing simulation.
+         * Consume that new cue now, without rescanning frame-based events. */
+        if (same_play_frame && advisor) game_audio_advisor(advisor);
+        return;
+    }
     game_audio_last_frame = frame;
+    game_audio_needs_prime = 0;
     game_audio_effects = 0;
+    if (!fresh && game_audio_pending_warp >= 0)
+        game_audio_emit(GAME_AUDIO_WARP_START, game_audio_pending_warp);
+    game_audio_pending_warp = -1;
     if (advisor && !fresh) game_audio_advisor(advisor);
     game_audio_tech(fresh);
     for (i = 0; i < MAX_UNITS; i++) {
@@ -386,7 +435,12 @@ static void game_audio_observe(void)
                 now |= (u32)GAME_AUDIO_VITAL(q) >> 4 & GAME_AUDIO_BUILDING_VITAL_MASK;
             } else if (q->alive && (prev & GAME_AUDIO_SNAPSHOT_CONSTRUCTING) &&
                        !q->under_construction && q->owner == SIDE) {
-                game_audio_emit(GAME_AUDIO_BUILT, game_audio_building_raw(q));
+#ifdef SC64_RACES
+                if (sc64_race_building_rule(q->type) && sc64_race_building_rule(q->type)->race == R_PROTOSS)
+                    game_audio_emit(GAME_AUDIO_WARP_DONE, game_audio_building_raw(q));
+                else
+#endif
+                    game_audio_emit(GAME_AUDIO_BUILT, game_audio_building_raw(q));
             }
         }
         snap[MAX_UNITS + i] = (u16)now;

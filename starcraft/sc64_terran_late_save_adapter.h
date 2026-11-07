@@ -1,5 +1,6 @@
 #ifndef SC64_TERRAN_LATE_SAVE_ADAPTER_H
 #define SC64_TERRAN_LATE_SAVE_ADAPTER_H
+#include "sc64_save_decode_context.h"
 
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_T4_RUNTIME) && \
     defined(SC64_TERRAN_LATE_ACTORS)
@@ -224,7 +225,7 @@ race_terran_late_save_players_valid(const RaceSave *candidate, int mission,
 
 static int
 race_terran_late_save_emitter_valid(const RaceSave *candidate, int mission,
-                                    int width, int height)
+                                    int width, int height SC64_GCTX_DECL)
 {
     const Sc64TerranLateMissionState *state = &candidate->terran_late;
     if (mission != SC64_TERRAN_LATE_GLOBAL_T7)
@@ -237,7 +238,7 @@ race_terran_late_save_emitter_valid(const RaceSave *candidate, int mission,
     unsigned human = (unsigned)sc64_terran_late_source_slot_for_controller(
         sc64_terran_late_setup_for_mission(mission),
         SC64_TERRAN_LATE_SOURCE_HUMAN_CONTROLLER);
-    if (!race_save_decode_unit(candidate, state->emitter_unit,
+    if (!SC64_GUARD_DECODE(candidate, state->emitter_unit,
                                (unsigned)width * 16u,
                                (unsigned)height * 16u, &item) ||
         !item.alive || item.raw_type != 217 || item.owner != SIDE ||
@@ -247,7 +248,7 @@ race_terran_late_save_emitter_valid(const RaceSave *candidate, int mission,
     if (state->emitter_carrier == SC64_TERRAN_LATE_NO_SLOT) return 1;
     Unit carrier;
     if (state->emitter_carrier == state->emitter_unit ||
-        !race_save_decode_unit(candidate, state->emitter_carrier,
+        !SC64_GUARD_DECODE(candidate, state->emitter_carrier,
                                (unsigned)width * 16u,
                                (unsigned)height * 16u, &carrier) ||
         !carrier.alive || carrier.owner != SIDE || carrier.type != U_SCV ||
@@ -297,7 +298,7 @@ race_terran_late_save_expand(Sc64TerranLateMissionState *dst,
 
 static int
 race_terran_late_save_candidate_valid(const RaceSave *candidate,
-                                      int width, int height)
+                                      int width, int height SC64_GCTX_DECL)
 {
     int mission;
     if (!candidate ||
@@ -310,7 +311,7 @@ race_terran_late_save_candidate_valid(const RaceSave *candidate,
                                                &candidate->terran_late,
                                                width, height) ||
         !race_terran_late_save_emitter_valid(candidate, mission,
-                                              width, height) ||
+                                              width, height SC64_GCTX_ARG) ||
         !race_terran_late_save_flight_goals_valid(candidate, width, height) ||
         !race_terran_late_save_queues_valid(candidate, mission))
         return 0;

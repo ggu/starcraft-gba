@@ -36,7 +36,7 @@ class SaveTags(unittest.TestCase):
     def compile_check(self, flags, expected, generation=None, succeeds=True,
                       diagnostic="base save tag overlaps roster save namespace"):
         gen, version = version_regions()
-        source = (gen if generation is None else "#define SC64_RACE_SAVE_GENERATION " + generation + "\n") + version
+        source = '#include "starcraft/sc64_save_tag_namespace.h"\n' + (gen if generation is None else "#define SC64_RACE_SAVE_GENERATION " + generation + "\n") + version
         source += f"\n_Static_assert(SAVE_VERSION == {expected}u, \"unexpected save tag\");\n"
         result = subprocess.run(["clang", "-std=c11", "-fsyntax-only", "-x", "c", "-", *flags],
                                 input=source, text=True, capture_output=True)

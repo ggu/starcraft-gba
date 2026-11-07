@@ -87,7 +87,14 @@ static void check_opening(int map, int human, int bots) {
         assert(hall >= 0 && !b[hall].under_construction);
         int worker = race == R_ZERG ? U_DRONE : race == R_PROTOSS ? U_PROBE : U_SCV;
         assert(count_type(owner, worker) == 4);
-        assert(count_buildings(owner) >= (race == R_ZERG ? 1 : 2));
+        /* The qualified stock opening no longer grants a Depot or Pylon.
+         * AI inventories follow the same engine rule; only the human opening
+         * was observed on native N64 (see the opening-supply audit). */
+        assert(count_buildings(owner) == 1);
+        assert(count_building_type(owner, hall_type(race)) == 1);
+        assert(!count_building_type(owner, B_DEPOT) && !count_building_type(owner, B_PYLON));
+        assert(race_owner_supply(owner) == 8);
+        assert(race_owner_supply_cap(owner) == (race == R_TER ? 20 : 18));
         assert(race_base_x[p] >= 0 && race_base_x[p] < race_cols * 16);
         assert(race_base_y[p] >= 0 && race_base_y[p] < race_rows * 16);
         int cx = race_base_x[p] >> 4, cy = race_base_y[p] >> 4;

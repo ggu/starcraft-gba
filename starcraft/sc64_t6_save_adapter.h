@@ -1,5 +1,6 @@
 #ifndef SC64_T6_SAVE_ADAPTER_H
 #define SC64_T6_SAVE_ADAPTER_H
+#include "sc64_save_decode_context.h"
 
 #if defined(SC64_T6_RUNTIME) && defined(SC64_T4_RUNTIME) && defined(SC64_T6_ENABLED)
 #include "sc64_t6_scenario_adapter.h"
@@ -173,7 +174,7 @@ race_t6_save_candidate_queues_available(const RaceSave *candidate)
 static int
 race_t6_save_burrow_valid(const RaceSave *candidate,
                           const Sc64T6MissionState *state,
-                          int width, int height)
+                          int width, int height SC64_GCTX_DECL)
 {
 #ifndef SC64_LATE_TERRAN_STORAGE
     (void)width; (void)height;
@@ -181,7 +182,7 @@ race_t6_save_burrow_valid(const RaceSave *candidate,
     for (unsigned i = 0; i < SC64_T6_UNIT_LIMIT; ++i) {
 #ifdef SC64_LATE_TERRAN_STORAGE
         Unit decoded;
-        if (!race_save_decode_unit(candidate, i, (unsigned)width * 16u,
+        if (!SC64_GUARD_DECODE(candidate, i, (unsigned)width * 16u,
                                    (unsigned)height * 16u, &decoded)) return 0;
 #define T6_BURROW(field) decoded.field
 #else
@@ -200,7 +201,7 @@ race_t6_save_burrow_valid(const RaceSave *candidate,
 }
 
 static int
-race_t6_save_candidate_valid(const RaceSave *candidate, int width, int height)
+race_t6_save_candidate_valid(const RaceSave *candidate, int width, int height SC64_GCTX_DECL)
 {
     const Sc64T6MissionState *state;
     if (!candidate || width != 96 || height != 96 ||
@@ -215,7 +216,7 @@ race_t6_save_candidate_valid(const RaceSave *candidate, int width, int height)
     if (!race_t6_save_state_valid(state) ||
         state->message != candidate->campaign.message ||
         state->message_ticks != candidate->campaign.message_ticks ||
-        !race_t6_save_burrow_valid(candidate, state, width, height)) return 0;
+        !race_t6_save_burrow_valid(candidate, state, width, height SC64_GCTX_ARG)) return 0;
     for (unsigned p = 0; p < 8; ++p)
         if (state->triggers.player[p].elapsed_ticks !=
             candidate->campaign.elapsed_frames) return 0;

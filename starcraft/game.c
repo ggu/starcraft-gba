@@ -10,6 +10,14 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#include "sc64_save_tag_namespace.h"
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#include "sc64_protoss_research_padding.h"
+static Sc64ProtossResearchLevels sc64_experimental_research_levels;
+#endif
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_SERVICE)
+#include "sc64_stage_save_auth.h"
+#endif
 #include "sc64_text_box_hook.h"
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_RACES)
 #error "Shared transport requires the race engine"
@@ -281,6 +289,84 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_Z7_COLONY_DEFENSE_ENABLED) && !defined(SC64_Z7_RUNTIME)
 #error "Z7 colony defense requires the Z7 runtime"
 #endif
+/* Experimental late-campaign service. The staged journal and producer are
+ * enabled together: neither is safe alone for paid campaign Eggs. */
+#ifdef SC64_SHARED_EGG_LATE_SERVICE
+#if defined(SC64_SHARED_EGG_CUSTOM_SERVICE) || defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+#error "Late Egg service owns its component flags"
+#endif
+#define SC64_SHARED_EGG_HOST_STAGE 1
+#define SC64_SHARED_EGG_JOURNAL_HOST_STAGE 1
+#define SC64_SHARED_EGG_WIRE_HOST_STAGE 1
+#define SC64_SHARED_EGG_PRODUCER_HOST_STAGE 1
+#endif
+/* Explicit, disabled-by-default integration for custom games. */
+#ifdef SC64_SHARED_EGG_CUSTOM_SERVICE
+#if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE)
+#error "Custom Egg service cannot combine with the legacy HOST Egg stages"
+#endif
+#define SC64_SHARED_EGG_WIRE_HOST_STAGE 1
+#define SC64_SHARED_EGG_CUSTOM_CANDIDATE 1
+#define SC64_SHARED_EGG_PRODUCER_HOST_STAGE 1
+#if !defined(SC64_RACES) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || !defined(SC64_SHARED_SCOURGE_COMBAT) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SCARAB_NAMESPACE_STAGE)
+#error "Custom Egg service requires authenticated custom transport without competing staged namespaces"
+#endif
+#endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && !defined(SC64_SHARED_EGG_LATE_SERVICE)) || !defined(SC64_RACES))
+#error "Shared Egg wire identity is HOST-only and requires race rules"
+#endif
+#if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
+#error "Guardian and Scarab candidate context integration is not qualified"
+#endif
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE) && \
+    !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
+#error "Combined Egg/Guardian journal requires authenticated candidate-local decode"
+#endif
+#if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || \
+     !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_RACES) || \
+     !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_WORKER_CARGO_KIND) || \
+     !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || \
+     defined(SC64_SCARAB_RUNTIME) || \
+     defined(SC64_SCARAB_NAMESPACE_STAGE))
+#error "Combined Guardian/Egg candidate requires the isolated HOST custom vector"
+#endif
+#if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) && \
+    ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_LATE_SERVICE)) || !defined(SC64_SHARED_EGG_HOST_STAGE) || \
+     !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || !defined(SC64_Z9_RUNTIME) || \
+     !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || \
+     !defined(SC64_SHARED_SCOURGE_COMBAT) || \
+     !defined(SC64_ZP_FULL_STORAGE) || defined(SC64_P7_TYPED_COMPACT_ENABLED) || \
+     defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+     defined(SC64_SCARAB_RUNTIME) || defined(SC64_P7_CARRIER_TRAINING_ENABLED) || \
+     defined(SC64_P4_RUNTIME) || defined(SC64_P5_RUNTIME) || \
+     defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT))
+#error "Egg journal prototype requires the isolated Z9 HOST vector without competing reservations"
+#endif
+#if defined(SC64_SHARED_EGG_HOST_STAGE) && \
+    ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_LATE_SERVICE)) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_Z8_RUNTIME) || \
+     !defined(SC64_Z7_EGG_PRODUCTION))
+#error "Shared Egg candidate is HOST-only and requires the Z9 Egg vector"
+#endif
+#if defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE) && \
+    ((!defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && !defined(SC64_SHARED_EGG_LATE_SERVICE) && \
+      (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE))) || \
+     !defined(SC64_SHARED_SCOURGE_COMBAT))
+#error "Shared Egg producer requires an authenticated custom candidate"
+#endif
+#if defined(SC64_Z7_EGG_PRODUCTION) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+#define SC64_EGG_RUNTIME 1
+#ifdef SC64_Z7_EGG_PRODUCTION
+#define SC64_EGG_ACTOR U_Z7_EGG
+#else
+#define SC64_EGG_ACTOR SC64_SHARED_EGG_TYPE
+#endif
+#ifdef SC64_Z7_RUNTIME
+#define SC64_EGG_IS_Z7() race_z7_active()
+#else
+#define SC64_EGG_IS_Z7() 0
+#endif
+#endif
 #if defined(SC64_Z7_EGG_PRODUCTION) && \
     (!defined(SC64_RACES) || !defined(SC64_Z7_RUNTIME))
 #error "Z7 Egg production requires the race and Z7 runtimes"
@@ -459,6 +545,8 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 /* The original-art skirmish owns its menus; see field_ui.h. */
 #define SC_DEFAULT_UI 1
 #endif
+_Static_assert(SC64_SAVE_TAG_BASE_VALID(SC64_BASE_SAVE_VERSION),
+               "base save tag leaves the historical 0x43 namespace");
 /* Roster-enabled saves contain identities absent from ordinary profiles.
  * Preserve every existing tag while reserving a separate high-bit namespace.
  * Fail at compile time if a future base tag claims that namespace. */
@@ -490,6 +578,15 @@ _Static_assert((SC64_PRE_CARGO_SAVE_VERSION & 0x01000000u) != 0,
 _Static_assert((SAVE_VERSION & 0x04000000u) == 0, "transport save namespace overlaps");
 #define SC64_TRANSPORT_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#if !defined(GBA_HOST) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SCARAB_NAMESPACE_STAGE)
+#error "Guardian journal prototype is HOST-only and requires cargo and transport without Scarab stage"
+#endif
+_Static_assert((SAVE_VERSION & 0x10000000u) != 0 && (SC64_TRANSPORT_SAVE_VERSION & 0x10000000u) != 0,
+               "Guardian namespace overlaps source selector");
+#define SC64_GUARDIAN_SAVE_VERSION (SAVE_VERSION ^ 0x10000000u)
+#define SC64_GUARDIAN_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x10000000u)
+#endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || (!defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_LATE_TERRAN_STORAGE))
 #error "Scarab namespace stage requires an explicitly supported impact save profile"
@@ -500,6 +597,24 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
 #define SC64_SCARAB_SAVE_VERSION (SAVE_VERSION | 0x08000000u)
 #ifdef SC64_SHARED_TRANSPORT
 #define SC64_SCARAB_TRANSPORT_SAVE_VERSION (SC64_SCARAB_SAVE_VERSION | 0x04000000u)
+#endif
+#endif
+/* HOST-only candidate namespaces. Authentication and journal admission are
+ * separate work; none of these selectors is wired into a save path here. */
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+_Static_assert((SAVE_VERSION & 0x40000000u) != 0,
+               "Egg tag selector overlaps an existing namespace");
+#define SC64_SHARED_EGG_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)
+#ifdef SC64_SHARED_TRANSPORT
+_Static_assert((SC64_TRANSPORT_SAVE_VERSION & 0x40000000u) != 0,
+               "Egg transport selector overlaps an existing namespace");
+#define SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION (SC64_TRANSPORT_SAVE_VERSION ^ 0x40000000u)
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#define SC64_GUARDIAN_EGG_SAVE_VERSION (SC64_GUARDIAN_SAVE_VERSION ^ 0x40000000u)
+#ifdef SC64_SHARED_TRANSPORT
+#define SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION (SC64_GUARDIAN_TRANSPORT_SAVE_VERSION ^ 0x40000000u)
+#endif
 #endif
 #endif
 #ifndef MAX_BUILDINGS
@@ -700,7 +815,7 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #include "sc64_skirmish_menu.h"
 #include "sc64_stock_motion.h"
 #include "sc64_stock_combat.h"
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
 #include "sc64_z7_egg_production.h"
 _Static_assert(SC_RU_COUNT <= 64,
                "Packed ZP actor type needs a six-bit enum");
@@ -942,6 +1057,15 @@ typedef struct {
 #endif
 #endif
 } Unit;
+#ifdef SC64_RACES
+/* Legacy saves can retain raw 36 on an Overlord. Its stored identity must
+ * remain distinct from a newly produced Egg when choosing visual assets. */
+static int sc64_unit_art_raw(const Unit *q)
+{
+    if (q->type == U_OVERLORD && q->raw_type == 36) return 42;
+    return q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+}
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 static int sc64_battlecruiser_source_tick_due(void);
 #endif
@@ -1161,6 +1285,7 @@ static Building b[MAX_BUILDINGS];
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
 #include "sc64_collision.h"
 #endif
+#include "sc64_depot_owner_capability.h"
 /* Temporary ascending-index owner lists used only during update_orders(). */
 static int target_unit_head[5], target_building_head[5];
 /* Signed links retain -1 as the list terminator. */
@@ -1168,6 +1293,16 @@ _Static_assert(MAX_UNITS <= 32768 && MAX_BUILDINGS <= 32768,
                "target list indices must fit in s16");
 static s16 target_unit_next[MAX_UNITS], target_building_next[MAX_BUILDINGS];
 static int target_lists_valid;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+/* Valid only within this orders pass; topology changes force scalar scans. */
+static int sc64_depot_owner_lists_valid;
+#ifdef SC64_DEPOT_OWNER_LIST_TEST
+#ifndef GBA_HOST
+#error "Depot owner-list test counter is host-only"
+#endif
+static unsigned sc64_depot_owner_list_test_hits;
+#endif
+#endif
 #if defined(SC64_RACES) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY))
 static u8 target_hostile_mask[5];
 static int target_hostile_masks_valid;
@@ -1522,6 +1657,18 @@ static int skirmish_bot_index(int owner);
 #error "Briefings need source-font pixel wrapping; run make sc64-interface"
 #endif
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+/* Source PUNI for the human Zerg slot denies Scourge (47) and Spire (141)
+ * in Z1 and Z5. Use the current controller, not an actor's original CHK
+ * owner: captured producers and workers obey their new player's permissions.
+ * This is an admission rule, not a restriction on loading existing actors. */
+static int race_zerg_campaign_product_available(int owner, int raw_product)
+{
+    return race_mode || owner != SIDE || race_human != R_ZERG ||
+        (race_selected_mission != 0 && race_selected_mission != 16) ||
+        (raw_product != 47 && raw_product != 141);
+}
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 static u16 sc64_battlecruiser_tech_bits;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -1762,17 +1909,15 @@ static int race_z6_transport_research_selected(void);
 static int race_z6_transport_start_research_selected(void);
 #endif
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+static int race_guardian_morph_tick(int slot);
+#endif
 #ifdef SC64_Z7_RUNTIME
 static Sc64Z7PersistentState race_z7;
 static int race_z7_active(void);
 static int race_z7_source_owner(unsigned source_slot);
 static int race_z7_product_source_owner(int owner);
 static void race_z7_note_building_death(const Building *q);
-#ifdef SC64_Z7_EGG_PRODUCTION
-static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot);
-static int race_z7_egg_cancel_available(void);
-static int race_z7_egg_cancel_selected(void);
-#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 static int race_colony_profile_allowed(void);
 static int race_colony_product_allowed(int owner,int raw_owner,int type);
@@ -1783,6 +1928,11 @@ static int race_z7_spore_morph_command_available(void);
 static int race_colony_pre_building_tick(void);
 static int race_colony_post_building_tick(void);
 #endif
+#endif
+#ifdef SC64_EGG_RUNTIME
+static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot);
+static int race_z7_egg_cancel_available(void);
+static int race_z7_egg_cancel_selected(void);
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
 static int race_p6_combat_unit_burrowed(int slot);
@@ -1929,6 +2079,9 @@ static int race_impact_save_write(void);
 static int race_impact_save_read(Sc64ImpactEvent *candidate, int *count);
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_WORKER_CARGO_KIND)
 static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count);
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth);
+#endif
 #endif
 static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #endif
@@ -2061,6 +2214,7 @@ static int race_owner_minerals(int owner), race_owner_gas(int owner);
 static int race_save_game(void),race_load_game(void);
 static void race_campaign_init(void),race_campaign_tick(void);
 #endif
+#include "field_menu_repeat.h"
 static int screen, menu_open, menu_cursor, help, won, lost, result_timer;
 static int cx, cy, camx, camy, toast_timer, toast_id, enemy_timer, wave;
 /* Transient controller gesture, deliberately outside the persistent save. */
@@ -2364,11 +2518,11 @@ unit_supply(int type)
 	type == U_FIREBAT ? 2 : type == U_MEDIC ? 2 : 2;
 }
 
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
 static inline int
 unit_slot_supply(const Unit *q)
 {
-    if (q && q->type == U_Z7_EGG)
+    if (q && q->type == SC64_EGG_ACTOR)
         return sc64_z7_egg_reserved_supply(q->target) > 0 ?
                sc64_z7_egg_reserved_supply(q->target) : 0;
     return q ? unit_supply(q->type) : 0;
@@ -2639,6 +2793,8 @@ spawn_unit(int owner, int type, int x, int y)
     return i;
 }
 
+static void game_audio_foundation(const Building *q);
+
 static int
 spawn_build(int owner, int type, int x, int y, int constructing)
 {
@@ -2801,6 +2957,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     if (owner == SIDE && type == B_COMMAND && !constructing) supply_cap += 20;
 #endif
     invalidate_path_grid();
+    if (constructing) game_audio_foundation(&b[i]);
     return i;
 }
 
@@ -2948,6 +3105,9 @@ terrain_blocked(int col, int row)
 static void
 invalidate_path_grid(void)
 {
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    sc64_depot_owner_lists_valid = 0;
+#endif
     path_grid_valid = 0;
 #ifdef SC64_DIRECT_FIRING_POINTS
     sc64_direct_firing_cache_invalidate();
@@ -3353,7 +3513,7 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
             if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
             int radius = 6;
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
             int mover_radius = sc64_game_unit_collision_radius(q->type);
             int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
             radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
@@ -3794,7 +3954,7 @@ __attribute__((optimize("Os")))
 sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                     SC64_P7_SOURCE_OWNER_PARAM)
 {
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     int egg_best = -1, egg_distance = max_distance * max_distance;
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
@@ -3844,8 +4004,8 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                     if (FAST_ABS(x - candidate_x) >= max_distance ||
                         FAST_ABS(y - candidate_y) >= max_distance) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-                    if (entity < MAX_UNITS && u[entity].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+                    if (entity < MAX_UNITS && u[entity].type == SC64_EGG_ACTOR) {
                         if (d < egg_distance &&
                             sc64_auto_target_candidate_allowed(
                                 attacker, entity, owner,
@@ -3867,7 +4027,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
             }
         }
     }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     return best >= 0 ? best : egg_best;
 #else
     return best;
@@ -3907,8 +4067,8 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                             attacker, entity, owner,
                             SC64_P7_SOURCE_OWNER_VALUE)) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-                    if (entity < MAX_UNITS && u[entity].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+                    if (entity < MAX_UNITS && u[entity].type == SC64_EGG_ACTOR) {
                         if (d < egg_distance) {
                             egg_distance = d;
                             egg_best = entity;
@@ -3924,7 +4084,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                 }
             }
     }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     return best >= 0 ? best : egg_best;
 #else
     return best;
@@ -3936,7 +4096,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
                    SC64_P7_SOURCE_OWNER_PARAM)
 {
     int i, best = -1, best_distance = max_distance * max_distance, d;
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     int egg_best = -1, egg_distance = max_distance * max_distance;
 #endif
     if (target_lists_valid) {
@@ -3947,8 +4107,8 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
                 if (!u[i].alive || FAST_ABS(x-u[i].x)>=max_distance || FAST_ABS(y-u[i].y)>=max_distance)continue;
                 if(!sc64_auto_target_candidate_allowed(attacker,i,owner,SC64_P7_SOURCE_OWNER_VALUE))continue;
                 d = dist2(x, y, u[i].x, u[i].y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-                if (u[i].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+                if (u[i].type == SC64_EGG_ACTOR) {
                     if (d < egg_distance) { egg_distance = d; egg_best = i; }
                     continue;
                 }
@@ -3972,7 +4132,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
                 }
             }
         }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
         return best >= 0 ? best : egg_best;
 #else
         return best;
@@ -3986,8 +4146,8 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
                     )
 	    continue;
 	d = dist2(x, y, u[i].x, u[i].y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-        if (u[i].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+        if (u[i].type == SC64_EGG_ACTOR) {
             if (d < egg_distance) { egg_distance = d; egg_best = i; }
             continue;
         }
@@ -4010,7 +4170,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
 	    best = MAX_UNITS + i;
 	}
     }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     return best >= 0 ? best : egg_best;
 #else
     return best;
@@ -4304,6 +4464,9 @@ sc64_direct_attack_issue_target(int target)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
         if (sc64_race_raw_unit(q->type)==12) q->work_timer&=~7;
 #endif
+        if (IS_WORKER(q->type) &&
+            (q->order == ORDER_MINE || q->order == ORDER_GAS))
+            q->work_timer = 0;
 #ifdef SC64_WORKER_CARGO_KIND
         sc64_worker_gather_pending_set(q, 0);
 #endif
@@ -4848,6 +5011,10 @@ hit_stock_building_target(const Building *source,int target,int damage)
 static int
 save_game(void)
 {
+#ifdef SC64_TEXT_BOXES
+    /* Neither a queued message nor a deferred result is serialized. */
+    if (sc64_text_box_count() || sc64_text_box_outcome.result) return 0;
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) return 0;
 #endif
@@ -4902,6 +5069,8 @@ save_game(void)
 #endif
 }
 
+static void game_audio_prime(void);
+
 static int
 load_game(void)
 {
@@ -4913,7 +5082,7 @@ load_game(void)
 #ifdef SC64_TEXT_BOXES
     if (loaded) sc64_text_box_reset();
 #endif
-    if (loaded) sc64_walk_reset_all();
+    if (loaded) { sc64_walk_reset_all(); game_audio_prime(); }
 #ifdef SC64_UNIT_FACING
     if (loaded) sc64_facing_reset_all();
 #endif
@@ -5048,6 +5217,7 @@ load_game(void)
 #endif
     update_exploration();
     toast(0);
+    game_audio_prime();
     return 1;
 #endif
 }
@@ -5169,6 +5339,11 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+    field_menu_repeat_reset();
+    game_audio_prime();
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
+#endif
 #ifdef SC64_TEXT_BOXES
     sc64_text_box_reset();
 #endif
@@ -5427,6 +5602,10 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+    field_menu_repeat_reset();
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
+#endif
 #ifdef SC64_TEXT_BOXES
     sc64_text_box_reset();
 #endif
@@ -5665,10 +5844,10 @@ issue_order(int order, int tx, int ty)
     selected_building = -1;
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE && u[i].selected) {
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
             /* The Egg's target field stores its paid product until birth. It
              * has no movement command; the selected-unit menu owns cancel. */
-            if (u[i].type == U_Z7_EGG) continue;
+            if (u[i].type == SC64_EGG_ACTOR) continue;
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
             if (sc64_game_unit_actor_flags(u[i].type) &&
@@ -5685,6 +5864,9 @@ issue_order(int order, int tx, int ty)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
             if (sc64_race_raw_unit(u[i].type)==12) u[i].work_timer&=~7;
 #endif
+            if (IS_WORKER(u[i].type) &&
+                (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
+                u[i].work_timer = 0;
 	    u[i].order = order;
 #ifdef SC64_WORKER_CARGO_KIND
             sc64_worker_gather_pending_set(&u[i], 0);
@@ -5909,6 +6091,9 @@ start_build(int type)
 	minerals += cost;
 	return;
     }
+    if (IS_WORKER(u[i].type) &&
+        (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
+        u[i].work_timer = 0;
     u[i].order = ORDER_BUILD;
     u[i].target = slot;
     u[i].tx = px;
@@ -5935,14 +6120,17 @@ stop_selected(void)
             int was_repair = 0;
 #endif
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
             /* STOP is not Egg cancellation: retain its paid product/timer so
              * the contextual CANCEL EGG action remains the only cancel path. */
-            if (u[i].type == U_Z7_EGG) continue;
+            if (u[i].type == SC64_EGG_ACTOR) continue;
 #endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
             if (sc64_race_raw_unit(u[i].type)==83) (void)race_scarab_stop_signal(i,0);
 #endif
+            if (IS_WORKER(u[i].type) &&
+                (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
+                u[i].work_timer = 0;
 	    u[i].order = ORDER_IDLE;
 #ifdef SC64_WORKER_CARGO_KIND
             sc64_worker_gather_pending_set(&u[i], 0);
@@ -6125,7 +6313,11 @@ static int __attribute__((noinline)) race_bunker_menu_available(void)
 enum {
     RACE_CONTEXT_SCARAB, RACE_CONTEXT_YAMATO, RACE_CONTEXT_BC_BUILDING,
     RACE_CONTEXT_BUNKER, RACE_CONTEXT_TRANSPORT, RACE_CONTEXT_TRANSPORT_TECH, RACE_CONTEXT_BATTERY,
-    RACE_CONTEXT_CARRIER, RACE_CONTEXT_COUNT
+    RACE_CONTEXT_CARRIER,
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+    RACE_CONTEXT_EGG,
+#endif
+    RACE_CONTEXT_COUNT
 };
 static int race_context_command_base(int context);
 #endif
@@ -6211,6 +6403,9 @@ static int race_context_command_width(int context)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     case RACE_CONTEXT_CARRIER: return race_p7_carrier_training_menu_available();
 #endif
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+    case RACE_CONTEXT_EGG: return race_z7_egg_cancel_available();
+#endif
     default: return 0;
     }
 }
@@ -6284,6 +6479,13 @@ choose_command(int choice)
 #ifdef SC64_RACES
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+        if (choice == race_context_command_base(RACE_CONTEXT_EGG) &&
+            race_z7_egg_cancel_available()) {
+            menu_open=0;mode=MODE_NORMAL;
+            toast(race_z7_egg_cancel_selected()?0:8);return;
+        }
+#endif
 #ifdef SC64_SHARED_TRANSPORT
         if (choice == race_context_command_base(RACE_CONTEXT_TRANSPORT_TECH) &&
             race_sk_transport_research_menu()) {
@@ -6328,7 +6530,7 @@ choose_command(int choice)
         toast(race_p7_carrier_training_queue_selected()?4:8); return;
     }
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) {
         menu_open = 0; mode = MODE_NORMAL;
         toast(race_z7_egg_cancel_selected() ? 0 : 8); return;
@@ -6561,7 +6763,7 @@ static int field_menu_count(void)
     if (race_battery_command_available()) return MENU_STOP+2;
     if (race_battery_build_available()) return MENU_STOP+4;
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     if (race_z7_egg_cancel_available()) return MENU_STOP + 2;
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
@@ -6668,7 +6870,7 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return "BUILD INTERCEPTOR";
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) return "CANCEL EGG";
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
@@ -6716,6 +6918,10 @@ static const char *race_menu_label(int i)
 #endif
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+        if (i == race_context_command_base(RACE_CONTEXT_EGG) &&
+            race_z7_egg_cancel_available()) return "CANCEL EGG";
+#endif
 #ifdef SC64_SHARED_TRANSPORT
         if (i == race_context_command_base(RACE_CONTEXT_TRANSPORT_TECH) &&
             race_sk_transport_research_menu())
@@ -7030,6 +7236,7 @@ interact(void)
 	int refinery = nearest_refinery(cx, cy);
 	if (worker >= 0 && refinery >= 0 && dist2(cx, cy, b[refinery].x, b[refinery].y) < 24 * 24) {
 	    sc64_worker_reset_repair_for_gather(&u[worker]);
+	    u[worker].work_timer = 0;
 	    u[worker].order = ORDER_GAS;
 	    u[worker].target = refinery;
 #ifdef SC64_WORKER_CARGO_KIND
@@ -7134,6 +7341,7 @@ interact(void)
 		}
 	    if (worker >= 0) {
                 sc64_worker_reset_repair_for_gather(&u[worker]);
+		u[worker].work_timer = 0;
 		u[worker].order = ORDER_GAS;
 		u[worker].target = selected_building;
 #ifdef SC64_WORKER_CARGO_KIND
@@ -7262,12 +7470,22 @@ race_nearest_resource_depot(Unit *worker)
     if (cached == -2) return -1; /* No reachable depot until a new one appears. */
     if (race_resource_depot_valid_for(worker, cached)) return cached;
     worker->build = -1;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    int use_owner_list = sc64_depot_owner_lists_valid && target_lists_valid &&
+        worker->owner >= 0 && worker->owner < 5;
+#ifdef SC64_DEPOT_OWNER_LIST_TEST
+    if (use_owner_list) ++sc64_depot_owner_list_test_hits;
+#endif
+    for (int i = use_owner_list ? target_building_head[worker->owner] : 0;
+         use_owner_list ? i >= 0 : i < MAX_BUILDINGS;
+         i = use_owner_list ? target_building_next[i] : i + 1) {
+#else
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
+#endif
         int distance;
         if (!race_resource_depot_valid_for(worker, i)) continue;
         distance = dist2(worker->x, worker->y, b[i].x, b[i].y);
-        /* Slots are scanned in ascending order, so equal-distance candidates
-         * cannot win the existing tie. Avoid a route search for them too. */
+        /* Both scans use ascending slot order, preserving equal-distance ties. */
         if (distance >= best_distance ||
             !race_resource_depot_reachable(worker, i)) continue;
         if (distance < best_distance) {
@@ -7316,6 +7534,52 @@ add_owner_resources(int owner, int ore, int vespene)
 }
 #endif
 
+/* Continue an established mineral job within its former mineral cluster.
+ * OpenBW bounds depleted-field searches to 12 source tiles (192 pixels at
+ * this engine's half scale). Reuse the normal route predicate; never assign
+ * an undiscovered human field or select an unreachable closer field.
+ * The engine does not retain source terrain elevation/worker field queues,
+ * so this is bounded continuation, not an exact native allocation policy. */
+static int __attribute__((noinline))
+worker_continue_minerals(Unit *q)
+{
+    int best = -1, best_d = 192 * 192 + 1;
+    int origin_x, origin_y;
+    if (q->target < 0 || q->target >= MAX_MINERALS) return 0;
+    origin_x = m[q->target].x;
+    origin_y = m[q->target].y;
+    for (int i = 0; i < MAX_MINERALS; ++i) {
+        int d, nx, ny;
+        if (m[i].amount <= 0 || m[i].x < 0 || m[i].y < 0 ||
+            m[i].x >= WORLD_W || m[i].y >= WORLD_H) continue;
+        if (q->owner == SIDE) {
+            int cell = m[i].x / 16 + (m[i].y / 16) * MAP_COLS;
+            if (!SC64_GRID_GET(explored, cell) && !SC64_GRID_GET(visible, cell))
+                continue;
+        }
+        d = dist2(origin_x, origin_y, m[i].x, m[i].y);
+        if (d >= best_d) continue;
+        if (!path_next_tile(q->x, q->y, m[i].x, m[i].y, &nx, &ny)) continue;
+        best = i; best_d = d;
+    }
+    if (best < 0) return 0;
+    q->target = best;
+    q->tx = m[best].x; q->ty = m[best].y;
+    q->path_timer = q->path_retry = 0;
+    q->work_timer = 0;
+    q->build = -1;
+    return 1;
+}
+
+/* A resource wait advances only while the worker is at its target. Existing
+ * saved nonzero timers remain remaining work; no new persistent state. */
+static int
+worker_gather_ready(Unit *q)
+{
+    if (!q->work_timer) q->work_timer = q->order == ORDER_MINE ? 45 : 60;
+    return --q->work_timer == 0;
+}
+
 #if defined(SC64_NEAREST_RESOURCE_DEPOT) || defined(SC64_WORKER_CARGO_KIND)
 /* Leave combat orders in fast RAM. Keeping the less frequent worker return
  * state machine in ROM prevents GCC's inlining decision from placing the
@@ -7326,6 +7590,11 @@ race_update_resource_worker(Unit *q)
     int home, tx, ty;
 #ifdef SC64_WORKER_CARGO_KIND
     int explicit_trip = sc64_worker_gather_pending(q);
+    /* A field can empty while an explicitly ordered empty worker is en
+     * route. Preserve that order if another known, reachable field is near. */
+    if (explicit_trip && q->order == ORDER_MINE && !q->carry &&
+        q->target >= 0 && q->target < MAX_MINERALS && m[q->target].amount <= 0)
+        (void)worker_continue_minerals(q);
 #endif
     if (sc64_worker_gather_pending(q) || !sc64_worker_cargo_matches_order(q)) {
         if ((q->order == ORDER_GAS &&
@@ -7397,19 +7666,26 @@ race_update_resource_worker(Unit *q)
             sc64_worker_cargo_clear(q);
 #endif
             q->build = -1;
-            q->work_timer = 20;
+            q->work_timer = 0;
         }
         return;
     }
     /* A loaded worker can return even if its former resource disappeared;
      * only an empty worker needs to read the resource target coordinates. */
+    if (q->order == ORDER_MINE &&
+        (q->target < 0 || q->target >= MAX_MINERALS || m[q->target].amount <= 0) &&
+        (q->carry || !worker_continue_minerals(q))) {
+        q->order = ORDER_IDLE;
+        q->build = -1;
+        return;
+    }
     tx = q->order == ORDER_MINE ? m[q->target].x : b[q->target].x;
     ty = q->order == ORDER_MINE ? m[q->target].y : b[q->target].y;
     if (dist2(q->x, q->y, tx, ty) >
         (q->order == ORDER_GAS ? 24 * 24 : 7 * 7)) {
         move_toward(q, tx, ty);
-    } else if (q->work_timer > 0) {
-        --q->work_timer;
+    } else if (!worker_gather_ready(q)) {
+        return;
     } else if (q->order == ORDER_MINE) {
 #ifdef SC64_WORKER_CARGO_KIND
         int collected = m[q->target].amount < 8 ? m[q->target].amount : 8;
@@ -7424,13 +7700,11 @@ race_update_resource_worker(Unit *q)
 #endif
         }
         if (q->carry > 0) q->build = -1;
-        q->work_timer = 45;
         if (collected <= 0) q->order = ORDER_IDLE;
 #else
         q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
         m[q->target].amount -= q->carry;
         if (q->carry > 0) q->build = -1;
-        q->work_timer = 45;
         if (q->carry <= 0) q->order = ORDER_IDLE;
 #endif
     } else {
@@ -7439,7 +7713,6 @@ race_update_resource_worker(Unit *q)
         if (IS_WORKER(q->type)) q->flags = (q->flags & ~SC64_WORKER_CARGO_MASK) | SC64_WORKER_CARGO_GAS;
 #endif
         q->build = -1;
-        q->work_timer = 60;
     }
 }
 #endif
@@ -7987,7 +8260,7 @@ tick_combat(Unit * q, int target)
              * pixels from source bounds; retain the six-pixel fallback in
              * the standard roster and do not widen ranged/min-range weapons. */
             int contact_range=6;
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
             if (target<MAX_UNITS) {
                 int mover_radius=sc64_game_unit_collision_radius(q->type);
                 int target_radius=sc64_game_unit_collision_radius(u[target].type);
@@ -8187,6 +8460,9 @@ static void GBA_HOT
 update_orders(void)
 {
     int i, target;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    sc64_depot_owner_lists_valid = 0;
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     race_transport_activity = 0;
 #endif
@@ -8227,6 +8503,9 @@ update_orders(void)
         target_building_head[owner] = i;
     }
     target_lists_valid = 1;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    sc64_depot_owner_lists_valid = 1;
+#endif
 target_lists_unavailable:
 #ifdef SC64_DIAGNOSTIC_SETUP
     sc64_setup_lists = gba_clock() - setup_part_start;
@@ -8287,8 +8566,14 @@ target_lists_unavailable:
         if (q->type == U_P7_CARRIER && race_p7_interceptor_flight_carrier_order(i))
             continue;
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
-        if (q->type == U_Z7_EGG) {
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        if (q->type == U_GUARDIAN_COCOON) {
+            (void)race_guardian_morph_tick(i);
+            continue;
+        }
+#endif
+#ifdef SC64_EGG_RUNTIME
+        if (q->type == SC64_EGG_ACTOR) {
             (void)race_z7_egg_tick_unit(i);
             continue;
         }
@@ -8468,6 +8753,11 @@ target_lists_unavailable:
 		}
 		if (q->carry) continue;
 	    }
+            if (!q->carry && q->order == ORDER_MINE &&
+                m[q->target].amount <= 0 && !worker_continue_minerals(q)) {
+                q->order = ORDER_IDLE;
+                continue;
+            }
 	    tx = q->order == ORDER_MINE ? m[q->target].x : b[q->target].x;
 	    ty = q->order == ORDER_MINE ? m[q->target].y : b[q->target].y;
 	    if (q->carry) {
@@ -8481,7 +8771,7 @@ target_lists_unavailable:
 #ifdef SC64_TERRAN_LATE_RUNTIME
                     if (race_late_active()) q->build = -1;
 #endif
-		    q->work_timer = 20;
+		    q->work_timer = 0;
 		}
 	    } else if (dist2(q->x, q->y, tx, ty) >
 #ifdef SC64_RACES
@@ -8491,15 +8781,14 @@ target_lists_unavailable:
 #endif
             ) {
 		move_toward(q, tx, ty);
-	    } else if (q->work_timer > 0) {
-		q->work_timer--;
+	    } else if (!worker_gather_ready(q)) {
+                continue;
 	    } else if (q->order == ORDER_MINE) {
 		q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
 		m[q->target].amount -= q->carry;
 #ifdef SC64_TERRAN_LATE_RUNTIME
                 if (race_late_active()) q->build = -1;
 #endif
-		q->work_timer = 45;
 		if (q->carry <= 0)
 		    q->order = ORDER_IDLE;
 	    } else {
@@ -8513,7 +8802,6 @@ target_lists_unavailable:
 		#else
 		q->carry = 4;
 		#endif
-		q->work_timer = 60;
 	    }
 	    continue;
 	}
@@ -8579,6 +8867,9 @@ target_lists_unavailable:
 	}
     }
     target_lists_valid = 0;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    sc64_depot_owner_lists_valid = 0;
+#endif
 #ifdef SC64_RACES
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     target_hostile_masks_valid = 0;
@@ -8953,8 +9244,17 @@ cancel_queue(int building)
     if (building < 0 || building >= MAX_BUILDINGS || !b[building].queue_count)
 	return;
     type = b[building].queue[b[building].queue_head];
-    minerals += unit_cost(type) * 3 / 4;
-    gas += unit_gas_cost(type) * 3 / 4;
+    minerals += unit_cost(type);
+    gas += unit_gas_cost(type);
+#ifdef SC64_RACES
+    /* Legacy Zerg producer queues consume one larva at admission. A paid
+     * Egg is a separate actor with its own cancellation path. */
+    {
+        const Sc64RaceUnitRule *rule = sc64_race_unit_rule(type);
+        if (rule && (rule->flags & SC_RACE_F_LARVA) && b[building].larva < 3)
+            ++b[building].larva;
+    }
+#endif
     b[building].queue_head = (b[building].queue_head + 1) % 5;
     b[building].queue_count--;
     b[building].queue_progress = 0;
@@ -9083,7 +9383,7 @@ select_next_train_type(void)
 #ifdef SC64_RACES
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (race_human == R_ZERG) {
-#ifdef SC64_Z7_SCOURGE_COMBAT
+#if defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
         static const int zerg_types[] = {U_DRONE, U_OVERLORD, U_ZERGLING, U_HYDRALISK, U_MUTALISK
             , U_SCOURGE
         };
@@ -9099,9 +9399,10 @@ select_next_train_type(void)
         for (int step = 1; step <= 5; ++step) {
             int type = zerg_types[(n + step) % 5];
 #endif
-#ifdef SC64_Z7_SCOURGE_COMBAT
+#if defined(SC64_Z7_SCOURGE_COMBAT) && !defined(SC64_SHARED_SCOURGE_COMBAT)
             if (type == U_SCOURGE && !race_z7_active()) continue;
 #endif
+            if (!race_zerg_campaign_product_available(SIDE, sc64_race_raw_unit(type))) continue;
             if (selected_building < 0 || sc64_race_producer_compatible(
                     b[selected_building].type, sc64_race_unit_rules[type].producer)) {
                 train_type = type; return;
@@ -9178,8 +9479,10 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
             if (cx != box_anchor_x || cy != box_anchor_y) box_state = 2;
         } else {
             if (box_state == 2) select_box_units();
-            else if (selected_building >= 0 && b[selected_building].alive &&
-                     b[selected_building].type == B_BARRACKS) cancel_queue(selected_building);
+            else if (selected_building >= 0 && selected_building < MAX_BUILDINGS &&
+                     b[selected_building].alive && b[selected_building].owner == SIDE &&
+                     (b[selected_building].queue_count ||
+                      b[selected_building].type == B_BARRACKS)) cancel_queue(selected_building);
             else cycle_selection();
             box_state = 0;
         }
@@ -9230,8 +9533,39 @@ pause_action(u16 pressed)
 
 #ifdef SC64_TEXT_BOXES
 #include "sc64_text_box_runtime.h"
-/* The simulation step keeps its own body, unedited: GCC's inlining of the hot
- * update path depends on its size, which steers IWRAM placement. */
+/* All text-enabled paths finish through the same boundary. A message posted
+ * in this tick must be acknowledged before its result can write a journal. */
+static __attribute__((noinline)) void game_finish_result(void)
+{
+    if (!(won || lost) || sc64_text_box_count() || sc64_text_box_outcome.result) return;
+#ifdef SC64_RACES
+    if (won && !race_mode) race_completed |= 1 << race_selected_mission;
+    save_game();
+#endif
+#ifdef SC64_TERRAN_CAMPAIGN
+    if (won) { campaign_completed |= 1 << campaign_mission; save_game(); }
+#endif
+    reset_selection_gestures();
+    screen = SCREEN_RESULT;
+    result_timer = 0;
+}
+
+static void race_text_box_publish_outcome(void)
+{
+    unsigned result = sc64_text_box_outcome.result;
+    if (!result || sc64_text_box_count()) return;
+#ifdef SC64_RACES
+    race_completed = (int)sc64_text_box_outcome.completed;
+    race_campaign.objective_flags = sc64_text_box_outcome.objective_flags;
+    race_campaign.phase = (u8)sc64_text_box_outcome.phase;
+#endif
+    sc64_text_box_outcome.result = 0;
+    won = (result & 1u) != 0;
+    lost = (result & 2u) != 0;
+    game_finish_result();
+}
+/* Keep the simulation step out of line: GCC's inlining of the hot update path
+ * depends on its size, which steers IWRAM placement. */
 #define SC64_GAME_STEP game_update_step
 static __attribute__((noinline)) void
 #else
@@ -9381,6 +9715,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
         update_imported_mission();
         update_exploration();
+#ifdef SC64_TEXT_BOXES
+        game_finish_result();
+#else
         if (won || lost) {
             if (won) race_completed |= 1 << race_selected_mission;
             save_game();
@@ -9388,6 +9725,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
             screen = SCREEN_RESULT;
             result_timer = 0;
         }
+#endif
         return;
     }
 #endif
@@ -9398,6 +9736,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
         ++frame;
         update_imported_mission();
         update_exploration();
+#ifdef SC64_TEXT_BOXES
+        game_finish_result();
+#else
         if (won || lost) {
             if (won) race_completed |= 1 << race_selected_mission;
             save_game();
@@ -9405,6 +9746,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
             screen = SCREEN_RESULT;
             result_timer = 0;
         }
+#endif
         return;
     }
 #endif
@@ -9461,6 +9803,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     }
 #endif
     if (menu_open) reset_selection_gestures();
+    else field_menu_repeat_reset();
 #ifdef SC_COMMAND_RING
     if (command_ring_input(held, pressed)) return;
 #endif
@@ -9482,15 +9825,17 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
 	}
     }
+    if (!menu_open) field_menu_repeat_reset();
     if (menu_open) {
+        u16 menu_pressed = field_menu_repeat_keys(held, pressed);
 	reset_selection_gestures();
 #ifdef SC64_COMMAND_ICONS
-	if (!field_card_navigate(pressed))
+	if (!field_card_navigate(menu_pressed))
 #endif
 	{
-	    if (pressed & KEY_UP)
+	    if (menu_pressed & KEY_UP)
 		menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
-	    if (pressed & KEY_DOWN)
+	    if (menu_pressed & KEY_DOWN)
 		menu_cursor = (menu_cursor + 1) % field_menu_count();
 	}
 	if (pressed & KEY_A)
@@ -9695,6 +10040,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 	    won = 1;
 #endif
     }
+#ifdef SC64_TEXT_BOXES
+    game_finish_result();
+#else
     if (won || lost) {
 #ifdef SC64_RACES
         if(won&&!race_mode)race_completed|=1<<race_selected_mission;
@@ -9710,6 +10058,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 	screen = SCREEN_RESULT;
 	result_timer = 0;
     }
+#endif
 }
 
 static int
@@ -10178,6 +10527,23 @@ sc64_source_unit_attack_pose(const Unit *q)
 }
 #endif
 
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+#if !defined(GBA_HOST) || !defined(SC64_GUARDIAN_COCOON_STAGE) || !defined(SC64_HAS_SPRITES)
+#error "Cocoon render stage requires HOST, Guardian stage, and sprites"
+#endif
+#include "sc64_guardian_cocoon_render.h"
+#ifdef SC64_GUARDIAN_TEST_BANK_HEADER
+#include SC64_GUARDIAN_TEST_BANK_HEADER
+#else
+#include "sc64_guardian_cocoon_bank_generated.h"
+#endif
+static int sc64_cocoon_world_visible(int x,int y)
+{
+    return (unsigned)x < (unsigned)(MAP_COLS*16) &&
+        (unsigned)y < (unsigned)(MAP_ROWS*16) && currently_visible(x,y);
+}
+#endif
+
 static void
 draw_unit_pass(Unit * q, int selection_pass)
 {
@@ -10187,6 +10553,12 @@ draw_unit_pass(Unit * q, int selection_pass)
 #endif
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    if (q->type == U_GUARDIAN_COCOON) {
+        /* Include both the primary canvas and its displaced underlay. */
+        if (x < -64 || x > 304 || y < -80 || y > 180) return;
+    } else
+#endif
     if (x < -8 || x > 247 || y < 10 || y > 125)
 	return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
@@ -10214,12 +10586,11 @@ draw_unit_pass(Unit * q, int selection_pass)
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
-        q->raw_type>=0?sc64_p8_unit_sprite_for_raw(q->raw_type):
+        q->raw_type >= 0 ? sc64_p8_unit_sprite_for_raw(sc64_unit_art_raw(q)) :
 #endif
         mission_unit_sprite(q->type);
 #ifdef SC64_UNIT_FACING
-    int facing_raw = q->raw_type >= 0 ? q->raw_type :
-        sc64_race_raw_unit(q->type);
+    int facing_raw = sc64_unit_art_raw(q);
     /* Units missing from the race bank (e.g. the sieged Siege Tank) can still
      * have per-direction art; its north frame also sizes the selection. */
     if (!sprite && facing_raw >= 0)
@@ -10234,6 +10605,16 @@ draw_unit_pass(Unit * q, int selection_pass)
     int sprite_y = sprite ? y - sprite->canvas_h / 2 + sprite->offset_y : y - 4;
     int sprite_w = sprite ? sprite->w : 8;
     int sprite_h = sprite ? sprite->h : 8;
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    const Sc64CocoonFrame *cocoon_frame=0;
+    if (q->type==U_GUARDIAN_COCOON) {
+        cocoon_frame=sc64_cocoon_resolve(&cocoon_bank,(unsigned)(q-u),q->work_timer);
+        if (!cocoon_frame) return; /* fail closed: never substitute another actor */
+        sprite_x=x-cocoon_frame->canvas_w/2+cocoon_frame->x;
+        sprite_y=y-cocoon_frame->canvas_h/2+cocoon_frame->y;
+        sprite_w=cocoon_frame->w;sprite_h=cocoon_frame->h;
+    }
+#endif
 #else
     int sprite_x = x - 4, sprite_y = y - 4, sprite_w = 8, sprite_h = 8;
 #endif
@@ -10249,6 +10630,12 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
     int walk = sc64_walk_track(q);
     int body_y = y - SC64_WALK_LIFT(walk);
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    if (cocoon_frame) {
+        (void)sc64_cocoon_draw(&cocoon_bank,(unsigned)(q-u),q->work_timer,
+            x,body_y,q->x,q->y-(y-body_y),q->owner==SIDE ? 0 : sc64_cocoon_world_visible);
+    } else {
+#endif
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_UNIT_FACING
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -10265,7 +10652,7 @@ draw_unit_pass(Unit * q, int selection_pass)
 #endif
     if (sprite) {
 #if defined(SC64_UNIT_WORD_SPRITES) && defined(SC64_RACE_UNIT_WORD_SPRITE_METADATA)
-        int sprite_raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+        int sprite_raw=sc64_unit_art_raw(q);
         const GbaSpriteWordFrame *word_sprite = sprite_raw >= 0 ?
             sc64_race_unit_words_sprite((unsigned short)sprite_raw,sprite) : 0;
         if (word_sprite)
@@ -10330,6 +10717,9 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
     y = feet;
     }
+#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
+    }
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
     if (sc64_worker_cargo_badge_kind(q) > 0)
         draw_worker_cargo_badge(sprite_x + sprite_w + 2,
@@ -12313,10 +12703,43 @@ game_update(u16 held, u16 pressed)
 {
     if (sc64_text_box_count()) {
         race_text_box_input(held, pressed);
+        race_text_box_publish_outcome();
         return;
     }
+    if (sc64_text_box_outcome.result) {
+        race_text_box_publish_outcome();
+        return;
+    }
+    int previous_won = won, previous_lost = lost, previous_screen = screen;
+#ifdef SC64_RACES
+    unsigned previous_completed = (unsigned)race_completed;
+    unsigned previous_objectives = race_campaign.objective_flags;
+    unsigned previous_phase = race_campaign.phase;
+#endif
     game_update_step(held, pressed);
+    if (sc64_text_box_count()) {
+        unsigned result = (won ? 1u : 0u) | (lost ? 2u : 0u);
+#ifdef SC64_RACES
+        if (!result && race_campaign.phase == SC64_RACE_PHASE_COMPLETE) result = 1u;
+        if (!result && race_campaign.phase == SC64_RACE_PHASE_FAILED) result = 2u;
+#endif
+        if (result) {
+            sc64_text_box_outcome.result = (u16)result;
+#ifdef SC64_RACES
+            sc64_text_box_outcome.completed = (u32)race_completed;
+            sc64_text_box_outcome.objective_flags = race_campaign.objective_flags;
+            sc64_text_box_outcome.phase = race_campaign.phase;
+            race_completed = (int)previous_completed;
+            race_campaign.objective_flags = previous_objectives;
+            race_campaign.phase = (u8)previous_phase;
+#endif
+            won = previous_won;
+            lost = previous_lost;
+            screen = previous_screen;
+        }
+    }
     race_text_box_host_acknowledge();
+    race_text_box_publish_outcome();
 }
 
 int game_text_box_up(void) { return sc64_text_box_count() != 0; }
@@ -12605,7 +13028,7 @@ game_self_test(void)
     if (b[3].queue_count != 1 || minerals != 950)
         return 10;
     cancel_queue(3);
-    if (b[3].queue_count || minerals != 987)
+    if (b[3].queue_count || minerals != 1000)
         return 11;
     supply_cap = 36;
     queue_unit(3, U_MARINE);
@@ -12785,7 +13208,13 @@ game_self_test(void)
 #ifdef SC64_P8_RUNTIME
 #include "sc64_p8_availability_adapter.h"
 #endif
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static unsigned race_shared_trigger_obligations(void);
+#endif
 #include "race_adapter.h"
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#include "sc64_guardian_morph_adapter.h"
+#endif
 #ifdef SC64_P7_OBSERVER_ENABLED
 #include "sc64_p7_runtime_adapter.h"
 #include "sc64_p7_observer_adapter.h"
@@ -12886,6 +13315,27 @@ game_self_test(void)
 #undef race_protoss_later_battery_candidate_valid
 #include "sc64_p10_runtime_adapter.h"
 #endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+#include "sc64_stage_save_auth.h"
+static int race_guardian_decode_authenticated(const RaceSave *,unsigned,unsigned,unsigned,Unit *,const Sc64StageSaveAuth *);
+#define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth
+#define SC64_GCTX_ARG , guard_auth
+#define SC64_GUARD_DECODE(c,s,w,h,o) race_guardian_decode_authenticated(c,s,w,h,o,guard_auth)
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+/* Carry the authenticated journal candidate explicitly through every save
+ * validator, just as the Guardian candidate does.  Never use process-global
+ * decode state: prepared journal selection can retry an older slot. */
+#include "sc64_stage_save_auth.h"
+static int race_save_decode_unit_authenticated(const RaceSave *,unsigned,unsigned,unsigned,Unit *,const Sc64StageSaveAuth *);
+#define SC64_GCTX_DECL , const Sc64StageSaveAuth *guard_auth
+#define SC64_GCTX_ARG , guard_auth
+#define SC64_GUARD_DECODE(c,s,w,h,o) race_save_decode_unit_authenticated(c,s,w,h,o,guard_auth)
+#else
+#define SC64_GCTX_DECL
+#define SC64_GCTX_ARG
+#define SC64_GUARD_DECODE(c,s,w,h,o) race_save_decode_unit(c,s,w,h,o)
+#endif
+
 #ifdef SC64_NYDUS_ENABLED
 static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
 static int race_save_decode_building(const RaceSave *, unsigned, Building *);
@@ -12908,6 +13358,16 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #endif
 #ifdef SC64_Z9_RUNTIME
 #include "sc64_zerg_late_runtime_adapter.h"
+#endif
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static unsigned race_shared_trigger_obligations(void)
+{
+    if (race_mode) return 0;
+    if (race_z8_active()) return sc64_stage_trigger_create_obligations(&race_z8_sched,&race_z8_program);
+    if (race_zl_active() && race_zl_mission)
+        return sc64_stage_trigger_create_obligations(&race_zl_sched.core,&race_zl_mission->program->rows);
+    return 0;
+}
 #endif
 #include "race_save_adapter.h"
 #ifdef SC64_IMPACT_EVENTS

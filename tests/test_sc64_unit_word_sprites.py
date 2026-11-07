@@ -49,7 +49,9 @@ class UnitWordSpriteTests(unittest.TestCase):
             self.skipTest('private generated race sprite header with unit-word metadata is unavailable')
         briefing_header = repo / '.local/sc64/briefings/generated/sc64_briefing_generated.h'
         interface = repo / '.local/sc64/interface/generated'
-        if (not briefing_header.is_file() or not all((interface / name).is_file()
+        commands = repo / '.local/sc64/command-icons/generated'
+        if (not (commands / 'sc64_command_icons_generated.h').is_file() or
+                not briefing_header.is_file() or not all((interface / name).is_file()
                 for name in ('sc64_font_generated.h', 'sc64_icons_generated.h', 'sc64_chrome_generated.h'))):
             self.skipTest('private generated campaign briefing header is unavailable')
 
@@ -57,6 +59,8 @@ class UnitWordSpriteTests(unittest.TestCase):
             '-DGBA_HOST', '-DGBA_SPRITE_WORDS', '-DGBA_SCENE_CLIP', '-DGBA_WINDOW_BANDS',
             '-DSC64_IMPORTED_MISSION', '-DSC64_HAS_TERRAIN_ART', '-DSC64_HAS_SPRITES',
             '-DSC64_AUDIO_IMPORTED', '-DSC64_RACES', '-DSC64_CONSTRUCTION_SOURCE_ART',
+            # Shared HUD helpers are provided with the production controls.
+            '-DSC64_FIELD_CONTROLS', '-DSC64_HUD_ICONS',
             '-DSC64_UNIFIED', '-DSC64_IMPORTED_SKIRMISH', '-DSC64_Z3_ENABLED',
             '-DSC64_CAMPAIGN_RACE=1', '-DSC64_ROUTE_PACK3', '-DSC64_VISIBILITY_SPANS',
             '-DSC64_Z3_WINDOWED_SCHEDULE', '-DSC64_NO_FRAME_CLEAR', '-DGBA_PRESENT_DEADLINE',
@@ -71,7 +75,7 @@ class UnitWordSpriteTests(unittest.TestCase):
         includes = [
             repo / 'common', repo / 'starcraft', generated.parent,
             repo / '.local/sc64/backwater/generated', repo / '.local/sc64/audio/generated',
-            repo / '.local/sc64/briefings/generated', interface,
+            repo / '.local/sc64/briefings/generated', interface, commands,
             repo / '.local/sc64/construction/generated', repo / '.local/sc64/skirmish/generated',
             repo / '.local/sc64/zp-stage/generated', repo / '.local/sc64/races/generated',
             repo / '.local/sc64/z4/generated',

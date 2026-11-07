@@ -1,5 +1,6 @@
 #ifndef SC64_Z6_TRANSPORT_SAVE_H
 #define SC64_Z6_TRANSPORT_SAVE_H
+#include "sc64_save_decode_context.h"
 #include "sc64_construction_save.h"
 #ifndef SC64_NYDUS_ORDER
 /* Standalone fixtures include this header without game.c's order enum. */
@@ -40,7 +41,7 @@ static int race_z6_transport_passenger_provenance_valid(const Unit *q)
  * and passengers already in TRANSPORTED state. */
 static int race_z6_transport_save_candidate_valid(
     const RaceSave *candidate, const Sc64Z6TransportTechState *tech,
-    int width, int height)
+    int width, int height SC64_GCTX_DECL)
 {
     u8 used[MAX_UNITS] = { 0 };
     int is_z6;
@@ -53,7 +54,7 @@ static int race_z6_transport_save_candidate_valid(
 
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit actor;
-        if (!race_save_decode_unit(candidate, (unsigned)i,
+        if (!SC64_GUARD_DECODE(candidate, (unsigned)i,
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &actor)) return 0;
         if (!actor.alive) continue;
@@ -105,7 +106,7 @@ static int race_z6_transport_save_candidate_valid(
             !race_z6_transport_passenger_provenance_valid(&actor)) return 0;
 
         Unit carrier;
-        if (!race_save_decode_unit(candidate, (unsigned)actor.target,
+        if (!SC64_GUARD_DECODE(candidate, (unsigned)actor.target,
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &carrier)) return 0;
         if (!carrier.alive || carrier.type != U_OVERLORD ||

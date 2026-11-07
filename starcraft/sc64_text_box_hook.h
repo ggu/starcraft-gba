@@ -8,8 +8,12 @@
 
 #ifdef SC64_TEXT_BOXES
 #include "sc64_text_box.h"
-static void race_text_box_post_string(unsigned long string_id);
-static void race_text_box_post_row(unsigned trigger, unsigned action);
+static int race_text_box_post_string(unsigned long string_id);
+static int race_text_box_post_row(unsigned trigger, unsigned action);
+#define RACE_TEXT_BOX_TRY_ROW(trigger, action) race_text_box_post_row((unsigned)(trigger), (unsigned)(action))
+#define RACE_TEXT_BOX_TRY_STRING(string_id) race_text_box_post_string((unsigned long)(string_id))
+#define RACE_TEXT_BOX_TRY_ACTION(opcode, string_id) \
+    (((opcode) == 7u || (opcode) == 9u) ? RACE_TEXT_BOX_TRY_STRING(string_id) : 0)
 #define RACE_TEXT_BOX_ROW(trigger, action) race_text_box_post_row((unsigned)(trigger), (unsigned)(action))
 #define RACE_TEXT_BOX_STRING(string_id) race_text_box_post_string((unsigned long)(string_id))
 /* For runtimes that share one case among Transmission, DisplayText and others. */
@@ -17,6 +21,9 @@ static void race_text_box_post_row(unsigned trigger, unsigned action);
         if ((opcode) == 7u || (opcode) == 9u) RACE_TEXT_BOX_STRING(string_id); \
     } while (0)
 #else
+#define RACE_TEXT_BOX_TRY_ROW(trigger, action) 0
+#define RACE_TEXT_BOX_TRY_STRING(string_id) 0
+#define RACE_TEXT_BOX_TRY_ACTION(opcode, string_id) 0
 #define RACE_TEXT_BOX_ROW(trigger, action) ((void)0)
 #define RACE_TEXT_BOX_STRING(string_id) ((void)0)
 #define RACE_TEXT_BOX_ACTION(opcode, string_id) ((void)0)

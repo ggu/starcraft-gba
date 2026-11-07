@@ -344,27 +344,27 @@ int main(void) {
     def test_all_runtime_raw_actor_and_building_ids_have_source_art(self):
         rules = (Path(__file__).resolve().parents[1] / 'starcraft/race_rules.h').read_text()
 
-        def numeric_raw_ids(function_signature, next_signature, include_roster=False):
-            start = rules.index(f'static inline int {function_signature}\n{{')
-            end = rules.index(f'static inline int {next_signature}\n{{', start)
-            body = rules[start:end]
-            if not include_roster:
-                # The identity-only extension is off in every normal ROM.
-                # Retain the all-gates art audit for shipped actor paths while
-                # checking its explicit missing-art set separately below.
-                lines, depth = [], 0
-                for line in body.splitlines():
-                    if re.match(r'\s*#\s*(if|ifdef|ifndef)\b', line):
-                        if depth or 'SC64_SKIRMISH_ROSTER' in line:
-                            depth += 1
-                            continue
-                    elif re.match(r'\s*#\s*endif\b', line) and depth:
-                        depth -= 1
+        def numeric_raw_ids(function_signature, next_signature, include_roster=False, source=None):
+            source = rules if source is None else source
+            start = source.index(f'static inline int {function_signature}\n{{')
+            end = source.index(f'static inline int {next_signature}\n{{', start)
+            body = source[start:end]
+            # The identity-only extension is off in every normal ROM.
+            # Retain the all-gates art audit for shipped actor paths while
+            # checking its explicit missing-art set separately below.
+            lines, depth = [], 0
+            for line in body.splitlines():
+                if re.match(r'\s*#\s*(if|ifdef|ifndef)\b', line):
+                    if depth or 'SC64_GUARDIAN_COCOON_STAGE' in line or (not include_roster and 'SC64_SKIRMISH_ROSTER' in line):
+                        depth += 1
                         continue
-                    if not depth:
-                        lines.append(line)
-                self.assertEqual(depth, 0)
-                body = '\n'.join(lines)
+                elif re.match(r'\s*#\s*endif\b', line) and depth:
+                    depth -= 1
+                    continue
+                if not depth:
+                    lines.append(line)
+            self.assertEqual(depth, 0)
+            body = '\n'.join(lines)
             return {int(value) for value in re.findall(r'return (\d+);', body)}
 
         runtime_units = numeric_raw_ids('sc64_race_raw_unit(int type)',
@@ -382,6 +382,16 @@ int main(void) {
         self.assertIn('#ifdef SC64_P10_DATA_ENABLED', p8_adapter)
         self.assertIn('raw_type == 82u) raw_type = 72u', p8_adapter)
         unit_assets.add(82)  # P10 raw82 Gantrithor reuses the raw72 Carrier art.
+        # A new ordinary actor must still appear as missing; only the explicit
+        # default-off Cocoon block is excluded from this shared-bank audit.
+        injected = rules.replace('case U_GUARDIAN_COCOON: return 59;',
+                                 'case U_GUARDIAN_COCOON: return 59;\n#endif\n'
+                                 'case U_FAKE_DEFAULT: return 250;\n'
+                                 '#ifdef SC64_GUARDIAN_COCOON_STAGE', 1)
+        injected_units = numeric_raw_ids('sc64_race_raw_unit(int type)',
+                                         'sc64_race_raw_building(int type)', source=injected)
+        self.assertEqual(injected_units - runtime_units, {250})
+        self.assertNotIn(250, unit_assets)
         self.assertEqual(runtime_units - unit_assets, {101},
                          'raw 101 is intentionally source-invisible')
         extended_units = numeric_raw_ids('sc64_race_raw_unit(int type)',

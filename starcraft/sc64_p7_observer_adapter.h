@@ -1,6 +1,22 @@
 #ifndef SC64_P7_OBSERVER_ADAPTER_H
 #define SC64_P7_OBSERVER_ADAPTER_H
 
+/* Exact aura hoists are shared by every product using this service. Keep an
+ * explicit opt-out for baseline and regression comparisons. */
+#ifdef SC64_AURA_HOISTS_DISABLED
+#undef SC64_AURA_SOURCE_HOIST_PROBE
+#undef SC64_AURA_SQUARE_HOIST_PROBE
+#elif defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#define SC64_AURA_SOURCE_HOIST_PROBE 1
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+#define SC64_AURA_SQUARE_HOIST_PROBE 1
+#endif
+#endif
+
+/* Shared source-tick snapshot invariants for optical detection. */
+#define SC64_P7_DETECTOR_BINDING_HOIST 1
+#define SC64_P7_DETECTOR_SNAPSHOT_FAST 1
+
 #if defined(SC64_P7_SIGHT_AXIS_CULL) && !defined(SC64_P7_ACTORS)
 #error "SC64_P7_SIGHT_AXIS_CULL requires SC64_P7_ACTORS"
 #endif
@@ -13,7 +29,13 @@
 /* Current roster maxima after source-pixel conversion, including fallbacks.
  * The optional cull is conservative; the exact radius/circle test follows it.
  * tests/sc64_p7_sight_axis_cull.c checks all types and the boundary geometry. */
-enum { SC64_P7_SIGHT_UNIT_AXIS_BOUND=176, SC64_P7_SIGHT_BUILDING_AXIS_BOUND=160 };
+enum { SC64_P7_SIGHT_UNIT_AXIS_BOUND=176,
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+       SC64_P7_SIGHT_BUILDING_AXIS_BOUND=176
+#else
+       SC64_P7_SIGHT_BUILDING_AXIS_BOUND=160
+#endif
+};
 #include "sc64_p7_observer_rules.h"
 #include "sc64_p7_geometry.h"
 #include "sc64_p7_sight_runtime.h"
@@ -21,9 +43,42 @@ enum { SC64_P7_SIGHT_UNIT_AXIS_BOUND=176, SC64_P7_SIGHT_BUILDING_AXIS_BOUND=160 
 #include "sc64_p7_power_geometry.h"
 #endif
 
-/* Owner-specific optical visibility query. The world maintains a single
- * SIDE grid, so only source slot 7 can reuse it. Other P7 owners are evaluated
- * on demand using the same cell-center circles as sc64_visibility.h. */
+/* Service slots are normalized only in generic custom games. Later campaign
+ * bindings retain the authenticated descriptor's raw human source slot. */
+static int sc64_p7_optical_human_slot(void)
+{
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    int binding = race_protoss_service_binding();
+    if (binding == SC64_PROTOSS_BIND_GENERIC || binding == SC64_PROTOSS_BIND_P7) return 7;
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+    if (binding == SC64_PROTOSS_BIND_LATER) {
+        int mission = race_protoss_binding_override >= 0 ?
+                      race_protoss_override_mission : race_selected_mission;
+        if (mission >= 0 && mission < SC64_RACE_MAP_COUNT &&
+            race_protoss_later_service_mission(mission)) {
+            int slot = sc64_race_maps[mission].human_slot;
+            if (slot >= 0 && slot < 8 && race_protoss_source_owner(slot) == SIDE) return slot;
+        }
+    }
+#endif
+    return -1;
+#else
+    return 7;
+#endif
+}
+
+static int sc64_p7_detector_current_slot(int live_owner, int source_slot)
+{
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    int human_slot = sc64_p7_optical_human_slot();
+    if (live_owner == SIDE && human_slot >= 0) return human_slot;
+#endif
+    return source_slot;
+}
+
+/* Owner-specific optical visibility query. The world maintains one SIDE
+ * grid, bound to the authenticated human source slot. Other source owners are
+ * evaluated on demand using the same cell-center circles as sc64_visibility.h. */
 static int sc64_p7_observer_source_matches(int raw_owner, int live_owner,
                                            int source_raw_owner,
                                            int source_live_owner)
@@ -31,8 +86,17 @@ static int sc64_p7_observer_source_matches(int raw_owner, int live_owner,
     /* A known querying slot must never absorb another source player's
        unknown or collapsed live-owner records. Unknown query provenance alone
        triggers the documented legacy live-owner fallback. */
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    int human_slot = sc64_p7_optical_human_slot();
+    if (source_raw_owner >= 0 && source_raw_owner < 8) {
+        if (race_protoss_source_owner((unsigned)source_raw_owner) != source_live_owner) return 0;
+        if (source_raw_owner == human_slot) return live_owner == SIDE;
+        return live_owner == source_live_owner && raw_owner == source_raw_owner;
+    }
+#else
     if (source_raw_owner >= 0 && source_raw_owner < 8)
         return raw_owner == source_raw_owner;
+#endif
     return live_owner == source_live_owner;
 }
 
@@ -42,8 +106,13 @@ static int sc64_p7_observer_owner_sees_cell(int source_owner, int live_owner,
 {
     int col = cell % MAP_COLS, row = cell / MAP_COLS;
     int cx = col * 16 + 8, cy = row * 16 + 8;
-    if (source_owner == 7 || (source_owner < 0 && live_owner == SIDE))
-        return SC64_GRID_GET(visible, cell);
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    if (source_owner >= 0 && source_owner < 8 &&
+        race_protoss_source_owner((unsigned)source_owner) != live_owner) return 0;
+#endif
+    if ((source_owner >= 0 && source_owner == sc64_p7_optical_human_slot()) ||
+        (source_owner < 0 && live_owner == SIDE))
+        return live_owner == SIDE && SC64_GRID_GET(visible, cell);
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
@@ -72,9 +141,21 @@ static int sc64_p7_observer_owner_sees_cell(int source_owner, int live_owner,
         int dx = cx - b[i].x, dy = cy - b[i].y;
         if (dx < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dx > SC64_P7_SIGHT_BUILDING_AXIS_BOUND ||
             dy < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dy > SC64_P7_SIGHT_BUILDING_AXIS_BOUND) continue;
-        int radius = sc64_p7_observer_sight_radius_runtime(b[i].type, 1);
+        int radius = sc64_p7_observer_sight_radius_runtime(
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+            sc64_shared_building_visibility_key(&b[i]),
 #else
-        int radius = sc64_p7_observer_sight_radius_runtime(b[i].type, 1);
+            b[i].type,
+#endif
+            1);
+#else
+        int radius = sc64_p7_observer_sight_radius_runtime(
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+            sc64_shared_building_visibility_key(&b[i]),
+#else
+            b[i].type,
+#endif
+            1);
         int dx = cx - b[i].x, dy = cy - b[i].y;
 #endif
         if (dx * dx + dy * dy <= radius * radius) return 1;
@@ -112,21 +193,12 @@ static int sc64_p7_observer_target_raw_type(int target)
 static int sc64_p7_observer_pylon_powers(int cannon, int source_owner,
                                           int live_owner)
 {
-#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) &&
         b[i].type == B_PYLON &&
         sc64_p7_observer_source_matches(RACE_PROTOSS_SLOT(&b[i]), b[i].owner,
                                         source_owner, live_owner) &&
         sc64_p7_in_psi_range(b[cannon].x-b[i].x,b[cannon].y-b[i].y))
         return 1;
-#else
-    for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) &&
-        b[i].type == B_PYLON &&
-        sc64_p7_observer_source_matches(RACE_PROTOSS_SLOT(&b[i]), b[i].owner,
-                                        source_owner, live_owner) &&
-        dist2(b[cannon].x, b[cannon].y, b[i].x, b[i].y) <= 144 * 144)
-        return 1;
-#endif
     return 0;
 }
 
@@ -157,6 +229,10 @@ static int sc64_p7_observer_rect_distance(unsigned raw_a, int x_a, int y_a,
     return (int)sc64_p7_observer_xy_length((unsigned)dx,(unsigned)dy);
 }
 
+#if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && defined(SC64_AURA_SQUARE_HOIST_PROBE)
+#include "sc64_aura_square_probe.h"
+#endif
+
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
 /* Exact continuation of rect_distance after both source rectangles have
  * passed the same actor-rectangle validation as the legacy helper. */
@@ -170,6 +246,7 @@ static int sc64_p7_observer_rect_distance_rects(int al,int at,int ar,int ab,
 
 /* The caller validates the Arbiter rectangle once before reusing target
  * rectangles here. The clipped finder-square policy is unchanged. */
+#if !defined(SC64_AURA_SQUARE_HOIST_PROBE) || defined(GBA_HOST)
 static int sc64_p7_arbiter_finder_square_rect(int arbiter,int tl,int tt,
                                               int tr,int tb)
 {
@@ -181,6 +258,7 @@ static int sc64_p7_arbiter_finder_square_rect(int arbiter,int tl,int tt,
     --tr; --tb;
     return tl<right && tr>=left && tt<bottom && tb>=top;
 }
+#endif
 #endif
 
 /* Generation-39 cache layout in the otherwise-unused Unit.weapon word:
@@ -274,6 +352,7 @@ static int sc64_p7_arbiter_finder_square(int arbiter,int target)
     return tl<right && tr>=left && tt<bottom && tb>=top;
 }
 
+#if !defined(SC64_AURA_SOURCE_HOIST_PROBE) || defined(GBA_HOST)
 static int sc64_p7_arbiter_same_source(int arbiter,int target)
 {
     int raw=RACE_PROTOSS_SLOT(&u[arbiter]);
@@ -284,6 +363,15 @@ static int sc64_p7_arbiter_same_source(int arbiter,int target)
     return race_protoss_source_owner((unsigned)raw)==u[arbiter].owner &&
            race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[target]))==u[target].owner;
 }
+#endif
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+/* The outer Arbiter loop has already checked this exact source-to-live-owner
+ * binding. Neither binding nor owners can change during the aura traversal. */
+static inline int sc64_p7_arbiter_same_validated_source(int target,int source,int owner)
+{
+    return u[target].owner==owner && RACE_PROTOSS_SLOT(&u[target])==source;
+}
+#endif
 
 static int sc64_p7_arbiter_aura_cloaks(int target)
 {
@@ -314,19 +402,38 @@ typedef struct {
 /* The source-owner mapping and actor visibility inputs do not change within
  * one cache source tick. Preserve the invalid-source fallback's comparison
  * against inactive (-1) mappings, including malformed signed owner rows. */
-static unsigned sc64_p7_optical_source_mask(int source, int owner, const int map[8])
+static unsigned sc64_p7_optical_source_mask(int source, int owner, const int map[8], int human_slot)
 {
     if(source>=0 && source<8)
         return map[source]>=0 && map[source]==owner ? 1u<<(unsigned)source : 0;
     unsigned result=0;
-    for(unsigned i=0;i<7;++i) if(map[i]==owner) result|=1u<<i;
+    for(unsigned i=0;i<8;++i) if((int)i!=human_slot && map[i]==owner) result|=1u<<i;
     return result;
 }
 
+#ifdef SC64_P7_DETECTOR_BINDING_HOIST
+/* Binding and the human source slot are immutable during one source tick.
+ * Keep the same generic/current-controller and mission/raw-origin rules. */
+static int sc64_p7_detector_bound_slot(int binding,int human_slot,int owner,int raw_owner)
+{
+    int source=race_protoss_binding_slot(binding,owner,raw_owner);
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    if (owner==SIDE && human_slot>=0) return human_slot;
+#else
+    (void)human_slot;
+#endif
+    return source;
+}
+#endif
 static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
 {
-    int map[8];
+    int map[8], human_slot=sc64_p7_optical_human_slot();
+#ifdef SC64_P7_DETECTOR_BINDING_HOIST
+    int binding=race_protoss_service_binding();
+    for(unsigned i=0;i<8;++i) map[i]=race_protoss_binding_source_owner(binding,i);
+#else
     for(unsigned i=0;i<8;++i) map[i]=race_protoss_source_owner(i);
+#endif
     lists->unit_count=lists->building_count=0;
     lists->optical_unit_count=lists->optical_building_count=0;
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
@@ -334,14 +441,24 @@ static void sc64_p7_detector_lists_build(Sc64P7DetectorLists *lists)
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
         !SC64_TRANSPORT_LOADED(&u[i])) {
-        unsigned mask=sc64_p7_optical_source_mask(RACE_PROTOSS_SLOT(&u[i]),u[i].owner,map);
+#ifdef SC64_P7_DETECTOR_BINDING_HOIST
+        int source=sc64_p7_detector_bound_slot(binding,human_slot,u[i].owner,u[i].raw_owner);
+#else
+        int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
+#endif
+        unsigned mask=sc64_p7_optical_source_mask(source,u[i].owner,map,human_slot);
         if(mask) {
             unsigned n=lists->optical_unit_count++;
             lists->optical_units[n]=(u8)i; lists->optical_unit_masks[n]=(u8)mask;
         }
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive) {
-        unsigned mask=sc64_p7_optical_source_mask(RACE_PROTOSS_SLOT(&b[i]),b[i].owner,map);
+#ifdef SC64_P7_DETECTOR_BINDING_HOIST
+        int source=sc64_p7_detector_bound_slot(binding,human_slot,b[i].owner,b[i].raw_owner);
+#else
+        int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
+#endif
+        unsigned mask=sc64_p7_optical_source_mask(source,b[i].owner,map,human_slot);
         if(mask) {
             unsigned n=lists->optical_building_count++;
             lists->optical_buildings[n]=(u8)i; lists->optical_building_masks[n]=(u8)mask;
@@ -369,7 +486,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         const u8 powered_cannons[MAX_BUILDINGS], const Sc64P7DetectorLists *lists)
 {
     unsigned visible_owners=0,detected=0;
-    int x,y,col,row,cx,cy;
+    int x,y,col,row,cx,cy, human_slot=sc64_p7_optical_human_slot();
     if(target<0||target>=MAX_UNITS||!u[target].alive) return 0;
     x=u[target].x; y=u[target].y; col=x/16; row=y/16;
     if(col<0||row<0||col>=MAP_COLS||row>=MAP_ROWS) return 0;
@@ -380,11 +497,11 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
                                   &target_l,&target_t,&target_r,&target_b))
         return 0;
 #endif
-    /* Calculate all non-human source visibility in one actor/building pass;
-       slot 7 uses the engine's authenticated SIDE visibility grid. */
+    /* Calculate non-human source visibility in one actor/building pass;
+       the authenticated human slot uses the SIDE visibility grid. */
     {
         int cell=col+row*MAP_COLS;
-        if(SC64_GRID_GET(visible,cell)) visible_owners|=1u<<7;
+        if(human_slot>=0 && SC64_GRID_GET(visible,cell)) visible_owners|=1u<<(unsigned)human_slot;
     }
 #ifdef SC64_DIAGNOSTIC_SETUP
     u32 optical_diag_start=gba_clock();
@@ -392,12 +509,19 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
     for(int k=0;k<(lists?(int)lists->optical_unit_count:MAX_UNITS);++k) {
         int i=lists?lists->optical_units[k]:k;
-        if(!(u[i].alive &&
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+        /* List entries were checked when this tick's snapshot was built. */
+        if (!lists && !(u[i].alive &&
+#else
+        if (!(u[i].alive &&
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
             !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
             !SC64_TRANSPORT_LOADED(&u[i]))) continue;
-        int source=RACE_PROTOSS_SLOT(&u[i]);
+#ifndef SC64_P7_DETECTOR_SNAPSHOT_FAST
+        int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
+#endif
 #ifdef SC64_P7_SIGHT_AXIS_CULL
         int dx=cx-u[i].x,dy=cy-u[i].y;
         if(dx < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dx > SC64_P7_SIGHT_UNIT_AXIS_BOUND ||
@@ -407,12 +531,18 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
         unsigned candidate=lists?lists->optical_unit_masks[k]:0;
         if(!lists) {
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+            int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
+#endif
             if(source>=0&&source<8) {
                 int live=race_protoss_source_owner((unsigned)source);
                 if(live>=0&&live==u[i].owner) candidate=1u<<(unsigned)source;
-            } else for(unsigned owner=0;owner<7;++owner)
-                if(race_protoss_source_owner(owner)==u[i].owner) candidate|=1u<<owner;
+            } else for(unsigned owner=0;owner<8;++owner)
+                if((int)owner!=human_slot && race_protoss_source_owner(owner)==u[i].owner) candidate|=1u<<owner;
         }
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+        if (human_slot>=0) candidate &= ~(1u << (unsigned)human_slot); /* SIDE grid is authoritative. */
+#endif
         if(!(candidate & ~visible_owners)) continue;
         int radius=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
         if(dx*dx+dy*dy>radius*radius) continue;
@@ -424,8 +554,12 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
     for(int k=0;k<(lists?(int)lists->optical_building_count:MAX_BUILDINGS);++k) {
         int i=lists?lists->optical_buildings[k]:k;
-        if(!b[i].alive) continue;
-        int source=RACE_PROTOSS_SLOT(&b[i]);
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+        if (!lists && !b[i].alive) continue;
+#else
+        if (!b[i].alive) continue;
+        int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
+#endif
 #ifdef SC64_P7_SIGHT_AXIS_CULL
         int dx=cx-b[i].x,dy=cy-b[i].y;
         if(dx < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dx > SC64_P7_SIGHT_BUILDING_AXIS_BOUND ||
@@ -435,14 +569,26 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
         unsigned candidate=lists?lists->optical_building_masks[k]:0;
         if(!lists) {
+#ifdef SC64_P7_DETECTOR_SNAPSHOT_FAST
+            int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
+#endif
             if(source>=0&&source<8) {
                 int live=race_protoss_source_owner((unsigned)source);
                 if(live>=0&&live==b[i].owner) candidate=1u<<(unsigned)source;
-            } else for(unsigned owner=0;owner<7;++owner)
-                if(race_protoss_source_owner(owner)==b[i].owner) candidate|=1u<<owner;
+            } else for(unsigned owner=0;owner<8;++owner)
+                if((int)owner!=human_slot && race_protoss_source_owner(owner)==b[i].owner) candidate|=1u<<owner;
         }
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+        if (human_slot>=0) candidate &= ~(1u << (unsigned)human_slot); /* SIDE grid is authoritative. */
+#endif
         if(!(candidate & ~visible_owners)) continue;
-        int radius=sc64_p7_observer_sight_radius_runtime(b[i].type,1);
+        int radius=sc64_p7_observer_sight_radius_runtime(
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+            sc64_shared_building_visibility_key(&b[i]),
+#else
+            b[i].type,
+#endif
+            1);
         if(dx*dx+dy*dy>radius*radius) continue;
         visible_owners|=candidate;
     }
@@ -457,7 +603,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #endif
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         RACE_PROTOSS_RAW(&u[i])==SC64_P7_OBSERVER_RAW)) continue;
-        int source=RACE_PROTOSS_SLOT(&u[i]);
+        int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         int ol,ot,or_,ob;
         int distance=-1;
@@ -472,15 +618,15 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         if(distance<0||distance>SC64_P7_OBSERVER_BASE_SIGHT_SOURCE_PX) continue;
         if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==u[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
-        else if(source<0||source>=8) for(unsigned owner=0;owner<7;++owner)
-            if(race_protoss_source_owner(owner)==u[i].owner &&
+        else if(source<0||source>=8) for(unsigned owner=0;owner<8;++owner)
+            if((int)owner!=human_slot && race_protoss_source_owner(owner)==u[i].owner &&
                (visible_owners&(1u<<owner))) detected|=1u<<owner;
     }
     for(int k=0;k<(lists?(int)lists->building_count:MAX_BUILDINGS);++k) {
         int i=lists?lists->buildings[k]:k;
         if(!(b[i].alive && RACE_PROTOSS_RAW(&b[i])==SC64_P7_CANNON_RAW &&
              building_complete(i) && powered_cannons[i])) continue;
-        int source=RACE_PROTOSS_SLOT(&b[i]);
+        int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         int cl,ct,cr,cb;
         int distance=-1;
@@ -495,8 +641,8 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         if(distance<0||distance>SC64_P7_CANNON_DETECTION_SOURCE_PX) continue;
         if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==b[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
-        else if(source<0||source>=8) for(unsigned owner=0;owner<7;++owner)
-            if(race_protoss_source_owner(owner)==b[i].owner &&
+        else if(source<0||source>=8) for(unsigned owner=0;owner<8;++owner)
+            if((int)owner!=human_slot && race_protoss_source_owner(owner)==b[i].owner &&
                (visible_owners&(1u<<owner))) detected|=1u<<owner;
     }
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
@@ -507,7 +653,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         int i=lists?lists->units[k]:k;
         if(!(u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
              RACE_PROTOSS_RAW(&u[i])==SC64_OVERLORD_RAW)) continue;
-        int source=RACE_PROTOSS_SLOT(&u[i]);
+        int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
         int ol,ot,or_,ob,distance=-1;
         if(sc64_p7_actor_rect_source(SC64_OVERLORD_RAW,u[i].x,u[i].y,0,
                                      &ol,&ot,&or_,&ob))
@@ -521,7 +667,7 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         int i=lists?lists->buildings[k]:k;
         if(!(b[i].alive && RACE_PROTOSS_RAW(&b[i])==SC64_SPORE_COLONY_RAW &&
              building_complete(i))) continue;
-        int source=RACE_PROTOSS_SLOT(&b[i]);
+        int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
         int sl,st,sr,sb,distance=-1;
         if(sc64_p7_actor_rect_source(SC64_SPORE_COLONY_RAW,b[i].x,b[i].y,1,
                                      &sl,&st,&sr,&sb))
@@ -589,10 +735,17 @@ static void sc64_p7_arbiter_cache_source_tick(void)
         RACE_PROTOSS_SLOT(&u[i])>=0 && RACE_PROTOSS_SLOT(&u[i])<8 && !(u[i].flags&8u) &&
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[i]))==u[i].owner) {
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+        int aura_source=RACE_PROTOSS_SLOT(&u[i]), aura_owner=u[i].owner;
+#endif
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         int al,at,ar,ab;
         if(!sc64_p7_actor_rect_source(71u,u[i].x,u[i].y,0,
                                       &al,&at,&ar,&ab)) continue;
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+        Sc64AuraSquare square=sc64_aura_square_make(u[i].x,u[i].y,
+                                  SC64_P7_MAP_COLS*32,SC64_P7_MAP_ROWS*32);
+#endif
 #endif
         if (sc64_target_index_active) {
             /* Target index cells are 64 GBA pixels. 160 source pixels is
@@ -603,8 +756,14 @@ static void sc64_p7_arbiter_cache_source_tick(void)
             int cols=(WORLD_W+63)/64, rows=(WORLD_H+63)/64;
             if (x0<0)x0=0; if(y0<0)y0=0;
             if(x1>=cols)x1=cols-1; if(y1>=rows)y1=rows-1;
+            /* Every aura target must have the Arbiter's compact owner. An
+             * active index was built from validated owner lists; retain the
+             * full traversal for malformed owner values. The raw-source
+             * checks below still distinguish collapsed source identities. */
+            int owner_first = (unsigned)u[i].owner < 5u ? u[i].owner : 0;
+            int owner_end = (unsigned)u[i].owner < 5u ? u[i].owner + 1 : 5;
             for (int cy=y0;cy<=y1;++cy) for(int cx=x0;cx<=x1;++cx)
-                for(int owner=0;owner<5;++owner) {
+                for(int owner=owner_first;owner<owner_end;++owner) {
                     int cell=cx+cy*SC64_TARGET_GRID_COLS;
                     Sc64TargetIndex ent=sc64_target_head[owner][cell];
                     while(ent!=SC64_TARGET_NONE) {
@@ -614,14 +773,22 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                            !aura[slot] &&
 #endif
                            sc64_p7_observer_arbiter_aura_candidate(slot) &&
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+                           sc64_p7_arbiter_same_validated_source(slot,aura_source,aura_owner) &&
+#else
                            sc64_p7_arbiter_same_source((int)i,slot) &&
+#endif
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
                            1) {
                             int tl,tt,tr,tb;
                             if(sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[slot]),
                                     u[slot].x,u[slot].y,0,&tl,&tt,&tr,&tb) &&
-                               sc64_p7_arbiter_finder_square_rect((int)i,
-                                    tl,tt,tr,tb)) {
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+                               sc64_aura_square_contains(&square,tl,tt,tr,tb)
+#else
+                               sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)
+#endif
+                               ) {
                                 int d=sc64_p7_observer_rect_distance_rects(
                                     al,at,ar,ab,tl,tt,tr,tb);
                                 if(d>=0&&d<=160)aura[slot]=1;
@@ -643,13 +810,22 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 !aura[j] &&
 #endif
                 sc64_p7_observer_arbiter_aura_candidate((int)j) &&
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+                sc64_p7_arbiter_same_validated_source((int)j,aura_source,aura_owner) &&
+#else
                 sc64_p7_arbiter_same_source((int)i,(int)j) &&
+#endif
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
                 1) {
                 int tl,tt,tr,tb;
                 if(sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[j]),
                         u[j].x,u[j].y,0,&tl,&tt,&tr,&tb) &&
-                   sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)) {
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+                   sc64_aura_square_contains(&square,tl,tt,tr,tb)
+#else
+                   sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)
+#endif
+                               ) {
                     int d=sc64_p7_observer_rect_distance_rects(
                         al,at,ar,ab,tl,tt,tr,tb);
                     if(d>=0&&d<=160)aura[j]=1;
@@ -695,12 +871,13 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 if (!powered_cannons_ready) {
                     memset(powered_cannons,0,sizeof(powered_cannons));
                     for(j=0;j<MAX_BUILDINGS;++j) if(b[j].alive &&
-                        RACE_PROTOSS_RAW(&b[j])==SC64_P7_CANNON_RAW && building_complete((int)j) &&
-                        RACE_PROTOSS_SLOT(&b[j])>=0 && RACE_PROTOSS_SLOT(&b[j])<8) {
-                        int live=race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&b[j]));
-                        if(live==b[j].owner)
-                            powered_cannons[j]=(u8)sc64_p7_observer_pylon_powers((int)j,
-                                RACE_PROTOSS_SLOT(&b[j]),live);
+                        RACE_PROTOSS_RAW(&b[j])==SC64_P7_CANNON_RAW && building_complete((int)j)) {
+                        int source=sc64_p7_detector_current_slot(b[j].owner,RACE_PROTOSS_SLOT(&b[j]));
+                        if(source>=0 && source<8) {
+                            int live=race_protoss_source_owner((unsigned)source);
+                            if(live==b[j].owner)
+                                powered_cannons[j]=(u8)sc64_p7_observer_pylon_powers((int)j,source,live);
+                        }
                     }
                     sc64_p7_detector_lists_build(&detector_lists);
                     powered_cannons_ready=1;
@@ -826,6 +1003,7 @@ static int sc64_p7_observer_detector_sees(int target, int source_owner,
 {
     int target_raw = sc64_p7_observer_target_raw_type(target);
     source_owner = race_protoss_query_slot(source_owner, live_owner);
+    source_owner = sc64_p7_detector_current_slot(live_owner,source_owner);
     if (target_raw < 0 || !sc64_p7_observer_target_optically_visible(
             target, source_owner, live_owner)) return 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
@@ -884,11 +1062,18 @@ static int sc64_p7_observer_can_attack_from(int attacker, int target,
                                             int source_owner)
 {
     if (!SC64_CAN_ATTACK_FROM(attacker, target, live_owner)) return 0;
+#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+    source_owner = sc64_p7_detector_current_slot(live_owner,
+        race_protoss_query_slot(source_owner,live_owner));
+#endif
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (!race_protoss_services_active() || !sc64_p7_observer_target_is_cloaked(target)) return 1;
     return sc64_p7_observer_detector_sees(target,source_owner,live_owner);
 #else
-    if (!race_protoss_services_active() || source_owner >= 8 ||
+    if (!race_protoss_services_active() ||
+#ifndef SC64_SOURCE_SIGHT_ALL_RACES
+        source_owner >= 8 ||
+#endif
         !sc64_p7_observer_is_cloaked(
             (unsigned)sc64_p7_observer_target_raw_type(target))) return 1;
     return sc64_p7_observer_target_allowed(

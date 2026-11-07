@@ -67,12 +67,23 @@ sc64_z8_rect_is_source(const Sc64Z8Rect *r, const Sc64Z8SourceLocation *src)
  * so a save never silently drops scheduler state. The AI bytes and wallets
  * are owned by the caller and left untouched. */
 static inline int
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+sc64_z8_state_pack_for(Sc64Z8PersistentState *out, const Sc64Z8SchedulerState *s,
+                   const Sc64Z8Program *p,int egg_stage)
+#else
 sc64_z8_state_pack(Sc64Z8PersistentState *out, const Sc64Z8SchedulerState *s,
                    const Sc64Z8Program *p)
+#endif
 {
     u8 moved[SC64_Z8_SAVE_MOVED_LOCATIONS];
     unsigned moved_count = sc64_z8_moved_locations(p, moved);
-    if (!out || !sc64_z8_state_valid(s, p) || moved_count == 0xffu ||
+    if (!out || !
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+sc64_z8_state_valid_for(s, p,egg_stage)
+#else
+sc64_z8_state_valid(s, p)
+#endif
+ || moved_count == 0xffu ||
         s->instance_count > SC64_Z8_SAVE_INSTANCES) return 0;
     for (unsigned i = 0; i < s->instance_count; ++i)
         if (s->instances[i].cursor > 15u) return 0;
@@ -102,15 +113,26 @@ sc64_z8_state_pack(Sc64Z8PersistentState *out, const Sc64Z8SchedulerState *s,
         out->moved[m] = m < moved_count ? s->locations[moved[m] - 1] : (Sc64Z8Rect){0};
     return 1;
 }
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static inline int sc64_z8_state_pack(Sc64Z8PersistentState *out,const Sc64Z8SchedulerState *s,const Sc64Z8Program *p)
+{ return sc64_z8_state_pack_for(out,s,p,0); }
+#endif
+
 
 /* Rebuild a full scheduler image from the program, the mission-start setup
  * and a compact record in caller-provided scratch (the engine lends a
  * transient buffer rather than reserving a second image). `out` changes
  * only if the result validates; `out` may be null to validate only. */
 static inline int
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+sc64_z8_state_unpack_for(Sc64Z8SchedulerState *out, const Sc64Z8PersistentState *in,
+                     const Sc64Z8Program *p, const Sc64Z8Setup *setup,
+                     Sc64Z8SchedulerState *scratch,int egg_stage)
+#else
 sc64_z8_state_unpack(Sc64Z8SchedulerState *out, const Sc64Z8PersistentState *in,
                      const Sc64Z8Program *p, const Sc64Z8Setup *setup,
                      Sc64Z8SchedulerState *scratch)
+#endif
 {
     Sc64Z8SchedulerState *const image = scratch;
     u8 moved[SC64_Z8_SAVE_MOVED_LOCATIONS];
@@ -140,9 +162,20 @@ sc64_z8_state_unpack(Sc64Z8SchedulerState *out, const Sc64Z8PersistentState *in,
     image->pass_counter = in->pass_counter;
     image->second_counter = in->second_counter;
     for (unsigned m = 0; m < moved_count; ++m) image->locations[moved[m] - 1] = in->moved[m];
-    if (!sc64_z8_state_valid(image, p)) return 0;
+    if (!
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+sc64_z8_state_valid_for(image, p,egg_stage)
+#else
+sc64_z8_state_valid(image, p)
+#endif
+) return 0;
     if (out) *out = *image;
     return 1;
 }
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static inline int sc64_z8_state_unpack(Sc64Z8SchedulerState *out,const Sc64Z8PersistentState *in,const Sc64Z8Program *p,const Sc64Z8Setup *setup,Sc64Z8SchedulerState *scratch)
+{ return sc64_z8_state_unpack_for(out,in,p,setup,scratch,0); }
+#endif
+
 
 #endif /* SC64_Z8_STATE_H */

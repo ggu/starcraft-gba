@@ -28,28 +28,28 @@ static const Sc64TextBoxMission *race_text_box_mission(void)
 #endif
 
 /* Rows are few, and a post is a rare event, so a bounded scan is enough. */
-static void race_text_box_post_string(unsigned long string_id)
+static int race_text_box_post_string(unsigned long string_id)
 {
     const Sc64TextBoxMission *m = race_text_box_mission();
-    if (!m) return;
+    if (!m) return 0;
     for (unsigned i = 0; i < m->row_count; ++i)
         if (m->rows[i].string_id == string_id) {
             RACE_TEXT_BOX_LOG(&m->rows[i]);
-            sc64_text_box_push(i);
-            return;
+            return sc64_text_box_contains(i) || sc64_text_box_push(i);
         }
+    return 0;
 }
 
-static void race_text_box_post_row(unsigned trigger, unsigned action)
+static int race_text_box_post_row(unsigned trigger, unsigned action)
 {
     const Sc64TextBoxMission *m = race_text_box_mission();
-    if (!m) return;
+    if (!m) return 0;
     for (unsigned i = 0; i < m->row_count; ++i)
         if (m->rows[i].trigger == trigger && m->rows[i].action == action) {
             RACE_TEXT_BOX_LOG(&m->rows[i]);
-            sc64_text_box_push(i);
-            return;
+            return sc64_text_box_contains(i) || sc64_text_box_push(i);
         }
+    return 0;
 }
 
 static const Sc64TextBoxRow *race_text_box_front_row(void)

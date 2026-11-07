@@ -273,14 +273,36 @@ race_impact_save_write(void)
         sc64_impact_encode(race_impact_rows, race_impact_count,
                            (u8 *)&race_impact_record + offset);
 #if defined(SC64_SHARED_TRANSPORT) && defined(SC64_WORKER_CARGO_KIND)
-    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION};
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
+        SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
+        SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION : SC64_GUARDIAN_TRANSPORT_SAVE_VERSION)
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG (race_data.version==SC64_SHARED_EGG_SAVE_VERSION ? SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
+#elif defined(SC64_GUARDIAN_COCOON_STAGE)
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
+#else
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#endif
+};
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#define SC64_GUARDIAN_WRITE_TAG SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#else
+#define SC64_GUARDIAN_WRITE_TAG SC64_TRANSPORT_SAVE_VERSION
+#endif
+#endif
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
     if (previous) {
         if (!save_write_selected(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                 SC64_TRANSPORT_SAVE_VERSION,previous,tags,2)) return 0;
+                                 SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                  SC64_TRANSPORT_SAVE_VERSION)) return 0;
+                                  SC64_GUARDIAN_WRITE_TAG)) return 0;
 #elif defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
@@ -321,12 +343,34 @@ race_impact_save_write(void)
     sc64_sk_transport_encode((u8 *)&race_impact_record + sizeof(RaceSave) + bytes,
                              &race_skirmish_transport_candidate);
 #ifdef SC64_WORKER_CARGO_KIND
-    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION};
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
+        SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
+        SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION : SC64_GUARDIAN_TRANSPORT_SAVE_VERSION)
+#elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG (race_data.version==SC64_SHARED_EGG_SAVE_VERSION ? SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
+#elif defined(SC64_GUARDIAN_COCOON_STAGE)
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
+#define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
+#else
+    const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+    ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#endif
+};
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#define SC64_GUARDIAN_WRITE_TAG SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#else
+#define SC64_GUARDIAN_WRITE_TAG SC64_TRANSPORT_SAVE_VERSION
+#endif
+#endif
     if (previous) {
         if (!save_write_selected(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                 SC64_TRANSPORT_SAVE_VERSION,previous,tags,2)) return 0;
+                                 SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                  SC64_TRANSPORT_SAVE_VERSION)) return 0;
+                                  SC64_GUARDIAN_WRITE_TAG)) return 0;
 #else
     save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes + SC64_TRANSPORT_TRAILER_BYTES,
                SC64_TRANSPORT_SAVE_VERSION);
@@ -354,9 +398,17 @@ race_impact_save_write(void)
 /* Decode an already-selected raw envelope in race_impact_record.  This may
  * rearrange that scratch record, but never reads SRAM or changes live state. */
 static int
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+race_impact_save_decode_selected_impl(u32 len, u32 selected_tag,
+                                 Sc64ImpactEvent *candidate, int *count,u32 authenticated_inner)
+#else
 race_impact_save_decode_selected(u32 len, u32 selected_tag,
                                  Sc64ImpactEvent *candidate, int *count)
+#endif
 {
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+    (void)authenticated_inner;
+#endif
     int rows;
     *count = 0;
     if (len > (u32)sizeof(race_impact_record)) return 0;
@@ -395,7 +447,12 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
        ) return 0;
     if (len < base) return 0;
     if (!legacy) {
-        if (race_data.version != selected_tag ||
+        if (race_data.version !=
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+            (authenticated_inner ? authenticated_inner : selected_tag) ||
+#else
+            selected_tag ||
+#endif
             ((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u ||
             ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
             ((unsigned)race_data.state[28] & 7u) > 4u) return 0;
@@ -428,6 +485,28 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     *count = rows;
     return 1;
 }
+
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count)
+{ return race_impact_save_decode_selected_impl(len,tag,candidate,count,0); }
+static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count,const Sc64StageSaveAuth *auth)
+{
+    if (!sc64_stage_save_auth_matches(auth,&race_data,race_data.version,0) ||
+#ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
+        (auth->features & ~(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG)) ||
+        tag!=(auth->features ? SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+        (auth->features & ~SC64_STAGE_SAVE_EGG) ||
+        tag!=((auth->features & SC64_STAGE_SAVE_EGG) ?
+              SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
+#else
+        (auth->features & ~SC64_STAGE_SAVE_GUARDIAN) ||
+        tag!=((auth->features & SC64_STAGE_SAVE_GUARDIAN) ?
+              SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
+#endif
+    return race_impact_save_decode_selected_impl(len,tag,candidate,count,auth->inner);
+}
+#endif
 
 /* Preserve the existing per-tag selection policy until semantic journal
  * migration is registered.  The decoder above is shared with that future

@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include <stdio.h>
 #include "../starcraft/sc64_stock_profiles.h"
+#ifdef SC64_STOCK_UPGRADE_DUMP
+#include "../starcraft/sc64_stock_upgrade_families.h"
+#endif
 
 int main(void)
 {
@@ -20,6 +23,17 @@ int main(void)
                p->upgrade_bonus, p->damage_factor, p->cooldown,
                p->min_range, p->max_range, p->damage_class);
     }
+#ifdef SC64_STOCK_UPGRADE_DUMP
+    for (int i = 0; i < SC64_STOCK_UNIT_LIMIT; ++i)
+        printf("A,%d,%d\n", i, sc64_stock_armor_upgrade_id(i));
+    for (int i = 0; i < SC64_STOCK_WEAPON_ROWS; ++i)
+        printf("F,%d,%d\n", i, sc64_stock_weapon_upgrade_id(i));
+    if (sc64_stock_armor_upgrade_id(-1) != SC64_STOCK_UPGRADE_NONE ||
+        sc64_stock_armor_upgrade_id(228) != SC64_STOCK_UPGRADE_NONE ||
+        sc64_stock_weapon_upgrade_id(-1) != SC64_STOCK_UPGRADE_NONE ||
+        sc64_stock_weapon_upgrade_id(SC64_STOCK_WEAPON_ROWS) != SC64_STOCK_UPGRADE_NONE)
+        return 3;
+#endif
     if (sc64_stock_unit_profile(-1) ||
         sc64_stock_unit_profile(SC64_STOCK_UNIT_LIMIT) ||
         sc64_stock_weapon_profile(-1) ||

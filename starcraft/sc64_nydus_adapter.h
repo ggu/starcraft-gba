@@ -15,6 +15,7 @@
  */
 #ifndef SC64_NYDUS_ADAPTER_H
 #define SC64_NYDUS_ADAPTER_H
+#include "sc64_save_decode_context.h"
 
 #ifdef SC64_NYDUS_ENABLED
 #if !defined(SC64_RACES) || !defined(SC64_ZP_CAMPAIGN_ACTORS) || \
@@ -25,8 +26,18 @@
 
 _Static_assert(MAX_BUILDINGS < SC64_NYDUS_NO_SLOT,
                "Nydus links store building slots in one byte");
-_Static_assert(ORDER_NYDUS_ENTER <= 15 && SC_RB_COUNT <= 64,
-               "packed unit order and building type fields");
+_Static_assert(ORDER_NYDUS_ENTER <= 15,
+               "packed unit order field is four bits");
+#ifdef SC64_Z7_DERIVED_SAVE
+_Static_assert(SC_RB_COUNT <= 64,
+               "legacy derived building type field is six bits");
+#else
+/* The selected compact (or P7 typed) building row retains its seventh type
+ * bit in trailing padding. Do not impose the older derived row's bound on
+ * that codec; its own encoder/decoder still validate every value and bit. */
+_Static_assert(SC_RB_COUNT <= 128,
+               "compact building type field is seven bits");
+#endif
 
 static const Sc64NydusSourceRecord *race_nydus_source;
 static Sc64NydusSourcePair race_nydus_pairs[SC64_NYDUS_MAX_LINKS];
@@ -285,6 +296,17 @@ static void race_nydus_clear_unit_references(int passenger)
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
         if (i == passenger || !q->alive || q->target != passenger) continue;
+        /* Paid production actors keep a product identity in target, not a
+         * unit-slot reference. A numerically matching passenger must not
+         * cancel their job when it enters the canal. */
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+        if (q->type == SC64_SHARED_EGG_TYPE) continue;
+#elif defined(SC64_Z7_EGG_PRODUCTION)
+        if (q->type == U_Z7_EGG) continue;
+#endif
+#ifdef SC64_GUARDIAN_COCOON_STAGE
+        if (q->type == U_GUARDIAN_COCOON) continue;
+#endif
         if (q->order == ORDER_ATTACK_TARGET
 #ifdef SC64_Z5_CONSUME_ENABLED
             || q->order == ORDER_Z5_CONSUME
@@ -461,7 +483,7 @@ static const Sc64NydusEndpointView *race_nydus_view_slot(
 }
 
 static int race_nydus_save_candidate_valid(const RaceSave *candidate, int width,
-                                           int height)
+                                           int height SC64_GCTX_DECL)
 {
     Sc64NydusEndpointView views[SC64_NYDUS_MAX_VIEWS];
     Sc64NydusSourcePair pairs[SC64_NYDUS_MAX_LINKS];
@@ -495,7 +517,7 @@ static int race_nydus_save_candidate_valid(const RaceSave *candidate, int width,
         const Sc64NydusEndpointView *in, *out;
         Sc64NydusPassengerView p;
         int partner;
-        if (!race_save_decode_unit(candidate, (unsigned)i, (unsigned)width * 16u,
+        if (!SC64_GUARD_DECODE(candidate, (unsigned)i, (unsigned)width * 16u,
                                    (unsigned)height * 16u, &q)) return 0;
         if (!q.alive || q.order != ORDER_NYDUS_ENTER) continue;
         if (!resolved || q.target < 0 || q.target >= MAX_BUILDINGS) return 0;

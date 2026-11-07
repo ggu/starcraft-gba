@@ -211,10 +211,17 @@ sc64_zl_init(Sc64ZlSchedulerState *s, const Sc64ZlProgram *zp,
 
 /* Full persisted-state check, as sc64_z8_state_valid() plus the countdown. */
 static inline int
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+sc64_zl_state_valid_for(const Sc64ZlSchedulerState *zs, const Sc64ZlProgram *zp, int egg_stage)
+#else
 sc64_zl_state_valid(const Sc64ZlSchedulerState *zs, const Sc64ZlProgram *zp)
+#endif
 {
     const Sc64Z8SchedulerState *s = zs ? &zs->core : 0;
     const Sc64Z8Program *p = zp ? &zp->rows : 0;
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    (void)egg_stage;
+#endif
     if (!s || !sc64_zl_program_valid(zp) || s->version != SC64_ZL_STATE_VERSION ||
         zs->countdown > SC64_ZL_COUNTDOWN_LIMIT ||
         s->trigger_count != p->trigger_count ||
@@ -247,8 +254,11 @@ sc64_zl_state_valid(const Sc64ZlSchedulerState *zs, const Sc64ZlProgram *zp)
             } else {
                 const Sc64Z8Action *a = in->cursor < SC64_Z8_ACTION_SLOTS ?
                     sc64_z8_action_at(p, &p->triggers[i], in->cursor) : 0;
-                if (!a || (a->flags & 2) || !sc64_z8_action_timed(a->opcode))
-                    return 0;
+                if (!a || (a->flags & 2) || (!sc64_z8_action_timed(a->opcode)
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+                    && !(egg_stage && a->opcode==11 && a->location && !(f & SC64_Z8_INST_ARMED))
+#endif
+                    )) return 0;
                 if (f & SC64_Z8_INST_ARMED) armed_mask |= 1u << o;
             }
         }
@@ -276,6 +286,11 @@ sc64_zl_state_valid(const Sc64ZlSchedulerState *zs, const Sc64ZlProgram *zp)
     }
     return 1;
 }
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static inline int sc64_zl_state_valid(const Sc64ZlSchedulerState *zs,const Sc64ZlProgram *zp)
+{ return sc64_zl_state_valid_for(zs,zp,0); }
+#endif
+
 
 /* Returns 1 (true), 0 (false) or -1 (fault). */
 static inline int
@@ -432,9 +447,17 @@ sc64_zl_action(Sc64ZlSchedulerState *zs, const Sc64ZlProgram *zp,
         if (!a->location) return 1;
         /* fall through */
     case 8: case 9: case 12: case 26:
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+        if (!ops || !ops->base.action) break;
+        r=ops->base.action(context,a,owner,rect);
+        if (a->opcode==11 && r==0) return 0;
+        if (r!=1) break;
+        return 1;
+#else
         if (!ops || !ops->base.action ||
             ops->base.action(context, a, owner, rect) != 1) break;
         return 1;
+#endif
     default:
         break;
     }

@@ -191,6 +191,9 @@ verify_roms = importlib.util.module_from_spec(verify_spec)
 verify_loader.exec_module(verify_roms)
 
 
+original_prepare = dev.prepare
+original_status = dev.status
+
 class OnboardingTests(unittest.TestCase):
     def test_construction_readiness_requires_glow_version_and_payload(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -356,9 +359,37 @@ class OnboardingTests(unittest.TestCase):
             header.write_text('sc64_race_z3_units\n', encoding='utf-8')
             self.assertFalse(dev.race_campaign_input_ready('zerg', header))
 
+    def test_zerg_alias_routes_z9_and_preserves_z7_save(self):
+        from tools import sc64_z9_setup
+        self.assertEqual(dev.GAMES['zerg'][1], dev.GAMES['zerg-z9'][1])
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['zerg'], dev.PLAY_SAVE_PROFILES['zerg-z9'])
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['zerg'], 'zerg-z9')
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['zerg-z7'], 'zerg-z7-transport1')
+        for profile in ('zerg', 'zerg-z9'):
+            calls = []
+            with patch.object(dev, 'prepare', side_effect=lambda rom, p: calls.append(p)), \
+                 patch.object(sc64_z9_setup, 'prepare') as late:
+                original_prepare(Path('/owned/rom'), profile)
+            self.assertEqual(calls, ['zerg-z7'])
+            late.assert_called_once_with(dev.ROOT, dev.run)
+            with patch.object(dev, 'status', return_value=0) as ready, patch.object(dev, 'run') as run:
+                dev.build(profile)
+            ready.assert_called_once_with(profile, include_built=False)
+            run.assert_called_once_with(['make', dev.GAMES[profile][0]])
+            with patch.object(dev, 'status', return_value=1), patch.object(dev, 'run') as run:
+                with self.assertRaisesRegex(RuntimeError, 'Z9 requires prepared inputs'):
+                    dev.build(profile)
+                run.assert_not_called()
+            for inherited, late_ready, expected in ((0, 0, 0), (1, 0, 1), (0, 1, 1)):
+                with patch.object(dev, 'status', return_value=inherited) as inherited_status, \
+                     patch.object(sc64_z9_setup, 'status', return_value=late_ready) as late_status:
+                    self.assertEqual(original_status(profile, include_built=False), expected)
+                inherited_status.assert_called_once_with('zerg-z7', include_built=False)
+                late_status.assert_called_once_with(dev.ROOT)
+
     def test_canonical_race_verifiers_use_current_mission_identities(self):
         self.assertEqual(verify_roms.TARGETS['--zerg'],
-                         ('StarCraft-Zerg-Z7-Transport1-GBA', 'starcraft-zerg-z7', 'SCZ7', 'SC ZERG Z7'))
+                         ('StarCraft-Zerg-Z9-Transport1-GBA', 'starcraft-zerg-z9', 'SCZ9', 'SC ZERG Z9'))
         self.assertEqual(verify_roms.TARGETS['--zerg-z6'],
                          ('StarCraft-Zerg-Z6-GBA', 'starcraft-zerg-z6', 'SCZ6', 'SC ZERG Z6'))
         self.assertEqual(verify_roms.TARGETS['--zerg-z7'],
@@ -399,22 +430,22 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.GAMES['protoss-p6'], ('protoss-p6', 'build/StarCraft-Protoss-P6-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p5-shuttle'],
                          ('protoss-p5-shuttle', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
-        self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z7-Transport1-GBA.gba'))
+        self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z9-Transport1-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z6'], ('zerg-z6', 'build/StarCraft-Zerg-Z6-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z7'], ('zerg-z7', 'build/StarCraft-Zerg-Z7-Transport1-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z4'], ('zerg-z4', 'build/StarCraft-Zerg-Z4-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES,
-                         {'terran': 'terran-transport1', 'zerg': 'zerg-z7-transport1', 'zerg-z6': 'zerg-z6', 'zerg-z7': 'zerg-z7-transport1',
+                         {'terran': 'terran-transport1', 'zerg': 'zerg-z9', 'zerg-z9': 'zerg-z9', 'zerg-z6': 'zerg-z6', 'zerg-z7': 'zerg-z7-transport1',
                           'zerg-z6-probe': 'zerg-z6', 'zerg-z4': 'zerg-z4', 'zerg-z3': 'zerg',
                           'protoss': 'protoss-p10-transport1', 'protoss-p7': 'protoss-p7-transport1',
                           'protoss-p6': 'protoss-p6', 'protoss-p3': 'protoss',
                           'protoss-p4-storm': 'protoss-p4-storm',
                           'protoss-p5-shuttle': 'protoss-p5-shuttle'})
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
-                         ('StarCraft-Zerg-Z7-Transport1-GBA.gba', 'starcraft-zerg-z7.elf'))
+                         ('StarCraft-Zerg-Z9-Transport1-GBA.gba', 'starcraft-zerg-z9.elf'))
         self.assertEqual(sc64_split_profile.PROFILE_BUILD_PATHS['zerg'],
-                         ('StarCraft-Zerg-Z7-Transport1-GBA.gba', 'starcraft-zerg-z7.elf'))
+                         ('StarCraft-Zerg-Z9-Transport1-GBA.gba', 'starcraft-zerg-z9.elf'))
         for routes in (sc64_split_profile.PROFILE_BUILD_PATHS, sc64_split_smoke.PROFILE_BUILD_PATHS):
             self.assertEqual(routes['protoss'],
                              ('StarCraft-Protoss-P10-Transport1-GBA.gba', 'starcraft-protoss-p10.elf'))
@@ -670,12 +701,12 @@ class OnboardingTests(unittest.TestCase):
             with patch.object(dev, 'ROOT', root), patch.object(
                     dev, 'run', side_effect=AssertionError('make must not run')):
                 with self.assertRaisesRegex(RuntimeError, 'SC64_Z6_DATA_ENABLED map gate'):
-                    dev.build('zerg')
+                    dev.build('zerg-z7')
             (stage / 'sc64_races_generated.h').write_text(z6_gate, encoding='ascii')
             with patch.object(dev, 'ROOT', root), patch.object(
                     dev, 'run', side_effect=AssertionError('make must not run')):
                 with self.assertRaisesRegex(RuntimeError, 'canonical Zerg Z7'):
-                    dev.build('zerg')
+                    dev.build('zerg-z7')
             z7_gate = ('#if defined(SC64_UNIFIED) && defined(SC64_Z7_DATA_ENABLED)\nsc64_race_z7_units\n'
                        '#endif /* SC64_UNIFIED && SC64_Z7_DATA_ENABLED */\n')
             (stage / 'sc64_races_generated.h').write_text(z6_gate + z7_gate, encoding='ascii')
@@ -686,8 +717,8 @@ class OnboardingTests(unittest.TestCase):
             calls = []
             with patch.object(dev, 'ROOT', root), patch.object(
                     dev, 'run', side_effect=lambda command, **_: calls.append(command)):
-                dev.build('zerg')
-            self.assertEqual(calls, [['make', 'zerg']])
+                dev.build('zerg-z7')
+            self.assertEqual(calls, [['make', 'zerg-z7']])
 
     def test_canonical_zerg_build_rejects_stale_sprite_header_before_make(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -699,7 +730,7 @@ class OnboardingTests(unittest.TestCase):
             with patch.object(dev, 'ROOT', root), patch.object(
                     dev, 'run', side_effect=AssertionError('make must not run')):
                 with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
-                    dev.build('zerg')
+                    dev.build('zerg-z7')
 
     @patch.object(dev, "bc_inputs_ready", return_value=True)
     def test_terran_build_requires_real_word_metadata_before_make(self, _bc_ready):
@@ -874,7 +905,11 @@ class OnboardingTests(unittest.TestCase):
         self.assertIn('build/StarCraft-Zerg-Z7-Transport1-GBA.gba', makefile)
         self.assertIn("'SC ZERG Z7' SCZ7", makefile)
         self.assertIn('test-sc64-z7-canonical-skirmish', makefile)
-        self.assertIn('test-zerg: test-zerg-z7', makefile)
+        self.assertIn('test-zerg: test-sc64-zerg-z9', makefile)
+        late_make = (ROOT / 'tests/sc64-zerg-late/Makefile').read_text(encoding='utf-8')
+        self.assertIn('test-sc64-zerg-z9: test-sc64-z9-canonical-skirmish', late_make)
+        self.assertIn('$(ZERG_Z9_CANONICAL_FLAGS) $< common/gba.c', late_make)
+        self.assertIn('--output .local/sc64/skirmish/zerg-z9-matches', late_make)
         self.assertIn('test-zerg-z6: build/test-zerg build/test-sc64-zerg-promoted-profile', makefile)
         self.assertIn('PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS)', makefile)
         self.assertIn('test-protoss-p7: ', makefile)
@@ -1696,7 +1731,7 @@ class OnboardingTests(unittest.TestCase):
             with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
                  patch.object(dev, 'run', side_effect=fake_bank_run), \
                  patch.object(dev, 'prepare_staged_campaign', side_effect=fake_staged):
-                dev.prepare(rom, 'zerg')
+                dev.prepare(rom, 'zerg-z7')
             self.assertEqual(staged, ['zerg-z6', 'zerg-z7'])
             bank_calls = [call for call in calls if '--include-z6-buildings' in call]
             self.assertEqual(len(bank_calls), 1)

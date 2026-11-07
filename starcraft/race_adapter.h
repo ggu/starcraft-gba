@@ -2,6 +2,7 @@
 #define SC64_RACE_ADAPTER_H
 
 #include "race_skirmish.h"
+#include "sc64_p7_power_geometry.h"
 #ifdef SC64_P3_PRODUCTION_EXIT
 #ifndef SC64_P3_RUNTIME
 #error "SC64_P3_PRODUCTION_EXIT requires the P3 campaign runtime"
@@ -13,13 +14,45 @@
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_battery_rules.h"
-#include "sc64_p7_power_geometry.h"
 #endif
 
 #ifdef SC64_T5_RUNTIME
 static int race_t5_active(void);
 static int race_t5_starport_has_control_tower(int producer);
 #endif
+
+/* Existing imported actors retain origin raw_owner on some rescue paths. Only
+ * assign a new actor after authenticating the creator against the active map.
+ * Generic/custom owners already use compact identities, so leave raw unset. */
+static int race_campaign_owner(const Sc64RaceMap *map, int raw_owner);
+static int race_creation_source_owner(int owner, int creator_raw)
+{
+    const Sc64RaceMap *map;
+    int candidate = -1;
+    if (race_mode || owner < SIDE || owner > 4 || race_selected_mission < 0 ||
+        race_selected_mission >= SC64_RACE_MAP_COUNT) return -1;
+    map = &sc64_race_maps[race_selected_mission];
+    if (!map->owner_modes || map->human_slot >= 8u) return -1;
+    if (creator_raw >= 0 && creator_raw < 8 &&
+        race_campaign_owner(map, creator_raw) == owner) return creator_raw;
+    /* A rescued human-controlled actor may retain its original raw slot.
+     * Claim the descriptor human slot only when it is the unique SIDE mapping. */
+    if (owner != SIDE || race_campaign_owner(map, map->human_slot) != SIDE) return -1;
+    for (int i = 0; i < 8; ++i) if (race_campaign_owner(map, i) == SIDE) {
+        if (candidate >= 0) return -1;
+        candidate = i;
+    }
+    return candidate == map->human_slot ? candidate : -1;
+}
+
+static int race_spawn_product(int owner, int type, int x, int y, int source_owner)
+{
+    int slot = spawn_unit(owner, type, x, y);
+    /* Mission-specific spawn hooks have priority over this shared fallback. */
+    if (slot >= 0 && source_owner >= 0 && u[slot].raw_owner < 0)
+        u[slot].raw_owner = source_owner;
+    return slot;
+}
 
 /* Live owner-independent race adapter. Include from game.c after engine
  * helpers and before the frame/update hooks that call these functions. */
@@ -99,7 +132,7 @@ static int race_owner_supply(int owner)
     for (i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == owner) {
             const Sc64RaceUnitRule *r = sc64_race_unit_rule(u[i].type);
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
             if (r) total += unit_slot_supply(&u[i]);
 #else
             if (r) total += r->supply;
@@ -137,19 +170,37 @@ static int race_owner_reserved_supply(int owner)
     return race_owner_supply(owner) + race_owner_queued_supply(owner);
 }
 
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
+#ifdef SC64_SHARED_EGG_HOST_STAGE
+/* Z7 keeps its existing source policy; this staging gate adds only Z8/Z9
+ * and custom games. No menu or guest capability is enabled here. */
+static int race_shared_egg_context(void)
+{
+    return race_mode || race_z8_active() || race_zl_active();
+}
+#define SC64_EGG_CONTEXT() (SC64_EGG_IS_Z7() || race_shared_egg_context())
+#elif defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+static int race_shared_egg_context(void) { return race_mode; }
+#define SC64_EGG_CONTEXT() (SC64_EGG_IS_Z7() || race_shared_egg_context())
+#else
+#define SC64_EGG_CONTEXT() SC64_EGG_IS_Z7()
+#endif
 /* Zerg production is attributed to the town hall in this adapter, while
  * Brood War applies products to individual larvae. Larvae persist through a
  * Lair/Hive morph; unfinished new Hatcheries still have no usable larvae. */
 static int race_z7_morphing_egg_hall(int owner, int producer)
 {
-    return race_z7_active() && owner >= 0 && owner < 5 &&
+    return SC64_EGG_CONTEXT() && owner >= 0 && owner < 5 &&
            race_owner_identity(owner) == R_ZERG &&
            producer >= 0 && producer < MAX_BUILDINGS &&
            b[producer].alive && b[producer].owner == owner &&
            b[producer].under_construction &&
            (b[producer].type == B_LAIR || b[producer].type == B_HIVE);
 }
+
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+static int __attribute__((noinline)) race_product_slots_available(unsigned wanted);
+#endif
 
 /* Egg rows are independent timers. The product and remaining clock live in
  * fields already serialized for every Unit, so no producer link or extra
@@ -163,10 +214,13 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
     Unit *q;
     const Sc64RaceUnitRule *product;
     int old_hp, new_hp, old_supply, owner, x, y, second;
+#if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+    int source_owner;
+#endif
     if (slot < 0 || slot >= MAX_UNITS) return 1;
     q = &u[slot];
-    if (!q->alive || q->type != U_Z7_EGG) return 1;
-    if (!race_z7_active() || !sc64_z7_egg_product_valid(q->target) ||
+    if (!q->alive || q->type != SC64_EGG_ACTOR) return 1;
+    if (!SC64_EGG_CONTEXT() || !sc64_z7_egg_product_valid(q->target) ||
         q->work_timer > sc64_z7_egg_duration(q->target)) {
         /* Invalid transient data is never allowed to turn into a free unit. */
         if (q->owner == SIDE) supply_used -= unit_slot_supply(q);
@@ -174,11 +228,28 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
         q->selected = 0;
         return 1;
     }
+#if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+    /* A paid paired birth waits until the reserved second slot is available. */
+    if (!SC64_EGG_IS_Z7() && q->work_timer==1 &&
+        sc64_z7_egg_product_count(q->target)==2 && find_unit_slot()<0) return 1;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+    if (!SC64_EGG_IS_Z7() && q->work_timer==1 &&
+        sc64_z7_egg_product_count(q->target)==2) {
+        if (!race_product_slots_available(0)) return 1;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        if (race_protoss_services_active() && !race_p7_carrier_training_slots_available(0)) return 1;
+#endif
+    }
+#endif
+#endif
     if (q->work_timer > 0) --q->work_timer;
     if (q->work_timer > 0) return 1;
 
     product = sc64_race_unit_rule(q->target);
     owner = q->owner;
+#if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+    source_owner = q->raw_owner;
+#endif
     x = q->x;
     y = q->y;
     old_hp = q->hp;
@@ -197,9 +268,19 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
     q->shield = product->shields;
     q->shield_remainder = 0;
     q->armor = sc64_race_unit_armor(q->type);
+#if !defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE) || !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
     q->weapon = owner == SIDE ? weapons_level : 0;
+#endif
     q->raw_type = sc64_race_raw_unit(q->type);
+#ifdef SC64_Z7_RUNTIME
+#if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+    q->raw_owner = SC64_EGG_IS_Z7() ? race_z7_product_source_owner(owner) : source_owner;
+#else
     q->raw_owner = race_z7_product_source_owner(owner);
+#endif
+#else
+    q->raw_owner = source_owner;
+#endif
     q->order = ORDER_IDLE;
     q->target = -1;
     q->tx = x;
@@ -218,29 +299,67 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
      * is full, it still completes the first Ling and does not retry later. */
     if (sc64_z7_egg_product_count(q->type) == 2) {
         second = spawn_unit(owner, q->type, x + 8 < WORLD_W - 8 ? x + 8 : x - 8, y);
+#if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+        if (!SC64_EGG_IS_Z7() && second>=0) {
+            u[second].raw_type=sc64_race_raw_unit(q->type);
+            u[second].raw_owner=source_owner;
+        }
+#endif
         (void)second;
     }
     return 1;
 }
 
+#if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+/* Owner-generic service for HOST proof. No ordinary menu binding yet. */
+static int race_shared_egg_cancel(int owner,int slot)
+{
+    if ((unsigned)owner>=5u || (unsigned)slot>=MAX_UNITS || SC64_EGG_IS_Z7() ||
+        !race_shared_egg_context()) return 0;
+    Unit *q=&u[slot];
+    if (!q->alive || q->owner!=owner || q->type!=SC64_EGG_ACTOR || q->raw_type!=36 ||
+        !sc64_z7_egg_product_valid(q->target)) return 0;
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+    const Sc64RaceUnitRule *product=sc64_race_unit_rule(q->target);
+    race_add_owner_resources(owner,product->minerals,product->gas);
+    if (owner==SIDE) supply_used-=unit_slot_supply(q);
+    q->alive=0;q->selected=0;
+    return 1;
+}
+#endif
+
 static int race_z7_egg_cancel_available(void)
 {
+#if defined(SC64_SHARED_EGG_HOST_STAGE) && !defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+    if (!SC64_EGG_IS_Z7()) return 0; /* no new menu binding in this slice */
+#endif
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].selected && u[i].owner == SIDE &&
-            u[i].type == U_Z7_EGG && sc64_z7_egg_product_valid(u[i].target))
+            u[i].type == SC64_EGG_ACTOR && sc64_z7_egg_product_valid(u[i].target))
             return 1;
     return 0;
 }
 
 static int race_z7_egg_cancel_selected(void)
 {
+#if defined(SC64_SHARED_EGG_HOST_STAGE) && !defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+    if (!SC64_EGG_IS_Z7()) return 0;
+#endif
     int canceled = 0;
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
         const Sc64RaceUnitRule *product;
         if (!q->alive || !q->selected || q->owner != SIDE ||
-            q->type != U_Z7_EGG || !sc64_z7_egg_product_valid(q->target))
+            q->type != SC64_EGG_ACTOR || !sc64_z7_egg_product_valid(q->target))
             continue;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+        if (!SC64_EGG_IS_Z7()) {
+            canceled += race_shared_egg_cancel(SIDE,i);
+            continue;
+        }
+#endif
         product = sc64_race_unit_rule(q->target);
         race_add_owner_resources(q->owner, product->minerals, product->gas);
         supply_used -= unit_slot_supply(q);
@@ -256,7 +375,7 @@ static int race_owner_has_prereq(int owner, unsigned short prereq)
 {
     int i;
     if (!prereq) return 1;
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     for (i = 0; i < MAX_BUILDINGS; ++i) if (
         (building_complete(i) || race_z7_morphing_egg_hall(owner, i)) &&
         b[i].owner == owner) {
@@ -343,7 +462,7 @@ static int race_site_powered(int owner, int x, int y)
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].type == B_PYLON && b[i].owner == owner && building_complete(i) &&
-            dist2(x, y, b[i].x, b[i].y) <= 144 * 144) return 1;
+            sc64_p7_in_psi_range(x - b[i].x, y - b[i].y)) return 1;
     return 0;
 }
 
@@ -367,7 +486,7 @@ static int race_site_creep(int owner, int x, int y)
 {
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i)
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
         if ((building_complete(i) || race_z7_morphing_egg_hall(owner, i) ||
 #else
         if ((building_complete(i) ||
@@ -645,8 +764,8 @@ static int __attribute__((noinline)) race_product_slots_available(unsigned wante
     unsigned free_slots = 0, committed = wanted;
     for (int i = 0; i < MAX_UNITS; ++i) {
         if (!u[i].alive) ++free_slots;
-#ifdef SC64_Z7_EGG_PRODUCTION
-        else if (u[i].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+        else if (u[i].type == SC64_EGG_ACTOR) {
             if (!sc64_z7_egg_product_valid(u[i].target)) return 0;
             committed += (unsigned)(sc64_z7_egg_product_count(u[i].target) - 1);
         }
@@ -668,7 +787,7 @@ static int __attribute__((noinline)) race_product_slots_available(unsigned wante
 static int race_queue_unit(int owner, int producer, int type)
 {
     int tail, count, reserved, cap;
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     int egg_job = 0;
 #endif
     const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
@@ -685,15 +804,22 @@ static int race_queue_unit(int owner, int producer, int type)
 #if defined(SC64_Z7_SCOURGE_COMBAT) && !defined(SC64_SHARED_SCOURGE_COMBAT)
     /* This staged producer uses Z7's paired Eggs. Other modes retain their
        existing product list until independent production is qualified there. */
-    if (type == U_SCOURGE && !race_z7_active()) return 0;
+    if (type == U_SCOURGE && !SC64_EGG_IS_Z7()) return 0;
+#endif
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    if (!race_zerg_campaign_product_available(owner, sc64_race_raw_unit(type))) return 0;
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_airborne(producer)) return 0;
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
-    egg_job = race_z7_active() && owner >= 0 && owner < 5 &&
+#ifdef SC64_EGG_RUNTIME
+    egg_job = SC64_EGG_CONTEXT() && owner >= 0 && owner < 5 &&
         race_owner_identity(owner) == R_ZERG && sc64_z7_egg_product_valid(type) &&
+#if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+        (!SC64_EGG_IS_Z7() || owner != ENEMY || type == U_ZERGLING);
+#else
         (owner != ENEMY || type == U_ZERGLING);
+#endif
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || !race_owner_fields_race(owner, r->race) ||
         (!building_complete(producer) && !(egg_job && race_z7_morphing_egg_hall(owner, producer)) &&
             !(race_mode && b[producer].alive && (b[producer].type == B_LAIR || b[producer].type == B_HIVE))) ||
@@ -702,6 +828,14 @@ static int race_queue_unit(int owner, int producer, int type)
         ) ||
         (!race_mode && !race_owner_has_prereq(owner, r->prereq))) return 0;
     if (!egg_job && b[producer].queue_count >= 5) return 0;
+#ifdef SC64_SHARED_EGG_HOST_STAGE
+    if (egg_job && !SC64_EGG_IS_Z7() && !race_mode) {
+        int source=b[producer].raw_owner;
+        if ((unsigned)source>=8u ||
+            (race_z8_active() ? race_z8_source_owner((unsigned)source) :
+                                race_zl_source_owner((unsigned)source)) != owner) return 0;
+    }
+#endif
 #else
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || !race_owner_fields_race(owner, r->race) ||
         (!building_complete(producer) && !(race_mode && b[producer].alive &&
@@ -738,6 +872,12 @@ static int race_queue_unit(int owner, int producer, int type)
     if ((r->flags & SC_RACE_F_LARVA) && b[producer].larva < 1) return 0;
     count = sc64_race_product_count(type);
 #ifdef SC64_SHARED_SCOURGE_COMBAT
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    if (!race_mode && !SC64_EGG_IS_Z7() && (race_z8_active() || race_zl_active())) {
+        unsigned pending=race_shared_trigger_obligations();
+        if (pending>MAX_UNITS || !race_product_slots_available((unsigned)count+pending)) return 0;
+    } else
+#endif
     if (!race_product_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -773,11 +913,11 @@ static int race_queue_unit(int owner, int producer, int type)
     cap = race_owner_supply_cap(owner);
     /* Zero-supply units (notably Overlords) must remain producible while
        over the current cap so the player can restore supply. */
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     if (egg_job) count = sc64_z7_egg_product_count(type);
 #endif
     if (r->supply && reserved + r->supply * count > cap) { race_refusal = 2; return 0; }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     if (egg_job) {
         int free_slots = 0;
         for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
@@ -793,12 +933,12 @@ static int race_queue_unit(int owner, int producer, int type)
     if (owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }
     else { race_minerals[owner] = bank.minerals; race_gas[owner] = bank.gas; }
     if (r->flags & SC_RACE_F_LARVA) --b[producer].larva;
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     if (egg_job) {
         int x = b[producer].x + 20, y = b[producer].y + 4;
         int slot;
         if (x >= WORLD_W - 8) x = b[producer].x - 20;
-        slot = spawn_unit(owner, U_Z7_EGG, x, y);
+        slot = spawn_unit(owner, SC64_EGG_ACTOR, x, y);
         if (slot < 0) {
             /* Admission checked for a slot before debiting the bank. This is
              * defensive against a future synchronous spawn side effect. */
@@ -809,6 +949,9 @@ static int race_queue_unit(int owner, int producer, int type)
         u[slot].target = type;
         u[slot].work_timer = (u16)sc64_z7_egg_duration(type);
         u[slot].raw_type = 36;
+#if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
+        if (!SC64_EGG_IS_Z7()) u[slot].raw_owner = race_mode ? -1 : b[producer].raw_owner;
+#endif
         u[slot].maxhp = 200;
         u[slot].hp = 200;
         u[slot].armor = 10;
@@ -830,6 +973,9 @@ static int race_build_request_valid(int owner, int worker, int type,
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     if (owner < 0 || owner > 4 || !x || !y) return 0;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    if (!race_zerg_campaign_product_available(owner, sc64_race_raw_building(type))) return 0;
+#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (type==B_CREEP_COLONY && race_colony_profile_allowed() &&
         !race_colony_product_allowed(owner,worker>=0 && worker<MAX_UNITS ? u[worker].raw_owner : -1,type)) return 0;
@@ -884,6 +1030,8 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
 #endif
     }
 #endif
+    if (u[worker].order == ORDER_MINE || u[worker].order == ORDER_GAS)
+        u[worker].work_timer = 0;
 #ifdef SC64_WORKER_CARGO_KIND
     sc64_worker_gather_pending_set(&u[worker], 0);
 #endif
@@ -911,8 +1059,13 @@ static void __attribute__((noinline)) race_pending_build_tick(int worker)
     bank.minerals = (unsigned short)race_owner_minerals(q->owner);
     bank.gas = (unsigned short)race_owner_gas(q->owner);
     if (!sc64_race_pay_building(&bank, type)) goto cancel;
-    slot = spawn_build(q->owner, type, x, y, 1);
-    if (slot < 0) goto cancel;
+    {
+        int source_owner = race_creation_source_owner(q->owner, q->raw_owner);
+        slot = spawn_build(q->owner, type, x, y, 1);
+        if (slot < 0) goto cancel;
+        if (source_owner >= 0 && b[slot].raw_owner < 0)
+            b[slot].raw_owner = source_owner;
+    }
     /* No yield or callback can spend the wallet between validation and this
      * commit. A failed slot allocation leaves the real wallet untouched. */
     if (q->owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }
@@ -1428,8 +1581,9 @@ static void race_tick_buildings(void)
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
                 }
-                int first_slot = spawn_unit(owner, type, first_x, first_y);
-                if (first_slot < 0 || spawn_unit(owner, type, second_x, second_y) < 0) {
+                int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
+                int first_slot = race_spawn_product(owner, type, first_x, first_y, source_owner);
+                if (first_slot < 0 || race_spawn_product(owner, type, second_x, second_y, source_owner) < 0) {
                     /* Capacity was checked before planning and no world state
                      * changes between the paired spawns; this is defensive. */
                     if (first_slot >= 0) u[first_slot].alive = 0;
@@ -1443,7 +1597,8 @@ static void race_tick_buildings(void)
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
                 }
-                spawned = spawn_unit(owner, type, first_x, first_y);
+                spawned = race_spawn_product(owner, type, first_x, first_y,
+                                             race_creation_source_owner(owner, b[i].raw_owner));
                 if (spawned < 0) {
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
@@ -1467,12 +1622,15 @@ static void race_tick_buildings(void)
             int free_slots=0;
             for(int slot=0;slot<MAX_UNITS;slot++)if(!u[slot].alive)free_slots++;
             if(free_slots<2){b[i].queue_progress=frames-1;continue;}
-            if (spawn_unit(owner, type, x, y) < 0 || spawn_unit(owner, type, x + 8, y) < 0) {
+            int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
+            if (race_spawn_product(owner, type, x, y, source_owner) < 0 ||
+                race_spawn_product(owner, type, x + 8, y, source_owner) < 0) {
                 b[i].queue_progress = frames - 1;
                 continue;
             }
         } else {
-            int spawned = spawn_unit(owner, type, x, y);
+            int spawned = race_spawn_product(owner, type, x, y,
+                                             race_creation_source_owner(owner, b[i].raw_owner));
             if (spawned >= 0 && sc64_race_is_worker(type)) {
                 int patch = nearest_mineral(x,y);
 #ifndef SC64_IMPORTED_SKIRMISH
@@ -1530,7 +1688,9 @@ static void race_skirmish_init(void)
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
     death_vfx_reset();
     memset(geysers, 0, sizeof(geysers));
-    minerals = 200; gas = 0; geyser_count = 4;
+    /* Native Melee opens with 50 minerals; give every active player the
+     * same starting bank. This is independent of mining/AI difficulty. */
+    minerals = 50; gas = 0; geyser_count = 4;
     for (i = 0; i < 4; ++i) {
         int sx = (i == 0 || i == 3) ? -1 : 1;
         int sy = (i == 0 || i == 2) ? 1 : -1;
@@ -1568,7 +1728,7 @@ static void race_skirmish_init(void)
     for (i = 0; i < 1 + race_bots && i < 4; ++i) {
         int base = i;
         owner = i == 0 ? SIDE : race_bot_owner_ids[i - 1];
-        if (owner != SIDE) race_minerals[owner] = 200;
+        if (owner != SIDE) race_minerals[owner] = 50;
         switch (race_owner_identity(owner)) {
         case R_ZERG: townhall = B_HATCHERY; worker_type = U_DRONE; break;
         case R_PROTOSS: townhall = B_NEXUS; worker_type = U_PROBE; break;

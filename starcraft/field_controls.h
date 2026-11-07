@@ -249,6 +249,9 @@ ui_missing_tech(int type, int worker)
     unsigned need;
     int bit;
     (void)worker;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    if (!race_zerg_campaign_product_available(SIDE, sc64_race_raw_building(type))) return "";
+#endif
     if (!r || !race_owner_fields_race(SIDE, r->race) ||
         type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return "";
 #ifdef SC64_TERRAN_LATE_RUNTIME
@@ -572,7 +575,10 @@ field_controls_draw_command_menu(void)
         int short_funds = state == UI_SITE_MINERALS || state == UI_SITE_GAS;
         u8 label = state == UI_SITE_OK || short_funds ? C_SILVER : C_DIM;
         if (i == menu_cursor) {
-            ui_highlight(x + 2, row - 1, w - 4);
+            /* Source icons are 18 pixels tall; select the whole 22-pixel
+             * row rather than the compact text lists' nine-pixel bar. */
+            gfx_rect(x + 2, row - 1, w - 4, UI_MENU_ROW_HEIGHT - 1, C_UI);
+            gfx_rect(x + 2, row - 1, 2, UI_MENU_ROW_HEIGHT - 1, C_GOLD);
             if (label == C_SILVER) label = C_WHITE;
         }
         ui_row_icon(i, x + 14, row + 9);
@@ -580,7 +586,7 @@ field_controls_draw_command_menu(void)
         sc64_font_ellipsis(race_menu_label(i), label_width, clipped, sizeof(clipped));
         sc64_font_text(x + 23, row + 6, label_width, clipped, label);
         if (cost && label != C_DIM) /* the HUD explains disabled rows */
-            ui_num_right(x + w - 5, row, cost, short_funds ? C_RED : C_GOLD);
+            ui_num_right(x + w - 5, row + 6, cost, short_funds ? C_RED : C_GOLD);
     }
     if (first) gfx_diamond(x + w - 8, y + 1, 2, 1, C_GOLD);
     if (first + UI_MENU_VISIBLE_ROWS < count)

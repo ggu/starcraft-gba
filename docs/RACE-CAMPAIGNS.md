@@ -12,7 +12,7 @@ qualified on earlier frozen ROMs. These Terran timings precede the latest
 minimap change, whose current ARM measurements cover Protoss. The current
 full-profile ARM T10 result is below the 30-fps target, and no physical GBA
 result is claimed. The canonical `terran` profile includes all ten Terran
-missions. Canonical Zerg includes its first seven missions. The default Protoss
+missions. Canonical Zerg includes its first nine missions. The default Protoss
 target includes all ten Protoss missions; see the
 [promotion audit](audits/2026-11-04-protoss-p10-default/README.md) for what that does
 and doesn't establish. Explicit `protoss-p7` keeps the P1–P7 product and its save
@@ -45,7 +45,26 @@ campaign startup/save checks and the Outpost/Blood Bath race-and-AI matrix.
 
 Use `zerg` or `protoss` in place of `terran` for the other builds. `prepare` accepts a `.z64`, `.v64`, or `.n64` image, or a ZIP containing exactly one supported image. It verifies the image and uses the pinned `sc64-maps` extractor; the first preparation requires Git and network access to fetch that tool. `status` checks preparation and build outputs. Build and test do not need an emulator; `play` requires mGBA. See [Development](DEVELOPMENT.md) for tool requirements and [SC64 development notes](SC64.md) for import details.
 
-The default ROM targets are `build/StarCraft-Terran-Transport1-GBA.gba`, `build/StarCraft-Zerg-Z7-Transport1-GBA.gba`, and `build/StarCraft-Protoss-P10-Transport1-GBA.gba`. Explicit `protoss-p7` retains `build/StarCraft-Protoss-P7-Transport1-GBA.gba`, and explicit `protoss-p6` retains `build/StarCraft-Protoss-P6-GBA.gba` and its generation-30 identity. Terran uses `.local/play/terran-transport1`; default Protoss uses `.local/play/protoss-p10-transport1`; explicit P7 uses `.local/play/protoss-p7-transport1`; P6 uses `.local/play/protoss-p6`. Z7 uses `.local/play/zerg-z7-transport1`, explicit Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
+The default ROM targets are `build/StarCraft-Terran-Transport1-GBA.gba`, `build/StarCraft-Zerg-Z9-Transport1-GBA.gba`, and `build/StarCraft-Protoss-P10-Transport1-GBA.gba`. Explicit `protoss-p7` retains `build/StarCraft-Protoss-P7-Transport1-GBA.gba`, and explicit `protoss-p6` retains `build/StarCraft-Protoss-P6-GBA.gba` and its generation-30 identity. Terran uses `.local/play/terran-transport1`; default Protoss uses `.local/play/protoss-p10-transport1`; explicit P7 uses `.local/play/protoss-p7-transport1`; P6 uses `.local/play/protoss-p6`. Canonical Zerg and explicit Z9 use `.local/play/zerg-z9`; explicit Z7 uses `.local/play/zerg-z7-transport1`, explicit Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
+
+An experimental custom-game Egg service can be built explicitly after preparing
+its corresponding profile inputs. It stays off in the normal targets:
+
+```sh
+make custom-egg-preview-terran
+make custom-egg-preview-zerg
+make custom-egg-preview-protoss
+make custom-egg-preview-showcase
+```
+
+The preview ROMs and ELFs are written under `build/custom-egg-preview/build/`;
+`make custom-egg-preview-z7` also builds the earlier Z7 profile. The targets
+verify ROM headers and preserve the ordinary link-time RAM reserves. The
+Protoss target generates its own ignored Egg-compatible fact header. These are
+opt-in previews, not a release or a claim of full campaign, emulator, physical
+hardware, or performance qualification. Use separate emulator save files for
+preview and ordinary products; custom games containing Eggs use a distinct
+save format. No ROM or private extracted inputs are fetched by these commands.
 
 To build and test all three race campaigns, prepare `terran`, `zerg` and
 `protoss` with the same verified ROM, then run
@@ -66,8 +85,8 @@ See the [canonical skirmish resume audit](audits/2026-10-27-canonical-skirmish-r
 
 ## Campaign progress
 
-The Terran profile presents ten missions, canonical Zerg seven and Protoss seven,
-exposing 24 of 30 entries. All six Zerg chapters have current-source host
+The canonical Terran and Protoss profiles present ten missions each; Zerg
+presents nine, exposing 29 of 30 entries. All six Zerg chapters have current-source host
 controller wins and input-only ARM wins in the canonical Z6 build; Z5 and Z6
 also have exact fresh-process SRAM restores followed by continued wins. See
 the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md). P1–P5 have current-source host and input-only ARM wins in the canonical
@@ -94,8 +113,8 @@ after packed rendering; see the
 [Terran rendering audit](audits/2026-10-26-terran-word-promotion/README.md).
 None of these are physical GBA guarantees.
 
-The `zerg` alias and explicit `zerg-z7` use the seven-entry product;
-explicit `zerg-z6` preserves the separate six-entry ROM and save route.
+The `zerg` alias and explicit `zerg-z9` use the nine-entry product; explicit
+`zerg-z7` and `zerg-z6` preserve their separate ROMs and save routes.
 At runtime base `9ff7f7c`, an input-only replay of the ordinary-input
 controller tape wins on ARM with all 909 checkpoints matching. The replay
 probe ROM is built with the candidate flags and its own main loop. A
@@ -130,7 +149,7 @@ and garrison counts but does not match them. See the
 [Z8 qualification audit](audits/2026-11-04-z8-qualification/README.md) and the
 [Z8 candidate audit](audits/2026-10-29-z8-playable/README.md).
 
-Z9 runs in a separate `zerg-z9` candidate (`make zerg-z9`, code `SCZ9`,
+Z9 is the canonical Zerg product and is also available as `zerg-z9` (`make zerg-z9`, code `SCZ9`,
 generation 48): the Z1–Z8 candidate plus Z9 as the ninth Zerg entry. Its
 authenticated 14-trigger program runs on the live game through the late-Zerg
 scheduler, which adds the countdown timer, Remove Unit and Deaths rows.
@@ -139,8 +158,8 @@ Its ordinary-input HOST route and full/prefix/fresh-process ARM continuation
 pass on the frozen integration, including worker-state digests and committed
 journal equality. All eight carried HOST routes and nine mission startup/save
 roundtrips pass with the expanded Z9 flags. Whole-tape ARM timing is about
-7.65 fps equivalent, below the 30-fps goal. This remains a separate candidate;
-carried ARM/save qualification and native AI gaps still limit default promotion.
+7.65 fps equivalent, below the 30-fps goal. Carried ARM/save qualification
+and native AI gaps remain; this alias does not claim arbitrary save coverage.
 See the [current Z9 audit](audits/2026-11-05-z9-current-integration/README.md),
 [carried HOST audit](audits/2026-11-05-z9-carried-host/README.md), and historical
 [Z9 candidate audit](audits/2026-11-01-z9-candidate/README.md).
@@ -177,8 +196,8 @@ reduces mean full costs from 2,155,200 to 2,113,065 cycles in 600 opening
 updates and from 2,426,615 to 2,233,602 cycles in 1,400 attack updates.
 Both remain below the 30-fps target. These are bounded samples, not a mission-wide
 average. Neither profile establishes native enemy-AI equivalence, arbitrary
-save-state coverage or physical-GBA behavior. Zerg 8–10 and Protoss 8–10
-remain unqualified in the canonical profiles.
+save-state coverage or physical-GBA behavior. Later canonical missions have
+separate qualification described below; Zerg 10 remains outside the profile.
 
 P8 **The Trial of Tassadar** has a separate `protoss-p8`
 candidate. It carries the canonical P1–P7 profile, is built with
@@ -260,7 +279,7 @@ Extractor. Gas depletion is still outside the shared engine model.
 
 Zerg 3 **The New Dominion**, Zerg 4 **Agent of the Swarm**, and Protoss 3
 **Higher Ground** are on the second campaign menu page. Canonical Zerg is
-`StarCraft-Zerg-Z7-Transport1-GBA.gba` / `starcraft-zerg-z7.elf`, code `SCZ7`, base generation 36 in the separate Transport1 namespace. Explicit `zerg-z6` retains `SCZ6`, generation 32. The explicit legacy `zerg-z4` target retains `StarCraft-Zerg-Z4-GBA.gba` /
+`StarCraft-Zerg-Z9-Transport1-GBA.gba` / `starcraft-zerg-z9.elf`, code `SCZ9`, base generation 48 in the separate Transport1 namespace. Explicit `zerg-z7` retains `SCZ7`, generation 36 and its own save directory; no migration is performed. Explicit `zerg-z6` retains `SCZ6`, generation 32. The explicit legacy `zerg-z4` target retains `StarCraft-Zerg-Z4-GBA.gba` /
 `starcraft-zerg-z4.elf`, code `SCZ4`, generation 20. The explicit legacy `zerg-z3` target retains `StarCraft-Zerg-GBA.gba` /
 `starcraft-zerg.elf` (versioned `-Z3` names alias these), code `SCZ3`,
 generation 5. Default Protoss uses `StarCraft-Protoss-P10-Transport1-GBA.gba` /
@@ -693,7 +712,31 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Canonical profiles expose T1–T10, Z1–Z7 and P1–P10 (27/30). Each Protoss mission has a host win and a fixed-input ARM replay under the P10 flags, P8 and P9 have fresh-process ARM SRAM continuation on the P10 default audit base, and P10 has a host continuation there plus an ARM continuation on an earlier base. P1–P7 have none under these flags; explicit P7's continuation is under its own flags. Explicit P6 retains its separate generation-30 product. Earlier P1–P5 ARM/cargo evidence remains scoped to P5. Zerg controllers complete all six chapters, with canonical Z6 ARM wins and Z5/Z6 save continuity. Terran ARM wins span all ten missions across frozen builds. Zerg 8–10 remain outside the canonical profile; engine, save qualification and performance gaps remain.
+- Canonical profiles expose T1–T10, Z1–Z9 and P1–P10 (29/30). Each Protoss mission has a host win and a fixed-input ARM replay under the P10 flags, P8 and P9 have fresh-process ARM SRAM continuation on the P10 default audit base, and P10 has a host continuation there plus an ARM continuation on an earlier base. P1–P7 have none under these flags; explicit P7's continuation is under its own flags. Explicit P6 retains its separate generation-30 product. Earlier P1–P5 ARM/cargo evidence remains scoped to P5. Z1–Z9 have ordinary-input HOST wins under the Z9 vector. Z9 has an ARM win and save continuation on the frozen integration; carried Z7/Z8 ARM and save results are scoped to the [carried audit](audits/2026-11-05-z9-carried-arm/README.md). Earlier Z6 ARM wins and Z5/Z6 save continuity remain scoped to their qualified builds. Terran ARM wins span all ten missions across frozen builds. Zerg 10 remains outside the canonical profile; engine, save qualification and performance gaps remain.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.
+
+## Opt-in late-campaign Egg preview
+
+After preparing the standard private Zerg profile inputs, build an isolated
+experimental product with:
+
+```sh
+make late-egg-preview-zerg
+make late-egg-preview-z10
+```
+
+These targets enable `SC64_SHARED_EGG_LATE_SERVICE` and write ROMs/ELFs under
+`build/late-egg-preview/build/`. Normal outputs and feature flags are unchanged.
+The Z9 product contains Zerg missions 1–9; the Z10 candidate contains 1–10,
+but an ordinary-input Z10 victory remains unqualified. Both retain the regular
+custom-game menu. This preview adds independent paid Eggs to Z8–Z10 where
+present, using the existing Z7 identity, real owner wallets and authenticated
+save context. Greater-Spire Guardian morphing remains unfinished.
+
+Do not combine this flag with the separate custom-Egg preview or competing
+Guardian/Scarab prototypes. Journals have product-specific generations; an old
+Z7-product save is not interchangeable with a Z9-product save. Qualification
+of matching predecessor records is separate from arbitrary historical-save
+compatibility. Preserve existing saves and use separate experimental filenames.

@@ -1,5 +1,6 @@
 #ifndef SC64_Z7_SAVE_H
 #define SC64_Z7_SAVE_H
+#include "sc64_save_decode_context.h"
 
 /* Pure candidate validation for the seventh Zerg map.  This deliberately
  * authenticates the canonical imported map and decoded candidate rather than
@@ -181,12 +182,12 @@ static int race_z7_save_egg_valid(const Sc64RaceMap *map, const Unit *saved,
 
 static unsigned race_z7_save_live_enemy_ling_eggs(const RaceSave *candidate,
                                                     unsigned width,
-                                                    unsigned height)
+                                                    unsigned height SC64_GCTX_DECL)
 {
     unsigned count = 0;
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit saved;
-        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
+        if (!SC64_GUARD_DECODE(candidate, i, width * 16u, height * 16u,
                                    &saved)) return ~0u;
         if (saved.alive && saved.type == U_Z7_EGG && saved.raw_owner == 4 &&
             saved.target == U_ZERGLING) ++count;
@@ -240,9 +241,16 @@ static unsigned race_z7_save_remaining_script_creates(
     return 0;
 }
 
-static int race_z7_save_candidate_valid(const RaceSave *candidate,
-                                         const Sc64Z7PersistentState *state,
-                                         unsigned width, unsigned height)
+static int
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
+race_z7_save_candidate_valid_for(const RaceSave *candidate,
+                                 const Sc64Z7PersistentState *state,
+                                 unsigned width, unsigned height, u32 expected_version SC64_GCTX_DECL)
+#else
+race_z7_save_candidate_valid(const RaceSave *candidate,
+                             const Sc64Z7PersistentState *state,
+                             unsigned width, unsigned height SC64_GCTX_DECL)
+#endif
 {
     const Sc64RaceMap *map;
     u8 seen_units[(MAX_UNITS+7u)/8u]={0};
@@ -272,7 +280,13 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
         height!=SC64_Z7_MAP_ROWS || !race_z7_save_map_valid(
             &sc64_race_maps[SC64_Z7_GLOBAL_ID]) ||
         !sc64_z7_persistent_state_valid(state) ||
-        candidate->version!=SAVE_VERSION || candidate->state[0]!=0 ||
+        candidate->version !=
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
+        expected_version
+#else
+        SAVE_VERSION
+#endif
+        || candidate->state[0]!=0 ||
         candidate->state[1]!=R_ZERG || candidate->state[2]!=SC64_Z7_GLOBAL_ID ||
         candidate->state[7]<0 || candidate->state[16]<0 ||
         candidate->state[16]>MAX_RACE_GEYSERS ||
@@ -306,7 +320,7 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit saved;
         int unused;
-        if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved)) return 0;
+        if (!SC64_GUARD_DECODE(candidate,i,width*16u,height*16u,&saved)) return 0;
         unused=race_z7_save_unused_unit(&saved);
         unit_flags[i]=(u8)((saved.alive?1u:0u)|(unused?2u:0u)
 #ifdef SC64_Z7_EGG_PRODUCTION
@@ -351,7 +365,7 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
 
     for (unsigned i=0; i<MAX_UNITS; ++i) {
         Unit saved;
-        if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved) ||
+        if (!SC64_GUARD_DECODE(candidate,i,width*16u,height*16u,&saved) ||
             RACE_SAVE_INV_U(candidate,i)>1u) return 0;
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (saved.type == U_Z7_EGG || saved.raw_type == 36) {
@@ -608,5 +622,15 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
     return 1;
 }
 
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SHARED_EGG_LATE_SERVICE)
+/* Save-time callers still require the current generation. Only prepared-load
+ * preflight may pass a separately authenticated predecessor version. */
+static int race_z7_save_candidate_valid(const RaceSave *candidate,
+                                         const Sc64Z7PersistentState *state,
+                                         unsigned width, unsigned height SC64_GCTX_DECL)
+{
+    return race_z7_save_candidate_valid_for(candidate,state,width,height,SAVE_VERSION SC64_GCTX_ARG);
+}
+#endif
 #endif /* SC64_Z7_RUNTIME */
 #endif /* SC64_Z7_SAVE_H */

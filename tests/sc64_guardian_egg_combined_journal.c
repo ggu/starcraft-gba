@@ -1,0 +1,182 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* HOST-only journal records; never seed these constructed rows into guest SRAM. */
+#include <assert.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include "../starcraft/game.c"
+extern void guardian_test_reset(void);
+extern void guardian_test_snapshot(void *);
+extern void guardian_test_retag(int,u32,u32);
+extern void guardian_test_replace(int,const void *,u32);
+static int add_actor(int type,int raw,int target,int timer,int x)
+{
+    int slot=spawn_unit(SIDE,U_OVERLORD,x,100);assert(slot>=0);
+    Unit *q=&u[slot];
+    /* Preserve the cache initialized by spawn, including P10 Arbiter state. */
+    u16 spawned_weapon=q->weapon;memset(q,0,sizeof(*q));q->weapon=spawned_weapon;
+    q->alive=1;q->selected=1;q->owner=SIDE;q->type=type;q->raw_type=raw;q->raw_owner=-1;
+    q->x=q->tx=q->path_x=x;q->y=q->ty=q->path_y=100;
+    q->hp=q->maxhp=200;q->armor=type==SC64_SHARED_EGG_TYPE ? 10 : 0;
+    q->order=ORDER_IDLE;q->target=target;q->work_timer=timer;q->build=-1;
+    return slot;
+}
+static void start_custom(void)
+{
+    guardian_test_reset();game_init();race_mode=1;race_human=R_ZERG;race_bots=1;
+    race_skirmish_map=0;race_bot_races[0]=R_PROTOSS;init_state();
+    assert(screen==SCREEN_PLAY && race_mode);
+}
+static void assert_failed_load_atomic(void)
+{
+    static Unit old_units[MAX_UNITS];static Building old_buildings[MAX_BUILDINGS];
+    static u8 old_explored[sizeof(explored)],old_visible[sizeof(visible)];
+    static u8 old_minerals[sizeof(m)],old_geysers[sizeof(geysers)];
+    static u8 old_impacts[sizeof(race_impact_rows)],old_front[sizeof(race_front)];
+    static int old_players[5],old_ore[5],old_gas[5],old_bots[3];
+    Sc64SkTransportTech old_tech=race_skirmish_transport_tech;
+    memcpy(old_units,u,sizeof(u));memcpy(old_buildings,b,sizeof(b));
+    memcpy(old_explored,explored,sizeof(explored));memcpy(old_visible,visible,sizeof(visible));
+    memcpy(old_minerals,m,sizeof(m));memcpy(old_geysers,geysers,sizeof(geysers));
+    memcpy(old_impacts,race_impact_rows,sizeof(race_impact_rows));memcpy(old_front,&race_front,sizeof(race_front));
+    memcpy(old_players,race_player,sizeof(race_player));memcpy(old_ore,race_minerals,sizeof(race_minerals));
+    memcpy(old_gas,race_gas,sizeof(race_gas));memcpy(old_bots,race_bot_races,sizeof(race_bot_races));
+    u32 old_seed=seed;int old_count=race_impact_count;
+    int before[]={minerals,gas,supply_used,supply_cap,race_selected_mission,race_mode,race_human,
+        race_bots,race_completed,race_skirmish_map,frame,screen,mode,menu,menu_open,menu_cursor,
+        help,won,lost,result_timer,selected_building,geyser_count,(int)race_front_transition,race_front_load_error};
+    assert(!race_load_game());
+    assert(!memcmp(old_units,u,sizeof(u)) && !memcmp(old_buildings,b,sizeof(b)));
+    assert(!memcmp(old_explored,explored,sizeof(explored)) && !memcmp(old_visible,visible,sizeof(visible)));
+    assert(!memcmp(old_minerals,m,sizeof(m)) && !memcmp(old_geysers,geysers,sizeof(geysers)));
+    assert(!memcmp(old_impacts,race_impact_rows,sizeof(race_impact_rows)) && old_count==race_impact_count);
+    assert(!memcmp(old_front,&race_front,sizeof(race_front)) && !memcmp(&old_tech,&race_skirmish_transport_tech,sizeof(old_tech)));
+    assert(!memcmp(old_players,race_player,sizeof(race_player)) && !memcmp(old_ore,race_minerals,sizeof(race_minerals)));
+    assert(!memcmp(old_gas,race_gas,sizeof(race_gas)) && !memcmp(old_bots,race_bot_races,sizeof(race_bot_races)));
+    int after[]={minerals,gas,supply_used,supply_cap,race_selected_mission,race_mode,race_human,
+        race_bots,race_completed,race_skirmish_map,frame,screen,mode,menu,menu_open,menu_cursor,
+        help,won,lost,result_timer,selected_building,geyser_count,(int)race_front_transition,race_front_load_error};
+    assert(!memcmp(before,after,sizeof(before)) && old_seed==seed);
+}
+static void exercise(unsigned features)
+{
+    start_custom();int ordinary=spawn_unit(SIDE,U_OVERLORD,100,100);assert(ordinary>=0);
+    u[ordinary].raw_type=36;Unit old=u[ordinary];int cocoon=-1,egg=-1;
+    if(features&SC64_STAGE_SAVE_GUARDIAN)cocoon=add_actor(U_GUARDIAN_COCOON,59,44,750,120);
+    if(features&SC64_STAGE_SAVE_EGG)egg=add_actor(SC64_SHARED_EGG_TYPE,36,U_DRONE,1,140);
+    assert(race_save_game());RaceLoadPlan plan;GbaSaveSelection selected;
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION);
+    if(features!= (SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG)) {
+        u32 outer=features==SC64_STAGE_SAVE_GUARDIAN ? SC64_GUARDIAN_TRANSPORT_SAVE_VERSION :
+                  features==SC64_STAGE_SAVE_EGG ? SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION;
+        u32 inner=features==SC64_STAGE_SAVE_GUARDIAN ? SC64_GUARDIAN_SAVE_VERSION :
+                  features==SC64_STAGE_SAVE_EGG ? SC64_SHARED_EGG_SAVE_VERSION : SAVE_VERSION;
+        guardian_test_retag(selected.slot,outer,inner);
+    }
+    assert(race_worker_cargo_select(&plan,&selected));assert(plan.guardian_auth.features==features);
+    u[ordinary].raw_type=42;if(cocoon>=0)u[cocoon].hp=1;if(egg>=0)u[egg].work_timer=2;
+    assert(race_load_game());assert(!memcmp(&u[ordinary],&old,sizeof(old)));
+    if(cocoon>=0)assert(u[cocoon].alive && u[cocoon].type==U_GUARDIAN_COCOON && u[cocoon].work_timer==750);
+    if(egg>=0)assert(u[egg].alive && u[egg].type==SC64_SHARED_EGG_TYPE && u[egg].work_timer==1);
+    if(features==(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG)) {
+        /* A checksum-valid outer/inner mismatch cannot publish either actor. */
+        guardian_test_retag(selected.slot,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_EGG_SAVE_VERSION);
+        assert_failed_load_atomic();
+        assert(!race_worker_cargo_select(&plan,&selected) && !plan.guardian_auth.candidate);
+    }
+}
+static void mixed_fallback(void)
+{
+    start_custom();int ordinary=spawn_unit(SIDE,U_OVERLORD,100,100);assert(ordinary>=0);
+    u[ordinary].raw_type=36;Unit legacy=u[ordinary];assert(race_save_game());
+    RaceLoadPlan plan;GbaSaveSelection selected;
+    assert(race_worker_cargo_select(&plan,&selected));
+    guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    assert(add_actor(U_GUARDIAN_COCOON,59,44,750,120)>=0);
+    int egg=add_actor(SC64_SHARED_EGG_TYPE,36,U_DRONE,1,140);assert(race_save_game());
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION);
+    static u8 envelope[sizeof(RaceImpactRecord)];u32 length=0;
+    assert(save_read_latest(envelope,sizeof(envelope),SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION,&length));
+    Unit bad=u[egg];bad.raw_owner=3; /* checksum-valid, candidate-owner invalid */
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    assert(sc64_p7_typed_unit_encode_for(&race_data.units[egg],&bad,race_cols*16u,race_rows*16u,1));
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    assert(sc64_derived_unit_encode(&race_data.units[egg],&bad,race_cols*16u,race_rows*16u));
+#else
+    assert(sc64_zp_unit_save_encode_for(&race_data.units[egg],&bad,race_cols*16u,race_rows*16u,1));
+#endif
+#else
+    assert(sc64_unit_save_encode_for(&race_data.units[egg],&bad,race_cols*16u,race_rows*16u,1));
+#endif
+    memcpy(envelope+offsetof(RaceSave,units)+egg*sizeof(race_data.units[0]),
+           &race_data.units[egg],sizeof(race_data.units[0]));
+    guardian_test_replace(selected.slot,envelope,length);
+    assert(race_load_game());assert(!memcmp(&u[ordinary],&legacy,sizeof(legacy)));
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_TRANSPORT_SAVE_VERSION && plan.guardian_auth.features==0);
+}
+/* Retag a real HOST-only staged journal as an ordinary shipping generation.
+ * A Z7 Egg type exists in the legacy enum, but a custom Egg requires the
+ * authenticated Egg namespace; row contents must not supply that authority. */
+static void reject_unauthenticated_legacy_egg(void)
+{
+    static u8 before[32768],after[32768];
+    start_custom();
+    assert(add_actor(SC64_SHARED_EGG_TYPE,36,U_DRONE,1,140)>=0);
+    assert(race_save_game());
+    RaceLoadPlan plan; GbaSaveSelection selected;
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION);
+    guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    guardian_test_snapshot(before);
+    assert_failed_load_atomic();
+    guardian_test_snapshot(after);assert(!memcmp(before,after,sizeof(before)));
+
+    /* An invalid newer legacy-tagged Egg must fall back to the older valid
+     * ordinary journal, without rewriting either SRAM record. */
+    start_custom();int old_slot=spawn_unit(SIDE,U_OVERLORD,100,100);assert(old_slot>=0);
+    u[old_slot].raw_type=36;Unit old=u[old_slot];assert(race_save_game());
+    assert(race_worker_cargo_select(&plan,&selected));
+    guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    assert(add_actor(SC64_SHARED_EGG_TYPE,36,U_DRONE,1,140)>=0);
+    assert(race_save_game());assert(race_worker_cargo_select(&plan,&selected));
+    guardian_test_retag(selected.slot,SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION);
+    guardian_test_snapshot(before);assert(race_load_game());
+    guardian_test_snapshot(after);assert(!memcmp(before,after,sizeof(before)));
+    assert(!memcmp(&u[old_slot],&old,sizeof(old)));
+    assert(race_worker_cargo_select(&plan,&selected));
+    assert(selected.tag==SC64_TRANSPORT_SAVE_VERSION && plan.guardian_auth.features==0);
+}
+
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+/* One paid Carrier order and one paired Egg need two additional unit slots;
+ * an already-allocated training child would already occupy a live slot. */
+static void carrier_reservation(void)
+{
+    guardian_test_reset();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;
+    race_skirmish_map=0;race_bot_races[0]=R_ZERG;init_state();assert(screen==SCREEN_PLAY);
+    minerals=1000;int carrier=spawn_unit(SIDE,U_P7_CARRIER,100,100);assert(carrier>=0);
+    assert(race_p7_carrier_training_queue(carrier));
+    int egg=add_actor(SC64_SHARED_EGG_TYPE,36,U_ZERGLING,300,140);
+    u[egg].owner=ENEMY;u[egg].selected=0;
+    int last=-1,free_slots=0;
+    for(int i=0;i<MAX_UNITS;i++)free_slots+=!u[i].alive;
+    while(free_slots>1) {last=spawn_unit(ENEMY,U_DRONE,160,160);assert(last>=0);--free_slots;}
+    assert(last>=0 && !race_save_game());
+    hit_target(last,9999,U_MARINE,SIDE);
+    assert(race_save_game());
+}
+#endif
+int main(void)
+{
+    reject_unauthenticated_legacy_egg();
+    exercise(0);exercise(SC64_STAGE_SAVE_GUARDIAN);exercise(SC64_STAGE_SAVE_EGG);
+    exercise(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG);mixed_fallback();
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    carrier_reservation();
+#endif
+    puts("Guardian/Egg real journal feature contexts passed");return 0;
+}

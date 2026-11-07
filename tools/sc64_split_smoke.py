@@ -33,7 +33,7 @@ FRONT_FIELDS: dict[str, int] = {}
 MAP_DIMS = ((64, 64), (64, 64))
 PROFILE_BUILD_PATHS = {
     "terran": ("StarCraft-Terran-Transport1-GBA.gba", "starcraft-terran.elf"),
-    "zerg": ("StarCraft-Zerg-Z7-Transport1-GBA.gba", "starcraft-zerg-z7.elf"),
+    "zerg": ("StarCraft-Zerg-Z9-Transport1-GBA.gba", "starcraft-zerg-z9.elf"),
     "protoss": ("StarCraft-Protoss-P10-Transport1-GBA.gba", "starcraft-protoss-p10.elf"),
     "protoss-p6": ("StarCraft-Protoss-P6-GBA.gba", "starcraft-protoss-p6.elf"),
 }

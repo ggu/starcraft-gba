@@ -404,8 +404,15 @@ sc64_z8_action_timed(unsigned opcode)
 /* Full persisted-state check for restore and the checked tick. A valid
  * state can only rest at a timed action: every other handler completes. */
 static inline int
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+sc64_z8_state_valid_for(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p,int egg_stage)
+#else
 sc64_z8_state_valid(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p)
+#endif
 {
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+    (void)egg_stage;
+#endif
     if (!s || !sc64_z8_program_valid(p) || s->version != SC64_Z8_STATE_VERSION ||
         s->trigger_count != p->trigger_count ||
         s->location_count != p->location_count ||
@@ -437,8 +444,11 @@ sc64_z8_state_valid(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p)
             } else {
                 const Sc64Z8Action *a = in->cursor < SC64_Z8_ACTION_SLOTS ?
                     sc64_z8_action_at(p, &p->triggers[i], in->cursor) : 0;
-                if (!a || (a->flags & 2) || !sc64_z8_action_timed(a->opcode))
-                    return 0;
+                if (!a || (a->flags & 2) || (!sc64_z8_action_timed(a->opcode)
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+                    && !(egg_stage && a->opcode==11 && a->location && !(f & SC64_Z8_INST_ARMED))
+#endif
+                    )) return 0;
                 if (f & SC64_Z8_INST_ARMED) armed_mask |= 1u << o;
             }
         }
@@ -468,6 +478,11 @@ sc64_z8_state_valid(const Sc64Z8SchedulerState *s, const Sc64Z8Program *p)
     }
     return 1;
 }
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+static inline int sc64_z8_state_valid(const Sc64Z8SchedulerState *s,const Sc64Z8Program *p)
+{ return sc64_z8_state_valid_for(s,p,0); }
+#endif
+
 
 /* Copy a saved image only after it passes the full validator; `out` is not
  * touched on rejection. */
@@ -691,9 +706,17 @@ sc64_z8_action(Sc64Z8SchedulerState *s, const Sc64Z8Program *p,
         if (!a->location) return 1;
         /* fall through */
     case 8: case 9: case 12: case 26:
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+        if (!ops || !ops->action) break;
+        r=ops->action(context,a,owner,rect);
+        if (a->opcode==11 && r==0) return 0; /* bounded capacity defer */
+        if (r!=1) break;
+        return 1;
+#else
         if (!ops || !ops->action ||
             ops->action(context, a, owner, rect) != 1) break;
         return 1;
+#endif
     default:
         break;
     }
@@ -736,6 +759,30 @@ sc64_z8_execute(Sc64Z8SchedulerState *s, const Sc64Z8Program *p,
     }
     return 1;
 }
+
+#ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+/* Only executing instances have committed actions. Already executed creates
+ * precede the cursor and are represented by live slots, not reservations. */
+static unsigned sc64_stage_trigger_create_obligations(const Sc64Z8SchedulerState *s,
+                                                       const Sc64Z8Program *p)
+{
+    unsigned total=0;
+    if (!s || !p || s->instance_count>SC64_Z8_INSTANCE_LIMIT) return ~0u;
+    for (unsigned i=0;i<s->instance_count;i++) {
+        const Sc64Z8Instance *in=&s->instances[i];
+        if (!(in->flags & SC64_Z8_INST_EXECUTING) || (in->flags & SC64_Z8_INST_DONE)) continue;
+        if (in->trigger>=p->trigger_count) return ~0u;
+        const Sc64Z8Trigger *t=&p->triggers[in->trigger];
+        if ((unsigned)t->first_action+t->action_count>p->action_count) return ~0u;
+        for (unsigned j=0;j<t->action_count;j++) {
+            const Sc64Z8Action *a=&p->actions[t->first_action+j];
+            if (a->index>=in->cursor && a->opcode==11 && a->location && !(a->flags&2))
+                total+=sc64_z8_create_count(a);
+        }
+    }
+    return total;
+}
+#endif
 
 /* One trigger pass (0x8008DAEC -> 0x8008D240 per owner). Owners run in
  * ascending slot order and each owner's instances in trigger order; every
