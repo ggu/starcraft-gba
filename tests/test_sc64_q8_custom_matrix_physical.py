@@ -3,6 +3,7 @@ import sys
 import os
 import signal
 import tempfile
+import time
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -79,16 +80,28 @@ class MatrixTest(unittest.TestCase):
     def test_worker_cannot_ack_with_live_child(self):
         pid=os.fork()
         if pid==0:
-            child=os.fork()
-            if child==0:
-                signal.pause();os._exit(0)
+            child=None;rc=1
             try:
-                try:matrix.require_no_children();rc=1
+                os.setsid()
+                child=os.fork()
+                if child==0:
+                    signal.pause();os._exit(0)
+                try:matrix.require_no_children()
                 except RuntimeError:rc=0
+            except BaseException:rc=1
             finally:
-                os.kill(child,signal.SIGKILL);os.waitpid(child,0)
+                if child is not None and child>0:
+                    try:os.kill(child,signal.SIGKILL);os.waitpid(child,0)
+                    except BaseException:rc=1
             os._exit(rc)
-        _,status=os.waitpid(pid,0)
+        deadline=time.monotonic()+3
+        while True:
+            done,status=os.waitpid(pid,os.WNOHANG)
+            if done:break
+            if time.monotonic()>=deadline:
+                matrix.signal_group(pid,signal.SIGKILL);os.waitpid(pid,0)
+                self.fail('authored worker did not exit before deadline')
+            time.sleep(.01)
         self.assertTrue(os.WIFEXITED(status) and os.WEXITSTATUS(status)==0)
 
     def test_supervisor_reaps_its_worker(self):
