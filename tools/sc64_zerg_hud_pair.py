@@ -16,6 +16,7 @@ import shutil
 import signal
 import sys
 import time
+import subprocess
 
 import sc64_skirmish_sram_continuation as world
 
@@ -54,6 +55,8 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ('off_rom','off_elf','on_rom','on_elf','runner','tape','output'):
         ap.add_argument('--'+name.replace('_','-'),type=Path,required=True)
+    ap.add_argument('--build-receipt',type=Path,required=True)
+    ap.add_argument('--profile',choices=('z9','z10'),required=True)
     ap.add_argument('--blank-flash',type=Path)
     ap.add_argument('--resume-tape',type=Path)
     ap.add_argument('--ticks',type=int,default=2500)
@@ -61,7 +64,7 @@ def main():
     a=ap.parse_args()
     if not 1<=a.ticks<=5000 or not 1<=a.deadline<=1200:ap.error('ticks/deadline out of bounds')
     if bool(a.blank_flash)!=bool(a.resume_tape):ap.error('blank Flash and resume tape must be supplied together')
-    paths=(a.off_rom,a.off_elf,a.on_rom,a.on_elf,a.runner,a.tape)
+    paths=(a.off_rom,a.off_elf,a.on_rom,a.on_elf,a.runner,a.tape,a.build_receipt)
     if a.blank_flash:
         if a.blank_flash.read_bytes()!=bytes([255])*131072:ap.error('Flash backing must be erased')
         paths+=a.blank_flash,a.resume_tape
@@ -69,6 +72,12 @@ def main():
     expected_tape='d6bb9e46f9011a8af8c32eb62942ab8d611974b5592df85e5788358900c32df5'
     if a.output.exists():raise ValueError('output already exists')
     pins={str(p.resolve()):sha(p) for p in paths}
+    receipt=json.loads(a.build_receipt.read_text())
+    if not receipt.get('unchanged') or not receipt.get('vectors_verified',{}).get(a.profile):raise ValueError('missing verified paired build receipt')
+    if subprocess.check_output(['git','rev-parse','--short=8','HEAD'],text=True).strip()!=receipt.get('head') or subprocess.run(['git','diff','--quiet','HEAD','--']).returncode:raise ValueError('source does not match build receipt')
+    for path in (a.off_rom,a.off_elf,a.on_rom,a.on_elf):
+        if receipt.get('artifacts',{}).get(str(path.resolve()))!=sha(path):raise ValueError('ROM/ELF differs from paired build receipt')
+    if sha(a.off_rom)==sha(a.on_rom) or sha(a.off_elf)==sha(a.on_elf):raise ValueError('paired variants unexpectedly identical')
     if sha(a.runner)!=expected_runner or sha(a.tape)!=expected_tape:raise ValueError('unapproved runner/tape')
     if a.resume_tape and sha(a.resume_tape)!='389a025f68e66c1cd723338109ab4dcd1d51467317937ded2ecd7a073580329f':raise ValueError('unapproved resume tape')
     if a.blank_flash:
@@ -143,7 +152,7 @@ def main():
                         loaded_job!=(saved_job[0],saved_job[1]-1)):
                         raise ValueError('fresh load did not restore the saved paid job and wallet')
                 elif last['screen']!=world.SCREEN_PLAY:raise ValueError('custom game no longer playing')
-                check();report={'pins':pins,'ticks':a.ticks,'counts':counts,'paired_every_tick_sha256':digest.hexdigest(),
+                check();report={'pins':pins,'source_head':receipt['head'],'profile':a.profile,'ticks':a.ticks,'counts':counts,'paired_every_tick_sha256':digest.hexdigest(),
                     'flash_images_equal':save_equal,'cycles':[{'mean':sum(v)/len(v),'max':max(v)} for v in elapsed],
                     'scope':'ordinary custom tape; full displayed indexed frame and palette plus named state every prefix tick; optional fresh Flash load; no campaign proof'}
                 (a.output/'result.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report),flush=True)
