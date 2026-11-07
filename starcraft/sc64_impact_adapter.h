@@ -249,6 +249,9 @@ race_impact_save_write(const GbaSaveSelection *previous)
 race_impact_save_write(void)
 #endif
 {
+#if defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+    (void)previous; /* This isolated stage fences all journal calls. */
+#endif
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT

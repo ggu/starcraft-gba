@@ -1,8 +1,26 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Authored HOST state, actual Z10 descriptor and Scarab lifecycle. */
-#define main sc64_original_z10_main
-#include "sc64_z10_game.c"
-#undef main
+#include <assert.h>
+#include <stdio.h>
+#include "../starcraft/game.c"
+
+static unsigned held_keys;
+static void input(unsigned held)
+{ game_update((u16)held, (u16)(held & ~held_keys)); held_keys=held; }
+static void press(unsigned key) { input(key); input(0); }
+static void launch_z10_from_normal_menu(void)
+{
+    int ordinal;
+    game_init();held_keys=0;assert(race_front.page==SC_FRONT_HOME);
+    ordinal=sc64_catalog_playable_ordinal(SC64_FACTION_ZERG,SC64_Z10_GLOBAL_ID);
+    assert(ordinal==9 && sc64_catalog_playable_count(SC64_FACTION_ZERG)==10);
+    press(KEY_A);assert(race_front.page==SC_FRONT_MISSION && race_front.faction==SC_FRONT_ZERG);
+    for (int page=0;page<ordinal/2;++page) press(KEY_RIGHT);
+    if (ordinal&1) press(KEY_DOWN);
+    press(KEY_A);assert(race_front.page==SC_FRONT_BRIEFING && race_front.mission==SC64_Z10_GLOBAL_ID);
+    press(KEY_START);assert(screen==SCREEN_PLAY && !race_mode && race_zl_active());
+    assert(race_selected_mission==SC64_Z10_GLOBAL_ID && mission_unsupported_count==0);
+}
 
 int main(void)
 {
