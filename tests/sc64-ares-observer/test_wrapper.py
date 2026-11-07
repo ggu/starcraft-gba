@@ -20,6 +20,16 @@ class WrapperTest(unittest.TestCase):
     code="import resource,sys;open(sys.argv[1],'w').write(repr(resource.getrlimit(resource.RLIMIT_FSIZE)))"
     with patch.object(m.sys,'stdin',source):m.relay([sys.executable,'-c',code,str(target)],d,os.environ.copy(),log,err,result,mode=mode)
     self.assertEqual(target.read_text(),repr(expected));self.assertEqual(result['returncode'],0)
+ def test_grid_witness_rejects_partial_and_wrong_checkpoint(self):
+  with tempfile.TemporaryDirectory() as d, patch.object(m,'EXPECTED_STEPS',3), patch.object(m,'EXPECTED_FRAME_STEPS',(0,1,2)):
+   p=Path(d);data=b'1 0 0 0 1\n'*3;rows=m.planned_rows(data)
+   (p/'commands.csv').write_text('begin,steps,mask,x,y,capture\n'+''.join(','.join(map(str,r))+'\n' for r in rows))
+   (p/'status.log').write_text('frontend=visual_only cpu_recompiler=1 rsp_recompiler=1 homebrew=0\ncompleted_steps=8617 gpu_ready=1 ')
+   (p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,0,1,1,4\n1,1,1,1,4\n2,2,1,1,4\n')
+   for i in range(3):(p/f'live-{i:03}.argb').write_bytes(b'1234')
+   self.assertTrue(m.planned_witness(p,rows));(p/'live-002.argb').unlink();self.assertFalse(m.planned_witness(p,rows))
+   (p/'live-002.argb').write_bytes(b'1234');(p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,0,1,1,4\n1,1,1,1,4\n2,3,1,1,4\n')
+   self.assertFalse(m.planned_witness(p,rows))
  def test_binary_admission_and_changed_input(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d)/'probe';p.write_bytes(b'qualified')
@@ -28,11 +38,12 @@ class WrapperTest(unittest.TestCase):
     with self.assertRaises(ValueError):m.require_binary(p)
  def test_binary_rechecked_after_lock_before_output(self):
   with tempfile.TemporaryDirectory() as d:
-   root=Path(d);rom=root/'rom';vk=root/'vk';binary=root/'probe';out=root/'out'
+   root=Path(d);rom=root/'rom';vk=root/'vk';binary=root/'probe';out=root/'out';plan=root/'plan';plan.write_bytes(b'plan')
    rom.write_bytes(b'rom');vk.write_bytes(b'vk');binary.write_bytes(b'qualified')
    def changed(*_args):binary.write_bytes(b'changed')
-   args=['--rom',str(rom),'--moltenvk',str(vk),'--binary',str(binary),'--source',str(root),'--output',str(out)]
-   with patch.object(m,'ROM_SHA',hashlib.sha256(b'rom').hexdigest()), \
+   args=['--command-file',str(plan),'--rom',str(rom),'--moltenvk',str(vk),'--binary',str(binary),'--source',str(root),'--output',str(out)]
+   with patch.object(m,'COMMAND_SHA',hashlib.sha256(b'plan').hexdigest()),patch.object(m,'planned_rows',return_value=[]), \
+        patch.object(m,'ROM_SHA',hashlib.sha256(b'rom').hexdigest()), \
         patch.object(m,'VK_SHA',hashlib.sha256(b'vk').hexdigest()), \
         patch.object(m,'VK_PATH',vk.resolve()),patch.object(m,'BINARY_SHA',hashlib.sha256(b'qualified').hexdigest()), \
         patch.object(m,'LOCK',str(root/'lock')),patch.object(m,'clean',return_value=True), \

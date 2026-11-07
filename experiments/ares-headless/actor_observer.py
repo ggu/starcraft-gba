@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Bounded read-only actor observer; commands are steps mask x y capture."""
-import argparse,fcntl,hashlib,json,os,pathlib,resource,selectors,shutil,signal,subprocess,sys,time
+import argparse,csv,fcntl,hashlib,json,os,pathlib,resource,selectors,shutil,signal,subprocess,sys,time
 
+COMMAND_SHA='78e482b7bbc84a58ecb980e845902838833e7b1ad3e8f59bd230890c21ca15a2'
+EXPECTED_STEPS=8617
+EXPECTED_FRAME_STEPS=(8536,8576,8616)
 ROM_SHA='e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 VK_SHA='432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 REV='0aafd85789215e84e1e43415c07d4c88461b7899'
@@ -82,7 +85,35 @@ def limits_for_mode(mode):
  if mode=='metal-compatible':return (8*1024**2,8*1024**2)
  raise ValueError('unsupported file-limit mode')
 
-def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector,mode='strict'):
+def planned_rows(data):
+ rows=[];step=0
+ for line in data.decode('ascii').splitlines():
+  fields=[int(x) for x in line.split()]
+  if len(fields)!=5:raise ValueError('invalid command')
+  count,mask,x,y,capture=fields
+  if not 1<=count<=1000 or mask<0 or mask&~1023 or not -32767<=x<=32767 or not -32767<=y<=32767 or capture not in (0,1):raise ValueError('invalid command')
+  rows.append([step,*fields]);step+=count
+ if step!=EXPECTED_STEPS or tuple(row[0]+row[1]-1 for row in rows if row[-1])!=EXPECTED_FRAME_STEPS:raise ValueError('unexpected grid plan')
+ return rows
+
+def planned_witness(path,expected):
+ try:
+  with (path/'commands.csv').open(newline='') as f:commands=list(csv.reader(f))
+  if commands[0]!=['begin','steps','mask','x','y','capture'] or [[int(v) for v in x] for x in commands[1:]]!=expected:return False
+  with (path/'frames.csv').open(newline='') as f:frames=list(csv.DictReader(f))
+  if tuple(int(x['observed_step']) for x in frames)!=EXPECTED_FRAME_STEPS:return False
+  if [x.name for x in sorted(path.glob('live-*.argb'))]!=['live-000.argb','live-001.argb','live-002.argb']:return False
+  status=(path/'status.log').read_text()
+  return ('completed_steps=8617 ' in status and 'frontend=visual_only cpu_recompiler=1 rsp_recompiler=1 homebrew=0' in status and 'gpu_ready=1 ' in status)
+ except (OSError,ValueError,KeyError,IndexError):return False
+
+def owned_guard(path):
+ total=sum(x.stat().st_size for x in pathlib.Path(path).rglob('*') if x.is_file() and not x.is_symlink())
+ if total>63*1024**2:raise ValueError('owned output threshold')
+ if shutil.disk_usage(path).free<5*1024**3:raise ValueError('disk reserve')
+ return total
+
+def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector,mode='strict',input_stream=None):
  limits=limits_for_mode(mode)
  """Own one child; cleanup also runs on selector errors and signals."""
  child=None;sel=None;started=time.monotonic()
@@ -96,9 +127,12 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector,
   child=subprocess.Popen(cmd,cwd=cwd,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,bufsize=0,preexec_fn=setup,start_new_session=True)
   signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
-  sel=selector_factory();sel.register(sys.stdin.buffer,selectors.EVENT_READ,'input');sel.register(child.stdout,selectors.EVENT_READ,'output');sel.register(child.stderr,selectors.EVENT_READ,'error')
+  source=input_stream if input_stream is not None else sys.stdin.buffer
+  sel=selector_factory();sel.register(source,selectors.EVENT_READ,'input');sel.register(child.stdout,selectors.EVENT_READ,'output');sel.register(child.stderr,selectors.EVENT_READ,'error')
   deadline=started+180;written={'output':0,'error':0}
   while child.poll() is None and time.monotonic()<deadline:
+   try:owned_guard(cwd)
+   except (OSError,ValueError) as exc:result['owned_guard_error']=str(exc);break
    if stopped_child(child):
     inspect_stopped_child(child,cwd,deadline-time.monotonic(),result)
     break
@@ -117,7 +151,7 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector,
      else:err.write(data);err.flush()
     else:sel.unregister(key.fileobj)
    if result.get('log_budget_exceeded'):break
-  if child.poll() is None and not result.get('log_budget_exceeded') and not result.get('signal_stop'):result['timeout']=True
+  if child.poll() is None and not result.get('log_budget_exceeded') and not result.get('signal_stop') and not result.get('owned_guard_error'):result['timeout']=True
  finally:
   signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGINT,signal.SIGTERM})
   try:
@@ -134,27 +168,37 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector,
 def main(argv=None):
  p=argparse.ArgumentParser()
  for arg in ('binary','source','moltenvk','rom','output'):p.add_argument('--'+arg,type=pathlib.Path,required=True)
+ p.add_argument('--command-file',type=pathlib.Path,required=True)
  p.add_argument('--file-limit-mode',choices=('strict','metal-compatible'),default='strict')
  a=p.parse_args(argv)
+ command_data=a.command_file.read_bytes()
+ if hashlib.sha256(command_data).hexdigest()!=COMMAND_SHA:raise SystemExit('command hash mismatch')
+ expected=planned_rows(command_data)
  if not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance mismatch')
  require_binary(a.binary)
  if a.output.exists():raise SystemExit('output must be new')
  with open(LOCK,'a') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
   check_reserve(a.output);require_binary(a.binary)
+  if a.command_file.read_bytes()!=command_data:raise SystemExit('command changed while queued')
   if a.output.exists() or not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance or output changed while queued')
   a.output.mkdir(parents=True);[(a.output/x).mkdir() for x in ('input','saves','systems')];copy=a.output/'input/game.z64';shutil.copyfile(a.rom,copy)
   if sha(copy)!=ROM_SHA:raise SystemExit('ROM copy mismatch')
   sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('observer_file_budget.h').resolve(),pathlib.Path(__file__).with_name('observer_sigxfsz.h').resolve(),pathlib.Path(__file__).with_name('observer_images.h').resolve(),pathlib.Path(__file__).with_name('visual_capture.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
   resources=[a.source/'ares/ares/resource/resource.cpp',a.source/'ares/ares/resource/resource.hpp',a.source/'mia/resource/resource.cpp',a.source/'mia/resource/resource.hpp'];inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
-  cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'frontend_role':'visual_only_jit','ram_capture_enabled':False,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':0,'ram_each_bytes':0,'ram_total_bytes':0,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
-  with (a.output/'bridge.log').open('wb') as log,(a.output/'stderr.log').open('wb') as err:
-   relay(cmd,a.output.resolve(),{**os.environ,'DYLD_LIBRARY_PATH':str(a.moltenvk.resolve().parent)},log,err,result,mode=a.file_limit_mode)
+  cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'command_sha256':COMMAND_SHA,'expected_steps':EXPECTED_STEPS,'expected_frame_steps':EXPECTED_FRAME_STEPS,'frontend_role':'visual_only_jit','ram_capture_enabled':False,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':0,'ram_each_bytes':0,'ram_total_bytes':0,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
+  readfd,writefd=os.pipe()
+  try:os.write(writefd,command_data)
+  finally:os.close(writefd)
+  with os.fdopen(readfd,'rb') as source,(a.output/'bridge.log').open('wb') as log,(a.output/'stderr.log').open('wb') as err:
+   relay(cmd,a.output.resolve(),{**os.environ,'DYLD_LIBRARY_PATH':str(a.moltenvk.resolve().parent)},log,err,result,mode=a.file_limit_mode,input_stream=source)
   result['unchanged']=clean(a.source) and sha(a.rom)==ROM_SHA and sha(copy)==ROM_SHA and sha(a.moltenvk)==VK_SHA and sha(a.binary)==binary==BINARY_SHA and all(sha(pathlib.Path(k))==v for k,v in inputs.items())
   files=sorted(a.output.glob('live-*.argb'));result['frames']={x.name:sha(x) for x in files};result['frame_bytes']=sum(x.stat().st_size for x in files);result['ok']=result['returncode']==0 and result['unchanged'] and 1<=len(files)<=3 and result['frame_bytes']<=2*1024**2
   ram=sorted(a.output.glob('ram-*.bin'));result['ram']={x.name:sha(x) for x in ram};result['ram_bytes']=sum(x.stat().st_size for x in ram);result['ok']=result['ok'] and len(ram)==0 and result['ram_bytes']==0
   for name in ('ram.csv','commands.csv','inputs.csv','callbacks.csv','status.log','sigxfsz.bin','images.bin','stopped-fds.txt'):result[name+'_sha256']=sha(a.output/name) if (a.output/name).is_file() else None
   diagnostic=a.output/'sigxfsz.bin';images=a.output/'images.bin';result['ok']=result['ok'] and diagnostic.is_file() and diagnostic.stat().st_size in (0,40) and images.is_file() and images.stat().st_size<=12+128*528
+  result['planned_witness_complete']=planned_witness(a.output,expected)
+  result['ok']=result['ok'] and result['planned_witness_complete'] and not result.get('owned_guard_error')
   result['output_bytes']=sum(x.stat().st_size for x in a.output.rglob('*') if x.is_file() and not x.is_symlink());result['ok']=result['ok'] and result['output_bytes']<=63*1024**2 and not result.get('log_budget_exceeded',False)
   (a.output/'manifest.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({'ok':result['ok'],'returncode':result['returncode'],'frames':len(files)}),flush=True)
   return 0 if result['ok'] else 1
