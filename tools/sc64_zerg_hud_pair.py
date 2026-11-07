@@ -51,6 +51,14 @@ def validate_flash_image(path):
     for byte in data[meta+16:meta+16+length]:value=((value^byte)*16777619)&0xffffffff
     if value!=int.from_bytes(data[meta+8:meta+12],'little'):raise ValueError('Flash payload checksum mismatch')
 
+def verify_build_roles(receipt,profile,off_rom,off_elf,on_rom,on_elf):
+    products=receipt.get('products',{}).get(profile,{})
+    for variant,rom,elf in (('off',off_rom,off_elf),('on',on_rom,on_elf)):
+        for kind,path in (('rom',rom),('elf',elf)):
+            entry=products.get(variant,{}).get(kind,{})
+            if entry.get('path')!=str(path.resolve()) or entry.get('sha256')!=sha(path):
+                raise ValueError('ROM/ELF role differs from paired build receipt')
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ('off_rom','off_elf','on_rom','on_elf','runner','tape','output'):
@@ -75,8 +83,7 @@ def main():
     receipt=json.loads(a.build_receipt.read_text())
     if not receipt.get('unchanged') or not receipt.get('vectors_verified',{}).get(a.profile):raise ValueError('missing verified paired build receipt')
     if subprocess.check_output(['git','rev-parse','--short=8','HEAD'],text=True).strip()!=receipt.get('head') or subprocess.run(['git','diff','--quiet','HEAD','--']).returncode:raise ValueError('source does not match build receipt')
-    for path in (a.off_rom,a.off_elf,a.on_rom,a.on_elf):
-        if receipt.get('artifacts',{}).get(str(path.resolve()))!=sha(path):raise ValueError('ROM/ELF differs from paired build receipt')
+    verify_build_roles(receipt,a.profile,a.off_rom,a.off_elf,a.on_rom,a.on_elf)
     if sha(a.off_rom)==sha(a.on_rom) or sha(a.off_elf)==sha(a.on_elf):raise ValueError('paired variants unexpectedly identical')
     if sha(a.runner)!=expected_runner or sha(a.tape)!=expected_tape:raise ValueError('unapproved runner/tape')
     if a.resume_tape and sha(a.resume_tape)!='389a025f68e66c1cd723338109ab4dcd1d51467317937ded2ecd7a073580329f':raise ValueError('unapproved resume tape')
