@@ -141,6 +141,26 @@ static void depot_query(int sx,int sy,int cx,int cy,int id)
     if(path_walkable[cell]&&dist[cell]==0){int dx=nx-cx,dy=ny-cy;assert(next==cell&&dx*dx+dy*dy<=1024);}
     else {assert((col==sx&&(row==sy+1||row==sy-1))||(row==sy&&(col==sx+1||col==sx-1)));assert(dist[next]>=0);if(path_walkable[cell]){assert(dist[next]==dist[cell]-1);int d=direction[cell];int want=cell+(d==1?1:d==2?-1:d==3?MAP_COLS:-MAP_COLS);assert(next==want);}else assert(next==expected);}
 }
+#if defined(SC64_DEPOT_REACHABILITY_PROBE) && defined(SC64_RACES) && defined(SC64_ROUTE_PACK3) && !defined(SC64_ROUTE_ACTIVE_STRIDE)
+/* Malformed cache fields are not assumed to be valid BFS forests. The
+ * candidate must honor the same bounded walk and reject cycles/invalid codes. */
+static void corrupt_field_cases(void)
+{
+    int col=MAP_COLS/2,row=MAP_ROWS/2,origin=col+row*MAP_COLS;
+    int nx,ny,x=col*16+8,y=row*16+8;
+    memset(path_walkable,1,sizeof(path_walkable)); path_walkable[origin]=0; reset();
+    memset(sc64_route_field[0],255,sizeof(sc64_route_field[0]));
+    sc64_route_valid[0]=1; sc64_route_goal[0]=SC64_ROUTE_DEPOT_TAG;
+    sc64_route_put(0,origin+1,1); sc64_route_put(0,origin+2,2); /* cycle */
+    sc64_route_put(0,origin-1,5); /* invalid direction */
+    assert(!sc64_route_depot_next(x,y,0,x,y,&nx,&ny));
+    assert(!sc64_route_depot_reachable(x,y,0,x,y));
+    sc64_route_put(0,origin-1,0); /* later root after cyclic first neighbor */
+    assert(sc64_route_depot_next(x,y,0,x,y,&nx,&ny));
+    assert(sc64_route_depot_reachable(x,y,0,x,y));
+}
+#endif
+
 static void point_query(int sx,int sy,int gx,int gy)
 {
     int cell=sx+sy*MAP_COLS,nx,ny;assert(path_walkable[cell]&&path_walkable[gx+gy*MAP_COLS]);
@@ -248,5 +268,8 @@ int main(void)
         int sx=(int)(rnd()%(u32)MAP_COLS),sy=(int)(rnd()%(u32)MAP_ROWS);
         make_bfs(cx,cy,-1);depot_query(sx,sy,cx,cy,id);
     }
+#if defined(SC64_DEPOT_REACHABILITY_PROBE) && defined(SC64_RACES) && defined(SC64_ROUTE_PACK3) && !defined(SC64_ROUTE_ACTIVE_STRIDE)
+    corrupt_field_cases();
+#endif
     puts("depot geometry and route BFS oracle passed");return 0;
 }
