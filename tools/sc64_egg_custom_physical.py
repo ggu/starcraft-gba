@@ -21,6 +21,8 @@ def digest(p):
 def check_state(state, info, active):
     if (state['race_mode'], state['race_human'], state['race_bots'], state['race_skirmish_map']) != (1, 1, 1, 0):
         raise ValueError('unexpected custom controller')
+    if not (0 <= info['supply'] <= info['supply_cap']):
+        raise ValueError('invalid supply')
     unit_fields = world.UNIT_FIELDS
     owner, typ, target, timer = (1 + unit_fields.index(x) for x in ('owner', 'type', 'target', 'work_timer'))
     eggs = [u for u in state['units'] if u[owner] == info['side'] and u[typ] == info['egg_type']]
