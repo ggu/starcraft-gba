@@ -639,6 +639,10 @@ static int race_zl_rebind_loaded_world(const Sc64RaceMap *map)
  * town's source wallet. */
 static int race_zl_ai_queue(unsigned town, int producer, int type)
 {
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+    if (!race_zl_active() || town >= SC64_ZL_AI_TOWNS ||
+        sc64_controller_building(producer) != race_zl_mission->town_slot[town]) return 0;
+#endif
     int saved_minerals = race_minerals[ENEMY], saved_gas = race_gas[ENEMY], ok;
     race_minerals[ENEMY] = (int)race_zl_ai_minerals[town];
     race_gas[ENEMY] = (int)race_zl_ai_gas[town];
@@ -695,7 +699,13 @@ static void race_zl_ai_wave(unsigned town)
         }
     if (tx < 0) return;
     for (int i = 0; i < MAX_UNITS && sent < want; ++i) if (u[i].alive &&
-        u[i].owner == ENEMY && u[i].raw_owner == slot && u[i].order == ORDER_IDLE &&
+        u[i].owner == ENEMY &&
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+        sc64_controller_unit(i) == slot &&
+#else
+        u[i].raw_owner == slot &&
+#endif
+        u[i].order == ORDER_IDLE &&
         !sc64_race_is_worker(u[i].type) && sc64_race_unit_damage(u[i].type) > 0) {
         if (guard < SC64_ZL_AI_HOME_GUARD) { ++guard; continue; }
         u[i].order = ORDER_ATTACK_MOVE; u[i].target = -1;

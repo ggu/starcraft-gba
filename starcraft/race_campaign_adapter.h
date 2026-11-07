@@ -153,6 +153,30 @@ race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 #endif
     return map->owner_modes[raw_owner];
 }
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+/* Only the reviewed P1 and Z9/Z10 contexts are admitted by this stage. */
+static int sc64_controller_source_owner(unsigned slot)
+{
+    const Sc64RaceMap *map;
+    if (race_mode || slot >= 8 || race_selected_mission < 0 || race_selected_mission >= SC64_RACE_MAP_COUNT) return -1;
+    map=&sc64_race_maps[race_selected_mission];
+    if (!map->owner_modes || !map->units || map->human_slot >= 8) return -1;
+#ifdef SC64_Z9_RUNTIME
+    if (race_zl_active()) return race_zl_map_shape_valid(map) ? race_zl_source_owner(slot) : -1;
+#endif
+    if (race_selected_mission != SC64_RACE_MISSION_P1) return -1;
+    return race_campaign_owner(map,(int)slot);
+}
+static int sc64_controller_human_source(void)
+{
+    const Sc64RaceMap *map=&sc64_race_maps[race_selected_mission];
+    int human=map->human_slot, count=0;
+    if (human < 0 || human >= 8 || sc64_controller_source_owner((unsigned)human)!=SIDE) return -1;
+    for (unsigned i=0;i<8;++i) if (sc64_controller_source_owner(i)==SIDE) ++count;
+    return count==1 ? human : -1;
+}
+#endif
+
 
 static int
 race_campaign_count_buildings(int owner)
@@ -568,6 +592,11 @@ race_campaign_init(void)
         );
 #endif
     map = &sc64_race_maps[race_selected_mission];
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+    if (sc64_controller_human_source() < 0) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
     /* Source UNIT flags remain owned by the imported map. Reject any worker
      * row using a runtime cargo/pending bit before actors are spawned or
@@ -1645,11 +1674,23 @@ race_campaign_tick(void)
                 for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == RESCUABLE &&
                     u[i].x >= 224 && u[i].x <= 784 && u[i].y >= 848 && u[i].y <= 1200) {
                     if ((int)i == fenix) race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_FENIX_MET;
-                    u[i].owner = SIDE; joined = 1;
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+                    if (!sc64_controller_transfer_unit(i,sc64_controller_human_source())) continue;
+#else
+                    u[i].owner = SIDE;
+#endif
+                    joined = 1;
                 }
                 for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == RESCUABLE &&
                     b[i].x >= 224 && b[i].x <= 784 && b[i].y >= 848 && b[i].y <= 1200) {
-                    if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) { b[i].owner = SIDE; joined = 1; }
+                    if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) {
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+                        if (!sc64_controller_transfer_building(i,sc64_controller_human_source())) continue;
+#else
+                        b[i].owner = SIDE;
+#endif
+                        joined = 1;
+                    }
                 }
                 if (joined) race_campaign_set_message(8);
             }
@@ -1657,7 +1698,11 @@ race_campaign_tick(void)
                 /* Source 008/01E MRGN 1 is "rescue Fenix". */
                 for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
                     dist2(u[i].x, u[i].y, f->x, f->y) <= 28 * 28) {
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+                    if (!sc64_controller_transfer_unit(fenix,sc64_controller_human_source())) break;
+#else
                     f->owner = SIDE;
+#endif
                     race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_FENIX_MET;
                     race_campaign_set_message(4);
                     break;

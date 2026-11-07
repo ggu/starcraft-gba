@@ -45,7 +45,7 @@ static int race_creation_source_owner(int owner, int creator_raw)
     return candidate == map->human_slot ? candidate : -1;
 }
 
-static int race_spawn_product(int owner, int type, int x, int y, int source_owner, int producer)
+static int race_spawn_product_from(int owner, int type, int x, int y, int source_owner, int producer)
 {
     int slot = spawn_unit(owner, type, x, y);
 #ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
@@ -59,6 +59,8 @@ static int race_spawn_product(int owner, int type, int x, int y, int source_owne
         u[slot].raw_owner = source_owner;
     return slot;
 }
+static int __attribute__((unused)) race_spawn_product(int owner,int type,int x,int y,int source_owner)
+{ return race_spawn_product_from(owner,type,x,y,source_owner,-1); }
 
 /* Live owner-independent race adapter. Include from game.c after engine
  * helpers and before the frame/update hooks that call these functions. */
@@ -1642,8 +1644,8 @@ static void race_tick_buildings(void)
                     continue;
                 }
                 int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
-                int first_slot = race_spawn_product(owner, type, first_x, first_y, source_owner, i);
-                if (first_slot < 0 || race_spawn_product(owner, type, second_x, second_y, source_owner, i) < 0) {
+                int first_slot = race_spawn_product_from(owner, type, first_x, first_y, source_owner, i);
+                if (first_slot < 0 || race_spawn_product_from(owner, type, second_x, second_y, source_owner, i) < 0) {
                     /* Capacity was checked before planning and no world state
                      * changes between the paired spawns; this is defensive. */
                     if (first_slot >= 0) u[first_slot].alive = 0;
@@ -1657,7 +1659,7 @@ static void race_tick_buildings(void)
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
                 }
-                spawned = race_spawn_product(owner, type, first_x, first_y,
+                spawned = race_spawn_product_from(owner, type, first_x, first_y,
                                              race_creation_source_owner(owner, b[i].raw_owner), i);
                 if (spawned < 0) {
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
@@ -1683,13 +1685,13 @@ static void race_tick_buildings(void)
             for(int slot=0;slot<MAX_UNITS;slot++)if(!u[slot].alive)free_slots++;
             if(free_slots<2){b[i].queue_progress=frames-1;continue;}
             int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
-            if (race_spawn_product(owner, type, x, y, source_owner, i) < 0 ||
-                race_spawn_product(owner, type, x + 8, y, source_owner, i) < 0) {
+            if (race_spawn_product_from(owner, type, x, y, source_owner, i) < 0 ||
+                race_spawn_product_from(owner, type, x + 8, y, source_owner, i) < 0) {
                 b[i].queue_progress = frames - 1;
                 continue;
             }
         } else {
-            int spawned = race_spawn_product(owner, type, x, y,
+            int spawned = race_spawn_product_from(owner, type, x, y,
                                              race_creation_source_owner(owner, b[i].raw_owner), i);
             if (spawned >= 0 && sc64_race_is_worker(type)) {
                 int patch = nearest_mineral(x,y);
