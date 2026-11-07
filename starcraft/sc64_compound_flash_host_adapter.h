@@ -3,10 +3,11 @@
 #ifndef SC64_COMPOUND_FLASH_HOST_ADAPTER_H
 #define SC64_COMPOUND_FLASH_HOST_ADAPTER_H
 #include "sc64_compound_flash_envelope.h"
+#include "sc64_compound_flash_recovery.h"
 _Static_assert(MAX_UNITS==240 && MAX_BUILDINGS==160,"compound Z10 actor shape");
 #define SC64_CF_SIDE (2u*(MAX_UNITS+MAX_BUILDINGS)+MAX_UNITS+4u*MAX_UNITS)
 #define SC64_CF_FLIGHT_OFFSET (2u*(MAX_UNITS+MAX_BUILDINGS)+MAX_UNITS)
-typedef struct {GbaFlashJournalRecord records[4];u8 seen[4],accepted[4];RaceLoadPlan *plan;} Sc64CfSnapshot;
+typedef struct {GbaFlashJournalRecord records[4],proven[4];u8 seen[4],accepted[4],has_proof[4];int classes[4];u32 digest_a,digest_b;RaceLoadPlan *plan;} Sc64CfSnapshot;
 static Sc64CfSnapshot sc64_cf_snapshot;
 static GbaFlashJournalRecord sc64_cf_previous;
 static int sc64_cf_has_previous;
@@ -18,9 +19,10 @@ static int sc64_cf_test_stage;
 #endif
 static Sc64CompoundFlashHeader sc64_cf_expected(u32 base)
 { return (Sc64CompoundFlashHeader){1,0,SC64_Z10_GLOBAL_ID,SC64_CF_FEATURES,base,1,MAX_UNITS+MAX_BUILDINGS,MAX_UNITS+MAX_BUILDINGS,MAX_UNITS,MAX_UNITS*4u}; }
-/* Until genuine predecessors have a qualified decoder, require an entirely
- * blank legacy area. Never reinterpret a historical or incomplete record. */
-static int sc64_cf_ownership(const GbaFlashJournalIo *io)
+static int sc64_cf_proof(void *ctx,const GbaFlashJournalIo *io,unsigned index);
+/* The legacy region stays strictly blank. Classify both new slots before
+ * outgoing serialization, when candidate scratch may safely be reused. */
+static int sc64_cf_legacy_blank(const GbaFlashJournalIo *io)
 {
     u8 bytes[64];
     if(!io || !io->read)return 0;
@@ -28,23 +30,29 @@ static int sc64_cf_ownership(const GbaFlashJournalIo *io)
         if(!io->read(io->context,p,bytes,sizeof bytes))return 0;
         for(unsigned j=0;j<sizeof bytes;++j)if(bytes[j]!=0xff)return 0;
     }
+    return 1;
+}
+static int sc64_cf_ownership(const GbaFlashJournalIo *io,Sc64CfSnapshot *s)
+{
+    if(!s || !sc64_cf_legacy_blank(io))return 0;
     for(unsigned i=2;i<4;++i) {
-        u8 commit[4],metadata[16],header[SC64_CF_HEADER];
-        if(!io->read(io->context,gba_fj_base(i),commit,4) ||
-           !io->read(io->context,gba_fj_metadata(i),metadata,sizeof metadata))return 0;
-        u32 a=gba_fj_u32(commit),b=gba_fj_u32(metadata);
-        if((a!=0xffffffffu && a!=SC64_COMPOUND_FLASH_TAG) ||
-           (b!=0xffffffffu && b!=SC64_COMPOUND_FLASH_TAG))return 0;
-        /* Check raw ownership even when probe will filter a bad CRC or
-         * length. Unknown/v1 tuples must never be erased as empty slots. */
-        if(a==SC64_COMPOUND_FLASH_TAG && b!=SC64_COMPOUND_FLASH_TAG)return 0;
-        if(b==SC64_COMPOUND_FLASH_TAG) {
-            Sc64CompoundFlashHeader parsed,expected=sc64_cf_expected(0);
-            if(!io->read(io->context,gba_fj_metadata(i)+16,header,sizeof header) ||
-               !sc64_cf_parse(header,gba_fj_u32(metadata+4),&expected,&parsed))return 0;
-        }
+        int state=sc64_cfr_classify(io,i,SC64_COMPOUND_FLASH_TAG,sc64_cf_proof,s);
+        if(state==SC64_CFR_FOREIGN)return 0;
+        s->classes[i]=state;
     }
     return 1;
+}
+/* Stream the exact owned physical span. This is an accidental-change check,
+ * not a cryptographic authenticator; semantic proof happens separately. */
+static int sc64_cf_digest(const GbaFlashJournalIo *io,u32 *a,u32 *b)
+{
+    u8 bytes[64];u32 x=2166136261u,y=0x9e3779b9u;
+    for(u32 off=0;off<98304u;off+=sizeof bytes) {
+        if(!io->read(io->context,off,bytes,sizeof bytes))return 0;
+        x=gba_fj_hash(x,bytes,sizeof bytes);
+        for(unsigned i=0;i<sizeof bytes;++i)y=(y<<5|y>>27)^bytes[i];
+    }
+    *a=x;*b=y;return 1;
 }
 static int sc64_cf_town(const Sc64ZlMission *m,unsigned controller)
 {
@@ -109,7 +117,7 @@ static int sc64_cf_validate(RaceLoadPlan *p)
     }
     return 1;
 }
-static int sc64_cf_prepare(RaceLoadPlan *p,const GbaFlashJournalIo *io,const GbaFlashJournalRecord *r)
+static int sc64_cf_prepare(RaceLoadPlan *p,const GbaFlashJournalIo *io,const GbaFlashJournalRecord *r,int require_commit)
 {
     u8 header[SC64_CF_HEADER],flight[MAX_UNITS*4u];Sc64CompoundFlashHeader got,expected=sc64_cf_expected(0);u32 at;
     if(r->index<2 || r->tag!=SC64_COMPOUND_FLASH_TAG)return 0;
@@ -129,16 +137,47 @@ static int sc64_cf_prepare(RaceLoadPlan *p,const GbaFlashJournalIo *io,const Gba
     at+=sizeof p->controller_buildings;
     if(gba_fj_read_payload(io,r,at,p->scarab_payers,sizeof p->scarab_payers)!=GBA_FJ_OK)return -1;
     if(!sc64_cf_validate(p))return 0;
+    if(!require_commit)return 1;
+    int marker=sc64_cfr_committed_marker(io,r->index);
+    if(marker<0)return -1;
+    if(!marker)return 0;
     GbaFlashJournalRecord checked;int status=gba_fj_probe(io,r->index,&checked);
     if(status<0)return -1;
     return status==GBA_FJ_OK && gba_fj_same_record(r,&checked);
+}
+/* Check metadata and the entire payload without consulting the commit tag;
+ * semantic decoding occurs only before outgoing serialization. */
+static int sc64_cf_proof(void *ctx,const GbaFlashJournalIo *io,unsigned index)
+{
+    Sc64CfSnapshot *s=ctx;u8 meta[16],again[16],bytes[64];u32 hash=2166136261u;
+    GbaFlashJournalRecord r;RaceLoadPlan scratch;
+    if(!s || !io->read(io->context,gba_fj_metadata(index),meta,sizeof meta))return -1;
+    r=(GbaFlashJournalRecord){index,gba_fj_u32(meta),gba_fj_u32(meta+4),gba_fj_u32(meta+8),gba_fj_u32(meta+12)};
+    if(r.tag!=SC64_COMPOUND_FLASH_TAG || !r.length || r.length>GBA_FJ_PAYLOAD_MAX || !r.sequence)return 0;
+    for(u32 off=0;off<r.length;) {
+        u32 n=r.length-off;if(n>sizeof bytes)n=sizeof bytes;
+        if(gba_fj_read_payload(io,&r,off,bytes,n)!=GBA_FJ_OK)return -1;
+        hash=gba_fj_hash(hash,bytes,n);off+=n;
+    }
+    if(hash!=r.checksum)return 0;
+    int ok=sc64_cf_prepare(&scratch,io,&r,0);if(ok<=0)return ok;
+    if(!io->read(io->context,gba_fj_metadata(index),again,sizeof again))return -1;
+    if(memcmp(meta,again,sizeof meta))return -1;
+    hash=2166136261u;
+    for(u32 off=0;off<r.length;) {
+        u32 n=r.length-off;if(n>sizeof bytes)n=sizeof bytes;
+        if(gba_fj_read_payload(io,&r,off,bytes,n)!=GBA_FJ_OK)return -1;
+        hash=gba_fj_hash(hash,bytes,n);off+=n;
+    }
+    if(hash!=r.checksum)return -1;
+    s->proven[index]=r;s->has_proof[index]=1;return 1;
 }
 static int sc64_cf_capture(void *ctx,const GbaFlashJournalIo *io,const GbaFlashJournalRecord *r)
 {
     Sc64CfSnapshot *s=ctx;int ok;
     if(!s || r->index>=4 || s->seen[r->index])return -1;
     if(r->index<2 || r->tag!=SC64_COMPOUND_FLASH_TAG)return 0;
-    ok=sc64_cf_prepare(s->plan,io,r);if(ok<0)return -1;
+    ok=sc64_cf_prepare(s->plan,io,r,1);if(ok<0)return -1;
     s->seen[r->index]=1;s->records[r->index]=*r;s->accepted[r->index]=(u8)ok;return ok;
 }
 static int sc64_cf_reselect(void *ctx,const GbaFlashJournalIo *io,const GbaFlashJournalRecord *r)
@@ -152,32 +191,101 @@ static int race_q8_flash_begin(void)
     SC64_CF_TEST_STAGE(1);
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();RaceLoadPlan scratch;int status;
     memset(&sc64_cf_snapshot,0,sizeof sc64_cf_snapshot);
-    if(!sc64_cf_ownership(io))return 0;
+    u32 a,b;
+    if(!sc64_cf_digest(io,&a,&b) || !sc64_cf_ownership(io,&sc64_cf_snapshot))return 0;
     sc64_cf_snapshot.plan=&scratch;
     status=gba_fj_select(io,sc64_cf_capture,&sc64_cf_snapshot,&sc64_cf_previous);
     sc64_cf_snapshot.plan=0;
     if(status<0)return 0;
     for(unsigned i=0;i<4;++i)if(sc64_cf_snapshot.seen[i] && !sc64_cf_snapshot.accepted[i])return 0;
-    sc64_cf_has_previous=status==GBA_FJ_OK;return 1;
+    sc64_cf_has_previous=status==GBA_FJ_OK;
+    if(!sc64_cf_digest(io,&sc64_cf_snapshot.digest_a,&sc64_cf_snapshot.digest_b) ||
+       a!=sc64_cf_snapshot.digest_a || b!=sc64_cf_snapshot.digest_b)return 0;
+    return 1;
 }
 static int race_q8_flash_select(RaceLoadPlan *plan)
 {
     const GbaFlashJournalIo *io=sc64_q8_flash_host_io();
     Sc64CfSnapshot snapshot={0};GbaFlashJournalRecord selected,checked;
-    if(!plan || !sc64_cf_ownership(io))return 0;
+    if(!plan || !sc64_cf_legacy_blank(io))return 0;
     snapshot.plan=plan;
     int status=gba_fj_select(io,sc64_cf_capture,&snapshot,&selected);
-    if(status!=GBA_FJ_OK || sc64_cf_prepare(plan,io,&selected)!=1)return 0;
+    if(status!=GBA_FJ_OK || sc64_cf_prepare(plan,io,&selected,1)!=1)return 0;
     status=gba_fj_probe(io,selected.index,&checked);
     return status==GBA_FJ_OK && gba_fj_same_record(&selected,&checked);
 }
-typedef struct {const GbaFlashJournalIo *inner;int checked;} Sc64CfGuard;
-static int sc64_cf_guard_read(void *v,u32 p,void *out,u32 n)
-{Sc64CfGuard *g=v;return g->inner->read(g->inner->context,p,out,n);}
-static int sc64_cf_guard_program(void *v,u32 p,const void *data,u32 n)
-{Sc64CfGuard *g=v;return g->inner->program(g->inner->context,p,data,n);}
-static int sc64_cf_guard_erase(void *v,u32 p)
-{Sc64CfGuard *g=v;if(!g->checked){if(!sc64_cf_ownership(g->inner))return 0;g->checked=1;}return g->inner->erase_sector(g->inner->context,p);}
+/* Program one marker byte at a time, with a readback before any data erase. */
+static int sc64_cf_finish_marker(const GbaFlashJournalIo *io,unsigned index)
+{
+    u8 byte;u32 base=gba_fj_base(index);
+    for(unsigned i=0;i<SC64_CFR_MARKER_SIZE;++i) {
+        if(!io->read(io->context,base+SC64_CFR_MARKER_OFFSET+i,&byte,1) ||
+           (byte&sc64_cfr_marker[i])!=sc64_cfr_marker[i])return 0;
+        if(byte!=sc64_cfr_marker[i] &&
+           !io->program(io->context,base+SC64_CFR_MARKER_OFFSET+i,&sc64_cfr_marker[i],1))return 0;
+    }
+    u8 marker[SC64_CFR_MARKER_SIZE];
+    return io->read(io->context,base+SC64_CFR_MARKER_OFFSET,marker,sizeof marker) &&
+           !memcmp(marker,sc64_cfr_marker,sizeof marker);
+}
+static int sc64_cf_erase_commit(const GbaFlashJournalIo *io,unsigned index)
+{
+    u8 bytes[64];u32 base=gba_fj_base(index);
+    if(!io->erase_sector(io->context,base))return 0;
+    for(u32 off=0;off<GBA_FJ_SECTOR;off+=sizeof bytes) {
+        if(!io->read(io->context,base+off,bytes,sizeof bytes))return 0;
+        for(unsigned i=0;i<sizeof bytes;++i)if(bytes[i]!=0xff)return 0;
+    }
+    return 1;
+}
+/* The semantic slot proof ran in begin, before data became the outgoing
+ * scratch span. This routine uses only recorded descriptors and reads. */
+static int sc64_cf_recovery_write(const GbaFlashJournalIo *io,const u8 *prefix,u32 prefix_length,
+                                  const void *data,u32 length,const u8 *tail,u32 tail_length)
+{
+    GbaFlashJournalRecord selected,written,checked;u8 meta[16],commit[4],bytes[64];
+    u32 a,b,index=2,sequence=1,hash=2166136261u,verify=2166136261u,source_hash;int status;
+    if(!io || !prefix || !data || !tail || !length || prefix_length>GBA_FJ_PAYLOAD_MAX ||
+       length>GBA_FJ_PAYLOAD_MAX-prefix_length || tail_length>GBA_FJ_PAYLOAD_MAX-prefix_length-length)return 0;
+    source_hash=gba_fj_hash(2166136261u,data,length);
+    status=gba_fj_select(io,sc64_cf_reselect,&sc64_cf_snapshot,&selected);
+    if(status<0 || (sc64_cf_has_previous && (status!=GBA_FJ_OK || !gba_fj_same_record(&selected,&sc64_cf_previous))) ||
+       (!sc64_cf_has_previous && status==GBA_FJ_OK))return 0;
+    /* Full device fingerprint checks raw slot/metadata/content after all
+     * semantic preflight and immediately before the first mutation. */
+    if(!sc64_cf_digest(io,&a,&b) || a!=sc64_cf_snapshot.digest_a || b!=sc64_cf_snapshot.digest_b ||
+       gba_fj_hash(2166136261u,data,length)!=source_hash)return 0;
+    if(status==GBA_FJ_OK) {
+        sequence=selected.sequence+1u;if(!sequence)sequence=1;
+        index=selected.index==2?3u:2u;
+    }
+    int state=sc64_cf_snapshot.classes[index];
+    if(state==SC64_CFR_FOREIGN)return 0;
+    if(state==SC64_CFR_ERASE || state==SC64_CFR_COMMITTED)
+        if(!sc64_cf_erase_commit(io,index))return 0;
+    if(state!=SC64_CFR_OPEN && !sc64_cf_finish_marker(io,index))return 0;
+    u32 base=gba_fj_base(index),metadata=gba_fj_metadata(index);
+    for(u32 sector=GBA_FJ_SECTOR;sector<GBA_FJ_SLOT;sector+=GBA_FJ_SECTOR)
+        if(!io->erase_sector(io->context,base+sector))return 0;
+    hash=gba_fj_hash(hash,prefix,prefix_length);hash=gba_fj_hash(hash,data,length);hash=gba_fj_hash(hash,tail,tail_length);
+    written=(GbaFlashJournalRecord){index,SC64_COMPOUND_FLASH_TAG,prefix_length+length+tail_length,hash,sequence};
+    gba_fj_put32(meta,written.tag);gba_fj_put32(meta+4,written.length);gba_fj_put32(meta+8,hash);gba_fj_put32(meta+12,sequence);
+    if(!io->program(io->context,metadata,meta,sizeof meta) ||
+       !io->program(io->context,metadata+16,prefix,prefix_length) ||
+       !io->program(io->context,metadata+16+prefix_length,data,length) ||
+       !io->program(io->context,metadata+16+prefix_length+length,tail,tail_length))return 0;
+    if(!io->read(io->context,metadata,bytes,sizeof meta) || memcmp(bytes,meta,sizeof meta))return 0;
+    for(u32 off=0;off<written.length;) {
+        u32 n=written.length-off;if(n>sizeof bytes)n=sizeof bytes;
+        if(gba_fj_read_payload(io,&written,off,bytes,n)!=GBA_FJ_OK)return 0;
+        verify=gba_fj_hash(verify,bytes,n);off+=n;
+    }
+    if(verify!=hash || gba_fj_hash(2166136261u,data,length)!=source_hash)return 0;
+    gba_fj_put32(commit,written.tag);
+    if(!io->program(io->context,base,commit,4) || gba_fj_probe(io,index,&checked)!=GBA_FJ_OK ||
+       !gba_fj_same_record(&written,&checked))return 0;
+    return 1;
+}
 static int race_q8_flash_write(const void *data,u32 length)
 {
     SC64_CF_TEST_STAGE(2);
@@ -238,11 +346,8 @@ static int race_q8_flash_write(const void *data,u32 length)
     memcpy((u8 *)&race_impact_record+suffix_start,suffix,suffix_length);
     if(!valid || gba_fj_hash(2166136261u,data,length)!=original_hash)return 0;
     Sc64CompoundFlashHeader envelope=sc64_cf_expected(length);sc64_cf_write(header,&envelope);
-    Sc64CfGuard guard={io,0};GbaFlashJournalIo guarded={&guard,sc64_cf_guard_read,sc64_cf_guard_erase,sc64_cf_guard_program};
-    GbaFlashJournalRecord written;
-    return gba_fj_write_three(&guarded,header,sizeof header,data,length,side,sizeof side,
-         SC64_COMPOUND_FLASH_TAG,sc64_cf_reselect,&sc64_cf_snapshot,
-         sc64_cf_has_previous?&sc64_cf_previous:0,&written)==GBA_FJ_OK;
+    if(!sc64_cf_recovery_write(io,header,sizeof header,data,length,side,sizeof side))return 0;
+    return gba_fj_hash(2166136261u,data,length)==original_hash;
 }
 
 #endif

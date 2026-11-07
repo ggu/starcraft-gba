@@ -76,6 +76,7 @@ test-zl-scarab-compound-flash:
 	  -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT \
 	  -DSC64_Q8_FLASH_HOST_STAGE $(ZERG_Z10_CANONICAL_FLAGS) tests/sc64_compound_flash_z10_game.c \
 	  $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) common/gba_flash1m.c -o $(ZL_SCARAB_OUT)/compound
+	$(ZL_SCARAB_OUT)/compound primitive-cuts $(ZL_SCARAB_OUT)/unused
 	$(ZL_SCARAB_OUT)/compound write-training $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound read-training $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound write-inside $(ZL_SCARAB_OUT)/z10-inside.flash
@@ -85,16 +86,30 @@ test-zl-scarab-compound-flash:
 	$(ZL_SCARAB_OUT)/compound write-moving $(ZL_SCARAB_OUT)/z10-moving.flash
 	$(ZL_SCARAB_OUT)/compound read-moving $(ZL_SCARAB_OUT)/z10-moving.flash
 	$(ZL_SCARAB_OUT)/compound foreign-v1 $(ZL_SCARAB_OUT)/z10-training.flash
+	$(ZL_SCARAB_OUT)/compound foreign-v2 $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound foreign-header $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound only-bad $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound only-bad-flight $(ZL_SCARAB_OUT)/z10-training.flash
+	$(ZL_SCARAB_OUT)/compound only-bad-marker $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound write-two $(ZL_SCARAB_OUT)/z10-two.flash
 	$(ZL_SCARAB_OUT)/compound fallback-bad $(ZL_SCARAB_OUT)/z10-two.flash
+	@for phase in marker commit-erase data-erase meta header base tail tag verify; do \
+	  $(ZL_SCARAB_OUT)/compound game-cut-$$phase $(ZL_SCARAB_OUT)/z10-two.flash && \
+	  $(ZL_SCARAB_OUT)/compound game-retry $(ZL_SCARAB_OUT)/z10-two.flash.$$phase.cut && \
+	  $(ZL_SCARAB_OUT)/compound game-check $(ZL_SCARAB_OUT)/z10-two.flash.$$phase.cut.recovered || exit $$?; \
+	done
 	$(ZL_SCARAB_OUT)/compound stale-shot $(ZL_SCARAB_OUT)/unused
+	$(ZL_SCARAB_OUT)/compound stale-marker $(ZL_SCARAB_OUT)/unused
 	$(ZL_SCARAB_OUT)/compound cut-write $(ZL_SCARAB_OUT)/z10-cut.flash
 	$(ZL_SCARAB_OUT)/compound cut-read $(ZL_SCARAB_OUT)/z10-cut.flash
+	$(ZL_SCARAB_OUT)/compound verify-recovered $(ZL_SCARAB_OUT)/z10-cut.flash.recovered
 
 # An actual prior v1 HOST image must be supplied separately; never retag it.
 .PHONY: test-zl-scarab-compound-v1-fence
 test-zl-scarab-compound-v1-fence:
 	$(ZL_SCARAB_OUT)/compound retained-v1 $(COMPOUND_V1_IMAGE)
+
+.PHONY: test-zl-scarab-compound-v2-fences
+test-zl-scarab-compound-v2-fences:
+	$(ZL_SCARAB_OUT)/compound retained-v2 $(COMPOUND_V2_IMAGE)
+	$(ZL_SCARAB_OUT)/compound retained-v2-cut $(COMPOUND_V2_CUT_IMAGE)

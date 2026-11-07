@@ -39,6 +39,7 @@ int main(void)
     header[12]|=0x80;assert(!sc64_cf_parse(header,18400,&expected,&parsed));
     sc64_cf_write(header,&expected);assert(!sc64_cf_parse(header,18399,&expected,&parsed));
     sc64_cf_put16(header+4,1);assert(!sc64_cf_parse(header,18400,&expected,&parsed));
+    sc64_cf_put16(header+4,2);assert(!sc64_cf_parse(header,18400,&expected,&parsed));
 #endif
     Unit worker,child,wire,decoded,restored;int carry,timer;
     gba_init();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;race_skirmish_init();

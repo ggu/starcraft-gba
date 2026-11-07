@@ -9,10 +9,47 @@
 #undef main
 static Model device;
 static GbaFlash1m flash={&device,rd,wr,20,0,0};
-static int erases,programs,fail_prefix;
-static int cf_read(void *c,uint32_t p,void *v,uint32_t n){return gba_flash1m_read(c,p,v,n);}
-static int cf_program(void *c,uint32_t p,const void *v,uint32_t n){++programs;if(fail_prefix && n==SC64_CF_HEADER && (p==gba_fj_metadata(2)+16 || p==gba_fj_metadata(3)+16))return 0;return gba_flash1m_program(c,p,v,n);}
-static int cf_erase(void *c,uint32_t p){++erases;return gba_flash1m_erase_sector(c,p);}
+static int erases,programs,fail_prefix,inject_reselect,injected,fault_triggered;
+static const char *fault_phase;
+static u8 external_after[131072];
+static int cf_read(void *c,uint32_t p,void *v,uint32_t n)
+{
+#ifdef SC64_CF_TEST_DIAGNOSTICS
+    if(inject_reselect && !injected && sc64_cf_test_stage==5) {
+        device.bytes[gba_fj_base(2)+SC64_CFR_MARKER_OFFSET+1]^=1;
+        memcpy(external_after,device.bytes,sizeof external_after);injected=1;
+    }
+#endif
+    if(fault_phase && !strcmp(fault_phase,"verify") && !fault_triggered && programs>=12 &&
+       p==gba_fj_metadata(2) && n==16){fault_triggered=1;return 0;}
+    return gba_flash1m_read(c,p,v,n);
+}
+static int cf_program(void *c,uint32_t p,const void *v,uint32_t n)
+{
+    ++programs;
+    if(fail_prefix && n==SC64_CF_HEADER && (p==gba_fj_metadata(2)+16 || p==gba_fj_metadata(3)+16))return 0;
+    if(fault_phase && !fault_triggered) {
+        u32 meta=gba_fj_metadata(2),base=gba_fj_base(2),partial=0;
+        if(!strcmp(fault_phase,"marker") && p==base+SC64_CFR_MARKER_OFFSET && n==1)partial=1;
+        else if(!strcmp(fault_phase,"meta") && p==meta && n==16)partial=8;
+        else if(!strcmp(fault_phase,"header") && p==meta+16 && n==SC64_CF_HEADER)partial=16;
+        else if(!strcmp(fault_phase,"base") && p==meta+16+SC64_CF_HEADER && n>64)partial=64;
+        else if(!strcmp(fault_phase,"tail") && n==SC64_CF_SIDE)partial=64;
+        else if(!strcmp(fault_phase,"tag") && p==base && n==4)partial=2;
+        if(partial){fault_triggered=1;assert(gba_flash1m_program(c,p,v,partial));return 0;}
+    }
+    return gba_flash1m_program(c,p,v,n);
+}
+static int cf_erase(void *c,uint32_t p)
+{
+    ++erases;
+    if(fault_phase && !fault_triggered &&
+       ((!strcmp(fault_phase,"commit-erase") && p==gba_fj_base(2)) ||
+        (!strcmp(fault_phase,"data-erase") && p==gba_fj_base(2)+GBA_FJ_SECTOR))) {
+        fault_triggered=1;assert(gba_flash1m_erase_sector(c,p));return 0;
+    }
+    return gba_flash1m_erase_sector(c,p);
+}
 static GbaFlashJournalIo io={&flash,cf_read,cf_erase,cf_program};
 const GbaFlashJournalIo *sc64_q8_flash_host_io(void){return &io;}
 static void copy_file(const char *path,int writing)
@@ -87,10 +124,160 @@ static FlightOutcome flight_finish(const FlightSnapshot *s)
         sc64_controller_unit(s->parent),sc64_scarab_stage_payer[s->parent]};
     return o;
 }
+/* Small strict 1->0 model exercises the actual recovery writer primitives.
+ * It is not a substitute for the separate real-game continuation fixture. */
+typedef struct {u8 bytes[GBA_FJ_BYTES];int budget,read_budget,mutations,reads;} TinyDevice;
+static TinyDevice tiny;static u8 tiny_initial[GBA_FJ_BYTES],tiny_winner[GBA_FJ_SLOT];
+static int tiny_read(void *v,u32 p,void *out,u32 n)
+{TinyDevice *t=v;if(p>GBA_FJ_BYTES || n>GBA_FJ_BYTES-p || t->read_budget==0)return 0;if(t->read_budget>0)--t->read_budget;++t->reads;memcpy(out,t->bytes+p,n);return 1;}
+static int tiny_mutation(TinyDevice *t)
+{if(t->budget==0)return 0;if(t->budget>0)--t->budget;++t->mutations;return 1;}
+static int tiny_erase(void *v,u32 p)
+{TinyDevice *t=v;if(p<32768 || p>=98304 || (p&4095) || !tiny_mutation(t))return 0;memset(t->bytes+p,255,4096);return 1;}
+static int tiny_program(void *v,u32 p,const void *src,u32 n)
+{
+    TinyDevice *t=v;const u8 *b=src;if(p<32768 || p>98304 || n>98304-p)return 0;
+    for(u32 i=0;i<n;++i){if((t->bytes[p+i]&b[i])!=b[i] || !tiny_mutation(t))return 0;t->bytes[p+i]&=b[i];}return 1;
+}
+static GbaFlashJournalIo tiny_io={&tiny,tiny_read,tiny_erase,tiny_program};
+static int tiny_proof(void *ctx,const GbaFlashJournalIo *device,unsigned index)
+{
+    Sc64CfSnapshot *s=ctx;u8 metadata[16],prefix[2],chunk[64];u32 hash=2166136261u;
+    if(!device->read(device->context,gba_fj_metadata(index),metadata,16))return -1;
+    GbaFlashJournalRecord r={index,gba_fj_u32(metadata),gba_fj_u32(metadata+4),gba_fj_u32(metadata+8),gba_fj_u32(metadata+12)};
+    if(r.tag!=SC64_COMPOUND_FLASH_TAG || r.length<2 || r.length>GBA_FJ_PAYLOAD_MAX || !r.sequence)return 0;
+    if(gba_fj_read_payload(device,&r,0,prefix,2)!=GBA_FJ_OK)return -1;
+    if(prefix[0]!=0xc3 || prefix[1]!=0x73)return 0;
+    for(u32 off=0;off<r.length;){u32 n=r.length-off;if(n>sizeof chunk)n=sizeof chunk;
+        if(gba_fj_read_payload(device,&r,off,chunk,n)!=GBA_FJ_OK)return -1;
+        hash=gba_fj_hash(hash,chunk,n);off+=n;}
+    if(hash!=r.checksum)return 0;s->proven[index]=r;s->has_proof[index]=1;return 1;
+}
+static int tiny_begin(void)
+{
+    memset(&sc64_cf_snapshot,0,sizeof sc64_cf_snapshot);
+    for(unsigned i=2;i<4;++i) {
+        int state=sc64_cfr_classify(&tiny_io,i,SC64_COMPOUND_FLASH_TAG,tiny_proof,&sc64_cf_snapshot);
+        if(state==SC64_CFR_FOREIGN)return 0;sc64_cf_snapshot.classes[i]=state;
+        GbaFlashJournalRecord r;int status=gba_fj_probe(&tiny_io,i,&r);
+        if(status<0)return 0;
+        if(status==GBA_FJ_OK) {
+            if(tiny_proof(&sc64_cf_snapshot,&tiny_io,i)!=1)return 0;
+            sc64_cf_snapshot.seen[i]=sc64_cf_snapshot.accepted[i]=1;sc64_cf_snapshot.records[i]=r;
+        }
+    }
+    int status=gba_fj_select(&tiny_io,sc64_cf_reselect,&sc64_cf_snapshot,&sc64_cf_previous);
+    if(status<0)return 0;sc64_cf_has_previous=status==GBA_FJ_OK;
+    return sc64_cf_digest(&tiny_io,&sc64_cf_snapshot.digest_a,&sc64_cf_snapshot.digest_b);
+}
+static int tiny_write(const u8 *prefix,const u8 *body,const u8 *tail)
+{return sc64_cf_recovery_write(&tiny_io,prefix,16,body,48,tail,16);}
+static void tiny_assert_legacy(void){for(unsigned i=0;i<32768;++i)assert(tiny.bytes[i]==255);}
+static void tiny_primitive_cuts(void)
+{
+    u8 prefix[16],body[48],tail[16],prefix_copy[16],body_copy[48],tail_copy[16];
+    for(unsigned i=0;i<sizeof prefix;++i)prefix[i]=(u8)(i+0x31);prefix[0]=0xc3;prefix[1]=0x73;
+    for(unsigned i=0;i<sizeof body;++i)body[i]=(u8)(i*3+1);
+    for(unsigned i=0;i<sizeof tail;++i)tail[i]=(u8)(i*7+5);
+    memcpy(prefix_copy,prefix,sizeof prefix);memcpy(body_copy,body,sizeof body);memcpy(tail_copy,tail,sizeof tail);
+    for(int scenario=0;scenario<3;++scenario) {
+        memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+        if(scenario>=1)assert(tiny_begin() && tiny_write(prefix,body,tail));
+        if(scenario==2)assert(tiny_begin() && tiny_write(prefix,body,tail));
+        assert(tiny_begin());int had_winner=sc64_cf_has_previous;GbaFlashJournalRecord winner=sc64_cf_previous;
+        memcpy(tiny_initial,tiny.bytes,sizeof tiny_initial);
+        if(had_winner)memcpy(tiny_winner,tiny.bytes+gba_fj_base(winner.index),sizeof tiny_winner);
+        tiny.mutations=tiny.reads=0;assert(tiny_write(prefix,body,tail));int operations=tiny.mutations,reads=tiny.reads;
+        for(int cut=0;cut<=operations;++cut) {
+            memcpy(tiny.bytes,tiny_initial,sizeof tiny_initial);tiny.budget=tiny.read_budget=-1;assert(tiny_begin());
+            tiny.budget=cut;(void)tiny_write(prefix,body,tail);tiny.budget=-1;
+            if(had_winner)assert(!memcmp(tiny.bytes+gba_fj_base(winner.index),tiny_winner,sizeof tiny_winner));tiny_assert_legacy();
+            assert(tiny_begin() && tiny_write(prefix,body,tail));tiny_assert_legacy();
+            assert(!memcmp(prefix,prefix_copy,sizeof prefix) && !memcmp(body,body_copy,sizeof body) && !memcmp(tail,tail_copy,sizeof tail));
+        }
+        for(int cut=0;cut<=reads;++cut) {
+            memcpy(tiny.bytes,tiny_initial,sizeof tiny_initial);tiny.budget=tiny.read_budget=-1;assert(tiny_begin());
+            tiny.read_budget=cut;(void)tiny_write(prefix,body,tail);tiny.read_budget=-1;
+            if(had_winner)assert(!memcmp(tiny.bytes+gba_fj_base(winner.index),tiny_winner,sizeof tiny_winner));tiny_assert_legacy();
+            assert(tiny_begin() && tiny_write(prefix,body,tail));
+        }
+        printf("tiny scenario=%d program/erase cuts=%d read cuts=%d PASS\n",scenario,operations+1,reads+1);
+    }
+    /* Every subset in one marker byte while all prior bytes are complete:
+     * unfinished bytes and the entire data area remain erased. */
+    unsigned marker_cases=0,tag_cases=0,erase_marker_cases=0;
+    for(unsigned byte=0;byte<SC64_CFR_MARKER_SIZE;++byte)for(unsigned mask=0;mask<256;++mask) {
+        memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+        u32 mark=gba_fj_base(2)+SC64_CFR_MARKER_OFFSET;
+        for(unsigned k=0;k<byte;++k)tiny.bytes[mark+k]=sc64_cfr_marker[k];
+        tiny.bytes[mark+byte]=(u8)(sc64_cfr_marker[byte]|mask);
+        assert(tiny_begin() && tiny_write(prefix,body,tail));tiny_assert_legacy();++marker_cases;
+    }
+    /* An old v3 target may suffer arbitrary 0->1 subsets within any tag or
+     * marker byte during isolated-sector erase. The other winner is intact. */
+    memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+    assert(tiny_begin() && tiny_write(prefix,body,tail));
+    assert(tiny_begin() && tiny_write(prefix,body,tail));
+    assert(tiny_begin() && sc64_cf_previous.index==3);
+    memcpy(tiny_initial,tiny.bytes,sizeof tiny_initial);memcpy(tiny_winner,tiny.bytes+gba_fj_base(3),sizeof tiny_winner);
+    for(unsigned byte=0;byte<4;++byte)for(unsigned mask=0;mask<256;++mask) {
+        memcpy(tiny.bytes,tiny_initial,sizeof tiny_initial);tiny.budget=tiny.read_budget=-1;
+        tiny.bytes[gba_fj_base(2)+byte]|=(u8)mask;
+        assert(tiny_begin() && tiny_write(prefix,body,tail));
+        assert(!memcmp(tiny.bytes+gba_fj_base(3),tiny_winner,sizeof tiny_winner));tiny_assert_legacy();++tag_cases;
+    }
+    for(unsigned byte=0;byte<SC64_CFR_MARKER_SIZE;++byte)for(unsigned mask=0;mask<256;++mask) {
+        memcpy(tiny.bytes,tiny_initial,sizeof tiny_initial);tiny.budget=tiny.read_budget=-1;
+        memset(tiny.bytes+gba_fj_base(2),255,4);
+        tiny.bytes[gba_fj_base(2)+SC64_CFR_MARKER_OFFSET+byte]|=(u8)mask;
+        assert(tiny_begin() && tiny_write(prefix,body,tail));
+        assert(!memcmp(tiny.bytes+gba_fj_base(3),tiny_winner,sizeof tiny_winner));tiny_assert_legacy();++erase_marker_cases;
+    }
+    printf("marker-program=%u partial-tag-erase=%u partial-marker-erase=%u PASS\n",marker_cases,tag_cases,erase_marker_cases);
+    /* Interrupted first save A must never be promoted during a distinct B
+     * retry. Test every B mutation cut after each incomplete A tag byte. */
+    static u8 partial[GBA_FJ_BYTES];u8 body_b[48],got[48];unsigned distinct_cases=0;
+    for(unsigned i=0;i<sizeof body_b;++i)body_b[i]=(u8)(body[i]^0x5a);
+    memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+    memcpy(tiny_initial,tiny.bytes,sizeof tiny_initial);assert(tiny_begin());tiny.mutations=0;
+    assert(tiny_write(prefix,body,tail));int first_operations=tiny.mutations;
+    for(int tag_bytes=0;tag_bytes<4;++tag_bytes) {
+        memcpy(tiny.bytes,tiny_initial,sizeof tiny_initial);tiny.budget=tiny.read_budget=-1;assert(tiny_begin());
+        tiny.budget=first_operations-4+tag_bytes;assert(!tiny_write(prefix,body,tail));tiny.budget=-1;
+        GbaFlashJournalRecord r;assert(gba_fj_probe(&tiny_io,2,&r)==GBA_FJ_NONE);
+        memcpy(partial,tiny.bytes,sizeof partial);assert(tiny_begin() && !sc64_cf_has_previous);
+        tiny.mutations=0;assert(tiny_write(prefix,body_b,tail));int retry_operations=tiny.mutations;
+        for(int cut=0;cut<=retry_operations;++cut) {
+            memcpy(tiny.bytes,partial,sizeof partial);tiny.budget=tiny.read_budget=-1;assert(tiny_begin() && !sc64_cf_has_previous);
+            tiny.budget=cut;(void)tiny_write(prefix,body_b,tail);tiny.budget=-1;
+            for(unsigned slot=2;slot<4;++slot)if(gba_fj_probe(&tiny_io,slot,&r)==GBA_FJ_OK) {
+                assert(gba_fj_read_payload(&tiny_io,&r,16,got,sizeof got)==GBA_FJ_OK && !memcmp(got,body_b,sizeof got));
+            }
+            assert(tiny_begin() && tiny_write(prefix,body_b,tail));tiny_assert_legacy();++distinct_cases;
+        }
+    }
+    printf("distinct-A-B retry cuts=%u PASS\n",distinct_cases);
+    /* Maximum slot payload and wrap are separate from small cut fixtures. */
+    static u8 maximum[GBA_FJ_PAYLOAD_MAX-32u],snapshot[GBA_FJ_BYTES];
+    for(unsigned i=0;i<sizeof maximum;++i)maximum[i]=(u8)(i*11u+7u);
+    memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+    assert(tiny_begin() && sc64_cf_recovery_write(&tiny_io,prefix,16,maximum,sizeof maximum,tail,16));
+    GbaFlashJournalRecord max_record;assert(gba_fj_probe(&tiny_io,2,&max_record)==GBA_FJ_OK && max_record.length==GBA_FJ_PAYLOAD_MAX);
+    memcpy(snapshot,tiny.bytes,sizeof snapshot);assert(tiny_begin());tiny.mutations=0;
+    assert(!sc64_cf_recovery_write(&tiny_io,prefix,16,maximum,sizeof maximum+1u,tail,16));
+    assert(!tiny.mutations && !memcmp(snapshot,tiny.bytes,sizeof snapshot));
+    memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+    assert(tiny_begin() && tiny_write(prefix,body,tail));
+    gba_fj_put32(tiny.bytes+gba_fj_metadata(2)+12,0xffffffffu); /* synthetic sequence boundary */
+    assert(tiny_begin() && sc64_cf_previous.sequence==0xffffffffu && tiny_write(prefix,body,tail));
+    assert(tiny_begin() && sc64_cf_previous.sequence==1 && sc64_cf_previous.index==3);
+    puts("maximum payload, overflow refusal and sequence wrap: PASS");
+}
 int main(int argc,char **argv)
 {
     assert(argc==3);gba_init();
-    if(!strncmp(argv[1],"write-",6)) {
+    if(!strcmp(argv[1],"primitive-cuts")) {tiny_primitive_cuts();
+    } else if(!strncmp(argv[1],"write-",6)) {
         int parent=-1,target=-1;launch_z10_from_normal_menu();
         for(int i=0;i<MAX_UNITS;++i) {
             if(parent<0 && u[i].alive && u[i].type==U_REAVER && u[i].owner==ENEMY && sc64_controller_unit(i)==0)parent=i;
@@ -168,6 +355,29 @@ int main(int argc,char **argv)
             FlightSnapshot original=flight_snapshot(parent);side_file(argv[2],".before",&original,sizeof original,1);
             FlightOutcome outcome=flight_finish(&original);side_file(argv[2],".after",&outcome,sizeof outcome,1);
         }
+    } else if(!strncmp(argv[1],"game-cut-",9)) {
+        const char *phase=argv[1]+9;game_init();copy_file(argv[2],0);assert(race_load_game());
+        static u8 winner[GBA_FJ_SLOT];memcpy(winner,device.bytes+gba_fj_base(3),sizeof winner);
+        live_capture(&before_live);erases=programs=0;fault_phase=phase;
+        assert(!race_save_game() && fault_triggered);fault_phase=0;live_unchanged();
+        assert(!memcmp(winner,device.bytes+gba_fj_base(3),sizeof winner));
+        char path[1024];assert(snprintf(path,sizeof path,"%s.%s.cut",argv[2],phase)>0);copy_file(path,1);
+    } else if(!strcmp(argv[1],"game-retry")) {
+        game_init();copy_file(argv[2],0);assert(race_load_game());live_capture(&before_live);
+        assert(race_save_game());live_unchanged();
+        char path[1024];assert(snprintf(path,sizeof path,"%s.recovered",argv[2])>0);copy_file(path,1);
+    } else if(!strcmp(argv[1],"game-check")) {
+        game_init();copy_file(argv[2],0);assert(race_load_game() && race_selected_mission==SC64_Z10_GLOBAL_ID);
+        int found=0;for(int i=0;i<MAX_UNITS;++i)if(u[i].alive && u[i].type==U_REAVER &&
+            u[i].raw_owner==0 && sc64_controller_unit(i)==7 && sc64_scarab_stage_payer[i]==13)++found;
+        assert(found==1 && race_zl_ai_minerals[1]==0);
+    } else if(!strcmp(argv[1],"stale-marker")) {
+        launch_z10_from_normal_menu();memset(device.bytes,0xff,sizeof device.bytes);
+        /* Physically reachable partial owner marker; data and commit blank. */
+        device.bytes[gba_fj_base(2)+SC64_CFR_MARKER_OFFSET]=sc64_cfr_marker[0];
+        live_capture(&before_live);erases=programs=0;inject_reselect=1;
+        assert(!race_save_game() && injected && !erases && !programs &&
+               !memcmp(external_after,device.bytes,sizeof external_after));live_unchanged();
     } else if(!strcmp(argv[1],"cut-write")) {
         launch_z10_from_normal_menu();memset(device.bytes,0xff,sizeof device.bytes);
         live_capture(&before_live);fail_prefix=1;assert(!race_save_game());fail_prefix=0;live_unchanged();
@@ -178,7 +388,11 @@ int main(int argc,char **argv)
         launch_z10_from_normal_menu();copy_file(argv[2],0);static u8 prior[131072];
         memcpy(prior,device.bytes,sizeof prior);live_capture(&before_live);erases=programs=0;
         assert(!race_load_game());live_unchanged();
-        assert(!race_save_game() && !erases && !programs && !memcmp(prior,device.bytes,sizeof prior));live_unchanged();
+        assert(race_save_game() && (erases || programs));live_unchanged();
+        char recovered[1024];assert(snprintf(recovered,sizeof recovered,"%s.recovered",argv[2])>0);
+        copy_file(recovered,1);
+    } else if(!strcmp(argv[1],"verify-recovered")) {
+        game_init();copy_file(argv[2],0);assert(race_load_game() && race_selected_mission==SC64_Z10_GLOBAL_ID);
     } else if(!strcmp(argv[1],"stale-shot")) {
         int caster=-1,dead=-1;launch_z10_from_normal_menu();memset(device.bytes,0xff,sizeof device.bytes);
         for(int i=0;i<MAX_UNITS;++i){if(caster<0 && u[i].alive)caster=i;if(dead<0 && !u[i].alive)dead=i;}
@@ -187,13 +401,18 @@ int main(int argc,char **argv)
         sc64_bc_shots[0].caster=(u16)caster;sc64_bc_shots[0].target=(u16)dead;
         live_capture(&before_live);erases=programs=0;assert(!race_save_game());
         assert(!erases && !programs);live_unchanged();
-    } else if(!strcmp(argv[1],"retained-v1")) {
+    } else if(!strcmp(argv[1],"retained-v1") || !strcmp(argv[1],"retained-v2") || !strcmp(argv[1],"retained-v2-cut")) {
         launch_z10_from_normal_menu();copy_file(argv[2],0);GbaFlashJournalRecord r;
-        assert(gba_fj_probe(&io,2,&r)==GBA_FJ_OK && sc64_cf_u16(device.bytes+gba_fj_metadata(2)+20)==1);
+        if(!strcmp(argv[1],"retained-v2-cut")) {
+            assert(gba_fj_probe(&io,2,&r)==GBA_FJ_NONE && gba_fj_u32(device.bytes+gba_fj_metadata(2))==SC64_COMPOUND_FLASH_TAG);
+        } else {
+            assert(gba_fj_probe(&io,2,&r)==GBA_FJ_OK);
+            assert(sc64_cf_u16(device.bytes+gba_fj_metadata(2)+20)==(!strcmp(argv[1],"retained-v1")?1:2));
+        }
         static u8 prior[131072];memcpy(prior,device.bytes,sizeof prior);live_capture(&before_live);erases=programs=0;
         assert(!race_load_game());live_unchanged();
         assert(!race_save_game() && !erases && !programs && !memcmp(prior,device.bytes,sizeof prior));live_unchanged();
-    } else if(!strcmp(argv[1],"only-bad") || !strcmp(argv[1],"only-bad-flight") || !strcmp(argv[1],"fallback-bad")) {
+    } else if(!strcmp(argv[1],"only-bad") || !strcmp(argv[1],"only-bad-flight") || !strcmp(argv[1],"only-bad-marker") || !strcmp(argv[1],"fallback-bad")) {
         launch_z10_from_normal_menu();copy_file(argv[2],0);
         GbaFlashJournalRecord a,b,*r;int sa=gba_fj_probe(&io,2,&a),sb=gba_fj_probe(&io,3,&b);
         assert(sa==GBA_FJ_OK);r=(sb==GBA_FJ_OK && gba_fj_newer(b.sequence,a.sequence))?&b:&a;
@@ -201,23 +420,28 @@ int main(int argc,char **argv)
         u32 controls=at+SC64_CF_HEADER+base+MAX_UNITS+MAX_BUILDINGS;unsigned j;
         for(j=0;j<MAX_UNITS+MAX_BUILDINGS && device.bytes[controls+j]==255;++j){}
         assert(j<MAX_UNITS+MAX_BUILDINGS);
-        if(!strcmp(argv[1],"only-bad-flight")) {
-            for(j=0;j<MAX_UNITS && device.bytes[controls+j]!=255;++j){}
-            assert(j<MAX_UNITS);u32 flight=controls+(MAX_UNITS+MAX_BUILDINGS)+MAX_UNITS;
-            device.bytes[flight+j*4]=1; /* nonzero waypoint in an empty slot */
-        } else device.bytes[controls+j]=254;
-        gba_fj_put32(device.bytes+gba_fj_metadata(r->index)+8,gba_fj_hash(2166136261u,device.bytes+at,r->length));
+        if(!strcmp(argv[1],"only-bad-marker")) {
+            device.bytes[gba_fj_base(r->index)+SC64_CFR_MARKER_OFFSET]=0; /* impossible marker bit */
+        } else {
+            if(!strcmp(argv[1],"only-bad-flight")) {
+                for(j=0;j<MAX_UNITS && device.bytes[controls+j]!=255;++j){}
+                assert(j<MAX_UNITS);u32 flight=controls+(MAX_UNITS+MAX_BUILDINGS)+MAX_UNITS;
+                device.bytes[flight+j*4]=1; /* nonzero waypoint in an empty slot */
+            } else device.bytes[controls+j]=254;
+            gba_fj_put32(device.bytes+gba_fj_metadata(r->index)+8,gba_fj_hash(2166136261u,device.bytes+at,r->length));
+        }
         static u8 prior[131072];memcpy(prior,device.bytes,sizeof prior);live_capture(&before_live);erases=programs=0;
         if(strcmp(argv[1],"fallback-bad")) {assert(!race_load_game());live_unchanged();}
         else {int old;side_file(argv[2],".old",&old,sizeof old,0);assert(race_load_game() && minerals==old);}
         assert(!memcmp(prior,device.bytes,sizeof prior) && !erases && !programs);
         live_capture(&before_live);
         assert(!race_save_game() && !memcmp(prior,device.bytes,sizeof prior) && !erases && !programs);live_unchanged();
-    } else if(!strcmp(argv[1],"foreign-v1") || !strcmp(argv[1],"foreign-header")) {
+    } else if(!strcmp(argv[1],"foreign-v1") || !strcmp(argv[1],"foreign-v2") || !strcmp(argv[1],"foreign-header")) {
         launch_z10_from_normal_menu();copy_file(argv[2],0);
         GbaFlashJournalRecord r;assert(gba_fj_probe(&io,2,&r)==GBA_FJ_OK);
         u32 at=gba_fj_metadata(r.index)+16;
         if(!strcmp(argv[1],"foreign-v1"))device.bytes[at+4]=1;
+        else if(!strcmp(argv[1],"foreign-v2"))device.bytes[at+4]=2;
         else device.bytes[at+12]|=0x80;
         assert(gba_fj_probe(&io,2,&r)==GBA_FJ_NONE); /* deliberately bad checksum */
         static u8 prior[131072],ctrl_u[MAX_UNITS],ctrl_b[MAX_BUILDINGS],debts[MAX_UNITS+MAX_BUILDINGS];
