@@ -243,7 +243,10 @@ int main(int argc,char** argv) {
       auto ram=[](u32 a) { return (std::uint8_t)rdram.ram.read<Byte>(a,RBusDevice::ARES_DEBUGGER); };
       if(!sc64_read_ram(0,scratch.size(),rdram.ram.size,scratch.data(),hit,cached,ram)) { std::cerr<<"snapshot cache conflict\n";return 8; }
       char name[32];std::snprintf(name,sizeof(name),"ram-%03u.bin",snapshotCount);
-      std::ofstream file(out/name,std::ios::binary);file.write(reinterpret_cast<const char*>(scratch.data()),scratch.size());file.close();if(!file)return 5;
+      int fd=::open((out/name).c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);if(fd<0)return 5;
+      std::size_t written=0;while(written<scratch.size()) { auto n=::write(fd,scratch.data()+written,scratch.size()-written);if(n<=0){::close(fd);return 5;}written+=static_cast<std::size_t>(n); }
+      if(::close(fd)!=0)return 5;
+      std::ofstream index(out/"ram.csv",std::ios::app); if(!index)return 5; index<<snapshotCount<<","<<completed<<","<<scratch.size()<<"\n";index.close();if(!index)return 5;
       std::cout<<"RAM "<<snapshotCount<<" "<<completed<<" "<<scratch.size()<<std::endl; ++snapshotCount;continue;
     }
     if(!capture) { std::cout<<"OK "<<completed<<std::endl; continue; }
@@ -273,7 +276,7 @@ int main(int argc,char** argv) {
   observations<<"callback,observed_step,width,height,nonblack\n";
   for(std::size_t i=0;i<p.observations.size();++i) { auto &o=p.observations[i]; observations<<i<<','<<o.step<<','<<o.width<<','<<o.height<<','<<o.nonblack<<'\n'; }
   for(auto& text:p.statuses) status<<text<<'\n';
-  status<<"frontend=hybrid_authentic jit_before_cpu="<<cpu_jit<<" jit_before_rsp="<<rsp_jit<<" homebrew="<<homebrew<<" hybrid_transition="<<transitioned<<" exact_view_equal="<<view_equal<<" cpu_after="<<ares::Nintendo64::cpu.recompiler.enabled<<" rsp_after="<<ares::Nintendo64::rsp.recompiler.enabled<<"\n";
+  status<<"frontend="<<(scenario=="snapshot"?"hybrid_snapshot":"hybrid_authentic")<<" jit_before_cpu="<<cpu_jit<<" jit_before_rsp="<<rsp_jit<<" homebrew="<<homebrew<<" hybrid_transition="<<transitioned<<" exact_view_equal="<<view_equal<<" cpu_after="<<ares::Nintendo64::cpu.recompiler.enabled<<" rsp_after="<<ares::Nintendo64::rsp.recompiler.enabled<<"\n";
   status<<"requested_steps="<<frames<<" completed_steps="<<completed<<" polls="<<p.polls.load()<<" a_polls="<<p.aPolls.load()<<" start_polls="<<p.startPolls.load()<<" a_pressed_polls="<<p.aPressedPolls.load()<<" start_pressed_polls="<<p.startPressedPolls.load()<<" audio_calls="<<p.audioCalls.load()<<" callbacks_total="<<p.callbacks<<" frames_copied="<<p.frames.size()<<" callbacks_discarded="<<p.discarded<<" gpu_ready="<<p.gpuReady<<" failure="<<p.failure<<'\n';
   if(p.failed || !p.gpuReady || p.frames.empty() || !transitioned || !view_equal || ares::Nintendo64::cpu.recompiler.enabled || ares::Nintendo64::rsp.recompiler.enabled) { std::cerr<<"renderer or callback failure: "<<p.failure<<" callbacks="<<p.callbacks<<"\n"; return 6; }
   for(std::size_t i=0;i<p.frames.size();++i) {
