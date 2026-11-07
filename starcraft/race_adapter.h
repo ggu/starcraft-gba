@@ -45,22 +45,26 @@ static int race_creation_source_owner(int owner, int creator_raw)
     return candidate == map->human_slot ? candidate : -1;
 }
 
-static int race_spawn_product_from(int owner, int type, int x, int y, int source_owner, int producer)
+static int race_spawn_product(int owner, int type, int x, int y, int source_owner)
 {
     int slot = spawn_unit(owner, type, x, y);
-#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
-    int controller = sc64_controller_building(producer);
-    if (slot >= 0 && sc64_controller_valid(controller,owner)) sc64_current_unit[slot] = (u8)controller;
-#else
-    (void)producer;
-#endif
     /* Mission-specific spawn hooks have priority over this shared fallback. */
     if (slot >= 0 && source_owner >= 0 && u[slot].raw_owner < 0)
         u[slot].raw_owner = source_owner;
     return slot;
 }
-static int __attribute__((unused)) race_spawn_product(int owner,int type,int x,int y,int source_owner)
-{ return race_spawn_product_from(owner,type,x,y,source_owner,-1); }
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+static int race_spawn_product_from(int owner, int type, int x, int y, int source_owner, int producer)
+{
+    int slot = race_spawn_product(owner,type,x,y,source_owner);
+    int controller = sc64_controller_building(producer);
+    if (slot >= 0 && sc64_controller_valid(controller,owner)) sc64_current_unit[slot] = (u8)controller;
+    return slot;
+}
+#else
+#define race_spawn_product_from(owner,type,x,y,source_owner,producer) \
+    race_spawn_product((owner),(type),(x),(y),(source_owner))
+#endif
 
 /* Live owner-independent race adapter. Include from game.c after engine
  * helpers and before the frame/update hooks that call these functions. */

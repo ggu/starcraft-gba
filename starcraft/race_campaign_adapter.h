@@ -169,8 +169,12 @@ static int sc64_controller_source_owner(unsigned slot)
 }
 static int sc64_controller_human_source(void)
 {
-    const Sc64RaceMap *map=&sc64_race_maps[race_selected_mission];
-    int human=map->human_slot, count=0;
+    const Sc64RaceMap *map;
+    int human, count=0;
+    if (race_mode || race_selected_mission < 0 || race_selected_mission >= SC64_RACE_MAP_COUNT) return -1;
+    map=&sc64_race_maps[race_selected_mission];
+    if (!map->owner_modes || !map->units) return -1;
+    human=map->human_slot;
     if (human < 0 || human >= 8 || sc64_controller_source_owner((unsigned)human)!=SIDE) return -1;
     for (unsigned i=0;i<8;++i) if (sc64_controller_source_owner(i)==SIDE) ++count;
     return count==1 ? human : -1;

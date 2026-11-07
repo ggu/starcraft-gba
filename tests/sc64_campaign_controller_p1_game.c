@@ -6,7 +6,14 @@
 int main(void)
 {
     int visitor=-1,nexus=-1,worker=-1,x,y,forge=-1;
-    gba_init(); game_init();race_mode=0;race_selected_mission=SC64_RACE_MISSION_P1;init_state();
+    gba_init(); game_init();
+    race_mode=0;race_selected_mission=-1;assert(sc64_controller_human_source()==-1);
+    race_selected_mission=SC64_RACE_MAP_COUNT;assert(sc64_controller_human_source()==-1);
+    race_mode=1;race_selected_mission=SC64_RACE_MISSION_P1;assert(sc64_controller_human_source()==-1);
+    assert(!race_load_game());
+    race_mode=0;race_selected_mission=SC64_RACE_MISSION_P3;init_state();
+    assert(screen==SCREEN_PAUSE && mission_unsupported_count>0);
+    race_mode=0;race_selected_mission=SC64_RACE_MISSION_P1;init_state();
     assert(screen==SCREEN_PLAY && sc64_controller_human_source()==7);
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && u[i].owner==SIDE && sc64_controller_unit(i)==7) { visitor=i; break; }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive && b[i].owner==RESCUABLE && b[i].raw_owner==1 && b[i].type==B_NEXUS && b[i].x>=224 && b[i].x<=784 && b[i].y>=848 && b[i].y<=1200) { nexus=i; break; }
