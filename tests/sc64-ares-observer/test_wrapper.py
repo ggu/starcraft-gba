@@ -12,6 +12,13 @@ class WrapperTest(unittest.TestCase):
   self.assertEqual(m.limits_for_mode('metal-compatible'),(8*1024**2,8*1024**2))
   with self.assertRaises(ValueError):m.limits_for_mode('unbounded')
 
+ def test_real_child_inherits_selected_limits(self):
+  for mode,expected in [('strict',(2*1024**2,8*1024**2)),('metal-compatible',(8*1024**2,8*1024**2))]:
+   with self.subTest(mode=mode), tempfile.TemporaryDirectory() as d, open(os.devnull,'r') as source, tempfile.TemporaryFile() as log, tempfile.TemporaryFile() as err:
+    result={};target=Path(d)/'limits'
+    code="import resource,sys;open(sys.argv[1],'w').write(repr(resource.getrlimit(resource.RLIMIT_FSIZE)))"
+    with patch.object(m.sys,'stdin',source):m.relay([sys.executable,'-c',code,str(target)],d,os.environ.copy(),log,err,result,mode=mode)
+    self.assertEqual(target.read_text(),repr(expected));self.assertEqual(result['returncode'],0)
  def test_binary_admission_and_changed_input(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d)/'probe';p.write_bytes(b'qualified')
