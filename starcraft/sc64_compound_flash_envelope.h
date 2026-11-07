@@ -24,7 +24,7 @@ static int sc64_cf_parse(const uint8_t *p,uint32_t length,const Sc64CompoundFlas
 {
     Sc64CompoundFlashHeader v;uint32_t total;
     if(!p || !expected || !out || length<SC64_CF_HEADER || length>SC64_CF_LIMIT ||
-       sc64_cf_u32(p)!=SC64_CF_MAGIC || sc64_cf_u16(p+4)!=2 || sc64_cf_u16(p+10))return 0;
+       sc64_cf_u32(p)!=SC64_CF_MAGIC || sc64_cf_u16(p+4)!=3 || sc64_cf_u16(p+10))return 0;
     v.profile=p[6];v.mode=p[7];v.mission=sc64_cf_u16(p+8);v.features=sc64_cf_u32(p+12);
     v.base_length=sc64_cf_u32(p+16);v.debts=sc64_cf_u16(p+20);v.controllers=sc64_cf_u16(p+22);
     v.payers=sc64_cf_u16(p+24);v.flights=sc64_cf_u16(p+26);v.codec=sc64_cf_u32(p+28);
@@ -47,7 +47,7 @@ static int sc64_cf_parse(const uint8_t *p,uint32_t length,const Sc64CompoundFlas
 static void sc64_cf_write(uint8_t p[SC64_CF_HEADER],const Sc64CompoundFlashHeader *v)
 {
     for(unsigned i=0;i<SC64_CF_HEADER;++i)p[i]=0;
-    sc64_cf_put32(p,SC64_CF_MAGIC);sc64_cf_put16(p+4,2);p[6]=v->profile;p[7]=v->mode;
+    sc64_cf_put32(p,SC64_CF_MAGIC);sc64_cf_put16(p+4,3);p[6]=v->profile;p[7]=v->mode;
     sc64_cf_put16(p+8,v->mission);sc64_cf_put32(p+12,v->features);sc64_cf_put32(p+16,v->base_length);
     sc64_cf_put16(p+20,v->debts);sc64_cf_put16(p+22,v->controllers);sc64_cf_put16(p+24,v->payers);sc64_cf_put16(p+26,v->flights);sc64_cf_put32(p+28,v->codec);
 }
