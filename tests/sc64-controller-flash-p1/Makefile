@@ -20,3 +20,11 @@ test-controller-flash-p1:
 	$(CONTROLLER_FLASH_OUT)/test only-bad $(CONTROLLER_FLASH_OUT)/p1.sav
 	$(CONTROLLER_FLASH_OUT)/test legacy $(CONTROLLER_FLASH_LEGACY) $(CONTROLLER_FLASH_OUT)/p1-migrated.sav
 	$(CONTROLLER_FLASH_OUT)/test legacy-read $(CONTROLLER_FLASH_OUT)/p1-migrated.sav
+
+# Optional additional genuine 0x43/0x44 producer files, if already prepared.
+.PHONY: test-controller-flash-p1-predecessors
+test-controller-flash-p1-predecessors:
+	$(CONTROLLER_FLASH_OUT)/test legacy-empty $(CONTROLLER_FLASH_43) $(CONTROLLER_FLASH_OUT)/p1-from-43.sav
+	$(CONTROLLER_FLASH_OUT)/test legacy-empty-read $(CONTROLLER_FLASH_OUT)/p1-from-43.sav
+	$(CONTROLLER_FLASH_OUT)/test legacy-empty $(CONTROLLER_FLASH_44) $(CONTROLLER_FLASH_OUT)/p1-from-44.sav
+	$(CONTROLLER_FLASH_OUT)/test legacy-empty-read $(CONTROLLER_FLASH_OUT)/p1-from-44.sav
