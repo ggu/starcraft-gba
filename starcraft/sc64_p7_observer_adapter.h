@@ -3,7 +3,10 @@
 
 /* Exact aura hoists are shared by every product using this service. Keep an
  * explicit opt-out for baseline and regression comparisons. */
-#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(SC64_AURA_HOISTS_DISABLED)
+#ifdef SC64_AURA_HOISTS_DISABLED
+#undef SC64_AURA_SOURCE_HOIST_PROBE
+#undef SC64_AURA_SQUARE_HOIST_PROBE
+#elif defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
 #define SC64_AURA_SOURCE_HOIST_PROBE 1
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
 #define SC64_AURA_SQUARE_HOIST_PROBE 1
