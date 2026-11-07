@@ -32,12 +32,25 @@ int main(void)
     assert(parent>=0 && target>=0);origin=u[parent].raw_owner;prior_owner=u[parent].owner;
     assert(origin==0 && sc64_controller_transfer_unit(parent,7));
     assert(sc64_controller_unit(parent)==7 && u[parent].raw_owner==0 && u[parent].owner==prior_owner);
-    u[parent].x=500;u[parent].y=500;u[parent].cd=0;
-    u[target].x=504;u[target].y=500;
+    /* Authored fixture isolation: choose a genuinely walkable horizontal
+     * corridor with no buildings, and remove other actor interference. */
+    int sx=-1,sy=-1;
+    for (int y=64;y<WORLD_H-64 && sx<0;y+=16) for (int x=64;x<WORLD_W-112;x+=16) {
+        int clear=1;
+        for (int k=0;k<=48;k+=4) if (terrain_blocked((x+k)/16,y/16)) clear=0;
+        for (int j=0;j<MAX_BUILDINGS && clear;++j) if (b[j].alive)
+            for (int k=0;k<=48;k+=4) if (dist2(x+k,y,b[j].x,b[j].y)<40*40) { clear=0;break; }
+        if (clear && direct_path_clear(x,y,x+48,y)) { sx=x;sy=y;break; }
+    }
+    assert(sx>=0 && sy>=0);
+    for (int i=0;i<MAX_UNITS;++i) if(i!=parent && i!=target) u[i].alive=0;
+    sc64_unit_bucket_active=0;target_lists_valid=0;sc64_target_index_end();
+    u[parent].x=sx;u[parent].y=sy;u[parent].cd=0;
+    u[target].x=sx+48;u[target].y=sy;
     u[target].hp=u[target].maxhp=200;u[target].shield=0;u[target].armor=0;
     { int raw,x,y,owner,hp=u[target].hp;
       assert(race_scarab_probe_target_info(target,&raw,&x,&y,&owner) && owners_hostile(prior_owner,owner));
-      assert((sc64_race_unit_range_vs(u[parent].type,0)+1)/2>=4);
+      assert((sc64_race_unit_range_vs(u[parent].type,0)+1)/2>=48);
       tick_combat(&u[parent],target);assert(u[target].hp==hp); }
     assert(sc64_controller_transfer_unit(parent,2));
     assert(sc64_controller_unit(parent)==2 && u[parent].raw_owner==origin && u[parent].owner==prior_owner);
@@ -82,12 +95,13 @@ int main(void)
       assert(u[child].owner==owner && sc64_controller_unit(child)==controller && race_zl_ai_minerals[0]==m0 && race_zl_ai_minerals[1]==m1); }
     assert(!sc64_controller_transfer_unit(parent,7));
     /* Advance only the real source-cadence child and impact services. The
-     * authored close ground target is stationary and has 200 HP, no armor or
+     * authored ground target is stationary and has 200 HP, no armor or
      * shields: the source weapon's full-radius packet is 100 damage. */
-    int launched_packet=0,damage_seen=0;
+    int launched_packet=0,damage_seen=0,moved=0;
     for (int i=0;i<120;++i) {
         ++frame;
         if (u[child].alive && sc64_battlecruiser_source_tick_due()) race_scarab_control_dispatch(child);
+        if (u[child].x!=sx || u[child].y!=sy) moved=1;
         if (race_impact_count) launched_packet=1;
         if (!launched_packet) assert(u[target].hp==200);
         race_impact_tick();
@@ -96,7 +110,7 @@ int main(void)
         if (u[target].hp<200) { damage_seen=1;break; }
     }
     fprintf(stderr,"impact packet=%d damage=%d hp=%d alive=%d childxy=%d,%d targetxy=%d,%d order=%d pending=%u carry=%d frame=%d\n",launched_packet,damage_seen,u[target].hp,u[child].alive,u[child].x,u[child].y,u[target].x,u[target].y,u[child].order,race_impact_count,u[child].carry,frame);
-    assert(launched_packet && damage_seen && u[target].hp==100 && !u[child].alive);
+    assert(moved && launched_packet && damage_seen && u[target].hp==100 && !u[child].alive);
     hit_target(parent,10000,U_MARINE,SIDE);
     assert(!u[parent].alive && sc64_controller_unit(parent)==-1);
     int reused=spawn_unit(ENEMY,U_REAVER,128,128);assert(reused==parent);
