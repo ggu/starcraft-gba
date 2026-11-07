@@ -7,6 +7,7 @@ persisted world fields, not framebuffer pixels or all transient state.
 import hashlib
 import json
 from pathlib import Path
+import signal
 import subprocess
 import sys
 
@@ -38,6 +39,10 @@ def comparable(state):
     return {k: v for k, v in state.items() if k != 'screen'}
 
 
+def phase_timeout(_signum, _frame):
+    raise TimeoutError('physical guest phase exceeded 600 seconds')
+
+
 def run(trace, rom, elf, runner, reader, erased, out):
     pins = {str(p.resolve()): digest(p) for p in (trace, rom, elf, runner, reader, erased)}
     if erased.read_bytes() != b'\xff' * 32768:
@@ -48,6 +53,8 @@ def run(trace, rom, elf, runner, reader, erased, out):
         raise ValueError('unexpected pause/save/resume sequence')
     out.mkdir(parents=True, exist_ok=False)
     save = out / 'guest.sav'
+    old_handler = signal.signal(signal.SIGALRM, phase_timeout)
+    signal.alarm(600)
     game = world.PhysicalGame(runner, rom, elf, out / 'prefix', save_input=erased, save_output=save)
     try:
         game.rsp.play_to(cut, edges)
@@ -63,7 +70,9 @@ def run(trace, rom, elf, runner, reader, erased, out):
         check_state(reference, info, False)
     finally:
         game.close()
+        signal.alarm(0)
     saved_sha = digest(save)
+    signal.alarm(600)
     resumed = world.PhysicalGame(runner, rom, elf, out / 'resume', save_input=save)
     try:
         resumed.step(512)
@@ -79,6 +88,8 @@ def run(trace, rom, elf, runner, reader, erased, out):
             raise ValueError('fresh guest continuation differs from uninterrupted reference')
     finally:
         resumed.close()
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
     if digest(save) != saved_sha or pins != {str(p.resolve()): digest(p) for p in (trace,rom,elf,runner,reader,erased)}:
         raise ValueError('frozen input or guest image changed')
     report = {'inputs': pins, 'save_sha256': saved_sha, 'journal': info,
