@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Explicit experimental ARM roster admission; never included by normal builds.
-# make -f Makefile -f tests/sc64-research-q8/arm-custom.mk q8-arm-custom-p10
+# make -f Makefile -f tests/sc64-research-q8-arm-custom/Makefile q8-arm-custom-p10
 Q8_CUSTOM_ARM_OUT ?= build/q8-arm-custom
 Q8_CUSTOM_COVER_DIR ?= .local/hardware-feedback/verified-cover
 Q8_CUSTOM_ARM_EXPERIMENT = -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_RESEARCH_BOUNDED_ARM_PROBE -DSC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT -DSC64_Q8_FLASH_ARM_PROBE -DSC64_Q8_FLASH_ALL_CUSTOM_ARM_PROBE
