@@ -79,6 +79,18 @@ def snapshot(game, case):
 def comparable(state): return {k:v for k,v in state.items() if k != 'screen'}
 
 
+def validate_receipt(receipt, rom, elf):
+    if receipt.get('head')!=COMPILED_HEAD or receipt.get('unchanged') is not True:
+        raise ValueError('unqualified compiled source receipt')
+    rows=receipt.get('results',[])
+    if len(rows)!=4 or {row.get('name') for row in rows if row.get('rc')==0} != {'arm-p10','rom','header','boundary'}:
+        raise ValueError('P10 build or boundary receipt incomplete')
+    product=receipt.get('products',{}).get('p10',{})
+    for kind,path in (('rom',rom),('elf',elf)):
+        if product.get(kind)!={'path':str(path.resolve()),'sha256':sha(path)}:
+            raise ValueError('P10 artifact role differs from receipt')
+
+
 def guard(out):
     if shutil.disk_usage(out).free < RESERVE: raise ValueError('disk reserve')
     if sum(p.stat().st_size for p in out.rglob('*') if p.is_file() and not p.is_symlink()) > LIMIT:
@@ -183,12 +195,7 @@ def main():
     if sha(args.runner)!=RUNNER or args.blank.read_bytes()!=b'\xff'*131072:
         raise ValueError('runner or virgin Flash differs')
     receipt=json.loads(args.receipt.read_text())
-    if receipt.get('head')!=COMPILED_HEAD or receipt.get('unchanged') is not True:
-        raise ValueError('unqualified compiled source receipt')
-    product=receipt.get('products',{}).get('p10',{})
-    for kind,path in (('rom',args.rom),('elf',args.elf)):
-        if product.get(kind)!={'path':str(path.resolve()),'sha256':sha(path)}:
-            raise ValueError('P10 artifact role differs from receipt')
+    validate_receipt(receipt,args.rom,args.elf)
     def check():
         if subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()!=args.driver_head:
             raise ValueError('driver HEAD changed')

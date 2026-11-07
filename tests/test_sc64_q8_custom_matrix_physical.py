@@ -2,6 +2,7 @@
 import sys
 import os
 import signal
+import tempfile
 from pathlib import Path
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
@@ -45,6 +46,17 @@ class MatrixTest(unittest.TestCase):
         finally:
             try:os.waitpid(pid,os.WNOHANG)
             except ChildProcessError:pass
+
+    def test_receipt_roles_and_completion(self):
+        with tempfile.TemporaryDirectory() as d:
+            rom=Path(d)/'a.gba';elf=Path(d)/'a.elf';rom.write_bytes(b'rom');elf.write_bytes(b'elf')
+            product={k:{'path':str(p.resolve()),'sha256':matrix.sha(p)} for k,p in [('rom',rom),('elf',elf)]}
+            receipt={'head':matrix.COMPILED_HEAD,'unchanged':True,'products':{'p10':product},
+                     'results':[{'name':name,'rc':0} for name in ('arm-p10','rom','header','boundary')]}
+            matrix.validate_receipt(receipt,rom,elf)
+            with self.assertRaises(ValueError):matrix.validate_receipt(receipt,elf,rom)
+            receipt['results'][-1]['rc']=1
+            with self.assertRaises(ValueError):matrix.validate_receipt(receipt,rom,elf)
 
 
 if __name__=='__main__':unittest.main()
