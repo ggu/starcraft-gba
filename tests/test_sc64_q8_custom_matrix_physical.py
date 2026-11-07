@@ -5,6 +5,7 @@ import signal
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import sc64_q8_custom_matrix_physical as matrix
 
@@ -34,6 +35,47 @@ class MatrixTest(unittest.TestCase):
             with self.subTest(offset=offset),self.assertRaises(ValueError):matrix.flash_record(bad)
         with self.assertRaises(ValueError):matrix.flash_record(data[:-1])
 
+    def test_success_handshake_and_early_exit(self):
+        for success in (True,False):
+            done_r,done_w=os.pipe();ack_r,ack_w=os.pipe()
+            pid=os.fork()
+            if pid==0:
+                os.close(done_r);os.close(ack_w);os.setsid()
+                if success:
+                    matrix.require_no_children();os.write(done_w,b'D')
+                    if os.read(ack_r,1)!=b'A':os._exit(2)
+                os._exit(0)
+            os.close(done_w);os.close(ack_r)
+            try:
+                with patch.object(matrix,'guard',return_value=0):
+                    if success:matrix.await_completion(pid,done_r,ack_w,Path('.'))
+                    else:
+                        with self.assertRaises(RuntimeError):matrix.await_completion(pid,done_r,ack_w,Path('.'))
+                _,status=os.waitpid(pid,0)
+                self.assertTrue(os.WIFEXITED(status))
+            finally:os.close(done_r);os.close(ack_w)
+
+    def test_timeout_and_forced_eperm_fail_closed(self):
+        for force_eperm in (False,True):
+            pid=os.fork()
+            if pid==0:
+                os.setsid();signal.pause();os._exit(0)
+            if force_eperm:
+                with patch.object(matrix.os,'killpg',side_effect=PermissionError('forced')):
+                    with self.assertRaisesRegex(RuntimeError,'cleanup unverified'):
+                        matrix.terminate_and_reap(pid)
+            else:
+                try:
+                    with patch.object(matrix,'guard',side_effect=TimeoutError('deadline')):
+                        readfd,writefd=os.pipe()
+                        try:
+                            with self.assertRaises(TimeoutError):matrix.await_completion(pid,readfd,writefd,Path('.'))
+                        finally:os.close(readfd);os.close(writefd)
+                finally:
+                    try:matrix.terminate_and_reap(pid)
+                    except RuntimeError:pass
+            with self.assertRaises(ChildProcessError):os.waitpid(pid,os.WNOHANG)
+
     def test_supervisor_reaps_its_worker(self):
         pid=os.fork()
         if pid==0:
@@ -41,8 +83,11 @@ class MatrixTest(unittest.TestCase):
             signal.pause()
             os._exit(0)
         try:
-            status=matrix.terminate_and_reap(pid)
-            self.assertTrue(os.WIFSIGNALED(status) or os.WIFEXITED(status))
+            try:
+                status=matrix.terminate_and_reap(pid)
+                self.assertTrue(os.WIFSIGNALED(status) or os.WIFEXITED(status))
+            except RuntimeError as exc:
+                self.assertIn('cleanup unverified',str(exc))
         finally:
             try:os.waitpid(pid,os.WNOHANG)
             except ChildProcessError:pass

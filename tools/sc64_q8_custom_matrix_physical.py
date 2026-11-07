@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import resource
+import select
 import shutil
 import signal
 import subprocess
@@ -171,11 +172,43 @@ def signal_group(pid, sig):
 def terminate_and_reap(pid):
     # Retain the leader until the whole owned group has been signaled, so
     # its PID/PGID cannot be recycled between observation and cleanup.
-    signal_group(pid,signal.SIGTERM)
+    failure=None
+    try: signal_group(pid,signal.SIGTERM)
+    except PermissionError as exc: failure=exc
     deadline=time.monotonic()+3
-    while not worker_exited(pid) and time.monotonic()<deadline: time.sleep(.05)
-    signal_group(pid,signal.SIGKILL)
-    return os.waitpid(pid,0)[1]
+    while failure is None and not worker_exited(pid) and time.monotonic()<deadline: time.sleep(.05)
+    try: signal_group(pid,signal.SIGKILL)
+    except PermissionError as exc: failure=exc
+    if failure is not None:
+        # Never reinterpret EPERM as group absence. Directly terminate our
+        # unreaped leader if possible, then surface the unverified cleanup.
+        try: os.kill(pid,signal.SIGKILL)
+        except (ProcessLookupError, PermissionError): pass
+    status=os.waitpid(pid,0)[1]
+    if failure is not None: raise RuntimeError('worker group cleanup unverified') from failure
+    return status
+
+
+def require_no_children():
+    try: pid,_=os.waitpid(-1,os.WNOHANG)
+    except ChildProcessError: return
+    raise RuntimeError('worker still owns a live or unreaped child' if not pid else
+                       'worker left an unreaped child')
+
+
+def await_completion(pid,done_read,ack_write,out):
+    while True:
+        if worker_exited(pid): raise RuntimeError('worker exited before completion handshake')
+        guard(out)  # 64 MiB is a polled threshold.
+        ready,_,_=select.select([done_read],[],[],.2)
+        if ready:
+            if os.read(done_read,1)!=b'D': raise RuntimeError('worker completion pipe closed')
+            if worker_exited(pid): raise RuntimeError('worker exited before acknowledgement')
+            if os.write(ack_write,b'A')!=1: raise RuntimeError('worker acknowledgement failed')
+            break
+    while not worker_exited(pid):
+        guard(out)
+        time.sleep(.05)
 
 
 def main():
@@ -219,14 +252,17 @@ def main():
                     'scope':'ordinary physical custom opening, save and 60-update named-world/Q8 continuation; no pixels, wins or hardware proof'}
             # Keep the native lock in the parent. Poll total owned output and
             # free space even while the worker blocks on its physical runner.
+            done_read,done_write=os.pipe();ack_read,ack_write=os.pipe()
             blocked={signal.SIGTERM,signal.SIGINT,signal.SIGALRM}
             oldmask=signal.pthread_sigmask(signal.SIG_BLOCK,blocked)
             try: pid=os.fork()
             except BaseException:
+                for fd in (done_read,done_write,ack_read,ack_write):os.close(fd)
                 signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
                 raise
             if pid==0:
                 try:
+                    os.close(done_read);os.close(ack_write)
                     os.setsid()  # All runner children inherit this group.
                     signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
                     with (args.output/'driver.log').open('wb') as log:
@@ -234,6 +270,10 @@ def main():
                         for i in range(args.first,args.first+args.count):
                             check();result['cases'].append(run_case(i,cases[i],args,args.output));check()
                             (args.output/'result.json').write_text(json.dumps(result,indent=2)+'\n')
+                    require_no_children()
+                    if os.write(done_write,b'D')!=1 or os.read(ack_read,1)!=b'A':
+                        raise RuntimeError('completion handshake failed')
+                    os.close(done_write);os.close(ack_read)
                     os._exit(0)
                 except BaseException as exc:
                     result['error']=repr(exc)
@@ -241,16 +281,14 @@ def main():
                         (args.output/'failure.json').write_text(json.dumps(result,indent=2)+'\n')
                         traceback.print_exc()
                     finally:os._exit(1)
+            os.close(done_write);os.close(ack_read)
             try:
                 signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
-                while not worker_exited(pid):
-                    guard(args.output)  # 64 MiB is a polled threshold.
-                    time.sleep(.2)
-                # Kill any orphaned descendants before reaping the leader;
-                # block termination through the reap/PID-disarm boundary.
+                await_completion(pid,done_read,ack_write,args.output)
+                # Worker proved it has reaped direct children before DONE;
+                # do not signal a zombie-only group on successful completion.
                 signal.pthread_sigmask(signal.SIG_BLOCK,blocked)
                 try:
-                    signal_group(pid,signal.SIGKILL)
                     _,status=os.waitpid(pid,0);pid=None
                 finally:signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
                 if not os.WIFEXITED(status) or os.WEXITSTATUS(status)!=0:
@@ -260,7 +298,9 @@ def main():
                 signal.pthread_sigmask(signal.SIG_BLOCK,blocked)
                 try:
                     if pid is not None: terminate_and_reap(pid)
-                finally:signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
+                finally:
+                    os.close(done_read);os.close(ack_write)
+                    signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
             return 0
     finally:
         signal.alarm(0);signal.signal(signal.SIGALRM,old);signal.signal(signal.SIGTERM,oldterm)
