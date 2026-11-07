@@ -147,13 +147,17 @@ def main():
     # L loads from title; sample before releasing it, with no gameplay update.
     step(512);loaded=[snap(g) for g in games]
     if loaded[0]['screen']!=world.SCREEN_PLAY or loaded[0]['frame']!=saved[0]['frame']:raise ValueError('fresh SRAM load not reached at saved frame')
-    ui={'screen','selected_building','selected_units','menu_open','menu_cursor','mode','toast_timer','toast_id'}
+    # Visibility is rebuilt on load; exploration is restored then may be
+    # expanded by that rebuild. Camera is derived at render, not saved.
+    ui={'screen','selected_building','selected_units','menu_open','menu_cursor','mode','toast_timer','toast_id',
+        'visible_sha256','explored_sha256','camx','camy'}
     persisted=lambda q:{k:v for k,v in q.items() if k not in ui}
     if persisted(saved[0])!=persisted(loaded[0]):raise ValueError('fresh load differs from saved named world before release')
     selection_reset_observed=saved[0]['selected_building']>=0 and loaded[0]['selected_building']==-1
     step(0)
     for _ in range(60):step(0)
-    check();report={'source':a.driver_head,'compiled_source':receipt['head'],'profile':a.profile,'mode':a.mode,'pins':pins,'sram_sha256':sha(saves[0]),'records':records_valid,'saved_ui':{k:saved[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'loaded_ui':{k:loaded[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'selection_reset_observed':selection_reset_observed,'saved_named_world_equal_before_release':True,'steps':len(records),'cycles_scope':'all physical updates, including menus and nonadvancing',
+    check();report={'source':a.driver_head,'compiled_source':receipt['head'],'profile':a.profile,'mode':a.mode,'pins':pins,'sram_sha256':sha(saves[0]),'records':records_valid,'saved_ui':{k:saved[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'loaded_ui':{k:loaded[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'selection_reset_observed':selection_reset_observed,'saved_named_world_equal_before_release':True,
+            'derived_cross_path_equal':{k:saved[0][k]==loaded[0][k] for k in ('visible_sha256','explored_sha256','camx','camy')},'steps':len(records),'cycles_scope':'all physical updates, including menus and nonadvancing',
             'cycles':[{'mean':sum(c)/len(c),'max':max(c)} for c in cycles],'comparisons':records,'scope':'physical input, full displayed indexed frame/palette and named world/UI at each step; cross-path selection reset recorded, not equated'}
     (a.output/'result.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({'steps':len(records),'saved_ui':report['saved_ui'],'loaded_ui':report['loaded_ui']}))
    except Exception as exc:
