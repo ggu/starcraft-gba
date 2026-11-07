@@ -42,11 +42,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matches OFF/ON state, full displayed frame and palette for 3,056 input ticks
   and again after fresh load; both guests write identical valid Flash saves.
   Restored named state matches uninterrupted play, including wallet/job/timer.
-  Immediate fresh-versus-uninterrupted pixels differ, so the conservative overall
-  gate fails; loader UI transients are a source-backed hypothesis, not a located
-  pixel diagnosis. Record raw images/compare after transient expiry, then qualify
-  Z10 and relevant campaign scenes. See the [scoped HUD audit](audits/2026-11-07-zerg-hud-memory/README.md).
-  No normal vector, hardware/performance or promotion claim changed.
+  Fresh-versus-uninterrupted pixels still differ after 60 neutral updates,
+  despite matching named state/palette and exact OFF/ON frame pairs. Raw views
+  show Forge selection/ring/HUD retained uninterrupted but cleared after load;
+  the tested loader resets that UI context and the compared world omits it.
+  This localizes an existing presentation-contract gap, without attributing
+  every map pixel. Define/qualify saved UI and presentation, then Z10/campaign
+  scenes; see the [scoped HUD audit](audits/2026-11-07-zerg-hud-memory/README.md).
+  The strict cross-path gate stays failed; normal flags and hardware/FPS claims
+  remain unchanged.
 - **Migration and roster gates:** the composed phase checker passes 39 process
   steps covering all 1,280 unit and 320 legacy building phases, 47 advancing
   updates, genuine old exports and alias/burn preservation. Actual checksum-valid
@@ -621,7 +625,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 | Work | State and next gate |
 | --- | --- |
 | [#349](https://github.com/ggu/starcraft-gba/pull/349), combined research Flash experiment | Draft; composed runtime `8be82458` now has six guarded links, HOST phase/roster/transaction checks, one ordinary paid Forge save/load/completion and exact feature-off P10 control. Clean public boundary/doctor/build/full-test checks also pass (1,026 Python, 26 skips, plus compiled checks); broader codecs/rosters, memory/stack, hardware and audio gates remain; normal flags off. |
-| Shared HUD memory probe | Optional `9f185cfd`; four links and four poisoned-page HOST diagnostics pass, saving 12,456 net EWRAM bytes on both Z9/Z10 experimental vectors. Corrected Z9 OFF/ON state/frame/palette and genuine Flash images match. Fresh named state equals uninterrupted play but immediate pixels differ; the conservative render gate fails. Raw/settled comparison, Z10, campaign and performance checks remain open. No normal vector change. |
+| Shared HUD memory probe | Optional `9f185cfd`; four links and four poisoned-page HOST diagnostics pass, saving 12,456 net EWRAM bytes on both Z9/Z10 experimental vectors. Corrected Z9 OFF/ON state/frame/palette and genuine Flash images match. Fresh named state equals uninterrupted play, while cross-path pixels differ even after 60 updates; raw images show cleared Forge selection/HUD after load. The strict presentation gate remains failed. UI/presentation contract, Z10, campaign and performance checks remain open. No normal vector change. |
 | [Z10 paid Scarab integration plan](audits/2026-11-07-z10-scarab-stage/README.md) | Source-only plan; current generic Reaver attack is a measured high-impact mismatch. Establish actual current-controller/town payer and AI policy, then compose paid production, flight/impact and saves. No ordinary Z10 win or new gameplay code in this plan. |
 | [#297](https://github.com/ggu/starcraft-gba/pull/297), late-campaign Egg integration | Runtime `f32356c6`, test-only `7166def0`: opt-in Z8–Z10 producer/journal/owner/trigger reservation integration, eight sanitizer targets and four matching-product predecessor cases passed. Actual Z10-product Z8/Z9/Z10 and Z9-product Z9 pause-save/export/fresh-load/natural-birth cases passed. All six normal ROM hashes/RAM ends remain identical to `6ba`; clean default checks pass (1,000 Python tests, 26 skipped, plus compiled/auxiliary suites). Both public preview recipes reproduce the actual guest-qualified ROM hashes at publication `4f0d7080`. See [qualification and limits](audits/2026-11-06-current-native-qualification/late-eggs.md). Common normal activation, Guardian, full campaigns, stack and performance remain open. |
 | [#295](https://github.com/ggu/starcraft-gba/pull/295), shared production preview | Merged as `34c1b38f`; whole tree equals reviewed publication `b57351af`. The [Egg-only custom candidate](audits/2026-11-05-shared-egg-custom/README.md) at `6ba76f8e` no longer depends on Guardian. Six normal ROM/RAM checks and clean default tests pass; all five opt-in GBA builds and HOST controller/journal/owner suites pass. The exact Terran ROM has physical-button ARM, genuine fresh-process SRAM and a separate static-frame/HUD visual check. Known pre-cargo Z6/Z7 reader regressions were reproduced and fixed without changing the authenticated inner token. Separate preview commands are available; default service remains off. Campaign integration, remaining guest products, long matches and performance are not thereby qualified. |

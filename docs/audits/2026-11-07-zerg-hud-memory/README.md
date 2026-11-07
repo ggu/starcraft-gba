@@ -4,7 +4,9 @@ This optional probe reuses the existing framebuffer-page HUD implementation.
 It does not change normal release vectors, actor/effect limits or linker reserves.
 Compiled source is `9f185cfdddbf235cff1197fbb0416d458f53b895`, based on the
 combined experimental research/Q8/Flash source `8be82458`. The separate physical
-comparison driver is `b42a21e5cabaeb51b174eb2cbc77dc128d6fc77e`.
+first diagnostic comparison driver is
+`b42a21e5cabaeb51b174eb2cbc77dc128d6fc77e`; the later raw/60-update driver is
+`fb65428dd618e6dbead6a0ede554b7ad47733ab5`.
 
 ## Resource and authored-render checks
 
@@ -46,13 +48,30 @@ comparison fails. The driver does not publish a full-success receipt.
 Private comparison SHA256:
 `44a1595b760e5e9fe371436865ad83f63cce6933029a91b18121a95b150d2cab`.
 
-The loader unconditionally adds a 55-update toast at y=108 and resets transient
-UI/effects/caches. Those are source-backed reasons immediate cross-path images
-can differ; the retained hashes alone do not locate the observed pixel difference.
-Record raw images and compare after the documented transient expires before
-claiming fresh-versus-uninterrupted render continuity. Preserve exact OFF/ON
-state/pixel/palette comparisons at every equivalent phase. The corrected Z10
-guest path is not yet run. No rollout or hardware qualification follows.
+A later controlled repeat records raw frames and advances both paths by 60
+ordinary neutral updates, past the existing 55-update loader toast. It retains
+strict immediate OFF/ON comparisons and a strict late cross-path comparison.
+The cross-path pixel difference persists: 2,459 immediate and 2,562 late pixels,
+with bounding box `[3,52,177,158]`, including 2,154 HUD-band pixels at both times.
+Every OFF/ON state/image pair still matches, as do cross-path named state,
+palette and display mode. The overall strict cross-path verdict remains failed.
+Private late comparison SHA256:
+`abb5f4a2e5d470849df3a609d1b25d39d39a6d2352df50a2bffb294f9dc3881d`.
+
+Independent viewing of the decoded retained frames shows the uninterrupted
+Forge selection ring and Forge health/command HUD, while fresh load shows no
+building selection and the generic objective/control HUD. Source explicitly
+clears `selected_building`; restoration requires `SC64_SAVE_UI_CONTEXT`, which
+neither tested compiler vector enables. The named-world comparator does not
+include that UI field. This establishes a visible selection-context difference
+and source behavior consistent with it; it does not attribute every different
+map pixel. Source also documents unsaved walk/facing presentation state.
+
+The probe demonstrates OFF/ON equivalence at the measured phases; it does not
+establish identical fresh-versus-uninterrupted presentation. Specify the saved
+UI/presentation contract and its comparison separately, then qualify the corrected
+Z10 guest path and relevant campaign scenes. No rollout or hardware qualification
+follows. Earlier failures, raw views and strict predicates remain retained.
 
 Recorded cycle distributions include every prefix tick, including pause/save and
 other nonadvancing calls. They are not a busy-frame FPS or performance result.
