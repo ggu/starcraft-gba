@@ -5,9 +5,14 @@
 #if defined(SC64_Q8_FLASH_HOST_STAGE) && \
     (!defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT) || \
      !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) || \
-     (defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE)) || \
-     !defined(SC64_P7_TYPED_COMPACT_ENABLED) || !defined(SC64_P10_RUNTIME))
+     (defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE) && !defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE)) || \
+     ((!defined(SC64_P7_TYPED_COMPACT_ENABLED) || !defined(SC64_P10_RUNTIME)) && !defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE)))
 #error "Q8 Flash stage requires HOST P10 typed custom jobs and excludes campaign"
+#endif
+#if defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) && defined(SC64_Q8_FLASH_HOST_STAGE) && \
+    (!defined(SC64_Z10_RUNTIME) || !defined(SC64_ZP_FULL_STORAGE) || \
+     !defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL))
+#error "Compound fractional context requires the explicit HOST Z10 campaign codec"
 #endif
 #if defined(SC64_Q8_FLASH_ARM_PROBE) && (defined(GBA_HOST) || defined(SC64_Q8_FLASH_HOST_STAGE) || !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE) || !defined(SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) || defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) || !defined(SC64_RACES))
 #error "ARM Q8 Flash probe requires shared custom research and excludes HOST and campaign"
