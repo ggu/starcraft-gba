@@ -47,7 +47,7 @@ def validate(document):
             paid.get("larva_before", -1) - paid.get("larva_after", -1) != 1 or
             birth.get("zerglings") != paid.get("zerglings_before", -3) + 2):
         raise ValueError("inconsistent checkpoint observations")
-    return {"transitions": edges, "save_tick": save["host_tick"],
+    return {"transitions": edges, "paid_tick": paid["host_tick"], "save_tick": save["host_tick"],
             "birth_tick": birth["host_tick"]}
 
 

@@ -30,8 +30,8 @@ int main(int argc, char **argv)
     }
     fprintf(stderr, "eggs=%d zerglings=%d supply=%d cap=%d\n", eggs, zerglings, race_owner_supply(SIDE), race_owner_supply_cap(SIDE));
     if (eggs != 1 || zerglings != 0 || race_owner_supply(SIDE) > race_owner_supply_cap(SIDE)) return 1;
-    printf("{\"version\":%u,\"frame\":%d,\"egg_slot\":%d,\"egg_timer\":%d,\"egg_type\":%d,\"zergling_type\":%d,\"side\":%d,\"supply\":%d,\"supply_cap\":%d,\"minerals\":%d,\"gas\":%d,\"bots\":%d}\n",
+    printf("{\"version\":%u,\"frame\":%d,\"egg_slot\":%d,\"egg_timer\":%d,\"egg_type\":%d,\"zergling_type\":%d,\"hall_type\":%d,\"pool_type\":%d,\"side\":%d,\"supply\":%d,\"supply_cap\":%d,\"minerals\":%d,\"gas\":%d,\"bots\":%d}\n",
            (unsigned)SC64_SHARED_EGG_SAVE_VERSION, frame, slot, u[slot].work_timer,
-           SC64_EGG_ACTOR, U_ZERGLING, SIDE, race_owner_supply(SIDE), race_owner_supply_cap(SIDE), minerals, gas, race_bots);
+           SC64_EGG_ACTOR, U_ZERGLING, B_HATCHERY, B_SPAWNING_POOL, SIDE, race_owner_supply(SIDE), race_owner_supply_cap(SIDE), minerals, gas, race_bots);
     return 0;
 }
