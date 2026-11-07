@@ -27,7 +27,7 @@ static void write_world(const char *path, int legacy)
 {
     int type=expected_type(legacy);
     gba_init(); game_init();
-    race_mode=1; race_human=R_TERRAN; race_bots=1; init_state();
+    race_mode=1; race_human=R_TER; race_bots=1; init_state();
     assert(screen==SCREEN_PLAY && race_mode);
     int slot=spawn_build(SIDE,type,300,300,0);
     assert(slot>=0 && b[slot].type==type);
@@ -43,7 +43,7 @@ static void read_world(const char *path, int legacy)
     int type=expected_type(legacy),found=-1;
     gba_init(); game_init();
     assert(sc64_test_sram_transfer(path,0));
-    assert(race_load_game() && race_mode && race_human==R_TERRAN);
+    assert(race_load_game() && race_mode && race_human==R_TER);
     for(int i=0;i<MAX_BUILDINGS;++i)
         if(b[i].alive && b[i].owner==SIDE && b[i].type==type &&
            b[i].x==300 && b[i].y==300) {assert(found<0);found=i;}
