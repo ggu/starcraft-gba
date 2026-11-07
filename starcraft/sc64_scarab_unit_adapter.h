@@ -310,6 +310,9 @@ static const Sc64ScarabOps race_scarab_ops={race_scarab_allocate,race_scarab_com
 static int race_scarab_enqueue(int slot,int upgraded)
 {
     Sc64ScarabParent p; Sc64ScarabCounts counts; Sc64ScarabWallet bank; int next;
+#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
+    if (race_zl_active() && !race_product_slots_available(SC64_ZL_AI_RESERVE_UNITS+1u)) return 0;
+#endif
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts) ||
         !sc64_scarab_wallet_read(bank=race_scarab_owner_bank(slot),&next)) return 0;
     if (!sc64_scarab_enqueue(&p,counts,upgraded,&next) ||
@@ -367,9 +370,6 @@ static int race_scarab_cancel(int slot,int upgraded,unsigned index)
 {
     Sc64ScarabParent p; Sc64ScarabCounts counts; Sc64ScarabUnitContext c={slot};
     Sc64ScarabWallet bank; int next;
-#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
-    if (race_zl_active() && !race_product_slots_available(SC64_ZL_AI_RESERVE_UNITS+1u)) return 0;
-#endif
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts) ||
         !sc64_scarab_wallet_read(bank=race_scarab_owner_bank(slot),&next)) return 0;
     if (!sc64_scarab_cancel(&p,counts,upgraded,&race_scarab_ops,&c,index,&next,

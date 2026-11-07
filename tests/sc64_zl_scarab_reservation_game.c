@@ -31,7 +31,10 @@ int main(void)
     assert(race_scarab_production_tick(parent,0)==SC64_SCARAB_WAIT);
     assert(race_scarab_parent_read(parent,0,&state,&counts) && state.queued==1 && state.active_slot<0);
     assert(race_zl_ai_minerals[1]==85 && free_units()==SC64_ZL_AI_RESERVE_UNITS);
-    u[last].alive=0;assert(race_scarab_production_tick(parent,0)==SC64_SCARAB_ALLOCATED);
+    assert(race_scarab_cancel(parent,0,0) && race_zl_ai_minerals[1]==100);
+    assert(!race_scarab_ai_restock_stage(parent));
+    u[last].alive=0;assert(race_scarab_ai_restock_stage(parent) && race_zl_ai_minerals[1]==85);
+    assert(race_scarab_production_tick(parent,0)==SC64_SCARAB_ALLOCATED);
     assert(free_units()==SC64_ZL_AI_RESERVE_UNITS && race_zl_ai_minerals[1]==85);
     Sc64Z8Action action={.location=1,.opcode=11,.flags=0x10,.unit=SC64_ZL_RAW_DRONE};
     assert(race_zl_create(0,&action,SC64_ZL_HUMAN_SLOT,1,0,100,100,200,200)==1);
