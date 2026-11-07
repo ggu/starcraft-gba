@@ -7403,8 +7403,14 @@ static int
 race_resource_depot_reachable(const Unit *worker, int slot)
 {
     int next_x, next_y;
+#if defined(SC64_DEPOT_REACHABILITY_PROBE) && defined(SC64_IMPORTED_MISSION)
+    (void)next_x; (void)next_y;
+    return dist2(worker->x, worker->y, b[slot].x, b[slot].y) <= 32 * 32 ||
+        sc64_route_depot_reachable(worker->x, worker->y, slot, b[slot].x, b[slot].y);
+#else
     return dist2(worker->x, worker->y, b[slot].x, b[slot].y) <= 32 * 32 ||
         worker_depot_next(worker->x, worker->y, slot, &next_x, &next_y);
+#endif
 }
 
 static void

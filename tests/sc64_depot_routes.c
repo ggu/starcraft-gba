@@ -112,8 +112,28 @@ static void depot_query(int sx,int sy,int cx,int cy,int id)
         reachable=best!=0x7fffffff;
     }
     memcpy(saved_grid,path_walkable,sizeof(saved_grid));
+#if defined(SC64_DEPOT_REACHABILITY_PROBE) && !defined(SC64_ROUTE_ACTIVE_STRIDE)
+    static u8 before_field[sizeof(sc64_route_field)], after_field[sizeof(sc64_route_field)];
+    u8 before_valid[sizeof(sc64_route_valid)], after_valid[sizeof(sc64_route_valid)];
+    u16 before_goal[SC64_ROUTE_SLOTS], after_goal[SC64_ROUTE_SLOTS];
+    u32 before_age[SC64_ROUTE_SLOTS], after_age[SC64_ROUTE_SLOTS],before_clock=sc64_route_clock,after_clock;
+    u32 before_hits=sc64_route_hits,before_builds=sc64_route_builds,after_hits,after_builds;
+    memcpy(before_field,sc64_route_field,sizeof(before_field));memcpy(before_valid,sc64_route_valid,sizeof(before_valid));
+    memcpy(before_goal,sc64_route_goal,sizeof(before_goal));memcpy(before_age,sc64_route_age,sizeof(before_age));
+#endif
     int ok=sc64_route_depot_next(sx*16+8,sy*16+8,id,cx,cy,&nx,&ny);
     assert(memcmp(saved_grid,path_walkable,sizeof(saved_grid))==0);
+#if defined(SC64_DEPOT_REACHABILITY_PROBE) && !defined(SC64_ROUTE_ACTIVE_STRIDE)
+    memcpy(after_field,sc64_route_field,sizeof(after_field));memcpy(after_valid,sc64_route_valid,sizeof(after_valid));
+    memcpy(after_goal,sc64_route_goal,sizeof(after_goal));memcpy(after_age,sc64_route_age,sizeof(after_age));after_clock=sc64_route_clock;after_hits=sc64_route_hits;after_builds=sc64_route_builds;
+    memcpy(sc64_route_field,before_field,sizeof(before_field));memcpy(sc64_route_valid,before_valid,sizeof(before_valid));
+    memcpy(sc64_route_goal,before_goal,sizeof(before_goal));memcpy(sc64_route_age,before_age,sizeof(before_age));sc64_route_clock=before_clock;sc64_route_hits=before_hits;sc64_route_builds=before_builds;
+    assert(sc64_route_depot_reachable(sx*16+8,sy*16+8,id,cx,cy)==ok);
+    assert(!memcmp(after_field,sc64_route_field,sizeof(after_field))&&!memcmp(after_valid,sc64_route_valid,sizeof(after_valid)));
+    assert(!memcmp(after_goal,sc64_route_goal,sizeof(after_goal))&&!memcmp(after_age,sc64_route_age,sizeof(after_age)));
+    assert(after_clock==sc64_route_clock&&after_hits==sc64_route_hits&&after_builds==sc64_route_builds);
+    assert(!memcmp(saved_grid,path_walkable,sizeof(saved_grid)));
+#endif
     if(ok!=reachable){fprintf(stderr,"depot reach mismatch src=%d,%d depot=%d,%d id=%d expected=%d got=%d\n",sx,sy,cx,cy,id,reachable,ok);assert(0);}
     if(!ok)return;
     int col=nx/16,row=ny/16;assert(col>=0&&row>=0&&col<MAP_COLS&&row<MAP_ROWS);

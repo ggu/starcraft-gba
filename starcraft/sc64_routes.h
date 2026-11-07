@@ -2043,6 +2043,45 @@ sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
     return 1;
 }
 
+
+#ifdef SC64_DEPOT_REACHABILITY_PROBE
+/* Same slot request and field mutation as the waypoint query. Selection only
+ * needs a yes/no answer, so stop at the first complete blocked-start path. */
+static int __attribute__((noinline, unused))
+sc64_route_depot_reachable(int x, int y, int depot_id, int center_x, int center_y)
+{
+    static const signed char dx[4] = {1, -1, 0, 0}, dy[4] = {0, 0, 1, -1};
+    int slot, col, row, cell, direction, px, py;
+    if (x < 0 || y < 0 || MAP_COLS <= 0 || MAP_ROWS <= 0 ||
+        x / 16 >= MAP_COLS || y / 16 >= MAP_ROWS) return 0;
+    col=x/16; row=y/16; cell=col+row*MAP_COLS;
+#ifdef SC64_DEPOT_BOUNDED
+    slot=sc64_route_depot_slot_for_origin(depot_id,center_x,center_y,cell);
+#else
+    slot=sc64_route_depot_slot(depot_id,center_x,center_y);
+#endif
+    if (slot < 0) return 0;
+    direction=sc64_route_depot_direction(slot,cell);
+    if (direction < 0 && !SC64_GRID_GET(path_walkable,cell)) {
+        for (int i=0;i<4;++i) {
+            int nx=col+dx[i],ny=row+dy[i],current,d,distance=0;
+            if (nx<0 || ny<0 || nx>=MAP_COLS || ny>=MAP_ROWS) continue;
+            current=nx+ny*MAP_COLS; d=sc64_route_depot_direction(slot,current);
+            while (d>0 && d<=4 && distance<MAP_CELLS) {
+                if (d==1) ++current; else if (d==2) --current;
+                else if (d==3) current+=MAP_COLS; else current-=MAP_COLS;
+                ++distance; d=sc64_route_depot_direction(slot,current);
+            }
+            if (d==0) return 1;
+        }
+        return 0;
+    }
+    if (direction < 0) return 0;
+    if (direction == 0) return sc64_depot_cell_point(center_x,center_y,col,row,&px,&py);
+    return direction <= 4;
+}
+#endif
+
 /* Group formation only needs a reachability decision, not a next step. On
  * complete imported-race fields, any walkable-rooted reverse field is an exact
  * connected-component label: membership in the same field is equivalent to
