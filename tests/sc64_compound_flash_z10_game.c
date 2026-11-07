@@ -176,6 +176,37 @@ static void tiny_primitive_cuts(void)
         }
         printf("tiny scenario=%d program/erase cuts=%d read cuts=%d PASS\n",scenario,operations+1,reads+1);
     }
+    /* Every subset in one marker byte while all prior bytes are complete:
+     * unfinished bytes and the entire data area remain erased. */
+    unsigned marker_cases=0,tag_cases=0,erase_marker_cases=0;
+    for(unsigned byte=0;byte<SC64_CFR_MARKER_SIZE;++byte)for(unsigned mask=0;mask<256;++mask) {
+        memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+        u32 mark=gba_fj_base(2)+SC64_CFR_MARKER_OFFSET;
+        for(unsigned k=0;k<byte;++k)tiny.bytes[mark+k]=sc64_cfr_marker[k];
+        tiny.bytes[mark+byte]=(u8)(sc64_cfr_marker[byte]|mask);
+        assert(tiny_begin() && tiny_write(prefix,body,tail));tiny_assert_legacy();++marker_cases;
+    }
+    /* An old v3 target may suffer arbitrary 0->1 subsets within any tag or
+     * marker byte during isolated-sector erase. The other winner is intact. */
+    memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+    assert(tiny_begin() && tiny_write(prefix,body,tail));
+    assert(tiny_begin() && tiny_write(prefix,body,tail));
+    assert(tiny_begin() && sc64_cf_previous.index==3);
+    memcpy(tiny_initial,tiny.bytes,sizeof tiny_initial);memcpy(tiny_winner,tiny.bytes+gba_fj_base(3),sizeof tiny_winner);
+    for(unsigned byte=0;byte<4;++byte)for(unsigned mask=0;mask<256;++mask) {
+        memcpy(tiny.bytes,tiny_initial,sizeof tiny_initial);tiny.budget=tiny.read_budget=-1;
+        tiny.bytes[gba_fj_base(2)+byte]|=(u8)mask;
+        assert(tiny_begin() && tiny_write(prefix,body,tail));
+        assert(!memcmp(tiny.bytes+gba_fj_base(3),tiny_winner,sizeof tiny_winner));tiny_assert_legacy();++tag_cases;
+    }
+    for(unsigned byte=0;byte<SC64_CFR_MARKER_SIZE;++byte)for(unsigned mask=0;mask<256;++mask) {
+        memcpy(tiny.bytes,tiny_initial,sizeof tiny_initial);tiny.budget=tiny.read_budget=-1;
+        memset(tiny.bytes+gba_fj_base(2),255,4);
+        tiny.bytes[gba_fj_base(2)+SC64_CFR_MARKER_OFFSET+byte]|=(u8)mask;
+        assert(tiny_begin() && tiny_write(prefix,body,tail));
+        assert(!memcmp(tiny.bytes+gba_fj_base(3),tiny_winner,sizeof tiny_winner));tiny_assert_legacy();++erase_marker_cases;
+    }
+    printf("marker-program=%u partial-tag-erase=%u partial-marker-erase=%u PASS\n",marker_cases,tag_cases,erase_marker_cases);
 }
 int main(int argc,char **argv)
 {
