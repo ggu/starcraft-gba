@@ -207,6 +207,29 @@ static void tiny_primitive_cuts(void)
         assert(!memcmp(tiny.bytes+gba_fj_base(3),tiny_winner,sizeof tiny_winner));tiny_assert_legacy();++erase_marker_cases;
     }
     printf("marker-program=%u partial-tag-erase=%u partial-marker-erase=%u PASS\n",marker_cases,tag_cases,erase_marker_cases);
+    /* Interrupted first save A must never be promoted during a distinct B
+     * retry. Test every B mutation cut after each incomplete A tag byte. */
+    static u8 partial[GBA_FJ_BYTES];u8 body_b[48],got[48];unsigned distinct_cases=0;
+    for(unsigned i=0;i<sizeof body_b;++i)body_b[i]=(u8)(body[i]^0x5a);
+    memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+    memcpy(tiny_initial,tiny.bytes,sizeof tiny_initial);assert(tiny_begin());tiny.mutations=0;
+    assert(tiny_write(prefix,body,tail));int first_operations=tiny.mutations;
+    for(int tag_bytes=0;tag_bytes<4;++tag_bytes) {
+        memcpy(tiny.bytes,tiny_initial,sizeof tiny_initial);tiny.budget=tiny.read_budget=-1;assert(tiny_begin());
+        tiny.budget=first_operations-4+tag_bytes;assert(!tiny_write(prefix,body,tail));tiny.budget=-1;
+        GbaFlashJournalRecord r;assert(gba_fj_probe(&tiny_io,2,&r)==GBA_FJ_NONE);
+        memcpy(partial,tiny.bytes,sizeof partial);assert(tiny_begin() && !sc64_cf_has_previous);
+        tiny.mutations=0;assert(tiny_write(prefix,body_b,tail));int retry_operations=tiny.mutations;
+        for(int cut=0;cut<=retry_operations;++cut) {
+            memcpy(tiny.bytes,partial,sizeof partial);tiny.budget=tiny.read_budget=-1;assert(tiny_begin() && !sc64_cf_has_previous);
+            tiny.budget=cut;(void)tiny_write(prefix,body_b,tail);tiny.budget=-1;
+            for(unsigned slot=2;slot<4;++slot)if(gba_fj_probe(&tiny_io,slot,&r)==GBA_FJ_OK) {
+                assert(gba_fj_read_payload(&tiny_io,&r,16,got,sizeof got)==GBA_FJ_OK && !memcmp(got,body_b,sizeof got));
+            }
+            assert(tiny_begin() && tiny_write(prefix,body_b,tail));tiny_assert_legacy();++distinct_cases;
+        }
+    }
+    printf("distinct-A-B retry cuts=%u PASS\n",distinct_cases);
 }
 int main(int argc,char **argv)
 {
