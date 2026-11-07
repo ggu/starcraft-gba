@@ -266,8 +266,8 @@ def main():
                         raise ValueError('fresh load differs after neutral 60-update interval')
                 elif last['screen']!=world.SCREEN_PLAY:raise ValueError('custom game no longer playing')
                 check();report={'pins':pins,'compiled_head':compiled_head,'driver_head':a.driver_head,'adapted_lobby':a.adapt_zerg_lobby,'profile':a.profile,'ticks':a.ticks,'counts':counts,'paired_every_tick_sha256':digest.hexdigest(),
-                    'flash_images_equal':save_equal,'cycles':[{'mean':sum(v)/len(v),'max':max(v)} for v in elapsed],
-                    'scope':'ordinary custom tape; full displayed indexed frame and palette plus named state every prefix tick; optional fresh Flash load; no campaign proof'}
+                    'flash_images_equal':save_equal,'neutral_updates_after_load':60 if a.blank_flash else 0,'cycles':[{'mean':sum(v)/len(v),'max':max(v)} for v in elapsed],
+                    'scope':'ordinary custom tape; full displayed indexed frame and palette plus named state every prefix tick; optional fresh Flash load and 60 neutral updates; no campaign proof'}
                 (a.output/'result.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report),flush=True)
             except Exception as exc:
                 diagnostic['error']=str(exc)
