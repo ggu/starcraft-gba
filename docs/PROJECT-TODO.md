@@ -35,8 +35,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   workaround; the feature-off P10 control matches the `317cc67d…` ROM. This is
   an emulated witness, not cartridge or all-mode qualification. HOST coverage
   includes 234 custom roster records and 234 genuine predecessor records; an
-  initial bounded subset of ordinary-input ARM roster cases passes, with the
-  remaining matrix still in progress. Campaigns, controller/race combinations,
+  all 234 early ordinary-input ARM roster openings pass across both maps,
+  three human races and all ordered one-to-three AI races. Saved research
+  levels and Q8 debt were zero; this is not active-research or combat proof.
+  Six experimental ARM probes pass at combined source, with Z9/Z10 EWRAM
+  margin 12,588 B (normal products: 13,244 B). The P10 ROM matches the prior
+  physical matrix byte-for-byte; all 28,999 defined symbol entries match.
+  Clean default checks at `340ecd44` pass (1,034 Python tests, 26 skips, plus
+  compiled checks). See the [combined audit](audits/2026-11-07-q8-custom-combined/README.md)
+  and [physical matrix](audits/2026-11-07-q8-custom-physical-matrix/README.md).
+  Campaigns, later controller/race combinations,
   repair/Z5 aliases, real failure recovery, runtime stack and hardware remain
   release gates. The separate Scarab stage is not release-qualified.
 - **Experimental memory and presentation:** at combined research source
@@ -84,8 +92,9 @@ below remain open. Keep source-only public artifacts and local Actions policy.
 
 ## Current real-device feedback and integration
 
-The November 6 report is confirmed as **Protoss10 custom gameplay** from the
-older KODAK package. Source merges do not update an already copied ROM.
+The November 6 report is confirmed as **Protoss10 custom gameplay**. The
+exact KODAK build used for that report is unconfirmed; its last recorded
+package was e983. Source merges do not update an already copied ROM.
 
 - **Merged shared fixes:** #304 aligns B-menu icon-row highlights and prices;
   #305 enables ordinary producer L cancellation/full unit refunds; #306 gives
@@ -112,8 +121,8 @@ older KODAK package. Source merges do not update an already copied ROM.
   Headers, logos, SRAM signatures and all 19 payload/metadata checksums passed
   read-back. Four-product minimum IWRAM/EWRAM margins remain 1,464/780 bytes;
   extra Z7 retains 1,168 IWRAM bytes. No hardware FPS or stack claim follows.
-  **KODAK still has the older e9838086 package** until a new physical copy is
-  recorded; the card is not currently mounted. Earlier Mac packages remain.
+  **The last recorded KODAK package is e9838086**; the card is not currently
+  mounted and its present contents have not been verified. Earlier Mac packages remain.
 - **Creation provenance #323 merged:** shared foundations and ordinary
   products fill missing source-owner slots only from a verified creator or
   uniquely mapped human controller. Existing rescued actors retain their
@@ -450,8 +459,8 @@ save/source-owner and timing evidence; do not advertise unwired components.
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
 - Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-f1fbf106`:
-  Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The older KODAK package
-  is `20261106-e9838086-campaigns`. Content coverage remains **29/30**;
+  Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The last recorded KODAK package
+  was `20261106-e9838086-campaigns`; its present contents are unverified. Content coverage remains **29/30**;
   this is not a claim of complete native mechanics or campaign parity.
 - Separate opt-in Mac package: `20261106-e9838086-custom-eggs-preview`.
   Versioned filenames and manifests distinguish it from the normal products;
