@@ -77,3 +77,19 @@ repository contains authored source, optional checks and this scoped audit.
 - Six ARM resource checks: `4ba11051d4661f61225096b2130bc2b87a3797f04b344d27261c60e3832d20f0`.
 - Ordinary-input guest result: `55f37191165f66f3cdd0243a948902864b419b1d2a2603fc916cb314e7e6ae0a`.
 - Normal P10 control: `46b8c45661d8a1cb67b5f0abfc34b7110129b0efabd71c743ad97943e563b3b4`.
+
+## Clean public default checks
+
+At the same `8be82458` source, the fresh asset-free worktree passes source
+boundary, `./dev doctor`, `./dev build` and the complete `./dev test` command.
+The last includes 1,026 Python tests (26 expected skips) plus compiled and
+auxiliary checks; the recorded test retry returns zero in 285.542 seconds with
+halt-on-sanitizer and no scanned diagnostics. No private game inputs were linked.
+
+The first supervisory postcondition incorrectly forbade any `build/generated`
+output. The public test legitimately creates an authored contact-geometry table.
+That failed supervisory attempt is retained; an independent regeneration matched
+the table, and the corrected exact allowlist passed the full test rerun. This
+was a test-harness correction, with no product-source changes.
+
+Final private receipt SHA256: `c1bc2900b4035329c8960c67743141947e1861a7488a795455ad4a3580380324`.
