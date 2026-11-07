@@ -67,12 +67,13 @@ def main():
  resource.setrlimit(resource.RLIMIT_FSIZE,(LIMIT,LIMIT));old=signal.signal(signal.SIGALRM,alarm);term=signal.signal(signal.SIGTERM,alarm);signal.alarm(a.deadline)
  try:
   with open(LOCK,'a') as lock:
-   fcntl.flock(lock,fcntl.LOCK_EX);check();a.output.mkdir(parents=True);games=[];records=[];diag={'profile':a.profile,'mode':a.mode,'stage':'starting'}
+   fcntl.flock(lock,fcntl.LOCK_EX);check();a.output.mkdir(parents=True);games=[];records=[];cycles=[[],[]];diag={'profile':a.profile,'mode':a.mode,'stage':'starting'}
    try:
     for name,rom,elf in [('off',a.off_rom,a.off_elf),('on',a.on_rom,a.on_elf)]:
      folder=a.output/name;folder.mkdir();games.append(world.PhysicalGame(a.runner,rom,elf,folder,save_input=a.blank,save_output=folder/'guest.sav'))
     def step(key):
-     for g in games:g.step(key)
+     for i,g in enumerate(games):
+      before_clock=g.rsp.clock();g.step(key);cycles[i].append(g.rsp.clock()-before_clock)
      states=[snap(g) for g in games];images=[video(g) for g in games]
      diag.update(stage='step',key=key,states=states,views=images)
      if states[0]!=states[1] or images[0]!=images[1]:raise ValueError('OFF/ON state or displayed frame mismatch')
@@ -140,7 +141,8 @@ def main():
     tap(512);loaded=[snap(g) for g in games]
     if loaded[0]['screen']!=world.SCREEN_PLAY or loaded[0]['frame']<saved[0]['frame']:raise ValueError('fresh SRAM load not reached')
     for _ in range(60):step(0)
-    check();report={'source':a.driver_head,'compiled_source':receipt['head'],'profile':a.profile,'mode':a.mode,'pins':pins,'sram_sha256':sha(saves[0]),'records':records_valid,'saved_ui':{k:saved[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'loaded_ui':{k:loaded[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'steps':len(records),'comparisons':records,'scope':'physical input, full displayed indexed frame/palette and named world/UI at each step; cross-path selection reset recorded, not equated'}
+    check();report={'source':a.driver_head,'compiled_source':receipt['head'],'profile':a.profile,'mode':a.mode,'pins':pins,'sram_sha256':sha(saves[0]),'records':records_valid,'saved_ui':{k:saved[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'loaded_ui':{k:loaded[0][k] for k in ('frame','screen','selected_building','menu_open','menu_cursor')},'steps':len(records),'cycles_scope':'all physical updates, including menus and nonadvancing',
+            'cycles':[{'mean':sum(c)/len(c),'max':max(c)} for c in cycles],'comparisons':records,'scope':'physical input, full displayed indexed frame/palette and named world/UI at each step; cross-path selection reset recorded, not equated'}
     (a.output/'result.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({'steps':len(records),'saved_ui':report['saved_ui'],'loaded_ui':report['loaded_ui']}))
    except Exception as exc:
     diag['error']=str(exc);(a.output/'failure.json').write_text(json.dumps(diag,indent=2)+'\n');raise
