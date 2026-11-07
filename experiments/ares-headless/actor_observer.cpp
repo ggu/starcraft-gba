@@ -5,6 +5,7 @@
 #include "observer_read.h"
 #include "hybrid_contract.h"
 #include "hybrid_snapshot_contract.h"
+#include "hybrid_snapshot_publish.h"
 #include <fcntl.h>
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Hybrid frontend: official same-process state restoration; no arbitrary guest-memory writes or host-input API.
@@ -237,17 +238,16 @@ int main(int argc,char** argv) {
     if(capture==3) {
       using namespace ares::Nintendo64;
       if(!sc64_hybrid_snapshot_allowed(scenario=="snapshot",transitioned,view_equal,cpu.recompiler.enabled,rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,rdram.ram.size,snapshotCount)) return 8;
-      std::vector<std::uint8_t> scratch(rdram.ram.size);
       auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull); bool hx=x.hit(a),hy=y.hit(a);return hx&&hy?-1:hx||hy?1:0; };
       auto cached=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);return (std::uint8_t)(x.hit(a)?x.bytes[(a&15u)^3u]:y.bytes[(a&15u)^3u]); };
       auto ram=[](u32 a) { return (std::uint8_t)rdram.ram.read<Byte>(a,RBusDevice::ARES_DEBUGGER); };
-      if(!sc64_read_ram(0,scratch.size(),rdram.ram.size,scratch.data(),hit,cached,ram)) { std::cerr<<"snapshot cache conflict\n";return 8; }
       char name[32];std::snprintf(name,sizeof(name),"ram-%03u.bin",snapshotCount);
-      int fd=::open((out/name).c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);if(fd<0)return 5;
-      std::size_t written=0;while(written<scratch.size()) { auto n=::write(fd,scratch.data()+written,scratch.size()-written);if(n<=0){::close(fd);return 5;}written+=static_cast<std::size_t>(n); }
-      if(::close(fd)!=0)return 5;
-      std::ofstream index(out/"ram.csv",std::ios::app); if(!index)return 5; index<<snapshotCount<<","<<completed<<","<<scratch.size()<<"\n";index.close();if(!index)return 5;
-      std::cout<<"RAM "<<snapshotCount<<" "<<completed<<" "<<scratch.size()<<std::endl; ++snapshotCount;continue;
+      auto file=out/name;
+      if(!sc64_publish_snapshot(file.c_str(),rdram.ram.size,[&](std::uint8_t* bytes,std::size_t size) {
+          return sc64_read_ram(0,size,rdram.ram.size,bytes,hit,cached,ram);
+      })) { std::cerr<<"snapshot conflict or publication failure\n";return 8; }
+      std::ofstream index(out/"ram.csv",std::ios::app); if(!index)return 5; index<<snapshotCount<<","<<completed<<","<<rdram.ram.size<<"\n";index.close();if(!index)return 5;
+      std::cout<<"RAM "<<snapshotCount<<" "<<completed<<" "<<rdram.ram.size<<std::endl; ++snapshotCount;continue;
     }
     if(!capture) { std::cout<<"OK "<<completed<<std::endl; continue; }
     std::unique_lock lock(p.mutex);

@@ -17,13 +17,21 @@ class SnapshotWrapperTest(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d)
    (p/'commands.csv').write_text('begin,steps,mask,x,y,capture\n'+''.join(','.join(map(str,r))+'\n' for r in rows))
-   (p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,4201,1,1,4\n1,4203,1,1,4\n')
-   for i in range(2):(p/f'live-{i:03}.argb').write_bytes(b'1234')
+   (p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,4201,640,240,614400\n1,4203,640,240,614400\n')
+   for i in range(2):
+    with (p/f'live-{i:03}.argb').open('wb') as f:f.truncate(614400)
    (p/'ram.csv').write_text(''.join(f'{i},{step},{8*1024**2}\n' for i,step in enumerate(m.EXPECTED_RAM_STEPS)))
    for i in range(3):
     with (p/f'ram-{i:03}.bin').open('wb') as f:f.truncate(8*1024**2)
    (p/'status.log').write_text('frontend=hybrid_snapshot jit_before_cpu=1 jit_before_rsp=1 homebrew=0 hybrid_transition=1 exact_view_equal=1 cpu_after=0 rsp_after=0\ncompleted_steps=4205 gpu_ready=1 ')
    self.assertTrue(m.planned_witness(p,rows))
+   good=(p/'frames.csv').read_text()
+   for old,new in [('640','639'),('240','239'),('614400','614399')]:
+    (p/'frames.csv').write_text(good.replace(old,new,1));self.assertFalse(m.planned_witness(p,rows))
+   (p/'frames.csv').write_text(good)
+   with (p/'live-001.argb').open('wb') as f:f.truncate(614399)
+   self.assertFalse(m.planned_witness(p,rows))
+   with (p/'live-001.argb').open('wb') as f:f.truncate(614400)
    (p/'ram-002.bin').unlink();self.assertFalse(m.planned_witness(p,rows))
    with (p/'ram-002.bin').open('wb') as f:f.truncate(8*1024**2)
    (p/'ram.csv').write_text('0,4202,8388608\n');self.assertFalse(m.planned_witness(p,rows))
