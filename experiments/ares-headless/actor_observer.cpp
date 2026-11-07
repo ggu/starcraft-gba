@@ -8,6 +8,7 @@
 #include "hybrid_snapshot_publish.h"
 #include "hybrid_register_csv.h"
 #include "../ares-store-probe/store_recorder.h"
+#include "../ares-store-probe/store_hash.h"
 #include "../ares-store-probe/store_hook.h"
 #include <fcntl.h>
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -258,7 +259,7 @@ int main(int argc,char** argv) {
       auto file=out/name;
       if(!sc64_publish_snapshot(file.c_str(),rdram.ram.size,[&](std::uint8_t* bytes,std::size_t size) {
           if(!sc64_read_ram(0,size,rdram.ram.size,bytes,hit,cached,ram))return false;
-          return scenario!="snapshot-stores" || snapshotCount!=0 || sc64_store_baseline_valid(bytes,size);
+          return scenario!="snapshot-stores" || snapshotCount!=0 || (sc64_store_baseline_valid(bytes,size) && sc64_store_baseline_hash_valid(bytes,size));
       })) { std::cerr<<"snapshot conflict or publication failure\n";return 8; }
       if(scenario=="snapshot-stores" && snapshotCount==0) {store_baseline_verified=true;sc64_stores.armed=true;}
       if(scenario=="snapshot-registers") {
@@ -286,7 +287,7 @@ int main(int argc,char** argv) {
   }
   sc64_stores.armed=false;
   if(scenario=="snapshot-stores") {
-    if(sc64_stores.overflow)return 8;
+    if(sc64_stores.overflow || sc64_stores.count==0)return 8;
     int fd=::open((out/"stores.bin").c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);if(fd<0)return 5;
     std::size_t bytes=sizeof(Sc64StoreEvent)*sc64_stores.count,done=0;
     auto data=reinterpret_cast<const std::uint8_t*>(sc64_stores.events);

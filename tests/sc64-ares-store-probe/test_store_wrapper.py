@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-import csv, hashlib, importlib.util, tempfile, unittest
+import struct, csv, hashlib, importlib.util, tempfile, unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location('hybrid_snapshot',ROOT/'experiments/ares-headless/hybrid_store_events.py')
@@ -24,11 +24,13 @@ class SnapshotWrapperTest(unittest.TestCase):
    for i in range(3):
     with (p/f'ram-{i:03}.bin').open('wb') as f:f.truncate(8*1024**2)
    (p/'status.log').write_text('frontend=hybrid_snapshot_stores jit_before_cpu=1 jit_before_rsp=1 homebrew=0 hybrid_transition=1 exact_view_equal=1 cpu_after=0 rsp_after=0\ncompleted_steps=4322 gpu_ready=1 ')
-   (p/'stores.bin').write_bytes(b'')
-   with (p/'status.log').open('a') as f:f.write('\nstore_baseline_verified=1 store_count=0 store_overflow=0\n')
+   event=struct.pack('<QQQQIIIHH',0x80001234,0x802ffd10,1,0x802ffd10,0xac830004,0x2ffd10,4202,4,4)
+   (p/'stores.bin').write_bytes(event)
+   with (p/'status.log').open('a') as f:f.write('\nstore_baseline_verified=1 store_count=1 store_overflow=0\n')
    self.assertTrue(m.planned_witness(p,rows))
-   (p/'stores.bin').write_bytes(b'x');self.assertFalse(m.planned_witness(p,rows))
-   (p/'stores.bin').write_bytes(b'')
+   for bad in (b'',b'x',struct.pack('<QQQQIIIHH',0,0,256,0,0,0x2ffd10,4202,1,0)):
+    (p/'stores.bin').write_bytes(bad);self.assertFalse(m.planned_witness(p,rows))
+   (p/'stores.bin').write_bytes(event)
    good=(p/'frames.csv').read_text()
    for old,new in [('640','639'),('240','239'),('614400','614399')]:
     (p/'frames.csv').write_text(good.replace(old,new,1));self.assertFalse(m.planned_witness(p,rows))

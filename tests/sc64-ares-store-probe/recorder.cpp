@@ -7,7 +7,8 @@ int main(){
  r->committed(0,b,4,1);assert(r->count==0);
  r->armed=true;r->instruction_begin(0x80001234,0xac830004,0xffffffff80001000ull);
  r->committed(0,b-4,4,1);r->committed(0,0xa0000000,4,1);r->committed(0,b,3,1);assert(r->count==0);
- for(unsigned w:{1u,2u,4u,8u})r->committed(0x80000000ull+b,b,w,0x1234);
+ for(unsigned w:{1u,2u,4u,8u})r->committed(0x80000000ull+b,b,w,0x123456789abcdef0ull);
+ assert(r->events[0].data==0xf0 && r->events[1].data==0xdef0 && r->events[2].data==0x9abcdef0 && r->events[3].data==0x123456789abcdef0ull);
  assert(r->count==4 && r->events[0].pc==0x80001234 && r->events[0].opcode==0xac830004 && r->events[0].base_index==4 && r->events[0].base==0xffffffff80001000ull);
  r->instruction_end();r->committed(0,b,4,0);assert(r->count==4);
  r->instruction_begin(9,0,0);for(unsigned i=4;i<r->limit;++i)r->committed(0,b,1,i);r->committed(0,b,1,0);assert(r->count==r->limit && r->overflow);

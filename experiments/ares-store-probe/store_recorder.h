@@ -19,7 +19,8 @@ struct Sc64StoreRecorder {
  void committed(std::uint64_t va,std::uint32_t pa,unsigned width,std::uint64_t data) {
   if(!armed || !active || (width!=1 && width!=2 && width!=4 && width!=8) || pa>=ram_size || width>ram_size-pa || pa>=end || pa+width<=begin)return;
   if(count==limit){overflow=true;return;}
-  events[count++]={pc,va,data,base,opcode,pa,step,static_cast<std::uint16_t>(width),static_cast<std::uint16_t>((opcode>>21)&31)};
+  const auto masked=width==8 ? data : data & ((std::uint64_t{1}<<(width*8))-1);
+  events[count++]={pc,va,masked,base,opcode,pa,step,static_cast<std::uint16_t>(width),static_cast<std::uint16_t>((opcode>>21)&31)};
  }
 };
 static_assert(sizeof(Sc64StoreEvent)*Sc64StoreRecorder::limit+64<=256u*1024u,"store output budget");
