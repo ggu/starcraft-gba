@@ -57,7 +57,7 @@ def main():
         if any(sha(Path(p))!=h for p,h in pins.items()):raise ValueError('input changed')
         if shutil.disk_usage(a.output.parent).free<RESERVE:raise ValueError('disk reserve')
     resource.setrlimit(resource.RLIMIT_FSIZE,(LIMIT,LIMIT))
-    old=signal.signal(signal.SIGALRM,alarm);signal.alarm(a.deadline)
+    old=signal.signal(signal.SIGALRM,alarm);old_term=signal.signal(signal.SIGTERM,alarm);signal.alarm(a.deadline)
     try:
         with open(LOCK,'a') as lock:
             fcntl.flock(lock,fcntl.LOCK_EX);check();a.output.mkdir(parents=True)
@@ -86,7 +86,9 @@ def main():
                     'scope':'ordinary custom tape; full displayed indexed frame and palette plus named state every tick; no save or campaign proof'}
                 (a.output/'result.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report),flush=True)
             finally:
-                for g in reversed(games):g.close()
-    finally:signal.alarm(0);signal.signal(signal.SIGALRM,old)
+                for g in reversed(games):
+                    try:g.close()
+                    except Exception:pass
+    finally:signal.alarm(0);signal.signal(signal.SIGALRM,old);signal.signal(signal.SIGTERM,old_term)
 
 if __name__=='__main__':main()
