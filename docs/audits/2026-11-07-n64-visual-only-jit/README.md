@@ -1,10 +1,14 @@
-# Visual-only ares frontend feasibility
+# Visual-only ares frontend: feasibility and qualified replay
+
+## Initial source review
 
 The earlier successful ordinary-input N64 custom-grid session used pinned ares `0aafd85789215e84e1e43415c07d4c88461b7899`, Vulkan GPU rendering, Homebrew Mode false and Recompiler true (`experiments/ares-headless/interactive.cpp:139–142`). Pinned `ares/n64/system/system.cpp:38–44` applies that option to both CPU and RSP recompilers where built; `ares/n64/accuracy.hpp` makes them available in the copied `PROFILE_PERFORMANCE` build. Its private receipt identifies binary SHA-256 `45d4dadbe233071efa6b6565bb16fa17809323609f5e27ff66417ecdadc974e5`, return code 0, 8,617 commanded steps in 78.533 seconds and three 614,400-byte frames. The retained ordinary input schedule reaches the custom setup around steps 3,200–4,200, then executes Probe/build commands and later grid captures. These are frontend steps and observed wall time, not authenticated game frames or native simulation timing.
 
 The later Metal-compatible actor observer explicitly disables Recompiler, requires cache-aware RAM snapshots, and showed the startup logo after one 700-step request in 45.814 seconds. The two sessions had different frontends and conditions; their durations do not establish a direct speed ratio. The previous gameplay capture supports feasibility of a visual-only recompiler path but does not guarantee completion inside the present 180-second wall limit.
 
 A possible separately qualified visual-only frontend would retain GPU, false Homebrew mode, ordinary platform input/video callbacks and the explicit 8/8 MiB Metal-compatible file limit; enable the official CPU and RSP recompilers and verify their actual flags after power; remove or reject every RDRAM snapshot command; label the binary, receipts and frames as visual-only; and preplan at most three frame checkpoints using the retained ordinary custom schedule. Keep the existing 2 MiB total frame, 64 MiB owned output, 175/180-second, 5 GiB reserve and shared-lock limits. This route cannot establish actor memory layout, guest writer PCs, order-dispatch cadence or exact native time, and may still time out or encounter the external cache problem. No new frontend or native run is authorized or claimed by this source audit.
+
+## Ordinary custom-game visual replay
 
 A separately qualified visual-only observer compiled from `e73e8da419131ea35b88fba9eb80a41c84701574`, wrapper-pin successor `60ade9105b675bd98f9d0ff9e458aac01598bc55`, binary SHA-256 `cfc176b57285df0ea2a8ffa7effc6d6aca9aef69e26e866e62ce66340142fc6f`, ran the single pinned 498-byte ordinary-input schedule SHA-256 `78e482b7bbc84a58ecb980e845902838833e7b1ad3e8f59bd230890c21ca15a2`. The wrapper authenticated the complete 8,617-step command ledger and all three expected capture checkpoints; the child returned 0 in 51.613 seconds, GPU/CPU-JIT/RSP-JIT were enabled, Homebrew mode was off, no RAM samples were requested or written, and all checked inputs remained unchanged. This wall time and callback steps are not native simulation timing.
 
