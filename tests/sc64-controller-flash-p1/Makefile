@@ -14,3 +14,5 @@ test-controller-flash-p1:
 	  $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c common/gba_flash1m.c -o $(CONTROLLER_FLASH_OUT)/test
 	$(CONTROLLER_FLASH_OUT)/test write $(CONTROLLER_FLASH_OUT)/p1.sav
 	$(CONTROLLER_FLASH_OUT)/test read $(CONTROLLER_FLASH_OUT)/p1.sav
+	$(CONTROLLER_FLASH_OUT)/test fallback $(CONTROLLER_FLASH_OUT)/p1.sav
+	$(CONTROLLER_FLASH_OUT)/test only-bad $(CONTROLLER_FLASH_OUT)/p1.sav
