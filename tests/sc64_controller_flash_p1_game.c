@@ -53,15 +53,31 @@ int main(int argc,char **argv)
         /* Deliberately malformed, checksum-valid test record; never call it
          * a genuine producer or alter any predecessor bytes. */
         u32 meta=gba_fj_metadata(newer->index),tail=newer->length-SC64_CONTROLLER_FLASH_BYTES;
-        device.bytes[meta+16+tail+8]=254;
+        unsigned changed=0;
+        for(unsigned i=0;i<MAX_UNITS+MAX_BUILDINGS;++i) if(device.bytes[meta+16+tail+8+i]==7) {
+            device.bytes[meta+16+tail+8+i]=254;changed=1;break;
+        }
+        assert(changed);
         gba_fj_put32(device.bytes+meta+8,gba_fj_hash(2166136261u,device.bytes+meta+16,newer->length));
         if(!strcmp(argv[1],"only-bad")) memset(device.bytes+gba_fj_base(older->index),0xff,4);
         static u8 frozen[131072];memcpy(frozen,device.bytes,sizeof frozen);
+        static Unit before_units[MAX_UNITS];static Building before_buildings[MAX_BUILDINGS];
+        static u8 before_controllers[MAX_UNITS],before_building_controllers[MAX_BUILDINGS];
+        static u8 before_debts[MAX_UNITS+MAX_BUILDINGS];Sc64ProtossResearchLevels before_levels=sc64_experimental_research_levels;
+        memcpy(before_units,u,sizeof u);memcpy(before_buildings,b,sizeof b);
+        memcpy(before_controllers,sc64_current_unit,sizeof sc64_current_unit);
+        memcpy(before_building_controllers,sc64_current_building,sizeof sc64_current_building);
+        memcpy(before_debts,sc64_pr_hp_debt,sizeof sc64_pr_hp_debt);
         int prior=minerals, priorframe=frame;
         if(!strcmp(argv[1],"fallback")) {
             assert(race_load_game() && minerals==900);
         } else {
             assert(!race_load_game() && minerals==prior && frame==priorframe);
+            assert(!memcmp(before_units,u,sizeof u) && !memcmp(before_buildings,b,sizeof b));
+            assert(!memcmp(before_controllers,sc64_current_unit,sizeof sc64_current_unit));
+            assert(!memcmp(before_building_controllers,sc64_current_building,sizeof sc64_current_building));
+            assert(!memcmp(before_debts,sc64_pr_hp_debt,sizeof sc64_pr_hp_debt));
+            assert(!memcmp(&before_levels,&sc64_experimental_research_levels,sizeof before_levels));
         }
         assert(!memcmp(frozen,device.bytes,sizeof frozen));
     } else assert(0);
