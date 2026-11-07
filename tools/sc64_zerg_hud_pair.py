@@ -52,6 +52,27 @@ def validate_flash_image(path):
     for byte in data[meta+16:meta+16+length]:value=((value^byte)*16777619)&0xffffffff
     if value!=int.from_bytes(data[meta+8:meta+12],'little'):raise ValueError('Flash payload checksum mismatch')
 
+def cycle_distribution(values):
+    ordered=sorted(values)
+    if not ordered:return {'count':0}
+    return {'count':len(ordered),'min':ordered[0],'mean':sum(ordered)/len(ordered),
+            'p50':ordered[(len(ordered)-1)//2],'p95':ordered[(len(ordered)-1)*95//100],
+            'max':ordered[-1]}
+
+def compare_fresh_reference(reference,reference_video,restored,restored_video):
+    variants=[]
+    for i in range(2):
+        variants.append({'named_state_equal':restored[i]==reference[i],
+                         'pixel_equal':restored_video[i][1]==reference_video[i][1],
+                         'palette_equal':restored_video[i][2]==reference_video[i][2],
+                         'display_except_page_equal':(restored_video[i][0]&~16)==(reference_video[i][0]&~16),
+                         'screen_play':restored[i]['screen']==world.SCREEN_PLAY})
+    return {'reference_pair_state_equal':reference[0]==reference[1],
+            'reference_pair_view_equal':reference_video[0]==reference_video[1],
+            'restored_pair_state_equal':restored[0]==restored[1],
+            'restored_pair_view_equal':restored_video[0]==restored_video[1],
+            'variants':variants}
+
 def verify_build_roles(receipt,profile,off_rom,off_elf,on_rom,on_elf):
     products=receipt.get('products',{}).get(profile,{})
     for variant,rom,elf in (('off',off_rom,off_elf),('on',on_rom,on_elf)):
@@ -180,6 +201,20 @@ def main():
                         if x.get('kind')=='input':resume.append((x['call_index'],x['held']))
                     for g in games:g.rsp.play_to(2,resume)
                     restored=[g.state() for g in games];v=[video(g) for g in games]
+                    def job_info(state):
+                        try:return {'job':research_job(state),'minerals':state['minerals'],'gas':state['gas'],'frame':state['frame']}
+                        except ValueError as exc:return {'error':str(exc),'minerals':state['minerals'],'gas':state['gas'],'frame':state['frame']}
+                    comparison={'pins':pins,'compiled_head':compiled_head,'driver_head':a.driver_head,
+                                'profile':a.profile,'saved_states':states,'reference_states':reference,
+                                'restored_states':restored,'saved_views':views,'reference_views':reference_video,
+                                'restored_views':v,'conditions':compare_fresh_reference(reference,reference_video,restored,v),
+                                'saved_jobs':[job_info(q) for q in states],
+                                'reference_jobs':[job_info(q) for q in reference],
+                                'restored_jobs':[job_info(q) for q in restored],
+                                'save_sha256':[sha(path) for path in saves],
+                                'prefix_counts':counts,'prefix_cycles':[cycle_distribution(x) for x in elapsed],
+                                'prefix_digest':digest.hexdigest()}
+                    (a.output/'comparison.json').write_text(json.dumps(comparison,indent=2)+'\n')
                     if (restored[0]!=restored[1] or v[0]!=v[1] or
                         restored[0]!=reference[0] or v[0][1:]!=reference_video[0][1:] or
                         (v[0][0]&~16)!=(reference_video[0][0]&~16) or
