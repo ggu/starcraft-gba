@@ -21,84 +21,10 @@ import sc64_headless_flash_physical as flash
 import sc64_skirmish_sram_continuation as world
 import sc64_research_flash_physical as research
 from sc64_races_profile import dwarf_struct_layout
-
-LOCK = '/tmp/sc64-native-build-20261031.lock'
-RUNNER = '75b8ba5f71919802a981516ffef05baf29866256f97b7f67f46276171d9690e2'
-COMPILED_HEAD = 'd7e7554e513bb83e21fbe4e47afa8d64162d3260'
-RESERVE, LIMIT = 4 * 1024**3, 64 * 1024**2
-BOT_OWNERS = (1, 3, 4)
-
-
-def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def scenarios():
-    return [(m, human, bots) for m in range(2) for human in range(3)
-            for count in range(1, 4) for bots in itertools.product(range(3), repeat=count)]
-
-
-def flash_record(data):
-    if len(data) != 131072 or data[:32768] != b'\xff' * 32768:
-        raise ValueError('Flash size or legacy area invalid')
-    valid = []
-    for base in (32768, 65536):
-        commit = int.from_bytes(data[base:base+4], 'little')
-        if commit == 0xffffffff: continue
-        meta = base + 4096
-        tag, length, checksum, sequence = (int.from_bytes(data[meta+i:meta+i+4], 'little') for i in (0,4,8,12))
-        if tag != commit or ((tag >> 16) & 255) != 0x48 or not 1 <= length <= 28656 or sequence != 1:
-            raise ValueError('invalid committed Flash header')
-        value = 2166136261
-        for byte in data[meta+16:meta+16+length]: value = ((value ^ byte) * 16777619) & 0xffffffff
-        if value != checksum: raise ValueError('Flash checksum mismatch')
-        valid.append({'base':base, 'tag':tag, 'length':length, 'sequence':sequence, 'checksum':checksum})
-    if len(valid) != 1: raise ValueError('expected exactly one fresh Flash record')
-    return valid[0]
-
-
-def read_array(game, name, count):
-    if game.sizes.get(name) != count * 4: raise ValueError('unexpected array ABI: ' + name)
-    raw = game.rsp.read(game.sym[name], count * 4)
-    return [int.from_bytes(raw[i:i+4], 'little', signed=True) for i in range(0, len(raw), 4)]
-
-
-def snapshot(game, case):
-    state = game.state()
-    for name, size in (('sc64_pr_hp_debt', 400), ('sc64_experimental_research_levels', 48)):
-        if game.sizes.get(name) != size: raise ValueError('unexpected Q8 ABI: ' + name)
-        state[name] = game.rsp.read(game.sym[name], size).hex()
-    state['players'] = read_array(game, 'race_player', 5)
-    state['bot_races'] = read_array(game, 'race_bot_races', 3)
-    state['won'] = game.u32('won'); state['lost'] = game.u32('lost')
-    m, human, bots = case
-    if (state['race_mode'], state['race_skirmish_map'], state['race_human'], state['race_bots']) != (1, m, human, len(bots)):
-        raise ValueError('guest context differs from requested roster')
-    if state['players'][0] != human or state['bot_races'][:len(bots)] != list(bots) or any(
-            state['players'][BOT_OWNERS[i]] != race for i, race in enumerate(bots)):
-        raise ValueError('guest current-controller roster differs')
-    return state
-
-
-def comparable(state): return {k:v for k,v in state.items() if k != 'screen'}
-
-
-def validate_receipt(receipt, rom, elf):
-    if receipt.get('head')!=COMPILED_HEAD or receipt.get('unchanged') is not True:
-        raise ValueError('unqualified compiled source receipt')
-    rows=receipt.get('results',[])
-    if len(rows)!=4 or {row.get('name') for row in rows if row.get('rc')==0} != {'arm-p10','rom','header','boundary'}:
-        raise ValueError('P10 build or boundary receipt incomplete')
-    product=receipt.get('products',{}).get('p10',{})
-    for kind,path in (('rom',rom),('elf',elf)):
-        if product.get(kind)!={'path':str(path.resolve()),'sha256':sha(path)}:
-            raise ValueError('P10 artifact role differs from receipt')
-
-
-def guard(out):
-    if shutil.disk_usage(out).free < RESERVE: raise ValueError('disk reserve')
-    if sum(p.stat().st_size for p in out.rglob('*') if p.is_file() and not p.is_symlink()) > LIMIT:
-        raise ValueError('aggregate output threshold')
-
+import sc64_q8_custom_matrix_physical as matrix
+from sc64_q8_custom_matrix_physical import (LOCK, RUNNER, COMPILED_HEAD, RESERVE, LIMIT,
+    sha, scenarios, flash_record, validate_receipt, guard, timeout, worker_exited,
+    terminate_and_reap, require_no_children, await_completion)
 
 def active_job(value):
     return [j for j in value['jobs'] if j['owner']==0 and j['family_plus_one']==3 and j['queue'][:2]==[0,1] and j['timer']>0]
@@ -132,6 +58,8 @@ def run_case(index, case, args, out):
     def observed(game):
         value = research.snapshot(game.rsp, game.sym, game.sizes, dwarf_struct_layout(args.elf, 'Building'))
         value['debt'] = game.rsp.read(game.sym['sc64_pr_hp_debt'], 400).hex()
+        context = matrix.snapshot(game, (0, 2, (0,)))
+        value['context'] = {k:context[k] for k in ('race_mode','race_skirmish_map','race_human','race_bots','players','bot_races')}
         return value
     def compare(value): return {k:v for k,v in value.items() if k != 'screen'}
     image = out / 'guest.sav'
@@ -160,59 +88,6 @@ def run_case(index, case, args, out):
         if second is not None: second.close()
     if sha(image)!=saved_hash: raise ValueError('guest save changed after fresh load')
     return progress
-
-
-def worker_exited(pid):
-    return os.waitid(os.P_PID,pid,os.WEXITED|os.WNOHANG|os.WNOWAIT) is not None
-
-
-def signal_group(pid, sig):
-    try: os.killpg(pid,sig)
-    except ProcessLookupError:
-        try: os.kill(pid,sig)  # Child may not yet have completed setsid().
-        except ProcessLookupError: pass
-
-
-def terminate_and_reap(pid):
-    # Retain the leader until the whole owned group has been signaled, so
-    # its PID/PGID cannot be recycled between observation and cleanup.
-    failure=None
-    try: signal_group(pid,signal.SIGTERM)
-    except PermissionError as exc: failure=exc
-    deadline=time.monotonic()+3
-    while failure is None and not worker_exited(pid) and time.monotonic()<deadline: time.sleep(.05)
-    try: signal_group(pid,signal.SIGKILL)
-    except PermissionError as exc: failure=exc
-    if failure is not None:
-        # Never reinterpret EPERM as group absence. Directly terminate our
-        # unreaped leader if possible, then surface the unverified cleanup.
-        try: os.kill(pid,signal.SIGKILL)
-        except (ProcessLookupError, PermissionError): pass
-    status=os.waitpid(pid,0)[1]
-    if failure is not None: raise RuntimeError('worker group cleanup unverified') from failure
-    return status
-
-
-def require_no_children():
-    try: pid,_=os.waitpid(-1,os.WNOHANG)
-    except ChildProcessError: return
-    raise RuntimeError('worker still owns a live or unreaped child' if not pid else
-                       'worker left an unreaped child')
-
-
-def await_completion(pid,done_read,ack_write,out):
-    while True:
-        if worker_exited(pid): raise RuntimeError('worker exited before completion handshake')
-        guard(out)  # 64 MiB is a polled threshold.
-        ready,_,_=select.select([done_read],[],[],.2)
-        if ready:
-            if os.read(done_read,1)!=b'D': raise RuntimeError('worker completion pipe closed')
-            if worker_exited(pid): raise RuntimeError('worker exited before acknowledgement')
-            if os.write(ack_write,b'A')!=1: raise RuntimeError('worker acknowledgement failed')
-            break
-    while not worker_exited(pid):
-        guard(out)
-        time.sleep(.05)
 
 
 def main():

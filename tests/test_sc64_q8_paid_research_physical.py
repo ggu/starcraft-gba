@@ -32,3 +32,17 @@ class PaidResearchContracts(unittest.TestCase):
             with self.assertRaises(ValueError): paid.validate_finished(bad)
 
 if __name__=='__main__': unittest.main()
+
+class ContextContracts(unittest.TestCase):
+    def test_context_is_part_of_restored_comparison(self):
+        saved={'screen':2,'context':{'race_mode':1,'race_skirmish_map':0,'race_human':2,
+               'race_bots':1,'players':[2,0,0,0,0],'bot_races':[0,1,2]}}
+        loaded=copy.deepcopy(saved); loaded['screen']=1
+        paid.validate_restored(saved,loaded)
+        for key in ('race_mode','race_skirmish_map','race_human','race_bots','players','bot_races'):
+            bad=copy.deepcopy(loaded); bad['context'][key]=None
+            with self.assertRaises(ValueError):paid.validate_restored(saved,bad)
+
+    def test_deadline_handler_is_bound(self):
+        self.assertTrue(callable(paid.timeout))
+        with self.assertRaises(TimeoutError):paid.timeout(None,None)
