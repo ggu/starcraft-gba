@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import sys
+import os
+import signal
 from pathlib import Path
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
@@ -30,6 +32,19 @@ class MatrixTest(unittest.TestCase):
             bad=bytearray(data);bad[offset]^=1
             with self.subTest(offset=offset),self.assertRaises(ValueError):matrix.flash_record(bad)
         with self.assertRaises(ValueError):matrix.flash_record(data[:-1])
+
+    def test_supervisor_reaps_its_worker(self):
+        pid=os.fork()
+        if pid==0:
+            os.setsid()
+            signal.pause()
+            os._exit(0)
+        try:
+            status=matrix.terminate_and_reap(pid)
+            self.assertTrue(os.WIFSIGNALED(status) or os.WIFEXITED(status))
+        finally:
+            try:os.waitpid(pid,os.WNOHANG)
+            except ChildProcessError:pass
 
 
 if __name__=='__main__':unittest.main()

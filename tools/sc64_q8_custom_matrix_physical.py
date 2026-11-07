@@ -13,6 +13,8 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
+import traceback
 
 import sc64_headless_flash_physical as flash
 import sc64_skirmish_sram_continuation as world
@@ -143,6 +145,27 @@ def run_case(index, case, args, out):
 def timeout(_sig,_frame): raise TimeoutError('custom Flash batch deadline')
 
 
+def worker_exited(pid):
+    return os.waitid(os.P_PID,pid,os.WEXITED|os.WNOHANG|os.WNOWAIT) is not None
+
+
+def signal_group(pid, sig):
+    try: os.killpg(pid,sig)
+    except ProcessLookupError:
+        try: os.kill(pid,sig)  # Child may not yet have completed setsid().
+        except ProcessLookupError: pass
+
+
+def terminate_and_reap(pid):
+    # Retain the leader until the whole owned group has been signaled, so
+    # its PID/PGID cannot be recycled between observation and cleanup.
+    signal_group(pid,signal.SIGTERM)
+    deadline=time.monotonic()+3
+    while not worker_exited(pid) and time.monotonic()<deadline: time.sleep(.05)
+    signal_group(pid,signal.SIGKILL)
+    return os.waitpid(pid,0)[1]
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ('rom','elf','runner','blank','receipt','output'):
@@ -187,14 +210,50 @@ def main():
             result={'driver_head':args.driver_head,'compiled_head':COMPILED_HEAD,'pins':pins,
                     'first':args.first,'count':args.count,'cases':[],
                     'scope':'ordinary physical custom opening, save and 60-update named-world/Q8 continuation; no pixels, wins or hardware proof'}
-            try:
-                for i in range(args.first,args.first+args.count):
-                    check();result['cases'].append(run_case(i,cases[i],args,args.output));check()
-                    (args.output/'result.json').write_text(json.dumps(result,indent=2)+'\n')
-            except BaseException as exc:
-                result['error']=repr(exc)
-                (args.output/'failure.json').write_text(json.dumps(result,indent=2)+'\n')
+            # Keep the native lock in the parent. Poll total owned output and
+            # free space even while the worker blocks on its physical runner.
+            blocked={signal.SIGTERM,signal.SIGINT,signal.SIGALRM}
+            oldmask=signal.pthread_sigmask(signal.SIG_BLOCK,blocked)
+            try: pid=os.fork()
+            except BaseException:
+                signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
                 raise
+            if pid==0:
+                try:
+                    os.setsid()  # All runner children inherit this group.
+                    signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
+                    with (args.output/'driver.log').open('wb') as log:
+                        os.dup2(log.fileno(),1);os.dup2(log.fileno(),2)
+                        for i in range(args.first,args.first+args.count):
+                            check();result['cases'].append(run_case(i,cases[i],args,args.output));check()
+                            (args.output/'result.json').write_text(json.dumps(result,indent=2)+'\n')
+                    os._exit(0)
+                except BaseException as exc:
+                    result['error']=repr(exc)
+                    try:
+                        (args.output/'failure.json').write_text(json.dumps(result,indent=2)+'\n')
+                        traceback.print_exc()
+                    finally:os._exit(1)
+            try:
+                signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
+                while not worker_exited(pid):
+                    guard(args.output)  # 64 MiB is a polled threshold.
+                    time.sleep(.2)
+                # Kill any orphaned descendants before reaping the leader;
+                # block termination through the reap/PID-disarm boundary.
+                signal.pthread_sigmask(signal.SIG_BLOCK,blocked)
+                try:
+                    signal_group(pid,signal.SIGKILL)
+                    _,status=os.waitpid(pid,0);pid=None
+                finally:signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
+                if not os.WIFEXITED(status) or os.WEXITSTATUS(status)!=0:
+                    raise RuntimeError('physical matrix worker failed')
+                check()
+            finally:
+                signal.pthread_sigmask(signal.SIG_BLOCK,blocked)
+                try:
+                    if pid is not None: terminate_and_reap(pid)
+                finally:signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
             return 0
     finally:
         signal.alarm(0);signal.signal(signal.SIGALRM,old);signal.signal(signal.SIGTERM,oldterm)
