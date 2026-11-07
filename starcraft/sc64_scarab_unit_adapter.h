@@ -158,13 +158,38 @@ static int race_scarab_parent_write(int slot, const Sc64ScarabParent *p)
     if(!sc64_scarab_parent_fields_pack(&f,&carry,&timer)) return 0;
     u[slot].carry=carry; u[slot].work_timer=(u16)timer; return 1;
 }
+#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
+/* A settled parent may change controller. Paid/in-flight children retain the
+ * old payer; do not mutate either controller or wallet while any remain. */
+static int race_scarab_controller_transfer_allowed(int slot)
+{
+    Sc64ScarabParent parent; Sc64ScarabCounts counts;
+    if (!race_scarab_parent_identity(slot)) return 1;
+    if (sc64_controller_unit(slot)<0 || !race_scarab_parent_read(slot,0,&parent,&counts) ||
+        parent.queued || parent.active_slot>=0 || counts.inside || counts.outside) return 0;
+    sc64_scarab_stage_payer[slot]=0;
+    return 1;
+}
+#endif
+
 static Sc64ScarabWallet race_scarab_owner_bank(int slot)
 {
     Sc64ScarabWallet bank = {.limit = 65535};
     if (!race_scarab_parent_identity(slot)) return bank;
 #ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
-    /* Campaign enemies can share a combat owner but have different wallets;
-     * their current source controller has not been authenticated here. */
+#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
+    if (!race_mode && race_zl_active()) {
+        int controller=sc64_controller_unit(slot), town=-1;
+        if (u[slot].owner!=ENEMY || controller<0 ||
+            (u[slot].raw_type!=-1 && u[slot].raw_type!=83)) return bank;
+        for (int i=0;i<SC64_ZL_AI_TOWNS;++i)
+            if (race_zl_mission->town_slot[i]==controller) { if (town>=0) return bank; town=i; }
+        if (town<0 || (sc64_scarab_stage_payer[slot] &&
+            sc64_scarab_stage_payer[slot]!=(u8)(controller+6))) return bank;
+        bank.source=&race_zl_ai_minerals[town];
+        return bank;
+    }
+#endif
     if (race_mode!=1 || race_bots<1 || race_bots>3 ||
         (u[slot].raw_type!=-1 && u[slot].raw_type!=83)) return bank;
     int stage_owner=u[slot].owner, active=stage_owner==SIDE && race_human==R_PROTOSS;
@@ -198,6 +223,10 @@ static int race_scarab_allocate(void *ctx,int *slot)
      * otherwise this callback cannot roll back arbitrary spawn side effects. */
     if(i!=predicted) return 0;
     u[i].raw_type=85; u[i].raw_owner=u[c->parent_slot].raw_owner;
+#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
+    { int controller=sc64_controller_unit(c->parent_slot);
+      if (sc64_controller_valid(controller,u[i].owner)) sc64_current_unit[i]=(u8)controller; }
+#endif
     u[i].hp=2; /* Q8 source starts at 512; integer Unit stores the floor. */
     u[i].carry=carry; u[i].work_timer=(u16)timer; u[i].build=-1;
     invincible_units[i]=1; *slot=i; return 1;
@@ -279,6 +308,10 @@ static int race_scarab_enqueue(int slot,int upgraded)
         !race_scarab_parent_write(slot,&p)) return 0;
     sc64_scarab_wallet_commit(bank,next);
 #ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
+    if (!race_mode && race_zl_active()) sc64_scarab_stage_payer[slot]=(u8)(sc64_controller_unit(slot)+6);
+    else
+#endif
     sc64_scarab_stage_payer[slot]=(u8)(u[slot].owner+1);
 #endif
     return 1;
