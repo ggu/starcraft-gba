@@ -188,13 +188,25 @@ static int race_compound_scarab_decode(const RaceSave *candidate,unsigned slot,
                                        unsigned width,unsigned height,Unit *out,
                                        const Sc64StageSaveAuth *auth)
 {
-    Unit wire,decoded;
+    Unit wire,decoded;unsigned x,y;
     if (!candidate || !out || !sc64_stage_save_auth_matches(auth,candidate,
             candidate->version,0) || (auth->features & ~SC64_STAGE_SAVE_SCARAB) ||
+        !auth->flight || auth->flight_count!=MAX_UNITS || slot>=MAX_UNITS ||
         !race_save_decode_unit(candidate,slot,width,height,&wire)) return 0;
-    if (wire.type!=U_SCARAB && wire.raw_type!=85) { *out=wire;return 1; }
+    const u8 *points=auth->flight+slot*4u;
+    x=(unsigned)points[0]|((unsigned)points[1]<<8);
+    y=(unsigned)points[2]|((unsigned)points[3]<<8);
+    if (wire.type!=U_SCARAB && wire.raw_type!=85) {
+        if(x || y)return 0;
+        *out=wire;return 1;
+    }
     if (!(auth->features & SC64_STAGE_SAVE_SCARAB) ||
+        wire.path_timer || wire.path_retry ||
         !sc64_scarab_flight_from_wire(&wire,&decoded,1,0)) return 0;
+    if(decoded.alive && (((unsigned)decoded.carry>>8)&3u)>=2u) {
+        if(x>32767 || y>32767)return 0;
+        decoded.path_timer=(u16)x;decoded.path_retry=(u16)y;
+    } else if(x || y)return 0;
     *out=decoded;return 1;
 }
 #endif
@@ -1732,6 +1744,7 @@ static int race_save_game(void) {
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
 #ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
     Sc64StageSaveAuth compound_writer_auth;
+    u8 compound_writer_flight[MAX_UNITS*4u]={0};
     const Sc64StageSaveAuth *guard_auth=&compound_writer_auth;
 #else
     const Sc64StageSaveAuth *guard_auth=0; /* Until a compound writer is admitted. */
@@ -1819,7 +1832,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (sc64_bc_pause_offset>4) return 0;
+#ifndef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
     race_bc_yamato_sync_references();
+#endif
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && sc64_race_raw_unit(u[i].type)==12) {
         if ((unsigned)u[i].work_timer>2047u || ((unsigned)u[i].work_timer&7u)>6u ||
             u[i].build< -1 || u[i].build>31 ||
@@ -1920,6 +1935,8 @@ static int race_save_game(void) {
     const Sc64StageTagPair compound_writer_pair={SC64_COMPOUND_FLASH_TAG,SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
     if (!sc64_stage_save_authenticate(&compound_writer_auth,&race_data,SC64_COMPOUND_FLASH_TAG,
                                       race_data.version,&compound_writer_pair,1)) return 0;
+    compound_writer_auth.flight=compound_writer_flight;
+    compound_writer_auth.flight_count=MAX_UNITS;
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
@@ -1997,7 +2014,21 @@ static int race_save_game(void) {
 #elif defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
     for (int i=0;i<MAX_UNITS;i++) {
         Unit wire;
-        if (!sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+        if (!u[i].alive && (u[i].type==U_SCARAB || u[i].raw_type==85)) {
+            /* Dead Scarabs are inert retired slots, not staged identities. */
+            memset(&wire,0,sizeof wire);
+        } else if (!sc64_scarab_flight_to_wire(&u[i],&wire,1,0)) return 0;
+        if (u[i].alive && u[i].type==U_SCARAB && u[i].raw_type==85) {
+            unsigned phase=((unsigned)u[i].carry>>8)&3u;
+            unsigned x=u[i].path_timer,y=u[i].path_retry;
+            if (phase>=2) {
+                if(x>32767 || y>32767)return 0;
+                compound_writer_flight[i*4u]=(u8)x;compound_writer_flight[i*4u+1]=(u8)(x>>8);
+                compound_writer_flight[i*4u+2]=(u8)y;compound_writer_flight[i*4u+3]=(u8)(y>>8);
+            } else if(x || y)return 0;
+            wire.path_timer=0;wire.path_retry=0;
+        }
+        if (
             !sc64_zp_unit_save_encode(&race_data.units[i],&wire,
                                       (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
     }
@@ -2725,6 +2756,7 @@ typedef struct {
     int building_damage_marker;
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
     Sc64StageSaveAuth compound_auth;
+    u8 compound_flight[MAX_UNITS*4u];
 #endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     u8 q8_debt[MAX_UNITS+MAX_BUILDINGS];
@@ -2782,6 +2814,9 @@ typedef struct {
     int impact_candidate_count;
 #endif
 } RaceLoadPlan;
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+typedef struct {RaceLoadPlan *plan;const u8 *flight;} Sc64CfPrepareContext;
+#endif
 
 /* May modify candidate/route scratch, never the live world or SRAM. */
 static int race_load_preflight_candidate(RaceLoadPlan *plan) {
@@ -4186,7 +4221,13 @@ static int race_load_preflight(RaceLoadPlan *plan) {
 /* Select and validate both generations together before publication. The
  * callback only mutates the shared candidate and its load plan. */
 static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,void *context) {
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+    Sc64CfPrepareContext *compound=context;
+    RaceLoadPlan *plan=compound?compound->plan:0;
+    if(!plan || !compound->flight)return 0;
+#else
     RaceLoadPlan *plan=context;
+#endif
 #if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE)
     if (!plan) return 0;
     memset(plan,0,sizeof(*plan));
@@ -4202,6 +4243,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     const Sc64StageTagPair compound_pair={SC64_COMPOUND_FLASH_TAG,SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
     if (!sc64_stage_save_authenticate(&plan->compound_auth,&race_data,tag,race_data.version,
                                       &compound_pair,1)) return 0;
+    memcpy(plan->compound_flight,compound->flight,sizeof plan->compound_flight);
+    plan->compound_auth.flight=plan->compound_flight;
+    plan->compound_auth.flight_count=MAX_UNITS;
     tag=SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION;
 #endif
 #if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)

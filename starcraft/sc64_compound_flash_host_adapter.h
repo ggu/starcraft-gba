@@ -4,7 +4,8 @@
 #define SC64_COMPOUND_FLASH_HOST_ADAPTER_H
 #include "sc64_compound_flash_envelope.h"
 _Static_assert(MAX_UNITS==240 && MAX_BUILDINGS==160,"compound Z10 actor shape");
-#define SC64_CF_SIDE (2u*(MAX_UNITS+MAX_BUILDINGS)+MAX_UNITS)
+#define SC64_CF_SIDE (2u*(MAX_UNITS+MAX_BUILDINGS)+MAX_UNITS+4u*MAX_UNITS)
+#define SC64_CF_FLIGHT_OFFSET (2u*(MAX_UNITS+MAX_BUILDINGS)+MAX_UNITS)
 typedef struct {GbaFlashJournalRecord records[4];u8 seen[4],accepted[4];RaceLoadPlan *plan;} Sc64CfSnapshot;
 static Sc64CfSnapshot sc64_cf_snapshot;
 static GbaFlashJournalRecord sc64_cf_previous;
@@ -16,7 +17,7 @@ static int sc64_cf_test_stage;
 #define SC64_CF_TEST_STAGE(n) ((void)0)
 #endif
 static Sc64CompoundFlashHeader sc64_cf_expected(u32 base)
-{ return (Sc64CompoundFlashHeader){1,0,SC64_Z10_GLOBAL_ID,SC64_CF_FEATURES,base,1,MAX_UNITS+MAX_BUILDINGS,MAX_UNITS+MAX_BUILDINGS,MAX_UNITS}; }
+{ return (Sc64CompoundFlashHeader){1,0,SC64_Z10_GLOBAL_ID,SC64_CF_FEATURES,base,1,MAX_UNITS+MAX_BUILDINGS,MAX_UNITS+MAX_BUILDINGS,MAX_UNITS,MAX_UNITS*4u}; }
 /* Until genuine predecessors have a qualified decoder, require an entirely
  * blank legacy area. Never reinterpret a historical or incomplete record. */
 static int sc64_cf_ownership(const GbaFlashJournalIo *io)
@@ -102,12 +103,15 @@ static int sc64_cf_validate(RaceLoadPlan *p)
 }
 static int sc64_cf_prepare(RaceLoadPlan *p,const GbaFlashJournalIo *io,const GbaFlashJournalRecord *r)
 {
-    u8 header[SC64_CF_HEADER];Sc64CompoundFlashHeader got,expected=sc64_cf_expected(0);u32 at;
+    u8 header[SC64_CF_HEADER],flight[MAX_UNITS*4u];Sc64CompoundFlashHeader got,expected=sc64_cf_expected(0);u32 at;
     if(r->index<2 || r->tag!=SC64_COMPOUND_FLASH_TAG)return 0;
     if(gba_fj_read_payload(io,r,0,header,sizeof header)!=GBA_FJ_OK)return -1;
     if(!sc64_cf_parse(header,r->length,&expected,&got) || got.base_length>sizeof(race_impact_record))return 0;
+    at=SC64_CF_HEADER+got.base_length+got.debts+got.controllers+got.payers;
+    if(gba_fj_read_payload(io,r,at,flight,sizeof flight)!=GBA_FJ_OK)return -1;
     if(gba_fj_read_payload(io,r,SC64_CF_HEADER,&race_impact_record,got.base_length)!=GBA_FJ_OK)return -1;
-    if(!race_worker_cargo_prepare_selected(&race_impact_record,got.base_length,SC64_COMPOUND_FLASH_TAG,p))return 0;
+    Sc64CfPrepareContext context={p,flight};
+    if(!race_worker_cargo_prepare_selected(&race_impact_record,got.base_length,SC64_COMPOUND_FLASH_TAG,&context))return 0;
     at=SC64_CF_HEADER+got.base_length;
     if(gba_fj_read_payload(io,r,at,p->q8_debt,sizeof p->q8_debt)!=GBA_FJ_OK)return -1;
     at+=sizeof p->q8_debt;
@@ -194,13 +198,23 @@ static int race_q8_flash_write(const void *data,u32 length)
     for(int i=0;i<MAX_UNITS;++i)side[at++]=u[i].alive?sc64_current_unit[i]:255;
     for(int i=0;i<MAX_BUILDINGS;++i)side[at++]=b[i].alive?sc64_current_building[i]:255;
     for(int i=0;i<MAX_UNITS;++i)side[at++]=u[i].alive?sc64_scarab_stage_payer[i]:0;
+    for(int i=0;i<MAX_UNITS;++i) {
+        unsigned x=0,y=0;
+        if(u[i].alive && u[i].type==U_SCARAB && u[i].raw_type==85 &&
+           (((unsigned)u[i].carry>>8)&3u)>=2u) {
+            x=u[i].path_timer;y=u[i].path_retry;
+            if(x>32767 || y>32767)return 0;
+        }
+        side[at++]=(u8)x;side[at++]=(u8)(x>>8);side[at++]=(u8)y;side[at++]=(u8)(y>>8);
+    }
     if(at!=sizeof side)return 0;
     suffix_length=length-suffix_start;
     memcpy(suffix,(const u8 *)data+suffix_start,suffix_length);
     original_hash=gba_fj_hash(2166136261u,data,length);
     for(unsigned i=0;i<MAX_BUILDINGS;++i)
         padding[i]=((u8 *)race_data.buildings)[i*SC64_PR_ROW_WIDTH+SC64_PR_ROW_WIDTH-1];
-    valid=race_worker_cargo_prepare_selected(data,length,SC64_COMPOUND_FLASH_TAG,&plan);
+    Sc64CfPrepareContext context={&plan,side+SC64_CF_FLIGHT_OFFSET};
+    valid=race_worker_cargo_prepare_selected(data,length,SC64_COMPOUND_FLASH_TAG,&context);
     SC64_CF_TEST_STAGE(valid?3:4);
     if(valid) {
         u32 cursor=0;

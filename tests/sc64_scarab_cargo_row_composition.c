@@ -32,11 +32,13 @@ int main(void)
 {
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
     Sc64StageSaveAuth auth;const Sc64StageSaveAuth *guard_auth=&auth;
+    u8 flight[MAX_UNITS*4u]={0};
     u8 header[SC64_CF_HEADER];Sc64CompoundFlashHeader parsed;
-    Sc64CompoundFlashHeader expected={1,0,SC64_Z10_GLOBAL_ID,SC64_CF_FEATURES,16368,1,400,400,240};
-    sc64_cf_write(header,&expected);assert(sc64_cf_parse(header,17440,&expected,&parsed));
-    header[12]|=0x80;assert(!sc64_cf_parse(header,17440,&expected,&parsed));
-    sc64_cf_write(header,&expected);assert(!sc64_cf_parse(header,17439,&expected,&parsed));
+    Sc64CompoundFlashHeader expected={1,0,SC64_Z10_GLOBAL_ID,SC64_CF_FEATURES,16368,1,400,400,240,960};
+    sc64_cf_write(header,&expected);assert(sc64_cf_parse(header,18400,&expected,&parsed));
+    header[12]|=0x80;assert(!sc64_cf_parse(header,18400,&expected,&parsed));
+    sc64_cf_write(header,&expected);assert(!sc64_cf_parse(header,18399,&expected,&parsed));
+    sc64_cf_put16(header+4,1);assert(!sc64_cf_parse(header,18400,&expected,&parsed));
 #endif
     Unit worker,child,wire,decoded,restored;int carry,timer;
     gba_init();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;race_skirmish_init();
@@ -75,6 +77,7 @@ int main(void)
     row_candidate.version=SAVE_VERSION;
     const Sc64StageTagPair pair={0x4a0001u,SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
     assert(sc64_stage_save_authenticate(&auth,&row_candidate,pair.outer,pair.inner,&pair,1));
+    auth.flight=flight;auth.flight_count=MAX_UNITS;
 #endif
     assert(row_encode(0,&worker) && row_encode(1,&reaver));
     assert(sc64_scarab_flight_to_wire(&child,&wire,1,0) && row_encode(2,&wire));
