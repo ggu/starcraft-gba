@@ -1285,6 +1285,7 @@ static Building b[MAX_BUILDINGS];
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
 #include "sc64_collision.h"
 #endif
+#include "sc64_depot_owner_capability.h"
 /* Temporary ascending-index owner lists used only during update_orders(). */
 static int target_unit_head[5], target_building_head[5];
 /* Signed links retain -1 as the list terminator. */
@@ -1292,6 +1293,16 @@ _Static_assert(MAX_UNITS <= 32768 && MAX_BUILDINGS <= 32768,
                "target list indices must fit in s16");
 static s16 target_unit_next[MAX_UNITS], target_building_next[MAX_BUILDINGS];
 static int target_lists_valid;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+/* Valid only within this orders pass; topology changes force scalar scans. */
+static int sc64_depot_owner_lists_valid;
+#ifdef SC64_DEPOT_OWNER_LIST_TEST
+#ifndef GBA_HOST
+#error "Depot owner-list test counter is host-only"
+#endif
+static unsigned sc64_depot_owner_list_test_hits;
+#endif
+#endif
 #if defined(SC64_RACES) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY))
 static u8 target_hostile_mask[5];
 static int target_hostile_masks_valid;
@@ -3092,6 +3103,9 @@ terrain_blocked(int col, int row)
 static void
 invalidate_path_grid(void)
 {
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    sc64_depot_owner_lists_valid = 0;
+#endif
     path_grid_valid = 0;
 #ifdef SC64_DIRECT_FIRING_POINTS
     sc64_direct_firing_cache_invalidate();
@@ -7440,12 +7454,22 @@ race_nearest_resource_depot(Unit *worker)
     if (cached == -2) return -1; /* No reachable depot until a new one appears. */
     if (race_resource_depot_valid_for(worker, cached)) return cached;
     worker->build = -1;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    int use_owner_list = sc64_depot_owner_lists_valid && target_lists_valid &&
+        worker->owner >= 0 && worker->owner < 5;
+#ifdef SC64_DEPOT_OWNER_LIST_TEST
+    if (use_owner_list) ++sc64_depot_owner_list_test_hits;
+#endif
+    for (int i = use_owner_list ? target_building_head[worker->owner] : 0;
+         use_owner_list ? i >= 0 : i < MAX_BUILDINGS;
+         i = use_owner_list ? target_building_next[i] : i + 1) {
+#else
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
+#endif
         int distance;
         if (!race_resource_depot_valid_for(worker, i)) continue;
         distance = dist2(worker->x, worker->y, b[i].x, b[i].y);
-        /* Slots are scanned in ascending order, so equal-distance candidates
-         * cannot win the existing tie. Avoid a route search for them too. */
+        /* Both scans use ascending slot order, preserving equal-distance ties. */
         if (distance >= best_distance ||
             !race_resource_depot_reachable(worker, i)) continue;
         if (distance < best_distance) {
@@ -8420,6 +8444,9 @@ static void GBA_HOT
 update_orders(void)
 {
     int i, target;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    sc64_depot_owner_lists_valid = 0;
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     race_transport_activity = 0;
 #endif
@@ -8460,6 +8487,9 @@ update_orders(void)
         target_building_head[owner] = i;
     }
     target_lists_valid = 1;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    sc64_depot_owner_lists_valid = 1;
+#endif
 target_lists_unavailable:
 #ifdef SC64_DIAGNOSTIC_SETUP
     sc64_setup_lists = gba_clock() - setup_part_start;
@@ -8821,6 +8851,9 @@ target_lists_unavailable:
 	}
     }
     target_lists_valid = 0;
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
+    sc64_depot_owner_lists_valid = 0;
+#endif
 #ifdef SC64_RACES
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     target_hostile_masks_valid = 0;
