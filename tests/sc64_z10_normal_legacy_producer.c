@@ -28,8 +28,9 @@ static void launch(void)
     game_init();held=0;assert(race_front.page==SC_FRONT_HOME);
     assert(sc64_catalog_playable_ordinal(SC64_FACTION_ZERG,SC64_Z10_GLOBAL_ID)==9);
     press(KEY_A);assert(race_front.page==SC_FRONT_MISSION && race_front.faction==SC_FRONT_ZERG);
-    for(int i=0;i<9;++i)press(KEY_DOWN);
-    assert(race_front.mission==SC64_Z10_GLOBAL_ID);press(KEY_START);
+    for(int i=0;i<4;++i)press(KEY_RIGHT);
+    press(KEY_DOWN);press(KEY_A);
+    assert(race_front.page==SC_FRONT_BRIEFING && race_front.mission==SC64_Z10_GLOBAL_ID);press(KEY_START);
     assert(screen==SCREEN_PLAY && !race_mode && race_selected_mission==SC64_Z10_GLOBAL_ID && race_zl_active());
 }
 static void transfer(const char *path,int write)
