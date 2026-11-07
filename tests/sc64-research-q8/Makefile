@@ -83,5 +83,6 @@ test-sc64-q8-flash-custom-races:
 
 # The supervising caller holds the shared native lock and freezes inputs.
 .PHONY: test-sc64-q8-flash-custom-matrix
+Q8_CUSTOM_MATRIX_OUT ?= build/research-q8-flash/custom-matrix
 test-sc64-q8-flash-custom-matrix: test-sc64-q8-flash-custom-races
-	$(PYTHON) tools/sc64_q8_flash_custom_matrix.py --fixture build/research-q8-flash/custom-races --output build/research-q8-flash/custom-matrix
+	$(PYTHON) tools/sc64_q8_flash_custom_matrix.py --fixture build/research-q8-flash/custom-races --output $(Q8_CUSTOM_MATRIX_OUT)
