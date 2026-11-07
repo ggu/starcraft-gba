@@ -2188,7 +2188,7 @@ static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #error "Scarab weapon probe requires autonomous control and impact events"
 #endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-#if !defined(SC64_SCARAB_NAMESPACE_STAGE) || !defined(SC64_SCARAB_WEAPON_PROBE)
+#if (!defined(SC64_SCARAB_NAMESPACE_STAGE) && !defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE)) || !defined(SC64_SCARAB_WEAPON_PROBE)
 #error "Scarab human control probe requires namespace and weapon probes"
 #endif
 static int race_scarab_parent_init(int slot);
