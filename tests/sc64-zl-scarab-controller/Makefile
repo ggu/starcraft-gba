@@ -86,3 +86,9 @@ test-zl-scarab-compound-flash:
 	$(ZL_SCARAB_OUT)/compound read-moving $(ZL_SCARAB_OUT)/z10-moving.flash
 	$(ZL_SCARAB_OUT)/compound foreign-v1 $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound foreign-header $(ZL_SCARAB_OUT)/z10-training.flash
+	$(ZL_SCARAB_OUT)/compound only-bad $(ZL_SCARAB_OUT)/z10-training.flash
+	$(ZL_SCARAB_OUT)/compound write-two $(ZL_SCARAB_OUT)/z10-two.flash
+	$(ZL_SCARAB_OUT)/compound fallback-bad $(ZL_SCARAB_OUT)/z10-two.flash
+	$(ZL_SCARAB_OUT)/compound stale-shot $(ZL_SCARAB_OUT)/unused
+	$(ZL_SCARAB_OUT)/compound cut-write $(ZL_SCARAB_OUT)/z10-cut.flash
+	$(ZL_SCARAB_OUT)/compound cut-read $(ZL_SCARAB_OUT)/z10-cut.flash

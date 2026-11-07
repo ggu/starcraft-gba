@@ -9,9 +9,9 @@
 #undef main
 static Model device;
 static GbaFlash1m flash={&device,rd,wr,20,0,0};
-static int erases,programs;
+static int erases,programs,fail_prefix;
 static int cf_read(void *c,uint32_t p,void *v,uint32_t n){return gba_flash1m_read(c,p,v,n);}
-static int cf_program(void *c,uint32_t p,const void *v,uint32_t n){++programs;return gba_flash1m_program(c,p,v,n);}
+static int cf_program(void *c,uint32_t p,const void *v,uint32_t n){++programs;if(fail_prefix && n==SC64_CF_HEADER && (p==gba_fj_metadata(2)+16 || p==gba_fj_metadata(3)+16))return 0;return gba_flash1m_program(c,p,v,n);}
 static int cf_erase(void *c,uint32_t p){++erases;return gba_flash1m_erase_sector(c,p);}
 static GbaFlashJournalIo io={&flash,cf_read,cf_erase,cf_program};
 const GbaFlashJournalIo *sc64_q8_flash_host_io(void){return &io;}
@@ -21,6 +21,27 @@ static void copy_file(const char *path,int writing)
     if(writing)assert(fwrite(device.bytes,1,sizeof device.bytes,f)==sizeof device.bytes);
     else assert(fread(device.bytes,1,sizeof device.bytes,f)==sizeof device.bytes && fgetc(f)==EOF);
     assert(!fclose(f));
+}
+typedef struct {
+    Unit units[MAX_UNITS];Building buildings[MAX_BUILDINGS];
+    u8 controller_units[MAX_UNITS],controller_buildings[MAX_BUILDINGS],payers[MAX_UNITS],debts[MAX_UNITS+MAX_BUILDINGS];
+    Sc64ProtossResearchLevels levels;Sc64ImpactEvent impacts[RACE_IMPACT_CAPACITY];Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT];
+    u32 town_minerals[SC64_ZL_AI_TOWNS],town_gas[SC64_ZL_AI_TOWNS];
+    int impact_count,minerals,gas,frame,screen,mission,mode;
+} LiveSnapshot;
+static LiveSnapshot before_live;
+static void live_capture(LiveSnapshot *s)
+{
+    memset(s,0,sizeof *s);memcpy(s->units,u,sizeof s->units);memcpy(s->buildings,b,sizeof s->buildings);
+    memcpy(s->controller_units,sc64_current_unit,sizeof s->controller_units);memcpy(s->controller_buildings,sc64_current_building,sizeof s->controller_buildings);
+    memcpy(s->payers,sc64_scarab_stage_payer,sizeof s->payers);memcpy(s->debts,sc64_pr_hp_debt,sizeof s->debts);
+    s->levels=sc64_experimental_research_levels;memcpy(s->impacts,race_impact_rows,sizeof s->impacts);memcpy(s->shots,sc64_bc_shots,sizeof s->shots);
+    memcpy(s->town_minerals,race_zl_ai_minerals,sizeof s->town_minerals);memcpy(s->town_gas,race_zl_ai_gas,sizeof s->town_gas);
+    s->impact_count=race_impact_count;s->minerals=minerals;s->gas=gas;s->frame=frame;s->screen=screen;s->mission=race_selected_mission;s->mode=race_mode;
+}
+static void live_unchanged(void)
+{
+    static LiveSnapshot after;live_capture(&after);assert(!memcmp(&before_live,&after,sizeof after));
 }
 typedef struct {
     int parent,child,target,parent_carry,parent_timer,parent_owner,parent_origin,parent_controller,payer;
@@ -99,7 +120,7 @@ int main(int argc,char **argv)
         Sc64ScarabParent p;Sc64ScarabCounts counts;
         assert(race_scarab_parent_read(parent,0,&p,&counts) && p.active_slot>=0);
         assert(sc64_scarab_stage_payer[parent]==13 && race_zl_ai_minerals[1]==0);
-        if(strcmp(argv[1],"write-training")) {
+        if(strcmp(argv[1],"write-training") && strcmp(argv[1],"write-two")) {
             for(int i=0;i<110;++i) {
                 assert(race_scarab_parent_read(parent,0,&p,&counts));
                 if(counts.inside)break;
@@ -125,7 +146,7 @@ int main(int argc,char **argv)
                 assert((wire.path_timer>24 || wire.path_retry>12) && !sc64_zp_unit_save_encode(&row,&wire,(unsigned)race_cols*16,(unsigned)race_rows*16));
                 assert(u[child].alive && (u[child].x!=x || u[child].y!=y) && !race_impact_count);
             }
-        } else assert(!strcmp(argv[1],"write-training") || !strcmp(argv[1],"write-inside"));
+        } else assert(!strcmp(argv[1],"write-training") || !strcmp(argv[1],"write-inside") || !strcmp(argv[1],"write-two"));
         memset(device.bytes,0xff,sizeof device.bytes);
         int saved=race_save_game();
 #ifdef SC64_CF_TEST_DIAGNOSTICS
@@ -140,11 +161,46 @@ int main(int argc,char **argv)
             fprintf(stderr,"graph=%d cargo=%d zl=%d\n",graph,cargo,zl);
         }
 #endif
-        assert(saved);copy_file(argv[2],1);
+        assert(saved);
+        if(!strcmp(argv[1],"write-two")) {int old=minerals;side_file(argv[2],".old",&old,sizeof old,1);minerals+=37;assert(race_save_game());}
+        copy_file(argv[2],1);
         if(!strcmp(argv[1],"write-moving")) {
             FlightSnapshot original=flight_snapshot(parent);side_file(argv[2],".before",&original,sizeof original,1);
             FlightOutcome outcome=flight_finish(&original);side_file(argv[2],".after",&outcome,sizeof outcome,1);
         }
+    } else if(!strcmp(argv[1],"cut-write")) {
+        launch_z10_from_normal_menu();memset(device.bytes,0xff,sizeof device.bytes);
+        live_capture(&before_live);fail_prefix=1;assert(!race_save_game());fail_prefix=0;live_unchanged();
+        assert(gba_fj_u32(device.bytes+gba_fj_metadata(2))==SC64_COMPOUND_FLASH_TAG &&
+               gba_fj_u32(device.bytes+gba_fj_base(2))==0xffffffffu);
+        copy_file(argv[2],1);
+    } else if(!strcmp(argv[1],"cut-read")) {
+        launch_z10_from_normal_menu();copy_file(argv[2],0);static u8 prior[131072];
+        memcpy(prior,device.bytes,sizeof prior);live_capture(&before_live);erases=programs=0;
+        assert(!race_load_game());live_unchanged();
+        assert(!race_save_game() && !erases && !programs && !memcmp(prior,device.bytes,sizeof prior));live_unchanged();
+    } else if(!strcmp(argv[1],"stale-shot")) {
+        int caster=-1,dead=-1;launch_z10_from_normal_menu();memset(device.bytes,0xff,sizeof device.bytes);
+        for(int i=0;i<MAX_UNITS;++i){if(caster<0 && u[i].alive)caster=i;if(dead<0 && !u[i].alive)dead=i;}
+        assert(caster>=0 && dead>=0);u[caster].order=ORDER_ATTACK_TARGET;u[caster].target=dead;
+        memset(sc64_bc_shots,0,sizeof sc64_bc_shots);sc64_bc_shots[0].state=SC64_BC_SHOT_CHARGING;
+        sc64_bc_shots[0].caster=(u16)caster;sc64_bc_shots[0].target=(u16)dead;
+        live_capture(&before_live);erases=programs=0;assert(!race_save_game());
+        assert(!erases && !programs);live_unchanged();
+    } else if(!strcmp(argv[1],"only-bad") || !strcmp(argv[1],"fallback-bad")) {
+        launch_z10_from_normal_menu();copy_file(argv[2],0);
+        GbaFlashJournalRecord a,b,*r;int sa=gba_fj_probe(&io,2,&a),sb=gba_fj_probe(&io,3,&b);
+        assert(sa==GBA_FJ_OK);r=(sb==GBA_FJ_OK && gba_fj_newer(b.sequence,a.sequence))?&b:&a;
+        u32 at=gba_fj_metadata(r->index)+16,base=gba_fj_u32(device.bytes+at+16);
+        u32 controls=at+SC64_CF_HEADER+base+MAX_UNITS+MAX_BUILDINGS;unsigned j;
+        for(j=0;j<MAX_UNITS+MAX_BUILDINGS && device.bytes[controls+j]==255;++j){}
+        assert(j<MAX_UNITS+MAX_BUILDINGS);device.bytes[controls+j]=254;
+        gba_fj_put32(device.bytes+gba_fj_metadata(r->index)+8,gba_fj_hash(2166136261u,device.bytes+at,r->length));
+        static u8 prior[131072];memcpy(prior,device.bytes,sizeof prior);live_capture(&before_live);erases=programs=0;
+        if(!strcmp(argv[1],"only-bad")) {assert(!race_load_game());live_unchanged();}
+        else {int old;side_file(argv[2],".old",&old,sizeof old,0);assert(race_load_game() && minerals==old);}
+        assert(!memcmp(prior,device.bytes,sizeof prior) && !erases && !programs);
+        assert(!race_save_game() && !memcmp(prior,device.bytes,sizeof prior) && !erases && !programs);
     } else if(!strcmp(argv[1],"foreign-v1") || !strcmp(argv[1],"foreign-header")) {
         launch_z10_from_normal_menu();copy_file(argv[2],0);
         GbaFlashJournalRecord r;assert(gba_fj_probe(&io,2,&r)==GBA_FJ_OK);
