@@ -27,13 +27,21 @@ LIMIT=64*1024**2
 
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def alarm(_sig,_frame):raise TimeoutError('HUD pair exceeded monitored wall deadline')
-def video(g):
+def raw_video(g):
     display=int.from_bytes(g.rsp.read(0x04000000,2),'little')
     if display&7!=4 or display&0x1000:raise ValueError('unexpected display mode or OBJ')
     page=(display>>4)&1
-    pixels=g.rsp.read(0x06000000+page*0xa000,38400)
-    palette=g.rsp.read(0x05000000,512)
-    return (display,sha_bytes(pixels),sha_bytes(palette))
+    return (display,g.rsp.read(0x06000000+page*0xa000,38400),g.rsp.read(0x05000000,512))
+def view(raw):return (raw[0],sha_bytes(raw[1]),sha_bytes(raw[2]))
+def video(g):return view(raw_video(g))
+def write_raw(out,label,raw):
+    (out/(label+'.pixels')).write_bytes(raw[1]);(out/(label+'.palette')).write_bytes(raw[2])
+def pixel_difference(a,b):
+    if len(a)!=38400 or len(b)!=38400:raise ValueError('invalid full-frame length')
+    changed=[i for i,(x,y) in enumerate(zip(a,b)) if x!=y]
+    if not changed:return {'count':0,'bbox':None}
+    xs=[i%240 for i in changed];ys=[i//240 for i in changed]
+    return {'count':len(changed),'bbox':[min(xs),min(ys),max(xs),max(ys)]}
 def sha_bytes(b):return hashlib.sha256(b).hexdigest()
 def research_job(state):
     fields=world.BUILDING_FIELDS
@@ -188,8 +196,17 @@ def main():
                     # Match the fresh title-load's one advancing release update
                     # with ordinary START/release on the uninterrupted games.
                     for g in games:g.step(8);g.step(0)
-                    reference=[g.state() for g in games];reference_video=[video(g) for g in games]
+                    reference=[g.state() for g in games];reference_raw=[raw_video(g) for g in games]
+                    reference_video=[view(raw) for raw in reference_raw]
+                    for label,raw in zip(('off-reference-immediate','on-reference-immediate'),reference_raw):write_raw(a.output,label,raw)
                     if reference[0]!=reference[1] or reference_video[0]!=reference_video[1]:raise ValueError('uninterrupted post-save pair mismatch')
+                    for g in games:g.step(0,60)
+                    reference_late=[g.state() for g in games];reference_late_raw=[raw_video(g) for g in games]
+                    reference_late_video=[view(raw) for raw in reference_late_raw]
+                    for label,raw in zip(('off-reference-late','on-reference-late'),reference_late_raw):write_raw(a.output,label,raw)
+                    if (reference_late[0]!=reference_late[1] or reference_late_video[0]!=reference_late_video[1] or
+                        any(q['frame']!=reference[i]['frame']+60 or q['screen']!=world.SCREEN_PLAY for i,q in enumerate(reference_late))):
+                        raise ValueError('uninterrupted neutral 60-update pair mismatch')
                     for g in reversed(games):g.close()
                     games=[]
                     for label,rom,elf,save in [('off',a.off_rom,a.off_elf,saves[0]),('on',a.on_rom,a.on_elf,saves[1])]:
@@ -200,7 +217,9 @@ def main():
                         x=json.loads(line)
                         if x.get('kind')=='input':resume.append((x['call_index'],x['held']))
                     for g in games:g.rsp.play_to(2,resume)
-                    restored=[g.state() for g in games];v=[video(g) for g in games]
+                    restored=[g.state() for g in games];restored_raw=[raw_video(g) for g in games]
+                    v=[view(raw) for raw in restored_raw]
+                    for label,raw in zip(('off-fresh-immediate','on-fresh-immediate'),restored_raw):write_raw(a.output,label,raw)
                     def job_info(state):
                         try:return {'job':research_job(state),'minerals':state['minerals'],'gas':state['gas'],'frame':state['frame']}
                         except ValueError as exc:return {'error':str(exc),'minerals':state['minerals'],'gas':state['gas'],'frame':state['frame']}
@@ -208,6 +227,7 @@ def main():
                                 'profile':a.profile,'saved_states':states,'reference_states':reference,
                                 'restored_states':restored,'saved_views':views,'reference_views':reference_video,
                                 'restored_views':v,'conditions':compare_fresh_reference(reference,reference_video,restored,v),
+                                'immediate_pixel_diff':[pixel_difference(reference_raw[i][1],restored_raw[i][1]) for i in range(2)],
                                 'saved_jobs':[job_info(q) for q in states],
                                 'reference_jobs':[job_info(q) for q in reference],
                                 'restored_jobs':[job_info(q) for q in restored],
@@ -216,16 +236,34 @@ def main():
                                 'prefix_cycles':[cycle_distribution(x) for x in elapsed],
                                 'prefix_digest':digest.hexdigest()}
                     (a.output/'comparison.json').write_text(json.dumps(comparison,indent=2)+'\n')
+                    # Cross-variant comparison remains strict immediately after load.
+                    # Cross-path pixels are diagnostic until both paths advance past
+                    # the existing 55-update load toast; the original strict oracle
+                    # and its failing evidence remain in the earlier driver commit.
                     if (restored[0]!=restored[1] or v[0]!=v[1] or
-                        restored[0]!=reference[0] or v[0][1:]!=reference_video[0][1:] or
+                        restored[0]!=reference[0] or
                         (v[0][0]&~16)!=(reference_video[0][0]&~16) or
-                        restored[0]['screen']!=world.SCREEN_PLAY):
-                        raise ValueError('fresh load differs from uninterrupted state/render')
+                        v[0][2]!=reference_video[0][2] or restored[0]['screen']!=world.SCREEN_PLAY):
+                        raise ValueError('fresh load immediate state/pair/palette mismatch')
                     loaded=restored[0];loaded_job=research_job(loaded)
                     if (loaded['frame']!=saved['frame']+1 or
                         (loaded['minerals'],loaded['gas'])!=(saved['minerals'],saved['gas']) or
                         loaded_job!=(saved_job[0],saved_job[1]-1)):
                         raise ValueError('fresh load did not restore the saved paid job and wallet')
+                    for g in games:g.step(0,60)
+                    restored_late=[g.state() for g in games];restored_late_raw=[raw_video(g) for g in games]
+                    restored_late_video=[view(raw) for raw in restored_late_raw]
+                    for label,raw in zip(('off-fresh-late','on-fresh-late'),restored_late_raw):write_raw(a.output,label,raw)
+                    comparison.update(reference_late_states=reference_late,reference_late_views=reference_late_video,
+                                      restored_late_states=restored_late,restored_late_views=restored_late_video,
+                                      late_conditions=compare_fresh_reference(reference_late,reference_late_video,restored_late,restored_late_video),
+                                      late_pixel_diff=[pixel_difference(reference_late_raw[i][1],restored_late_raw[i][1]) for i in range(2)])
+                    (a.output/'comparison.json').write_text(json.dumps(comparison,indent=2)+'\n')
+                    if (restored_late[0]!=restored_late[1] or restored_late_video[0]!=restored_late_video[1] or
+                        restored_late[0]!=reference_late[0] or restored_late_video[0][1:]!=reference_late_video[0][1:] or
+                        (restored_late_video[0][0]&~16)!=(reference_late_video[0][0]&~16) or
+                        any(q['frame']!=restored[i]['frame']+60 or q['screen']!=world.SCREEN_PLAY for i,q in enumerate(restored_late))):
+                        raise ValueError('fresh load differs after neutral 60-update interval')
                 elif last['screen']!=world.SCREEN_PLAY:raise ValueError('custom game no longer playing')
                 check();report={'pins':pins,'compiled_head':compiled_head,'driver_head':a.driver_head,'adapted_lobby':a.adapt_zerg_lobby,'profile':a.profile,'ticks':a.ticks,'counts':counts,'paired_every_tick_sha256':digest.hexdigest(),
                     'flash_images_equal':save_equal,'cycles':[{'mean':sum(v)/len(v),'max':max(v)} for v in elapsed],
