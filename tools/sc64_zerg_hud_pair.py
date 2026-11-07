@@ -212,7 +212,8 @@ def main():
                                 'reference_jobs':[job_info(q) for q in reference],
                                 'restored_jobs':[job_info(q) for q in restored],
                                 'save_sha256':[sha(path) for path in saves],
-                                'prefix_counts':counts,'prefix_cycles':[cycle_distribution(x) for x in elapsed],
+                                'prefix_counts':counts,'prefix_cycles_scope':'all physical prefix ticks, including nonadvancing',
+                                'prefix_cycles':[cycle_distribution(x) for x in elapsed],
                                 'prefix_digest':digest.hexdigest()}
                     (a.output/'comparison.json').write_text(json.dumps(comparison,indent=2)+'\n')
                     if (restored[0]!=restored[1] or v[0]!=v[1] or
