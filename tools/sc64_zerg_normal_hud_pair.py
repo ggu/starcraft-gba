@@ -119,7 +119,13 @@ def main():
     for _ in range(600):
      if int.from_bytes(games[0].rsp.read(0x06013fe0,2),'little'):tap(1)
      else:step(0)
-    # Exercise pause/open/close; save only the actual running game.
+    # Exercise camera/cursor movement and the ordinary command-menu overlay.
+    for _ in range(30):step(16)
+    step(0);tap(1);tap(2)
+    if snap(games[0])['menu_open']!=1:raise ValueError('command menu did not open')
+    tap(2)
+    if snap(games[0])['menu_open']!=0:raise ValueError('command menu did not close')
+    # Save only the actual running game via its pause menu.
     tap(8)
     if snap(games[0])['screen']!=world.SCREEN_PAUSE:raise ValueError('pause not reached')
     tap(2);saved=[snap(g) for g in games]
