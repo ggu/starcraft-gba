@@ -8,6 +8,23 @@ static const u8 sc64_cfr_marker[SC64_CFR_MARKER_SIZE]={0x53,0x43,0x36,0x34,0x43,
 enum {SC64_CFR_FOREIGN=-1,SC64_CFR_BLANK=0,SC64_CFR_MARKER_PARTIAL=1,
       SC64_CFR_OPEN=2,SC64_CFR_ERASE=3,SC64_CFR_COMMITTED=4};
 typedef int (*Sc64CfrProof)(void *,const GbaFlashJournalIo *,unsigned);
+/* A committed v3 marker may be partly erased only by 0->1 transitions;
+ * no other commit-sector bytes belong to the format. */
+static int sc64_cfr_committed_marker(const GbaFlashJournalIo *io,unsigned index)
+{
+    u8 bytes[64];u32 base=gba_fj_base(index);
+    for(u32 off=0;off<GBA_FJ_SECTOR;off+=sizeof bytes) {
+        if(!io->read(io->context,base+off,bytes,sizeof bytes))return -1;
+        for(unsigned j=0;j<sizeof bytes;++j) {
+            u32 p=off+j;if(p<4)continue;
+            if(p>=SC64_CFR_MARKER_OFFSET && p<SC64_CFR_MARKER_OFFSET+SC64_CFR_MARKER_SIZE) {
+                u8 expected=sc64_cfr_marker[p-SC64_CFR_MARKER_OFFSET];
+                if((bytes[j]&expected)!=expected)return 0;
+            } else if(bytes[j]!=0xff)return 0;
+        }
+    }
+    return 1;
+}
 /* One byte is programmed at a time. A cut may leave any bitwise partial
  * value in that byte; all preceding bytes are complete and later bytes FF. */
 static int sc64_cfr_marker_prefix(const u8 *bytes)

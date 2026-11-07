@@ -90,6 +90,7 @@ test-zl-scarab-compound-flash:
 	$(ZL_SCARAB_OUT)/compound foreign-header $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound only-bad $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound only-bad-flight $(ZL_SCARAB_OUT)/z10-training.flash
+	$(ZL_SCARAB_OUT)/compound only-bad-marker $(ZL_SCARAB_OUT)/z10-training.flash
 	$(ZL_SCARAB_OUT)/compound write-two $(ZL_SCARAB_OUT)/z10-two.flash
 	$(ZL_SCARAB_OUT)/compound fallback-bad $(ZL_SCARAB_OUT)/z10-two.flash
 	@for phase in marker commit-erase data-erase meta header base tail tag verify; do \
@@ -107,3 +108,8 @@ test-zl-scarab-compound-flash:
 .PHONY: test-zl-scarab-compound-v1-fence
 test-zl-scarab-compound-v1-fence:
 	$(ZL_SCARAB_OUT)/compound retained-v1 $(COMPOUND_V1_IMAGE)
+
+.PHONY: test-zl-scarab-compound-v2-fences
+test-zl-scarab-compound-v2-fences:
+	$(ZL_SCARAB_OUT)/compound retained-v2 $(COMPOUND_V2_IMAGE)
+	$(ZL_SCARAB_OUT)/compound retained-v2-cut $(COMPOUND_V2_CUT_IMAGE)

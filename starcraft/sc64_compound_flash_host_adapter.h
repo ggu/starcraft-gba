@@ -138,6 +138,9 @@ static int sc64_cf_prepare(RaceLoadPlan *p,const GbaFlashJournalIo *io,const Gba
     if(gba_fj_read_payload(io,r,at,p->scarab_payers,sizeof p->scarab_payers)!=GBA_FJ_OK)return -1;
     if(!sc64_cf_validate(p))return 0;
     if(!require_commit)return 1;
+    int marker=sc64_cfr_committed_marker(io,r->index);
+    if(marker<0)return -1;
+    if(!marker)return 0;
     GbaFlashJournalRecord checked;int status=gba_fj_probe(io,r->index,&checked);
     if(status<0)return -1;
     return status==GBA_FJ_OK && gba_fj_same_record(r,&checked);
