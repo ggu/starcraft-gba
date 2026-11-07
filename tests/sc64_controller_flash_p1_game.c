@@ -9,7 +9,7 @@ static void setup_p1(void)
 }
 int main(int argc,char **argv)
 {
-    assert(argc==3);setup_p1();
+    assert(argc==3 || argc==4);setup_p1();
     if(!strcmp(argv[1],"write")) {
         int p=spawn_build(SIDE,B_PYLON,240,240,0),f=spawn_build(SIDE,B_FORGE,240,240,0);
         int u0=spawn_unit(SIDE,U_DRAGOON,300,300);assert(p>=0 && f>=0 && u0>=0);
@@ -31,6 +31,20 @@ int main(int argc,char **argv)
         Sc64PrPaidReceipt paid;assert(sc64_pr_stage_receipt(f,&paid)&&paid.payer==SIDE);
         unsigned left=b[f].queue_progress;assert(left);for(unsigned i=0;i<left;++i)sc64_pr_stage_tick();
         assert(!b[f].level && sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]==1);
+    } else if(!strcmp(argv[1],"legacy")) {
+        assert(argc==4);memset(device.bytes,0xff,sizeof device.bytes);
+        file_read(argv[2],device.bytes,32768);static u8 legacy[32768];memcpy(legacy,device.bytes,sizeof legacy);
+        assert(race_load_game() && race_selected_mission==SC64_RACE_MISSION_P1);
+        int f=-1;for(int i=0;i<MAX_BUILDINGS;++i)if(b[i].alive&&b[i].type==B_FORGE&&b[i].level)f=i;
+        assert(f>=0 && sc64_controller_building(f)==7);
+        Sc64PrPaidReceipt paid;assert(sc64_pr_stage_receipt(f,&paid)&&paid.payer==SIDE);
+        assert(race_save_game() && !memcmp(legacy,device.bytes,sizeof legacy));
+        file_write(argv[3],device.bytes,sizeof device.bytes);
+    } else if(!strcmp(argv[1],"legacy-read")) {
+        file_read(argv[2],device.bytes,sizeof device.bytes);assert(race_load_game());
+        int f=-1;for(int i=0;i<MAX_BUILDINGS;++i)if(b[i].alive&&b[i].type==B_FORGE&&b[i].level)f=i;
+        assert(f>=0 && sc64_controller_building(f)==7);
+        Sc64PrPaidReceipt paid;assert(sc64_pr_stage_receipt(f,&paid)&&paid.payer==SIDE);
     } else if(!strcmp(argv[1],"fallback") || !strcmp(argv[1],"only-bad")) {
         file_read(argv[2],device.bytes,sizeof device.bytes);
         GbaFlashJournalRecord r2,r3,*newer,*older;

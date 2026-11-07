@@ -2,6 +2,8 @@
 CONTROLLER_FLASH_COVER_DIR ?= .local/hardware-feedback/verified-cover
 CONTROLLER_FLASH_POLICY_DIR ?= .local/research-campaign-runtime/policy
 CONTROLLER_FLASH_OUT ?= build/controller-flash-p1
+# Explicit genuine prior 0x47 producer output; caller supplies its verified path.
+CONTROLLER_FLASH_LEGACY ?= .local/controller-flash-p1/legacy-47.sav
 .PHONY: test-controller-flash-p1
 test-controller-flash-p1:
 	@mkdir -p $(CONTROLLER_FLASH_OUT)
@@ -16,3 +18,5 @@ test-controller-flash-p1:
 	$(CONTROLLER_FLASH_OUT)/test read $(CONTROLLER_FLASH_OUT)/p1.sav
 	$(CONTROLLER_FLASH_OUT)/test fallback $(CONTROLLER_FLASH_OUT)/p1.sav
 	$(CONTROLLER_FLASH_OUT)/test only-bad $(CONTROLLER_FLASH_OUT)/p1.sav
+	$(CONTROLLER_FLASH_OUT)/test legacy $(CONTROLLER_FLASH_LEGACY) $(CONTROLLER_FLASH_OUT)/p1-migrated.sav
+	$(CONTROLLER_FLASH_OUT)/test legacy-read $(CONTROLLER_FLASH_OUT)/p1-migrated.sav
