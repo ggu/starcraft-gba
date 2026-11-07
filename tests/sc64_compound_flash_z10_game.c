@@ -22,6 +22,50 @@ static void copy_file(const char *path,int writing)
     else assert(fread(device.bytes,1,sizeof device.bytes,f)==sizeof device.bytes && fgetc(f)==EOF);
     assert(!fclose(f));
 }
+typedef struct {
+    int parent,child,target,parent_carry,parent_timer,parent_owner,parent_origin,parent_controller,payer;
+    int carry,timer,order,target_ref,x,y,path_timer,path_retry,path_x,path_y,weapon,cd,child_controller;
+    int target_hp,target_debt,frame,minerals,gas,town0,town1,town2,impacts;
+} FlightSnapshot;
+typedef struct {int frame,child_alive,target_alive,target_hp,target_debt,town0,town1,town2,minerals,gas,impacts,controller,payer;} FlightOutcome;
+static void side_file(const char *base,const char *suffix,void *data,size_t n,int writing)
+{
+    char path[1024];assert(snprintf(path,sizeof path,"%s%s",base,suffix)>0);
+    FILE *f=fopen(path,writing?"wb":"rb");assert(f);
+    if(writing)assert(fwrite(data,1,n,f)==n);
+    else assert(fread(data,1,n,f)==n && fgetc(f)==EOF);
+    assert(!fclose(f));
+}
+static FlightSnapshot flight_snapshot(int parent)
+{
+    FlightSnapshot s={0};s.parent=parent;s.child=-1;
+    for(int i=0;i<MAX_UNITS;++i){int owner;unsigned phase;
+        if(race_scarab_child_lookup(i,&owner,&phase) && owner==parent && phase==SC64_SCARAB_CHILD_OUTSIDE){s.child=i;break;}}
+    assert(s.child>=0);Unit *q=&u[s.child];s.target=q->target;
+    assert(s.target>=0 && s.target<MAX_UNITS && u[s.target].alive);
+    s.parent_carry=u[parent].carry;s.parent_timer=u[parent].work_timer;s.parent_owner=u[parent].owner;
+    s.parent_origin=u[parent].raw_owner;s.parent_controller=sc64_controller_unit(parent);s.payer=sc64_scarab_stage_payer[parent];
+    s.carry=q->carry;s.timer=q->work_timer;s.order=q->order;s.target_ref=q->target;s.x=q->x;s.y=q->y;
+    s.path_timer=q->path_timer;s.path_retry=q->path_retry;s.path_x=q->path_x;s.path_y=q->path_y;
+    s.weapon=q->weapon;s.cd=q->cd;s.child_controller=sc64_controller_unit(s.child);
+    s.target_hp=u[s.target].hp;s.target_debt=sc64_pr_hp_debt[s.target];s.frame=frame;
+    s.minerals=minerals;s.gas=gas;s.town0=race_zl_ai_minerals[0];s.town1=race_zl_ai_minerals[1];s.town2=race_zl_ai_minerals[2];s.impacts=race_impact_count;
+    return s;
+}
+static FlightOutcome flight_finish(const FlightSnapshot *s)
+{
+    int initial_hp=u[s->target].hp,damage=0;
+    for(int i=0;i<150;++i) {
+        ++frame;if(u[s->child].alive && sc64_battlecruiser_source_tick_due())race_scarab_control_dispatch(s->child);
+        race_impact_tick();if(!u[s->target].alive || u[s->target].hp<initial_hp)damage=1;
+        if(damage && !u[s->child].alive && !race_impact_count)break;
+    }
+    assert(damage && !u[s->child].alive && !race_impact_count);
+    FlightOutcome o={frame,u[s->child].alive,u[s->target].alive,u[s->target].hp,sc64_pr_hp_debt[s->target],
+        (int)race_zl_ai_minerals[0],(int)race_zl_ai_minerals[1],(int)race_zl_ai_minerals[2],minerals,gas,race_impact_count,
+        sc64_controller_unit(s->parent),sc64_scarab_stage_payer[s->parent]};
+    return o;
+}
 int main(int argc,char **argv)
 {
     assert(argc==3);gba_init();
@@ -97,6 +141,10 @@ int main(int argc,char **argv)
         }
 #endif
         assert(saved);copy_file(argv[2],1);
+        if(!strcmp(argv[1],"write-moving")) {
+            FlightSnapshot original=flight_snapshot(parent);side_file(argv[2],".before",&original,sizeof original,1);
+            FlightOutcome outcome=flight_finish(&original);side_file(argv[2],".after",&outcome,sizeof outcome,1);
+        }
     } else if(!strcmp(argv[1],"foreign-v1") || !strcmp(argv[1],"foreign-header")) {
         launch_z10_from_normal_menu();copy_file(argv[2],0);
         GbaFlashJournalRecord r;assert(gba_fj_probe(&io,2,&r)==GBA_FJ_OK);
@@ -131,7 +179,15 @@ int main(int argc,char **argv)
             else assert(0);
             assert(!sc64_controller_transfer_unit(i,2));
             int fractional=0;for(int j=0;j<MAX_UNITS;++j)if(u[j].alive && sc64_pr_hp_debt[j]==128)++fractional;
-            assert(fractional>=1);found++;
+            assert(fractional>=1);
+            if(!strcmp(argv[1],"read-moving")) {
+                FlightSnapshot expected,actual=flight_snapshot(i);side_file(argv[2],".before",&expected,sizeof expected,0);
+                assert(!memcmp(&actual,&expected,sizeof actual));
+                FlightOutcome expected_outcome,actual_outcome=flight_finish(&actual);
+                side_file(argv[2],".after",&expected_outcome,sizeof expected_outcome,0);
+                assert(!memcmp(&actual_outcome,&expected_outcome,sizeof actual_outcome));
+            }
+            found++;
         }
         assert(found==1);
     } else assert(0);
