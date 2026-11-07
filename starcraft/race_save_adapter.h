@@ -1,6 +1,9 @@
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
 #include "sc64_construction_save.h"
+#ifdef SC64_Q8_FLASH_ALL_CUSTOM_HOST
+#include "sc64_q8_flash_custom_roster.h"
+#endif
 #if defined(SC64_WORKER_CARGO_KIND) && (!defined(SC64_IMPACT_EVENTS) || defined(SC64_SCARAB_NAMESPACE_STAGE))
 #error "worker cargo requires the impact journal and does not support the Scarab draft"
 #endif
@@ -1716,7 +1719,13 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
-    if (!race_mode || race_human!=R_PROTOSS || !race_q8_flash_begin()) return 0;
+    if (race_mode!=1 ||
+#ifdef SC64_Q8_FLASH_ALL_CUSTOM_HOST
+        !sc64_q8_flash_custom_roster_valid(race_human,race_bots,race_player,race_bot_races) ||
+#else
+        race_human!=R_PROTOSS ||
+#endif
+        !race_q8_flash_begin()) return 0;
     GbaSaveSelection cargo_previous={0};
     int cargo_have_previous=0;
 #else

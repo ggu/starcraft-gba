@@ -70,3 +70,13 @@ build-sc64-q8-flash-phase: check-sc64-q8-flash-baseline
 	@mkdir -p build/research-q8-flash-phase
 	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT -DSC64_Q8_FLASH_HOST_STAGE tests/sc64_q8_flash_phase_game.c common/gba_flash1m.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash-phase/consumer
 	$(CLANG) -I$(Q8_BASELINE_ROOT)/common -I$(Q8_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_Q8_FLASH_BASELINE tests/sc64_q8_flash_phase_game.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash-phase/old-producer
+
+# Explicit HOST-only authored cross-race Flash writer/reader; no normal enable.
+.PHONY: test-sc64-q8-flash-custom-races
+test-sc64-q8-flash-custom-races:
+	@mkdir -p build/research-q8-flash
+	$(CLANG) $(P8_HOST_FLAGS) -I.local/hardware-feedback/verified-cover $(PROTOSS_P10_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT -DSC64_Q8_FLASH_HOST_STAGE -DSC64_Q8_FLASH_ALL_CUSTOM_HOST tests/sc64_q8_flash_custom_races_game.c common/gba_flash1m.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o build/research-q8-flash/custom-races
+	./build/research-q8-flash/custom-races write terran build/research-q8-flash/custom-terran.sav
+	./build/research-q8-flash/custom-races read terran build/research-q8-flash/custom-terran.sav
+	./build/research-q8-flash/custom-races write zerg build/research-q8-flash/custom-zerg.sav
+	./build/research-q8-flash/custom-races read zerg build/research-q8-flash/custom-zerg.sav

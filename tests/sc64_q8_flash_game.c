@@ -173,4 +173,4 @@ int main(int argc,char **argv)
 #endif
     puts("Q8 Flash actual game process: PASS");return 0;
 }
-#endif
+#endif /* SC64_Q8_FLASH_NO_FIXTURE_MAIN */
