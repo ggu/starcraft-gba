@@ -1285,6 +1285,7 @@ static Building b[MAX_BUILDINGS];
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
 #include "sc64_collision.h"
 #endif
+#include "sc64_depot_owner_capability.h"
 /* Temporary ascending-index owner lists used only during update_orders(). */
 static int target_unit_head[5], target_building_head[5];
 /* Signed links retain -1 as the list terminator. */
