@@ -1,3 +1,7 @@
+#if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_RACES))
+#error "Campaign controller experiment requires HOST and shared races"
+#endif
 #if defined(SC64_CONTACT_MEMO_ORACLE) && \
     (!defined(GBA_HOST) || \
      !defined(SC64_CONTACT_CACHE))
@@ -1707,9 +1711,6 @@ static int skirmish_bot_index(int owner);
 #endif
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
 #ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
-#if !defined(GBA_HOST) || !defined(SC64_RACES)
-#error "Campaign controller experiment requires HOST and shared races"
-#endif
 /* Transient source controller, distinct from retained CHK origin. A reused
  * slot starts unknown; only authenticated source events can bind it. */
 static u8 sc64_current_unit[MAX_UNITS], sc64_current_building[MAX_BUILDINGS];
