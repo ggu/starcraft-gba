@@ -7,6 +7,11 @@ spec=importlib.util.spec_from_file_location('actor_observer',ROOT/'experiments/a
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 class WrapperTest(unittest.TestCase):
+ def test_limit_modes_are_fixed(self):
+  self.assertEqual(m.limits_for_mode('strict'),(2*1024**2,8*1024**2))
+  self.assertEqual(m.limits_for_mode('metal-compatible'),(8*1024**2,8*1024**2))
+  with self.assertRaises(ValueError):m.limits_for_mode('unbounded')
+
  def test_binary_admission_and_changed_input(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d)/'probe';p.write_bytes(b'qualified')

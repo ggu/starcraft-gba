@@ -7,7 +7,7 @@ ROM_SHA='e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 VK_SHA='432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 REV='0aafd85789215e84e1e43415c07d4c88461b7899'
 # Qualified independently from the historical non-diagnostic binary.
-BINARY_SHA='f626c08a64ecdfa70caf39408b53327c706834be3e80712cd09719f8dcea15be'
+BINARY_SHA=None
 LOCK='/tmp/sc64-native-build-20261031.lock'
 VK_PATH=pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
 
@@ -77,7 +77,13 @@ def inspect_stopped_child(child,cwd,remaining,result):
     helper.wait(timeout=2)
   finally:signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
 
-def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector):
+def limits_for_mode(mode):
+ if mode=='strict':return (2*1024**2,8*1024**2)
+ if mode=='metal-compatible':return (8*1024**2,8*1024**2)
+ raise ValueError('unsupported file-limit mode')
+
+def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector,mode='strict'):
+ limits=limits_for_mode(mode)
  """Own one child; cleanup also runs on selector errors and signals."""
  child=None;sel=None;started=time.monotonic()
  def terminate(signum,_frame):raise SystemExit(128+signum)
@@ -85,7 +91,7 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector)
  oldmask=signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGINT,signal.SIGTERM})
  try:
   def setup():
-   resource.setrlimit(resource.RLIMIT_FSIZE,(2*1024**2,8*1024**2))
+   resource.setrlimit(resource.RLIMIT_FSIZE,limits)
    signal.pthread_sigmask(signal.SIG_SETMASK,oldmask)
   child=subprocess.Popen(cmd,cwd=cwd,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,bufsize=0,preexec_fn=setup,start_new_session=True)
@@ -128,6 +134,7 @@ def relay(cmd,cwd,env,log,err,result,selector_factory=selectors.DefaultSelector)
 def main(argv=None):
  p=argparse.ArgumentParser()
  for arg in ('binary','source','moltenvk','rom','output'):p.add_argument('--'+arg,type=pathlib.Path,required=True)
+ p.add_argument('--file-limit-mode',choices=('strict','metal-compatible'),default='strict')
  a=p.parse_args(argv)
  if not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance mismatch')
  require_binary(a.binary)
@@ -140,9 +147,9 @@ def main(argv=None):
   if sha(copy)!=ROM_SHA:raise SystemExit('ROM copy mismatch')
   sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('observer_file_budget.h').resolve(),pathlib.Path(__file__).with_name('observer_sigxfsz.h').resolve(),pathlib.Path(__file__).with_name('observer_images.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
   resources=[a.source/'ares/ares/resource/resource.cpp',a.source/'ares/ares/resource/resource.hpp',a.source/'mia/resource/resource.cpp',a.source/'mia/resource/resource.hpp'];inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
-  cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV}
+  cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'interactive','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':3,'ram_each_bytes':8*1024**2,'ram_total_bytes':24*1024**2,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
   with (a.output/'bridge.log').open('wb') as log,(a.output/'stderr.log').open('wb') as err:
-   relay(cmd,a.output.resolve(),{**os.environ,'DYLD_LIBRARY_PATH':str(a.moltenvk.resolve().parent)},log,err,result)
+   relay(cmd,a.output.resolve(),{**os.environ,'DYLD_LIBRARY_PATH':str(a.moltenvk.resolve().parent)},log,err,result,mode=a.file_limit_mode)
   result['unchanged']=clean(a.source) and sha(a.rom)==ROM_SHA and sha(copy)==ROM_SHA and sha(a.moltenvk)==VK_SHA and sha(a.binary)==binary==BINARY_SHA and all(sha(pathlib.Path(k))==v for k,v in inputs.items())
   files=sorted(a.output.glob('live-*.argb'));result['frames']={x.name:sha(x) for x in files};result['frame_bytes']=sum(x.stat().st_size for x in files);result['ok']=result['returncode']==0 and result['unchanged'] and len(files)<=3 and result['frame_bytes']<=2*1024**2
   ram=sorted(a.output.glob('ram-*.bin'));result['ram']={x.name:sha(x) for x in ram};result['ram_bytes']=sum(x.stat().st_size for x in ram);result['ok']=result['ok'] and len(ram)==3 and all(x.stat().st_size==8*1024**2 for x in ram) and result['ram_bytes']<=24*1024**2

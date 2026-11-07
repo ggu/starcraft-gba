@@ -134,6 +134,10 @@ int main(int argc,char** argv) {
      !std::filesystem::is_directory(out/"systems")) return 2;
   int diagnostic_fd=::open((out/"sigxfsz.bin").c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);
   if(diagnostic_fd<0 || !sc64_observer_signal_install(diagnostic_fd)) return 2;
+  rlimit initial_file_limit{};
+  if(getrlimit(RLIMIT_FSIZE,&initial_file_limit)!=0 ||
+     initial_file_limit.rlim_max!=SC64_OBSERVER_RAM_FILE ||
+     (initial_file_limit.rlim_cur!=SC64_OBSERVER_SMALL_FILE && initial_file_limit.rlim_cur!=SC64_OBSERVER_RAM_FILE)) return 2;
   Probe p; ares::platform=&p;
   auto saves=std::filesystem::absolute(out/"saves").string()+"/";
   auto systems=std::filesystem::absolute(out/"systems").string()+"/";
@@ -222,7 +226,7 @@ int main(int argc,char** argv) {
       char name[32];std::snprintf(name,sizeof(name),"ram-%03u.bin",snapshots++);
       if(!sc64_observer_file_limit(SC64_OBSERVER_RAM_FILE)) return 8;
       std::ofstream file(out/name,std::ios::binary);file.write((const char*)bytes.data(),bytes.size());file.close();
-      if(!sc64_observer_file_limit(SC64_OBSERVER_SMALL_FILE) || !file) return 5;
+      if(!sc64_observer_file_limit(initial_file_limit.rlim_cur) || !file) return 5;
       std::ofstream ledger(out/"ram.csv",std::ios::app);ledger<<name<<','<<completed<<','<<cpu.ipu.pc<<','<<cpu.clock<<','<<bytes.size()<<'\n';ledger.close();if(!ledger) return 5;
       std::cout<<"RAM "<<name<<' '<<completed<<std::endl;continue;
     }
@@ -244,7 +248,12 @@ int main(int argc,char** argv) {
   std::lock_guard lock(p.mutex);
   std::ofstream status(out/"status.log"), observations(out/"callbacks.csv");
   std::ofstream inputs(out/"inputs.csv"); inputs<<"observed_step,button,pressed\n";
-  for(auto &e:p.inputEvents) inputs<<e.step<<','<<e.button<<','<<e.pressed<<'\n';
+  std::size_t input_bytes=std::strlen("observed_step,button,pressed\n");
+  for(auto &e:p.inputEvents) {
+    auto row=std::to_string(e.step)+","+std::to_string(e.button)+","+std::to_string(e.pressed)+"\n";
+    if(input_bytes+row.size()>2u*1024u*1024u) { std::cerr<<"input CSV budget exceeded\n"; return 5; }
+    inputs<<row;input_bytes+=row.size();
+  }
   observations<<"callback,observed_step,width,height,nonblack\n";
   for(std::size_t i=0;i<p.observations.size();++i) { auto &o=p.observations[i]; observations<<i<<','<<o.step<<','<<o.width<<','<<o.height<<','<<o.nonblack<<'\n'; }
   for(auto& text:p.statuses) status<<text<<'\n';
