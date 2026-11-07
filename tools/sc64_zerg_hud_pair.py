@@ -19,6 +19,7 @@ import time
 import subprocess
 
 import sc64_skirmish_sram_continuation as world
+import sc64_hud_zerg_lobby_plan as lobby_plan
 
 LOCK='/tmp/sc64-native-build-20261031.lock'
 RESERVE=4*1024**3
@@ -65,6 +66,8 @@ def main():
         ap.add_argument('--'+name.replace('_','-'),type=Path,required=True)
     ap.add_argument('--build-receipt',type=Path,required=True)
     ap.add_argument('--profile',choices=('z9','z10'),required=True)
+    ap.add_argument('--driver-head',required=True)
+    ap.add_argument('--adapt-zerg-lobby',action='store_true')
     ap.add_argument('--blank-flash',type=Path)
     ap.add_argument('--resume-tape',type=Path)
     ap.add_argument('--ticks',type=int,default=2500)
@@ -85,7 +88,14 @@ def main():
     required={'hud-ab-test-roles'} | {f'hud-ab-{p}-{v}' for p in ('z9','z10') for v in ('off','on')} | {f'hud-ab-host-{p}-{v}' for p in ('z9','z10') for v in ('off','on')}
     results=receipt.get('results',[])
     if {row.get('name') for row in results if row.get('rc')==0}!=required or len(results)!=len(required):raise ValueError('paired build/host checks incomplete or failed')
-    if subprocess.check_output(['git','rev-parse','--short=8','HEAD'],text=True).strip()!=receipt.get('head') or subprocess.run(['git','diff','--quiet','HEAD','--']).returncode:raise ValueError('source does not match build receipt')
+    compiled_head=receipt.get('head')
+    allowed={'tools/sc64_zerg_hud_pair.py','tools/sc64_hud_zerg_lobby_plan.py','tests/sc64-zerg-hud-ab/test_driver.py'}
+    def source_check():
+        if subprocess.check_output(['git','rev-parse','--short=8','HEAD'],text=True).strip()!=a.driver_head or subprocess.run(['git','diff','--quiet','HEAD','--']).returncode:
+            raise ValueError('driver source changed')
+        changed=set(subprocess.check_output(['git','diff','--name-only',compiled_head,'HEAD','--'],text=True).splitlines())
+        if not changed.issubset(allowed):raise ValueError('product source or build recipe differs from compiled receipt')
+    source_check()
     verify_build_roles(receipt,a.profile,a.off_rom,a.off_elf,a.on_rom,a.on_elf)
     if sha(a.off_rom)==sha(a.on_rom) or sha(a.off_elf)==sha(a.on_elf):raise ValueError('paired variants unexpectedly identical')
     if sha(a.runner)!=expected_runner or sha(a.tape)!=expected_tape:raise ValueError('unapproved runner/tape')
@@ -98,9 +108,11 @@ def main():
         x=json.loads(line)
         if x.get('kind')=='input':events.append((x['call_index'],x['held']))
     if not events or any(type(t)!=int or type(k)!=int or t<0 or k<0 or k>1023 or k&48==48 or k&192==192 for t,k in events) or any(events[i][0]>=events[i+1][0] for i in range(len(events)-1)):raise ValueError('invalid input tape')
+    if a.adapt_zerg_lobby:
+        plan=lobby_plan.derive(a.tape);events=plan['transitions']
+        if a.blank_flash and a.ticks!=plan['unverified_save_tick']:ap.error('adapted save checkpoint requires 3056 ticks')
     def check():
-        if subprocess.check_output(['git','rev-parse','--short=8','HEAD'],text=True).strip()!=receipt.get('head') or subprocess.run(['git','diff','--quiet','HEAD','--']).returncode:
-            raise ValueError('source changed after build')
+        source_check()
         if any(sha(Path(p))!=h for p,h in pins.items()):raise ValueError('input changed')
         if shutil.disk_usage(a.output.parent).free<RESERVE:raise ValueError('disk reserve')
     resource.setrlimit(resource.RLIMIT_FSIZE,(LIMIT,LIMIT))
@@ -108,7 +120,7 @@ def main():
     try:
         with open(LOCK,'a') as lock:
             fcntl.flock(lock,fcntl.LOCK_EX);check();a.output.mkdir(parents=True)
-            games=[]
+            games=[];diagnostic={'driver_head':a.driver_head,'compiled_head':compiled_head,'profile':a.profile,'tick':-1}
             try:
                 for label,rom,elf in [('off',a.off_rom,a.off_elf),('on',a.on_rom,a.on_elf)]:
                     folder=a.output/label;folder.mkdir();games.append(world.PhysicalGame(a.runner,rom,elf,folder,save_input=a.blank_flash,save_output=(folder/'guest.sav') if a.blank_flash else None))
@@ -120,6 +132,20 @@ def main():
                     for i,g in enumerate(games):
                         clock=g.rsp.clock();g.step(held);elapsed[i].append(g.rsp.clock()-clock)
                     states=[g.state() for g in games];views=[video(g) for g in games]
+                    diagnostic.update(tick=tick,held=held,before=before,states=states,views=views,counts=dict(counts))
+                    if a.adapt_zerg_lobby and tick in (3,7,11,15):
+                        observed=[{'page':g.front_field('page'),'row':g.front_field('row'),
+                                   'race':g.front_field('race'),'bots':g.front_field('bots'),
+                                   'map':g.front_field('map'),'bot0':g.front_field('bot_races',0)} for g in games]
+                        diagnostic['lobby']=observed
+                        expected={3:(0,1,2,2),7:(1,2,2,2),11:(2,2,1,2),15:(3,2,1,0)}[tick]
+                        if any((v['row'],v['race'],v['bots'],v['bot0'])!=expected or
+                               v['page']!=world.FRONT_SKIRMISH or v['map']!=0 for v in observed):
+                            raise ValueError(f'lobby checkpoint {tick} mismatch: {observed}')
+                    if a.adapt_zerg_lobby and tick==23 and any(
+                            q['screen']!=world.SCREEN_PLAY or q['race_mode']!=1 or
+                            q['race_human']!=2 or q['race_bots']!=1 or q['race_skirmish_map']!=0 for q in states):
+                        raise ValueError('custom match did not start with requested lobby')
                     if states[0]!=states[1] or views[0]!=views[1]:raise ValueError(f'pair mismatch at physical tick {tick}, frame {before}, display {views}')
                     if any(int.from_bytes(g.rsp.read(0x06013fe0,2),'little') for g in games):raise ValueError('unexpected modal: no automatic acknowledgement in this tape')
                     advancing=states[0]['frame']==before[0]+1 and states[0]['screen']==world.SCREEN_PLAY
@@ -130,7 +156,8 @@ def main():
                 if last['race_mode']!=1 or last['race_human']!=2 or last['race_bots']!=1 or counts['advancing']<1000:raise ValueError('custom scene did not reach expected advancing state')
                 save_equal=None
                 if a.blank_flash:
-                    if a.ticks!=3048 or last['screen']!=world.SCREEN_PAUSE:raise ValueError('save checkpoint not reached')
+                    expected_cut=3056 if a.adapt_zerg_lobby else 3048
+                    if a.ticks!=expected_cut or last['screen']!=world.SCREEN_PAUSE:raise ValueError('save checkpoint not reached')
                     for g in games:g.rsp.export_sram()
                     saves=[a.output/label/'guest.sav' for label in ('off','on')]
                     save_equal=sha(saves[0])==sha(saves[1])
@@ -164,10 +191,14 @@ def main():
                         loaded_job!=(saved_job[0],saved_job[1]-1)):
                         raise ValueError('fresh load did not restore the saved paid job and wallet')
                 elif last['screen']!=world.SCREEN_PLAY:raise ValueError('custom game no longer playing')
-                check();report={'pins':pins,'source_head':receipt['head'],'profile':a.profile,'ticks':a.ticks,'counts':counts,'paired_every_tick_sha256':digest.hexdigest(),
+                check();report={'pins':pins,'compiled_head':compiled_head,'driver_head':a.driver_head,'adapted_lobby':a.adapt_zerg_lobby,'profile':a.profile,'ticks':a.ticks,'counts':counts,'paired_every_tick_sha256':digest.hexdigest(),
                     'flash_images_equal':save_equal,'cycles':[{'mean':sum(v)/len(v),'max':max(v)} for v in elapsed],
                     'scope':'ordinary custom tape; full displayed indexed frame and palette plus named state every prefix tick; optional fresh Flash load; no campaign proof'}
                 (a.output/'result.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report),flush=True)
+            except Exception as exc:
+                diagnostic['error']=str(exc)
+                (a.output/'failure.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
+                raise
             finally:
                 for g in reversed(games):
                     try:g.close()
