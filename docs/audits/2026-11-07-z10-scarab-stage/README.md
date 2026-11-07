@@ -1,5 +1,33 @@
 # Z10 Scarab integration boundary
 
+## Later HOST custom-controller stage
+
+The separate runtime `60c6c12c` connects the existing paid child queue to an
+explicit, default-off `SC64_SCARAB_AI_RESTOCK_HOST_STAGE`. At most one request
+is attempted on the existing source-update hook when no job is queued. This
+is an authored automatic-purchase policy, not observed N64 AI timing. It binds
+payments to active custom-game Protoss controllers and refuses campaign town
+wallets. A transient payer witness prevents refunds being redirected after a
+controller change. Capture remains refused even after the old queue is settled;
+authenticated transfer and child settlement are still unfinished.
+
+The actual-engine authored HOST fixture passes with ASan/UBSan and all 593
+prepared inputs unchanged. It covers distinct human/AI wallets, a 15-mineral
+debit, queue refusal, shortage, stale race mappings, transfer refusal and
+cancellation, training, lethal parent damage and slot reuse under a different
+payer. It checks that all four save/load entry points refuse this unsaved stage.
+The source-boundary check also passes. The first compile correctly rejected the
+incompatible worker-cargo/Scarab codec combination; only the isolated fixture
+recipe now excludes the cargo flag, and the runtime guard is unchanged.
+
+This is not an ordinary-input, ARM, campaign, complete flight/impact, save,
+performance or hardware qualification. Normal product flags are unchanged;
+the full default suite and composed release qualification remain outstanding.
+Private receipt SHA-256:
+`17035068e6fd7e292a0ac34de4a2c12d08ddca30b4e4e9fcbb6217527b7ae036`.
+
+## Earlier source audit
+
 Source-only review against main `df5c8ee8`. No generated inputs were copied,
 native jobs run, or feature enabled. Z10 has no qualified ordinary-input win.
 In an older paired, 31,000-call HOST trial using an experimental Egg service,

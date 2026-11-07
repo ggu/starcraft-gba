@@ -32,6 +32,13 @@ static int race_q8_flash_write(const void *data,u32 length);
     (!defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE)))
 #error "Active research journal requires the HOST-only research job stage"
 #endif
+#if defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) && \
+    (!defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) || !defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) || !defined(SC64_Z9_RUNTIME))
+#error "Zerg late Scarab controller stage requires both HOST stages and Z9 runtime"
+#endif
+#if defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) && (!defined(GBA_HOST) || !defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) || !defined(SC64_RACES))
+#error "Scarab AI restock requires the HOST-only race lifecycle probe"
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
 #include "sc64_protoss_research_padding.h"
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
@@ -1726,8 +1733,19 @@ static int sc64_controller_building(int slot)
 { return slot >= 0 && slot < MAX_BUILDINGS && b[slot].alive && sc64_controller_valid(sc64_current_building[slot], b[slot].owner) ? sc64_current_building[slot] : -1; }
 /* The caller must authenticate the source event and complete any other
  * transfer guards before committing; source identity is not inferred. */
+#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
+static int race_scarab_controller_transfer_allowed(int slot);
+#endif
 static int __attribute__((unused)) sc64_controller_transfer_unit(int slot, int source)
-{ if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || source < 0 || source >= 8 ) return 0; int owner=sc64_controller_source_owner((unsigned)source); if (owner < 0) return 0; u[slot].owner=owner; sc64_current_unit[slot]=(u8)source; return 1; }
+{
+    if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || source < 0 || source >= 8) return 0;
+    int owner=sc64_controller_source_owner((unsigned)source);
+    if (owner < 0) return 0;
+#ifdef SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE
+    if (!race_scarab_controller_transfer_allowed(slot)) return 0;
+#endif
+    u[slot].owner=owner; sc64_current_unit[slot]=(u8)source; return 1;
+}
 static int __attribute__((unused)) sc64_controller_transfer_building(int slot, int source)
 { if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive || source < 0 || source >= 8 ) return 0; int owner=sc64_controller_source_owner((unsigned)source); if (owner < 0) return 0; b[slot].owner=owner; sc64_current_building[slot]=(u8)source; return 1; }
 #endif
@@ -5147,6 +5165,10 @@ hit_stock_building_target(const Building *source,int target,int damage)
 static int
 save_game(void)
 {
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    /* The stage's payer witness has no authenticated save representation. */
+    return 0;
+#endif
 #ifdef SC64_TEXT_BOXES
     /* Neither a queued message nor a deferred result is serialized. */
     if (sc64_text_box_count() || sc64_text_box_outcome.result) return 0;
@@ -5216,6 +5238,10 @@ static void game_audio_prime(void);
 static int
 load_game(void)
 {
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    /* No saved record authenticates the stage's payer witnesses yet. */
+    return 0;
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) return 0;
 #endif
@@ -13589,6 +13615,9 @@ static int race_scarab_human_enqueue(void)
 static void __attribute__((noinline)) race_scarab_human_parent_step(int slot)
 {
     race_scarab_probe_parent_tick(slot);
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    (void)race_scarab_ai_restock_stage(slot);
+#endif
     (void)race_scarab_production_tick(slot,0);
 }
 /* Retire hidden children before the generic parent slot is invalidated.
