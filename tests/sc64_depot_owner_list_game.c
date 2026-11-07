@@ -25,6 +25,7 @@ static void compare(Unit *q)
     u32 before_age[SC64_ROUTE_SLOTS],after_age[SC64_ROUTE_SLOTS];
     u32 clock0=sc64_route_clock,hits0=sc64_route_hits,builds0=sc64_route_builds,clock1,hits1,builds1;
     int prior=q->build,owner_valid=sc64_depot_owner_lists_valid,scalar,fast;
+    unsigned hits_before=sc64_depot_owner_list_test_hits;
     memcpy(before_field,sc64_route_field,sizeof(before_field));memcpy(before_valid,sc64_route_valid,sizeof(before_valid));
     memcpy(before_goal,sc64_route_goal,sizeof(before_goal));memcpy(before_age,sc64_route_age,sizeof(before_age));
     sc64_depot_owner_lists_valid=0;scalar=race_nearest_resource_depot(q);
@@ -35,6 +36,7 @@ static void compare(Unit *q)
     memcpy(sc64_route_goal,before_goal,sizeof(before_goal));memcpy(sc64_route_age,before_age,sizeof(before_age));
     sc64_route_clock=clock0;sc64_route_hits=hits0;sc64_route_builds=builds0;q->build=prior;sc64_depot_owner_lists_valid=owner_valid;
     fast=race_nearest_resource_depot(q);assert(fast==scalar && q->build==(scalar<0?-2:scalar));
+    assert(sc64_depot_owner_list_test_hits==hits_before+(unsigned)(owner_valid && target_lists_valid && q->owner>=0 && q->owner<5));
     assert(!memcmp(after_field,sc64_route_field,sizeof(after_field))&&!memcmp(after_valid,sc64_route_valid,sizeof(after_valid)));
     assert(!memcmp(after_goal,sc64_route_goal,sizeof(after_goal))&&!memcmp(after_age,sc64_route_age,sizeof(after_age)));
     assert(clock1==sc64_route_clock && hits1==sc64_route_hits && builds1==sc64_route_builds);

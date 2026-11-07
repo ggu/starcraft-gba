@@ -1295,6 +1295,12 @@ static int target_lists_valid;
 #ifdef SC64_DEPOT_OWNER_LIST_PROBE
 /* Valid only within this orders pass; topology changes force scalar scans. */
 static int sc64_depot_owner_lists_valid;
+#ifdef SC64_DEPOT_OWNER_LIST_TEST
+#ifndef GBA_HOST
+#error "Depot owner-list test counter is host-only"
+#endif
+static unsigned sc64_depot_owner_list_test_hits;
+#endif
 #endif
 #if defined(SC64_RACES) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY))
 static u8 target_hostile_mask[5];
@@ -7450,6 +7456,9 @@ race_nearest_resource_depot(Unit *worker)
 #ifdef SC64_DEPOT_OWNER_LIST_PROBE
     int use_owner_list = sc64_depot_owner_lists_valid && target_lists_valid &&
         worker->owner >= 0 && worker->owner < 5;
+#ifdef SC64_DEPOT_OWNER_LIST_TEST
+    if (use_owner_list) ++sc64_depot_owner_list_test_hits;
+#endif
     for (int i = use_owner_list ? target_building_head[worker->owner] : 0;
          use_owner_list ? i >= 0 : i < MAX_BUILDINGS;
          i = use_owner_list ? target_building_next[i] : i + 1) {
