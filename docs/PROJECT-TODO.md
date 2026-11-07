@@ -32,13 +32,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cases without erase/program or live-state publication. The separate HOST-only
   compound-format stage now saves paid Z10 training, inside and fresh-release
   outside children and reloads them in separate processes, retaining source
-  origin, current town, payer and fractional HP (`1af50e56`/`018cca6e`). Moving
-  flight, malformed/fallback and predecessor-format checks are still in progress;
-  A moving-flight test exposed that the row codec stores five/four-bit route
-  timers while live Scarabs retain full waypoint coordinates there. An explicit
-  bounded compound flight section is being implemented; no truncation or old
-  format reinterpretation is permitted. ARM, hardware and other campaigns
-  remain open. Normal upgrades stay off.
+  origin, current town, payer and fractional HP. At `78a01699`, the v2 compound
+  format also preserves a moving child's full waypoints, packed fractional
+  position, heading/velocity and other selected fields through a fresh process,
+  then matches an uninterrupted continuation through actual impact/retirement.
+  This fixes the discovered five/four-bit route-timer mismatch using an explicit
+  960-byte flight section, not truncation or old-format reinterpretation. Bad-CRC
+  foreign/v1 headers refuse writing. Malformed/fallback, genuine predecessor
+  bridges, partial-write recovery, ARM, hardware and other campaigns remain open.
+  Independent review also identified pre-save live Yamato reconciliation as a
+  failed-save atomicity issue; the staged fix and negative checks remain scoped.
+  Normal upgrades stay off.
 - **Reachable custom-game performance now measured:** the released `70e9800f…`
   P10 ROM runs map 1 with human Protoss and independently selected Terran,
   Zerg and Protoss AIs through a natural 4,000-update opening. All next 500
@@ -54,8 +58,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and ten sampled full frames, palettes and selected-state/workload snapshots.
   Mean cycles fall 3.87%, p99 26.35% and maximum 22.40%; original worst-frame
   orders fall 42.34%. Actual in-pass construction invalidation and next-pass
-  rebuild tests pass. Shared-default six-profile/save/default qualification is
-  the next gate, not another routing or cadence change. This is one opening,
+  rebuild tests pass. Shared-default promotion is merged in
+  [#364](https://github.com/ggu/starcraft-gba/pull/364), with six normal guarded
+  links, clean default checks, a prepared unified build and a genuine
+  old-writer/new-reader/resave HOST sequence. Current P10 normal bytes exactly
+  match the measured candidate; no save fields, actor caps or cadence change.
+  `test-unified` still lacks its documented private BC asset header. The normal
+  Mac package is `StarCraft-GBA-2026-11-07-a5064cb2`. This is one opening,
   not combat, all race/map combinations or hardware/30-fps qualification.
   A separate reachability-only probe is rejected after only 0.09% mean
   improvement and 0.30% worst-orders improvement. The bounds-mask probe saves 0.58% mean in the P7 combat window but
@@ -126,12 +135,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the caller chain. The counter observer at `52a79f9f` captures 36 stores from
   verified PC `80023954`, decrementing `800a5acc` from 66 to 31 and reproducing
   both later counter views. This establishes a CPU-written periodic countdown,
-  not an independent game clock. The first same-binary ordinary Start test
-  visibly reaches GAME PAUSED; its two paused RAM views retain counter 30
-  with no watched stores between them. A second Start opens Options, so resume
-  is not established. The corrected visible-menu intervention is separately
-  gated; see the [scoped pause audit](https://github.com/ggu/starcraft-gba/blob/27ee0f2c/docs/audits/2026-11-07-n64-counter-pause-plan/README.md).
-  STOP, independent actors and fresh reset remain open.
+  not an independent game clock. The first Start attempt reaches GAME PAUSED
+  but a second Start opens Options. A corrected ordinary menu intervention at
+  `454c23eb` visibly resumes gameplay: the two paused views retain counter 30
+  without watched stores, and 20 more validated decrement stores follow resume.
+  All prior 37 stores, initial RAM, play and pause frames match exactly. The
+  final frame shows the selected Probe in gameplay. Root independently checked
+  the record stream and both UI outcomes. See the
+  [scoped pause/resume audit](https://github.com/ggu/starcraft-gba/blob/0d40d44e/docs/audits/2026-11-07-n64-counter-pause-plan/README.md).
+  This establishes pause-associated suppression and resumed writes for one
+  countdown, not an independent clock or speed scaling. STOP, independent actors
+  and fresh reset remain open.
   See [draft #354](https://github.com/ggu/starcraft-gba/pull/354) and the
   [scoped store audit](https://github.com/ggu/starcraft-gba/blob/70108527831f1737fc1bfb7cd9299f03c3bc67f0/docs/audits/2026-11-07-n64-store-observer-design/README.md).
 - **Normal package and HUD:** #352 merged normal Z9/Z10 HUD page reuse at
@@ -199,9 +213,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   visual context, not power-boundary, remembered-fog, damage or timing parity.
   This frontend rejects RAM capture; N1 actor/clock/cadence gates remain open.
 
-The latest prepared Mac package is `StarCraft-GBA-2026-11-07-34c101e0`; main
-through #362 produces the same normal ROM bytes. These new experimental branches
-have not been copied to KODAK. The full campaign 29/30 and near-30-fps gates
+The latest prepared Mac package is `StarCraft-GBA-2026-11-07-a5064cb2`:
+T10, Z9, P10, Showcase and optional Z10 preview. All five ROM headers, SRAM
+signatures, lengths and read-back checksums pass; P10 is exactly the measured
+`0ec0ebeb…` candidate. T10/Showcase retain their preceding normal bytes because
+those vectors do not use the nearest-depot service. KODAK is not mounted, so no
+SD copy occurred. Research/ammunition/Flash experimental stages remain excluded. The full campaign 29/30 and near-30-fps gates
 below remain open. Keep source-only public artifacts and local Actions policy.
 
 ## Current real-device feedback and integration
@@ -659,7 +676,7 @@ the serialized native-test lock permit it.
 | S3 | P0 / open | Qualify saves throughout each combined campaign, including early Protoss missions under the P10 product. [One early physical P1–P7 save point each](audits/2026-11-06-early-protoss-save/README.md) now reloads with matching selected-state continuation on the pre-#323 `ff94a2ea` P10 ROM; P1 also has a matching mid-mission controller-tail continuation, but its historical tape no longer wins on the packaged product; P2/P7 remain especially early and no winning continuation is established. | Fresh-process ordinary save/load and continued wins across all campaign entries on current combined flags, with source-owned effects, actors, clocks and objectives preserved. Reproduce and fix each rejection; do not infer arbitrary-save support from one point. |
 | C3 | P0 / open | Finish Z10 through ordinary controls and retain all other 29 missions. Rally recall and inefficient selections were fixed in the controller, but no Z10 win exists. | Fresh ordinary-input win, Temple/crystal sequence, text/results, save prefix, fresh-process continuation and ARM replay on the integrated engine; rerun affected carried missions. Never inject a win, resources, units or SRAM. |
 | N1 | P1 / in progress | Validate N64 actor records, game clock and event cadence. This is a prerequisite for behavior-changing timing optimizations. | Explicit select/move/stop correlation for independent actors, fresh reset, owner/type/position validation, independent clock and writer-PC evidence. Bound read-only snapshots; no guest writes or MMIO side effects. |
-| P1 | P1 / open | Reduce representative busy-frame cost toward 30 fps. Small isolated gains do not close the current gap. | Exact-source normal/diagnostic pairs on P7/P10 and 1-/3-AI custom games, advancing combat frames, ordinary input and modal handling. Measure update/render and worst-frame distribution; require material improvement without mode regressions. Confirm on GBA hardware. |
+| P1 | P1 / in progress | Reduce representative busy-frame cost toward 30 fps. Small isolated gains do not close the current gap. | Exact-source normal/diagnostic pairs on P7/P10 and 1-/3-AI custom games, advancing combat frames, ordinary input and modal handling. Measure update/render and worst-frame distribution; require material improvement without mode regressions. Confirm on GBA hardware. |
 | C4 | P1 / open | Replace campaign AI scalar approximations where verified source/native behavior differs. Late-Zerg waves use averaged groups/gaps; arrival, rebuilding and transport tactics are not equivalent to script commands. | Source script interpretation plus N64 observations of actual production, wallets, launch groups, targeting and rebuilds. Reproduce a concrete mismatch before changing AI; retain mission objective semantics. |
 | U1 | P1 / partial | Scourge/Spire source restrictions and shared picker correction are merged in #290. Continue the broader campaign PUNI/UPGR/TECx audit, especially P10. | Preserve current controlling ownership, nonspending denial and full supported custom catalog. Apply remaining source permissions with per-owner tests and save compatibility; do not infer complete availability parity from this one product fix. |
 | U3 | P0 / in progress | Deliver usable shared Forge/Core research. #318 is disabled save groundwork; verified family IDs and campaign-policy extraction remain separate work. | Authenticated owner and payer identity; source initial/max levels; atomic paid producer jobs, power/cancel/death/capture/reset behavior, active-job saves and legacy migration; weapon/armor/shield/range effects on every relevant path; ordinary building menus and cross-product campaign/custom/Showcase checks. |
