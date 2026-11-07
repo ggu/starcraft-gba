@@ -2255,8 +2255,14 @@ volatile u32 sc64_t5_rescue_cycles, sc64_t5_mine_cycles, sc64_t5_trigger_ai_cycl
 #ifdef SC64_DIAGNOSTIC_SETUP
 volatile u32 sc64_setup_buckets, sc64_setup_lists, sc64_setup_index, sc64_setup_arbiter;
 #endif
+#if defined(SC64_DIAGNOSTIC_CUSTOM_LEAVES) && !defined(SC64_DIAGNOSTIC_ORDERS)
+#error "SC64_DIAGNOSTIC_CUSTOM_LEAVES requires SC64_DIAGNOSTIC_ORDERS"
+#endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
 volatile u32 sc64_order_setup_cycles, sc64_order_query_cycles, sc64_order_move_cycles;
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+volatile u32 sc64_leaf_grid_count, sc64_leaf_grid_cycles, sc64_leaf_point_count, sc64_leaf_point_cycles, sc64_leaf_point_nodes, sc64_leaf_depot_count, sc64_leaf_depot_cycles, sc64_leaf_depot_nodes, sc64_leaf_contact_count, sc64_leaf_contact_cycles, sc64_leaf_depot_search_count, sc64_leaf_depot_search_cycles, sc64_leaf_mineral_search_count, sc64_leaf_mineral_search_cycles;
+#endif
 #define SC64_ORDER_DIAG_ACCUM(counter, start) \
     do { (counter) += gba_clock() - (start); } while (0)
 #endif
@@ -3138,6 +3144,9 @@ static void GBA_HOT
 #endif
 build_path_grid(void)
 {
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+    u32 leaf_grid_start = gba_clock(); ++sc64_leaf_grid_count;
+#endif
     int col, row, i;
 #if defined(SC64_BULK_TERRAIN_GRID) && defined(SC64_RACES) && \
     defined(SC64_IMPORTED_MISSION) && \
@@ -3216,6 +3225,9 @@ build_path_grid(void)
                     SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
     }
     path_grid_valid = 1;
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+    sc64_leaf_grid_cycles += gba_clock() - leaf_grid_start;
+#endif
 }
 
 static int
@@ -3715,7 +3727,13 @@ move_toward(Unit * q, int tx, int ty)
 #if defined(SC64_CONTACT_CACHE)
 	/* One bucket pass answers all eight unit_step_clear() offsets; the
 	 * selection order and tie-breaking below are unchanged. */
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+        u32 leaf_contact_start = gba_clock(); ++sc64_leaf_contact_count;
+#endif
 	unsigned blocked = sc64_contact_blocked_mask(q, speed);
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+        sc64_leaf_contact_cycles += gba_clock() - leaf_contact_start;
+#endif
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);
@@ -7431,6 +7449,9 @@ race_depot_cache_clear_no_home(void)
  * destination ownership/type/completion is checked whenever the slot is used. */
 /* Keep the bounded route-selection scan in ROM. Inlining it into the hot
  * order loop consumes the reserved IWRAM stack space on campaign builds. */
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+#define race_nearest_resource_depot race_nearest_resource_depot_leaf_impl
+#endif
 static int __attribute__((noinline))
 race_nearest_resource_depot(Unit *worker)
 {
@@ -7481,6 +7502,10 @@ static int __attribute__((noinline)) race_late_worker_home(Unit *worker)
     worker->build = best;
     return best;
 }
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+#undef race_nearest_resource_depot
+static int race_nearest_resource_depot(Unit *q) { u32 t = gba_clock(); int result; ++sc64_leaf_depot_search_count; result = race_nearest_resource_depot_leaf_impl(q); sc64_leaf_depot_search_cycles += gba_clock() - t; return result; }
+#endif
 #endif
 #ifndef SC64_SKIRMISH
 static void
@@ -7500,6 +7525,9 @@ add_owner_resources(int owner, int ore, int vespene)
  * an undiscovered human field or select an unreachable closer field.
  * The engine does not retain source terrain elevation/worker field queues,
  * so this is bounded continuation, not an exact native allocation policy. */
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+#define worker_continue_minerals worker_continue_minerals_leaf_impl
+#endif
 static int __attribute__((noinline))
 worker_continue_minerals(Unit *q)
 {
@@ -7531,6 +7559,10 @@ worker_continue_minerals(Unit *q)
     return 1;
 }
 
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+#undef worker_continue_minerals
+static int worker_continue_minerals(Unit *q) { u32 t = gba_clock(); int result; ++sc64_leaf_mineral_search_count; result = worker_continue_minerals_leaf_impl(q); sc64_leaf_mineral_search_cycles += gba_clock() - t; return result; }
+#endif
 /* A resource wait advances only while the worker is at its target. Existing
  * saved nonzero timers remain remaining work; no new persistent state. */
 static int
@@ -8428,6 +8460,14 @@ update_orders(void)
     sc64_order_setup_cycles = 0;
     sc64_order_query_cycles = 0;
     sc64_order_move_cycles = 0;
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+    sc64_leaf_grid_count = sc64_leaf_grid_cycles = 0;
+    sc64_leaf_point_count = sc64_leaf_point_cycles = sc64_leaf_point_nodes = 0;
+    sc64_leaf_depot_count = sc64_leaf_depot_cycles = sc64_leaf_depot_nodes = 0;
+    sc64_leaf_contact_count = sc64_leaf_contact_cycles = 0;
+    sc64_leaf_depot_search_count = sc64_leaf_depot_search_cycles = 0;
+    sc64_leaf_mineral_search_count = sc64_leaf_mineral_search_cycles = 0;
+#endif
 #endif
 #if !defined(SC64_SKIRMISH) && !defined(SC64_RACES)
     int cc;

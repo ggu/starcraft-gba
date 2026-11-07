@@ -1261,6 +1261,9 @@ sc64_route_slot(int goal)
                sizeof(sc64_range_route_snapshot_key));
     }
 #endif
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+    u32 leaf_build_start = gba_clock(); ++sc64_leaf_point_count;
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
@@ -1387,6 +1390,9 @@ sc64_route_slot(int goal)
     sc64_route_valid[slot] = 1;
 #endif
     sc64_route_builds++;
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+    sc64_leaf_point_cycles += gba_clock() - leaf_build_start; sc64_leaf_point_nodes += (u32)tail;
+#endif
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     sc64_route_probe_host_flood((unsigned)tail);
 #endif
@@ -1876,6 +1882,9 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
                sizeof(sc64_range_route_snapshot_key));
     }
 #endif
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+    u32 leaf_build_start = gba_clock(); ++sc64_leaf_depot_count;
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
@@ -1975,6 +1984,9 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
 #endif
     sc64_route_valid[slot] = complete ? 1 : 2;
     sc64_route_builds++;
+#ifdef SC64_DIAGNOSTIC_CUSTOM_LEAVES
+    sc64_leaf_depot_cycles += gba_clock() - leaf_build_start; sc64_leaf_depot_nodes += (u32)tail;
+#endif
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     sc64_route_probe_host_flood((unsigned)tail);
 #endif
