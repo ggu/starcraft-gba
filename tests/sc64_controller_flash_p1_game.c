@@ -11,6 +11,11 @@ int main(int argc,char **argv)
 {
     assert(argc==3 || argc==4);setup_p1();
     if(!strcmp(argv[1],"write")) {
+        int visitor=-1,nexus=-1;
+        for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && u[i].owner==SIDE){visitor=i;break;}
+        for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive && b[i].owner==RESCUABLE && b[i].raw_owner==1 && b[i].type==B_NEXUS && b[i].x>=224 && b[i].x<=784 && b[i].y>=848 && b[i].y<=1200){nexus=i;break;}
+        assert(visitor>=0 && nexus>=0);u[visitor].x=400;u[visitor].y=900;race_campaign_tick();
+        assert(b[nexus].owner==SIDE && b[nexus].raw_owner==1 && sc64_controller_building(nexus)==7);
         int p=spawn_build(SIDE,B_PYLON,240,240,0),f=spawn_build(SIDE,B_FORGE,240,240,0);
         int u0=spawn_unit(SIDE,U_DRAGOON,300,300);assert(p>=0 && f>=0 && u0>=0);
         b[p].raw_owner=b[f].raw_owner=7;u[u0].raw_owner=7;
@@ -19,6 +24,9 @@ int main(int argc,char **argv)
         u[u0].shield=0;u[u0].shield_remainder=0;
         hit_target_impl_ex(u0,128,U_MARINE,ENEMY,SC64_STOCK_DMG_IGNORE_ARMOR,SC64_HIT_PACKET_Q8);
         memset(device.bytes,0xff,sizeof device.bytes);
+        static u8 blank[131072];memcpy(blank,device.bytes,sizeof blank);
+        sc64_current_building[f]=254;assert(!race_save_game() && !memcmp(blank,device.bytes,sizeof blank));
+        sc64_current_building[f]=7;
         assert(race_save_game());minerals=889;
         assert(race_save_game());file_write(argv[2],device.bytes,sizeof device.bytes);
     } else if(!strcmp(argv[1],"read")) {
@@ -27,6 +35,8 @@ int main(int argc,char **argv)
         for(int i=0;i<MAX_BUILDINGS;++i)if(b[i].alive&&b[i].type==B_FORGE&&b[i].level)f=i;
         for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].type==U_DRAGOON&&u[i].x==300)a=i;
         assert(f>=0 && a>=0 && minerals==889 && sc64_controller_building(f)==7 && sc64_controller_unit(a)==7);
+        int nexus=-1;for(int i=0;i<MAX_BUILDINGS;++i)if(b[i].alive&&b[i].type==B_NEXUS&&b[i].raw_owner==1&&b[i].owner==SIDE){nexus=i;break;}
+        assert(nexus>=0 && sc64_controller_building(nexus)==7);
         assert(sc64_pr_q8_actor_hp(a,&hp)&&hp==(unsigned)u[a].maxhp*256u-128u);
         Sc64PrPaidReceipt paid;assert(sc64_pr_stage_receipt(f,&paid)&&paid.payer==SIDE);
         unsigned left=b[f].queue_progress;assert(left);for(unsigned i=0;i<left;++i)sc64_pr_stage_tick();

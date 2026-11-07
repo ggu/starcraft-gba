@@ -321,6 +321,25 @@ static int race_q8_flash_write(const void *data,u32 length)
     suffix_length=length-suffix_start;
     memcpy(suffix,(const u8 *)data+suffix_start,suffix_length);
     original_hash=gba_fj_hash(2166136261u,data,length);
+#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+    /* Preflight can normalize rows before rejecting. Preserve the original
+     * wire bytes on every path, including semantic failure. */
+    u8 padding[MAX_BUILDINGS];int valid;
+    for(unsigned i=0;i<MAX_BUILDINGS;++i)
+        padding[i]=((u8 *)race_data.buildings)[i*SC64_PR_ROW_WIDTH+SC64_PR_ROW_WIDTH-1];
+    valid=race_worker_cargo_prepare_selected(data,length,SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION,&plan);
+    if(valid) {
+        u32 at=SC64_Q8_FLASH_TAIL_HEADER+SC64_Q8_FLASH_DEBTS+8u;
+        memcpy(plan.q8_debt,tail+SC64_Q8_FLASH_TAIL_HEADER,SC64_Q8_FLASH_DEBTS);
+        memcpy(plan.controller_units,tail+at,MAX_UNITS);
+        memcpy(plan.controller_buildings,tail+at+MAX_UNITS,MAX_BUILDINGS);
+        valid=race_q8_flash_candidate_fractions(&plan,0) && race_controller_flash_candidate(&plan,0);
+    }
+    for(unsigned i=0;i<MAX_BUILDINGS;++i)
+        ((u8 *)race_data.buildings)[i*SC64_PR_ROW_WIDTH+SC64_PR_ROW_WIDTH-1]=padding[i];
+    memcpy((u8 *)&race_impact_record+suffix_start,suffix,suffix_length);
+    if(!valid || gba_fj_hash(2166136261u,data,length)!=original_hash) return 0;
+#else
     if(!race_worker_cargo_prepare_selected(data,length,
 #ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
           SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION,
@@ -346,6 +365,7 @@ static int race_q8_flash_write(const void *data,u32 length)
                               &plan.research_levels)) return 0;
     memcpy((u8 *)&race_impact_record+suffix_start,suffix,suffix_length);
     if(gba_fj_hash(2166136261u,data,length)!=original_hash) return 0;
+#endif
     Sc64Q8FlashGuard guard={io,0};
     GbaFlashJournalIo guarded={&guard,race_q8_flash_guard_read,race_q8_flash_guard_erase,race_q8_flash_guard_program};
     return gba_fj_write_parts(&guarded,data,length,tail,sizeof tail,SC64_Q8_FLASH_TAG,
