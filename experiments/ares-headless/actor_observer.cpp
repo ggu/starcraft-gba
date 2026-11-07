@@ -254,7 +254,7 @@ int main(int argc,char** argv) {
       })) { std::cerr<<"snapshot conflict or publication failure\n";return 8; }
       if(scenario=="snapshot-registers") {
         std::array<std::uint64_t,32> regs{};for(unsigned i=0;i<regs.size();++i)regs[i]=cpu.ipu.r[i].u64;
-        auto row=sc64_register_csv_row(snapshotCount,static_cast<unsigned>(completed),cpu.ipu.pc,cpu.clock(),regs);
+        auto row=sc64_register_csv_row(snapshotCount,static_cast<unsigned>(completed),cpu.ipu.pc,static_cast<std::uint64_t>(cpu.clock),regs);
         std::ofstream values(out/"registers.csv",std::ios::app);if(!values || row.empty())return 5;
         values<<row;values.close();if(!values)return 5;
       }
