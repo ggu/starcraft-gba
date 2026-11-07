@@ -7,6 +7,8 @@
 #include "hybrid_snapshot_contract.h"
 #include "hybrid_snapshot_publish.h"
 #include "hybrid_register_csv.h"
+#include "../ares-store-probe/store_recorder.h"
+#include "../ares-store-probe/store_hook.h"
 #include <fcntl.h>
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Hybrid frontend: official same-process state restoration; no arbitrary guest-memory writes or host-input API.
@@ -38,6 +40,11 @@ namespace ares::Nintendo64 {
   auto load(Node::System&, string) -> bool;
   auto option(string, string) -> bool;
 }
+
+static Sc64StoreRecorder sc64_stores;
+extern "C" void sc64_store_instruction_begin(std::uint64_t pc,std::uint32_t op,std::uint64_t base) {sc64_stores.instruction_begin(pc,op,base);}
+extern "C" void sc64_store_instruction_end() {sc64_stores.instruction_end();}
+extern "C" void sc64_store_committed(std::uint64_t va,std::uint32_t pa,unsigned width,std::uint64_t data) {sc64_stores.committed(va,pa,width,data);}
 
 struct Probe final : ares::Platform {
   std::shared_ptr<mia::Pak> systemPak, gamePak;
@@ -133,7 +140,7 @@ int main(int argc,char** argv) {
   if(argc!=5) { std::cerr<<"usage: probe ROM OUTPUT_DIR neutral|tap FRAMES\n"; return 2; }
   std::string scenario=argv[3];
   char* end=nullptr; long frames=std::strtol(argv[4],&end,10);
-  if((scenario!="interactive" && scenario!="snapshot" && scenario!="snapshot-registers" && scenario!="neutral" && scenario!="tap" && scenario!="start" && scenario!="mission" && scenario!="advance" && scenario!="calibrate" && scenario!="select" && scenario!="select2" && scenario!="select3" && scenario!="select4" && scenario!="build" && scenario!="grid" && scenario!="custom" && scenario!="customstart" && scenario!="protosssetup" && scenario!="protossstart" && scenario!="protossselect" && scenario!="probe2" && scenario!="probe3") || !end || *end || frames<1 || frames>14000) return 2;
+  if((scenario!="interactive" && scenario!="snapshot" && scenario!="snapshot-registers" && scenario!="snapshot-stores" && scenario!="neutral" && scenario!="tap" && scenario!="start" && scenario!="mission" && scenario!="advance" && scenario!="calibrate" && scenario!="select" && scenario!="select2" && scenario!="select3" && scenario!="select4" && scenario!="build" && scenario!="grid" && scenario!="custom" && scenario!="customstart" && scenario!="protosssetup" && scenario!="protossstart" && scenario!="protossselect" && scenario!="probe2" && scenario!="probe3") || !end || *end || frames<1 || frames>14000) return 2;
   std::filesystem::path out=argv[2];
   if(!std::filesystem::is_directory(out) || !std::filesystem::is_directory(out/"saves") ||
      !std::filesystem::is_directory(out/"systems")) return 2;
@@ -193,7 +200,7 @@ int main(int argc,char** argv) {
   if(!meta || !steps) return 5;
   meta<<"callback,observed_step,width,height,bytes\n";
   steps<<"run,mask,polls,a_polls,start_polls,audio_calls,callbacks\n";
-  long completed=0; unsigned totalIdle=0, snapshotCount=0; bool transitioned=false, view_equal=false; auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(175);
+  long completed=0; unsigned totalIdle=0, snapshotCount=0; bool transitioned=false, view_equal=false, store_baseline_verified=false; auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(175);
   std::ofstream commands(out/"commands.csv"); commands<<"begin,steps,mask,x,y,capture\n";
   int images_fd=::open((out/"images.bin").c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);
   if(images_fd<0 || !sc64_observer_images_write(images_fd) || ::close(images_fd)!=0) return 2;
@@ -217,10 +224,10 @@ int main(int argc,char** argv) {
     }
     if(line.empty() || line.size()>=128 || std::chrono::steady_clock::now()>=commandDeadline || totalIdle>=60000) break;
     std::istringstream in(line); int count,mask,x,y,capture; std::string extra;
-    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !(sc64_hybrid_capture_allowed(capture) || ((scenario=="snapshot" || scenario=="snapshot-registers") && capture==3)) || (capture==3 && !sc64_hybrid_snapshot_allowed(scenario=="snapshot" || scenario=="snapshot-registers",transitioned,view_equal,ares::Nintendo64::cpu.recompiler.enabled,ares::Nintendo64::rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,ares::Nintendo64::rdram.ram.size,snapshotCount)) || (capture==2 && (transitioned || completed+count!=4200))) { std::cerr<<"invalid command\n"; return 7; }
+    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !(sc64_hybrid_capture_allowed(capture) || ((scenario=="snapshot" || scenario=="snapshot-registers" || scenario=="snapshot-stores") && capture==3)) || (capture==3 && !sc64_hybrid_snapshot_allowed(scenario=="snapshot" || scenario=="snapshot-registers" || scenario=="snapshot-stores",transitioned,view_equal,ares::Nintendo64::cpu.recompiler.enabled,ares::Nintendo64::rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,ares::Nintendo64::rdram.ram.size,snapshotCount)) || (capture==2 && (transitioned || completed+count!=4200))) { std::cerr<<"invalid command\n"; return 7; }
     commands<<completed<<','<<count<<','<<mask<<','<<x<<','<<y<<','<<capture<<'\n'; commands.flush();
     unsigned previous; {std::lock_guard lock(p.mutex); previous=p.frames.size();}
-    for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
+    for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; sc64_stores.step=static_cast<std::uint32_t>(completed); if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
     if(capture==2) {
       using namespace ares::Nintendo64;
       if(transitioned || completed!=4200 || !cpu.recompiler.enabled || !rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode || rdram.ram.size!=8u*1024u*1024u) return 8;
@@ -243,15 +250,17 @@ int main(int argc,char** argv) {
     }
     if(capture==3) {
       using namespace ares::Nintendo64;
-      if(!sc64_hybrid_snapshot_allowed(scenario=="snapshot" || scenario=="snapshot-registers",transitioned,view_equal,cpu.recompiler.enabled,rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,rdram.ram.size,snapshotCount)) return 8;
+      if(!sc64_hybrid_snapshot_allowed(scenario=="snapshot" || scenario=="snapshot-registers" || scenario=="snapshot-stores",transitioned,view_equal,cpu.recompiler.enabled,rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,rdram.ram.size,snapshotCount)) return 8;
       auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull); bool hx=x.hit(a),hy=y.hit(a);return hx&&hy?-1:hx||hy?1:0; };
       auto cached=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);return (std::uint8_t)(x.hit(a)?x.bytes[(a&15u)^3u]:y.bytes[(a&15u)^3u]); };
       auto ram=[](u32 a) { return (std::uint8_t)rdram.ram.read<Byte>(a,RBusDevice::ARES_DEBUGGER); };
       char name[32];std::snprintf(name,sizeof(name),"ram-%03u.bin",snapshotCount);
       auto file=out/name;
       if(!sc64_publish_snapshot(file.c_str(),rdram.ram.size,[&](std::uint8_t* bytes,std::size_t size) {
-          return sc64_read_ram(0,size,rdram.ram.size,bytes,hit,cached,ram);
+          if(!sc64_read_ram(0,size,rdram.ram.size,bytes,hit,cached,ram))return false;
+          return scenario!="snapshot-stores" || snapshotCount!=0 || sc64_store_baseline_valid(bytes,size);
       })) { std::cerr<<"snapshot conflict or publication failure\n";return 8; }
+      if(scenario=="snapshot-stores" && snapshotCount==0) {store_baseline_verified=true;sc64_stores.armed=true;}
       if(scenario=="snapshot-registers") {
         std::array<std::uint64_t,32> regs{};for(unsigned i=0;i<regs.size();++i)regs[i]=cpu.ipu.r[i].u64;
         auto row=sc64_register_csv_row(snapshotCount,static_cast<unsigned>(completed),cpu.ipu.pc,static_cast<std::uint64_t>(cpu.clock),regs);
@@ -275,6 +284,15 @@ int main(int argc,char** argv) {
     std::unique_lock lock(p.mutex);
     if(!p.failed && p.callbacks==0) p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.callbacks>0;});
   }
+  sc64_stores.armed=false;
+  if(scenario=="snapshot-stores") {
+    if(sc64_stores.overflow)return 8;
+    int fd=::open((out/"stores.bin").c_str(),O_WRONLY|O_CREAT|O_EXCL,0600);if(fd<0)return 5;
+    std::size_t bytes=sizeof(Sc64StoreEvent)*sc64_stores.count,done=0;
+    auto data=reinterpret_cast<const std::uint8_t*>(sc64_stores.events);
+    while(done<bytes){auto n=::write(fd,data+done,bytes-done);if(n<=0){::close(fd);return 5;}done+=static_cast<std::size_t>(n);}
+    if(::close(fd)!=0)return 5;
+  }
   root->unload(); root.reset(); // joins the upstream screen thread before reading frames
   std::lock_guard lock(p.mutex);
   std::ofstream status(out/"status.log"), observations(out/"callbacks.csv");
@@ -288,8 +306,9 @@ int main(int argc,char** argv) {
   observations<<"callback,observed_step,width,height,nonblack\n";
   for(std::size_t i=0;i<p.observations.size();++i) { auto &o=p.observations[i]; observations<<i<<','<<o.step<<','<<o.width<<','<<o.height<<','<<o.nonblack<<'\n'; }
   for(auto& text:p.statuses) status<<text<<'\n';
-  status<<"frontend="<<(scenario=="snapshot-registers"?"hybrid_snapshot_registers":scenario=="snapshot"?"hybrid_snapshot":"hybrid_authentic")<<" jit_before_cpu="<<cpu_jit<<" jit_before_rsp="<<rsp_jit<<" homebrew="<<homebrew<<" hybrid_transition="<<transitioned<<" exact_view_equal="<<view_equal<<" cpu_after="<<ares::Nintendo64::cpu.recompiler.enabled<<" rsp_after="<<ares::Nintendo64::rsp.recompiler.enabled<<"\n";
+  status<<"frontend="<<(scenario=="snapshot-stores"?"hybrid_snapshot_stores":scenario=="snapshot-registers"?"hybrid_snapshot_registers":scenario=="snapshot"?"hybrid_snapshot":"hybrid_authentic")<<" jit_before_cpu="<<cpu_jit<<" jit_before_rsp="<<rsp_jit<<" homebrew="<<homebrew<<" hybrid_transition="<<transitioned<<" exact_view_equal="<<view_equal<<" cpu_after="<<ares::Nintendo64::cpu.recompiler.enabled<<" rsp_after="<<ares::Nintendo64::rsp.recompiler.enabled<<"\n";
   status<<"requested_steps="<<frames<<" completed_steps="<<completed<<" polls="<<p.polls.load()<<" a_polls="<<p.aPolls.load()<<" start_polls="<<p.startPolls.load()<<" a_pressed_polls="<<p.aPressedPolls.load()<<" start_pressed_polls="<<p.startPressedPolls.load()<<" audio_calls="<<p.audioCalls.load()<<" callbacks_total="<<p.callbacks<<" frames_copied="<<p.frames.size()<<" callbacks_discarded="<<p.discarded<<" gpu_ready="<<p.gpuReady<<" failure="<<p.failure<<'\n';
+  if(scenario=="snapshot-stores") status<<"store_baseline_verified="<<store_baseline_verified<<" store_count="<<sc64_stores.count<<" store_overflow="<<sc64_stores.overflow<<"\n";
   if(p.failed || !p.gpuReady || p.frames.empty() || !transitioned || !view_equal || ares::Nintendo64::cpu.recompiler.enabled || ares::Nintendo64::rsp.recompiler.enabled) { std::cerr<<"renderer or callback failure: "<<p.failure<<" callbacks="<<p.callbacks<<"\n"; return 6; }
   for(std::size_t i=0;i<p.frames.size();++i) {
     auto& f=p.frames[i]; auto bytes=f.pixels.size()*sizeof(std::uint32_t);

@@ -1,0 +1,25 @@
+--- a/ares/n64/cpu/cpu.cpp
++++ b/ares/n64/cpu/cpu.cpp
+@@ -2,0 +3,3 @@
++#ifdef SC64_OBSERVER_CPU_STORE
++#include "sc64_store_hook.h"
++#endif
+@@ -168,0 +172,3 @@
++#ifdef SC64_OBSERVER_CPU_STORE
++  sc64_store_instruction_begin(ipu.pc, *data, ipu.r[(*data >> 21) & 31].u64);
++#endif
+@@ -169,0 +176,3 @@
++#ifdef SC64_OBSERVER_CPU_STORE
++  sc64_store_instruction_end();
++#endif
+--- a/ares/n64/cpu/memory.cpp
++++ b/ares/n64/cpu/memory.cpp
+@@ -192,2 +192,6 @@
+-  if(access.cache) return dcache.write<Size>(access.vaddr, paddr, data), true;
+-  return busWrite<Size>(paddr, data), true;
++  if(access.cache) dcache.write<Size>(access.vaddr, paddr, data);
++  else busWrite<Size>(paddr, data);
++#ifdef SC64_OBSERVER_CPU_STORE
++  sc64_store_committed(access.vaddr,paddr,Size,data);
++#endif
++  return true;
