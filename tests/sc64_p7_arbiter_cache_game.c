@@ -87,6 +87,13 @@ static void geometry_hoist_differential(void)
                         &tl,&tt,&tr,&tb) &&
                     sc64_p7_arbiter_finder_square_rect(0,tl,tt,tr,tb);
                 assert(old==candidate);
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+                Sc64AuraSquare square=sc64_aura_square_make(u[0].x,u[0].y,
+                    SC64_P7_MAP_COLS*32,SC64_P7_MAP_ROWS*32);
+                if (sc64_p7_actor_rect_source(71,u[0].x,u[0].y,0,&tl,&tt,&tr,&tb) &&
+                    sc64_p7_actor_rect_source(actors[ti],u[1].x,u[1].y,0,&tl,&tt,&tr,&tb))
+                    assert(candidate==sc64_aura_square_contains(&square,tl,tt,tr,tb));
+#endif
             }
     u[0]=saved0; u[1]=saved1;
 }

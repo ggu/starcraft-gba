@@ -217,6 +217,10 @@ static int sc64_p7_observer_rect_distance(unsigned raw_a, int x_a, int y_a,
     return (int)sc64_p7_observer_xy_length((unsigned)dx,(unsigned)dy);
 }
 
+#if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && defined(SC64_AURA_SQUARE_HOIST_PROBE)
+#include "sc64_aura_square_probe.h"
+#endif
+
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
 /* Exact continuation of rect_distance after both source rectangles have
  * passed the same actor-rectangle validation as the legacy helper. */
@@ -711,6 +715,10 @@ static void sc64_p7_arbiter_cache_source_tick(void)
         int al,at,ar,ab;
         if(!sc64_p7_actor_rect_source(71u,u[i].x,u[i].y,0,
                                       &al,&at,&ar,&ab)) continue;
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+        Sc64AuraSquare square=sc64_aura_square_make(u[i].x,u[i].y,
+                                  SC64_P7_MAP_COLS*32,SC64_P7_MAP_ROWS*32);
+#endif
 #endif
         if (sc64_target_index_active) {
             /* Target index cells are 64 GBA pixels. 160 source pixels is
@@ -744,8 +752,12 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                             int tl,tt,tr,tb;
                             if(sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[slot]),
                                     u[slot].x,u[slot].y,0,&tl,&tt,&tr,&tb) &&
-                               sc64_p7_arbiter_finder_square_rect((int)i,
-                                    tl,tt,tr,tb)) {
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+                               sc64_aura_square_contains(&square,tl,tt,tr,tb)
+#else
+                               sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)
+#endif
+                               ) {
                                 int d=sc64_p7_observer_rect_distance_rects(
                                     al,at,ar,ab,tl,tt,tr,tb);
                                 if(d>=0&&d<=160)aura[slot]=1;
@@ -773,7 +785,12 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 int tl,tt,tr,tb;
                 if(sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[j]),
                         u[j].x,u[j].y,0,&tl,&tt,&tr,&tb) &&
-                   sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)) {
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+                   sc64_aura_square_contains(&square,tl,tt,tr,tb)
+#else
+                   sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)
+#endif
+                               ) {
                     int d=sc64_p7_observer_rect_distance_rects(
                         al,at,ar,ab,tl,tt,tr,tb);
                     if(d>=0&&d<=160)aura[j]=1;
