@@ -1707,6 +1707,9 @@ static int race_save_game(void) {
      * Refuse all writes, including direct calls that bypass save_game(). */
     return 0;
 #endif
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    return 0; /* HOST payer witnesses have no authenticated journal. */
+#endif
 #ifdef SC64_SHARED_EGG_HOST_STAGE
     /* No new Egg save format is admitted by this HOST-only experiment.
      * Include dead Egg identities: kill_unit retains actor identity. Raw 36
@@ -4372,6 +4375,9 @@ static int race_load_game(void) {
     /* No old or research-journal candidate may publish ambiguous staged
      * building fields until active-job decoding is separately validated. */
     return 0;
+#endif
+#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+    return 0; /* No candidate can restore the HOST payer witnesses. */
 #endif
     RaceLoadPlan plan = {0};
 #ifdef SC64_GUARDIAN_COCOON_STAGE
