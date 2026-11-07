@@ -1,7 +1,7 @@
 import importlib.util, os, pathlib, signal, subprocess, sys, tempfile, time, unittest
 from unittest.mock import patch
 root=pathlib.Path(__file__).resolve().parents[2]
-spec=importlib.util.spec_from_file_location('observer',root/'experiments/ares-headless/actor_observer.py')
+spec=importlib.util.spec_from_file_location('observer',root/'experiments/ares-headless/marine_snapshot.py')
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 class StopTests(unittest.TestCase):
  def test_real_stop_owned_fd_and_kill(self):
