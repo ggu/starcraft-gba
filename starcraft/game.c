@@ -1,3 +1,7 @@
+#if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && \
+    (!defined(GBA_HOST) || !defined(SC64_RACES))
+#error "Campaign controller experiment requires HOST and shared races"
+#endif
 #if defined(SC64_CONTACT_MEMO_ORACLE) && \
     (!defined(GBA_HOST) || \
      !defined(SC64_CONTACT_CACHE))
@@ -1706,6 +1710,28 @@ static int skirmish_bot_index(int owner);
 #error "Briefings need source-font pixel wrapping; run make sc64-interface"
 #endif
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+/* Transient source controller, distinct from retained CHK origin. A reused
+ * slot starts unknown; only authenticated source events can bind it. */
+static u8 sc64_current_unit[MAX_UNITS], sc64_current_building[MAX_BUILDINGS];
+static int sc64_controller_source_owner(unsigned slot);
+static int sc64_controller_human_source(void);
+static void sc64_controller_reset(void)
+{ memset(sc64_current_unit, 255, sizeof sc64_current_unit); memset(sc64_current_building, 255, sizeof sc64_current_building); }
+static int sc64_controller_valid(int source, int owner)
+{ return source >= 0 && source < 8 && sc64_controller_source_owner((unsigned)source) == owner; }
+static int sc64_controller_unit(int slot)
+{ return slot >= 0 && slot < MAX_UNITS && u[slot].alive && sc64_controller_valid(sc64_current_unit[slot], u[slot].owner) ? sc64_current_unit[slot] : -1; }
+static int sc64_controller_building(int slot)
+{ return slot >= 0 && slot < MAX_BUILDINGS && b[slot].alive && sc64_controller_valid(sc64_current_building[slot], b[slot].owner) ? sc64_current_building[slot] : -1; }
+/* The caller must authenticate the source event and complete any other
+ * transfer guards before committing; source identity is not inferred. */
+static int __attribute__((unused)) sc64_controller_transfer_unit(int slot, int source)
+{ if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || source < 0 || source >= 8 ) return 0; int owner=sc64_controller_source_owner((unsigned)source); if (owner < 0) return 0; u[slot].owner=owner; sc64_current_unit[slot]=(u8)source; return 1; }
+static int __attribute__((unused)) sc64_controller_transfer_building(int slot, int source)
+{ if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive || source < 0 || source >= 8 ) return 0; int owner=sc64_controller_source_owner((unsigned)source); if (owner < 0) return 0; b[slot].owner=owner; sc64_current_building[slot]=(u8)source; return 1; }
+#endif
+
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 /* Source PUNI for the human Zerg slot denies Scourge (47) and Spire (141)
  * in Z1 and Z5. Use the current controller, not an actor's original CHK
@@ -2662,6 +2688,9 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+    sc64_current_unit[i] = 255;
+#endif
 #ifdef SC64_RANGE_WORK
     sc64_range_route_forget_target(i);
 #endif
@@ -2883,6 +2912,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_target_removed((unsigned)(MAX_UNITS+i));
+#endif
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+    sc64_current_building[i] = 255;
 #endif
     /* Destruction leaves the selection index on the dead slot; a new
        structure there must not inherit it (and its selected vital bar). */
@@ -5455,6 +5487,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+    sc64_controller_reset();
+#endif
     field_menu_repeat_reset();
     game_audio_prime();
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
