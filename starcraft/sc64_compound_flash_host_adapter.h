@@ -29,12 +29,20 @@ static int sc64_cf_ownership(const GbaFlashJournalIo *io)
         for(unsigned j=0;j<sizeof bytes;++j)if(bytes[j]!=0xff)return 0;
     }
     for(unsigned i=2;i<4;++i) {
-        u8 commit[4],metadata[4];
+        u8 commit[4],metadata[16],header[SC64_CF_HEADER];
         if(!io->read(io->context,gba_fj_base(i),commit,4) ||
-           !io->read(io->context,gba_fj_metadata(i),metadata,4))return 0;
+           !io->read(io->context,gba_fj_metadata(i),metadata,sizeof metadata))return 0;
         u32 a=gba_fj_u32(commit),b=gba_fj_u32(metadata);
         if((a!=0xffffffffu && a!=SC64_COMPOUND_FLASH_TAG) ||
            (b!=0xffffffffu && b!=SC64_COMPOUND_FLASH_TAG))return 0;
+        /* Check raw ownership even when probe will filter a bad CRC or
+         * length. Unknown/v1 tuples must never be erased as empty slots. */
+        if(a==SC64_COMPOUND_FLASH_TAG && b!=SC64_COMPOUND_FLASH_TAG)return 0;
+        if(b==SC64_COMPOUND_FLASH_TAG) {
+            Sc64CompoundFlashHeader parsed,expected=sc64_cf_expected(0);
+            if(!io->read(io->context,gba_fj_metadata(i)+16,header,sizeof header) ||
+               !sc64_cf_parse(header,gba_fj_u32(metadata+4),&expected,&parsed))return 0;
+        }
     }
     return 1;
 }

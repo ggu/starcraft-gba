@@ -9,9 +9,10 @@
 #undef main
 static Model device;
 static GbaFlash1m flash={&device,rd,wr,20,0,0};
+static int erases,programs;
 static int cf_read(void *c,uint32_t p,void *v,uint32_t n){return gba_flash1m_read(c,p,v,n);}
-static int cf_program(void *c,uint32_t p,const void *v,uint32_t n){return gba_flash1m_program(c,p,v,n);}
-static int cf_erase(void *c,uint32_t p){return gba_flash1m_erase_sector(c,p);}
+static int cf_program(void *c,uint32_t p,const void *v,uint32_t n){++programs;return gba_flash1m_program(c,p,v,n);}
+static int cf_erase(void *c,uint32_t p){++erases;return gba_flash1m_erase_sector(c,p);}
 static GbaFlashJournalIo io={&flash,cf_read,cf_erase,cf_program};
 const GbaFlashJournalIo *sc64_q8_flash_host_io(void){return &io;}
 static void copy_file(const char *path,int writing)
@@ -96,6 +97,25 @@ int main(int argc,char **argv)
         }
 #endif
         assert(saved);copy_file(argv[2],1);
+    } else if(!strcmp(argv[1],"foreign-v1") || !strcmp(argv[1],"foreign-header")) {
+        launch_z10_from_normal_menu();copy_file(argv[2],0);
+        GbaFlashJournalRecord r;assert(gba_fj_probe(&io,2,&r)==GBA_FJ_OK);
+        u32 at=gba_fj_metadata(r.index)+16;
+        if(!strcmp(argv[1],"foreign-v1"))device.bytes[at+4]=1;
+        else device.bytes[at+12]|=0x80;
+        assert(gba_fj_probe(&io,2,&r)==GBA_FJ_NONE); /* deliberately bad checksum */
+        static u8 prior[131072],ctrl_u[MAX_UNITS],ctrl_b[MAX_BUILDINGS],debts[MAX_UNITS+MAX_BUILDINGS];
+        static Unit units[MAX_UNITS];static Building buildings[MAX_BUILDINGS];
+        static Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT];
+        memcpy(prior,device.bytes,sizeof prior);memcpy(units,u,sizeof units);memcpy(buildings,b,sizeof buildings);
+        memcpy(ctrl_u,sc64_current_unit,sizeof ctrl_u);memcpy(ctrl_b,sc64_current_building,sizeof ctrl_b);
+        memcpy(debts,sc64_pr_hp_debt,sizeof debts);memcpy(shots,sc64_bc_shots,sizeof shots);
+        int old_minerals=minerals,old_gas=gas,old_frame=frame;erases=programs=0;
+        assert(!race_save_game() && !erases && !programs && !memcmp(prior,device.bytes,sizeof prior));
+        assert(!memcmp(units,u,sizeof units) && !memcmp(buildings,b,sizeof buildings) &&
+               !memcmp(ctrl_u,sc64_current_unit,sizeof ctrl_u) && !memcmp(ctrl_b,sc64_current_building,sizeof ctrl_b) &&
+               !memcmp(debts,sc64_pr_hp_debt,sizeof debts) && !memcmp(shots,sc64_bc_shots,sizeof shots) &&
+               old_minerals==minerals && old_gas==gas && old_frame==frame);
     } else if(!strncmp(argv[1],"read-",5)) {
         game_init();copy_file(argv[2],0);assert(race_load_game());
         int found=0;
