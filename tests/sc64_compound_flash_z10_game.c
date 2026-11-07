@@ -257,6 +257,21 @@ static void tiny_primitive_cuts(void)
         }
     }
     printf("distinct-A-B retry cuts=%u PASS\n",distinct_cases);
+    /* Maximum slot payload and wrap are separate from small cut fixtures. */
+    static u8 maximum[GBA_FJ_PAYLOAD_MAX-32u],snapshot[GBA_FJ_BYTES];
+    for(unsigned i=0;i<sizeof maximum;++i)maximum[i]=(u8)(i*11u+7u);
+    memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+    assert(tiny_begin() && sc64_cf_recovery_write(&tiny_io,prefix,16,maximum,sizeof maximum,tail,16));
+    GbaFlashJournalRecord max_record;assert(gba_fj_probe(&tiny_io,2,&max_record)==GBA_FJ_OK && max_record.length==GBA_FJ_PAYLOAD_MAX);
+    memcpy(snapshot,tiny.bytes,sizeof snapshot);assert(tiny_begin());tiny.mutations=0;
+    assert(!sc64_cf_recovery_write(&tiny_io,prefix,16,maximum,sizeof maximum+1u,tail,16));
+    assert(!tiny.mutations && !memcmp(snapshot,tiny.bytes,sizeof snapshot));
+    memset(&tiny,0,sizeof tiny);memset(tiny.bytes,255,sizeof tiny.bytes);tiny.budget=tiny.read_budget=-1;
+    assert(tiny_begin() && tiny_write(prefix,body,tail));
+    gba_fj_put32(tiny.bytes+gba_fj_metadata(2)+12,0xffffffffu); /* synthetic sequence boundary */
+    assert(tiny_begin() && sc64_cf_previous.sequence==0xffffffffu && tiny_write(prefix,body,tail));
+    assert(tiny_begin() && sc64_cf_previous.sequence==1 && sc64_cf_previous.index==3);
+    puts("maximum payload, overflow refusal and sequence wrap: PASS");
 }
 int main(int argc,char **argv)
 {
