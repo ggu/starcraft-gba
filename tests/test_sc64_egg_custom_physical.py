@@ -17,7 +17,7 @@ def unit(slot, typ, target=4, timer=5):
 
 
 def fixture():
-    return ({'race_mode': 1, 'race_human': 1, 'race_bots': 1, 'race_skirmish_map': 0,
+    return ({'screen': 1, 'race_mode': 1, 'race_human': 1, 'race_bots': 1, 'race_skirmish_map': 0,
              'units': [unit(12, 40)]},
             {'side': 0, 'egg_type': 40, 'zergling_type': 4, 'egg_slot': 12,
              'egg_timer': 5, 'supply': 8, 'supply_cap': 18})

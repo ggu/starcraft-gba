@@ -20,6 +20,8 @@ def digest(p):
 
 
 def check_state(state, info, active):
+    if state['screen'] not in (world.SCREEN_PLAY, world.SCREEN_PAUSE):
+        raise ValueError('guest left the match')
     if (state['race_mode'], state['race_human'], state['race_bots'], state['race_skirmish_map']) != (1, 1, 1, 0):
         raise ValueError('unexpected custom controller')
     if not (0 <= info['supply'] <= info['supply_cap']):
@@ -64,9 +66,13 @@ def run(trace, rom, elf, runner, reader, erased, out):
         game.rsp.export_sram()
         result = subprocess.run([str(reader), str(save)], capture_output=True, text=True, timeout=30, check=True)
         info = json.loads(result.stdout)
+        if saved['frame'] != info['frame'] or game.u32('won') or game.u32('lost'):
+            raise ValueError('saved frame or game outcome differs')
         check_state(saved, info, True)
         game.rsp.play_to(end, edges)
         reference = game.state()
+        if game.u32('won') or game.u32('lost'):
+            raise ValueError('uninterrupted game ended')
         check_state(reference, info, False)
     finally:
         game.close()
@@ -83,6 +89,8 @@ def run(trace, rom, elf, runner, reader, erased, out):
         continuation = [(0,512)] + [(t-cut, k) for t,k in edges if t > cut]
         resumed.rsp.play_to(end-cut, continuation)
         final = resumed.state()
+        if resumed.u32('won') or resumed.u32('lost'):
+            raise ValueError('resumed game ended')
         check_state(final, info, False)
         if comparable(final) != comparable(reference):
             raise ValueError('fresh guest continuation differs from uninterrupted reference')
