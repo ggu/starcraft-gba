@@ -96,6 +96,8 @@ def main():
         if x.get('kind')=='input':events.append((x['call_index'],x['held']))
     if not events or any(type(t)!=int or type(k)!=int or t<0 or k<0 or k>1023 or k&48==48 or k&192==192 for t,k in events) or any(events[i][0]>=events[i+1][0] for i in range(len(events)-1)):raise ValueError('invalid input tape')
     def check():
+        if subprocess.check_output(['git','rev-parse','--short=8','HEAD'],text=True).strip()!=receipt.get('head') or subprocess.run(['git','diff','--quiet','HEAD','--']).returncode:
+            raise ValueError('source changed after build')
         if any(sha(Path(p))!=h for p,h in pins.items()):raise ValueError('input changed')
         if shutil.disk_usage(a.output.parent).free<RESERVE:raise ValueError('disk reserve')
     resource.setrlimit(resource.RLIMIT_FSIZE,(LIMIT,LIMIT))
