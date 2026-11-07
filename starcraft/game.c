@@ -3624,6 +3624,10 @@ sc64_steer_best_direction(Unit *q, int speed, int from_cell,
 }
 #endif
 
+#if defined(SC64_CONTACT_CACHE) && defined(SC64_STEER_COST_DELTA_PROBE)
+#include "sc64_steer_cost_delta.h"
+#endif
+
 static void GBA_HOT
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
 __attribute__((optimize("Os")))
@@ -3716,9 +3720,18 @@ move_toward(Unit * q, int tx, int ty)
 	/* One bucket pass answers all eight unit_step_clear() offsets; the
 	 * selection order and tie-breaking below are unchanged. */
 	unsigned blocked = sc64_contact_blocked_mask(q, speed);
+#ifdef SC64_STEER_COST_DELTA_PROBE
+        Sc64SteerCostDelta delta;
+        int delta_valid=sc64_steer_cost_delta_prepare(&delta,q->x,q->y,q->path_x,q->path_y,speed);
+#endif
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
+#ifdef SC64_STEER_COST_DELTA_PROBE
+            int cost=delta_valid ? sc64_steer_cost_delta(&delta,dx[i],dy[i]) :
+                                  dist2(sx,sy,q->path_x,q->path_y);
+#else
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);
+#endif
 	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
 		!(blocked & (1u << i))) { best = i; best_cost = cost; }
 	}
