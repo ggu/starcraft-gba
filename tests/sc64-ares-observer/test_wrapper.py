@@ -30,6 +30,14 @@ class WrapperTest(unittest.TestCase):
    self.assertTrue(m.planned_witness(p,rows));(p/'live-002.argb').unlink();self.assertFalse(m.planned_witness(p,rows))
    (p/'live-002.argb').write_bytes(b'1234');(p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,0,1,1,4\n1,1,1,1,4\n2,3,1,1,4\n')
    self.assertFalse(m.planned_witness(p,rows))
+ def test_owned_guard_rejects_growth_and_low_disk(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);f=p/'large'
+   with f.open('wb') as stream:stream.truncate(63*1024**2+1)
+   with self.assertRaises(ValueError):m.owned_guard(p)
+   f.unlink()
+   with patch.object(m.shutil,'disk_usage',return_value=type('D',(),{'free':5*1024**3-1})()):
+    with self.assertRaises(ValueError):m.owned_guard(p)
  def test_binary_admission_and_changed_input(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d)/'probe';p.write_bytes(b'qualified')
