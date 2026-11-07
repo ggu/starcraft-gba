@@ -116,6 +116,11 @@ def main():
                     if not save_equal:raise ValueError('guest Flash images differ')
                     for save in saves:validate_flash_image(save)
                     saved=states[0];saved_job=research_job(saved)
+                    # Match the fresh title-load's one advancing release update
+                    # with ordinary START/release on the uninterrupted games.
+                    for g in games:g.step(8);g.step(0)
+                    reference=[g.state() for g in games];reference_video=[video(g) for g in games]
+                    if reference[0]!=reference[1] or reference_video[0]!=reference_video[1]:raise ValueError('uninterrupted post-save pair mismatch')
                     for g in reversed(games):g.close()
                     games=[]
                     for label,rom,elf,save in [('off',a.off_rom,a.off_elf,saves[0]),('on',a.on_rom,a.on_elf,saves[1])]:
@@ -127,7 +132,10 @@ def main():
                         if x.get('kind')=='input':resume.append((x['call_index'],x['held']))
                     for g in games:g.rsp.play_to(2,resume)
                     restored=[g.state() for g in games];v=[video(g) for g in games]
-                    if restored[0]!=restored[1] or v[0]!=v[1] or restored[0]['screen']!=world.SCREEN_PLAY:raise ValueError('fresh load/render mismatch')
+                    if (restored[0]!=restored[1] or v[0]!=v[1] or
+                        restored[0]!=reference[0] or v[0]!=reference_video[0] or
+                        restored[0]['screen']!=world.SCREEN_PLAY):
+                        raise ValueError('fresh load differs from uninterrupted state/render')
                     loaded=restored[0];loaded_job=research_job(loaded)
                     if (loaded['frame']!=saved['frame']+1 or
                         (loaded['minerals'],loaded['gas'])!=(saved['minerals'],saved['gas']) or
