@@ -104,7 +104,7 @@ def planned_witness(path,expected):
   if tuple(int(x['observed_step']) for x in frames)!=EXPECTED_FRAME_STEPS:return False
   if [x.name for x in sorted(path.glob('live-*.argb'))]!=['live-000.argb','live-001.argb','live-002.argb']:return False
   status=(path/'status.log').read_text()
-  return ('completed_steps=8617 ' in status and 'frontend=visual_only cpu_recompiler=1 rsp_recompiler=1 homebrew=0' in status and 'gpu_ready=1 ' in status)
+  return (f'completed_steps={EXPECTED_STEPS} ' in status and 'frontend=visual_only cpu_recompiler=1 rsp_recompiler=1 homebrew=0' in status and 'gpu_ready=1 ' in status)
  except (OSError,ValueError,KeyError,IndexError):return False
 
 def owned_guard(path):

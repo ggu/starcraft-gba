@@ -24,7 +24,7 @@ class WrapperTest(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d, patch.object(m,'EXPECTED_STEPS',3), patch.object(m,'EXPECTED_FRAME_STEPS',(0,1,2)):
    p=Path(d);data=b'1 0 0 0 1\n'*3;rows=m.planned_rows(data)
    (p/'commands.csv').write_text('begin,steps,mask,x,y,capture\n'+''.join(','.join(map(str,r))+'\n' for r in rows))
-   (p/'status.log').write_text('frontend=visual_only cpu_recompiler=1 rsp_recompiler=1 homebrew=0\ncompleted_steps=8617 gpu_ready=1 ')
+   (p/'status.log').write_text('frontend=visual_only cpu_recompiler=1 rsp_recompiler=1 homebrew=0\ncompleted_steps=3 gpu_ready=1 ')
    (p/'frames.csv').write_text('callback,observed_step,width,height,bytes\n0,0,1,1,4\n1,1,1,1,4\n2,2,1,1,4\n')
    for i in range(3):(p/f'live-{i:03}.argb').write_bytes(b'1234')
    self.assertTrue(m.planned_witness(p,rows));(p/'live-002.argb').unlink();self.assertFalse(m.planned_witness(p,rows))
