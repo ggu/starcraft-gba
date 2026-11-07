@@ -62,7 +62,14 @@ def check_paid(before, after, info):
     if not pools or before['minerals'] - after['minerals'] != 50 or not any(
             slot in halls_after and halls_after[slot] == count - 1 for slot, count in halls_before.items()):
         raise ValueError('guest did not pay with a completed Pool and Hatchery larva')
-    check_state(after, info, True)
+    unit_fields = world.UNIT_FIELDS
+    unit_owner, unit_type, target, timer = (1 + unit_fields.index(x) for x in
+                                             ('owner', 'type', 'target', 'work_timer'))
+    eggs = [u for u in after['units'] if u[unit_owner] == info['side'] and u[unit_type] == info['egg_type']]
+    if (len(eggs) != 1 or eggs[0][0] != info['egg_slot'] or
+            eggs[0][target] != info['zergling_type'] or eggs[0][timer] <= 0 or
+            not 0 <= after['supply_used'] <= after['supply_cap']):
+        raise ValueError('guest payment did not produce an active Zergling Egg')
 
 
 def phase_timeout(_signum, _frame):

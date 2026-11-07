@@ -57,6 +57,9 @@ class SnapshotTest(unittest.TestCase):
         before.update(minerals=100, buildings=[building(1, 10, 2), building(2, 11, 0)])
         after.update(minerals=50, buildings=[building(1, 10, 1), building(2, 11, 0)])
         physical.check_paid(before, after, info)
+        after['units'][0][1 + world.UNIT_FIELDS.index('work_timer')] = 6
+        after['supply_used'] = 9
+        physical.check_paid(before, after, info)  # Paid-time values may precede the save.
         after['minerals'] = 51
         with self.assertRaises(ValueError): physical.check_paid(before, after, info)
 
