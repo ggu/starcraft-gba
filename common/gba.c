@@ -245,7 +245,11 @@ static const u16 colors[32]={
  RGB(12,1,2),RGB(2,3,5),RGB(8,11,12),RGB(31,31,18)
 };
 /* Cartridge backup signature used by emulator/flash-cart save-type detection. */
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+__attribute__((used,aligned(4))) const char gba_save_signature[]="FLASH1M_V103";
+#else
 __attribute__((used)) const char gba_save_signature[]="SRAM_V113";
+#endif
 #if defined(SC64_AUDIO_IMPORTED) && !defined(GBA_HOST)
 static void audio_hw_init(void);
 #endif
@@ -1547,6 +1551,11 @@ volatile u32 audio_irq_cycles,audio_irq_peak,audio_irq_frames;
 /* audio_music_clear: the mixer zeroed one music half when music stopped;
  * the other half still holds the last frame and is zeroed next VBlank. */
 static u8 audio_half,audio_music_clear;
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+/* Only audio_hw_init claims the channels in this engine; any future
+ * DMA/timer ownership handoff must clear this before touching them. */
+static u8 audio_flash_owned;
+#endif
 /* Thumb, from ROM: the IWRAM reserve is too small for the mixer. */
 static void __attribute__((noinline)) audio_vblank(void){
  u32 start=gba_clock();
@@ -1590,6 +1599,9 @@ static void audio_hw_init(void){
  REG16(0x04000004)|=0x0008;
  REG16(0x04000200)=0x0001;
  REG16(0x04000208)=1;
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+ audio_flash_owned=1;
+#endif
 }
 #endif
 #else
@@ -1602,4 +1614,39 @@ int audio_music_track(void){return -1;}
 #ifdef GBA_HOST
 u8 gfx_test_pixel(int x,int y){if((unsigned)x>=240||(unsigned)y>=160)return 0;u16 v=pixels[y*120+x/2];return (u8)(x&1?v>>8:v);}
 void gfx_dump_ppm(const char* path){FILE*f=fopen(path,"wb");if(!f)return;fprintf(f,"P6\n240 160\n255\n");for(int i=0;i<38400;i++){u16 a=host_fb[front][i/2];u8 idx=(i&1)?a>>8:a&255;u16 v=host_palette[idx];u8 rgb[3]={(u8)((v&31)*255/31),(u8)(((v>>5)&31)*255/31),(u8)(((v>>10)&31)*255/31)};fwrite(rgb,1,3,f);}fclose(f);}
+#endif
+
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+#include "gba_flash_transaction.h"
+#include "gba_flash_audio_transaction.h"
+static u16 flash_read_ime(void *p){(void)p;return REG16(0x04000208);}
+static void flash_write_ime(void *p,u16 v){(void)p;REG16(0x04000208)=v;}
+static u16 flash_reg_read(void *p,u32 a){(void)p;return REG16(a);}
+static void flash_reg_write16(void *p,u32 a,u16 v){(void)p;REG16(a)=v;}
+static void flash_reg_write32(void *p,u32 a,u32 v){(void)p;REG32(a)=v;}
+static GbaFlashAudioTransaction flash_audio={
+ 0,flash_reg_read,flash_reg_write16,flash_reg_write32,
+#ifdef SC64_AUDIO_IMPORTED
+ (u32)AUDIO_MIX_BUFFER,(u32)AUDIO_MUSIC_BUFFER,(u16)(65536u-280896u/AUDIO_FRAME_SAMPLES),0,0,1,0
+#else
+ 0,0,0,0,0,0,0
+#endif
+};
+static int flash_audio_stop(void *p){
+ (void)p;
+#ifdef SC64_AUDIO_IMPORTED
+ flash_audio.imported=audio_flash_owned;
+#endif
+ return gba_flash_audio_stop(&flash_audio);
+}
+static void flash_audio_restore(void *p){
+ (void)p;
+#ifdef SC64_AUDIO_IMPORTED
+ if(flash_audio.active)audio_half=0;
+#endif
+ gba_flash_audio_restore(&flash_audio);
+}
+static GbaFlashTransaction flash_transaction={0,flash_read_ime,flash_write_ime,flash_audio_stop,flash_audio_restore,0,0};
+int gba_flash_game_transaction_begin(void){return gba_flash_transaction_begin(&flash_transaction);}
+void gba_flash_game_transaction_end(void){gba_flash_transaction_end(&flash_transaction);}
 #endif

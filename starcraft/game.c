@@ -11,11 +11,16 @@ static void sc64_contact_memo_invalidate(void);
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
 #include "sc64_save_tag_namespace.h"
-#ifdef SC64_Q8_FLASH_HOST_STAGE
+#if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_scope.h"
 #include "../common/gba_flash_journal.h"
 /* Supplied explicitly by the isolated HOST test harness. */
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+extern const GbaFlashJournalIo *sc64_q8_flash_arm_io(void);
+#define sc64_q8_flash_host_io sc64_q8_flash_arm_io
+#else
 extern const GbaFlashJournalIo *sc64_q8_flash_host_io(void);
+#endif
 static int race_q8_flash_begin(void);
 static int race_q8_flash_write(const void *data,u32 length);
 #endif
@@ -1255,7 +1260,7 @@ static int sc64_pr_stage_transfer_allowed(int slot,int new_owner);
 #define SC64_PR_ALLOW_BUILDING_TRANSFER(slot,owner) 1
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
-#if !defined(GBA_HOST) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_RACES) || (defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && !defined(SC64_Q8_FLASH_HOST_STAGE))
+#if (!defined(GBA_HOST) && !defined(SC64_Q8_FLASH_ARM_PROBE)) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_RACES) || (defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && !defined(SC64_Q8_FLASH_HOST_STAGE) && !defined(SC64_Q8_FLASH_ARM_PROBE))
 #error "Q8 research combat requires HOST jobs without unqualified fraction persistence"
 #endif
 static u8 sc64_pr_hp_debt[MAX_UNITS+MAX_BUILDINGS];
@@ -5118,7 +5123,13 @@ save_game(void)
     if (sc64_showcase_scene >= 0) return 0;
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+    if(!gba_flash_game_transaction_begin())return 0;
+    int saved=race_save_game();
+    gba_flash_game_transaction_end();return saved;
+#else
     return race_save_game();
+#endif
 #else
     data.version = SAVE_VERSION;
     memcpy(data.units, u, sizeof(u));
@@ -5177,7 +5188,13 @@ load_game(void)
     if (sc64_showcase_scene >= 0) return 0;
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+    if(!gba_flash_game_transaction_begin())return 0;
+#endif
     int loaded = race_load_game();
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+    gba_flash_game_transaction_end();
+#endif
 #ifdef SC64_TEXT_BOXES
     if (loaded) sc64_text_box_reset();
 #endif
