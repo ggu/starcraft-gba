@@ -27,9 +27,11 @@ int main(void)
     int parent=-1, child=-1, target=-1, origin, prior_owner;
     launch_z10_from_normal_menu();
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].type==U_REAVER &&
-        u[i].owner==ENEMY && sc64_controller_unit(i)==7) { parent=i; break; }
+        u[i].owner==ENEMY && sc64_controller_unit(i)==0) { parent=i; break; }
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].owner==SIDE && !invincible_units[i] && !sc64_race_unit_flying(u[i].type)) { target=i;break; }
     assert(parent>=0 && target>=0);origin=u[parent].raw_owner;prior_owner=u[parent].owner;
+    assert(origin==0 && sc64_controller_transfer_unit(parent,7));
+    assert(sc64_controller_unit(parent)==7 && u[parent].raw_owner==0 && u[parent].owner==prior_owner);
     u[parent].x=500;u[parent].y=500;u[parent].cd=0;
     u[target].x=512;u[target].y=500;
     { int raw,x,y,owner,hp=u[target].hp;
