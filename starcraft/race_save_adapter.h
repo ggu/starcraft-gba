@@ -16,6 +16,9 @@ _Static_assert(MAX_BUILDINGS <= 254, "UI save index exceeds one-byte encoding");
 #error "experimental research journal requires normal shared transport profiles"
 #endif
 #define SC64_RESEARCH_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH(SC64_TRANSPORT_SAVE_VERSION)
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+#define SC64_COMPOUND_FLASH_TAG SC64_SAVE_TAG_COMPOUND_FLASH(SC64_TRANSPORT_SAVE_VERSION)
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
 /* Resolve the candidate's immutable mission roles without consulting or
  * changing the currently running mission. The ordinary load preflight still
@@ -1723,10 +1726,15 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 
 static int race_save_game(void) {
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+    Sc64StageSaveAuth compound_writer_auth;
+    const Sc64StageSaveAuth *guard_auth=&compound_writer_auth;
+#else
     const Sc64StageSaveAuth *guard_auth=0; /* Until a compound writer is admitted. */
     return 0;
 #endif
-#if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE)
+#endif
+#if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE) && !defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
     return 0; /* no sidecar wire format yet, for any candidate */
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
@@ -1741,7 +1749,7 @@ static int race_save_game(void) {
      * Refuse all writes, including direct calls that bypass save_game(). */
     return 0;
 #endif
-#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+#if defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) && !defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
     return 0; /* HOST payer witnesses have no authenticated journal. */
 #endif
 #ifdef SC64_SHARED_EGG_HOST_STAGE
@@ -1759,7 +1767,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
-#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+    if (race_mode!=0 || race_selected_mission!=SC64_Z10_GLOBAL_ID || race_human!=R_ZERG || !race_q8_flash_begin()) return 0;
+#elif defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE)
     if (race_mode!=0 || race_selected_mission!=SC64_RACE_MISSION_P1 || race_human!=R_PROTOSS || !race_q8_flash_begin()) return 0;
 #else
     if (race_mode!=1 ||
@@ -1902,6 +1912,11 @@ static int race_save_game(void) {
 #else
         SAVE_VERSION;
 #endif
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+    const Sc64StageTagPair compound_writer_pair={SC64_COMPOUND_FLASH_TAG,SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
+    if (!sc64_stage_save_authenticate(&compound_writer_auth,&race_data,SC64_COMPOUND_FLASH_TAG,
+                                      race_data.version,&compound_writer_pair,1)) return 0;
+#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
     const Sc64StageTagPair writer_pair=race_mode ?
@@ -1974,6 +1989,13 @@ static int race_save_game(void) {
             memset(&wire,0,sizeof(wire));
         if (!sc64_zp_unit_save_encode(&race_data.units[i],&wire,
                                      (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+    }
+#elif defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
+    for (int i=0;i<MAX_UNITS;i++) {
+        Unit wire;
+        if (!sc64_scarab_flight_to_wire(&u[i],&wire,1,0) ||
+            !sc64_zp_unit_save_encode(&race_data.units[i],&wire,
+                                      (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
     }
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     for (int i=0;i<MAX_UNITS;i++) {
@@ -2702,8 +2724,11 @@ typedef struct {
 #endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     u8 q8_debt[MAX_UNITS+MAX_BUILDINGS];
-#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+#if defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE) || defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
     u8 controller_units[MAX_UNITS], controller_buildings[MAX_BUILDINGS];
+#endif
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+    u8 scarab_payers[MAX_UNITS];
 #endif
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
@@ -4166,6 +4191,15 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (raw != (const void *)&race_impact_record) return 0;
     memset(plan,0,sizeof(*plan));
 #endif
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+    /* Only the compound reader calls this stage, after validating its full
+     * outer checksum and fixed header. Bind the token to this scratch record. */
+    if (tag!=SC64_COMPOUND_FLASH_TAG) return 0;
+    const Sc64StageTagPair compound_pair={SC64_COMPOUND_FLASH_TAG,SAVE_VERSION,SC64_STAGE_SAVE_SCARAB};
+    if (!sc64_stage_save_authenticate(&plan->compound_auth,&race_data,tag,race_data.version,
+                                      &compound_pair,1)) return 0;
+    tag=SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION;
+#endif
 #if defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
     const Sc64StageTagPair combined_tags[]={
         {SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0},
@@ -4303,7 +4337,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     return race_load_preflight(plan);
 #endif
 }
-#if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+#include "sc64_compound_flash_host_adapter.h"
+#elif defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_host_adapter.h"
 #endif
 static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
@@ -4411,10 +4447,10 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 }
 #endif
 static int race_load_game(void) {
-#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+#if defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) && !defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
     return 0; /* No compound envelope reader has been admitted yet. */
 #endif
-#if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE)
+#if defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) && !defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE) && !defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
     return 0; /* title state cannot identify an incoming campaign candidate */
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
@@ -4425,7 +4461,7 @@ static int race_load_game(void) {
      * building fields until active-job decoding is separately validated. */
     return 0;
 #endif
-#ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
+#if defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) && !defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
     return 0; /* No candidate can restore the HOST payer witnesses. */
 #endif
     RaceLoadPlan plan = {0};
@@ -4881,9 +4917,12 @@ static int race_load_game(void) {
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     memcpy(sc64_pr_hp_debt,plan.q8_debt,sizeof sc64_pr_hp_debt);
-#ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
+#if defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE) || defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
     memcpy(sc64_current_unit,plan.controller_units,sizeof sc64_current_unit);
     memcpy(sc64_current_building,plan.controller_buildings,sizeof sc64_current_building);
+#endif
+#ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
+    memcpy(sc64_scarab_stage_payer,plan.scarab_payers,sizeof sc64_scarab_stage_payer);
 #endif
 #endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
