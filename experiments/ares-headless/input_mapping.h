@@ -6,7 +6,7 @@ constexpr unsigned sc64_command_bit(unsigned id) {
     switch (id) {
     case 1: return 1; case 2: return 2; case 4: return 4;
     case 32: return 8; case 64: return 16; case 128: return 32;
-    case 256: return 64; case 512: return 128; case 1024: return 256;
+    case 256: return 64; case 512: return 128; case 1024: return 256; case 2048: return 512;
     default: return 0;
     }
 }
