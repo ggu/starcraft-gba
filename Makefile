@@ -18,6 +18,7 @@ test: test-scarab-save-selection
 
 include tests/gba-save-parts/Makefile
 include mk/text-box/Makefile
+include mk/combat-perf/Makefile
 
 .PHONY: test-scarab-parent-migration
 build/test-scarab-parent-migration: tests/sc64_scarab_parent_migration.c starcraft/sc64_scarab_fields.h Makefile | build
@@ -364,11 +365,6 @@ BC_FLAGS := -I$(BC_DIR) -I$(BC_YAMATO_DIR) -DSC64_BATTLECRUISER_EXPERIMENT -DSC6
 
 SC64_RELEASE_TRANSPORT_FLAGS := -DSC64_SHARED_TRANSPORT
 SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH -DSC64_SHARED_SCOURGE_COMBAT -DSC64_SHARED_BATTERY -DSC64_SHARED_BUNKER
-# Flip mode-4 pages from the VBlank interrupt so the next update overlaps the
-# wait for VBlank. Drawing and simulation are unchanged; only the time at
-# which a finished page appears moves. It takes effect in ROMs with the
-# sampled-audio interrupt; host builds and other ROMs keep the polled gate.
-SC64_PRESENT_FLAGS ?= -DGBA_ASYNC_PRESENT
 RACES_FLAGS := $(BACKWATER_FLAGS) $(SC64_PRESENT_FLAGS) -DSC64_RACES -DSC64_SOURCE_SIGHT_ALL_RACES -DSC64_DEPOT_BOUNDED -DSC64_ENGINE_CORE_REQUIRED $(SC64_SHARED_ENGINE_FLAGS) -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(HUD_ICON_FLAGS) $(RACE_CONSTRUCTION_FLAGS) $(SC64_BUILDING_FIRE_FLAGS) $(SC64_ORDER_MARKER_FLAGS) $(UNIT_FACING_FLAGS)
 RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(COMMAND_ICON_HEADER) $(RACE_CONSTRUCTION_INPUTS) $(SC64_BUILDING_FIRE_HEADER) $(SC64_ORDER_MARKER_HEADER) $(UNIT_FACING_INPUTS)
 
@@ -508,11 +504,6 @@ ifneq ($(words $(CANONICAL_ROUTE_INDEX)),1)
 $(error CANONICAL_ROUTE_INDEX must be 0 or 1)
 endif
 CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS)
-# Size cached route fields to the active map, so the fixed route bank holds
-# more of them on maps smaller than 128 by 128 (56 on the 64-by-64 custom
-# maps instead of 14). Answers are unchanged; fewer fields are rebuilt.
-# Empty this to compare a canonical ROM with the fixed 14-field layout.
-CANONICAL_ROUTE_STRIDE_FLAGS ?= -DSC64_ROUTE_ACTIVE_STRIDE
 # Fresh-cell writer requires the existing paired-visit route configuration.
 # Showcase also needs the split flood when this option is enabled.
 CANONICAL_ROUTE_NEW_CELL ?= $(CANONICAL_ROUTE_INDEX)
@@ -4829,17 +4820,6 @@ test-sc64-weapon-source-cull-fast-diff: | build
 	else \
 		$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -Wall -Wextra -Werror -Wno-unused-function -I"$(WEAPON_SOURCE_DIR)" tests/sc64_weapon_source_cull_fast_diff.c -o build/test-sc64-weapon-source-cull-fast-diff && \
 		./build/test-sc64-weapon-source-cull-fast-diff; \
-	fi
-
-# Optional differential of the per-profile tick cache, the 32-bit flight and
-# position paths against retained earlier code, over every prepared profile.
-.PHONY: test-sc64-weapon-source-ticks-bank
-test-sc64-weapon-source-ticks-bank: | build
-	@if test ! -f "$(WEAPON_SOURCE_HEADER)"; then \
-		echo "SKIP: prepared weapon source bank not present at $(WEAPON_SOURCE_HEADER)"; \
-	else \
-		$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -Wall -Wextra -Werror -Wno-unused-function -I"$(WEAPON_SOURCE_DIR)" -Istarcraft tests/sc64_weapon_source_ticks_bank.c -o build/test-sc64-weapon-source-ticks-bank && \
-		./build/test-sc64-weapon-source-ticks-bank; \
 	fi
 
 # Explicit qualification of an already-prepared bank with profile bounds.
