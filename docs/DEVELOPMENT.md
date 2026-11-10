@@ -64,6 +64,77 @@ available here. Use local checks on the current machine or a separately
 configured trusted machine; do not automatically execute public PR code on
 personal runners. Routine verification does not require a new runner service.
 
+## Release check, package and SD copy
+
+`tools/sc64_release.py` (wrapped as `./dev release ...`) is the repeatable local
+check for the shipped ROMs: the original-art default, Terran T10, Zerg Z9,
+Protoss P10 and Showcase, plus the Zerg Z10 preview when named. It is
+local-only: it does not push, open pull requests, or touch GitHub Actions.
+
+```sh
+./dev release check [--products terran,protoss] [--require-all] [--out DIR] \
+    [--make-arg ARG ...]
+./dev release package --check build/release-check/<rev8> [--out DIR] [--allow-dirty]
+./dev release copy --package build/release/<label> --dest /Volumes/CARD
+./dev release verify --dest /Volumes/CARD [--package build/release/<label>]
+```
+
+`check` runs, per product and in order, build, verify (`tools/verify_roms.py`,
+now including `--showcase`) and the product's HOST suite. Once per run it also
+runs `tools/check_source_tree.py` and `tests/test_sc64_engine_capabilities.py`,
+which compiles the shared-engine contract at the flag vectors the ROMs are linked
+with (the Terran, Zerg Z9/Z10 and Protoss P10 release vectors among them).
+Results go to `release-check.json` and `release-check.md` (default
+`build/release-check/<rev8>/`, ignored by Git) with per-step PASS/FAIL/SKIPPED,
+durations, make commands, log paths, ROM sha256, length and game code, linker RAM
+margins (`__iwram_end` and `__bss_end` against the limits in `common/gba.ld`),
+the full source revision, a dirty flag for modified tracked files, and tool
+versions. It exits non-zero if any step FAILED.
+
+- **SKIPPED** means the step did not run because private generated inputs are
+  absent. Before each step the tool reads make's rule database (`make -p -q` on a
+  no-op target, so no product recipe or importer runs) and reports prerequisites
+  that do not exist and have no rule, for example `SKIPPED (missing: .local/...)`.
+  It never generates inputs. A SKIPPED step is not a pass; `--require-all`
+  turns any SKIPPED into a failed run. The detection is a heuristic over make's
+  explicit rules and ignores missing `build/` outputs, which implicit rules may
+  create; the make invocation itself remains the authority and a miss shows as FAIL.
+- `--make-arg` passes an argument to every make call, including the database
+  read; use it for local input layouts, for example
+  `--make-arg -o --make-arg .local/sc64/p4/generated/sc64_p4_scenario_generated.h`
+  (files named with `-o` are assumed present) or
+  `--make-arg Z8_DESCRIPTOR=.local/build/z9-inputs/z8-descriptor.json`.
+- Native builds are serialized and bounded. Make runs with `-j1` unless you
+  pass your own `-j`. If `SC64_BUILD_LOCK` (or `--build-lock`) names a file, an
+  exclusive `flock` on it is held around each make invocation. A build starts
+  only with at least 4 GiB free (`SC64_MIN_FREE_GIB` or `--min-free-gib`);
+  otherwise that step FAILS without running.
+
+`package` builds `StarCraft-GBA-<date>-<rev8>/` from a check result: each passed
+product's ROM under a versioned file name, `MANIFEST.json`, `SHA256SUMS`
+(`shasum -a 256 -c SHA256SUMS` works), and a `README.txt` that opens with the
+source revision, lists what was and was not checked, and embeds
+[the hardware checklist](HARDWARE-CHECKLIST.md) with empty tick boxes. It
+refuses when the check's revision is not HEAD, when tracked files are modified
+(`--allow-dirty` adds `-dirty` to the label), when a requested product did not
+PASS, when a ROM changed after the check, or when the output would land in a
+tracked or non-ignored repository path. Products whose build and verify passed
+but whose HOST suite was SKIPPED are packaged only with `--accept-skipped`,
+which the README records.
+
+`copy` writes `<dest>/<package name>/`. It validates the package against its
+own `SHA256SUMS`, refuses (before copying anything) if a destination file
+already holds different content, never overwrites or deletes anything, so
+existing saves are untouched, then re-reads every copied file (bypassing the
+OS cache where macOS allows), compares sha256, and writes `COPY-VERIFIED.txt`
+(or `COPY-FAILED.txt`) in the copied folder. The operating system can still
+cache a write; eject, reinsert and run `verify --dest` for a fresh read-back.
+Only after a verified copy may a newer build be described as on the card.
+
+Hardware results are recorded by hand on the checklist. No tool in this
+repository marks a ROM as tested on a Game Boy Advance, and a package's
+`MANIFEST.json` always says `"hardware_tested": false`.
+
 ## Canonical Zerg unit rendering
 
 Canonical Zerg uses prealigned unit sprite words generated from the same indexed
