@@ -6,6 +6,7 @@
 static void z7_hit_observer(int target, int damage, int source_type, int source_owner);
 #define SC64_TEST_HIT_OBSERVER(t,d,s,o) z7_hit_observer((t),(d),(s),(o))
 #include "../starcraft/game.c"
+#include "sc64_route_purity.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -371,7 +372,18 @@ static void step(u16 held)
            (u[i].type==U_HYDRALISK||u[i].type==U_MUTALISK)) {
             defender_hp[i]=u[i].hp;defender_raw[i]=u[i].raw_type;
         } else {defender_hp[i]=-1;defender_raw[i]=-1;}
+#ifdef ROUTE_PURITY_DEBUG
+    static uint64_t purity_after_update;
+    static int purity_armed;
+    if(purity_armed&&route_purity_hash()!=purity_after_update) {
+        fprintf(stderr,"route purity: controller code changed engine route state before frame %u\n",(unsigned)frame);
+        abort();
+    }
+#endif
     game_update(held,pressed);
+#ifdef ROUTE_PURITY_DEBUG
+    purity_after_update=route_purity_hash();purity_armed=1;
+#endif
     z7_last_seen_observe();
     if((unsigned)frame>=11200u&&(unsigned)frame<=13200u) {
         int observed=0;
