@@ -13015,6 +13015,9 @@ game_render(void)
 #ifdef SC64_IMPORTED_MISSION
     u32 profile_start;
 #endif
+#ifdef SC64_FIELD_CONTROLS
+    ui_site_drawn.valid = 0;
+#endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_NO_FRAME_CLEAR)
     /* Imported live scenes overwrite every pixel in the map and HUD bands.
      * Title pages retain the regular clear; coverage fixtures exercise live,
