@@ -179,11 +179,15 @@ static int race_colony_post_building_tick(void)
                 q->queue_progress + SC64_Z7_SUNKEN_HP - SC64_Z7_CREEP_HP;
             if (hp < 1) hp = 1;
             if (hp > target_hp) hp = target_hp;
-            q->hp = hp;
 #endif
             q->type = spore ? B_SPORE_COLONY : B_SUNKEN_COLONY;
             q->raw_type = spore ? SC64_Z7_SPORE_RAW : SC64_Z7_SUNKEN_RAW;
             q->maxhp = target_hp;
+#ifndef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            /* Keep the stock store order: moving this store changed the
+             * generated Z9 code, and flag-off ROMs must stay byte-identical. */
+            q->hp = hp;
+#endif
             q->flags &= ~(SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG);
             q->queue_progress = 0;
         }
