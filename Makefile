@@ -502,7 +502,12 @@ endif
 ifneq ($(words $(CANONICAL_ROUTE_INDEX)),1)
 $(error CANONICAL_ROUTE_INDEX must be 0 or 1)
 endif
-CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID)
+CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS)
+# Size cached route fields to the active map, so the fixed route bank holds
+# more of them on maps smaller than 128 by 128 (56 on the 64-by-64 custom
+# maps instead of 14). Answers are unchanged; fewer fields are rebuilt.
+# Empty this to compare a canonical ROM with the fixed 14-field layout.
+CANONICAL_ROUTE_STRIDE_FLAGS ?= -DSC64_ROUTE_ACTIVE_STRIDE
 # Fresh-cell writer requires the existing paired-visit route configuration.
 # Showcase also needs the split flood when this option is enabled.
 CANONICAL_ROUTE_NEW_CELL ?= $(CANONICAL_ROUTE_INDEX)

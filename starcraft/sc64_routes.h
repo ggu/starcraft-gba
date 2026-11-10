@@ -86,9 +86,8 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #endif
 
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
-#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3) || \
-    !defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_LARGE_MAPS)
-#error "SC64_ROUTE_ACTIVE_STRIDE requires the packed ZP large-map race profile"
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_ROUTE_ACTIVE_STRIDE requires packed race route fields"
 #endif
 #endif
 
@@ -105,31 +104,36 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #error "SC64_T4_RUNTIME requires large packed race routes"
 #endif
 #ifdef SC64_RACES
+/* Fields the bank holds when each one is sized for the largest map. */
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-#ifdef SC64_ROUTE_ACTIVE_STRIDE
-#define SC64_ROUTE_SLOTS 18
-#define SC64_ROUTE_ACTIVE_MAX_SLOTS 18
-#else
-#define SC64_ROUTE_SLOTS 14
-#endif
+#define SC64_ROUTE_FIXED_SLOTS 14
 #elif defined(SC64_LARGE_MAPS)
 #ifdef SC64_ROUTE_PACK3
-#define SC64_ROUTE_SLOTS 20
+#define SC64_ROUTE_FIXED_SLOTS 20
 #else
-#define SC64_ROUTE_SLOTS 15
+#define SC64_ROUTE_FIXED_SLOTS 15
 #endif
 #elif defined(SC64_T3_ENABLED)
 #ifdef SC64_ROUTE_PACK3
-#define SC64_ROUTE_SLOTS 22
+#define SC64_ROUTE_FIXED_SLOTS 22
 #else
-#define SC64_ROUTE_SLOTS 17
+#define SC64_ROUTE_FIXED_SLOTS 17
 #endif
 #else
 #ifdef SC64_ROUTE_PACK3
-#define SC64_ROUTE_SLOTS 24
+#define SC64_ROUTE_FIXED_SLOTS 24
 #else
-#define SC64_ROUTE_SLOTS 18
+#define SC64_ROUTE_FIXED_SLOTS 18
 #endif
+#endif
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+/* The bank keeps its size. A map smaller than the largest one packs more
+ * fields into it: a 64-by-64 map fits 56 where a 128-by-128 map fits 14.
+ * Only the cache's residency changes; every answer is the same field. */
+#define SC64_ROUTE_ACTIVE_MAX_SLOTS 56
+#define SC64_ROUTE_SLOTS SC64_ROUTE_ACTIVE_MAX_SLOTS
+#else
+#define SC64_ROUTE_SLOTS SC64_ROUTE_FIXED_SLOTS
 #endif
 #ifdef SC64_ROUTE_PACK3
 #define SC64_ROUTE_BYTES ((MAP_CELLS * 3 + 7) / 8)
@@ -158,7 +162,7 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
  * packed byte count is not a multiple of four, so the helper handles a byte
  * prefix and tail around its aligned word stores. */
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
-#define SC64_ROUTE_POOL_BYTES (14u * SC64_ROUTE_BYTES)
+#define SC64_ROUTE_POOL_BYTES ((unsigned)SC64_ROUTE_FIXED_SLOTS * SC64_ROUTE_BYTES)
 static u8 sc64_route_pool[SC64_ROUTE_POOL_BYTES] __attribute__((aligned(4)));
 static u8 *sc64_route_field[SC64_ROUTE_SLOTS];
 static unsigned sc64_route_active_bytes, sc64_route_active_slots;
@@ -200,7 +204,7 @@ static void sc64_route_field_clear(u8 *field)
 }
 #else
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
-#define SC64_ROUTE_POOL_BYTES (14u * SC64_ROUTE_BYTES)
+#define SC64_ROUTE_POOL_BYTES ((unsigned)SC64_ROUTE_FIXED_SLOTS * SC64_ROUTE_BYTES)
 static u8 sc64_route_pool[SC64_ROUTE_POOL_BYTES];
 static u8 *sc64_route_field[SC64_ROUTE_SLOTS];
 static unsigned sc64_route_active_bytes, sc64_route_active_slots;
@@ -1423,9 +1427,14 @@ sc64_route_step_slot_mode(int origin, int goal, int allow_build)
         return allow_build ? sc64_route_slot(goal) : -1;
 #endif
     for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS && used < 2; ++i) {
-        int root, rx, ry, gx, gy, cur, steps;
+        int root, rx, ry, gx, gy, cur, steps, apart;
         if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
+        /* A root within four cells of the goal is at most four rows and four
+         * columns away, so a larger index gap cannot qualify. This skips the
+         * divisions below for nearly every cached field. */
+        apart = root > goal ? root - goal : goal - root;
+        if (apart > 4 * MAP_COLS + 4) continue;
         if (!SC64_GRID_GET(path_walkable, root)) continue;
         rx = root % MAP_COLS; ry = root / MAP_COLS;
         gx = goal % MAP_COLS; gy = goal / MAP_COLS;
@@ -1488,9 +1497,14 @@ sc64_route_step_slot(int origin, int goal)
     if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) return sc64_route_slot(goal);
 #endif
     for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS && used < 2; ++i) {
-        int root, rx, ry, gx, gy, cur, steps;
+        int root, rx, ry, gx, gy, cur, steps, apart;
         if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
+        /* A root within four cells of the goal is at most four rows and four
+         * columns away, so a larger index gap cannot qualify. This skips the
+         * divisions below for nearly every cached field. */
+        apart = root > goal ? root - goal : goal - root;
+        if (apart > 4 * MAP_COLS + 4) continue;
         if (!SC64_GRID_GET(path_walkable, root)) continue;
         rx = root % MAP_COLS; ry = root / MAP_COLS;
         gx = goal % MAP_COLS; gy = goal / MAP_COLS;

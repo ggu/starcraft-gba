@@ -207,7 +207,7 @@ static void assert_random_queries(unsigned count)
 int main(void)
 {
     assert(sc64_route_configure());
-    assert(sc64_route_active_bytes == 1536 && sc64_route_active_slots == 18);
+    assert(sc64_route_active_bytes == 1536 && sc64_route_active_slots == 56);
     assert_random_queries(240);
     assert_pool_canaries();
     /* Open-grid ties exercise the exact root-BFS direction, including L-fast. */
@@ -227,7 +227,7 @@ int main(void)
 
     set_shape(127, 127, 6049, 14);
     assert_pool_canaries();
-    set_shape(64, 64, 1536, 18);
+    set_shape(64, 64, 1536, 56);
     assert_random_queries(180);
     assert_pool_canaries();
 
