@@ -90,10 +90,14 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #error "SC64_ROUTE_ACTIVE_STRIDE requires packed race route fields"
 #endif
 #endif
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+#if !defined(SC64_ROUTE_FLOOD_SPLIT) || defined(SC64_ROUTE_PARTIAL_FLOOD)
+#error "SC64_ROUTE_ACTIVE_STRIDE requires complete split-flood race routes"
+#endif
+#endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
-#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3) || \
-    !defined(SC64_ROUTE_FLOOD_SPLIT) || defined(SC64_ROUTE_PARTIAL_FLOOD)
-#error "SC64_ROUTE_KEEP_FIELDS requires complete packed split-flood race routes"
+#ifndef SC64_ROUTE_ACTIVE_STRIDE
+#error "SC64_ROUTE_KEEP_FIELDS requires SC64_ROUTE_ACTIVE_STRIDE"
 #endif
 #endif
 
@@ -132,14 +136,16 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #define SC64_ROUTE_FIXED_SLOTS 18
 #endif
 #endif
+/* The logical cache is the fixed layout: this many fields, with the same
+ * bookkeeping and eviction in every build. */
+#define SC64_ROUTE_SLOTS SC64_ROUTE_FIXED_SLOTS
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* The bank keeps its size. A map smaller than the largest one packs more
- * fields into it: a 64-by-64 map fits 56 where a 128-by-128 map fits 14.
- * Only the cache's residency changes; every answer is the same field. */
-#define SC64_ROUTE_ACTIVE_MAX_SLOTS 56
-#define SC64_ROUTE_SLOTS SC64_ROUTE_ACTIVE_MAX_SLOTS
-#else
-#define SC64_ROUTE_SLOTS SC64_ROUTE_FIXED_SLOTS
+ * physical fields into it (56 on 64 by 64, 14 on 128 by 128). Each logical
+ * slot owns one physical field; the others hold "donors": the bytes of complete
+ * point fields that left the logical cache. A logical miss for a goal with a
+ * usable donor takes that field instead of flooding. */
+#define SC64_ROUTE_PHYS_MAX 56
 #endif
 #ifdef SC64_ROUTE_PACK3
 #define SC64_ROUTE_BYTES ((MAP_CELLS * 3 + 7) / 8)
@@ -227,30 +233,39 @@ static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
 
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
-#ifdef SC64_ROUTE_KEEP_FIELDS
-/* A structure change used to discard every cached field. With this option the
- * cache bookkeeping (valid, goal, age, clock, victim choice, range work) still
- * changes exactly as it did, so every behaviour that depends on which fields
- * are resident is unchanged, but the bytes of each discarded complete point
- * field stay in their slot as a "donor". The first query that would have
- * flooded the same goal adopts the donor's bytes instead and marks the slot
- * "lazy". Only a single-cell read may use a lazy slot as it is, after the
- * validation in sc64_route_gate; any other reader first floods the slot
- * ("exact"), which gives the bytes a flood on the current grid would give.
- * The log names the cells that became walkable; each slot remembers how many
- * log entries existed when its bytes were flooded. */
-#define SC64_ROUTE_LOG_SIZE 24
-#define SC64_ROUTE_FLAG_LAZY 1
-#define SC64_ROUTE_FLAG_DONOR 2
-#ifndef SC64_ROUTE_GRID_CELLS_PER_BYTE
-#define SC64_ROUTE_GRID_CELLS_PER_BYTE 1
-#endif
-/* Host tests may count which validation outcome decided each use. */
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+#define SC64_ROUTE_FLAG_STALE 1  /* bytes flooded on an earlier grid */
+#define SC64_ROUTE_FLAG_DONOR 2  /* bytes of a complete point field, in no logical slot */
 #ifndef SC64_ROUTE_KEEP_COUNT
 #define SC64_ROUTE_KEEP_COUNT(name) ((void)0)
 #endif
+static u8 sc64_route_lphys[SC64_ROUTE_SLOTS];       /* logical slot -> physical field */
+static u8 sc64_route_pcount;                        /* donor-capable physical fields; 0: none */
+static u8 sc64_route_pf_flags[SC64_ROUTE_PHYS_MAX], sc64_route_pf_logn[SC64_ROUTE_PHYS_MAX];
+static u8 sc64_route_pf_owner[SC64_ROUTE_PHYS_MAX]; /* logical slot or 0xff */
+static u16 sc64_route_pf_goal[SC64_ROUTE_PHYS_MAX], sc64_route_pf_stamp[SC64_ROUTE_PHYS_MAX];
+static u16 sc64_route_donor_clock;
+#define SC64_ROUTE_PF(slot) sc64_route_pf_flags[sc64_route_lphys[slot]]
+#define SC64_ROUTE_LOGN(slot) sc64_route_pf_logn[sc64_route_lphys[slot]]
+#define SC64_ROUTE_DONORS_CLEAR() memset(sc64_route_pf_flags, 0, sizeof(sc64_route_pf_flags))
+#else
+#define SC64_ROUTE_DONORS_CLEAR() ((void)0)
+#endif
+#ifdef SC64_ROUTE_KEEP_FIELDS
+/* A structure change used to discard every cached field. With this option the
+ * cache bookkeeping (valid, goal, age, clock, victim choice, range work) is
+ * reset exactly as before, so everything that depends on which fields are
+ * resident is unchanged, but the bytes of each complete point field stay in
+ * place as a donor. A donor is "stale" once the grid has changed since it was
+ * flooded. A stale field answers only a single-cell next-step read, after the
+ * validation in sc64_route_gate; any other reader floods it first. The log
+ * names the cells that became walkable; each field remembers how many log
+ * entries existed when it was flooded. */
+#define SC64_ROUTE_LOG_SIZE 24
+#ifndef SC64_ROUTE_GRID_CELLS_PER_BYTE
+#define SC64_ROUTE_GRID_CELLS_PER_BYTE 1
+#endif
 static u16 sc64_route_open_log[SC64_ROUTE_LOG_SIZE]; /* col | row << 8 */
-static u8 sc64_route_logn[SC64_ROUTE_SLOTS], sc64_route_flags[SC64_ROUTE_SLOTS];
 static u8 sc64_route_open_head, sc64_route_open_count;
 static u8 sc64_route_grid_known, sc64_route_grid_copied;
 static u8 sc64_route_keep_cols, sc64_route_keep_rows;
@@ -262,12 +277,16 @@ static short sc64_route_query_origin = -1;
     ((u8 *)(void *)bfs_queue + sizeof(bfs_queue) - sizeof(path_walkable))
 _Static_assert(sizeof(path_walkable) <= sizeof(bfs_queue),
                "previous grid copy must fit the BFS queue");
-#define SC64_ROUTE_KEEP_CLAIM(slot) (sc64_route_flags[slot] = 0)
-#define SC64_ROUTE_KEEP_FORGET() \
-    (memset(sc64_route_flags, 0, sizeof(sc64_route_flags)), sc64_route_grid_known = 0)
+#define SC64_ROUTE_LAZY(slot) (SC64_ROUTE_PF(slot) & SC64_ROUTE_FLAG_STALE)
+#define SC64_ROUTE_KEEP_FORGET() (sc64_route_grid_known = 0)
 #else
-#define SC64_ROUTE_KEEP_CLAIM(slot) ((void)0)
+#define SC64_ROUTE_LAZY(slot) 0
 #define SC64_ROUTE_KEEP_FORGET() ((void)0)
+static inline int sc64_route_gate(int slot, int origin, int goal)
+{
+    (void)slot; (void)origin; (void)goal;
+    return 0;
+}
 #endif
 #ifdef SC64_RANGE_WORK
 static void sc64_range_route_reset(void);
@@ -279,7 +298,7 @@ static int sc64_range_route_usable_slots(void);
 static int sc64_route_configure(void)
 {
     int cols = MAP_COLS, rows = MAP_ROWS;
-    unsigned cells, bytes, slots, i;
+    unsigned cells, bytes, fit, i;
     if (cols <= 0 || rows <= 0 || cols > 128 || rows > 128 ||
         (unsigned)cols > (unsigned)MAP_CELLS / (unsigned)rows) {
         if (sc64_route_config_cols != cols || sc64_route_config_rows != rows ||
@@ -291,10 +310,14 @@ static int sc64_route_configure(void)
             sc64_route_config_rows = rows;
             sc64_route_active_bytes = 0;
             sc64_route_active_slots = 0;
-            for (i = 0; i < SC64_ROUTE_ACTIVE_MAX_SLOTS; ++i) sc64_route_field[i] = 0;
+            sc64_route_pcount = 0;
+            for (i = 0; i < SC64_ROUTE_SLOTS; ++i) sc64_route_field[i] = 0;
             memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+#ifdef SC64_ROUTE_DECAY_FREQ
             memset(sc64_route_age, 0, sizeof(sc64_route_age));
             sc64_route_clock = 0;
+#endif
+            SC64_ROUTE_DONORS_CLEAR();
             SC64_ROUTE_KEEP_FORGET();
         }
         return 0;
@@ -303,23 +326,37 @@ static int sc64_route_configure(void)
     bytes = (cells * 3u + 7u) / 8u;
     if (bytes == 0 || bytes > SC64_ROUTE_BYTES || bytes > SC64_ROUTE_POOL_BYTES)
         return 0;
-    slots = SC64_ROUTE_POOL_BYTES / bytes;
-    if (slots > SC64_ROUTE_ACTIVE_MAX_SLOTS) slots = SC64_ROUTE_ACTIVE_MAX_SLOTS;
-    if (slots == 0) return 0;
     if (sc64_route_config_cols == cols && sc64_route_config_rows == rows &&
-        sc64_route_active_bytes == bytes && sc64_route_active_slots == slots) return 1;
+        sc64_route_active_bytes == bytes && sc64_route_active_slots != 0) return 1;
 #ifdef SC64_RANGE_WORK
     sc64_range_route_reset();
 #endif
+    /* Physical fields that never touch the range worker's two scratch planes
+     * at the end of the bank. If they cannot outnumber the logical slots, the
+     * map is as large as the bank allows and the layout is the plain fixed one. */
+#ifdef SC64_RANGE_WORK
+    fit = (SC64_ROUTE_POOL_BYTES - SC64_RANGE_WORK_RESERVED_PLANES * SC64_ROUTE_BYTES) / bytes;
+#else
+    fit = SC64_ROUTE_POOL_BYTES / bytes;
+#endif
+    if (fit > SC64_ROUTE_PHYS_MAX) fit = SC64_ROUTE_PHYS_MAX;
     sc64_route_config_cols = cols;
     sc64_route_config_rows = rows;
     sc64_route_active_bytes = bytes;
-    sc64_route_active_slots = slots;
-    for (i = 0; i < slots; ++i) sc64_route_field[i] = sc64_route_pool + i * bytes;
-    for (; i < SC64_ROUTE_ACTIVE_MAX_SLOTS; ++i) sc64_route_field[i] = 0;
+    sc64_route_active_slots = SC64_ROUTE_SLOTS;
+    sc64_route_pcount = fit >= SC64_ROUTE_SLOTS ? (u8)fit : 0;
+    for (i = 0; i < SC64_ROUTE_SLOTS; ++i) {
+        sc64_route_lphys[i] = (u8)i;
+        sc64_route_field[i] = sc64_route_pool + i * bytes;
+    }
+    for (i = 0; i < SC64_ROUTE_PHYS_MAX; ++i)
+        sc64_route_pf_owner[i] = i < SC64_ROUTE_SLOTS ? (u8)i : 0xff;
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+#ifdef SC64_ROUTE_DECAY_FREQ
     memset(sc64_route_age, 0, sizeof(sc64_route_age));
     sc64_route_clock = 0;
+#endif
+    SC64_ROUTE_DONORS_CLEAR();
     SC64_ROUTE_KEEP_FORGET();
     return 1;
 }
@@ -392,6 +429,7 @@ static void sc64_route_age_request(void)
         memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
         memset(sc64_route_age, 0, sizeof(sc64_route_age));
         sc64_route_clock = 0;
+        SC64_ROUTE_DONORS_CLEAR();
         SC64_ROUTE_KEEP_FORGET();
     }
     ++sc64_route_clock;
@@ -449,7 +487,7 @@ static void GBA_HOT sc64_route_put(int slot, int cell, int direction)
 
 
 static void
-#ifdef SC64_ROUTE_KEEP_FIELDS
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
 sc64_routes_reset_state(void)
 #else
 sc64_routes_reset(void)
@@ -468,17 +506,103 @@ sc64_routes_reset(void)
 #endif
 }
 
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+/* The donors' bytes are only good for the grid they were flooded on. */
+static void sc64_routes_forget_donors(void)
+{
+    SC64_ROUTE_DONORS_CLEAR();
 #ifdef SC64_ROUTE_KEEP_FIELDS
+    sc64_route_grid_copied = 0;
+    sc64_route_open_head = sc64_route_open_count = 0;
+#endif
+    SC64_ROUTE_KEEP_FORGET();
+}
+
 /* Map start, load, shape change or any explicit reset: no field survives. */
 static void
 sc64_routes_reset(void)
 {
     sc64_routes_reset_state();
-    SC64_ROUTE_KEEP_FORGET();
-    sc64_route_grid_copied = 0;
-    sc64_route_open_head = sc64_route_open_count = 0;
+    sc64_routes_forget_donors();
 }
 
+/* A complete point field in a valid logical slot is about to leave the logical
+ * cache: its bytes become a donor for its goal. */
+static void sc64_route_make_donor(int slot)
+{
+    int f = sc64_route_lphys[slot];
+    if (!sc64_route_pcount || !sc64_route_valid[slot]) return;
+    if (sc64_route_valid[slot] == 1 && !(sc64_route_goal[slot] & SC64_ROUTE_DEPOT_TAG)) {
+        sc64_route_pf_flags[f] |= SC64_ROUTE_FLAG_DONOR;
+        sc64_route_pf_goal[f] = sc64_route_goal[slot];
+        sc64_route_pf_stamp[f] = ++sc64_route_donor_clock;
+    } else {
+        sc64_route_pf_flags[f] = 0;
+    }
+}
+
+static u8 *sc64_route_phys_base(int id)
+{
+    return sc64_route_pool + (unsigned)id * sc64_route_active_bytes;
+}
+
+/* Give a logical slot another physical field; the displaced one takes over the
+ * other's former role. No bytes move. */
+static void sc64_route_swap_phys(int slot, int id)
+{
+    int old = sc64_route_lphys[slot];
+    u8 other;
+    if (old == id) return;
+    other = sc64_route_pf_owner[id];
+    sc64_route_lphys[slot] = (u8)id;
+    sc64_route_pf_owner[id] = (u8)slot;
+    sc64_route_field[slot] = sc64_route_phys_base(id);
+    sc64_route_pf_owner[old] = other;
+    if (other != 0xff) {
+        sc64_route_lphys[other] = (u8)old;
+        sc64_route_field[other] = sc64_route_phys_base(old);
+    }
+}
+
+/* A physical field whose bytes may be overwritten: a free one, else the
+ * oldest donor. Never a field of a valid logical slot, never `avoid`. */
+static int sc64_route_pick_target(int avoid)
+{
+    int id, best = -1;
+    for (id = 0; id < sc64_route_pcount; ++id) {
+        u8 owner = sc64_route_pf_owner[id];
+        if (id == avoid || (owner != 0xff && sc64_route_valid[owner])) continue;
+        if (!(sc64_route_pf_flags[id] & SC64_ROUTE_FLAG_DONOR)) return id;
+        if (best < 0 || sc64_route_pf_stamp[id] < sc64_route_pf_stamp[best]) best = id;
+    }
+    return best;
+}
+
+static int sc64_route_find_donor(int goal)
+{
+    int id;
+    for (id = 0; id < sc64_route_pcount; ++id)
+        if ((sc64_route_pf_flags[id] & SC64_ROUTE_FLAG_DONOR) &&
+            sc64_route_pf_goal[id] == (u16)goal) return id;
+    return -1;
+}
+
+/* The slot's bytes are about to be overwritten with something that is not a
+ * point field (depot flood, range snapshot). The old field survives as a donor
+ * in another physical field. */
+static void sc64_route_take_scratch(int slot)
+{
+    int f, g;
+    if (!sc64_route_pcount) return;
+    f = sc64_route_lphys[slot];
+    sc64_route_make_donor(slot);
+    g = sc64_route_pick_target(f);
+    if (g >= 0) sc64_route_swap_phys(slot, g);
+    sc64_route_pf_flags[sc64_route_lphys[slot]] = 0;
+}
+#endif
+
+#ifdef SC64_ROUTE_KEEP_FIELDS
 static void sc64_route_exact(int slot);
 
 /* A structure changed. The cache bookkeeping is reset exactly as a full reset
@@ -486,15 +610,8 @@ static void sc64_route_exact(int slot);
 static void __attribute__((noinline, unused)) sc64_routes_topology_changed(void)
 {
     int i;
-#ifdef SC64_ROUTE_ACTIVE_STRIDE
     (void)sc64_route_configure();
-#endif
-    for (i = 0; i < SC64_ROUTE_SLOTS; ++i) {
-        if (sc64_route_valid[i] == 1 && !(sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG))
-            sc64_route_flags[i] = SC64_ROUTE_FLAG_DONOR;
-        else if (sc64_route_valid[i])
-            sc64_route_flags[i] = 0;
-    }
+    for (i = 0; i < SC64_ROUTE_SLOTS; ++i) sc64_route_make_donor(i);
     sc64_routes_reset_state();
 }
 
@@ -502,17 +619,17 @@ static void __attribute__((noinline, unused)) sc64_routes_topology_changed(void)
 static void __attribute__((noinline, unused)) sc64_routes_grid_begin(void)
 {
     sc64_route_grid_copied = 0;
-    if (sc64_route_grid_known && sc64_route_keep_cols == (u8)MAP_COLS &&
-        sc64_route_keep_rows == (u8)MAP_ROWS) {
+    if (sc64_route_pcount && sc64_route_grid_known &&
+        sc64_route_keep_cols == (u8)MAP_COLS && sc64_route_keep_rows == (u8)MAP_ROWS) {
         memcpy(SC64_ROUTE_OLD_GRID, path_walkable, sizeof(path_walkable));
         sc64_route_grid_copied = 1;
     }
 }
 
-/* Called by build_path_grid once the new grid is valid. Logs the cells that
- * became walkable and drops donors that have missed more log entries than the
- * log holds. Without a previous grid, or with too many opened cells, no donor
- * survives. */
+/* Called by build_path_grid once the new grid is valid. When the grid changed,
+ * every donor becomes stale; the cells that became walkable are logged, and
+ * donors that have missed more log entries than the log holds are dropped.
+ * Without a previous grid, or with too many opened cells, no donor survives. */
 static void __attribute__((noinline, unused)) sc64_routes_grid_commit(void)
 {
     const u8 *old = SC64_ROUTE_OLD_GRID;
@@ -521,8 +638,9 @@ static void __attribute__((noinline, unused)) sc64_routes_grid_commit(void)
                      SC64_ROUTE_GRID_CELLS_PER_BYTE;
     unsigned i, k, opened = 0, changed = 0;
     u16 list[SC64_ROUTE_LOG_SIZE];
+    if (!sc64_route_pcount) goto done;
     if (!sc64_route_grid_copied) {
-        sc64_routes_reset();
+        sc64_routes_forget_donors();
         goto done;
     }
     sc64_route_grid_copied = 0;
@@ -543,7 +661,7 @@ static void __attribute__((noinline, unused)) sc64_routes_grid_commit(void)
     if (!changed) { SC64_ROUTE_KEEP_COUNT(COMMIT_SAME); goto done; }
     if (opened > SC64_ROUTE_LOG_SIZE) {
         SC64_ROUTE_KEEP_COUNT(COMMIT_OVERFLOW);
-        sc64_routes_reset();
+        sc64_routes_forget_donors();
         goto done;
     }
     for (i = 0; i < opened; ++i) {
@@ -551,18 +669,23 @@ static void __attribute__((noinline, unused)) sc64_routes_grid_commit(void)
         if (++sc64_route_open_head == SC64_ROUTE_LOG_SIZE) sc64_route_open_head = 0;
         ++sc64_route_open_count;
     }
-    for (i = 0; i < SC64_ROUTE_SLOTS; ++i)
-        if ((sc64_route_flags[i] & SC64_ROUTE_FLAG_DONOR) &&
-            (u8)(sc64_route_open_count - sc64_route_logn[i]) > SC64_ROUTE_LOG_SIZE) {
-            SC64_ROUTE_KEEP_COUNT(COMMIT_DROP);
-            sc64_route_flags[i] = 0;
+    for (i = 0; i < sc64_route_pcount; ++i)
+        if (sc64_route_pf_flags[i] & SC64_ROUTE_FLAG_DONOR) {
+            if ((u8)(sc64_route_open_count - sc64_route_pf_logn[i]) > SC64_ROUTE_LOG_SIZE) {
+                SC64_ROUTE_KEEP_COUNT(COMMIT_DROP);
+                sc64_route_pf_flags[i] = 0;
+            } else {
+                sc64_route_pf_flags[i] |= SC64_ROUTE_FLAG_STALE;
+            }
         }
 done:
     sc64_route_grid_known = 1;
     sc64_route_keep_cols = (u8)MAP_COLS;
     sc64_route_keep_rows = (u8)MAP_ROWS;
 }
+#endif
 
+#ifdef SC64_ROUTE_KEEP_FIELDS
 /* May a slot whose bytes were flooded on an earlier grid answer the next-step
  * query "from walkable origin toward goal" with its stored direction? Yes when
  * (a) the stored route from the origin to the field's root crosses only cells
@@ -616,7 +739,7 @@ sc64_route_gate(int slot, int origin, int goal)
             }
         }
     }
-    age = (u8)(sc64_route_open_count - sc64_route_logn[slot]);
+    age = (u8)(sc64_route_open_count - SC64_ROUTE_LOGN(slot));
     for (i = 1; i <= age; ++i) {
         int at = (int)sc64_route_open_head - i, ux, uy, dxg, dyg;
         if (at < 0) at += SC64_ROUTE_LOG_SIZE;
@@ -699,26 +822,12 @@ static Sc64RangeRouteSnapshotKey sc64_range_route_snapshot_key;
  * that touches scratch storage while an active worker owns the planes. */
 static int sc64_range_route_reduced_slots(void)
 {
-#ifdef SC64_ROUTE_ACTIVE_STRIDE
-    unsigned slots;
-    if (!sc64_route_active_bytes) return 0;
-    slots = (SC64_ROUTE_POOL_BYTES -
-             SC64_RANGE_WORK_RESERVED_PLANES * SC64_ROUTE_BYTES) /
-            sc64_route_active_bytes;
-    if (slots > sc64_route_active_slots) slots = sc64_route_active_slots;
-    return (int)slots;
-#else
     return (int)SC64_ROUTE_SLOTS - (int)SC64_RANGE_WORK_RESERVED_PLANES;
-#endif
 }
 static int sc64_range_route_usable_slots(void)
 {
     if (sc64_range_route_active.valid) return sc64_range_route_reduced_slots();
-#ifdef SC64_ROUTE_ACTIVE_STRIDE
-    return (int)sc64_route_active_slots;
-#else
     return SC64_ROUTE_SLOTS;
-#endif
 }
 
 /* Claim the planes before the worker writes any scratch byte.  A packed
@@ -726,15 +835,13 @@ static int sc64_range_route_usable_slots(void)
 static void sc64_range_route_claim_planes(void)
 {
     int first = sc64_range_route_reduced_slots();
-#ifdef SC64_ROUTE_ACTIVE_STRIDE
-    int full = (int)sc64_route_active_slots;
-#else
     int full = SC64_ROUTE_SLOTS;
-#endif
     for (int i = first; i < full; ++i) {
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+        sc64_route_make_donor(i);
+#endif
         sc64_route_valid[i] = 0;
         sc64_route_age[i] = 0;
-        SC64_ROUTE_KEEP_CLAIM(i);
     }
     if (sc64_range_route_snapshot_slot >= first) {
         sc64_range_route_snapshot_slot = -1;
@@ -955,7 +1062,9 @@ static int sc64_range_route_snapshot_begin_copy(void)
            sizeof(sc64_range_route_snapshot_key));
     sc64_range_route_copy_slot = slot;
     sc64_range_route_copy_cursor = 0;
-    SC64_ROUTE_KEEP_CLAIM(slot);
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    sc64_route_take_scratch(slot);
+#endif
     sc64_route_valid[slot] = 3; /* reserved/tagged; ordinary fields ignore it */
     return 1;
 }
@@ -1417,7 +1526,7 @@ sc64_route_flood(int slot, int head, int *tail, int origin,
 #else
 #define SC64_ROUTE_SLOT_ATTR GBA_HOT
 #endif
-#ifdef SC64_ROUTE_KEEP_FIELDS
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* Flood the whole field of a goal into a slot on the current grid. Returns the
  * number of queued cells (for diagnostics). */
 static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
@@ -1461,35 +1570,26 @@ static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
     for (i = 0; i < tail; ++i) SC64_GRID_SET(path_walkable, bfs_queue[i], 1);
 #endif
     (void)i;
-    sc64_route_logn[slot] = sc64_route_open_count;
-    sc64_route_flags[slot] = 0;
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
+#endif
+    SC64_ROUTE_PF(slot) = 0;
     SC64_ROUTE_KEEP_COUNT(FILL);
     return tail;
-}
-
-static void sc64_route_copy_field(int to, int from)
-{
-    unsigned bytes =
-#ifdef SC64_ROUTE_ACTIVE_STRIDE
-        sc64_route_active_bytes;
-#else
-        SC64_ROUTE_BYTES;
-#endif
-    memcpy(sc64_route_field[to], sc64_route_field[from], bytes);
 }
 
 /* Give a lazy slot the bytes a flood on the current grid gives. The cache
  * bookkeeping is untouched. */
 static void __attribute__((noinline)) sc64_route_exact(int slot)
 {
-    if (!(sc64_route_flags[slot] & SC64_ROUTE_FLAG_LAZY)) return;
+    if (!SC64_ROUTE_LAZY(slot)) return;
     SC64_ROUTE_KEEP_COUNT(MATERIALIZE);
     (void)sc64_route_fill(slot, (int)sc64_route_goal[slot]);
 }
 
 static int __attribute__((noinline)) sc64_route_reaches(int slot, int cell)
 {
-    if ((sc64_route_flags[slot] & SC64_ROUTE_FLAG_LAZY) &&
+    if (SC64_ROUTE_LAZY(slot) &&
         SC64_GRID_GET(path_walkable, cell) &&
         sc64_route_gate(slot, cell, (int)sc64_route_goal[slot])) return 1;
     sc64_route_exact(slot);
@@ -1547,7 +1647,7 @@ sc64_route_slot(int goal)
             partial_slot = i;
 #else
 #ifdef SC64_ROUTE_KEEP_FIELDS
-            if ((sc64_route_flags[i] & SC64_ROUTE_FLAG_LAZY) &&
+            if (SC64_ROUTE_LAZY(i) &&
                 (origin < 0 || !sc64_route_gate(i, origin, goal)))
                 sc64_route_exact(i);
 #endif
@@ -1583,27 +1683,34 @@ sc64_route_slot(int goal)
                sizeof(sc64_range_route_snapshot_key));
     }
 #endif
-#ifdef SC64_ROUTE_KEEP_FIELDS
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
     {
-        /* The bookkeeping below is a flood's. Adopt the bytes of a donor for
-         * the same goal when the caller reads a single walkable cell. */
-        int donor = -1;
+        /* The bookkeeping below is a flood's. If a donor holds the goal's
+         * bytes, the slot takes that physical field instead of flooding. */
         (void)head;
-        if (origin >= 0)
-            for (i = 0; i < active_slots; ++i)
-                if ((sc64_route_flags[i] & SC64_ROUTE_FLAG_DONOR) && !sc64_route_valid[i] &&
-                    sc64_route_goal[i] == (u16)goal) { donor = i; break; }
-        if (donor >= 0) {
-            u8 logn = sc64_route_logn[donor];
-            if (donor != slot) {
-                sc64_route_copy_field(slot, donor);
-                sc64_route_flags[donor] = 0;
+        (void)i;
+        if (sc64_route_pcount) {
+            int old = sc64_route_lphys[slot], donor, target;
+            sc64_route_make_donor(slot);
+            donor = sc64_route_find_donor(goal);
+            if (donor >= 0) {
+                u8 stale = sc64_route_pf_flags[donor] & SC64_ROUTE_FLAG_STALE;
+                sc64_route_swap_phys(slot, donor);
+                sc64_route_pf_flags[donor] &= (u8)~SC64_ROUTE_FLAG_DONOR;
+                sc64_route_goal[slot] = (u16)goal;
+                tail = 0;
+                SC64_ROUTE_KEEP_COUNT(ADOPT);
+#ifdef SC64_ROUTE_KEEP_FIELDS
+                if (stale && (origin < 0 || !sc64_route_gate(slot, origin, goal)))
+                    tail = sc64_route_fill(slot, goal);
+#else
+                (void)stale;
+#endif
+            } else {
+                target = sc64_route_pick_target(old);
+                if (target >= 0) sc64_route_swap_phys(slot, target);
+                tail = sc64_route_fill(slot, goal);
             }
-            sc64_route_goal[slot] = (u16)goal;
-            sc64_route_logn[slot] = logn;
-            sc64_route_flags[slot] = SC64_ROUTE_FLAG_LAZY;
-            if (!sc64_route_gate(slot, origin, goal)) sc64_route_exact(slot);
-            tail = 0;
         } else {
             tail = sc64_route_fill(slot, goal);
         }
@@ -1971,7 +2078,7 @@ sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
     }
     if (slot < 0) return 0;
 #ifdef SC64_ROUTE_KEEP_FIELDS
-    if ((sc64_route_flags[slot] & SC64_ROUTE_FLAG_LAZY) &&
+    if (SC64_ROUTE_LAZY(slot) &&
         (!SC64_GRID_GET(path_walkable, cell) || !sc64_route_gate(slot, cell, goal)))
         sc64_route_exact(slot);
 #endif
@@ -2261,7 +2368,9 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     }
     if (partial_slot>=0) slot=partial_slot;
     if (slot < 0) return -1;
-    SC64_ROUTE_KEEP_CLAIM(slot);
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    sc64_route_take_scratch(slot);
+#endif
 #ifdef SC64_RANGE_WORK
     /* A depot flood may evict a completed range snapshot. Never leave a
      * range key pointing at the newly repurposed field. */

@@ -57,7 +57,7 @@ enum {
     KEEP_GATE_CALL, KEEP_GATE_HIT, KEEP_FAIL_BLOCKED, KEEP_FAIL_CODE,
     KEEP_FAIL_LENGTH, KEEP_FAIL_SEEDS, KEEP_FAIL_NEAR_GOAL, KEEP_FAIL_OPENED,
     KEEP_COMMIT_SAME, KEEP_COMMIT_OVERFLOW, KEEP_COMMIT_DROP, KEEP_MATERIALIZE,
-    KEEP_FILL, KEEP_STATS
+    KEEP_FILL, KEEP_ADOPT, KEEP_STATS
 };
 static unsigned keep_stat[KEEP_STATS];
 #define SC64_ROUTE_KEEP_COUNT(name) (++keep_stat[KEEP_##name])
@@ -113,7 +113,7 @@ static int aux_rn(int n)
 static int chance(int percent) { return rn(100) < percent; }
 
 /* ---- oracle: independent reverse BFS, expanded left, right, up, down ---- */
-enum { POOL = 12 };
+enum { POOL = 40 };
 typedef struct { int goal, version; short dist[MAP_CELLS]; u8 dir[MAP_CELLS]; } Oracle;
 static Oracle oracle[POOL + 1];
 static int grid_version = 1;
@@ -218,6 +218,16 @@ static u32 state_hash(void)
 }
 static void record_state(void)
 {
+    {
+        static long dump_at = -2;
+        if (dump_at == -2) { const char *e = getenv("DUMP_AT"); dump_at = e ? atol(e) : -1; }
+        if ((long)state_hash_count >= dump_at - 1 && (long)state_hash_count <= dump_at + 1 && dump_at >= 0) {
+            printf("state %lu clock %u hits %u builds %u:", state_hash_count, sc64_route_clock, sc64_route_hits, sc64_route_builds);
+            for (int i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i)
+                printf(" [%d v%d g%d a%x]", i, sc64_route_valid[i], sc64_route_goal[i], sc64_route_age[i]);
+            printf("\n");
+        }
+    }
     if (state_hash_count == state_hash_capacity) {
         state_hash_capacity = state_hash_capacity ? state_hash_capacity * 2 : 1u << 16;
         state_hashes = realloc(state_hashes, state_hash_capacity * sizeof(u32));
@@ -314,44 +324,91 @@ static void reach_query(int sx, int sy, int g1x, int g1y, int g2x, int g2y)
 }
 #endif
 
-#ifdef SC64_ROUTE_KEEP_FIELDS
-/* White box: whenever the gate accepts an origin for a lazy slot or a donor,
- * the stored code must be the code a fresh flood stores there. Tried for
- * sampled origins plus every cell near the latest change. */
-static void check_gate_codes(const int *changed, int changed_count)
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+static int phys_get(int id, int cell)
 {
-    for (int slot = 0; slot < SC64_ROUTE_SLOTS; ++slot) {
-        int stale = ((sc64_route_flags[slot] & SC64_ROUTE_FLAG_LAZY) && sc64_route_valid[slot] == 1) ||
-                    ((sc64_route_flags[slot] & SC64_ROUTE_FLAG_DONOR) && !sc64_route_valid[slot]);
-        if (!stale) continue;
+    int slot = 0, code, ol = sc64_route_lphys[0];
+    u8 *of = sc64_route_field[0];
+    sc64_route_lphys[0] = (u8)id; sc64_route_field[0] = sc64_route_phys_base(id);
+    code = sc64_route_get(slot, cell);
+    sc64_route_lphys[0] = (u8)ol; sc64_route_field[0] = of;
+    return code;
+}
+
+/* A donor flooded on the current grid must hold exactly what a flood stores. */
+static unsigned long donors_checked;
+static void check_donors(void)
+{
+    for (int id = 0; id < sc64_route_pcount; ++id) {
+        if ((sc64_route_pf_flags[id] & (SC64_ROUTE_FLAG_DONOR | SC64_ROUTE_FLAG_STALE)) != SC64_ROUTE_FLAG_DONOR)
+            continue;
         {
-            int goal = sc64_route_goal[slot];
-            const Oracle *o = oracle_for(goal);
-            int cells = MAP_COLS * MAP_ROWS;
-            for (int n = 0; n < 700 + changed_count * 40; ++n) {
-                int cell;
-                if (n < 700) cell = aux_rn(cells);
-                else {
-                    int c = changed[(n - 700) / 40];
-                    int x = c % MAP_COLS + aux_rn(11) - 5, y = c / MAP_COLS + aux_rn(11) - 5;
-                    if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) continue;
-                    cell = x + y * MAP_COLS;
+            const Oracle *o = oracle_for(sc64_route_pf_goal[id]);
+            for (int cell = 0; cell < MAP_COLS * MAP_ROWS; ++cell) {
+                int expected = o->dist[cell] < 0 ? SC64_ROUTE_UNREACHABLE : o->dir[cell];
+                if (phys_get(id, cell) != expected) {
+                    printf("FRESH DONOR WRONG: shape %dx%d phys %d goal %d cell %d\n", MAP_COLS,
+                           MAP_ROWS, id, sc64_route_pf_goal[id], cell);
+                    abort();
                 }
-                if (!desired[cell]) continue;
-                if (sc64_route_gate(slot, cell, goal)) {
-                    ++gate_checked;
-                    if (o->dist[cell] < 0 || sc64_route_get(slot, cell) != o->dir[cell]) {
-                        printf("GATE ACCEPTED A STALE CODE: shape %dx%d cell (%d,%d) goal (%d,%d) "
-                               "stored %d fresh %d (dist %d)\n", MAP_COLS, MAP_ROWS,
-                               cell % MAP_COLS, cell / MAP_COLS, goal % MAP_COLS, goal / MAP_COLS,
-                               sc64_route_get(slot, cell), o->dir[cell], o->dist[cell]);
-                        abort();
-                    }
-                }
+            }
+            ++donors_checked;
+        }
+    }
+}
+#else
+static void check_donors(void) {}
+#endif
+
+#ifdef SC64_ROUTE_KEEP_FIELDS
+/* White box: whenever the gate accepts an origin for a lazy slot or a stale
+ * donor, the stored code must be the code a fresh flood stores there. Tried
+ * for sampled origins plus every cell near the latest change. */
+static void gate_sweep(int slot, int goal, const int *changed, int changed_count)
+{
+    const Oracle *o = oracle_for(goal);
+    int cells = MAP_COLS * MAP_ROWS;
+    for (int n = 0; n < 500 + changed_count * 40; ++n) {
+        int cell;
+        if (n < 500) cell = aux_rn(cells);
+        else {
+            int c = changed[(n - 500) / 40];
+            int x = c % MAP_COLS + aux_rn(11) - 5, y = c / MAP_COLS + aux_rn(11) - 5;
+            if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) continue;
+            cell = x + y * MAP_COLS;
+        }
+        if (!desired[cell]) continue;
+        if (sc64_route_gate(slot, cell, goal)) {
+            ++gate_checked;
+            if (o->dist[cell] < 0 || sc64_route_get(slot, cell) != o->dir[cell]) {
+                printf("GATE ACCEPTED A STALE CODE: shape %dx%d cell (%d,%d) goal (%d,%d) "
+                       "stored %d fresh %d (dist %d)\n", MAP_COLS, MAP_ROWS,
+                       cell % MAP_COLS, cell / MAP_COLS, goal % MAP_COLS, goal / MAP_COLS,
+                       sc64_route_get(slot, cell), o->dir[cell], o->dist[cell]);
+                abort();
             }
         }
     }
 }
+
+static void check_gate_codes(const int *changed, int changed_count)
+{
+    for (int slot = 0; slot < SC64_ROUTE_SLOTS; ++slot)
+        if (sc64_route_valid[slot] == 1 && SC64_ROUTE_LAZY(slot))
+            gate_sweep(slot, sc64_route_goal[slot], changed, changed_count);
+    for (int id = 0; id < sc64_route_pcount; ++id)
+        if ((sc64_route_pf_flags[id] & (SC64_ROUTE_FLAG_DONOR | SC64_ROUTE_FLAG_STALE)) ==
+            (SC64_ROUTE_FLAG_DONOR | SC64_ROUTE_FLAG_STALE)) {
+            /* borrow logical slot 0's view for the physical field */
+            int ol = sc64_route_lphys[0];
+            u8 *of = sc64_route_field[0];
+            sc64_route_lphys[0] = (u8)id; sc64_route_field[0] = sc64_route_phys_base(id);
+            gate_sweep(0, sc64_route_pf_goal[id], changed, changed_count);
+            sc64_route_lphys[0] = (u8)ol; sc64_route_field[0] = of;
+        }
+}
+#else
+static void check_gate_codes(const int *changed, int changed_count) { (void)changed; (void)changed_count; }
 #endif
 
 /* Every resident field that is not lazy must hold exactly what a flood on the
@@ -361,9 +418,7 @@ static void check_resident_fields(void)
 {
     for (int slot = 0; slot < SC64_ROUTE_ACTIVE_SLOTS; ++slot) {
         if (sc64_route_valid[slot] != 1) continue;
-#ifdef SC64_ROUTE_KEEP_FIELDS
-        if (sc64_route_flags[slot] & SC64_ROUTE_FLAG_LAZY) continue;
-#endif
+        if (SC64_ROUTE_LAZY(slot)) continue;
         {
             int goal = sc64_route_goal[slot];
             const Oracle *o = oracle_for(goal);
@@ -424,13 +479,15 @@ static void make_terrain(int kind)
 }
 
 /* ---- scenario ---- */
-enum { K_BLOCK, K_OPEN, K_MIXED, K_REVERT, K_BURST, K_KINDS };
-static const char *const kind_name[K_KINDS] = { "block", "open", "mixed", "revert", "burst" };
+enum { K_BLOCK, K_OPEN, K_MIXED, K_REVERT, K_BURST, K_CYCLE, K_KINDS };
+static const char *const kind_name[K_KINDS] = { "block", "open", "mixed", "revert", "burst", "cycle" };
+static int cycle_mode;
+static unsigned cycle_counter;
 static unsigned long kind_builds[K_KINDS];
 /* Floods that really ran: every build without the macro, the fills with it. */
 static unsigned long floods_now(void)
 {
-#ifdef SC64_ROUTE_KEEP_FIELDS
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
     return keep_stat[KEEP_FILL];
 #else
     return sc64_route_builds;
@@ -453,8 +510,8 @@ static void pick_pool(void)
 {
     for (int i = 0; i < POOL; ++i) {
         int cell;
-        if (i < 6) cell = random_cell_with(1);
-        else if (i < 10) cell = random_cell_with(0);
+        if (i < 24) cell = random_cell_with(1);
+        else if (i < 34) cell = random_cell_with(0);
         else cell = chance(50) ? rn(MAP_COLS) : (MAP_ROWS - 1) * MAP_COLS + rn(MAP_COLS);
         pool_goal[i] = cell;
     }
@@ -521,7 +578,7 @@ static void run_queries(int count, int *last_origin)
 {
     int cells = MAP_COLS * MAP_ROWS;
     for (int q = 0; q < count; ++q) {
-        int goal = pool_goal[rn(POOL)], origin;
+        int goal = pool_goal[cycle_mode ? cycle_counter++ % POOL : (unsigned)rn(POOL)], origin;
         int sx, sy;
         int pick = rn(100);
         if (pick < 40) origin = random_cell_with(1);
@@ -553,10 +610,18 @@ static void scenario(int shape_cols, int shape_rows, int terrain, int kind, int 
     origin_hint = random_cell_with(1);
     builds_before = (int)floods_now();
     run_queries(2 * POOL, &origin_hint); /* populate fields */
+    cycle_mode = kind == K_CYCLE;
     for (int step = 0; step < steps; ++step) {
         int mode = kind == K_BLOCK ? K_BLOCK : kind == K_OPEN ? K_OPEN : K_MIXED;
         int changes = (kind == K_BURST) ? 1 + rn(5) : 1;
         if (kind == K_BLOCK && chance(10)) invalidate(), ++grid_version; /* no-op rebuild */
+        if (kind == K_CYCLE) { /* recurring goals, more than the cache holds */
+            if (step % 4 == 3) make_change(chance(50) ? K_BLOCK : K_MIXED, origin_hint);
+            run_queries(80, &origin_hint);
+            if (path_grid_valid) { check_donors(); check_gate_codes(changed_cells, edit_count); }
+            if (step % 3 == 0 && path_grid_valid) check_resident_fields();
+            continue;
+        }
         for (int c = 0; c < changes; ++c) {
             if (kind == K_MIXED && chance(60)) mode = chance(50) ? K_BLOCK : K_OPEN;
             if (kind == K_BURST) mode = chance(50) ? K_OPEN : K_MIXED;
@@ -564,9 +629,7 @@ static void scenario(int shape_cols, int shape_rows, int terrain, int kind, int 
             if (kind == K_BURST && chance(50)) run_queries(3, &origin_hint);
         }
         run_queries(40, &origin_hint);
-#ifdef SC64_ROUTE_KEEP_FIELDS
-        if (path_grid_valid) check_gate_codes(changed_cells, edit_count);
-#endif
+        if (path_grid_valid) { check_donors(); check_gate_codes(changed_cells, edit_count); }
         if (kind == K_REVERT || chance(8)) {
             revert_change();
             run_queries(30, &origin_hint);
@@ -593,10 +656,15 @@ int main(int argc, char **argv)
     for (unsigned s = 0; s < sizeof(shapes) / sizeof(shapes[0]); ++s)
         for (int terrain = 0; terrain < T_KINDS; ++terrain)
             for (int kind = 0; kind < K_KINDS; ++kind)
-                scenario(shapes[s][0], shapes[s][1], terrain, kind, 14);
+                scenario(shapes[s][0], shapes[s][1], terrain, kind, 10);
 
     printf("validated queries: %lu\n", validated);
     for (int k = 0; k < K_KINDS; ++k) printf("builds %-7s %lu\n", kind_name[k], kind_builds[k]);
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    printf("eviction/reset donors: adopted %u of %u floods needed; fresh donors checked %lu\n",
+           keep_stat[KEEP_ADOPT], keep_stat[KEEP_ADOPT] + keep_stat[KEEP_FILL], donors_checked);
+    assert(keep_stat[KEEP_ADOPT] > 1000 && donors_checked > 1000);
+#endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     printf("gate: calls %u hits %u | fail blocked %u code %u length %u seeds %u near-goal %u opened %u\n",
            keep_stat[KEEP_GATE_CALL], keep_stat[KEEP_GATE_HIT], keep_stat[KEEP_FAIL_BLOCKED],
@@ -653,7 +721,8 @@ int main(int argc, char **argv)
             assert(fscanf(f, "%31s %lu", name, &base) == 2 && !strcmp(name, kind_name[k]));
             printf("kind %-7s baseline builds %lu, keep builds %lu\n", name, base, kind_builds[k]);
             assert(kind_builds[k] <= base);
-            if (k == K_BLOCK) assert(kind_builds[k] < base);
+            if (k == K_BLOCK || k == K_CYCLE) assert(kind_builds[k] < base);
+            if (k == K_CYCLE) assert(kind_builds[k] * 10 < base * 7);
             total_base += base; total_keep += kind_builds[k];
         }
         fclose(f);
