@@ -13,6 +13,13 @@ SC64_PRESENT_FLAGS ?= -DGBA_ASYNC_PRESENT
 # Empty this to compare a canonical ROM with the fixed 14-field layout.
 CANONICAL_ROUTE_STRIDE_FLAGS ?= -DSC64_ROUTE_ACTIVE_STRIDE
 
+# A structure change keeps the bytes of complete point fields. Each use is
+# validated against the cells opened since the field was flooded, so every
+# answer is the one a fresh flood gives, and cache residency is unchanged; only
+# the re-flood cost goes away. Empty this to compare a canonical ROM that
+# floods every field again after a grid change.
+CANONICAL_ROUTE_KEEP_FLAGS ?= -DSC64_ROUTE_KEEP_FIELDS
+
 # Optional differential of the per-profile tick cache, the 32-bit flight and
 # position paths against retained earlier code, over every prepared profile.
 .PHONY: test-sc64-weapon-source-ticks-bank
