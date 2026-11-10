@@ -99,6 +99,18 @@ static inline int audio_mixer_request(AudioMixer *m, u16 sound, u8 priority, u8 
     return 1;
 }
 
+/* Game-loop side: nonzero while an advisor line plays or waits in the queue.
+ * A request made now would be refused, so callers hold their line instead.
+ * A stale read of tail or a voice only delays or repeats one such check. */
+static inline int audio_mixer_advisor_busy(const AudioMixer *m)
+{
+    for (u32 i = AUDIO_SPEECH_VOICE + 1u; i < AUDIO_VOICES; ++i)
+        if (m->voice[i].remaining && m->voice[i].priority == AUDIO_PRIORITY_ADVISOR) return 1;
+    for (u8 t = m->tail; t != m->head; t = (u8)((t + 1u) % AUDIO_QUEUE))
+        if (m->queue[t].kind == AUDIO_CLASS_ADVISOR) return 1;
+    return 0;
+}
+
 static inline void audio_mixer_music(AudioMixer *m, u8 track, u8 loop)
 {
     m->music_loop = loop;
