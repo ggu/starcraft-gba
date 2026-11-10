@@ -84,6 +84,22 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(args.make_arg, ["-o", "x.h"])
 
 
+class ErrorLineTests(unittest.TestCase):
+    def test_picks_missing_rule_then_first_failing_test_then_compiler_error(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            log = Path(td) / "l.log"
+            log.write_text("usage: x\npython3 -m unittest: error: argument --a\n"
+                           "ERROR: test_a (m.C.test_a)\nx.c:1:1: fatal error: 'h.h' file not found\n"
+                           "make: *** [t] Error 1\n")
+            self.assertEqual(rel.first_error_line(log), "ERROR: test_a (m.C.test_a)")
+            log.write_text("cc x.c\nx.c:3:4: error: boom\nmake: *** [t] Error 1\n")
+            self.assertEqual(rel.first_error_line(log), "x.c:3:4: error: boom")
+            log.write_text("make: *** No rule to make target `a.h', needed by `b'.  Stop.\nERROR: test\n")
+            self.assertIn("No rule to make target", rel.first_error_line(log))
+            log.write_text("nothing special\nlast words\n")
+            self.assertEqual(rel.first_error_line(log), "last words")
+
+
 class MissingInputTests(unittest.TestCase):
     DATABASE = """\
 # Variables

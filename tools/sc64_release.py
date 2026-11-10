@@ -303,15 +303,23 @@ def rom_info(path: Path) -> dict[str, object] | None:
 
 
 def first_error_line(log: Path) -> str:
+    """Pick the most informative failure line: a missing rule, the first failing
+    unittest, a compiler error, then make's own error line."""
     try:
         lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return "log unreadable"
-    patterns = (" error: ", "No rule to make target", "*** [", "Error ", "FAIL", "Traceback",
-                "Assertion", "AddressSanitizer", "ERROR")
-    for pattern in patterns:
+    tests = re.compile(r"^(ERROR|FAIL): ")
+    wanted = (
+        lambda line: "No rule to make target" in line,
+        lambda line: bool(tests.match(line)),
+        lambda line: "fatal error:" in line or ": error: " in line and "unittest" not in line,
+        lambda line: "*** [" in line,
+        lambda line: any(word in line for word in ("Traceback", "Assertion", "AddressSanitizer")),
+    )
+    for matches in wanted:
         for line in lines:
-            if pattern in line and not line.startswith("+ "):
+            if matches(line):
                 return line.strip()[:300]
     tail = [line for line in lines if line.strip()]
     return tail[-1].strip()[:300] if tail else "no output"
