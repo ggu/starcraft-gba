@@ -311,7 +311,9 @@ static int train_at(int hatch,int type)
        minerals<(int)rule->minerals||gas<(int)rule->gas||
        race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)return 0;
     if(!select_building(hatch))return 0;
-    for(int n=0;n<8&&train_type!=type;n++)KEY_TAP(KEY_R);
+    /* The product cycle grows with tech (Hydralisk, Mutalisk, Scourge, ...): R until
+       the wanted type shows, bounded well above the longest cycle. */
+    for(int n=0;n<12&&train_type!=type;n++)KEY_TAP(KEY_R);
     if(train_type!=type)return 0;
     int before=minerals,larva=b[hatch].larva;
     KEY_TAP(KEY_A);

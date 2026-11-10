@@ -72,6 +72,58 @@ static int army_count(void)
     return count_units(SIDE,U_HYDRALISK)+count_units(SIDE,U_ZERGLING);
 }
 
+/* Combat helpers. A Reaver outranges and out-sees a Hydralisk, so a group that waits
+ * in front of a garrison is shot down piecemeal; the army attack-moves into it at
+ * once. One L-drag box orders every Hydralisk in it with a single command, where
+ * double-taps reach about a screen of them. */
+static int isqrt_i(int v){int lo=0,hi=46340;while(lo<hi){int mid=(lo+hi+1)/2;if(mid*mid<=v)lo=mid;else hi=mid-1;}return lo;}
+static int foe_combat(int raw){return raw==65||raw==66||raw==67||raw==68||raw==70||raw==71||raw==72||raw==83;}
+static int nearest_foe(int x,int y,int *dd){
+    int best=-1,bd=0x7fffffff;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&foe_combat(u[i].raw_type)&&!SC64_TRANSPORT_LOADED(&u[i])){int d=dist2(u[i].x,u[i].y,x,y);if(d<bd){bd=d;best=i;}}
+    if(dd)*dd=best>=0?isqrt_i(bd):9999;
+    return best;
+}
+static int hydra_box_attack(int x,int y,int r,int tx,int ty,int force_rebox)
+{
+    int near=0,sel=0,x0=0x7fffffff,y0=0x7fffffff,x1=-1,y1=-1;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&dist2(u[i].x,u[i].y,x,y)<r*r){
+        ++near;sel+=u[i].selected;
+        if(u[i].x<x0)x0=u[i].x;if(u[i].y<y0)y0=u[i].y;if(u[i].x>x1)x1=u[i].x;if(u[i].y>y1)y1=u[i].y;
+    }
+    if(!near)return 0;
+    /* A box takes everything in it: leave Kerrigan, Overlords and Drones out of it. */
+    int foreign=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type!=U_HYDRALISK&&
+        u[i].x>=x0-24&&u[i].x<=x1+24&&u[i].y>=y0-24&&u[i].y<=y1+24)++foreign;
+    if(foreign){
+        group_area_x=x;group_area_y=y;group_area_r=r;group_rounds=8;
+        int g=group_command(U_HYDRALISK,MENU_ATTACK,tx,ty,1);
+        group_area_x=-1;group_rounds=6;
+        return g?near:0;
+    }
+    if(force_rebox||selected_building>=0||sel*100<near*75||selected_count()>near+6){
+        int n=box_select(x0-24,y0-24,x1+24,y1+24);
+        if(!n)return 0;
+    }
+    return command_selected(MENU_ATTACK,tx,ty)?near:0;
+}
+/* Top up every finished Extractor to `wanted` gas Drones. */
+static int assign_gas_all(int wanted)
+{
+    for(int r=0;r<MAX_BUILDINGS;r++)if(b[r].alive&&b[r].owner==SIDE&&b[r].type==B_EXTRACTOR&&building_complete(r)){
+        int have=0,worker=-1;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_DRONE){
+            if(u[i].order==ORDER_GAS&&u[i].target==r)++have;
+            else if(worker<0&&u[i].order==ORDER_MINE&&!u[i].carry)worker=i;
+        }
+        if(have>=wanted||worker<0||!select_single(worker))continue;
+        move_cursor(b[r].x,b[r].y);KEY_TAP(KEY_A);
+        return u[worker].order==ORDER_GAS;
+    }
+    return 0;
+}
+
 static void census(const char *label)
 {
     int enemy_b=0,k=kerrigan(),n1=nexus(1),n2=nexus(2);
@@ -156,7 +208,10 @@ int main(int argc,char **argv)
     int saved=0,kerrigan_sent=0,opened=0,ne_overlord=0;
     int next_checkpoint=2000,next_mine=0,next_train=0,next_build=120,next_gas=600,next_order=600;
     int next_hatch=1500,next_rally=3000,next_visit[3]={0,4400,7000};
-    int next_se_eco=0,next_defend=0,rush=0,rush_west=0,army_x=0,army_y=0,army_r=0,posted=0,turn=0,army_leg=0,mustered=0,next_status=0,next_detector=0,next_save_build=0,raid_guard=-1,raid_last_x=0,raid_last_y=0,raid_still_since=0,fields=0,fields_since=0;
+    int next_se_eco=0,next_defend=0,rush=0,rush_west=0,army_x=0,army_y=0,army_r=0,posted=0,turn=0,army_leg=0,mustered=0,next_status=0,next_detector=0,next_save_build=0,raid_guard=-1,raid_last_x=0,raid_last_y=0,raid_still_since=0,fields=0,fields_since=0,next_research=0;
+    /* Upgrades, the raid-quiet window and the charge: see the notes at each use. */
+    const int tech_after=14000,quiet_lead=2400,gas_per_extractor=3,contact=320,box_reach=420,rebox_period=300,fight_period=90,hold_lead=2600;
+    int last_box=-100000;
     const int drone_goal=16,hatch_goal=8,gas_drones=3;
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
         if(menu_open)KEY_TAP(KEY_B);
@@ -169,6 +224,10 @@ int main(int argc,char **argv)
         static const struct { int at,g,town; } raids[]={{1845,GUARD_SE,1},{10448,GUARD_NE,2},{12850,GUARD_SE,2},
             {20872,GUARD_NW,1},{26930,GUARD_NW,2},{34170,GUARD_SE,1},{46230,GUARD_SE,2},{55880,GUARD_NW,1},{68340,GUARD_NW,2},{80000,GUARD_SE,1}};
         enum { RAID_ROWS=sizeof(raids)/sizeof(raids[0]) };
+        /* Upgrades and gas Drones move the cursor away from a guard: they wait out the
+           stretch from 2,400 frames before a raid to 900 frames after its spawn. */
+        int quiet=1;
+        for(int r=0;r<RAID_ROWS;r++)if((int)frame+quiet_lead>=raids[r].at&&(int)frame<raids[r].at+900)quiet=0;
         if(raid>=0){
             if(FAST_ABS(u[raid].x-raid_last_x)>8||FAST_ABS(u[raid].y-raid_last_y)>8){
                 raid_last_x=u[raid].x;raid_last_y=u[raid].y;raid_still_since=frame;
@@ -325,6 +384,11 @@ int main(int argc,char **argv)
             int leg_count=west?6:3;
             const int (*legs)[2]=west?legs_w:legs_e;
             next_order=frame+300;
+            /* Once the east falls the army turns west. A raid of a standing town (at 34,170
+               the southern hive) pins its guard squad, so the march waits for it to pass. */
+            int raid_soon=0;
+            for(int r=0;r<RAID_ROWS;r++)if(nexus(raids[r].town)>=0&&(int)frame+hold_lead>=raids[r].at&&(int)frame<raids[r].at+1200)raid_soon=1;
+            if(west&&raid_soon)target=-1;
             if(target>=0&&!rush){
                 int from_x=west?guards[GUARD_SE].guard_x:stage_x,from_y=west?guards[GUARD_SE].guard_y:stage_y;
                 int home=army_near(from_x,from_y,west?460:700);
@@ -379,6 +443,21 @@ int main(int argc,char **argv)
                     if(dist2(army_x,army_y,b[target].x,b[target].y)<dr*dr&&currently_visible(b[target].x,b[target].y)){gx=b[target].x;gy=b[target].y;}}
                     /* One selection reaches about a screen: repeat around whoever
                        has not got this leg's order yet. */
+                    int fd=9999,foe=nearest_foe(army_x,army_y,&fd);
+                    if(foe>=0&&fd<contact&&dist2(army_x,army_y,guards[GUARD_NW].guard_x,guards[GUARD_NW].guard_y)>=340*340){
+                        /* In reach of the garrison: everything charges at once, Reavers first. */
+                        int fx=0,fy=0,fn=0,rv=-1,rbd=360*360;
+                        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&foe_combat(u[i].raw_type)&&!SC64_TRANSPORT_LOADED(&u[i])){
+                            if(dist2(u[i].x,u[i].y,u[foe].x,u[foe].y)<200*200){fx+=u[i].x;fy+=u[i].y;++fn;}
+                            if(u[i].raw_type==83){int dd=dist2(u[i].x,u[i].y,army_x,army_y);if(dd<rbd){rbd=dd;rv=i;}}
+                        }
+                        gx=fx/fn;gy=fy/fn;
+                        if(rv>=0){gx=u[rv].x;gy=u[rv].y;}
+                        (void)hydra_box_attack(army_x,army_y,box_reach,gx,gy,frame-last_box>=rebox_period);
+                        if(frame-last_box>=rebox_period)last_box=frame;
+                        fprintf(trace,"{\"kind\":\"charge\",\"frame\":%u,\"target\":[%d,%d],\"foe\":%d,\"fd\":%d,\"army\":%d}\n",(unsigned)frame,gx,gy,foe,fd,n);
+                        next_order=frame+fight_period;
+                    } else {
                     group_area_x=army_x;group_area_y=army_y;group_area_r=army_r;group_rounds=8;
                     (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,gx==b[target].x&&gy==b[target].y);
                     group_area_x=-1;group_rounds=6;
@@ -386,6 +465,7 @@ int main(int argc,char **argv)
                     /* Count from the order's end: a far army's order can outlast
                        a fixed period and starve production. */
                     next_order=frame+300;
+                    }
                 }
             }
         }
@@ -498,6 +578,10 @@ int main(int argc,char **argv)
         if(frame>=next_build&&opened&&raid<0){
             if(count_buildings(B_SPAWNING_POOL,1)&&!count_buildings(B_HYDRALISK_DEN,0)&&minerals>=100&&gas>=50&&drone_count()>=5)
                 (void)build_near(B_HYDRALISK_DEN,MENU_ACADEMY,ax+64,ay+96,128);
+            /* Not before frame 14,000: an Evolution Chamber at frame 4,900 delayed the first
+               Hatchery by two thousand frames and the second raid reached its hive. */
+            else if(frame>=tech_after&&count_buildings(B_HYDRALISK_DEN,1)&&!count_buildings(B_EVOLUTION_CHAMBER,0)&&minerals>=100&&drone_count()>=6)
+                (void)build_near(B_EVOLUTION_CHAMBER,MENU_ENG_BAY,ax+96,ay+96,128);
             else if(count_buildings(B_SPAWNING_POOL,1)&&!count_buildings(B_EXTRACTOR,0)&&minerals>=50&&drone_count()>=6)
                 (void)build_extractor_near(ax,ay);
             next_build=frame+240;
@@ -513,7 +597,23 @@ int main(int argc,char **argv)
             next_hatch=frame+300;
         }
         COST(9)
-        if(frame>=next_gas&&raid<0){(void)assign_gas_drone(gas_drones);next_gas=frame+600;}
+        if(frame>=next_gas&&raid<0&&(frame<tech_after||quiet)){if(frame<tech_after)(void)assign_gas_drone(gas_drones);else (void)assign_gas_all(gas_per_extractor);next_gas=frame+(frame<tech_after?600:200);}
+        COST(30)
+        if(frame>=tech_after&&frame>=next_research&&raid<0&&quiet&&count_buildings(B_EVOLUTION_CHAMBER,1)){
+            next_research=frame+240;
+            for(int w=0;w<2;w++){
+                int which=w?MENU_ARMOR:MENU_WEAPONS;
+                int lvl=w?armor_level:weapons_level,busy=w?armor_research:weapons_research;
+                if(lvl<2&&!busy&&minerals>=100&&gas>=100){
+                    int pick=free_drone(-1,-1);
+                    if(pick>=0&&select_single(pick)){
+                        (void)choose_row(which);
+                        close_menus();
+                        fprintf(trace,"{\"kind\":\"research\",\"frame\":%u,\"which\":%d,\"w\":%d,\"a\":%d}\n",(unsigned)frame,w,weapons_level,armor_level);
+                    }
+                }
+            }
+        }
         COST(10)
         /* An Overlord for the eastern guard, started early because it is slow. */
         if(!ne_overlord&&opened&&frame>=3000&&raid<0){
