@@ -1,6 +1,13 @@
 #ifndef SC64_P4_STORM_ADAPTER_H
 #define SC64_P4_STORM_ADAPTER_H
 
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+#include "sc64_research_q8_storm.h"
+#define SC64_P4_STORM_APPLY(klass,inv,hit,hp,shields) sc64_pr_q8_storm_hit((klass),(inv),(hit),(hp),(shields),0)
+#else
+#define SC64_P4_STORM_APPLY sc64_psionic_storm_apply_hit
+#endif
+
 #if !defined(SC64_P4_RUNTIME) || !defined(SC64_P4_STORM_ENABLED)
 #error "P4 Storm adapter requires SC64_P4_RUNTIME and SC64_P4_STORM_ENABLED"
 #endif
@@ -143,14 +150,22 @@ static int race_p4_storm_tick(void)
                 continue;
             klass = (u8)sc64_psionic_storm_target_class(
                 sc64_race_unit_flying(u[i].type), !!(flags & SC64_GAME_ACTOR_BUILDING));
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            if(!sc64_pr_q8_storm_read(i,&hp_q8,&shields_q8))return 0;
+#else
             hp_q8 = u[i].hp * SC64_STORM_ENERGY_ONE;
             shields_q8 = u[i].shield * SC64_STORM_ENERGY_ONE;
-            if (!sc64_psionic_storm_apply_hit(klass,
+#endif
+            if (!SC64_P4_STORM_APPLY(klass,
                     invincible_units[i] || (u[i].flags & 16) ||
                     (flags & SC64_GAME_ACTOR_INVINCIBLE), &hit[i],
                     &hp_q8, &shields_q8)) continue;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            if(!sc64_pr_q8_storm_commit(i,hp_q8,shields_q8))return 0;
+#else
             u[i].hp = hp_q8 / SC64_STORM_ENERGY_ONE;
             u[i].shield = shields_q8 / SC64_STORM_ENERGY_ONE;
+#endif
             if (u[i].hp <= 0) {
                 u[i].hp = 0; u[i].alive = 0; u[i].selected = 0;
                 if (u[i].owner == SIDE) supply_used -= unit_supply(u[i].type);
@@ -177,5 +192,7 @@ static void race_p4_storm_draw(void)
         gfx_line(x, y-2, x, y+2, C_WHITE);
     }
 }
+
+#undef SC64_P4_STORM_APPLY
 
 #endif

@@ -163,14 +163,22 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   level one. The real Flash backend uses no guest-state writes or polling
   workaround; the feature-off P10 control matches the `317cc67d…` ROM. This is
   an emulated witness, not cartridge or all-mode qualification. HOST coverage
-  includes 234 custom roster records and 234 genuine predecessor records; an
-  all 234 early ordinary-input ARM roster openings pass. The saved research
-  levels and damage debt were zero. A separate paid Forge witness on the
-  same experimental P10 product verifies the natural 100/100 debit, genuine
-  Flash save, identical wallet/job/timer/context before L release and level-one
-  completion. Six experimental ARM links and clean default checks at
-  `340ecd44` pass (1,034 Python tests, 26 skips, plus compiled checks); later
-  controller-only additions have their focused checks. See [draft #349](https://github.com/ggu/starcraft-gba/pull/349).
+  includes 234 custom roster records and 234 genuine predecessor records;
+  all 234 early ordinary-input ARM roster openings pass across both maps,
+  three human races and all ordered one-to-three AI races. Saved research
+  levels and Q8 debt were zero; this is not active-research or combat proof.
+  Six experimental ARM probes pass at combined source, with Z9/Z10 EWRAM
+  margin 12,588 B (normal products: 13,244 B). The P10 ROM matches the prior
+  physical matrix byte-for-byte; all 28,999 defined symbol entries match.
+  Clean default checks at `340ecd44` pass (1,034 Python tests, 26 skips, plus
+  compiled checks). See the [combined audit](audits/2026-11-07-q8-custom-combined/README.md)
+  and [physical matrix](audits/2026-11-07-q8-custom-physical-matrix/README.md).
+  A separate [paid Forge replay](audits/2026-11-07-q8-paid-research-physical/README.md)
+  on that exact P10 binary now verifies the natural 100/100 debit, a genuine
+  Flash save, identical job/wallet/timer/context immediately after fresh L,
+  and level-one completion. Its damage debt stayed zero. This adds an active
+  job witness, not nonzero combat fractions or campaign qualification. Later
+  controller-only additions have their own focused checks; see [draft #349](https://github.com/ggu/starcraft-gba/pull/349).
   Campaigns, later controller/race combinations,
   repair/Z5 aliases, real failure recovery, runtime stack and hardware remain
   release gates. The separate Scarab stage is not release-qualified.

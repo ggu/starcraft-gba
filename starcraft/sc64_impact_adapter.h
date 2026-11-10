@@ -249,6 +249,9 @@ race_impact_save_write(const GbaSaveSelection *previous)
 race_impact_save_write(void)
 #endif
 {
+#if defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+    (void)previous; /* This isolated stage fences all journal calls. */
+#endif
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -288,21 +291,40 @@ race_impact_save_write(void)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+    ,SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+    ,SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION
+#endif
+#endif
 #endif
 };
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+#define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION : SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION)
+#else
+#define SC64_GUARDIAN_WRITE_TAG SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#endif
+#else
 #define SC64_GUARDIAN_WRITE_TAG SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#endif
 #else
 #define SC64_GUARDIAN_WRITE_TAG SC64_TRANSPORT_SAVE_VERSION
 #endif
 #endif
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
+#if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
+    (void)previous; (void)tags;
+    if (!race_q8_flash_write(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;
+#else
     if (previous) {
         if (!save_write_selected(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
                                  SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
                                   SC64_GUARDIAN_WRITE_TAG)) return 0;
+#endif
 #elif defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
@@ -358,19 +380,38 @@ race_impact_save_write(void)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+    ,SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+    ,SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION
+#endif
+#endif
 #endif
 };
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+#ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
+#define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION : SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION)
+#else
+#define SC64_GUARDIAN_WRITE_TAG SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#endif
+#else
 #define SC64_GUARDIAN_WRITE_TAG SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#endif
 #else
 #define SC64_GUARDIAN_WRITE_TAG SC64_TRANSPORT_SAVE_VERSION
 #endif
 #endif
+#if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
+    (void)previous; (void)tags;
+    if (!race_q8_flash_write(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;
+#else
     if (previous) {
         if (!save_write_selected(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
                                  SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
                                   SC64_GUARDIAN_WRITE_TAG)) return 0;
+#endif
 #else
     save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes + SC64_TRANSPORT_TRAILER_BYTES,
                SC64_TRANSPORT_SAVE_VERSION);

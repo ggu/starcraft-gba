@@ -240,3 +240,8 @@ void save_test_corrupt_latest(u32 length,u32 tag);
 u8 gfx_test_pixel(int x,int y);
 #endif
 #endif
+
+#ifdef SC64_Q8_FLASH_ARM_PROBE
+int gba_flash_game_transaction_begin(void);
+void gba_flash_game_transaction_end(void);
+#endif

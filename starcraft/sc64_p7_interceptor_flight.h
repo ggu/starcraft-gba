@@ -174,6 +174,9 @@ static void race_p7_flight_dock(int child)
     Unit *q = &u[child];
     race_p7_flight_place(q, u[q->build].x, u[q->build].y);
     q->hp = 40; q->shield = 40; q->shield_remainder = 0;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+    sc64_pr_hp_debt[child]=0;
+#endif
     q->carry = 0; q->cd = 0; q->target = -1; q->order = ORDER_IDLE;
     q->path_retry = 0; q->path_timer = 0; q->selected = 0;
     sc64_p7_carrier_inside_insert_front(child);

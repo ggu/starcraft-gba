@@ -1864,6 +1864,7 @@ static inline int sc64_race_raw_unit(int type)
 /* Exact raw-12 identities, including profiles that carry multiple aliases. */
 static inline int sc64_race_is_battlecruiser(int type)
 {
+    (void)type; /* Some source-cadence profiles contain no BC actor enum. */
 #ifdef SC64_TERRAN_LATE_ACTORS
     if (type == U_BATTLECRUISER) return 1;
 #endif

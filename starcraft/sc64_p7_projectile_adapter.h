@@ -143,6 +143,9 @@ static void race_p7_projectile_source_tick(void)
         if (impact && race_p7_projectile_target_alive(row.target_ref)) {
             int owner=race_protoss_source_owner(row.raw_source_owner);
             int damage=6+(owner==SIDE?weapons_level:0);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+            damage=6+sc64_pr_stage_weapon_level(owner,79);
+#endif
             if (owner>=0) hit_target(row.target_ref,damage,U_P7_INTERCEPTOR,owner);
         }
         id=next;
