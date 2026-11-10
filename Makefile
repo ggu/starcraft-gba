@@ -4453,8 +4453,10 @@ build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcar
 build/StarCraft-Showcase-Transport1-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC SHOWCASE' SCSH
-.PHONY: showcase test-sc64-showcase test-sc64-showcase-front
+.PHONY: showcase verify-showcase test-sc64-showcase test-sc64-showcase-front
 showcase: build/StarCraft-Showcase-Transport1-GBA.gba
+verify-showcase: build/StarCraft-Showcase-Transport1-GBA.gba
+	$(PYTHON) tools/verify_roms.py --showcase
 build/test-sc64-showcase-front: tests/sc64_frontend.c starcraft/sc64_frontend.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_SHOWCASE_ENABLED -Icommon $< -o $@
 build/test-sc64-showcase-game: tests/sc64_showcase_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c Makefile | build
@@ -6138,3 +6140,5 @@ test-sc64-creation-provenance-t3: build/test-sc64-creation-provenance-t3
 include tests/sc64-menu-repeat/Makefile
 
 include tests/sc64-shared-source-sight/Makefile
+
+include tests/sc64-aura-square/Makefile

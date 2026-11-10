@@ -1,6 +1,6 @@
-# StarCraft GBA Demake Project
+# StarCraft GBA Demake Research Project
 
-This project is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
+This research project is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
 
 Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. The canonical profiles expose Terran 1–10, Zerg 1–9, and Protoss 1–10: 29 of 30 campaign entries. The [Z9 canonical audit](docs/audits/2026-11-05-z9-canonical-alias/README.md) and [P10 default audit](docs/audits/2026-11-04-protoss-p10-default/README.md) record replay evidence and remaining save, gameplay and performance limits.
 

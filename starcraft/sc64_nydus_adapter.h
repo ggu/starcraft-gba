@@ -26,8 +26,18 @@
 
 _Static_assert(MAX_BUILDINGS < SC64_NYDUS_NO_SLOT,
                "Nydus links store building slots in one byte");
-_Static_assert(ORDER_NYDUS_ENTER <= 15 && SC_RB_COUNT <= 64,
-               "packed unit order and building type fields");
+_Static_assert(ORDER_NYDUS_ENTER <= 15,
+               "packed unit order field is four bits");
+#ifdef SC64_Z7_DERIVED_SAVE
+_Static_assert(SC_RB_COUNT <= 64,
+               "legacy derived building type field is six bits");
+#else
+/* The selected compact (or P7 typed) building row retains its seventh type
+ * bit in trailing padding. Do not impose the older derived row's bound on
+ * that codec; its own encoder/decoder still validate every value and bit. */
+_Static_assert(SC_RB_COUNT <= 128,
+               "compact building type field is seven bits");
+#endif
 
 static const Sc64NydusSourceRecord *race_nydus_source;
 static Sc64NydusSourcePair race_nydus_pairs[SC64_NYDUS_MAX_LINKS];

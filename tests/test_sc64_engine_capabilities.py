@@ -35,6 +35,15 @@ MAKE_VARS = (
     "PROTOSS_P6_CANONICAL_FLAGS",
 )
 
+# The flag vectors the shipped (release) ROMs are actually linked with. Some
+# live in optional Makefile fragments; the test skips, with a reason, when a
+# vector cannot be expanded in the current checkout.
+SHIPPED_VECTORS = (
+    "ZERG_Z9_RELEASE_FLAGS",
+    "ZERG_Z10_RELEASE_FLAGS",
+    "PROTOSS_P10_FLAGS",
+)
+
 PROBE_SOURCE = r"""
 #include "sc64_engine_capabilities.h"
 
@@ -61,14 +70,15 @@ class EngineCapabilityProfiles(unittest.TestCase):
         if not cls.clang:
             raise unittest.SkipTest("clang is required for the asset-free probes")
 
-    def _make_values(self, overrides: tuple[str, ...] = ()) -> dict[str, str]:
+    def _expand(self, names: tuple[str, ...],
+                overrides: tuple[str, ...] = ()) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory(prefix="sc64-engine-capabilities-") as td:
             helper = Path(td) / "print-profiles.mk"
             recipe = ["print-engine-profiles:"]
-            for name in (*MAKE_VARS, "RACE_CONSTRUCTION_INPUTS"):
+            for name in names:
                 recipe.append(f"\t@printf '%s\\t%s\\n' '{name}' '$({name})'")
             helper.write_text("\n".join(recipe) + "\n", encoding="utf-8")
-            result = subprocess.run(
+            return subprocess.run(
                 [self.make, "--no-print-directory", "-s", "-f", "Makefile",
                  "-f", str(helper), *overrides, "print-engine-profiles"],
                 cwd=ROOT,
@@ -77,17 +87,24 @@ class EngineCapabilityProfiles(unittest.TestCase):
                 stderr=subprocess.PIPE,
                 check=False,
             )
-        self.assertEqual(
-            result.returncode,
-            0,
-            msg=f"production Makefile expansion failed:\n{result.stderr}",
-        )
+
+    def _parse_values(self, result: subprocess.CompletedProcess[str]) -> dict[str, str]:
         values: dict[str, str] = {}
         for line in result.stdout.splitlines():
             name, separator, value = line.partition("\t")
             self.assertTrue(separator, f"malformed Make output line: {line!r}")
             self.assertNotIn(name, values, f"duplicate Make variable {name}")
             values[name] = value
+        return values
+
+    def _make_values(self, overrides: tuple[str, ...] = ()) -> dict[str, str]:
+        result = self._expand((*MAKE_VARS, "RACE_CONSTRUCTION_INPUTS"), overrides)
+        self.assertEqual(
+            result.returncode,
+            0,
+            msg=f"production Makefile expansion failed:\n{result.stderr}",
+        )
+        values = self._parse_values(result)
         self.assertEqual(set(values), {*MAKE_VARS, "RACE_CONSTRUCTION_INPUTS"})
         # The repository Makefile has pre-existing duplicate recipes. Their
         # warnings are captured above; only command status/output
@@ -116,6 +133,26 @@ class EngineCapabilityProfiles(unittest.TestCase):
                 self.assertIn("-DSC64_SIEGE_SPLASH", args)
                 self.assertIn("-DSC64_SHARED_BATTERY", args)
                 self.assertIn("-DSC64_SHARED_BUNKER", args)
+                self.assertEqual(args.count("-DSC64_DEPOT_BOUNDED"), 1)
+                result = self._compile_probe(values[name])
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_shipped_release_vectors_compile_with_shared_mechanics(self) -> None:
+        result = self._expand(SHIPPED_VECTORS)
+        if result.returncode != 0:
+            self.skipTest("shipped release vectors cannot be expanded here: " +
+                          (result.stderr.strip().splitlines() or ["make failed"])[-1])
+        values = self._parse_values(result)
+        absent = [name for name in SHIPPED_VECTORS if not values.get(name, "").strip()]
+        if absent:
+            self.skipTest("shipped release vectors are empty in this checkout: " + ", ".join(absent))
+        for name in SHIPPED_VECTORS:
+            with self.subTest(vector=name):
+                args = shlex.split(values[name])
+                for flag in ("-DSC64_ENGINE_CORE_REQUIRED", "-DSC64_CONSTRUCTION_HP",
+                             "-DSC64_SIEGE_SPLASH", "-DSC64_SHARED_BATTERY",
+                             "-DSC64_SHARED_BUNKER"):
+                    self.assertIn(flag, args)
                 self.assertEqual(args.count("-DSC64_DEPOT_BOUNDED"), 1)
                 result = self._compile_probe(values[name])
                 self.assertEqual(result.returncode, 0, result.stderr)

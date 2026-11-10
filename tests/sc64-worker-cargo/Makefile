@@ -52,3 +52,16 @@ test-sc64-worker-route-p10: build/test-sc64-worker-route-p10
 # Optional cross-revision producer/consumer: build separately in each tree.
 build/test-sc64-worker-legacy-p10: $(WORKER_CARGO_LEGACY_SOURCE) tests/sc64_pre_cargo_compat_shim.c tests/sc64_guardian_journal_shim.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile tests/sc64-worker-cargo/Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(WORKER_CARGO_CPPFLAGS) $(WORKER_CARGO_p10_FLAGS) -DSC64_WORKER_CARGO_KIND $(WORKER_CARGO_LEGACY_SOURCE) tests/sc64_pre_cargo_compat_shim.c $(WORKER_CARGO_p10_SOURCES) -o $@
+
+# Owner-list probe uses existing prepared P10 inputs; optional and never prepares assets.
+build/test-sc64-depot-owner-p10: tests/sc64_depot_owner_list_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile tests/sc64-worker-cargo/Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(WORKER_CARGO_CPPFLAGS) $(WORKER_CARGO_p10_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DEPOT_OWNER_LIST_TEST -MMD -MP -MF build/test-sc64-depot-owner-p10.d $< common/gba.c $(WORKER_CARGO_p10_SOURCES) -o $@
+-include build/test-sc64-depot-owner-p10.d
+.PHONY: test-sc64-depot-owner-p10 test-sc64-depot-owner-capability
+test-sc64-depot-owner-p10: build/test-sc64-depot-owner-p10
+	./build/test-sc64-depot-owner-p10
+test-sc64-depot-owner-capability:
+	$(CLANG) -std=c11 -Werror -fsyntax-only -DEXPECT_OWNER_LIST_OFF tests/sc64_depot_owner_capability.c
+	$(CLANG) -std=c11 -Werror -fsyntax-only -DSC64_NEAREST_RESOURCE_DEPOT -DEXPECT_OWNER_LIST_ON tests/sc64_depot_owner_capability.c
+	$(CLANG) -std=c11 -Werror -fsyntax-only -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DEPOT_OWNER_LIST_DISABLED -DEXPECT_OWNER_LIST_OFF tests/sc64_depot_owner_capability.c
+	$(CLANG) -std=c11 -Werror -fsyntax-only -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DEPOT_OWNER_LIST_DISABLED -DSC64_DEPOT_OWNER_LIST_PROBE -DEXPECT_OWNER_LIST_OFF tests/sc64_depot_owner_capability.c

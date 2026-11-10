@@ -5,6 +5,19 @@
 #include <string.h>
 #include "../starcraft/game.c"
 
+#if defined(SC64_AURA_HOISTS_DISABLED)
+#if defined(SC64_AURA_SOURCE_HOIST_PROBE) || defined(SC64_AURA_SQUARE_HOIST_PROBE)
+#error "Aura opt-out must select both scalar paths"
+#endif
+#elif defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#ifndef SC64_AURA_SOURCE_HOIST_PROBE
+#error "Shared Arbiter source hoist must be enabled"
+#endif
+#if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && !defined(SC64_AURA_SQUARE_HOIST_PROBE)
+#error "Shared Arbiter square hoist must follow geometry support"
+#endif
+#endif
+
 static int make_actor(int live_owner,unsigned raw,int type,int owner,int x,int y)
 {
     int n=spawn_unit(live_owner,type,x,y);
@@ -87,13 +100,49 @@ static void geometry_hoist_differential(void)
                         &tl,&tt,&tr,&tb) &&
                     sc64_p7_arbiter_finder_square_rect(0,tl,tt,tr,tb);
                 assert(old==candidate);
+#ifdef SC64_AURA_SQUARE_HOIST_PROBE
+                Sc64AuraSquare square=sc64_aura_square_make(u[0].x,u[0].y,
+                    SC64_P7_MAP_COLS*32,SC64_P7_MAP_ROWS*32);
+                if (sc64_p7_actor_rect_source(71,u[0].x,u[0].y,0,&tl,&tt,&tr,&tb) &&
+                    sc64_p7_actor_rect_source(actors[ti],u[1].x,u[1].y,0,&tl,&tt,&tr,&tb))
+                    assert(candidate==sc64_aura_square_contains(&square,tl,tt,tr,tb));
+#endif
             }
     u[0]=saved0; u[1]=saved1;
 }
 #endif
 
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+static void aura_source_hoist_differential(void)
+{
+    Unit a=u[0],b0=u[1]; signed char old_override=race_protoss_binding_override;
+    int checked=0;
+    for(int binding=SC64_PROTOSS_BIND_GENERIC;binding<=SC64_PROTOSS_BIND_LATER;binding++) {
+#ifndef SC64_PROTOSS_LATER_BINDINGS
+        if(binding==SC64_PROTOSS_BIND_LATER) continue;
+#endif
+        race_protoss_binding_override=(signed char)binding;
+        for(int owner=-2;owner<=6;owner++)for(int raw=-2;raw<=9;raw++) {
+            u[0].owner=owner;u[0].raw_owner=raw;
+            int source=RACE_PROTOSS_SLOT(&u[0]);
+            if(source<0||source>=8||race_protoss_source_owner((unsigned)source)!=u[0].owner)continue;
+            for(int target_owner=-2;target_owner<=6;target_owner++)for(int target_raw=-2;target_raw<=9;target_raw++) {
+                u[1].owner=target_owner;u[1].raw_owner=target_raw;
+                assert(sc64_p7_arbiter_same_source(0,1)==
+                       sc64_p7_arbiter_same_validated_source(1,source,u[0].owner));
+                checked++;
+            }
+        }
+    }
+    assert(checked>0);u[0]=a;u[1]=b0;race_protoss_binding_override=old_override;
+}
+#endif
+
 int main(void)
 {
+#ifdef SC64_AURA_SOURCE_HOIST_PROBE
+    aura_source_hoist_differential();
+#endif
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     assert(SC64_RACE_SAVE_GENERATION==40u);
 #else
