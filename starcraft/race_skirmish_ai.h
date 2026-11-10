@@ -42,7 +42,14 @@ enum {
     RACE_AI_UNIT_LIMIT = 56,
     RACE_AI_STALL_PASSES = 40,          /* ~64 s for a builder to arrive */
     RACE_AI_THREAT_RANGE = 320,
-    RACE_AI_DEPLOYED_RANGE = 576
+    RACE_AI_DEPLOYED_RANGE = 576,
+    /* The engine's attack-move acquires a target within 64 px (more for
+     * long-range units). An objective is only held by hostiles that a unit
+     * standing on it would engage. */
+    RACE_AI_OBJECTIVE_REACH = 64,
+    RACE_AI_HOME_PYLON_RANGE = 256,
+    RACE_AI_WORKER_FLOOR = 4,
+    RACE_AI_FLOAT_MINERALS = 400
 };
 
 /* Tracked raw IDs. 0 means untracked; otherwise key + 1. Unit and building
@@ -85,8 +92,8 @@ typedef struct {
     int depot[RACE_AI_MAX_DEPOTS], depots;
     int refinery[RACE_AI_MAX_REFINERIES], refinery_load[RACE_AI_MAX_REFINERIES], refineries;
     int workers, miners, gas_workers, idle_workers, pending_builders;
-    int army, army_supply, home_army, deployed, deployed_supply, units, buildings;
-    int producers, larva, pending_supply, patches, queued_units, free_supply, site_searches;
+    int army, army_supply, home_army, home_anti_air, deployed, deployed_supply, units, buildings;
+    int producers, larva, pending_supply, patches, ore_patches, queued_units, free_supply, site_searches;
     int supply_used, supply_cap, supply_queued;
     unsigned char lane_patch[16], lane_patches, lane_geyser[2], lane_geysers;
     int enemy_air, enemy_army, enemy_air_tech, enemy_defense;
@@ -136,6 +143,7 @@ static int race_ai_building_cap(void)
 static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
 {
     int i, best_threat = RACE_AI_THREAT_RANGE * RACE_AI_THREAT_RANGE;
+    int air_threat = -1, air_d = best_threat, air_count = 0;
     memset(c, 0, sizeof *c);
     c->owner = owner;
     c->race = race_owner_identity(owner);
@@ -203,6 +211,7 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
     c->hy = c->home >= 0 ? b[c->home].y : race_base_y[c->base];
     for (i = 0; i < MAX_MINERALS; ++i) {
         if (m[i].amount <= 0) continue;
+        ++c->ore_patches;
         if (c->lane_patches < 16 && dist2(m[i].x, m[i].y, c->hx, c->hy) <= 288 * 288)
             c->lane_patch[c->lane_patches++] = (unsigned char)i;
         for (int k = 0; k < c->depots; ++k)
@@ -226,13 +235,16 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             continue;
         }
         if (q->owner != owner) {
-            int flying, d, nearby = 0;
+            int flying, d, nearby = 0, best;
             if (!owners_hostile(owner, q->owner) || !race_ai_armed(q->type)) continue;
             /* Only armed non-workers participate in this defense policy. */
             if (sc64_race_is_worker(q->type)) continue;
             flying = sc64_race_unit_flying(q->type);
             ++c->enemy_army;
             if (flying) ++c->enemy_air;
+            /* A unit with no ground weapon (Scourge) cannot hurt a base. */
+            if (sc64_race_unit_damage_vs(q->type, 0) <= 0) continue;
+            best = flying ? air_d : best_threat;
             /* Count distinct actors, while choosing the distance to their
              * nearest owned depot. Overlapping bases do not multiply them. */
             for (int k = 0; k < c->depots || (k == 0 && !c->depots); ++k) {
@@ -240,12 +252,18 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
                 int ay = c->depots ? b[c->depot[k]].y : c->hy;
                 d = dist2(q->x, q->y, ax, ay);
                 if (d < RACE_AI_THREAT_RANGE * RACE_AI_THREAT_RANGE) nearby = 1;
-                if (d < best_threat) {
-                    best_threat = d; c->threat = i;
+                if (d < best) best = d;
+            }
+            /* Ground and flying threats are kept apart until the home
+             * army's anti-air is known. */
+            if (flying) { air_count += nearby; if (best < air_d) { air_d = best; air_threat = i; } }
+            else {
+                c->threat_count += nearby;
+                if (best < best_threat) {
+                    best_threat = best; c->threat = i;
                     c->threat_x = q->x; c->threat_y = q->y;
                 }
             }
-            c->threat_count += nearby;
             continue;
         }
         ++c->units;
@@ -283,7 +301,19 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             ++c->army; c->army_supply += supply;
             if (dist2(q->x, q->y, c->hx, c->hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) {
                 ++c->deployed; c->deployed_supply += supply;
-            } else ++c->home_army;
+            } else {
+                ++c->home_army;
+                if (sc64_race_unit_can_attack_air(q->type)) ++c->home_anti_air;
+            }
+        }
+    }
+    /* Flying threats count only when something at home can shoot them. A
+     * ground army recalled under aircraft it cannot hit never left again. */
+    if (c->home_anti_air && air_count) {
+        c->threat_count += air_count;
+        if (air_d < best_threat) {
+            best_threat = air_d; c->threat = air_threat;
+            c->threat_x = u[air_threat].x; c->threat_y = u[air_threat].y;
         }
     }
     c->threat_d = best_threat;
@@ -294,8 +324,10 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
 
 static int race_ai_affordable(const RaceAiCensus *c, int minerals_cost, int gas_cost)
 {
+    /* Gas reserved for a later step does not block a purchase that needs
+     * none (workers, Marines, Zerglings, Zealots, supply). */
     return race_owner_minerals(c->owner) - c->reserve_minerals >= minerals_cost &&
-           race_owner_gas(c->owner) - c->reserve_gas >= gas_cost;
+           (!gas_cost || race_owner_gas(c->owner) - c->reserve_gas >= gas_cost);
 }
 
 static int race_ai_worker_target(const RaceAiCensus *c)
@@ -303,6 +335,8 @@ static int race_ai_worker_target(const RaceAiCensus *c)
     /* Two per local mineral patch, three per refinery, plus a builder. */
     int target = c->patches * 2 + c->refineries * 3 + 1;
     int cap = race_ai_unit_cap() / 2;
+    /* With no ore left anywhere a new worker has nothing to mine. */
+    if (!c->ore_patches) return 0;
     if (target < 8) target = 8;
     if (target > cap) target = cap;
     return target > RACE_AI_WORKER_CAP ? RACE_AI_WORKER_CAP : target;
@@ -392,7 +426,10 @@ static void race_ai_balance_gas(RaceAiCensus *c)
 #endif
             ++c->gas_workers; ++c->refinery_load[light];
         }
-    } else if (c->gas_workers > want + 1) {
+    } else if (c->gas_workers > want + (want > 0)) {
+        /* One over the wanted number is tolerated, but not when none is
+         * wanted: an owner's last worker stayed on gas with ore left and
+         * no minerals to train another. */
         int w = race_ai_nearest_worker(c, ORDER_GAS, c->hx, c->hy);
         if (w >= 0) {
             u[w].order = ORDER_IDLE; u[w].target = -1;
@@ -563,40 +600,85 @@ static int race_ai_exit_clear(int type, int x, int y)
     return 1;
 }
 
-/* Lattice rings around (ax,ay). Only one pair of rings is examined per pass,
- * rotating with the frame counter, and at most RACE_AI_SITE_CHECKS
- * candidates reach the expensive checks. front_first orders each ring from
- * the direction of the map center. Only one search runs per pass and it
- * examines a single ring, rotating with the pass number. */
+static int race_ai_needs_power(int type)
+{
+    const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
+    return (r && (r->flags & SC_RACE_F_REQUIRES_POWER)) || race_skirmish_power_required(type);
+}
+
+/* The index-th completed Pylon within psi-building distance of the home
+ * depot, or the number of them when index is negative. */
+static int race_ai_home_pylon(const RaceAiCensus *c, int index)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == c->owner && b[i].type == B_PYLON &&
+            !b[i].under_construction &&
+            dist2(b[i].x, b[i].y, c->hx, c->hy) <
+            RACE_AI_HOME_PYLON_RANGE * RACE_AI_HOME_PYLON_RANGE && n++ == index) return i;
+    return index < 0 ? n : -1;
+}
+
+/* One lattice ring of radius `radius` around (ax,ay): up to `steps` of its 16
+ * directions, fanning out from the one facing (mx,my). Cheap rejections run
+ * first; `checks` counts the candidates sent to the expensive placement
+ * services across the whole pass. */
+static int race_ai_ring(const RaceAiCensus *c, int type, int ax, int ay, int radius,
+                        int mx, int my, int away, int steps, int *checks,
+                        int *out_x, int *out_y)
+{
+    int front = 0, best_dot = -0x7fffffff;
+    for (int k = 0; k < 16; ++k) {
+        int dot = race_ai_dir[k][0] * mx + race_ai_dir[k][1] * my;
+        if (dot > best_dot) { best_dot = dot; front = k; }
+    }
+    if (away) front = (front + 8) & 15;
+    for (int step = 0; step < steps; ++step) {
+        /* front, front+1, front-1, front+2, ... */
+        int k = (front + ((step & 1) ? (step + 1) / 2 : -(step / 2)) + 16) & 15;
+        int x = ax + race_ai_dir[k][0] * radius / 64;
+        int y = ay + race_ai_dir[k][1] * radius / 64;
+        if (!race_ai_site_lane_clear(c, x, y) || !race_ai_exit_clear(type, x, y)) continue;
+        if ((type == B_FACTORY || type == B_STARPORT) &&
+            !can_place(B_DEPOT, x + 48, y + 8)) continue;
+        if (++*checks > RACE_AI_SITE_CHECKS) return 0;
+        if (race_can_site(c->owner, type, x, y) && can_place(type, x, y)) {
+            *out_x = x; *out_y = y; return 1;
+        }
+    }
+    return 0;
+}
+
+/* Lattice rings around (ax,ay). One search runs per pass and it examines a
+ * single ring, rotating with the pass number; at most RACE_AI_SITE_CHECKS
+ * candidates reach the expensive checks. front_first orders the ring from
+ * the direction of the map center.
+ *
+ * A Protoss structure that needs psi power gets one more ring when that
+ * search finds nothing: the half of an inner ring around one of the owner's
+ * completed home Pylons that faces the Nexus (the map center for defenses),
+ * a different Pylon and radius as the passes go by. Rings around the Nexus
+ * alone often miss every psi field, which left Gateways unplaced for the
+ * rest of a match. The expensive-check budget is shared by both rings. */
 static int __attribute__((noinline))
 race_ai_find_site(RaceAiCensus *c, int type, int ax, int ay, int min_ring,
                   int max_ring, int front_first, int *out_x, int *out_y)
 {
     static const unsigned char radius[6] = { 64, 96, 128, 160, 192, 224 };
     int rings = max_ring - min_ring + 1, pass = frame / RACE_AI_PERIOD, checks = 0;
-    int start_ring, front = 0, best_dot = -0x7fffffff;
-    int mx = WORLD_W / 2 - ax, my = WORLD_H / 2 - ay;
     /* One placement search per pass bounds the per-update cost. */
     if (rings <= 0 || c->site_searches++) return 0;
-    for (int k = 0; k < 16; ++k) {
-        int dot = race_ai_dir[k][0] * mx + race_ai_dir[k][1] * my;
-        if (dot > best_dot) { best_dot = dot; front = k; }
-    }
-    if (!front_first) front = (front + 8) & 15;
-    start_ring = min_ring + pass % rings;
-    for (int ring = start_ring; ring <= start_ring; ++ring) {
-        for (int step = 0; step < 16; ++step) {
-            /* front, front+1, front-1, front+2, ... */
-            int k = (front + ((step & 1) ? (step + 1) / 2 : -(step / 2)) + 16) & 15;
-            int x = ax + race_ai_dir[k][0] * radius[ring] / 64;
-            int y = ay + race_ai_dir[k][1] * radius[ring] / 64;
-            if (!race_ai_site_lane_clear(c, x, y) || !race_ai_exit_clear(type, x, y)) continue;
-            if ((type == B_FACTORY || type == B_STARPORT) &&
-                !can_place(B_DEPOT, x + 48, y + 8)) continue;
-            if (++checks > RACE_AI_SITE_CHECKS) return 0;
-            if (race_can_site(c->owner, type, x, y) && can_place(type, x, y)) {
-                *out_x = x; *out_y = y; return 1;
-            }
+    if (race_ai_ring(c, type, ax, ay, radius[min_ring + pass % rings],
+                     WORLD_W / 2 - ax, WORLD_H / 2 - ay, !front_first, 16, &checks,
+                     out_x, out_y)) return 1;
+    if (c->race == R_PROTOSS && race_ai_needs_power(type)) {
+        int n = race_ai_home_pylon(c, -1), pylon;
+        if (n > 0 && (pylon = race_ai_home_pylon(c, (pass / 2) % n)) >= 0) {
+            int px = b[pylon].x, py = b[pylon].y;
+            return race_ai_ring(c, type, px, py, radius[pass & 1],
+                                front_first ? WORLD_W / 2 - px : c->hx - px,
+                                front_first ? WORLD_H / 2 - py : c->hy - py,
+                                0, 9, &checks, out_x, out_y);
         }
     }
     return 0;
@@ -665,6 +747,15 @@ static int race_ai_home_ore(const RaceAiCensus *c)
 
 /* --------------------------------------------------------- supply, tech */
 
+/* Protoss structures need a completed Pylon's psi field. Supply alone does
+ * not ask for one: Pylons left at a lost expansion keep the supply cap up
+ * while nothing can be placed at the remaining Nexus. */
+static int race_ai_home_unpowered(const RaceAiCensus *c)
+{
+    return c->race == R_PROTOSS && c->depots && c->workers >= 9 && !c->pend[AK_PYLON] &&
+           !race_ai_home_pylon(c, -1);
+}
+
 static int race_ai_supply(RaceAiCensus *c)
 {
     /* Census totals follow race_owner_supply_cap and
@@ -673,23 +764,28 @@ static int race_ai_supply(RaceAiCensus *c)
     int free_supply = cap - c->supply_used - c->supply_queued;
     c->free_supply = free_supply;
     int margin = 4 + 4 * c->producers, x, y;
+    int repower = race_ai_home_unpowered(c);
     if (margin > 24) margin = 24;
-    if (cap >= 400 || free_supply >= margin) return 0;
-    if (c->pending_supply >= (cap >= 64 ? 2 : 1)) return 0;
+    if (!repower) {
+        if (cap >= 400 || free_supply >= margin) return 0;
+        if (c->pending_supply >= (cap >= 64 ? 2 : 1)) return 0;
+    }
     if (c->race == R_ZERG) {
         for (int k = 0; k < c->depots; ++k)
             if (b[c->depot[k]].larva > 0 && race_queue_unit(c->owner, c->depot[k], U_OVERLORD)) {
                 ++c->pending_supply; return 1;
             }
         /* Reserve the Overlord price until a larva is available. */
-        c->reserve_minerals += sc64_race_unit_rule(U_OVERLORD)->minerals;
+        if (c->ore_patches) c->reserve_minerals += sc64_race_unit_rule(U_OVERLORD)->minerals;
         return 0;
     }
     {
         int type = c->race == R_PROTOSS ? B_PYLON : B_DEPOT;
         const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
         if (!race_ai_affordable(c, r->minerals, r->gas)) {
-            c->reserve_minerals += r->minerals; return 0;
+            /* With no ore left a price the bank cannot meet is never met. */
+            if (c->ore_patches) c->reserve_minerals += r->minerals;
+            return 0;
         }
         if (race_ai_find_site(c, type, c->hx, c->hy, c->race == R_PROTOSS ? 1 : 0, 5, 0, &x, &y) &&
             race_ai_start_build(c, type, x, y)) { ++c->pending_supply; return 1; }
@@ -878,7 +974,8 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
             int result;
             if (!race_ai_affordable(c, rule->minerals, rule->gas)) {
                 int halls = c->have[key] + c->pend[key] + c->have[AK_LAIR] + c->have[AK_HIVE];
-                if (halls < step->count && (race_ai_home_ore(c) < 3000 || c->race == R_ZERG)) {
+                if (halls < step->count && c->ore_patches &&
+                    (race_ai_home_ore(c) < 3000 || c->race == R_ZERG)) {
                     c->reserve_minerals += rule->minerals; return;
                 }
                 continue;
@@ -895,8 +992,10 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
             (parent = race_ai_attach_parent(c, r)) < 0) continue;
         if (step->kind == RACE_AI_STEP_GAS && !race_ai_build_gas(c, 1)) continue;
         if (!race_ai_affordable(c, rule->minerals, rule->gas)) {
-            /* Reserve only when the gas side can eventually be met. */
-            if (!rule->gas || c->refineries) {
+            /* Reserve only when the price can eventually be met: the gas
+             * side needs a refinery, and with no ore left anywhere the bank
+             * is final and is better spent on units. */
+            if (c->ore_patches && (!rule->gas || c->refineries)) {
                 c->reserve_minerals += rule->minerals; c->reserve_gas += rule->gas;
             }
             return;
@@ -979,6 +1078,27 @@ static int race_ai_pick_protoss(RaceAiCensus *c, int producer)
     return 65;
 }
 
+/* Called when the picked unit could not be queued. When it needs gas the
+ * owner lacks and minerals are piling up, train the race's gas-free line
+ * unit rather than leave the producer idle. Protoss already fall back from
+ * Dragoons to Zealots. */
+static int race_ai_gas_fallback(RaceAiCensus *c, int producer, int raw)
+{
+    int type = sc64_race_unit_from_raw(raw), alt = -1;
+    const Sc64RaceUnitRule *r = type >= 0 ? sc64_race_unit_rule(type) : 0;
+    if (!r) return 0;
+    /* With no ore left anywhere the bank is final: take the line unit
+     * whenever the pick cannot be paid for. */
+    if (c->ore_patches &&
+        (!r->gas || race_owner_gas(c->owner) - c->reserve_gas >= r->gas ||
+         race_owner_minerals(c->owner) - c->reserve_minerals < RACE_AI_FLOAT_MINERALS)) return 0;
+    if (c->race == R_TER) {
+        if (b[producer].type == B_BARRACKS) alt = 0;            /* Marine */
+        else if (b[producer].type == B_FACTORY) alt = 2;        /* Vulture */
+    } else if (c->race == R_ZERG) alt = 37;                     /* Zergling */
+    return alt >= 0 && alt != raw && race_ai_try_queue(c, producer, alt, 1);
+}
+
 static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
 {
     int worker_target = race_ai_worker_target(c), unit_cap = race_ai_unit_cap();
@@ -1003,6 +1123,11 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
         }
     }
     if (committed >= unit_cap) return;
+    /* Keep the price of a worker while almost none are left. An owner that
+     * spends its last minerals on army after a raid can never mine again. */
+    if (c->depots && c->ore_patches &&
+        race_ai_count(c, race_ai_key(c->worker_raw)) < RACE_AI_WORKER_FLOOR)
+        c->reserve_minerals += sc64_race_unit_rule(c->worker_type)->minerals;
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         int raw;
         if (!b[i].alive || b[i].owner != c->owner) continue;
@@ -1017,7 +1142,8 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
         }
         if (raw < 0) continue;
         if (!race_ai_try_queue(c, i, raw, 1) &&
-            !(c->race == R_PROTOSS && raw == 66 && race_ai_try_queue(c, i, 65, 1))) continue;
+            !(c->race == R_PROTOSS && raw == 66 && race_ai_try_queue(c, i, 65, 1)) &&
+            !race_ai_gas_fallback(c, i, raw)) continue;
         if (++committed >= unit_cap) return;
     }
 }
@@ -1027,21 +1153,25 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
 /* Army supply (doubled units) needed before an attack. It grows slowly
  * with match time and with hostile static defenses, but never beyond what
  * this owner's unit share can field. */
+/* A maxed-out owner, an owner whose mineral fields are exhausted, and any
+ * owner after 25 minutes commit whatever army they have, so mined-out maps
+ * resolve instead of stalling. */
+static int race_ai_all_in(const RaceAiCensus *c)
+{
+    return c->units + c->queued_units >= race_ai_unit_cap() - 4 || frame >= 25 * 1800 ||
+           (!c->patches && race_owner_minerals(c->owner) < 100);
+}
+
 static int race_ai_attack_threshold(const RaceAiCensus *c)
 {
-    int minutes = frame / 1800, t = 24, cap = race_ai_unit_cap();
+    int minutes = frame / 1800, t = 24;
     /* No offensive before six minutes; defense is unaffected. */
     if (minutes < 6) return 0x7fff;
     t += (minutes - 6) * 2;
     t += c->enemy_defense * 2 > 16 ? 16 : c->enemy_defense * 2;
     if (t > 64) t = 64;
-    /* A maxed-out owner, an owner whose mineral fields are exhausted, and
-     * any owner after 25 minutes attack with whatever army they have, even
-     * one below the normal threshold, so mined-out maps resolve instead of
-     * stalling. */
-    if ((c->units + c->queued_units >= cap - 4 || minutes >= 25 ||
-         (!c->patches && race_owner_minerals(c->owner) < 100)) &&
-        c->army_supply > 0 && t > c->army_supply)
+    /* All in: even an army below the normal threshold attacks. */
+    if (race_ai_all_in(c) && c->army_supply > 0 && t > c->army_supply)
         t = c->army_supply;
     return t;
 }
@@ -1050,8 +1180,15 @@ static int race_ai_attack_threshold(const RaceAiCensus *c)
  * jams units, and each jammed unit repeats a route search every few frames. */
 static void race_ai_order(Unit *q, int order, int x, int y, int n)
 {
-    int tx = limit(x + ((n % 5) - 2) * 16, 8, WORLD_W - 8);
-    int ty = limit(y + ((n / 5 % 3) - 1) * 16, 8, WORLD_H - 8);
+    /* The first unit takes the point itself, so a lone unit is never sent
+     * to an offset slot that a structure's footprint has walled off. */
+    int tx = limit(x + (((n + 2) % 5) - 2) * 16, 8, WORLD_W - 8);
+    int ty = limit(y + (((n / 5 + 1) % 3) - 1) * 16, 8, WORLD_H - 8);
+    /* A slot on blocked terrain can never be reached, and its unit would
+     * hold the group's objective forever. Use the unspread point. */
+    if (terrain_blocked(tx / 16, ty / 16)) {
+        tx = limit(x, 8, WORLD_W - 8); ty = limit(y, 8, WORLD_H - 8);
+    }
     /* Do not restart paths for a unit already carrying out this order. */
     if (q->order == order && dist2(q->tx, q->ty, tx, ty) < 48 * 48) return;
     q->order = order; q->tx = tx; q->ty = ty;
@@ -1098,8 +1235,10 @@ static int race_ai_target(const RaceAiCensus *c, int x, int y, int *tx, int *ty)
     return 1;
 }
 
-/* An objective stays live while a hostile structure or ground unit is near
- * it. Aircraft do not hold it: a ground army could wait under one forever. */
+/* An objective stays live while a hostile structure or ground unit is within
+ * reach of it. Aircraft do not hold it: a ground army could wait under one
+ * forever. A wider radius let a structure that no unit standing on the
+ * objective would acquire hold the army there for the rest of the match. */
 static int race_ai_hostile_near(const RaceAiCensus *c, int x, int y, int radius)
 {
     for (int i = 0; i < MAX_BUILDINGS; ++i)
@@ -1115,7 +1254,7 @@ static void __attribute__((noinline)) race_ai_military(RaceAiCensus *c)
 {
     int rx = c->hx + (WORLD_W / 2 - c->hx) * 3 / 10, ry = c->hy + (WORLD_H / 2 - c->hy) * 3 / 10;
     int threshold = race_ai_attack_threshold(c), n = 0, tx, ty;
-    int home_supply = c->army_supply - c->deployed_supply;
+    int home_supply = c->army_supply - c->deployed_supply, all_in = race_ai_all_in(c);
     if (c->threat >= 0) {
         /* Defend: every army unit, and workers if the army is outnumbered. */
         int pulled = 0, worker_defense = c->threat_count >= 2 && c->home_army < c->threat_count &&
@@ -1161,7 +1300,8 @@ static void __attribute__((noinline)) race_ai_military(RaceAiCensus *c)
             }
         /* A destroyed objective leaves units crowding its old position in
          * attack-move; retarget once nothing hostile remains near it. */
-        if (deployed_tx >= 0 && !race_ai_hostile_near(c, deployed_tx, deployed_ty, 128)) {
+        if (deployed_tx >= 0 &&
+            !race_ai_hostile_near(c, deployed_tx, deployed_ty, RACE_AI_OBJECTIVE_REACH)) {
             any_x = deployed_tx; any_y = deployed_ty; deployed_tx = -1;
         }
         if (deployed_tx < 0 && !race_ai_target(c, any_x, any_y, &deployed_tx, &deployed_ty)) return;
@@ -1171,16 +1311,21 @@ static void __attribute__((noinline)) race_ai_military(RaceAiCensus *c)
             if (!race_ai_movable_army(q, c->owner)) continue;
             far = dist2(q->x, q->y, c->hx, c->hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE;
             /* Idle deployed units take the next target; home units join in
-             * groups so reinforcements do not trickle in one at a time. */
+             * groups so reinforcements do not trickle in one at a time,
+             * unless the owner is all in and no larger group is coming. */
             if (far ? (q->order == ORDER_IDLE || q->order == ORDER_ATTACK_MOVE ||
-                       q->order == ORDER_MOVE) : home_supply >= 12)
+                       q->order == ORDER_MOVE) : (home_supply >= 12 || all_in))
                 race_ai_order(q, ORDER_ATTACK_MOVE, deployed_tx, deployed_ty, n++);
         }
         return;
     }
-    /* Last resort on an exhausted map: with no army, no local minerals and
-     * no means to train, the workers attack so the match can resolve. */
-    if (!c->army && !c->patches && race_owner_minerals(c->owner) < 50 &&
+    /* Last resort on an exhausted map: with no army, no ore left anywhere
+     * and less than the price of the race's cheapest army unit, the workers
+     * attack so the match can resolve. While any field has ore they keep
+     * mining it, however far away: sending them cost an owner its economy
+     * with over 20,000 minerals still on the map. */
+    if (!c->army && !c->ore_patches &&
+        race_owner_minerals(c->owner) < (c->race == R_PROTOSS ? 100 : 50) &&
         frame >= 54000 && race_ai_target(c, c->hx, c->hy, &tx, &ty)) {
         for (int i = 0; i < MAX_UNITS; ++i)
             if (u[i].alive && u[i].owner == c->owner && sc64_race_is_worker(u[i].type) &&
@@ -1234,7 +1379,10 @@ static void __attribute__((noinline)) race_ai_plan(int owner)
     race_ai_recover_construction(&c);
     race_ai_recover_workers(&c);
     race_ai_balance_gas(&c);
-    if (!race_ai_supply(&c)) race_ai_develop(&c);
+    /* With every depot lost, the bank is all there is until a new one
+     * stands: rebuilding it comes before supply. A Protoss owner otherwise
+     * spent the Nexus price on Pylons to replace the Nexus's own supply. */
+    if (!c.depots || !race_ai_supply(&c)) race_ai_develop(&c);
     race_ai_produce(&c);
     race_ai_military(&c);
     race_ai_scout(&c);
