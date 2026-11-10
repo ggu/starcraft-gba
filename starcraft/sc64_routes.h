@@ -1199,7 +1199,7 @@ sc64_route_slot_for_origin(int goal, int origin, int origin_walkable)
 sc64_route_slot(int goal)
 #endif
 {
-    int i, slot = -1, head = 0, tail = 0;
+    int i, slot = -1, head = 0, tail = 0, active_slots;
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
     int partial_slot = -1, complete = 1;
 #endif
@@ -1212,7 +1212,8 @@ sc64_route_slot(int goal)
 #ifdef SC64_ROUTE_DECAY_FREQ
     sc64_route_age_request();
 #endif
-    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; i++) {
+    active_slots = SC64_ROUTE_ACTIVE_SLOTS;
+    for (i = 0; i < active_slots; i++) {
 #ifdef SC64_RANGE_WORK
         if (i == sc64_range_route_copy_slot) continue;
         if ((sc64_route_valid[i] == 1 || sc64_route_valid[i] == 2) &&
@@ -1412,10 +1413,11 @@ static int GBA_HOT sc64_route_slot(int goal)
 static int __attribute__((noinline))
 sc64_route_step_slot_mode(int origin, int goal, int allow_build)
 {
-    int i, used = 0;
+    int i, used = 0, active_slots;
     if (origin == goal || !SC64_GRID_GET(path_walkable, origin) ||
         !SC64_GRID_GET(path_walkable, goal)) return allow_build ? sc64_route_slot(goal) : -1;
-    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i)
+    active_slots = SC64_ROUTE_ACTIVE_SLOTS;
+    for (i = 0; i < active_slots; ++i)
 #ifdef SC64_RANGE_WORK
         if ((sc64_route_valid[i] == 1 || sc64_route_valid[i] == 2) &&
             sc64_route_goal[i] == (u16)goal) return sc64_route_slot(goal);
@@ -1426,7 +1428,7 @@ sc64_route_step_slot_mode(int origin, int goal, int allow_build)
     if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK)
         return allow_build ? sc64_route_slot(goal) : -1;
 #endif
-    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS && used < 2; ++i) {
+    for (i = 0; i < active_slots && used < 2; ++i) {
         int root, rx, ry, gx, gy, cur, steps, apart;
         if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
@@ -1483,10 +1485,11 @@ static int __attribute__((noinline)) sc64_route_step_slot(int origin, int goal)
 static int __attribute__((noinline))
 sc64_route_step_slot(int origin, int goal)
 {
-    int i, used = 0;
+    int i, used = 0, active_slots;
     if (origin == goal || !SC64_GRID_GET(path_walkable, origin) ||
         !SC64_GRID_GET(path_walkable, goal)) return sc64_route_slot(goal);
-    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i)
+    active_slots = SC64_ROUTE_ACTIVE_SLOTS;
+    for (i = 0; i < active_slots; ++i)
 #ifdef SC64_RANGE_WORK
         if ((sc64_route_valid[i] == 1 || sc64_route_valid[i] == 2) &&
             sc64_route_goal[i] == (u16)goal) return sc64_route_slot(goal);
@@ -1496,7 +1499,7 @@ sc64_route_step_slot(int origin, int goal)
 #ifdef SC64_ROUTE_DECAY_FREQ
     if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) return sc64_route_slot(goal);
 #endif
-    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS && used < 2; ++i) {
+    for (i = 0; i < active_slots && used < 2; ++i) {
         int root, rx, ry, gx, gy, cur, steps, apart;
         if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
@@ -1817,7 +1820,7 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
 static int __attribute__((noinline))
 sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int origin)
 {
-    int i, slot = -1, head = 0, tail = 0;
+    int i, slot = -1, head = 0, tail = 0, active_slots;
     int x0, x1, y0, y1, col, row;
     int partial_slot=-1, complete=1;
     u16 key;
@@ -1844,7 +1847,8 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
 #ifdef SC64_ROUTE_DECAY_FREQ
     sc64_route_age_request();
 #endif
-    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i) {
+    active_slots = SC64_ROUTE_ACTIVE_SLOTS;
+    for (i = 0; i < active_slots; ++i) {
 #ifdef SC64_RANGE_WORK
         if (i == sc64_range_route_copy_slot) continue;
         if ((sc64_route_valid[i] == 1 || sc64_route_valid[i] == 2) &&
