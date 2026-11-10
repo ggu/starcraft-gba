@@ -99,16 +99,20 @@ WARP_SOUNDS = (528, 529)  # OpenBW foundation creation and timer-zero cues.
 ADVISOR_LINES = ("minerals", "gas", "supply")
 ADVISOR_SOUNDS = ((147, 150, 153), (146, 149, 152), (148, 151, 154))
 # Advisor alerts in the game's race order (Terran, Zerg, Protoss); ALERT_NONE
-# stays silent. Terran rows were matched in captured N64 audio at the trigger;
-# Zerg and Protoss rows follow the ROM's Zerg, Terran, Protoss clip order, which
-# the refusal lines above also use. docs/DEVELOPMENT.md lists what was observed.
+# stays silent. Only clips matched in captured N64 audio at their trigger are
+# imported: every Terran line, and Zerg research (Burrow finishing in Z1). The
+# other Zerg and Protoss ids (116/119/130/155 and 118/121/124/132/157) are
+# guesses from the ROM's clip order, so those alerts stay silent and their
+# clips stay out of the bank. starcraft/game_audio.h keeps a matching table of
+# lines (game_audio_heard); tests/test_sc64_alert_evidence.py compares the two.
+# docs/DEVELOPMENT.md lists what was observed.
 ALERT_NONE = 0xFFFF
 ALERT_LINES = ("base_attack", "forces_attack", "research", "upgrade", "energy",
                "no_build", "no_land", "built")
 ALERT_SOUNDS = (
     (117, 120, 123, 131, 156, 159, 141, 135),
-    (116, 119, 122, 130, 155, None, None, None),
-    (118, 121, 124, 132, 157, None, None, None),
+    (None, None, 122, None, None, None, None, None),
+    (None, None, None, None, None, None, None, None),
 )
 # Roles come from the resident N64 music selector (see the module comment).
 MUSIC_ROLES = {

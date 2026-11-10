@@ -699,8 +699,9 @@ What is imported:
   order (Terran, Zerg, Protoss), each as minerals, gas, supply.
 - Advisor alerts are added by `sfxdata` id, and the header's `sc64_audio_alert`
   lists them per race and line. `sc64_audio_alert` holds `SC64_AUDIO_ALERT_NONE`
-  where no clip is imported. See [Advisor alerts](#advisor-alerts). The bank then
-  is about 192 KB larger than without them (543 streams with the warp cues).
+  where no clip is imported. See [Advisor alerts](#advisor-alerts). Only the nine
+  clips with N64 evidence are imported (eight Terran and Zerg research), about
+  102 KB, so the bank holds 521 streams with the warp cues.
 - Music roles come from the resident N64 selector, which loads resource
   `0x1500 + track`: 0 is the menu theme; Terran, Zerg and Protoss play
   4/5, 8/9 and 12/13 in game, alternating as each ends; 2/3, 6/7 and 10/11 are
@@ -747,15 +748,13 @@ Engine design (`common/audio_mixer.h`, `common/gba.c`):
   bank generated before the advisor table stays silent for them. It never
   writes simulation state or uses the game RNG, at most two effects start per
   frame, and it ignores any tick discontinuity such as a load or restart.
-- Advisor alerts come from the same observer and use the advisor voice rules.
-  Hit points are compared every eighth tick, so an attack can be heard up to
-  about a quarter second late. Their state lives in the VRAM arena after the
-  event snapshot, so they add no EWRAM. With every slot of the Terran profile
-  alive and player-owned (192 units and 96 buildings, which no mission reaches),
-  the ARM probe measured 39,718 observer cycles per frame on average, against
-  28,755 with the hit-point checks and tech comparison removed (before the warp
-  cues were merged; with them, 42,947). A bank generated before the alert table stays silent for them, and
-  profiles without a bank play a short PSG tone.
+- Advisor alerts come from the same observer and use the advisor voice rules
+  (see "Voice policy" below). Their state lives in the VRAM arena after the
+  event snapshot (two words), so they add no EWRAM, and the observer does no
+  per-actor hit-point work: the simulation reports a hostile hit or a finished
+  research with one store each. A bank generated before the alert table stays
+  silent for them, and profiles without a bank play a short PSG tone for the
+  races that have evidence.
 
 ### Advisor alerts
 
@@ -766,21 +765,82 @@ observing only and are not gameplay evidence.
 
 | Alert | Terran id | N64 trigger as observed | Port trigger |
 | --- | --- | --- | --- |
-| Base is under attack | 117 | Fighting at a base off screen. Eleven plays, 14.2 to 15.6 s apart. | A player building's hit points and shields fall off screen. |
-| Your forces are under attack | 120 | Fighting off screen, after panning away: 13.4 s apart. None in the 40 s before the pan, with fighting on screen. | The same for a player unit. Shares the base line's 15 s limit. |
-| Research complete | 123 | Stim Packs finished. Zerg: id 122 when Burrow finished, in Z1. | Finished Yamato or reactor, transport or Ventral Sacs research. |
+| Base is under attack | 117 | Fighting at a base off screen. Eleven plays, 14.2 to 15.6 s apart. | A hostile hit on a player building off screen. |
+| Your forces are under attack | 120 | Fighting off screen, after panning away: 13.4 s apart. None in the 40 s before the pan, with fighting on screen. | A hostile hit on a player unit off screen. Shares the base line's 15 s limit. |
+| Research complete | 123 | Stim Packs finished. Zerg: id 122 when Burrow finished, in Z1. | Finished Yamato or reactor research (battlecruiser research builds); Zerg transport (Ventral Sacs) research. |
 | Upgrade complete | 131 | An Engineering Bay upgrade finished. | A running weapon or armor upgrade finished. |
 | Not enough energy | 156 | Comsat Scanner targeted without the energy, with on-screen text. | Storm, cloak or Yamato refused without the energy. |
 | Blocked placement | 159 | Each refused placement, including a site the SCV can't reach, with text. | Terran placement refused because the site can't be built on. |
 | Can't land there | 141 | A refused landing site, with text. | A refused landing order. |
 | Job's finished | 135 | Engineering Bay, Barracks, Academy and Comsat finished. | A Terran building or add-on finished, replacing its selection sound. |
 
-Zerg and Protoss alert clips are the ROM's neighboring ids, which run Zerg,
-Terran, Protoss like the refusal lines. Only Zerg research was heard on the N64,
-so the others are inferred from that order and from transcripts. How long the
-N64 waits between attack alerts, whether base and unit alerts share one wait and
-whether the wait is counted in game time are inferred from those repeats; the
-port uses one 450-tick limit.
+What plays for each race, and how sure that is:
+
+| Race | Plays | Evidence | Silent |
+| --- | --- | --- | --- |
+| Terran | All eight rows above | Each clip was matched in captured N64 audio at its trigger. The port trigger is the nearest port event (a Stim Pack research stands for any research, a Comsat for any energy refusal). | Nothing, but see the limits below. |
+| Zerg | Research complete (122) | Heard on the N64 when Burrow finished in Z1. The port plays it for Ventral Sacs research, which was not itself observed. | Base and forces under attack (116, 119), upgrade complete (130), not enough energy (155), job's finished, blocked placement, can't land. |
+| Protoss | Nothing | None of its alert clips was heard. | Every alert. |
+
+The silent Zerg and Protoss rows are not played because the clip ids (116, 119,
+130, 155 for Zerg; 118, 121, 124, 132, 157 for Protoss) were only guessed from
+the ROM's Zerg, Terran, Protoss clip order, which the refusal lines also
+follow, and from transcripts. They are not imported into the bank.
+`game_audio_heard` in `starcraft/game_audio.h` and `ALERT_SOUNDS` in
+`tools/sc64_audio_pack.py` hold the same list, and
+`tests/test_sc64_alert_evidence.py` fails if they differ or a guessed clip is
+imported. An alert should only be added for a race after its trigger and clip
+are heard on the N64. This does not claim N64 parity: only the table above was
+observed. How long the N64 waits between attack alerts, whether base and unit
+alerts share one wait and whether the wait is counted in game time are inferred
+from those repeats; the port uses one 450-tick limit.
+
+Attack alerts. The simulation's damage path (`hit_target_impl_ex`) already
+receives the owner of whoever dealt the damage. `game_audio_note_hit` reads
+that owner and records a pending base or forces alert only when the target is a
+player building or unit off screen and the attacker is another player (not the
+player, not neutral, and not no owner). Building burn, which lowers hit points
+in `race_tick_building_damage` outside that path, and any damage with no owner
+therefore never alerts, and a building that is both burning and under attack
+still does. A hit that kills the target counts, because the report is made at
+the hit, not by comparing hit points later. Psionic storm damage writes hit
+points directly and is not reported. Research and upgrades finished by the
+default-off research jobs (`SC64_EXPERIMENTAL_RESEARCH_JOBS`) do not make the
+finish report and stay silent.
+
+Attack wait. The state keeps the game tick of the last attack alert in a
+16-bit word. A new match, restart or load starts that wait from the current
+tick (`game_audio_observe` on a primed frame), so none of them can alert in
+their first 450 ticks (15 s), whatever the word held before, and a load of an
+earlier tick cannot read an old stamp as long ago. A pause or other tick
+discontinuity discards hits reported before it but keeps the wait, so pausing
+does not restart it. The age is kept below its 16-bit wrap, so a long quiet
+spell never reads as recent. A hit during the wait is dropped, not postponed:
+a fight that goes on reports again. One pending report makes at most one alert.
+The wait is not saved and no save format changes: after a load the wait simply
+restarts.
+
+One-shots. Research and upgrades are reported where they finish
+(`tick_research` for weapon and armor upgrades; the Yamato and reactor lab, the
+skirmish transport job and the Z6 transport timer for research), so scripted
+grants, loads and another player's research are silent. Each report makes one
+alert: several that finish in the same update are one announcement, and a
+completion that arrives while the advisor voice is taken is kept until it can
+play. "Job's finished" is part of the building completion event and is spoken
+once per frame.
+
+Voice policy. Every alert, the funds and supply refusals and "Job's finished"
+are advisor-class requests (`AUDIO_CLASS_ADVISOR`, priority zero). The mixer
+(`common/audio_mixer.h`) gives them an effect voice, never the speech voice, so
+a unit response is never cut off by an alert, and plays one advisor line at a
+time, so an alert never stacks on or cuts off another. On top of that the
+observer allows one advisor request per observed frame and asks
+`audio_advisor_busy()` first. The order within a frame is the player's own
+refusal, attack, research, upgrade, then a finished building. A line that finds
+the voice taken is dropped if it is an attack alert or a refusal, kept if it is
+a research or upgrade alert, and replaced by the building's own selection hum
+if it is "Job's finished". `tests/game_audio_run.c` and `tests/audio_mixer.c`
+check each of these.
 
 Not wired:
 
@@ -792,6 +852,9 @@ Not wired:
   normal landing. When they fire is unknown.
 - Zerg and Protoss blocked placement: not triggered on the N64, so those
   placements stay silent.
+
+No alert has been listened to on a device, and the clip timing and wait lengths
+above are not measured on hardware.
 
 Check the engine with `make test-audio` (asset-free, part of `./dev test`) and
 `make test-game-audio-unified` (part of `make test-unified`). Measured costs
