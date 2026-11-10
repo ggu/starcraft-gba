@@ -372,29 +372,20 @@ static int queued_count(int type)
     return n;
 }
 
-static int train_type_step_count(int current, int wanted)
-{
-    static const int types[5] = {U_DRONE, U_OVERLORD, U_ZERGLING, U_HYDRALISK, U_MUTALISK};
-    int from = -1, to = -1;
-    for (int i = 0; i < 5; ++i) {
-        if (types[i] == current) from = i;
-        if (types[i] == wanted) to = i;
-    }
-    return from < 0 || to < 0 ? -1 : (to - from + 5) % 5;
-}
-
 static int queue_unit_type(int wanted)
 {
     int before = queued_count(wanted);
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         if (!b[i].alive || b[i].owner != SIDE || b[i].under_construction ||
             !sc64_race_is_zerg_townhall(b[i].type) || b[i].queue_count >= 4) continue;
-        int cycle = train_type_step_count(train_type, wanted);
-        if (cycle < 0) return 0;
         move_cursor(b[i].x, b[i].y);
         tap(KEY_A); /* Select the actual Hatchery/Lair/Hive. */
         if (selected_building != i) continue;
-        for (int n = 0; n < cycle; ++n) tap(KEY_R);
+        /* R steps to the next available product. The cycle differs by profile
+         * (the Z9 products add the Scourge), so press R until the live product
+         * is the wanted one rather than counting steps in a fixed table. */
+        for (int n = 0; n < 8 && train_type != wanted; ++n) tap(KEY_R);
+        if (train_type != wanted) continue;
         tap(KEY_A); /* Queue the selected unit through the normal producer. */
         if (queued_count(wanted) > before) return 1;
     }
