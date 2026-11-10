@@ -70,6 +70,29 @@ static int hydras_near(int x,int y,int r)
     return n;
 }
 
+static int isqrt_i(int v){int lo=0,hi=46340;while(lo<hi){int mid=(lo+hi+1)/2;if(mid*mid<=v)lo=mid;else hi=mid-1;}return lo;}
+static int foe_combat(int raw){return raw==65||raw==66||raw==67||raw==68||raw==70||raw==71||raw==72||raw==83;}
+static int nearest_foe(int x,int y,int *dd){
+    int best=-1,bd=0x7fffffff;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&foe_combat(u[i].raw_type)){int d=dist2(u[i].x,u[i].y,x,y);if(d<bd){bd=d;best=i;}}
+    if(dd)*dd=best>=0?isqrt_i(bd):9999;
+    return best;
+}
+/* One L-drag box around every Hydralisk within r of (x,y), then one attack order. */
+static int hydra_box_attack(int x,int y,int r,int tx,int ty,int force_rebox)
+{
+    int near=0,sel=0,x0=0x7fffffff,y0=0x7fffffff,x1=-1,y1=-1;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&dist2(u[i].x,u[i].y,x,y)<r*r){
+        ++near;sel+=u[i].selected;
+        if(u[i].x<x0)x0=u[i].x;if(u[i].y<y0)y0=u[i].y;if(u[i].x>x1)x1=u[i].x;if(u[i].y>y1)y1=u[i].y;
+    }
+    if(!near)return 0;
+    if(force_rebox||selected_building>=0||sel*100<near*75||selected_count()>near+6){
+        int n=box_select(x0-24,y0-24,x1+24,y1+24);
+        if(!n)return 0;
+    }
+    return command_selected(MENU_ATTACK,tx,ty)?near:0;
+}
 static void census(const char *label,int leg)
 {
     int enemy=0,eb=0;
@@ -94,14 +117,21 @@ int main(int argc,char **argv)
     launch_catalog_mission(SC64_Z9_GLOBAL_ID);
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==SC64_Z9_GLOBAL_ID);
     census("launch",0);
-    int saved=0,turn=0,leg=0,rush=0,next_checkpoint=2000,next_mine=0,next_train=0,next_build=100,next_gas=400,next_hatch=600,next_rally=1500,next_order=0,next_save_build=0,next_stream=0,next_runner=0,runner=-1,runner_leg=0,taken=0,escort=-1,next_defend=0;
-    const int drone_goal=16,hatch_goal=7,gas_drones=3,hydra_cap=110;
+    int saved=0,turn=0,leg=0,rush=0,next_checkpoint=2000,next_mine=0,next_train=0,next_build=100,next_gas=400,next_hatch=600,next_rally=1500,next_order=0,next_save_build=0,next_stream=0,next_runner=0,runner=-1,runner_leg=0,taken=0,escort=-1,next_defend=0,next_research=0,leg_since=0,leg_last=-1,last_box=-100000,next_muta=0,muta_go=0,next_lair=0,next_mgather=0,mfront=2,next_wait=0,next_mwait=0;
+    const int drone_goal=16,hatch_goal=7,gas_drones=3,hydra_cap=16;
+    /* The garrisons are Reaver-heavy and a Hydralisk cannot answer one from the ground, so
+       Mutalisks (air-only targets for Reavers and Zealots) clear the road ahead of the Drone
+       while a small Hydralisk guard holds the rally point. Upgrades come from the starting
+       Evolution Chamber. */
+    const int hold_after=36000,gather_percent=80,gather_wait=1500,upgrades=2,contact=320,fight_period=90,rebox_period=300,box_reach=420,
+        muta_cap=40,muta_go_count=14,lair_after=2500,muta_reach=520,hydra_go_count=12,return_lead=150;
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
         if(!taken&&race_zl_sched.countdown){taken=1;fprintf(trace,"{\"kind\":\"taken\",\"frame\":%u,\"hydras\":%d,\"leg\":%d}\n",(unsigned)frame,count_units(SIDE,U_HYDRALISK),leg);}
         if(taken==1&&crystal()>=0){taken=2;fprintf(trace,"{\"kind\":\"crystal\",\"frame\":%u,\"hydras\":%d}\n",(unsigned)frame,count_units(SIDE,U_HYDRALISK));}
         if(menu_open)KEY_TAP(KEY_B);
         int mark=frame,ax=HOME_X,ay=HOME_Y;
         int carrier=crystal_drone();
+        int waiting=race_zl_sched.countdown>return_lead;
         /* The crystal's Drone walks home a leg behind the army, or alone once
            there is no army. */
         if(carrier>=0){
@@ -145,7 +175,10 @@ int main(int argc,char **argv)
         if(frame>=next_order){
             next_order=frame+150;
             int home=count_units(SIDE,U_HYDRALISK);
-            if(!rush&&home>=(frame<30000?75:50)&&frame>=8000){rush=1;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d}\n",(unsigned)frame,home);}
+            int upgraded=(weapons_level>=upgrades&&armor_level>=upgrades)||frame>=hold_after;
+            {int rv=0;for(int i=0;i<MAX_UNITS;i++)rv+=u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==83&&u[i].y<1000&&u[i].x>700&&u[i].x<1400;
+                if(rv>1&&frame<hold_after)upgraded=0;}
+            if(!rush&&(muta_go&&home>=hydra_go_count)&&frame>=8000&&upgraded){rush=1;fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d}\n",(unsigned)frame,home);}
             if(rush){
                 int n=0,sx=0,sy=0;
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK){
@@ -160,9 +193,12 @@ int main(int argc,char **argv)
                     int nearest=0,bd=0x7fffffff;
                     for(int k=0;k<ROAD_LEGS;k++){int dd=dist2(ax2,ay2,road[k][0],road[k][1]);if(dd<bd){bd=dd;nearest=k;}}
                     if(nearest<leg-2)leg=nearest;
-                    while(crystal()<0&&leg<ROAD_LEGS-1&&road_cannon(ax2,ay2,220)<0){
-                        int there=hydras_near(road[leg][0],road[leg][1],170);
-                        if(there*100<n*50)break;
+                    if(muta_go&&crystal()<0){leg=mfront>0?mfront-1:0;}
+                    else while(crystal()<0&&leg<ROAD_LEGS-1&&road_cannon(ax2,ay2,220)<0){
+                        int there=hydras_near(road[leg][0],road[leg][1],200);
+                        int total=0;for(int i=0;i<MAX_UNITS;i++)total+=u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&dist2(u[i].x,u[i].y,HOME_X,HOME_Y+60)>350*350;
+                        if(leg!=leg_last){leg_last=leg;leg_since=frame;}
+                        if(there*100<total*gather_percent&&frame-leg_since<gather_wait)break;
                         ++leg;
                     }
                     /* A far order gives up, so a clump behind walks to the next leg. */
@@ -187,11 +223,35 @@ int main(int argc,char **argv)
                     int reaver=-1;
                     {int rd=300;rd*=rd;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==83&&dist2(u[i].x,u[i].y,road[to_leg][0],road[to_leg][1])<260*260){int dd=dist2(u[i].x,u[i].y,ax2,ay2);if(dd<rd){rd=dd;reaver=i;}}}
                     if(reaver>=0){gx=u[reaver].x;gy=u[reaver].y;}
+                    if(muta_go&&crystal()<0){to_leg=0;gx=road[to_leg][0];gy=road[to_leg][1];}
+                    int fd=9999,foe=crystal()<0?nearest_foe(ax2,ay2,&fd):-1;
+                    if(waiting){
+                        if(frame>=next_wait){(void)hydra_box_attack(ax2,ay2,box_reach+200,road[2][0],road[2][1],1);next_wait=frame+600;}
+                        next_order=frame+300;
+                    } else if(crystal()<0){
+                        if(foe>=0&&fd<contact){
+                            /* In reach of the garrison: everything charges at once. */
+                            int fx=0,fy=0,fn=0;
+                            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&foe_combat(u[i].raw_type)&&dist2(u[i].x,u[i].y,u[foe].x,u[foe].y)<200*200){fx+=u[i].x;fy+=u[i].y;++fn;}
+                            gx=fx/fn;gy=fy/fn;
+                            if(reaver>=0&&dist2(u[reaver].x,u[reaver].y,ax2,ay2)<360*360){gx=u[reaver].x;gy=u[reaver].y;}
+                            (void)hydra_box_attack(ax2,ay2,box_reach,gx,gy,frame-last_box>=rebox_period);
+                            if(frame-last_box>=rebox_period)last_box=frame;
+                            fprintf(trace,"{\"kind\":\"charge\",\"frame\":%u,\"target\":[%d,%d],\"foe\":%d,\"fd\":%d,\"army\":%d}\n",(unsigned)frame,gx,gy,foe,fd,n);
+                            next_order=frame+fight_period;
+                        } else {
+                            (void)hydra_box_attack(ax2,ay2,box_reach,gx,gy,1);
+                            last_box=frame;
+                            fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d],\"fd\":%d}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2,fd);
+                            next_order=frame+300;
+                        }
+                    } else {
                     group_area_x=ax2;group_area_y=ay2;group_area_r=320;group_rounds=8;
                     (void)group_command(U_HYDRALISK,MENU_ATTACK,gx,gy,cannon>=0||reaver>=0);
                     group_area_x=-1;group_rounds=6;
                     fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"leg\":%d,\"army\":%d,\"at\":[%d,%d]}\n",(unsigned)frame,gx,gy,leg,n,ax2,ay2);
                     next_order=frame+(reaver>=0?60:300);
+                    }
                 }
             }
         }
@@ -237,6 +297,7 @@ int main(int argc,char **argv)
                     int spare=race_owner_supply_cap(SIDE)-race_owner_supply(SIDE),type=-1;
                     if(drone_count()+queued_units(U_DRONE)<drone_goal&&minerals>=50)type=U_DRONE;
                     else if(spare<14&&minerals>=100&&queued_units(U_OVERLORD)<3)type=U_OVERLORD;
+                    else if(count_buildings(B_SPIRE,1)&&minerals>=100&&gas>=100&&spare>=4&&count_units(SIDE,U_MUTALISK)+queued_units(U_MUTALISK)<muta_cap)type=U_MUTALISK;
                     else if(count_buildings(B_HYDRALISK_DEN,1)&&minerals>=75&&gas>=25&&spare>=2&&count_units(SIDE,U_HYDRALISK)<hydra_cap)type=U_HYDRALISK;
                     else if(count_buildings(B_SPAWNING_POOL,1)&&minerals>=150&&frame>=2000&&spare>=2&&(!count_buildings(B_HYDRALISK_DEN,1)||gas<25))type=U_ZERGLING;
                     if(type<0||!train_at(i,type))break;
@@ -250,6 +311,20 @@ int main(int argc,char **argv)
         if(frame>=next_build){
             if(!count_buildings(B_HYDRALISK_DEN,0)&&minerals>=100&&gas>=50&&drone_count()>=5)
                 (void)build_near(B_HYDRALISK_DEN,MENU_ACADEMY,ax-90,ay+60,128);
+            else if(!count_buildings(B_EVOLUTION_CHAMBER,0)&&count_buildings(B_HYDRALISK_DEN,1)&&minerals>=100&&drone_count()>=6)
+                (void)build_near(B_EVOLUTION_CHAMBER,MENU_ENG_BAY,ax-90,ay+150,128);
+            else if(frame>=lair_after&&frame>=next_lair&&count_buildings(B_SPAWNING_POOL,1)&&!count_buildings(B_LAIR,0)&&minerals>=150&&gas>=100){
+                int h=-1,bd=0x7fffffff;
+                for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HATCHERY&&building_complete(i)&&!b[i].queue_count){int d=dist2(b[i].x,b[i].y,296,328);if(d<bd){bd=d;h=i;}}
+                next_lair=frame+(h>=0?600:100);
+                if(h>=0&&select_building(h)){
+                    int ok=choose_row(MENU_ZP_LAIR);
+                    close_menus();clear_selected_building();
+                    fprintf(trace,"{\"kind\":\"lair\",\"frame\":%u,\"ok\":%d,\"lair\":%d}\n",(unsigned)frame,ok,count_buildings(B_LAIR,0));
+                }
+            }
+            else if(count_buildings(B_LAIR,1)&&!count_buildings(B_SPIRE,0)&&minerals>=200&&gas>=150&&drone_count()>=6)
+                (void)build_near(B_SPIRE,MENU_ZP_SPIRE,ax+90,ay+150,128);
             else if(!count_buildings(B_EXTRACTOR,0)&&minerals>=50&&drone_count()>=6)
                 (void)build_extractor_near(416,240);
             next_build=frame+240;
@@ -265,6 +340,73 @@ int main(int argc,char **argv)
         }
         COST(5)
         if(frame>=next_gas){(void)assign_gas_drone(gas_drones);next_gas=frame+600;}
+        COST(12)
+        if(frame>=next_muta&&crystal()<0){
+            next_muta=frame+fight_period;
+            int nm=0,mx=0,my=0;
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_MUTALISK){nm++;mx+=u[i].x;my+=u[i].y;}
+            if(!muta_go&&nm>=muta_go_count){muta_go=1;fprintf(trace,"{\"kind\":\"muta_go\",\"frame\":%u,\"mutas\":%d}\n",(unsigned)frame,nm);}
+            if(muta_go&&nm<muta_go_count/3)muta_go=0;
+            if(!muta_go&&nm>=4&&frame>=next_mgather){
+                next_mgather=frame+900;
+                group_area_x=mx/nm;group_area_y=my/nm;group_area_r=700;group_rounds=3;
+                (void)group_command(U_MUTALISK,MENU_MOVE,560,250,0);
+                group_area_x=-1;group_rounds=6;
+            }
+            if(muta_go&&nm&&waiting){
+                mx/=nm;my/=nm;
+                if(frame>=next_mwait){
+                    group_area_x=mx;group_area_y=my;group_area_r=420;group_rounds=3;
+                    (void)group_command(U_MUTALISK,MENU_ATTACK,road[3][0],road[3][1],1);
+                    group_area_x=-1;group_rounds=6;
+                    next_mwait=frame+600;
+                }
+            } else if(muta_go&&nm){
+                mx/=nm;my/=nm;
+                /* The front walks down the road: clear what threatens the air or the Drone near it. */
+                static const int prio[]={83,66,70,71,72,68,67,65,69,84,64};
+                int fx=road[mfront][0],fy=road[mfront][1],tgt=-1,tb=-1,bd=0x7fffffff,RM=muta_reach;
+                for(unsigned pi=0;pi<sizeof(prio)/sizeof(prio[0])&&tgt<0&&tb<0;pi++){
+                    if(pi==7)for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==ENEMY&&b[i].raw_type==162&&dist2(b[i].x,b[i].y,fx,fy)<RM*RM){
+                        int d=dist2(b[i].x,b[i].y,mx,my);if(d<bd){bd=d;tb=i;}
+                    }
+                    if(tb>=0)break;
+                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==prio[pi]&&!SC64_TRANSPORT_LOADED(&u[i])&&dist2(u[i].x,u[i].y,fx,fy)<RM*RM){
+                        int d=dist2(u[i].x,u[i].y,mx,my);if(d<bd){bd=d;tgt=i;}
+                    }
+                }
+                int gx=-1,gy=-1,gt=0;
+                if(tgt>=0){gx=u[tgt].x;gy=u[tgt].y;gt=u[tgt].raw_type;}
+                else if(tb>=0){gx=b[tb].x;gy=b[tb].y;gt=162;}
+                if(gx>=0){
+                    group_area_x=mx;group_area_y=my;group_area_r=420;group_rounds=3;
+                    (void)group_command(U_MUTALISK,MENU_ATTACK,gx,gy,1);
+                    group_area_x=-1;group_rounds=6;
+                    fprintf(trace,"{\"kind\":\"muta_order\",\"frame\":%u,\"mutas\":%d,\"target\":[%d,%d],\"type\":%d,\"front\":%d}\n",(unsigned)frame,nm,gx,gy,gt,mfront);
+                } else {
+                    if(nm>=muta_go_count/2&&mfront<ROAD_LEGS-1){++mfront;fprintf(trace,"{\"kind\":\"muta_front\",\"frame\":%u,\"front\":%d,\"mutas\":%d}\n",(unsigned)frame,mfront,nm);}
+                    group_area_x=mx;group_area_y=my;group_area_r=420;group_rounds=3;
+                    (void)group_command(U_MUTALISK,MENU_ATTACK,fx,fy,0);
+                    group_area_x=-1;group_rounds=6;
+                }
+            }
+        }
+        COST(11)
+        if(frame>=next_research&&count_buildings(B_EVOLUTION_CHAMBER,1)){
+            next_research=frame+240;
+            for(int w=0;w<2;w++){
+                int which=w?MENU_ARMOR:MENU_WEAPONS;
+                int lvl=w?armor_level:weapons_level,busy=w?armor_research:weapons_research;
+                if(lvl<2&&!busy&&minerals>=100&&gas>=100){
+                    int pick=free_drone(-1,-1);
+                    if(pick>=0&&select_single(pick)){
+                        (void)choose_row(which);
+                        close_menus();
+                        fprintf(trace,"{\"kind\":\"research\",\"frame\":%u,\"which\":%d,\"w\":%d,\"a\":%d}\n",(unsigned)frame,w,weapons_level,armor_level);
+                    }
+                }
+            }
+        }
         COST(6)
         if(frame>=next_rally&&!rush){
             group_area_x=ax;group_area_y=ay+60;group_area_r=480;group_rounds=4;

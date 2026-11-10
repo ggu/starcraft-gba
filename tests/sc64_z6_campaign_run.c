@@ -318,28 +318,30 @@ static int build_extractor(void)
         b[raw_building(149,SIDE)].build_progress);
     return raw_building(149,SIDE)>=0;
 }
-static int build_extra_hatchery(void)
+static int build_extra_hatchery(int want)
 {
     int worker=-1,site_x=-1,site_y=-1,hatch=raw_building(132,SIDE),best=-1;
     int existing=owned_building_count(B_HATCHERY),intent=-1;
     if(hatch<0)hatch=raw_building(131,SIDE);
-    if(owned_building_count(B_HATCHERY)>=2)return 1;
+    if(owned_building_count(B_HATCHERY)>=want)return 1;
     if(hatch<0||minerals<300)return 0;
     for(int y=120;y<500;y+=16)for(int x=400;x<720;x+=16)
         if(race_can_site(SIDE,B_HATCHERY,x,y)&&can_place(B_HATCHERY,x,y)){
             int d=dist2(x,y,b[hatch].x,b[hatch].y);
             if(d>80*80&&(best<0||d<best)){best=d;site_x=x;site_y=y;}
         }
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==41&&
-        (u[i].order==ORDER_MINE||u[i].order==ORDER_IDLE)){worker=i;break;}
-    if(worker<0||site_x<0){fprintf(stderr,"extra Hatchery site/worker unavailable worker%d site%d,%d\n",worker,site_x,site_y);return 0;}
-    if(!select_slot(worker)) {
+    if(site_x<0){fprintf(stderr,"extra Hatchery site unavailable\n");return 0;}
+    /* A mining Drone walks while the cursor is steered, so a single click can
+     * miss it. Try each empty-handed worker until one is actually selected. */
+    for(int i=0;i<MAX_UNITS&&worker<0;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==41&&
+        !u[i].carry&&(u[i].order==ORDER_MINE||u[i].order==ORDER_IDLE)&&select_slot(i))worker=i;
+    if(worker<0) {
         int actual=-1;
         if(selected_count()==1)for(int i=0;i<MAX_UNITS;i++)if(u[i].selected&&
             u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==41&&!u[i].carry&&
             !SC64_TRANSPORT_LOADED(&u[i])&&
             (u[i].order==ORDER_IDLE||u[i].order==ORDER_MINE))actual=i;
-        if(actual<0)return 0;
+        if(actual<0){fprintf(stderr,"extra Hatchery worker unavailable\n");return 0;}
         worker=actual;
     }
     if(!choose_menu_row(MENU_DEPOT))return 0;
@@ -994,7 +996,7 @@ static int clear_force2_locations(void)
 {
     int support_prepared=0,support_x=-1,support_y=-1,support_targets=0;
     int support_casts=0,casts_since_retreat=0,support_waiting=0;
-    int extra_hatchery_attempted=0;
+    int extra_hatchery_attempted=0; /* delayed-Hatchery attempts */
     (void)support_casts; /* Also compile under canonical Z6 flags without the DirectAttack controller. */
     for(unsigned loc=4;loc<=5&&screen==SCREEN_PLAY&&!won&&!lost;loc++) {
         int ll,tt,rr,bb;u32 before=0,after=0;unsigned rounds=0;
@@ -1055,17 +1057,49 @@ static int clear_force2_locations(void)
                 }
             /* With only the last Force2 actors left, reinforcements trickle in
              * from the main base one at a time and can stall the round budget.
-             * If no escort is near the target, Kerrigan finishes it with an
-             * ordinary attack-move instead; victory conditions are unchanged. */
-            int escort_near=0;
+             * If no escort remains alive and none can be rebuilt, Kerrigan
+             * finishes it with an ordinary attack-move; victory conditions
+             * are unchanged. */
+            int escort_alive=0;
             for(int ei=0;ei<MAX_UNITS;ei++)
                 if(u[ei].alive&&u[ei].owner==SIDE&&u[ei].raw_type!=41&&u[ei].raw_type!=42&&
-                   u[ei].raw_type!=51&&dist2(u[ei].x,u[ei].y,wx,wy)<=320*320)escort_near=1;
+                   u[ei].raw_type!=51)escort_alive=1;
+            if(loc==5&&!escort_alive&&owned_building_count(B_HATCHERY)+
+               owned_building_count(B_LAIR)+owned_building_count(B_HIVE)>0&&
+               minerals>=225&&gas>=75) {
+                /* The escort is gone but the bank is not: buy a new Hydralisk
+                 * wave through the ordinary Hatchery menu and keep Kerrigan
+                 * back until it exists, instead of sending her ahead alone. */
+                unsigned rebuild_start=host_ticks,last_buy=0;
+                int fresh=0;
+                fprintf(stderr,"  escort gone at%u; rebuilding Hydralisks before the next push bank%d/%d\n",
+                    host_ticks,minerals,gas);
+                while(host_ticks-rebuild_start<3000&&screen==SCREEN_PLAY&&!won&&!lost) {
+                    if(!last_buy||host_ticks-last_buy>=300u) {
+                        (void)assign_idle_mineral_workers();
+                        for(int ph=0;ph<3&&minerals>=75&&gas>=25;ph++) {
+                            int n=minerals/75;
+                            if(gas/25<n)n=gas/25;
+                            if(n>3)n=3;
+                            if(!queue_hatchery_type(38,n))break;
+                        }
+                        last_buy=host_ticks;
+                    }
+                    fresh=side_raw_count(38);
+                    if(fresh>=6)break;
+                    input(0);
+                }
+                fprintf(stderr,"  rebuilt Hydralisks%d at%u\n",fresh,host_ticks);
+                escort_alive=side_combat_count()>(kerrigan()>=0);
+            }
             int hero=kerrigan();
-            int hero_finish=loc==5&&!escort_near&&hero>=0&&
+            /* Kerrigan goes alone only when no Hydralisk or other escort is
+             * alive anywhere. A far escort is marched to the target by the
+             * group order below; sending her ahead of it gets her killed. */
+            int hero_finish=loc==5&&!escort_alive&&hero>=0&&
                 (before<=3||z6_policy_hero_structure(hero,wx,wy));
             if(hero_finish)
-                fprintf(stderr,"  no escort within 320px of final Force2 actors; Kerrigan finishes\n");
+                fprintf(stderr,"  no escort alive; Kerrigan finishes\n");
             if(before<=1&&!hero_finish) {
                 int in_range=0,stepped=0;
                 for(int ui=0;ui<MAX_UNITS;ui++)if(u[ui].alive&&u[ui].owner==SIDE&&u[ui].raw_type==38) {
@@ -1125,7 +1159,7 @@ static int clear_force2_locations(void)
                 while(minerals<300&&host_ticks-bank_start<1800u&&screen==SCREEN_PLAY&&!won&&!lost)
                     input(0);
                 if(minerals>=300) {
-                    int built=build_extra_hatchery();
+                    int built=build_extra_hatchery(2);
                     fprintf(stderr,"normal-input second Hatchery order%d count%d bank%d/%d\n",
                         built,owned_building_count(B_HATCHERY),minerals,gas);
                 } else fprintf(stderr,"normal-input Hatchery skipped bank%d/%d\n",minerals,gas);
@@ -1181,20 +1215,33 @@ static int clear_force2_locations(void)
                             host_ticks);
                     }
                 }
-                if(host_ticks-last_production>=600u) {
+                if(host_ticks-last_production>=300u) {
                     (void)assign_idle_mineral_workers();
-                    if(loc==4&&!extra_hatchery_attempted&&
-                       owned_building_count(B_HATCHERY)<1&&minerals>=300) {
-                        extra_hatchery_attempted=1;
-                        fprintf(stderr,"normal-input delayed second Hatchery order%d\n",
-                                build_extra_hatchery());
+                    /* The bank grows without bound while one townhall's larva
+                     * is the only Hydralisk source: add macro Hatcheries. */
+                    int want_hatch=3;
+                    if(extra_hatchery_attempted<12&&owned_building_count(B_HATCHERY)<want_hatch&&
+                       minerals>=450) {
+                        extra_hatchery_attempted++;
+                        fprintf(stderr,"normal-input delayed extra Hatchery order%d\n",
+                                build_extra_hatchery(want_hatch));
                     }
                     int hydras=side_raw_count(38),queued=0,workers=0;
                     for(int wi=0;wi<MAX_UNITS;wi++)workers+=u[wi].alive&&u[wi].owner==SIDE&&u[wi].raw_type==41;
                     if(workers<8&&owner_count(SIDE)<48&&minerals>=50)
                         queued=queue_hatchery_type(41,1);
-                    else if(hydras<30&&owner_count(SIDE)<48&&minerals>=75&&gas>=25)
-                        queued=queue_hatchery_type(38,1);
+                    else if(hydras<30&&owner_count(SIDE)<48&&minerals>=75&&gas>=25) {
+                        /* Spend the larva: each producer takes as many Hydralisks
+                         * as the bank and supply allow, up to its queue limit. */
+                        for(int ph=0;ph<3;ph++) {
+                            int n=minerals/75,g=gas/25,room=48-owner_count(SIDE);
+                            if(g<n)n=g;
+                            if(room<n)n=room;
+                            if(n>3)n=3;
+                            if(n<1||!queue_hatchery_type(38,n))break;
+                            queued++;
+                        }
+                    }
                     if(queued)fprintf(stderr,"normal-input ongoing production at%u Hydras%d workers%d bank%d/%d\n",
                         host_ticks,hydras,workers,minerals,gas);
                     last_production=host_ticks;

@@ -150,12 +150,25 @@ static int side_incomplete_pylon_count(void)
     return count;
 }
 
+/* A Probe sent to a far site holds a pending-construction order whose target
+ * is the building type; the structure itself appears on arrival. */
+static int build_order_accepted(int worker, int type, int x, int y)
+{
+    if (worker < 0 || !u[worker].alive) return 0;
+    if (SC64_PENDING_BUILD_ORDER(u[worker].order))
+        return u[worker].target == type && dist2(u[worker].tx, u[worker].ty, x, y) <= 8 * 8;
+    int target = u[worker].target;
+    return u[worker].order == ORDER_BUILD && target >= 0 && target < MAX_BUILDINGS &&
+           b[target].alive && b[target].owner == SIDE && b[target].type == type &&
+           dist2(b[target].x, b[target].y, x, y) <= 8 * 8;
+}
+
 static int build_gateway_from_probe(int gateway_index)
 {
     int worker = -1;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
-            u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS) { worker = i; break; }
+            !SC64_BUILD_WORKER_ORDER(u[i].order) && u[i].order != ORDER_GAS) { worker = i; break; }
     if (worker < 0 || minerals < 150 || gateway_index >= 4) return 0;
     int x = -1, y = -1;
     static const int spot[][2] = {
@@ -176,11 +189,7 @@ static int build_gateway_from_probe(int gateway_index)
     if (mode != MODE_BUILD) return 0;
     move_cursor(x, y);
     tap(KEY_A);
-    int target = u[worker].target;
-    int gateway = target >= 0 && target < MAX_BUILDINGS && b[target].alive &&
-                  b[target].owner == SIDE && b[target].type == B_GATEWAY &&
-                  dist2(b[target].x, b[target].y, x, y) <= 8 * 8 ? target : -1;
-    if (gateway >= 0 && u[worker].order == ORDER_BUILD) return 1;
+    if (build_order_accepted(worker, B_GATEWAY, x, y)) return 1;
     if (mode == MODE_BUILD) tap_b();
     if (menu_open) tap_b();
     return 0;
@@ -192,7 +201,7 @@ static int build_cybernetics_core_from_probe(void)
     if (side_building_type(B_CYBERNETICS_CORE, 0) >= 0 || minerals < 200) return 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
-            u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS) { worker = i; break; }
+            !SC64_BUILD_WORKER_ORDER(u[i].order) && u[i].order != ORDER_GAS) { worker = i; break; }
     if (worker < 0) return 0;
     int nexus = source_building(154, SIDE);
     int x = -1, y = -1, best = 0x7fffffff;
@@ -214,11 +223,7 @@ static int build_cybernetics_core_from_probe(void)
     if (mode != MODE_BUILD) return 0;
     move_cursor(x, y);
     tap(KEY_A);
-    int target = u[worker].target;
-    int core = target >= 0 && target < MAX_BUILDINGS && b[target].alive &&
-               b[target].owner == SIDE && b[target].type == B_CYBERNETICS_CORE &&
-               dist2(b[target].x, b[target].y, x, y) <= 8 * 8 ? target : -1;
-    if (core >= 0 && u[worker].order == ORDER_BUILD) return 1;
+    if (build_order_accepted(worker, B_CYBERNETICS_CORE, x, y)) return 1;
     if (mode == MODE_BUILD) tap_b();
     if (menu_open) tap_b();
     return 0;
@@ -234,7 +239,7 @@ static int assign_probe_to_gas(void)
     for (int i = 0; i < MAX_UNITS; ++i) {
         if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_PROBE) continue;
         if (u[i].order == ORDER_GAS) { ++gas_workers; continue; }
-        if (u[i].order == ORDER_BUILD) continue;
+        if (SC64_BUILD_WORKER_ORDER(u[i].order)) continue;
         int d = dist2(u[i].x, u[i].y, b[assimilator].x, b[assimilator].y);
         if (d < best) { best = d; worker = i; }
     }
@@ -266,7 +271,7 @@ static int build_cannon_from_probe(int cannon_index)
     int worker = -1;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
-            u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS) { worker = i; break; }
+            !SC64_BUILD_WORKER_ORDER(u[i].order) && u[i].order != ORDER_GAS) { worker = i; break; }
     if (worker < 0 || minerals < 150 || cannon_index >= 3 ||
         source_building(166, SIDE) < 0) return 0;
     int x = -1, y = -1;
@@ -282,11 +287,7 @@ static int build_cannon_from_probe(int cannon_index)
     if (mode != MODE_BUILD) return 0;
     move_cursor(x, y);
     tap(KEY_A);
-    int target = u[worker].target;
-    int cannon = target >= 0 && target < MAX_BUILDINGS && b[target].alive &&
-                 b[target].owner == SIDE && b[target].type == B_PHOTON_CANNON &&
-                 dist2(b[target].x, b[target].y, x, y) <= 8 * 8 ? target : -1;
-    if (cannon >= 0 && u[worker].order == ORDER_BUILD) return 1;
+    if (build_order_accepted(worker, B_PHOTON_CANNON, x, y)) return 1;
     if (mode == MODE_BUILD) tap_b();
     if (menu_open) tap_b();
     return 0;
@@ -311,7 +312,7 @@ static int build_pylon_from_probe(void)
     int worker = -1;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
-            u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS) {
+            !SC64_BUILD_WORKER_ORDER(u[i].order) && u[i].order != ORDER_GAS) {
             worker = i; break;
         }
     if (worker < 0 || minerals < 100) return 0;
@@ -326,6 +327,19 @@ static int build_pylon_from_probe(void)
             int d = dist2(u[worker].x, u[worker].y, spot[i][0], spot[i][1]);
             if (d < best) { x = spot[i][0]; y = spot[i][1]; best = d; }
         }
+    /* The fixed list is spent after about eight Pylons; a 64-pixel lattice
+     * around the base supplies further legal, reachable sites. */
+    if (x < 0)
+        for (int yy = 240; yy <= 560; yy += 64)
+            for (int xx = 416; xx <= 928; xx += 64) {
+                if (!race_can_site(SIDE, B_PYLON, xx, yy) || !can_place(B_PYLON, xx, yy))
+                    continue;
+                int next_x, next_y;
+                if (!sc64_route_next(u[worker].x, u[worker].y, xx, yy, &next_x, &next_y))
+                    continue;
+                int d = dist2(u[worker].x, u[worker].y, xx, yy);
+                if (d < best) { x = xx; y = yy; best = d; }
+            }
     if (x < 0) return 0;
     if (!cycle_select_actor(worker)) return 0;
     tap_b();
@@ -334,11 +348,7 @@ static int build_pylon_from_probe(void)
     if (mode != MODE_BUILD) return 0;
     move_cursor(x, y);
     tap(KEY_A);
-    int target = u[worker].target;
-    if (u[worker].order == ORDER_BUILD &&
-        target >= 0 && target < MAX_BUILDINGS && b[target].alive &&
-        b[target].owner == SIDE && b[target].type == B_PYLON &&
-        dist2(b[target].x, b[target].y, x, y) <= 8 * 8) return 1;
+    if (build_order_accepted(worker, B_PYLON, x, y)) return 1;
     /* A rejected placement leaves the build cursor armed. Cancel through the
      * ordinary field menu so the next placement attempt starts cleanly. */
     if (mode == MODE_BUILD) tap_b();

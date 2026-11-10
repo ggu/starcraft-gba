@@ -392,7 +392,8 @@ static int queue_combat_unit(void)
        race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)return 0;
     int producer=-1,best_queue=4;
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
-        b[i].type==B_GATEWAY&&building_complete(i)&&b[i].queue_count<best_queue){
+        b[i].type==B_GATEWAY&&building_complete(i)&&race_site_powered(SIDE,b[i].x,b[i].y)&&
+        b[i].queue_count<best_queue){
         producer=i;best_queue=b[i].queue_count;
     }
     if(producer<0)return 0;
@@ -737,9 +738,10 @@ int main(int argc,char **argv)
                 (unsigned)frame,first,host_tick,paused,screen,building,menu_last);
             census("saved");
         }
+#ifndef SC64_NEAREST_RESOURCE_DEPOT
         /* A hero with an enemy in Scarab range steps to the walkable spot
          * near the Nexus farthest from every enemy; Protoss hit points do
-         * not regenerate. */
+         * not regenerate. (The nearest-depot economy parks Fenix instead.) */
         if(frame>=next_evade&&home>=0){
             int heroes[2]={f,h};
             for(int k=0;k<2;k++){
@@ -770,6 +772,7 @@ int main(int argc,char **argv)
             }
             next_evade=frame+150;
         }
+#endif
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
         /* Reavers shell the base from out of sight, and idle units do not answer.
          * Check for raiders before spending time on the economy. */
@@ -812,6 +815,32 @@ int main(int argc,char **argv)
              * and four Cannons come right after the first Gateway, then gas
              * and the Cybernetics Core, and a large bank buys more. */
             static const int ax[6]={-40,40,-104,104,-120,-40},ay[6]={160,160,112,112,-80,-80};
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+            int cannons=count_type(B_PHOTON_CANNON,0);
+            int gateways=count_type(B_GATEWAY,0),started=0;
+            /* The first item that can be afforded and sited starts; one that
+             * fails (no legal site, no free Probe) falls through to the next
+             * instead of blocking every later item. */
+#define BUILD_NEXT(cond,call) do{ if(!started&&(cond))started=(call)!=0; }while(0)
+            BUILD_NEXT(gateways<1,build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1));
+            /* Raids arrive sooner on this economy. Take gas early: it recovers
+             * loaded Probes, and Dragoons follow. Raids can destroy gas;
+             * Dragoons are the only ground answer to the Arbiters, so rebuild
+             * it ahead of Cannons. */
+            BUILD_NEXT(!count_type(B_ASSIMILATOR,0),build_assimilator());
+            BUILD_NEXT(!count_type(B_CYBERNETICS_CORE,0)&&count_type(B_GATEWAY,1),
+                       build_structure(B_CYBERNETICS_CORE,MENU_ACADEMY,80,224,-1,-1));
+            /* A large bank means production is the limit, however many Probes
+             * the raids have left. */
+            BUILD_NEXT((minerals>=400||probe_count()>=10)&&gateways<6,
+                       build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1));
+            BUILD_NEXT(!count_type(B_FORGE,0),build_structure(B_FORGE,MENU_ENG_BAY,80,224,-1,-1));
+            BUILD_NEXT(count_type(B_FORGE,1)&&home>=0&&cannons<4,
+                       build_cannon(b[home].x+ax[cannons%6],b[home].y+ay[cannons%6]));
+            BUILD_NEXT(count_type(B_FORGE,1)&&home>=0&&minerals>=500&&cannons<12,
+                       build_cannon(b[home].x+ax[cannons%6],b[home].y+ay[cannons%6]));
+#undef BUILD_NEXT
+#else
             int cannons=count_type(B_PHOTON_CANNON,0);
             if(count_type(B_GATEWAY,0)<1)
                 (void)build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1);
@@ -842,6 +871,7 @@ int main(int argc,char **argv)
                 (void)build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1);
             else if(count_type(B_FORGE,1)&&home>=0&&minerals>=500&&cannons<12)
                 (void)build_cannon(b[home].x+ax[cannons%6],b[home].y+ay[cannons%6]);
+#endif
             next_build=frame+(minerals>=400?240:600);
         }
         if(frame>=next_gas){
@@ -871,6 +901,10 @@ int main(int argc,char **argv)
             else if(home>=0){
                 int fx=b[home].x,fy=b[home].y+48;
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
+                /* Raiders arrive from the south and east, and Fenix's hit
+                 * points do not regenerate: keep him in the quiet north-west
+                 * corner behind the base, out of every approach. */
+                fx=b[home].x-64;fy=b[home].y-176;
                 /* Selecting a walking hero sends the cursor across the map, which
                  * costs production. Order each one only when it has stopped. */
                 if(f>=0&&u[f].owner==SIDE&&u[f].order!=ORDER_MOVE&&dist2(u[f].x,u[f].y,fx,fy)>48*48)
