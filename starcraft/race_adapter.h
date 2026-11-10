@@ -53,6 +53,18 @@ static int race_spawn_product(int owner, int type, int x, int y, int source_owne
         u[slot].raw_owner = source_owner;
     return slot;
 }
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+static int race_spawn_product_from(int owner, int type, int x, int y, int source_owner, int producer)
+{
+    int slot = race_spawn_product(owner,type,x,y,source_owner);
+    int controller = sc64_controller_building(producer);
+    if (slot >= 0 && sc64_controller_valid(controller,owner)) sc64_current_unit[slot] = (u8)controller;
+    return slot;
+}
+#else
+#define race_spawn_product_from(owner,type,x,y,source_owner,producer) \
+    race_spawn_product((owner),(type),(x),(y),(source_owner))
+#endif
 
 /* Live owner-independent race adapter. Include from game.c after engine
  * helpers and before the frame/update hooks that call these functions. */
@@ -1063,6 +1075,10 @@ static void __attribute__((noinline)) race_pending_build_tick(int worker)
         int source_owner = race_creation_source_owner(q->owner, q->raw_owner);
         slot = spawn_build(q->owner, type, x, y, 1);
         if (slot < 0) goto cancel;
+#ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
+        { int controller=sc64_controller_unit(worker);
+          if (sc64_controller_valid(controller,q->owner)) sc64_current_building[slot]=(u8)controller; }
+#endif
         if (source_owner >= 0 && b[slot].raw_owner < 0)
             b[slot].raw_owner = source_owner;
     }
@@ -1217,14 +1233,36 @@ static void race_tick_state(void)
                 raw_type = SC64_Z5_HP_REGEN_RAW_INFESTED_KERRIGAN;
 #endif
             if (raw_type >= 0)
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            {
+                unsigned hp,maximum=(unsigned)u[i].maxhp*256u;
+                /* Four Q8/source update at 24 Hz becomes 16/5 Q8 per
+                 * 30 Hz update. The non-shield alias now stores residue 0..4. */
+                if (u[i].maxhp>0 && u[i].shield_remainder<5 &&
+                    sc64_pr_q8_actor_hp(i,&hp) && hp>0 && hp<=maximum) {
+                    if (hp==maximum) u[i].shield_remainder=0;
+                    else {
+                        unsigned phase=(unsigned)u[i].shield_remainder+16u;
+                        unsigned gain=phase/5u;
+                        hp=maximum-hp<gain ? maximum : hp+gain;
+                        if (sc64_pr_q8_commit_hp(i,hp))
+                            u[i].shield_remainder=(u16)(hp==maximum ? 0u : phase%5u);
+                    }
+                }
+            }
+#else
                 (void)sc64_z5_hp_regen_tick(raw_type, &u[i].hp, u[i].maxhp,
                                              &u[i].shield_remainder, 0);
+#endif
         }
 #endif
         if(u[i].owner==SIDE){used+=unit_slot_supply(&u[i]);cap+=sc64_race_unit_supply_provided(u[i].type);}
         if (r->shields && u[i].shield < r->shields) {
             unsigned short value = (unsigned short)u[i].shield;
             unsigned short rem = (unsigned short)u[i].shield_remainder;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            sc64_pr_q8_regen(&value,r->shields,&rem);
+#else
 #ifdef SC64_BATTERY_SERVICE_ENABLED
             if (race_battery_active()) {
                 unsigned shield_value=value, shield_rem=rem;
@@ -1235,6 +1273,7 @@ static void race_tick_state(void)
             } else
 #endif
                 sc64_race_shield_tick_30fps(&value, r->shields, &rem);
+#endif
             u[i].shield = value;
             u[i].shield_remainder = rem;
         }
@@ -1249,7 +1288,11 @@ static void race_tick_state(void)
         if (max && b[i].shield < max) {
             unsigned short value = (unsigned short)b[i].shield;
             unsigned short rem = (unsigned short)b[i].shield_remainder;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            sc64_pr_q8_regen(&value,max,&rem);
+#else
             sc64_race_shield_tick_30fps(&value, max, &rem);
+#endif
             b[i].shield = value;
             b[i].shield_remainder = rem;
         }
@@ -1303,8 +1346,15 @@ race_construction_hp_progress(int i, int progress, int total)
         building->hp <= 0 || race_construction_growth_is_morph(building)) return;
     gain = sc64_construction_hp_gain(building->maxhp, progress, total);
     if (gain > 0) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+        unsigned hp, maximum=(unsigned)building->maxhp*256u, added=(unsigned)gain*256u;
+        if (!sc64_pr_q8_actor_hp(MAX_UNITS+i,&hp) || hp>maximum) return;
+        hp=maximum-hp<added ? maximum : hp+added;
+        if (!sc64_pr_q8_commit_hp(MAX_UNITS+i,hp)) return;
+#else
         building->hp += gain;
         if (building->hp > building->maxhp) building->hp = building->maxhp;
+#endif
     }
     shield_max = sc64_race_building_shields(building->type);
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
@@ -1315,8 +1365,15 @@ race_construction_hp_progress(int i, int progress, int total)
 #endif
     if (shield_max > building->shield && shield_max > 0) {
         gain = sc64_construction_shield_gain(shield_max, progress, total);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+        unsigned shield, maximum=(unsigned)shield_max*256u, added=(unsigned)gain*256u;
+        if (!sc64_pr_q8_actor_shield(MAX_UNITS+i,&shield) || shield>maximum) return;
+        shield=maximum-shield<added ? maximum : shield+added;
+        (void)sc64_pr_q8_commit_shield(MAX_UNITS+i,shield);
+#else
         building->shield += gain;
         if (building->shield > shield_max) building->shield = shield_max;
+#endif
     }
 }
 #endif
@@ -1337,7 +1394,16 @@ static void race_complete_building(int i)
     {
         int old_max = race_construction_morph_source_max(b[i].type);
         if (old_max > 0) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
+            unsigned hp; int64_t next;
+            if (!sc64_pr_q8_actor_hp(MAX_UNITS+i,&hp)) return;
+            next=(int64_t)hp+((int64_t)b[i].maxhp-old_max)*256;
+            if (next<256) next=256;
+            if (next>(int64_t)b[i].maxhp*256) next=(int64_t)b[i].maxhp*256;
+            if (!sc64_pr_q8_commit_hp(MAX_UNITS+i,(unsigned)next)) return;
+#else
             b[i].hp = sc64_construction_morph_hp(b[i].hp, old_max, b[i].maxhp);
+#endif
         }
         else if (!race_construction_growth_is_morph(&b[i]) &&
                  b[i].hp > b[i].maxhp)
@@ -1582,8 +1648,8 @@ static void race_tick_buildings(void)
                     continue;
                 }
                 int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
-                int first_slot = race_spawn_product(owner, type, first_x, first_y, source_owner);
-                if (first_slot < 0 || race_spawn_product(owner, type, second_x, second_y, source_owner) < 0) {
+                int first_slot = race_spawn_product_from(owner, type, first_x, first_y, source_owner, i);
+                if (first_slot < 0 || race_spawn_product_from(owner, type, second_x, second_y, source_owner, i) < 0) {
                     /* Capacity was checked before planning and no world state
                      * changes between the paired spawns; this is defensive. */
                     if (first_slot >= 0) u[first_slot].alive = 0;
@@ -1597,8 +1663,8 @@ static void race_tick_buildings(void)
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
                 }
-                spawned = race_spawn_product(owner, type, first_x, first_y,
-                                             race_creation_source_owner(owner, b[i].raw_owner));
+                spawned = race_spawn_product_from(owner, type, first_x, first_y,
+                                             race_creation_source_owner(owner, b[i].raw_owner), i);
                 if (spawned < 0) {
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
                     continue;
@@ -1623,14 +1689,14 @@ static void race_tick_buildings(void)
             for(int slot=0;slot<MAX_UNITS;slot++)if(!u[slot].alive)free_slots++;
             if(free_slots<2){b[i].queue_progress=frames-1;continue;}
             int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
-            if (race_spawn_product(owner, type, x, y, source_owner) < 0 ||
-                race_spawn_product(owner, type, x + 8, y, source_owner) < 0) {
+            if (race_spawn_product_from(owner, type, x, y, source_owner, i) < 0 ||
+                race_spawn_product_from(owner, type, x + 8, y, source_owner, i) < 0) {
                 b[i].queue_progress = frames - 1;
                 continue;
             }
         } else {
-            int spawned = race_spawn_product(owner, type, x, y,
-                                             race_creation_source_owner(owner, b[i].raw_owner));
+            int spawned = race_spawn_product_from(owner, type, x, y,
+                                             race_creation_source_owner(owner, b[i].raw_owner), i);
             if (spawned >= 0 && sc64_race_is_worker(type)) {
                 int patch = nearest_mineral(x,y);
 #ifndef SC64_IMPORTED_SKIRMISH

@@ -6,7 +6,8 @@
  * validate the journal checksum and sequence, then pass that slot's outer
  * tag and its detached payload's unmodified inner version. No field value
  * inside the payload alone can authorize a staged interpretation. */
-enum { SC64_STAGE_SAVE_EGG = 1u, SC64_STAGE_SAVE_GUARDIAN = 2u };
+enum { SC64_STAGE_SAVE_EGG = 1u, SC64_STAGE_SAVE_GUARDIAN = 2u,
+       SC64_STAGE_SAVE_SCARAB = 4u };
 typedef struct {
     uint32_t outer,inner;
     unsigned features;
@@ -15,6 +16,10 @@ typedef struct {
     const void *candidate;
     uint32_t outer,inner;
     unsigned features;
+#ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
+    const uint8_t *flight;
+    unsigned flight_count;
+#endif
 } Sc64StageSaveAuth;
 static int sc64_stage_save_authenticate(Sc64StageSaveAuth *auth,const void *candidate,
                                         uint32_t outer,uint32_t inner,
@@ -33,7 +38,7 @@ static int sc64_stage_save_authenticate(Sc64StageSaveAuth *auth,const void *cand
         }
     }
     if (!found) return 0;
-    *auth=(Sc64StageSaveAuth){candidate,outer,inner,features};
+    *auth=(Sc64StageSaveAuth){.candidate=candidate,.outer=outer,.inner=inner,.features=features};
     return 1;
 }
 static int sc64_stage_save_auth_matches(const Sc64StageSaveAuth *auth,const void *candidate,
