@@ -4708,6 +4708,7 @@ test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign bui
 	./build/test-sc64-protoss-carried-p5 --limit 180000 --attempt-tag canonical-p6-carried-p5
 test-protoss-p7: test-sc64-protoss-carried-missions
 -include mk/protoss-carried/Makefile
+-include mk/campaign-progression/Makefile
 
 # The indexed and packed sprite paths must agree over the whole framebuffer,
 # including transparent lanes, alignment and both clipping configurations.
