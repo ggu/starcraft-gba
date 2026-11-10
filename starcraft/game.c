@@ -795,6 +795,7 @@ static inline void sc64_grid_set(u8 *grid, unsigned cell, int value) {
 #define SC64_GRID_GET(grid, cell) sc64_grid_get((grid), (unsigned)(cell))
 #define SC64_GRID_SET(grid, cell, value) sc64_grid_set((grid), (unsigned)(cell), (value))
 #define SC64_GRID_CLEAR(grid) memset((grid), 0, sizeof(grid))
+#define SC64_ROUTE_GRID_CELLS_PER_BYTE 8
 #else
 #define SC64_GRID_STORAGE_BYTES MAP_CELLS
 #define SC64_GRID_GET(grid, cell) ((grid)[(cell)] != 0)
@@ -1665,6 +1666,27 @@ _Static_assert(sizeof(RaceSave)+sizeof(Unit)*MAX_UNITS<=sizeof(u16)*MAP_CELLS,
                "Carrier candidate decode must fit existing route scratch");
 #endif
 static Sc64ZpRouteSaveScratch sc64_zp_route_save_scratch;
+#ifdef SC64_ROUTE_KEEP_FIELDS
+/* build_path_grid parks the previous grid in the last bytes of the BFS queue.
+ * No other member of this union may reach them. */
+#define SC64_ROUTE_TAIL_CLEAR(type, member) \
+    _Static_assert(sizeof(((type *)0)->member) + sizeof(path_walkable) <= \
+                   sizeof(((type *)0)->bfs_queue), \
+                   "previous-grid copy overlaps " #member)
+SC64_ROUTE_TAIL_CLEAR(Sc64ZpRouteSaveScratch, save);
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+SC64_ROUTE_TAIL_CLEAR(Sc64ZpRouteSaveScratch, carrier_candidate);
+#endif
+#ifdef SC64_Z8_RUNTIME
+SC64_ROUTE_TAIL_CLEAR(Sc64ZpRouteSaveScratch, z8_candidate);
+#endif
+#ifdef SC64_Z9_RUNTIME
+SC64_ROUTE_TAIL_CLEAR(Sc64ZpRouteSaveScratch, zl_candidate);
+#endif
+#ifdef SC64_IMPACT_EVENTS
+SC64_ROUTE_TAIL_CLEAR(Sc64ZpRouteSaveScratch, impact_record);
+#endif
+#endif
 #endif
 #ifdef SC64_IMPORTED_MISSION
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -1680,6 +1702,16 @@ _Static_assert(sizeof(RaceImpactRecord) <= sizeof(u16) * MAP_CELLS,
                "impact save record must fit existing route scratch");
 #endif
 static Sc64CombinedRouteSaveScratch sc64_combined_route_save_scratch;
+#ifdef SC64_ROUTE_KEEP_FIELDS
+#define SC64_ROUTE_TAIL_CLEAR(type, member) \
+    _Static_assert(sizeof(((type *)0)->member) + sizeof(path_walkable) <= \
+                   sizeof(((type *)0)->bfs_queue), \
+                   "previous-grid copy overlaps " #member)
+SC64_ROUTE_TAIL_CLEAR(Sc64CombinedRouteSaveScratch, save);
+#ifdef SC64_IMPACT_EVENTS
+SC64_ROUTE_TAIL_CLEAR(Sc64CombinedRouteSaveScratch, impact_record);
+#endif
+#endif
 #define bfs_queue sc64_combined_route_save_scratch.bfs_queue
 #elif defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_IMPORTED_MISSION
@@ -1691,6 +1723,11 @@ static u16 bfs_queue[MAP_CELLS];
 static u16 bfs_queue[MAP_CELLS];
 #endif
 static void sc64_routes_reset(void);
+#ifdef SC64_ROUTE_KEEP_FIELDS
+static void sc64_routes_topology_changed(void);
+static void sc64_routes_grid_begin(void);
+static void sc64_routes_grid_commit(void);
+#endif
 #ifdef SC64_RANGE_WORK
 static void sc64_range_route_forget_target(int target);
 #endif
@@ -3288,7 +3325,12 @@ invalidate_path_grid(void)
     race_depot_cache_invalidate_topology();
 #endif
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    /* Point fields survive; build_path_grid compares the grids and decides. */
+    sc64_routes_topology_changed();
+#else
     sc64_routes_reset();
+#endif
 #endif
 }
 
@@ -3327,6 +3369,9 @@ static void GBA_HOT
 build_path_grid(void)
 {
     int col, row, i;
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    sc64_routes_grid_begin();
+#endif
 #if defined(SC64_BULK_TERRAIN_GRID) && defined(SC64_RACES) && \
     defined(SC64_IMPORTED_MISSION) && \
     (defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE))
@@ -3404,6 +3449,9 @@ build_path_grid(void)
                     SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
     }
     path_grid_valid = 1;
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    sc64_routes_grid_commit();
+#endif
 }
 
 static int
