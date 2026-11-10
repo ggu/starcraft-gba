@@ -25,6 +25,13 @@ static int race_t5_starport_has_control_tower(int producer);
  * assign a new actor after authenticating the creator against the active map.
  * Generic/custom owners already use compact identities, so leave raw unset. */
 static int race_campaign_owner(const Sc64RaceMap *map, int raw_owner);
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+static int race_z4_source_owner(unsigned source_slot);
+#endif
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+static int race_z6_source_owner(unsigned source_slot);
+static unsigned race_z6_ai_pending_source_creates(void);
+#endif
 static int race_creation_source_owner(int owner, int creator_raw)
 {
     const Sc64RaceMap *map;
@@ -188,7 +195,23 @@ static int race_owner_reserved_supply(int owner)
  * and custom games. No menu or guest capability is enabled here. */
 static int race_shared_egg_context(void)
 {
-    return race_mode || race_z8_active() || race_zl_active();
+    return race_mode || race_z8_active() || race_zl_active()
+#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
+        || (!race_mode && race_selected_mission==0) /* Z1 */
+#endif
+#ifdef SC64_SHARED_EGG_Z2_HOST_STAGE
+        || (!race_mode && race_selected_mission==1) /* Z2 */
+#endif
+#ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
+        || (!race_mode && race_selected_mission==14) /* Z3 */
+#endif
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        || (!race_mode && race_selected_mission==15) /* Z4 */
+#endif
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+        || (!race_mode && race_selected_mission==17) /* Z6 */
+#endif
+        ;
 }
 #define SC64_EGG_CONTEXT() (SC64_EGG_IS_Z7() || race_shared_egg_context())
 #elif defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
@@ -247,6 +270,11 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
     if (!SC64_EGG_IS_Z7() && q->work_timer==1 &&
         sc64_z7_egg_product_count(q->target)==2) {
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+        if (!race_mode && race_selected_mission==17) {
+            if (!race_product_slots_available(race_z6_ai_pending_source_creates())) return 1;
+        } else
+#endif
         if (!race_product_slots_available(0)) return 1;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         if (race_protoss_services_active() && !race_p7_carrier_training_slots_available(0)) return 1;
@@ -843,6 +871,56 @@ static int race_queue_unit(int owner, int producer, int type)
 #ifdef SC64_SHARED_EGG_HOST_STAGE
     if (egg_job && !SC64_EGG_IS_Z7() && !race_mode) {
         int source=b[producer].raw_owner;
+#ifdef SC64_SHARED_EGG_Z1_HOST_STAGE
+        if (race_selected_mission==0) {
+            /* Retain only the descriptor-authenticated producer source;
+             * transfer admission requires a separate saved-control proof. */
+            const Sc64RaceMap *map=&sc64_race_maps[0];
+            if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
+                ((unsigned)source==map->human_slot ? SIDE : map->owner_modes[source])!=owner)
+                return 0;
+        } else
+#endif
+#ifdef SC64_SHARED_EGG_Z2_HOST_STAGE
+        if (race_selected_mission==1) {
+            const Sc64RaceMap *map=&sc64_race_maps[1];
+            int raw_product=sc64_race_raw_unit(type);
+            if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
+                ((unsigned)source==map->human_slot ? SIDE : map->owner_modes[source])!=owner ||
+                raw_product<0 || !sc64_early_zerg_permission_available(1u,(unsigned)source,(unsigned)raw_product))
+                return 0;
+        } else
+#endif
+#ifdef SC64_SHARED_EGG_Z3_HOST_STAGE
+        if (race_selected_mission==14) {
+            const Sc64RaceMap *map=&sc64_race_maps[14];
+            int raw_product=sc64_race_raw_unit(type);
+            if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
+                ((unsigned)source==map->human_slot ? SIDE : map->owner_modes[source])!=owner ||
+                raw_product<0 || !sc64_early_zerg_permission_available(14u,(unsigned)source,(unsigned)raw_product))
+                return 0;
+        } else
+#endif
+#ifdef SC64_SHARED_EGG_Z4_HOST_STAGE
+        if (race_selected_mission==15) {
+            const Sc64RaceMap *map=&sc64_race_maps[15];
+            int raw_product=sc64_race_raw_unit(type);
+            if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
+                race_z4_source_owner((unsigned)source)!=owner || raw_product<0 ||
+                !sc64_early_zerg_permission_available(15u,(unsigned)source,(unsigned)raw_product))
+                return 0;
+        } else
+#endif
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+        if (race_selected_mission==17) {
+            const Sc64RaceMap *map=&sc64_race_maps[17];
+            int raw_product=sc64_race_raw_unit(type);
+            if ((unsigned)source>=8u || map->owner_races[source]!=R_ZERG ||
+                race_z6_source_owner((unsigned)source)!=owner || raw_product<0 ||
+                !sc64_mid_zerg_permission_available(17u,(unsigned)source,(unsigned)raw_product))
+                return 0;
+        } else
+#endif
         if ((unsigned)source>=8u ||
             (race_z8_active() ? race_z8_source_owner((unsigned)source) :
                                 race_zl_source_owner((unsigned)source)) != owner) return 0;
@@ -885,6 +963,12 @@ static int race_queue_unit(int owner, int producer, int type)
     count = sc64_race_product_count(type);
 #ifdef SC64_SHARED_SCOURGE_COMBAT
 #ifdef SC64_SHARED_EGG_JOURNAL_HOST_STAGE
+#ifdef SC64_SHARED_EGG_Z6_HOST_STAGE
+    if (!race_mode && race_selected_mission==17) {
+        unsigned pending=race_z6_ai_pending_source_creates();
+        if (pending>MAX_UNITS || !race_product_slots_available((unsigned)count+pending)) return 0;
+    } else
+#endif
     if (!race_mode && !SC64_EGG_IS_Z7() && (race_z8_active() || race_zl_active())) {
         unsigned pending=race_shared_trigger_obligations();
         if (pending>MAX_UNITS || !race_product_slots_available((unsigned)count+pending)) return 0;

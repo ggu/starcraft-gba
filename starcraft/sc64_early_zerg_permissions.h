@@ -4,7 +4,14 @@
 #ifndef SC64_EARLY_ZERG_PERMISSIONS
 #error "Early Zerg permissions require explicitly prepared private inputs"
 #endif
+#ifdef SC64_EARLY_ZERG_PERMISSION_TEST_FIXTURE
+#ifndef GBA_HOST
+#error "Synthetic permission fixtures are HOST-only"
+#endif
+#include "sc64_early_zerg_permissions_fixture.h"
+#else
 #include "sc64_early_zerg_permissions_generated.h"
+#endif
 /* This reads source PUNI only. Callers must separately validate source-owner
  * mapping and the saved/current controller. source_race stores raw CHK SIDE
  * values, not the engine's R_* enumeration. No live world is read here. */
