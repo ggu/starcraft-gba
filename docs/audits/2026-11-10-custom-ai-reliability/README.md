@@ -156,9 +156,10 @@ matches.
   products, and at 20,000 in the Terran product; the other two matches had
   ended by then.
 - Ordinary-input controller (`tools/sc64_skirmish_controller_matrix.py`,
-  unsanitized build, the same earlier candidate): all 54 matches end in a
-  result at base and with the candidate. The scripted human loses 53 of 54
-  either way; two lobbies changed outcome.
+  unsanitized build): all 54 matches end in a result at base and with the
+  final planner (blob `6d7354edfc18`). The scripted human loses 53 of 54 at
+  base (it wins Outpost, Protoss human, three opponents in the Terran
+  product) and all 54 with the final planner.
 
 ## ARM cost (mGBA core, not hardware)
 
