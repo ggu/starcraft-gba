@@ -3,9 +3,11 @@
  * ARM probe for advisor alerts (replaces common/main.c).
  *
  * The probe links a race profile's flags and bank, puts a player unit and a
- * building in a fixture, then edits only those fixture fields and runs the
- * shipped observer and mixer interrupt: each alert must request the player
- * race's clip from the bank. audio_play_sample is wrapped to see the request
+ * building in a fixture, then reports hostile hits and finished research and
+ * upgrades through the shipped engine entry points and runs the shipped
+ * observer and mixer interrupt: each alert must request the player race's clip
+ * from the bank, as an advisor-class request, and a race with no N64 evidence
+ * for a line must request nothing. audio_play_sample is wrapped to see the request
  * and still plays it. Results go to the mGBA debug log; no debugger reads or
  * writes game state. Emulator evidence only: it shows requests and the
  * decoding budget, not gameplay and not what a person hears.
@@ -65,11 +67,6 @@ static void observe_next(void)
     frame_wait();
 }
 
-static void observe_vitals(void)
-{
-    do observe_next(); while (frame & GAME_AUDIO_VITAL_TICK_MASK);
-}
-
 /* Asserts this line's clip was requested, then waits out the advisor voice. */
 static void expect(const char *name, int alert)
 {
@@ -102,6 +99,7 @@ static void fixture(void)
     b[0].hp = 1000; b[0].maxhp = 1500; b[0].raw_type = -1;
     weapons_level = armor_level = weapons_research = armor_research = 0;
     frame = 1000;
+    game_audio_prime();
     game_audio_observe();
     for (int k = 0; k <= GAME_AUDIO_ATTACK_ALERT_TICKS; ++k) observe_next();
     last_sample = last_kind = -1;
@@ -111,12 +109,13 @@ static void run_race(int race)
 {
     race_human = race;
     fixture();
-    u[10].hp = 20; observe_vitals(); expect("forces", GAME_AUDIO_ALERT_FORCES);
+    hit_target(10, 3, 0, ENEMY); observe_next(); expect("forces", GAME_AUDIO_ALERT_FORCES);
     for (int k = 0; k < GAME_AUDIO_ATTACK_ALERT_TICKS; ++k) observe_next();
     last_sample = last_kind = -1;
-    b[0].hp = 900; observe_vitals(); expect("base", GAME_AUDIO_ALERT_BASE);
+    hit_target(MAX_UNITS + 0, 20, 0, ENEMY); observe_next(); expect("base", GAME_AUDIO_ALERT_BASE);
+    game_audio_cue(GAME_AUDIO_CUE_RESEARCH); observe_next(); expect("research", GAME_AUDIO_ALERT_RESEARCH);
     weapons_research = 600; observe_next();
-    weapons_research = 0; ++weapons_level; observe_next(); expect("upgrade", GAME_AUDIO_ALERT_UPGRADE);
+    tick_research(); observe_next(); expect("upgrade", GAME_AUDIO_ALERT_UPGRADE);
     toast_advisor = TOAST_CUE_ENERGY; observe_next(); expect("energy", GAME_AUDIO_ALERT_ENERGY);
     toast_advisor = TOAST_CUE_NO_BUILD; observe_next(); expect("no_build", GAME_AUDIO_ALERT_NO_BUILD);
     toast_advisor = TOAST_CUE_NO_LAND; observe_next(); expect("no_land", GAME_AUDIO_ALERT_NO_LAND);
@@ -131,7 +130,6 @@ static void measure_observer(void)
     for (int i = 0; i < MAX_UNITS; ++i) { u[i] = u[10]; u[i].selected = 0; }
     for (int i = 0; i < MAX_BUILDINGS; ++i) b[i] = b[0];
     observe_next();
-    /* Whole eight-tick cycles, so the average includes the vitals comparison. */
     for (int k = 0; k < 120; ++k) {
         u32 start;
         ++frame;

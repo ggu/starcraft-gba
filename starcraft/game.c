@@ -2590,8 +2590,11 @@ toast(int id)
  * cue the race advisor: game_audio_observe() takes the cue at render time, so
  * the command paths gain only this store. Presentation only, never saved. */
 static u8 toast_advisor;
-/* Alert cues, above every toast id: the observer plays the line for each. */
+/* Alert cues, above every toast id: the observer plays the line for each. The
+ * stores below report a hostile hit and finished research to that observer. */
 enum { TOAST_CUE_ENERGY = 32, TOAST_CUE_NO_BUILD, TOAST_CUE_NO_LAND };
+enum { GAME_AUDIO_CUE_RESEARCH, GAME_AUDIO_CUE_UPGRADE };
+static void game_audio_cue(int), game_audio_note_hit(int, int);
 static void
 toast_refusal(int id)
 {
@@ -5009,6 +5012,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
     }
     if(!damage)return;
 #endif
+    game_audio_note_hit(target,source_owner);
     if (target < MAX_UNITS) {
 	tx = u[target].x;
 	ty = u[target].y;
@@ -6435,10 +6439,12 @@ tick_research(void)
     if (weapons_research && ++weapons_research > 600) {
 	weapons_research = 0;
 	weapons_level++;
+        game_audio_cue(GAME_AUDIO_CUE_UPGRADE);
     }
     if (armor_research && ++armor_research > 600) {
 	armor_research = 0;
 	armor_level++;
+        game_audio_cue(GAME_AUDIO_CUE_UPGRADE);
     }
 }
 
@@ -14064,31 +14070,5 @@ static int sc64_battlecruiser_source_tick_due(void)
 #else
     return (unsigned)frame % 5u != 0u;
 #endif
-}
-#endif
-
-#ifdef SC64_RACES
-/* The player's finished tech for game_audio_tech(); bounded by the owner keys. */
-static int race_audio_research_count(void)
-{
-    int count = 0;
-#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
-    /* Most missions have no tech bits, so they skip this per-frame scan. */
-    if (sc64_battlecruiser_tech_bits) for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE) {
-        int key = sc64_battlecruiser_owner_key(race_mode, race_selected_mission, SIDE, b[i].raw_owner);
-        if (key >= 0) {
-            count += sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits, (unsigned)key, SC64_BC_TECH_YAMATO) +
-                     sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits, (unsigned)key, SC64_BC_TECH_REACTOR);
-            break;
-        }
-    }
-#endif
-#ifdef SC64_SHARED_TRANSPORT
-    count += race_skirmish_transport_tech.owner[sc64_sk_transport_owner_index(SIDE)].researched;
-#endif
-#ifdef SC64_Z6_TRANSPORT_ENABLED
-    if (race_z6_active()) count += race_z6.transport.researched;
-#endif
-    return count;
 }
 #endif
