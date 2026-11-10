@@ -1260,8 +1260,16 @@ def main() -> int:
     sc64.add_argument("action", choices=("prepare", "prepare-bc", "status", "build", "test", "play"))
     sc64.add_argument("--rom", type=Path, help="user-supplied USA N64 ROM (or ZIP) for prepare")
     sc64.add_argument("--profile", choices=SC64_PROFILES, default="unified")
+    release = commands.add_parser(
+        "release", help="check, package, copy and verify release ROMs (tools/sc64_release.py)",
+        description="Thin wrapper over tools/sc64_release.py; options after the action are passed through.")
+    release.add_argument("action", choices=("check", "package", "copy", "verify"))
+    release.add_argument("rest", nargs=argparse.REMAINDER, help="options for the action; see tools/sc64_release.py <action> --help")
     args = parser.parse_args()
     try:
+        if args.command == "release":
+            return subprocess.run([sys.executable, str(ROOT / "tools" / "sc64_release.py"),
+                                   args.action, *args.rest], cwd=ROOT, check=False).returncode
         if args.command == "doctor":
             return doctor(args.emulator)
         if args.command == "build":
