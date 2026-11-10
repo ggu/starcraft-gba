@@ -4427,6 +4427,14 @@ mission qualification or additional completed campaign.
 
 ### Experimental route fields sized to the active map
 
+> Later status (2026-11-10): the canonical products now enable this option
+> in a different form. The logical cache keeps the fixed slot count and the
+> spare bank holds evicted fields as donors. See the
+> [combat profile](audits/2026-11-10-busy-combat-profile/README.md). The
+> record below describes the earlier experiment, which raised the logical
+> slot count to 18; a later comparison showed that changing the logical
+> count changes custom-game results.
+
 `SC64_ROUTE_ACTIVE_STRIDE` retains the fixed 86,016-byte ZP PACK3 data bank
 and uses `ceil(3 * active_cells / 8)` bytes per cached field. Capacity is
 capped at 18: 64×64 and 128×96 maps use 18 fields, while 128×128 and 127×127
