@@ -2590,6 +2590,8 @@ toast(int id)
  * cue the race advisor: game_audio_observe() takes the cue at render time, so
  * the command paths gain only this store. Presentation only, never saved. */
 static u8 toast_advisor;
+/* Alert cues, above every toast id: the observer plays the line for each. */
+enum { TOAST_CUE_ENERGY = 32, TOAST_CUE_NO_BUILD, TOAST_CUE_NO_LAND };
 static void
 toast_refusal(int id)
 {
@@ -6263,7 +6265,10 @@ start_build(int type)
                 toast_refusal(problem == UI_SITE_MINERALS ? 1 : 12);
             else
 #endif
-            toast(8);
+            {
+                toast(8);
+                if (!can_place(type, site_x, site_y)) toast_advisor = TOAST_CUE_NO_BUILD;
+            }
         }
         return;
     }
@@ -6286,6 +6291,7 @@ start_build(int type)
     }
     if (!can_place(type, px, py)) {
 	toast(6);
+	toast_advisor = TOAST_CUE_NO_BUILD;
 	return;
     }
 #ifdef SC_DEFAULT_UI
@@ -6831,6 +6837,7 @@ choose_command(int choice)
     if (choice == MENU_STOP + 1 && race_z6_cloak_menu_available()) {
         int result=race_z6_cloak_toggle_selected();
         menu_open=0; mode=MODE_NORMAL;
+        if (result==SC64_Z5_CLOAK_DENIED_ENERGY) toast_advisor=TOAST_CUE_ENERGY;
         toast(result==SC64_Z5_CLOAK_ADVANCED ? 0 : 8); return;
     }
 #endif
@@ -6844,6 +6851,7 @@ choose_command(int choice)
         int result = race_z5_cloak_toggle_selected();
         menu_open = 0;
         mode = MODE_NORMAL;
+        if (result == SC64_Z5_CLOAK_DENIED_ENERGY) toast_advisor = TOAST_CUE_ENERGY;
         toast(result == SC64_Z5_CLOAK_ADVANCED ? 0 : 8);
         return;
     }
@@ -7339,6 +7347,7 @@ interact(void)
 #else
         toast(8);
 #endif
+        if (toast_id == 8) toast_advisor = TOAST_CUE_NO_LAND;
         mode = MODE_NORMAL; return;
     }
 #endif
@@ -7354,6 +7363,10 @@ interact(void)
 #ifdef SC64_Z6_STORM_ENABLED
         if (race_z6_active()) cast=race_z6_storm_cast_selected(cx,cy);
 #endif
+        if (!cast) for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].owner==SIDE && u[i].selected) {
+            if (u[i].carry < SC64_STORM_ENERGY_COST*SC64_STORM_ENERGY_ONE) toast_advisor=TOAST_CUE_ENERGY;
+            break;
+        }
         mode=MODE_NORMAL; toast(cast ? 0 : 8); return;
     }
 #endif
@@ -7375,6 +7388,9 @@ interact(void)
         if(target>=0) for(int i=0;i<MAX_UNITS;++i)
             if(u[i].alive && u[i].owner==SIDE && u[i].selected && sc64_race_raw_unit(u[i].type)==12)
                 issued+=race_bc_yamato_issue(i,target);
+        if(target>=0 && !issued) for(int i=0;i<MAX_UNITS;++i)
+            if(u[i].alive && u[i].owner==SIDE && u[i].selected && sc64_race_raw_unit(u[i].type)==12 &&
+               u[i].carry<150*256) {toast_advisor=TOAST_CUE_ENERGY;break;}
         mode=MODE_NORMAL;toast(issued?0:8);return;
     }
 #endif
@@ -14048,5 +14064,31 @@ static int sc64_battlecruiser_source_tick_due(void)
 #else
     return (unsigned)frame % 5u != 0u;
 #endif
+}
+#endif
+
+#ifdef SC64_RACES
+/* The player's finished tech for game_audio_tech(); bounded by the owner keys. */
+static int race_audio_research_count(void)
+{
+    int count = 0;
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    /* Most missions have no tech bits, so they skip this per-frame scan. */
+    if (sc64_battlecruiser_tech_bits) for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE) {
+        int key = sc64_battlecruiser_owner_key(race_mode, race_selected_mission, SIDE, b[i].raw_owner);
+        if (key >= 0) {
+            count += sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits, (unsigned)key, SC64_BC_TECH_YAMATO) +
+                     sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits, (unsigned)key, SC64_BC_TECH_REACTOR);
+            break;
+        }
+    }
+#endif
+#ifdef SC64_SHARED_TRANSPORT
+    count += race_skirmish_transport_tech.owner[sc64_sk_transport_owner_index(SIDE)].researched;
+#endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (race_z6_active()) count += race_z6.transport.researched;
+#endif
+    return count;
 }
 #endif
