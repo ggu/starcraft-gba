@@ -32,6 +32,9 @@ static int mirror_human, mirror_frame = -1;
  *    Queue appends are counted exactly: the queue head only ever moves
  *    forward by one per completed product, so appends = count change +
  *    head movement.
+ *  - A paid Interceptor order (a Carrier-class unit's queue count rising, or
+ *    a training child appearing as the count falls) costs the Interceptor's
+ *    rule-table price, read from actor storage like a queue append.
  *  - Mineral cargo that left a worker (delivered, or lost with the worker)
  *    bounds what the bank may gain in that update.
  *
@@ -46,11 +49,14 @@ typedef struct {
     int supply_bad, supply_over;         /* admissions beyond the supply cap */
     int model_errors;                    /* storage changes the audit cannot read */
     int made[256], done[256], made_n[256];
+    /* Carrier use: updates with an own Interceptor in flight, the most at
+     * once, and updates with an own shot in the projectile pool. */
+    int outside_updates, max_outside, fire_updates;
 } OwnerAudit;
 typedef struct { int alive, owner, type, x, y, hp, maxhp, progress, raw_type, constructing, head, count; } AuditBuilding;
 static struct { int on, ore_start; OwnerAudit o[5]; } ledger;
 static AuditBuilding audit_pre_b[MAX_BUILDINGS];
-static struct { int owner, carry; } audit_pre_u[MAX_UNITS];
+static struct { int owner, carry, parent, orders, interceptor; } audit_pre_u[MAX_UNITS];
 static int audit_pre_minerals[5], audit_pre_cap[5];
 
 static int audit_owners(int *ids)
@@ -121,6 +127,11 @@ static void audit_before(void)
     for (int i = 0; i < MAX_UNITS; ++i) {
         audit_pre_u[i].owner = u[i].owner;
         audit_pre_u[i].carry = audit_mineral_cargo(&u[i]);
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        audit_pre_u[i].parent = u[i].alive && sc64_p7_carrier_parent_type(u[i].type);
+        audit_pre_u[i].orders = audit_pre_u[i].parent ? u[i].carry : 0;
+        audit_pre_u[i].interceptor = u[i].alive && u[i].type == U_P7_INTERCEPTOR;
+#endif
     }
     for (int k = 0; k < n; ++k) {
         audit_pre_minerals[ids[k]] = race_owner_minerals(ids[k]);
@@ -190,6 +201,50 @@ static void audit_after(void)
         now = u[i].alive && u[i].owner == audit_pre_u[i].owner ? audit_mineral_cargo(&u[i]) : 0;
         if (now < was && audit_pre_u[i].owner < 5) vanish[audit_pre_u[i].owner] += was - now;
     }
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    {
+        int orders[5] = {0}, outside[5] = {0};
+        const Sc64RaceUnitRule *ir = sc64_race_unit_rule(U_P7_INTERCEPTOR);
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            const Unit *q = &u[i];
+            if (!q->alive || q->owner >= 5) continue;
+            if (audit_pre_u[i].parent && audit_pre_u[i].owner == q->owner &&
+                sc64_p7_carrier_parent_type(q->type)) orders[q->owner] += q->carry - audit_pre_u[i].orders;
+            if (q->type == U_P7_INTERCEPTOR) {
+                unsigned state = sc64_p7_carrier_child_state(q);
+                if (!audit_pre_u[i].interceptor && state == SC64_P7_INTERCEPTOR_TRAINING) ++orders[q->owner];
+                if (state == SC64_P7_INTERCEPTOR_OUTSIDE) ++outside[q->owner];
+            }
+        }
+        for (int k = 0; k < n; ++k) {
+            int o = ids[k];
+            if (orders[o] < 0 || (orders[o] && !ir)) { ++ledger.o[o].model_errors; continue; }
+            for (int j = 0; j < orders[o]; ++j) {
+                cost[o] += ir->minerals; cost_gas[o] += ir->gas;
+                audit_note(o, sc64_race_raw_unit(U_P7_INTERCEPTOR));
+            }
+            if (outside[o]) {
+                ++ledger.o[o].outside_updates;
+                if (outside[o] > ledger.o[o].max_outside) ledger.o[o].max_outside = outside[o];
+            }
+        }
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+        {
+            u8 id = sc64_pool_active_head(&race_p7_projectiles);
+            int shooting[5] = {0};
+            for (unsigned steps = 0; id != SC64_END && steps < SC64_POOL_CAPACITY; ++steps) {
+                Sc64ProjectileRow row;
+                int owner;
+                if (!sc64_pool_get_row(&race_p7_projectiles, id, &row)) break;
+                owner = race_protoss_source_owner(row.raw_source_owner);
+                if (owner >= 0 && owner < 5) shooting[owner] = 1;
+                id = row.next_link;
+            }
+            for (int k = 0; k < n; ++k) ledger.o[ids[k]].fire_updates += shooting[ids[k]];
+        }
+#endif
+    }
+#endif
     for (int k = 0; k < n; ++k) {
         int o = ids[k], income;
         OwnerAudit *a = &ledger.o[o];
@@ -481,7 +536,17 @@ static void print_audit(FILE *out)
         }
         fprintf(out, "}}");
     }
-    fprintf(out, "]}");
+    fprintf(out, "]");
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    fprintf(out, ",\"carrier\":[");
+    for (int k = 0; k < n; ++k) {
+        const OwnerAudit *a = &ledger.o[ids[k]];
+        fprintf(out, "%s{\"owner\":%d,\"outside_updates\":%d,\"max_outside\":%d,\"fire_updates\":%d}",
+                k ? "," : "", ids[k], a->outside_updates, a->max_outside, a->fire_updates);
+    }
+    fprintf(out, "]");
+#endif
+    fprintf(out, "}");
 }
 
 static void snapshot(FILE *out, const char *label)

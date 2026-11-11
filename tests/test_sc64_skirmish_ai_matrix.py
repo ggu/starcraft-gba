@@ -710,7 +710,7 @@ def engine_catalog(override=None):
     rows = []
     for raw, need in ai.PREREQS.items():
         race = ai.RACE_OF[raw]
-        is_unit = raw in (7, 0, 32, 2, 3, 5, 8, 41, 42, 37, 38, 43, 47, 64, 65, 66, 70)
+        is_unit = raw in (7, 0, 32, 2, 3, 5, 8, 41, 42, 37, 38, 43, 47, 64, 65, 66, 70, 72)
         need = sorted(need)
         row = {"raw": raw, "race": race, "kind": 4 if is_unit else 1, "producer_raw": 255, "parent_raw": 255,
                "prereq1": 255, "prereq2": 255}
@@ -903,6 +903,120 @@ class CatalogAndCases(unittest.TestCase):
             # The default asks for the showcase binary, which is absent here.
             with self.assertRaises(FileNotFoundError):
                 ai.main(["--build", str(build), "--output", str(out), "--kinds", "catalog"])
+
+
+class CarrierMatches(unittest.TestCase):
+    """A Protoss owner must build and use Carriers in the Carrier lobbies."""
+
+    def carrier_audit(self, made=None, use=None):
+        made = {"72": 1, "73": 4} if made is None else made
+        use = {"outside_updates": 40, "max_outside": 4, "fire_updates": 25} if use is None else use
+        return {"ore_start": 1000, "owners": [audit_row(0, 50), audit_row(1, 50, made_n=made)],
+                "carrier": [{"owner": 0, "outside_updates": 0, "max_outside": 0, "fire_updates": 0},
+                            {"owner": 1, **{"outside_updates": 0, "max_outside": 0, "fire_updates": 0, **use}}]}
+
+    def evaluate(self, **kw):
+        case = ("match-carrier", "protoss", 1, 2, "p", ai.MATCH_TICKS)
+        owners = [developed(0, 2), developed(1, 2)]
+        frames = list(range(1800, 1800 * 7, 1800))
+        text = "\n".join([snapshot("tick", f, owners) for f in frames] +
+                         [snapshot("final", frames[-1] + 1, owners, won=1, audit=self.carrier_audit(**kw))])
+        return ai.evaluate(case, 0, text, 1800)
+
+    def test_cases_exist_for_the_protoss_profile_only(self):
+        cases = [c for c in ai.cases(36000) if c[0] == "match-carrier"]
+        self.assertEqual({c[1] for c in cases}, {"protoss"})
+        self.assertEqual(len(cases), len(ai.CARRIER_LOBBIES))
+        for map_id, human, bots in ai.CARRIER_LOBBIES:
+            self.assertIn(("match-carrier", "protoss", map_id, ai.RACES.index(human), bots, ai.MATCH_TICKS), cases)
+        # Every lobby has a Protoss opponent or human, the long mirrored match the case needs.
+        self.assertTrue(all("p" in h + b for _, h, b in ai.CARRIER_LOBBIES))
+        # Economy-only runs skip nothing here: it is a match like the others.
+        self.assertTrue(any(c[0] == "match-carrier" for c in ai.cases(36000, "economy")))
+
+    def test_run_case_plays_it_as_a_mirrored_match(self):
+        seen = []
+
+        class Done:
+            returncode, stdout, stderr = 0, "", ""
+
+        real = ai.subprocess.run
+        ai.subprocess.run = lambda argv, **kw: seen.append((argv, kw.get("timeout"))) or Done()
+        try:
+            ai.run_case(Path("build"), ("match-carrier", "protoss", 1, 0, "pt", ai.MATCH_TICKS), 600)
+        finally:
+            ai.subprocess.run = real
+        argv, timeout = seen[0]
+        self.assertEqual(argv[1:], ["--map", "1", "--human", "t", "--bots", "pt", "--mirror", "--ticks",
+                                    str(ai.MATCH_TICKS), "--every", "1800"])
+        self.assertEqual(timeout, 3600)
+
+    def test_use_is_judged_from_the_audit_and_the_carrier_record(self):
+        result = self.evaluate()
+        self.assertTrue(result["ok"], result)
+        self.assertTrue(result["checks"]["carriers"])
+        self.assertEqual(result["carrier"][1]["carriers"], 1)
+        self.assertEqual(result["carrier"][1]["interceptor_orders"], 4)
+        # Each piece of evidence is required: a Carrier, an Interceptor order, flight and fire.
+        for kw in (dict(made={"73": 4}), dict(made={"72": 1}), dict(made={}),
+                   dict(use={"outside_updates": 0}), dict(use={"fire_updates": 0})):
+            failed = self.evaluate(**kw)
+            self.assertFalse(failed["ok"], kw)
+            self.assertEqual([k for k, v in failed["checks"].items() if not v], ["carriers"], kw)
+        self.assertRaisesRegex(ai.RecordError, "harness exit", ai.evaluate,
+                               ("match-carrier", "protoss", 1, 2, "p", ai.MATCH_TICKS), 1, "", 1800)
+
+    def test_other_races_do_not_count_and_the_other_checks_still_apply(self):
+        owners = [developed(0, 2), developed(1, 0)]
+        frames = list(range(1800, 1800 * 7, 1800))
+        audit = self.carrier_audit()
+        text = "\n".join([snapshot("tick", f, owners) for f in frames] +
+                         [snapshot("final", frames[-1] + 1, owners, won=1, audit=audit)])
+        result = ai.evaluate(("match-carrier", "protoss", 1, 2, "t", ai.MATCH_TICKS), 0, text, 1800)
+        self.assertFalse(result["ok"])
+        self.assertEqual(sorted(result["carrier"]), [0])
+        # A match that fails an ordinary criterion fails even with Carriers in use.
+        paid = self.carrier_audit()
+        paid["owners"][1]["low"] = 3
+        paid["owners"][1]["first_bad"] = 900
+        owners = [developed(0, 2), developed(1, 2)]
+        text = "\n".join([snapshot("tick", f, owners) for f in frames] +
+                         [snapshot("final", frames[-1] + 1, owners, won=1, audit=paid)])
+        result = ai.evaluate(("match-carrier", "protoss", 1, 2, "p", ai.MATCH_TICKS), 0, text, 1800)
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["checks"]["carriers"])
+        self.assertFalse(result["checks"]["audit"])
+
+    def test_carrier_use_record_is_validated_strictly(self):
+        def run(edit):
+            records = [json.loads(t) for t in lines()]
+            records[-1]["audit"]["carrier"] = [
+                {"owner": 0, "outside_updates": 0, "max_outside": 0, "fire_updates": 0},
+                {"owner": 1, "outside_updates": 0, "max_outside": 0, "fire_updates": 0}]
+            edit(records[-1]["audit"]["carrier"])
+            return ai.validate_run([json.dumps(r) for r in records], 0, [1], 1800, 3600)
+        self.assertEqual(run(lambda rows: None)[-1]["audit"]["carrier"][1]["owner"], 1)
+        with self.assertRaisesRegex(ai.RecordError, "carrier use list"):
+            run(lambda rows: rows.pop())
+        with self.assertRaisesRegex(ai.RecordError, "carrier use owner"):
+            run(lambda rows: rows[1].update(owner=3))
+        with self.assertRaisesRegex(ai.RecordError, "malformed"):
+            run(lambda rows: rows[0].pop("fire_updates"))
+        with self.assertRaisesRegex(ai.RecordError, "malformed"):
+            run(lambda rows: rows[0].update(extra=1))
+        with self.assertRaisesRegex(ai.RecordError, "integer"):
+            run(lambda rows: rows[0].update(max_outside=-1))
+
+    def test_carrier_and_fleet_beacon_prerequisites_are_in_the_table(self):
+        self.assertEqual(ai.PREREQS[ai.CARRIER], {167, 169})
+        self.assertEqual(ai.PREREQS[169], {167})
+        self.assertIn(ai.CARRIER, ai.POWERED)
+        self.assertIn(169, ai.TECH[2])
+        # A Carrier with no Fleet Beacon is a prerequisite violation.
+        recs = match(human=2, bots=(2,), edit=lambda recs: [
+            (r["owners"][1]["unit_raw"].__setitem__(72, 1), r["owners"][1]["first_made"].__setitem__(72, 300))
+            for r in recs])
+        self.assertTrue(any("kind 72" in v and "without 169" in v for v in ai.prerequisite_violations(recs)))
 
 
 if __name__ == "__main__":
