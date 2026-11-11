@@ -146,6 +146,7 @@ static inline int sc64_pr_stage_shield_armor(int target)
     if (!SC64_PR_ANY_LEVEL) return 0;
     return sc64_pr_stage_shield_armor_slow(target);
 }
+static int sc64_pr_stage_dragoon_bonus_slow(const Unit *q);
 static inline int sc64_pr_stage_dragoon_bonus(const Unit *q)
 {
     if (q->type!=U_DRAGOON || !SC64_PR_ANY_LEVEL) return 0;
