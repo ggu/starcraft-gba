@@ -1,4 +1,7 @@
 #include "gba.h"
+#ifdef SC64_SOFT_FOG
+#include "gba_fog_palette.h"
+#endif
 #include "audio_mixer.h"
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
 #include "gba_present.h"
@@ -343,6 +346,26 @@ void gfx_set_palette(int first,int count,const u16 *rgb555) {
  if(gfx_tile_on)gfx_tile_palette_sync();
 #endif
 }
+#ifdef SC64_SOFT_FOG
+/* Palette changes are rare. Build once from the installed LCD/UI colors;
+ * live fog drawing only performs a byte lookup. VRAM accepts halfword
+ * writes, so stage the map on the stack and commit pairs explicitly. */
+void gfx_fog_palette_prepare(volatile u16 *destination128)
+{
+ u16 palette[256];
+ u8 lookup[256];
+ if(!destination128||((uintptr_t)destination128&1u))return;
+ for(unsigned i=0;i<256;i++) {
+#ifdef GBA_HOST
+  palette[i]=host_palette[i];
+#else
+  palette[i]=((volatile const u16*)0x05000000)[i];
+#endif
+ }
+ gba_fog_palette_make(palette,lookup);
+ for(unsigned i=0;i<128;i++)destination128[i]=(u16)(lookup[2*i]|((u16)lookup[2*i+1]<<8));
+}
+#endif
 u32 gba_clock(void){
 #ifdef GBA_HOST
 return 0;
@@ -704,6 +727,31 @@ HOT_MODE4 void gfx_blit16(int x,int y,const u8 *src) {
   }
  }
 }
+#ifdef SC64_SOFT_FOG
+/* Rows [row0,row1) of a 16x16 opaque cell at (x,y), ignoring the scene clip:
+ * the caller has already clipped to the rows it may draw. Word stores when the
+ * destination and source allow, as gfx_blit16 does, but in ROM. */
+void gfx_blit16_rows(int x,int y,const u8 *src,int row0,int row1) {
+ if(!src||x>=240||x<=-16||row0<0||row1>16||row0>=row1||y+row0<0||y+row1>160)return;
+ GFX_TILE_TOUCH(x,y+row0,x+16,y+row1);
+ if(x>=0&&x<=224&&!(x&3)&&!((uintptr_t)src&3)) {
+  for(int row=row0;row<row1;row++) {
+   const u32 *s=(const u32*)(src+row*16);
+   volatile u32 *d=(volatile u32*)(pixels+(y+row)*120+x/2);
+   d[0]=s[0];d[1]=s[1];d[2]=s[2];d[3]=s[3];
+  }
+ } else {
+  int left=x<0?-x:0,right=x+16>240?240-x:16;
+  for(int row=row0;row<row1;row++) {
+   int col=left;
+   volatile u16 *d=pixels+(y+row)*120+((x+col)>>1);
+   if((x+col)&1){*d=(*d&255)|((u16)src[row*16+col]<<8);d++;col++;}
+   for(;col+1<right;col+=2)*d++=src[row*16+col]|((u16)src[row*16+col+1]<<8);
+   if(col<right)*d=(*d&0xff00)|src[row*16+col];
+  }
+ }
+}
+#endif
 HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
  if(!src||width<=0||height<=0||width>256||height>256||x>=240||x+width<=0)return;
 #ifdef GBA_SCENE_CLIP
