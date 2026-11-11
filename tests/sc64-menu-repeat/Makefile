@@ -12,9 +12,9 @@ SC64_MENU_HOST_SOURCES = common/gba.c $(sort $(filter-out starcraft/game.c,$(STA
 SC64_MENU_HOST_FLAGS = -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(SC64_MENU_P10_EXTRA_FLAGS)
 
 build/field-menu-repeat-p10.o: tests/field_menu_card_p10.c $(wildcard starcraft/*.h) $(SOURCE_WEAPON_INPUTS) build/walk-pair-verified common/gba.h | build
-	$(CLANG) $(SC64_MENU_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+	$(CLANG) $(SC64_MENU_HOST_FLAGS) $(PROTOSS_P10_BASE_FLAGS) -MMD -MP -MF $(@:.o=.d) -c $< -o $@
 build/test-field-menu-repeat-p10: build/field-menu-repeat-p10.o $(SC64_MENU_HOST_SOURCES) | build
-	$(CLANG) $(SC64_MENU_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $^ -o $@
+	$(CLANG) $(SC64_MENU_HOST_FLAGS) $(PROTOSS_P10_BASE_FLAGS) $^ -o $@
 .PHONY: test-field-menu-repeat-p10
 test-field-menu-repeat-p10: build/test-field-menu-repeat-p10
 	./build/test-field-menu-repeat-p10

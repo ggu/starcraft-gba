@@ -16,7 +16,7 @@ combined-journal-zerg:
 	$(CLANG) $(COMBINED_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_egg_combined_journal.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/combined-journal-zerg
 	$(COMBINED_BIN_DIR)/combined-journal-zerg
 combined-journal-protoss:
-	$(CLANG) $(COMBINED_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(COMBINED_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_guardian_egg_combined_journal.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/combined-journal-protoss
+	$(CLANG) $(COMBINED_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(COMBINED_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_guardian_egg_combined_journal.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/combined-journal-protoss
 	$(COMBINED_BIN_DIR)/combined-journal-protoss
 combined-journal-showcase:
 	$(CLANG) $(COMBINED_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_egg_combined_journal.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/combined-journal-showcase
