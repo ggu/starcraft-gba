@@ -35,9 +35,12 @@
 /* Protoss opponents add Carriers when the product exists in this build: the
  * same Stargate product, Interceptor orders and flight service the human uses
  * (sc64_p7_carrier_training.h). Other products compile none of it. */
+/* -DRACE_AI_NO_CARRIERS keeps the Carrier service but gives the planner none of
+ * this, to separate the cost of the engine change from that of the new play. */
 #if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && \
     defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
-    defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_P7_ACTORS)
+    defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_P7_ACTORS) && \
+    !defined(RACE_AI_NO_CARRIERS)
 #define RACE_AI_CARRIERS 1
 #ifndef SC64_P7_INTERCEPTOR_COST
 #define SC64_P7_INTERCEPTOR_COST 25     /* must match sc64_p7_carrier_training.h */
