@@ -39,7 +39,7 @@ OWNER_FIELDS = ("owner", "race", "minerals", "gas", "supply", "cap", "workers", 
                 "trainable")
 OWNER_MAPS = ("unit_raw", "building_raw", "first_made", "first_complete")
 # Structures beyond the first producer and supply that show tech progress.
-TECH = {0: {112, 113, 114, 120, 122, 123}, 1: {132, 135, 139, 141, 144, 146}, 2: {162, 164, 166, 167, 169}}
+TECH = {0: {112, 113, 114, 120, 122, 123}, 1: {132, 135, 139, 141, 144, 146}, 2: {155, 162, 164, 166, 167, 169, 171}}
 WORKERS = {0: 7, 1: 41, 2: 64}
 OFFENSIVE_FRAME = 10800
 # Full-match cases: the harness cap and the snapshot spacing the thresholds
@@ -72,16 +72,17 @@ PREREQS = {
     131: set(), 132: {131, 142}, 135: {142}, 139: {131}, 141: {132}, 142: {131}, 143: {131},
     144: {143, 139}, 146: {143, 142}, 149: set(),
     # Protoss.
-    64: {154}, 65: {160}, 66: {160, 164}, 70: {167}, 72: {167, 169},
+    64: {154}, 65: {160}, 66: {160, 164}, 70: {167}, 72: {167, 169}, 83: {155, 171},
     154: set(), 156: set(), 157: set(), 160: {154}, 162: {166}, 164: {160}, 166: {154}, 167: {164}, 169: {167},
+    155: {164}, 171: {155},
 }
 # Protoss structures, and the units their producers train, also need a
 # completed Pylon (the psi field itself is a position and is not checked).
-POWERED = {160, 162, 164, 166, 167, 169, 65, 66, 70, 72}
+POWERED = {155, 160, 162, 164, 166, 167, 169, 171, 65, 66, 70, 72, 83}
 PYLON = 156
 RACE_OF = {**{r: 0 for r in (7, 0, 32, 2, 3, 5, 8, 106, 109, 110, 111, 112, 113, 114, 120, 122, 123, 124)},
            **{r: 1 for r in (41, 42, 37, 38, 43, 47, 131, 132, 135, 139, 141, 142, 143, 144, 146, 149)},
-           **{r: 2 for r in (64, 65, 66, 70, 72, 154, 156, 157, 160, 162, 164, 166, 167, 169)}}
+           **{r: 2 for r in (64, 65, 66, 70, 72, 83, 154, 155, 156, 157, 160, 162, 164, 166, 167, 169, 171)}}
 
 
 class RecordError(ValueError):
@@ -164,7 +165,7 @@ AUDIT_FIELDS = ("owner", "start", "spent", "spent_gas", "income", "vanished", "l
 
 def validate_audit(audit, owners):
     """The spending audit that closes a run; owners is [(id, race)]."""
-    if type(audit) is not dict or set(audit) not in ({"ore_start", "owners"}, {"ore_start", "owners", "carrier"}):
+    if type(audit) is not dict or set(audit) - {"carrier", "reaver"} != {"ore_start", "owners"}:
         raise RecordError("final record lacks a well-formed audit")
     out = {"ore_start": _int(audit["ore_start"], "ore_start", 0, 1 << 24), "owners": []}
     rows = audit["owners"]
@@ -181,6 +182,29 @@ def validate_audit(audit, owners):
         out["owners"].append({**row, "made_n": _counts(row["made_n"], "made_n", False)})
     if "carrier" in audit:
         out["carrier"] = validate_carrier_use(audit["carrier"], owners)
+    if "reaver" in audit:
+        out["reaver"] = validate_reaver_use(audit["reaver"], owners)
+    return out
+
+
+REAVER_FIELDS = ("owner", "scarab_updates", "max_scarabs")
+
+
+def validate_reaver_use(rows, owners):
+    """Per owner, how the paid Scarab service was used: updates with an own
+    Scarab in flight and the most in flight at once. Only the profile that
+    compiles the service emits it."""
+    if type(rows) is not list or len(rows) != len(owners):
+        raise RecordError("reaver use list does not match the lobby")
+    out = []
+    for row, (owner, _) in zip(rows, owners):
+        if type(row) is not dict or set(row) != set(REAVER_FIELDS):
+            raise RecordError("reaver use row is malformed")
+        if row["owner"] != owner:
+            raise RecordError(f"reaver use owner {row['owner']} != {owner}")
+        for f in REAVER_FIELDS:
+            _int(row[f], f, 0, 1 << 30)
+        out.append(dict(row))
     return out
 
 
@@ -444,6 +468,27 @@ def carrier_evidence(records):
                                 "outside_updates": mine.get("outside_updates", 0),
                                 "fire_updates": mine.get("fire_updates", 0),
                                 "used": bool(made and orders and mine.get("outside_updates") and mine.get("fire_updates"))}
+    return {"ok": any(v["used"] for v in owners.values()), "owners": owners}
+
+
+def reaver_evidence(records):
+    """Whether a Protoss owner of a finished match used Reavers: it made at
+    least one (a Robotics Facility and a Support Bay stood and the Reaver was
+    paid for like any unit), ordered at least one Scarab through the shared
+    service (a made-count of raw 85 in the spending audit, each one charged
+    the rule-table price) and had a Scarab in flight."""
+    audit = records[-1]["audit"]
+    use = {row["owner"]: row for row in audit.get("reaver", [])}
+    owners = {}
+    for row, snapshot in zip(audit["owners"], records[-1]["owners"]):
+        if snapshot["race"] != 2:
+            continue
+        mine = use.get(row["owner"], {})
+        made, orders = row["made_n"].get(REAVER, 0), row["made_n"].get(SCARAB, 0)
+        owners[row["owner"]] = {"reavers": made, "scarab_orders": orders,
+                                "scarab_updates": mine.get("scarab_updates", 0),
+                                "max_scarabs": mine.get("max_scarabs", 0),
+                                "used": bool(made and orders and mine.get("scarab_updates"))}
     return {"ok": any(v["used"] for v in owners.values()), "owners": owners}
 
 
@@ -782,6 +827,12 @@ MATCH_EXTRA = {"terran": ((1, "p", "pp"),), "protoss": ((1, "p", "pp"),)}
 CARRIER_LOBBIES = ((0, "p", "pp"), (1, "t", "pt"), (1, "p", "pp"), (0, "z", "zpt"))
 CARRIER = 72
 INTERCEPTOR = 73
+# The same for Reavers: the planner's Robotics Facility and Support Bay, a
+# Reaver paid like any unit, its Scarabs ordered through the human's command
+# and fired. The lobbies are those of the sweep in which an owner did.
+REAVER_LOBBIES = ((0, "p", "pp"), (1, "p", "pp"), (0, "t", "pt"), (1, "z", "zpt"))
+REAVER = 83
+SCARAB = 85
 # A lobby that ends with nothing left in the world that can act, by profile:
 # four owners on the small map with every field mined out. Which lobbies end
 # this way shifts with any planner change; when this one starts to resolve,
@@ -838,6 +889,8 @@ def cases(ticks, criteria="development"):
         if profile == "protoss":
             for map_id, human, bots in CARRIER_LOBBIES:
                 out.append(("match-carrier", profile, map_id, RACES.index(human), bots, MATCH_TICKS))
+            for map_id, human, bots in REAVER_LOBBIES:
+                out.append(("match-reaver", profile, map_id, RACES.index(human), bots, MATCH_TICKS))
     if criteria == "development":
         for profile in PROFILES:
             out.append(("catalog", profile, 1, 0, "t", 0))
@@ -903,7 +956,7 @@ def run_case(build: Path, case, every):
         argv += ["--builder", str(arg)]
     elif kind == "workers":
         argv += ["--workers", str(arg)]
-    elif kind in ("match", "match-draw", "match-carrier"):
+    elif kind in ("match", "match-draw", "match-carrier", "match-reaver"):
         argv += ["--mirror", "--ticks", str(arg), "--every", str(MATCH_EVERY)]
     elif kind == "catalog":
         argv = [str(binary), "--audit"]
@@ -920,7 +973,7 @@ def run_case(build: Path, case, every):
     else:
         argv += ["--recovery", str(arg)]
     proc = subprocess.run(argv, capture_output=True, text=True,
-                          timeout=3600 if kind in ("match", "match-draw", "match-carrier") else 900)
+                          timeout=3600 if kind in ("match", "match-draw", "match-carrier", "match-reaver") else 900)
     return case, argv, proc.returncode, proc.stdout, sanitizer_report(proc.stderr) + proc.stderr[-2000:]
 
 
@@ -954,6 +1007,14 @@ def evaluate(case, returncode, stdout, every, criteria="development"):
         evidence = carrier_evidence(records)
         result["checks"]["carriers"] = evidence["ok"]
         return {"ok": result.pop("ok") and evidence["ok"], "carrier": evidence["owners"], **result}
+    if kind == "match-reaver":
+        if returncode != 0:
+            raise RecordError(f"harness exit {returncode}")
+        records = validate_run(lines, human, bot_races, MATCH_EVERY, arg)
+        result = match_checks(records)
+        evidence = reaver_evidence(records)
+        result["checks"]["reavers"] = evidence["ok"]
+        return {"ok": result.pop("ok") and evidence["ok"], "reaver": evidence["owners"], **result}
     if kind == "catalog":
         if returncode != 0:
             raise RecordError(f"harness exit {returncode}")

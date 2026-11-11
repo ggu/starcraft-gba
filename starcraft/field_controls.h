@@ -559,7 +559,7 @@ ui_source_icon_for_row(int i, int kind, int type)
         return race_late_airborne(selected_building) ? SC64_ICON_LAND : SC64_ICON_LIFT;
 #endif
     if (ui_same(label, "BUILD INTERCEPTOR")) return 73;
-#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+#if defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) || defined(SC64_PAID_SCARAB)
     if (ui_same(label, "BUILD SCARAB")) return 85;
 #endif
     if (ui_same(label, "CANCEL EGG")) return 36;

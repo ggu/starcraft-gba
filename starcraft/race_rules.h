@@ -132,7 +132,7 @@ enum {
     /* P10 source raw 82, the Gantrithor hero Carrier. Appended likewise. */
     U_P10_GANTRITHOR,
 #endif
-#ifdef SC64_SCARAB_RUNTIME
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_PAID_SCARAB)
     /* Appended identity only: production and lifecycle are separate services. */
     U_SCARAB,
 #endif
@@ -397,7 +397,7 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     },
     [U_HUNTER_KILLER] = { R_ZERG, 0, B_HATCHERY, 0, 150, 50, 780, 160, 0, SC_PR_HYDRALISK_DEN },
     [U_REAVER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 8, 200, 100, 1050, 100, 80, 0 },
-#ifdef SC64_SCARAB_RUNTIME
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_PAID_SCARAB)
     [U_SCARAB] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 0, 15, 0, 105, 20, 10, 0 },
 #endif
     [U_FENIX_DRAGOON] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 0, 300, 100, 1500, 240, 240, 0 },
@@ -864,7 +864,7 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_P10_DATA_ENABLED
         ,[U_P10_GANTRITHOR] = "GANTRITHOR"
 #endif
-#ifdef SC64_SCARAB_RUNTIME
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_PAID_SCARAB)
         ,[U_SCARAB] = "SCARAB"
 #endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
@@ -1757,7 +1757,7 @@ static inline int sc64_race_raw_unit(int type)
     case U_PROBE: return 64; case U_ZEALOT: return 65; case U_DRAGOON: return 66;
     case U_SCOUT: return 70; case U_FENIX: return 77; case U_FENIX_DRAGOON: return 78;
     case U_TASSADAR: return 79; case U_REAVER: return 83; case U_GOLIATH: return 3;
-#ifdef SC64_SCARAB_RUNTIME
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_PAID_SCARAB)
     case U_SCARAB: return 85;
 #endif
     case U_TANK: return 5; case U_SIEGE_TANK: return 30;
@@ -2026,7 +2026,7 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 64: return U_PROBE; case 65: return U_ZEALOT; case 66: return U_DRAGOON;
     case 70: return U_SCOUT; case 77: return U_FENIX;
     case 78: return U_FENIX_DRAGOON; case 83: return U_REAVER;
-#ifdef SC64_SCARAB_RUNTIME
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_PAID_SCARAB)
     case 85: return U_SCARAB;
 #endif
     case 79: return U_TASSADAR;

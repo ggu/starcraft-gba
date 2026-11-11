@@ -47,6 +47,14 @@
 #endif
 #endif
 
+/* Protoss opponents also build a Robotics Facility, a Support Bay and Reavers,
+ * and buy their Scarabs through the command the human uses
+ * (sc64_paid_scarab.h). -DRACE_AI_NO_REAVERS keeps the service but not the play. */
+#if defined(SC64_PAID_SCARAB) && !defined(RACE_AI_NO_REAVERS)
+#define RACE_AI_REAVERS 1
+#define SC64_PSC_PRICE_FOR_AI 15        /* must match the U_SCARAB rule row */
+#endif
+
 enum {
     RACE_AI_PHASE = 16,                 /* frames between two bots' passes */
     RACE_AI_PERIOD = 48,                /* frames between one bot's passes */
@@ -65,6 +73,13 @@ enum {
     RACE_AI_HOME_PYLON_RANGE = 256,
     RACE_AI_WORKER_FLOOR = 4,
     RACE_AI_FLOAT_MINERALS = 400
+#ifdef RACE_AI_REAVERS
+    ,
+    /* At most three Reavers, one more only once the ground line numbers
+     * three per Reaver it would then have. */
+    RACE_AI_REAVER_CAP = 3,
+    RACE_AI_REAVER_LINE = 3
+#endif
 #ifdef RACE_AI_CARRIERS
     ,
     /* At most four Carriers, and one more only once the ground line (Zealots
@@ -91,6 +106,9 @@ enum {
 #ifdef RACE_AI_CARRIERS
     AK_CARRIER, AK_FLEET,
 #endif
+#ifdef RACE_AI_REAVERS
+    AK_REAVER, AK_ROBOTICS, AK_BAY,
+#endif
     AK_COUNT
 };
 
@@ -113,6 +131,9 @@ static const unsigned char race_ai_raw_key[256] = {
     [162] = AK_CANNON + 1, [167] = AK_STARGATE + 1,
 #ifdef RACE_AI_CARRIERS
     [72] = AK_CARRIER + 1, [169] = AK_FLEET + 1,
+#endif
+#ifdef RACE_AI_REAVERS
+    [83] = AK_REAVER + 1, [155] = AK_ROBOTICS + 1, [171] = AK_BAY + 1,
 #endif
 };
 
@@ -268,6 +289,9 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
     for (i = 0; i < MAX_UNITS; ++i) {
         const Unit *q = &u[i];
         if (!q->alive) continue;
+#ifdef RACE_AI_REAVERS
+        if (q->type == U_SCARAB) continue; /* ammunition in flight is not army */
+#endif
         if (SC64_TRANSPORT_LOADED(q)) {
             /* Loaded passengers still count against supply. */
             if (q->owner == owner) {
@@ -906,6 +930,10 @@ static const RaceAiStep race_ai_protoss_plan[] = {
 #ifdef RACE_AI_CARRIERS
     { RACE_AI_STEP_BUILD, 169, 1, 16, RACE_AI_IF_RICH }, /* Fleet Beacon: Carriers */
 #endif
+#ifdef RACE_AI_REAVERS
+    { RACE_AI_STEP_BUILD, 155, 1, 16, RACE_AI_IF_RICH }, /* Robotics Facility */
+    { RACE_AI_STEP_BUILD, 171, 1, 16, RACE_AI_IF_RICH }, /* Support Bay: Reavers */
+#endif
     { RACE_AI_STEP_BUILD, 166, 1, 16, RACE_AI_IF_LATE },
     { RACE_AI_STEP_DEFENSE, 162, 1, 16, RACE_AI_IF_LATE },
     { RACE_AI_STEP_BUILD, 160, 4, 16, RACE_AI_IF_RICH },
@@ -1166,6 +1194,31 @@ static int race_ai_save_for_carrier(RaceAiCensus *c)
 }
 #endif
 
+#ifdef RACE_AI_REAVERS
+/* A Reaver is due when a Support Bay stands, the cap and the ground-line
+ * ratio allow one more and the owner's unit share has room for it. */
+static int race_ai_reaver_wanted(const RaceAiCensus *c)
+{
+    int reavers = race_ai_count(c, AK_REAVER);
+    return c->have[AK_BAY] && reavers < RACE_AI_REAVER_CAP &&
+           race_ai_count(c, AK_ZEALOT) + race_ai_count(c, AK_DRAGOON) >=
+               (reavers + 1) * RACE_AI_REAVER_LINE &&
+           c->units + c->queued_units + 1 <= race_ai_unit_cap();
+}
+
+/* One Scarab order for each of this owner's Reavers, paid from the owner's
+ * bank by the service the human's command uses; it enforces the capacity and
+ * the queue. Money held for a structure or another purchase is respected. */
+static void race_ai_stock_reavers(const RaceAiCensus *c)
+{
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || u[i].owner != c->owner || u[i].type != U_REAVER) continue;
+        if (race_owner_minerals(c->owner) - c->reserve_minerals < SC64_PSC_PRICE_FOR_AI) return;
+        (void)race_paid_scarab_queue_owner(i);
+    }
+}
+#endif
+
 static int race_ai_pick_protoss(RaceAiCensus *c, int producer)
 {
     int zealots = race_ai_count(c, AK_ZEALOT), dragoons = race_ai_count(c, AK_DRAGOON);
@@ -1173,6 +1226,9 @@ static int race_ai_pick_protoss(RaceAiCensus *c, int producer)
     if (b[producer].type == B_STARGATE && race_ai_carrier_wanted(c)) return 72;
 #endif
     if (b[producer].type == B_STARGATE) return 70;
+#ifdef RACE_AI_REAVERS
+    if (b[producer].type == B_ROBOTICS_FACILITY && race_ai_reaver_wanted(c)) return 83;
+#endif
     if (b[producer].type != B_GATEWAY) return -1;
     if (c->have[AK_CORE] && (c->enemy_air || dragoons <= zealots) &&
         race_owner_gas(c->owner) - c->reserve_gas >= 50) return 66;
@@ -1235,6 +1291,9 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
 #ifdef RACE_AI_CARRIERS
     race_ai_stock_hangars(c);
     carrier_reserve = race_ai_save_for_carrier(c);
+#endif
+#ifdef RACE_AI_REAVERS
+    race_ai_stock_reavers(c);
 #endif
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         int raw;

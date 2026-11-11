@@ -229,6 +229,9 @@ static int race_p7_carrier_training_candidate_valid(const Unit *actors,
     unsigned char rank_bits[MAX_UNITS];
     if (!actors || count < 0 || count > MAX_UNITS) return 0;
     for (int i = 0; i < MAX_UNITS; ++i) rank_bits[i] = 0;
+#ifdef SC64_PAID_SCARAB
+    if (!race_paid_scarab_candidate_valid(actors, count)) return 0;
+#endif
     for (int i = 0; i < count; ++i) {
         const Unit *q = &actors[i];
         unsigned state;
@@ -341,7 +344,12 @@ static int race_p7_carrier_training_can_queue(int carrier)
 
 static int race_p7_carrier_training_menu_available(void)
 {
+#ifdef SC64_PAID_SCARAB
+    /* The same contextual command buys a Scarab for a selected Reaver. */
+    return race_p7_carrier_training_selected() || race_paid_scarab_menu_available();
+#else
     return race_p7_carrier_training_selected();
+#endif
 }
 
 /* The user's command handler should call this only for a selected SIDE
@@ -371,6 +379,9 @@ static int race_p7_carrier_training_queue_selected(void)
     int queued = 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].selected && race_p7_carrier_training_queue(i)) ++queued;
+#ifdef SC64_PAID_SCARAB
+    queued += race_paid_scarab_queue_selected();
+#endif
     return queued;
 }
 

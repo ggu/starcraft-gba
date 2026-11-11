@@ -66,7 +66,7 @@ card_icon(int i)
     ui_row_kind(i, &type);
     if (type >= 0) return card_building_icon(type);
     label = race_menu_label(i);
-#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+#if defined(SC64_SCARAB_HUMAN_CONTROL_PROBE) || defined(SC64_PAID_SCARAB)
     if (ui_same(label, "BUILD SCARAB")) return card_portrait(85);
 #endif
     for (k = 0; k < sizeof specials / sizeof specials[0]; k++)

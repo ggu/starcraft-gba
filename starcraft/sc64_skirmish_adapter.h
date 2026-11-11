@@ -109,13 +109,16 @@ static int race_skirmish_product_admitted(int owner, int producer,
     ur = sc64_race_unit_rule(type);
     /* Campaign-only actors with no ordinary producer are not silently made
      * into working skirmish units by exposing their names in a menu. */
-    /* Reaver requires a Scarab ammunition lifecycle; the generic weapon
-     * path alone is not an implementation of its ordinary product. */
+    /* Reaver requires a Scarab ammunition lifecycle (SC64_PAID_SCARAB); the
+     * generic weapon path alone is not an implementation of its product. */
 #ifndef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
     /* Production remains unavailable until its service is complete. */
     if (r->raw_id == 12) return 0;
 #endif
-    if (r->raw_id == 83 || !ur || race_skirmish_product_producer(type) == 255) return 0;
+#ifndef SC64_PAID_SCARAB
+    if (r->raw_id == 83) return 0;
+#endif
+    if (!ur || race_skirmish_product_producer(type) == 255) return 0;
     producer_raw = sc64_race_raw_building(b[producer].type);
     if (r->producer_raw == 35) {
         if (!sc64_race_is_zerg_townhall(b[producer].type)) return 0;

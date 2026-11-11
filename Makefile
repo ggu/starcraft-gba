@@ -2057,6 +2057,7 @@ sc64-p8-arm-replay: build/StarCraft-Protoss-P8-Replay.gba build/StarCraft-Protos
 # Explicit P10 candidate, in its own fragment: this file is at the source
 # check's 512 KiB limit. Optional, so make fixtures that copy only this file
 # still parse it.
+-include mk/paid-scarab/Makefile
 -include mk/protoss-p10/Makefile
 -include mk/carrier-gantrithor/Makefile
 
@@ -5454,7 +5455,8 @@ test-shared-builders: $(addprefix build/test-shared-builder-,terran zerg protoss
 SKIRMISH_CONTROLLER_EXTRA_INPUTS = $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS))
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,CANONICAL_ZERG_PROFILE_FLAGS,CANONICAL_ZERG_PROFILE_INPUTS))
-$(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
+# The Protoss profile is the shipped P10 product (research, Carriers, paid Scarabs).
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,PROTOSS_P10_FLAGS,PROTOSS_P10_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
 
 # Long-horizon AI economy/tech/army progression and SRAM continuation in the
 # canonical race runtimes. Inputs are ordinary controller ticks. Variable
@@ -5466,7 +5468,7 @@ endef
 $(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
 $(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,zerg,CANONICAL_ZERG_PROFILE_FLAGS,CANONICAL_ZERG_PROFILE_INPUTS,))
 SKIRMISH_AI_PROTOSS_SOURCES = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
-$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,SKIRMISH_AI_PROTOSS_SOURCES))
+$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,protoss,PROTOSS_P10_FLAGS,PROTOSS_P10_INPUTS,SKIRMISH_AI_PROTOSS_SOURCES))
 SKIRMISH_AI_SHOWCASE_INPUTS = $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS)
 $(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,showcase,SHOWCASE_FLAGS,SKIRMISH_AI_SHOWCASE_INPUTS,))
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,showcase,SHOWCASE_FLAGS,SKIRMISH_AI_SHOWCASE_INPUTS,))
