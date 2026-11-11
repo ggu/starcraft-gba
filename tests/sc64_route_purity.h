@@ -42,6 +42,30 @@ static const RoutePureRegion route_pure_regions[] = {
 #else
     RP_REGION(sc64_route_field),
 #endif
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    /* Donor bookkeeping: logical->physical table, per-physical flags, log
+     * counts, owner, goal and stamp, and the donor clock. */
+    RP_REGION(sc64_route_lphys),
+    RP_REGION(sc64_route_pcount),
+    RP_REGION(sc64_route_pf_flags),
+    RP_REGION(sc64_route_pf_logn),
+    RP_REGION(sc64_route_pf_owner),
+    RP_REGION(sc64_route_pf_goal),
+    RP_REGION(sc64_route_pf_stamp),
+    RP_REGION(sc64_route_donor_clock),
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    /* Opened-cell log, grid-known/copied flags, remembered shape and the
+     * query origin. The previous-grid copy lives in the BFS queue tail. */
+    RP_REGION(sc64_route_open_log),
+    RP_REGION(sc64_route_open_head),
+    RP_REGION(sc64_route_open_count),
+    RP_REGION(sc64_route_grid_known),
+    RP_REGION(sc64_route_grid_copied),
+    RP_REGION(sc64_route_keep_cols),
+    RP_REGION(sc64_route_keep_rows),
+    RP_REGION(sc64_route_query_origin),
+#endif
+#endif
     RP_REGION(sc64_route_valid),
     RP_REGION(sc64_route_goal),
     RP_REGION(sc64_route_age),
