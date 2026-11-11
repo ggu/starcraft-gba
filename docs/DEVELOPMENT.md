@@ -3007,13 +3007,20 @@ The search borrows existing scratch only for the call and adds no save state.
 assets. See the [route-step audit](audits/2026-10-29-monotone-route-step/README.md)
 for tie-order reasoning, measured gains, workload limits and remaining stalls.
 
-The normal race and Showcase flag sets also select `CANONICAL_FOG_FLAGS` for
-palette-shaded explored terrain and cosmetic fog edges. Empty it for an A/B
-build. Gameplay visibility retains its existing cell grid. The shade map and
-terrain cache use explicit, disjoint OBJ VRAM reservations; no save field is
-added. Asset-free checks are `make test-sc64-fog test-terrain-soft-fog
-test-gba-fog-palette`. See the [soft-fog audit](audits/2026-10-29-soft-fog/README.md)
-for memory ownership, clipping, tests and the remaining qualification gates.
+The normal race and Showcase flag sets also select `CANONICAL_FOG_FLAGS`
+(`-DSC64_SOFT_FOG`) for palette-shaded explored terrain and softened fog edges.
+Empty it for an A/B build (`make CANONICAL_FOG_FLAGS= ...`). Gameplay
+visibility retains its existing cell grid. The 256-byte shade map and the
+terrain cache have explicit, disjoint OBJ VRAM ranges in
+`starcraft/sc64_obj_vram.h`; no save field is added. Asset-free checks are
+`make test-sc64-fog test-terrain-soft-fog test-gba-fog-palette`; with the
+private inputs, `python3 -m unittest tests.test_sc64_fog_frames` renders both
+custom maps and the first campaign mission with and without the feature and
+checks which pixels change (`SC64_FOG_FRAMES_OUT=.local/fog-frames` keeps the
+frames, which contain imported art and must not be committed). The look is an
+authored approximation, not N64 parity. See the
+[soft-fog audit](audits/2026-10-29-soft-fog/README.md) for memory ownership,
+measured cost, clipping, tests and the remaining gates.
 
 An experimental mode-0 renderer builds on that movement probe:
 
