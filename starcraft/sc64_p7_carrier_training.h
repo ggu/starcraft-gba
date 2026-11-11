@@ -7,8 +7,8 @@
 #error "P7 Carrier training requires the typed P7 Interceptor actor profile"
 #endif
 
-/* Carrier Interceptors are real Unit rows, but remain hidden in the hangar
- * until a separate source-faithful flight/IScript adapter is available. */
+/* Carrier Interceptors are real Unit rows. They stay hidden in the hangar until
+ * the flight adapter (sc64_p7_interceptor_flight.h) releases them. */
 #define SC64_P7_CARRIER_RAW 72
 #define SC64_P7_INTERCEPTOR_RAW 73
 #define SC64_P7_CARRIER_CAPACITY 4
@@ -32,6 +32,36 @@ enum {
     SC64_P7_INTERCEPTOR_OUTSIDE = 3,
     SC64_P7_INTERCEPTOR_DETACHED = 4
 };
+
+/* Carrier-class parents: the ordinary Carrier (raw 72) and, in builds that
+ * carry the P10 roster, the Gantrithor hero Carrier (raw 82). They share one
+ * hangar service: same capacity, queue, Interceptor rules and save fields. */
+#define SC64_P10_GANTRITHOR_RAW 82
+
+/* The source raw ID a Carrier-class actor type must carry, or 0. */
+static int sc64_p7_carrier_parent_raw_of(int type)
+{
+    if (type == U_P7_CARRIER) return SC64_P7_CARRIER_RAW;
+#ifdef SC64_P10_DATA_ENABLED
+    if (type == U_P10_GANTRITHOR) return SC64_P10_GANTRITHOR_RAW;
+#endif
+    return 0;
+}
+
+static int sc64_p7_carrier_parent_type(int type)
+{ return sc64_p7_carrier_parent_raw_of(type) != 0; }
+
+/* A row's raw ID and type agree about being a Carrier-class parent. */
+static int sc64_p7_carrier_parent_row_consistent(const Unit *q)
+{
+    int want = sc64_p7_carrier_parent_raw_of(q->type), raw = RACE_PROTOSS_RAW(q);
+    if (want) return raw == want;
+    return raw != SC64_P7_CARRIER_RAW
+#ifdef SC64_P10_DATA_ENABLED
+        && raw != SC64_P10_GANTRITHOR_RAW
+#endif
+        ;
+}
 
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static void race_p7_interceptor_flight_detach(int child);
@@ -76,13 +106,14 @@ static int sc64_p7_carrier_parent_valid_in(const Unit *actors, int count,
     if (!actors || count < 0 || count > MAX_UNITS || slot < 0 || slot >= count)
         return 0;
     /* Reject ordinary rows before resolving their source owner. */
-    if (!actors[slot].alive || actors[slot].type != U_P7_CARRIER) return 0;
+    if (!actors[slot].alive || !sc64_p7_carrier_parent_type(actors[slot].type))
+        return 0;
     service_slot = RACE_PROTOSS_SLOT(&actors[slot]);
     mapped_owner = service_slot >= 0 && service_slot < 8 ?
         race_protoss_source_owner((unsigned)service_slot) : -1;
     return actors[slot].alive && mapped_owner >= 0 &&
-        actors[slot].type == U_P7_CARRIER &&
-        RACE_PROTOSS_RAW(&actors[slot]) == SC64_P7_CARRIER_RAW &&
+        RACE_PROTOSS_RAW(&actors[slot]) ==
+            sc64_p7_carrier_parent_raw_of(actors[slot].type) &&
         actors[slot].owner == mapped_owner;
 }
 
@@ -170,8 +201,8 @@ static int race_p7_carrier_training_slots_available(unsigned wanted)
             continue;
         }
 #endif
-        if (!u[i].alive || u[i].type != U_P7_CARRIER ||
-            RACE_PROTOSS_RAW(&u[i]) != SC64_P7_CARRIER_RAW) continue;
+        if (!u[i].alive || !sc64_p7_carrier_parent_type(u[i].type) ||
+            !sc64_p7_carrier_parent_row_consistent(&u[i])) continue;
         if (u[i].carry < 0 || u[i].carry >= SC64_P7_CARRIER_QUEUE_LIMIT)
             return 0;
         commitments += (unsigned)u[i].carry;
@@ -201,18 +232,17 @@ static int race_p7_carrier_training_candidate_valid(const Unit *actors,
     for (int i = 0; i < count; ++i) {
         const Unit *q = &actors[i];
         unsigned state;
-        if ((RACE_PROTOSS_RAW(q) == SC64_P7_CARRIER_RAW) !=
-            (q->type == U_P7_CARRIER)) return 0;
+        if (!sc64_p7_carrier_parent_row_consistent(q)) return 0;
         if ((RACE_PROTOSS_RAW(q) == SC64_P7_INTERCEPTOR_RAW) !=
             (q->type == U_P7_INTERCEPTOR)) return 0;
         if (!q->alive) {
             if (q->type == U_P7_INTERCEPTOR &&
                 (((unsigned)q->flags & SC64_P7_CARRIER_RUNTIME_MASK) ||
                  q->build >= 0)) return 0;
-            if (q->type == U_P7_CARRIER && q->carry) return 0;
+            if (sc64_p7_carrier_parent_type(q->type) && q->carry) return 0;
             continue;
         }
-        if (q->type == U_P7_CARRIER) {
+        if (sc64_p7_carrier_parent_type(q->type)) {
             unsigned inside = 0, training = 0;
             if (!sc64_p7_carrier_parent_valid_in(actors, count, i) ||
                 q->carry < 0 ||
@@ -281,26 +311,32 @@ static int race_p7_carrier_training_selected(void)
     if (!race_protoss_services_active() || selected_building >= 0) return 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].selected && u[i].owner==SIDE &&
-            RACE_PROTOSS_SLOT(&u[i])==SC64_PROTOSS_HUMAN_SLOT &&
             sc64_p7_carrier_parent_valid(i)) return 1;
     return 0;
 }
 
-static int race_p7_carrier_training_can_queue(int carrier)
+/* Any owner's order: the price comes from that owner's own bank, whether the
+ * human's or a computer opponent's. */
+static int race_p7_carrier_training_can_queue_owner(int carrier)
 {
     unsigned inside = 0, training = 0;
     Unit *parent;
-    if (!race_protoss_services_active() || !sc64_p7_carrier_parent_valid(carrier) ||
-        u[carrier].owner != SIDE ||
-        RACE_PROTOSS_SLOT(&u[carrier]) != SC64_PROTOSS_HUMAN_SLOT) return 0;
+    if (!race_protoss_services_active() || !sc64_p7_carrier_parent_valid(carrier))
+        return 0;
     parent = &u[carrier];
     return parent->carry >= 0 && parent->carry < SC64_P7_CARRIER_QUEUE_LIMIT &&
-        minerals >= SC64_P7_INTERCEPTOR_COST &&
+        race_owner_minerals(parent->owner) >= SC64_P7_INTERCEPTOR_COST &&
         sc64_p7_carrier_count_children(carrier, &inside, &training) &&
         training <= 1 && training + (unsigned)parent->carry <
             SC64_P7_CARRIER_QUEUE_LIMIT &&
         inside + training + (unsigned)parent->carry < SC64_P7_CARRIER_CAPACITY &&
         race_p7_carrier_training_slots_available(1);
+}
+
+static int race_p7_carrier_training_can_queue(int carrier)
+{
+    return carrier >= 0 && carrier < MAX_UNITS && u[carrier].owner == SIDE &&
+        race_p7_carrier_training_can_queue_owner(carrier);
 }
 
 static int race_p7_carrier_training_menu_available(void)
@@ -314,6 +350,14 @@ static int race_p7_carrier_training_menu_available(void)
  * slot 7 has Carrier Capacity current/max level 0/0. Enemy slot 4 uses the
  * global default, whose current/max levels are also 0/0. Thus both active
  * Carrier owners use four slots in this mission. */
+static int race_p7_carrier_training_queue_owner(int carrier)
+{
+    if (!race_p7_carrier_training_can_queue_owner(carrier)) return 0;
+    race_add_owner_resources(u[carrier].owner, -SC64_P7_INTERCEPTOR_COST, 0);
+    ++u[carrier].carry;
+    return 1;
+}
+
 static int race_p7_carrier_training_queue(int carrier)
 {
     if (!race_p7_carrier_training_can_queue(carrier)) return 0;
@@ -416,6 +460,25 @@ static int race_p7_carrier_training_stock(int carrier, unsigned count)
     return (int)added;
 }
 
+/* A Carrier-class parent changed hands (a rescue or capture): its children,
+ * docked, in production or launched, go with it. Call after the parent's
+ * owner and raw_owner are updated. The flight service re-derives each
+ * launched child's target from its new owner's enemies. */
+static void race_p7_carrier_training_owner_changed(int carrier)
+{
+    if (!race_protoss_services_active() || carrier < 0 || carrier >= MAX_UNITS ||
+        !sc64_p7_carrier_parent_type(u[carrier].type)) return;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit *child = &u[i];
+        if (!child->alive || child->type != U_P7_INTERCEPTOR ||
+            RACE_PROTOSS_RAW(child) != SC64_P7_INTERCEPTOR_RAW ||
+            child->build != carrier) continue;
+        child->owner = u[carrier].owner;
+        child->raw_owner = u[carrier].raw_owner;
+        child->selected = 0;
+    }
+}
+
 /* Call only on the existing source-24 due event. Tick existing trainers
  * before starting new orders on that event so every child receives 300 full
  * source ticks before completion. */
@@ -427,8 +490,8 @@ static void sc64_p7_carrier_child_remove(int child_slot,
 static void race_p7_carrier_training_clear_slot(int slot)
 {
     if (slot < 0 || slot >= MAX_UNITS) return;
-    if (u[slot].type == U_P7_CARRIER &&
-        RACE_PROTOSS_RAW(&u[slot]) == SC64_P7_CARRIER_RAW) {
+    if (sc64_p7_carrier_parent_type(u[slot].type) &&
+        sc64_p7_carrier_parent_row_consistent(&u[slot])) {
         race_p7_carrier_training_parent_died(
             slot, race_p7_projectile_clear_references);
     } else if (u[slot].type == U_P7_INTERCEPTOR &&
@@ -551,8 +614,8 @@ static void race_p7_carrier_training_end_frame(void)
 {
     if (!race_protoss_services_active()) return;
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (!u[i].alive && u[i].type == U_P7_CARRIER &&
-            RACE_PROTOSS_RAW(&u[i]) == SC64_P7_CARRIER_RAW)
+        if (!u[i].alive && sc64_p7_carrier_parent_type(u[i].type) &&
+            sc64_p7_carrier_parent_row_consistent(&u[i]))
             race_p7_carrier_training_parent_died(
                 i, race_p7_projectile_clear_references);
     for (int i = 0; i < MAX_UNITS; ++i) {
@@ -583,7 +646,7 @@ static void race_p7_carrier_training_end_frame(void)
 }
 
 /* Game hooks exclude TRAINING/INSIDE rows from ordinary visibility, movement,
- * selection, collision and target acquisition. No launch, outside flight or
- * combat policy is provided here. */
+ * selection, collision and target acquisition. Launch, outside flight and
+ * combat policy live in sc64_p7_interceptor_flight.h. */
 #endif /* SC64_P7_CARRIER_TRAINING_ENABLED */
 #endif /* SC64_P7_CARRIER_TRAINING_H */

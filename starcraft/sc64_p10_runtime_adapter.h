@@ -582,6 +582,15 @@ static void race_p10_rescue_tick(void)
                 u[i].owner = SIDE; u[i].raw_owner = SC64_P10_HUMAN_SLOT;
                 u[i].selected = 0; u[i].target = -1;
                 u[i].order = ORDER_IDLE; u[i].tx = u[i].x; u[i].ty = u[i].y;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+                /* The Gantrithor joins with a full hangar; any children it
+                 * already has change hands with it. */
+                if (sc64_p7_carrier_parent_type(u[i].type)) {
+                    race_p7_carrier_training_owner_changed(i);
+                    if (!race_p7_carrier_training_child_count(i))
+                        (void)race_p7_carrier_training_stock(i, SC64_P7_CARRIER_CAPACITY);
+                }
+#endif
                 break;
             }
         }

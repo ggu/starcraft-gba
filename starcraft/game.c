@@ -2329,6 +2329,8 @@ static void race_p7_carrier_training_clear_slot(int slot);
 static void race_p7_carrier_training_end_frame(void);
 static int race_p7_carrier_training_slots_available(unsigned wanted);
 static unsigned race_p7_carrier_training_child_count(int carrier);
+static int sc64_p7_carrier_parent_type(int type);
+static int race_p7_carrier_training_queue_owner(int carrier);
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static int race_p7_interceptor_flight_carrier_holds(int carrier);
 static int race_p7_interceptor_flight_carrier_order(int carrier);
@@ -8852,7 +8854,7 @@ target_lists_unavailable:
 #endif
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
         /* An engaged Carrier stops and launches instead of closing in. */
-        if (q->type == U_P7_CARRIER && race_p7_interceptor_flight_carrier_order(i))
+        if (sc64_p7_carrier_parent_type(q->type) && race_p7_interceptor_flight_carrier_order(i))
             continue;
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
@@ -12764,7 +12766,7 @@ sc64_hud_race_keys(int *values,int first)
     if (values[8]>1) values[12]=0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if(first>=0 && race_protoss_services_active() && u[first].type==U_P7_CARRIER)
+    if(first>=0 && race_protoss_services_active() && sc64_p7_carrier_parent_type(u[first].type))
         values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
