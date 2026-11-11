@@ -2650,11 +2650,13 @@ toast(int id)
  * cue the race advisor: game_audio_observe() takes the cue at render time, so
  * the command paths gain only this store. Presentation only, never saved. */
 static u8 toast_advisor;
-/* Alert cues, above every toast id: the observer plays the line for each. The
- * stores below report a hostile hit and finished research to that observer. */
+/* Alert cues above the toast ids, and the stores that feed the observer. */
 enum { TOAST_CUE_ENERGY = 32, TOAST_CUE_NO_BUILD, TOAST_CUE_NO_LAND };
 enum { GAME_AUDIO_CUE_RESEARCH, GAME_AUDIO_CUE_UPGRADE };
 static void game_audio_cue(int), game_audio_note_hit(int, int);
+#ifdef SC64_RACES
+static void game_audio_energy_refused(int, int);
+#endif
 static void
 toast_refusal(int id)
 {
@@ -7361,10 +7363,7 @@ interact(void)
 #ifdef SC64_Z6_STORM_ENABLED
         if (race_z6_active()) cast=race_z6_storm_cast_selected(cx,cy);
 #endif
-        if (!cast) for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].owner==SIDE && u[i].selected) {
-            if (u[i].carry < SC64_STORM_ENERGY_COST*SC64_STORM_ENERGY_ONE) toast_advisor=TOAST_CUE_ENERGY;
-            break;
-        }
+        if (!cast) game_audio_energy_refused(-1, SC64_STORM_ENERGY_COST*SC64_STORM_ENERGY_ONE);
         mode=MODE_NORMAL; toast(cast ? 0 : 8); return;
     }
 #endif
@@ -7386,9 +7385,7 @@ interact(void)
         if(target>=0) for(int i=0;i<MAX_UNITS;++i)
             if(u[i].alive && u[i].owner==SIDE && u[i].selected && sc64_race_raw_unit(u[i].type)==12)
                 issued+=race_bc_yamato_issue(i,target);
-        if(target>=0 && !issued) for(int i=0;i<MAX_UNITS;++i)
-            if(u[i].alive && u[i].owner==SIDE && u[i].selected && sc64_race_raw_unit(u[i].type)==12 &&
-               u[i].carry<150*256) {toast_advisor=TOAST_CUE_ENERGY;break;}
+        if(target>=0 && !issued) game_audio_energy_refused(12, 150*256);
         mode=MODE_NORMAL;toast(issued?0:8);return;
     }
 #endif

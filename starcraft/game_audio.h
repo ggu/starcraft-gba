@@ -206,6 +206,20 @@ static void __attribute__((noinline)) game_audio_note_hit(int target, int source
     if (!game_audio_on_screen(x, y)) GAME_AUDIO_STATE[GAME_AUDIO_STATE_PENDING] |= (u16)bit;
 }
 
+#ifdef SC64_RACES
+/* A spell was refused for energy: cue the advisor if a selected caster of this
+ * raw type (any type when raw is -1, and then only the first selected unit
+ * counts) lacks the energy cost. Carry holds the energy. */
+static void game_audio_energy_refused(int raw, int cost)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].selected && (raw < 0 || sc64_race_raw_unit(u[i].type) == raw)) {
+            if (u[i].carry < cost) { toast_advisor = TOAST_CUE_ENERGY; break; }
+            if (raw < 0) break;
+        }
+}
+#endif
+
 /* Simulation side: the player's research or upgrade just finished. Scripted
  * grants never call this. */
 static void game_audio_cue(int cue)
