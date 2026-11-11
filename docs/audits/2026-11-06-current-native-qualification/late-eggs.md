@@ -115,3 +115,18 @@ unproven and coverage remains 29/30.
 See [isolated preview commands](../../RACE-CAMPAIGNS.md#opt-in-late-campaign-egg-preview),
 the [performance and N64 observations](README.md), and the
 [living backlog](../../PROJECT-TODO.md).
+
+## Common release capability candidate
+
+The common `SC64_SHARED_EGG_SERVICE` selects the existing authenticated late
+context for Z9/Z10 products and the custom-game context for Terran, Z7, P10
+and Showcase. Normal product recipes request that capability. P10 generates
+its Egg-aware facts in a separate build directory, leaving the legacy fact
+input intact. Existing isolated preview recipes retain their explicit flags.
+
+This is an activation candidate, not completion of S1. In particular Z1–Z6
+campaign production and its owner/save candidates still need shared-engine
+implementation and qualification; they are not a permanent product exception.
+Static actor art, stack and busy-match performance, and broad ordinary campaign
+regressions remain open. The predecessor ARM evidence above establishes the
+preview contexts, not the newly built release artifacts.

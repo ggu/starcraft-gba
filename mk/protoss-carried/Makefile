@@ -18,11 +18,11 @@ test-sc64-protoss-carried-missions: test-sc64-protoss-carried-p4-p6
 # tape, host replay and an input-only ARM replay ROM for each.
 PX_DIR := build/protoss-px
 PX_TOOL = $(PYTHON) tools/sc64_p8_arm_replay.py --mission $(1) --prefix PX
-PX_CLANG = $(CLANG) -std=c11 -O1 -g -w -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_P10_FLAGS)
+PX_CLANG = $(CLANG) -std=c11 -O1 -g -w -fsanitize=address,undefined -DGBA_HOST -Icommon $(P10_PRODUCT_FLAGS)
 PX_SOURCES = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c
 # $(1) name, $(2) controller source, $(3) extra source, $(4) mission, $(5) recipe writing $@.raw
 define PX_MISSION
-build/px-$(1)-controller: tests/$(2).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(PROTOSS_P10_INPUTS) common/gba.c $$(COMMON_HEADERS) mk/protoss-carried/Makefile | build
+build/px-$(1)-controller: tests/$(2).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(filter-out $$(P10_FACT_V2_HEADER),$$(PROTOSS_P10_INPUTS)) $$(P10_EGG_FACT_HEADER) common/gba.c $$(COMMON_HEADERS) mk/protoss-carried/Makefile | build
 	$$(PX_CLANG) -DPX_TAPE_TRACE $$< $(3) $$(PX_SOURCES) -o $$@
 $$(PX_DIR)/$(1)/trace.jsonl: build/px-$(1)-controller tools/sc64_protoss_tape.py
 	mkdir -p $$(PX_DIR)/$(1)
@@ -30,13 +30,13 @@ $$(PX_DIR)/$(1)/trace.jsonl: build/px-$(1)-controller tools/sc64_protoss_tape.py
 	$$(PYTHON) tools/sc64_protoss_tape.py $$@.raw $$@ --mission $(4)
 $$(PX_DIR)/$(1)/sc64_px_tape_generated.h: $$(PX_DIR)/$(1)/trace.jsonl tools/sc64_p8_arm_replay.py
 	$$(call PX_TOOL,$(4)) tape $$< $$@
-PX_$(1)_DEPS = tests/sc64_protoss_arm_replay.c $$(PX_DIR)/$(1)/sc64_px_tape_generated.h $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(PROTOSS_P10_INPUTS) $$(COMMON_HEADERS) mk/protoss-carried/Makefile
+PX_$(1)_DEPS = tests/sc64_protoss_arm_replay.c $$(PX_DIR)/$(1)/sc64_px_tape_generated.h $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(filter-out $$(P10_FACT_V2_HEADER),$$(PROTOSS_P10_INPUTS)) $$(P10_EGG_FACT_HEADER) $$(COMMON_HEADERS) mk/protoss-carried/Makefile
 build/px-$(1)-replay: $$(PX_$(1)_DEPS) | build
 	$$(PX_CLANG) -I$$(PX_DIR)/$(1) -DPX_MISSION=$(4) $$< $$(PX_SOURCES) -o $$@
 $$(PX_DIR)/$(1)/host-full.txt: build/px-$(1)-replay
 	./$$< > $$@
 build/starcraft-px-$(1).elf: $$(PX_$(1)_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
-	$$(CC) $$(CFLAGS) $$(PROTOSS_P10_FLAGS) -I$$(PX_DIR)/$(1) -DPX_MISSION=$(4) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(LDFLAGS) -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(P10_PRODUCT_FLAGS) -I$$(PX_DIR)/$(1) -DPX_MISSION=$(4) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(LDFLAGS) -lgcc -o $$@
 build/StarCraft-Protoss-PX-$(1).gba: build/starcraft-px-$(1).elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@
 	$$(PYTHON) tools/fix_rom.py $$@ 'SC PX REPLAY' SCPA
@@ -67,9 +67,9 @@ $$(PX_DIR)/$(1)/host-resume.txt: build/px-$(1)-prefix build/px-$(1)-resume $$(PX
 	./build/px-$(1)-resume $$(PX_DIR)/$(1)/host-prefix.sav > $$@
 	$$(call PX_TOOL,$(2)) compare --from-tick $$$$(sed -n 's/^#define PX_TAPE_RESUME_TICK \([0-9]*\)u$$$$/\1/p' $$(PX_DIR)/$(1)/sc64_px_tape_generated.h) $$(PX_DIR)/$(1)/host-full.txt $$@
 build/starcraft-px-$(1)-prefix.elf: $$(PX_$(1)_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
-	$$(CC) $$(CFLAGS) $$(PROTOSS_P10_FLAGS) -I$$(PX_DIR)/$(1) -DPX_MISSION=$(2) -DPX_REPLAY_PREFIX $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(LDFLAGS) -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(P10_PRODUCT_FLAGS) -I$$(PX_DIR)/$(1) -DPX_MISSION=$(2) -DPX_REPLAY_PREFIX $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(LDFLAGS) -lgcc -o $$@
 build/starcraft-px-$(1)-resume.elf: $$(PX_$(1)_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
-	$$(CC) $$(CFLAGS) $$(PROTOSS_P10_FLAGS) -I$$(PX_DIR)/$(1) -DPX_MISSION=$(2) -DPX_REPLAY_RESUME $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(LDFLAGS) -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(P10_PRODUCT_FLAGS) -I$$(PX_DIR)/$(1) -DPX_MISSION=$(2) -DPX_REPLAY_RESUME $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(LDFLAGS) -lgcc -o $$@
 build/StarCraft-Protoss-PX-$(1)-Prefix.gba: build/starcraft-px-$(1)-prefix.elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@
 	$$(PYTHON) tools/fix_rom.py $$@ 'SC PX REPLAY' SCPA
