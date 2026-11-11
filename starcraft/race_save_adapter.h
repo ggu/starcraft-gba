@@ -1790,6 +1790,11 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
     if (jobs_tag==2) return 0;
 #endif
     Sc64PrCandidateScan scan;
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+    /* A campaign record never carries research: it must use the pre-research
+     * tag and hold no levels. Its Forge/Core rows are not reinterpreted. */
+    if (candidate && candidate->state[0]==0) return !jobs_tag;
+#endif
     if (!candidate || !levels || candidate->state[0]!=1 ||
         candidate->state[4]<1 || candidate->state[4]>3 ||
         candidate->state[11]<0 || candidate->state[12]<0 ||
@@ -1830,6 +1835,9 @@ static int race_save_game(void) {
     if (sc64_pr_stage_fault || (race_mode!=1
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
         && race_mode!=0
+#endif
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+        && race_mode!=0 /* campaign saves keep the pre-research tag and layout */
 #endif
        )) return 0;
 #endif
@@ -2796,6 +2804,9 @@ static int race_save_game(void) {
             (unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+    if (race_mode==1) {
+#endif
     if (!race_research_jobs_candidate_scan(&race_data,&sc64_experimental_research_levels,
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
                                             race_mode ? 1 : 2
@@ -2812,8 +2823,14 @@ static int race_save_game(void) {
                 !sc64_pr_job_receipt_valid(&decoded,paid.payer,&paid)) return 0;
         }
     }
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+    }
+#endif
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+    if (race_mode==1)
+#endif
     if ((race_mode!=0 && race_mode!=1) ||
         !sc64_pr_padding_write((u8 *)race_data.buildings, MAX_BUILDINGS, SC64_PR_ROW_WIDTH,
                                SC64_PR_USED_BITS, race_mode ? 5u : 8u,
@@ -4466,8 +4483,11 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
 #endif
        ) {
-        if ((race_data.state[0]!=0 && race_data.state[0]!=1) ||
-            !sc64_pr_padding_read((u8 *)race_data.buildings,MAX_BUILDINGS,SC64_PR_ROW_WIDTH,
+        if ((race_data.state[0]!=0 && race_data.state[0]!=1)
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+            || race_data.state[0]!=1 /* only custom games write a research tag */
+#endif
+            || !sc64_pr_padding_read((u8 *)race_data.buildings,MAX_BUILDINGS,SC64_PR_ROW_WIDTH,
                                   SC64_PR_USED_BITS,race_data.state[0] ? 5u : 8u,
                                   &plan->research_levels)) return 0;
     }

@@ -29,8 +29,8 @@ static int race_q8_flash_begin(void);
 static int race_q8_flash_write(const void *data,u32 length);
 #endif
 #if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && \
-    (!defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE)))
-#error "Active research journal requires the HOST-only research job stage"
+    (!defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE) && !defined(SC64_RESEARCH_SRAM_PRODUCT)))
+#error "Active research journal requires the research job stage"
 #endif
 #if defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) && \
     (!defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) || !defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_SHARED_SCOURGE_COMBAT))
@@ -5024,6 +5024,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
     int *shield=target<MAX_UNITS?&u[target].shield:&b[target-MAX_UNITS].shield;
     if (!(hit_flags & SC64_HIT_PRECOMPUTED_HP)) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+        if (*shield>0) damage=sc64_pr_stage_shield_reduce(target,damage);
+#endif
         int absorbed=*shield<damage?*shield:damage;*shield-=absorbed;damage-=absorbed;
     }
     if(!damage)return;
@@ -6685,10 +6688,7 @@ choose_command(int choice)
 {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     if (sc64_pr_stage_menu_selected()) {
-        int family=sc64_pr_stage_menu_family(choice), ok;
-        if (choice==3) ok=sc64_pr_stage_cancel_slot(selected_building,0);
-        else ok=family>=0 && sc64_pr_stage_begin_slot(selected_building,(unsigned)family);
-        menu_open=0; mode=MODE_NORMAL; toast(ok ? 4 : 8); return;
+        toast(sc64_pr_stage_menu_command(choice)); menu_open=0; mode=MODE_NORMAL; return;
     }
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
