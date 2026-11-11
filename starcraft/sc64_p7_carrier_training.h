@@ -49,7 +49,7 @@ static int sc64_p7_carrier_parent_raw_of(int type)
 }
 
 static int sc64_p7_carrier_parent_type(int type)
-{ return sc64_p7_carrier_parent_raw_of(type) != 0; }
+{ return SC64_P7_CARRIER_PARENT_TYPE(type); }
 
 /* A row's raw ID and type agree about being a Carrier-class parent. */
 static int sc64_p7_carrier_parent_row_consistent(const Unit *q)
@@ -106,7 +106,7 @@ static int sc64_p7_carrier_parent_valid_in(const Unit *actors, int count,
     if (!actors || count < 0 || count > MAX_UNITS || slot < 0 || slot >= count)
         return 0;
     /* Reject ordinary rows before resolving their source owner. */
-    if (!actors[slot].alive || !sc64_p7_carrier_parent_type(actors[slot].type))
+    if (!actors[slot].alive || !SC64_P7_CARRIER_PARENT_TYPE(actors[slot].type))
         return 0;
     service_slot = RACE_PROTOSS_SLOT(&actors[slot]);
     mapped_owner = service_slot >= 0 && service_slot < 8 ?
@@ -614,7 +614,7 @@ static void race_p7_carrier_training_end_frame(void)
 {
     if (!race_protoss_services_active()) return;
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (!u[i].alive && sc64_p7_carrier_parent_type(u[i].type) &&
+        if (!u[i].alive && SC64_P7_CARRIER_PARENT_TYPE(u[i].type) &&
             sc64_p7_carrier_parent_row_consistent(&u[i]))
             race_p7_carrier_training_parent_died(
                 i, race_p7_projectile_clear_references);
