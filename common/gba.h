@@ -175,6 +175,8 @@ int audio_sampled_available(void);
  * which ignores priority and plays one line at a time (audio_mixer.h). */
 enum { AUDIO_CLASS_EFFECT, AUDIO_CLASS_SPEECH, AUDIO_CLASS_ADVISOR };
 void audio_play_sample(u16 sample,u8 priority,u8 kind);
+/* Nonzero while an advisor line plays or is queued; always 0 without a bank. */
+int audio_advisor_busy(void);
 void audio_play_music(int track,int loop);
 /* Current or pending music track, or -1 when silent. */
 int audio_music_track(void);

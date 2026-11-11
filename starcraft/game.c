@@ -2650,6 +2650,13 @@ toast(int id)
  * cue the race advisor: game_audio_observe() takes the cue at render time, so
  * the command paths gain only this store. Presentation only, never saved. */
 static u8 toast_advisor;
+/* Alert cues above the toast ids, and the stores that feed the observer. */
+enum { TOAST_CUE_ENERGY = 32, TOAST_CUE_NO_BUILD, TOAST_CUE_NO_LAND };
+enum { GAME_AUDIO_CUE_RESEARCH, GAME_AUDIO_CUE_UPGRADE };
+static void game_audio_cue(int), game_audio_note_hit(int, int);
+#ifdef SC64_RACES
+static void game_audio_energy_refused(int, int);
+#endif
 static void
 toast_refusal(int id)
 {
@@ -4998,6 +5005,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
     }
     if(!damage)return;
 #endif
+    game_audio_note_hit(target,source_owner);
     if (target < MAX_UNITS) {
 	tx = u[target].x;
 	ty = u[target].y;
@@ -6255,7 +6263,10 @@ start_build(int type)
                 toast_refusal(problem == UI_SITE_MINERALS ? 1 : 12);
             else
 #endif
-            toast(8);
+            {
+                toast(8);
+                if (!can_place(type, site_x, site_y)) toast_advisor = TOAST_CUE_NO_BUILD;
+            }
         }
         return;
     }
@@ -6278,6 +6289,7 @@ start_build(int type)
     }
     if (!can_place(type, px, py)) {
 	toast(6);
+	toast_advisor = TOAST_CUE_NO_BUILD;
 	return;
     }
 #ifdef SC_DEFAULT_UI
@@ -6421,10 +6433,12 @@ tick_research(void)
     if (weapons_research && ++weapons_research > 600) {
 	weapons_research = 0;
 	weapons_level++;
+        game_audio_cue(GAME_AUDIO_CUE_UPGRADE);
     }
     if (armor_research && ++armor_research > 600) {
 	armor_research = 0;
 	armor_level++;
+        game_audio_cue(GAME_AUDIO_CUE_UPGRADE);
     }
 }
 
@@ -6823,6 +6837,7 @@ choose_command(int choice)
     if (choice == MENU_STOP + 1 && race_z6_cloak_menu_available()) {
         int result=race_z6_cloak_toggle_selected();
         menu_open=0; mode=MODE_NORMAL;
+        if (result==SC64_Z5_CLOAK_DENIED_ENERGY) toast_advisor=TOAST_CUE_ENERGY;
         toast(result==SC64_Z5_CLOAK_ADVANCED ? 0 : 8); return;
     }
 #endif
@@ -6836,6 +6851,7 @@ choose_command(int choice)
         int result = race_z5_cloak_toggle_selected();
         menu_open = 0;
         mode = MODE_NORMAL;
+        if (result == SC64_Z5_CLOAK_DENIED_ENERGY) toast_advisor = TOAST_CUE_ENERGY;
         toast(result == SC64_Z5_CLOAK_ADVANCED ? 0 : 8);
         return;
     }
@@ -7331,6 +7347,7 @@ interact(void)
 #else
         toast(8);
 #endif
+        if (toast_id == 8) toast_advisor = TOAST_CUE_NO_LAND;
         mode = MODE_NORMAL; return;
     }
 #endif
@@ -7346,6 +7363,7 @@ interact(void)
 #ifdef SC64_Z6_STORM_ENABLED
         if (race_z6_active()) cast=race_z6_storm_cast_selected(cx,cy);
 #endif
+        if (!cast) game_audio_energy_refused(-1, SC64_STORM_ENERGY_COST*SC64_STORM_ENERGY_ONE);
         mode=MODE_NORMAL; toast(cast ? 0 : 8); return;
     }
 #endif
@@ -7367,6 +7385,7 @@ interact(void)
         if(target>=0) for(int i=0;i<MAX_UNITS;++i)
             if(u[i].alive && u[i].owner==SIDE && u[i].selected && sc64_race_raw_unit(u[i].type)==12)
                 issued+=race_bc_yamato_issue(i,target);
+        if(target>=0 && !issued) game_audio_energy_refused(12, 150*256);
         mode=MODE_NORMAL;toast(issued?0:8);return;
     }
 #endif

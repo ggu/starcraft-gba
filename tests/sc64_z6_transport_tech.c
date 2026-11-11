@@ -14,6 +14,9 @@ static Building b[MAX_BUILDINGS];
 static int selected_building = -1;
 static int minerals, gas;
 static int race_z6_active(void) { return 1; }
+enum { GAME_AUDIO_CUE_RESEARCH };
+static int research_cues;
+static void game_audio_cue(int cue) { assert(cue == GAME_AUDIO_CUE_RESEARCH); ++research_cues; }
 static int race_z6_source_owner(unsigned slot) { return slot == 3u ? SIDE : -1; }
 #define SC64_Z6_RUNTIME 1
 #define SC64_TRANSPORT_RUNTIME 1
@@ -142,8 +145,9 @@ static void test_world_adapter_gates_and_death_refund(void)
     assert(race_z6_transport_research_tick(1));
     assert(race_z6.transport.ticks_remaining==3000);
     for (int i=0;i<2999;++i) assert(race_z6_transport_research_tick(0));
-    assert(race_z6.transport.ticks_remaining==1);
+    assert(race_z6.transport.ticks_remaining==1 && !research_cues);
     assert(race_z6_transport_research_tick(0));
+    assert(research_cues==1); /* Announced once, when it finishes. */
     assert(race_z6_transport_overlord_ready());
     assert(race_z6_transport_state_valid());
 

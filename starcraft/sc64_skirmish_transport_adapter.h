@@ -71,7 +71,9 @@ static void race_sk_transport_research_tick(void)
             (void)race_sk_transport_cancel_owner(owners[i], destroyed);
             continue;
         }
+        int was = job->researched;
         sc64_sk_transport_tick(job);
+        if (!was && job->researched && owners[i] == SIDE) game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
     }
 }
 
