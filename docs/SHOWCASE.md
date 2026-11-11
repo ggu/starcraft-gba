@@ -32,8 +32,9 @@ showcase build has its own ROM game code (`SCSH`).
 | Base Under Siege | Marines advance on a defended Zerg outpost with Tanks holding position behind them. |
 
 These are staged starting positions running the current game simulation.
-Carrier Interceptor combat is unfinished: Carrier Approach is explicitly
-labeled a preview, with escorts doing the fighting. Tank weapons use the
+Carrier Interceptor combat is not compiled into the Showcase ROM (the Protoss
+ROM has it): Carrier Approach is explicitly labeled a preview, with escorts
+doing the fighting. Tank weapons use the
 current adaptation's combat. The current build includes authored weapon-family
 shots and impacts instead of the earlier common straight-line tracer; these
 visuals preserve the existing damage timing. These scenes do not demonstrate native StarCraft

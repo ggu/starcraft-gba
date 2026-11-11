@@ -83,7 +83,47 @@ rule tables.
 | --- | --- | --- |
 | Terran | Barracks ×3, Refinery ×2, Factory ×2 with Machine Shops, Academy, Engineering Bay, Missile Turrets, Armory, Starport, Command Center | Marines and Firebats; Siege Tanks (Tank Mode) from Factories with a Machine Shop, otherwise Vultures; Goliaths after the Armory, favored against air; Wraiths |
 | Zerg | Spawning Pool, up to five Hatcheries, Extractor ×2, Hydralisk Den, Lair (morph), Evolution Chamber, Spire, Creep Colonies morphed into Spore and Sunken Colonies | Zerglings, Hydralisks (favored against air or after eight Zerglings), Mutalisks, Scourge against air |
-| Protoss | Gateway ×4, Assimilator ×2, Cybernetics Core, Forge, Photon Cannons, Stargate, Nexus | Zealots and Dragoons (Dragoons favored against air), Scouts |
+| Protoss | Gateway ×4, Assimilator ×2, Cybernetics Core, Forge, Photon Cannons, Stargate, Fleet Beacon (Protoss ROM only, see below), Nexus | Zealots and Dragoons (Dragoons favored against air), Scouts, and in the Protoss ROM Carriers |
+
+### Carriers (Protoss ROM)
+
+The Protoss ROM compiles the Carrier service, so a Protoss opponent uses the
+same paid products the human does. Other ROMs compile none of it and their
+opponents keep the plan above (their bytes are unchanged).
+
+- **Fleet Beacon.** A plan step, after the second Assimilator, once the bank
+  holds 600 minerals (`RACE_AI_IF_RICH`) and the Stargate stands. The step
+  reserves its price like any other unaffordable tech step.
+- **Carrier.** A due Carrier replaces the Scout at an idle Stargate when a
+  completed Fleet Beacon stands, fewer than four Carriers exist or are queued,
+  the ground line (Zealots and Dragoons) numbers at least four per Carrier
+  counting the new one, and the owner's unit share has room for the Carrier
+  and its four Interceptors (children occupy unit slots, and the owner's
+  share, 56 units at most, binds them). It goes through `race_queue_unit`
+  (350 minerals, 250 gas, 12 supply), so supply, power and the actor pool
+  apply. The ratio and cap are the whole policy: Gateways keep producing, and
+  the Carrier is never taken from money the line needs, except that once the
+  gas is in hand, an idle powered Stargate and free supply stand ready, the
+  Carrier's price is reserved so the Gateways cannot spend the last minerals
+  first. Without gas or supply nothing is reserved.
+- **Interceptors.** Each pass the planner orders one Interceptor for every
+  Carrier of the owner, through `race_p7_carrier_training_queue_owner`: the
+  25-mineral price comes from the owner's own bank, and the service enforces
+  its queue limit, the four-slot hangar and the actor pool. Money reserved for
+  a structure or another purchase is respected.
+- **Combat.** A Carrier counts as an armed, air-capable army unit. It takes
+  part in attack and defend orders; with an enemy within eight tiles the
+  flight service stops it and launches Interceptors (`sc64_p7_interceptor_flight.h`).
+  Hostile Carriers count as ground and air threats.
+- **No state.** The planner keeps nothing for any of this: it reads Carriers,
+  Interceptors, the Fleet Beacon and the banks from actor storage each pass.
+  Work is two more linear scans per pass.
+
+The matrix checks it with `match-carrier` cases (four lobbies, Protoss profile):
+besides every match criterion, including the spending audit, which now reads
+paid Interceptor orders from the Carrier's queue count, a Protoss owner must
+make a Carrier, order Interceptors, have them in flight and have its own shots
+in the projectile pool.
 
 Addons and building morphs go through `race_skirmish_start_record`. The human
 command row uses the same function. It pays from the owner's own bank and
@@ -176,7 +216,8 @@ why:
 | Zerg larva products are queued serially per Hatchery in these products. Parallel eggs exist only in the Z7 runtime. | Zerg production capacity comes from extra Hatcheries. Queues are capped at two items. |
 | Per-owner weapon and armor upgrades: unit levels apply only to the human. | No Forge, Engineering Bay, Evolution Chamber or Armory research. Those buildings are built only for defenses and unit prerequisites. |
 | Medic healing, Queen spells, High Templar, Science Vessel, Defiler and Dark Templar products | Not trained. They have no working ordinary combat role in custom games. |
-| Reaver (Scarab ammunition), Carrier and Interceptors, Arbiter, Observer, Shuttle and Ultralisk ordinary production (producer `255` or explicitly rejected) | Not trained. Robotics, Templar, Fleet Beacon and Ultralisk Cavern paths are omitted. |
+| Reaver (Scarab ammunition), Arbiter, Observer, Shuttle and Ultralisk ordinary production (producer `255` or explicitly rejected) | Not trained. Robotics, Templar and Ultralisk Cavern paths are omitted. |
+| Carrier and Interceptors in the Terran, Zerg and Showcase ROMs | Not compiled there, so a Protoss opponent in those ROMs never trains Carriers (see [Carriers in the other ROMs](CARRIER-PROJECTILES.md#carriers-in-the-other-roms)). The Protoss ROM does train them, above. |
 | Unit morphs: Lurker, Guardian, Devourer, Archon | Not available. The Hive and Greater Spire morphs have no payoff and are skipped. |
 | Siege Mode transition and Siege research | Tanks fight in Tank Mode only. |
 | Bunker loading by computer players | Opponents do not build Bunkers. |
