@@ -89,7 +89,7 @@ the linker guards (`__iwram_end < 0x03005000`, `__bss_end < 0x0203e000`) and
 | --- | --- | --- | --- | ---: | ---: |
 | Terran | `030044a8` | `0203748c` | `0203780c` | +896 | 26,612 |
 | Zerg Z9 | `03004850` | `0203b1ac` | `0203b43c` | +656 | 11,204 |
-| Protoss P10 | `03004818` | `02039758` | `02039ad8` | +896 | 17,704 |
+| Protoss P10 | `03004818` | `0203978c` | `02039b0c` | +896 | 17,652 |
 | Showcase | `03004a68` | `020372d0` | `02037650` | +896 | 27,056 |
 
 The added EWRAM is the per-frame signature array (306 bytes), the wider
@@ -102,13 +102,15 @@ longer applies at this base.
 ## Cost (ARM, pinned busiest 1,000 updates of the three-opponent custom battle)
 
 Mean cycles per update on the mGBA core, same workload (`same_workload=True`)
-on a base ROM built at the same commit with `CANONICAL_FOG_FLAGS=` empty:
+on a base ROM built from the same tree (default branch `9ff4af31`) with
+`CANONICAL_FOG_FLAGS=` empty. The merged-draft column was measured one base
+earlier (`ebcb294e`; its Protoss base mean was 1,484,718):
 
 | Product | loop mean, base | merged draft | this branch | simulation (`upd`) |
 | --- | ---: | ---: | ---: | ---: |
 | Terran | 1,121,240 | 1,513,329 (+35.0%) | 1,174,958 (**+4.8%**) | unchanged (+0.02%) |
 | Zerg | 1,376,574 | 1,814,941 (+31.8%) | 1,439,539 (**+4.6%**) | unchanged (-0.04%) |
-| Protoss | 1,484,718 | 1,940,198 (+30.7%) | 1,552,585 (**+4.6%**) | unchanged (-0.04%) |
+| Protoss | 1,482,775 | 1,940,198 (+30.7%) | 1,550,663 (**+4.6%**) | unchanged (-0.03%) |
 
 This misses the 1% aim. The draft's cost was almost all in three places and
 those are fixed (see the commit message); what remains is the real work of
@@ -125,7 +127,7 @@ the builds, so only the fog functions are listed):
 | --- | ---: | ---: | ---: | --- |
 | `sc64_fog_compose_rect` | +19,107 | +19,890 | +21,854 | composes the exposed strips of cells that need edge masks or shading |
 | `sc64_terrain_fill_now` | +11,749 | +15,165 | +12,356 | per-frame signatures of the view (replaces three per-cell passes) |
-| `gfx_blit_opaque` | +8,638 | +8,937 | +10,540 | clipped blit of those strips (the base blits whole tiles) |
+| `gfx_blit_opaque` | +8,638 | +8,937 | +10,542 | clipped blit of those strips (the base blits whole tiles) |
 | `sc64_fog_raster_strips` | +6,791 | +6,953 | +7,418 | strip selection and dispatch |
 
 The terrain cache still hits as before; the extra work is only in dirty cells.
