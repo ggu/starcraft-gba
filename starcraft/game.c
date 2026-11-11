@@ -11905,7 +11905,8 @@ sc64_static_objects_key(void)
 static void __attribute__((noinline))
 sc64_fog_compact_barrier(int partial, int x, int y, u16 signature, const u8 *shade)
 {
-    u8 terrain[256] __attribute__((aligned(4)));
+    /* Static: the shaded-tile cache identifies tiles by address. */
+    static u8 terrain[256] __attribute__((aligned(4)));
     memset(terrain, C_STONE, sizeof(terrain));
     for (int i = 2; i < 14; ++i) {
         terrain[2 * 16 + i] = terrain[13 * 16 + i] = C_SILVER;

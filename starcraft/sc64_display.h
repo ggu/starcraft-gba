@@ -4,6 +4,7 @@
 #include "../common/gba.h"
 #ifdef SC64_SOFT_FOG
 #include "sc64_obj_vram.h"
+#include "sc64_fog.h"
 #endif
 
 /* A milder LCD lift than the Den display curve. Retain true black and bright
@@ -34,6 +35,7 @@ static void sc64_display_palette(const u16 *source) {
     }
 #ifdef SC64_SOFT_FOG
     gfx_fog_palette_prepare(SC64_OBJ_VRAM_FOG);
+    sc64_fog_tiles_invalidate();
 #endif
 }
 

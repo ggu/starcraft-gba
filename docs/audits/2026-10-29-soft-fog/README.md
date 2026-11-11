@@ -1,6 +1,6 @@
 # Soft fog: shaded explored terrain and softened boundaries
 
-Status (2026-11-12): finished on `codex/soft-fog-finish-20261112`, which
+Status (2026-11-12): complete but not at the cost target, on `codex/soft-fog-finish-20261112`, which
 supersedes draft [#146](https://github.com/ggu/starcraft-gba/pull/146). The
 feature is on in the Terran, Zerg, Protoss and Showcase products through
 `CANONICAL_FOG_FLAGS` (`-DSC64_SOFT_FOG`, defined in the top-level `Makefile`,
@@ -87,54 +87,60 @@ the linker guards (`__iwram_end < 0x03005000`, `__bss_end < 0x0203e000`) and
 
 | Product | `__iwram_end` | `__bss_end` base | `__bss_end` soft fog | change | EWRAM headroom left |
 | --- | --- | --- | --- | ---: | ---: |
-| Terran | `030044a8` | `0203748c` | `0203780c` | +896 | 26,612 |
-| Zerg Z9 | `03004850` | `0203b1ac` | `0203b43c` | +656 | 11,204 |
-| Protoss P10 | `03004818` | `0203978c` | `02039b0c` | +896 | 17,652 |
-| Showcase | `03004a68` | `020372d0` | `02037650` | +896 | 27,056 |
+| Terran | `030044a8` | `0203748c` | `020399e8` | +9,564 | 17,944 |
+| Zerg Z9 | `03004850` | `0203b1ac` | `0203d620` | +9,332 | 2,528 |
+| Protoss P10 | `03004818` | `0203978c` | `0203bcf0` | +9,572 | 8,976 |
+| Showcase | `03004a68` | `020372d0` | `0203982c` | +9,308 | 18,388 |
 
-The added EWRAM is the per-frame signature array (306 bytes), the wider
-per-cell state (2 bytes instead of 1, 153 more bytes), the partial-redraw
-flags (153 bytes) and, in the products whose terrain cache shares VRAM with the
-projectile arena, one cache row moved from VRAM to EWRAM (240 bytes); the
-rest is alignment. The earlier draft's Showcase headroom of 48 bytes no
-longer applies at this base.
+About 8.2 KB of the added EWRAM is the shaded-tile cache (32 tiles of 256
+bytes plus tags, `SC64_FOG_TILE_SLOTS`, a power of two; 16 slots would give
+Zerg 4 KB more headroom, not measured); the rest is the per-frame signature
+array (306 bytes), the fog fingerprint (88), the wider per-cell state (153
+more), the partial-redraw flags (153) and, where the terrain cache shares VRAM
+with the projectile arena, one cache row moved from VRAM to EWRAM (240).
+Zerg's headroom is thin: choose 16 slots there if more is needed. VRAM use is
+unchanged by this pass (the 256-byte shade map and the ranges above).
 
 ## Cost (ARM, pinned busiest 1,000 updates of the three-opponent custom battle)
 
-Mean cycles per update on the mGBA core, same workload (`same_workload=True`)
-on a base ROM built from the same tree (default branch `9ff4af31`) with
-`CANONICAL_FOG_FLAGS=` empty. The merged-draft column was measured one base
-earlier (`ebcb294e`; its Protoss base mean was 1,484,718):
+Mean cycles per update on the mGBA core, base and fog-on ROMs built from the
+same tree (default branch `22015eb2`; base has `CANONICAL_FOG_FLAGS=` empty),
+replayed over the same ticks. The Protoss opponent changed with the Carrier
+merge, so the Protoss window no longer matches the original pin
+(`same_workload=False` against it); fog-off and fog-on were instead compared
+with each other: identical tick, frame, screen and unit and building counts at
+every row. Terran and Zerg still match the original pin.
 
-| Product | loop mean, base | merged draft | this branch | simulation (`upd`) |
-| --- | ---: | ---: | ---: | ---: |
-| Terran | 1,121,240 | 1,513,329 (+35.0%) | 1,174,958 (**+4.8%**) | unchanged (+0.02%) |
-| Zerg | 1,376,574 | 1,814,941 (+31.8%) | 1,439,539 (**+4.6%**) | unchanged (-0.04%) |
-| Protoss | 1,482,775 | 1,940,198 (+30.7%) | 1,550,663 (**+4.6%**) | unchanged (-0.03%) |
+| Product | loop mean, base | merged draft (older base) | first optimization | **this pass** | shade-only variant | simulation (`upd`) |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Terran | 1,121,240 | +35.0% | +4.4% | 1,158,191 (**+3.3%**) | +2.5% | unchanged |
+| Zerg | 1,376,574 | +31.8% | +4.1% | 1,418,972 (**+3.1%**) | +2.3% | unchanged |
+| Protoss | 1,489,501 | +30.7% | +4.3% | 1,535,765 (**+3.1%**) | +2.0% | unchanged |
 
-This misses the 1% aim. The draft's cost was almost all in three places and
-those are fixed (see the commit message); what remains is the real work of
-shading pixels in ROM-resident Thumb code with no IWRAM to spend, concentrated
-in scrolling frames: in this window the camera scrolls on about 73% of
-updates, so a strip of cells is newly exposed on most frames.
+This is above the 1.5% aim, and shade-only (`-DSC64_SOFT_FOG_SHADE_ONLY`:
+explored terrain shaded, no edge masks, kept as a measurement option) is also
+above it. What this pass did, in cycles per update on Terran:
 
-Per-function cost from the instruction-level profiler (`profile_custom.py`,
-`report.py`; mean cycles per update over the window, fog on minus base; the
-compiler also inlines `game_render` and `draw_minimap` differently between
-the builds, so only the fog functions are listed):
+* Signature array: skipped unless the window or a fog bit changed (fingerprint
+  of the halo row words), which cut it from +11.7k to +7.7k. It is not gone
+  because the fingerprint itself reads two bit runs for each of ten rows every
+  frame.
+* Shaded-tile cache: a cell that is explored with no unknown neighbor is a
+  whole shaded tile, so it is blitted like a visible one from a cache of shaded
+  tiles, not recomposed per pixel.
+* Cells clipped by the world band use a word-store row blit instead of the
+  halfword generic blit.
 
-| Function | Terran | Zerg | Protoss | What it does |
-| --- | ---: | ---: | ---: | --- |
-| `sc64_fog_compose_rect` | +19,107 | +19,890 | +21,854 | composes the exposed strips of cells that need edge masks or shading |
-| `sc64_terrain_fill_now` | +11,749 | +15,165 | +12,356 | per-frame signatures of the view (replaces three per-cell passes) |
-| `gfx_blit_opaque` | +8,638 | +8,937 | +10,542 | clipped blit of those strips (the base blits whole tiles) |
-| `sc64_fog_raster_strips` | +6,791 | +6,953 | +7,418 | strip selection and dispatch |
-
-The terrain cache still hits as before; the extra work is only in dirty cells.
-Options for the remaining cost, none done here: skip the signature pass when
-no fog bit changed (needs a cheap change flag from the writer of the grids);
-compose exposed strips of fully explored cells from a small cache of shaded
-tiles; or accept about +4.6% in these battle frames.
+The remaining floor is the work of shading pixels in ROM-resident Thumb code
+(no IWRAM to spend) in frames where the camera scrolls (73% of updates here):
+Terran after this pass is signature fingerprint +7.7k, strip dispatch and
+decoding +6.8k, shaded-tile misses +5.6k, composing exposed edge strips +5.1k,
+other blits +1.8k, plus 1.3k elsewhere. A fully visible tile is one word-store
+blit; a shaded one needs a 256-entry lookup per pixel the first time it is
+seen, and edge pixels need a per-pixel choice among black, shaded and plain.
+Going further needs a change flag from the writer of the visibility grids
+(so the fingerprint can be skipped) and a larger shaded-tile cache, which is
+EWRAM Zerg does not have.
 
 ## Pixel evidence (host, private frames under `.local/`, never committed)
 
@@ -172,8 +178,8 @@ and 72 of the 100 samples (the rest show no fog boundary), as intended.
 
 The custom AI harness (`tools/sc64_skirmish_ai_matrix.py --profiles
 terran,zerg,protoss`, 330 cases, unsanitized `-O2` builds with and without the
-feature) passes 330 of 330 for both, and every case's complete stdout
-(3.67 MB) is byte-identical. Two controllers per race (Terran T7 and T8, Zerg
+feature) passes 334 of 334 for both (the matrix grew with the Carrier merge), and every
+case's complete stdout (3.83 MB) is byte-identical. Two controllers per race (Terran T7 and T8, Zerg
 Z8 and Z9, Protoss P8 and P10, 40,000 ticks each) give byte-identical
 stdout and traces. These harnesses never call the renderer, so they show
 that the flag changes no simulation code path; the frame test above covers

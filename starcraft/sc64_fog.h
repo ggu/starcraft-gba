@@ -97,6 +97,17 @@ sc64_fog_div3(unsigned x)
     return (x * 43691u) >> 17;
 }
 
+#ifdef SC64_SOFT_FOG_SHADE_ONLY
+/* Measurement variant: no edge masks. The signature keeps only the center
+ * class (neighbors read as visible), so cells shade when explored and
+ * nothing else changes. */
+static inline u16
+sc64_fog_shade_only(unsigned center)
+{
+    return (u16)(center ? 19682u - 81u * (2u - center) : 0u);
+}
+#endif
+
 static inline unsigned
 sc64_fog_center_state(u16 signature)
 {
@@ -144,8 +155,65 @@ sc64_fog_blit_cell(int sx, int sy, const u8 *source)
     } else if (top == sy && bottom == sy + 16) {
         gfx_blit16(sx, sy, source);
     } else {
-        gfx_blit_opaque(sx, top, 16, bottom - top, source + (top - sy) * 16);
+        gfx_blit16_rows(sx, sy, source, top - sy, bottom - sy);
     }
+}
+
+/* Shaded copies of recently used terrain tiles. A cell whose center is
+ * explored and that has no unknown neighbor is the shade of its tile all over,
+ * so it is drawn with the same whole-tile blit as a visible cell from a
+ * direct-mapped cache of shaded tiles: scrolling over explored ground then
+ * costs about what scrolling over visible ground does, and a tile is shaded
+ * once, not every time its cell is exposed. Tiles are identified by address,
+ * so the source must be immutable terrain art (or a buffer that always holds
+ * the same pixels); sc64_fog_tiles_invalidate() drops every entry and must run
+ * when the shade map changes. */
+#ifndef SC64_FOG_TILE_SLOTS
+#define SC64_FOG_TILE_SLOTS 32
+#endif
+_Static_assert((SC64_FOG_TILE_SLOTS & (SC64_FOG_TILE_SLOTS - 1)) == 0,
+               "the shaded-tile cache size must be a power of two");
+static u8 sc64_fog_tile_pixels[SC64_FOG_TILE_SLOTS][256] __attribute__((aligned(4)));
+static const u8 *sc64_fog_tile_tag[SC64_FOG_TILE_SLOTS];
+static const u8 *sc64_fog_tile_lut_tag;
+
+static void __attribute__((unused))
+sc64_fog_tiles_invalidate(void)
+{
+    for (unsigned i = 0; i < SC64_FOG_TILE_SLOTS; ++i) sc64_fog_tile_tag[i] = 0;
+    sc64_fog_tile_lut_tag = 0;
+}
+
+static const u8 *
+sc64_fog_shaded_tile(const u8 *terrain, const u8 *lut)
+{
+    unsigned slot = (unsigned)((uintptr_t)terrain >> 8) & (SC64_FOG_TILE_SLOTS - 1u);
+    u8 *out = sc64_fog_tile_pixels[slot];
+    if (sc64_fog_tile_tag[slot] != terrain || sc64_fog_tile_lut_tag != lut) {
+        const u8 *src = terrain, *end = terrain + 256;
+        if (sc64_fog_tile_lut_tag != lut) {
+            for (unsigned i = 0; i < SC64_FOG_TILE_SLOTS; ++i) sc64_fog_tile_tag[i] = 0;
+            sc64_fog_tile_lut_tag = lut;
+        }
+        if (!((unsigned)(uintptr_t)terrain & 3u)) {
+            const u32 *in = (const u32 *)(const void *)terrain;
+            u32 *to = (u32 *)(void *)out;
+            for (unsigned q = 0; q < 64; ++q) {
+                u32 t = in[q];
+                to[q] = (u32)lut[t & 255u] | ((u32)lut[(t >> 8) & 255u] << 8) |
+                        ((u32)lut[(t >> 16) & 255u] << 16) | ((u32)lut[t >> 24] << 24);
+            }
+        } else {
+            while (src < end) {
+                u8 a0 = src[0], a1 = src[1], a2 = src[2], a3 = src[3];
+                out[0] = lut[a0]; out[1] = lut[a1]; out[2] = lut[a2]; out[3] = lut[a3];
+                src += 4; out += 4;
+            }
+        }
+        sc64_fog_tile_tag[slot] = terrain;
+        out = sc64_fog_tile_pixels[slot];
+    }
+    return out;
 }
 
 /* Bit k of the index selects byte k of the result. */
@@ -225,6 +293,11 @@ sc64_fog_decode(u16 signature, unsigned *unknown_neighbors, unsigned *explored_n
         *unknown_neighbors = *explored_neighbors = 0;
         return SC64_FOG_VISIBLE;
     }
+    if (signature == 9841u) { /* every digit one: explored all round */
+        *unknown_neighbors = 0;
+        *explored_neighbors = 0xffu;
+        return SC64_FOG_EXPLORED;
+    }
     if (!signature) {
         *unknown_neighbors = 0xffu;
         *explored_neighbors = 0;
@@ -271,6 +344,10 @@ sc64_fog_raster_cell(int sx, int sy, u16 signature,
     }
     if (center == SC64_FOG_UNKNOWN || !terrain || !shade_lut) {
         sc64_fog_blit_cell(sx, sy, 0);
+        return;
+    }
+    if (center == SC64_FOG_EXPLORED && !unknown_neighbors) {
+        sc64_fog_blit_cell(sx, sy, sc64_fog_shaded_tile(terrain, shade_lut));
         return;
     }
     sc64_fog_raster_compose(sx, sy, center, unknown_neighbors,
@@ -339,9 +416,17 @@ sc64_fog_compose_rect(int sx, int sy, unsigned center,
             b >>= rx0;
             sh >>= rx0;
             if (!(b | sh)) {
-                for (rx = rx0; rx < rx1; ++rx) *out++ = in[rx];
+                const u8 *src = in + rx0, *end = in + rx1;
+                while (src < end) *out++ = *src++;
             } else if (!b && (sh & full) == full) {
-                for (rx = rx0; rx < rx1; ++rx) *out++ = shade_lut[in[rx]];
+                const u8 *src = in + rx0, *end = in + rx1;
+                while (end - src >= 4) {
+                    u8 a0 = src[0], a1 = src[1], a2 = src[2], a3 = src[3];
+                    out[0] = shade_lut[a0]; out[1] = shade_lut[a1];
+                    out[2] = shade_lut[a2]; out[3] = shade_lut[a3];
+                    src += 4; out += 4;
+                }
+                while (src < end) *out++ = shade_lut[*src++];
             } else {
                 for (rx = rx0; rx < rx1; ++rx, b >>= 1, sh >>= 1) {
                     unsigned t = in[rx];
@@ -376,19 +461,30 @@ sc64_fog_raster_strips(int sx, int sy, u16 signature,
         sc64_fog_blit_cell(sx, sy, terrain);
         return;
     }
-    if (vx1 > vx0) {
-        a = vx0 > sx ? vx0 : sx;
-        b = vx1 < sx + 16 ? vx1 : sx + 16;
-        if (b > a) sc64_fog_compose_rect(sx, sy, center, unknown_neighbors,
-                                         explored_neighbors, terrain, shade_lut,
-                                         a - sx, 0, b - sx, 16);
+    if (center == SC64_FOG_EXPLORED && !unknown_neighbors) {
+        sc64_fog_blit_cell(sx, sy, sc64_fog_shaded_tile(terrain, shade_lut));
+        return;
     }
-    if (hy1 > hy0) {
-        a = hy0 > sy ? hy0 : sy;
-        b = hy1 < sy + 16 ? hy1 : sy + 16;
-        if (b > a) sc64_fog_compose_rect(sx, sy, center, unknown_neighbors,
-                                         explored_neighbors, terrain, shade_lut,
-                                         0, a - sy, 16, b - sy);
+    /* Only the part of the cell inside the world band, scene clip and
+     * screen is worth composing. */
+    {
+        int ry0 = top - sy, ry1 = bottom - sy;
+        int cx0 = sx < 0 ? -sx : 0, cx1 = sx + 16 > 240 ? 240 - sx : 16;
+        if (vx1 > vx0) {
+            a = vx0 > sx ? vx0 : sx;
+            b = vx1 < sx + 16 ? vx1 : sx + 16;
+            if (b > a) sc64_fog_compose_rect(sx, sy, center, unknown_neighbors,
+                                             explored_neighbors, terrain, shade_lut,
+                                             a - sx, ry0, b - sx, ry1);
+        }
+        if (hy1 > hy0) {
+            a = hy0 > top ? hy0 : top;
+            b = hy1 < bottom ? hy1 : bottom;
+            if (b > a && cx1 > cx0)
+                sc64_fog_compose_rect(sx, sy, center, unknown_neighbors,
+                                      explored_neighbors, terrain, shade_lut,
+                                      cx0, a - sy, cx1, b - sy);
+        }
     }
 }
 

@@ -71,7 +71,12 @@ static inline Sc64TerrainState
 sc64_terrain_state(int col, int row)
 {
 #ifdef SC64_SOFT_FOG
+#ifdef SC64_SOFT_FOG_SHADE_ONLY
+    return sc64_fog_shade_only(sc64_fog_center_state(
+        sc64_fog_signature(visible, explored, MAP_COLS, MAP_ROWS, col, row)));
+#else
     return sc64_fog_signature(visible, explored, MAP_COLS, MAP_ROWS, col, row);
+#endif
 #else
     int cell = col + row * MAP_COLS;
     return (SC64_GRID_GET(visible, cell) ? 1 : 0) |
@@ -111,11 +116,20 @@ sc64_terrain_fog_run(const u8 *grid, int row, int col0, int width)
 {
 #ifdef SC64_TERRAIN_PACKED_FOG_GRID
     unsigned base = (unsigned)(row * MAP_COLS + col0);
-    unsigned first = base >> 3, last = (base + (unsigned)width - 1u) >> 3;
-    unsigned bits = grid[first];
-    if (last > first) bits |= (unsigned)grid[first + 1] << 8;
-    if (last > first + 1) bits |= (unsigned)grid[first + 2] << 16;
-    if (last > first + 2) bits |= (unsigned)grid[first + 3] << 24;
+    unsigned first = base >> 3;
+    unsigned bits;
+    if (first + 3u < (unsigned)sizeof(visible)) {
+        /* Four bytes cover any run of up to 25 bits; the grids are the same
+         * size, and bits past the run are masked off. */
+        bits = (unsigned)grid[first] | ((unsigned)grid[first + 1] << 8) |
+               ((unsigned)grid[first + 2] << 16) | ((unsigned)grid[first + 3] << 24);
+    } else {
+        unsigned last = (base + (unsigned)width - 1u) >> 3;
+        bits = grid[first];
+        if (last > first) bits |= (unsigned)grid[first + 1] << 8;
+        if (last > first + 1) bits |= (unsigned)grid[first + 2] << 16;
+        if (last > first + 2) bits |= (unsigned)grid[first + 3] << 24;
+    }
     return (bits >> (base & 7u)) & ((1u << width) - 1u);
 #else
     unsigned bits = 0;
@@ -136,15 +150,30 @@ static const u8 sc64_terrain_fog_triple[64] = {
     12, 13, 15, 16, 21, 22, 24, 25, 13, 14, 16, 17, 22, 23, 25, 26,
 };
 
+/* The fog bits the array was built from: the known and visible words of every
+ * halo row of its window. While the window and these words are unchanged the
+ * array is still exact, so a scroll inside one cell window, or a frame in which
+ * no fog bit changed, skips the combine pass entirely. */
+static u32 sc64_terrain_fp_known[SC64_TERRAIN_FOG_ROWS + 2];
+static u32 sc64_terrain_fp_seen[SC64_TERRAIN_FOG_ROWS + 2];
+static int sc64_terrain_fp_valid;
+
 static void
 sc64_terrain_fill_now(int col0, int row0, int col1, int row1)
 {
     u8 triple[SC64_TERRAIN_FOG_ROWS + 2][SC64_TERRAIN_FOG_COLS];
+    u32 known_row[SC64_TERRAIN_FOG_ROWS + 2], seen_row[SC64_TERRAIN_FOG_ROWS + 2];
     int cols = col1 - col0, rows = row1 - row0, hr, c, r;
+    int same;
     sc64_terrain_now_valid = 0;
     if (cols <= 0 || rows <= 0 || cols > SC64_TERRAIN_FOG_COLS ||
-        rows > SC64_TERRAIN_FOG_ROWS)
+        rows > SC64_TERRAIN_FOG_ROWS) {
+        sc64_terrain_fp_valid = 0;
         return;
+    }
+    same = sc64_terrain_fp_valid && sc64_terrain_now_col0 == col0 &&
+           sc64_terrain_now_row0 == row0 && sc64_terrain_now_cols == cols &&
+           sc64_terrain_now_rows == rows;
     for (hr = 0; hr < rows + 2; ++hr) {
         int row = row0 - 1 + hr;
         unsigned known = 0, seen = 0;
@@ -159,19 +188,39 @@ sc64_terrain_fill_now(int col0, int row0, int col1, int row1)
             known = (v | e) << shift;
             seen = v << shift;
         }
+        known_row[hr] = known;
+        seen_row[hr] = seen;
+        if (same && (known != sc64_terrain_fp_known[hr] || seen != sc64_terrain_fp_seen[hr]))
+            same = 0;
+    }
+    if (same) {
+        sc64_terrain_now_valid = 1;
+        return;
+    }
+    for (hr = 0; hr < rows + 2; ++hr) {
+        unsigned known = known_row[hr], seen = seen_row[hr];
+        sc64_terrain_fp_known[hr] = known;
+        sc64_terrain_fp_seen[hr] = seen;
         for (c = 0; c < cols; ++c)
             triple[hr][c] = sc64_terrain_fog_triple[((known >> c) & 7u) |
                                                     (((seen >> c) & 7u) << 3)];
     }
     for (r = 0; r < rows; ++r)
         for (c = 0; c < cols; ++c)
+#ifdef SC64_SOFT_FOG_SHADE_ONLY
+            sc64_terrain_now[r * cols + c] = sc64_fog_shade_only(
+                ((sc64_terrain_fp_known[r + 1] >> (c + 1)) & 1u) +
+                ((sc64_terrain_fp_seen[r + 1] >> (c + 1)) & 1u));
+#else
             sc64_terrain_now[r * cols + c] =
                 (u16)(triple[r][c] + 27u * triple[r + 1][c] + 729u * triple[r + 2][c]);
+#endif
     sc64_terrain_now_col0 = col0;
     sc64_terrain_now_row0 = row0;
     sc64_terrain_now_cols = cols;
     sc64_terrain_now_rows = rows;
     sc64_terrain_now_valid = 1;
+    sc64_terrain_fp_valid = 1;
 }
 
 #define SC64_TERRAIN_FILL(c0, r0, c1, r1) sc64_terrain_fill_now((c0), (r0), (c1), (r1))
@@ -732,7 +781,9 @@ static void __attribute__((unused))
 sc64_terrain_fog_cell(int partial, int sx, int sy, u16 signature,
                       const u8 *terrain, const u8 *lut)
 {
-    if (partial)
+    if (signature == SC64_FOG_SIGNATURE_COUNT - 1 && terrain)
+        sc64_fog_blit_cell(sx, sy, terrain); /* fully visible: as the base draws it */
+    else if (partial)
         sc64_fog_raster_strips(sx, sy, signature, terrain, lut,
                                sc64_terrain_strip_x0, sc64_terrain_strip_x1,
                                sc64_terrain_strip_y0, sc64_terrain_strip_y1);

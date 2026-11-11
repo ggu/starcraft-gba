@@ -415,6 +415,16 @@ render_fixture(int camx, int camy, int incremental)
          * newly exposed strips and world-edge margins. */
         gfx_rect(0, SC64_TERRAIN_CACHE_Y, 240, SC64_TERRAIN_CACHE_HEIGHT, 255);
         (void)sc64_terrain_cached(camx, camy);
+#ifdef SC64_SOFT_FOG
+        /* Whatever the lookup left behind must equal the from-scratch
+         * signature of every cell of the view, every frame. */
+        if (sc64_terrain_now_valid)
+            for (int row = sc64_terrain_now_row0; row < sc64_terrain_now_row0 + sc64_terrain_now_rows; ++row)
+                for (int col = sc64_terrain_now_col0; col < sc64_terrain_now_col0 + sc64_terrain_now_cols; ++col)
+                    assert(sc64_terrain_now[(row - sc64_terrain_now_row0) * sc64_terrain_now_cols +
+                                            (col - sc64_terrain_now_col0)] ==
+                           sc64_terrain_state(col, row));
+#endif
     }
     for (int row = camy / 16; row <= (camy + SC64_TERRAIN_CACHE_HEIGHT) / 16; row++)
         for (int col = camx / 16; col <= (camx + 240) / 16; col++) {

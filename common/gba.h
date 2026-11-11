@@ -44,6 +44,10 @@ int gfx_copy_band_from_front(int y,int height);
 /* Opaque indexed rows at any screen position; every source pixel is stored,
  * including color 0. Uses the current scene clip. */
 void gfx_blit_opaque(int x,int y,int width,int height,const u8 *indexed_pixels);
+#ifdef SC64_SOFT_FOG
+/* Rows [row0,row1) of a 16x16 cell; the scene clip is not consulted. */
+void gfx_blit16_rows(int x,int y,const u8 *cell,int row0,int row1);
+#endif
 /* The two mode-4 pages end at 0x06013600 and bitmap products keep objects
  * off, so the OBJ tile area 0x06014000-0x06017FFF holds data instead. It is
  * shared, not free: starcraft/sc64_obj_vram.h assigns its ranges (the P7
