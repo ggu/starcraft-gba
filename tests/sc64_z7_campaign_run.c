@@ -6,6 +6,7 @@
 static void z7_hit_observer(int target, int damage, int source_type, int source_owner);
 #define SC64_TEST_HIT_OBSERVER(t,d,s,o) z7_hit_observer((t),(d),(s),(o))
 #include "../starcraft/game.c"
+#include "sc64_route_purity.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,7 +80,7 @@ static unsigned char z7_escort_attempts;
 typedef struct {
     int x,y,raw_type,owner;
     unsigned seen_frame,last_order_frame,next_attempt_frame;
-    unsigned char used;
+    unsigned char used,tries;
 } Z7LastSeenBuilding;
 static Z7LastSeenBuilding z7_last_seen_buildings[Z7_LAST_SEEN_BUILDING_MAX];
 static unsigned z7_last_seen_overflow;
@@ -112,7 +113,32 @@ static unsigned z7_evacuation_retry_frame;
 static int geyser_attack_sent;
 static int geyser_secured;
 static int geyser_scout_ordered;
+#ifndef Z7_LATE_RESERVE
+#define Z7_LATE_RESERVE 1500
+#endif
+#ifndef Z7_LAST_SEEN_ARRIVE_FRAMES
+#define Z7_LAST_SEEN_ARRIVE_FRAMES 9000u
+#endif
+#ifndef Z7_LATE_RECON_PATIENCE
+#define Z7_LATE_RECON_PATIENCE 6000u
+#endif
+#ifndef Z7_LOCAL_RECON_PATIENCE
+#define Z7_LOCAL_RECON_PATIENCE 4000u
+#endif
+#ifndef Z7_AIR_STAGNATION_FRAMES
+#define Z7_AIR_STAGNATION_FRAMES 8000u
+#endif
+#ifndef Z7_AIR_GATE_FRAME
+#define Z7_AIR_GATE_FRAME 70000u
+#endif
+#ifndef Z7_LATE_ARMY_FRAME
+#define Z7_LATE_ARMY_FRAME 30000u
+#endif
+#ifndef Z7_LATE_ARMY_HYDRAS
+#define Z7_LATE_ARMY_HYDRAS 36
+#endif
 static int geyser_visible_extractor_found;
+static unsigned geyser_extractor_retry_frame;
 static int geyser_mutas_returned;
 static unsigned geyser_return_retry_frame;
 static int scourge_outputs_ordered;
@@ -298,7 +324,7 @@ static void z7_last_seen_observe(void)
         if(slot<0)slot=z7_last_seen_alloc();
         Z7LastSeenBuilding *entry=&z7_last_seen_buildings[slot];
         if(!entry->used||entry->x!=b[i].x||entry->y!=b[i].y) {
-            entry->last_order_frame=0;entry->next_attempt_frame=0;
+            entry->last_order_frame=0;entry->next_attempt_frame=0;entry->tries=0;
             entry->x=b[i].x;entry->y=b[i].y;
         }
         entry->raw_type=b[i].raw_type;
@@ -346,7 +372,18 @@ static void step(u16 held)
            (u[i].type==U_HYDRALISK||u[i].type==U_MUTALISK)) {
             defender_hp[i]=u[i].hp;defender_raw[i]=u[i].raw_type;
         } else {defender_hp[i]=-1;defender_raw[i]=-1;}
+#ifdef ROUTE_PURITY_DEBUG
+    static uint64_t purity_after_update;
+    static int purity_armed;
+    if(purity_armed&&route_purity_hash()!=purity_after_update) {
+        fprintf(stderr,"route purity: controller code changed engine route state before frame %u\n",(unsigned)frame);
+        abort();
+    }
+#endif
     game_update(held,pressed);
+#ifdef ROUTE_PURITY_DEBUG
+    purity_after_update=route_purity_hash();purity_armed=1;
+#endif
     z7_last_seen_observe();
     if((unsigned)frame>=11200u&&(unsigned)frame<=13200u) {
         int observed=0;
@@ -2513,6 +2550,11 @@ static int campaign_nearest_unexplored(int *out_x,int *out_y)
             for(int row=0;row<MAP_ROWS;row++)for(int col=0;col<MAP_COLS;col++) {
                 int idx=col+row*MAP_COLS;
                 if(SC64_GRID_GET(explored,idx)||SC64_GRID_GET(visible,idx))continue;
+                /* Thousands of unseen cells are cliffs and water. The 256
+                   attempt budget below was spent on the nearest of those, so
+                   walkable fog farther away (an unexplored enemy base) was
+                   never offered. Terrain is visible on the map, so skip it. */
+                if(!SC64_GRID_GET(path_walkable,idx))continue;
                 int x=col*16+8,y=row*16+8;
                 if(x<16||y<16||x>=WORLD_W-16||y>=WORLD_H-16)continue;
                 int d=dist2(ax,ay,x,y),skip=0;
@@ -2657,9 +2699,9 @@ static int campaign_local_cluster_attack_move(int target_x,int target_y)
         fprintf(stderr,"  local scout slot%d at%d,%d order%d to%d,%d path%d next%d,%d\n",
             i,u[i].x,u[i].y,u[i].order,u[i].tx,u[i].ty,route,nx,ny);
     }
-    if(!menu_open)tap(KEY_B);
-    tap(KEY_DOWN);tap(KEY_A);
-    if(mode!=MODE_ATTACK){cancel_ui_mode();return 0;}
+    /* The command menu remembers its last row, so a fixed DOWN press picks a
+       different command whenever the previous order used another row. */
+    if(!choose_menu_row(MENU_ATTACK)||mode!=MODE_ATTACK){cancel_ui_mode();return 0;}
     move_cursor(tx,ty);tap(KEY_A);
     int accepted=0,routable=0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected&&u[i].owner==SIDE&&
@@ -3433,6 +3475,48 @@ static int campaign_visible_attack_flank(int target,int *out_x,int *out_y,
     return 1;
 }
 
+/* Known enemy buildings that have left sight are still on the map the player
+   remembers. Once the visible targets are gone, march the whole army to the
+   nearest remembered building it can walk to instead of sweeping fog for it.
+   The coordinates are controller observations, never proof it still stands:
+   the entry is dropped when its tile is seen empty. */
+static int z7_army_last_seen_step(void)
+{
+    int ax=0,ay=0,n=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+        !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
+        sc64_race_unit_damage(u[i].type)>0){ax+=u[i].x;ay+=u[i].y;++n;}
+    if(!n)return 0;
+    ax/=n;ay/=n;
+    int best=-1,best_d=0x7fffffff;
+    for(int k=0;k<Z7_LAST_SEEN_BUILDING_MAX;k++) {
+        Z7LastSeenBuilding *entry=&z7_last_seen_buildings[k];
+        if(!entry->used||entry->owner!=ENEMY||currently_visible(entry->x,entry->y))continue;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+           !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
+           sc64_race_unit_damage(u[i].type)>0&&u[i].order==ORDER_ATTACK_MOVE&&
+           abs(u[i].tx-entry->x)<=32&&abs(u[i].ty-entry->y)<=32&&
+           (unsigned)frame-entry->last_order_frame<Z7_LAST_SEEN_ARRIVE_FRAMES)return 1;
+    }
+    for(int k=0;k<Z7_LAST_SEEN_BUILDING_MAX;k++) {
+        Z7LastSeenBuilding *entry=&z7_last_seen_buildings[k];
+        if(!entry->used||entry->owner!=ENEMY||currently_visible(entry->x,entry->y)||
+           (unsigned)frame<entry->next_attempt_frame||entry->tries>=3||
+           !campaign_any_combat_has_path_to_attack_point(entry->x,entry->y,0))continue;
+        int d=dist2(ax,ay,entry->x,entry->y);
+        if(d<best_d){best=k;best_d=d;}
+    }
+    if(best<0)return 0;
+    Z7LastSeenBuilding *entry=&z7_last_seen_buildings[best];
+    int accepted=army_order(1,entry->x,entry->y);
+    entry->next_attempt_frame=(unsigned)frame+(accepted?Z7_LAST_SEEN_ARRIVE_FRAMES:1200u);
+    entry->last_order_frame=(unsigned)frame;
+    if(entry->tries<255)entry->tries++;
+    fprintf(stderr,"Z7 whole-army Attack-Move to remembered building raw%d at%d,%d accepted%d frame%u army%d\n",
+        entry->raw_type,entry->x,entry->y,accepted,(unsigned)frame,combat_count(SIDE));
+    return accepted;
+}
+
 static int campaign_assault_retarget(void)
 {
     int full_clear=(unsigned)frame>=9000u&&worker_count(-1)>=6&&combat_count(SIDE)>=16;
@@ -3713,6 +3797,10 @@ static int campaign_assault_retarget(void)
                     (unsigned)frame<9000u?"priority":"",
                     building,building_raw,tx,ty,(unsigned)frame,combat_count(SIDE));
             }
+        } else if((unsigned)frame>=45000u&&worker_count(-1)>=6&&combat_count(SIDE)>=10&&
+                  (accepted=z7_army_last_seen_step())) {
+            campaign_assault_target=-1;campaign_assault_target_raw=0;
+            campaign_assault_is_building=0;campaign_recon_active=0;campaign_recon_global_active=0;
         } else if((unsigned)frame>=100000u&&campaign_recon_stage>=19&&
                   worker_count(-1)>=6&&combat_count(SIDE)>=10) {
             static int local_recon_activated;
@@ -3756,6 +3844,19 @@ static int campaign_assault_retarget(void)
                         matching,near_waypoint,(unsigned)frame);
                     campaign_recon_active=0;campaign_recon_global_active=0;
                     campaign_recon_stage++;
+                }
+            }
+            /* A local sweep whose tile is never revealed (its group died, or sight
+               cannot reach the tile) would otherwise hold the army forever. */
+            static unsigned local_recon_since;
+            if(!campaign_recon_active)local_recon_since=0;
+            else if(!campaign_recon_global_active) {
+                if(!local_recon_since)local_recon_since=(unsigned)frame;
+                if((unsigned)frame-local_recon_since>=Z7_LOCAL_RECON_PATIENCE) {
+                    fprintf(stderr,"Z7 local recon abandoned stage%d xy%d,%d after%u frames frame%u\n",
+                        campaign_recon_stage,campaign_recon_x,campaign_recon_y,
+                        (unsigned)frame-local_recon_since,(unsigned)frame);
+                    campaign_recon_active=0;campaign_recon_stage++;local_recon_since=0;
                 }
             }
             if(campaign_recon_active) return 1;
@@ -3811,6 +3912,17 @@ static int campaign_assault_retarget(void)
                     (unsigned)frame,matching);
             } else if(campaign_recon_active&&matching==0) {
                 campaign_recon_active=0;campaign_recon_stage++;
+            }
+            /* A waypoint the group never reaches (it keeps its Attack-Move but
+               cannot get within range) held the whole army for 80,000 frames. */
+            static unsigned late_recon_since;
+            if(!campaign_recon_active)late_recon_since=0;
+            else if(!late_recon_since)late_recon_since=(unsigned)frame;
+            else if((unsigned)frame-late_recon_since>=Z7_LATE_RECON_PATIENCE) {
+                fprintf(stderr,"Z7 recon waypoint abandoned stage%d xy%d,%d after%u frames frame%u\n",
+                    campaign_recon_stage,campaign_recon_x,campaign_recon_y,
+                    (unsigned)frame-late_recon_since,(unsigned)frame);
+                campaign_recon_active=0;campaign_recon_stage++;late_recon_since=0;
             }
             static unsigned next_recon_retry;
             if(!campaign_recon_active&&(unsigned)frame>=next_recon_retry) {
@@ -4297,20 +4409,36 @@ static void macro_step(void)
     }
     /* The defended-home branch below returns while waiting for paid tech.
      * Start safe local mining first or that wait can never earn minerals. */
-    if(!enemy_at_minerals&&!workers_retreating&&assign_idle_workers_to_minerals())return;
+    /* With a large bank the idle-worker pass must not consume every macro turn:
+       macro turns are rare during army orders, and in the late game this return
+       starved the paid Mutalisk and Hydralisk queues for 50,000 frames. */
+    if(!enemy_at_minerals&&!workers_retreating&&assign_idle_workers_to_minerals()&&minerals<1000)return;
     /* Start the paid air route only after ordinary recon has exhausted
        reachable fog and no currently visible enemy building has a ground
        attack path. Do not inspect hidden enemy structure counts or positions. */
-    static unsigned next_late_air_gate_check;
-    if((unsigned)frame>=100000u&&!late_air_breakthrough_active&&
-       campaign_recon_stage>=24&&(unsigned)frame>=next_late_air_gate_check) {
+    static unsigned next_late_air_gate_check,known_signature,known_change_frame;
+    {
+        /* The set of enemy buildings the player has seen. While ground
+           sweeps keep finding new ones the air tech is not needed; once
+           they stop, the rest are out of the walking army's reach. */
+        unsigned sig=0;
+        for(int k=0;k<Z7_LAST_SEEN_BUILDING_MAX;k++)
+            if(z7_last_seen_buildings[k].used&&z7_last_seen_buildings[k].owner==ENEMY)
+                sig=sig*31u+(unsigned)(z7_last_seen_buildings[k].x*7+z7_last_seen_buildings[k].y)+1u;
+        if(sig!=known_signature||!known_change_frame) {
+            known_signature=sig;known_change_frame=(unsigned)frame;
+        }
+    }
+    int sweep_stagnant=(unsigned)frame-known_change_frame>=Z7_AIR_STAGNATION_FRAMES;
+    if((unsigned)frame>=Z7_AIR_GATE_FRAME&&!late_air_breakthrough_active&&
+       (campaign_recon_stage>=24||sweep_stagnant)&&(unsigned)frame>=next_late_air_gate_check) {
         next_late_air_gate_check=(unsigned)frame+600u;
         int bx=-1,by=-1,building=-1,fx=-1,fy=-1;
         int visible_ground_target=nearest_enemy_building(&bx,&by,&building);
         int reachable_frontier=campaign_recon_waypoint(campaign_recon_stage,&fx,&fy);
-        fprintf(stderr,"Z7 late-air observation gate stage%d visibleGroundTarget%d frontier%d frame%u\n",
-            campaign_recon_stage,visible_ground_target,reachable_frontier,(unsigned)frame);
-        if(!visible_ground_target&&!reachable_frontier) {
+        fprintf(stderr,"Z7 late-air observation gate stage%d visibleGroundTarget%d frontier%d stagnant%d frame%u\n",
+            campaign_recon_stage,visible_ground_target,reachable_frontier,sweep_stagnant,(unsigned)frame);
+        if(!visible_ground_target&&(!reachable_frontier||sweep_stagnant)) {
             late_air_breakthrough_active=1;muta_scout_leg=0;
             fprintf(stderr,"Z7 activate late air breakthrough after observed recon exhaustion stage%d frame%u bank%d/%d\n",
                 campaign_recon_stage,(unsigned)frame,minerals,gas);
@@ -4962,6 +5090,33 @@ static void macro_step(void)
                 (unsigned)frame,worker_goal,worker_count(-1),queued_unit_count(U_DRONE),
                 minerals,z7_townhall(SIDE)>=0?b[z7_townhall(SIDE)].larva:-1,mode,menu);
             last_worker_goal_failure=(unsigned)frame;
+        }
+    }
+    /* After the opening the bank grows without bound (thousands of minerals
+       and gas) while the army is only refilled to twelve Hydralisks, one per
+       macro turn, and the macro turn is rare during long army orders. Keep
+       buying Hydralisks through the ordinary Hatchery queue up to the late
+       army size, and Overlords when supply is the limit. */
+    /* Once the air route is chosen its Lair, Spire and Mutalisks come first; the
+       mineral line is mined out by now, so more Hydralisks would starve them. */
+    if((unsigned)frame>=Z7_LATE_ARMY_FRAME&&home_complete&&
+       building_complete(raw_building(135,SIDE))&&gas>=25&&
+       minerals>=Z7_LATE_RESERVE) {
+        int supply_room=race_owner_supply_cap(SIDE)-race_owner_reserved_supply(SIDE);
+        int hydras=unit_type_count(U_HYDRALISK,SIDE)+queued_unit_count(U_HYDRALISK);
+        if(supply_room<=4&&race_owner_supply_cap(SIDE)<200&&
+           queued_unit_count(U_OVERLORD)==0&&minerals>=100&&
+           queue_hatchery_type(U_OVERLORD))return;
+        int bought=0;
+        for(int pass=0;pass<3&&hydras+bought<Z7_LATE_ARMY_HYDRAS&&
+            supply_room-2*bought>=2&&minerals>=75&&gas>=25;pass++) {
+            if(!queue_hatchery_type(U_HYDRALISK))break;
+            ++bought;
+        }
+        if(bought) {
+            /* A producer left selected blocks the next army order. */
+            if(selected_building>=0)tap(KEY_SELECT);
+            return;
         }
     }
     /* Production orders still work while workers are being evacuated. Keep
@@ -5855,6 +6010,22 @@ static void attack_step(void)
         geyser_secured=1;
         fprintf(stderr,"Z7 restored source geyser secured at%d,%d frame%u enemieswithin160=0 nodes%d\n",
             geyser_target_x,geyser_target_y,(unsigned)frame,geyser_count);
+    }
+    /* The first Extractor order is spent once the escorts draw the Mutalisks
+       away, and the damaged Extractor then stands for the rest of the game
+       with the starting gas gone. Once the local defenders are dead, send the
+       air group back with the same ordinary Attack-Move, then target the
+       building again as soon as it is in sight. */
+    if(geyser_visible_extractor_found&&!geyser_secured&&geyser_target_x>=0&&
+       (unsigned)frame>=geyser_extractor_retry_frame&&combat_count(SIDE)>=2&&
+       !enemy_combat_near_source_node(geyser_target_x,geyser_target_y,160)) {
+        int ex=source_extractor_at_position(geyser_target_x,geyser_target_y);
+        geyser_extractor_retry_frame=(unsigned)frame+(ex>=0?240u:480u);
+        int accepted=ex>=0?typed_attack_move_to_extractor(U_MUTALISK,b[ex].x,b[ex].y,ex):
+            typed_attack_move(U_MUTALISK,geyser_target_x,geyser_target_y);
+        fprintf(stderr,"Z7 normal-input Extractor %s accepted%d at%d,%d frame%u\n",
+            ex>=0?"re-attack":"return",accepted,geyser_target_x,geyser_target_y,(unsigned)frame);
+        if(accepted)return;
     }
     if(geyser_secured&&!geyser_mutas_returned&&hatch>=0&&unit_type_count(U_MUTALISK,SIDE)>0&&
        (unsigned)frame>=geyser_return_retry_frame) {
