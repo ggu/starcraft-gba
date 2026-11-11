@@ -512,8 +512,11 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
                             anim->duration_ticks > anim->loop_source_tick ?
             anim->duration_ticks - anim->loop_source_tick : 0;
         if ((int64_t)timeline_tick < base_trigger) continue;
-        uint32_t last_iteration = loop_len ?
-            (uint32_t)(((int64_t)timeline_tick - base_trigger) / loop_len) : 0;
+        /* timeline_tick >= base_trigger here, so the span is non-negative. */
+        uint64_t span = (uint64_t)((int64_t)timeline_tick - base_trigger);
+        uint32_t last_iteration = !loop_len ? 0 :
+            span <= UINT32_MAX ? (uint32_t)span / loop_len :
+                                 (uint32_t)(span / loop_len);
         int sprite = sc64_weapon_source_vfx_overlay_is_sprite(overlay->opcode);
         uint32_t first_iteration = sprite && last_iteration >= 7u ?
                                    last_iteration - 7u : 0u;
@@ -633,11 +636,14 @@ sc64_vfx_projectile_animations(uint16_t image_id,
     }
 }
 
+/* `prepared` is nullable; when given it must be the motion prepared for this
+ * profile from the trace's launch point to (x1,y1). */
 static inline void
-sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
+sc64_weapon_source_vfx_draw_trace_motion(Sc64WeaponSourceVfxKey key,
                                      const Sc64WeaponSourceAttackProfile *p,
                                      int x0, int y0, int x1, int y1, int live,
-                                     uint32_t gba_age)
+                                     uint32_t gba_age,
+                                     const Sc64WeaponSourceMotion *prepared)
 {
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
     u32 section_start=gba_clock();
@@ -652,9 +658,11 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
     if (!image || !image->source_frame_count ||
         image->frame_first >= SC64_WEAPON_SOURCE_FRAME_COUNT) return;
 
-    Sc64WeaponSourceMotion motion =
+    Sc64WeaponSourceMotion motion = prepared ? *prepared :
         sc64_weapon_source_motion_prepare(p, launch_x, launch_y, x1, y1);
-    if (!sc64_weapon_source_trace_has_duration_motion(p, launch_x, launch_y, x1, y1, &motion)) return;
+    Sc64WeaponSourceProfileTicks ticks;
+    sc64_weapon_source_profile_ticks(p, &ticks);
+    if (!sc64_weapon_source_trace_has_duration_ticks(p, &motion, &ticks)) return;
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
     diag_motion+=gba_clock()-section_start; section_start=gba_clock();
 #endif
@@ -680,13 +688,18 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
 #endif
     if (attack_age < release_ticks) return;
     uint32_t source_age = attack_age - release_ticks;
-    uint32_t init_ticks = sc64_weapon_source_trace_startup_ticks(p);
     const Sc64WeaponSourceAnimation *init, *flight_anim, *death;
     sc64_vfx_projectile_animations(image->image_id,&init,&death,&flight_anim);
     int moving = !sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type);
     uint32_t flight_ticks = moving ? motion.flight : 0;
+#ifdef SC64_WEAPON_SOURCE_TICKS_CACHE
+    uint32_t init_ticks = ticks.startup;
+    uint32_t death_ticks = death ? ticks.death : 0u;
+#else
+    uint32_t init_ticks = sc64_weapon_source_trace_startup_ticks(p);
     uint32_t death_ticks = death ?
         sc64_weapon_source_animation_visual_ticks(death) : 0u;
+#endif
     uint64_t projectile_visual_end = (uint64_t)init_ticks +
         (moving ? flight_ticks : 0u) + death_ticks;
     if (projectile_visual_end > UINT32_MAX) projectile_visual_end = UINT32_MAX;
@@ -768,6 +781,16 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
     diag_children+=gba_clock()-section_start;
 #endif
+}
+
+static inline void
+sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
+                                     const Sc64WeaponSourceAttackProfile *p,
+                                     int x0, int y0, int x1, int y1, int live,
+                                     uint32_t gba_age)
+{
+    sc64_weapon_source_vfx_draw_trace_motion(key, p, x0, y0, x1, y1, live,
+                                             gba_age, 0);
 }
 
 static inline void

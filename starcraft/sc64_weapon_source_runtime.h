@@ -118,6 +118,25 @@ sc64_weapon_source_trace_flight_ticks_distance(const Sc64WeaponSourceAttackProfi
     if (!remaining || sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type))
         return 0;
     if (top <= 0) return 0;
+    if (remaining <= INT32_MAX) {
+        /* Same arithmetic in 32 bits: top <= INT32_MAX, accel <= INT16_MAX,
+         * so speed + accel and remaining + top - 1 cannot wrap. */
+        uint32_t rem = (uint32_t)remaining, top32 = (uint32_t)top, speed32 = 0;
+        uint32_t tick32 = 1;
+        if (accel <= 0) speed32 = top32;
+        else {
+            uint32_t accel32 = (uint32_t)accel;
+            for (; tick32 <= limit && speed32 < top32; ++tick32) {
+                speed32 += accel32;
+                if (speed32 > top32) speed32 = top32;
+                if (speed32 >= rem) return tick32;
+                rem -= speed32;
+            }
+        }
+        if (tick32 > limit) return limit;
+        uint32_t arrival32 = tick32 - 1u + (rem + top32 - 1u) / top32;
+        return arrival32 > limit ? limit : arrival32;
+    }
     if (accel <= 0) speed = top;
     /* Step tick by tick only while accelerating toward top speed. */
     uint32_t tick = 1;
@@ -259,6 +278,31 @@ sc64_weapon_source_trace_position_motion(const Sc64WeaponSourceAttackProfile *p,
     int64_t speed = 0, top = p->speed_raw;
     int64_t accel = p->accel_raw;
     uint64_t travelled = 0;
+    if (distance <= INT32_MAX) {
+        /* Same walk in 32 bits: speed <= top <= INT32_MAX and travelled <
+         * distance <= INT32_MAX before each add, so nothing wraps. */
+        uint32_t d32 = (uint32_t)distance, top32 = (uint32_t)top;
+        uint32_t speed32 = 0, travelled32 = 0, tick32 = 0;
+        for (; tick32 < source_age && accel > 0 && speed32 < top32; ++tick32) {
+            speed32 += (uint32_t)accel;
+            if (speed32 > top32) speed32 = top32;
+            travelled32 += speed32;
+            if (travelled32 >= d32) { travelled32 = d32; break; }
+        }
+        if (travelled32 < d32 && tick32 < source_age) {
+            uint32_t rest = source_age - tick32, room = d32 - travelled32;
+            travelled32 = rest >= (room + top32 - 1u) / top32 ?
+                          d32 : travelled32 + rest * top32;
+        }
+        int64_t px = dx * (int64_t)travelled32, py = dy * (int64_t)travelled32;
+        int64_t qx = px >= INT32_MIN && px <= INT32_MAX ?
+            (int64_t)((int32_t)px / (int32_t)d32) : px / (int64_t)d32;
+        int64_t qy = py >= INT32_MIN && py <= INT32_MAX ?
+            (int64_t)((int32_t)py / (int32_t)d32) : py / (int64_t)d32;
+        *x = (int)((int64_t)x0 + qx);
+        *y = (int)((int64_t)y0 + qy);
+        return 1;
+    }
     /* Step tick by tick only while accelerating; top > 0 since flight > 0. */
     uint32_t tick = 0;
     for (; tick < source_age && accel > 0 && speed < top; ++tick) {
@@ -288,41 +332,113 @@ sc64_weapon_source_trace_position(const Sc64WeaponSourceAttackProfile *p,
                                                      source_age, x, y, 0);
 }
 
+/* Per-profile values that depend only on the immutable bank. */
+typedef struct {
+    uint32_t startup, death, actor;
+    int image_ok;
+} Sc64WeaponSourceProfileTicks;
+
+static inline void
+sc64_weapon_source_profile_ticks_compute(const Sc64WeaponSourceAttackProfile *p,
+                                         Sc64WeaponSourceProfileTicks *t)
+{
+    const Sc64WeaponSourceAnimation *anim;
+    t->startup = t->death = t->actor = 0;
+    t->image_ok = p && p->projectile_image &&
+                  sc64_weapon_source_image_lookup(p->projectile_image) != 0;
+    if (!t->image_ok) return;
+    t->startup = sc64_weapon_source_trace_startup_ticks(p);
+    anim = sc64_weapon_source_animation_lookup(p->projectile_image, 1u);
+    if (anim) t->death = sc64_weapon_source_animation_visual_ticks(anim);
+    anim = sc64_weapon_source_animation_lookup(p->attack_image, p->attack_anim);
+    if (anim && anim->loop_pc == UINT32_MAX)
+        t->actor = sc64_weapon_source_animation_visual_ticks(anim);
+}
+
+#ifdef SC64_WEAPON_SOURCE_TICKS_CACHE
+/* Index of an exact record of the const generated bank, or -1. Copies and
+ * synthetic profiles are never cached. */
+static inline int
+sc64_weapon_source_profile_bank_index(const Sc64WeaponSourceAttackProfile *p)
+{
+    uintptr_t base = (uintptr_t)(const void *)sc64_weapon_source_profiles;
+    uintptr_t addr = (uintptr_t)(const void *)p;
+    if (addr < base) return -1;
+    addr -= base;
+    if (addr % sizeof(sc64_weapon_source_profiles[0])) return -1;
+    addr /= sizeof(sc64_weapon_source_profiles[0]);
+    return addr < SC64_WEAPON_SOURCE_PROFILE_COUNT ? (int)addr : -1;
+}
+
+/* Filled lazily, one profile at a time; 8 bytes per bank profile of RAM.
+ * Values that do not fit 16 bits are recomputed instead of cached. */
+static inline void
+sc64_weapon_source_profile_ticks(const Sc64WeaponSourceAttackProfile *p,
+                                 Sc64WeaponSourceProfileTicks *t)
+{
+    static uint16_t cache[SC64_WEAPON_SOURCE_PROFILE_COUNT][4];
+    int index = sc64_weapon_source_profile_bank_index(p);
+    if (index >= 0) {
+        const uint16_t *c = cache[index];
+        if (c[3]) {
+            t->startup = c[0]; t->death = c[1]; t->actor = c[2];
+            t->image_ok = c[3] == 2u;
+            return;
+        }
+    }
+    sc64_weapon_source_profile_ticks_compute(p, t);
+    if (index >= 0 && t->startup <= 0xffffu && t->death <= 0xffffu &&
+        t->actor <= 0xffffu) {
+        uint16_t *c = cache[index];
+        c[0] = (uint16_t)t->startup; c[1] = (uint16_t)t->death;
+        c[2] = (uint16_t)t->actor; c[3] = t->image_ok ? 2u : 1u;
+    }
+}
+#else
+static inline void
+sc64_weapon_source_profile_ticks(const Sc64WeaponSourceAttackProfile *p,
+                                 Sc64WeaponSourceProfileTicks *t)
+{
+    sc64_weapon_source_profile_ticks_compute(p, t);
+}
+#endif
+
+/* Duration from already prepared motion and profile values. */
+static inline uint32_t
+sc64_weapon_source_trace_duration_ticks(const Sc64WeaponSourceAttackProfile *p,
+                                        const Sc64WeaponSourceMotion *motion,
+                                        const Sc64WeaponSourceProfileTicks *t)
+{
+    uint32_t flight, source_ticks;
+    if (!t->image_ok) return 0;
+    flight = motion->flight;
+    if (!sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type) &&
+        motion->distance && !flight) return 0;
+    /* The order signal enters GndAttkInit. For moving bullets the death script
+     * starts at distance-derived arrival/expiry; stationary bullets transition
+     * to Death immediately after the authored startup event. */
+    source_ticks = sc64_weapon_source_trace_release_ticks(p) + t->startup +
+                   flight + t->death;
+    if (!source_ticks) source_ticks = p->projectile_frame_count ? 1u : 0u;
+    if (t->actor > source_ticks) source_ticks = t->actor;
+    return sc64_weapon_source_vfx_gba_duration(source_ticks);
+}
+
 static inline uint32_t
 sc64_weapon_source_trace_duration_motion(const Sc64WeaponSourceAttackProfile *p,
                                          int x0, int y0, int x1, int y1,
                                          const Sc64WeaponSourceMotion *motion)
 {
-    uint32_t flight, startup_ticks, death_ticks = 0;
-    uint32_t source_ticks, actor_ticks = 0, release_ticks;
-    const Sc64WeaponSourceAnimation *anim;
-    if (!p || !p->projectile_image ||
-        !sc64_weapon_source_image_lookup(p->projectile_image)) return 0;
+    Sc64WeaponSourceProfileTicks t;
+    if (!p) return 0;
+    sc64_weapon_source_profile_ticks(p, &t);
+    if (!t.image_ok) return 0;
     Sc64WeaponSourceMotion local;
     if (!motion) {
         local = sc64_weapon_source_motion_prepare(p, x0, y0, x1, y1);
         motion = &local;
     }
-    flight = motion->flight;
-    if (!sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type) &&
-        motion->distance && !flight) return 0;
-    startup_ticks = sc64_weapon_source_trace_startup_ticks(p);
-    anim = sc64_weapon_source_animation_lookup(p->projectile_image, 1u);
-    if (anim) death_ticks = sc64_weapon_source_animation_visual_ticks(anim);
-    /* The order signal enters GndAttkInit. For moving bullets the death script
-     * starts at distance-derived arrival/expiry; stationary bullets transition
-     * to Death immediately after the authored startup event. */
-    uint32_t active_ticks = flight;
-    release_ticks = sc64_weapon_source_trace_release_ticks(p);
-    source_ticks = release_ticks + startup_ticks + active_ticks + death_ticks;
-    if (!source_ticks) source_ticks = p->projectile_frame_count ? 1u : 0u;
-    anim = sc64_weapon_source_animation_lookup(p->attack_image, p->attack_anim);
-    if (anim && anim->loop_pc == UINT32_MAX) {
-        uint32_t visual = sc64_weapon_source_animation_visual_ticks(anim);
-        actor_ticks = visual;
-    }
-    if (actor_ticks > source_ticks) source_ticks = actor_ticks;
-    return sc64_weapon_source_vfx_gba_duration(source_ticks);
+    return sc64_weapon_source_trace_duration_ticks(p, motion, &t);
 }
 
 static inline uint32_t
@@ -336,21 +452,32 @@ sc64_weapon_source_trace_duration(const Sc64WeaponSourceAttackProfile *p,
  * projectile with frames always has a duration, so the overlay walks run only
  * for frameless projectiles. */
 static inline int
+sc64_weapon_source_trace_has_duration_ticks(const Sc64WeaponSourceAttackProfile *p,
+                                            const Sc64WeaponSourceMotion *motion,
+                                            const Sc64WeaponSourceProfileTicks *t)
+{
+    if (!t->image_ok) return 0;
+    if (!sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type) &&
+        motion->distance && !motion->flight) return 0;
+    if (p->projectile_frame_count) return 1;
+    return sc64_weapon_source_trace_duration_ticks(p, motion, t) != 0;
+}
+
+static inline int
 sc64_weapon_source_trace_has_duration_motion(const Sc64WeaponSourceAttackProfile *p,
                                              int x0, int y0, int x1, int y1,
                                              const Sc64WeaponSourceMotion *motion)
 {
-    if (!p || !p->projectile_image ||
-        !sc64_weapon_source_image_lookup(p->projectile_image)) return 0;
+    Sc64WeaponSourceProfileTicks t;
+    if (!p) return 0;
+    sc64_weapon_source_profile_ticks(p, &t);
+    if (!t.image_ok) return 0;
     Sc64WeaponSourceMotion local;
     if (!motion) {
         local = sc64_weapon_source_motion_prepare(p, x0, y0, x1, y1);
         motion = &local;
     }
-    if (!sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type) &&
-        motion->distance && !motion->flight) return 0;
-    if (p->projectile_frame_count) return 1;
-    return sc64_weapon_source_trace_duration_motion(p, x0, y0, x1, y1, motion) != 0;
+    return sc64_weapon_source_trace_has_duration_ticks(p, motion, &t);
 }
 
 static inline int

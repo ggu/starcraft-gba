@@ -422,8 +422,9 @@ ui_site_problem(int type, int x, int y, const char **need, int *ground)
     int worker = field_ui_build_worker(type), problem = UI_SITE_OK;
     const char *missing = ui_missing_tech(type, worker);
     int site = race_can_site(SIDE, type, x, y);
+    int placeable = can_place(type, x, y);
     *need = missing ? missing : "";
-    *ground = can_place(type, x, y) && (missing || site);
+    *ground = placeable && (missing || site);
     if (missing) problem = UI_SITE_TECH;
     else if (minerals < building_cost(type)) problem = UI_SITE_MINERALS;
     else if (gas < building_gas_cost(type)) problem = UI_SITE_GAS;
@@ -432,9 +433,37 @@ ui_site_problem(int type, int x, int y, const char **need, int *ground)
         problem = ui_gas_building(type) ? UI_SITE_GEYSER :
             r && (r->flags & SC_RACE_F_REQUIRES_POWER) ? UI_SITE_POWER :
             race_human == R_ZERG && type != B_HATCHERY ? UI_SITE_CREEP : UI_SITE_BLOCKED;
-    else if (!can_place(type, x, y)) problem = UI_SITE_BLOCKED;
+    else if (!placeable) problem = UI_SITE_BLOCKED;
     else if (find_build_slot() < 0) problem = UI_SITE_FULL;
     return problem;
+}
+
+/* The cursor and the command panel both show the same site's verdict in one
+ * draw. Nothing in the world changes while a frame is drawn, so the second
+ * caller reuses the first one's answer; game_render clears it for each draw. */
+static struct {
+    const char *need;
+    s16 type, x, y;
+    u8 valid, ground, problem;
+} ui_site_drawn;
+
+static int
+ui_site_problem_drawn(int type, int x, int y, const char **need, int *ground)
+{
+    if (ui_site_drawn.valid && ui_site_drawn.type == type &&
+        ui_site_drawn.x == x && ui_site_drawn.y == y) {
+        *need = ui_site_drawn.need;
+        *ground = ui_site_drawn.ground;
+        return ui_site_drawn.problem;
+    }
+    ui_site_drawn.problem = (u8)ui_site_problem(type, x, y, need, ground);
+    ui_site_drawn.need = *need;
+    ui_site_drawn.ground = (u8)(*ground != 0);
+    ui_site_drawn.type = (s16)type;
+    ui_site_drawn.x = (s16)x;
+    ui_site_drawn.y = (s16)y;
+    ui_site_drawn.valid = (s16)type == type && (s16)x == x && (s16)y == y;
+    return ui_site_drawn.problem;
 }
 
 /* One line naming the problem (red), or note (dim) when there is none;
@@ -640,7 +669,7 @@ field_controls_draw_cursor(int x, int y)
         int site_x = cx, site_y = cy, ground, problem, big = ui_footprint_big(menu);
         const char *need;
         field_ui_site(menu, &site_x, &site_y);
-        problem = ui_site_problem(menu, site_x, site_y, &need, &ground);
+        problem = ui_site_problem_drawn(menu, site_x, site_y, &need, &ground);
         {
             /* Red: the ground rejects it. Gold: clear ground, but tech,
              * funds or a worker are missing. Green: A places it. */
@@ -783,7 +812,7 @@ field_controls_draw_hud(void)
     if (mode == MODE_BUILD) {
         int site_x = cx, site_y = cy, ground, problem;
         field_ui_site(menu, &site_x, &site_y);
-        problem = ui_site_problem(menu, site_x, site_y, &need, &ground);
+        problem = ui_site_problem_drawn(menu, site_x, site_y, &need, &ground);
         card_hud_icon(card_building_icon(menu));
         ui_title_costs(x, sc64_race_building_name(menu), building_cost(menu), building_gas_cost(menu));
         if (problem == UI_SITE_OK) ui_armed_keys(x, 137, -1);

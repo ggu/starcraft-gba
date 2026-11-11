@@ -157,9 +157,9 @@ static void set_shape(int cols, int rows, unsigned expected_bytes,
     race_rows = rows;
     sc64_routes_reset();
     assert(sc64_route_active_bytes == expected_bytes);
-    assert(sc64_route_active_slots == expected_slots);
-    for (unsigned i = expected_slots; i < SC64_ROUTE_ACTIVE_MAX_SLOTS; ++i)
-        assert(sc64_route_field[i] == 0);
+    /* The logical cache is the fixed layout; the bank holds more physical fields. */
+    assert(sc64_route_active_slots == SC64_ROUTE_SLOTS);
+    assert(sc64_route_pcount == expected_slots);
     for (int i = 0; i < SC64_ROUTE_SLOTS; ++i) assert(sc64_route_valid[i] == 0);
 }
 
@@ -183,9 +183,14 @@ static void assert_pool_canaries(void)
         assert(sc64_route_get((int)slot, (int)cells - 1) == (int)((slot + 1) & 7u));
         if (cells > 1) assert(sc64_route_get((int)slot, 0) == 7);
     }
-    for (unsigned byte = sc64_route_active_bytes * sc64_route_active_slots;
-         byte < sizeof(sc64_route_pool); ++byte)
-        assert(sc64_route_pool[byte] == 0xa5);
+    /* Bytes outside every logical slot's physical field are untouched. */
+    for (unsigned byte = 0; byte < sizeof(sc64_route_pool); ++byte) {
+        int inside = 0;
+        for (unsigned slot = 0; slot < sc64_route_active_slots; ++slot)
+            inside |= sc64_route_pool + byte >= sc64_route_field[slot] &&
+                      sc64_route_pool + byte < sc64_route_field[slot] + sc64_route_active_bytes;
+        if (!inside) assert(sc64_route_pool[byte] == 0xa5);
+    }
 }
 
 static void assert_random_queries(unsigned count)
@@ -207,7 +212,8 @@ static void assert_random_queries(unsigned count)
 int main(void)
 {
     assert(sc64_route_configure());
-    assert(sc64_route_active_bytes == 1536 && sc64_route_active_slots == 18);
+    assert(sc64_route_active_bytes == 1536 && sc64_route_active_slots == SC64_ROUTE_SLOTS &&
+           sc64_route_pcount == 56);
     assert_random_queries(240);
     assert_pool_canaries();
     /* Open-grid ties exercise the exact root-BFS direction, including L-fast. */
@@ -227,7 +233,7 @@ int main(void)
 
     set_shape(127, 127, 6049, 14);
     assert_pool_canaries();
-    set_shape(64, 64, 1536, 18);
+    set_shape(64, 64, 1536, 56);
     assert_random_queries(180);
     assert_pool_canaries();
 
