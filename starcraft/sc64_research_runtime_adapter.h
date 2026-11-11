@@ -30,6 +30,41 @@ static int sc64_pr_stage_campaign_initialize(void)
 #endif
 static int sc64_pr_stage_job_marked(const Building *q)
 { return q && (q->type==B_FORGE || q->type==B_CYBERNETICS_CORE) && (q->level || q->queue_progress); }
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+/* Idle-cost caches of the product. `jobs` is the exact number of producers for
+ * which sc64_pr_stage_job_marked() holds; `levels_any` is set while any
+ * completed typed level is nonzero. Both are derived state: they are zeroed on
+ * every reset, rebuilt from the loaded world by sc64_pr_stage_resync(), and
+ * maintained where a job starts, completes, is cancelled or destroyed. With
+ * both clear the per-update scan and every per-hit lookup reduce to one test. */
+static uint16_t sc64_pr_stage_jobs;
+static uint8_t sc64_pr_stage_levels_any;
+#define SC64_PR_ANY_LEVEL (sc64_pr_stage_levels_any)
+#define SC64_PR_STAGE_RESET() (sc64_pr_stage_jobs=0, sc64_pr_stage_levels_any=0)
+#define SC64_PR_JOBS_ADJUST(n) (sc64_pr_stage_jobs=(uint16_t)(sc64_pr_stage_jobs+(n)))
+static unsigned sc64_pr_stage_jobs_scan(void)
+{
+    unsigned n=0;
+    for (int i=0;i<MAX_BUILDINGS;++i) if (sc64_pr_stage_job_marked(&b[i])) ++n;
+    return n;
+}
+static unsigned sc64_pr_stage_levels_scan(void)
+{
+    unsigned any=0;
+    for (unsigned o=0;o<SC64_PR_CAMPAIGN_OWNERS;++o)
+        for (unsigned f=0;f<SC64_PR_FAMILY_COUNT;++f) any|=sc64_experimental_research_levels.level[o][f];
+    return any!=0;
+}
+static void sc64_pr_stage_resync(void)
+{
+    sc64_pr_stage_jobs=(uint16_t)sc64_pr_stage_jobs_scan();
+    sc64_pr_stage_levels_any=(uint8_t)sc64_pr_stage_levels_scan();
+}
+#else
+#define SC64_PR_ANY_LEVEL 1
+#define SC64_PR_STAGE_RESET() ((void)0)
+#define SC64_PR_JOBS_ADJUST(n) ((void)0)
+#endif
 static int sc64_pr_stage_receipt(int slot, Sc64PrPaidReceipt *paid)
 {
     return slot>=0 && slot<MAX_BUILDINGS &&
@@ -60,7 +95,7 @@ static inline unsigned sc64_pr_stage_typed(int owner,unsigned family)
     unsigned v=sc64_experimental_research_levels.level[owner][family];
     return v>3u ? 3u : v;
 }
-static int sc64_pr_stage_weapon_level(int owner,int raw_weapon)
+static int sc64_pr_stage_weapon_level_slow(int owner,int raw_weapon)
 {
     int base=owner==SIDE ? weapons_level : 0, id=sc64_stock_weapon_upgrade_id(raw_weapon), family;
     if (base<0 || base>2 || owner<0 || owner>=SC64_PR_CUSTOM_OWNERS ||
@@ -71,7 +106,7 @@ static int sc64_pr_stage_weapon_level(int owner,int raw_weapon)
     return (int)sc64_pr_effective_level((unsigned)family,
         sc64_pr_stage_typed(owner,(unsigned)family),(unsigned)base,0);
 }
-static int sc64_pr_stage_unit_armor_level(const Unit *q)
+static int sc64_pr_stage_unit_armor_level_slow(const Unit *q)
 {
     int base=q->owner==SIDE ? armor_level : 0;
     int raw=q->raw_type>=0 ? q->raw_type : sc64_race_raw_unit(q->type);
@@ -88,12 +123,33 @@ static int sc64_pr_stage_unit_armor_level(const Unit *q)
  * target's controller and used only while the target still has shields. The
  * integer engine floors a reduced hit at one point (the original game's floor
  * is half a point); hit_target_impl_ex() and the siege packet call this. */
-static int sc64_pr_stage_shield_armor(int target)
+static int sc64_pr_stage_shield_armor_slow(int target)
 {
     int owner=target<MAX_UNITS ? u[target].owner : b[target-MAX_UNITS].owner;
     if (owner<0 || owner>=SC64_PR_CUSTOM_OWNERS ||
         !sc64_pr_stage_owner_active((unsigned)owner)) return 0;
     return (int)sc64_pr_stage_typed(owner,SC64_PR_SHIELDS);
+}
+/* With no completed level anywhere every result below is the legacy value. */
+static inline int sc64_pr_stage_weapon_level(int owner,int raw_weapon)
+{
+    if (!SC64_PR_ANY_LEVEL) return owner==SIDE ? weapons_level : 0;
+    return sc64_pr_stage_weapon_level_slow(owner,raw_weapon);
+}
+static inline int sc64_pr_stage_unit_armor_level(const Unit *q)
+{
+    if (!SC64_PR_ANY_LEVEL) return q->owner==SIDE ? armor_level : 0;
+    return sc64_pr_stage_unit_armor_level_slow(q);
+}
+static inline int sc64_pr_stage_shield_armor(int target)
+{
+    if (!SC64_PR_ANY_LEVEL) return 0;
+    return sc64_pr_stage_shield_armor_slow(target);
+}
+static inline int sc64_pr_stage_dragoon_bonus(const Unit *q)
+{
+    if (q->type!=U_DRAGOON || !SC64_PR_ANY_LEVEL) return 0;
+    return sc64_pr_stage_dragoon_bonus_slow(q);
 }
 static inline int sc64_pr_stage_shield_reduce(int target,int damage)
 {
@@ -105,7 +161,7 @@ static inline int sc64_pr_stage_shield_reduce(int target,int damage)
 /* Pinned OpenBW grants the standard raw-66 Dragoon +64 source pixels
  * (32 at this engine's half scale) on either weapon target. Hero raw IDs
  * retain their existing behavior until their independent rule is integrated. */
-static int sc64_pr_stage_dragoon_bonus(const Unit *q)
+static int sc64_pr_stage_dragoon_bonus_slow(const Unit *q)
 {
     int raw=q->raw_type>=0 ? q->raw_type : sc64_race_raw_unit(q->type);
     if (q->type!=U_DRAGOON || raw!=66 || q->owner>=SC64_PR_CUSTOM_OWNERS ||
@@ -172,6 +228,7 @@ static int sc64_pr_stage_begin_slot(int slot,unsigned family)
         &ore,&vespene,max,1,1,1,0,(unsigned)legacy_w,(unsigned)legacy_a,pending_w,pending_a)) return 0;
     *q=candidate; if (owner==SIDE) { minerals=ore; gas=vespene; }
     else { race_minerals[owner]=ore; race_gas[owner]=vespene; }
+    SC64_PR_JOBS_ADJUST(1);
     return 1;
 }
 static int sc64_pr_stage_menu_selected(void)
@@ -218,6 +275,7 @@ static int sc64_pr_stage_cancel_slot(int slot, int destroyed)
                                   owner==SIDE ? INT_MAX : 65535)) return 0;
     b[slot]=candidate; if (owner==SIDE) { minerals=ore; gas=vespene; }
     else { race_minerals[owner]=ore; race_gas[owner]=vespene; }
+    SC64_PR_JOBS_ADJUST(-1);
     return 1;
 }
 static int sc64_pr_stage_destroy_slot(int slot)
@@ -233,6 +291,7 @@ static int sc64_pr_stage_destroy_slot(int slot)
                                    owner==SIDE ? INT_MAX : 65535)) return 0;
     b[slot]=candidate; if (owner==SIDE) { minerals=ore; gas=vespene; }
     else { race_minerals[owner]=ore; race_gas[owner]=vespene; }
+    SC64_PR_JOBS_ADJUST(-1);
     return 1;
 }
 static int sc64_pr_stage_transfer_allowed(int slot,int new_owner)
@@ -244,6 +303,9 @@ static int sc64_pr_stage_transfer_allowed(int slot,int new_owner)
 /* Validate all rows and duplicate keys before advancing any job. */
 static void sc64_pr_stage_tick(void)
 {
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+    if (!sc64_pr_stage_jobs) return; /* idle: nothing to validate or advance */
+#endif
     if (sc64_pr_stage_fault) return;
     for (int i=0;i<MAX_BUILDINGS;++i) {
         Sc64PrPaidReceipt p;
@@ -271,8 +333,13 @@ static void sc64_pr_stage_tick(void)
         int pw=o==SIDE && weapons_research, pa=o==SIDE && armor_research;
         if (!race_site_powered((int)o,b[i].x,b[i].y)) continue;
         if (lw<0 || lw>2 || la<0 || la>2) continue;
-        (void)sc64_pr_job_tick_custom(&b[i],o,&sc64_experimental_research_levels,
-                                      (unsigned)lw,(unsigned)la,pw,pa,1);
+        if (sc64_pr_job_tick_custom(&b[i],o,&sc64_experimental_research_levels,
+                                    (unsigned)lw,(unsigned)la,pw,pa,1)==1) {
+            SC64_PR_JOBS_ADJUST(-1);
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+            sc64_pr_stage_levels_any=1;
+#endif
+        }
     }
 }
 static int sc64_pr_stage_blocks_legacy(int type)

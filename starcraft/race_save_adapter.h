@@ -5115,6 +5115,9 @@ static int race_load_game(void) {
     memcpy(sc64_scarab_stage_payer,plan.scarab_payers,sizeof sc64_scarab_stage_payer);
 #endif
 #endif
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+    sc64_pr_stage_resync();
+#endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }
 #endif

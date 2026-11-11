@@ -55,6 +55,15 @@ static void write_sram(const char *path)
 }
 
 #ifndef SC64_PRODUCT_TEST_BASE
+/* The idle-cost caches must equal a from-scratch scan after every step. */
+static unsigned cache_checks;
+static void check_caches(void)
+{
+    ++cache_checks;
+    assert(sc64_pr_stage_jobs==sc64_pr_stage_jobs_scan());
+    assert(sc64_pr_stage_levels_any==sc64_pr_stage_levels_scan());
+}
+#define game_update(h,p) do { (game_update)((h),(p)); check_caches(); } while (0)
 static Sc64PrPaidReceipt receipt(int slot)
 {
     Sc64PrPaidReceipt r; memset(&r,0,sizeof r);
@@ -82,6 +91,7 @@ static int menu_command(int slot,int row)
     assert(menu_cursor==row);
     game_update(KEY_A,KEY_A); game_update(0,0);
     assert(!menu_open);
+    check_caches();
     return toast_id;
 }
 /* The menu command spends a few updates; the job has ticked that long. */
@@ -173,19 +183,19 @@ static void lifecycle(void)
     assert(menu_command(forge,0)==0 && minerals==850 && gas==850 && near_full(b[forge].queue_progress,5600));
     assert(menu_command(forge,3)==0 && minerals==1000);
     /* Maximum level: level three done means nothing further is sold. */
-    sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]=3; /* test setup */
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_WEAPONS]=3; /* test setup */ sc64_pr_stage_resync();
     assert(menu_command(forge,0)==10 && minerals==1000 && !receipt(forge).live);
 
     /* Shields: level one needs no Core, level two needs one. */
     assert(menu_command(forge,2)==0); assert(menu_command(forge,3)==0);
-    sc64_experimental_research_levels.level[SIDE][SC64_PR_SHIELDS]=1; /* test setup */
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_SHIELDS]=1; /* test setup */ sc64_pr_stage_resync();
     assert(sc64_pr_quote_v45(SC64_PR_SHIELDS,1,&q) && q.mineral==300 && q.ticks==5600);
     assert(menu_command(forge,2)==0 && minerals==700); assert(menu_command(forge,3)==0 && minerals==1000);
 
     /* Core: air weapons, air armor and Singularity Charge (once). */
     assert(menu_command(core,2)==0 && minerals==850 && gas==850 && near_full(b[core].queue_progress,3125));
     assert(menu_command(core,3)==0 && minerals==1000);
-    sc64_experimental_research_levels.level[SIDE][SC64_PR_SINGULARITY]=1;
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_SINGULARITY]=1; sc64_pr_stage_resync();
     assert(menu_command(core,2)==10);
     assert(menu_command(core,0)==0 && minerals==900); assert(menu_command(core,3)==0);
 
@@ -193,9 +203,10 @@ static void lifecycle(void)
      * destroyed building keeps nothing of the job. */
     minerals=gas=1000;
     assert(menu_command(forge,1)==0 && minerals==900);
-    sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_ARMOR]=0;
+    sc64_experimental_research_levels.level[SIDE][SC64_PR_GROUND_ARMOR]=0; sc64_pr_stage_resync();
     b[forge].hp=1; b[forge].shield=0;
     hit_target_impl_ex(MAX_UNITS+forge,10,U_MARINE,ENEMY,SC64_STOCK_DMG_NORMAL,0);
+    check_caches();
     assert(!b[forge].alive && minerals==975 && gas==975 && !b[forge].level && !b[forge].queue_progress);
     assert(!sc64_pr_stage_fault);
     destroy_building(forge,ENEMY); assert(minerals==975); /* no second credit */
@@ -214,6 +225,7 @@ static void lifecycle(void)
     assert(sc64_pr_stage_begin_slot(efs,SC64_PR_GROUND_WEAPONS));
     assert(race_minerals[ENEMY]==900 && minerals==hm && gas==hg && receipt(efs).payer==ENEMY);
     assert(sc64_pr_stage_cancel_slot(efs,0) && race_minerals[ENEMY]==1000);
+    printf("cache checks equal to a full scan: %u\n",cache_checks);
     puts("research lifecycle through the ordinary menu: PASS");
 }
 
@@ -233,11 +245,12 @@ static void quiet_world(void)
     memset(invincible_units,0,sizeof invincible_units);
     memset(invincible_buildings,0,sizeof invincible_buildings);
     memset(&sc64_experimental_research_levels,0,sizeof sc64_experimental_research_levels);
+    sc64_pr_stage_resync();
     weapons_level=armor_level=0; race_impact_reset();
     for (int c=0;c<MAP_CELLS;++c) SC64_GRID_SET(visible,c,1);
 }
 static void set_level(int owner,unsigned family,unsigned level)
-{ sc64_experimental_research_levels.level[owner][family]=(uint8_t)level; }
+{ sc64_experimental_research_levels.level[owner][family]=(uint8_t)level; sc64_pr_stage_resync(); }
 static void drain_impacts(void) { for (int i=0;i<64;++i) race_impact_tick(); }
 
 /* One ordinary swing through tick_combat and the impact queue. */
@@ -445,6 +458,7 @@ static void t_save_read(const char *path)
     gba_init(); game_init(); read_sram(path);
     assert(race_load_game());
     assert(frame==fr && race_mode==1 && race_human==R_PROTOSS);
+    check_caches(); assert(sc64_pr_stage_jobs==2 && sc64_pr_stage_levels_any==1);
     assert(minerals==e[0] && gas==e[1] && race_minerals[ENEMY]==e[2] && race_gas[ENEMY]==e[3]);
     for (int o=0;o<5;++o) for (unsigned k=0;k<6;++k) assert(level_of(o,k)==lv[o][k]);
     int forge=e[4], core=e[6];
@@ -458,6 +472,7 @@ static void t_save_read(const char *path)
     assert(b[forge].queue_progress==e[5]-5 && b[core].queue_progress==e[7]-5);
     /* Its recorded price is intact, so cancelling pays it back exactly. */
     int m=minerals,g=gas;
+    check_caches();
     assert(menu_command(forge,3)==0 && minerals==m+300 && gas==g+300);
     assert(menu_command(core,3)==0 && minerals==m+400 && gas==g+400 && !receipt(core).live);
     /* And completion still works from the loaded state. */
@@ -527,7 +542,7 @@ static void old_read(const char *path)
     gba_init(); game_init(); read_sram(path);
     assert(race_load_game());
     for (int o=0;o<5;++o) for (unsigned k=0;k<6;++k) assert(level_of(o,k)==0);
-    assert(!sc64_pr_stage_fault);
+    assert(!sc64_pr_stage_fault); check_caches(); assert(!sc64_pr_stage_jobs && !sc64_pr_stage_levels_any);
     for (int i=0;i<MAX_BUILDINGS;++i) assert(!receipt(i).live);
     assert(weapons_level==1 && armor_level==2); /* the old generic floors stay */
     assert(digest()==want);

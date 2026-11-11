@@ -5576,6 +5576,7 @@ init_state(void)
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     sc64_pr_stage_fault=0;
+    SC64_PR_STAGE_RESET();
 #ifdef GBA_HOST
     sc64_pr_stage_fault_slot=-1; memset(&sc64_pr_stage_fault_building,0,sizeof(sc64_pr_stage_fault_building));
     memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
@@ -5848,6 +5849,7 @@ game_init(void)
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     sc64_pr_stage_fault=0;
+    SC64_PR_STAGE_RESET();
 #ifdef GBA_HOST
     sc64_pr_stage_fault_slot=-1; memset(&sc64_pr_stage_fault_building,0,sizeof(sc64_pr_stage_fault_building));
     memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
