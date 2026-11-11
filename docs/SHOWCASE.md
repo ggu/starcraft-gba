@@ -68,7 +68,7 @@ profile's controls and menus:
   minerals or gas short by an amount, no free worker, nothing selected,
   fully upgraded). Contextual rows (Nexus, Cannon, Lair, Spire, Creep
   Colony, spells, transports, lift/land) keep their places. The list
-  reopens on the last command, so B, A repeats it. The Showcase draws this list as a command card (below).
+  reopens on the last command, so B, A repeats it. The Showcase's custom-game list has 20 rows (Protoss; Terran 23, Zerg 22), more than the command card's 15 buttons, so the Showcase draws the framed list and UP and DOWN step through it. The command card (below) is used for lists of 15 rows or fewer.
 - Placement snaps to an 8-pixel grid; gas structures snap to their geyser.
   The footprint is green when A places it, gold on clear ground that still
   lacks tech, funds or a worker, and red when the ground rejects it, with the
@@ -109,12 +109,14 @@ imports from the verified ROM into `.local/sc64/command-icons/generated/`
   race's supply icon, without their 1-pixel frame so they fit the
   12-pixel top bar, matched to the nearest runtime palette colours.
 
-- B opens the card bottom right: Move, Stop and Attack on the top row, then
+- When a list fits (15 rows or fewer, so not the Showcase's custom-game list),
+  B opens the card bottom right: Move, Stop and Attack on the top row, then
   the list's other commands three to a row in their usual order. Buttons are
   green when usable, grey when not, and gold and framed when highlighted; a
   red pip marks a command that is only short of minerals or gas.
 - The D-pad moves on the card. Left and right wrap within a row, up and down
-  within a column, so B, Left, A arms Attack Move.
+  within a column, so B, Left, A arms Attack Move. On the framed list, B,
+  Down, A arms Attack Move.
 - The HUD shows the highlighted command's button beside its name, cost and
   explanation, and keeps the button while a move, attack or placement is
   armed.
