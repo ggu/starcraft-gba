@@ -88,17 +88,20 @@ the linker guards (`__iwram_end < 0x03005000`, `__bss_end < 0x0203e000`) and
 | Product | `__iwram_end` | `__bss_end` base | `__bss_end` soft fog | change | EWRAM headroom left |
 | --- | --- | --- | --- | ---: | ---: |
 | Terran | `030044a8` | `0203748c` | `020399e8` | +9,564 | 17,944 |
-| Zerg Z9 | `03004850` | `0203b1ac` | `0203d620` | +9,332 | 2,528 |
+| Zerg Z9 (16 slots) | `03004850` | `0203b1ac` | `0203c5e0` | +4,148 | 6,688 |
 | Protoss P10 | `03004818` | `0203978c` | `0203bcf0` | +9,572 | 8,976 |
 | Showcase | `03004a68` | `020372d0` | `0203982c` | +9,308 | 18,388 |
 
-About 8.2 KB of the added EWRAM is the shaded-tile cache (32 tiles of 256
-bytes plus tags, `SC64_FOG_TILE_SLOTS`, a power of two; 16 slots would give
-Zerg 4 KB more headroom, not measured); the rest is the per-frame signature
+About 8.2 KB of the added EWRAM (4.1 KB on Zerg) is the shaded-tile cache (256
+bytes per slot plus tags; `FOG_TILE_SLOTS` in the top-level `Makefile`, a power
+of two, default 32; `FOG_TILE_SLOTS_ZERG`, default 16, because Egg activation
+and paid Scarabs need Zerg's EWRAM); the rest is the per-frame signature
 array (306 bytes), the fog fingerprint (88), the wider per-cell state (153
 more), the partial-redraw flags (153) and, where the terrain cache shares VRAM
 with the projectile arena, one cache row moved from VRAM to EWRAM (240).
-Zerg's headroom is thin: choose 16 slots there if more is needed. VRAM use is
+On Zerg, 32 slots measured +3.08% (headroom 2,528 bytes) and 16 slots +3.30%
+(1,421,950 against 1,376,574); the frames and the ARM page and palette hashes
+are identical in both, only cost differs. VRAM use is
 unchanged by this pass (the 256-byte shade map and the ranges above).
 
 ## Cost (ARM, pinned busiest 1,000 updates of the three-opponent custom battle)
@@ -114,7 +117,7 @@ every row. Terran and Zerg still match the original pin.
 | Product | loop mean, base | merged draft (older base) | first optimization | **this pass** | shade-only variant | simulation (`upd`) |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | Terran | 1,121,240 | +35.0% | +4.4% | 1,158,191 (**+3.3%**) | +2.5% | unchanged |
-| Zerg | 1,376,574 | +31.8% | +4.1% | 1,418,972 (**+3.1%**) | +2.3% | unchanged |
+| Zerg | 1,376,574 | +31.8% | +4.1% | 1,421,950 (**+3.3%**, 16 slots) | +2.3% | unchanged |
 | Protoss | 1,489,501 | +30.7% | +4.3% | 1,535,765 (**+3.1%**) | +2.0% | unchanged |
 
 This is above the 1.5% aim, and shade-only (`-DSC64_SOFT_FOG_SHADE_ONLY`:
