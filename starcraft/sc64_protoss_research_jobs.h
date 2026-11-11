@@ -6,8 +6,8 @@
 #ifndef SC64_PROTOSS_RESEARCH_JOBS_H
 #define SC64_PROTOSS_RESEARCH_JOBS_H
 #include <limits.h>
-#if (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE)) || !defined(SC64_RACES) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL)
-#error "Research job integration stage is HOST-only and requires the research journal"
+#if (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE) && !defined(SC64_RESEARCH_SRAM_PRODUCT)) || !defined(SC64_RACES) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL)
+#error "Research jobs need the HOST stage, the bounded ARM probe or the SRAM product, and the research journal"
 #endif
 
 /* Immutable quote contract for journal namespace 0x45. A policy change must

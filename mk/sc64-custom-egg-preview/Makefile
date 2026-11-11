@@ -4,7 +4,7 @@ SC64_EGG_PREVIEW_ROOT := build/custom-egg-preview
 SC64_EGG_PREVIEW_BUILD := $(SC64_EGG_PREVIEW_ROOT)/build
 SC64_EGG_PREVIEW_FACT_DIR := $(SC64_EGG_PREVIEW_ROOT)/p10-facts
 SC64_EGG_PREVIEW_FACT := $(SC64_EGG_PREVIEW_FACT_DIR)/sc64_fact_tables_generated.h
-SC64_EGG_PREVIEW_P10_FLAGS = $(patsubst -I$(P10_FACT_V2_DIR),-I$(SC64_EGG_PREVIEW_FACT_DIR),$(PROTOSS_P10_FLAGS))
+SC64_EGG_PREVIEW_P10_FLAGS = $(patsubst -I$(P10_FACT_V2_DIR),-I$(SC64_EGG_PREVIEW_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS))
 SC64_EGG_PREVIEW_DEPS := $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.ld Makefile mk/sc64-custom-egg-preview/Makefile
 
 $(SC64_EGG_PREVIEW_FACT): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile mk/sc64-custom-egg-preview/Makefile

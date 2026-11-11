@@ -12,7 +12,7 @@ custom-egg-z9:
 	$(CLANG) $(CUSTOM_HOST) $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_egg_ordinary_input.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-z9
 	$(COMBINED_BIN_DIR)/custom-egg-z9
 custom-egg-p10:
-	$(CLANG) $(CUSTOM_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(CUSTOM_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_ordinary_input.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-p10
+	$(CLANG) $(CUSTOM_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(CUSTOM_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_shared_egg_ordinary_input.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-p10
 	$(COMBINED_BIN_DIR)/custom-egg-p10
 custom-egg-showcase:
 	$(CLANG) $(CUSTOM_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_ordinary_input.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-showcase
@@ -29,7 +29,7 @@ custom-egg-journal-z9:
 	$(CLANG) $(CUSTOM_HOST) $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_egg_custom_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-journal-z9
 	$(COMBINED_BIN_DIR)/custom-egg-journal-z9
 custom-egg-journal-p10:
-	$(CLANG) $(CUSTOM_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(CUSTOM_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_custom_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-journal-p10
+	$(CLANG) $(CUSTOM_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(CUSTOM_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_shared_egg_custom_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-journal-p10
 	$(COMBINED_BIN_DIR)/custom-egg-journal-p10
 custom-egg-journal-showcase:
 	$(CLANG) $(CUSTOM_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_custom_journal.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-journal-showcase
@@ -72,7 +72,7 @@ custom-egg-context-z9:
 	$(CLANG) $(CUSTOM_HOST) $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-z9
 	$(COMBINED_BIN_DIR)/custom-egg-context-z9
 custom-egg-context-p10:
-	$(CLANG) $(CUSTOM_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(CUSTOM_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-p10
+	$(CLANG) $(CUSTOM_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(CUSTOM_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-p10
 	$(COMBINED_BIN_DIR)/custom-egg-context-p10
 custom-egg-context-showcase:
 	$(CLANG) $(CUSTOM_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_context_game.c $(CUSTOM_EXTRA) -o $(COMBINED_BIN_DIR)/custom-egg-context-showcase
