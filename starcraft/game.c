@@ -29,8 +29,8 @@ static int race_q8_flash_begin(void);
 static int race_q8_flash_write(const void *data,u32 length);
 #endif
 #if defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) && \
-    (!defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE)))
-#error "Active research journal requires the HOST-only research job stage"
+    (!defined(SC64_EXPERIMENTAL_RESEARCH_JOBS) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || (!defined(GBA_HOST) && !defined(SC64_RESEARCH_BOUNDED_ARM_PROBE) && !defined(SC64_RESEARCH_SRAM_PRODUCT)))
+#error "Active research journal requires the research job stage"
 #endif
 #if defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) && \
     (!defined(SC64_CAMPAIGN_CONTROLLER_HOST_STAGE) || !defined(SC64_SCARAB_AI_RESTOCK_HOST_STAGE) || !defined(SC64_Z9_RUNTIME) || !defined(SC64_SHARED_SCOURGE_COMBAT))
@@ -5026,6 +5026,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
     int *shield=target<MAX_UNITS?&u[target].shield:&b[target-MAX_UNITS].shield;
     if (!(hit_flags & SC64_HIT_PRECOMPUTED_HP)) {
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+        if (*shield>0) damage=sc64_pr_stage_shield_reduce(target,damage);
+#endif
         int absorbed=*shield<damage?*shield:damage;*shield-=absorbed;damage-=absorbed;
     }
     if(!damage)return;
@@ -5575,6 +5578,7 @@ init_state(void)
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     sc64_pr_stage_fault=0;
+    SC64_PR_STAGE_RESET();
 #ifdef GBA_HOST
     sc64_pr_stage_fault_slot=-1; memset(&sc64_pr_stage_fault_building,0,sizeof(sc64_pr_stage_fault_building));
     memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
@@ -5847,6 +5851,7 @@ game_init(void)
     memset(&sc64_experimental_research_levels,0,sizeof(sc64_experimental_research_levels));
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     sc64_pr_stage_fault=0;
+    SC64_PR_STAGE_RESET();
 #ifdef GBA_HOST
     sc64_pr_stage_fault_slot=-1; memset(&sc64_pr_stage_fault_building,0,sizeof(sc64_pr_stage_fault_building));
     memset(&sc64_pr_stage_fault_receipt,0,sizeof(sc64_pr_stage_fault_receipt));
@@ -6687,10 +6692,7 @@ choose_command(int choice)
 {
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     if (sc64_pr_stage_menu_selected()) {
-        int family=sc64_pr_stage_menu_family(choice), ok;
-        if (choice==3) ok=sc64_pr_stage_cancel_slot(selected_building,0);
-        else ok=family>=0 && sc64_pr_stage_begin_slot(selected_building,(unsigned)family);
-        menu_open=0; mode=MODE_NORMAL; toast(ok ? 4 : 8); return;
+        toast(sc64_pr_stage_menu_command(choice)); menu_open=0; mode=MODE_NORMAL; return;
     }
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -8066,9 +8068,16 @@ unit_range(int type)
     return 0;
 }
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
-#define SC64_PR_ACQUIRE_RANGE(q) (unit_range((q)->type)+sc64_pr_stage_dragoon_bonus(q))
+/* Out of line, like the unit_range() call it replaces, so update_orders() keeps
+ * its register allocation; idle cost is the bonus's one type test. */
+static int __attribute__((noinline)) sc64_pr_unit_range(const Unit *q)
+{ return unit_range(q->type)+sc64_pr_stage_dragoon_bonus(q); }
+#define SC64_PR_ACQUIRE_RANGE(q) sc64_pr_unit_range(q)
+/* One evaluation: a second unit_range() call is not folded across the bonus. */
+#define SC64_PR_FAR_RANGE(q) ({ int ar_=SC64_PR_ACQUIRE_RANGE(q); ar_>64?ar_+18:64; })
 #else
 #define SC64_PR_ACQUIRE_RANGE(q) unit_range((q)->type)
+#define SC64_PR_FAR_RANGE(q) (SC64_PR_ACQUIRE_RANGE(q)>64?SC64_PR_ACQUIRE_RANGE(q)+18:64)
 #endif
 
 static int
@@ -9111,9 +9120,11 @@ target_lists_unavailable:
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
             target = nearest_enemy_typed(q->x,q->y,q->owner,
 #ifdef SC64_RACES
-                SC64_PR_ACQUIRE_RANGE(q)>64?SC64_PR_ACQUIRE_RANGE(q)+18:
+                SC64_PR_FAR_RANGE(q),
+#else
+                64,
 #endif
-                64,q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
+                q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
             if (target >= 0) tick_combat(q, target);
             else if (dist2(q->x, q->y, q->tx, q->ty) > 36) move_toward(q, q->tx, q->ty);
             else q->order = ORDER_IDLE;
