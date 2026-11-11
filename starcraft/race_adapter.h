@@ -350,6 +350,24 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
     return 1;
 }
 
+/* A canceled Egg gives its larva back, as the queued legacy order does. The
+ * Egg keeps no producer link, so the nearest owned town hall with room (the
+ * Egg spawns beside its producer) receives it; larvae stay within the saved
+ * limit of three. Without a hall with room the larva is lost. */
+static void __attribute__((noinline)) race_egg_return_larva(int owner, int x, int y)
+{
+    int best = -1, best_d = 0x7fffffff;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        int d;
+        if (!b[i].alive || b[i].owner != owner || b[i].larva >= 3 ||
+            !sc64_race_is_zerg_townhall(b[i].type) ||
+            (b[i].under_construction && b[i].type == B_HATCHERY)) continue;
+        d = dist2(x, y, b[i].x, b[i].y);
+        if (d < best_d) { best_d = d; best = i; }
+    }
+    if (best >= 0) ++b[best].larva;
+}
+
 #if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
 /* Owner-generic service for HOST proof. No ordinary menu binding yet. */
 static int race_shared_egg_cancel(int owner,int slot)
@@ -364,6 +382,7 @@ static int race_shared_egg_cancel(int owner,int slot)
 #endif
     const Sc64RaceUnitRule *product=sc64_race_unit_rule(q->target);
     race_add_owner_resources(owner,product->minerals,product->gas);
+    race_egg_return_larva(owner,q->x,q->y);
     if (owner==SIDE) supply_used-=unit_slot_supply(q);
     q->alive=0;q->selected=0;
     return 1;
@@ -402,6 +421,7 @@ static int race_z7_egg_cancel_selected(void)
 #endif
         product = sc64_race_unit_rule(q->target);
         race_add_owner_resources(q->owner, product->minerals, product->gas);
+        race_egg_return_larva(q->owner, q->x, q->y);
         supply_used -= unit_slot_supply(q);
         q->alive = 0;
         q->selected = 0;

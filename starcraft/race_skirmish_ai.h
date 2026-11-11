@@ -271,8 +271,19 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             int key = race_ai_key(sc64_race_raw_unit(q->type));
             const Sc64RaceUnitRule *ur = sc64_race_unit_rule(q->type);
             if (key >= 0 && c->have[key] < 255) ++c->have[key];
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
             if (ur) c->supply_used += unit_slot_supply(q);
+            /* A paid Egg is the pending product: it counts toward the
+             * product's census, the worker target, pending supply and the
+             * unit share like the queued order it replaces. */
+            if (q->type == SC64_EGG_ACTOR && sc64_z7_egg_product_valid(q->target)) {
+                int pk = race_ai_key(sc64_race_raw_unit(q->target));
+                int n = sc64_z7_egg_product_count(q->target);
+                if (pk >= 0 && c->pend[pk] < 255) c->pend[pk] = (unsigned char)(c->pend[pk] + n > 255 ? 255 : c->pend[pk] + n);
+                if (q->target == U_OVERLORD) ++c->pending_supply;
+                if (sc64_race_is_worker(q->target)) ++c->workers;
+                c->queued_units += n - 1;
+            }
 #else
             if (ur) c->supply_used += ur->supply;
 #endif

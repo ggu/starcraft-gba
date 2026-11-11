@@ -5,7 +5,7 @@ RELEASE_EGG_TEST_DIR ?= /tmp/sc64-release-egg-tests
 RELEASE_EGG_HOST = -std=c11 -O1 -g0 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(SC64_RELEASE_EGG_FLAGS)
 RELEASE_EGG_EXTRA = tests/sc64_guardian_journal_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
 .PHONY: release-egg-host release-egg-terran release-egg-z7 release-egg-z9 release-egg-z10 release-egg-p10 release-egg-showcase
-release-egg-host: release-egg-terran release-egg-z7 release-egg-z9 release-egg-z10 release-egg-p10 release-egg-showcase
+release-egg-host: release-egg-terran release-egg-z7 release-egg-z9 release-egg-z10 release-egg-p10 release-egg-showcase release-egg-rules
 # Each ordinary-input fixture selects a real Hatchery, pays, saves/loads and births.
 define RELEASE_EGG_CUSTOM_TEST
 release-egg-$(1): $(3)
@@ -40,3 +40,26 @@ release-egg-deferred:
 	mkdir -p $(RELEASE_EGG_TEST_DIR)
 	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $(SC64_RELEASE_EGG_FLAGS) tests/sc64_shared_egg_deferred_journal_game.c tests/sc64_shared_egg_journal_shim.c -o $(RELEASE_EGG_TEST_DIR)/deferred
 	$(RELEASE_EGG_TEST_DIR)/deferred
+
+# Rules in every product: price, larva, supply, timer, paired births, cancel,
+# kill, pool and supply caps and a Zerg opponent, then an uninterrupted run
+# against a pause-menu save written by one process and loaded by another.
+.PHONY: release-egg-rules release-egg-rules-terran release-egg-rules-z7 release-egg-rules-z9 release-egg-rules-z10 release-egg-rules-p10 release-egg-rules-showcase
+release-egg-rules: release-egg-rules-terran release-egg-rules-z7 release-egg-rules-z9 release-egg-rules-z10 release-egg-rules-p10 release-egg-rules-showcase
+define RELEASE_EGG_RULES_TEST
+release-egg-rules-$(1): $(3) build/generated/weapon-lookup/sc64_weapon_source_indexed.h
+	mkdir -p $$(RELEASE_EGG_TEST_DIR)
+	$$(CLANG) $$(RELEASE_EGG_HOST) $(2) tests/sc64_shared_egg_rules.c $$(RELEASE_EGG_EXTRA) -o $$(RELEASE_EGG_TEST_DIR)/$(1)-rules
+	$$(RELEASE_EGG_TEST_DIR)/$(1)-rules rules
+	$$(RELEASE_EGG_TEST_DIR)/$(1)-rules full > $$(RELEASE_EGG_TEST_DIR)/$(1)-full.txt
+	$$(RELEASE_EGG_TEST_DIR)/$(1)-rules prefix $$(RELEASE_EGG_TEST_DIR)/$(1).sav
+	$$(RELEASE_EGG_TEST_DIR)/$(1)-rules resume $$(RELEASE_EGG_TEST_DIR)/$(1).sav > $$(RELEASE_EGG_TEST_DIR)/$(1)-resume.txt
+	diff $$(RELEASE_EGG_TEST_DIR)/$(1)-full.txt $$(RELEASE_EGG_TEST_DIR)/$(1)-resume.txt
+	cat $$(RELEASE_EGG_TEST_DIR)/$(1)-resume.txt
+endef
+$(eval $(call RELEASE_EGG_RULES_TEST,terran,$(TERRAN_ROM_FLAGS),))
+$(eval $(call RELEASE_EGG_RULES_TEST,z7,$(ZERG_Z7_RELEASE_FLAGS),$(ZERG_Z7_CANONICAL_INPUTS)))
+$(eval $(call RELEASE_EGG_RULES_TEST,z9,$(ZERG_Z9_RELEASE_FLAGS),$(ZERG_Z9_CANONICAL_INPUTS)))
+$(eval $(call RELEASE_EGG_RULES_TEST,z10,$(ZERG_Z10_RELEASE_FLAGS),$(ZERG_Z10_CANONICAL_INPUTS)))
+$(eval $(call RELEASE_EGG_RULES_TEST,p10,$(filter-out $(SC64_RELEASE_EGG_FLAGS),$(P10_PRODUCT_FLAGS)),$(filter-out $(P10_FACT_V2_HEADER),$(PROTOSS_P10_INPUTS)) $(P10_EGG_FACT_HEADER)))
+$(eval $(call RELEASE_EGG_RULES_TEST,showcase,$(SHOWCASE_FLAGS),))
