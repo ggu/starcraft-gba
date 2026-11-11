@@ -15,7 +15,37 @@ enum { MAP_COLS = 64, MAP_ROWS = 64, MAP_CELLS = MAP_COLS * MAP_ROWS };
 #define WORLD_W (MAP_COLS * 16)
 #define WORLD_H (MAP_ROWS * 16)
 
+#ifdef SC64_FOG_TEST_PACKED
+static u8 visible[(MAP_CELLS + 7) / 8], explored[(MAP_CELLS + 7) / 8];
+#define SC64_GRID_GET(grid, cell) \
+    (((grid)[(unsigned)(cell) >> 3] >> ((unsigned)(cell) & 7u)) & 1u)
+#define FOG_TEST_SET(grid, cell, value) do { \
+    u8 mask_ = (u8)(1u << ((unsigned)(cell) & 7u)); \
+    if (value) (grid)[(unsigned)(cell) >> 3] |= mask_; \
+    else (grid)[(unsigned)(cell) >> 3] &= (u8)~mask_; \
+} while (0)
+#define FOG_TEST_GET(grid, cell) SC64_GRID_GET(grid, cell)
+#else
 static u8 visible[MAP_CELLS], explored[MAP_CELLS];
+#define FOG_TEST_SET(grid, cell, value) ((grid)[cell] = (u8)((value) != 0))
+#define FOG_TEST_GET(grid, cell) ((grid)[cell] != 0)
+#endif
+static void fog_test_fill(int visible_value, int explored_value)
+{
+    for (int cell = 0; cell < MAP_CELLS; ++cell) {
+        FOG_TEST_SET(visible, cell, visible_value);
+        FOG_TEST_SET(explored, cell, explored_value);
+    }
+}
+#ifdef SC64_SOFT_FOG
+/* The cache oracle uses terrain only for the tile being painted. Fog masks
+ * may inspect neighboring fog state, but must never sample hidden terrain. */
+static u8 terrain[MAP_CELLS];
+#ifdef SC64_FOG_TEST_REAL_RASTER
+static u8 raster_tiles[MAP_CELLS][256];
+static u8 raster_shade_lut[256];
+#endif
+#endif
 static unsigned int test_static_key;
 #define SC64_TERRAIN_STATIC_KEY test_static_key
 #ifndef SC64_TERRAIN_CACHE_REAL_GFX
@@ -63,6 +93,24 @@ gfx_blit_window(int y, int height, const u8 *src, int stride, int rows,
 #endif
 
 #include "../starcraft/sc64_terrain_cache.h"
+#ifdef SC64_SOFT_FOG
+#include "../starcraft/sc64_fog.h"
+#endif
+#if defined(SC64_TERRAIN_CACHE_VRAM) && defined(SC64_SOFT_FOG)
+static void fog_vram_canary_init(void)
+{
+    volatile u8 *bytes = (volatile u8 *)(void *)SC64_OBJ_VRAM_FOG;
+    for (unsigned i = 0; i < SC64_OBJ_VRAM_FOG_BYTES; ++i) bytes[i] = 0xa5u;
+}
+static void fog_vram_canary_check(void)
+{
+    volatile const u8 *bytes = (volatile const u8 *)(const void *)SC64_OBJ_VRAM_FOG;
+    for (unsigned i = 0; i < SC64_OBJ_VRAM_FOG_BYTES; ++i) assert(bytes[i] == 0xa5u);
+}
+#else
+#define fog_vram_canary_init() ((void)0)
+#define fog_vram_canary_check() ((void)0)
+#endif
 
 #ifdef SC64_RENDER_KEY_ONCE
 /* Exercise the same scenarios through the caller-supplied key API. */
@@ -84,8 +132,7 @@ fill_band(u8 value)
 static void
 test_diagnostic_counters(void)
 {
-    memset(visible, 0, sizeof(visible));
-    memset(explored, 0, sizeof(explored));
+    fog_test_fill(0, 0);
     sc64_terrain_cache_valid = 0;
     sc64_terrain_cache_reused_base = 0;
     sc64_terrain_requests = sc64_terrain_hits = sc64_terrain_partial = 0;
@@ -119,7 +166,7 @@ test_diagnostic_counters(void)
     assert(sc64_terrain_diag_tiles_checked == (u32)sc64_terrain_cache_mask_count);
     assert(sc64_terrain_diag_dirty_tiles == 0);
 
-    visible[0] = 1;
+    FOG_TEST_SET(visible, 0, 1);
     assert(!sc64_terrain_cached(0, 0));
     assert(sc64_terrain_diag_dirty_tiles == 1);
     assert(sc64_terrain_diag_tiles_checked == 2u * (u32)sc64_terrain_cache_mask_count);
@@ -163,7 +210,7 @@ test_restore_preserves_surrounding_pixels(void)
     memset(pixels, 0x17, sizeof(pixels));
     memset(top, 0x17, sizeof(top));
     memset(bottom, 0x17, sizeof(bottom));
-    visible[10 + 5 * MAP_COLS] = 1;
+    FOG_TEST_SET(visible, 10 + 5 * MAP_COLS, 1);
     fill_band(0x5a);
     assert(sc64_terrain_store(0, 0));
     assert(read_calls == 1);
@@ -181,25 +228,24 @@ test_restore_preserves_surrounding_pixels(void)
 static void
 test_camera_and_fog_invalidation(void)
 {
-    memset(visible, 0, sizeof(visible));
-    memset(explored, 0, sizeof(explored));
+    fog_test_fill(0, 0);
     fill_band(0x31);
     assert(sc64_terrain_store(0, 0));
     assert(!sc64_terrain_cached(16, 0));
 
     /* A changed fog cell outside the viewport does not dirty this band. */
-    visible[63 + 63 * MAP_COLS] = 1;
+    FOG_TEST_SET(visible, 63 + 63 * MAP_COLS, 1);
     assert(sc64_terrain_cached(0, 0));
     assert(sc64_terrain_tile_clean(0, 0));
     /* At x=1, column 15 is visible by one pixel at the right edge. */
     assert(sc64_terrain_store(1, 0));
-    visible[15] = 1;
+    FOG_TEST_SET(visible, 15, 1);
     assert(!sc64_terrain_cached(1, 0));
     assert(!sc64_terrain_tile_clean(15, 0));
     assert(sc64_terrain_tile_clean(14, 0));
     assert(sc64_terrain_store(1, 0));
-    visible[15] = 0;
-    explored[15] = 1;
+    FOG_TEST_SET(visible, 15, 0);
+    FOG_TEST_SET(explored, 15, 1);
     assert(!sc64_terrain_cached(1, 0));
     assert(!sc64_terrain_tile_clean(15, 0));
     assert(sc64_terrain_tile_clean(15, 1));
@@ -208,8 +254,7 @@ test_camera_and_fog_invalidation(void)
 static void
 test_edge_viewport_and_campaign_mission_key(void)
 {
-    memset(visible, 0, sizeof(visible));
-    memset(explored, 0, sizeof(explored));
+    fog_test_fill(0, 0);
     fill_band(0x49);
     assert(sc64_terrain_store(WORLD_W - 240, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT));
     assert(sc64_terrain_cached(WORLD_W - 240, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT));
@@ -233,8 +278,7 @@ test_failed_capture_does_not_validate_cache(void)
 static void
 test_static_object_key_invalidates_full_base(void)
 {
-    memset(visible, 0, sizeof(visible));
-    memset(explored, 0, sizeof(explored));
+    fog_test_fill(0, 0);
     test_static_key = 17;
     fill_band(0x72);
     assert(sc64_terrain_store(0, 0));
@@ -303,6 +347,9 @@ static void verify_obj_guards(void)
     unsigned hi = lo + 240u * SC64_TERRAIN_CACHE_VRAM_ROWS;
     unsigned changed = 0;
     for (unsigned i = 0; i < GBA_VRAM_SCRATCH_BYTES; ++i) {
+        if (i >= SC64_OBJ_VRAM_FOG_OFFSET &&
+            i < SC64_OBJ_VRAM_FOG_OFFSET + SC64_OBJ_VRAM_FOG_BYTES)
+            continue; /* the fog shade map has its own canary */
         if (i < lo || i >= hi) assert(GBA_VRAM_SCRATCH[i] == obj_guard(i));
         else changed += GBA_VRAM_SCRATCH[i] != obj_guard(i);
     }
@@ -310,16 +357,53 @@ static void verify_obj_guards(void)
 }
 #endif
 
+#if defined(SC64_SOFT_FOG) && defined(SC64_FOG_TEST_REAL_RASTER)
+static unsigned partial_cells_drawn, full_cells_drawn;
+#endif
 static void
-render_cell(int col, int row, int camx, int camy)
+render_cell(int col, int row, int camx, int camy, int partial)
 {
+    (void)partial;
     int cell = col + row * MAP_COLS;
     int x = col * 16 - camx;
     int y = 12 + row * 16 - camy;
-    u8 color = visible[cell] ? (u8)(32 + (col * 3 + row) % 224) :
-               (explored[cell] ? 8 : 0);
+#ifdef SC64_SOFT_FOG
+#ifdef SC64_FOG_TEST_REAL_RASTER
+    const u16 signature = sc64_fog_signature(visible, explored, MAP_COLS,
+                                             MAP_ROWS, col, row);
+    const unsigned center = sc64_fog_center_state(signature);
+    /* Unknown cells pass no terrain pointer. The production raster must paint
+     * opaque black without observing terrain for hidden cells. */
+    if (partial) ++partial_cells_drawn; else ++full_cells_drawn;
+    sc64_terrain_fog_cell(partial, x, y, signature,
+                          center == SC64_FOG_UNKNOWN ? 0 : raster_tiles[cell],
+                          raster_shade_lut);
+#else
+    unsigned signature = sc64_fog_signature(visible, explored, MAP_COLS,
+                                            MAP_ROWS, col, row);
+    unsigned digits[9];
+    (void)partial;
+    /* The helper encodes the row-major 3x3 neighborhood as a base-3 number.
+     * Paint nine tiny state swatches so every signature digit affects pixels. */
+    for (int i = 8; i >= 0; --i) {
+        digits[i] = signature % 3u;
+        signature /= 3u;
+    }
+    u8 color = FOG_TEST_GET(visible, cell) ? (u8)(32 + terrain[cell] % 192u) :
+               (FOG_TEST_GET(explored, cell) ? 8 : 0);
+    gfx_rect(x, y, 16, 16, color);
+    for (int i = 0; i < 9; ++i) {
+        int px = x + 1 + (i % 3) * 5;
+        int py = y + 1 + (i / 3) * 5;
+        gfx_rect(px, py, 4, 4, (u8)(12u + digits[i]));
+    }
+#endif
+#else
+    u8 color = FOG_TEST_GET(visible, cell) ? (u8)(32 + (col * 3 + row) % 224) :
+               (FOG_TEST_GET(explored, cell) ? 8 : 0);
     /* Draw black too: a newly unknown cell must erase old terrain. */
     gfx_rect(x, y, 16, 16, color);
+#endif
 }
 
 static void
@@ -331,12 +415,27 @@ render_fixture(int camx, int camy, int incremental)
          * newly exposed strips and world-edge margins. */
         gfx_rect(0, SC64_TERRAIN_CACHE_Y, 240, SC64_TERRAIN_CACHE_HEIGHT, 255);
         (void)sc64_terrain_cached(camx, camy);
+#ifdef SC64_SOFT_FOG
+        /* Whatever the lookup left behind must equal the from-scratch
+         * signature of every cell of the view, every frame. */
+        if (sc64_terrain_now_valid)
+            for (int row = sc64_terrain_now_row0; row < sc64_terrain_now_row0 + sc64_terrain_now_rows; ++row)
+                for (int col = sc64_terrain_now_col0; col < sc64_terrain_now_col0 + sc64_terrain_now_cols; ++col)
+                    assert(sc64_terrain_now[(row - sc64_terrain_now_row0) * sc64_terrain_now_cols +
+                                            (col - sc64_terrain_now_col0)] ==
+                           sc64_terrain_state(col, row));
+#endif
     }
     for (int row = camy / 16; row <= (camy + SC64_TERRAIN_CACHE_HEIGHT) / 16; row++)
         for (int col = camx / 16; col <= (camx + 240) / 16; col++) {
             if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) continue;
             if (incremental && sc64_terrain_tile_clean(col, row)) continue;
-            render_cell(col, row, camx, camy);
+#ifdef SC64_SOFT_FOG
+            render_cell(col, row, camx, camy,
+                        incremental && sc64_terrain_tile_partial(col, row));
+#else
+            render_cell(col, row, camx, camy, 0);
+#endif
         }
 }
 
@@ -353,8 +452,10 @@ compare_incremental_with_fresh(int camx, int camy)
     assert(memcmp(incremental, fresh, sizeof(fresh)) == 0);
     render_fixture(camx, camy, 0);
     assert(sc64_terrain_store(camx, camy));
+    fog_vram_canary_check();
 }
 
+#ifdef SC64_TERRAIN_SCROLL
 static void
 test_scroll_differential(void)
 {
@@ -369,13 +470,12 @@ test_scroll_differential(void)
         {WORLD_W - 480, WORLD_H - 216}, {0, 0},
         {240, 108}, {480, 216}, {WORLD_W - 240, WORLD_H - 108}
     };
-    memset(visible, 0, sizeof(visible));
-    memset(explored, 0, sizeof(explored));
+    fog_test_fill(0, 0);
     for (int row = 0; row < MAP_ROWS; ++row)
         for (int col = 0; col < MAP_COLS; ++col) {
             int cell = col + row * MAP_COLS;
-            visible[cell] = ((col * 7 + row * 3) % 5) != 0;
-            explored[cell] = ((col + row) % 7) != 0;
+            FOG_TEST_SET(visible, cell, ((col * 7 + row * 3) % 5) != 0);
+            FOG_TEST_SET(explored, cell, ((col + row) % 7) != 0);
         }
     test_static_key = 71;
     for (unsigned i = 0; i < sizeof(cameras) / sizeof(cameras[0]); ++i) {
@@ -383,11 +483,15 @@ test_scroll_differential(void)
             int col = cameras[i][0] / 16 + 4;
             int row = cameras[i][1] / 16 + 3;
             int cell = col + row * MAP_COLS;
-            visible[cell] = !visible[cell];
-            explored[cell] = 1;
+            FOG_TEST_SET(visible, cell, !FOG_TEST_GET(visible, cell));
+            FOG_TEST_SET(explored, cell, 1);
         }
         compare_incremental_with_fresh(cameras[i][0], cameras[i][1]);
     }
+#if defined(SC64_SOFT_FOG) && defined(SC64_FOG_TEST_REAL_RASTER)
+    /* The comparisons above must have exercised strip-only redraws. */
+    assert(partial_cells_drawn > 0 && full_cells_drawn > 0);
+#endif
     /* These jumps have no overlap and must use a complete repaint. */
     compare_incremental_with_fresh(100, 100);
     compare_incremental_with_fresh(400, 400);
@@ -405,6 +509,153 @@ test_scroll_differential(void)
     assert(!sc64_terrain_cache_valid);
     compare_incremental_with_fresh(101, 100);
 }
+#endif
+
+#ifdef SC64_SOFT_FOG
+/* The per-frame signature array must equal the nine-read definition for every
+ * cell of every view, including views on each map edge and fogs that mix all
+ * three classes, with and without a stale explored bit under a visible one. */
+static void
+test_signature_array(void)
+{
+    static const int views[][4] = {
+        {0, 0, 16, 8}, {0, 0, 17, 9}, {1, 1, 17, 9}, {10, 5, 27, 13},
+        {MAP_COLS - 17, MAP_ROWS - 9, MAP_COLS, MAP_ROWS},
+        {MAP_COLS - 16, 0, MAP_COLS, 8}, {0, MAP_ROWS - 8, 16, MAP_ROWS},
+        {31, 20, 32, 21}, {2, 0, 3, 9}, {0, 3, 17, 4},
+    };
+    unsigned seed = 12345u;
+    for (int round = 0; round < 40; ++round) {
+        for (int cell = 0; cell < MAP_CELLS; ++cell) {
+            seed = seed * 1664525u + 1013904223u;
+            unsigned r = (seed >> 16) % 7u;
+            /* Round 0 is empty; rounds >= 1 use a different class mix each. */
+            int vis = round && r < (unsigned)(1 + round % 4);
+            int exp = round && (r % 3u == 0u || (round % 5 == 0 && r > 3u));
+            FOG_TEST_SET(visible, cell, vis);
+            FOG_TEST_SET(explored, cell, exp);
+        }
+        for (unsigned v = 0; v < sizeof(views) / sizeof(views[0]); ++v) {
+            int col0 = views[v][0], row0 = views[v][1], col1 = views[v][2], row1 = views[v][3];
+            sc64_terrain_fill_now(col0, row0, col1, row1);
+            assert(sc64_terrain_now_valid);
+            for (int row = row0; row < row1; ++row)
+                for (int col = col0; col < col1; ++col) {
+                    int index = (row - row0) * (col1 - col0) + (col - col0);
+                    assert(sc64_terrain_now[index] == sc64_terrain_state(col, row));
+                    assert(sc64_terrain_state_view(col, row) == sc64_terrain_state(col, row));
+                }
+        }
+    }
+    /* Oversize views are refused rather than overrunning the array. */
+    sc64_terrain_fill_now(0, 0, 18, 9);
+    assert(!sc64_terrain_now_valid);
+    sc64_terrain_fill_now(0, 0, 17, 10);
+    assert(!sc64_terrain_now_valid);
+    sc64_terrain_now_valid = 0;
+}
+
+static void
+test_soft_fog_neighbor_cache(void)
+{
+    test_signature_array();
+    fog_test_fill(1, 1);
+    for (int i = 0; i < MAP_CELLS; ++i) terrain[i] = (u8)(i * 13u + 7u);
+#ifdef SC64_FOG_TEST_REAL_RASTER
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        for (int p = 0; p < 256; ++p)
+            raster_tiles[cell][p] = (u8)(cell * 13u + p * 7u);
+    for (int p = 0; p < 256; ++p) raster_shade_lut[p] = (u8)(p / 2u);
+#endif
+    test_static_key = 211;
+    compare_incremental_with_fresh(100, 100);
+
+    /* An interior fog change changes its own mask and masks of its neighbors. */
+    int col = 12, row = 10, cell = col + row * MAP_COLS;
+    FOG_TEST_SET(visible, cell, 0);
+    assert(!sc64_terrain_cached(100, 100));
+    assert(!sc64_terrain_tile_clean(col, row));
+    assert(!sc64_terrain_tile_clean(col - 1, row));
+    assert(!sc64_terrain_tile_clean(col + 1, row));
+    assert(!sc64_terrain_tile_clean(col, row - 1));
+    assert(!sc64_terrain_tile_clean(col, row + 1));
+    compare_incremental_with_fresh(100, 100);
+
+    /* Each outside-view edge/corner neighbor participates in a visible tile's
+     * dependency signature even though that neighbor's pixels are offscreen. */
+    static const int outside[][2] = {
+        {5, 10}, {22, 10}, {12, 5}, {12, 14},
+        {5, 5}, {22, 5}, {5, 14}, {22, 14}
+    };
+    static const int inside[][2] = {
+        {6, 10}, {21, 10}, {12, 6}, {12, 13},
+        {6, 6}, {21, 6}, {6, 13}, {21, 13}
+    };
+    for (unsigned i = 0; i < sizeof(outside) / sizeof(outside[0]); ++i) {
+        compare_incremental_with_fresh(100, 100);
+        int oc = outside[i][0], orow = outside[i][1];
+        int ic = inside[i][0], irow = inside[i][1];
+        FOG_TEST_SET(visible, oc + orow * MAP_COLS, 0);
+        assert(!sc64_terrain_cached(100, 100));
+        assert(!sc64_terrain_tile_clean(ic, irow));
+        compare_incremental_with_fresh(100, 100);
+    }
+
+    /* Unrelated offscreen fog is not a dependency. Hidden terrain is not read
+     * by the current tile or by any neighboring mask. */
+    FOG_TEST_SET(visible, 50 + 50 * MAP_COLS, 0);
+    assert(sc64_terrain_cached(100, 100));
+    FOG_TEST_SET(explored, cell, 0); /* Make the poison target truly unknown. */
+    assert(!sc64_terrain_cached(100, 100));
+    _Alignas(4) u8 before_hidden_terrain[240 * SC64_TERRAIN_CACHE_HEIGHT];
+    _Alignas(4) u8 after_hidden_terrain[240 * SC64_TERRAIN_CACHE_HEIGHT];
+    render_fixture(100, 100, 0);
+    assert(gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+                         before_hidden_terrain));
+#ifdef SC64_FOG_TEST_REAL_RASTER
+    raster_tiles[cell][113] ^= 0x5au;
+#else
+    terrain[cell] ^= 0x5au;
+#endif
+    /* `cell` is now unknown and must paint the same black without its source. */
+    render_fixture(100, 100, 0);
+    assert(gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+                         after_hidden_terrain));
+    assert(memcmp(before_hidden_terrain, after_hidden_terrain,
+                  sizeof(before_hidden_terrain)) == 0);
+
+    /* Whole-grid load/reset-style replacement at a fixed camera is discovered
+     * from the saved dependency signatures without an explicit cache epoch. */
+    fog_test_fill(0, 0);
+    assert(!sc64_terrain_cached(100, 100));
+    compare_incremental_with_fresh(100, 100);
+
+    /* Subtile and tile-crossing scrolls compare the new world signatures with
+     * their old overlapping entries; exposed pixels still receive full paint. */
+    compare_incremental_with_fresh(101, 101);
+    FOG_TEST_SET(explored, 16 + 7 * MAP_COLS, 1);
+    compare_incremental_with_fresh(102, 102);
+    compare_incremental_with_fresh(116, 116);
+    compare_incremental_with_fresh(0, 0);
+    compare_incremental_with_fresh(WORLD_W - 240,
+                                   WORLD_H - SC64_TERRAIN_CACHE_HEIGHT);
+#if defined(SC64_TERRAIN_ROW_MASKS_ACTIVE) && defined(SC64_FOG_TEST_PACKED)
+    /* At (128,128), the clipped 18-column halo begins at packed bit 7 and
+     * spans through bit 24. This requires the fourth source byte. Column 24
+     * and row 15 lie outside the view but affect its right/bottom corner. */
+    fog_test_fill(1, 1);
+    compare_incremental_with_fresh(128, 128);
+    FOG_TEST_SET(visible, 24 + 10 * MAP_COLS, 0);
+    assert(!sc64_terrain_cached(128, 128));
+    assert(!sc64_terrain_tile_clean(23, 10));
+    compare_incremental_with_fresh(128, 128);
+    FOG_TEST_SET(visible, 24 + 15 * MAP_COLS, 0);
+    assert(!sc64_terrain_cached(128, 128));
+    assert(!sc64_terrain_tile_clean(23, 14));
+    compare_incremental_with_fresh(128, 128);
+#endif
+}
+#endif
 
 int
 main(void)
@@ -415,14 +666,14 @@ main(void)
 #ifdef SC64_TERRAIN_CACHE_VRAM
     seed_obj_guards();
 #endif
+    fog_vram_canary_init(); /* after the guards: the fog map has its own pattern */
     test_static_key = 17;
-    memset(visible, 0, sizeof(visible));
-    memset(explored, 0, sizeof(explored));
+    fog_test_fill(0, 0);
     for (int row = 0; row < 9; row++)
         for (int col = 0; col < 16; col++) {
             int cell = col + row * MAP_COLS;
-            visible[cell] = ((col + row) % 3) != 0;
-            explored[cell] = 1;
+            FOG_TEST_SET(visible, cell, ((col + row) % 3) != 0);
+            FOG_TEST_SET(explored, cell, 1);
         }
     render_fixture(1, 3, 0);
     assert(gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT, expected));
@@ -431,23 +682,23 @@ main(void)
     assert(sc64_terrain_cached(1, 3));
     assert(gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT, observed));
     assert(memcmp(expected, observed, sizeof(expected)) == 0);
+    fog_vram_canary_check();
     render_fixture(1, 3, 0); /* fresh uncached draw through the real GBA_HOST renderer */
     assert(gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT, observed));
     assert(memcmp(expected, observed, sizeof(expected)) == 0);
 
     /* Toggle sight, reveal previously hidden cells, then reset exploration.
        Each incremental redraw must equal a clean full render byte for byte. */
-    visible[3 + 2 * MAP_COLS] = 0;
-    explored[3 + 2 * MAP_COLS] = 0;
-    visible[7 + 4 * MAP_COLS] = 1;
-    explored[7 + 4 * MAP_COLS] = 1;
-    visible[10 + 1 * MAP_COLS] = 0;
-    explored[10 + 1 * MAP_COLS] = 1;
+    FOG_TEST_SET(visible, 3 + 2 * MAP_COLS, 0);
+    FOG_TEST_SET(explored, 3 + 2 * MAP_COLS, 0);
+    FOG_TEST_SET(visible, 7 + 4 * MAP_COLS, 1);
+    FOG_TEST_SET(explored, 7 + 4 * MAP_COLS, 1);
+    FOG_TEST_SET(visible, 10 + 1 * MAP_COLS, 0);
+    FOG_TEST_SET(explored, 10 + 1 * MAP_COLS, 1);
     render_fixture(1, 3, 1);
     compare_incremental_with_fresh(1, 3);
 
-    memset(visible, 0, sizeof(visible));
-    memset(explored, 0, sizeof(explored));
+    fog_test_fill(0, 0);
     render_fixture(1, 3, 1); /* changed visible cells are repainted black */
     compare_incremental_with_fresh(1, 3);
 
@@ -458,9 +709,14 @@ main(void)
     assert(!sc64_terrain_cached(17, 11));
     render_fixture(17, 11, 1);
     compare_incremental_with_fresh(17, 11);
+#ifdef SC64_TERRAIN_SCROLL
     test_scroll_differential();
+#endif
 #ifdef SC64_TERRAIN_CACHE_VRAM
     verify_obj_guards();
+#endif
+#ifdef SC64_SOFT_FOG
+    test_soft_fog_neighbor_cache();
 #endif
     return 0;
 }
