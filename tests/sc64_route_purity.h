@@ -91,6 +91,17 @@ static const RoutePureRegion route_pure_regions[] = {
     /* Path grid, its valid flag and the BFS scratch. */
     RP_REGION(path_walkable),
     RP_REGION(path_grid_valid),
+#ifdef SC64_PATH_GRID_INCREMENTAL
+    /* The incremental update's record of the grid it last built: it must
+     * travel with path_walkable or a restored grid would disagree with it. */
+    RP_REGION(path_fp),
+    RP_REGION(path_fp_key),
+    RP_REGION(path_fp_valid),
+#ifdef SC64_PATH_GRID_VERIFY
+    RP_REGION(path_grid_verify_prev),
+    RP_REGION(path_grid_verify_have),
+#endif
+#endif
     RP_REGION(bfs_queue),
 #ifndef SC64_IMPORTED_MISSION
     RP_REGION(bfs_prev),
