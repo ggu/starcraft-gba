@@ -119,6 +119,19 @@ test_layout_is_disjoint(void)
     if (arena_lo != obj) { fprintf(stderr, "arena is not at the OBJ VRAM base\n"); ++failures; }
     if (arena_hi > cache_lo) { fprintf(stderr, "arena overlaps the terrain cache\n"); ++failures; }
     if (cache_hi > obj + GBA_VRAM_SCRATCH_BYTES) { fprintf(stderr, "terrain cache exceeds OBJ VRAM\n"); ++failures; }
+#ifdef SC64_SOFT_FOG
+    {
+        /* The shade map sits between the arena and the cache; neither may
+         * reach into its 256 bytes, and it must stay inside the area. */
+        const u8 *fog_lo = (const u8 *)(const void *)SC64_OBJ_VRAM_FOG;
+        const u8 *fog_hi = fog_lo + SC64_OBJ_VRAM_FOG_BYTES;
+        if (fog_lo < arena_hi) { fprintf(stderr, "fog shade map overlaps the arena\n"); ++failures; }
+        if (fog_hi > cache_lo) { fprintf(stderr, "fog shade map overlaps the terrain cache\n"); ++failures; }
+        if (fog_hi - fog_lo != 256) { fprintf(stderr, "fog shade map is not 256 bytes\n"); ++failures; }
+        printf("fog map [0x%08x, 0x%08x)\n", 0x06014000u + (unsigned)(fog_lo - obj),
+               0x06014000u + (unsigned)(fog_hi - obj));
+    }
+#endif
     /* The hardware addresses derive from the same offsets. */
     if (0x06014000u + SC64_OBJ_VRAM_PROJECTILE_BYTES > 0x06014000u + SC64_OBJ_VRAM_CACHE_OFFSET ||
         0x06014000u + SC64_OBJ_VRAM_CACHE_OFFSET + CACHE_VRAM_BYTES > 0x06018000u) {
