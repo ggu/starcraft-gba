@@ -11,7 +11,7 @@ shared-egg-live-z9:
 	$(CLANG) $(LIVE_HOST) $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_egg_live_game.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-live-z9
 	$(COMBINED_BIN_DIR)/shared-egg-live-z9
 shared-egg-live-p10:
-	$(CLANG) $(LIVE_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(COMBINED_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_live_game.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-live-p10
+	$(CLANG) $(LIVE_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(COMBINED_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_shared_egg_live_game.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-live-p10
 	$(COMBINED_BIN_DIR)/shared-egg-live-p10
 shared-egg-live-showcase:
 	$(CLANG) $(LIVE_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_live_game.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-live-showcase
@@ -28,7 +28,7 @@ shared-egg-input-z9:
 	$(CLANG) $(LIVE_HOST) $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_egg_ordinary_input.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-input-z9
 	$(COMBINED_BIN_DIR)/shared-egg-input-z9
 shared-egg-input-p10:
-	$(CLANG) $(LIVE_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(COMBINED_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_ordinary_input.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-input-p10
+	$(CLANG) $(LIVE_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(COMBINED_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_shared_egg_ordinary_input.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-input-p10
 	$(COMBINED_BIN_DIR)/shared-egg-input-p10
 shared-egg-input-showcase:
 	$(CLANG) $(LIVE_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_ordinary_input.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-input-showcase

@@ -61,8 +61,9 @@ simulation.
 Bunker attacks remain occupant-driven. The bank does not synthesize a Bunker
 weapon profile from a nonexistent independent Bunker firing script; the
 existing occupant/fallback route remains responsible for that case. Carrier
-production, launch, Interceptor flight and Carrier combat are separate
-unfinished work; see [Carrier projectile development](CARRIER-PROJECTILES.md).
+production, launch, Interceptor flight and Carrier combat are the Carrier
+service's work, compiled into the Protoss ROM only; see
+[Carrier projectile development](CARRIER-PROJECTILES.md).
 
 The pipeline imports visual data only. It does not add attack eligibility,
 weapon damage, target rules, splash damage, or combat timing. Existing authored

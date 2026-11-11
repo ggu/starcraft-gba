@@ -243,8 +243,12 @@ start-up program, the victory and defeat triggers, and a pause-menu save that
 continues identically in a fresh process. One ordinary-input host controller run
 wins P10 from Raynor's base, which can now train and build. The input-only ARM
 replay matches every host observation through the win, and a pause-menu SRAM save
-continues to the same win in a fresh process. The Gantrithor has no attack, and the
-AI backend is authored. See the
+continues to the same win in a fresh process. The Gantrithor is a Carrier-class
+parent: it joins with a full hangar of four Interceptors, launches them at
+enemies it faces, rebuilds them for 25 minerals each and takes them with it when
+it dies. The controller sends it against raids near Raynor's base (it won at
+update 52,505 before the Gantrithor could fight and at 52,969 after). The AI
+backend is authored. See the
 [ordinary-input audit](audits/2026-11-03-p10-ordinary-input/README.md) and the
 [P10 candidate audit](audits/2026-11-01-p10-campaign/README.md).
 All ten Protoss missions have an ordinary-input win under the P10 flags, and an ARM

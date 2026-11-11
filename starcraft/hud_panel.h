@@ -36,7 +36,12 @@ hud_level(int value, int maximum, int levels)
 /* Icons in production order. A queue shares one bar; separate research jobs
  * each fill their own, under their slot. */
 typedef struct {
-    int count, separate, eggs, level[2];
+    int count, separate, eggs;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    int level[3];
+#else
+    int level[2];
+#endif
     short icon[HUD_QUEUE_SLOTS];
 } HudJobs;
 
@@ -105,6 +110,20 @@ hud_building_jobs(int slot, HudJobs *jobs, int with_eggs)
         return;
     }
     if (q->under_construction) return;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (sc64_pr_stage_hud_building(q)) {
+        int slot_out, done, total;
+        jobs->separate = 1;
+        jobs->count = 3;
+        jobs->icon[0] = (short)card_weapons_icon();
+        jobs->icon[1] = (short)card_armor_icon();
+        jobs->icon[2] = (short)(q->type == B_FORGE ? card_armor_icon() : card_weapons_icon());
+        jobs->level[2] = 0;
+        if (sc64_pr_stage_hud_job(slot, &slot_out, &done, &total))
+            hud_job_level(jobs, slot_out, done, total);
+        return;
+    }
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (with_eggs && hud_egg_jobs(q, jobs)) return;
 #endif
@@ -266,7 +285,7 @@ static int
 hud_unit_hangar(int slot)
 {
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (race_protoss_services_active() && u[slot].type == U_P7_CARRIER)
+    if (race_protoss_services_active() && sc64_p7_carrier_parent_type(u[slot].type))
         return (int)race_p7_carrier_training_child_count(slot);
 #endif
     (void)slot;
@@ -532,7 +551,22 @@ hud_jobs_bars(const HudJobs *jobs)
     }
     gfx_bar(HUD_COLUMN, HUD_BAR_Y, CARD_CELL, HUD_BAR_H, jobs->level[0], CARD_CELL, C_GOLD, C_SHADOW);
     gfx_bar(HUD_COLUMN + HUD_SLOT_PITCH, HUD_BAR_Y, CARD_CELL, HUD_BAR_H, jobs->level[1], CARD_CELL, C_GOLD, C_SHADOW);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    if (jobs->count > 2)
+        gfx_bar(HUD_COLUMN + 2 * HUD_SLOT_PITCH, HUD_BAR_Y, CARD_CELL, HUD_BAR_H, jobs->level[2], CARD_CELL, C_GOLD, C_SHADOW);
+#endif
 }
+
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+static int
+hud_job_number(int i)
+{
+    if (sc64_pr_stage_hud_building(&b[selected_building])) return sc64_pr_stage_hud_level(selected_building, i);
+    return i ? armor_level : weapons_level;
+}
+#else
+#define hud_job_number(i) ((i) ? armor_level : weapons_level)
+#endif
 
 static void
 hud_draw_jobs(const HudJobs *jobs)
@@ -544,7 +578,7 @@ hud_draw_jobs(const HudJobs *jobs)
             int busy = jobs->separate ? jobs->level[i] > 0 : !i;
             hud_slot(jobs->icon[i], x, HUD_SLOT_Y, busy ? card_gold : card_green);
             if (busy) gfx_frame(x, HUD_SLOT_Y, CARD_CELL, CARD_CELL, C_GOLD);
-            if (jobs->separate) hud_slot_number(x, HUD_SLOT_Y, i ? armor_level : weapons_level, C_WHITE);
+            if (jobs->separate) hud_slot_number(x, HUD_SLOT_Y, hud_job_number(i), C_WHITE);
         } else if (!jobs->separate) hud_empty_slot(x, HUD_SLOT_Y);
     }
     if (jobs->eggs) hud_jobs_bars(jobs);
@@ -616,11 +650,19 @@ hud_draw_unit(int slot)
     }
     if (sc64_race_unit_damage(q->type) > 0) {
         hud_slot(card_weapons_icon(), x, HUD_SLOT_Y, card_green);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+        hud_slot_number(x, HUD_SLOT_Y, sc64_pr_stage_hud_weapons(q), C_WHITE);
+#else
         hud_slot_number(x, HUD_SLOT_Y, weapons_level, C_WHITE);
+#endif
         x += HUD_SLOT_PITCH;
     }
     hud_slot(card_armor_icon(), x, HUD_SLOT_Y, card_green);
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+    hud_slot_number(x, HUD_SLOT_Y, sc64_unit_armor_upgrade_level(q), C_WHITE);
+#else
     hud_slot_number(x, HUD_SLOT_Y, armor_level, C_WHITE);
+#endif
     x += HUD_SLOT_PITCH;
     value = hud_unit_hangar(slot);
     if (value >= 0) {

@@ -1,5 +1,43 @@
 # Carrier projectile development
 
+## Current status (2026-11-12)
+
+The three layers below (projectiles, hangar training, Interceptor flight) are
+compiled into the Protoss ROM, whose P7, P8, P9 and P10 flag vectors include
+`SC64_P7_PROJECTILES_ENABLED`, `SC64_P7_CARRIER_TRAINING_ENABLED` and
+`SC64_P7_INTERCEPTOR_FLIGHT_ENABLED`. They run for every Carrier-class actor of
+a Protoss ROM, not only in P7. The generation descriptions below are the
+history and the contract of each layer; where they call a layer "default-off"
+or say the canonical ROMs leave it off, that was true of the development
+probes, not of the Protoss ROM.
+
+| Parent | Where | What works |
+| --- | --- | --- |
+| Carrier (raw 72) | Protoss ROM: custom games, P7 to P10 | Paid Interceptor orders, release every 7 source ticks, attack passes, return and dock, rebuild, death of the parent or the target, saves. |
+| Gantrithor (raw 82) | Protoss ROM, P10 finale | The same service and rules (same hangar of four, 25 minerals, release cadence). It joins the human side with a full hangar, launches at enemies it faces, rebuilds lost Interceptors on the ordinary "BUILD INTERCEPTOR" command, and its children follow it if it changes owner and die with it. No save field was added: a P10 save written before this change loads with a Gantrithor that has no children. |
+| Computer opponents | Protoss ROM, custom games | A Protoss opponent builds a Fleet Beacon, trains Carriers and pays for their Interceptors through the same service ([Skirmish AI](SKIRMISH-AI.md#carriers-protoss-rom)). |
+| Everything above | Terran, Zerg Z9/Z10 and Showcase ROMs | Not compiled: see [Carriers in the other ROMs](#carriers-in-the-other-roms). |
+
+How the Gantrithor is a parent: `sc64_p7_carrier_parent_type()` and
+`sc64_p7_carrier_parent_raw_of()` in `starcraft/sc64_p7_carrier_training.h` name
+the Carrier-class types (type `U_P7_CARRIER` with raw 72; in builds with the P10
+roster, `U_P10_GANTRITHOR` with raw 82). Every parent check, queue, release,
+death and save validation goes through them, so there is one service and no
+mission-only branch; the only mission-specific code is the P10 rescue tick,
+which calls `race_p7_carrier_training_owner_changed()` and stocks the hangar
+once, when the hero joins the human (`starcraft/sc64_p10_runtime_adapter.h`).
+The hangar size is the ordinary four: the authenticated P10 scenario data carries
+no Carrier Capacity upgrade rows, so nothing in it says otherwise. That the
+Gantrithor starts with a full hangar is an assumption (a placed Carrier starts
+loaded); the source data does not say.
+
+Actor slots: Interceptors are Unit rows and count against the 240-slot pool. In
+the P10 finale controller run the pool already reaches 240 of 240 at update
+35,789 without the Gantrithor's children; with them the peak is 239 of 240.
+Nothing stalls on a full pool: Interceptor training and ordinary production
+wait for a free slot (`race_p7_carrier_training_slots_available`), and the
+mission's source triggers create their units at start-up, before the pool fills.
+
 The optional `SC64_P7_PROJECTILES_ENABLED` generation-41 profile connects the
 authored weapon-79 projectile model to P7's game update, ordinary damage
 handler and save/load validation. That projectile-only profile does **not**
@@ -30,8 +68,9 @@ make protoss-p7-projectile-probe
 
 The probe is `build/StarCraft-Protoss-P7-Projectile-Probe-GBA.gba`, title
 `SC P7 SHOT41`, code `SC7J`. It is a development profile, not an additional
-playable Carrier release. Canonical race ROMs and the filming ROM leave this
-gate off. No assets, generated headers, ROMs or saves belong in Git.
+playable Carrier release; the Protoss ROM now carries this layer together with
+the two that follow. The Terran, Zerg and Showcase ROMs leave the gate off. No
+assets, generated headers, ROMs or saves belong in Git.
 
 The separate training-stage checks and probe are:
 
@@ -80,9 +119,11 @@ make protoss-p7-interceptor-flight-probe
 ```
 
 The probe is `build/StarCraft-Protoss-P7-Interceptor-Flight-Probe-GBA.gba`,
-title `SC P7 FLY43`, code `SC7L`. It is a development profile; canonical and
-filming ROMs leave it off. With the flag off, the generation 41/42 probes and
-the canonical ROMs are byte-identical to the base revision.
+title `SC P7 FLY43`, code `SC7L`. It is a development profile; the Protoss ROM
+carries the same flags. The Terran, Zerg and Showcase ROMs leave them off, and
+with the flags off those ROMs are byte-identical to the base revision (checked
+again for the Gantrithor and Computer-opponent change: Terran, Zerg Z9, Zerg
+Z10 and Showcase build to the same bytes).
 
 Save format: RaceSave stays 16,292 bytes. Launched-child state uses actor
 fields the typed codec already stores:
@@ -222,3 +263,94 @@ training originally linked with IWRAM/BSS ends `0x03004a30` / `0x0203daf4`.
 The later shared weapon-effect pool expands BSS to `0x0203dcd4`, retaining
 the same IWRAM end and unchanged guards. It has no production, native Carrier-combat, hardware, fps or
 P7-win qualification claim. Those gates remain required before promotion.
+
+## Carriers in the other ROMs
+
+Measured on 2026-11-12 at the base of the Gantrithor change; nothing here is
+implemented. A Protoss player on the Terran, Zerg or Showcase ROM gets no
+working Carrier. What stops it, and the smallest sound way to start:
+
+| Fact | Terran | Zerg Z9 / Z10 | Showcase | Protoss P10 (has it) |
+| --- | --- | --- | --- | --- |
+| Carrier (raw 72) as a unit type | none (raw 72 maps to no type) | none | `U_P7_CARRIER`, producer 255 (not trainable) | trainable at a Stargate |
+| Interceptor (raw 73) type | none | none | none | `U_P7_INTERCEPTOR` |
+| P7 flags compiled | none | none | `SC64_P7_ACTORS`, battery, observer; no projectiles, training or flight | all |
+| Generated fact tables (`SC64_FACT_TABLES`) | no | no | no | yes (per-vector header) |
+| Persistent unit IDs now (six-bit field, 63 max) | 44 | 42 | 49 | 53 |
+| `RaceSave` bytes / free of 16,368 | 15,856 / 512 | 16,296 / 72 | 14,228 / 2,140 | 16,332 / 36 |
+| Unit row | packed 38 bytes, all fields | packed 35 bytes (`path_timer` <= 24, `path_retry` <= 12) | typed 28 bytes (`flags` 14 bits) | typed 28 bytes |
+| OBJ VRAM terrain cache | all 16,384 bytes (68 rows) | none | all 16,384 bytes (68 rows) | 11,568 bytes (48 rows) |
+| IWRAM end (limit `0x03005000`) | `0x030044a8` | `0x03004850` | `0x03004a68` | `0x03004818` |
+| BSS end (limit `0x0203e000`) | `0x0203748c` | `0x0203b1ac` | `0x020372d0` | `0x02039758` |
+
+The blockers, in order:
+
+1. **Flags and companion sources.** The services need `SC64_P7_ACTORS`
+   (types and facts), `SC64_P7_PROJECTILES_ENABLED` (Interceptor type, arena,
+   save field), `SC64_P7_CARRIER_TRAINING_ENABLED`,
+   `SC64_P7_INTERCEPTOR_FLIGHT_ENABLED` and the three companion translation units
+   (`sc64_interceptor_motion.c`, `sc64_interceptor_pool_codec.c`,
+   `sc64_interceptor_orders.c`). Showcase has the first only. The Terran and Zerg
+   products have none of the P7 flags.
+2. **Persistent IDs.** `U_P7_*` and `U_P7_INTERCEPTOR` are inserted in the middle
+   of the unit enumeration (`race_rules.h`). In the other products that would
+   renumber every later type and break their saves. New types must be appended
+   (the way `U_SCARAB` and the shared Shuttle are). Headroom exists: the unit
+   type field is six bits and the products use 42 to 49 IDs.
+3. **Generated fact tables.** `SC64_FACT_TABLES` headers come from
+   `tools/sc64_fact_tables_gen.c` per Protoss flag vector only. Each other
+   vector needs its own regenerated header with the Carrier and Interceptor
+   rows; PR #212 found that the generator's gate list and signatures must change
+   with it.
+4. **Save record.** Interceptor state already fits the existing unit rows: the
+   Terran and Zerg packed rows store `flags` (16 bits), `build` (10 bits),
+   `work_timer`, `path_retry`, `path_timer` and `cd` losslessly (Zerg's narrower
+   `path_timer`/`path_retry` still hold the Interceptor's 0 to 2 and 0 to 5), and
+   Showcase's typed row is the P10 row. What does not fit is the projectile pool
+   packet, 2,103 bytes plus one padding byte: Terran would need 17,960 bytes
+   (1,592 over), Zerg 18,400 (2,032 over). Showcase would land at 16,332, the same
+   36 free bytes P10 has, so it needs no format change.
+5. **OBJ VRAM.** The arena takes 4,816 bytes of the 16,384 (`sc64_obj_vram.h`).
+   Terran and Showcase use all of it for the VRAM terrain cache; the arena would
+   leave 11,568 bytes, 48 rows instead of 68, the figure the P10 ROM already has.
+   Zerg has no VRAM cache, so the arena fits in unused memory there. The
+   experimental tile renderer owns the whole area and is excluded.
+6. **Code memory.** Not measured for these products in this pass. The change that
+   gave the Gantrithor its hangar linked P10 with an unchanged IWRAM end
+   (`0x03004818`) and BSS end (`0x02039758`) and 1,428 more bytes of ROM text. The
+   experimental #210 link of Showcase with everything enabled ended at IWRAM
+   `0x03004d18`, EWRAM `0x0203abf4`, inside the guards.
+
+Smallest sound way, by product:
+
+- **Showcase first.** Add the P7 services to its flag vector (projectiles,
+  training, flight, fact tables and rect tables, the three companion sources).
+  Its typed rows and save layout already equal P10's, so no codec change and no
+  new save generation: the record grows from 14,228 to 16,332 bytes. Accept the
+  20 fewer terrain-cache rows (or measure a cheaper cache), and keep
+  `U_P7_INTERCEPTOR` out of the middle of its enumeration if any Showcase save
+  records type IDs (append it).
+- **Terran and Zerg, custom games only.** A Protoss player on those ROMs only
+  exists in custom games, where the campaign-only regions of `RaceSave` are zero.
+  Append Carrier and Interceptor IDs, add the flags and fact tables, and give
+  the custom-game record a new generation tag whose projectile packet is
+  variable length (active rows only) and whose campaign-only regions are
+  omitted. The arithmetic, as upper bounds: Terran has 512 free bytes plus at
+  most the 2,280 between its `campaign` member (offset 13,536) and the Yamato
+  shot rows (15,816), part of which (the invincibility bits, for one) is live in a
+  custom game; the packet needs 1,592 more than it has, so at least 1,592 of those
+  bytes must prove omittable member by member, or a shot cap must make up the
+  difference. Zerg has 72 free plus at most the 360 from `campaign` (offset 15,936)
+  to the end of the record (Backwater and the 180-byte `z5` union), 432 bytes, about
+  20 rows of the packet. Both therefore need a hard cap on live shots that the
+  packet's budget can hold, with the weapon event refusing to fire when the
+  budget is full (the pool already rejects a shot when it is full), a candidate
+  check that rejects a larger packet, and the old generation loading unchanged.
+- **Do not** edit the existing legacy reader's commit path: PR #212 found its
+  mission rebinds are not atomic and fenced predecessor loads off instead. A new
+  generation should preflight the whole candidate and leave the legacy path
+  alone. Competing designs in #212 and #210 (a shared "namespace" codec versus a
+  separate typed arena) should be settled before either product adopts one.
+
+That is also the order the work has risk: Showcase needs no new format, Terran
+needs a variable-length packet, Zerg needs the packet and a low shot cap.

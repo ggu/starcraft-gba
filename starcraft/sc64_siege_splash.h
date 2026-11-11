@@ -108,7 +108,12 @@ static int sc64_siege_resolve(int target,unsigned packet_q8,int *shield_loss) {
 #endif
 
  if(shields>0) {
-  unsigned absorbed=damage<(unsigned)shields*256u?damage:(unsigned)shields*256u;
+  unsigned absorbed;
+#ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
+  {unsigned sa=(unsigned)sc64_pr_stage_shield_armor(target)*256u;
+   if(sa){damage=damage>sa+128u?damage-sa:128u;}}
+#endif
+  absorbed=damage<(unsigned)shields*256u?damage:(unsigned)shields*256u;
   shield_contact=absorbed!=0;
   *shield_loss=(int)(absorbed/256u); damage-=absorbed;
  }
