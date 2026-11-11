@@ -10,6 +10,13 @@
  * perturbs the world it is reading, and a tape replay without the controller
  * cannot reproduce its run.
  *
+ * Every static that route queries or the grid rebuild read or write must be
+ * in route_pure_regions below (the route fields and bookkeeping, the BFS
+ * scratch, path_walkable and path_grid_valid, and the incremental grid
+ * update's record of what path_walkable was built from). A region left out
+ * is silently kept across the restore, which breaks the purity assertion or,
+ * worse, makes the restored state inconsistent.
+ *
  * Include this header AFTER "../starcraft/game.c". It defines
  * route_pure_path_next_tile(), which runs path_next_tile() and then restores
  * every byte of engine route state to what it was. Nested use is allowed: only
@@ -91,6 +98,18 @@ static const RoutePureRegion route_pure_regions[] = {
     /* Path grid, its valid flag and the BFS scratch. */
     RP_REGION(path_walkable),
     RP_REGION(path_grid_valid),
+#ifdef SC64_PATH_GRID_INCREMENTAL
+    /* The incremental update's record of the grid it last built: it must
+     * travel with path_walkable or a restored grid would disagree with it.
+     * Any new route, route-cache or grid state must be listed in this table. */
+    RP_REGION(path_fp),
+    RP_REGION(path_fp_key),
+    RP_REGION(path_fp_valid),
+#ifdef SC64_PATH_GRID_VERIFY
+    RP_REGION(path_grid_verify_prev),
+    RP_REGION(path_grid_verify_have),
+#endif
+#endif
     RP_REGION(bfs_queue),
 #ifndef SC64_IMPORTED_MISSION
     RP_REGION(bfs_prev),
