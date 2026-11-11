@@ -87,3 +87,12 @@ $(eval $(call PATH_GRID_VARIANT_RULES,plain,PLAIN))
 test-sc64-path-grid-incremental: $(foreach v,$(PATH_GRID_VARIANTS),build/test-sc64-path-grid-$(v) build/test-sc64-path-grid-$(v)-full)
 	$(foreach v,$(PATH_GRID_VARIANTS),./build/test-sc64-path-grid-$(v) && ./build/test-sc64-path-grid-$(v)-full && ) true
 test-starcraft: test-sc64-path-grid-incremental
+
+# The 32-bit fast path of the depot goal-cell test against the original 64-bit
+# computation, over in-range and out-of-range arguments.
+build/test-sc64-depot-cell-point-diff: tests/sc64_depot_cell_point_diff.c starcraft/sc64_depot_goal.h mk/combat-perf/Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-depot-cell-point-diff
+test-sc64-depot-cell-point-diff: build/test-sc64-depot-cell-point-diff
+	./build/test-sc64-depot-cell-point-diff
+test-starcraft: test-sc64-depot-cell-point-diff

@@ -7678,6 +7678,9 @@ race_nearest_resource_depot(Unit *worker)
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
 #endif
         int distance;
+        /* The first two tests of race_resource_depot_valid_for, ahead of the
+         * call: a full slot scan calls it for every slot of every worker. */
+        if (!b[i].alive || b[i].owner != worker->owner) continue;
         if (!race_resource_depot_valid_for(worker, i)) continue;
         distance = dist2(worker->x, worker->y, b[i].x, b[i].y);
         /* Both scans use ascending slot order, preserving equal-distance ties. */

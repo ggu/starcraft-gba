@@ -103,8 +103,12 @@ static u32 hash3(u32 a, u32 c, u32 d)
 static void mock_terrain_fill(void)
 {
     int c, r;
+    /* Terrain depends on the scene only where the game's terrain_blocked does. */
     terrain_salt = (u32)(race_mode * 7 + race_selected_mission * 131 + race_skirmish_map * 17 +
-                         (sc64_showcase_scene + 1) * 29 + race_cols * 3 + race_rows);
+                         race_cols * 3 + race_rows);
+#ifdef SC64_SHOWCASE_ENABLED
+    terrain_salt += (u32)((sc64_showcase_scene + 1) * 29);
+#endif
     for (r = 0; r < race_rows; ++r)
         for (c = 0; c < race_cols; ++c)
             mock_blocked[c + r * race_cols] = (u8)(hash3(terrain_salt, (u32)c, (u32)r) % 9 == 0);
@@ -306,6 +310,7 @@ static void mutate(int step, int burst)
     }
     if (rn(400) == 0) { int i = rn(MAX_BUILDINGS); place(i); b[i].x = 40000 + rn(100); }
     if (rn(400) == 0) { int i = rn(MAX_BUILDINGS); place(i); b[i].y = -40000 - rn(100); }
+    if (rn(300) == 0) { int i = rn(MAX_BUILDINGS); place(i); b[i].type = 256 + rn(8); }
 }
 
 int main(void)

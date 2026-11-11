@@ -32,7 +32,7 @@ static unsigned path_grid_stat_full, path_grid_stat_inc, path_grid_stat_same;
 #ifdef SC64_PATH_GRID_INCREMENTAL
 enum { PFP_NONE = 0, PFP_CIRCLE, PFP_T4_DOOR, PFP_DOOR, PFP_SOURCE };
 enum { PATH_GRID_MAX_DIRTY = 24 };
-typedef struct { s16 x, y; u16 type; u8 kind, pad; } PathFootprint;
+typedef struct { s16 x, y; u8 type, kind; } PathFootprint; /* 6 bytes */
 typedef struct { int cols, rows, mode, mission, skirmish, scene; } PathTerrainKey;
 typedef struct { u8 c0, c1, r0, r1; } PathDirtyRect;
 static PathFootprint path_fp[MAX_BUILDINGS];
@@ -61,8 +61,8 @@ static void __attribute__((noinline))
 path_fp_describe(int i, PathFootprint *f)
 {
     int left, up, right, down;
-    f->kind = PFP_NONE; f->pad = 0;
-    f->x = (s16)b[i].x; f->y = (s16)b[i].y; f->type = (u16)b[i].type;
+    f->kind = PFP_NONE;
+    f->x = (s16)b[i].x; f->y = (s16)b[i].y; f->type = (u8)b[i].type;
     if (!b[i].alive) return;
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
     if (race_bc_facility_airborne(i)) return;
@@ -158,9 +158,9 @@ path_grid_record_state(void)
     path_fp_valid = 1;
     for (i = 0; i < MAX_BUILDINGS; ++i) {
         path_fp_describe(i, &path_fp[i]);
-        /* A coordinate the record cannot hold exactly disables the update. */
+        /* A coordinate or type the record cannot hold exactly disables the update. */
         if (b[i].x != (s16)b[i].x || b[i].y != (s16)b[i].y ||
-            b[i].type != (int)(u16)b[i].type) path_fp_valid = 0;
+            b[i].type != (int)(u8)b[i].type) path_fp_valid = 0;
     }
 }
 
@@ -197,7 +197,7 @@ path_grid_update(void)
     if (memcmp(&key, &path_fp_key, sizeof key) != 0) return 0;
     for (i = 0; i < MAX_BUILDINGS; ++i) {
         if (b[i].x != (s16)b[i].x || b[i].y != (s16)b[i].y ||
-            b[i].type != (int)(u16)b[i].type) { path_fp_valid = 0; return 0; }
+            b[i].type != (int)(u8)b[i].type) { path_fp_valid = 0; return 0; }
         path_fp_describe(i, &now);
         if (path_fp_same(&now, &path_fp[i])) continue;
         path_dirty_add(dirty, &n, &path_fp[i]);
