@@ -14,8 +14,10 @@ fires the source victory and each defeat trigger, and a save taken during the
 victory epilogue continues identically. The P1–P10 carried-profile matrix and
 234 skirmish configurations pass. The ROM links at `__bss_end=0x0203913c` and
 `__iwram_end=0x03004a50`. P10 has no ordinary-input win and no emulator or
-hardware evidence. Raynor's base cannot train or build, and the Gantrithor
-has no attack. See the
+hardware evidence. (When this audit was written Raynor's base could not train
+or build and the Gantrithor had no attack; both have since changed. The
+Gantrithor now launches Interceptors through the shared Carrier service, see
+[Carrier projectiles](CARRIER-PROJECTILES.md#current-status-2026-11-12).) See the
 [P10 candidate audit](audits/2026-11-01-p10-campaign/README.md).
 
 ## Protoss P9 candidate (2026-10-29)

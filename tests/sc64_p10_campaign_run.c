@@ -29,6 +29,11 @@
 static FILE *trace;
 static u16 prior;
 static unsigned host_tick;
+#ifdef P10_POOL_AUDIT
+/* Optional pool-pressure audit (stderr only; the trace is unchanged). */
+static int audit_pool_peak,audit_kids_peak,audit_outside_peak,audit_shots;
+static unsigned audit_outside_updates;
+#endif
 
 static void input(u16 held)
 {
@@ -42,6 +47,22 @@ static void input(u16 held)
     game_update(held,pressed);
     prior=held;
     ++host_tick;
+#ifdef P10_POOL_AUDIT
+    {
+        int n=0,kids=0,out=0;
+        for(int i=0;i<MAX_UNITS;i++){
+            n+=u[i].alive!=0;
+            if(u[i].alive&&u[i].type==U_P7_INTERCEPTOR){
+                ++kids;out+=sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE;
+            }
+        }
+        if(n>audit_pool_peak)audit_pool_peak=n;
+        if(kids>audit_kids_peak)audit_kids_peak=kids;
+        if(out>audit_outside_peak)audit_outside_peak=out;
+        audit_outside_updates+=out!=0;
+        audit_shots+=sc64_pool_active_head(&race_p7_projectiles)!=SC64_END;
+    }
+#endif
     if(trace && changed)
         fprintf(trace,"{\"kind\":\"input\",\"call_index\":%u,\"frame_before\":%u,\"frame_after\":%u,\"held\":%u,\"pressed\":%u}\n",
             call_index,frame_before,(unsigned)frame,(unsigned)held,(unsigned)pressed);
@@ -338,7 +359,7 @@ static int army_count(void)
 {
     int n=0;
     for(int i=0;i<MAX_UNITS;i++)n+=u[i].alive&&u[i].owner==SIDE&&!IS_WORKER(u[i].type)&&
-        u[i].raw_type!=28&&u[i].raw_type!=78&&u[i].raw_type!=72;
+        u[i].raw_type!=28&&u[i].raw_type!=78&&u[i].raw_type!=72&&u[i].raw_type!=73;
     return n;
 }
 
@@ -770,9 +791,23 @@ int main(int argc,char **argv)
             if(h>=0&&u[h].owner==SIDE&&fly_stage<3&&u[h].order!=ORDER_MOVE){
                 (void)hero_command(h,fly_x[fly_stage],fly_y[fly_stage]);
                 ++fly_stage;
-            } else if(fly_stage>=3&&h>=0&&u[h].owner==SIDE&&u[h].order!=ORDER_MOVE&&
-                      home>=0&&dist2(u[h].x,u[h].y,b[home].x,b[home].y)>96*96)
-                (void)hero_command(h,b[home].x,b[home].y-24);
+            } else if(fly_stage>=3&&h>=0&&u[h].owner==SIDE&&home>=0){
+                /* The Gantrithor fights through its Interceptors, which hit
+                 * ground and air alike (Guardians cannot touch the ship):
+                 * meet a raid near the base with an attack order, then go
+                 * home. It stops to launch once the target is in range. */
+                int rt=-1,rd=420*420;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY){
+                    int d=dist2(u[i].x,u[i].y,b[home].x,b[home].y);
+                    if(u[i].order==ORDER_IDLE&&d>=288*288)continue;
+                    if(d<rd){rd=d;rt=i;}
+                }
+                if(rt>=0){
+                    if(!(u[h].order==ORDER_ATTACK_MOVE&&dist2(u[h].tx,u[h].ty,u[rt].x,u[rt].y)<96*96))
+                        (void)unit_order(h,MENU_ATTACK,u[rt].x,u[rt].y);
+                } else if(u[h].order!=ORDER_MOVE&&dist2(u[h].x,u[h].y,b[home].x,b[home].y)>96*96)
+                    (void)hero_command(h,b[home].x,b[home].y-24);
+            }
             if(f>=0&&u[f].owner==SIDE&&home>=0&&u[f].order!=ORDER_MOVE&&
                dist2(u[f].x,u[f].y,b[home].x,b[home].y)>96*96)
                 (void)hero_command(f,b[home].x,b[home].y+48);
@@ -887,6 +922,11 @@ int main(int argc,char **argv)
         input(0);
     }
     census("final");
+#ifdef P10_POOL_AUDIT
+    fprintf(stderr,"p10 pool audit: peak live units %d of %d, Interceptors peak %d, outside peak %d, "
+            "updates with Interceptors outside %u, updates with a shot in flight %d\n",
+            audit_pool_peak,MAX_UNITS,audit_kids_peak,audit_outside_peak,audit_outside_updates,audit_shots);
+#endif
     fclose(trace);
     printf("p10 controller: frame=%u calls=%u won=%d lost=%d screen=%d\n",
            (unsigned)frame,host_tick,won,lost,screen);

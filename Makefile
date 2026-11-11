@@ -2060,6 +2060,7 @@ sc64-p8-arm-replay: build/StarCraft-Protoss-P8-Replay.gba build/StarCraft-Protos
 # check's 512 KiB limit. Optional, so make fixtures that copy only this file
 # still parse it.
 -include mk/protoss-p10/Makefile
+-include mk/carrier-gantrithor/Makefile
 
 build/test-sc64-p5-transport-on: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_P5_SHUTTLE_ENABLED $< -o $@

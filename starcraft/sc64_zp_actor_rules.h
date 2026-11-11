@@ -147,7 +147,8 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
 #ifdef SC64_P10_DATA_ENABLED
     /* Pinned BWAPI raw82 Hero_Gantrithor facts: 800 HP, 500 shields,
        armor 4, 9-tile sight, L32/U32/R31/D31, flying, Large. It has no
-       weapon of its own; its Interceptors are not launched in P10. */
+       weapon of its own; like the Carrier it attacks through its Interceptors
+       (sc64_p7_carrier_training.h). */
     static const Sc64ZpActorFact p10_gantrithor = {
         82,800,500,4,700,600,4200,288, 32,32,31,31,1,2,
         0,0,0,0,0, 0,0,0,0,0,

@@ -3278,8 +3278,10 @@ Carrier pool, codec and motion checks are asset-free and included in
 `./dev test`. The separate generation-41 P7 projectile probe reserves the
 Mode 4 arena and integrates game updates, damage consumption and saves.
 The separate generation-42 training probe adds paid Interceptor queues and
-saved hidden hangar children. Carrier production, launch/flight and the
-weapon-event caller remain unfinished; neither enables Carrier combat.
+saved hidden hangar children, and generation 43 adds launch, flight and the
+weapon-event caller. The Protoss ROM carries all three layers (Carrier
+production at a Stargate, the P10 Gantrithor and computer opponents' Carriers
+included); the Terran, Zerg and Showcase ROMs do not.
 See [Carrier projectile development](CARRIER-PROJECTILES.md)
 for commands, memory ownership, reference evidence and promotion limits.
 
