@@ -95,3 +95,28 @@ A save written by the new ROM in a custom game is not readable by the old ROM.
 - Psionic Storm ignores shield armor; no HUD slot shows the shield level on
   selected units.
 - Hardware: untested.
+
+## Idle cost
+
+Measured on the pinned Protoss custom-battle window (human Zerg, three
+opponents, nobody researching; `same_workload=True` for every row), mean
+`game_update` cycles per update on the emulator core:
+
+| ROM | cycles |
+| --- | ---: |
+| base `7aa7d51b` | 961,075 |
+| first research ROM | 1,000,128 (+39,053) |
+| with idle caches and out-of-line acquire range | 959,138 (-1,937) |
+
+The first profile showed three costs: the per-update job scan
+(`sc64_pr_stage_tick`, 8,533 cycles scanning every building slot twice), the
+Dragoon range bonus (8,944 cycles over about 102 calls), and a changed register
+allocation of `update_orders` (+12,600) caused by the inlined range hook. Fixes:
+a job count and an any-level flag (derived state, zeroed on every reset,
+recomputed from the world after a load, adjusted where a job starts, completes,
+is cancelled or destroyed) turn the scan and every per-hit level lookup into one
+test when idle, and the acquire range is one out-of-line call like the
+`unit_range()` call it replaces. A running job costs the old scan, about 8.5k
+cycles per update, plus nothing per hit beyond the level lookups. The lifecycle
+and save tests assert after every `game_update`, menu command and load that both
+caches equal a from-scratch scan.
