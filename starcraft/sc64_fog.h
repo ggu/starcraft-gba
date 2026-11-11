@@ -43,73 +43,67 @@ sc64_fog_signature(const u8 *visible, const u8 *explored,
     return (u16)signature;
 }
 
-/* For each cell-local pixel, each byte marks the neighboring directions that
- * cross the corresponding Bayer threshold. Direction bits follow the eight
- * row-major neighbors with the center omitted. These authored tables are
- * generated from the distance bands and 4x4 Bayer matrix below in tests; they
- * are const ROM data (768 bytes) and add no BSS or IWRAM. */
-static const u8 sc64_fog_shade_neighbors[256] = {
-    0x0bu, 0x0bu, 0x0bu, 0x0au, 0x0bu, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x12u, 0x02u, 0x16u, 0x16u, 0x16u, 0x16u,
-    0x0bu, 0x0bu, 0x02u, 0x0bu, 0x02u, 0x0au, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x12u, 0x02u, 0x16u, 0x12u, 0x16u,
-    0x0bu, 0x0au, 0x0bu, 0x0au, 0x0bu, 0x02u, 0x0au, 0x02u, 0x02u, 0x02u, 0x16u, 0x02u, 0x16u, 0x12u, 0x16u, 0x16u,
-    0x08u, 0x0bu, 0x08u, 0x0au, 0x00u, 0x02u, 0x00u, 0x02u, 0x00u, 0x02u, 0x00u, 0x12u, 0x00u, 0x16u, 0x10u, 0x16u,
-    0x0bu, 0x08u, 0x0bu, 0x08u, 0x0au, 0x00u, 0x02u, 0x00u, 0x02u, 0x00u, 0x12u, 0x00u, 0x16u, 0x10u, 0x16u, 0x10u,
-    0x08u, 0x0au, 0x00u, 0x08u, 0x00u, 0x0au, 0x00u, 0x00u, 0x00u, 0x02u, 0x00u, 0x10u, 0x00u, 0x12u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x0au, 0x08u, 0x08u, 0x00u, 0x0au, 0x00u, 0x00u, 0x00u, 0x12u, 0x00u, 0x10u, 0x10u, 0x12u, 0x10u,
-    0x08u, 0x08u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x00u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x08u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x00u, 0x10u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x00u, 0x08u, 0x00u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x00u, 0x10u, 0x10u, 0x10u,
-    0x48u, 0x08u, 0x68u, 0x08u, 0x48u, 0x00u, 0x48u, 0x00u, 0x40u, 0x00u, 0x50u, 0x00u, 0x50u, 0x10u, 0xd0u, 0x10u,
-    0x08u, 0x48u, 0x08u, 0x48u, 0x00u, 0x40u, 0x00u, 0x40u, 0x00u, 0x40u, 0x00u, 0x50u, 0x00u, 0x50u, 0x10u, 0x50u,
-    0x68u, 0x48u, 0x68u, 0x48u, 0x68u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x50u, 0x40u, 0xd0u, 0x50u, 0xd0u, 0x50u,
-    0x48u, 0x68u, 0x00u, 0x68u, 0x40u, 0x48u, 0x00u, 0x40u, 0x40u, 0x40u, 0x00u, 0x50u, 0x40u, 0xd0u, 0x10u, 0xd0u,
-    0x68u, 0x68u, 0x68u, 0x48u, 0x68u, 0x40u, 0x48u, 0x40u, 0x40u, 0x40u, 0xd0u, 0x40u, 0xd0u, 0x50u, 0xd0u, 0xd0u,
-    0x68u, 0x68u, 0x48u, 0x68u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x50u, 0x40u, 0xd0u, 0xd0u, 0xd0u,
+/* Authored edge masks. For each of the eight neighbor directions (row-major
+ * neighbors with the center omitted), a 256-bit map over the cell's pixels
+ * (bit j of word w is pixel 32w+j) marks the pixels that neighbor affects,
+ * after radial falloff and a 4x4 ordered-dither threshold. Three maps per
+ * direction: pixels turned black by an unknown neighbor, pixels shaded early
+ * by an unknown neighbor, and pixels shaded by an explored neighbor. A cell
+ * ORs the maps of its neighbors, so composing costs a few word operations plus
+ * one pass over the pixels. The tests derive the same pixels from the
+ * distance bands and Bayer matrix directly. They are const ROM data (768
+ * bytes) and add no BSS or IWRAM. */
+/* Pixels turned black by an unknown neighbor in each direction. */
+static const u32 sc64_fog_black_dir[8][8] = {
+    {0x00020007u, 0x00000001u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u},
+    {0xffffffffu, 0x8888ffffu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u},
+    {0xa000c000u, 0x00004000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u},
+    {0x00030007u, 0x000b0007u, 0x00030007u, 0x000b0007u, 0x00030007u, 0x000b0007u, 0x00030007u, 0x000b0007u},
+    {0xe000f000u, 0xe000f000u, 0xe000f000u, 0xe000f000u, 0xe000f000u, 0xe000f000u, 0xe000f000u, 0xe000f000u},
+    {0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00020000u, 0x00030007u},
+    {0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0xaaaa5555u, 0xffffffffu},
+    {0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x8000c000u},
 };
 
-static const u8 sc64_fog_early_shade_neighbors[256] = {
-    0x0bu, 0x0bu, 0x0bu, 0x0bu, 0x0bu, 0x0au, 0x0au, 0x02u, 0x02u, 0x02u, 0x16u, 0x12u, 0x16u, 0x16u, 0x16u, 0x16u,
-    0x0bu, 0x0bu, 0x0bu, 0x0bu, 0x0au, 0x0au, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x16u, 0x16u, 0x16u, 0x16u, 0x16u,
-    0x0bu, 0x0bu, 0x0bu, 0x0bu, 0x0bu, 0x02u, 0x0au, 0x02u, 0x02u, 0x02u, 0x16u, 0x16u, 0x16u, 0x16u, 0x16u, 0x16u,
-    0x0bu, 0x0bu, 0x0bu, 0x0bu, 0x0au, 0x0au, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x12u, 0x12u, 0x16u, 0x16u, 0x16u,
-    0x0bu, 0x0bu, 0x0bu, 0x0au, 0x0au, 0x0au, 0x0au, 0x02u, 0x02u, 0x02u, 0x12u, 0x12u, 0x16u, 0x16u, 0x16u, 0x12u,
-    0x08u, 0x0au, 0x08u, 0x0au, 0x08u, 0x0au, 0x00u, 0x02u, 0x00u, 0x02u, 0x00u, 0x12u, 0x10u, 0x12u, 0x10u, 0x12u,
-    0x0au, 0x08u, 0x0au, 0x08u, 0x0au, 0x00u, 0x0au, 0x00u, 0x02u, 0x00u, 0x12u, 0x10u, 0x12u, 0x10u, 0x12u, 0x10u,
-    0x08u, 0x08u, 0x08u, 0x08u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x08u, 0x08u, 0x08u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x08u, 0x08u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u, 0x10u, 0x10u,
-    0x68u, 0x08u, 0x68u, 0x48u, 0x48u, 0x00u, 0x48u, 0x40u, 0x40u, 0x00u, 0x50u, 0x50u, 0x50u, 0x10u, 0xd0u, 0x50u,
-    0x48u, 0x68u, 0x48u, 0x48u, 0x48u, 0x48u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x50u, 0x50u, 0xd0u, 0x50u, 0xd0u,
-    0x68u, 0x68u, 0x68u, 0x48u, 0x68u, 0x48u, 0x48u, 0x40u, 0x40u, 0x40u, 0x50u, 0x50u, 0xd0u, 0xd0u, 0xd0u, 0xd0u,
-    0x68u, 0x68u, 0x68u, 0x68u, 0x48u, 0x48u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0xd0u, 0xd0u, 0xd0u, 0xd0u, 0xd0u,
-    0x68u, 0x68u, 0x68u, 0x68u, 0x68u, 0x40u, 0x48u, 0x40u, 0x40u, 0x40u, 0xd0u, 0xd0u, 0xd0u, 0xd0u, 0xd0u, 0xd0u,
-    0x68u, 0x68u, 0x68u, 0x68u, 0x48u, 0x48u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0xd0u, 0xd0u, 0xd0u, 0xd0u, 0xd0u,
+/* Pixels shaded early by an unknown neighbor in each direction. */
+static const u32 sc64_fog_early_dir[8][8] = {
+    {0x000f001fu, 0x000f001fu, 0x00000007u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u},
+    {0xffffffffu, 0xffffffffu, 0xaaaaffffu, 0x00005555u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u},
+    {0xf800f400u, 0xe000fc00u, 0x00007000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u},
+    {0x003f007fu, 0x003f005fu, 0x003f007fu, 0x003f005fu, 0x003f007fu, 0x003f005fu, 0x003f007fu, 0x003f005fu},
+    {0xf800fc00u, 0xf800fc00u, 0xf800fc00u, 0xf800fc00u, 0xf800fc00u, 0xf800fc00u, 0xf800fc00u, 0xf800fc00u},
+    {0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00020005u, 0x000f0017u, 0x000f001fu},
+    {0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0xffffddddu, 0xffffffffu, 0xffffffffu},
+    {0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0xa0004000u, 0xf800f000u, 0xf800fc00u},
 };
 
-static const u8 sc64_fog_black_neighbors[256] = {
-    0x0bu, 0x0bu, 0x0bu, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x12u, 0x12u, 0x16u, 0x16u,
-    0x0au, 0x0bu, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x16u, 0x12u, 0x16u,
-    0x0bu, 0x0au, 0x0au, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x02u, 0x12u, 0x12u, 0x16u, 0x12u,
-    0x08u, 0x08u, 0x00u, 0x0au, 0x00u, 0x00u, 0x00u, 0x02u, 0x00u, 0x00u, 0x00u, 0x02u, 0x00u, 0x10u, 0x10u, 0x12u,
-    0x08u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x00u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u, 0x10u,
-    0x08u, 0x08u, 0x00u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x10u, 0x10u, 0x10u,
-    0x48u, 0x08u, 0x48u, 0x00u, 0x40u, 0x00u, 0x40u, 0x00u, 0x40u, 0x00u, 0x40u, 0x00u, 0x50u, 0x10u, 0x50u, 0x10u,
-    0x08u, 0x68u, 0x00u, 0x40u, 0x00u, 0x40u, 0x00u, 0x40u, 0x00u, 0x40u, 0x00u, 0x40u, 0x00u, 0x50u, 0x10u, 0x50u,
-    0x68u, 0x68u, 0x68u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x50u, 0x50u, 0xd0u, 0xd0u,
-    0x68u, 0x68u, 0x40u, 0x48u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x40u, 0x50u, 0x50u, 0xd0u,
+/* Pixels shaded by an explored neighbor in each direction. */
+static const u32 sc64_fog_shade_dir[8][8] = {
+    {0x000b0017u, 0x00020015u, 0x00000005u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u},
+    {0xffffffffu, 0xaaaaffffu, 0x22225555u, 0x00004444u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u},
+    {0xa000f000u, 0xa000d400u, 0x00005000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u},
+    {0x002b001fu, 0x000f005fu, 0x002b001fu, 0x000f005fu, 0x002b001fu, 0x000f005fu, 0x002b001fu, 0x000f005fu},
+    {0xe800f400u, 0xe800f400u, 0xe800f400u, 0xe800f400u, 0xe800f400u, 0xe800f400u, 0xe800f400u, 0xe800f400u},
+    {0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000004u, 0x000a0015u, 0x000b0017u},
+    {0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0xaaaa5555u, 0xbbbbffffu, 0xffffffffu},
+    {0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00004000u, 0xa0005000u, 0xe000d400u},
 };
+
+/* Exact x / 3 for x < 131072 without a library division call (the ARM7 has
+ * no divide instruction and Thumb code has no long multiply). */
+static inline unsigned
+sc64_fog_div3(unsigned x)
+{
+    return (x * 43691u) >> 17;
+}
 
 static inline unsigned
 sc64_fog_center_state(u16 signature)
 {
+    unsigned q;
     if (signature >= SC64_FOG_SIGNATURE_COUNT) return SC64_FOG_UNKNOWN;
-    return (signature / 81u) % 3u;
+    q = sc64_fog_div3(sc64_fog_div3(sc64_fog_div3(sc64_fog_div3(signature)))); /* /81 */
+    return q - 3u * sc64_fog_div3(q);
 }
 
 /* Composite one 16x16 terrain cell. This helper is deliberately called only
@@ -154,32 +148,111 @@ sc64_fog_blit_cell(int sx, int sy, const u8 *source)
     }
 }
 
+/* Bit k of the index selects byte k of the result. */
+static const u32 sc64_fog_byte_mask[16] = {
+    0x00000000u, 0x000000ffu, 0x0000ff00u, 0x0000ffffu,
+    0x00ff0000u, 0x00ff00ffu, 0x00ffff00u, 0x00ffffffu,
+    0xff000000u, 0xff0000ffu, 0xff00ff00u, 0xff00ffffu,
+    0xffff0000u, 0xffff00ffu, 0xffffff00u, 0xffffffffu,
+};
+
+/* Four pixels at a time: look up the shaded value of each byte only when some
+ * pixel of the group is shaded, then select by the groups's byte masks. */
+static inline u32
+sc64_fog_group(u32 pixels, unsigned black, unsigned shaded, const u8 *lut)
+{
+    if (shaded) {
+        u32 lit = (u32)lut[pixels & 255u] | ((u32)lut[(pixels >> 8) & 255u] << 8) |
+                  ((u32)lut[(pixels >> 16) & 255u] << 16) | ((u32)lut[pixels >> 24] << 24);
+        u32 mask = sc64_fog_byte_mask[shaded];
+        pixels = (lit & mask) | (pixels & ~mask);
+    }
+    if (black) pixels &= ~sc64_fog_byte_mask[black];
+    return pixels;
+}
+
 static void __attribute__((noinline, unused))
 sc64_fog_raster_compose(int sx, int sy, unsigned center,
                         unsigned unknown_neighbors, unsigned explored_neighbors,
                         const u8 terrain[256], const u8 shade_lut[256])
 {
-    u8 output[256] __attribute__((aligned(4)));
-    for (unsigned p = 0; p < 256; ++p) {
-        u8 unknown = sc64_fog_black_neighbors[p];
-        u8 shade_neighbors = sc64_fog_shade_neighbors[p];
-        u8 early_shade = sc64_fog_early_shade_neighbors[p];
-        if ((unknown_neighbors & unknown) != 0) output[p] = C_BLACK;
-        else if (center == SC64_FOG_EXPLORED ||
-                 (unknown_neighbors & early_shade) != 0 ||
-                 (explored_neighbors & shade_neighbors) != 0)
-            output[p] = shade_lut[terrain[p]];
-        else output[p] = terrain[p];
+    u32 output[64];
+    u32 black[8], shaded[8];
+    unsigned w, d, q;
+    u32 all = center == SC64_FOG_EXPLORED ? 0xffffffffu : 0u;
+    for (w = 0; w < 8; ++w) { black[w] = 0; shaded[w] = all; }
+    for (d = 0; d < 8; ++d) {
+        if (unknown_neighbors & (1u << d))
+            for (w = 0; w < 8; ++w) {
+                black[w] |= sc64_fog_black_dir[d][w];
+                shaded[w] |= sc64_fog_early_dir[d][w];
+            }
+        if (explored_neighbors & (1u << d))
+            for (w = 0; w < 8; ++w) shaded[w] |= sc64_fog_shade_dir[d][w];
     }
-    sc64_fog_blit_cell(sx, sy, output);
+    if (!((unsigned)(uintptr_t)terrain & 3u)) {
+        const u32 *in = (const u32 *)(const void *)terrain;
+        for (q = 0; q < 64; ++q) {
+            unsigned shift = (q & 7u) * 4u;
+            unsigned b = (black[q >> 3] >> shift) & 15u;
+            unsigned s = (shaded[q >> 3] >> shift) & 15u & ~b;
+            output[q] = sc64_fog_group(in[q], b, s, shade_lut);
+        }
+    } else {
+        for (q = 0; q < 64; ++q) {
+            unsigned shift = (q & 7u) * 4u;
+            unsigned b = (black[q >> 3] >> shift) & 15u;
+            unsigned s = (shaded[q >> 3] >> shift) & 15u & ~b;
+            const u8 *p = terrain + 4u * q;
+            u32 pixels = (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
+            output[q] = sc64_fog_group(pixels, b, s, shade_lut);
+        }
+    }
+    sc64_fog_blit_cell(sx, sy, (const u8 *)(const void *)output);
+}
+
+/* Split a signature into the center class and the bit sets of unknown and
+ * explored neighbors (bit k is the k-th neighbor, row-major, center omitted). */
+static inline unsigned
+sc64_fog_decode(u16 signature, unsigned *unknown_neighbors, unsigned *explored_neighbors)
+{
+    unsigned center = SC64_FOG_UNKNOWN, encoded, neighbor = 0;
+    unsigned unknown = 0, explored = 0;
+    if (signature >= SC64_FOG_SIGNATURE_COUNT) signature = 0;
+    /* The two most common neighborhoods: all visible (every digit two) and
+     * all unknown. */
+    if (signature == SC64_FOG_SIGNATURE_COUNT - 1) {
+        *unknown_neighbors = *explored_neighbors = 0;
+        return SC64_FOG_VISIBLE;
+    }
+    if (!signature) {
+        *unknown_neighbors = 0xffu;
+        *explored_neighbors = 0;
+        return SC64_FOG_UNKNOWN;
+    }
+    encoded = signature;
+    for (unsigned i = 0; i < 9; ++i) {
+        unsigned quotient = sc64_fog_div3(encoded);
+        unsigned state = encoded - 3u * quotient;
+        encoded = quotient;
+        if (i != 4u) {
+            if (state == SC64_FOG_UNKNOWN) unknown |= 1u << neighbor;
+            else if (state == SC64_FOG_EXPLORED) explored |= 1u << neighbor;
+            ++neighbor;
+        } else {
+            center = state;
+        }
+    }
+    *unknown_neighbors = unknown;
+    *explored_neighbors = explored;
+    return center;
 }
 
 static void __attribute__((noinline, unused))
 sc64_fog_raster_cell(int sx, int sy, u16 signature,
                      const u8 terrain[256], const u8 shade_lut[256])
 {
-    unsigned center, encoded, neighbor = 0, unknown_neighbors = 0;
-    unsigned explored_neighbors = 0;
+    unsigned center, unknown_neighbors, explored_neighbors;
     int top, bottom;
 
     /* Avoid inspecting even the source pointer for cells wholly outside the
@@ -188,18 +261,7 @@ sc64_fog_raster_cell(int sx, int sy, u16 signature,
     (void)top;
     (void)bottom;
 
-    if (signature >= SC64_FOG_SIGNATURE_COUNT) signature = 0;
-    center = sc64_fog_center_state(signature);
-    encoded = signature;
-    for (unsigned i = 0; i < 9; ++i) {
-        unsigned state = encoded % 3u;
-        encoded /= 3u;
-        if (i != 4u) {
-            if (state == SC64_FOG_UNKNOWN) unknown_neighbors |= 1u << neighbor;
-            else if (state == SC64_FOG_EXPLORED) explored_neighbors |= 1u << neighbor;
-            ++neighbor;
-        }
-    }
+    center = sc64_fog_decode(signature, &unknown_neighbors, &explored_neighbors);
 
     /* This path uses only a few scalars and does not reserve the compositing
      * scratch buffer. All-visible cells bypass the edge masks entirely. */
@@ -213,6 +275,121 @@ sc64_fog_raster_cell(int sx, int sy, u16 signature,
     }
     sc64_fog_raster_compose(sx, sy, center, unknown_neighbors,
                             explored_neighbors, terrain, shade_lut);
+}
+
+/* Opaque w x h block at (x, y), clipped to the world band and scene clip like
+ * a whole cell. */
+static inline void
+sc64_fog_blit_rect(int x, int y, int w, int h, const u8 *packed)
+{
+    int top = y, bottom = y + h;
+    if (x >= 240 || x + w <= 0 || top >= 120 || bottom <= 12) return;
+    if (top < 12) top = 12;
+    if (bottom > 120) bottom = 120;
+#ifdef GBA_SCENE_CLIP
+    {
+        u16 clip = gfx_get_clip_y();
+        int clip_top = clip & 255u, clip_bottom = clip >> 8;
+        if (top < clip_top) top = clip_top;
+        if (bottom > clip_bottom) bottom = clip_bottom;
+    }
+#endif
+    if (top >= bottom) return;
+    if (!packed) gfx_rect(x, top, w, bottom - top, C_BLACK);
+    else gfx_blit_opaque(x, top, w, bottom - top, packed + (top - y) * w);
+}
+
+/* Compose only the pixels [rx0,rx1) x [ry0,ry1) of a cell whose signature is
+ * already decoded. Each pixel is the same function of the signature as in
+ * sc64_fog_raster_cell, so a rectangle drawn over restored pixels equals a
+ * whole-cell draw there. Used for cells whose fog state is unchanged but
+ * whose edge strip was newly exposed by a scroll: composing the whole cell
+ * for a few exposed pixels is most of the cost of a scrolling frame. */
+static void __attribute__((noinline, unused))
+sc64_fog_compose_rect(int sx, int sy, unsigned center,
+                      unsigned unknown_neighbors, unsigned explored_neighbors,
+                      const u8 terrain[256], const u8 shade_lut[256],
+                      int rx0, int ry0, int rx1, int ry1)
+{
+    int w = rx1 - rx0, h = ry1 - ry0, rx, ry;
+    u8 packed[256];
+    u32 black[8], shaded[8];
+    unsigned d, k, first = (unsigned)ry0 >> 1, last = (unsigned)(ry1 - 1) >> 1;
+    u32 all = center == SC64_FOG_EXPLORED ? 0xffffffffu : 0u;
+    if (w <= 0 || h <= 0) return;
+    for (k = first; k <= last; ++k) { black[k] = 0; shaded[k] = all; }
+    for (d = 0; d < 8; ++d) {
+        if (unknown_neighbors & (1u << d))
+            for (k = first; k <= last; ++k) {
+                black[k] |= sc64_fog_black_dir[d][k];
+                shaded[k] |= sc64_fog_early_dir[d][k];
+            }
+        if (explored_neighbors & (1u << d))
+            for (k = first; k <= last; ++k) shaded[k] |= sc64_fog_shade_dir[d][k];
+    }
+    {
+        u8 *out = packed;
+        unsigned full = (1u << w) - 1u;
+        for (ry = ry0; ry < ry1; ++ry) {
+            /* One row is 16 bits of each map: half a word. */
+            unsigned shift = ((unsigned)ry & 1u) * 16u;
+            unsigned b = (black[(unsigned)ry >> 1] >> shift) & 0xffffu;
+            unsigned sh = ((shaded[(unsigned)ry >> 1] >> shift) & 0xffffu) & ~b;
+            const u8 *in = terrain + ry * 16;
+            b >>= rx0;
+            sh >>= rx0;
+            if (!(b | sh)) {
+                for (rx = rx0; rx < rx1; ++rx) *out++ = in[rx];
+            } else if (!b && (sh & full) == full) {
+                for (rx = rx0; rx < rx1; ++rx) *out++ = shade_lut[in[rx]];
+            } else {
+                for (rx = rx0; rx < rx1; ++rx, b >>= 1, sh >>= 1) {
+                    unsigned t = in[rx];
+                    if (b & 1u) t = C_BLACK;
+                    else if (sh & 1u) t = shade_lut[t];
+                    *out++ = (u8)t;
+                }
+            }
+        }
+    }
+    sc64_fog_blit_rect(sx + rx0, sy + ry0, w, h, packed);
+}
+
+/* Redraw the part of a cell inside the vertical strip x in [vx0,vx1) and the
+ * horizontal strip y in [hy0,hy1) (screen coordinates; an empty strip has
+ * vx1 <= vx0 or hy1 <= hy0). Cells that need no composing are simply blitted
+ * whole: that is cheaper than selecting pixels. */
+static void __attribute__((noinline, unused))
+sc64_fog_raster_strips(int sx, int sy, u16 signature,
+                       const u8 terrain[256], const u8 shade_lut[256],
+                       int vx0, int vx1, int hy0, int hy1)
+{
+    unsigned center, unknown_neighbors, explored_neighbors;
+    int top, bottom, a, b;
+    if (!sc64_fog_cell_clip(sx, sy, &top, &bottom)) return;
+    center = sc64_fog_decode(signature, &unknown_neighbors, &explored_neighbors);
+    if (center == SC64_FOG_UNKNOWN || !terrain || !shade_lut) {
+        sc64_fog_blit_cell(sx, sy, 0);
+        return;
+    }
+    if (center == SC64_FOG_VISIBLE && !unknown_neighbors && !explored_neighbors) {
+        sc64_fog_blit_cell(sx, sy, terrain);
+        return;
+    }
+    if (vx1 > vx0) {
+        a = vx0 > sx ? vx0 : sx;
+        b = vx1 < sx + 16 ? vx1 : sx + 16;
+        if (b > a) sc64_fog_compose_rect(sx, sy, center, unknown_neighbors,
+                                         explored_neighbors, terrain, shade_lut,
+                                         a - sx, 0, b - sx, 16);
+    }
+    if (hy1 > hy0) {
+        a = hy0 > sy ? hy0 : sy;
+        b = hy1 < sy + 16 ? hy1 : sy + 16;
+        if (b > a) sc64_fog_compose_rect(sx, sy, center, unknown_neighbors,
+                                         explored_neighbors, terrain, shade_lut,
+                                         0, a - sy, 16, b - sy);
+    }
 }
 
 #ifdef SC64_FOG_LOCAL_GRID_GET

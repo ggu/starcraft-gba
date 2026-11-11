@@ -72,6 +72,20 @@ static void check_signature_raster(unsigned sig)
                    reference_pixel(sig, px, py));
 }
 
+/* Terrain art in ROM is not guaranteed to be word aligned: the same pixels
+ * must come out of an odd source address. */
+static void check_signature_raster_unaligned(unsigned sig)
+{
+    static u8 shifted[257] __attribute__((aligned(4)));
+    const int x = 40, y = 40;
+    memcpy(shifted + 1, terrain, 256);
+    sc64_fog_raster_cell(x, y, (u16)sig, shifted + 1, shade);
+    for (unsigned py = 0; py < 16; ++py)
+        for (unsigned px = 0; px < 16; ++px)
+            assert(gfx_test_pixel(x + (int)px, y + (int)py) ==
+                   reference_pixel(sig, px, py));
+}
+
 static void test_signature_encoding(void)
 {
     u8 visible[25] = {0}, explored[25] = {0};
@@ -106,8 +120,10 @@ static void test_signature_encoding(void)
 static void test_all_neighborhoods(void)
 {
     /* Every ternary 3x3 signature, including every center class. */
-    for (unsigned sig = 0; sig < SC64_FOG_SIGNATURE_COUNT; ++sig)
+    for (unsigned sig = 0; sig < SC64_FOG_SIGNATURE_COUNT; ++sig) {
         check_signature_raster(sig);
+        check_signature_raster_unaligned(sig);
+    }
 }
 
 static void test_unknown_never_reads_terrain(void)

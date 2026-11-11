@@ -357,9 +357,13 @@ static void verify_obj_guards(void)
 }
 #endif
 
+#if defined(SC64_SOFT_FOG) && defined(SC64_FOG_TEST_REAL_RASTER)
+static unsigned partial_cells_drawn, full_cells_drawn;
+#endif
 static void
-render_cell(int col, int row, int camx, int camy)
+render_cell(int col, int row, int camx, int camy, int partial)
 {
+    (void)partial;
     int cell = col + row * MAP_COLS;
     int x = col * 16 - camx;
     int y = 12 + row * 16 - camy;
@@ -370,13 +374,15 @@ render_cell(int col, int row, int camx, int camy)
     const unsigned center = sc64_fog_center_state(signature);
     /* Unknown cells pass no terrain pointer. The production raster must paint
      * opaque black without observing terrain for hidden cells. */
-    sc64_fog_raster_cell(x, y, signature,
-                         center == SC64_FOG_UNKNOWN ? 0 : raster_tiles[cell],
-                         raster_shade_lut);
+    if (partial) ++partial_cells_drawn; else ++full_cells_drawn;
+    sc64_terrain_fog_cell(partial, x, y, signature,
+                          center == SC64_FOG_UNKNOWN ? 0 : raster_tiles[cell],
+                          raster_shade_lut);
 #else
     unsigned signature = sc64_fog_signature(visible, explored, MAP_COLS,
                                             MAP_ROWS, col, row);
     unsigned digits[9];
+    (void)partial;
     /* The helper encodes the row-major 3x3 neighborhood as a base-3 number.
      * Paint nine tiny state swatches so every signature digit affects pixels. */
     for (int i = 8; i >= 0; --i) {
@@ -414,7 +420,12 @@ render_fixture(int camx, int camy, int incremental)
         for (int col = camx / 16; col <= (camx + 240) / 16; col++) {
             if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) continue;
             if (incremental && sc64_terrain_tile_clean(col, row)) continue;
-            render_cell(col, row, camx, camy);
+#ifdef SC64_SOFT_FOG
+            render_cell(col, row, camx, camy,
+                        incremental && sc64_terrain_tile_partial(col, row));
+#else
+            render_cell(col, row, camx, camy, 0);
+#endif
         }
 }
 
@@ -467,6 +478,10 @@ test_scroll_differential(void)
         }
         compare_incremental_with_fresh(cameras[i][0], cameras[i][1]);
     }
+#if defined(SC64_SOFT_FOG) && defined(SC64_FOG_TEST_REAL_RASTER)
+    /* The comparisons above must have exercised strip-only redraws. */
+    assert(partial_cells_drawn > 0 && full_cells_drawn > 0);
+#endif
     /* These jumps have no overlap and must use a complete repaint. */
     compare_incremental_with_fresh(100, 100);
     compare_incremental_with_fresh(400, 400);
@@ -487,9 +502,53 @@ test_scroll_differential(void)
 #endif
 
 #ifdef SC64_SOFT_FOG
+/* The per-frame signature array must equal the nine-read definition for every
+ * cell of every view, including views on each map edge and fogs that mix all
+ * three classes, with and without a stale explored bit under a visible one. */
+static void
+test_signature_array(void)
+{
+    static const int views[][4] = {
+        {0, 0, 16, 8}, {0, 0, 17, 9}, {1, 1, 17, 9}, {10, 5, 27, 13},
+        {MAP_COLS - 17, MAP_ROWS - 9, MAP_COLS, MAP_ROWS},
+        {MAP_COLS - 16, 0, MAP_COLS, 8}, {0, MAP_ROWS - 8, 16, MAP_ROWS},
+        {31, 20, 32, 21}, {2, 0, 3, 9}, {0, 3, 17, 4},
+    };
+    unsigned seed = 12345u;
+    for (int round = 0; round < 40; ++round) {
+        for (int cell = 0; cell < MAP_CELLS; ++cell) {
+            seed = seed * 1664525u + 1013904223u;
+            unsigned r = (seed >> 16) % 7u;
+            /* Round 0 is empty; rounds >= 1 use a different class mix each. */
+            int vis = round && r < (unsigned)(1 + round % 4);
+            int exp = round && (r % 3u == 0u || (round % 5 == 0 && r > 3u));
+            FOG_TEST_SET(visible, cell, vis);
+            FOG_TEST_SET(explored, cell, exp);
+        }
+        for (unsigned v = 0; v < sizeof(views) / sizeof(views[0]); ++v) {
+            int col0 = views[v][0], row0 = views[v][1], col1 = views[v][2], row1 = views[v][3];
+            sc64_terrain_fill_now(col0, row0, col1, row1);
+            assert(sc64_terrain_now_valid);
+            for (int row = row0; row < row1; ++row)
+                for (int col = col0; col < col1; ++col) {
+                    int index = (row - row0) * (col1 - col0) + (col - col0);
+                    assert(sc64_terrain_now[index] == sc64_terrain_state(col, row));
+                    assert(sc64_terrain_state_view(col, row) == sc64_terrain_state(col, row));
+                }
+        }
+    }
+    /* Oversize views are refused rather than overrunning the array. */
+    sc64_terrain_fill_now(0, 0, 18, 9);
+    assert(!sc64_terrain_now_valid);
+    sc64_terrain_fill_now(0, 0, 17, 10);
+    assert(!sc64_terrain_now_valid);
+    sc64_terrain_now_valid = 0;
+}
+
 static void
 test_soft_fog_neighbor_cache(void)
 {
+    test_signature_array();
     fog_test_fill(1, 1);
     for (int i = 0; i < MAP_CELLS; ++i) terrain[i] = (u8)(i * 13u + 7u);
 #ifdef SC64_FOG_TEST_REAL_RASTER

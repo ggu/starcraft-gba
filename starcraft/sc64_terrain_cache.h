@@ -78,6 +78,108 @@ sc64_terrain_state(int col, int row)
            (SC64_GRID_GET(explored, cell) ? 2 : 0);
 #endif
 }
+#ifdef SC64_SOFT_FOG
+/* The signatures of the view being rendered are computed once per frame, by
+ * the cache lookup (or by the draw pass when the lookup did not get that
+ * far), and read by the dirty test, the draw pass and the capture. A
+ * signature costs nine grid reads, so computing it three times per cell per
+ * frame was the dominant cost of the first draft. Here each map row is read
+ * as two bit runs and the rows are combined with three table lookups per
+ * cell. The array describes the view named by the four fields below. */
+#define SC64_TERRAIN_FOG_COLS 17
+#define SC64_TERRAIN_FOG_ROWS 9
+static u16 sc64_terrain_now[SC64_TERRAIN_CACHE_CELLS];
+/* After a scrolled lookup, a dirty cell whose fog is unchanged but which the
+ * shifted pixels do not fully cover is redrawn only inside the exposed strips:
+ * x in [strip_x0, strip_x1) and y in [strip_y0, strip_y1) on screen. */
+static u8 sc64_terrain_part[SC64_TERRAIN_CACHE_CELLS];
+static int sc64_terrain_part_active;
+static int sc64_terrain_strip_x0, sc64_terrain_strip_x1;
+static int sc64_terrain_strip_y0, sc64_terrain_strip_y1;
+static int sc64_terrain_now_valid;
+static int sc64_terrain_now_col0, sc64_terrain_now_row0;
+static int sc64_terrain_now_cols, sc64_terrain_now_rows;
+
+#if defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE) || \
+    defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_FOG_TEST_PACKED)
+#define SC64_TERRAIN_PACKED_FOG_GRID 1
+#endif
+
+/* Bit i of the result is cell col0+i of the row, for i < width <= 19. */
+static unsigned
+sc64_terrain_fog_run(const u8 *grid, int row, int col0, int width)
+{
+#ifdef SC64_TERRAIN_PACKED_FOG_GRID
+    unsigned base = (unsigned)(row * MAP_COLS + col0);
+    unsigned first = base >> 3, last = (base + (unsigned)width - 1u) >> 3;
+    unsigned bits = grid[first];
+    if (last > first) bits |= (unsigned)grid[first + 1] << 8;
+    if (last > first + 1) bits |= (unsigned)grid[first + 2] << 16;
+    if (last > first + 2) bits |= (unsigned)grid[first + 3] << 24;
+    return (bits >> (base & 7u)) & ((1u << width) - 1u);
+#else
+    unsigned bits = 0;
+    for (int i = 0; i < width; ++i)
+        if (SC64_GRID_GET(grid, row * MAP_COLS + col0 + i)) bits |= 1u << i;
+    return bits;
+#endif
+}
+
+/* One neighbor row's contribution to a signature: the three cells left,
+ * centre and right of a column, as base-three digits 1, 3 and 9. The index is
+ * the three known bits (bits 0-2) and the three visible bits (bits 3-5);
+ * a known cell counts one, a visible one a second. */
+static const u8 sc64_terrain_fog_triple[64] = {
+     0,  1,  3,  4,  9, 10, 12, 13,  1,  2,  4,  5, 10, 11, 13, 14,
+     3,  4,  6,  7, 12, 13, 15, 16,  4,  5,  7,  8, 13, 14, 16, 17,
+     9, 10, 12, 13, 18, 19, 21, 22, 10, 11, 13, 14, 19, 20, 22, 23,
+    12, 13, 15, 16, 21, 22, 24, 25, 13, 14, 16, 17, 22, 23, 25, 26,
+};
+
+static void
+sc64_terrain_fill_now(int col0, int row0, int col1, int row1)
+{
+    u8 triple[SC64_TERRAIN_FOG_ROWS + 2][SC64_TERRAIN_FOG_COLS];
+    int cols = col1 - col0, rows = row1 - row0, hr, c, r;
+    sc64_terrain_now_valid = 0;
+    if (cols <= 0 || rows <= 0 || cols > SC64_TERRAIN_FOG_COLS ||
+        rows > SC64_TERRAIN_FOG_ROWS)
+        return;
+    for (hr = 0; hr < rows + 2; ++hr) {
+        int row = row0 - 1 + hr;
+        unsigned known = 0, seen = 0;
+        if (row >= 0 && row < MAP_ROWS) {
+            /* Bit j is column col0 - 1 + j; columns outside the map stay
+             * unknown (zero). */
+            int first = col0 > 0 ? col0 - 1 : 0;
+            int last = col1 < MAP_COLS ? col1 : MAP_COLS - 1;
+            unsigned shift = (unsigned)(first - (col0 - 1));
+            unsigned v = sc64_terrain_fog_run(visible, row, first, last - first + 1);
+            unsigned e = sc64_terrain_fog_run(explored, row, first, last - first + 1);
+            known = (v | e) << shift;
+            seen = v << shift;
+        }
+        for (c = 0; c < cols; ++c)
+            triple[hr][c] = sc64_terrain_fog_triple[((known >> c) & 7u) |
+                                                    (((seen >> c) & 7u) << 3)];
+    }
+    for (r = 0; r < rows; ++r)
+        for (c = 0; c < cols; ++c)
+            sc64_terrain_now[r * cols + c] =
+                (u16)(triple[r][c] + 27u * triple[r + 1][c] + 729u * triple[r + 2][c]);
+    sc64_terrain_now_col0 = col0;
+    sc64_terrain_now_row0 = row0;
+    sc64_terrain_now_cols = cols;
+    sc64_terrain_now_rows = rows;
+    sc64_terrain_now_valid = 1;
+}
+
+#define SC64_TERRAIN_FILL(c0, r0, c1, r1) sc64_terrain_fill_now((c0), (r0), (c1), (r1))
+#define SC64_TERRAIN_STATE_AT(i, col, row) ((Sc64TerrainState)sc64_terrain_now[i])
+#else
+#define SC64_TERRAIN_FILL(c0, r0, c1, r1) ((void)0)
+#define SC64_TERRAIN_STATE_AT(i, col, row) sc64_terrain_state((col), (row))
+#endif
 #if defined(SC64_TERRAIN_ROW_MASKS) && \
     (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE))
 /* Packed-grid profiles can compare a whole cached row of fog state at once.
@@ -116,6 +218,19 @@ sc64_terrain_halo(int col0, int row0, int col1, int row1,
 }
 #endif
 #endif
+/* The signature of a cell of the view being drawn. */
+static inline Sc64TerrainState
+sc64_terrain_state_view(int col, int row)
+{
+#ifdef SC64_SOFT_FOG
+    if (sc64_terrain_now_valid &&
+        col >= sc64_terrain_now_col0 && col < sc64_terrain_now_col0 + sc64_terrain_now_cols &&
+        row >= sc64_terrain_now_row0 && row < sc64_terrain_now_row0 + sc64_terrain_now_rows)
+        return sc64_terrain_now[(row - sc64_terrain_now_row0) * sc64_terrain_now_cols +
+                                (col - sc64_terrain_now_col0)];
+#endif
+    return sc64_terrain_state(col, row);
+}
 static int sc64_terrain_cache_valid;
 static volatile unsigned sc64_terrain_requests, sc64_terrain_hits, sc64_terrain_partial;
 static int sc64_terrain_cache_reused_base;
@@ -254,6 +369,17 @@ sc64_terrain_cache_view(int x, int y, int *col0, int *row0,
             (*col1 - *col0) * (*row1 - *row0) <= SC64_TERRAIN_CACHE_CELLS);
 }
 
+#ifdef SC64_SOFT_FOG
+/* Compute the signatures of the view at (x, y) unless a lookup already has. */
+static void __attribute__((unused))
+sc64_terrain_prepare(int x, int y)
+{
+    int col0, row0, col1, row1;
+    if (!sc64_terrain_now_valid && sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1))
+        sc64_terrain_fill_now(col0, row0, col1, row1);
+}
+#endif
+
 #if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
 #define SC64_TERRAIN_CACHE_KEY static_key
 static int
@@ -270,6 +396,10 @@ sc64_terrain_cached(int x, int y)
     int dx, dy;
     sc64_terrain_requests++;
     sc64_terrain_cache_reused_base = 0;
+#ifdef SC64_SOFT_FOG
+    sc64_terrain_now_valid = 0;
+    sc64_terrain_part_active = 0;
+#endif
     if (!sc64_terrain_cache_valid ||
         sc64_terrain_cache_mission != sc64_terrain_cache_mission_key() ||
         sc64_terrain_cache_static_key != SC64_TERRAIN_CACHE_KEY) {
@@ -356,6 +486,7 @@ sc64_terrain_cached(int x, int y)
                 sc64_terrain_hits++;
                 return 1;
             }
+            SC64_TERRAIN_FILL(old_col0, old_row0, old_col1, old_row1);
             for (r = 0; r < rows; r++) {
 #ifndef SC64_SOFT_FOG
                 if (!(changed_rows & (1u << r))) {
@@ -369,7 +500,7 @@ sc64_terrain_cached(int x, int y)
 #endif
                 row = old_row0 + r;
                 for (col = old_col0; col < old_col1; col++) {
-                    Sc64TerrainState state = sc64_terrain_state(col, row);
+                    Sc64TerrainState state = SC64_TERRAIN_STATE_AT(i, col, row);
                     sc64_terrain_cache_dirty[i] = sc64_terrain_cache_mask[i] != state;
 #ifdef SC64_DIAGNOSTIC_TERRAIN
                     SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, 1);
@@ -383,9 +514,10 @@ sc64_terrain_cached(int x, int y)
             return 0;
         }
 #else
+        SC64_TERRAIN_FILL(old_col0, old_row0, old_col1, old_row1);
         for (row = old_row0; row < old_row1; row++)
             for (col = old_col0; col < old_col1; col++) {
-                Sc64TerrainState state = sc64_terrain_state(col, row);
+                Sc64TerrainState state = SC64_TERRAIN_STATE_AT(i, col, row);
                 sc64_terrain_cache_dirty[i] = sc64_terrain_cache_mask[i] != state;
 #ifdef SC64_DIAGNOSTIC_TERRAIN
                 SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, 1);
@@ -429,12 +561,24 @@ sc64_terrain_cached(int x, int y)
     sc64_terrain_cache_view_camx = x;
     sc64_terrain_cache_view_camy = y;
     sc64_terrain_cache_reused_base = 1;
+    SC64_TERRAIN_FILL(col0, row0, col1, row1);
+#ifdef SC64_SOFT_FOG
+    /* The shifted old pixels cover screen x in [-dx, 240-dx) and band rows
+     * [-dy, H-dy); the rest of the band is the exposed strips. */
+    sc64_terrain_part_active = 1;
+    sc64_terrain_strip_x0 = dx > 0 ? 240 - dx : 0;
+    sc64_terrain_strip_x1 = dx > 0 ? 240 : (dx < 0 ? -dx : 0);
+    sc64_terrain_strip_y0 = SC64_TERRAIN_CACHE_Y +
+        (dy > 0 ? SC64_TERRAIN_CACHE_HEIGHT - dy : 0);
+    sc64_terrain_strip_y1 = SC64_TERRAIN_CACHE_Y +
+        (dy > 0 ? SC64_TERRAIN_CACHE_HEIGHT : (dy < 0 ? -dy : 0));
+#endif
     for (row = row0; row < row1; row++)
         for (col = col0; col < col1; col++) {
             int left = col * 16, top = row * 16;
             int right = left + 16, bottom = top + 16;
             int old_index = -1;
-            Sc64TerrainState state = sc64_terrain_state(col, row);
+            Sc64TerrainState state = SC64_TERRAIN_STATE_AT(i, col, row);
             if (left < x) left = x;
             if (top < y) top = y;
             if (right > x + 240) right = x + 240;
@@ -450,6 +594,13 @@ sc64_terrain_cached(int x, int y)
                 top < sc64_terrain_cache_camy ||
                 bottom > sc64_terrain_cache_camy + SC64_TERRAIN_CACHE_HEIGHT ||
                 sc64_terrain_cache_mask[old_index < 0 ? 0 : old_index] != state;
+#ifdef SC64_SOFT_FOG
+            /* A cell the scroll exposed with unchanged fog, or one that lies
+             * wholly beyond the old view: either way, only the exposed
+             * strips of it are on screen and new. */
+            sc64_terrain_part[i] = sc64_terrain_cache_dirty[i] &&
+                (old_index < 0 || sc64_terrain_cache_mask[old_index] == state);
+#endif
 #ifdef SC64_DIAGNOSTIC_TERRAIN
             SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, 1);
             if (sc64_terrain_cache_dirty[i])
@@ -465,6 +616,10 @@ sc64_terrain_cached(int x, int y)
     int col0, row0, col1, row1, col, row, i = 0, unchanged = 1;
     sc64_terrain_requests++;
     sc64_terrain_cache_reused_base = 0;
+#ifdef SC64_SOFT_FOG
+    sc64_terrain_now_valid = 0;
+    sc64_terrain_part_active = 0;
+#endif
     if (!sc64_terrain_cache_valid ||
         x != sc64_terrain_cache_camx || y != sc64_terrain_cache_camy ||
         sc64_terrain_cache_mission != sc64_terrain_cache_mission_key() ||
@@ -506,9 +661,10 @@ sc64_terrain_cached(int x, int y)
     }
 #endif
     sc64_terrain_cache_reused_base = 1;
+    SC64_TERRAIN_FILL(col0, row0, col1, row1);
     for (row = row0; row < row1; row++)
         for (col = col0; col < col1; col++) {
-            Sc64TerrainState state = sc64_terrain_state(col, row);
+            Sc64TerrainState state = SC64_TERRAIN_STATE_AT(i, col, row);
             sc64_terrain_cache_dirty[i] = sc64_terrain_cache_mask[i] != state;
 #ifdef SC64_DIAGNOSTIC_TERRAIN
             SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, 1);
@@ -549,6 +705,42 @@ sc64_terrain_tile_clean(int col, int row)
     return !sc64_terrain_cache_dirty[i];
 }
 
+#ifdef SC64_SOFT_FOG
+/* A dirty tile that needs only its exposed strips redrawn (see
+ * sc64_terrain_part); false for every tile unless the last lookup scrolled. */
+static int
+sc64_terrain_tile_partial(int col, int row)
+{
+#ifdef SC64_TERRAIN_SCROLL
+    int x = sc64_terrain_cache_view_camx, y = sc64_terrain_cache_view_camy;
+#else
+    int x = sc64_terrain_cache_camx, y = sc64_terrain_cache_camy;
+#endif
+    int col0 = x / 16, row0 = y / 16, col1 = (x + 240) / 16 + 1;
+    if (!sc64_terrain_part_active || !sc64_terrain_cache_reused_base) return 0;
+    if (col1 > MAP_COLS) col1 = MAP_COLS;
+    if (col < col0 || col >= col1 || row < row0) return 0;
+    {
+        int i = (row - row0) * (col1 - col0) + col - col0;
+        if (i >= SC64_TERRAIN_CACHE_CELLS) return 0;
+        return sc64_terrain_part[i];
+    }
+}
+
+/* Draw one tile of fog-composed terrain: whole, or only the exposed strips. */
+static void __attribute__((unused))
+sc64_terrain_fog_cell(int partial, int sx, int sy, u16 signature,
+                      const u8 *terrain, const u8 *lut)
+{
+    if (partial)
+        sc64_fog_raster_strips(sx, sy, signature, terrain, lut,
+                               sc64_terrain_strip_x0, sc64_terrain_strip_x1,
+                               sc64_terrain_strip_y0, sc64_terrain_strip_y1);
+    else
+        sc64_fog_raster_cell(sx, sy, signature, terrain, lut);
+}
+#endif
+
 #if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
 #define SC64_TERRAIN_CACHE_KEY static_key
 static int
@@ -572,6 +764,17 @@ sc64_terrain_store(int x, int y)
         sc64_terrain_cache_reused_base = 0;
         return 0;
     }
+#ifdef SC64_SOFT_FOG
+    if (!sc64_terrain_now_valid || sc64_terrain_now_col0 != col0 ||
+        sc64_terrain_now_row0 != row0 || sc64_terrain_now_cols != col1 - col0 ||
+        sc64_terrain_now_rows != row1 - row0)
+        sc64_terrain_fill_now(col0, row0, col1, row1);
+    if (sc64_terrain_now_valid) {
+        for (i = 0; i < sc64_terrain_now_cols * sc64_terrain_now_rows; ++i)
+            sc64_terrain_cache_mask[i] = sc64_terrain_now[i];
+        sc64_terrain_now_valid = 0;
+    } else
+#endif
     for (row = row0; row < row1; row++)
         for (col = col0; col < col1; col++) {
             sc64_terrain_cache_mask[i++] = sc64_terrain_state(col, row);
