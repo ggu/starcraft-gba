@@ -35,7 +35,42 @@ static volatile u16 *pixels=host_fb[1];
 #else
 static volatile u16 *pixels=(volatile u16*)0x0600a000;
 #endif
+/* GBA_ASYNC_PRESENT takes effect in ROMs that have the sampled-audio VBlank
+ * interrupt and mode-4 pages; other builds keep the polled present gate. */
+#if defined(GBA_ASYNC_PRESENT) && !defined(GBA_HOST) && \
+    defined(SC64_AUDIO_IMPORTED) && !defined(SC64_TILE_RENDERER)
+#define GBA_ASYNC_PRESENT_ACTIVE 1
+#endif
+#ifdef GBA_ASYNC_PRESENT_ACTIVE
+/* The VBlank interrupt performs the page flip that gfx_end queues, so the
+ * next update runs while the finished page waits for VBlank. Flips stay at
+ * least two hardware frames apart, the same 30 Hz cap as the polled gate.
+ * gfx_begin waits for a queued flip before it draws into the page that is
+ * still on screen. Drawing and simulation are unchanged; only the time at
+ * which a finished page appears moves. */
+static volatile u16 front;
+static volatile u8 flip_pending;
+static volatile u8 vblanks_since_flip;
+/* Hardware frames each presented page stayed on screen; slot 7 is 7+. */
+volatile u32 gba_present_intervals[8];
+static void __attribute__((noinline)) present_vblank(void) {
+ unsigned since=vblanks_since_flip;
+ if(since<255)vblanks_since_flip=(u8)++since;
+ if(flip_pending&&since>=2) {
+  u16 next=(u16)(front^1);
+  front=next;
+  REG16(0x04000000)=(u16)(0x0404|(next?16:0));
+  gba_present_intervals[since<7?since:7]++;
+  vblanks_since_flip=0;
+  flip_pending=0;
+ }
+}
+static void __attribute__((noinline)) wait_flip(void) {
+ while(flip_pending){}
+}
+#else
 static u16 front;
+#endif
 static u8 backbuffer_index;
 static u32 clear_generation[2];
 #ifdef GBA_SCENE_CLIP
@@ -232,7 +267,9 @@ void gfx_host_frame_rgb(u16 *rgb) {
     for(int i=0;i<38400;i++){u16 a=host_fb[front][i/2];rgb[i]=host_palette[(i&1)?a>>8:a&255];}
 }
 #endif
+#ifndef GBA_ASYNC_PRESENT_ACTIVE
 static u32 previous_present;
+#endif
 #ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
 volatile u32 gfx_sprite_words_calls;
 #endif
@@ -264,6 +301,9 @@ void gba_init(void) {
 #else
  REG16(0x04000208)=0;
  REG16(0x04000000)=0x0404;
+#ifdef GBA_ASYNC_PRESENT_ACTIVE
+ flip_pending=0; vblanks_since_flip=2;
+#endif
  REG16(0x04000204)=0x4317;
  volatile u16 *pal=(volatile u16*)0x05000000;
  for(int i=0;i<32;i++)pal[i]=colors[i];
@@ -317,12 +357,15 @@ return 0;
 return (~REG16(0x04000130))&1023;
 #endif
 }
-#if !defined(GBA_HOST) && !defined(SC64_LATE_TERRAN_STORAGE) && !defined(GBA_PRESENT_DEADLINE)
+#if !defined(GBA_HOST) && !defined(SC64_LATE_TERRAN_STORAGE) && !defined(GBA_PRESENT_DEADLINE) && !defined(GBA_ASYNC_PRESENT_ACTIVE)
 static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<160){}}
 #endif
 void gfx_begin(u8 color) {
 #ifdef GBA_SCENE_CLIP
  gfx_clip_top=0; gfx_clip_bottom=160;
+#endif
+#ifdef GBA_ASYNC_PRESENT_ACTIVE
+ wait_flip();
 #endif
  draw_start=gba_clock();
 #ifdef SC64_TILE_RENDERER
@@ -349,6 +392,9 @@ void gfx_begin(u8 color) {
 void gfx_begin_preserve(void) {
 #ifdef GBA_SCENE_CLIP
  gfx_clip_top=0; gfx_clip_bottom=160;
+#endif
+#ifdef GBA_ASYNC_PRESENT_ACTIVE
+ wait_flip();
 #endif
  draw_start=gba_clock();
 #ifdef SC64_TILE_RENDERER
@@ -554,6 +600,11 @@ HOT int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows
 #endif
 void gfx_end(void) {
     gfx_draw_cycles=gba_clock()-draw_start;
+#ifdef GBA_ASYNC_PRESENT_ACTIVE
+    /* The page is complete; the VBlank interrupt shows it. */
+    flip_pending=1;
+    return;
+#else
 #ifndef GBA_HOST
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
     while (!gba_present_ready(gba_clock()-previous_present,
@@ -597,6 +648,7 @@ void gfx_end(void) {
 #else
     if(elapsed<280896u)vblank();
     previous_present=gba_clock();
+#endif
 #endif
 #endif
 }
@@ -1570,6 +1622,9 @@ static u8 audio_flash_owned;
 #endif
 /* Thumb, from ROM: the IWRAM reserve is too small for the mixer. */
 static void __attribute__((noinline)) audio_vblank(void){
+#ifdef GBA_ASYNC_PRESENT_ACTIVE
+ present_vblank();
+#endif
  u32 start=gba_clock();
  u32 half=0;
  if(audio_half){

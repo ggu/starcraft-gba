@@ -2713,15 +2713,35 @@ remains off in standard profiles pending broader qualification. See
 full host/ARM replay, timing and opening-save evidence and remaining limits.
 
 
-### Experimental route fields sized to the active map
+### Route bank sized to the active map
 
-`SC64_ROUTE_ACTIVE_STRIDE` requires race rules, `SC64_ROUTE_PACK3`,
-`SC64_ZP_CAMPAIGN_STORAGE` and `SC64_LARGE_MAPS`. It partitions the existing
-86,016-byte route bank using the active map's packed field size. A 128×96
-map fits 18 fields instead of 14; a 128×128 map retains 14. Metadata and field
-pointers reset when map dimensions change. No field-data bank or save bytes
-are added; the pointer/configuration metadata uses 112 additional ARM BSS bytes.
-The flag remains off in standard profiles pending broader qualification.
+`SC64_ROUTE_ACTIVE_STRIDE` requires race rules, `SC64_ROUTE_PACK3` and
+`SC64_ROUTE_FLOOD_SPLIT`, and excludes `SC64_ROUTE_PARTIAL_FLOOD`. The
+logical route cache keeps the fixed layout's slot count and bookkeeping, so
+which fields the game sees as cached does not change. The existing route
+bank is partitioned at the active map's packed field size, up to 56 fields
+on a 64×64 map (48 with range work's two reserved planes); fields no logical
+slot owns hold evicted complete point fields as donors, and a miss for a
+goal with a donor swaps pointers instead of flooding. A map where the bank
+holds no more fields than the logical cache keeps the fixed layout.
+`SC64_ROUTE_KEEP_FIELDS` additionally keeps those bytes across a structure
+change as stale donors that may answer only a checked single-cell next-step
+read. No field-data bank or save bytes are added. The four canonical products
+enable both through `CANONICAL_ROUTE_STRIDE_FLAGS` and
+`CANONICAL_ROUTE_KEEP_FLAGS` in `mk/combat-perf/Makefile`; empty them to
+build a ROM with the fixed layout for comparison.
+
+Game behaviour depends on which point fields are resident, because
+weapon-range movement uses a cached field only when one exists. Any change
+to cache residency therefore changes the simulation, and a test controller
+that queries routes through the cache perturbs the game it plays.
+
+The same file holds `SC64_PRESENT_FLAGS` (`-DGBA_ASYNC_PRESENT`): `gfx_end`
+queues the mode-4 page flip and the sampled-audio VBlank interrupt performs
+it, at most once per two hardware frames, so the next update overlaps the
+wait for VBlank. Host builds and ROMs without that interrupt keep the polled
+gate. Measurements are in the
+[2026-11-10 combat profile](audits/2026-11-10-busy-combat-profile/README.md).
 
 ```sh
 make test-sc64-route-active-stride

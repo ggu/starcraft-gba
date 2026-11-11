@@ -16,6 +16,7 @@ typedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32; typedef int8_t s
 #define SC64_LARGE_MAPS
 #define SC64_ZP_CAMPAIGN_STORAGE
 #define SC64_ROUTE_ACTIVE_STRIDE
+#define SC64_ROUTE_FLOOD_SPLIT
 #endif
 #ifdef TEST_DECAY
 #define SC64_ROUTE_DECAY_FREQ
@@ -271,7 +272,7 @@ static void test_unreachable_goal(void)
 static void assert_invalidated(void)
 {
     int i;
-    for (i = 0; i < SC64_ROUTE_ACTIVE_MAX_SLOTS; ++i) assert(sc64_route_valid[i] == 0);
+    for (i = 0; i < SC64_ROUTE_SLOTS; ++i) assert(sc64_route_valid[i] == 0);
 }
 static void test_active_resize(void)
 {
@@ -284,7 +285,7 @@ static void test_active_resize(void)
     test_cols = 64; test_rows = 64;
     assert(sc64_route_configure()); assert_invalidated();
     assert(sc64_route_active_bytes == (64u * 64u * 3u + 7u) / 8u);
-    assert(sc64_route_active_slots == SC64_ROUTE_ACTIVE_MAX_SLOTS);
+    assert(sc64_route_active_slots == SC64_ROUTE_SLOTS && sc64_route_pcount == SC64_ROUTE_PHYS_MAX);
     canary = sc64_route_active_bytes * sc64_route_active_slots;
     assert(canary < SC64_ROUTE_POOL_BYTES); sc64_route_pool[canary] = 0xa5;
     set_open(); { int s = sc64_route_slot(1); assert(s >= 0 && sc64_route_valid[s]); }
