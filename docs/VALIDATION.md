@@ -5610,9 +5610,11 @@ Limits: these are emulator measurements, not physical-GBA results, and the
 audio itself was not checked by ear in this run. Direct Sound is 8-bit mono at
 10512 Hz, below StarCraft 64's 16-bit stereo 11025 Hz mix. There are four
 voices, with no distance attenuation or panning, and at most two new effects
-per frame. Annoyed responses, transmissions, briefing audio and advisor lines
-other than the funds and supply refusals (added later; see
-[Advisor refusal lines](#advisor-refusal-lines-2026-10-28)) are not played. Building completion uses the building's selection sound.
+per frame. Annoyed responses, transmissions and briefing audio are not played.
+Advisor lines were added later: see
+[Advisor refusal lines](#advisor-refusal-lines-2026-10-28) and
+[Advisor alerts](DEVELOPMENT.md#advisor-alerts). Zerg and Protoss building
+completion uses the building's selection sound.
 Shots are inferred from a raised cooldown, so a weapon sounds once per
 cooldown cycle. Victory and defeat stingers come from the N64 result flag and
 have not been confirmed by ear.

@@ -740,6 +740,7 @@ static void race_bc_lab_tick(int slot)
     if (!sc64_battlecruiser_research_tick(&r,(unsigned)key,&bits,
                                            sc64_battlecruiser_source_tick_due())) return;
     b[slot].level=(int)r.kind; b[slot].queue_progress=(int)r.remaining;
+    if (b[slot].owner==SIDE && bits!=sc64_battlecruiser_tech_bits) game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
     sc64_battlecruiser_tech_bits=(u16)bits;
 }
 #endif

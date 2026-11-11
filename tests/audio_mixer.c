@@ -264,9 +264,22 @@ int main(void)
     mix(&m);
     mix(&m);
     CHECK(!m.voice[1].remaining && !m.voice[2].remaining && !m.voice[3].remaining, "advisor line ends");
+    CHECK(!audio_mixer_advisor_busy(&m), "idle mixer is not busy");
     audio_mixer_request(&m, 4, 0, AUDIO_CLASS_ADVISOR);
+    CHECK(audio_mixer_advisor_busy(&m), "a queued advisor line is busy");
     audio_mixer_service(&m, &bank);
     CHECK(m.voice[1].sound == 4 && m.voice[1].remaining == 352, "advisor replays after it ends");
+    CHECK(audio_mixer_advisor_busy(&m), "a playing advisor line is busy");
+    audio_mixer_request(&m, 2, 3, AUDIO_CLASS_EFFECT);
+    audio_mixer_service(&m, &bank);
+    mix(&m);
+    mix(&m);
+    CHECK(!audio_mixer_advisor_busy(&m), "a finished advisor line is not busy");
+    audio_mixer_reset(&m, decoders);
+    audio_mixer_request(&m, 3, 1, AUDIO_CLASS_SPEECH);
+    audio_mixer_request(&m, 2, 3, AUDIO_CLASS_EFFECT);
+    audio_mixer_service(&m, &bank);
+    CHECK(!audio_mixer_advisor_busy(&m), "speech and effects are not advisor lines");
 
     /* The ring holds AUDIO_QUEUE-1 requests and rejects the rest. */
     audio_mixer_reset(&m, decoders);

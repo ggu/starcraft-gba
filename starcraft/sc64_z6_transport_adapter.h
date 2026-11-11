@@ -132,6 +132,7 @@ static int race_z6_transport_research_tick(int paused)
     valid = race_z6_transport_research_producer_valid(slot);
     if (!valid) return 0;
     result = sc64_z6_transport_tech_tick(&race_z6.transport, 0, 1);
+    if (result == SC64_Z6_TRANSPORT_TECH_RESEARCHED) game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
     return result != SC64_Z6_TRANSPORT_TECH_ERROR;
 }
 

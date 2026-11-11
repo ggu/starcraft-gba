@@ -7,6 +7,8 @@
 
 extern u32 audio_host_tones, audio_host_noises, audio_host_samples;
 extern int audio_host_last_sample, audio_host_music;
+extern int audio_host_last_kind, audio_host_last_priority, audio_host_advisor_busy;
+extern u32 audio_host_advisor_samples;
 
 static u16 previous_held;
 
@@ -253,6 +255,475 @@ static int warp_lifecycle(void)
 
 #endif
 
+/* ---- Advisor alerts: what reaches the observer, and when it speaks. ---- */
+
+#ifdef SC64_RACES
+static void set_race(int race) { race_human = race; }
+#else
+static void set_race(int race) { (void)race; }
+#endif
+
+/* A hit through the real damage path; the owner is the attacker. */
+static void hostile_hit(int target, int owner) { hit_target(target, 3, U_ZERGLING, owner); }
+
+static void quiet(int ticks) { for (int k = 0; k < ticks; k++) observe_next(); }
+
+static void quiet_past_cooldown(void) { quiet(GAME_AUDIO_ATTACK_ALERT_TICKS + 1); clear_events(); }
+
+#define ATTACK_TICK GAME_AUDIO_STATE[GAME_AUDIO_STATE_ATTACK_TICK]
+
+#if defined(SC64_AUDIO_IMPORTED) && defined(SC64_AUDIO_ALERT_LINES)
+#define ALERT_SAMPLE(line) sc64_audio_alert[GAME_AUDIO_PLAYER_RACE * SC64_AUDIO_ALERT_LINES + (line)]
+/* An alert is one advisor-class request at priority zero. */
+static int advisor_request(int line)
+{
+    return audio_host_last_sample == ALERT_SAMPLE(line) && audio_host_last_kind == AUDIO_CLASS_ADVISOR &&
+           audio_host_last_priority == 0;
+}
+#endif
+
+static void off_screen_player(void)
+{
+    put_unit(10, SIDE, U_MARINE, 900, 900);
+    put_unit(11, SIDE, U_MARINE, 60, 60);
+    u[10].hp = u[10].maxhp = u[11].hp = u[11].maxhp = 200;
+    b[0].alive = 1; b[0].owner = SIDE; b[0].type = B_DEPOT; b[0].x = 900; b[0].y = 700;
+    b[0].hp = 300; b[0].maxhp = 500;
+}
+
+/* Only a hostile hit raises an under-attack alert: not burn, not friendly or
+ * ownerless damage, not an on-screen fight, and a one-shot kill still counts. */
+static int attack_alerts(void)
+{
+    fixture();
+    set_race(0);
+    off_screen_player();
+    observe_next();
+    quiet_past_cooldown();
+
+    hostile_hit(11, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT)) return fail("on-screen hit alerted");
+    hostile_hit(10, SIDE);
+    hit_target(10, 3, U_ZERGLING, -1);
+    hostile_hit(10, NEUTRAL);
+    hit_target(MAX_UNITS + 0, 20, U_ZERGLING, -1);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT)) return fail("friendly or ownerless damage alerted");
+    put_unit(5, ENEMY, U_ZERGLING, 900, 900);
+    hostile_hit(5, SIDE);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT)) return fail("damage to an enemy alerted");
+
+    hostile_hit(10, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_FORCES)
+        return fail("off-screen unit hit");
+#if defined(SC64_AUDIO_IMPORTED) && defined(SC64_AUDIO_ALERT_LINES)
+    if (!advisor_request(GAME_AUDIO_ALERT_FORCES)) return fail("forces alert is not an advisor request");
+#endif
+    observe_next();
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("one hit alerted twice");
+
+    /* The wait is shared by base and forces, and runs from the alert. */
+    int alerted = ATTACK_TICK;
+    hostile_hit(10, ENEMY);
+    hit_target(MAX_UNITS + 0, 20, U_ZERGLING, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("a base hit right after a unit alert");
+    while ((u16)(frame - alerted) < GAME_AUDIO_ATTACK_ALERT_TICKS - 2) observe_next();
+    hit_target(MAX_UNITS + 0, 20, U_ZERGLING, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("sustained attack repeated inside the wait");
+    hit_target(MAX_UNITS + 0, 20, U_ZERGLING, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 2 || game_audio_last_alert != GAME_AUDIO_ALERT_BASE)
+        return fail("off-screen building hit");
+    /* A unit and a building hit in the same update make one alert, base first. */
+    quiet_past_cooldown();
+    hostile_hit(10, ENEMY);
+    hostile_hit(MAX_UNITS + 0, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_BASE)
+        return fail("simultaneous hits");
+
+    /* A unit killed outright between two looks still alerts. */
+    quiet_past_cooldown();
+    u[10].hp = 4;
+    hit_target(10, 50, U_ZERGLING, ENEMY);
+    if (u[10].alive) return fail("fixture unit survived");
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_FORCES)
+        return fail("one-shot kill");
+    quiet_past_cooldown();
+    b[0].hp = 5;
+    hit_target(MAX_UNITS + 0, 500, U_ZERGLING, ENEMY);
+    if (b[0].alive) return fail("fixture building survived");
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_BASE)
+        return fail("one-shot building kill");
+
+    /* A discontinuity drops a hit from before it. */
+    quiet_past_cooldown();
+    put_unit(10, SIDE, U_MARINE, 900, 900);
+    hostile_hit(10, ENEMY);
+    frame += 40;
+    game_render();
+    quiet(2);
+    if (events(GAME_AUDIO_ALERT)) return fail("hit across a discontinuity alerted");
+
+    /* Zerg and Protoss attack alerts have no N64 evidence: silent, and no work. */
+#ifdef SC64_RACES
+    for (int race = 1; race <= 2; race++) {
+        fixture();
+        set_race(race);
+        off_screen_player();
+        observe_next();
+        quiet_past_cooldown();
+        hostile_hit(10, ENEMY);
+        hit_target(MAX_UNITS + 0, 20, U_ZERGLING, ENEMY);
+        observe_next();
+        if (events(GAME_AUDIO_ALERT) || GAME_AUDIO_STATE[GAME_AUDIO_STATE_PENDING])
+            return fail("attack alert for a race without evidence");
+    }
+    set_race(0);
+#endif
+    return 0;
+}
+
+#ifdef SC64_RACES
+/* Terran buildings below a third of their hit points burn without any enemy. */
+static int burning_building(void)
+{
+    fixture();
+    set_race(0);
+    off_screen_player();
+    b[1].alive = 1; b[1].owner = SIDE; b[1].type = B_BARRACKS; b[1].raw_type = -1;
+    b[1].x = 900; b[1].y = 800; b[1].maxhp = 1000;
+    b[1].shield_remainder = NEUTRAL * 256;
+    if (!race_building_can_burn(&b[1])) return fail("fixture building cannot burn");
+    /* 336 of 1000 burns (a third is 33.4): one point lost crosses a step of 16. */
+    b[1].hp = 336;
+    observe_next();
+    quiet_past_cooldown();
+    for (int k = 0; k < 600; k++) {
+        ++frame;
+        race_tick_building_damage(1);
+        game_render();
+    }
+    if (b[1].hp >= 336 - 5) return fail("fixture building did not burn");
+    if (events(GAME_AUDIO_ALERT)) return fail("burn alone alerted");
+    /* The same building taking an enemy hit while it burns is under attack. */
+    ++frame;
+    hit_target(MAX_UNITS + 1, 15, U_MARINE, ENEMY);
+    race_tick_building_damage(1);
+    game_render();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_BASE)
+        return fail("hit on a burning building");
+    /* Burn that kills it is still no attack. */
+    quiet_past_cooldown();
+    b[1].hp = 1; b[1].shield_remainder = NEUTRAL * 256;
+    for (int k = 0; k < 40 && b[1].alive; k++) {
+        ++frame;
+        race_tick_building_damage(1);
+        game_render();
+    }
+    if (b[1].alive) return fail("fixture building did not burn down");
+    if (events(GAME_AUDIO_ALERT)) return fail("burn kill alerted");
+    return 0;
+}
+#endif
+
+/* The attack wait starts with the match or the load, from any old state. */
+static int cooldown_start(void)
+{
+    /* A new match with leftover observer words from some earlier game. */
+    previous_held = 0;
+    init_state();
+    set_race(0);
+    GAME_AUDIO_STATE[GAME_AUDIO_STATE_ATTACK_TICK] = 0x7000;
+    GAME_AUDIO_STATE[GAME_AUDIO_STATE_PENDING] = 0xf;
+    /* The opening position stays as it is, so a save of it is valid. */
+    int k = 10;
+    for (int i = 0; i < MAX_UNITS; i++) if (u[i].alive && u[i].owner == SIDE) { k = i; break; }
+    if (!u[k].alive) return fail("no player unit to attack");
+    u[k].x = u[k].tx = 330; u[k].y = u[k].ty = 200; /* in the world, off the first screen */
+    u[k].hp = u[k].maxhp = 400;
+    screen = SCREEN_PLAY;
+    camx = camy = 0;
+    observe_next();
+    clear_events();
+    if (GAME_AUDIO_STATE[GAME_AUDIO_STATE_PENDING]) return fail("a new match kept pending alerts");
+    int start = ATTACK_TICK;
+    if ((u16)(frame - start) > 3) return fail("the wait did not start with the match");
+    hostile_hit(k, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT)) return fail("alert in the first seconds of a match");
+    while ((u16)(frame - start) < GAME_AUDIO_ATTACK_ALERT_TICKS - 2) observe_next();
+    hostile_hit(k, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT)) return fail("alert one tick early");
+    hostile_hit(k, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("no alert once the wait is over");
+
+    /* A load: the saved game's tick is far from the one in the observer's state. */
+    quiet(300);
+    if (!save_game()) return fail("save for the load check");
+    int saved = frame;
+    quiet(GAME_AUDIO_ATTACK_ALERT_TICKS * 3);
+    hostile_hit(k, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 2) return fail("alert before the load");
+    if (!load_game() || frame != saved) return fail("load for the cooldown check");
+    game_render();
+    clear_events();
+    hostile_hit(k, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT)) return fail("alert right after a load");
+    start = ATTACK_TICK;
+    while ((u16)(frame - start) < GAME_AUDIO_ATTACK_ALERT_TICKS) observe_next();
+    hostile_hit(k, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("no alert after the load wait");
+
+    /* Pausing keeps the wait where it was; it is not a restart. */
+    quiet_past_cooldown();
+    screen = SCREEN_PAUSE;
+    observe_next();
+    screen = SCREEN_PLAY;
+    observe_next();
+    hostile_hit(k, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("a pause restarted the wait");
+
+    /* A long quiet spell never wraps the 16-bit age into a false wait. */
+    quiet_past_cooldown();
+    u[k].hp = 400;
+    hostile_hit(k, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("alert before the long quiet spell");
+    clear_events();
+    for (int k = 0; k < 8; k++) { frame += 8192; game_render(); }
+    frame += 100;
+    game_render();
+    quiet(2);
+    hostile_hit(k, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("an old alert read as recent after the age wrapped");
+    return 0;
+}
+
+/* Research and upgrades speak once per completion, however many finish at once. */
+static int one_shots(void)
+{
+    fixture();
+    set_race(0);
+    off_screen_player();
+    observe_next();
+    quiet_past_cooldown();
+
+    /* Both upgrades finishing in one update: one announcement. */
+    weapons_research = armor_research = 600;
+    observe_next();
+    tick_research();
+    if (weapons_level != 1 || armor_level != 1) return fail("fixture upgrades did not finish");
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_UPGRADE)
+        return fail("two upgrades in one update");
+    quiet(10);
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("upgrade alert repeated");
+    /* A level that is not a finished upgrade stays silent. */
+    ++weapons_level;
+    quiet(2);
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("granted upgrade alerted");
+    /* The next one is a new completion. */
+    armor_research = 600;
+    observe_next();
+    tick_research();
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 2) return fail("a later upgrade stayed silent");
+    clear_events();
+
+    /* Research finishing twice in one update is one announcement, a later one another. */
+    game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
+    game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_RESEARCH)
+        return fail("research alert");
+    quiet(5);
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("research alert repeated");
+    game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 2) return fail("a later research stayed silent");
+    clear_events();
+
+    /* A load or restart forgets what finished before it. */
+    game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
+    game_audio_cue(GAME_AUDIO_CUE_UPGRADE);
+    game_audio_prime();
+    quiet(3);
+    if (events(GAME_AUDIO_ALERT)) return fail("research replayed across a prime");
+
+    /* Research races are told apart: Zerg has research only, Protoss nothing. */
+#ifdef SC64_RACES
+    fixture();
+    set_race(1);
+    quiet_past_cooldown();
+    game_audio_cue(GAME_AUDIO_CUE_UPGRADE);
+    observe_next();
+    quiet(2);
+    if (events(GAME_AUDIO_ALERT)) return fail("Zerg upgrade alert has no evidence");
+    game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_RESEARCH)
+        return fail("Zerg research alert");
+    fixture();
+    set_race(2);
+    quiet_past_cooldown();
+    game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
+    game_audio_cue(GAME_AUDIO_CUE_UPGRADE);
+    observe_next();
+    quiet(2);
+    if (events(GAME_AUDIO_ALERT) || GAME_AUDIO_STATE[GAME_AUDIO_STATE_PENDING])
+        return fail("Protoss alert has no evidence");
+    set_race(0);
+#endif
+    return 0;
+}
+
+#if defined(SC64_RACES) && defined(SC64_SHARED_TRANSPORT)
+/* The skirmish transport research announces itself when its timer ends, for
+ * the player's job only. */
+static int zerg_research_job(void)
+{
+    set_race(1);
+    gba_init(); game_init();
+    race_mode = 1; race_human = R_ZERG; race_bots = 1; race_bot_races[0] = R_TER; race_skirmish_map = 0;
+    init_state(); screen = SCREEN_PLAY; game_render();
+    int slot = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_HATCHERY) { slot = i; break; }
+    if (slot < 0) return fail("no Zerg hall for the research job");
+    b[slot].type = B_LAIR; b[slot].raw_type = -1;
+    minerals = gas = 5000;
+    if (!race_sk_transport_start_owner(SIDE, slot)) return fail("transport research did not start");
+    clear_events();
+    int guard = 0;
+    while (race_skirmish_transport_tech.owner[sc64_sk_transport_owner_index(SIDE)].remaining && guard++ < 20000) {
+        ++frame;
+        race_sk_transport_research_tick();
+        if (events(GAME_AUDIO_ALERT)) break;
+        game_render();
+        if (!race_skirmish_transport_tech.owner[sc64_sk_transport_owner_index(SIDE)].remaining) break;
+    }
+    game_render();
+    if (!race_skirmish_transport_tech.owner[sc64_sk_transport_owner_index(SIDE)].researched)
+        return fail("transport research did not finish");
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_RESEARCH)
+        return fail("transport research did not announce itself once");
+    quiet(10);
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("finished transport research repeated");
+    set_race(0);
+    return 0;
+}
+#endif
+
+/* The advisor voice: one request per frame, held back while it is taken. */
+static int voice_policy(void)
+{
+    fixture();
+    set_race(0);
+    off_screen_player();
+    observe_next();
+    quiet_past_cooldown();
+
+    /* Taken by another line: an attack is dropped, a one-shot waits. */
+    audio_host_advisor_busy = 1;
+    hostile_hit(10, ENEMY);
+    game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
+    observe_next();
+    quiet(3);
+    if (events(GAME_AUDIO_ALERT)) return fail("alert while the advisor voice was taken");
+    audio_host_advisor_busy = 0;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_RESEARCH)
+        return fail("held research did not play when the voice freed");
+    quiet(5);
+    if (events(GAME_AUDIO_ALERT) != 1) return fail("a dropped attack came back or research repeated");
+    /* The dropped attack did not use up the wait. */
+    hostile_hit(10, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 2 || game_audio_last_alert != GAME_AUDIO_ALERT_FORCES)
+        return fail("a dropped attack consumed the wait");
+    clear_events();
+
+    /* Everything at once: one per frame, attack, research, upgrade in that order. */
+    quiet_past_cooldown();
+    hostile_hit(10, ENEMY);
+    game_audio_cue(GAME_AUDIO_CUE_UPGRADE);
+    game_audio_cue(GAME_AUDIO_CUE_RESEARCH);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_FORCES)
+        return fail("attack first");
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 2 || game_audio_last_alert != GAME_AUDIO_ALERT_RESEARCH)
+        return fail("research second");
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 3 || game_audio_last_alert != GAME_AUDIO_ALERT_UPGRADE)
+        return fail("upgrade third");
+    quiet(5);
+    if (events(GAME_AUDIO_ALERT) != 3) return fail("held alerts repeated");
+    clear_events();
+
+    /* The player's own refusal takes the voice before an alert in the same frame. */
+    quiet_past_cooldown();
+    toast_advisor = TOAST_CUE_NO_BUILD;
+    hostile_hit(10, ENEMY);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_NO_BUILD)
+        return fail("refusal before attack");
+    clear_events();
+
+#if defined(SC64_AUDIO_IMPORTED) && defined(SC64_AUDIO_ALERT_LINES)
+    /* Job's finished is an advisor line when the voice is free, and keeps the
+     * building's own hum when it is not; two finishing together share one line. */
+    quiet_past_cooldown();
+    for (int i = 1; i <= 2; i++) {
+        b[i].alive = 1; b[i].owner = SIDE; b[i].type = B_BARRACKS; b[i].x = 100 + i * 40; b[i].y = 80;
+        b[i].hp = b[i].maxhp = 1000; b[i].under_construction = 1;
+    }
+    observe_next();
+    clear_events();
+    u32 samples = audio_host_samples, advisor = audio_host_advisor_samples;
+    u32 lines = game_audio_alert_lines[GAME_AUDIO_ALERT_BUILT];
+    b[1].under_construction = 0;
+    b[2].under_construction = 0;
+    observe_next();
+    if (events(GAME_AUDIO_BUILT) != 2) return fail("both buildings should complete");
+    if (game_audio_alert_lines[GAME_AUDIO_ALERT_BUILT] - lines != 1 || audio_host_advisor_samples - advisor != 1 ||
+        audio_host_samples - samples != 2)
+        return fail("job's finished was not one advisor request");
+    b[1].under_construction = 1; b[2].under_construction = 1;
+    observe_next();
+    clear_events();
+    audio_host_advisor_busy = 1;
+    b[1].under_construction = 0;
+    observe_next();
+    audio_host_advisor_busy = 0;
+    if (events(GAME_AUDIO_BUILT) != 1 || audio_host_last_kind == AUDIO_CLASS_ADVISOR ||
+        game_audio_alert_lines[GAME_AUDIO_ALERT_BUILT] - lines != 1)
+        return fail("job's finished took a taken advisor voice");
+    /* An alert never takes the speech voice used for unit responses. */
+    quiet_past_cooldown();
+    hostile_hit(10, ENEMY);
+    observe_next();
+    if (audio_host_last_kind == AUDIO_CLASS_SPEECH) return fail("alert used the speech voice");
+#endif
+    return 0;
+}
+
 static int hooks(void)
 {
 #ifndef SC64_RACES
@@ -433,6 +904,52 @@ static int hooks(void)
     observe_next();
     if (events(GAME_AUDIO_ADVISOR) || toast_advisor) return fail("discontinuity kept an advisor cue");
 
+    /* Advisor alerts: hostile hits, the attack wait, one-shots and the voice. */
+    if (attack_alerts() || cooldown_start() || one_shots() || voice_policy()) return 1;
+#ifdef SC64_RACES
+    if (burning_building()) return 1;
+#endif
+
+    /* Refused sites and low energy use their cues, then clear. */
+    fixture();
+    set_race(0);
+    quiet_past_cooldown();
+    clear_events();
+    toast_advisor = TOAST_CUE_NO_BUILD;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_NO_BUILD)
+        return fail("blocked placement");
+    toast_advisor = TOAST_CUE_NO_LAND;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 2 || game_audio_last_alert != GAME_AUDIO_ALERT_NO_LAND)
+        return fail("blocked landing");
+    toast_advisor = TOAST_CUE_ENERGY;
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 3 || game_audio_last_alert != GAME_AUDIO_ALERT_ENERGY)
+        return fail("low energy");
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 3 || events(GAME_AUDIO_ADVISOR)) return fail("alert cue repeated");
+#if defined(SC64_AUDIO_IMPORTED) && defined(SC64_AUDIO_ALERT_LINES)
+    if (GAME_AUDIO_PLAYER_RACE == 0 &&
+        audio_host_last_sample != sc64_audio_alert[GAME_AUDIO_ALERT_ENERGY])
+        return fail("race energy line");
+#endif
+
+    /* A placement on impossible ground takes the cue through the real command path. */
+    fixture();
+    put_unit(12, SIDE, U_SCV, 60, 60);
+    u[12].selected = 1;
+    minerals = gas = 5000;
+    observe_next();
+    observe_next();
+    clear_events();
+    cx = cy = 2;
+    if (can_place(B_DEPOT, cx, cy)) return fail("fixture site is placeable");
+    start_build(B_DEPOT);
+    observe_next();
+    if (events(GAME_AUDIO_ALERT) != 1 || game_audio_last_alert != GAME_AUDIO_ALERT_NO_BUILD)
+        return fail("blocked placement cue");
+
     /* A tick discontinuity (load or restart) and pauses never replay history. */
     put_unit(7, ENEMY, U_ZERGLING, 50, 50);
     observe_next();
@@ -457,7 +974,24 @@ static int hooks(void)
 #else
     if (audio_host_tones == 0) return fail("placeholder tones");
 #endif
+#if defined(SC64_RACES) && defined(SC64_SHARED_TRANSPORT)
+    if (zerg_research_job()) return 1;
+#endif
     return 0;
+}
+
+/* One alert check by name, for telling failures apart. */
+static int alert_check(const char *name)
+{
+    set_race(0);
+    if (!strcmp(name, "attack")) return attack_alerts();
+    if (!strcmp(name, "cooldown")) return cooldown_start();
+    if (!strcmp(name, "oneshot")) return one_shots();
+    if (!strcmp(name, "voice")) return voice_policy();
+#ifdef SC64_RACES
+    if (!strcmp(name, "burn")) return burning_building();
+#endif
+    return fail("unknown alert check");
 }
 #endif
 
@@ -466,6 +1000,11 @@ int main(int argc, char **argv)
     gba_init();
     game_init();
 #ifndef GAME_AUDIO_OFF
+    if (argc > 2 && !strcmp(argv[1], "alert")) {
+        if (alert_check(argv[2])) return 1;
+        printf("alert check %s passed\n", argv[2]);
+        return 0;
+    }
     if (argc > 1 && !strcmp(argv[1], "hooks")) {
         if (hooks()) return 1;
         puts("game audio hook checks passed");
@@ -494,10 +1033,14 @@ int main(int argc, char **argv)
 #ifndef GAME_AUDIO_OFF
     u32 total = 0;
     for (int k = 0; k < GAME_AUDIO_EVENT_KINDS; k++) total += events(k);
-    printf("events attack=%u death=%u ready=%u what=%u yes=%u built=%u advisor=%u\n",
+    printf("events attack=%u death=%u ready=%u what=%u yes=%u built=%u advisor=%u alert=%u\n",
            events(GAME_AUDIO_ATTACK), events(GAME_AUDIO_DEATH), events(GAME_AUDIO_READY),
            events(GAME_AUDIO_WHAT), events(GAME_AUDIO_YES), events(GAME_AUDIO_BUILT),
-           events(GAME_AUDIO_ADVISOR));
+           events(GAME_AUDIO_ADVISOR), events(GAME_AUDIO_ALERT));
+    printf("alerts base=%u forces=%u research=%u upgrade=%u energy=%u no_build=%u no_land=%u built=%u\n",
+           game_audio_alert_lines[0], game_audio_alert_lines[1], game_audio_alert_lines[2],
+           game_audio_alert_lines[3], game_audio_alert_lines[4], game_audio_alert_lines[5],
+           game_audio_alert_lines[6], game_audio_alert_lines[7]);
     if (!total) return fail("long run produced no audio events");
 #endif
     return 0;

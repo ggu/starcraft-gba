@@ -1515,6 +1515,9 @@ void save_test_corrupt_latest(u32 len,u32 tag) {
 #ifdef GBA_HOST
 u32 audio_host_tones, audio_host_noises, audio_host_samples;
 int audio_host_last_sample=-1, audio_host_music=-1;
+/* Host fixtures read the last request's class and priority, and can hold the advisor busy. */
+int audio_host_last_kind=-1, audio_host_last_priority=-1, audio_host_advisor_busy;
+u32 audio_host_advisor_samples;
 #endif
 void audio_tone(int hz,int frames,int volume){
 #ifdef GBA_HOST
@@ -1569,8 +1572,17 @@ int audio_sampled_available(void){return 1;}
 void audio_play_sample(u16 sample,u8 priority,u8 kind){
 #ifdef GBA_HOST
  ++audio_host_samples; audio_host_last_sample=sample;
+ audio_host_last_kind=kind; audio_host_last_priority=priority;
+ if(kind==AUDIO_CLASS_ADVISOR)++audio_host_advisor_samples;
 #endif
  audio_mixer_request(&audio_mixer,sample,priority,kind);
+}
+int audio_advisor_busy(void){
+#ifdef GBA_HOST
+ return audio_host_advisor_busy; /* The host never services the queue. */
+#else
+ return audio_mixer_advisor_busy(&audio_mixer);
+#endif
 }
 void audio_play_music(int track,int loop){
 #ifdef GBA_HOST
@@ -1662,6 +1674,13 @@ static void audio_hw_init(void){
 #else
 int audio_sampled_available(void){return 0;}
 void audio_play_sample(u16 sample,u8 priority,u8 kind){(void)sample;(void)priority;(void)kind;}
+int audio_advisor_busy(void){
+#ifdef GBA_HOST
+ return audio_host_advisor_busy;
+#else
+ return 0;
+#endif
+}
 void audio_play_music(int track,int loop){(void)track;(void)loop;}
 int audio_music_track(void){return -1;}
 #endif
