@@ -26,9 +26,9 @@ test: test-terrain-soft-fog
 
 # Asset-free ternary fog signature and clipped indexed-cell raster contract.
 build/test-sc64-fog: tests/sc64_fog.c starcraft/sc64_fog.h common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -Icommon $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_SOFT_FOG -DGBA_SCENE_CLIP -Icommon $< common/gba.c -o $@
 build/test-sc64-fog-no-clip: tests/sc64_fog.c starcraft/sc64_fog.h common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_SOFT_FOG -Icommon $< common/gba.c -o $@
 .PHONY: test-sc64-fog
 test-sc64-fog: build/test-sc64-fog build/test-sc64-fog-no-clip
 	./build/test-sc64-fog

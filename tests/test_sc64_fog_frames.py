@@ -7,8 +7,8 @@ same scenarios and compared frame by frame. The properties asserted:
 1. Unknown cells stay opaque: every pixel inside an unknown cell is identical
    with the feature on and off (black, apart from anything drawn over it
    identically by both builds).
-2. Visible terrain is unchanged: a pixel in a visible cell whose eight
-   neighbours are all visible is bit-identical with the feature on and off.
+2. Visible terrain is unchanged: a pixel in a visible cell whose in-map eight
+   neighbours are all visible (the map border is not an edge) is bit-identical with the feature on and off.
 3. Only explored-but-not-visible cells and the edges beside them change: every
    differing pixel lies in an explored cell, or in a visible cell with at least
    one non-visible neighbour. The feature must also change something.
@@ -81,7 +81,10 @@ def compare(on, off):
             col = (x + on["camx"]) // 16
             i = y * 240 + x
             klass = cell_class(on, col, row)
+            # A neighbour beyond the map takes the cell's own class, so the
+            # map border is not an edge: visible cells there must not change.
             interior = klass == 2 and all(
+                not (0 <= col + dx < on["cols"] and 0 <= row + dy < on["rows"]) or
                 cell_class(on, col + dx, row + dy) == 2
                 for dy in (-1, 0, 1) for dx in (-1, 0, 1))
             if klass == 0:

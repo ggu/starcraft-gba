@@ -99,9 +99,13 @@ static void test_signature_encoding(void)
         for (int dy = -1; dy <= 1; ++dy)
             for (int dx = -1; dx <= 1; ++dx, place *= 3u) {
                 int x = col + dx, y = row + dy;
-                unsigned state = SC64_FOG_UNKNOWN;
+                /* Beyond the map: the center's own class, so no border edge. */
+                unsigned cc = (unsigned)(col + row * 5);
+                unsigned state = visible[cc] ? SC64_FOG_VISIBLE :
+                                 explored[cc] ? SC64_FOG_EXPLORED : SC64_FOG_UNKNOWN;
                 if (x >= 0 && x < 5 && y >= 0 && y < 5) {
                     unsigned cell = (unsigned)(x + y * 5);
+                    state = SC64_FOG_UNKNOWN;
                     if (visible[cell]) state = SC64_FOG_VISIBLE;
                     else if (explored[cell]) state = SC64_FOG_EXPLORED;
                 }
@@ -109,12 +113,40 @@ static void test_signature_encoding(void)
             }
         assert(sc64_fog_signature(visible, explored, 5, 5, col, row) == expected);
     }
-    /* Explicitly prove visible wins over explored and out-of-map is unknown. */
+    /* Explicitly prove visible wins over explored and out-of-map takes the
+     * center's class (here visible, not unknown). */
     memset(visible, 0, sizeof(visible)); memset(explored, 1, sizeof(explored));
     visible[0] = 1;
     u16 sig = sc64_fog_signature(visible, explored, 5, 5, 0, 0);
     assert(reference_state(sig, 4) == SC64_FOG_VISIBLE);
-    assert(reference_state(sig, 0) == SC64_FOG_UNKNOWN);
+    assert(reference_state(sig, 0) == SC64_FOG_VISIBLE);
+    assert(reference_state(sig, 1) == SC64_FOG_VISIBLE);
+    assert(reference_state(sig, 3) == SC64_FOG_VISIBLE);
+    assert(reference_state(sig, 5) == SC64_FOG_EXPLORED); /* real neighbor */
+}
+
+/* The map border draws no edge: an all-visible map's corner and edge cells are
+ * the plain terrain, and an all-explored map's are the plain shade. */
+static void test_map_border_has_no_fringe(void)
+{
+    u8 visible[25], explored[25];
+    for (int explored_only = 0; explored_only < 2; ++explored_only) {
+        memset(visible, !explored_only, sizeof(visible));
+        memset(explored, 1, sizeof(explored));
+        for (int row = 0; row < 5; ++row)
+            for (int col = 0; col < 5; ++col) {
+                u16 sig = sc64_fog_signature(visible, explored, 5, 5, col, row);
+                assert(sig == (explored_only ? 9841 : SC64_FOG_SIGNATURE_COUNT - 1));
+                gfx_begin(C_HIGHLIGHT);
+                sc64_fog_raster_cell(40, 40, sig, terrain, shade);
+                for (unsigned py = 0; py < 16; ++py)
+                    for (unsigned px = 0; px < 16; ++px) {
+                        u8 plain = terrain[py * 16 + px];
+                        assert(gfx_test_pixel(40 + (int)px, 40 + (int)py) ==
+                               (explored_only ? shade[plain] : plain));
+                    }
+            }
+    }
 }
 
 static void test_all_neighborhoods(void)
@@ -228,6 +260,7 @@ int main(void)
         shade[i] = (u8)(255u - i);
     }
     test_signature_encoding();
+    test_map_border_has_no_fringe();
     gfx_begin(C_BLACK);
     test_all_neighborhoods();
     test_unknown_never_reads_terrain();

@@ -36,7 +36,9 @@ Unknown cells are still opaque black.
 
 Fog classes are unknown, explored and visible; visible takes precedence. The
 nine classes in a cell's 3x3 neighborhood fit exactly in a 16-bit base-three
-signature. Out-of-map neighbors are unknown. Unknown cells paint opaque black
+signature. A neighbor beyond the map counts as the cell's own class, so the map border
+is never an edge (an earlier version treated it as unknown and drew a dark
+dithered fringe on visible terrain along the border). Unknown cells paint opaque black
 without reading terrain. Known cells sample only their own terrain;
 neighboring terrain, actors and occupancy never affect the masks.
 
@@ -116,7 +118,7 @@ every row. Terran and Zerg still match the original pin.
 
 | Product | loop mean, base | merged draft (older base) | first optimization | **this pass** | shade-only variant | simulation (`upd`) |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| Terran | 1,121,240 | +35.0% | +4.4% | 1,158,191 (**+3.3%**) | +2.5% | unchanged |
+| Terran | 1,121,240 | +35.0% | +4.4% | 1,157,474 (**+3.2%**; border fix re-measured) | +2.5% | unchanged |
 | Zerg | 1,376,574 | +31.8% | +4.1% | 1,421,950 (**+3.3%**, 16 slots) | +2.3% | unchanged |
 | Protoss | 1,489,501 | +30.7% | +4.3% | 1,535,765 (**+3.1%**) | +2.0% | unchanged |
 
@@ -156,14 +158,17 @@ simulation is identical in both builds, and 600 further updates with a render
 after each leave an identical state digest. Over 45 frames (a 240x108 world band is
 25,920 pixels):
 
-* Changed pixels: 330,550 in total (7,346 per frame on average, 0 to 16,058).
+* Changed pixels: 320,398 in total (7,120 per frame on average, 0 to 16,058).
   296,235 are in explored-not-visible cells (94.9% of the 312,136 pixels of
-  such cells; the rest map to themselves), and 34,315 are in visible cells
+  such cells; the rest map to themselves), and 24,163 are in visible cells
   that touch a non-visible neighbor.
 * Unknown cells: 210,528 pixels, none changed, so they remain opaque black
   (apart from cursor and sprites drawn identically by both builds).
-* Visible interior: 522,184 pixels of visible cells whose eight neighbors are
-  all visible, none changed (bit-identical).
+* Visible interior: 557,704 pixels of visible cells whose in-map eight
+  neighbors are all visible (map-border cells included), none changed
+  (bit-identical). Against the previous head, 19 of the 45 frames differ by
+  11,802 pixels in total, all in cells on the map border; fog-off frames and
+  every pixel away from the border are identical.
 
 ## Determinism and palette on ARM
 

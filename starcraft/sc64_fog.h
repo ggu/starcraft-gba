@@ -22,18 +22,25 @@ enum {
 #endif
 
 /* Encode the 3x3 state neighborhood in base three, row-major, with the
- * center at digit four. Cells beyond the map are unknown. */
+ * center at digit four. A cell beyond the map counts as the center's own
+ * state, so the map border never draws an edge: only real neighbors do. */
 static inline u16
 sc64_fog_signature(const u8 *visible, const u8 *explored,
                    int cols, int rows, int col, int row)
 {
-    unsigned signature = 0, place = 1;
+    unsigned signature = 0, place = 1, center;
+    {
+        int cell = col + row * cols;
+        center = SC64_FOG_GRID_GET(visible, cell) ? SC64_FOG_VISIBLE :
+                 SC64_FOG_GRID_GET(explored, cell) ? SC64_FOG_EXPLORED : SC64_FOG_UNKNOWN;
+    }
     for (int dy = -1; dy <= 1; ++dy) {
         for (int dx = -1; dx <= 1; ++dx, place *= 3u) {
             int x = col + dx, y = row + dy;
-            unsigned state = SC64_FOG_UNKNOWN;
+            unsigned state = center;
             if (x >= 0 && x < cols && y >= 0 && y < rows) {
                 int cell = x + y * cols;
+                state = SC64_FOG_UNKNOWN;
                 if (SC64_FOG_GRID_GET(visible, cell)) state = SC64_FOG_VISIBLE;
                 else if (SC64_FOG_GRID_GET(explored, cell)) state = SC64_FOG_EXPLORED;
             }

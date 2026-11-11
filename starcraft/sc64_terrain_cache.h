@@ -215,6 +215,15 @@ sc64_terrain_fill_now(int col0, int row0, int col1, int row1)
             sc64_terrain_now[r * cols + c] =
                 (u16)(triple[r][c] + 27u * triple[r + 1][c] + 729u * triple[r + 2][c]);
 #endif
+    /* The combine above reads cells beyond the map as unknown; the
+     * definition says they take the center's class. Fix the border cells. */
+    if (col0 == 0 || col1 == MAP_COLS || row0 == 0 || row1 == MAP_ROWS)
+        for (r = 0; r < rows; ++r)
+            for (c = 0; c < cols; ++c) {
+                int col = col0 + c, row = row0 + r;
+                if (col == 0 || col == MAP_COLS - 1 || row == 0 || row == MAP_ROWS - 1)
+                    sc64_terrain_now[r * cols + c] = sc64_terrain_state(col, row);
+            }
     sc64_terrain_now_col0 = col0;
     sc64_terrain_now_row0 = row0;
     sc64_terrain_now_cols = cols;
