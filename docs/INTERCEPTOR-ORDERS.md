@@ -1,14 +1,22 @@
 # Interceptor order decisions
 
 `starcraft/sc64_interceptor_orders.h` provides an asset-free decision model for
-the Interceptor's attack passes and return to its Carrier. Its only gameplay
-caller is the default-off generation-43 flight adapter
-(`starcraft/sc64_p7_interceptor_flight.h`; see
-[Carrier projectiles](CARRIER-PROJECTILES.md#generation-43-interceptor-flight)).
-It does not qualify another campaign mission.
+the Interceptor's attack passes and return to its Carrier. Its gameplay caller
+is the flight adapter (`starcraft/sc64_p7_interceptor_flight.h`; see
+[Carrier projectiles](CARRIER-PROJECTILES.md#generation-43-interceptor-flight)),
+which the Protoss ROM (the P7 to P10 flag vectors) compiles into ordinary
+play. Which parents use it, in which ROM:
 
-The module is excluded from `STARCRAFT` runtime sources until that adapter is
-ready. Its isolated host target links the implementation explicitly.
+| Parent | Where | Status |
+| --- | --- | --- |
+| Carrier (raw 72) | Custom games and P7 to P10 missions on the Protoss ROM | Paid Interceptors, launch, attack passes, return, rebuild, death and saves. |
+| Gantrithor (raw 82) | P10 finale, Protoss ROM | The same service. It joins the human side with a full hangar of four, launches at enemies it faces, rebuilds for 25 minerals each and takes its children with it if it changes hands or dies. |
+| Computer opponents' Carriers | Custom games, Protoss ROM | A Protoss opponent trains Carriers and pays for their Interceptors through the same service ([Skirmish AI](SKIRMISH-AI.md)). |
+| Any Carrier | Terran, Zerg and Showcase ROMs | Not compiled; see [Other ROMs](CARRIER-PROJECTILES.md#carriers-in-the-other-roms). |
+
+The module is linked as a companion translation unit
+(`P7_INTERCEPTOR_FLIGHT_SOURCES`) in the Protoss builds. Its isolated host
+target links the implementation explicitly.
 
 Run the authored C regression suite with:
 
@@ -39,10 +47,9 @@ Return decisions lower the Interceptor near its parent and request hiding and
 hangar relinking at the arrival boundary. The adapter must commit the list and
 visibility changes together, including slot-reuse and parent-death handling.
 
-Keep the module disconnected until those effects are implemented and tested
-through ordinary game input, save/load and ARM execution. No persistent memory,
-save format, actor capacity, ROM identity or gameplay feature flag is changed
-by this foundation.
+The foundation itself (2026-10-25) changed no persistent memory, save format,
+actor capacity or ROM identity; the adapter that now calls it is described in
+[Carrier projectiles](CARRIER-PROJECTILES.md).
 
 ## Reference and scope
 

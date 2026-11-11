@@ -32,6 +32,21 @@
  * early worker scout is cosmetic and is not used as a knowledge source.
  */
 
+/* Protoss opponents add Carriers when the product exists in this build: the
+ * same Stargate product, Interceptor orders and flight service the human uses
+ * (sc64_p7_carrier_training.h). Other products compile none of it. */
+/* -DRACE_AI_NO_CARRIERS keeps the Carrier service but gives the planner none of
+ * this, to separate the cost of the engine change from that of the new play. */
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && \
+    defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
+    defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_P7_ACTORS) && \
+    !defined(RACE_AI_NO_CARRIERS)
+#define RACE_AI_CARRIERS 1
+#ifndef SC64_P7_INTERCEPTOR_COST
+#define SC64_P7_INTERCEPTOR_COST 25     /* must match sc64_p7_carrier_training.h */
+#endif
+#endif
+
 enum {
     RACE_AI_PHASE = 16,                 /* frames between two bots' passes */
     RACE_AI_PERIOD = 48,                /* frames between one bot's passes */
@@ -50,6 +65,15 @@ enum {
     RACE_AI_HOME_PYLON_RANGE = 256,
     RACE_AI_WORKER_FLOOR = 4,
     RACE_AI_FLOAT_MINERALS = 400
+#ifdef RACE_AI_CARRIERS
+    ,
+    /* At most four Carriers, and one more only once the ground line (Zealots
+     * and Dragoons) numbers four per Carrier it would then have: the Stargate
+     * never takes the money that keeps the line growing, and the opponent
+     * keeps a land army to hold what the Carriers win. */
+    RACE_AI_CARRIER_CAP = 4,
+    RACE_AI_CARRIER_LINE = 4
+#endif
 };
 
 /* Tracked raw IDs. 0 means untracked; otherwise key + 1. Unit and building
@@ -64,6 +88,9 @@ enum {
     AK_CREEP, AK_SUNKEN, AK_SPORE, AK_EXTRACTOR,
     AK_NEXUS, AK_PYLON, AK_ASSIMILATOR, AK_GATEWAY, AK_CORE, AK_FORGE,
     AK_CANNON, AK_STARGATE,
+#ifdef RACE_AI_CARRIERS
+    AK_CARRIER, AK_FLEET,
+#endif
     AK_COUNT
 };
 
@@ -84,6 +111,9 @@ static const unsigned char race_ai_raw_key[256] = {
     [154] = AK_NEXUS + 1, [156] = AK_PYLON + 1, [157] = AK_ASSIMILATOR + 1,
     [160] = AK_GATEWAY + 1, [164] = AK_CORE + 1, [166] = AK_FORGE + 1,
     [162] = AK_CANNON + 1, [167] = AK_STARGATE + 1,
+#ifdef RACE_AI_CARRIERS
+    [72] = AK_CARRIER + 1, [169] = AK_FLEET + 1,
+#endif
 };
 
 typedef struct {
@@ -122,9 +152,22 @@ static int race_ai_is_depot(int type)
     return type == B_COMMAND || type == B_NEXUS || sc64_race_is_zerg_townhall(type);
 }
 
+/* A Carrier has no weapon row of its own: it fights through its Interceptors,
+ * which hit ground and air. It is an armed unit for every purpose here. */
+static int race_ai_carrier(int type)
+{
+#ifdef RACE_AI_CARRIERS
+    return type == U_P7_CARRIER;
+#else
+    (void)type;
+    return 0;
+#endif
+}
+
 static int race_ai_armed(int type)
 {
-    return sc64_race_unit_damage(type) > 0 || sc64_race_unit_can_attack_air(type);
+    return sc64_race_unit_damage(type) > 0 || sc64_race_unit_can_attack_air(type) ||
+           race_ai_carrier(type);
 }
 
 /* Unit pool share. The human keeps the same share as each opponent, and
@@ -243,7 +286,7 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             ++c->enemy_army;
             if (flying) ++c->enemy_air;
             /* A unit with no ground weapon (Scourge) cannot hurt a base. */
-            if (sc64_race_unit_damage_vs(q->type, 0) <= 0) continue;
+            if (sc64_race_unit_damage_vs(q->type, 0) <= 0 && !race_ai_carrier(q->type)) continue;
             best = flying ? air_d : best_threat;
             /* Count distinct actors, while choosing the distance to their
              * nearest owned depot. Overlapping bases do not multiply them. */
@@ -303,7 +346,8 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
                 ++c->deployed; c->deployed_supply += supply;
             } else {
                 ++c->home_army;
-                if (sc64_race_unit_can_attack_air(q->type)) ++c->home_anti_air;
+                if (sc64_race_unit_can_attack_air(q->type) || race_ai_carrier(q->type))
+                    ++c->home_anti_air;
             }
         }
     }
@@ -859,6 +903,9 @@ static const RaceAiStep race_ai_protoss_plan[] = {
     { RACE_AI_STEP_BUILD, 167, 1, 15, 0 },       /* Stargate: Scouts */
     { RACE_AI_STEP_BUILD, 160, 3, 15, RACE_AI_IF_RICH },
     { RACE_AI_STEP_GAS,   157, 2, 16, 0 },
+#ifdef RACE_AI_CARRIERS
+    { RACE_AI_STEP_BUILD, 169, 1, 16, RACE_AI_IF_RICH }, /* Fleet Beacon: Carriers */
+#endif
     { RACE_AI_STEP_BUILD, 166, 1, 16, RACE_AI_IF_LATE },
     { RACE_AI_STEP_DEFENSE, 162, 1, 16, RACE_AI_IF_LATE },
     { RACE_AI_STEP_BUILD, 160, 4, 16, RACE_AI_IF_RICH },
@@ -1068,9 +1115,63 @@ static int race_ai_pick_zerg(RaceAiCensus *c)
     return -1;
 }
 
+#ifdef RACE_AI_CARRIERS
+/* A Carrier is due when a Fleet Beacon stands, the cap and the ground-line
+ * ratio allow one more, and the owner's unit share has room for it and its
+ * four Interceptors (children occupy unit slots like any other unit). */
+static int race_ai_carrier_wanted(const RaceAiCensus *c)
+{
+    int carriers = race_ai_count(c, AK_CARRIER);
+    return c->have[AK_FLEET] && carriers < RACE_AI_CARRIER_CAP &&
+           race_ai_count(c, AK_ZEALOT) + race_ai_count(c, AK_DRAGOON) >=
+               (carriers + 1) * RACE_AI_CARRIER_LINE &&
+           c->units + c->queued_units + 5 <= race_ai_unit_cap();
+}
+
+/* One Interceptor order for each of this owner's Carrier-class units, paid
+ * from the owner's bank by the service the human's command uses. The service
+ * enforces the queue limit, hangar capacity and the actor pool; money held
+ * for a structure or another purchase is respected. */
+static void race_ai_stock_hangars(const RaceAiCensus *c)
+{
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || u[i].owner != c->owner || !race_ai_carrier(u[i].type)) continue;
+        if (race_owner_minerals(c->owner) - c->reserve_minerals < SC64_P7_INTERCEPTOR_COST) return;
+        (void)race_p7_carrier_training_queue_owner(i);
+    }
+}
+#endif
+
+#ifdef RACE_AI_CARRIERS
+/* While a Carrier is due, an idle powered Stargate stands ready for it, the
+ * supply is free and the gas is already in hand, hold its price so that the
+ * line's Gateways cannot spend the last minerals first. Returns whether a
+ * price is held. With the gas or supply missing nothing is held, so the line
+ * keeps growing meanwhile and the Pylon step can make room. */
+static int race_ai_save_for_carrier(RaceAiCensus *c)
+{
+    const Sc64RaceUnitRule *cr;
+    int ready = 0;
+    if (!race_ai_carrier_wanted(c)) return 0;
+    cr = sc64_race_unit_rule(U_P7_CARRIER);
+    if (!cr || race_owner_gas(c->owner) - c->reserve_gas < cr->gas ||
+        c->free_supply < cr->supply) return 0;
+    for (int i = 0; i < MAX_BUILDINGS && !ready; ++i)
+        ready = b[i].alive && b[i].owner == c->owner && b[i].type == B_STARGATE &&
+                building_complete(i) && b[i].queue_count < 1 &&
+                race_site_powered(c->owner, b[i].x, b[i].y);
+    if (!ready) return 0;
+    c->reserve_minerals += cr->minerals; c->reserve_gas += cr->gas;
+    return 1;
+}
+#endif
+
 static int race_ai_pick_protoss(RaceAiCensus *c, int producer)
 {
     int zealots = race_ai_count(c, AK_ZEALOT), dragoons = race_ai_count(c, AK_DRAGOON);
+#ifdef RACE_AI_CARRIERS
+    if (b[producer].type == B_STARGATE && race_ai_carrier_wanted(c)) return 72;
+#endif
     if (b[producer].type == B_STARGATE) return 70;
     if (b[producer].type != B_GATEWAY) return -1;
     if (c->have[AK_CORE] && (c->enemy_air || dragoons <= zealots) &&
@@ -1103,6 +1204,9 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
 {
     int worker_target = race_ai_worker_target(c), unit_cap = race_ai_unit_cap();
     int committed = c->units + c->queued_units;
+#ifdef RACE_AI_CARRIERS
+    int carrier_reserve = 0;
+#endif
     /* Workers first, from every depot; only pending builds are reserved. */
     for (int k = 0; k < c->depots && c->workers < worker_target && committed < unit_cap; ++k) {
         int depot = c->depot[k];
@@ -1128,6 +1232,10 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
     if (c->depots && c->ore_patches &&
         race_ai_count(c, race_ai_key(c->worker_raw)) < RACE_AI_WORKER_FLOOR)
         c->reserve_minerals += sc64_race_unit_rule(c->worker_type)->minerals;
+#ifdef RACE_AI_CARRIERS
+    race_ai_stock_hangars(c);
+    carrier_reserve = race_ai_save_for_carrier(c);
+#endif
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         int raw;
         if (!b[i].alive || b[i].owner != c->owner) continue;
@@ -1141,6 +1249,19 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
             raw = c->race == R_TER ? race_ai_pick_terran(c, i) : race_ai_pick_protoss(c, i);
         }
         if (raw < 0) continue;
+#ifdef RACE_AI_CARRIERS
+        if (raw == 72 && carrier_reserve) {
+            /* The held price is this purchase's own: release it to buy, and
+             * keep holding if the order is refused. */
+            const Sc64RaceUnitRule *cr = sc64_race_unit_rule(U_P7_CARRIER);
+            c->reserve_minerals -= cr->minerals; c->reserve_gas -= cr->gas;
+            if (race_ai_try_queue(c, i, raw, 1)) {
+                carrier_reserve = 0;
+                if (++committed >= unit_cap) return;
+            } else { c->reserve_minerals += cr->minerals; c->reserve_gas += cr->gas; }
+            continue;
+        }
+#endif
         if (!race_ai_try_queue(c, i, raw, 1) &&
             !(c->race == R_PROTOSS && raw == 66 && race_ai_try_queue(c, i, 65, 1)) &&
             !race_ai_gas_fallback(c, i, raw)) continue;

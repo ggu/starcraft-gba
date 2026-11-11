@@ -39,7 +39,7 @@ OWNER_FIELDS = ("owner", "race", "minerals", "gas", "supply", "cap", "workers", 
                 "trainable")
 OWNER_MAPS = ("unit_raw", "building_raw", "first_made", "first_complete")
 # Structures beyond the first producer and supply that show tech progress.
-TECH = {0: {112, 113, 114, 120, 122, 123}, 1: {132, 135, 139, 141, 144, 146}, 2: {162, 164, 166, 167}}
+TECH = {0: {112, 113, 114, 120, 122, 123}, 1: {132, 135, 139, 141, 144, 146}, 2: {162, 164, 166, 167, 169}}
 WORKERS = {0: 7, 1: 41, 2: 64}
 OFFENSIVE_FRAME = 10800
 # Full-match cases: the harness cap and the snapshot spacing the thresholds
@@ -72,16 +72,16 @@ PREREQS = {
     131: set(), 132: {131, 142}, 135: {142}, 139: {131}, 141: {132}, 142: {131}, 143: {131},
     144: {143, 139}, 146: {143, 142}, 149: set(),
     # Protoss.
-    64: {154}, 65: {160}, 66: {160, 164}, 70: {167},
-    154: set(), 156: set(), 157: set(), 160: {154}, 162: {166}, 164: {160}, 166: {154}, 167: {164},
+    64: {154}, 65: {160}, 66: {160, 164}, 70: {167}, 72: {167, 169},
+    154: set(), 156: set(), 157: set(), 160: {154}, 162: {166}, 164: {160}, 166: {154}, 167: {164}, 169: {167},
 }
 # Protoss structures, and the units their producers train, also need a
 # completed Pylon (the psi field itself is a position and is not checked).
-POWERED = {160, 162, 164, 166, 167, 65, 66, 70}
+POWERED = {160, 162, 164, 166, 167, 169, 65, 66, 70, 72}
 PYLON = 156
 RACE_OF = {**{r: 0 for r in (7, 0, 32, 2, 3, 5, 8, 106, 109, 110, 111, 112, 113, 114, 120, 122, 123, 124)},
            **{r: 1 for r in (41, 42, 37, 38, 43, 47, 131, 132, 135, 139, 141, 142, 143, 144, 146, 149)},
-           **{r: 2 for r in (64, 65, 66, 70, 154, 156, 157, 160, 162, 164, 166, 167)}}
+           **{r: 2 for r in (64, 65, 66, 70, 72, 154, 156, 157, 160, 162, 164, 166, 167, 169)}}
 
 
 class RecordError(ValueError):
@@ -164,7 +164,7 @@ AUDIT_FIELDS = ("owner", "start", "spent", "spent_gas", "income", "vanished", "l
 
 def validate_audit(audit, owners):
     """The spending audit that closes a run; owners is [(id, race)]."""
-    if type(audit) is not dict or set(audit) != {"ore_start", "owners"}:
+    if type(audit) is not dict or set(audit) not in ({"ore_start", "owners"}, {"ore_start", "owners", "carrier"}):
         raise RecordError("final record lacks a well-formed audit")
     out = {"ore_start": _int(audit["ore_start"], "ore_start", 0, 1 << 24), "owners": []}
     rows = audit["owners"]
@@ -179,6 +179,29 @@ def validate_audit(audit, owners):
             # Income is signed: an unexplained charge makes an update's negative.
             _int(row[f], f, -1 if f == "first_bad" else -(1 << 30) if f == "income" else 0, 1 << 30)
         out["owners"].append({**row, "made_n": _counts(row["made_n"], "made_n", False)})
+    if "carrier" in audit:
+        out["carrier"] = validate_carrier_use(audit["carrier"], owners)
+    return out
+
+
+CARRIER_FIELDS = ("owner", "outside_updates", "max_outside", "fire_updates")
+
+
+def validate_carrier_use(rows, owners):
+    """Per owner, how the Carrier service was used: updates with an own
+    Interceptor in flight, the most in flight at once, and updates with an own
+    shot in the projectile pool. Only profiles that compile the service emit it."""
+    if type(rows) is not list or len(rows) != len(owners):
+        raise RecordError("carrier use list does not match the lobby")
+    out = []
+    for row, (owner, _) in zip(rows, owners):
+        if type(row) is not dict or set(row) != set(CARRIER_FIELDS):
+            raise RecordError("carrier use row is malformed")
+        if row["owner"] != owner:
+            raise RecordError(f"carrier use owner {row['owner']} != {owner}")
+        for f in CARRIER_FIELDS:
+            _int(row[f], f, 0, 1 << 30)
+        out.append(dict(row))
     return out
 
 
@@ -401,6 +424,27 @@ def match_checks(records, expect_draw=False):
             "streaks": {str(k): v for k, v in streaks.items()}, "failed_owners": failed,
             "prerequisites": prerequisite_violations(records)[:8], "audit": audit_violations(final),
             "progression": {str(k): v for k, v in prog.items()}}
+
+
+def carrier_evidence(records):
+    """Whether a Protoss owner of a finished match used Carriers: it made at
+    least one (so a Fleet Beacon and a Stargate stood, and the Carrier was
+    paid for like any unit), ordered at least one Interceptor through the
+    shared service (a made-count of raw 73 in the spending audit), had its
+    Interceptors in flight and had its own shots in the projectile pool."""
+    audit = records[-1]["audit"]
+    use = {row["owner"]: row for row in audit.get("carrier", [])}
+    owners = {}
+    for row, snapshot in zip(audit["owners"], records[-1]["owners"]):
+        if snapshot["race"] != 2:
+            continue
+        mine = use.get(row["owner"], {})
+        made, orders = row["made_n"].get(CARRIER, 0), row["made_n"].get(INTERCEPTOR, 0)
+        owners[row["owner"]] = {"carriers": made, "interceptor_orders": orders,
+                                "outside_updates": mine.get("outside_updates", 0),
+                                "fire_updates": mine.get("fire_updates", 0),
+                                "used": bool(made and orders and mine.get("outside_updates") and mine.get("fire_updates"))}
+    return {"ok": any(v["used"] for v in owners.values()), "owners": owners}
 
 
 def _records(lines):
@@ -729,6 +773,15 @@ MATCH_LOBBIES = (
 # Unresolved at baseline too, but within the limits only in some profiles (the
 # Zerg profile's human Protoss banks minerals for 17 snapshots).
 MATCH_EXTRA = {"terran": ((1, "p", "pp"),), "protoss": ((1, "p", "pp"),)}
+# Long mirrored matches in which a Protoss owner must put Carriers to use: the
+# planner's Fleet Beacon, a Carrier from the Stargate (paid like any unit), its
+# Interceptors ordered through the same service the human's command uses,
+# launched and firing. Only the Protoss profile compiles the Carrier service;
+# the lobbies are those of the sweep in which an owner did. They run every
+# match criterion too, so the spending audit covers the Interceptor orders.
+CARRIER_LOBBIES = ((0, "p", "pp"), (1, "t", "pt"), (1, "p", "pp"), (0, "z", "zpt"))
+CARRIER = 72
+INTERCEPTOR = 73
 # A lobby that ends with nothing left in the world that can act, by profile:
 # four owners on the small map with every field mined out. Which lobbies end
 # this way shifts with any planner change; when this one starts to resolve,
@@ -782,6 +835,9 @@ def cases(ticks, criteria="development"):
         if profile in MATCH_DRAWS:
             map_id, human, bots = MATCH_DRAWS[profile]
             out.append(("match-draw", profile, map_id, RACES.index(human), bots, MATCH_TICKS))
+        if profile == "protoss":
+            for map_id, human, bots in CARRIER_LOBBIES:
+                out.append(("match-carrier", profile, map_id, RACES.index(human), bots, MATCH_TICKS))
     if criteria == "development":
         for profile in PROFILES:
             out.append(("catalog", profile, 1, 0, "t", 0))
@@ -847,7 +903,7 @@ def run_case(build: Path, case, every):
         argv += ["--builder", str(arg)]
     elif kind == "workers":
         argv += ["--workers", str(arg)]
-    elif kind in ("match", "match-draw"):
+    elif kind in ("match", "match-draw", "match-carrier"):
         argv += ["--mirror", "--ticks", str(arg), "--every", str(MATCH_EVERY)]
     elif kind == "catalog":
         argv = [str(binary), "--audit"]
@@ -864,7 +920,7 @@ def run_case(build: Path, case, every):
     else:
         argv += ["--recovery", str(arg)]
     proc = subprocess.run(argv, capture_output=True, text=True,
-                          timeout=3600 if kind in ("match", "match-draw") else 900)
+                          timeout=3600 if kind in ("match", "match-draw", "match-carrier") else 900)
     return case, argv, proc.returncode, proc.stdout, sanitizer_report(proc.stderr) + proc.stderr[-2000:]
 
 
@@ -890,6 +946,14 @@ def evaluate(case, returncode, stdout, every, criteria="development"):
         records = validate_run(lines, human, bot_races, MATCH_EVERY, arg)
         result = match_checks(records, expect_draw=kind == "match-draw")
         return {"ok": result.pop("ok"), **result}
+    if kind == "match-carrier":
+        if returncode != 0:
+            raise RecordError(f"harness exit {returncode}")
+        records = validate_run(lines, human, bot_races, MATCH_EVERY, arg)
+        result = match_checks(records)
+        evidence = carrier_evidence(records)
+        result["checks"]["carriers"] = evidence["ok"]
+        return {"ok": result.pop("ok") and evidence["ok"], "carrier": evidence["owners"], **result}
     if kind == "catalog":
         if returncode != 0:
             raise RecordError(f"harness exit {returncode}")

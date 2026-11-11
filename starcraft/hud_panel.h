@@ -285,7 +285,7 @@ static int
 hud_unit_hangar(int slot)
 {
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (race_protoss_services_active() && u[slot].type == U_P7_CARRIER)
+    if (race_protoss_services_active() && sc64_p7_carrier_parent_type(u[slot].type))
         return (int)race_p7_carrier_training_child_count(slot);
 #endif
     (void)slot;
