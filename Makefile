@@ -4459,21 +4459,7 @@ build/StarCraft-Showcase-Transport1-GBA.gba: build/starcraft-showcase.elf tools/
 showcase: build/StarCraft-Showcase-Transport1-GBA.gba
 verify-showcase: build/StarCraft-Showcase-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --showcase
-build/test-sc64-showcase-front: tests/sc64_frontend.c starcraft/sc64_frontend.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_SHOWCASE_ENABLED -Icommon $< -o $@
-build/test-sc64-showcase-game: tests/sc64_showcase_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c Makefile | build
-	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
-build/test-sc64-showcase-game-packed: tests/sc64_showcase_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c Makefile | build
-	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) -DSC64_UNIT_WORD_SPRITES -DGBA_SCENE_CLIP $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
-build/test-sc64-showcase-game-indexed: tests/sc64_showcase_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c Makefile | build
-	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(filter-out -DSC64_UNIT_WORD_SPRITES,$(SHOWCASE_FLAGS)) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
-test-sc64-showcase-front: build/test-sc64-showcase-front
-	./build/test-sc64-showcase-front
-test-starcraft: test-sc64-showcase-front
-test-sc64-showcase: test-sc64-showcase-front build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed
-	./build/test-sc64-showcase-game
-	./build/test-sc64-showcase-game-packed
-	./build/test-sc64-showcase-game-indexed
+include mk/showcase/Makefile
 
 build/test-sc64-t5-facing: tests/sc64_t5_facing.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(UNIT_FACING_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $(UNIT_FACING_FLAGS) -DSC64_UNIT_WORD_SPRITES $< common/gba.c -o $@
@@ -5482,38 +5468,7 @@ test-sc64-skirmish-build-controller: $(addprefix build/test-sc64-skirmish-build-
 	  ./build/test-sc64-skirmish-build-controller-$$profile 1 moving; \
 	done
 
-# Exact depot-circle geometry and BFS oracle, independent of private assets.
-DEPOT_ROUTE_HOST_FLAGS = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -I.
-define DEPOT_ROUTE_FIXTURE
-build/test-sc64-depot-routes-$(1): tests/sc64_depot_routes.c starcraft/sc64_routes.h starcraft/sc64_depot_goal.h Makefile | build
-	$$(CLANG) $$(DEPOT_ROUTE_HOST_FLAGS) $(2) $$< -o $$@
-endef
-$(eval $(call DEPOT_ROUTE_FIXTURE,pack3,-DSC64_ROUTE_PACK3))
-$(eval $(call DEPOT_ROUTE_FIXTURE,split,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_FLOOD_SPLIT))
-$(eval $(call DEPOT_ROUTE_FIXTURE,partial,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_PARTIAL_FLOOD))
-$(eval $(call DEPOT_ROUTE_FIXTURE,visit,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_VISIT_GRID))
-$(eval $(call DEPOT_ROUTE_FIXTURE,combined,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_MONOTONE_PROBE))
-$(eval $(call DEPOT_ROUTE_FIXTURE,large128,-DSC64_LARGE_MAPS -DSC64_ROUTE_PACK3 -DRACE_TEST_COLS=128 -DRACE_TEST_ROWS=128))
-$(eval $(call DEPOT_ROUTE_FIXTURE,t4,-DSC64_LARGE_MAPS -DSC64_ROUTE_PACK3 -DSC64_T4_RUNTIME -DRACE_TEST_COLS=128 -DRACE_TEST_ROWS=128))
-$(eval $(call DEPOT_ROUTE_FIXTURE,active,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_LARGE_MAPS -DSC64_ROUTE_PACK3 -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_ROUTE_WORD_CLEAR))
-$(eval $(call DEPOT_ROUTE_FIXTURE,base,))
-$(eval $(call DEPOT_ROUTE_FIXTURE,rect,-DRACE_TEST_COLS=80 -DRACE_TEST_ROWS=48 -DSC64_ROUTE_PACK3))
-$(eval $(call DEPOT_ROUTE_FIXTURE,legacy,-DSC64_DEPOT_TEST_LEGACY))
-$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-pack3,-DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
-$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-nibble,-DSC64_DEPOT_BOUNDED))
-$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-partial,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ -DSC64_DEPOT_BOUNDED))
-$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-visit,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_VISIT_GRID -DSC64_DEPOT_BOUNDED))
-$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-newcell,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_NEW_CELL -DSC64_DEPOT_BOUNDED))
-$(eval $(call DEPOT_ROUTE_FIXTURE,full-newcell,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_NEW_CELL))
-$(eval $(call DEPOT_ROUTE_FIXTURE,active-newcell,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_NEW_CELL -DSC64_DEPOT_BOUNDED -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_LARGE_MAPS))
-$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-rect,-DRACE_TEST_COLS=80 -DRACE_TEST_ROWS=48 -DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
-$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-large,-DRACE_TEST_COLS=128 -DRACE_TEST_ROWS=128 -DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
-$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-readonly,-DSC64_ROUTE_PACK3 -DSC64_TEST_READONLY_GRID -DSC64_DEPOT_BOUNDED))
-DEPOT_ROUTE_CASES := pack3 split partial visit combined large128 t4 active base rect legacy bounded-pack3 bounded-nibble bounded-partial bounded-visit bounded-newcell full-newcell active-newcell bounded-rect bounded-large bounded-readonly
-.PHONY: test-sc64-depot-routes test-sc64-depot-approach-default
-test: test-sc64-depot-routes test-sc64-depot-approach-default
-test-sc64-depot-routes: $(addprefix build/test-sc64-depot-routes-,$(DEPOT_ROUTE_CASES))
-	@set -e; for variant in $(DEPOT_ROUTE_CASES); do ./build/test-sc64-depot-routes-$$variant; done
+include mk/depot-routes/Makefile
 build/test-sc64-depot-approach-default: tests/sc64_depot_approach_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) $(SKIRMISH_CONTROLLER_HOST_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 test-sc64-depot-approach-default: build/test-sc64-depot-approach-default

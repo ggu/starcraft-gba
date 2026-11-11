@@ -88,8 +88,10 @@ static void sc64_showcase_start(int scene)
          * the final hit, building death and defeat use normal combat rules. */
         if(base>=0) {
             /* Normal Nexus shield regeneration absorbs three HP damage
-             * over this staged eight-shot sequence. */
-            b[base].hp=scene==4?37:40;
+             * over this staged eight-shot sequence. A Command Center this
+             * low burns for one HP every 16 updates (eight or nine times
+             * before update 150), so it starts with seven more. */
+            b[base].hp=scene==4?37:scene==2?47:40;
             b[base].shield=0;b[base].shield_remainder=0;
         }
         int attacker=sc64_showcase_actor(ENEMY,U_MARINE,552,512,
