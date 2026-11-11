@@ -8,7 +8,7 @@ CONTROLLER_FLAGS = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -W
 test-campaign-controller: test-campaign-controller-p1 test-campaign-controller-z10
 test-campaign-controller-p1:
 	@mkdir -p $(CONTROLLER_OUT)
-	$(CLANG) $(CONTROLLER_FLAGS) $(PROTOSS_P10_FLAGS) tests/sc64_campaign_controller_p1_game.c common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $(CONTROLLER_OUT)/p1
+	$(CLANG) $(CONTROLLER_FLAGS) $(PROTOSS_P10_BASE_FLAGS) tests/sc64_campaign_controller_p1_game.c common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $(CONTROLLER_OUT)/p1
 	$(CONTROLLER_OUT)/p1
 test-campaign-controller-z10:
 	@mkdir -p $(CONTROLLER_OUT)

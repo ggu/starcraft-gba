@@ -8,7 +8,7 @@ shared-egg-identities:
 	$(EGG_TEST_BIN_DIR)/shared-egg-identity-terran
 	$(CLANG) $(EGG_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_identity_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-identity-zerg
 	$(EGG_TEST_BIN_DIR)/shared-egg-identity-zerg
-	$(CLANG) $(EGG_HOST) $(PROTOSS_P10_FLAGS) tests/sc64_shared_egg_identity_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-identity-protoss
+	$(CLANG) $(EGG_HOST) $(PROTOSS_P10_BASE_FLAGS) tests/sc64_shared_egg_identity_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-identity-protoss
 	$(EGG_TEST_BIN_DIR)/shared-egg-identity-protoss
 	$(CLANG) $(EGG_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_identity_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-identity-showcase
 	$(EGG_TEST_BIN_DIR)/shared-egg-identity-showcase
@@ -24,7 +24,7 @@ shared-egg-identities-stage-facts: shared-egg-stage-facts
 	$(EGG_TEST_BIN_DIR)/shared-egg-facts-terran
 	$(CLANG) $(EGG_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_identity_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-facts-zerg
 	$(EGG_TEST_BIN_DIR)/shared-egg-facts-zerg
-	$(CLANG) $(EGG_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(EGG_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_identity_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-facts-protoss
+	$(CLANG) $(EGG_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(EGG_P10_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_shared_egg_identity_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-facts-protoss
 	$(EGG_TEST_BIN_DIR)/shared-egg-facts-protoss
 	$(CLANG) $(EGG_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_identity_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-facts-showcase
 	$(EGG_TEST_BIN_DIR)/shared-egg-facts-showcase
@@ -34,7 +34,7 @@ shared-egg-actor-stage-facts: shared-egg-stage-facts
 	$(EGG_TEST_BIN_DIR)/shared-egg-actor-terran
 	$(CLANG) $(EGG_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_actor_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-actor-zerg
 	$(EGG_TEST_BIN_DIR)/shared-egg-actor-zerg
-	$(CLANG) $(EGG_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(EGG_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_actor_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-actor-protoss
+	$(CLANG) $(EGG_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(EGG_P10_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_shared_egg_actor_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-actor-protoss
 	$(EGG_TEST_BIN_DIR)/shared-egg-actor-protoss
 	$(CLANG) $(EGG_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_actor_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-actor-showcase
 	$(EGG_TEST_BIN_DIR)/shared-egg-actor-showcase
@@ -44,7 +44,7 @@ shared-egg-wire-stage-facts: shared-egg-stage-facts
 	$(EGG_TEST_BIN_DIR)/shared-egg-wire-terran
 	$(CLANG) $(EGG_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_wire_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-wire-zerg
 	$(EGG_TEST_BIN_DIR)/shared-egg-wire-zerg
-	$(CLANG) $(EGG_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(EGG_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_shared_egg_wire_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-wire-protoss
+	$(CLANG) $(EGG_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(EGG_P10_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_shared_egg_wire_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-wire-protoss
 	$(EGG_TEST_BIN_DIR)/shared-egg-wire-protoss
 	$(CLANG) $(EGG_HOST) $(SHOWCASE_FLAGS) tests/sc64_shared_egg_wire_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-wire-showcase
 	$(EGG_TEST_BIN_DIR)/shared-egg-wire-showcase
@@ -54,7 +54,7 @@ shared-egg-auth-real: shared-egg-stage-facts
 	$(EGG_TEST_BIN_DIR)/shared-egg-auth-terran
 	$(CLANG) $(EGG_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_stage_save_auth_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-auth-zerg
 	$(EGG_TEST_BIN_DIR)/shared-egg-auth-zerg
-	$(CLANG) $(EGG_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(EGG_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)) tests/sc64_stage_save_auth_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-auth-protoss
+	$(CLANG) $(EGG_HOST) $(patsubst -I$(P10_FACT_V2_DIR),-I$(EGG_P10_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_stage_save_auth_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-auth-protoss
 	$(EGG_TEST_BIN_DIR)/shared-egg-auth-protoss
 	$(CLANG) $(EGG_HOST) $(SHOWCASE_FLAGS) tests/sc64_stage_save_auth_real.c $(EGG_EXTRA) -o $(EGG_TEST_BIN_DIR)/shared-egg-auth-showcase
 	$(EGG_TEST_BIN_DIR)/shared-egg-auth-showcase

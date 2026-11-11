@@ -3415,3 +3415,22 @@ are compiled only for the Z9/Z10 runtime, and the generated header, previews,
 ROMs and manifests remain private. The pickup uses its composed source Init
 frame; its later source animation and deferred shadow rendering are not
 implemented. This art change does not qualify or promote a mission.
+
+## Protoss Forge and Core research (P10 custom games)
+
+`make protoss` builds a ROM in which a Protoss human can research weapon,
+armor, shield and Singularity Charge levels. Select a completed Forge or
+Cybernetics Core, press `B`, pick a row; the fourth row cancels. The product
+flag vector is `PROTOSS_P10_FLAGS`, which is `PROTOSS_P10_BASE_FLAGS` plus
+`PROTOSS_RESEARCH_FLAGS` (`mk/protoss-research/Makefile`). The staged
+experiment fixtures under `tests/` use the base vector.
+
+```sh
+make test-sc64-protoss-research PR_BASE_TREE=<unchanged default-branch checkout>
+```
+
+runs the lifecycle, damage-number, save/fresh-process load, corrupted-newest-slot
+and pre-research-save checks on prepared P10 inputs. `PR_BASE_TREE` is the
+checkout whose build writes the genuine older save; without it that last check
+is skipped. See the [audit](audits/2026-11-11-protoss-research-sram/README.md)
+for scope, integer rounding and what is not covered.
