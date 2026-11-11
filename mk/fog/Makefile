@@ -48,3 +48,18 @@ test-gba-fog-palette: build/test-gba-fog-palette build/test-gba-fog-palette-runt
 	./build/test-gba-fog-palette-runtime
 	./build/test-gba-fog-palette-runtime-p7
 test: test-gba-fog-palette
+
+# Real rendered frames with the feature on and off (see
+# tests/test_sc64_fog_frames.py). Each pair uses one product's own flags; only
+# -DSC64_SOFT_FOG differs. Variable names are passed because some canonical
+# flags are defined later.
+FOG_FRAMES_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+define FOG_FRAMES_PROFILE
+build/sc64-fog-frames-$(1)-on: tests/sc64_fog_frames.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$($(4)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile mk/fog/Makefile | build
+	$$(CLANG) $$(FOG_FRAMES_FLAGS) $$($(2)) -DSC64_SOFT_FOG $$< starcraft/sc64_bc_body_art.c $$($(4)) -o $$@
+build/sc64-fog-frames-$(1)-off: tests/sc64_fog_frames.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$($(4)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile mk/fog/Makefile | build
+	$$(CLANG) $$(FOG_FRAMES_FLAGS) $$($(2)) -USC64_SOFT_FOG $$< starcraft/sc64_bc_body_art.c $$($(4)) -o $$@
+endef
+$(eval $(call FOG_FRAMES_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
+$(eval $(call FOG_FRAMES_PROFILE,zerg,CANONICAL_ZERG_PROFILE_FLAGS,CANONICAL_ZERG_PROFILE_INPUTS,))
+$(eval $(call FOG_FRAMES_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,SKIRMISH_AI_PROTOSS_SOURCES))
