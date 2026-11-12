@@ -156,6 +156,17 @@ build/test-sc64-z10-defense-combined: tests/sc64_zp_defense_targets.c $(STARCRAF
 test-sc64-z10-defense-combined: build/test-sc64-z10-defense-combined
 	./build/test-sc64-z10-defense-combined
 
+define Z10_DEPOT_FIRST_NEAREST_TEST
+build/test-sc64-z10-depot-first-nearest-$(1): tests/sc64_depot_first_nearest.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(ZERG_Z10_RELEASE_FLAGS) $(2) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o $$@
+endef
+$(eval $(call Z10_DEPOT_FIRST_NEAREST_TEST,stock,))
+$(eval $(call Z10_DEPOT_FIRST_NEAREST_TEST,probe,-DSC64_DEPOT_FIRST_NEAREST_PROBE))
+.PHONY: test-sc64-z10-depot-first-nearest
+test-sc64-z10-depot-first-nearest: build/test-sc64-z10-depot-first-nearest-stock build/test-sc64-z10-depot-first-nearest-probe
+	./build/test-sc64-z10-depot-first-nearest-stock
+	./build/test-sc64-z10-depot-first-nearest-probe
+
 
 # Source-art coverage over both authenticated maps and their CreateUnit rows.
 build/test-sc64-zerg-late-art: tests/sc64_zerg_late_art.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
