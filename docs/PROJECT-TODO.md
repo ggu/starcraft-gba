@@ -46,10 +46,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pure sequence matches native Human Random, one/two CPU Random rows,
   and a joint Human Random / two CPU Random capture. The Blood Bath
   preview follows that order and now offers Human Random; Outpost and
-  defaults keep named human choices. Terran ARM passes physical CPU
-  Random save/restart and the prior normal build reads that save;
-  physical Human Random validation remains open. Other native modes,
-  difficulty and long ordinary-input victories also remain open.
+  defaults keep named human choices. The Terran ARM preview passes
+  physical-button Human and CPU Random save/restart checks, and the
+  prior normal build reads those saves. Other native modes, difficulty
+  and long ordinary-input victories also remain open.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
