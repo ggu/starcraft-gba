@@ -811,6 +811,7 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    three race products and Showcase. Z10 also matches two complete three-AI
    defeats, one per map. P10 host campaign/save and 234 lineup checks pass;
    the normal P10 cartridge also wins from SRAM with 23 matching observations.
+   The full Terran host campaign suite passes with both probes.
    The separate defense/sight/walk combination saves 8.18–13.05% in Z10
    with matching pixels and state; finish the remaining cartridge paths.
    Historical inclusive scopes are not promised savings. The N64

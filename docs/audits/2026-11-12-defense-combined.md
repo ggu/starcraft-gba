@@ -62,6 +62,12 @@ There were seven ordinary text dismissals, no guest writes, and the input
 save was unchanged. The P10 ROM SHA-256 is
 `7ccf696f06afac355ca98cecb37ad4b3bcb76f0f0c1f0004553f29da1d0f1b07`.
 
+The Terran host full campaign suite also passes with the two probe flags:
+the early regression group, late world/save/repair fixtures, and T7–T10
+controller victories. T7–T10 each report zero mission faults. This
+complements the signed-owner and wide-coordinate Pylon fixture; it is
+not a T10 cartridge stack or long-skirmish measurement.
+
 ## Combined rendering and sight experiment
 
 The defense probe was also built with [packed walking sprites](https://github.com/ggu/starcraft-gba/pull/400)
@@ -110,8 +116,8 @@ combined cartridge.
 | Legacy Z9 | 5,704 B | 1,056 B |
 
 Both windows still exceed the two-frame budget of 561,792 cycles. Do not
-infer a hardware frame rate from these CPU cycle measurements. Promotion
-requires complete ordinary-input campaign and custom comparisons, behavior
-checks for the other products, and stack checks in those paths.
+infer a hardware frame rate from these CPU cycle measurements. The source
+probe can be retained with normal defaults off. Enabling it requires
+long skirmishes and stack checks in the wider cartridge matrix.
 The spatial lookup currently replaces the Zerg/Protoss campaign owner-list
 pass; the scalar, P3 and late Terran target policies remain separate.
