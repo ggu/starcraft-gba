@@ -11,7 +11,7 @@ depot/perimeter/ranged floods alone.
 `make test-sc64-route-dense-flood` compares against the existing sanitized
 route-cache oracle on five map shapes. All 321,445 queries agreed, including
 cache residency; 21,704 resident fields were also checked against a fresh
-flood. The probe remains off in normal products.
+flood. Set `CANONICAL_ROUTE_DENSE_FLAGS=` to compare with the packed path.
 
 ## Paired ARM results
 
@@ -67,7 +67,20 @@ mismatches. All three normal links pass, with unchanged EWRAM ends and
 These are physical-key tapes in otherwise canonical ARM builds with a test
 entry point, and do not establish arbitrary saves or timing on GBA hardware.
 The quiet test is one early custom window. All nine normal ROM verify
-targets pass with the probe requested (default/unified unchanged, Terran,
+targets pass with the path enabled (default/unified unchanged, Terran,
 Z7/Z8/Z9/Z10, P10 and Showcase). The narrowest IWRAM margin before the
-existing reserve guard is 408 bytes on Z7. The bounded three-product lobby
-comparison is still in progress before changing the normal flags.
+existing reserve guard is 408 bytes on Z7. Expanding the nine default link
+recipes produces exactly the commands used for the verified opt-in builds.
+
+For each of the Terran T10, Zerg Z9 and Protoss P7 HOST vectors, the
+ordinary-input controller covered both maps, all player races, and one
+to three independently selected AI slots using the same rotated race
+assignment in each pair. All 54 bounded 7,000-update trace pairs matched
+byte-for-byte. This covers progress and setup, not 54 complete matches.
+The separate paired ARM Protoss performance run used P10.
+
+A separate depot probe, which reused the visited bit for a bounded exit
+and shared seed distance calculations by axis, passed the geometry and
+route oracle. Its single paired Z9 battle saved 0.20% in mean and 2.23%
+in peak loop cycles. Those changes are separate from this patch and remain
+an experiment.

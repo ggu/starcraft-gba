@@ -510,7 +510,10 @@ endif
 ifneq ($(words $(CANONICAL_ROUTE_INDEX)),1)
 $(error CANONICAL_ROUTE_INDEX must be 0 or 1)
 endif
-CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS) $(CANONICAL_ROUTE_KEEP_FLAGS) $(CANONICAL_PATH_GRID_UPDATE_FLAGS)
+# Complete point floods on eligible 64x64 maps use the faster scratch grid.
+# Set this empty to compare the previous packed flood with the same cache.
+CANONICAL_ROUTE_DENSE_FLAGS ?= -DSC64_ROUTE_DENSE_FLOOD_PROBE
+CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS) $(CANONICAL_ROUTE_DENSE_FLAGS) $(CANONICAL_ROUTE_KEEP_FLAGS) $(CANONICAL_PATH_GRID_UPDATE_FLAGS)
 # Fresh-cell writer requires the existing paired-visit route configuration.
 # Showcase also needs the split flood when this option is enabled.
 CANONICAL_ROUTE_NEW_CELL ?= $(CANONICAL_ROUTE_INDEX)
