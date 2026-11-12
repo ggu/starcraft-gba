@@ -721,13 +721,12 @@ Scarab stages, prove native canal timing or change the 29/30 content count.
 
 The [stock 200 supply limit](audits/2026-11-12-stock-supply-cap.md) now
 applies to shared production and the HUD, including AI owners and legacy
-profiles. Existing units and reservations survive provider loss. Separate
-per-race banks for mixed-race owners and original native actor capacity
-remain distinct fidelity work. A read-only N64 T8 sample now confirms
-three separate cap/provider/usage families. Build the race-aware supply
-admission and HUD ledger first; prove a rescued second race can train
-without spending the first race's cap. Separately measure whether the GBA
-actor pool can represent representative armies at the stock cap.
+profiles. Existing units and reservations survive provider loss. The
+[independent race ledgers](audits/2026-11-12-race-supply-ledgers.md)
+also match the separate native T8 cap/provider/usage families. The
+original P10 opening now trains both Terran and Protoss without
+spending the other race's cap. Separately measure whether the GBA actor
+pool can represent armies at the stock cap.
 **Ghost and Nuclear Strike (P0):** the [N64 source and blast audit](audits/2026-11-12-ghost-nuclear-strike.md)
 records native T8 attachment and supply-first refusal. The shared opt-in
 probe trains Ghosts and paid missiles, launches from ordinary GBA controls,

@@ -126,14 +126,23 @@ static void t8_attachment(void)
     assert(race_nuke_silos[silo].ammo.remaining == SC64_NUKE_MISSILE_SOURCE_TICKS &&
            race_nuke_reserved_supply(SIDE) == 16);
     puts("T8: queued Silo round-trips through the cartridge SRAM journal");
-#endif
+    /* Other fixtures test the complete training clock. Keep the real T8
+     * trigger and campaign clocks synchronized while proving the ARM journal. */
+    race_nuke_silos[silo].ammo.remaining = 1;
+    for (int i = 0; i < 3 && !race_nuke_silos[silo].ammo.armed; ++i) game_update(0, 0);
+#else
     advance_world(1876);
+#endif
     assert(race_nuke_armed_slot(SIDE) == silo);
     assert(race_late_lift(cc));
     assert(b[silo].owner == NEUTRAL && race_nuke_armed_slot(SIDE) < 0 &&
            race_nuke_reserved_supply(SIDE) == 16);
     assert(race_late_flight_order(cc, x, y, 1));
+#ifdef SC64_NUKE_SILO_JOURNAL
+    game_update(0, 0);
+#else
     ++frame; race_late_flight_tick();
+#endif
     assert(b[silo].owner == SIDE && race_nuke_armed_slot(SIDE) == silo &&
            race_nuke_reserved_supply(SIDE) == 16);
     puts("T8: native roster, Command Center lands, claims neutral Silo and trains an allowed missile");
@@ -141,9 +150,10 @@ static void t8_attachment(void)
     assert(witness >= 0 && u[witness].alive && spotter >= 0 &&
            race_nuke_issue(spotter, SIDE, 3666 / 2, 3882 / 2));
 #ifdef SC64_NUKE_ACTIVE_JOURNAL
-    advance_world(25);
+    for (int i = 0; i < 25; ++i) game_update(0, 0);
     Sc64NukeWorldFlight *painting = race_nuke_track(spotter);
     assert(painting && painting->actor_slot_plus1);
+    assert((unsigned)frame == race_campaign.elapsed_frames);
     int age = painting->strike.age, actor_slot = painting->actor_slot_plus1;
     assert(race_save_game());
     race_nuke_reset();
@@ -166,9 +176,12 @@ static void nuke_supply_boundary(void)
     memset(u, 0, sizeof u); memset(b, 0, sizeof b);
     int silo = fixture_building(SIDE, 108, 240, 200);
     fixture_building(SIDE, 106, 192, 192);
-    for (int i = 0; i < 25; ++i) fixture_building(SIDE, 109, 160, 160);
+    fixture_building(SIDE, 156, 160, 164);
     minerals = gas = 10000;
-    for (int i = 0; i < 107; ++i) fixture_unit(SIDE, 0, 80, 80);
+    for (int i = 0; i < 3; ++i) fixture_unit(SIDE, 0, 80, 80);
+    assert(race_nuke_arm(silo, SIDE) == 2); /* Protoss supply cannot subsidize a Terran warhead. */
+    for (int i = 0; i < 25; ++i) fixture_building(SIDE, 109, 160, 160);
+    for (int i = 3; i < 107; ++i) fixture_unit(SIDE, 0, 80, 80);
     for (int i = 0; i < 17; ++i) {
         int producer = fixture_building(SIDE, 111, 100, 100);
         for (int q = 0; q < 5; ++q) assert(race_queue_unit(SIDE, producer, U_MARINE));
@@ -180,6 +193,8 @@ static void nuke_supply_boundary(void)
     assert(race_nuke_arm(silo, SIDE) == 2 && minerals == 1000 && gas == 1000);
     hit_target_impl_ex(marine, 10000, -1, ENEMY, -1, 0);
     assert(race_nuke_arm(silo, SIDE) == 4 && race_owner_reserved_supply(SIDE) == 400);
+    assert(race_supply_ledger_reserved(race_owner_supply_ledger(SIDE, R_TER)) == 400 &&
+           race_supply_ledger_reserved(race_owner_supply_ledger(SIDE, R_PROTOSS)) == 0);
     assert(race_nuke_reserved_supply(ENEMY) == 0);
     puts("missile reserves exactly to 200 supply, refuses above it without spending");
 }

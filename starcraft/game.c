@@ -2477,6 +2477,7 @@ static int sc64_terran_late_product_source_slot(int owner, int raw_owner);
 #endif
 static int race_nuke_reserved_supply(int owner), race_nuke_ghost_locked(int slot);
 static int race_nuke_arm(int slot, int owner), race_nuke_cancel_arm(int slot, int owner);
+static int race_nuke_arm_supply_available(int owner);
 static int race_nuke_abort(int slot), race_nuke_menu_action(void);
 static int race_nuke_issue_selected(int x, int y), race_nuke_command_index(void);
 #ifdef SC64_HAS_SPRITES
@@ -13106,6 +13107,7 @@ sc64_hud_changed(void)
      * same numbers. Legacy aggregate counters remain available elsewhere. */
     values[2] = supply_faction;
     values[3] = sc64_supply_limit(ledger.provided);
+    ledger.queued += race_supply_nuke_reservations(SIDE, supply_faction);
     values[23] = race_supply_ledger_reserved(ledger);
     sc64_hud_race_keys(values,first);
 

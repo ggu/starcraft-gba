@@ -364,8 +364,7 @@ ui_row_state(int i, int *cost, int *gas_cost, const char **need)
     if (i == race_nuke_command_index() && race_nuke_menu_action() == NUKE_MENU_ARM) {
         *cost = SC64_NUKE_MISSILE_ORE;
         *gas_cost = SC64_NUKE_MISSILE_GAS;
-        if (race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) <
-            SC64_NUKE_MISSILE_SUPPLY) return UI_SITE_FULL;
+        if (!race_nuke_arm_supply_available(SIDE)) return UI_SITE_FULL;
         if (minerals < *cost) return UI_SITE_MINERALS;
         if (gas < *gas_cost) return UI_SITE_GAS;
         return UI_SITE_OK;

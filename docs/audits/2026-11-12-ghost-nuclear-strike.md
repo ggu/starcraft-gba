@@ -35,6 +35,11 @@ building. With a completed warhead inside, destruction of the parent
 Command Center neutralized the Silo but left the original player's
 missile and eight-supply reservation intact. The GBA probe preserves
 this reservation until the missile is destroyed or changes hands.
+With an unfinished missile, native parent destruction canceled and
+refunded the job. Another controlled copy with 250 supply provided
+accepted a missile at 192/200 and refused one at 193/200, unchanged wallet
+and supply on refusal. The GBA checks the same boundary using the
+Terran ledger, without borrowing a rescued Protoss provider.
 When armed, the native Ghost gains C-Left **NUKE**. Targeting shows a
 small yellow ring. After A confirms, the Ghost gains C-Down **CANCEL**,
 the red dot blinks, and the warning appears during ascent. The observed
@@ -57,6 +62,11 @@ In the paired cancellation branch, C-Down during ascent removed the
 missile and its supply without refunding resources. The Ghost survived
 beyond the comparison run's impact time.
 Frame-exact native timing and damage at each splash boundary remain open.
+On the identified native logic clock, the source ascent ended at tick
+6508; the missile was falling by 6764, reached its point by 6828, and
+entered its impact animation at 6835. HP loss came after the 6838
+sample and by 6852. The GBA uses that observed order and a bounded
+flash-to-damage delay, preserving the unspent impact across a save.
 
 ## Owned-ROM assets and blast facts
 

@@ -210,6 +210,13 @@ static int race_nuke_reserved_supply(int owner)
     return result;
 }
 
+static int race_nuke_arm_supply_available(int owner)
+{
+    Sc64RaceSupplyLedger supply = race_owner_supply_ledger(owner, R_TER);
+    return sc64_supply_allows(race_supply_ledger_reserved(supply),
+                              SC64_NUKE_MISSILE_SUPPLY, supply.provided);
+}
+
 /* Return a HUD feedback code so a failed purchase gives the same feedback
  * as an ordinary unit queue. One slot per complete attached Silo. */
 static int race_nuke_arm(int slot, int owner)
@@ -222,7 +229,8 @@ static int race_nuke_arm(int slot, int owner)
 #endif
     Sc64NukeWorldSilo *s = &race_nuke_silos[slot];
     if (sc64_nuke_silo_supply(&s->ammo)) return NUKE_TOAST_OCCUPIED;
-    int used = race_owner_reserved_supply(owner), cap = race_owner_supply_cap(owner);
+    Sc64RaceSupplyLedger supply = race_owner_supply_ledger(owner, R_TER);
+    int used = race_supply_ledger_reserved(supply), cap = sc64_supply_limit(supply.provided);
     if (cap - used < SC64_NUKE_MISSILE_SUPPLY) return 2;
     int ore = race_owner_minerals(owner), gas_amount = race_owner_gas(owner);
     if (ore < SC64_NUKE_MISSILE_ORE) return 1;

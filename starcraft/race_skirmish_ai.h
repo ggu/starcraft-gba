@@ -361,6 +361,7 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
         }
     }
     c->supply_cap = sc64_supply_limit(c->supply_cap);
+    c->supply_queued += race_supply_nuke_reservations(owner, c->race);
     c->threat_d = best_threat;
     if (c->threat_count == 0) c->threat = -1;
 }
