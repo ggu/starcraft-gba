@@ -475,7 +475,12 @@ map-select skirmish setup and the same two maps:
 | Outpost | Project-authored map. |
 | Blood Bath | Imported from the supplied ROM. |
 
-The human player can choose Terran, Zerg, or Protoss independently of the campaign race used by that ROM. Choose one, two, or three computer opponents, then set each opponent's race independently. The engine and available gameplay mechanics remain shared among the profiles.
+The human player can choose Terran, Zerg, or Protoss independently of the
+campaign race used by that ROM. Set each of the three computer rows to a
+named race, **Random**, or **Closed**. Leave at least one row open to
+launch. The **Opponents** row is a shortcut that opens the first one,
+two, or three seats. The game resolves Random at launch and keeps the
+chosen races and starts when saving or restarting the match.
 
 On the current frozen combined ROM `d8678867`, a 10,000-tick neutral Blood
 Bath run with a Terran human and three independently selected Zerg, Protoss

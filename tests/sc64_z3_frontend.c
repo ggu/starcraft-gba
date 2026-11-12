@@ -160,7 +160,7 @@ static void test_skirmish_choices_remain_independent(void) {
     assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE);
     assert(f.bot_races[0] >= 0 && f.bot_races[0] <= 2);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 4);
-    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 5);
+    assert(press(&f, KEY_A) == SC_FRONT_NONE && f.row == SC_FRONT_SKIRMISH_LAUNCH_ROW);
     assert(press(&f, KEY_A) == SC_FRONT_START_SKIRMISH);
 #else
     assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.race == SC_FRONT_RACE_ZERG);

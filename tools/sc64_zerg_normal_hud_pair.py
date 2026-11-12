@@ -110,11 +110,12 @@ def main():
       tap(32)
      if front('bots')!=1:raise ValueError('cannot select one bot')
      tap(128)
-     for _ in range(3):
+     fixed_seats=all('race_skirmish_slots' in g.sym for g in games)
+     for _ in range(5 if fixed_seats else 3):
       if front('bot_races',0)==0:break
       tap(16)
      if front('bot_races',0)!=0:raise ValueError('cannot select Terran opponent')
-     while front('row')<4:tap(128)
+     while front('row')<(6 if fixed_seats else 4):tap(128)
      tap(1)
     else:
      tap(1)

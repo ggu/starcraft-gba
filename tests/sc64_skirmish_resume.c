@@ -38,7 +38,7 @@ static void to_row(int row)
 }
 static void set_field(int *field, int value)
 {
-    for (int i = 0; *field != value && i < 3; ++i) tap(KEY_RIGHT);
+    for (int i = 0; *field != value && i < 5; ++i) tap(KEY_RIGHT);
     assert(*field == value);
 }
 static int bot_race(int human, int slot) { return (human + 1 + slot) % 3; }
@@ -55,7 +55,7 @@ static void launch(int map, int human, int bots, int forced_bot_race)
         to_row(3 + i);
         set_field(&race_front.bot_races[i], forced_bot_race >= 0 ? forced_bot_race : bot_race(human, i));
     }
-    to_row(3 + bots); tap(KEY_A);
+    to_row(SC_FRONT_SKIRMISH_LAUNCH_ROW); tap(KEY_A);
     assert(screen == SCREEN_PLAY && race_mode);
     assert(race_skirmish_map == map && race_human == human && race_bots == bots);
     for (int i = 0; i < bots; ++i)

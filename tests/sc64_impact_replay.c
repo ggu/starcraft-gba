@@ -228,7 +228,7 @@ static void to_row(int row)
 }
 static void set_field(int *field, int value)
 {
-    for (int i = 0; *field != value && i < 3; ++i) tap(KEY_RIGHT);
+    for (int i = 0; *field != value && i < 5; ++i) tap(KEY_RIGHT);
 }
 
 /* Every frame while impacts from the save may still be pending, then every
@@ -286,7 +286,7 @@ static int save_phase(void)
     for (int i = 0; i < SKIRMISH_BOTS; ++i) {
         to_row(3 + i); set_field(&race_front.bot_races[i], (human + 1 + i) % 3);
     }
-    to_row(3 + SKIRMISH_BOTS); tap(KEY_A);
+    to_row(SC_FRONT_SKIRMISH_LAUNCH_ROW); tap(KEY_A);
     if (screen != SCREEN_PLAY || !race_mode || race_skirmish_map != SKIRMISH_MAP ||
         race_bots != SKIRMISH_BOTS) return 11;
 #ifdef SC64_IMPACT_SAVE_BATTLE

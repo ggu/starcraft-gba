@@ -201,7 +201,7 @@ class Game:
                 self.tap(KEY_DOWN if current < row else KEY_UP)
             raise ContinuationError(f"menu row {row} not reached")
         def set_field(name, value, index=0):
-            for _ in range(3):
+            for _ in range(5 if name == "bot_races" and "race_skirmish_slots" in self.sym else 3):
                 if self.front_field(name, index) == value:
                     return
                 self.tap(KEY_RIGHT)
@@ -212,7 +212,7 @@ class Game:
         to_row(2); set_field("bots", len(bots))
         for i, race in enumerate(bots):
             to_row(3 + i); set_field("bot_races", race, i)
-        to_row(3 + len(bots)); self.tap(KEY_A)
+        to_row(6 if "race_skirmish_slots" in self.sym else 3 + len(bots)); self.tap(KEY_A)
         if (self.u32("screen"), self.u32("race_mode"), self.u32("race_skirmish_map"),
                 self.u32("race_human"), self.u32("race_bots")) != (SCREEN_PLAY, 1, map_id, human, len(bots)):
             raise ContinuationError("custom game did not start with the selected lobby")

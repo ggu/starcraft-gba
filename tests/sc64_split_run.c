@@ -53,7 +53,7 @@ static void row_to(int row) {
 }
 static void cycle_field(int *field, int value) {
     int guard = 0;
-    while (*field != value && guard++ < 3) press(KEY_RIGHT);
+    while (*field != value && guard++ < 5) press(KEY_RIGHT);
     assert(*field == value);
 }
 static void launch_skirmish(int map, int human, int bots) {
@@ -69,7 +69,7 @@ static void launch_skirmish(int map, int human, int bots) {
         row_to(3 + i);
         cycle_field(&race_front.bot_races[i], ai);
     }
-    row_to(3 + bots);
+    row_to(SC_FRONT_SKIRMISH_LAUNCH_ROW);
     press(KEY_A);
     assert(screen == SCREEN_PLAY && race_mode == 1);
     assert(race_skirmish_map == map && race_human == human && race_bots == bots);

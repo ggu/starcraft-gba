@@ -20,7 +20,7 @@ static void row(int target)
 }
 static void field(int *value, int target)
 {
-    for (int n = 0; *value != target && n < 3; ++n) tap(KEY_RIGHT);
+    for (int n = 0; *value != target && n < 5; ++n) tap(KEY_RIGHT);
     assert(*value == target);
 }
 static int units(int owner)
@@ -42,7 +42,7 @@ static void lineup(int map, int human, int bots, const int ai[3])
     row(1); field(&race_front.race, human);
     row(2); field(&race_front.bots, bots);
     for (int i = 0; i < bots; ++i) { row(3 + i); field(&race_front.bot_races[i], ai[i]); }
-    row(3 + bots); tap(KEY_A);
+    row(SC_FRONT_SKIRMISH_LAUNCH_ROW); tap(KEY_A);
     assert(screen == SCREEN_PLAY && race_mode && !won && !lost);
     assert(race_skirmish_map == map && race_human == human && race_bots == bots);
     assert(race_player[SIDE] == human && units(SIDE) && buildings(SIDE));

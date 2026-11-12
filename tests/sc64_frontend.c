@@ -354,7 +354,70 @@ static void test_t3_paging_retention_and_reset(void) {
 }
 #endif
 
+#ifdef SC64_IMPORTED_SKIRMISH
+static void test_independent_skirmish_seats(void)
+{
+    Sc64Frontend f;
+    int races[3], repeat[3], old_race;
+    unsigned seats, seen = 0;
+    sc64_frontend_reset(&f, 0, SC_FRONT_RACE_TERRAN, 3, -1);
+    press(&f, KEY_DOWN); press(&f, KEY_A);
+    assert(f.page == SC_FRONT_SKIRMISH);
+    for (int i = 0; i < SC_FRONT_BOT_FIRST_ROW; ++i) press(&f, KEY_DOWN);
+    assert(f.bot_races[0] == SC_FRONT_RACE_ZERG);
+    press(&f, KEY_LEFT);
+    assert(f.bot_races[0] == SC_FRONT_BOT_CLOSED && f.bots == 2);
+    press(&f, KEY_DOWN);
+    assert(f.bot_races[1] == SC_FRONT_RACE_PROTOSS);
+    press(&f, KEY_RIGHT);
+    assert(f.bot_races[1] == SC_FRONT_BOT_RANDOM && f.bots == 2);
+    press(&f, KEY_RIGHT);
+    assert(f.bot_races[1] == SC_FRONT_BOT_CLOSED && f.bots == 1);
+    press(&f, KEY_RIGHT);
+    assert(f.bot_races[1] == SC_FRONT_RACE_ZERG && f.bots == 2);
+    press(&f, KEY_RIGHT);
+    assert(f.bot_races[1] == SC_FRONT_RACE_TERRAN && f.bots == 2);
+    press(&f, KEY_DOWN);
+    press(&f, KEY_LEFT);
+    assert(f.bot_races[2] == SC_FRONT_BOT_CLOSED && f.bots == 1);
+    press(&f, KEY_DOWN);
+    assert(press(&f, KEY_A) == SC_FRONT_START_SKIRMISH);
+    assert(sc64_front_skirmish_resolve(&f, races) == 2u && races[0] == SC_FRONT_RACE_TERRAN);
+    press(&f, KEY_UP); press(&f, KEY_UP);
+    press(&f, KEY_RIGHT); press(&f, KEY_RIGHT);
+    assert(f.bot_races[1] == SC_FRONT_BOT_RANDOM);
+    for (int i = 0; i < 100; ++i) {
+        assert(sc64_front_skirmish_resolve(&f, races) == 2u && races[0] >= 0 && races[0] < 3);
+        assert(sc64_front_skirmish_resolve(&f, repeat) == 2u && races[0] == repeat[0]);
+        seen |= 1u << races[0];
+        (void)sc64_frontend_update(&f, 0);
+    }
+    assert(seen == 7u && f.bot_races[1] == SC_FRONT_BOT_RANDOM);
+    press(&f, KEY_RIGHT); press(&f, KEY_DOWN); press(&f, KEY_DOWN);
+    assert(!f.bots && press(&f, KEY_A) == SC_FRONT_NONE);
+    assert(!sc64_front_skirmish_resolve(&f, races));
+    assert(sc64_skirmish_read_seat_word(1, 1, 2, &old_race, &seats) &&
+           old_race == 2 && !seats);
+    for (unsigned mask = 1; mask <= SC64_SKIRMISH_SEAT_MASK; ++mask) {
+        int bots = sc64_skirmish_seat_count(mask);
+        int sparse = mask != sc64_skirmish_dense_seats(bots);
+        int word = sc64_skirmish_seat_word(2, sparse ? mask : 0);
+        assert(sc64_skirmish_read_seat_word(1, bots, word, &old_race, &seats) &&
+               old_race == 2 && seats == (sparse ? mask : 0));
+        if (sparse) {
+            assert(!sc64_skirmish_read_seat_word(0, bots, word, &old_race, &seats));
+            assert(!sc64_skirmish_read_seat_word(1, 3, word, &old_race, &seats));
+            assert(!sc64_skirmish_read_seat_word(1, bots, word | 1, &old_race, &seats));
+            assert(!sc64_skirmish_read_seat_word(1, bots, word | 32, &old_race, &seats));
+        }
+    }
+}
+#endif
+
 int main(void) {
+#ifdef SC64_IMPORTED_SKIRMISH
+    test_independent_skirmish_seats();
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     test_hidden_showcase();
 #endif
@@ -382,11 +445,11 @@ int main(void) {
     assert(press(&f, KEY_LEFT) == SC_FRONT_NONE && f.bots == 2);
     assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bots == 3);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 3);
-    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[0] == 2);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[0] == SC_FRONT_RACE_TERRAN);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 4);
-    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[1] == 0);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[1] == SC_FRONT_BOT_RANDOM);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 5);
-    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[2] == 2);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[2] == SC_FRONT_RACE_TERRAN);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 6);
     assert(press(&f, KEY_A) == SC_FRONT_START_SKIRMISH);
 #endif
