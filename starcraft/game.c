@@ -2748,6 +2748,9 @@ unit_slot_supply(const Unit *q)
 #else
 #define unit_slot_supply(q) unit_supply((q)->type)
 #endif
+#ifdef SC64_RACES
+#include "sc64_race_supply.h"
+#endif
 static int
 unit_build_time(int type)
 {
@@ -12520,19 +12523,28 @@ unit_name(int type)
 static void
 draw_hud_resources(void)
 {
+#ifdef SC64_RACES
+    int faction = race_command_race();
+    Sc64RaceSupplyLedger ledger = race_owner_supply_ledger(SIDE, faction);
+    int used = race_supply_ledger_reserved(ledger) / 2;
+    int cap = sc64_supply_limit(ledger.provided) / 2;
+#else
+    int used = supply_used / 2;
+    int cap = sc64_supply_limit(supply_cap) / 2;
+#endif
     gfx_rect(0, 0, 240, 12, C_PANEL);
 #ifdef SC64_HUD_ICONS
     card_resource_icon(SC64_HUD_SPRITE_MINERAL, 2);
     gfx_num(16, 3, minerals, C_WHITE);
     card_resource_icon(SC64_HUD_SPRITE_GAS, 60);
     gfx_num(74, 3, gas, C_WHITE);
-    card_resource_icon(card_supply_sprite(), 126);
+    card_resource_icon(SC64_HUD_SPRITE_SUPPLY_TERRAN + faction, 126);
     {
         /* The slash follows the used count, so 100/200 keeps its spacing. */
-        int used = (supply_used + race_owner_queued_supply(SIDE)) / 2, x = 140 + ui_num_width(used) + 3;
+        int x = 140 + ui_num_width(used) + 3;
         gfx_num(140, 3, used, C_WHITE);
         gfx_text(x, 3, "/", C_WHITE);
-        gfx_num(x + 8, 3, sc64_supply_limit(supply_cap) / 2, C_WHITE);
+        gfx_num(x + 8, 3, cap, C_WHITE);
     }
 #else
     gfx_text(3, 3, "MIN", C_GOLD);
@@ -12540,15 +12552,9 @@ draw_hud_resources(void)
     gfx_text(61, 3, "GAS", C_CYAN);
     gfx_num(82, 3, gas, C_WHITE);
     gfx_text(127, 3, "SUP", C_WHITE);
-    gfx_num(151,3,
-#ifdef SC64_RACES
-        (supply_used+race_owner_queued_supply(SIDE))/2,
-#else
-        supply_used/2,
-#endif
-        C_WHITE);
+    gfx_num(151, 3, used, C_WHITE);
     gfx_text(165, 3, "/", C_WHITE);
-    gfx_num(173, 3, sc64_supply_limit(supply_cap) / 2, C_WHITE);
+    gfx_num(173, 3, cap, C_WHITE);
 #endif
 }
 
@@ -12824,8 +12830,6 @@ sc64_hud_race_keys(int *values,int first)
     if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID)
         values[20] |= (int)race_p3.sequence << 8;
 #endif
-    /* race_tick_state has already counted live supply before rendering. */
-    values[23]=supply_used+race_owner_queued_supply(SIDE);
     values[21]=race_selected_mission;
 #ifdef SC64_T5_RUNTIME
     /* T5 has no HUD text driven by the elapsed frame counter. Keep the
@@ -12871,14 +12875,25 @@ sc64_hud_changed(void)
     int values[SC64_HUD_KEY_COUNT] = {minerals, gas, supply_used, sc64_supply_limit(supply_cap), mode, selected_building,
         train_type, mission_unsupported_count};
     int i, first = -1, changed = sc64_hud_valid ? 0 : 3;
+#ifdef SC64_RACES
+    int supply_faction = race_command_race();
+    Sc64RaceSupplyLedger ledger = {0};
+#endif
     for (i = 0; i < MAX_UNITS; i++) if (u[i].alive && u[i].owner == SIDE) {
         if (u[i].selected) { values[8]++; if (first < 0) first = i; }
         if (u[i].type == U_MARINE) values[9]++;
         if (u[i].type == U_RAYNOR) values[10] = 1;
+#ifdef SC64_RACES
+        race_supply_count_unit(&ledger, &u[i], supply_faction);
+#endif
     }
     if (first >= 0) { values[11] = u[first].type; values[12] = u[first].hp; }
-    for (i = 0; i < MAX_BUILDINGS; i++)
-        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_BARRACKS) values[13] = 1;
+    for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive && b[i].owner == SIDE) {
+        if (b[i].type == B_BARRACKS) values[13] = 1;
+#ifdef SC64_RACES
+        race_supply_count_building(&ledger, &b[i], supply_faction);
+#endif
+    }
     if (selected_building >= 0 && b[selected_building].alive) {
         Building *q = &b[selected_building];
         values[14] = 1; values[15] = q->type; values[16] = q->under_construction;
@@ -12886,6 +12901,11 @@ sc64_hud_changed(void)
     }
     values[18] = box_state == 2;
 #ifdef SC64_RACES
+    /* The supply icon changes even when both races happen to have the
+     * same numbers. Legacy aggregate counters remain available elsewhere. */
+    values[2] = supply_faction;
+    values[3] = sc64_supply_limit(ledger.provided);
+    values[23] = race_supply_ledger_reserved(ledger);
     sc64_hud_race_keys(values,first);
 
 #endif

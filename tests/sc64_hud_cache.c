@@ -141,6 +141,16 @@ expect_mask_and_match_at(int expected, int line)
 static void
 test_wallet_and_queued_supply_invalidate_top_only(void)
 {
+    race_human = R_ZERG;
+    u[0].alive = 1;
+    u[0].owner = SIDE;
+    u[0].type = U_ZERGLING;
+    u[0].selected = 0;
+    b[0].alive = 1;
+    b[0].owner = SIDE;
+    b[0].type = B_HATCHERY;
+    b[0].under_construction = 0;
+    b[0].queue_count = 0;
     assert_cached_matches_full();
     minerals += 37;
     assert(probe_change_mask() == HUD_TOP);
@@ -150,14 +160,11 @@ test_wallet_and_queued_supply_invalidate_top_only(void)
 
     gas += 9;
     expect_mask_and_match(HUD_TOP);
-    supply_used += 2;
+    assert(spawn_unit(SIDE, U_DRONE, 80, 80) >= 0);
     expect_mask_and_match(HUD_TOP);
-    supply_cap += 8;
+    assert(spawn_unit(SIDE, U_OVERLORD, 104, 80) >= 0);
     expect_mask_and_match(HUD_TOP);
 
-    b[0].alive = 1;
-    b[0].owner = SIDE;
-    b[0].type = B_HATCHERY;
     b[0].queue_count = 1;
     b[0].queue_head = 0;
     b[0].queue[0] = U_ZERGLING;
@@ -182,10 +189,11 @@ test_selection_building_box_and_modes_invalidate_bottom(void)
     selected_building = 0;
     b[0].type = B_HATCHERY;
     b[0].under_construction = 1;
-    expect_mask_and_match(HUD_BOTTOM);
+    expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
     b[0].under_construction = 0;
     train_type = U_HYDRALISK;
-    expect_mask_and_match(HUD_BOTTOM);
+    expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
+    b[0].queue[1] = U_ZERGLING;
     b[0].queue_count = 2;
     expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
 
@@ -543,7 +551,7 @@ test_panel_group_and_objective(void)
         u[i].raw_type = sc64_race_raw_unit(u[i].type); u[i].raw_owner = 7;
         u[i].hp = u[i].maxhp = 40;
     }
-    expect_mask_and_match(HUD_BOTTOM);
+    expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
     render_cached();
     assert(hud_count_color(5, 148, 175, 11, C_GOLD) == 0);
     assert(hud_count_color(HUD_COLUMN, HUD_PORTRAIT_Y, CARD_CELL, CARD_CELL, C_GREEN) > 0);

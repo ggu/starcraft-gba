@@ -832,7 +832,7 @@ static int __attribute__((noinline)) race_product_slots_available(unsigned wante
 
 static int race_queue_unit(int owner, int producer, int type)
 {
-    int tail, count, reserved, cap;
+    int tail, count;
 #ifdef SC64_EGG_RUNTIME
     int egg_job = 0;
 #endif
@@ -1011,14 +1011,14 @@ static int race_queue_unit(int owner, int producer, int type)
         if (committed + (unsigned)count > free_slots) return 0;
     }
 #endif
-    reserved = race_owner_reserved_supply(owner);
-    cap = race_owner_supply_cap(owner);
+    Sc64RaceSupplyLedger supply = race_owner_supply_ledger(owner, r->race);
     /* Zero-supply units (notably Overlords) must remain producible while
        over the current cap so the player can restore supply. */
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) count = sc64_z7_egg_product_count(type);
 #endif
-    if (!sc64_supply_allows(reserved, r->supply * count, cap)) { race_refusal = 2; return 0; }
+    if (!sc64_supply_allows(race_supply_ledger_reserved(supply), r->supply * count,
+                            supply.provided)) { race_refusal = 2; return 0; }
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) {
         int free_slots = 0;
