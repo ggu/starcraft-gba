@@ -36,7 +36,22 @@ python3 -m unittest discover -s tests -p test_sc64_z7_sight_spans.py
 make LATE_ZERG_PACKED_SIGHT=1 verify-zerg-z10
 ```
 
-The current opt-in path is the existing late-Zerg source-sight transition.
-Before activation, qualify full campaign and legacy paths and compare the
-other race profiles' shared-span transition before generalizing. Do not add the separate renderer or defense savings to
-these results without measuring the combined build.
+## Current split-cache cartridge
+
+With the packed walking and split terrain caches already active, the same
+two 1,000-call windows average 1,532,236 → 1,491,881 (−2.63%) and
+1,914,170 → 1,859,653 (−2.85%) full-loop cycles. Both runs match all 34
+sampled gameplay checkpoints and all 24 sampled drawn pages, palettes,
+camera positions, visibility and exploration.
+
+The prepared phase/clipping fixture passes. All four Z7–Z10 opt-in
+cartridge verifiers pass their original guards. The exact enabled Z10
+ROM is `31d54a25fa9b45fd23d8e3b70fa03949f8d9548bf09aa20ef017d92584fbd47c`.
+Switching back to 0 in the same build tree rebuilds the normal Z10 ROM
+and reproduces its stock SHA-256
+`b1a0831adbf2d1b15cf8ae669047be43a64547246815f7a0470eda955252fc9f`.
+
+The normal selector stays off until the enabled Z10 full campaign replay,
+a legacy continuation and the current custom workload are qualified.
+Other profiles use a different shared-span transition and need separate
+evaluation. These measurements still exceed the 30 fps cycle budget.

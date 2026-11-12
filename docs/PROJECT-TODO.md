@@ -818,8 +818,9 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    The separate defense/sight/walk combination saves 8.18–13.05% in Z10
    with matching pixels and state; finish the remaining cartridge paths.
    The [packed sight-row probe](audits/2026-11-12-packed-sight-rows.md)
-   saves 2.71–2.82% in two Z10 battle windows with matched pixels and state;
-   qualify custom, carried missions and shared-span profiles before activation.
+   saves 2.63–2.85% with the current split cache, with matched state and
+   pixels. All four late Zerg ROMs verify and flag-off Z10 is byte-identical;
+   finish the enabled full replay, legacy continuation and custom checks.
    Historical inclusive scopes are not promised savings. The N64
    order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
