@@ -196,19 +196,25 @@ test-sc64-z10-carried-profile: build/test-sc64-z10-carried-profile
 	./build/test-sc64-z10-carried-profile
 test-zerg-z10: test-sc64-z10-carried-profile
 
-# Ordinary-input carried controllers linked with the complete Z9 vector.
-define Z9_CARRIED_CONTROLLER
-build/test-sc64-z9-carried-$(1): tests/$(2).c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
-	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z9_CANONICAL_FLAGS) $$< $(3) -o $$@
+# Ordinary-input carried controllers must use the full cartridge vector,
+# including the extra save and campaign code in Z10.
+define ZERG_CARRIED_CONTROLLER
+build/test-sc64-$(1)-carried-$(3): tests/$(4).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) $$< $(5) -o $$@
 endef
-$(eval $(call Z9_CARRIED_CONTROLLER,z1z2,race_campaign_run,common/gba.c))
-$(eval $(call Z9_CARRIED_CONTROLLER,z3,sc64_z3_campaign_run,common/gba.c))
-$(eval $(call Z9_CARRIED_CONTROLLER,z4,sc64_z4_campaign_run,common/gba.c))
-$(eval $(call Z9_CARRIED_CONTROLLER,z5,sc64_z5_campaign_run,common/gba.c))
-$(eval $(call Z9_CARRIED_CONTROLLER,z6,sc64_z6_campaign_run,common/gba.c))
-$(eval $(call Z9_CARRIED_CONTROLLER,z7,sc64_z7_campaign_run,common/gba.c))
-$(eval $(call Z9_CARRIED_CONTROLLER,z8,sc64_z8_campaign_run,))
-$(eval $(call Z9_CARRIED_CONTROLLER,z1,race_z1_controls,common/gba.c))
+define ZERG_CARRIED_CONTROLLERS
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z1z2,race_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z3,sc64_z3_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z4,sc64_z4_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z5,sc64_z5_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z6,sc64_z6_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z7,sc64_z7_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z8,sc64_z8_campaign_run,))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z1,race_z1_controls,common/gba.c))
+endef
+$(eval $(call ZERG_CARRIED_CONTROLLERS,z9,Z9))
+$(eval $(call ZERG_CARRIED_CONTROLLERS,z10,Z10))
+$(eval $(call ZERG_CARRIED_CONTROLLER,z10,Z10,z9-run,sc64_z9_campaign_run,))
 
 # Z8 carried replay, compiled with the actual Z9 vector and strict cargo digest.
 Z9_Z8_REPLAY_DEPS = tests/sc64_protoss_arm_replay.c build/z8-carried/sc64_px_tape_generated.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile
@@ -243,28 +249,39 @@ endef
 $(eval $(call Z9_Z7_CARRIED_REPLAY,full,-DZ7_ARM_MODE=0))
 $(eval $(call Z9_Z7_CARRIED_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=40000u))
 $(eval $(call Z9_Z7_CARRIED_REPLAY,resume,-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z9_Z7_CUT)u))
-# Keep the documented ordinary-input routes together; controller 0 of the
-# generic early-race runner is not the established Z1 route.
-.PHONY: test-sc64-z9-carried-missions
-test-sc64-z9-carried-missions: $(addprefix build/test-sc64-z9-carried-,z1 z1z2 z3 z4 z5 z6 z7 z8)
-	mkdir -p .local/sc64/z9-carried
-	./build/test-sc64-z9-carried-z1 --trace .local/sc64/z9-carried/z1.json
-	./build/test-sc64-z9-carried-z1z2 --controller 1 --trace .local/sc64/z9-carried/z2.json
-	./build/test-sc64-z9-carried-z3 --policy hybrid --trace .local/sc64/z9-carried/z3.json
-	./build/test-sc64-z9-carried-z4 --limit 150000 --trace .local/sc64/z9-carried/z4.json
-	./build/test-sc64-z9-carried-z5 --limit 60000 --trace .local/sc64/z9-carried/z5-diagnostic.json --attempt .local/sc64/z9-carried/z5-attempt.json --verified .local/sc64/z9-carried/z5.json
-	./build/test-sc64-z9-carried-z6 --trace .local/sc64/z9-carried/z6.json
-	./build/test-sc64-z9-carried-z7 $(ZERG_Z7_CONTROLLER_POLICY) --limit $(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/z9-carried/z7.json
-	./build/test-sc64-z9-carried-z8 .local/sc64/z9-carried/z8.jsonl
-test-sc64-zerg-z9: test-sc64-z9-carried-profile test-sc64-z9-carried-missions
+# Controller 0 of the generic early-race runner is not the established Z1 route.
+define ZERG_CARRIED_MISSIONS
+.PHONY: test-sc64-$(1)-carried-missions
+test-sc64-$(1)-carried-missions: $$(addprefix build/test-sc64-$(1)-carried-,z1 z1z2 z3 z4 z5 z6 z7 z8)
+	mkdir -p .local/sc64/$(1)-carried
+	./build/test-sc64-$(1)-carried-z1 --trace .local/sc64/$(1)-carried/z1.json
+	./build/test-sc64-$(1)-carried-z1z2 --controller 1 --trace .local/sc64/$(1)-carried/z2.json
+	./build/test-sc64-$(1)-carried-z3 --policy hybrid --trace .local/sc64/$(1)-carried/z3.json
+	./build/test-sc64-$(1)-carried-z4 --limit 150000 --trace .local/sc64/$(1)-carried/z4.json
+	./build/test-sc64-$(1)-carried-z5 --limit 60000 --trace .local/sc64/$(1)-carried/z5-diagnostic.json --attempt .local/sc64/$(1)-carried/z5-attempt.json --verified .local/sc64/$(1)-carried/z5.json
+	./build/test-sc64-$(1)-carried-z6 --trace .local/sc64/$(1)-carried/z6.json
+	./build/test-sc64-$(1)-carried-z7 $$(ZERG_Z7_CONTROLLER_POLICY) --limit $$(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/$(1)-carried/z7.json
+	./build/test-sc64-$(1)-carried-z8 .local/sc64/$(1)-carried/z8.jsonl
+endef
+$(eval $(call ZERG_CARRIED_MISSIONS,z9))
+$(eval $(call ZERG_CARRIED_MISSIONS,z10))
+.PHONY: test-sc64-z10-carried-z9-controller
+test-sc64-z10-carried-z9-controller: build/test-sc64-z10-carried-z9-run
+	mkdir -p .local/sc64/z10-carried
+	./$< .local/sc64/z10-carried/z9.jsonl
 
-# Full ordinary-input skirmish matches under the actual canonical Z9 vector.
-build/test-sc64-skirmish-match-zerg-z9: tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h Makefile tests/sc64-zerg-late/Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z9_CANONICAL_FLAGS) $< common/gba.c -o $@
-.PHONY: test-sc64-z9-canonical-skirmish
-test-sc64-z9-canonical-skirmish: build/test-sc64-skirmish-match-zerg-z9
-	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller $< --output .local/sc64/skirmish/zerg-z9-matches
-test-sc64-zerg-z9: test-sc64-z9-canonical-skirmish
+# Full ordinary-input skirmish matches under each late Zerg product vector.
+define ZERG_LATE_SKIRMISH_MATCHES
+build/test-sc64-skirmish-match-zerg-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) $$(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h Makefile tests/sc64-zerg-late/Makefile | build
+	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) $$< common/gba.c -o $$@
+.PHONY: test-sc64-$(1)-canonical-skirmish
+test-sc64-$(1)-canonical-skirmish: build/test-sc64-skirmish-match-zerg-$(1)
+	$$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller $$< --output .local/sc64/skirmish/zerg-$(1)-matches
+endef
+$(eval $(call ZERG_LATE_SKIRMISH_MATCHES,z9,Z9))
+$(eval $(call ZERG_LATE_SKIRMISH_MATCHES,z10,Z10))
+test-sc64-zerg-z9: test-sc64-z9-carried-profile test-sc64-z9-carried-missions test-sc64-z9-canonical-skirmish
+test-sc64-zerg-z10: test-sc64-z10-carried-missions test-sc64-z10-carried-z9-controller test-sc64-z10-canonical-skirmish
 
 # Optional prepared-input path-grid parity: the Z5 fixture also exercises
 # authored door actions and save/load. Extra include paths can select a

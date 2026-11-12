@@ -67,8 +67,8 @@ personal runners. Routine verification does not require a new runner service.
 ## Release check, package and SD copy
 
 `tools/sc64_release.py` (wrapped as `./dev release ...`) is the repeatable local
-check for the shipped ROMs: the original-art default, Terran T10, Zerg Z9,
-Protoss P10 and Showcase, plus the Zerg Z10 preview when named. It is
+check for the shipped ROMs: the original-art default, Terran T10, Zerg Z10,
+Protoss P10 and Showcase. Explicit `zerg-z9` remains available for legacy saves. It is
 local-only: it does not push, open pull requests, or touch GitHub Actions.
 
 ```sh
@@ -1508,7 +1508,7 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss builds
 
-The standard Zerg build includes its first nine missions. The canonical Protoss
+The standard Zerg build includes all ten missions. The canonical Protoss
 target includes all ten Protoss missions. Explicit `protoss-p7` builds the P1–P7
 product that has passed its canonical presentation, save, host campaign and bounded
 ARM continuation checks, and explicit `protoss-p6` still builds the separately
@@ -1529,8 +1529,8 @@ flags and save identity remain separate.
 ./dev sc64 play --profile zerg
 ```
 
-Replace `zerg` with `protoss` for the ten-mission product. The output pairs are
-`build/StarCraft-Zerg-Z9-Transport1-GBA.gba` / `build/starcraft-zerg-z9.elf` and
+Replace `zerg` with `protoss` for the Protoss campaign. The output pairs are
+`build/StarCraft-Zerg-Z10-Transport1-GBA.gba` / `build/starcraft-zerg-z10.elf` and
 `build/StarCraft-Protoss-P10-Transport1-GBA.gba` / `build/starcraft-protoss-p10.elf`.
 Explicit `protoss-p7` builds `build/StarCraft-Protoss-P7-Transport1-GBA.gba` /
 `build/starcraft-protoss-p7.elf`, and explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
@@ -1543,17 +1543,18 @@ save identity; versioned `-Z3` names are aliases. `protoss-p3` preserves the
 legacy P3 real files, code and save path. Retain matching
 frozen ROM/ELF pairs for replay.
 
-The canonical Zerg test target runs ordinary-input controllers for all nine
+The canonical Zerg test target runs ordinary-input controllers for all ten
 chapters under the canonical flags, normal-menu startup/save fixtures and
 the skirmish matrix, including all 234 combinations
 of map, human race and independently selected AI races. The setup/save matrix
 does not prove a completed match for every combination. Build guards still
 enforce the same IWRAM and EWRAM reserves.
 
-Canonical Zerg uses `SCZ9`, base save generation 48 in the Transport1 namespace,
-the Z9 runtime and expanded Z8 sprite bank. Preparing `zerg` prepares Z7 first,
-then authenticates and prepares Z8/Z9. Canonical Zerg and explicit `zerg-z9`
-share `.local/play/zerg-z9`. Explicit Z7 retains `SCZ7`, generation 36 and
+Canonical Zerg uses `SCZA`, generation 49, and the expanded Z8 sprite bank.
+Preparing `zerg` prepares Z7 first, then authenticates and prepares Z8–Z10.
+Canonical Zerg and explicit `zerg-z10` share `.local/play/zerg-z10`; explicit
+`zerg-z9` retains `SCZ9`, generation 48 and `.local/play/zerg-z9`. Explicit Z7
+retains `SCZ7`, generation 36 and
 `.local/play/zerg-z7-transport1`; no SRAM is migrated.
 Explicit `zerg-z6` retains its SCZ6 generation-32 ROM and `.local/play/zerg-z6`;
 no SRAM is automatically imported. The P7
@@ -2896,7 +2897,7 @@ for explicit commands, provenance, supported data and remaining runtime work.
 
 ## Z9/Z10 authenticated source descriptors
 
-To prepare the full ten-mission candidate from your local USA ROM:
+To prepare the full ten-mission profile from your local USA ROM:
 
 ```sh
 ./dev sc64 prepare --rom PATH --profile zerg-z10
@@ -2906,8 +2907,8 @@ make zerg-z10
 ```
 
 This explicit profile checks the Z8, Z9 and Z10 descriptors and programs
-against the retained original data. Z9 remains the default; Z10 has a
-separate save directory and does not migrate Z9 saves.
+against the retained original data. The default `zerg` alias uses the same
+Z10 product. Use `zerg-z9` to keep using an existing Z9 save.
 
 
 `tools/sc64_zerg_late_pack.py pack --mission Z9` (or `Z10`) authenticates the

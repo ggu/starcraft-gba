@@ -30,6 +30,31 @@ trigger program. On a workspace with prepared inputs:
 make test-sc64-z10-carried-profile test-sc64-z10-replay sc64-z10-arm-replay
 ```
 
-Z9 is still the default release; Z10 uses its own save directory and save
-generation. This work does not migrate Z9 saves, establish every Z10 save
+At qualification time Z9 was still the default. Z10 uses its own save
+directory and save generation. This work does not migrate Z9 saves, establish every Z10 save
 point, verify original-N64 timing, or measure physical hardware.
+
+## Default release switch
+
+[PR #393](https://github.com/ggu/starcraft-gba/pull/393) selects Z10 as the
+default Zerg product. The Z10 build and explicit Z9 build match their
+previously qualified ROMs byte-for-byte. The existing Z9 filename, code
+`SCZ9`, and `.local/play/zerg-z9` are unchanged. Z10 uses `SCZA` and
+`.local/play/zerg-z10`.
+
+- Ordinary host controllers for carried Z1–Z9 all win under the same Z10
+  profile flags, as does the Z10 controller above. The carried Z9 controller
+  wins at frame 68,520 with zero faults.
+- All 18 full custom controller runs on the Z10 flags, covering both maps,
+  three human races and 1–3 rotated AI slots, reach ordinary defeat results.
+  This adds complete outcomes to the separate 234 startup/save cases.
+- Physical button input to the normal ROMs loads a 32 KiB Z9 save at Z8
+  frame 16,660 on Z9, and a Z10 save at frame 2,527 on Z10. Z10 declines the
+  Z9 journal and remains at the title. Neither seed file was modified.
+- On the normal Z10 ROM, physical buttons start Blood Bath as Protoss
+  against three AIs and reproduce the host result at frame 18,986
+  (19,121 input calls). This sample tests the normal entry point and a
+  complete custom match, not the entire ARM lineup matrix.
+- The matched 1,000-update Zerg ARM battle window changes mean loop cycles
+  from 1,369,965 on Z9 to 1,368,916 on Z10 (−0.08%). Sampled workloads
+  match. The window remains above the 561,792-cycle budget for 30 fps.

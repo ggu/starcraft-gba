@@ -26,7 +26,7 @@ write down what you saw for any box you cannot tick.
 - [ ] Terran custom game: SCVs mine and the supply count updates.
 - [ ] A Command Center or Barracks command card shows the right icons and prices.
 
-## Zerg Z9 and Z10 preview
+## Zerg Z10 and legacy Z9
 <!-- products: zerg-z9, zerg-z10 -->
 
 - [ ] Zerg custom game: Drones mine and Larva hatch into units.
