@@ -29,6 +29,19 @@ class Z9Setup(unittest.TestCase):
         self.assertEqual(len(rows), 5)
         self.assertFalse(any(ready for _, _, ready in rows))
 
+    def test_z10_prepares_and_authenticates_the_additional_scenario(self):
+        rows = setup.readiness(self.root, include_z10=True)
+        self.assertEqual(len(rows), 7)
+        self.assertEqual([label for label, _, _ in rows[-2:]], [
+            "Authenticated Z10 descriptor", "Authenticated Z10 trigger program"])
+        self.assertFalse(any(ready for _, _, ready in rows))
+        calls = []
+        with patch.object(setup, "readiness", return_value=[]) as check:
+            setup.prepare(self.root, calls.append, include_z10=True)
+        self.assertEqual([c[c.index("--mission")+1] for c in calls if "--mission" in c], ["Z9", "Z10"])
+        self.assertIn(str(setup.paths(self.root, "Z10")[1]), calls[-2])
+        check.assert_called_once_with(self.root, include_z10=True)
+
     def test_missing_late_art_does_not_pass_as_inherited_bank(self):
         bank = self.bank()
         self.assertTrue(setup.bank_ready(bank))
@@ -90,6 +103,10 @@ class Z9Setup(unittest.TestCase):
         dev = importlib.util.module_from_spec(spec)
         loader.exec_module(dev)
         self.assertIn("zerg-z9", dev.SC64_PROFILES)
+        self.assertIn("zerg-z10", dev.SC64_PROFILES)
+        self.assertEqual(dev.SC64_TEST_TARGETS["zerg-z10"], "test-sc64-zerg-z10")
+        self.assertEqual(dev.PLAY_SAVE_PROFILES["zerg-z10"], "zerg-z10")
+        self.assertNotEqual(dev.GAMES["zerg-z9"][1], dev.GAMES["zerg-z10"][1])
         self.assertEqual(dev.SC64_TEST_TARGETS["zerg-z9"], "test-sc64-zerg-z9")
         self.assertEqual(dev.GAMES["zerg"][1], dev.GAMES["zerg-z9"][1])
         self.assertIn("Zerg-Z7", dev.GAMES["zerg-z7"][1])
@@ -100,10 +117,12 @@ class Z9Setup(unittest.TestCase):
         spec = importlib.util.spec_from_loader(loader.name, loader)
         dev = importlib.util.module_from_spec(spec)
         loader.exec_module(dev)
-        with patch.object(dev, "status", return_value=0) as status, patch.object(dev, "run") as run:
-            dev.build("zerg-z9")
-        status.assert_called_once_with("zerg-z9", include_built=False)
-        run.assert_called_once_with(["make", "zerg-z9"])
+        for profile in ("zerg-z9", "zerg-z10"):
+            with self.subTest(profile=profile):
+                with patch.object(dev, "status", return_value=0) as status, patch.object(dev, "run") as run:
+                    dev.build(profile)
+                status.assert_called_once_with(profile, include_built=False)
+                run.assert_called_once_with(["make", profile])
 
 
 if __name__ == "__main__":

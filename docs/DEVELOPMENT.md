@@ -2896,6 +2896,20 @@ for explicit commands, provenance, supported data and remaining runtime work.
 
 ## Z9/Z10 authenticated source descriptors
 
+To prepare the full ten-mission candidate from your local USA ROM:
+
+```sh
+./dev sc64 prepare --rom PATH --profile zerg-z10
+./dev sc64 status --profile zerg-z10
+make zerg-z10
+./dev sc64 test --profile zerg-z10
+```
+
+This explicit profile checks the Z8, Z9 and Z10 descriptors and programs
+against the retained original data. Z9 remains the default; Z10 has a
+separate save directory and does not migrate Z9 saves.
+
+
 `tools/sc64_zerg_late_pack.py pack --mission Z9` (or `Z10`) authenticates the
 retained scenario against a pinned per-mission contract. It writes a
 descriptor to a new ignored `.local/build/z9-*` or `.local/build/z10-*` path,

@@ -41,7 +41,7 @@ GAMES = {
     "zerg-z6-probe": ("zerg-z6-probe", "build/StarCraft-Zerg-Z6-Probe-GBA.gba"),
     "protoss-p5-shuttle": ("protoss-p5-shuttle", "build/StarCraft-Protoss-P5-Shuttle-GBA.gba"),
 }
-PLAY_SAVE_PROFILES = {"terran": "terran-transport1", "zerg": "zerg-z9", "zerg-z9": "zerg-z9", "zerg-z6": "zerg-z6", "zerg-z7": "zerg-z7-transport1",
+PLAY_SAVE_PROFILES = {"terran": "terran-transport1", "zerg": "zerg-z9", "zerg-z9": "zerg-z9", "zerg-z10": "zerg-z10", "zerg-z6": "zerg-z6", "zerg-z7": "zerg-z7-transport1",
                       "zerg-z6-probe": "zerg-z6", "zerg-z4": "zerg-z4", "zerg-z3": "zerg",
                       "protoss": "protoss-p10-transport1", "protoss-p7": "protoss-p7-transport1",
                       "protoss-p6": "protoss-p6",
@@ -49,7 +49,7 @@ PLAY_SAVE_PROFILES = {"terran": "terran-transport1", "zerg": "zerg-z9", "zerg-z9
                       "protoss-p4-storm": "protoss-p4-storm",
                       "protoss-p5-shuttle": "protoss-p5-shuttle"}
 SC64_PROFILES = ("wasteland", "backwater", "skirmish", "campaign", "races", "unified",
-                 "terran", "zerg", "zerg-z6", "zerg-z7", "zerg-z9", "zerg-z6-probe", "zerg-z4", "zerg-z3",
+                 "terran", "zerg", "zerg-z6", "zerg-z7", "zerg-z9", "zerg-z10", "zerg-z6-probe", "zerg-z4", "zerg-z3",
                  "protoss", "protoss-p7", "protoss-p3", "protoss-p4-storm", "protoss-p5-shuttle", "protoss-p6")
 SC64_TEST_TARGETS = {
     "unified": "test-unified", "races": "test-races",
@@ -64,6 +64,7 @@ SC64_TEST_TARGETS = {
     "zerg-z6": "test-zerg-z6",
     "zerg-z7": "test-zerg-z7",
     "zerg-z9": "test-sc64-zerg-z9",
+    "zerg-z10": "test-sc64-zerg-z10",
     "zerg-z6-probe": ("test-sc64-z6-runtime", "test-sc64-z6-save", "test-sc64-z6-profile",
                 "test-sc64-z6-frame-coverage", "test-sc64-z6-controller"),
     "protoss-p5-shuttle": ("test-sc64-p5-shuttle-runtime", "test-sc64-p5-campaign-run"),
@@ -615,9 +616,10 @@ def doctor(require_emulator: bool = False) -> int:
 
 
 def build(game: str) -> None:
-    if game in ("zerg", "zerg-z9"):
+    if game in ("zerg", "zerg-z9", "zerg-z10"):
         if status(game, include_built=False):
-            raise RuntimeError("Z9 requires prepared inputs; run ./dev sc64 prepare --rom PATH --profile zerg-z9")
+            stage = "Z10" if game == "zerg-z10" else "Z9"
+            raise RuntimeError(f"{stage} requires prepared inputs; run ./dev sc64 prepare --rom PATH --profile zerg-{stage.lower()}")
         run(["make", GAMES[game][0]])
         return
     if game == "terran" and not unit_word_sprite_input_ready(
@@ -833,11 +835,12 @@ def prepare_bc(rom: Path) -> None:
 
 
 def prepare(rom: Path, profile: str) -> None:
-    if profile in ("zerg", "zerg-z9"):
-        from tools.sc64_z9_setup import prepare as prepare_z9
+    if profile in ("zerg", "zerg-z9", "zerg-z10"):
+        from tools.sc64_z9_setup import prepare as prepare_late
         prepare(rom, "zerg-z7")
-        prepare_z9(ROOT, run)
-        print("Prepared Z9 inputs; the separate Z7 save profile is unchanged.")
+        include_z10 = profile == "zerg-z10"
+        prepare_late(ROOT, run, include_z10=include_z10)
+        print(f"Prepared {'Z10' if include_z10 else 'Z9'} inputs; existing save profiles are unchanged.")
         return
     rom = rom.expanduser().resolve()
     if not rom.is_file():
@@ -1048,10 +1051,10 @@ def prepare(rom: Path, profile: str) -> None:
 
 
 def status(profile: str, *, include_built: bool = True) -> int:
-    if profile in ("zerg", "zerg-z9"):
-        from tools.sc64_z9_setup import status as status_z9
+    if profile in ("zerg", "zerg-z9", "zerg-z10"):
+        from tools.sc64_z9_setup import status as status_late
         inherited = status("zerg-z7", include_built=False)
-        failed = bool(status_z9(ROOT) or inherited)
+        failed = bool(status_late(ROOT, include_z10=profile == "zerg-z10") or inherited)
         if include_built:
             rom = ROOT / GAMES[profile][1]
             print(f"{'READY  ' if rom.is_file() else 'MISSING'} Built ROM: {rom}")
