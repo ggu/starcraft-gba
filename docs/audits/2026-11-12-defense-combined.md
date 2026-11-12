@@ -30,9 +30,18 @@ make test-sc64-z10-defense-combined
 make CANONICAL_DIRECT_FIRING_FLAGS='-DSC64_DIRECT_FIRING_POINTS -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER' verify-zerg-z10
 ```
 
+An instrumented Z10 ROM, using the same combined runtime, painted unused
+user stack at boot and repeated the same physical-input replay. All 34
+checkpoints still match. The lowest changed canary word was `0x030072f4`:
+2,828 bytes below the user stack top, with 8,948 bytes untouched above the
+`0x03005000` guard. This bounds the observed stack writes on this replay,
+including the SRAM load. It does not measure the IRQ stack or exercise the
+malformed-owner fallback. Instrumented ROM SHA-256:
+`8cadcba3aee619d12fd691c7d586baeb0ec66191a6ddd74334dc0164a4b8cc34`.
+
 Both windows still exceed the two-frame budget of 561,792 cycles. Do not
 infer a hardware frame rate from these CPU cycle measurements. Promotion
-requires the dynamic stack check, complete ordinary-input campaign and
-custom comparisons, and links and behavior checks for the other products.
+requires complete ordinary-input campaign and custom comparisons, links
+and behavior checks for the other products, and stack checks in those paths.
 The spatial lookup currently replaces the Zerg/Protoss campaign owner-list
 pass; the scalar, P3 and late Terran target policies remain separate.
