@@ -281,7 +281,7 @@ $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z3,sc64_z3_campaign_run,common
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z4,sc64_z4_campaign_run,common/gba.c,tests/sc64_route_purity.h))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z5,sc64_z5_campaign_run,common/gba.c,tests/sc64_route_purity.h))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z6,sc64_z6_campaign_run,common/gba.c,tests/sc64_route_purity.h))
-$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z7,sc64_z7_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z7,sc64_z7_campaign_run,common/gba.c,tests/sc64_route_purity.h))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z8,sc64_z8_campaign_run,))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z1,race_z1_controls,common/gba.c))
 endef
@@ -322,6 +322,11 @@ endef
 $(eval $(call Z9_Z7_CARRIED_REPLAY,full,-DZ7_ARM_MODE=0))
 $(eval $(call Z9_Z7_CARRIED_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=40000u))
 $(eval $(call Z9_Z7_CARRIED_REPLAY,resume,-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z9_Z7_CUT)u))
+# The carried Z10 runtime can fill its live unit bank before the historical
+# Z7 policy starts buying air support. Start that controller's paid air plan
+# earlier; the carried Z9 and standalone Z7 policies stay independent.
+ZERG_Z9_CARRIED_Z7_POLICY = $(ZERG_Z7_CONTROLLER_POLICY)
+ZERG_Z10_CARRIED_Z7_POLICY ?= $(ZERG_Z7_CONTROLLER_POLICY) --force-late-air-at-frame 85000
 # Controller 0 of the generic early-race runner is not the established Z1 route.
 define ZERG_CARRIED_MISSIONS
 .PHONY: test-sc64-$(1)-carried-missions
@@ -333,11 +338,11 @@ test-sc64-$(1)-carried-missions: $$(addprefix build/test-sc64-$(1)-carried-,z1 z
 	./build/test-sc64-$(1)-carried-z4 --limit 150000 --trace .local/sc64/$(1)-carried/z4.json
 	./build/test-sc64-$(1)-carried-z5 --limit 60000 --trace .local/sc64/$(1)-carried/z5-diagnostic.json --attempt .local/sc64/$(1)-carried/z5-attempt.json --verified .local/sc64/$(1)-carried/z5.json
 	./build/test-sc64-$(1)-carried-z6 --trace .local/sc64/$(1)-carried/z6.json
-	./build/test-sc64-$(1)-carried-z7 $$(ZERG_Z7_CONTROLLER_POLICY) --limit $$(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/$(1)-carried/z7.json
+	./build/test-sc64-$(1)-carried-z7 $$(ZERG_$(2)_CARRIED_Z7_POLICY) --limit $$(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/$(1)-carried/z7.json
 	./build/test-sc64-$(1)-carried-z8 .local/sc64/$(1)-carried/z8.jsonl
 endef
-$(eval $(call ZERG_CARRIED_MISSIONS,z9))
-$(eval $(call ZERG_CARRIED_MISSIONS,z10))
+$(eval $(call ZERG_CARRIED_MISSIONS,z9,Z9))
+$(eval $(call ZERG_CARRIED_MISSIONS,z10,Z10))
 .PHONY: test-sc64-z10-carried-z9-controller
 test-sc64-z10-carried-z9-controller: build/test-sc64-z10-carried-z9-run
 	mkdir -p .local/sc64/z10-carried
