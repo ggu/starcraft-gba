@@ -102,3 +102,24 @@ physical start assignment. The opt-in Blood Bath preview follows that
 order with one GBA clock seed; the normal title menu and Outpost use
 their existing selector. Resolved race and placement are stored in the
 already qualified v2 record, with no new format.
+
+
+Source `4db23aa7422e07f675cb51bb19d9d9adfa49b05f` passed the four
+canonical sanitizer profiles both with and without the preview. This
+includes exact sparse and dense CPU Random lobby vectors and malformed
+lobby rejection. The Terran preview ARM ROM
+`a6d1864c2b00f1698f1c7c25e7fa69dfd6eb5850afaf3db87d5c9ab134411fab`
+also passed physical-button runs for one and two Random CPU rows. The
+first clock sample before each launch (4104 and 5311 ms) predicts both
+the resolved races and starts. The actual checksummed v2 saves preserved
+both after a fresh load, 60 updates and a pause restart.
+
+The prior normal Terran ROM and this preview independently loaded the
+new Random v2 save, the previous preview's v2 save, and the older sparse
+v1 save. They matched on load, continuation and restart and left every
+SRAM image unchanged. The physical receipt SHA-256 is
+`d9056d6934a9cc0e4652c7111dd040b38d1b1d74990495e82076124300eac8c9`;
+the cross-load receipt SHA-256 is
+`1d8042ffb6f0444fc5f1a99b4777fac8a035c551982e2b04fa0bfc09dc12c4af`.
+The CPU Random change was physically checked on ARM for Terran; the
+other three products have host checks for this change.
