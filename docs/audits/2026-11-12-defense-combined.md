@@ -23,6 +23,28 @@ The Z10 verifier passes. EWRAM remains `0x0203c9b8`; IWRAM ends at
 `0x03004be0`, up 256 bytes from stock. Combined ROM SHA-256:
 `9eab3d5ddc9e7893b82ed902a37059728c50338ce93ff0543cff79c9b180914b`.
 
+## Full Z10 win and skirmish checks
+
+The exact timed ROM continued from the same ordinary SRAM save to the
+victory screen at controller call 60,834, game frame 58,795, with zero
+mission faults. Sixty checkpoints matched the qualified ARM witness's
+mission, frame, screen, result, wallet and fault fields. The first 34 also
+matched the stock normal cartridge's raw arrays. The runner used only
+physical buttons, including nine ordinary text dismissals.
+
+The pinned 64×64 Z10 custom battle window matched all frame/screen rows and
+21 sampled actor-count rows, with mean loop cycles 1,368,916 → 1,369,303
+(+0.03%). This is a scoped performance sample, not a full custom match.
+
+The same matrix cartridges each launched six custom games by physical
+buttons: one on each map for each AI count from one to three. Across the
+24 launches, all three human races and independent AI race choices were
+exercised, including duplicate AI races. Every selected owner, starting
+roster and wallet matched the setup; all runs then advanced 120 frames.
+This establishes selection, loading and early play on all four products.
+Complete custom outcomes and long-running behavior on the wider profile
+matrix are still separate gates.
+
 With the same prepared inputs, use a clean build tree:
 
 ```sh

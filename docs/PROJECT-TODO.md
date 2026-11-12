@@ -805,9 +805,11 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
    [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
    seven opt-in ROMs link and the Z10 stack canary leaves 8,948 bytes
-   untouched above its guard. Finish full ordinary-input outcomes and
-   cross-profile defense-path qualification before promoting. Historical inclusive scopes are not
-   promised savings. The N64 order gate is a research lead, not permission to
+   untouched above its guard. Z10 wins at frame 58,795 from ordinary SRAM;
+   24 physical custom starts cover both maps and all three AI counts on the
+   three race products and Showcase. Finish complete custom outcomes and
+   the other campaign paths before promoting. Historical inclusive scopes
+   are not promised savings. The N64 order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
 4. Retry Z10 through ordinary controls after the relevant mechanics are usable;
    qualify genuine save continuation and affected carried missions. Preserve the
