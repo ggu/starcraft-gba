@@ -12,7 +12,7 @@ as a current full result. None of these are physical GBA tests.
 | T1–T10 | [Normal-menu ARM wins across frozen Terran builds](../VALIDATION.md#canonical-terran-t1t10-profile-2026-10-23); the later canonical T9 replay uses the scheduler. | No exact current full physical result found for any of the ten. |
 | Z1 | Carried Z9 [ARM test-entry win](2026-11-12-dense-point-flood.md#campaign-and-save-checks). | Open. |
 | Z2 | [Carried Z9 HOST wins](2026-11-05-z9-carried-host/README.md). | Open. |
-| Z3 | [Older normal Z7 physical win](2026-10-31-z3-normal-physical/README.md); current Z10 prefix below. | Prefix only; full win open. |
+| Z3 | [Older normal Z7 physical win](2026-10-31-z3-normal-physical/README.md) and current Z10 replay below. | Full win from fresh HOME at frame 136,588. |
 | Z4–Z6 | Carried HOST wins; earlier Z6 ARM and Z5/Z6 save coverage in [campaign notes](../RACE-CAMPAIGNS.md). | Open for all three. |
 | Z7 | [Older normal Z7 physical win](2026-10-31-z7-normal-physical/README.md) and [carried Z9 test-entry replay and SRAM continuation](2026-11-05-z9-carried-arm/README.md). | Open on current Z10. |
 | Z8 | [Normal Z9 physical win after loading legacy SRAM](2026-11-12-packed-sight-rows.md#per-race-supply-build-and-legacy-continuation). | Open on current Z10. |
@@ -24,10 +24,10 @@ as a current full result. None of these are physical GBA tests.
 | P9 | [P10-flag replacement-loop ARM win and fresh SRAM continuation](2026-11-03-protoss-p1-p10-evidence/README.md#save-continuation). | Open on current P10. |
 | P10 | [Earlier ARM replacement-loop win and SRAM](2026-11-03-p10-ordinary-input/README.md), plus an earlier normal physical continuation in the [project notes](../PROJECT-TODO.md). | No exact current full physical result found. |
 
-This is a conservative audit of retained evidence: one exact current
-full result (Z10 from SRAM), one current prefix (Z3), and no exact current
-full result found for the other 28 entries. It does not downgrade older
-wins or imply that the remaining missions are unplayable.
+This is a conservative audit of retained evidence: two exact current full
+results (Z3 from HOME and Z10 from SRAM) and no exact current full result
+found for the other 28 entries. It does not downgrade older wins or imply
+that the remaining missions are unplayable.
 
 ## Carried Z3: controller reads no longer alter the route cache
 
@@ -61,9 +61,26 @@ frame-202 mineral query. The paired ELF hash is
 This prefix made no guest-memory writes. It is not a full ARM win, a
 full actor-state comparison, or a save/resume test.
 
+### Full physical-button replay
+
+A fresh emulator boot of the same ROM won through the normal menu at
+frame 136,588, with the Chrysalis at 250 HP and five hostile actors left.
+All 465 named observations matched the HOST tape. The recorded timeline
+used 139,009 tape calls and 139,015 physical updates. The six extra
+updates were ordinary A presses and releases for the three authored
+victory transmissions. The replay checked that none advanced the game
+frame and preserved the previously held gameplay buttons. It made no
+guest-memory writes. The historical driver without acknowledgments
+matched 463 observations, then fell behind when the text blocked the
+simulation. Full replay receipt SHA-256:
+`9e845def47d8b7b2b2cbf9261feef7d69263fcceff83465ee6ea2bf6776d3955`.
+This proves one exact normal-ROM route in mGBA. It does not cover saves,
+all actor fields, or the frame rate on hardware.
+
 The remaining known cache-mutating controllers are Z4, Z5, Z6, T5 and
-P3–P6. In particular, Z4 and P4–P6 also call `sc64_route_next` directly;
-the Z3 wrapper alone does not protect those calls. Z5 explicitly rebuilds
-the path grid. Snapshot the actual observer scope, including direct
-calls, then require a controller-free tape match before treating a HOST
-win as proof of the normal ROM.
+P3–P6. Z4's live mineral selection uses the same path helper as Z3;
+its direct `sc64_route_next` calls are in failure diagnostics. P4–P6
+call it directly during decisions, and Z5 explicitly rebuilds the path
+grid. Snapshot the actual observer scope, including direct calls, then
+require a controller-free tape match before treating a HOST win as
+proof of the normal ROM.
