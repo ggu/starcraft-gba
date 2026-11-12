@@ -51,7 +51,21 @@ Switching back to 0 in the same build tree rebuilds the normal Z10 ROM
 and reproduces its stock SHA-256
 `b1a0831adbf2d1b15cf8ae669047be43a64547246815f7a0470eda955252fc9f`.
 
-The normal selector stays off until the enabled Z10 full campaign replay,
-a legacy continuation and the current custom workload are qualified.
-Other profiles use a different shared-span transition and need separate
-evaluation. These measurements still exceed the 30 fps cycle budget.
+## Full Z10 win and current custom comparison
+
+The same enabled cartridge loaded ordinary SRAM and won Full Circle with
+physical buttons at game frame 58,795 (controller call 60,834). All 60
+named gameplay checkpoints matched the qualified witness, with zero
+mission faults and nine ordinary text dismissals. The first 34 also
+match the stock raw unit, building and mineral snapshots. There were no
+guest-memory writes.
+
+The current split-cache stock and enabled ROMs also match every sampled
+state in the pinned 64×64 custom window, calls 10,860–11,859. Mean
+full-loop cycles fall from 1,338,144 to 1,325,662 (−0.93%); p95 falls
+from 1,696,800 to 1,687,167. Mean simulation cycles fall from 788,304
+to 776,058 (−1.55%).
+
+The normal selector stays off pending a legacy campaign continuation.
+Other race profiles use a different shared-span transition and need
+separate evaluation. These measurements still exceed the 30 fps budget.

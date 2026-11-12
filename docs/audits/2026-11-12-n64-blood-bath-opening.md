@@ -75,6 +75,30 @@ their three captures. Plan SHA-256 values:
 - Zerg: `b3fa3ac28c0c6c89fc53702c958f2172a54201c6b6339b1f2c0707dfbd698e53`
 - Protoss: `2b02ca34275770801fd85418e9e1ffad4b3723c4477946f9650406b47dc1bb61`
 
+## Individual computer slot options
+
+On the third computer row, ordinary Right presses from Computer Protoss
+produced Computer Random at step 3,329, Closed at 3,384 and Computer Zerg
+at 3,439. The first two computer rows stayed Zerg and Terran. The N64
+uses individual slot choices in addition to named race choices.
+
+A second input plan closed the first and third computer rows and kept
+only Computer Terran on the middle row. The lobby at step 3,694 showed
+exactly that arrangement. Start reached the field: the readable HUD at
+steps 4,204 and 4,704 showed 50 then 75 minerals and unchanged 4/10
+supply. Both field captures have corruption across their lower halves,
+so they do not establish the computer's spawn, camera position, or
+pathing. The GBA port currently exposes a count of one to three AIs and
+named races for those slots; it has no individual Random or Closed option.
+Compare actual starting positions before assuming that closing an N64
+slot is equivalent to reducing the GBA count.
+
+Both visual-only observer manifests passed with three frames and
+unchanged input provenance. Plan SHA-256 values:
+
+- Computer option cycle: `a34a47e416565bd795a373003fded0664d5ff9f7e170b5bb60ecf16c5ed6176b`
+- Middle computer slot only: `15bb40d6e5ab35965bb23fd0a895560d3f8d0855f018dc083bea0ff3d9bf463b`
+
 The ROM, input tape, screenshots and runner outputs remain private. See the
 [earlier Challenger observation](2026-11-07-n64-visual-only-jit/README.md)
 for the same observer's provenance and limits.
