@@ -115,10 +115,11 @@ static int race_skirmish_product_admitted(int owner, int producer,
     /* Production remains unavailable until its service is complete. */
     if (r->raw_id == 12) return 0;
 #endif
-#ifndef SC64_PAID_SCARAB
-    if (r->raw_id == 83) return 0;
-#endif
+#ifdef SC64_PAID_SCARAB
     if (!ur || race_skirmish_product_producer(type) == 255) return 0;
+#else
+    if (r->raw_id == 83 || !ur || race_skirmish_product_producer(type) == 255) return 0;
+#endif
     producer_raw = sc64_race_raw_building(b[producer].type);
     if (r->producer_raw == 35) {
         if (!sc64_race_is_zerg_townhall(b[producer].type)) return 0;

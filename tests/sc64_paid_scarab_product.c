@@ -478,24 +478,45 @@ static void loss(void)
         printf("loss: an expired Scarab did no damage\n");
     }
     kill_actor(t0);
-    /* Path lost: a target behind an unwalkable tile; the Scarab waits and
-     * expires without damage, or flies round it and hits. Either way it is
-     * gone within its lifetime and the world stays valid. */
+    /* Blocked route, built into the fixture: a wall of seven enemy Pylons
+     * between the Reaver and a Hatchery on the same row. The inflated
+     * footprints are unwalkable. The Scarab never enters a Pylon's tile;
+     * it flies the walkable route round the wall or waits and expires. */
     {
-        int wx = -1, wy = -1;
-        for (int c = 4; c < 14 && wx < 0; ++c)
-            for (int rr = -3; rr <= 3; ++rr) {
-                int col = u[r].x / 16 + c, row = u[r].y / 16 + rr;
-                if (!is_traversable(col, row, -1)) { wx = col; wy = row; break; }
-            }
-        if (wx >= 0) {
-            int h2 = fresh_target(r, wx * 16 + 8 + 48, wy * 16 + 8, 2);
-            for (int n = 0; n < 200; ++n) step(1);
-            drain();
-            assert(race_paid_scarab_candidate_valid(u, MAX_UNITS));
-            kill_actor(h2);
+        int pyl[7], wallx = hx - 40, minpass = 1 << 30;
+        for (int k = 0; k < 7; ++k) {
+            int p = spawn_build(ENEMY, B_PYLON, wallx, hy - 96 + 32 * k, 0);
+            assert(p >= 0);
+            b[p].hp = b[p].maxhp; b[p].under_construction = 0; pyl[k] = p;
         }
-        printf("loss: blocked route %s\n", wx >= 0 ? "exercised" : "(no blocked tile in the arena)");
+        invalidate_path_grid(); sc64_visibility_reset(); update_exploration();
+        assert(!is_traversable(wallx / 16, hy / 16, -1));       /* the wall blocks */
+        {
+            int h2 = enemy_hatchery(hx + 60, hy);
+            u[r].carry = SC64_PSC_INIT | 2; u[r].work_timer = 0;
+            place(&u[r], hx - 120, hy);
+            u[r].order = ORDER_ATTACK_MOVE; u[r].tx = hx + 60; u[r].ty = hy;
+            shot = wait_launch(r);
+            stand_down(r);
+            for (int n = 0; n < 120 && count_scarabs(); ++n) {
+                int s2 = scarab_in_flight(-1);
+                if (s2 >= 0)
+                    for (int k = 0; k < 7; ++k) {
+                        int d = dist2(u[s2].x, u[s2].y, b[pyl[k]].x, b[pyl[k]].y);
+                        if (d < minpass) minpass = d;
+                    }
+                step(1);
+            }
+            drain();
+            assert(minpass >= 14 * 14);          /* never inside a Pylon */
+            assert(race_paid_scarab_candidate_valid(u, MAX_UNITS));
+            printf("loss: blocked route: closest approach to a wall Pylon %d px, Hatchery %s\n",
+                   (int)(minpass < (1 << 30) ? (int)__builtin_sqrt((double)minpass) : -1),
+                   hp_total(MAX_UNITS + h2) < b[h2].maxhp + b[h2].shield ? "hit by detour" : "untouched");
+            kill_actor(MAX_UNITS + h2);
+        }
+        for (int k = 0; k < 7; ++k) kill_actor(MAX_UNITS + pyl[k]);
+        place(&u[r], hx - 96, hy);
     }
     /* Reaver death with a Scarab in flight: it goes on, detached, and hits. */
     t0 = fresh_target(r, hx, hy, 2);
