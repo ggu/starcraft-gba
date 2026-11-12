@@ -39,7 +39,7 @@ int main(void)
                 }
     }
     assert(count == 1800);
-    const Sc64SpriteFrame *fallback = sc64_race_building_sprite(142, 0);
+    const Sc64SpriteFrame *fallback = sc64_race_building_art_sprite(142);
     assert(fallback && sc64_building_word_lookup(fallback) == NULL);
     fill(12, 120);
     draw_mission_sprite(fallback, 120, 65);
