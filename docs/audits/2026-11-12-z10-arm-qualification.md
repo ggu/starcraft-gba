@@ -30,6 +30,6 @@ trigger program. On a workspace with prepared inputs:
 make test-sc64-z10-carried-profile test-sc64-z10-replay sc64-z10-arm-replay
 ```
 
-Z9 is still the default release; Z10 uses its own save directory and save
-generation. This work does not migrate Z9 saves, establish every Z10 save
+At qualification time Z9 was still the default. Z10 uses its own save
+directory and save generation. This work does not migrate Z9 saves, establish every Z10 save
 point, verify original-N64 timing, or measure physical hardware.

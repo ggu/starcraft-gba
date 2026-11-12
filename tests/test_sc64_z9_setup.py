@@ -108,7 +108,7 @@ class Z9Setup(unittest.TestCase):
         self.assertEqual(dev.PLAY_SAVE_PROFILES["zerg-z10"], "zerg-z10")
         self.assertNotEqual(dev.GAMES["zerg-z9"][1], dev.GAMES["zerg-z10"][1])
         self.assertEqual(dev.SC64_TEST_TARGETS["zerg-z9"], "test-sc64-zerg-z9")
-        self.assertEqual(dev.GAMES["zerg"][1], dev.GAMES["zerg-z9"][1])
+        self.assertEqual(dev.GAMES["zerg"][1], dev.GAMES["zerg-z10"][1])
         self.assertIn("Zerg-Z7", dev.GAMES["zerg-z7"][1])
         self.assertEqual(dev.PLAY_SAVE_PROFILES.get("zerg-z9", "zerg-z9"), "zerg-z9")
 
