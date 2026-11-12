@@ -40,6 +40,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
   reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
   windows with 24 identical sampled frames and palettes.
+  A [split terrain cache](audits/2026-11-12-late-zerg-terrain-vram.md)
+  frees 16,080 B of Z10 working RAM and saves 1.29–1.49% in a separate
+  matched replay; check it against the current packed-walk release.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
