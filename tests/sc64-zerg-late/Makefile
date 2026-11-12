@@ -248,12 +248,12 @@ test-zerg-z10: test-sc64-z10-carried-profile
 # Ordinary-input carried controllers must use the full cartridge vector,
 # including the extra save and campaign code in Z10.
 define ZERG_CARRIED_CONTROLLER
-build/test-sc64-$(1)-carried-$(3): tests/$(4).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
+build/test-sc64-$(1)-carried-$(3): tests/$(4).c $(6) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
 	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) $$< $(5) -o $$@
 endef
 define ZERG_CARRIED_CONTROLLERS
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z1z2,race_campaign_run,common/gba.c))
-$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z3,sc64_z3_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z3,sc64_z3_campaign_run,common/gba.c,tests/sc64_route_purity.h))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z4,sc64_z4_campaign_run,common/gba.c))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z5,sc64_z5_campaign_run,common/gba.c))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z6,sc64_z6_campaign_run,common/gba.c))
