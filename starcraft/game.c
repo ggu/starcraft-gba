@@ -8362,6 +8362,30 @@ move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
 #include "sc64_unit_facing.h"
 #endif
 
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+/* Ground orders cannot enter the 16 px cells touched by a source footprint.
+ * Measure extra melee contact from that blocking edge, so an attacker can
+ * swing from the neighboring walkable cell instead of walking into a wall.
+ * Do not reduce the original center reach or change ranged weapon spacing. */
+static int __attribute__((noinline))
+sc64_structure_melee_contact(const Unit *q, int slot, int reach)
+{
+    const Building *p = &b[slot];
+    int left, up, right, down;
+    if (!sc64_game_building_bounds_source(p->type, &left, &up, &right, &down) ||
+        !sc64_t4_building_collidable(slot)) return 0;
+    /* Source bounds are in double-resolution coordinates. These are the
+     * outer edges of the same cells cleared by build_path_grid(). */
+    int x0 = ((p->x * 2 - left) / 32) * 16;
+    int y0 = ((p->y * 2 - up) / 32) * 16;
+    int x1 = ((p->x * 2 + right) / 32 + 1) * 16;
+    int y1 = ((p->y * 2 + down) / 32 + 1) * 16;
+    int dx = q->x - limit(q->x, x0, x1);
+    int dy = q->y - limit(q->y, y0, y1);
+    return dx * dx + dy * dy <= reach * reach;
+}
+#endif
+
 #ifdef SC64_Z6_RUNTIME
 /* The large weapon body is already in ROM; keep its validation wrapper
  * there as well rather than duplicating it in every ARM order branch. */
@@ -8501,7 +8525,15 @@ tick_combat(Unit * q, int target)
 #endif
     if (!damage)
 	return;
-    if (dx * dx + dy * dy <= range * range) {
+    int in_range = dx * dx + dy * dy <= range * range;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (!in_range && target >= MAX_UNITS && stock_weapon && !flying &&
+        !minimum_range && stock_attack.weapon->max_range <= 32 &&
+        !sc64_race_unit_flying(q->type))
+        in_range = sc64_structure_melee_contact(q, target - MAX_UNITS,
+                        (stock_attack.weapon->max_range + 1) / 2);
+#endif
+    if (in_range) {
 #ifdef SC64_RACES
         if (dx*dx+dy*dy<minimum_range*minimum_range) return;
 #endif
