@@ -78,11 +78,40 @@ static void check_route_work(int indexed)
     assert(sc64_route_builds == builds + 2 && sc64_route_hits == hits);
 }
 
+static void check_bad_owner_or_invalid_snapshot(void)
+{
+    reset_world();
+    depot(0, 160, 400);
+    depot(1, 400, 400);
+    int worker = spawn_unit(SIDE, U_PROBE, 520, 400);
+    assert(worker >= 0);
+    grid(-1, 0);
+    u[worker].owner = 7;
+    b[0].owner = b[1].owner = 7;
+    target_lists_valid = sc64_depot_owner_lists_valid = 1;
+    /* An out-of-domain owner must not index the five owner heads. */
+    assert(race_nearest_resource_depot(&u[worker]) == 1);
+
+    reset_world();
+    depot(0, 160, 400);
+    depot(1, 400, 400);
+    worker = spawn_unit(SIDE, U_PROBE, 520, 400);
+    assert(worker >= 0);
+    grid(-1, 0);
+    target_building_head[SIDE] = 0;
+    target_building_next[0] = -1;
+    sc64_depot_owner_lists_valid = 1;
+    target_lists_valid = 0;
+    /* A stale list that misses the nearer slot cannot decide a return. */
+    assert(race_nearest_resource_depot(&u[worker]) == 1);
+}
+
 int main(void)
 {
     gba_init();
     check_route_work(0);
     check_route_work(1);
+    check_bad_owner_or_invalid_snapshot();
     puts("nearest depot slot, tie and route work checks passed");
     return 0;
 }
