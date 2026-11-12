@@ -48,11 +48,32 @@ owner: Terran on Outpost at frame 18,621 and Protoss on Blood Bath at frame
 18,986. Those are selected complete outcomes; long-running behavior across
 the wider profile matrix remains a separate gate.
 
+The combined Protoss host build passes the carried P1–P10 startup/save
+checks and all 234 custom startup/save lineups. The full Eye of the Storm
+controller wins at frame 52,969 with zero faults; 22 fresh-process
+continuation checkpoints match the uninterrupted host replay, including
+victory. The Gantrithor continuation and outcome text fixtures also pass.
+This is host evidence; it does not substitute for the P10 cartridge replay.
+
+## Combined rendering and sight experiment
+
+The defense probe was also built with [packed walking sprites](https://github.com/ggu/starcraft-gba/pull/400)
+and the [packed sight rows](https://github.com/ggu/starcraft-gba/pull/401).
+Against the original stock ROM, the same 1,000-call windows average
+1,439,766 and 1,735,312 loop cycles (−8.18% and −13.05%). Mean simulation
+cost falls by 14.77% and 20.62%. All 34 gameplay checkpoints and the 24
+drawn pages, palettes and fog observations match. This was measured as one
+build; the savings were not added from separate probes. Packed walking
+is now on the release branch; sight and defense are still gated.
+
+The fully composed experimental ROM SHA-256 is
+`caaa8acabfaab7a10a8d7f201bf503c6a5aad18e5dbb4efa49a4c09c986ed718`.
+
 With the same prepared inputs, use a clean build tree:
 
 ```sh
 make test-sc64-z10-defense-combined
-make SC64_DEFENSE_PROBE_FLAGS='-DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER' verify-zerg-z10
+make CANONICAL_WALK_WORDS=0 SC64_DEFENSE_PROBE_FLAGS='-DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER' verify-zerg-z10
 ```
 
 An instrumented Z10 ROM, using the same combined runtime, painted unused
