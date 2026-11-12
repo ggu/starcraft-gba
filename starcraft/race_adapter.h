@@ -181,6 +181,9 @@ static int race_owner_supply_cap(int owner)
 static int race_owner_queued_supply(int owner)
 {
     int i, j, total = 0;
+#ifdef SC64_SHARED_NUKE_PROBE
+    total += race_nuke_reserved_supply(owner);
+#endif
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == owner)
         for (j = 0; j < b[i].queue_count; ++j) {
             const Sc64RaceUnitRule *r = sc64_race_unit_rule(b[i].queue[(b[i].queue_head + j) % 5]);

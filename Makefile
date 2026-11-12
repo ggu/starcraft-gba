@@ -6139,3 +6139,4 @@ include tests/sc64-research-campaign-policy/Makefile
 include mk/arbiter-cloak/Makefile
 include mk/fog/Makefile
 include mk/protoss-research/Makefile
+include mk/sc64-nuke/Makefile

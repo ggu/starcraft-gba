@@ -42,8 +42,11 @@ static int race_late_landing_site(int slot, int x, int y)
 static int race_late_flight_order(int slot, int x, int y, int land)
 {
     if (!race_late_airborne(slot) || b[slot].owner != SIDE ||
-        x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ||
-        (land && !race_late_landing_site(slot, x, y))) return 0;
+        x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return 0;
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (land) race_nuke_snap_addon_landing(slot, &x, &y, race_late_landing_site);
+#endif
+    if (land && !race_late_landing_site(slot, x, y)) return 0;
     race_late.flight_goals[slot] = (u32)x | ((u32)y << 11) |
                                   SC64_FLIGHT_ACTIVE | (land ? SC64_FLIGHT_LAND : 0);
     return 1;
@@ -54,9 +57,15 @@ static int race_late_lift(int slot)
         !b[slot].alive || b[slot].owner != SIDE || b[slot].under_construction ||
         !race_late_can_lift(b[slot].type) || (b[slot].flags & 4) ||
         b[slot].queue_count) return 0;
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (race_nuke_addon_constructing(slot)) return 0;
+#endif
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
     if (race_bc_parent_addon_constructing(slot)) return 0;
     race_bc_parent_detach(slot);
+#endif
+#ifdef SC64_SHARED_NUKE_PROBE
+    race_nuke_detach_addon(slot);
 #endif
     b[slot].flags |= 4;
     race_late.flight_goals[slot] = 0;
@@ -86,6 +95,9 @@ static void race_late_flight_tick(void)
             if (!race_late_landing_site(i, x, y)) continue;
             b[i].flags &= ~4;
             invalidate_path_grid(); target_lists_valid = 0;
+#ifdef SC64_SHARED_NUKE_PROBE
+            race_nuke_relink_neutral_addon(i);
+#endif
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
             race_bc_parent_relink(i);
 #endif

@@ -1818,6 +1818,11 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 #endif
 
 static int race_save_game(void) {
+#ifdef SC64_SHARED_NUKE_PROBE
+    /* No authenticated wire format for Silo receipts, flights or new Ghost
+     * identities yet. Never replace an existing save with partial state. */
+    return 0;
+#endif
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
 #ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
     Sc64StageSaveAuth compound_writer_auth;
@@ -5117,6 +5122,9 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_RESEARCH_SRAM_PRODUCT
     sc64_pr_stage_resync();
+#endif
+#ifdef SC64_SHARED_NUKE_PROBE
+    race_nuke_reset();
 #endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }

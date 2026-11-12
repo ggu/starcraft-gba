@@ -360,6 +360,17 @@ ui_row_state(int i, int *cost, int *gas_cost, const char **need)
     int type, kind = ui_row_kind(i, &type);
     *cost = *gas_cost = 0;
     *need = "";
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (i == race_nuke_command_index() && race_nuke_menu_action() == NUKE_MENU_ARM) {
+        *cost = SC64_NUKE_MISSILE_ORE;
+        *gas_cost = SC64_NUKE_MISSILE_GAS;
+        if (race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) <
+            SC64_NUKE_MISSILE_SUPPLY) return UI_SITE_FULL;
+        if (minerals < *cost) return UI_SITE_MINERALS;
+        if (gas < *gas_cost) return UI_SITE_GAS;
+        return UI_SITE_OK;
+    }
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     if (sc64_pr_stage_menu_selected()) {
         Sc64ProtossResearchQuote quote;
@@ -724,6 +735,9 @@ static const char *
 field_controls_hint(void)
 {
     if (menu_open) return "A CHOOSE  B CLOSE";
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (mode == MODE_NUCLEAR_TARGET) return "A TARGET  B BACK";
+#endif
     switch (ui_action) {
     case UI_A_MOVE_HERE: return "A MOVE HERE  B BACK";
     case UI_A_ATTACK_HERE: return "A ATTACK HERE  B BACK";

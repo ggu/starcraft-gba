@@ -27,6 +27,7 @@ MISSILE_UNIT, TARGET_SPRITE, IMPACT_SPRITE = 14, 231, 267
 # Missile's launch/return headings are 0 and 128, the exact ends of the 17
 # source directions, as used by order_NukeLaunch.
 MISSILE_DIRECTIONS = (0, 16)
+MISSILE_SPEED_Q8, MISSILE_ACCEL_Q8, MISSILE_WARP_TICKS = 8533, 33, 250
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,9 @@ def _validate_animations(payload: bytes) -> None:
         raise ValueError("missile SpecialState1 no longer selects the expected effects")
     if _animation(payload, index, missile, "Init")[0] != (0, [0]):
         raise ValueError("unexpected missile directional group")
+    warp = _animation(payload, index, missile, "WarpIn")
+    if warp[:3] != [(5, [125]), (5, [125]), (36, [2])]:
+        raise ValueError("missile warp no longer waits 250 source ticks before descent")
     for image in IMAGES[1:]:
         anim = _animation(payload, index, image, "Init")
         if [args[0] for op, args in anim if op == 0] != list(range(image.frames)):
@@ -137,7 +141,12 @@ def _collect(get, remap: bytes, palette: dict) -> tuple[bytes, bytes, dict, dict
         raise ValueError("palette JSON must contain 256 GBA RGB555 colors")
 
     units = audit.read_column(get("00C/001"), 228, "B", 0, "units.flingy")
-    flingy = audit.read_column(get("00C/002"), 209, "H", 0, "flingy.sprite")
+    flingy_data = get("00C/002")
+    flingy = audit.read_column(flingy_data, 209, "H", 0, "flingy.sprite")
+    speed = audit.read_column(flingy_data, 209, "i", 209 * 2, "flingy.top_speed")
+    accel = audit.read_column(flingy_data, 209, "h", 209 * 6, "flingy.acceleration")
+    if (speed[109], accel[109]) != (MISSILE_SPEED_Q8, MISSILE_ACCEL_Q8):
+        raise ValueError("unexpected source missile motion")
     sprite_image = audit.read_column(get("00C/003"), 517, "H", 0, "sprites.image")
     if (units[MISSILE_UNIT], flingy[109], sprite_image[266],
             sprite_image[TARGET_SPRITE], sprite_image[IMPACT_SPRITE]) != (109, 266, 316, 233, 318):
@@ -214,6 +223,9 @@ def _header(pixels: bytes, lut: bytes, rows: dict) -> str:
         "    uint8_t x,y,w,h,cw,ch,modifier;",
         "} Sc64NukeFrame;",
         "#define SC64_NUKE_LIGHT_ROWS 63",
+        f"#define SC64_NUKE_SPEED_Q8 {MISSILE_SPEED_Q8}",
+        f"#define SC64_NUKE_ACCEL_Q8 {MISSILE_ACCEL_Q8}",
+        f"#define SC64_NUKE_WARP_SOURCE_TICKS {MISSILE_WARP_TICKS}",
         "#define SC64_NUKE_IMPACT_SOURCE_Y (-42)",
         "#define SC64_NUKE_DOT_SOURCE_TICKS 1",
         "#define SC64_NUKE_BURST_SOURCE_TICKS 2",

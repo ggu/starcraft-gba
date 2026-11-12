@@ -16,6 +16,16 @@ static void sc64_contact_memo_invalidate(void);
 #include "sc64_engine_capabilities.h"
 #include "sc64_supply.h"
 #include "sc64_save_tag_namespace.h"
+#ifdef SC64_SHARED_NUKE_PROBE
+#if !defined(SC64_RACES) || !defined(GBA_SCENE_CLIP)
+#error "Shared nuclear strike probe requires shared races and playfield clipping"
+#endif
+#ifndef SC64_NUKE_BLAST_PROBE
+#define SC64_NUKE_BLAST_PROBE
+#endif
+#include "sc64_nuke_rules.h"
+#include "sc64_nuke_render.h"
+#endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_scope.h"
 #include "../common/gba_flash_journal.h"
@@ -1063,6 +1073,9 @@ enum {
 };
 enum {
     MODE_NORMAL, MODE_MOVE, MODE_ATTACK, MODE_BUILD
+#ifdef SC64_SHARED_NUKE_PROBE
+    , MODE_NUCLEAR_TARGET
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
     , MODE_YAMATO
 #endif
@@ -2417,6 +2430,34 @@ static const Sc64SpriteFrame *mission_building_sprite(int type);
 #endif
 static int race_owner_supply(int owner),race_owner_supply_capacity(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
+#ifdef SC64_SHARED_NUKE_PROBE
+enum { NUKE_MENU_NONE, NUKE_MENU_ARM, NUKE_MENU_CANCEL_ARM, NUKE_MENU_CAST,
+       NUKE_MENU_ABORT, NUKE_MENU_ARMED };
+enum { NUKE_TOAST_WARNING = 16, NUKE_TOAST_ARMED, NUKE_TOAST_ABORTED,
+       NUKE_TOAST_EMPTY, NUKE_TOAST_OCCUPIED };
+static void race_nuke_reset(void), race_nuke_tick(void), race_nuke_draw(void);
+static void race_nuke_clear_silo(int slot);
+static int race_nuke_parent_slot(int addon, unsigned parent_raw);
+static void race_nuke_relink_neutral_addon(int parent);
+static void race_nuke_detach_addon(int parent);
+static int race_nuke_addon_constructing(int parent);
+static void race_nuke_snap_addon_landing(int parent, int *x, int *y, int (*valid)(int,int,int));
+#ifdef SC64_TERRAN_LATE_RUNTIME
+static int sc64_terran_late_source_product_available(int source_slot, int raw_type);
+static int sc64_terran_late_product_source_slot(int owner, int raw_owner);
+#endif
+static int race_nuke_reserved_supply(int owner), race_nuke_ghost_locked(int slot);
+static int race_nuke_arm(int slot, int owner), race_nuke_cancel_arm(int slot, int owner);
+static int race_nuke_abort(int slot), race_nuke_menu_action(void);
+static int race_nuke_issue_selected(int x, int y), race_nuke_command_index(void);
+#ifdef SC64_HAS_SPRITES
+static int race_nuke_silo_working(int slot);
+#ifdef SC64_UNIT_FACING
+static int race_nuke_draw_ghost(int slot, int x, int y);
+#endif
+#endif
+static const char *race_nuke_menu_label(int action);
+#endif
 static void race_add_owner_resources(int owner,int ore,int vespene);
 #ifdef SC64_SHARED_TRANSPORT
 static int race_owner_minerals(int owner), race_owner_gas(int owner);
@@ -2647,7 +2688,11 @@ reset_selection_gestures(void)
     r_tap_state = 0;
 #endif
 }
-static const char *toast_text[] = {"Command issued", "Need more minerals", "Supply limit reached", "Building placed", "Training unit", "Select a worker", "Site blocked", "Game saved", "Tech prerequisite missing", "Building unfinished", "Research unavailable", "Queue full", "No gas", "Unit pool full", "Mission data skipped", "Deliver cargo first"};
+static const char *toast_text[] = {"Command issued", "Need more minerals", "Supply limit reached", "Building placed", "Training unit", "Select a worker", "Site blocked", "Game saved", "Tech prerequisite missing", "Building unfinished", "Research unavailable", "Queue full", "No gas", "Unit pool full", "Mission data skipped", "Deliver cargo first"
+#ifdef SC64_SHARED_NUKE_PROBE
+    , "NUCLEAR LAUNCH DETECTED", "Missile armed", "Strike aborted", "No missile armed", "Silo occupied"
+#endif
+};
 static int
 limit(int n, int lo, int hi)
 {
@@ -2830,6 +2875,9 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_SHARED_NUKE_PROBE
+    (void)race_nuke_abort(i);
+#endif
 #ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
     sc64_current_unit[i] = 255;
 #endif
@@ -3045,6 +3093,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     /* Skip an unresolved dead slot without starving other free slots. */
     while (i<MAX_BUILDINGS && (b[i].alive || sc64_pr_stage_job_marked(&b[i]))) ++i;
     if (i>=MAX_BUILDINGS) return -1;
+#endif
+#ifdef SC64_SHARED_NUKE_PROBE
+    race_nuke_clear_silo(i);
 #endif
 #ifdef SC64_RANGE_WORK
     sc64_range_route_forget_target(MAX_UNITS+i);
@@ -4781,6 +4832,9 @@ destroy_building(int slot, int source_owner)
 {
     Building *q = &b[slot];
     if (!q->alive) return;
+#ifdef SC64_SHARED_NUKE_PROBE
+    race_nuke_detach_addon(slot);
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     /* Death always proceeds. An unauthenticated payer gets no credit and
      * leaves a sticky HOST fault so the unresolved state cannot be saved. */
@@ -4858,6 +4912,9 @@ destroy_building(int slot, int source_owner)
                 q->flags &= ~(SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG);
                 q->queue_progress=0;
             }
+#endif
+#ifdef SC64_SHARED_NUKE_PROBE
+            race_nuke_clear_silo(slot);
 #endif
 	    q->alive = 0;
 #ifdef SC64_BATTERY_SERVICE_ENABLED
@@ -5048,6 +5105,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 	    if (u[target].owner == SIDE)
 		supply_used -= unit_slot_supply(&u[target]);
 	    u[target].alive = 0;
+#ifdef SC64_SHARED_NUKE_PROBE
+            (void)race_nuke_abort(target);
+#endif
 #ifdef SC64_Z6_RUNTIME
             if (race_z6_active()) (void)race_z6_hallucination_cleanup_dead(&u[target]);
 #endif
@@ -5485,6 +5545,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_SHARED_NUKE_PROBE
+    race_nuke_reset();
+#endif
 #ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
     sc64_controller_reset();
 #endif
@@ -6015,6 +6078,9 @@ issue_order(int order, int tx, int ty)
     selected_building = -1;
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE && u[i].selected) {
+#ifdef SC64_SHARED_NUKE_PROBE
+            if (sc64_race_ordinary_ghost(u[i].type) && race_nuke_ghost_locked(i)) continue;
+#endif
 #ifdef SC64_EGG_RUNTIME
             /* The Egg's target field stores its paid product until birth. It
              * has no movement command; the selected-unit menu owns cancel. */
@@ -6497,6 +6563,9 @@ enum {
     RACE_CONTEXT_SCARAB, RACE_CONTEXT_YAMATO, RACE_CONTEXT_BC_BUILDING,
     RACE_CONTEXT_BUNKER, RACE_CONTEXT_TRANSPORT, RACE_CONTEXT_TRANSPORT_TECH, RACE_CONTEXT_BATTERY,
     RACE_CONTEXT_CARRIER,
+#ifdef SC64_SHARED_NUKE_PROBE
+    RACE_CONTEXT_NUKE,
+#endif
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
     RACE_CONTEXT_EGG,
 #endif
@@ -6558,6 +6627,9 @@ static int race_bc_yamato_target_at(int x,int y)
 static int race_context_command_width(int context)
 {
     switch (context) {
+#ifdef SC64_SHARED_NUKE_PROBE
+    case RACE_CONTEXT_NUKE: return race_nuke_menu_action() != NUKE_MENU_NONE;
+#endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     case RACE_CONTEXT_SCARAB: return race_scarab_human_selected() >= 0;
 #endif
@@ -6609,6 +6681,24 @@ static int race_carrier_command_base(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (choice == race_nuke_command_index()) {
+        int action = race_nuke_menu_action();
+        if (action) {
+            menu_open = 0; mode = MODE_NORMAL;
+            if (action == NUKE_MENU_ARM) toast(race_nuke_arm(selected_building, SIDE));
+            else if (action == NUKE_MENU_CANCEL_ARM) {
+                if (!race_nuke_cancel_arm(selected_building, SIDE)) toast(8);
+            } else if (action == NUKE_MENU_CAST) mode = MODE_NUCLEAR_TARGET;
+            else if (action == NUKE_MENU_ARMED) toast(NUKE_TOAST_ARMED);
+            else if (action == NUKE_MENU_ABORT) {
+                for (int i = 0; i < MAX_UNITS; ++i)
+                    if (u[i].selected && u[i].owner == SIDE) (void)race_nuke_abort(i);
+            }
+            return;
+        }
+    }
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     if (sc64_pr_stage_menu_selected()) {
         toast(sc64_pr_stage_menu_command(choice)); menu_open=0; mode=MODE_NORMAL; return;
@@ -6925,6 +7015,9 @@ static int race_skirmish_command_count(void)
 
 /* Advanced Terran commands are available in the T5 development profile.
  * Other factions retain their existing ten-row command list. */
+#ifdef SC64_SHARED_NUKE_PROBE
+#define field_menu_count field_menu_count_without_nuke
+#endif
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
@@ -7060,6 +7153,18 @@ static int field_menu_count(void)
 #else
 #define field_menu_count() MENU_COUNT
 #endif
+#ifdef SC64_SHARED_NUKE_PROBE
+#undef field_menu_count
+static int race_nuke_command_index(void)
+{
+    return race_mode ? race_context_command_base(RACE_CONTEXT_NUKE) :
+                       field_menu_count_without_nuke();
+}
+static int field_menu_count(void)
+{
+    return field_menu_count_without_nuke() + (!race_mode && race_nuke_menu_action() != NUKE_MENU_NONE);
+}
+#endif
 
 #ifdef SC64_RACES
 static const char *field_menu_base_label(int choice, const char *const *labels)
@@ -7087,6 +7192,12 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (i == race_nuke_command_index()) {
+        int action = race_nuke_menu_action();
+        if (action) return race_nuke_menu_label(action);
+    }
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     if (sc64_pr_stage_menu_selected()) {
         static const char *const names[]={"GROUND ARMOR","AIR ARMOR","GROUND WEAPONS",
@@ -7333,6 +7444,14 @@ interact(void)
                 issued+=race_bc_yamato_issue(i,target);
         if(target>=0 && !issued) game_audio_energy_refused(12, 150*256);
         mode=MODE_NORMAL;toast(issued?0:8);return;
+    }
+#endif
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (mode == MODE_NUCLEAR_TARGET) {
+        int issued = race_nuke_issue_selected(cx, cy);
+        mode = MODE_NORMAL;
+        toast(issued ? 0 : NUKE_TOAST_EMPTY);
+        return;
     }
 #endif
     if (mode == MODE_MOVE) {
@@ -8825,6 +8944,9 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+#ifdef SC64_SHARED_NUKE_PROBE
+        if (sc64_race_ordinary_ghost(q->type) && race_nuke_ghost_locked(i)) continue;
+#endif
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
         if (sc64_race_raw_unit(q->type)==83 && sc64_battlecruiser_source_tick_due()) {
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
@@ -10200,6 +10322,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     race_bc_yamato_sync_references();
 #endif
     update_orders();
+#ifdef SC64_SHARED_NUKE_PROBE
+    race_nuke_tick();
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (sc64_battlecruiser_source_tick_due())
         for (int i=0;i<SC64_BC_SHOT_LIMIT;++i)
@@ -10402,9 +10527,17 @@ mission_unit_sprite(int type)
 }
 
 #ifdef SC64_RACES
+#ifdef SC64_SHARED_NUKE_PROBE
+#include "sc64_nuke_building_art.h"
+#include "sc64_nuke_ghost_art.h"
+#endif
 static const Sc64SpriteFrame *
 sc64_race_building_art_sprite(int raw)
 {
+#ifdef SC64_SHARED_NUKE_PROBE
+    const Sc64SpriteFrame *nuke = sc64_nuke_building_sprite((unsigned)raw, 0);
+    if (nuke) return nuke;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     /* ZP reuses several stock raw identities for buildings with distinct
        campaign art (including Queen's Nest and Ultralisk Cavern). Prefer the
@@ -10921,6 +11054,10 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
     int walk = sc64_walk_track(q);
     int body_y = y - SC64_WALK_LIFT(walk);
+#if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_HAS_SPRITES) && defined(SC64_UNIT_FACING)
+    if (sc64_race_ordinary_ghost(q->type) && race_nuke_draw_ghost((int)(q - u), x, body_y))
+        goto after_unit_body;
+#endif
 #ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
     if (cocoon_frame) {
         (void)sc64_cocoon_draw(&cocoon_bank,(unsigned)(q-u),q->work_timer,
@@ -11010,6 +11147,9 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
 #ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
     }
+#endif
+#if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_HAS_SPRITES) && defined(SC64_UNIT_FACING)
+after_unit_body:
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
     if (sc64_worker_cargo_badge_kind(q) > 0)
@@ -11658,6 +11798,16 @@ draw_building_overlay(Building *q)
     }
 #endif
 #ifdef SC64_RACES
+#if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_HAS_SPRITES)
+    if (!q->under_construction && sc64_race_raw_building(q->type) == SC64_NUKE_SILO_RAW) {
+        int tick = race_nuke_silo_working((int)(q - b));
+        if (tick >= 0) {
+            const Sc64SpriteFrame *overlay =
+                sc64_nuke_building_working_sprite(SC64_NUKE_SILO_RAW, (unsigned)tick);
+            if (overlay) draw_mission_sprite(overlay, x, y);
+        }
+    }
+#endif
 #if defined(SC64_PHOTON_SOURCE_FRAMES) && defined(SC64_HAS_SPRITES)
     if (!q->under_construction && q->type==B_PHOTON_CANNON) {
         unsigned elapsed=race_site_powered(q->owner,q->x,q->y) &&
@@ -12224,6 +12374,9 @@ sc64_tile_background_done:
     draw_death_vfx(0);
 #endif
     draw_tracers();
+#ifdef SC64_SHARED_NUKE_PROBE
+    race_nuke_draw();
+#endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (race_protoss_services_active()) race_p7_projectile_draw();
 #endif
@@ -12642,6 +12795,9 @@ draw_hud_commands_body(void)
 #endif
     } else {
 	gfx_text(5, 126, mode == MODE_BUILD ? "BUILD PLACEMENT" :
+#ifdef SC64_SHARED_NUKE_PROBE
+                 mode == MODE_NUCLEAR_TARGET ? "NUCLEAR STRIKE TARGET" :
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
                  mode == MODE_LAND ? "LANDING SITE" :
 #endif
@@ -13204,6 +13360,9 @@ game_render(void)
 static unsigned race_shared_trigger_obligations(void);
 #endif
 #include "race_adapter.h"
+#ifdef SC64_SHARED_NUKE_PROBE
+#include "sc64_nuke_runtime.h"
+#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #include "sc64_guardian_morph_adapter.h"
 #endif

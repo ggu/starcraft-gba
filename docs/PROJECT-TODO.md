@@ -723,14 +723,32 @@ The [stock 200 supply limit](audits/2026-11-12-stock-supply-cap.md) now
 applies to shared production and the HUD, including AI owners and legacy
 profiles. Existing units and reservations survive provider loss. Separate
 per-race banks for mixed-race owners and original native actor capacity
-remain distinct fidelity work.
+remain distinct fidelity work. A read-only N64 T8 sample now confirms
+three separate cap/provider/usage families. Build the race-aware supply
+admission and HUD ledger first; prove a rescued second race can train
+without spending the first race's cap. Separately measure whether the GBA
+actor pool can represent representative armies at the stock cap.
 **Ghost and Nuclear Strike (P0):** the [N64 source and blast audit](audits/2026-11-12-ghost-nuclear-strike.md)
-records the T8 native entry, exact missile/target/impact assets and
-checked stock impact rules. Silo and Ghost launch UI stay disabled
-pending real attachment and production, native timing and the authenticated
-save path. Finish the shared path across all race products, not a Showcase
-effect. Stock research, unsupported production and scaled-down AI remain
-separate fidelity items below.
+records native T8 attachment and supply-first refusal. The shared opt-in
+probe trains Ghosts and paid missiles, launches from ordinary GBA controls,
+and uses the owned Ghost, Silo, missile, dot, warning and impact assets.
+It has no authenticated save writer and remains off in default builds.
+Finish the native timing comparison, Ghost abilities and AI and complete
+the persistence and ARM-input checks before enabling it.
+
+Other core rules to prioritize after this:
+
+- **Production:** replace the normal custom Hatchery queue with stock
+  Larva and simultaneous Eggs for humans and AI. The isolated Egg checks
+  do not establish shared save or production behavior.
+- **Tech and combat:** finish cross-cartridge and AI research, then
+  extend omitted spells and ammo, including Defiler, Scarabs and
+  Carriers on the remaining cartridges. Keep the exact damage fractions
+  and actual windup separate from projectile drawing.
+- **Custom games:** allow each opponent slot to be closed, Random or a
+  named race independently, as observed on N64. Difficulty and native AI
+  behavior need their own checks. Confirm native win and defeat triggers
+  before changing the current last-building rule.
 
 ## Priority order
 

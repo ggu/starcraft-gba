@@ -24,6 +24,18 @@
 #include "sc64_t6_actor_rules.h"
 #endif
 
+#ifdef SC64_SHARED_NUKE_PROBE
+#if !defined(SC64_T4_RUNTIME) && !defined(SC64_Z5_ACTORS)
+#define SC64_NUKE_FALLBACK_GHOST 1
+#endif
+#if !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+#define SC64_NUKE_FALLBACK_ADDONS 1
+#ifndef SC64_BATTLECRUISER_EXPERIMENT
+#define SC64_NUKE_FALLBACK_SCIENCE_FACILITY 1
+#endif
+#endif
+#endif
+
 /* Compact authored rules for the skirmish races. Resource costs, build times,
  * HP/shields and doubled supply were checked against BWAPI's public default
  * tables (pinned d727fed68558c506163048ea889131d8cbb33915,
@@ -153,7 +165,15 @@ enum {
     U_SHARED_EGG_STAGE = SC_RU_LEGACY_COUNT,
 #endif
 #endif
+#ifdef SC64_NUKE_FALLBACK_GHOST
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
+    U_SHARED_GHOST,
+#else
+    U_SHARED_GHOST = SC_RU_LEGACY_COUNT,
+#endif
+#endif
+#if defined(SC64_NUKE_FALLBACK_GHOST) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
     SC_RU_COUNT
 #else
     SC_RU_COUNT = SC_RU_LEGACY_COUNT
@@ -188,7 +208,8 @@ _Static_assert(U_SHARED_EGG_STAGE == SC_RU_LEGACY_COUNT, "Egg append position ch
 _Static_assert(U_SHARED_EGG_STAGE < 64, "staged Egg requires a six-bit identity");
 #endif
 #endif
-#if !defined(SC64_GUARDIAN_COCOON_STAGE) && (!defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_Z7_EGG_PRODUCTION))
+#if !defined(SC64_NUKE_FALLBACK_GHOST) && !defined(SC64_GUARDIAN_COCOON_STAGE) && \
+    (!defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_Z7_EGG_PRODUCTION))
 _Static_assert(SC_RU_COUNT == SC_RU_LEGACY_COUNT, "legacy unit IDs changed");
 #endif
 enum {
@@ -292,6 +313,12 @@ enum {
 #if defined(SC64_P10_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
     /* P10 source raw 147, the Overmind (with shell), the victory target. */
     B_P10_OVERMIND,
+#endif
+#ifdef SC64_NUKE_FALLBACK_ADDONS
+    B_SHARED_NUCLEAR_SILO, B_SHARED_COVERT_OPS,
+#endif
+#ifdef SC64_NUKE_FALLBACK_SCIENCE_FACILITY
+    B_NUKE_SCIENCE_FACILITY,
 #endif
     SC_RB_COUNT
 };
@@ -455,7 +482,13 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     , [U_ZP_ULTRALISK] = { R_ZERG, 0, 255, 0, 0, 0, 0, 400, 0, 0 }
 #endif
 #ifdef SC64_Z5_ACTORS
+#ifdef SC64_SHARED_NUKE_PROBE
+    /* Raw 1 is an ordinary Ghost, including when preplaced. Keep its
+     * existing scenario identity, but expose its stock paid product. */
+    , [U_Z5_GHOST] = { R_TER, 0, B_BARRACKS, 2, 25, 75, 750, 45, 0, 0 }
+#else
     , [U_Z5_GHOST] = { R_TER, 0, 255, 0, 0, 0, 0, 45, 0, 0 }
+#endif
     , [U_Z5_CIVILIAN] = { R_TER, 0, 255, 0, 0, 0, 0, 40, 0, 0 }
     , [U_Z5_RHYNADON] = { R_TER, 0, 255, 0, 0, 0, 0, 60, 0, 0 }
     , [U_Z5_BENGALAAS] = { R_TER, 0, 255, 0, 0, 0, 0, 60, 0, 0 }
@@ -549,6 +582,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #endif
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     , [U_SHARED_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 4, 200, 0, 900, 80, 60, 0 }
+#endif
+#ifdef SC64_NUKE_FALLBACK_GHOST
+    , [U_SHARED_GHOST] = { R_TER, 0, B_BARRACKS, 2, 25, 75, 750, 45, 0, 0 }
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     , [U_GUARDIAN_COCOON] = { R_ZERG, 0, 255, 4, 0, 0, 0, 200, 0, 0 }
@@ -750,7 +786,34 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_SHARED_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
     , [B_SHARED_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
 #endif
+#ifdef SC64_NUKE_FALLBACK_ADDONS
+    , [B_SHARED_NUCLEAR_SILO] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 100, 1200, 600, 0 }
+    , [B_SHARED_COVERT_OPS] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 750, 0 }
+#endif
+#ifdef SC64_NUKE_FALLBACK_SCIENCE_FACILITY
+    , [B_NUKE_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
+#endif
 };
+
+#ifdef SC64_SHARED_NUKE_PROBE
+/* Heroes with the same weapon or art cannot spot for an ordinary missile. */
+static inline int sc64_race_ordinary_ghost(int type)
+{
+    switch (type) {
+#ifdef SC64_T4_RUNTIME
+    case U_GHOST:
+#endif
+#ifdef SC64_Z5_ACTORS
+    case U_Z5_GHOST:
+#endif
+#ifdef SC64_NUKE_FALLBACK_GHOST
+    case U_SHARED_GHOST:
+#endif
+        return 1;
+    default: return 0;
+    }
+}
+#endif
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
 { return type >= 0 && type < SC_RU_COUNT ? &sc64_race_unit_rules[type] : 0; }
@@ -873,6 +936,9 @@ static inline const char *sc64_race_unit_name(int type)
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
         ,[U_SHARED_SHUTTLE] = "SHUTTLE"
 #endif
+#ifdef SC64_NUKE_FALLBACK_GHOST
+        ,[U_SHARED_GHOST] = "GHOST"
+#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
         ,[U_GUARDIAN_COCOON] = "COCOON"
 #ifdef SC64_GUARDIAN_DISTINCT_STAGE
@@ -970,6 +1036,13 @@ static inline const char *sc64_race_building_name(int type)
 #if defined(SC64_P10_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS) && \
     !defined(SC64_NYDUS_ENABLED)
         ,[B_P10_OVERMIND] = "OVERMIND"
+#endif
+#ifdef SC64_NUKE_FALLBACK_ADDONS
+        ,[B_SHARED_NUCLEAR_SILO] = "NUCLEAR SILO"
+        ,[B_SHARED_COVERT_OPS] = "COVERT OPS"
+#endif
+#ifdef SC64_NUKE_FALLBACK_SCIENCE_FACILITY
+        ,[B_NUKE_SCIENCE_FACILITY] = "SCIENCE FACILITY"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -1318,6 +1391,9 @@ static inline int sc64_race_unit_damage(int type)
     case U_GHOST: return 10;
     case U_RAYNOR_MARINE: return 18;
 #endif
+#ifdef SC64_NUKE_FALLBACK_GHOST
+    case U_SHARED_GHOST: return 10;
+#endif
 #ifdef SC64_T5_RUNTIME
     case U_KERRIGAN: case U_RAYNOR_VULTURE: return 30;
 #endif
@@ -1359,6 +1435,9 @@ static inline int sc64_race_unit_range(int type)
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: return 224;
     case U_RAYNOR_MARINE: return 160;
+#endif
+#ifdef SC64_NUKE_FALLBACK_GHOST
+    case U_SHARED_GHOST: return 224;
 #endif
 #ifdef SC64_T5_RUNTIME
     case U_KERRIGAN: return 192;
@@ -1407,6 +1486,9 @@ static inline int sc64_race_unit_cooldown(int type)
     case U_RAYNOR: return 22;
 #else
     case U_RAYNOR: return 15;
+#endif
+#ifdef SC64_NUKE_FALLBACK_GHOST
+    case U_SHARED_GHOST: return 22;
 #endif
 #ifdef SC64_T5_RUNTIME
     case U_KERRIGAN: case U_RAYNOR_VULTURE: return 22;
@@ -1487,6 +1569,9 @@ static inline int sc64_race_unit_can_attack_air(int type)
 #endif
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: case U_RAYNOR_MARINE:
+#endif
+#ifdef SC64_NUKE_FALLBACK_GHOST
+    case U_SHARED_GHOST:
 #endif
 #ifndef SC64_T4_RUNTIME
     case U_RAYNOR:
@@ -1727,6 +1812,14 @@ static inline int sc64_race_building_armor(int type)
 #ifdef SC64_T6_ENABLED
     case B_CRASHED_NORAD_II: case B_QUEENS_NEST: return 1;
 #endif
+#ifdef SC64_NUKE_FALLBACK_ADDONS
+    case B_SHARED_NUCLEAR_SILO: case B_SHARED_COVERT_OPS: return 1;
+#elif defined(SC64_SHARED_NUKE_PROBE) && !defined(SC64_TERRAN_LATE_ACTORS) && defined(SC64_SKIRMISH_ROSTER)
+    case B_SK_NUCLEAR_SILO: case B_SK_COVERT_OPS: return 1;
+#endif
+#ifdef SC64_NUKE_FALLBACK_SCIENCE_FACILITY
+    case B_NUKE_SCIENCE_FACILITY: return 1;
+#endif
     default: return 0;
     }
 }
@@ -1772,6 +1865,9 @@ static inline int sc64_race_raw_unit(int type)
     case U_Z5_GHOST: return 1; case U_Z5_CIVILIAN: return 15;
     case U_Z5_RHYNADON: return 89; case U_Z5_BENGALAAS: return 90;
     case U_Z5_RAGNASAUR: return 95; case U_Z5_DATA_DISK: return 218;
+#endif
+#ifdef SC64_NUKE_FALLBACK_GHOST
+    case U_SHARED_GHOST: return 1;
 #endif
 #ifdef SC64_Z6_ACTORS
     case U_Z6_GUARDIAN: return 44;
@@ -1994,6 +2090,12 @@ static inline int sc64_race_raw_building(int type)
     case B_SHARED_SCIENCE_FACILITY: return 116;
     case B_SHARED_PHYSICS_LAB: return 118;
 #endif
+#ifdef SC64_NUKE_FALLBACK_ADDONS
+    case B_SHARED_NUCLEAR_SILO: return 108; case B_SHARED_COVERT_OPS: return 117;
+#endif
+#ifdef SC64_NUKE_FALLBACK_SCIENCE_FACILITY
+    case B_NUKE_SCIENCE_FACILITY: return 116;
+#endif
     default: return -1;
     }
 }
@@ -2049,6 +2151,9 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 8: return U_WRAITH; case 43: return U_MUTALISK;
     case 53: return U_HUNTER_KILLER; case 216: return U_CHRYSALIS;
     case 47: return U_SCOURGE;
+#ifdef SC64_NUKE_FALLBACK_GHOST
+    case 1: return U_SHARED_GHOST;
+#endif
 #ifdef SC64_Z5_ACTORS
     case 1: return U_Z5_GHOST; case 15: return U_Z5_CIVILIAN;
     case 89: return U_Z5_RHYNADON; case 90: return U_Z5_BENGALAAS;
@@ -2297,6 +2402,12 @@ static inline int sc64_race_building_from_raw(int raw)
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
     case 116: return B_SHARED_SCIENCE_FACILITY;
     case 118: return B_SHARED_PHYSICS_LAB;
+#endif
+#ifdef SC64_NUKE_FALLBACK_ADDONS
+    case 108: return B_SHARED_NUCLEAR_SILO; case 117: return B_SHARED_COVERT_OPS;
+#endif
+#ifdef SC64_NUKE_FALLBACK_SCIENCE_FACILITY
+    case 116: return B_NUKE_SCIENCE_FACILITY;
 #endif
     default: return -1;
     }

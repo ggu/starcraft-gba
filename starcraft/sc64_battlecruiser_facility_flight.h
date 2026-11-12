@@ -40,6 +40,10 @@ static int race_bc_facility_lift(int slot)
         b[slot].owner!=SIDE || !building_complete(slot) ||
         sc64_race_raw_building(b[slot].type)!=116 || (b[slot].flags&4) ||
         b[slot].queue_count || b[slot].level || race_bc_parent_addon_constructing(slot)) return 0;
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (race_nuke_addon_constructing(slot)) return 0;
+    race_nuke_detach_addon(slot);
+#endif
     race_bc_parent_detach(slot);
     b[slot].flags|=4; b[slot].level=0;
     b[slot].build_progress=0; b[slot].queue_progress=0;
@@ -48,8 +52,11 @@ static int race_bc_facility_lift(int slot)
 }
 static int race_bc_facility_land(int slot,int x,int y)
 {
-    if (!race_bc_facility_airborne(slot) || b[slot].owner!=SIDE ||
-        !race_bc_facility_landing_site(slot,x,y)) return 0;
+    if (!race_bc_facility_airborne(slot) || b[slot].owner!=SIDE) return 0;
+#ifdef SC64_SHARED_NUKE_PROBE
+    race_nuke_snap_addon_landing(slot, &x, &y, race_bc_facility_landing_site);
+#endif
+    if (!race_bc_facility_landing_site(slot,x,y)) return 0;
     b[slot].build_progress=x; b[slot].queue_progress=y; b[slot].level=1;
     return 1;
 }
@@ -69,6 +76,9 @@ static void race_bc_facility_flight_tick(void)
         if (b[i].x!=x || b[i].y!=y || !race_bc_facility_landing_site(i,x,y)) continue;
         b[i].flags &= ~4; b[i].level=0; b[i].build_progress=0; b[i].queue_progress=0;
         invalidate_path_grid(); target_lists_valid=0; race_bc_parent_relink(i);
+#ifdef SC64_SHARED_NUKE_PROBE
+        race_nuke_relink_neutral_addon(i);
+#endif
     }
 }
 #endif
