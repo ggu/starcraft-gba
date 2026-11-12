@@ -291,9 +291,28 @@ different Random selections, victory conditions or other maps.
 | Melee | `d7923a4a7abced9026ddc95b5b573ceb3ad63c838baebb391d437b3a9fb89840` | `7e245d3378b968b3144b6205d1353b4059792ab678f66db4270210b5e6569594` |
 | Free for All | `b759ddf7e897e385ab756ee066e62be320cb9557d5a29317530c3bc75bbd0903` | `4538e843914374adc280be510da10d8368bb045ba5553e1cc9aaf3295ce95260` |
 
-The [GBA's custom hostility predicate](../../starcraft/game.c) currently
-treats every distinct non-neutral owner as hostile. A GBA mode selector
-should use the shared hostility path, preserve existing free-for-all
-behavior for earlier custom saves, and retain the selected mode through
-fresh load and restart. Qualify Free for All Random draws and native
-end conditions separately.
+## Shared GBA mode preview
+
+The Blood Bath preview exposes the Game Type choice and applies the
+native CPU relation in the [shared hostility path](../../starcraft/game.c).
+The campaign and Outpost rules are unchanged. Existing dense, sparse
+and resolved-start saves still load as Free for All. A distinct `0x534e`
+context marks Melee, so older ROMs refuse it rather than changing the
+saved CPU alliances. Free for All keeps the `0x534d` resolved-start word.
+
+All four preview HOST profiles pass the 234 named opening cases and
+the extra sparse, Random, mode, AI target and save cases. All four ARM
+previews pass their memory and ROM guards. Physical-button tests cover
+one, two and three CPUs and the three human races across the four
+products. The emulator reloads the actual save in a fresh process,
+then matches the 60-update continuation without modifying its SRAM.
+
+On the Terran ARM preview, both game types pass physical named and
+Random launches, fresh load, continuation, and pause restart. Both
+human and CPU races and their base positions follow the existing seeded
+sequence. Read-only ARM register traces on the loaded games show CPU 1
+treating CPU 3 as hostile only in Free for All, while both modes treat
+the human as hostile. The previous normal Terran rejects the Melee save
+at HOME without changing its SRAM; both old and new cartridges read the
+older and current Free for All saves. This does not establish native
+Random draws in Free for All, allied vision, or the original end rules.

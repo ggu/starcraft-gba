@@ -53,10 +53,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cycles Melee and Free for All on Challenger and Blood Bath, with no
   difficulty or team row in either lobby. The [paired native launches](audits/2026-11-12-n64-blood-bath-opening.md#paired-blood-bath-launches)
   show CPUs open allied in Melee and hostile in Free for All; the same
-  seed and named seats produce identical starts in both. Next: add a
-  shared mode selector and save contract that preserves earlier GBA
-  free-for-all behavior. Free for All Random draws, native end
-  conditions and long ordinary-input victories remain open.
+  seed and named seats produce identical starts in both. The shared
+  Blood Bath preview now offers both modes and preserves earlier Free
+  for All saves. All four preview ARM products pass guarded links and
+  physical save/load; on Terran, both modes also pass restart and the
+  actual CPU-to-CPU target predicate matches the native distinction.
+  Next: check native Free for All Random draws and both modes' end
+  conditions, complete ordinary-input victories, and qualify on hardware.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
