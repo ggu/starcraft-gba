@@ -796,7 +796,10 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    saves. Keep partial prototypes gated; source splash may increase Z10 danger.
 3. In parallel, re-profile current-source order/detection, movement and
    rendering, then reduce measured busy-loop cost with paired state/pixel and
-   gameplay checks. Historical inclusive scopes are not promised savings. The N64
+   gameplay checks. The [packed sight-row probe](audits/2026-11-12-packed-sight-rows.md)
+   saves 2.71–2.82% in two Z10 battle windows with matched pixels and state;
+   qualify custom, carried missions and shared-span profiles before activation.
+   Historical inclusive scopes are not promised savings. The N64
    order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
 4. Retry Z10 through ordinary controls after the relevant mechanics are usable;
