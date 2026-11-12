@@ -22,7 +22,8 @@ the 32 MiB limit. Z10 packed probe ROM SHA-256:
 `d7c219637dbebe8223001a35beb717678cc008ec370f2062ace095196b7aff67`.
 
 The source-only build reuses the existing managed importer dependency and
-`CANONICAL_WALK_WORDS=0` comparison switch. It adds a prepared-pixel fixture
-target for the Z10 build vector. Release checks include Z7–Z10 ROM guards,
-the packed-pixel fixtures, and matching the normal Z10 build to the probe.
-This reduces one part of rendering cost; it does not establish 30 fps.
+`CANONICAL_WALK_WORDS=0` comparison switch. Both generic packed sprite
+fixtures and all 6,880 prepared Z10 pose, heading and clipping comparisons
+passed. The normal Z7, Z8, Z9 and Z10 ROMs passed their existing guards,
+and the normal Z10 output is byte-identical to the timed probe. This reduces
+one part of rendering cost; it does not establish 30 fps.
