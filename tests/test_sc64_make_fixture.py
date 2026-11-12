@@ -29,6 +29,21 @@ class MakeFixtureTest(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 copy_makefile_with_includes(source, Path(b))
 
+    def test_optional_includes_keep_fixture_independent_of_build_outputs(self):
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            source, fixture = Path(a), Path(b)
+            (source / 'build').mkdir()
+            (source / 'build' / 'stale.d').write_text('include missing-private.mk\n')
+            (source / 'present.mk').write_text('VALUE := yes\n')
+            (source / 'Makefile').write_text(
+                '-include build/missing.d build/stale.d\n'
+                'sinclude absent.mk present.mk\n'
+            )
+            copy_makefile_with_includes(source, fixture)
+            self.assertFalse((fixture / 'build').exists())
+            self.assertFalse((fixture / 'absent.mk').exists())
+            self.assertEqual((fixture / 'present.mk').read_text(), 'VALUE := yes\n')
+
 
 if __name__ == '__main__':
     unittest.main()
