@@ -1980,6 +1980,7 @@ static int race_skirmish_map;
 static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
 #ifdef SC64_IMPORTED_SKIRMISH
 static unsigned race_skirmish_slots; /* 0 keeps the legacy dense seating */
+static unsigned race_skirmish_start_order; /* 0 keeps the legacy physical starts */
 #endif
 static Sc64Frontend race_front;
 static unsigned race_front_transition;
@@ -5914,7 +5915,7 @@ game_init(void)
 #endif
     race_mode=0;race_completed=0;race_bots=2;race_skirmish_map=0;
 #ifdef SC64_IMPORTED_SKIRMISH
-    race_skirmish_slots=0;
+    race_skirmish_slots=0;race_skirmish_start_order=0;
 #endif
 #ifdef SC64_CAMPAIGN_RACE
     race_human=SC64_CAMPAIGN_RACE;
@@ -10118,6 +10119,15 @@ SC64_GAME_STEP(u16 held, u16 pressed)
                 race_bots=sc64_skirmish_seat_count(seats);
                 race_skirmish_slots=seats==sc64_skirmish_dense_seats(race_bots) ? 0 : seats;
                 race_skirmish_map=race_front.map;
+                race_skirmish_start_order=0;
+                /* These are observed launch cases, not a general N64 start selector. */
+                if(race_skirmish_map==SC64_MAP_BLOOD_BATH && race_front.race==R_TER){
+                    if(race_bots==1 && (resolved[0]==R_TER || resolved[0]==R_PROTOSS))
+                        race_skirmish_start_order=SC64_SKIRMISH_BLOOD_BATH_SOLO_ORDER;
+                    else if(race_bots==3 && resolved[0]==R_ZERG &&
+                            resolved[1]==R_TER && resolved[2]==R_PROTOSS)
+                        race_skirmish_start_order=SC64_SKIRMISH_BLOOD_BATH_DENSE_ORDER;
+                }
                 for(int i=0;i<3;i++)race_bot_races[i]=resolved[i];
             }
 #else
