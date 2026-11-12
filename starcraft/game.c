@@ -3508,7 +3508,7 @@ is_traversable(int col, int row, int from_cell)
 #include "sc64_routes.h"
 #endif
 #include "sc64_depot_goal.h"
-_Static_assert(MAX_BUILDINGS < 0x8000, "depot slot keys must fit the tagged route namespace");
+_Static_assert(MAX_BUILDINGS < 0x4000, "facility slot keys must fit the tagged route namespace");
 
 /* Breadth-first on the bounded walk grid; return the first tile toward goal. */
 static int GBA_HOT
@@ -8368,7 +8368,7 @@ move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
  * swing from the neighboring walkable cell instead of walking into a wall.
  * Do not reduce the original center reach or change ranged weapon spacing. */
 static int __attribute__((noinline))
-sc64_structure_melee_contact(const Unit *q, int slot, int reach)
+sc64_structure_melee_edges(int slot, int edges[4])
 {
     const Building *p = &b[slot];
     int left, up, right, down;
@@ -8376,14 +8376,33 @@ sc64_structure_melee_contact(const Unit *q, int slot, int reach)
         !sc64_t4_building_collidable(slot)) return 0;
     /* Source bounds are in double-resolution coordinates. These are the
      * outer edges of the same cells cleared by build_path_grid(). */
-    int x0 = ((p->x * 2 - left) / 32) * 16;
-    int y0 = ((p->y * 2 - up) / 32) * 16;
-    int x1 = ((p->x * 2 + right) / 32 + 1) * 16;
-    int y1 = ((p->y * 2 + down) / 32 + 1) * 16;
-    int dx = q->x - limit(q->x, x0, x1);
-    int dy = q->y - limit(q->y, y0, y1);
-    return dx * dx + dy * dy <= reach * reach;
+    edges[0] = ((p->x * 2 - left) / 32) * 16;
+    edges[1] = ((p->y * 2 - up) / 32) * 16;
+    edges[2] = ((p->x * 2 + right) / 32 + 1) * 16;
+    edges[3] = ((p->y * 2 + down) / 32 + 1) * 16;
+    return 1;
 }
+
+#ifdef SC64_IMPORTED_MISSION
+/* Use a single cached multi-source field for all attackers, even when a
+ * footprint covers every one of the center-based route's seed tiles. */
+static void __attribute__((noinline))
+sc64_structure_melee_approach(Unit *q, int slot, const int edges[4])
+{
+    if (q->path_timer <= 0 && !q->path_retry) {
+        int x, y;
+        if (!sc64_route_facility_next(q->x, q->y, slot, b[slot].x, b[slot].y,
+                                      &x, &y, edges)) {
+            q->path_retry = 12;
+            return;
+        }
+        q->path_x = x;
+        q->path_y = y;
+        q->path_timer = 24;
+    }
+    move_toward(q, q->path_x, q->path_y);
+}
+#endif
 #endif
 
 #ifdef SC64_Z6_RUNTIME
@@ -8527,11 +8546,17 @@ tick_combat(Unit * q, int target)
 	return;
     int in_range = dx * dx + dy * dy <= range * range;
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
-    if (!in_range && target >= MAX_UNITS && stock_weapon && !flying &&
+    int melee_edges[4];
+    int footprint_melee = !in_range && target >= MAX_UNITS && stock_weapon && !flying &&
         !minimum_range && stock_attack.weapon->max_range <= 32 &&
-        !sc64_race_unit_flying(q->type))
-        in_range = sc64_structure_melee_contact(q, target - MAX_UNITS,
-                        (stock_attack.weapon->max_range + 1) / 2);
+        !sc64_race_unit_flying(q->type) &&
+        sc64_structure_melee_edges(target - MAX_UNITS, melee_edges);
+    if (footprint_melee) {
+        int ex = q->x - limit(q->x, melee_edges[0], melee_edges[2]);
+        int ey = q->y - limit(q->y, melee_edges[1], melee_edges[3]);
+        int reach = (stock_attack.weapon->max_range + 1) / 2;
+        in_range = ex * ex + ey * ey <= reach * reach;
+    }
 #endif
     if (in_range) {
 #ifdef SC64_RACES
@@ -8628,6 +8653,12 @@ tick_combat(Unit * q, int target)
     } else {
 #ifdef SC64_SHARED_BUNKER
         if (q->order==ORDER_TRANSPORTED && q->target>=MAX_UNITS) return;
+#endif
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) && defined(SC64_IMPORTED_MISSION)
+        if (footprint_melee) {
+            sc64_structure_melee_approach(q, target - MAX_UNITS, melee_edges);
+            return;
+        }
 #endif
 #ifdef SC64_DIRECT_FIRING_POINTS
 #ifdef SC64_RANGE_WORK

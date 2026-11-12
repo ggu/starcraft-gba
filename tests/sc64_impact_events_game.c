@@ -395,8 +395,11 @@ static void test_melee_approaches_bounded_structures(void)
                     int hp = b[slot].hp, target = MAX_UNITS + slot;
                     tick_combat(&u[mover], target);
                     assert(b[slot].hp == hp && observed_count == 0);
-                    for (int tick = 0; tick < 180 && b[slot].hp == hp; ++tick)
+                    /* Motion uses the live tick for fractional step phase. */
+                    for (int tick = 0; tick < 180 && b[slot].hp == hp; ++tick) {
+                        ++frame;
                         tick_combat(&u[mover], target);
+                    }
                     if (b[slot].hp >= hp)
                         fprintf(stderr, "No melee hit: unit %d, structure %d, face %d, phase %d, offset (%d,%d)\n",
                                 attackers[a], types[k], face, phase, u[mover].x - x, u[mover].y - y);

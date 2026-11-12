@@ -5,6 +5,7 @@
 
 /* Point goals are cell indices; the upper bit identifies depot slots. */
 #define SC64_ROUTE_DEPOT_TAG 0x8000u
+#define SC64_ROUTE_MELEE_ID_TAG 0x4000u
 _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap depot keys");
 #ifdef SC64_RANGE_WORK
 #if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3) || \
@@ -2301,7 +2302,11 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
  * fields serve only already-discovered origins and are never component proofs.
  * A paired grid accessor may temporarily borrow and restore walkability bits. */
 static int __attribute__((noinline))
-sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int origin)
+sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, int origin
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+                                  , const int *edges
+#endif
+                                   )
 {
     int i, slot = -1, head = 0, tail = 0, active_slots;
     int x0, x1, y0, y1, col, row;
@@ -2323,6 +2328,11 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     if (!sc64_route_configure()) return -1;
 #endif
     key = (u16)(SC64_ROUTE_DEPOT_TAG | (unsigned)depot_id);
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    /* Perimeter fields share the depot pool and its topology invalidation,
+     * but must not satisfy a worker's deposit lookup for the same slot. */
+    if (edges) key |= SC64_ROUTE_MELEE_ID_TAG;
+#endif
     if (!path_grid_valid) build_path_grid();
 #ifdef SC64_DEPOT_BOUNDED
     if (origin>=0 && !SC64_GRID_GET(path_walkable,origin)) origin=-1;
@@ -2402,13 +2412,33 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
      * neighbors are visited once while the walkability bit is borrowed. */
     u8 *new_field = sc64_route_field[slot];
 #endif
-    x0 = center_x >= 32 ? (center_x - 32) / 16 : 0;
-    y0 = center_y >= 32 ? (center_y - 32) / 16 : 0;
-    x1 = (center_x + 32) / 16; if (x1 >= MAP_COLS) x1 = MAP_COLS - 1;
-    y1 = (center_y + 32) / 16; if (y1 >= MAP_ROWS) y1 = MAP_ROWS - 1;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (edges) {
+        x0 = edges[0] / 16 - 1; y0 = edges[1] / 16 - 1;
+        x1 = edges[2] / 16;     y1 = edges[3] / 16;
+    } else
+#endif
+    {
+        x0 = center_x >= 32 ? (center_x - 32) / 16 : 0;
+        y0 = center_y >= 32 ? (center_y - 32) / 16 : 0;
+        x1 = (center_x + 32) / 16; if (x1 >= MAP_COLS) x1 = MAP_COLS - 1;
+        y1 = (center_y + 32) / 16; if (y1 >= MAP_ROWS) y1 = MAP_ROWS - 1;
+    }
     for (row = y0; row <= y1; ++row) for (col = x0; col <= x1; ++col) {
-        int px, py, cell = col + row * MAP_COLS;
-        if (!SC64_GRID_GET(path_walkable, cell) ||
+        int cell, px, py;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        if (edges) {
+            if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS ||
+                /* Only the four sides, not diagonal corner cells. */
+                ((col == x0 || col == x1) == (row == y0 || row == y1))) continue;
+        }
+#endif
+        cell = col + row * MAP_COLS;
+        if (!SC64_GRID_GET(path_walkable, cell)) continue;
+        if (
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+            !edges &&
+#endif
             !sc64_depot_cell_point(center_x, center_y, col, row, &px, &py)) continue;
 #ifdef SC64_RACES
         sc64_route_put(slot, cell, 0);
@@ -2485,6 +2515,16 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     return slot;
 }
 
+static inline int sc64_route_depot_slot_for_origin(int depot_id, int center_x,
+                                                   int center_y, int origin)
+{
+    return sc64_route_facility_slot_for_origin(depot_id, center_x, center_y, origin
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+                                               , 0
+#endif
+                                               );
+}
+
 static int __attribute__((unused)) sc64_route_depot_slot(int depot_id,int center_x,int center_y)
 {
     return sc64_route_depot_slot_for_origin(depot_id,center_x,center_y,-1);
@@ -2503,14 +2543,23 @@ sc64_route_depot_direction(int slot, int cell)
 }
 
 static int __attribute__((noinline, unused))
-sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
-                      int *next_x, int *next_y)
+sc64_route_facility_next(int x, int y, int depot_id, int center_x, int center_y,
+                         int *next_x, int *next_y
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+                         , const int *edges
+#endif
+                         )
 {
     static const signed char dx[4] = {1, -1, 0, 0}, dy[4] = {0, 0, 1, -1};
     int slot, col, row, cell, direction;
     if (!next_x || !next_y || x < 0 || y < 0 ||
         MAP_COLS <= 0 || MAP_ROWS <= 0 || x / 16 >= MAP_COLS || y / 16 >= MAP_ROWS) return 0;
     col = x / 16; row = y / 16; cell = col + row * MAP_COLS;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (edges) slot = sc64_route_facility_slot_for_origin(depot_id, center_x,
+                                                          center_y, -1, edges);
+    else
+#endif
 #ifdef SC64_DEPOT_BOUNDED
     slot = sc64_route_depot_slot_for_origin(depot_id,center_x,center_y,cell);
 #else
@@ -2536,8 +2585,18 @@ sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
         if (best < 0) return 0;
         col += dx[best]; row += dy[best];
     } else if (direction < 0) return 0;
-    else if (direction == 0)
+    else if (direction == 0) {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        if (edges) {
+            /* A seed tile touches an edge. Close within the tile, never
+             * step back into a blocked footprint to reach the center. */
+            *next_x = x < edges[0] ? edges[0]-1 : x >= edges[2] ? edges[2] : x;
+            *next_y = y < edges[1] ? edges[1]-1 : y >= edges[3] ? edges[3] : y;
+            return 1;
+        }
+#endif
         return sc64_depot_cell_point(center_x, center_y, col, row, next_x, next_y);
+    }
     else if (direction == 1) ++col;
     else if (direction == 2) --col;
     else if (direction == 3) ++row;
@@ -2545,6 +2604,17 @@ sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
     else return 0;
     *next_x = col * 16 + 8; *next_y = row * 16 + 8;
     return 1;
+}
+
+static inline int __attribute__((unused))
+sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
+                      int *next_x, int *next_y)
+{
+    return sc64_route_facility_next(x, y, depot_id, center_x, center_y, next_x, next_y
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+                                    , 0
+#endif
+                                    );
 }
 
 /* Group formation only needs a reachability decision, not a next step. On
