@@ -93,7 +93,22 @@ continuation match within and across each pair. Each pair writes the same
 custom games exercise the existing 64×64 route path, while the Z10
 campaign proves the new 96-column flood.
 
+The 96×96 Protoss First Strike prefix also matches through physical call
+4,000 (game frame 3,793). Nine world, cache, camera, fog and video samples
+agree. Both builds recorded nine logical route builds and 1,810 hits.
+Read-only breakpoints counted six actual point fills; all six use the new
+linear routine on the candidate. This is a campaign prefix, not a full P1
+playthrough.
+
+The 96×96 Terran Desperate Alliance prefix matches through physical call
+268 (game frame 248). An ordinary A input dismisses the opening dialog;
+a selected Marine then moves toward (488, 1304) around blocked terrain.
+The nine snapshots match, including the Marine at (501, 1385) at the end.
+Both builds recorded three logical route builds and 62 hits. One actual
+point fill occurred on physical call 203; the candidate uses the linear
+routine. This is a campaign prefix, not a full T3 playthrough.
+
 This result reduces a particular lag spike. Both cycle counts are still
-above the two-VBlank budget. Keep the shared flag off by default until
-targeted ordinary-input checks on the 96-column Terran and Protoss
-campaign maps and real hardware qualification.
+above the two-VBlank budget. Keep the shared flag off by default while
+qualifying it on hardware and confirming that the remaining IWRAM is
+enough for the next shared engine changes.

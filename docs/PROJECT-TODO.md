@@ -94,8 +94,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cycles. The [exact linear FIFO probe](audits/2026-11-12-z10-linear-point-flood.md)
   reduces the 96-column peak by 45.65% and the early window mean by 1.04%.
   The full Z10 win, both complete custom matches, and four paired physical
-  custom/SRAM checks match; all four links pass. The shared option defaults
-  off pending 96-column Terran and Protoss campaign and hardware checks.
+  custom/SRAM checks match; all four links pass. First Strike and
+  Desperate Alliance exercise seven actual fills on their 96×96 maps
+  with matching ARM state and video. The shared option defaults off
+  pending hardware checks.
   Continue steady simulation and drawing work separately.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
