@@ -809,7 +809,8 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    untouched above its guard. Z10 wins at frame 58,795 from ordinary SRAM;
    24 physical custom starts cover both maps and all three AI counts on the
    three race products and Showcase. Z10 also matches two complete three-AI
-   defeats, one per map. P10 host campaign/save and 234 lineup checks pass.
+   defeats, one per map. P10 host campaign/save and 234 lineup checks pass;
+   the normal P10 cartridge also wins from SRAM with 23 matching observations.
    The separate defense/sight/walk combination saves 8.18–13.05% in Z10
    with matching pixels and state; finish the remaining cartridge paths.
    Historical inclusive scopes are not promised savings. The N64

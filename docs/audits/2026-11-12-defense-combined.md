@@ -53,7 +53,14 @@ checks and all 234 custom startup/save lineups. The full Eye of the Storm
 controller wins at frame 52,969 with zero faults; 22 fresh-process
 continuation checkpoints match the uninterrupted host replay, including
 victory. The Gantrithor continuation and outcome text fixtures also pass.
-This is host evidence; it does not substitute for the P10 cartridge replay.
+
+The normal P10 probe ROM then loaded that 32 KiB save through the title and
+won with physical buttons at the same frame 52,969. All 23 observations
+(load, periodic and victory) match the host witness's frame, result,
+mission, fault count, wallet, Overmind and Zeratul HP and mission switches.
+There were seven ordinary text dismissals, no guest writes, and the input
+save was unchanged. The P10 ROM SHA-256 is
+`7ccf696f06afac355ca98cecb37ad4b3bcb76f0f0c1f0004553f29da1d0f1b07`.
 
 ## Combined rendering and sight experiment
 
