@@ -74,11 +74,11 @@ static int launch_match(void)
     if (race_front.bots != option_bots) return 0;
     for (int i = 0; i < option_bots; ++i) {
         tap(KEY_DOWN);
-        for (int n = 0; race_front.bot_races[i] != option_bot_races[i] && n < 3; ++n)
+        for (int n = 0; race_front.bot_races[i] != option_bot_races[i] && n < 5; ++n)
             tap(KEY_RIGHT);
         if (race_front.bot_races[i] != option_bot_races[i]) return 0;
     }
-    while (race_front.row < 3 + option_bots) tap(KEY_DOWN);
+    while (race_front.row < SC_FRONT_SKIRMISH_LAUNCH_ROW) tap(KEY_DOWN);
     tap(KEY_A);
     if (screen != SCREEN_PLAY || !race_mode || race_human != option_human ||
         race_bots != option_bots || race_skirmish_map != option_map) return 0;

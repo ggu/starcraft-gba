@@ -144,7 +144,8 @@ static int race_ai_count(const RaceAiCensus *c, int key)
 
 static int race_ai_owner_base(int owner)
 {
-    return owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : 3;
+    int base = race_skirmish_owner_base(owner);
+    return base < 0 ? 3 : base;
 }
 
 static int race_ai_is_depot(int type)

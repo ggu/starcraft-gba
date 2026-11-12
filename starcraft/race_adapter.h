@@ -105,6 +105,18 @@ static int race_bot_index(int owner)
     return -1;
 }
 
+static int race_skirmish_owner_base(int owner)
+{
+    int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : owner == 4 ? 3 : -1;
+#ifdef SC64_IMPORTED_SKIRMISH
+    if (base > 0 && race_skirmish_slots) {
+        int seat = sc64_skirmish_bot_seat(race_skirmish_slots, base - 1);
+        return seat >= 0 ? seat + 1 : -1;
+    }
+#endif
+    return base;
+}
+
 static int race_owner_identity(int owner)
 { return owner >= 0 && owner < 5 ? race_player[owner] : -1; }
 
@@ -1882,8 +1894,9 @@ static void race_skirmish_init(void)
 #endif
     race_player[SIDE] = race_human;
     for (i = 0; i < 1 + race_bots && i < 4; ++i) {
-        int base = i;
         owner = i == 0 ? SIDE : race_bot_owner_ids[i - 1];
+        int base = race_skirmish_owner_base(owner);
+        if (base < 0) continue;
         if (owner != SIDE) race_minerals[owner] = 50;
         switch (race_owner_identity(owner)) {
         case R_ZERG: townhall = B_HATCHERY; worker_type = U_DRONE; break;
@@ -1926,7 +1939,7 @@ static void race_skirmish_init(void)
 
 static int race_skirmish_site_for(int owner, int type, int *x, int *y)
 {
-    int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : owner == 4 ? 3 : -1;
+    int base = race_skirmish_owner_base(owner);
     static const int dx[8] = { 48,-48,0,0,48,-48,48,-48 };
     static const int dy[8] = { 0,0,48,-48,48,48,-48,-48 };
     int i;

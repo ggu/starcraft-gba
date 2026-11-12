@@ -1940,6 +1940,9 @@ static Sc64SkTransportTech race_skirmish_transport_candidate;
 #endif
 static int race_skirmish_map;
 static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
+#ifdef SC64_IMPORTED_SKIRMISH
+static unsigned race_skirmish_slots; /* 0 keeps the legacy dense seating */
+#endif
 static Sc64Frontend race_front;
 static unsigned race_front_transition;
 static int race_front_load_error;
@@ -1968,7 +1971,17 @@ static void race_frontend_reset(void)
     for(int i=0;i<SC64_RACE_MAP_COUNT;i++)if(race_completed&(1<<i))completed=i;
     sc64_frontend_reset(&race_front,race_selected_mission,race_human,race_bots,completed);
     race_front.map=race_skirmish_map;
+#ifdef SC64_IMPORTED_SKIRMISH
+    unsigned seats=race_skirmish_slots ? race_skirmish_slots : sc64_skirmish_dense_seats(race_front.bots);
+    int rank=0;
+    for(int i=0;i<3;i++){
+        int race=race_bot_races[seats&(1u<<i) ? rank++ : i];
+        race_front.bot_last_races[i]=race;
+        race_front.bot_races[i]=seats&(1u<<i) ? race : SC_FRONT_BOT_CLOSED;
+    }
+#else
     for(int i=0;i<3;i++)race_front.bot_races[i]=race_bot_races[i];
+#endif
     race_front_transition=0;race_front_load_error=0;
 }
 static int race_player[5],race_minerals[5],race_gas[5];
@@ -5801,6 +5814,9 @@ game_init(void)
     memset(&race_p3,0,sizeof(race_p3));race_p3_action_ticks=0;
 #endif
     race_mode=0;race_completed=0;race_bots=2;race_skirmish_map=0;
+#ifdef SC64_IMPORTED_SKIRMISH
+    race_skirmish_slots=0;
+#endif
 #ifdef SC64_CAMPAIGN_RACE
     race_human=SC64_CAMPAIGN_RACE;
     race_selected_mission=sc64_frontend_first_mission(SC64_CAMPAIGN_RACE);
@@ -9905,12 +9921,24 @@ SC64_GAME_STEP(u16 held, u16 pressed)
         } else
 #endif
         if(action==SC_FRONT_START_CAMPAIGN||action==SC_FRONT_START_SKIRMISH) {
-            race_mode=action==SC_FRONT_START_SKIRMISH;
-            race_selected_mission=race_front.mission;
-            race_human=race_mode?race_front.race:sc64_race_maps[race_selected_mission].owner_races[sc64_race_maps[race_selected_mission].human_slot];
+#ifdef SC64_IMPORTED_SKIRMISH
+            if(action==SC_FRONT_START_SKIRMISH){
+                int resolved[3];
+                unsigned seats=sc64_front_skirmish_resolve(&race_front,resolved);
+                if(!seats)return;
+                race_bots=sc64_skirmish_seat_count(seats);
+                race_skirmish_slots=seats==sc64_skirmish_dense_seats(race_bots) ? 0 : seats;
+                race_skirmish_map=race_front.map;
+                for(int i=0;i<3;i++)race_bot_races[i]=resolved[i];
+            }
+#else
             race_bots=race_front.bots;
             race_skirmish_map=race_front.map;
             for(int i=0;i<3;i++)race_bot_races[i]=race_front.bot_races[i];
+#endif
+            race_mode=action==SC_FRONT_START_SKIRMISH;
+            race_selected_mission=race_front.mission;
+            race_human=race_mode?race_front.race:sc64_race_maps[race_selected_mission].owner_races[sc64_race_maps[race_selected_mission].human_slot];
             sc64_display_palette(sc64_palette+32);
             audio_tone(880,5,3);
             init_state();

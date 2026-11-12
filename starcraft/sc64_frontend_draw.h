@@ -248,7 +248,7 @@ static void sc64_frontend_draw(void)
         front_header("Battle Setup",0);
 #ifdef SC64_IMPORTED_SKIRMISH
         char option[24];
-        for(int row=0;row<3+race_front.bots;row++) {
+        for(int row=0;row<SC_FRONT_SKIRMISH_LAUNCH_ROW;row++) {
             if(row==0) {
                 int n=0;const char *label="MAP ";while(label[n]){option[n]=label[n];n++;}
                 const char *value=front_map_title(race_front.map);int j=0;while(value[j])option[n++]=value[j++];option[n]=0;
@@ -261,13 +261,16 @@ static void sc64_frontend_draw(void)
             } else {
                 int ai=row-3;option[0]='A';option[1]='I';option[2]=' ';
                 option[3]=(char)('1'+ai);option[4]=' ';
-                const char *value=sc64_race_names[race_front.bot_races[ai]];int j=0;
+                int choice=race_front.bot_races[ai],j=0;
+                const char *value=choice==SC_FRONT_BOT_CLOSED ? "Closed" :
+                    choice==SC_FRONT_BOT_RANDOM ? "Random" : sc64_race_names[choice];
                 while(value[j]) { option[5+j]=value[j]; ++j; }
                 option[5+j]=0;
             }
             front_button(104,50+row*12,120,11,option,race_front.row==row);
         }
-        front_button(104,50+(3+race_front.bots)*12,120,11,"LAUNCH",race_front.row==3+race_front.bots);
+        front_button(104,50+SC_FRONT_SKIRMISH_LAUNCH_ROW*12,120,11,
+            race_front.bots ? "LAUNCH" : "NEED OPPONENT",race_front.row==SC_FRONT_SKIRMISH_LAUNCH_ROW);
         front_footer("U/D Row L/R Edit A OK B Back");
 #else
         front_text(24,66,"Faction",C_DIM);
