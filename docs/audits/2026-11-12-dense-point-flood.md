@@ -13,7 +13,7 @@ route-cache oracle on five map shapes. All 321,445 queries agreed, including
 cache residency; 21,704 resident fields were also checked against a fresh
 flood. The probe remains off in normal products.
 
-## First paired ARM result
+## Paired ARM results
 
 The control is #386's `6ba59b1` Z9 ROM; the candidate differs by the dense
 probe. Both use the same normal-menu Zerg tape and libmGBA runner. The pinned
@@ -39,6 +39,19 @@ Probe ROM SHA-256:
 Tape SHA-256:
 `13019d6073bbf365cae1833f6e9e161ba96d61f660e38f3bc948254073e792d2`.
 
-Before enabling the probe, pair the Terran and Protoss custom windows,
-check quiet and campaign windows for a speed regression, run the shared
-profile and save checks, and verify hardware timing separately.
+The same paired comparison passed on the Terran and Protoss normal profiles,
+and on an earlier Z9 skirmish window. All have zero sampled workload
+mismatches. All three normal links pass, with unchanged EWRAM ends and
+656–672 additional bytes of IWRAM.
+
+| Product and tape window | Mean loop cycles | p95 change | Peak change |
+| --- | ---: | ---: | ---: |
+| Terran custom, 10,887–11,886 | 1,153,411 → 1,126,888 (−2.30%) | −10.79% | −22.27% |
+| Z9 custom, 10,860–11,859 | 1,416,948 → 1,369,965 (−3.32%) | −9.93% | −13.36% |
+| P10 custom, 10,888–11,887 | 1,524,331 → 1,497,523 (−1.76%) | −4.84% | −16.59% |
+| Z9 early custom, 2,000–2,999 | 606,745 → 606,459 (−0.05%) | +0.03% | −14.94% |
+
+Before enabling the probe, verify the remaining products and campaign
+windows, including 64×64 campaigns, exact longer gameplay and save
+continuations, and hardware timing. The quiet test is one early custom
+window, not a guarantee across all maps and missions.
