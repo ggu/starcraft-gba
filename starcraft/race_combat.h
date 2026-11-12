@@ -67,15 +67,20 @@ _Static_assert(MAX_UNITS < 255,
 #ifdef SC64_DEFENSE_PYLON_ROSTER
 #include "sc64_p7_power_geometry.h"
 _Static_assert(MAX_BUILDINGS <= 255, "defense Pylon roster uses byte slots");
-_Static_assert(sizeof(((Building *)0)->x) == sizeof(s16) &&
-               sizeof(((Building *)0)->y) == sizeof(s16),
-               "defense Pylon roster probe requires compact building coordinates");
+#ifdef SC64_ZP_FULL_STORAGE
+typedef s16 RaceDefenseCoordinate;
+#else
+typedef int RaceDefenseCoordinate;
+#endif
+_Static_assert(sizeof(((Building *)0)->x) == sizeof(RaceDefenseCoordinate) &&
+               sizeof(((Building *)0)->y) == sizeof(RaceDefenseCoordinate),
+               "defense Pylon roster preserves building coordinate width");
 
 typedef struct {
     int count;
     u8 head[5];
     u8 next[MAX_BUILDINGS];
-    s16 x[MAX_BUILDINGS], y[MAX_BUILDINGS];
+    RaceDefenseCoordinate x[MAX_BUILDINGS], y[MAX_BUILDINGS];
 } RaceDefensePylons;
 
 #ifdef GBA_HOST
@@ -89,11 +94,11 @@ static int race_defense_scalar_power;
 static __attribute__((noinline)) int
 race_defense_powered(RaceDefensePylons *pylons, const Building *q)
 {
-    unsigned owner = q->owner;
+    int owner = q->owner;
 #ifdef GBA_HOST
     if (race_defense_scalar_power) return race_site_powered(owner, q->x, q->y);
 #endif
-    if (owner >= 5) return race_site_powered(owner, q->x, q->y);
+    if ((unsigned)owner >= 5) return race_site_powered(owner, q->x, q->y);
     if (pylons->count < 0) {
         int count = 0;
         memset(pylons->head, 0xff, sizeof(pylons->head));
