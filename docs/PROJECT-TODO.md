@@ -719,6 +719,12 @@ plus compiled suites); engine/build source matches the six-ROM/unified-qualified
 `3ebed0e2`. This does not enable shared Egg/Guardian/
 Scarab stages, prove native canal timing or change the 29/30 content count.
 
+The [stock 200 supply limit](audits/2026-11-12-stock-supply-cap.md) now
+applies to shared production and the HUD, including AI owners and legacy
+profiles. Existing units and reservations survive provider loss. Separate
+per-race banks for mixed-race owners and original native actor capacity
+remain distinct fidelity work.
+
 ## Priority order
 
 Priorities are the maintainer's decisions after the [2026-11-06 GPT-6.1 Terra

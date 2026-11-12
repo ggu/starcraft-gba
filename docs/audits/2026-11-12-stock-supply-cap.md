@@ -41,3 +41,8 @@ fixture verifies save/load after losing enough supply to be over cap.
 The asset-free race rule fixtures pass both build variants. The broad
 Race integration binary has a pre-existing gas fixture failure reproduced
 on unchanged main. ARM ROM and real-hardware performance are separate.
+
+The default GBA ROM, Terran T10, Zerg Z10, Protoss P10 and Showcase all pass
+their normal ARM ROM verifiers and memory guards with the cap enabled. The
+behavioral boundary and old-save continuation checks above ran on the host;
+this is not a 200-supply hardware stress test.
