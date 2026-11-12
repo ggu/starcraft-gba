@@ -160,7 +160,7 @@ static int race_owner_supply(int owner)
     return total;
 }
 
-static int race_owner_supply_cap(int owner)
+static int race_owner_supply_capacity(int owner)
 {
     int i, total = 0;
     for (i = 0; i < MAX_BUILDINGS; ++i) if ((building_complete(i) ||
@@ -171,6 +171,11 @@ static int race_owner_supply_cap(int owner)
     for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == owner)
         total += sc64_race_unit_supply_provided(u[i].type);
     return total;
+}
+
+static int race_owner_supply_cap(int owner)
+{
+    return sc64_supply_limit(race_owner_supply_capacity(owner));
 }
 
 static int race_owner_queued_supply(int owner)
@@ -1013,7 +1018,7 @@ static int race_queue_unit(int owner, int producer, int type)
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) count = sc64_z7_egg_product_count(type);
 #endif
-    if (r->supply && reserved + r->supply * count > cap) { race_refusal = 2; return 0; }
+    if (!sc64_supply_allows(reserved, r->supply * count, cap)) { race_refusal = 2; return 0; }
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) {
         int free_slots = 0;
@@ -1913,7 +1918,7 @@ static void race_skirmish_init(void)
             }
         }
     }
-    supply_cap = race_owner_supply_cap(SIDE);
+    supply_cap = race_owner_supply_capacity(SIDE);
     cx = race_base_x[0]; cy = race_base_y[0]; camx = camy = 0;
     selected_building = -1; mode = MODE_NORMAL; menu_open = 0;
     enemy_timer = 0; wave = 0; invalidate_path_grid(); update_exploration();

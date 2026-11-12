@@ -2,6 +2,7 @@
 #define SC64_RACE_SKIRMISH_H
 
 #include "race_rules.h"
+#include "sc64_supply.h"
 
 /* Fixed-width faction state shared by human and AI owners. The caller stores
  * one record per owner and feeds completed hatcheries/pylons and unit queues
@@ -51,7 +52,7 @@ static inline void sc64_race_state_init(Sc64RaceState *s, unsigned char race,
 {
     s->race = race;
     s->supply_used = used;
-    s->supply_cap = cap;
+    s->supply_cap = (unsigned short)sc64_supply_limit(cap);
     s->hatcheries = hatcheries;
     s->larva = larvae > 3 ? 3 : larvae;
     s->powered = 0;
@@ -74,15 +75,15 @@ static inline int sc64_race_can_produce(const Sc64RaceState *s,
                                          int unit_type, int count)
 {
     const Sc64RaceUnitRule *r = sc64_race_unit_rule(unit_type);
-    unsigned int needed;
+    unsigned int per;
     if (!r || r->race != s->race || count < 1) return 0;
     if ((r->flags & SC_RACE_F_LARVA) && s->larva < 1) return 0;
     if (r->flags & SC_RACE_F_REQUIRES_POWER) return 0;
     /* A Zergling egg yields two units from one larva and reserves one supply
      * per unit (one doubled supply point each). */
-    needed = unit_type == U_ZERGLING ? (unsigned int)count * 2u : r->supply * (unsigned int)count;
-    if (s->supply_used + needed > s->supply_cap) return 0;
-    return 1;
+    per = unit_type == U_ZERGLING ? 2u : r->supply;
+    if (per && (unsigned int)count > SC64_SUPPLY_LIMIT / per) return 0;
+    return sc64_supply_allows(s->supply_used, (int)(per * (unsigned int)count), s->supply_cap);
 }
 
 static inline int sc64_race_morph(Sc64RaceState *s, int unit_type, int count)
@@ -126,8 +127,7 @@ static inline int sc64_race_build_complete(Sc64RaceState *s, int building_type)
         if (s->larva < 3) ++s->larva;
     }
     if (r->supply_provided) {
-        unsigned int cap = s->supply_cap + r->supply_provided;
-        s->supply_cap = cap > 65535u ? 65535u : (unsigned short)cap;
+        s->supply_cap = (unsigned short)sc64_supply_limit(s->supply_cap + r->supply_provided);
     }
     return 1;
 }

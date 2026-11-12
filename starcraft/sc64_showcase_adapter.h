@@ -119,7 +119,7 @@ static void sc64_showcase_start(int scene)
         sc64_showcase_group(ENEMY,U_HYDRALISK,8,560,477,2,15,ORDER_ATTACK_MOVE,483,512);
         sc64_showcase_group(ENEMY,U_ZERGLING,10,558,535,5,11,ORDER_ATTACK_MOVE,483,512);
     }
-    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_capacity(SIDE);
     reset_selection_gestures();invalidate_path_grid();sc64_visibility_reset();
     update_exploration();sc64_showcase_reveal();
     screen=SCREEN_PAUSE;
