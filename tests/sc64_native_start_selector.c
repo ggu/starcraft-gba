@@ -41,9 +41,10 @@ static void test_random_launch(void)
     } cases[] = {
         /* Independent native actor witness: Human Random resolved Zerg. */
         {15, {r,z,t,p}, {z,z,t,p}, {2,3,0,1}, 0xa39d7707u},
-        /* CPU Random vectors derived from the stock startup instructions. */
+        /* Independent CPU Random witnesses: middle only and dense. */
         {5, {t,x,r,x}, {t,x,z,x}, {0,x,1,x}, 0xa39d7707u},
         {15, {t,r,r,p}, {t,z,t,p}, {1,2,3,0}, 0xb953c674u},
+        /* Additional gap and no-draw cases from the stock instructions. */
         {11, {t,r,x,r}, {t,z,x,t}, {2,3,x,0}, 0xb953c674u},
         {5, {t,r,z,r}, {t,x,z,x}, {2,x,1,x}, 0xf3aeu},
     };

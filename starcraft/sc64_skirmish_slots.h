@@ -110,17 +110,15 @@ static inline int sc64_skirmish_read_start_word(int custom, int blood_bath, int 
 #ifdef SC64_NATIVE_MELEE_STARTS
 #include "sc64_native_start_selector.h"
 
-static inline unsigned sc64_skirmish_blood_bath_start_order(unsigned seats, uint32_t seed)
+static inline unsigned sc64_skirmish_blood_bath_start_order(unsigned rows,
+                                                              const Sc64NativeMeleeStarts *starts)
 {
     /* CHK markers are SE, SW, NW, NE. The saved GBA base IDs are NW, SE, NE, SW. */
     static const uint8_t gba_base_by_marker[] = {1, 3, 0, 2};
-    Sc64NativeMeleeStarts starts;
-    unsigned rows = (seats << 1) | 1u; /* human occupies row zero */
-    if (!sc64_native_melee_starts(seed, rows, 15u, &starts)) return 0;
     unsigned order = 0, rank = 0;
     for (unsigned row = 0; row < 4; ++row)
         if (rows & (1u << row))
-            order |= (unsigned)gba_base_by_marker[starts.marker_by_row[row]] << (2u * rank++);
+            order |= (unsigned)gba_base_by_marker[starts->marker_by_row[row]] << (2u * rank++);
     return order;
 }
 #endif

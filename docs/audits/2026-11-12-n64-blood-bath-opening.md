@@ -204,16 +204,23 @@ not consume a draw in Melee. Placement uses the resulting state.
 The observed Human Random launch independently checks the sequence:
 seed `0xf3ae` resolves the human to Zerg, leaves the RNG at
 `0xa39d7707` before placement, then gives human/CPU marker IDs
-`[2, 3, 0, 1]`. The three opening actor samples agree. The pure launch
-fixture also covers CPU Random positions derived from the same stock
-instructions, including two Random rows and a named or closed row
-between active slots. Those CPU vectors are source-derived rather than
-new emulator observations; the bounded CPU capture was deferred because
-the disk fell below the observer's 5 GiB reserve.
+`[2, 3, 0, 1]`. Two further owned-ROM runs showed the same reset seed
+for CPU Random. Each case verified its lobby and three read-only
+opening actor samples, matching all 60 resource positions and four
+workers per hall.
 
-The GBA preview still chooses Random races with its existing selector;
-this source-only sequence does not enable a different selector in any
-ROM. A later preview can draw Random and starts from one clock seed,
-then persist only the resolved races and positions. Before changing
-the preview, verify the CPU Random actor/placement cases and an ARM
-save/restart. Other native modes remain unqualified.
+| CPU rows (Terran human) | Resolved CPU races | Human and CPU marker IDs by row | State before placement |
+|---|---|---|---|
+| Closed / Random / Closed | – / Zerg / – | 0 / – / 1 / – | `0xa39d7707` |
+| Random / Random / Protoss | Zerg / Terran / Protoss | 1 / 2 / 3 / 0 | `0xb953c674` |
+
+The native manifests are `3eaa2d7e49d36bc2dfc3e7d43ab4bf2d0fb5a098bea3c977f5418d9426988dcb`
+(sparse) and `bf3bafeca0d1835d7bb2ffaad160aa7c62047adb05faf6f115e9cc02f245ad75`
+(dense), SHA-256. The bounded pure fixture uses these captures as
+expected vectors and adds malformed and unobserved gap controls.
+
+The opt-in GBA Blood Bath Melee preview now uses one elapsed-time seed
+for CPU Random and starts. It persists the same resolved races and v2
+start-order fields; a load or restart draws nothing. Default builds,
+Outpost and the named-only GBA human selector keep their existing
+behavior. Other native modes remain unqualified.

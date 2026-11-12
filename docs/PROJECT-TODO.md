@@ -43,9 +43,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   on all four products. Keep full matches and hardware frame rate as
   separate qualification.
   The stock launch resolves Random race rows before drawing starts; the
-  pure sequence matches the native Human Random capture. A native CPU
-  Random capture and preview integration are still pending. Other native
-  modes, difficulty and long ordinary-input victories also remain open.
+  pure sequence matches native Human Random and one/two CPU Random
+  captures. The preview now follows that order for CPU Random on Blood
+  Bath. Its physical ARM gate remains separate from the prior placement
+  check. Other native modes, difficulty and long ordinary-input victories
+  also remain open.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)

@@ -21,9 +21,9 @@ the seed. It observes the existing Timer 2/3 cycle counter once per main
 loop to extend its 256-second wrap, then samples again at Launch. This
 approximates the native clock's role without claiming the same elapsed
 time or draw for the same button tape. Outpost and default products keep
-their existing new-match starts. The port's existing Random race
-selection is separate from the native start draw. Other N64 game modes
-are not covered.
+their existing new-match starts. Default Random selection remains separate from the native start draw.
+The optional preview's CPU Random sequence is qualified separately
+below. Other N64 game modes are not covered.
 
 Use `make sc64-native-melee-start-probe` with all four prepared profiles to
 build the private opt-in cartridges. The preview uses distinct ROM names
@@ -92,3 +92,13 @@ are `b9dd5f5f79f3eba7bcfa5c36d8c8fc7485c2c6ce7794a80b96822c94b7dafbb5`,
 `e9df0ebbdb2162d4e4b5133fed0d3880a0c8a42817da555d3a788ed32659a0cc`,
 `5cc21827e6d71d145a1dca94d98db15c49ce684f07674b834f88b27db2d43157`
 and `7e245d3378b968b3144b6205d1353b4059792ab678f66db4270210b5e6569594`.
+
+
+## CPU Random sequencing in the preview
+
+The [owned N64 CPU captures](2026-11-12-n64-blood-bath-opening.md#random-races-consume-the-launch-stream-first)
+confirmed that one or two Random CPU rows consume one draw each before
+physical start assignment. The opt-in Blood Bath preview follows that
+order with one GBA clock seed; the normal title menu and Outpost use
+their existing selector. Resolved race and placement are stored in the
+already qualified v2 record, with no new format.
