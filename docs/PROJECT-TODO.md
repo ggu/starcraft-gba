@@ -838,12 +838,12 @@ The 30 available campaign entries do not change the near-30-fps and parity requi
 Native dialogue timing remains a concrete UX mismatch: critical outcome
 deferral is merged, but removal of synthetic holds remains staged after P4/P6
 controller failures. The [native Blood Bath opening](audits/2026-11-12-n64-blood-bath-opening.md)
-now reaches play with a Terran human and Zerg, Terran and Protoss opponents
-selected in the lobby. The native HUD shows 50 minerals and 4/10 supply,
-then minerals rise with neutral input. The normal Z10 cartridge confirms
-the same displayed Terran opening and automatic mining with that lobby.
-Next establish equal-speed timing, native AI wallets and full-match
-behavior; the opening does not qualify those.
+now reaches play with each named human race against a mixed Zerg, Terran
+and Protoss lineup. The native and normal GBA Z10 HUDs agree on 50 starting
+minerals and race-specific supply (Terran 4/10; Zerg and Protoss 4/9).
+Minerals rise with neutral input in all six runs. Next establish equal-speed
+timing, native AI wallets and full-match behavior; the opening does not
+qualify those.
 
 ## Current work and open PRs
 
