@@ -1981,23 +1981,6 @@ static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
 #ifdef SC64_IMPORTED_SKIRMISH
 static unsigned race_skirmish_slots; /* 0 keeps the legacy dense seating */
 static unsigned race_skirmish_start_order; /* 0 keeps the legacy physical starts */
-#ifdef SC64_NATIVE_MELEE_STARTS
-#include "sc64_native_start_selector.h"
-
-static unsigned race_blood_bath_start_order(unsigned seats)
-{
-    /* CHK markers are SE, SW, NW, NE. The saved GBA base IDs are NW, SE, NE, SW. */
-    static const u8 gba_base_by_marker[] = {1, 3, 0, 2};
-    Sc64NativeMeleeStarts starts;
-    unsigned rows = (seats << 1) | 1u; /* human occupies row zero */
-    if (!sc64_native_melee_starts(gba_elapsed_milliseconds(), rows, 15u, &starts)) return 0;
-    unsigned order = 0, rank = 0;
-    for (unsigned row = 0; row < 4; ++row)
-        if (rows & (1u << row))
-            order |= (unsigned)gba_base_by_marker[starts.marker_by_row[row]] << (2u * rank++);
-    return order;
-}
-#endif
 #endif
 static Sc64Frontend race_front;
 static unsigned race_front_transition;
@@ -10139,7 +10122,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
                 race_skirmish_start_order=0;
 #ifdef SC64_NATIVE_MELEE_STARTS
                 if(race_skirmish_map==SC64_MAP_BLOOD_BATH)
-                    race_skirmish_start_order=race_blood_bath_start_order(seats);
+                    race_skirmish_start_order=sc64_skirmish_blood_bath_start_order(seats,gba_elapsed_milliseconds());
 #endif
                 for(int i=0;i<3;i++)race_bot_races[i]=resolved[i];
             }
