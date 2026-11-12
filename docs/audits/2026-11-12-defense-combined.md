@@ -42,8 +42,11 @@ buttons: one on each map for each AI count from one to three. Across the
 exercised, including duplicate AI races. Every selected owner, starting
 roster and wallet matched the setup; all runs then advanced 120 frames.
 This establishes selection, loading and early play on all four products.
-Complete custom outcomes and long-running behavior on the wider profile
-matrix are still separate gates.
+Two full three-AI physical-input matches on the exact Z10 probe also
+reproduce the corresponding host losses and final actor counts for each
+owner: Terran on Outpost at frame 18,621 and Protoss on Blood Bath at frame
+18,986. Those are selected complete outcomes; long-running behavior across
+the wider profile matrix remains a separate gate.
 
 With the same prepared inputs, use a clean build tree:
 
