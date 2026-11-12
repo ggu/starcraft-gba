@@ -24,6 +24,24 @@ class MarineSnapshotTest(unittest.TestCase):
   for ns,pa in ((False,False),(True,False),(True,True)):
    with self.assertRaises(ValueError):m.admit_plan(pause,ns,pa)
   with self.assertRaises(ValueError):m.admit_plan(control,False,True)
+ def test_pause_controls_keep_the_matched_capture_boundaries(self):
+  fixtures=ROOT/'tests/sc64-ares-observer/fixtures'
+  pause=(fixtures/'native-marine-pause-late.txt').read_bytes()
+  options=(fixtures/'native-marine-pause-options-late.txt').read_bytes()
+  resume=(fixtures/'native-marine-resume-late.txt').read_bytes()
+  _,p=m.admit_plan(pause,False,True);_,o=m.admit_plan(options,False,options=True)
+  _,r=m.admit_plan(resume,False,resume=True)
+  def changed(rows):
+   def expand(v):
+    return [tuple(row[2:]) for row in v for _ in range(row[1])]
+   return [i for i,(a,b) in enumerate(zip(expand(p),expand(rows),strict=True)) if a!=b]
+  self.assertEqual(changed(o), list(range(7200,7210)))
+  self.assertEqual(changed(r), [i for a in (7185,7195,7205,7215) for i in range(a,a+5)])
+  self.assertEqual([(row[0],row[2]) for row in r if 7180<=row[0] and row[2]],
+                   [(7185,4),(7195,4),(7205,4),(7215,1)])
+  for data in (resume,options):
+   with self.assertRaises(ValueError):m.admit_plan(data,False,True)
+  with self.assertRaises(ValueError):m.admit_plan(pause,False,resume=True)
  def test_plan_prefix_and_capture_boundaries(self):
   d=(ROOT/'tests/sc64-ares-observer/fixtures/native-marine-discovery-late.txt').read_bytes();self.assertEqual(hashlib.sha256(d).hexdigest(),m.COMMAND_SHA);rows=m.planned_rows(d)
   self.assertEqual([(r[0],r[2]) for r in rows if r[2] in (64,256)],[(7140,64),(7170,256)])

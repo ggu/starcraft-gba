@@ -126,3 +126,39 @@ pointer-shaped values and a small integer at physical `0x11dc54` that reads
 not an identified game clock. Require a separate pause/resume and idle
 comparison, actual update-write evidence, and an independent event interval
 before using any such word to tune GBA timing.
+
+### 2026-11-12: matched Options and Resume controls
+
+All three controls (leave paused, press Start again, select Resume) and the
+unpaused control have identical full RAM and frame hashes at the pre-input
+boundaries, 7,090 and 7,169, with matching ROM and emulator pins. The second
+Start press at 7,200–7,209 selects the highlighted Options row; the last
+frame shows **Options**. It retains the same position, move order, target,
+and motion words as leaving the game paused. That plan is pinned at
+`4bbb2fb3be027ca7d0c849c5ac245023b3de4cab177b38a5671ef9cc3da47608`.
+The first attempt stopped at the disk guard, before any captures.
+
+The actual Resume plan
+`c7a316b6a7f2c23ece8b7c5cb719c269f27ec07358314dd9a41c58e8593d4e0d`
+uses three ordinary D-Pad Down presses (steps 7,185–7,189, 7,195–7,199,
+7,205–7,209) followed by A at 7,215–7,219. Each interval logged two
+positive polls. The final frame shows the selected 40-HP Marine with the
+world and Move/Stop controls visible. The previous order (6) and destination
+(702,159) remain; it has moved from the paused position (187,172) to
+(192,174). The uninterrupted Marine is at (243,157) at the same boundary.
+
+| Final condition | Position-shaped pair | Pending target | RAM clock candidate |
+| --- | --- | --- | ---: |
+| Never paused | (243,157) | (702,159) | 6 |
+| Left paused | (187,172) | (702,159) | 3 |
+| Second Start, Options shown | (187,172) | (702,159) | 3 |
+| Resume selected | (192,174) | (702,159) | 4 |
+
+The Resume trial's manifest SHA-256 is
+`128eb40ec0f3d637fe75ab7e53e658c0c8db742fc7f647bd3d36ebed26f3aff0`;
+its recorded output before the manifest was 61,698,581 bytes. All three
+frame/RAM witness checks pass under the existing guards. This establishes
+that ordinary menu Resume continues the pending move in the observed scene.
+The GBA field controls deliberately offer Start as a direct Resume shortcut.
+The RAM candidate still needs a separate idle observation and write/event
+correlation before it can serve as an independent clock.
