@@ -19,6 +19,13 @@ squared-distance scan; the asset-free sanitizer test runs the new variant
 alongside the five existing full-grid oracle variants. Z10 verifies with
 unchanged IWRAM (`0x03004ae0`) and EWRAM (`0x0203c9b8`).
 
+The prepared Z10 fixture also compares the packed decoder with the scalar
+row path for all phases and supported radii on both 64×64 and 128×128 map
+geometry, including edge clipping. The pinned 1,000-call 64×64 skirmish
+window matches its frame/screen and sampled actor counts. Mean full-loop
+cycles fall from 1,368,916 to 1,356,372 (−0.92%); p95 falls from
+1,726,162 to 1,717,394.
+
 Probe ROM SHA-256:
 `02fbc1319442a9ce82dc29e28f1435a3857a15ad1b99211e291991df973f3eee`.
 
@@ -30,7 +37,7 @@ make CANONICAL_DIRECT_FIRING_FLAGS='-DSC64_DIRECT_FIRING_POINTS -DSC64_Z7_VISIBI
 ```
 
 The current opt-in path is the existing late-Zerg source-sight transition.
-Before activation, measure the paired custom workload, qualify full campaign
-and legacy paths, and compare the other race profiles' shared-span transition
+Before activation, qualify full campaign and legacy paths and compare the
+other race profiles' shared-span transition
 before generalizing. Do not add the separate renderer or defense savings to
 these results without measuring the combined build.
