@@ -99,11 +99,11 @@ $(Z10_PROGRAM_HEADER): $(Z10_DESCRIPTOR) tools/sc64_zerg_late_program_pack.py to
 # The ordinary Z10 renderer needs the same exact static key for lookup and
 # capture. Compute it once per draw, as the other capable products do.
 ZERG_Z10_DEFENSE_FLAGS ?= -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
-ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -DSC64_RENDER_KEY_ONCE -Ibuild/generated/z10 $(ZERG_Z10_DEFENSE_FLAGS)
+ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -DSC64_RENDER_KEY_ONCE -Ibuild/generated/z10 $(ZERG_Z10_DEFENSE_FLAGS) -DSC64_DEPOT_FIRST_NEAREST_PROBE
 ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES)
 ZERG_Z10_RELEASE_FLAGS = $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z9_CANONICAL_INPUTS)) $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h $(Z10_PROGRAM_HEADER)
-build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile | build
+build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile tests/sc64-zerg-late/Makefile | build
 	$(CC) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
@@ -158,7 +158,7 @@ test-sc64-z10-defense-combined: build/test-sc64-z10-defense-combined
 
 define Z10_DEPOT_FIRST_NEAREST_TEST
 build/test-sc64-z10-depot-first-nearest-$(1): tests/sc64_depot_first_nearest.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
-	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(ZERG_Z10_RELEASE_FLAGS) $(2) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o $$@
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(filter-out -DSC64_DEPOT_FIRST_NEAREST_PROBE,$$(ZERG_Z10_RELEASE_FLAGS)) $(2) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o $$@
 endef
 $(eval $(call Z10_DEPOT_FIRST_NEAREST_TEST,stock,))
 $(eval $(call Z10_DEPOT_FIRST_NEAREST_TEST,probe,-DSC64_DEPOT_FIRST_NEAREST_PROBE))

@@ -65,8 +65,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   one scan. [Exact instruction traces](audits/2026-11-12-z10-route-stalls.md)
   attribute the largest stalls to worker depot reachability, including
   36.0M cycles in one update. Finishing partial fields on retry helped one
-  peak and regressed another, so it stays off. First eliminate unnecessary
-  depot searches while preserving stock choice and tie order.
+  peak and regressed another, so it stays off. [Trying the nearest legal
+  depot first](audits/2026-11-12-z10-depot-first-nearest.md) is now enabled
+  for Z10. It preserves the full physical campaign and both three-AI custom
+  outcomes. On top of the current release, it cuts the two campaign-window
+  means by 8.72% and 4.54%, and the maxima from 35.18M to 14.84M and
+  38.37M to 3.46M cycles. Next: address the remaining point flood, then
+  qualify the optimization separately in other profiles.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
