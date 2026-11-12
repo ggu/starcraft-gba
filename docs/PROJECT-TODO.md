@@ -109,6 +109,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Desperate Alliance exercise seven actual fills on their 96×96 maps
   with matching ARM state and video. The shared option defaults off
   pending hardware checks.
+  A [Z7 profile](audits/2026-11-13-z7-wide-point-flood.md) separates the
+  final 58.7M-cycle result transition from a 37.55M-cycle gameplay
+  update, of which 33.95M are point-field fills. The exact 128-column
+  FIFO probe reduces that gameplay update to 21.31M with matching
+  checkpoints; Z10 still wins with matching state and video. Complete the
+  wide Z7 tape and the cross-product checks. Treat the result transition
+  separately, and prioritize steady simulation and drawing over the
+  selection-ring probe (under 0.12% mean savings in Z10).
   Continue steady simulation and drawing work separately.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
