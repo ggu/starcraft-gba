@@ -44,6 +44,8 @@ static void test_random_launch(void)
         /* Independent CPU Random witnesses: middle only and dense. */
         {5, {t,x,r,x}, {t,x,z,x}, {0,x,1,x}, 0xa39d7707u},
         {15, {t,r,r,p}, {t,z,t,p}, {1,2,3,0}, 0xb953c674u},
+        /* Joint native witness checks the human draw order among ascending CPU rows. */
+        {15, {r,r,r,p}, {z,t,z,p}, {2,0,1,3}, 0x1d976e05u},
         /* Additional gap and no-draw cases from the stock instructions. */
         {11, {t,r,x,r}, {t,z,x,t}, {2,3,x,0}, 0xb953c674u},
         {5, {t,r,z,r}, {t,x,z,x}, {2,x,1,x}, 0xf3aeu},

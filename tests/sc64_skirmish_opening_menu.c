@@ -54,8 +54,8 @@ static void check_fallback(int owner, int base)
            census.hx == race_base_x[base] && census.hy == race_base_y[base]);
 }
 
-static void mixed_opening_and_save(int map, const int choices[3], unsigned order,
-                                   const int *expected_races)
+static void mixed_opening_and_save(int map, int human_choice, int expected_human,
+                                   const int choices[3], unsigned order, const int *expected_races)
 {
     unsigned seats = 0;
     for (int seat = 0; seat < 3; ++seat)
@@ -70,8 +70,9 @@ static void mixed_opening_and_save(int map, const int choices[3], unsigned order
     assert(race_front.page == SC_FRONT_SKIRMISH);
     if (map) tap(KEY_RIGHT);
     tap(KEY_DOWN);
-    for (int step = 0; race_front.race != R_TER && step < 3; ++step) tap(KEY_RIGHT);
-    assert(race_front.race == R_TER);
+    for (int step = 0; race_front.race != human_choice && step < 4; ++step) tap(KEY_RIGHT);
+    assert(race_front.race == human_choice);
+    sc64_frontend_draw();
     while (race_front.row < SC_FRONT_BOT_FIRST_ROW) tap(KEY_DOWN);
     for (int seat = 0; seat < 3; ++seat, tap(KEY_DOWN)) {
         int choice = choices[seat];
@@ -81,7 +82,9 @@ static void mixed_opening_and_save(int map, const int choices[3], unsigned order
     assert(race_front.row == SC_FRONT_SKIRMISH_LAUNCH_ROW);
     tap(KEY_A);
     assert(screen == SCREEN_PLAY && race_mode && race_skirmish_map == map &&
-           race_skirmish_slots == sparse && race_bots == bots);
+           race_skirmish_slots == sparse && race_bots == bots && race_human == expected_human);
+    check_owner(SIDE, expected_human);
+    check_seat(SIDE, order ? sc64_skirmish_start_base(order, 0) : 0);
     int saved_races[3];
     for (int i = 0; i < 3; ++i) saved_races[i] = race_bot_races[i];
     assert(race_skirmish_start_order == order);
@@ -105,7 +108,8 @@ static void mixed_opening_and_save(int map, const int choices[3], unsigned order
     game_init(); prior_keys = 0;
     assert(race_load_game());
     assert(race_skirmish_map == map && race_skirmish_slots == sparse &&
-           race_skirmish_start_order == order && race_bots == bots);
+           race_skirmish_start_order == order && race_bots == bots && race_human == expected_human);
+    check_seat(SIDE, order ? sc64_skirmish_start_base(order, 0) : 0);
     for (int i = 0; i < race_bots; ++i) {
         assert(race_bot_races[i] == saved_races[i]);
         int base = order ? sc64_skirmish_start_base(order, i + 1) : sc64_skirmish_bot_seat(seats, i) + 1;
@@ -114,7 +118,9 @@ static void mixed_opening_and_save(int map, const int choices[3], unsigned order
     }
     if (order) {
         tap(KEY_START); assert(screen == SCREEN_PAUSE);
-        tap(KEY_R); assert(screen == SCREEN_PLAY && race_skirmish_start_order == order);
+        tap(KEY_R); assert(screen == SCREEN_PLAY && race_skirmish_start_order == order &&
+                           race_human == expected_human);
+        check_owner(SIDE, expected_human);
         check_seat(SIDE, sc64_skirmish_start_base(order, 0));
         for (int i = 0; i < race_bots; ++i) {
             assert(race_bot_races[i] == saved_races[i]);
@@ -123,6 +129,7 @@ static void mixed_opening_and_save(int map, const int choices[3], unsigned order
         }
     }
     race_frontend_reset();
+    assert(race_front.race == expected_human);
     for (int i = 0, rank = 0; i < 3; ++i)
         assert(race_front.bot_races[i] == ((seats & (1u << i)) ?
                saved_races[rank++] : SC_FRONT_BOT_CLOSED));
@@ -139,11 +146,11 @@ static void sparse_opening_and_save(int map, unsigned seats)
         const unsigned order_by_mask[] = {[2]=0x0c, [4]=0x0d, [5]=0x18, [6]=0x36};
         const int races[2] = {seats == 2 || seats == 6 ? R_TER : R_ZERG,
                               seats == 6 ? R_ZERG : R_TER};
-        mixed_opening_and_save(map, choices, order_by_mask[seats], races);
+        mixed_opening_and_save(map, R_TER, R_TER, choices, order_by_mask[seats], races);
         return;
     }
 #endif
-    mixed_opening_and_save(map, choices, 0, NULL);
+    mixed_opening_and_save(map, R_TER, R_TER, choices, 0, NULL);
 }
 
 #ifdef SC64_NATIVE_MELEE_STARTS
@@ -152,28 +159,50 @@ static void check_native_random_openings(void)
     const int sparse[] = {SC_FRONT_BOT_CLOSED, SC_FRONT_BOT_RANDOM, SC_FRONT_BOT_CLOSED};
     const int dense[] = {SC_FRONT_BOT_RANDOM, SC_FRONT_BOT_RANDOM, R_PROTOSS};
     const int races[] = {R_ZERG, R_TER, R_PROTOSS};
-    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, sparse, 0x0d, races);
-    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, dense, 0x63, races);
+    const int joint_races[] = {R_TER, R_ZERG, R_PROTOSS};
+    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, R_TER, R_TER, sparse, 0x0d, races);
+    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, R_TER, R_TER, dense, 0x63, races);
+    /* The load/restart seed in mixed_opening_and_save would instead roll Protoss. */
+    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, SC_FRONT_HUMAN_RANDOM, R_ZERG,
+                           dense, 0xb4, joint_races);
+
+    Sc64Frontend picker;
+    sc64_frontend_reset(&picker, 0, R_TER, 1, -1);
+    picker.page = SC_FRONT_SKIRMISH;
+    picker.map = SC64_MAP_BLOOD_BATH;
+    picker.row = 1;
+    sc64_frontend_update(&picker, KEY_RIGHT);
+    assert(picker.race == R_PROTOSS);
+    sc64_frontend_update(&picker, 0);
+    sc64_frontend_update(&picker, KEY_RIGHT);
+    assert(picker.race == SC_FRONT_HUMAN_RANDOM);
+    sc64_frontend_update(&picker, 0);
+    sc64_frontend_update(&picker, KEY_UP);
+    sc64_frontend_update(&picker, KEY_LEFT);
+    assert(picker.map == SC64_MAP_OUTPOST && picker.race == R_PROTOSS);
+    sc64_frontend_update(&picker, KEY_DOWN);
+    sc64_frontend_update(&picker, KEY_RIGHT);
+    assert(picker.race == R_TER);
 
     Sc64Frontend malformed = {.map=SC64_MAP_BLOOD_BATH, .race=R_TER, .bots=1};
-    int result[3] = {-1, -2, -3};
+    int human = -1, result[3] = {-1, -2, -3};
     unsigned order = 0x123u;
     malformed.bot_races[0] = SC_FRONT_BOT_CLOSED;
     malformed.bot_races[1] = SC_FRONT_BOT_CLOSED;
     malformed.bot_races[2] = SC_FRONT_BOT_CLOSED;
-    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, result, &order));
+    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, &human, result, &order));
     malformed.bot_races[1] = -1;
-    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, result, &order));
+    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, &human, result, &order));
     malformed.bot_races[1] = SC_FRONT_BOT_RANDOM;
     malformed.bots = 2;
-    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, result, &order));
+    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, &human, result, &order));
     malformed.bots = 1;
     malformed.map = SC64_MAP_OUTPOST;
-    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, result, &order));
+    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, &human, result, &order));
     malformed.map = SC64_MAP_BLOOD_BATH;
-    malformed.race = SC_FRONT_BOT_RANDOM;
-    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, result, &order));
-    assert(result[0] == -1 && result[1] == -2 && result[2] == -3 && order == 0x123u);
+    malformed.race = SC_FRONT_BOT_CLOSED;
+    assert(!sc64_front_skirmish_native_resolve(&malformed, 0xf3ae, &human, result, &order));
+    assert(human == -1 && result[0] == -1 && result[1] == -2 && result[2] == -3 && order == 0x123u);
 }
 #endif
 

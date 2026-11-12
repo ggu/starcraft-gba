@@ -482,6 +482,10 @@ launch. The **Opponents** row is a shortcut that opens the first one,
 two, or three seats. The game resolves Random at launch and keeps the
 chosen races and starts when saving or restarting the match.
 
+The optional Blood Bath Melee preview also offers **Random** on the
+human row. It uses the same launch draw for the human and all open
+computer rows. Outpost and normal builds keep the named human choices.
+
 On the current frozen combined ROM `d8678867`, a 10,000-tick neutral Blood
 Bath run with a Terran human and three independently selected Zerg, Protoss
 and Terran opponents averaged 29.49 effective fps in mGBA; observed intervals

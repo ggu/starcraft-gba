@@ -10111,13 +10111,14 @@ SC64_GAME_STEP(u16 held, u16 pressed)
         } else
 #endif
         if(action==SC_FRONT_START_CAMPAIGN||action==SC_FRONT_START_SKIRMISH) {
+            int skirmish_human=race_front.race;
 #ifdef SC64_IMPORTED_SKIRMISH
             if(action==SC_FRONT_START_SKIRMISH){
                 int resolved[3];
                 unsigned seats,order=0;
 #ifdef SC64_NATIVE_MELEE_STARTS
                 if(race_front.map==SC64_MAP_BLOOD_BATH)
-                    seats=sc64_front_skirmish_native_resolve(&race_front,gba_elapsed_milliseconds(),resolved,&order);
+                    seats=sc64_front_skirmish_native_resolve(&race_front,gba_elapsed_milliseconds(),&skirmish_human,resolved,&order);
                 else
 #endif
                     seats=sc64_front_skirmish_resolve(&race_front,resolved);
@@ -10135,7 +10136,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
             race_mode=action==SC_FRONT_START_SKIRMISH;
             race_selected_mission=race_front.mission;
-            race_human=race_mode?race_front.race:sc64_race_maps[race_selected_mission].owner_races[sc64_race_maps[race_selected_mission].human_slot];
+            race_human=race_mode?skirmish_human:sc64_race_maps[race_selected_mission].owner_races[sc64_race_maps[race_selected_mission].human_slot];
             sc64_display_palette(sc64_palette+32);
             audio_tone(880,5,3);
             init_state();

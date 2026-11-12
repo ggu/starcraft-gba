@@ -123,3 +123,33 @@ the cross-load receipt SHA-256 is
 `1d8042ffb6f0444fc5f1a99b4777fac8a035c551982e2b04fa0bfc09dc12c4af`.
 The CPU Random change was physically checked on ARM for Terran; the
 other three products have host checks for this change.
+
+## Human Random in the Blood Bath preview
+
+The [joint N64 capture](2026-11-12-n64-blood-bath-opening.md#random-races-consume-the-launch-stream-first)
+confirms the human draws before the active CPU rows. The preview offers
+this option on Blood Bath only and restores the most recent named
+human choice if the player switches to Outpost. There is no save
+format change: the human race field and the v2 start word store the
+resolved result.
+
+Source `f2010444fd97582ef697bc9c0664e2a962822a39` passed the native
+selector fixture, all four preview sanitizer profiles and the normal
+Terran opening matrix. A port-free mGBA replay used physical inputs
+and read-only guest memory on the Terran ARM ROM
+`b2ace7120b80cc7faa8b4a6ea8c87f7c2e7f9bd87aef04b79f44616a59974bd2`.
+Two launches with Human Random and two CPU Random rows matched the
+observed clock draws. In the non-Terran launch, 5679 ms resolves
+Zerg / Terran / Protoss / Protoss and produces start word `0x534d0f1e`.
+The human hatchery and all CPU halls matched their expected owners and
+positions. The preview and a prior normal Terran ROM reproduced the
+saved state, 60 updates and pause restart and left SRAM bytes
+unchanged. A named Outpost match also matched the prior normal ROM
+after switching away from Human Random.
+
+The private receipt SHA-256 values are
+`95f332146f5bb41cacc4cd942b826ee74b6321818b0b1b8182c3b8eeaeadd395`
+(joint Random and Outpost) and
+`04152731c105e0e57484a6560feed3d7286e4061e1fdf6c5decaf8546f391b0a`
+(non-Terran Human Random and normal cross-load). This covers one ARM
+profile in emulation; the other products have sanitizer coverage.
