@@ -57,4 +57,71 @@ static inline int sc64_skirmish_read_seat_word(int custom, int bots, int word,
     *sparse = seats;
     return 1;
 }
+/* Blood Bath's imported geometry order is a save contract: NW, SE, NE, SW.
+ * The selected base IDs are packed in owner order: human then open CPU rows. */
+enum {
+    SC64_SKIRMISH_BLOOD_BATH_SOLO_ORDER = (3u << 2),
+    SC64_SKIRMISH_BLOOD_BATH_DENSE_ORDER = 2u | (1u << 2) | (3u << 6),
+    SC64_SKIRMISH_START_TAG = 0x534d0000
+};
+
+static inline int sc64_skirmish_start_base(unsigned order, int rank)
+{
+    return (int)((order >> (2u * (unsigned)rank)) & 3u);
+}
+
+static inline int sc64_skirmish_start_valid(int bots, unsigned mask, unsigned order)
+{
+    if (bots < 1 || bots > SC64_SKIRMISH_SEAT_COUNT ||
+        (mask & ~SC64_SKIRMISH_SEAT_MASK) || sc64_skirmish_seat_count(mask) != bots ||
+        !order || (order >> (2u * (unsigned)(bots + 1)))) return 0;
+    unsigned used = 0;
+    for (int rank = 0; rank <= bots; ++rank) {
+        unsigned bit = 1u << sc64_skirmish_start_base(order, rank);
+        if (used & bit) return 0;
+        used |= bit;
+    }
+    return 1;
+}
+
+static inline int sc64_skirmish_start_word(int last_race, unsigned mask, unsigned order)
+{
+    return SC64_SKIRMISH_START_TAG | (int)(order << 5) | (int)(mask << 2) | last_race;
+}
+
+static inline int sc64_skirmish_read_start_word(int custom, int blood_bath, int bots, int word,
+                                                int *last_race, unsigned *sparse, unsigned *order)
+{
+    unsigned bits = (unsigned)word;
+    if ((bits & ~0x1fffu) != SC64_SKIRMISH_START_TAG) {
+        if (!sc64_skirmish_read_seat_word(custom, bots, word, last_race, sparse)) return 0;
+        *order = 0;
+        return 1;
+    }
+    unsigned race = bits & 3u, mask = (bits >> 2) & SC64_SKIRMISH_SEAT_MASK;
+    unsigned starts = (bits >> 5) & 0xffu;
+    if (custom != 1 || !blood_bath || race >= 3 || !sc64_skirmish_start_valid(bots, mask, starts))
+        return 0;
+    *last_race = (int)race;
+    *sparse = mask == sc64_skirmish_dense_seats(bots) ? 0 : mask;
+    *order = starts;
+    return 1;
+}
+#ifdef SC64_NATIVE_MELEE_STARTS
+#include "sc64_native_start_selector.h"
+
+static inline unsigned sc64_skirmish_blood_bath_start_order(unsigned seats, uint32_t seed)
+{
+    /* CHK markers are SE, SW, NW, NE. The saved GBA base IDs are NW, SE, NE, SW. */
+    static const uint8_t gba_base_by_marker[] = {1, 3, 0, 2};
+    Sc64NativeMeleeStarts starts;
+    unsigned rows = (seats << 1) | 1u; /* human occupies row zero */
+    if (!sc64_native_melee_starts(seed, rows, 15u, &starts)) return 0;
+    unsigned order = 0, rank = 0;
+    for (unsigned row = 0; row < 4; ++row)
+        if (rows & (1u << row))
+            order |= (unsigned)gba_base_by_marker[starts.marker_by_row[row]] << (2u * rank++);
+    return order;
+}
+#endif
 #endif

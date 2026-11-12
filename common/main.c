@@ -114,6 +114,9 @@ int main(void) {
 #endif
 #endif
         u32 start=gba_clock();
+#if defined(SC64_NATIVE_MELEE_STARTS) && defined(SC64_IMPORTED_SKIRMISH)
+        gba_elapsed_clock_sample(start);
+#endif
         u16 held=gba_keys();
 #ifndef GBA_NO_DEBUG_INPUTS
         held|=demo_inject_keys;

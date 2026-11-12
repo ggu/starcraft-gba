@@ -6,8 +6,11 @@ Protoss to Random, then Closed, then Zerg. With the first and third rows
 closed, the original started a match with only middle-row Terran. The
 field captures did not establish which physical start that computer used.
 
-The GBA custom menu now keeps all three seats visible. Closed skips that
-map start. Random resolves once per seat on Launch; restart and load
+The original GBA seat implementation kept all three seats visible and
+skipped the map start associated with a closed row. [Later Blood Bath
+checks](2026-11-12-blood-bath-resolved-starts.md) found two specific lobby
+layouts that use different physical starts. Random resolves once per
+seat on Launch; restart and load
 reuse the resolved race. Both maps and all human races remain available.
 The Opponents shortcut opens the first N seats, and a lobby cannot start
 with no opponents. Sparse setups use the corresponding existing GBA map

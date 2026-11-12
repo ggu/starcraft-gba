@@ -2282,7 +2282,12 @@ static int race_save_game(void) {
         };
     memcpy(race_data.state,state,sizeof(state));
 #ifdef SC64_IMPORTED_SKIRMISH
-    if(race_mode && race_skirmish_slots){
+    if(race_mode && race_skirmish_start_order){
+        unsigned mask=race_skirmish_slots ? race_skirmish_slots : sc64_skirmish_dense_seats(race_bots);
+        if(race_skirmish_map!=SC64_MAP_BLOOD_BATH || race_bot_races[2]<0 || race_bot_races[2]>=3 ||
+           !sc64_skirmish_start_valid(race_bots,mask,race_skirmish_start_order))return 0;
+        race_data.state[23]=sc64_skirmish_start_word(race_bot_races[2],mask,race_skirmish_start_order);
+    }else if(race_mode && race_skirmish_slots){
         if(!sc64_skirmish_sparse_valid(race_bots,race_skirmish_slots) ||
            race_bot_races[2]<0 || race_bot_races[2]>=3)return 0;
         race_data.state[23]=sc64_skirmish_seat_word(race_bot_races[2],race_skirmish_slots);
@@ -3157,8 +3162,9 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(v[20]<0||v[20]>SC64_SKIRMISH_IMPORTED_COUNT)return 0;
     for(int i=21;i<23;i++)if(v[i]<0||v[i]>2)return 0;
     int saved_last_race;
-    unsigned saved_sparse;
-    if(!sc64_skirmish_read_seat_word(v[0],v[4],v[23],&saved_last_race,&saved_sparse))return 0;
+    unsigned saved_sparse,saved_starts;
+    if(!sc64_skirmish_read_start_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
+                                    &saved_last_race,&saved_sparse,&saved_starts))return 0;
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
@@ -4837,7 +4843,8 @@ static int race_load_game(void) {
     race_skirmish_map=v[20];for(int i=0;i<2;i++)race_bot_races[i]=v[21+i];
     /* Already checked by race_load_preflight; no partially loaded world on
      * malformed seating. */
-    (void)sc64_skirmish_read_seat_word(v[0],v[4],v[23],&race_bot_races[2],&race_skirmish_slots);
+    (void)sc64_skirmish_read_start_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
+                                     &race_bot_races[2],&race_skirmish_slots,&race_skirmish_start_order);
 #endif
     minerals=v[5];gas=v[6];frame=v[7];cx=v[8];cy=v[9];train_type=v[10];
     weapons_level=v[11];armor_level=v[12];weapons_research=v[13];armor_research=v[14];seed=(u32)v[15];

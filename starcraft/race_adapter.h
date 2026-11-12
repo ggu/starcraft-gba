@@ -109,6 +109,8 @@ static int race_skirmish_owner_base(int owner)
 {
     int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : owner == 4 ? 3 : -1;
 #ifdef SC64_IMPORTED_SKIRMISH
+    if (race_skirmish_start_order && base >= 0)
+        return base <= race_bots ? sc64_skirmish_start_base(race_skirmish_start_order,base) : -1;
     if (base > 0 && race_skirmish_slots) {
         int seat = sc64_skirmish_bot_seat(race_skirmish_slots, base - 1);
         return seat >= 0 ? seat + 1 : -1;
@@ -1935,7 +1937,8 @@ static void race_skirmish_init(void)
         }
     }
     supply_cap = race_owner_supply_capacity(SIDE);
-    cx = race_base_x[0]; cy = race_base_y[0]; camx = camy = 0;
+    int human_base = race_skirmish_owner_base(SIDE);
+    cx = race_base_x[human_base]; cy = race_base_y[human_base]; camx = camy = 0;
     selected_building = -1; mode = MODE_NORMAL; menu_open = 0;
     enemy_timer = 0; wave = 0; invalidate_path_grid(); update_exploration();
 }

@@ -412,11 +412,37 @@ static void test_independent_skirmish_seats(void)
         }
     }
 }
+
+static void test_blood_bath_start_wire(void)
+{
+    int race;
+    unsigned sparse, order;
+    int v1 = sc64_skirmish_seat_word(2, 2);
+    int solo = sc64_skirmish_start_word(2, 2, SC64_SKIRMISH_BLOOD_BATH_SOLO_ORDER);
+    int dense = sc64_skirmish_start_word(2, 7, SC64_SKIRMISH_BLOOD_BATH_DENSE_ORDER);
+    assert(sc64_skirmish_read_start_word(1, 1, 1, v1, &race, &sparse, &order) &&
+           race == 2 && sparse == 2 && !order);
+    assert(sc64_skirmish_read_start_word(0, 0, 2, 2, &race, &sparse, &order) &&
+           race == 2 && !sparse && !order);
+    assert(sc64_skirmish_read_start_word(1, 1, 1, solo, &race, &sparse, &order) &&
+           race == 2 && sparse == 2 && order == SC64_SKIRMISH_BLOOD_BATH_SOLO_ORDER);
+    assert(sc64_skirmish_read_start_word(1, 1, 3, dense, &race, &sparse, &order) &&
+           race == 2 && !sparse && order == SC64_SKIRMISH_BLOOD_BATH_DENSE_ORDER);
+    assert(!sc64_skirmish_read_start_word(0, 1, 1, solo, &race, &sparse, &order));
+    assert(!sc64_skirmish_read_start_word(1, 0, 1, solo, &race, &sparse, &order));
+    assert(!sc64_skirmish_read_start_word(1, 1, 2, solo, &race, &sparse, &order));
+    assert(!sc64_skirmish_read_start_word(1, 1, 1, solo | 1, &race, &sparse, &order));
+    assert(!sc64_skirmish_read_start_word(1, 1, 1, solo | (1 << 13), &race, &sparse, &order));
+    assert(!sc64_skirmish_read_start_word(1, 1, 1, solo | (1 << 9), &race, &sparse, &order));
+    assert(!sc64_skirmish_read_start_word(1, 1, 1,
+        sc64_skirmish_start_word(0, 2, 5), &race, &sparse, &order)); /* duplicate base 1 */
+}
 #endif
 
 int main(void) {
 #ifdef SC64_IMPORTED_SKIRMISH
     test_independent_skirmish_seats();
+    test_blood_bath_start_wire();
 #endif
 #ifdef SC64_SHOWCASE_ENABLED
     test_hidden_showcase();
