@@ -4565,7 +4565,12 @@ test-audio-codec-cross: build/test-audio-codec tests/audio_codec_vectors.py tool
 
 # Optional private check, not part of ./dev test: the C decoder reproduces the
 # generated bank's manifest pcm_sha256 (needs a format-2 bank in SC64_AUDIO_DIR).
-build/test-audio-bank: tests/audio_bank.c common/audio_codec.h common/gba.h $(SC64_AUDIO_DIR)/sc64_audio_generated.h | build
+SC64_AUDIO_BANK_CONFIG := build/sc64-audio-bank-config
+.PHONY: sc64-audio-bank-config-force
+$(SC64_AUDIO_BANK_CONFIG): sc64-audio-bank-config-force | build
+	@printf '%s\n' '$(SC64_AUDIO)' '$(SC64_AUDIO_DIR)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm -f $@.tmp || mv $@.tmp $@
+build/test-audio-bank: tests/audio_bank.c common/audio_codec.h common/gba.h $(SC64_AUDIO_DIR)/sc64_audio_generated.h $(SC64_AUDIO_BANK_CONFIG) | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -DSC64_AUDIO_IMPORTED -I$(SC64_AUDIO_DIR) $< -o $@
 .PHONY: test-audio-bank
 test-audio-bank: build/test-audio-bank

@@ -66,7 +66,7 @@ test-sc64-nuke-journal-compat: test-sc64-nuke-silo-journal test-sc64-nuke-strike
 		"$$strike" prior-silo "$$silo.sav"; "$$silo" legacy "$$strike.descent.sav"; done
 
 define SC64_NUKE_ARM
-build/starcraft-nuke-$(1).elf: $$(COMMON) $$(COMMON_HEADERS) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(4) $$(SC64_NUKE_RUNTIME_ASSETS) common/gba.ld mk/sc64-nuke/Makefile Makefile | build
+build/starcraft-nuke-$(1).elf: $$(COMMON) $$(COMMON_HEADERS) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(4) $$(SC64_NUKE_RUNTIME_ASSETS) $$(SC64_AUDIO_BANK_CONFIG) common/gba.ld mk/sc64-nuke/Makefile Makefile | build
 	$$(CC) $$(CFLAGS) $$(SC64_NUKE_RUNTIME_FLAGS) $$(SC64_NUKE_STRIKE_FLAGS) $(2) $$(COMMON) $$(STARCRAFT) $(4) $$(LDFLAGS) -Wl,-Map,build/starcraft-nuke-$(1).map -lgcc -o $$@
 	$$(SIZE) $$@
 build/StarCraft-Nuke-Probe-$(1)-GBA.gba: build/starcraft-nuke-$(1).elf tools/fix_rom.py
@@ -83,7 +83,7 @@ sc64-nuke-probe: $(foreach profile,terran z10 p10 showcase,build/StarCraft-Nuke-
 
 .PHONY: sc64-nuke-arm-world
 sc64-nuke-arm-world: build/StarCraft-Nuke-World-ARM-Test-GBA.gba
-build/starcraft-nuke-arm-world.elf: tests/sc64_nuke_world_game.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.ld mk/sc64-nuke/Makefile Makefile | build
+build/starcraft-nuke-arm-world.elf: tests/sc64_nuke_world_game.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) $(SC64_AUDIO_BANK_CONFIG) common/gba.ld mk/sc64-nuke/Makefile Makefile | build
 	$(CC) $(CFLAGS) $(SC64_NUKE_RUNTIME_FLAGS) $(SC64_NUKE_STRIKE_FLAGS) $(TERRAN_ROM_FLAGS) -DSC64_NUKE_ARM_WORLD_TEST $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Nuke-World-ARM-Test-GBA.gba: build/starcraft-nuke-arm-world.elf tools/fix_rom.py
