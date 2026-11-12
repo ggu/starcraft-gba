@@ -14,6 +14,16 @@ class MarineSnapshotTest(unittest.TestCase):
                    [([7170,10,256,0,0,0],[7170,10,0,0,0,0])])
   with self.assertRaises(ValueError):m.admit_plan(control,False)
   with self.assertRaises(ValueError):m.admit_plan(stop,True)
+ def test_pause_uses_only_the_native_start_intervention(self):
+  fixtures=ROOT/'tests/sc64-ares-observer/fixtures'
+  control=(fixtures/'native-marine-no-stop-late.txt').read_bytes()
+  pause=(fixtures/'native-marine-pause-late.txt').read_bytes()
+  _,cr=m.admit_plan(control,True);_,pr=m.admit_plan(pause,False,True)
+  self.assertEqual([(c,p) for c,p in zip(cr,pr,strict=True) if c!=p],
+                   [([7170,10,0,0,0,0],[7170,10,2,0,0,0])])
+  for ns,pa in ((False,False),(True,False),(True,True)):
+   with self.assertRaises(ValueError):m.admit_plan(pause,ns,pa)
+  with self.assertRaises(ValueError):m.admit_plan(control,False,True)
  def test_plan_prefix_and_capture_boundaries(self):
   d=(ROOT/'tests/sc64-ares-observer/fixtures/native-marine-discovery-late.txt').read_bytes();self.assertEqual(hashlib.sha256(d).hexdigest(),m.COMMAND_SHA);rows=m.planned_rows(d)
   self.assertEqual([(r[0],r[2]) for r in rows if r[2] in (64,256)],[(7140,64),(7170,256)])

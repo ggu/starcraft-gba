@@ -93,3 +93,36 @@ for this selected T1 Marine. Snapshot spacing cannot establish the exact
 stopping tick, store instruction or game-clock cadence. The global word at
 `0xe02ec` still points to the other record at the last two boundaries in
 both trials; this is not a selected-unit ABI.
+
+### 2026-11-12: matched Start pause control
+
+The separate Start plan `fd689fdb…` differs from the no-STOP control only
+by asserting mask 2 at steps 7,170–7,179. The observer records eight positive
+Start polls in that interval. The same ROM, binary, ares source and MoltenVK
+pins were verified. The first attempt stopped at the 5 GiB disk guard and is
+not evidence for the final state. The retry completed all 7,231 steps and
+passed the three RAM and three frame witness checks under the original caps.
+Its manifest SHA-256 is
+`1f78c9fcdad2f78ec1c0a426f0492fb29c6c96c3f86cf1e0d6be01c6d3ab8e55`;
+the recorded output before manifest was 61,698,521 bytes.
+
+The full RAM views and frame hashes match the no-STOP control at both
+pre-input boundaries, 7,090 and 7,169. The final Start frame visibly reads
+**Game Paused** and offers **Resume**. In the same authenticated 40-HP
+Marine record, the move order (6) and destination (702,159) are still
+present, as are nonzero motion-shaped values. The position-shaped pair
+reaches (187,172) by step 7,230, versus (243,157) without Start. The paired
+STOP trial instead clears the destination and motion words by that boundary.
+Thus the pause intervention preserves the pending move in this scene; it is
+distinct from STOP. These samples do not isolate the exact pause update or
+show that motion resumes correctly after unpausing.
+
+As a candidate filter, scan aligned big-endian 32-bit RAM words for deltas
+between 2 and 100 in both unpaused intervals, approximately proportional to
+their 79 and 61 observer steps (`abs(d1 * 61 - d2 * 79) <= 158`), and for
+less than half the latter delta after Start. Three addresses pass: two
+pointer-shaped values and a small integer at physical `0x11dc54` that reads
+0, 3, 6 in the running sequence and 3 at the paused endpoint. This is a lead,
+not an identified game clock. Require a separate pause/resume and idle
+comparison, actual update-write evidence, and an independent event interval
+before using any such word to tune GBA timing.
