@@ -359,6 +359,56 @@ static void test_immediate_weapons(void)
 #endif
 }
 
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+/* Fixture-seeded actors; run actual approach, collision and weapon damage.
+ * A source footprint may block a different number of cells depending on
+ * where its center falls within a tile. Exercise every phase on both axes. */
+static void test_melee_approaches_bounded_structures(void)
+{
+    const int types[] = { B_ZP_CONTROL_TOWER, B_ZP_MACHINE_SHOP, B_ZP_ARMORY,
+                          B_ZP_QUEENS_NEST, B_ZP_ULTRALISK_CAVERN };
+    const int attackers[] = { U_ZERGLING, U_ZEALOT };
+    const int dx[] = { -1, 1, 0, 0 }, dy[] = { 0, 0, -1, 1 };
+    int cx = -1, cy = -1;
+    setup();
+    for (int r = 5; r < MAP_ROWS - 5 && cy < 0; ++r)
+        for (int c = 5; c < MAP_COLS - 5 && cy < 0; ++c) {
+            int clear = 1;
+            for (int y = r - 5; y <= r + 5; ++y)
+                for (int x = c - 5; x <= c + 5; ++x)
+                    if (terrain_blocked(x, y)) clear = 0;
+            if (clear) { cx = c * 16; cy = r * 16; }
+        }
+    assert(cx >= 0 && cy >= 0);
+    for (unsigned k = 0; k < sizeof(types) / sizeof(types[0]); ++k)
+        for (unsigned a = 0; a < sizeof(attackers) / sizeof(attackers[0]); ++a)
+            for (int face = 0; face < 4; ++face)
+                for (int phase = 0; phase < 16; ++phase) {
+                    int x = cx + phase, y = cy + ((phase * 7) & 15);
+                    setup();
+                    int slot = spawn_build(ENEMY, types[k], x, y, 0);
+                    int mover = add_unit(SIDE, attackers[a], x + dx[face] * 80,
+                                                              y + dy[face] * 80);
+                    assert(slot >= 0);
+                    build_path_grid();
+                    assert(!SC64_GRID_GET(path_walkable, x / 16 + y / 16 * MAP_COLS));
+                    int hp = b[slot].hp, target = MAX_UNITS + slot;
+                    tick_combat(&u[mover], target);
+                    assert(b[slot].hp == hp && observed_count == 0);
+                    /* Motion uses the live tick for fractional step phase. */
+                    for (int tick = 0; tick < 180 && b[slot].hp == hp; ++tick) {
+                        ++frame;
+                        tick_combat(&u[mover], target);
+                    }
+                    if (b[slot].hp >= hp)
+                        fprintf(stderr, "No melee hit: unit %d, structure %d, face %d, phase %d, offset (%d,%d)\n",
+                                attackers[a], types[k], face, phase, u[mover].x - x, u[mover].y - y);
+                    assert(b[slot].hp < hp && observed_count > 0);
+                }
+    puts("Melee approaches across source structure footprints: PASS");
+}
+#endif
+
 #ifdef SC64_IMPACT_EVENTS
 static RaceImpactRecord record_copy;
 
@@ -459,8 +509,17 @@ static void test_save_capacity(void)
 }
 #endif
 
-int main(void)
+int main(int argc, char **argv)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (argc == 2 && !strcmp(argv[1], "--structure-melee")) {
+        test_melee_approaches_bounded_structures();
+        return 0;
+    }
+#else
+    (void)argv;
+#endif
+    if (argc != 1) return 2;
 #ifdef SC64_IMPACT_EVENTS
     test_impact_matches_presentation();
     test_moving_target_still_hit();
@@ -478,5 +537,8 @@ int main(void)
     puts("Immediate damage without source projectiles: PASS");
 #endif
     test_immediate_weapons();
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    test_melee_approaches_bounded_structures();
+#endif
     return 0;
 }
