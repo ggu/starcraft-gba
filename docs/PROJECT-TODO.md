@@ -819,8 +819,10 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    with matching pixels and state; finish the remaining cartridge paths.
    The [packed sight-row probe](audits/2026-11-12-packed-sight-rows.md)
    saves 2.63–2.85% with the current split cache, with matched state and
-   pixels. All four late Zerg ROMs verify and flag-off Z10 is byte-identical;
-   finish the enabled full replay, legacy continuation and custom checks.
+   pixels. All four late Zerg ROMs verify and flag-off Z10 is byte-identical.
+   Enabled Z10 wins from SRAM with 60 matching checkpoints, and the current
+   64×64 custom window is 0.93% faster with matching sampled state. Verify a
+   legacy campaign continuation before changing the default.
    Historical inclusive scopes are not promised savings. The N64
    order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
@@ -845,9 +847,12 @@ controller failures. The [native Blood Bath opening](audits/2026-11-12-n64-blood
 now reaches play with each named human race against a mixed Zerg, Terran
 and Protoss lineup. The native and normal GBA Z10 HUDs agree on 50 starting
 minerals and race-specific supply (Terran 4/10; Zerg and Protoss 4/9).
-Minerals rise with neutral input in all six runs. Next establish equal-speed
-timing, native AI wallets and full-match behavior; the opening does not
-qualify those.
+Minerals rise with neutral input in all six runs. Native computer rows can
+independently choose Random or Closed; the N64 also starts a match with
+only the middle computer row occupied. The GBA uses an AI count and named
+races. Compare starting slots with a clean capture before treating the two
+menus as equivalent. Equal-speed timing, AI wallets and full-match
+behavior remain unverified.
 
 ## Current work and open PRs
 
