@@ -197,6 +197,7 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
     for (i = 0; i < MAX_BUILDINGS; ++i) {
         const Building *q = &b[i];
         int key;
+        const Sc64RaceBuildingRule *br;
         if (!q->alive) continue;
         if (q->owner != owner) {
             int raw;
@@ -209,6 +210,7 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             continue;
         }
         ++c->buildings;
+        br = sc64_race_building_rule(q->type);
         /* A Creep Colony morphing into a Sunken Colony counts as the
          * pending Sunken (race_construction_deferred_morph). */
         key = race_ai_key(sc64_race_raw_building(race_construction_deferred_morph(q) >= 0 ?
@@ -216,15 +218,12 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
         if (q->under_construction &&
             !(race_mode && (q->type == B_LAIR || q->type == B_HIVE))) {
             if (key >= 0 && c->pend[key] < 255) ++c->pend[key];
-            if (race_ai_is_depot(q->type) || q->type == B_DEPOT || q->type == B_PYLON)
+            if (br && br->race == c->race && br->supply_provided)
                 ++c->pending_supply;
             continue;
         }
         if (key >= 0 && c->have[key] < 255) ++c->have[key];
-        {
-            const Sc64RaceBuildingRule *br = sc64_race_building_rule(q->type);
-            if (br) c->supply_cap += br->supply_provided;
-        }
+        if (br && br->race == c->race) c->supply_cap += br->supply_provided;
         if (race_ai_is_depot(q->type) && c->depots < RACE_AI_MAX_DEPOTS)
             c->depot[c->depots++] = i;
         if ((q->type == B_REFINERY || q->type == B_EXTRACTOR || q->type == B_ASSIMILATOR) &&
@@ -238,11 +237,12 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             int queued = q->queue[(q->queue_head + j) % 5];
             int qk = race_ai_key(sc64_race_raw_unit(queued));
             if (qk >= 0 && c->pend[qk] < 255) ++c->pend[qk];
-            if (queued == U_OVERLORD) ++c->pending_supply;
+            if (queued == U_OVERLORD && c->race == R_ZERG) ++c->pending_supply;
             c->queued_units += sc64_race_product_count(queued);
             {
                 const Sc64RaceUnitRule *qr = sc64_race_unit_rule(queued);
-                if (qr) c->supply_queued += qr->supply * sc64_race_product_count(queued);
+                if (qr && qr->race == c->race)
+                    c->supply_queued += qr->supply * sc64_race_product_count(queued);
             }
         }
     }
@@ -272,8 +272,10 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             /* Loaded passengers still count against supply. */
             if (q->owner == owner) {
                 const Sc64RaceUnitRule *ur = sc64_race_unit_rule(q->type);
-                if (ur) c->supply_used += ur->supply;
-                c->supply_cap += sc64_race_unit_supply_provided(q->type);
+                if (ur && ur->race == c->race) {
+                    c->supply_used += unit_slot_supply(q);
+                    c->supply_cap += sc64_race_unit_supply_provided(q->type);
+                }
             }
             continue;
         }
@@ -314,12 +316,10 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             int key = race_ai_key(sc64_race_raw_unit(q->type));
             const Sc64RaceUnitRule *ur = sc64_race_unit_rule(q->type);
             if (key >= 0 && c->have[key] < 255) ++c->have[key];
-#ifdef SC64_Z7_EGG_PRODUCTION
-            if (ur) c->supply_used += unit_slot_supply(q);
-#else
-            if (ur) c->supply_used += ur->supply;
-#endif
-            c->supply_cap += sc64_race_unit_supply_provided(q->type);
+            if (ur && ur->race == c->race) {
+                c->supply_used += unit_slot_supply(q);
+                c->supply_cap += sc64_race_unit_supply_provided(q->type);
+            }
         }
         if (sc64_race_is_worker(q->type)) {
             ++c->workers;
@@ -335,7 +335,7 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
                 ++c->pending_builders;
                 if (key >= 0 && c->pend[key] < 255) ++c->pend[key];
                 if (r) { c->reserve_minerals += r->minerals; c->reserve_gas += r->gas; }
-                if (q->target == B_DEPOT || q->target == B_PYLON || race_ai_is_depot(q->target))
+                if (r && r->race == c->race && r->supply_provided)
                     ++c->pending_supply;
             }
         } else if (race_ai_armed(q->type)) {
@@ -803,8 +803,8 @@ static int race_ai_home_unpowered(const RaceAiCensus *c)
 
 static int race_ai_supply(RaceAiCensus *c)
 {
-    /* Census totals follow race_owner_supply_cap and
-     * race_owner_reserved_supply; race_queue_unit still checks admission. */
+    /* Census tracks the planner's race. The production gate checks the
+     * requested product's actual race again before debiting the wallet. */
     int cap = c->supply_cap;
     int free_supply = cap - c->supply_used - c->supply_queued;
     c->free_supply = free_supply;
