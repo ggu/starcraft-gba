@@ -188,6 +188,14 @@ build/test-sc64-z9-carried-profile: tests/sc64_promoted_race_profile.c tests/sc6
 test-sc64-z9-carried-profile: build/test-sc64-z9-carried-profile
 	./build/test-sc64-z9-carried-profile
 
+# The ten-mission cartridge must preserve campaign and custom menus and saves.
+build/test-sc64-z10-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z10_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z10-carried-profile
+test-sc64-z10-carried-profile: build/test-sc64-z10-carried-profile
+	./build/test-sc64-z10-carried-profile
+test-zerg-z10: test-sc64-z10-carried-profile
+
 # Ordinary-input carried controllers linked with the complete Z9 vector.
 define Z9_CARRIED_CONTROLLER
 build/test-sc64-z9-carried-$(1): tests/$(2).c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build

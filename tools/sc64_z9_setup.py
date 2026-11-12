@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Preparation and readiness checks for the nine-mission Zerg product.
+"""Preparation and readiness checks for the late Zerg products.
 
 The dev wrapper prepares its inherited Z7 inputs first. This layer authenticates
-the two later source scenarios and builds the additional private bank/programs.
+the later source scenarios and builds the additional private bank/programs.
 It does not migrate existing saves.
 """
 from __future__ import annotations
@@ -56,10 +56,10 @@ def bank_ready(path: Path) -> bool:
                          text, re.MULTILINE) for marker in BANK_MARKERS)
 
 
-def readiness(root: Path) -> list[tuple[str, Path, bool]]:
+def readiness(root: Path, *, include_z10: bool = False) -> list[tuple[str, Path, bool]]:
     """Read only; reject stale source descriptors and edited program tables."""
     rows = [("Expanded Zerg source sprite bank", root / BANK, bank_ready(root / BANK))]
-    for mission in ("Z8", "Z9"):
+    for mission in (("Z8", "Z9", "Z10") if include_z10 else ("Z8", "Z9")):
         descriptor, header = paths(root, mission)
         valid, program = False, False
         try:
@@ -74,7 +74,7 @@ def readiness(root: Path) -> list[tuple[str, Path, bool]]:
     return rows
 
 
-def prepare(root: Path, run: Callable[[list[str]], None]) -> None:
+def prepare(root: Path, run: Callable[[list[str]], None], *, include_z10: bool = False) -> None:
     """Use the already verified, privately retained ROM and source CHKs.
 
     Existing descriptors must verify before reuse: the packers deliberately
@@ -83,7 +83,7 @@ def prepare(root: Path, run: Callable[[list[str]], None]) -> None:
     py = sys.executable
     rom = root / ".local/sc64/rom/StarCraft64-USA.z64"
     source = root / ".local/sc64/zp-stage/generated/source_maps"
-    for mission in ("Z8", "Z9"):
+    for mission in (("Z8", "Z9", "Z10") if include_z10 else ("Z8", "Z9")):
         descriptor, header = paths(root, mission)
         tool = "sc64_z8_pack.py" if mission == "Z8" else "sc64_zerg_late_pack.py"
         args = [py, str(root / "tools" / tool)]
@@ -104,13 +104,13 @@ def prepare(root: Path, run: Callable[[list[str]], None]) -> None:
          "--include-zerg-late-art", "--prepack-unit-words",
          "--out", str((root / BANK).parent / "sprites"),
          "--header", str(root / BANK)])
-    missing = [label for label, _, ready in readiness(root) if not ready]
+    missing = [label for label, _, ready in readiness(root, include_z10=include_z10) if not ready]
     if missing:
-        raise RuntimeError("Z9 preparation is incomplete: " + ", ".join(missing))
+        raise RuntimeError(f"{'Z10' if include_z10 else 'Z9'} preparation is incomplete: " + ", ".join(missing))
 
 
-def status(root: Path) -> int:
-    rows = readiness(root)
+def status(root: Path, *, include_z10: bool = False) -> int:
+    rows = readiness(root, include_z10=include_z10)
     for label, path, ready in rows:
         print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}")
     return int(any(not ready for _, _, ready in rows))

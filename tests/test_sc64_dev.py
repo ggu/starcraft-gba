@@ -365,19 +365,21 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.PLAY_SAVE_PROFILES['zerg'], dev.PLAY_SAVE_PROFILES['zerg-z9'])
         self.assertEqual(dev.PLAY_SAVE_PROFILES['zerg'], 'zerg-z9')
         self.assertEqual(dev.PLAY_SAVE_PROFILES['zerg-z7'], 'zerg-z7-transport1')
-        for profile in ('zerg', 'zerg-z9'):
+        for profile in ('zerg', 'zerg-z9', 'zerg-z10'):
+            include_z10 = profile == 'zerg-z10'
+            stage = 'Z10' if include_z10 else 'Z9'
             calls = []
             with patch.object(dev, 'prepare', side_effect=lambda rom, p: calls.append(p)), \
                  patch.object(sc64_z9_setup, 'prepare') as late:
                 original_prepare(Path('/owned/rom'), profile)
             self.assertEqual(calls, ['zerg-z7'])
-            late.assert_called_once_with(dev.ROOT, dev.run)
+            late.assert_called_once_with(dev.ROOT, dev.run, include_z10=include_z10)
             with patch.object(dev, 'status', return_value=0) as ready, patch.object(dev, 'run') as run:
                 dev.build(profile)
             ready.assert_called_once_with(profile, include_built=False)
             run.assert_called_once_with(['make', dev.GAMES[profile][0]])
             with patch.object(dev, 'status', return_value=1), patch.object(dev, 'run') as run:
-                with self.assertRaisesRegex(RuntimeError, 'Z9 requires prepared inputs'):
+                with self.assertRaisesRegex(RuntimeError, f'{stage} requires prepared inputs'):
                     dev.build(profile)
                 run.assert_not_called()
             for inherited, late_ready, expected in ((0, 0, 0), (1, 0, 1), (0, 1, 1)):
@@ -385,7 +387,7 @@ class OnboardingTests(unittest.TestCase):
                      patch.object(sc64_z9_setup, 'status', return_value=late_ready) as late_status:
                     self.assertEqual(original_status(profile, include_built=False), expected)
                 inherited_status.assert_called_once_with('zerg-z7', include_built=False)
-                late_status.assert_called_once_with(dev.ROOT)
+                late_status.assert_called_once_with(dev.ROOT, include_z10=include_z10)
 
     def test_canonical_race_verifiers_use_current_mission_identities(self):
         self.assertEqual(verify_roms.TARGETS['--zerg'],
@@ -436,7 +438,7 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.GAMES['zerg-z4'], ('zerg-z4', 'build/StarCraft-Zerg-Z4-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES,
-                         {'terran': 'terran-transport1', 'zerg': 'zerg-z9', 'zerg-z9': 'zerg-z9', 'zerg-z6': 'zerg-z6', 'zerg-z7': 'zerg-z7-transport1',
+                         {'terran': 'terran-transport1', 'zerg': 'zerg-z9', 'zerg-z9': 'zerg-z9', 'zerg-z10': 'zerg-z10', 'zerg-z6': 'zerg-z6', 'zerg-z7': 'zerg-z7-transport1',
                           'zerg-z6-probe': 'zerg-z6', 'zerg-z4': 'zerg-z4', 'zerg-z3': 'zerg',
                           'protoss': 'protoss-p10-transport1', 'protoss-p7': 'protoss-p7-transport1',
                           'protoss-p6': 'protoss-p6', 'protoss-p3': 'protoss',
