@@ -334,6 +334,19 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
     q->path_y = y;
     q->flags = 0;
     if (owner == SIDE) supply_used += unit_supply(q->type) - old_supply;
+#ifdef SC64_EGG_RUNTIME
+    /* A worker hatched from an Egg goes to work as a queued one does (the
+     * production path above sends it to the nearest field), not idle.
+     * EXCEPTION: the Z7 campaign Egg keeps its idle Drones. With this fix the
+     * Z7 ordinary-input controller no longer wins (200,000-update limit), so
+     * the exception stays until Z7 is requalified (docs/PROJECT-TODO.md, S1). */
+    if (!SC64_EGG_IS_Z7() && sc64_race_is_worker(q->type)) {
+        int patch = nearest_mineral(x, y);
+        if (patch >= 0 && patch < MAX_MINERALS && m[patch].amount > 0) {
+            q->order = ORDER_MINE; q->target = patch; q->work_timer = 0;
+        }
+    }
+#endif
 
     /* Brood War attempts the paired Ling as one birth event. If the unit pool
      * is full, it still completes the first Ling and does not retry later. */

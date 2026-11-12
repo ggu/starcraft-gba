@@ -4206,6 +4206,21 @@ sc64_target_hostility_snapshot(void)
     target_hostile_masks_valid = 1;
 }
 #endif
+#ifdef SC64_EGG_RUNTIME
+/* Egg fallback bookkeeping stays out of the IWRAM-resident scan. */
+static int __attribute__((noinline))
+sc64_egg_target_note(int egg_best, int *egg_distance, int d, int entity,
+                     int attacker, int owner SC64_P7_SOURCE_OWNER_PARAM)
+{
+    if (d < *egg_distance &&
+        sc64_auto_target_candidate_allowed(attacker, entity, owner,
+                                           SC64_P7_SOURCE_OWNER_VALUE)) {
+        *egg_distance = d;
+        return entity;
+    }
+    return egg_best;
+}
+#endif
 static int GBA_HOT __attribute__((noinline))
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
 __attribute__((optimize("Os")))
@@ -4265,13 +4280,9 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                     d = dist2(x, y, candidate_x, candidate_y);
 #ifdef SC64_EGG_RUNTIME
                     if (entity < MAX_UNITS && u[entity].type == SC64_EGG_ACTOR) {
-                        if (d < egg_distance &&
-                            sc64_auto_target_candidate_allowed(
-                                attacker, entity, owner,
-                                SC64_P7_SOURCE_OWNER_VALUE)) {
-                            egg_distance = d;
-                            egg_best = entity;
-                        }
+                        egg_best = sc64_egg_target_note(egg_best, &egg_distance, d,
+                            entity, attacker, owner
+                            SC64_P7_SOURCE_OWNER_ARG(SC64_P7_SOURCE_OWNER_VALUE));
                         continue;
                     }
 #endif

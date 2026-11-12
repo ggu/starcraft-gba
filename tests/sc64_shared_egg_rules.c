@@ -151,7 +151,10 @@ static void rule_price_larva_supply_timer_birth(void)
         assert(count_type(SIDE, type) == owned + n);
         assert(supply_used == supply_before);          /* reservation becomes the units */
         assert(supply_used == race_owner_supply(SIDE));
-        assert(u[egg].hp > 0 && u[egg].hp <= u[egg].maxhp && u[egg].order == ORDER_IDLE);
+        assert(u[egg].hp > 0 && u[egg].hp <= u[egg].maxhp);
+        /* A hatched worker goes to the nearest field, as a queued one does. */
+        if (sc64_race_is_worker(type)) assert(u[egg].order == ORDER_MINE && u[egg].target >= 0);
+        else assert(u[egg].order == ORDER_IDLE);
     }
 }
 
