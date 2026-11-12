@@ -1,11 +1,34 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "../starcraft/sc64_native_start_selector.h"
+#include "../common/gba_elapsed_clock.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
+static void test_elapsed_clock(void)
+{
+    GbaElapsedClock clock = {0};
+    assert(gba_elapsed_milliseconds_at(&clock) == 0);
+    gba_elapsed_observe(&clock, (1u << 24) - 1u);
+    assert(gba_elapsed_milliseconds_at(&clock) == 999);
+    gba_elapsed_observe(&clock, 1u << 24);
+    assert(gba_elapsed_milliseconds_at(&clock) == 1000);
+    gba_elapsed_observe(&clock, UINT32_MAX);
+    assert(gba_elapsed_milliseconds_at(&clock) == 255999);
+    gba_elapsed_observe(&clock, 0);
+    assert(gba_elapsed_milliseconds_at(&clock) == 256000);
+    gba_elapsed_observe(&clock, 1u << 23);
+    assert(gba_elapsed_milliseconds_at(&clock) == 256500);
+    for (unsigned i = 0; i < 128; ++i) {
+        gba_elapsed_observe(&clock, UINT32_MAX);
+        gba_elapsed_observe(&clock, 0);
+    }
+    assert(gba_elapsed_milliseconds_at(&clock) == 129u * 256000u);
+}
+
 int main(void)
 {
+    test_elapsed_clock();
     const struct {
         uint32_t seed;
         unsigned occupied;

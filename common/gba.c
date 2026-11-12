@@ -3,6 +3,14 @@
 #include "gba_fog_palette.h"
 #endif
 #include "audio_mixer.h"
+#if defined(SC64_NATIVE_MELEE_STARTS) && defined(SC64_IMPORTED_SKIRMISH)
+#include "gba_elapsed_clock.h"
+#ifndef GBA_HOST
+static GbaElapsedClock gba_elapsed_clock;
+#else
+static u32 gba_host_elapsed_ms;
+#endif
+#endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
 #include "gba_present.h"
 #endif
@@ -313,6 +321,9 @@ void gba_init(void) {
  REG16(0x04000084)=0x0080;
  REG16(0x04000080)=0x9977;
  REG16(0x04000082)=0x0002;
+#if defined(SC64_NATIVE_MELEE_STARTS) && defined(SC64_IMPORTED_SKIRMISH)
+ gba_elapsed_clock=(GbaElapsedClock){0};
+#endif
  REG16(0x04000108)=0; REG16(0x0400010c)=0;
  REG16(0x0400010e)=0x0084; REG16(0x0400010a)=0x0080;
  front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
@@ -373,6 +384,28 @@ return 0;
 u16 hi,lo;do{hi=REG16(0x0400010c);lo=REG16(0x04000108);}while(hi!=REG16(0x0400010c));return ((u32)hi<<16)|lo;
 #endif
 }
+#if defined(SC64_NATIVE_MELEE_STARTS) && defined(SC64_IMPORTED_SKIRMISH)
+void gba_elapsed_clock_sample(u32 cycles)
+{
+#ifdef GBA_HOST
+ (void)cycles;
+#else
+ gba_elapsed_observe(&gba_elapsed_clock,cycles);
+#endif
+}
+u32 gba_elapsed_milliseconds(void)
+{
+#ifdef GBA_HOST
+ return gba_host_elapsed_ms;
+#else
+ gba_elapsed_clock_sample(gba_clock());
+ return gba_elapsed_milliseconds_at(&gba_elapsed_clock);
+#endif
+}
+#ifdef GBA_HOST
+void gba_test_set_elapsed_milliseconds(u32 milliseconds) { gba_host_elapsed_ms=milliseconds; }
+#endif
+#endif
 u16 gba_keys(void){
 #ifdef GBA_HOST
 return 0;

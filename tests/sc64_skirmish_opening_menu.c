@@ -76,15 +76,18 @@ static void sparse_opening_and_save(int map, unsigned seats)
            race_skirmish_slots == seats && race_bots == sc64_skirmish_seat_count(seats));
     int saved_races[3];
     for (int i = 0; i < 3; ++i) saved_races[i] = race_bot_races[i];
-    int southwest = map == SC64_MAP_BLOOD_BATH && race_bots == 1 && saved_races[0] != R_ZERG;
-    unsigned order = southwest ? SC64_SKIRMISH_BLOOD_BATH_SOLO_ORDER : 0;
+    unsigned order = 0;
+#ifdef SC64_NATIVE_MELEE_STARTS
+    if (map == SC64_MAP_BLOOD_BATH)
+        order = race_bots == 1 ? SC64_SKIRMISH_BLOOD_BATH_SOLO_ORDER : 0x31u;
+#endif
     assert(race_skirmish_start_order == order);
     for (int i = 0; i < race_bots; ++i) {
         int seat = sc64_skirmish_bot_seat(seats, i);
         assert(saved_races[i] >= 0 && saved_races[i] <= 2);
         if (seat == 1) assert(saved_races[i] == R_TER);
         check_owner(race_bot_owner_ids[i], saved_races[i]);
-        check_seat(race_bot_owner_ids[i], southwest ? 3 : seat + 1);
+        check_seat(race_bot_owner_ids[i], order ? sc64_skirmish_start_base(order, i + 1) : seat + 1);
     }
     for (int i = race_bots; i < 3; ++i)
         assert(race_player[race_bot_owner_ids[i]] == -1);
@@ -98,14 +101,16 @@ static void sparse_opening_and_save(int map, unsigned seats)
            race_skirmish_start_order == order && race_bots == sc64_skirmish_seat_count(seats));
     for (int i = 0; i < race_bots; ++i) {
         assert(race_bot_races[i] == saved_races[i]);
-        int base = southwest ? 3 : sc64_skirmish_bot_seat(seats, i) + 1;
+        int base = order ? sc64_skirmish_start_base(order, i + 1) : sc64_skirmish_bot_seat(seats, i) + 1;
         check_seat(race_bot_owner_ids[i], base);
         check_fallback(race_bot_owner_ids[i], base);
     }
-    if (southwest) {
+    if (order) {
         tap(KEY_START); assert(screen == SCREEN_PAUSE);
         tap(KEY_R); assert(screen == SCREEN_PLAY && race_skirmish_start_order == order);
-        check_seat(ENEMY, 3);
+        check_seat(SIDE, sc64_skirmish_start_base(order, 0));
+        for (int i = 0; i < race_bots; ++i)
+            check_seat(race_bot_owner_ids[i], sc64_skirmish_start_base(order, i + 1));
     }
     race_frontend_reset();
     for (int i = 0, rank = 0; i < 3; ++i)
@@ -113,38 +118,50 @@ static void sparse_opening_and_save(int map, unsigned seats)
                saved_races[rank++] : SC_FRONT_BOT_CLOSED));
 }
 
-static void dense_blood_bath_start_and_save(void)
+static void dense_blood_bath_start_and_save(unsigned seed, unsigned order)
 {
+#ifdef SC64_NATIVE_MELEE_STARTS
+    gba_test_set_elapsed_milliseconds(seed);
+#else
+    (void)seed;
+#endif
     option_map = SC64_MAP_BLOOD_BATH;
     option_human = R_TER; option_bots = 3;
     option_bot_races[0] = R_ZERG; option_bot_races[1] = R_TER; option_bot_races[2] = R_PROTOSS;
-    const unsigned order = SC64_SKIRMISH_BLOOD_BATH_DENSE_ORDER;
     const int owners[] = {SIDE, ENEMY, RESCUABLE, 4};
-    const int bases[] = {2, 1, 0, 3};
     assert(launch_match() && !race_skirmish_slots && race_skirmish_start_order == order);
     assert(race_base_x[0] == 64 && race_base_y[0] == 120 &&
            race_base_x[1] == 880 && race_base_y[1] == 904 &&
            race_base_x[2] == 880 && race_base_y[2] == 120 &&
            race_base_x[3] == 144 && race_base_y[3] == 904);
-    assert(cx == 880 && cy == 120);
-    for (int i = 0; i < 4; ++i) check_seat(owners[i], bases[i]);
+    int human_base = order ? sc64_skirmish_start_base(order, 0) : 0;
+    assert(cx == race_base_x[human_base] && cy == race_base_y[human_base]);
+    for (int i = 0; i < 4; ++i) check_seat(owners[i], order ? sc64_skirmish_start_base(order, i) : i);
     assert(race_save_game());
-    assert(race_data.state[23] == sc64_skirmish_start_word(R_PROTOSS, 7, order));
+    assert(race_data.state[23] == (order ? sc64_skirmish_start_word(R_PROTOSS, 7, order) : R_PROTOSS));
+#ifdef SC64_NATIVE_MELEE_STARTS
+    gba_test_set_elapsed_milliseconds(seed == 0xf3ae ? 0xf6e0 : 0xf3ae);
+#endif
     game_init(); prior_keys = 0;
     assert(race_load_game() && !race_skirmish_slots && race_skirmish_start_order == order);
     for (int i = 0; i < 4; ++i) {
-        check_seat(owners[i], bases[i]);
-        if (i) check_fallback(owners[i], bases[i]);
+        int base = order ? sc64_skirmish_start_base(order, i) : i;
+        check_seat(owners[i], base);
+        if (i) check_fallback(owners[i], base);
     }
     tap(KEY_START); assert(screen == SCREEN_PAUSE);
     tap(KEY_R); assert(screen == SCREEN_PLAY && race_skirmish_start_order == order);
-    assert(cx == 880 && cy == 120);
-    for (int i = 0; i < 4; ++i) check_seat(owners[i], bases[i]);
+    assert(cx == race_base_x[human_base] && cy == race_base_y[human_base]);
+    for (int i = 0; i < 4; ++i) check_seat(owners[i], order ? sc64_skirmish_start_base(order, i) : i);
 }
+
 #endif
 
 int main(void)
 {
+#ifdef SC64_NATIVE_MELEE_STARTS
+    gba_test_set_elapsed_milliseconds(0xf3ae);
+#endif
     int cases=0;
     for(option_map=0;option_map<SC64_FRONT_MAP_COUNT;++option_map)
       for(option_human=R_TER;option_human<=R_PROTOSS;++option_human)
@@ -170,8 +187,14 @@ int main(void)
         for (unsigned seats = 1; seats <= SC64_SKIRMISH_SEAT_MASK; ++seats)
             if (sc64_skirmish_sparse_valid(sc64_skirmish_seat_count(seats), seats))
                 sparse_opening_and_save(map, seats);
-    dense_blood_bath_start_and_save();
-    puts("Sparse lobbies and qualified Blood Bath starts survive SRAM load and restart");
+#ifdef SC64_NATIVE_MELEE_STARTS
+    dense_blood_bath_start_and_save(0xf3ae, SC64_SKIRMISH_BLOOD_BATH_DENSE_ORDER);
+    dense_blood_bath_start_and_save(0xf6e0, 0x9cu);
+    puts("Native Blood Bath draws survive SRAM load and restart with a changed clock seed");
+#else
+    dense_blood_bath_start_and_save(0, 0);
+    puts("Default dense and sparse Blood Bath starts survive SRAM load and restart");
+#endif
 #endif
     return 0;
 }

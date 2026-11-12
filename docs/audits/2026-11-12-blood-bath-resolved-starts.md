@@ -14,14 +14,20 @@ extracted Blood Bath map. Each opening hall had four workers.
 | Terran; Closed / Closed / Protoss | Northwest | Southwest |
 | Terran; Zerg / Terran / Protoss | Northeast | Southeast / Northwest / Southwest |
 
-A lone Terran or Protoss computer therefore starts southwest in the
-qualified Terran-human configuration, regardless of its lobby row.
-The three-opponent case changes the human start as well. The GBA applies
-these observed assignments to new matches with the same map and resolved
-races. Outpost, two-opponent matches, a lone Zerg computer, other
-three-opponent lineups and other human races retain their existing GBA
-starts. These checks do not establish the N64's general start selection
-algorithm or Random policy.
+These are five outcomes of the [native seeded draw](2026-11-12-n64-blood-bath-opening.md#seeded-melee-start-draw),
+not a fixed table. The optional GBA Melee preview uses that draw on Blood
+Bath for any open rows, with the current GBA's elapsed milliseconds as
+the seed. It observes the existing Timer 2/3 cycle counter once per main
+loop to extend its 256-second wrap, then samples again at Launch. This
+approximates the native clock's role without claiming the same elapsed
+time or draw for the same button tape. Outpost and default products keep
+their existing new-match starts. The port's existing Random race
+selection is separate from the native start draw. Other N64 game modes
+are not covered.
+
+Use `make sc64-native-melee-start-probe` with all four prepared profiles to
+build the private opt-in cartridges. The preview uses distinct ROM names
+and cartridge identities. The default targets do not enable it.
 
 The port's Blood Bath location IDs stay northwest, southeast, northeast,
 southwest. A new resolved-start SRAM marker stores the occupied lobby mask
@@ -29,15 +35,19 @@ and the physical location IDs in human/active computer order. The record
 length and outer save tag stay the same. The loader checks the mode, map,
 number of active seats, legal race and distinct locations before publishing
 the world. Existing untagged dense and original sparse saves keep their
-previous locations for AI fallback and match restart. Previous releases
-will reject the new marker; their save journal may still fall back to an
-older valid record if one exists.
+previous locations for AI fallback and match restart. Changing the clock
+seed after a save does not change the restored locations. A newer default
+build can read a preview save and retains its resolved starts. Releases
+without this loader reject the new marker; their save journal may still
+fall back to an older valid record if one exists.
 
 Canonical host sanitizer checks cover 234 normal starts plus eight sparse
-starts in each of Terran, Zerg Z10, Protoss P10 and Showcase, including
-tagged save/load, AI fallback with the starting hall absent and normal
-pause-menu restart. The three frontend sanitizer variants cover legacy
-and malformed marker decoding. An unchanged prior Terran ARM SRAM image
+starts in each of Terran, Zerg Z10, Protoss P10 and Showcase, with the
+preview both off and on. The preview checks include tagged save/load,
+AI fallback with the starting hall absent, and pause-menu restart with
+a different clock seed. The source-only fixture checks clock conversion
+across the hardware counter wrap. The three frontend sanitizer variants
+cover legacy and malformed marker decoding. An unchanged prior Terran ARM SRAM image
 from the middle-only Blood Bath lobby loaded with the original northeast
 AI hall and fallback origin, kept its old marker on re-save, and restarted
 at the original positions. Six malformed tagged records with recomputed

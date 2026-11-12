@@ -34,9 +34,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Showcase. [Native opening actors](audits/2026-11-12-n64-blood-bath-opening.md#sparse-seat-spawn-positions)
   establish the seeded Melee draw for one, two and three opponents on
   Blood Bath, including two delayed launches that changed the locations.
-  The source-only selector matches all observed native seeds; connect it to
-  a GBA elapsed-time seed and persist the resolved start order while preserving
-  legacy fallback locations. Other native modes, difficulty and long ordinary-input
+  The source-only selector matches all observed native seeds. The optional
+  GBA preview uses its elapsed-time clock and preserves resolved starts in
+  SRAM; qualify its full ARM products and physical save/restart before
+  considering promotion. Other native modes, difficulty and long ordinary-input
   victories also remain open.
 
 - **Final Zerg mission performance (P1):** the

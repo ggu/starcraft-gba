@@ -799,7 +799,7 @@ build/test-skirmish-ai: tests/skirmish_ai.c starcraft/skirmish_ai.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined tests/skirmish_ai.c -o $@
 
 .PHONY: test-sc64-native-start-selector
-build/test-sc64-native-start-selector: tests/sc64_native_start_selector.c starcraft/sc64_native_start_selector.h | build
+build/test-sc64-native-start-selector: tests/sc64_native_start_selector.c starcraft/sc64_native_start_selector.h common/gba_elapsed_clock.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 test-sc64-native-start-selector: build/test-sc64-native-start-selector
 	./build/test-sc64-native-start-selector
@@ -6152,3 +6152,4 @@ include mk/arbiter-cloak/Makefile
 include mk/fog/Makefile
 include mk/protoss-research/Makefile
 include mk/sc64-nuke/Makefile
+include mk/native-melee-starts/Makefile
