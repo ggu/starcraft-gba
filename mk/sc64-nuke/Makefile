@@ -20,6 +20,22 @@ $(SC64_NUKE_P10_FACT_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/
 	mv $@.tmp $@
 $(eval $(call SC64_NUKE_FIXTURE,p10,$(patsubst -I$(P10_FACT_V2_DIR),-I$(SC64_NUKE_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)),$(filter-out $(P10_FACT_V2_HEADER),$(PROTOSS_P10_INPUTS)) $(SC64_NUKE_P10_FACT_HEADER),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
 
+define SC64_NUKE_SILO_FIXTURE
+build/test-sc64-nuke-silo-$(1): tests/sc64_nuke_silo_journal_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $$(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $$(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
+	$$(CLANG) $$(SC64_NUKE_FIXTURE_FLAGS) $$(SC64_NUKE_RUNTIME_FLAGS) -DSC64_NUKE_SILO_JOURNAL $(2) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(4) -o $$@
+endef
+$(eval $(call SC64_NUKE_SILO_FIXTURE,terran,$(TERRAN_ROM_FLAGS),$(TERRAN_FULL_INPUTS)))
+$(eval $(call SC64_NUKE_SILO_FIXTURE,z10,$(ZERG_Z10_CANONICAL_FLAGS),$(ZERG_Z10_CANONICAL_INPUTS)))
+$(eval $(call SC64_NUKE_SILO_FIXTURE,showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_INPUTS)))
+$(eval $(call SC64_NUKE_SILO_FIXTURE,p10,$(patsubst -I$(P10_FACT_V2_DIR),-I$(SC64_NUKE_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)),$(filter-out $(P10_FACT_V2_HEADER),$(PROTOSS_P10_INPUTS)) $(SC64_NUKE_P10_FACT_HEADER),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+.PHONY: test-sc64-nuke-silo-journal
+test-sc64-nuke-silo-journal: $(addprefix build/test-sc64-nuke-silo-,terran z10 p10 showcase)
+	@set -e; for test in $^; do \
+		"$$test" write "$$test.sav"; "$$test" read "$$test.sav"; \
+		"$$test" fallback "$$test.sav"; "$$test" bad-payer "$$test.sav"; done
+	build/test-sc64-nuke-silo-terran campaign-write build/test-sc64-nuke-silo-t8.sav
+	build/test-sc64-nuke-silo-terran campaign-read build/test-sc64-nuke-silo-t8.sav
+
 define SC64_NUKE_ARM
 build/starcraft-nuke-$(1).elf: $$(COMMON) $$(COMMON_HEADERS) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(4) $$(SC64_NUKE_RUNTIME_ASSETS) common/gba.ld mk/sc64-nuke/Makefile Makefile | build
 	$$(CC) $$(CFLAGS) $$(SC64_NUKE_RUNTIME_FLAGS) $(2) $$(COMMON) $$(STARCRAFT) $(4) $$(LDFLAGS) -Wl,-Map,build/starcraft-nuke-$(1).map -lgcc -o $$@

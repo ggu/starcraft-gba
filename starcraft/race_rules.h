@@ -179,7 +179,13 @@ enum {
     SC_RU_COUNT = SC_RU_LEGACY_COUNT
 #endif
 };
+#ifdef SC64_NUKE_SILO_JOURNAL
+/* The compact mechanics decode can represent the appended Ghost; the
+ * journal preflight checks the exact feature tag before publishing it. */
+#define SC_RU_LEGACY_BOUND SC_RU_COUNT
+#else
 #define SC_RU_LEGACY_BOUND SC_RU_LEGACY_COUNT
+#endif
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
 _Static_assert(SC_RU_LEGACY_COUNT <= 64, "legacy unit IDs exceed six-bit bound");
 #endif

@@ -26,6 +26,18 @@ static void sc64_contact_memo_invalidate(void);
 #include "sc64_nuke_rules.h"
 #include "sc64_nuke_render.h"
 #endif
+#ifdef SC64_NUKE_SILO_JOURNAL
+#if !defined(SC64_SHARED_NUKE_PROBE) || !defined(SC64_SHARED_TRANSPORT) || \
+    !defined(SC64_WORKER_CARGO_KIND) || defined(SC64_IMPACT_EVENTS_DISABLED) || \
+    defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || \
+    defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
+    defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE) || \
+    defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) || \
+    (defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) && !defined(SC64_RESEARCH_SRAM_PRODUCT))
+#error "The Silo journal only composes with the release SRAM envelope and P10 custom research"
+#endif
+#include "sc64_nuke_save_rows.h"
+#endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_scope.h"
 #include "../common/gba_flash_journal.h"
@@ -2281,7 +2293,11 @@ static void race_impact_launch(int target, int damage, int hits, int owner,
                                int damage_class, int source_type, unsigned steps);
 static void race_impact_tick(void);
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_WORKER_CARGO_KIND)
-static int race_impact_save_write(const GbaSaveSelection *previous);
+static int race_impact_save_write(const GbaSaveSelection *previous
+#ifdef SC64_NUKE_SILO_JOURNAL
+                                  , int nuke_silo_tag
+#endif
+                                  );
 #else
 static int race_impact_save_write(void);
 #endif
