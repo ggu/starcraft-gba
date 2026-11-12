@@ -4,6 +4,7 @@
 import argparse,csv,fcntl,hashlib,json,os,pathlib,resource,selectors,shutil,signal,subprocess,sys,time
 
 COMMAND_SHA='90b79bf8e34ddfcc90a66c1938e4e9bb48b6e99e6bf05304d1138be4d0874588'
+NO_STOP_SHA='10bd445848fb8d54036c92a68156b0f3a84ef71bcd0b96459f863ee889f8ffec'
 EXPECTED_STEPS=7231
 HYBRID_STEP=7000
 EXPECTED_FRAME_STEPS=(7090,7169,7230)
@@ -98,6 +99,11 @@ def planned_rows(data):
  if step!=EXPECTED_STEPS or tuple(row[0]+row[1]-1 for row in rows if row[-1]==1)!=EXPECTED_FRAME_STEPS or [row[0]+row[1] for row in rows if row[-1]==2]!=[HYBRID_STEP] or tuple(row[0]+row[1] for row in rows if row[-1]==3)!=EXPECTED_RAM_STEPS:raise ValueError('unexpected snapshot plan')
  return rows
 
+def admit_plan(data,no_stop):
+ digest=NO_STOP_SHA if no_stop else COMMAND_SHA
+ if hashlib.sha256(data).hexdigest()!=digest:raise ValueError('command hash mismatch')
+ return digest,planned_rows(data)
+
 def planned_witness(path,expected):
  try:
   with (path/'commands.csv').open(newline='') as f:commands=list(csv.reader(f))
@@ -177,11 +183,12 @@ def main(argv=None):
  p=argparse.ArgumentParser()
  for arg in ('binary','source','moltenvk','rom','output'):p.add_argument('--'+arg,type=pathlib.Path,required=True)
  p.add_argument('--command-file',type=pathlib.Path,required=True)
+ p.add_argument('--no-stop-control',action='store_true')
  p.add_argument('--file-limit-mode',choices=('strict','metal-compatible'),default='strict')
  a=p.parse_args(argv)
  command_data=a.command_file.read_bytes()
- if hashlib.sha256(command_data).hexdigest()!=COMMAND_SHA:raise SystemExit('command hash mismatch')
- expected=planned_rows(command_data)
+ try:command_sha,expected=admit_plan(command_data,a.no_stop_control)
+ except ValueError as exc:raise SystemExit(str(exc))
  if not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance mismatch')
  require_binary(a.binary)
  if a.output.exists():raise SystemExit('output must be new')
@@ -194,7 +201,8 @@ def main(argv=None):
   if sha(copy)!=ROM_SHA:raise SystemExit('ROM copy mismatch')
   sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('observer_file_budget.h').resolve(),pathlib.Path(__file__).with_name('observer_sigxfsz.h').resolve(),pathlib.Path(__file__).with_name('observer_images.h').resolve(),pathlib.Path(__file__).with_name('visual_capture.h').resolve(),pathlib.Path(__file__).with_name('hybrid_contract.h').resolve(),pathlib.Path(__file__).with_name('hybrid_snapshot_contract.h').resolve(),pathlib.Path(__file__).with_name('hybrid_snapshot_publish.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
   resources=[a.source/'ares/ares/resource/resource.cpp',a.source/'ares/ares/resource/resource.hpp',a.source/'mia/resource/resource.cpp',a.source/'mia/resource/resource.hpp'];inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
-  cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'snapshot','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'command_sha256':COMMAND_SHA,'expected_steps':EXPECTED_STEPS,'expected_frame_steps':EXPECTED_FRAME_STEPS,'frontend_role':'authentic_hybrid_marine_discovery','state_scope':'official restoration of same-process state; no arbitrary guest-memory writes','ram_capture_enabled':True,'cache_view_bytes':8*1024**2,'in_memory_state_max_bytes':16*1024**2,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':3,'ram_each_bytes':8*1024**2,'ram_total_bytes':24*1024**2,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
+  cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'snapshot','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'command_sha256':command_sha,'expected_steps':EXPECTED_STEPS,'expected_frame_steps':EXPECTED_FRAME_STEPS,'frontend_role':'authentic_hybrid_marine_discovery','state_scope':'official restoration of same-process state; no arbitrary guest-memory writes','ram_capture_enabled':True,'cache_view_bytes':8*1024**2,'in_memory_state_max_bytes':16*1024**2,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':3,'ram_each_bytes':8*1024**2,'ram_total_bytes':24*1024**2,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
+  result['trial']='no_stop' if a.no_stop_control else 'stop'
   readfd,writefd=os.pipe()
   try:os.write(writefd,command_data)
   finally:os.close(writefd)

@@ -5,6 +5,15 @@ ROOT=Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location('marine',ROOT/'experiments/ares-headless/marine_snapshot.py')
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 class MarineSnapshotTest(unittest.TestCase):
+ def test_no_stop_only_neutralizes_intervention(self):
+  fixtures=ROOT/'tests/sc64-ares-observer/fixtures'
+  stop=(fixtures/'native-marine-discovery-late.txt').read_bytes()
+  control=(fixtures/'native-marine-no-stop-late.txt').read_bytes()
+  _,sr=m.admit_plan(stop,False);_,cr=m.admit_plan(control,True)
+  self.assertEqual([(s,c) for s,c in zip(sr,cr,strict=True) if s!=c],
+                   [([7170,10,256,0,0,0],[7170,10,0,0,0,0])])
+  with self.assertRaises(ValueError):m.admit_plan(control,False)
+  with self.assertRaises(ValueError):m.admit_plan(stop,True)
  def test_plan_prefix_and_capture_boundaries(self):
   d=(ROOT/'tests/sc64-ares-observer/fixtures/native-marine-discovery-late.txt').read_bytes();self.assertEqual(hashlib.sha256(d).hexdigest(),m.COMMAND_SHA);rows=m.planned_rows(d)
   self.assertEqual([(r[0],r[2]) for r in rows if r[2] in (64,256)],[(7140,64),(7170,256)])
