@@ -110,6 +110,15 @@ hud_building_jobs(int slot, HudJobs *jobs, int with_eggs)
         return;
     }
     if (q->under_construction) return;
+#ifdef SC64_SHARED_NUKE_PROBE
+    int missile = race_nuke_silo_status(slot);
+    if (missile >= 0) {
+        jobs->icon[0] = (short)card_portrait(SC64_NUKE_MISSILE_RAW);
+        jobs->count = 1;
+        hud_job_level(jobs, 0, missile, SC64_NUKE_MISSILE_SOURCE_TICKS);
+        return;
+    }
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
     if (sc64_pr_stage_hud_building(q)) {
         int slot_out, done, total;
@@ -333,6 +342,9 @@ hud_panel_key(int first, int selected)
         /* Hit points step too, so a building under attack is not redrawn per hit. */
         HUD_MIX(h, hud_level(q->hp, q->maxhp, 64)); HUD_MIX(h, q->maxhp);
         HUD_MIX(h, q->queue_count); HUD_MIX(h, q->under_construction);
+#ifdef SC64_SHARED_NUKE_PROBE
+        HUD_MIX(h, race_nuke_silo_status(selected_building) == SC64_NUKE_MISSILE_SOURCE_TICKS);
+#endif
         for (i = 0; i < q->queue_count && i < HUD_QUEUE_SLOTS; i++)
             HUD_MIX(h, q->queue[(q->queue_head + i) % 5]);
         if (!q->queue_count) {
@@ -600,6 +612,19 @@ hud_draw_building(void)
     }
     hud_building_jobs(selected_building, &jobs, 1);
     if (q->under_construction && !jobs.count) return; /* hud_panel_bars() shows its progress */
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (raw == SC64_NUKE_SILO_RAW) {
+        int missile = race_nuke_silo_status(selected_building);
+        if (missile >= 0) {
+            hud_draw_jobs(&jobs);
+            gfx_text(HUD_COLUMN + HUD_SLOT_PITCH + 3, HUD_SLOT_Y + 4,
+                     missile == SC64_NUKE_MISSILE_SOURCE_TICKS ? "MISSILE ARMED" : "ARMING MISSILE",
+                     C_WHITE);
+        }
+        hud_hint(HUD_CHIP_X, HUD_HINT_Y, "B", UI_GLYPH_ORDERS);
+        return;
+    }
+#endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (sc64_race_raw_building(q->type) == 172) {
         int powered = race_battery_powered_live(selected_building);

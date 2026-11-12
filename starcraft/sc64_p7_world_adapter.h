@@ -478,7 +478,7 @@ static int sc64_p7_world_create(Sc64P7WorldContext *ctx,
     type=sc64_race_unit_from_raw(a->unit);
     owner=ctx->live_owner_for_source[slot];
     if (type<0 || owner<SIDE || owner>4) return 0; /* No actor aliases. */
-    for (int i=0;i<MAX_UNITS;++i) free_slots += !u[i].alive;
+    for (int i=0;i<MAX_UNITS;++i) free_slots += sc64_unit_slot_available(i);
     if (!free_slots) return 0;
     int created=spawn_unit(owner,type,(l+r)/2,(t+bm)/2);
     if (created<0) return 0;

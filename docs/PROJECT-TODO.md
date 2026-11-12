@@ -721,9 +721,34 @@ Scarab stages, prove native canal timing or change the 29/30 content count.
 
 The [stock 200 supply limit](audits/2026-11-12-stock-supply-cap.md) now
 applies to shared production and the HUD, including AI owners and legacy
-profiles. Existing units and reservations survive provider loss. Separate
-per-race banks for mixed-race owners and original native actor capacity
-remain distinct fidelity work.
+profiles. Existing units and reservations survive provider loss. The
+[independent race ledgers](audits/2026-11-12-race-supply-ledgers.md)
+also match the separate native T8 cap/provider/usage families. The
+original P10 opening now trains both Terran and Protoss without
+spending the other race's cap. Separately measure whether the GBA actor
+pool can represent armies at the stock cap.
+**Ghost and Nuclear Strike (P0):** the [N64 source and blast audit](audits/2026-11-12-ghost-nuclear-strike.md)
+records native T8 attachment and supply-first refusal. The shared opt-in
+probe trains Ghosts and paid missiles, launches from ordinary GBA controls,
+and uses the owned Ghost, Silo, missile, dot, warning and impact assets.
+It has authenticated Silo and flight journals for queued, armed, painting
+and descending missiles and remains off in default builds.
+Finish the native timing comparison, Ghost abilities and AI and complete
+the persistence and ARM-input checks before enabling it.
+
+Other core rules to prioritize after this:
+
+- **Production:** replace the normal custom Hatchery queue with stock
+  Larva and simultaneous Eggs for humans and AI. The isolated Egg checks
+  do not establish shared save or production behavior.
+- **Tech and combat:** finish cross-cartridge and AI research, then
+  extend omitted spells and ammo, including Defiler, Scarabs and
+  Carriers on the remaining cartridges. Keep the exact damage fractions
+  and actual windup separate from projectile drawing.
+- **Custom games:** allow each opponent slot to be closed, Random or a
+  named race independently, as observed on N64. Difficulty and native AI
+  behavior need their own checks. Confirm native win and defeat triggers
+  before changing the current last-building rule.
 
 ## Priority order
 

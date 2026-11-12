@@ -1,0 +1,71 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#ifndef SC64_NUKE_RENDER_H
+#define SC64_NUKE_RENDER_H
+#include "../common/gba.h"
+#include "sc64_nuke_source_generated.h"
+
+enum { SC64_NUKE_ROW_MAX = 126 };
+
+static int
+sc64_nuke_expand_row(const uint8_t **input, const uint8_t *end, uint8_t *row,
+                     unsigned width)
+{
+    unsigned col = 0;
+    while (col < width) {
+        if (*input == end) return 0;
+        unsigned token = *(*input)++;
+        unsigned n = token & 63u;
+        unsigned kind = token >> 6;
+        if (!n || n > width - col || kind == 3) return 0;
+        if (kind == 0) {
+            if ((unsigned)(end - *input) < n) return 0;
+            if (row) for (unsigned i = 0; i < n; ++i) row[col + i] = (*input)[i];
+            *input += n;
+        } else {
+            uint8_t value = 0;
+            if (kind == 1) {
+                if (*input == end) return 0;
+                value = *(*input)++;
+            }
+            if (row) for (unsigned i = 0; i < n; ++i) row[col + i] = value;
+        }
+        col += n;
+    }
+    return 1;
+}
+
+/* Positions are projected screen centers; world/camera clipping remains
+ * with the caller. Rows are decoded only when the whole sprite overlaps the
+ * screen. Modifier 9 modifies the destination, exactly as for source weapons. */
+static int
+sc64_nuke_draw_frame(const Sc64NukeFrame *f, int cx, int cy)
+{
+    uint8_t row[SC64_NUKE_ROW_MAX];
+    if (!f || !f->w || !f->h || f->w > sizeof(row) || f->x + f->w > f->cw ||
+        f->y + f->h > f->ch || (f->modifier != 0 && f->modifier != 9) ||
+        f->offset > sizeof(sc64_nuke_pixels) ||
+        f->length > sizeof(sc64_nuke_pixels) - f->offset)
+        return 0;
+    int left = cx - f->cw / 2 + f->x, top = cy - f->ch / 2 + f->y;
+    int clip_top = 0, clip_end = 160;
+#ifdef GBA_SCENE_CLIP
+    unsigned clip = gfx_get_clip_y();
+    clip_top = (int)(clip & 255u); clip_end = (int)(clip >> 8);
+#endif
+    if (left >= 240 || left + f->w <= 0 || top >= clip_end || top + f->h <= clip_top)
+        return 1;
+    const uint8_t *input = sc64_nuke_pixels + f->offset, *end = input + f->length;
+    for (unsigned y = 0; y < f->h; ++y) {
+        int screen_y = top + (int)y;
+        int visible = screen_y >= clip_top && screen_y < clip_end;
+        if (!sc64_nuke_expand_row(&input, end, visible ? row : 0, f->w)) return 0;
+        if (!visible) continue;
+        if (f->modifier == 9)
+            gfx_blit_sprite_mapped(left, screen_y, f->w, 1, row,
+                                   sc64_nuke_light_lut, SC64_NUKE_LIGHT_ROWS);
+        else
+            gfx_blit_sprite(left, screen_y, f->w, 1, row);
+    }
+    return input == end;
+}
+#endif

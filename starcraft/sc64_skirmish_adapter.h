@@ -20,6 +20,10 @@ static int race_skirmish_has_raw(int owner, unsigned raw)
         if (race_bc_facility_airborne(i)) continue;
 #endif
         have = sc64_race_raw_building(b[i].type);
+#ifdef SC64_SHARED_NUKE_PROBE
+        if (raw == SC64_NUKE_COVERT_RAW && have == SC64_NUKE_COVERT_RAW &&
+            race_nuke_parent_slot(i, 116) < 0) continue;
+#endif
         if (b[i].under_construction) {
             /* While upgrading, the existing source tier still exists. */
             if (have == 132) have = 131;
@@ -158,7 +162,9 @@ static int race_skirmish_record_ready(int owner, int producer,
 {
     /* The catalog retains the Silo row, but production is unavailable until
      * nuclear ammunition and launch are implemented. */
+#ifndef SC64_SHARED_NUKE_PROBE
     if (r && r->raw_id == 108) return 0;
+#endif
     if (!race_mode || !race_skirmish_requirements(owner, r) ||
         sc64_race_building_from_raw(r->raw_id) < 0) return 0;
     if (r->kind != SC64_SK_ADDON && r->kind != SC64_SK_BUILDING_MORPH) return 0;
@@ -224,7 +230,9 @@ static int race_skirmish_start_record(int owner, int producer,
 static int race_skirmish_record_available(const Sc64SkirmishRecord *r)
 {
     int type;
+#ifndef SC64_SHARED_NUKE_PROBE
     if (r && r->raw_id == 108) return 0;
+#endif
     if (!race_mode || !race_skirmish_requirements(SIDE, r) ||
         (type = sc64_race_building_from_raw(r->raw_id)) < 0) return 0;
     if (r->kind == SC64_SK_WORKER_BUILD) {

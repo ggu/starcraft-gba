@@ -244,7 +244,11 @@ race_impact_tick(void)
  * any SRAM write; they land within a second of play. */
 static int
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_WORKER_CARGO_KIND)
-race_impact_save_write(const GbaSaveSelection *previous)
+race_impact_save_write(const GbaSaveSelection *previous
+#ifdef SC64_NUKE_SILO_JOURNAL
+                       , int nuke_silo_tag
+#endif
+                      )
 #else
 race_impact_save_write(void)
 #endif
@@ -254,6 +258,11 @@ race_impact_save_write(void)
 #endif
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+#ifdef SC64_NUKE_SILO_JOURNAL
+#define SC64_SILO_COMMIT_TAG (nuke_silo_tag ? SC64_NUKE_SILO_TRANSPORT_TAG : SC64_GUARDIAN_WRITE_TAG)
+#else
+#define SC64_SILO_COMMIT_TAG SC64_GUARDIAN_WRITE_TAG
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     /* The fixed base stays legacy-sized. Only active Yamato rows consume
      * extension bytes; mask bits are in the already-versioned state word. */
@@ -289,6 +298,9 @@ race_impact_save_write(void)
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_NUKE_SILO_JOURNAL
+    ,SC64_NUKE_SILO_TRANSPORT_TAG
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
@@ -324,9 +336,9 @@ race_impact_save_write(void)
 #else
     if (previous) {
         if (!save_write_selected(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                 SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
+                                 SC64_SILO_COMMIT_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                  SC64_GUARDIAN_WRITE_TAG)) return 0;
+                                  SC64_SILO_COMMIT_TAG)) return 0;
 #endif
 #elif defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
@@ -381,6 +393,9 @@ race_impact_save_write(void)
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_NUKE_SILO_JOURNAL
+    ,SC64_NUKE_SILO_TRANSPORT_TAG
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
@@ -414,9 +429,9 @@ race_impact_save_write(void)
 #else
     if (previous) {
         if (!save_write_selected(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                 SC64_GUARDIAN_WRITE_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
+                                 SC64_SILO_COMMIT_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                  SC64_GUARDIAN_WRITE_TAG)) return 0;
+                                  SC64_SILO_COMMIT_TAG)) return 0;
 #endif
 #else
     save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes + SC64_TRANSPORT_TRAILER_BYTES,
@@ -439,6 +454,7 @@ race_impact_save_write(void)
     save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes, SAVE_VERSION);
 #endif
 #endif
+#undef SC64_SILO_COMMIT_TAG
     return 1;
 }
 

@@ -179,6 +179,9 @@ static int race_transport_request_board(int passenger, int carrier)
         !race_transport_carrier_valid(carrier) ||
         !u[passenger].alive || SC64_TRANSPORT_LOADED(&u[passenger]) ||
         u[passenger].owner != u[carrier].owner) return 0;
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (sc64_race_ordinary_ghost(u[passenger].type) && race_nuke_ghost_locked(passenger)) return 0;
+#endif
     used = race_transport_cargo_space(carrier);
     space = race_transport_passenger_space(&u[passenger]);
     if (used < 0 || space < 0 || used + space > SC64_TRANSPORT_DROPSHIP_SPACE)

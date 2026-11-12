@@ -3153,6 +3153,21 @@ build/test-sc64-siege-splash-game: tests/sc64_siege_splash_game.c $(STARCRAFT) $
 .PHONY: test-sc64-siege-splash-game
 test-sc64-siege-splash-game: build/test-sc64-siege-splash-game
 	./build/test-sc64-siege-splash-game
+build/test-sc64-nuke-rules: tests/sc64_nuke_rules.c starcraft/sc64_nuke_rules.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-nuke-blast: tests/sc64_nuke_blast_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P7_ACTORS $< common/gba.c -o $@
+.PHONY: test-sc64-nuke-rules test-sc64-nuke-blast
+test-sc64-nuke-rules: build/test-sc64-nuke-rules
+	./build/test-sc64-nuke-rules
+test-sc64-nuke-blast: test-sc64-nuke-rules build/test-sc64-nuke-blast
+	./build/test-sc64-nuke-blast
+SC64_NUKE_ASSET_DIR ?= .local/sc64/nuke/generated
+build/test-sc64-nuke-render: tests/sc64_nuke_render_game.c starcraft/sc64_nuke_render.h $(SC64_NUKE_ASSET_DIR)/sc64_nuke_source_generated.h common/gba.c common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -I$(SC64_NUKE_ASSET_DIR) $< common/gba.c -o $@
+.PHONY: test-sc64-nuke-render
+test-sc64-nuke-render: build/test-sc64-nuke-render
+	./build/test-sc64-nuke-render
 build/test-sc64-p7-archon-splash: tests/sc64_p7_archon_splash.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P7_ACTORS -DSC64_P7_ARCHON_SPLASH $< common/gba.c -o $@
 .PHONY: test-sc64-p7-archon-splash
@@ -6132,3 +6147,4 @@ include tests/sc64-research-campaign-policy/Makefile
 include mk/arbiter-cloak/Makefile
 include mk/fog/Makefile
 include mk/protoss-research/Makefile
+include mk/sc64-nuke/Makefile

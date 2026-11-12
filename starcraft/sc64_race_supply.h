@@ -51,6 +51,15 @@ race_supply_ledger_reserved(Sc64RaceSupplyLedger ledger)
     return ledger.used + ledger.queued;
 }
 
+static inline int race_supply_nuke_reservations(int owner, int faction)
+{
+#ifdef SC64_SHARED_NUKE_PROBE
+    return faction == R_TER ? race_nuke_reserved_supply(owner) : 0;
+#else
+    (void)owner; (void)faction; return 0;
+#endif
+}
+
 /* Admission and uncached resource-bar drawing need a fresh view. The normal
  * HUD invalidation and AI census reuse their already-existing actor walks. */
 static Sc64RaceSupplyLedger __attribute__((noinline))
@@ -65,6 +74,7 @@ race_owner_supply_ledger(int owner, int faction)
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == owner)
             race_supply_count_building(&ledger, &b[i], faction);
+    ledger.queued += race_supply_nuke_reservations(owner, faction);
     return ledger;
 }
 #endif

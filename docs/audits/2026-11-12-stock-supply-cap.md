@@ -25,8 +25,12 @@ official [Brood War Dark Archon guide](https://classic.battle.net/scc/protoss/un
 also describes independent race supply when controlling multiple races.
 The port still aggregates mixed-race armies by owner, including missions
 with a shared or rescued force. Per-race ledgers for those cases remain a
-separate fidelity task. These sources establish the stock reference;
-there was no fresh N64 limit replay for this patch.
+separate fidelity task. A later, read-only T8 N64 comparison found three
+separate 12-owner cap/provider/usage arrays, with a doubled 400 cap in
+each race family. The Terran usage array followed actual HUD changes and
+the native missile's eight-supply reservation. This confirms separate
+native pools; it was not a full 200-supply battle or a native Mind Control
+replay.
 
 ## Local checks
 
