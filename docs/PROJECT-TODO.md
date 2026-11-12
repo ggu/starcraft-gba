@@ -40,6 +40,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
   reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
   windows with 24 identical sampled frames and palettes.
+  The [combined defense probe](audits/2026-11-12-defense-combined.md) saves
+  4.74–7.50% with matching checkpoints. It remains opt-in pending the
+  remaining cross-cartridge campaign and skirmish comparisons.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
@@ -799,7 +802,19 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    saves. Keep partial prototypes gated; source splash may increase Z10 danger.
 3. In parallel, re-profile current-source order/detection, movement and
    rendering, then reduce measured busy-loop cost with paired state/pixel and
-   gameplay checks. Historical inclusive scopes are not promised savings. The N64
+   gameplay checks. The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
+   saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
+   [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
+   seven opt-in ROMs link and the Z10 stack canary leaves 8,948 bytes
+   untouched above its guard. Z10 wins at frame 58,795 from ordinary SRAM;
+   24 physical custom starts cover both maps and all three AI counts on the
+   three race products and Showcase. Z10 also matches two complete three-AI
+   defeats, one per map. P10 host campaign/save and 234 lineup checks pass;
+   the normal P10 cartridge also wins from SRAM with 23 matching observations.
+   The full Terran host campaign suite passes with both probes.
+   The separate defense/sight/walk combination saves 8.18–13.05% in Z10
+   with matching pixels and state; finish the remaining cartridge paths.
+   Historical inclusive scopes are not promised savings. The N64
    order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
 4. Retry Z10 through ordinary controls after the relevant mechanics are usable;
