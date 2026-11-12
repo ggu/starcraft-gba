@@ -33,11 +33,10 @@ With prepared inputs in a clean build tree:
 
 ```sh
 python3 -m unittest discover -s tests -p test_sc64_z7_sight_spans.py
-make CANONICAL_DIRECT_FIRING_FLAGS='-DSC64_DIRECT_FIRING_POINTS -DSC64_Z7_VISIBILITY_PACKED_ROWS' verify-zerg-z10
+make LATE_ZERG_PACKED_SIGHT=1 verify-zerg-z10
 ```
 
 The current opt-in path is the existing late-Zerg source-sight transition.
 Before activation, qualify full campaign and legacy paths and compare the
-other race profiles' shared-span transition
-before generalizing. Do not add the separate renderer or defense savings to
+other race profiles' shared-span transition before generalizing. Do not add the separate renderer or defense savings to
 these results without measuring the combined build.

@@ -34,11 +34,46 @@ static void build_target_lists(u8 head[5][2], u8 next[MAX_UNITS], u8 hostile[5])
     }
 }
 
+#ifdef SC64_DEFENSE_PYLON_ROSTER
+static void pylon_roster_preserves_wide_coordinates(void)
+{
+    RaceDefensePylons pylons;
+    Building cannon = { .x = 400, .y = 400, .owner = SIDE };
+    memset(b, 0, sizeof(b));
+    b[0] = (Building){ .x = 65536 + 400, .y = 400, .owner = SIDE,
+        .type = B_PYLON, .alive = 1 };
+    pylons.count = -1;
+    assert(!race_defense_powered(&pylons, &cannon));
+    cannon.x = b[0].x;
+    assert(race_defense_powered(&pylons, &cannon));
+    cannon.x = b[0].x + 127;
+    assert(race_defense_powered(&pylons, &cannon));
+    ++cannon.x;
+    assert(!race_defense_powered(&pylons, &cannon));
+    cannon.x = b[0].x - 127;
+    assert(race_defense_powered(&pylons, &cannon));
+    --cannon.x;
+    assert(!race_defense_powered(&pylons, &cannon));
+
+    /* The malformed-owner path remains the exact scalar geometry check. */
+    cannon.x = b[0].x;
+    cannon.owner = b[0].owner = -1;
+    pylons.count = -1;
+    assert(race_defense_powered(&pylons, &cannon));
+    b[0].alive = 0;
+    assert(!race_defense_powered(&pylons, &cannon));
+    memset(b, 0, sizeof(b));
+}
+#endif
+
 int main(void)
 {
     u8 head[5][2], next[MAX_UNITS], hostile[5];
     Building tower;
     gba_init(); game_init();
+#ifdef SC64_DEFENSE_PYLON_ROSTER
+    pylon_roster_preserves_wide_coordinates();
+#endif
     race_mode = 1; race_human = R_TER; race_bots = 2;
     race_skirmish_init(); screen = SCREEN_PLAY;
     memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));

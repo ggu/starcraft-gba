@@ -114,15 +114,27 @@ zerg-z10: verify-zerg-z10
 SC64_SIGHT_ROW_LUT_HEADER = build/generated/sc64_sight_row_lut_generated.h
 $(SC64_SIGHT_ROW_LUT_HEADER): tools/sc64_sight_row_lut.py | build
 	$(PYTHON) $< $@
-ifneq ($(filter -DSC64_Z7_VISIBILITY_PACKED_ROWS,$(CANONICAL_DIRECT_FIRING_FLAGS)),)
-$(addprefix build/starcraft-zerg-z,$(addsuffix .elf,7 8 9 10)): $(SC64_SIGHT_ROW_LUT_HEADER)
-endif
+LATE_ZERG_SIGHT_CONFIG := $(if $(shell test -f build/late-zerg-sight-config && printf '%s\n' '$(LATE_ZERG_PACKED_SIGHT)' | cmp -s - build/late-zerg-sight-config && printf matched),,force-late-zerg-sight-rebuild)
+.PHONY: force-late-zerg-sight-config force-late-zerg-sight-rebuild
+force-late-zerg-sight-config:
+force-late-zerg-sight-rebuild:
+build/late-zerg-sight-config: force-late-zerg-sight-config | build
+	@printf '%s\n' '$(LATE_ZERG_PACKED_SIGHT)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+$(addprefix build/starcraft-zerg-z,$(addsuffix .elf,7 8 9 10)): build/late-zerg-sight-config $(LATE_ZERG_SIGHT_CONFIG) $(if $(LATE_ZERG_PACKED_SIGHT_FLAGS),$(SC64_SIGHT_ROW_LUT_HEADER))
 build/test-sc64-z10-sight-packed-rows: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_SIGHT_ROW_LUT_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_RELEASE_FLAGS) -DSC64_Z7_VISIBILITY_PACKED_ROWS $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_Z7_VISIBILITY_PACKED_ROWS,$(ZERG_Z10_RELEASE_FLAGS)) -DSC64_Z7_VISIBILITY_PACKED_ROWS $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 .PHONY: test-sc64-z10-sight-packed-rows
 test-sc64-z10-sight-packed-rows: build/test-sc64-z10-sight-packed-rows
 	./build/test-sc64-z10-sight-packed-rows
 
+ifeq ($(CANONICAL_WALK_WORDS),1)
+build/test-sc64-z10-walk-words-pixels: tests/sc64_walk_words_pixels.c tests/sc64_unit_walk_frames_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(ZERG_Z10_RELEASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-walk-words-pixels
+test-sc64-z10-walk-words-pixels: build/test-sc64-z10-walk-words-pixels
+	./build/test-sc64-z10-walk-words-pixels
+endif
 build/test-sc64-z10-game: tests/sc64_z10_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_CANONICAL_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z10-carried-z9: tests/sc64_z9_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -131,6 +143,27 @@ build/test-sc64-z10-carried-z9: tests/sc64_z9_game.c $(STARCRAFT) $(wildcard sta
 test-zerg-z10: build/test-sc64-z10-game build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-game
+
+# Current Z10 differential for the optional defense spatial query.
+build/test-sc64-z10-defense-spatial: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_RELEASE_FLAGS) -DSC64_DEFENSE_SPATIAL_PROBE $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-defense-spatial
+test-sc64-z10-defense-spatial: build/test-sc64-z10-defense-spatial
+	./build/test-sc64-z10-defense-spatial
+
+# Compare scalar power checks and the per-defense-pass Pylon roster using
+# the production Z10 storage and targeting vector. The probe stays opt-in.
+build/test-sc64-z10-defense-pylon-roster: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_RELEASE_FLAGS) -DSC64_DEFENSE_PYLON_ROSTER -DSC64_DEFENSE_PYLON_ROSTER_TEST_ONLY $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-defense-pylon-roster
+test-sc64-z10-defense-pylon-roster: build/test-sc64-z10-defense-pylon-roster
+	./build/test-sc64-z10-defense-pylon-roster
+build/test-sc64-z10-defense-combined: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_RELEASE_FLAGS) -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-defense-combined
+test-sc64-z10-defense-combined: build/test-sc64-z10-defense-combined
+	./build/test-sc64-z10-defense-combined
+
 
 # Source-art coverage over both authenticated maps and their CreateUnit rows.
 build/test-sc64-zerg-late-art: tests/sc64_zerg_late_art.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build

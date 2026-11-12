@@ -37,6 +37,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   samples spend 218k cycles per update on the sprite blitter and 288k on
   defenses. Prioritize exact Cannon power and target queries, then sprite
   drawing and exploration. Preserve the existing 64×64 route fast path.
+  [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
+  reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
+  windows with 24 identical sampled frames and palettes.
+  The [split terrain cache](audits/2026-11-12-late-zerg-terrain-vram.md)
+  frees 16,080 B of Z10 working RAM. Compared with the packed-walk release,
+  it saves 1.33–1.49% with matching replay checkpoints and sampled pages.
+  The [combined defense probe](audits/2026-11-12-defense-combined.md) saves
+  4.74–7.50% in the busy Z10 campaign. It remains opt-in pending broader
+  cross-cartridge and long skirmish comparisons.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
@@ -796,7 +805,19 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    saves. Keep partial prototypes gated; source splash may increase Z10 danger.
 3. In parallel, re-profile current-source order/detection, movement and
    rendering, then reduce measured busy-loop cost with paired state/pixel and
-   gameplay checks. The [packed sight-row probe](audits/2026-11-12-packed-sight-rows.md)
+   gameplay checks. The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
+   saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
+   [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
+   seven opt-in ROMs link and the Z10 stack canary leaves 8,948 bytes
+   untouched above its guard. Z10 wins at frame 58,795 from ordinary SRAM;
+   24 physical custom starts cover both maps and all three AI counts on the
+   three race products and Showcase. Z10 also matches two complete three-AI
+   defeats, one per map. P10 host campaign/save and 234 lineup checks pass;
+   the normal P10 cartridge also wins from SRAM with 23 matching observations.
+   The full Terran host campaign suite passes with both probes.
+   The separate defense/sight/walk combination saves 8.18–13.05% in Z10
+   with matching pixels and state; finish the remaining cartridge paths.
+   The [packed sight-row probe](audits/2026-11-12-packed-sight-rows.md)
    saves 2.71–2.82% in two Z10 battle windows with matched pixels and state;
    qualify custom, carried missions and shared-span profiles before activation.
    Historical inclusive scopes are not promised savings. The N64
@@ -820,12 +841,12 @@ The 30 available campaign entries do not change the near-30-fps and parity requi
 Native dialogue timing remains a concrete UX mismatch: critical outcome
 deferral is merged, but removal of synthetic holds remains staged after P4/P6
 controller failures. The [native Blood Bath opening](audits/2026-11-12-n64-blood-bath-opening.md)
-now reaches play with a Terran human and Zerg, Terran and Protoss opponents
-selected in the lobby. The native HUD shows 50 minerals and 4/10 supply,
-then minerals rise with neutral input. The normal Z10 cartridge confirms
-the same displayed Terran opening and automatic mining with that lobby.
-Next establish equal-speed timing, native AI wallets and full-match
-behavior; the opening does not qualify those.
+now reaches play with each named human race against a mixed Zerg, Terran
+and Protoss lineup. The native and normal GBA Z10 HUDs agree on 50 starting
+minerals and race-specific supply (Terran 4/10; Zerg and Protoss 4/9).
+Minerals rise with neutral input in all six runs. Next establish equal-speed
+timing, native AI wallets and full-match behavior; the opening does not
+qualify those.
 
 ## Current work and open PRs
 
