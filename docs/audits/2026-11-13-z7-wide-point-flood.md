@@ -43,7 +43,13 @@ linear probe and below `0x03005000`).
 
 The ordinary replay matches the first 127 observations through that
 call; the route build and hit counters also match. The gameplay spike
-is 43.24% shorter. On the 96×128 Z10 mission, the same wide cartridge
+is 43.24% shorter. The complete wide run matches all 253 normal and
+96-column observations and wins at the same frame 194,998 (call
+197,455). Its mean drops from 1,794,976 to 1,679,547 guest cycles
+(−6.43%, 9.35 to 9.99 emulated updates per second). Its worst ordinary
+gameplay loop is 21,320,327 cycles at call 50,263, down 43.22% from
+the worst normal gameplay loop. The separate result transition still
+takes 57,817,607 cycles. On the 96×128 Z10 mission, the same wide cartridge
 matches all 61 state checkpoints, 24 video/palette/fog samples and the
 full win at frame 59,997. Its two measured window means are within 0.02%
 of the earlier 96-column probe.
@@ -57,6 +63,11 @@ video samples each. Terran T4 exercises seven wide point fills through
 frame 1,476. Protoss P10 exercises eleven through frame 1,476, with seven
 ordinary authored-message acknowledgments. These are prefixes, not
 full Terran or Protoss mission wins.
+
+Both complete Z10 custom matches with three independently selected AIs
+also reproduce their normal control through defeat (76 and 77 state
+checkpoints). The measured 64×64 custom window means are within 0.04%
+of normal; the existing small-map FIFO remains the active path.
 
 ## Routine battle and menu cost
 
@@ -72,9 +83,11 @@ workload worth an exact scaling/compositing check.
 
 Wide probe ROM SHA-256:
 `1abfd1e56dcc8c7a44522973ad37564136ccf1923b46e0b1486ac2ee718c2499`.
+Full wide Z7 receipt SHA-256:
+`4c136e7454ea30d6f59c5ab881f0a878d7688cbbb9eb7628b45cb8b52af7bf15`.
 
-The option remains off by default. Complete the wide Z7 run and qualify
-on hardware. The 561,792-cycle target
+The option remains off by default pending hardware qualification.
+The 561,792-cycle target
 still requires a substantial reduction in routine simulation and draw
 work. A separate selection-ring span probe matched all 35 gameplay and
 24 video samples in the Z10 battle windows, but improved mean loop cost

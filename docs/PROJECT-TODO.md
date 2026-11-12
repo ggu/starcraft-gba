@@ -112,10 +112,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A [Z7 profile](audits/2026-11-13-z7-wide-point-flood.md) separates the
   final 58.7M-cycle result transition from a 37.55M-cycle gameplay
   update, of which 33.95M are point-field fills. The exact 128-column
-  FIFO probe reduces that gameplay update to 21.31M with matching
-  checkpoints; Z10 still wins with matching state and video. All four
+  FIFO probe reduces that gameplay update to 21.31M; the full Z7 win
+  matches all 253 checkpoints and its mean falls 6.43%. Z10 still wins
+  with matching state and video, and both full custom outcomes match. All four
   guarded links pass; 128×128 T4/P10 physical prefixes match and exercise
-  the new kernel. Complete the wide Z7 tape and hardware checks. Treat
+  the new kernel. Qualify on hardware before promoting the option. Treat
   the result transition separately. A new Z7 instruction sample puts
   routine rendering at 701k cycles and simulation at 462k. Prioritize
   static map and sprite drawing and the separately measured command-menu
