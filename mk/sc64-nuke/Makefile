@@ -1,7 +1,19 @@
 # Private prepared-input gate. Default ROM targets never opt in.
+build/test-sc64-ghost-tech: tests/sc64_ghost_tech.c starcraft/sc64_ghost_tech.h starcraft/sc64_battlecruiser_rules.h starcraft/sc64_nuke_rules.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-ghost-tech
+test-sc64-ghost-tech: build/test-sc64-ghost-tech
+	./$<
+
 SC64_NUKE_RUNTIME_FLAGS := -DSC64_SHARED_NUKE_PROBE -I$(SC64_NUKE_ASSET_DIR)
 SC64_NUKE_RUNTIME_ASSETS := $(addprefix $(SC64_NUKE_ASSET_DIR)/,sc64_nuke_source_generated.h sc64_nuke_building_source_generated.h sc64_nuke_ghost_source_generated.h)
 SC64_NUKE_FIXTURE_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+
+build/test-sc64-ghost-tech-world: tests/sc64_ghost_tech_world_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
+	$(CLANG) $(SC64_NUKE_FIXTURE_FLAGS) $(SC64_NUKE_RUNTIME_FLAGS) -DSC64_NUKE_SILO_JOURNAL -DSC64_GHOST_TECH_PROBE $(TERRAN_ROM_FLAGS) $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-ghost-tech-world
+test-sc64-ghost-tech-world: build/test-sc64-ghost-tech-world
+	./$<
 
 define SC64_NUKE_FIXTURE
 build/test-sc64-nuke-world-$(1): tests/sc64_nuke_world_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $$(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $$(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
@@ -37,6 +49,12 @@ test-sc64-nuke-silo-journal: $(addprefix build/test-sc64-nuke-silo-,terran z10 p
 	build/test-sc64-nuke-silo-terran campaign-read build/test-sc64-nuke-silo-t8.sav
 
 SC64_NUKE_STRIKE_FLAGS := -DSC64_NUKE_SILO_JOURNAL -DSC64_NUKE_ACTIVE_JOURNAL
+build/test-sc64-ghost-tech-world-active: tests/sc64_ghost_tech_world_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
+	$(CLANG) $(SC64_NUKE_FIXTURE_FLAGS) $(SC64_NUKE_RUNTIME_FLAGS) $(SC64_NUKE_STRIKE_FLAGS) -DSC64_GHOST_TECH_PROBE $(TERRAN_ROM_FLAGS) $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-ghost-tech-world-active
+test-sc64-ghost-tech-world-active: build/test-sc64-ghost-tech-world-active
+	./$<
+
 SC64_NUKE_STRIKE_P10_FACT_DIR := build/generated/p10-nuke-strike
 SC64_NUKE_STRIKE_P10_FACT_HEADER := $(SC64_NUKE_STRIKE_P10_FACT_DIR)/sc64_fact_tables_generated.h
 $(SC64_NUKE_STRIKE_P10_FACT_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) $(P8_AVAILABILITY_HEADER) mk/sc64-nuke/Makefile | build

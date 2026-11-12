@@ -291,6 +291,10 @@ sc64_visibility_same(const Sc64VisibilitySnapshot *old, int active,
 static int __attribute__((noinline))
 sc64_actor_unit_sight_pixels(int type)
 {
+#ifdef SC64_GHOST_TECH_PROBE
+    if (type == SC64_GHOST_OCULAR_SIGHT_KEY) return SC64_NUKE_OCULAR_SOURCE_SIGHT;
+    if (sc64_race_ordinary_ghost(type)) return SC64_NUKE_SOURCE_SIGHT;
+#endif
 #ifdef SC64_Z7_SOURCE_SIGHT
     int z7_pixels = sc64_z7_source_unit_sight_pixels(type);
     if (z7_pixels) return z7_pixels;
@@ -1064,6 +1068,11 @@ sc64_update_exploration(void)
         int x = active ? u[i].x : 0;
         int y = active ? u[i].y : 0;
         int type = active ? u[i].type : 0;
+#ifdef SC64_GHOST_TECH_PROBE
+        if (active && sc64_race_ordinary_ghost(type) &&
+            race_ghost_sight(&u[i]) == SC64_NUKE_OCULAR_SOURCE_SIGHT)
+            type = SC64_GHOST_OCULAR_SIGHT_KEY;
+#endif
         if (sc64_visibility_same(old, active, x, y, type))
             continue;
 #ifndef SC64_SOURCE_SIGHT_ALL_RACES
