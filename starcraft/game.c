@@ -8384,23 +8384,19 @@ sc64_structure_melee_edges(int slot, int edges[4])
 }
 
 #ifdef SC64_IMPORTED_MISSION
-/* Use a single cached multi-source field for all attackers, even when a
- * footprint covers every one of the center-based route's seed tiles. */
+/* Fall back to a cached multi-source field when the normal approach cannot
+ * plan a step. Keep the existing route when it can already reach the target. */
 static void __attribute__((noinline))
-sc64_structure_melee_approach(Unit *q, int slot, const int edges[4])
+sc64_structure_melee_retry(Unit *q, int slot, const int edges[4])
 {
-    if (q->path_timer <= 0 && !q->path_retry) {
-        int x, y;
-        if (!sc64_route_facility_next(q->x, q->y, slot, b[slot].x, b[slot].y,
-                                      &x, &y, edges)) {
-            q->path_retry = 12;
-            return;
-        }
-        q->path_x = x;
-        q->path_y = y;
-        q->path_timer = 24;
-    }
-    move_toward(q, q->path_x, q->path_y);
+    int x, y;
+    if (!sc64_route_facility_next(q->x, q->y, slot, b[slot].x, b[slot].y,
+                                  &x, &y, edges)) return;
+    q->path_x = x;
+    q->path_y = y;
+    q->path_timer = 24;
+    q->path_retry = 0;
+    move_toward(q, b[slot].x, b[slot].y);
 }
 #endif
 #endif
@@ -8655,10 +8651,7 @@ tick_combat(Unit * q, int target)
         if (q->order==ORDER_TRANSPORTED && q->target>=MAX_UNITS) return;
 #endif
 #if defined(SC64_ZP_CAMPAIGN_ACTORS) && defined(SC64_IMPORTED_MISSION)
-        if (footprint_melee) {
-            sc64_structure_melee_approach(q, target - MAX_UNITS, melee_edges);
-            return;
-        }
+        int may_retry_perimeter = footprint_melee && !q->path_retry && q->path_timer <= 0;
 #endif
 #ifdef SC64_DIRECT_FIRING_POINTS
 #ifdef SC64_RANGE_WORK
@@ -8670,6 +8663,10 @@ tick_combat(Unit * q, int target)
 #endif
 #else
 	move_toward(q, target_x(target), target_y(target));
+#endif
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) && defined(SC64_IMPORTED_MISSION)
+        if (may_retry_perimeter && q->path_retry == 12)
+            sc64_structure_melee_retry(q, target - MAX_UNITS, melee_edges);
 #endif
     }
 }
