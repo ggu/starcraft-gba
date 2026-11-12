@@ -54,8 +54,54 @@ static void check_fallback(int owner, int base)
            census.hx == race_base_x[base] && census.hy == race_base_y[base]);
 }
 
+#ifdef SC64_NATIVE_MELEE_STARTS
+static void check_match_hostility(int melee, unsigned order)
+{
+    assert(race_skirmish_melee == (unsigned)melee);
+    for (int i = 0; i < race_bots; ++i) {
+        int owner = race_bot_owner_ids[i];
+        assert(!owners_hostile(owner, owner) && !owners_hostile(owner, NEUTRAL));
+        assert(owners_hostile(owner, SIDE) && owners_hostile(SIDE, owner));
+        for (int j = 0; j < race_bots; ++j) if (i != j) {
+            int other = race_bot_owner_ids[j];
+            assert(owners_hostile(owner, other) == !melee);
+            if (order) {
+                RaceAiCensus census = {.owner = owner};
+                int base = sc64_skirmish_start_base(order, j + 1);
+                int human = sc64_skirmish_start_base(order, 0);
+                int x = race_base_x[base], y = race_base_y[base], tx = -1, ty = -1;
+                assert(race_ai_hostile_near(&census, x, y, 16) == !melee);
+                assert(race_ai_target(&census, x, y, &tx, &ty));
+                assert(tx == (melee ? race_base_x[human] : x));
+                assert(ty == (melee ? race_base_y[human] : y));
+            }
+        }
+    }
+}
+
+static void check_match_words(void)
+{
+    unsigned order = SC64_SKIRMISH_BLOOD_BATH_DENSE_ORDER;
+    int race = -1;
+    unsigned sparse = 99, decoded = 99, mode = 99;
+    int melee = sc64_skirmish_melee_word(R_PROTOSS, 7, order);
+    assert(!sc64_skirmish_read_start_word(1, 1, 3, melee, &race, &sparse, &decoded));
+    assert(!sc64_skirmish_read_match_word(0, 1, 3, melee, &race, &sparse, &decoded, &mode));
+    assert(!sc64_skirmish_read_match_word(1, 0, 3, melee, &race, &sparse, &decoded, &mode));
+    assert(!sc64_skirmish_read_match_word(1, 1, 2, melee, &race, &sparse, &decoded, &mode));
+    assert(!sc64_skirmish_read_match_word(1, 1, 3, melee | 0x2000, &race, &sparse, &decoded, &mode));
+    assert(race == -1 && sparse == 99 && decoded == 99 && mode == 99);
+    assert(sc64_skirmish_read_match_word(1, 1, 3, melee, &race, &sparse, &decoded, &mode));
+    assert(race == R_PROTOSS && !sparse && decoded == order && mode == 1);
+    int legacy = sc64_skirmish_start_word(R_PROTOSS, 7, order);
+    assert(sc64_skirmish_read_match_word(1, 1, 3, legacy, &race, &sparse, &decoded, &mode));
+    assert(race == R_PROTOSS && !sparse && decoded == order && mode == 0);
+}
+#endif
+
 static void mixed_opening_and_save(int map, int human_choice, int expected_human,
-                                   const int choices[3], unsigned order, const int *expected_races)
+                                   const int choices[3], unsigned order, const int *expected_races,
+                                   int melee)
 {
     unsigned seats = 0;
     for (int seat = 0; seat < 3; ++seat)
@@ -79,6 +125,15 @@ static void mixed_opening_and_save(int map, int human_choice, int expected_human
         for (int step = 0; race_front.bot_races[seat] != choice && step < 5; ++step) tap(KEY_RIGHT);
         assert(race_front.bot_races[seat] == choice);
     }
+#ifdef SC64_NATIVE_MELEE_STARTS
+    assert(race_front.row == SC_FRONT_SKIRMISH_MODE_ROW);
+    if (melee) tap(KEY_RIGHT);
+    assert(race_front.skirmish_melee == (unsigned)melee);
+    sc64_frontend_draw();
+    tap(KEY_DOWN);
+#else
+    assert(!melee);
+#endif
     assert(race_front.row == SC_FRONT_SKIRMISH_LAUNCH_ROW);
     tap(KEY_A);
     assert(screen == SCREEN_PLAY && race_mode && race_skirmish_map == map &&
@@ -100,15 +155,21 @@ static void mixed_opening_and_save(int map, int human_choice, int expected_human
         assert(race_player[race_bot_owner_ids[i]] == -1);
 
     assert(race_save_game());
-    assert(race_data.state[23] == (order ? sc64_skirmish_start_word(saved_races[2], seats, order) :
-           sc64_skirmish_seat_word(saved_races[2], sparse)));
+    int word = order ? sc64_skirmish_start_word(saved_races[2], seats, order) :
+                       sc64_skirmish_seat_word(saved_races[2], sparse);
 #ifdef SC64_NATIVE_MELEE_STARTS
+    check_match_hostility(melee, order);
+    if (melee) word = sc64_skirmish_melee_word(saved_races[2], seats, order);
     gba_test_set_elapsed_milliseconds(0xf6e0);
 #endif
+    assert(race_data.state[23] == word);
     game_init(); prior_keys = 0;
     assert(race_load_game());
     assert(race_skirmish_map == map && race_skirmish_slots == sparse &&
            race_skirmish_start_order == order && race_bots == bots && race_human == expected_human);
+#ifdef SC64_NATIVE_MELEE_STARTS
+    check_match_hostility(melee, order);
+#endif
     check_seat(SIDE, order ? sc64_skirmish_start_base(order, 0) : 0);
     for (int i = 0; i < race_bots; ++i) {
         assert(race_bot_races[i] == saved_races[i]);
@@ -120,6 +181,9 @@ static void mixed_opening_and_save(int map, int human_choice, int expected_human
         tap(KEY_START); assert(screen == SCREEN_PAUSE);
         tap(KEY_R); assert(screen == SCREEN_PLAY && race_skirmish_start_order == order &&
                            race_human == expected_human);
+#ifdef SC64_NATIVE_MELEE_STARTS
+        check_match_hostility(melee, order);
+#endif
         check_owner(SIDE, expected_human);
         check_seat(SIDE, sc64_skirmish_start_base(order, 0));
         for (int i = 0; i < race_bots; ++i) {
@@ -130,6 +194,9 @@ static void mixed_opening_and_save(int map, int human_choice, int expected_human
     }
     race_frontend_reset();
     assert(race_front.race == expected_human);
+#ifdef SC64_NATIVE_MELEE_STARTS
+    assert(race_front.skirmish_melee == (unsigned)melee);
+#endif
     for (int i = 0, rank = 0; i < 3; ++i)
         assert(race_front.bot_races[i] == ((seats & (1u << i)) ?
                saved_races[rank++] : SC_FRONT_BOT_CLOSED));
@@ -146,11 +213,11 @@ static void sparse_opening_and_save(int map, unsigned seats)
         const unsigned order_by_mask[] = {[2]=0x0c, [4]=0x0d, [5]=0x18, [6]=0x36};
         const int races[2] = {seats == 2 || seats == 6 ? R_TER : R_ZERG,
                               seats == 6 ? R_ZERG : R_TER};
-        mixed_opening_and_save(map, R_TER, R_TER, choices, order_by_mask[seats], races);
+        mixed_opening_and_save(map, R_TER, R_TER, choices, order_by_mask[seats], races, 0);
         return;
     }
 #endif
-    mixed_opening_and_save(map, R_TER, R_TER, choices, 0, NULL);
+    mixed_opening_and_save(map, R_TER, R_TER, choices, 0, NULL, 0);
 }
 
 #ifdef SC64_NATIVE_MELEE_STARTS
@@ -160,11 +227,13 @@ static void check_native_random_openings(void)
     const int dense[] = {SC_FRONT_BOT_RANDOM, SC_FRONT_BOT_RANDOM, R_PROTOSS};
     const int races[] = {R_ZERG, R_TER, R_PROTOSS};
     const int joint_races[] = {R_TER, R_ZERG, R_PROTOSS};
-    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, R_TER, R_TER, sparse, 0x0d, races);
-    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, R_TER, R_TER, dense, 0x63, races);
+    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, R_TER, R_TER, sparse, 0x0d, races, 0);
+    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, R_TER, R_TER, sparse, 0x0d, races, 1);
+    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, R_TER, R_TER, dense, 0x63, races, 0);
+    mixed_opening_and_save(SC64_MAP_BLOOD_BATH, R_TER, R_TER, dense, 0x63, races, 1);
     /* The load/restart seed in mixed_opening_and_save would instead roll Protoss. */
     mixed_opening_and_save(SC64_MAP_BLOOD_BATH, SC_FRONT_HUMAN_RANDOM, R_ZERG,
-                           dense, 0xb4, joint_races);
+                           dense, 0xb4, joint_races, 0);
 
     Sc64Frontend picker;
     sc64_frontend_reset(&picker, 0, R_TER, 1, -1);
@@ -178,8 +247,9 @@ static void check_native_random_openings(void)
     assert(picker.race == SC_FRONT_HUMAN_RANDOM);
     sc64_frontend_update(&picker, 0);
     sc64_frontend_update(&picker, KEY_UP);
+    picker.skirmish_melee = 1;
     sc64_frontend_update(&picker, KEY_LEFT);
-    assert(picker.map == SC64_MAP_OUTPOST && picker.race == R_PROTOSS);
+    assert(picker.map == SC64_MAP_OUTPOST && picker.race == R_PROTOSS && !picker.skirmish_melee);
     sc64_frontend_update(&picker, KEY_DOWN);
     sc64_frontend_update(&picker, KEY_RIGHT);
     assert(picker.race == R_TER);
@@ -279,7 +349,8 @@ int main(void)
     dense_blood_bath_start_and_save(0xf3ae, SC64_SKIRMISH_BLOOD_BATH_DENSE_ORDER);
     dense_blood_bath_start_and_save(0xf6e0, 0x9cu);
     check_native_random_openings();
-    puts("Native Blood Bath Random races and positions survive save and restart with a changed clock seed");
+    check_match_words();
+    puts("Native Blood Bath races, positions and CPU diplomacy survive save and restart");
 #else
     dense_blood_bath_start_and_save(0, 0);
     puts("Default dense and sparse Blood Bath starts survive SRAM load and restart");

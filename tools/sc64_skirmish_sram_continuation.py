@@ -187,7 +187,8 @@ class Game:
     def front_field(self, name: str, index: int = 0) -> int:
         return self.u32("race_front", self.front[name] + 4 * index)
 
-    def launch(self, map_id: int, human: int, bots: list[int], *, seats: list[int] | None = None) -> None:
+    def launch(self, map_id: int, human: int, bots: list[int], *,
+               seats: list[int] | None = None, melee: bool = False) -> None:
         if (self.u32("screen"), self.front_field("page")) != (SCREEN_TITLE, FRONT_HOME):
             raise ContinuationError("fresh boot is not on HOME")
         self.step(0, 2)
@@ -216,10 +217,19 @@ class Game:
             raise ContinuationError("ROM lacks independent computer seats")
         for i, race in enumerate(bots if seats is None else seats):
             to_row(3 + i); set_field("bot_races", race, i)
-        to_row(6 if "race_skirmish_slots" in self.sym else 3 + len(bots)); self.tap(KEY_A)
+        if "race_skirmish_melee" in self.sym:
+            to_row(6); set_field("skirmish_melee", int(melee))
+            to_row(7)
+        elif melee:
+            raise ContinuationError("ROM lacks the Blood Bath Melee option")
+        else:
+            to_row(6 if "race_skirmish_slots" in self.sym else 3 + len(bots))
+        self.tap(KEY_A)
         if (self.u32("screen"), self.u32("race_mode"), self.u32("race_skirmish_map"),
                 self.u32("race_human"), self.u32("race_bots")) != (SCREEN_PLAY, 1, map_id, human, len(bots)):
             raise ContinuationError("custom game did not start with the selected lobby")
+        if "race_skirmish_melee" in self.sym and self.u32("race_skirmish_melee") != int(melee):
+            raise ContinuationError("custom game did not start with the selected game type")
 
     def state(self) -> dict:
         units = entity_rows(self.rsp.read(self.sym["u"], self.sizes["u"]), self.unit_stride,
@@ -279,6 +289,8 @@ class PhysicalGame(Game):
         state = super().state()
         for name in ("race_mode", "race_human", "race_bots", "race_skirmish_map"):
             state[name] = self.u32(name)
+        if "race_skirmish_melee" in self.sym:
+            state["race_skirmish_melee"] = self.u32("race_skirmish_melee")
         return state
 
 
@@ -356,8 +368,11 @@ def run(args) -> dict:
     if use_physical and getattr(args, "tamper_sram", False):
         raise ContinuationError("physical mode cannot tamper with SRAM")
     seats = getattr(args, "seats", None)
+    melee = getattr(args, "melee", False)
     if seats is not None and not use_physical:
         raise ContinuationError("--seats requires physical-button mode")
+    if melee and (not use_physical or args.map != 1):
+        raise ContinuationError("--melee requires a physical Blood Bath launch")
     game_class = PhysicalGame if use_physical else Game
     out = args.output
     if out.exists():
@@ -376,7 +391,10 @@ def run(args) -> dict:
         record["seats"] = seats
     game = game_class(args.runner, args.rom, args.elf, out / "phase1", save_output=sram)
     try:
-        game.launch(args.map, human, bots, seats=None if seats is None else [SEAT_OPTIONS.index(c) for c in seats])
+        lobby_options = {"seats": None if seats is None else [SEAT_OPTIONS.index(c) for c in seats]}
+        if melee:
+            lobby_options["melee"] = True
+        game.launch(args.map, human, bots, **lobby_options)
         if seats is not None:
             record["launch_seats"] = physical_seats(game)
             validate_launch_seats(game, seats, record["launch_seats"])
@@ -394,6 +412,8 @@ def run(args) -> dict:
         if use_physical:
             record["saved_lobby"] = {name: saved[name] for name in
                 ("race_mode", "race_human", "race_bots", "race_skirmish_map")}
+            if "race_skirmish_melee" in saved:
+                record["saved_game_type"] = saved["race_skirmish_melee"]
         game.step(KEY_A)
         game.step(0, args.continue_updates)
         record["reference"] = summary(game.state())
@@ -423,6 +443,8 @@ def run(args) -> dict:
         if use_physical:
             record["restored_lobby"] = {name: restored[name] for name in
                 ("race_mode", "race_human", "race_bots", "race_skirmish_map")}
+            if "race_skirmish_melee" in restored:
+                record["restored_game_type"] = restored["race_skirmish_melee"]
         game.step(0, args.continue_updates)
         record["resumed"] = summary(game.state())
         record["phase2_stale_update_stops"] = game.stale_update_stops
@@ -441,6 +463,10 @@ def run(args) -> dict:
             record["reference"]["frame"] - record["saved"]["frame"] == args.continue_updates and
             record["resumed"]["frame"] - record["restored"]["frame"] == args.continue_updates)
         record["ok"] = record["ok"] and record["checks"]["lobby_matches"] and record["checks"]["game_updates_match"]
+        if "saved_game_type" in record or melee:
+            record["checks"]["game_type_matches"] = (
+                record.get("saved_game_type") == record.get("restored_game_type") == int(melee))
+            record["ok"] = record["ok"] and record["checks"]["game_type_matches"]
     if seats is not None:
         record["checks"]["seats_and_resolved_starts_match"] = (
             record["launch_seats"] == record["saved_seats"] == record.get("restored_seats"))
@@ -467,11 +493,15 @@ def main(argv=None) -> int:
     parser.add_argument("--continue", dest="continue_updates", type=int, default=900)
     parser.add_argument("--physical", action="store_true",
                         help="use physical buttons and read-only guest state")
+    parser.add_argument("--melee", action="store_true",
+                        help="select allied CPUs in the Blood Bath preview")
     parser.add_argument("--tamper-sram", action="store_true",
                         help="negative control: corrupt the saved record before phase 2")
     args = parser.parse_args(argv)
     if args.physical and args.tamper_sram:
         parser.error("--physical cannot be combined with --tamper-sram")
+    if args.melee and (not args.physical or args.map != 1):
+        parser.error("--melee requires --physical --map 1")
     if args.seats is not None:
         if not args.physical:
             parser.error("--seats requires --physical")

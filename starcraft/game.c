@@ -1981,6 +1981,9 @@ static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
 #ifdef SC64_IMPORTED_SKIRMISH
 static unsigned race_skirmish_slots; /* 0 keeps the legacy dense seating */
 static unsigned race_skirmish_start_order; /* 0 keeps the legacy physical starts */
+#ifdef SC64_NATIVE_MELEE_STARTS
+static unsigned race_skirmish_melee; /* CPU players allied in the native Blood Bath preview */
+#endif
 #endif
 static Sc64Frontend race_front;
 static unsigned race_front_transition;
@@ -2011,6 +2014,9 @@ static void race_frontend_reset(void)
     sc64_frontend_reset(&race_front,race_selected_mission,race_human,race_bots,completed);
     race_front.map=race_skirmish_map;
 #ifdef SC64_IMPORTED_SKIRMISH
+#ifdef SC64_NATIVE_MELEE_STARTS
+    race_front.skirmish_melee=race_skirmish_melee && race_front.map==SC64_MAP_BLOOD_BATH;
+#endif
     unsigned seats=race_skirmish_slots ? race_skirmish_slots : sc64_skirmish_dense_seats(race_front.bots);
     int rank=0;
     for(int i=0;i<3;i++){
@@ -2637,6 +2643,10 @@ owners_hostile(int a, int other)
     if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID)
         return (a == SIDE && (other == ENEMY || other == 4)) ||
                (other == SIDE && (a == ENEMY || a == 4));
+#endif
+#if defined(SC64_IMPORTED_SKIRMISH) && defined(SC64_NATIVE_MELEE_STARTS)
+    if (race_mode && race_skirmish_melee)
+        return a != NEUTRAL && other != NEUTRAL && ((a == SIDE) != (other == SIDE));
 #endif
     return a!=other && a!=NEUTRAL && other!=NEUTRAL &&
         (race_mode || a==ENEMY || other==ENEMY);
@@ -5916,6 +5926,9 @@ game_init(void)
     race_mode=0;race_completed=0;race_bots=2;race_skirmish_map=0;
 #ifdef SC64_IMPORTED_SKIRMISH
     race_skirmish_slots=0;race_skirmish_start_order=0;
+#ifdef SC64_NATIVE_MELEE_STARTS
+    race_skirmish_melee=0;
+#endif
 #endif
 #ifdef SC64_CAMPAIGN_RACE
     race_human=SC64_CAMPAIGN_RACE;
@@ -10127,6 +10140,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
                 race_skirmish_slots=seats==sc64_skirmish_dense_seats(race_bots) ? 0 : seats;
                 race_skirmish_map=race_front.map;
                 race_skirmish_start_order=order;
+#ifdef SC64_NATIVE_MELEE_STARTS
+                race_skirmish_melee=order && race_front.skirmish_melee;
+#endif
                 for(int i=0;i<3;i++)race_bot_races[i]=resolved[i];
             }
 #else

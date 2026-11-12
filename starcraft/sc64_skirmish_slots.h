@@ -110,6 +110,29 @@ static inline int sc64_skirmish_read_start_word(int custom, int blood_bath, int 
 #ifdef SC64_NATIVE_MELEE_STARTS
 #include "sc64_native_start_selector.h"
 
+/* Only the new allied-CPU mode needs a new tag. Free for All keeps the
+ * previous word exactly; older cartridges reject Melee rather than silently
+ * turning the saved allies into enemies. */
+enum { SC64_SKIRMISH_MELEE_TAG = 0x534e0000 };
+
+static inline int sc64_skirmish_melee_word(int last_race, unsigned mask, unsigned order)
+{
+    return SC64_SKIRMISH_MELEE_TAG | (sc64_skirmish_start_word(last_race, mask, order) & 0x1fff);
+}
+
+static inline int sc64_skirmish_read_match_word(int custom, int blood_bath, int bots, int word,
+                                                int *last_race, unsigned *sparse,
+                                                unsigned *order, unsigned *melee)
+{
+    unsigned bits = (unsigned)word;
+    unsigned allied = (bits & ~0x1fffu) == SC64_SKIRMISH_MELEE_TAG;
+    if (allied) word = SC64_SKIRMISH_START_TAG | (int)(bits & 0x1fffu);
+    if (!sc64_skirmish_read_start_word(custom, blood_bath, bots, word, last_race, sparse, order))
+        return 0;
+    *melee = allied;
+    return 1;
+}
+
 static inline unsigned sc64_skirmish_blood_bath_start_order(unsigned rows,
                                                               const Sc64NativeMeleeStarts *starts)
 {

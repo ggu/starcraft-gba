@@ -268,8 +268,13 @@ static void sc64_frontend_draw(void)
             } else if(row==2) {
                 option[0]='O';option[1]='P';option[2]='P';option[3]='O';option[4]='N';option[5]='E';option[6]='N';option[7]='T';option[8]='S';option[9]=' ';
                 option[10]=(char)('0'+race_front.bots);option[11]=0;
+#ifdef SC64_NATIVE_MELEE_STARTS
+            } else if(row==SC_FRONT_SKIRMISH_MODE_ROW) {
+                const char *label=race_front.skirmish_melee ? "TYPE MELEE" : "TYPE FREE FOR ALL";
+                int j=0;while(label[j]){option[j]=label[j];++j;}option[j]=0;
+#endif
             } else {
-                int ai=row-3;option[0]='A';option[1]='I';option[2]=' ';
+                int ai=row-SC_FRONT_BOT_FIRST_ROW;option[0]='A';option[1]='I';option[2]=' ';
                 option[3]=(char)('1'+ai);option[4]=' ';
                 int choice=race_front.bot_races[ai],j=0;
                 const char *value=choice==SC_FRONT_BOT_CLOSED ? "Closed" :

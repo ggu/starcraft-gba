@@ -83,7 +83,14 @@ enum {
 
 #ifdef SC64_IMPORTED_SKIRMISH
 enum { SC_FRONT_BOT_RANDOM = 3, SC_FRONT_BOT_CLOSED, SC_FRONT_BOT_FIRST_ROW = 3,
-       SC_FRONT_SKIRMISH_LAUNCH_ROW = SC_FRONT_BOT_FIRST_ROW + SC64_SKIRMISH_SEAT_COUNT };
+       SC_FRONT_BOT_END_ROW = SC_FRONT_BOT_FIRST_ROW + SC64_SKIRMISH_SEAT_COUNT,
+#ifdef SC64_NATIVE_MELEE_STARTS
+       SC_FRONT_SKIRMISH_MODE_ROW = SC_FRONT_BOT_END_ROW,
+       SC_FRONT_SKIRMISH_LAUNCH_ROW = SC_FRONT_SKIRMISH_MODE_ROW + 1
+#else
+       SC_FRONT_SKIRMISH_LAUNCH_ROW = SC_FRONT_BOT_END_ROW
+#endif
+};
 #ifdef SC64_NATIVE_MELEE_STARTS
 enum { SC_FRONT_HUMAN_RANDOM = SC_FRONT_BOT_RANDOM };
 #endif
@@ -112,6 +119,7 @@ typedef struct Sc64Frontend {
     int bot_last_races[3];  /* Count shortcut can reopen a seat's prior choice */
 #ifdef SC64_NATIVE_MELEE_STARTS
     int human_last_race;   /* Named choice to restore on Outpost */
+    unsigned skirmish_melee; /* Blood Bath option; existing sessions are Free for All */
 #endif
 #endif
 } Sc64Frontend;
@@ -388,6 +396,7 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
                                SC_FRONT_RACE_PROTOSS);
 #if defined(SC64_IMPORTED_SKIRMISH) && defined(SC64_NATIVE_MELEE_STARTS)
     f->human_last_race = f->race;
+    f->skirmish_melee = 0;
 #endif
     f->bots = sc64_front_clamp(bots, 1, 3);
 #ifdef SC64_UNIFIED
@@ -576,8 +585,10 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
         if (f->row == 0) {
             f->map = sc64_front_wrap(f->map + d, SC64_FRONT_MAP_COUNT);
 #ifdef SC64_NATIVE_MELEE_STARTS
-            if (f->map != SC64_MAP_BLOOD_BATH && f->race == SC_FRONT_HUMAN_RANDOM)
-                f->race = f->human_last_race;
+            if (f->map != SC64_MAP_BLOOD_BATH) {
+                if (f->race == SC_FRONT_HUMAN_RANDOM) f->race = f->human_last_race;
+                f->skirmish_melee = 0;
+            }
 #endif
         } else if (f->row == 1) {
 #ifdef SC64_NATIVE_MELEE_STARTS
@@ -597,7 +608,7 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
             int bots = f->bots ? sc64_front_wrap(f->bots - 1 + d, 3) + 1 :
                 (d > 0 ? 1 : SC64_SKIRMISH_SEAT_COUNT);
             sc64_front_skirmish_seats(f, sc64_skirmish_dense_seats(bots));
-        } else if (f->row >= SC_FRONT_BOT_FIRST_ROW && f->row < SC_FRONT_SKIRMISH_LAUNCH_ROW) {
+        } else if (f->row >= SC_FRONT_BOT_FIRST_ROW && f->row < SC_FRONT_BOT_END_ROW) {
             static const u8 cycle[] = { SC_FRONT_RACE_ZERG, SC_FRONT_RACE_TERRAN,
                 SC_FRONT_RACE_PROTOSS, SC_FRONT_BOT_RANDOM, SC_FRONT_BOT_CLOSED };
             int seat = f->row - SC_FRONT_BOT_FIRST_ROW, index = 0;
@@ -607,6 +618,10 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
             f->bot_races[seat] = next;
             if (next != SC_FRONT_BOT_CLOSED) f->bot_last_races[seat] = next;
             f->bots += (next != SC_FRONT_BOT_CLOSED) - (old != SC_FRONT_BOT_CLOSED);
+#ifdef SC64_NATIVE_MELEE_STARTS
+        } else if (f->row == SC_FRONT_SKIRMISH_MODE_ROW && f->map == SC64_MAP_BLOOD_BATH) {
+            f->skirmish_melee ^= 1u;
+#endif
         }
 #else
         if (f->row == 0) f->race = sc64_front_wrap(f->race + d, 3);
