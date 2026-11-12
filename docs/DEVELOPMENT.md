@@ -2734,7 +2734,25 @@ build a ROM with the fixed layout for comparison.
 Game behaviour depends on which point fields are resident, because
 weapon-range movement uses a cached field only when one exists. Any change
 to cache residency therefore changes the simulation, and a test controller
-that queries routes through the cache perturbs the game it plays.
+that queries routes through the cache perturbs the game it plays. Controllers
+that must not perturb the game restore all route and grid state around their
+queries (`tests/sc64_route_purity.h`); any new route, route-cache or
+walkability-grid state must be added to its region list, including the
+incremental grid update's record described below.
+
+`path_walkable` is rebuilt after a structure change by `build_path_grid`
+(`starcraft/path_grid_build.h`). With `SC64_PATH_GRID_INCREMENTAL`
+(`CANONICAL_PATH_GRID_UPDATE_FLAGS` in `mk/combat-perf/Makefile`, race maps
+only) it records, per building slot, the footprint kind and the position and
+type that determine it, plus the terrain identity, and the next rebuild
+resets and re-covers only the footprints of slots that changed; anything it
+cannot prove (first build, other map or mission, more than 24 changed slots,
+a coordinate outside 16 bits) takes the unchanged full rebuild. Any new
+writer of `path_walkable`, or new input to a footprint, must be part of that
+record or must invalidate it. A host build with `-DSC64_PATH_GRID_VERIFY`
+compares every incremental update with a full rebuild and traps on a
+difference; `make test-sc64-path-grid-incremental` runs the randomized
+differential test.
 
 The same file holds `SC64_PRESENT_FLAGS` (`-DGBA_ASYNC_PRESENT`): `gfx_end`
 queues the mode-4 page flip and the sampled-audio VBlank interrupt performs

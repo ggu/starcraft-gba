@@ -187,3 +187,54 @@ the four windows, and anything on hardware.
   (50,000–65,000), terrain band restore and unit drawing.
 - No hardware measurement. mGBA does not model the cartridge prefetch
   buffer exactly, so ROM-code cost on a console can differ.
+
+## Round two: the worst updates (2026-11-12)
+
+Base `22015eb2` for the profile, `bdc7b795` (soft fog on) for the final
+measurement. Same pinned windows, regenerated against the then-current
+opponents (`same_workload` true for every run). Instruction-level profile of
+the five slowest updates of each custom window; "incl" is inclusive cycles.
+
+| Window | Slowest updates (cycles) | What dominates them |
+| --- | --- | --- |
+| Zerg | 4.38M, 3.75M, 3.07M, 3.00M, 3.00M | Point route floods (`sc64_route_flood` with `sc64_route_put_new`, about 360k to 450k per flood of roughly 2,700 cells) are 35% to 60% of each update except the first. The first (4.38M, a structure change) is depot routing 2.08M, of which the depot-slot scan `race_resource_depot_valid_for` 619k (7,251 calls, 85 cycles each, every worker scanning all 160 slots because the owner lists are invalid after the change), depot route floods 1.15M (including `sc64_depot_cell_point` 130k and `build_path_grid` 290k), plus 884k of point floods. The second (3.75M) is depot floods again (903k) and three point floods. |
+| Protoss | 4.62M, 3.25M, 2.94M, 2.93M, 2.88M | The first is depot routing 1.51M (`build_path_grid` 286k, `sc64_depot_cell_point` 161k, depot floods) and point floods 1.1M. The rest are point floods (1.1M to 1.5M of each). |
+| Terran | 2.49M (max) | Three point route fills, 1.35M (54%) of the update, of which the flood loop 1.09M. |
+
+The top self-cost functions of the mean are not concentrated: `game_render`
+8% to 11%, `sc64_route_flood` 3% to 4%, `sc64_contact_blocked_mask_uncached`
+4%, `sc64_target_nearest` 3%, `sc64_route_monotone_probe` 3% to 4% (Terran,
+Protoss). No single exact change in these was found that takes 3% off a mean.
+
+Changes (exact: 54 of 54 custom lobbies byte-identical per product, HOST):
+
+- `race_nearest_resource_depot` rejects dead and foreign slots before calling
+  `race_resource_depot_valid_for` (the first two tests of that function).
+- `sc64_depot_cell_point` uses 32-bit arithmetic for map-sized arguments
+  (535 cycles per call before; `tests/sc64_depot_cell_point_diff.c`, 120M
+  cases against the original).
+- The walkability grid is updated incrementally after a structure change
+  (`starcraft/path_grid_build.h`; `tests/sc64_path_grid_incremental.c`; the
+  full rebuild remains the fallback). The rebuild went from about 290k to
+  about 125k cycles in the worst updates.
+
+| Window | Mean per update | Slowest update |
+| --- | ---: | ---: |
+| Terran | 1,157,945 to 1,156,120 (-0.16%) | 2,569,569 to 2,569,662 |
+| Zerg | 1,424,326 to 1,420,239 (-0.29%) | 4,476,226 to 3,803,179 (-15.0%) |
+| Protoss | 1,529,227 to 1,526,177 (-0.20%) | 4,635,774 to 4,393,100 (-5.2%) |
+
+Updates over 3,000,000 cycles are unchanged (0, 5, 2). The mean barely moves
+because the gain is limited to the updates that follow a structure change.
+After the change the slowest Zerg updates (3.80M, 3.76M) are depot floods and
+point floods; the follow-on spike ten updates after a structure change (every
+worker's depot field restarts as a farther worker asks) and the point floods
+remain. Skipping a flood exactly needs a persisted flood frontier per field
+(RAM) or a changed route cache; both were rejected here. A faster flood loop
+was estimated at 1.5% to 2% of the mean and was not attempted.
+
+Memory against `bdc7b795`: IWRAM end unchanged on all three ROMs; EWRAM end
++608 bytes Terran, +984 bytes Protoss and Zerg (the Zerg ROM keeps 5,704 of
+its 6,688 bytes of headroom). Not shown: hardware, P7 campaign window, other
+frames.
+

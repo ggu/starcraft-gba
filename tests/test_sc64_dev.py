@@ -881,7 +881,7 @@ class OnboardingTests(unittest.TestCase):
         z8_flags = next(line for line in makefile.splitlines()
                         if line.startswith('ZERG_Z8_CANONICAL_FLAGS ='))
         self.assertIn('-DSC64_CONTACT_STEER_ROM', z8_flags)
-        self.assertIn('ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS',
+        self.assertIn('ZERG_Z7_RELEASE_FLAGS = $(filter-out $(RETIRED_ZERG_ROM_DROPS),$(ZERG_Z7_CANONICAL_FLAGS)) -DGBA_NO_DEBUG_INPUTS',
                       makefile)
         self.assertIn('ZERG_Z7_CANONICAL_FLAGS) $(3) $$< common/gba.c -o $$@', makefile)
         self.assertIn('$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS)', makefile)
