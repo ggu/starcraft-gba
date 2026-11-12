@@ -32,10 +32,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   start. The [GBA seat changes](audits/2026-11-12-skirmish-seat-options.md)
   pass physical button and fresh SRAM checks on Terran, Z10, P10, and
   Showcase. [Native opening actors](audits/2026-11-12-n64-blood-bath-opening.md#sparse-seat-spawn-positions)
-  show a southwest opponent for both first-only and middle-only starts;
-  the GBA currently sends middle-only northeast. Establish the general
-  occupied-seat, start assignment and difficulty rules before changing them;
-  long ordinary-input victories also remain open.
+  show a southwest opponent for all three single-seat starts. The dense
+  native lobby changes the human origin as well. The GBA still differs;
+  establish the two-opponent and general assignment rules and preserve old
+  SRAM placement before changing defaults. Difficulty and long ordinary-input
+  victories also remain open.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
@@ -53,9 +54,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [split terrain cache](audits/2026-11-12-late-zerg-terrain-vram.md)
   frees 16,080 B of Z10 working RAM. Compared with the packed-walk release,
   it saves 1.33–1.49% with matching replay checkpoints and sampled pages.
-  The [combined defense probe](audits/2026-11-12-defense-combined.md) saves
-  4.74–7.50% in the busy Z10 campaign. It remains opt-in pending broader
-  cross-cartridge and long skirmish comparisons.
+  [Combined defense indexing](audits/2026-11-12-defense-combined.md) is
+  enabled for Z10 after exact campaign and two complete three-AI ARM
+  comparisons. It saves 5.23–7.31% in two Z10 windows and adds about 0.31%
+  in the two measured custom windows. Other product defaults are unchanged.
   The [single static key scan](audits/2026-11-12-z10-static-key.md) saves
   1.38–1.60% in two fresh Z10 battle windows and 1.25% in a three-AI custom
   battle with matching game and video samples. Local tile repair gave

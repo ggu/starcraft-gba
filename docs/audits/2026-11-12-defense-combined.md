@@ -201,3 +201,31 @@ make LATE_ZERG_PACKED_SIGHT=1 SC64_DEFENSE_PROBE_FLAGS='-DSC64_DEFENSE_SPATIAL_P
 ```
 
 Use separate clean build outputs when changing the defense flags.
+
+## Normal Z10 promotion after the renderer and lobby merges
+
+The composed normal ROM verifies at SHA-256
+`296bb98e174e079be581ecef2abe2fc96c2762c168c4cf21a8934735998a4a1e`.
+It differs from the current normal control only by the two defense flags
+and host-only test changes. EWRAM ends at `0x02038af8` and IWRAM at
+`0x03004be0`, both within the original guards. The independent packed-sight
+canary above had 8,948 bytes clear above the user-stack guard.
+
+From genuine SRAM the composed normal builds matched all 61 campaign
+state checkpoints and all 24 drawn page, palette, camera and fog samples,
+with identical victory at frame 59,997 and zero faults. Normal physical
+custom matches on both maps used the new lobby and the same in-game input
+schedule; they matched every sampled raw state through the same defeat.
+
+| Window (1,000 calls) | Control mean | Defense mean | Change |
+| --- | ---: | ---: | ---: |
+| Z10 19,000–19,999 | 1,780,125 | 1,687,059 | −5.23% |
+| Z10 35,000–35,999 | 1,764,438 | 1,635,460 | −7.31% |
+| Outpost, Terran vs. three CPUs | 1,316,531 | 1,320,699 | +0.32% |
+| Blood Bath, Protoss vs. three CPUs | 1,187,343 | 1,191,030 | +0.31% |
+
+Outpost matched 76 observations through frame 18,621; Blood Bath matched
+77 through frame 18,986. This enables only the Z10 profile, where the
+campaign gain is material and custom mean cost changes by under 0.4% in
+the measured windows. Other products retain their previous selection.
+The worst route stalls and the hardware 30 fps target remain open.
