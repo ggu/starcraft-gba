@@ -119,6 +119,14 @@ test-zerg-z10: build/test-sc64-z10-game build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-game
 
+# Compare scalar power checks and the per-defense-pass Pylon roster using
+# the production Z10 storage and targeting vector. The probe stays opt-in.
+build/test-sc64-z10-defense-pylon-roster: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_RELEASE_FLAGS) -DSC64_DEFENSE_PYLON_ROSTER -DSC64_DEFENSE_PYLON_ROSTER_TEST_ONLY $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-defense-pylon-roster
+test-sc64-z10-defense-pylon-roster: build/test-sc64-z10-defense-pylon-roster
+	./build/test-sc64-z10-defense-pylon-roster
+
 # Source-art coverage over both authenticated maps and their CreateUnit rows.
 build/test-sc64-zerg-late-art: tests/sc64_zerg_late_art.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_CANONICAL_FLAGS) $< common/gba.c -o $@

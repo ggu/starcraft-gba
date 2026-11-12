@@ -65,8 +65,18 @@ static void world_restore(const DefenseWorld *s)
 static void compare_paths(void)
 {
     world_save(&before);
+#ifdef SC64_DEFENSE_PYLON_ROSTER
+    race_defense_scalar_power = 1;
+#endif
     race_tick_defenses_fullscan();
     world_save(&expected);
+#ifdef SC64_DEFENSE_PYLON_ROSTER
+    race_defense_scalar_power = 0;
+    world_restore(&before);
+    race_tick_defenses_fullscan();
+    world_save(&actual);
+    assert(!memcmp(&expected, &actual, sizeof(expected)));
+#endif
     world_restore(&before);
     race_tick_defenses_zp_targets();
     world_save(&actual);
@@ -408,11 +418,39 @@ static void human_defense_fog_acquisition(void)
     assert(u[1].hp < 100);
 }
 
+#ifdef SC64_DEFENSE_PYLON_ROSTER
+static void pylon_slot_state_at_defense_boundary(void)
+{
+    clear_world();
+    b[0] = (Building){ .x=400, .y=400, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_PHOTON_CANNON, .alive=1, .raw_type=-1 };
+    b[MAX_BUILDINGS-1] = (Building){ .x=432, .y=400, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_PYLON, .alive=1, .raw_type=-1,
+        .under_construction=1 };
+    u[0] = (Unit){ .x=416, .y=400, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_ZERGLING, .alive=1, .raw_type=-1 };
+
+    compare_paths();
+    assert(actual.buildings[0].queue_progress == 0);
+    b[MAX_BUILDINGS-1].under_construction = 0;
+    compare_paths();
+    assert(actual.buildings[0].queue_progress == 28);
+    b[MAX_BUILDINGS-1].owner = ENEMY;
+    compare_paths();
+    assert(actual.buildings[0].queue_progress == 0);
+    b[MAX_BUILDINGS-1].owner = SIDE;
+    b[MAX_BUILDINGS-1].alive = 0;
+    compare_paths();
+    assert(actual.buildings[0].queue_progress == 0);
+}
+#endif
+
 int main(void)
 {
     gba_init();
     game_init();
     randomized_differential();
+#ifndef SC64_DEFENSE_PYLON_ROSTER_TEST_ONLY
     tie_range_and_early_kill();
     sunken_explosive_size_shields_and_armor();
     air_defense_filters_ground_goliath();
@@ -421,6 +459,10 @@ int main(void)
     dispatcher_preserves_p3_and_skirmish_paths();
     stock_defense_attack_intervals();
     human_defense_fog_acquisition();
+#endif
+#ifdef SC64_DEFENSE_PYLON_ROSTER
+    pylon_slot_state_at_defense_boundary();
+#endif
     puts("Z/P defense target differential tests passed");
     return 0;
 }
