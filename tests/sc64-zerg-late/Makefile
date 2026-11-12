@@ -142,7 +142,7 @@ build/starcraft-zerg-$(1)-$(5).elf: $$($(2)_REPLAY_DEPS) $$(P8_REPLAY_COMMON) co
 	$$(SIZE) $$@
 build/StarCraft-Zerg-$(2)-$(7).gba: build/starcraft-zerg-$(1)-$(5).elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@
-	$$(PYTHON) tools/fix_rom.py $$@ 'SC $(2) REPLAY' $(4)
+	$$(PYTHON) tools/fix_rom.py $$@ '$(if $(filter Z10,$(2)),SC Z10 RPLY,SC $(2) REPLAY)' $(4)
 endef
 define ZERG_LATE_QUALIFICATION
 $(2)_ARM_DIR := build/$(1)-arm
