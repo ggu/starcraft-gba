@@ -53,6 +53,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [combined defense probe](audits/2026-11-12-defense-combined.md) saves
   4.74–7.50% in the busy Z10 campaign. It remains opt-in pending broader
   cross-cartridge and long skirmish comparisons.
+  The [single static key scan](audits/2026-11-12-z10-static-key.md) saves
+  1.38–1.60% in two fresh Z10 battle windows and 1.25% in a three-AI custom
+  battle with matching game and video samples. Local tile repair gave
+  little additional campaign gain and regressed custom play compared with
+  one scan. Investigate the current tape's 34–38M-cycle simulation spikes
+  separately from the typical-frame rendering budget.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
