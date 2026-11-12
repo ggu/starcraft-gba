@@ -4,10 +4,10 @@ LIVE_HOST = $(COMBINED_HOST) -DSC64_SHARED_EGG_PRODUCER_HOST_STAGE
 shared-egg-live-terran:
 	$(CLANG) $(LIVE_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_shared_egg_live_game.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-live-terran
 	$(COMBINED_BIN_DIR)/shared-egg-live-terran
-shared-egg-live-z7:
+shared-egg-live-z7: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(LIVE_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_live_game.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-live-z7
 	$(COMBINED_BIN_DIR)/shared-egg-live-z7
-shared-egg-live-z9:
+shared-egg-live-z9: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(LIVE_HOST) $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_egg_live_game.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-live-z9
 	$(COMBINED_BIN_DIR)/shared-egg-live-z9
 shared-egg-live-p10:
@@ -21,10 +21,10 @@ shared-egg-live-showcase:
 shared-egg-input-terran:
 	$(CLANG) $(LIVE_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_shared_egg_ordinary_input.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-input-terran
 	$(COMBINED_BIN_DIR)/shared-egg-input-terran
-shared-egg-input-z7:
+shared-egg-input-z7: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(LIVE_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_shared_egg_ordinary_input.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-input-z7
 	$(COMBINED_BIN_DIR)/shared-egg-input-z7
-shared-egg-input-z9:
+shared-egg-input-z9: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(LIVE_HOST) $(ZERG_Z9_CANONICAL_FLAGS) tests/sc64_shared_egg_ordinary_input.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/shared-egg-input-z9
 	$(COMBINED_BIN_DIR)/shared-egg-input-z9
 shared-egg-input-p10:

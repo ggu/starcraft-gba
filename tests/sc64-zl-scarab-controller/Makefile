@@ -7,7 +7,7 @@ ZL_SCARAB_OUT ?= build/zl-scarab-controller
 # fixture refuses all saves; do not apply this exclusion to product vectors.
 ZL_SCARAB_HOST_FLAGS = $(filter-out -DSC64_WORKER_CARGO_KIND,$(ZERG_Z10_CANONICAL_FLAGS))
 .PHONY: test-zl-scarab-controller
-test-zl-scarab-controller:
+test-zl-scarab-controller: | $(LATE_ZERG_SIGHT_INPUTS)
 	@mkdir -p $(ZL_SCARAB_OUT)
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -I$(ZL_SCARAB_COVER_DIR) \
 	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
@@ -19,7 +19,7 @@ test-zl-scarab-controller:
 	$(ZL_SCARAB_OUT)/test
 
 .PHONY: test-zl-scarab-reservation
-test-zl-scarab-reservation:
+test-zl-scarab-reservation: | $(LATE_ZERG_SIGHT_INPUTS)
 	@mkdir -p $(ZL_SCARAB_OUT)
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -I$(ZL_SCARAB_COVER_DIR) \
 	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
@@ -33,7 +33,7 @@ test-zl-scarab-reservation:
 
 # Full normal Z10 cargo flags with the still-save-fenced detached context.
 .PHONY: test-zl-scarab-cargo-context
-test-zl-scarab-cargo-context:
+test-zl-scarab-cargo-context: | $(LATE_ZERG_SIGHT_INPUTS)
 	@mkdir -p $(ZL_SCARAB_OUT)
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -I$(ZL_SCARAB_COVER_DIR) \
 	  -DSC64_SCARAB_RUNTIME -DSC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
@@ -46,7 +46,7 @@ test-zl-scarab-cargo-context:
 	$(ZL_SCARAB_OUT)/cargo-context
 
 .PHONY: test-zl-scarab-cargo-q8-context
-test-zl-scarab-cargo-q8-context:
+test-zl-scarab-cargo-q8-context: | $(LATE_ZERG_SIGHT_INPUTS)
 	@mkdir -p $(ZL_SCARAB_OUT)
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -I$(ZL_SCARAB_COVER_DIR) -I$(CONTROLLER_FLASH_POLICY_DIR) \
 	  -DSC64_SCARAB_RUNTIME -DSC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
@@ -63,7 +63,7 @@ test-zl-scarab-cargo-q8-context:
 
 .PHONY: test-zl-scarab-compound-flash
 # Authored HOST model, fresh process reader; prepared assets only.
-test-zl-scarab-compound-flash:
+test-zl-scarab-compound-flash: | $(LATE_ZERG_SIGHT_INPUTS)
 	@mkdir -p $(ZL_SCARAB_OUT)
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -I$(ZL_SCARAB_COVER_DIR) -I$(CONTROLLER_FLASH_POLICY_DIR) \
 	  -DSC64_SCARAB_RUNTIME -DSC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE -DSC64_COMPOUND_FLASH_Z10_HOST_STAGE -DSC64_CF_TEST_DIAGNOSTICS -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
