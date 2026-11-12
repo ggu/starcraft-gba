@@ -72,6 +72,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   means by 8.72% and 4.54%, and the maxima from 35.18M to 14.84M and
   38.37M to 3.46M cycles. Next: address the remaining point flood, then
   qualify the optimization separately in other profiles.
+  [Packed completed-building art](audits/2026-11-12-packed-buildings.md)
+  saves another 1.64–2.19% in the Z10 windows, with matching gameplay and
+  sampled video, the same RAM limits, and both three-AI outcomes matching.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in

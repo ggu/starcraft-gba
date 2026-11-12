@@ -30,7 +30,28 @@ make test-sc64-z10-building-words-pixels
 make Z10_BUILDING_WORDS=1 verify-zerg-z10
 ```
 
-The default stays off pending more workloads and other sprite banks.
-The remaining costly static-cache misses are a separate target: count
-them first, then try dirtying old and new sprite bounds instead of
-invalidating the whole terrain band.
+## Current normal cartridge
+
+After packed sight, the single terrain scan, defense indexing and
+nearest-first depot selection, the normal candidate matches all 61 raw
+gameplay checkpoints, 24 sampled drawn pages/palettes/camera/fog states,
+and the same zero-fault win at frame 59,997 from physical SRAM. EWRAM
+and IWRAM endpoints remain `0x02038af8` and `0x03004be0`. Linked text
+adds approximately 235 KiB inside the existing 32 MiB cartridge size.
+
+| 1,000-call window | Current control mean | Packed mean | Change |
+| --- | ---: | ---: | ---: |
+| Z10 19,000–19,999 | 1,539,918 | 1,514,736 | −1.64% |
+| Z10 35,000–35,999 | 1,561,129 | 1,526,879 | −2.19% |
+| Outpost, Terran vs. three CPUs | 1,322,351 | 1,322,320 | −0.00% |
+| Blood Bath, Protoss vs. three CPUs | 1,190,546 | 1,187,739 | −0.24% |
+
+Both ordinary-input custom matches matched every raw checkpoint through
+the same result (76 on Outpost and 77 on Blood Bath). Enable for the
+qualified Z10 bank. Other banks have no generated data from this trial.
+
+A separate generic sprite experiment reused the already loaded source
+word for mixed-transparency groups. It matched all 61 state checkpoints
+and 24 video samples but saved only 0.09–0.13% mean loop cycles and used
+120 more IWRAM bytes, so it remains out of the release. Neither change
+solves the point-route spikes or the hardware 30 fps budget.
