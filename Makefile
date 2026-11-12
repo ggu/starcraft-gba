@@ -374,7 +374,8 @@ sc64-interface:
 	python3 tools/sc64_briefing_assets.py
 	python3 tools/sc64_icon_assets.py
 	python3 tools/sc64_chrome_assets.py
-$(SC64_INTERFACE_INPUTS):
+# The text-box module owns its generated header and its extraction recipe.
+$(filter-out $(TEXT_BOX_HEADER),$(SC64_INTERFACE_INPUTS)):
 	@echo 'Private interface data is missing. Run make sc64-interface with the prepared local ROM and reference checkout.'
 	@false
 build/test-sc64-font: tests/sc64_font.c starcraft/sc64_font.h common/gba.h | build
