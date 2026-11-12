@@ -48,8 +48,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   preview follows that order and now offers Human Random; Outpost and
   defaults keep named human choices. The Terran ARM preview passes
   physical-button Human and CPU Random save/restart checks, and the
-  prior normal build reads those saves. Other native modes, difficulty
-  and long ordinary-input victories also remain open.
+  prior normal build reads those saves.
+  The [native Game Type row](audits/2026-11-12-n64-blood-bath-opening.md#single-player-game-type-row)
+  cycles Melee and Free for All on Challenger and Blood Bath, with no
+  difficulty or team row in either lobby. Next: pair native launches
+  to verify CPU-to-CPU hostility, start draws and victory conditions
+  before adding a selector that preserves existing GBA custom saves.
+  Long ordinary-input victories remain open.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
@@ -508,8 +513,9 @@ merges do not update an already copied ROM.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
-  resource/fog presentation, AI difficulty choices and direct native defeat
-  behavior remain open. Current custom defeat counts the last live owned
+  resource/fog presentation and direct native defeat behavior remain open.
+  AI difficulty choices would extend the two native lobbies checked above.
+  Current custom defeat counts the last live owned
   building. Delivered death pixels/timelines were authenticated; their large
   source frames require a paired native presentation check, not guessed scale.
   The [source-only geometry audit](audits/2026-11-07-custom-death-geometry/README.md)
