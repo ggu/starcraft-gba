@@ -51,7 +51,23 @@ mismatches. All three normal links pass, with unchanged EWRAM ends and
 | P10 custom, 10,888–11,887 | 1,524,331 → 1,497,523 (−1.76%) | −4.84% | −16.59% |
 | Z9 early custom, 2,000–2,999 | 606,745 → 606,459 (−0.05%) | +0.03% | −14.94% |
 
-Before enabling the probe, verify the remaining products and campaign
-windows, including 64×64 campaigns, exact longer gameplay and save
-continuations, and hardware timing. The quiet test is one early custom
-window, not a guarantee across all maps and missions.
+## Campaign and save checks
+
+- **Z1, 64×64:** The same ordinary-controller tape wins in both carried Z9
+  ARM probes at frame 50,669, after 50,816 tape calls. All 51 observations
+  match, including final digest 4,255,456,905. This exercises the map size
+  eligible for the dense path. Over the paired render-loop probes, total
+  measured cycles change from 39,501,658,005 to 39,450,809,582 (−0.13%).
+- **Z8, larger map:** The probe matches all 18 observations through the
+  pause-menu save at call 17,123. Its 32 KiB SRAM image matches the control
+  byte-for-byte. A fresh mGBA process loads that image, matches all 30
+  subsequent observations against the uninterrupted control and wins at
+  frame 45,468, with final digest 2,533,489,598.
+
+These are physical-key tapes in otherwise canonical ARM builds with a test
+entry point, and do not establish arbitrary saves or timing on GBA hardware.
+The quiet test is one early custom window. All nine normal ROM verify
+targets pass with the probe requested (default/unified unchanged, Terran,
+Z7/Z8/Z9/Z10, P10 and Showcase). The narrowest IWRAM margin before the
+existing reserve guard is 408 bytes on Z7. The bounded three-product lobby
+comparison is still in progress before changing the normal flags.
