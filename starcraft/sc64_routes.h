@@ -1527,12 +1527,115 @@ sc64_route_flood(int slot, int head, int *tail, int origin,
 #else
 #define SC64_ROUTE_SLOT_ATTR GBA_HOT
 #endif
+#if defined(SC64_ROUTE_DENSE_FLOOD_PROBE) && defined(SC64_ROUTE_ACTIVE_STRIDE) && \
+    SC64_ROUTE_GRID_CELLS_PER_BYTE == 8 && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define SC64_ROUTE_DENSE_FLOOD 1
+enum { SC64_DENSE_SIDE = 64, SC64_DENSE_STRIDE = 72,
+       SC64_DENSE_CELLS = SC64_DENSE_SIDE * SC64_DENSE_SIDE,
+       SC64_DENSE_BYTES = (SC64_DENSE_SIDE + 2) * SC64_DENSE_STRIDE };
+/* The queue can hold every active cell. The padded byte field uses the
+ * middle of scratch, clear of both the queue and the retained topology grid. */
+_Static_assert(sizeof(bfs_queue) >= SC64_DENSE_CELLS * sizeof(u16) +
+               3 + SC64_DENSE_BYTES + sizeof(path_walkable),
+               "dense flood scratch overlaps another grid");
+
+#define SC64_DENSE_BYTE(n, b) (7u | (((n) & (1u << (b))) ? 0u : 8u))
+#define SC64_DENSE_WORD(n) (SC64_DENSE_BYTE(n, 0) | SC64_DENSE_BYTE(n, 1) << 8 | \
+    SC64_DENSE_BYTE(n, 2) << 16 | SC64_DENSE_BYTE(n, 3) << 24)
+static const u32 sc64_dense_words[16] = {
+    SC64_DENSE_WORD(0), SC64_DENSE_WORD(1), SC64_DENSE_WORD(2), SC64_DENSE_WORD(3),
+    SC64_DENSE_WORD(4), SC64_DENSE_WORD(5), SC64_DENSE_WORD(6), SC64_DENSE_WORD(7),
+    SC64_DENSE_WORD(8), SC64_DENSE_WORD(9), SC64_DENSE_WORD(10), SC64_DENSE_WORD(11),
+    SC64_DENSE_WORD(12), SC64_DENSE_WORD(13), SC64_DENSE_WORD(14), SC64_DENSE_WORD(15),
+};
+#undef SC64_DENSE_BYTE
+#undef SC64_DENSE_WORD
+
+static inline u32 sc64_dense_pack4(const u8 *p)
+{
+    u32 v;
+    __builtin_memcpy(&v, __builtin_assume_aligned(p, 4), sizeof(v));
+    v &= 0x07070707u;
+    v = (v | (v >> 5)) & 0x003f003fu;
+    return (v | (v >> 10)) & 0xfffu;
+}
+
+static int GBA_HOT __attribute__((noinline))
+sc64_route_fill_dense(u8 *field, int goal)
+{
+    uintptr_t scratch = ((uintptr_t)(void *)(bfs_queue + SC64_DENSE_CELLS) + 3u) &
+        ~(uintptr_t)3u;
+    u8 *dense = (u8 *)(void *)scratch;
+    const u8 *walk = path_walkable;
+    const int start = (goal & 63) + 4 + ((goal >> 6) + 1) * SC64_DENSE_STRIDE;
+    int head = 0, tail = 0;
+
+    memset(dense, 15, SC64_DENSE_STRIDE);
+    memset(dense + (SC64_DENSE_SIDE + 1) * SC64_DENSE_STRIDE, 15, SC64_DENSE_STRIDE);
+    for (int y = 1; y <= SC64_DENSE_SIDE; ++y) {
+        u8 *row = dense + y * SC64_DENSE_STRIDE;
+        const u32 border = 0x0f0f0f0fu;
+        __builtin_memcpy(__builtin_assume_aligned(row, 4), &border, 4);
+        __builtin_memcpy(__builtin_assume_aligned(row + 68, 4), &border, 4);
+        for (int x = 4; x < 68; x += 8) {
+            u32 bits = *walk++;
+            __builtin_memcpy(__builtin_assume_aligned(row + x, 4),
+                             &sc64_dense_words[bits & 15u], 4);
+            __builtin_memcpy(__builtin_assume_aligned(row + x + 4, 4),
+                             &sc64_dense_words[bits >> 4], 4);
+        }
+    }
+    if (dense[start] == 7u) {
+        dense[start] = 0;
+        bfs_queue[tail++] = (u16)start;
+    } else {
+        for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
+            int seed = start + dy * SC64_DENSE_STRIDE + dx;
+            if (dense[seed] != 7u) continue;
+            dense[seed] = 0;
+            bfs_queue[tail++] = (u16)seed;
+        }
+    }
+    while (head < tail) {
+        int c = bfs_queue[head++];
+#define SC64_DENSE_STEP(offset, direction) \
+        if (dense[c + (offset)] == 7u) { \
+            dense[c + (offset)] = direction; \
+            bfs_queue[tail++] = (u16)(c + (offset)); \
+        }
+        SC64_DENSE_STEP(-1, 1)
+        SC64_DENSE_STEP(1, 2)
+        SC64_DENSE_STEP(-SC64_DENSE_STRIDE, 3)
+        SC64_DENSE_STEP(SC64_DENSE_STRIDE, 4)
+#undef SC64_DENSE_STEP
+    }
+    for (int y = 1; y <= SC64_DENSE_SIDE; ++y) {
+        const u8 *row = dense + y * SC64_DENSE_STRIDE;
+        for (int x = 4; x < 68; x += 8) {
+            u32 pair = sc64_dense_pack4(row + x) |
+                       sc64_dense_pack4(row + x + 4) << 12;
+            *field++ = (u8)pair;
+            *field++ = (u8)(pair >> 8);
+            *field++ = (u8)(pair >> 16);
+        }
+    }
+    return tail;
+}
+#endif
+
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* Flood the whole field of a goal into a slot on the current grid. Returns the
  * number of queued cells (for diagnostics). */
 static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
 {
     int i, tail = 0;
+#ifdef SC64_ROUTE_DENSE_FLOOD
+    if (MAP_COLS == SC64_DENSE_SIDE && MAP_ROWS == SC64_DENSE_SIDE)
+        tail = sc64_route_fill_dense(sc64_route_field[slot], goal);
+    else
+#endif
+    {
+
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
 #else
@@ -1571,6 +1674,7 @@ static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
     for (i = 0; i < tail; ++i) SC64_GRID_SET(path_walkable, bfs_queue[i], 1);
 #endif
     (void)i;
+    }
 #ifdef SC64_ROUTE_KEEP_FIELDS
     SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
 #endif
