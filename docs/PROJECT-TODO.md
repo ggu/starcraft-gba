@@ -27,6 +27,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   campaign availability and selected play paths; frame budget, broader save
   coverage, and original N64 behavior remain separate gates below.
 
+- **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
+  confirmed separate named, Random, and Closed seats and a middle-only
+  start. The [GBA seat changes](audits/2026-11-12-skirmish-seat-options.md)
+  pass physical button and fresh SRAM checks on Terran, Z10, P10, and
+  Showcase. Exact N64 slot-to-start mapping, difficulty, and long
+  ordinary-input victories remain open.
+
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
   measures 1.57M and 2.00M mean loop cycles in two battle windows, against a

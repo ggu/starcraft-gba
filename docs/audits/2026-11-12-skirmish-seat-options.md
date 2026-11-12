@@ -47,3 +47,10 @@ records with malformed seat markers and left the title state untouched.
 
 The four canonical ARM products built and passed the 32 MiB cartridge
 verification: Terran, Zerg Z10, Protoss P10, and Showcase.
+Physical button playback on all four at runtime source `60474982` also
+refused an all-Closed lobby, resolved named and Random opponents, and
+checked live town coordinates for seat masks 2, 6, 1, and 5 respectively.
+Each 32 KiB cartridge SRAM image loaded unchanged in a fresh emulator
+process and matched 60 subsequent ordinary updates against the
+uninterrupted match. This is a bounded continuation, not a full-match
+ARM or N64 placement-parity check.
