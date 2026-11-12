@@ -802,9 +802,10 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
 3. In parallel, re-profile current-source order/detection, movement and
    rendering, then reduce measured busy-loop cost with paired state/pixel and
    gameplay checks. The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
-   saves 2.85–5.98% full-loop cycles with matching campaign checkpoints;
-   compose it with the Pylon probe and verify the other defense paths and
-   stack limits before promoting. Historical inclusive scopes are not
+   saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
+   [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
+   qualify the other defense paths, RAM and stack, and full ordinary-input
+   outcomes before promoting. Historical inclusive scopes are not
    promised savings. The N64 order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
 4. Retry Z10 through ordinary controls after the relevant mechanics are usable;
