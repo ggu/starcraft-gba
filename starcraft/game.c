@@ -13183,6 +13183,9 @@ game_render(void)
 #ifdef SC64_SIEGE_SPLASH
 #include "sc64_siege_splash.h"
 #endif
+#ifdef SC64_NUKE_BLAST_PROBE
+#include "sc64_nuke_blast_adapter.h"
+#endif
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_availability_adapter.h"
 #endif

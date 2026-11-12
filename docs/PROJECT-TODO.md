@@ -719,6 +719,14 @@ plus compiled suites); engine/build source matches the six-ROM/unified-qualified
 `3ebed0e2`. This does not enable shared Egg/Guardian/
 Scarab stages, prove native canal timing or change the 29/30 content count.
 
+**Ghost and Nuclear Strike (P0):** the [N64 source and blast audit](audits/2026-11-12-ghost-nuclear-strike.md)
+records the T8 native entry, exact missile/target/impact assets and
+checked stock impact rules. Silo and Ghost launch UI stay disabled
+pending real attachment and production, native timing and the authenticated
+save path. Finish the shared path across all race products, not a Showcase
+effect. Stock research, unsupported production and scaled-down AI remain
+separate fidelity items below.
+
 ## Priority order
 
 Priorities are the maintainer's decisions after the [2026-11-06 GPT-6.1 Terra
