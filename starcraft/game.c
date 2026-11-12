@@ -3423,100 +3423,7 @@ static const u8 *sc64_base_blocked_map(void)
 }
 #endif
 
-#if (defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-/* Rebuilds follow map/door changes. Keep the larger span visibility path in
- * IWRAM and this occasional full-grid rebuild in ROM within the same reserve. */
-static void
-#else
-static void GBA_HOT
-#endif
-build_path_grid(void)
-{
-    int col, row, i;
-#ifdef SC64_ROUTE_KEEP_FIELDS
-    sc64_routes_grid_begin();
-#endif
-#if defined(SC64_BULK_TERRAIN_GRID) && defined(SC64_RACES) && \
-    defined(SC64_IMPORTED_MISSION) && \
-    (defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE))
-    const u8 *base_blocked = sc64_base_blocked_map();
-    if (base_blocked) sc64_terrain_grid_pack(path_walkable, base_blocked, (unsigned)MAP_COLS * (unsigned)MAP_ROWS);
-    else
-#endif
-    for (row = 0; row < MAP_ROWS; row++)
-	for (col = 0; col < MAP_COLS; col++) {
-	    int cell = col + row * MAP_COLS;
-	    SC64_GRID_SET(path_walkable, cell, !terrain_blocked(col, row));
-	}
-    for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive) {
-#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
-        if (race_bc_facility_airborne(i)) continue;
-#endif
-#ifdef SC64_RACES
-        if(b[i].type==B_ZERG_BEACON)continue;
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-        if (!sc64_t4_building_collidable(i)) continue;
-#ifdef SC64_T4_RUNTIME
-#ifdef SC64_T4_SCENARIO_RUNTIME
-        if (race_t4_active() && sc64_race_t4_is_door(b[i].type)) {
-            /* Conservative tile overlap at the GBA's half scale. Opening
-             * restores the retained terrain, rather than carving new floor. */
-            race_t4_block_door_grid(i);
-            continue;
-        }
-#endif
-#endif
-#ifdef SC64_Z5_RUNTIME
-        if (race_z5_active() && race_z5_is_door_type(b[i].type)) {
-            if (race_z5_building_collidable(i)) {
-                int left, up, right, down;
-                if (sc64_game_building_bounds_source(b[i].type, &left, &up, &right, &down)) {
-                    int c0=limit((b[i].x*2-left)/32,0,MAP_COLS-1);
-                    int c1=limit((b[i].x*2+right)/32,0,MAP_COLS-1);
-                    int r0=limit((b[i].y*2-up)/32,0,MAP_ROWS-1);
-                    int r1=limit((b[i].y*2+down)/32,0,MAP_ROWS-1);
-                    for(row=r0;row<=r1;row++) for(col=c0;col<=c1;col++)
-                        SC64_GRID_SET(path_walkable,col+row*MAP_COLS,0);
-                }
-            }
-            continue;
-        }
-#endif
-#endif
-#endif
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
-        {
-            int left, up, right, down;
-            if (sc64_game_building_bounds_source(b[i].type, &left, &up, &right, &down)) {
-                int x0 = b[i].x * 2 - left, x1 = b[i].x * 2 + right;
-                int y0 = b[i].y * 2 - up, y1 = b[i].y * 2 + down;
-                int c0 = limit(x0 / 32, 0, MAP_COLS - 1);
-                int c1 = limit(x1 / 32, 0, MAP_COLS - 1);
-                int r0 = limit(y0 / 32, 0, MAP_ROWS - 1);
-                int r1 = limit(y1 / 32, 0, MAP_ROWS - 1);
-                for (row = r0; row <= r1; ++row)
-                    for (col = c0; col <= c1; ++col) {
-                        int cell_x0 = col * 32, cell_y0 = row * 32;
-                        int cell_x1 = cell_x0 + 32, cell_y1 = cell_y0 + 32;
-                        if (cell_x0 <= x1 && cell_x1 >= x0 &&
-                            cell_y0 <= y1 && cell_y1 >= y0)
-                            SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
-                    }
-                continue;
-            }
-        }
-#endif
-        int c = b[i].x / 16, r = b[i].y / 16;
-        for (row = limit(r - 2, 0, MAP_ROWS - 1); row <= limit(r + 2, 0, MAP_ROWS - 1); row++)
-            for (col = limit(c - 2, 0, MAP_COLS - 1); col <= limit(c + 2, 0, MAP_COLS - 1); col++)
-                if (dist2(col * 16 + 8, row * 16 + 8, b[i].x, b[i].y) < 18 * 18)
-                    SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
-    }
-    path_grid_valid = 1;
-#ifdef SC64_ROUTE_KEEP_FIELDS
-    sc64_routes_grid_commit();
-#endif
-}
+#include "path_grid_build.h"
 
 static int
 can_place_except_worker(int type, int x, int y, int worker)
@@ -7802,6 +7709,9 @@ race_nearest_resource_depot(Unit *worker)
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
 #endif
         int distance;
+        /* The first two tests of race_resource_depot_valid_for, ahead of the
+         * call: a full slot scan calls it for every slot of every worker. */
+        if (!b[i].alive || b[i].owner != worker->owner) continue;
         if (!race_resource_depot_valid_for(worker, i)) continue;
         distance = dist2(worker->x, worker->y, b[i].x, b[i].y);
         /* Both scans use ascending slot order, preserving equal-distance ties. */

@@ -20,6 +20,13 @@ CANONICAL_ROUTE_STRIDE_FLAGS ?= -DSC64_ROUTE_ACTIVE_STRIDE
 # floods every field again after a grid change.
 CANONICAL_ROUTE_KEEP_FLAGS ?= -DSC64_ROUTE_KEEP_FIELDS
 
+# After a structure change, update only the walkability cells its footprint can
+# have changed instead of rebuilding the whole grid (race maps only). The
+# result is the grid a full rebuild gives. Empty this to compare a canonical
+# ROM with the full rebuild; add -DSC64_PATH_GRID_VERIFY to a host build to
+# compare every incremental update with a full rebuild.
+CANONICAL_PATH_GRID_UPDATE_FLAGS ?= -DSC64_PATH_GRID_INCREMENTAL
+
 # Optional differential of the per-profile tick cache, the 32-bit flight and
 # position paths against retained earlier code, over every prepared profile.
 .PHONY: test-sc64-weapon-source-ticks-bank
@@ -59,3 +66,33 @@ test-sc64-route-keep-fields: build/test-sc64-route-keep-fields-a-ref build/test-
 	./build/test-sc64-route-keep-fields-b-ref --emit build/route-keep-b.ref
 	./build/test-sc64-route-keep-fields-b --compare build/route-keep-b.ref
 test-starcraft: test-sc64-route-keep-fields
+
+# Randomized differential test of the incremental walkability update against
+# the whole-grid rebuild it replaces, over the footprint kinds of each product
+# family. The -full builds run the same scenarios with the update disabled.
+PATH_GRID_TEST_BASE = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter -fsanitize=address,undefined
+PATH_GRID_TEST_DEPS = tests/sc64_path_grid_incremental.c starcraft/path_grid_build.h Makefile mk/combat-perf/Makefile
+PATH_GRID_VARIANTS = terran zerg scenario plain
+define PATH_GRID_VARIANT_RULES
+build/test-sc64-path-grid-$(1): $$(PATH_GRID_TEST_DEPS) | build
+	$$(CLANG) $$(PATH_GRID_TEST_BASE) -DVARIANT_$(2) $$< -o $$@
+build/test-sc64-path-grid-$(1)-full: $$(PATH_GRID_TEST_DEPS) | build
+	$$(CLANG) $$(PATH_GRID_TEST_BASE) -DVARIANT_$(2) -DNO_INCREMENTAL $$< -o $$@
+endef
+$(eval $(call PATH_GRID_VARIANT_RULES,terran,TERRAN))
+$(eval $(call PATH_GRID_VARIANT_RULES,zerg,ZERG))
+$(eval $(call PATH_GRID_VARIANT_RULES,scenario,SCENARIO))
+$(eval $(call PATH_GRID_VARIANT_RULES,plain,PLAIN))
+.PHONY: test-sc64-path-grid-incremental
+test-sc64-path-grid-incremental: $(foreach v,$(PATH_GRID_VARIANTS),build/test-sc64-path-grid-$(v) build/test-sc64-path-grid-$(v)-full)
+	$(foreach v,$(PATH_GRID_VARIANTS),./build/test-sc64-path-grid-$(v) && ./build/test-sc64-path-grid-$(v)-full && ) true
+test-starcraft: test-sc64-path-grid-incremental
+
+# The 32-bit fast path of the depot goal-cell test against the original 64-bit
+# computation, over in-range and out-of-range arguments.
+build/test-sc64-depot-cell-point-diff: tests/sc64_depot_cell_point_diff.c starcraft/sc64_depot_goal.h mk/combat-perf/Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-depot-cell-point-diff
+test-sc64-depot-cell-point-diff: build/test-sc64-depot-cell-point-diff
+	./build/test-sc64-depot-cell-point-diff
+test-starcraft: test-sc64-depot-cell-point-diff

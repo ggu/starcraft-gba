@@ -244,6 +244,21 @@ static int enter_showcase_menu(void)
 #ifdef SC64_FIELD_CONTROLS
 static int check_field_controls_review(void);
 
+/* From the open order menu on Move, step to Attack the way the player does.
+ * The icon card puts Move, Stop, Attack in one row, so LEFT wraps to Attack.
+ * The plain list (any list over 15 rows, such as the 20-row Showcase one)
+ * ignores LEFT and steps DOWN. Either way menu_cursor lands on MENU_ATTACK. */
+static void open_order_menu_to_attack(void)
+{
+#ifdef SC64_COMMAND_ICONS
+    if (card_fits()) {
+        press(KEY_LEFT);
+        return;
+    }
+#endif
+    press(KEY_DOWN);
+}
+
 /* Default-profile controls ported to the race engine (field_controls.h),
  * exercised on the live Carrier Approach scene. */
 static int check_field_controls(void)
@@ -285,11 +300,7 @@ static int check_field_controls(void)
     press(KEY_R);
     press(KEY_B);
     if (!menu_open || menu_cursor != MENU_MOVE) return fail("controls: order list did not open on Move");
-#ifdef SC64_COMMAND_ICONS
-    press(KEY_LEFT); /* Move, Stop, Attack: left wraps to Attack */
-#else
-    press(KEY_DOWN);
-#endif
+    open_order_menu_to_attack();
     press(KEY_A);
     field_ui_refresh();
     if (mode != MODE_ATTACK || field_controls_title_color() != C_RED ||
@@ -538,12 +549,83 @@ static int card_pixels(int x, int y, int w, int h, u8 color)
     return n;
 }
 
+/* The Showcase order list is the custom-game list: Protoss has 20 rows (ten
+ * base rows and ten structure rows, none filtered by what is selected), over
+ * the card's 15 buttons. The game then draws the framed text list, where
+ * UP and DOWN step through the rows with wrap and LEFT and RIGHT do nothing.
+ * This is the player's view of every custom game today; it also guards the
+ * card fallback itself. Starts in scene 0 with the army selected. */
+static int check_order_list_fallback(void)
+{
+    int count, stripe, armed = 0;
+    clear_selection();
+    press(KEY_R);
+    if (selected_count() < 2) return fail("list: R tap did not select the army");
+    count = field_menu_count();
+    if (count != 20) return fail("list: the Showcase order list is not the 20-row Protoss list");
+    if (card_fits()) return fail("list: a 20-row list must not use the 15-button card");
+    press(KEY_B);
+    if (!menu_open || menu_cursor != MENU_MOVE) return fail("list: B did not open the order list on Move");
+
+    /* The list is drawn: the selected row has a two-pixel gold stripe at the
+     * left of the panel (x 102), which the card never draws there. */
+    game_render();
+    stripe = card_pixels(102, 14, 2, 4 * 22 + 4, C_GOLD);
+    if (stripe < 2 * 20) return fail("list: the framed list does not highlight the selected row");
+
+    press(KEY_DOWN);
+    if (menu_cursor != MENU_ATTACK) return fail("list: DOWN from Move is not Attack");
+    press(KEY_UP);
+    if (menu_cursor != MENU_MOVE) return fail("list: UP from Attack is not Move");
+    press(KEY_UP);
+    if (menu_cursor != count - 1) return fail("list: UP from the top row does not wrap to the last row");
+    if (!race_menu_label(menu_cursor)[0]) return fail("list: the last row has no label");
+    game_render(); /* the list scrolls to the last row and still highlights it */
+    if (card_pixels(102, 14, 2, 4 * 22 + 4, C_GOLD) < 2 * 20)
+        return fail("list: the scrolled list does not highlight the last row");
+    press(KEY_DOWN);
+    if (menu_cursor != MENU_MOVE) return fail("list: DOWN from the last row does not wrap to Move");
+    press(KEY_LEFT);
+    press(KEY_RIGHT);
+    if (menu_cursor != MENU_MOVE) return fail("list: LEFT or RIGHT moved the plain list");
+    for (int i = MENU_MOVE; i < MENU_STOP; ++i) press(KEY_DOWN);
+    if (menu_cursor != MENU_STOP) return fail("list: nine DOWN presses from Move do not reach Stop");
+    press(KEY_A);
+    if (menu_open || mode != MODE_NORMAL) return fail("list: A on Stop did not run and close the list");
+
+    /* A arms the chosen order: the HUD hint and the title colour say so. */
+    press(KEY_B);
+    if (!menu_open || menu_cursor != MENU_STOP) return fail("list: B did not reopen on the last command");
+    for (int i = 0; i < count && menu_cursor != MENU_ATTACK; ++i) press(KEY_UP);
+    if (menu_cursor != MENU_ATTACK) return fail("list: UP never reached Attack");
+    press(KEY_A);
+    field_ui_refresh();
+    armed = mode == MODE_ATTACK && field_controls_title_color() == C_RED &&
+            field_controls_hint() && !strcmp(field_controls_hint(), "A ATTACK HERE  B BACK");
+    if (!armed) return fail("list: A on Attack did not arm it in the HUD");
+    press(KEY_B); /* B BACK returns to the list */
+    if (mode != MODE_NORMAL || !menu_open) return fail("list: B did not cancel the armed order back to the list");
+    press(KEY_B);
+    if (menu_open) return fail("list: B did not close the list");
+    clear_selection();
+    return 0;
+}
+
 /* The command card: every base row of every race has its ROM button, the
  * grid order is a permutation of the list, the D-pad reaches every slot,
  * and the card and HUD draw the highlighted, usable and unavailable states. */
+/* Nothing of a selection title lies right of HUD_RIGHT: not in the two
+ * columns before the minimap frame (x 181 on) and not in the three rows
+ * above it (the name row starts at y 121, the frame at y 124). */
+static int title_past_edge(void)
+{
+    return card_pixels(HUD_RIGHT + 1, 121, 2, 16, C_PANEL) != 2 * 16 ||
+           card_pixels(HUD_RIGHT + 1, 121, 240 - HUD_RIGHT - 1, 3, C_PANEL) != (240 - HUD_RIGHT - 1) * 3;
+}
+
 static int check_command_card(void)
 {
-    int saved_race = race_human, count, x, y, w, h;
+    int saved_race = race_human, saved_race_mode, saved_mission, count, x, y, w, h;
     for (int race = 0; race < 3; ++race) {
         race_human = race;
         for (int i = 0; i <= MENU_STOP; ++i) {
@@ -561,8 +643,19 @@ static int check_command_card(void)
     if (!enter_showcase_menu()) return fail("card: could not open showcase");
     press(KEY_A); press(KEY_A);
     if (screen != SCREEN_PLAY) return fail("card: scene 0 did not start");
+    if (check_order_list_fallback()) return 1;
+
+    /* The Showcase list never fits the card (see above), so the card's
+     * geometry, colours and D-pad run in the game's ordinary mission
+     * context, where the same Protoss list has the ten base rows. The flag
+     * flips back after the card is closed. */
+    saved_race_mode = race_mode;
+    saved_mission = race_selected_mission;
+    race_mode = 0;
+    race_selected_mission = 26;
+    clear_selection();
     count = field_menu_count();
-    if (!card_fits()) return fail("card: the Showcase list does not fit the card");
+    if (!card_fits()) return fail("card: the ordinary mission list does not fit the card");
     for (int s = 0; s < count; ++s) {
         int i = card_slot_command(s);
         if (i < 0 || i >= count || card_command_slot(i) != s) return fail("card: slots are not a permutation");
@@ -572,6 +665,7 @@ static int check_command_card(void)
         return fail("card: the top row is not Move, Stop, Attack");
 
     clear_selection();
+    menu_last = menu_cursor = MENU_MOVE; /* B reopens on the last command; the list check left Stop */
     press(KEY_B);
     if (!menu_open || menu_cursor != MENU_MOVE) return fail("card: B did not open the card on Move");
     press(KEY_RIGHT);
@@ -618,6 +712,8 @@ static int check_command_card(void)
         return fail("card: the HUD does not show the highlighted button");
     press(KEY_B);
     if (menu_open) return fail("card: B did not close the card");
+    race_mode = saved_race_mode;
+    race_selected_mission = saved_mission;
 
     /* Resource bar: the mineral chunk, the race's gas and supply sprites
      * replace the MIN, GAS and SUP labels. */
@@ -670,35 +766,69 @@ static int check_command_card(void)
         supply_cap = saved_cap;
     }
 
-    /* One selected unit: its portrait, full health bar and shield bar. */
+    /* One selected unit. The selection panel (hud_panel.h) draws the portrait
+     * at (HUD_PORTRAIT_X, HUD_PORTRAIT_Y), 22 pixels square, and the vital
+     * bars directly under it, StarCraft style: a one-pixel shield bar 23 rows
+     * below the portrait's top, then a two-pixel health bar two rows lower.
+     * Both span the portrait's width. Shields are cyan; health is green above
+     * two thirds, gold above one third and red below, on a dark red track. A
+     * shielded unit also prints its shield number in cyan beside the hit
+     * points, at the right of the name row. */
     {
-        int unit = -1;
+        enum { BX = HUD_PORTRAIT_X, SHIELD_Y = HUD_PORTRAIT_Y + 23, HEALTH_Y = HUD_PORTRAIT_Y + 25, BW = 22 };
+        int unit = -1, shields;
         for (int i = 0; i < MAX_UNITS && unit < 0; ++i)
-            if (u[i].alive && u[i].owner == SIDE && card_unit_icon(&u[i]) >= 0) unit = i;
-        if (unit < 0) return fail("card: no friendly unit has a portrait");
+            if (u[i].alive && u[i].owner == SIDE && card_unit_icon(&u[i]) >= 0 &&
+                sc64_actor_max_shields(u[i].type, 0) > 0) unit = i;
+        if (unit < 0) return fail("card: no friendly unit with a portrait and shields");
+        shields = sc64_actor_max_shields(u[unit].type, 0);
         clear_selection();
         u[unit].selected = 1;
         u[unit].hp = u[unit].maxhp;
+        u[unit].shield = shields;
         draw_hud_commands();
-        if (card_pixels(3, 124, CARD_CELL, CARD_CELL, C_GREEN) +
-            card_pixels(3, 124, CARD_CELL, CARD_CELL, C_HIGHLIGHT) < 20)
+        if (card_pixels(HUD_PORTRAIT_X + 1, HUD_PORTRAIT_Y + 1, CARD_CELL, CARD_CELL, C_GREEN) +
+            card_pixels(HUD_PORTRAIT_X + 1, HUD_PORTRAIT_Y + 1, CARD_CELL, CARD_CELL, C_HIGHLIGHT) < 20)
             return fail("card: the selected unit has no portrait");
-        if (card_pixels(27, 140, 22, 4, C_GREEN) != 22 * 4)
+        if (card_pixels(BX, HEALTH_Y, BW, 2, C_GREEN) != BW * 2)
             return fail("card: a full health bar is not green");
-        if (sc64_actor_max_shields(u[unit].type, 0) > 0 && !card_pixels(27, 137, 22, 2, C_CYAN))
+        if (card_pixels(BX, SHIELD_Y, BW, 1, C_CYAN) != BW)
             return fail("card: the shield bar is missing");
+        if (!card_pixels(30, HUD_NAME_Y, HUD_RIGHT - 29, 10, C_CYAN))
+            return fail("card: the shield number is missing from the name row");
+        u[unit].shield = shields / 2;
+        draw_hud_commands();
+        if (card_pixels(BX, SHIELD_Y, BW, 1, C_CYAN) != BW / 2 ||
+            card_pixels(BX, SHIELD_Y, BW, 1, C_SHADOW) != BW - BW / 2)
+            return fail("card: the shield bar ignores damage");
+        u[unit].shield = shields;
         u[unit].hp = u[unit].maxhp / 2 > 0 ? u[unit].maxhp / 2 : 1;
         draw_hud_commands();
-        if (!card_pixels(27, 140, 22, 4, C_RED_DARK)) return fail("card: the health bar ignores damage");
+        if (!card_pixels(BX, HEALTH_Y, BW, 2, C_RED_DARK) || !card_pixels(BX, HEALTH_Y, BW, 2, C_GOLD) ||
+            card_pixels(BX, HEALTH_Y, BW, 2, C_GREEN))
+            return fail("card: the health bar ignores damage");
+        u[unit].hp = u[unit].maxhp / 5 > 0 ? u[unit].maxhp / 5 : 1;
+        draw_hud_commands();
+        if (!card_pixels(BX, HEALTH_Y, BW, 2, C_RED))
+            return fail("card: a low health bar is not red");
+        u[unit].hp = u[unit].maxhp;
         clear_selection();
     }
 
     /* The combined layout. The card draws after the HUD bands, so the
      * resource bar and the HUD edge must match a frame without it. Source-
-     * font unit and building titles stay left of x 166 on the HUD rows. */
+     * font unit and building titles stay between x 30 and HUD_RIGHT (178);
+     * the minimap frame starts at x 181. */
     {
         unsigned top[2];
         int building = -1, unit = -1;
+        race_mode = 0; /* the open card (not the 20-row list) is under test here */
+        menu_open = 0;
+        /* The supply cases above left their last count (200/200) on the bar and
+         * the cached bar is not redrawn for the first frame; draw the true
+         * counts so both passes compare the same bar. */
+        draw_hud_resources();
+        game_render();
         for (int pass = 0; pass < 2; ++pass) {
             menu_open = pass;
             menu_cursor = MENU_MOVE;
@@ -709,6 +839,7 @@ static int check_command_card(void)
             if (card_pixels(0, 120, 240, 1, C_EDGE) != 240) return fail("card: the HUD edge is painted over");
         }
         menu_open = 0;
+        race_mode = saved_race_mode;
         if (top[0] != top[1]) return fail("card: the open card paints the resource bar");
         for (int i = 0; i < MAX_UNITS && unit < 0; ++i)
             if (u[i].alive && u[i].owner == SIDE && card_unit_icon(&u[i]) >= 0) unit = i;
@@ -718,15 +849,24 @@ static int check_command_card(void)
         clear_selection();
         u[unit].selected = 1;
         draw_hud_commands();
-        if (card_pixels(27, 124, 139, 12, C_PANEL) == 139 * 12) return fail("card: the unit has no title");
-        if (card_pixels(166, 121, 74, 16, C_PANEL) != 74 * 16) return fail("card: the unit title runs past x 165");
-        if (card_pixels(27, 140, 22, 4, C_PANEL)) return fail("card: the unit title covers the health bar");
+        if (card_pixels(30, HUD_NAME_Y, HUD_RIGHT - 29, 12, C_PANEL) == (HUD_RIGHT - 29) * 12)
+            return fail("card: the unit has no title");
+        /* Name and numbers stay in x 30..HUD_RIGHT, clear of the portrait column
+         * and of the product chip area to the right. */
+        if (title_past_edge())
+            return fail("card: the unit title runs past the panel's right edge");
+        if (card_pixels(HUD_PORTRAIT_X + 22, 121, HUD_COLUMN - HUD_PORTRAIT_X - 22, 16, C_PANEL) !=
+            (HUD_COLUMN - HUD_PORTRAIT_X - 22) * 16)
+            return fail("card: the unit title runs into the portrait column");
+        if (card_pixels(HUD_PORTRAIT_X, HUD_PORTRAIT_Y + 23, 22, 4, C_PANEL) == 22 * 4)
+            return fail("card: the vital bars are missing under the portrait");
         clear_selection();
         selected_building = building;
         draw_hud_commands();
         if (card_pixels(3, 124, 23, 23, C_PANEL) == 23 * 23) return fail("card: the building has no source icon");
-        if (card_pixels(30, 124, 94, 12, C_PANEL) == 94 * 12) return fail("card: the building has no title");
-        if (card_pixels(166, 121, 74, 16, C_PANEL) != 74 * 16) return fail("card: the building title runs past x 165");
+        if (card_pixels(30, HUD_NAME_Y, 94, 12, C_PANEL) == 94 * 12) return fail("card: the building has no title");
+        if (title_past_edge())
+            return fail("card: the building title runs past the panel's right edge");
         selected_building = -1;
     }
     return 0;
