@@ -102,3 +102,27 @@ unchanged input provenance. Plan SHA-256 values:
 The ROM, input tape, screenshots and runner outputs remain private. See the
 [earlier Challenger observation](2026-11-07-n64-visual-only-jit/README.md)
 for the same observer's provenance and limits.
+
+## Sparse seat spawn positions
+
+Read-only, cache-aware ares samples from the owned USA ROM verified the
+actual first buildings in three independent Blood Bath Melee launches.
+Both sides played Terran. The setup screens verified the active row
+before ordinary Start input. Each opening had two full Command Centers
+and four SCVs per owner; the linked actor list also matched all 60
+source resource positions. The camera origin identifies the human base.
+
+| Active computer row | Human, native pixels | Computer, native pixels |
+| --- | --- | --- |
+| Middle only | (128, 240), northwest | (288, 1808), southwest |
+| Middle only, Start delayed 137 callbacks | (128, 240), northwest | (288, 1808), southwest |
+| First only, same launch timing as original | (128, 240), northwest | (288, 1808), southwest |
+
+The GBA's middle-only start currently maps to the northeast (880, 120)
+in half-scale pixels. The southwest native location corresponds to
+(144, 904) on GBA. This disproves the current middle-seat placement for
+the observed cases and shows that first and middle do not use distinct
+fixed starts for a sole opponent in these runs. It does not identify the
+rule for a third seat, denser lobbies, other races and maps, or Random.
+The Melee setup screens showed no difficulty selector; other modes and
+any internal difficulty policy are unverified.

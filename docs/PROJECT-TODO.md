@@ -31,8 +31,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   confirmed separate named, Random, and Closed seats and a middle-only
   start. The [GBA seat changes](audits/2026-11-12-skirmish-seat-options.md)
   pass physical button and fresh SRAM checks on Terran, Z10, P10, and
-  Showcase. Exact N64 slot-to-start mapping, difficulty, and long
-  ordinary-input victories remain open.
+  Showcase. [Native opening actors](audits/2026-11-12-n64-blood-bath-opening.md#sparse-seat-spawn-positions)
+  show a southwest opponent for both first-only and middle-only starts;
+  the GBA currently sends middle-only northeast. Establish the general
+  occupied-seat, start assignment and difficulty rules before changing them;
+  long ordinary-input victories also remain open.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
@@ -57,8 +60,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   1.38–1.60% in two fresh Z10 battle windows and 1.25% in a three-AI custom
   battle with matching game and video samples. Local tile repair gave
   little additional campaign gain and regressed custom play compared with
-  one scan. Investigate the current tape's 34–38M-cycle simulation spikes
-  separately from the typical-frame rendering budget.
+  one scan. [Exact instruction traces](audits/2026-11-12-z10-route-stalls.md)
+  attribute the largest stalls to worker depot reachability, including
+  36.0M cycles in one update. Finishing partial fields on retry helped one
+  peak and regressed another, so it stays off. First eliminate unnecessary
+  depot searches while preserving stock choice and tie order.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
