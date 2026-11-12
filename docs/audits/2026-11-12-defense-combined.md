@@ -68,6 +68,19 @@ controller victories. T7–T10 each report zero mission faults. This
 complements the signed-owner and wide-coordinate Pylon fixture; it is
 not a T10 cartridge stack or long-skirmish measurement.
 
+Two more 1,000-update custom windows compared the normal Terran and Protoss
+cartridges directly with their opt-in counterparts. The sampled states
+matched for both pairs, but neither shows a useful mean speedup:
+
+| Product | Mean loop cycles, stock → probe | p95, stock → probe |
+| --- | ---: | ---: |
+| Terran | 1,126,888 → 1,126,882 | 1,450,767 → 1,450,903 |
+| Protoss | 1,497,523 → 1,497,864 | 1,896,164 → 1,885,863 |
+
+These windows are different workloads from the Z10 campaign. Keep the
+defense flags off by default; the observed campaign gain does not imply a
+gain in skirmish.
+
 ## Combined rendering and sight experiment
 
 The defense probe was also built with [packed walking sprites](https://github.com/ggu/starcraft-gba/pull/400)

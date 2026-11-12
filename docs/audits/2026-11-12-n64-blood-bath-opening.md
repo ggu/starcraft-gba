@@ -45,6 +45,36 @@ its three raw frame SHA-256 values are:
 - `f714c0433d55a26d0da9df671344a292f1a222c1876a7b733e7de67143b5316a`
 - `ac57b7c8d8612acbd4701e52e7311468a19c051a26892ecadd098c6716c3f58b`
 
+## Named Zerg and Protoss openings
+
+Two more clean N64 runs selected the named human races while leaving the
+computer slots Zerg, Terran and Protoss. One Right on the human race row
+selects Protoss from Terran; three select Zerg, passing Random. Both runs
+showed the chosen race in the lobby before Start and held neutral after it.
+
+| Human race | Lobby step | First gameplay capture | Later gameplay capture |
+| --- | ---: | --- | --- |
+| Terran | 3,244 | 3,754: Command Center, 50 minerals, 4/10 | 4,254: 66 minerals, 4/10 |
+| Zerg | 3,424 | 3,934: Hatchery and Overlord, 50 minerals, 4/9 | 4,434: 66 minerals, 4/9 |
+| Protoss | 3,334 | 3,844: Nexus, 50 minerals, 4/9 | 4,344: 66 minerals, 4/9 |
+
+The normal GBA Z10 cartridge after #400 started all three lineups through
+physical buttons with the same map and named AI races. At frame 1 every
+human race had 50 minerals and zero gas. Terran started at 4/10 supply;
+Zerg and Protoss started at 4/9. Each run sampled the same mineral sequence
+(50, 50, 82, 90, 114) at game frames 1, 61, 121, 181 and 241. Supply stayed
+at the opening values. These are matched opening HUD values and evidence of
+automatic mining on both systems. The N64 pictures do not verify gas or
+AI wallets, matched rates, AI difficulty or long-match behavior.
+
+The GBA ROM SHA-256 is
+`d7c219637dbebe8223001a35beb717678cc008ec370f2062ace095196b7aff67`.
+Both new N64 observer manifests passed with unchanged inputs and verified
+their three captures. Plan SHA-256 values:
+
+- Zerg: `b3fa3ac28c0c6c89fc53702c958f2172a54201c6b6339b1f2c0707dfbd698e53`
+- Protoss: `2b02ca34275770801fd85418e9e1ffad4b3723c4477946f9650406b47dc1bb61`
+
 The ROM, input tape, screenshots and runner outputs remain private. See the
 [earlier Challenger observation](2026-11-07-n64-visual-only-jit/README.md)
 for the same observer's provenance and limits.
