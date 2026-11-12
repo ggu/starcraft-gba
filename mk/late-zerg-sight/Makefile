@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Shared by the late Zerg cartridge, controller, replay and test vectors.
-LATE_ZERG_PACKED_SIGHT ?= 0
+# The earlier race products use a different sight-span path.
+LATE_ZERG_PACKED_SIGHT ?= 1
 ifneq ($(words $(filter 0 1,$(LATE_ZERG_PACKED_SIGHT))),1)
 $(error LATE_ZERG_PACKED_SIGHT must be 0 or 1)
 endif
