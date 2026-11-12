@@ -2234,7 +2234,7 @@ build/test-sc64-zp-protoss-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildc
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-zp-air-tech: tests/sc64_zp_air_tech.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
-build/test-sc64-z4-campaign-run: tests/sc64_z4_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+build/test-sc64-z4-campaign-run: tests/sc64_z4_campaign_run.c tests/sc64_route_purity.h $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z4_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z4-runtime test-sc64-p4-runtime test-sc64-p4-create-prefix test-sc64-zp-storage
 
@@ -4155,7 +4155,7 @@ build/test-sc64-z7-carried-z2: tests/race_campaign_run.c $(ZERG_Z7_CARRIED_DEPS)
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z7-carried-z3: tests/sc64_z3_campaign_run.c tests/sc64_route_purity.h $(ZERG_Z7_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
-build/test-sc64-z7-carried-z4: tests/sc64_z4_campaign_run.c $(ZERG_Z7_CARRIED_DEPS) | build
+build/test-sc64-z7-carried-z4: tests/sc64_z4_campaign_run.c tests/sc64_route_purity.h $(ZERG_Z7_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z7-carried-missions
 test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-carried-z2 build/test-sc64-z7-carried-z3 build/test-sc64-z7-carried-z4
@@ -4687,7 +4687,7 @@ build/test-sc64-zerg-carried-z2: tests/race_campaign_run.c $(ZERG_CARRIED_DEPS) 
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-zerg-carried-z3: tests/sc64_z3_campaign_run.c tests/sc64_route_purity.h $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
-build/test-sc64-zerg-carried-z4: tests/sc64_z4_campaign_run.c $(ZERG_CARRIED_DEPS) | build
+build/test-sc64-zerg-carried-z4: tests/sc64_z4_campaign_run.c tests/sc64_route_purity.h $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-zerg-carried-z5: tests/sc64_z5_campaign_run.c $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@

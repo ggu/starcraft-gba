@@ -1,6 +1,11 @@
 /* Normal-controller Z4 campaign attempt. All game changes are produced by
  * ordinary game_update input. Runtime reads only guide choices and checkpoints. */
 #include "../starcraft/game.c"
+/* Only the live mineral observer needs restoration. Failure diagnostics
+ * run after the recorded game and do not drive any further inputs. */
+#define ROUTE_PURE_DISABLE
+#include "sc64_route_purity.h"
+#undef ROUTE_PURE_DISABLE
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -205,6 +210,7 @@ static void step(u16 held)
         return;
     }
     u16 pressed = held & (u16)~prior_keys;
+    assert(route_pure_depth == 0);
     game_update(held, pressed);
     prior_keys = held;
     ++host_ticks;
@@ -541,6 +547,7 @@ static void assign_idle_miner(void)
             u[actual].order == ORDER_IDLE && !u[actual].carry) { worker = actual; break; }
     }
     if (worker < 0) return;
+    ROUTE_PURE_BEGIN();
     for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0) {
         int nx, ny, load=0;
         if (!path_next_tile(u[worker].x,u[worker].y,m[i].x,m[i].y,&nx,&ny)) continue;
@@ -549,6 +556,7 @@ static void assign_idle_miner(void)
         int d = dist2(u[worker].x,u[worker].y,m[i].x,m[i].y) + load * 40000;
         if (d < best) { best = d; patch = i; }
     }
+    ROUTE_PURE_END();
     if (patch < 0) return;
     if (!currently_visible(m[patch].x,m[patch].y)) {
         /* The controller may consult map contents, but uses a normal Move to
@@ -718,6 +726,8 @@ int main(int argc, char **argv)
     checkpoint(won ? "won" : lost ? "lost" : controller_input_error ? "input-error" : "limit");
     fprintf(trace, "]}\n");
     fclose(trace);
+    fprintf(stderr, "Z4 route observer: %lu scopes, %lu changed then restored\n",
+            route_pure_scopes, route_pure_changed_scopes);
     printf("Z4 controller attempt result=%s frame=%d host_tick=%u outcome=%u hatch=0x%x remaining_force3_CC=%d side_units=%d side_buildings=%d trace=%s\n",
            won ? "WON" : lost ? "LOST" : controller_input_error ? "INPUT_ERROR" : "LIMIT", frame, (unsigned)host_ticks,
            race_z4.model.outcome, race_z4.hatch_effects, force3_command_centers(),
