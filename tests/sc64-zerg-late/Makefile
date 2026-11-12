@@ -110,6 +110,13 @@ build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/
 verify-zerg-z10: build/StarCraft-Zerg-Z10-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z10
 zerg-z10: verify-zerg-z10
+ifeq ($(CANONICAL_WALK_WORDS),1)
+build/test-sc64-z10-walk-words-pixels: tests/sc64_walk_words_pixels.c tests/sc64_unit_walk_frames_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(ZERG_Z10_RELEASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-walk-words-pixels
+test-sc64-z10-walk-words-pixels: build/test-sc64-z10-walk-words-pixels
+	./build/test-sc64-z10-walk-words-pixels
+endif
 build/test-sc64-z10-game: tests/sc64_z10_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_CANONICAL_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z10-carried-z9: tests/sc64_z9_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build

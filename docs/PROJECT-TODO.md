@@ -37,6 +37,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   samples spend 218k cycles per update on the sprite blitter and 288k on
   defenses. Prioritize exact Cannon power and target queries, then sprite
   drawing and exploration. Preserve the existing 64×64 route fast path.
+  [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
+  reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
+  windows with 24 identical sampled frames and palettes.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
