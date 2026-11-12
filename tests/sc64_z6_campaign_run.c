@@ -1,5 +1,6 @@
 /* Source-driven normal-input Z6 campaign controller experiment. */
 #include "../starcraft/game.c"
+#include "sc64_route_purity.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@ static int trace_carrier_slot=-1;
 static int hero_track_slot=-2,hero_track_hp,hero_track_shield,hero_track_x,hero_track_y;
 static int z6_storms_cast;
 static int kerrigan(void);
+static void trace_model_event(const char *kind);
 static void z6_log_hero_hit(int hero,int old_x,int old_y,int old_hp,int old_shield);
 static int select_slot(int slot);
 static int assign_gas_worker(int worker);
@@ -47,7 +49,15 @@ static void input(u16 held)
     u16 pressed=(u16)(held & (u16)~prior);
     int changed=held!=prior;
     if (screen==SCREEN_RESULT || won || lost) return;
+    assert(route_pure_depth == 0);
+#ifdef ROUTE_PURITY_DEBUG
+    static uint64_t route_after_update;
+    if (host_ticks) assert(route_purity_hash() == route_after_update);
+#endif
     game_update(held,pressed);
+#ifdef ROUTE_PURITY_DEBUG
+    route_after_update = route_purity_hash();
+#endif
     prior=held;
     ++host_ticks;
     /* A retreat can recursively advance input; record this tick first. */
@@ -56,6 +66,9 @@ static void input(u16 held)
             trace_event_started?",":"",host_ticks,(unsigned)held,(unsigned)pressed);
         trace_event_started=1;
     }
+    if(controller_trace && host_ticks % 900u == 0u &&
+       screen==SCREEN_PLAY && !won && !lost)
+        trace_model_event("periodic");
     int hero=kerrigan();
     if(hero_track_slot==-2) {
         if(hero>=0) {
@@ -495,6 +508,7 @@ static int controller_attackmove_click_point(int sx,int sy,int x,int y,
     /* Search 40/48px cardinal offsets, plus 32x32 diagonals (~45px). The
      * source picker bounds are 31px for units and 26px for buildings; all
      * points stay outside that bound and within the 64px Hydra range. */
+    ROUTE_PURE_BEGIN();
     for(int extra=9;extra<=17;extra+=8) for(int d=0;d<4;d++) {
         int radius=pick_radius+extra;
         int px=x+cardinal[d][0]*radius,py=y+cardinal[d][1]*radius,nx,ny;
@@ -502,7 +516,9 @@ static int controller_attackmove_click_point(int sx,int sy,int x,int y,
         if(sc64_direct_attack_find_target(px,py)>=0) { ++targeted; continue; }
         if(!is_traversable(px/16,py/16,-1)) { ++blocked; continue; }
         if(!controller_attackmove_group_reachable(px,py)) { ++unreachable; continue; }
-        *out_x=px;*out_y=py;return 1;
+        *out_x=px;*out_y=py;
+        ROUTE_PURE_END();
+        return 1;
     }
     for(int d=0;d<4;d++) {
         int px=x+diagonal[d][0]*32,py=y+diagonal[d][1]*32,nx,ny;
@@ -510,8 +526,11 @@ static int controller_attackmove_click_point(int sx,int sy,int x,int y,
         if(sc64_direct_attack_find_target(px,py)>=0) { ++targeted; continue; }
         if(!is_traversable(px/16,py/16,-1)) { ++blocked; continue; }
         if(!controller_attackmove_group_reachable(px,py)) { ++unreachable; continue; }
-        *out_x=px;*out_y=py;return 1;
+        *out_x=px;*out_y=py;
+        ROUTE_PURE_END();
+        return 1;
     }
+    ROUTE_PURE_END();
     /* Diagnostics only: report nearest live hostile, rejection totals, and
      * selected group coordinates. This does not affect candidate choice. */
     {
@@ -964,12 +983,17 @@ static int route_waypoint(int sx,int sy,int tx,int ty,int steps,int *out_x,int *
 {
     int x=sx,y=sy,nx=0,ny=0;
     if(steps<1)steps=1;
+    ROUTE_PURE_BEGIN();
     for(int i=0;i<steps;i++) {
-        if(!path_next_tile(x,y,tx,ty,&nx,&ny))return 0;
+        if(!path_next_tile(x,y,tx,ty,&nx,&ny)) {
+            ROUTE_PURE_END();
+            return 0;
+        }
         if(nx==x&&ny==y)break;
         x=nx;y=ny;
         if(dist2(x,y,tx,ty)<=24*24)break;
     }
+    ROUTE_PURE_END();
     *out_x=x;*out_y=y;
     return x!=sx||y!=sy;
 }
@@ -1332,6 +1356,7 @@ static int clear_force2_locations(void)
                     sc64_z6_world_owner_matches(&race_z6_world,19,b[i].raw_owner,b[i].owner)>0)
                     fprintf(stderr,"  Force2 building slot%d raw%d xy%d,%d hp%d complete%d\n",
                         i,b[i].raw_type,b[i].x,b[i].y,b[i].hp,building_complete(i));
+                ROUTE_PURE_BEGIN();
                 for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
                     u[i].raw_type!=41&&u[i].raw_type!=42) {
                     int nx=-1,ny=-1,has=path_next_tile(u[i].x,u[i].y,u[i].tx,u[i].ty,&nx,&ny);
@@ -1344,6 +1369,7 @@ static int clear_force2_locations(void)
                         has,nx,ny,clear,u[i].path_x,u[i].path_y,u[i].path_timer,u[i].path_retry,
                         SC64_GRID_GET(path_walkable,(u[i].x/16)+(u[i].y/16)*MAP_COLS));
                 }
+                ROUTE_PURE_END();
                 return 0;
                 }
             } else stalled_rounds=0;
@@ -1853,6 +1879,8 @@ int main(int argc,char **argv)
     fputs("]}\n",controller_trace);
     if(fclose(controller_trace)!=0) { perror("write Z6 controller trace"); return 2; }
     controller_trace=NULL;
+    fprintf(stderr,"Z6 route observer: %lu scopes, %lu changed then restored; terminal=%s frame=%u calls=%u\n",
+            route_pure_scopes,route_pure_changed_scopes,terminal,(unsigned)frame,host_ticks);
     /* Helpers historically returned zero for both early aborts and the
      * completed route. Only an observed source victory may pass this target. */
     return result == 0 && strcmp(terminal,"won") == 0 ? 0 : 1;

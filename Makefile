@@ -2972,7 +2972,7 @@ test-sc64-z6-save: build/test-sc64-z6-save build/test-sc64-z6-game-save
 	./build/test-sc64-z6-game-save
 
 # Full normal-input sixth-mission playthrough; imported private inputs required.
-build/test-sc64-z6-controller: tests/sc64_z6_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+build/test-sc64-z6-controller: tests/sc64_z6_campaign_run.c tests/sc64_route_purity.h $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z6-controller
 test-sc64-z6-controller: build/test-sc64-z6-controller
@@ -4021,9 +4021,9 @@ test-sc64-z7-steering: build/test-sc64-z7-full-render-steering
 # Direct AttackUnit remains enabled; the controller must issue ground clicks
 # when its policy requests Attack-Move. This does not promote the profile.
 $(eval $(call Z7_FULL_RENDER_FIXTURE,carried-z5,sc64_z5_campaign_run.c,$(Z7_STEERING_OPTIONS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ,tests/sc64_route_purity.h))
-$(eval $(call Z7_FULL_RENDER_FIXTURE,carried-z6,sc64_z6_campaign_run.c,$(Z7_STEERING_OPTIONS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,carried-z6,sc64_z6_campaign_run.c,$(Z7_STEERING_OPTIONS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ,tests/sc64_route_purity.h))
 $(eval $(call Z7_FULL_RENDER_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c,$(Z7_STEERING_OPTIONS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ))
-build/test-sc64-z7-full-render-z6-controller-policy: tests/sc64_z6_campaign_run.c
+build/test-sc64-z7-full-render-z6-controller-policy: tests/sc64_z6_campaign_run.c tests/sc64_route_purity.h
 .PHONY: test-sc64-z7-carried-z6
 test-sc64-z7-carried-z6: build/test-sc64-z7-full-render-carried-z6 build/test-sc64-z7-full-render-z6-controller-policy
 	mkdir -p .local/build/z7-carried-z6
@@ -4120,9 +4120,9 @@ $(eval $(call Z7_CANONICAL_FIXTURE,controller,sc64_z7_campaign_run.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,last-seen,sc64_z7_last_seen.c))
 build/test-sc64-z7-canonical-last-seen: tests/sc64_z7_campaign_run.c
 $(eval $(call Z7_CANONICAL_FIXTURE,carried-z5,sc64_z5_campaign_run.c,,tests/sc64_route_purity.h))
-$(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c,,tests/sc64_route_purity.h))
 $(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c))
-build/test-sc64-z7-canonical-z6-controller-policy: tests/sc64_z6_campaign_run.c
+build/test-sc64-z7-canonical-z6-controller-policy: tests/sc64_z6_campaign_run.c tests/sc64_route_purity.h
 ZERG_Z7_CONTROLLER_TRACE ?= .local/sc64/zerg-z7-canonical-controller.jsonl
 ZERG_Z7_CONTROLLER_LIMIT ?= 200000
 ZERG_Z7_CONTROLLER_POLICY ?= --policy early-gas --policy-workers 6 --policy-reserve 50 --policy-hydras 8 --policy-second-first 0 --policy-retreat 0 --policy-home-radius 320 --home-army-r --start-delay 33
@@ -4698,7 +4698,7 @@ build/test-sc64-zerg-carried-z4: tests/sc64_z4_campaign_run.c tests/sc64_route_p
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-zerg-carried-z5: tests/sc64_z5_campaign_run.c tests/sc64_route_purity.h $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
-build/test-sc64-zerg-carried-z6: tests/sc64_z6_campaign_run.c $(ZERG_CARRIED_DEPS) | build
+build/test-sc64-zerg-carried-z6: tests/sc64_z6_campaign_run.c tests/sc64_route_purity.h $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
 .PHONY: test-sc64-zerg-carried-missions
 test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64-zerg-carried-z2 build/test-sc64-zerg-carried-z3 build/test-sc64-zerg-carried-z4 build/test-sc64-zerg-carried-z5 build/test-sc64-zerg-carried-z6
