@@ -40,6 +40,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restart checks. Real hardware and default promotion remain open.
   Other native modes, difficulty and long ordinary-input
   victories also remain open.
+  Exact normal builds after the preview merged pass the [repeatable
+  physical seat and SRAM checks](audits/2026-11-12-skirmish-seat-options.md#repeatable-physical-seat-checks)
+  on all four products. Keep full matches and hardware frame rate as
+  separate qualification.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)

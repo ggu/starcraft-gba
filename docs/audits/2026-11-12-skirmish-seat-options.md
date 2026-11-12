@@ -57,3 +57,29 @@ Each 32 KiB cartridge SRAM image loaded unchanged in a fresh emulator
 process and matched 60 subsequent ordinary updates against the
 uninterrupted match. This is a bounded continuation, not a full-match
 ARM or N64 placement-parity check.
+
+## Repeatable physical seat checks
+
+Normal Terran T10, Zerg Z10, Protoss P10, and Showcase ROMs rebuilt at
+`6e843d8` after the seeded-start preview merged. All four ROM verifiers
+passed. On each ROM one sparse and one three-CPU lobby passed ordinary
+physical launch, save, fresh-process load, and 60-update continuation.
+Across the eight cases both maps, all human races and one, two, and
+three opponents were exercised. All-Closed launch was refused in each
+case. Fresh normal lobbies kept legacy start order; no SRAM bytes changed
+on readback. The later Z5 qualification changes test code only.
+
+For an ordinary middle-only Random match on Blood Bath:
+
+```sh
+python3 tools/sc64_skirmish_sram_continuation.py --physical \
+  --rom build/StarCraft-Terran-Transport1-GBA.gba --elf build/starcraft-terran.elf \
+  --runner /path/to/sc64-headless-replay --output /tmp/sc64-middle-random \
+  --map 1 --human t --seats=-r- --play 60 --continue 60
+```
+
+`--seats` supplies three visible rows: `t`, `z`, `p`, `r` for Random and
+`-` for Closed. It checks the actual opening halls, the resolved races
+and base IDs, and their persistence in addition to the normal world
+fingerprint. It also accepts a ROM carrying the opt-in seeded starts.
+The original `--bots` argument still selects contiguous named opponents.
