@@ -13,17 +13,17 @@ typedef struct {
 } Sc64NukeWorldFlight;
 typedef struct {
     Sc64NukeSilo ammo;
-    u8 payer;
+    u8 payer, landing;
 } Sc64NukeWorldSilo;
 static Sc64NukeWorldSilo race_nuke_silos[MAX_BUILDINGS];
 static Sc64NukeWorldFlight race_nuke_flights[SC64_NUKE_FLIGHT_LIMIT];
-static unsigned race_nuke_paid_silos, race_nuke_active_flights;
+static unsigned race_nuke_paid_silos, race_nuke_active_flights, race_nuke_landing_addons;
 
 static void race_nuke_reset(void)
 {
     memset(race_nuke_silos, 0, sizeof race_nuke_silos);
     memset(race_nuke_flights, 0, sizeof race_nuke_flights);
-    race_nuke_paid_silos = race_nuke_active_flights = 0;
+    race_nuke_paid_silos = race_nuke_active_flights = race_nuke_landing_addons = 0;
 }
 
 static int race_nuke_raw_building(int slot, unsigned raw)
@@ -72,6 +72,11 @@ static int race_nuke_silo_status(int slot)
 #endif
 
 #ifdef SC64_HAS_SPRITES
+static int race_nuke_addon_landing(int slot)
+{
+    return (int)race_nuke_silos[slot].landing - 1;
+}
+
 static int race_nuke_silo_working(int slot)
 {
     unsigned remaining = race_nuke_silos[slot].ammo.remaining;
@@ -86,6 +91,20 @@ static void race_nuke_clear_silo(int slot)
     if (sc64_nuke_silo_supply(&s->ammo)) --race_nuke_paid_silos;
     s->ammo = (Sc64NukeSilo){0};
     s->payer = SC64_NUKE_NO_PAYER;
+}
+
+static void race_nuke_clear_landing(int slot)
+{
+    if (race_nuke_silos[slot].landing) {
+        race_nuke_silos[slot].landing = 0;
+        --race_nuke_landing_addons;
+    }
+}
+
+static void race_nuke_forget_building(int slot)
+{
+    race_nuke_clear_silo(slot);
+    race_nuke_clear_landing(slot);
 }
 
 static unsigned race_nuke_addon_raw(int parent)
@@ -121,6 +140,8 @@ static void race_nuke_relink_neutral_addon(int parent)
             b[i].x != b[parent].x + 48 || b[i].y != b[parent].y + 8 ||
             !race_nuke_raw_building(i, addon_raw)) continue;
         if (race_nuke_silos[i].ammo.armed) race_nuke_silos[i].payer = (u8)b[parent].owner;
+        if (!race_nuke_silos[i].landing) ++race_nuke_landing_addons;
+        race_nuke_silos[i].landing = 1;
         b[i].owner = b[parent].owner;
         b[i].raw_owner = b[parent].raw_owner;
         target_lists_valid = 0;
@@ -149,6 +170,7 @@ static void race_nuke_detach_addon(int parent)
     int slot = race_nuke_owned_addon(parent);
     if (slot < 0 || b[slot].under_construction) return;
     Sc64NukeWorldSilo *s = &race_nuke_silos[slot];
+    race_nuke_clear_landing(slot);
     if (s->ammo.remaining) {
         int owner = s->payer;
         race_nuke_clear_silo(slot);
@@ -400,9 +422,10 @@ static void race_nuke_tick(void)
     /* Classic source data runs at 24 Hz. Keep approach/cast opportunity on
      * every game update, but advance paid and flight clocks on source ticks. */
     int due = (unsigned)frame % 5u != 0u;
-    if (race_nuke_paid_silos && due)
+    if ((race_nuke_paid_silos || race_nuke_landing_addons) && due)
         for (int i = 0; i < MAX_BUILDINGS; ++i) {
             Sc64NukeWorldSilo *s = &race_nuke_silos[i];
+            if (s->landing && ++s->landing > 10) race_nuke_clear_landing(i);
             if (!sc64_nuke_silo_supply(&s->ammo)) continue;
             if (!race_nuke_raw_building(i, SC64_NUKE_SILO_RAW) ||
                 (b[i].owner != s->payer && !(b[i].owner == NEUTRAL && s->ammo.armed))) {

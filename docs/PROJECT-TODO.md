@@ -732,7 +732,8 @@ actor pool can represent representative armies at the stock cap.
 records native T8 attachment and supply-first refusal. The shared opt-in
 probe trains Ghosts and paid missiles, launches from ordinary GBA controls,
 and uses the owned Ghost, Silo, missile, dot, warning and impact assets.
-It has no authenticated save writer and remains off in default builds.
+It has an authenticated Silo writer for queued and armed missiles and
+remains off in default builds; an active strike still refuses a save.
 Finish the native timing comparison, Ghost abilities and AI and complete
 the persistence and ARM-input checks before enabling it.
 

@@ -86,10 +86,14 @@ static void t8_attachment(void)
     race_selected_mission = SC64_TERRAN_LATE_GLOBAL_T8;
     init_state();
     assert(race_late_active() && screen == SCREEN_PLAY);
-    int silo = -1, cc = -1;
+    int silo = -1, cc = -1, witness = -1, spotter = -1;
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         if (race_nuke_raw_building(i, 108) && b[i].owner == NEUTRAL) silo = i;
         if (race_nuke_raw_building(i, 106) && b[i].owner == SIDE && race_late_airborne(i)) cc = i;
+    }
+    for (int i = 0; i < MAX_UNITS; ++i) if (race_nuke_ghost_eligible(i, SIDE)) {
+        if (u[i].x == 3484 / 2 && u[i].y == 3885 / 2) witness = i;
+        else spotter = i;
     }
     assert(silo >= 0 && cc >= 0 && find_ghost(SIDE) >= 0);
     assert(!race_nuke_silo_online(silo, SIDE));
@@ -99,8 +103,12 @@ static void t8_attachment(void)
     b[cc].x = x + 2; b[cc].y = y;
     assert(race_late_flight_order(cc, x + 2, y - 2, 1));
     for (int i = 0; i < 20 && race_late_airborne(cc); ++i) {
+#ifdef SC64_NUKE_SILO_JOURNAL
+        game_update(0, 0);
+#else
         ++frame;
         race_late_flight_tick();
+#endif
     }
     assert(!race_late_airborne(cc) && b[cc].x == x && b[cc].y == y);
     assert(b[silo].owner == SIDE && b[silo].raw_owner == b[cc].raw_owner &&
@@ -111,6 +119,14 @@ static void t8_attachment(void)
     assert(race_nuke_arm(silo, SIDE) == 2); /* T8 opens at 20/20. */
     fixture_building(SIDE, 109, x - 96, y); /* supply from an additional completed Depot */
     assert(race_nuke_arm(silo, SIDE) == 4);
+#ifdef SC64_NUKE_SILO_JOURNAL
+    assert(race_save_game());
+    race_nuke_reset();
+    assert(!race_nuke_reserved_supply(SIDE) && race_load_game());
+    assert(race_nuke_silos[silo].ammo.remaining == SC64_NUKE_MISSILE_SOURCE_TICKS &&
+           race_nuke_reserved_supply(SIDE) == 16);
+    puts("T8: queued Silo round-trips through the cartridge SRAM journal");
+#endif
     advance_world(1876);
     assert(race_nuke_armed_slot(SIDE) == silo);
     assert(race_late_lift(cc));
@@ -121,6 +137,12 @@ static void t8_attachment(void)
     assert(b[silo].owner == SIDE && race_nuke_armed_slot(SIDE) == silo &&
            race_nuke_reserved_supply(SIDE) == 16);
     puts("T8: native roster, Command Center lands, claims neutral Silo and trains an allowed missile");
+    /* Match the native target and the specific friendly Ghost that died. */
+    assert(witness >= 0 && u[witness].alive && spotter >= 0 &&
+           race_nuke_issue(spotter, SIDE, 3666 / 2, 3882 / 2));
+    advance_world(600);
+    assert(!u[witness].alive && !race_nuke_reserved_supply(SIDE));
+    puts("T8: same friendly Ghost dies at the observed native strike point");
 }
 #endif
 
@@ -212,7 +234,9 @@ int main(void)
     hud_building_jobs(silo, &jobs, 0);
     assert(jobs.count == 1 && jobs.level[0] == HUD_BAR_LEVELS);
 #endif
-    assert(!race_save_game()); /* do not replace a user's save with missing ammunition */
+#ifndef SC64_NUKE_SILO_JOURNAL
+    assert(!race_save_game()); /* the no-journal world test must fail closed */
+#endif
 
     selected_building = -1; u[ghost].selected = 1;
     int x = u[ghost].x + 48, y = u[ghost].y;
@@ -229,6 +253,7 @@ int main(void)
     cx = x; cy = y;
     game_update(KEY_A, KEY_A);
     assert(mode == MODE_NORMAL && race_nuke_ghost_locked(ghost));
+    assert(!race_save_game()); /* never save a partial in-flight state */
     gfx_begin(0); gfx_set_clip_y(12, 120); draw_unit(&u[ghost]); gfx_end();
     assert(race_nuke_armed_slot(SIDE) < 0 && race_owner_reserved_supply(SIDE) == already + 16);
     assert(!race_nuke_issue(ghost, SIDE, x, y));

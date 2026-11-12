@@ -2452,7 +2452,7 @@ enum { NUKE_MENU_NONE, NUKE_MENU_ARM, NUKE_MENU_CANCEL_ARM, NUKE_MENU_CAST,
 enum { NUKE_TOAST_WARNING = 16, NUKE_TOAST_ARMED, NUKE_TOAST_ABORTED,
        NUKE_TOAST_EMPTY, NUKE_TOAST_OCCUPIED };
 static void race_nuke_reset(void), race_nuke_tick(void), race_nuke_draw(void);
-static void race_nuke_clear_silo(int slot);
+static void race_nuke_forget_building(int slot);
 static int race_nuke_parent_slot(int addon, unsigned parent_raw);
 static void race_nuke_relink_neutral_addon(int parent);
 static void race_nuke_detach_addon(int parent);
@@ -2467,7 +2467,7 @@ static int race_nuke_arm(int slot, int owner), race_nuke_cancel_arm(int slot, in
 static int race_nuke_abort(int slot), race_nuke_menu_action(void);
 static int race_nuke_issue_selected(int x, int y), race_nuke_command_index(void);
 #ifdef SC64_HAS_SPRITES
-static int race_nuke_silo_working(int slot);
+static int race_nuke_silo_working(int slot), race_nuke_addon_landing(int slot);
 #ifdef SC64_UNIT_FACING
 static int race_nuke_draw_ghost(int slot, int x, int y);
 #endif
@@ -3114,7 +3114,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     if (i>=MAX_BUILDINGS) return -1;
 #endif
 #ifdef SC64_SHARED_NUKE_PROBE
-    race_nuke_clear_silo(i);
+    race_nuke_forget_building(i);
 #endif
 #ifdef SC64_RANGE_WORK
     sc64_range_route_forget_target(MAX_UNITS+i);
@@ -4933,7 +4933,7 @@ destroy_building(int slot, int source_owner)
             }
 #endif
 #ifdef SC64_SHARED_NUKE_PROBE
-            race_nuke_clear_silo(slot);
+            race_nuke_forget_building(slot);
 #endif
 	    q->alive = 0;
 #ifdef SC64_BATTERY_SERVICE_ENABLED
@@ -11818,11 +11818,16 @@ draw_building_overlay(Building *q)
 #endif
 #ifdef SC64_RACES
 #if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_HAS_SPRITES)
-    if (!q->under_construction && sc64_race_raw_building(q->type) == SC64_NUKE_SILO_RAW) {
-        int tick = race_nuke_silo_working((int)(q - b));
-        if (tick >= 0) {
-            const Sc64SpriteFrame *overlay =
-                sc64_nuke_building_working_sprite(SC64_NUKE_SILO_RAW, (unsigned)tick);
+    if (!q->under_construction) {
+        int raw = sc64_race_raw_building(q->type), slot = (int)(q - b);
+        if (raw == SC64_NUKE_SILO_RAW || raw == SC64_NUKE_COVERT_RAW) {
+            int landing = race_nuke_addon_landing(slot);
+            int working = raw == SC64_NUKE_SILO_RAW ? race_nuke_silo_working(slot) : -1;
+            const Sc64SpriteFrame *overlay = landing >= 0 ?
+                sc64_nuke_building_landing_sprite((unsigned)raw, (unsigned)landing) : 0;
+            if (overlay) draw_mission_sprite(overlay, x, y);
+            overlay = working >= 0 ?
+                sc64_nuke_building_working_sprite((unsigned)raw, (unsigned)working) : 0;
             if (overlay) draw_mission_sprite(overlay, x, y);
         }
     }
@@ -12416,6 +12421,11 @@ sc64_tile_background_done:
 #ifdef SC_DEFAULT_UI
     field_ui_draw_cursor(x, y);
 #else
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (mode == MODE_NUCLEAR_TARGET)
+        draw_selection_ellipse(x, y, 4, 2, C_GOLD, SELECTION_RING, 0);
+    else {
+#endif
     gfx_frame(x - 4, y - 4, 9, 9, (mode == MODE_BUILD
 #ifdef SC64_BATTERY_SERVICE_ENABLED
               || mode == MODE_RECHARGE
@@ -12437,6 +12447,9 @@ sc64_tile_background_done:
     gfx_line(x, y - 7, x, y + 7, C_HIGHLIGHT);
 #ifdef SC64_FIELD_CONTROLS
     field_controls_draw_cursor(x, y);
+#endif
+#ifdef SC64_SHARED_NUKE_PROBE
+    }
 #endif
 #endif
     if (box_state == 2) {
