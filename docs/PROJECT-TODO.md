@@ -37,11 +37,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   samples spend 218k cycles per update on the sprite blitter and 288k on
   defenses. Prioritize exact Cannon power and target queries, then sprite
   drawing and exploration. Preserve the existing 64×64 route fast path.
-  The compact Pylon probe saves 1.67–2.06% full-loop cycles in the two Z10
-  windows with matching checkpoints. It remains opt-in pending stack
-  high-water and cross-profile qualification. Defense targeting still costs
-  up to 168k cycles in the measured samples; compare a spatial candidate
-  against the existing target order, ground/air rules and strict radius.
+  [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
+  reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
+  windows with 24 identical sampled frames and palettes.
+  The [combined defense probe](audits/2026-11-12-defense-combined.md) saves
+  4.74–7.50% with matching checkpoints. It remains opt-in pending the
+  remaining cross-cartridge campaign and skirmish comparisons.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
