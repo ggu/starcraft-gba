@@ -216,7 +216,7 @@ static int race_p7_carrier_training_slots_available(unsigned wanted)
             commitments += (unsigned)sc64_race_product_count(type);
         }
     }
-    for (int i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+    for (int i = 0; i < MAX_UNITS; ++i) free_slots += sc64_unit_slot_available(i);
     return commitments <= free_slots;
 }
 

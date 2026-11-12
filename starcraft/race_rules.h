@@ -172,7 +172,14 @@ enum {
     U_SHARED_GHOST = SC_RU_LEGACY_COUNT,
 #endif
 #endif
-#if defined(SC64_NUKE_FALLBACK_GHOST) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+#ifdef SC64_NUKE_FALLBACK_GHOST
+    U_NUKE_WIRE_MISSILE,
+#else
+    U_NUKE_WIRE_MISSILE = SC_RU_LEGACY_COUNT,
+#endif
+#endif
+#if defined(SC64_NUKE_ACTIVE_JOURNAL) || defined(SC64_NUKE_FALLBACK_GHOST) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
     (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
     SC_RU_COUNT
 #else
@@ -214,7 +221,7 @@ _Static_assert(U_SHARED_EGG_STAGE == SC_RU_LEGACY_COUNT, "Egg append position ch
 _Static_assert(U_SHARED_EGG_STAGE < 64, "staged Egg requires a six-bit identity");
 #endif
 #endif
-#if !defined(SC64_NUKE_FALLBACK_GHOST) && !defined(SC64_GUARDIAN_COCOON_STAGE) && \
+#if !defined(SC64_NUKE_ACTIVE_JOURNAL) && !defined(SC64_NUKE_FALLBACK_GHOST) && !defined(SC64_GUARDIAN_COCOON_STAGE) && \
     (!defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_Z7_EGG_PRODUCTION))
 _Static_assert(SC_RU_COUNT == SC_RU_LEGACY_COUNT, "legacy unit IDs changed");
 #endif
@@ -591,6 +598,11 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #endif
 #ifdef SC64_NUKE_FALLBACK_GHOST
     , [U_SHARED_GHOST] = { R_TER, 0, B_BARRACKS, 2, 25, 75, 750, 45, 0, 0 }
+#endif
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    /* Journal-only identity. Runtime keeps missiles out of the Unit world
+     * and applies stock supply separately, so this cannot be trained. */
+    , [U_NUKE_WIRE_MISSILE] = { R_TER, 0, 255, 0, 0, 0, 0, 100, 0, 0 }
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     , [U_GUARDIAN_COCOON] = { R_ZERG, 0, 255, 4, 0, 0, 0, 200, 0, 0 }

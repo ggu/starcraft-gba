@@ -227,7 +227,7 @@ static int race_z6_authored_ai_pulse(void)
             q->path_x = q->path_y = 0;
         }
     }
-    for (int i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+    for (int i = 0; i < MAX_UNITS; ++i) free_slots += sc64_unit_slot_available(i);
     if (free_slots <= race_z6_ai_pending_source_creates() +
                       race_z6_ai_committed_unit_slots()) return 1;
     for (unsigned offset = 0; offset < 4; ++offset) {

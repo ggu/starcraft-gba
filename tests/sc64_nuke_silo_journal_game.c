@@ -277,6 +277,7 @@ static void campaign_read(const char *path)
 }
 #endif
 
+#ifndef SC64_NUKE_JOURNAL_FIXTURE_NO_MAIN
 int main(int argc, char **argv)
 {
     assert(argc == 3);
@@ -292,3 +293,4 @@ int main(int argc, char **argv)
     else assert(!"unknown test operation");
     return 0;
 }
+#endif

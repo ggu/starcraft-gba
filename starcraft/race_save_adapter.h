@@ -1820,6 +1820,9 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 #ifdef SC64_NUKE_SILO_JOURNAL
 #include "sc64_nuke_silo_journal.h"
 #endif
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+#include "sc64_nuke_strike_journal.h"
+#endif
 
 static int race_save_game(void) {
 #ifdef SC64_NUKE_SILO_JOURNAL
@@ -2857,6 +2860,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    if (!race_nuke_save_write_strikes(&nuke_writer_auth)) return 0;
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
     if (!race_impact_save_write(cargo_have_previous ? &cargo_previous : 0
 #ifdef SC64_NUKE_SILO_JOURNAL
@@ -2905,6 +2911,9 @@ typedef struct {
 #ifdef SC64_NUKE_SILO_JOURNAL
     Sc64NukeSaveAuth nuke_silo_auth;
     u16 nuke_silo_receipts[MAX_BUILDINGS];
+#endif
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    Sc64NukeStrikeLoadPlan nuke_strikes;
 #endif
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
     Sc64StageSaveAuth compound_auth;
@@ -3143,6 +3152,13 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    /* Remove journal-only actor rows before ordinary migrations or mission
+     * validation. The detached plan holds their authenticated state. */
+    const Sc64NukeSaveWorld strike_world = race_nuke_save_world(v[0], v[4], width * 16, height * 16);
+    if (!race_nuke_save_prepare_strikes(&race_data, &strike_world, &plan->nuke_silo_auth,
+                                       &plan->nuke_strikes)) return 0;
+#endif
 #ifdef SC64_SHARED_BATTERY
     if (!race_battery_migrate_shield_phase(&race_data,width,height SC64_GCTX_ARG)) return 0;
 #endif
@@ -5182,6 +5198,9 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     race_nuke_save_restore(plan.nuke_silo_receipts);
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    race_nuke_save_restore_strikes(&plan.nuke_strikes);
+#endif
 #elif defined(SC64_SHARED_NUKE_PROBE)
     race_nuke_reset();
 #endif

@@ -812,7 +812,7 @@ static int __attribute__((noinline)) race_product_slots_available(unsigned wante
 {
     unsigned free_slots = 0, committed = wanted;
     for (int i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive) ++free_slots;
+        if (sc64_unit_slot_available(i)) ++free_slots;
 #ifdef SC64_EGG_RUNTIME
         else if (u[i].type == SC64_EGG_ACTOR) {
             if (!sc64_z7_egg_product_valid(u[i].target)) return 0;
@@ -992,7 +992,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
         unsigned committed = race_p4_reserved_units();
         unsigned free_slots = 0;
-        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
         for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
             for (int q = 0; q < b[slot].queue_count; ++q) {
                 int queued = b[slot].queue[(b[slot].queue_head + q) % 5];
@@ -1005,7 +1005,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_mode && race_selected_mission == SC64_P5_GLOBAL_ID) {
         unsigned committed = race_p5_reserved_units();
         unsigned free_slots = 0;
-        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
         for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
             for (int q = 0; q < b[slot].queue_count; ++q) {
                 int queued = b[slot].queue[(b[slot].queue_head + q) % 5];
@@ -1025,7 +1025,7 @@ static int race_queue_unit(int owner, int producer, int type)
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) {
         int free_slots = 0;
-        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
         if (!free_slots) return 0;
     }
 #endif
@@ -1711,7 +1711,7 @@ static void race_tick_buildings(void)
 #ifdef SC64_P4_RUNTIME
         if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
             unsigned free_slots = 0;
-            for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+            for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
             if (free_slots < race_p4_reserved_units() + (unsigned)sc64_race_product_count(type)) {
                 b[i].queue_progress = frames - 1;
                 continue;
@@ -1727,7 +1727,7 @@ static void race_tick_buildings(void)
             if (sc64_race_product_count(type) == 2) {
                 int second_x, second_y, free_slots = 0;
                 ctx.reserved = 0;
-                for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+                for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
                 if (free_slots < 2 ||
                     !sc64_p3_find_production_exit(i, type, x, y, &first_x, &first_y, &ctx)) {
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
@@ -1779,7 +1779,7 @@ static void race_tick_buildings(void)
 #endif
         if (sc64_race_product_count(type) == 2) {
             int free_slots=0;
-            for(int slot=0;slot<MAX_UNITS;slot++)if(!u[slot].alive)free_slots++;
+            for(int slot=0;slot<MAX_UNITS;slot++)if(sc64_unit_slot_available(slot))free_slots++;
             if(free_slots<2){b[i].queue_progress=frames-1;continue;}
             int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
             if (race_spawn_product_from(owner, type, x, y, source_owner, i) < 0 ||

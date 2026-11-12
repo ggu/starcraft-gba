@@ -18,8 +18,13 @@ static Sc64NukeSaveWorld race_nuke_save_world(int mode, int bots, unsigned width
     unsigned owner_mask = 0;
     int count = mode == 0 ? 4 : mode == 1 && bots >= 1 && bots <= 3 ? bots + 1 : 0;
     for (int i = 0; i < count; ++i) owner_mask |= 1u << owners[i];
-    /* The dedicated missile actor format is not admitted in this stage. */
-    return (Sc64NukeSaveWorld){width, height, MAX_UNITS, MAX_BUILDINGS, NEUTRAL, owner_mask, 63};
+    return (Sc64NukeSaveWorld){width, height, MAX_UNITS, MAX_BUILDINGS, NEUTRAL, owner_mask,
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+                              U_NUKE_WIRE_MISSILE
+#else
+                              63 /* the missile actor format is not admitted */
+#endif
+                             };
 }
 
 static int race_nuke_new_unit_type(int type)
@@ -44,6 +49,11 @@ static int race_nuke_new_building_type(int type)
 
 static int race_nuke_save_unit_valid(int type, int raw_type, int has_tag)
 {
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    /* Wire rows are consumed by detached preflight. The ordinary actor
+     * layer must never admit a raw or synthetic missile row. */
+    if (type == U_NUKE_WIRE_MISSILE) return 0;
+#endif
     if (raw_type == SC64_NUKE_MISSILE_RAW) return 0;
     if (!race_nuke_new_unit_type(type)) return 1;
     return has_tag && (raw_type == -1 || raw_type == SC64_NUKE_GHOST_RAW);
@@ -58,14 +68,21 @@ static int race_nuke_save_building_identity(const Building *q, int has_tag)
         (has_tag && (q->raw_type == -1 || q->raw_type == raw));
 }
 
-/* Decide the outer namespace before serializing any bytes. Painting,
- * approach, and descent all affect gameplay and cannot be dropped. An
- * already resolved blast's short visual effect is transient. */
+/* Decide the outer namespace before serializing any bytes. A pending
+ * approach has no wire representation and cannot be dropped. An already
+ * resolved blast's short visual effect is transient. */
 static int race_nuke_save_live_scope(int *has_tag)
 {
     *has_tag = 0;
-    for (unsigned i = 0; i < SC64_NUKE_FLIGHT_LIMIT; ++i)
-        if (race_nuke_flights[i].approaching || race_nuke_flights[i].strike.phase) return 0;
+    for (unsigned i = 0; i < SC64_NUKE_FLIGHT_LIMIT; ++i) {
+        if (race_nuke_flights[i].approaching) return 0;
+        if (!race_nuke_flights[i].strike.phase) continue;
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+        *has_tag = 1;
+#else
+        return 0;
+#endif
+    }
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         if (!race_nuke_save_unit_valid(u[i].type, u[i].raw_type, 1)) return 0;
         if (race_nuke_new_unit_type(u[i].type)) *has_tag = 1;
@@ -76,6 +93,9 @@ static int race_nuke_save_live_scope(int *has_tag)
             sc64_nuke_silo_supply(&race_nuke_silos[i].ammo)) *has_tag = 1;
         for (unsigned q = 0; q < 5; ++q)
             if (race_nuke_new_unit_type(b[i].queue[q])) *has_tag = 1;
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+            else if (b[i].queue[q] == U_NUKE_WIRE_MISSILE) return 0;
+#endif
     }
     return 1;
 }
@@ -183,8 +203,12 @@ static int race_nuke_save_candidate_building(const RaceSave *candidate, unsigned
 {
     int has_tag = sc64_nuke_save_auth_matches(auth, candidate, candidate->version);
     if (!race_nuke_save_building_identity(q, has_tag)) return 0;
-    for (unsigned j = 0; j < 5; ++j)
+    for (unsigned j = 0; j < 5; ++j) {
         if (race_nuke_new_unit_type(q->queue[j]) && !has_tag) return 0;
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+        if (q->queue[j] == U_NUKE_WIRE_MISSILE) return 0;
+#endif
+    }
     *receipt = 0;
     if (sc64_race_raw_building(q->type) != SC64_NUKE_SILO_RAW) return 1;
     if (q->queue_count || q->queue_head) return 0;

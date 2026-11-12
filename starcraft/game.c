@@ -38,6 +38,9 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "sc64_nuke_save_rows.h"
 #endif
+#if defined(SC64_NUKE_ACTIVE_JOURNAL) && !defined(SC64_NUKE_SILO_JOURNAL)
+#error "Active strikes require the authenticated Silo journal"
+#endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_scope.h"
 #include "../common/gba_flash_journal.h"
@@ -1394,6 +1397,16 @@ _Static_assert(sizeof(SaveData) <= 16368, "Save exceeds an alternating SRAM reco
 static SaveData data;
 #endif
 static Unit u[MAX_UNITS];
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+static u8 race_nuke_unit_reserved[(MAX_UNITS + 7) / 8];
+static inline int sc64_unit_slot_available(int slot)
+{
+    return !u[slot].alive &&
+        !(race_nuke_unit_reserved[(unsigned)slot >> 3] & (1u << ((unsigned)slot & 7u)));
+}
+#else
+#define sc64_unit_slot_available(slot) (!u[(slot)].alive)
+#endif
 #ifdef SC64_UNIT_FACING
 static void sc64_facing_reset_all(void);
 static void sc64_facing_reset_slot(int slot);
@@ -2869,7 +2882,7 @@ find_unit_slot(void)
 {
     int i;
     for (i = 0; i < MAX_UNITS; i++)
-	if (!u[i].alive)
+	if (sc64_unit_slot_available(i))
 	    return i;
     return -1;
 }

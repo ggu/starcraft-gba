@@ -3,13 +3,16 @@
 #define SC64_NUKE_RUNTIME_H
 
 /* Opt-in world probe. The command and update paths use the same ownership
- * checks, including for campaign actors. No new state is written to SRAM. */
+ * checks, including for campaign actors. The journal has its own gate. */
 enum { SC64_NUKE_FLIGHT_LIMIT = 8, SC64_NUKE_NO_PAYER = 255 };
 enum { SC64_NUKE_ASCENT_TICKS = 90, SC64_NUKE_ALERT_TICKS = 45 };
 typedef struct {
     Sc64NukeFlight strike;
     u16 origin_x, origin_y, approach_x, approach_y;
     u8 approaching, impact_tick, ascent_ticks;
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    u8 actor_slot_plus1;
+#endif
 } Sc64NukeWorldFlight;
 typedef struct {
     Sc64NukeSilo ammo;
@@ -23,6 +26,9 @@ static void race_nuke_reset(void)
 {
     memset(race_nuke_silos, 0, sizeof race_nuke_silos);
     memset(race_nuke_flights, 0, sizeof race_nuke_flights);
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    memset(race_nuke_unit_reserved, 0, sizeof race_nuke_unit_reserved);
+#endif
     race_nuke_paid_silos = race_nuke_active_flights = race_nuke_landing_addons = 0;
 }
 
@@ -261,8 +267,29 @@ static Sc64NukeWorldFlight *race_nuke_track(int slot)
     return 0;
 }
 
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+static void race_nuke_reserve_actor(Sc64NukeWorldFlight *f, unsigned slot)
+{
+    /* A reserved slot stays dead to the ordinary world. Unit construction,
+     * batch production and trigger allocation all treat it as occupied. */
+    race_nuke_unit_reserved[slot >> 3] |= (u8)(1u << (slot & 7u));
+    f->actor_slot_plus1 = (u8)(slot + 1);
+}
+
+static void race_nuke_release_actor(Sc64NukeWorldFlight *f)
+{
+    if (!f->actor_slot_plus1) return;
+    unsigned slot = (unsigned)f->actor_slot_plus1 - 1u;
+    race_nuke_unit_reserved[slot >> 3] &= (u8)~(1u << (slot & 7u));
+    f->actor_slot_plus1 = 0;
+}
+#endif
+
 static void race_nuke_retire(Sc64NukeWorldFlight *f)
 {
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    race_nuke_release_actor(f);
+#endif
     *f = (Sc64NukeWorldFlight){0};
     --race_nuke_active_flights;
 }
@@ -319,27 +346,48 @@ static unsigned race_nuke_travel_ticks(unsigned distance, unsigned limit_ticks)
     return tick;
 }
 
-static int race_nuke_commit(Sc64NukeWorldFlight *f, int silo)
+static Sc64NukeCadence race_nuke_cadence_at(unsigned origin_y, unsigned target_y, u8 *ascent)
 {
     /* Nominal OpenBW order timers plus the ROM's Warpin waits. Account for
      * a short climb near the northern edge and a map-clamped reentry. */
-    unsigned rise = race_nuke_travel_ticks((unsigned)b[silo].y, SC64_NUKE_ASCENT_TICKS);
-    unsigned drop = f->strike.y < 160 ? f->strike.y : 160;
+    unsigned rise = race_nuke_travel_ticks(origin_y, SC64_NUKE_ASCENT_TICKS);
+    unsigned drop = target_y < 160 ? target_y : 160;
     unsigned fall = race_nuke_travel_ticks(drop > 5 ? drop - 5 : 0, SC64_NUKE_ASCENT_TICKS);
-    const Sc64NukeCadence cadence = {
+    *ascent = (u8)rise;
+    return (Sc64NukeCadence){
         (u16)(rise + SC64_NUKE_WARP_SOURCE_TICKS), (u16)fall,
         (u16)(rise < SC64_NUKE_ALERT_TICKS ? rise : SC64_NUKE_ALERT_TICKS)
     };
+}
+
+static int race_nuke_commit(Sc64NukeWorldFlight *f, int silo)
+{
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    int missile_slot = find_unit_slot();
+    if (missile_slot < 0) return 0; /* keep the armed Silo's missile */
+#endif
+    u8 ascent;
+    const Sc64NukeCadence cadence = race_nuke_cadence_at((unsigned)b[silo].y, f->strike.y, &ascent);
     int slot = f->strike.spotter;
     if (!sc64_nuke_launch(&race_nuke_silos[silo].ammo, &f->strike,
                           f->strike.owner, (unsigned)slot,
                           f->strike.x, f->strike.y, cadence)) return 0;
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    race_nuke_reserve_actor(f, (unsigned)missile_slot);
+    /* As with allocating an ordinary actor, the slot's dead predecessor
+     * is now gone. Match the canonical empty row recovered on load. */
+    memset(&u[missile_slot], 0, sizeof u[missile_slot]);
+#ifdef SC64_UNIFIED
+    invincible_units[missile_slot] = 0;
+#endif
+    race_impact_clear_target(missile_slot);
+#endif
     /* sc64_nuke_launch clears the ammo before the wrapper resets its payer. */
     --race_nuke_paid_silos;
     race_nuke_clear_silo(silo);
     f->origin_x = (u16)b[silo].x;
     f->origin_y = (u16)b[silo].y;
-    f->ascent_ticks = (u8)rise;
+    f->ascent_ticks = ascent;
     f->approaching = 0;
     u[slot].order = ORDER_IDLE;
     u[slot].target = -1;
@@ -456,6 +504,9 @@ static void race_nuke_tick(void)
         }
         if (!due || !f->strike.phase) continue;
         unsigned event = sc64_nuke_flight_step(&f->strike, race_nuke_ghost_eligible(slot, owner));
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+        if (event & SC64_NUKE_EVENT_RELEASE) f->strike.spotter = SC64_NUKE_SAVE_NO_GHOST;
+#endif
         if (event & SC64_NUKE_EVENT_WARNING) {
             toast(NUKE_TOAST_WARNING);
             game_audio_nuclear_warning();
@@ -463,6 +514,9 @@ static void race_nuke_tick(void)
         if (event & SC64_NUKE_EVENT_ABORT) race_nuke_retire(f);
         if (event & SC64_NUKE_EVENT_IMPACT) {
             int x = f->strike.x, y = f->strike.y;
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+            race_nuke_release_actor(f);
+#endif
             f->impact_tick = 1;
             race_nuke_apply_blast(x, y, owner, -1);
         }
