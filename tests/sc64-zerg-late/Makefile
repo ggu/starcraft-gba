@@ -100,6 +100,9 @@ ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAI
 ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES)
 # Keep the experimental blitter local to the qualified Z10 sprite bank.
 Z10_BUILDING_WORDS ?= 0
+ifneq ($(words $(filter 0 1,$(Z10_BUILDING_WORDS))),1)
+$(error Z10_BUILDING_WORDS must be 0 or 1)
+endif
 ifneq ($(filter $(Z10_BUILDING_WORDS),0 1),$(Z10_BUILDING_WORDS))
 $(error Z10_BUILDING_WORDS must be 0 or 1)
 endif
@@ -129,10 +132,27 @@ $(SC64_BUILDING_WORDS_HEADER): $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h to
 	$(PYTHON) tools/sc64_building_words.py $< > $@.tmp
 	mv $@.tmp $@
 build/test-sc64-z10-building-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_BUILDING_WORDS_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
-	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(ZERG_Z10_RELEASE_FLAGS) -DSC64_BUILDING_WORDS_PROBE $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(filter-out -DSC64_Z7_VISIBILITY_PACKED_ROWS,$(ZERG_Z10_RELEASE_FLAGS)) -DSC64_BUILDING_WORDS_PROBE $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 .PHONY: test-sc64-z10-building-words-pixels
 test-sc64-z10-building-words-pixels: build/test-sc64-z10-building-words-pixels
 	./build/test-sc64-z10-building-words-pixels
+
+SC64_SIGHT_ROW_LUT_HEADER = build/generated/sc64_sight_row_lut_generated.h
+$(SC64_SIGHT_ROW_LUT_HEADER): tools/sc64_sight_row_lut.py | build
+	$(PYTHON) $< $@
+LATE_ZERG_SIGHT_CONFIG := $(if $(shell test -f build/late-zerg-sight-config && printf '%s\n' '$(LATE_ZERG_PACKED_SIGHT)' | cmp -s - build/late-zerg-sight-config && printf matched),,force-late-zerg-sight-rebuild)
+.PHONY: force-late-zerg-sight-config force-late-zerg-sight-rebuild
+force-late-zerg-sight-config:
+force-late-zerg-sight-rebuild:
+build/late-zerg-sight-config: force-late-zerg-sight-config | build
+	@printf '%s\n' '$(LATE_ZERG_PACKED_SIGHT)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+$(addprefix build/starcraft-zerg-z,$(addsuffix .elf,7 8 9 10)): build/late-zerg-sight-config $(LATE_ZERG_SIGHT_CONFIG) $(if $(LATE_ZERG_PACKED_SIGHT_FLAGS),$(SC64_SIGHT_ROW_LUT_HEADER))
+build/test-sc64-z10-sight-packed-rows: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_SIGHT_ROW_LUT_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_Z7_VISIBILITY_PACKED_ROWS,$(ZERG_Z10_RELEASE_FLAGS)) -DSC64_Z7_VISIBILITY_PACKED_ROWS $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-sight-packed-rows
+test-sc64-z10-sight-packed-rows: build/test-sc64-z10-sight-packed-rows
+	./build/test-sc64-z10-sight-packed-rows
 
 ifeq ($(CANONICAL_WALK_WORDS),1)
 build/test-sc64-z10-walk-words-pixels: tests/sc64_walk_words_pixels.c tests/sc64_unit_walk_frames_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build

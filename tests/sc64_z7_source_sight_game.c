@@ -196,10 +196,45 @@ static void test_runtime_lair_morph_uses_native_predecessor_radius(void)
     assert_visible_matches_full_scan();
 }
 
+#ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
+static void test_packed_rows_match_scalar(void)
+{
+    int saved_cols = race_cols, saved_rows = race_rows;
+    for (int map_size = 64; map_size <= 128; map_size *= 2) {
+        race_cols = race_rows = map_size;
+        const int tiles[] = { 0, 1, map_size / 2, map_size - 1, map_size };
+        for (int radius = 64; radius <= 176; radius += 16)
+        for (int yp = 0; yp < 16; ++yp)
+        for (int xp = 0; xp < 16; ++xp)
+        for (unsigned c = 0; c < sizeof(tiles)/sizeof(tiles[0]); ++c)
+        for (unsigned r = 0; r < sizeof(tiles)/sizeof(tiles[0]); ++r) {
+            Sc64Z7VisibilityRowContext ctx;
+            assert(sc64_z7_visibility_prepare_rows(&ctx, tiles[c]*16+xp,
+                                                    tiles[r]*16+yp, radius));
+            assert(ctx.packed_rows);
+            for (int row = tiles[r] - 13; row <= tiles[r] + 13; ++row) {
+                if (row < 0 || row >= MAP_ROWS) continue;
+                int first, last;
+                sc64_z7_visibility_prepared_row_span(&ctx,row,&first,&last);
+                unsigned got = sc64_z7_visibility_packed_row(&ctx,row);
+                unsigned expected = first > last ? SC64_SIGHT_EMPTY_SPAN :
+                                                    (unsigned)(last*256+first);
+                assert(got == expected);
+            }
+        }
+    }
+    race_cols = saved_cols;
+    race_rows = saved_rows;
+}
+#endif
+
 int main(void)
 {
     init_state();
     clear_fixture();
+#ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
+    test_packed_rows_match_scalar();
+#endif
     test_cached_spans_match_moving_full_scan();
     test_runtime_lair_morph_uses_native_predecessor_radius();
     puts("Z7 source sight table and incremental visibility match full scan");

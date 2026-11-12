@@ -817,6 +817,10 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    The full Terran host campaign suite passes with both probes.
    The separate defense/sight/walk combination saves 8.18–13.05% in Z10
    with matching pixels and state; finish the remaining cartridge paths.
+   The [packed sight-row probe](audits/2026-11-12-packed-sight-rows.md)
+   saves 2.63–2.85% with the current split cache, with matched state and
+   pixels. All four late Zerg ROMs verify and flag-off Z10 is byte-identical;
+   finish the enabled full replay, legacy continuation and custom checks.
    Historical inclusive scopes are not promised savings. The N64
    order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
@@ -838,12 +842,12 @@ The 30 available campaign entries do not change the near-30-fps and parity requi
 Native dialogue timing remains a concrete UX mismatch: critical outcome
 deferral is merged, but removal of synthetic holds remains staged after P4/P6
 controller failures. The [native Blood Bath opening](audits/2026-11-12-n64-blood-bath-opening.md)
-now reaches play with a Terran human and Zerg, Terran and Protoss opponents
-selected in the lobby. The native HUD shows 50 minerals and 4/10 supply,
-then minerals rise with neutral input. The normal Z10 cartridge confirms
-the same displayed Terran opening and automatic mining with that lobby.
-Next establish equal-speed timing, native AI wallets and full-match
-behavior; the opening does not qualify those.
+now reaches play with each named human race against a mixed Zerg, Terran
+and Protoss lineup. The native and normal GBA Z10 HUDs agree on 50 starting
+minerals and race-specific supply (Terran 4/10; Zerg and Protoss 4/9).
+Minerals rise with neutral input in all six runs. Next establish equal-speed
+timing, native AI wallets and full-match behavior; the opening does not
+qualify those.
 
 ## Current work and open PRs
 
