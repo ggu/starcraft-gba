@@ -130,8 +130,7 @@ read-only samples again matched all 60 map resources. The table above
 records one set of draws; those locations are not fixed by row or count.
 Preserve the resolved placement explicitly before changing the startup rule:
 already-written GBA saves must keep their old AI fallback locations.
-The Melee setup screens showed no difficulty selector; other modes and
-any internal difficulty policy are unverified.
+The setup exposes a separate [Game Type row](#single-player-game-type-row).
 
 ## Seeded Melee start draw
 
@@ -233,3 +232,37 @@ for human and CPU Random and starts. It persists the resolved human
 and CPU races and the same v2 start-order field; a load or restart
 draws nothing. Default builds and Outpost keep their existing
 named human selector. Other native modes remain unqualified.
+
+## Single-player Game Type row
+
+Two visual-only runs of the owned USA ROM in Ares with the Expansion Pak
+enabled reached Single-Player → Custom using ordinary controller inputs.
+With the Game Type row highlighted, two separate Right presses cycle
+**Melee → Free for All → Melee**. Map and race rows stay fixed:
+
+| Map | Starting slots | CPU rows shown | Melee, Free for All, Melee observer steps |
+| --- | ---: | --- | --- |
+| Challenger | 2 | Zerg | 2,499 / 2,554 / 2,609 |
+| Blood Bath | 4 | Zerg / Terran / Protoss | 3,194 / 3,249 / 3,304 |
+
+Both runs retain the human Terran row. Neither inspected lobby has a
+separate team or difficulty row. This establishes the visible cycle on
+these single-player maps; it does not cover split-screen, other maps,
+internal AI policies, or the actual combat relationship between CPUs.
+The read-only observer captured three frames per run, no RAM, and
+verified its inputs and emulator source remained unchanged. The command
+stream SHA-256 hashes are
+`dacf85bf61a2eb15f3bcc060e8007911be83bf66c4a2ec5901a6c51480b97717`
+(Challenger) and
+`8c523c722e77aaf0bac7de19d0c4979e9fefe5371656dce80f8c29f6a2291f71`
+(Blood Bath).
+
+The [GBA's custom hostility predicate](../../starcraft/game.c) treats
+every distinct non-neutral owner as hostile. The native menu labels
+alone do not establish what Melee changes. Before exposing a GBA
+selector, pair native Blood Bath launches with the same three named
+CPUs and recovered seed. Observe CPU-to-CPU hostility and check whether
+mode changes starting positions or victory conditions. Then repeat with
+Random rows to check the race draws.
+Preserve the GBA's existing free-for-all behavior for earlier custom
+saves and verify any new mode persists through fresh load and restart.
