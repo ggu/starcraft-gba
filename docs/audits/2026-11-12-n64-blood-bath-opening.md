@@ -136,7 +136,7 @@ any internal difficulty policy are unverified.
 ## Seeded Melee start draw
 
 The player records and camera identify the human independently of race or
-lobby row. In all nine qualified runs, three read-only samples agreed on the
+lobby row. In all ten qualified runs, three read-only samples agreed on the
 opening halls and matched all 60 Blood Bath resource placements. Source
 marker IDs and full native world coordinates are 0 southeast (1760, 1808),
 1 southwest (288, 1808), 2 northwest (128, 240), and 3 northeast (1760, 240).
@@ -152,6 +152,7 @@ marker IDs and full native world coordinates are 0 southeast (1760, 1808),
 | Zerg / Terran / Protoss | `0xf3ae` | 3 | 0 / 2 / 1 |
 | Same, Start delayed 50 callbacks | `0xf6e0` | 2 | 1 / 0 / 3 |
 | Closed / Terran / Closed, Start delayed 37 callbacks | `0xf618` | 1 | – / 3 / – |
+| Human Random (resolved Zerg); Zerg / Terran / Protoss | `0xf3ae` | 2 | 3 / 0 / 1 |
 
 The private USA-ROM instruction trace at `0x8003e458` copies the occupied
 player rows in ascending order and assigns their starting locations in
@@ -161,14 +162,19 @@ bounded draw at `0x8003ddf8` advances the 32-bit state by multiplying by
 `0x015a4e35` and adding 1. It scales the resulting high 15 bits to the
 number of remaining markers. The source-only selector accepts the
 occupied rows, legal marker IDs and explicit seed. Its host sanitizer
-fixture reproduces all nine observed assignments and checks every valid
+fixture reproduces all ten observed assignments and checks every valid
 eight-slot row and marker mask.
 
 The native launch path uses the low word of `osGetTime() / 46875` to seed
 this RNG on the observed mode path; a separate branch uses a fixed seed.
 We recovered each launch seed independently by reversing the RNG using
 the recorded state and draw count in all three opening snapshots. A
-controller callback count is not the seed. A GBA launch can use its own
+controller callback count is not the seed. In the Human Random capture,
+the live player is Zerg and the observed markers match after one prior RNG
+advance (pre-placement state `0xa39d7707`), consistent with a race draw
+consuming the stream. The kernel vector supplies that explicit state; it
+does not assume the GBA's existing Random chooser shares the stream.
+A GBA launch can use its own
 monotonic elapsed milliseconds, with an explicit seed for host
 verification, without claiming the two machines sample identical timing.
 Keep the placement resolved in SRAM so loading or restarting cannot
@@ -182,3 +188,5 @@ alternate-seed cases are:
 - Zerg / Terran / Closed: `0273c8548c2c217d351f30ae8a814c9caff747b75dca06fdb9d62972cffde399`
 - Dense, 50 extra callbacks: `5cae966eb41394d8f0a363b16448390dd16bd88edbc5f18c20ff1f47dd132011`
 - Middle only, 37 extra callbacks: `7f5b5bd28668f61028ff978ac4c0747377c56fa71586b22ea17c939612931f70`
+
+- Human Random (resolved Zerg), dense: `b8cd9948e6a3dfe4e2a420aa9244e0bc9648684409681da760505525238eac63`

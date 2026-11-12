@@ -43,6 +43,7 @@ int main(void)
         {0xf3ae, 7, {0, 2, 1, 255}}, /* third closed */
         {0xf6e0, 15, {2, 1, 0, 3}}, /* three computers, alternate seed */
         {0xf618, 5, {1, 255, 3, 255}}, /* middle only, alternate seed */
+        {0xa39d7707u, 15, {2, 3, 0, 1}}, /* Random human resolved Zerg: after one advance */
     };
     Sc64NativeMeleeStarts out;
     for (unsigned i = 0; i < sizeof(native) / sizeof(native[0]); ++i) {
