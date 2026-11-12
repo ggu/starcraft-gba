@@ -7847,12 +7847,23 @@ race_nearest_resource_depot(Unit *worker)
     if (cached == -2) return -1; /* No reachable depot until a new one appears. */
     if (race_resource_depot_valid_for(worker, cached)) return cached;
     worker->build = -1;
+#ifdef SC64_DEPOT_FIRST_NEAREST_PROBE
+    int known_miss = -1, candidates = 0;
+#endif
 #ifdef SC64_DEPOT_OWNER_LIST_PROBE
     int use_owner_list = sc64_depot_owner_lists_valid && target_lists_valid &&
         worker->owner >= 0 && worker->owner < 5;
 #ifdef SC64_DEPOT_OWNER_LIST_TEST
     if (use_owner_list) ++sc64_depot_owner_list_test_hits;
 #endif
+#endif
+#ifdef SC64_DEPOT_FIRST_NEAREST_PROBE
+    /* Rank legal depots without touching the route cache. If the first
+     * minimum is reachable, no later scan or other flood can improve it.
+     * Otherwise repeat the old ordered search, excluding only that miss. */
+    do {
+#endif
+#ifdef SC64_DEPOT_OWNER_LIST_PROBE
     for (int i = use_owner_list ? target_building_head[worker->owner] : 0;
          use_owner_list ? i >= 0 : i < MAX_BUILDINGS;
          i = use_owner_list ? target_building_next[i] : i + 1) {
@@ -7860,19 +7871,36 @@ race_nearest_resource_depot(Unit *worker)
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
 #endif
         int distance;
+#ifdef SC64_DEPOT_FIRST_NEAREST_PROBE
+        if (i == known_miss) continue;
+#endif
         /* The first two tests of race_resource_depot_valid_for, ahead of the
          * call: a full slot scan calls it for every slot of every worker. */
         if (!b[i].alive || b[i].owner != worker->owner) continue;
         if (!race_resource_depot_valid_for(worker, i)) continue;
         distance = dist2(worker->x, worker->y, b[i].x, b[i].y);
         /* Both scans use ascending slot order, preserving equal-distance ties. */
+#ifdef SC64_DEPOT_FIRST_NEAREST_PROBE
+        if (known_miss < 0) ++candidates;
+        if (distance >= best_distance ||
+            (known_miss >= 0 && !race_resource_depot_reachable(worker, i))) continue;
+#else
         if (distance >= best_distance ||
             !race_resource_depot_reachable(worker, i)) continue;
+#endif
         if (distance < best_distance) {
             best = i;
             best_distance = distance;
         }
     }
+#ifdef SC64_DEPOT_FIRST_NEAREST_PROBE
+    if (known_miss >= 0 || best < 0 ||
+        race_resource_depot_reachable(worker, best)) break;
+    known_miss = best;
+    best = -1;
+    best_distance = 0x7fffffff;
+    } while (candidates > 1);
+#endif
     worker->build = best >= 0 ? best : -2;
     return best;
 }

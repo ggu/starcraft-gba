@@ -24,9 +24,7 @@ earlier maximum fell from 35.38M to 30.30M cycles, but the later maximum
 rose from 38.51M to 39.02M. Mean loop cycles improved by 1.64% and 0.32%
 against the packed-sight-only control. This is a probe, not a release flag.
 
-Next: check the geometrically nearest legal depot first. If it is
-reachable, that is already the old selector's answer; if it is not, the
-old scan can run without that known failure. Exact route cache effects,
-slot tie order, stale topology, disconnected and blocked starts, and both
-custom maps need regression checks. Keep the 30 fps budget separate from
-these worst update stalls.
+The [nearest-first follow-up](2026-11-12-z10-depot-first-nearest.md) now
+removes most of the observed depot stalls in normal Z10. The earlier
+window's remaining maximum is the point flood at call 19,531. Keep the
+30 fps budget separate from these worst update stalls.
