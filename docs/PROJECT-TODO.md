@@ -792,7 +792,9 @@ records native T8 attachment and supply-first refusal. The shared opt-in
 probe trains Ghosts and paid missiles, launches from ordinary GBA controls,
 and uses the owned Ghost, Silo, missile, dot, warning and impact assets.
 It has authenticated Silo and flight journals for queued, armed, painting
-and descending missiles and remains off in default builds.
+and descending missiles and remains off in default builds. P10 generates
+separate actor tables for the world, silo and active-strike probes;
+local checks reject tables generated for a different mode.
 Finish the native timing comparison, Ghost abilities and AI and complete
 the persistence and ARM-input checks before enabling it.
 

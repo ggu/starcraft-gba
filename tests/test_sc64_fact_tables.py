@@ -170,6 +170,44 @@ class FactTablesTest(unittest.TestCase):
                         self.assertNotEqual(built.returncode, 0)
                         self.assertIn(f"generated {state} {gate}".encode(), built.stderr)
 
+    def test_nuke_tables_match_their_mode_and_reject_other_modes(self):
+        shared = ("SC64_SHARED_NUKE_PROBE",)
+        silo = shared + ("SC64_NUKE_SILO_JOURNAL",)
+        modes = {"stock": (), "world": shared, "silo": silo,
+                 "active": silo + ("SC64_NUKE_ACTIVE_JOURNAL",)}
+        fallbacks = {"SC64_NUKE_FALLBACK_GHOST", "SC64_NUKE_FALLBACK_ADDONS",
+                     "SC64_NUKE_FALLBACK_SCIENCE_FACILITY"}
+        # A compact roster appends missing actors; the full roster already
+        # contains them, so its world/silo tables have the same actor counts.
+        with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-nuke-") as directory:
+            for roster in ("zp_p7", "all_race_roster"):
+                for mode, flags in modes.items():
+                    label = f"{roster}-{mode}"
+                    base = CONFIGS[roster]
+                    table_dir = generate(self.compiler, base + flags, directory, label)
+                    for consumer, consumer_flags in modes.items():
+                        with self.subTest(roster=roster, generated=mode, consumer=consumer):
+                            built, check = compile_program(self.compiler, CHECK,
+                                base + consumer_flags + ("SC64_FACT_TABLES",),
+                                directory, f"{label}-used-by-{consumer}", ("-I", str(table_dir)))
+                            if consumer == mode:
+                                self.assertEqual(built.returncode, 0, built.stderr.decode())
+                                result = subprocess.run([str(check)], check=True, cwd=ROOT,
+                                                        stdout=subprocess.PIPE).stdout
+                                self.assertIn(b"fact tables exact:", result)
+                                continue
+                            self.assertNotEqual(built.returncode, 0)
+                            generated_gates = set(flags)
+                            used_gates = set(consumer_flags)
+                            if roster == "zp_p7":
+                                if flags:
+                                    generated_gates |= fallbacks
+                                if consumer_flags:
+                                    used_gates |= fallbacks
+                            for gate in generated_gates ^ used_gates:
+                                state = "with" if gate in generated_gates else "without"
+                                self.assertIn(f"generated {state} {gate}".encode(), built.stderr)
+
     def test_tables_reject_scarab_gate_mismatch_both_directions(self):
         base = CONFIGS["zp_p7"]
         with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-scarab-") as directory:
