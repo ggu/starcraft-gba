@@ -59,3 +59,37 @@ Run the existing exact 7,231-step STOP plan and, as a separately reviewed fresh-
 Decode each successful post-store event against its actual PC/opcode, effective address, width and masked value. Reconstruct the watched record from the authenticated baseline and compare it with the two later RAM views, identifying uncovered bytes and DMA/cache-writeback blind spots. The key comparison is the order/target and position-write sequence after the C-Down interval versus the same interval in no-STOP control, with the target remaining unreached and selection/terrain checked in frames. Compare the two later views and subsequent stream without claiming an observed settled interval unless the data actually include one. The paired input alone cannot prove unit selection, causal STOP semantics, an independent game clock, native frame timing or hardware behavior. A new source build, fixture tests for both independent admission cases and observer-only binary pin require review before either run; no new run or build is claimed here.
 
 An additional independent read of the same record found 32-bit values at offsets `+0x2c` of 44032, 45976 and 49152, and at `+0x30` of 42752, 43392 and 44544; these are consistent with Q8 position candidates but are not yet authenticated as such. Values at `+0x38` and `+0x3c` are 0, 1024, 0 and at `+0x40` are 0, 972, 0; their return to zero is compatible with a stop, but their meanings and the time of any settling remain unproven. The proposed 312-byte watch includes these offsets.
+
+### 2026-11-12: matched replay without STOP
+
+The no-STOP control completed all 7,231 steps with the same pinned ROM, ares
+source, MoltenVK and observer binary as the original STOP replay. The wrapper
+at `d3a62412` separately admits the exact no-STOP script; the two plans differ
+only in the C-Down mask (256 to 0) for steps 7,170–7,179. Three RAM views and
+three frames passed the existing provenance, restore and output guards. The
+no-STOP manifest SHA-256 is
+`724d3992dcc33add3cfc4858b5dd992b1da7b5b34ddff1b5c70a3d76368398ac`;
+recorded output before manifest was 61,698,029 bytes.
+
+Both full RAM and raw frame hashes match between the two replays at the
+7,090 and 7,169 capture boundaries, before the intervention. The final
+no-STOP frame still displays a selected 40-HP Marine with the STOP control.
+The independently matched record at physical `0x2e31e0` has the same
+10,240 HP-shaped word and owner byte 1 in all captures:
+
+| Boundary | Trial | Position-shaped pair | Order-shaped byte | Target-shaped pair | Motion-shaped words |
+| --- | --- | --- | --- | --- | --- |
+| 7,090 | Both | (172, 167) | 3 | (0, 0) | 0, 0, 0, 0 |
+| 7,169 | Both | (179, 169) | 6 | (702, 159) | 1024, 1024, 972, 320 |
+| 7,230 | STOP | (192, 174) | 3 | (0, 0) | 0, 0, 0, 0 |
+| 7,230 | No STOP | (243, 157) | 6 | (702, 159) | 1024, 1024, 740, −708 |
+
+The table uses big-endian fields at record offsets +0x28, +0x4d, +0x58
+and signed words +0x38 through +0x44. The matched control rules out ordinary
+arrival or obstruction as an explanation for the cleared order in this
+scene: at the same boundary the no-STOP Marine is farther along with its
+destination still pending. This establishes the observed effect of C-Down
+for this selected T1 Marine. Snapshot spacing cannot establish the exact
+stopping tick, store instruction or game-clock cadence. The global word at
+`0xe02ec` still points to the other record at the last two boundaries in
+both trials; this is not a selected-unit ABI.
