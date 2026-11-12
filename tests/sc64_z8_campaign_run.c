@@ -277,9 +277,10 @@ int main(int argc,char **argv)
            Kerrigan. Put them back over the guard before the next raid. */
         if(raid<0&&raid_guard>=0){
             Guard *q=&guards[raid_guard];
-            /* Raids reach this rectangle by two roads, north and west. After the
-               first one, wait at the corner where they meet. */
-            if(raid_guard==GUARD_SE){q->guard_x=1240;q->guard_y=1930;}
+            /* After the first southern raid, intercept on the shared road
+               before the turn toward the defeat rectangle. A guard posted at
+               the rectangle has too little time for another firing cycle. */
+            if(raid_guard==GUARD_SE){q->guard_x=1320;q->guard_y=1832;}
             int o=-1,od=0x7fffffff,k=kerrigan();
             for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==RAW_OVERLORD){
                 int d=dist2(u[i].x,u[i].y,q->guard_x,q->guard_y);
@@ -287,7 +288,7 @@ int main(int argc,char **argv)
             }
             /* The southern Overlord sits up the road both raid routes share,
                so the squad sees a raid coming. */
-            int ov_x=raid_guard==GUARD_SE?1250:q->guard_x,ov_y=raid_guard==GUARD_SE?1880:q->guard_y;
+            int ov_x=q->guard_x,ov_y=raid_guard==GUARD_SE?q->guard_y-48:q->guard_y;
             if(o>=0&&(dist2(u[o].x,u[o].y,ov_x,ov_y)>48*48||dist2(u[o].tx,u[o].ty,ov_x,ov_y)>48*48))
                 (void)unit_order(o,MENU_MOVE,ov_x,ov_y);
             if(k>=0&&raid_guard==GUARD_SE&&dist2(u[k].x,u[k].y,q->guard_x+24,q->guard_y+24)>64*64)
@@ -355,21 +356,30 @@ int main(int argc,char **argv)
                 }
             if(waiting){input(0);continue;}
         }
-        /* Two Scouts sit over the southern fields and kill whatever mines there.
-           The first army south clears them on its way, so Drones can mine again. */
-        if(raid<0&&nexus(2)<0&&!rush&&!fields&&frame<76000&&
-           army_near(guards[GUARD_SE].guard_x,guards[GUARD_SE].guard_y,460)>=24){
-            group_area_x=guards[GUARD_SE].guard_x;group_area_y=guards[GUARD_SE].guard_y;group_area_r=460;group_rounds=3;
-            (void)group_command(U_HYDRALISK,MENU_ATTACK,1860,1650,1);
-            group_area_x=-1;group_rounds=6;
-            fields=1;fields_since=frame;
+        /* Reopen mineral income after the east falls. Keep the southern
+           column here until the Scouts over the fields have been driven off. */
+        if(nexus(2)<0&&!fields)rush=0;
+        if(raid<0&&nexus(2)<0&&!fields&&
+           army_near(guards[GUARD_SE].guard_x,guards[GUARD_SE].guard_y,460)>=16){
+            fields=1;fields_since=frame-900;
             fprintf(trace,"{\"kind\":\"fields\",\"frame\":%u}\n",(unsigned)frame);
         }
+        int fields_hostile=-1;
+        if(fields==1)for(int i=0;i<MAX_UNITS;i++)
+            if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==70&&
+               dist2(u[i].x,u[i].y,1860,1650)<280*280){fields_hostile=i;break;}
         if(fields==1&&raid<0&&frame-fields_since>=900){
-            group_area_x=1860;group_area_y=1650;group_area_r=420;group_rounds=3;
-            (void)group_command(U_HYDRALISK,MENU_ATTACK,guards[GUARD_SE].guard_x,guards[GUARD_SE].guard_y,1);
+            group_area_x=1860;group_area_y=1650;group_area_r=680;group_rounds=3;
+            if(fields_hostile>=0){
+                /* An intervening raid can pull the attack group back to its
+                   post. Resume clearing the field when the road is quiet. */
+                (void)group_command(U_HYDRALISK,MENU_ATTACK,u[fields_hostile].x,u[fields_hostile].y,1);
+            }else{
+                (void)group_command(U_HYDRALISK,MENU_ATTACK,guards[GUARD_SE].guard_x,guards[GUARD_SE].guard_y,1);
+                fields=2;
+            }
             group_area_x=-1;group_rounds=6;
-            fields=2;
+            fields_since=frame;
         }
         if(frame-mark>=20){input(0);continue;}
         if(frame>=next_order&&raid<0){
@@ -388,7 +398,7 @@ int main(int argc,char **argv)
                the southern hive) pins its guard squad, so the march waits for it to pass. */
             int raid_soon=0;
             for(int r=0;r<RAID_ROWS;r++)if(nexus(raids[r].town)>=0&&(int)frame+hold_lead>=raids[r].at&&(int)frame<raids[r].at+1200)raid_soon=1;
-            if(west&&raid_soon)target=-1;
+            if(west&&(raid_soon||fields!=2))target=-1;
             if(target>=0&&!rush){
                 int from_x=west?guards[GUARD_SE].guard_x:stage_x,from_y=west?guards[GUARD_SE].guard_y:stage_y;
                 int home=army_near(from_x,from_y,west?460:700);
@@ -413,6 +423,7 @@ int main(int argc,char **argv)
                 /* The army is its largest clump: it outruns any fixed circle, and
                    the far squads and fresh Hydralisks at home are not part of it. */
                 int n=0,sx=0,sy=0;
+                int front_n=0,front_x=0,front_y=0,front_dist=0x7fffffff;
                 for(int i=0;i<MAX_UNITS&&rush;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&
                     (west||dist2(u[i].x,u[i].y,guards[GUARD_SE].guard_x,guards[GUARD_SE].guard_y)>=340*340)&&
                     dist2(u[i].x,u[i].y,guards[GUARD_NW].guard_x,guards[GUARD_NW].guard_y)>=340*340){
@@ -420,7 +431,17 @@ int main(int argc,char **argv)
                     for(int k=0;k<MAX_UNITS;k++)if(u[k].alive&&u[k].owner==SIDE&&u[k].type==U_HYDRALISK&&
                         dist2(u[k].x,u[k].y,u[i].x,u[i].y)<240*240){++c;ax2+=u[k].x;ay2+=u[k].y;}
                     if(c>n){n=c;sx=ax2;sy=ay2;}
+                    if(west&&c>=12){
+                        int d=dist2(ax2/c,ay2/c,legs[army_leg][0],legs[army_leg][1]);
+                        if(d<front_dist||(d==front_dist&&c>front_n)){
+                            front_dist=d;front_n=c;front_x=ax2;front_y=ay2;
+                        }
+                    }
                 }
+                /* After the Nydus crossing, keep the coherent southern
+                   column on the westward road instead of selecting a
+                   larger group still gathering in the east. */
+                if(front_n&&3*front_n>=n){n=front_n;sx=front_x;sy=front_y;}
                 if(!west&&n&&sy/n<560&&n<20)rush=0;
                 if(n<8)rush=0;
                 else if(rush){
