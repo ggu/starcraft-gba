@@ -30,7 +30,13 @@ grid remains intact.
 
 The prepared probe was built from [#425](https://github.com/ggu/starcraft-gba/pull/425)
 with the normal Z10 options and `SC64_ROUTE_LINEAR_FLOOD_PROBE`. The
-control is the normal [#421](https://github.com/ggu/starcraft-gba/pull/421)
+same flag is available in the shared profile options:
+
+```sh
+make CANONICAL_ROUTE_LINEAR=1 verify-zerg-z10
+```
+
+The control is the normal [#421](https://github.com/ggu/starcraft-gba/pull/421)
 cartridge; the intervening preview changes do not enable native start
 selection in either normal build. Both loaded the same saved mission from
 HOME with ordinary buttons and advanced through call 20,000 with the same
