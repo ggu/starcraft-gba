@@ -190,3 +190,30 @@ alternate-seed cases are:
 - Middle only, 37 extra callbacks: `7f5b5bd28668f61028ff978ac4c0747377c56fa71586b22ea17c939612931f70`
 
 - Human Random (resolved Zerg), dense: `b8cd9948e6a3dfe4e2a420aa9244e0bc9648684409681da760505525238eac63`
+
+### Random races consume the launch stream first
+
+The USA ROM launch path calls its race resolver at `0x80022b1c` before
+entering start assignment at `0x80022b2c`. The resolver `0x8003e88c`
+scans active player rows in ascending order. Only race code 6 (Random)
+requests a draw in [0, 2] from the same native RNG; the outputs identify
+Zerg, Terran and Protoss in that order. It then writes the resolved
+races back in the same row order. A named race or a closed row does
+not consume a draw in Melee. Placement uses the resulting state.
+
+The observed Human Random launch independently checks the sequence:
+seed `0xf3ae` resolves the human to Zerg, leaves the RNG at
+`0xa39d7707` before placement, then gives human/CPU marker IDs
+`[2, 3, 0, 1]`. The three opening actor samples agree. The pure launch
+fixture also covers CPU Random positions derived from the same stock
+instructions, including two Random rows and a named or closed row
+between active slots. Those CPU vectors are source-derived rather than
+new emulator observations; the bounded CPU capture was deferred because
+the disk fell below the observer's 5 GiB reserve.
+
+The GBA preview still chooses Random races with its existing selector;
+this source-only sequence does not enable a different selector in any
+ROM. A later preview can draw Random and starts from one clock seed,
+then persist only the resolved races and positions. Before changing
+the preview, verify the CPU Random actor/placement cases and an ARM
+save/restart. Other native modes remain unqualified.
