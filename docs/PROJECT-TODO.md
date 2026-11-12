@@ -247,6 +247,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   supplements the 19-step six-profile OFF/ON resource checkpoint; it does not
   qualify early campaigns, full pixels, all rosters or hardware. Early stages
   remain HOST-only and normal release flags/#298 remain unchanged.
+- **P10 shared Egg and research SRAM (S1):** the [compound P10 probe](audits/2026-11-12-p10-research-egg-sram.md)
+  preserves both a paid Zerg Egg and Forge research in a single skirmish
+  save without increasing the record. A physical-button ARM run saved and
+  reloaded both, hatched the Drone and completed level one. Old research
+  ARM migration preserves the prior slot; the Egg-only HOST predecessor
+  also migrates. Keep the separate build opt-in for broader campaign,
+  compatibility, stack and busy custom qualification.
 - **[Native visual evidence](audits/2026-11-07-n64-visual-only-jit/README.md):** the bounded GPU interpreter probe reaches startup.
   Separately, the official CPU/RSP-JIT visual-only frontend at `60ade910` now
   completes the retained 8,617-step ordinary custom schedule, all three requested
