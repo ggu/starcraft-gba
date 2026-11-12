@@ -1,8 +1,33 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "../starcraft/game.c"
+#ifdef SC64_NUKE_ARM_WORLD_TEST
+volatile u16 demo_keys;
+static void nuke_fixture_emit(const char *prefix, const char *line)
+{
+    volatile char *out = (volatile char *)0x04fff600;
+    while (*prefix) *out++ = *prefix++;
+    while (*line) *out++ = *line++;
+    *out = 0;
+    *(volatile u16 *)0x04fff700 = 0x102;
+}
+#define nuke_fixture_log(line) nuke_fixture_emit("IMPACT NUKE ", line)
+#define NUKE_FIXTURE_STR1(x) #x
+#define NUKE_FIXTURE_STR(x) NUKE_FIXTURE_STR1(x)
+#define assert(expr) do { if (!(expr)) { \
+    nuke_fixture_log("FAIL line " NUKE_FIXTURE_STR(__LINE__)); \
+    for (;;) __asm__ volatile ("" ::: "memory"); \
+} } while (0)
+#define puts(msg) nuke_fixture_log(msg)
+#else
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
+#endif
+
+static int nuke_fixture_equal(const char *a, const char *b)
+{
+    while (*a && *a == *b) ++a, ++b;
+    return *a == *b;
+}
 
 static int fixture_building(int owner, int raw, int x, int y)
 {
@@ -28,7 +53,7 @@ static void nuke_action(int action)
 {
     int row = race_nuke_command_index();
     assert(row >= 0 && row < field_menu_count());
-    assert(!strcmp(race_menu_label(row), race_nuke_menu_label(action)));
+    assert(nuke_fixture_equal(race_menu_label(row), race_nuke_menu_label(action)));
     assert(!menu_open);
     game_update(KEY_B, KEY_B);
     assert(menu_open);
@@ -128,6 +153,9 @@ static void nuke_supply_boundary(void)
 int main(void)
 {
     gba_init();
+#ifdef SC64_NUKE_ARM_WORLD_TEST
+    *(volatile u16 *)0x04fff780 = 0xc0de;
+#endif
     game_init();
     race_mode = 1; race_human = R_TER; race_bots = 1;
     init_state();
@@ -169,12 +197,21 @@ int main(void)
     nuke_action(NUKE_MENU_ARM);
     assert(minerals == ore - 200 && gas == gas_before - 200);
     assert(race_owner_reserved_supply(SIDE) == already + 16);
+#ifdef SC64_FIELD_CONTROLS
+    HudJobs jobs;
+    hud_building_jobs(silo, &jobs, 0);
+    assert(jobs.count == 1 && jobs.icon[0] == card_portrait(14) && jobs.level[0] == 0);
+#endif
     assert(race_nuke_arm(silo, SIDE) == NUKE_TOAST_OCCUPIED);
     nuke_action(NUKE_MENU_CANCEL_ARM);
     assert(minerals == ore && gas == gas_before && race_owner_reserved_supply(SIDE) == already);
     nuke_action(NUKE_MENU_ARM);
     advance_world(1876);
     assert(race_nuke_armed_slot(SIDE) == silo && race_owner_reserved_supply(SIDE) == already + 16);
+#ifdef SC64_FIELD_CONTROLS
+    hud_building_jobs(silo, &jobs, 0);
+    assert(jobs.count == 1 && jobs.level[0] == HUD_BAR_LEVELS);
+#endif
     assert(!race_save_game()); /* do not replace a user's save with missing ammunition */
 
     selected_building = -1; u[ghost].selected = 1;
@@ -182,6 +219,11 @@ int main(void)
     int friendly = fixture_unit(SIDE, 0, x, y);
     int enemy = fixture_unit(ENEMY, 0, x, y + 8);
     already = race_owner_reserved_supply(SIDE) - 16;
+    int far_x = x + 170;
+    assert(race_nuke_issue(ghost, SIDE, far_x, y));
+    assert(race_nuke_track(ghost) && !race_nuke_ghost_locked(ghost) &&
+           u[ghost].order == ORDER_MOVE && u[ghost].tx == far_x);
+    assert(race_nuke_abort(ghost) && race_nuke_armed_slot(SIDE) == silo);
     nuke_action(NUKE_MENU_CAST);
     assert(mode == MODE_NUCLEAR_TARGET);
     cx = x; cy = y;
@@ -227,6 +269,11 @@ int main(void)
     nuke_supply_boundary();
 #ifdef SC64_TERRAN_LATE_RUNTIME
     t8_attachment();
+#endif
+#ifdef SC64_NUKE_ARM_WORLD_TEST
+    nuke_fixture_log("ordinary input and production checks passed");
+    nuke_fixture_emit("IMPACT ", "DONE"); /* use the shared no-GDB runner */
+    for (;;) __asm__ volatile ("" ::: "memory");
 #endif
     return 0;
 }

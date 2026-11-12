@@ -44,6 +44,7 @@ static int race_nuke_parent_slot(int addon, unsigned parent_raw)
 #ifdef SC64_TERRAN_LATE_RUNTIME
         if (race_late_airborne(i)) continue;
 #endif
+
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
         if (race_bc_facility_airborne(i)) continue;
 #endif
@@ -58,6 +59,17 @@ static int race_nuke_silo_online(int slot, int owner)
         race_nuke_raw_building(slot, SC64_NUKE_SILO_RAW) && b[slot].owner == owner &&
         race_nuke_parent_slot(slot, 106) >= 0;
 }
+
+#ifdef SC64_FIELD_CONTROLS
+/* Negative means no paid missile; zero or more is source progress. */
+static int race_nuke_silo_status(int slot)
+{
+    if (!race_nuke_raw_building(slot, SC64_NUKE_SILO_RAW) || b[slot].owner != SIDE) return -1;
+    const Sc64NukeWorldSilo *s = &race_nuke_silos[slot];
+    if (s->payer != SIDE || !sc64_nuke_silo_supply(&s->ammo)) return -1;
+    return SC64_NUKE_MISSILE_SOURCE_TICKS - (int)s->ammo.remaining;
+}
+#endif
 
 #ifdef SC64_HAS_SPRITES
 static int race_nuke_silo_working(int slot)

@@ -28,9 +28,13 @@ same refusal order. In a separate checkpoint copy, only the initial gas
 and available supply were raised to fund the order. Ordinary native
 **BLD NUKE** charged 200 minerals, 200 gas and 8 supply; **CANCEL** returned
 all three. The native Silo showed a missile icon and progress bar while
-building. A fully timed strike and damage comparison still require a
-native replay. The earlier T10 audio capture independently identified
-the original warning clip.
+building. With a completed warhead inside, destruction of the parent
+Command Center neutralized the Silo but left the original player's
+missile and eight-supply reservation intact. The GBA probe preserves
+this reservation until the missile is destroyed or changes hands.
+A fully timed strike and damage comparison still require a native replay.
+The earlier T10 audio capture independently identified the original
+warning clip.
 
 ## Owned-ROM assets and blast facts
 
@@ -50,7 +54,8 @@ matches every projected source crop; the C renderer decodes all 40
 frames, applies destination-dependent light and keeps the HUD clipped.
 The bank also imports the original Ghost poses (3,289 indexed pixel bytes)
 and the two add-ons (6,925 bytes). The Silo working light animates during
-production. Optional audio preparation adds the native warning, sound 127,
+production and the selection shows the original missile portrait, its
+progress bar, and whether it is armed. Optional audio preparation adds the native warning, sound 127,
 to the ordinary advisor mixer; existing banks remain compatible and silent
 for this event. No proprietary files are committed.
 
@@ -76,6 +81,12 @@ WarpIn. Ascent, reentry, warning and impact still use a bounded model
 based on the [reference order sequence](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L5829-L5939)
 and owned motion data; this is not a claim of measured native timing.
 
+The same world fixture passes in mGBA under the real ARM Terran flags
+and renderer. It sets up the test field and campaign landing vicinity
+directly, then uses the real menu handlers and simulation. All four
+playable probe ROMs pass the ARM memory limits and header checks.
+This does not measure frame rate on hardware.
+
 ```sh
 python3 -m unittest discover -s tests -p test_sc64_nuke_assets.py
 python3 tools/sc64_nuke_assets.py
@@ -83,6 +94,8 @@ python3 tools/sc64_nuke_building_assets.py
 python3 tools/sc64_nuke_ghost_assets.py
 make test-sc64-nuke-blast test-sc64-nuke-render test-sc64-nuke-world
 make sc64-nuke-probe
+make sc64-nuke-arm-world
+python3 tools/sc64_impact_arm_probe.py build/StarCraft-Nuke-World-ARM-Test-GBA.gba --out /tmp/sc64-nuke-arm-world
 ```
 
 To include the original warning, prepare the optional audio bank and
@@ -103,7 +116,8 @@ make sc64-nuke-probe SC64_AUDIO_DIR=.local/sc64/audio/nuke-generated
    Match the full add-on and missile actor lifecycle, including lift in
    custom games and whether a visible missile can be attacked.
 3. Authenticate armed, queued and active strikes and read predecessor
-   saves. Verify the ordinary ARM controller sequence, bot production
-   and launches, and busy fights before enabling the default ROMs.
+   saves. Verify a title-to-strike ARM tape without direct setup, bot
+   production and launches, and busy fights before enabling the default
+   ROMs.
    The asset-free `make test-sc64-nuke-save-rows` validates a proposed
    no-growth format independently. It is not connected to the journal yet.

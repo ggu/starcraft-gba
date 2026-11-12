@@ -2456,6 +2456,9 @@ static int race_nuke_silo_working(int slot);
 static int race_nuke_draw_ghost(int slot, int x, int y);
 #endif
 #endif
+#ifdef SC64_FIELD_CONTROLS
+static int race_nuke_silo_status(int slot);
+#endif
 static const char *race_nuke_menu_label(int action);
 #endif
 static void race_add_owner_resources(int owner,int ore,int vespene);

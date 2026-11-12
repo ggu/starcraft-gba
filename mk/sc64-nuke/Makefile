@@ -36,6 +36,15 @@ $(eval $(call SC64_NUKE_ARM,showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_INPUTS),$(P7_I
 .PHONY: sc64-nuke-probe
 sc64-nuke-probe: $(foreach profile,terran z10 p10 showcase,build/StarCraft-Nuke-Probe-$(profile)-GBA.gba)
 
+.PHONY: sc64-nuke-arm-world
+sc64-nuke-arm-world: build/StarCraft-Nuke-World-ARM-Test-GBA.gba
+build/starcraft-nuke-arm-world.elf: tests/sc64_nuke_world_game.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.ld mk/sc64-nuke/Makefile Makefile | build
+	$(CC) $(CFLAGS) $(SC64_NUKE_RUNTIME_FLAGS) $(TERRAN_ROM_FLAGS) -DSC64_NUKE_ARM_WORLD_TEST $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Nuke-World-ARM-Test-GBA.gba: build/starcraft-nuke-arm-world.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC NUKE TEST' SCNW
+
 .PHONY: test-sc64-nuke-world
 test-sc64-nuke-world: $(addprefix build/test-sc64-nuke-world-,terran z10 p10 showcase)
 	@for test in $^; do "$$test" || exit $$?; done
