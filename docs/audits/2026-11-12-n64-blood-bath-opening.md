@@ -190,3 +190,37 @@ alternate-seed cases are:
 - Middle only, 37 extra callbacks: `7f5b5bd28668f61028ff978ac4c0747377c56fa71586b22ea17c939612931f70`
 
 - Human Random (resolved Zerg), dense: `b8cd9948e6a3dfe4e2a420aa9244e0bc9648684409681da760505525238eac63`
+
+### Random races consume the launch stream first
+
+The USA ROM launch path calls its race resolver at `0x80022b1c` before
+entering start assignment at `0x80022b2c`. The resolver `0x8003e88c`
+scans active player rows in ascending order. Only race code 6 (Random)
+requests a draw in [0, 2] from the same native RNG; the outputs identify
+Zerg, Terran and Protoss in that order. It then writes the resolved
+races back in the same row order. A named race or a closed row does
+not consume a draw in Melee. Placement uses the resulting state.
+
+The observed Human Random launch independently checks the sequence:
+seed `0xf3ae` resolves the human to Zerg, leaves the RNG at
+`0xa39d7707` before placement, then gives human/CPU marker IDs
+`[2, 3, 0, 1]`. Two further owned-ROM runs showed the same reset seed
+for CPU Random. Each case verified its lobby and three read-only
+opening actor samples, matching all 60 resource positions and four
+workers per hall.
+
+| CPU rows (Terran human) | Resolved CPU races | Human and CPU marker IDs by row | State before placement |
+|---|---|---|---|
+| Closed / Random / Closed | – / Zerg / – | 0 / – / 1 / – | `0xa39d7707` |
+| Random / Random / Protoss | Zerg / Terran / Protoss | 1 / 2 / 3 / 0 | `0xb953c674` |
+
+The native manifests are `3eaa2d7e49d36bc2dfc3e7d43ab4bf2d0fb5a098bea3c977f5418d9426988dcb`
+(sparse) and `bf3bafeca0d1835d7bb2ffaad160aa7c62047adb05faf6f115e9cc02f245ad75`
+(dense), SHA-256. The bounded pure fixture uses these captures as
+expected vectors and adds malformed and unobserved gap controls.
+
+The opt-in GBA Blood Bath Melee preview now uses one elapsed-time seed
+for CPU Random and starts. It persists the same resolved races and v2
+start-order fields; a load or restart draws nothing. Default builds,
+Outpost and the named-only GBA human selector keep their existing
+behavior. Other native modes remain unqualified.

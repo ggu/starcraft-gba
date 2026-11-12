@@ -26,9 +26,52 @@ static void test_elapsed_clock(void)
     assert(gba_elapsed_milliseconds_at(&clock) == 129u * 256000u);
 }
 
+static void test_random_launch(void)
+{
+    const uint8_t x = SC64_NATIVE_START_NONE;
+    const uint8_t r = SC64_NATIVE_RACE_RANDOM;
+    const uint8_t z = SC64_NATIVE_RACE_ZERG;
+    const uint8_t t = SC64_NATIVE_RACE_TERRAN;
+    const uint8_t p = SC64_NATIVE_RACE_PROTOSS;
+    const struct {
+        unsigned rows;
+        uint8_t choices[SC64_NATIVE_START_SLOTS];
+        uint8_t races[4], starts[4];
+        uint32_t placement_seed;
+    } cases[] = {
+        /* Independent native actor witness: Human Random resolved Zerg. */
+        {15, {r,z,t,p}, {z,z,t,p}, {2,3,0,1}, 0xa39d7707u},
+        /* Independent CPU Random witnesses: middle only and dense. */
+        {5, {t,x,r,x}, {t,x,z,x}, {0,x,1,x}, 0xa39d7707u},
+        {15, {t,r,r,p}, {t,z,t,p}, {1,2,3,0}, 0xb953c674u},
+        /* Additional gap and no-draw cases from the stock instructions. */
+        {11, {t,r,x,r}, {t,z,x,t}, {2,3,x,0}, 0xb953c674u},
+        {5, {t,r,z,r}, {t,x,z,x}, {2,x,1,x}, 0xf3aeu},
+    };
+    Sc64NativeMeleeLaunch out;
+    for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        assert(sc64_native_melee_launch(0xf3ae, cases[i].rows, 15, cases[i].choices, &out));
+        assert(out.placement_seed == cases[i].placement_seed);
+        assert(!memcmp(out.race_by_row, cases[i].races, 4));
+        assert(!memcmp(out.starts.marker_by_row, cases[i].starts, 4));
+        for (unsigned j = 4; j < SC64_NATIVE_START_SLOTS; ++j)
+            assert(out.race_by_row[j] == x && out.starts.marker_by_row[j] == x);
+    }
+    const uint8_t bad[SC64_NATIVE_START_SLOTS] = {t,r,4};
+    Sc64NativeMeleeLaunch unchanged = out;
+    assert(!sc64_native_melee_launch(0xf3ae, 7, 15, bad, &out));
+    assert(!sc64_native_melee_launch(0xf3ae, 3, 1, bad, &out));
+    assert(!sc64_native_melee_launch(0xf3ae, 0, 15, bad, &out));
+    assert(out.placement_seed == unchanged.placement_seed &&
+           out.starts.seed_after == unchanged.starts.seed_after &&
+           !memcmp(out.race_by_row, unchanged.race_by_row, sizeof(out.race_by_row)) &&
+           !memcmp(out.starts.marker_by_row, unchanged.starts.marker_by_row, sizeof(out.starts.marker_by_row)));
+}
+
 int main(void)
 {
     test_elapsed_clock();
+    test_random_launch();
     const struct {
         uint32_t seed;
         unsigned occupied;

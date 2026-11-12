@@ -38,12 +38,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   GBA preview uses its elapsed-time clock and preserves resolved starts in
   SRAM. Four ARM previews pass physical-button save, fresh load and
   restart checks. Real hardware and default promotion remain open.
-  Other native modes, difficulty and long ordinary-input
-  victories also remain open.
   Exact normal builds after the preview merged pass the [repeatable
   physical seat and SRAM checks](audits/2026-11-12-skirmish-seat-options.md#repeatable-physical-seat-checks)
   on all four products. Keep full matches and hardware frame rate as
   separate qualification.
+  The stock launch resolves Random race rows before drawing starts; the
+  pure sequence matches native Human Random and one/two CPU Random
+  captures. The preview now follows that order for CPU Random on Blood
+  Bath. Terran ARM passes physical Random save/restart and the prior
+  normal build reads the same new save; the other three have host checks.
+  Other native modes, difficulty and long ordinary-input victories also
+  remain open.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)

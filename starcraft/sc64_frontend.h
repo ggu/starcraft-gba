@@ -120,13 +120,18 @@ static inline void sc64_front_skirmish_seats(Sc64Frontend *f, unsigned seats)
     f->bots = sc64_skirmish_seat_count(seats);
 }
 
+static inline void sc64_front_skirmish_race_defaults(const Sc64Frontend *f, int races[3])
+{
+    for (int i = 0; i < SC64_SKIRMISH_SEAT_COUNT; ++i)
+        races[i] = f->bot_last_races[i] < SC_FRONT_BOT_RANDOM ?
+            f->bot_last_races[i] : (f->race + i + 1) % 3;
+}
+
 static inline unsigned sc64_front_skirmish_resolve(const Sc64Frontend *f, int races[3])
 {
     unsigned seats = 0;
     int used = 0;
-    for (int i = 0; i < SC64_SKIRMISH_SEAT_COUNT; ++i)
-        races[i] = f->bot_last_races[i] < SC_FRONT_BOT_RANDOM ?
-            f->bot_last_races[i] : (f->race + i + 1) % 3;
+    sc64_front_skirmish_race_defaults(f, races);
     for (int i = 0; i < SC64_SKIRMISH_SEAT_COUNT; ++i) {
         int race = f->bot_races[i];
         if (race == SC_FRONT_BOT_CLOSED) continue;
@@ -146,6 +151,37 @@ static inline unsigned sc64_front_skirmish_resolve(const Sc64Frontend *f, int ra
     }
     return seats;
 }
+#ifdef SC64_NATIVE_MELEE_STARTS
+static inline unsigned sc64_front_skirmish_native_resolve(const Sc64Frontend *f, u32 seed,
+                                                            int races[3], unsigned *order)
+{
+    static const uint8_t native_race[] = {SC64_NATIVE_RACE_TERRAN, SC64_NATIVE_RACE_ZERG,
+                                         SC64_NATIVE_RACE_PROTOSS, SC64_NATIVE_RACE_RANDOM};
+    static const uint8_t front_race[] = {SC_FRONT_RACE_ZERG, SC_FRONT_RACE_TERRAN,
+                                        SC_FRONT_RACE_PROTOSS};
+    if (!f || !races || !order || f->map != SC64_MAP_BLOOD_BATH ||
+        f->race < SC_FRONT_RACE_TERRAN || f->race > SC_FRONT_RACE_PROTOSS) return 0;
+    uint8_t choices[SC64_NATIVE_START_SLOTS] = {native_race[f->race]};
+    unsigned seats = 0;
+    for (int seat = 0; seat < SC64_SKIRMISH_SEAT_COUNT; ++seat) {
+        int choice = f->bot_races[seat];
+        if (choice == SC_FRONT_BOT_CLOSED) continue;
+        if (choice < SC_FRONT_RACE_TERRAN || choice > SC_FRONT_BOT_RANDOM) return 0;
+        choices[seat + 1] = native_race[choice];
+        seats |= 1u << seat;
+    }
+    if (!seats || sc64_skirmish_seat_count(seats) != f->bots) return 0;
+    unsigned rows = (seats << 1) | 1u;
+    Sc64NativeMeleeLaunch launch;
+    if (!sc64_native_melee_launch(seed, rows, 15u, choices, &launch)) return 0;
+    sc64_front_skirmish_race_defaults(f, races);
+    for (int seat = 0, rank = 0; seat < SC64_SKIRMISH_SEAT_COUNT; ++seat)
+        if (seats & (1u << seat))
+            races[rank++] = front_race[launch.race_by_row[seat + 1]];
+    *order = sc64_skirmish_blood_bath_start_order(rows, &launch.starts);
+    return seats;
+}
+#endif
 #endif
 
 /* Mission IDs are a stable save/loader contract: Z1,Z2,P1,P2,T1,T2. */

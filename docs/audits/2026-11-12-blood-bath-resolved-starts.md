@@ -21,9 +21,9 @@ the seed. It observes the existing Timer 2/3 cycle counter once per main
 loop to extend its 256-second wrap, then samples again at Launch. This
 approximates the native clock's role without claiming the same elapsed
 time or draw for the same button tape. Outpost and default products keep
-their existing new-match starts. The port's existing Random race
-selection is separate from the native start draw. Other N64 game modes
-are not covered.
+their existing new-match starts. Default Random selection remains separate from the native start draw.
+The optional preview's CPU Random sequence is qualified separately
+below. Other N64 game modes are not covered.
 
 Use `make sc64-native-melee-start-probe` with all four prepared profiles to
 build the private opt-in cartridges. The preview uses distinct ROM names
@@ -92,3 +92,34 @@ are `b9dd5f5f79f3eba7bcfa5c36d8c8fc7485c2c6ce7794a80b96822c94b7dafbb5`,
 `e9df0ebbdb2162d4e4b5133fed0d3880a0c8a42817da555d3a788ed32659a0cc`,
 `5cc21827e6d71d145a1dca94d98db15c49ce684f07674b834f88b27db2d43157`
 and `7e245d3378b968b3144b6205d1353b4059792ab678f66db4270210b5e6569594`.
+
+
+## CPU Random sequencing in the preview
+
+The [owned N64 CPU captures](2026-11-12-n64-blood-bath-opening.md#random-races-consume-the-launch-stream-first)
+confirmed that one or two Random CPU rows consume one draw each before
+physical start assignment. The opt-in Blood Bath preview follows that
+order with one GBA clock seed; the normal title menu and Outpost use
+their existing selector. Resolved race and placement are stored in the
+already qualified v2 record, with no new format.
+
+
+Source `4db23aa7422e07f675cb51bb19d9d9adfa49b05f` passed the four
+canonical sanitizer profiles both with and without the preview. This
+includes exact sparse and dense CPU Random lobby vectors and malformed
+lobby rejection. The Terran preview ARM ROM
+`a6d1864c2b00f1698f1c7c25e7fa69dfd6eb5850afaf3db87d5c9ab134411fab`
+also passed physical-button runs for one and two Random CPU rows. The
+first clock sample before each launch (4104 and 5311 ms) predicts both
+the resolved races and starts. The actual checksummed v2 saves preserved
+both after a fresh load, 60 updates and a pause restart.
+
+The prior normal Terran ROM and this preview independently loaded the
+new Random v2 save, the previous preview's v2 save, and the older sparse
+v1 save. They matched on load, continuation and restart and left every
+SRAM image unchanged. The physical receipt SHA-256 is
+`d9056d6934a9cc0e4652c7111dd040b38d1b1d74990495e82076124300eac8c9`;
+the cross-load receipt SHA-256 is
+`1d8042ffb6f0444fc5f1a99b4777fac8a035c551982e2b04fa0bfc09dc12c4af`.
+The CPU Random change was physically checked on ARM for Terran; the
+other three products have host checks for this change.

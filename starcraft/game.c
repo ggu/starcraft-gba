@@ -10114,16 +10114,18 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_IMPORTED_SKIRMISH
             if(action==SC_FRONT_START_SKIRMISH){
                 int resolved[3];
-                unsigned seats=sc64_front_skirmish_resolve(&race_front,resolved);
+                unsigned seats,order=0;
+#ifdef SC64_NATIVE_MELEE_STARTS
+                if(race_front.map==SC64_MAP_BLOOD_BATH)
+                    seats=sc64_front_skirmish_native_resolve(&race_front,gba_elapsed_milliseconds(),resolved,&order);
+                else
+#endif
+                    seats=sc64_front_skirmish_resolve(&race_front,resolved);
                 if(!seats)return;
                 race_bots=sc64_skirmish_seat_count(seats);
                 race_skirmish_slots=seats==sc64_skirmish_dense_seats(race_bots) ? 0 : seats;
                 race_skirmish_map=race_front.map;
-                race_skirmish_start_order=0;
-#ifdef SC64_NATIVE_MELEE_STARTS
-                if(race_skirmish_map==SC64_MAP_BLOOD_BATH)
-                    race_skirmish_start_order=sc64_skirmish_blood_bath_start_order(seats,gba_elapsed_milliseconds());
-#endif
+                race_skirmish_start_order=order;
                 for(int i=0;i<3;i++)race_bot_races[i]=resolved[i];
             }
 #else
