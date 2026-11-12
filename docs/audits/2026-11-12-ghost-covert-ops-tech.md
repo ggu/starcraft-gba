@@ -95,8 +95,9 @@ The current Silo journal remains usable for source-seeded worlds.
 If a Ghost upgrade has been paid for or earned, this experimental
 build refuses to overwrite a save until an authenticated Ghost tech
 layout exists. Canceling an unfinished upgrade can reenable saves
-if no other nonserializable state remains. An active nuclear flight
-retains its existing separate save guard.
+if no other nonserializable state remains. The active-strike journal
+can still save supported painting or descent when no Ghost tech state
+would be lost. The Silo-only journal still rejects flights.
 
 Lockdown raw weapon 32 in `00C/007` has target flags `0x17`
 (air and ground mechanical units, no buildings), range 256 source
@@ -131,5 +132,9 @@ scenario seeding, Ocular sight, paid energy and cloak drain arithmetic.
 With prepared inputs, `make test-sc64-ghost-tech-world` drives actual
 B, D-pad and A inputs in the Terran HOST profile and checks the
 research jobs, flight/attachment, static fog expansion, new range,
-energy, scenario seeds and an unchanged live Silo save. Neither test
-qualifies native field spell timing or the two unimplemented spells.
+energy, scenario seeds and an unchanged live Silo save.
+`make test-sc64-ghost-tech-world-active` runs the same profile with the
+active-strike journal, including a supported painting save before an
+upgrade starts and refusal to overwrite it once research is paid for.
+These tests do not qualify native field spell timing or the two
+unimplemented spells.

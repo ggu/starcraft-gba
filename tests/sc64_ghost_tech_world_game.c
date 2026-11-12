@@ -89,7 +89,25 @@ static void custom_world(void)
     assert(race_nuke_armed_slot(SIDE) == silo && race_save_game());
     memcpy(base_save, host_save, sizeof base_save);
     assert(race_nuke_issue(human_ghost, SIDE, 420, 408));
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    Sc64NukeWorldFlight *painting = race_nuke_track(human_ghost);
+    assert(painting && painting->strike.phase == SC64_NUKE_PAINTING);
+    int missile_slot = painting->actor_slot_plus1;
+    assert(missile_slot > 0 && race_save_game());
+    static u8 active_save[sizeof host_save];
+    memcpy(active_save, host_save, sizeof active_save);
+    assert(race_ghost_tech_start(first, SC64_GHOST_TECH_OCULAR) == 0);
+    assert(!race_save_game() && memcmp(active_save, host_save, sizeof active_save) == 0);
+    assert(race_load_game() && !race_ghost_job_at(first));
+    painting = race_nuke_track(human_ghost);
+    assert(painting && painting->actor_slot_plus1 == missile_slot &&
+           painting->strike.phase == SC64_NUKE_PAINTING &&
+           race_nuke_reserved_supply(SIDE) == SC64_NUKE_MISSILE_SUPPLY);
+    /* Also restore the prior Silo-only snapshot in this combined build. */
+    memcpy(host_save, base_save, sizeof base_save);
+#else
     assert(!race_save_game() && memcmp(base_save, host_save, sizeof base_save) == 0);
+#endif
     assert(race_load_game() && race_nuke_armed_slot(SIDE) == silo);
     read_energy(human_ghost, 50 * 256, 200 * 256);
     update_exploration();
@@ -130,6 +148,10 @@ static void custom_world(void)
     assert(!race_nuke_ghost_in_range(enemy_ghost, 968, 648));
     update_exploration();
     assert(currently_visible(568, 408)); /* Same stationary Ghost. */
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    assert(race_nuke_issue(human_ghost, SIDE, 568, 408));
+    assert(race_nuke_track(human_ghost)->strike.phase == SC64_NUKE_PAINTING);
+#endif
     assert(!race_save_game() && memcmp(base_save, host_save, sizeof base_save) == 0);
 
     choose(first, SC64_GHOST_TECH_REACTOR, "MOEBIUS REACTOR");
