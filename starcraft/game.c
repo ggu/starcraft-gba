@@ -888,6 +888,11 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #endif
 #define UNIT_DOUBLE_TAP_TICKS 12u
 #define UNIT_DOUBLE_TAP_RADIUS 8
+#if defined(SC64_NATIVE_SKIRMISH_ELIMINATION) && \
+    (!defined(GBA_HOST) || !defined(SC64_RACES) || !defined(SC64_IMPORTED_SKIRMISH) || \
+     !defined(SC64_NATIVE_MELEE_STARTS))
+#error "Native CPU elimination is a HOST-only Blood Bath preview"
+#endif
 #define SIDE 0
 #define ENEMY 1
 #define NEUTRAL 2
@@ -1983,6 +1988,9 @@ static unsigned race_skirmish_slots; /* 0 keeps the legacy dense seating */
 static unsigned race_skirmish_start_order; /* 0 keeps the legacy physical starts */
 #ifdef SC64_NATIVE_MELEE_STARTS
 static unsigned race_skirmish_melee; /* CPU players allied in the native Blood Bath preview */
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+static u8 race_skirmish_eliminated; /* mask of occupied CPU ranks, not lobby rows */
+#endif
 #endif
 #endif
 static Sc64Frontend race_front;
@@ -5888,6 +5896,9 @@ game_init(void)
     race_skirmish_slots=0;race_skirmish_start_order=0;
 #ifdef SC64_NATIVE_MELEE_STARTS
     race_skirmish_melee=0;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    race_skirmish_eliminated=0;
+#endif
 #endif
 #endif
 #ifdef SC64_CAMPAIGN_RACE
@@ -9004,6 +9015,11 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        if (race_mode && race_skirmish_eliminated && race_skirmish_start_order &&
+            q->owner == NEUTRAL && q->raw_owner == 11)
+            continue;
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
         if (sc64_race_ordinary_ghost(q->type) && race_nuke_ghost_locked(i)) continue;
 #endif

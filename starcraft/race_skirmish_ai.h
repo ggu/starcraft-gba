@@ -1519,6 +1519,9 @@ static void __attribute__((noinline)) race_ai_tick(void)
     if (frame % RACE_AI_PHASE) return;
     slot = (frame / RACE_AI_PHASE) % (RACE_AI_PERIOD / RACE_AI_PHASE);
     if (slot >= race_bots || slot >= 3) return;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    if (race_skirmish_eliminated & (1u << slot)) return;
+#endif
     race_ai_plan(race_bot_owner_ids[slot]);
 }
 

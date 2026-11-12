@@ -133,6 +133,40 @@ static inline int sc64_skirmish_read_match_word(int custom, int blood_bath, int 
     return 1;
 }
 
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+/* Resolved Blood Bath records used only low bits 0..12. Older readers
+ * reject bits 13..15 instead of reactivating eliminated CPU ranks. */
+enum { SC64_SKIRMISH_ELIM_SHIFT = 13, SC64_SKIRMISH_ELIM_BITS = 7u << 13 };
+
+static inline int sc64_skirmish_elimination_word(int bots, int word,
+                                                 unsigned eliminated, int *out)
+{
+    unsigned tag = (unsigned)word & 0xffff0000u;
+    if (!out || (eliminated & ~sc64_skirmish_dense_seats(bots)) ||
+        ((unsigned)word & SC64_SKIRMISH_ELIM_BITS) ||
+        (eliminated && tag != SC64_SKIRMISH_START_TAG && tag != SC64_SKIRMISH_MELEE_TAG))
+        return 0;
+    *out = word | (int)(eliminated << SC64_SKIRMISH_ELIM_SHIFT);
+    return 1;
+}
+
+static inline int sc64_skirmish_read_elimination_word(int custom, int blood_bath, int bots,
+    int word, int *last_race, unsigned *sparse, unsigned *order, unsigned *melee,
+    unsigned *eliminated)
+{
+    unsigned bits = (unsigned)word;
+    unsigned mask = (bits & SC64_SKIRMISH_ELIM_BITS) >> SC64_SKIRMISH_ELIM_SHIFT;
+    if (mask && (custom != 1 || !blood_bath ||
+                 (mask & ~sc64_skirmish_dense_seats(bots)) ||
+                 ((bits & 0xffff0000u) != SC64_SKIRMISH_START_TAG &&
+                  (bits & 0xffff0000u) != SC64_SKIRMISH_MELEE_TAG))) return 0;
+    if (!sc64_skirmish_read_match_word(custom, blood_bath, bots,
+            (int)(bits & ~SC64_SKIRMISH_ELIM_BITS), last_race, sparse, order, melee)) return 0;
+    *eliminated = mask;
+    return 1;
+}
+#endif
+
 static inline unsigned sc64_skirmish_blood_bath_start_order(unsigned rows,
                                                               const Sc64NativeMeleeStarts *starts)
 {

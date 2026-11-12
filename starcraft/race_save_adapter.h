@@ -2294,6 +2294,10 @@ static int race_save_game(void) {
             race_skirmish_melee ? sc64_skirmish_melee_word(race_bot_races[2],mask,race_skirmish_start_order) :
 #endif
             sc64_skirmish_start_word(race_bot_races[2],mask,race_skirmish_start_order);
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        if (!sc64_skirmish_elimination_word(race_bots, race_data.state[23],
+                race_skirmish_eliminated, &race_data.state[23])) return 0;
+#endif
     }else if(race_mode && race_skirmish_slots){
         if(!sc64_skirmish_sparse_valid(race_bots,race_skirmish_slots) ||
            race_bot_races[2]<0 || race_bot_races[2]>=3)return 0;
@@ -3170,7 +3174,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     for(int i=21;i<23;i++)if(v[i]<0||v[i]>2)return 0;
     int saved_last_race;
     unsigned saved_sparse,saved_starts;
-#ifdef SC64_NATIVE_MELEE_STARTS
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    unsigned saved_melee, saved_eliminated;
+    if (!sc64_skirmish_read_elimination_word(v[0], v[20]==SC64_MAP_BLOOD_BATH, v[4], v[23],
+            &saved_last_race, &saved_sparse, &saved_starts, &saved_melee, &saved_eliminated)) return 0;
+#elif defined(SC64_NATIVE_MELEE_STARTS)
     unsigned saved_melee;
     if(!sc64_skirmish_read_match_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
                                      &saved_last_race,&saved_sparse,&saved_starts,&saved_melee))return 0;
@@ -3268,6 +3276,15 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        if (saved_eliminated &&
+            (race_skirmish_retired_owner(saved_eliminated, RACE_U(i,owner)) ||
+             (RACE_U(i,owner) == NEUTRAL && RACE_U(i,raw_owner) == 11 &&
+              (RACE_U(i,order) != ORDER_IDLE || RACE_U(i,selected) ||
+               RACE_U(i,target) != -1 || RACE_U(i,build) != -1 ||
+               RACE_U(i,tx) != RACE_U(i,x) || RACE_U(i,ty) != RACE_U(i,y) ||
+               RACE_U(i,path_timer) || RACE_U(i,path_retry) || RACE_U(i,work_timer))))) return 0;
+#endif
         if(RACE_U(i,type)<0||RACE_U(i,type)>=SC_RU_COUNT||RACE_U(i,owner)<0||RACE_U(i,owner)>4||
             RACE_U(i,hp)<=0||RACE_U(i,maxhp)<=0||RACE_U(i,hp)>RACE_U(i,maxhp)||
             RACE_U(i,x)<0||RACE_U(i,x)>=width*16||RACE_U(i,y)<0||RACE_U(i,y)>=height*16||
@@ -3457,6 +3474,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             RACE_B(i,shield)!=0||RACE_SAVE_INV_B(&race_data, i)!=1))return 0;
 #endif
         if(!RACE_B(i,alive))continue;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        if (saved_eliminated && race_skirmish_retired_owner(saved_eliminated, RACE_B(i,owner)))
+            return 0;
+#endif
         int health_ok=RACE_B(i,hp)>0&&RACE_B(i,maxhp)>0&&
                       RACE_B(i,hp)<=RACE_B(i,maxhp);
         if (sc64_legacy_beacon_hp_sentinel(RACE_B(i,type),RACE_B(i,raw_type),
@@ -4856,7 +4877,12 @@ static int race_load_game(void) {
     race_skirmish_map=v[20];for(int i=0;i<2;i++)race_bot_races[i]=v[21+i];
     /* Already checked by race_load_preflight; no partially loaded world on
      * malformed seating. */
-#ifdef SC64_NATIVE_MELEE_STARTS
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    unsigned eliminated = 0;
+    (void)sc64_skirmish_read_elimination_word(v[0], v[20]==SC64_MAP_BLOOD_BATH, v[4], v[23],
+        &race_bot_races[2], &race_skirmish_slots, &race_skirmish_start_order, &race_skirmish_melee, &eliminated);
+    race_skirmish_eliminated = (u8)eliminated;
+#elif defined(SC64_NATIVE_MELEE_STARTS)
     (void)sc64_skirmish_read_match_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
                                      &race_bot_races[2],&race_skirmish_slots,&race_skirmish_start_order,&race_skirmish_melee);
 #else
