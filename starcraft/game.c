@@ -10699,6 +10699,7 @@ draw_mission_sprite(const Sc64SpriteFrame *s, int cx, int cy)
     gfx_blit_sprite(cx - s->canvas_w / 2 + s->offset_x,
 	cy - s->canvas_h / 2 + s->offset_y, s->w, s->h, s->pixels);
 }
+#include "sc64_static_mineral_draw.h"
 #ifdef SC64_CONSTRUCTION_SOURCE_ART
 static int
 draw_construction_image(unsigned short image_id, unsigned short frame_index,
@@ -12156,7 +12157,7 @@ draw_map_static_objects(void)
 	        currently_visible(m[i].x, m[i].y)) {
 #ifdef SC64_HAS_SPRITES
 		const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
-		if (sprite) draw_mission_sprite(sprite, x, y);
+		if (sprite) draw_static_mineral_sprite(sprite, x, y);
 		else {
 #endif
 		gfx_diamond(x, y, 7, 4, C_CYAN);
