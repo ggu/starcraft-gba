@@ -5,6 +5,14 @@ build/test-sc64-ghost-tech: tests/sc64_ghost_tech.c starcraft/sc64_ghost_tech.h 
 test-sc64-ghost-tech: build/test-sc64-ghost-tech
 	./$<
 
+
+# Asset-free detached HOST codec; this does not select any journal tag.
+build/test-sc64-ghost-tech-save-wire: tests/sc64_ghost_tech_save_wire.c starcraft/sc64_ghost_tech_save_wire.h starcraft/sc64_ghost_tech.h starcraft/sc64_battlecruiser_rules.h starcraft/sc64_nuke_save_rows.h starcraft/sc64_nuke_rules.h starcraft/sc64_save_tag_namespace.h mk/sc64-nuke/Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST $< -o $@
+.PHONY: test-sc64-ghost-tech-save-wire
+test-sc64-ghost-tech-save-wire: build/test-sc64-ghost-tech-save-wire
+	./$<
+
 SC64_NUKE_RUNTIME_FLAGS := -DSC64_SHARED_NUKE_PROBE -I$(SC64_NUKE_ASSET_DIR)
 SC64_NUKE_RUNTIME_ASSETS := $(addprefix $(SC64_NUKE_ASSET_DIR)/,sc64_nuke_source_generated.h sc64_nuke_building_source_generated.h sc64_nuke_ghost_source_generated.h)
 SC64_NUKE_FIXTURE_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon

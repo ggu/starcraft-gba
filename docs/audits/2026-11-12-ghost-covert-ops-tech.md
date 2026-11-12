@@ -138,3 +138,52 @@ active-strike journal, including a supported painting save before an
 upgrade starts and refusal to overwrite it once research is paid for.
 These tests do not qualify native field spell timing or the two
 unimplemented spells.
+
+## Detached save experiment
+
+`make test-sc64-ghost-tech-save-wire` verifies a HOST-only projection on
+the `556ab0d` Ghost probe. This does not change what the game can save.
+It does not allocate a journal tag, change a default build, or install a
+reader or writer. Existing transport, nuclear, and research tags retain
+their current meaning.
+
+A fixed tail cannot preserve every legal predecessor: Z7, Z9, Z10 and
+P10 have valid impact, transport and Yamato combinations that already
+fill the [16,368-byte payload](../SC64-JOURNAL-DEBT-CAPACITY-AUDIT-20261107.md).
+The experiment adds no bytes to those layouts:
+
+- The 16 possible earned Ocular/Moebius bits are a two-bit-per-source-key
+  delta from the authenticated map's seeds. An explicitly selected
+  candidate layout XORs the delta into the low half of the known building
+  damage marker in `state[25]`. Detached decoding restores the full
+  canonical marker. A predecessor keeps its original marker, including
+  zero, and restores only the scenario's seeds.
+- Raw-117 Covert Ops rows use their empty `queue_progress` for up to 2,500
+  remaining source ticks and their empty `level` for one of the 16
+  payer/upgrade pairs. A receipt requires a live, complete Covert Ops and
+  an independently validated same-owner, same-source-key Science Facility
+  socket. The payer key must agree with the candidate's active bank and
+  research permission. Unsupported, duplicated, foreign, and detached
+  receipts refuse; no partial load plan is returned.
+- Raw-108 Silo receipts, raw-14 active missile rows, typed Protoss
+  research padding, and the transport/impact trailers keep their current
+  projections. The fixture passes an armed Silo and painting strike on the
+  same candidate through the existing nuclear codecs alongside both a paid
+  upgrade and an earned upgrade. It rejects altered rows atomically and
+  still accepts the preceding nuclear-only payload as a base layout.
+
+A game integration needs its own reviewed exact outer/inner layout
+authorization. The low marker bits or a nonzero Covert row must never
+select it. The writer must check that decoded receipts reproduce the full
+live pending mask before any SRAM write. The reader must use only detached
+candidate data, normalize the marker and Covert receipt fields before
+ordinary validation, and publish research, silo, and flight state only
+after the entire candidate passes. Reserve the existing slot and sequence
+selection rules so invalid new candidates can fall back to a compatible
+predecessor. Source-key/owner mapping and socket derivation must be checked
+on every admitted profile; holding detached or captured work requires a
+separate original-payer proof. Also verify Ghost Q8 energy with each unit
+row layout, including full Moebius energy and legacy signed storage.
+Before a cartridge enables this, run independent writer/reader processes
+on real predecessors, malformed newest records, full payloads, and
+painting/descent saves, then qualify the normal ARM path and its guards.
