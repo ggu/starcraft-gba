@@ -117,7 +117,8 @@ The same world fixture passes in mGBA under the real ARM Terran flags
 and renderer. It sets up the test field and campaign landing vicinity
 directly, then uses the real menu handlers and simulation. It matches
 the observed friendly Ghost casualty at the same source coordinates,
-and saves and reloads the paid T8 queue through the GBA SRAM journal.
+and saves and reloads both the paid T8 queue and a painting strike
+through the GBA SRAM journal before reproducing the impact.
 All four playable probe ROMs pass the ARM memory limits and header checks.
 This does not measure frame rate on hardware.
 

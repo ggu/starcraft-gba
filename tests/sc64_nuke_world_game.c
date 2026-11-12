@@ -281,6 +281,12 @@ int main(void)
     cx = x; cy = y;
     game_update(KEY_A, KEY_A);
     assert(mode == MODE_NORMAL && race_nuke_ghost_locked(ghost));
+    assert(!issue_order(ORDER_MOVE, x - 30, y));
+#ifdef SC64_DIRECT_ATTACK
+    assert(!sc64_direct_attack_issue_target(enemy));
+#endif
+    stop_selected();
+    assert(u[ghost].order == ORDER_IDLE && race_nuke_ghost_locked(ghost));
 #ifndef SC64_NUKE_ACTIVE_JOURNAL
     assert(!race_save_game()); /* never save a partial in-flight state */
 #endif

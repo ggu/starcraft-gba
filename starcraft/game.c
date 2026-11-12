@@ -4701,6 +4701,9 @@ sc64_direct_attack_issue_target(int target)
         Unit *q = &u[i];
         if (!q->alive || !q->selected || q->owner != SIDE ||
             SC64_TRANSPORT_LOADED(q)) continue;
+#ifdef SC64_SHARED_NUKE_PROBE
+        if (sc64_race_ordinary_ghost(q->type) && race_nuke_ghost_locked(i)) continue;
+#endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         if (sc64_game_unit_actor_flags(q->type) &&
             !(sc64_game_unit_actor_flags(q->type) & SC64_GAME_ACTOR_MOVABLE))
@@ -6386,6 +6389,9 @@ stop_selected(void)
     int i;
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && u[i].selected) {
+#ifdef SC64_SHARED_NUKE_PROBE
+            if (sc64_race_ordinary_ghost(u[i].type) && race_nuke_ghost_locked(i)) continue;
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
 #ifdef SC64_T6_RUNTIME
             int was_repair = u[i].order == ORDER_REPAIR;
