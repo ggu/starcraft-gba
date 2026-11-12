@@ -15,6 +15,9 @@
 #if defined(SC64_Z7_VISIBILITY_ROW_CONTEXT) && !defined(SC64_Z7_SIGHT_SPANS)
 #error "SC64_Z7_VISIBILITY_ROW_CONTEXT requires SC64_Z7_SIGHT_SPANS"
 #endif
+#if defined(SC64_Z7_VISIBILITY_PACKED_ROWS) && !defined(SC64_Z7_VISIBILITY_ROW_CONTEXT)
+#error "SC64_Z7_VISIBILITY_PACKED_ROWS requires SC64_Z7_VISIBILITY_ROW_CONTEXT"
+#endif
 
 #ifdef SC64_Z7_SOURCE_SIGHT
 #include "sc64_z7_source_sight.h"
@@ -708,7 +711,32 @@ sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta)
 typedef struct {
     int x, y, col, row, radius, extent;
     const u8 *halfwidths;
+#ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
+    const u8 *packed_rows;
+#endif
 } Sc64Z7VisibilityRowContext;
+
+#ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
+#include "sc64_sight_row_lut_generated.h"
+enum { SC64_SIGHT_ROW_BIAS = 12, SC64_SIGHT_EMPTY_SPAN = 0x00ff };
+
+/* The transition clips world rows once. The row table clips the authored
+ * footprint; the decode clips absolute columns to the current map. */
+static inline unsigned
+sc64_z7_visibility_packed_row(const Sc64Z7VisibilityRowContext *ctx, int row)
+{
+    unsigned index = (unsigned)(row - ctx->row + SC64_SIGHT_ROW_BIAS);
+    if (index >= 25) return SC64_SIGHT_EMPTY_SPAN;
+    unsigned v = ctx->packed_rows[index];
+    if (v == 0xff) return SC64_SIGHT_EMPTY_SPAN;
+    int first = ctx->col - (int)(v >> 4);
+    int last = ctx->col + (int)(v & 15u);
+    if (first < 0) first = 0;
+    if (last >= MAP_COLS) last = MAP_COLS - 1;
+    if (first > last) return SC64_SIGHT_EMPTY_SPAN;
+    return (unsigned)(last * 256 + first);
+}
+#endif
 
 static inline int
 sc64_z7_visibility_prepare_rows(Sc64Z7VisibilityRowContext *ctx,
@@ -721,6 +749,10 @@ sc64_z7_visibility_prepare_rows(Sc64Z7VisibilityRowContext *ctx,
     ctx->radius = radius; ctx->extent = (radius + 23) / 16;
     ctx->halfwidths = sc64_z7_visibility_halfwidths +
                       sc64_z7_visibility_halfwidth_offsets[index];
+#ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
+    ctx->packed_rows = x >= 0 && y >= 0 ?
+        sc64_z7_sight_packed_rows[index][((y & 15) << 4) | (x & 15)] : 0;
+#endif
     return 1;
 }
 
@@ -777,12 +809,29 @@ sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
     Sc64Z7VisibilityRowContext old_ctx, new_ctx;
     if (!sc64_z7_visibility_prepare_rows(&old_ctx, old_x, old_y, radius) ||
         !sc64_z7_visibility_prepare_rows(&new_ctx, new_x, new_y, radius)) return;
+#ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
+    int use_packed = old_ctx.packed_rows && new_ctx.packed_rows && MAP_COLS <= 255;
+    if (use_packed) {
+        if (row0 < 0) row0 = 0;
+        if (row1 >= MAP_ROWS) row1 = MAP_ROWS - 1;
+    }
+#endif
 #endif
     for (row = row0; row <= row1; ++row) {
         int of, ol, nf, nl;
 #ifdef SC64_Z7_VISIBILITY_ROW_CONTEXT
-        sc64_z7_visibility_prepared_row_span(&old_ctx, row, &of, &ol);
-        sc64_z7_visibility_prepared_row_span(&new_ctx, row, &nf, &nl);
+#ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
+        if (use_packed) {
+            unsigned old_span = sc64_z7_visibility_packed_row(&old_ctx, row);
+            unsigned new_span = sc64_z7_visibility_packed_row(&new_ctx, row);
+            of = (int)(old_span & 255u); ol = (int)(old_span >> 8);
+            nf = (int)(new_span & 255u); nl = (int)(new_span >> 8);
+        } else
+#endif
+        {
+            sc64_z7_visibility_prepared_row_span(&old_ctx, row, &of, &ol);
+            sc64_z7_visibility_prepared_row_span(&new_ctx, row, &nf, &nl);
+        }
 #else
         sc64_z7_visibility_row_span(old_x, old_y, row, radius, extent, &of, &ol);
         sc64_z7_visibility_row_span(new_x, new_y, row, radius, extent, &nf, &nl);
