@@ -643,9 +643,42 @@ static void scenario(int shape_cols, int shape_rows, int terrain, int kind, int 
     kind_builds[kind] += floods_now() - (unsigned long)builds_before;
 }
 
+#ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
+static void check_linear96_uses_expected_path(void)
+{
+    enum { CELLS = 96 * 128, GOAL = 48 + 64 * 96 };
+    int filled;
+    race_cols = 96;
+    race_rows = 128;
+    sc64_routes_reset();
+    assert(sc64_route_configure());
+    memset(desired, 1, CELLS);
+    build_path_grid();
+    memset(sc64_route_field[0], 0x53, sc64_route_active_bytes);
+    memset(SC64_ROUTE_OLD_GRID, 0x5a, sizeof(path_walkable));
+    filled = sc64_route_fill_linear96(sc64_route_field[0], GOAL);
+#ifdef TEST_LINEAR_OVERFLOW
+    assert(filled == -1);
+    for (unsigned i = 0; i < sc64_route_active_bytes; ++i)
+        assert(sc64_route_field[0][i] == 0x53);
+    assert(sc64_route_fill(0, GOAL) == CELLS);
+#else
+    assert(filled == CELLS); /* must compact: the field is larger than the queue */
+#endif
+    reference_bfs(&oracle[POOL], GOAL);
+    for (int i = 0; i < CELLS; ++i) assert(sc64_route_get(0, i) == oracle[POOL].dir[i]);
+    for (unsigned i = 0; i < sizeof(path_walkable); ++i) assert(SC64_ROUTE_OLD_GRID[i] == 0x5a);
+    check_grid_unchanged();
+}
+#endif
+
 int main(int argc, char **argv)
 {
-    static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 } };
+    static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
+#ifdef TEST_LINEAR_FLOOD
+                                    { 96, 128 },
+#endif
+    };
     const char *emit = 0, *compare = 0;
     for (int i = 1; i + 1 < argc; ++i) {
         if (!strcmp(argv[i], "--emit")) emit = argv[i + 1];
@@ -730,6 +763,9 @@ int main(int argc, char **argv)
         printf("total baseline builds %lu, keep builds %lu (%.1f%%)\n", total_base, total_keep,
                100.0 * (double)total_keep / (double)total_base);
     }
+#ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
+    check_linear96_uses_expected_path();
+#endif
     puts("sc64 route keep-fields: ok");
     return 0;
 }
