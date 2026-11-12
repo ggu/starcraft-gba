@@ -2659,7 +2659,15 @@ build/test-unified-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft
 test-sc64-stock-supply: build/test-race-engine build/test-unified-engine
 	./build/test-race-engine --stock-supply
 	./build/test-unified-engine --stock-supply
+	./build/test-race-engine --mixed-supply
+	./build/test-unified-engine --mixed-supply
 test-races test-unified: test-sc64-stock-supply
+
+build/test-sc64-race-supply-ledger: tests/sc64_race_supply_ledger.c starcraft/sc64_supply.h starcraft/sc64_race_supply.h starcraft/race_rules.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-race-supply-ledger
+test-sc64-race-supply-ledger: build/test-sc64-race-supply-ledger
+	./$<
 
 test-unified: build/test-unified build/test-unified-frontend build/test-unified-menu build/test-unified-engine build/test-unified-factions build/test-unified-campaign build/test-unified-targets build/test-sc64-zerg-townhalls build/test-unified-hud build/test-sc64-weapon-vfx-game build/test-sc64-shield-bars
 	./build/test-unified
