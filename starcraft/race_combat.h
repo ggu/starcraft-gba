@@ -128,6 +128,61 @@ static void GBA_HOT race_tick_defenses(void) {
 }
 
 #ifdef SC64_ZP_DEFENSE_TARGETS
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+/* A late mission can have dozens of defenses looking for a short-range
+ * target. Group the current unit slots by 256-pixel cells once per defense
+ * pass, after trigger/controller mutations. An ordinary 112-pixel search
+ * then needs at most four cells. Slot ties remain independent of list order. */
+enum { DEFENSE_CELL_SHIFT = 8, DEFENSE_CELL_SIDE = 8,
+       DEFENSE_CELL_LIMIT = DEFENSE_CELL_SIDE << DEFENSE_CELL_SHIFT };
+
+typedef struct {
+    u8 head[DEFENSE_CELL_SIDE * DEFENSE_CELL_SIDE];
+    u8 next[MAX_UNITS], flying[MAX_UNITS];
+} RaceDefenseCells;
+
+static int GBA_HOT __attribute__((noinline))
+race_defense_target_from_zp_cells(const Building *q, int ground, int air,
+                                  int range, const RaceDefenseCells *cells,
+                                  u8 hostile_mask)
+{
+    int x = q->x, y = q->y;
+    if (x <= -range || y <= -range ||
+        x >= DEFENSE_CELL_LIMIT + range - 1 ||
+        y >= DEFENSE_CELL_LIMIT + range - 1) return -1;
+    int left = x - range + 1, top = y - range + 1;
+    int right = x + range - 1, bottom = y + range - 1;
+    int best = -1, bestd = range * range;
+    left = (left < 0 ? 0 : left) >> DEFENSE_CELL_SHIFT;
+    top = (top < 0 ? 0 : top) >> DEFENSE_CELL_SHIFT;
+    right = (right >= DEFENSE_CELL_LIMIT ? DEFENSE_CELL_LIMIT - 1 : right) >> DEFENSE_CELL_SHIFT;
+    bottom = (bottom >= DEFENSE_CELL_LIMIT ? DEFENSE_CELL_LIMIT - 1 : bottom) >> DEFENSE_CELL_SHIFT;
+
+    for (int row = top; row <= bottom; ++row) {
+        for (int col = left; col <= right; ++col) {
+            int cell = row * DEFENSE_CELL_SIDE + col;
+            for (int j = cells->head[cell]; j != 0xff; j = cells->next[j]) {
+                const Unit *target = &u[j];
+                unsigned owner = target->owner;
+                if (!target->alive || owner >= 5 ||
+                    !(hostile_mask & (1u << owner)) ||
+                    (cells->flying[j] ? !air : !ground)) continue;
+                int dx = x - target->x, dy = y - target->y;
+                if (FAST_ABS(dx) >= range || FAST_ABS(dy) >= range ||
+                    (target->flags & 16) ||
+                    !sc64_auto_target_candidate_allowed(-1, j, q->owner,
+                                                        q->raw_owner)) continue;
+                int d = dx * dx + dy * dy;
+                if (d < bestd || (best >= 0 && d == bestd && j < best)) {
+                    bestd = d;
+                    best = j;
+                }
+            }
+        }
+    }
+    return best;
+}
+#else
 /* The mission tick runs before defenses and may change owners or alliances.
  * Build fresh owner/class lists here, after those effects, instead of reusing
  * the lists prepared before the mission tick by update_orders. */
@@ -159,19 +214,19 @@ race_defense_target_from_zp_lists(const Building *q, int ground, int air,
     return best;
 }
 
+#endif
+
 static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
 {
-    u8 head[5][2], next[MAX_UNITS], hostile_mask[5];
+    u8 hostile_mask[5];
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+    RaceDefenseCells cells;
+#else
+    u8 head[5][2], next[MAX_UNITS];
+#endif
 
-    /* Invalid ownership is tolerated by the old scan. Decide to fall back
-     * before any cooldown or health mutation, so the result stays exact. */
-    for (int j = 0; j < MAX_UNITS; ++j) {
-        int owner = u[j].owner;
-        if (u[j].alive && (owner < 0 || owner >= 5)) {
-            race_tick_defenses_fullscan();
-            return;
-        }
-    }
+    /* Finish validation before any cooldown or health mutation. The scalar
+     * scan remains authoritative for unusual actor coordinates or owners. */
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         int owner = b[i].owner;
         if (b[i].alive && (owner < 0 || owner >= 5)) {
@@ -180,6 +235,29 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         }
     }
 
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+    memset(cells.head, 0xff, sizeof(cells.head));
+    for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
+        if ((unsigned)u[j].owner >= 5 ||
+            (unsigned)u[j].x >= DEFENSE_CELL_LIMIT ||
+            (unsigned)u[j].y >= DEFENSE_CELL_LIMIT) {
+            race_tick_defenses_fullscan();
+            return;
+        }
+        int cell = (u[j].y >> DEFENSE_CELL_SHIFT) * DEFENSE_CELL_SIDE +
+                   (u[j].x >> DEFENSE_CELL_SHIFT);
+        cells.flying[j] = (u8)sc64_race_unit_flying(u[j].type);
+        cells.next[j] = cells.head[cell];
+        cells.head[cell] = (u8)j;
+    }
+#else
+    for (int j = 0; j < MAX_UNITS; ++j) {
+        int owner = u[j].owner;
+        if (u[j].alive && (owner < 0 || owner >= 5)) {
+            race_tick_defenses_fullscan();
+            return;
+        }
+    }
     memset(head, 0xff, sizeof(head));
     for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
         int owner = u[j].owner;
@@ -187,6 +265,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         next[j] = head[owner][flying];
         head[owner][flying] = (u8)j;
     }
+#endif
     for (int owner = 0; owner < 5; ++owner) {
         u8 mask = 0;
         for (int other = 0; other < 5; ++other)
@@ -207,8 +286,13 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         default: continue;
         }
         if (!race_defense_cooldown_ready(q)) continue;
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+        int best = race_defense_target_from_zp_cells(
+            q, ground, air, range, &cells, hostile_mask[q->owner]);
+#else
         int best = race_defense_target_from_zp_lists(
             q, ground, air, range, head, next, hostile_mask[q->owner]);
+#endif
         if (best >= 0) {
             if (!hit_stock_building_target(q,best,damage)) continue;
 

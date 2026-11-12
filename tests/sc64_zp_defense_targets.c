@@ -408,11 +408,48 @@ static void human_defense_fog_acquisition(void)
     assert(u[1].hp < 100);
 }
 
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+static void spatial_boundaries_and_ties(void)
+{
+    clear_world();
+    b[0] = (Building){ .x=255, .y=255, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_SUNKEN_COLONY, .alive=1, .raw_type=-1 };
+    u[0] = (Unit){ .x=270, .y=270, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_ZERGLING, .alive=1, .raw_type=-1 };
+    u[1] = u[0];
+    u[1].x = 240;
+    u[1].y = 240;
+    compare_paths();
+    assert(actual.units[0].hp < 100 && actual.units[1].hp == 100);
+
+    /* This target remains in range across the last spatial cell's boundary.
+     * Moving it off the covered domain must retain the scalar answer. Use
+     * an AI defense so human viewport/fog bounds do not mask the fallback. */
+    b[0].owner = ENEMY;
+    u[0].owner = SIDE;
+    b[0].x = 1937;
+    u[0].x = DEFENSE_CELL_LIMIT - 1;
+    u[0].y = 255;
+    u[1].alive = 0;
+    compare_paths();
+    assert(actual.units[0].hp < 100);
+    u[0].x = DEFENSE_CELL_LIMIT;
+    compare_paths();
+    assert(actual.units[0].hp < 100);
+    ++u[0].x;
+    compare_paths();
+    assert(actual.units[0].hp == 100);
+}
+#endif
+
 int main(void)
 {
     gba_init();
     game_init();
     randomized_differential();
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+    spatial_boundaries_and_ties();
+#else
     tie_range_and_early_kill();
     sunken_explosive_size_shields_and_armor();
     air_defense_filters_ground_goliath();
@@ -421,6 +458,7 @@ int main(void)
     dispatcher_preserves_p3_and_skirmish_paths();
     stock_defense_attack_intervals();
     human_defense_fog_acquisition();
+#endif
     puts("Z/P defense target differential tests passed");
     return 0;
 }
