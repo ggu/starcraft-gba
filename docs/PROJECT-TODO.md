@@ -32,10 +32,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   start. The [GBA seat changes](audits/2026-11-12-skirmish-seat-options.md)
   pass physical button and fresh SRAM checks on Terran, Z10, P10, and
   Showcase. [Native opening actors](audits/2026-11-12-n64-blood-bath-opening.md#sparse-seat-spawn-positions)
-  show a southwest opponent for all three single-seat starts. The dense
-  native lobby changes the human origin as well. The GBA still differs;
-  establish the two-opponent and general assignment rules and preserve old
-  SRAM placement before changing defaults. Difficulty and long ordinary-input
+  establish the seeded Melee draw for one, two and three opponents on
+  Blood Bath, including two delayed launches that changed the locations.
+  The source-only selector matches all observed native seeds; connect it to
+  a GBA elapsed-time seed and persist the resolved start order while preserving
+  legacy fallback locations. Other native modes, difficulty and long ordinary-input
   victories also remain open.
 
 - **Final Zerg mission performance (P1):** the
@@ -909,10 +910,10 @@ and Protoss lineup. The native and normal GBA Z10 HUDs agree on 50 starting
 minerals and race-specific supply (Terran 4/10; Zerg and Protoss 4/9).
 Minerals rise with neutral input in all six runs. Native computer rows can
 independently choose Random or Closed; the N64 also starts a match with
-only the middle computer row occupied. The GBA uses an AI count and named
-races. Compare starting slots with a clean capture before treating the two
-menus as equivalent. Equal-speed timing, AI wallets and full-match
-behavior remain unverified.
+only the middle computer row occupied. The GBA now has independent seats
+as well. The native Melee selector uses a launch-time seed and can move
+the human and all opponents even with the same lobby. Equal-speed timing,
+AI wallets and full-match behavior remain unverified.
 
 ## Current work and open PRs
 

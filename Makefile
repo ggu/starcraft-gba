@@ -798,6 +798,13 @@ test-sc64-shield-bars: build/test-sc64-shield-bars
 build/test-skirmish-ai: tests/skirmish_ai.c starcraft/skirmish_ai.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined tests/skirmish_ai.c -o $@
 
+.PHONY: test-sc64-native-start-selector
+build/test-sc64-native-start-selector: tests/sc64_native_start_selector.c starcraft/sc64_native_start_selector.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-sc64-native-start-selector: build/test-sc64-native-start-selector
+	./build/test-sc64-native-start-selector
+test-starcraft: test-sc64-native-start-selector
+
 build/test-sc64-frontend: tests/sc64_frontend.c starcraft/sc64_frontend.h starcraft/sc64_skirmish_slots.h starcraft/campaign_catalog.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/sc64_frontend.c -o $@
 
