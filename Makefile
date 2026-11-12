@@ -2753,6 +2753,8 @@ $(eval $(call TERRAN_FULL_TEST,t4-run,tests/sc64_t4_campaign_run.c))
 $(eval $(call TERRAN_FULL_TEST,t4-save,tests/sc64_t4_scenario_save.c))
 $(eval $(call TERRAN_FULL_TEST,t5-save,tests/sc64_t5_save.c))
 $(eval $(call TERRAN_FULL_TEST,t5-run,tests/sc64_t5_campaign_run.c,-DSC64_T5_PROBE_ENTRY))
+$(eval $(call TERRAN_FULL_TEST,t5-home-run,tests/sc64_t5_campaign_run.c))
+build/sc64-t5-controller-probe build/test-sc64-t6-t5-run build/test-sc64-full-t5-run build/test-sc64-full-t5-home-run: tests/sc64_route_purity.h
 $(eval $(call TERRAN_FULL_TEST,t6-run,tests/sc64_t6_campaign_run.c,-DSC64_T6_PROBE_ENTRY))
 .PHONY: test-sc64-terran-full-regression
 test-sc64-terran-full-regression: $(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run t4-save t5-save t5-run t6-run) test-terran

@@ -47,6 +47,14 @@ def sample_trace() -> dict:
             "tick_limit": 1200, "events": events}
 
 
+def sample_home_trace() -> dict:
+    trace = sample_trace()
+    prefix = [dict(kind="input", host_tick=tick, held=held, pressed=held)
+              for tick, held in enumerate((1, 0, 16, 0, 16, 0, 1, 0, 8), 1)]
+    body = [{**row, "host_tick": row["host_tick"] + 9} for row in trace["events"]]
+    return {**trace, "entry": "t5-home-entry", "tick_limit": 1209, "events": prefix + body}
+
+
 def add_aux_snapshot(row: dict, *, transport: bool = True) -> dict:
     row.update({
         "starport_slot": -1, "starport_raw": -1, "starport_complete": 0,
@@ -174,6 +182,25 @@ class T5ReplayValidationTests(unittest.TestCase):
         self.assertEqual(plan["checkpoints"][0]["host_tick"], 509)
         self.assertEqual(plan["checkpoints"][1]["host_tick"], 1009)
         self.assertEqual(plan["final"]["host_tick"], 1209)
+
+    def test_home_trace_preserves_real_menu_and_gameplay_update_numbers(self):
+        trace = sample_home_trace()
+        add_aux_snapshot(trace["events"][9])
+        plan = replay.validate_trace(trace, 256)
+        self.assertEqual(plan["inputs"], replay.validate_trace(sample_trace(), 256)["inputs"])
+        self.assertEqual(plan["start"]["transport_passenger_snapshot_tick"], 0)
+        self.assertEqual((plan["start_tick"], plan["stop_tick"]), (9, 1209))
+        self.assertEqual(trace["events"][9]["transport_passenger_snapshot_tick"], 9)
+
+    def test_home_trace_rejects_wrong_mission_page_and_missing_start_release(self):
+        trace = sample_home_trace()
+        trace["events"][4].update(held=128, pressed=128)
+        with self.assertRaisesRegex(ValueError, "verified menu sequence"):
+            replay.validate_trace(trace, 256)
+        trace = sample_home_trace()
+        del trace["events"][10]
+        with self.assertRaisesRegex(ValueError, "release Start"):
+            replay.validate_trace(trace, 256)
 
     def test_exact_checkpoint_pages_and_nonmultiple_stop(self):
         plan = replay.validate_trace(sample_trace(), capacity=256)
