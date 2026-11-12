@@ -29,8 +29,31 @@ make CLANG='clang -D_FORTIFY_SOURCE=0' build/test-sc64-z10-carried-z9-run
 ./build/test-sc64-z10-carried-z9-run .local/sc64/z9-current.jsonl
 ```
 
+The unchanged normal cartridge won from fresh HOME in mGBA at the same
+frame. All 32 checkpoints matched across 15 named fields, including the
+countdown and three active AI towns. The controller's private waypoint index
+is not a guest field. The tape contains 10,044 held-key transitions and an
+ordinary pause save. Six A presses and releases dismissed authored pages
+without advancing the simulation, for 74,398 physical updates in total.
+The replay runner made no guest-memory writes and did not load SRAM.
+
+The live scheduler reported 14 trigger rows and no faults. The observed
+countdown passed 582, 417, 228 and 96 seconds before reaching zero. At
+frame 59,894 a live human Drone acquired the new crystal at (896, 1456).
+The crystal followed that same Drone to (269, 240) inside source location 1.
+The human source outcome became victory, and the primary objective and
+campaign completion bits were set. This checks the port's authenticated
+trigger program and its crystal carry, with no claim of native timing
+or AI parity.
+
+The full replay averaged 1,762,501 guest cycles per main loop (9.52 emulated
+updates per second), including rendering, UI and presentation waits. It
+does not meet the near-30-fps target or measure physical GBA frame rate.
+This covers one complete route from HOME; it does not test Z10 SRAM reload.
+
 - ROM SHA-256: `6224e1821edacff7a88908d2a9b5bc64b496094a567213153a1796c3d36715d3`.
 - ELF SHA-256: `9bbe176b7d2916f945aa75691feccc2d1743e8b9e18b6e40807c99e05883c307`.
 - Earlier tape divergence receipt SHA-256: `1024db764073c02eaed9be4747d8161d9c2333a777906018c1d3ef93c21a18f2`.
 - Fresh baseline prefix receipt SHA-256: `2dd14cd77770ea7a05f27b7bfd522199f80bc2dd86e58e9bec1006ae9fa72221`.
 - Winning HOST tape SHA-256: `26aecd7758ac368b9f8e34cb1764f47bf12c0bf6d7f5e8607aec9e096ae610bf`.
+- Full physical win receipt SHA-256: `9309bbf77599bf779bb45443fe5f52d7766800731c21466b3d6d6a7362503281`.
