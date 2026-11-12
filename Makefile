@@ -514,7 +514,16 @@ endif
 # Complete point floods on eligible 64x64 maps use the faster scratch grid.
 # Set this empty to compare the previous packed flood with the same cache.
 CANONICAL_ROUTE_DENSE_FLAGS ?= -DSC64_ROUTE_DENSE_FLOOD_PROBE
-CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS) $(CANONICAL_ROUTE_DENSE_FLAGS) $(CANONICAL_ROUTE_KEEP_FLAGS) $(CANONICAL_PATH_GRID_UPDATE_FLAGS)
+# Opt-in full-field experiment shared by all four cartridge profiles.
+CANONICAL_ROUTE_LINEAR ?= 0
+ifneq ($(filter $(CANONICAL_ROUTE_LINEAR),0 1),$(CANONICAL_ROUTE_LINEAR))
+$(error CANONICAL_ROUTE_LINEAR must be 0 or 1)
+endif
+ifneq ($(words $(CANONICAL_ROUTE_LINEAR)),1)
+$(error CANONICAL_ROUTE_LINEAR must be 0 or 1)
+endif
+CANONICAL_ROUTE_LINEAR_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_LINEAR)),-DSC64_ROUTE_LINEAR_FLOOD_PROBE)
+CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS) $(CANONICAL_ROUTE_DENSE_FLAGS) $(CANONICAL_ROUTE_LINEAR_FLAGS) $(CANONICAL_ROUTE_KEEP_FLAGS) $(CANONICAL_PATH_GRID_UPDATE_FLAGS)
 # Fresh-cell writer requires the existing paired-visit route configuration.
 # Showcase also needs the split flood when this option is enabled.
 CANONICAL_ROUTE_NEW_CELL ?= $(CANONICAL_ROUTE_INDEX)
@@ -571,7 +580,7 @@ $(error CANONICAL_LOOKUP_INDEX must be 0 or 1)
 endif
 # Read-only key comparison also handles sub-second changes with macOS Make 3.81.
 sc64_lookup_quote = '$(subst ','"'"',$(1))'
-CANONICAL_LOOKUP_CONFIG_KEY := $(shell $(PYTHON) tools/sc64_weapon_lookup_index.py --config-key $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_INDEX)) $(call sc64_lookup_quote,$(WEAPON_SOURCE_HEADER)))-route$(CANONICAL_ROUTE_INDEX)-newcell$(CANONICAL_ROUTE_NEW_CELL)-pathgrid$(CANONICAL_PATH_GRID)-showhud$(SHOWCASE_HUD_CACHE)-showcontact$(SHOWCASE_CONTACT_CACHE)-showterrain$(SHOWCASE_TERRAIN_CACHE_VRAM)-showconfig$(SHOWCASE_CACHE_CONFIG_KEY)-walk$(shell $(PYTHON) tools/sc64_unit_walk_words.py --config-key $(CANONICAL_WALK_WORDS) $(call sc64_lookup_quote,$(UNIT_WALK_HEADER)) $(call sc64_lookup_quote,$(UNIT_FACING_HEADER)))
+CANONICAL_LOOKUP_CONFIG_KEY := $(shell $(PYTHON) tools/sc64_weapon_lookup_index.py --config-key $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_INDEX)) $(call sc64_lookup_quote,$(WEAPON_SOURCE_HEADER)))-route$(CANONICAL_ROUTE_INDEX)$(if $(CANONICAL_ROUTE_LINEAR_FLAGS),-linear)-newcell$(CANONICAL_ROUTE_NEW_CELL)-pathgrid$(CANONICAL_PATH_GRID)-showhud$(SHOWCASE_HUD_CACHE)-showcontact$(SHOWCASE_CONTACT_CACHE)-showterrain$(SHOWCASE_TERRAIN_CACHE_VRAM)-showconfig$(SHOWCASE_CACHE_CONFIG_KEY)-walk$(shell $(PYTHON) tools/sc64_unit_walk_words.py --config-key $(CANONICAL_WALK_WORDS) $(call sc64_lookup_quote,$(UNIT_WALK_HEADER)) $(call sc64_lookup_quote,$(UNIT_FACING_HEADER)))
 CANONICAL_LOOKUP_REBUILD := $(if $(shell test -f build/canonical-lookup-config && printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' | cmp -s - build/canonical-lookup-config && printf matched),,force-canonical-lookup-rebuild)
 INDEXED_WEAPON_HEADER := build/generated/weapon-lookup/sc64_weapon_source_indexed.h
 CANONICAL_LOOKUP_INPUTS = $(if $(filter 1,$(CANONICAL_WALK_WORDS)),$(WALK_WORDS_HEADER)) $(if $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(INDEXED_WEAPON_HEADER)) build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)

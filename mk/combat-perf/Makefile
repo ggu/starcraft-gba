@@ -76,6 +76,25 @@ test-sc64-route-dense-flood: build/test-sc64-route-keep-fields-a-ref build/test-
 	./build/test-sc64-route-keep-fields-a-ref --emit build/route-dense-a.ref
 	./build/test-sc64-route-dense-flood --compare build/route-dense-a.ref
 
+ROUTE_LINEAR_TEST_FLAGS = $(ROUTE_KEEP_TEST_BASE) $(ROUTE_KEEP_TEST_A) -DTEST_LINEAR_FLOOD
+ROUTE_LINEAR_BASE_FLAGS = -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ROUTE_KEEP_FIELDS -DSC64_ROUTE_DENSE_FLOOD_PROBE
+ROUTE_LINEAR_CANDIDATE_FLAGS = $(ROUTE_LINEAR_BASE_FLAGS) -DSC64_ROUTE_LINEAR_FLOOD_PROBE
+build/test-sc64-route-linear-ref: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_BASE_FLAGS) $< -o $@
+build/test-sc64-route-linear: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) $< -o $@
+build/test-sc64-route-linear-overflow: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_QUEUE_CAP=32 -DTEST_LINEAR_OVERFLOW $< -o $@
+.PHONY: test-sc64-route-linear
+test-sc64-route-linear: build/test-sc64-route-linear-ref build/test-sc64-route-linear build/test-sc64-route-linear-overflow
+	./build/test-sc64-route-linear-ref --emit build/route-linear-base.ref
+	./build/test-sc64-route-linear --emit build/route-linear-probe.ref
+	./build/test-sc64-route-linear-overflow --emit build/route-linear-overflow.ref
+	cmp build/route-linear-base.ref build/route-linear-probe.ref
+	cmp build/route-linear-base.ref build/route-linear-overflow.ref
+	cmp build/route-linear-base.ref.state build/route-linear-probe.ref.state
+	cmp build/route-linear-base.ref.state build/route-linear-overflow.ref.state
+
 # Randomized differential test of the incremental walkability update against
 # the whole-grid rebuild it replaces, over the footprint kinds of each product
 # family. The -full builds run the same scenarios with the update disabled.

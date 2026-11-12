@@ -92,10 +92,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   showed that skipping a logically resident field changes combat even
   when its first step is exact. Deferring only the field bytes preserves
   the full Z10 campaign and both custom outcomes, but is flat on mean
-  cycles. An exact linear FIFO candidate reduces the 96-column peak by
-  45.65% and the early window mean by 1.04% with matching early ARM samples.
-  Complete its campaign, custom and shared-product checks before promotion;
-  continue steady simulation and drawing work separately.
+  cycles. The [exact linear FIFO probe](audits/2026-11-12-z10-linear-point-flood.md)
+  reduces the 96-column peak by 45.65% and the early window mean by 1.04%.
+  The full Z10 win, both complete custom matches, and four paired physical
+  custom/SRAM checks match; all four links pass. First Strike and
+  Desperate Alliance exercise seven actual fills on their 96×96 maps
+  with matching ARM state and video. The shared option defaults off
+  pending hardware checks.
+  Continue steady simulation and drawing work separately.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
