@@ -40,9 +40,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
   reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
   windows with 24 identical sampled frames and palettes.
+  The [split terrain cache](audits/2026-11-12-late-zerg-terrain-vram.md)
+  frees 16,080 B of Z10 working RAM. Compared with the packed-walk release,
+  it saves 1.33–1.49% with matching replay checkpoints and sampled pages.
   The [combined defense probe](audits/2026-11-12-defense-combined.md) saves
-  4.74–7.50% with matching checkpoints. It remains opt-in pending the
-  remaining cross-cartridge campaign and skirmish comparisons.
+  4.74–7.50% in the busy Z10 campaign. It remains opt-in pending broader
+  cross-cartridge and long skirmish comparisons.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
