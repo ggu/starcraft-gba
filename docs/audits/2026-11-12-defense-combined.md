@@ -27,7 +27,7 @@ With the same prepared inputs, use a clean build tree:
 
 ```sh
 make test-sc64-z10-defense-combined
-make CANONICAL_DIRECT_FIRING_FLAGS='-DSC64_DIRECT_FIRING_POINTS -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER' verify-zerg-z10
+make SC64_DEFENSE_PROBE_FLAGS='-DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER' verify-zerg-z10
 ```
 
 An instrumented Z10 ROM, using the same combined runtime, painted unused
@@ -39,9 +39,26 @@ including the SRAM load. It does not measure the IRQ stack or exercise the
 malformed-owner fallback. Instrumented ROM SHA-256:
 `8cadcba3aee619d12fd691c7d586baeb0ec66191a6ddd74334dc0164a4b8cc34`.
 
+The shared Pylon lookup now retains each building layout's coordinate width.
+The wider Terran host sanitizer fixture passes, including a coordinate
+that would alias after narrowing, exact range boundaries, and signed invalid
+owner fallback. All seven opt-in ROM verifiers pass with the original
+linker guards. The Z10 ROM from this matrix is byte-identical to the timed
+combined cartridge.
+
+| Cartridge | EWRAM room below guard | IWRAM room below guard |
+| --- | ---: | ---: |
+| Terran T10 | 17,336 B | 2,232 B |
+| Zerg Z10 | 5,704 B | 1,056 B |
+| Protoss P10 | 7,992 B | 1,136 B |
+| Showcase | 17,396 B | 544 B |
+| Legacy Z7 | 1,564 B | 152 B |
+| Legacy Z8 | 348 B | 1,056 B |
+| Legacy Z9 | 5,704 B | 1,056 B |
+
 Both windows still exceed the two-frame budget of 561,792 cycles. Do not
 infer a hardware frame rate from these CPU cycle measurements. Promotion
-requires complete ordinary-input campaign and custom comparisons, links
-and behavior checks for the other products, and stack checks in those paths.
+requires complete ordinary-input campaign and custom comparisons, behavior
+checks for the other products, and stack checks in those paths.
 The spatial lookup currently replaces the Zerg/Protoss campaign owner-list
 pass; the scalar, P3 and late Terran target policies remain separate.

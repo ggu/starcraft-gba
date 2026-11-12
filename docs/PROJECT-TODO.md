@@ -804,8 +804,9 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    gameplay checks. The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
    saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
    [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
-   qualify the other defense paths, RAM and stack, and full ordinary-input
-   outcomes before promoting. Historical inclusive scopes are not
+   seven opt-in ROMs link and the Z10 stack canary leaves 8,948 bytes
+   untouched above its guard. Finish full ordinary-input outcomes and
+   cross-profile defense-path qualification before promoting. Historical inclusive scopes are not
    promised savings. The N64 order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
 4. Retry Z10 through ordinary controls after the relevant mechanics are usable;
