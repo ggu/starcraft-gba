@@ -7,7 +7,7 @@ test-sc64-research-jobs-p10:
 	./build/research-jobs/host-p10
 
 .PHONY: test-sc64-research-jobs-z9
-test-sc64-research-jobs-z9:
+test-sc64-research-jobs-z9: | $(LATE_ZERG_SIGHT_INPUTS)
 	@mkdir -p build/research-jobs
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS tests/sc64_research_jobs_game.c -o build/research-jobs/host-z9
 	./build/research-jobs/host-z9
@@ -21,6 +21,6 @@ build-sc64-research-job-journal-p10:
 
 # Optional Z9 active-job journal producer/consumer; input banks are operator-supplied.
 .PHONY: build-sc64-research-job-journal-z9
-build-sc64-research-job-journal-z9:
+build-sc64-research-job-journal-z9: | $(LATE_ZERG_SIGHT_INPUTS)
 	@mkdir -p build/research-jobs
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL tests/sc64_research_jobs_journal_game.c -o build/research-jobs/journal-z9

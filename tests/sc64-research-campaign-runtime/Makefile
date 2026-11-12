@@ -36,7 +36,7 @@ test-sc64-research-campaign-journal-p10: check-sc64-research-campaign-baseline
 	./build/research-campaign-runtime/tag-inventory
 
 .PHONY: test-sc64-research-campaign-journal-z9
-test-sc64-research-campaign-journal-z9: check-sc64-research-campaign-baseline
+test-sc64-research-campaign-journal-z9: check-sc64-research-campaign-baseline | $(LATE_ZERG_SIGHT_INPUTS)
 	@mkdir -p build/research-campaign-runtime
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) -I$(SC64_PR_POLICY_DIR) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_EXPERIMENTAL_RESEARCH_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_JOBS -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS -DSC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL -DSC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL tests/sc64_research_campaign_journal_game.c -o build/research-campaign-runtime/journal-z9
 	$(CLANG) -I$(SC64_CAMPAIGN_BASELINE_ROOT)/common -I$(SC64_CAMPAIGN_BASELINE_ROOT)/starcraft $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(ZERG_Z9_CANONICAL_FLAGS) -DSC64_CAMPAIGN_BASELINE_WRITER tests/sc64_research_campaign_journal_game.c -o build/research-campaign-runtime/journal-z9-old

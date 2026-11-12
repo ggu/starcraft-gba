@@ -857,10 +857,13 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    with matching pixels and state; finish the remaining cartridge paths.
    The [packed sight-row probe](audits/2026-11-12-packed-sight-rows.md)
    saves 2.63–2.85% with the current split cache, with matched state and
-   pixels. All four late Zerg ROMs verify and flag-off Z10 is byte-identical.
-   Enabled Z10 wins from SRAM with 60 matching checkpoints, and the current
-   64×64 custom window is 0.93% faster with matching sampled state. Verify a
-   legacy campaign continuation before changing the default.
+   pixels. Packed sight is now the Z7–Z10 default, and the current normal Z9
+   ROM wins the carried Z8 mission from legacy SRAM. After the per-race
+   supply changes, both normal Z10 ROMs win from fresh
+   physical SRAM with 61 matching raw and named checkpoints and 24 matching
+   rendered and visibility samples. Mean loop cost falls 2.80–3.14% in the
+   two latest campaign windows; the earlier 64×64 custom window is 0.93%
+   faster with matching sampled state. Continue profiling the large stalls.
    Historical inclusive scopes are not promised savings. The N64
    order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
