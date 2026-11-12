@@ -70,6 +70,30 @@ Control SHA-256:
 Probe SHA-256:
 `6935591f2067ed1d165f1f720007df1ca3756e2c1b9dccdafca25392893e36b4`.
 
+## Cartridge links and save/load
+
+Terran T10, Zerg Z10, Protoss P10 and Showcase all link and pass the
+normal ROM verifier with the shared opt-in. Each has the same EWRAM end
+as its control. The IWRAM ends remain below the `0x03005000` guard:
+
+| Cartridge | Control IWRAM end | Probe IWRAM end | Probe ROM SHA-256 |
+| --- | --- | --- | --- |
+| Terran T10 | `0x03004748` | `0x030048b8` | `4bf6d9d30561f36bb6c36105d062af558d2425bce2073e84a7b2b283fce5e964` |
+| Zerg Z10 | `0x03004be0` | `0x03004d50` | `6935591f2067ed1d165f1f720007df1ca3756e2c1b9dccdafca25392893e36b4` |
+| Protoss P10 | `0x03004ab0` | `0x03004c18` | `d911805a13ce877d5a8a8ac8b21d13d057ed5bac143b58464bed9e7b1dcfa048` |
+| Showcase | `0x03004d00` | `0x03004e68` | `90fffb07ccb0943b7407929e7e46959683b3555ac86490633be05dac124759fc` |
+
+The physical-button SRAM checks pair the normal and opt-in cartridge for
+each product. Across the four pairs they cover both maps, all three human
+races, one to three AIs, and named, Random and Closed seats. Each run
+plays 120 updates, saves through Pause and reloads in a fresh emulator.
+The resolved races, hall positions, world fingerprints, and 60-update
+continuation match within and across each pair. Each pair writes the same
+32 KiB SRAM image, and fresh loading leaves those bytes unchanged. These
+custom games exercise the existing 64×64 route path, while the Z10
+campaign proves the new 96-column flood.
+
 This result reduces a particular lag spike. Both cycle counts are still
-above the two-VBlank budget. Qualify the other cartridge RAM guards and
-real hardware before promoting the probe.
+above the two-VBlank budget. Keep the shared flag off by default until
+targeted ordinary-input checks on the 96-column Terran and Protoss
+campaign maps and real hardware qualification.
