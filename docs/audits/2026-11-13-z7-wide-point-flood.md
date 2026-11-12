@@ -48,11 +48,33 @@ matches all 61 state checkpoints, 24 video/palette/fog samples and the
 full win at frame 59,997. Its two measured window means are within 0.02%
 of the earlier 96-column probe.
 
+Terran, Protoss P10 and Showcase also link with unchanged EWRAM, with
+IWRAM ends at `0x030048d0`, `0x03004c30` and `0x03004e80`. Their three
+physical 64×64 save/fresh-load/continuation runs match the normal
+controls, including resolved starts and identical SRAM bytes. Paired
+128×128 campaign prefixes match nine world, route-cache, camera, fog and
+video samples each. Terran T4 exercises seven wide point fills through
+frame 1,476. Protoss P10 exercises eleven through frame 1,476, with seven
+ordinary authored-message acknowledgments. These are prefixes, not
+full Terran or Protoss mission wins.
+
+## Routine battle and menu cost
+
+A separate normal-ROM instruction sample profiles 12 calls spaced 89
+inputs apart from call 15,000 and matches 39 gameplay observations.
+The eleven samples outside the command menu average 1,196,454 guest
+cycles: rendering takes 700,872 and game update takes 462,315. Selected
+large render costs include static map objects (124,926) and the generic
+sprite blitter (111,752); these scopes can overlap and must not be added.
+The one menu sample, call 15,623, spends 2,164,120 cycles drawing the
+command list, including 1,070,811 in its row icons. The menu is a separate
+workload worth an exact scaling/compositing check.
+
 Wide probe ROM SHA-256:
 `1abfd1e56dcc8c7a44522973ad37564136ccf1923b46e0b1486ac2ee718c2499`.
 
-The option remains off by default. Complete the wide Z7 run and
-cross-product checks, then qualify on hardware. The 561,792-cycle target
+The option remains off by default. Complete the wide Z7 run and qualify
+on hardware. The 561,792-cycle target
 still requires a substantial reduction in routine simulation and draw
 work. A separate selection-ring span probe matched all 35 gameplay and
 24 video samples in the Z10 battle windows, but improved mean loop cost

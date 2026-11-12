@@ -113,10 +113,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   final 58.7M-cycle result transition from a 37.55M-cycle gameplay
   update, of which 33.95M are point-field fills. The exact 128-column
   FIFO probe reduces that gameplay update to 21.31M with matching
-  checkpoints; Z10 still wins with matching state and video. Complete the
-  wide Z7 tape and the cross-product checks. Treat the result transition
-  separately, and prioritize steady simulation and drawing over the
-  selection-ring probe (under 0.12% mean savings in Z10).
+  checkpoints; Z10 still wins with matching state and video. All four
+  guarded links pass; 128×128 T4/P10 physical prefixes match and exercise
+  the new kernel. Complete the wide Z7 tape and hardware checks. Treat
+  the result transition separately. A new Z7 instruction sample puts
+  routine rendering at 701k cycles and simulation at 462k. Prioritize
+  static map and sprite drawing and the separately measured command-menu
+  icon cost over the selection-ring probe (under 0.12% mean savings).
   Continue steady simulation and drawing work separately.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
