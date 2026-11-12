@@ -51,10 +51,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   prior normal build reads those saves.
   The [native Game Type row](audits/2026-11-12-n64-blood-bath-opening.md#single-player-game-type-row)
   cycles Melee and Free for All on Challenger and Blood Bath, with no
-  difficulty or team row in either lobby. Next: pair native launches
-  to verify CPU-to-CPU hostility, start draws and victory conditions
-  before adding a selector that preserves existing GBA custom saves.
-  Long ordinary-input victories remain open.
+  difficulty or team row in either lobby. The [paired native launches](audits/2026-11-12-n64-blood-bath-opening.md#paired-blood-bath-launches)
+  show CPUs open allied in Melee and hostile in Free for All; the same
+  seed and named seats produce identical starts in both. Next: add a
+  shared mode selector and save contract that preserves earlier GBA
+  free-for-all behavior. Free for All Random draws, native end
+  conditions and long ordinary-input victories remain open.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)

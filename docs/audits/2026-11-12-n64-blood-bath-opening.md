@@ -231,7 +231,7 @@ The opt-in GBA Blood Bath Melee preview now uses one elapsed-time seed
 for human and CPU Random and starts. It persists the resolved human
 and CPU races and the same v2 start-order field; a load or restart
 draws nothing. Default builds and Outpost keep their existing
-named human selector. Other native modes remain unqualified.
+named human selector. Free for All Random draws remain unqualified.
 
 ## Single-player Game Type row
 
@@ -247,8 +247,8 @@ With the Game Type row highlighted, two separate Right presses cycle
 
 Both runs retain the human Terran row. Neither inspected lobby has a
 separate team or difficulty row. This establishes the visible cycle on
-these single-player maps; it does not cover split-screen, other maps,
-internal AI policies, or the actual combat relationship between CPUs.
+these single-player maps; it does not cover split-screen, other maps
+or internal AI policies.
 The read-only observer captured three frames per run, no RAM, and
 verified its inputs and emulator source remained unchanged. The command
 stream SHA-256 hashes are
@@ -257,12 +257,43 @@ stream SHA-256 hashes are
 `8c523c722e77aaf0bac7de19d0c4979e9fefe5371656dce80f8c29f6a2291f71`
 (Blood Bath).
 
-The [GBA's custom hostility predicate](../../starcraft/game.c) treats
-every distinct non-neutral owner as hostile. The native menu labels
-alone do not establish what Melee changes. Before exposing a GBA
-selector, pair native Blood Bath launches with the same three named
-CPUs and recovered seed. Observe CPU-to-CPU hostility and check whether
-mode changes starting positions or victory conditions. Then repeat with
-Random rows to check the race draws.
-Preserve the GBA's existing free-for-all behavior for earlier custom
-saves and verify any new mode persists through fresh load and restart.
+### Paired Blood Bath launches
+
+The owned USA ROM launched the same human Terran and named Zerg,
+Terran and Protoss CPUs in both modes. In the Free for All run, the
+mode change replaced part of the Melee tape's idle time, leaving
+Start at the same observer step (3,695). Both lobbies were captured
+immediately before Start. The three read-only opening RAM samples per
+mode (steps 4,201, 4,210 and 4,215) have the same RNG states and draw
+counts and independently recover seed `0xf3ae`. The decoded actor
+records match: human and visible CPU row markers `3 / 0 / 2 / 1`, four
+workers at each hall and all 60 map resource positions. The first
+sampled game image also matches.
+
+The native relation table at `0x800b92a4` has 12 rows of 12 bytes.
+Across the paired runs all three samples agree: the only table changes
+are the six directed CPU-to-CPU entries, from `2` in Melee to `0` in
+Free for All. The human is native owner 3 and each active CPU is one
+of owners 0–2. Human-to-CPU and CPU-to-human entries remain `0`, and
+the four active self entries remain `1`.
+
+The native initializer at `0x8003d97c` clears the table and conditionally
+writes symmetric `2` entries for the computer player type. An enemy-unit
+scan reads the current owner's row at `0x80060fb8`; it skips nonzero
+entries and calls the other player's unit search at `0x80060fd0` only
+for zero. Together the captured table and that reader establish that
+the Melee CPUs open allied to one another, while Free for All admits
+them as opponents. The pairing does not measure a later firefight,
+different Random selections, victory conditions or other maps.
+
+| Mode | Controller plan SHA-256 | Observer manifest SHA-256 |
+| --- | --- | --- |
+| Melee | `d7923a4a7abced9026ddc95b5b573ceb3ad63c838baebb391d437b3a9fb89840` | `7e245d3378b968b3144b6205d1353b4059792ab678f66db4270210b5e6569594` |
+| Free for All | `b759ddf7e897e385ab756ee066e62be320cb9557d5a29317530c3bc75bbd0903` | `4538e843914374adc280be510da10d8368bb045ba5553e1cc9aaf3295ce95260` |
+
+The [GBA's custom hostility predicate](../../starcraft/game.c) currently
+treats every distinct non-neutral owner as hostile. A GBA mode selector
+should use the shared hostility path, preserve existing free-for-all
+behavior for earlier custom saves, and retain the selected mode through
+fresh load and restart. Qualify Free for All Random draws and native
+end conditions separately.
