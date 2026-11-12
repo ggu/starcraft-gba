@@ -142,6 +142,14 @@ int main(void)
     for (int i = 0; i < 684; ++i) sc64_race_larva_tick(&z);
     assert(z.larva == 3);
 
+    sc64_race_state_init(&z, R_ZERG, 399, 416, 1, 2);
+    assert(z.supply_cap == 400);
+    assert(!sc64_race_can_produce(&z, U_ZERGLING, 1));
+    assert(sc64_race_can_produce(&z, U_OVERLORD, 1));
+    assert(sc64_race_build_complete(&z, B_HATCHERY) && z.supply_cap == 400);
+    sc64_race_state_init(&z, R_ZERG, 401, 398, 1, 1);
+    assert(sc64_race_morph(&z, U_OVERLORD, 1) && z.supply_used == 401);
+
     sc64_race_state_init(&p, R_PROTOSS, 2, 16, 0, 0);
     assert(sc64_race_morph(&p, U_ZEALOT, 1));
     assert(p.supply_used == 6);

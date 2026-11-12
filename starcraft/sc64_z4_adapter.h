@@ -360,7 +360,7 @@ race_z4_remove_selected(unsigned selector, unsigned raw_type,
         if (selected_building == i) selected_building = -1;
     }
     supply_used = race_owner_supply(SIDE);
-    supply_cap = race_owner_supply_cap(SIDE);
+    supply_cap = race_owner_supply_capacity(SIDE);
     return 1;
 }
 

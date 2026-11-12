@@ -360,6 +360,7 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             c->threat_x = u[air_threat].x; c->threat_y = u[air_threat].y;
         }
     }
+    c->supply_cap = sc64_supply_limit(c->supply_cap);
     c->threat_d = best_threat;
     if (c->threat_count == 0) c->threat = -1;
 }
@@ -811,7 +812,7 @@ static int race_ai_supply(RaceAiCensus *c)
     int repower = race_ai_home_unpowered(c);
     if (margin > 24) margin = 24;
     if (!repower) {
-        if (cap >= 400 || free_supply >= margin) return 0;
+        if (cap >= SC64_SUPPLY_LIMIT || free_supply >= margin) return 0;
         if (c->pending_supply >= (cap >= 64 ? 2 : 1)) return 0;
     }
     if (c->race == R_ZERG) {

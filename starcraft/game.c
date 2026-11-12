@@ -14,6 +14,7 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#include "sc64_supply.h"
 #include "sc64_save_tag_namespace.h"
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_scope.h"
@@ -1782,6 +1783,8 @@ sc64_direct_firing_cache_invalidate(void)
 #error "SC64_RANGE_WORK requires imported race routing, packed route fields, and direct firing points"
 #endif
 #endif
+/* Keep the uncapped provider total for incremental updates and legacy
+ * saves. Use sc64_supply_limit when displaying or admitting production. */
 static int minerals, gas, supply_used, supply_cap, frame, mode, menu, train_type;
 static int geyser_count;
 #ifdef SC64_IMPORTED_MISSION
@@ -2412,7 +2415,7 @@ static void race_skirmish_geometry(void);
 static const Sc64SpriteFrame *mission_geyser_sprite(void);
 static const Sc64SpriteFrame *mission_building_sprite(int type);
 #endif
-static int race_owner_supply(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
+static int race_owner_supply(int owner),race_owner_supply_capacity(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
 static void race_add_owner_resources(int owner,int ore,int vespene);
 #ifdef SC64_SHARED_TRANSPORT
@@ -5247,7 +5250,7 @@ load_game(void)
     if (data.campaign_mission < 0 || data.campaign_mission >= SC64_CAMPAIGN_COUNT ||
 	data.campaign_completed < 0 || data.campaign_completed > 3) return 0;
 #endif
-    if (data.minerals < 0 || data.minerals > 100000 || data.gas < 0 || data.gas > 100000 || data.supply_cap < 0 || data.supply_cap > 400 || data.frame < 0)
+    if (data.minerals < 0 || data.minerals > 100000 || data.gas < 0 || data.gas > 100000 || data.supply_cap < 0 || data.frame < 0)
 	return 0;
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     if (data.geyser_count < 0 || data.geyser_count > MAX_RACE_GEYSERS) return 0;
@@ -5288,7 +5291,9 @@ load_game(void)
             if (data.buildings[i].owner == SIDE && data.buildings[i].type == B_COMMAND && !data.buildings[i].under_construction) computed_cap += 20;
 #endif
 	}
-    if (computed_cap != data.supply_cap || computed_supply > data.supply_cap ||
+    /* Provider loss can leave a legitimate save over its current limit. The
+     * stored provider total must still match the actual surviving providers. */
+    if (computed_cap != data.supply_cap ||
 	data.train_type < U_MARINE || data.train_type > U_MEDIC ||
 	data.weapons_level < 0 || data.weapons_level > 2 || data.armor_level < 0 || data.armor_level > 2)
 	return 0;
@@ -5533,7 +5538,7 @@ init_state(void)
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
     if (!race_mode) (void)sc64_pr_stage_campaign_initialize();
 #endif
-    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_capacity(SIDE);
 #ifdef SC64_FIELD_CONTROLS
     /* A restart jumps frame back, so the cached A action must resolve afresh. */
     menu_last=ping_life=r_tap_state=0;ui_action=ui_tick_mode=0;
@@ -7250,7 +7255,7 @@ queue_unit(int building, int type)
 	toast_refusal(12);
 	return;
     }
-    if (reserved_supply() + unit_supply(type) > supply_cap) {
+    if (!sc64_supply_allows(reserved_supply(), unit_supply(type), supply_cap)) {
 	toast_refusal(2);
 	return;
     }
@@ -12527,7 +12532,7 @@ draw_hud_resources(void)
         int used = (supply_used + race_owner_queued_supply(SIDE)) / 2, x = 140 + ui_num_width(used) + 3;
         gfx_num(140, 3, used, C_WHITE);
         gfx_text(x, 3, "/", C_WHITE);
-        gfx_num(x + 8, 3, supply_cap / 2, C_WHITE);
+        gfx_num(x + 8, 3, sc64_supply_limit(supply_cap) / 2, C_WHITE);
     }
 #else
     gfx_text(3, 3, "MIN", C_GOLD);
@@ -12543,7 +12548,7 @@ draw_hud_resources(void)
 #endif
         C_WHITE);
     gfx_text(165, 3, "/", C_WHITE);
-    gfx_num(173, 3, supply_cap / 2, C_WHITE);
+    gfx_num(173, 3, sc64_supply_limit(supply_cap) / 2, C_WHITE);
 #endif
 }
 
@@ -12863,7 +12868,7 @@ static int GBA_HOT __attribute__((noinline))
 #endif
 sc64_hud_changed(void)
 {
-    int values[SC64_HUD_KEY_COUNT] = {minerals, gas, supply_used, supply_cap, mode, selected_building,
+    int values[SC64_HUD_KEY_COUNT] = {minerals, gas, supply_used, sc64_supply_limit(supply_cap), mode, selected_building,
         train_type, mission_unsupported_count};
     int i, first = -1, changed = sc64_hud_valid ? 0 : 3;
     for (i = 0; i < MAX_UNITS; i++) if (u[i].alive && u[i].owner == SIDE) {
