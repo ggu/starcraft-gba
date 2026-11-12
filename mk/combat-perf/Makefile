@@ -67,6 +67,15 @@ test-sc64-route-keep-fields: build/test-sc64-route-keep-fields-a-ref build/test-
 	./build/test-sc64-route-keep-fields-b --compare build/route-keep-b.ref
 test-starcraft: test-sc64-route-keep-fields
 
+# The probe is opt-in for normal ROMs. Exercise it against the same captured
+# route answers and cache residency, including maps where it must fall back.
+.PHONY: test-sc64-route-dense-flood
+build/test-sc64-route-dense-flood: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_KEEP_TEST_BASE) $(ROUTE_KEEP_TEST_A) -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ROUTE_KEEP_FIELDS -DSC64_ROUTE_DENSE_FLOOD_PROBE $< -o $@
+test-sc64-route-dense-flood: build/test-sc64-route-keep-fields-a-ref build/test-sc64-route-dense-flood
+	./build/test-sc64-route-keep-fields-a-ref --emit build/route-dense-a.ref
+	./build/test-sc64-route-dense-flood --compare build/route-dense-a.ref
+
 # Randomized differential test of the incremental walkability update against
 # the whole-grid rebuild it replaces, over the footprint kinds of each product
 # family. The -full builds run the same scenarios with the update disabled.
