@@ -314,5 +314,7 @@ sequence. Read-only ARM register traces on the loaded games show CPU 1
 treating CPU 3 as hostile only in Free for All, while both modes treat
 the human as hostile. The previous normal Terran rejects the Melee save
 at HOME without changing its SRAM; both old and new cartridges read the
-older and current Free for All saves. This does not establish native
-Random draws in Free for All, allied vision, or the original end rules.
+older and current Free for All saves. These opening tests do not establish
+native Random draws in Free for All or allied vision. The separate
+[Blood Bath end-rule audit](2026-11-13-n64-blood-bath-end-rules.md)
+decodes the live native triggers and traces the defeat cleanup.
