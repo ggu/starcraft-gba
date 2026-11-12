@@ -442,6 +442,12 @@ static void pylon_slot_state_at_defense_boundary(void)
     b[MAX_BUILDINGS-1].alive = 0;
     compare_paths();
     assert(actual.buildings[0].queue_progress == 0);
+    b[0].queue_progress = 3;
+    compare_paths();
+    assert(actual.buildings[0].queue_progress == 3);
+    b[MAX_BUILDINGS-1].alive = 1;
+    compare_paths();
+    assert(actual.buildings[0].queue_progress == 2);
 }
 #endif
 

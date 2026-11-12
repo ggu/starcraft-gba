@@ -67,6 +67,9 @@ _Static_assert(MAX_UNITS < 255,
 #ifdef SC64_DEFENSE_PYLON_ROSTER
 #include "sc64_p7_power_geometry.h"
 _Static_assert(MAX_BUILDINGS <= 255, "defense Pylon roster uses byte slots");
+_Static_assert(sizeof(((Building *)0)->x) == sizeof(s16) &&
+               sizeof(((Building *)0)->y) == sizeof(s16),
+               "defense Pylon roster probe requires compact building coordinates");
 
 typedef struct {
     int count;

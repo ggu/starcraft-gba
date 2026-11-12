@@ -37,6 +37,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   samples spend 218k cycles per update on the sprite blitter and 288k on
   defenses. Prioritize exact Cannon power and target queries, then sprite
   drawing and exploration. Preserve the existing 64×64 route fast path.
+  The compact Pylon probe saves 1.67–2.06% full-loop cycles in the two Z10
+  windows with matching checkpoints. It remains opt-in pending stack
+  high-water and cross-profile qualification. Defense targeting still costs
+  up to 168k cycles in the measured samples; compare a spatial candidate
+  against the existing target order, ground/air rules and strict radius.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
