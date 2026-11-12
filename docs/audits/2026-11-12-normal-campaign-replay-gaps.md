@@ -1,6 +1,6 @@
 # Normal cartridge campaign replay gaps
 
-This inventory is pinned to the production source tree at `2c412e8`. A
+This inventory is pinned to the production source tree at `a55ddef`. A
 current full result means an unmodified normal race ROM booted in mGBA,
 ordinary button input from HOME or a genuine cartridge-format SRAM
 resume, and a checked terminal win. A HOST controller win, a replacement
@@ -13,20 +13,21 @@ as a current full result. None of these are physical GBA tests.
 | Z1 | Carried Z9 [ARM test-entry win](2026-11-12-dense-point-flood.md#campaign-and-save-checks). | Open. |
 | Z2 | [Carried Z9 HOST wins](2026-11-05-z9-carried-host/README.md). | Open. |
 | Z3 | [Older normal Z7 physical win](2026-10-31-z3-normal-physical/README.md) and current Z10 replay below. | Full win from fresh HOME at frame 136,588. |
-| Z4–Z6 | Carried HOST wins; earlier Z6 ARM and Z5/Z6 save coverage in [campaign notes](../RACE-CAMPAIGNS.md). | Open for all three. |
+| Z4 | [Carried normal Z10 replay](2026-11-12-z4-normal-physical.md) with authored dialogue. | Full win from fresh HOME at frame 34,984. |
+| Z5–Z6 | Carried HOST wins; earlier Z6 ARM and Z5/Z6 save coverage in [campaign notes](../RACE-CAMPAIGNS.md). | Open for both. |
 | Z7 | [Older normal Z7 physical win](2026-10-31-z7-normal-physical/README.md) and [carried Z9 test-entry replay and SRAM continuation](2026-11-05-z9-carried-arm/README.md). | Open on current Z10. |
 | Z8 | [Normal Z9 physical win after loading legacy SRAM](2026-11-12-packed-sight-rows.md#per-race-supply-build-and-legacy-continuation). | Open on current Z10. |
 | Z9 | Earlier [ARM and save continuation](../RACE-CAMPAIGNS.md) on the frozen Z9 integration. | Open on current Z10. |
-| Z10 | [Normal composed Z10 physical win from genuine SRAM](2026-11-12-defense-combined.md#normal-z10-promotion-after-the-renderer-and-lobby-merges). | Full win from SRAM at frame 59,997; the production tree matches the qualified artifact. |
+| Z10 | [Normal Z10 physical win from genuine SRAM with nearest-first depot selection](2026-11-12-z10-depot-first-nearest.md). | Full win from SRAM at frame 59,997. |
 | P1–P6 | [P10-flag replacement-loop ARM wins](2026-11-03-protoss-p1-p10-evidence/README.md) and [older normal P10 physical save points](2026-11-06-early-protoss-save/README.md). | Open for all six; the older P1 tape did not win on the packaged ROM. |
 | P7 | [Older normal P7 physical win](2026-11-01-p7-physical-prep/README.md); bounded current-family P10 replay and older early SRAM. | Open on current P10. |
 | P8 | [Older normal P8 full physical win and SRAM resume](2026-10-31-protoss-cannon-lazy/README.md); P10-flag ARM replay with a replacement main. | Open on current P10. |
 | P9 | [P10-flag replacement-loop ARM win and fresh SRAM continuation](2026-11-03-protoss-p1-p10-evidence/README.md#save-continuation). | Open on current P10. |
 | P10 | [Earlier ARM replacement-loop win and SRAM](2026-11-03-p10-ordinary-input/README.md), plus an earlier normal physical continuation in the [project notes](../PROJECT-TODO.md). | No exact current full physical result found. |
 
-This is a conservative audit of retained evidence: two exact current full
-results (Z3 from HOME and Z10 from SRAM) and no exact current full result
-found for the other 28 entries. It does not downgrade older wins or imply
+This is a conservative audit of retained evidence: three full results
+at this revision (Z3 and Z4 from HOME and Z10 from SRAM) and no full result
+found for the other 27 entries. It does not downgrade older wins or imply
 that the remaining missions are unplayable.
 
 ## Carried Z3: controller reads no longer alter the route cache
@@ -77,10 +78,13 @@ simulation. Full replay receipt SHA-256:
 This proves one exact normal-ROM route in mGBA. It does not cover saves,
 all actor fields, or the frame rate on hardware.
 
-The remaining known cache-mutating controllers are Z4, Z5, Z6, T5 and
-P3–P6. Z4's live mineral selection uses the same path helper as Z3;
-its direct `sc64_route_next` calls are in failure diagnostics. P4–P6
-call it directly during decisions, and Z5 explicitly rebuilds the path
-grid. Snapshot the actual observer scope, including direct calls, then
-require a controller-free tape match before treating a HOST win as
-proof of the normal ROM.
+The same Z3 tape also won on the later canonical `042cb218…1062` ROM
+with nearest-first depot selection, matching all 465 observations and
+the same three authored transmissions and terminal frame. The later
+test-only merges through `a55ddef` do not change that runtime.
+
+The remaining known cache-mutating controllers are Z5, Z6, T5 and P3–P6.
+P4–P6 call `sc64_route_next` during decisions, and Z5 explicitly rebuilds
+the path grid. Snapshot the actual observer scope, including direct
+calls, then require a controller-free tape match before treating a HOST
+win as proof of the normal ROM.
