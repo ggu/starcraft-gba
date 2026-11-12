@@ -760,7 +760,7 @@ build/test-field-ui-ring: tests/field_ui_run.c common/gba.c $(STARCRAFT) $(wildc
 build/test-starcraft-selection: tests/sc64_selection_run.c common/gba.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon tests/sc64_selection_run.c common/gba.c -o $@
 
-build/test-race-rules: tests/race_rules.c starcraft/race_rules.h starcraft/race_skirmish.h | build
+build/test-race-rules: tests/race_rules.c starcraft/race_rules.h starcraft/race_skirmish.h starcraft/sc64_supply.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined tests/race_rules.c -o $@
 
 build/test-sc64-trace-profile-cache: tests/sc64_trace_profile_cache.c starcraft/sc64_trace_cache_word.h starcraft/sc64_trace_profile_cache.h | build
@@ -1442,7 +1442,7 @@ build/test-sc64-race-collision: tests/sc64_race_collision.c $(STARCRAFT) $(wildc
 test-sc64-race-collision: build/test-sc64-race-collision
 	./build/test-sc64-race-collision
 
-build/test-race-rules-z3: tests/race_rules.c starcraft/race_rules.h starcraft/race_skirmish.h | build
+build/test-race-rules-z3: tests/race_rules.c starcraft/race_rules.h starcraft/race_skirmish.h starcraft/sc64_supply.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_Z3_ENABLED tests/race_rules.c -o $@
 
 .PHONY: test-sc64-z3-import
@@ -2655,6 +2655,12 @@ build/test-sc64-zerg-townhalls: tests/sc64_zerg_townhalls.c $(STARCRAFT) $(wildc
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
 build/test-unified-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-stock-supply
+test-sc64-stock-supply: build/test-race-engine build/test-unified-engine
+	./build/test-race-engine --stock-supply
+	./build/test-unified-engine --stock-supply
+test-races test-unified: test-sc64-stock-supply
+
 test-unified: build/test-unified build/test-unified-frontend build/test-unified-menu build/test-unified-engine build/test-unified-factions build/test-unified-campaign build/test-unified-targets build/test-sc64-zerg-townhalls build/test-unified-hud build/test-sc64-weapon-vfx-game build/test-sc64-shield-bars
 	./build/test-unified
 	./build/test-unified-frontend

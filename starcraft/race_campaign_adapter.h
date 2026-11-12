@@ -1324,7 +1324,7 @@ static void race_terran_tick(void)
     }
     if(lost){won=0;race_campaign.phase=SC64_RACE_PHASE_FAILED;}
     else if(won){race_campaign.phase=SC64_RACE_PHASE_COMPLETE;race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;race_completed|=1<<race_selected_mission;}
-    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_capacity(SIDE);
 }
 #endif
 

@@ -5104,7 +5104,7 @@ static int race_load_game(void) {
     invalidate_path_grid();
 #endif
     sc64_visibility_reset();update_exploration();reset_selection_gestures();
-    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_capacity(SIDE);
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     memcpy(sc64_pr_hp_debt,plan.q8_debt,sizeof sc64_pr_hp_debt);
 #if defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE) || defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)

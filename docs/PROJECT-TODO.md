@@ -719,6 +719,11 @@ plus compiled suites); engine/build source matches the six-ROM/unified-qualified
 `3ebed0e2`. This does not enable shared Egg/Guardian/
 Scarab stages, prove native canal timing or change the 29/30 content count.
 
+The [stock 200 supply limit](audits/2026-11-12-stock-supply-cap.md) now
+applies to shared production and the HUD, including AI owners and legacy
+profiles. Existing units and reservations survive provider loss. Separate
+per-race banks for mixed-race owners and original native actor capacity
+remain distinct fidelity work.
 **Ghost and Nuclear Strike (P0):** the [N64 source and blast audit](audits/2026-11-12-ghost-nuclear-strike.md)
 records the T8 native entry, exact missile/target/impact assets and
 checked stock impact rules. Silo and Ghost launch UI stay disabled

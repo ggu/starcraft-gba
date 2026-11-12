@@ -1121,7 +1121,7 @@ sc64_terran_late_world_tick(void)
             }
         }
     supply_used = race_owner_supply(SIDE);
-    supply_cap = race_owner_supply_cap(SIDE);
+    supply_cap = race_owner_supply_capacity(SIDE);
     target_lists_valid = 0;
     sc64_unit_bucket_active = 0;
     sc64_target_index_end();

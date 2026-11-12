@@ -300,7 +300,7 @@ race_t4_effect_remove(const Sc64T4Action *action, unsigned owner,
             if (stale) { u[i].target = -1; u[i].order = ORDER_IDLE; }
         }
         supply_used = race_owner_supply(SIDE);
-        supply_cap = race_owner_supply_cap(SIDE);
+        supply_cap = race_owner_supply_capacity(SIDE);
         target_lists_valid = 0;
         sc64_unit_bucket_active = 0;
         sc64_target_index_end();

@@ -10,7 +10,9 @@ The owned USA N64 ROM's The Big Push map starts with two Terran Ghosts,
 two Terran Command Centers and two neutral Nuclear Silos. Missile raw 14
 is permitted by the mission. An isolated ares run loaded the local
 campaign-unlock state, selected The Big Push and entered the ordinary
-field. No strike was captured. The first neutral Silo is at source
+field. A second bounded boot captured the field at 250 minerals, 100 gas
+and 20/20 supply, then saved a private emulator checkpoint. No strike
+was captured. The first neutral Silo is at source
 (2784, 3296); the ROM's placement rectangles and add-on offset put the
 matching landed Command Center center at (2688, 3280). That is the next
 ordinary-button test. The earlier native T10 audio capture independently
