@@ -263,7 +263,8 @@ OBJCOPY := $(PREFIX)objcopy
 SIZE := $(PREFIX)size
 CLANG ?= clang
 PYTHON ?= python3
-CFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -O2 -g -std=c11 -ffreestanding -fno-builtin -fno-strict-aliasing -fno-common -ffunction-sections -fdata-sections -Wall -Wextra -Icommon
+SC64_DEFENSE_PROBE_FLAGS ?=
+CFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -O2 -g -std=c11 -ffreestanding -fno-builtin -fno-strict-aliasing -fno-common -ffunction-sections -fdata-sections -Wall -Wextra -Icommon $(SC64_DEFENSE_PROBE_FLAGS)
 LDFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -nostdlib -Tcommon/gba.ld -Wl,--gc-sections
 COMMON := common/start.s common/main.c common/gba.c common/memory.c common/audio_bank.S
 COMMON_HEADERS := $(wildcard common/*.h)
@@ -4012,7 +4013,9 @@ zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 # Historical Z7 probes and their tests continue to use Z7_FULL_RENDER_FLAGS.
 # Reuse the managed walk sidecar already listed in Z7_FULL_RENDER_INPUTS.
 ZERG_Z7_CONTACT_MASK_TABLE_HEADER = build/generated/sc64_contact_mask_table_generated.h
-ZERG_Z7_CANONICAL_FLAGS = -DSC64_Z7_VISIBILITY_ROW_CONTEXT -DSC64_Z7_VISIBILITY_PHASE_REJECT $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $(CANONICAL_DIRECT_FIRING_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_FOG_FLAGS_ZERG) $(CANONICAL_WALK_WORDS_FLAGS)
+# Use the existing terrain VRAM arena; fog keeps its reserved first 256 B.
+LATE_ZERG_TERRAIN_CACHE_FLAGS ?= -DSC64_TERRAIN_CACHE_VRAM
+ZERG_Z7_CANONICAL_FLAGS = -DSC64_Z7_VISIBILITY_ROW_CONTEXT -DSC64_Z7_VISIBILITY_PHASE_REJECT $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $(CANONICAL_DIRECT_FIRING_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_FOG_FLAGS_ZERG) $(CANONICAL_WALK_WORDS_FLAGS) $(LATE_ZERG_TERRAIN_CACHE_FLAGS)
 # The retired Z7 and Z8 ROMs have no work RAM left for the soft-fog tile cache
 # or the incremental walkability record; they keep the earlier paths.
 RETIRED_ZERG_ROM_DROPS = $(CANONICAL_FOG_FLAGS_ZERG) $(CANONICAL_PATH_GRID_UPDATE_FLAGS)

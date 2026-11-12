@@ -64,6 +64,73 @@ _Static_assert(MAX_UNITS < 255,
                "Z/P defense lists reserve 0xff as the end marker");
 #endif
 
+#ifdef SC64_DEFENSE_PYLON_ROSTER
+#include "sc64_p7_power_geometry.h"
+_Static_assert(MAX_BUILDINGS <= 255, "defense Pylon roster uses byte slots");
+#ifdef SC64_ZP_FULL_STORAGE
+typedef s16 RaceDefenseCoordinate;
+#else
+typedef int RaceDefenseCoordinate;
+#endif
+_Static_assert(sizeof(((Building *)0)->x) == sizeof(RaceDefenseCoordinate) &&
+               sizeof(((Building *)0)->y) == sizeof(RaceDefenseCoordinate),
+               "defense Pylon roster preserves building coordinate width");
+
+typedef struct {
+    int count;
+    u8 head[5];
+    u8 next[MAX_BUILDINGS];
+    RaceDefenseCoordinate x[MAX_BUILDINGS], y[MAX_BUILDINGS];
+} RaceDefensePylons;
+
+#ifdef GBA_HOST
+static int race_defense_scalar_power;
+#endif
+
+/* One lazy snapshot per defense pass. Production and mission/controller
+ * mutations precede this pass; the pass itself fires at units only. It cannot
+ * create, transfer, move, complete or destroy a Pylon. A fresh pass rebuilds
+ * the snapshot before looking up its first Cannon. */
+static __attribute__((noinline)) int
+race_defense_powered(RaceDefensePylons *pylons, const Building *q)
+{
+    int owner = q->owner;
+#ifdef GBA_HOST
+    if (race_defense_scalar_power) return race_site_powered(owner, q->x, q->y);
+#endif
+    if ((unsigned)owner >= 5) return race_site_powered(owner, q->x, q->y);
+    if (pylons->count < 0) {
+        int count = 0;
+        memset(pylons->head, 0xff, sizeof(pylons->head));
+        /* Descending slots plus push-front preserves scalar traversal order. */
+        for (int i = MAX_BUILDINGS - 1; i >= 0; --i) {
+            const Building *p = &b[i];
+            if (p->type != B_PYLON || !building_complete(i) ||
+                (unsigned)p->owner >= 5) continue;
+            pylons->x[count] = p->x;
+            pylons->y[count] = p->y;
+            pylons->next[count] = pylons->head[p->owner];
+            pylons->head[p->owner] = (u8)count++;
+        }
+        pylons->count = count;
+    }
+    int x = q->x, y = q->y;
+    for (int k = pylons->head[owner]; k != 0xff; k = pylons->next[k]) {
+        int dx = x - pylons->x[k];
+        if ((unsigned)(dx + 127) >= 255) continue;
+        int dy = y - pylons->y[k];
+        if ((unsigned)(dy + 79) < 159 && sc64_p7_in_psi_range(dx, dy))
+            return 1;
+    }
+    return 0;
+}
+#define RACE_DEFENSE_PYLONS RaceDefensePylons pylons; pylons.count = -1
+#define RACE_DEFENSE_POWERED(q) race_defense_powered(&pylons, q)
+#else
+#define RACE_DEFENSE_PYLONS ((void)0)
+#define RACE_DEFENSE_POWERED(q) race_site_powered((q)->owner, (q)->x, (q)->y)
+#endif
+
 /* Unit cooldowns are decremented before their next attack check. Defense
  * queue_progress must likewise allow the defense to fire on the update the
  * converted source cooldown expires, rather than one update afterward. */
@@ -91,11 +158,12 @@ static void GBA_HOT race_tick_defenses_fullscan(void) {
 #else
 static void GBA_HOT race_tick_defenses(void) {
 #endif
+    RACE_DEFENSE_PYLONS;
     for(int i=0;i<MAX_BUILDINGS;i++)if(building_complete(i)) {
         Building *q=&b[i];int ground=0,air=0,range=0,damage=0,cooldown=0;
         switch(q->type) {
         case B_PHOTON_CANNON:
-            if(!race_site_powered(q->owner,q->x,q->y))continue;
+            if (!RACE_DEFENSE_POWERED(q)) continue;
             ground=air=1;range=112;damage=20;cooldown=28;break;
         case B_SUNKEN_COLONY:ground=1;range=112;damage=40;cooldown=40;break;
         case B_SPORE_COLONY:air=1;range=112;damage=15;cooldown=19;break;
@@ -128,6 +196,61 @@ static void GBA_HOT race_tick_defenses(void) {
 }
 
 #ifdef SC64_ZP_DEFENSE_TARGETS
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+/* A late mission can have dozens of defenses looking for a short-range
+ * target. Group the current unit slots by 256-pixel cells once per defense
+ * pass, after trigger/controller mutations. An ordinary 112-pixel search
+ * then needs at most four cells. Slot ties remain independent of list order. */
+enum { DEFENSE_CELL_SHIFT = 8, DEFENSE_CELL_SIDE = 8,
+       DEFENSE_CELL_LIMIT = DEFENSE_CELL_SIDE << DEFENSE_CELL_SHIFT };
+
+typedef struct {
+    u8 head[DEFENSE_CELL_SIDE * DEFENSE_CELL_SIDE];
+    u8 next[MAX_UNITS], flying[MAX_UNITS];
+} RaceDefenseCells;
+
+static int GBA_HOT __attribute__((noinline))
+race_defense_target_from_zp_cells(const Building *q, int ground, int air,
+                                  int range, const RaceDefenseCells *cells,
+                                  u8 hostile_mask)
+{
+    int x = q->x, y = q->y;
+    if (x <= -range || y <= -range ||
+        x >= DEFENSE_CELL_LIMIT + range - 1 ||
+        y >= DEFENSE_CELL_LIMIT + range - 1) return -1;
+    int left = x - range + 1, top = y - range + 1;
+    int right = x + range - 1, bottom = y + range - 1;
+    int best = -1, bestd = range * range;
+    left = (left < 0 ? 0 : left) >> DEFENSE_CELL_SHIFT;
+    top = (top < 0 ? 0 : top) >> DEFENSE_CELL_SHIFT;
+    right = (right >= DEFENSE_CELL_LIMIT ? DEFENSE_CELL_LIMIT - 1 : right) >> DEFENSE_CELL_SHIFT;
+    bottom = (bottom >= DEFENSE_CELL_LIMIT ? DEFENSE_CELL_LIMIT - 1 : bottom) >> DEFENSE_CELL_SHIFT;
+
+    for (int row = top; row <= bottom; ++row) {
+        for (int col = left; col <= right; ++col) {
+            int cell = row * DEFENSE_CELL_SIDE + col;
+            for (int j = cells->head[cell]; j != 0xff; j = cells->next[j]) {
+                const Unit *target = &u[j];
+                unsigned owner = target->owner;
+                if (!target->alive || owner >= 5 ||
+                    !(hostile_mask & (1u << owner)) ||
+                    (cells->flying[j] ? !air : !ground)) continue;
+                int dx = x - target->x, dy = y - target->y;
+                if (FAST_ABS(dx) >= range || FAST_ABS(dy) >= range ||
+                    (target->flags & 16) ||
+                    !sc64_auto_target_candidate_allowed(-1, j, q->owner,
+                                                        q->raw_owner)) continue;
+                int d = dx * dx + dy * dy;
+                if (d < bestd || (best >= 0 && d == bestd && j < best)) {
+                    bestd = d;
+                    best = j;
+                }
+            }
+        }
+    }
+    return best;
+}
+#else
 /* The mission tick runs before defenses and may change owners or alliances.
  * Build fresh owner/class lists here, after those effects, instead of reusing
  * the lists prepared before the mission tick by update_orders. */
@@ -159,19 +282,19 @@ race_defense_target_from_zp_lists(const Building *q, int ground, int air,
     return best;
 }
 
+#endif
+
 static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
 {
-    u8 head[5][2], next[MAX_UNITS], hostile_mask[5];
+    u8 hostile_mask[5];
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+    RaceDefenseCells cells;
+#else
+    u8 head[5][2], next[MAX_UNITS];
+#endif
 
-    /* Invalid ownership is tolerated by the old scan. Decide to fall back
-     * before any cooldown or health mutation, so the result stays exact. */
-    for (int j = 0; j < MAX_UNITS; ++j) {
-        int owner = u[j].owner;
-        if (u[j].alive && (owner < 0 || owner >= 5)) {
-            race_tick_defenses_fullscan();
-            return;
-        }
-    }
+    /* Finish validation before any cooldown or health mutation. The scalar
+     * scan remains authoritative for unusual actor coordinates or owners. */
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         int owner = b[i].owner;
         if (b[i].alive && (owner < 0 || owner >= 5)) {
@@ -180,6 +303,29 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         }
     }
 
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+    memset(cells.head, 0xff, sizeof(cells.head));
+    for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
+        if ((unsigned)u[j].owner >= 5 ||
+            (unsigned)u[j].x >= DEFENSE_CELL_LIMIT ||
+            (unsigned)u[j].y >= DEFENSE_CELL_LIMIT) {
+            race_tick_defenses_fullscan();
+            return;
+        }
+        int cell = (u[j].y >> DEFENSE_CELL_SHIFT) * DEFENSE_CELL_SIDE +
+                   (u[j].x >> DEFENSE_CELL_SHIFT);
+        cells.flying[j] = (u8)sc64_race_unit_flying(u[j].type);
+        cells.next[j] = cells.head[cell];
+        cells.head[cell] = (u8)j;
+    }
+#else
+    for (int j = 0; j < MAX_UNITS; ++j) {
+        int owner = u[j].owner;
+        if (u[j].alive && (owner < 0 || owner >= 5)) {
+            race_tick_defenses_fullscan();
+            return;
+        }
+    }
     memset(head, 0xff, sizeof(head));
     for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
         int owner = u[j].owner;
@@ -187,6 +333,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         next[j] = head[owner][flying];
         head[owner][flying] = (u8)j;
     }
+#endif
     for (int owner = 0; owner < 5; ++owner) {
         u8 mask = 0;
         for (int other = 0; other < 5; ++other)
@@ -194,12 +341,13 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         hostile_mask[owner] = mask;
     }
 
+    RACE_DEFENSE_PYLONS;
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i)) {
         Building *q = &b[i];
         int ground = 0, air = 0, range = 0, damage = 0, cooldown = 0;
         switch (q->type) {
         case B_PHOTON_CANNON:
-            if (!race_site_powered(q->owner, q->x, q->y)) continue;
+            if (!RACE_DEFENSE_POWERED(q)) continue;
             ground = air = 1; range = 112; damage = 20; cooldown = 28; break;
         case B_SUNKEN_COLONY: ground = 1; range = 112; damage = 40; cooldown = 40; break;
         case B_SPORE_COLONY: air = 1; range = 112; damage = 15; cooldown = 19; break;
@@ -207,8 +355,13 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         default: continue;
         }
         if (!race_defense_cooldown_ready(q)) continue;
+#ifdef SC64_DEFENSE_SPATIAL_PROBE
+        int best = race_defense_target_from_zp_cells(
+            q, ground, air, range, &cells, hostile_mask[q->owner]);
+#else
         int best = race_defense_target_from_zp_lists(
             q, ground, air, range, head, next, hostile_mask[q->owner]);
+#endif
         if (best >= 0) {
             if (!hit_stock_building_target(q,best,damage)) continue;
 
@@ -236,12 +389,13 @@ static __attribute__((noinline)) void race_tick_defenses_p3_targets(void) {
             force_targets[force_count++] = (u8)j;
     }
 
+    RACE_DEFENSE_PYLONS;
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i)) {
         Building *q = &b[i];
         int ground = 0, air = 0, range = 0, damage = 0, cooldown = 0;
         switch (q->type) {
         case B_PHOTON_CANNON:
-            if (!race_site_powered(q->owner, q->x, q->y)) continue;
+            if (!RACE_DEFENSE_POWERED(q)) continue;
             ground = air = 1; range = 112; damage = 20; cooldown = 28; break;
         case B_SUNKEN_COLONY: ground = 1; range = 112; damage = 40; cooldown = 40; break;
         case B_SPORE_COLONY: air = 1; range = 112; damage = 15; cooldown = 19; break;
@@ -341,12 +495,13 @@ static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
         hostile_mask[owner] = mask;
     }
 
+    RACE_DEFENSE_PYLONS;
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i)) {
         Building *q = &b[i];
         int ground = 0, air = 0, range = 0, damage = 0, cooldown = 0;
         switch (q->type) {
         case B_PHOTON_CANNON:
-            if (!race_site_powered(q->owner, q->x, q->y)) continue;
+            if (!RACE_DEFENSE_POWERED(q)) continue;
             ground = air = 1; range = 112; damage = 20; cooldown = 28; break;
         case B_SUNKEN_COLONY: ground = 1; range = 112; damage = 40; cooldown = 40; break;
         case B_SPORE_COLONY: air = 1; range = 112; damage = 15; cooldown = 19; break;
@@ -381,4 +536,6 @@ static void race_tick_defenses(void)
     else race_tick_defenses_fullscan();
 }
 #endif
+#undef RACE_DEFENSE_POWERED
+#undef RACE_DEFENSE_PYLONS
 #endif
