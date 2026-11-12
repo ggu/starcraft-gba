@@ -106,8 +106,8 @@ for the same observer's provenance and limits.
 ## Sparse seat spawn positions
 
 Read-only, cache-aware ares samples from the owned USA ROM verified the
-actual first buildings in three independent Blood Bath Melee launches.
-Both sides played Terran. The setup screens verified the active row
+actual first buildings in four single-opponent Blood Bath Melee launches.
+The human played Terran. The setup screens verified the active row
 before ordinary Start input. Each opening had two full Command Centers
 and four SCVs per owner; the linked actor list also matched all 60
 source resource positions. The camera origin identifies the human base.
@@ -117,12 +117,18 @@ source resource positions. The camera origin identifies the human base.
 | Middle only | (128, 240), northwest | (288, 1808), southwest |
 | Middle only, Start delayed 137 callbacks | (128, 240), northwest | (288, 1808), southwest |
 | First only, same launch timing as original | (128, 240), northwest | (288, 1808), southwest |
+| Third only (Protoss CPU) | (128, 240), northwest | (288, 1808), southwest |
 
 The GBA's middle-only start currently maps to the northeast (880, 120)
 in half-scale pixels. The southwest native location corresponds to
 (144, 904) on GBA. This disproves the current middle-seat placement for
-the observed cases and shows that first and middle do not use distinct
-fixed starts for a sole opponent in these runs. It does not identify the
-rule for a third seat, denser lobbies, other races and maps, or Random.
+the observed cases and shows that the sole opponent uses the same start in
+all three rows. A fifth launch, with Human Terran and Zerg/Terran/Protoss CPUs,
+put the human northeast (1760, 240) and the CPUs southeast (1760, 1808),
+northwest (128, 240) and southwest (288, 1808) in lobby order. These three
+read-only samples again matched all 60 map resources. The one- and three-CPU
+runs do not establish the rules for two CPUs, other human races, or Random.
+Preserve the resolved placement explicitly before changing the startup rule:
+already-written GBA saves must keep their old AI fallback locations.
 The Melee setup screens showed no difficulty selector; other modes and
 any internal difficulty policy are unverified.
