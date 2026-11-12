@@ -385,8 +385,11 @@ test-sc64-font: build/test-sc64-font
 	./build/test-sc64-font
 build/test-sc64-icons: tests/sc64_icons.c starcraft/sc64_icons.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
-test-sc64-icons: build/test-sc64-icons
+build/test-sc64-icon-scaling: tests/sc64_icon_scaling.c starcraft/sc64_icons.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+test-sc64-icons: build/test-sc64-icons build/test-sc64-icon-scaling
 	./build/test-sc64-icons
+	./build/test-sc64-icon-scaling
 test-starcraft: test-sc64-font test-sc64-icons
 
 .PHONY: sc64-briefings test-sc64-briefing
