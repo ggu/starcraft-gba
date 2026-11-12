@@ -27,6 +27,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   campaign availability and selected play paths; frame budget, broader save
   coverage, and original N64 behavior remain separate gates below.
 
+- **Final Zerg mission performance (P1):** the
+  [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
+  measures 1.57M and 2.00M mean loop cycles in two battle windows, against a
+  561,792-cycle budget. The rectangular point-flood trial changes the means
+  by less than 0.13% and regresses the 64×64 custom battle, so it stays out.
+  Even simulation alone exceeds budget in both windows. A 24-call instruction
+  profile puts about half of elapsed time in rendering; the late window
+  samples spend 218k cycles per update on the sprite blitter and 288k on
+  defenses. Prioritize exact Cannon power and target queries, then sprite
+  drawing and exploration. Preserve the existing 64×64 route fast path.
+
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
   an explicit HOST-only Flash format. Fresh-process tests retain an actually
