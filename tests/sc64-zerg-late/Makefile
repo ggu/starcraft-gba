@@ -255,7 +255,7 @@ define ZERG_CARRIED_CONTROLLERS
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z1z2,race_campaign_run,common/gba.c))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z3,sc64_z3_campaign_run,common/gba.c,tests/sc64_route_purity.h))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z4,sc64_z4_campaign_run,common/gba.c,tests/sc64_route_purity.h))
-$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z5,sc64_z5_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z5,sc64_z5_campaign_run,common/gba.c,tests/sc64_route_purity.h))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z6,sc64_z6_campaign_run,common/gba.c))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z7,sc64_z7_campaign_run,common/gba.c))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z8,sc64_z8_campaign_run,))
