@@ -9,9 +9,10 @@ press **A** at the target. The Ghost approaches if needed and can abort
 before descent. Once it starts descending, killing the Ghost or the Silo
 does not cancel the missile. Blast damage affects friendly units and air
 targets as well as enemies. The playable probe uses distinct ROM codes and
-the [Silo journal](2026-11-12-nuke-silo-sram.md) for queued and armed missiles.
-An active approach or flight still refuses a save. Default ROMs omit this
-feature and do not use its new save tag.
+the [Silo](2026-11-12-nuke-silo-sram.md) and
+[active strike](2026-11-12-active-strike-sram.md) journals. Queued, armed,
+painting and descending missiles can be saved. An unfinished approach
+still refuses a save. Default ROMs omit this feature and its save tag.
 
 The owned USA N64 ROM's The Big Push map starts with two Terran Ghosts,
 two Terran Command Centers and two neutral Nuclear Silos. Missile raw 14
@@ -46,6 +47,12 @@ as the downward missile appeared. It hit the selected ground point
 (3666, 3882) and killed a friendly Ghost at (3484, 3885). The test copy
 changed only the starting gas and supply capacity to fund the missile;
 the launch, combat stats, actors and enemy AI used the original game.
+The hit reached a Dropship and structures whose centers were outside
+the outer ring but whose footprints reached it. The native Dropship lost
+124 HP, the Barracks 165.5, the Factory 207.25, and Duke 496. These match
+the source footprint, max-HP damage floor and explosive armor calculation.
+The standard GBA engine still stores integer HP, so these fractional
+losses are rounded on that path.
 In the paired cancellation branch, C-Down during ascent removed the
 missile and its supply without refunding resources. The Ghost survived
 beyond the comparison run's impact time.
@@ -110,7 +117,7 @@ python3 tools/sc64_nuke_assets.py
 python3 tools/sc64_nuke_building_assets.py
 python3 tools/sc64_nuke_ghost_assets.py
 make test-sc64-nuke-blast test-sc64-nuke-render test-sc64-nuke-world
-make test-sc64-nuke-silo-journal
+make test-sc64-nuke-journal-compat
 make sc64-nuke-probe
 make sc64-nuke-arm-world
 python3 tools/sc64_impact_arm_probe.py build/StarCraft-Nuke-World-ARM-Test-GBA.gba --out /tmp/sc64-nuke-arm-world
@@ -133,10 +140,8 @@ make sc64-nuke-probe SC64_AUDIO_DIR=.local/sc64/audio/nuke-generated
 2. Implement stock Cloak, Lockdown, Ocular Implants and energy research.
    Match the full add-on and missile actor lifecycle, including lift in
    custom games and whether a visible missile can be attacked.
-3. Persist active strikes in the authenticated journal and read predecessor
-   saves. Verify a title-to-strike ARM tape without direct setup, bot
+3. Verify an ordinary title-to-strike ARM tape without direct setup, bot
    production and launches, and busy fights before enabling the default
-   ROMs.
-   The asset-free `make test-sc64-nuke-save-rows` validates a proposed
-   no-growth missile actor format independently. The Silo receipt part is
-   connected to the probe journal; the in-flight actor is not.
+   ROMs. Persist the unfinished approach or keep an explicit refusal.
+   The asset-free `make test-sc64-nuke-save-rows` validates the compact
+   missile actor format independently.

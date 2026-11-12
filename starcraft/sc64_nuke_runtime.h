@@ -6,6 +6,11 @@
  * checks, including for campaign actors. The journal has its own gate. */
 enum { SC64_NUKE_FLIGHT_LIMIT = 8, SC64_NUKE_NO_PAYER = 255 };
 enum { SC64_NUKE_ASCENT_TICKS = 90, SC64_NUKE_ALERT_TICKS = 45 };
+/* T8's missile reached the ground before the impact script began, and
+ * the script's flash preceded HP loss. The latter is a bounded estimate
+ * inside the native sampled damage window, not an exact order counter. */
+enum { SC64_NUKE_GROUND_SETTLE = 7, SC64_NUKE_DAMAGE_LEAD = 9,
+       SC64_NUKE_REENTRY_HEIGHT = 160, SC64_NUKE_NORTH_EDGE = 7 };
 typedef struct {
     Sc64NukeFlight strike;
     u16 origin_x, origin_y, approach_x, approach_y;
@@ -346,16 +351,24 @@ static unsigned race_nuke_travel_ticks(unsigned distance, unsigned limit_ticks)
     return tick;
 }
 
+static unsigned race_nuke_drop(unsigned y)
+{
+    if (y <= SC64_NUKE_NORTH_EDGE) return 0;
+    y -= SC64_NUKE_NORTH_EDGE;
+    return y < SC64_NUKE_REENTRY_HEIGHT ? y : SC64_NUKE_REENTRY_HEIGHT;
+}
+
 static Sc64NukeCadence race_nuke_cadence_at(unsigned origin_y, unsigned target_y, u8 *ascent)
 {
     /* Nominal OpenBW order timers plus the ROM's Warpin waits. Account for
      * a short climb near the northern edge and a map-clamped reentry. */
-    unsigned rise = race_nuke_travel_ticks(origin_y, SC64_NUKE_ASCENT_TICKS);
-    unsigned drop = target_y < 160 ? target_y : 160;
-    unsigned fall = race_nuke_travel_ticks(drop > 5 ? drop - 5 : 0, SC64_NUKE_ASCENT_TICKS);
+    unsigned rise = race_nuke_travel_ticks(origin_y > SC64_NUKE_NORTH_EDGE ?
+        origin_y - SC64_NUKE_NORTH_EDGE : 0, SC64_NUKE_ASCENT_TICKS);
+    unsigned fall = race_nuke_travel_ticks(race_nuke_drop(target_y), SC64_NUKE_ASCENT_TICKS);
     *ascent = (u8)rise;
     return (Sc64NukeCadence){
-        (u16)(rise + SC64_NUKE_WARP_SOURCE_TICKS), (u16)fall,
+        (u16)(rise + SC64_NUKE_WARP_SOURCE_TICKS),
+        (u16)(fall + SC64_NUKE_GROUND_SETTLE + SC64_NUKE_DAMAGE_LEAD),
         (u16)(rise < SC64_NUKE_ALERT_TICKS ? rise : SC64_NUKE_ALERT_TICKS)
     };
 }
@@ -517,10 +530,19 @@ static void race_nuke_tick(void)
 #ifdef SC64_NUKE_ACTIVE_JOURNAL
             race_nuke_release_actor(f);
 #endif
-            f->impact_tick = 1;
+            f->impact_tick = SC64_NUKE_DAMAGE_LEAD + 1;
             race_nuke_apply_blast(x, y, owner, -1);
         }
     }
+}
+
+static void race_nuke_draw_impact(int x, int y, unsigned tick)
+{
+    if (tick / SC64_NUKE_BURST_SOURCE_TICKS < SC64_NUKE_BURST_FRAME_COUNT)
+        sc64_nuke_draw_frame(&sc64_nuke_burst_frames[tick / SC64_NUKE_BURST_SOURCE_TICKS], x, y);
+    if (tick / SC64_NUKE_IMPACT_SOURCE_TICKS < SC64_NUKE_IMPACT_FRAME_COUNT)
+        sc64_nuke_draw_frame(&sc64_nuke_impact_frames[tick / SC64_NUKE_IMPACT_SOURCE_TICKS],
+                             x, y + SC64_NUKE_IMPACT_SOURCE_Y / 2);
 }
 
 static void race_nuke_draw(void)
@@ -532,15 +554,8 @@ static void race_nuke_draw(void)
         if (!strike->phase && !f->impact_tick) continue;
         int x = strike->x - camx, y = strike->y - camy + 12;
         if (f->impact_tick) {
-            if (strike->owner == SIDE || currently_visible(strike->x, strike->y)) {
-                unsigned tick = f->impact_tick - 1;
-                if (tick / SC64_NUKE_BURST_SOURCE_TICKS < SC64_NUKE_BURST_FRAME_COUNT)
-                    sc64_nuke_draw_frame(&sc64_nuke_burst_frames[tick / SC64_NUKE_BURST_SOURCE_TICKS],
-                                         x, y);
-                sc64_nuke_draw_frame(&sc64_nuke_impact_frames[(f->impact_tick - 1) /
-                                                             SC64_NUKE_IMPACT_SOURCE_TICKS],
-                                     x, y + SC64_NUKE_IMPACT_SOURCE_Y / 2);
-            }
+            if (strike->owner == SIDE || currently_visible(strike->x, strike->y))
+                race_nuke_draw_impact(x, y, f->impact_tick - 1);
             continue;
         }
         if (strike->owner == SIDE || currently_visible(strike->x, strike->y)) {
@@ -548,9 +563,13 @@ static void race_nuke_draw(void)
                 sc64_nuke_draw_frame(&sc64_nuke_dot_frames[(strike->age / SC64_NUKE_DOT_SOURCE_TICKS) %
                                                           SC64_NUKE_DOT_FRAME_COUNT], x, y);
             if (strike->phase == SC64_NUKE_DESCENDING) {
-                int height = (strike->y < 160 ? strike->y : 160) -
-                    (int)race_nuke_travel(strike->age - strike->cadence.paint);
-                sc64_nuke_draw_frame(&sc64_nuke_missile_frames[1], x, y - height);
+                unsigned elapsed = strike->age - strike->cadence.paint;
+                unsigned flash = strike->cadence.descent - SC64_NUKE_DAMAGE_LEAD;
+                if (elapsed >= flash) race_nuke_draw_impact(x, y, elapsed - flash);
+                else {
+                    int height = (int)race_nuke_drop(strike->y) - (int)race_nuke_travel(elapsed);
+                    sc64_nuke_draw_frame(&sc64_nuke_missile_frames[1], x, y - (height > 0 ? height : 0));
+                }
             }
         }
         if (strike->phase == SC64_NUKE_PAINTING &&

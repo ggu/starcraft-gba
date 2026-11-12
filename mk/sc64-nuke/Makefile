@@ -67,7 +67,7 @@ test-sc64-nuke-journal-compat: test-sc64-nuke-silo-journal test-sc64-nuke-strike
 
 define SC64_NUKE_ARM
 build/starcraft-nuke-$(1).elf: $$(COMMON) $$(COMMON_HEADERS) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(4) $$(SC64_NUKE_RUNTIME_ASSETS) common/gba.ld mk/sc64-nuke/Makefile Makefile | build
-	$$(CC) $$(CFLAGS) $$(SC64_NUKE_RUNTIME_FLAGS) -DSC64_NUKE_SILO_JOURNAL $(2) $$(COMMON) $$(STARCRAFT) $(4) $$(LDFLAGS) -Wl,-Map,build/starcraft-nuke-$(1).map -lgcc -o $$@
+	$$(CC) $$(CFLAGS) $$(SC64_NUKE_RUNTIME_FLAGS) $$(SC64_NUKE_STRIKE_FLAGS) $(2) $$(COMMON) $$(STARCRAFT) $(4) $$(LDFLAGS) -Wl,-Map,build/starcraft-nuke-$(1).map -lgcc -o $$@
 	$$(SIZE) $$@
 build/StarCraft-Nuke-Probe-$(1)-GBA.gba: build/starcraft-nuke-$(1).elf tools/fix_rom.py
 	$$(OBJCOPY) -O binary $$< $$@
@@ -75,7 +75,7 @@ build/StarCraft-Nuke-Probe-$(1)-GBA.gba: build/starcraft-nuke-$(1).elf tools/fix
 endef
 $(eval $(call SC64_NUKE_ARM,terran,$(TERRAN_ROM_FLAGS),$(TERRAN_FULL_INPUTS),,SC NUKE T,SCNT))
 $(eval $(call SC64_NUKE_ARM,z10,$(ZERG_Z10_RELEASE_FLAGS),$(ZERG_Z10_CANONICAL_INPUTS),,SC NUKE Z,SCNZ))
-$(eval $(call SC64_NUKE_ARM,p10,$(patsubst -I$(P10_FACT_V2_DIR),-I$(SC64_NUKE_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)),$(filter-out $(P10_FACT_V2_HEADER),$(PROTOSS_P10_INPUTS)) $(SC64_NUKE_P10_FACT_HEADER),$(P7_INTERCEPTOR_FLIGHT_SOURCES),SC NUKE P,SCNP))
+$(eval $(call SC64_NUKE_ARM,p10,$(patsubst -I$(P10_FACT_V2_DIR),-I$(SC64_NUKE_STRIKE_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)),$(filter-out $(P10_FACT_V2_HEADER),$(PROTOSS_P10_INPUTS)) $(SC64_NUKE_STRIKE_P10_FACT_HEADER),$(P7_INTERCEPTOR_FLIGHT_SOURCES),SC NUKE P,SCNP))
 $(eval $(call SC64_NUKE_ARM,showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES),SC NUKE S,SCNS))
 
 .PHONY: sc64-nuke-probe
@@ -84,7 +84,7 @@ sc64-nuke-probe: $(foreach profile,terran z10 p10 showcase,build/StarCraft-Nuke-
 .PHONY: sc64-nuke-arm-world
 sc64-nuke-arm-world: build/StarCraft-Nuke-World-ARM-Test-GBA.gba
 build/starcraft-nuke-arm-world.elf: tests/sc64_nuke_world_game.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.ld mk/sc64-nuke/Makefile Makefile | build
-	$(CC) $(CFLAGS) $(SC64_NUKE_RUNTIME_FLAGS) -DSC64_NUKE_SILO_JOURNAL $(TERRAN_ROM_FLAGS) -DSC64_NUKE_ARM_WORLD_TEST $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -lgcc -o $@
+	$(CC) $(CFLAGS) $(SC64_NUKE_RUNTIME_FLAGS) $(SC64_NUKE_STRIKE_FLAGS) $(TERRAN_ROM_FLAGS) -DSC64_NUKE_ARM_WORLD_TEST $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Nuke-World-ARM-Test-GBA.gba: build/starcraft-nuke-arm-world.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@

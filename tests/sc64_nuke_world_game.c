@@ -140,6 +140,18 @@ static void t8_attachment(void)
     /* Match the native target and the specific friendly Ghost that died. */
     assert(witness >= 0 && u[witness].alive && spotter >= 0 &&
            race_nuke_issue(spotter, SIDE, 3666 / 2, 3882 / 2));
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    advance_world(25);
+    Sc64NukeWorldFlight *painting = race_nuke_track(spotter);
+    assert(painting && painting->actor_slot_plus1);
+    int age = painting->strike.age, actor_slot = painting->actor_slot_plus1;
+    assert(race_save_game());
+    race_nuke_reset();
+    assert(race_load_game());
+    painting = race_nuke_track(spotter);
+    assert(painting && painting->strike.age == age && painting->actor_slot_plus1 == actor_slot);
+    puts("T8: painting strike round-trips through the cartridge SRAM journal");
+#endif
     advance_world(600);
     assert(!u[witness].alive && !race_nuke_reserved_supply(SIDE));
     puts("T8: same friendly Ghost dies at the observed native strike point");
@@ -247,13 +259,16 @@ int main(void)
     assert(race_nuke_issue(ghost, SIDE, far_x, y));
     assert(race_nuke_track(ghost) && !race_nuke_ghost_locked(ghost) &&
            u[ghost].order == ORDER_MOVE && u[ghost].tx == far_x);
+    assert(!race_save_game()); /* an unfinished approach cannot be dropped */
     assert(race_nuke_abort(ghost) && race_nuke_armed_slot(SIDE) == silo);
     nuke_action(NUKE_MENU_CAST);
     assert(mode == MODE_NUCLEAR_TARGET);
     cx = x; cy = y;
     game_update(KEY_A, KEY_A);
     assert(mode == MODE_NORMAL && race_nuke_ghost_locked(ghost));
+#ifndef SC64_NUKE_ACTIVE_JOURNAL
     assert(!race_save_game()); /* never save a partial in-flight state */
+#endif
     gfx_begin(0); gfx_set_clip_y(12, 120); draw_unit(&u[ghost]); gfx_end();
     assert(race_nuke_armed_slot(SIDE) < 0 && race_owner_reserved_supply(SIDE) == already + 16);
     assert(!race_nuke_issue(ghost, SIDE, x, y));

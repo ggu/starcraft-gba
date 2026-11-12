@@ -19,15 +19,17 @@ sc64_nuke_expand_row(const uint8_t **input, const uint8_t *end, uint8_t *row,
         if (!n || n > width - col || kind == 3) return 0;
         if (kind == 0) {
             if ((unsigned)(end - *input) < n) return 0;
-            for (unsigned i = 0; i < n; ++i) row[col++] = *(*input)++;
+            if (row) for (unsigned i = 0; i < n; ++i) row[col + i] = (*input)[i];
+            *input += n;
         } else {
             uint8_t value = 0;
             if (kind == 1) {
                 if (*input == end) return 0;
                 value = *(*input)++;
             }
-            for (unsigned i = 0; i < n; ++i) row[col++] = value;
+            if (row) for (unsigned i = 0; i < n; ++i) row[col + i] = value;
         }
+        col += n;
     }
     return 1;
 }
@@ -45,13 +47,19 @@ sc64_nuke_draw_frame(const Sc64NukeFrame *f, int cx, int cy)
         f->length > sizeof(sc64_nuke_pixels) - f->offset)
         return 0;
     int left = cx - f->cw / 2 + f->x, top = cy - f->ch / 2 + f->y;
-    if (left >= 240 || left + f->w <= 0 || top >= 160 || top + f->h <= 0)
+    int clip_top = 0, clip_end = 160;
+#ifdef GBA_SCENE_CLIP
+    unsigned clip = gfx_get_clip_y();
+    clip_top = (int)(clip & 255u); clip_end = (int)(clip >> 8);
+#endif
+    if (left >= 240 || left + f->w <= 0 || top >= clip_end || top + f->h <= clip_top)
         return 1;
     const uint8_t *input = sc64_nuke_pixels + f->offset, *end = input + f->length;
     for (unsigned y = 0; y < f->h; ++y) {
-        if (!sc64_nuke_expand_row(&input, end, row, f->w)) return 0;
         int screen_y = top + (int)y;
-        if (screen_y < 0 || screen_y >= 160) continue;
+        int visible = screen_y >= clip_top && screen_y < clip_end;
+        if (!sc64_nuke_expand_row(&input, end, visible ? row : 0, f->w)) return 0;
+        if (!visible) continue;
         if (f->modifier == 9)
             gfx_blit_sprite_mapped(left, screen_y, f->w, 1, row,
                                    sc64_nuke_light_lut, SC64_NUKE_LIGHT_ROWS);
