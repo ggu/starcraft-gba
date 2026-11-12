@@ -644,30 +644,30 @@ static void scenario(int shape_cols, int shape_rows, int terrain, int kind, int 
 }
 
 #ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
-static void check_linear96_uses_expected_path(void)
+static void check_linear_uses_expected_path(int cols)
 {
-    enum { CELLS = 96 * 128, GOAL = 48 + 64 * 96 };
+    const int cells = cols * 128, goal = cols / 2 + 64 * cols;
     int filled;
-    race_cols = 96;
+    race_cols = cols;
     race_rows = 128;
     sc64_routes_reset();
     assert(sc64_route_configure());
-    memset(desired, 1, CELLS);
+    memset(desired, 1, (size_t)cells);
     build_path_grid();
     memset(sc64_route_field[0], 0x53, sc64_route_active_bytes);
     memset(SC64_ROUTE_OLD_GRID, 0x5a, sizeof(path_walkable));
-    filled = sc64_route_fill_linear96(sc64_route_field[0], GOAL);
+    filled = sc64_route_fill_linear(sc64_route_field[0], goal);
+    for (unsigned i = 0; i < sizeof(path_walkable); ++i) assert(SC64_ROUTE_OLD_GRID[i] == 0x5a);
 #ifdef TEST_LINEAR_OVERFLOW
     assert(filled == -1);
     for (unsigned i = 0; i < sc64_route_active_bytes; ++i)
         assert(sc64_route_field[0][i] == 0x53);
-    assert(sc64_route_fill(0, GOAL) == CELLS);
+    assert(sc64_route_fill(0, goal) == cells);
 #else
-    assert(filled == CELLS); /* must compact: the field is larger than the queue */
+    assert(filled == cells); /* must compact: the field is larger than the queue */
 #endif
-    reference_bfs(&oracle[POOL], GOAL);
-    for (int i = 0; i < CELLS; ++i) assert(sc64_route_get(0, i) == oracle[POOL].dir[i]);
-    for (unsigned i = 0; i < sizeof(path_walkable); ++i) assert(SC64_ROUTE_OLD_GRID[i] == 0x5a);
+    reference_bfs(&oracle[POOL], goal);
+    for (int i = 0; i < cells; ++i) assert(sc64_route_get(0, i) == oracle[POOL].dir[i]);
     check_grid_unchanged();
 }
 #endif
@@ -764,7 +764,8 @@ int main(int argc, char **argv)
                100.0 * (double)total_keep / (double)total_base);
     }
 #ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
-    check_linear96_uses_expected_path();
+    check_linear_uses_expected_path(96);
+    check_linear_uses_expected_path(128);
 #endif
     puts("sc64 route keep-fields: ok");
     return 0;
