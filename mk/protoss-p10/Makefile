@@ -61,6 +61,11 @@ $(P10_ARM_TRACE): build/test-sc64-p10-campaign-run
 	./build/test-sc64-p10-campaign-run $@
 .PHONY: test-sc64-p10-controller
 test-sc64-p10-controller: $(P10_ARM_TRACE)
+# The normal cartridge proof carries briefing and authored text inputs in the
+# tape. Keep it separate from the replacement-main and save-resume fixtures.
+build/test-sc64-p10-normal-home: tests/sc64_p10_campaign_run.c tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_P10_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+
 $(P10_ARM_DIR)/sc64_p10_tape_generated.h: $(P10_ARM_TRACE) tools/sc64_p8_arm_replay.py mk/protoss-p10/Makefile
 	$(P10_REPLAY_TOOL) tape $< $@
 P10_REPLAY_DEPS = tests/sc64_p10_arm_replay.c $(P10_ARM_DIR)/sc64_p10_tape_generated.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile
