@@ -1,4 +1,10 @@
 # Private prepared-input gate. Default ROM targets never opt in.
+build/test-sc64-ghost-tech: tests/sc64_ghost_tech.c starcraft/sc64_ghost_tech.h starcraft/sc64_battlecruiser_rules.h starcraft/sc64_nuke_rules.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-ghost-tech
+test-sc64-ghost-tech: build/test-sc64-ghost-tech
+	./$<
+
 SC64_NUKE_RUNTIME_FLAGS := -DSC64_SHARED_NUKE_PROBE -I$(SC64_NUKE_ASSET_DIR)
 SC64_NUKE_RUNTIME_ASSETS := $(addprefix $(SC64_NUKE_ASSET_DIR)/,sc64_nuke_source_generated.h sc64_nuke_building_source_generated.h sc64_nuke_ghost_source_generated.h)
 SC64_NUKE_FIXTURE_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
