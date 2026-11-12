@@ -11728,6 +11728,8 @@ building_art_sprite(const Building *q)
 }
 #endif
 
+#include "sc64_building_word_draw.h"
+
 static int
 building_art_in_view(const Building *q, int x, int y)
 {
@@ -11778,7 +11780,7 @@ draw_building_art(Building *q)
 #endif
 #endif
 #ifdef SC64_HAS_SPRITES
-    if (sprite) draw_mission_sprite(sprite, x, y);
+    if (sprite) draw_completed_building_sprite(sprite, x, y);
     else
 #endif
     {
@@ -11918,7 +11920,7 @@ draw_building_overlay(Building *q)
                          (unsigned)(28-q->queue_progress)*4u/5u : 24u;
         const Sc64SpriteFrame *cannon=sc64_race_building_sprite(162,
                                    sc64_photon_cannon_attack_frame(elapsed));
-        if (cannon) draw_mission_sprite(cannon,x,y);
+        if (cannon) draw_completed_building_sprite(cannon,x,y);
     }
 #endif
 #ifdef SC64_BUILDING_FIRE_ART

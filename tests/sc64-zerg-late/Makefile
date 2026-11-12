@@ -101,10 +101,18 @@ $(Z10_PROGRAM_HEADER): $(Z10_DESCRIPTOR) tools/sc64_zerg_late_program_pack.py to
 ZERG_Z10_DEFENSE_FLAGS ?= -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
 ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -DSC64_RENDER_KEY_ONCE -Ibuild/generated/z10 $(ZERG_Z10_DEFENSE_FLAGS) -DSC64_DEPOT_FIRST_NEAREST_PROBE
 ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES)
+# The packed frames belong to the qualified Z10 sprite bank.
+Z10_BUILDING_WORDS ?= 1
+ifneq ($(filter $(Z10_BUILDING_WORDS),0 1),$(Z10_BUILDING_WORDS))
+$(error Z10_BUILDING_WORDS must be 0 or 1)
+endif
+SC64_BUILDING_WORDS_HEADER = build/generated/sc64_building_words_generated.h
+Z10_BUILDING_WORDS_FLAGS = $(if $(filter 1,$(Z10_BUILDING_WORDS)),-DSC64_BUILDING_WORDS_PROBE)
+Z10_BUILDING_WORDS_CONFIG := $(if $(shell test -f build/z10-building-words-config && printf '%s\n' '$(Z10_BUILDING_WORDS)' | cmp -s - build/z10-building-words-config && printf matched),,force-z10-building-words-rebuild)
 ZERG_Z10_RELEASE_FLAGS = $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z9_CANONICAL_INPUTS)) $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h $(Z10_PROGRAM_HEADER)
-build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile tests/sc64-zerg-late/Makefile | build
-	$(CC) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
+build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(SC64_BUILDING_WORDS_HEADER)) | build
+	$(CC) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -119,6 +127,22 @@ build/test-sc64-z10-sight-packed-rows: tests/sc64_z7_source_sight_game.c $(STARC
 .PHONY: test-sc64-z10-sight-packed-rows
 test-sc64-z10-sight-packed-rows: build/test-sc64-z10-sight-packed-rows
 	./build/test-sc64-z10-sight-packed-rows
+
+.PHONY: force-z10-building-words-config force-z10-building-words-rebuild
+force-z10-building-words-config:
+force-z10-building-words-rebuild:
+build/z10-building-words-config: force-z10-building-words-config | build
+	@printf '%s\n' '$(Z10_BUILDING_WORDS)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+$(SC64_BUILDING_WORDS_HEADER): $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h tools/sc64_building_words.py tools/sc64_unit_facing.py | build
+	mkdir -p $(dir $@)
+	$(PYTHON) tools/sc64_building_words.py $< > $@.tmp
+	mv $@.tmp $@
+build/test-sc64-z10-building-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_BUILDING_WORDS_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(ZERG_Z10_RELEASE_FLAGS) -DSC64_BUILDING_WORDS_PROBE $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-building-words-pixels
+test-sc64-z10-building-words-pixels: build/test-sc64-z10-building-words-pixels
+	./build/test-sc64-z10-building-words-pixels
 
 ifeq ($(CANONICAL_WALK_WORDS),1)
 build/test-sc64-z10-walk-words-pixels: tests/sc64_walk_words_pixels.c tests/sc64_unit_walk_frames_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
