@@ -43,6 +43,9 @@ static void sc64_showcase_start(int scene)
     race_mode=1;race_skirmish_map=0;race_bots=scene==6?2:1;
 #ifdef SC64_IMPORTED_SKIRMISH
     race_skirmish_slots=0;race_skirmish_start_order=0;
+#ifdef SC64_NATIVE_MELEE_STARTS
+    race_skirmish_melee=0;
+#endif
 #endif
     race_human=scene==0||scene==4||scene==5?R_PROTOSS:
                scene==3?R_ZERG:R_TER;

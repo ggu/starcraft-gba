@@ -482,9 +482,15 @@ launch. The **Opponents** row is a shortcut that opens the first one,
 two, or three seats. The game resolves Random at launch and keeps the
 chosen races and starts when saving or restarting the match.
 
-The optional Blood Bath Melee preview also offers **Random** on the
-human row. It uses the same launch draw for the human and all open
-computer rows. Outpost and normal builds keep the named human choices.
+The optional Blood Bath preview (`make sc64-native-melee-start-probe`)
+also offers **Random** on the human row and a **Type** row after the three
+computer seats. In **Melee**, the computers are allied with one another
+and can all attack the human. In **Free for All**, they can attack one
+another too. Both choices keep the same seeded launch draw. The game
+keeps the type and resolved races and positions when saving or restarting.
+Existing saves remain Free for All. An older cartridge cannot load a new
+Melee save; use the preview that wrote it. Outpost and the normal builds
+keep Free for All and named human races.
 
 On the current frozen combined ROM `d8678867`, a 10,000-tick neutral Blood
 Bath run with a Terran human and three independently selected Zerg, Protoss
