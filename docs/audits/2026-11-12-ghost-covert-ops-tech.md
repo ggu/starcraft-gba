@@ -1,7 +1,9 @@
 # Ghost Covert Ops research
 
-This source-only stage models the four paid jobs at a Covert Ops. It
-adds no game commands, spell effects, ROM assets or save fields.
+The pure rules model all four paid jobs at a Covert Ops. The separately
+enabled `SC64_GHOST_TECH_PROBE` exposes only Ocular Implants and Moebius
+Reactor in the normal field command menu. Cloak and Lockdown remain
+unavailable. This stage adds no ROM assets or new save fields.
 
 The owned USA ROM is SHA-1 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`.
 The BOLT `00C/008` technology table SHA-256 is
@@ -45,6 +47,15 @@ instead seeds both spells and both level-one upgrades for source slots
 0 and 6, but not human slot 1. Do not give every placed Ghost the
 training default or every campaign owner the same research.
 
+Across the original campaign catalogue, every placed raw-1 Ghost uses
+valid UNIT energy 100%, and the Ocular/Moebius price and time selectors
+in UPGS/UPGx use stock data. Upgrade availability differs: T1–T3
+disallow both for slot 1; T5 disallows both for slots 0 and 3, and seeds
+only Moebius for slot 6; T6 and T7 disallow both for slot 0. The T10
+seeded owners already have both. Remaining original campaign PUPx/UPGR
+rows admit both as unresearched. Only the two upgrade seeds are applied
+in this runtime stage.
+
 The Ghost raw-1 unit entry has sight 9 tiles at byte 8173 in
 `00C/001`. Its special flags at byte 7036 are `0x18210200`
 (organic, has energy, no mechanical flag). Ocular raises sight to
@@ -71,16 +82,21 @@ destruction returns three quarters per resource, matching the
 [PC reference](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L3294-L3323).
 Only the authenticated original payer receives either refund.
 
-Reuse the existing Physics Lab `level`/`queue_progress` lifecycle,
-but assign Ghost owner bits independently and only add them to a
-new, authenticated save layout. The shared Nuclear Silo stage already
-provides `race_nuke_parent_slot` for the attachment check. Ocular
-must update both the targeting radius and the actual fog footprint,
-including for a stationary Ghost; include the upgraded radius in the
-visibility snapshot key. The energy arithmetic reuses the existing
-Battlecruiser Q8 helpers. Cloak needs shared detection and rendering,
-not the one-off Kerrigan adapters. A selected player's HUD energy
-already routes through `sc64_unit_energy`.
+The Ghost upgrades use separate owner bits and a bounded 16-entry
+receipt pool; an attached receipt caches its parent slot and rechecks
+the live socket, owner key and flight state before ticking. Ocular
+updates the targeting radius and the actual fog footprint, including
+for a stationary Ghost. The energy arithmetic reuses the existing
+Battlecruiser Q8 helpers; the selected unit HUD shows the current
+energy and Moebius cap. Cloak still needs shared detection and
+rendering.
+
+The current Silo journal remains usable for source-seeded worlds.
+If a Ghost upgrade has been paid for or earned, this experimental
+build refuses to overwrite a save until an authenticated Ghost tech
+layout exists. Canceling an unfinished upgrade can reenable saves
+if no other nonserializable state remains. An active nuclear flight
+retains its existing separate save guard.
 
 Lockdown raw weapon 32 in `00C/007` has target flags `0x17`
 (air and ground mechanical units, no buildings), range 256 source
@@ -112,4 +128,8 @@ target handle rather than an instant damage event.
 `make test-sc64-ghost-tech` requires no ROM data. It exercises all four
 exact timers, independent owners, attachment interruption, two refunds,
 scenario seeding, Ocular sight, paid energy and cloak drain arithmetic.
-No native spell timing or field controls are qualified by this test.
+With prepared inputs, `make test-sc64-ghost-tech-world` drives actual
+B, D-pad and A inputs in the Terran HOST profile and checks the
+research jobs, flight/attachment, static fog expansion, new range,
+energy, scenario seeds and an unchanged live Silo save. Neither test
+qualifies native field spell timing or the two unimplemented spells.

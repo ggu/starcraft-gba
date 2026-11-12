@@ -1825,6 +1825,10 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 #endif
 
 static int race_save_game(void) {
+#ifdef SC64_GHOST_TECH_PROBE
+    /* Do not overwrite an existing slot with omitted paid or earned upgrades. */
+    if (!race_ghost_tech_save_safe()) return 0;
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     int nuke_silo_tag;
     if (!race_nuke_save_live_scope(&nuke_silo_tag)) return 0;
@@ -5180,6 +5184,9 @@ static int race_load_game(void) {
             u[i].build=-1;
 #else
     invalidate_path_grid();
+#endif
+#ifdef SC64_GHOST_TECH_PROBE
+    race_ghost_tech_reset(); /* Only a source-seeded baseline is serializable. */
 #endif
     sc64_visibility_reset();update_exploration();reset_selection_gestures();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_capacity(SIDE);

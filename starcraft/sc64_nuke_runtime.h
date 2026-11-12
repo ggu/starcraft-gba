@@ -43,24 +43,30 @@ static int race_nuke_raw_building(int slot, unsigned raw)
         sc64_race_raw_building(b[slot].type) == (int)raw;
 }
 
-static int race_nuke_parent_slot(int addon, unsigned parent_raw)
+static int race_nuke_parent_matches(int addon, int parent, unsigned parent_raw)
 {
-    if ((unsigned)addon >= MAX_BUILDINGS || !building_complete(addon)) return -1;
+    if ((unsigned)addon >= MAX_BUILDINGS || !building_complete(addon) ||
+        !race_nuke_raw_building(parent, parent_raw) || !building_complete(parent)) return 0;
     int owner = b[addon].owner;
-    if ((unsigned)owner >= 5 || owner == NEUTRAL) return -1;
-    for (int i = 0; i < MAX_BUILDINGS; ++i) {
-        if (b[i].owner != owner || b[addon].x != b[i].x + 48 ||
-            b[addon].y != b[i].y + 8 || !race_nuke_raw_building(i, parent_raw) ||
-            !building_complete(i)) continue;
+    if ((unsigned)owner >= 5 || owner == NEUTRAL || b[parent].owner != owner ||
+        b[addon].x != b[parent].x + 48 || b[addon].y != b[parent].y + 8) return 0;
 #ifdef SC64_TERRAN_LATE_RUNTIME
-        if (race_late_airborne(i)) continue;
+    if (race_late_airborne(parent)) return 0;
 #endif
 
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
-        if (race_bc_facility_airborne(i)) continue;
+    if (race_bc_facility_airborne(parent)) return 0;
 #endif
-        return i;
-    }
+    return 1;
+}
+
+static int race_nuke_parent_slot(int addon, unsigned parent_raw)
+{
+    if ((unsigned)addon >= MAX_BUILDINGS || !building_complete(addon) ||
+        (unsigned)b[addon].owner >= 5 || b[addon].owner == NEUTRAL) return -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].owner == b[addon].owner && b[addon].x == b[i].x + 48 &&
+            b[addon].y == b[i].y + 8 && race_nuke_parent_matches(addon, i, parent_raw)) return i;
     return -1;
 }
 
@@ -339,9 +345,11 @@ static int race_nuke_draw_ghost(int slot, int x, int y)
 
 static int race_nuke_ghost_in_range(int slot, int x, int y)
 {
-    /* Half-scale world. This uses base sight until Ocular Implants has a
-     * real owner research row and the native boundary is measured. */
+#ifdef SC64_GHOST_TECH_PROBE
+    const int radius = race_ghost_sight(&u[slot]) / 2;
+#else
     const int radius = SC64_NUKE_SOURCE_SIGHT / 2;
+#endif
     return dist2(u[slot].x, u[slot].y, x, y) <= radius * radius;
 }
 

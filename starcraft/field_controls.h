@@ -360,6 +360,15 @@ ui_row_state(int i, int *cost, int *gas_cost, const char **need)
     int type, kind = ui_row_kind(i, &type);
     *cost = *gas_cost = 0;
     *need = "";
+#ifdef SC64_GHOST_TECH_PROBE
+    int ghost_tech = race_ghost_tech_menu_kind(i);
+    if (ghost_tech) {
+        if (ghost_tech == SC64_GHOST_MENU_CANCEL) return UI_SITE_OK;
+        const Sc64GhostTechFact *fact = sc64_ghost_tech_fact((unsigned)ghost_tech);
+        *cost = fact->minerals; *gas_cost = fact->gas;
+        return minerals < *cost ? UI_SITE_MINERALS : gas < *gas_cost ? UI_SITE_GAS : UI_SITE_OK;
+    }
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     if (i == race_nuke_command_index() && race_nuke_menu_action() == NUKE_MENU_ARM) {
         *cost = SC64_NUKE_MISSILE_ORE;

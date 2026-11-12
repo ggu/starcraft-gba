@@ -9,6 +9,12 @@ SC64_NUKE_RUNTIME_FLAGS := -DSC64_SHARED_NUKE_PROBE -I$(SC64_NUKE_ASSET_DIR)
 SC64_NUKE_RUNTIME_ASSETS := $(addprefix $(SC64_NUKE_ASSET_DIR)/,sc64_nuke_source_generated.h sc64_nuke_building_source_generated.h sc64_nuke_ghost_source_generated.h)
 SC64_NUKE_FIXTURE_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
 
+build/test-sc64-ghost-tech-world: tests/sc64_ghost_tech_world_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
+	$(CLANG) $(SC64_NUKE_FIXTURE_FLAGS) $(SC64_NUKE_RUNTIME_FLAGS) -DSC64_NUKE_SILO_JOURNAL -DSC64_GHOST_TECH_PROBE $(TERRAN_ROM_FLAGS) $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-ghost-tech-world
+test-sc64-ghost-tech-world: build/test-sc64-ghost-tech-world
+	./$<
+
 define SC64_NUKE_FIXTURE
 build/test-sc64-nuke-world-$(1): tests/sc64_nuke_world_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $$(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $$(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
 	$$(CLANG) $$(SC64_NUKE_FIXTURE_FLAGS) $$(SC64_NUKE_RUNTIME_FLAGS) $(2) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(4) -o $$@
