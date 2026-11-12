@@ -150,8 +150,13 @@ static void sc64_frontend_draw(void)
     const u8 *background=sc64_chrome_menu_home;
     if(page==SC_FRONT_CAMPAIGN||page==SC_FRONT_MISSION||page==SC_FRONT_BRIEFING)
         background=front_campaign_art(faction);
-    if(page==SC_FRONT_SKIRMISH)
-        background=race_front.race==R_TER?sc64_chrome_menu_terran:race_front.race==R_ZERG?sc64_chrome_menu_zerg:sc64_chrome_menu_protoss;
+    if(page==SC_FRONT_SKIRMISH) {
+        int human=race_front.race;
+#if defined(SC64_IMPORTED_SKIRMISH) && defined(SC64_NATIVE_MELEE_STARTS)
+        if(human==SC_FRONT_HUMAN_RANDOM)human=race_front.human_last_race;
+#endif
+        background=human==R_TER?sc64_chrome_menu_terran:human==R_ZERG?sc64_chrome_menu_zerg:sc64_chrome_menu_protoss;
+    }
     const u16 *palette=sc64_chrome_menu_palette;
     if(page==SC_FRONT_BRIEFING) {
         background=sc64_briefing_background;
@@ -254,7 +259,12 @@ static void sc64_frontend_draw(void)
                 const char *value=front_map_title(race_front.map);int j=0;while(value[j])option[n++]=value[j++];option[n]=0;
             } else if(row==1) {
                 int n=0;const char *label="HUMAN ";while(label[n]){option[n]=label[n];n++;}
-                const char *value=sc64_race_names[race_front.race];int j=0;while(value[j])option[n++]=value[j++];option[n]=0;
+                const char *value=
+#ifdef SC64_NATIVE_MELEE_STARTS
+                    race_front.race==SC_FRONT_HUMAN_RANDOM ? "Random" :
+#endif
+                    sc64_race_names[race_front.race];
+                int j=0;while(value[j])option[n++]=value[j++];option[n]=0;
             } else if(row==2) {
                 option[0]='O';option[1]='P';option[2]='P';option[3]='O';option[4]='N';option[5]='E';option[6]='N';option[7]='T';option[8]='S';option[9]=' ';
                 option[10]=(char)('0'+race_front.bots);option[11]=0;

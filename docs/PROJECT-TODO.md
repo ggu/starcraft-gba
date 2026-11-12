@@ -43,12 +43,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   on all four products. Keep full matches and hardware frame rate as
   separate qualification.
   The stock launch resolves Random race rows before drawing starts; the
-  pure sequence matches native Human Random and one/two CPU Random
-  captures. The preview now follows that order for CPU Random on Blood
-  Bath. Terran ARM passes physical Random save/restart and the prior
-  normal build reads the same new save; the other three have host checks.
-  Other native modes, difficulty and long ordinary-input victories also
-  remain open.
+  pure sequence matches native Human Random, one/two CPU Random rows,
+  and a joint Human Random / two CPU Random capture. The Blood Bath
+  preview follows that order and now offers Human Random; Outpost and
+  defaults keep named human choices. Terran ARM passes physical CPU
+  Random save/restart and the prior normal build reads that save;
+  physical Human Random validation remains open. Other native modes,
+  difficulty and long ordinary-input victories also remain open.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)

@@ -201,26 +201,35 @@ Zerg, Terran and Protoss in that order. It then writes the resolved
 races back in the same row order. A named race or a closed row does
 not consume a draw in Melee. Placement uses the resulting state.
 
-The observed Human Random launch independently checks the sequence:
+The first observed Human Random launch independently checks the sequence:
 seed `0xf3ae` resolves the human to Zerg, leaves the RNG at
 `0xa39d7707` before placement, then gives human/CPU marker IDs
-`[2, 3, 0, 1]`. Two further owned-ROM runs showed the same reset seed
-for CPU Random. Each case verified its lobby and three read-only
+`[2, 3, 0, 1]`. Three further owned-ROM runs showed the same reset seed
+with CPU Random. Each case verified its lobby and three read-only
 opening actor samples, matching all 60 resource positions and four
 workers per hall.
 
-| CPU rows (Terran human) | Resolved CPU races | Human and CPU marker IDs by row | State before placement |
+| Human / CPU choices | Resolved human / CPU races | Human and CPU marker IDs by row | State before placement |
 |---|---|---|---|
-| Closed / Random / Closed | – / Zerg / – | 0 / – / 1 / – | `0xa39d7707` |
-| Random / Random / Protoss | Zerg / Terran / Protoss | 1 / 2 / 3 / 0 | `0xb953c674` |
+| Terran / Closed / Random / Closed | Terran / – / Zerg / – | 0 / – / 1 / – | `0xa39d7707` |
+| Terran / Random / Random / Protoss | Terran / Zerg / Terran / Protoss | 1 / 2 / 3 / 0 | `0xb953c674` |
+| Random / Random / Random / Protoss | Zerg / Terran / Zerg / Protoss | 2 / 0 / 1 / 3 | `0x1d976e05` |
+
+The joint Human/CPU Random case checks that the human draws before
+the ascending CPU rows. The first two draws resolve to different races, and
+the human viewport identifies the Zerg hatchery at `(128,240)` as
+the human base. The CPUs open at `(1760,1808)`, `(288,1808)` and
+`(1760,240)`, in row order. All three RAM samples reverse the native
+RNG counter/state to the same `0xf3ae` reset seed.
 
 The native manifests are `3eaa2d7e49d36bc2dfc3e7d43ab4bf2d0fb5a098bea3c977f5418d9426988dcb`
-(sparse) and `bf3bafeca0d1835d7bb2ffaad160aa7c62047adb05faf6f115e9cc02f245ad75`
-(dense), SHA-256. The bounded pure fixture uses these captures as
+(sparse), `bf3bafeca0d1835d7bb2ffaad160aa7c62047adb05faf6f115e9cc02f245ad75`
+(dense), and `fae8647d253a2a7c353b8566b7d495b1dcfb19a0402112415c41e79335151615`
+(joint Human/CPU Random), SHA-256. The bounded pure fixture uses these captures as
 expected vectors and adds malformed and unobserved gap controls.
 
 The opt-in GBA Blood Bath Melee preview now uses one elapsed-time seed
-for CPU Random and starts. It persists the same resolved races and v2
-start-order fields; a load or restart draws nothing. Default builds,
-Outpost and the named-only GBA human selector keep their existing
-behavior. Other native modes remain unqualified.
+for human and CPU Random and starts. It persists the resolved human
+and CPU races and the same v2 start-order field; a load or restart
+draws nothing. Default builds and Outpost keep their existing
+named human selector. Other native modes remain unqualified.
