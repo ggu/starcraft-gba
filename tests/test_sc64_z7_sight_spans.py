@@ -127,6 +127,13 @@ static int check_prepared_rows(void) {
                             radius,x,y,row,first,last,want_first,want_last);
                         return 1;
                     }
+#ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
+                    if (row >= 0 && row < MAP_ROWS && ctx.packed_rows) {
+                        unsigned want = want_first > want_last ? SC64_SIGHT_EMPTY_SPAN :
+                                                    (unsigned)(want_last*256+want_first);
+                        if (sc64_z7_visibility_packed_row(&ctx,row) != want) return 1;
+                    }
+#endif
                 }
             }
     return 0;
@@ -410,6 +417,9 @@ class Z7SightSpansTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="sc64-z7-sight-") as temp:
             source = Path(temp) / "fixture.c"
             source.write_text(C_SOURCE)
+            subprocess.run(["python3", str(ROOT / "tools/sc64_sight_row_lut.py"),
+                            str(Path(temp) / "sc64_sight_row_lut_generated.h")],
+                           check=True, cwd=ROOT)
             variants = (
                 ("scalar", [], 0),
                 ("legacy-spans", ["-DSC64_VISIBILITY_SPANS"], 0),
@@ -419,6 +429,10 @@ class Z7SightSpansTests(unittest.TestCase):
                 ("z7-row-context", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
                                     "-DSC64_Z7_VISIBILITY_PHASE_REJECT",
                                     "-DSC64_Z7_VISIBILITY_ROW_CONTEXT"], 1),
+                ("z7-packed-rows", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
+                                    "-DSC64_Z7_VISIBILITY_PHASE_REJECT",
+                                    "-DSC64_Z7_VISIBILITY_ROW_CONTEXT",
+                                    "-DSC64_Z7_VISIBILITY_PACKED_ROWS"], 1),
             )
             for suffix, extra, expect_z7 in variants:
                 binary = Path(temp) / f"fixture-{suffix}"
@@ -429,7 +443,7 @@ class Z7SightSpansTests(unittest.TestCase):
                     f"-DTEST_EXPECT_Z7_SPANS={expect_z7}",
                     "-DSC64_RACES", "-DSC64_Z7_RUNTIME", "-DSC64_Z7_SOURCE_SIGHT",
                     "-DSC64_ZP_CAMPAIGN_ACTORS", "-DSC64_ZP_CAMPAIGN_STORAGE",
-                    *extra, "-I", str(ROOT), str(source), "-o", str(binary),
+                    *extra, "-I", temp, "-I", str(ROOT), str(source), "-o", str(binary),
                 ]
                 subprocess.run(command, check=True, cwd=ROOT)
                 result = subprocess.run([str(binary)], cwd=ROOT,
