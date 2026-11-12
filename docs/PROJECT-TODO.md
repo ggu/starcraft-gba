@@ -36,8 +36,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Blood Bath, including two delayed launches that changed the locations.
   The source-only selector matches all observed native seeds. The optional
   GBA preview uses its elapsed-time clock and preserves resolved starts in
-  SRAM; qualify its full ARM products and physical save/restart before
-  considering promotion. Other native modes, difficulty and long ordinary-input
+  SRAM. Four ARM previews pass physical-button save, fresh load and
+  restart checks. Real hardware and default promotion remain open.
+  Other native modes, difficulty and long ordinary-input
   victories also remain open.
 
 - **Final Zerg mission performance (P1):** the
