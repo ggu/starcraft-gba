@@ -419,7 +419,7 @@ build/test-sc64-scv-contact-zp: tests/sc64_scv_contact_game.c $(STARCRAFT) $(wil
 test-sc64-scv-contact-zp: build/test-sc64-scv-contact-zp
 	./build/test-sc64-scv-contact-zp
 UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
-RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
+RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH $(BB_OPENING_FLAGS) -I.local/sc64/skirmish/generated
 RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
 T3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_T3_ENABLED -DSC64_CAMPAIGN_RACE=0 $(T3_EXTRA_FLAGS)
 Z3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_VISIBILITY_SPANS -DSC64_Z3_WINDOWED_SCHEDULE -DSC64_NO_FRAME_CLEAR -DGBA_PRESENT_DEADLINE -DSC64_TARGET_OCCUPANCY -DSC64_UNARMED_QUERY_SKIP
@@ -1556,7 +1556,7 @@ build/test-sc64-frontend-zerg: RACE_FRONTEND_ID=1
 build/test-sc64-frontend-protoss: RACE_FRONTEND_ID=2
 RACE_FRONTEND_TESTS := build/test-sc64-frontend-terran build/test-sc64-frontend-zerg build/test-sc64-frontend-protoss
 $(RACE_FRONTEND_TESTS): tests/sc64_frontend.c starcraft/sc64_frontend.h starcraft/sc64_skirmish_slots.h starcraft/campaign_catalog.h common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_IMPORTED_SKIRMISH -DSC64_CAMPAIGN_RACE=$(RACE_FRONTEND_ID) -Icommon tests/sc64_frontend.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_IMPORTED_SKIRMISH -DSC64_CAMPAIGN_RACE=$(RACE_FRONTEND_ID) $(BB_OPENING_FLAGS) -Icommon tests/sc64_frontend.c -o $@
 
 build/test-sc64-frontend-t3-terran: RACE_FRONTEND_ID=0
 build/test-sc64-frontend-t3-zerg: RACE_FRONTEND_ID=1
