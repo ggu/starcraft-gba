@@ -134,10 +134,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   observations in a custom match with up to four depots for one owner.
   Homeland also wins with 59 matching snapshots on the promoted ROM.
   Three gameplay stalls fall by 80–95%; full P10 averages 8.99 emulated
-  updates/s, up from 8.80. The result autosave still peaks at 76.54M cycles.
-  The [composed experiment](audits/2026-11-13-p10-nearest-composed.md)
-  remains separate. Next: reduce sustained movement and render costs and
-  qualify the exact save-reader improvement for the result transition.
+  updates/s, up from 8.80. The [typed save byte reader](audits/2026-11-13-typed-save-reader.md#default-builds-with-nearest-first-p10-routing)
+  is now default on P10 and Showcase, the two products using typed rows.
+  The P10 result update drops from 76.51M to 37.49M cycles with matching
+  world, video and SRAM. Showcase writes identical two-bank journals and
+  keeps corrupt-bank fallback. Next: reduce sustained movement and render
+  costs; these save timings do not improve the ordinary update budget.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)

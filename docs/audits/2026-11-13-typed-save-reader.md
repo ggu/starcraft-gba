@@ -132,3 +132,29 @@ not a hardware timing measurement.
 - First / second journal: `0dd3a27af39186ddc1355e20e0c6c68a88ba4336be319aa483eb6d05bf2374ad` /
   `7e8471dd38ad8586c7962521b1babaaf9a979c090c1bf12130fe979b84acde4a`.
 - Paired receipt: `2f889436bf3abda8ea7e1158fc8bbf3d96cb39748f3d2445ec061978dcc27ee7`.
+
+## Default builds with nearest-first P10 routing
+
+Both P10 cartridges use nearest-first routing. The only compiler flag
+change on the candidate is the typed byte reader. Both booted fresh,
+loaded the original KODAK pause journal at frame 36,761 with 213 units
+and 81 buildings, and won at frame 46,057. The starting actor and mineral
+state and all five ordered suffix samples of world, both video pages,
+palette and fog match. Both 32 KiB result journals are byte-identical to
+the earlier normal result journal above.
+
+| Single update | Original reader | Typed byte reader |
+| --- | ---: | ---: |
+| Fresh pause-save load | 60,683,013 cycles | 34,686,110 cycles |
+| Victory and result autosave | 76,507,651 cycles | 37,492,973 cycles |
+
+These measure save latency in mGBA. Neither the wire format nor the
+sustained gameplay update policy changes. The build commands add the
+reader only on P10 and Showcase. Terran and Z10 commands are unchanged;
+they do not use these typed rows. The default Showcase command also
+reproduces the exact isolated Showcase candidate ROM. P10's IWRAM
+and BSS ends remain `0x03004aa0` and `0x0203c0e0`.
+
+- Nearest-first P10 control: `64a2bb9e43840c737b30934831f689fa948c43e640198f0473dadce7c9bfd525`.
+- P10 with the byte reader: `0505b233994dca90cda47d92f1a153a14f01e781d980b3498390d3b4005e7c41`.
+- Paired nearest-first P10 receipt: `36dfc5ac12193fd3ccb97554e2468f2f99f70ca8bd2f53526c11d5f890c674e1`.
