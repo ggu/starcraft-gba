@@ -23,6 +23,14 @@ static int race_transport_activity;
 static int race_z6_transport_overlord_ready(void);
 #endif
 
+#if defined(SC64_SHARED_TRANSPORT) && defined(SC64_NATIVE_SKIRMISH_ELIMINATION)
+static int race_transport_overlord_identity(const Unit *q)
+{
+    int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+    return raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD;
+}
+#endif
+
 #ifdef SC64_Z6_TRANSPORT_ENABLED
 static int __attribute__((noinline)) race_transport_carrier_type(const Unit *q)
 #else
@@ -37,6 +45,10 @@ static int race_transport_carrier_type(const Unit *q)
             sc64_race_unit_from_raw(raw) == q->type) return 1;
         if (race_mode && raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD) {
             int owner = sc64_sk_transport_owner_index(q->owner);
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+            if (q->owner == NEUTRAL && q->raw_owner == 11)
+                return race_skirmish_neutral_ventral;
+#endif
             if (owner >= 0 && race_skirmish_transport_tech.owner[owner].researched)
                 return 1;
         }
@@ -70,6 +82,20 @@ static int race_transport_carrier_valid(int slot)
            race_transport_carrier_type(&u[slot]) &&
            !SC64_TRANSPORT_LOADED(&u[slot]);
 }
+
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+/* Check the old owner's admission before committing the entire group. */
+static int race_transport_retirement_carrier_type(const Unit *q)
+{
+    int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_transport_overlord_identity(q)) return race_transport_carrier_type(q);
+#endif
+    return sc64_transport_unconditional_carrier_raw((unsigned)raw) &&
+           sc64_race_unit_from_raw(raw) == q->type &&
+           race_transport_carrier_type(q);
+}
+#endif
 
 static int race_transport_passenger_space(const Unit *q)
 {
@@ -179,6 +205,9 @@ static int race_transport_request_board(int passenger, int carrier)
         !race_transport_carrier_valid(carrier) ||
         !u[passenger].alive || SC64_TRANSPORT_LOADED(&u[passenger]) ||
         u[passenger].owner != u[carrier].owner) return 0;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    if (race_mode && u[carrier].owner == NEUTRAL && u[carrier].raw_owner == 11) return 0;
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     if (sc64_race_ordinary_ghost(u[passenger].type) && race_nuke_ghost_locked(passenger)) return 0;
 #endif
@@ -208,6 +237,9 @@ static int race_transport_request_unload(int carrier, int x, int y)
     if (!race_transport_carrier_valid(carrier) ||
         race_transport_cargo_space(carrier) <= 0 ||
         x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return 0;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    if (race_mode && u[carrier].owner == NEUTRAL && u[carrier].raw_owner == 11) return 0;
+#endif
     u[carrier].order = ORDER_UNLOAD;
     u[carrier].target = -1;
     u[carrier].tx = x; u[carrier].ty = y;

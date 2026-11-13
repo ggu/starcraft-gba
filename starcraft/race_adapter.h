@@ -105,6 +105,15 @@ static int race_bot_index(int owner)
     return -1;
 }
 
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+static int race_skirmish_retired_owner(unsigned mask, int owner)
+{
+    for (int rank = 0; rank < 3; ++rank)
+        if (owner == race_bot_owner_ids[rank]) return !!(mask & (1u << rank));
+    return 0;
+}
+#endif
+
 static int race_skirmish_owner_base(int owner)
 {
     int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : owner == 4 ? 3 : -1;
@@ -1858,6 +1867,12 @@ static void race_skirmish_init(void)
     memset(race_player, 0xff, sizeof(race_player));
     memset(race_minerals, 0, sizeof(race_minerals)); memset(race_gas, 0, sizeof(race_gas));
     race_skirmish_geometry();
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    race_skirmish_eliminated = 0;
+#ifdef SC64_SHARED_TRANSPORT
+    race_skirmish_neutral_ventral = 0;
+#endif
+#endif
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
     death_vfx_reset();
     memset(geysers, 0, sizeof(geysers));
@@ -1996,14 +2011,134 @@ static void race_tick_ai(void)
     race_ai_tick();
 }
 
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+/* These actors are coupled to separately stored service records. Hold the
+ * entire owner transition until the linked case is supported; do not
+ * expose overlapping loaded passengers or publish half a transfer. */
+static int race_skirmish_neutral_transfer_ready(const Unit *q)
+{
+#ifdef SC64_TRANSPORT_RUNTIME
+    if (SC64_TRANSPORT_LOADED(q)) {
+        int carrier = q->target;
+        if (!race_transport_carrier_valid(carrier) || u[carrier].owner != q->owner ||
+            !race_transport_retirement_carrier_type(&u[carrier]) ||
+            q->x != u[carrier].x || q->y != u[carrier].y) return 0;
+    }
+#endif
+    if (SC64_CARRIER_CHILD_SCRIPTED(q) || SC64_SCARAB_CHILD(q)) return 0;
+#ifdef SC64_EGG_RUNTIME
+    if (q->type == SC64_EGG_ACTOR) return 0;
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (SC64_P7_CARRIER_PARENT_TYPE(q->type)) return 0;
+#endif
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+    if (sc64_race_raw_unit(q->type) == 83) return 0;
+#endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (sc64_race_is_battlecruiser(q->type)) return 0;
+#endif
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (sc64_race_ordinary_ghost(q->type)) return 0;
+#endif
+    return 1;
+}
+
+static void race_skirmish_retire_bot(int rank)
+{
+    int owner = race_bot_owner_ids[rank];
+#ifdef SC64_SHARED_TRANSPORT
+    int research = sc64_sk_transport_owner_index(owner);
+    int ventral = 0;
+#endif
+#ifdef SC64_TRANSPORT_RUNTIME
+    u8 cargo[MAX_UNITS] = {0};
+#endif
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i];
+        if (!q->alive || q->owner != owner) continue;
+        if (!race_skirmish_neutral_transfer_ready(q)) return;
+#ifdef SC64_SHARED_TRANSPORT
+        if (research >= 0 && race_skirmish_transport_tech.owner[research].researched &&
+            race_transport_overlord_identity(q)) ventral = 1;
+#endif
+#ifdef SC64_TRANSPORT_RUNTIME
+        if (SC64_TRANSPORT_LOADED(q)) {
+            int space = race_transport_passenger_space(q);
+            if (space < 0 || cargo[q->target] + space > SC64_TRANSPORT_DROPSHIP_SPACE)
+                return;
+            cargo[q->target] += (u8)space;
+        }
+#endif
+    }
+
+    race_skirmish_eliminated |= (u8)(1u << rank);
+#ifdef SC64_SHARED_TRANSPORT
+    race_skirmish_neutral_ventral |= (u8)ventral;
+#endif
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i];
+        if (!q->alive || q->owner != owner) continue;
+        q->owner = NEUTRAL;
+        q->raw_owner = 11;
+        q->selected = 0;
+        if (!SC64_TRANSPORT_LOADED(q)) {
+            q->order = ORDER_IDLE;
+            q->target = -1;
+        }
+        q->build = -1;
+        q->tx = q->path_x = q->x;
+        q->ty = q->path_y = q->y;
+        q->work_timer = q->path_timer = q->path_retry = 0;
+        if (sc64_race_is_worker(q->type)) {
+            q->carry = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+            sc64_worker_cargo_clear(q);
+            sc64_worker_gather_pending_set(q, 0);
+#endif
+        }
+#ifdef SC64_IMPACT_EVENTS
+        race_impact_clear_target(i);
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+        race_p7_projectile_clear_references(i);
+#endif
+#ifdef SC64_DIRECT_ATTACK
+        sc64_direct_attack_clear_references(i);
+#endif
+    }
+#ifdef SC64_TRANSPORT_RUNTIME
+    race_transport_changed();
+#endif
+}
+#endif
+
 static void race_skirmish_outcome(void)
 {
     int i, human_buildings = 0, enemy_buildings = 0;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    unsigned enemy_with_buildings = 0;
+#endif
     if (!race_mode || won || lost) return;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
         if (b[i].owner == SIDE) ++human_buildings;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        else {
+            int rank = race_bot_index(b[i].owner);
+            if (rank < 0) continue;
+            ++enemy_buildings;
+            enemy_with_buildings |= 1u << rank;
+        }
+#else
         else if (race_bot_index(b[i].owner) >= 0) ++enemy_buildings;
+#endif
     }
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    if (human_buildings && race_skirmish_map == SC64_MAP_BLOOD_BATH && race_skirmish_start_order)
+        for (int rank = 0; rank < race_bots && rank < 3; ++rank)
+            if (!((enemy_with_buildings | race_skirmish_eliminated) & (1u << rank)))
+                race_skirmish_retire_bot(rank);
+#endif
     if (!human_buildings) { lost = 1; screen = SCREEN_RESULT; result_timer = 0; }
     else if (!enemy_buildings) { won = 1; screen = SCREEN_RESULT; result_timer = 0; }
 }

@@ -22,3 +22,10 @@ $(eval $(call NATIVE_MELEE_START_PROFILE,showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_I
 sc64-native-melee-start-probe: $(foreach profile,terran z10 p10 showcase,build/StarCraft-Melee-Starts-Probe-$(profile)-GBA.gba)
 test-sc64-native-melee-start-probe: $(addprefix build/test-native-melee-start-,terran z10 p10 showcase)
 	@for test in $^; do "$$test" || exit $$?; done
+
+# HOST-only preview; separate from shipped or ARM preview cartridges.
+.PHONY: test-sc64-native-skirmish-elimination
+build/test-native-skirmish-elimination: tests/sc64_skirmish_elimination.c tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/native-melee-starts/Makefile | build
+	$(CLANG) $(NATIVE_MELEE_HOST_FLAGS) $(NATIVE_MELEE_START_FLAGS) -DSC64_NATIVE_SKIRMISH_ELIMINATION $(filter-out -DGBA_NO_DEBUG_INPUTS,$(TERRAN_ROM_FLAGS)) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
+test-sc64-native-skirmish-elimination: build/test-native-skirmish-elimination
+	./$<

@@ -611,11 +611,59 @@ static int race_shared_egg_custom_candidate_valid(const RaceSave *candidate,
 
 #endif
 #ifdef SC64_SHARED_TRANSPORT
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+/* High bit of the first research byte; its low bit remains the human's
+ * completion bit. All older readers require each research byte <= 1. */
+enum { SC64_NEUTRAL_VENTRAL_BYTE = 3, SC64_NEUTRAL_VENTRAL_BIT = 0x80 };
+static int race_sk_transport_wire_decode(const u8 in[16])
+{
+    u8 clean[16];
+    Sc64SkTransportTech decoded;
+    memcpy(clean, in, sizeof(clean));
+    unsigned neutral = !!(clean[SC64_NEUTRAL_VENTRAL_BYTE] & SC64_NEUTRAL_VENTRAL_BIT);
+    clean[SC64_NEUTRAL_VENTRAL_BYTE] &= (u8)~SC64_NEUTRAL_VENTRAL_BIT;
+    race_skirmish_neutral_ventral_candidate = 0;
+    if (!sc64_sk_transport_decode(&decoded, clean, MAX_BUILDINGS)) return 0;
+    race_skirmish_transport_candidate = decoded;
+    race_skirmish_neutral_ventral_candidate = (u8)neutral;
+    return 1;
+}
+
+static void race_sk_transport_wire_encode(u8 out[16])
+{
+    sc64_sk_transport_encode(out, &race_skirmish_transport_candidate);
+    if (race_skirmish_neutral_ventral_candidate)
+        out[SC64_NEUTRAL_VENTRAL_BYTE] |= SC64_NEUTRAL_VENTRAL_BIT;
+}
+#else
+#define race_sk_transport_wire_decode(in) \
+    sc64_sk_transport_decode(&race_skirmish_transport_candidate, (in), MAX_BUILDINGS)
+#define race_sk_transport_wire_encode(out) \
+    sc64_sk_transport_encode((out), &race_skirmish_transport_candidate)
+#endif
+
 /* Validate only candidate data, before installing any world state. */
 static int race_sk_transport_candidate_valid(const RaceSave *candidate)
 {
     static const int owners[SC64_SK_TRANSPORT_OWNERS] = {0, 1, 3, 4};
     if (!candidate) return 0;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    if (race_skirmish_neutral_ventral_candidate) {
+        int last_race;
+        unsigned sparse, starts, melee, marked;
+        int bots = candidate->state[4];
+        int seeded = 0;
+        if (candidate->state[0] != 1 || bots < 1 || bots > 3 ||
+            !sc64_skirmish_read_elimination_word(1,
+                candidate->state[20] == SC64_MAP_BLOOD_BATH, bots,
+                candidate->state[23], &last_race, &sparse, &starts, &melee, &marked) ||
+            !marked) return 0;
+        for (int rank = 0; rank < candidate->state[4]; ++rank)
+            if ((marked & (1u << rank)) && candidate->players[owners[rank + 1]] == R_ZERG &&
+                race_skirmish_transport_candidate.owner[rank + 1].researched) seeded = 1;
+        if (!seeded) return 0;
+    }
+#endif
     for (int i = 0; i < SC64_SK_TRANSPORT_OWNERS; ++i) {
         const Sc64SkTransportJob *job = &race_skirmish_transport_candidate.owner[i];
         int active = candidate->state[0] && (i == 0 || i <= candidate->state[4]);
@@ -1583,6 +1631,10 @@ static int race_skirmish_saved_transport(const RaceSave *candidate, const Unit *
     if (raw == SC64_TRANSPORT_OVERLORD_RAW && ship->type == U_OVERLORD) {
         if (candidate->state[0]) {
             int owner = sc64_sk_transport_owner_index(ship->owner);
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+            if (ship->owner == NEUTRAL && ship->raw_owner == 11)
+                return race_skirmish_neutral_ventral_candidate;
+#endif
             return owner >= 0 && race_skirmish_transport_candidate.owner[owner].researched;
         }
 #ifdef SC64_Z6_TRANSPORT_ENABLED
@@ -1606,6 +1658,14 @@ static int race_skirmish_transport_save_valid(const RaceSave *candidate,
         Unit actor;
         if (!race_skirmish_transport_decode(candidate, i, width, height, &actor SC64_GCTX_ARG)) return 0;
         if (!actor.alive) continue;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        int retired_cargo = candidate->state[0] && actor.owner == NEUTRAL &&
+            (((unsigned)candidate->state[23] >> SC64_SKIRMISH_ELIM_SHIFT) & 7u);
+        if (retired_cargo && (actor.order == ORDER_BOARD || actor.order == ORDER_UNLOAD ||
+            (actor.order == ORDER_TRANSPORTED &&
+             (actor.raw_owner != 11 || actor.target >= MAX_UNITS || actor.build != -1 ||
+              actor.tx != actor.x || actor.ty != actor.y || actor.work_timer)))) return 0;
+#endif
         if (actor.order == ORDER_UNLOAD) {
             if (!race_skirmish_saved_transport(candidate, &actor) || actor.target != -1 ||
                 actor.work_timer < 0 || actor.work_timer > SC64_TRANSPORT_UNLOAD_TICKS ||
@@ -1631,6 +1691,10 @@ static int race_skirmish_transport_save_valid(const RaceSave *candidate,
 #endif
             space == SC64_TRANSPORT_SPACE_UNAVAILABLE) return 0;
         if (actor.order == ORDER_TRANSPORTED) {
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+            if (retired_cargo && (carrier.raw_owner != 11 ||
+                carrier.order != ORDER_IDLE)) return 0;
+#endif
             if (actor.selected || actor.x != carrier.x || actor.y != carrier.y ||
                 actor.path_timer || actor.path_retry ||
                 (unsigned)used[actor.target] + space > SC64_TRANSPORT_DROPSHIP_SPACE) return 0;
@@ -2294,6 +2358,10 @@ static int race_save_game(void) {
             race_skirmish_melee ? sc64_skirmish_melee_word(race_bot_races[2],mask,race_skirmish_start_order) :
 #endif
             sc64_skirmish_start_word(race_bot_races[2],mask,race_skirmish_start_order);
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        if (!sc64_skirmish_elimination_word(race_bots, race_data.state[23],
+                race_skirmish_eliminated, &race_data.state[23])) return 0;
+#endif
     }else if(race_mode && race_skirmish_slots){
         if(!sc64_skirmish_sparse_valid(race_bots,race_skirmish_slots) ||
            race_bot_races[2]<0 || race_bot_races[2]>=3)return 0;
@@ -2340,6 +2408,9 @@ static int race_save_game(void) {
 #endif
     memcpy(race_data.players,race_player,sizeof(race_player));
 #ifdef SC64_SHARED_TRANSPORT
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    race_skirmish_neutral_ventral_candidate = race_mode ? race_skirmish_neutral_ventral : 0;
+#endif
     if (race_mode) race_skirmish_transport_candidate = race_skirmish_transport_tech;
     else memset(&race_skirmish_transport_candidate, 0, sizeof(race_skirmish_transport_candidate));
     if (!race_sk_transport_candidate_valid(&race_data)) return 0;
@@ -2896,7 +2967,7 @@ static int race_save_game(void) {
 #elif defined(SC64_SHARED_TRANSPORT)
     {
         u8 trailer[16];
-        sc64_sk_transport_encode(trailer, &race_skirmish_transport_candidate);
+        race_sk_transport_wire_encode(trailer);
         if (!save_write_parts(&race_data, sizeof(race_data), trailer, sizeof(trailer),
                               SC64_TRANSPORT_SAVE_VERSION)) return 0;
     }
@@ -3170,7 +3241,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     for(int i=21;i<23;i++)if(v[i]<0||v[i]>2)return 0;
     int saved_last_race;
     unsigned saved_sparse,saved_starts;
-#ifdef SC64_NATIVE_MELEE_STARTS
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    unsigned saved_melee, saved_eliminated;
+    if (!sc64_skirmish_read_elimination_word(v[0], v[20]==SC64_MAP_BLOOD_BATH, v[4], v[23],
+            &saved_last_race, &saved_sparse, &saved_starts, &saved_melee, &saved_eliminated)) return 0;
+#elif defined(SC64_NATIVE_MELEE_STARTS)
     unsigned saved_melee;
     if(!sc64_skirmish_read_match_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
                                      &saved_last_race,&saved_sparse,&saved_starts,&saved_melee))return 0;
@@ -3268,6 +3343,20 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        if (saved_eliminated &&
+            (race_skirmish_retired_owner(saved_eliminated, RACE_U(i,owner)) ||
+             (RACE_U(i,owner) == NEUTRAL && RACE_U(i,raw_owner) == 11 &&
+              ((RACE_U(i,order) != ORDER_IDLE
+#ifdef SC64_TRANSPORT_RUNTIME
+                && RACE_U(i,order) != ORDER_TRANSPORTED
+#endif
+               ) || RACE_U(i,selected) ||
+               (RACE_U(i,order) == ORDER_IDLE && RACE_U(i,target) != -1) ||
+               RACE_U(i,build) != -1 ||
+               RACE_U(i,tx) != RACE_U(i,x) || RACE_U(i,ty) != RACE_U(i,y) ||
+               RACE_U(i,path_timer) || RACE_U(i,path_retry) || RACE_U(i,work_timer))))) return 0;
+#endif
         if(RACE_U(i,type)<0||RACE_U(i,type)>=SC_RU_COUNT||RACE_U(i,owner)<0||RACE_U(i,owner)>4||
             RACE_U(i,hp)<=0||RACE_U(i,maxhp)<=0||RACE_U(i,hp)>RACE_U(i,maxhp)||
             RACE_U(i,x)<0||RACE_U(i,x)>=width*16||RACE_U(i,y)<0||RACE_U(i,y)>=height*16||
@@ -3457,6 +3546,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             RACE_B(i,shield)!=0||RACE_SAVE_INV_B(&race_data, i)!=1))return 0;
 #endif
         if(!RACE_B(i,alive))continue;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        if (saved_eliminated && race_skirmish_retired_owner(saved_eliminated, RACE_B(i,owner)))
+            return 0;
+#endif
         int health_ok=RACE_B(i,hp)>0&&RACE_B(i,maxhp)>0&&
                       RACE_B(i,hp)<=RACE_B(i,maxhp);
         if (sc64_legacy_beacon_hp_sentinel(RACE_B(i,type),RACE_B(i,raw_type),
@@ -4805,7 +4898,7 @@ static int race_load_game(void) {
         if (!save_read_parts(&race_data, sizeof(race_data), trailer, sizeof(trailer),
                              SC64_TRANSPORT_SAVE_VERSION) ||
             race_data.version != SAVE_VERSION ||
-            !sc64_sk_transport_decode(&race_skirmish_transport_candidate, trailer, MAX_BUILDINGS))
+            !race_sk_transport_wire_decode(trailer))
             return 0;
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
         if (((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u
@@ -4842,6 +4935,9 @@ static int race_load_game(void) {
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_SHARED_TRANSPORT
     race_skirmish_transport_tech = race_skirmish_transport_candidate;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    race_skirmish_neutral_ventral = race_skirmish_neutral_ventral_candidate;
+#endif
 #endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     sc64_battlecruiser_tech_bits = (u16)((unsigned)v[27] & 65535u);
@@ -4856,7 +4952,12 @@ static int race_load_game(void) {
     race_skirmish_map=v[20];for(int i=0;i<2;i++)race_bot_races[i]=v[21+i];
     /* Already checked by race_load_preflight; no partially loaded world on
      * malformed seating. */
-#ifdef SC64_NATIVE_MELEE_STARTS
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    unsigned eliminated = 0;
+    (void)sc64_skirmish_read_elimination_word(v[0], v[20]==SC64_MAP_BLOOD_BATH, v[4], v[23],
+        &race_bot_races[2], &race_skirmish_slots, &race_skirmish_start_order, &race_skirmish_melee, &eliminated);
+    race_skirmish_eliminated = (u8)eliminated;
+#elif defined(SC64_NATIVE_MELEE_STARTS)
     (void)sc64_skirmish_read_match_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
                                      &race_bot_races[2],&race_skirmish_slots,&race_skirmish_start_order,&race_skirmish_melee);
 #else
