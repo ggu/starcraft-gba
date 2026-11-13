@@ -174,7 +174,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   passes four guarded links and physical custom SRAM continuations. P10
   still wins and runs at 9.62 emulated updates/s (8.60% fewer cycles).
   Both full Z10 custom outcomes match, but the Blood Bath timing window
-  regresses (+0.75% mean, +7.41% max). Attribute the tail before promotion.
+  regresses (+0.75% mean, +7.41% max). The traced tail is a facility fill
+  with little expansion work; qualify a scalar choice for cheap short fills
+  before promotion.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in

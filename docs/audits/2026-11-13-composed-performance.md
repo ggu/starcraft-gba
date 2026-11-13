@@ -37,9 +37,13 @@ A separate replay reproduces the new maximum at call 11,539:
 2,235,129 → 2,447,406 cycles on the same closed-menu update. Unit
 orders rise by 215,833 cycles, accounting for the increase; map and
 HUD work do not. The old maximum at call 11,092 rises by 8,166 cycles.
-Keep the composition optional. Attribute the extra work within unit
-orders, extend full campaign coverage and measure the build on hardware
-before enabling these options by default.
+A paired instruction trace of call 11,539 puts 361,686 → 570,727 cycles
+in the facility lookup, with matching route builds (2,336) and hits
+(29,673). The new fill takes 470,415 cycles including only 36,148 for
+FIFO expansion. Grid initialization and packing are part of the
+remaining cost. A cheap scalar path for small, early-stopping fills is
+the next comparison. Keep the composition optional and measure the
+build on hardware before enabling these options by default.
 
 - P10 composed ROM SHA-256: `6ac056503bf28b8ce7af09b3313b90b78f764cfd9a3fd805e75ae12d5bd08c97`.
 - P10 composed replay receipt: `51f06c06340b5ddd7ebbff37809093d111b098f6f14a53868287521ff6b06f61`.
