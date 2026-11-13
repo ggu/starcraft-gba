@@ -37,14 +37,18 @@ account for the difference; expansion falls from 5.89–7.18M to
 0.77%, from 1,639,374 to 1,626,691. This improves the sampled stalls
 without materially changing the sustained update rate.
 
-The next gate is to load the retained normal-cartridge pause journal at
-frame 36,761 with both composed cartridges, compare the fresh world before
-inputs (including workers' home and order fields), then run the same physical
-suffix through frame 46,057 and compare world, pixels, final mission state,
-and any journals. Detached save validation also checks depot reachability.
-Follow this with a complete fresh HOME composition replay and a representative
-P10 custom matchup with multiple depots before changing defaults. A matching
-menu or matching SRAM schema alone does not prove a compatible world.
+Both composed builds loaded the same retained KODAK pause journal through
+physical L at frame 36,761. The restored world fingerprint
+`65a9decfb8bac76b4108a594efc52c05a8203c80e18402d5de5814579646e8fd`
+matched the normal ROM, with 213 units and 81 buildings. At all five
+sampled suffix checkpoints, world state, both indexed pages, palette and
+fog matched, including the victory at frame 46,057. Both exported the
+same final journal (`c69ff8edddd990e94f3f9418e5b2198cb47e649a555afb36aca5d6f54de58cbf`).
+The paired suffix receipt is
+`a5e84f91c6d0d6f9f7eff853018c2a0fb93b543625f3c6f55390b2822e8e6dc5`.
+This qualifies the composed save suffix. A fresh full normal HOME replay
+and a custom match with multiple active depots are separate gates for
+promoting nearest-first on the default P10 cartridge.
 
 - Control ROM: `6ac056503bf28b8ce7af09b3313b90b78f764cfd9a3fd805e75ae12d5bd08c97`.
 - Candidate ROM: `cb8990e8b3a5621b3bbaa637e0a6f4c37ff8f5ac4ec5d79cf0fe15f6faba8f66`.
