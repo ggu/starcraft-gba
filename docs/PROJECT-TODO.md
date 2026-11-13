@@ -77,9 +77,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   opponent slots. Defeat transfers the remaining actors to neutral ownership
   and detaches their AI. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
   traces the loaded passenger exception and the Carrier/Reaver queue reset.
-  A passive replay did not reach elimination. Next: verify per-CPU elimination
-  with a surviving mobile force in an active match, check native Free for All
-  Random draws, and qualify complete ordinary-input matches on hardware.
+  A passive replay did not reach elimination. [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
+  tests retirement and neutral cargo on HOST. Before ARM enablement, ensure
+  final victory cannot bypass a deferred retirement, and resolve in-flight
+  damage and simultaneous outcomes against native evidence. Next: record
+  an active elimination, check native Free for All Random draws, and qualify
+  complete ordinary-input matches on hardware.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
