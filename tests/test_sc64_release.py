@@ -70,11 +70,12 @@ class RegistryTests(unittest.TestCase):
 
     def test_product_selection(self) -> None:
         keys = [p.key for p in rel.resolve_products(None)]
-        self.assertNotIn("zerg-z10", keys)
+        self.assertIn("zerg-z10", keys)
+        self.assertNotIn("zerg-z9", keys)
         self.assertIn("showcase", keys)
-        self.assertIn("zerg-z10", [p.key for p in rel.resolve_products("all")])
+        self.assertIn("zerg-z9", [p.key for p in rel.resolve_products("all")])
         self.assertEqual([p.key for p in rel.resolve_products("zerg,protoss")],
-                         ["zerg-z9", "protoss-p10"])
+                         ["zerg-z10", "protoss-p10"])
         with self.assertRaises(rel.ReleaseError):
             rel.resolve_products("nonsense")
 
@@ -212,7 +213,7 @@ class CheckLogicTests(unittest.TestCase):
 
     def test_missing_inputs_are_skipped_never_passed(self) -> None:
         def missing(targets, args):
-            return [".local/a.h", ".local/b.h", ".local/c.h", ".local/d.h"] if "test-zerg" in targets else []
+            return [".local/a.h", ".local/b.h", ".local/c.h", ".local/d.h"] if "test-sc64-zerg-z9" in targets else []
         self.build_roms("zerg-z9")
         result = self.run_check(make_env(self.root, FakeRunner(), missing), self.products("zerg-z9"))
         product = result["products"][0]
@@ -326,7 +327,7 @@ class PackageTests(unittest.TestCase):
         self.check_dir = self.root / "chk"
 
         def missing(targets, args):
-            return [".local/z"] if "test-zerg" in targets else []
+            return [".local/z"] if "test-sc64-zerg-z9" in targets else []
         env = make_env(self.root, FakeRunner(), missing)
         keys = ("terran", "protoss-p10", "zerg-z9")
         for key in ("zerg-z9",):

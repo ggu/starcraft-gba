@@ -107,12 +107,14 @@ static void test_skirmish_selection_unchanged(void)
     assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bots == 2);
     assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bots == 3);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 3);
-    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[0] == 2);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[0] == SC_FRONT_RACE_TERRAN);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[0] == SC_FRONT_RACE_PROTOSS);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 4);
-    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[1] == 0);
+    assert(press(&f, KEY_LEFT) == SC_FRONT_NONE && f.bot_races[1] == SC_FRONT_RACE_TERRAN);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 5);
-    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[2] == 2);
-    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 6);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[2] == SC_FRONT_RACE_TERRAN);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[2] == SC_FRONT_RACE_PROTOSS);
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == SC_FRONT_SKIRMISH_LAUNCH_ROW);
     assert(press(&f, KEY_A) == SC_FRONT_START_SKIRMISH);
     assert(f.race == SC_FRONT_RACE_ZERG && f.bots == 3);
 }

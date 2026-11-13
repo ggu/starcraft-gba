@@ -1817,7 +1817,22 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 }
 #endif
 
+#ifdef SC64_NUKE_SILO_JOURNAL
+#include "sc64_nuke_silo_journal.h"
+#endif
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+#include "sc64_nuke_strike_journal.h"
+#endif
+
 static int race_save_game(void) {
+#ifdef SC64_NUKE_SILO_JOURNAL
+    int nuke_silo_tag;
+    if (!race_nuke_save_live_scope(&nuke_silo_tag)) return 0;
+#elif defined(SC64_SHARED_NUKE_PROBE)
+    /* No authenticated wire format for Silo receipts, flights or new Ghost
+     * identities yet. Never replace an existing save with partial state. */
+    return 0;
+#endif
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
 #ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
     Sc64StageSaveAuth compound_writer_auth;
@@ -2241,6 +2256,13 @@ static int race_save_game(void) {
         race_data.buildings[i][j]=(s16)n;
     }
 #endif
+#ifdef SC64_NUKE_SILO_JOURNAL
+    Sc64NukeSaveAuth nuke_writer_auth = {0};
+    if (nuke_silo_tag && !sc64_nuke_save_authenticate(&nuke_writer_auth, &race_data,
+            SC64_NUKE_SILO_TRANSPORT_TAG, race_data.version,
+            SC64_TRANSPORT_SAVE_VERSION, SAVE_VERSION)) return 0;
+    if (!race_nuke_save_write_silos(&nuke_writer_auth, nuke_silo_tag)) return 0;
+#endif
     memset(race_data.fog,0,sizeof(race_data.fog));
     for(int i=0;i<MAP_CELLS;i++)if(SC64_GRID_GET(explored,i))race_data.fog[i>>3]|=1u<<(i&7);
 #ifdef SC64_ZP_FULL_STORAGE
@@ -2259,6 +2281,25 @@ static int race_save_game(void) {
 #endif
         };
     memcpy(race_data.state,state,sizeof(state));
+#ifdef SC64_IMPORTED_SKIRMISH
+#ifdef SC64_NATIVE_MELEE_STARTS
+    if(race_mode && race_skirmish_melee && !race_skirmish_start_order)return 0;
+#endif
+    if(race_mode && race_skirmish_start_order){
+        unsigned mask=race_skirmish_slots ? race_skirmish_slots : sc64_skirmish_dense_seats(race_bots);
+        if(race_skirmish_map!=SC64_MAP_BLOOD_BATH || race_bot_races[2]<0 || race_bot_races[2]>=3 ||
+           !sc64_skirmish_start_valid(race_bots,mask,race_skirmish_start_order))return 0;
+        race_data.state[23]=
+#ifdef SC64_NATIVE_MELEE_STARTS
+            race_skirmish_melee ? sc64_skirmish_melee_word(race_bot_races[2],mask,race_skirmish_start_order) :
+#endif
+            sc64_skirmish_start_word(race_bot_races[2],mask,race_skirmish_start_order);
+    }else if(race_mode && race_skirmish_slots){
+        if(!sc64_skirmish_sparse_valid(race_bots,race_skirmish_slots) ||
+           race_bot_races[2]<0 || race_bot_races[2]>=3)return 0;
+        race_data.state[23]=sc64_skirmish_seat_word(race_bot_races[2],race_skirmish_slots);
+    }
+#endif
 #ifdef SC64_SAVE_UI_CONTEXT
     {
         int selected = selected_building;
@@ -2838,8 +2879,15 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    if (!race_nuke_save_write_strikes(&nuke_writer_auth)) return 0;
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
-    if (!race_impact_save_write(cargo_have_previous ? &cargo_previous : 0)) return 0;
+    if (!race_impact_save_write(cargo_have_previous ? &cargo_previous : 0
+#ifdef SC64_NUKE_SILO_JOURNAL
+                                , nuke_silo_tag
+#endif
+                               )) return 0;
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     if (!race_impact_save_write(have_previous ? &previous : 0)) return 0;
 #else
@@ -2879,6 +2927,13 @@ _Static_assert(SC64_PR_PAD_TUPLE_VALID(MAX_BUILDINGS,SC64_PR_ROW_WIDTH,SC64_PR_U
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_NUKE_SILO_JOURNAL
+    Sc64NukeSaveAuth nuke_silo_auth;
+    u16 nuke_silo_receipts[MAX_BUILDINGS];
+#endif
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    Sc64NukeStrikeLoadPlan nuke_strikes;
+#endif
 #ifdef SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE
     Sc64StageSaveAuth compound_auth;
     u8 compound_flight[MAX_UNITS*4u];
@@ -3112,10 +3167,27 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     int height=v[0]?64:sc64_race_maps[v[2]].height;
 #ifdef SC64_IMPORTED_SKIRMISH
     if(v[20]<0||v[20]>SC64_SKIRMISH_IMPORTED_COUNT)return 0;
-    for(int i=21;i<24;i++)if(v[i]<0||v[i]>2)return 0;
+    for(int i=21;i<23;i++)if(v[i]<0||v[i]>2)return 0;
+    int saved_last_race;
+    unsigned saved_sparse,saved_starts;
+#ifdef SC64_NATIVE_MELEE_STARTS
+    unsigned saved_melee;
+    if(!sc64_skirmish_read_match_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
+                                     &saved_last_race,&saved_sparse,&saved_starts,&saved_melee))return 0;
+#else
+    if(!sc64_skirmish_read_start_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
+                                    &saved_last_race,&saved_sparse,&saved_starts))return 0;
+#endif
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    /* Remove journal-only actor rows before ordinary migrations or mission
+     * validation. The detached plan holds their authenticated state. */
+    const Sc64NukeSaveWorld strike_world = race_nuke_save_world(v[0], v[4], width * 16, height * 16);
+    if (!race_nuke_save_prepare_strikes(&race_data, &strike_world, &plan->nuke_silo_auth,
+                                       &plan->nuke_strikes)) return 0;
+#endif
 #ifdef SC64_SHARED_BATTERY
     if (!race_battery_migrate_shield_phase(&race_data,width,height SC64_GCTX_ARG)) return 0;
 #endif
@@ -3151,6 +3223,12 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||
         race_data.ore[i]<0||race_data.ore[i]>65535||race_data.vespene[i]<0||race_data.vespene[i]>65535)return 0;
+#ifdef SC64_NUKE_SILO_JOURNAL
+    const Sc64NukeSaveWorld nuke_world = race_nuke_save_world(v[0], v[4], width * 16, height * 16);
+    Sc64NukeSaveCensus nuke_census = {0};
+    const int nuke_has_tag = sc64_nuke_save_auth_matches(&plan->nuke_silo_auth,
+                                                         &race_data, race_data.version);
+#endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define RACE_U(i,f) candidate_unit.f
 #else
@@ -3168,6 +3246,9 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                                   (unsigned)(width * 16),
                                   (unsigned)(height * 16),
                                   &candidate_unit)) return 0;
+#endif
+#ifdef SC64_NUKE_SILO_JOURNAL
+        if (!race_nuke_save_unit_valid(RACE_U(i,type), RACE_U(i,raw_type), nuke_has_tag)) return 0;
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         /* U_Z7_EGG is a legacy type only in the Z7 campaign. Every custom or
@@ -3346,6 +3427,14 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         Building candidate_building;
         if(!sc64_building_save_decode(&candidate_building,
                                      &race_data.buildings[i])) return 0;
+#elif defined(SC64_NUKE_SILO_JOURNAL)
+        Building candidate_building;
+        if (!race_save_decode_building(&race_data, (unsigned)i, &candidate_building)) return 0;
+#endif
+#ifdef SC64_NUKE_SILO_JOURNAL
+        if (!race_nuke_save_candidate_building(&race_data, (unsigned)i, &candidate_building,
+                &nuke_world, &plan->nuke_silo_auth, &nuke_census, &plan->nuke_silo_receipts[i]))
+            return 0;
 #endif
         if(RACE_B(i,alive)<0||RACE_B(i,alive)>1)return 0;
 #ifdef SC64_CONSTRUCTION_HP
@@ -4435,6 +4524,15 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (!race_impact_save_decode_selected_guardian(len,impact_tag,plan->impact_candidate,
                                           &plan->impact_candidate_count,&plan->guardian_auth)) return 0;
 #else
+#ifdef SC64_NUKE_SILO_JOURNAL
+    int nuke_silo_tag = tag == SC64_NUKE_SILO_TRANSPORT_TAG;
+    if (nuke_silo_tag && (len < sizeof(race_data.version) ||
+        !sc64_nuke_save_authenticate(&plan->nuke_silo_auth, &race_data,
+            tag, race_data.version, SC64_TRANSPORT_SAVE_VERSION, SAVE_VERSION))) return 0;
+    /* The proven transport/impact codec still receives its original outer
+     * family and inner version; its byte layout and limits do not change. */
+    if (nuke_silo_tag) tag = SC64_TRANSPORT_SAVE_VERSION;
+#endif
 #ifdef SC64_SHARED_TRANSPORT
     if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
@@ -4476,6 +4574,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif /* SC64_SHARED_EGG_JOURNAL_HOST_STAGE */
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
     if (tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION
+#if defined(SC64_NUKE_SILO_JOURNAL) && defined(SC64_RESEARCH_SRAM_PRODUCT)
+        || (nuke_silo_tag && race_data.state[0] == 1)
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
         || tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
@@ -4494,6 +4595,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
     plan->research_jobs_tag=(u8)(tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION);
+#if defined(SC64_NUKE_SILO_JOURNAL) && defined(SC64_RESEARCH_SRAM_PRODUCT)
+    if (nuke_silo_tag && race_data.state[0] == 1) plan->research_jobs_tag = 1;
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
     if (tag==SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION) plan->research_jobs_tag=2;
     /* Old campaign records did not initialize typed levels. Preserve any
@@ -4544,6 +4648,9 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_NUKE_SILO_JOURNAL
+        ,SC64_NUKE_SILO_TRANSPORT_TAG
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
         ,SC64_RESEARCH_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
@@ -4746,7 +4853,16 @@ static int race_load_game(void) {
 #endif
 #endif
 #ifdef SC64_IMPORTED_SKIRMISH
-    race_skirmish_map=v[20];for(int i=0;i<3;i++)race_bot_races[i]=v[21+i];
+    race_skirmish_map=v[20];for(int i=0;i<2;i++)race_bot_races[i]=v[21+i];
+    /* Already checked by race_load_preflight; no partially loaded world on
+     * malformed seating. */
+#ifdef SC64_NATIVE_MELEE_STARTS
+    (void)sc64_skirmish_read_match_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
+                                     &race_bot_races[2],&race_skirmish_slots,&race_skirmish_start_order,&race_skirmish_melee);
+#else
+    (void)sc64_skirmish_read_start_word(v[0],v[20]==SC64_MAP_BLOOD_BATH,v[4],v[23],
+                                     &race_bot_races[2],&race_skirmish_slots,&race_skirmish_start_order);
+#endif
 #endif
     minerals=v[5];gas=v[6];frame=v[7];cx=v[8];cy=v[9];train_type=v[10];
     weapons_level=v[11];armor_level=v[12];weapons_research=v[13];armor_research=v[14];seed=(u32)v[15];
@@ -5104,7 +5220,7 @@ static int race_load_game(void) {
     invalidate_path_grid();
 #endif
     sc64_visibility_reset();update_exploration();reset_selection_gestures();
-    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_capacity(SIDE);
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     memcpy(sc64_pr_hp_debt,plan.q8_debt,sizeof sc64_pr_hp_debt);
 #if defined(SC64_CONTROLLER_FLASH_P1_HOST_STAGE) || defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
@@ -5117,6 +5233,14 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_RESEARCH_SRAM_PRODUCT
     sc64_pr_stage_resync();
+#endif
+#ifdef SC64_NUKE_SILO_JOURNAL
+    race_nuke_save_restore(plan.nuke_silo_receipts);
+#ifdef SC64_NUKE_ACTIVE_JOURNAL
+    race_nuke_save_restore_strikes(&plan.nuke_strikes);
+#endif
+#elif defined(SC64_SHARED_NUKE_PROBE)
+    race_nuke_reset();
 #endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }

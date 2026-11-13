@@ -39,13 +39,21 @@
 #define PROFILE_FACTION SC64_FACTION_ZERG
 #define PROFILE_FRONT_FACTION SC_FRONT_ZERG
 #define PROFILE_RACE R_ZERG
-#define PROFILE_SAVE_GENERATION 48u
 #define PROFILE_OLD_SAVE_TAG 0x53435a32u
+#ifdef SC64_Z10_RUNTIME
+#define PROFILE_SAVE_GENERATION 49u
+static const int profile_missions[] = {0, 1, 14, 15, 16, 17, 18, 19, 20, 21};
+#else
+#define PROFILE_SAVE_GENERATION 48u
 static const int profile_missions[] = {0, 1, 14, 15, 16, 17, 18, 19, 20};
+#endif
 static const char *const profile_titles[] = {
     "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM",
     "THE AMERIGO", "THE DARK TEMPLAR", "THE CULLING", "EYE FOR AN EYE",
-    "THE INVASION OF AIUR"
+    "THE INVASION OF AIUR",
+#ifdef SC64_Z10_RUNTIME
+    "FULL CIRCLE",
+#endif
 };
 #elif SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z7_RUNTIME)
 #define PROFILE_FACTION SC64_FACTION_ZERG

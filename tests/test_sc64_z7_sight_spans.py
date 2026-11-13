@@ -127,6 +127,13 @@ static int check_prepared_rows(void) {
                             radius,x,y,row,first,last,want_first,want_last);
                         return 1;
                     }
+#ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
+                    if (row >= 0 && row < MAP_ROWS && ctx.packed_rows) {
+                        unsigned want = want_first > want_last ? SC64_SIGHT_EMPTY_SPAN :
+                                                    (unsigned)(want_last*256+want_first);
+                        if (sc64_z7_visibility_packed_row(&ctx,row) != want) return 1;
+                    }
+#endif
                 }
             }
     return 0;
@@ -154,6 +161,32 @@ static int expected_radius(int raw) {
     default: return 0;
     }
 }
+
+#ifdef SC64_SHARED_SIGHT_PACKED_ROWS
+/* Exact scalar row reference across every sub-tile phase, supported radius
+ * and both clipped map corners. The stateful oracle below additionally
+ * checks counts, visibility, exploration and minimap occupancy. */
+static int check_shared_packed_rows(void)
+{
+    for (int radius=64;radius<=176;radius+=16)
+        for (int y=0;y<16;++y) for (int x=0;x<16;++x)
+            for (int corner=0;corner<2;++corner) {
+                int xx=x+corner*(MAP_COLS-1)*16, yy=y+corner*(MAP_ROWS-1)*16;
+                int r=(radius-64)/16, extent=(radius+23)/16;
+                const u8 *rows=sc64_z7_sight_packed_rows[r][y*16+x];
+                const u8 *half=sc64_z7_visibility_halfwidths+sc64_z7_visibility_halfwidth_offsets[r];
+                for (int j=0;j<MAP_ROWS;++j) {
+                    int first,last;
+                    sc64_visibility_row_span(xx,yy,j,radius,extent,half,&first,&last);
+                    unsigned expected=first>last ? SC64_SIGHT_EMPTY_SPAN :
+                                                   (unsigned)(last*256+first);
+                    if (expected!=sc64_visibility_unpack_row(rows,xx/16,
+                            (unsigned)(j-yy/16+SC64_SIGHT_ROW_BIAS))) return 1;
+                }
+            }
+    return 0;
+}
+#endif
 
 static int owner_unit_radius(int type) {
     if (type == U_ZP_SOURCE) return 200; /* intentionally outside Z7 LUT */
@@ -370,6 +403,10 @@ static int run_dense_counts(int step) {
 }
 
 int main(void) {
+#ifdef SC64_SHARED_SIGHT_PACKED_ROWS
+    if (check_shared_packed_rows()) return 1;
+#endif
+
     int step;
 #ifdef SC64_Z7_SIGHT_SPANS
     if (check_z7_lookup()) return 1;
@@ -410,15 +447,25 @@ class Z7SightSpansTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="sc64-z7-sight-") as temp:
             source = Path(temp) / "fixture.c"
             source.write_text(C_SOURCE)
+            subprocess.run(["python3", str(ROOT / "tools/sc64_sight_row_lut.py"),
+                            str(Path(temp) / "sc64_sight_row_lut_generated.h")],
+                           check=True, cwd=ROOT)
             variants = (
                 ("scalar", [], 0),
                 ("legacy-spans", ["-DSC64_VISIBILITY_SPANS"], 0),
                 ("z7-spans", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS"], 1),
+                ("shared-packed", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
+                                   "-DSC64_SHARED_SPAN_TABLES",
+                                   "-DSC64_SHARED_SIGHT_PACKED_ROWS"], 1),
                 ("z7-phase", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
                               "-DSC64_Z7_VISIBILITY_PHASE_REJECT"], 1),
                 ("z7-row-context", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
                                     "-DSC64_Z7_VISIBILITY_PHASE_REJECT",
                                     "-DSC64_Z7_VISIBILITY_ROW_CONTEXT"], 1),
+                ("z7-packed-rows", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
+                                    "-DSC64_Z7_VISIBILITY_PHASE_REJECT",
+                                    "-DSC64_Z7_VISIBILITY_ROW_CONTEXT",
+                                    "-DSC64_Z7_VISIBILITY_PACKED_ROWS"], 1),
             )
             for suffix, extra, expect_z7 in variants:
                 binary = Path(temp) / f"fixture-{suffix}"
@@ -429,7 +476,7 @@ class Z7SightSpansTests(unittest.TestCase):
                     f"-DTEST_EXPECT_Z7_SPANS={expect_z7}",
                     "-DSC64_RACES", "-DSC64_Z7_RUNTIME", "-DSC64_Z7_SOURCE_SIGHT",
                     "-DSC64_ZP_CAMPAIGN_ACTORS", "-DSC64_ZP_CAMPAIGN_STORAGE",
-                    *extra, "-I", str(ROOT), str(source), "-o", str(binary),
+                    *extra, "-I", temp, "-I", str(ROOT), str(source), "-o", str(binary),
                 ]
                 subprocess.run(command, check=True, cwd=ROOT)
                 result = subprocess.run([str(binary)], cwd=ROOT,

@@ -365,13 +365,47 @@ static void check_defeat(int raw)
     assert(lost && !won && race_p10_outcome() == SC64_P10_OUTCOME_LOST);
 }
 
+/* P10 is a real mixed army, not a test-only relaxation of skirmish tech.
+ * Run the original startup trigger and pay for both races' workers. */
+static void check_mixed_supply(void)
+{
+    start_p10();
+    run_updates(1);
+    int command = -1, nexus = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == SIDE) {
+        if (b[i].type == B_COMMAND) command = i;
+        if (b[i].type == B_NEXUS) nexus = i;
+    }
+    assert(command >= 0 && nexus >= 0);
+    Sc64RaceSupplyLedger terran = race_owner_supply_ledger(SIDE, R_TER);
+    Sc64RaceSupplyLedger protoss = race_owner_supply_ledger(SIDE, R_PROTOSS);
+    assert(terran.provided >= 20 && protoss.provided >= 18);
+    assert(race_queue_unit(SIDE, command, U_SCV));
+    assert(race_owner_supply_ledger(SIDE, R_TER).queued == terran.queued + 2);
+    assert(race_owner_supply_ledger(SIDE, R_PROTOSS).queued == protoss.queued);
+    assert(race_queue_unit(SIDE, nexus, U_PROBE));
+    assert(race_owner_supply_ledger(SIDE, R_TER).queued == terran.queued + 2);
+    assert(race_owner_supply_ledger(SIDE, R_PROTOSS).queued == protoss.queued + 2);
+    assert(minerals == 0);
+    selected_building = command;
+    assert(race_command_race() == R_TER);
+    selected_building = nexus;
+    assert(race_command_race() == R_PROTOSS);
+}
+
 int main(int argc, char **argv)
 {
     gba_init();
     if (argc == 3 && !strcmp(argv[1], "--resume")) return resume_main(argv[2]);
+    if (argc == 2 && !strcmp(argv[1], "--mixed-supply")) {
+        check_mixed_supply();
+        puts("P10 Terran and Protoss producers charge separate supply ledgers.");
+        return 0;
+    }
     if (argc != 2) { fprintf(stderr, "usage: %s OUTDIR\n", argv[0]); return 2; }
     check_candidate_cursor_bounds();
     check_startup();
+    check_mixed_supply();
     check_save_continuation(argv[0], argv[1]);
     check_victory();
     check_defeat(75);

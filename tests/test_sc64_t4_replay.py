@@ -264,20 +264,23 @@ class ReplayValidationTests(unittest.TestCase):
             def read(self, address, size):
                 return self.data[address:address + size]
 
-        fields = {"alive": 0, "owner": 4, "raw_owner": 8, "type": 12,
-                  "raw_type": 16, "x": 20, "y": 24}
-        first = bytearray(32)
-        values = {"alive": 1, "owner": 1, "raw_owner": 2, "type": 20,
-                  "raw_type": 20, "x": 1234, "y": 5678}
-        for name, value in values.items():
-            first[fields[name]:fields[name] + 4] = value.to_bytes(4, "little", signed=True)
-        second = bytearray(32)
-        second[fields["x"]:fields["x"] + 4] = (321).to_bytes(4, "little", signed=True)
-        second[fields["y"]:fields["y"] + 4] = (654).to_bytes(4, "little", signed=True)
-        bank = {"unit_offsets": fields, "unit_capacity": 2, "unit_stride_bytes": 32}
-        slots = replay.read_unit_slots(FakeRsp(first + second), 0, bank)
-        self.assertTrue(replay.raynor_alive_from_slots(slots))
-        self.assertEqual((slots[1]["x"], slots[1]["y"]), (321, 654))
+        names = ("alive", "owner", "raw_owner", "type", "raw_type", "x", "y")
+        for widths in ((4,) * 7, (1, 1, 1, 1, 2, 2, 2)):
+            with self.subTest(widths=widths):
+                offsets = dict(zip(names, (sum(widths[:i]) for i in range(7))))
+                signed = {name: name in ("raw_owner", "x", "y") for name in names}
+                fields = replay.races.DwarfOffsets(offsets, dict(zip(names, widths)), signed)
+                stride = sum(widths)
+                def encode(values):
+                    return b"".join(value.to_bytes(width, "little", signed=signed[name])
+                                    for name, width, value in zip(names, widths, values))
+                raw = encode((1, 1, 2, 20, 20, 1234, 5678)) + encode((0, 0, -1, 0, 0, -321, 654))
+                bank = {"unit_offsets": fields, "unit_capacity": 2, "unit_stride_bytes": stride}
+                slots = replay.read_unit_slots(FakeRsp(raw), 0, bank)
+                self.assertTrue(replay.raynor_alive_from_slots(slots))
+                self.assertEqual((slots[1]["raw_owner"], slots[1]["x"], slots[1]["y"]), (-1, -321, 654))
+                with self.assertRaisesRegex(RuntimeError, "truncated"):
+                    replay.read_unit_slots(FakeRsp(raw[:-1]), 0, bank)
 
 
 if __name__ == "__main__":

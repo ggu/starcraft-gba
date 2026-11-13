@@ -11,6 +11,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef SC64_P10_NORMAL_HOME
+#if !defined(SC64_TEXT_BOXES) || !defined(SC64_TEXT_BOX_HOST_MODAL)
+#error "The normal P10 HOME trace requires the cartridge's modal text"
+#endif
+#include "sc64_route_purity.h"
+#endif
+
 #ifndef P10_CONTROLLER_PROFILE
 #define P10_CONTROLLER_PROFILE "PROTOSS_P10_FLAGS"
 #endif
@@ -29,13 +36,17 @@
 static FILE *trace;
 static u16 prior;
 static unsigned host_tick;
+#ifdef SC64_P10_NORMAL_HOME
+static unsigned modal_pages;
+static uint64_t after_update;
+#endif
 #ifdef P10_POOL_AUDIT
 /* Optional pool-pressure audit (stderr only; the trace is unchanged). */
 static int audit_pool_peak,audit_kids_peak,audit_outside_peak,audit_shots;
 static unsigned audit_outside_updates;
 #endif
 
-static void input(u16 held)
+static void step(u16 held)
 {
     /* Once the mission ends, later calls are not inputs: the trace stops at
      * the deciding call, so a replay ends there too. */
@@ -44,7 +55,13 @@ static void input(u16 held)
     int changed=held!=prior;
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
+#ifdef SC64_P10_NORMAL_HOME
+    assert(route_purity_hash()==after_update);
+#endif
     game_update(held,pressed);
+#ifdef SC64_P10_NORMAL_HOME
+    after_update=route_purity_hash();
+#endif
     prior=held;
     ++host_tick;
 #ifdef P10_POOL_AUDIT
@@ -66,6 +83,31 @@ static void input(u16 held)
     if(trace && changed)
         fprintf(trace,"{\"kind\":\"input\",\"call_index\":%u,\"frame_before\":%u,\"frame_after\":%u,\"held\":%u,\"pressed\":%u}\n",
             call_index,frame_before,(unsigned)frame,(unsigned)held,(unsigned)pressed);
+}
+
+static void input(u16 held)
+{
+    step(held);
+#ifdef SC64_P10_NORMAL_HOME
+    /* Acknowledge source pages with buttons, preserving the controller's held
+     * keys and simulation frame. Record both transitions in the same tape. */
+    for (unsigned guard=0; sc64_text_box_count(); ++guard) {
+        assert(guard<48);
+        unsigned row=sc64_text_box_front(),page=sc64_text_box_page(),f=(unsigned)frame;
+        const Sc64TextBoxRow *front=race_text_box_front_row();
+        assert(front && page<front->page_count && !SC64_TEXT_BOX_WORDS[SC64_TEXT_BOX_ACK_WORD]);
+        u16 key=(held&KEY_A)?KEY_START:KEY_A;
+        fprintf(trace,"{\"kind\":\"modal\",\"call_index\":%u,\"frame\":%u,\"row\":%u,\"page\":%u,\"trigger\":%u,\"action\":%u,\"held\":%u,\"key\":%u}\n",
+                host_tick,f,row,page,front->trigger,front->action,held,key);
+        ++modal_pages;
+        step(held|key);
+        assert((unsigned)frame==f && sc64_text_box_front()==row && sc64_text_box_page()==page &&
+               SC64_TEXT_BOX_WORDS[SC64_TEXT_BOX_ACK_WORD]==key);
+        step(held);
+        assert((unsigned)frame==f && !SC64_TEXT_BOX_WORDS[SC64_TEXT_BOX_ACK_WORD]);
+        assert(!sc64_text_box_count() || sc64_text_box_front()!=row || sc64_text_box_page()!=page);
+    }
+#endif
 }
 
 /* Read-only route query over the engine's current walkability plane. */
@@ -619,10 +661,27 @@ int main(int argc,char **argv)
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
     fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":29,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n",P10_CONTROLLER_PROFILE);
     game_init();prior=0;
+#ifdef SC64_P10_NORMAL_HOME
+    after_update=route_purity_hash();
+#endif
     assert(screen==SCREEN_TITLE&&race_front.page==SC_FRONT_HOME);
     /* Campaign, page 5 of the two-entry mission list, second row, briefing. */
     KEY_TAP(KEY_A);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);
-    KEY_TAP(KEY_DOWN);KEY_TAP(KEY_A);KEY_TAP(KEY_START);
+    KEY_TAP(KEY_DOWN);KEY_TAP(KEY_A);
+#ifdef SC64_P10_NORMAL_HOME
+    assert(race_front.page==SC_FRONT_BRIEFING && race_front.mission==SC64_P10_GLOBAL_ID);
+    const unsigned briefing_pages=race_front.briefing_pages;
+    assert(briefing_pages>1 && briefing_pages<64);
+    for (unsigned page=0;page<briefing_pages;++page) {
+        assert(screen==SCREEN_TITLE && race_front.briefing_page==page && race_front_briefing_page());
+        if (!sc64_frontend_briefing_is_revealed(&race_front)) KEY_TAP(KEY_A);
+        assert(sc64_frontend_briefing_is_revealed(&race_front));
+        fprintf(trace,"{\"kind\":\"briefing\",\"page\":%u,\"call_index\":%u}\n",page,host_tick);
+        KEY_TAP(KEY_A);
+    }
+#else
+    KEY_TAP(KEY_START);
+#endif
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==29);
     census("launch");
     for(int i=0;i<MAX_UNITS;i++)pending_since[i]=-1;
@@ -922,6 +981,17 @@ int main(int argc,char **argv)
         input(0);
     }
     census("final");
+#ifdef SC64_P10_NORMAL_HOME
+    fprintf(trace,"{\"kind\":\"mission\",\"selected\":%d,\"phase\":%u,\"objective_flags\":%u,\"completed\":%d,\"switches\":%u,\"faults\":%u,\"modal_pages\":%u}\n",
+            race_selected_mission,race_campaign.phase,race_campaign.objective_flags,race_completed,
+            race_p10.switches,mission_unsupported_count,modal_pages);
+    if (won) {
+        assert(race_p10_outcome()==SC64_P10_OUTCOME_WON && screen==SCREEN_RESULT &&
+               (race_campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY) &&
+               (race_completed&(1<<SC64_P10_GLOBAL_ID)) && !mission_unsupported_count &&
+               modal_pages && overmind()<0 && hero(75)>=0 && hero(82)>=0 && hero(28)>=0);
+    }
+#endif
 #ifdef P10_POOL_AUDIT
     fprintf(stderr,"p10 pool audit: peak live units %d of %d, Interceptors peak %d, outside peak %d, "
             "updates with Interceptors outside %u, updates with a shot in flight %d\n",

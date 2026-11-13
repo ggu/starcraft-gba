@@ -1,4 +1,5 @@
 # Showcase HOST suite. Included by the top-level Makefile after SHOWCASE_FLAGS.
+SHOWCASE_FLAGS += -DSC64_TYPED_UNIT_CHUNK_READER
 # The indexed build drops packed word sprites, so it also drops the walk-word
 # poses that depend on them (sc64_unit_facing.h rejects one without the other).
 build/test-sc64-showcase-front: tests/sc64_frontend.c starcraft/sc64_frontend.h Makefile | build

@@ -391,7 +391,7 @@ static int race_zl_remove(void *context, const Sc64Z8Action *a,
     for (int i = 0; i < MAX_UNITS; ++i) if (remove[i]) { race_zl_clear_unit(i); changed = 1; }
     if (changed) {
         supply_used = race_owner_supply(SIDE);
-        supply_cap = race_owner_supply_cap(SIDE);
+        supply_cap = race_owner_supply_capacity(SIDE);
         target_lists_valid = 0; sc64_unit_bucket_active = 0;
         sc64_target_index_end();
     }

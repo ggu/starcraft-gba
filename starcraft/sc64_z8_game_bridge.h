@@ -95,6 +95,18 @@ sc64_z8_game_source_extents(unsigned raw, int x, int y, int building,
     return *left >= 0 && *top >= 0 && *right >= 0 && *bottom >= 0;
 }
 
+/* Both readers must reject malformed live rows before owner/type filtering. */
+static inline int
+sc64_z8_game_actor_validate(int owner, int raw, int x, int y, int building,
+                            int *left, int *top, int *right, int *bottom)
+{
+    if (owner < 0 || owner >= SC64_Z8_SOURCE_OWNER_LIMIT) return -1;
+    int type = building ? sc64_race_building_from_raw(raw) :
+                          sc64_race_unit_from_raw(raw);
+    return type >= 0 && sc64_z8_game_source_extents((unsigned)raw, x, y,
+                building, left, top, right, bottom) ? type : -1;
+}
+
 /* Read directly from the bounded game pools. The provider enumerates pool
  * capacity so newly created actors are visible to later trigger callbacks in
  * the same pass. `raw_owner` preserves the CHK slot even when engine owner
@@ -111,12 +123,9 @@ sc64_z8_game_actor_at(void *context, unsigned index, Sc64Z8ActorView *out)
         *out = (Sc64Z8ActorView){0};
         out->alive = actor->alive != 0;
         if (!out->alive) return 1;
-        if (actor->raw_owner < 0 || actor->raw_owner >= SC64_Z8_SOURCE_OWNER_LIMIT)
-            return -1;
-        type = sc64_race_unit_from_raw(actor->raw_type);
-        if (type < 0 || !sc64_z8_game_source_extents((unsigned)actor->raw_type,
-                actor->x, actor->y, 0, &left, &up, &right, &down))
-            return -1;
+        type = sc64_z8_game_actor_validate(actor->raw_owner, actor->raw_type,
+                    actor->x, actor->y, 0, &left, &up, &right, &down);
+        if (type < 0) return -1;
         out->raw_type = (u16)actor->raw_type;
         out->source_owner = actor->raw_owner;
         out->x = (s16)actor->x; out->y = (s16)actor->y;
@@ -138,15 +147,11 @@ sc64_z8_game_actor_at(void *context, unsigned index, Sc64Z8ActorView *out)
     {
         unsigned slot = index - MAX_UNITS;
         const Building *actor = &b[slot];
-        int type;
         *out = (Sc64Z8ActorView){0};
         out->alive = actor->alive != 0;
         if (!out->alive) return 1;
-        if (actor->raw_owner < 0 || actor->raw_owner >= SC64_Z8_SOURCE_OWNER_LIMIT)
-            return -1;
-        type = sc64_race_building_from_raw(actor->raw_type);
-        if (type < 0 || !sc64_z8_game_source_extents((unsigned)actor->raw_type,
-                actor->x, actor->y, 1, &left, &up, &right, &down))
+        if (sc64_z8_game_actor_validate(actor->raw_owner, actor->raw_type,
+                    actor->x, actor->y, 1, &left, &up, &right, &down) < 0)
             return -1;
         out->raw_type = (u16)actor->raw_type;
         out->source_owner = actor->raw_owner;
@@ -160,6 +165,66 @@ sc64_z8_game_actor_at(void *context, unsigned index, Sc64Z8ActorView *out)
     }
 }
 
+#ifdef SC64_Z8_DIRECT_COMMAND_CENSUS
+/* Command does not use location, cargo, or invincibility. Keep the same
+ * provider validation for every live slot (even a nonmatching owner/type)
+ * before consulting the query, and inspect the pools again on every call
+ * so preceding trigger actions take effect immediately. */
+static int
+sc64_z8_game_command_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *c,
+                           unsigned trigger_owner, u32 *out)
+{
+    int completed = sc64_z8_condition_counts_completed(c);
+    unsigned count = 0;
+    int left, up, right, down;
+    if (world->actor_at != sc64_z8_game_actor_at ||
+        world->actor_count != MAX_UNITS + MAX_BUILDINGS)
+        return 0;
+
+    for (unsigned i = 0; i < MAX_UNITS; ++i) {
+        const Unit *q = &u[i];
+        int owner, type;
+        if (!q->alive) continue;
+        type = sc64_z8_game_actor_validate(q->raw_owner, q->raw_type,
+                    q->x, q->y, 0, &left, &up, &right, &down);
+        if (type < 0) return -1;
+        owner = sc64_z8_world_owner_matches(world, c->player, trigger_owner,
+                                            (unsigned)q->raw_owner);
+        if (owner < 0) return -1;
+        if (!owner) continue;
+        if ((unsigned)q->raw_type >= SC64_Z8_RAW_UNIT_LIMIT) return -1;
+        if (c->unit != 229u && c->unit != (unsigned)q->raw_type &&
+            (c->unit != 230u || !(sc64_game_unit_actor_flags(type) & SC64_GAME_ACTOR_MEN)))
+            continue;
+#ifdef SC64_Z7_EGG_PRODUCTION
+        if (completed && q->type == U_Z7_EGG) continue;
+#endif
+        ++count;
+    }
+
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        const Building *q = &b[i];
+        int owner;
+        if (!q->alive) continue;
+        if (sc64_z8_game_actor_validate(q->raw_owner, q->raw_type,
+                    q->x, q->y, 1, &left, &up, &right, &down) < 0)
+            return -1;
+        owner = sc64_z8_world_owner_matches(world, c->player, trigger_owner,
+                                            (unsigned)q->raw_owner);
+        if (owner < 0) return -1;
+        if (!owner) continue;
+        if ((unsigned)q->raw_type >= SC64_Z8_RAW_UNIT_LIMIT) return -1;
+        if ((completed && q->under_construction) ||
+            (c->unit != 229u && c->unit != 231u && c->unit != (unsigned)q->raw_type))
+            continue;
+        ++count;
+    }
+
+    *out = count;
+    return 1;
+}
+#endif
+
 static void
 sc64_z8_game_bind_actor_pool(Sc64Z8WorldView *world)
 {
@@ -168,6 +233,9 @@ sc64_z8_game_bind_actor_pool(Sc64Z8WorldView *world)
     world->actor_count = (u16)(MAX_UNITS + MAX_BUILDINGS);
     world->actor_context = 0;
     world->actor_at = sc64_z8_game_actor_at;
+#ifdef SC64_Z8_DIRECT_COMMAND_CENSUS
+    world->command_count = sc64_z8_game_command_count;
+#endif
 }
 
 static void

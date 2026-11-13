@@ -690,7 +690,7 @@ sc64_terran_late_create(const Sc64T4Action *action, unsigned trigger_owner)
     if (x < 8 || y < 8 || x >= WORLD_W - 8 || y >= WORLD_H - 8) return -1;
     unsigned free_count = 0;
     for (int i = 0; i < MAX_UNITS && free_count < count; ++i)
-        if (!u[i].alive) slots[free_count++] = i;
+        if (sc64_unit_slot_available(i)) slots[free_count++] = i;
     if (free_count < count) return 0;
     /* All actor slots and authored placement inputs have been validated before
      * the first creation. The deterministic compact formation is a GBA policy. */
@@ -1121,7 +1121,7 @@ sc64_terran_late_world_tick(void)
             }
         }
     supply_used = race_owner_supply(SIDE);
-    supply_cap = race_owner_supply_cap(SIDE);
+    supply_cap = race_owner_supply_capacity(SIDE);
     target_lists_valid = 0;
     sc64_unit_bucket_active = 0;
     sc64_target_index_end();

@@ -108,6 +108,20 @@ static int race_bot_index(int owner)
     return -1;
 }
 
+static int race_skirmish_owner_base(int owner)
+{
+    int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : owner == 4 ? 3 : -1;
+#ifdef SC64_IMPORTED_SKIRMISH
+    if (race_skirmish_start_order && base >= 0)
+        return base <= race_bots ? sc64_skirmish_start_base(race_skirmish_start_order,base) : -1;
+    if (base > 0 && race_skirmish_slots) {
+        int seat = sc64_skirmish_bot_seat(race_skirmish_slots, base - 1);
+        return seat >= 0 ? seat + 1 : -1;
+    }
+#endif
+    return base;
+}
+
 static int race_owner_identity(int owner)
 { return owner >= 0 && owner < 5 ? race_player[owner] : -1; }
 
@@ -163,7 +177,7 @@ static int race_owner_supply(int owner)
     return total;
 }
 
-static int race_owner_supply_cap(int owner)
+static int race_owner_supply_capacity(int owner)
 {
     int i, total = 0;
     for (i = 0; i < MAX_BUILDINGS; ++i) if ((building_complete(i) ||
@@ -176,9 +190,17 @@ static int race_owner_supply_cap(int owner)
     return total;
 }
 
+static int race_owner_supply_cap(int owner)
+{
+    return sc64_supply_limit(race_owner_supply_capacity(owner));
+}
+
 static int race_owner_queued_supply(int owner)
 {
     int i, j, total = 0;
+#ifdef SC64_SHARED_NUKE_PROBE
+    total += race_nuke_reserved_supply(owner);
+#endif
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == owner)
         for (j = 0; j < b[i].queue_count; ++j) {
             const Sc64RaceUnitRule *r = sc64_race_unit_rule(b[i].queue[(b[i].queue_head + j) % 5]);
@@ -807,7 +829,7 @@ static int __attribute__((noinline)) race_product_slots_available(unsigned wante
 {
     unsigned free_slots = 0, committed = wanted;
     for (int i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive) ++free_slots;
+        if (sc64_unit_slot_available(i)) ++free_slots;
 #ifdef SC64_EGG_RUNTIME
         else if (u[i].type == SC64_EGG_ACTOR) {
             if (!sc64_z7_egg_product_valid(u[i].target)) return 0;
@@ -830,7 +852,7 @@ static int __attribute__((noinline)) race_product_slots_available(unsigned wante
 
 static int race_queue_unit(int owner, int producer, int type)
 {
-    int tail, count, reserved, cap;
+    int tail, count;
 #ifdef SC64_EGG_RUNTIME
     int egg_job = 0;
 #endif
@@ -987,7 +1009,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
         unsigned committed = race_p4_reserved_units();
         unsigned free_slots = 0;
-        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
         for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
             for (int q = 0; q < b[slot].queue_count; ++q) {
                 int queued = b[slot].queue[(b[slot].queue_head + q) % 5];
@@ -1000,7 +1022,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_mode && race_selected_mission == SC64_P5_GLOBAL_ID) {
         unsigned committed = race_p5_reserved_units();
         unsigned free_slots = 0;
-        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
         for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
             for (int q = 0; q < b[slot].queue_count; ++q) {
                 int queued = b[slot].queue[(b[slot].queue_head + q) % 5];
@@ -1009,18 +1031,18 @@ static int race_queue_unit(int owner, int producer, int type)
         if (committed + (unsigned)count > free_slots) return 0;
     }
 #endif
-    reserved = race_owner_reserved_supply(owner);
-    cap = race_owner_supply_cap(owner);
+    Sc64RaceSupplyLedger supply = race_owner_supply_ledger(owner, r->race);
     /* Zero-supply units (notably Overlords) must remain producible while
        over the current cap so the player can restore supply. */
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) count = sc64_z7_egg_product_count(type);
 #endif
-    if (r->supply && reserved + r->supply * count > cap) { race_refusal = 2; return 0; }
+    if (!sc64_supply_allows(race_supply_ledger_reserved(supply), r->supply * count,
+                            supply.provided)) { race_refusal = 2; return 0; }
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) {
         int free_slots = 0;
-        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
         if (!free_slots) return 0;
     }
 #endif
@@ -1706,7 +1728,7 @@ static void race_tick_buildings(void)
 #ifdef SC64_P4_RUNTIME
         if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
             unsigned free_slots = 0;
-            for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+            for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
             if (free_slots < race_p4_reserved_units() + (unsigned)sc64_race_product_count(type)) {
                 b[i].queue_progress = frames - 1;
                 continue;
@@ -1722,7 +1744,7 @@ static void race_tick_buildings(void)
             if (sc64_race_product_count(type) == 2) {
                 int second_x, second_y, free_slots = 0;
                 ctx.reserved = 0;
-                for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+                for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
                 if (free_slots < 2 ||
                     !sc64_p3_find_production_exit(i, type, x, y, &first_x, &first_y, &ctx)) {
                     b[i].queue_progress = frames > 8 ? frames - 8 : 0;
@@ -1774,7 +1796,7 @@ static void race_tick_buildings(void)
 #endif
         if (sc64_race_product_count(type) == 2) {
             int free_slots=0;
-            for(int slot=0;slot<MAX_UNITS;slot++)if(!u[slot].alive)free_slots++;
+            for(int slot=0;slot<MAX_UNITS;slot++)if(sc64_unit_slot_available(slot))free_slots++;
             if(free_slots<2){b[i].queue_progress=frames-1;continue;}
             int source_owner = race_creation_source_owner(owner, b[i].raw_owner);
             if (race_spawn_product_from(owner, type, x, y, source_owner, i) < 0 ||
@@ -1880,8 +1902,9 @@ static void race_skirmish_init(void)
 #endif
     race_player[SIDE] = race_human;
     for (i = 0; i < 1 + race_bots && i < 4; ++i) {
-        int base = i;
         owner = i == 0 ? SIDE : race_bot_owner_ids[i - 1];
+        int base = race_skirmish_owner_base(owner);
+        if (base < 0) continue;
         if (owner != SIDE) race_minerals[owner] = 50;
         switch (race_owner_identity(owner)) {
         case R_ZERG: townhall = B_HATCHERY; worker_type = U_DRONE; break;
@@ -1916,15 +1939,16 @@ static void race_skirmish_init(void)
             }
         }
     }
-    supply_cap = race_owner_supply_cap(SIDE);
-    cx = race_base_x[0]; cy = race_base_y[0]; camx = camy = 0;
+    supply_cap = race_owner_supply_capacity(SIDE);
+    int human_base = race_skirmish_owner_base(SIDE);
+    cx = race_base_x[human_base]; cy = race_base_y[human_base]; camx = camy = 0;
     selected_building = -1; mode = MODE_NORMAL; menu_open = 0;
     enemy_timer = 0; wave = 0; invalidate_path_grid(); update_exploration();
 }
 
 static int race_skirmish_site_for(int owner, int type, int *x, int *y)
 {
-    int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : owner == 4 ? 3 : -1;
+    int base = race_skirmish_owner_base(owner);
     static const int dx[8] = { 48,-48,0,0,48,-48,48,-48 };
     static const int dy[8] = { 0,0,48,-48,48,48,-48,-48 };
     int i;

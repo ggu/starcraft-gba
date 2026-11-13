@@ -59,7 +59,7 @@ class Z7FullRenderTests(unittest.TestCase):
             'StarCraft-Zerg-Z7-Full-Render-Probe-GBA',
             'starcraft-zerg-z7-full-render-probe', 'SCZR', 'SC Z7 FULL36'))
         self.assertEqual(verify_roms.TARGETS['--zerg'], (
-            'StarCraft-Zerg-Z9-Transport1-GBA', 'starcraft-zerg-z9', 'SCZ9', 'SC ZERG Z9'))
+            'StarCraft-Zerg-Z10-Transport1-GBA', 'starcraft-zerg-z10', 'SCZA', 'SC ZERG Z10'))
         self.assertEqual(verify_roms.TARGETS['--zerg-z7'], (
             'StarCraft-Zerg-Z7-Transport1-GBA', 'starcraft-zerg-z7', 'SCZ7', 'SC ZERG Z7'))
         self.assertEqual(verify_roms.TARGETS['--zerg-z6'], (

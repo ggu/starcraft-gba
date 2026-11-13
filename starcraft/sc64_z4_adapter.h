@@ -272,7 +272,7 @@ static int race_z4_paired_egg_conflict(void)
 {
     unsigned free_slots=0,paired=0,queued=0;
     for (int i=0;i<MAX_UNITS;++i) {
-        if (!u[i].alive) ++free_slots;
+        if (sc64_unit_slot_available(i)) ++free_slots;
         else if (u[i].type==SC64_EGG_ACTOR && sc64_z7_egg_product_valid(u[i].target))
             paired+=(unsigned)(sc64_z7_egg_product_count(u[i].target)-1);
     }
@@ -360,7 +360,7 @@ race_z4_remove_selected(unsigned selector, unsigned raw_type,
         if (selected_building == i) selected_building = -1;
     }
     supply_used = race_owner_supply(SIDE);
-    supply_cap = race_owner_supply_cap(SIDE);
+    supply_cap = race_owner_supply_capacity(SIDE);
     return 1;
 }
 

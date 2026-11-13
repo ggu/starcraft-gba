@@ -56,7 +56,7 @@ typedef struct {
     void *create_context;
 } Sc64Z8WorldServices;
 
-typedef struct {
+typedef struct Sc64Z8WorldView {
     Sc64Z8ActorView *actors; /* Canonical engine enumeration order. */
     u16 actor_count; /* Provider mode may expose pool capacity, including dead slots. */
     void *actor_context;
@@ -73,6 +73,12 @@ typedef struct {
     u32 *source_minerals[SC64_Z8_OWNER_LIMIT];
     u32 *source_gas[SC64_Z8_OWNER_LIMIT];
     Sc64Z8WorldServices services;
+#ifdef SC64_Z8_DIRECT_COMMAND_CENSUS
+    /* Optional live-pool census. Zero means the provider has been replaced
+     * and this query must use actor_at; -1 is a census fault. */
+    int (*command_count)(const struct Sc64Z8WorldView *, const Sc64Z8Condition *,
+                         unsigned trigger_owner, u32 *out);
+#endif
 } Sc64Z8WorldView;
 
 static inline int
@@ -190,6 +196,12 @@ sc64_z8_world_count(void *context, const Sc64Z8Condition *c,
         return 1;
     }
     if (c->opcode == 3 && !rect) return -1;
+#ifdef SC64_Z8_DIRECT_COMMAND_CENSUS
+    if (c->opcode == 2 && w->command_count) {
+        int status = w->command_count(w, c, trigger_owner, out);
+        if (status) return status;
+    }
+#endif
     for (unsigned i = 0; i < w->actor_count; ++i) {
         Sc64Z8ActorView actor;
         Sc64Z8ActorView *a = &actor;

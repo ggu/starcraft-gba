@@ -46,14 +46,14 @@ static int
 owner_supply_cap(int owner)
 {
     int i, cap = 0;
-    if (owner == SIDE) return supply_cap;
+    if (owner == SIDE) return sc64_supply_limit(supply_cap);
     if (skirmish_bot_index(owner) < 0) return 0;
     for (i = 0; i < MAX_BUILDINGS; ++i) {
-        if (!b[i].alive || b[i].owner != owner) continue;
+        if (!b[i].alive || b[i].owner != owner || b[i].under_construction) continue;
         if (b[i].type == B_COMMAND) cap += 20;
-        else if (b[i].type == B_DEPOT && !b[i].under_construction) cap += 16;
+        else if (b[i].type == B_DEPOT) cap += 16;
     }
-    return cap;
+    return sc64_supply_limit(cap);
 }
 
 static void
@@ -136,7 +136,7 @@ owner_queue_unit(int owner, int building, int type)
         if (type == U_FIREBAT && !has_building(owner, B_ACADEMY)) return 0;
     } else return 0;
     if (owner_minerals(owner) < unit_cost(type) || owner_gas(owner) < unit_gas_cost(type) ||
-        owner_reserved_supply(owner) + unit_supply(type) > owner_supply_cap(owner)) return 0;
+        !sc64_supply_allows(owner_reserved_supply(owner), unit_supply(type), owner_supply_cap(owner))) return 0;
     tail = (b[building].queue_head + b[building].queue_count) % 5;
     b[building].queue[tail] = type;
     ++b[building].queue_count;

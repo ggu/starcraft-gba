@@ -22,6 +22,16 @@ static const int road[][2]={{640,260},{760,280},{900,264},{1040,280},{1056,400},
     {1000,620},{968,760},{904,860},{904,1000},{904,1170},{904,1336},{870,1390}};
 enum { ROAD_LEGS=sizeof(road)/sizeof(road[0]) };
 
+static int near_road(int x,int y,int reach)
+{
+    for(int k=0;k+1<ROAD_LEGS;k++)for(int t=0;t<=4;t++){
+        int px=road[k][0]+(road[k+1][0]-road[k][0])*t/4;
+        int py=road[k][1]+(road[k+1][1]-road[k][1])*t/4;
+        if(dist2(x,y,px,py)<reach*reach)return 1;
+    }
+    return 0;
+}
+
 static int crystal(void)
 {
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==RAW_CRYSTAL)return i;
@@ -367,11 +377,15 @@ int main(int argc,char **argv)
                 static const int prio[]={83,66,70,71,72,68,67,65,69,84,64};
                 int fx=road[mfront][0],fy=road[mfront][1],tgt=-1,tb=-1,bd=0x7fffffff,RM=muta_reach;
                 for(unsigned pi=0;pi<sizeof(prio)/sizeof(prio[0])&&tgt<0&&tb<0;pi++){
-                    if(pi==7)for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==ENEMY&&b[i].raw_type==162&&dist2(b[i].x,b[i].y,fx,fy)<RM*RM){
+                    /* The Drone needs the road, not every Cannon in the area.
+                       A distant emplacement can trap the sweep on a flank. */
+                    if(pi==7)for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==ENEMY&&b[i].raw_type==162&&
+                        dist2(b[i].x,b[i].y,fx,fy)<RM*RM&&near_road(b[i].x,b[i].y,340)){
                         int d=dist2(b[i].x,b[i].y,mx,my);if(d<bd){bd=d;tb=i;}
                     }
                     if(tb>=0)break;
-                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==prio[pi]&&!SC64_TRANSPORT_LOADED(&u[i])&&dist2(u[i].x,u[i].y,fx,fy)<RM*RM){
+                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==prio[pi]&&
+                        !SC64_TRANSPORT_LOADED(&u[i])&&dist2(u[i].x,u[i].y,fx,fy)<RM*RM&&near_road(u[i].x,u[i].y,340)){
                         int d=dist2(u[i].x,u[i].y,mx,my);if(d<bd){bd=d;tgt=i;}
                     }
                 }
@@ -380,9 +394,15 @@ int main(int argc,char **argv)
                 else if(tb>=0){gx=b[tb].x;gy=b[tb].y;gt=162;}
                 if(gx>=0){
                     group_area_x=mx;group_area_y=my;group_area_r=420;group_rounds=3;
-                    (void)group_command(U_MUTALISK,MENU_ATTACK,gx,gy,1);
+                    int groups=group_command(U_MUTALISK,MENU_ATTACK,gx,gy,1);
+                    /* A dispersed air group can have no selectable cluster
+                       near its average position. Try the remaining anchors. */
+                    if(!groups){
+                        group_area_x=-1;group_rounds=8;
+                        groups=group_command(U_MUTALISK,MENU_ATTACK,gx,gy,1);
+                    }
                     group_area_x=-1;group_rounds=6;
-                    fprintf(trace,"{\"kind\":\"muta_order\",\"frame\":%u,\"mutas\":%d,\"target\":[%d,%d],\"type\":%d,\"front\":%d}\n",(unsigned)frame,nm,gx,gy,gt,mfront);
+                    fprintf(trace,"{\"kind\":\"muta_order\",\"frame\":%u,\"mutas\":%d,\"target\":[%d,%d],\"type\":%d,\"front\":%d,\"groups\":%d}\n",(unsigned)frame,nm,gx,gy,gt,mfront,groups);
                 } else {
                     if(nm>=muta_go_count/2&&mfront<ROAD_LEGS-1){++mfront;fprintf(trace,"{\"kind\":\"muta_front\",\"frame\":%u,\"front\":%d,\"mutas\":%d}\n",(unsigned)frame,mfront,nm);}
                     group_area_x=mx;group_area_y=my;group_area_r=420;group_rounds=3;

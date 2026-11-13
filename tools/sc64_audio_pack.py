@@ -114,6 +114,11 @@ ALERT_SOUNDS = (
     (None, None, 122, None, None, None, None, None),
     (None, None, None, None, None, None, None, None),
 )
+# The native T10 audio capture matched this global warning (see
+# docs/DEVELOPMENT.md). Pin the complete source entry, including its decoder
+# state, separately from the containing ROM's authentication.
+NUKE_WARNING_SOUND = 127
+NUKE_WARNING_SHA256 = "3c7b68072c816f4f059d5405de3360981e75bdc5ddebebfc139a24788e350bf9"
 # Roles come from the resident N64 music selector (see the module comment).
 MUSIC_ROLES = {
     0: "menu", 1: "unused-1", 2: "terran-result-a", 3: "terran-result-b",
@@ -603,7 +608,7 @@ def encode_bank(clips: list[bytes], tracks: dict[int, bytes], verify: bool = Tru
 
 def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
              upstream: Path = UPSTREAM, verify: bool = True,
-             predictors=DEFAULT_PREDICTORS) -> dict:
+             predictors=DEFAULT_PREDICTORS, nuke_warning: bool = False) -> dict:
     extractor = load_sprites(ROOT / "tools/sc64_sprites.py").load_extractor(upstream)
     rom = extractor.load_rom(str(rom_path))
     rom_sha = hashlib.sha1(rom).hexdigest()
@@ -646,6 +651,14 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
         if sound not in selected:
             selected.append(sound)
     selected.sort()
+    if nuke_warning:
+        sound = NUKE_WARNING_SOUND
+        offset, length = offsets[sound], lengths[sound]
+        if hashlib.sha256(blob[offset:offset + length]).hexdigest() != NUKE_WARNING_SHA256:
+            raise ValueError("nuclear warning does not match the verified N64 clip")
+        # Append so adding the cue cannot renumber existing effect requests.
+        if sound not in selected:
+            selected.append(sound)
 
     clips: list[bytes] = []
     converted: dict[tuple[int, int], int] = {}
@@ -713,6 +726,8 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
         c_array("sc64_audio_alert", "u16",
                 [ALERT_NONE if s is None else bank_index[s] for race in ALERT_SOUNDS for s in race],
                 len(ALERT_LINES)),
+        *([f"#define SC64_AUDIO_NUKE_WARNING_SAMPLE {bank_index[NUKE_WARNING_SOUND]}"]
+          if nuke_warning else []),
         "/* Byte offset of each imported track's stream. */",
         c_array("sc64_audio_music_offset", "u32", music_offset, 8),
         "/* Track lengths in 176-sample frames; zero when not imported. */",
@@ -746,6 +761,11 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
                          for line, sound in zip(ALERT_LINES, sounds) if sound is not None}
                   for race, sounds in zip(("terran", "zerg", "protoss"), ALERT_SOUNDS)},
     }
+    if nuke_warning:
+        sample = bank_index[NUKE_WARNING_SOUND]
+        report["nuclear_warning"] = {"sound_id": NUKE_WARNING_SOUND, "sample": sample,
+                                     "samples": sample_length[sample],
+                                     "source_entry_sha256": NUKE_WARNING_SHA256}
     (out_dir / "sc64_audio_manifest.json").write_text(json.dumps(report, indent=2) + "\n")
     return report
 
@@ -825,6 +845,8 @@ def main(argv: list[str] | None = None) -> int:
                              "of '012' (default %(default)s; '012' compresses most)")
     parser.add_argument("--no-verify", action="store_true",
                         help="skip decoding every stream with the reference decoder")
+    parser.add_argument("--nuke-warning", action="store_true",
+                        help="include the verified N64 nuclear launch advisor clip")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--encode-pcm", type=Path, metavar="IN",
                       help="encode raw signed 8-bit PCM as one stream to --out")
@@ -864,7 +886,7 @@ def main(argv: list[str] | None = None) -> int:
     if any(t < 0 or t >= MUSIC_TRACKS for t in music):
         parser.error("music tracks are 0-15")
     report = generate(args.rom, args.out or OUT_DEFAULT, music, verify=not args.no_verify,
-                      predictors=predictors)
+                      predictors=predictors, nuke_warning=args.nuke_warning)
     print(json.dumps(report["output"], indent=2))
     return 0
 

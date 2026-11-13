@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import shlex
 
-_INCLUDE = re.compile(r'^\s*(?:-?include|sinclude)\s+(.+)$')
+_INCLUDE = re.compile(r'^\s*(-?include|sinclude)\s+(.+)$')
 
 
 def copy_makefile_with_includes(source_root: Path, fixture_root: Path) -> None:
@@ -19,16 +19,21 @@ def copy_makefile_with_includes(source_root: Path, fixture_root: Path) -> None:
             match = _INCLUDE.match(line)
             if not match or line.startswith('\t'):
                 continue
-            for name in shlex.split(match.group(1), comments=True):
+            optional = match.group(1) != 'include'
+            for name in shlex.split(match.group(2), comments=True):
                 if any(ch in name for ch in '$*?['):
                     continue  # Make resolves dynamic includes from fixture inputs.
                 relative = Path(name)
                 if relative.is_absolute() or '..' in relative.parts:
                     raise ValueError(f'non-repository Make include: {name}')
+                if optional and relative.parts[:1] in (('build',), ('.local',)):
+                    continue  # A clean fixture owns its generated inputs.
                 if relative in seen:
                     continue
                 target = source_root / relative
                 if not target.is_file():
+                    if optional:
+                        continue
                     raise FileNotFoundError(target)
                 destination = fixture_root / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)

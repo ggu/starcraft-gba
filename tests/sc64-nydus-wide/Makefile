@@ -2,7 +2,7 @@
 NYDUS_WIDE_OUT ?= build/nydus-wide
 NYDUS_WIDE_COVER_DIR ?= .local/hardware-feedback/verified-cover
 .PHONY: test-sc64-nydus-wide
-test-sc64-nydus-wide:
+test-sc64-nydus-wide: | $(LATE_ZERG_SIGHT_INPUTS)
 	@mkdir -p $(NYDUS_WIDE_OUT)
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -I$(NYDUS_WIDE_COVER_DIR) \
 	  $(BC_FLAGS) $(ZERG_Z10_CANONICAL_FLAGS) tests/sc64_nydus_wide_save.c tests/sc64_yamato_host_sram_shim.c \
@@ -16,7 +16,7 @@ test-sc64-nydus-wide:
 NYDUS_WIDE_LEGACY_SOURCE ?=
 NYDUS_WIDE_LEGACY_BC_FLAGS = $(filter-out -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_PRODUCTION_EXPERIMENT -DSC64_BATTLECRUISER_FLIGHT_EXPERIMENT -DSC64_BATTLECRUISER_RESEARCH_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT,$(BC_FLAGS))
 .PHONY: test-sc64-nydus-wide-predecessor
-test-sc64-nydus-wide-predecessor:
+test-sc64-nydus-wide-predecessor: | $(LATE_ZERG_SIGHT_INPUTS)
 	@test -n "$(NYDUS_WIDE_LEGACY_SOURCE)" && test -f "$(NYDUS_WIDE_LEGACY_SOURCE)"
 	@test -x $(NYDUS_WIDE_OUT)/test
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -I$(NYDUS_WIDE_COVER_DIR) \

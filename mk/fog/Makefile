@@ -3,6 +3,11 @@
 # CANONICAL_FOG_FLAGS is defined in the top-level Makefile.
 
 .PHONY: test-terrain-soft-fog
+build/test-terrain-dirty-capture: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h starcraft/sc64_static_dirty_rows.h starcraft/sc64_fog.h starcraft/sc64_obj_vram.h common/gba.h common/gba.c | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_TERRAIN_CACHE_REAL_GFX -DSC64_TERRAIN_SCROLL -DSC64_TERRAIN_ROW_MASKS -DSC64_TERRAIN_CACHE_VRAM -DSC64_TERRAIN_DIRTY_CAPTURE -DSC64_P7_PROJECTILES_ENABLED -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_FOG_TEST_PACKED -DSC64_SOFT_FOG -DSC64_FOG_TEST_REAL_RASTER -Icommon $< common/gba.c -o $@
+.PHONY: test-terrain-dirty-capture
+test-terrain-dirty-capture: build/test-terrain-dirty-capture
+	./build/test-terrain-dirty-capture
 build/test-terrain-soft-fog: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h starcraft/sc64_fog.h common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_TERRAIN_CACHE_REAL_GFX -DSC64_SOFT_FOG -Icommon $< common/gba.c -o $@
 build/test-terrain-soft-fog-scroll: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h starcraft/sc64_fog.h common/gba.h common/gba.c | build
@@ -63,3 +68,22 @@ endef
 $(eval $(call FOG_FRAMES_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
 $(eval $(call FOG_FRAMES_PROFILE,zerg,CANONICAL_ZERG_PROFILE_FLAGS,CANONICAL_ZERG_PROFILE_INPUTS,))
 $(eval $(call FOG_FRAMES_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,SKIRMISH_AI_PROTOSS_SOURCES))
+
+# Optional normal-cart capture probe; one C flag and a dedicated rebuild key.
+CANONICAL_TERRAIN_DIRTY_CAPTURE ?= 0
+ifneq ($(words $(CANONICAL_TERRAIN_DIRTY_CAPTURE)),1)
+$(error CANONICAL_TERRAIN_DIRTY_CAPTURE must be 0 or 1)
+endif
+ifeq ($(filter 0 1,$(CANONICAL_TERRAIN_DIRTY_CAPTURE)),)
+$(error CANONICAL_TERRAIN_DIRTY_CAPTURE must be 0 or 1)
+endif
+ifeq ($(CANONICAL_TERRAIN_DIRTY_CAPTURE),1)
+TERRAIN_DIRTY_CAPTURE_ELFS := build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf
+$(TERRAIN_DIRTY_CAPTURE_ELFS): CFLAGS += -DSC64_TERRAIN_DIRTY_CAPTURE
+endif
+.PHONY: force-terrain-dirty-capture-config
+force-terrain-dirty-capture-config:
+build/terrain-dirty-capture-config: force-terrain-dirty-capture-config | build
+	@printf '%s\n' '$(CANONICAL_TERRAIN_DIRTY_CAPTURE)' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
+build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf: build/terrain-dirty-capture-config

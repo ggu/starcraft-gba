@@ -3,6 +3,7 @@
  * Every mutation of game state below is produced by game_update controller
  * input. Runtime reads are used only for adaptive choices and the trace. */
 #include "../starcraft/game.c"
+#include "sc64_route_purity.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -107,6 +108,7 @@ static void step(u16 held)
         abort();
     }
     u16 pressed = held & (u16)~prior_keys;
+    assert(route_pure_depth == 0);
     game_update(held, pressed);
     prior_keys = held;
     ++host_ticks;
@@ -334,6 +336,9 @@ static void assign_idle_miner(void)
             u[actual].order == ORDER_IDLE && !u[actual].carry) { worker = actual; break; }
     }
     if (worker < 0) return;
+    /* Rank the fields against one working route cache, then restore it
+     * before giving the chosen worker any controller input. */
+    ROUTE_PURE_BEGIN();
     for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 &&
         dist2(b[hatch].x,b[hatch].y,m[i].x,m[i].y) <= 220*220) {
         int nx, ny, load=0, unsafe=0;
@@ -347,6 +352,7 @@ static void assign_idle_miner(void)
         int d = dist2(u[worker].x,u[worker].y,m[i].x,m[i].y) + load * 40000;
         if (d < best) { best = d; patch = i; }
     }
+    ROUTE_PURE_END();
     if (patch < 0) return;
     if (!currently_visible(m[patch].x,m[patch].y)) {
         /* The controller may consult map contents, but uses a normal Move to
@@ -834,6 +840,8 @@ int main(int argc, char **argv)
     checkpoint(won ? "won" : lost ? "lost" : "limit");
     fprintf(trace, "]}\n");
     fclose(trace);
+    fprintf(stderr, "Z3 route observer: %lu scopes, %lu changed then restored\n",
+            route_pure_scopes, route_pure_changed_scopes);
     printf("Z3 normal-controller run: policy=%s result=%s frame=%d elapsed=%u side=%d/%d enemy=%d/%d ore=%d gas=%d trace=%s\n",
            policy,
            won ? "WON" : lost ? "LOST" : "LIMIT", frame,

@@ -370,7 +370,7 @@ race_campaign_p2_ai_queue_room(void)
         (race_campaign.objective_flags & SC64_RACE_OBJECTIVE_FENIX_READY) ||
         race_campaign.phase == SC64_RACE_PHASE_COMPLETE ||
         race_campaign.phase == SC64_RACE_PHASE_FAILED) return MAX_UNITS;
-    for (i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+    for (i = 0; i < MAX_UNITS; ++i) free_slots += sc64_unit_slot_available(i);
     /* Count every owner's pending products because any of them can occupy
      * the slots needed by the source trigger. Zerglings hatch as pairs. */
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive)
@@ -1170,7 +1170,7 @@ race_campaign_spawn_p2_reinforcements(void)
     };
     int i, type, slot, free_slots = 0, created[14], old_supply_used = supply_used;
     /* P2 TRIG record 5: CountdownTimer(900), MRGN 1/3/4/5. */
-    for (i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+    for (i = 0; i < MAX_UNITS; ++i) free_slots += sc64_unit_slot_available(i);
     if (free_slots < 14) return 0;
     for (i = 0; i < 14; ++i)
         if (sc64_race_unit_from_raw(raw_types[i]) < 0) return 0;
@@ -1324,7 +1324,7 @@ static void race_terran_tick(void)
     }
     if(lost){won=0;race_campaign.phase=SC64_RACE_PHASE_FAILED;}
     else if(won){race_campaign.phase=SC64_RACE_PHASE_COMPLETE;race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;race_completed|=1<<race_selected_mission;}
-    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+    supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_capacity(SIDE);
 }
 #endif
 

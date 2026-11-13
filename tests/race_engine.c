@@ -46,8 +46,175 @@ static void save_roundtrip(int n) {
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);
     assert(!load_game());assert(frame==saved_frame);
 }
-int main(void) {
+/* Same production gate as the field commands and AI. Stock limits are
+ * tested with real provider and unit rows rather than a forced counter. */
+static void stock_supply_boundary(int faction, int owner, int custom)
+{
+    static const int bases[] = {B_COMMAND, B_HATCHERY, B_NEXUS};
+    static const int workers[] = {U_SCV, U_DRONE, U_PROBE};
+    static const int army[] = {U_TANK, U_MUTALISK, U_ZEALOT};
+    int base, providers[26], number;
+    init_mission(0);
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    race_mode = custom;
+    race_player[owner] = faction;
+    if (owner == SIDE) race_human = faction;
+    race_bots = owner == 4 ? 3 : owner == RESCUABLE ? 2 : 1;
+    minerals = gas = 1000;
+    race_minerals[owner] = race_gas[owner] = 1000;
+    base = spawn_build(owner, bases[faction], 128, 128, 0);
+    assert(base >= 0);
+    int base_supply = sc64_race_building_rule(bases[faction])->supply_provided;
+    number = (SC64_SUPPLY_LIMIT + 16 - base_supply + 15) / 16;
+    for (int i = 0; i < number; ++i) {
+        int x = 32 + (i % 8) * 48, y = 200 + (i / 8) * 48;
+        if (faction == R_ZERG)
+            providers[i] = spawn_unit(owner, U_OVERLORD, x, y);
+        else
+            providers[i] = spawn_build(owner, faction == R_TER ? B_DEPOT : B_PYLON, x, y, 0);
+        assert(providers[i] >= 0);
+    }
+    for (int i = 0; i < 99; ++i)
+        assert(spawn_unit(owner, army[faction], 32 + (i % 16) * 24, 420 + (i / 16) * 24) >= 0);
+    assert(spawn_unit(owner, workers[faction], 64, 64) >= 0);
+    if (faction == R_ZERG)
+        assert(spawn_build(owner, B_SPAWNING_POOL, 176, 128, 0) >= 0);
+    assert(race_owner_supply(owner) == 398 && race_owner_supply_capacity(owner) >= 416);
+    assert(race_owner_supply_cap(owner) == SC64_SUPPLY_LIMIT);
+    if (owner == SIDE) {
+        static u8 bar[12 * 240];
+        race_tick_state();
+        int raw_capacity = supply_cap;
+        assert(raw_capacity == race_owner_supply_capacity(owner));
+        gfx_begin(C_BLACK);
+        draw_hud_resources();
+        for (int y = 0; y < 12; ++y)
+            for (int x = 0; x < 240; ++x)
+                bar[y * 240 + x] = gfx_test_pixel(x, y);
+        if (faction == R_ZERG) u[providers[0]].alive = 0;
+        else b[providers[0]].alive = 0;
+        gfx_begin(C_BLACK);
+        draw_hud_resources();
+        for (int y = 0; y < 12; ++y)
+            for (int x = 0; x < 240; ++x)
+                assert(bar[y * 240 + x] == gfx_test_pixel(x, y));
+        if (faction == R_ZERG) u[providers[0]].alive = 1;
+        else b[providers[0]].alive = 1;
+    }
+    assert(race_queue_unit(owner, base, faction == R_ZERG ? U_ZERGLING : workers[faction]));
+    assert(race_owner_reserved_supply(owner) == SC64_SUPPLY_LIMIT);
+    int ore = race_owner_minerals(owner);
+    assert(!race_queue_unit(owner, base, workers[faction]) && race_refusal == 2);
+    assert(race_owner_minerals(owner) == ore && b[base].queue_count == 1);
+
+    /* Surplus providers can absorb a loss; only a further loss lowers the
+     * effective cap. A provider death does not cancel a paid queue. */
+    if (faction == R_ZERG) u[providers[0]].alive = 0;
+    else b[providers[0]].alive = 0;
+    assert(race_owner_supply_cap(owner) == SC64_SUPPLY_LIMIT);
+    if (faction == R_ZERG) u[providers[1]].alive = 0;
+    else b[providers[1]].alive = 0;
+    assert(race_owner_supply_cap(owner) < SC64_SUPPLY_LIMIT);
+    assert(race_owner_reserved_supply(owner) == SC64_SUPPLY_LIMIT);
+    assert(!race_queue_unit(owner, base, workers[faction]) && race_refusal == 2);
+    if (faction == R_ZERG)
+        assert(race_queue_unit(owner, base, U_OVERLORD));
+    else
+        assert(race_owner_minerals(owner) == ore);
+    assert(race_owner_reserved_supply(owner) == SC64_SUPPLY_LIMIT);
+
+    /* Scripted placement/rescue uses the actor primitive, not production
+     * admission. Above-cap actors remain and block new paid supply. */
+    int reinforcement = spawn_unit(owner, army[faction], 80, 64);
+    assert(reinforcement >= 0 && u[reinforcement].alive);
+    assert(race_owner_reserved_supply(owner) == SC64_SUPPLY_LIMIT + 4);
+    assert(!race_queue_unit(owner, base, workers[faction]) && race_refusal == 2);
+}
+
+static void mixed_supply_boundary(int faction, int owner, int custom)
+{
+    static const int bases[] = {B_COMMAND, B_HATCHERY, B_NEXUS};
+    static const int workers[] = {U_SCV, U_DRONE, U_PROBE};
+    static const int army[] = {U_TANK, U_MUTALISK, U_ZEALOT};
+    int foreign = (faction + 1) % 3;
+    init_mission(0);
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    race_mode = custom;
+    race_player[owner] = faction;
+    if (owner == SIDE) race_human = faction;
+    race_bots = owner == 4 ? 3 : owner == RESCUABLE ? 2 : 1;
+    minerals = gas = 1000;
+    race_minerals[owner] = race_gas[owner] = 1000;
+
+    int base = spawn_build(owner, bases[faction], 128, 128, 0);
+    assert(base >= 0);
+    int cap = sc64_race_building_rule(bases[faction])->supply_provided;
+    for (int i = 0; i < (cap - 2) / 2; ++i)
+        assert(spawn_unit(owner, workers[faction], 32 + i * 8, 96) >= 0);
+    for (int i = 0; i < 3; ++i) {
+        int captive = spawn_unit(NEUTRAL, army[foreign], 300 + i * 8, 180);
+        assert(captive >= 0);
+        /* The campaign transfer changes the live owner while retaining
+         * scenario provenance. Treat neither as the product race. */
+        u[captive].raw_owner = 7;
+        u[captive].owner = owner;
+    }
+    assert(race_owner_supply_ledger(owner, foreign).used == 12);
+    assert(race_owner_reserved_supply(owner) > race_owner_supply_cap(owner));
+    assert(race_queue_unit(owner, base, workers[faction]));
+    Sc64RaceSupplyLedger own = race_owner_supply_ledger(owner, faction);
+    assert(own.provided == cap && race_supply_ledger_reserved(own) == cap);
+
+    int captured = spawn_build(NEUTRAL, bases[foreign], 320, 280, 0);
+    assert(captured >= 0);
+    b[captured].raw_owner = 7;
+    b[captured].owner = owner;
+    b[captured].queue_count = 1;
+    b[captured].queue[0] = workers[foreign];
+    if (foreign == R_ZERG)
+        assert(spawn_unit(owner, U_OVERLORD, 304, 304) >= 0);
+    Sc64RaceSupplyLedger other = race_owner_supply_ledger(owner, foreign);
+    assert(other.used == 12 && other.queued == 2 && other.provided > other.used);
+    assert(race_owner_reserved_supply(owner) < race_owner_supply_capacity(owner));
+    int ore = race_owner_minerals(owner);
+    assert(!race_queue_unit(owner, base, workers[faction]) && race_refusal == 2);
+    assert(race_owner_minerals(owner) == ore && b[base].queue_count == 1);
+    if (custom && owner != SIDE) {
+        RaceAiCensus census;
+        race_ai_census(owner, &census);
+        assert(census.supply_used == own.used && census.supply_queued == own.queued &&
+               census.supply_cap == own.provided);
+    }
+    if (faction == R_ZERG) {
+        assert(spawn_unit(owner, U_DRONE, 148, 96) >= 0); /* Scripted over cap. */
+        assert(race_queue_unit(owner, base, U_OVERLORD));
+        own = race_owner_supply_ledger(owner, faction);
+        assert(race_supply_ledger_reserved(own) == cap + 2);
+    }
+}
+
+int main(int argc, char **argv) {
     gba_init();
+    if (argc == 2 && !strcmp(argv[1], "--stock-supply")) {
+        static const int owners[] = {SIDE, ENEMY, RESCUABLE, 4};
+        for (int custom = 0; custom < 2; ++custom)
+            for (int faction = R_TER; faction <= R_PROTOSS; ++faction)
+                for (int i = 0; i < (custom ? 4 : 2); ++i)
+                    stock_supply_boundary(faction, owners[i], custom);
+        puts("Stock supply: Terran, Zerg and Protoss campaign/skirmish caps, HUD and reservations pass.");
+        return 0;
+    }
+    if (argc == 2 && !strcmp(argv[1], "--mixed-supply")) {
+        static const int owners[] = {SIDE, ENEMY, RESCUABLE, 4};
+        for (int custom = 0; custom < 2; ++custom)
+            for (int faction = R_TER; faction <= R_PROTOSS; ++faction)
+                for (int i = 0; i < (custom ? 4 : 2); ++i)
+                    mixed_supply_boundary(faction, owners[i], custom);
+        puts("Mixed supply: campaign and custom owner transfers, reservations and zero-cost supply pass.");
+        return 0;
+    }
     for(int n=0;n<4;n++){validate_source_placements(n);save_roundtrip(n);}
     init_mission(0);memset(u,0,sizeof(u));memset(b,0,sizeof(b));
     int z=spawn_unit(SIDE,U_ZERGLING,400,400);

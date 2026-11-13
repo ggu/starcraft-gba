@@ -12,6 +12,31 @@
 #endif
 #endif
 
+#ifdef SC64_ICON_TABLE_PRESENT
+/* The source importer fits each icon in a 20-pixel square. Larger valid
+ * tables can still use the scalar path below. */
+enum { SC64_ICON_COORD_LIMIT = 20 };
+
+/* Produce floor(i * source / drawn) * stride with one division per scaled
+ * axis. The remainder accumulates the fractional part of the source step. */
+static void
+sc64_icon_sample_offsets(u16 *out, unsigned source, unsigned drawn, unsigned stride)
+{
+    unsigned offset = 0, error = 0;
+    unsigned step = source == drawn ? 1u : source / drawn;
+    unsigned remainder = source - step * drawn;
+    for (unsigned i = 0; i < drawn; ++i) {
+        out[i] = (u16)offset;
+        offset += step * stride;
+        error += remainder;
+        if (error >= drawn) {
+            error -= drawn;
+            offset += stride;
+        }
+    }
+}
+#endif
+
 /* Draw an icon centered in a square UI slot, scaling down only when needed.
  * Returns zero for an absent or empty source icon so callers keep their
  * existing procedural glyph as a fallback. */
@@ -42,6 +67,28 @@ sc64_icon_draw_centered(unsigned icon_id, int center_x, int center_y, int size)
     }
     left = center_x - (int)draw_w / 2;
     top = center_y - (int)draw_h / 2;
+    if (draw_w <= SC64_ICON_COORD_LIMIT && draw_h <= SC64_ICON_COORD_LIMIT) {
+        u16 columns[SC64_ICON_COORD_LIMIT], rows[SC64_ICON_COORD_LIMIT];
+        const u8 *src = sc64_icon_pixels + icon->offset;
+        sc64_icon_sample_offsets(columns, icon->width, draw_w, 1);
+        sc64_icon_sample_offsets(rows, icon->height, draw_h, icon->width);
+        for (y = 0; y < draw_h; ++y) {
+            const u8 *row = src + rows[y];
+            for (x = 0; x < draw_w; ++x) {
+                if (row[columns[x]] && ++opaque == 4u) goto draw_sampled;
+            }
+        }
+        return 0;
+draw_sampled:
+        for (y = 0; y < draw_h; ++y) {
+            const u8 *row = src + rows[y];
+            for (x = 0; x < draw_w; ++x) {
+                u8 color = row[columns[x]];
+                if (color) gfx_pixel(left + (int)x, top + (int)y, color);
+            }
+        }
+        return 1;
+    }
     for (y = 0; y < draw_h; ++y) {
         unsigned sy = y * icon->height / draw_h;
         for (x = 0; x < draw_w; ++x) {

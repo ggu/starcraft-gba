@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-10. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-13. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -18,6 +18,256 @@ does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
+
+- **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
+  Showcase built from runtime `cbba1c5` were copied to
+  `Games/Development/StarCraft-2026-11-13`. All four 32 MiB files were
+  read back from the mounted card and matched their build SHA-256 values;
+  the card folder has `COPY-VERIFIED.txt` and `START-HERE.txt`. The files
+  include the shared command-menu speedup. Older delivery notes below are
+  historical. Existing saves and older ROMs were retained. Next: test B-menu
+  scrolling and battle speed on a physical GBA SP.
+
+- **One ten-mission cartridge per race:** the default build and release
+  profiles are Terran T10, Zerg Z10 and Protoss P10. All ten Zerg controllers
+  win under the Z10 flags; its 234 custom startup/save cases and 18 complete
+  ordinary-input skirmish runs are covered separately. Explicit `zerg-z9`
+  keeps its original ROM identity and save path. These results establish
+  campaign availability and selected play paths; frame budget, broader save
+  coverage, and original N64 behavior remain separate gates below. The
+  [campaign evidence matrix](audits/2026-11-13-normal-campaign-matrix.md)
+  separates exact KODAK wins, earlier normal builds and remaining checks.
+  [Z3](audits/2026-11-13-z3-current-home.md) and
+  [Z4](audits/2026-11-13-z4-two-normal-roms.md) win on both November 13
+  Z10 revisions. [Z5](audits/2026-11-13-z5-kodak-replay.md) and
+  [Z6](audits/2026-11-13-z6-kodak-replay.md) also win on the KODAK Z10
+  ROM with Kerrigan alive, including the Z6 transport route.
+  All ten Terran missions now have complete HOME wins on that same ROM.
+  Continue exact normal Z10 and P10 replays and broader save checks. The normal
+  Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
+  with the complete briefing, authored dialogue and all three heroes alive.
+  The exact KODAK P10 ROM reproduces that win at 8.79 emulated updates per
+  second and from one fresh mid-mission SRAM load. The exact KODAK Z10 ROM
+  wins [Z1](audits/2026-11-13-z1-normal-home.md) and
+  [Z2](audits/2026-11-13-z2-normal-home.md) from HOME, matching 51 and nine
+  observations respectively, including the briefing and authored pages.
+  Their emulator rates are 23.74 and 21.86 updates/s. The exact KODAK P10
+  cartridge [also wins P9 from HOME](audits/2026-11-13-p9-normal-home.md)
+  with 59 matching checks, both Cerebrate objectives and both heroes alive.
+  Its replay averages 8.27 emulated updates/s.
+  [Homeland](audits/2026-11-13-p7-carried-normal-home.md) wins on both
+  November 13 P10 revisions and the nearest-first candidate. P1–P6
+  and P8 still need equivalent qualification.
+
+- **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
+  confirmed separate named, Random, and Closed seats and a middle-only
+  start. The [GBA seat changes](audits/2026-11-12-skirmish-seat-options.md)
+  pass physical button and fresh SRAM checks on Terran, Z10, P10, and
+  Showcase. [Native opening actors](audits/2026-11-12-n64-blood-bath-opening.md#sparse-seat-spawn-positions)
+  establish the seeded Melee draw for one, two and three opponents on
+  Blood Bath, including two delayed launches that changed the locations.
+  The source-only selector matches all observed native seeds. The optional
+  GBA preview uses its elapsed-time clock and preserves resolved starts in
+  SRAM. Four ARM previews pass physical-button save, fresh load and
+  restart checks. Real hardware and default promotion remain open.
+  Exact normal builds after the preview merged pass the [repeatable
+  physical seat and SRAM checks](audits/2026-11-12-skirmish-seat-options.md#repeatable-physical-seat-checks)
+  on all four products. Keep full matches and hardware frame rate as
+  separate qualification. The [ordinary-profile Blood Bath preview](audits/2026-11-12-skirmish-seat-options.md#ordinary-four-profile-blood-bath-preview)
+  matches the last-open CPU edit and passes 24 physical same-build checks
+  and 20 cross-build checks. The old ROMs reject Melee saves as intended.
+  Keep the flag off while full matches and native elimination are open.
+  The [native T1 fresh-load witness](audits/2026-11-13-n64-t1-save-selection.md)
+  clears the selected Command Center, consistent with the normal GBA
+  selection reset; native Z7 remains untested.
+  The stock launch resolves Random race rows before drawing starts; the
+  pure sequence matches native Human Random, one/two CPU Random rows,
+  and a joint Human Random / two CPU Random capture. The Blood Bath
+  preview follows that order and now offers Human Random; Outpost and
+  defaults keep named human choices. The Terran ARM preview passes
+  physical-button Human and CPU Random save/restart checks, and the
+  prior normal build reads those saves.
+  The [native Game Type row](audits/2026-11-12-n64-blood-bath-opening.md#single-player-game-type-row)
+  cycles Melee and Free for All on Challenger and Blood Bath, with no
+  difficulty or team row in either lobby. The [paired native launches](audits/2026-11-12-n64-blood-bath-opening.md#paired-blood-bath-launches)
+  show CPUs open allied in Melee and hostile in Free for All; the same
+  seed and named seats produce identical starts in both. The shared
+  Blood Bath preview now offers both modes and preserves earlier Free
+  for All saves. All four preview ARM products pass guarded links and
+  physical save/load; on Terran, both modes also pass restart and the
+  actual CPU-to-CPU target predicate matches the native distinction.
+  A [matched native Random pair](audits/2026-11-12-n64-blood-bath-opening.md#paired-random-launches)
+  now verifies the same seed, resolved races, start markers and three
+  later RNG states in Melee and Free for All for Human Random and
+  CPU Random / Random / Protoss. A second pair matches a named Terran
+  human with only the middle CPU set to Random, including the same
+  resolved race, starts and RNG state. Other sparse lineups and seeds
+  remain unobserved.
+  The [native Blood Bath end-rule audit](audits/2026-11-13-n64-blood-bath-end-rules.md)
+  traces both modes to defeat at zero buildings and victory at zero eligible
+  opponent slots. Defeat transfers the remaining actors to neutral ownership
+  and detaches their AI. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
+  traces the loaded passenger exception and the Carrier/Reaver queue reset.
+  The [last Command Center lift](audits/2026-11-13-n64-blood-bath-airborne-last-building.md)
+  confirms an airborne building still counts. GBA skirmish needs a
+  shared Terran lift/land service with compatible save validation and
+  correct depot, add-on, collision and air-target behavior.
+  A passive replay did not reach elimination. [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
+  tests retirement and neutral cargo on HOST. Its final victory now waits
+  for deferred retirement, including a surviving Battlecruiser fixture.
+  Before ARM enablement, resolve in-flight damage and simultaneous
+  outcomes against native evidence. Next: record
+  an active elimination, broaden the native Free for All Random opening
+  sample, and qualify complete ordinary-input matches on hardware.
+  [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
+  now wins from HOME on the KODAK ROM and staged Terran ROM with all 95
+  observations matching. The policy puts idle builders back on minerals,
+  trains Marines, Firebats and Medics, and defends before pushing. It
+  averages 27.29 emulated updates/s but peaks at 14.04M cycles. Expand to
+  Blood Bath and to two and three independent opponents; native automatic
+  [SCV resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md)
+  and the outcome of surviving actors still need native witnesses.
+
+- **Protoss route stalls (P1):** the normal P10 cartridge now uses the
+  same nearest-first depot selection as Z10. [Normal P10 qualification](audits/2026-11-13-p10-nearest-normal.md)
+  matches Eye of the Storm from HOME and a fresh pause save, and 101
+  observations in a custom match with up to four depots for one owner.
+  Homeland also wins with 59 matching snapshots on the promoted ROM.
+  Three gameplay stalls fall by 80–95%; full P10 averages 8.99 emulated
+  updates/s, up from 8.80. The [typed save byte reader](audits/2026-11-13-typed-save-reader.md#default-builds-with-nearest-first-p10-routing)
+  is now default on P10 and Showcase, the two products using typed rows.
+  The P10 result update drops from 76.51M to 37.49M cycles with matching
+  world, video and SRAM. Showcase writes identical two-bank journals and
+  keeps corrupt-bank fallback. Next: reduce sustained movement and render
+  costs; these save timings do not improve the ordinary update budget.
+
+- **Final Zerg mission performance (P1):** the
+  [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
+  measures 1.57M and 2.00M mean loop cycles in two battle windows, against a
+  561,792-cycle budget. The rectangular point-flood trial changes the means
+  by less than 0.13% and regresses the 64×64 custom battle, so it stays out.
+  Even simulation alone exceeds budget in both windows. A 24-call instruction
+  profile puts about half of elapsed time in rendering; the late window
+  samples spend 218k cycles per update on the sprite blitter and 288k on
+  defenses. Prioritize exact Cannon power and target queries, then sprite
+  drawing and exploration. Preserve the existing 64×64 route fast path.
+  [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
+  reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
+  windows with 24 identical sampled frames and palettes.
+  The [split terrain cache](audits/2026-11-12-late-zerg-terrain-vram.md)
+  frees 16,080 B of Z10 working RAM. Compared with the packed-walk release,
+  it saves 1.33–1.49% with matching replay checkpoints and sampled pages.
+  The [partial terrain capture probe](audits/2026-11-13-terrain-dirty-capture.md)
+  copies only validated dirty bands back into the split cache. Host
+  raster and fallback checks pass; keep it off until matching ARM
+  video and timing establish its benefit during actual play.
+  [Combined defense indexing](audits/2026-11-12-defense-combined.md) is
+  enabled for Z10 after exact campaign and two complete three-AI ARM
+  comparisons. It saves 5.23–7.31% in two Z10 windows and adds about 0.31%
+  in the two measured custom windows. Other product defaults are unchanged.
+  The [single static key scan](audits/2026-11-12-z10-static-key.md) saves
+  1.38–1.60% in two fresh Z10 battle windows and 1.25% in a three-AI custom
+  battle with matching game and video samples. Local tile repair gave
+  little additional campaign gain and regressed custom play compared with
+  one scan. [Exact instruction traces](audits/2026-11-12-z10-route-stalls.md)
+  attribute the largest stalls to worker depot reachability, including
+  36.0M cycles in one update. Finishing partial fields on retry helped one
+  peak and regressed another, so it stays off. [Trying the nearest legal
+  depot first](audits/2026-11-12-z10-depot-first-nearest.md) is now enabled
+  for Z10. It preserves the full physical campaign and both three-AI custom
+  outcomes. On top of the current release, it cuts the two campaign-window
+  means by 8.72% and 4.54%, and the maxima from 35.18M to 14.84M and
+  38.37M to 3.46M cycles. Next: address the remaining point flood, then
+  qualify the optimization separately in other profiles.
+  [Packed completed-building art](audits/2026-11-12-packed-buildings.md)
+  saves another 1.64–2.19% in the Z10 windows, with matching gameplay and
+  sampled video, the same RAM limits, and both three-AI outcomes matching.
+  The [remaining point-flood investigation](audits/2026-11-12-z10-route-stalls.md#why-the-first-bounded-route-shortcut-changed-combat)
+  showed that skipping a logically resident field changes combat even
+  when its first step is exact. Deferring only the field bytes preserves
+  the full Z10 campaign and both custom outcomes, but is flat on mean
+  cycles. The [exact linear FIFO probe](audits/2026-11-12-z10-linear-point-flood.md)
+  reduces the 96-column peak by 45.65% and the early window mean by 1.04%.
+  The full Z10 win, both complete custom matches, and four paired physical
+  custom/SRAM checks match; all four links pass. First Strike and
+  Desperate Alliance exercise seven actual fills on their 96×96 maps
+  with matching ARM state and video. The shared option defaults off
+  pending hardware checks.
+  A [Z7 profile](audits/2026-11-13-z7-wide-point-flood.md) separates the
+  final 58.7M-cycle result transition from a 37.55M-cycle gameplay
+  update, of which 33.95M are point-field fills. The exact 128-column
+  FIFO probe reduces that gameplay update to 21.31M; the full Z7 win
+  matches all 253 checkpoints and its mean falls 6.43%. Z10 still wins
+  with matching state and video, and both full custom outcomes match. All four
+  guarded links pass; 128×128 T4/P10 physical prefixes match and exercise
+  the new kernel. Qualify on hardware before promoting the option. Treat
+  the result transition separately. A new Z7 instruction sample puts
+  routine rendering at 701k cycles and simulation at 462k. The shared
+  [command icon fix](audits/2026-11-13-command-icon-scaling.md) cuts open-menu
+  update cost 22.93% across four matching normal Z7 samples, with no
+  material change outside the menu. Both full three-CPU replays and the
+  four normal physical custom/SRAM checks match. Prioritize steady map,
+  sprite and simulation work over the selection-ring probe (under 0.12%
+  mean savings).
+  The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
+  cuts Z7's sampled static resource pass by 18.82% and matches ordered
+  pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
+  of the Blood Bath menu timing tail and hardware checks.
+  The [P10 profile](audits/2026-11-13-p10-command-census.md) finds depot
+  facility floods account for 41.94M cycles of the largest gameplay update.
+  The shared Command census probe cuts the full normal P10 win's mean
+  by 7.42% and a sampled trigger update by 34.97% with matching gameplay
+  and sampled video; it leaves depot stalls unchanged. The probe stays off
+  pending cross-profile and hardware checks. The [paired P10 routing tests](audits/2026-11-13-p10-route-options.md)
+  show wide point FIFO saves only 0.15% overall; nearest-first saves
+  2.05% and cuts two individual depot stalls by over 93%, with the full
+  win unchanged but different cache contents. Keep P10 defaults stable
+  until broader checks. The [exact bounded facility FIFO](audits/2026-11-13-bounded-facility-fifo.md)
+  cuts three P10 gameplay stalls by 43–57% and its full mean by 1.12%,
+  matching the observed route bytes, outcomes and video. Four guarded links,
+  the Z7 window and one 64×64 SRAM continuation pass. Keep it opt-in pending
+  composed RAM checks and hardware. The [typed save reader](audits/2026-11-13-typed-save-reader.md)
+  cuts the P10 result update from 76.50M to 37.51M cycles with the same
+  pause/result journals and fresh-load win. Keep it opt-in until broader
+  save and hardware checks. Next: reduce facility grid conversion and the
+  routine rendering and simulation costs that still dominate wall time.
+  [P10 sight profiles](audits/2026-11-13-shared-sight-phase.md) put exact
+  row math at 5.75% of ordinary loop cost. Only 48 of 453 sampled moves
+  share an identical footprint, so the phase-only probe stays out.
+  The [shared packed-row probe](audits/2026-11-13-shared-packed-sight.md)
+  matches 43,000 normal P10 calls, with a 1.78% mean improvement and a
+  3.04% late-window improvement. Keep it opt-in: it adds 40 IWRAM bytes
+  and has not been replayed through victory or on all four cartridges.
+  The [linear route word-pack probe](audits/2026-11-13-route-linear-word-pack.md)
+  matches scalar output and overflow behavior under sanitizers. It
+  targets packed output writes in the expensive facility and wide point
+  fills. Exact P10 ARM comparison cuts three sampled stalls 1.42–2.35%
+  with unchanged working RAM, but mean cost only falls 0.027%. Keep it
+  off and prioritize fewer route rebuilds over output-store tuning.
+  The [cursor query probe](audits/2026-11-13-p10-field-cursor-cost.md)
+  matches the same P10 prefix and cuts mean cycles 1.23%, with unchanged
+  IWRAM and BSS. Keep it off until all products and a composed battle
+  replay are checked; focus larger gains on simulation and route stalls.
+  The [three-option composition](audits/2026-11-13-composed-performance.md)
+  passes four guarded links and physical custom SRAM continuations. P10
+  still wins and runs at 9.62 emulated updates/s (8.60% fewer cycles).
+  Both full Z10 custom outcomes match, but the Blood Bath timing window
+  regresses (+0.75% mean, +7.41% max). The traced tail is a facility fill
+  with little expansion work. A [64-pop scalar prefix](audits/2026-11-13-small-facility-prefix.md)
+  leaves the Blood Bath spike and slows the Outpost window, so it remains
+  outside the release tree. A [lazy-row prototype](audits/2026-11-13-lazy-facility-rows.md)
+  also stays out: it saves short synthetic queries but slows a far one
+  by 33% even with matched placement, which would exceed Showcase's
+  available IWRAM. [Read-only facility samples](audits/2026-11-13-facility-fill-populations.md)
+  show Blood Bath's six fills use 25–165 pops, while four Outpost fills
+  use 1,957–3,239. [Touched-span packing](audits/2026-11-13-facility-output-span.md)
+  improves the sampled Blood Bath peak by 1.98%, but raises Outpost's
+  peak by 4.51% versus the composition and remains outside the release
+  tree. The paired Outpost trace attributes its tail to flip wait;
+  measure presentation timing before using it.
+  The three-option composition also matches the full Z7 win from HOME
+  and the full Z10 win after a fresh SRAM load, with little or no speed
+  gain in those runs.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
@@ -426,8 +676,10 @@ merges do not update an already copied ROM.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
-  resource/fog presentation, AI difficulty choices and direct native defeat
-  behavior remain open. Current custom defeat counts the last live owned
+  resource/fog presentation and an ordinary-input native elimination
+  witness remain open.
+  AI difficulty choices would extend the two native lobbies checked above.
+  Current custom defeat counts the last live owned
   building. Delivered death pixels/timelines were authenticated; their large
   source frames require a paired native presentation check, not guessed scale.
   The [source-only geometry audit](audits/2026-11-07-custom-death-geometry/README.md)
@@ -691,6 +943,39 @@ plus compiled suites); engine/build source matches the six-ROM/unified-qualified
 `3ebed0e2`. This does not enable shared Egg/Guardian/
 Scarab stages, prove native canal timing or change the 29/30 content count.
 
+The [stock 200 supply limit](audits/2026-11-12-stock-supply-cap.md) now
+applies to shared production and the HUD, including AI owners and legacy
+profiles. Existing units and reservations survive provider loss. The
+[independent race ledgers](audits/2026-11-12-race-supply-ledgers.md)
+also match the separate native T8 cap/provider/usage families. The
+original P10 opening now trains both Terran and Protoss without
+spending the other race's cap. Separately measure whether the GBA actor
+pool can represent armies at the stock cap.
+**Ghost and Nuclear Strike (P0):** the [N64 source and blast audit](audits/2026-11-12-ghost-nuclear-strike.md)
+records native T8 attachment and supply-first refusal. The shared opt-in
+probe trains Ghosts and paid missiles, launches from ordinary GBA controls,
+and uses the owned Ghost, Silo, missile, dot, warning and impact assets.
+It has authenticated Silo and flight journals for queued, armed, painting
+and descending missiles and remains off in default builds. P10 generates
+separate actor tables for the world, silo and active-strike probes;
+local checks reject tables generated for a different mode.
+Finish the native timing comparison, Ghost abilities and AI and complete
+the persistence and ARM-input checks before enabling it.
+
+Other core rules to prioritize after this:
+
+- **Production:** replace the normal custom Hatchery queue with stock
+  Larva and simultaneous Eggs for humans and AI. The isolated Egg checks
+  do not establish shared save or production behavior.
+- **Tech and combat:** finish cross-cartridge and AI research, then
+  extend omitted spells and ammo, including Defiler, Scarabs and
+  Carriers on the remaining cartridges. Keep the exact damage fractions
+  and actual windup separate from projectile drawing.
+- **Custom games:** allow each opponent slot to be closed, Random or a
+  named race independently, as observed on N64. Difficulty and native AI
+  behavior need their own checks. Confirm native win and defeat triggers
+  before changing the current last-building rule.
+
 ## Priority order
 
 Priorities are the maintainer's decisions after the [2026-11-06 GPT-6.1 Terra
@@ -706,16 +991,16 @@ the serialized native-test lock permit it.
 | C2 | P0 / in progress | Complete shared Reaver/Scarab behavior. Normal campaign Reavers still use a generic 100-damage attack; draft #356 has scoped HOST paid movement/impact with current town ownership. Custom production and release composition remain staged. | Source/native ammunition and attack-event checks; paid training, capacity, launch, flight, terrain/target loss, splash, death/slot reuse, save/load and AI purchases across applicable products. No generic free shot as a substitute. |
 | S1 | P0 / in progress | Finish shared Egg/Guardian production. The [opt-in late service](audits/2026-11-06-current-native-qualification/late-eggs.md) now has four actual ARM campaign Egg/SRAM continuations; normal activation across products and Guardian gameplay remain unfinished. | All real profile codecs and journals, interleaved tag contexts, old raw-36 Overlords, bad-newer fallback, atomic rejection, paired births, trigger reservations and Carrier/Egg capacity boundaries. Then ARM/RAM/stack, ordinary controls and genuine SRAM continuation before common activation. |
 | S3 | P0 / open | Qualify saves throughout each combined campaign, including early Protoss missions under the P10 product. [One early physical P1–P7 save point each](audits/2026-11-06-early-protoss-save/README.md) now reloads with matching selected-state continuation on the pre-#323 `ff94a2ea` P10 ROM; P1 also has a matching mid-mission controller-tail continuation, but its historical tape no longer wins on the packaged product; P2/P7 remain especially early and no winning continuation is established. | Fresh-process ordinary save/load and continued wins across all campaign entries on current combined flags, with source-owned effects, actors, clocks and objectives preserved. Reproduce and fix each rejection; do not infer arbitrary-save support from one point. |
-| C3 | P1 / partial | All 30 mission controllers now win on current source with ordinary input (HOST). Z10 has its first win (`tests/sc64_z10_campaign_run.c`: a Sunken Colony fortress with Hydralisks through the first waves, then a Lair, Spire and 34 Mutalisks to the Temple, escorting the crystal Drone; frame 58,795, with a fresh-process save continuation to the same win). Z7 wins at host tick 186,921 with a controller that restores all route-cache state around its own path queries (`tests/sc64_route_purity.h`), so a controller-free tape replay reproduces the win. Several wins are timing-sensitive (Z6, Z8, Z10, P8). Other controllers that query routes through the cache (Z3, Z4, Z5, Z6, T5, P3, P4, P5, P6) still perturb the game they play. | ARM replay of the Z7 and Z10 wins on the integrated ROMs; Temple/crystal text and results screens; apply the route-purity helper to the remaining controllers and add controller-free replays; keep all 30 winning as the engine changes. |
-| N1 | P1 / in progress | Validate N64 actor records, game clock and event cadence. This is a prerequisite for behavior-changing timing optimizations. | Explicit select/move/stop correlation for independent actors, fresh reset, owner/type/position validation, independent clock and writer-PC evidence. Bound read-only snapshots; no guest writes or MMIO side effects. |
-| P1 | P1 / in progress | Reduce representative busy-frame cost toward 30 fps. The [2026-11-10 instruction-level profile](audits/2026-11-10-busy-combat-profile/README.md) found route floods at a third of custom-battle cost. Reusing evicted route fields from the spare bank, keeping fields across structure changes, an interrupt page flip, a cheaper placement cursor and cached tracer values cut three pinned 140-unit custom windows by 33–49% in mean emulator cycles, with HOST traces identical to the base in all 54 custom lobbies, and the P7 campaign window by 4%. A second round (see the audit's [worst-update section](audits/2026-11-10-busy-combat-profile/README.md#round-two-the-worst-updates-2026-11-12)) cut the slowest Zerg update by 15% and the Protoss one by 5% (cheaper depot slot scan and goal-cell test, incremental walkability update) with identical traces; the mean barely moves. Those windows are still two to three times the budget. | Next: route floods (35% to 60% of the slowest updates; no exact skip found), the follow-on depot flood after a structure change, Arbiter bookkeeping, target-index work, and terrain and unit drawing. Exact-source pairs on the pinned windows with trace identity; confirm on GBA hardware. |
+| C3 | P1 / partial | All 30 mission controllers now win on current source with ordinary input (HOST). Z10 has its first win (`tests/sc64_z10_campaign_run.c`: a Sunken Colony fortress with Hydralisks through the first waves, then a Lair, Spire and 34 Mutalisks to the Temple, escorting the crystal Drone; frame 58,795, with a fresh-process save continuation to the same win). The [Z10 ARM replay](audits/2026-11-12-z10-arm-qualification.md) now reproduces that win and 59 matching checkpoints after a fresh SRAM load. Z10 also passes all ten HOST campaign starts/saves and the 234 custom startup/save lineups. [Carried Z7](audits/2026-11-12-z7-normal-physical.md) wins from HOME on the normal Z10 cartridge at frame 194,998 with 253 matching observations after the route-pure controller starts its paid air plan earlier. Its full replay averages 9.35 emulated updates per second. The November 13 Z10 KODAK cartridge also wins after a fresh SRAM load at frame 185,926 and one ordinary A press to reselect the Hatchery; all five remaining observations match. [Carried Z8](audits/2026-11-12-z8-normal-physical.md) wins from HOME on the same normal Z10 cartridge at frame 45,468, with 19 matching observations, both Nexuses destroyed and Kerrigan at 400 HP. [Carried Z9](audits/2026-11-13-z9-normal-physical.md) wins from HOME on that cartridge at frame 72,628, with 32 matching observations and a live Drone carrying the crystal back to the hive after the countdown. Several wins are timing-sensitive (Z6, Z8, Z10, P8). [Carried Z3](audits/2026-11-12-normal-campaign-replay-gaps.md) wins twice on HOST with identical route-pure tapes and wins from HOME on the normal Z10 ROM at frame 136,588 with 465 matching physical replay observations. [Carried Z4](audits/2026-11-12-z4-normal-physical.md) also has a route-pure HOST tape and a normal Z10 win at frame 34,984 with 42 matching observations on the nearest-first runtime. [Carried Z5](audits/2026-11-12-z5-normal-physical.md) wins at frame 48,347 on the same normal Z10 runtime, with 55 matching observations and separate physical acknowledgments for authored text and the source pause. [Carried Z6](audits/2026-11-12-z6-normal-physical.md) wins on the normal Z10 ROM at frame 56,913 with 65 matching observations, including Kerrigan boarding and leaving the Overlord. [T1 and T2](audits/2026-11-13-t1-t2-normal-physical.md) win from HOME on the exact KODAK Terran cartridge at frames 10,120 and 29,366 with all retained scalar checkpoints matching and authored pages acknowledged. [T3 and T4](audits/2026-11-13-t3-t4-normal-physical.md) also win from HOME on the exact KODAK Terran cartridge at frames 54,000 and 8,911, with all recorded checkpoints and authored acknowledgments verified. [T5](audits/2026-11-13-t5-normal-physical.md) now wins from HOME on the normal Terran T10 cartridge at frame 122,281 with 150 matching observations, both heroes alive and no hostile buildings. [T6](audits/2026-11-13-t6-normal-physical.md) now wins on exact KODAK Terran at frame 23,536 after replacing a host-only menu write with physical keys and isolating route queries. [T7](audits/2026-11-13-t7-t9-normal-physical.md) wins from HOME at frame 3,931 with Kerrigan alive and the Psi Emitter delivered. [T8](audits/2026-11-13-t8-normal-physical.md) wins from HOME at frame 139,216 with all 272 observations matched. The T7/T9 audit also verifies [T9](audits/2026-11-13-t7-t9-normal-physical.md#t9-new-gettysburg) through victory at frame 47,266 with all 51 observations matched, Kerrigan alive and all hostile Protoss buildings destroyed. [T10](audits/2026-11-13-t10-normal-physical.md) wins from HOME at frame 3,361 on the same Terran cartridge, with all six checkpoints matched, the Ion Cannon destroyed and Raynor alive. P3–P6 still have mutating route observers. | Keep the distinct Z9 save path; qualify a neutral carried Z7 save cut or persist the selection safely; Temple/crystal text and results screens; apply the route-purity helper to the remaining controllers and add controller-free replays; keep all 30 winning as the engine changes. |
+| N1 | P1 / in progress | Validate N64 actor records, game clock and event cadence before behavior-changing timing optimizations. The [matched T1 Marine STOP/no-STOP replay](https://github.com/ggu/starcraft-gba/blob/5445fb3d/docs/audits/2026-11-07-n64-stop-control/README.md#2026-11-12-matched-replay-without-stop) has identical RAM and frames at both pre-press boundaries. C-Down clears the move order and target by step 7,230; with no press the same Marine is farther along and still has the destination pending. The [matched native Start trial](https://github.com/ggu/starcraft-gba/blob/d44739a695afe28ef1ac9070c4d140029cd26bbf/docs/audits/2026-11-07-n64-stop-control/README.md#2026-11-12-matched-start-pause-control) opens Game Paused while retaining the pending move and target. The [matched menu Resume trial](https://github.com/ggu/starcraft-gba/blob/f2898c66202c4c66a6ffd75086c856a92468877f/docs/audits/2026-11-07-n64-stop-control/README.md#2026-11-12-matched-options-and-resume-controls) continues the same move; a second Start opens Options on the N64, while GBA field controls use Start as a Resume shortcut. A RAM counter freezes and advances with Resume, but its purpose is unproven. | Trace actual writes, compare idle and other actors, and establish an independent game clock before using it for timing. Keep snapshots bounded and read-only, with no MMIO side effects. The paired samples do not establish the precise stop tick or a selected-unit pointer ABI. |
+| P1 | P1 / in progress | Reduce representative busy-frame cost toward 30 fps. The [2026-11-10 instruction-level profile](audits/2026-11-10-busy-combat-profile/README.md) found route floods at a third of custom-battle cost. Reusing evicted route fields from the spare bank, keeping fields across structure changes, an interrupt page flip, a cheaper placement cursor and cached tracer values cut three pinned 140-unit custom windows by 33–49% in mean emulator cycles, with HOST traces identical to the base in all 54 custom lobbies, and the P7 campaign window by 4%. A second round (see the audit's [worst-update section](audits/2026-11-10-busy-combat-profile/README.md#round-two-the-worst-updates-2026-11-12)) cut the slowest Zerg update by 15% and the Protoss one by 5% (cheaper depot slot scan and goal-cell test, incremental walkability update) with identical traces; the mean barely moves. Those windows are still two to three times the budget. | The [dense point-flood probe](audits/2026-11-12-dense-point-flood.md) ([#389](https://github.com/ggu/starcraft-gba/pull/389)) saves 1.76–3.32% mean and 13.36–22.27% peak loop cycles across the three paired ARM custom windows, with matching sampled workloads. All nine ROM verify targets pass, the 64×64 Z1 campaign wins in matching ARM replays, and Z8 produces identical SRAM and a matching fresh-process win. The 54 bounded HOST lobby trace pairs match. It is on for eligible maps in the canonical builds. Next: address depot floods after structure changes, Arbiter bookkeeping, target-index work, and terrain and unit drawing. Exact-source pairs on the pinned windows with trace identity; confirm on GBA hardware. |
 | C4 | P1 / open | Replace campaign AI scalar approximations where verified source/native behavior differs. Late-Zerg waves use averaged groups/gaps; arrival, rebuilding and transport tactics are not equivalent to script commands. | Source script interpretation plus N64 observations of actual production, wallets, launch groups, targeting and rebuilds. Reproduce a concrete mismatch before changing AI; retain mission objective semantics. |
 | U1 | P1 / partial | Scourge/Spire source restrictions and shared picker correction are merged in #290. Continue the broader campaign PUNI/UPGR/TECx audit, especially P10. | Preserve current controlling ownership, nonspending denial and full supported custom catalog. Apply remaining source permissions with per-owner tests and save compatibility; do not infer complete availability parity from this one product fix. |
 | U3 | P0 / partial | Shared Forge/Core research. Done: the Protoss P10 ROM's custom games (SRAM, integer combat; [audit](audits/2026-11-11-protoss-research-sram/README.md)). Open: campaign missions (needs the generated source-policy header), computer-opponent research, Terran/Zerg/Showcase ROMs, Storm and other paths that bypass shield armor, hardware. Q8 fractions and Flash stay staged and unused. | Authenticated owner and payer identity; source initial/max levels; atomic paid producer jobs, power/cancel/death/capture/reset behavior, active-job saves and legacy migration; weapon/armor/shield/range effects on every relevant path; ordinary building menus and cross-product campaign/custom/Showcase checks. |
 | U2 | P1 / partial | Carrier/Interceptor behavior. **Done on the Protoss ROM** ([details](CARRIER-PROJECTILES.md#current-status-2026-11-12)): Carriers train and fly in custom games and in P7 to P10; the P10 Gantrithor is a Carrier-class parent of the same shared service (full hangar on rescue, launch, return, rebuild on the ordinary command, parent and target death, owner change, actor cap, in-process and fresh-process saves, a pre-change P10 save loads with an empty hangar); Protoss computer opponents build a Fleet Beacon and Carriers and pay for their Interceptors through that service (stateless, cap of four, one per four Zealots/Dragoons; four `match-carrier` matrix cases). **Open:** the Terran, Zerg Z9/Z10 and Showcase ROMs compile none of it, so a Protoss player there has no Carriers; the [report](CARRIER-PROJECTILES.md#carriers-in-the-other-roms) finds Showcase needs no save-format change, Terran and Zerg need a variable-length projectile packet and a shot cap. Also open: the Gantrithor's starting hangar is an assumption (no source data), capture by Mind Control is not in P10 so owner change is rescue only, no ARM replay of a Gantrithor fight, no hardware timing. | Showcase first (flags, fact tables, appended IDs; the P10 save layout), then Terran/Zerg custom-game generation with a bounded packet, each with fresh-process saves and the full profile matrix. Settle the #212/#210 codec designs first; do not merge those drafts. |
 | S2 | P0 / in progress | Maintain one shared capability and persistence contract across products. The stale Nydus guard now follows the selected codec's existing seven-bit capacity; no wire or cap change. P1 HOST research/controller saving is composed in #361. Ammunition, remaining controller contexts, repair, detection and morphs still need shared persistence. | Per-product and per-mode inventory from actual flags/call sites, lossless versioned representations, source-owned permissions, lifecycle/death/capture checks and every applicable save codec. No Showcase-only engine fix or mission-objective predicate used as a service gate. |
 | K1 | P1 / partial | Qualify complete supported custom games for all race combinations and 1–3 AIs. Validate building/unit progression, economy, targeting, victory and long-game stability. The [2026-11-10 planner audit](audits/2026-11-10-custom-ai-reliability/README.md) fixed the opponent planner's stalls and economy failures on HOST: of 288 planner-driven matches (a mirrored-human fixture, both maps, every race mix, 1–3 AIs) 281 now reach the engine's victory or defeat instead of 271, all 144 on Blood Bath, and the AI matrix adds full-match, prerequisite, spending-audit and save/resume cases. Open: an ordinary-input human who wins late games, the ARM matrix beyond three sampled lobbies per ROM, hardware, and K2/K3 below. Zerg opponents remain much weaker than Terran and Protoss (serial larva queues). | Both maps, each human race, homogeneous and mixed AI races, actual tech progression and save/load. Track global pool/queue pressure and ensure human production is not silently starved (measured: with three AIs at their shares the human keeps at least an equal share of unit and building slots). |
-| K2 | P1 / open | Melee reach against structures that carry source bounds (Armory, Machine Shop, Control Tower, Queen's Nest, Ultralisk Cavern and others) in the Zerg and Protoss products. `tick_combat` allows the weapon range plus 18 px from the center, while the path grid keeps ground units outside every tile the bounds touch, 35 to 48 px away on the long side. Zealots and Zerglings acquire such a structure and never damage it unless they arrive on a short side; one of 288 audit matches still stalls on it. Shared combat, so campaign reach changes with the fix. | Edge-based reach in the shared `tick_combat` for every product; a HOST fixture with melee units on each side of each bounded structure; Zerg and Protoss campaign controller suites rerun; custom matrix rerun. |
+| K2 | P1 / fixed in #386 | [#386](https://github.com/ggu/starcraft-gba/pull/386) lets short-range ground attacks contact the blocked footprint edge and falls back to a perimeter field when the regular route cannot plan a step. Runtime `ecaa865` passes 640 Z7 sanitizer cases. The mirrored HOST Outpost fixture (Z7, Terran vs three Zerg AIs) goes from unresolved at 216,001 updates on base to Terran defeat at 34,091. The corrected ordinary-input Z8 controller wins on Z9 in HOST and mGBA at frame 45,468, with matching fresh-process save continuation. All nine ROM variants verify. The pinned Z9 ARM battle's mean loop cost rises 0.17%, still far above budget. See [the replay and performance audit](audits/2026-11-12-melee-perimeter.md). | Broaden exact N64 contact-distance evidence and continue K1/K3. The older Gateway placement fixture fails on control and candidate before depot logic; update its setup separately. |
 | K3 | P2 / open | Custom-game end states and worker rally. A game ends only when the human or every AI has no structure, so a world in which no owner can ever act again stays open (six of 288 audit matches, all four-owner Outpost games with every field mined out). Separately, a new worker and a resumed cargo carrier go to the nearest mineral field anywhere, including another owner's base while the owner's own second base has ore (about 1% of worker spawns). | Decide the native end-of-match behavior from N64 observation before adding any rule. Owner-aware rally in the shared spawn path with campaign controllers rerun. |
 | M1 | P0 / in progress | Keep expanded mechanics within GBA memory and global actor capacity. Z10 has reached the 240-actor pool, preventing its former 70-Hydralisk launch goal. | Unchanged safety reserves, ROM/EWRAM/IWRAM and stack checks, child/queue/trigger capacity accounting and sustained busy play. Document adaptation limits; do not present catalog capacity as native-scale simulation. |
 | B1 | P2 / open | Finish combat-rule and attack-event fidelity: fractional HP/shields, armor/size/upgrade effects, Firebat collateral, appear-at-target wind-up, shield-hit effects and specialized weapons. | Verify current code first; compare source/N64 events, not only appearance. Exercise allies, invincibility, shields, deaths and impact saturation with persistence and clipping. See [combat audit](ENGINE-FIDELITY-AUDIT.md). |
@@ -777,12 +1062,33 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    saves. Keep partial prototypes gated; source splash may increase Z10 danger.
 3. In parallel, re-profile current-source order/detection, movement and
    rendering, then reduce measured busy-loop cost with paired state/pixel and
-   gameplay checks. Historical inclusive scopes are not promised savings. The N64
+   gameplay checks. The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
+   saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
+   [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
+   seven opt-in ROMs link and the Z10 stack canary leaves 8,948 bytes
+   untouched above its guard. Z10 wins at frame 58,795 from ordinary SRAM;
+   24 physical custom starts cover both maps and all three AI counts on the
+   three race products and Showcase. Z10 also matches two complete three-AI
+   defeats, one per map. P10 host campaign/save and 234 lineup checks pass;
+   the normal P10 cartridge also wins from SRAM with 23 matching observations.
+   The full Terran host campaign suite passes with both probes.
+   The separate defense/sight/walk combination saves 8.18–13.05% in Z10
+   with matching pixels and state; finish the remaining cartridge paths.
+   The [packed sight-row probe](audits/2026-11-12-packed-sight-rows.md)
+   saves 2.63–2.85% with the current split cache, with matched state and
+   pixels. Packed sight is now the Z7–Z10 default, and the current normal Z9
+   ROM wins the carried Z8 mission from legacy SRAM. After the per-race
+   supply changes, both normal Z10 ROMs win from fresh
+   physical SRAM with 61 matching raw and named checkpoints and 24 matching
+   rendered and visibility samples. Mean loop cost falls 2.80–3.14% in the
+   two latest campaign windows; the earlier 64×64 custom window is 0.93%
+   faster with matching sampled state. Continue profiling the large stalls.
+   Historical inclusive scopes are not promised savings. The N64
    order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
 4. Retry Z10 through ordinary controls after the relevant mechanics are usable;
    qualify genuine save continuation and affected carried missions. Preserve the
-   existing 29-mission coverage rather than tune difficulty around a substitute
+   existing campaign coverage rather than tune difficulty around a substitute
    weapon or injected victory. Independently qualify early Protoss campaign
    save continuation under the combined P10 product.
 5. Use a separate bounded reference task for moving-target projectiles and
@@ -793,12 +1099,22 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
 The custom Egg service is an explicit preview across all four delivered
 products, with legacy Z7 separately checked. Its static frame and selected-Egg
 HUD work; pulse/birth/shadow animation and a producer job list remain V1 work.
-No feature or build result changes the 29/30 coverage or near-30-fps requirement.
+The 30 available campaign entries do not change the near-30-fps and parity requirements.
 
 Native dialogue timing remains a concrete UX mismatch: critical outcome
 deferral is merged, but removal of synthetic holds remains staged after P4/P6
-controller failures. Native custom-game wallets and AI setup still need direct
-evidence; corrected human opening supply does not establish all setup parity.
+controller failures. The [native Blood Bath opening](audits/2026-11-12-n64-blood-bath-opening.md)
+now reaches play with each named human race against a mixed Zerg, Terran
+and Protoss lineup. The native and normal GBA Z10 HUDs agree on 50 starting
+minerals and race-specific supply (Terran 4/10; Zerg and Protoss 4/9).
+Minerals rise with neutral input in all six runs. Native computer rows can
+independently choose Random or Closed; the N64 also starts a match with
+only the middle computer row occupied. In both native Blood Bath modes,
+Right on the final Random CPU skips Closed and moves to Zerg. Keep one
+to three CPUs and match the edit behavior in the ordinary-profile
+preview. The GBA now has independent seats as well. The native Melee selector uses a launch-time seed and can move
+the human and all opponents even with the same lobby. Equal-speed timing,
+AI wallets and full-match behavior remain unverified.
 
 ## Current work and open PRs
 
@@ -822,7 +1138,7 @@ evidence; corrected human opening supply does not establish all setup parity.
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Finished as [#381](https://github.com/ggu/starcraft-gba/pull/381) (merged with the current base, memory/VRAM ownership re-derived, ARM cost cut from about +33% to about +3.2%, pixel and simulation-identity checks). Open: the 1% cost aim, native preview, hardware check. |
 | [#315](https://github.com/ggu/starcraft-gba/pull/315), late-Zerg packed grid | Merged as `738223a4`; scoped tests and emulator timing are recorded above. The later #323 package retains this capability, with a different binary; its speed has not been remeasured. Strict current Z7 winning validation, broader campaign/skirmish and hardware qualification remain open. |
 | [#318](https://github.com/ggu/starcraft-gba/pull/318), research journal groundwork | Merged as `f34004af`, default-off. Full default suite and current flag-off composition passed; feature-on current-base and functional research qualification remain open. The default-off groundwork alone did not change package bytes; #323 is included in the newer normal package. |
-| SD delivery | Latest verified normal Mac package is `StarCraft-GBA-2026-11-07-34c101e0` (T10, Z9, P10, Showcase; optional Z10 preview), with Protoss-custom testing instructions. KODAK is not mounted; its last recorded copy is `e9838086` plus the separate custom Egg preview, and present contents are unverified. Never claim a newer build is on the card without a physical copy and read-back verification; `./dev release copy` writes `COPY-VERIFIED.txt` only after that read-back matches. Packages from now on can come from `./dev release package`; earlier ones were assembled by hand. |
+| SD delivery | The November 13 KODAK folder holds verified T10, Z10, P10 and Showcase builds from runtime `cbba1c5`. Their card files match the local SHA-256 values; older ROMs and saves remain available under their original filenames. |
 
 ## Verification and maintenance
 

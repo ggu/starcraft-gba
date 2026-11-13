@@ -625,7 +625,7 @@ race_t5_remove_action(const Sc64T4Action *action, unsigned trigger_owner)
     }
     if (changed) {
         supply_used = race_owner_supply(SIDE);
-        supply_cap = race_owner_supply_cap(SIDE);
+        supply_cap = race_owner_supply_capacity(SIDE);
         invalidate_path_grid(); update_exploration();
     }
     return 1;

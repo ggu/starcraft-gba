@@ -54,7 +54,7 @@ class Product:
     verify_target: str            # make target that runs tools/verify_roms.py
     test_targets: tuple[str, ...]
     game_code: str
-    optional: bool = False        # preview products are opt-in
+    optional: bool = False        # legacy and preview products are opt-in
     aliases: tuple[str, ...] = ()
 
     @property
@@ -70,11 +70,11 @@ REGISTRY: tuple[Product, ...] = (
     Product("terran", "Terran campaign T10", "build/StarCraft-Terran-Transport1-GBA.gba",
             "build/starcraft-terran.elf", "verify-terran",
             ("test-sc64-terran-full-campaign", "test-terran"), "SCT8"),
-    Product("zerg-z9", "Zerg campaign Z9", "build/StarCraft-Zerg-Z9-Transport1-GBA.gba",
-            "build/starcraft-zerg-z9.elf", "verify-zerg", ("test-zerg",), "SCZ9",
+    Product("zerg-z10", "Zerg campaign Z10", "build/StarCraft-Zerg-Z10-Transport1-GBA.gba",
+            "build/starcraft-zerg-z10.elf", "verify-zerg", ("test-zerg",), "SCZA",
             aliases=("zerg",)),
-    Product("zerg-z10", "Zerg Z10 preview", "build/StarCraft-Zerg-Z10-Transport1-GBA.gba",
-            "build/starcraft-zerg-z10.elf", "verify-zerg-z10", ("test-zerg-z10",), "SCZA",
+    Product("zerg-z9", "Zerg campaign Z9 (legacy saves)", "build/StarCraft-Zerg-Z9-Transport1-GBA.gba",
+            "build/starcraft-zerg-z9.elf", "verify-zerg-z9", ("test-sc64-zerg-z9",), "SCZ9",
             optional=True),
     Product("protoss-p10", "Protoss campaign P10", "build/StarCraft-Protoss-P10-Transport1-GBA.gba",
             "build/starcraft-protoss-p10.elf", "verify-protoss", ("test-protoss",), "SCPA",
@@ -138,7 +138,7 @@ def tool_versions() -> dict[str, str]:
 
 
 def resolve_products(spec: str | None) -> list[Product]:
-    """Default: every non-optional product. ``all`` adds the preview."""
+    """Default: every non-optional product. ``all`` adds opt-in products."""
     if not spec:
         return [p for p in REGISTRY if not p.optional]
     if spec == "all":
@@ -616,6 +616,10 @@ def render_readme(check: dict[str, object], label: str, dirty: bool,
     for entry in entries:
         lines += [f"  {entry['file']}", f"    product {entry['product']} ({entry['title']}), game code "
                   f"{entry['game_code']}, {entry['bytes']} bytes", f"    sha256 {entry['sha256']}"]
+    if any(entry["product"] == "zerg-z10" for entry in entries):
+        lines += ["", "ZERG SAVES",
+                  "  Keep your existing Z9 ROM and its matching save together.",
+                  "  The ten-mission Z10 ROM has a separate save identity; it does not convert Z9 saves."]
     lines += ["", "WHAT WAS CHECKED (tools/sc64_release.py check, on this revision)", ""]
     for step in check["global_steps"]:  # type: ignore[union-attr]
         lines.append(f"  tree     {step['name']}: {step['status']}" +
@@ -890,7 +894,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     check = sub.add_parser("check", help="build, verify and test each product")
     check.add_argument("--products", help="comma list (" + ", ".join(p.key for p in REGISTRY) +
-                       ") or 'all'; default: all but the optional preview")
+                       ") or 'all'; default: current products only")
     check.add_argument("--require-all", action="store_true", help="treat SKIPPED as failure")
     check.add_argument("--out", type=Path, help="output directory (default build/release-check/<rev8>)")
     check.add_argument("--make-arg", action="append", default=[], metavar="ARG",

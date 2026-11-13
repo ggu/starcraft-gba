@@ -1,8 +1,7 @@
-/* Bounded normal-controller attempt for the private T5 mission probe.
- * After game_init performs the compile-gated probe entry, all gameplay changes
- * are made through game_update(held, pressed); this fixture is not a runtime
- * state injection test or a hardware performance proof. */
+/* Bounded T5 controller with either normal HOME or compile-gated probe entry.
+ * All gameplay changes are made through game_update(held, pressed). */
 #include "../starcraft/game.c"
+#include "sc64_route_purity.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +16,7 @@ static u16 prior_keys;
 static int last_logged_keys = -1;
 static int trace_first = 1;
 static int run_limit = T5_RUN_LIMIT_DEFAULT;
+static int launching;
 static u32 host_ticks;
 static void checkpoint(const char *kind);
 static int controller_wraith_queue_count(void);
@@ -283,9 +283,17 @@ static void trace_prefix(void)
 
 static void step(u16 held)
 {
-    if (host_ticks >= (u32)run_limit || screen != SCREEN_PLAY || won || lost) return;
+    if (host_ticks >= (u32)run_limit || (!launching && screen != SCREEN_PLAY) || won || lost) return;
     u16 pressed = held & (u16)~prior_keys;
+#ifdef ROUTE_PURITY_DEBUG
+    static uint64_t prior_route_hash;
+    assert(!route_pure_depth);
+    assert(!host_ticks || route_purity_hash() == prior_route_hash);
+#endif
     game_update(held, pressed);
+#ifdef ROUTE_PURITY_DEBUG
+    prior_route_hash = route_purity_hash();
+#endif
     prior_keys = held;
     ++host_ticks;
     if (trace_file && held != (u16)last_logged_keys) {
@@ -301,6 +309,18 @@ static void tap(u16 key)
 {
     step(key);
     step(0);
+}
+
+static void launch_from_home(void)
+{
+    assert(screen == SCREEN_TITLE);
+    launching = 1;
+    tap(KEY_A);
+    tap(KEY_RIGHT);
+    tap(KEY_RIGHT);
+    tap(KEY_A);
+    step(KEY_START); /* Skip the briefing; release during the first gameplay update. */
+    launching = 0;
 }
 
 /* L cancels a selected producer queue; SELECT leaves it untouched. */
@@ -571,6 +591,7 @@ static int controller_build_supply_depot(int *out_slot)
     /* Build placement uses the cursor's current four-pixel lattice. A planned
        site based on source coordinates can round differently after selecting
        the SCV, so evaluate candidates on the actual placement lattice. */
+    ROUTE_PURE_BEGIN();
     for (int candidate_y = b[command].y - 192;
          candidate_y <= b[command].y + 192; candidate_y += 16)
         for (int cx0 = b[command].x - 192; cx0 <= b[command].x + 192; cx0 += 16) {
@@ -602,6 +623,7 @@ static int controller_build_supply_depot(int *out_slot)
             score -= dist2(px, py, u[worker].x, u[worker].y) / 8;
             if (score > best_score) { best_score = score; x = px; y = py; }
         }
+    ROUTE_PURE_END();
     if (x < 0 || y < 0) {
         fprintf(stderr, "T5 Supply Depot found no legal site near Command Center=%d,%d\n",
                 b[command].x, b[command].y);
@@ -2151,6 +2173,17 @@ int main(int argc, char **argv)
     }
     if (run_limit < 1 || run_limit > 200000) return 2;
     game_init();
+    int from_home = screen == SCREEN_TITLE;
+    if (trace_path && !inspect) {
+        trace_file = fopen(trace_path, "wb");
+        if (!trace_file) return 2;
+        fprintf(trace_file,
+                "{\"trace_schema\":1,\"entry\":\"%s\","
+                "\"policy\":\"bounded-normal-controller-paid-air-wing-attempt\","
+                "\"mission\":8,\"tick_limit\":%d,\"events\":[\n",
+                from_home ? "t5-home-entry" : "t5-probe-entry", run_limit);
+    }
+    if (from_home) launch_from_home();
     assert(screen == SCREEN_PLAY && !race_mode &&
            race_selected_mission == SC64_T5_GLOBAL_ID && race_t5_active());
     assert(race_t5.active_mask == SC64_T5_ACTIVE_SOURCE_MASK &&
@@ -2191,15 +2224,6 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if (trace_path) {
-        trace_file = fopen(trace_path, "wb");
-        if (!trace_file) return 2;
-        fprintf(trace_file,
-                "{\"trace_schema\":1,\"entry\":\"t5-probe-entry\","
-                "\"policy\":\"bounded-normal-controller-paid-air-wing-attempt\","
-                "\"mission\":8,\"tick_limit\":%d,\"events\":[\n",
-                run_limit);
-    }
     checkpoint("start");
     wait_frames(500); /* let the source-ordered opening triggers finish */
     checkpoint("opening");

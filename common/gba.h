@@ -18,6 +18,13 @@ enum { C_BLACK=0,C_WHITE,C_DIM,C_PANEL,C_EDGE,C_RED,C_RED_DARK,C_GREEN,C_GREEN_D
 void gba_init(void);
 u16 gba_keys(void);
 u32 gba_clock(void);
+#if defined(SC64_NATIVE_MELEE_STARTS) && defined(SC64_IMPORTED_SKIRMISH)
+void gba_elapsed_clock_sample(u32 cycles);
+u32 gba_elapsed_milliseconds(void);
+#ifdef GBA_HOST
+void gba_test_set_elapsed_milliseconds(u32 milliseconds);
+#endif
+#endif
 void gfx_begin(u8 background);
 #ifdef GBA_SCENE_CLIP
 /* Restrict drawing primitives to [top,bottom). Invalid ranges are ignored.

@@ -13,6 +13,7 @@ q8-arm-custom-$(1):
 	$$(CC) $$(CFLAGS) -fstack-usage -I$$(Q8_CUSTOM_COVER_DIR) $$(Q8_CUSTOM_ARM_EXPERIMENT) $$($(2)) $$(Q8_CUSTOM_ARM_COMMON) $$(STARCRAFT) $(3) $$(LDFLAGS) -Wl,-Map,$$(Q8_CUSTOM_ARM_OUT)/$(1).map -lgcc -o $$(Q8_CUSTOM_ARM_OUT)/$(1).elf
 	$$(SIZE) $$(Q8_CUSTOM_ARM_OUT)/$(1).elf
 endef
+q8-arm-custom-z7 q8-arm-custom-z9 q8-arm-custom-z10: | $(LATE_ZERG_SIGHT_INPUTS)
 $(eval $(call Q8_CUSTOM_ARM_LINK,terran,TERRAN_ROM_FLAGS,))
 $(eval $(call Q8_CUSTOM_ARM_LINK,z9,ZERG_Z9_RELEASE_FLAGS,))
 $(eval $(call Q8_CUSTOM_ARM_LINK,z10,ZERG_Z10_RELEASE_FLAGS,))

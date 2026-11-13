@@ -67,7 +67,8 @@ static const u8 game_audio_heard[3] = { 0xffu, 1u << GAME_AUDIO_ALERT_RESEARCH, 
  * campaigns): when the last attack alert played, and the alerts waiting. */
 enum { GAME_AUDIO_STATE_ATTACK_TICK, GAME_AUDIO_STATE_PENDING, GAME_AUDIO_STATE_WORDS };
 enum { GAME_AUDIO_PENDING_UNIT = 1, GAME_AUDIO_PENDING_BUILDING = 2,
-       GAME_AUDIO_PENDING_RESEARCH = 4, GAME_AUDIO_PENDING_UPGRADE = 8 };
+       GAME_AUDIO_PENDING_RESEARCH = 4, GAME_AUDIO_PENDING_UPGRADE = 8,
+       GAME_AUDIO_PENDING_NUCLEAR_WARNING = 16 };
 
 #ifdef GBA_HOST
 u32 game_audio_events[GAME_AUDIO_EVENT_KINDS];
@@ -228,6 +229,19 @@ static void game_audio_cue(int cue)
         GAME_AUDIO_STATE[GAME_AUDIO_STATE_PENDING] |= (u16)(GAME_AUDIO_PENDING_RESEARCH << cue);
 }
 
+#ifdef SC64_SHARED_NUKE_PROBE
+/* This is a global alert, even if the Ghost and the Silo are off camera.
+ * Keep it out of simulation state and let the observer arbitrate playback. */
+static void game_audio_nuclear_warning(void)
+{
+#if defined(SC64_AUDIO_IMPORTED) && defined(SC64_AUDIO_NUKE_WARNING_SAMPLE)
+    _Static_assert(SC64_AUDIO_NUKE_WARNING_SAMPLE < SC64_AUDIO_SAMPLE_COUNT,
+                   "nuclear warning index exceeds the audio bank");
+    GAME_AUDIO_STATE[GAME_AUDIO_STATE_PENDING] |= GAME_AUDIO_PENDING_NUCLEAR_WARNING;
+#endif
+}
+#endif
+
 static void game_audio_emit(int kind, int raw)
 {
 #if defined(SC64_AUDIO_IMPORTED) && !defined(SC64_AUDIO_WARP_CUES)
@@ -383,6 +397,13 @@ static void game_audio_pending(int fresh)
         state[GAME_AUDIO_STATE_ATTACK_TICK] = (u16)((u32)frame - 0x8000u);
     if (!pending) return;
     if (fresh) { state[GAME_AUDIO_STATE_PENDING] = 0; return; }
+#if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_AUDIO_IMPORTED) && defined(SC64_AUDIO_NUKE_WARNING_SAMPLE)
+    if ((pending & GAME_AUDIO_PENDING_NUCLEAR_WARNING) && game_audio_voice_free()) {
+        game_audio_advised = 1;
+        audio_play_sample(SC64_AUDIO_NUKE_WARNING_SAMPLE, 0, AUDIO_CLASS_ADVISOR);
+        pending &= ~(u32)GAME_AUDIO_PENDING_NUCLEAR_WARNING;
+    }
+#endif
     if (pending & (GAME_AUDIO_PENDING_UNIT | GAME_AUDIO_PENDING_BUILDING)) {
         if ((u16)((u32)frame - state[GAME_AUDIO_STATE_ATTACK_TICK]) >= GAME_AUDIO_ATTACK_ALERT_TICKS &&
             game_audio_alert(pending & GAME_AUDIO_PENDING_BUILDING ? GAME_AUDIO_ALERT_BASE : GAME_AUDIO_ALERT_FORCES))

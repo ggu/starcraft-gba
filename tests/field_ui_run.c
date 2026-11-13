@@ -763,6 +763,21 @@ selection_circle_tests(void)
     selected_building = -1;
 }
 
+static void supply_loss_save_test(void)
+{
+    init_state();
+    check(supply_used == 26 && supply_cap == 36, "test begins at normal outpost supply");
+    hit_target(MAX_UNITS + 2, 1000, U_ZERGLING, ENEMY);
+    check(!b[2].alive && supply_used == 26 && supply_cap == 20,
+          "destroying the Depot lowers capacity without removing troops");
+    int ore = minerals;
+    queue_unit(3, U_MARINE);
+    check(minerals == ore && !b[3].queue_count, "over-cap production does not spend");
+    check(save_game() && load_game(), "a game over cap after provider loss still reloads");
+    check(!b[2].alive && supply_used == 26 && supply_cap == 20,
+          "reload preserves troops and surviving capacity");
+}
+
 int
 main(void)
 {
@@ -784,6 +799,7 @@ main(void)
     queue_panel_tests();
     research_and_construction_panel_tests();
     panel_marks_tests();
+    supply_loss_save_test();
     if (failures) return 1;
 #ifdef SC_COMMAND_RING
     puts("Default menus and controls (ring build): deselect, smart move, smart attack, R tap, placement status order, snapping, title/pause/result, selection ellipses, queue panel: ok");

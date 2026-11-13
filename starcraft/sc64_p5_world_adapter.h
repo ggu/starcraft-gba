@@ -462,7 +462,7 @@ static int sc64_p5_world_action(void *context, const Sc64P5SourceAction *a)
         type = sc64_race_unit_from_raw(a->unit);
         owner = ctx->live_owner_for_source[source_owner];
         if (type < 0 || owner < 0) return 0;
-        for (int i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+        for (int i = 0; i < MAX_UNITS; ++i) free_slots += sc64_unit_slot_available(i);
         if (free_slots < (int)count) return 0;
         for (unsigned n = 0; n < count; ++n) {
             int slot = spawn_unit(owner, type, (l + r) / 2, (t + btm) / 2);
@@ -499,7 +499,7 @@ static int sc64_p5_world_action(void *context, const Sc64P5SourceAction *a)
         }
         if (changed) {
             supply_used = race_owner_supply(SIDE);
-            supply_cap = race_owner_supply_cap(SIDE);
+            supply_cap = race_owner_supply_capacity(SIDE);
             target_lists_valid = 0; sc64_unit_bucket_active = 0;
             sc64_target_index_end();
         }

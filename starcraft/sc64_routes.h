@@ -5,6 +5,7 @@
 
 /* Point goals are cell indices; the upper bit identifies depot slots. */
 #define SC64_ROUTE_DEPOT_TAG 0x8000u
+#define SC64_ROUTE_MELEE_ID_TAG 0x4000u
 _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap depot keys");
 #ifdef SC64_RANGE_WORK
 #if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3) || \
@@ -1526,12 +1527,293 @@ sc64_route_flood(int slot, int head, int *tail, int origin,
 #else
 #define SC64_ROUTE_SLOT_ATTR GBA_HOT
 #endif
+#if defined(SC64_ROUTE_DENSE_FLOOD_PROBE) && defined(SC64_ROUTE_ACTIVE_STRIDE) && \
+    SC64_ROUTE_GRID_CELLS_PER_BYTE == 8 && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define SC64_ROUTE_DENSE_FLOOD 1
+enum { SC64_DENSE_SIDE = 64, SC64_DENSE_STRIDE = 72,
+       SC64_DENSE_CELLS = SC64_DENSE_SIDE * SC64_DENSE_SIDE,
+       SC64_DENSE_BYTES = (SC64_DENSE_SIDE + 2) * SC64_DENSE_STRIDE };
+/* The queue can hold every active cell. The padded byte field uses the
+ * middle of scratch, clear of both the queue and the retained topology grid. */
+_Static_assert(sizeof(bfs_queue) >= SC64_DENSE_CELLS * sizeof(u16) +
+               3 + SC64_DENSE_BYTES + sizeof(path_walkable),
+               "dense flood scratch overlaps another grid");
+
+#define SC64_DENSE_BYTE(n, b) (7u | (((n) & (1u << (b))) ? 0u : 8u))
+#define SC64_DENSE_WORD(n) (SC64_DENSE_BYTE(n, 0) | SC64_DENSE_BYTE(n, 1) << 8 | \
+    SC64_DENSE_BYTE(n, 2) << 16 | SC64_DENSE_BYTE(n, 3) << 24)
+static const u32 sc64_dense_words[16] = {
+    SC64_DENSE_WORD(0), SC64_DENSE_WORD(1), SC64_DENSE_WORD(2), SC64_DENSE_WORD(3),
+    SC64_DENSE_WORD(4), SC64_DENSE_WORD(5), SC64_DENSE_WORD(6), SC64_DENSE_WORD(7),
+    SC64_DENSE_WORD(8), SC64_DENSE_WORD(9), SC64_DENSE_WORD(10), SC64_DENSE_WORD(11),
+    SC64_DENSE_WORD(12), SC64_DENSE_WORD(13), SC64_DENSE_WORD(14), SC64_DENSE_WORD(15),
+};
+#undef SC64_DENSE_BYTE
+#undef SC64_DENSE_WORD
+
+static inline u32 sc64_dense_pack4(const u8 *p)
+{
+    u32 v;
+    __builtin_memcpy(&v, __builtin_assume_aligned(p, 4), sizeof(v));
+    v &= 0x07070707u;
+    v = (v | (v >> 5)) & 0x003f003fu;
+    return (v | (v >> 10)) & 0xfffu;
+}
+
+static int GBA_HOT __attribute__((noinline))
+sc64_route_fill_dense(u8 *field, int goal)
+{
+    uintptr_t scratch = ((uintptr_t)(void *)(bfs_queue + SC64_DENSE_CELLS) + 3u) &
+        ~(uintptr_t)3u;
+    u8 *dense = (u8 *)(void *)scratch;
+    const u8 *walk = path_walkable;
+    const int start = (goal & 63) + 4 + ((goal >> 6) + 1) * SC64_DENSE_STRIDE;
+    int head = 0, tail = 0;
+
+    memset(dense, 15, SC64_DENSE_STRIDE);
+    memset(dense + (SC64_DENSE_SIDE + 1) * SC64_DENSE_STRIDE, 15, SC64_DENSE_STRIDE);
+    for (int y = 1; y <= SC64_DENSE_SIDE; ++y) {
+        u8 *row = dense + y * SC64_DENSE_STRIDE;
+        const u32 border = 0x0f0f0f0fu;
+        __builtin_memcpy(__builtin_assume_aligned(row, 4), &border, 4);
+        __builtin_memcpy(__builtin_assume_aligned(row + 68, 4), &border, 4);
+        for (int x = 4; x < 68; x += 8) {
+            u32 bits = *walk++;
+            __builtin_memcpy(__builtin_assume_aligned(row + x, 4),
+                             &sc64_dense_words[bits & 15u], 4);
+            __builtin_memcpy(__builtin_assume_aligned(row + x + 4, 4),
+                             &sc64_dense_words[bits >> 4], 4);
+        }
+    }
+    if (dense[start] == 7u) {
+        dense[start] = 0;
+        bfs_queue[tail++] = (u16)start;
+    } else {
+        for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
+            int seed = start + dy * SC64_DENSE_STRIDE + dx;
+            if (dense[seed] != 7u) continue;
+            dense[seed] = 0;
+            bfs_queue[tail++] = (u16)seed;
+        }
+    }
+    while (head < tail) {
+        int c = bfs_queue[head++];
+#define SC64_DENSE_STEP(offset, direction) \
+        if (dense[c + (offset)] == 7u) { \
+            dense[c + (offset)] = direction; \
+            bfs_queue[tail++] = (u16)(c + (offset)); \
+        }
+        SC64_DENSE_STEP(-1, 1)
+        SC64_DENSE_STEP(1, 2)
+        SC64_DENSE_STEP(-SC64_DENSE_STRIDE, 3)
+        SC64_DENSE_STEP(SC64_DENSE_STRIDE, 4)
+#undef SC64_DENSE_STEP
+    }
+    for (int y = 1; y <= SC64_DENSE_SIDE; ++y) {
+        const u8 *row = dense + y * SC64_DENSE_STRIDE;
+        for (int x = 4; x < 68; x += 8) {
+            u32 pair = sc64_dense_pack4(row + x) |
+                       sc64_dense_pack4(row + x + 4) << 12;
+            *field++ = (u8)pair;
+            *field++ = (u8)(pair >> 8);
+            *field++ = (u8)(pair >> 16);
+        }
+    }
+    return tail;
+}
+#if defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || defined(SC64_ROUTE_FACILITY_FIFO_PROBE)
+enum { SC64_LINEAR_COLS = 96, SC64_LINEAR_WIDE_COLS = 128, SC64_LINEAR_MAX_ROWS = 128,
+       SC64_LINEAR_PAD = 8, SC64_LINEAR_WIDE_QUEUE_LIMIT = 6144 };
+#ifndef SC64_ROUTE_LINEAR_QUEUE_CAP
+#define SC64_ROUTE_LINEAR_QUEUE_CAP 8192
+#endif
+#define SC64_LINEAR_WIDE_QUEUE_CAP ((SC64_ROUTE_LINEAR_QUEUE_CAP < SC64_LINEAR_WIDE_QUEUE_LIMIT) ? \
+                                   SC64_ROUTE_LINEAR_QUEUE_CAP : SC64_LINEAR_WIDE_QUEUE_LIMIT)
+_Static_assert(SC64_ROUTE_LINEAR_QUEUE_CAP >= 8 &&
+               sizeof(bfs_queue) >= SC64_ROUTE_LINEAR_QUEUE_CAP * sizeof(u16) +
+               3 + (SC64_LINEAR_MAX_ROWS + 2) * (SC64_LINEAR_COLS + SC64_LINEAR_PAD) +
+               sizeof(path_walkable),
+               "linear flood scratch overlaps the queue or retained grid");
+_Static_assert(sizeof(bfs_queue) >= SC64_LINEAR_WIDE_QUEUE_CAP * sizeof(u16) +
+               3 + (SC64_LINEAR_MAX_ROWS + 2) * (SC64_LINEAR_WIDE_COLS + SC64_LINEAR_PAD) +
+               sizeof(path_walkable),
+               "wide linear flood scratch overlaps the queue or retained grid");
+
+static inline u8 *sc64_route_linear_grid(int cols, int rows, int stride, int cap)
+{
+    uintptr_t scratch = ((uintptr_t)(void *)(bfs_queue + cap) + 3u) & ~(uintptr_t)3u;
+    u8 *dense = (u8 *)(void *)scratch;
+    const u8 *walk = path_walkable;
+
+    memset(dense, 15, (size_t)stride);
+    memset(dense + (rows + 1) * stride, 15, (size_t)stride);
+    for (int y = 1; y <= rows; ++y) {
+        u8 *out = dense + y * stride;
+        const u32 border = 0x0f0f0f0fu;
+        __builtin_memcpy(__builtin_assume_aligned(out, 4), &border, 4);
+        __builtin_memcpy(__builtin_assume_aligned(out + cols + 4, 4),
+                         &border, 4);
+        for (int x = 4; x < cols + 4; x += 8) {
+            u32 bits = *walk++;
+            __builtin_memcpy(__builtin_assume_aligned(out + x, 4),
+                             &sc64_dense_words[bits & 15u], 4);
+            __builtin_memcpy(__builtin_assume_aligned(out + x + 4, 4),
+                             &sc64_dense_words[bits >> 4], 4);
+        }
+    }
+    return dense;
+}
+
+static inline u32 sc64_dense_pack8(const u8 *p)
+{
+    return sc64_dense_pack4(p) | sc64_dense_pack4(p + 4) << 12;
+}
+
+#ifdef SC64_ROUTE_LINEAR_WORD_PACK_PROBE
+/* The dense helpers above require little endian. Four 24-bit groups
+ * occupy exactly three aligned words; neither source borders nor bytes
+ * beyond the active field are included. The route pool and all eligible
+ * packed row widths are word aligned. Keep the general byte writer for
+ * any caller outside that layout. */
+static void __attribute__((noinline))
+sc64_route_pack_linear_words(u8 *field, const u8 *dense,
+                             int cols, int rows, int stride)
+{
+    for (int y = 1; y <= rows; ++y) {
+        const u8 *in = dense + y * stride + 4;
+        for (int x = 0; x < cols; x += 32) {
+            u32 a = sc64_dense_pack8(in + x);
+            u32 b = sc64_dense_pack8(in + x + 8);
+            u32 c = sc64_dense_pack8(in + x + 16);
+            u32 d = sc64_dense_pack8(in + x + 24);
+            u32 low = a | b << 24;
+            u32 mid = b >> 8 | c << 16;
+            u32 high = c >> 16 | d << 8;
+            __builtin_memcpy(__builtin_assume_aligned(field, 4), &low, 4);
+            __builtin_memcpy(__builtin_assume_aligned(field + 4, 4), &mid, 4);
+            __builtin_memcpy(__builtin_assume_aligned(field + 8, 4), &high, 4);
+            field += 12;
+        }
+    }
+}
+#endif
+
+static inline void sc64_route_pack_linear(u8 *field, const u8 *dense,
+                                          int cols, int rows, int stride)
+{
+#ifdef SC64_ROUTE_LINEAR_WORD_PACK_PROBE
+    if (!(cols & 31) && !((uintptr_t)(void *)field & 3u)) {
+        sc64_route_pack_linear_words(field, dense, cols, rows, stride);
+        return;
+    }
+#endif
+    for (int y = 1; y <= rows; ++y) {
+        const u8 *in = dense + y * stride;
+        for (int x = 4; x < cols + 4; x += 8) {
+            u32 pair = sc64_dense_pack8(in + x);
+            *field++ = (u8)pair;
+            *field++ = (u8)(pair >> 8);
+            *field++ = (u8)(pair >> 16);
+        }
+    }
+}
+
+#endif
+#ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
+/* Keep the oldest-to-newest FIFO order. A batch may append at most four
+ * cells per pop; make room between batches instead of wrapping each access.
+ * No live route bytes or grid bits have changed if a frontier does not fit. */
+static int GBA_HOT __attribute__((noinline))
+sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
+{
+    int head = 0, consumed = 0;
+    while (head < tail) {
+        int limit = head + (cap - tail) / 4;
+        if (limit > tail) limit = tail;
+        if (limit == head) {
+            int pending = tail - head;
+            if (pending > cap - 4) return -1;
+            for (int i = 0; i < pending; ++i) bfs_queue[i] = bfs_queue[head + i];
+            consumed += head;
+            head = 0;
+            tail = pending;
+            continue;
+        }
+        do {
+            int c = bfs_queue[head++];
+#define SC64_LINEAR_STEP(offset, direction) \
+            if (dense[c + (offset)] == 7u) { \
+                dense[c + (offset)] = direction; \
+                bfs_queue[tail++] = (u16)(c + (offset)); \
+            }
+            SC64_LINEAR_STEP(-1, 1)
+            SC64_LINEAR_STEP(1, 2)
+            SC64_LINEAR_STEP(-stride, 3)
+            SC64_LINEAR_STEP(stride, 4)
+#undef SC64_LINEAR_STEP
+        } while (head < limit);
+    }
+    return consumed + tail;
+}
+
+static int __attribute__((noinline))
+sc64_route_fill_linear(u8 *field, int goal)
+{
+    const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
+    const int cap = cols == SC64_LINEAR_WIDE_COLS ? SC64_LINEAR_WIDE_QUEUE_CAP : SC64_ROUTE_LINEAR_QUEUE_CAP;
+    u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
+    const int row = sc64_cell_row(goal);
+    const int start = goal + row * SC64_LINEAR_PAD + stride + 4;
+    int tail = 0;
+
+    if (dense[start] == 7u) {
+        dense[start] = 0;
+        bfs_queue[tail++] = (u16)start;
+    } else {
+        for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
+            int seed = start + dy * stride + dx;
+            if (dense[seed] != 7u) continue;
+            dense[seed] = 0;
+            bfs_queue[tail++] = (u16)seed;
+        }
+    }
+    tail = sc64_route_expand_linear(dense, tail, stride, cap);
+    if (tail < 0) return tail;
+    sc64_route_pack_linear(field, dense, cols, rows, stride);
+    return tail;
+}
+#endif
+#endif
+#if defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) && !defined(SC64_ROUTE_DENSE_FLOOD)
+#error "linear flood probe requires the active-stride packed-grid dense helpers"
+#endif
+
+#if defined(SC64_ROUTE_FACILITY_FIFO_PROBE) && \
+    (!defined(SC64_ROUTE_DENSE_FLOOD) || !defined(SC64_DEPOT_BOUNDED))
+#error "facility FIFO probe requires bounded depot and active-stride packed-grid dense helpers"
+#endif
+
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* Flood the whole field of a goal into a slot on the current grid. Returns the
  * number of queued cells (for diagnostics). */
 static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
 {
     int i, tail = 0;
+#ifdef SC64_ROUTE_DENSE_FLOOD
+    if (MAP_COLS == SC64_DENSE_SIDE && MAP_ROWS == SC64_DENSE_SIDE)
+        tail = sc64_route_fill_dense(sc64_route_field[slot], goal);
+    else
+#endif
+    {
+#ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
+    if ((MAP_COLS == SC64_LINEAR_COLS || MAP_COLS == SC64_LINEAR_WIDE_COLS) &&
+        MAP_ROWS > 0 && MAP_ROWS <= SC64_LINEAR_MAX_ROWS) {
+        tail = sc64_route_fill_linear(sc64_route_field[slot], goal);
+        if (tail >= 0) goto fill_finished;
+        tail = 0;
+    }
+#endif
+
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
 #else
@@ -1570,6 +1852,10 @@ static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
     for (i = 0; i < tail; ++i) SC64_GRID_SET(path_walkable, bfs_queue[i], 1);
 #endif
     (void)i;
+    }
+#ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
+fill_finished:
+#endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
 #endif
@@ -2294,6 +2580,93 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     return 1;
 }
 
+#ifdef SC64_ROUTE_FACILITY_FIFO_PROBE
+/* Match the packed field's seed predicate. The caller enumerates candidates
+ * in row-major order. */
+static inline int sc64_route_facility_seed(int center_x, int center_y, int col, int row,
+                                           int x0, int x1, int y0, int y1, int perimeter)
+{
+    int px, py;
+    if (perimeter) {
+        if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS ||
+            ((col == x0 || col == x1) == (row == y0 || row == y1))) return 0;
+        return SC64_GRID_GET(path_walkable, col + row * MAP_COLS);
+    }
+    return SC64_GRID_GET(path_walkable, col + row * MAP_COLS) &&
+           sc64_depot_cell_point(center_x, center_y, col, row, &px, &py);
+}
+
+#ifndef SC64_ROUTE_FACILITY_FIFO_FALLBACK
+#define SC64_ROUTE_FACILITY_FIFO_FALLBACK() ((void)0)
+#endif
+/* The origin check follows each whole pop, including its remaining
+ * neighbors. At entry an origin on any seed stops before the first pop.
+ * The sentinel for an unbounded flood is in the padded border. */
+static int GBA_HOT __attribute__((noinline))
+sc64_route_expand_facility_fifo(u8 *dense, int tail, int stride, int cap,
+                                int origin, int *complete)
+{
+    int head = 0, consumed = 0;
+    if (tail && dense[origin] < 7u) {
+        *complete = 0;
+        return tail;
+    }
+    while (head < tail) {
+        int limit = head + (cap - tail) / 4;
+        if (limit > tail) limit = tail;
+        if (limit == head) {
+            int pending = tail - head;
+            if (pending > cap - 4) return -1;
+            for (int i = 0; i < pending; ++i) bfs_queue[i] = bfs_queue[head + i];
+            consumed += head;
+            head = 0;
+            tail = pending;
+            continue;
+        }
+        do {
+            int c = bfs_queue[head++];
+#define SC64_FACILITY_FIFO_STEP(offset, direction) \
+            if (dense[c + (offset)] == 7u) { \
+                dense[c + (offset)] = direction; \
+                bfs_queue[tail++] = (u16)(c + (offset)); \
+            }
+            SC64_FACILITY_FIFO_STEP(-1, 1)
+            SC64_FACILITY_FIFO_STEP(1, 2)
+            SC64_FACILITY_FIFO_STEP(-stride, 3)
+            SC64_FACILITY_FIFO_STEP(stride, 4)
+#undef SC64_FACILITY_FIFO_STEP
+            if (dense[origin] < 7u) {
+                *complete = 0;
+                return consumed + tail;
+            }
+        } while (head < limit);
+    }
+    return consumed + tail;
+}
+
+static int __attribute__((noinline))
+sc64_route_fill_facility_fifo(u8 *field, int center_x, int center_y,
+                             int x0, int x1, int y0, int y1, int perimeter,
+                             int origin, int *complete)
+{
+    const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
+    const int cap = cols == SC64_LINEAR_WIDE_COLS ? SC64_LINEAR_WIDE_QUEUE_CAP : SC64_ROUTE_LINEAR_QUEUE_CAP;
+    u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
+    int tail = 0, start = 0;
+    if (origin >= 0) start = origin + sc64_cell_row(origin) * SC64_LINEAR_PAD + stride + 4;
+    for (int row = y0; row <= y1; ++row) for (int col = x0; col <= x1; ++col) {
+        if (!sc64_route_facility_seed(center_x, center_y, col, row, x0, x1, y0, y1, perimeter)) continue;
+        if (tail == cap) return -1;
+        int cell = (row + 1) * stride + col + 4;
+        dense[cell] = 0;
+        bfs_queue[tail++] = (u16)cell;
+    }
+    tail = sc64_route_expand_facility_fifo(dense, tail, stride, cap, start, complete);
+    if (tail >= 0) sc64_route_pack_linear(field, dense, cols, rows, stride);
+    return tail;
+}
+#endif
+
 /* Depot fields use a separate key namespace and all reachable deposit cells
  * as roots. A depot moving, being removed or reusing its slot must invalidate
  * the route cache. The existing topology/load invalidation owns that contract.
@@ -2301,7 +2674,11 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
  * fields serve only already-discovered origins and are never component proofs.
  * A paired grid accessor may temporarily borrow and restore walkability bits. */
 static int __attribute__((noinline))
-sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int origin)
+sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, int origin
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+                                  , const int *edges
+#endif
+                                   )
 {
     int i, slot = -1, head = 0, tail = 0, active_slots;
     int x0, x1, y0, y1, col, row;
@@ -2323,6 +2700,11 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     if (!sc64_route_configure()) return -1;
 #endif
     key = (u16)(SC64_ROUTE_DEPOT_TAG | (unsigned)depot_id);
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    /* Perimeter fields share the depot pool and its topology invalidation,
+     * but must not satisfy a worker's deposit lookup for the same slot. */
+    if (edges) key |= SC64_ROUTE_MELEE_ID_TAG;
+#endif
     if (!path_grid_valid) build_path_grid();
 #ifdef SC64_DEPOT_BOUNDED
     if (origin>=0 && !SC64_GRID_GET(path_walkable,origin)) origin=-1;
@@ -2380,6 +2762,33 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
                sizeof(sc64_range_route_snapshot_key));
     }
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (edges) {
+        x0 = edges[0] / 16 - 1; y0 = edges[1] / 16 - 1;
+        x1 = edges[2] / 16;     y1 = edges[3] / 16;
+    } else
+#endif
+    {
+        x0 = center_x >= 32 ? (center_x - 32) / 16 : 0;
+        y0 = center_y >= 32 ? (center_y - 32) / 16 : 0;
+        x1 = (center_x + 32) / 16; if (x1 >= MAP_COLS) x1 = MAP_COLS - 1;
+        y1 = (center_y + 32) / 16; if (y1 >= MAP_ROWS) y1 = MAP_ROWS - 1;
+    }
+#ifdef SC64_ROUTE_FACILITY_FIFO_PROBE
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    int perimeter = edges != 0;
+#else
+    const int perimeter = 0;
+#endif
+    if ((MAP_COLS == SC64_DENSE_SIDE || MAP_COLS == SC64_LINEAR_COLS ||
+         MAP_COLS == SC64_LINEAR_WIDE_COLS) && MAP_ROWS <= SC64_LINEAR_MAX_ROWS) {
+        tail = sc64_route_fill_facility_fifo(sc64_route_field[slot], center_x, center_y,
+                                            x0, x1, y0, y1, perimeter, origin, &complete);
+        if (tail >= 0) goto facility_finished;
+        SC64_ROUTE_FACILITY_FIFO_FALLBACK();
+        tail = 0;
+    }
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
@@ -2402,13 +2811,21 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
      * neighbors are visited once while the walkability bit is borrowed. */
     u8 *new_field = sc64_route_field[slot];
 #endif
-    x0 = center_x >= 32 ? (center_x - 32) / 16 : 0;
-    y0 = center_y >= 32 ? (center_y - 32) / 16 : 0;
-    x1 = (center_x + 32) / 16; if (x1 >= MAP_COLS) x1 = MAP_COLS - 1;
-    y1 = (center_y + 32) / 16; if (y1 >= MAP_ROWS) y1 = MAP_ROWS - 1;
     for (row = y0; row <= y1; ++row) for (col = x0; col <= x1; ++col) {
-        int px, py, cell = col + row * MAP_COLS;
-        if (!SC64_GRID_GET(path_walkable, cell) ||
+        int cell, px, py;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        if (edges) {
+            if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS ||
+                /* Only the four sides, not diagonal corner cells. */
+                ((col == x0 || col == x1) == (row == y0 || row == y1))) continue;
+        }
+#endif
+        cell = col + row * MAP_COLS;
+        if (!SC64_GRID_GET(path_walkable, cell)) continue;
+        if (
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+            !edges &&
+#endif
             !sc64_depot_cell_point(center_x, center_y, col, row, &px, &py)) continue;
 #ifdef SC64_RACES
         sc64_route_put(slot, cell, 0);
@@ -2471,6 +2888,9 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
 #if defined(SC64_RACES) && defined(SC64_GRID_SET)
     for (i=0;i<tail;++i) SC64_GRID_SET(path_walkable,bfs_queue[i],1);
 #endif
+#ifdef SC64_ROUTE_FACILITY_FIFO_PROBE
+facility_finished:
+#endif
     sc64_route_goal[slot] = key;
 #ifdef SC64_ROUTE_DECAY_FREQ
     sc64_route_age[slot] = sc64_route_age_pack(1u, sc64_route_clock);
@@ -2483,6 +2903,16 @@ sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int o
     sc64_route_probe_host_flood((unsigned)tail);
 #endif
     return slot;
+}
+
+static inline int sc64_route_depot_slot_for_origin(int depot_id, int center_x,
+                                                   int center_y, int origin)
+{
+    return sc64_route_facility_slot_for_origin(depot_id, center_x, center_y, origin
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+                                               , 0
+#endif
+                                               );
 }
 
 static int __attribute__((unused)) sc64_route_depot_slot(int depot_id,int center_x,int center_y)
@@ -2503,14 +2933,23 @@ sc64_route_depot_direction(int slot, int cell)
 }
 
 static int __attribute__((noinline, unused))
-sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
-                      int *next_x, int *next_y)
+sc64_route_facility_next(int x, int y, int depot_id, int center_x, int center_y,
+                         int *next_x, int *next_y
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+                         , const int *edges
+#endif
+                         )
 {
     static const signed char dx[4] = {1, -1, 0, 0}, dy[4] = {0, 0, 1, -1};
     int slot, col, row, cell, direction;
     if (!next_x || !next_y || x < 0 || y < 0 ||
         MAP_COLS <= 0 || MAP_ROWS <= 0 || x / 16 >= MAP_COLS || y / 16 >= MAP_ROWS) return 0;
     col = x / 16; row = y / 16; cell = col + row * MAP_COLS;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (edges) slot = sc64_route_facility_slot_for_origin(depot_id, center_x,
+                                                          center_y, -1, edges);
+    else
+#endif
 #ifdef SC64_DEPOT_BOUNDED
     slot = sc64_route_depot_slot_for_origin(depot_id,center_x,center_y,cell);
 #else
@@ -2536,8 +2975,18 @@ sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
         if (best < 0) return 0;
         col += dx[best]; row += dy[best];
     } else if (direction < 0) return 0;
-    else if (direction == 0)
+    else if (direction == 0) {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        if (edges) {
+            /* A seed tile touches an edge. Close within the tile, never
+             * step back into a blocked footprint to reach the center. */
+            *next_x = x < edges[0] ? edges[0]-1 : x >= edges[2] ? edges[2] : x;
+            *next_y = y < edges[1] ? edges[1]-1 : y >= edges[3] ? edges[3] : y;
+            return 1;
+        }
+#endif
         return sc64_depot_cell_point(center_x, center_y, col, row, next_x, next_y);
+    }
     else if (direction == 1) ++col;
     else if (direction == 2) --col;
     else if (direction == 3) ++row;
@@ -2545,6 +2994,17 @@ sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
     else return 0;
     *next_x = col * 16 + 8; *next_y = row * 16 + 8;
     return 1;
+}
+
+static inline int __attribute__((unused))
+sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
+                      int *next_x, int *next_y)
+{
+    return sc64_route_facility_next(x, y, depot_id, center_x, center_y, next_x, next_y
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+                                    , 0
+#endif
+                                    );
 }
 
 /* Group formation only needs a reachability decision, not a next step. On
