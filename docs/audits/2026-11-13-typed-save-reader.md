@@ -58,3 +58,32 @@ Result journal SHA-256:
 `c69ff8edddd990e94f3f9418e5b2198cb47e649a555afb36aca5d6f54de58cbf`.
 Fresh-resume receipt SHA-256:
 `df391ae95300ae8bf162d323626038a78478b7cd9c64006dd46285ed8f001bdd`.
+
+## Normal P10 result latency
+
+The reader-only P10 candidate on merged source `5877e6d` replays all
+47,194 physical-button updates from HOME and wins at frame 46,057.
+All 20 gameplay checkpoints, ten briefing records, 14 authored pages
+and 21 paired prefix video/state samples match the normal KODAK
+control. The uninterrupted pause and result SRAM exports are also
+byte-identical to the existing KODAK pause and fresh-resume result
+journals. The original bank is unchanged after the result save.
+
+The KODAK loop counter at the result transition drops from 76,499,788
+to 37,506,196 guest cycles (−50.97%). Comparing the bounded original
+instruction trace above and the candidate trace at the same input,
+the autosave scope drops from 71,802,053 to 33,715,475 cycles, and
+typed-unit decoding from 52,008,246 to 13,921,619. The repeated
+canonical lookup is still present and unchanged in cost. The largest
+loop is now the existing 45,252,677-cycle depot stall. Full replay
+mean moves from 1,907,674 to 1,906,514 cycles (−0.061%); this improves
+save latency, while ordinary combat throughput is unchanged.
+
+ROM verification passes; BSS and IWRAM ends are unchanged at
+`0x0203c0e0` and `0x03004ab0`. This is one campaign and its matching
+journal, not a full ARM matrix or hardware timing qualification.
+
+Candidate ROM SHA-256:
+`81b34c1b83b92e47fc2ed2a1de8060bd3e27adc46e1cf8eb3508bb21c2e031b5`.
+Full candidate receipt SHA-256:
+`3f84960d7c704619f415ac319590f16c2d6c7cac2f116def404fbaac1ee11de0`.
