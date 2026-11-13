@@ -71,6 +71,16 @@ class SaveTest(unittest.TestCase):
         self.assertEqual(save.resume_inputs([(1,1),(4,0),(11,4)],10,load_updates=2),
                          [(0,save.L),(1,0),(2,4)])
 
+    def test_physical_reselection_preserves_update_alignment(self):
+        transitions = [(1, 1), (4, 0), (12, save.SELECT), (13, 0), (14, 16)]
+        self.assertEqual(save.resume_inputs(transitions, 10, 1, reselect=True),
+                         [(0, save.L), (1, save.A), (2, save.SELECT), (3, 0), (4, 16)])
+        with self.assertRaisesRegex(ValueError, 'requires physical'):
+            save.resume_inputs(transitions, 10, 2, reselect=True)
+        for following in ([(11, 16)], [(12, 16)], [(13, save.SELECT)], []):
+            with self.assertRaisesRegex(ValueError, 'neutral then Select'):
+                save.resume_inputs(transitions[:2] + following, 10, 1, reselect=True)
+
     def test_restored_and_tamper_fail_closed(self):
         world = {'frame': 10, 'screen': 2, 'fingerprint': 'a'*64}
         saved = {'cut': 10, 'mission': 18, 'world': world, 'model': {k: ([0]*8 if k in ('action_cursors','action_ticks') else 0) for k in save.MODEL_FIELDS}}

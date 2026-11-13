@@ -7,7 +7,7 @@ import sc64_z7_arm_replay as z7
 
 import sc64_p8_normal_replay as p8
 
-START, B, L = 8, 2, 512
+START, SELECT, B, A, L = 8, 4, 2, 1, 512
 # Canonical Z7 Egg profile only: SC64_RACE_SAVE_GENERATION=36 in game.c.
 # The tag is a profile constraint, not a value inferred from DWARF.
 CANONICAL_Z7_EGG_TAG = 0x53435a54
@@ -40,7 +40,7 @@ def save_inputs(cut):
     return [(cut, START), (cut + 1, 0), (cut + 2, B), (cut + 3, 0)]
 
 
-def resume_inputs(transitions, cut, load_updates=2):
+def resume_inputs(transitions, cut, load_updates=2, *, reselect=False):
     """Load from title and map the remaining one-based host inputs.
 
     Physical input reaches the restored state after one title update. The next
@@ -50,6 +50,8 @@ def resume_inputs(transitions, cut, load_updates=2):
     """
     if load_updates not in (1, 2):
         raise ValueError('unsupported load update count')
+    if reselect and load_updates != 1:
+        raise ValueError('building reselection requires physical input')
     previous = 0
     for tick, held in transitions:
         if tick > cut: break
@@ -57,6 +59,10 @@ def resume_inputs(transitions, cut, load_updates=2):
     if load_updates == 1:
         if previous: raise ValueError('physical load requires neutral cut')
         following = [(tick-cut, held) for tick,held in transitions if tick > cut]
+        if reselect:
+            if not following or following[0] != (2, SELECT):
+                raise ValueError('building reselection requires neutral then Select immediately after the cut')
+            return [(0, L), (1, A)] + following
         if following and following[0][0] == 1:
             if following[0][1] & L:
                 raise ValueError('first physical resume input cannot hold L')
@@ -94,7 +100,8 @@ def validate_journal(data, layout, frame, save_format='legacy'):
     # Fresh title starts with blank SRAM, so a successful first save is slot 0, sequence 1.
     tag, length, checksum, sequence = struct.unpack_from('<4I', data)
     base_tag = Z10_CARGO_TAG if save_format == 'z10-transport1' else CANONICAL_Z7_EGG_TAG
-    expected_tag = base_tag | 0x04000000 if trailer_size else base_tag
+    expected_tag = {'legacy': CANONICAL_Z7_EGG_TAG, 'transport1': TRANSPORT1_Z7_TAG,
+                    'z10-transport1': TRANSPORT1_Z10_TAG}[save_format]
     if (tag, length, sequence) != (expected_tag, size + trailer_size, 1):
         raise ValueError('invalid fresh Z7 journal header')
     payload = data[16:16+length]
