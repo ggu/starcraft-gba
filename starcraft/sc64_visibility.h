@@ -704,6 +704,27 @@ sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta)
     }
 }
 
+#if defined(SC64_Z7_VISIBILITY_PACKED_ROWS) || defined(SC64_SHARED_SIGHT_PACKED_ROWS)
+#include "sc64_sight_row_lut_generated.h"
+enum { SC64_SIGHT_ROW_BIAS = 12, SC64_SIGHT_EMPTY_SPAN = 0x00ff };
+
+/* The transition clips world rows once. The row table clips the authored
+ * footprint; the decode clips absolute columns to the current map. */
+static inline unsigned
+sc64_visibility_unpack_row(const u8 *rows, int col, unsigned index)
+{
+    if (index >= 25) return SC64_SIGHT_EMPTY_SPAN;
+    unsigned v = rows[index];
+    if (v == 0xff) return SC64_SIGHT_EMPTY_SPAN;
+    int first = col - (int)(v >> 4);
+    int last = col + (int)(v & 15u);
+    if (first < 0) first = 0;
+    if (last >= MAP_COLS) last = MAP_COLS - 1;
+    if (first > last) return SC64_SIGHT_EMPTY_SPAN;
+    return (unsigned)(last * 256 + first);
+}
+#endif
+
 #ifndef SC64_SHARED_SPAN_TABLES
 #ifdef SC64_Z7_VISIBILITY_ROW_CONTEXT
 /* A transition's centers, clipping extent and radius table do not change
@@ -717,24 +738,11 @@ typedef struct {
 } Sc64Z7VisibilityRowContext;
 
 #ifdef SC64_Z7_VISIBILITY_PACKED_ROWS
-#include "sc64_sight_row_lut_generated.h"
-enum { SC64_SIGHT_ROW_BIAS = 12, SC64_SIGHT_EMPTY_SPAN = 0x00ff };
-
-/* The transition clips world rows once. The row table clips the authored
- * footprint; the decode clips absolute columns to the current map. */
 static inline unsigned
 sc64_z7_visibility_packed_row(const Sc64Z7VisibilityRowContext *ctx, int row)
 {
-    unsigned index = (unsigned)(row - ctx->row + SC64_SIGHT_ROW_BIAS);
-    if (index >= 25) return SC64_SIGHT_EMPTY_SPAN;
-    unsigned v = ctx->packed_rows[index];
-    if (v == 0xff) return SC64_SIGHT_EMPTY_SPAN;
-    int first = ctx->col - (int)(v >> 4);
-    int last = ctx->col + (int)(v & 15u);
-    if (first < 0) first = 0;
-    if (last >= MAP_COLS) last = MAP_COLS - 1;
-    if (first > last) return SC64_SIGHT_EMPTY_SPAN;
-    return (unsigned)(last * 256 + first);
+    return sc64_visibility_unpack_row(ctx->packed_rows, ctx->col,
+                                      (unsigned)(row - ctx->row + SC64_SIGHT_ROW_BIAS));
 }
 #endif
 
@@ -857,6 +865,65 @@ sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
 
 #endif
 
+#ifdef SC64_VISIBILITY_SPANS
+static inline __attribute__((always_inline)) void
+sc64_visibility_row_delta(int row, int old_first, int old_last,
+                          int new_first, int new_last)
+{
+    if (old_first > old_last) {
+        sc64_visibility_apply_span(row, new_first, new_last, 1);
+    } else if (new_first > new_last) {
+        sc64_visibility_apply_span(row, old_first, old_last, 0);
+    } else {
+        if (old_first < new_first)
+            sc64_visibility_apply_span(row, old_first,
+                old_last < new_first - 1 ? old_last : new_first - 1, 0);
+        if (old_last > new_last)
+            sc64_visibility_apply_span(row,
+                old_first > new_last + 1 ? old_first : new_last + 1,
+                old_last, 0);
+        if (new_first < old_first)
+            sc64_visibility_apply_span(row, new_first,
+                new_last < old_first - 1 ? new_last : old_first - 1, 1);
+        if (new_last > old_last)
+            sc64_visibility_apply_span(row,
+                new_first > old_last + 1 ? new_first : old_last + 1,
+                new_last, 1);
+    }
+}
+#endif
+
+#if defined(SC64_SHARED_SPAN_TABLES) && defined(SC64_SHARED_SIGHT_PACKED_ROWS)
+/* The supported source-radius transition stays in ROM. Use the original
+ * shared row loop for negative centers, unsupported radii and legacy
+ * geometry; both paths apply exactly the same ordered count changes. */
+static int __attribute__((noinline))
+sc64_visibility_try_packed_transition(int old_x, int old_y, int new_x, int new_y,
+                                      int radius)
+{
+    if ((old_x | old_y | new_x | new_y) < 0 || MAP_COLS > 255) return 0;
+    unsigned index = (unsigned)(radius - 64) / 16u;
+    const u8 *old_rows = sc64_z7_sight_packed_rows[index][((old_y & 15) << 4) | (old_x & 15)];
+    const u8 *new_rows = sc64_z7_sight_packed_rows[index][((new_y & 15) << 4) | (new_x & 15)];
+    int old_col = old_x / 16, new_col = new_x / 16;
+    int old_row = old_y / 16, new_row = new_y / 16;
+    int extent = (radius + 23) / 16;
+    int row0 = (old_row < new_row ? old_row : new_row) - extent;
+    int row1 = (old_row > new_row ? old_row : new_row) + extent;
+    if (row0 < 0) row0 = 0;
+    if (row1 >= MAP_ROWS) row1 = MAP_ROWS - 1;
+    for (int row = row0; row <= row1; ++row) {
+        unsigned old_span = sc64_visibility_unpack_row(old_rows, old_col,
+            (unsigned)(row - old_row + SC64_SIGHT_ROW_BIAS));
+        unsigned new_span = sc64_visibility_unpack_row(new_rows, new_col,
+            (unsigned)(row - new_row + SC64_SIGHT_ROW_BIAS));
+        sc64_visibility_row_delta(row, old_span & 255u, old_span >> 8,
+                                  new_span & 255u, new_span >> 8);
+    }
+    return 1;
+}
+#endif
+
 /* Update a nearby unit's old and new footprints together. Pixels can move
  * within a tile every frame, but only the thin symmetric difference of the
  * two sight circles needs source-count work. */
@@ -878,6 +945,10 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
             sc64_t4_adjust_visibility_source(new_x, new_y, radius, 1);
             return;
         }
+#ifdef SC64_SHARED_SIGHT_PACKED_ROWS
+        if (sc64_visibility_try_packed_transition(old_x, old_y, new_x, new_y, radius))
+            return;
+#endif
         halfwidths = sc64_z7_visibility_halfwidths +
                      sc64_z7_visibility_halfwidth_offsets[(radius - 64) / 16];
         extent = (radius + 23) / 16;
@@ -952,26 +1023,7 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                                  halfwidths,
 #endif
                                  &new_first, &new_last);
-        if (old_first > old_last) {
-            sc64_visibility_apply_span(row, new_first, new_last, 1);
-        } else if (new_first > new_last) {
-            sc64_visibility_apply_span(row, old_first, old_last, 0);
-        } else {
-            if (old_first < new_first)
-                sc64_visibility_apply_span(row, old_first,
-                    old_last < new_first - 1 ? old_last : new_first - 1, 0);
-            if (old_last > new_last)
-                sc64_visibility_apply_span(row,
-                    old_first > new_last + 1 ? old_first : new_last + 1,
-                    old_last, 0);
-            if (new_first < old_first)
-                sc64_visibility_apply_span(row, new_first,
-                    new_last < old_first - 1 ? new_last : old_first - 1, 1);
-            if (new_last > old_last)
-                sc64_visibility_apply_span(row,
-                    new_first > old_last + 1 ? new_first : old_last + 1,
-                    new_last, 1);
-        }
+        sc64_visibility_row_delta(row, old_first, old_last, new_first, new_last);
     }
 #else
     for (row = row0; row <= row1; row++)
