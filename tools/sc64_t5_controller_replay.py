@@ -216,14 +216,45 @@ def validate_aux_snapshot(row: dict, label: str) -> None:
             raise ValueError(f"{label} present transport needs a raw type")
 
 
+def _probe_relative_home_trace(trace: dict, rows: list) -> dict:
+    """Check the recorded HOME sequence, then validate the common gameplay body."""
+    if len(rows) < ENTRY_TICKS + 3 or trace["tick_limit"] <= ENTRY_TICKS:
+        raise ValueError("T5 HOME trace is missing its menu or gameplay body")
+    previous = 0
+    for row, (tick, held) in zip(rows[:ENTRY_TICKS], menu_prefix()[:ENTRY_TICKS]):
+        if (not isinstance(row, dict) or
+                any(type(row.get(field)) is not int for field in ("host_tick", "held", "pressed")) or
+                row != {"kind": "input", "host_tick": tick, "held": held, "pressed": held & ~previous}):
+            raise ValueError("T5 HOME trace does not record the verified menu sequence")
+        previous = held
+    release = rows[ENTRY_TICKS + 1]
+    if (not isinstance(release, dict) or
+            any(type(release.get(field)) is not int for field in ("host_tick", "held", "pressed")) or
+            release != {"kind": "input", "host_tick": ENTRY_TICKS + 1, "held": 0, "pressed": 0}):
+        raise ValueError("T5 HOME trace must release Start on its first gameplay update")
+    relative = []
+    for row in rows[ENTRY_TICKS:]:
+        if not isinstance(row, dict) or type(row.get("host_tick")) is not int:
+            raise ValueError("T5 HOME gameplay row has invalid host_tick")
+        item = {**row, "host_tick": row["host_tick"] - ENTRY_TICKS}
+        if "transport_passenger_snapshot_tick" in row:
+            snapshot_tick = row["transport_passenger_snapshot_tick"]
+            if type(snapshot_tick) is not int or snapshot_tick < ENTRY_TICKS:
+                raise ValueError("T5 HOME passenger snapshot precedes gameplay")
+            item["transport_passenger_snapshot_tick"] = snapshot_tick - ENTRY_TICKS
+        relative.append(item)
+    return {**trace, "entry": "t5-probe-entry", "tick_limit": trace["tick_limit"] - ENTRY_TICKS,
+            "events": relative}
+
+
 def validate_trace(trace: object, capacity: int) -> dict:
     """Validate source trace and return absolute normal-menu scheduler plan."""
     if type(capacity) is not int or capacity < 1:
         raise ValueError("controller queue capacity must be a positive integer")
     if not isinstance(trace, dict) or type(trace.get("trace_schema")) is not int or trace["trace_schema"] != 1:
         raise ValueError("T5 trace must have trace_schema=1")
-    if trace.get("entry") != "t5-probe-entry":
-        raise ValueError("T5 source trace entry must be 't5-probe-entry'")
+    if trace.get("entry") not in ("t5-probe-entry", "t5-home-entry"):
+        raise ValueError("T5 source trace entry must be 't5-probe-entry' or 't5-home-entry'")
     if not isinstance(trace.get("policy"), str) or not trace["policy"]:
         raise ValueError("T5 trace policy must be a nonempty string")
     if type(trace.get("tick_limit")) is not int or not 1 <= trace["tick_limit"] <= scheduler.MAX_U32:
@@ -233,6 +264,9 @@ def validate_trace(trace: object, capacity: int) -> dict:
     rows = trace.get("events")
     if not isinstance(rows, list) or not rows:
         raise ValueError("T5 trace events must be a nonempty array")
+    if trace["entry"] == "t5-home-entry":
+        trace = _probe_relative_home_trace(trace, rows)
+        rows = trace["events"]
 
     start = final = None
     checkpoints: list[dict] = []
@@ -425,9 +459,11 @@ _BUILDING_TYPES = {"starport": 114, "control_tower": 115}
 
 
 def _read_signed(row: bytes, offsets: dict[str, int], field: str) -> int:
-    if field not in offsets or offsets[field] + 4 > len(row):
+    width = getattr(offsets, "widths", {}).get(field, 4)
+    if field not in offsets or width not in (1, 2, 4) or not 0 <= offsets[field] <= len(row) - width:
         raise RuntimeError(f"T5 replay ELF DWARF lacks unit/building field {field}")
-    return int.from_bytes(row[offsets[field]:offsets[field] + 4], "little", signed=True)
+    signed = getattr(offsets, "signed", {}).get(field, True)
+    return int.from_bytes(row[offsets[field]:offsets[field] + width], "little", signed=signed)
 
 
 def _row_alive(row: dict) -> bool:
@@ -474,8 +510,8 @@ def replay_aux_state(rsp, sym: dict[str, int], bank: dict, buildings: dict) -> d
     if "u" not in sym:
         raise RuntimeError("T5 replay ELF has no unit bank symbol")
     pool_size = unit_capacity * stride
-    if unit_capacity != _MAX_UNITS:
-        raise RuntimeError(f"T5 replay expects {_MAX_UNITS} unit slots, got {unit_capacity}")
+    if unit_capacity not in (_MAX_UNITS, 192):
+        raise RuntimeError(f"T5 replay expects {_MAX_UNITS} or 192 unit slots, got {unit_capacity}")
     pool = rsp.read(sym["u"], pool_size)
     records = []
     for slot in range(unit_capacity):
