@@ -195,7 +195,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   use 1,957–3,239. [Touched-span packing](audits/2026-11-13-facility-output-span.md)
   improves the sampled Blood Bath peak by 1.98%, but raises Outpost's
   peak by 4.51% versus the composition and remains outside the release
-  tree. Attribute that Outpost update before using it.
+  tree. The paired Outpost trace attributes its tail to flip wait;
+  measure presentation timing before using it.
   The three-option composition also matches the full Z7 win from HOME
   and the full Z10 win after a fresh SRAM load, with little or no speed
   gain in those runs.

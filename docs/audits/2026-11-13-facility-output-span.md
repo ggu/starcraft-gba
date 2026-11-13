@@ -47,16 +47,20 @@ pages, palette and gameplay state match at every checkpoint.
 
 All timings use the same 1,000 updates, calls 10,860–11,859. Outpost's
 mean is effectively flat against composed, while its maximum rises 4.51%.
-Call 11,759 is 163,803 cycles higher than the same call on composed. Blood
-Bath's p95 falls 0.49% and its maximum falls 1.98%, but both its mean and
-maximum still exceed the icon control.
+Call 11,759 is 163,803 cycles higher than the same call on composed.
+A paired instruction trace attributes 162,790 of those cycles to
+`wait_flip` inside `gfx_begin_preserve`. Route counters and the
+simulation frame match, and unit orders are 10,525 cycles lower.
+This points to the presentation boundary in that update rather than
+more facility work. Blood Bath's p95 falls 0.49% and its maximum falls
+1.98%, but both its mean and maximum still exceed the icon control.
 
 At Blood Bath call 11,539, the profiled update falls from 2,447,899 to
 2,399,394 cycles with route builds and hits unchanged (2,336 / 29,673).
 Facility lookup and fill fall from 570,727 to 519,650 cycles. Expansion
 stays flat (36,148 → 36,174), confirming the gain is outside the flood
 kernel. The icon control took 2,235,622 cycles. Keep the option off pending
-an explanation of the Outpost tail and broader qualification.
+an explanation of broader qualification, including presentation timing.
 
 Candidate full replay receipt SHA-256:
 
