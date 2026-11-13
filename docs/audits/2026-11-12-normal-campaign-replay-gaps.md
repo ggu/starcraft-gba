@@ -10,7 +10,7 @@ as a current full result. None of these are physical GBA tests.
 | Missions | Best retained evidence | Full normal replay on this tree |
 | --- | --- | --- |
 | T1–T10 | [Normal-menu ARM wins across frozen Terran builds](../VALIDATION.md#canonical-terran-t1t10-profile-2026-10-23); the later canonical T9 replay uses the scheduler. | No exact current full physical result found for any of the ten. |
-| Z1 | Carried Z9 [ARM test-entry win](2026-11-12-dense-point-flood.md#campaign-and-save-checks). | Open. |
+| Z1 | Carried Z9 [ARM test-entry win](2026-11-12-dense-point-flood.md#campaign-and-save-checks). | Later [normal Z10 KODAK replay](2026-11-13-z1-normal-home.md) wins from HOME at frame 50,669. |
 | Z2 | [Normal Z10 cartridge HOME replay](2026-11-13-z2-normal-home.md), including authored briefing and dialogue. | Full win from fresh HOME at frame 8,164. |
 | Z3 | [Older normal Z7 physical win](2026-10-31-z3-normal-physical/README.md) and current Z10 replay below. | Full win from fresh HOME at frame 136,588. |
 | Z4 | [Carried normal Z10 replay](2026-11-12-z4-normal-physical.md) with authored dialogue. | Full win from fresh HOME at frame 34,984. |
