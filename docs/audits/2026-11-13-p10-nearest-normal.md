@@ -45,6 +45,14 @@ and fog through the same victory at frame 46,057. The exported journals
 are byte-identical. This is a fresh process for each cartridge and the
 same physical suffix, with no changes to saved input.
 
+The default P10 build command differs from the staged command only by
+that selector define, and a separate guarded link reproduces the exact
+candidate ROM SHA-256 below. Terran, Z10 and Showcase build commands
+are unchanged. The candidate also wins Homeland from HOME at frame
+55,892 after 57,678 physical calls; 59 named snapshots and every input
+transition frame match the staged result. Candidate P7 receipt:
+`8cd6076b129b8f921c07ba7f95ae03358e68856406dfc643fb599cc31ed0a273`.
+
 - Control ROM: `b24184ee2b10b8c6f64153672a25d79a39ef6dc098b8c4cc7582ec8016538474`.
 - Candidate ROM: `64a2bb9e43840c737b30934831f689fa948c43e640198f0473dadce7c9bfd525`.
 - Control / candidate campaign: `e88bf80bdbad31ba3bd35a52424e35498085277160dca46a458640b96f32794d` /
