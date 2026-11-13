@@ -126,6 +126,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [split terrain cache](audits/2026-11-12-late-zerg-terrain-vram.md)
   frees 16,080 B of Z10 working RAM. Compared with the packed-walk release,
   it saves 1.33–1.49% with matching replay checkpoints and sampled pages.
+  The [partial terrain capture probe](audits/2026-11-13-terrain-dirty-capture.md)
+  copies only validated dirty bands back into the split cache. Host
+  raster and fallback checks pass; keep it off until matching ARM
+  video and timing establish its benefit during actual play.
   [Combined defense indexing](audits/2026-11-12-defense-combined.md) is
   enabled for Z10 after exact campaign and two complete three-AI ARM
   comparisons. It saves 5.23–7.31% in two Z10 windows and adds about 0.31%
