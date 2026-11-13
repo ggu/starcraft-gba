@@ -192,10 +192,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   by 33% even with matched placement, which would exceed Showcase's
   available IWRAM. [Read-only facility samples](audits/2026-11-13-facility-fill-populations.md)
   show Blood Bath's six fills use 25–165 pops, while four Outpost fills
-  use 1,957–3,239. Test packing only the touched span before changing
-  expansion or choosing a cutoff.
-  The same three-option composition wins Z7 with all 253 observations
-  and no material speed change from the older normal control.
+  use 1,957–3,239. [Touched-span packing](audits/2026-11-13-facility-output-span.md)
+  improves the sampled Blood Bath peak by 1.98%, but raises Outpost's
+  peak by 4.51% versus the composition and remains outside the release
+  tree. Attribute that Outpost update before using it.
+  The three-option composition also matches the full Z7 win from HOME
+  and the full Z10 win after a fresh SRAM load, with little or no speed
+  gain in those runs.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in

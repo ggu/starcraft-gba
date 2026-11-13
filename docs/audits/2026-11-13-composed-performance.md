@@ -53,6 +53,17 @@ comparison with that older ROM rather than an exact KODAK control.
 The result supports compatibility for this route and no substantial
 steady Z7 gain.
 
+A paired normal Z10 Full Circle continuation starts with the same
+cartridge-format SRAM at frame 2,527 and wins at frame 59,997. All 61
+raw world checkpoints, 24 drawn page/palette/fog samples and nine
+authored acknowledgments match. The two sampled 1,000-update mean
+costs rise from 1,479,357 to 1,485,626 (+0.42%) and from 1,507,022
+to 1,508,665 (+0.11%). The latter window's maximum rises from
+3,418,866 to 4,055,372. The composition remains optional.
+
+- Z10 Full Circle paired receipts (control / composition):
+  `f6122c66becab2b3fb62655c959ba49c88bd75745d71bdd65151ab029f6a2499` /
+  `70d103064302b68240f7dad759169e18a50d1e6afa808dc5d70cecc597c15411`.
 - Z7 composed replay receipt: `3be0f473121bae6d3f58f21c13ed10ba2f21fb38fd117a8b90f6cf42652ea5ee`.
 - P10 composed ROM SHA-256: `6ac056503bf28b8ce7af09b3313b90b78f764cfd9a3fd805e75ae12d5bd08c97`.
 - P10 composed replay receipt: `51f06c06340b5ddd7ebbff37809093d111b098f6f14a53868287521ff6b06f61`.
