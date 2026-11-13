@@ -37,3 +37,18 @@ make SC64_DEFENSE_PROBE_FLAGS=-DSC64_TARGET_BULK_REBUILD_PROBE verify-zerg-z10
 The default remains off. Next measure the other cartridge layouts,
 long custom matches and the separate cross-cell move cost. These Z10
 battle windows still exceed the 561,792-cycle frame budget.
+
+## Current flag-off ROMs
+
+Rebased on `e22f6cc` with the probe flag off, all four guarded normal
+ARM links reproduced the exact staged ROMs, including the default P10
+nearest-depot and typed-save changes. The six sanitizer configurations
+also passed again. The table above measures the earlier Z10 candidate;
+this rebase does not qualify enabling the option by default.
+
+| Normal ROM | SHA-256 |
+| --- | --- |
+| Terran 10 | `6f869a5e295aa95d9ecfecebc0f18eba4be4b8ce5b5f5a7ee67a6ba664304a0c` |
+| Zerg 10 | `ef36f3f0e8f44ea1207ef39c05ac1417c727b498a2596e93b98b765c74b9768e` |
+| Protoss 10 | `0505b233994dca90cda47d92f1a153a14f01e781d980b3498390d3b4005e7c41` |
+| Showcase | `5b9cf1ec7cee3809cec4a84130e60d656a26d9a2c4706d6c83f793bb98d33adb` |
