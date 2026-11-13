@@ -42,8 +42,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   wins [Z1](audits/2026-11-13-z1-normal-home.md) and
   [Z2](audits/2026-11-13-z2-normal-home.md) from HOME, matching 51 and nine
   observations respectively, including the briefing and authored pages.
-  Their emulator rates are 23.74 and 21.86 updates/s. P1–P9 still need
-  equivalent qualification.
+  Their emulator rates are 23.74 and 21.86 updates/s. The exact KODAK P10
+  cartridge [also wins P9 from HOME](audits/2026-11-13-p9-normal-home.md)
+  with 59 matching checks, both Cerebrate objectives and both heroes alive.
+  Its replay averages 8.27 emulated updates/s. P1–P8 still need equivalent
+  qualification.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
   confirmed separate named, Random, and Closed seats and a middle-only
