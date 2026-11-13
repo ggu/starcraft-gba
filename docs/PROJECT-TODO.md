@@ -219,7 +219,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [linear route word-pack probe](audits/2026-11-13-route-linear-word-pack.md)
   matches scalar output and overflow behavior under sanitizers. It
   targets packed output writes in the expensive facility and wide point
-  fills; actual ARM cycle savings and placement remain unmeasured.
+  fills. Exact P10 ARM comparison cuts three sampled stalls 1.42–2.35%
+  with unchanged working RAM, but mean cost only falls 0.027%. Keep it
+  off and prioritize fewer route rebuilds over output-store tuning.
   The [cursor query probe](audits/2026-11-13-p10-field-cursor-cost.md)
   matches the same P10 prefix and cuts mean cycles 1.23%, with unchanged
   IWRAM and BSS. Keep it off until all products and a composed battle
