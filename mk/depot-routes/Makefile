@@ -31,3 +31,17 @@ DEPOT_ROUTE_CASES := pack3 split partial visit combined large128 t4 active base 
 test: test-sc64-depot-routes test-sc64-depot-approach-default
 test-sc64-depot-routes: $(addprefix build/test-sc64-depot-routes-,$(DEPOT_ROUTE_CASES))
 	@set -e; for variant in $(DEPOT_ROUTE_CASES); do ./build/test-sc64-depot-routes-$$variant; done
+
+FACILITY_FIFO_HOST_FLAGS = $(DEPOT_ROUTE_HOST_FLAGS) -DSC64_ROUTE_PACK3 -DSC64_LARGE_MAPS -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ROUTE_KEEP_FIELDS -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_NEW_CELL -DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_DECAY_FREQ -DSC64_DEPOT_BOUNDED -DSC64_ROUTE_DENSE_FLOOD_PROBE -DSC64_ROUTE_MONOTONE_PROBE -DSC64_ROUTE_MONOTONE_DIAGNOSTICS
+FACILITY_FIFO_DEPS = tests/sc64_facility_fifo.c starcraft/sc64_routes.h starcraft/sc64_depot_goal.h starcraft/sc64_route_monotone_probe.h Makefile mk/depot-routes/Makefile
+build/test-sc64-facility-fifo-base: $(FACILITY_FIFO_DEPS) | build
+	$(CLANG) $(FACILITY_FIFO_HOST_FLAGS) $< -o $@
+build/test-sc64-facility-fifo-probe: $(FACILITY_FIFO_DEPS) | build
+	$(CLANG) $(FACILITY_FIFO_HOST_FLAGS) -DSC64_ROUTE_FACILITY_FIFO_PROBE $< -o $@
+build/test-sc64-facility-fifo-overflow: $(FACILITY_FIFO_DEPS) | build
+	$(CLANG) $(FACILITY_FIFO_HOST_FLAGS) -DSC64_ROUTE_FACILITY_FIFO_PROBE -DSC64_ROUTE_LINEAR_QUEUE_CAP=32 -DTEST_FACILITY_OVERFLOW $< -o $@
+.PHONY: test-sc64-facility-fifo
+test-sc64-facility-fifo: build/test-sc64-facility-fifo-base build/test-sc64-facility-fifo-probe build/test-sc64-facility-fifo-overflow
+	./build/test-sc64-facility-fifo-base
+	./build/test-sc64-facility-fifo-probe
+	./build/test-sc64-facility-fifo-overflow
