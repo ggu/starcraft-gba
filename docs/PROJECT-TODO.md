@@ -1050,8 +1050,10 @@ and Protoss lineup. The native and normal GBA Z10 HUDs agree on 50 starting
 minerals and race-specific supply (Terran 4/10; Zerg and Protoss 4/9).
 Minerals rise with neutral input in all six runs. Native computer rows can
 independently choose Random or Closed; the N64 also starts a match with
-only the middle computer row occupied. The GBA now has independent seats
-as well. The native Melee selector uses a launch-time seed and can move
+only the middle computer row occupied. In both native Blood Bath modes,
+Right on the final Random CPU skips Closed and moves to Zerg. Keep one
+to three CPUs and match the edit behavior in the ordinary-profile
+preview. The GBA now has independent seats as well. The native Melee selector uses a launch-time seed and can move
 the human and all opponents even with the same lobby. Equal-speed timing,
 AI wallets and full-match behavior remain unverified.
 
