@@ -615,6 +615,12 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
             while (index < 4 && cycle[index] != f->bot_races[seat]) ++index;
             int old = f->bot_races[seat];
             int next = cycle[sc64_front_wrap(index + d, 5)];
+#ifdef SC64_NATIVE_MELEE_STARTS
+            /* Native Blood Bath skips Closed on the last occupied CPU row. */
+            if (f->map == SC64_MAP_BLOOD_BATH && f->bots == 1 &&
+                old != SC_FRONT_BOT_CLOSED && next == SC_FRONT_BOT_CLOSED)
+                next = cycle[sc64_front_wrap(4 + d, 5)];
+#endif
             f->bot_races[seat] = next;
             if (next != SC_FRONT_BOT_CLOSED) f->bot_last_races[seat] = next;
             f->bots += (next != SC_FRONT_BOT_CLOSED) - (old != SC_FRONT_BOT_CLOSED);

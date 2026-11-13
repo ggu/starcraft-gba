@@ -434,15 +434,38 @@ static void test_blood_bath_zero_seats(void)
         sc64_frontend_reset(&f, 0, SC_FRONT_RACE_TERRAN, 1, -1);
         press(&f, KEY_DOWN); press(&f, KEY_A);
         while (f.map != SC64_MAP_BLOOD_BATH) press(&f, KEY_RIGHT);
-        while (f.row < SC_FRONT_BOT_FIRST_ROW) press(&f, KEY_DOWN);
-        while (f.bots) press(&f, KEY_RIGHT);
+        /* Select the mode first, then reach a sole third-seat Random CPU
+         * through the real menu, including valid closures with two CPUs. */
         while (f.row < SC_FRONT_SKIRMISH_MODE_ROW) press(&f, KEY_DOWN);
         if (melee) press(&f, KEY_RIGHT);
         assert(f.skirmish_melee == melee);
-        assert(press(&f, KEY_A) == SC_FRONT_NONE && f.row == SC_FRONT_SKIRMISH_LAUNCH_ROW);
-        assert(press(&f, KEY_A) == SC_FRONT_NONE && f.page == SC_FRONT_SKIRMISH);
+        while (f.row > SC_FRONT_BOT_FIRST_ROW) press(&f, KEY_UP);
+        press(&f, KEY_DOWN); press(&f, KEY_DOWN);
+        press(&f, KEY_RIGHT); /* open the third seat */
+        assert(f.bots == 2 && f.bot_races[2] == SC_FRONT_RACE_ZERG);
+        press(&f, KEY_UP); press(&f, KEY_UP);
+        press(&f, KEY_LEFT); /* close the first seat */
+        assert(f.bots == 1 && f.bot_races[0] == SC_FRONT_BOT_CLOSED);
+        press(&f, KEY_DOWN); press(&f, KEY_DOWN);
+        press(&f, KEY_LEFT); /* reverse skip is inferred from the cycle */
+        assert(f.bots == 1 && f.bot_races[2] == SC_FRONT_BOT_RANDOM);
+        press(&f, KEY_RIGHT); /* observed native Random -> Zerg */
+        assert(f.bots == 1 && f.bot_races[2] == SC_FRONT_RACE_ZERG &&
+               f.bot_last_races[2] == SC_FRONT_RACE_ZERG);
         int human = -1, races[3];
         unsigned order = 0;
+        assert(sc64_front_skirmish_native_resolve(&f, 0xf3ae, &human, races, &order) == 4u);
+        assert(human == SC_FRONT_RACE_TERRAN && races[0] == SC_FRONT_RACE_ZERG && order);
+
+        /* The launch guard also rejects an inconsistent all-Closed state. */
+        f.bots = 0;
+        f.bot_races[2] = SC_FRONT_BOT_CLOSED;
+        while (f.row < SC_FRONT_SKIRMISH_MODE_ROW) press(&f, KEY_DOWN);
+        assert(f.skirmish_melee == melee);
+        assert(press(&f, KEY_A) == SC_FRONT_NONE && f.row == SC_FRONT_SKIRMISH_LAUNCH_ROW);
+        assert(press(&f, KEY_A) == SC_FRONT_NONE && f.page == SC_FRONT_SKIRMISH);
+        human = -1;
+        order = 0;
         assert(!sc64_front_skirmish_native_resolve(&f, 0xf3ae, &human, races, &order));
         assert(human == -1 && !order);
     }
