@@ -164,8 +164,43 @@ static void run_map(int w, int h)
 #endif
 }
 
+#ifdef SC64_ROUTE_LINEAR_WORD_PACK_PROBE
+static void check_pack_alignments(void)
+{
+    enum { ROWS = 3, MAX_COLS = 128 };
+    _Alignas(4) u8 dense[(MAX_COLS + 8) * (ROWS + 2)];
+    _Alignas(4) u8 out[MAX_COLS * ROWS * 3 / 8 + 12];
+    u8 expected[sizeof(out)];
+    const int widths[] = { 64, 80, 96, 128 };
+
+    for (unsigned w = 0; w < sizeof(widths) / sizeof(widths[0]); ++w) {
+        const int cols = widths[w], stride = cols + 8;
+        for (int offset = 0; offset < 4; ++offset) {
+            u8 *dst = out + 4 + offset;
+            u8 *ref = expected + 4 + offset;
+            memset(out, 0x5a, sizeof(out));
+            memset(expected, 0x5a, sizeof(expected));
+            memset(ref, 0, cols * ROWS * 3 / 8);
+            for (unsigned i = 0; i < sizeof(dense); ++i) dense[i] = random_word() >> 24;
+            for (int y = 0; y < ROWS; ++y) for (int x = 0; x < cols; ++x) {
+                int bit = 3 * (y * cols + x);
+                u8 v = dense[(y + 1) * stride + 4 + x];
+                for (int b = 0; b < 3; ++b) {
+                    ref[(bit + b) / 8] |= ((v >> b) & 1u) << ((bit + b) % 8);
+                }
+            }
+            sc64_route_pack_linear(dst, dense, cols, ROWS, stride);
+            assert(!memcmp(out, expected, sizeof(out)));
+        }
+    }
+}
+#endif
+
 int main(void)
 {
+#ifdef SC64_ROUTE_LINEAR_WORD_PACK_PROBE
+    check_pack_alignments();
+#endif
     run_map(64, 64);
     run_map(96, 73);
     run_map(128, 96);

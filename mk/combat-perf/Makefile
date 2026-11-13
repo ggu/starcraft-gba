@@ -95,6 +95,22 @@ test-sc64-route-linear: build/test-sc64-route-linear-ref build/test-sc64-route-l
 	cmp build/route-linear-base.ref.state build/route-linear-probe.ref.state
 	cmp build/route-linear-base.ref.state build/route-linear-overflow.ref.state
 
+build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@
+build/test-sc64-route-linear-word-pack-overflow: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE -DSC64_ROUTE_LINEAR_QUEUE_CAP=32 -DTEST_LINEAR_OVERFLOW $< -o $@
+.PHONY: test-sc64-route-linear-word-pack
+test-sc64-route-linear-word-pack: build/test-sc64-route-linear-ref build/test-sc64-route-linear-word-pack build/test-sc64-route-linear-word-pack-overflow build/test-sc64-facility-word-pack build/test-sc64-facility-word-pack-overflow
+	./build/test-sc64-facility-word-pack
+	./build/test-sc64-facility-word-pack-overflow
+	./build/test-sc64-route-linear-ref --emit build/route-linear-word-ref
+	./build/test-sc64-route-linear-word-pack --emit build/route-linear-word-candidate
+	./build/test-sc64-route-linear-word-pack-overflow --emit build/route-linear-word-overflow
+	cmp build/route-linear-word-ref build/route-linear-word-candidate
+	cmp build/route-linear-word-ref build/route-linear-word-overflow
+	cmp build/route-linear-word-ref.state build/route-linear-word-candidate.state
+	cmp build/route-linear-word-ref.state build/route-linear-word-overflow.state
+
 # Randomized differential test of the incremental walkability update against
 # the whole-grid rebuild it replaces, over the footprint kinds of each product
 # family. The -full builds run the same scenarios with the update disabled.
