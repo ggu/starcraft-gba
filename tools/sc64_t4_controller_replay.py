@@ -211,15 +211,20 @@ def require_trace_fields(row: dict, fields: tuple[str, ...], label: str) -> None
 def read_unit_slots(rsp, address: int, bank: dict) -> list[dict]:
     fields = bank["unit_offsets"]
     needed = ("alive", "owner", "raw_owner", "type", "raw_type", "x", "y")
-    if any(name not in fields for name in needed):
-        raise RuntimeError("Unit DWARF lacks fields needed for T4 actor/Raynor verification")
     capacity, stride = bank["unit_capacity"], bank["unit_stride_bytes"]
+    for name in needed:
+        width = fields.widths.get(name)
+        if (name not in fields or name not in fields.signed or width not in (1, 2, 4) or
+                not 0 <= fields[name] <= stride - width):
+            raise RuntimeError(f"Invalid Unit DWARF field for T4 actor verification: {name}")
     raw = rsp.read(address, capacity * stride)
+    if len(raw) != capacity * stride:
+        raise RuntimeError("Debugger returned a truncated T4 unit bank")
     slots = []
     for slot in range(capacity):
         base = slot * stride
-        entry = {name: int.from_bytes(raw[base + fields[name]:base + fields[name] + 4],
-                                       "little", signed=True) for name in needed}
+        entry = {name: int.from_bytes(raw[base + fields[name]:base + fields[name] + fields.widths[name]],
+                                       "little", signed=fields.signed[name]) for name in needed}
         entry["slot"] = slot
         slots.append(entry)
     return slots
