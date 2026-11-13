@@ -2,11 +2,18 @@
  * Asset-free property fixture for the P7 typed rows.
  * Synthetic canonical facts test bit packing and bounds only. Actual P7
  * constructor/runtime facts remain the responsibility of engine fixtures. */
+#ifdef SC64_TYPED_UNIT_ARM_BENCH
+#include <stddef.h>
+void *memset(void *, int, size_t);
+int memcmp(const void *, const void *, size_t);
+#define assert(x) ((void)(x))
+#else
 #include <assert.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#endif
+#include <stdint.h>
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -105,7 +112,7 @@ int sc64_test_reference_unit(void *out, const void *row, unsigned w, unsigned h)
 #define main sc64_test_reference_fixture_main
 #endif
 
-#ifdef SC64_TYPED_UNIT_CHUNK_READER
+#if defined(SC64_TYPED_UNIT_CHUNK_READER) && !defined(SC64_TYPED_UNIT_ARM_BENCH)
 void sc64_test_reference_init(void);
 int sc64_test_reference_unit(void *, const void *, unsigned, unsigned);
 static void compare_readers(const Sc64P7TypedUnitSave *row,unsigned w,unsigned h)
@@ -154,6 +161,66 @@ static void compare_unit_readers(void)
 }
 #endif
 
+#ifdef SC64_TYPED_UNIT_ARM_BENCH
+#include "gba.h"
+enum { RUNS = 12 };
+static Sc64P7TypedUnitSave rows[MAX_UNITS];
+volatile unsigned bench_result[9];
+__attribute__((noinline,noclone)) static void bench_done(void)
+{
+    __asm__ volatile("" ::: "memory");
+}
+
+static unsigned digest(unsigned hash, const Unit *q)
+{
+    return (hash ^ (unsigned)(q->hp + q->carry + q->shield + q->path_y +
+                              q->weapon + q->flags + q->owner)) * 16777619u;
+}
+
+int main(void)
+{
+    init_facts();
+    for (unsigned i=0;i<MAX_UNITS;++i) {
+        Unit q;
+        unit_make(&q,i%64,1);
+        if (!sc64_p7_typed_unit_encode(&rows[i],&q,2048,2048)) bench_result[0]=1;
+    }
+    *(volatile u16*)0x04000204 = 0x4317;
+    *(volatile u16*)0x0400010a = 0x0080;
+    *(volatile u16*)0x0400010e = 0x0084;
+    unsigned hash=2166136261u, failures=0;
+    u32 start=gba_clock();
+    for(unsigned p=0;p<RUNS;++p)
+        for(unsigned i=0;i<MAX_UNITS;++i) {
+            Unit q;
+            if (sc64_p7_typed_unit_decode(&q,&rows[i],2048,2048))
+                hash=digest(hash,&q);
+            else ++failures;
+        }
+    bench_result[1]=gba_clock()-start;
+    bench_result[2]=hash;
+    bench_result[3]=failures;
+    unsigned corrupt=0, mutated=0;
+    Unit q, sentinel;
+    memset(&sentinel,0x73,sizeof(sentinel));
+    start=gba_clock();
+    for(unsigned p=0;p<RUNS;++p)
+        for(unsigned i=0;i<MAX_UNITS;++i) {
+            Sc64P7TypedUnitSave bad=rows[i];
+            unit_setbits(&bad,146,5,31); /* late path_timer rejection */
+            q=sentinel;
+            corrupt+=sc64_p7_typed_unit_decode(&q,&bad,2048,2048);
+            mutated+=memcmp(&q,&sentinel,sizeof(q))!=0;
+        }
+    bench_result[4]=gba_clock()-start;
+    bench_result[5]=corrupt;
+    bench_result[6]=mutated;
+    bench_result[7]=MAX_UNITS*RUNS;
+    bench_result[8]=0xc001c0de;
+    bench_done();
+    for (;;) {}
+}
+#else
 int main(void) {
   init_facts();
 #ifdef SC64_TYPED_UNIT_CHUNK_READER
@@ -244,3 +311,5 @@ int main(void) {
   printf("asset-free typed codec fixture: 12000 randomized pairs plus 64/64 types, boundaries, markers, padding, rejection atomicity, legacy-field comparisons passed\n");
   return 0;
 }
+
+#endif /* SC64_TYPED_UNIT_ARM_BENCH */
