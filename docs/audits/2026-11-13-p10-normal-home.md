@@ -74,3 +74,26 @@ This remains below the frame target.
 - KODAK ROM SHA-256: `7a8aa4da8bf156993db753b18a2fc2e02ad6bd880a58f014b6593b983a781310`.
 - Matching ELF SHA-256: `667bf7f4c435916c58c7715892485c9533fce4f9830011387bfbd8b6f8a3f73d`.
 - Physical replay receipt SHA-256: `5f6456ec24ab2c81df2bd0c97d8237e1a8f5c523aa971b93d462ef9b2b7e1660`.
+
+### Fresh-process SRAM continuation
+
+An additional run of the exact KODAK build pressed B in the pause menu
+at frame 36,761 and exported the 32 KiB SRAM image. A new emulator
+process loaded it using L from HOME. The restored observation matched
+the paused state's frame, live actor/queue and wallet fingerprints,
+camera, supply and mission result fields, with the game back in play.
+The runner made no guest writes and carried over no emulator state.
+
+Resuming from pause in the first process and applying the same tail
+after the fresh load in the second process yielded five identical
+checkpoints through the win at frame 46,057. The saved snapshot held
+213 units and 81 buildings. The terminal observation held 177 units and
+69 buildings, with victory and the P10 completion bit set in both runs.
+
+The result screen commits a new save. The original sequence-1 bank
+remains byte-for-byte intact; the alternate bank has a valid payload
+checksum and sequence 2. The read-back therefore confirms both a
+non-destructive reload and the expected result autosave. This is one
+specific mid-mission save, not arbitrary-save coverage.
+
+- Fresh-load receipt SHA-256: `ce8eb0d3fad5ab4797f1613fa589e34aeeddd0286e23c20ec59e2252607aa84a`.

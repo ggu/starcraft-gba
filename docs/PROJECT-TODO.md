@@ -38,7 +38,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
   with the complete briefing, authored dialogue and all three heroes alive.
   The exact KODAK P10 ROM reproduces that win at 8.79 emulated updates per
-  second. P1–P9 still need equivalent qualification.
+  second and from one fresh mid-mission SRAM load. P1–P9 still need
+  equivalent qualification.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
   confirmed separate named, Random, and Closed seats and a middle-only
