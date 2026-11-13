@@ -16,14 +16,15 @@ physical GBA check or all routes through a mission.
 | T9 | [HOME win](2026-11-13-t7-t9-normal-physical.md#t9-new-gettysburg) | All 51 checkpoints matched. |
 | T10 | [HOME win](2026-11-13-t10-normal-physical.md) | Raynor alive; Ion Cannon destroyed. |
 | Z1–Z2 | [Z1 HOME win](2026-11-13-z1-normal-home.md), [Z2 HOME win](2026-11-13-z2-normal-home.md) | Briefings and authored pages acknowledged. |
-| Z3 | No complete exact-ROM receipt here | [HOME win](2026-11-12-normal-campaign-replay-gaps.md#full-physical-button-replay) on a preceding normal Z10 ROM. |
+| Z3 | [HOME win](2026-11-13-z3-current-home.md) | All 465 observations also match on staged `c906058`; Chrysalis retains all 250 HP. |
 | Z4 | [HOME win](2026-11-13-z4-two-normal-roms.md) | All 42 checkpoints also match on staged `c906058`; Kerrigan survives. |
-| Z5–Z6 | No complete exact-ROM receipt here | [Z5](2026-11-12-z5-normal-physical.md) and [Z6](2026-11-12-z6-normal-physical.md) win on preceding normal Z10 ROMs. |
+| Z5 | [HOME win](2026-11-13-z5-kodak-replay.md) | All 55 checkpoints matched, with the source pause and Kerrigan alive. |
+| Z6 | No complete exact-ROM receipt here | [HOME win](2026-11-12-z6-normal-physical.md) on a preceding normal Z10 ROM. |
 | Z7 | [Fresh SRAM win](2026-11-12-z7-normal-physical.md#fresh-sram-on-the-november-13-z10-kodak-cartridge) | Ordinary HOME reached the late save cut on the exact ROM; reselect the Hatchery after load. Full uninterrupted HOME win on a preceding Z10 ROM. |
 | Z8–Z9 | No complete exact-ROM receipt here | [Z8](2026-11-12-z8-normal-physical.md) and [Z9](2026-11-13-z9-normal-physical.md) win on a preceding normal Z10 ROM. |
 | Z10 | [Fresh SRAM win](2026-11-13-composed-performance.md) | Both normal ROMs in the comparison won from the same SRAM. [HOME win on the ARM test entry](2026-11-12-z10-arm-qualification.md). |
 | P1–P6 | No complete exact-ROM receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). Rebuild stale P1 input and isolate controller route queries for P3–P6. |
-| P7 | No complete exact-ROM receipt here | [Normal P7 HOME win](2026-11-01-p7-physical-prep/README.md); verify the carried P10 route. |
+| P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
 | P8 | No complete exact-ROM receipt here | [Preceding normal P8 win and SRAM continuation](2026-10-31-protoss-cannon-lazy/README.md); verify the carried P10 route. |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |
 | P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | Full replay averaged 8.79 emulated updates/s; below the performance target. |
