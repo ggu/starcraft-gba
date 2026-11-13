@@ -156,13 +156,27 @@ ui_hostile_at(int x, int y, int *tx, int *ty)
 {
     int i;
     for (i = 0; i < MAX_UNITS; i++)
-        if (u[i].alive && u[i].owner == ENEMY && dist2(x, y, u[i].x, u[i].y) < 9 * 9 &&
+        if (u[i].alive &&
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+            field_cursor_near(x, y, u[i].x, u[i].y, 9) &&
+#endif
+            u[i].owner == ENEMY &&
+#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
+            dist2(x, y, u[i].x, u[i].y) < 9 * 9 &&
+#endif
             currently_visible(u[i].x, u[i].y)) {
             *tx = u[i].x; *ty = u[i].y;
             return 1;
         }
     for (i = 0; i < MAX_BUILDINGS; i++)
-        if (b[i].alive && b[i].owner == ENEMY && dist2(x, y, b[i].x, b[i].y) < 16 * 16 &&
+        if (b[i].alive &&
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+            field_cursor_near(x, y, b[i].x, b[i].y, 16) &&
+#endif
+            b[i].owner == ENEMY &&
+#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
+            dist2(x, y, b[i].x, b[i].y) < 16 * 16 &&
+#endif
             currently_visible(b[i].x, b[i].y)) {
             *tx = b[i].x; *ty = b[i].y;
             return 1;

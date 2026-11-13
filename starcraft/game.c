@@ -5980,13 +5980,40 @@ clear_selection(void)
     selected_building = -1;
 }
 
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+/* Cursor reach is small. Reject far axes before squaring, while retaining
+ * the same strict circle and slot-order tie behavior. */
+static inline int
+field_cursor_in_box(int x, int y, int a, int b, int radius)
+{
+    int dx = x - a;
+    if (dx <= -radius || dx >= radius) return 0;
+    int dy = y - b;
+    return dy > -radius && dy < radius;
+}
+
+static inline int
+field_cursor_near(int x, int y, int a, int b, int radius)
+{
+    return field_cursor_in_box(x, y, a, b, radius) &&
+           dist2(x, y, a, b) < radius * radius;
+}
+#endif
+
 static int
 selection_target(void)
 {
     int i, best_unit = -1, best_building = -1;
     int unit_distance = 31 * 31, building_distance = 26 * 26, d;
     for (i = 0; i < MAX_UNITS; i++) {
-	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_CHILD(&u[i]) || u[i].owner != SIDE
+	if (!u[i].alive ||
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+            u[i].owner != SIDE || !field_cursor_in_box(cx, cy, u[i].x, u[i].y, 31) ||
+#endif
+            SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_CHILD(&u[i])
+#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
+            || u[i].owner != SIDE
+#endif
 #ifdef SC64_RACES
             ||u[i].type==U_CHRYSALIS
 #endif
@@ -6003,6 +6030,9 @@ selection_target(void)
     }
     for (i = 0; i < MAX_BUILDINGS; i++) {
 	if (!b[i].alive || b[i].owner != SIDE
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+            || !field_cursor_in_box(cx, cy, b[i].x, b[i].y, 26)
+#endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
             ||!sc64_game_building_selectable(b[i].type)
 #endif
@@ -6187,11 +6217,9 @@ find_selected_worker(void)
     return -1;
 }
 
-/* Contextual mineral target shared by dispatch and HUD. */
 static int
-selected_worker_mineral_target(void)
+field_cursor_mineral_at(void)
 {
-    if (find_selected_worker() < 0 || selection_target() >= 0) return -1;
 #ifdef SC64_WORKER_CARGO_KIND
     return sc64_worker_mineral_at(cx, cy);
 #else
@@ -6204,6 +6232,14 @@ selected_worker_mineral_target(void)
     }
     return patch;
 #endif
+}
+
+/* Contextual mineral target shared by dispatch and HUD. */
+static int
+selected_worker_mineral_target(void)
+{
+    if (find_selected_worker() < 0 || selection_target() >= 0) return -1;
+    return field_cursor_mineral_at();
 }
 
 #ifdef SC64_P10_RUNTIME
