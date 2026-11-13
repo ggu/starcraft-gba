@@ -4,8 +4,19 @@
 #include "../common/gba.c"
 #include "../starcraft/game.c"
 
-#if !defined(SC64_Z8_DIRECT_COMMAND_CENSUS) || !defined(SC64_P10_RUNTIME)
-#error "Requires the shared Command census and prepared P10 host flags"
+#ifndef SC64_Z8_DIRECT_COMMAND_CENSUS
+#error "Requires the shared Command census"
+#endif
+#if defined(SC64_P10_RUNTIME)
+#define CENSUS_MISSION SC64_P10_GLOBAL_ID
+#define CENSUS_ACTIVE race_p10_active
+#define CENSUS_WORLD race_p10_view
+#elif defined(SC64_Z8_RUNTIME)
+#define CENSUS_MISSION SC64_Z8_GLOBAL_ID
+#define CENSUS_ACTIVE race_z8_active
+#define CENSUS_WORLD race_z8_view
+#else
+#error "Requires prepared P10 or Z8 host flags"
 #endif
 
 static int compare(const Sc64Z8WorldView *world, unsigned player, unsigned raw,
@@ -37,12 +48,12 @@ int main(void)
 {
     game_init();
     race_mode = 0;
-    race_selected_mission = SC64_P10_GLOBAL_ID;
+    race_selected_mission = CENSUS_MISSION;
     init_state();
-    assert(screen == SCREEN_PLAY && race_p10_active());
-    assert(race_p10_view.command_count == sc64_z8_game_command_count);
+    assert(screen == SCREEN_PLAY && CENSUS_ACTIVE());
+    assert(CENSUS_WORLD.command_count == sc64_z8_game_command_count);
 
-    Sc64Z8WorldView world = race_p10_view;
+    Sc64Z8WorldView world = CENSUS_WORLD;
     const unsigned selectors[] = {0, 1, 2, 7, 8, 12, 13, 17, 18, 19, 20, 21};
     for (unsigned i = 0; i < sizeof selectors / sizeof *selectors; ++i)
         for (unsigned raw = 0; raw <= 231; ++raw)
@@ -73,6 +84,17 @@ int main(void)
     assert(compare(&world, 0, 64, 0, 0, 2, 0, 0) == -1);
     u[slot].alive = 0;
     assert(compare(&world, 0, 0, 0, 0, 2, 0, &count) == 1 && count == 0);
+
+#ifdef SC64_Z7_EGG_PRODUCTION
+    u[slot] = (Unit){.alive = 1, .raw_owner = 0, .raw_type = 36, .type = U_Z7_EGG,
+                     .x = 42, .y = 42};
+    assert(compare(&world, 0, 36, 0, 0, 2, 0, &count) == 1 && count == 0);
+    assert(compare(&world, 0, 36, 1, 0, 2, 0, &count) == 1 && count == 1);
+    u[slot].type = U_DRONE;
+    u[slot].raw_type = 41;
+    assert(compare(&world, 0, 41, 0, 0, 2, 0, &count) == 1 && count == 1);
+    u[slot].alive = 0;
+#endif
 
     b[building] = (Building){.alive = 1, .raw_owner = 0, .raw_type = 154,
                              .x = 48, .y = 48, .under_construction = 1};

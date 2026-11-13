@@ -160,6 +160,13 @@ test-zerg-z10: build/test-sc64-z10-game build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-game
 
+# Exercise the shared Z8 game bridge with the carried Z10 configuration.
+.PHONY: test-sc64-z10-command-census
+test-sc64-z10-command-census: build/test-sc64-z10-command-census
+	./build/test-sc64-z10-command-census
+build/test-sc64-z10-command-census: tests/sc64_z8_command_census.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z10_CANONICAL_FLAGS) -DSC64_Z8_DIRECT_COMMAND_CENSUS $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+
 # Current Z10 differential for the optional defense spatial query.
 build/test-sc64-z10-defense-spatial: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_RELEASE_FLAGS) -DSC64_DEFENSE_SPATIAL_PROBE $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
