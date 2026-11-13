@@ -120,7 +120,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [native Blood Bath end-rule audit](audits/2026-11-13-n64-blood-bath-end-rules.md)
   traces both modes to defeat at zero buildings and victory at zero eligible
   opponent slots. Defeat transfers the remaining actors to neutral ownership
-  and detaches their AI. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
+  and detaches their AI. The [native cadence audit](audits/2026-11-13-n64-blood-bath-result-cadence.md)
+  finds that the stock dispatcher evaluates all eligible owners before
+  publishing results. Watch its real countdown rather than counting video
+  frames when testing a direct last-building kill. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
   traces the loaded passenger exception and the Carrier/Reaver queue reset.
   The [last Command Center lift](audits/2026-11-13-n64-blood-bath-airborne-last-building.md)
   confirms an airborne building still counts. GBA skirmish needs a
