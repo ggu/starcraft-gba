@@ -39,6 +39,15 @@ the condition, and sees all earlier trigger mutations. Bring, Kills and
 replacement actor providers use the original path. It changes no trigger
 schedule, persistent state, or save layout.
 
+The common game-pool binder installs the provider for P8, P9, P10 and
+Z8. P8's live-slot wrapper continues to compact Bring only, while P9
+retains its location-based path. The late Zerg Z9/Z10 mission provider
+special-cases the carried crystal and continues using generic actor
+enumeration; their cartridges also carry the eligible Z8 mission.
+The standalone P8, P9 and Z8 products have different content/feature
+flags; in particular, the Zerg bridge can see an in-progress Egg.
+The P10 replay does not qualify those products or the Egg branch.
+
 The ASan/UBSan differential uses the actual P10 pools and compares 66,816
 queries over owners, forces, raw types, group types and comparisons. It
 also covers same-slot creation, removal, ownership and building completion
