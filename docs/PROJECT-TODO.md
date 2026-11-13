@@ -39,8 +39,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   separates exact KODAK wins, earlier normal builds and remaining checks.
   [Z3](audits/2026-11-13-z3-current-home.md) and
   [Z4](audits/2026-11-13-z4-two-normal-roms.md) win on both November 13
-  Z10 revisions; [Z5](audits/2026-11-13-z5-kodak-replay.md) also wins
-  on the KODAK Z10 ROM with Kerrigan alive.
+  Z10 revisions. [Z5](audits/2026-11-13-z5-kodak-replay.md) and
+  [Z6](audits/2026-11-13-z6-kodak-replay.md) also win on the KODAK Z10
+  ROM with Kerrigan alive, including the Z6 transport route.
   All ten Terran missions now have complete HOME wins on that same ROM.
   Continue exact normal Z10 and P10 replays and broader save checks. The normal
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
