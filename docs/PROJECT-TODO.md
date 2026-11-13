@@ -154,8 +154,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The shared Command census probe cuts the full normal P10 win's mean
   by 7.42% and a sampled trigger update by 34.97% with matching gameplay
   and sampled video; it leaves depot stalls unchanged. The probe stays off
-  pending cross-profile and hardware checks. Pursue an exact partial
-  facility flood separately from steady drawing and simulation.
+  pending cross-profile and hardware checks. The [paired P10 routing tests](audits/2026-11-13-p10-route-options.md)
+  show wide point FIFO saves only 0.15% overall; nearest-first saves
+  2.05% and cuts two individual depot stalls by over 93%, with the full
+  win unchanged but different cache contents. Keep P10 defaults stable
+  until broader checks. Pursue the byte-exact partial facility flood
+  separately from steady drawing and simulation.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
