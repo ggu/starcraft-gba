@@ -34,7 +34,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   ordinary-input skirmish runs are covered separately. Explicit `zerg-z9`
   keeps its original ROM identity and save path. These results establish
   campaign availability and selected play paths; frame budget, broader save
-  coverage, and original N64 behavior remain separate gates below.
+  coverage, and original N64 behavior remain separate gates below. The normal
+  Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
+  with the complete briefing, authored dialogue and all three heroes alive.
+  Its replay averages 8.72 emulated updates per second; P1–P9 still need
+  equivalent qualification.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
   confirmed separate named, Random, and Closed seats and a middle-only
