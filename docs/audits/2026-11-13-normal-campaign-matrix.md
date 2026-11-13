@@ -20,7 +20,7 @@ physical GBA check or all routes through a mission.
 | Z4 | [HOME win](2026-11-13-z4-two-normal-roms.md) | All 42 checkpoints also match on staged `c906058`; Kerrigan survives. |
 | Z5 | [HOME win](2026-11-13-z5-kodak-replay.md) | All 55 checkpoints matched, with the source pause and Kerrigan alive. |
 | Z6 | [HOME win](2026-11-13-z6-kodak-replay.md) | All 65 checkpoints matched, including four with Kerrigan aboard the Overlord. |
-| Z7 | [Fresh SRAM win](2026-11-12-z7-normal-physical.md#fresh-sram-on-the-november-13-z10-kodak-cartridge) | Ordinary HOME reached the late save cut on the exact ROM; reselect the Hatchery after load. Full uninterrupted HOME win on a preceding Z10 ROM. |
+| Z7 | [HOME win](2026-11-12-z7-normal-physical.md#uninterrupted-home-on-the-exact-kodak-cartridge), [fresh SRAM win](2026-11-12-z7-normal-physical.md#fresh-sram-on-the-november-13-z10-kodak-cartridge) | All 253 HOME observations and five overlapping save observations matched. Reselect the Hatchery after load. |
 | Z8 | [HOME win](2026-11-12-z8-normal-physical.md#exact-november-13-kodak-cartridge) | Both objective Nexuses destroyed, Kerrigan at full HP; 19 checkpoints matched. |
 | Z9 | [HOME win](2026-11-13-z9-normal-physical.md#exact-november-13-kodak-cartridge) | The same Drone carries the crystal home; 32 checkpoints matched. |
 | Z10 | [HOME win](2026-11-13-z10-exact-home.md), [fresh SRAM win](2026-11-13-composed-performance.md) | All 61 shared world checkpoints match between the two routes. |
@@ -30,7 +30,8 @@ physical GBA check or all routes through a mission.
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |
 | P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | Full replay averaged 8.79 emulated updates/s; below the performance target. |
 
-All ten Terran missions now have a checked HOME win on the same exact
-cartridge. The exact ROMs in this index are the Terran, Z10 and P10 cartridges
-copied to KODAK under runtime `cbba1c5`. Tests on previews or composed
-performance builds do not substitute for the normal cartridge row.
+All ten Terran missions and all ten Zerg missions now have a checked HOME
+win on their respective exact cartridges. The exact ROMs in this index
+are the Terran, Z10 and P10 cartridges copied to KODAK under runtime
+`cbba1c5`. Tests on previews or composed performance builds do not
+substitute for the normal cartridge row.

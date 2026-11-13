@@ -119,3 +119,35 @@ actual slot and frame before continuing.
 - SRAM SHA-256: `632a64001689bbbc35ae7a2ca4cea20b93c94a1187c5ee7cdb95ffe88b05662f`.
 - Save export receipt SHA-256: `bd83af7627678c2448007fc1cc095c20f40403659a69fd339032df06f8478eb6`.
 - Verified reselection and victory receipt SHA-256: `9acb1daa2cfb68a9d458cb9d66b1fc078cb3e10220c45a2a9b2114b146bb86ab`.
+
+## Uninterrupted HOME on the exact KODAK cartridge
+
+The same November 13 KODAK Z10 ROM and held-key tape now also win without
+loading a save. The physical-button observer starts at fresh HOME and
+checks 253 named observations through call 197,455 and frame 194,998.
+All five simulation-frame observations shared with the fresh SRAM route
+match in the named state, excluding the different input counters. The
+objective completed with zero hostile buildings, 13 hostile units, and
+no observed trigger fault. No authored text box interrupted the run.
+
+Use the physical command above without save or cut options, with the
+KODAK ROM and ELF hashes listed in the preceding section. The full run
+averages 1,787,077 guest cycles per update (9.39 emulated main-loop
+updates/s), including UI and presentation waits. Its peak is 58,629,570
+cycles. This qualifies the route in mGBA; the 30 fps hardware goal remains
+open.
+
+- Uninterrupted KODAK HOME receipt SHA-256: `8767402601941f660ce5cdfa31fd62f4d03c82f5fa31990d56fc945af7e45c57`.
+
+The timing counters also separate sustained load from a single stall.
+Across simulation frames 50,015–75,289 the mean is 2,385,709 cycles
+(7.03 updates/s); across 75,289–101,083 it is 2,465,591 cycles (6.80
+updates/s). The interval at frames 46,499–46,976 averages 3,753,052
+cycles across 480 updates, with 236–237 live units at its endpoints.
+That interval is exactly calls 47,758–48,237. The clock advances from
+69,130,754,997 to 70,932,219,943 cycles, and 479 of the 480 calls land
+in the highest recorded presentation bucket.
+No interval between the 253 sampled checkpoints averages under the
+561,792-cycle budget. These are whole-loop measurements, including
+menu and presentation time. Profile the 480-update interval by stage
+before attributing its cost to actor count or a specific subsystem.
