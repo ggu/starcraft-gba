@@ -4769,6 +4769,8 @@ test-gfx-sprite-packed: build/test-gfx-sprite-packed build/test-gfx-sprite-packe
 	./build/test-gfx-sprite-packed-no-clip
 test-starcraft: test-gfx-sprite-packed
 
+include mk/static-mineral-words/Makefile
+
 .PHONY: test-gfx-unit-facing-clip
 build/test-gfx-unit-facing-clip: tests/gfx_unit_facing_clip.c common/gba.c common/gba.h .local/sc64/facing/generated/sc64_unit_facing_generated.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SPRITE_WORDS -DSC64_UNIT_FACING -Icommon -I.local/sc64/facing/generated $< common/gba.c -o $@
