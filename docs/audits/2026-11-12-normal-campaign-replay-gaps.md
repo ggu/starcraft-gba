@@ -11,7 +11,7 @@ as a current full result. None of these are physical GBA tests.
 | --- | --- | --- |
 | T1–T10 | [Normal-menu ARM wins across frozen Terran builds](../VALIDATION.md#canonical-terran-t1t10-profile-2026-10-23); the later canonical T9 replay uses the scheduler. | No exact current full physical result found for any of the ten. |
 | Z1 | Carried Z9 [ARM test-entry win](2026-11-12-dense-point-flood.md#campaign-and-save-checks). | Open. |
-| Z2 | [Carried Z9 HOST wins](2026-11-05-z9-carried-host/README.md). | Open. |
+| Z2 | [Normal Z10 cartridge HOME replay](2026-11-13-z2-normal-home.md), including authored briefing and dialogue. | Full win from fresh HOME at frame 8,164. |
 | Z3 | [Older normal Z7 physical win](2026-10-31-z3-normal-physical/README.md) and current Z10 replay below. | Full win from fresh HOME at frame 136,588. |
 | Z4 | [Carried normal Z10 replay](2026-11-12-z4-normal-physical.md) with authored dialogue. | Full win from fresh HOME at frame 34,984. |
 | Z5–Z6 | Carried HOST wins; earlier Z6 ARM and Z5/Z6 save coverage in [campaign notes](../RACE-CAMPAIGNS.md). | Open for both. |
