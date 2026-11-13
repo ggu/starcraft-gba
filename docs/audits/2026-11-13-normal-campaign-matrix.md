@@ -19,7 +19,7 @@ physical GBA check or all routes through a mission.
 | Z3 | [HOME win](2026-11-13-z3-current-home.md) | All 465 observations also match on staged `c906058`; Chrysalis retains all 250 HP. |
 | Z4 | [HOME win](2026-11-13-z4-two-normal-roms.md) | All 42 checkpoints also match on staged `c906058`; Kerrigan survives. |
 | Z5 | [HOME win](2026-11-13-z5-kodak-replay.md) | All 55 checkpoints matched, with the source pause and Kerrigan alive. |
-| Z6 | No complete exact-ROM receipt here | [HOME win](2026-11-12-z6-normal-physical.md) on a preceding normal Z10 ROM. |
+| Z6 | [HOME win](2026-11-13-z6-kodak-replay.md) | All 65 checkpoints matched, including four with Kerrigan aboard the Overlord. |
 | Z7 | [Fresh SRAM win](2026-11-12-z7-normal-physical.md#fresh-sram-on-the-november-13-z10-kodak-cartridge) | Ordinary HOME reached the late save cut on the exact ROM; reselect the Hatchery after load. Full uninterrupted HOME win on a preceding Z10 ROM. |
 | Z8–Z9 | No complete exact-ROM receipt here | [Z8](2026-11-12-z8-normal-physical.md) and [Z9](2026-11-13-z9-normal-physical.md) win on a preceding normal Z10 ROM. |
 | Z10 | [Fresh SRAM win](2026-11-13-composed-performance.md) | Both normal ROMs in the comparison won from the same SRAM. [HOME win on the ARM test entry](2026-11-12-z10-arm-qualification.md). |
