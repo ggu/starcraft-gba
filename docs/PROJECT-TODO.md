@@ -162,8 +162,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cuts three P10 gameplay stalls by 43–57% and its full mean by 1.12%,
   matching the observed route bytes, outcomes and video. Four guarded links,
   the Z7 window and one 64×64 SRAM continuation pass. Keep it opt-in pending
-  composed RAM checks and hardware. The facility grid conversion, routine
-  rendering and simulation, and result autosave are separate priorities.
+  composed RAM checks and hardware. The [typed save reader](audits/2026-11-13-typed-save-reader.md)
+  cuts the P10 result update from 76.50M to 37.51M cycles with the same
+  pause/result journals and fresh-load win. Keep it opt-in until broader
+  save and hardware checks. Next: reduce facility grid conversion and the
+  routine rendering and simulation costs that still dominate wall time.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
