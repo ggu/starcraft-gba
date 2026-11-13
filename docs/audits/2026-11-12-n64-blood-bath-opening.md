@@ -388,3 +388,32 @@ vector. Other sparse lineups and launch seeds remain unobserved.
 | --- | --- | --- |
 | Melee | `04cdf796673202a8b3a583351f7a1c6bb5ec65345b58792ce5e52832cc31951a` | `3eaa2d7e49d36bc2dfc3e7d43ab4bf2d0fb5a098bea3c977f5418d9426988dcb` |
 | Free for All | `ebfa1ce61f80e98e9018cbce9552a14f4e91db3da0375fc0298584c90220088c` | `d0973068f916f9c7a86ab733a67af2f2617709d3c5dbd254dc071d902cbe35c8` |
+
+### The last CPU cannot be closed with Right
+
+In both native Blood Bath game types, the first two CPU rows were
+closed and the third row was selected. The lobby displayed Terran
+for the human and Random for the third CPU. One isolated Right
+press changed that CPU directly from Random to Zerg while the other
+two rows stayed closed. With another CPU open, Right on a Random
+row can choose Closed, as observed in the sparse Random setup.
+Start after the last-seat attempt successfully launched play with
+the remaining CPU choice. The observed lobby prevents reaching
+zero CPUs through this edit; it does not expose a zero-CPU state
+on which to test the Start handler itself.
+
+These visual-only ares runs used the owned USA ROM, ordinary controller
+input and no RAM snapshots. Both manifests passed the planned witness
+and unchanged input checks. The three captures per mode show the
+pre-edit lobby, post-edit lobby and ensuing gameplay.
+
+| Mode | Observer steps | Controller plan SHA-256 | Observer manifest SHA-256 |
+| --- | --- | --- | --- |
+| Free for All | 3,824 / 3,914 / 4,524 | `147c3445195202dc584a3a4421b93d0b3918b51a0c6f2cc7b106b7c4d98335ce` | `2d50d3ef57f9a093320e5e18b75461fbdc2bae7ff29d754532bb75684772d2c4` |
+| Melee | 3,859 / 3,949 / 4,559 | `b95e2dc312e0010ac3b484cf7246ad89034ee1512b8afd489c5f7512bdd6a1c1` | `a325ddc8d0a897f4f651cbdb97cf7b5dfc909e12607a8b7b1d3ba37da7a6a370` |
+
+Keep the supported launch and resolved-save range at one to three CPUs
+in both GBA modes. The GBA preview can display all Closed while editing
+but disables Launch; the native observation supports the same launch
+floor and identifies a separate menu difference. It does not cover
+other maps, all directions or injected state.
