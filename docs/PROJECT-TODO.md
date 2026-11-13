@@ -144,8 +144,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Blood Bath and to two and three independent opponents. The [named lineup
   controller](audits/2026-11-13-named-skirmish-matches.md) now records
   complete HOST losses with one, two and three chosen CPUs, including a
-  Terran mirror, two duplicate CPUs and a reversed mixed lineup. Replay
-  those on ARM and develop a winning Blood Bath route. Native automatic
+  Terran mirror, two duplicate CPUs and a reversed mixed lineup. The
+  three-CPU Blood Bath result matches all 25 checks on the staged Terran
+  ROM at 20.93 emulated updates/s. Check the other two on ARM and develop
+  a winning Blood Bath route. Native automatic
   [SCV resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md)
   and the outcome of surviving actors still need native witnesses.
 
