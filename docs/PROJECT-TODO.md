@@ -151,9 +151,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   of the Blood Bath menu timing tail and hardware checks.
   The [P10 profile](audits/2026-11-13-p10-command-census.md) finds depot
   facility floods account for 41.94M cycles of the largest gameplay update.
-  The shared Command census probe cuts the first 11,300 normal P10 loops'
-  mean by 8.70% and a sampled trigger update by 34.97% with matching
-  gameplay and video; it leaves depot stalls unchanged. The probe stays off
+  The shared Command census probe cuts the full normal P10 win's mean
+  by 7.42% and a sampled trigger update by 34.97% with matching gameplay
+  and sampled video; it leaves depot stalls unchanged. The probe stays off
   pending cross-profile and hardware checks. Pursue an exact partial
   facility flood separately from steady drawing and simulation.
 
