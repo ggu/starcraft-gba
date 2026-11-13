@@ -92,3 +92,59 @@ actor itself survives and is relinked to owner 11; it does not establish
 whether a pending projectile may hit that actor afterward. Keep the policy
 unchanged until the native projectile target path or a qualified runtime
 witness distinguishes transfer from death.
+
+### Native capture that would distinguish the incoming shot
+
+First qualify the chosen direct, moving projectile against an ordinary
+stationary target without an owner change. Identify its launch, target
+pointer, impact handler, and any pointer-clear or recycle writes from that
+control, and tie target HP/shield writes to that same projectile. The native
+projectile record layout, launch/cancel sites and damage writer PC are not
+identified by the retained Blood Bath evidence. A sprite disappearing or an
+HP-shaped word changing is insufficient. Use a second control in which the
+target dies before arrival to identify the genuine death cleanup; never use
+a copied PC field layout as proof of the N64 projectile layout.
+
+Use a normal three-owner Free for All, preferably a Terran human against
+two Terran CPUs. Preserve one other CPU with a building so there is no
+result screen. Fight down one CPU to a weakened last building and keep one
+of its ordinary surviving units alive and visible. Try a Vulture firing at
+that unit, with a separate Marine group finishing the building at close
+range. Confirm the Vulture shot is a moving, single-target projectile in the
+control before committing to that weapon. Separate the groups and stop other
+attacks on the watched unit; avoid splash, transports, and shield
+regeneration. A late checkpoint reached through normal controller input can
+be used to tune the final pulses, provided the actual witness records the
+authenticated input and no guest state is edited. Abort this attempt if
+the target dies, the shot arrives first, or no other competitive owner
+remains.
+
+Record the known writer anchors from the retained native code:
+
+| Store PC | Value to observe |
+| --- | --- |
+| `0x8008cd94` | Pending defeat byte 2 at `0x8010dbe0 + defeated owner` |
+| `0x8008d9a8` | Published defeat byte 2 at `0x800b936c + defeated owner` |
+| `0x801357a4` | Surviving actor owner byte changes to 11 at actor + `0x4c` |
+| `0x8013581c` | The same actor is linked into the destination owner chain |
+
+Confirm the last-building count at `0x8010ac80 + 4 * owner` goes to
+zero and another competitive owner remains. Snapshot the live target record
+and projectile immediately before and after the owner change and through the
+calibrated arrival window. A projectile-target link that survives transfer,
+followed by its own impact and damage write to the same live neutral actor,
+establishes retention and damage. A clear/recycle write in the transfer
+window establishes cancellation only if that exact projectile was live and
+targeted the actor beforehand. A link surviving transfer but being rejected
+by the impact handler is a third outcome. No damage without observing
+which of those paths happened is inconclusive.
+
+The previously qualified interpreter store observer is a precedent for a
+bounded read-only hook, not a ready-made Blood Bath recorder: its old binary
+is pinned to a different actor, input and replay. Reauthenticate the new
+checkpoint, require complete watched-range coverage with no trace overflow,
+and correlate committed-store PC, address, width and value in event order.
+Use a small ring around the transfer and a few cache-aware snapshots rather
+than extending passive capture. The observer step is not an exact game
+clock. This is a proposed discriminator; no new capture or runtime change
+was made.
