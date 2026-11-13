@@ -162,6 +162,32 @@ static int expected_radius(int raw) {
     }
 }
 
+#ifdef SC64_SHARED_SIGHT_PACKED_ROWS
+/* Exact scalar row reference across every sub-tile phase, supported radius
+ * and both clipped map corners. The stateful oracle below additionally
+ * checks counts, visibility, exploration and minimap occupancy. */
+static int check_shared_packed_rows(void)
+{
+    for (int radius=64;radius<=176;radius+=16)
+        for (int y=0;y<16;++y) for (int x=0;x<16;++x)
+            for (int corner=0;corner<2;++corner) {
+                int xx=x+corner*(MAP_COLS-1)*16, yy=y+corner*(MAP_ROWS-1)*16;
+                int r=(radius-64)/16, extent=(radius+23)/16;
+                const u8 *rows=sc64_z7_sight_packed_rows[r][y*16+x];
+                const u8 *half=sc64_z7_visibility_halfwidths+sc64_z7_visibility_halfwidth_offsets[r];
+                for (int j=0;j<MAP_ROWS;++j) {
+                    int first,last;
+                    sc64_visibility_row_span(xx,yy,j,radius,extent,half,&first,&last);
+                    unsigned expected=first>last ? SC64_SIGHT_EMPTY_SPAN :
+                                                   (unsigned)(last*256+first);
+                    if (expected!=sc64_visibility_unpack_row(rows,xx/16,
+                            (unsigned)(j-yy/16+SC64_SIGHT_ROW_BIAS))) return 1;
+                }
+            }
+    return 0;
+}
+#endif
+
 static int owner_unit_radius(int type) {
     if (type == U_ZP_SOURCE) return 200; /* intentionally outside Z7 LUT */
     int radius = z7_active ? expected_radius(type) : 0;
@@ -377,6 +403,10 @@ static int run_dense_counts(int step) {
 }
 
 int main(void) {
+#ifdef SC64_SHARED_SIGHT_PACKED_ROWS
+    if (check_shared_packed_rows()) return 1;
+#endif
+
     int step;
 #ifdef SC64_Z7_SIGHT_SPANS
     if (check_z7_lookup()) return 1;
