@@ -57,6 +57,8 @@ replay and fresh-process SRAM qualification are separate checks described in
 `docs/VALIDATION.md`. See `docs/RACE-CAMPAIGNS.md` for campaign controls and
 profile limits.
 
+A change that adds work RAM or changes compiler flags shared by several ROMs must also run `make check-all-roms`, which links every `verify-*` ROM target and prints each one's IWRAM and EWRAM margin (see `docs/DEVELOPMENT.md#link-every-rom-target`).
+
 Do not fetch or generate private game inputs just to complete a default-profile task. If an optional check cannot run because its local inputs are absent, say so in the handoff and report the default checks completed.
 
 ## Local verification and Actions usage

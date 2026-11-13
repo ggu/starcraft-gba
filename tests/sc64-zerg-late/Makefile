@@ -237,17 +237,9 @@ $(eval $(call Z9_Z7_CARRIED_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK
 $(eval $(call Z9_Z7_CARRIED_REPLAY,resume,-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z9_Z7_CUT)u))
 # Keep the documented ordinary-input routes together; controller 0 of the
 # generic early-race runner is not the established Z1 route.
+# The runs themselves are the check-campaign-z1..z8 rules (mk/campaign-check/Makefile).
 .PHONY: test-sc64-z9-carried-missions
-test-sc64-z9-carried-missions: $(addprefix build/test-sc64-z9-carried-,z1 z1z2 z3 z4 z5 z6 z7 z8)
-	mkdir -p .local/sc64/z9-carried
-	./build/test-sc64-z9-carried-z1 --trace .local/sc64/z9-carried/z1.json
-	./build/test-sc64-z9-carried-z1z2 --controller 1 --trace .local/sc64/z9-carried/z2.json
-	./build/test-sc64-z9-carried-z3 --policy hybrid --trace .local/sc64/z9-carried/z3.json
-	./build/test-sc64-z9-carried-z4 --limit 150000 --trace .local/sc64/z9-carried/z4.json
-	./build/test-sc64-z9-carried-z5 --limit 60000 --trace .local/sc64/z9-carried/z5-diagnostic.json --attempt .local/sc64/z9-carried/z5-attempt.json --verified .local/sc64/z9-carried/z5.json
-	./build/test-sc64-z9-carried-z6 --trace .local/sc64/z9-carried/z6.json
-	./build/test-sc64-z9-carried-z7 $(ZERG_Z7_CONTROLLER_POLICY) --limit $(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/z9-carried/z7.json
-	./build/test-sc64-z9-carried-z8 .local/sc64/z9-carried/z8.jsonl
+test-sc64-z9-carried-missions: $(addprefix check-campaign-z,1 2 3 4 5 6 7 8)
 test-sc64-zerg-z9: test-sc64-z9-carried-profile test-sc64-z9-carried-missions
 
 # Full ordinary-input skirmish matches under the actual canonical Z9 vector.

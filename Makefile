@@ -19,6 +19,7 @@ test: test-scarab-save-selection
 include tests/gba-save-parts/Makefile
 include mk/text-box/Makefile
 include mk/combat-perf/Makefile
+include mk/rom-check/Makefile
 
 .PHONY: test-scarab-parent-migration
 build/test-scarab-parent-migration: tests/sc64_scarab_parent_migration.c starcraft/sc64_scarab_fields.h Makefile | build
@@ -2720,25 +2721,15 @@ $(eval $(call TERRAN_FULL_TEST,t5-save,tests/sc64_t5_save.c))
 $(eval $(call TERRAN_FULL_TEST,t5-run,tests/sc64_t5_campaign_run.c,-DSC64_T5_PROBE_ENTRY))
 $(eval $(call TERRAN_FULL_TEST,t6-run,tests/sc64_t6_campaign_run.c,-DSC64_T6_PROBE_ENTRY))
 .PHONY: test-sc64-terran-full-regression
-test-sc64-terran-full-regression: $(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run t4-save t5-save t5-run t6-run) test-terran
-	mkdir -p .local/sc64/terran-late
-	./build/test-sc64-full-t1-run --trace .local/sc64/terran-late/full-t1-controller.json
-	./build/test-sc64-full-t2-run --trace .local/sc64/terran-late/full-t2-controller.json
-	./build/test-sc64-full-t3-run
+# The T1-T6 controller runs are the check-campaign-t1..t6 rules (mk/campaign-check/Makefile).
+test-sc64-terran-full-regression: $(addprefix build/test-sc64-full-,t3-save t3-resume t4-save t5-save) $(addprefix check-campaign-t,1 2 3 4 5 6) test-terran
 	./build/test-sc64-full-t3-save
 	./build/test-sc64-full-t3-resume
-	./build/test-sc64-full-t4-run --limit 30000 --trace .local/sc64/terran-late/full-t4-controller.json
 	./build/test-sc64-full-t4-save
 	./build/test-sc64-full-t5-save
-	./build/test-sc64-full-t5-run --limit 200000 --trace .local/sc64/terran-late/full-t5-controller.json
-	./build/test-sc64-full-t6-run --limit 30000 --trace .local/sc64/terran-late/full-t6-controller.json
 
 .PHONY: test-sc64-terran-full-campaign
-test-sc64-terran-full-campaign: test-sc64-terran-full-regression test-sc64-terran-late-world test-sc64-terran-late-save test-sc64-terran-late-repair $(addprefix build/test-sc64-t,7-campaign-run 8-campaign-run 9-campaign-run 10-campaign-run)
-	./build/test-sc64-t7-campaign-run --limit 60000 --trace .local/sc64/terran-late/full-t7-controller.json
-	./build/test-sc64-t8-campaign-run --limit 200000 --trace .local/sc64/terran-late/full-t8-controller.json
-	./build/test-sc64-t9-campaign-run --limit 500000 --trace .local/sc64/terran-late/full-t9-controller.json
-	./build/test-sc64-t10-campaign-run --limit 100000 --trace .local/sc64/terran-late/full-t10-controller.json
+test-sc64-terran-full-campaign: test-sc64-terran-full-regression test-sc64-terran-late-world test-sc64-terran-late-save test-sc64-terran-late-repair $(addprefix check-campaign-t,7 8 9 10)
 
 
 build/test-sc64-p6-model: tests/sc64_p6.c starcraft/sc64_p6.h common/gba.h | build
@@ -4691,6 +4682,7 @@ test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign bui
 test-protoss-p7: test-sc64-protoss-carried-missions
 -include mk/protoss-carried/Makefile
 -include mk/campaign-progression/Makefile
+include mk/campaign-check/Makefile
 
 # The indexed and packed sprite paths must agree over the whole framebuffer,
 # including transparent lanes, alignment and both clipping configurations.

@@ -131,6 +131,36 @@ OS cache where macOS allows), compares sha256, and writes `COPY-VERIFIED.txt`
 cache a write; eject, reinsert and run `verify --dest` for a fresh read-back.
 Only after a verified copy may a newer build be described as on the card.
 
+### Link every ROM target
+
+`release check` covers the shipped products. Older ROM targets (the Zerg Z3, Z4,
+Z6, Z7 and Z8 stages, Protoss P3 to P9, the SC64 profiles) are built by nobody
+unless asked, so a change that adds work RAM or a shared compiler flag can break
+them unnoticed. One command links them all:
+
+```sh
+make check-all-roms                       # all 24 verify targets (22 ROMs), one table
+make check-all-roms ROM_CHECK_ARGS="--only verify-zerg-z8,verify-showcase"
+make check-all-roms ROM_CHECK_ARGS="--prune --require-all"
+```
+
+It runs every `verify` / `verify-*` rule that builds a ROM, continues past
+failures, and prints one row per target: `__iwram_end`, `__bss_end`, the bytes left
+under the limits in `common/gba.ld` (`0x03005000` and `0x0203e000`), and PASS,
+FAIL or SKIPPED. It exits non-zero if any ROM fails to link or verify. A target
+whose private inputs are absent is SKIPPED with the first missing input; the tool
+finds it the way `release check` does, by reading make's rule database with
+`make -p -q` (no recipe runs), so SKIPPED is never a pass (`--require-all` turns it
+into a failure). It adds `-o .local/sc64/p4/generated/sc64_p4_scenario_generated.h`
+and `Z8_DESCRIPTOR=.local/build/z9-inputs/z8-descriptor.json` when those files
+exist; `--make-arg` replaces them. Logs, a JSON copy of the table and each ROM's
+sha256 go to `build/rom-check/<rev8>/`. `--prune` deletes each ROM and ELF after
+it is recorded, for small disks. The list of targets is explicit in
+`tools/sc64_rom_check.py`, and `tests/test_sc64_rom_check.py` fails when a
+`verify-*` rule that builds a ROM is missing from it. Run it after any change that
+adds RAM or touches flags shared by several ROMs; it is not part of `release check`
+because it builds about twenty more images.
+
 Hardware results are recorded by hand on the checklist. No tool in this
 repository marks a ROM as tested on a Game Boy Advance, and a package's
 `MANIFEST.json` always says `"hardware_tested": false`.
