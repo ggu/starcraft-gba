@@ -4018,6 +4018,12 @@ test-sc64-z7-reachable-formation: build/test-sc64-z7-full-render-formation-refer
 
 $(eval $(call Z7_FULL_RENDER_FIXTURE,prune-reference,sc64_z7_prune_game.c))
 $(eval $(call Z7_FULL_RENDER_FIXTURE,prune,sc64_z7_prune_game.c,-DSC64_Z7_PRUNE_STARTED))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,validated-census,sc64_z7_prune_game.c,-DSC64_Z7_PRUNE_STARTED -DSC64_Z7_VALIDATED_CENSUS))
+.PHONY: test-sc64-z7-validated-census
+test-sc64-z7-validated-census: build/test-sc64-z7-full-render-prune build/test-sc64-z7-full-render-validated-census
+	./build/test-sc64-z7-full-render-prune
+	./build/test-sc64-z7-full-render-validated-census
+
 .PHONY: test-sc64-z7-prune-started
 test-sc64-z7-prune-started: build/test-sc64-z7-full-render-prune-reference build/test-sc64-z7-full-render-prune
 	./build/test-sc64-z7-full-render-prune-reference
