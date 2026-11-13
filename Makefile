@@ -2705,8 +2705,8 @@ test-unified: build/test-unified build/test-unified-frontend build/test-unified-
 clean:
 	rm -rf build
 
-# Ordinary-controller probes do not mark a catalog mission qualified.
-build/test-sc64-t6-campaign-run: tests/sc64_t6_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+# Private controller fixtures.
+build/test-sc64-t6-campaign-run: tests/sc64_t6_campaign_run.c tests/sc64_route_purity.h $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_RUNTIME_FLAGS) -DSC64_T6_PROBE_ENTRY $< common/gba.c -o $@
 build/test-sc64-t8-campaign-run: tests/sc64_t8_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=11 $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
@@ -2758,7 +2758,7 @@ $(eval $(call TERRAN_FULL_TEST,t4-save,tests/sc64_t4_scenario_save.c))
 $(eval $(call TERRAN_FULL_TEST,t5-save,tests/sc64_t5_save.c))
 $(eval $(call TERRAN_FULL_TEST,t5-run,tests/sc64_t5_campaign_run.c,-DSC64_T5_PROBE_ENTRY))
 $(eval $(call TERRAN_FULL_TEST,t5-home-run,tests/sc64_t5_campaign_run.c))
-build/sc64-t5-controller-probe build/test-sc64-t6-t5-run build/test-sc64-full-t5-run build/test-sc64-full-t5-home-run: tests/sc64_route_purity.h
+build/sc64-t5-controller-probe build/test-sc64-t6-t5-run build/test-sc64-full-t5-run build/test-sc64-full-t5-home-run build/test-sc64-full-t6-run: tests/sc64_route_purity.h
 $(eval $(call TERRAN_FULL_TEST,t6-run,tests/sc64_t6_campaign_run.c,-DSC64_T6_PROBE_ENTRY))
 .PHONY: test-sc64-terran-full-regression
 test-sc64-terran-full-regression: $(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run t4-save t5-save t5-run t6-run) test-terran
