@@ -188,7 +188,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [P10 sight profiles](audits/2026-11-13-shared-sight-phase.md) put exact
   row math at 5.75% of ordinary loop cost. Only 48 of 453 sampled moves
   share an identical footprint, so the phase-only probe stays out.
-  Measure the packed-row lookup separately on the normal P10 path.
+  The [shared packed-row probe](audits/2026-11-13-shared-packed-sight.md)
+  matches 43,000 normal P10 calls, with a 1.78% mean improvement and a
+  3.04% late-window improvement. Keep it opt-in: it adds 40 IWRAM bytes
+  and has not been replayed through victory or on all four cartridges.
   The [three-option composition](audits/2026-11-13-composed-performance.md)
   passes four guarded links and physical custom SRAM continuations. P10
   still wins and runs at 9.62 emulated updates/s (8.60% fewer cycles).
