@@ -185,6 +185,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pause/result journals and fresh-load win. Keep it opt-in until broader
   save and hardware checks. Next: reduce facility grid conversion and the
   routine rendering and simulation costs that still dominate wall time.
+  [P10 sight profiles](audits/2026-11-13-shared-sight-phase.md) put exact
+  row math at 5.75% of ordinary loop cost. Only 48 of 453 sampled moves
+  share an identical footprint, so the phase-only probe stays out.
+  Measure the packed-row lookup separately on the normal P10 path.
   The [three-option composition](audits/2026-11-13-composed-performance.md)
   passes four guarded links and physical custom SRAM continuations. P10
   still wins and runs at 9.62 emulated updates/s (8.60% fewer cycles).
