@@ -47,3 +47,24 @@ This qualifies one route from HOME; it does not test SRAM reload.
 - ELF SHA-256: `d17801881a4badb0152f9169f5c7c0cadebb79832365f77fbddf54431c1b5913`.
 - Winning HOME tape SHA-256: `5547d53fc2fccf6fa802f4fff9165525f78cc5e80a72f39de2963db312ae70d9`.
 - Full physical win receipt SHA-256: `345efc2a25d17ebfb53f473770b256b3b3eec441a0924afd18db3f6943c1df85`.
+
+## Exact November 13 KODAK cartridge
+
+The same winning HOME tape ran on the unmodified KODAK Terran ROM
+(`cbba1c5`). All 150 observations matched, and the same 14 gameplay
+pages were acknowledged with physical input while the simulation frame
+held. It won at physical call 123,820, game frame 122,281, with Raynor
+and Kerrigan alive, a surviving Command Center, 15 paid Wraiths,
+no enemy buildings, and no trigger faults. The win's objective flag
+matched the retained trace. No save was supplied or cartridge rebuilt.
+
+The exact cartridge averaged 784,492 guest cycles per update (21.39
+emulated updates/s), including rendering and display waits. This closes
+one fresh HOME win on the exact KODAK ROM for each of the ten Terran
+missions; see the [campaign matrix](2026-11-13-normal-campaign-matrix.md).
+It does not measure real hardware or verify every campaign branch or save.
+
+- KODAK ROM SHA-256: `0f5e893037f71860c66112920e7195f5d7e2db5b4aa7f9e64e222689419de3d8`.
+- Matching ELF SHA-256: `00951a012354bf97ccd3d81682f8e4e7d2321381195c589b0d2d705b1abb8ab8`.
+- Physical observer SHA-256: `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549`.
+- Exact physical replay receipt SHA-256: `25b010e84ebd8df7bc9c5b5e433dee5c67e3a8f3d79a139c478643690ffd5448`.

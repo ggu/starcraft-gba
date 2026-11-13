@@ -9,7 +9,7 @@ physical GBA check or all routes through a mission.
 | --- | --- | --- |
 | T1–T2 | [HOME wins](2026-11-13-t1-t2-normal-physical.md) | Fresh SRAM and hardware still separate. |
 | T3–T4 | [HOME wins](2026-11-13-t3-t4-normal-physical.md) | Fresh SRAM and hardware still separate. |
-| T5 | No complete exact-ROM receipt here | [HOME win on the preceding Terran ROM](2026-11-13-t5-normal-physical.md). Replay that tape on KODAK. |
+| T5 | [HOME win](2026-11-13-t5-normal-physical.md#exact-november-13-kodak-cartridge) | All 150 observations matched and both heroes survived. |
 | T6 | [HOME win](2026-11-13-t6-normal-physical.md) | Fixed the controller's direct menu write and route observer. |
 | T7 | [HOME win](2026-11-13-t7-t9-normal-physical.md) | All 15 checkpoints matched. |
 | T8 | [HOME win](2026-11-13-t8-normal-physical.md) | All 272 checkpoints matched. |
@@ -27,6 +27,7 @@ physical GBA check or all routes through a mission.
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |
 | P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | Full replay averaged 8.79 emulated updates/s; below the performance target. |
 
-The exact ROMs in this index are the Terran, Z10 and P10 cartridges
+All ten Terran missions now have a checked HOME win on the same exact
+cartridge. The exact ROMs in this index are the Terran, Z10 and P10 cartridges
 copied to KODAK under runtime `cbba1c5`. Tests on previews or composed
 performance builds do not substitute for the normal cartridge row.
