@@ -103,6 +103,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   opponent slots. Defeat transfers the remaining actors to neutral ownership
   and detaches their AI. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
   traces the loaded passenger exception and the Carrier/Reaver queue reset.
+  The [last Command Center lift](audits/2026-11-13-n64-blood-bath-airborne-last-building.md)
+  confirms an airborne building still counts. GBA skirmish needs a
+  shared Terran lift/land service with compatible save validation and
+  correct depot, add-on, collision and air-target behavior.
   A passive replay did not reach elimination. [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
   tests retirement and neutral cargo on HOST. Its final victory now waits
   for deferred retirement, including a surviving Battlecruiser fixture.
@@ -118,6 +122,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Blood Bath and to two and three independent opponents; native automatic
   [SCV resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md)
   and the outcome of surviving actors still need native witnesses.
+
+- **Protoss route stalls (P1):** on the [composed P10 route comparison](audits/2026-11-13-p10-nearest-composed.md),
+  nearest-first reduced three depot spikes by 52–74% and the prefix peak
+  by 37.75%, but the mean improved just 0.77%. Actor state and ordered
+  pixels matched. The composed candidate also loads the existing SRAM and
+  wins with the same world and final journal. The cache layout changes by
+  design. Qualify the normal
+  P10 ROM through full HOME, fresh SRAM and a custom match with multiple
+  depots before enabling this selection order there.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
