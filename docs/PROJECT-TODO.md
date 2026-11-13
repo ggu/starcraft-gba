@@ -39,8 +39,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with the complete briefing, authored dialogue and all three heroes alive.
   The exact KODAK P10 ROM reproduces that win at 8.79 emulated updates per
   second and from one fresh mid-mission SRAM load. The exact KODAK Z10 ROM
-  [wins Z2 from HOME](audits/2026-11-13-z2-normal-home.md), matching nine
-  observations and all briefing and authored pages. P1–P9 still need
+  wins [Z1](audits/2026-11-13-z1-normal-home.md) and
+  [Z2](audits/2026-11-13-z2-normal-home.md) from HOME, matching 51 and nine
+  observations respectively, including the briefing and authored pages.
+  Their emulator rates are 23.74 and 21.86 updates/s. P1–P9 still need
   equivalent qualification.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
@@ -184,8 +186,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   regresses (+0.75% mean, +7.41% max). The traced tail is a facility fill
   with little expansion work. A [64-pop scalar prefix](audits/2026-11-13-small-facility-prefix.md)
   leaves the Blood Bath spike and slows the Outpost window, so it remains
-  outside the release tree. Measure per-fill work before trying another
-  handoff.
+  outside the release tree. A [lazy-row prototype](audits/2026-11-13-lazy-facility-rows.md)
+  also stays out: it saves short synthetic queries but slows a far one
+  by 33% even with matched placement, which would exceed Showcase's
+  available IWRAM. Measure actual per-fill work before another handoff.
+  The same three-option composition wins Z7 with all 253 observations
+  and no material speed change from the older normal control.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in

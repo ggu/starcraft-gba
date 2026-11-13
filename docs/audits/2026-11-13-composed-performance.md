@@ -45,6 +45,15 @@ remaining cost. A cheap scalar path for small, early-stopping fills is
 the next comparison. Keep the composition optional and measure the
 build on hardware before enabling these options by default.
 
+The same composition wins Z7 from HOME on Z10 at frame 194,998, matching
+all 253 named observations from the retained tape. It averages 1,800,367
+guest cycles, or 9.32 emulated updates/s. The previous qualified Z10
+control averaged 1,794,976 cycles on the same tape (9.35); this is a
+comparison with that older ROM rather than an exact KODAK control.
+The result supports compatibility for this route and no substantial
+steady Z7 gain.
+
+- Z7 composed replay receipt: `3be0f473121bae6d3f58f21c13ed10ba2f21fb38fd117a8b90f6cf42652ea5ee`.
 - P10 composed ROM SHA-256: `6ac056503bf28b8ce7af09b3313b90b78f764cfd9a3fd805e75ae12d5bd08c97`.
 - P10 composed replay receipt: `51f06c06340b5ddd7ebbff37809093d111b098f6f14a53868287521ff6b06f61`.
 - Z10 custom receipts (Outpost / Blood Bath):
