@@ -38,7 +38,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
   with the complete briefing, authored dialogue and all three heroes alive.
   The exact KODAK P10 ROM reproduces that win at 8.79 emulated updates per
-  second and from one fresh mid-mission SRAM load. P1–P9 still need
+  second and from one fresh mid-mission SRAM load. The exact KODAK Z10 ROM
+  [wins Z2 from HOME](audits/2026-11-13-z2-normal-home.md), matching nine
+  observations and all briefing and authored pages. P1–P9 still need
   equivalent qualification.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
@@ -175,8 +177,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   still wins and runs at 9.62 emulated updates/s (8.60% fewer cycles).
   Both full Z10 custom outcomes match, but the Blood Bath timing window
   regresses (+0.75% mean, +7.41% max). The traced tail is a facility fill
-  with little expansion work; qualify a scalar choice for cheap short fills
-  before promotion.
+  with little expansion work. A [64-pop scalar prefix](audits/2026-11-13-small-facility-prefix.md)
+  leaves the Blood Bath spike and slows the Outpost window, so it remains
+  outside the release tree. Measure per-fill work before trying another
+  handoff.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
