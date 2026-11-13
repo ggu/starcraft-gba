@@ -27,7 +27,7 @@ physical GBA check or all routes through a mission.
 | P1 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 27 matched observations and the rescued hero alive. |
 | P2–P6 | No complete exact-KODAK receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). The [fresh P2 prefix](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes) matches the newer staged ROM; isolate route queries for P3–P6. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
-| P8 | No complete exact-ROM receipt here | [Preceding normal P8 win and SRAM continuation](2026-10-31-protoss-cannon-lazy/README.md); the [updated carried P10 controller](2026-11-13-p8-host-hero-retreat.md) wins on HOST with both heroes at full health. Verify authored pages and victory on ARM. |
+| P8 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10), 41 matched observations, both heroes at full health and the Stasis Cell destroyed. [Earlier normal save continuation](2026-10-31-protoss-cannon-lazy/README.md). |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |
 | P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | Full replay averaged 8.79 emulated updates/s; below the performance target. |
 

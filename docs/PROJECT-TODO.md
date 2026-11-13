@@ -66,12 +66,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Homeland](audits/2026-11-13-p7-carried-normal-home.md) wins on both
   November 13 P10 revisions and the nearest-first candidate. [P1 now
   wins from HOME on staged P10](audits/2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes)
-  with the rescued hero alive. P2–P6 and P8 still need complete exact-ROM
+  with the rescued hero alive. P2–P6 still need complete exact-ROM
   qualification. Fresh P2 inputs match the opening on staged P10. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
-  wins on HOST with both heroes at full health. The exact-ROM verifier's
-  static plan authenticates the authored page table. Next: run its
-  opening through the old defeat point, then verify the full ARM win.
+  now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
+  with both heroes at full health, 41 matching observations and twelve
+  authenticated in-game pages. Check a fresh save continuation separately.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
   confirmed separate named, Random, and Closed seats and a middle-only
