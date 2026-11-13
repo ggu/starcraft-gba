@@ -231,7 +231,8 @@ The opt-in GBA Blood Bath Melee preview now uses one elapsed-time seed
 for human and CPU Random and starts. It persists the resolved human
 and CPU races and the same v2 start-order field; a load or restart
 draws nothing. Default builds and Outpost keep their existing
-named human selector. Free for All Random draws remain unqualified.
+named human selector. The [matched Free for All Random launch](#paired-random-launches) below
+checks the same selector in that mode.
 
 ## Single-player Game Type row
 
@@ -314,7 +315,47 @@ sequence. Read-only ARM register traces on the loaded games show CPU 1
 treating CPU 3 as hostile only in Free for All, while both modes treat
 the human as hostile. The previous normal Terran rejects the Melee save
 at HOME without changing its SRAM; both old and new cartridges read the
-older and current Free for All saves. These opening tests do not establish
-native Random draws in Free for All or allied vision. The separate
+older and current Free for All saves. These ARM tests do not establish allied vision. The native Random
+pair below checks the observed race and start sequence in Free for All. The separate
 [Blood Bath end-rule audit](2026-11-13-n64-blood-bath-end-rules.md)
 decodes the live native triggers and traces the defeat cleanup.
+
+
+### Paired Random launches
+
+A short controller tape matched the earlier joint Random Melee opening
+with Free for All on the same owned USA ROM. Both lobby frames showed
+Human Random and CPU Random / Random / Protoss. The input tapes pressed
+Start at the same observer step (3,695) and held neutral afterward.
+The bounded cache-aware observer verified both lobbies and three RAM
+samples per mode. Each sample independently reverses the native RNG
+state and draw count to launch seed `0xf3ae`.
+
+| Sample step | Draw count | RNG state in both modes |
+| --- | ---: | --- |
+| 4,201 | 572 | `0xd3699d52` |
+| 4,210 | 575 | `0x3c6eb959` |
+| 4,215 | 581 | `0xa63467d3` |
+
+Every sample gives owner IDs 2 / 0 / 1 / 3 in human and visible CPU
+row order. The resolved races are Zerg / Terran / Zerg / Protoss and
+the start markers are 2 / 0 / 1 / 3. Both modes have the same four
+workers per hall and the same 60 resource actors by type and position.
+The game-type byte is 3 for Melee and 1 for Free for All, and the six
+directed CPU relations are 2 and 0 respectively.
+
+The existing selector predicts this opening: the three ascending
+Random rows consume draws before placement and leave state
+`0x1d976e05`; the named Protoss row consumes no race draw.
+Placement then assigns the available marker IDs in reverse row order.
+The [GBA launch dispatch](../../starcraft/game.c) already uses the
+same opt-in Blood Bath selector for both modes and stores the mode
+separately from the resolved races and positions. No selector change
+is needed for this vector. The witness covers one dense lineup and
+seed; it does not compare sparse Random launches in Free for All or
+establish identical clocks between the machines.
+
+| Mode | Controller plan SHA-256 | Observer manifest SHA-256 |
+| --- | --- | --- |
+| Melee | `90884125d92b3353f5de35ac95037b4134b9617549d01a5f536615727b0dea4e` | `fae8647d253a2a7c353b8566b7d495b1dcfb19a0402112415c41e79335151615` |
+| Free for All | `02da3f120d0918f4de0ec79320479e2f238528f425f61b347f63664dda261c85` | `5120e53b82fc15624119f10848e33b7313ba459da8dd7f69febc3aa0035a7792` |
