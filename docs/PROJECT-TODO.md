@@ -77,9 +77,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   opponent slots. Defeat transfers the remaining actors to neutral ownership
   and detaches their AI. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
   traces the loaded passenger exception and the Carrier/Reaver queue reset.
-  A passive replay did not reach elimination. Next: verify per-CPU elimination
-  with a surviving mobile force in an active match, check native Free for All
-  Random draws, and qualify complete ordinary-input matches on hardware.
+  A passive replay did not reach elimination. [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
+  tests retirement and neutral cargo on HOST. Before ARM enablement, ensure
+  final victory cannot bypass a deferred retirement, and resolve in-flight
+  damage and simultaneous outcomes against native evidence. Next: record
+  an active elimination, check native Free for All Random draws, and qualify
+  complete ordinary-input matches on hardware.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
@@ -167,6 +170,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pause/result journals and fresh-load win. Keep it opt-in until broader
   save and hardware checks. Next: reduce facility grid conversion and the
   routine rendering and simulation costs that still dominate wall time.
+  The [three-option composition](audits/2026-11-13-composed-performance.md)
+  passes four guarded links and physical custom SRAM continuations. P10
+  still wins and runs at 9.62 emulated updates/s (8.60% fewer cycles).
+  Both full Z10 custom outcomes match, but the Blood Bath timing window
+  regresses (+0.75% mean, +7.41% max). Attribute the tail before promotion.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
