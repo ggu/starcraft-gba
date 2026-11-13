@@ -57,6 +57,10 @@ test-sc64-z8-command-census: build/test-sc64-z8-command-census
 build/test-sc64-z8-command-census: tests/sc64_z8_command_census.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_Z8_DIRECT_COMMAND_CENSUS $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 
+# Carried P9 normal cartridge route with authored briefing and modal input.
+build/test-sc64-p10-p9-normal-home: tests/sc64_p9_campaign_run.c tests/sc64_controller_authored_pages.h tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_P9_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL -DP9_CONTROLLER_PROFILE=\"PROTOSS_P10_FLAGS\" $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+
 # P10 ordinary-input qualification, built like the P8 and P9 ones.
 P10_ARM_DIR := build/p10-arm
 P10_ARM_TRACE := $(P10_ARM_DIR)/p10-controller.jsonl
