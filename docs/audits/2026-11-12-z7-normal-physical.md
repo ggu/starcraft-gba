@@ -151,3 +151,13 @@ No interval between the 253 sampled checkpoints averages under the
 561,792-cycle budget. These are whole-loop measurements, including
 menu and presentation time. Profile the 480-update interval by stage
 before attributing its cost to actor count or a specific subsystem.
+
+`tools/sc64_z7_stage_window.py --first 47758 --last 48237` can replay
+the pinned inputs above and sample every completed call in that window.
+It takes `--trace`, `--rom`, `--elf`, and `--runner` with their corresponding
+`--*-sha256` values. Its `--plan` check verified the actual ROM, ELF, tape
+and observer, all 14 counter symbols, and the 131 checkpoints through the
+window. For a replay, use `--output` with a fresh directory and omit
+`--plan`. The tool checks the prefix and endpoints and reconciles the
+sampled loop cycles with the independent accumulated counter. ARM stage
+timing has not run yet.
