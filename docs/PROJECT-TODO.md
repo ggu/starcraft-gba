@@ -77,9 +77,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   opponent slots. Defeat transfers the remaining actors to neutral ownership
   and detaches their AI. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
   traces the loaded passenger exception and the Carrier/Reaver queue reset.
-  A passive replay did not reach elimination. Next: verify per-CPU elimination
-  with a surviving mobile force in an active match, check native Free for All
-  Random draws, and qualify complete ordinary-input matches on hardware.
+  A passive replay did not reach elimination. A [HOST-only prototype](audits/2026-11-13-blood-bath-elimination-host.md)
+  retires each CPU, saves ordinary survivors and supported cargo groups, and
+  preserves neutral Ventral Sacs. Other linked actors still defer retirement.
+  Next: verify an active native elimination, finish the coupled actor cases,
+  qualify physical ARM and hardware matches, and check native Free for All
+  Random draws.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
