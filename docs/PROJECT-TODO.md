@@ -36,7 +36,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   campaign availability and selected play paths; frame budget, broader save
   coverage, and original N64 behavior remain separate gates below. The
   [campaign evidence matrix](audits/2026-11-13-normal-campaign-matrix.md)
-  separates exact KODAK wins, earlier normal builds and remaining checks. The normal
+  separates exact KODAK wins, earlier normal builds and remaining checks.
+  All ten Terran missions now have complete HOME wins on that same ROM.
+  Continue exact normal Z10 and P10 replays and broader save checks. The normal
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
   with the complete briefing, authored dialogue and all three heroes alive.
   The exact KODAK P10 ROM reproduces that win at 8.79 emulated updates per
