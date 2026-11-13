@@ -368,6 +368,56 @@ sc64_terrain_cache_capture(void)
 #endif
 }
 
+#if defined(SC64_TERRAIN_DIRTY_CAPTURE) && defined(SC64_TERRAIN_CACHE_VRAM)
+#include "sc64_static_dirty_rows.h"
+#define SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE 1
+static int sc64_terrain_cache_mission_key(void);
+typedef struct {
+    u32 generation;
+    u8 page;
+} Sc64TerrainCapturePage;
+
+static inline Sc64TerrainCapturePage sc64_terrain_capture_page(void)
+{
+    u8 page = gfx_backbuffer_index();
+    return (Sc64TerrainCapturePage){gfx_clear_generation(page), page};
+}
+
+static int __attribute__((noinline))
+sc64_terrain_capture_dirty(const Sc64StaticDirtyRowsPlan *plan, Sc64TerrainCapturePage base,
+                           int x, int y, unsigned static_key)
+{
+    const int first = SC64_TERRAIN_CACHE_Y;
+    const int split = first + SC64_TERRAIN_CACHE_VRAM_ROWS;
+    const int end = first + SC64_TERRAIN_CACHE_HEIGHT;
+    int previous = first, total = 0;
+    if (!plan || !plan->count || plan->count > SC64_STATIC_DIRTY_ROWS_MAX_BANDS ||
+        !sc64_terrain_cache_valid || !sc64_terrain_cache_reused_base ||
+        sc64_terrain_cache_camx != x || sc64_terrain_cache_camy != y ||
+        sc64_terrain_cache_static_key != static_key ||
+        sc64_terrain_cache_mission != sc64_terrain_cache_mission_key() ||
+        base.page != gfx_backbuffer_index() || base.generation != gfx_clear_generation(base.page)) return 0;
+    for (unsigned i = 0; i < plan->count; ++i) {
+        int top = plan->bands[i].top, bottom = plan->bands[i].bottom;
+        if (top < previous || bottom <= top || bottom > end) return 0;
+        total += bottom - top;
+        previous = bottom;
+    }
+    if (total >= SC64_TERRAIN_CACHE_HEIGHT) return 0;
+    for (unsigned i = 0; i < plan->count; ++i) {
+        int top = plan->bands[i].top, bottom = plan->bands[i].bottom;
+        if (top < split) {
+            int last = bottom < split ? bottom : split;
+            if (!gfx_read_band(top, last - top, sc64_terrain_cache_pixels_vram + (top - first) * 240)) return 0;
+            top = last;
+        }
+        if (top < bottom &&
+            !gfx_read_band(top, bottom - top, sc64_terrain_cache_pixels_ram + (top - split) * 240)) return 0;
+    }
+    return total;
+}
+#endif
+
 #ifdef SC64_TERRAIN_SCROLL
 /* Scrolled restore: rows outside each segment are skipped by the window
  * helper, so the two segment calls together cover exactly the old band. */
@@ -804,16 +854,32 @@ sc64_terrain_fog_cell(int partial, int sx, int sy, u16 signature,
 #if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
 #define SC64_TERRAIN_CACHE_KEY static_key
 static int
-sc64_terrain_store_key(int x, int y, unsigned int static_key)
+sc64_terrain_store_key(int x, int y, unsigned int static_key
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+                       , const Sc64StaticDirtyRowsPlan *plan, Sc64TerrainCapturePage base
+#endif
+                       )
 #else
 #define SC64_TERRAIN_CACHE_KEY (unsigned int)(SC64_TERRAIN_STATIC_KEY)
 static int
-sc64_terrain_store(int x, int y)
+sc64_terrain_store(int x, int y
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+                   , const Sc64StaticDirtyRowsPlan *plan, Sc64TerrainCapturePage base
+#endif
+                   )
 #endif
 {
     int col0, row0, col1, row1, col, row, i = 0;
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+    int captured_rows = 0;
+#endif
     if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1) ||
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+        (!(captured_rows = sc64_terrain_capture_dirty(plan, base, x, y, SC64_TERRAIN_CACHE_KEY)) &&
+         !sc64_terrain_cache_capture())) {
+#else
         !sc64_terrain_cache_capture()) {
+#endif
 #ifdef SC64_DIAGNOSTIC_TERRAIN
         if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1))
             SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_view, 1);
@@ -878,7 +944,13 @@ sc64_terrain_store(int x, int y)
 #endif
 #ifdef SC64_DIAGNOSTIC_TERRAIN
     SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_captured_pixels,
-                          240 * SC64_TERRAIN_CACHE_HEIGHT);
+                          240 *
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+                          (captured_rows ? captured_rows : SC64_TERRAIN_CACHE_HEIGHT)
+#else
+                          SC64_TERRAIN_CACHE_HEIGHT
+#endif
+                          );
     SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_captured_tiles, i);
 #endif
     sc64_terrain_cache_camx = x;

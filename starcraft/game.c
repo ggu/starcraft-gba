@@ -12234,6 +12234,10 @@ draw_map(void)
     defined(SC64_IMPORTED_MISSION)
     unsigned int terrain_static_key;
 #endif
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+    Sc64TerrainCapturePage capture_page = sc64_terrain_capture_page();
+    Sc64StaticDirtyRowsPlan capture_rows = {0};
+#endif
     camx = viewport_left();
     camy = viewport_top();
 #ifdef SC64_IMPORTED_MISSION
@@ -12424,7 +12428,11 @@ draw_map(void)
     {
         u16 saved_clip = gfx_get_clip_y();
         int view_col0, view_row0, view_col1, view_row1;
-        Sc64StaticDirtyRowsPlan plan;
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+        Sc64StaticDirtyRowsPlan *plan = &capture_rows;
+#else
+        Sc64StaticDirtyRowsPlan plan_storage, *plan = &plan_storage;
+#endif
         int planned = 0;
 
         /* Only partial cache reuse has a complete current-view dirty mask.
@@ -12443,11 +12451,11 @@ draw_map(void)
                 sc64_terrain_cache_dirty,
                 (unsigned)(view_col1 - view_col0),
                 (unsigned)(view_row1 - view_row0), view_row0, camy,
-                (int)(saved_clip & 0xffu), (int)(saved_clip >> 8), &plan);
+                (int)(saved_clip & 0xffu), (int)(saved_clip >> 8), plan);
 
         if (planned) {
-            for (unsigned band = 0; band < plan.count; ++band) {
-                gfx_set_clip_y(plan.bands[band].top, plan.bands[band].bottom);
+            for (unsigned band = 0; band < plan->count; ++band) {
+                gfx_set_clip_y(plan->bands[band].top, plan->bands[band].bottom);
                 draw_map_static_objects();
 #ifdef GBA_HOST
                 ++sc64_static_dirty_rows_host_bands;
@@ -12464,9 +12472,17 @@ draw_map(void)
 #endif
 #ifdef SC64_IMPORTED_MISSION
 #if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
-    sc64_terrain_store_key(camx, camy, terrain_static_key);
+    sc64_terrain_store_key(camx, camy, terrain_static_key
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+                           , &capture_rows, capture_page
+#endif
+                           );
 #else
-    sc64_terrain_store(camx, camy);
+    sc64_terrain_store(camx, camy
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+                       , &capture_rows, capture_page
+#endif
+                       );
 #endif
     }
 #ifdef SC64_TILE_RENDERER
