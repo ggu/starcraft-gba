@@ -142,6 +142,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   four normal physical custom/SRAM checks match. Prioritize steady map,
   sprite and simulation work over the selection-ring probe (under 0.12%
   mean savings).
+  The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
+  cuts Z7's sampled static resource pass by 18.82% and matches ordered
+  pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
+  of the Blood Bath menu timing tail and hardware checks.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
