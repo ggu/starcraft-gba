@@ -1606,6 +1606,14 @@ static int race_skirmish_transport_save_valid(const RaceSave *candidate,
         Unit actor;
         if (!race_skirmish_transport_decode(candidate, i, width, height, &actor SC64_GCTX_ARG)) return 0;
         if (!actor.alive) continue;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        int retired_cargo = candidate->state[0] && actor.owner == NEUTRAL &&
+            (((unsigned)candidate->state[23] >> SC64_SKIRMISH_ELIM_SHIFT) & 7u);
+        if (retired_cargo && (actor.order == ORDER_BOARD || actor.order == ORDER_UNLOAD ||
+            (actor.order == ORDER_TRANSPORTED &&
+             (actor.raw_owner != 11 || actor.target >= MAX_UNITS || actor.build != -1 ||
+              actor.tx != actor.x || actor.ty != actor.y || actor.work_timer)))) return 0;
+#endif
         if (actor.order == ORDER_UNLOAD) {
             if (!race_skirmish_saved_transport(candidate, &actor) || actor.target != -1 ||
                 actor.work_timer < 0 || actor.work_timer > SC64_TRANSPORT_UNLOAD_TICKS ||
@@ -1631,6 +1639,10 @@ static int race_skirmish_transport_save_valid(const RaceSave *candidate,
 #endif
             space == SC64_TRANSPORT_SPACE_UNAVAILABLE) return 0;
         if (actor.order == ORDER_TRANSPORTED) {
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+            if (retired_cargo && (carrier.raw_owner != 11 ||
+                carrier.order != ORDER_IDLE)) return 0;
+#endif
             if (actor.selected || actor.x != carrier.x || actor.y != carrier.y ||
                 actor.path_timer || actor.path_retry ||
                 (unsigned)used[actor.target] + space > SC64_TRANSPORT_DROPSHIP_SPACE) return 0;
@@ -3280,8 +3292,13 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         if (saved_eliminated &&
             (race_skirmish_retired_owner(saved_eliminated, RACE_U(i,owner)) ||
              (RACE_U(i,owner) == NEUTRAL && RACE_U(i,raw_owner) == 11 &&
-              (RACE_U(i,order) != ORDER_IDLE || RACE_U(i,selected) ||
-               RACE_U(i,target) != -1 || RACE_U(i,build) != -1 ||
+              ((RACE_U(i,order) != ORDER_IDLE
+#ifdef SC64_TRANSPORT_RUNTIME
+                && RACE_U(i,order) != ORDER_TRANSPORTED
+#endif
+               ) || RACE_U(i,selected) ||
+               (RACE_U(i,order) == ORDER_IDLE && RACE_U(i,target) != -1) ||
+               RACE_U(i,build) != -1 ||
                RACE_U(i,tx) != RACE_U(i,x) || RACE_U(i,ty) != RACE_U(i,y) ||
                RACE_U(i,path_timer) || RACE_U(i,path_retry) || RACE_U(i,work_timer))))) return 0;
 #endif

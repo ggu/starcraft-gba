@@ -153,25 +153,71 @@ static void check_elimination(int melee)
 }
 
 #ifdef SC64_TRANSPORT_RUNTIME
-static void check_deferred_transfer(void)
+static void check_neutral_cargo(int ship_type, int owner)
 {
     launch(0);
-    int ship = spawn_unit(ENEMY, U_DROPSHIP, 500, 500);
-    int passenger = worker_of(ENEMY);
-    assert(ship >= 0 && passenger >= 0);
-    u[passenger].order = ORDER_TRANSPORTED;
+    int ship = spawn_unit(owner, ship_type, 500, 500);
+    int passenger = spawn_unit(owner, U_MARINE, 500, 500);
+    int pending = spawn_unit(owner, U_MARINE, 470, 500);
+    assert(ship >= 0 && passenger >= 0 && pending >= 0);
+    assert(race_transport_request_board(passenger, ship));
+    assert(race_transport_tick_unit(passenger) && u[passenger].order == ORDER_TRANSPORTED);
+    assert(race_transport_request_board(pending, ship));
+    assert(race_transport_request_unload(ship, 510, 510));
+    destroy_building(building_of(owner), SIDE);
+    race_skirmish_outcome();
+    const unsigned mark = 1u << (owner == ENEMY ? 0 : 2);
+    assert(race_skirmish_eliminated == mark && !won && !lost);
+    assert(u[ship].alive && u[ship].owner == NEUTRAL && u[ship].raw_owner == 11 &&
+           u[ship].order == ORDER_IDLE && u[ship].target == -1);
+    assert(u[passenger].alive && u[passenger].owner == NEUTRAL &&
+           u[passenger].raw_owner == 11 && u[passenger].order == ORDER_TRANSPORTED &&
+           u[passenger].target == ship && !u[passenger].selected &&
+           u[passenger].x == u[ship].x && u[passenger].y == u[ship].y);
+    assert(u[pending].alive && u[pending].owner == NEUTRAL &&
+           u[pending].order == ORDER_IDLE && u[pending].target == -1);
+    assert(race_transport_cargo_space(ship) == 1);
+    assert(!race_transport_request_board(pending, ship) &&
+           !race_transport_request_unload(ship, 510, 510));
+    assert(race_save_game());
+    u[passenger].target = pending;
+    assert(!race_save_game()); /* a neutral nontransport is not a cargo host */
     u[passenger].target = ship;
-    u[passenger].x = u[ship].x; u[passenger].y = u[ship].y;
-    destroy_building(building_of(ENEMY), SIDE);
-    race_skirmish_outcome();
-    assert(!race_skirmish_eliminated && u[ship].owner == ENEMY &&
-           u[passenger].owner == ENEMY && u[passenger].target == ship);
-    u[passenger].order = ORDER_IDLE;
-    u[passenger].target = -1;
-    race_skirmish_outcome();
-    assert(race_skirmish_eliminated == 1 && u[ship].owner == NEUTRAL &&
-           u[passenger].owner == NEUTRAL);
+    u[passenger].raw_owner = 3;
+    assert(!race_save_game()); /* marked cargo must have neutral provenance */
+    u[passenger].raw_owner = 11;
+
+    game_init(); prior_keys = 0;
+    assert(race_load_game());
+    for (int i = 0; i < 8; ++i) game_update(0, 0);
+    assert(race_skirmish_eliminated == mark && !won && !lost &&
+           u[ship].owner == NEUTRAL && u[ship].order == ORDER_IDLE &&
+           u[passenger].owner == NEUTRAL && u[passenger].order == ORDER_TRANSPORTED &&
+           u[passenger].target == ship && race_transport_cargo_space(ship) == 1);
+    assert(!race_transport_request_board(pending, ship) &&
+           !race_transport_request_unload(ship, 510, 510));
+    assert(race_save_game());
 }
+
+#ifdef SC64_SHARED_TRANSPORT
+static void check_deferred_overlord(void)
+{
+    launch(0);
+    const int owner = RESCUABLE;
+    int ship = spawn_unit(owner, U_OVERLORD, 500, 500);
+    int passenger = spawn_unit(owner, U_ZERGLING, 500, 500);
+    assert(ship >= 0 && passenger >= 0);
+    int research = sc64_sk_transport_owner_index(owner);
+    assert(research >= 0);
+    race_skirmish_transport_tech.owner[research].researched = 1;
+    assert(race_transport_request_board(passenger, ship));
+    assert(race_transport_tick_unit(passenger) && u[passenger].order == ORDER_TRANSPORTED);
+    destroy_building(building_of(owner), SIDE);
+    race_skirmish_outcome();
+    assert(!race_skirmish_eliminated && u[ship].owner == owner &&
+           u[passenger].owner == owner && u[passenger].target == ship);
+}
+#endif
 #endif
 
 int main(void)
@@ -179,7 +225,13 @@ int main(void)
     check_elimination(0);
     check_elimination(1);
 #ifdef SC64_TRANSPORT_RUNTIME
-    check_deferred_transfer();
+    check_neutral_cargo(U_DROPSHIP, ENEMY);
+#ifdef SC64_SHARED_TRANSPORT
+    int shuttle = sc64_race_unit_from_raw(SC64_TRANSPORT_SHUTTLE_RAW);
+    assert(shuttle >= 0);
+    check_neutral_cargo(shuttle, 4);
+    check_deferred_overlord();
+#endif
 #endif
     puts("Blood Bath Melee/FFA elimination, surviving CPUs and SRAM: pass");
     return 0;

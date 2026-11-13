@@ -2014,8 +2014,15 @@ static void race_tick_ai(void)
  * expose overlapping loaded passengers or publish half a transfer. */
 static int race_skirmish_neutral_transfer_ready(const Unit *q)
 {
-    if (SC64_TRANSPORT_LOADED(q) || SC64_CARRIER_CHILD_SCRIPTED(q) ||
-        SC64_SCARAB_CHILD(q)) return 0;
+#ifdef SC64_TRANSPORT_RUNTIME
+    if (SC64_TRANSPORT_LOADED(q)) {
+        int carrier = q->target;
+        if (!race_transport_carrier_valid(carrier) || u[carrier].owner != q->owner ||
+            !race_transport_neutral_carrier_type(&u[carrier]) ||
+            q->x != u[carrier].x || q->y != u[carrier].y) return 0;
+    }
+#endif
+    if (SC64_CARRIER_CHILD_SCRIPTED(q) || SC64_SCARAB_CHILD(q)) return 0;
 #ifdef SC64_EGG_RUNTIME
     if (q->type == SC64_EGG_ACTOR) return 0;
 #endif
@@ -2037,9 +2044,22 @@ static int race_skirmish_neutral_transfer_ready(const Unit *q)
 static void race_skirmish_retire_bot(int rank)
 {
     int owner = race_bot_owner_ids[rank];
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == owner &&
-            !race_skirmish_neutral_transfer_ready(&u[i])) return;
+#ifdef SC64_TRANSPORT_RUNTIME
+    u8 cargo[MAX_UNITS] = {0};
+#endif
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i];
+        if (!q->alive || q->owner != owner) continue;
+        if (!race_skirmish_neutral_transfer_ready(q)) return;
+#ifdef SC64_TRANSPORT_RUNTIME
+        if (SC64_TRANSPORT_LOADED(q)) {
+            int space = race_transport_passenger_space(q);
+            if (space < 0 || cargo[q->target] + space > SC64_TRANSPORT_DROPSHIP_SPACE)
+                return;
+            cargo[q->target] += (u8)space;
+        }
+#endif
+    }
 
     race_skirmish_eliminated |= (u8)(1u << rank);
     for (int i = 0; i < MAX_UNITS; ++i) {
@@ -2048,8 +2068,11 @@ static void race_skirmish_retire_bot(int rank)
         q->owner = NEUTRAL;
         q->raw_owner = 11;
         q->selected = 0;
-        q->order = ORDER_IDLE;
-        q->target = q->build = -1;
+        if (!SC64_TRANSPORT_LOADED(q)) {
+            q->order = ORDER_IDLE;
+            q->target = -1;
+        }
+        q->build = -1;
         q->tx = q->path_x = q->x;
         q->ty = q->path_y = q->y;
         q->work_timer = q->path_timer = q->path_retry = 0;
@@ -2070,6 +2093,9 @@ static void race_skirmish_retire_bot(int rank)
         sc64_direct_attack_clear_references(i);
 #endif
     }
+#ifdef SC64_TRANSPORT_RUNTIME
+    race_transport_changed();
+#endif
 }
 #endif
 
