@@ -1,6 +1,12 @@
 /* Normal-controller P4 playthrough attempt. Controller choices use runtime
  * reads only; gameplay changes occur exclusively through game_update inputs. */
 #include "../starcraft/game.c"
+#ifdef SC64_P34_NORMAL_HOME
+#include "sc64_route_purity.h"
+#include "sc64_controller_authored_pages.h"
+static uint64_t route_after;
+static int last_checkpoint_frame = -1;
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +19,11 @@
 
 static FILE *trace;
 static u16 prior_keys;
+#ifdef SC64_P34_NORMAL_HOME
+static unsigned long host_ticks;
+#else
 static u32 host_ticks;
+#endif
 static int last_logged_keys = -1;
 static int trace_first = 1;
 static int run_limit = RUN_LIMIT_DEFAULT;
@@ -34,6 +44,14 @@ static char attempt_path[160] = ".local/sc64/p4-controller-attempt-running.json"
 static char final_attempt_path[160] = ".local/sc64/p4-controller-attempt.json";
 static char verified_path[160] = ".local/sc64/p4-controller-win.json";
 
+static void step(u16 held)
+{
+    step_raw(held);
+#ifdef SC64_P34_NORMAL_HOME
+    sc64_controller_ack_pages(step_raw, held, &host_ticks, stderr);
+#endif
+}
+
 static void tap(u16 key);
 static void tap_b(void);
 static void move_cursor(int x, int y);
@@ -43,6 +61,18 @@ static int cycle_select_actor(int slot);
 static int source_pool_slack(void);
 static int safe_escape_waypoint(int start_x, int start_y, int goal_x, int goal_y,
                                 int *out_x, int *out_y);
+
+#ifdef SC64_P34_NORMAL_HOME
+/* The P4 site picker calls the lower-level route API directly. */
+static int p4_pure_route_next(int x, int y, int tx, int ty, int *nx, int *ny)
+{
+    ROUTE_PURE_BEGIN();
+    int result = sc64_route_next(x, y, tx, ty, nx, ny);
+    ROUTE_PURE_END();
+    return result;
+}
+#define sc64_route_next p4_pure_route_next
+#endif
 
 static void trace_prefix(void)
 {
@@ -442,11 +472,17 @@ static void checkpoint(const char *kind)
     fflush(trace);
 }
 
-static void step(u16 held)
+static void step_raw(u16 held)
 {
     if (deployed && (screen != SCREEN_PLAY || won || lost)) return;
     u16 pressed = held & (u16)~prior_keys;
+#ifdef SC64_P34_NORMAL_HOME
+    assert(route_purity_hash() == route_after);
+#endif
     game_update(held, pressed);
+#ifdef SC64_P34_NORMAL_HOME
+    route_after = route_purity_hash();
+#endif
     prior_keys = held;
     ++host_ticks;
     if (held != (u16)last_logged_keys) {
@@ -456,8 +492,16 @@ static void step(u16 held)
         last_logged_keys = held;
         fflush(trace);
     }
-    if (deployed && screen == SCREEN_PLAY && frame > 0 &&
-        frame % CHECKPOINT_PERIOD == 0) checkpoint("periodic");
+    if (deployed && screen == SCREEN_PLAY && frame > 0 && frame % CHECKPOINT_PERIOD == 0
+#ifdef SC64_P34_NORMAL_HOME
+        && frame != last_checkpoint_frame
+#endif
+        ) {
+#ifdef SC64_P34_NORMAL_HOME
+        last_checkpoint_frame = frame;
+#endif
+        checkpoint("periodic");
+    }
 }
 
 static void tap(u16 key) { step(key); step(0); }
@@ -990,7 +1034,11 @@ static void launch_from_normal_menu(void)
 {
     assert(sc64_catalog_is_playable(SC64_P4_GLOBAL_ID));
     assert(sc64_catalog_playable_ordinal(SC64_FACTION_PROTOSS, SC64_P4_GLOBAL_ID) == 3);
-    game_init(); prior_keys = 0;
+    game_init();
+#ifdef SC64_P34_NORMAL_HOME
+    route_after = route_purity_hash();
+#endif
+    prior_keys = 0;
     assert(screen == SCREEN_TITLE && race_front.page == SC_FRONT_HOME);
     tap(KEY_A);
     assert(race_front.page == SC_FRONT_MISSION && race_front.faction == SC_FRONT_PROTOSS);
@@ -1000,7 +1048,11 @@ static void launch_from_normal_menu(void)
     tap(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING &&
            race_front.mission == SC64_P4_GLOBAL_ID);
+#ifdef SC64_P34_NORMAL_HOME
+    assert(sc64_controller_reveal_briefing(tap, SC64_P4_GLOBAL_ID, &host_ticks, stderr));
+#else
     step(KEY_START);
+#endif
     deployed = 1;
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == SC64_P4_GLOBAL_ID && race_p4_active());
