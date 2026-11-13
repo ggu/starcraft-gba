@@ -42,6 +42,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Z10 revisions. [Z5](audits/2026-11-13-z5-kodak-replay.md) and
   [Z6](audits/2026-11-13-z6-kodak-replay.md) also win on the KODAK Z10
   ROM with Kerrigan alive, including the Z6 transport route.
+  [Z8](audits/2026-11-12-z8-normal-physical.md#exact-november-13-kodak-cartridge)
+  and [Z9](audits/2026-11-13-z9-normal-physical.md#exact-november-13-kodak-cartridge)
+  now win from HOME on that ROM, with both Nexuses destroyed in Z8 and
+  the Drone delivering the crystal in Z9.
   All ten Terran missions now have complete HOME wins on that same ROM.
   Continue exact normal Z10 and P10 replays and broader save checks. The normal
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
