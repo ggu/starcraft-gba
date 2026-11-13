@@ -158,8 +158,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   show wide point FIFO saves only 0.15% overall; nearest-first saves
   2.05% and cuts two individual depot stalls by over 93%, with the full
   win unchanged but different cache contents. Keep P10 defaults stable
-  until broader checks. Pursue the byte-exact partial facility flood
-  separately from steady drawing and simulation.
+  until broader checks. The [exact bounded facility FIFO](audits/2026-11-13-bounded-facility-fifo.md)
+  cuts three P10 gameplay stalls by 43–57% and its full mean by 1.12%,
+  matching the observed route bytes, outcomes and video. Four guarded links,
+  the Z7 window and one 64×64 SRAM continuation pass. Keep it opt-in pending
+  composed RAM checks and hardware. The facility grid conversion, routine
+  rendering and simulation, and result autosave are separate priorities.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
