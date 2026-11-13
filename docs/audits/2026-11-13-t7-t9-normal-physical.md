@@ -18,17 +18,27 @@ though its carrier dies. The game wins at physical call 4,274, frame
 Mean loop cost is 850,073 guest cycles (19.74 emulated updates per second),
 with a peak of 20,836,897 cycles.
 
-New Gettysburg (T9) reads nine briefing pages and acknowledges four
-in-game pages. The recorded comparison matches all 45 observations
-through gameplay call 42,000 (physical call 42,049, frame 41,326) across
-18 guest fields. The host controller's private `failed_action` flag is
-excluded. The next free-space guard stopped the run before the tape's
-47,984-call victory checkpoint. There is no cartridge result or win
-claim for this run. No T8 replay was started.
+## T9: New Gettysburg
 
-These checks establish one winning T7 route and a bounded T9 prefix from
-HOME. They do not establish hardware speed or fresh SRAM continuation.
-No cartridge was rebuilt.
+New Gettysburg (T9) wins at gameplay call 47,984 (physical call
+48,051, frame 47,266). All 51 host observations match across 18 guest
+fields. The replay reads nine briefing pages and acknowledges 13 in-game
+pages. Kerrigan survives, Protoss Force 2 has no buildings left, and
+Zerg Force 3 retains 21. The objective and completion bits are set with
+no trigger faults. The host controller's private `failed_action` flag is
+excluded. Mean loop cost is 1,075,139 guest cycles (15.60 emulated
+updates per second), with a peak of 27,042,746 cycles.
+
+The first T9 attempt matched 45 observations through gameplay call
+42,000 (physical call 42,049, frame 41,326) before its free-space guard
+stopped the run. The full retry started from fresh HOME with the same
+ROM, ELF, observer, and tape. The retry checked free space every 500
+calls and wrote 32,783 bytes of result JSON plus 1,788 bytes of progress
+log; the guest log was empty.
+
+These checks establish one winning route per mission from HOME. They do
+not establish hardware speed or fresh SRAM continuation. No cartridge
+was rebuilt.
 
 | Pinned input or receipt | SHA-256 |
 | --- | --- |
@@ -41,3 +51,5 @@ No cartridge was rebuilt.
 | T9 host tape | `f0342ae15aaef00f8a55581e2758a365d73692ec5388920eea8bf754d0cbf82f` |
 | T9 early prefix receipt (through call 4,000) | `bc49b057ca97b7902546c732fd290790a0db617190a00a0b86df83c4878e4867` |
 | T9 extended prefix checkpoint log | `b0fdc863ba61a395f87adbb578efda58a852859f1f2e850b7facb559f41b4251` |
+| T9 full replay harness | `4a7ec8a17faa99c571a79a4c1c0c3b14dd62cbb80862c3411e3d63b458fa90ff` |
+| T9 full physical receipt | `529c1ea2b3086cce6ef83512cb4b3203fb4bb21883c7e0a1f0877580008343e8` |
