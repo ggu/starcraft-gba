@@ -94,3 +94,56 @@ later simulation and targeting. In particular, the code trace does not
 qualify neutral Overlord cargo after the owner changes, surviving
 fighter links, Egg progression, or in-flight spell behavior. No native
 ROM, RAM, frame, or extracted code is included here.
+
+## Overlord transport research follows the neutral owner
+
+Native transport admission for raw 42 is owner-dependent. The check at
+`0x8014ddbc` reads the actor's current owner and requires a nonzero
+upgrade byte at `0x800ba6f8 + 61 * owner + 24` before using the native
+eight-slot capacity. Upgrade 24 is Ventral Sacs. The normal boarding
+order calls this check at `0x8014e904`; carrier death calls it at
+`0x80135990` before iterating cargo. The ordinary unload loop instead
+looks up passengers by their stored slot IDs.
+
+The owner switch copies relevant upgrade levels **before** changing
+the owner byte. The call at `0x801375ac` uses iterator `0x80089bf0`
+and callback `0x801374e4`, passing the destination owner. The iterator
+uses the actor's old owner and the upgrade table at `0x80003ce8`;
+the raw-42 row contains IDs 24, 25 and 26 before its sentinel. The
+callback raises each corresponding destination entry to the old
+owner's level if that is greater. Its narrow table guard still
+allows upgrade 24. Thus a transferred Overlord from a researched
+owner raises owner 11's Ventral Sacs entry, even if that Overlord
+has no passengers. A later unresearched transfer cannot lower it.
+The scope is the destination owner, so it also applies to other
+neutral Overlords; the native code does not retain former-owner
+provenance for this admission check.
+
+The code windows and table row match all six authenticated opening
+samples. The Ventral Sacs entry begins at zero for all twelve owners
+in both modes. The loaded transfer and upgrade copy are traced code
+paths; no retained sample exercised them in a match.
+
+For the port, a persistent neutral Ventral Sacs bit would represent
+this rule without granting a competitive owner any research. Raise it
+only when a successful retirement transfers at least one live Overlord
+whose owner completed the upgrade. Commit it with the owner and cargo
+transition, retain it for the match, and clear it on restart. Validate
+and restore it with the marked Blood Bath record before checking a
+neutral Overlord cargo graph. Keep it separate from pending research,
+and from eligibility to issue new neutral transport orders. Deriving
+it solely from the remaining neutral units would lose the upgrade
+after the carrier dies; copying it to each carrier separately would
+miss the native owner-wide effect. This is a proposed representation,
+not a shipped behavior.
+
+The retained custom-game save state checked for a shorter controller
+route is the documented [Challenger opening](2026-11-04-n64-skirmish-opening/README.md),
+with a single CPU. The authenticated Blood Bath tapes start at the
+lobby or early economy and have no late checkpoint. A useful next
+controller run would keep the existing Free for All launch, build a
+human attack force with visual feedback, then save at a stable point
+before attacking the last building of a CPU whose live roster still
+includes mobile units. Use a fresh save directory and retain that
+pre-attack checkpoint with the controller log, rather than sampling
+a long idle interval. This route is a plan, not a completed replay.
