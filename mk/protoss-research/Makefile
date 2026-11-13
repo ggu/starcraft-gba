@@ -36,4 +36,4 @@ test-sc64-protoss-research-old: $(PR_PRODUCT_DIR)/product
 	rm -f $(PR_PRODUCT_DIR)/old.sav $(PR_PRODUCT_DIR)/old.sav.digest
 	$(PR_BASE_TREE)/../old-writer old-write $(CURDIR)/$(PR_PRODUCT_DIR)/old.sav
 	./$(PR_PRODUCT_DIR)/product old-read $(PR_PRODUCT_DIR)/old.sav
-include mk/paid-scarab/late.mk
+include mk/paid-scarab-checks/Makefile

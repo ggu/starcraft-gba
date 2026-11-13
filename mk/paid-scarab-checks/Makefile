@@ -13,7 +13,7 @@ $(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,protoss,PROTOSS_P10_FLAGS,PROTOSS_P10
 # branch: make test-sc64-paid-scarab PSC_BASE_TREE=<path to that checkout>.
 PSC_DIR := build/paid-scarab
 PSC_SRC := tests/sc64_paid_scarab_product.c
-PSC_DEPS := $(PSC_SRC) $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/paid-scarab/Makefile
+PSC_DEPS := $(PSC_SRC) $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/paid-scarab-checks/Makefile
 $(PSC_DIR)/product: $(PSC_DEPS) | build
 	@mkdir -p $(PSC_DIR)
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_FLAGS) $(PSC_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
