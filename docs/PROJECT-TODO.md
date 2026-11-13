@@ -45,7 +45,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Z8](audits/2026-11-12-z8-normal-physical.md#exact-november-13-kodak-cartridge)
   and [Z9](audits/2026-11-13-z9-normal-physical.md#exact-november-13-kodak-cartridge)
   now win from HOME on that ROM, with both Nexuses destroyed in Z8 and
-  the Drone delivering the crystal in Z9.
+  the Drone delivering the crystal in Z9. [Z10 also wins from HOME](audits/2026-11-13-z10-exact-home.md)
+  on that ROM, matching all 61 shared world checkpoints with the
+  earlier save continuation. Z7 remains the only Zerg mission lacking
+  an uninterrupted HOME win on that exact ROM.
   All ten Terran missions now have complete HOME wins on that same ROM.
   Continue exact normal Z10 and P10 replays and broader save checks. The normal
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
