@@ -70,6 +70,7 @@ static int free_unit_slots(void)
 }
 
 static int press_minerals, press_gas, press_free, press_used, press_larva;
+static u32 press_ready;
 static int free_unit_slots(void);
 /* Ordinary input: select the Hatchery, cycle the train choice, press A. */
 static int order_unit(int hall, int type)
@@ -83,7 +84,12 @@ static int order_unit(int hall, int type)
     if (!found) return 0;
     press_minerals = minerals; press_gas = gas;
     press_free = free_unit_slots(); press_used = supply_used; press_larva = b[hall].larva;
-    tap(KEY_A);
+    /* The audio observer runs at render time and skips discontinuities: prime it,
+     * then render every update around the order. */
+    game_render();
+    press_ready = game_audio_events[GAME_AUDIO_READY];
+    input(KEY_A); game_render();
+    input(0); game_render();
     return 1;
 }
 
@@ -112,12 +118,13 @@ static void rule_price_larva_supply_timer_birth(void)
     int hall = own_hall(SIDE);
     assert(hall >= 0);
     setup_tech(hall);
-    static const int products[] = { U_DRONE, U_ZERGLING, U_SCOURGE };
-    for (unsigned k = 0; k < 3; k++) {
+    static const int products[] = { U_DRONE, U_ZERGLING, U_SCOURGE, U_OVERLORD };
+    for (unsigned k = 0; k < 4; k++) {
         int type = products[k];
         const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
         int n = sc64_z7_egg_product_count(type), duration = sc64_z7_egg_duration(type);
         b[hall].larva = 3; minerals = 5000; gas = 5000; /* HOST setup: refill */
+        int cap_before = race_owner_supply_cap(SIDE);
         int larva = b[hall].larva, used = supply_used;
         int reserved = race_owner_reserved_supply(SIDE);
         int queue = b[hall].queue_count;
@@ -140,16 +147,26 @@ static void rule_price_larva_supply_timer_birth(void)
         /* The ordering tap runs two updates; the timer started at the full duration. */
         assert(u[egg].work_timer <= duration && u[egg].work_timer >= duration - 3);
         int remaining = u[egg].work_timer;
+        /* "Unit ready" does not play when the Egg is made, only when it hatches. */
+        assert(game_audio_events[GAME_AUDIO_READY] == press_ready);
         int born_at = host_ticks, supply_before = supply_used, owned = count_type(SIDE, type);
         int guard = 0;
-        while (u[egg].alive && u[egg].type == SC64_EGG_ACTOR && guard++ < 2000) input(0);
+        while (u[egg].alive && u[egg].type == SC64_EGG_ACTOR && guard++ < 2000) { input(0); game_render(); }
         int took = (int)host_ticks - born_at;
         printf("%s egg: build %d frames -> hatched after %d ticks, %d bod%s\n",
                unit_name(type), duration, took, n, n == 1 ? "y" : "ies");
         assert(u[egg].alive && u[egg].type == type);
+        if (game_audio_events[GAME_AUDIO_READY] != press_ready + (u32)n)
+            fprintf(stderr, "READY events %u, expected %u + %d\n", game_audio_events[GAME_AUDIO_READY], press_ready, n);
+        assert(game_audio_events[GAME_AUDIO_READY] == press_ready + (u32)n);
         assert(took >= remaining - 1 && took <= remaining + 1);
         assert(count_type(SIDE, type) == owned + n);
         assert(supply_used == supply_before);          /* reservation becomes the units */
+        if (type == U_OVERLORD) {                      /* the new supply shows at once */
+            input(0);
+            assert(supply_cap == race_owner_supply_cap(SIDE));
+            assert(race_owner_supply_cap(SIDE) >= cap_before + sc64_race_unit_supply_provided(U_OVERLORD));
+        }
         assert(supply_used == race_owner_supply(SIDE));
         assert(u[egg].hp > 0 && u[egg].hp <= u[egg].maxhp);
         /* A hatched worker goes to the nearest field, as a queued one does. */
@@ -387,6 +404,13 @@ int main(int argc, char **argv)
         f = fopen(argv[2], "wb");
         assert(f && fwrite(image, 1, sizeof image, f) == sizeof image);
         fclose(f);
+        {
+            unsigned l0 = image[4] | image[5] << 8 | image[6] << 16 | (unsigned)image[7] << 24;
+            unsigned l1 = image[16384 + 4] | image[16384 + 5] << 8 |
+                          image[16384 + 6] << 16 | (unsigned)image[16384 + 7] << 24;
+            fprintf(stderr, "SAVELEN record bytes slot0=%u slot1=%u sizeof(RaceSave)=%zu limit=16368\n",
+                    l0, l1, sizeof(RaceSave));
+        }
         puts("PREFIX saved");
         return 0;
     }

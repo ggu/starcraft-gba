@@ -62,6 +62,7 @@ static const u8 game_audio_heard[3] = { 0xffu, 1u << GAME_AUDIO_ALERT_RESEARCH, 
 /* Transport unloading raises the cooldown without firing. */
 #define GAME_AUDIO_SNAPSHOT_LOADED 0x200u
 #define GAME_AUDIO_SNAPSHOT_CONSTRUCTING 0x400u
+#define GAME_AUDIO_SNAPSHOT_EGG 0x800u
 
 /* Observer words after the snapshot (EWRAM has no room for them in the late
  * campaigns): when the last attack alert played, and the alerts waiting. */
@@ -446,11 +447,20 @@ static void game_audio_observe(void)
         u32 cd = q->cd > 255 ? 255u : (u32)q->cd;
         u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE | cd : 0;
         if (q->alive && SC64_TRANSPORT_LOADED(q)) now |= GAME_AUDIO_SNAPSHOT_LOADED;
+#ifdef SC64_EGG_RUNTIME
+        /* A paid Egg is created alive but is not a finished unit: "ready" plays
+         * when it hatches into one. */
+        if (q->alive && q->type == SC64_EGG_ACTOR) now |= GAME_AUDIO_SNAPSHOT_EGG;
+#endif
         if (!fresh) {
             if ((prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !q->alive) {
                 if (game_audio_on_screen(q->x, q->y))
                     game_audio_emit(GAME_AUDIO_DEATH, game_audio_unit_raw(q));
             } else if (!(prev & GAME_AUDIO_SNAPSHOT_ALIVE) && q->alive) {
+                if (q->owner == SIDE && !(now & GAME_AUDIO_SNAPSHOT_EGG))
+                    game_audio_emit(GAME_AUDIO_READY, game_audio_unit_raw(q));
+            } else if ((prev & GAME_AUDIO_SNAPSHOT_EGG) && q->alive &&
+                       !(now & GAME_AUDIO_SNAPSHOT_EGG)) {
                 if (q->owner == SIDE) game_audio_emit(GAME_AUDIO_READY, game_audio_unit_raw(q));
             } else if (q->alive && cd > (prev & 0xffu) && !(prev & GAME_AUDIO_SNAPSHOT_LOADED) &&
                        game_audio_on_screen(q->x, q->y)) {

@@ -434,7 +434,7 @@ static int race_z7_egg_cancel_selected(void)
 #endif
         product = sc64_race_unit_rule(q->target);
         race_add_owner_resources(q->owner, product->minerals, product->gas);
-        race_egg_return_larva(q->owner, q->x, q->y);
+        if (!SC64_EGG_IS_Z7()) race_egg_return_larva(q->owner, q->x, q->y); /* Z7 mission keeps its cancel */
         supply_used -= unit_slot_supply(q);
         q->alive = 0;
         q->selected = 0;

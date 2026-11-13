@@ -254,7 +254,7 @@ test-sc64-zerg-z9: test-sc64-z9-carried-profile test-sc64-z9-carried-missions
 
 # Full ordinary-input skirmish matches under the actual canonical Z9 vector.
 build/test-sc64-skirmish-match-zerg-z9: tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z9_CANONICAL_INPUTS) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h Makefile tests/sc64-zerg-late/Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z9_CANONICAL_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z9_CANONICAL_FLAGS) $(SC64_RELEASE_EGG_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z9-canonical-skirmish
 test-sc64-z9-canonical-skirmish: build/test-sc64-skirmish-match-zerg-z9
 	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller $< --output .local/sc64/skirmish/zerg-z9-matches

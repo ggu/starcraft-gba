@@ -4018,7 +4018,7 @@ ZERG_Z7_RELEASE_FLAGS = $(filter-out $(RETIRED_ZERG_ROM_DROPS),$(ZERG_Z7_CANONIC
 ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS) $(ZERG_Z7_CONTACT_MASK_TABLE_HEADER)
 include tests/sc64-z7-promotion/Makefile
 build/starcraft-zerg-z7.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS) $(SC64_RELEASE_EGG_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z7-Transport1-GBA.gba: build/starcraft-zerg-z7.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -5450,8 +5450,11 @@ test-shared-builders: $(addprefix build/test-shared-builder-,terran zerg protoss
 # Canonical controller fixtures use the same ordered feature/include vectors
 # as the three race ROMs, including the P7 interceptor companion translation unit.
 SKIRMISH_CONTROLLER_EXTRA_INPUTS = $(UNIT_FACING_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
-$(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS))
-$(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,CANONICAL_ZERG_PROFILE_FLAGS,CANONICAL_ZERG_PROFILE_INPUTS))
+# Custom-game matrices run the shipped Egg vector (Protoss P10 keeps Eggs off).
+ZERG_EGG_PROFILE_FLAGS = $(CANONICAL_ZERG_PROFILE_FLAGS) $(SC64_RELEASE_EGG_FLAGS)
+SHOWCASE_EGG_FLAGS = $(SHOWCASE_FLAGS) $(SC64_RELEASE_EGG_FLAGS)
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,TERRAN_PRODUCT_FLAGS,TERRAN_FULL_INPUTS))
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,ZERG_EGG_PROFILE_FLAGS,CANONICAL_ZERG_PROFILE_INPUTS))
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
 
 # Long-horizon AI economy/tech/army progression and SRAM continuation in the
@@ -5461,13 +5464,13 @@ define SKIRMISH_AI_PROGRESS_PROFILE
 build/test-sc64-skirmish-ai-progress-$(1): tests/sc64_skirmish_ai_progress.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$($(4)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
 	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $$($(2)) $$< common/gba.c starcraft/sc64_bc_body_art.c $$($(4)) -o $$@
 endef
-$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
-$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,zerg,CANONICAL_ZERG_PROFILE_FLAGS,CANONICAL_ZERG_PROFILE_INPUTS,))
+$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,terran,TERRAN_PRODUCT_FLAGS,TERRAN_FULL_INPUTS,))
+$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,zerg,ZERG_EGG_PROFILE_FLAGS,CANONICAL_ZERG_PROFILE_INPUTS,))
 SKIRMISH_AI_PROTOSS_SOURCES = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
 $(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,SKIRMISH_AI_PROTOSS_SOURCES))
 SKIRMISH_AI_SHOWCASE_INPUTS = $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS)
-$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,showcase,SHOWCASE_FLAGS,SKIRMISH_AI_SHOWCASE_INPUTS,))
-$(eval $(call SKIRMISH_CONTROLLER_PROFILE,showcase,SHOWCASE_FLAGS,SKIRMISH_AI_SHOWCASE_INPUTS,))
+$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,showcase,SHOWCASE_EGG_FLAGS,SKIRMISH_AI_SHOWCASE_INPUTS,))
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,showcase,SHOWCASE_EGG_FLAGS,SKIRMISH_AI_SHOWCASE_INPUTS,))
 .PHONY: test-sc64-skirmish-build-controller
 test-sc64-skirmish-build-controller: $(addprefix build/test-sc64-skirmish-build-controller-,terran zerg protoss)
 	@set -e; for profile in terran zerg protoss; do \
