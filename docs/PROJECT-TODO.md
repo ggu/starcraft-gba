@@ -58,8 +58,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   for All saves. All four preview ARM products pass guarded links and
   physical save/load; on Terran, both modes also pass restart and the
   actual CPU-to-CPU target predicate matches the native distinction.
-  Next: check native Free for All Random draws and both modes' end
-  conditions, complete ordinary-input victories, and qualify on hardware.
+  The [native Blood Bath end-rule audit](audits/2026-11-13-n64-blood-bath-end-rules.md)
+  traces both modes to defeat at zero buildings and victory at zero eligible
+  opponent slots. Defeat transfers the remaining actors to neutral ownership
+  and detaches their AI. Next: implement and verify per-CPU elimination,
+  check native Free for All Random draws, and qualify complete ordinary-input
+  matches on hardware.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
@@ -530,7 +534,8 @@ merges do not update an already copied ROM.
   Category navigation and the power-field overlay still need ordinary-input,
   framebuffer and dense-scene checks.
 - **Other feedback:** death sounds, large death effects, remembered
-  resource/fog presentation and direct native defeat behavior remain open.
+  resource/fog presentation and an ordinary-input native elimination
+  witness remain open.
   AI difficulty choices would extend the two native lobbies checked above.
   Current custom defeat counts the last live owned
   building. Delivered death pixels/timelines were authenticated; their large
