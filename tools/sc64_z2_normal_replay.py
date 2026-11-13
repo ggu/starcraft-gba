@@ -14,10 +14,18 @@ from sc64_skirmish_sram_continuation import BUILDING_FIELDS, UNIT_FIELDS, Physic
 from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta, timing_snapshot
 
 
+# Bound the authenticated, all-neutral HOST controller unwind after WIN.
+MAX_TERMINAL_NEUTRAL_CALLS = 5
+
+
 def terminal_modal_release(call, stop, keys, checks, modal, frame, final):
     """Recognize the final HOST neutral bookkeeping update after a modal WIN."""
     count, _, armed, _ = modal
-    if (call != stop - 1 or keys.get(call) != 0 or count or armed
+    if (not 1 <= stop - call <= MAX_TERMINAL_NEUTRAL_CALLS
+            or keys.get(call) != 0
+            or any(keys.get(tick, 0) != 0 or checks.get(tick)
+                   for tick in range(call + 1, stop + 1))
+            or count or armed
             or frame != final["frame"] or final["won"] != 1 or final["lost"]):
         return False
     for kind, *row in checks.get(call - 2, ()):
@@ -158,6 +166,7 @@ def run(args):
             # Never let a later tape edge restart a failed attempt.
             boundaries.update(range(1, stop_at + 1))
         terminal_release = None
+        terminal_snapshot = None
         for call in sorted(n for n in boundaries if n <= stop_at):
             if call % 500 == 0 or call == stop_at:
                 if shutil.disk_usage(args.out).free < int(4.15 * 1024**3):
@@ -188,7 +197,15 @@ def run(args):
                     assert count and (page,armed,current,n("frame")) == (expected_page,key,expected_row,frame)
                 else:
                     assert kind == "released" and not armed and n("frame") == row[0]
-            if mission != 1 and call < stop and n("screen") == 3:
+            if terminal_snapshot is not None:
+                actual = observe()
+                count, _, armed, _ = struct.unpack("<4H", r.read(0x06013fe0, 8))
+                if actual != terminal_snapshot or r.held or count or armed:
+                    (args.out/"divergence.json").write_text(json.dumps(
+                        dict(call=call, terminal_before=terminal_snapshot, terminal_after=actual,
+                             held=r.held, modal_count=count, modal_armed=armed), indent=2))
+                    raise RuntimeError(f"terminal state changed during neutral tail at call {call}")
+            elif mission != 1 and call < stop and n("screen") == 3:
                 actual = observe()
                 active = struct.unpack("<4H", r.read(0x06013fe0, 8))
                 differences = {k: [v, actual[k]] for k, v in final.items() if actual[k] != v}
@@ -198,6 +215,7 @@ def run(args):
                         dict(call=call, unexpected_result=actual, differences=differences), indent=2))
                     raise RuntimeError(f"unexpected RESULT at call {call}")
                 terminal_release = call
+                terminal_snapshot = actual
             if call in checkpoints or call == stop:
                 assert not int.from_bytes(r.read(0x06013fe0, 2), "little"), (call, "unacknowledged modal")
                 expected = final if call == stop else checkpoints[call]

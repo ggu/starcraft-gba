@@ -18,8 +18,14 @@ class TerminalModalReleaseTest(unittest.TestCase):
         final = {"frame": 15, "won": 1, "lost": 0}
         args = [19, 20, keys, checks, (0, 0, 0, 0), 15, final]
         self.assertTrue(terminal_modal_release(*args))
+        self.assertTrue(terminal_modal_release(19, 24, keys, checks, (0, 0, 0, 0), 15, final))
+        self.assertFalse(terminal_modal_release(19, 25, keys, checks, (0, 0, 0, 0), 15, final))
+        self.assertFalse(terminal_modal_release(19, 24, keys | {23: 1}, checks,
+                                                (0, 0, 0, 0), 15, final))
+        self.assertFalse(terminal_modal_release(19, 24, keys, checks | {23: [("briefing", 0, 1)]},
+                                                (0, 0, 0, 0), 15, final))
         for index, wrong in (
-            (0, 18), (1, 21), (2, keys | {19: 1}), (3, {}),
+            (0, 18), (1, 19), (2, keys | {19: 1}), (3, {}),
             (4, (1, 0, 0, 4)), (5, 16), (6, final | {"lost": 1}),
         ):
             with self.subTest(index=index):

@@ -24,7 +24,8 @@ physical GBA check or all routes through a mission.
 | Z8 | [HOME win](2026-11-12-z8-normal-physical.md#exact-november-13-kodak-cartridge) | Both objective Nexuses destroyed, Kerrigan at full HP; 19 checkpoints matched. |
 | Z9 | [HOME win](2026-11-13-z9-normal-physical.md#exact-november-13-kodak-cartridge) | The same Drone carries the crystal home; 32 checkpoints matched. |
 | Z10 | [HOME win](2026-11-13-z10-exact-home.md), [fresh SRAM win](2026-11-13-composed-performance.md) | All 61 shared world checkpoints match between the two routes. |
-| P1–P6 | No complete exact-ROM receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). Rebuild stale P1 input and isolate controller route queries for P3–P6. |
+| P1 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 27 matched observations and the rescued hero alive. |
+| P2–P6 | No complete exact-KODAK receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). The [fresh P2 prefix](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes) matches the newer staged ROM; isolate route queries for P3–P6. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
 | P8 | No complete exact-ROM receipt here | [Preceding normal P8 win and SRAM continuation](2026-10-31-protoss-cannon-lazy/README.md); the [updated carried P10 controller](2026-11-13-p8-host-hero-retreat.md) wins on HOST with both heroes at full health. Verify authored pages and victory on ARM. |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |

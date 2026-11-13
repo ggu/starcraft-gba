@@ -41,8 +41,12 @@ objective flags 6,919, the rescued hero alive and zero enemy buildings.
 The strict verifier stopped because the tape has one remaining neutral
 call. A focused fix validates this final dialogue release and compares
 all terminal fields both before and after the remaining input. The
-corrected full replay is still pending; the earlier stop does not count
-as a completed tape check.
+corrected replay finishes all 26,082 calls and matches all 27
+observations, six briefing pages and nine authored pages. The hero
+survives, the mission is marked complete, and all enemy buildings are
+destroyed. It averages 23.82 emulated updates/s, with an 11.82M-cycle
+peak. This is a win on staged P10 `0505b233`, separate from the older
+KODAK P10 in the matrix and from physical GBA timing.
 
 | Local artifact | SHA-256 |
 | --- | --- |
@@ -51,3 +55,4 @@ as a completed tape check.
 | Fresh P1 4,000-call prefix | `da0597750da39d01260fa1811fd75f3a5afee4934bb157319d08a6deb8252786` |
 | Fresh P2 4,000-call prefix | `c17db52a5fb28dfc9a899d58f8068146b0660d9dd21d29344d341818be61e278` |
 | First P1 terminal observation | `e0e90327e31e217772ca36835ffe839ce110c00492ffb6f583dac54e6abb37da` |
+| Complete staged P1 replay | `61d215d6df53fc2ff74fe67ba680f1b2ceb91bc836be175170bbee3edae94315` |
