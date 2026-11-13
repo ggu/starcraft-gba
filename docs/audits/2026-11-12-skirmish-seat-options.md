@@ -83,3 +83,42 @@ python3 tools/sc64_skirmish_sram_continuation.py --physical \
 and base IDs, and their persistence in addition to the normal world
 fingerprint. It also accepts a ROM carrying the opt-in seeded starts.
 The original `--bots` argument still selects contiguous named opponents.
+
+## Ordinary four-profile Blood Bath preview
+
+Build the ordinary Terran T10, Zerg Z10, Protoss P10 and Showcase profiles
+with `BB_OPENING_FLAGS=-DSC64_NATIVE_MELEE_STARTS`. With the variable unset,
+the existing custom menu and match selection remain the default. On the
+preview, editing the last open Blood Bath CPU skips Closed; all four ROMs
+match the observed native Right transition from Random to Zerg in both
+modes. The reverse transition works on GBA; the native witness tested
+Right only. A second CPU can still be opened on a separate row.
+
+All four ARM products pass the existing ROM/RAM verifier. Relative to
+KODAK, the preview uses 16 more EWRAM bytes per profile and 48 more IWRAM
+bytes except Z10, which uses 64. All reserves remain above their guards.
+All eight frontend sanitizer configurations (four products, flag off/on)
+pass, as do the 16 continuation tool tests.
+
+The physical runner used the normal HOME lobby, then played 240 updates,
+saved through Pause, loaded in a new emulator, and compared a further
+120 updates against uninterrupted play. Four cases passed per preview:
+Outpost with three named CPUs, Blood Bath Free for All with one middle
+Random CPU, Blood Bath Melee with one third-row Zerg CPU, and Blood Bath
+Melee with three mixed CPUs. The eight legacy control runs for the first
+two cases also passed. Separate physical edit checks launch two opponents
+from nonadjacent rows in both modes and on all four preview products.
+
+Fresh-process cross-loads matched in both directions for Outpost and
+Blood Bath Free for All on each profile (16 cases); loaded state and the
+120-update continuation matched the same-profile control. All four old
+readers rejected the new allied Melee save without entering play. This is
+intentional: old ROMs cannot safely play that save as Free for All. All
+readers left the SRAM seed unchanged. These are opening and save checks,
+not full matches, elimination fidelity, or performance on hardware.
+
+| Receipt | SHA-256 |
+| --- | --- |
+| 24 same-build continuation cases | `131fc4f600c6d074f5ed3566ab7ddd3490f9d8d03a2ef9f2bdc785fd769a1bb3` |
+| Eight two-seat edit/launch checks | `8a1561c765a3e1686e4aa588b8fa60ece3114863d14e496a1b4c1bf28b88493e` |
+| Twenty cross-build checks | `3f9d628456f0a4c48c5af908bd4c2e7d5d2379a52f2aa22b2c659cbbe0bc3a49` |

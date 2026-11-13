@@ -62,7 +62,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Exact normal builds after the preview merged pass the [repeatable
   physical seat and SRAM checks](audits/2026-11-12-skirmish-seat-options.md#repeatable-physical-seat-checks)
   on all four products. Keep full matches and hardware frame rate as
-  separate qualification.
+  separate qualification. The [ordinary-profile Blood Bath preview](audits/2026-11-12-skirmish-seat-options.md#ordinary-four-profile-blood-bath-preview)
+  matches the last-open CPU edit and passes 24 physical same-build checks
+  and 20 cross-build checks. The old ROMs reject Melee saves as intended.
+  Keep the flag off while full matches and native elimination are open.
   The stock launch resolves Random race rows before drawing starts; the
   pure sequence matches native Human Random, one/two CPU Random rows,
   and a joint Human Random / two CPU Random capture. The Blood Bath

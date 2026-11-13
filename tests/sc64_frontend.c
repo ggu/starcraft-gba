@@ -105,11 +105,19 @@ static void test_skirmish_setup_and_quickload(void) {
     sc64_frontend_reset(&f, 0, SC_FRONT_RACE_TERRAN, 3, -1);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 1);
     assert(press(&f, KEY_A) == SC_FRONT_NONE && f.page == SC_FRONT_SKIRMISH);
+#ifdef SC64_IMPORTED_SKIRMISH
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 1);
+    assert(press(&f, KEY_LEFT) == SC_FRONT_NONE && f.race == SC_FRONT_RACE_PROTOSS);
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 2);
+    assert(press(&f, KEY_LEFT) == SC_FRONT_NONE && f.bots == 2);
+    while (f.row < SC_FRONT_SKIRMISH_LAUNCH_ROW) press(&f, KEY_DOWN);
+#else
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 1);
     assert(press(&f, KEY_LEFT) == SC_FRONT_NONE && f.bots == 2);
     assert(press(&f, KEY_UP) == SC_FRONT_NONE && f.row == 0);
     assert(press(&f, KEY_LEFT) == SC_FRONT_NONE && f.race == SC_FRONT_RACE_PROTOSS);
     assert(press(&f, KEY_UP) == SC_FRONT_NONE && f.row == 2);
+#endif
     assert(press(&f, KEY_A) == SC_FRONT_START_SKIRMISH);
     assert(f.page == SC_FRONT_SKIRMISH && f.race == SC_FRONT_RACE_PROTOSS && f.bots == 2);
     assert(press(&f, KEY_L) == SC_FRONT_LOAD);
@@ -252,6 +260,10 @@ static void test_unified_skirmish_all_races(void) {
     press(&f, KEY_DOWN);
     press(&f, KEY_A);
     assert(f.page==SC_FRONT_SKIRMISH);
+#ifdef SC64_IMPORTED_SKIRMISH
+    assert(f.map == SC64_MAP_OUTPOST);
+    press(&f, KEY_DOWN);
+#endif
     for (int race=SC_FRONT_RACE_TERRAN;race<=SC_FRONT_RACE_PROTOSS;race++) {
         assert(f.race==race);
         press(&f, KEY_RIGHT);
@@ -380,10 +392,10 @@ static void test_independent_skirmish_seats(void)
     press(&f, KEY_DOWN);
     press(&f, KEY_LEFT);
     assert(f.bot_races[2] == SC_FRONT_BOT_CLOSED && f.bots == 1);
-    press(&f, KEY_DOWN);
+    while (f.row < SC_FRONT_SKIRMISH_LAUNCH_ROW) press(&f, KEY_DOWN);
     assert(press(&f, KEY_A) == SC_FRONT_START_SKIRMISH);
     assert(sc64_front_skirmish_resolve(&f, races) == 2u && races[0] == SC_FRONT_RACE_TERRAN);
-    press(&f, KEY_UP); press(&f, KEY_UP);
+    while (f.row > SC_FRONT_BOT_FIRST_ROW + 1) press(&f, KEY_UP);
     press(&f, KEY_RIGHT); press(&f, KEY_RIGHT);
     assert(f.bot_races[1] == SC_FRONT_BOT_RANDOM);
     for (int i = 0; i < 100; ++i) {
@@ -393,7 +405,8 @@ static void test_independent_skirmish_seats(void)
         (void)sc64_frontend_update(&f, 0);
     }
     assert(seen == 7u && f.bot_races[1] == SC_FRONT_BOT_RANDOM);
-    press(&f, KEY_RIGHT); press(&f, KEY_DOWN); press(&f, KEY_DOWN);
+    press(&f, KEY_RIGHT);
+    while (f.row < SC_FRONT_SKIRMISH_LAUNCH_ROW) press(&f, KEY_DOWN);
     assert(!f.bots && press(&f, KEY_A) == SC_FRONT_NONE);
     assert(!sc64_front_skirmish_resolve(&f, races));
     assert(sc64_skirmish_read_seat_word(1, 1, 2, &old_race, &seats) &&
@@ -412,6 +425,52 @@ static void test_independent_skirmish_seats(void)
         }
     }
 }
+
+#ifdef SC64_NATIVE_MELEE_STARTS
+static void test_blood_bath_zero_seats(void)
+{
+    for (unsigned melee = 0; melee < 2; ++melee) {
+        Sc64Frontend f;
+        sc64_frontend_reset(&f, 0, SC_FRONT_RACE_TERRAN, 1, -1);
+        press(&f, KEY_DOWN); press(&f, KEY_A);
+        while (f.map != SC64_MAP_BLOOD_BATH) press(&f, KEY_RIGHT);
+        /* Select the mode first, then reach a sole third-seat Random CPU
+         * through the real menu, including valid closures with two CPUs. */
+        while (f.row < SC_FRONT_SKIRMISH_MODE_ROW) press(&f, KEY_DOWN);
+        if (melee) press(&f, KEY_RIGHT);
+        assert(f.skirmish_melee == melee);
+        while (f.row > SC_FRONT_BOT_FIRST_ROW) press(&f, KEY_UP);
+        press(&f, KEY_DOWN); press(&f, KEY_DOWN);
+        press(&f, KEY_RIGHT); /* open the third seat */
+        assert(f.bots == 2 && f.bot_races[2] == SC_FRONT_RACE_ZERG);
+        press(&f, KEY_UP); press(&f, KEY_UP);
+        press(&f, KEY_LEFT); /* close the first seat */
+        assert(f.bots == 1 && f.bot_races[0] == SC_FRONT_BOT_CLOSED);
+        press(&f, KEY_DOWN); press(&f, KEY_DOWN);
+        press(&f, KEY_LEFT); /* reverse skip is inferred from the cycle */
+        assert(f.bots == 1 && f.bot_races[2] == SC_FRONT_BOT_RANDOM);
+        press(&f, KEY_RIGHT); /* observed native Random -> Zerg */
+        assert(f.bots == 1 && f.bot_races[2] == SC_FRONT_RACE_ZERG &&
+               f.bot_last_races[2] == SC_FRONT_RACE_ZERG);
+        int human = -1, races[3];
+        unsigned order = 0;
+        assert(sc64_front_skirmish_native_resolve(&f, 0xf3ae, &human, races, &order) == 4u);
+        assert(human == SC_FRONT_RACE_TERRAN && races[0] == SC_FRONT_RACE_ZERG && order);
+
+        /* The launch guard also rejects an inconsistent all-Closed state. */
+        f.bots = 0;
+        f.bot_races[2] = SC_FRONT_BOT_CLOSED;
+        while (f.row < SC_FRONT_SKIRMISH_MODE_ROW) press(&f, KEY_DOWN);
+        assert(f.skirmish_melee == melee);
+        assert(press(&f, KEY_A) == SC_FRONT_NONE && f.row == SC_FRONT_SKIRMISH_LAUNCH_ROW);
+        assert(press(&f, KEY_A) == SC_FRONT_NONE && f.page == SC_FRONT_SKIRMISH);
+        human = -1;
+        order = 0;
+        assert(!sc64_front_skirmish_native_resolve(&f, 0xf3ae, &human, races, &order));
+        assert(human == -1 && !order);
+    }
+}
+#endif
 
 static void test_blood_bath_start_wire(void)
 {
@@ -436,6 +495,18 @@ static void test_blood_bath_start_wire(void)
     assert(!sc64_skirmish_read_start_word(1, 1, 1, solo | (1 << 9), &race, &sparse, &order));
     assert(!sc64_skirmish_read_start_word(1, 1, 1,
         sc64_skirmish_start_word(0, 2, 5), &race, &sparse, &order)); /* duplicate base 1 */
+#ifdef SC64_NATIVE_MELEE_STARTS
+    unsigned mode;
+    const int melee = sc64_skirmish_melee_word(2, 2, SC64_SKIRMISH_BLOOD_BATH_SOLO_ORDER);
+    assert(sc64_skirmish_read_match_word(1, 1, 1, melee, &race, &sparse, &order, &mode) &&
+           race == 2 && sparse == 2 && order == SC64_SKIRMISH_BLOOD_BATH_SOLO_ORDER && mode);
+    assert(!sc64_skirmish_read_start_word(1, 1, 1, melee, &race, &sparse, &order));
+    assert(!sc64_skirmish_read_match_word(1, 0, 1, melee, &race, &sparse, &order, &mode));
+    assert(!sc64_skirmish_read_match_word(0, 1, 1, melee, &race, &sparse, &order, &mode));
+    assert(!sc64_skirmish_read_match_word(1, 1, 0, melee, &race, &sparse, &order, &mode));
+    assert(sc64_skirmish_read_match_word(1, 1, 1, solo, &race, &sparse, &order, &mode) &&
+           race == 2 && sparse == 2 && order == SC64_SKIRMISH_BLOOD_BATH_SOLO_ORDER && !mode);
+#endif
 }
 #endif
 
@@ -443,6 +514,9 @@ int main(void) {
 #ifdef SC64_IMPORTED_SKIRMISH
     test_independent_skirmish_seats();
     test_blood_bath_start_wire();
+#ifdef SC64_NATIVE_MELEE_STARTS
+    test_blood_bath_zero_seats();
+#endif
 #endif
 #ifdef SC64_SHOWCASE_ENABLED
     test_hidden_showcase();
@@ -466,7 +540,12 @@ int main(void) {
     f.page = SC_FRONT_SKIRMISH; f.race = SC_FRONT_RACE_TERRAN; f.bots = 3; f.row = 0;
     assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.map == 1);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 1);
-    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.race == 1);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE);
+#ifdef SC64_NATIVE_MELEE_STARTS
+    assert(f.race == (f.map == SC64_MAP_BLOOD_BATH ? SC_FRONT_RACE_PROTOSS : SC_FRONT_RACE_ZERG));
+#else
+    assert(f.race == SC_FRONT_RACE_ZERG);
+#endif
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 2);
     assert(press(&f, KEY_LEFT) == SC_FRONT_NONE && f.bots == 2);
     assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bots == 3);
@@ -476,7 +555,7 @@ int main(void) {
     assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[1] == SC_FRONT_BOT_RANDOM);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 5);
     assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[2] == SC_FRONT_RACE_TERRAN);
-    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 6);
+    while (f.row < SC_FRONT_SKIRMISH_LAUNCH_ROW) press(&f, KEY_DOWN);
     assert(press(&f, KEY_A) == SC_FRONT_START_SKIRMISH);
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
