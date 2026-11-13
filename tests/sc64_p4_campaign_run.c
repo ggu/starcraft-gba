@@ -44,6 +44,8 @@ static char attempt_path[160] = ".local/sc64/p4-controller-attempt-running.json"
 static char final_attempt_path[160] = ".local/sc64/p4-controller-attempt.json";
 static char verified_path[160] = ".local/sc64/p4-controller-win.json";
 
+static void step_raw(u16 held);
+
 static void step(u16 held)
 {
     step_raw(held);
