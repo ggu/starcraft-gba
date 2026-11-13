@@ -31,7 +31,32 @@ mask and all 38,400 indexed page bytes match. The timed icon batch
 falls from 865,570 to 150,286 guest cycles (82.6%); the linker's IWRAM
 and EWRAM end addresses are unchanged in these fixtures.
 
-These are icon-only measurements. The normal Z7 command-menu window
-and paired 64×64 custom render samples still need to confirm the
-whole-game effect. The profile also found a separate signed-division
-cost outside this change.
+## Normal cartridge qualification
+
+On the normal Z10 cartridge playing Z7 from HOME, the paired physical
+mGBA replay matched all 39 named checkpoints through the test window
+and 67 sampled states. The selected and previous frame pages, palette,
+fog, exploration, HUD state and raw world fingerprints all match.
+Four samples have the command menu open. Their mean whole-loop cost
+drops from 3,109,827 to 2,396,722 guest cycles (22.93%); the mean scoped
+HUD cost drops from 2,629,969 to 1,798,627 cycles (31.61%). Call 15,623
+falls from 3,285,923 to 2,523,781 cycles. The remaining 63 samples are
+effectively flat, averaging 1,317,485 and 1,318,076 cycles. A separate
+signed-division cost remains outside the icon change. These are
+emulated update costs over a bounded window, not GBA hardware FPS.
+
+Both full Z10 three-CPU custom tapes reproduce their results and all
+76 Outpost and 77 Blood Bath checkpoints; the measured 1,000-update
+means differ by under 0.2%. The paired physical custom save/load and
+60-update fresh-process continuation match on all four product ROMs,
+including unchanged SRAM hashes and the resolved seats. All four
+32 MiB links pass their unchanged RAM guards and ROM verification.
+The asset-free default ROM and source boundary also pass.
+
+The control was the previous qualified normal Z10 product; the source
+changes between that control and this candidate include opt-in paths
+left off for these runs. The exact candidate runtime is `cbba1c5`.
+Paired Z7 receipt SHA-256 values:
+
+- Control: `479ecdf90f34d1c603332c133cb15d283058d29645a4b5e8a7f1ef901802f268`.
+- Candidate: `d38326cb92a5d48161c4e01eb0f43b717d6efce2a991f43feb3d00fa5fecadac`.

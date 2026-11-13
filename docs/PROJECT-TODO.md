@@ -118,10 +118,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   guarded links pass; 128×128 T4/P10 physical prefixes match and exercise
   the new kernel. Qualify on hardware before promoting the option. Treat
   the result transition separately. A new Z7 instruction sample puts
-  routine rendering at 701k cycles and simulation at 462k. Prioritize
-  static map and sprite drawing and the separately measured command-menu
-  icon cost over the selection-ring probe (under 0.12% mean savings).
-  Continue steady simulation and drawing work separately.
+  routine rendering at 701k cycles and simulation at 462k. The shared
+  [command icon fix](audits/2026-11-13-command-icon-scaling.md) cuts open-menu
+  update cost 22.93% across four matching normal Z7 samples, with no
+  material change outside the menu. Both full three-CPU replays and the
+  four normal physical custom/SRAM checks match. Prioritize steady map,
+  sprite and simulation work over the selection-ring probe (under 0.12%
+  mean savings).
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
