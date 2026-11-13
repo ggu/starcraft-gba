@@ -87,3 +87,74 @@ Candidate ROM SHA-256:
 `81b34c1b83b92e47fc2ed2a1de8060bd3e27adc46e1cf8eb3508bb21c2e031b5`.
 Full candidate receipt SHA-256:
 `3f84960d7c704619f415ac319590f16c2d6c7cac2f116def404fbaac1ee11de0`.
+
+## Direct Showcase comparison
+
+The normal staged Showcase control uses source `c906058`. The
+candidate uses the same compiler arguments with only
+`-DSC64_TYPED_UNIT_CHUNK_READER` added, immediately after the compiler
+executable. Both ROMs verify as 32 MiB. IWRAM ends at `0x03004cf0`
+and BSS at `0x02039c24` on both. Text shrinks by 392 bytes.
+
+Both cartridges start the same physical Outpost match with a Terran
+human and Terran, Zerg, and Protoss opponents. After 4,500 updates,
+ordinary pause and save inputs create the first bank; after 600
+more updates a second save creates the newer bank. The second
+pause is at frame 5,101, with 51 live units and 32 buildings.
+Both 32 KiB exports match byte for byte at each save. In each
+export after the second save the complete first bank is unchanged.
+
+Both cartridges load the same second-save journal in a fresh process.
+The loaded world, indexed pages, palette, and seat assignments match
+between cartridges, as do the same observations after 60 further
+updates. The continued world matches the uninterrupted run. In a
+separate fresh process, flipping one payload bit in the newest bank
+without changing its checksum makes each loader select the original
+saved world in the older bank. The paired fallback observations match.
+Neither load rewrites its input journal. This fallback case tests
+checksum rejection; the malformed typed-row differential above
+separately tests decoder rejection.
+
+| Ordinary button update | Original cycles | Byte reader cycles |
+| --- | ---: | ---: |
+| First pause save | 10,481,730 | 8,845,385 |
+| Second pause save | 23,583,390 | 18,842,364 |
+| Fresh load from the second bank | 22,575,641 | 18,853,101 |
+| Fresh load with the newest bank damaged | 21,841,966 | 18,555,850 |
+
+These are guest cycles for the complete button updates. The second
+save is 20.1% shorter and the ordinary fresh load is 16.5% shorter.
+The result qualifies one populated Showcase custom save path; it is
+not a hardware timing measurement.
+
+- Control ROM: `d5b983eaa42c499664605c3404144566a5655f3ead5ebb807e79fc80b8eb464b`.
+- Reader-only ROM: `5b9cf1ec7cee3809cec4a84130e60d656a26d9a2c4706d6c83f793bb98d33adb`.
+- First / second journal: `0dd3a27af39186ddc1355e20e0c6c68a88ba4336be319aa483eb6d05bf2374ad` /
+  `7e8471dd38ad8586c7962521b1babaaf9a979c090c1bf12130fe979b84acde4a`.
+- Paired receipt: `2f889436bf3abda8ea7e1158fc8bbf3d96cb39748f3d2445ec061978dcc27ee7`.
+
+## Default builds with nearest-first P10 routing
+
+Both P10 cartridges use nearest-first routing. The only compiler flag
+change on the candidate is the typed byte reader. Both booted fresh,
+loaded the original KODAK pause journal at frame 36,761 with 213 units
+and 81 buildings, and won at frame 46,057. The starting actor and mineral
+state and all five ordered suffix samples of world, both video pages,
+palette and fog match. Both 32 KiB result journals are byte-identical to
+the earlier normal result journal above.
+
+| Single update | Original reader | Typed byte reader |
+| --- | ---: | ---: |
+| Fresh pause-save load | 60,683,013 cycles | 34,686,110 cycles |
+| Victory and result autosave | 76,507,651 cycles | 37,492,973 cycles |
+
+These measure save latency in mGBA. Neither the wire format nor the
+sustained gameplay update policy changes. The build commands add the
+reader only on P10 and Showcase. Terran and Z10 commands are unchanged;
+they do not use these typed rows. The default Showcase command also
+reproduces the exact isolated Showcase candidate ROM. P10's IWRAM
+and BSS ends remain `0x03004aa0` and `0x0203c0e0`.
+
+- Nearest-first P10 control: `64a2bb9e43840c737b30934831f689fa948c43e640198f0473dadce7c9bfd525`.
+- P10 with the byte reader: `0505b233994dca90cda47d92f1a153a14f01e781d980b3498390d3b4005e7c41`.
+- Paired nearest-first P10 receipt: `36dfc5ac12193fd3ccb97554e2468f2f99f70ca8bd2f53526c11d5f890c674e1`.
