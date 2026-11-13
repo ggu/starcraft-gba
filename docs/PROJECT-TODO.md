@@ -167,6 +167,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pause/result journals and fresh-load win. Keep it opt-in until broader
   save and hardware checks. Next: reduce facility grid conversion and the
   routine rendering and simulation costs that still dominate wall time.
+  The [three-option composition](audits/2026-11-13-composed-performance.md)
+  passes four guarded links and physical custom SRAM continuations. P10
+  still wins and runs at 9.62 emulated updates/s (8.60% fewer cycles).
+  Both full Z10 custom outcomes match, but the Blood Bath timing window
+  regresses (+0.75% mean, +7.41% max). Attribute the tail before promotion.
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
