@@ -351,11 +351,40 @@ Placement then assigns the available marker IDs in reverse row order.
 The [GBA launch dispatch](../../starcraft/game.c) already uses the
 same opt-in Blood Bath selector for both modes and stores the mode
 separately from the resolved races and positions. No selector change
-is needed for this vector. The witness covers one dense lineup and
-seed; it does not compare sparse Random launches in Free for All or
-establish identical clocks between the machines.
+is needed for this vector. This dense pair and the sparse pair below
+use one recovered seed; they do not establish identical clocks
+between the machines.
 
 | Mode | Controller plan SHA-256 | Observer manifest SHA-256 |
 | --- | --- | --- |
 | Melee | `90884125d92b3353f5de35ac95037b4134b9617549d01a5f536615727b0dea4e` | `fae8647d253a2a7c353b8566b7d495b1dcfb19a0402112415c41e79335151615` |
 | Free for All | `02da3f120d0918f4de0ec79320479e2f238528f425f61b347f63664dda261c85` | `5120e53b82fc15624119f10848e33b7313ba459da8dd7f69febc3aa0035a7792` |
+
+
+The sparse repeat used a named Terran human and only the middle CPU
+row set to Random. The Free for All lobby displayed four starting
+slots for the map, even with the first and third CPU rows closed.
+It exposed the game type, map and race rows, with no separate
+difficulty or team row visible. Start launched with exactly one CPU.
+This checks that the middle seat can be the sole CPU; it does not
+establish whether the lobby permits zero CPUs.
+
+The matching Melee and Free for All tapes both pressed Start at
+step 3,695. All three RAM samples at steps 4,201, 4,210 and 4,215
+agreed on draw count 370 and RNG state `0x6c523784`, independently
+recovering `0xf3ae`. The active owners were human 0 and CPU 1.
+The hall and four workers identify Terran at marker 0 and Zerg
+at marker 1, respectively, with the same 60 resource placements.
+The mode bytes were 3 and 1. A one-CPU launch has no CPU-to-CPU
+relation to compare.
+
+The same GBA selector, with occupied rows 0 and 2 and marker mask
+15, resolves the middle Random CPU to Zerg, leaving state
+`0xa39d7707` before placing the two halls at markers 0 and 1.
+The named human and both closed rows consume no race draw in this
+vector. Other sparse lineups and launch seeds remain unobserved.
+
+| Sparse mode | Controller plan SHA-256 | Observer manifest SHA-256 |
+| --- | --- | --- |
+| Melee | `04cdf796673202a8b3a583351f7a1c6bb5ec65345b58792ce5e52832cc31951a` | `3eaa2d7e49d36bc2dfc3e7d43ab4bf2d0fb5a098bea3c977f5418d9426988dcb` |
+| Free for All | `ebfa1ce61f80e98e9018cbce9552a14f4e91db3da0375fc0298584c90220088c` | `d0973068f916f9c7a86ab733a67af2f2617709d3c5dbd254dc071d902cbe35c8` |

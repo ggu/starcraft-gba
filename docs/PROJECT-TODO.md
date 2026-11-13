@@ -82,8 +82,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A [matched native Random pair](audits/2026-11-12-n64-blood-bath-opening.md#paired-random-launches)
   now verifies the same seed, resolved races, start markers and three
   later RNG states in Melee and Free for All for Human Random and
-  CPU Random / Random / Protoss. Sparse Free for All Random starts and
-  other seeds remain unobserved.
+  CPU Random / Random / Protoss. A second pair matches a named Terran
+  human with only the middle CPU set to Random, including the same
+  resolved race, starts and RNG state. Other sparse lineups and seeds
+  remain unobserved.
   The [native Blood Bath end-rule audit](audits/2026-11-13-n64-blood-bath-end-rules.md)
   traces both modes to defeat at zero buildings and victory at zero eligible
   opponent slots. Defeat transfers the remaining actors to neutral ownership
