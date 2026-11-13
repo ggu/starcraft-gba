@@ -91,7 +91,7 @@ linked list. The transfer calls `0x80058d20` to detach the old AI
 record and clears the actor AI pointer at offset `0x124`; the later
 registration hook at `0x8007d2dc` returns immediately for owners 8 or
 higher. For ordinary actors with actor-status bit 1 clear, it also sets
-primary order `0x17` and resets its order fields when the order changes.
+secondary order `0x17` and resets its order fields when the order changes.
 This is the same initial order seen on neutral resources. Owner 11
 already owns all 60 neutral mineral and geyser actors in the opening
 captures, has relation 1 in both directions with every slot, and is
@@ -113,6 +113,8 @@ The next ordinary-input witness is a multi-CPU match where an opponent
 loses its last building while it still has a mobile force and another
 opponent survives. Observe the result byte, owner-chain transfer, and
 subsequent orders and targetability before qualifying the GBA behavior.
+The [linked survivor follow-up](2026-11-13-n64-blood-bath-linked-survivors.md)
+traces loaded cargo and records a later sample without an elimination.
 Also check last buildings in transitional states, simultaneous end
 conditions, and whether other maps and modes install the same records.
 No emulator session, native ROM, snapshot, or extracted content is
