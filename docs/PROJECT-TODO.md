@@ -37,6 +37,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   coverage, and original N64 behavior remain separate gates below. The
   [campaign evidence matrix](audits/2026-11-13-normal-campaign-matrix.md)
   separates exact KODAK wins, earlier normal builds and remaining checks.
+  [Z4 wins on both normal Z10 revisions](audits/2026-11-13-z4-two-normal-roms.md)
+  with matching checkpoints and Kerrigan alive.
   All ten Terran missions now have complete HOME wins on that same ROM.
   Continue exact normal Z10 and P10 replays and broader save checks. The normal
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
@@ -107,19 +109,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Before ARM enablement, resolve in-flight damage and simultaneous
   outcomes against native evidence. Next: record
   an active elimination, broaden the native Free for All Random opening
-  sample, and qualify complete ordinary-input matches on hardware. A
-  one-CPU controller scout tried spending faster, three Barracks and
-  grouping 14–22 Marines. Its six Terran trials still lost; the best
-  Outpost trial reached frame 32,519 but attacked an expansion before
-  losing its own production. Next controller should defend its base
-  and use a legal mixed army before testing full-match victory on ARM.
-  The [mixed-army scout](audits/2026-11-13-custom-human-economy.md)
-  lost after the mineral bank stalled despite gas income. A [checked
-  worker order](audits/2026-11-13-skirmish-builder-minerals.md) now mines
-  an alternate visible patch and deposits eight minerals on exact KODAK.
-  Use it to sustain economy in a full controller match. [Native automatic
-  resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md) still
-  needs a same-worker witness.
+  sample, and qualify complete ordinary-input matches on hardware.
+  [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
+  now wins from HOME on the KODAK ROM and staged Terran ROM with all 95
+  observations matching. The policy puts idle builders back on minerals,
+  trains Marines, Firebats and Medics, and defends before pushing. It
+  averages 27.29 emulated updates/s but peaks at 14.04M cycles. Expand to
+  Blood Bath and to two and three independent opponents; native automatic
+  [SCV resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md)
+  and the outcome of surviving actors still need native witnesses.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)

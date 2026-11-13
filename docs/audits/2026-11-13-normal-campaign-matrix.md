@@ -16,7 +16,8 @@ physical GBA check or all routes through a mission.
 | T9 | [HOME win](2026-11-13-t7-t9-normal-physical.md#t9-new-gettysburg) | All 51 checkpoints matched. |
 | T10 | [HOME win](2026-11-13-t10-normal-physical.md) | Raynor alive; Ion Cannon destroyed. |
 | Z1–Z2 | [Z1 HOME win](2026-11-13-z1-normal-home.md), [Z2 HOME win](2026-11-13-z2-normal-home.md) | Briefings and authored pages acknowledged. |
-| Z3–Z4 | No complete exact-ROM receipt here | [Z3](2026-11-12-normal-campaign-replay-gaps.md#full-physical-button-replay) and [Z4](2026-11-12-z4-normal-physical.md) win on preceding normal Z10 ROMs. |
+| Z3 | No complete exact-ROM receipt here | [HOME win](2026-11-12-normal-campaign-replay-gaps.md#full-physical-button-replay) on a preceding normal Z10 ROM. |
+| Z4 | [HOME win](2026-11-13-z4-two-normal-roms.md) | All 42 checkpoints also match on staged `c906058`; Kerrigan survives. |
 | Z5–Z6 | No complete exact-ROM receipt here | [Z5](2026-11-12-z5-normal-physical.md) and [Z6](2026-11-12-z6-normal-physical.md) win on preceding normal Z10 ROMs. |
 | Z7 | [Fresh SRAM win](2026-11-12-z7-normal-physical.md#fresh-sram-on-the-november-13-z10-kodak-cartridge) | Ordinary HOME reached the late save cut on the exact ROM; reselect the Hatchery after load. Full uninterrupted HOME win on a preceding Z10 ROM. |
 | Z8–Z9 | No complete exact-ROM receipt here | [Z8](2026-11-12-z8-normal-physical.md) and [Z9](2026-11-13-z9-normal-physical.md) win on a preceding normal Z10 ROM. |
