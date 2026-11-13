@@ -327,10 +327,58 @@ static void check_ventral_seed_scope(void)
 #endif
 #endif
 
+#ifdef SC64_IMPACT_EVENTS
+static void check_queued_elimination(void)
+{
+    launch(0);
+    int human = building_of(SIDE), first = building_of(ENEMY);
+    assert(human >= 0 && first >= 0);
+    /* Exercise the real projectile queue and normal update ordering without
+     * depending on exact weapon travel or the CPU's launch schedule. The
+     * earlier impact retires the attacker while other CPUs keep play active. */
+    race_impact_launch(MAX_UNITS + first, 4000, 1, SIDE,
+                       SC64_STOCK_DMG_NORMAL, U_MARINE, 1);
+    race_impact_launch(MAX_UNITS + human, 4000, 1, ENEMY,
+                       SC64_STOCK_DMG_NORMAL, U_MARINE, 2);
+    game_update(0, 0);
+    assert(!b[first].alive && b[human].alive && race_skirmish_eliminated == 1 &&
+           screen == SCREEN_PLAY && race_impact_count == 1);
+    game_update(0, 0);
+    assert(!b[human].alive && !won && lost && screen == SCREEN_RESULT &&
+           race_skirmish_eliminated == 1 && race_impact_count == 0);
+
+    /* Both final buildings fall in the same impact pass. Assert the existing
+     * HOST precedence in both queue orders, with no native precedence claim. */
+    for (int reversed = 0; reversed < 2; ++reversed) {
+        launch(0);
+        for (int i = 0; i < MAX_BUILDINGS; ++i)
+            if (b[i].alive && (b[i].owner == RESCUABLE || b[i].owner == 4))
+                destroy_building(i, SIDE);
+        game_update(0, 0);
+        assert(!won && !lost && race_skirmish_eliminated == 6);
+        human = building_of(SIDE); first = building_of(ENEMY);
+        assert(human >= 0 && first >= 0);
+        for (int n = 0; n < 2; ++n) {
+            int hits_human = n ^ reversed;
+            race_impact_launch(MAX_UNITS + (hits_human ? human : first), 4000, 1,
+                               hits_human ? ENEMY : SIDE, SC64_STOCK_DMG_NORMAL,
+                               U_MARINE, 1);
+        }
+        game_update(0, 0);
+        assert(!b[human].alive && !b[first].alive && !won && lost &&
+               screen == SCREEN_RESULT && race_skirmish_eliminated == 6 &&
+               race_impact_count == 0);
+    }
+}
+#endif
+
 int main(void)
 {
     check_elimination(0);
     check_elimination(1);
+#ifdef SC64_IMPACT_EVENTS
+    check_queued_elimination();
+#endif
 #if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_P7_CARRIER_TRAINING_ENABLED)
     check_fenced_final_result(0);
     check_fenced_final_result(1);

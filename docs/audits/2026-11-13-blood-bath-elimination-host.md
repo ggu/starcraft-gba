@@ -74,3 +74,21 @@ previous and marked record reads, a changed launch clock, and a malformed
 marked record that tries to eliminate a still-live owner. It checks the
 previous reader's exact word policy directly. It is a host fixture and
 does not qualify an ARM ROM or establish late-game N64 observation.
+
+The queued impact fixture covers two distinct boundaries. A packet from a
+CPU whose last building falls first still arrives on the next update while
+other CPUs keep the match active, and can defeat the human. If both last
+buildings fall in the same update, both due packets resolve in either queue
+order before the outcome check; the existing human defeat branch wins that
+tie. This is a host ordering check, not a native precedence claim. The
+native defeat action at `0x80080690` preserves pending result 3 or 4, but
+that alone does not show whether the victory condition is met in the same
+trigger pass as the human loses its final building.
+
+The inverse direction remains unresolved: retirement currently clears
+incoming pending impact target references for live neutral transfers with
+the same helper used on death. The owned finalizer establishes that the
+actor itself survives and is relinked to owner 11; it does not establish
+whether a pending projectile may hit that actor afterward. Keep the policy
+unchanged until the native projectile target path or a qualified runtime
+witness distinguishes transfer from death.
