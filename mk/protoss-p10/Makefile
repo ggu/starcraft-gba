@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+include mk/paid-scarab/Makefile
 # Included from the top-level Makefile after the P9 candidate rules; it is not
 # a standalone makefile. Run these targets from the repository root.
 
