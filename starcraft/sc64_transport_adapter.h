@@ -23,6 +23,14 @@ static int race_transport_activity;
 static int race_z6_transport_overlord_ready(void);
 #endif
 
+#if defined(SC64_SHARED_TRANSPORT) && defined(SC64_NATIVE_SKIRMISH_ELIMINATION)
+static int race_transport_overlord_identity(const Unit *q)
+{
+    int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+    return raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD;
+}
+#endif
+
 #ifdef SC64_Z6_TRANSPORT_ENABLED
 static int __attribute__((noinline)) race_transport_carrier_type(const Unit *q)
 #else
@@ -37,6 +45,10 @@ static int race_transport_carrier_type(const Unit *q)
             sc64_race_unit_from_raw(raw) == q->type) return 1;
         if (race_mode && raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD) {
             int owner = sc64_sk_transport_owner_index(q->owner);
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+            if (q->owner == NEUTRAL && q->raw_owner == 11)
+                return race_skirmish_neutral_ventral;
+#endif
             if (owner >= 0 && race_skirmish_transport_tech.owner[owner].researched)
                 return 1;
         }
@@ -72,10 +84,13 @@ static int race_transport_carrier_valid(int slot)
 }
 
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
-/* Cargo can persist on these transports without a former owner's research. */
-static int race_transport_neutral_carrier_type(const Unit *q)
+/* Check the old owner's admission before committing the entire group. */
+static int race_transport_retirement_carrier_type(const Unit *q)
 {
     int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_transport_overlord_identity(q)) return race_transport_carrier_type(q);
+#endif
     return sc64_transport_unconditional_carrier_raw((unsigned)raw) &&
            sc64_race_unit_from_raw(raw) == q->type &&
            race_transport_carrier_type(q);

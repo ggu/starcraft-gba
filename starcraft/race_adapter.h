@@ -1869,6 +1869,9 @@ static void race_skirmish_init(void)
     race_skirmish_geometry();
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
     race_skirmish_eliminated = 0;
+#ifdef SC64_SHARED_TRANSPORT
+    race_skirmish_neutral_ventral = 0;
+#endif
 #endif
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
     death_vfx_reset();
@@ -2018,7 +2021,7 @@ static int race_skirmish_neutral_transfer_ready(const Unit *q)
     if (SC64_TRANSPORT_LOADED(q)) {
         int carrier = q->target;
         if (!race_transport_carrier_valid(carrier) || u[carrier].owner != q->owner ||
-            !race_transport_neutral_carrier_type(&u[carrier]) ||
+            !race_transport_retirement_carrier_type(&u[carrier]) ||
             q->x != u[carrier].x || q->y != u[carrier].y) return 0;
     }
 #endif
@@ -2044,6 +2047,10 @@ static int race_skirmish_neutral_transfer_ready(const Unit *q)
 static void race_skirmish_retire_bot(int rank)
 {
     int owner = race_bot_owner_ids[rank];
+#ifdef SC64_SHARED_TRANSPORT
+    int research = sc64_sk_transport_owner_index(owner);
+    int ventral = 0;
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     u8 cargo[MAX_UNITS] = {0};
 #endif
@@ -2051,6 +2058,10 @@ static void race_skirmish_retire_bot(int rank)
         Unit *q = &u[i];
         if (!q->alive || q->owner != owner) continue;
         if (!race_skirmish_neutral_transfer_ready(q)) return;
+#ifdef SC64_SHARED_TRANSPORT
+        if (research >= 0 && race_skirmish_transport_tech.owner[research].researched &&
+            race_transport_overlord_identity(q)) ventral = 1;
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
         if (SC64_TRANSPORT_LOADED(q)) {
             int space = race_transport_passenger_space(q);
@@ -2062,6 +2073,9 @@ static void race_skirmish_retire_bot(int rank)
     }
 
     race_skirmish_eliminated |= (u8)(1u << rank);
+#ifdef SC64_SHARED_TRANSPORT
+    race_skirmish_neutral_ventral |= (u8)ventral;
+#endif
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
         if (!q->alive || q->owner != owner) continue;

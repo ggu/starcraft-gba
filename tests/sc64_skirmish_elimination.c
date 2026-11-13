@@ -200,23 +200,92 @@ static void check_neutral_cargo(int ship_type, int owner)
 }
 
 #ifdef SC64_SHARED_TRANSPORT
-static void check_deferred_overlord(void)
+static void check_neutral_ventral(void)
 {
     launch(0);
     const int owner = RESCUABLE;
+    const int research = sc64_sk_transport_owner_index(owner);
     int ship = spawn_unit(owner, U_OVERLORD, 500, 500);
     int passenger = spawn_unit(owner, U_ZERGLING, 500, 500);
-    assert(ship >= 0 && passenger >= 0);
-    int research = sc64_sk_transport_owner_index(owner);
-    assert(research >= 0);
+    assert(ship >= 0 && passenger >= 0 && research >= 0);
+    assert(!race_transport_request_board(passenger, ship));
     race_skirmish_transport_tech.owner[research].researched = 1;
     assert(race_transport_request_board(passenger, ship));
     assert(race_transport_tick_unit(passenger) && u[passenger].order == ORDER_TRANSPORTED);
     destroy_building(building_of(owner), SIDE);
+
+    /* Reject the entire retirement, including the capability, if cargo is
+     * malformed. Restore the valid group and let the normal outcome run. */
+    int x = u[passenger].x;
+    ++u[passenger].x;
     race_skirmish_outcome();
-    assert(!race_skirmish_eliminated && u[ship].owner == owner &&
-           u[passenger].owner == owner && u[passenger].target == ship);
+    assert(!race_skirmish_eliminated && !race_skirmish_neutral_ventral &&
+           u[ship].owner == owner && u[passenger].owner == owner);
+    u[passenger].x = x;
+    race_skirmish_outcome();
+    assert(race_skirmish_eliminated == 2 && race_skirmish_neutral_ventral &&
+           u[ship].owner == NEUTRAL && u[ship].order == ORDER_IDLE &&
+           u[passenger].owner == NEUTRAL && u[passenger].order == ORDER_TRANSPORTED &&
+           u[passenger].target == ship && race_transport_cargo_space(ship) == 1 &&
+           !race_transport_request_unload(ship, 510, 510));
+    assert(race_save_game());
+    const int marked = race_data.state[23];
+    u8 wire[16];
+    Sc64SkTransportTech previous;
+    race_sk_transport_wire_encode(wire);
+    assert((wire[SC64_NEUTRAL_VENTRAL_BYTE] & SC64_NEUTRAL_VENTRAL_BIT) &&
+           !sc64_sk_transport_decode(&previous, wire, MAX_BUILDINGS));
+    assert(race_sk_transport_wire_decode(wire) && race_sk_transport_candidate_valid(&race_data));
+    race_data.state[23] = marked & ~(int)SC64_SKIRMISH_ELIM_BITS;
+    assert(!race_sk_transport_candidate_valid(&race_data));
+    race_data.state[23] = marked;
+    race_skirmish_transport_candidate.owner[research].researched = 0;
+    assert(!race_sk_transport_candidate_valid(&race_data));
+    wire[SC64_NEUTRAL_VENTRAL_BYTE] &= (u8)~SC64_NEUTRAL_VENTRAL_BIT;
+    assert(sc64_sk_transport_decode(&previous, wire, MAX_BUILDINGS) &&
+           race_sk_transport_wire_decode(wire) && !race_skirmish_neutral_ventral_candidate &&
+           !race_skirmish_transport_save_valid(&race_data, race_cols, race_rows));
+
+    game_init(); prior_keys = 0;
+    assert(!race_skirmish_neutral_ventral && race_load_game());
+    game_update(0, 0);
+    assert(race_skirmish_neutral_ventral && race_skirmish_eliminated == 2 &&
+           race_transport_carrier_valid(ship) && race_transport_cargo_space(ship) == 1 &&
+           u[passenger].alive && u[passenger].target == ship);
+    hit_target(ship, 5000, U_MARINE, SIDE);
+    assert(!u[ship].alive && !u[passenger].alive && race_skirmish_neutral_ventral);
+    assert(race_save_game());
+    game_init(); prior_keys = 0;
+    assert(race_load_game() && race_skirmish_neutral_ventral &&
+           !u[ship].alive && !u[passenger].alive);
+    tap(KEY_START); assert(screen == SCREEN_PAUSE);
+    tap(KEY_R); assert(screen == SCREEN_PLAY && !race_skirmish_neutral_ventral);
 }
+
+static void check_ventral_seed_scope(void)
+{
+    launch(0);
+    const int owner = RESCUABLE;
+    const int research = sc64_sk_transport_owner_index(owner);
+    assert(research >= 0);
+    race_skirmish_transport_tech.owner[research].researched = 1;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == owner && u[i].type == U_OVERLORD)
+            hit_target(i, 5000, U_MARINE, SIDE);
+    destroy_building(building_of(owner), SIDE);
+    race_skirmish_outcome();
+    assert(race_skirmish_eliminated == 2 && !race_skirmish_neutral_ventral);
+
+    launch(0);
+    int empty_ship = spawn_unit(owner, U_OVERLORD, 500, 500);
+    assert(empty_ship >= 0);
+    race_skirmish_transport_tech.owner[research].researched = 1;
+    destroy_building(building_of(owner), SIDE);
+    race_skirmish_outcome();
+    assert(race_skirmish_eliminated == 2 && race_skirmish_neutral_ventral &&
+           race_transport_carrier_valid(empty_ship) && race_transport_cargo_space(empty_ship) == 0);
+}
+
 #endif
 #endif
 
@@ -230,7 +299,8 @@ int main(void)
     int shuttle = sc64_race_unit_from_raw(SC64_TRANSPORT_SHUTTLE_RAW);
     assert(shuttle >= 0);
     check_neutral_cargo(shuttle, 4);
-    check_deferred_overlord();
+    check_neutral_ventral();
+    check_ventral_seed_scope();
 #endif
 #endif
     puts("Blood Bath Melee/FFA elimination, surviving CPUs and SRAM: pass");
