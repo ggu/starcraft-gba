@@ -37,8 +37,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   coverage, and original N64 behavior remain separate gates below. The normal
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
   with the complete briefing, authored dialogue and all three heroes alive.
-  Its replay averages 8.72 emulated updates per second; P1–P9 still need
-  equivalent qualification.
+  The exact KODAK P10 ROM reproduces that win at 8.79 emulated updates per
+  second. P1–P9 still need equivalent qualification.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
   confirmed separate named, Random, and Closed seats and a middle-only
@@ -74,9 +74,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [native Blood Bath end-rule audit](audits/2026-11-13-n64-blood-bath-end-rules.md)
   traces both modes to defeat at zero buildings and victory at zero eligible
   opponent slots. Defeat transfers the remaining actors to neutral ownership
-  and detaches their AI. Next: implement and verify per-CPU elimination,
-  check native Free for All Random draws, and qualify complete ordinary-input
-  matches on hardware.
+  and detaches their AI. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
+  traces the loaded passenger exception and the Carrier/Reaver queue reset.
+  A passive replay did not reach elimination. Next: verify per-CPU elimination
+  with a surviving mobile force in an active match, check native Free for All
+  Random draws, and qualify complete ordinary-input matches on hardware.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
@@ -1014,7 +1016,7 @@ AI wallets and full-match behavior remain unverified.
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Finished as [#381](https://github.com/ggu/starcraft-gba/pull/381) (merged with the current base, memory/VRAM ownership re-derived, ARM cost cut from about +33% to about +3.2%, pixel and simulation-identity checks). Open: the 1% cost aim, native preview, hardware check. |
 | [#315](https://github.com/ggu/starcraft-gba/pull/315), late-Zerg packed grid | Merged as `738223a4`; scoped tests and emulator timing are recorded above. The later #323 package retains this capability, with a different binary; its speed has not been remeasured. Strict current Z7 winning validation, broader campaign/skirmish and hardware qualification remain open. |
 | [#318](https://github.com/ggu/starcraft-gba/pull/318), research journal groundwork | Merged as `f34004af`, default-off. Full default suite and current flag-off composition passed; feature-on current-base and functional research qualification remain open. The default-off groundwork alone did not change package bytes; #323 is included in the newer normal package. |
-| SD delivery | Latest verified normal Mac package is `StarCraft-GBA-2026-11-07-34c101e0` (T10, Z9, P10, Showcase; optional Z10 preview), with Protoss-custom testing instructions. KODAK is not mounted; its last recorded copy is `e9838086` plus the separate custom Egg preview, and present contents are unverified. Never claim a newer build is on the card without a physical copy and read-back verification; `./dev release copy` writes `COPY-VERIFIED.txt` only after that read-back matches. Packages from now on can come from `./dev release package`; earlier ones were assembled by hand. |
+| SD delivery | The November 13 KODAK folder holds verified T10, Z10, P10 and Showcase builds from runtime `cbba1c5`. Their card files match the local SHA-256 values; older ROMs and saves remain available under their original filenames. |
 
 ## Verification and maintenance
 
