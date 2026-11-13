@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-12. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-13. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -18,6 +18,15 @@ does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
+
+- **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
+  Showcase built from runtime `cbba1c5` were copied to
+  `Games/Development/StarCraft-2026-11-13`. All four 32 MiB files were
+  read back from the mounted card and matched their build SHA-256 values;
+  the card folder has `COPY-VERIFIED.txt` and `START-HERE.txt`. The files
+  include the shared command-menu speedup. Older delivery notes below are
+  historical. Existing saves and older ROMs were retained. Next: test B-menu
+  scrolling and battle speed on a physical GBA SP.
 
 - **One ten-mission cartridge per race:** the default build and release
   profiles are Terran T10, Zerg Z10 and Protoss P10. All ten Zerg controllers
@@ -122,10 +131,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   guarded links pass; 128×128 T4/P10 physical prefixes match and exercise
   the new kernel. Qualify on hardware before promoting the option. Treat
   the result transition separately. A new Z7 instruction sample puts
-  routine rendering at 701k cycles and simulation at 462k. Prioritize
-  static map and sprite drawing and the separately measured command-menu
-  icon cost over the selection-ring probe (under 0.12% mean savings).
-  Continue steady simulation and drawing work separately.
+  routine rendering at 701k cycles and simulation at 462k. The shared
+  [command icon fix](audits/2026-11-13-command-icon-scaling.md) cuts open-menu
+  update cost 22.93% across four matching normal Z7 samples, with no
+  material change outside the menu. Both full three-CPU replays and the
+  four normal physical custom/SRAM checks match. Prioritize steady map,
+  sprite and simulation work over the selection-ring probe (under 0.12%
+  mean savings).
 
 - **First campaign controller journal:** [draft #361](https://github.com/ggu/starcraft-gba/pull/361)
   now composes P1 research, Q8 damage debt and current-controller sidecars in
