@@ -312,6 +312,10 @@ static int race_p8_condition_live_scan(void *context,
        race_p8_view.actor_at!=sc64_z8_game_actor_at ||
        race_p8_view.actor_count!=MAX_UNITS+MAX_BUILDINGS)
         return sc64_p8_world_condition(context,source,owner);
+#ifdef SC64_Z8_DIRECT_COMMAND_CENSUS
+    if (source->opcode == 2u)
+        return sc64_p8_world_condition(context,source,owner);
+#endif
     unsigned count=0;
     for(unsigned i=0;i<MAX_UNITS;i++)if(u[i].alive)race_p8_condition_live[count++]=(u16)i;
     for(unsigned i=0;i<MAX_BUILDINGS;i++)if(b[i].alive)race_p8_condition_live[count++]=(u16)(MAX_UNITS+i);
