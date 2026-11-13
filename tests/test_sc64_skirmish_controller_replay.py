@@ -210,6 +210,23 @@ class TraceValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "identity"):
             replay.validate_trace(trace, 32)
 
+    def test_accepts_independent_named_races_and_checks_live_slots(self):
+        trace = valid_trace()
+        bots = [{"owner": 1, "race": 1}, {"owner": 3, "race": 0}, {"owner": 4, "race": 1}]
+        trace["events"][8]["bots"] = bots
+        trace["terminal"]["bot_count"] = 3
+        trace["terminal"]["bots"] = [dict(bot, units=1, buildings=0) for bot in bots]
+        plan = replay.validate_trace(trace, 32)
+        state = {"race_mode": 1, "race_human": 1, "race_bots": 3, "race_skirmish_map": 0,
+                 "bot_races": [1, 0, 1], "bot_owners": [1, 3, 4]}
+        replay.verify_configuration(plan["start"], state)
+        state["bot_races"][1] = 2
+        with self.assertRaisesRegex(RuntimeError, "live ARM bot races"):
+            replay.verify_configuration(plan["start"], state)
+        bots[1]["owner"] = 4
+        with self.assertRaisesRegex(ValueError, "contiguous seat order"):
+            replay.validate_trace(trace, 32)
+
     def test_rejects_boolean_configuration_values(self):
         trace = valid_trace()
         trace["events"][8]["bots"][0]["owner"] = True

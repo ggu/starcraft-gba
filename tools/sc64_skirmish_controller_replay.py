@@ -203,8 +203,8 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True,
         _exact_keys(bot, {"owner", "race"}, f"start bot {index}")
         _integer(bot["owner"], f"start bot {index}.owner", 0, 4)
         _integer(bot["race"], f"start bot {index}.race", 0, 2)
-        if bot["owner"] != BOT_OWNERS[index] or bot["race"] != (human_race + 1 + index) % 3:
-            raise ValueError("start bot owners/races do not match the supported skirmish setup")
+        if bot["owner"] != BOT_OWNERS[index]:
+            raise ValueError("start bot owner does not match the supported contiguous seat order")
     if start_index <= 0 or start_index >= len(rows) - 1:
         raise ValueError("start marker is not between input events and terminal timeline")
 

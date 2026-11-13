@@ -527,14 +527,31 @@ static void write_progress(void)
     fputc('\n', stderr);
 }
 
+static int set_named_bot_races(const char *lineup)
+{
+    /* Named rows only; Random and closed physical seats need a trace schema
+     * that distinguishes the lobby choice from the resolved match owner. */
+    if (strlen(lineup) != (size_t)option_bots) return 0;
+    for (int i = 0; i < option_bots; ++i) {
+        switch (lineup[i]) {
+        case 't': option_bot_races[i] = R_TER; break;
+        case 'z': option_bot_races[i] = R_ZERG; break;
+        case 'p': option_bot_races[i] = R_PROTOSS; break;
+        default: return 0;
+        }
+    }
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     const char *trace_path;
     char *end = NULL;
     long value;
-    if (argc < 5 || argc > 6) {
-        fprintf(stderr, "usage: %s MAP HUMAN_RACE BOT_COUNT TRACE_PATH [MAX_TICKS]\n"
-                        "  MAP: 0 or 1; HUMAN_RACE: 0 Terran, 1 Zerg, 2 Protoss; BOT_COUNT: 1..3\n",
+    if (argc < 5 || argc > 7) {
+        fprintf(stderr, "usage: %s MAP HUMAN_RACE BOT_COUNT TRACE_PATH [MAX_TICKS [BOT_RACES]]\n"
+                        "  MAP: 0 or 1; HUMAN_RACE: 0 Terran, 1 Zerg, 2 Protoss; BOT_COUNT: 1..3\n"
+                        "  BOT_RACES: one lowercase t, z or p for each CPU seat in order\n",
                 argv[0]);
         return 2;
     }
@@ -552,15 +569,16 @@ int main(int argc, char **argv)
     for (int i = 0; i < option_bots; ++i)
         option_bot_races[i] = (option_human + 1 + i) % 3;
     trace_path = argv[4];
-    if (argc == 6) {
+    if (argc >= 6) {
         end = NULL;
         value = strtol(argv[5], &end, 10);
         if (!end || *end || value < 1 || value > 1000000L) goto invalid_args;
         match_limit = (unsigned)value;
     }
+    if (argc == 7 && !set_named_bot_races(argv[6])) goto invalid_args;
     const char *witness = getenv("SC64_SKIRMISH_COMBINED_ARMS");
     if (witness && strcmp(witness, "1") == 0) {
-        if (option_map != 0 || option_human != R_TER || option_bots != 1) {
+        if (option_map != 0 || option_human != R_TER || option_bots != 1 || option_bot_races[0] != R_ZERG) {
             fprintf(stderr, "combined-arms witness requires Outpost, Terran and one Zerg CPU\n");
             return 2;
         }
@@ -688,7 +706,7 @@ int main(int argc, char **argv)
     return won ? 0 : lost ? 3 : 4;
 
 invalid_args:
-    fprintf(stderr, "invalid arguments; usage: %s MAP HUMAN_RACE BOT_COUNT TRACE_PATH [MAX_TICKS]\n",
+    fprintf(stderr, "invalid arguments; usage: %s MAP HUMAN_RACE BOT_COUNT TRACE_PATH [MAX_TICKS [BOT_RACES]]\n",
             argv[0]);
     return 2;
 }
