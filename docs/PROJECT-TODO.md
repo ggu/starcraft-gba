@@ -37,8 +37,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   coverage, and original N64 behavior remain separate gates below. The
   [campaign evidence matrix](audits/2026-11-13-normal-campaign-matrix.md)
   separates exact KODAK wins, earlier normal builds and remaining checks.
-  [Z4 wins on both normal Z10 revisions](audits/2026-11-13-z4-two-normal-roms.md)
-  with matching checkpoints and Kerrigan alive.
+  [Z3](audits/2026-11-13-z3-current-home.md) and
+  [Z4](audits/2026-11-13-z4-two-normal-roms.md) win on both November 13
+  Z10 revisions; [Z5](audits/2026-11-13-z5-kodak-replay.md) also wins
+  on the KODAK Z10 ROM with Kerrigan alive.
   All ten Terran missions now have complete HOME wins on that same ROM.
   Continue exact normal Z10 and P10 replays and broader save checks. The normal
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
@@ -51,8 +53,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Their emulator rates are 23.74 and 21.86 updates/s. The exact KODAK P10
   cartridge [also wins P9 from HOME](audits/2026-11-13-p9-normal-home.md)
   with 59 matching checks, both Cerebrate objectives and both heroes alive.
-  Its replay averages 8.27 emulated updates/s. P1–P8 still need equivalent
-  qualification.
+  Its replay averages 8.27 emulated updates/s.
+  [Homeland](audits/2026-11-13-p7-carried-normal-home.md) wins on both
+  November 13 P10 revisions and the nearest-first candidate. P1–P6
+  and P8 still need equivalent qualification.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
   confirmed separate named, Random, and Closed seats and a middle-only
