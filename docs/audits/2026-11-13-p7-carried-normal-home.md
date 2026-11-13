@@ -38,3 +38,16 @@ does not qualify a save continuation or physical hardware performance.
 | KODAK P10 ROM | `7a8aa4da8bf156993db753b18a2fc2e02ad6bd880a58f014b6593b983a781310` |
 | Matching KODAK ELF | `667bf7f4c435916c58c7715892485c9533fce4f9830011387bfbd8b6f8a3f73d` |
 | KODAK physical receipt | `8ff96db01eaf51181cbc8116cef0985564cbddfaadfe51e10be48fae18465ed3` |
+
+The bit-verified nearest-depot promotion candidate also completed the
+same route. Its receipt matched every recorded value in the staged
+receipt apart from the provenance hashes, including the 59 named
+snapshots, all dialogue observations, and the absence of key-transition
+frame drift.
+
+| Promotion input or receipt | SHA-256 |
+| --- | --- |
+| P10 candidate ROM | `64a2bb9e43840c737b30934831f689fa948c43e640198f0473dadce7c9bfd525` |
+| Matching candidate ELF | `1a810dd3768a10e0bbd75e7cf8a1ca48d6c1101eb71c6f5e8f1b2fa4ccf4676c` |
+| Candidate replay harness | `24c8feb7839157293727bae31939d57d6364eaa8801717c047f4b322f5a04e0c` |
+| Candidate physical receipt | `8cd6076b129b8f921c07ba7f95ae03358e68856406dfc643fb599cc31ed0a273` |
