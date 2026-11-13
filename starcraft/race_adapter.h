@@ -2134,10 +2134,18 @@ static void race_skirmish_outcome(void)
 #endif
     }
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
-    if (human_buildings && race_skirmish_map == SC64_MAP_BLOOD_BATH && race_skirmish_start_order)
-        for (int rank = 0; rank < race_bots && rank < 3; ++rank)
-            if (!((enemy_with_buildings | race_skirmish_eliminated) & (1u << rank)))
+    if (human_buildings && race_skirmish_map == SC64_MAP_BLOOD_BATH && race_skirmish_start_order) {
+        unsigned occupied = 0;
+        for (int rank = 0; rank < race_bots && rank < 3; ++rank) {
+            const unsigned bit = 1u << rank;
+            occupied |= bit;
+            if (!((enemy_with_buildings | race_skirmish_eliminated) & bit))
                 race_skirmish_retire_bot(rank);
+        }
+        /* A fenced CPU is still competitive even with no buildings. Keep
+         * updating so its retirement can finish when the fence clears. */
+        if ((race_skirmish_eliminated & occupied) != occupied) return;
+    }
 #endif
     if (!human_buildings) { lost = 1; screen = SCREEN_RESULT; result_timer = 0; }
     else if (!enemy_buildings) { won = 1; screen = SCREEN_RESULT; result_timer = 0; }

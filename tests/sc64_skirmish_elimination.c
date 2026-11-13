@@ -152,6 +152,44 @@ static void check_elimination(int melee)
     assert(won && !lost && race_skirmish_eliminated == 7);
 }
 
+#if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+static void check_fenced_final_result(int human_defeat)
+{
+    launch(0);
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    const int owner = ENEMY, bit = 1, type = U_BATTLECRUISER;
+#else
+    const int owner = 4, bit = 4, type = U_P7_CARRIER;
+#endif
+    const int ship = spawn_unit(owner, type, 500, 500);
+    const int survivor = spawn_unit(owner, U_MARINE, 480, 500);
+    assert(ship >= 0 && survivor >= 0 && !race_skirmish_neutral_transfer_ready(&u[ship]));
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner != SIDE && b[i].owner != owner)
+            destroy_building(i, SIDE);
+    game_update(0, 0);
+    assert(!won && !lost && race_skirmish_eliminated == (7 ^ bit));
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == owner) destroy_building(i, SIDE);
+    game_update(0, 0);
+    assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == (7 ^ bit));
+    assert(u[ship].owner == owner && u[survivor].owner == owner && owners_hostile(SIDE, owner));
+    if (human_defeat) {
+        for (int i = 0; i < MAX_BUILDINGS; ++i)
+            if (b[i].alive && b[i].owner == SIDE) destroy_building(i, owner);
+        game_update(0, 0);
+        assert(!won && lost && screen == SCREEN_RESULT && race_skirmish_eliminated == (7 ^ bit));
+    } else {
+        hit_target(ship, 5000, U_MARINE, SIDE);
+        assert(!u[ship].alive);
+        game_update(0, 0);
+        assert(won && !lost && screen == SCREEN_RESULT && race_skirmish_eliminated == 7);
+        assert(u[survivor].alive && u[survivor].owner == NEUTRAL &&
+               !owners_hostile(SIDE, NEUTRAL));
+    }
+}
+#endif
+
 #ifdef SC64_TRANSPORT_RUNTIME
 static void check_neutral_cargo(int ship_type, int owner)
 {
@@ -293,6 +331,10 @@ int main(void)
 {
     check_elimination(0);
     check_elimination(1);
+#if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+    check_fenced_final_result(0);
+    check_fenced_final_result(1);
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     check_neutral_cargo(U_DROPSHIP, ENEMY);
 #ifdef SC64_SHARED_TRANSPORT

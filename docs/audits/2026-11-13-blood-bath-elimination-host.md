@@ -36,10 +36,10 @@ Overlord cannot set it. This follows the native transfer's upgrade copy
 to owner 11.
 
 Actors with coupled Carrier, Scarab, Egg, Ghost or Battlecruiser state
-still defer the owner transition in profiles that enable them. Until such a
-transition can run, the port keeps its existing final win/loss logic.
-Ordinary human defeat and simultaneous final losses also keep the
-existing result precedence. A release needs linked survivor evidence
+still defer the owner transition in profiles that enable them. Victory waits until all occupied CPU ranks retire, even when no CPU has
+buildings. The match keeps updating while a fenced CPU remains active.
+The host prototype retains the existing human defeat rule; this does
+not establish native precedence for simultaneous final losses. A release needs linked survivor evidence
 from an ordinary native match and ARM and hardware tests, including the
 cost of a large transfer and persistence of relevant sidecars.
 
@@ -66,7 +66,8 @@ ordinary Terran profile inputs already prepared. The sanitizer fixture
 uses physical menu keys, real building creation/destruction, the
 ordinary simulation, SRAM save/load and pause restart. It covers both
 modes, a surviving CPU still taking turns, two owners eliminated in one
-update, final victory, Dropship and Shuttle cargo through SRAM, rejected
+update, victory after a final CPU's fence clears, human defeat while a
+CPU is still fenced, Dropship and Shuttle cargo through SRAM, rejected
 neutral boarding/unload commands and malformed cargo, Overlord retirement,
 SRAM, death and restart, the neutral research bit's prior reader rejection,
 previous and marked record reads, a changed launch clock, and a malformed
