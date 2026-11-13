@@ -124,4 +124,15 @@ flight resolves.
    witnessed. Retain the private capture locally and publish only
    the evidence hashes, observations and source notes.
 
-This audit records no new emulator run and changes no game code.
+## Repeated Free for All opening
+
+A fresh ares run of the same known opening reproduced all three 8 MiB
+RAM captures and both raw images byte for byte. The hybrid transition at
+step 4,200 passed both cache checks and reported `view_equal=1`. At
+steps 4,201, 4,210 and 4,215 the countdown again reads 7, 4 and 2; CPU
+kinds are 1/1/1, human kind is 2, and every active player has one building.
+All pending and published results are zero. This confirms the opening
+and observer repeatability. It does not exercise an elimination.
+
+- Fresh manifest SHA-256: `8f1a5be749b09990fa69785025e552a43e041279a2ef24b0ad738e35aebaf4f2`.
+- Matching full relation matrix SHA-256: `a210f69340f9933492d808c821ae0e1859e109b7f7359836cb788917aaef8dba`.
