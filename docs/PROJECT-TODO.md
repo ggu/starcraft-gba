@@ -45,9 +45,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Z8](audits/2026-11-12-z8-normal-physical.md#exact-november-13-kodak-cartridge)
   and [Z9](audits/2026-11-13-z9-normal-physical.md#exact-november-13-kodak-cartridge)
   now win from HOME on that ROM, with both Nexuses destroyed in Z8 and
-  the Drone delivering the crystal in Z9.
-  All ten Terran missions now have complete HOME wins on that same ROM.
-  Continue exact normal Z10 and P10 replays and broader save checks. The normal
+  the Drone delivering the crystal in Z9. [Z10 also wins from HOME](audits/2026-11-13-z10-exact-home.md)
+  on that ROM, matching all 61 shared world checkpoints with the
+  earlier save continuation. [Z7 now wins uninterrupted from HOME](audits/2026-11-12-z7-normal-physical.md#uninterrupted-home-on-the-exact-kodak-cartridge)
+  with 253 matching observations, including five shared with the SRAM
+  continuation. All ten Terran and all ten Zerg missions now have
+  complete HOME wins on their exact KODAK cartridges. Continue Protoss
+  replays, broader save checks, and spot checks on newer runtime builds. The normal
   Protoss cartridge now has a [full P10 win from HOME](audits/2026-11-13-p10-normal-home.md)
   with the complete briefing, authored dialogue and all three heroes alive.
   The exact KODAK P10 ROM reproduces that win at 8.79 emulated updates per
@@ -212,7 +216,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   material change outside the menu. Both full three-CPU replays and the
   four normal physical custom/SRAM checks match. Prioritize steady map,
   sprite and simulation work over the selection-ring probe (under 0.12%
-  mean savings).
+  mean savings). On exact KODAK Z7, the 25,000-frame stretch after
+  frame 75,289 averages 6.80 updates/s. Profile the separate 480-update
+  interval at frames 46,499–46,976 (3.75M cycles/update) by stage; the
+  early rendering sample does not explain this sustained midgame cost.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
