@@ -12,7 +12,11 @@ START, B, L = 8, 2, 512
 # The tag is a profile constraint, not a value inferred from DWARF.
 CANONICAL_Z7_EGG_TAG = 0x53435a54
 TRANSPORT1_Z7_TAG = CANONICAL_Z7_EGG_TAG | 0x04000000
-SAVE_FORMATS = ('legacy', 'transport1')
+# Carried Z7 on the normal Z10 profile: generation 49, worker cargo tag,
+# then the shared transport bit. Keep this distinct from the older Z7 ROM.
+Z10_CARGO_TAG = (0x53435a30 + 49) ^ 0x01000000
+TRANSPORT1_Z10_TAG = Z10_CARGO_TAG | 0x04000000
+SAVE_FORMATS = ('legacy', 'transport1', 'z10-transport1')
 TRANSPORT1_TRAILER_BYTES = 16
 
 
@@ -74,7 +78,7 @@ def validate_journal(data, layout, frame, save_format='legacy'):
     if save_format not in SAVE_FORMATS:
         raise ValueError('unsupported Z7 save format')
     size, fields = layout
-    trailer_size = TRANSPORT1_TRAILER_BYTES if save_format == 'transport1' else 0
+    trailer_size = TRANSPORT1_TRAILER_BYTES if save_format != 'legacy' else 0
     if type(size) is not int or not 0 < size <= 16368 - trailer_size:
         raise ValueError('invalid ELF RaceSave size')
     if fields.widths.get('version') != 4 or fields.arrays.get('state') != (32, 4, True):
@@ -89,7 +93,8 @@ def validate_journal(data, layout, frame, save_format='legacy'):
         raise ValueError('second SRAM slot is not erased')
     # Fresh title starts with blank SRAM, so a successful first save is slot 0, sequence 1.
     tag, length, checksum, sequence = struct.unpack_from('<4I', data)
-    expected_tag = TRANSPORT1_Z7_TAG if save_format == 'transport1' else CANONICAL_Z7_EGG_TAG
+    base_tag = Z10_CARGO_TAG if save_format == 'z10-transport1' else CANONICAL_Z7_EGG_TAG
+    expected_tag = base_tag | 0x04000000 if trailer_size else base_tag
     if (tag, length, sequence) != (expected_tag, size + trailer_size, 1):
         raise ValueError('invalid fresh Z7 journal header')
     payload = data[16:16+length]
@@ -98,7 +103,7 @@ def validate_journal(data, layout, frame, save_format='legacy'):
         h = ((h ^ byte) * 16777619) & 0xffffffff
     if h != checksum:
         raise ValueError('Z7 journal payload checksum differs')
-    if struct.unpack_from('<I', payload, version)[0] != CANONICAL_Z7_EGG_TAG:
+    if struct.unpack_from('<I', payload, version)[0] != base_tag:
         raise ValueError('Z7 payload version differs from base version')
     if trailer_size and payload[size:] != bytes(trailer_size):
         raise ValueError('Z7 campaign transport trailer is not zero')

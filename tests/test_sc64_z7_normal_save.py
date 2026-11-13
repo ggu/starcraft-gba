@@ -174,6 +174,20 @@ class SaveTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'second SRAM slot'): save.validate_journal(changed, layout, 10, 'transport1')
         with self.assertRaises(ValueError): save.validate_journal(image, (16353, fields), 10, 'transport1')
         with self.assertRaises(ValueError): save.validate_journal(image, layout, 11, 'transport1')
+        z10_base = bytearray(base)
+        struct.pack_into('<I', z10_base, 0, 0x52435a61)
+        z10 = record(z10_base + bytes(16), tag=0x56435a61)
+        self.assertEqual(save.validate_journal(z10, layout, 10, 'z10-transport1')['tag'],
+                         0x56435a61)
+        with self.assertRaises(ValueError):
+            save.validate_journal(z10, layout, 10, 'transport1')
+        with self.assertRaises(ValueError):
+            save.validate_journal(image, layout, 10, 'z10-transport1')
+        wrong_mission = bytearray(z10_base)
+        struct.pack_into('<i', wrong_mission, 16, 21)
+        with self.assertRaises(ValueError):
+            save.validate_journal(record(wrong_mission + bytes(16), tag=0x56435a61),
+                                  layout, 10, 'z10-transport1')
 
     def test_cli_passes_explicit_save_format_and_defaults_to_legacy(self):
         argv = ['replay', '--trace', 't', '--rom', 'r', '--elf', 'e', '--runner', 'b', '--output', 'o']

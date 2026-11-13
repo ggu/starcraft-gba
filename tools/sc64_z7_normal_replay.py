@@ -368,7 +368,7 @@ def main():
     ap.add_argument('--stop',type=int); ap.add_argument('--cut',type=int)
     ap.add_argument('--resume-stop',type=int,help='Bound a resume at a recorded observation; short resumes are prefixes')
     ap.add_argument('--save-format',choices=save.SAVE_FORMATS,default='legacy',
-                    help='Explicit journal namespace; transport1 accepts only the zero-impact campaign trailer')
+                    help='Explicit Z7 or carried Z10 journal namespace; transport formats require a zero campaign trailer')
     ap.add_argument('--physical',action='store_true',help='Use emulator buttons; supports release ROMs without scheduler symbols')
     ap.add_argument('--export-save',action='store_true'); ap.add_argument('--save-input',type=Path); ap.add_argument('--saved-state',type=Path)
     a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut,a.physical,a.save_format,a.resume_stop)
