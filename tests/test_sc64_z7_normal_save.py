@@ -71,6 +71,16 @@ class SaveTest(unittest.TestCase):
         self.assertEqual(save.resume_inputs([(1,1),(4,0),(11,4)],10,load_updates=2),
                          [(0,save.L),(1,0),(2,4)])
 
+    def test_physical_reselection_preserves_update_alignment(self):
+        transitions = [(1, 1), (4, 0), (12, save.SELECT), (13, 0), (14, 16)]
+        self.assertEqual(save.resume_inputs(transitions, 10, 1, reselect=True),
+                         [(0, save.L), (1, save.A), (2, save.SELECT), (3, 0), (4, 16)])
+        with self.assertRaisesRegex(ValueError, 'requires physical'):
+            save.resume_inputs(transitions, 10, 2, reselect=True)
+        for following in ([(11, 16)], [(12, 16)], [(13, save.SELECT)], []):
+            with self.assertRaisesRegex(ValueError, 'neutral then Select'):
+                save.resume_inputs(transitions[:2] + following, 10, 1, reselect=True)
+
     def test_restored_and_tamper_fail_closed(self):
         world = {'frame': 10, 'screen': 2, 'fingerprint': 'a'*64}
         saved = {'cut': 10, 'mission': 18, 'world': world, 'model': {k: ([0]*8 if k in ('action_cursors','action_ticks') else 0) for k in save.MODEL_FIELDS}}
@@ -174,6 +184,20 @@ class SaveTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'second SRAM slot'): save.validate_journal(changed, layout, 10, 'transport1')
         with self.assertRaises(ValueError): save.validate_journal(image, (16353, fields), 10, 'transport1')
         with self.assertRaises(ValueError): save.validate_journal(image, layout, 11, 'transport1')
+        z10_base = bytearray(base)
+        struct.pack_into('<I', z10_base, 0, 0x52435a61)
+        z10 = record(z10_base + bytes(16), tag=0x56435a61)
+        self.assertEqual(save.validate_journal(z10, layout, 10, 'z10-transport1')['tag'],
+                         0x56435a61)
+        with self.assertRaises(ValueError):
+            save.validate_journal(z10, layout, 10, 'transport1')
+        with self.assertRaises(ValueError):
+            save.validate_journal(image, layout, 10, 'z10-transport1')
+        wrong_mission = bytearray(z10_base)
+        struct.pack_into('<i', wrong_mission, 16, 21)
+        with self.assertRaises(ValueError):
+            save.validate_journal(record(wrong_mission + bytes(16), tag=0x56435a61),
+                                  layout, 10, 'z10-transport1')
 
     def test_cli_passes_explicit_save_format_and_defaults_to_legacy(self):
         argv = ['replay', '--trace', 't', '--rom', 'r', '--elf', 'e', '--runner', 'b', '--output', 'o']

@@ -206,7 +206,7 @@ def resume_window(plan, cut, resume_stop):
     return end, transitions, observations
 
 
-def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None, physical=False, save_format='legacy', resume_stop=None):
+def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None, physical=False, save_format='legacy', resume_stop=None, reselect_building=None):
     if save_format not in save.SAVE_FORMATS:
         raise ValueError('unsupported Z7 save format')
     if export_save and (save_input or saved_state or stop is not None):
@@ -215,6 +215,9 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
         raise ValueError('resume requires both save and saved summary, without prefix/export options')
     if resume_stop is not None and not save_input:
         raise ValueError('resume stop requires a save input')
+    if reselect_building is not None and (not physical or not save_input or
+                                         type(reselect_building) is not int or reselect_building < 0):
+        raise ValueError('building reselection requires a physical resume and nonnegative building slot')
     if bool(export_save or save_input) != (cut is not None):
         raise ValueError('save export and resume require an explicit cut')
     inputs=(trace,rom,elf,runner) + ((save_input,saved_state) if save_input else ())
@@ -233,7 +236,8 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
     load_updates=1 if physical else 2
     if export_save or save_input:
         events = ([(t-1,h) for t,h in plan['transitions'] if t <= cut] + save.save_inputs(cut)
-                  if export_save else save.resume_inputs(resume_transitions,cut,load_updates))
+                  if export_save else save.resume_inputs(resume_transitions,cut,load_updates,
+                                                         reselect=reselect_building is not None))
         end = cut + 4 if export_save else load_updates + original_stop - cut
         checks = ({t:t for t in plan['observations'] if t <= cut} if export_save else
                   {load_updates+t-cut:t for t in resume_observations})
@@ -271,6 +275,10 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
     output.mkdir(parents=True,exist_ok=False)
     proc=rsp=log=None; records=[]
     def u32(name): return int.from_bytes(rsp.read(sym[name],4),'little')
+    def selected_building():
+        if sizes.get('selected_building') != 4:
+            raise ValueError('invalid selected building symbol width')
+        return int.from_bytes(rsp.read(sym['selected_building'],4),'little',signed=True)
     def write_page(events):
         rsp.write(sym['demo_schedule_events'],b''.join(struct.pack('<2I',*item) for item in events))
         rsp.write(sym['demo_schedule_count'],struct.pack('<I',len(events)))
@@ -301,6 +309,13 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             save.verify_restored(saved,restored,cut,z7.MISSION)
             save.verify_cut_summary(restored,plan['observations'][cut],cut,1)
             (output/'restored-state.json').write_text(json.dumps(restored,indent=2)+'\n')
+            if reselect_building is not None:
+                if selected_building() != -1:
+                    raise RuntimeError('load did not leave building selection clear')
+                rsp.play_to(2, events)
+                if (selected_building() != reselect_building or u32('screen') != 1 or
+                        u32('frame') != restored['world']['frame'] + 1):
+                    raise RuntimeError('A did not reselect the expected building on the first resumed update')
             if not physical:
                 rsp.breakpoint(sym['game_update']&~1,False)
                 rsp.breakpoint(sym['demo_replay_checkpoint']&~1,True)
@@ -351,6 +366,8 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             result['save']={'cut':cut,'journal':journal,'sha256':input_hashes((output/'saved.sav',output/'saved-state.json'))}
         if save_input:
             result['resume']={'cut':cut,'restored_matches':True,'seed_file_unchanged':True}
+            if reselect_building is not None:
+                result['resume']['reselected_building']=reselect_building
         (output/'result.json').write_text(json.dumps(result,indent=2)+'\n');return result
     finally:
         if proc is not None:
@@ -367,10 +384,12 @@ def main():
     for name in ('trace','rom','elf','runner','output'):ap.add_argument('--'+name,type=Path,required=True)
     ap.add_argument('--stop',type=int); ap.add_argument('--cut',type=int)
     ap.add_argument('--resume-stop',type=int,help='Bound a resume at a recorded observation; short resumes are prefixes')
+    ap.add_argument('--reselect-building',type=int,help='On physical resume, press A instead of the first neutral update and verify this building slot')
     ap.add_argument('--save-format',choices=save.SAVE_FORMATS,default='legacy',
-                    help='Explicit journal namespace; transport1 accepts only the zero-impact campaign trailer')
+                    help='Explicit Z7 or carried Z10 journal namespace; transport formats require a zero campaign trailer')
     ap.add_argument('--physical',action='store_true',help='Use emulator buttons; supports release ROMs without scheduler symbols')
     ap.add_argument('--export-save',action='store_true'); ap.add_argument('--save-input',type=Path); ap.add_argument('--saved-state',type=Path)
-    a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut,a.physical,a.save_format,a.resume_stop)
+    a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut,a.physical,a.save_format,a.resume_stop,
+                          reselect_building=a.reselect_building)
 
 if __name__=='__main__':main()

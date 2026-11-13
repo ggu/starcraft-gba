@@ -79,3 +79,43 @@ the 561,792-cycle budget for two GBA video frames.
 - Physical divergence receipt SHA-256: `bf8851593eaa11eedb6fce0198abb8d5f42997140a5245e5177bf71da09c3058`.
 - Timing prefix receipt SHA-256: `85dcee94d5a8078795ce485bf2522cf8e0bdc4414416fd2462b303e38a00e376`.
 - Simulation timing receipt SHA-256: `1f0504f50e6df2f0486829f4ed0c6131fad6f67a7ee11c4715400d3ef45d8794`.
+
+## Fresh SRAM on the November 13 Z10 KODAK cartridge
+
+The normal Z10 ROM from `cbba1c5` replayed the same winning tape through
+call 188,324, game frame 185,926, with 248 matching named observations.
+Ordinary Start then B wrote the first SRAM journal. The tool verifies the
+32 KiB image, authenticated Z10 transport tag `0x56435a61`, payload version
+`0x52435a61`, 16,312-byte payload, sequence 1, checksum, zero transport
+trailer, erased alternate slot, mission 18 and exact game frame.
+
+In a fresh emulator process, L restored the saved frame and the bounded
+world fingerprint, model and economy exactly. The unchanged cartridge
+does not restore the selected building. Without intervention, Select on
+the second gameplay update opened Pause, and the R in the next movement
+chord restarted the mission. The first retained post-load observation
+therefore saw frame 1,911 instead of 187,840. This was a control-state
+mismatch after a successful load.
+
+The cursor still pointed at the same Hatchery. Replacing the first neutral
+update with ordinary A reselected building slot 1 and advanced exactly
+one game frame. The tape then cleared the selection as intended. The
+remaining 9,131 gameplay calls and all five observations matched, and the
+fresh process won at frame 194,998. The SRAM seed stayed byte-identical.
+This proves a continuation with one explicit button repair; it does not
+show that the cartridge restores selection or every transient UI state.
+
+For the tape and matching build, add `--export-save --cut 188324
+--save-format z10-transport1` to the physical command above. In a new
+output directory, use `--cut 188324 --save-format z10-transport1
+--save-input PATH/saved.sav --saved-state PATH/saved-state.json
+--reselect-building 1` instead. The reselection option requires a neutral
+first gameplay update followed immediately by Select, and verifies the
+actual slot and frame before continuing.
+
+- KODAK ROM SHA-256: `e23e85d72041951e09c25e0b49111538c35ce174b4875aa4aed51143dfdfc907`.
+- KODAK ELF SHA-256: `74c4b2394c4aee619bf2ea0549c31de7987827a915c32c5c50e7a4fec58ad6c1`.
+- Observer SHA-256: `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549`.
+- SRAM SHA-256: `632a64001689bbbc35ae7a2ca4cea20b93c94a1187c5ee7cdb95ffe88b05662f`.
+- Save export receipt SHA-256: `bd83af7627678c2448007fc1cc095c20f40403659a69fd339032df06f8478eb6`.
+- Verified reselection and victory receipt SHA-256: `9acb1daa2cfb68a9d458cb9d66b1fc078cb3e10220c45a2a9b2114b146bb86ab`.
