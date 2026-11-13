@@ -65,7 +65,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Its replay averages 8.27 emulated updates/s.
   [Homeland](audits/2026-11-13-p7-carried-normal-home.md) wins on both
   November 13 P10 revisions and the nearest-first candidate. P1–P6
-  and P8 still need equivalent qualification. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
+  and P8 still need equivalent qualification. [The old P1 and P2 tapes](audits/2026-11-13-p1-p2-staged-prefixes.md)
+  reach play on staged P10, then differ in enemy count and minerals,
+  respectively. Re-record them with the current product flags. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   wins on HOST with both heroes at full health. The exact-ROM verifier's
   static plan authenticates the authored page table. Next: run its
@@ -118,7 +120,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [native Blood Bath end-rule audit](audits/2026-11-13-n64-blood-bath-end-rules.md)
   traces both modes to defeat at zero buildings and victory at zero eligible
   opponent slots. Defeat transfers the remaining actors to neutral ownership
-  and detaches their AI. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
+  and detaches their AI. The [native cadence audit](audits/2026-11-13-n64-blood-bath-result-cadence.md)
+  finds that the stock dispatcher evaluates all eligible owners before
+  publishing results. Watch its real countdown rather than counting video
+  frames when testing a direct last-building kill. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
   traces the loaded passenger exception and the Carrier/Reaver queue reset.
   The [last Command Center lift](audits/2026-11-13-n64-blood-bath-airborne-last-building.md)
   confirms an airborne building still counts. GBA skirmish needs a
@@ -139,8 +144,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Blood Bath and to two and three independent opponents. The [named lineup
   controller](audits/2026-11-13-named-skirmish-matches.md) now records
   complete HOST losses with one, two and three chosen CPUs, including a
-  Terran mirror, two duplicate CPUs and a reversed mixed lineup. Replay
-  those on ARM and develop a winning Blood Bath route. Native automatic
+  Terran mirror, two duplicate CPUs and a reversed mixed lineup. The
+  three-CPU Blood Bath result matches all 25 checks on the staged Terran
+  ROM at 20.93 emulated updates/s. Check the other two on ARM and develop
+  a winning Blood Bath route. Native automatic
   [SCV resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md)
   and the outcome of surviving actors still need native witnesses.
 
@@ -225,9 +232,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   four normal physical custom/SRAM checks match. Prioritize steady map,
   sprite and simulation work over the selection-ring probe (under 0.12%
   mean savings). On exact KODAK Z7, the 25,000-frame stretch after
-  frame 75,289 averages 6.80 updates/s. Profile the separate 480-update
-  interval at frames 46,499–46,976 (3.75M cycles/update) by stage; the
-  early rendering sample does not explain this sustained midgame cost.
+  frame 75,289 averages 6.80 updates/s. The [dense stock stage sample](audits/2026-11-12-z7-normal-physical.md#uninterrupted-home-on-the-exact-kodak-cartridge)
+  finds movement orders take 2.61M of 3.77M cycles per active update.
+  Route-build calls average 3.14M orders cycles versus 1.03M without a
+  build. Prioritize route churn and the remaining orders cost on that
+  exact window; early rendering samples describe a different workload.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
