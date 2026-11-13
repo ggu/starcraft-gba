@@ -14,6 +14,24 @@ from sc64_skirmish_sram_continuation import BUILDING_FIELDS, UNIT_FIELDS, Physic
 from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta, timing_snapshot
 
 
+def terminal_modal_release(call, stop, keys, checks, modal, frame, final):
+    """Recognize the final HOST neutral bookkeeping update after a modal WIN."""
+    count, _, armed, _ = modal
+    if (call != stop - 1 or keys.get(call) != 0 or count or armed
+            or frame != final["frame"] or final["won"] != 1 or final["lost"]):
+        return False
+    for kind, *row in checks.get(call - 2, ()):
+        if kind != "modal":
+            continue
+        frozen, box, page, _, _, held, key = row
+        if (held and keys.get(call - 2) == held | key
+                and keys.get(call - 1) == held and frozen == frame
+                and ("armed", frame, box, page, key) in checks.get(call - 1, ())
+                and ("released", frame) in checks.get(call, ())):
+            return True
+    return False
+
+
 def run(args):
     if not __debug__:
         raise RuntimeError("Replay checks require Python assertions")
@@ -139,6 +157,7 @@ def run(args):
             # The runner cannot stop a batch when RESULT or a modal opens.
             # Never let a later tape edge restart a failed attempt.
             boundaries.update(range(1, stop_at + 1))
+        terminal_release = None
         for call in sorted(n for n in boundaries if n <= stop_at):
             if call % 500 == 0 or call == stop_at:
                 if shutil.disk_usage(args.out).free < int(4.15 * 1024**3):
@@ -151,9 +170,6 @@ def run(args):
                 if call-1 in keys:
                     r.set_keys(keys[call-1])
                 r._advance(1)
-                if n("screen") == 3 and call < stop:
-                    (args.out/"divergence.json").write_text(json.dumps(dict(call=call, unexpected_result=observe()),indent=2))
-                    raise RuntimeError(f"unexpected RESULT at call {call}")
             for check in checks.get(call, ()):
                 kind, *row = check
                 count, page, armed, current = struct.unpack("<4H", r.read(0x06013fe0, 8))
@@ -172,6 +188,16 @@ def run(args):
                     assert count and (page,armed,current,n("frame")) == (expected_page,key,expected_row,frame)
                 else:
                     assert kind == "released" and not armed and n("frame") == row[0]
+            if mission != 1 and call < stop and n("screen") == 3:
+                actual = observe()
+                active = struct.unpack("<4H", r.read(0x06013fe0, 8))
+                differences = {k: [v, actual[k]] for k, v in final.items() if actual[k] != v}
+                if differences or not terminal_modal_release(call, stop, keys, checks, active,
+                                                              actual["frame"], final):
+                    (args.out/"divergence.json").write_text(json.dumps(
+                        dict(call=call, unexpected_result=actual, differences=differences), indent=2))
+                    raise RuntimeError(f"unexpected RESULT at call {call}")
+                terminal_release = call
             if call in checkpoints or call == stop:
                 assert not int.from_bytes(r.read(0x06013fe0, 2), "little"), (call, "unacknowledged modal")
                 expected = final if call == stop else checkpoints[call]
@@ -184,7 +210,7 @@ def run(args):
                 print(f"Matched mission {mission} call {call}, frame {actual['frame']}",flush=True)
         require_unchanged(files, pins)
         result = dict(status="won" if stop_at == stop else "prefix", calls=stop_at, observations=observations, briefing=reveals,
-                      pages=pages, sha256=pins,
+                      pages=pages, terminal_modal_release=terminal_release, sha256=pins,
                       timing=timing_delta(start,timing_snapshot(r,g.sym,g.sizes),stop_at))
         (args.out/"result.json").write_text(json.dumps(result,indent=2)+"\n")
     finally:
