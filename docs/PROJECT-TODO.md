@@ -123,14 +123,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [SCV resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md)
   and the outcome of surviving actors still need native witnesses.
 
-- **Protoss route stalls (P1):** on the [composed P10 route comparison](audits/2026-11-13-p10-nearest-composed.md),
-  nearest-first reduced three depot spikes by 52–74% and the prefix peak
-  by 37.75%, but the mean improved just 0.77%. Actor state and ordered
-  pixels matched. The composed candidate also loads the existing SRAM and
-  wins with the same world and final journal. The cache layout changes by
-  design. Qualify the normal
-  P10 ROM through full HOME, fresh SRAM and a custom match with multiple
-  depots before enabling this selection order there.
+- **Protoss route stalls (P1):** the normal P10 cartridge now uses the
+  same nearest-first depot selection as Z10. [Normal P10 qualification](audits/2026-11-13-p10-nearest-normal.md)
+  matches Eye of the Storm from HOME and a fresh pause save, and 101
+  observations in a custom match with up to four depots for one owner.
+  Homeland also wins with 59 matching snapshots on the promoted ROM.
+  Three gameplay stalls fall by 80–95%; full P10 averages 8.99 emulated
+  updates/s, up from 8.80. The result autosave still peaks at 76.54M cycles.
+  The [composed experiment](audits/2026-11-13-p10-nearest-composed.md)
+  remains separate. Next: reduce sustained movement and render costs and
+  qualify the exact save-reader improvement for the result transition.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
