@@ -1083,6 +1083,10 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    rendered and visibility samples. Mean loop cost falls 2.80–3.14% in the
    two latest campaign windows; the earlier 64×64 custom window is 0.93%
    faster with matching sampled state. Continue profiling the large stalls.
+   The [batched target-index probe](audits/2026-11-12-target-index-bulk.md)
+   saves 0.86–0.89% in two earlier normal Z10 windows with matching state
+   and drawn pages. The probe stays off pending current cartridge and
+   longer custom-match checks.
    Historical inclusive scopes are not promised savings. The N64
    order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
