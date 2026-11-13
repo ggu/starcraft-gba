@@ -230,9 +230,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   four normal physical custom/SRAM checks match. Prioritize steady map,
   sprite and simulation work over the selection-ring probe (under 0.12%
   mean savings). On exact KODAK Z7, the 25,000-frame stretch after
-  frame 75,289 averages 6.80 updates/s. Profile the separate 480-update
-  interval at frames 46,499–46,976 (3.75M cycles/update) by stage; the
-  early rendering sample does not explain this sustained midgame cost.
+  frame 75,289 averages 6.80 updates/s. The [dense stock stage sample](audits/2026-11-12-z7-normal-physical.md#uninterrupted-home-on-the-exact-kodak-cartridge)
+  finds movement orders take 2.61M of 3.77M cycles per active update.
+  Route-build calls average 3.14M orders cycles versus 1.03M without a
+  build. Prioritize route churn and the remaining orders cost on that
+  exact window; early rendering samples describe a different workload.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution

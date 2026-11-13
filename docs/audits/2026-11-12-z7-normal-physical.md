@@ -159,5 +159,21 @@ It takes `--trace`, `--rom`, `--elf`, and `--runner` with their corresponding
 and observer, all 14 counter symbols, and the 131 checkpoints through the
 window. For a replay, use `--output` with a fresh directory and omit
 `--plan`. The tool checks the prefix and endpoints and reconciles the
-sampled loop cycles with the independent accumulated counter. ARM stage
-timing has not run yet.
+sampled loop cycles with the independent accumulated counter.
+
+The stock ARM run matched all 131 prefix checkpoints and captured all
+480 calls. The 477 updates that advanced simulation averaged 3,766,477
+cycles per loop. Simulation used 3,160,442 cycles, including 2,609,769
+in movement orders (69% of the whole loop), 312,487 in other update
+work, and 228,600 in sight. Map drawing averaged 417,654 cycles.
+
+Excluding the first sample, 357 active calls with a changed route-build
+counter averaged 3,142,755 cycles in movement orders. The 119 active
+calls without a changed counter still averaged 1,025,223 in orders.
+The counter increased by 614 between the first and last samples. The
+largest loop was call 47,823 at 9,087,886 cycles, including 7,895,389 in
+orders. These counters identify where to profile next; they do not say
+which fills were avoidable or measure hardware FPS. Preserve route-cache
+semantics and compare the same dense window before promoting a change.
+
+- Dense stage receipt SHA-256: `93809b1993233b716cdc09c9b132a69a775c0e4747989045413d9d00402e72cf`.
