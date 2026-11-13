@@ -16,6 +16,8 @@ order_selected_worker_to_visible_minerals(int worker, void (*move)(int, int),
         {7,13}, {-7,13}, {7,-13}, {-7,-13},
         {11,11}, {-11,11}, {11,-11}, {-11,-11}
     };
+    if (worker < 0 || worker >= MAX_UNITS || !u[worker].alive ||
+        u[worker].owner != SIDE || !IS_WORKER(u[worker].type) || !move || !press) return -1;
     int x = u[worker].x, y = u[worker].y, last_distance = -1, last_patch = -1;
     for (int attempt = 0; attempt < 8; ++attempt) {
         int patch = -1, distance = 0x7fffffff;

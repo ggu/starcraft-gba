@@ -110,9 +110,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   losing its own production. Next controller should defend its base
   and use a legal mixed army before testing full-match victory on ARM.
   The [mixed-army scout](audits/2026-11-13-custom-human-economy.md)
-  lost after the mineral bank stalled despite gas income. First check
-  an ordinary post-construction gather order through a verified deposit;
-  do not infer that stock N64 resumes mining on its own.
+  lost after the mineral bank stalled despite gas income. A [checked
+  worker order](audits/2026-11-13-skirmish-builder-minerals.md) now mines
+  an alternate visible patch and deposits eight minerals on exact KODAK.
+  Use it to sustain economy in a full controller match. [Native automatic
+  resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md) still
+  needs a same-worker witness.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
