@@ -50,6 +50,13 @@ test-sc64-p10-mission: build/test-sc64-p10-mission
 	./build/test-sc64-p10-mission $(P10_HOST_DIR)
 test-sc64-protoss-p10: test-sc64-p10-mission test-sc64-p10-carried-profile
 
+# Optional shared census; use the full P10 roster to compare live providers.
+.PHONY: test-sc64-z8-command-census
+test-sc64-z8-command-census: build/test-sc64-z8-command-census
+	./build/test-sc64-z8-command-census
+build/test-sc64-z8-command-census: tests/sc64_z8_command_census.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_Z8_DIRECT_COMMAND_CENSUS $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+
 # P10 ordinary-input qualification, built like the P8 and P9 ones.
 P10_ARM_DIR := build/p10-arm
 P10_ARM_TRACE := $(P10_ARM_DIR)/p10-controller.jsonl
