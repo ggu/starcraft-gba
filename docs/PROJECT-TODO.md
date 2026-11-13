@@ -65,7 +65,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Its replay averages 8.27 emulated updates/s.
   [Homeland](audits/2026-11-13-p7-carried-normal-home.md) wins on both
   November 13 P10 revisions and the nearest-first candidate. P1–P6
-  and P8 still need equivalent qualification.
+  and P8 still need equivalent qualification. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
+  loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
+  wins on HOST with both heroes at full health. The exact-ROM verifier's
+  static plan authenticates the authored page table. Next: run its
+  opening through the old defeat point, then verify the full ARM win.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
   confirmed separate named, Random, and Closed seats and a middle-only
@@ -132,7 +136,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   observations matching. The policy puts idle builders back on minerals,
   trains Marines, Firebats and Medics, and defends before pushing. It
   averages 27.29 emulated updates/s but peaks at 14.04M cycles. Expand to
-  Blood Bath and to two and three independent opponents; native automatic
+  Blood Bath and to two and three independent opponents. The [named lineup
+  controller](audits/2026-11-13-named-skirmish-matches.md) now records
+  complete HOST losses with one, two and three chosen CPUs, including a
+  Terran mirror, two duplicate CPUs and a reversed mixed lineup. Replay
+  those on ARM and develop a winning Blood Bath route. Native automatic
   [SCV resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md)
   and the outcome of surviving actors still need native witnesses.
 

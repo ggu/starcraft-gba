@@ -26,7 +26,7 @@ physical GBA check or all routes through a mission.
 | Z10 | [HOME win](2026-11-13-z10-exact-home.md), [fresh SRAM win](2026-11-13-composed-performance.md) | All 61 shared world checkpoints match between the two routes. |
 | P1–P6 | No complete exact-ROM receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). Rebuild stale P1 input and isolate controller route queries for P3–P6. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
-| P8 | No complete exact-ROM receipt here | [Preceding normal P8 win and SRAM continuation](2026-10-31-protoss-cannon-lazy/README.md); verify the carried P10 route. |
+| P8 | No complete exact-ROM receipt here | [Preceding normal P8 win and SRAM continuation](2026-10-31-protoss-cannon-lazy/README.md); the [updated carried P10 controller](2026-11-13-p8-host-hero-retreat.md) wins on HOST with both heroes at full health. Verify authored pages and victory on ARM. |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |
 | P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | Full replay averaged 8.79 emulated updates/s; below the performance target. |
 
