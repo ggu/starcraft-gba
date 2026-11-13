@@ -387,3 +387,10 @@ build/test-sc64-z9-bulk-z5: tests/sc64_z5_bulk_grid.c tests/sc64_z5_runtime.c $(
 test-sc64-z9-bulk-grid: build/test-sc64-z9-bulk-grid build/test-sc64-z9-bulk-z5
 	./build/test-sc64-z9-bulk-grid
 	./build/test-sc64-z9-bulk-z5
+
+# Prepared opt-in Z7 census differential.
+$(eval $(call Z7_FULL_RENDER_FIXTURE,validated-census,sc64_z7_prune_game.c,-DSC64_Z7_PRUNE_STARTED -DSC64_Z7_VALIDATED_CENSUS))
+.PHONY: test-sc64-z7-validated-census
+test-sc64-z7-validated-census: build/test-sc64-z7-full-render-prune build/test-sc64-z7-full-render-validated-census
+	./build/test-sc64-z7-full-render-prune
+	./build/test-sc64-z7-full-render-validated-census

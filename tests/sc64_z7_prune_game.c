@@ -85,7 +85,7 @@ static void assert_pruned_snapshot(u16 started)
     static const u8 location[5]={0,0,4,3,5};
     unsigned mask=expected_cache_mask(started);
     assert(race_z7_live_world_valid());
-    assert(sc64_z7_count_snapshot_begin_pruned(&race_z7_world,started));
+    assert(sc64_z7_count_snapshot_begin_pruned(&race_z7_world,started,0));
     assert(race_z7_world.count_snapshot.active==mask);
     for(unsigned q=0;q<5;++q) {
         const Sc64Z7SourceCondition *c;
@@ -102,6 +102,39 @@ static void assert_pruned_snapshot(u16 started)
         }
     }
 }
+
+#ifdef SC64_Z7_VALIDATED_CENSUS
+static void test_validated_late_census(void)
+{
+    load_canonical_z7();
+    const u16 started=(1u<<4)|(1u<<6)|(1u<<7);
+    int own=-1, enemy=-1;
+    u32 counts[2];
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && u[i].raw_owner==3) { own=i; break; }
+    for (int i=0;i<MAX_BUILDINGS;++i)
+        if (b[i].alive && b[i].raw_owner==4) { enemy=i; break; }
+    assert(own>=0 && enemy>=0 && sc64_z7_count_snapshot_needed(started)==3u);
+    for (unsigned i=0;i<4;++i) {
+        u[own].alive=(i&1u)!=0;
+        b[enemy].alive=(i&2u)!=0;
+        assert(race_z7_validate_live_world(counts));
+        assert(sc64_z7_count_snapshot_begin_pruned(&race_z7_world,started,0));
+        Sc64Z7WorldContext ref=race_z7_world;
+        assert(sc64_z7_count_snapshot_begin_pruned(&race_z7_world,started,counts));
+        assert(race_z7_world.count_snapshot.active==3u);
+        assert(!memcmp(ref.count_snapshot.count,race_z7_world.count_snapshot.count,
+                       sizeof(ref.count_snapshot.count)));
+    }
+    counts[0]=counts[1]=0xcafeu;
+    b[enemy].raw_type=-1;
+    assert(!race_z7_validate_live_world(counts));
+    assert(counts[0]==0xcafeu && counts[1]==0xcafeu);
+    race_z7.runtime.model.started=started;
+    assert(!race_z7_runtime_tick(0,1u));
+    assert(race_z7.runtime.fault==SC64_Z7_RUNTIME_FAULT_ACTOR);
+}
+#endif
 
 static void test_started_conditions_and_active_waits(void)
 {
@@ -194,8 +227,8 @@ static void test_authentication_fallback_save_load_and_terminal(void)
     assert(race_z7_pruned_condition_callback(&race_z7_world,&race_z7.runtime,
                                               &copied)<0);
     assert(race_z7_pruned_condition_callback((void *)1,&race_z7.runtime,c)<0);
-    assert(sc64_z7_count_snapshot_begin_pruned(&race_z7_world,0));
-    assert(!sc64_z7_count_snapshot_begin_pruned(&race_z7_world,0x100u));
+    assert(sc64_z7_count_snapshot_begin_pruned(&race_z7_world,0,0));
+    assert(!sc64_z7_count_snapshot_begin_pruned(&race_z7_world,0x100u,0));
     assert(!race_z7_world.count_snapshot.active);
 
     /* A stale callback binding retains the baseline fail-closed behavior. */
@@ -303,6 +336,9 @@ int main(void)
 {
     test_reference_path_remains_checked();
 #ifdef SC64_Z7_PRUNE_STARTED
+#ifdef SC64_Z7_VALIDATED_CENSUS
+    test_validated_late_census();
+#endif
     test_started_conditions_and_active_waits();
     test_mutations_refresh_only_unstarted_counts();
     test_authentication_fallback_save_load_and_terminal();
