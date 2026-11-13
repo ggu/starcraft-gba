@@ -22,7 +22,7 @@ as a current full result. None of these are physical GBA tests.
 | P1–P6 | [P10-flag replacement-loop ARM wins](2026-11-03-protoss-p1-p10-evidence/README.md) and [older normal P10 physical save points](2026-11-06-early-protoss-save/README.md). | Open for all six; the older P1 tape did not win on the packaged ROM. |
 | P7 | [Older normal P7 physical win](2026-11-01-p7-physical-prep/README.md); bounded current-family P10 replay and older early SRAM. | Open on current P10. |
 | P8 | [Older normal P8 full physical win and SRAM resume](2026-10-31-protoss-cannon-lazy/README.md); P10-flag ARM replay with a replacement main. | Open on current P10. |
-| P9 | [P10-flag replacement-loop ARM win and fresh SRAM continuation](2026-11-03-protoss-p1-p10-evidence/README.md#save-continuation). | Open on current P10. |
+| P9 | [Normal P10 cartridge HOME replay](2026-11-13-p9-normal-home.md), with all 11 briefing pages. | Full win from fresh HOME at frame 144,361. |
 | P10 | [Earlier ARM replacement-loop win and SRAM](2026-11-03-p10-ordinary-input/README.md), plus an earlier normal physical continuation in the [project notes](../PROJECT-TODO.md). | No exact current full physical result found. |
 
 This is a conservative audit of retained evidence: three full results
