@@ -74,6 +74,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   for All saves. All four preview ARM products pass guarded links and
   physical save/load; on Terran, both modes also pass restart and the
   actual CPU-to-CPU target predicate matches the native distinction.
+  A [matched native Random pair](audits/2026-11-12-n64-blood-bath-opening.md#paired-random-launches)
+  now verifies the same seed, resolved races, start markers and three
+  later RNG states in Melee and Free for All for Human Random and
+  CPU Random / Random / Protoss. Sparse Free for All Random starts and
+  other seeds remain unobserved.
   The [native Blood Bath end-rule audit](audits/2026-11-13-n64-blood-bath-end-rules.md)
   traces both modes to defeat at zero buildings and victory at zero eligible
   opponent slots. Defeat transfers the remaining actors to neutral ownership
@@ -83,8 +88,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   tests retirement and neutral cargo on HOST. Before ARM enablement, ensure
   final victory cannot bypass a deferred retirement, and resolve in-flight
   damage and simultaneous outcomes against native evidence. Next: record
-  an active elimination, check native Free for All Random draws, and qualify
-  complete ordinary-input matches on hardware.
+  an active elimination, broaden the native Free for All Random opening
+  sample, and qualify complete ordinary-input matches on hardware.
 
 - **Final Zerg mission performance (P1):** the
   [paired normal Z10 ARM replay](audits/2026-11-12-z10-battle-cycles.md)
