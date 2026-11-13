@@ -87,9 +87,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and detaches their AI. A [linked-actor audit](audits/2026-11-13-n64-blood-bath-linked-survivors.md)
   traces the loaded passenger exception and the Carrier/Reaver queue reset.
   A passive replay did not reach elimination. [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
-  tests retirement and neutral cargo on HOST. Before ARM enablement, ensure
-  final victory cannot bypass a deferred retirement, and resolve in-flight
-  damage and simultaneous outcomes against native evidence. Next: record
+  tests retirement and neutral cargo on HOST. Its final victory now waits
+  for deferred retirement, including a surviving Battlecruiser fixture.
+  Before ARM enablement, resolve in-flight damage and simultaneous
+  outcomes against native evidence. Next: record
   an active elimination, broaden the native Free for All Random opening
   sample, and qualify complete ordinary-input matches on hardware.
 
@@ -189,7 +190,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   outside the release tree. A [lazy-row prototype](audits/2026-11-13-lazy-facility-rows.md)
   also stays out: it saves short synthetic queries but slows a far one
   by 33% even with matched placement, which would exceed Showcase's
-  available IWRAM. Measure actual per-fill work before another handoff.
+  available IWRAM. [Read-only facility samples](audits/2026-11-13-facility-fill-populations.md)
+  show Blood Bath's six fills use 25–165 pops, while four Outpost fills
+  use 1,957–3,239. Test packing only the touched span before changing
+  expansion or choosing a cutoff.
   The same three-option composition wins Z7 with all 253 observations
   and no material speed change from the older normal control.
 
