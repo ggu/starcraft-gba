@@ -294,6 +294,12 @@ $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z1,race_z1_controls,common/gba
 endef
 $(eval $(call ZERG_CARRIED_CONTROLLERS,z9,Z9))
 $(eval $(call ZERG_CARRIED_CONTROLLERS,z10,Z10))
+
+# Z2 normal cartridge trace: reveal briefing pages and acknowledge authored
+# messages with physical key pairs; the existing carried suite is unchanged.
+build/test-sc64-z10-z2-normal-home: tests/race_campaign_run.c tests/sc64_controller_authored_pages.h tests/sc64_route_purity.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z10_CANONICAL_FLAGS) -DSC64_Z2_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< common/gba.c -o $@
+
 $(eval $(call ZERG_CARRIED_CONTROLLER,z10,Z10,z9-run,sc64_z9_campaign_run,))
 
 # Z8 carried replay, compiled with the actual Z9 vector and strict cargo digest.
