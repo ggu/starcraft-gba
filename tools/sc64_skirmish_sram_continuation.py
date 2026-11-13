@@ -215,7 +215,12 @@ class Game:
             to_row(2); set_field("bots", len(bots))
         elif "race_skirmish_slots" not in self.sym:
             raise ContinuationError("ROM lacks independent computer seats")
-        for i, race in enumerate(bots if seats is None else seats):
+        choices = list(enumerate(bots if seats is None else seats))
+        if seats is not None and "race_skirmish_melee" in self.sym and map_id == 1:
+            # Open the requested CPU rows before closing any others: the
+            # native lobby will not close its last open row.
+            choices.sort(key=lambda choice: choice[1] == SEAT_OPTIONS.index("-"))
+        for i, race in choices:
             to_row(3 + i); set_field("bot_races", race, i)
         if "race_skirmish_melee" in self.sym:
             to_row(6); set_field("skirmish_melee", int(melee))
