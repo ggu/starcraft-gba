@@ -66,6 +66,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matches the last-open CPU edit and passes 24 physical same-build checks
   and 20 cross-build checks. The old ROMs reject Melee saves as intended.
   Keep the flag off while full matches and native elimination are open.
+  The [native T1 fresh-load witness](audits/2026-11-13-n64-t1-save-selection.md)
+  clears the selected Command Center, consistent with the normal GBA
+  selection reset; native Z7 remains untested.
   The stock launch resolves Random race rows before drawing starts; the
   pure sequence matches native Human Random, one/two CPU Random rows,
   and a joint Human Random / two CPU Random capture. The Blood Bath
