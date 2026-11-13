@@ -95,8 +95,70 @@ static void reject_unit_decode_unchanged(const Sc64P7TypedUnitSave *row,unsigned
 static void reject_building_decode_unchanged(const Sc64P7TypedBuildingSave *row,unsigned ww,unsigned wh) {
   Building out,before; memset(&out,0x96,sizeof(out)); before=out; assert(!sc64_p7_typed_building_decode(&out,row,ww,wh)); assert(!memcmp(&out,&before,sizeof(out)));
 }
+#ifdef SC64_TYPED_UNIT_READER_REFERENCE
+/* Separate TU compiles the same layout with the original bit reader. */
+void sc64_test_reference_init(void) { init_facts(); }
+int sc64_test_reference_unit(void *out, const void *row, unsigned w, unsigned h)
+{
+  return sc64_p7_typed_unit_decode(out,row,w,h);
+}
+#define main sc64_test_reference_fixture_main
+#endif
+
+#ifdef SC64_TYPED_UNIT_CHUNK_READER
+void sc64_test_reference_init(void);
+int sc64_test_reference_unit(void *, const void *, unsigned, unsigned);
+static void compare_readers(const Sc64P7TypedUnitSave *row,unsigned w,unsigned h)
+{
+  Unit ref,fast,sentinel;
+  memset(&sentinel,0x91,sizeof(sentinel));
+  ref=fast=sentinel;
+  int status=sc64_test_reference_unit(&ref,row,w,h);
+  assert(sc64_p7_typed_unit_decode(&fast,row,w,h)==status);
+  if(status) {
+    unit_equal(&fast,&ref);
+    Sc64P7TypedUnitSave encoded;
+    assert(sc64_p7_typed_unit_encode(&encoded,&fast,w,h));
+    assert(!memcmp(&encoded,row,sizeof(encoded)));
+  } else {
+    assert(!memcmp(&fast,&sentinel,sizeof(fast)));
+    assert(!memcmp(&ref,&sentinel,sizeof(ref)));
+  }
+}
+static void compare_unit_readers(void)
+{
+  sc64_test_reference_init();
+  /* The row starts unaligned and ends at the allocation boundary:
+   * sanitizers catch a wider read past the final byte. */
+  struct { u8 odd; Sc64P7TypedUnitSave row; } *sample=malloc(sizeof(*sample));
+  assert(sample && sizeof(*sample)==29);
+  for(unsigned n=0;n<4096;++n) {
+    Unit q;
+    unit_make(&q,n%64,n%7==0);
+    assert(sc64_p7_typed_unit_encode(&sample->row,&q,2048,2048));
+    compare_readers(&sample->row,2048,2048);
+    unsigned bit=n%224;
+    sample->row.bytes[bit>>3]^=(u8)(1u<<(bit&7u));
+    compare_readers(&sample->row,2048,2048);
+    compare_readers(&sample->row,1+n%2048,1+(n*19)%2048);
+    for(unsigned j=0;j<sizeof(sample->row.bytes);++j)sample->row.bytes[j]=(u8)rnd();
+    compare_readers(&sample->row,2048,2048);
+  }
+  free(sample);
+  Sc64P7TypedUnitSave zero={{0}};
+  compare_readers(&zero,1,1);
+  compare_readers(&zero,0,1);
+  compare_readers(&zero,1,2049);
+  compare_readers(0,1,1);
+  puts("typed-unit byte reader: matched original on 16,388 differential inputs");
+}
+#endif
+
 int main(void) {
   init_facts();
+#ifdef SC64_TYPED_UNIT_CHUNK_READER
+  compare_unit_readers();
+#endif
   for(int t=0;t<64;t++) {
     Unit u,d; Sc64P7TypedUnitSave tr; unit_make(&u,t,1);
     assert(sc64_p7_typed_unit_encode(&tr,&u,2048,2048)); assert(sc64_p7_typed_unit_decode(&d,&tr,2048,2048)); unit_equal(&u,&d);

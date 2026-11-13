@@ -4419,6 +4419,16 @@ test-sc64-p7-typed-codec: build/test-sc64-p7-typed-codec
 	./build/test-sc64-p7-typed-codec
 test-starcraft: test-sc64-p7-typed-codec
 
+# Compare the opt-in byte reader against the same fixture built with the bit reader.
+build/sc64-p7-typed-codec-reference.o: tests/sc64_p7_typed_codec.c starcraft/sc64_p7_typed_unit_save.h starcraft/sc64_p7_typed_building_save.h starcraft/sc64_zp_unit_save.h starcraft/sc64_compact_building_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_TYPED_UNIT_READER_REFERENCE -c $< -o $@
+build/test-sc64-p7-typed-chunk-reader: tests/sc64_p7_typed_codec.c build/sc64-p7-typed-codec-reference.o Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_TYPED_UNIT_CHUNK_READER $< build/sc64-p7-typed-codec-reference.o -o $@
+.PHONY: test-sc64-p7-typed-chunk-reader
+test-sc64-p7-typed-chunk-reader: build/test-sc64-p7-typed-chunk-reader
+	./build/test-sc64-p7-typed-chunk-reader
+test-starcraft: test-sc64-p7-typed-chunk-reader
+
 # Asset-free Carrier storage and codec coverage.
 build/test-sc64-interceptor-pool-codec: tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c -o $@

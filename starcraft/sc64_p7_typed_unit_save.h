@@ -52,6 +52,7 @@ static int sc64_p7_typed_unit_put(Sc64P7TypedUnitSave *r, unsigned *bit,
     return 1;
 }
 
+#ifndef SC64_TYPED_UNIT_CHUNK_READER
 static int sc64_p7_typed_unit_get(const Sc64P7TypedUnitSave *r,
                                   unsigned *bit, unsigned width, u32 *value)
 {
@@ -63,6 +64,26 @@ static int sc64_p7_typed_unit_get(const Sc64P7TypedUnitSave *r,
     *value = v;
     return 1;
 }
+
+#endif
+
+#ifdef SC64_TYPED_UNIT_CHUNK_READER
+/* This helper only receives the fixed offsets and widths of the typed
+ * unit row below. Read the intersected bytes explicitly: row pointers
+ * need not be aligned, and the last field ends at byte 27. */
+static inline __attribute__((always_inline)) u32
+sc64_p7_typed_unit_chunk(const Sc64P7TypedUnitSave *row, unsigned bit,
+                        unsigned width)
+{
+    const u8 *p = row->bytes + (bit >> 3);
+    unsigned shift = bit & 7u;
+    u32 value = p[0];
+    if (shift + width > 8) value |= (u32)p[1] << 8;
+    if (shift + width > 16) value |= (u32)p[2] << 16;
+    if (shift + width > 24) value |= (u32)p[3] << 24;
+    return (value >> shift) & (((u32)1 << width) - 1u);
+}
+#endif
 
 static int sc64_p7_typed_unit_zero(const Sc64P7TypedUnitSave *r)
 {
@@ -160,6 +181,13 @@ static int SC64_TYPED_WIRE_ENCODE(Sc64P7TypedUnitSave *row,
     return 1;
 }
 
+/* Share the field sequence and validation between the two readers. */
+#if defined(SC64_TYPED_UNIT_CHUNK_READER)
+#define SC64_TYPED_READ(w) \
+    (v = sc64_p7_typed_unit_chunk(row, bit, (w)), bit += (w), 1)
+#else
+#define SC64_TYPED_READ(w) sc64_p7_typed_unit_get(row, &bit, (w), &v)
+#endif
 static int SC64_TYPED_WIRE_DECODE(Unit *out,
                                      const Sc64P7TypedUnitSave *row,
                                      unsigned ww, unsigned wh SC64_TYPED_WIRE_PARAM)
@@ -171,13 +199,13 @@ static int SC64_TYPED_WIRE_DECODE(Unit *out,
     if (!out || !row || !ww || !wh || ww > 2048 || wh > 2048) return 0;
     memset(&q, 0, sizeof(q));
     if (sc64_p7_typed_unit_zero(row)) { *out = q; return 1; }
-#define GET(w, dst) do { if (!sc64_p7_typed_unit_get(row, &bit, (w), &v)) return 0; (dst) = (int)v; } while (0)
+#define GET(w, dst) do { if (!SC64_TYPED_READ(w)) return 0; (dst) = (int)v; } while (0)
     GET(11, q.x); GET(11, q.y);
-    if (!sc64_p7_typed_unit_get(row, &bit, 18, &v)) return 0;
+    if (!SC64_TYPED_READ(18)) return 0;
     q.hp = (int)v - 131072;
     GET(3, q.owner); GET(6, q.type); GET(1, q.alive); GET(1, q.selected);
     GET(8, q.cd); GET(4, q.order); GET(11, q.tx); GET(11, q.ty);
-    if (!sc64_p7_typed_unit_get(row, &bit, 17, &v)) return 0;
+    if (!SC64_TYPED_READ(17)) return 0;
     q.carry = (int)v - 65536;
     GET(8, v); q.build = (int)v - 2; GET(11, q.work_timer);
     GET(16, q.weapon); GET(9, v); q.target = (int)v - 1;
@@ -185,7 +213,7 @@ static int SC64_TYPED_WIRE_DECODE(Unit *out,
     GET(11, q.path_y); GET(9, q.shield); GET(8, v); q.raw_type = (int)v - 1;
     GET(4, v); q.raw_owner = (int)v - 1; GET(14, q.flags);
     GET(11, q.shield_remainder);
-    if (!sc64_p7_typed_unit_get(row, &bit, 1, &v) || v != 1 || bit != 224 ||
+    if (!SC64_TYPED_READ(1) || v != 1 || bit != 224 ||
         !SC64_TYPED_WIRE_CANONICAL(q.type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG)) return 0;
     q.maxhp = maxhp; q.armor = armor;
     if (!SC64_TYPED_WIRE_VALIDATE(&q, ww, wh SC64_TYPED_WIRE_ARG)) return 0;
@@ -193,6 +221,8 @@ static int SC64_TYPED_WIRE_DECODE(Unit *out,
     return 1;
 #undef GET
 }
+
+#undef SC64_TYPED_READ
 
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
 static int sc64_p7_typed_unit_canonical(int t,int *hp,int *a,int *sh)
