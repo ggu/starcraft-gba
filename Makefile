@@ -4419,6 +4419,8 @@ test-sc64-p7-typed-codec: build/test-sc64-p7-typed-codec
 	./build/test-sc64-p7-typed-codec
 test-starcraft: test-sc64-p7-typed-codec
 
+include tests/sc64-typed-save/Makefile
+
 # Asset-free Carrier storage and codec coverage.
 build/test-sc64-interceptor-pool-codec: tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c -o $@
