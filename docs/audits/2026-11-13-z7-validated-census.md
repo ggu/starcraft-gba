@@ -27,9 +27,8 @@ authentication, mutation and active waits, pause/load and terminal
 behavior. The new case compares both late counters to the existing
 standalone census across unit and building liveness transitions, and
 asserts a malformed late building leaves both output counters untouched
-and produces the same actor fault. No ARM build or candidate timing
-was run. A native check should profile a geometry-bearing steady
-sample and a later authenticated two-counter update separately.
+and produces the same actor fault. The ARM comparison below separates
+geometry-bearing steady work from the late authenticated two-counter path.
 
 ## Paired Z10 cartridge comparison
 

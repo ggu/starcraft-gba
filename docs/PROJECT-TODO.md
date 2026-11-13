@@ -1091,6 +1091,9 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    saves 0.86–0.89% in two earlier normal Z10 windows with matching state
    and drawn pages. The probe stays off pending current cartridge and
    longer custom-match checks.
+   The [Z7 census probe](audits/2026-11-13-z7-validated-census.md)
+   matches sampled gameplay and pixels with 0.34% lower steady loop cost.
+   Keep it off while larger sustained movement and render costs remain.
    Historical inclusive scopes are not promised savings. The N64
    order gate is a research lead, not permission to
    skip cooldowns, movement, pre-handlers or entire unit updates.
