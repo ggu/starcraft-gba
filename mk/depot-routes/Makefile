@@ -45,3 +45,8 @@ test-sc64-facility-fifo: build/test-sc64-facility-fifo-base build/test-sc64-faci
 	./build/test-sc64-facility-fifo-base
 	./build/test-sc64-facility-fifo-probe
 	./build/test-sc64-facility-fifo-overflow
+
+build/test-sc64-facility-word-pack: $(FACILITY_FIFO_DEPS) | build
+	$(CLANG) $(FACILITY_FIFO_HOST_FLAGS) -DSC64_ROUTE_FACILITY_FIFO_PROBE -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@
+build/test-sc64-facility-word-pack-overflow: $(FACILITY_FIFO_DEPS) | build
+	$(CLANG) $(FACILITY_FIFO_HOST_FLAGS) -DSC64_ROUTE_FACILITY_FIFO_PROBE -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE -DSC64_ROUTE_LINEAR_QUEUE_CAP=32 -DTEST_FACILITY_OVERFLOW $< -o $@

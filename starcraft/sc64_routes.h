@@ -1664,14 +1664,53 @@ static inline u8 *sc64_route_linear_grid(int cols, int rows, int stride, int cap
     return dense;
 }
 
+static inline u32 sc64_dense_pack8(const u8 *p)
+{
+    return sc64_dense_pack4(p) | sc64_dense_pack4(p + 4) << 12;
+}
+
+#ifdef SC64_ROUTE_LINEAR_WORD_PACK_PROBE
+/* The dense helpers above require little endian. Four 24-bit groups
+ * occupy exactly three aligned words; neither source borders nor bytes
+ * beyond the active field are included. The route pool and all eligible
+ * packed row widths are word aligned. Keep the general byte writer for
+ * any caller outside that layout. */
+static void __attribute__((noinline))
+sc64_route_pack_linear_words(u8 *field, const u8 *dense,
+                             int cols, int rows, int stride)
+{
+    for (int y = 1; y <= rows; ++y) {
+        const u8 *in = dense + y * stride + 4;
+        for (int x = 0; x < cols; x += 32) {
+            u32 a = sc64_dense_pack8(in + x);
+            u32 b = sc64_dense_pack8(in + x + 8);
+            u32 c = sc64_dense_pack8(in + x + 16);
+            u32 d = sc64_dense_pack8(in + x + 24);
+            u32 low = a | b << 24;
+            u32 mid = b >> 8 | c << 16;
+            u32 high = c >> 16 | d << 8;
+            __builtin_memcpy(__builtin_assume_aligned(field, 4), &low, 4);
+            __builtin_memcpy(__builtin_assume_aligned(field + 4, 4), &mid, 4);
+            __builtin_memcpy(__builtin_assume_aligned(field + 8, 4), &high, 4);
+            field += 12;
+        }
+    }
+}
+#endif
+
 static inline void sc64_route_pack_linear(u8 *field, const u8 *dense,
                                           int cols, int rows, int stride)
 {
+#ifdef SC64_ROUTE_LINEAR_WORD_PACK_PROBE
+    if (!(cols & 31) && !((uintptr_t)(void *)field & 3u)) {
+        sc64_route_pack_linear_words(field, dense, cols, rows, stride);
+        return;
+    }
+#endif
     for (int y = 1; y <= rows; ++y) {
         const u8 *in = dense + y * stride;
         for (int x = 4; x < cols + 4; x += 8) {
-            u32 pair = sc64_dense_pack4(in + x) |
-                       sc64_dense_pack4(in + x + 4) << 12;
+            u32 pair = sc64_dense_pack8(in + x);
             *field++ = (u8)pair;
             *field++ = (u8)(pair >> 8);
             *field++ = (u8)(pair >> 16);
