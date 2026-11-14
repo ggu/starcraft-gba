@@ -1,6 +1,12 @@
 /* Normal-controller Higher Ground win attempt. Runtime reads choose inputs and
  * populate the trace; every gameplay mutation is produced by game_update(). */
 #include "../starcraft/game.c"
+#ifdef SC64_P34_NORMAL_HOME
+#include "sc64_route_purity.h"
+#include "sc64_controller_authored_pages.h"
+static uint64_t route_after;
+static int last_checkpoint_frame = -1;
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +18,11 @@
 
 static FILE *trace;
 static u16 prior_keys;
+#ifdef SC64_P34_NORMAL_HOME
+static unsigned long host_ticks;
+#else
 static u32 host_ticks;
+#endif
 static int last_logged_keys = -1;
 static int trace_first = 1;
 static const char *trace_path;
@@ -217,11 +227,17 @@ static void checkpoint(const char *kind)
     fflush(trace);
 }
 
-static void step(u16 held)
+static void step_raw(u16 held)
 {
     if (deployed && (screen != SCREEN_PLAY || won || lost)) return;
     u16 pressed = held & (u16)~prior_keys;
+#ifdef SC64_P34_NORMAL_HOME
+    assert(route_purity_hash() == route_after);
+#endif
     game_update(held, pressed);
+#ifdef SC64_P34_NORMAL_HOME
+    route_after = route_purity_hash();
+#endif
     prior_keys = held;
     ++host_ticks;
     if (trace && held != (u16)last_logged_keys) {
@@ -231,8 +247,24 @@ static void step(u16 held)
         last_logged_keys = held;
         fflush(trace);
     }
-    if (trace && deployed && screen == SCREEN_PLAY && frame > 0 && frame % CHECKPOINT_PERIOD == 0)
+    if (trace && deployed && screen == SCREEN_PLAY && frame > 0 && frame % CHECKPOINT_PERIOD == 0
+#ifdef SC64_P34_NORMAL_HOME
+        && frame != last_checkpoint_frame
+#endif
+        ) {
+#ifdef SC64_P34_NORMAL_HOME
+        last_checkpoint_frame = frame;
+#endif
         checkpoint("periodic");
+    }
+}
+
+static void step(u16 held)
+{
+    step_raw(held);
+#ifdef SC64_P34_NORMAL_HOME
+    sc64_controller_ack_pages(step_raw, held, &host_ticks, stderr);
+#endif
 }
 
 static void tap(u16 key)
@@ -348,12 +380,19 @@ static void issue_attack_move(int x, int y)
 static void launch_p3(void)
 {
     game_init();
+#ifdef SC64_P34_NORMAL_HOME
+    route_after = route_purity_hash();
+#endif
     prior_keys = 0;
     tap(KEY_A);        /* HOME -> Protoss mission list */
     tap(KEY_RIGHT);    /* P3 ordinal 2, page two */
     step(KEY_A);       /* briefing */
     step(0);
+#ifdef SC64_P34_NORMAL_HOME
+    assert(sc64_controller_reveal_briefing(tap, SC64_P3_GLOBAL_ID, &host_ticks, stderr));
+#else
     step(KEY_START);   /* explicit launch without a gameplay tick */
+#endif
     deployed = 1;
     assert(screen == SCREEN_PLAY && !race_mode &&
            race_selected_mission == SC64_P3_GLOBAL_ID);

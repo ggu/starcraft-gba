@@ -69,8 +69,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with their rescued heroes alive. [P5](audits/2026-11-14-p5-p6-normal-home.md)
   now also wins on staged P10, with Tassadar rescued and the authored pages
   verified. P6 also wins on staged P10 with Zeratul and Tassadar alive and
-  all 113 checkpoints matched. P3–P4 still need complete exact-ROM
-  qualification. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
+  all 113 checkpoints matched. [P4](audits/2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win)
+  now wins on staged P10 with Raynor and Tassadar alive and 146 matching
+  checks. P3 clears Force 3 but stalls at a base exit; finish that route
+  before exact-ROM replay. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
   with both heroes at full health, 41 matching observations and twelve

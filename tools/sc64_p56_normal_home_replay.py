@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Replay a verified P5/P6 controller tape on a pinned normal P10 cartridge."""
+"""Replay a verified P4–P6 controller tape on a pinned normal P10 cartridge."""
 import argparse
 from collections import defaultdict
 import json
@@ -22,6 +22,7 @@ def require(ok, message):
 def plan(trace, pages, mission):
     require(trace.get("schema") == 1 and trace.get("mission") == mission, "wrong tape")
     keys, checks, briefs, modals = {}, {}, {}, {}
+    mid_kinds = ("periodic", "both-rescued") if mission == 23 else ("periodic",)
     held, last = 0, 0
     for row in trace["events"]:
         tick, kind = row["host_tick"], row["kind"]
@@ -34,14 +35,14 @@ def plan(trace, pages, mission):
                     and row["pressed"] == value & ~held, "invalid input edge")
             keys[tick - 1] = held = value
         else:
-            require(tick not in checks and kind in ("start", "periodic", "won"), "invalid checkpoint")
+            require(tick not in checks and kind in ("start", "won", *mid_kinds), "invalid checkpoint")
             checks[tick] = row
     stop = last
     require(len(checks) >= 3 and next(iter(checks.values()))["kind"] == "start"
             and checks[stop]["kind"] == "won"
-            and not any(r["kind"] != "periodic" for r in list(checks.values())[1:-1])
+            and not any(r["kind"] not in mid_kinds for r in list(checks.values())[1:-1])
             and checks[stop]["won"] == checks[stop]["outcome"] == 1
-            and checks[stop]["lost"] == checks[stop]["fault"] == 0
+            and checks[stop]["lost"] == checks[stop]["faults" if mission == 23 else "fault"] == 0
             and checks[stop]["screen"] == 3 and keys.get(0) == 1 and keys.get(1) == 0,
             "tape does not establish HOME to victory")
     for line in pages.splitlines():
@@ -59,7 +60,7 @@ def plan(trace, pages, mission):
                     and not any(k in modals for k in range(tick - 1, tick + 2)),
                     f"invalid dialogue call {tick}")
             modals[tick] = (frame, box, page, trigger, action, old, key)
-    require(len(briefs) == (12 if mission == 24 else 6)
+    require(len(briefs) == {23: 7, 24: 12, 25: 6}[mission]
             and list(briefs) == sorted(briefs)
             and list(briefs.values()) == [(i, len(briefs)) for i in range(len(briefs))]
             and modals, "incomplete authored pages")
@@ -81,7 +82,10 @@ def run(args):
     resource.setrlimit(resource.RLIMIT_FSIZE, (1 << 20,) * 2)
     n = mission - 19
     runtime_name, state_name = f"Sc64P{n}RuntimeState", f"Sc64P{n}State"
-    _, persist = dwarf_struct_layout(args.elf, f"Sc64P{n}PersistentState")
+    base = 0
+    if mission != 23:
+        _, persist = dwarf_struct_layout(args.elf, f"Sc64P{n}PersistentState")
+        base = persist["runtime"]
     _, runtime = dwarf_struct_layout(args.elf, runtime_name)
     _, model = dwarf_struct_layout(args.elf, state_name)
     _, campaign = dwarf_struct_layout(args.elf, "Sc64RaceCampaignState")
@@ -100,18 +104,30 @@ def run(args):
     def observe():
         data = r.read(g.sym[f"race_p{n}"], g.sizes[f"race_p{n}"])
         def read_model(k):
-            return field(data, persist["runtime"] + runtime["model"], model, k)
+            return field(data, base + runtime["model"], model, k)
         units = entity_rows(r.read(g.sym["u"], g.sizes["u"]), g.unit_stride, g.unit_layout, unit_fields)
         def find(raw):
             return next((u for u in units if u[1:3] == (0, raw)), None)
         hero = find(79)
         result = dict((k, scalar(k)) for k in ("frame", "screen", "won", "lost", "mode"))
+        if mission == 23:
+            result.update(fired=read_model("fired"), outcome=read_model("outcome"),
+                          cursor=[scalar("cx"), scalar("cy")], minerals=scalar("minerals"),
+                          side_units=sum(u[1] == 0 for u in units))
+            for key in ("source_paused", "created_count", "faults"):
+                result["created" if key == "created_count" else key] = field(data, base, runtime, key)
+            for name, raw in (("raynor", 19), ("tassadar", 79)):
+                unit = next((u for u in units if u[2] == raw), None)
+                owner, x, y = (unit[1], unit[4], unit[5]) if unit else (-1, -1, -1)
+                result.update({f"{name}_alive": int(unit is not None),
+                               f"{name}_owner": owner, f"{name}_x": x, f"{name}_y": y})
+            return result
         result.update(started=read_model("started"), outcome=read_model("outcome"),
-                      fault=field(data, persist["runtime"], runtime, "fault"),
+                      fault=field(data, base, runtime, "fault"),
                       cursor=[scalar("cx"), scalar("cy")],
                       selected=sum(u[-1] != 0 for u in units))
         count, width, signed = model.arrays["action_cursor"]
-        offset = persist["runtime"] + runtime["model"] + model["action_cursor"]
+        offset = base + runtime["model"] + model["action_cursor"]
         result["action_cursors"] = [int.from_bytes(data[j:j+width], "little", signed=signed)
                                     for j in range(offset, offset+width*count, width)]
         if mission == 24:
@@ -180,7 +196,7 @@ def run(args):
 
 if __name__ == "__main__":
     cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument("--mission", type=int, choices=(24, 25), required=True)
+    cli.add_argument("--mission", type=int, choices=(23, 24, 25), required=True)
     for name in ("trace", "pages", "rom", "elf", "runner"):
         cli.add_argument("--" + name, type=Path, required=True)
         cli.add_argument("--" + name + "-sha256", required=True)
