@@ -84,3 +84,22 @@ November 13 KODAK ROM and actual hardware are separate.
 | P4 HOST tape | `a744df3cdc3e88866dbb96092596a8ac0230643dfeb410e807e52b42acc236c0` |
 | P4 authored pages | `aa904b858811393c3056491f2ed87e09c0c53f6a6f106d106bf54f11542ba5b6` |
 | P4 physical replay receipt | `6c07d80e62b4754929ebea17aa498010a12b4e6027f6b59b1e7e3de6838b5c85` |
+
+The same input tape also wins on the exact November 13 KODAK P10
+cartridge, with 146 matching observations and both heroes at the exit.
+It averages 15.30 emulated updates/s. The receipt SHA-256 is
+`b4411bce2469bfc60b4c6bcd9c68940263335391cff49ab94d62f71554a8d1d0`.
+The cartridge SHA-256 is
+`7a8aa4da8bf156993db753b18a2fc2e02ad6bd880a58f014b6593b983a781310`.
+
+## P3 egress follow-up
+
+A local regroup probe independently detected the stationary army at
+(1684,1355), beginning at frame 64,355. In this group 12 of 14 fighters
+were waiting on a path retry. The probe found no reachable open rally
+cell in its 96-pixel search, issued no commands, and produced the same
+180,000-frame result as the previous route. The tape SHA-256 is
+`d9c5a26f8d3b195ed0b403e53507465f5fb68f9aafd903d77262cb1e2baa127e`. Picking a different far building alone is not a
+demonstrated recovery. Inspect local occupancy and the map corridor
+before the home construction cluster forms, or sustain a reachable
+second economy and army through ordinary inputs. No ARM win is claimed.

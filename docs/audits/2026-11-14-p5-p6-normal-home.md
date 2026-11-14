@@ -52,3 +52,17 @@ home-p5` to P5 and `--trace /path/to/fresh-p6.json` to P6. Capture stderr
 for authored-page metadata. Supply each tape, its page log and the matching
 ROM, ELF and mGBA observer to `tools/sc64_p56_normal_home_replay.py` with
 their SHA-256 pins. The verifier leaves the artifacts unchanged.
+
+## Exact KODAK P10 replays
+
+The same controller tapes also win on the older P10 cartridge copied to
+KODAK on November 13. All state checkpoints and authored page counts match
+the staged runs. Each replay starts at HOME and sets its mission completion
+bit without trigger faults.
+
+| Mission | Calls | Checks | Briefing / gameplay pages | Emulated updates/s | Receipt SHA-256 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| P5 | 5,172 | 7 | 12 / 5 | 18.23 | `aa79cd17bee965551a2a05fe582a99a280b3af770dfad27c24ebbb448d5ec348` |
+| P6 | 101,370 | 113 | 6 / 17 | 12.55 | `2b41527a030d0c33715a0239464e31191409f9b439d49a1c09b824a3cbbe4d34` |
+
+KODAK P10 ROM SHA-256: `7a8aa4da8bf156993db753b18a2fc2e02ad6bd880a58f014b6593b983a781310`.

@@ -24,7 +24,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   `Games/Development/StarCraft-2026-11-13`. All four 32 MiB files were
   read back from the mounted card and matched their build SHA-256 values;
   the card folder has `COPY-VERIFIED.txt` and `START-HERE.txt`. The files
-  include the shared command-menu speedup. Older delivery notes below are
+  include the shared command-menu speedup. The November 14 package replaces
+  that build on the Mac with the shared wide point FIFO (merged as
+  `8935d56`), verified across all four ROMs. It is staged in Downloads;
+  KODAK was not detected during staging. Older delivery notes below are
   historical. Existing saves and older ROMs were retained. Next: test B-menu
   scrolling and battle speed on a physical GBA SP.
 
@@ -69,9 +72,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with their rescued heroes alive. [P5](audits/2026-11-14-p5-p6-normal-home.md)
   now also wins on staged P10, with Tassadar rescued and the authored pages
   verified. P6 also wins on staged P10 with Zeratul and Tassadar alive and
-  all 113 checkpoints matched. [P4](audits/2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win)
-  now wins on staged P10 with Raynor and Tassadar alive and 146 matching
-  checks. P3 clears Force 3 but stalls at a base exit; finish that route
+  all 113 checkpoints matched. [Both missions also win on the exact KODAK
+  P10 ROM](audits/2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays).
+  [P4](audits/2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win)
+  wins on both staged P10 and the exact KODAK cartridge with Raynor and
+  Tassadar alive and 146 matching checks. P3 clears Force 3 but stalls at a base exit; finish that route
   before exact-ROM replay. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
