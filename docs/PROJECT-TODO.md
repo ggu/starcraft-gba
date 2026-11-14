@@ -248,9 +248,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Verify endpoint field bytes, four current links and save continuations
   before promotion. [Dense route measurement](audits/2026-11-14-z7-point-flood-retention.md)
   finds no same-seed aliases among 448 stock point fills. One retained
-  field would match 51 misses in a point-only model; test its 6 KiB cost
-  and full paired timing before promotion. Remaining movement cost still
-  leaves the candidate well short of 30 fps.
+  field matches 51 misses in a point-only model, but the ARM copy-based
+  probe adds 6,152 EWRAM bytes and slows the wide FIFO by 0.55% with
+  byte-identical sampled state. Leave retention off. Finish wide FIFO
+  qualification and pursue cheaper full or exactly scoped point floods;
+  the measured dense workload is still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
