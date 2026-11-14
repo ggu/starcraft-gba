@@ -166,3 +166,10 @@ Hardware timing and the 30 fps target remain open.
 | Paired raw endpoints | `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4` |
 | Eight ROM and RAM checks | `a4953198be35777b7f59aa878a2d7b1dca3fafe3f1c9821bda6f48b515d1c0d1` |
 | Four custom SRAM comparisons | `7d1778f12eaf26015be1fc6561c840994b5f22bbe75087c60ab9afac1d87e246` |
+
+The packaged Z10 binary (`c251f81c`) also matches all 131 checkpoints
+and all 480 frame and route-counter samples against the archived stock
+run. Its mean active loop is 3.034M cycles, a 19.45% reduction against
+that stock run; orders fall 28.10%. This is 5.53 emulated updates/s
+in the dense window. The package receipt SHA-256 is
+`f07f38751269a2aaf166df34e000e4c7c5b660ae5a8d0e6fd5e46c75982c87fe`.
