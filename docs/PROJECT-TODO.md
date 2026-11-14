@@ -151,9 +151,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   outcomes against native evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
-  were published in that opening. Next: record active elimination and
-  distinguish in-flight damage and simultaneous outcomes, then qualify
-  complete ordinary-input matches on hardware.
+  were published in that opening. A separate ordinary-input replay
+  verified placement and construction of a Barracks. Next: complete the
+  Barracks, train a force and record active elimination. Distinguish
+  in-flight damage and simultaneous outcomes, then qualify complete
+  ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
   now wins from HOME on the KODAK ROM and staged Terran ROM with all 95
   observations matching. The policy puts idle builders back on minerals,
