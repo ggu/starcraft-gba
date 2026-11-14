@@ -11,7 +11,7 @@ P10_SCENARIO_HEADER := .local/sc64/zp-stage/generated/scenarios/sc64_p10_scenari
 # reachable depot. Rank candidates first to avoid filling unused routes.
 P10_CAMPAIGN_DEFINES := -DSC64_P10_DATA_ENABLED -DSC64_P10_RUNTIME -DSC64_P10_CAMPAIGN_ENTRY -DSC64_NEAREST_RESOURCE_DEPOT
 PROTOSS_P10_BASE_FLAGS = $(patsubst -I$(P9_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(PROTOSS_P9_FLAGS)) $(P10_CAMPAIGN_DEFINES) -DSC64_DEPOT_FIRST_NEAREST_PROBE
-PROTOSS_P10_FLAGS = $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS) -DSC64_TYPED_UNIT_CHUNK_READER
+PROTOSS_P10_FLAGS = $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS) -DSC64_TYPED_UNIT_CHUNK_READER $(CENSUS_FLAGS)
 PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P10_FACT_V2_HEADER) $(P10_SCENARIO_HEADER)
 $(P10_FACT_V2_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
 	mkdir -p $(P10_FACT_V2_DIR)
@@ -56,7 +56,7 @@ test-sc64-protoss-p10: test-sc64-p10-mission test-sc64-p10-carried-profile
 test-sc64-z8-command-census: build/test-sc64-z8-command-census
 	./build/test-sc64-z8-command-census
 build/test-sc64-z8-command-census: tests/sc64_z8_command_census.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
-	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_Z8_DIRECT_COMMAND_CENSUS $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+	$(CLANG) $(P8_HOST_FLAGS) $(filter-out -DSC64_Z8_DIRECT_COMMAND_CENSUS,$(PROTOSS_P10_FLAGS)) -DSC64_Z8_DIRECT_COMMAND_CENSUS $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 
 # Carried P9 normal cartridge route with authored briefing and modal input.
 build/test-sc64-p10-p9-normal-home: tests/sc64_p9_campaign_run.c tests/sc64_controller_authored_pages.h tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
