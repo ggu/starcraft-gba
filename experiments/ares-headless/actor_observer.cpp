@@ -32,6 +32,10 @@
 #include <vector>
 #include "input_mapping.h"
 #include "observer_file_budget.h"
+#ifdef SC64_RESULT_TRACE
+#include "result_trace.h"
+#include <charconv>
+#endif
 
 namespace ares::Nintendo64 {
   auto load(Node::System&, string) -> bool;
@@ -128,11 +132,76 @@ struct Probe final : ares::Platform {
   }
 };
 
+#ifdef SC64_RESULT_TRACE
+namespace {
+Sc64ResultTrace result_trace;
+unsigned result_step;
+bool result_active;
+
+bool read_result_field(std::uint32_t address, unsigned len, std::uint32_t& value) {
+  using namespace ares::Nintendo64;
+  auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull); bool hx=x.hit(a),hy=y.hit(a);return hx&&hy?-1:hx||hy?1:0; };
+  auto cached=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);return (std::uint8_t)(x.hit(a)?x.bytes[(a&15u)^3u]:y.bytes[(a&15u)^3u]); };
+  auto ram=[](u32 a) { return (std::uint8_t)rdram.ram.read<Byte>(a,RBusDevice::ARES_DEBUGGER); };
+  std::uint8_t bytes[4];
+  if (len > sizeof(bytes) || !sc64_read_ram(address,len,rdram.ram.size,bytes,hit,cached,ram)) return false;
+  value=0;
+  for (unsigned i=0;i<len;++i) value=(value<<8)|bytes[i];
+  return true;
+}
+
+bool write_result_trace(const std::filesystem::path& path) {
+  if (result_trace.failed || !result_trace.count) return false;
+  return sc64_publish_snapshot(path.c_str(), result_trace.count*sc64_result_fields*4,
+    [](std::uint8_t* bytes,std::size_t size) {
+      auto next=bytes;
+      for (unsigned i=0;i<result_trace.count;++i)
+        for (auto word:result_trace.rows[i])
+          for (int shift=24;shift>=0;shift-=8) *next++=static_cast<std::uint8_t>(word>>shift);
+      return next==bytes+size;
+    });
+}
+}
+
+extern "C" void sc64_result_before_instruction(std::uint32_t pc, std::uint32_t opcode) {
+  if (!result_active || result_trace.failed) return;
+  using namespace ares::Nintendo64;
+  for (unsigned i=0;i<std::size(sc64_result_points);++i) {
+    if (pc!=sc64_result_points[i].pc) continue;
+    std::uint32_t arg0=0,arg1=0;
+    if (pc==0x8008dbbc && !read_result_field(0x10dbd8,4,arg0)) {
+      result_trace.failed=true; return;
+    }
+    if (pc==0x8008d9a8) { arg0=cpu.ipu.r[16].u32; arg1=cpu.ipu.r[4].u32; }
+    if (pc==0x801357a4) { arg0=cpu.ipu.r[17].u32; arg1=cpu.ipu.r[19].u32; }
+    result_trace.add(result_step,i,opcode,arg0,arg1,read_result_field);
+    return;
+  }
+}
+#endif
+
 int main(int argc,char** argv) {
+  unsigned hybrid_step=4200;
+#ifdef SC64_RESULT_TRACE
+  unsigned trace_start=0,trace_end=0;
+  if(argc==8) {
+    auto number=[](const char* s,unsigned& value) {
+      auto end=s+std::strlen(s);
+      auto parsed=std::from_chars(s,end,value);
+      return parsed.ec==std::errc{} && parsed.ptr==end;
+    };
+    if(!number(argv[5],hybrid_step) || !number(argv[6],trace_start) || !number(argv[7],trace_end) ||
+       hybrid_step<4200 || trace_start<hybrid_step || trace_end<=trace_start || trace_end-trace_start>sc64_result_max_steps ||
+       std::strcmp(argv[3],"snapshot")!=0) return 2;
+  } else
+#endif
   if(argc!=5) { std::cerr<<"usage: probe ROM OUTPUT_DIR neutral|tap FRAMES\n"; return 2; }
   std::string scenario=argv[3];
   char* end=nullptr; long frames=std::strtol(argv[4],&end,10);
   if((scenario!="interactive" && scenario!="snapshot" && scenario!="neutral" && scenario!="tap" && scenario!="start" && scenario!="mission" && scenario!="advance" && scenario!="calibrate" && scenario!="select" && scenario!="select2" && scenario!="select3" && scenario!="select4" && scenario!="build" && scenario!="grid" && scenario!="custom" && scenario!="customstart" && scenario!="protosssetup" && scenario!="protossstart" && scenario!="protossselect" && scenario!="probe2" && scenario!="probe3") || !end || *end || frames<1 || frames>14000) return 2;
+#ifdef SC64_RESULT_TRACE
+  if(trace_end>static_cast<unsigned long>(frames)) return 2;
+#endif
   std::filesystem::path out=argv[2];
   if(!std::filesystem::is_directory(out) || !std::filesystem::is_directory(out/"saves") ||
      !std::filesystem::is_directory(out/"systems")) return 2;
@@ -211,13 +280,27 @@ int main(int argc,char** argv) {
     }
     if(line.empty() || line.size()>=128 || std::chrono::steady_clock::now()>=commandDeadline || totalIdle>=60000) break;
     std::istringstream in(line); int count,mask,x,y,capture; std::string extra;
-    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !(sc64_hybrid_capture_allowed(capture) || (scenario=="snapshot" && capture==3)) || (capture==3 && !sc64_hybrid_snapshot_allowed(scenario=="snapshot",transitioned,view_equal,ares::Nintendo64::cpu.recompiler.enabled,ares::Nintendo64::rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,ares::Nintendo64::rdram.ram.size,snapshotCount)) || (capture==2 && (transitioned || completed+count!=4200))) { std::cerr<<"invalid command\n"; return 7; }
+    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !(sc64_hybrid_capture_allowed(capture) || (scenario=="snapshot" && capture==3)) || (capture==3 && !sc64_hybrid_snapshot_allowed(scenario=="snapshot",transitioned,view_equal,ares::Nintendo64::cpu.recompiler.enabled,ares::Nintendo64::rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,ares::Nintendo64::rdram.ram.size,snapshotCount)) || (capture==2 && (transitioned || static_cast<unsigned long>(completed+count)!=hybrid_step))) { std::cerr<<"invalid command\n"; return 7; }
     commands<<completed<<','<<count<<','<<mask<<','<<x<<','<<y<<','<<capture<<'\n'; commands.flush();
     unsigned previous; {std::lock_guard lock(p.mutex); previous=p.frames.size();}
-    for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture==1 && i==count-1) p.forceCapture=true; root->run(); ++completed; }
+    for(int i=0;i<count;++i) {
+      p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed;
+      if(capture==1 && i==count-1) p.forceCapture=true;
+#ifdef SC64_RESULT_TRACE
+      result_step=static_cast<unsigned>(completed);
+      result_active=trace_end && result_step>=trace_start && result_step<trace_end;
+      if(result_active && (!transitioned || !view_equal || ares::Nintendo64::cpu.recompiler.enabled ||
+          ares::Nintendo64::rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode)) return 8;
+#endif
+      root->run(); ++completed;
+#ifdef SC64_RESULT_TRACE
+      result_active=false;
+      if(result_trace.failed) return 8;
+#endif
+    }
     if(capture==2) {
       using namespace ares::Nintendo64;
-      if(transitioned || completed!=4200 || !cpu.recompiler.enabled || !rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode || rdram.ram.size!=8u*1024u*1024u) return 8;
+      if(transitioned || static_cast<unsigned long>(completed)!=hybrid_step || !cpu.recompiler.enabled || !rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode || rdram.ram.size!=8u*1024u*1024u) return 8;
       auto read_view=[&](std::vector<std::uint8_t>& bytes) {
         auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull); bool hx=x.hit(a),hy=y.hit(a);return hx&&hy?-1:hx||hy?1:0; };
         auto cached=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);return (std::uint8_t)(x.hit(a)?x.bytes[(a&15u)^3u]:y.bytes[(a&15u)^3u]); };
@@ -263,6 +346,9 @@ int main(int argc,char** argv) {
     std::unique_lock lock(p.mutex);
     if(!p.failed && p.callbacks==0) p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.callbacks>0;});
   }
+#ifdef SC64_RESULT_TRACE
+  if(trace_end && (completed<trace_end || !write_result_trace(out/"result-trace.bin"))) return 8;
+#endif
   root->unload(); root.reset(); // joins the upstream screen thread before reading frames
   std::lock_guard lock(p.mutex);
   std::ofstream status(out/"status.log"), observations(out/"callbacks.csv");

@@ -12,6 +12,9 @@ ROM_SHA='e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 VK_SHA='432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 REV='0aafd85789215e84e1e43415c07d4c88461b7899'
 # Qualified independently from the historical non-diagnostic binary.
+# A separate local wrapper pins the rebuilt executable and opt-in window.
+RESULT_TRACE_WINDOW=None
+RESULT_TRACE_CPU_SOURCE=None
 BINARY_SHA='54d100a9b56d342b07c9a0fdf8fbffedeab0134010359eaa57952d0be0b0b75c'
 LOCK='/tmp/sc64-native-build-20261031.lock'
 VK_PATH=pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
@@ -31,6 +34,11 @@ def check_reserve(path):
  if shutil.disk_usage(output_ancestor(path)).free<5*1024**3:raise ValueError('output filesystem disk reserve')
 
 def clean(source):
+ if RESULT_TRACE_WINDOW is not None:
+  from result_trace_source import expected,matches
+  if RESULT_TRACE_CPU_SOURCE is not None:
+   return matches(source,REV,False) and pathlib.Path(RESULT_TRACE_CPU_SOURCE).read_bytes()==expected(source,REV)
+  return matches(source,REV,True)
  return subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()==REV and not subprocess.check_output(['git','-C',str(source),'status','--porcelain'],text=True).strip()
 
 def terminate_child(child):
@@ -181,7 +189,11 @@ def main(argv=None):
  a=p.parse_args(argv)
  command_data=a.command_file.read_bytes()
  if hashlib.sha256(command_data).hexdigest()!=COMMAND_SHA:raise SystemExit('command hash mismatch')
+ if RESULT_TRACE_WINDOW is None and HYBRID_STEP!=4200:raise SystemExit('late transition requires result trace')
  expected=planned_rows(command_data)
+ if RESULT_TRACE_WINDOW is not None:
+  begin,end=RESULT_TRACE_WINDOW
+  if not 4200<=HYBRID_STEP<=begin<end<=EXPECTED_STEPS or end-begin>256:raise SystemExit('result trace window out of range')
  if not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance mismatch')
  require_binary(a.binary)
  if a.output.exists():raise SystemExit('output must be new')
@@ -193,8 +205,17 @@ def main(argv=None):
   a.output.mkdir(parents=True);[(a.output/x).mkdir() for x in ('input','saves','systems')];copy=a.output/'input/game.z64';shutil.copyfile(a.rom,copy)
   if sha(copy)!=ROM_SHA:raise SystemExit('ROM copy mismatch')
   sources=[pathlib.Path(__file__).resolve(),pathlib.Path(__file__).with_name('actor_observer.cpp').resolve(),pathlib.Path(__file__).with_name('input_mapping.h').resolve(),pathlib.Path(__file__).with_name('observer_read.h').resolve(),pathlib.Path(__file__).with_name('observer_file_budget.h').resolve(),pathlib.Path(__file__).with_name('observer_sigxfsz.h').resolve(),pathlib.Path(__file__).with_name('observer_images.h').resolve(),pathlib.Path(__file__).with_name('visual_capture.h').resolve(),pathlib.Path(__file__).with_name('hybrid_contract.h').resolve(),pathlib.Path(__file__).with_name('hybrid_snapshot_contract.h').resolve(),pathlib.Path(__file__).with_name('hybrid_snapshot_publish.h').resolve(),pathlib.Path(__file__).with_name('inject.cmake').resolve()]
-  resources=[a.source/'ares/ares/resource/resource.cpp',a.source/'ares/ares/resource/resource.hpp',a.source/'mia/resource/resource.cpp',a.source/'mia/resource/resource.hpp'];inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
+  resources=[a.source/'ares/ares/resource/resource.cpp',a.source/'ares/ares/resource/resource.hpp',a.source/'mia/resource/resource.cpp',a.source/'mia/resource/resource.hpp']
+  if RESULT_TRACE_WINDOW is not None:
+   from result_trace_source import CPU
+   sources += [pathlib.Path(__file__).with_name(name).resolve() for name in ('result_trace.h','result_trace_source.py','result_trace_decode.py')]
+   resources.append(pathlib.Path(RESULT_TRACE_CPU_SOURCE).resolve() if RESULT_TRACE_CPU_SOURCE is not None else a.source/CPU)
+  inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
   cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'snapshot','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'command_sha256':COMMAND_SHA,'expected_steps':EXPECTED_STEPS,'expected_frame_steps':EXPECTED_FRAME_STEPS,'frontend_role':'authentic_hybrid_neutral_snapshot','state_scope':'official restoration of same-process state; no arbitrary guest-memory writes','ram_capture_enabled':True,'cache_view_bytes':8*1024**2,'in_memory_state_max_bytes':16*1024**2,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':3,'ram_each_bytes':8*1024**2,'ram_total_bytes':24*1024**2,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
+  if RESULT_TRACE_WINDOW is not None:
+   cmd.extend(map(str,(HYBRID_STEP,*RESULT_TRACE_WINDOW)));result['result_trace_window']=RESULT_TRACE_WINDOW
+   result['hybrid_step']=HYBRID_STEP
+   result['owned_limits']['result_trace_bytes']=40*1024
   readfd,writefd=os.pipe()
   try:os.write(writefd,command_data)
   finally:os.close(writefd)
@@ -205,6 +226,14 @@ def main(argv=None):
   ram=sorted(a.output.glob('ram-*.bin'));result['ram']={x.name:sha(x) for x in ram};result['ram_bytes']=sum(x.stat().st_size for x in ram);result['ok']=result['ok'] and len(ram)==3 and result['ram_bytes']==24*1024**2
   for name in ('ram.csv','commands.csv','inputs.csv','callbacks.csv','status.log','sigxfsz.bin','images.bin','stopped-fds.txt'):result[name+'_sha256']=sha(a.output/name) if (a.output/name).is_file() else None
   diagnostic=a.output/'sigxfsz.bin';images=a.output/'images.bin';result['ok']=result['ok'] and diagnostic.is_file() and diagnostic.stat().st_size in (0,40) and images.is_file() and images.stat().st_size<=12+128*528
+  if RESULT_TRACE_WINDOW is not None:
+   from result_trace_decode import read_trace
+   trace=a.output/'result-trace.bin'
+   try:
+    rows=read_trace(trace,*RESULT_TRACE_WINDOW)
+    result['result_trace_rows']=len(rows);result['result_trace_sha256']=sha(trace)
+   except (OSError,ValueError) as exc:
+    result['result_trace_error']=str(exc);result['ok']=False
   result['planned_witness_complete']=planned_witness(a.output,expected)
   result['ok']=result['ok'] and result['planned_witness_complete'] and not result.get('owned_guard_error')
   result['output_bytes']=sum(x.stat().st_size for x in a.output.rglob('*') if x.is_file() and not x.is_symlink());result['ok']=result['ok'] and result['output_bytes']<=63*1024**2 and not result.get('log_budget_exceeded',False)
