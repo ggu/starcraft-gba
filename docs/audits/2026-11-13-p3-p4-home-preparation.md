@@ -27,3 +27,37 @@ restart the mission.
 No HOST compile or cartridge replay was started for this preparation;
 the shared disk reserve was unavailable. This is source preparation,
 not a claim of a new win.
+
+## P3 staged HOST route limit
+
+On November 14, the ordinary HOME P3 controller compiled under the
+staged P10 gameplay vector with ASan/UBSan and HOST modal handling.
+It read all nine briefing pages and passed the route-state fingerprint
+guard through 180,763 inputs (180,000 simulation frames). It cleared
+Force 3 buildings, then stopped at the configured limit with ten
+Force 2 buildings remaining, the same building count as at frame
+60,000. There was no victory, defeat, or sanitizer error.
+
+The final trace shows the selected army still under attack orders, with
+many units clustered around (1684,1356) near the home structures and
+repeated path retries. The economy had 44 minerals and 44 gas and two
+idle Probes. This identifies a controller route and economy limit; it
+does not establish that any one building caused the jam.
+
+Two isolated controller experiments also hit their limits. A local
+waypoint cycle engaged too early and left 38 enemy buildings. Keeping
+new structures out of a 96-pixel radius around the observed cluster
+cleared Force 3 buildings but left 12 Force 2 buildings. Neither
+experiment is carried forward. The next controller test should track
+sustained lack of movement before regrouping and verify that the army
+actually leaves the base before sending it on the long sweep. Restore
+worker income if a new sweep cannot replace losses.
+
+No ARM replay was started because no current route-pure HOST tape won.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P3 HOST limit tape | `d9c5a26f8d3b195ed0b403e53507465f5fb68f9aafd903d77262cb1e2baa127e` |
+| P3 HOST launch and blocker log | `a62cda2ca9d5303823aa3470c92ecb12766c5f0cab732d25938fdec9e61612b3` |
+| Waypoint experiment tape | `13a2d762b3187371522950623b635e70cfaa24c7a5083cf0b564ec7447bd4b83` |
+| Build clearance experiment tape | `06445148f3cbff53472f75e28f82e1d734961613cfe2dc7628352680e714dfaa` |
