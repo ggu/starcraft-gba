@@ -14,6 +14,7 @@ REV='0aafd85789215e84e1e43415c07d4c88461b7899'
 # Qualified independently from the historical non-diagnostic binary.
 # A separate local wrapper pins the rebuilt executable and opt-in window.
 RESULT_TRACE_WINDOW=None
+RESULT_TRACE_CPU_SOURCE=None
 BINARY_SHA='54d100a9b56d342b07c9a0fdf8fbffedeab0134010359eaa57952d0be0b0b75c'
 LOCK='/tmp/sc64-native-build-20261031.lock'
 VK_PATH=pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
@@ -34,7 +35,9 @@ def check_reserve(path):
 
 def clean(source):
  if RESULT_TRACE_WINDOW is not None:
-  from result_trace_source import matches
+  from result_trace_source import expected,matches
+  if RESULT_TRACE_CPU_SOURCE is not None:
+   return matches(source,REV,False) and pathlib.Path(RESULT_TRACE_CPU_SOURCE).read_bytes()==expected(source,REV)
   return matches(source,REV,True)
  return subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()==REV and not subprocess.check_output(['git','-C',str(source),'status','--porcelain'],text=True).strip()
 
@@ -206,7 +209,7 @@ def main(argv=None):
   if RESULT_TRACE_WINDOW is not None:
    from result_trace_source import CPU
    sources += [pathlib.Path(__file__).with_name(name).resolve() for name in ('result_trace.h','result_trace_source.py','result_trace_decode.py')]
-   resources.append(a.source/CPU)
+   resources.append(pathlib.Path(RESULT_TRACE_CPU_SOURCE).resolve() if RESULT_TRACE_CPU_SOURCE is not None else a.source/CPU)
   inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
   cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'snapshot','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'command_sha256':COMMAND_SHA,'expected_steps':EXPECTED_STEPS,'expected_frame_steps':EXPECTED_FRAME_STEPS,'frontend_role':'authentic_hybrid_neutral_snapshot','state_scope':'official restoration of same-process state; no arbitrary guest-memory writes','ram_capture_enabled':True,'cache_view_bytes':8*1024**2,'in_memory_state_max_bytes':16*1024**2,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':3,'ram_each_bytes':8*1024**2,'ram_total_bytes':24*1024**2,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
   if RESULT_TRACE_WINDOW is not None:
