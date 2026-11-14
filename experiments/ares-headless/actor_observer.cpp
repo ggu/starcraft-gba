@@ -181,16 +181,17 @@ extern "C" void sc64_result_before_instruction(std::uint32_t pc, std::uint32_t o
 #endif
 
 int main(int argc,char** argv) {
+  unsigned hybrid_step=4200;
 #ifdef SC64_RESULT_TRACE
   unsigned trace_start=0,trace_end=0;
-  if(argc==7) {
+  if(argc==8) {
     auto number=[](const char* s,unsigned& value) {
       auto end=s+std::strlen(s);
       auto parsed=std::from_chars(s,end,value);
       return parsed.ec==std::errc{} && parsed.ptr==end;
     };
-    if(!number(argv[5],trace_start) || !number(argv[6],trace_end) ||
-       trace_start<4200 || trace_end<=trace_start || trace_end-trace_start>sc64_result_max_steps ||
+    if(!number(argv[5],hybrid_step) || !number(argv[6],trace_start) || !number(argv[7],trace_end) ||
+       hybrid_step<4200 || trace_start<hybrid_step || trace_end<=trace_start || trace_end-trace_start>sc64_result_max_steps ||
        std::strcmp(argv[3],"snapshot")!=0) return 2;
   } else
 #endif
@@ -279,7 +280,7 @@ int main(int argc,char** argv) {
     }
     if(line.empty() || line.size()>=128 || std::chrono::steady_clock::now()>=commandDeadline || totalIdle>=60000) break;
     std::istringstream in(line); int count,mask,x,y,capture; std::string extra;
-    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !(sc64_hybrid_capture_allowed(capture) || (scenario=="snapshot" && capture==3)) || (capture==3 && !sc64_hybrid_snapshot_allowed(scenario=="snapshot",transitioned,view_equal,ares::Nintendo64::cpu.recompiler.enabled,ares::Nintendo64::rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,ares::Nintendo64::rdram.ram.size,snapshotCount)) || (capture==2 && (transitioned || completed+count!=4200))) { std::cerr<<"invalid command\n"; return 7; }
+    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || !sc64_visual_mask_allowed(mask) || x < -32767 || x>32767 || y < -32767 || y>32767 || !(sc64_hybrid_capture_allowed(capture) || (scenario=="snapshot" && capture==3)) || (capture==3 && !sc64_hybrid_snapshot_allowed(scenario=="snapshot",transitioned,view_equal,ares::Nintendo64::cpu.recompiler.enabled,ares::Nintendo64::rsp.recompiler.enabled,ares::Nintendo64::system.homebrewMode,ares::Nintendo64::rdram.ram.size,snapshotCount)) || (capture==2 && (transitioned || static_cast<unsigned long>(completed+count)!=hybrid_step))) { std::cerr<<"invalid command\n"; return 7; }
     commands<<completed<<','<<count<<','<<mask<<','<<x<<','<<y<<','<<capture<<'\n'; commands.flush();
     unsigned previous; {std::lock_guard lock(p.mutex); previous=p.frames.size();}
     for(int i=0;i<count;++i) {
@@ -299,7 +300,7 @@ int main(int argc,char** argv) {
     }
     if(capture==2) {
       using namespace ares::Nintendo64;
-      if(transitioned || completed!=4200 || !cpu.recompiler.enabled || !rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode || rdram.ram.size!=8u*1024u*1024u) return 8;
+      if(transitioned || static_cast<unsigned long>(completed)!=hybrid_step || !cpu.recompiler.enabled || !rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode || rdram.ram.size!=8u*1024u*1024u) return 8;
       auto read_view=[&](std::vector<std::uint8_t>& bytes) {
         auto hit=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull); bool hx=x.hit(a),hy=y.hit(a);return hx&&hy?-1:hx||hy?1:0; };
         auto cached=[](u32 a) { auto &x=cpu.dcache.line((u64)a|0x80000000ull); auto &y=cpu.dcache.line(((u64)a|0x80000000ull)^0x1000ull);return (std::uint8_t)(x.hit(a)?x.bytes[(a&15u)^3u]:y.bytes[(a&15u)^3u]); };

@@ -186,10 +186,11 @@ def main(argv=None):
  a=p.parse_args(argv)
  command_data=a.command_file.read_bytes()
  if hashlib.sha256(command_data).hexdigest()!=COMMAND_SHA:raise SystemExit('command hash mismatch')
+ if RESULT_TRACE_WINDOW is None and HYBRID_STEP!=4200:raise SystemExit('late transition requires result trace')
  expected=planned_rows(command_data)
  if RESULT_TRACE_WINDOW is not None:
   begin,end=RESULT_TRACE_WINDOW
-  if not HYBRID_STEP<=begin<end<=EXPECTED_STEPS or end-begin>128:raise SystemExit('result trace window out of range')
+  if not 4200<=HYBRID_STEP<=begin<end<=EXPECTED_STEPS or end-begin>128:raise SystemExit('result trace window out of range')
  if not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance mismatch')
  require_binary(a.binary)
  if a.output.exists():raise SystemExit('output must be new')
@@ -209,7 +210,8 @@ def main(argv=None):
   inputs={str(x):sha(x) for x in sources+resources};binary=sha(a.binary)
   cmd=[str(a.binary.resolve()),str(copy.resolve()),str(a.output.resolve()),'snapshot','14000'];result={'command':cmd,'binary_sha256':binary,'input_sha256':inputs,'rom_sha256':ROM_SHA,'moltenvk_sha256':VK_SHA,'source_commit':REV,'command_sha256':COMMAND_SHA,'expected_steps':EXPECTED_STEPS,'expected_frame_steps':EXPECTED_FRAME_STEPS,'frontend_role':'authentic_hybrid_neutral_snapshot','state_scope':'official restoration of same-process state; no arbitrary guest-memory writes','ram_capture_enabled':True,'cache_view_bytes':8*1024**2,'in_memory_state_max_bytes':16*1024**2,'file_limit_mode':a.file_limit_mode,'rlimit_fsize_soft':limits_for_mode(a.file_limit_mode)[0],'rlimit_fsize_hard':limits_for_mode(a.file_limit_mode)[1],'owned_limits':{'ram_count':3,'ram_each_bytes':8*1024**2,'ram_total_bytes':24*1024**2,'frame_total_bytes':2*1024**2,'input_csv_bytes':2*1024**2,'recorded_output_pre_manifest_bytes':63*1024**2,'outer_wall_seconds':180,'child_wall_seconds':175,'inventory_bytes':67596,'fd_inspection_bytes':65536}}
   if RESULT_TRACE_WINDOW is not None:
-   cmd.extend(map(str,RESULT_TRACE_WINDOW));result['result_trace_window']=RESULT_TRACE_WINDOW
+   cmd.extend(map(str,(HYBRID_STEP,*RESULT_TRACE_WINDOW)));result['result_trace_window']=RESULT_TRACE_WINDOW
+   result['hybrid_step']=HYBRID_STEP
    result['owned_limits']['result_trace_bytes']=40*1024
   readfd,writefd=os.pipe()
   try:os.write(writefd,command_data)

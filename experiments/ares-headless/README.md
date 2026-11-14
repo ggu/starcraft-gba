@@ -37,10 +37,12 @@ result tracing by default.
 
 In a local copy of the wrapper and observer source companions, pin the
 new executable SHA-256, the exact controller command SHA-256 and sample
-schedule, and `RESULT_TRACE_WINDOW=(begin,end)`. The window is half-open
-in observer steps, starts at or after the verified step-4200 hybrid
-transition, spans at most 128 steps, and must end within the recorded
-tape. The normal wrapper invocation and file/disk/time guards still
+schedule, `HYBRID_STEP`, and `RESULT_TRACE_WINDOW=(begin,end)`. The
+normal snapshot build still transitions at step 4200. For the trace build,
+pin the hybrid transition to the end of a controller command at step 4200
+or later, before the final attack. The half-open trace window starts at or
+after the transition, spans at most 128 observer steps, and must end within
+the recorded tape. The normal wrapper invocation and file/disk/time guards still
 apply; the wrapper requires the source to differ from pinned ares only
 by the exact derived hook, and hashes the modified source and decoder.
 A known opening tape can check the decrement/scan path. Qualifying defeat
