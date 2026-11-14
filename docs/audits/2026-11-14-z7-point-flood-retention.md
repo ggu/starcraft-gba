@@ -31,3 +31,32 @@ neither a speedup nor default activation is established.
 | Register observer | `b0b9abdf79604b7ebca7f877c3b1e8774d0a4c19e0ffe2996fbd054ecc0ae1f6` |
 | Stock seed receipt | `96c975a51fc0c4e54a234abe1195850120227c479ea46b94c0d83bfd1380f3b7` |
 | Retention receipt | `8f0a39d5b70702e6ce4572911199186100dfe8bb4d0eac57a40a69ada902b162` |
+
+## One-plane ARM result: do not enable
+
+A Z10 probe preserves the stock logical insertion and adds one private
+field for point misses on 128×128 maps with no stock donor planes.
+On a miss it can retain a fresh point victim; on a match it copies or
+swaps the packed bytes. It invalidates on route resets and geometry
+changes. The asset-free sanitizer fixture compared the retained result
+with an independent BFS across all 16,384 cells, checked the logical
+miss counters, and verified that topology invalidation forces a fill.
+
+The paired ARM build uses the same KODAK source vector as the wide FIFO
+probe and adds only the retention flag. All 131 checkpoints, the route
+build and hit counters on all 480 calls, and raw world, grid and logical
+field bytes at both endpoints matched the wide FIFO. Of 480 calls, 477
+advanced the simulation. Mean sampled active draw/update cost grew
+**0.55%**; orders grew **0.89%**. The 95th-percentile call fell from
+4.704M to 4.567M cycles, but the worst call grew from 5.970M to 6.096M.
+The dense speed falls from 5.54 to 5.51 emulated updates/s. Z10 passes
+its guards but uses another 6,152 bytes of EWRAM; IWRAM is unchanged.
+Skip the copy-based scheme in production. The wide FIFO and narrower
+floods that can prove the same route answers remain better candidates.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Retention candidate ROM | `5fd918f89087f1780202cc03d59cb17d0388b4f58f50ccc53608e3fcce867a10` |
+| Matching ELF | `5e63aa55632f7bfd2f8674d75f5e22b1fad3f4dbe2f96cf2edda3c8316714b68` |
+| Paired timing receipt | `982716b63b52b23526f15fb1d750323a00fccadcef30491474301512bb943f2f` |
+| Shared endpoint state receipt | `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4` |
