@@ -272,10 +272,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   point fills take 736k cycles per active call, including 489k in FIFO
   expansion and 135k in packing. Aligned word output saves 0.52% of
   the loop with matching fields and no extra RAM; keep it opt-in.
-  Test pointer-only one-field retention on the safe physical prefix,
-  preserving logical eviction and both range scratch bindings. Check
-  reserves before timing, and break down the 1.05M orders cycles outside
-  point fills. The dense workload is still well short of 30 fps.
+  [Pointer-only one-field retention](audits/2026-11-14-z7-point-flood-retention.md#one-plane-pointer-retention-on-the-current-fifo)
+  now saves 2.85% mean loop and 8.29% p95 cycles on the same dense tape
+  while keeping route oracles and scratch bindings unchanged. Its spare
+  field costs about 6 KiB of EWRAM. Keep it off pending composed guards,
+  SRAM continuation and other wide-map tests. Break down the 1.05M
+  remaining orders cycles outside point fills; the dense workload is
+  still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
