@@ -115,11 +115,15 @@ The normal Terran and Showcase compile vectors do not change.
 | Mission on normal ROM | Matched world checks | Win frame | Mean guest cycles per call | Effective emulated updates/s |
 | --- | ---: | ---: | ---: | ---: |
 | Z8 (Z10) | 19 | 45,468 | 1,206,048 → 1,171,831 (−2.84%) | 13.91 → 14.32 |
+| P8 (P10) | 41 | 122,809 | 1,784,079 → 1,687,131 (−5.43%) | 9.40 → 9.94 |
+| P9 (P10) | 59 | 144,361 | 1,994,520 → 1,888,568 (−5.31%) | 8.41 → 8.88 |
 | P10 (P10) | 20 | 46,057 | 1,862,770 → 1,722,799 (−7.51%) | 9.01 → 9.74 |
 
-Both ordinary-controller replays match the no-census controls from HOME
-through victory with the same observed gameplay, authored pages and
-campaign outcomes. In a separate P10 pair, a pause save at frame 36,761
+All four ordinary-controller replays match the no-census controls from
+HOME through victory with the same observed gameplay, authored pages and
+campaign outcomes. P8 retains both heroes, P9 clears both Cerebrate
+objectives, and all four report zero trigger faults. In a separate P10
+pair, a pause save at frame 36,761
 is byte-identical. A fresh HOME load restores the same sampled world and
 matches five continuation checkpoints through the win. The two result
 saves are also byte-identical; the result write adds a journal entry and
@@ -138,6 +142,8 @@ builds to identical bytes with the census setting on or off.
 | Z10 census ROM | `8e4737c9085dda0ed6f6084ed6f3150ae7dfd722dd97e466f766d6c6bad20efb` |
 | P10 census ROM | `6230e726153ed9dea2fd4f5bbcb5278cbcff1f68f0035855af59ee22626dfae8` |
 | Z8 census full win | `c70b8e168d51c8807616751b1f519505a5e69cc56b8f12b02f68604eebd2e085` |
+| P8 census full win | `5161c803372b3ed03f2bbfc9b12a6038a0465f670429917272a8e3df472bea8f` |
+| P9 census full win | `a64fd58cca64911998e5f0a1342aeab83c6cf1838822a68d9a767005a5830fb7` |
 | P10 census full win | `51a278871b6d9e5babb899621152d4b701fe3d9d3b2ae2a3300dda4dc847d0a6` |
 | P10 census fresh-load continuation | `0b2554a6ee36952c8d4429e0ce508283b6e78601d7e514ff5ca0b3b88276a82b` |
 | Two Blood Bath save and continuation comparisons | `5eaf0452ebe9586358d9df51893b7cd8aa4bac4b15d0b3579591dc2f03e16dfd` |
