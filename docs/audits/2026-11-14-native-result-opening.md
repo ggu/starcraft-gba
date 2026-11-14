@@ -57,3 +57,19 @@ isolated emulator saves, and reported unchanged inputs.
 | Selected Barracks menu frame | `a6d6ddc0687c7e2e4cbd8b5961abc298d0f99d5fb9c9713ce068e33df57eded8` |
 | Valid placement frame | `a5eaf390e5446af6ce6b8b8433532686e2b9c57cb23e44f3897544c5ef38ff9e` |
 | Construction scaffold frame | `ded6d5550c8d40da5639a941a965e2bde8c651640abe777c257ade58b7a00f51` |
+
+The next replay verified the completed Barracks at step 11,782. It
+matched the preceding run's first five frames byte for byte before
+advancing past step 9,332. The completed building can be selected and
+exposes its production and lift-off controls. The longer local frontend
+logs the first polled value and each change per controller input while
+returning the held value on every native poll. Its wall-clock deadline
+is bounded at 235 seconds with a 240-second supervisor; the 8 MiB file
+limits, 131,072 input-log cap, and disk guard are unchanged. The run
+finished in 157 seconds with unchanged inputs.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Completion manifest | `962a0e4aa4dcbaff5e8f91b6f0de12cba3e945a1daa8d30f79ac17c6ab35271a` |
+| First frame with completed Barracks | `3807896eac0062e4751289f055e211462ab08d1cdf127b8f5ea06a9c20ed19b6` |
+| Selected Barracks and its controls | `5457617031ec98b74953cde5ab5a689b1700dce64c3e9db4ad496e3b35d27ab9` |
