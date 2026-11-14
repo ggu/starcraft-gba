@@ -135,9 +135,46 @@ static void test_lazy_plane_reservation(void)
     puts("PASS lazy route-plane reservation and geometry alias oracle");
 }
 
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+static void test_retained_point_with_range_planes(void)
+{
+    const int goal = 64 * 128 + 40;
+    race_cols = race_rows = 128;
+    memset(path_walkable, 1, sizeof(path_walkable));
+    path_grid_valid = 1;
+    sc64_routes_reset();
+    assert(sc64_route_pcount == 0);
+    const int reduced = sc64_range_route_reduced_slots();
+    u8 *first_scratch = sc64_route_field[reduced];
+    u8 *last_scratch = sc64_route_field[SC64_ROUTE_SLOTS - 1];
+    for (int i = 0; i <= SC64_ROUTE_SLOTS + 2; ++i)
+        assert(sc64_route_slot(goal + i) >= 0);
+    assert(sc64_route_point_saved >= 0);
+    assert(sc64_route_field[reduced] == first_scratch &&
+           sc64_route_field[SC64_ROUTE_SLOTS - 1] == last_scratch);
+    assert(sc64_range_route_gradient_storage() == first_scratch &&
+           sc64_range_route_frontier_storage() == last_scratch);
+    sc64_range_route_claim_planes();
+    assert(!sc64_route_valid[reduced] && !sc64_route_valid[SC64_ROUTE_SLOTS - 1]);
+    const int saved_goal = sc64_route_point_saved;
+    const u8 *saved_plane = sc64_route_point_spare;
+    sc64_range_route_active.valid = 1;
+    int slot = sc64_route_slot(saved_goal);
+    assert(slot >= 0 && slot < reduced && sc64_route_field[slot] == saved_plane);
+    assert(sc64_route_get(slot, saved_goal) == 0);
+    assert(sc64_route_field[reduced] == first_scratch &&
+           sc64_route_field[SC64_ROUTE_SLOTS - 1] == last_scratch);
+    puts("PASS retained point backing moves while both claimed range planes stay fixed");
+}
+#endif
+
 int main(void)
 {
     test_copy_alignment_and_remainders();
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    test_retained_point_with_range_planes();
+#else
     test_lazy_plane_reservation();
+#endif
     return 0;
 }
