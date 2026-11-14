@@ -6,13 +6,31 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef SC64_P56_NORMAL_HOME
+#include "sc64_route_purity.h"
+#include "sc64_controller_authored_pages.h"
+static uint64_t route_after;
+static int last_checkpoint_frame = -1;
+static int p5_pure_route_next(int x, int y, int tx, int ty, int *nx, int *ny)
+{
+    ROUTE_PURE_BEGIN();
+    int result = sc64_route_next(x, y, tx, ty, nx, ny);
+    ROUTE_PURE_END();
+    return result;
+}
+#define sc64_route_next p5_pure_route_next
+#endif
 
 #define P5_RUN_LIMIT 10000
 #define P5_CHECKPOINT_PERIOD 900
 
 static FILE *trace;
 static u16 prior_keys;
+#ifdef SC64_P56_NORMAL_HOME
+static unsigned long host_ticks;
+#else
 static u32 host_ticks;
+#endif
 static int deployed;
 static int run_limit = P5_RUN_LIMIT;
 static int trace_first = 1;
@@ -32,7 +50,11 @@ static P5ThreatSnapshot prior_threats[MAX_UNITS];
 static P5ThreatSnapshot prior_buildings[MAX_BUILDINGS];
 static char attempt_path[160] = ".local/sc64/p5-controller-attempt-running.json";
 static char final_path[160] = ".local/sc64/p5-controller-attempt.json";
+#ifdef SC64_P56_NORMAL_HOME
+static char verified_path[160] = ".local/sc64/p5-normal-home-win.json";
+#else
 static char verified_path[160] = ".local/sc64/p5-controller-win.json";
+#endif
 
 static void tap(u16 key);
 static void move_cursor(int x, int y);
@@ -409,7 +431,7 @@ static void checkpoint(const char *kind)
     }
 }
 
-static void step(u16 held)
+static void step_raw(u16 held)
 {
     if (deployed && (screen != SCREEN_PLAY || won || lost)) return;
     u16 pressed = held & (u16)~prior_keys;
@@ -442,7 +464,13 @@ static void step(u16 held)
             s->air_damage = (u8)damage;
         }
     }
+#ifdef SC64_P56_NORMAL_HOME
+    assert(route_purity_hash() == route_after);
+#endif
     game_update(held, pressed);
+#ifdef SC64_P56_NORMAL_HOME
+    route_after = route_purity_hash();
+#endif
     prior_keys = held;
     ++host_ticks;
     if (path_diagnostics && before_carrier >= 0 &&
@@ -483,7 +511,24 @@ static void step(u16 held)
     }
     int checkpoint_period = path_diagnostics ? 100 : P5_CHECKPOINT_PERIOD;
     if (deployed && screen == SCREEN_PLAY && frame > 0 &&
-        frame % checkpoint_period == 0) checkpoint("periodic");
+        frame % checkpoint_period == 0
+#ifdef SC64_P56_NORMAL_HOME
+        && frame != last_checkpoint_frame
+#endif
+        ) {
+#ifdef SC64_P56_NORMAL_HOME
+        last_checkpoint_frame = frame;
+#endif
+        checkpoint("periodic");
+    }
+}
+
+static void step(u16 held)
+{
+    step_raw(held);
+#ifdef SC64_P56_NORMAL_HOME
+    sc64_controller_ack_pages(step_raw, held, &host_ticks, stderr);
+#endif
 }
 
 static void tap(u16 key) { step(key); step(0); }
@@ -562,6 +607,9 @@ static void launch_from_menu(void)
     assert(sc64_catalog_playable_ordinal(SC64_FACTION_PROTOSS,
                                          SC64_P5_GLOBAL_ID) == 4);
     game_init(); prior_keys = 0;
+#ifdef SC64_P56_NORMAL_HOME
+    route_after = route_purity_hash();
+#endif
     assert(screen == SCREEN_TITLE && race_front.page == SC_FRONT_HOME);
     tap(KEY_A);
     assert(race_front.page == SC_FRONT_MISSION &&
@@ -572,7 +620,11 @@ static void launch_from_menu(void)
     tap(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING &&
            race_front.mission == SC64_P5_GLOBAL_ID);
+#ifdef SC64_P56_NORMAL_HOME
+    if (!sc64_controller_reveal_briefing(tap, SC64_P5_GLOBAL_ID, &host_ticks, stderr)) abort();
+#else
     step(KEY_START);
+#endif
     deployed = 1;
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == SC64_P5_GLOBAL_ID && race_p5_active());
