@@ -517,8 +517,8 @@ endif
 # Complete point floods on eligible 64x64 maps use the faster scratch grid.
 # Set this empty to compare the previous packed flood with the same cache.
 CANONICAL_ROUTE_DENSE_FLAGS ?= -DSC64_ROUTE_DENSE_FLOOD_PROBE
-# Opt-in full-field experiment shared by all four cartridge profiles.
-CANONICAL_ROUTE_LINEAR ?= 0
+# Wide point FIFO; set 0 for the scalar comparison.
+CANONICAL_ROUTE_LINEAR ?= 1
 ifneq ($(filter $(CANONICAL_ROUTE_LINEAR),0 1),$(CANONICAL_ROUTE_LINEAR))
 $(error CANONICAL_ROUTE_LINEAR must be 0 or 1)
 endif
