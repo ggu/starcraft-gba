@@ -65,9 +65,29 @@ unit reader. The Egg-only recipe still uses its original reader. The combined
 probe deliberately rejects the separate Nuclear Silo, Guardian/Egg and Flash
 journal experiments; their own recipes and formats are unchanged.
 
-The asset-free typed-reader, Nuclear Silo save rows and engine capability
-checks pass. The full compound HOST recipes require local P10 assets that
-were absent from this checkout. The ARM hash and evidence above apply to
-the original preview only. Rebuild the three HOST vectors and rerun their
-round trips, then requalify the ARM preview (including an authentic Egg-only
-predecessor) before treating the current port as cartridge-tested.
+At `9b3308e`, `make test-sc64-protoss-research-egg-probe` rebuilt all
+three sanitised HOST vectors from retained inputs. Each wrote a 16,308-byte
+payload. Mixed continuation, both predecessor migrations with old-slot
+preservation, semantic fallback, atomic rejection and unchanged campaign tags
+passed. The asset-free typed-reader, Nuclear Silo save rows, save tag/layout
+and engine capability checks also passed.
+
+`make protoss-research-egg-probe` passed the header and RAM guards. The
+current 32 MiB ROM SHA-256 is
+`95c7da4c5aae2996ec171195607226f7a88849c1d47565e6a29e41f1b56ac1ae`;
+EWRAM ends at `0x0203c0e0`, IWRAM at `0x03004b98`. Ordinary buttons in
+mGBA recreated the active Egg and paid Forge job at frame 3,005, wrote the
+same SRAM hash as the original preview, and restored both timers on a fresh
+HOME load. The Drone hatched and the Forge completed level one at frame
+8,005. The current ROM also loaded and migrated the genuine research-only
+ARM save, preserved its old bank, and reloaded the migrated job.
+
+The current Egg-only preview (ROM SHA-256
+`eee07e1ca618d666166572132d1a19a46dd931e6aacabe0a6ca52341ff5c8a83`)
+also wrote an authentic ARM save with an active Egg at frame 3,005 through
+the ordinary menu. The compound ROM loaded it with zero research and the
+unchanged Egg, saved to the other bank under the combined tag, and restored
+those observations on a fresh load. The predecessor bank was byte-identical.
+
+The combined preview remains opt-in. Broader campaign and older-format
+coverage, stack, busy-match measurements and physical hardware remain open.

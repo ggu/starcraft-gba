@@ -503,12 +503,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   remain HOST-only and normal release flags/#298 remain unchanged.
 - **P10 shared Egg and research SRAM (S1):** the [compound P10 probe](audits/2026-11-12-p10-research-egg-sram.md)
   preserves both a paid Zerg Egg and Forge research in a single skirmish
-  save without increasing the record. In the original preview, a physical-button
-  ARM run reloaded both, hatched the Drone and completed level one. Research-only
-  ARM migration preserved the prior slot; the Egg-only predecessor was tested on
-  HOST. The current port inherits the normal P10 typed reader. Keep it opt-in
-  pending a fresh HOST/ARM run, broader compatibility and campaign checks, stack
-  headroom, and busy-match measurements.
+  save without increasing the record. The current port inherits the normal
+  P10 typed reader. Host sanitizers and physical-button ARM replays pass for
+  the mixed save and migration from both research-only and Egg-only journals.
+  Keep the separate build opt-in pending broader campaign and older-format
+  checks, stack headroom, busy-match measurements and physical hardware.
 - **[Native visual evidence](audits/2026-11-07-n64-visual-only-jit/README.md):** the bounded GPU interpreter probe reaches startup.
   Separately, the official CPU/RSP-JIT visual-only frontend at `60ade910` now
   completes the retained 8,617-step ordinary custom schedule, all three requested
