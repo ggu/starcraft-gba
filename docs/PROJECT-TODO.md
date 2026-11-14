@@ -136,8 +136,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   tests retirement and neutral cargo on HOST. Its final victory now waits
   for deferred retirement, including a surviving Battlecruiser fixture.
   Before ARM enablement, resolve in-flight damage and simultaneous
-  outcomes against native evidence. Next: record
-  an active elimination, broaden the native Free for All Random opening
+  outcomes against native evidence. The [result observer](https://github.com/ggu/starcraft-gba/pull/490)
+  linked against pinned ares, but its opening test hit the process file
+  limit before gameplay. Qualify a disposable Metal cache under the
+  existing guard, then record an active elimination, broaden the native Free for All Random opening
   sample, and qualify complete ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
   now wins from HOME on the KODAK ROM and staged Terran ROM with all 95
@@ -242,8 +244,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   find four point fills in each of three slow calls. The FIFO cuts mean
   active loop cost 19.56% and orders 28.26% with matching checkpoints.
   Verify endpoint field bytes, four current links and save continuations
-  before promotion. Then tackle repeated goal eviction and the remaining
-  movement cost; the candidate still falls well short of 30 fps.
+  before promotion. [Dense route measurement](audits/2026-11-14-z7-point-flood-retention.md)
+  finds no same-seed aliases among 448 stock point fills. One retained
+  field would match 51 misses in a point-only model; test its 6 KiB cost
+  and full paired timing before promotion. Remaining movement cost still
+  leaves the candidate well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
