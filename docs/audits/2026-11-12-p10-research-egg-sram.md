@@ -99,3 +99,35 @@ output-path check. The exact pre-port default reproduced all seven faults
 with the same input layout in a separate worktree; none hit the compound
 save path. The focused sanitizer and ARM passes above are the evidence
 for this preview. A clean broad check and default activation remain open.
+
+## Release-base refresh with wide point FIFO
+
+On release base `ecc8a6ac`, the probe inherits the wide point FIFO and the
+normal P10 typed unit reader. The probe alone adds the custom Egg and
+compound SRAM flags and substitutes the Egg-aware fact table include.
+Source-boundary, doctor, and default build checks passed. The separate
+`make test-sc64-protoss-research-egg-probe` rebuilt all three ASan/UBSan
+configurations. Mixed continuation and refund, both predecessor migrations,
+semantic fallback, atomic rejection, and unchanged campaign tags passed.
+Each writer produced a 16,308-byte payload.
+
+`make protoss-p10` produced byte-identical normal P10 ROMs with and
+without this probe (independent worktrees, same prepared inputs), SHA-256
+`2891e18d368a117cc61be21e8aa32a730044cabffed9484f6ac3cd3fbd3f8f5d`.
+
+`make protoss-research-egg-probe custom-egg-preview-protoss` passed the ROM
+header and both RAM guards. The compound ROM measured 32 MiB, with SHA-256
+`4cf613bf013bdd86e4c3325068c28189bc34af39fb8f3526f368c4e01ecb51af`,
+EWRAM end `0x0203c0e0`, and IWRAM end `0x03004d08`. The Egg-only preview
+ROM SHA-256 was
+`a207273add85968fd58f27f12fc32d98773bd74ed4537e7e997586574dc33ffe`.
+
+In mGBA, ordinary buttons recreated the paid Forge job and active Drone
+Egg together at frame 3,005. The cartridge wrote the same mixed SRAM
+SHA-256 as before. A fresh HOME load restored both timers (4,999 and 10),
+then advanced both on the next update. The Drone hatched and the Forge
+completed level one at frame 8,005. The same compound ROM migrated a
+genuine older research-only ARM save and an Egg-only save made by the
+refreshed preview. Each original bank remained byte-identical and each
+migrated save reloaded in a fresh process. The checks used physical button
+events and named read-only observations, without guest-memory writes.
