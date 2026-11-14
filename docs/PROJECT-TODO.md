@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-13. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-14. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -66,7 +66,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Homeland](audits/2026-11-13-p7-carried-normal-home.md) wins on both
   November 13 P10 revisions and the nearest-first candidate. [P1 and P2
   now win from HOME on staged P10](audits/2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes)
-  with their rescued heroes alive. P3–P6 still need complete exact-ROM
+  with their rescued heroes alive. [P5](audits/2026-11-14-p5-p6-normal-home.md)
+  now also wins on staged P10, with Tassadar rescued and the authored pages
+  verified. P6 also wins on staged P10 with Zeratul and Tassadar alive and
+  all 113 checkpoints matched. P3–P4 still need complete exact-ROM
   qualification. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)

@@ -7,13 +7,31 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef SC64_P56_NORMAL_HOME
+#include "sc64_route_purity.h"
+#include "sc64_controller_authored_pages.h"
+static uint64_t route_after;
+static int last_checkpoint_frame = -1;
+static int p6_pure_route_next(int x, int y, int tx, int ty, int *nx, int *ny)
+{
+    ROUTE_PURE_BEGIN();
+    int result = sc64_route_next(x, y, tx, ty, nx, ny);
+    ROUTE_PURE_END();
+    return result;
+}
+#define sc64_route_next p6_pure_route_next
+#endif
 
 #define P6_RUN_LIMIT 180000
 #define P6_CHECKPOINT_PERIOD 900
 
 static FILE *trace;
 static u16 prior_keys;
+#ifdef SC64_P56_NORMAL_HOME
+static unsigned long host_ticks;
+#else
 static u32 host_ticks;
+#endif
 static int deployed;
 static int start_checkpoint_written;
 static int run_limit = P6_RUN_LIMIT;
@@ -45,7 +63,11 @@ static int frontline_aim_x, frontline_aim_y;
 static const char *prefix_inputs_path;
 static char attempt_path[512] = ".local/sc64/p6-controller-attempt-running.json";
 static char final_path[512] = ".local/sc64/p6-controller-attempt.json";
+#ifdef SC64_P56_NORMAL_HOME
+static char verified_path[512] = ".local/sc64/p6-normal-home-win.json";
+#else
 static char verified_path[512] = ".local/sc64/p6-controller-win.json";
+#endif
 static int storm_trap_raw(int raw);
 
 static void step(u16 held);
@@ -64,6 +86,10 @@ static int select_actor_only(int slot);
     } \
     step(tap_key_); step(0); \
 } while (0)
+
+#ifdef SC64_P56_NORMAL_HOME
+static void p6_tap_callback(u16 key) { step(key); step(0); }
+#endif
 
 static int isqrt_u32(unsigned value)
 {
@@ -138,7 +164,7 @@ static void log_south_combat_snapshot(unsigned frame, int slot)
     int n = 0;
     fprintf(stderr,
         "P6 south snapshot frame=%u host=%u mode=%d menu=%d hero=%d raw=%d at=%d,%d hp=%d shield=%d energy=%d order=%d target=%d cd=%d\n",
-        frame, host_ticks, mode, menu_open, slot, u[slot].raw_type,
+        frame, (unsigned)host_ticks, mode, menu_open, slot, u[slot].raw_type,
         u[slot].x, u[slot].y, u[slot].hp, u[slot].shield, u[slot].carry,
         u[slot].order, u[slot].target, u[slot].cd);
     for(unsigned i=0;i<SC64_STORM_MAX_ACTIVE;++i){
@@ -348,7 +374,7 @@ static void checkpoint(const char *kind)
                 (unsigned)race_p6.runtime.model.started, (unsigned)race_p6.runtime.fault);
 }
 
-static void step(u16 held)
+static void step_raw(u16 held)
 {
     int hero_before = deployed ? raw_unit(SC64_P6_RAW_HERO, SIDE) : -1;
     int carry_before = hero_before >= 0 ? u[hero_before].carry : -1;
@@ -374,7 +400,13 @@ static void step(u16 held)
     } else probe_units=0;
     if (deployed && (screen != SCREEN_PLAY || won || lost)) return;
     u16 pressed = held & (u16)~prior_keys;
+#ifdef SC64_P56_NORMAL_HOME
+    assert(route_purity_hash() == route_after);
+#endif
     game_update(held, pressed);
+#ifdef SC64_P56_NORMAL_HOME
+    route_after = route_purity_hash();
+#endif
     if (probe_units) for (unsigned f=0;f<SC64_STORM_MAX_ACTIVE;++f) {
         const Sc64PsionicStorm *after=&race_p6.storm.storm[f];
         const struct StormProbe *before=&storms_before[f];
@@ -417,7 +449,16 @@ static void step(u16 held)
         fflush(trace);
     }
     if (deployed && screen == SCREEN_PLAY && frame > 0 &&
-        frame % P6_CHECKPOINT_PERIOD == 0) checkpoint("periodic");
+        frame % P6_CHECKPOINT_PERIOD == 0
+#ifdef SC64_P56_NORMAL_HOME
+        && frame != last_checkpoint_frame
+#endif
+        ) {
+#ifdef SC64_P56_NORMAL_HOME
+        last_checkpoint_frame = frame;
+#endif
+        checkpoint("periodic");
+    }
     if (team_escort_diagnostics && team_escort_commit_frame &&
         frame >= team_escort_commit_frame && frame % 600 == 0) {
         int ts=raw_unit(SC64_P6_RAW_HERO,SIDE);
@@ -435,6 +476,14 @@ static void step(u16 held)
                         i,u[i].x,u[i].y,u[i].hp,u[i].order,u[i].tx,u[i].ty,
                         u[i].path_x,u[i].path_y);
     }
+}
+
+static void step(u16 held)
+{
+    step_raw(held);
+#ifdef SC64_P56_NORMAL_HOME
+    sc64_controller_ack_pages(step_raw, held, &host_ticks, stderr);
+#endif
 }
 
 /* Optional reproducibility bridge: replay an earlier controller's complete
@@ -478,7 +527,7 @@ static void replay_prefix_inputs(const char *path)
             }
         fprintf(stderr,
             "P6 prefix snapshot host=%u frame=%u hero=%d at=%d,%d hp=%d shield=%d energy_q8=%d nearest_slot=%d raw=%d owner=%d at=%d,%d d2=%d hostile_within240=%d cursor=%d,%d mode=%d menu=%d\n",
-            host_ticks, (unsigned)frame, hero,
+            (unsigned)host_ticks, (unsigned)frame, hero,
             hero >= 0 ? u[hero].x : -1, hero >= 0 ? u[hero].y : -1,
             hero >= 0 ? u[hero].hp : 0, hero >= 0 ? u[hero].shield : 0,
             hero >= 0 ? u[hero].carry : -1, near_slot,
@@ -496,14 +545,22 @@ static void replay_prefix_inputs(const char *path)
 static void start_live_route(void)
 {
     game_init();
+#ifdef SC64_P56_NORMAL_HOME
+    route_after = route_purity_hash();
+#endif
     prior_keys = 0;
     tap(KEY_A);
     tap(KEY_RIGHT);
     tap(KEY_RIGHT);
     tap(KEY_DOWN);
     tap(KEY_A);
+#ifdef SC64_P56_NORMAL_HOME
+    if (!sc64_controller_reveal_briefing(p6_tap_callback, SC64_P6_GLOBAL_ID, &host_ticks, stderr)) abort();
+#else
     tap(KEY_START);
-    assert(host_ticks == 12 && screen == SCREEN_PLAY && !won && !lost &&
+    assert(host_ticks == 12);
+#endif
+    assert(screen == SCREEN_PLAY && !won && !lost &&
            race_p6_active());
     deployed = 1;
     checkpoint("start");
@@ -1903,6 +1960,12 @@ int main(int argc, char **argv)
         } else return 2;
     }
     if (run_limit < 1 || run_limit > 1000000) return 2;
+#ifdef SC64_P56_NORMAL_HOME
+    if (prefix_inputs_path) {
+        fputs("Normal HOME qualification requires a fresh controller route\n", stderr);
+        return 2;
+    }
+#endif
     team_escort_diagnostics = team_escort;
     if (path_diagnostics)
         fprintf(stderr, "P6 controller options limit=%d team=%d prefix=%s\n",
@@ -2012,7 +2075,7 @@ int main(int argc, char **argv)
                     "P6 Marine rescue approach frame=%u slot=%d at=%d,%d distance2=%d Tassadar=%d,%d goal=%d,%d command=%d,%d route=%d next=%d,%d issued=%d host=%u\n",
                     (unsigned)frame,rescue_marine,rx,ry,rescue_dist,
                     u[tassadar].x,u[tassadar].y,approach_x,approach_y,cx,cy,
-                    1,route_nx,route_ny,issued,host_ticks);
+                    1,route_nx,route_ny,issued,(unsigned)host_ticks);
                 if(path_diagnostics)fprintf(stderr,"P6 Marine rescue census owned=%d unresolved=%d\n",
                     raw_count(0,SIDE),raw_count(0,RESCUABLE));
                 if(path_diagnostics)fprintf(stderr,
@@ -2030,7 +2093,7 @@ int main(int argc, char **argv)
                 if(path_diagnostics&&frame%30==0)fprintf(stderr,
                     "P6 Marine rescue contact frame=%u slot=%d dist2=%d converted=%d living-marines=%d at=%d,%d host=%u\n",
                     (unsigned)frame,rescue_marine,rescue_dist,
-                    u[rescue_marine].owner==SIDE,raw_count(0,SIDE),rx,ry,host_ticks);
+                    u[rescue_marine].owner==SIDE,raw_count(0,SIDE),rx,ry,(unsigned)host_ticks);
                 step(0);
                 continue;
             }
@@ -2046,7 +2109,7 @@ int main(int argc, char **argv)
                 if(ordered)rescued_marine_rally_phase=1;
                 if(path_diagnostics)fprintf(stderr,
                     "P6 Marine regroup order frame=%u selected=%d ordered=%d target=996,500 host=%u\n",
-                    (unsigned)frame,n,ordered,host_ticks);
+                    (unsigned)frame,n,ordered,(unsigned)host_ticks);
                 step(0);continue;
             }
             if(rescued_marine_rally_phase==1 &&
@@ -2066,7 +2129,7 @@ int main(int argc, char **argv)
                 if(path_diagnostics)fprintf(stderr,
                     "P6 Marine escort commit frame=%u selected=%d ordered=%d target=%d,%d T=%d,%d host=%u\n",
                     (unsigned)frame,n,ordered,marine_front_x,marine_front_y,
-                    u[tassadar].x,u[tassadar].y,host_ticks);
+                    u[tassadar].x,u[tassadar].y,(unsigned)host_ticks);
                 step(0);continue;
             }
         }
@@ -2112,7 +2175,7 @@ int main(int argc, char **argv)
                     issue_selected_order(marine_stage_x, marine_stage_y, 0);
                 fprintf(stderr, " marines=%d ordered=%d target=%d,%d host=%u\n",
                         selected_marines, ordered, marine_stage_x, marine_stage_y,
-                        host_ticks);
+                        (unsigned)host_ticks);
                 if (path_diagnostics) for (int i = 0; i < MAX_UNITS; ++i)
                     if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == 0 &&
                         u[i].selected)
@@ -2139,7 +2202,7 @@ int main(int argc, char **argv)
                     fprintf(stderr,"P6 west Marine transit frame=%u candidates=%d selected=%d marines=%d other=%d ordered=%d target=%d,%d host=%u\n",
                             (unsigned)frame,candidates,selected,marines,
                             other,ordered,marine_stage_x,marine_stage_y,
-                            host_ticks);
+                            (unsigned)host_ticks);
                 }
                 int arrived = eastern_marine_count_near(marine_stage_x,
                                                         marine_stage_y, 96);
@@ -2150,7 +2213,7 @@ int main(int argc, char **argv)
                     fprintf(stderr, "P6 team staging frame=%u marines=%d/%d Tassadar=%d,%d move=%d,%d host=%u\n",
                             (unsigned)frame, arrived, raw_count(0, SIDE),
                             u[tassadar].x,u[tassadar].y,
-                            marine_stage_x - 48,marine_stage_y,host_ticks);
+                            marine_stage_x - 48,marine_stage_y,(unsigned)host_ticks);
                 }
             } else if (marine_team_phase == 2) {
                 int arrived = eastern_marine_count_near(marine_stage_x,
@@ -2172,7 +2235,7 @@ int main(int argc, char **argv)
                     fprintf(stderr,"P6 team escort commit frame=%u selected=%d/%d ordered=%d corridor=%d,%d Tassadar=%d,%d marines-near=%d host=%u\n",
                             (unsigned)frame,marines,candidates,ordered,
                             marine_front_x,marine_front_y,u[tassadar].x,
-                            u[tassadar].y,arrived,host_ticks);
+                            u[tassadar].y,arrived,(unsigned)host_ticks);
                     marine_team_phase=3;
                     team_escort_commit_frame=(int)frame;
                 }
@@ -2190,7 +2253,7 @@ int main(int argc, char **argv)
                             tassadar>=0?u[tassadar].ty:-1,
                             tassadar>=0?u[tassadar].hp:0,
                             tassadar>=0?u[tassadar].shield:0,
-                            tassadar>=0?u[tassadar].carry:-1,host_ticks);
+                            tassadar>=0?u[tassadar].carry:-1,(unsigned)host_ticks);
                 }
                 step(0);
                 continue;
@@ -2344,7 +2407,7 @@ int main(int argc, char **argv)
                         target>=0?u[target].x:-1,target>=0?u[target].y:-1,
                         nearest,tassadar>=0?u[tassadar].x:-1,
                         tassadar>=0?u[tassadar].y:-1,sx,sy,support_route,
-                        host_ticks);
+                        (unsigned)host_ticks);
             if(path_diagnostics)fprintf(stderr,"P6 team support route=%d next=%d,%d target-walk=%d terrain=%d\n",
                 support_route,route_next_x,route_next_y,
                 sx>=0?SC64_GRID_GET(path_walkable,sx/16+(sy/16)*MAP_COLS):0,
@@ -2440,7 +2503,7 @@ int main(int argc, char **argv)
                 if(path_diagnostics)fprintf(stderr,
                     "P6 team corridor follow frame=%u selected=%d marines=%d/%d other=%d ordered=%d target=%d,%d host=%u\n",
                     (unsigned)frame,selected,marines,candidates,other,
-                    ordered,follow_x,frontline_lane_y,host_ticks);
+                    ordered,follow_x,frontline_lane_y,(unsigned)host_ticks);
             }
         }
         if(team_escort&&team_follow_ordered&&!team_repositioned&&
@@ -2453,7 +2516,7 @@ int main(int argc, char **argv)
             if(path_diagnostics)fprintf(stderr,
                 "P6 team clear T route frame=%u selected=%d ordered=%d target=720,1860 T=%d,%d host=%u\n",
                 (unsigned)frame,selected,ordered,u[tassadar].x,
-                u[tassadar].y,host_ticks);
+                u[tassadar].y,(unsigned)host_ticks);
         }
         int late_retreat_active = tassadar >= 0 &&
             u[tassadar].y > 1650 && waiting_for_storm;
@@ -2564,7 +2627,7 @@ int main(int argc, char **argv)
                     if(path_diagnostics)fprintf(stderr,"P6 frontline safe-waypoint frame=%u issued=%d target=%d,%d raw=%d owner=%d at=%d,%d caster=%d,%d menu=%d mode=%d host=%u\n",
                         (unsigned)frame,issued,tx,ty,raw,owner,
                         is_building?-1:u[slot].x,is_building?-1:u[slot].y,
-                        u[tassadar].x,u[tassadar].y,menu_open,mode,host_ticks);
+                        u[tassadar].x,u[tassadar].y,menu_open,mode,(unsigned)host_ticks);
                 }
                 int wait_for_close_pack=frontline_pursuit&&
                     frame>=next_storm_frame&&
@@ -2711,7 +2774,7 @@ int main(int argc, char **argv)
                         if(path_diagnostics)fprintf(stderr,
                             "P6 team flank order frame=%u selected=%d marines=%d/%d other=%d ordered=%d target=%d,%d host=%u\n",
                             (unsigned)frame,selected,marines,candidates,other,
-                            ordered,tx,ty,host_ticks);
+                            ordered,tx,ty,(unsigned)host_ticks);
                     }
                 } else if(frontline_pursuit) {
                     int rx=-1,ry=-1,threat=-1,threat_d2=0;
@@ -2747,7 +2810,7 @@ int main(int argc, char **argv)
                         route=sc64_route_next(u[tassadar].x,u[tassadar].y,
                                               tx,ty,&nx,&ny);
                     fprintf(stderr,"P6 frontline wait frame=%u host=%u menu=%d mode=%d at=%d,%d cursor=%d,%d cursor_d2=%d order=%d tx=%d,%d path=%d,%d retry=%u route=%d next=%d,%d targetterrain=%d targetwalk=%d energy=%d nearest=%d raw=%d at=%d,%d d2=%d burrow=%d order=%d hp=%d shield=%d\n",
-                        (unsigned)frame,host_ticks,menu_open,mode,
+                        (unsigned)frame,(unsigned)host_ticks,menu_open,mode,
                         u[tassadar].x,u[tassadar].y,cx,cy,
                         dist2(cx,cy,u[tassadar].x,u[tassadar].y),u[tassadar].order,
                         u[tassadar].tx,u[tassadar].ty,u[tassadar].path_x,
