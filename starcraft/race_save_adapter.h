@@ -11,8 +11,17 @@
 #include "sc64_save_ui_context.h"
 _Static_assert(MAX_BUILDINGS <= 254, "UI save index exceeds one-byte encoding");
 #endif
+#if defined(SC64_P10_RESEARCH_EGG_SRAM_PROBE) && \
+    (!defined(SC64_P10_RUNTIME) || !defined(SC64_RESEARCH_SRAM_PRODUCT) || \
+     !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) || \
+     !defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
+     defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) || \
+     defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE) || \
+     defined(SC64_NUKE_SILO_JOURNAL) || defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE))
+#error "combined P10 SRAM requires the custom Egg and research product journals"
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
-#if !defined(SC64_RACES) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_SCARAB_NAMESPACE_STAGE)
+#if !defined(SC64_RACES) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || (defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) && !defined(SC64_P10_RESEARCH_EGG_SRAM_PROBE)) || defined(SC64_SCARAB_NAMESPACE_STAGE)
 #error "experimental research journal requires normal shared transport profiles"
 #endif
 #define SC64_RESEARCH_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH(SC64_TRANSPORT_SAVE_VERSION)
@@ -59,6 +68,44 @@ static int race_research_campaign_candidate_rule(const RaceSave *candidate,
 
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
 #define SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH_JOBS(SC64_TRANSPORT_SAVE_VERSION)
+#ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
+/* Combine the existing Egg feature selector and research namespace. Keep
+ * the proven Egg inner version and the research building padding layout. */
+#define SC64_RESEARCH_EGG_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH_JOBS(SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION)
+#define SC64_P10_RESEARCH_EGG_TAG_ROWS(X) \
+    X(SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0) \
+    X(SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0) \
+    X(SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION,SC64_STAGE_SAVE_EGG) \
+    X(SC64_RESEARCH_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0) \
+    X(SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0) \
+    X(SC64_RESEARCH_EGG_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_SAVE_VERSION,SC64_STAGE_SAVE_EGG)
+#define SC64_P10_OUTER(outer,inner,features) (outer),
+static const u32 sc64_p10_research_egg_tags[] = {
+    SC64_P10_RESEARCH_EGG_TAG_ROWS(SC64_P10_OUTER)
+};
+#undef SC64_P10_OUTER
+#define SC64_P10_PAIR(outer,inner,features) {outer,inner,features},
+static const Sc64StageTagPair sc64_p10_research_egg_pairs[] = {
+    SC64_P10_RESEARCH_EGG_TAG_ROWS(SC64_P10_PAIR)
+};
+#undef SC64_P10_PAIR
+#undef SC64_P10_RESEARCH_EGG_TAG_ROWS
+#define SC64_P10_RESEARCH_EGG_TAG_COUNT (sizeof(sc64_p10_research_egg_tags)/sizeof(sc64_p10_research_egg_tags[0]))
+_Static_assert(SC64_P10_RESEARCH_EGG_TAG_COUNT <= GBA_SAVE_MAX_ACCEPTED_TAGS,
+               "combined P10 save tag set exceeds selection capacity");
+_Static_assert(SC64_RESEARCH_EGG_TRANSPORT_SAVE_VERSION != SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION &&
+               SC64_RESEARCH_EGG_TRANSPORT_SAVE_VERSION != SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
+               "combined P10 save tag collision");
+
+static u32 race_p10_research_egg_impact_tag(const Sc64StageSaveAuth *auth)
+{
+    if ((auth->features & SC64_STAGE_SAVE_EGG) ||
+        auth->outer==SC64_RESEARCH_TRANSPORT_SAVE_VERSION ||
+        auth->outer==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION)
+        return SC64_TRANSPORT_SAVE_VERSION;
+    return auth->outer;
+}
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
 #define SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_CAMPAIGN_JOBS(SC64_TRANSPORT_SAVE_VERSION)
 _Static_assert(SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION != SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION &&
@@ -4491,6 +4538,17 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (!race_impact_save_decode_selected_guardian(len,impact_tag,plan->impact_candidate,
                                           &plan->impact_candidate_count,&plan->guardian_auth)) return 0;
 #elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+#ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
+    if (!sc64_stage_save_authenticate(&plan->egg_auth,&race_data,tag,race_data.version,
+                                      sc64_p10_research_egg_pairs,SC64_P10_RESEARCH_EGG_TAG_COUNT)) return 0;
+    /* Both feature formats apply only to the custom-game roster. */
+    if (race_data.state[0]!=1 &&
+        ((plan->egg_auth.features & SC64_STAGE_SAVE_EGG) ||
+         tag==SC64_RESEARCH_TRANSPORT_SAVE_VERSION ||
+         tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION)) return 0;
+    plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
+    u32 impact_tag=race_p10_research_egg_impact_tag(&plan->egg_auth);
+#else
     const Sc64StageTagPair egg_tags[]={
         {SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,0},
         {SC64_TRANSPORT_SAVE_VERSION,SAVE_VERSION,0},
@@ -4503,6 +4561,7 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
     u32 impact_tag=(plan->egg_auth.features & SC64_STAGE_SAVE_EGG) ?
                     SC64_TRANSPORT_SAVE_VERSION : tag;
+#endif
 #ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
     if (!race_impact_save_decode_selected_guardian(len,impact_tag,plan->impact_candidate,
                                           &plan->impact_candidate_count,&plan->egg_auth)) return 0;
@@ -4579,6 +4638,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
         || tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
+        || tag==SC64_RESEARCH_EGG_TRANSPORT_SAVE_VERSION
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
         || tag==SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION
 #endif
@@ -4594,7 +4656,11 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     }
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
-    plan->research_jobs_tag=(u8)(tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION);
+    plan->research_jobs_tag=(u8)(tag==SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION
+#ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
+        || tag==SC64_RESEARCH_EGG_TRANSPORT_SAVE_VERSION
+#endif
+        );
 #if defined(SC64_NUKE_SILO_JOURNAL) && defined(SC64_RESEARCH_SRAM_PRODUCT)
     if (nuke_silo_tag && race_data.state[0] == 1) plan->research_jobs_tag = 1;
 #endif
@@ -4642,6 +4708,8 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
+#elif defined(SC64_P10_RESEARCH_EGG_SRAM_PROBE)
+#define SC64_P10_RESEARCH_EGG_SELECT_TAGS sc64_p10_research_egg_tags
 #elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
@@ -4668,7 +4736,13 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_SAVE_VERSION,SAVE_VERSION};
 #endif
 #if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
-    int selected=save_select_prepared(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
+    int selected=save_select_prepared(&race_impact_record,sizeof(race_impact_record),
+#ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
+                                      SC64_P10_RESEARCH_EGG_SELECT_TAGS,SC64_P10_RESEARCH_EGG_TAG_COUNT,
+#undef SC64_P10_RESEARCH_EGG_SELECT_TAGS
+#else
+                                      tags,sizeof(tags)/sizeof(tags[0]),
+#endif
                                       race_worker_cargo_prepare_selected,plan,selection);
     if (!selected) memset(plan,0,sizeof(*plan));
     return selected;

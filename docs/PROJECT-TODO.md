@@ -151,9 +151,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   outcomes against native evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
-  were published in that opening. Next: record active elimination and
-  distinguish in-flight damage and simultaneous outcomes, then qualify
-  complete ordinary-input matches on hardware.
+  were published in that opening. A separate ordinary-input replay
+  verified placement and construction of a Barracks. Next: complete the
+  Barracks, train a force and record active elimination. Distinguish
+  in-flight damage and simultaneous outcomes, then qualify complete
+  ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
   now wins from HOME on the KODAK ROM and staged Terran ROM with all 95
   observations matching. The policy puts idle builders back on minerals,
@@ -265,9 +267,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finds no same-seed aliases among 448 stock point fills. One retained
   field matches 51 misses in a point-only model, but the ARM copy-based
   probe adds 6,152 EWRAM bytes and slows the wide FIFO by 0.55% with
-  byte-identical sampled state. Leave retention off. Pursue cheaper
-  full or exactly scoped point floods;
-  the measured dense workload is still well short of 30 fps.
+  byte-identical sampled state. Leave copy-based retention off. On the
+  [current pointer ROM](audits/2026-11-13-route-linear-word-pack.md#dense-z7-on-the-pointer-fifo),
+  point fills take 736k cycles per active call, including 489k in FIFO
+  expansion and 135k in packing. Aligned word output saves 0.52% of
+  the loop with matching fields and no extra RAM; keep it opt-in.
+  Test pointer-only one-field retention on the safe physical prefix,
+  preserving logical eviction and both range scratch bindings. Check
+  reserves before timing, and break down the 1.05M orders cycles outside
+  point fills. The dense workload is still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
@@ -528,6 +536,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   supplements the 19-step six-profile OFF/ON resource checkpoint; it does not
   qualify early campaigns, full pixels, all rosters or hardware. Early stages
   remain HOST-only and normal release flags/#298 remain unchanged.
+- **P10 shared Egg and research SRAM (S1):** the [compound P10 probe](audits/2026-11-12-p10-research-egg-sram.md)
+  preserves both a paid Zerg Egg and Forge research in a single skirmish
+  save without increasing the record. The current port inherits the normal
+  P10 typed reader. Host sanitizers and physical-button ARM replays pass for
+  the mixed save and migration from both research-only and Egg-only journals.
+  Keep the separate build opt-in pending broader campaign and older-format
+  checks, stack headroom, busy-match measurements and physical hardware.
 - **[Native visual evidence](audits/2026-11-07-n64-visual-only-jit/README.md):** the bounded GPU interpreter probe reaches startup.
   Separately, the official CPU/RSP-JIT visual-only frontend at `60ade910` now
   completes the retained 8,617-step ordinary custom schedule, all three requested

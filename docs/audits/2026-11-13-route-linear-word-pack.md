@@ -98,3 +98,53 @@ off; no wide Z7 or other product replay was run.
 - Candidate replay: `3b9cc6315510930e16be1aa65b4bee8470fb41671d04d7c8fd6cc963acf59539`.
 - Matched ordered state/video: `5fd998f18b6ea21bd9b49142fa30a0bc151eb30eb28a8493f62c42a249b4d9d6`.
 - Profile comparison: `5916b98489e072d4198de92f7536180bb6cf5f591c655db0daefbb857e55ee4a`.
+
+## Dense Z7 on the pointer FIFO
+
+On `ecc8a6ac`, the stock pointer FIFO ROM replayed calls 47,758–48,237
+with read-only breakpoints at the wide point fill and expansion entry and
+return addresses. All 131 ordinary HOME checkpoints and all 480 frame,
+loop and orders counters matched the earlier pointer timing. Across 477
+active calls, its 448 point fills average 736,160 cycles per active call:
+111,655 in grid setup and seeding, 489,348 in FIFO expansion and 135,158
+in output packing and return. Point fills account for 41.25% of orders
+and 25.02% of the full loop. The rest of orders costs 1,048,326 cycles
+per active call in aggregate; the breakpoint trace does not attribute
+that remainder to individual functions. The worst loop (call 47,823)
+spends 3,123,144 cycles in four point fills, including 2,078,957 in
+expansion.
+
+The comparison ARM build uses the same compiler command and adds only
+`SC64_ROUTE_LINEAR_WORD_PACK_PROBE`. It matches all 131 checkpoints,
+frame progression and route counters on all 480 calls, and the raw
+world, walkability, route metadata and every valid route-field hash at
+both endpoints. The normal and 32-entry forced-overflow pointer FIFO
+variants with word packing also match the scalar reference on 386,646
+asset-free ASan/UBSan point queries apiece; both facility packing fixtures
+pass. The 32 MiB Z10 ROM passes its guards; text grows by 400 bytes with
+unchanged EWRAM and IWRAM ends (`0x02038b00` and `0x03004d50`).
+
+| Guest cycle counter | Pointer baseline | Word packing | Change |
+| --- | ---: | ---: | ---: |
+| Whole loop, active mean | 2,941,972 | 2,926,725 | −0.52% |
+| Movement orders, active mean | 1,784,487 | 1,769,346 | −0.85% |
+| Whole loop, all calls p95 | 4,420,534 | 4,362,853 | −1.30% |
+| Whole loop, all calls maximum | 5,583,925 | 5,515,951 | −1.22% |
+
+The result establishes a small improvement on this tape. Keep the
+option off pending comparable evidence from the other products; this
+experiment does not replay a full win, saves or hardware timing. FIFO
+expansion remains the largest measured part of point fills. The earlier
+stock victim trace placed every one of its 448 point fills in logical
+slots 1, 2 or 4, away from the two range scratch planes. That makes
+pointer-only retention a better next trial than another packed copy:
+confirm the same victims on the pointer ROM, then exchange a safe
+victim's backing pointer with one extra plane. Keep logical keys, ages
+and eviction unchanged, and leave both scratch bindings fixed. Check
+all four RAM reserves before timing; if the extra plane cannot fit,
+focus on reducing expansion cost without changing FIFO order.
+
+- Pointer breakpoint receipt: `52d7288321c40742c2bf6fdae57ed90ed83c8dbde8c362b52f35ff9d3ab9cb62`.
+- Word-pack cycle receipt: `c25fd850c3960f0b277bbc61625986e43e9cc78d66df8b89adbd9fe28cce8d9b`.
+- Matching raw endpoints: `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4`.
+- Word-pack ROM: `0c0811c8efc9b98f7fcd08f5733fb2c6f69f7a4b3a37bbe310a2de530014a5e2`.
