@@ -76,8 +76,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   P10 ROM](audits/2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays).
   [P4](audits/2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win)
   wins on both staged P10 and the exact KODAK cartridge with Raynor and
-  Tassadar alive and 146 matching checks. P3 clears Force 3 but stalls at a base exit; finish that route
-  before exact-ROM replay. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
+  Tassadar alive and 146 matching checks. [P3 now wins on the packaged
+  wide P10 ROM](audits/2026-11-13-p3-p4-home-preparation.md#wide-p10-packaged-rom-p3-victory)
+  after opening a second mineral line. All 47 checks match, and a separate
+  pre-expansion pause save reloads with matching state through 241 updates.
+  All 30 missions now have a complete ordinary-input win on a normal ROM
+  in mGBA. Check remaining older/current cross-build and save continuations.
+  The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
   with both heroes at full health, 41 matching observations and twelve

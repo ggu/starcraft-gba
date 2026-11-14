@@ -732,6 +732,35 @@ static int recover_stalled_builder(void)
     return 0;
 }
 
+#ifdef SC64_P34_NORMAL_HOME
+/* Open a second mineral line before the starting bank is spent. */
+static void build_forward_nexus(void)
+{
+    int home = side_building(B_NEXUS, 1), x = 0, y = 0, best = 0;
+    if (home < 0 || side_building_count(B_NEXUS) != 1 || minerals < 500) return;
+    for (int mslot = 0; mslot < MAX_MINERALS; ++mslot) {
+        if (m[mslot].amount < 250 || !currently_visible(m[mslot].x,m[mslot].y) ||
+            dist2(m[mslot].x,m[mslot].y,b[home].x,b[home].y) < 288*288) continue;
+        for (int dy = -112; dy <= 112; dy += 32)
+            for (int dx = -112; dx <= 112; dx += 32) {
+                int sx = (m[mslot].x+dx)&~15, sy = (m[mslot].y+dy)&~15;
+                int score = 0;
+                if (sx < 64 || sy < 64 || sx >= WORLD_W-64 || sy >= WORLD_H-64 ||
+                    !race_can_site(SIDE,B_NEXUS,sx,sy) || !can_place(B_NEXUS,sx,sy)) continue;
+                for (int mi = 0; mi < MAX_MINERALS; ++mi)
+                    if (m[mi].amount > 0 && dist2(sx,sy,m[mi].x,m[mi].y) < 160*160)
+                        score += m[mi].amount;
+                if (score <= best || nearest_available_probe(sx,sy) < 0) continue;
+                best=score; x=sx; y=sy;
+            }
+    }
+    if (best) {
+        fprintf(stderr,"P3 forward Nexus frame=%d xy=%d,%d ore=%d\n",frame,x,y,best);
+        build_on_site(B_NEXUS,MENU_STOP+1,x,y);
+    }
+}
+#endif
+
 static void build_pylons_and_gateways(void)
 {
     if (side_active_builders() >= 2) return;
@@ -927,6 +956,9 @@ int main(int argc, char **argv)
     int next_build = frame + 10;
     int next_gas = frame + 10;
     int assault_started = 0;
+#ifdef SC64_P34_NORMAL_HOME
+    int next_expansion = 12000;
+#endif
     while (frame < run_limit && screen == SCREEN_PLAY && !won && !lost &&
            !controller_input_error) {
         /* Failed placements can leave the ordinary command menu open, which
@@ -938,6 +970,12 @@ int main(int argc, char **argv)
             build_pylons_and_gateways();
             next_build = frame + 240;
         }
+#ifdef SC64_P34_NORMAL_HOME
+        if (frame >= next_expansion && side_building_count(B_NEXUS) == 1) {
+            build_forward_nexus();
+            next_expansion = frame + 1200;
+        }
+#endif
         if (frame >= next_worker) {
             mine_idle_probes();
             queue_probe();
