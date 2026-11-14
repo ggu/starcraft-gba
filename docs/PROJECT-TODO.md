@@ -64,10 +64,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with 59 matching checks, both Cerebrate objectives and both heroes alive.
   Its replay averages 8.27 emulated updates/s.
   [Homeland](audits/2026-11-13-p7-carried-normal-home.md) wins on both
-  November 13 P10 revisions and the nearest-first candidate. [P1 now
-  wins from HOME on staged P10](audits/2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes)
-  with the rescued hero alive. P2–P6 still need complete exact-ROM
-  qualification. Fresh P2 inputs match the opening on staged P10. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
+  November 13 P10 revisions and the nearest-first candidate. [P1 and P2
+  now win from HOME on staged P10](audits/2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes)
+  with their rescued heroes alive. P3–P6 still need complete exact-ROM
+  qualification. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
   with both heroes at full health, 41 matching observations and twelve
@@ -235,8 +235,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   frame 75,289 averages 6.80 updates/s. The [dense stock stage sample](audits/2026-11-12-z7-normal-physical.md#uninterrupted-home-on-the-exact-kodak-cartridge)
   finds movement orders take 2.61M of 3.77M cycles per active update.
   Route-build calls average 3.14M orders cycles versus 1.03M without a
-  build. Prioritize route churn and the remaining orders cost on that
-  exact window; early rendering samples describe a different workload.
+  build. [Stock breakpoints and a paired wide FIFO run](audits/2026-11-13-z7-wide-point-flood.md#dense-window-on-the-exact-kodak-build-vector)
+  find four point fills in each of three slow calls. The FIFO cuts mean
+  active loop cost 19.56% and orders 28.26% with matching checkpoints.
+  Verify endpoint field bytes, four current links and save continuations
+  before promotion. Then tackle repeated goal eviction and the remaining
+  movement cost; the candidate still falls well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
