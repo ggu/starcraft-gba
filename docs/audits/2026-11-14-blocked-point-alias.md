@@ -56,3 +56,17 @@ hash-checking stderr wrapper that drops only the routine DMA messages.
 The replay guard and the read-only breakpoint protocol were unchanged.
 The stock receipt is
 `96c975a51fc0c4e54a234abe1195850120227c479ea46b94c0d83bfd1380f3b7`.
+
+The separate point-only retention model observes the pre-fill victim at
+that exact callsite. The 14 active physical mappings are identity and
+stock has no donor planes. Of the 448 misses, 319 evict a fresh complete
+point field. A shadow that retains one, two, or three recently evicted
+fields would see 51, 92, or 132 hits respectively (11.4%, 20.5%, 29.5%
+of point fills). The model does not redirect a logical slot or run a
+candidate, and excludes evictions from facility and range work. One
+extra map-sized plane costs 6,144 bytes before tags or transfer code;
+measure against the wide FIFO and keep linker reserve checks before
+using one. More than one does not fit the historical P10 guard.
+
+Retention receipt:
+`8f0a39d5b70702e6ce4572911199186100dfe8bb4d0eac57a40a69ada902b162`.
