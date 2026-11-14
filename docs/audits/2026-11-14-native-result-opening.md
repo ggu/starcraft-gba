@@ -73,3 +73,17 @@ finished in 157 seconds with unchanged inputs.
 | Completion manifest | `962a0e4aa4dcbaff5e8f91b6f0de12cba3e945a1daa8d30f79ac17c6ab35271a` |
 | First frame with completed Barracks | `3807896eac0062e4751289f055e211462ab08d1cdf127b8f5ea06a9c20ed19b6` |
 | Selected Barracks and its controls | `5457617031ec98b74953cde5ab5a689b1700dce64c3e9db4ad496e3b35d27ab9` |
+
+For a selected Barracks, C-Right opens the production grid. It initially
+selects the empty center tile. Up selects the Marine, whose grid entry
+shows 50 minerals and one supply. A queues it: the next clean frame
+shows the Marine portrait in the queue and supply rising from 4/10 to
+5/10. This establishes the original production input and queue behavior.
+Later frames have display corruption, so this run establishes neither
+a completed Marine nor any live combat or elimination.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Training manifest | `33d749b91afd6a9f415e0bffb09149886028d211f4988f8e70147ee5ba8debca` |
+| Marine selected (step 11,823) | `3b11c9e441e200490f2f88f80468ffcba59583a5fed1bfa1d930169c01cdc051` |
+| Marine in training (step 11,843) | `4a30f2d705b16ba65fd10118220addc0c4ebe9dd9236bd383353eabb3dd87606` |
