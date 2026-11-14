@@ -57,7 +57,7 @@ enum {
     KEEP_GATE_CALL, KEEP_GATE_HIT, KEEP_FAIL_BLOCKED, KEEP_FAIL_CODE,
     KEEP_FAIL_LENGTH, KEEP_FAIL_SEEDS, KEEP_FAIL_NEAR_GOAL, KEEP_FAIL_OPENED,
     KEEP_COMMIT_SAME, KEEP_COMMIT_OVERFLOW, KEEP_COMMIT_DROP, KEEP_MATERIALIZE,
-    KEEP_FILL, KEEP_ADOPT, KEEP_STATS
+    KEEP_FILL, KEEP_ADOPT, KEEP_BLOCKED_ALIAS, KEEP_STATS
 };
 static unsigned keep_stat[KEEP_STATS];
 #define SC64_ROUTE_KEEP_COUNT(name) (++keep_stat[KEEP_##name])
@@ -672,6 +672,38 @@ static void check_linear_uses_expected_path(int cols)
 }
 #endif
 
+#ifdef SC64_ROUTE_BLOCKED_ALIAS
+static void check_blocked_alias(void)
+{
+    const int goal = 128 * 32 + 32, donor = goal + 1;
+    race_cols = race_rows = 128;
+    for (int extra = 0; extra <= 1; ++extra) {
+        int first, second;
+        unsigned fills = keep_stat[KEEP_FILL], aliases = keep_stat[KEEP_BLOCKED_ALIAS];
+        unsigned builds = sc64_route_builds;
+        memset(desired, 0, sizeof(desired));
+        /* Equal ordered seeds, unless the donor's outer column is open. */
+        desired[goal - 128] = desired[goal + 1 - 128] = 1;
+        desired[goal + 2 - 128] = (u8)extra;
+        desired[goal - 256] = 1;
+        sc64_routes_reset();
+        build_path_grid();
+        first = sc64_route_slot(donor);
+        second = sc64_route_slot(goal);
+        assert(first == SC64_ROUTE_SLOTS - 1 && second == first - 1);
+        assert(sc64_route_builds == builds + 2 && sc64_route_goal[first] == donor &&
+               sc64_route_goal[second] == goal && sc64_route_valid[second] == 1);
+        assert(keep_stat[KEEP_BLOCKED_ALIAS] - aliases == (unsigned)!extra);
+        assert(keep_stat[KEEP_FILL] - fills == 1u + (unsigned)extra);
+        reference_bfs(&oracle[POOL], goal);
+        for (int i = 0; i < MAP_CELLS; ++i)
+            assert(sc64_route_get(second, i) == oracle[POOL].dir[i]);
+        check_grid_unchanged();
+    }
+    puts("PASS blocked-goal alias bytes, logical insertion and unequal seed fallback");
+}
+#endif
+
 int main(int argc, char **argv)
 {
     static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
@@ -680,6 +712,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_BLOCKED_ALIAS
+    if (argc == 2 && !strcmp(argv[1], "--blocked-alias-only")) {
+        check_blocked_alias();
+        return 0;
+    }
+#endif
     for (int i = 1; i + 1 < argc; ++i) {
         if (!strcmp(argv[i], "--emit")) emit = argv[i + 1];
         if (!strcmp(argv[i], "--compare")) compare = argv[i + 1];

@@ -79,6 +79,11 @@ test-sc64-route-dense-flood: build/test-sc64-route-keep-fields-a-ref build/test-
 ROUTE_LINEAR_TEST_FLAGS = $(ROUTE_KEEP_TEST_BASE) $(ROUTE_KEEP_TEST_A) -DTEST_LINEAR_FLOOD
 ROUTE_LINEAR_BASE_FLAGS = -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ROUTE_KEEP_FIELDS -DSC64_ROUTE_DENSE_FLOOD_PROBE
 ROUTE_LINEAR_CANDIDATE_FLAGS = $(ROUTE_LINEAR_BASE_FLAGS) -DSC64_ROUTE_LINEAR_FLOOD_PROBE
+build/test-sc64-route-blocked-alias: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_BLOCKED_ALIAS $< -o $@
+.PHONY: test-sc64-route-blocked-alias
+test-sc64-route-blocked-alias: build/test-sc64-route-blocked-alias
+	./build/test-sc64-route-blocked-alias --blocked-alias-only
 build/test-sc64-route-linear-ref: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_BASE_FLAGS) $< -o $@
 build/test-sc64-route-linear: $(ROUTE_KEEP_TEST_DEPS) | build
