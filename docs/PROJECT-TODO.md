@@ -267,9 +267,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finds no same-seed aliases among 448 stock point fills. One retained
   field matches 51 misses in a point-only model, but the ARM copy-based
   probe adds 6,152 EWRAM bytes and slows the wide FIFO by 0.55% with
-  byte-identical sampled state. Leave retention off. Pursue cheaper
-  full or exactly scoped point floods;
-  the measured dense workload is still well short of 30 fps.
+  byte-identical sampled state. Leave copy-based retention off. On the
+  [current pointer ROM](audits/2026-11-13-route-linear-word-pack.md#dense-z7-on-the-pointer-fifo),
+  point fills take 736k cycles per active call, including 489k in FIFO
+  expansion and 135k in packing. Aligned word output saves 0.52% of
+  the loop with matching fields and no extra RAM; keep it opt-in.
+  Test pointer-only one-field retention on the safe physical prefix,
+  preserving logical eviction and both range scratch bindings. Check
+  reserves before timing, and break down the 1.05M orders cycles outside
+  point fills. The dense workload is still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
