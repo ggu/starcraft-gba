@@ -103,3 +103,37 @@ process and owned-output budgets. Preserve the existing shared cache.
 | Detached CPU source | `084e5b438d9e7d94bdc8e29bcedf4adf9d096aee518f20b3dead2fab3fee9d1b` |
 | Link receipt | `c2c0a80fd4a8112c06ec79db00638616ba9f20bb5c4332e49fc3b3c37d29d393` |
 | Guarded capture manifest | `33a36401c474ecde3bd67208b1f2f4d6a090726f926b9f2949ed9b1fd6b2d7e6` |
+
+## Guarded opening control passed
+
+On macOS, the identical observer completed the authenticated opening
+under its original 8 MiB soft and hard file limits when Metal cache
+writes were denied for the wrapper and its child. The additional
+sandbox rule leaves cache reads available; it is not a general-purpose
+containment profile. It changes no cache paths, shared files, guest
+inputs or output limits. With a new output directory and the pinned
+opening wrapper described above, prepend this fixed command:
+
+```sh
+/usr/bin/sandbox-exec -p '(version 1) (allow default) (deny file-write* (regex #"/com[.]apple[.]metal(/|$)"))' \
+  /usr/bin/env PYTHONDONTWRITEBYTECODE=1 python3 hybrid_snapshot.py \
+  --binary "$observer" --source "$ares_source" --moltenvk "$moltenvk" \
+  --rom "$owned_rom" --command-file "$opening_tape" --output "$new_output" \
+  --file-limit-mode metal-compatible
+```
+
+The archived 3,694 and 4,204 images and two retained RAM observations
+at steps 4,201 and 4,215 match byte for byte. The hybrid transition
+preserves the cache-aware view. The result file contains 95 rows
+(3,800 bytes). Scans at steps 4,223, 4,328 and 4,431 each dispatch
+owners 0–3 before returning; both complete intervals contain exactly
+31 decrements with no reset. Pending and published result bytes stay
+zero throughout. This proves the opening cadence and read-only observer
+plumbing. It does not qualify live defeat, projectile ownership or result
+precedence during combat.
+
+| Local artifact | SHA-256 |
+| --- | --- |
+| Successful opening manifest | `5f9491117b00fc57faefc8b90d5653ae1d84e152cf1aa55e41d6645a94d8ffb0` |
+| Pinned opening tape | `da668b3e6826b61974364c671afd7f218e6288ef9e216bfabbdbfc83f761436b` |
+| Opening result trace | `8eb9aed95f0b4a3b86216d0f4e89eaf75b161b15c2bcd322c3643c9425bb1635` |
