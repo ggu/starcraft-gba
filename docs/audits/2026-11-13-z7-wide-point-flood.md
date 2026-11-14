@@ -130,3 +130,39 @@ links, save checks, and hardware timing are still needed for promotion.
 - Stock route breakpoint receipt SHA-256: `a2b15bc6129089b9bf7df2dc27ef0266532951a6a5c4449c6d827e3d305c08fe`.
 - Candidate stage receipt SHA-256: `afc895639478e972ea4a6a966d6b6fb2e6c2648cbde34499195cba8b4656b298`.
 - Candidate ROM SHA-256: `415f0b994bf43b4e2481ba97bb1e46c06d714fa14da32514129032ac02f4804c`.
+
+## Default qualification on November 14
+
+A fresh stock capture matches both raw endpoints of the paired dense Z7
+run: world banks, path grid, cache keys and ages, and the hash of every
+valid packed route field. The 131 checkpoints, 480 per-call counters,
+and cycle changes above all reproduce.
+
+On current source `4194784`, the four stock and four wide ARM builds
+passed the header and unchanged RAM guards. The proposed default build
+commands are identical to the qualified wide vectors. No EWRAM grows.
+
+| Product | Stock IWRAM end | Wide IWRAM end |
+| --- | ---: | ---: |
+| Terran T10 | `0x03004738` | `0x030048c0` |
+| Zerg Z10 | `0x03004be0` | `0x03004d68` |
+| Protoss P10 | `0x03004aa0` | `0x03004c20` |
+| Showcase | `0x03004cf0` | `0x03004e70` |
+
+Four paired Blood Bath skirmishes matched all 21 compared fields after
+ordinary input, a pause-menu save at 600 requested updates, a fresh
+process load and 180 continuation updates. The complete saves were
+byte-identical within each pair. Independent named and Random seats
+were covered, including a middle-only closed position and three CPUs.
+The 128×128 T4 and P10 campaign prefixes again match nine samples
+apiece, including rendered pixels, route state and all authored modal
+acknowledgments. They exercised seven and eleven wide point fills
+respectively. Publishing the flag makes the same route kernel available
+in all four products; 64×64 maps still use their existing dense path.
+Hardware timing and the 30 fps target remain open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paired raw endpoints | `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4` |
+| Eight ROM and RAM checks | `a4953198be35777b7f59aa878a2d7b1dca3fafe3f1c9821bda6f48b515d1c0d1` |
+| Four custom SRAM comparisons | `7d1778f12eaf26015be1fc6561c840994b5f22bbe75087c60ab9afac1d87e246` |
