@@ -143,11 +143,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   tests retirement and neutral cargo on HOST. Its final victory now waits
   for deferred retirement, including a surviving Battlecruiser fixture.
   Before ARM enablement, resolve in-flight damage and simultaneous
-  outcomes against native evidence. The [result observer](https://github.com/ggu/starcraft-gba/pull/490)
-  linked against pinned ares, but its opening test hit the process file
-  limit before gameplay. Qualify a disposable Metal cache under the
-  existing guard, then record an active elimination, broaden the native Free for All Random opening
-  sample, and qualify complete ordinary-input matches on hardware.
+  outcomes against native evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
+  now matches the archived opening under unchanged file limits and
+  confirms the 31-decrement cadence and owner scan order. No live results
+  were published in that opening. Next: record active elimination and
+  distinguish in-flight damage and simultaneous outcomes, then qualify
+  complete ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
   now wins from HOME on the KODAK ROM and staged Terran ROM with all 95
   observations matching. The policy puts idle builders back on minerals,
