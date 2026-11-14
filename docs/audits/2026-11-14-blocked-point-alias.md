@@ -22,3 +22,15 @@ FIFO for two distinct blocked goals, verifies their separate logical
 insertions, and repeats with an extra donor seed that forces a real fill.
 The probe remains off pending a density estimate from a physical trace,
 guarded links and paired Z7 timing and route-state checks.
+
+`tools/sc64_z7_point_goals.py` supplies that density check without
+changing the stock ROM. Its plan pins the KODAK ROM, ELF and tape and
+checks the route-bank layout and 131 expected observations. The linked
+physical observer adds one fixed read of `r0`, `r1` and `lr` while stopped
+at a breakpoint. On the dense 480-call window the tool counts actual
+point fills, same-grid repeat distances, topology barriers and eligible
+same-seed donors in the resident bank. Repeated fills are an upper bound
+on reusable work, not evidence that a cache of a particular size would
+avoid them. Run only after the 5.25 GiB admission guard passes. This
+register-enabled binary has linked against pinned mGBA; the dense
+register capture has not run yet.

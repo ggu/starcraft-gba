@@ -3,7 +3,8 @@
  * Build against the matching private libmgba.a with USE_DEBUGGERS enabled.
  * The line protocol exposes only reads, writes, hardware breakpoints, continue
  * and the 64-bit emulated cycle clock. --physical disables guest writes and
- * exposes bounded button input and breakpoint-stepped update batches. Optional SRAM files are imported only
+ * exposes bounded button input, breakpoint-stepped update batches and a
+ * stopped, read-only snapshot of r0, r1 and lr. Optional SRAM files are imported only
  * before boot and exported only to an explicitly configured new output file.
  * It never modifies the ROM file or accepts SRAM bus-write commands. */
 #include <mgba/core/core.h>
@@ -178,6 +179,15 @@ int main(int argc, char **argv) {
                 mDebuggerRun(&debugger);
             if (stopped == 1) printf("STOP %08x\n", stop_address);
             else puts("ERR execution");
+        } else if (physical && stopped == 1 && !strcmp(line, "r")) {
+            int32_t r0, r1, lr;
+            if (!core->readRegister || !core->readRegister(core, "r0", &r0) ||
+                !core->readRegister(core, "r1", &r1) || !core->readRegister(core, "lr", &lr)) {
+                puts("ERR registers");
+            } else {
+                printf("REG %08" PRIx32 " %08" PRIx32 " %08" PRIx32 "\n",
+                       (uint32_t)r0, (uint32_t)r1, (uint32_t)lr);
+            }
         } else if (!strcmp(line, "t")) printf("%" PRIu64 "\n", mTimingGlobalTime(core->timing));
         else if (!strcmp(line, "s") && save_output) {
             puts(export_sram(core, save_output) ? "OK 32768" : "ERR save");

@@ -240,7 +240,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   active loop cost 19.56% and orders 28.26% with matching checkpoints.
   Verify endpoint field bytes, four current links and save continuations
   before promotion. Then tackle repeated goal eviction and the remaining
-  movement cost; the candidate still falls well short of 30 fps.
+  movement cost; the candidate still falls well short of 30 fps. The
+  [blocked-goal field reuse probe](audits/2026-11-14-blocked-point-alias.md)
+  passes the packed-cell differential. Measure actual equal-seed donors
+  and repeat distances on the dense interval before trying it on ARM.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
