@@ -41,10 +41,13 @@ schedule, `HYBRID_STEP`, and `RESULT_TRACE_WINDOW=(begin,end)`. The
 normal snapshot build still transitions at step 4200. For the trace build,
 pin the hybrid transition to the end of a controller command at step 4200
 or later, before the final attack. The half-open trace window starts at or
-after the transition, spans at most 128 observer steps, and must end within
+after the transition, spans at most 256 observer steps, and must end within
 the recorded tape. The normal wrapper invocation and file/disk/time guards still
 apply; the wrapper requires the source to differ from pinned ares only
 by the exact derived hook, and hashes the modified source and decoder.
+For a two-object relink, keep upstream clean and set
+`RESULT_TRACE_CPU_SOURCE` to the detached CPU translation unit; the
+wrapper compares it byte for byte with the exact derived hook.
 A known opening tape can check the decrement/scan path. Qualifying defeat
 requires a separately recorded ordinary controller combat tape.
 

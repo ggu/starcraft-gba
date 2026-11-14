@@ -193,7 +193,7 @@ def main(argv=None):
  expected=planned_rows(command_data)
  if RESULT_TRACE_WINDOW is not None:
   begin,end=RESULT_TRACE_WINDOW
-  if not 4200<=HYBRID_STEP<=begin<end<=EXPECTED_STEPS or end-begin>128:raise SystemExit('result trace window out of range')
+  if not 4200<=HYBRID_STEP<=begin<end<=EXPECTED_STEPS or end-begin>256:raise SystemExit('result trace window out of range')
  if not clean(a.source) or sha(a.rom)!=ROM_SHA or a.moltenvk.resolve()!=VK_PATH or sha(a.moltenvk)!=VK_SHA:raise SystemExit('input provenance mismatch')
  require_binary(a.binary)
  if a.output.exists():raise SystemExit('output must be new')

@@ -15,7 +15,7 @@ inline constexpr Sc64ResultPoint sc64_result_points[] = {
   {0x8008dbec, 0x8fbf0024}, // result pass returned
   {0x8008ce0c, 0xa462dbd2}, // countdown reset to 1
 };
-inline constexpr unsigned sc64_result_max_steps = 128;
+inline constexpr unsigned sc64_result_max_steps = 256;
 inline constexpr unsigned sc64_result_max_rows = 1024;
 inline constexpr unsigned sc64_result_fields = 10;
 using Sc64ResultRow = std::array<std::uint32_t, sc64_result_fields>;
