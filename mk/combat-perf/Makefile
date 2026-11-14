@@ -95,6 +95,24 @@ test-sc64-route-linear: build/test-sc64-route-linear-ref build/test-sc64-route-l
 	cmp build/route-linear-base.ref.state build/route-linear-probe.ref.state
 	cmp build/route-linear-base.ref.state build/route-linear-overflow.ref.state
 
+# Compare the same route and residency receipts with and without pointer FIFO
+# access, including the forced small queue that exercises fallback.
+ROUTE_LINEAR_POINTER_FLAGS = $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_POINTER_FIFO_PROBE
+build/test-sc64-route-linear-pointer: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_POINTER_FLAGS) $< -o $@
+build/test-sc64-route-linear-pointer-overflow: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_POINTER_FLAGS) -DSC64_ROUTE_LINEAR_QUEUE_CAP=32 -DTEST_LINEAR_OVERFLOW $< -o $@
+.PHONY: test-sc64-route-linear-pointer
+test-sc64-route-linear-pointer: build/test-sc64-route-linear build/test-sc64-route-linear-pointer build/test-sc64-route-linear-overflow build/test-sc64-route-linear-pointer-overflow
+	./build/test-sc64-route-linear --emit build/route-linear-pointer-stock.ref
+	./build/test-sc64-route-linear-pointer --emit build/route-linear-pointer-probe.ref
+	./build/test-sc64-route-linear-overflow --emit build/route-linear-pointer-overflow-stock.ref
+	./build/test-sc64-route-linear-pointer-overflow --emit build/route-linear-pointer-overflow-probe.ref
+	cmp build/route-linear-pointer-stock.ref build/route-linear-pointer-probe.ref
+	cmp build/route-linear-pointer-stock.ref.state build/route-linear-pointer-probe.ref.state
+	cmp build/route-linear-pointer-overflow-stock.ref build/route-linear-pointer-overflow-probe.ref
+	cmp build/route-linear-pointer-overflow-stock.ref.state build/route-linear-pointer-overflow-probe.ref.state
+
 build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@
 build/test-sc64-route-linear-word-pack-overflow: $(ROUTE_KEEP_TEST_DEPS) | build

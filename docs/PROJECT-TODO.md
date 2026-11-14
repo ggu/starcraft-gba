@@ -258,6 +258,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   active loop cost 19.56% and orders 28.26% with matching checkpoints.
   The wide FIFO is enabled in all four normal products after matching
   raw endpoint state, four guarded links and four paired SRAM checks.
+  Using pointers inside the bounded FIFO removes two instructions per
+  enqueue and saves a further 3.03% on the dense Z7 replay without more
+  working RAM. Four paired SRAM checks and T4/P10 prefixes match.
   Physical GBA timing remains open. [Dense route measurement](audits/2026-11-14-z7-point-flood-retention.md)
   finds no same-seed aliases among 448 stock point fills. One retained
   field matches 51 misses in a point-only model, but the ARM copy-based
