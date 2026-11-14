@@ -100,7 +100,7 @@ $(Z10_PROGRAM_HEADER): $(Z10_DESCRIPTOR) tools/sc64_zerg_late_program_pack.py to
 # capture. Compute it once per draw, as the other capable products do.
 ZERG_Z10_DEFENSE_FLAGS ?= -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
 ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -DSC64_RENDER_KEY_ONCE -Ibuild/generated/z10 $(ZERG_Z10_DEFENSE_FLAGS) -DSC64_DEPOT_FIRST_NEAREST_PROBE
-ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES)
+ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES) $(CENSUS_FLAGS)
 # The packed frames belong to the qualified Z10 sprite bank.
 Z10_BUILDING_WORDS ?= 1
 ifneq ($(filter $(Z10_BUILDING_WORDS),0 1),$(Z10_BUILDING_WORDS))
@@ -165,7 +165,7 @@ test-zerg-z10: build/test-sc64-z10-game build/test-sc64-z10-carried-z9
 test-sc64-z10-command-census: build/test-sc64-z10-command-census
 	./build/test-sc64-z10-command-census
 build/test-sc64-z10-command-census: tests/sc64_z8_command_census.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
-	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z10_CANONICAL_FLAGS) -DSC64_Z8_DIRECT_COMMAND_CENSUS $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+	$(CLANG) $(Z8_HOST_FLAGS) $(filter-out -DSC64_Z8_DIRECT_COMMAND_CENSUS,$(ZERG_Z10_CANONICAL_FLAGS)) -DSC64_Z8_DIRECT_COMMAND_CENSUS $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 
 # Current Z10 differential for the optional defense spatial query.
 build/test-sc64-z10-defense-spatial: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
