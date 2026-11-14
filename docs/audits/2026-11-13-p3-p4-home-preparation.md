@@ -132,3 +132,16 @@ faults occurred.
 | HOST briefing and dialogue log | `82e8dc2beaf9e1dd3e3d93998860156a0c4e6f7f4c00e897b376972020666a23` |
 | Physical observer | `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549` |
 | Full normal-ROM receipt | `dc22b22e3fd27c7aeb7036cdd5f71a743eddbf9756240f7fd4be776c129d5f44` |
+
+A separate run followed the same physical tape to call 24,588, frame
+24,000, before the expansion. START and B saved a genuine 32 KiB SRAM;
+a fresh process loaded it from HOME with L. The saved and restored
+named world, campaign and P3 runtime state matched. The uninterrupted
+and fresh-load paths also matched at frame 24,241 after neutral input,
+and SRAM readback was byte-identical. This covers one pre-expansion
+save point and a bounded continuation, without a resumed win claim.
+
+The save receipt SHA-256 is
+`6a56a77d0a10b2eee6e281f8d103b755f3ec8285c3d1b70f5e831caf5c2b5d6c`;
+the physical SRAM SHA-256 is
+`a07d7611ec5f986332872270b163779ef1f220560577e6eaf92b5cefea691c1b`.
