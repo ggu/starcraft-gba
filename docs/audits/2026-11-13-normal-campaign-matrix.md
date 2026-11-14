@@ -26,7 +26,7 @@ physical GBA check or all routes through a mission.
 | Z10 | [HOME win](2026-11-13-z10-exact-home.md), [fresh SRAM win](2026-11-13-composed-performance.md) | All 61 shared world checkpoints match between the two routes. |
 | P1 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 27 matched observations and the rescued hero alive. |
 | P2 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 36 matched observations and the rescued hero alive. |
-| P3 | No complete exact-KODAK receipt here | [Route-pure staged HOST limit](2026-11-13-p3-p4-home-preparation.md#p3-staged-host-route-limit): Force 3 cleared, Force 2 remains, and the army stalls near a base exit. |
+| P3 | Not replayed on the November 13 KODAK binary | [HOME win on the packaged wide P10 ROM](2026-11-13-p3-p4-home-preparation.md#wide-p10-packaged-rom-p3-victory): 47 checkpoints, both enemy structure banks cleared, and a separate checked pause save and fresh-load prefix. |
 | P4 | [HOME win](2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win) | 146 matching observations on KODAK and staged P10; both heroes survive. |
 | P5–P6 | [HOME wins](2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays) | Seven and 113 matching checkpoints; both also win on newer staged P10. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
@@ -39,3 +39,7 @@ win on their respective exact cartridges. The exact ROMs in this index
 are the Terran, Z10 and P10 cartridges copied to KODAK under runtime
 `cbba1c5`. Tests on previews or composed performance builds do not
 substitute for the normal cartridge row.
+
+All 30 original missions now have a checked HOME win on a normal ROM.
+This includes different P10 revisions for different Protoss missions;
+it does not establish all 30 on a single set of ROM revisions.

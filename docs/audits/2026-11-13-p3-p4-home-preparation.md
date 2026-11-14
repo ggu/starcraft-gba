@@ -103,3 +103,45 @@ cell in its 96-pixel search, issued no commands, and produced the same
 demonstrated recovery. Inspect local occupancy and the map corridor
 before the home construction cluster forms, or sustain a reachable
 second economy and army through ordinary inputs. No ARM win is claimed.
+
+## Wide P10 packaged ROM: P3 victory
+
+The earlier route reached a lasting jam near its first base and could
+no longer replace losses. A direct waypoint experiment and a building
+exclusion around the late cluster did not produce wins. The successful
+controller changes the economy earlier: starting at frame 12,000 it
+periodically considers visible mineral lines beyond the first Nexus.
+It checks legal placement and a reachable Probe, ranks sites by nearby
+ore, then issues the ordinary Nexus build command. The accepted route
+built the second Nexus near (1888,96). The production rules, actor
+state, and route engine are unchanged.
+
+On the staged wide P10 flags, the ASan/UBSan HOST controller won from
+HOME in 46,735 inputs, frame 45,951. The exact packaged wide P10 ROM
+reproduced all 47 checkpoints across 27 named fields, read all nine
+briefing pages, and acknowledged three in-game dialogue pages. Both
+enemy forces had no buildings left. The P3 victory sequence completed,
+the campaign objective and completion bits were set, and no mission
+faults occurred.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Wide P10 ROM | `2ded5e5e314466bc02e71916fcf7ca56227cd84a4d5ee999fd2ed7799fae05e9` |
+| Matching ELF | `534e64d95beec4577b4e25978c5810e34a371f1268c8a8b6e3670c0ae9975dd9` |
+| HOST tape | `0a0540f40220daf10fa88c682caaccf0064128a2ceeb68d84dd854e5062cc95b` |
+| HOST briefing and dialogue log | `82e8dc2beaf9e1dd3e3d93998860156a0c4e6f7f4c00e897b376972020666a23` |
+| Physical observer | `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549` |
+| Full normal-ROM receipt | `dc22b22e3fd27c7aeb7036cdd5f71a743eddbf9756240f7fd4be776c129d5f44` |
+
+A separate run followed the same physical tape to call 24,588, frame
+24,000, before the expansion. START and B saved a genuine 32 KiB SRAM;
+a fresh process loaded it from HOME with L. The saved and restored
+named world, campaign and P3 runtime state matched. The uninterrupted
+and fresh-load paths also matched at frame 24,241 after neutral input,
+and SRAM readback was byte-identical. This covers one pre-expansion
+save point and a bounded continuation, without a resumed win claim.
+
+The save receipt SHA-256 is
+`6a56a77d0a10b2eee6e281f8d103b755f3ec8285c3d1b70f5e831caf5c2b5d6c`;
+the physical SRAM SHA-256 is
+`a07d7611ec5f986332872270b163779ef1f220560577e6eaf92b5cefea691c1b`.
