@@ -24,7 +24,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   `Games/Development/StarCraft-2026-11-13`. All four 32 MiB files were
   read back from the mounted card and matched their build SHA-256 values;
   the card folder has `COPY-VERIFIED.txt` and `START-HERE.txt`. The files
-  include the shared command-menu speedup. Older delivery notes below are
+  include the shared command-menu speedup. The November 14 package replaces
+  that build on the Mac with the shared wide point FIFO (merged as
+  `8935d56`), verified across all four ROMs. It is staged in Downloads;
+  KODAK was not detected during staging. Older delivery notes below are
   historical. Existing saves and older ROMs were retained. Next: test B-menu
   scrolling and battle speed on a physical GBA SP.
 
@@ -69,8 +72,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with their rescued heroes alive. [P5](audits/2026-11-14-p5-p6-normal-home.md)
   now also wins on staged P10, with Tassadar rescued and the authored pages
   verified. P6 also wins on staged P10 with Zeratul and Tassadar alive and
-  all 113 checkpoints matched. P3–P4 still need complete exact-ROM
-  qualification. The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
+  all 113 checkpoints matched. [Both missions also win on the exact KODAK
+  P10 ROM](audits/2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays).
+  [P4](audits/2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win)
+  wins on both staged P10 and the exact KODAK cartridge with Raynor and
+  Tassadar alive and 146 matching checks. [P3 now wins on the packaged
+  wide P10 ROM](audits/2026-11-13-p3-p4-home-preparation.md#wide-p10-packaged-rom-p3-victory)
+  after opening a second mineral line. All 47 checks match, and a separate
+  pre-expansion pause save reloads with matching state through 241 updates.
+  All 30 missions now have a complete ordinary-input win on a normal ROM
+  in mGBA. Check remaining older/current cross-build and save continuations.
+  The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
   with both heroes at full health, 41 matching observations and twelve
@@ -136,11 +148,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   tests retirement and neutral cargo on HOST. Its final victory now waits
   for deferred retirement, including a surviving Battlecruiser fixture.
   Before ARM enablement, resolve in-flight damage and simultaneous
-  outcomes against native evidence. The [result observer](https://github.com/ggu/starcraft-gba/pull/490)
-  linked against pinned ares, but its opening test hit the process file
-  limit before gameplay. Qualify a disposable Metal cache under the
-  existing guard, then record an active elimination, broaden the native Free for All Random opening
-  sample, and qualify complete ordinary-input matches on hardware.
+  outcomes against native evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
+  now matches the archived opening under unchanged file limits and
+  confirms the 31-decrement cadence and owner scan order. No live results
+  were published in that opening. Next: record active elimination and
+  distinguish in-flight damage and simultaneous outcomes, then qualify
+  complete ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
   now wins from HOME on the KODAK ROM and staged Terran ROM with all 95
   observations matching. The policy puts idle builders back on minerals,
@@ -243,12 +256,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   build. [Stock breakpoints and a paired wide FIFO run](audits/2026-11-13-z7-wide-point-flood.md#dense-window-on-the-exact-kodak-build-vector)
   find four point fills in each of three slow calls. The FIFO cuts mean
   active loop cost 19.56% and orders 28.26% with matching checkpoints.
-  Verify endpoint field bytes, four current links and save continuations
-  before promotion. [Dense route measurement](audits/2026-11-14-z7-point-flood-retention.md)
+  The wide FIFO is enabled in all four normal products after matching
+  raw endpoint state, four guarded links and four paired SRAM checks.
+  Using pointers inside the bounded FIFO removes two instructions per
+  enqueue and saves a further 3.03% on the dense Z7 replay without more
+  working RAM. Four paired SRAM checks and T4/P10 prefixes match.
+  Physical GBA timing remains open. [Dense route measurement](audits/2026-11-14-z7-point-flood-retention.md)
   finds no same-seed aliases among 448 stock point fills. One retained
-  field would match 51 misses in a point-only model; test its 6 KiB cost
-  and full paired timing before promotion. Remaining movement cost still
-  leaves the candidate well short of 30 fps.
+  field matches 51 misses in a point-only model, but the ARM copy-based
+  probe adds 6,152 EWRAM bytes and slows the wide FIFO by 0.55% with
+  byte-identical sampled state. Leave retention off. Pursue cheaper
+  full or exactly scoped point floods;
+  the measured dense workload is still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution

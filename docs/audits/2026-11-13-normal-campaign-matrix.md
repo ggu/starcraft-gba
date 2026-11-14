@@ -26,8 +26,9 @@ physical GBA check or all routes through a mission.
 | Z10 | [HOME win](2026-11-13-z10-exact-home.md), [fresh SRAM win](2026-11-13-composed-performance.md) | All 61 shared world checkpoints match between the two routes. |
 | P1 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 27 matched observations and the rescued hero alive. |
 | P2 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 36 matched observations and the rescued hero alive. |
-| P3–P4 | No complete exact-KODAK receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). Finish controller steering and replay ordinary inputs. |
-| P5–P6 | No complete exact-KODAK receipt here | [HOME wins on newer staged P10](2026-11-14-p5-p6-normal-home.md), with seven and 113 matching checkpoints. |
+| P3 | Not replayed on the November 13 KODAK binary | [HOME win on the packaged wide P10 ROM](2026-11-13-p3-p4-home-preparation.md#wide-p10-packaged-rom-p3-victory): 47 checkpoints, both enemy structure banks cleared, and a separate checked pause save and fresh-load prefix. |
+| P4 | [HOME win](2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win) | 146 matching observations on KODAK and staged P10; both heroes survive. |
+| P5–P6 | [HOME wins](2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays) | Seven and 113 matching checkpoints; both also win on newer staged P10. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
 | P8 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10), 41 matched observations, both heroes at full health and the Stasis Cell destroyed. [Earlier normal save continuation](2026-10-31-protoss-cannon-lazy/README.md). |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |
@@ -38,3 +39,7 @@ win on their respective exact cartridges. The exact ROMs in this index
 are the Terran, Z10 and P10 cartridges copied to KODAK under runtime
 `cbba1c5`. Tests on previews or composed performance builds do not
 substitute for the normal cartridge row.
+
+All 30 original missions now have a checked HOME win on a normal ROM.
+This includes different P10 revisions for different Protoss missions;
+it does not establish all 30 on a single set of ROM revisions.

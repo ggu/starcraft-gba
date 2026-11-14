@@ -130,3 +130,79 @@ links, save checks, and hardware timing are still needed for promotion.
 - Stock route breakpoint receipt SHA-256: `a2b15bc6129089b9bf7df2dc27ef0266532951a6a5c4449c6d827e3d305c08fe`.
 - Candidate stage receipt SHA-256: `afc895639478e972ea4a6a966d6b6fb2e6c2648cbde34499195cba8b4656b298`.
 - Candidate ROM SHA-256: `415f0b994bf43b4e2481ba97bb1e46c06d714fa14da32514129032ac02f4804c`.
+
+## Default qualification on November 14
+
+A fresh stock capture matches both raw endpoints of the paired dense Z7
+run: world banks, path grid, cache keys and ages, and the hash of every
+valid packed route field. The 131 checkpoints, 480 per-call counters,
+and cycle changes above all reproduce.
+
+On current source `4194784`, the four stock and four wide ARM builds
+passed the header and unchanged RAM guards. The proposed default build
+commands are identical to the qualified wide vectors. No EWRAM grows.
+
+| Product | Stock IWRAM end | Wide IWRAM end |
+| --- | ---: | ---: |
+| Terran T10 | `0x03004738` | `0x030048c0` |
+| Zerg Z10 | `0x03004be0` | `0x03004d68` |
+| Protoss P10 | `0x03004aa0` | `0x03004c20` |
+| Showcase | `0x03004cf0` | `0x03004e70` |
+
+Four paired Blood Bath skirmishes matched all 21 compared fields after
+ordinary input, a pause-menu save at 600 requested updates, a fresh
+process load and 180 continuation updates. The complete saves were
+byte-identical within each pair. Independent named and Random seats
+were covered, including a middle-only closed position and three CPUs.
+The 128×128 T4 and P10 campaign prefixes again match nine samples
+apiece, including rendered pixels, route state and all authored modal
+acknowledgments. They exercised seven and eleven wide point fills
+respectively. Publishing the flag makes the same route kernel available
+in all four products; 64×64 maps still use their existing dense path.
+Hardware timing and the 30 fps target remain open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paired raw endpoints | `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4` |
+| Eight ROM and RAM checks | `a4953198be35777b7f59aa878a2d7b1dca3fafe3f1c9821bda6f48b515d1c0d1` |
+| Four custom SRAM comparisons | `7d1778f12eaf26015be1fc6561c840994b5f22bbe75087c60ab9afac1d87e246` |
+
+The packaged Z10 binary (`c251f81c`) also matches all 131 checkpoints
+and all 480 frame and route-counter samples against the archived stock
+run. Its mean active loop is 3.034M cycles, a 19.45% reduction against
+that stock run; orders fall 28.10%. This is 5.53 emulated updates/s
+in the dense window. The package receipt SHA-256 is
+`f07f38751269a2aaf166df34e000e4c7c5b660ae5a8d0e6fd5e46c75982c87fe`.
+
+## Pointer FIFO inner loop
+
+ARM7TDMI can store one halfword and advance its address in one instruction.
+The wide FIFO now reads and appends through pointers within each already
+bounded batch; it keeps the stock four-neighbor order, queue compaction,
+scratch allocation and overflow fallback. On Z10 the linked loop loses
+20 bytes and IWRAM ends 24 bytes earlier, with the same EWRAM end.
+The asset-free sanitizer target `make test-sc64-route-linear-pointer`
+matches build and logical residency receipts for 386,646 queries per
+configuration, including a 32-entry forced-overflow check.
+
+Over the exact released Z10 dense Z7 window, the pointer candidate
+matches 131 checkpoints, all 480 route counters and both raw endpoints.
+Mean active loop cost is 3,033,769 → 2,941,972 cycles (−3.03%);
+orders cost is 1,876,375 → 1,784,487 (−4.90%). The maximum falls from
+5,993,556 to 5,583,925 cycles. The candidate runs at 5.70 emulated
+updates/s in that interval. That is an improvement, still far from 30.
+
+All four ARM products link and pass their normal memory guards. Four
+Blood Bath save/load pairs match the previous wide ROMs including
+full SRAM bytes. The paired T4 and P10 campaign prefixes still match
+pixels, world data, cache state and dialogue and exercise seven and
+eleven wide fills. The default applies to all four products; set
+`CANONICAL_ROUTE_POINTER=0` to rebuild the indexed wide control.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Candidate Z10 ROM | `bfff158af9b6a00ebfaa96cd5e0a65c9e5a0fd508aed28c2400a56e0871fb8b3` |
+| Pinned Z10 candidate timing | `1a22dcdced7c8c0f4cce03272301728bdc4fbe8609432a4fe19532636726cbe6` |
+| Identical raw endpoints | `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4` |
+| Four custom SRAM confirmations | `21f0956d4af37834a46c7c830ea9b4e7ee52f84ffb4c3f1d153e69c2042a7707` |
+| Paired T4 and P10 prefixes | `be7683c82e38e94d691cf74c9690cd1b70f4e5a5ed19c2d4201918d441b19a78` |
