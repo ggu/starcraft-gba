@@ -65,7 +65,12 @@ samples the result tables after the pass returns. The `reset` event
 identifies the reset helper's write of 1. The countdown samples may
 bound the census change without identifying the precise instruction
 that wrote the building counter. Decode with
-`python3 result_trace_decode.py /path/to/result-trace.bin BEGIN END`.
+`python3 result_trace_decode.py /path/to/result-trace.bin BEGIN END`. Add
+`--cadence` to report underflow anchors, dispatched owners, result-pass
+ordering, reset intervals, and complete reset-free `30 … 0` intervals.
+A trace without two anchored scans cannot verify the 31-decrement cadence.
+A relink in the result pass still requires survivor identity and ownership
+confirmation from the full snapshots.
 Trace overflow, opcode mismatch, incomplete window, or an ambiguous
 cache read rejects the witness; the output is never truncated to a
 passing trace. The extension is source-only until a pinned build and
