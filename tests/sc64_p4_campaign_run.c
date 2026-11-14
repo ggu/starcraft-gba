@@ -1059,8 +1059,18 @@ static void launch_from_normal_menu(void)
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == SC64_P4_GLOBAL_ID && race_p4_active());
     assert(race_campaign.mission == SC64_P4_GLOBAL_ID);
+#ifdef SC64_P34_NORMAL_HOME
+    /* The last briefing A releases in play, after one ordinary world update. */
+    fprintf(stderr, "P4 HOME start frame=%d units=%d Tassadar=%d Raynor=%d faults=%u\n",
+            frame, alive_units(), source_unit(SC64_P4_RAW_TASSADAR),
+            source_unit(SC64_P4_RAW_RAYNOR_VULTURE), race_p4.faults);
+    assert(frame == 1 && alive_units() == 138 &&
+           source_unit(SC64_P4_RAW_TASSADAR) >= 0 &&
+           source_unit(SC64_P4_RAW_RAYNOR_VULTURE) >= 0 && !race_p4.faults);
+#else
     assert(alive_units() == 137 && source_unit(SC64_P4_RAW_TASSADAR) >= 0);
     assert(source_unit(SC64_P4_RAW_RAYNOR_VULTURE) < 0);
+#endif
 }
 
 static int trace_path_exists(const char *path)
