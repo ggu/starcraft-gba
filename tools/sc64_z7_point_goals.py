@@ -17,11 +17,13 @@ from sc64_z7_normal_replay import build_plan, compare, input_hashes, make_layout
 
 
 FIRST, LAST = 47758, 48237
+POINT_MISS_RETURN = 0x0802c8a5
 PINS = ('e23e85d72041951e09c25e0b49111538c35ce174b4875aa4aed51143dfdfc907',
         '74c4b2394c4aee619bf2ea0549c31de7987827a915c32c5c50e7a4fec58ad6c1',
         'e1c7693d633f1ecd486036e797baea555dcaddf1e0a409d4da397f3b2f3fbe17')
 FIELDS = {'path_walkable': 2048, 'sc64_route_valid': 14, 'sc64_route_goal': 28,
-          'sc64_route_lphys': 14, 'sc64_route_pf_flags': 56, 'sc64_route_active_slots': 4}
+          'sc64_route_lphys': 14, 'sc64_route_pf_flags': 56, 'sc64_route_active_slots': 4,
+          'sc64_route_pcount': 1}
 
 
 def point_seed(grid, goal):
@@ -62,6 +64,8 @@ def run(args):
     checked = 0
     epoch = 0
     rows = []
+    shadow = {n: [] for n in range(1, 4)}
+    shadow_hits = Counter()
     recent = {}
     topologies = []
 
@@ -92,13 +96,30 @@ def run(args):
         if any(i >= len(flags) for i in phys[:slots]):
             raise RuntimeError('logical route slot points outside physical flags')
         goals = struct.unpack('<14H', read('sc64_route_goal'))
+        victim = None
+        if lr == POINT_MISS_RETURN:
+            if slots != 14 or phys[:slots] != bytes(range(slots)) or number('sc64_route_pcount'):
+                raise RuntimeError('stock point-miss donor mapping differs from the pinned identity')
+            if valid[slot] == 1 and not flags[phys[slot]] & 1 and goals[slot] < 16384:
+                victim = goals[slot]
+            for limit, entries in shadow.items():
+                if goal in entries:
+                    entries.remove(goal)
+                    shadow_hits[limit] += 1
+                if victim is not None:
+                    if victim in entries:
+                        entries.remove(victim)
+                    entries.insert(0, victim)
+                    del entries[limit:]
+
         aliases = [i for i in range(slots) if i != slot and valid[i] == 1 and not flags[phys[i]] & 1
                    and goals[i] != goal and seeds and point_seed(grid, goals[i]) == seeds]
         previous = recent.get(goal)
         distance = len(rows) - previous if previous is not None else None
         recent[goal] = len(rows)
         rows.append(dict(call=call, slot=slot, goal=goal, caller=hex(lr), epoch=epoch,
-                         aliases=aliases, fill_distance=distance))
+                         aliases=aliases, fill_distance=distance, point_miss=lr == POINT_MISS_RETURN,
+                         fresh_point_victim=victim))
 
     try:
         if number('screen') != 0 or number('frame') != 0:
@@ -132,6 +153,8 @@ def run(args):
                     epoch += 1
                     topologies.append(call)
                     recent.clear()
+                    for entries in shadow.values():
+                        entries.clear()
                 else:
                     raise RuntimeError('unexpected breakpoint')
             else:
@@ -145,6 +168,8 @@ def run(args):
         require_unchanged(paths, hashes)
         result = dict(checks=checked, topologies=topologies, fill_count=len(rows),
                       equal_seed_candidates=sum(bool(r['aliases']) for r in rows),
+                      point_misses=sum(r['point_miss'] for r in rows),
+                      point_only_shadow_hits={k: shadow_hits[k] for k in shadow},
                       repeat_distance=dict(Counter(r['fill_distance'] for r in rows
                                                    if r['fill_distance'] is not None)),
                       rows=rows, hashes=hashes)

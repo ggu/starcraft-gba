@@ -34,3 +34,25 @@ on reusable work, not evidence that a cache of a particular size would
 avoid them. Run only after the 5.25 GiB admission guard passes. This
 register-enabled binary has linked against pinned mGBA; the dense
 register capture has not run yet.
+
+## Exact stock result
+
+The read-only observer replayed calls 47,758–48,237 on KODAK Z10 with
+all 131 checkpoints matching. There were 448 point fills over 308 of the
+480 updates, to 11 distinct goals. **None had a resident donor with the
+same ordered walkable seeds.** There were no topology resets in this
+window. All 448 fills called from the ordinary miss at
+`0x0802c8a0` (Thumb return `0x0802c8a5` in the pinned ELF), rather than
+stale-field materialization. At least 437 fills repeat a goal already
+seen in this window; 399 have a preceding same-goal fill within 15 point
+fills. This is a point-fill interval, not the number of unrelated
+evictions. For this workload there is no reason to add the blocked seed
+alias code to normal ROMs. Measure retention of the same goal's field
+before spending RAM.
+
+The first attempt hit the file-size guard on diagnostic DMA messages. The
+successful attempt used the identical register-observer executable with a
+hash-checking stderr wrapper that drops only the routine DMA messages.
+The replay guard and the read-only breakpoint protocol were unchanged.
+The stock receipt is
+`96c975a51fc0c4e54a234abe1195850120227c479ea46b94c0d83bfd1380f3b7`.
