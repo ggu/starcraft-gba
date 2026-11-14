@@ -91,3 +91,11 @@ those observations on a fresh load. The predecessor bank was byte-identical.
 
 The combined preview remains opt-in. Broader campaign and older-format
 coverage, stack, busy-match measurements and physical hardware remain open.
+
+The default build passed. The broad test invocation in the prepared,
+symlink-backed worktree failed its Terran and Protoss renderer fixture
+(raw 85 absent), four missing private Z4 input checks, and one Z8 symlink
+output-path check. The exact pre-port default reproduced all seven faults
+with the same input layout in a separate worktree; none hit the compound
+save path. The focused sanitizer and ARM passes above are the evidence
+for this preview. A clean broad check and default activation remain open.
