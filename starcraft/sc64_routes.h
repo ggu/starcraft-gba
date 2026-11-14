@@ -1739,6 +1739,25 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
             tail = pending;
             continue;
         }
+#ifdef SC64_ROUTE_LINEAR_POINTER_FIFO_PROBE
+        u16 *read = bfs_queue + head, *write = bfs_queue + tail;
+        const u16 *end = bfs_queue + limit;
+        do {
+            const int c = *read++;
+#define SC64_LINEAR_STEP(offset, direction) \
+            if (dense[c + (offset)] == 7u) { \
+                dense[c + (offset)] = direction; \
+                *write++ = (u16)(c + (offset)); \
+            }
+            SC64_LINEAR_STEP(-1, 1)
+            SC64_LINEAR_STEP(1, 2)
+            SC64_LINEAR_STEP(-stride, 3)
+            SC64_LINEAR_STEP(stride, 4)
+#undef SC64_LINEAR_STEP
+        } while (read != end);
+        head = limit;
+        tail = (int)(write - bfs_queue);
+#else
         do {
             int c = bfs_queue[head++];
 #define SC64_LINEAR_STEP(offset, direction) \
@@ -1752,6 +1771,7 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
             SC64_LINEAR_STEP(stride, 4)
 #undef SC64_LINEAR_STEP
         } while (head < limit);
+#endif
     }
     return consumed + tail;
 }
