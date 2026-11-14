@@ -75,3 +75,15 @@ Trace overflow, opcode mismatch, incomplete window, or an ambiguous
 cache read rejects the witness; the output is never truncated to a
 passing trace. The extension is source-only until a pinned build and
 runtime witness are verified.
+
+For a simultaneous-loss parity check, first reproduce the authenticated
+opening with the observer attached. Then use a new ordinary-input match
+to stage attacks on the last registered grounded building of each owner.
+Retain the two building identities and census before the volley; record
+the first two result scans across the losses and the resulting state.
+Two census losses between adjacent scans can establish what takes
+precedence at the next scan. To prove an identical gameplay update or the
+order of damage, also capture a verified update boundary and the two
+census stores. The current trace alone cannot make either stronger claim.
+For a projectile that survives owner transfer, qualify a normal impact
+control first, then observe its target, impact and HP separately.

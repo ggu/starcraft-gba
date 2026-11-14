@@ -13,9 +13,12 @@ POINTS = {0x8008db2c: 'countdown', 0x8008db58: 'scan', 0x8008dbbc: 'owner',
           0x8008ce0c: 'reset'}
 ROW = struct.Struct('>10I')
 LIMIT = 1024 * ROW.size
+MAX_STEPS = 256
 
 
 def read_trace(path, begin, end):
+    if not 0 <= begin < end or end - begin > MAX_STEPS:
+        raise ValueError('invalid result trace window')
     with path.open('rb') as data:
         raw = data.read(LIMIT + 1)
     if not raw or len(raw) > LIMIT or len(raw) % ROW.size:
@@ -52,7 +55,7 @@ def inspect_cadence(rows):
             if previous is not None:
                 # The following scan proves the previous one ended. A scan
                 # without a live list can skip the result pass entirely.
-                if previous['owners'] and not previous['returned']:
+                if (previous['owners'] or previous['writes']) and not previous['returned']:
                     previous['ordering_issues'].append('missing result-pass return')
                 kind = 'unknown_anchor'
                 if anchor and previous['underflow_anchor']:
@@ -78,6 +81,8 @@ def inspect_cadence(rows):
                     issues.append('invalid or repeated owner dispatch')
                 previous['owners'].append(arg0)
             elif event == 'publish':
+                if not previous['owners']:
+                    issues.append('result publication without owner dispatch')
                 if previous['returned']:
                     issues.append('result publication after pass returned')
                 previous['writes'].append({'row': idx, 'owner': arg0, 'result': arg1})

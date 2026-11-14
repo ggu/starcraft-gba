@@ -45,6 +45,11 @@ class ResultTraceTests(unittest.TestCase):
         self.assertIn('owner dispatch after result publication', report['scans'][0]['ordering_issues'])
         self.assertIn('missing result-pass return', report['scans'][0]['ordering_issues'])
 
+    def test_publication_and_lack_of_return_cannot_hide_a_partial_pass(self):
+        rows = scan(4200) + [row('publish', value=2)] + scan(4231)
+        self.assertEqual(inspect_cadence(rows)['scans'][0]['ordering_issues'],
+                         ['result publication without owner dispatch', 'missing result-pass return'])
+
     def test_malformed_and_unbounded_files_are_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             trace = Path(d) / 'trace.bin'
@@ -54,6 +59,10 @@ class ResultTraceTests(unittest.TestCase):
                     trace.write_bytes(blob)
                     with self.assertRaises(ValueError):
                         read_trace(trace, 4200, 4240)
+            trace.write_bytes(ROW.pack(*row('countdown')))
+            for begin, end in ((-1, 1), (4200, 4200), (4200, 4457)):
+                with self.subTest(begin=begin, end=end), self.assertRaises(ValueError):
+                    read_trace(trace, begin, end)
 
 
 if __name__ == '__main__':
