@@ -61,3 +61,26 @@ No ARM replay was started because no current route-pure HOST tape won.
 | P3 HOST launch and blocker log | `a62cda2ca9d5303823aa3470c92ecb12766c5f0cab732d25938fdec9e61612b3` |
 | Waypoint experiment tape | `13a2d762b3187371522950623b635e70cfaa24c7a5083cf0b564ec7447bd4b83` |
 | Build clearance experiment tape | `06445148f3cbff53472f75e28f82e1d734961613cfe2dc7628352680e714dfaa` |
+
+## P4 full staged HOME win
+
+Under the staged P10 flags, releasing the final briefing input advances
+the first world frame and creates Raynor as specified by the mission.
+The controller now checks that observed 138-unit opening, instead of the
+137-unit pre-update census used by the legacy harness.
+
+The route-pure HOST controller won at frame 129,310. A fresh
+physical-button replay on the staged P10 cartridge matched all
+146 observations, seven briefing pages, and
+13 authored gameplay pages, including the rescue and the terminal
+completion. Both heroes are alive at extraction with no trigger faults.
+The replay used 130,239 input calls and averaged
+15.30 emulated updates/s. This is the same
+pinned staged P10 ROM and observer as the P5/P6 evidence; the exact
+November 13 KODAK ROM and actual hardware are separate.
+
+| Local artifact | SHA-256 |
+| --- | --- |
+| P4 HOST tape | `a744df3cdc3e88866dbb96092596a8ac0230643dfeb410e807e52b42acc236c0` |
+| P4 authored pages | `aa904b858811393c3056491f2ed87e09c0c53f6a6f106d106bf54f11542ba5b6` |
+| P4 physical replay receipt | `6c07d80e62b4754929ebea17aa498010a12b4e6027f6b59b1e7e3de6838b5c85` |

@@ -26,7 +26,8 @@ physical GBA check or all routes through a mission.
 | Z10 | [HOME win](2026-11-13-z10-exact-home.md), [fresh SRAM win](2026-11-13-composed-performance.md) | All 61 shared world checkpoints match between the two routes. |
 | P1 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 27 matched observations and the rescued hero alive. |
 | P2 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 36 matched observations and the rescued hero alive. |
-| P3–P4 | No complete exact-KODAK receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). Finish controller steering and replay ordinary inputs. |
+| P3 | No complete exact-KODAK receipt here | [Route-pure staged HOST limit](2026-11-13-p3-p4-home-preparation.md#p3-staged-host-route-limit): Force 3 cleared, Force 2 remains, and the army stalls near a base exit. |
+| P4 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win): 146 matching observations, both heroes survive. |
 | P5–P6 | No complete exact-KODAK receipt here | [HOME wins on newer staged P10](2026-11-14-p5-p6-normal-home.md), with seven and 113 matching checkpoints. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
 | P8 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10), 41 matched observations, both heroes at full health and the Stasis Cell destroyed. [Earlier normal save continuation](2026-10-31-protoss-cannon-lazy/README.md). |
