@@ -60,3 +60,44 @@ floods that can prove the same route answers remain better candidates.
 | Matching ELF | `5e63aa55632f7bfd2f8674d75f5e22b1fad3f4dbe2f96cf2edda3c8316714b68` |
 | Paired timing receipt | `982716b63b52b23526f15fb1d750323a00fccadcef30491474301512bb943f2f` |
 | Shared endpoint state receipt | `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4` |
+
+## One-plane pointer retention on the current FIFO
+
+The default-off `SC64_ROUTE_POINT_POINTER_PROBE` rotates one spare
+backing pointer into a safe logical slot on a 128×128 point miss.
+The victim's bytes become the spare without a copy. It preserves the
+logical slot, key, age, counts and eviction order, and excludes the two
+slots backing the fixed range scratch planes. A reset or grid rebuild
+invalidates the retained key. On asset-free ASan/UBSan tests, the recovered
+bytes match an independent BFS, the logical build still increments, and
+both range scratch pointers remain fixed across an actual plane claim.
+A 386,646-query differential also matches the logical residency receipt.
+
+The paired Z10 build adds only this probe to the production pointer FIFO.
+All 131 checkpoints, all 480 frame and route counter samples, and raw
+world, walkability and valid route-field bytes at both endpoints match.
+Of the 480 calls, 477 advanced the simulation.
+
+| Guest cycle counter | Pointer FIFO | Pointer retention | Change |
+| --- | ---: | ---: | ---: |
+| Whole loop, active mean | 2,941,972 | 2,858,242 | −2.85% |
+| Movement orders, active mean | 1,784,487 | 1,700,683 | −4.70% |
+| Whole loop, all calls p95 | 4,420,534 | 4,053,982 | −8.29% |
+| Whole loop, all calls maximum | 5,583,925 | 5,361,778 | −3.98% |
+
+All four 32 MiB ARM builds verify and pass the unchanged linker guards.
+The tightest EWRAM margin is 1,816 bytes on Protoss P10. IWRAM does not
+change on any of the four products. Keep the probe off pending fresh
+process SRAM continuation and physical input parity on the other wide
+maps. The measured improvement is in guest cycles for one Z7 interval.
+
+| Product | EWRAM end | IWRAM end |
+| --- | ---: | ---: |
+| Terran | `0x0203b468` | `0x030048a8` |
+| Zerg Z10 | `0x0203a310` | `0x03004d50` |
+| Protoss P10 | `0x0203d8e8` | `0x03004c10` |
+| Showcase | `0x0203b424` | `0x03004e60` |
+
+- Candidate Z10 ROM: `1152e11de4b6bf2426558f8fb33af015215563b2ce1f89ddfec6224d25aff869`.
+- Paired dense replay receipt: `e92822c5dc324e492065127a63b471cd88d6478add9dea18850055d31b5bb074`.
+- Matching raw endpoints: `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4`.

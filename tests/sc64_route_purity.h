@@ -42,6 +42,11 @@ static const RoutePureRegion route_pure_regions[] = {
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
     RP_REGION(sc64_route_pool),
     RP_REGION(sc64_route_field),
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    RP_REGION(sc64_route_point_plane),
+    RP_REGION(sc64_route_point_spare),
+    RP_REGION(sc64_route_point_saved),
+#endif
     RP_REGION(sc64_route_active_bytes),
     RP_REGION(sc64_route_active_slots),
     RP_REGION(sc64_route_config_cols),

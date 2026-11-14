@@ -113,6 +113,15 @@ test-sc64-route-linear-pointer: build/test-sc64-route-linear build/test-sc64-rou
 	cmp build/route-linear-pointer-overflow-stock.ref build/route-linear-pointer-overflow-probe.ref
 	cmp build/route-linear-pointer-overflow-stock.ref.state build/route-linear-pointer-overflow-probe.ref.state
 
+build/test-sc64-route-point-pointer: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_POINTER_FLAGS) -DSC64_ROUTE_POINT_POINTER_PROBE $< -o $@
+build/test-sc64-route-point-pointer-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h | build
+	$(CLANG) $(filter-out -DTEST_PACKED_GRID -DSC64_ROUTE_GRID_CELLS_PER_BYTE=8 -DTEST_LINEAR_FLOOD -DSC64_ROUTE_DENSE_FLOOD_PROBE,$(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_BASE_FLAGS)) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_POINT_POINTER_PROBE $< -o $@
+.PHONY: test-sc64-route-point-pointer
+test-sc64-route-point-pointer: build/test-sc64-route-point-pointer build/test-sc64-route-point-pointer-range
+	./$< --point-pointer-only
+	./build/test-sc64-route-point-pointer-range
+
 build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@
 build/test-sc64-route-linear-word-pack-overflow: $(ROUTE_KEEP_TEST_DEPS) | build

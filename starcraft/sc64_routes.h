@@ -234,6 +234,16 @@ static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
 
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
+#if defined(SC64_ROUTE_POINT_POINTER_PROBE) && (!defined(SC64_ROUTE_ACTIVE_STRIDE) || \
+    !defined(SC64_ROUTE_PACK3) || !defined(SC64_ROUTE_KEEP_FIELDS))
+#error "point pointer retention requires complete packed fields and active stride"
+#endif
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+enum { SC64_ROUTE_POINT_SIDE = 128, SC64_ROUTE_POINT_BYTES = 6144 };
+static u8 sc64_route_point_plane[SC64_ROUTE_POINT_BYTES] __attribute__((aligned(4)));
+static u8 *sc64_route_point_spare;
+static int sc64_route_point_saved = -1;
+#endif
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 #define SC64_ROUTE_FLAG_STALE 1  /* bytes flooded on an earlier grid */
 #define SC64_ROUTE_FLAG_DONOR 2  /* bytes of a complete point field, in no logical slot */
@@ -346,6 +356,10 @@ static int sc64_route_configure(void)
     sc64_route_active_bytes = bytes;
     sc64_route_active_slots = SC64_ROUTE_SLOTS;
     sc64_route_pcount = fit >= SC64_ROUTE_SLOTS ? (u8)fit : 0;
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    sc64_route_point_spare = sc64_route_point_plane;
+    sc64_route_point_saved = -1;
+#endif
     for (i = 0; i < SC64_ROUTE_SLOTS; ++i) {
         sc64_route_lphys[i] = (u8)i;
         sc64_route_field[i] = sc64_route_pool + i * bytes;
@@ -498,6 +512,9 @@ sc64_routes_reset(void)
     (void)sc64_route_configure();
 #endif
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    sc64_route_point_saved = -1;
+#endif
 #ifdef SC64_RANGE_WORK
     sc64_range_route_reset();
 #endif
@@ -620,6 +637,9 @@ static void __attribute__((noinline, unused)) sc64_routes_topology_changed(void)
 static void __attribute__((noinline, unused)) sc64_routes_grid_begin(void)
 {
     sc64_route_grid_copied = 0;
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    sc64_route_point_saved = -1;
+#endif
     if (sc64_route_pcount && sc64_route_grid_known &&
         sc64_route_keep_cols == (u8)MAP_COLS && sc64_route_keep_rows == (u8)MAP_ROWS) {
         memcpy(SC64_ROUTE_OLD_GRID, path_walkable, sizeof(path_walkable));
@@ -1884,6 +1904,38 @@ fill_finished:
     return tail;
 }
 
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+/* Wide fixed-layout slots keep their own metadata. Rotate only backing
+ * pointers on safe point misses; range scratch continues to use fixed
+ * pool offsets. The parked plane contributes no logical residency. */
+static int __attribute__((noinline)) sc64_route_fill_point_pointer(int slot, int goal)
+{
+    if (MAP_COLS == SC64_ROUTE_POINT_SIDE && MAP_ROWS == SC64_ROUTE_POINT_SIDE
+#ifdef SC64_RANGE_WORK
+        && slot < sc64_range_route_reduced_slots()
+#endif
+    ) {
+        const int victim = sc64_route_valid[slot] == 1 && !SC64_ROUTE_LAZY(slot) &&
+            sc64_route_goal[slot] < SC64_ROUTE_POINT_SIDE * SC64_ROUTE_POINT_SIDE ?
+            sc64_route_goal[slot] : -1;
+        const int hit = goal == sc64_route_point_saved;
+        if (hit || victim >= 0) {
+            u8 *old = sc64_route_field[slot];
+            sc64_route_field[slot] = sc64_route_point_spare;
+            sc64_route_point_spare = old;
+            sc64_route_point_saved = victim;
+        }
+        if (hit) {
+            SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
+            SC64_ROUTE_PF(slot) = 0;
+            SC64_ROUTE_KEEP_COUNT(POINT_POINTER);
+            return 0;
+        }
+    }
+    return sc64_route_fill(slot, goal);
+}
+#endif
+
 /* Give a lazy slot the bytes a flood on the current grid gives. The cache
  * bookkeeping is untouched. */
 static void __attribute__((noinline)) sc64_route_exact(int slot)
@@ -2018,7 +2070,11 @@ sc64_route_slot(int goal)
                 tail = sc64_route_fill(slot, goal);
             }
         } else {
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+            tail = sc64_route_fill_point_pointer(slot, goal);
+#else
             tail = sc64_route_fill(slot, goal);
+#endif
         }
         (void)tail;
     }
