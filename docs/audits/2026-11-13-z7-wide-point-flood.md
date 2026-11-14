@@ -92,3 +92,41 @@ still requires a substantial reduction in routine simulation and draw
 work. A separate selection-ring span probe matched all 35 gameplay and
 24 video samples in the Z10 battle windows, but improved mean loop cost
 by only 0.09–0.11%, so it stays out.
+
+## Dense window on the exact KODAK build vector
+
+The [stock stage sample](2026-11-12-z7-normal-physical.md#uninterrupted-home-on-the-exact-kodak-cartridge)
+identified calls 47,758–48,237 as a sustained movement-orders load. A
+second stock run matched all 131 prefix checkpoints and used read-only
+breakpoints at point-fill entry, facility-field clear, and topology
+change. Three slow calls (47,823, 47,855 and 48,073) each enter point
+fill four times; two also clear one facility field. Call 48,064 clears
+three facility fields and enters no point fill; call 48,222 triggers
+none of those events. No sampled call enters the topology-change hook.
+This distinguishes the sampled point-heavy calls from facility churn;
+it does not count every kind of route work across the whole window.
+
+The candidate adds only `SC64_ROUTE_LINEAR_FLOOD_PROBE` to the normal
+KODAK `cbba1c5` build vector. It matches all 131 prefix checkpoints
+and each of the 480 calls in frame progression, screen, route-build and
+route-hit counters. There are 477 active simulation updates. Times are
+guest cycles per call, measured with identical ordinary input.
+
+| Counter | Stock | Wide FIFO | Change |
+| --- | ---: | ---: | ---: |
+| Whole loop, active mean | 3,766,477 | 3,029,745 | −19.56% |
+| Simulation, active mean | 3,160,442 | 2,423,077 | −23.33% |
+| Movement orders, active mean | 2,609,769 | 1,872,160 | −28.26% |
+| Whole loop, all calls p95 | 7,060,165 | 4,704,489 | −33.37% |
+| Whole loop, all calls max | 9,087,886 | 5,970,168 | −34.31% |
+
+The active mean goes from 4.45 to 5.54 emulated updates/s in this
+interval, still far below 30. EWRAM ends at `0x02038b00` in both builds;
+IWRAM grows by 392 bytes to `0x03004d68`, leaving 664 bytes before the
+link guard. The candidate captured raw world and valid route fields at
+both endpoints. A matching stock raw capture and refreshed four-profile
+links, save checks, and hardware timing are still needed for promotion.
+
+- Stock route breakpoint receipt SHA-256: `a2b15bc6129089b9bf7df2dc27ef0266532951a6a5c4449c6d827e3d305c08fe`.
+- Candidate stage receipt SHA-256: `afc895639478e972ea4a6a966d6b6fb2e6c2648cbde34499195cba8b4656b298`.
+- Candidate ROM SHA-256: `415f0b994bf43b4e2481ba97bb1e46c06d714fa14da32514129032ac02f4804c`.

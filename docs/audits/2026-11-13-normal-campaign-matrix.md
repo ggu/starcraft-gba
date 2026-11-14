@@ -25,7 +25,8 @@ physical GBA check or all routes through a mission.
 | Z9 | [HOME win](2026-11-13-z9-normal-physical.md#exact-november-13-kodak-cartridge) | The same Drone carries the crystal home; 32 checkpoints matched. |
 | Z10 | [HOME win](2026-11-13-z10-exact-home.md), [fresh SRAM win](2026-11-13-composed-performance.md) | All 61 shared world checkpoints match between the two routes. |
 | P1 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 27 matched observations and the rescued hero alive. |
-| P2–P6 | No complete exact-KODAK receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). The [fresh P2 prefix](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes) matches the newer staged ROM; isolate route queries for P3–P6. |
+| P2 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 36 matched observations and the rescued hero alive. |
+| P3–P6 | No complete exact-KODAK receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). Isolate controller route queries and re-record ordinary inputs. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
 | P8 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10), 41 matched observations, both heroes at full health and the Stasis Cell destroyed. [Earlier normal save continuation](2026-10-31-protoss-cannon-lazy/README.md). |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |

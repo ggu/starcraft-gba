@@ -48,6 +48,14 @@ destroyed. It averages 23.82 emulated updates/s, with an 11.82M-cycle
 peak. This is a win on staged P10 `0505b233`, separate from the older
 KODAK P10 in the matrix and from physical GBA timing.
 
+P2 also wins from HOME on the staged ROM. All 36 observations, fourteen
+briefing pages and six authored pages match. The rescued hero is alive
+at frame 33,803; the mission is complete with objective flags 908. The
+verifier authenticates the final dialogue release at call 35,859 and
+checks that all five remaining neutral calls preserve the full named
+victory state. The 35,864-call replay averages 16.32 emulated updates/s,
+with a 13.74M-cycle peak.
+
 | Local artifact | SHA-256 |
 | --- | --- |
 | Fresh P1 HOST tape | `70259667d448fabb7efc898e7674c6f051ac87f9e3f65ab414069bde818d94be` |
@@ -56,3 +64,4 @@ KODAK P10 in the matrix and from physical GBA timing.
 | Fresh P2 4,000-call prefix | `c17db52a5fb28dfc9a899d58f8068146b0660d9dd21d29344d341818be61e278` |
 | First P1 terminal observation | `e0e90327e31e217772ca36835ffe839ce110c00492ffb6f583dac54e6abb37da` |
 | Complete staged P1 replay | `61d215d6df53fc2ff74fe67ba680f1b2ceb91bc836be175170bbee3edae94315` |
+| Complete staged P2 replay | `d224289d3d9c19e5ed44872f5a3e84a1eaa9fb9685ef67188b8afe40308289f0` |
