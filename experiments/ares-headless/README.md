@@ -87,3 +87,19 @@ order of damage, also capture a verified update boundary and the two
 census stores. The current trace alone cannot make either stronger claim.
 For a projectile that survives owner transfer, qualify a normal impact
 control first, then observe its target, impact and HP separately.
+
+A guarded opening control on 2026-11-14 linked the pinned two-object
+observer successfully. The child stopped on `SIGXFSZ` before the first
+gameplay command under the existing 8 MiB soft/hard per-file limit. An
+open read/write Metal cache data descriptor referred to an 83,722,240-byte
+file; the stopped-descriptor diagnostic does not identify the interrupted
+write. No RAM snapshots, frames or trace rows were captured. The next
+qualification needs a disposable Metal cache that meets the existing
+process and owned-output budgets. Preserve the existing shared cache.
+
+| Local artifact | SHA-256 |
+| --- | --- |
+| Linked two-object observer | `41112c2d8c83731faaf18e5efb690e1c365f29fed7e3327d9eb239288b266a82` |
+| Detached CPU source | `084e5b438d9e7d94bdc8e29bcedf4adf9d096aee518f20b3dead2fab3fee9d1b` |
+| Link receipt | `c2c0a80fd4a8112c06ec79db00638616ba9f20bb5c4332e49fc3b3c37d29d393` |
+| Guarded capture manifest | `33a36401c474ecde3bd67208b1f2f4d6a090726f926b9f2949ed9b1fd6b2d7e6` |
