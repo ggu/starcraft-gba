@@ -101,6 +101,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #error "SC64_ROUTE_KEEP_FIELDS requires SC64_ROUTE_ACTIVE_STRIDE"
 #endif
 #endif
+#if defined(SC64_ROUTE_BLOCKED_ALIAS) && !defined(SC64_ROUTE_ACTIVE_STRIDE)
+#error "SC64_ROUTE_BLOCKED_ALIAS requires complete active-stride point fields"
+#endif
 
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
@@ -1794,11 +1797,59 @@ sc64_route_fill_linear(u8 *field, int goal)
 #endif
 
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
+#ifdef SC64_ROUTE_BLOCKED_ALIAS
+/* Two blocked point goals produce identical packed fields when the same
+ * absolute walkable cells seed both queues. Each seed loop visits in
+ * row-major order, so equal sets also establish the exact FIFO tie order. */
+static __attribute__((noinline)) int
+sc64_route_blocked_alias(int slot, int goal)
+{
+    const int limit = SC64_ROUTE_ACTIVE_SLOTS;
+    if (MAP_COLS != 128 || MAP_ROWS != 128 || SC64_GRID_GET(path_walkable, goal)) return 0;
+    const int gx = goal & 127, gy = goal >> 7;
+    int minx = 128, maxx = -1, miny = 128, maxy = -1;
+    for (int y = gy - 1; y <= gy + 1; ++y) for (int x = gx - 1; x <= gx + 1; ++x) {
+        if ((unsigned)x >= 128 || (unsigned)y >= 128 ||
+            !SC64_GRID_GET(path_walkable, x + 128 * y)) continue;
+        if (x < minx) minx = x;
+        if (x > maxx) maxx = x;
+        if (y < miny) miny = y;
+        if (y > maxy) maxy = y;
+    }
+    if (maxx < 0) return 0;
+    for (int i = 0; i < limit; ++i) {
+        int root = sc64_route_goal[i];
+        /* The victim's logical metadata may still describe bytes already
+         * moved aside by the physical donor allocator. */
+        if (i == slot || sc64_route_valid[i] != 1 || SC64_ROUTE_LAZY(i) ||
+            (unsigned)root >= 128u * 128u || root == goal) continue;
+        int x = root & 127, y = root >> 7;
+        if (minx < x - 1 || maxx > x + 1 || miny < y - 1 || maxy > y + 1 ||
+            SC64_GRID_GET(path_walkable, root)) continue;
+        for (int ry = y - 1; ry <= y + 1; ++ry) for (int rx = x - 1; rx <= x + 1; ++rx) {
+            if ((unsigned)rx >= 128 || (unsigned)ry >= 128 ||
+                ((unsigned)(rx - gx + 1) <= 2 && (unsigned)(ry - gy + 1) <= 2)) continue;
+            if (SC64_GRID_GET(path_walkable, rx + 128 * ry)) goto next_root;
+        }
+        memcpy(sc64_route_field[slot], sc64_route_field[i], sc64_route_active_bytes);
+        return 1;
+next_root:;
+    }
+    return 0;
+}
+#endif
+
 /* Flood the whole field of a goal into a slot on the current grid. Returns the
  * number of queued cells (for diagnostics). */
 static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
 {
     int i, tail = 0;
+#ifdef SC64_ROUTE_BLOCKED_ALIAS
+    if (sc64_route_blocked_alias(slot, goal)) {
+        SC64_ROUTE_KEEP_COUNT(BLOCKED_ALIAS);
+        goto field_ready;
+    }
+#endif
 #ifdef SC64_ROUTE_DENSE_FLOOD
     if (MAP_COLS == SC64_DENSE_SIDE && MAP_ROWS == SC64_DENSE_SIDE)
         tail = sc64_route_fill_dense(sc64_route_field[slot], goal);
@@ -1856,11 +1907,14 @@ static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
 #ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
 fill_finished:
 #endif
+    SC64_ROUTE_KEEP_COUNT(FILL);
+#ifdef SC64_ROUTE_BLOCKED_ALIAS
+field_ready:
+#endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
 #endif
     SC64_ROUTE_PF(slot) = 0;
-    SC64_ROUTE_KEEP_COUNT(FILL);
     return tail;
 }
 
