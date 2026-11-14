@@ -10,6 +10,7 @@ endif
 CANONICAL_ROUTE_FACILITY_FIFO_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_FACILITY_FIFO)),-DSC64_ROUTE_FACILITY_FIFO_PROBE)
 FACILITY_FIFO_KEY = $(if $(CANONICAL_ROUTE_FACILITY_FIFO_FLAGS),-facilityfifo)
 include config/route-pack/Makefile
+include config/command-census/Makefile
 
 # Keep the old indexed FIFO available for measured comparisons.
 CANONICAL_ROUTE_POINTER ?= 1

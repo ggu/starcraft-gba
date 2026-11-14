@@ -283,10 +283,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   of the Blood Bath menu timing tail and hardware checks.
   The [P10 profile](audits/2026-11-13-p10-command-census.md) finds depot
   facility floods account for 41.94M cycles of the largest gameplay update.
-  The shared Command census probe cuts the full normal P10 win's mean
-  by 7.42% and a sampled trigger update by 34.97% with matching gameplay
-  and sampled video; it leaves depot stalls unchanged. The probe stays off
-  pending cross-profile and hardware checks. The [paired P10 routing tests](audits/2026-11-13-p10-route-options.md)
+  The shared Command census cuts mean cost in current normal P8, P9, P10,
+  and Z8 replays with matching outcomes. Fresh HOME reload matches P10
+  through victory; both current products match paired Blood Bath saves.
+  Enable it in the two current cartridges that carry the affected campaigns.
+  Depot stalls and physical GBA timing remain open. The [paired P10 routing tests](audits/2026-11-13-p10-route-options.md)
   show wide point FIFO saves only 0.15% overall; nearest-first saves
   2.05% and cuts two individual depot stalls by over 93%, with the full
   win unchanged but different cache contents. Keep P10 defaults stable
