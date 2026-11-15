@@ -417,3 +417,34 @@ Future integration still needs a save generation and exact byte budget,
 candidate actor and projectile validation, persistent unit IDs, generated
 facts, and per-product memory and gameplay checks. No profile, runtime
 projectile cap, or existing save format changes with this foundation.
+
+### Showcase Carrier probe
+
+With the prepared Showcase assets, run `make showcase-carrier-probe` and
+`make test-sc64-showcase-carrier`. The isolated cartridge is
+`StarCraft-Showcase-Carrier-Probe-GBA.gba` (game code `SCCP`).
+It runs the same shared Carrier and Interceptor services as the Protoss build.
+The regular Showcase target and its save format stay unchanged.
+
+The probe retains every existing Showcase actor ID and appends raw 73 at
+type 49. The custom-game Carrier uses the existing Stargate production rule
+and Fleet Beacon requirement; the ordinary selected-unit command pays for
+an Interceptor. The probe generates its own fact and rectangle tables from
+the matching actor vector.
+
+The probe's save tag distinguishes its projectile extension while retaining the
+predecessor's inner state version. The largest packet has 95 simultaneous
+Interceptor shots. The pool refuses a launch while all 95 slots are active. The
+1,924-byte extension includes the compact packet's length and zero padding.
+It raises the 14,228-byte predecessor base, including both Yamato rows, to
+16,152 bytes. Adding the 8-byte impact header, 32 six-byte impacts and 16-byte
+transport trailer gives exactly 16,368 bytes, the SRAM slot's payload limit.
+The saved shape cannot reduce the impact queue or truncate active Yamato rows.
+
+Old journals load through the detached selector, which reads their actors,
+impacts and Yamato rows at the original offsets and supplies an empty
+Interceptor pool. The test uses a real predecessor writer and fresh readers.
+It trains a paid Carrier and Interceptor, observes flight through the real
+firing path, saves all three queues at once and checks that a checksum-correct
+invalid extension falls back to the intact predecessor. With that
+predecessor removed, the invalid record changes neither live state nor SRAM.

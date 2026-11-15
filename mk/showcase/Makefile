@@ -17,3 +17,35 @@ test-sc64-showcase: test-sc64-showcase-front build/test-sc64-showcase-game build
 	./build/test-sc64-showcase-game
 	./build/test-sc64-showcase-game-packed
 	./build/test-sc64-showcase-game-indexed
+
+# Separate experimental cartridge and journal; standard Showcase stays unchanged.
+SHOWCASE_CARRIER_PROBE_FLAGS = -DSC64_SHOWCASE_CARRIER_PROBE -DSC64_INTERCEPTOR_COMPACT_CODEC -DSC64_P7_PROJECTILES_ENABLED -DSC64_P7_CARRIER_TRAINING_ENABLED -DSC64_P7_INTERCEPTOR_FLIGHT_ENABLED -DSC64_P7_RECT_TABLES
+SHOWCASE_CARRIER_FACT_DIR = build/showcase-carrier-facts
+SHOWCASE_CARRIER_FACT_HEADER = $(SHOWCASE_CARRIER_FACT_DIR)/sc64_fact_tables_generated.h
+SHOWCASE_CARRIER_FLAGS = $(SHOWCASE_FLAGS) $(SHOWCASE_CARRIER_PROBE_FLAGS) -DSC64_FACT_TABLES -I$(SHOWCASE_CARRIER_FACT_DIR)
+SHOWCASE_CARRIER_DEPS = $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) $(UNIT_FACING_INPUTS) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) mk/showcase/Makefile Makefile
+$(SHOWCASE_CARRIER_FACT_HEADER): tools/sc64_fact_tables_gen.c $(SHOWCASE_CARRIER_DEPS) | build
+	mkdir -p $(SHOWCASE_CARRIER_FACT_DIR)
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $(SHOWCASE_CARRIER_PROBE_FLAGS) $< -o $(SHOWCASE_CARRIER_FACT_DIR)/gen
+	$(SHOWCASE_CARRIER_FACT_DIR)/gen > $@.tmp
+	mv $@.tmp $@
+
+build/starcraft-showcase-carrier-probe.elf: $(COMMON) $(SHOWCASE_CARRIER_DEPS) $(SHOWCASE_CARRIER_FACT_HEADER) common/gba.ld | build
+	$(CC) $(CFLAGS) $(SHOWCASE_CARRIER_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase-carrier-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Showcase-Carrier-Probe-GBA.gba: build/starcraft-showcase-carrier-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC CARRIER' SCCP
+.PHONY: showcase-carrier-probe test-sc64-showcase-carrier
+showcase-carrier-probe: build/StarCraft-Showcase-Carrier-Probe-GBA.gba
+
+SHOWCASE_CARRIER_TEST_SOURCES = tests/sc64_showcase_carrier_journal.c tests/sc64_yamato_host_sram_shim.c
+build/test-sc64-showcase-carrier-predecessor: $(SHOWCASE_CARRIER_TEST_SOURCES) $(SHOWCASE_CARRIER_DEPS) common/gba.c | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $(SHOWCASE_CARRIER_TEST_SOURCES) $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+build/test-sc64-showcase-carrier-journal: $(SHOWCASE_CARRIER_TEST_SOURCES) $(SHOWCASE_CARRIER_DEPS) $(SHOWCASE_CARRIER_FACT_HEADER) common/gba.c | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_CARRIER_FLAGS) $(SHOWCASE_CARRIER_TEST_SOURCES) $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+test-sc64-showcase-carrier: build/test-sc64-showcase-carrier-predecessor build/test-sc64-showcase-carrier-journal
+	set -eu; fixture="$$(mktemp -d build/showcase-carrier-journal.XXXXXX)"; trap 'rm -rf "$$fixture"' EXIT; \
+		./build/test-sc64-showcase-carrier-predecessor "$$fixture/predecessor.sav"; \
+		./build/test-sc64-showcase-carrier-journal "$$fixture/predecessor.sav" "$$fixture/carrier.sav"; \
+		./build/test-sc64-showcase-carrier-journal "$$fixture/carrier.sav"

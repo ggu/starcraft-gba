@@ -94,7 +94,7 @@ enum {
     /* Raw 36 is a real, independently ticking Zerg Egg actor. */
     U_Z7_EGG,
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_SHOWCASE_CARRIER_PROBE)
     /* Independent raw73 identity; child lifecycle is a separate feature. */
     U_P7_INTERCEPTOR,
 #endif
@@ -150,6 +150,10 @@ enum {
 #endif
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     U_SHARED_SHUTTLE,
+#endif
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    /* Showcase's raw73 identity follows every predecessor row. */
+    U_P7_INTERCEPTOR,
 #endif
     SC_RU_LEGACY_COUNT,
 #ifdef SC64_GUARDIAN_COCOON_STAGE

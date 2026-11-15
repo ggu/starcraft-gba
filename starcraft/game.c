@@ -315,6 +315,19 @@ static u32 sc64_unit_words_explicit_raw_calls;
 _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
                "Interceptor arena exceeds Mode 4 OBJ reserve");
 #endif
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+#if !defined(SC64_SHOWCASE_ENABLED) || !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || \
+    !defined(SC64_INTERCEPTOR_COMPACT_CODEC) || !defined(SC64_IMPACT_EVENTS) || \
+    !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || \
+    !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
+    defined(SC64_NUKE_SILO_JOURNAL) || defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || \
+    defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
+    defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
+#error "Showcase Carrier probe requires the full Showcase journal and shared flight"
+#endif
+#include "sc64_showcase_carrier_wire.h"
+#endif
 #if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_P7_PROJECTILES_ENABLED)
 #error "Carrier training requires P7 projectile storage and typed actor state"
 #endif
@@ -492,6 +505,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #define SC64_RACE_SAVE_GENERATION 45u
 #elif defined(SC64_P8_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 44u
+#elif defined(SC64_SHOWCASE_CARRIER_PROBE)
+/* The outer tag selects the extension; preserve the predecessor inner token. */
+#define SC64_RACE_SAVE_GENERATION 40u
 #elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 43u
 #elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
@@ -665,6 +681,9 @@ _Static_assert((SC64_PRE_CARGO_SAVE_VERSION & 0x01000000u) != 0,
 #ifdef SC64_SHARED_TRANSPORT
 _Static_assert((SAVE_VERSION & 0x04000000u) == 0, "transport save namespace overlaps");
 #define SC64_TRANSPORT_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+#define SC64_SHOWCASE_CARRIER_TAG SC64_SAVE_TAG_SHOWCASE_CARRIER(SC64_TRANSPORT_SAVE_VERSION)
+#endif
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #if !defined(GBA_HOST) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SCARAB_NAMESPACE_STAGE)
@@ -2275,7 +2294,11 @@ static void race_p7_projectile_source_tick(void);
 static void race_p7_projectile_tick_if_due(void);
 static void race_p7_projectile_draw(void);
 static int race_p7_projectile_encode(u8 *packet);
-static int race_p7_projectile_restore(const u8 *packet);
+static int race_p7_projectile_restore(const u8 *packet
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+                                      ,u16 size
+#endif
+                                     );
 #endif
 #ifdef SC64_IMPACT_EVENTS
 static void race_impact_clear_target(int ref);

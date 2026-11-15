@@ -301,6 +301,9 @@ race_impact_save_write(void)
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    ,SC64_SHOWCASE_CARRIER_TAG
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     ,SC64_NUKE_SILO_TRANSPORT_TAG
 #endif
@@ -314,7 +317,9 @@ race_impact_save_write(void)
 #endif
 #endif
 };
-#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+#define SC64_GUARDIAN_WRITE_TAG SC64_SHOWCASE_CARRIER_TAG
+#elif defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL)
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
 #define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION : SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION)
@@ -484,6 +489,11 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     int rows;
     *count = 0;
     if (len > (u32)sizeof(race_impact_record)) return 0;
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    int predecessor=selected_tag!=SC64_SHOWCASE_CARRIER_TAG;
+    if (len>RACE_IMPACT_RECORD_MAX) return 0;
+    if (!predecessor) selected_tag=SC64_TRANSPORT_SAVE_VERSION;
+#endif
 #ifdef SC64_SHARED_TRANSPORT
 #if defined(SC64_WORKER_CARGO_KIND)
     if ((selected_tag != SC64_TRANSPORT_SAVE_VERSION && selected_tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION) || len < SC64_TRANSPORT_TRAILER_BYTES) return 0;
@@ -505,7 +515,11 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
 #endif
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-    const u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES;
+    const u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+        - (predecessor ? SC64_SHOWCASE_PROJECTILE_EXTENSION : 0u)
+#endif
+        ;
     Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT] = {{0}};
     u32 offset = base, mask = 0, impact_bytes;
     int legacy = selected_tag == SC64_LEGACY_SAVE_VERSION;
@@ -541,10 +555,22 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     if (impact_bytes > sizeof(race_impact_record.impacts)) return 0;
     memmove(race_impact_record.impacts, (u8 *)&race_impact_record + offset, impact_bytes);
     memcpy(race_data.battlecruiser_shots, shots, sizeof(shots));
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    /* Both legacy queues were moved out of this range before normalizing. */
+    if (predecessor) {
+        race_data.interceptor_size=2;
+        memset(race_data.interceptor_projectiles,0,sizeof(race_data.interceptor_projectiles));
+    }
+#endif
     if (!impact_bytes) return 1;
     rows = sc64_impact_decode(race_impact_record.impacts, impact_bytes,
                               RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
-                              SC_RU_COUNT, candidate);
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+                              predecessor ? U_P7_INTERCEPTOR : SC_RU_COUNT,
+#else
+                              SC_RU_COUNT,
+#endif
+                              candidate);
 #else
     (void)selected_tag; /* Version validation remains in race_load_game. */
     if (len < sizeof(RaceSave)) return 0;
