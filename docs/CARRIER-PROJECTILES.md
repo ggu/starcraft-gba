@@ -459,3 +459,17 @@ the full journal's re-encoded 1,919-byte projectile packet matched its input
 byte for byte. This is ARM load/write evidence for constructed fixtures.
 Paid production and combat through ordinary ARM inputs, the full Showcase
 matrix, hardware stack high-water and battle timing remain open.
+
+A separate ordinary-input ARM run started a blank authored-map custom game
+as Protoss against one Terran bot. Probes gathered minerals and gas and
+completed the Assimilator, Pylon and Forge. The guest saved at frame 3,004
+with 476 minerals and 112 gas. From that save, the Gateway completed by
+frame 4,151, Cybernetics Core by 5,369 and Stargate by 6,754. A further
+normal-origin continuation completed the Fleet Beacon at (184, 120) by
+frame 8,800, with 316 minerals and 74 gas. START/B produced a 16,128-byte
+Carrier journal (tag `0x764c5058`); a fresh title-L load restored the same
+frame, wallet, supply and observed unit and building rows. This ordinary
+tech path is separate from the synthetic full-journal smoke. Waiting for
+Carrier gas did not reach a purchase before the match left play. The next
+ordinary-input run needs an earlier gas and defense plan to pay for the
+Carrier and Interceptor, attack, and save during flight.
