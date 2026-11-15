@@ -275,9 +275,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the loop with matching fields and no extra RAM; keep it opt-in.
   [Pointer-only one-field retention](audits/2026-11-14-z7-point-flood-retention.md#one-plane-pointer-retention-on-the-current-fifo)
   now saves 2.85% mean loop and 8.29% p95 cycles on the same dense tape
-  while keeping route oracles and scratch bindings unchanged. Its spare
-  field costs about 6 KiB of EWRAM. Keep it off pending composed guards,
-  SRAM continuation and other wide-map tests. Break down the 1.05M
+  while keeping route oracles and scratch bindings unchanged. Composed
+  builds and four paired SRAM continuations pass. T4 and P10 prefixes
+  match but exercise no retained hits. Keep the switch off while seeking
+  wider speed evidence and ways to avoid its 6 KiB EWRAM cost. Break down the 1.05M
   remaining orders cycles outside point fills; the dense workload is
   still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)

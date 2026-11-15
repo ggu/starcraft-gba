@@ -101,3 +101,33 @@ maps. The measured improvement is in guest cycles for one Z7 interval.
 - Candidate Z10 ROM: `1152e11de4b6bf2426558f8fb33af015215563b2ce1f89ddfec6224d25aff869`.
 - Paired dense replay receipt: `e92822c5dc324e492065127a63b471cd88d6478add9dea18850055d31b5bb074`.
 - Matching raw endpoints: `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4`.
+
+## Current-cartridge composition (November 15)
+
+`CANONICAL_ROUTE_POINT_RETENTION=1` builds this variant through the normal
+make targets. The default is off. Against release `33224096`, the four
+Blood Bath pairs use ordinary buttons to play, save, load in a fresh
+process and continue for 180 updates. All 21 compared fields and both
+32 KiB SRAM exports match within every pair. Separate physical T4 and
+P10 sequences match all 12 checkpoints each, including world data,
+video, walkability, route counters and valid fresh field bytes. Both
+executed point floods on 128×128 maps; neither sequence exercised a
+retained hit or establishes a new campaign win.
+
+Z10 and P10 were independently re-linked with the current Command
+census. The strict EWRAM guards still have 15,600 and 1,808 bytes of
+headroom respectively, and IWRAM does not grow. The current Zerg 7
+control and retention ROMs match all 131 checkpoints, 480 count and
+frame samples, and raw endpoint hashes. Active cost falls from
+2,941,970 to 2,858,242 guest cycles (−2.85%); all-call p95 falls from
+4,420,530 to 4,053,982 (−8.29%). The mean corresponds to 5.87 emulated
+updates per second in this dense window. The extra plane costs about
+6 KiB even on ROMs where no retained hit has been observed; leave the
+switch off pending broader dense-map timing and hardware checks.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Current Z10 and P10 link bounds | `c649e6ac787f67cafb27d310422415a6ed59488b09d6633ad1444891d72f5ce9` |
+| Four paired Blood Bath save/load runs | `0096745b571d7c94c1bcf9ffeae9798f1b39cc3b12a72b42dd2d158f5160f187` |
+| T4 and P10 physical sequences | `f041133e2fedd2e22fd626b2d5ccc9214d46793afef5621b9a38645c69fedaae` |
+| Dense Zerg 7 comparison | `14a4d821be9bb50805541a0a5865a645b858a2b805ac2d0fe2520f8551e27748` |
