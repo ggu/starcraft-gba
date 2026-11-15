@@ -89,8 +89,21 @@ zero speed, steps of 1–14 and a one-pixel move within the same bucket.
 All four normal cartridge vectors pass their RAM guards (IWRAM grows
 80 bytes in P10 and Showcase; the other two do not grow).
 
+Four paired Blood Bath skirmishes match all 21 tested fields and both
+SRAM exports per product after ordinary save, fresh-process load, and
+180 further updates. Paired Terran 4 and Protoss 10 input sequences
+match 12 world, video and route samples each. In a separate full P10
+replay, 20 campaign checks, 10 briefing pages, 14 authored pages and 19
+raw video/state checks match through victory at frame 46,057. Mean P10
+cycles rise by 0.22% (1,722,799 to 1,726,522); the larger improvement is
+specific to the crowded Z7 window. Use `CANONICAL_CONTACT_COINCIDENT=0`
+to rebuild the unchanged prior comparison vector.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Candidate classification counts | `0a3fd7401ea5cdfed2e9c15cadacf32d086f83465621e792c26c582bdf0a4bbf` |
 | Empty bucket word scan | `8bec63f898e99670ace303ef2d3d839d507024ac050126bca1a05d34c5f934be` |
 | Coincident-coordinate comparison | `fc8fd166fe91c4b74ea70d4c779c1c92bd1ab9e748826dc8c8ab3ee21a020be1` |
+| Four paired Blood Bath save/load cases | `f878ed928cd0e0a7e87b71edd1dbedeec13148cef705e39d396b5e5f92f1063f` |
+| T4 and P10 gameplay comparisons | `eebae1bf87620c5f6255afb52cc8e9e4dcfb0b85907cebe0ca91c17c380d8972` |
+| Full P10 win comparison | `f2da9241d836aff4c23919c55cd78e2bdf9e6112053666db0db1c6013f587598` |
