@@ -637,6 +637,22 @@ static void test_compact_all_caps(void)
         assert(sc64_compact_codec_validate(compact, limit, cap, NULL, NULL));
         assert(sc64_compact_codec_decode(&target, compact, limit, cap));
         assert(!memcmp(source_words, target_words, sizeof(source_words)));
+        if (cap == SC64_POOL_CAPACITY) {
+            /* The compact body uses the first 154 bits of the same ordinal's
+             * fixed row, even though the compact traversal is in list order. */
+            assert(sc64_codec_encode(&source, second, sizeof(second)));
+            size_t compact_bit = 16u + 7u * SC64_POOL_CAPACITY;
+            uint8_t current = sc64_pool_active_head(&source);
+            for (unsigned i = 0; i < cap; ++i) {
+                assert(current < cap);
+                size_t fixed_bit = (3u + 21u * current) * 8u;
+                for (unsigned j = 0; j < 154; ++j, ++compact_bit, ++fixed_bit)
+                    assert(((compact[compact_bit / 8u] >> (compact_bit % 8u)) & 1u) ==
+                           ((second[fixed_bit / 8u] >> (fixed_bit % 8u)) & 1u));
+                current = (uint8_t)source.words[row_word(current, TEST_F_NEXT)];
+            }
+            assert(current == SC64_END);
+        }
 
         /* Vary the retirement order so neither list is an ordinal sort. */
         for (unsigned i = cap; i > 0; --i)

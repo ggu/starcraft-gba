@@ -372,7 +372,7 @@ static uint32_t getbits(const uint8_t * b, size_t * pos, unsigned n){
     return v;
 }
 static void
-putrow_fields(uint8_t * b, size_t * pos, const Sc64ProjectileRow * r)
+putrow(uint8_t * b, size_t * pos, const Sc64ProjectileRow * r)
 {
     putbits(b, pos, (uint32_t) r->x_q8_source, 22);
     putbits(b, pos, (uint32_t) r->y_q8_source, 22);
@@ -392,11 +392,6 @@ putrow_fields(uint8_t * b, size_t * pos, const Sc64ProjectileRow * r)
     putbits(b, pos, r->script_phase, 2);
     putbits(b, pos, r->raw_source_owner, 4);
     putbits(b, pos, r->pending_damage_event, 1);
-}
-static void
-putrow(uint8_t * b, size_t * pos, const Sc64ProjectileRow * r)
-{
-    putrow_fields(b, pos, r);
     putbits(b, pos, r->next_link, 7);
     putbits(b, pos, r->reserved_snapshot_bits, 3);
 }
@@ -404,7 +399,7 @@ static int32_t signv(uint32_t v, unsigned n){
     uint32_t	    sign = 1u << (n - 1);
     return (int32_t) ((v ^ sign) - sign);
 }
-static Sc64ProjectileRow getrow_fields(const uint8_t * b, size_t * pos){
+static Sc64ProjectileRow getrow(const uint8_t * b, size_t * pos){
     Sc64ProjectileRow r;
     memset(&r, 0, sizeof r);
     r.x_q8_source = signv(getbits(b, pos, 22), 22);
@@ -425,10 +420,6 @@ static Sc64ProjectileRow getrow_fields(const uint8_t * b, size_t * pos){
     r.script_phase = (uint8_t) getbits(b, pos, 2);
     r.raw_source_owner = (uint8_t) getbits(b, pos, 4);
     r.pending_damage_event = (uint8_t) getbits(b, pos, 1);
-    return r;
-}
-static Sc64ProjectileRow getrow(const uint8_t * b, size_t * pos){
-    Sc64ProjectileRow r = getrow_fields(b, pos);
     r.next_link = (uint8_t) getbits(b, pos, 7);
     r.reserved_snapshot_bits = (uint8_t) getbits(b, pos, 3);
     return r;
@@ -608,6 +599,54 @@ sc64_codec_decode(Sc64Arena * a, const uint8_t * in, size_t n)
     return sc64_pool_validate(a);
 }
 
+/* Keep the compact bit layout independent so existing saved-game builds
+ * retain the fixed codec's ARM code. The active fixture exercises both
+ * implementations and the shared row domain. */
+static void
+putrow_fields(uint8_t * b, size_t * pos, const Sc64ProjectileRow * r)
+{
+    putbits(b, pos, (uint32_t) r->x_q8_source, 22);
+    putbits(b, pos, (uint32_t) r->y_q8_source, 22);
+    putbits(b, pos, (uint16_t) r->destination_x_source, 14);
+    putbits(b, pos, (uint16_t) r->destination_y_source, 14);
+    putbits(b, pos, r->next_speed, 15);
+    putbits(b, pos, r->turn_rate_raw, 9);
+    putbits(b, pos, r->heading, 8);
+    putbits(b, pos, r->next_velocity_direction, 8);
+    putbits(b, pos, r->target_ref, 9);
+    putbits(b, pos, r->owner_ref, 8);
+    putbits(b, pos, (uint16_t) r->remaining_time, 9);
+    putbits(b, pos, r->state, 2);
+    putbits(b, pos, r->order_signal_bit0, 1);
+    putbits(b, pos, r->movement_flags_low4, 4);
+    putbits(b, pos, r->hit_flags_low2, 2);
+    putbits(b, pos, r->script_phase, 2);
+    putbits(b, pos, r->raw_source_owner, 4);
+    putbits(b, pos, r->pending_damage_event, 1);
+}
+static Sc64ProjectileRow getrow_fields(const uint8_t * b, size_t * pos){
+    Sc64ProjectileRow r;
+    memset(&r, 0, sizeof r);
+    r.x_q8_source = signv(getbits(b, pos, 22), 22);
+    r.y_q8_source = signv(getbits(b, pos, 22), 22);
+    r.destination_x_source = (int16_t) signv(getbits(b, pos, 14), 14);
+    r.destination_y_source = (int16_t) signv(getbits(b, pos, 14), 14);
+    r.next_speed = (uint16_t) getbits(b, pos, 15);
+    r.turn_rate_raw = (uint16_t) getbits(b, pos, 9);
+    r.heading = (uint8_t) getbits(b, pos, 8);
+    r.next_velocity_direction = (uint8_t) getbits(b, pos, 8);
+    r.target_ref = (uint16_t) getbits(b, pos, 9);
+    r.owner_ref = (uint8_t) getbits(b, pos, 8);
+    r.remaining_time = (int16_t) signv(getbits(b, pos, 9), 9);
+    r.state = (uint8_t) getbits(b, pos, 2);
+    r.order_signal_bit0 = (uint8_t) getbits(b, pos, 1);
+    r.movement_flags_low4 = (uint8_t) getbits(b, pos, 4);
+    r.hit_flags_low2 = (uint8_t) getbits(b, pos, 2);
+    r.script_phase = (uint8_t) getbits(b, pos, 2);
+    r.raw_source_owner = (uint8_t) getbits(b, pos, 4);
+    r.pending_damage_event = (uint8_t) getbits(b, pos, 1);
+    return r;
+}
 /* Compact packet:
  *   allocated groups (byte), active count (byte)
  *   all allocated ordinals, active list then free list (7 bits each)
