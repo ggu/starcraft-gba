@@ -11,6 +11,7 @@ CANONICAL_ROUTE_FACILITY_FIFO_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_FACILITY
 FACILITY_FIFO_KEY = $(if $(CANONICAL_ROUTE_FACILITY_FIFO_FLAGS),-facilityfifo)
 include config/route-pack/Makefile
 include config/command-census/Makefile
+include config/contact-scan/Makefile
 
 # Keep the old indexed FIFO available for measured comparisons.
 CANONICAL_ROUTE_POINTER ?= 1
