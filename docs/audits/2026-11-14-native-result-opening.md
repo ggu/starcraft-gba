@@ -110,3 +110,32 @@ exit (191.314 seconds) under the same local input, file and disk guards.
 | Selected Marine, 40 HP (step 13,258) | `e44a265d9ed306ff2831479c3700ce54413ba94213062bf9bd7aa1d93f619ba7` |
 | Marine moving (step 13,427) | `3ee59ae537594ff096cdb8e763f30a44ce641bfe1827ddf42fd839adbc048ace` |
 | Marine at destination (step 13,532) | `3f0217f62b8c0f38e50ae87b0ef36ef04984817f1144a1d0abe5802c1b949cab` |
+
+## Hostile contact and Hatchery damage (November 16)
+
+Start opens a pause menu with Options, Goals, Abort Mission and Resume.
+The observed top-level menu offered no save action. The next separate
+bounded discovery build instead replayed and matched the 19 archived
+frames through the first Marine move, then advanced beyond the former
+14,000-step allowance. It allows at most 28,000 steps and 32,768 input
+records; it keeps the 235/240-second frontend/supervisor deadlines, 8 MiB
+file limits and disk floor, with isolated saves and unchanged input pins.
+
+The selected Marine moves south, revealing a red Zerg worker by step
+14,893 and a live enemy Hatchery at 15,793. A subsequent replay matches
+the anchor again and puts the cursor on the Hatchery. The native
+contextual prompt at 15,846 is `B KILL UNIT`. A separate, fully scripted
+replay matches that exact aiming frame, presses B and then uses A to
+read the target's details. Clean frames show Marine fire and the
+Hatchery's HP falling. They establish hostile contact, a player-issued
+attack and actual damage given ordinary controller input. No building
+destruction or competitive result has been observed in this sequence.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Contact and scouting manifest | `1cdd899ab1947b7608e565448e50bbc223661f344a023c77c4dd9dfa69b6ae99` |
+| Marine at enemy base (step 15,793) | `b78c27900df257af66d10710dd07bd7d2bd7c1b0650c597a97e2d0e1d8a36fee` |
+| Attack manifest | `52e34423ed584aa01b16c2ea85c6780a5793a7bbfcf272afab073d5f9e54a496` |
+| Hatchery 1,222 HP (step 16,277) | `abcccd15227af5a53be929c3e4d0163b517fa0096461096c9e40ddda117d3b5d` |
+| Hatchery 1,179 HP (step 16,697) | `2f94e0c4515e525dce109e0d4cb0f72e3df7d17c82a4707d3bd1cb65bb6320e9` |
+| Hatchery 1,141 HP (step 17,117) | `23df433e226255480e33b150dfc4ffc6a8109308da9419544f7fb5039e2b702a` |
