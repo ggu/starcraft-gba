@@ -448,3 +448,14 @@ It trains a paid Carrier and Interceptor, observes flight through the real
 firing path, saves all three queues at once and checks that a checksum-correct
 invalid extension falls back to the intact predecessor. With that
 predecessor removed, the invalid record changes neither live state nor SRAM.
+
+A bounded mGBA run drove the probe with the pinned physical-button runner
+(`4f655601…`), without writing guest memory. A blank guest reached frame 241
+of an authored-map custom game with a Protoss human and one Terran bot.
+Separate fresh guests loaded the predecessor and full-journal **host
+fixtures** with title L, then saved with START/B. Both ARM writes used the
+16,368-byte payload. The predecessor's original bank stayed byte-identical;
+the full journal's re-encoded 1,919-byte projectile packet matched its input
+byte for byte. This is ARM load/write evidence for constructed fixtures.
+Paid production and combat through ordinary ARM inputs, the full Showcase
+matrix, hardware stack high-water and battle timing remain open.
