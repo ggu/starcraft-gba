@@ -314,8 +314,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The cheaper row-local memo keeps answers after unrelated movement
   and cuts a further 6.51% mean overall and 11.05% in orders on this
   window. It also fixes stale collision when a Drone starts a building.
-  The packed axis probe was slower; focus next on exact route expansion
-  and routine drawing. Dense play remains well short of 30 fps.
+  The packed axis probe was slower. The [resumable route budget](audits/2026-11-16-resumable-frontier-budget.md)
+  puts full point fills at 25.95% of the old dense Z7 loop and 4.95%
+  of sampled Z9. Observed origins need about 39% and 2% of FIFO work,
+  with at most 52 pending entries at first discovery. Prioritize
+  preserving and resuming ordered frontier work; do not restart
+  or omit logical cache entries. Dense play remains well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
