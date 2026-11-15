@@ -17,7 +17,22 @@ static int race_cols = 128, race_rows = 128;
 #define MAP_COLS race_cols
 #define MAP_ROWS race_rows
 enum { MAP_CELLS = 128 * 128 };
-static u8 path_walkable[MAP_CELLS];
+#if SC64_ROUTE_GRID_CELLS_PER_BYTE == 8
+#define SC64_GRID_STORAGE_BYTES ((MAP_CELLS + 7u) / 8u)
+#define SC64_GRID_OPEN_BYTE 255
+#define SC64_GRID_GET(grid, cell) (((grid)[(cell) >> 3] >> ((cell) & 7u)) & 1u)
+#define SC64_GRID_SET(grid, cell, value) do { \
+    u8 mask_ = (u8)(1u << ((cell) & 7u)); \
+    if (value) (grid)[(cell) >> 3] |= mask_; \
+    else (grid)[(cell) >> 3] &= (u8)~mask_; \
+} while (0)
+#else
+#define SC64_GRID_STORAGE_BYTES MAP_CELLS
+#define SC64_GRID_OPEN_BYTE 1
+#define SC64_GRID_GET(grid, cell) ((grid)[cell] != 0)
+#define SC64_GRID_SET(grid, cell, value) ((grid)[cell] = (u8)((value) != 0))
+#endif
+static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 static u16 bfs_queue[MAP_CELLS];
 static int path_grid_valid;
 static int frame;
@@ -28,9 +43,6 @@ static int limit(int n, int lo, int hi)
 }
 static int sc64_cell_row(unsigned cell) { return (int)cell / MAP_COLS; }
 static int sc64_cell_col(unsigned cell) { return (int)cell % MAP_COLS; }
-#define SC64_GRID_GET(grid, cell) ((grid)[cell] != 0)
-#define SC64_GRID_SET(grid, cell, value) ((grid)[cell] = (u8)((value) != 0))
-#define SC64_GRID_STORAGE_BYTES MAP_CELLS
 #include "../starcraft/sc64_routes.h"
 
 static void test_copy_alignment_and_remainders(void)
@@ -71,7 +83,7 @@ static void test_lazy_plane_reservation(void)
     for (unsigned shape = 0; shape < sizeof(shapes) / sizeof(shapes[0]); ++shape) {
         int full, reduced, next_col, next_row;
         race_cols = shapes[shape][0]; race_rows = shapes[shape][1];
-        memset(path_walkable, 1, sizeof(path_walkable)); path_grid_valid = 1;
+        memset(path_walkable, SC64_GRID_OPEN_BYTE, sizeof(path_walkable)); path_grid_valid = 1;
         sc64_routes_reset();
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
         assert(sc64_route_configure());
@@ -140,7 +152,7 @@ static void test_retained_point_with_range_planes(void)
 {
     const int goal = 64 * 128 + 40;
     race_cols = race_rows = 128;
-    memset(path_walkable, 1, sizeof(path_walkable));
+    memset(path_walkable, SC64_GRID_OPEN_BYTE, sizeof(path_walkable));
     path_grid_valid = 1;
     sc64_routes_reset();
     assert(sc64_route_pcount == 0);

@@ -286,8 +286,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now saves 2.85% mean loop and 8.29% p95 cycles on the same dense tape
   while keeping route oracles and scratch bindings unchanged. Composed
   builds and four paired SRAM continuations pass. T4 and P10 prefixes
-  match but exercise no retained hits. Keep the switch off while seeking
-  wider speed evidence and ways to avoid its 6 KiB EWRAM cost. The
+  match but exercise no retained hits. The [borrowed scratch tail](audits/2026-11-14-z7-point-flood-retention.md#borrow-the-route-queue-tail-november-16)
+  brings the cost down to at most eight EWRAM bytes and saves 1.25% mean
+  and 4.32% p95 cycles on dense Z7. Keep it opt-in. Before default use,
+  prioritize independent review of queue, range and save ownership, then
+  time another dense 128×128 map and check the facility FIFO composition.
+  The
   [current instruction trace](audits/2026-11-15-z7-contact-cost.md) puts
   524k cycles in uncached collision masks in three no-flood samples,
   about half those samples' order cost. Prioritize the candidate scan;
