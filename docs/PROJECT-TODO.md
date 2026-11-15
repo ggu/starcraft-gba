@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-14. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-15. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -152,9 +152,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
   were published in that opening. A separate ordinary-input replay
-  verified placement, construction and completion of a Barracks, and
-  queued a Marine. Next: verify a clean spawn, build a force and record
-  active elimination. Distinguish
+  verified placement, construction and completion of a Barracks, then
+  queued, selected and moved the resulting Marine. Next: reach hostile
+  contact under the native capture controls and record active elimination. Distinguish
   in-flight damage and simultaneous outcomes, then qualify complete
   ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
