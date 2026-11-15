@@ -482,6 +482,30 @@ stock_rates(void)
         for (k = 0; k < 3; ++k) stock_one(5 + 16 * k, t, t % MAX_UNITS, (int)(t & 1u));
 }
 
+static void
+coincident_steering(void)
+{
+    memset(u, 0, sizeof(u));
+    u[0].alive = u[1].alive = 1;
+    u[0].type = u[1].type = U_MARINE;
+    u[0].raw_type = u[1].raw_type = sc64_race_raw_unit(U_MARINE);
+    u[0].order = u[1].order = ORDER_IDLE;
+    u[0].x = u[1].x = 32;
+    u[0].y = u[1].y = 32;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    assert(sc64_contact_blocked_mask(&u[0], 0) == 0xffu);
+    for (int speed = 1; speed <= 14; ++speed)
+        assert(sc64_contact_blocked_mask(&u[0], speed) == 0);
+    ++u[1].x;
+    sc64_unit_bucket_move(&u[1]);
+    /* Now an eastward step enters the actor instead of moving away. */
+    assert(sc64_contact_blocked_mask(&u[0], 1) & 1u);
+    check_mask(&u[0], 0);
+    check_mask(&u[0], 1);
+    sc64_unit_buckets_end();
+}
+
 int
 main(void)
 {
@@ -489,6 +513,7 @@ main(void)
     if (trace_path) { contact_trace = fopen(trace_path, "wb"); assert(contact_trace); }
     stock_rates();
     world_passes();
+    coincident_steering();
 #ifndef SC64_PERSISTENT_COLLISION
     dirty_overflow();
 #endif

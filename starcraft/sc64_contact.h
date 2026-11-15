@@ -565,6 +565,14 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 #endif
     int mover_radius, mover_flying, mover_slot = (int)(q - u), p6;
     int minx, maxx, miny, maxy, row, col, reach;
+#if defined(SC64_CONTACT_COINCIDENT_PROBE) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE))
+    _Static_assert(__builtin_offsetof(Unit, y) == __builtin_offsetof(Unit, x) + 2 &&
+                   (__builtin_offsetof(Unit, x) & 3u) == 0 && (_Alignof(Unit) & 3u) == 0,
+                   "contact coordinate pair must be adjacent and word aligned");
+    u32 origin;
+    __builtin_memcpy(&origin, __builtin_assume_aligned(&q->x, 4), 4);
+    int can_skip_coincident = speed > 0 && speed <= 255;
+#endif
     if (sc64_contact_mask_prepare(q, speed, &mask, &mover_radius, &mover_flying))
         return mask;
     p6 = sc64_contact_p6_active();
@@ -586,7 +594,16 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 #ifndef SC64_CONTACT_MASK_TABLE
                 int od2;
 #endif
-                if (i == mover_slot || !c->alive || (SC64_TRANSPORT_LOADED(c) || SC64_SCARAB_NONCOLLIDING(c))) continue;
+                if (i == mover_slot) continue;
+#if defined(SC64_CONTACT_COINCIDENT_PROBE) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE))
+                /* Every nonzero steering offset is farther from an actor
+                 * at the exact origin. The scalar fallback also uses the
+                 * non-strict query, so no actor type can block here. */
+                u32 xy;
+                __builtin_memcpy(&xy, __builtin_assume_aligned(&c->x, 4), 4);
+                if (xy == origin && can_skip_coincident) continue;
+#endif
+                if (!c->alive || (SC64_TRANSPORT_LOADED(c) || SC64_SCARAB_NONCOLLIDING(c))) continue;
                 cc = sc64_contact_class_for(c->type);
                 if (!(cc & SC64_CONTACT_VALID)) {
                     mask = sc64_contact_mask_reference(q, i, speed, mask,

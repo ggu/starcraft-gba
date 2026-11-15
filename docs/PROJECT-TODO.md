@@ -292,7 +292,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   wider speed evidence and ways to avoid its 6 KiB EWRAM cost. The
   [current instruction trace](audits/2026-11-15-z7-contact-cost.md) puts
   524k cycles in uncached collision masks in three no-flood samples,
-  about half those samples' order cost. Prioritize the candidate scan;
+  about half those samples' order cost. The next replay shows that
+  44% of visited actors share the mover's exact coordinates. Rejecting
+  those early cuts mean dense Z7 cycles by 3.99%, with matching state.
+  Focus next on the 40% rejected at the axis test and large route fills;
   the dense workload is still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
