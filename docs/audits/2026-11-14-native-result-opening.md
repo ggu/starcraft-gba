@@ -110,3 +110,62 @@ exit (191.314 seconds) under the same local input, file and disk guards.
 | Selected Marine, 40 HP (step 13,258) | `e44a265d9ed306ff2831479c3700ce54413ba94213062bf9bd7aa1d93f619ba7` |
 | Marine moving (step 13,427) | `3ee59ae537594ff096cdb8e763f30a44ce641bfe1827ddf42fd839adbc048ace` |
 | Marine at destination (step 13,532) | `3f0217f62b8c0f38e50ae87b0ef36ef04984817f1144a1d0abe5802c1b949cab` |
+
+## Hostile contact and Hatchery damage (November 16)
+
+Start opens a pause menu with Options, Goals, Abort Mission and Resume.
+The observed top-level menu offered no save action. The next separate
+bounded discovery build instead replayed and matched the 19 archived
+frames through the first Marine move, then advanced beyond the former
+14,000-step allowance. It allows at most 28,000 steps and 32,768 input
+records; it keeps the 235/240-second frontend/supervisor deadlines, 8 MiB
+file limits and disk floor, with isolated saves and unchanged input pins.
+
+The selected Marine moves south, revealing a red Zerg worker by step
+14,893 and a live enemy Hatchery at 15,793. A subsequent replay matches
+the anchor again and puts the cursor on the Hatchery. The native
+contextual prompt at 15,846 is `B KILL UNIT`. A separate, fully scripted
+replay matches that exact aiming frame, presses B and then uses A to
+read the target's details. Clean frames show Marine fire and the
+Hatchery's HP falling. They establish hostile contact, a player-issued
+attack and actual damage given ordinary controller input. No building
+destruction or competitive result has been observed in this sequence.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Contact and scouting manifest | `1cdd899ab1947b7608e565448e50bbc223661f344a023c77c4dd9dfa69b6ae99` |
+| Marine at enemy base (step 15,793) | `b78c27900df257af66d10710dd07bd7d2bd7c1b0650c597a97e2d0e1d8a36fee` |
+| Attack manifest | `52e34423ed584aa01b16c2ea85c6780a5793a7bbfcf272afab073d5f9e54a496` |
+| Hatchery 1,222 HP (step 16,277) | `abcccd15227af5a53be929c3e4d0163b517fa0096461096c9e40ddda117d3b5d` |
+| Hatchery 1,179 HP (step 16,697) | `2f94e0c4515e525dce109e0d4cb0f72e3df7d17c82a4707d3bd1cb65bb6320e9` |
+| Hatchery 1,141 HP (step 17,117) | `23df433e226255480e33b150dfc4ffc6a8109308da9419544f7fb5039e2b702a` |
+
+An endurance replay matches the 24 retained pre-attack frames and all
+three HP anchors. It sends no further commands after targeting and the
+original attack. At 27,899 the same Hatchery has 171 HP and the Marine
+is still visible. The callback input log is byte-identical to the
+shorter attack run; the additional commands are neutral waits only.
+The run finishes in 159.496 seconds, with no result observed.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Endurance manifest | `d5d7f593e5afb8fb7bb3e5bd14552c26075aea2e657e17d05433b51bfd3030ab` |
+| Hatchery 171 HP (step 27,899) | `6118e3bf1eabc6437e15a0f26d838114feae2f56d28c2cf4509550143113dd8c` |
+
+The last replay uses a separate 31,000-step local visual limit. It
+matches the 24 pre-attack anchors, the three earlier damage anchors
+and the exact 171-HP frame. The callback input log still matches the
+original attack. After neutral wait, the Hatchery is shown at 104 and
+then 43 HP. By 29,999 it is destroyed: the selection and HP clear and
+orange remains occupy the footprint. By 30,699 the footprint is clear.
+Another enemy structure and mobile units remain visible. This is a
+building-destruction witness, with no visible owner elimination or
+match result. The clean 32-frame run takes 149.565 seconds; the same
+wall-time, input-record, output and disk limits apply.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Destruction manifest | `50da1f7c17e2821245820b28016df1905d438302f35b6f1ecac7cf56ccdfdd64` |
+| Hatchery at 43 HP (step 29,299) | `9cd06399ce8dc4ec9c2d9e3cd7afa2d3f91b59dc49a2f584d8213cff8beb2fb1` |
+| Destroyed and deselected (step 29,999) | `f7d63bfe8db5e90926108a3c0f62ba0ac0cc2f23a1c3f5086b1a8f5301f14d60` |
+| Cleared footprint (step 30,699) | `7de51ae9f648dc5432c2b9d42970e35faac3ea35c26fa137df957f976b11a4bc` |

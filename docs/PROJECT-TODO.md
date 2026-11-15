@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-15. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-16. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -162,8 +162,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   confirms the 31-decrement cadence and owner scan order. No live results
   were published in that opening. A separate ordinary-input replay
   verified placement, construction and completion of a Barracks, then
-  queued, selected and moved the resulting Marine. Next: reach hostile
-  contact under the native capture controls and record active elimination. Distinguish
+  queued, selected and moved the resulting Marine. The next bounded replay
+  reaches and destroys a hostile Hatchery using a normal Marine attack.
+  Other enemy structures and units remain. Next: capture destruction of
+  an owner's final building and the published result. Distinguish
   in-flight damage and simultaneous outcomes, then qualify complete
   ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
@@ -294,7 +296,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The
   [current instruction trace](audits/2026-11-15-z7-contact-cost.md) puts
   524k cycles in uncached collision masks in three no-flood samples,
-  about half those samples' order cost. Prioritize the candidate scan;
+  about half those samples' order cost. The next replay shows that
+  44% of visited actors share the mover's exact coordinates. Rejecting
+  those early cuts mean dense Z7 cycles by 3.99%, with matching state.
+  Focus next on the 40% rejected at the axis test and large route fills;
   the dense workload is still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
