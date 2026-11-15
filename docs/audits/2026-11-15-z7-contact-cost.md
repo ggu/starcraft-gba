@@ -149,7 +149,7 @@ comparisons including the memo oracle. All four normal links with the
 probe pass the original limits, with +16 bytes EWRAM and +32 IWRAM
 bytes apiece.
 
-The exact dense Z7 comparison uses the shipping coincident shortcut on
+The initial dense Z7 comparison uses the shipping coincident shortcut on
 both sides and the stable `5d4b085` Z10 baseline. All 131 checkpoints,
 480 frame/route samples and raw endpoints match.
 
@@ -160,9 +160,15 @@ both sides and the stable `5d4b085` Z10 baseline. All 131 checkpoints,
 | All-call p95 | 4,317,436 | 4,198,368 | −2.76% |
 | All-call peak | 5,440,259 | 5,174,688 | −4.88% |
 
-This is still about 6.35 guest updates per second on the dense window.
-Keep the knob off until independent mutation-path review and contrasting
-campaign, custom save/load, and timing checks are complete.
+This early result is still only about 6.35 guest updates per second
+on the dense window. Independent mutation review found a stale-mask
+case when `race_builder_arrived` consumes a Drone without routing through
+the ordinary damage or movement hooks. The actual build-arrival
+regression reproduced a cached mask different from the uncached mask.
+A shared invalidation now retires those answers before the Drone is
+marked dead. The focused regression passes with row reuse enabled and
+disabled. Rerun the exact paired timing and gameplay checks with the
+correctness fix on both sides; the table above is preliminary.
 
 - Local comparison SHA-256: `a53cd6c04acbc5cca1b971d81317293dcce61ab24de271c02aadc7386dacba6e`.
 - Candidate Z10 ROM SHA-256: `b85a355cbd84c77ba090798ec8f819234603ca2b4f3eb93953544ba858ac5c69`.
