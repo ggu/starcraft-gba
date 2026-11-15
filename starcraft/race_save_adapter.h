@@ -1872,6 +1872,11 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 #endif
 
 static int race_save_game(void) {
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+    /* Everything that writes the route/save union comes through this entry
+     * (or the paired save/load entry); never retain borrowed bytes here. */
+    SC64_ROUTE_POINT_TAIL_RELEASE();
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     int nuke_silo_tag;
     if (!race_nuke_save_live_scope(&nuke_silo_tag)) return 0;
@@ -4818,6 +4823,11 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 }
 #endif
 static int race_load_game(void) {
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+    /* Everything that writes the route/save union comes through this entry
+     * (or the paired save/load entry); never retain borrowed bytes here. */
+    SC64_ROUTE_POINT_TAIL_RELEASE();
+#endif
 #if defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) && !defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE)
     return 0; /* No compound envelope reader has been admitted yet. */
 #endif

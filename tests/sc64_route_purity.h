@@ -43,7 +43,9 @@ static const RoutePureRegion route_pure_regions[] = {
     RP_REGION(sc64_route_pool),
     RP_REGION(sc64_route_field),
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
-    RP_REGION(sc64_route_point_plane),
+#ifndef SC64_ROUTE_POINT_TAIL_PROBE
+    RP_REGION(sc64_route_point_plane), /* Otherwise covered by bfs_queue below. */
+#endif
     RP_REGION(sc64_route_point_spare),
     RP_REGION(sc64_route_point_saved),
 #endif
