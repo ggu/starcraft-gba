@@ -107,3 +107,24 @@ to rebuild the unchanged prior comparison vector.
 | Four paired Blood Bath save/load cases | `f878ed928cd0e0a7e87b71edd1dbedeec13148cef705e39d396b5e5f92f1063f` |
 | T4 and P10 gameplay comparisons | `eebae1bf87620c5f6255afb52cc8e9e4dcfb0b85907cebe0ca91c17c380d8972` |
 | Full P10 win comparison | `f2da9241d836aff4c23919c55cd78e2bdf9e6112053666db0db1c6013f587598` |
+
+### Packed reach test after the coincident shortcut
+
+A follow-up used the same coordinate word to check both axes against a
+conservative rectangle (`SC64_CONTACT_REACH(flying) + speed`) before
+reading actor facts. The packed comparison uses guards between its
+16-bit coordinate lanes, keeps the old path for out-of-domain movers,
+and leaves the scalar narrow phase unchanged. Z10 and P10 linked within
+the normal guards and passed 1,274,178 active sanitizer mask checks.
+
+Against exact release `5d4b085`, the Zerg 7 replay matched all 131
+checkpoints, 480 frame/route samples, and both raw route/world endpoints.
+The added guard cost more than it avoided: mean loop cycles increased
+1.82% (2,824,509 to 2,875,927); mean orders increased 3.06%; p95
+increased 1.04%. Leave the packed test out. The 40% rejection rate
+belongs to an actor-specific radius check and does not predict what
+the wider rectangle can reject. Look for a cheaper invalidation or
+indexing change, or reduce the measured route fill cost.
+
+- Exact packed candidate ROM SHA-256: `6796cad89980d58d3cd85b54c462874ac0b81aed584d240c42b3b0abe18258ac`.
+- Local packed candidate comparison SHA-256: `f2efe808a41ecb7b84a9c7542858094117bc135700587226487a7f4a17dcbe0c`.
