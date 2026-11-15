@@ -278,9 +278,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   while keeping route oracles and scratch bindings unchanged. Composed
   builds and four paired SRAM continuations pass. T4 and P10 prefixes
   match but exercise no retained hits. Keep the switch off while seeking
-  wider speed evidence and ways to avoid its 6 KiB EWRAM cost. Break down the 1.05M
-  remaining orders cycles outside point fills; the dense workload is
-  still well short of 30 fps.
+  wider speed evidence and ways to avoid its 6 KiB EWRAM cost. The
+  [current instruction trace](audits/2026-11-15-z7-contact-cost.md) puts
+  524k cycles in uncached collision masks in three no-flood samples,
+  about half those samples' order cost. Prioritize the candidate scan;
+  the dense workload is still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
@@ -298,8 +300,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   until broader checks. The [exact bounded facility FIFO](audits/2026-11-13-bounded-facility-fifo.md)
   cuts three P10 gameplay stalls by 43–57% and its full mean by 1.12%,
   matching the observed route bytes, outcomes and video. Four guarded links,
-  the Z7 window and one 64×64 SRAM continuation pass. Keep it opt-in pending
-  composed RAM checks and hardware. The [typed save reader](audits/2026-11-13-typed-save-reader.md)
+  the Z7 window and one 64×64 SRAM continuation pass. A current P10
+  rerun with a smaller wide-only FIFO matches the win but raises mean
+  cycles by 0.21%, with only 24 IWRAM bytes to the Showcase guard. Keep
+  it off. The [typed save reader](audits/2026-11-13-typed-save-reader.md)
   cuts the P10 result update from 76.50M to 37.51M cycles with the same
   pause/result journals and fresh-load win. Keep it opt-in until broader
   save and hardware checks. Next: reduce facility grid conversion and the
