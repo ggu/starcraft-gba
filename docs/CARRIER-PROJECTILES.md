@@ -268,8 +268,9 @@ P7-win qualification claim. Those gates remain required before promotion.
 
 Measured on 2026-11-12 at the base of the Gantrithor change. No additional
 ROM currently enables these services. A standalone [compact packet](#compact-packet-foundation)
-is available for future Terran and Zerg integration. A Protoss player on the Terran, Zerg or Showcase ROM gets no
-working Carrier. What stops it, and the smallest sound way to start:
+is available for future Terran and Zerg integration. A Protoss player on
+the Terran, Zerg or Showcase ROM gets no working Carrier. What stops it,
+and the smallest sound way to start:
 
 | Fact | Terran | Zerg Z9 / Z10 | Showcase | Protoss P10 (has it) |
 | --- | --- | --- | --- | --- |
@@ -353,15 +354,19 @@ Smallest sound way, by product:
   alone. Competing designs in #212 and #210 (a shared "namespace" codec versus a
   separate typed arena) should be settled before either product adopts one.
 
-That is also the order the work has risk: Showcase needs no new format, Terran
-needs a variable-length packet, Zerg needs the packet and a low shot cap.
+Showcase can reuse the fixed packet layout only if its exact worst-case
+journal fits with the other advertised features. It still needs a way to
+authenticate the changed record length and safely load predecessor saves
+with an empty projectile pool. Terran needs a variable-length packet;
+Zerg needs the packet and a verified bound for simultaneous shots.
 
 ### Compact packet foundation
 
 The asset-free `sc64_compact_*` API is separate from the existing fixed
-2,103-byte projectile packet and is not wired into RaceSave. An enclosing save
-generation specifies a fixed simultaneous shot cap (0 to 100) and passes the
-exact packet length. The packet starts with two bytes (allocated groups of ten,
+2,103-byte projectile packet and is not wired into RaceSave. The
+`SC64_INTERCEPTOR_COMPACT_CODEC` compile flag enables it for the host fixture;
+no production profile sets this flag. An enclosing save generation specifies
+a fixed simultaneous shot cap (0 to 100) and passes the exact packet length. The packet starts with two bytes (allocated groups of ten,
 active count), followed by all allocated ordinals in active-list order then
 free-list order, seven low-bit-first bits per ordinal. The active rows follow
 in list order, 154 bits each: the legacy row fields up through the pending

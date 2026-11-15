@@ -59,6 +59,7 @@ int sc64_pool_get_row(const Sc64Arena *a, uint8_t ordinal, Sc64ProjectileRow *ou
 int sc64_pool_set_row(Sc64Arena *a, uint8_t ordinal, const Sc64ProjectileRow *row);
 uint8_t sc64_native_index(uint8_t ordinal);
 
+#ifdef SC64_INTERCEPTOR_COMPACT_CODEC
 /* Standalone compact format. The enclosing save owns its version and the
  * active cap (0..SC64_POOL_CAPACITY), fixed from pool init through loading.
  * Use only the capped acquire and canonical retire operations for this pool.
@@ -89,6 +90,7 @@ int sc64_compact_codec_validate_target(const Sc64Arena *a, const uint8_t *in,
 /* Commit after the same preflight, without a world predicate. */
 int sc64_compact_codec_decode(Sc64Arena *a, const uint8_t *in, size_t in_size,
                               unsigned cap);
+#endif
 #ifdef __cplusplus
 }
 #endif

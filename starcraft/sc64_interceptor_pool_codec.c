@@ -599,6 +599,7 @@ sc64_codec_decode(Sc64Arena * a, const uint8_t * in, size_t n)
     return sc64_pool_validate(a);
 }
 
+#ifdef SC64_INTERCEPTOR_COMPACT_CODEC
 /* Keep the compact bit layout independent so existing saved-game builds
  * retain the fixed codec's ARM code. The active fixture exercises both
  * implementations and the shared row domain. */
@@ -829,3 +830,4 @@ int sc64_compact_codec_decode(Sc64Arena *a, const uint8_t *in, size_t n,
     }
     return 1;
 }
+#endif
