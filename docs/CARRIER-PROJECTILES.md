@@ -491,3 +491,45 @@ Hydralisk had 68 HP, down from 80 at the save point. This checks paid
 production, attack and a live projectile across a real ARM save. It does not
 attribute every hit to the Interceptor or qualify return and docking, other
 matchups, hardware stack use, or battle timing.
+
+### Terran custom journal study
+
+The Terran storage study is separate from the Showcase probe. With prepared
+Terran assets, run:
+
+```sh
+make -f Makefile -f tests/sc64-terran-carrier-envelope/Makefile test-sc64-terran-carrier-envelope
+```
+
+The host-only study wraps a current Terran custom save under a distinct
+checksum-verified SRAM tag. Its worst case is **15,929 of 16,368 bytes**:
+
+| Region | Bytes | Treatment |
+| --- | ---: | --- |
+| Prefix through Backwater state | 13,618 | Exact bytes: 192 unit and 96 building slots, full fog, wallets, campaign state and Backwater state |
+| Invincibility flags | 36 | Packs all 288 binary unit/building flags |
+| Packet and tail lengths | 4 | Two little-endian lengths |
+| Full compact Interceptor packet | 2,015 | 100 active projectiles |
+| Existing Yamato, impact and transport tail | 256 | Both active Yamatos, all 32 impacts and transport, in the existing wire order |
+
+The 1,910 bytes between the flags and the Yamato tail are T3/late-mission
+storage and padding. The writer refuses a custom save if any omitted byte
+is nonzero, and refuses nonbinary invincibility flags. No fog cells are
+omitted and no engine capacity changes. A separate ARM compile confirmed
+the same prefix, omitted range and total size.
+
+The host fixture saturates the three queues on both custom maps and
+reconstructs each original 16,072-byte save byte for byte. It writes and
+selects the study envelope through the ordinary SRAM journal routines, then
+runs the real Terran game's detached candidate preflight on the reconstructed
+save. Both a malformed compact packet and a structurally valid envelope with
+an invalid map fall back to the preserved ordinary predecessor. The fixture
+also round-trips saves after 90 gameplay updates in all 18 map/human-race/bot
+configurations, and checks that truncation, excess length and insufficient
+output capacity fail before changing the destination.
+
+This proves storage and prepared selection only. The normal Terran ROM keeps
+its writer, reader and flags. Its future Carrier probe still needs appended
+actor IDs, appropriate facts and art, world validation of projectile
+references, a bounded live writer/commit path and its own ARM memory and
+ordinary gameplay qualification.
