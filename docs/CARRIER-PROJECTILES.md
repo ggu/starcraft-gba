@@ -473,3 +473,21 @@ tech path is separate from the synthetic full-journal smoke. Waiting for
 Carrier gas did not reach a purchase before the match left play. The next
 ordinary-input run needs an earlier gas and defense plan to pay for the
 Carrier and Interceptor, attack, and save during flight.
+
+A defended ordinary-input run against one Zerg bot completed the next
+checkpoint on probe ROM SHA-256 `2a8a3849…`. From a blank custom game,
+ordinary buttons built the tech chain and kept Probes gathering gas. A
+Stargate queued a Carrier at frame 9,753 for exactly 350 minerals and 250
+gas. The Carrier completed at 12,386. Its selected-unit command paid 25
+minerals at frame 12,431; the Interceptor completed at 12,811 and was outside
+the hangar by 12,864.
+
+START/B at 12,888 wrote a 16,128-byte journal with one moving projectile in
+a 30-byte compact packet. The packet named the player's Interceptor (slot
+12) and a Hydralisk (slot 43). A fresh title-L load restored frame, wallet,
+supply and observed actors, and a guest re-save reproduced the entire
+1,924-byte compact extension. After 80 more updates the observed
+Hydralisk had 68 HP, down from 80 at the save point. This checks paid
+production, attack and a live projectile across a real ARM save. It does not
+attribute every hit to the Interceptor or qualify return and docking, other
+matchups, hardware stack use, or battle timing.
