@@ -163,8 +163,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   were published in that opening. A separate ordinary-input replay
   verified placement, construction and completion of a Barracks, then
   queued, selected and moved the resulting Marine. The next bounded replay
-  reaches a hostile Hatchery and verifies a normal attack with falling HP.
-  Next: capture building destruction and active elimination. Distinguish
+  reaches and destroys a hostile Hatchery using a normal Marine attack.
+  Other enemy structures and units remain. Next: capture destruction of
+  an owner's final building and the published result. Distinguish
   in-flight damage and simultaneous outcomes, then qualify complete
   ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
