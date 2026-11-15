@@ -128,3 +128,41 @@ indexing change, or reduce the measured route fill cost.
 
 - Exact packed candidate ROM SHA-256: `6796cad89980d58d3cd85b54c462874ac0b81aed584d240c42b3b0abe18258ac`.
 - Local packed candidate comparison SHA-256: `f2efe808a41ecb7b84a9c7542858094117bc135700587226487a7f4a17dcbe0c`.
+
+### Movement invalidation by bucket rows
+
+The four-entry collision memo previously cleared all entries whenever
+any actor moved. The opt-in `CANONICAL_CONTACT_LOCAL_MEMO=1` probe gives
+each entry a conservative span of complete bucket rows. Its widest
+flight reach encloses all rows visited for either movement layer. Moving
+an actor now drops an entry if that actor's old or new cell intersects
+the span, including a move within one cell. Keep the full invalidations
+at bucket begin/end and on the existing non-movement mutation paths.
+This only changes when a memoized answer can be reused.
+
+A prepared host fixture retains a mask for a second actor with the same
+key when a distant actor moves. Moving the distant actor into the span
+and back out evicts the result in both directions and changes the
+expected eastward mask. The legacy and persistent asset-free memo
+contracts pass under ASan/UBSan, as do over 1.27M prepared Z10/P10 mask
+comparisons including the memo oracle. All four normal links with the
+probe pass the original limits, with +16 bytes EWRAM and +32 IWRAM
+bytes apiece.
+
+The exact dense Z7 comparison uses the shipping coincident shortcut on
+both sides and the stable `5d4b085` Z10 baseline. All 131 checkpoints,
+480 frame/route samples and raw endpoints match.
+
+| Guest cycles | Control | Row-local invalidation | Change |
+| --- | ---: | ---: | ---: |
+| Active mean loop | 2,824,509 | 2,640,646 | −6.51% |
+| Active mean orders | 1,667,932 | 1,483,645 | −11.05% |
+| All-call p95 | 4,317,436 | 4,198,368 | −2.76% |
+| All-call peak | 5,440,259 | 5,174,688 | −4.88% |
+
+This is still about 6.35 guest updates per second on the dense window.
+Keep the knob off until independent mutation-path review and contrasting
+campaign, custom save/load, and timing checks are complete.
+
+- Local comparison SHA-256: `a53cd6c04acbc5cca1b971d81317293dcce61ab24de271c02aadc7386dacba6e`.
+- Candidate Z10 ROM SHA-256: `b85a355cbd84c77ba090798ec8f819234603ca2b4f3eb93953544ba858ac5c69`.

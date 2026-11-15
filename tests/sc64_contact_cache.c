@@ -506,6 +506,46 @@ coincident_steering(void)
     sc64_unit_buckets_end();
 }
 
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+static void
+row_disjoint_movement(void)
+{
+    memset(u, 0, sizeof(u));
+    for (int i = 0; i < 4; ++i) {
+        u[i].alive = 1;
+        u[i].type = U_MARINE;
+        u[i].raw_type = sc64_race_raw_unit(U_MARINE);
+        u[i].order = ORDER_IDLE;
+        u[i].x = 32;
+        u[i].y = i < 2 ? 32 : 112;
+    }
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    assert(sc64_contact_blocked_mask(&u[0], 1) == 0);
+    assert(sc64_contact_blocked_mask(&u[3], 1) == 0);
+    assert(sc64_contact_memo_count == 2);
+    ++u[2].x;
+    sc64_unit_bucket_move(&u[2]);
+    assert(sc64_contact_memo_count == 1);
+    /* A different actor with the same key may still use the retained
+     * result: coincident presence cannot block a nonzero step. */
+    assert(sc64_contact_blocked_mask(&u[1], 1) == 0);
+    assert(sc64_contact_memo_count == 1);
+    assert(sc64_contact_blocked_mask(&u[3], 1) & 1u);
+    u[2].y = 32;
+    sc64_unit_bucket_move(&u[2]);
+    assert(sc64_contact_memo_count == 0);
+    assert(sc64_contact_blocked_mask(&u[1], 1) & 1u);
+    u[2].y = 112;
+    sc64_unit_bucket_move(&u[2]);
+    assert(sc64_contact_memo_count == 0);
+    assert(sc64_contact_blocked_mask(&u[1], 1) == 0);
+    check_mask(&u[0], 1);
+    check_mask(&u[3], 1);
+    sc64_unit_buckets_end();
+}
+#endif
+
 int
 main(void)
 {
@@ -514,6 +554,9 @@ main(void)
     stock_rates();
     world_passes();
     coincident_steering();
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+    row_disjoint_movement();
+#endif
 #ifndef SC64_PERSISTENT_COLLISION
     dirty_overflow();
 #endif

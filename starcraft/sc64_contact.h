@@ -369,6 +369,9 @@ sc64_contact_mask_apply_geometry(unsigned mask, int radius, int speed,
 typedef struct {
     s16 x, y, raw_type;
     u8 type, order, speed, p6, mask, valid;
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+    u16 first_cell, last_cell;
+#endif
 } Sc64ContactMemoEntry;
 _Static_assert(sizeof(Sc64ContactMemoEntry) <= 16, "contact memo entry exceeds bound");
 static Sc64ContactMemoEntry sc64_contact_memo_entries[4];
@@ -385,6 +388,28 @@ sc64_contact_memo_invalidate(void)
     ++sc64_contact_memo_generation;
 #endif
 }
+
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+/* Movement can affect an earlier query only if a bucket the scan can
+ * read contains the actor before or after. Whole rows conservatively
+ * include every consulted column. Other transitions still clear all. */
+static void __attribute__((noinline))
+sc64_contact_memo_move_cells(unsigned from, unsigned to)
+{
+#ifdef SC64_CONTACT_MEMO_ORACLE
+    ++sc64_contact_memo_generation;
+#endif
+    unsigned kept = 0;
+    for (unsigned i = 0; i < sc64_contact_memo_count; ++i) {
+        const Sc64ContactMemoEntry *e = &sc64_contact_memo_entries[i];
+        unsigned first = e->first_cell, span = e->last_cell - first;
+        if (from - first <= span || to - first <= span) continue;
+        if (kept != i) sc64_contact_memo_entries[kept] = *e;
+        ++kept;
+    }
+    sc64_contact_memo_count = (u8)kept;
+}
+#endif
 
 static int __attribute__((noinline))
 sc64_contact_memo_key_equal(const Sc64ContactMemoEntry *e, const Unit *q,
@@ -435,6 +460,15 @@ sc64_contact_memo_remember(const Unit *q, int speed, int p6, unsigned mask)
     sc64_contact_memo_entries[0].p6 = (u8)p6;
     sc64_contact_memo_entries[0].mask = (u8)mask;
     sc64_contact_memo_entries[0].valid = 1;
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+    /* Use the broadest reach across both layers without another fact
+     * lookup; the first and last rows are clamped to the current map. */
+    int pad = SC64_CONTACT_REACH(1) + speed;
+    int first = (q->y - pad) >> 4, last = (q->y + pad) >> 4;
+    int rows = MAP_ROWS, cols = MAP_COLS;
+    sc64_contact_memo_entries[0].first_cell = (u16)((first < 0 ? 0 : first) * cols);
+    sc64_contact_memo_entries[0].last_cell = (u16)((last + 1 > rows ? rows : last + 1) * cols - 1);
+#endif
 }
 
 #ifdef SC64_CONTACT_MEMO_ORACLE
@@ -509,6 +543,9 @@ sc64_contact_memo_eligible(const Unit *q, int speed)
         q->x < 0 || q->x >= WORLD_W || q->y < 0 || q->y >= WORLD_H ||
         q->raw_type < -32768 || q->raw_type > 32767 ||
         q->order < 0 || q->order > 255) return 0;
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+    if ((unsigned)MAP_COLS * (unsigned)MAP_ROWS >= 0xffffu) return 0;
+#endif
     if (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS)) return 0;
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     { unsigned flags = sc64_game_unit_actor_flags(q->type);
