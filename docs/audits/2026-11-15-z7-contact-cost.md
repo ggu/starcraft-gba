@@ -33,3 +33,20 @@ against the existing differential and all four cartridge guards.
 
 - Released Z10 ROM SHA-256: `8e4737c9085dda0ed6f6084ed6f3150ae7dfd722dd97e466f766d6c6bad20efb`.
 - Local instruction and call-stack receipt SHA-256: `92943604967ce17f7c8d14c233732b584b317a6d1ba8f4c3a9ca0c13f48ad3d8`.
+
+## Candidate scan experiment
+
+Hoisting the mover coordinates and row stride, combining the axis
+checks and postponing the burrow query passed the existing contact
+oracles on the Zerg and Protoss vectors (637,282 and 636,892 mask
+queries, plus the step, slot mutation and memo checks). The exact
+current Z10 comparison matches 131 checkpoints, 480 frame and route
+count samples and raw route/world endpoints. It lowers average active
+loop cycles only 0.19%, from 2,941,970 to 2,936,433; order cost drops
+0.30% and maximum rises slightly (5,583,946 → 5,584,766). Do not enable
+this experiment. Measure how many empty buckets and wrong-layer actors
+are visited before trying to prune candidates earlier, and account for
+bucket changes on same-cell moves and transport transitions.
+
+- Candidate dense replay SHA-256: `505bb098e2aa34e81eacb3014eb4fb0c3a3be6aef9b85143d626d87fe8f72ffa`.
+- Matching raw endpoint receipt SHA-256: `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4`.
