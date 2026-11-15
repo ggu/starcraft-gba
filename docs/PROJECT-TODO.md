@@ -23,10 +23,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Interceptor services. Terran, Zerg and Showcase still lack working Carriers.
   The [compact projectile packet](CARRIER-PROJECTILES.md#compact-packet-foundation)
   now round-trips allocator order, stable slots and active state at explicit
-  shot caps. It is a codec only. Next: budget the complete Showcase journal
-  with active impacts and Yamato, then verify a predecessor migration and a
-  fresh reload during launch and return. Use the compact packet where the
-  fixed record cannot fit. Keep the existing roster and saved IDs stable.
+  shot caps. [Showcase draft #514](https://github.com/ggu/starcraft-gba/pull/514)
+  fits full projectile, impact and Yamato state and reloads a predecessor
+  journal. A normal-input game completed a Fleet Beacon, reloaded its save,
+  and a later defended game paid the actual 350/250 Carrier cost at the
+  Stargate. Next: finish the build, pay for Interceptors, and attack and
+  reload in flight before extending the shared service to other ROMs.
+  Keep existing roster and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to
@@ -165,9 +168,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   queued, selected and moved the resulting Marine. The next bounded replay
   reaches and destroys a hostile Hatchery using a normal Marine attack.
   An authenticated continuation selects the surviving Extractor at
-  750 HP, so the Hatchery was not the last building. Fork an earlier
-  opening with a larger attack force to capture an owner's final
-  building and the published result under the same replay limits.
+  750 HP, so the Hatchery was not the last building. A new fork trains
+  three Marines and selects the group through ordinary input. Use it
+  to capture an owner's final building and the published result under
+  the same replay limits.
   Distinguish in-flight damage and simultaneous outcomes, then qualify
   complete ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
@@ -306,8 +310,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   about half those samples' order cost. The next replay shows that
   44% of visited actors share the mover's exact coordinates. Rejecting
   those early cuts mean dense Z7 cycles by 3.99%, with matching state.
-  Focus next on the 40% rejected at the axis test and large route fills;
-  the dense workload is still well short of 30 fps.
+  The cheaper row-local memo keeps answers after unrelated movement
+  and cuts a further 6.51% mean overall and 11.05% in orders on this
+  window. It also fixes stale collision when a Drone starts a building.
+  The packed axis probe was slower; focus next on exact route expansion
+  and routine drawing. Dense play remains well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution

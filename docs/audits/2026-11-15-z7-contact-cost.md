@@ -132,8 +132,8 @@ indexing change, or reduce the measured route fill cost.
 ### Movement invalidation by bucket rows
 
 The four-entry collision memo previously cleared all entries whenever
-any actor moved. The opt-in `CANONICAL_CONTACT_LOCAL_MEMO=1` probe gives
-each entry a conservative span of complete bucket rows. Its widest
+any actor moved. The shared `CANONICAL_CONTACT_LOCAL_MEMO` configuration
+gives each entry a conservative span of complete bucket rows. Its widest
 flight reach encloses all rows visited for either movement layer. Moving
 an actor now drops an entry if that actor's old or new cell intersects
 the span, including a move within one cell. Keep the full invalidations
@@ -149,9 +149,11 @@ comparisons including the memo oracle. All four normal links with the
 probe pass the original limits, with +16 bytes EWRAM and +32 IWRAM
 bytes apiece.
 
-The initial dense Z7 comparison uses the shipping coincident shortcut on
-both sides and the stable `5d4b085` Z10 baseline. All 131 checkpoints,
-480 frame/route samples and raw endpoints match.
+The exact corrected dense Z7 comparison puts the shared Drone
+invalidation and shipping coincident shortcut on both sides, then
+toggles only row-local invalidation. The corrected control also matches
+the stable `5d4b085` Z10 gameplay and timing at this window. All 131
+checkpoints, 480 frame/route samples and raw endpoints match.
 
 | Guest cycles | Control | Row-local invalidation | Change |
 | --- | ---: | ---: | ---: |
@@ -160,15 +162,25 @@ both sides and the stable `5d4b085` Z10 baseline. All 131 checkpoints,
 | All-call p95 | 4,317,436 | 4,198,368 | −2.76% |
 | All-call peak | 5,440,259 | 5,174,688 | −4.88% |
 
-This early result is still only about 6.35 guest updates per second
-on the dense window. Independent mutation review found a stale-mask
-case when `race_builder_arrived` consumes a Drone without routing through
-the ordinary damage or movement hooks. The actual build-arrival
-regression reproduced a cached mask different from the uncached mask.
-A shared invalidation now retires those answers before the Drone is
-marked dead. The focused regression passes with row reuse enabled and
-disabled. Rerun the exact paired timing and gameplay checks with the
-correctness fix on both sides; the table above is preliminary.
+This is still only about 6.35 guest updates per second on the dense
+window. Independent mutation review found a stale-mask case when
+`race_builder_arrived` consumes a Drone without routing through the
+ordinary damage or movement hooks. The actual build-arrival regression
+reproduced a cached mask different from the uncached mask. A shared
+invalidation now retires those answers before the Drone is marked dead,
+with row reuse enabled or disabled. A separate adversarial movement
+oracle passed 160,000 moves per bucket lifecycle.
 
-- Local comparison SHA-256: `a53cd6c04acbc5cca1b971d81317293dcce61ab24de271c02aadc7386dacba6e`.
-- Candidate Z10 ROM SHA-256: `b85a355cbd84c77ba090798ec8f819234603ca2b4f3eb93953544ba858ac5c69`.
+The corrected Z10, Terran, P10 and Showcase guarded links and all
+four Blood Bath physical save/reload pairs match the shipping SRAM.
+The full Protoss 10 win matches 20 checkpoints, ten briefing pages,
+14 authored pages, and 19 ordered raw framebuffer and state samples.
+Full-run P10 mean rises by 0.22% (1,726,522 to 1,730,328 cycles).
+The change is enabled in the shared configuration; select
+`CANONICAL_CONTACT_LOCAL_MEMO=0` to compare global invalidation with
+the same Drone construction fix on both sides.
+
+- Corrected dense pair and old release control SHA-256: `faef131993379ff09721b0c7e610b45f403db9202dbfc5fe57e13545ad6b952f`.
+- Corrected Z10 ROM SHA-256: `2b907cdecb5769dde471de04b280ffe7de79a3b43874b2eaabfc2a9b8be43eb8`.
+- Four corrected Blood Bath comparisons SHA-256: `68491c988acee4fc70786fa0111fef9bda5609c179b75cc7daea0d4b6667200e`.
+- Full corrected Protoss 10 comparison SHA-256: `b6b82f0e79832546473998ccc83f18f86f29474eb8b3d19ce074758c4c2a14c7`.
