@@ -169,3 +169,32 @@ wall-time, input-record, output and disk limits apply.
 | Hatchery at 43 HP (step 29,299) | `9cd06399ce8dc4ec9c2d9e3cd7afa2d3f91b59dc49a2f584d8213cff8beb2fb1` |
 | Destroyed and deselected (step 29,999) | `f7d63bfe8db5e90926108a3c0f62ba0ac0cc2f23a1c3f5086b1a8f5301f14d60` |
 | Cleared footprint (step 30,699) | `7de51ae9f648dc5432c2b9d42970e35faac3ea35c26fa137df957f976b11a4bc` |
+
+## Identify the surviving structure (November 16)
+
+A fresh owned-ROM replay matches all 24 pre-attack captures, the three
+early damage frames, the 171-HP frame, and the exact destruction and
+cleared-footprint frames. From command end 30,700, hold X=30,000 for 13
+steps, release for seven, hold Y=-22,000 for 12, and release for 18. The
+cursor hovers over the surviving red structure at observed step 30,749.
+Press A for eight steps and release for 30. The clean step 30,787 frame
+shows its hostile selection ring and identifies it as an Extractor with
+750 HP. This confirms a second live hostile building in that base; it
+does not establish that the Extractor is the owner's last building.
+
+The replay finishes at step 30,788 under the same 31,000-step visual
+limit and the existing wall-time, file, disk and isolation limits. No
+second attack or competitive result was observed. The remaining 212
+steps could not cover another sustained lone-Marine attack at the
+measured rate. To reach the result within the bound, fork the earlier
+opening with a larger force and pair any last-building kill with the
+read-only result observer. A suggested north-pan route to reacquire the
+existing Marine never ran: that separate attempt rejected a mismatching
+opening capture before sending new input.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Extractor identification manifest | `5beee8297a3aedb81eaa08be53a8560761c3d78d7b99c439bd1e059ab8ac87cc` |
+| Complete controller commands | `1652bd16f42525777a73f8ddec1b44311a622a87dbc5c7b75d874288fe9be843` |
+| Hovered structure (step 30,749) | `f23c0584b59e8b1dc17d2b988ae30140d3d8244e11fc904b08aa695c706b67db` |
+| Selected Extractor at 750 HP (step 30,787) | `972ae09bab4564a470286862b63068ca720061b68d16e68ecfa396433981bb7e` |
