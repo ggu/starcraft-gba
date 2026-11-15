@@ -195,3 +195,56 @@ the facility FIFO composition.
 | T4 and P10 physical sequences | `a7680f913722c6c9aee10a2caeb9dc4920f6a1184da112f0014c95cd0a5501ec` |
 | Zerg 7 SRAM written with a live borrowed slot | `b5f6c43a303f32f02299d0ff980431b86815a7d095c70b86f05adcd40236a0e1` |
 | Matching fresh-load world samples from that save | `108f9aedc07a98fc1632bd25be6aa4ede19433ac09eeb6b47c24df2ec75b3f0f` |
+
+## Other wide missions and facility composition (November 16)
+
+Both sides of each replay include the shipping coincident-collision
+shortcut. The baseline Z10 ROM matches the packaged `5d4b085` hash.
+The point counts below are reads at compiled branch addresses; the
+wide-flood deficit matches the direct retained-return count at every
+sampled checkpoint. Z9 records one additional outer point-wrapper
+observation after call 39,000; use the wide-entry and retained-return
+probes to count avoided floods.
+
+| Replay | Physical calls | Historical / raw snapshot pairs | Wide fills, control → tail | Retained returns | Mean active loop | All-call p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Zerg 8 | 26,506 | 11 / 38 | 235 → 219 | 16 | −0.05% | −0.47% |
+| Zerg 9 | 46,500 | 21 / 68 | 3,162 → 2,700 | 462 | −0.53% | −1.66% |
+| Zerg 9, facility FIFO on both sides | 33,500 | 16 / 50 | 1,486 → 1,187 | 299 | −0.53% | −3.33% |
+
+The final 500-call Z8 window has 14 retained hits and cuts mean active
+loop cost by 1.63%. The earlier window with the largest historical
+army has zero hits and nearly flat timing. The known 240-unit Z9 window
+has ten hits and a 0.98% mean reduction. The post-hoc 500-call Z9
+window with the most hits has 29 and cuts mean by 2.58%; it does not
+represent the whole match.
+
+The facility pairing runs 747 facility FIFO entries on each build,
+including 351 entries when the candidate already has a live borrowed
+field; no natural fallback occurs. Separate ASan/UBSan paired fixtures
+force the facility FIFO to overflow after 32 entries. Normal facility
+FIFO leaves the live tail bytes unchanged. The forced fallback
+evacuates byte-identical live point data to the pool before writing
+over the tail. All checked game state, logical route fields, and
+sampled counters match apart from expected physical work counts.
+
+All four current contact-enabled candidate links pass the original
+RAM bounds; the EWRAM difference is +8 bytes or zero. In four paired
+Blood Bath custom games, ordinary save at 600 updates and fresh load
+followed by 180 more updates match all 21 recorded fields and both
+SRAM files against the exact release. The full physical Protoss 10
+replay matches 20 checkpoints, ten briefing pages, 14 authored pages
+and 19 raw video/state samples through victory at frame 46,057.
+Mean cost is effectively unchanged (1,726,522 → 1,726,528 cycles).
+The switch remains opt-in.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paired Z8 timing and state | `f603ff1d346d4994175f013fb33004aa1499dea37cba5c46432b2e00bcdfaac6` |
+| Paired Z9 timing and state | `bbabfa3c84eb59ab6184186e2870c1e86a84ccedb628887b18d9abac2247cd4f` |
+| Exact Z10/P10 link receipt | `b85cad19ed2558ab6d73b2bc593a32c56d5f9d876e3c60159afb87640daee6e0` |
+| Paired Z9 facility timing and state | `68f11e6efe8b585228e5e0d1d3ea12c82044b2b257dd2cb89bc77c0f9b33cf4c` |
+| Facility composition link receipt | `e4f43e7b7fdb0ec60e58778c126b19e95e224995fc5c0eb6f30cd0c26639205c` |
+| Facility and forced-overflow host checks | `52944c04b0936c8cfdaa2df4f166f100dd5e515e4608baff552595958a10984d` |
+| Four paired current Blood Bath saves | `fe6e6b47703cf585fb44c8074bd4bc6cd6310346514097ed7b60d32add2329dd` |
+| Fully matched current Protoss 10 win | `81b68281e30040b0d12e47dc8bbec04aca503f90c03637052545f531e4bdf241` |
