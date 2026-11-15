@@ -182,8 +182,11 @@ over a fresh load and 180 neutral updates. A later save at call 48,237
 also matches through 180 neutral updates. The historical input suffix
 after that load diverges from its continuous run identically on both
 ROMs. The separate T4 and P10 physical prefixes match but avoid no
-floods. Keep the mode opt-in pending independent ownership review and
-timing on another dense wide map, including facility FIFO composition.
+floods. An independent source review at `e8f97ee` found no ownership
+blocker across queue writers, range copies, map shape changes, and
+aliases of the save union. It did not run a second replay. Keep the
+mode opt-in pending timing on another dense wide map and checking
+the facility FIFO composition.
 
 | Local receipt | SHA-256 |
 | --- | --- |
