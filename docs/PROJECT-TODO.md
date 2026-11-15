@@ -19,6 +19,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and
+  Interceptor services. Terran, Zerg and Showcase still lack working Carriers.
+  The [compact projectile packet](CARRIER-PROJECTILES.md#compact-packet-foundation)
+  now round-trips allocator order, stable slots and active state at explicit
+  shot caps. It is a codec only. Next: budget the complete Showcase journal
+  with active impacts and Yamato, then verify a predecessor migration and a
+  fresh reload during launch and return. Use the compact packet where the
+  fixed record cannot fit. Keep the existing roster and saved IDs stable.
+
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to
   `Games/Development/StarCraft-2026-11-13`. All four 32 MiB files were

@@ -266,9 +266,11 @@ P7-win qualification claim. Those gates remain required before promotion.
 
 ## Carriers in the other ROMs
 
-Measured on 2026-11-12 at the base of the Gantrithor change; nothing here is
-implemented. A Protoss player on the Terran, Zerg or Showcase ROM gets no
-working Carrier. What stops it, and the smallest sound way to start:
+Measured on 2026-11-12 at the base of the Gantrithor change. No additional
+ROM currently enables these services. A standalone [compact packet](#compact-packet-foundation)
+is available for future Terran and Zerg integration. A Protoss player on
+the Terran, Zerg or Showcase ROM gets no working Carrier. What stops it,
+and the smallest sound way to start:
 
 | Fact | Terran | Zerg Z9 / Z10 | Showcase | Protoss P10 (has it) |
 | --- | --- | --- | --- | --- |
@@ -352,5 +354,66 @@ Smallest sound way, by product:
   alone. Competing designs in #212 and #210 (a shared "namespace" codec versus a
   separate typed arena) should be settled before either product adopts one.
 
-That is also the order the work has risk: Showcase needs no new format, Terran
-needs a variable-length packet, Zerg needs the packet and a low shot cap.
+Showcase can reuse the fixed packet layout only if its exact worst-case
+journal fits with the other advertised features. It still needs a way to
+authenticate the changed record length and safely load predecessor saves
+with an empty projectile pool. Terran needs a variable-length packet;
+Zerg needs the packet and a verified bound for simultaneous shots.
+
+### Compact packet foundation
+
+The asset-free `sc64_compact_*` API is separate from the existing fixed
+2,103-byte projectile packet and is not wired into RaceSave. The
+`SC64_INTERCEPTOR_COMPACT_CODEC` compile flag enables it for the host fixture;
+no production profile sets this flag. An enclosing save generation specifies
+a fixed simultaneous shot cap (0 to 100) and passes the exact packet length. The packet starts with two bytes (allocated groups of ten,
+active count), followed by all allocated ordinals in active-list order then
+free-list order, seven low-bit-first bits per ordinal. The active rows follow
+in list order, 154 bits each: the legacy row fields up through the pending
+damage bit. The list reconstructs both heads, tails and links; the omitted
+reserved bits and final byte padding must be zero.
+
+The capped acquire preserves ten-slot growth and the original list operations.
+Retire resets the free slot's fields to known values without changing its
+identity or list location. This is safe for the game path that initializes all
+fields on the next acquisition. Compact encoding refuses old arenas with
+noncanonical free fields; it never silently discards stale data. The future
+game adapter must use compact retire in place of both legacy retirement and
+the subsequent write of the retired row. An exact compact roundtrip restores
+every arena halfword for any conforming pool.
+
+With cap `C`, the largest allocated size is
+`A = min(100, 10 * (floor(C / 10) + 1))` for nonzero caps, because early
+growth can happen when the next shot uses the last existing free slot. For
+cap zero, `A = 0`. The exact worst case is
+`2 + ceil((7 * A + 154 * C) / 8)` bytes. Examples, before enclosing size tags,
+alignment and any other fields:
+
+| Active cap | Worst case |
+| ---: | ---: |
+| 0 | 2 bytes |
+| 3 | 69 bytes |
+| 20 | 414 bytes |
+| 21 | 433 bytes |
+| 25 | 510 bytes |
+| 100 | 2,015 bytes |
+
+Using the measured space above, Terran's existing 512 free bytes could fit
+the 25-shot packet itself; Zerg's theoretical 432 bytes would fit the 20-shot
+packet itself only if the enclosing layout frees enough of that space. Zerg's
+unchanged 72-byte margin fits three shots before enclosing overhead. These
+numbers describe storage bounds, not recommended caps or combat
+qualification. Showcase can use the existing fixed packet if its measured
+layout still fits.
+
+Detached preflight rejects malformed lengths, caps, slot permutations, row
+domains and padding. It can check the destination for overlap and run a
+candidate-only world predicate over active rows after the structural checks.
+A rejected packet leaves the destination untouched. The asset-free sanitizer
+suite checks every cap, compares all arena words across saves, compares the
+next allocation sequence, and exercises malformed packet rejection.
+
+Future integration still needs a save generation and exact byte budget,
+candidate actor and projectile validation, persistent unit IDs, generated
+facts, and per-product memory and gameplay checks. No profile, runtime
+projectile cap, or existing save format changes with this foundation.
