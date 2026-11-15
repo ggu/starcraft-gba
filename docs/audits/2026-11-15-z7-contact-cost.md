@@ -176,7 +176,11 @@ four Blood Bath physical save/reload pairs match the shipping SRAM.
 The full Protoss 10 win matches 20 checkpoints, ten briefing pages,
 14 authored pages, and 19 ordered raw framebuffer and state samples.
 Full-run P10 mean rises by 0.22% (1,726,522 to 1,730,328 cycles).
-The change is enabled in the shared configuration; select
+A separate 46,500-input Zerg 9 replay matches 21 historical checkpoints,
+68 raw world and route snapshots, and all frame and route counters.
+Z9 mean active cost rises 0.19% overall and 0.21% in the 240-unit window.
+The observed gain is specific to dense overlapping movement, where repeated
+steering sees reusable rows. The change is enabled in the shared configuration; select
 `CANONICAL_CONTACT_LOCAL_MEMO=0` to compare global invalidation with
 the same Drone construction fix on both sides.
 
@@ -184,3 +188,4 @@ the same Drone construction fix on both sides.
 - Corrected Z10 ROM SHA-256: `2b907cdecb5769dde471de04b280ffe7de79a3b43874b2eaabfc2a9b8be43eb8`.
 - Four corrected Blood Bath comparisons SHA-256: `68491c988acee4fc70786fa0111fef9bda5609c179b75cc7daea0d4b6667200e`.
 - Full corrected Protoss 10 comparison SHA-256: `b6b82f0e79832546473998ccc83f18f86f29474eb8b3d19ce074758c4c2a14c7`.
+- Current Zerg 9 comparison SHA-256: `589641091c2082cd0253c51df284e42d71a28e0114a3f8bd463617022daded72`.

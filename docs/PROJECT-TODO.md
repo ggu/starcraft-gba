@@ -25,11 +25,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now round-trips allocator order, stable slots and active state at explicit
   shot caps. [Showcase draft #514](https://github.com/ggu/starcraft-gba/pull/514)
   fits full projectile, impact and Yamato state and reloads a predecessor
-  journal. A normal-input game completed a Fleet Beacon, reloaded its save,
-  and a later defended game paid the actual 350/250 Carrier cost at the
-  Stargate. Next: finish the build, pay for Interceptors, and attack and
-  reload in flight before extending the shared service to other ROMs.
-  Keep existing roster and saved IDs stable.
+  journal. An ordinary-input ARM match builds a paid Carrier and
+  Interceptor, launches at a Hydralisk and resumes from a fresh save
+  with a moving projectile. The immediate re-save preserves the
+  compact extension byte for byte. Next: verify return and docking,
+  and fit the same shared mechanic into Terran and Zerg custom saves
+  before broad activation. Keep existing roster and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to
