@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-14. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-15. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -161,9 +161,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
   were published in that opening. A separate ordinary-input replay
-  verified placement, construction and completion of a Barracks, and
-  queued a Marine. Next: verify a clean spawn, build a force and record
-  active elimination. Distinguish
+  verified placement, construction and completion of a Barracks, then
+  queued, selected and moved the resulting Marine. Next: reach hostile
+  contact under the native capture controls and record active elimination. Distinguish
   in-flight damage and simultaneous outcomes, then qualify complete
   ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
@@ -282,10 +282,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   point fills take 736k cycles per active call, including 489k in FIFO
   expansion and 135k in packing. Aligned word output saves 0.52% of
   the loop with matching fields and no extra RAM; keep it opt-in.
-  Test pointer-only one-field retention on the safe physical prefix,
-  preserving logical eviction and both range scratch bindings. Check
-  reserves before timing, and break down the 1.05M orders cycles outside
-  point fills. The dense workload is still well short of 30 fps.
+  [Pointer-only one-field retention](audits/2026-11-14-z7-point-flood-retention.md#one-plane-pointer-retention-on-the-current-fifo)
+  now saves 2.85% mean loop and 8.29% p95 cycles on the same dense tape
+  while keeping route oracles and scratch bindings unchanged. Composed
+  builds and four paired SRAM continuations pass. T4 and P10 prefixes
+  match but exercise no retained hits. Keep the switch off while seeking
+  wider speed evidence and ways to avoid its 6 KiB EWRAM cost. Break down the 1.05M
+  remaining orders cycles outside point fills; the dense workload is
+  still well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution

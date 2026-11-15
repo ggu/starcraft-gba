@@ -87,3 +87,26 @@ a completed Marine nor any live combat or elimination.
 | Training manifest | `33d749b91afd6a9f415e0bffb09149886028d211f4988f8e70147ee5ba8debca` |
 | Marine selected (step 11,823) | `3b11c9e441e200490f2f88f80468ffcba59583a5fed1bfa1d930169c01cdc051` |
 | Marine in training (step 11,843) | `4a30f2d705b16ba65fd10118220addc0c4ebe9dd9236bd383353eabb3dd87606` |
+
+## Marine spawn and movement (November 15)
+
+The next bounded visual run reproduces the ten earlier frames through
+the training queue, then shows the queue empty and a separate actor
+beside the Barracks. After closing the Barracks grid with B and moving
+the cursor onto the actor, A selects it. The clean step 13,258 frame
+identifies it as a Marine with 40 HP and shows the selection ring.
+
+The player points southeast and presses C-Right. Two subsequent clean
+frames show the selected Marine move from near the Barracks to the
+cursor's destination. This is a verified ordinary-input spawn, selection
+and move command. It does not establish combat, an attack order, or
+elimination. The 19-frame manifest reports unchanged inputs and a clean
+exit (191.314 seconds) under the same local input, file and disk guards.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Spawn and movement manifest | `941b58097f7889ed5cbf758218ad8575a0ff4259446f8d17baf28e0950fad8bf` |
+| Controller command log | `4f19619b2e43978354c38eeaf23e35bd98118a362c6693fe14cdff2a85e725c9` |
+| Selected Marine, 40 HP (step 13,258) | `e44a265d9ed306ff2831479c3700ce54413ba94213062bf9bd7aa1d93f619ba7` |
+| Marine moving (step 13,427) | `3ee59ae537594ff096cdb8e763f30a44ce641bfe1827ddf42fd839adbc048ace` |
+| Marine at destination (step 13,532) | `3f0217f62b8c0f38e50ae87b0ef36ef04984817f1144a1d0abe5802c1b949cab` |

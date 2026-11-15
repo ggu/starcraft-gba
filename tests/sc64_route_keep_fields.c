@@ -57,7 +57,7 @@ enum {
     KEEP_GATE_CALL, KEEP_GATE_HIT, KEEP_FAIL_BLOCKED, KEEP_FAIL_CODE,
     KEEP_FAIL_LENGTH, KEEP_FAIL_SEEDS, KEEP_FAIL_NEAR_GOAL, KEEP_FAIL_OPENED,
     KEEP_COMMIT_SAME, KEEP_COMMIT_OVERFLOW, KEEP_COMMIT_DROP, KEEP_MATERIALIZE,
-    KEEP_FILL, KEEP_ADOPT, KEEP_STATS
+    KEEP_FILL, KEEP_ADOPT, KEEP_POINT_POINTER, KEEP_STATS
 };
 static unsigned keep_stat[KEEP_STATS];
 #define SC64_ROUTE_KEEP_COUNT(name) (++keep_stat[KEEP_##name])
@@ -672,6 +672,50 @@ static void check_linear_uses_expected_path(int cols)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+static void check_single_retained_point(void)
+{
+    const int first = 64 * 128 + 32, count = 128 * 128;
+    race_cols = race_rows = 128;
+    memset(desired, 1, count);
+    sc64_routes_reset();
+    build_path_grid();
+    assert(sc64_route_configure());
+    /* This fixture has no range reservation. Reproduce the pinned stock
+     * 128x128 point bank: fixed identity slots and no ordinary donor planes. */
+    sc64_route_pcount = 0;
+    for (int i = 0; i <= SC64_ROUTE_SLOTS; ++i)
+        assert(sc64_route_slot(first+i) >= 0);
+    assert(sc64_route_point_saved == first);
+    unsigned old_fills = keep_stat[KEEP_FILL], old_hits = keep_stat[KEEP_POINT_POINTER];
+    u32 old_logical = sc64_route_builds;
+    u8 *saved = sc64_route_point_spare;
+    int slot = sc64_route_slot(first);
+    assert(sc64_route_field[slot] == saved && sc64_route_point_spare != saved);
+    assert(slot >= 0 && sc64_route_goal[slot] == first && sc64_route_valid[slot] == 1);
+    assert(sc64_route_point_saved == first+1);
+    assert(keep_stat[KEEP_FILL] == old_fills && keep_stat[KEEP_POINT_POINTER] == old_hits+1);
+    assert(sc64_route_builds == old_logical+1);
+    reference_bfs(&oracle[POOL], first);
+    for (int i = 0; i < count; ++i) assert(sc64_route_get(slot, i) == oracle[POOL].dir[i]);
+    check_grid_unchanged();
+    sc64_routes_topology_changed();
+    assert(sc64_route_point_saved == -1);
+    assert(sc64_route_slot(first) >= 0 && keep_stat[KEEP_FILL] == old_fills+1);
+    sc64_routes_reset();
+    assert(sc64_route_point_saved == -1);
+    race_cols = race_rows = 64;
+    sc64_routes_reset();
+    assert(sc64_route_field[0] == sc64_route_pool &&
+           sc64_route_point_spare == sc64_route_point_plane);
+    race_cols = race_rows = 128;
+    sc64_routes_reset();
+    assert(sc64_route_field[SC64_ROUTE_SLOTS - 1] == sc64_route_pool +
+           (SC64_ROUTE_SLOTS - 1u) * SC64_ROUTE_POINT_BYTES);
+    puts("point pointer retention matches fresh BFS, logical miss and topology invalidation");
+}
+#endif
+
 int main(int argc, char **argv)
 {
     static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
@@ -680,6 +724,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-pointer-only")) {
+        check_single_retained_point();
+        return 0;
+    }
+#endif
     for (int i = 1; i + 1 < argc; ++i) {
         if (!strcmp(argv[i], "--emit")) emit = argv[i + 1];
         if (!strcmp(argv[i], "--compare")) compare = argv[i + 1];
