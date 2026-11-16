@@ -28,10 +28,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   its Interceptor docked. The ordinary Showcase ROM rebuilt byte for byte.
   The [Terran probe](CARRIER-PROJECTILES.md#terran-custom-carrier-runtime-probe)
   now verifies the same paid production, active shot and docked save on ARM.
-  [Zerg #518](https://github.com/ggu/starcraft-gba/pull/518)
-  has a verified custom save format. Next: connect the Zerg format to the
-  same service, verify the full release matrix including saves and memory,
-  and only then enable the mechanic across the applicable regular builds.
+  The [Z10 probe](audits/2026-11-16-z10-custom-carrier-envelope.md) verifies
+  those same gates using a custom journal that retains all 100 projectiles
+  and 32 pending impacts. Next: verify the full release matrix, stack
+  high-water and battle timing before enabling the mechanic in regular builds.
   Keep existing roster and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and

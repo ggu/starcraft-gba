@@ -157,6 +157,16 @@ static RaceImpactRecord race_impact_record;
 #else
 static RaceSave race_data;
 #endif
+#ifdef SC64_ZERG_CARRIER_PROBE
+#define SC64_ZERG_CARRIER_TAG SC64_SAVE_TAG_ZERG_CARRIER(SC64_TRANSPORT_SAVE_VERSION)
+#define SC64_ZC_SCRATCH ((u8 *)&sc64_zp_route_save_scratch)
+static const u32 race_zc_tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
+                                 SC64_TRANSPORT_SAVE_VERSION,SC64_ZERG_CARRIER_TAG};
+static u8 race_zc_packet[SC64_ZC_PACKET_MAX];
+static u16 race_zc_size;
+static u8 race_zc_authenticated;
+#endif
+
 #ifdef SC64_TERRAN_CARRIER_PROBE
 #define SC64_TERRAN_CARRIER_TAG SC64_SAVE_TAG_TERRAN_CARRIER(SC64_TRANSPORT_SAVE_VERSION)
 /* Keep the packet while the authenticated record expands in place and the
@@ -1526,22 +1536,47 @@ static int race_p5_save_candidate_valid(const RaceSave *candidate,
     return live + queued + race_p5_saved_remaining_creations(&candidate->p5) <= MAX_UNITS;
 }
 #endif
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#ifdef SC64_CUSTOM_CARRIER_PROBE
 #include "sc64_p7_projectile_save_adapter.h"
 
-static int race_tc_candidate(unsigned ww,unsigned wh)
+/* Impact and transport data are already detached when this scratch view
+ * overlays the serialized tail. Each profile supplies its own authenticated packet. */
+static int race_custom_carrier_candidate(unsigned ww,unsigned wh
+#ifdef SC64_ZERG_CARRIER_PROBE
+                                         ,const Sc64ImpactEvent *impacts,int impact_count
+#endif
+                                        )
 {
-    Unit *actors=sc64_combined_route_save_scratch.carrier_candidate.units;
+#ifdef SC64_ZERG_CARRIER_PROBE
+    if (!race_zc_authenticated) return 1;
+    Unit *actors=sc64_zp_route_save_scratch.carrier_candidate.units;
+    const u8 *packet=race_zc_packet;
+    unsigned packet_size=race_zc_size;
+#else
     if (!race_tc_authenticated) return 1;
+    Unit *actors=sc64_combined_route_save_scratch.carrier_candidate.units;
+    const u8 *packet=race_tc_packet;
+    unsigned packet_size=race_tc_size;
+#endif
     if (race_data.state[0]!=1) return 0;
-    /* Impacts and transport already live in the load plan. Decode the
-     * actor table into the route scratch after the impact wire tail. */
     for (unsigned i=0;i<MAX_UNITS;++i)
         if (!SC64_GUARD_DECODE(&race_data,i,ww,wh,&actors[i])) return 0;
+#ifdef SC64_ZERG_CARRIER_PROBE
+    for (int i=0;i<impact_count;++i) {
+        unsigned target=(unsigned)sc64_impact_event_target(&impacts[i]);
+        if (target<MAX_UNITS) {
+            if (!actors[target].alive || SC64_TRANSPORT_LOADED(&actors[target])) return 0;
+        } else {
+            Building building;
+            if (!race_save_decode_building(&race_data,target-MAX_UNITS,&building) ||
+                !building.alive) return 0;
+        }
+    }
+#endif
     Sc64ShowcaseProjectileCandidate view={&race_data,ww,wh};
     return race_p7_carrier_training_candidate_valid(actors,MAX_UNITS) &&
-        sc64_compact_codec_validate_target(&race_p7_projectiles,race_tc_packet,
-            race_tc_size,SC64_POOL_CAPACITY,race_showcase_projectile_row,&view);
+        sc64_compact_codec_validate_target(&race_p7_projectiles,packet,packet_size,
+            SC64_POOL_CAPACITY,race_showcase_projectile_row,&view);
 }
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
@@ -2899,7 +2934,7 @@ static int race_save_game(void) {
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
-#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
     race_data.interceptor_size=race_p7_projectile_encode(race_data.interceptor_projectiles);
     if (!race_p7_projectile_save_candidate_valid
@@ -2910,7 +2945,7 @@ static int race_save_game(void) {
         (&race_data,
             (unsigned)(race_cols*16),(unsigned)(race_rows*16) SC64_GCTX_ARG)) return 0;
 #endif
-#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
     if (!race_p7_carrier_training_save_valid(&race_data,
             (unsigned)(race_cols*16),(unsigned)(race_rows*16) SC64_GCTX_ARG)) return 0;
 #endif
@@ -3077,7 +3112,11 @@ typedef struct {
     int expanded_terran_late_valid;
 #endif
 #ifdef SC64_IMPACT_EVENTS
+#ifdef SC64_ZERG_CARRIER_PROBE
+    Sc64ImpactEvent impact_candidate[RACE_IMPACT_ROWS];
+#else
     Sc64ImpactEvent impact_candidate[RACE_IMPACT_SAVE_CAPACITY ? RACE_IMPACT_SAVE_CAPACITY : 1];
+#endif
     int impact_candidate_count;
 #endif
 } RaceLoadPlan;
@@ -3104,7 +3143,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_SAVE_UI_CONTEXT
     if (!sc64_save_ui_valid((unsigned)v[SC64_SAVE_UI_STATE_INDEX], MAX_BUILDINGS)) return 0;
 #endif
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_CUSTOM_CARRIER_PROBE)
     race_protoss_bind_candidate(v[0], v[2]);
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
@@ -3356,6 +3395,13 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             return 0;
 #endif
         }
+#endif
+#ifdef SC64_ZERG_CARRIER_PROBE
+        if (!race_zc_authenticated &&
+            (RACE_U(i,type)==U_P7_INTERCEPTOR ||
+             (v[0] && RACE_U(i,raw_type)==73) ||
+             (v[0] && RACE_U(i,type)==U_P7_CARRIER &&
+              (RACE_U(i,carry) || RACE_U(i,work_timer))))) return 0;
 #endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
@@ -3618,7 +3664,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             int type=race_data.buildings[i][offsetof(Building,queue)/sizeof(int)+(RACE_B(i,queue_head)+j)%5];
 #endif
             if(type<0||type>=SC_RU_COUNT)return 0;
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#ifdef SC64_ZERG_CARRIER_PROBE
+            if (type==U_P7_INTERCEPTOR ||
+                (race_zc_authenticated && type==U_P7_CARRIER && RACE_B(i,type)!=B_STARGATE)) return 0;
+#elif defined(SC64_TERRAN_CARRIER_PROBE)
             if (type==U_P7_INTERCEPTOR ||
                 (type==U_P7_CARRIER &&
                  (!race_tc_authenticated || RACE_B(i,type)!=B_STARGATE))) return 0;
@@ -4457,10 +4506,14 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
     if (!v[0] && v[2] == SC64_T4_GLOBAL_ID && !plan->expanded_t4_valid) return 0;
 #endif
-#ifdef SC64_TERRAN_CARRIER_PROBE
-    if (!race_tc_candidate((unsigned)(width*16),(unsigned)(height*16))) return 0;
+#ifdef SC64_CUSTOM_CARRIER_PROBE
+    if (!race_custom_carrier_candidate((unsigned)(width*16),(unsigned)(height*16)
+#ifdef SC64_ZERG_CARRIER_PROBE
+            ,plan->impact_candidate,plan->impact_candidate_count
 #endif
-#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
+            )) return 0;
+#endif
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
     if (!race_p7_projectile_save_candidate_valid(&race_data,
             (unsigned)(width*16),(unsigned)(height*16) SC64_GCTX_ARG)) return 0;
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
@@ -4477,7 +4530,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     }
 #endif
 #endif
-#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
     if (!race_p7_carrier_training_save_valid(&race_data,
             (unsigned)(width*16),(unsigned)(height*16) SC64_GCTX_ARG)) return 0;
 #endif
@@ -4545,12 +4598,12 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 }
 
 static int race_load_preflight(RaceLoadPlan *plan) {
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_CUSTOM_CARRIER_PROBE)
     signed char prior_binding = race_protoss_binding_override;
     int prior_mission = race_protoss_override_mission;
 #endif
     int ok = race_load_preflight_candidate(plan);
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_CUSTOM_CARRIER_PROBE)
     race_protoss_binding_override = prior_binding;
     race_protoss_override_mission = prior_mission;
 #endif
@@ -4773,7 +4826,34 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #elif defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_host_adapter.h"
 #endif
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#ifdef SC64_ZERG_CARRIER_PROBE
+static int race_zc_prepare(const void *raw,u32 len,u32 tag,void *context)
+{
+    RaceLoadPlan *plan=context;
+    if (raw!=SC64_ZC_SCRATCH || !plan) return 0;
+    race_zc_authenticated=(tag==SC64_ZERG_CARRIER_TAG);
+    race_zc_size=2;
+    race_zc_packet[0]=race_zc_packet[1]=0;
+    if (!race_zc_authenticated)
+        return race_worker_cargo_prepare_selected(raw,len,tag,context);
+    unsigned size;
+    len=sc64_zc_unpack_in_place(SC64_ZC_SCRATCH,len,sizeof(sc64_zp_route_save_scratch),&size);
+    if (!len) return 0;
+    race_zc_size=(u16)size;
+    memcpy(race_zc_packet,SC64_ZC_SCRATCH+SC64_ZC_PACKET_WORK,size);
+    memset(plan,0,sizeof(*plan));
+    unsigned impact=len-sizeof(RaceSave)-SC64_TRANSPORT_TRAILER_BYTES;
+    const u8 *tail=SC64_ZC_SCRATCH+sizeof(RaceSave);
+    if (!sc64_sk_transport_decode(&race_skirmish_transport_candidate,tail+impact,MAX_BUILDINGS))
+        return 0;
+    if (impact) {
+        plan->impact_candidate_count=sc64_impact_decode(tail,impact,RACE_IMPACT_ROWS,
+            MAX_UNITS+MAX_BUILDINGS,5,SC_RU_COUNT,plan->impact_candidate);
+        if (plan->impact_candidate_count<=0) return 0;
+    }
+    return race_load_preflight(plan);
+}
+#elif defined(SC64_TERRAN_CARRIER_PROBE)
 static int race_tc_prepare(const void *raw,u32 len,u32 tag,void *context)
 {
     if (raw!=(const void *)&race_impact_record) return 0;
@@ -4791,6 +4871,11 @@ static int race_tc_prepare(const void *raw,u32 len,u32 tag,void *context)
 }
 #endif
 static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
+#ifdef SC64_ZERG_CARRIER_PROBE
+    return save_select_prepared(SC64_ZC_SCRATCH,RACE_IMPACT_RECORD_MAX,
+           race_zc_tags,sizeof(race_zc_tags)/sizeof(race_zc_tags[0]),
+           race_zc_prepare,plan,selection);
+#else
 #ifdef SC64_SHARED_TRANSPORT
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
@@ -4849,6 +4934,7 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
                                 race_worker_cargo_prepare_selected,plan,selection);
 #endif
 #endif
+#endif /* Z10 Carrier probe */
 }
 static int race_worker_cargo_previous(GbaSaveSelection *selection) {
     RaceLoadPlan plan;
@@ -5356,10 +5442,12 @@ static int race_load_game(void) {
     if (plan.expanded_terran_late_valid) race_late = plan.expanded.terran_late;
     else memset(&race_late, 0, sizeof(race_late));
 #endif
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#ifdef SC64_ZERG_CARRIER_PROBE
+    if (!race_p7_projectile_restore(race_zc_packet,race_zc_size)) return 0;
+#elif defined(SC64_TERRAN_CARRIER_PROBE)
     if (!race_p7_projectile_restore(race_tc_packet,race_tc_size)) return 0;
 #endif
-#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
     /* Last commit step: later mission rebind failures must not clear the old
      * projectile arena. The candidate packet already passed full preflight. */
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles

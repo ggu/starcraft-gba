@@ -10,7 +10,9 @@
  * halfword arena API; never memcpy/memset a byte buffer onto video memory.
  * The experimental Mode 0 renderer uses this region and is excluded there. */
 #include "sc64_obj_vram.h"
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#ifdef SC64_ZERG_CARRIER_PROBE
+#include "sc64_zerg_carrier_envelope.h"
+#elif defined(SC64_TERRAN_CARRIER_PROBE)
 #include "sc64_terran_carrier_envelope.h"
 #endif
 static Sc64Arena race_p7_projectiles={SC64_OBJ_VRAM_PROJECTILES,SC64_ARENA_WORDS};
@@ -26,8 +28,11 @@ static void race_p7_projectile_reset(void)
     race_p7_projectile_fault=(u8)!sc64_pool_init(&race_p7_projectiles);
 }
 
-#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_TERRAN_CARRIER_PROBE)
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)
+#if defined(SC64_ZERG_CARRIER_PROBE)
+#define SC64_COMPACT_PROJECTILE_CAP SC64_POOL_CAPACITY
+#define SC64_COMPACT_PROJECTILE_BYTES SC64_ZC_PACKET_MAX
+#elif defined(SC64_TERRAN_CARRIER_PROBE)
 #define SC64_COMPACT_PROJECTILE_CAP SC64_POOL_CAPACITY
 #define SC64_COMPACT_PROJECTILE_BYTES SC64_TC_PACKET_MAX
 #else
@@ -136,7 +141,7 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
         !sc64_interceptor_projectile_launch(&row,source_x_q8,source_y_q8,
             (s16)(target_x(target)*2),(s16)(target_y(target)*2),heading,
             (u16)target,(u8)shooter,(u8)RACE_PROTOSS_SLOT(&u[shooter]))) return 0;
-#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)
     if (!sc64_compact_pool_acquire(&race_p7_projectiles,SC64_COMPACT_PROJECTILE_CAP,
                                     &id,&native_index)) return 0;
 #else
@@ -172,7 +177,7 @@ static void race_p7_projectile_source_tick(void)
         /* The pulse is consumed inside this complete update. A saved DYING
          * row must never reapply it after load. Commit before callbacks. */
         row.pending_damage_event=0;
-#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)
         if (row.state==3) {
             if (!sc64_compact_pool_retire(&race_p7_projectiles,id)) break;
         } else
