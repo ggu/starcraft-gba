@@ -73,8 +73,8 @@ These are guest cycle counts, not GBA SP frame-rate measurements.
 
 ## Cut the wide grid setup cost before changing admission
 
-The optional `CANONICAL_ROUTE_LINEAR_GRID_LUT8=1` expands each packed
-walkability byte with one 2 KiB ROM table. The entry stores the same two
+The byte lookup, originally opt-in via `CANONICAL_ROUTE_LINEAR_GRID_LUT8=1`,
+expands each packed walkability byte with one 2 KiB ROM table. The entry stores the same two
 words that the two nibble lookups generate. The 64-column dedicated path,
 border values, queue bounds, seed ordering and field packing stay unchanged.
 The wide setup shared by point and optional depot floods uses the table.
@@ -137,9 +137,7 @@ and the raw unit, building and map-state bytes. The replay executed
 
 The [isolated-loop](#cut-the-wide-grid-setup-cost-before-changing-admission)
 and gameplay results measure different scopes. The complete frame
-still exceeds the 30 fps target in this workload. Keep the option off
-while comparing another busy workload, other profile builds and real
-hardware. The paired receipt SHA-256 is
+still exceeds the 30 fps target in this workload. The paired receipt SHA-256 is
 `b85c153ff69db8205ad08ca88e79690656ac4bb2c9fda1a1cd51e40813fcf52e`.
 
 ### Paired Z9 run with both changes
@@ -170,10 +168,9 @@ checkpoints, all 21,987 call and frame IDs and all 34 raw snapshots with
 peak by 3.99% against release, compared with 1.86% for the combined
 build. Adding the cold prefix lifts the byte lookup's peak by 497,335
 cycles while cutting p95 by 481,396. Both peaks still exceed 22 million
-guest cycles. Keep the experiments off and prioritize broader validation
-of the smaller byte-lookup change; the cold prefix still needs a cheaper
-decline. Longer runs, save/load, other product guards and GBA SP timing
-remain open.
+guest cycles. The cold prefix still needs a cheaper decline. The
+standalone lookup is the one qualified below; it does not depend on
+the cold prefix.
 
 | Local artifact | SHA-256 |
 | --- | --- |
@@ -181,3 +178,40 @@ remain open.
 | Matched checkpoints | `f27de8d6bf00393e4105527374623a6f37183e93d2e8e230a4c6b0eba083f971` |
 | Three-way comparison | `dabacc77e8b0f3a3e3939fe606ed41350afef2c4eacb1a1bd76ab52d4cb8eb1e` |
 | Comparison including lookup alone | `461439d9eca6d9351d33a7b294d9ff8d99591f9df0bb6798985e8ee284062b74` |
+
+### Enable the standalone lookup in regular builds
+
+Regular Terran 10, Zerg 10, Protoss 10 and Showcase now select the byte
+lookup for wide linear grids. All four flags select the same implementation;
+the 64-column path and builds without either linear or facility FIFO
+are unaffected. `CANONICAL_ROUTE_LINEAR_GRID_LUT8=0` selects the earlier
+nibble code and configuration key. Cold-prefix point fills remain disabled.
+
+All four links pass the header and RAM guards. EWRAM and IWRAM ends match
+their corresponding `cb210bc` packages exactly.
+
+| Product | EWRAM end | IWRAM end | Lookup ROM SHA-256 |
+| --- | --- | --- | --- |
+| Terran 10 | `0x02039c70` | `0x030048c8` | `cc68120edf8bf0c0b85d93b7e9a8759778c36025100360dc57409c7d45f74529` |
+| Zerg 10 | `0x02038b18` | `0x03004d70` | `f0d4ae5395cd4ed9fb1eeb6200891a7973f4e53196103e187b265848fe29450f` |
+| Protoss 10 | `0x0203c0f8` | `0x03004c80` | `69edd2cf2893b784c01fbe1cd5a55abd9fe6a70ca005b450e345ee9b6bd182d6` |
+| Showcase | `0x02039c34` | `0x03004ed0` | `ccaa72dcc4c09d094d82ad42c515dc37a126fe3be5a1147f234f1284ab2685da` |
+
+Eight physical-key skirmish pairs boot from the menu, two per product,
+covering Outpost and Blood Bath, every human faction and one to three
+opponents, with named, Random and Closed seats in the sample. Each
+restores frame 601 in a fresh emulator process at title L, then matches
+the watched uninterrupted world at frame 781. All 21 watched fields
+and both 32 KiB SRAM exports match between the packaged and lookup builds.
+
+Both Protoss 10 builds reach the same victory in 47,194 input calls, with
+20 matching world checkpoints, all 10 briefing pages and 14 authored
+dialogue pages. The full emulated mean changes by −0.005% and the peak by
++0.003%; no practical change there. The dense Zerg samples above see a modest
+benefit. These runs do not establish 30 fps on the GBA SP or cover all lobby
+combinations and arbitrary mid-battle saves.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Eight skirmish comparisons | `85e78368c9c6be7ba1f9472af50ec7e2203e7a7234275a5af8c2dee0fd25dd6c` |
+| Protoss 10 victory comparison | `4f85ff68fda54ef92285f71cb7abc302ed2e0ccf7e265462843905da2a7ee94b` |
