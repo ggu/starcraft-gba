@@ -25,8 +25,9 @@ LINEAR_POINTER_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_POINTER)),-DSC64_ROUTE_
 LINEAR_POINTER_KEY = $(if $(LINEAR_POINTER_FLAGS),-ptr)
 CANONICAL_ROUTE_LINEAR_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_LINEAR)),-DSC64_ROUTE_LINEAR_FLOOD_PROBE $(LINEAR_POINTER_FLAGS))
 
-# Use one ROM lookup for both initialized words of the padded grid.
-CANONICAL_ROUTE_LINEAR_GRID_LUT8 ?= 0
+# Use one ROM lookup for both initialized words of the wide padded grid.
+# Set to zero to recreate the prior nibble-lookup build.
+CANONICAL_ROUTE_LINEAR_GRID_LUT8 ?= 1
 ifneq ($(words $(CANONICAL_ROUTE_LINEAR_GRID_LUT8)),1)
 $(error CANONICAL_ROUTE_LINEAR_GRID_LUT8 must be 0 or 1)
 endif

@@ -358,8 +358,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   falls 13.35%, and the worst call now falls 1.86% against the release.
   Byte lookup alone preserves the same state and cuts the worst call
   by 3.99%. The cold prefix improves p95 but gives back 497,335 cycles
-  at the peak. Prioritize the standalone lookup for longer runs, saves,
-  other profiles and hardware. Keep both options off.
+  at the peak. The standalone lookup now ships across the four regular
+  builds. Both maps pass matching save/load in eight paired skirmishes,
+  and the full Protoss 10 victory matches with effectively unchanged
+  timing. Use `CANONICAL_ROUTE_LINEAR_GRID_LUT8=0` for comparisons.
+  Keep cold-prefix continuation off and test the lookup on hardware.
   Dense play remains well short of 30 fps. In the
   [Z10](audits/2026-11-12-z10-battle-cycles.md) and
   [busy P10](audits/2026-11-06-current-p10-busy/README.md) samples,
