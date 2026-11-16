@@ -308,8 +308,46 @@ The run used no guest memory writes or emulator state restoration. The
 | Actual ARM-written SRAM | `34bfc1bb7bd6d2f412d72c139408cfaeea3969f6ed8de2b7e230cb5d34031c85` |
 | Save and restore result | `c414dec6e778863eb986cba6eaec8b87efdc05b47ac0bb289a8a287a0faeb6ea` |
 
-This result establishes an ordinary paid ARM round trip using a prepared
-economy and a separate blank frontend check. Building the tech tree from
-blank play, a new combined ARM save during painting or descent,
-malformed-newer ARM fallback, measured load stack high-water and hardware
-timing remain open.
+### Combined physical ARM painting round trip
+
+This follow-up used the same pinned `SCCT` ROM and read-only observer.
+The starting SRAM was written by the paid ARM trial above, so this was
+a continuation from a prepared economy. At frame 5,252, title L loaded
+Moebius earned, Ocular pending (2,499 source ticks), and an empty Silo.
+
+To repeat the proof, build `make sc64-ghost-covert-arm` with prepared
+inputs and use a working copy of a save in that state. In the match,
+press A to select the empty Silo, use B and the D-pad to find its missile
+command, and confirm with A. Verify the 200/200 resource debit and wait
+until the missile is armed while Ocular is still pending. Select the
+Ghost, open its B menu and confirm the nuclear targeting command. Aim
+near the Ghost, press A, then use START and B immediately to save while
+the Ghost is still painting. Start a fresh emulator process with the
+resulting SRAM and press L at the title. Compare the research masks,
+receipt and remaining timer, Ghost energy, world frame and resources, and
+the active strike's owner, target, origin, spotter, phase, age, timers,
+and reserved missile slot. Check the new bank's header and checksum
+and compare the prior bank byte for byte. Use controller input and
+read-only observation; the proof needs no guest writes or save states.
+
+The missile was armed at frame 7,362 with 811 Ocular ticks left. The
+save and fresh load both had frame 7,520, 685 Ocular ticks, Moebius
+earned, 48,928 Q8 Ghost energy, and 3,138/850 resources. The single
+strike was in painting at age 1, targeting `(420, 408)` from Silo
+`(672, 728)`, with Ghost slot 8 and reserved missile slot 28. The
+writer retained the 15,832-byte payload, wrote tag `0x764f5442` at
+sequence 3, and preserved the earlier bank byte for byte. The 5.25 GiB
+disk guard passed before and after the run. The pinned local artifacts
+are identified here by hash; they are not build or test dependencies.
+
+| Painting receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `0c7fdc50c623210e5533a299550a9a6705657b1fec9e13c3d9feea2f02268f67` |
+| Actual ARM-written SRAM | `ab2be6ed9fbf9e1ffb94ce254cd840e3c9953a3a0dfe883c1d891538ecdd1f43` |
+| Save and restore result | `5f708021fa1084c18d43cad224546a93f86666cc804cc1eaf014899da70e0204` |
+
+This qualifies the combined painting save at one point in a Terran
+custom match. Building the tech tree from a blank match, saving during
+descent or advancing the restored strike through impact, malformed-newer
+ARM fallback, other lobby profiles, measured load stack high-water, and
+hardware timing remain open.
