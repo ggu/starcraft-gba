@@ -120,6 +120,15 @@ $(eval $(call SC64_NUKE_ARM,showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_INPUTS),$(P7_I
 .PHONY: sc64-nuke-probe
 sc64-nuke-probe: $(foreach profile,terran z10 p10 showcase,build/StarCraft-Nuke-Probe-$(profile)-GBA.gba)
 
+# Separate executable and cart identity; neither the stock Terran nor the
+# ordinary Nuclear Strike preview enables the Covert journal.
+$(eval $(call SC64_NUKE_ARM,terran-covert,$(TERRAN_ROM_FLAGS) -DSC64_GHOST_TECH_PROBE -DSC64_GHOST_COVERT_ARM_PROBE,$(TERRAN_FULL_INPUTS),,SC COVERT T,SCCT))
+build/starcraft-nuke-terran-covert.elf: | sc64-ghost-covert-arm-disk-check
+.PHONY: sc64-ghost-covert-arm sc64-ghost-covert-arm-disk-check
+sc64-ghost-covert-arm: build/StarCraft-Nuke-Probe-terran-covert-GBA.gba
+sc64-ghost-covert-arm-disk-check:
+	@$(PYTHON) -c 'from shutil import disk_usage; import sys; sys.exit("Covert ARM link requires 5.25 GiB free") if disk_usage(".").free < 5637144576 else None'
+
 .PHONY: sc64-nuke-arm-world
 sc64-nuke-arm-world: build/StarCraft-Nuke-World-ARM-Test-GBA.gba
 build/starcraft-nuke-arm-world.elf: tests/sc64_nuke_world_game.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) $(SC64_AUDIO_BANK_CONFIG) common/gba.ld mk/sc64-nuke/Makefile Makefile | build

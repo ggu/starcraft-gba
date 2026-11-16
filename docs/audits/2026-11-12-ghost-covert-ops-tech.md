@@ -193,8 +193,9 @@ painting/descent saves, then qualify the normal ARM path and its guards.
 `make test-sc64-ghost-covert-journal` runs three Terran HOST processes
 against prepared inputs. The new opt-in `SC64_GHOST_COVERT_HOST_JOURNAL`
 requires the authenticated active-strike and Terran packed save vector.
-It cannot be used in an ARM build or with Carrier or other research
-journals. Campaigns still accept and write their existing baseline
+That HOST flag remains unavailable to ARM; a separate preview is below.
+Neither flag combines with Carrier or other research journals. Campaigns
+still accept and write their existing baseline
 format, and still refuse paid or earned changes the baseline cannot
 carry. No regular build opts in.
 
@@ -250,6 +251,30 @@ image byte-matched the earlier receipt (SHA-256
 The same fresh-load and malformed-newer fallback checks passed without
 changing either receipt.
 
-An ARM build still needs the
-unmodified `__iwram_end < 0x03005000` and `__bss_end < 0x0203e000` guards,
-plus measured combined load stack use and ordinary gameplay validation.
+### Separate Terran ARM preview
+
+`make sc64-ghost-covert-arm` builds the explicit Terran-only Covert cart
+`build/StarCraft-Nuke-Probe-terran-covert-GBA.gba` (game code `SCCT`).
+The stock Terran and base Nuclear Strike preview targets do not use
+`SC64_GHOST_COVERT_ARM_PROBE`. This separate ARM gate requires the same
+active-strike and packed-building vector as the HOST fixture. Both gates
+share the serializer and the same authenticated `0x4f` envelope; there is
+no format change for existing HOST, nuclear-only, or campaign saves.
+
+One link using the prepared inputs passed at 5,745,647,616 bytes free
+against the 5.25 GiB disk floor. Artifacts were 73,853,469 bytes total.
+The unmodified `__iwram_end < 0x03005000` and `__bss_end < 0x0203e000`
+guards passed: actual endpoints were `0x03004ba0` and `0x0203a040`
+(1,120 and 16,320 bytes below their guards). The ROM was 33,554,432 bytes
+with a verified header and SHA-256
+`543bf2287fd2a4b32402a065ff46d39ab1101bc6642595cf43ba238a9cd7ac38`.
+The corresponding ELF SHA-256 was
+`362e59f87e7e2a42c032e2287ffe6906fc26135b009f13348a3864744e327338`.
+Disassembly shows the streamed reader reserving 416 bytes for its own
+frame (380 locals and 36 register saves) and its matching parent finder
+reserving 136 bytes for its own frame. These omit other callees, callers
+and interrupts, so they do not bound the total load stack.
+
+No emulator run was started. Ordinary ARM inputs, HOST-to-ARM SRAM
+migration/fallback, active descent, and measured combined stack and
+hardware timing remain open; neither preview is a release activation.

@@ -248,7 +248,7 @@ race_impact_save_write(const GbaSaveSelection *previous
 #ifdef SC64_NUKE_SILO_JOURNAL
                        , int nuke_silo_tag
 #endif
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
                        , int ghost_covert_tag
 #endif
                       )
@@ -281,7 +281,7 @@ race_impact_save_write(void)
 #endif
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
 #define SC64_SILO_COMMIT_TAG (ghost_covert_tag ? SC64_GHOST_COVERT_TAG : \
     (nuke_silo_tag ? SC64_NUKE_SILO_TRANSPORT_TAG : SC64_GUARDIAN_WRITE_TAG))
 #elif defined(SC64_NUKE_SILO_JOURNAL)
@@ -336,7 +336,7 @@ race_impact_save_write(void)
 #ifdef SC64_NUKE_SILO_JOURNAL
     ,SC64_NUKE_SILO_TRANSPORT_TAG
 #endif
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
     ,SC64_GHOST_COVERT_TAG
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL

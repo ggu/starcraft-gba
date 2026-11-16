@@ -1931,12 +1931,12 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 #ifdef SC64_NUKE_ACTIVE_JOURNAL
 #include "sc64_nuke_strike_journal.h"
 #endif
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
 #include "sc64_ghost_tech_journal.h"
 #endif
 
 static int race_save_game(void) {
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
     int ghost_covert_tag = !race_ghost_tech_save_safe();
     if (sc64_ghost_tech_fault || (ghost_covert_tag && race_mode!=1)) return 0;
 #elif defined(SC64_GHOST_TECH_PROBE)
@@ -1951,7 +1951,7 @@ static int race_save_game(void) {
 #ifdef SC64_NUKE_SILO_JOURNAL
     int nuke_silo_tag;
     if (!race_nuke_save_live_scope(&nuke_silo_tag)) return 0;
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
     if (ghost_covert_tag) nuke_silo_tag=1;
 #endif
 #elif defined(SC64_SHARED_NUKE_PROBE)
@@ -3011,7 +3011,7 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
     if (ghost_covert_tag && !race_ghost_save_write()) return 0;
 #endif
 #ifdef SC64_NUKE_ACTIVE_JOURNAL
@@ -3022,7 +3022,7 @@ static int race_save_game(void) {
 #ifdef SC64_NUKE_SILO_JOURNAL
                                 , nuke_silo_tag
 #endif
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
                                 , ghost_covert_tag
 #endif
                                )) return 0;
@@ -3065,7 +3065,7 @@ _Static_assert(SC64_PR_PAD_TUPLE_VALID(MAX_BUILDINGS,SC64_PR_ROW_WIDTH,SC64_PR_U
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
     Sc64GhostJournalPlan ghost_covert;
     int ghost_covert_tag;
 #endif
@@ -3403,7 +3403,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_NUKE_SILO_JOURNAL
         if (!race_nuke_save_unit_valid(RACE_U(i,type), RACE_U(i,raw_type), nuke_has_tag)) return 0;
 #endif
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
         if (plan->ghost_covert_tag && candidate_unit.alive &&
             sc64_race_ordinary_ghost(candidate_unit.type) &&
             (candidate_unit.carry<0 || candidate_unit.carry>sc64_ghost_energy_cap(
@@ -4731,7 +4731,7 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
                                           &plan->impact_candidate_count,&plan->guardian_auth)) return 0;
 #else
 #ifdef SC64_NUKE_SILO_JOURNAL
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
     /* save_select_prepared checked the checksum. Prove our exact outer/inner
      * pair independently, then authorize the embedded nuclear projection. */
     if (tag==SC64_GHOST_COVERT_TAG) {
@@ -4793,7 +4793,7 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (race_data.version != (plan->legacy_worker_cargo ? SC64_WORKER_CARGO_LEGACY_SAVE_VERSION : SAVE_VERSION)) return 0;
 #endif
 #endif /* SC64_SHARED_EGG_JOURNAL_HOST_STAGE */
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
     if (!race_ghost_save_prepare(&plan->ghost_covert,plan->ghost_covert_tag)) return 0;
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
@@ -4939,7 +4939,7 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
 #ifdef SC64_NUKE_SILO_JOURNAL
         ,SC64_NUKE_SILO_TRANSPORT_TAG
 #endif
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
         ,SC64_GHOST_COVERT_TAG
 #endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
@@ -5536,7 +5536,7 @@ static int race_load_game(void) {
 #else
     invalidate_path_grid();
 #endif
-#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+#ifdef SC64_GHOST_COVERT_JOURNAL
     race_ghost_save_publish(&plan.ghost_covert);
 #elif defined(SC64_GHOST_TECH_PROBE)
     race_ghost_tech_reset(); /* Only a source-seeded baseline is serializable. */

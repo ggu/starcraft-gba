@@ -2,11 +2,11 @@
 #ifndef SC64_GHOST_TECH_SAVE_WIRE_H
 #define SC64_GHOST_TECH_SAVE_WIRE_H
 
-/* Detached host experiment. The caller selects the layout from an
+/* Detached experiment. The caller selects the layout from an
  * authenticated journal envelope. No game tag is assigned here, and an
  * existing transport or nuclear tag must never select the extension. */
-#ifndef GBA_HOST
-#error "Ghost tech save wire is a detached host-only experiment"
+#if !defined(GBA_HOST) && !defined(SC64_GHOST_COVERT_JOURNAL)
+#error "Ghost tech save wire requires the guarded Covert journal preview"
 #endif
 #include "sc64_ghost_tech.h"
 

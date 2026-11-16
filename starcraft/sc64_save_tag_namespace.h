@@ -21,7 +21,7 @@
 /* 0x4b is reserved by the nuclear journal. */
 #define SC64_SAVE_TAG_SHOWCASE_CARRIER_NAMESPACE 0x004c0000u
 #define SC64_SAVE_TAG_ZERG_CARRIER_NAMESPACE 0x004e0000u
-/* Combined Nuclear Strike/Covert Ops snapshot, HOST Terran evaluation only. */
+/* Combined Nuclear Strike/Covert Ops snapshot for guarded Terran previews. */
 #define SC64_SAVE_TAG_GHOST_COVERT_NAMESPACE 0x004f0000u
 #define SC64_SAVE_TAG_GHOST_COVERT(tag) (((tag)&~SC64_SAVE_TAG_NAMESPACE_MASK)|SC64_SAVE_TAG_GHOST_COVERT_NAMESPACE)
 #define SC64_SAVE_TAG_ZERG_CARRIER(tag) (((tag)&~SC64_SAVE_TAG_NAMESPACE_MASK)|SC64_SAVE_TAG_ZERG_CARRIER_NAMESPACE)
