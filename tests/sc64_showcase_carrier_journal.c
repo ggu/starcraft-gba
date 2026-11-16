@@ -131,6 +131,14 @@ static u16 projectiles_before[SC64_ARENA_WORDS];
 
 int main(int argc,char **argv)
 {
+    const char *carrier_name = sc64_race_unit_name(U_P7_CARRIER);
+    const char *observer_name = sc64_race_unit_name(U_P7_OBSERVER);
+    assert(carrier_name && !strcmp(carrier_name, "CARRIER"));
+    assert(observer_name && !strcmp(observer_name, "OBSERVER"));
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    const char *interceptor_name = sc64_race_unit_name(U_P7_INTERCEPTOR);
+    assert(interceptor_name && !strcmp(interceptor_name, "INTERCEPTOR"));
+#endif
     start_world();
 #ifndef SC64_SHOWCASE_CARRIER_PROBE
     assert(argc==2);

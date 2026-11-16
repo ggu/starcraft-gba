@@ -28,10 +28,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   its Interceptor docked. The ordinary Showcase ROM rebuilt byte for byte.
   The [Terran probe](CARRIER-PROJECTILES.md#terran-custom-carrier-runtime-probe)
   now verifies the same paid production, active shot and docked save on ARM.
-  [Zerg #518](https://github.com/ggu/starcraft-gba/pull/518)
-  has a verified custom save format. Next: connect the Zerg format to the
-  same service, verify the full release matrix including saves and memory,
-  and only then enable the mechanic across the applicable regular builds.
+  The [Z10 probe](audits/2026-11-16-z10-custom-carrier-envelope.md) verifies
+  those same gates using a custom journal that retains all 100 projectiles
+  and 32 pending impacts. Next: verify the full release matrix, stack
+  high-water and battle timing before enabling the mechanic in regular builds.
   Keep existing roster and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
@@ -41,8 +41,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the card folder has `COPY-VERIFIED.txt` and `START-HERE.txt`. The files
   include the shared command-menu speedup. The November 14 package replaces
   that build on the Mac with the shared wide point FIFO (merged as
-  `8935d56`), verified across all four ROMs. It is staged in Downloads;
-  KODAK was not detected during staging. Older delivery notes below are
+  `8935d56`), verified across all four ROMs. The November 16 package at
+  `cb210bc` adds row-local steering and fixes stale collision after a Drone
+  starts a building. Its four regular ROMs and three separate Carrier
+  previews are staged in Downloads. KODAK was not detected during staging.
+  Older delivery notes below are
   historical. Existing saves and older ROMs were retained. Next: test B-menu
   scrolling and battle speed on a physical GBA SP.
 
@@ -176,8 +179,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matching all 24 archived frames and six read-only guest-state samples.
   Clean frames show 980, 719 and 468 HP. A neutral-input continuation
   matches those frames and catches 217 and 11 HP, then the destroyed
-  Hatchery while enemy buildings and mobile units remain. Next, reach an
-  owner's final building and the published result under the same limits.
+  Hatchery while enemy buildings and mobile units remain. Read-only native
+  rows now confirm the selected Hatchery leaves owner 0's chain, the count
+  falls from six to five, and no result byte changes. The next target is
+  the still-full 750 HP Extractor. Continue toward the last structure and
+  the published result under the same limits.
   Distinguish in-flight damage and simultaneous outcomes, then qualify
   complete ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)

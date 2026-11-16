@@ -306,8 +306,14 @@ static u32 sc64_unit_words_explicit_raw_calls;
 #error "P7 typed compact save requires unified P7 battery and Arbiter cache profile"
 #endif
 
+#if defined(SC64_TERRAN_CARRIER_PROBE) && defined(SC64_ZERG_CARRIER_PROBE)
+#error "Terran and Z10 Carrier journals are mutually exclusive"
+#endif
+#if defined(SC64_TERRAN_CARRIER_PROBE) || defined(SC64_ZERG_CARRIER_PROBE)
+#define SC64_CUSTOM_CARRIER_PROBE 1
+#endif
 #if defined(SC64_P7_PROJECTILES_ENABLED) && \
-    (!defined(SC64_P7_TYPED_COMPACT_ENABLED) || !defined(SC64_P7_ACTORS)) && !defined(SC64_TERRAN_CARRIER_PROBE)
+    (!defined(SC64_P7_TYPED_COMPACT_ENABLED) || !defined(SC64_P7_ACTORS)) && !defined(SC64_CUSTOM_CARRIER_PROBE)
 #error "Interceptor projectiles require the P7 typed save and shared source clock"
 #endif
 #if defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_TILE_RENDERER)
@@ -318,7 +324,18 @@ static u32 sc64_unit_words_explicit_raw_calls;
 _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
                "Interceptor arena exceeds Mode 4 OBJ reserve");
 #endif
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#ifdef SC64_ZERG_CARRIER_PROBE
+#if !defined(SC64_Z10_RUNTIME) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || !defined(SC64_INTERCEPTOR_COMPACT_CODEC) || \
+    !defined(SC64_IMPACT_EVENTS) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || \
+    defined(SC64_Z7_DERIVED_SAVE) || !defined(SC64_P7_ACTORS) || defined(SC64_SHOWCASE_CARRIER_PROBE) || \
+    defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
+    defined(SC64_NUKE_SILO_JOURNAL) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
+    defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || \
+    defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
+#error "Z10 Carrier probe requires the isolated full Z10 journal vector"
+#endif
+#elif defined(SC64_TERRAN_CARRIER_PROBE)
 #if !defined(SC64_TERRAN_LATE_RUNTIME) || !defined(SC64_LATE_TERRAN_STORAGE) || \
     !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || !defined(SC64_INTERCEPTOR_COMPACT_CODEC) || \
     !defined(SC64_IMPACT_EVENTS) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
@@ -524,11 +541,11 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #elif defined(SC64_SHOWCASE_CARRIER_PROBE)
 /* The outer tag selects the extension; preserve the predecessor inner token. */
 #define SC64_RACE_SAVE_GENERATION 40u
-#elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
+#elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
 #define SC64_RACE_SAVE_GENERATION 43u
-#elif defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
+#elif defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
 #define SC64_RACE_SAVE_GENERATION 42u
-#elif defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
+#elif defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
 #define SC64_RACE_SAVE_GENERATION 41u
 #elif defined(SC64_P7_TYPED_COMPACT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 40u
@@ -2282,10 +2299,10 @@ enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
 static void hit_target_impl_ex(int,int,int,int,int,int);
 static void race_siege_splash_attack(Unit *,int,int);
 #endif
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_CUSTOM_CARRIER_PROBE)
 static int race_p7_active(void);
 #include "sc64_protoss_services.h"
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#ifdef SC64_CUSTOM_CARRIER_PROBE
 static int race_p7_active(void) { return 0; }
 static int race_p7_source_owner(unsigned slot) { (void)slot; return -1; }
 static u8 *race_protoss_service_clock(void) { return race_protoss_generic_clock; }
@@ -2326,7 +2343,7 @@ static void race_p7_projectile_tick_if_due(void);
 static void race_p7_projectile_draw(void);
 static int race_p7_projectile_encode(u8 *packet);
 static int race_p7_projectile_restore(const u8 *packet
-#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)
                                       ,u16 size
 #endif
                                      );
@@ -10480,7 +10497,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     if (race_protoss_services_active()) sc64_p7_arbiter_cache_frame_tick();
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#ifdef SC64_CUSTOM_CARRIER_PROBE
     race_protoss_generic_clock[0]=(u8)((unsigned)frame%5u);
 #endif
     race_p7_carrier_training_frame_tick();
@@ -13148,7 +13165,7 @@ static unsigned race_shared_trigger_obligations(void);
 #ifdef SC64_BATTERY_SERVICE_ENABLED
 #include "sc64_battery_adapter.h"
 #endif
-#ifdef SC64_TERRAN_CARRIER_PROBE
+#ifdef SC64_CUSTOM_CARRIER_PROBE
 #include "sc64_p7_projectile_adapter.h"
 #include "sc64_p7_carrier_training.h"
 #include "sc64_p7_interceptor_flight.h"

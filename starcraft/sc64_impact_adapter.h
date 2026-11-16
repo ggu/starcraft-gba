@@ -256,6 +256,26 @@ race_impact_save_write(void)
 #if defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
     (void)previous; /* This isolated stage fences all journal calls. */
 #endif
+#ifdef SC64_ZERG_CARRIER_PROBE
+    if (race_mode) {
+        if (race_impact_count>RACE_IMPACT_ROWS || !race_p7_carrier_training_live_world_valid()) return 0;
+        u8 *wire=SC64_ZC_SCRATCH, *packet=wire+SC64_ZC_PACKET_WORK;
+        unsigned n=race_p7_projectile_encode(packet);
+        Sc64ShowcaseProjectileCandidate view={&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H};
+        if (!n || !sc64_compact_codec_validate(packet,n,SC64_POOL_CAPACITY,
+                                             race_showcase_projectile_row,&view)) return 0;
+        unsigned tail=race_impact_count ? sc64_impact_save_bytes(race_impact_count) : 0;
+        if (tail && !sc64_impact_encode(race_impact_rows,race_impact_count,wire+sizeof(RaceSave)))
+            return 0;
+        sc64_sk_transport_encode(wire+sizeof(RaceSave)+tail,&race_skirmish_transport_candidate);
+        n=sc64_zc_pack(wire,sizeof(RaceSave)+tail+SC64_TRANSPORT_TRAILER_BYTES,
+                       packet,n,wire,RACE_IMPACT_RECORD_MAX);
+        if (!n) return 0;
+        return previous ? save_write_selected(wire,n,SC64_ZERG_CARRIER_TAG,previous,
+                        race_zc_tags,sizeof(race_zc_tags)/sizeof(race_zc_tags[0])) :
+                        save_write_first(wire,n,SC64_ZERG_CARRIER_TAG);
+    }
+#endif
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
 #ifdef SC64_NUKE_SILO_JOURNAL
@@ -423,6 +443,9 @@ race_impact_save_write(void)
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_ZERG_CARRIER_PROBE
+    ,SC64_ZERG_CARRIER_TAG
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     ,SC64_NUKE_SILO_TRANSPORT_TAG
 #endif
