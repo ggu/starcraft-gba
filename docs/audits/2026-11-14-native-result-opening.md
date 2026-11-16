@@ -320,3 +320,28 @@ surviving-unit transfer, or simultaneous outcomes.
 | --- | --- |
 | Late witness manifest | `067108019460627d123656d54c916cde8896467dd04c79456e55996c345d714a` |
 | Read-only owner-chain map | `8ca1f2489eb16c0cac3d9a47c6beb389dfc3ed427a73fb231cd5dd7b371411be` |
+
+### Localize the rejected N64 scanout
+
+The next cursor calibration was fenced before any new selection or
+attack. In the first run a scout frame had a corrupt lower half while
+its top half, margins and immediately later scout frame matched the
+archive. A sibling observer then recorded both halves before palette
+conversion, from the live callback and after copying into owned
+memory. The input authorization and exact raw-frame gate were unchanged.
+
+The diagnostic run stopped at the group gate. Seventeen of 18 raw
+frames and all six guest-state samples matched. The remaining frame
+differed by 325 pixels at x=8–335, y=120–190. Its lower-half pre-palette
+pixels convert exactly to the captured bad bytes. All 36 half records
+also matched across palette conversion and the owned copy, with the
+expected callback labels. This places that mismatch before palette
+conversion and file capture; it does not distinguish VI processing,
+GPU readback or the guest framebuffer. No new cursor calibration
+inputs, selection or attack were sent in this run. Keep the exact gate
+for a future Extractor attack.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Diagnostic replay manifest | `f49185b4d39d5912ff4ef23522d77e67e7724819e07754a1a0a6bd192547c8e0` |
+| Scanout stage rows | `7f441b820b9853f30cef4728d14a7881f944e371259eeb0daf4ee79641d535f9` |
