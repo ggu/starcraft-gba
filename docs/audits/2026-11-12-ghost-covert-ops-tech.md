@@ -240,9 +240,16 @@ row and its codec/socket callees; the pure measurement is neither a
 linked-game frame bound nor a hardware stack high-water measurement.
 
 Pure research, stream/codec, and Nuclear Strike row tests pass under
-ASan/UBSan. The prepared HOST matrix requires at least 5 GiB free before
-launch; this follow-up was checked at 4,784,398,336 bytes free, so the previous
-prepared three-process receipt has not been rerun on the streaming adapter.
-The stage remains HOST-only. An eventual ARM build still needs the
+ASan/UBSan. After the disk reserve recovered, the prepared writer, fresh
+reader, and malformed-record fixture also passed under ASan/UBSan on
+`72eb7623aa01e369d0d09ae4a089ee935759e709`. Free-space checks passed at
+5,828,653,056 bytes before compilation and 5,787,873,280 before running.
+The compact payload was still 15,832 bytes, and the complete 32 KiB SRAM
+image byte-matched the earlier receipt (SHA-256
+`5daa6912f252b20d86dde7f5ac414dbd9e99b1e9bdb3dff2a91e414d6f057f82`).
+The same fresh-load and malformed-newer fallback checks passed without
+changing either receipt.
+
+An ARM build still needs the
 unmodified `__iwram_end < 0x03005000` and `__bss_end < 0x0203e000` guards,
 plus measured combined load stack use and ordinary gameplay validation.
