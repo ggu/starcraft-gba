@@ -40,8 +40,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   chapters, and twelve mixed and sparse skirmish saves with restarts across
   both maps. All three previews also converted one regular Transport1
   custom save with the old bank intact and restored the new compact bank.
-  Next: measure peak stack use and battle timing before regular activation;
-  keep existing roster and saved IDs stable.
+  The [sampled ARM stack gate](CARRIER-PROJECTILES.md#sampled-arm-stack-use)
+  measured title load, active Interceptor combat and pause/save. The
+  smallest SYS margin was 5,880 bytes and all three had 120 bytes of
+  conservative IRQ margin. Next: repeat with the newer default route-grid
+  lookup, qualify longer dense battles and full-pool saves, and check
+  stack and timing on hardware before regular activation. Keep roster
+  and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to
@@ -52,11 +57,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   that build on the Mac with the shared wide point FIFO (merged as
   `8935d56`), verified across all four ROMs. The November 16 package at
   `cb210bc` adds row-local steering and fixes stale collision after a Drone
-  starts a building. Its four regular ROMs and three separate Carrier
-  previews are staged in Downloads. KODAK was not detected during staging.
-  Older delivery notes below are
-  historical. Existing saves and older ROMs were retained. Next: test B-menu
-  scrolling and battle speed on a physical GBA SP.
+  starts a building. The regular `002a591` package adds the wide routing
+  lookup. All four ROMs were checked against their SHA-256 values and
+  are in Downloads with a quick test guide. The separate Carrier previews
+  remain available. KODAK was not detected during staging, so the older
+  card copy and all saves remain untouched. Next: test B-menu scrolling,
+  save/load and battle speed on a physical GBA SP.
 
 - **One ten-mission cartridge per race:** the default build and release
   profiles are Terran T10, Zerg Z10 and Protoss P10. All ten Zerg controllers
@@ -1133,8 +1139,14 @@ It has authenticated Silo and flight journals for queued, armed, painting
 and descending missiles and remains off in default builds. P10 generates
 separate actor tables for the world, silo and active-strike probes;
 local checks reject tables generated for a different mode.
-Finish the native timing comparison, Ghost abilities and AI and complete
-the persistence and ARM-input checks before enabling it.
+The [Covert Ops draft](https://github.com/ggu/starcraft-gba/pull/411)
+restored both painting and descent on ARM from prepared Terran saves,
+matched the uninterrupted blast, and rejected a malformed newer record
+without changing SRAM. A separate blank Blood Bath run paid for and
+finished its Barracks through ordinary controls. Next: mine gas and
+complete the Factory through Covert Ops chain from blank; qualify the
+resulting Ghost/Silo and paid research save. Finish native timing,
+other lobbies, combined journals and AI before enabling it.
 
 Other core rules to prioritize after this:
 
@@ -1171,7 +1183,7 @@ the serialized native-test lock permit it.
 | C4 | P1 / open | Replace campaign AI scalar approximations where verified source/native behavior differs. Late-Zerg waves use averaged groups/gaps; arrival, rebuilding and transport tactics are not equivalent to script commands. | Source script interpretation plus N64 observations of actual production, wallets, launch groups, targeting and rebuilds. Reproduce a concrete mismatch before changing AI; retain mission objective semantics. |
 | U1 | P1 / partial | Scourge/Spire source restrictions and shared picker correction are merged in #290. Continue the broader campaign PUNI/UPGR/TECx audit, especially P10. | Preserve current controlling ownership, nonspending denial and full supported custom catalog. Apply remaining source permissions with per-owner tests and save compatibility; do not infer complete availability parity from this one product fix. |
 | U3 | P0 / partial | Shared Forge/Core research. Done: the Protoss P10 ROM's custom games (SRAM, integer combat; [audit](audits/2026-11-11-protoss-research-sram/README.md)). Open: campaign missions (needs the generated source-policy header), computer-opponent research, Terran/Zerg/Showcase ROMs, Storm and other paths that bypass shield armor, hardware. Q8 fractions and Flash stay staged and unused. | Authenticated owner and payer identity; source initial/max levels; atomic paid producer jobs, power/cancel/death/capture/reset behavior, active-job saves and legacy migration; weapon/armor/shield/range effects on every relevant path; ordinary building menus and cross-product campaign/custom/Showcase checks. |
-| U2 | P1 / partial | Carrier and Interceptor behavior. **Regular Protoss:** paid production, AI, flight and saves in custom games and P7–P10, including the shared Gantrithor service in P10. **Showcase, Terran and Z10 previews:** ordinary ARM controls paid for both units and saved and loaded both a live projectile and a docked Interceptor. The [ARM gate](CARRIER-PROJECTILES.md#pinned-arm-release-gate) also qualified campaign openings, sampled custom lobbies, and one generation of custom SRAM migration. **Regular Showcase, Terran and Zerg:** service remains off. | Physical stack high-water and battle timing before regular activation. Protoss: Gantrithor rescue stock is assumed; ARM Gantrithor combat replay and hardware timing remain open. |
+| U2 | P1 / partial | Carrier and Interceptor behavior. **Regular Protoss:** paid production, AI, flight and saves in custom games and P7–P10, including the shared Gantrithor service in P10. **Showcase, Terran and Z10 previews:** ordinary ARM controls paid for both units and saved and loaded both a live projectile and a docked Interceptor. The [ARM gate](CARRIER-PROJECTILES.md#pinned-arm-release-gate) qualified campaign openings, sampled custom lobbies, one generation of custom SRAM migration and short stack samples. **Regular Showcase, Terran and Zerg:** service remains off. | Repeat stack and timing checks with the newer lookup default, long battles, full-pool saves and GBA hardware. Protoss: Gantrithor rescue stock is assumed; ARM Gantrithor combat replay and hardware timing remain open. |
 | S2 | P0 / in progress | Maintain one shared capability and persistence contract across products. The stale Nydus guard now follows the selected codec's existing seven-bit capacity; no wire or cap change. P1 HOST research/controller saving is composed in #361. Ammunition, remaining controller contexts, repair, detection and morphs still need shared persistence. | Per-product and per-mode inventory from actual flags/call sites, lossless versioned representations, source-owned permissions, lifecycle/death/capture checks and every applicable save codec. No Showcase-only engine fix or mission-objective predicate used as a service gate. |
 | K1 | P1 / partial | Qualify complete supported custom games for all race combinations and 1–3 AIs. Validate building/unit progression, economy, targeting, victory and long-game stability. The [2026-11-10 planner audit](audits/2026-11-10-custom-ai-reliability/README.md) fixed the opponent planner's stalls and economy failures on HOST: of 288 planner-driven matches (a mirrored-human fixture, both maps, every race mix, 1–3 AIs) 281 now reach the engine's victory or defeat instead of 271, all 144 on Blood Bath, and the AI matrix adds full-match, prerequisite, spending-audit and save/resume cases. Open: an ordinary-input human who wins late games, the ARM matrix beyond three sampled lobbies per ROM, hardware, and K2/K3 below. Zerg opponents remain much weaker than Terran and Protoss (serial larva queues). | Both maps, each human race, homogeneous and mixed AI races, actual tech progression and save/load. Track global pool/queue pressure and ensure human production is not silently starved (measured: with three AIs at their shares the human keeps at least an equal share of unit and building slots). |
 | K2 | P1 / fixed in #386 | [#386](https://github.com/ggu/starcraft-gba/pull/386) lets short-range ground attacks contact the blocked footprint edge and falls back to a perimeter field when the regular route cannot plan a step. Runtime `ecaa865` passes 640 Z7 sanitizer cases. The mirrored HOST Outpost fixture (Z7, Terran vs three Zerg AIs) goes from unresolved at 216,001 updates on base to Terran defeat at 34,091. The corrected ordinary-input Z8 controller wins on Z9 in HOST and mGBA at frame 45,468, with matching fresh-process save continuation. All nine ROM variants verify. The pinned Z9 ARM battle's mean loop cost rises 0.17%, still far above budget. See [the replay and performance audit](audits/2026-11-12-melee-perimeter.md). | Broaden exact N64 contact-distance evidence and continue K1/K3. The older Gateway placement fixture fails on control and candidate before depot logic; update its setup separately. |

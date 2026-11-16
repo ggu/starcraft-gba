@@ -687,7 +687,9 @@ on the exact guarded ARM candidate before changing defaults:
   custom maps. Protoss: verify the ordinary binary and existing paid
   Carrier and Gantrithor behavior and continuation.
 - Measure guarded memory, stack high-water and dense battle timing on the
-  selected candidates. The selector itself does not qualify those gates.
+  selected candidates. The [sampled stack checks](#sampled-arm-stack-use)
+  cover short load, combat and save cuts; qualify longer and full-pool
+  workloads on the combined build before activation.
 
 The asset-free selector test checks the actual Make profile flags and
 dispatch. Its prepared HOST target runs the existing per-product tests;
@@ -847,3 +849,39 @@ complete converted image. The stock and compact payload sizes were
 `a48ab6ee90ba4c0cad9d7e2785897096f55e6725b0cb8b4eebc040af5e8a77e9`.
 The selected regular writer represents one save generation and one opening
 cut per product.
+
+### Sampled ARM stack use
+
+A physical-input observer built from mGBA 0.10.5 (`26b7884b`) read the
+active ARM stack pointer and CPU mode after each instruction. A separate
+12-instruction fixture lowered then restored both stack pointers between
+input stops. It reported the two exact minima (`0x03007a00` SYS and
+`0x03007f20` IRQ), matched the original observer's emulated clocks, and
+rejected a debugger write command. The calibration receipt SHA-256 is
+`37955b90585caa33a479dd583cbe82f445f13f49f4f71677e862e3bececb786a`.
+
+Each product used the exact selector-equivalent preview listed above, with
+the wide route-grid byte lookup disabled. From the first HOME input stop,
+title L loaded a genuine custom save with an active Interceptor shot. The
+guest ran 80 more game updates, then START/B committed a valid compact
+successor without changing the previous bank. Counts and minima are
+cumulative from HOME; the 84 input updates include the load and pause/save.
+
+| Product | SYS minimum after load and through combat | SYS minimum through save | Bytes above SYS guard | Instructions through save | Audio IRQs |
+| --- | --- | --- | ---: | ---: | ---: |
+| Terran | `0x03006a98` | `0x030066f8` | 5,880 | 48,195,963 | 489 |
+| Z10 | `0x03007268` | `0x03007268` | 8,808 | 52,126,274 | 532 |
+| Showcase | `0x030072e0` | `0x030072e0` | 8,928 | 42,204,366 | 447 |
+
+SYS starts at `0x03007e00` and its linker guard is `0x03005000`. The IRQ
+stack starts at `0x03007fa0`; all three reached `0x03007e78` during load
+and went no lower through combat and save. That leaves **120 bytes** to the
+conservative SYS-top boundary. The index of all three receipts and SRAM
+hashes has SHA-256
+`733e8c4a823648c0a988b01a7b2b4da4aa717e8f7a3e80f0a272afbb948b9392`.
+
+These runs establish minima for the sampled emulator intervals. The newer
+default lookup and Carrier have not been composed and measured together
+in this stack gate. Longer dense battles, saves and loads with full actor,
+projectile and impact pools, and physical GBA stack and timing checks
+remain open. The product runs did not measure cycle or frame rates.
