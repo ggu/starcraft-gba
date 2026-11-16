@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Fail-closed checks for the Carrier ARM gate's evidence parser."""
+import hashlib
 import struct
 import sys
 import unittest
@@ -51,6 +52,47 @@ class TestCarrierReleasePhysical(unittest.TestCase):
     def test_showcase_has_no_campaign_cartridge_case(self):
         with self.assertRaises(gate.ContinuationError):
             gate.plan_case("showcase", "campaign")
+
+    def test_campaign_chapters_in_menu_order(self):
+        for profile, ids in (("terran", list(range(4, 14))),
+                             ("zerg", [0, 1, *range(14, 22)])):
+            plans = [gate.plan_case(profile, "campaign", chapter) for chapter in range(1, 11)]
+            self.assertEqual([plan["mission"] for plan in plans], ids)
+            self.assertEqual([plan["ordinal"] for plan in plans], list(range(10)))
+            self.assertEqual(gate.plan_case(profile, "campaign"), plans[-1])
+        for invalid in (0, 11, True):
+            with self.subTest(chapter=invalid), self.assertRaises(gate.ContinuationError):
+                gate.plan_case("terran", "campaign", invalid)
+        with self.assertRaises(gate.ContinuationError):
+            gate.plan_case("zerg", "migration", 3)
+
+    def test_stock_migration_preserves_bank_and_accepts_distinct_payload_layouts(self):
+        for profile in gate.PRODUCTS:
+            plan = gate.plan_case(profile, "migration")
+            a, b = plan["predecessor_tag"], plan["tag"]
+            stock = record(a, 1, self.data)
+            packed = b"migrated compact state"
+            converted = record(b, 2, packed)
+            with self.subTest(profile=profile):
+                evidence = gate.verify_migration_journal(stock + self.erased, stock + converted, a, b)
+                self.assertEqual(evidence["stock_payload_sha256"], hashlib.sha256(self.data).hexdigest())
+                self.assertEqual(evidence["new_payload_sha256"], hashlib.sha256(packed).hexdigest())
+
+    def test_stock_migration_rejects_fallback_overwrite_and_unqualified_source(self):
+        old_tag = 0x76435442
+        stock = record(old_tag, 1, self.data)
+        fresh = stock + self.erased
+        converted = record(TAG, 2, b"compact")
+        for first, second, target_tag in (
+            (fresh, stock + record(old_tag, 2, self.data), TAG),
+            (fresh, stock + record(TAG, 3, b"compact"), TAG),
+            (fresh, stock + converted[:16] + b"X" + converted[17:], TAG),
+            (fresh, stock[:-1] + b"\x00" + converted, TAG),
+            (stock + converted, stock + converted, TAG),
+            (fresh, stock + record(old_tag, 2, self.data), old_tag),
+        ):
+            with self.assertRaises(gate.ContinuationError):
+                gate.verify_migration_journal(first, second, old_tag, target_tag)
 
 
 if __name__ == "__main__":

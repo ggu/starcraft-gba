@@ -34,22 +34,46 @@ PRODUCTS = {
     "terran": (
         "965ceacbcd5059230a90c8a0dc49c2ced6d19d95ebb08eaa493e8608c9d984d6",
         "0e2c38e0688c175a5477539c74c015fff3ef92f7b639586db8db0f72dfbd1330",
-        13, 0x76435442, 0x764D5442,
+        0x76435442, 0x764D5442,
     ),
     "zerg": (
         "2719456571efc210638a832bcca8b069078a39475075e97a4193e63df66b58ed",
         "5d22af38b5091d61af2c65afa7910f9d8d78245c2dfac49b4f6b1f0dbae8daa2",
-        21, 0x56435A61, 0x564E5A61,
+        0x56435A61, 0x564E5A61,
     ),
     "showcase": (
         "9d5dca67d8387a12f98c370d8cb43734be75a56f2586c8cc2282ad28e210139e",
         "56dfeb9ceb0003d1552cbb29b76b70c077b5af82e1a278f8dd72a5eace8021d3",
-        None, None, 0x764C5058,
+        None, 0x764C5058,
     ),
+}
+# November 16 regular Transport1 package (source release cb210bc). These
+# executable stock writers, rather than arbitrary SRAM files or a guessed
+# tag, supply the migration predecessor.
+STOCK = {
+    "terran": (
+        "a7ce64dadab8b334bbc2f6ccdbbc0aeff06378d2f44d6ecd39702ade2825aa59",
+        "d64da445d3bf3949269f6f46c50a5497d1cdf95e1f199dc4285e5039f0783ffb",
+        0x76435442,
+    ),
+    "zerg": (
+        "2b907cdecb5769dde471de04b280ffe7de79a3b43874b2eaabfc2a9b8be43eb8",
+        "672ea55a9cb8d8121e452034909abe64bd5fff9aab066c011fca06afc79ea84a",
+        0x56435A61,
+    ),
+    "showcase": (
+        "8d0d9f9464629ac3c694ea812e8cd53b8d5d65839bf1de33ad891e88dc416590",
+        "085417775b50a22346bb72408829d7c47ad029b99317bccc57fbb243acf0bc82",
+        0x76435058,
+    ),
+}
+CAMPAIGN_IDS = {
+    "terran": tuple(range(4, 14)),
+    "zerg": (0, 1, *range(14, 22)),
 }
 MAPS = {"outpost": 0, "blood-bath": 1}
 LINEUPS = {"mixed": ("p", "tzp"), "sparse": ("z", "p-r")}
-CASES = ("campaign", *(f"{m}-{lineup}" for m in MAPS for lineup in LINEUPS))
+CASES = ("campaign", "migration", *(f"{m}-{lineup}" for m in MAPS for lineup in LINEUPS))
 RESERVE, FILE_LIMIT, OUTPUT_LIMIT = 5 * 2**30, 8 * 2**20, 16 * 2**20
 SLOT, SRAM = 16384, 32768
 MAX_STEPS, CONTINUE, KEY_R = 512, 60, 256
@@ -68,12 +92,22 @@ def sha(path):
     return digest.hexdigest()
 
 
-def plan_case(profile, case):
-    _, _, mission, campaign_tag, custom_tag = PRODUCTS[profile]
+def plan_case(profile, case, chapter=None):
+    _, _, campaign_tag, custom_tag = PRODUCTS[profile]
     if case == "campaign":
-        require(mission is not None, "Showcase has no late-campaign gate")
-        return dict(case=case, mode=0, mission=mission, ordinal=9,
+        require(profile in CAMPAIGN_IDS, "Showcase has no campaign gate")
+        chapter = 10 if chapter is None else chapter
+        require(type(chapter) is int and 1 <= chapter <= 10, "campaign chapter must be 1–10")
+        ordinal = chapter - 1
+        return dict(case=case, mode=0, mission=CAMPAIGN_IDS[profile][ordinal], ordinal=ordinal,
+                    chapter=chapter,
                     human=RACES.index(profile[0]), tag=campaign_tag, idle=30)
+    require(chapter is None, "chapter applies only to campaign")
+    if case == "migration":
+        # Named seats preserve the noncontiguous mask without relying on
+        # a randomly resolved faction differing between products.
+        return dict(case=case, mode=1, map=1, human=RACES.index("z"), seats="p-t",
+                    tag=custom_tag, predecessor_tag=STOCK[profile][2], idle=120)
     map_name, lineup = case.rsplit("-", 1)
     human, seats = LINEUPS[lineup]
     return dict(case=case, mode=1, map=MAPS[map_name],
@@ -81,20 +115,31 @@ def plan_case(profile, case):
 
 
 def pin_inputs(args):
-    plan = plan_case(args.profile, args.case)
-    rom, elf, _, _, _ = PRODUCTS[args.profile]
+    plan = plan_case(args.profile, args.case, args.chapter)
+    rom, elf, _, _ = PRODUCTS[args.profile]
     expected = {"rom": rom, "elf": elf, "runner": RUNNER}
+    if args.case == "migration":
+        require(args.stock_rom is not None and args.stock_elf is not None,
+                "migration requires the pinned stock ROM and ELF")
+        stock_rom, stock_elf, _ = STOCK[args.profile]
+        expected.update(stock_rom=stock_rom, stock_elf=stock_elf)
+    else:
+        require(args.stock_rom is None and args.stock_elf is None,
+                "stock ROM/ELF apply only to migration")
     pins = {}
     for role, digest in expected.items():
         path = getattr(args, role).resolve(strict=True)
         require(path.is_file() and sha(path) == digest, f"unqualified {role} for {args.profile}")
         pins[role] = {"path": str(path), "sha256": digest}
     check_layout(args.elf, plan)
+    if args.case == "migration":
+        check_layout(args.stock_elf, plan)
     if not plan["mode"]:
         catalog = read_campaign_metadata(args.rom, args.elf, args.profile)
         ids = catalog["enabled_mission_ids"]
-        require(len(ids) == 10 and ids[plan["ordinal"]] == plan["mission"],
-                "late mission differs from pinned campaign catalog")
+        require(tuple(ids) == CAMPAIGN_IDS[args.profile] and
+                [entry["chapter"] for entry in catalog["enabled_missions"]] == list(range(1, 11)),
+                "compiled campaign catalog differs from pinned campaign entries")
         plan["catalog"] = ids
     return plan, pins
 
@@ -151,6 +196,18 @@ def verify_journal(first, second, tag):
                 payload_sha256=hashlib.sha256(a).hexdigest())
 
 
+def verify_migration_journal(first, second, old_tag, new_tag):
+    require(old_tag != new_tag, "migration tags must remain distinct")
+    old = slot(first, 0, old_tag, 1)
+    require(first[SLOT:] == b"\xff" * SLOT, "stock writer did not leave its other bank erased")
+    require(second[:SLOT] == first[:SLOT], "conversion changed the original stock SRAM bank")
+    new = slot(second, 1, new_tag, 2)
+    return dict(stock_tag=f"{old_tag:#010x}", stock_bytes=len(old),
+                stock_payload_sha256=hashlib.sha256(old).hexdigest(),
+                new_tag=f"{new_tag:#010x}", new_bytes=len(new),
+                new_payload_sha256=hashlib.sha256(new).hexdigest())
+
+
 class BoundedGame(PhysicalGame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -164,8 +221,9 @@ class BoundedGame(PhysicalGame):
 
 
 @contextmanager
-def open_game(args, out, source, destination):
-    game = BoundedGame(args.runner, args.rom, args.elf, out,
+def open_game(args, out, source, destination, *, stock=False):
+    rom, elf = (args.stock_rom, args.stock_elf) if stock else (args.rom, args.elf)
+    game = BoundedGame(args.runner, rom, elf, out,
                        save_input=source, save_output=destination)
     try:
         require((game.u32("screen"), game.front_field("page")) == (SCREEN_TITLE, FRONT_HOME),
@@ -184,16 +242,18 @@ def launch(game, plan):
     game.step(0, 2)
     game.tap(KEY_A)
     require(game.front_field("page") == FRONT_MISSION, "HOME did not open campaign")
-    for _ in range(4):
+    page, row = divmod(plan["ordinal"], 2)
+    for _ in range(page):
         game.tap(KEY_RIGHT)
-    require((game.front_field("mission_page"), game.front_field("row")) == (4, 0),
-            "late campaign page/row changed")
-    game.tap(KEY_DOWN)
+    require((game.front_field("mission_page"), game.front_field("row")) == (page, 0),
+            "campaign page/row changed")
+    if row:
+        game.tap(KEY_DOWN)
     game.tap(KEY_A)
     require((game.front_field("page"), game.front_field("mission")) ==
-            (FRONT_BRIEFING, plan["mission"]), "unexpected late-mission briefing")
+            (FRONT_BRIEFING, plan["mission"]), "unexpected campaign briefing")
     game.tap(KEY_START)
-    require(game.u32("screen") == SCREEN_PLAY, "late campaign did not enter play")
+    require(game.u32("screen") == SCREEN_PLAY, "campaign did not enter play")
     # Only confirm an actual authored modal, never advance the live world with A.
     if "sc64_text_box_missions" in game.sym:
         for _ in range(8):
@@ -258,10 +318,7 @@ def guard_output(path):
             "physical gate output exceeded its bound")
 
 
-def run(args, plan, pins):
-    out = args.output
-    first, second = out / "first.sav", out / "second.sav"
-    blank = out / "blank.sav"
+def reporter(out, plan, pins):
     report = {"plan": plan, "pins": pins, "status": "incomplete"}
 
     def checkpoint(key, value):
@@ -269,6 +326,14 @@ def run(args, plan, pins):
         guard_output(out)
         (out / "result.json").write_text(json.dumps(report, indent=2) + "\n")
 
+    return report, checkpoint
+
+
+def run(args, plan, pins):
+    out = args.output
+    first, second = out / "first.sav", out / "second.sav"
+    blank = out / "blank.sav"
+    report, checkpoint = reporter(out, plan, pins)
     blank.write_bytes(b"\xff" * SRAM)
     with open_game(args, out / "initial", blank, first) as game:
         report["initial_inputs"] = game.inputs
@@ -313,6 +378,60 @@ def run(args, plan, pins):
     checkpoint("status", "passed")
 
 
+def run_migration(args, plan, pins):
+    out = args.output
+    old, new, export = [out / f"{name}.sav" for name in ("stock", "converted", "observed")]
+    blank = out / "blank.sav"
+    report, checkpoint = reporter(out, plan, pins)
+    erased = b"\xff" * SRAM
+    blank.write_bytes(erased)
+    with open_game(args, out / "stock", blank, old, stock=True) as game:
+        report["stock_inputs"] = game.inputs
+        launch(game, plan)
+        start = observed(game, plan, SCREEN_PLAY)
+        checkpoint("stock_launch", start)
+        game.step(0, plan["idle"])
+        ready = observed(game, plan, SCREEN_PLAY)
+        require(ready["frame"] == start["frame"] + plan["idle"], "stock save cut did not advance")
+        saved = pause_save(game, plan)
+        require(same_world(saved, ready), "stock pause and save changed the world")
+        checkpoint("stock_saved", saved)
+    raw = old.read_bytes()
+    slot(raw, 0, plan["predecessor_tag"], 1)
+    require(raw[SLOT:] == erased[:SLOT] and blank.read_bytes() == erased,
+            "stock predecessor is not a fresh single-bank save")
+    with open_game(args, out / "converting", old, new) as game:
+        report["converting_inputs"] = game.inputs
+        game.step(0, 2)
+        game.step(KEY_L)
+        restored = observed(game, plan, SCREEN_PLAY)
+        require(same_world(saved, restored), "candidate did not restore the stock custom world")
+        checkpoint("loaded_stock", restored)
+        # Deliberately make the two valid banks describe different game frames.
+        # A later loader that silently falls back to the predecessor must fail.
+        game.step(0, CONTINUE)
+        advanced = observed(game, plan, SCREEN_PLAY)
+        require(advanced["frame"] == saved["frame"] + CONTINUE, "converted world did not advance")
+        migrated = pause_save(game, plan)
+        require(same_world(advanced, migrated), "conversion save changed the world")
+        checkpoint("saved_compact", migrated)
+    packed = new.read_bytes()
+    checkpoint("journal", verify_migration_journal(raw, packed, plan["predecessor_tag"], plan["tag"]))
+    with open_game(args, out / "fresh", new, export) as game:
+        report["fresh_inputs"] = game.inputs
+        game.step(0, 2)
+        game.step(KEY_L)
+        final = observed(game, plan, SCREEN_PLAY)
+        require(same_world(final, migrated) and not same_world(final, saved),
+                "fresh load did not select the newer compact world")
+        game.rsp.export_sram()
+        checkpoint("fresh_compact", final)
+    require(old.read_bytes() == raw and new.read_bytes() == packed and export.read_bytes() == packed,
+            "physical load changed a stock or conversion SRAM image")
+    same_inputs(pins)
+    checkpoint("status", "passed")
+
+
 def timeout(_number, _frame):
     raise TimeoutError("physical gate deadline or request to stop")
 
@@ -321,6 +440,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--profile", choices=PRODUCTS, required=True)
     p.add_argument("--case", choices=CASES, required=True)
+    p.add_argument("--chapter", type=int, help="campaign chapter 1–10 (default: 10)")
+    p.add_argument("--stock-rom", type=Path, help="pinned regular product ROM for migration")
+    p.add_argument("--stock-elf", type=Path, help="matching regular ELF for migration")
     for name in ("rom", "elf", "runner", "output"):
         p.add_argument("--" + name, type=Path, required=name != "output")
     p.add_argument("--plan", action="store_true", help="validate pins/catalog; never launch or lock")
@@ -344,7 +466,7 @@ def main():
             handlers = {sig: signal.signal(sig, timeout) for sig in (signal.SIGALRM, signal.SIGTERM)}
             signal.alarm(args.deadline)
             try:
-                run(args, plan, pins)
+                (run_migration if plan["case"] == "migration" else run)(args, plan, pins)
             finally:
                 signal.alarm(0)
                 for sig, handler in handlers.items():
