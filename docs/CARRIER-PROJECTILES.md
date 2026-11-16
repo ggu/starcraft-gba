@@ -692,3 +692,15 @@ on the exact guarded ARM candidate before changing defaults:
 The asset-free selector test checks the actual Make profile flags and
 dispatch. Its prepared HOST target runs the existing per-product tests;
 neither check constitutes the full ARM activation matrix above.
+
+On release `bb348edd`, all three selector-on ARM links passed the
+ordinary memory guards and their packaged ROMs matched the direct
+preview flags byte for byte. The Showcase fact header also matched
+across the two separate builds. The regular Protoss P10 fact-generation
+and ARM commands were identical inside and outside the selector target.
+
+| Product | Identical packaged SHA-256 | IWRAM end | EWRAM BSS end |
+| --- | --- | --- | --- |
+| Terran | `965ceacbcd5059230a90c8a0dc49c2ced6d19d95ebb08eaa493e8608c9d984d6` | `0x030049f8` | `0x0203b728` |
+| Z10 | `2719456571efc210638a832bcca8b069078a39475075e97a4193e63df66b58ed` | `0x03004d90` | `0x0203a5d8` |
+| Showcase | `9d5dca67d8387a12f98c370d8cb43734be75a56f2586c8cc2282ad28e210139e` | `0x03004d68` | `0x0203aefc` |
