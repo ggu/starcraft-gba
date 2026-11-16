@@ -110,7 +110,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
   with both heroes at full health, 41 matching observations and twelve
-  authenticated in-game pages. Check a fresh save continuation separately.
+  authenticated in-game pages. The [current ROM also wins after fresh SRAM load](audits/2026-11-13-p8-host-hero-retreat.md#fresh-sram-win-on-the-november-16-normal-p10-build)
+  from the verified pause save at frame 30,825, matching all 41 checkpoints
+  and retaining both heroes. Continue with other save states and missions.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
   confirmed separate named, Random, and Closed seats and a middle-only
@@ -188,7 +190,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Hatchery while enemy buildings and mobile units remain. Read-only native
   rows now confirm the selected Hatchery leaves owner 0's chain, the count
   falls from six to five, and no result byte changes. The next target is
-  the still-full 750 HP Extractor. Continue toward the last structure and
+  the still-full 750 HP Extractor. The [scanout diagnostic](audits/2026-11-14-native-result-opening.md#localize-the-rejected-n64-scanout)
+  rejects an intermittent raw-frame error and locates it before palette
+  conversion and capture. Keep the exact gate; no second attack fired.
+  Continue toward the last structure and
   the published result under the same limits.
   Distinguish in-flight damage and simultaneous outcomes, then qualify
   complete ordinary-input matches on hardware.
@@ -337,7 +342,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with at most 52 pending entries at first discovery. The paired Z9 probe
   continues declined searches in the same ordered grid. Busy p95 improves
   11.3%, but the worst call still costs 2.0% more; leave it off and reduce
-  the decline cost before activation. Dense play remains well short of 30 fps.
+  the decline cost before activation. The same audit tracks a byte lookup
+  that cuts the wide grid setup loop from 14 Thumb instructions to eight
+  and its isolated mGBA cycles by 34.6%, with identical HOST route and
+  fallback receipts. The paired dense Z7 replay matches 131 checkpoints
+  and both raw route endpoints, cutting the active mean by 1.39%, p95 by
+  2.79% and the worst update by 2.85%. Keep the option off pending checks
+  on other workloads and release profiles and on real hardware.
+  Dense play remains well short of 30 fps. In the
+  [Z10](audits/2026-11-12-z10-battle-cycles.md) and
+  [busy P10](audits/2026-11-06-current-p10-busy/README.md) samples,
+  simulation alone already exceeds the 561,792-cycle frame budget.
+  Prioritize routing and simulation. The
+  [Mode 0 experiment](VALIDATION.md#p7-mode-0-tile-renderer) traded draw
+  savings for VBlank copies and did not improve whole-game frame rate.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution

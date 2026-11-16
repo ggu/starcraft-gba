@@ -19,7 +19,10 @@ class ProbeSafety(unittest.TestCase):
    p=self.root/n;p.write_bytes(n.encode());self.files.append(p)
   self.output=self.root/'new'/'result'
   self.args=sum(([f'--{n}',str(p)] for n,p in zip(('rom','elf','runner'),self.files)),[])+['--output',str(self.output)]
+  # These mocked child-process tests exercise lock and cleanup behavior
+  # independently of the host's free space. The disk test supplies its own floor.
   self.patches=[mock.patch.object(probe,'LOCK_PATH',str(self.lock)),
+   mock.patch.object(probe.shutil,'disk_usage',return_value=mock.Mock(free=8*2**30)),
    *[mock.patch.object(probe,n,hashlib.sha256(p.read_bytes()).hexdigest()) for n,p in zip(('ROM_SHA','ELF_SHA','RUNNER_SHA'),self.files)]]
   for p in self.patches:p.start();self.addCleanup(p.stop)
  def test_bad_counts_and_internal_worker_refused(self):

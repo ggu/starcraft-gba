@@ -10,6 +10,7 @@ import struct
 
 BASE_TAG = 0x7343505c
 TRANSPORT_TAG = 0x7743505c
+P10_CARGO_TAGS = (0x7243505f, 0x7643505f)
 SLOT_SIZE = 16384
 SRAM_SIZE = 2 * SLOT_SIZE
 SHOT_BYTES = 20
@@ -18,7 +19,7 @@ TRAILER_BYTES = 16
 P8_MISSION = 27
 
 
-def validate_neutral_journal(data, layout, expected_frame, *, medium='physical'):
+def validate_neutral_journal(data, layout, expected_frame, *, medium='physical', p10_cargo=False):
     """Validate a fresh neutral cut and return the exact observed journal facts.
 
     ``physical`` requires the untouched second flash slot to be erased; ``host``
@@ -28,6 +29,9 @@ def validate_neutral_journal(data, layout, expected_frame, *, medium='physical')
     """
     if medium not in ('physical', 'host'):
         raise ValueError('unknown SRAM medium')
+    # Keep the historical P8 and current P10 worker-cargo generations
+    # distinct. The caller selects the generation from the pinned build.
+    inner_tag, outer_tag = P10_CARGO_TAGS if p10_cargo else (BASE_TAG, TRANSPORT_TAG)
     if type(expected_frame) is not int or expected_frame < 0:
         raise ValueError('invalid expected saved frame')
     if len(data) != SRAM_SIZE:
@@ -45,7 +49,7 @@ def validate_neutral_journal(data, layout, expected_frame, *, medium='physical')
     if min(version, state) < 0 or version + 4 > base or state + 128 > base:
         raise ValueError('RaceSave fields exceed fixed base')
     tag, length, checksum, sequence = struct.unpack_from('<4I', data)
-    if (tag, length, sequence) != (TRANSPORT_TAG, base + TRAILER_BYTES, 1):
+    if (tag, length, sequence) != (outer_tag, base + TRAILER_BYTES, 1):
         raise ValueError('unsupported P8 fresh neutral journal envelope')
     payload = data[16:16 + length]
     h = 2166136261
@@ -53,7 +57,7 @@ def validate_neutral_journal(data, layout, expected_frame, *, medium='physical')
         h = ((h ^ byte) * 16777619) & 0xffffffff
     if h != checksum:
         raise ValueError('P8 journal checksum differs')
-    if struct.unpack_from('<I', payload, version)[0] != BASE_TAG:
+    if struct.unpack_from('<I', payload, version)[0] != inner_tag:
         raise ValueError('P8 inner version differs')
     words = struct.unpack_from('<32I', payload, state)
     if (words[0], words[2], words[7]) != (0, P8_MISSION, expected_frame):
@@ -66,7 +70,7 @@ def validate_neutral_journal(data, layout, expected_frame, *, medium='physical')
     # No variable shots and length exactly base+trailer proves no impact bytes.
     if payload[base:] != bytes(TRAILER_BYTES):
         raise ValueError('nonzero campaign transport trailer unsupported')
-    return {'slot': 0, 'tag': tag, 'inner_version': BASE_TAG,
+    return {'slot': 0, 'tag': tag, 'inner_version': inner_tag,
             'payload_bytes': length, 'sequence': sequence, 'checksum': checksum,
             'frame': expected_frame, 'yamato_shots': 0, 'impact_bytes': 0,
             'medium': medium, 'sha256': hashlib.sha256(data).hexdigest()}

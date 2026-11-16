@@ -59,5 +59,17 @@ class P8NeutralSaveTest(unittest.TestCase):
             payload = bytearray(self.payload); payload[off+3] ^= 1
             with self.subTest(offset=off), self.assertRaises(ValueError): save.validate_neutral_journal(self.image(payload), self.layout, 31676)
 
+    def test_current_and_old_journal_namespaces_cannot_mix(self):
+        inner, outer = save.P10_CARGO_TAGS
+        new_payload = bytearray(self.payload)
+        struct.pack_into('<I', new_payload, 0, inner)
+        current = self.image(new_payload, tag=outer)
+        record = save.validate_neutral_journal(current, self.layout, 31676, p10_cargo=True)
+        self.assertEqual((record['inner_version'], record['tag']), (inner, outer))
+        with self.assertRaisesRegex(ValueError, 'envelope'):
+            save.validate_neutral_journal(current, self.layout, 31676)
+        with self.assertRaisesRegex(ValueError, 'inner version'):
+            save.validate_neutral_journal(self.image(tag=outer), self.layout, 31676, p10_cargo=True)
+
 
 if __name__ == '__main__': unittest.main()
