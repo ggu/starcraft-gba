@@ -704,3 +704,38 @@ and ARM commands were identical inside and outside the selector target.
 | Terran | `965ceacbcd5059230a90c8a0dc49c2ced6d19d95ebb08eaa493e8608c9d984d6` | `0x030049f8` | `0x0203b728` |
 | Z10 | `2719456571efc210638a832bcca8b069078a39475075e97a4193e63df66b58ed` | `0x03004d90` | `0x0203a5d8` |
 | Showcase | `9d5dca67d8387a12f98c370d8cb43734be75a56f2586c8cc2282ad28e210139e` | `0x03004d68` | `0x0203aefc` |
+
+### Campaign and lobby HOST matrix
+
+Run the prepared-input checks sequentially:
+
+```sh
+make -j1 -f Makefile -f mk/carrier-release/Makefile test-carrier-release-matrix
+```
+
+The optional `SC64_CARRIER_RELEASE_PROFILE` setting limits the matrix to
+one product. The Terran and Z10 fixtures open each of their ten missions
+from the ordinary menu, take 30 idle updates, and save with START/B.
+They reset the game in the same HOST process, load with title L, compare
+the world digest and frame, then repeat START/B and compare the entire
+journal payload. The ordinary and selector-on fixtures produce the same
+ten length-prefixed payloads; they never write the custom Carrier tag in
+the campaign. SHA-256 of the combined HOST payloads:
+
+| Product | Ordinary campaign tag | SHA-256 |
+| --- | --- | --- |
+| Terran T10 | `76435442` | `fedd2755ed68978b4bd21f6f46ada27ff7ca49975e2bd0fc6b5f1630036a39ac` |
+| Zerg Z10 | `56435a61` | `17f8d66cba460b8c29e573b4deefd769096eb355f0170f4310ab09be90ac5e4b` |
+
+The ordinary lobby fixture selects both maps, each human race, and all
+named enemy race combinations for one, two or three opponents (234 starts
+per product), then exercises separate dense and sparse save/restart cases.
+The Showcase suite additionally navigates all eight scenes in the standard
+and selector-on profiles. An exhibit refuses both save and load; later,
+the ordinary frontend still loads the independent custom match. The P10
+matrix row runs the existing Gantrithor test with its unchanged flags.
+
+These checks use actual engine input handling and HOST SRAM under
+ASan/UBSan. They do not prove a mission win, another process restoring a
+guest SRAM image, longer skirmishes, late-campaign saves, or GBA speed.
+The ARM and hardware gates above still apply to regular activation.

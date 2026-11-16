@@ -28,6 +28,23 @@ static void check_owner(int owner, int race)
 }
 
 #ifdef SC64_IMPORTED_SKIRMISH
+static int saved_start_word(void)
+{
+#ifdef SC64_CUSTOM_CARRIER_PROBE
+    /* Compact writers reuse the existing scratch in place. Authenticate and
+     * expand the written slot before inspecting the ordinary state word. */
+    RaceLoadPlan plan;
+    GbaSaveSelection selected;
+    assert(race_worker_cargo_select(&plan,&selected));
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    assert(selected.tag==SC64_TERRAN_CARRIER_TAG);
+#else
+    assert(selected.tag==SC64_ZERG_CARRIER_TAG);
+#endif
+#endif
+    return race_data.state[23];
+}
+
 static void check_seat(int owner, int base)
 {
     assert(race_ai_owner_base(owner) == base);
@@ -162,7 +179,7 @@ static void mixed_opening_and_save(int map, int human_choice, int expected_human
     if (melee) word = sc64_skirmish_melee_word(saved_races[2], seats, order);
     gba_test_set_elapsed_milliseconds(0xf6e0);
 #endif
-    assert(race_data.state[23] == word);
+    assert(saved_start_word() == word);
     game_init(); prior_keys = 0;
     assert(race_load_game());
     assert(race_skirmish_map == map && race_skirmish_slots == sparse &&
@@ -296,7 +313,7 @@ static void dense_blood_bath_start_and_save(unsigned seed, unsigned order)
     assert(cx == race_base_x[human_base] && cy == race_base_y[human_base]);
     for (int i = 0; i < 4; ++i) check_seat(owners[i], order ? sc64_skirmish_start_base(order, i) : i);
     assert(race_save_game());
-    assert(race_data.state[23] == (order ? sc64_skirmish_start_word(R_PROTOSS, 7, order) : R_PROTOSS));
+    assert(saved_start_word() == (order ? sc64_skirmish_start_word(R_PROTOSS, 7, order) : R_PROTOSS));
 #ifdef SC64_NATIVE_MELEE_STARTS
     gba_test_set_elapsed_milliseconds(seed == 0xf3ae ? 0xf6e0 : 0xf3ae);
 #endif
@@ -338,7 +355,7 @@ int main(void)
      * inactive third race, and still round-trips with implicit seating. */
     option_map = 0; option_human = R_TER; option_bots = 1; option_bot_races[0] = R_ZERG;
     assert(launch_match() && !race_skirmish_slots && race_save_game());
-    assert(race_data.state[23] == race_bot_races[2]);
+    assert(saved_start_word() == race_bot_races[2]);
     game_init();
     assert(race_load_game() && !race_skirmish_slots && race_bots == 1);
     for (int map = 0; map < SC64_FRONT_MAP_COUNT; ++map)

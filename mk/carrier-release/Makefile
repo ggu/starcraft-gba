@@ -2,6 +2,7 @@
 # Opt in: make -f Makefile -f mk/carrier-release/Makefile carrier-release
 include tests/sc64-terran-carrier-runtime/Makefile
 include tests/sc64-zerg-carrier-runtime/Makefile
+include mk/carrier-release/host-matrix/Makefile
 
 SC64_CARRIER_RELEASE_PROFILE ?= all
 SC64_CARRIER_RELEASE_PRODUCTS := terran zerg-z10 showcase protoss-p10
@@ -26,8 +27,9 @@ else
 SC64_CARRIER_RELEASE_SELECTED := $(SC64_CARRIER_RELEASE_PROFILE)
 endif
 
-.PHONY: carrier-release test-carrier-release carrier-release-plan
+.PHONY: carrier-release test-carrier-release test-carrier-release-matrix carrier-release-plan
 carrier-release: $(foreach profile,$(SC64_CARRIER_RELEASE_SELECTED),$(SC64_CARRIER_RELEASE_ROM_$(profile)))
 test-carrier-release: $(foreach profile,$(SC64_CARRIER_RELEASE_SELECTED),$(SC64_CARRIER_RELEASE_TEST_$(profile)))
+test-carrier-release-matrix: $(addprefix test-carrier-release-matrix-,$(SC64_CARRIER_RELEASE_SELECTED))
 carrier-release-plan:
 	@$(foreach profile,$(SC64_CARRIER_RELEASE_SELECTED),printf '%s\n' '$(profile) $(SC64_CARRIER_RELEASE_ROM_$(profile)) $(SC64_CARRIER_RELEASE_TEST_$(profile))';)
