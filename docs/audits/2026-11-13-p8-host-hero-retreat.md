@@ -70,3 +70,21 @@ separate check.
 | Physical mGBA observer | `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549` |
 | Neutral physical journal | `eb85fbbf33fc2d14b4e75c8b8050e6f283a553c61341b306997093b82d62f1db` |
 | Prefix receipt | `258646e05e1bdfd862b5bae8b808dc0d631955ca89e9acbf90750e1e4f18c60f` |
+
+## Fresh SRAM win on the November 16 normal P10 build
+
+The verifier reopened the independently checked physical prefix receipt and
+the byte-identical journal at frame 30,825. It authenticated the same ROM,
+ELF, tape and observer before a new HOME process loaded the journal through
+title L. The loaded game matched the first resumed checkpoints again and
+ran the remaining inputs through victory. The original SRAM did not change.
+
+Together the prefix and continuation match all 41 named checkpoints, eight
+briefing pages, twelve in-game pages and the recorded key edges. The win
+comes at frame 122,809. Fenix has 240 HP and 240 shields, the Hyperion has
+850 HP, the Stasis Cell is destroyed, and there are no trigger scheduler
+faults. The objective flag and completion bit are set. This qualifies one
+current physical save cut, not arbitrary P8 saves or hardware timing.
+
+The full combined receipt SHA-256 is
+`cd2935955e1b664f620a81a7998bdca0b4c45319c1bd83c9503dbafada1ed42b`.
