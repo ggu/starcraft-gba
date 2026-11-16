@@ -2,9 +2,9 @@
 #ifndef SC64_ZERG_CARRIER_ENVELOPE_H
 #define SC64_ZERG_CARRIER_ENVELOPE_H
 
-/* Detached storage study for the two current 64x64 Z10 custom maps.
- * Include after the normal RaceSave, impact and transport codecs. The outer
- * journal is not wired into the shipping reader or writer. */
+/* Compact journal for the two current 64x64 Z10 custom maps.
+ * Include after the normal RaceSave, impact and transport codecs.
+ * The ordinary Z10 reader and writer do not use the compact envelope. */
 #include "sc64_interceptor_pool_codec.h"
 
 enum {
@@ -123,7 +123,7 @@ static void sc64_zc_row(u8 *out,unsigned d,const u8 *in,unsigned s,
 }
 
 /* Validate the intact old impact/transport block independently of the legacy
- * SRAM capacity. The study keeps all live impacts; the normal recorder only
+ * SRAM capacity. The envelope keeps all live impacts; the normal recorder only
  * has room for eight. Runtime publication must additionally validate actor
  * and projectile ownership against the candidate world. */
 static int sc64_zc_tail(const u8 *tail,unsigned size)

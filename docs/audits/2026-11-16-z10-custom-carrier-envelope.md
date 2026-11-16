@@ -51,13 +51,52 @@ independently confirms the layout and workspace sizes.
 make -f Makefile -f tests/sc64-zerg-carrier-envelope/Makefile test-sc64-zerg-carrier-envelope
 ```
 
-No normal build or reader uses the study tag. Next: overlay the shared
-Carrier service and append its actor ID without altering old IDs, validate
-full live projectile references before publishing world or arena, and
-qualify a dedicated, guarded ARM preview with ordinary input and game
-saves, then integrate across cartridges.
+No standard build or reader uses the study tag; the optional runtime below
+attaches it to the shared Carrier behavior.
 
 | Local receipt | SHA-256 |
 | --- | --- |
 | Z10 sanitizer study | `f2f297125ea6d29f5e74ce4332797d78ca5e72121429a4807cea96ea6bb15e85` |
 | ARM layout receipt | `03dbc28b8bb8856a64914d2fe3bdad75a93b52e14fce1cef76899302fdfdd41c` |
+
+The optional Z10 runtime uses that envelope in custom games only. Carrier
+retains its existing engine ID 45; Interceptor appends at 49. The shared
+production, flight, projectile and Protoss bot services use the existing
+actor facts and directional art. Campaign records still use the original
+tag, base layout and eight-row journal limit. The probe keeps the live
+32-row queue and allows all 32 rows in custom saves.
+
+The new reader opens the compact record in the existing route/save scratch
+and holds the projectile packet apart while it validates the reconstructed
+world. It checks active impacts and projectile references against the
+candidate world and validates each Carrier hangar before commit. Ordinary
+predecessors retain their own tag and are loaded with an empty projectile
+arena. The first compact upgrade retains the intact old bank.
+
+```sh
+make -f Makefile -f tests/sc64-zerg-carrier-runtime/Makefile \
+  test-sc64-zerg-carrier-runtime build/StarCraft-Zerg-Z10-Carrier-Probe.gba
+```
+
+The ASan/UBSan runtime fixture paid for both actors through the real
+queues and Carrier menu, restored a live shot and every one of 32 pending
+impacts, then observed damage. A correctly checksummed record with an
+invalid shooter or malformed packet fell back to the preserved ordinary
+bank. A Zerg campaign save still opened under the original tag. The ARM
+link passed the unchanged guards, leaving 14,888 bytes before the EWRAM
+guard and 624 bytes before the IWRAM guard. With the probe flags off, the
+packaged standard Z10 ROM is byte-identical to the envelope draft base
+(`72e5c4f768de2cd163e4e82ac34885f8c15c25740406fa19d576b5e1684cb2a6`).
+
+The ARM probe (`f4145128abbf64a1ef710baeea4278bf45debeeadd3196d2df33678dc5e5b47c`)
+then ran a blank-journal Protoss-vs-Zerg match on authored Outpost. The
+ordinary Stargate queue charged 350 minerals and 250 gas at frame 9,753;
+the Carrier menu charged 25 minerals at 12,431. The Interceptor was in
+flight by frame 12,811. A physical START/B save at 12,847 wrote a 14,100-byte
+record: a 30-byte packet named the player's Interceptor, slot 12, as
+shooter and a Hydralisk, slot 48, as target. A fresh process used title L
+to restore the frame, wallets, supply and observed actors, and the
+immediate re-save reproduced the full payload. The target was present at
+40 HP after restore and absent 80 updates later; the replay does not
+isolate the cause. Return and docking, physical stack high-water and
+timing, and the full custom and campaign matrix still need qualification.

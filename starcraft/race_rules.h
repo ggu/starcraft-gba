@@ -94,7 +94,7 @@ enum {
     /* Raw 36 is a real, independently ticking Zerg Egg actor. */
     U_Z7_EGG,
 #endif
-#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_SHOWCASE_CARRIER_PROBE)
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_SHOWCASE_CARRIER_PROBE) && !defined(SC64_ZERG_CARRIER_PROBE)
     /* Independent raw73 identity; child lifecycle is a separate feature. */
     U_P7_INTERCEPTOR,
 #endif
@@ -151,8 +151,8 @@ enum {
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     U_SHARED_SHUTTLE,
 #endif
-#ifdef SC64_SHOWCASE_CARRIER_PROBE
-    /* Showcase's raw73 identity follows every predecessor row. */
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_ZERG_CARRIER_PROBE)
+    /* The raw73 identity follows every predecessor row. */
     U_P7_INTERCEPTOR,
 #endif
     SC_RU_LEGACY_COUNT,
@@ -901,7 +901,7 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_Z7_EGG_PRODUCTION
         ,"EGG"
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_ZERG_CARRIER_PROBE)
         ,"INTERCEPTOR"
 #endif
 #ifdef SC64_SKIRMISH_ROSTER
@@ -960,6 +960,9 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #ifdef SC64_NUKE_FALLBACK_GHOST
         ,[U_SHARED_GHOST] = "GHOST"
+#endif
+#ifdef SC64_ZERG_CARRIER_PROBE
+        ,[U_P7_INTERCEPTOR] = "INTERCEPTOR"
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
         ,[U_GUARDIAN_COCOON] = "COCOON"

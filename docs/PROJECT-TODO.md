@@ -28,12 +28,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   journal. An ordinary-input ARM match builds a paid Carrier and
   Interceptor, launches at a Hydralisk and resumes from a fresh save
   with a moving projectile. The immediate re-save preserves the
-  compact extension byte for byte. A [Z10 save study](audits/2026-11-16-z10-custom-carrier-envelope.md)
-  fits all 100 projectiles and 32 impacts in the existing journal, in
-  place within the route/save scratch. Terran has a separate
-  [custom save study](https://github.com/ggu/starcraft-gba/pull/517).
-  Next: verify return and docking and wire the shared mechanic into
-  both formats. Keep existing roster and saved IDs stable.
+  compact extension byte for byte. The [Z10 custom probe](audits/2026-11-16-z10-custom-carrier-envelope.md)
+  fits all 100 projectiles and 32 impacts in the existing journal and
+  passed one blank-journal ordinary ARM fight and fresh live-shot
+  continuation. It still needs docking, stack high-water, timing and
+  the full profile matrix. Terran has a separate
+  [custom save probe](https://github.com/ggu/starcraft-gba/pull/517).
+  Keep existing roster and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to
