@@ -607,3 +607,100 @@ and the immediate re-save reproduces the entire payload byte for byte.
 The memory guards and these receipts do not establish physical stack
 use, timing, or coverage of the other custom and campaign configurations.
 Keep the probe disabled in the standard build.
+
+### Shared release selector
+
+The Carrier release candidate is opt-in. From a tree with the prepared
+inputs, use the same selector for each supported product:
+
+```sh
+make -f Makefile -f mk/carrier-release/Makefile carrier-release-plan
+make -f Makefile -f mk/carrier-release/Makefile test-carrier-release
+make -f Makefile -f mk/carrier-release/Makefile carrier-release
+```
+
+Set `SC64_CARRIER_RELEASE_PROFILE` to `terran`, `zerg-z10`, `showcase`
+or `protoss-p10` to run only that row; the default for these explicit
+targets is `all`. The first three write their existing preview filenames.
+Protoss uses the regular P10 artifact and the existing Gantrithor test.
+The ordinary targets and their feature flags remain unchanged.
+
+The single `SC64_CARRIER_RELEASE` compile capability is applied through
+`SC64_CARRIER_RELEASE_FLAGS`, which includes the selector header in every
+translation unit. It infers the envelope from the canonical product flags
+and selects the shared Carrier orders, training, flight and projectile
+codec. It also selects the Showcase rectangle facts. The existing profile
+guards still require the appropriate actor, asset and journal vector.
+An unsupported or ambiguous product, or combining the selector with a
+direct preview gate, is a compile error. On P10 the capability adds no
+service flags, actor IDs, codec switches or journal changes.
+
+| Product | Existing actor identities | Journal written by the candidate |
+| --- | --- | --- |
+| Terran T10 | Carrier 44 and Interceptor 45 append after the ordinary roster | Custom: `0x764d5442`, at most 15,929 bytes, 100 projectile slots and 32 impacts. Campaign: ordinary tag and layout. |
+| Zerg Z10 | Keeps Carrier 45; appends Interceptor 49 | Custom: `0x564e5a61`, at most 16,285 bytes, 100 projectile slots and 32 impacts. Campaign: ordinary tag, layout and impact save limit. |
+| Showcase | Keeps Carrier 47; appends Interceptor 49 | Custom: `0x764c5058`, at most 16,368 bytes, 95 projectile slots, all 32 impacts and both Yamatos. Exhibit scenes still do not load or save a match. |
+| Protoss P10 | Existing Carrier, Interceptor and Gantrithor identities | Existing P10 payload and accepted predecessor tags. |
+
+The new readers accept each product's current ordinary SRAM tag and its
+already supported worker-cargo predecessor. An ordinary save has no
+Interceptor packet or persistent child, so candidate preflight supplies an
+empty arena. The first START/B write after loading a predecessor uses the
+other bank and retains the source record. A checksum-valid compact record
+still has to pass detached actor and projectile preflight before title L
+can publish it. Each reader accepts only its own product's tags; the
+three new formats are not interchange formats. Terran and Z10 campaign
+records still carry the ordinary tag and mission data, even in a
+Carrier-enabled build.
+
+A future regular build must keep accepting its current preview tag and
+preserve its existing actor IDs and inner version. Do not rebrand the
+compact bytes with the ordinary tag; an older build would interpret those
+bytes as a different layout. Once both banks have been rotated to the
+compact format, a pre-Carrier build cannot continue that custom match.
+Even with an older bank left, the old writer can refuse to overwrite the
+recognized-as-committed but unsupported newer bank. Back up the regular
+save before trying a candidate. Keep preview and standard filenames
+separate during qualification.
+
+Before switching a standard target, add the shared flags and required
+Interceptor orders source to its normal compiler invocations, including
+the Showcase fact generator where applicable. Keep the current probe
+reader logic active as the regular reader rather than writing a one-time
+conversion. Leave P10 on its own current build vector. Compare a flag-off
+build to the shipped ROM. With the selector on, use the following matrix
+on the exact guarded ARM candidate before changing defaults:
+
+- For each new product: blank-journal paid match, active-shot and docked
+  START/B saves, fresh title-L continuation and an immediate re-save;
+  then repeat with a preview-authored save and compare the normalized
+  payload and scene or campaign context.
+- For each new product and both regular predecessor generations: test
+  title-L load, a first migrated write that leaves its original bank
+  intact, and fallback to it when a newer compact record is checksum-valid
+  but semantically invalid. Reject foreign product tags and malformed
+  records without publishing state or changing SRAM.
+- Terran and Z10: run the full campaign startup and save/load matrix
+  through the ordinary frontend, confirm the campaign tag and actor IDs,
+  and run both custom maps and all lobby configurations.
+- Showcase: check exhibit navigation and its save/load fence, plus both
+  custom maps. Protoss: verify the ordinary binary and existing paid
+  Carrier and Gantrithor behavior and continuation.
+- Measure guarded memory, stack high-water and dense battle timing on the
+  selected candidates. The selector itself does not qualify those gates.
+
+The asset-free selector test checks the actual Make profile flags and
+dispatch. Its prepared HOST target runs the existing per-product tests;
+neither check constitutes the full ARM activation matrix above.
+
+On release `bb348edd`, all three selector-on ARM links passed the
+ordinary memory guards and their packaged ROMs matched the direct
+preview flags byte for byte. The Showcase fact header also matched
+across the two separate builds. The regular Protoss P10 fact-generation
+and ARM commands were identical inside and outside the selector target.
+
+| Product | Identical packaged SHA-256 | IWRAM end | EWRAM BSS end |
+| --- | --- | --- | --- |
+| Terran | `965ceacbcd5059230a90c8a0dc49c2ced6d19d95ebb08eaa493e8608c9d984d6` | `0x030049f8` | `0x0203b728` |
+| Z10 | `2719456571efc210638a832bcca8b069078a39475075e97a4193e63df66b58ed` | `0x03004d90` | `0x0203a5d8` |
+| Showcase | `9d5dca67d8387a12f98c370d8cb43734be75a56f2586c8cc2282ad28e210139e` | `0x03004d68` | `0x0203aefc` |

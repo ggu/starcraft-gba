@@ -30,8 +30,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now verifies the same paid production, active shot and docked save on ARM.
   The [Z10 probe](audits/2026-11-16-z10-custom-carrier-envelope.md) verifies
   those same gates using a custom journal that retains all 100 projectiles
-  and 32 pending impacts. Next: verify the full release matrix, stack
-  high-water and battle timing before enabling the mechanic in regular builds.
+  and 32 pending impacts. The [shared selector](CARRIER-PROJECTILES.md#shared-release-selector)
+  builds byte-identical ARM previews for all three and leaves the Protoss
+  build command unchanged. Next: verify the full campaign, lobby and
+  predecessor save matrix, stack high-water and battle timing before
+  enabling the mechanic in regular builds.
   Keep existing roster and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and

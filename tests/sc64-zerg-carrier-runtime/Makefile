@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Add with -f Makefile -f tests/sc64-zerg-carrier-runtime/Makefile.
-ZERG_CARRIER_PROBE_FLAGS := -DSC64_ZERG_CARRIER_PROBE -DSC64_INTERCEPTOR_COMPACT_CODEC -DSC64_P7_PROJECTILES_ENABLED -DSC64_P7_CARRIER_TRAINING_ENABLED -DSC64_P7_INTERCEPTOR_FLIGHT_ENABLED
-ZERG_CARRIER_PROBE_DEPS = $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(RACES_INPUTS) $(COMMON_HEADERS) Makefile tests/sc64-zerg-carrier-runtime/Makefile
+ZERG_CARRIER_PROBE_FLAGS := $(SC64_CARRIER_RELEASE_FLAGS)
+ZERG_CARRIER_PROBE_DEPS = $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(RACES_INPUTS) $(COMMON_HEADERS) Makefile mk/carrier-release/flags/Makefile tests/sc64-zerg-carrier-runtime/Makefile
 .PHONY: test-sc64-zerg-carrier-runtime
 test-sc64-zerg-carrier-runtime: build/test-sc64-zerg-carrier-runtime
 	./build/test-sc64-zerg-carrier-runtime
