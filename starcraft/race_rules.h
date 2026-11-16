@@ -907,7 +907,7 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_Z7_EGG_PRODUCTION
         ,"EGG"
 #endif
-#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_ZERG_CARRIER_PROBE) && !defined(SC64_TERRAN_CARRIER_PROBE)
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_SHOWCASE_CARRIER_PROBE) && !defined(SC64_ZERG_CARRIER_PROBE) && !defined(SC64_TERRAN_CARRIER_PROBE)
         ,"INTERCEPTOR"
 #endif
 #ifdef SC64_SKIRMISH_ROSTER
@@ -967,7 +967,7 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_NUKE_FALLBACK_GHOST
         ,[U_SHARED_GHOST] = "GHOST"
 #endif
-#ifdef SC64_ZERG_CARRIER_PROBE
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_ZERG_CARRIER_PROBE)
         ,[U_P7_INTERCEPTOR] = "INTERCEPTOR"
 #elif defined(SC64_TERRAN_CARRIER_PROBE)
         ,[U_P7_CARRIER] = "CARRIER", [U_P7_INTERCEPTOR] = "INTERCEPTOR"
