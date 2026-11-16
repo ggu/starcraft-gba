@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+SC64_CARRIER_RELEASE_HEADER := starcraft/sc64_carrier_release.h
+SC64_CARRIER_RELEASE_FLAGS := -DSC64_CARRIER_RELEASE -include $(SC64_CARRIER_RELEASE_HEADER)
