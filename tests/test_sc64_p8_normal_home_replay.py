@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from sc64_p8_normal_home_replay import parse_plan, validate_rows
+from sc64_p8_normal_home_replay import admit_resume_prefix, CHECK_FIELDS, parse_plan, validate_rows
 
 
 class ReplayPlanTest(unittest.TestCase):
@@ -66,3 +66,22 @@ class ReplayPlanTest(unittest.TestCase):
         for k, value in (("page_count", 0), ("trigger", 8), ("string_id", 0)):
             with self.subTest(k=k), self.assertRaisesRegex(ValueError, "metadata"):
                 validate_rows([dict(valid, **{k: value})])
+
+    def test_resume_prefix_requires_matching_inputs_and_a_checked_reload(self):
+        fields = {name: self.rows[2][name] for name in CHECK_FIELDS}
+        pins = {"p10.gba": "pinned"}
+        checks = {5: fields, 11: fields}
+        observations = [
+            dict(call=call, fields=fields.copy(), mission=27, campaign={"mission": 27})
+            for call in checks
+        ]
+        row = dict(status="prefix", last_index=11, fresh_load_verified=True,
+                   first_frame_drift=None, first_mismatch=None, sha256=pins.copy(),
+                   obs=observations, briefing=[[2, 0]], pages=[{"index": 7}, {"index": 9}])
+        kept, pages, briefs = admit_resume_prefix(row, pins, checks, {2: (0, 1)}, 9)
+        self.assertEqual((kept, pages, briefs), (observations[:1], [{"index": 7}], [[2, 0]]))
+        with self.assertRaisesRegex(ValueError, "different ROM"):
+            admit_resume_prefix(row, {"p10.gba": "other"}, checks, {2: (0, 1)}, 9)
+        with self.assertRaisesRegex(ValueError, "checkpoints"):
+            admit_resume_prefix(dict(row, obs=observations[:1]),
+                                pins, checks, {2: (0, 1)}, 9)
