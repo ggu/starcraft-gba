@@ -70,3 +70,74 @@ These are guest cycle counts, not GBA SP frame-rate measurements.
 | --- | --- |
 | Paired Z9 prefix | `9cee2e36562a3a4e68e689c67b0fc2d506fa8a960541a926f097c8cd37bb299c` |
 | Peak-only attribution | `7fee9ae77e6ce1104b375e9fc40f9b83f85f8c73d75d51700e56437a7b7c9763` |
+
+## Cut the wide grid setup cost before changing admission
+
+The optional `CANONICAL_ROUTE_LINEAR_GRID_LUT8=1` expands each packed
+walkability byte with one 2 KiB ROM table. The entry stores the same two
+words that the two nibble lookups generate. The 64-column dedicated path,
+border values, queue bounds, seed ordering and field packing stay unchanged.
+The wide setup shared by point and optional depot floods uses the table.
+The configuration key includes the switch so a stale build cannot reuse
+the other route compiler flags.
+
+The prepared 96- and 128-column HOST route oracle and forced-overflow
+fallback have identical field, cache and residency receipts. A Z10 ARM
+build with the option off is byte-identical to packaged release
+`2b907cdecb5769dde471de04b280ffe7de79a3b43874b2eaabfc2a9b8be43eb8`.
+Both links end at EWRAM `0x02038b18` and IWRAM `0x03004d70`.
+The optional ROM is
+`f0d4ae5395cd4ed9fb1eeb6200891a7973f4e53196103e187b265848fe29450f`.
+
+In the emitted Z10 Thumb code the inner grid setup loop goes from
+14 instructions to eight per packed byte. The new loop loads and stores
+the adjacent words with `ldmia` and `stmia`.
+
+[The isolated loop benchmark](../../tools/sc64_route_grid_loop_bench.py)
+relocates those exact emitted instructions and their authored tables
+into micro ROMs. It uses the game's wait-state register value, brackets
+each loop with the read-only mGBA observer and compares every output
+byte with an independent bit pattern. It does not boot either game.
+
+| Packed input | Stock cycles | Byte lookup cycles |
+| --- | ---: | ---: |
+| Wide, 2,048 all-open bytes | 106,490 | 69,626 |
+| Wide, 2,048 mixed bytes, either run order | 106,490 | 69,626 |
+| Midwidth, 1,536 mixed bytes | 79,866 | 52,218 |
+
+The isolated loop uses 34.6% fewer emulated cycles. The result says
+nothing about seeding, traversal, packing, rendering or complete frame
+rate. Reproduce with the pinned ROM pair above and physical observer:
+
+```sh
+python3 tools/sc64_route_grid_loop_bench.py \
+  --stock STOCK.gba --candidate CANDIDATE.gba --runner OBSERVER --out NEW_DIR
+```
+
+The receipt SHA-256 is
+`f321c41740e811cdebc1717b560f81eaecf7f34b145fbeeb969dd23e0fb2744d`.
+
+### Paired gameplay on the exact dense Z7 release
+
+The physical-key replay on the same release and candidate digests
+matched all 131 named checkpoints and all 480 sampled call indices,
+simulation frames and route counters. Both endpoints also matched
+the resident route fields, walkability, cache identities and ages,
+and the raw unit, building and map-state bytes. The replay executed
+477 active calls in the timed window.
+
+| Guest cycles, active calls | Packaged release | Byte lookup | Change |
+| --- | ---: | ---: | ---: |
+| Complete update, mean | 2,640,646 | 2,603,901 | −1.39% |
+| Complete update, p95 | 4,201,699 | 4,084,306 | −2.79% |
+| Complete update, maximum (call 47,823) | 5,174,688 | 5,027,328 | −2.85% |
+| Orders, mean | 1,483,645 | 1,447,017 | −2.47% |
+| Orders, p95 | 3,061,150 | 2,945,794 | −3.77% |
+| Orders, maximum (call 47,855) | 4,004,291 | 3,855,167 | −3.72% |
+
+The [isolated-loop](#cut-the-wide-grid-setup-cost-before-changing-admission)
+and gameplay results measure different scopes. The complete frame
+still exceeds the 30 fps target in this workload. Keep the option off
+while comparing another busy workload, other profile builds and real
+hardware. The paired receipt SHA-256 is
+`b85c153ff69db8205ad08ca88e79690656ac4bb2c9fda1a1cd51e40813fcf52e`.
