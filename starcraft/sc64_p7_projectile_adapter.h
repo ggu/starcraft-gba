@@ -23,6 +23,23 @@ static void race_p7_projectile_reset(void)
     race_p7_projectile_fault=(u8)!sc64_pool_init(&race_p7_projectiles);
 }
 
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+static int race_p7_projectile_encode(u8 *packet)
+{
+    if (race_p7_projectile_fault) return 0;
+    memset(packet,0,SC64_SHOWCASE_PROJECTILE_BYTES);
+    return (int)sc64_compact_codec_encode(&race_p7_projectiles,
+        SC64_SHOWCASE_PROJECTILE_CAP,packet,SC64_SHOWCASE_PROJECTILE_BYTES);
+}
+
+static int race_p7_projectile_restore(const u8 *packet,u16 size)
+{
+    if (!sc64_compact_codec_decode(&race_p7_projectiles,packet,size,
+                                    SC64_SHOWCASE_PROJECTILE_CAP)) return 0;
+    race_p7_projectile_fault=0;
+    return 1;
+}
+#else
 static int race_p7_projectile_encode(u8 *packet)
 {
     return !race_p7_projectile_fault &&
@@ -35,6 +52,8 @@ static int race_p7_projectile_restore(const u8 *packet)
     race_p7_projectile_fault=0;
     return 1;
 }
+
+#endif
 
 static int race_p7_projectile_target_alive(unsigned ref)
 {
@@ -107,7 +126,12 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
         !sc64_interceptor_projectile_launch(&row,source_x_q8,source_y_q8,
             (s16)(target_x(target)*2),(s16)(target_y(target)*2),heading,
             (u16)target,(u8)shooter,(u8)RACE_PROTOSS_SLOT(&u[shooter]))) return 0;
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    if (!sc64_compact_pool_acquire(&race_p7_projectiles,SC64_SHOWCASE_PROJECTILE_CAP,
+                                    &id,&native_index)) return 0;
+#else
     if (!sc64_pool_acquire(&race_p7_projectiles,&id,&native_index)) return 0;
+#endif
     (void)native_index;
     if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) {
         race_p7_projectile_fault=1; return 0;
@@ -138,7 +162,13 @@ static void race_p7_projectile_source_tick(void)
         /* The pulse is consumed inside this complete update. A saved DYING
          * row must never reapply it after load. Commit before callbacks. */
         row.pending_damage_event=0;
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+        if (row.state==3) {
+            if (!sc64_compact_pool_retire(&race_p7_projectiles,id)) break;
+        } else
+#else
         if (row.state==3 && !sc64_pool_retire(&race_p7_projectiles,id)) break;
+#endif
         if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) break;
         if (impact && race_p7_projectile_target_alive(row.target_ref)) {
             int owner=race_protoss_source_owner(row.raw_source_owner);

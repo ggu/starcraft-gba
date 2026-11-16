@@ -20,17 +20,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 ## Current integration priorities
 
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and
-  Interceptor services. Terran, Zerg and Showcase still lack working Carriers.
-  The [compact projectile packet](CARRIER-PROJECTILES.md#compact-packet-foundation)
-  now round-trips allocator order, stable slots and active state at explicit
-  shot caps. [Showcase draft #514](https://github.com/ggu/starcraft-gba/pull/514)
-  fits full projectile, impact and Yamato state and reloads a predecessor
-  journal. An ordinary-input ARM match builds a paid Carrier and
-  Interceptor, launches at a Hydralisk and resumes from a fresh save
-  with a moving projectile. The immediate re-save preserves the
-  compact extension byte for byte. Next: verify return and docking,
-  and fit the same shared mechanic into Terran and Zerg custom saves
-  before broad activation. Keep existing roster and saved IDs stable.
+  Interceptor services. The standard Terran, Zerg and Showcase builds still
+  lack working Carriers. The [Showcase probe](CARRIER-PROJECTILES.md#showcase-carrier-probe)
+  fits the projectile, impact and Yamato queues. Ordinary ARM controls paid
+  for a Carrier and an Interceptor, attacked a Hydralisk, resumed from a save
+  with a live shot, then moved the Carrier away and reloaded the game with
+  its Interceptor docked. The ordinary Showcase ROM rebuilt byte for byte.
+  [Terran #517](https://github.com/ggu/starcraft-gba/pull/517) has a separate
+  opt-in ARM runtime and [Zerg #518](https://github.com/ggu/starcraft-gba/pull/518)
+  has a verified custom save format. Next: connect the Zerg format to the
+  same service, verify the full release matrix including saves and memory,
+  and only then enable the mechanic across the applicable regular builds.
+  Keep existing roster and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to
