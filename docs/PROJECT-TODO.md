@@ -35,9 +35,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   build command unchanged. The [HOST matrix](CARRIER-PROJECTILES.md#campaign-and-lobby-host-matrix)
   now checks ordinary Terran/Z10 campaign boot, save and load on all ten
   entries per ROM, both skirmish maps, lobby lineups and Showcase scene
-  save isolation. Next: qualify these paths and predecessor saves on ARM,
-  measure stack high-water and battle timing, then enable the mechanic in
-  regular builds.
+  save isolation. The [ARM gate](CARRIER-PROJECTILES.md#pinned-arm-release-gate)
+  confirms two final-mission save cuts and all twelve mixed and sparse
+  skirmishes on both maps, with fresh loads and byte-identical re-saves.
+  Next: broaden campaign and predecessor SRAM coverage, measure stack
+  high-water and battle timing, then enable the mechanic in regular builds.
   Keep existing roster and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and

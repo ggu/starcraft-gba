@@ -778,10 +778,23 @@ same checksummed payload in the other bank. Skirmishes also use R from
 pause after the continuation; the restart must preserve the chosen map,
 resolved races, seat mask and starting halls while resetting the frame.
 
-Start with the two late campaign saves and the sparse Blood Bath cuts
-when native time is limited. These bounded cases check the named world and
-on-cartridge journal, not visual output, an end-to-end win, paid Carrier
-orders, predecessor migration, sustained skirmish combat or hardware
-speed. The HOST matrix proves none of those ARM properties. At the
-initial handoff only offline pin/layout/catalog planning and asset-free
-receipt tests have run; the physical cases remain unqualified.
+All 14 cases passed on the pinned ARM pair for each product. Both late
+missions saved at frame 31 and matched their uninterrupted world at
+frame 91. The 12 skirmishes saved at frame 121, matched the uninterrupted
+world at frame 181, then restarted on the same map with the same resolved
+seats and halls. Every immediate re-save reproduced the complete payload
+while preserving the original bank.
+
+| ARM case | Passed | Journal tag | Payload bytes |
+| --- | ---: | --- | ---: |
+| Final Terran mission | 1 | `0x76435442` | 15,858 |
+| Final Z10 mission | 1 | `0x56435a61` | 16,312 |
+| Terran custom | 4 | `0x764d5442` | 13,676 |
+| Z10 custom | 4 | `0x564e5a61` | 14,072 |
+| Showcase custom | 4 | `0x764c5058` | 16,128 |
+
+The local index of all 14 receipt hashes has SHA-256
+`e45d6b0a11d38facc72d5a8d24c1c9cef402a8da265baea45d288f0376dcd987`.
+These bounded cases qualify the sampled ARM boots, saves and continuations.
+They do not cover every campaign, end-to-end wins, cross-generation
+predecessor migration, full battles, physical stack use or GBA SP speed.
