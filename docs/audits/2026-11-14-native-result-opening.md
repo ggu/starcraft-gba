@@ -297,3 +297,26 @@ limits stayed pinned, and no guest memory was written.
 | Hatchery 217 HP | `23078af3f9ae79946c78e43bc21db034272fb4db2e282a2f0e0faa950c94d581` |
 | Hatchery 11 HP | `59b80037a3cc8ee119eb42bf1a3ec5213dc4ebaeb9228363f7acab1fac757042` |
 | Hatchery no longer selected, remains visible | `968cfaf7278caf4612bc6c15ebf4809df623364da5a7678b4e8964a6c10e23c6` |
+
+### Owner chain confirms one building loss
+
+A read-only replay matched all pre-attack frames and guest records, the
+earlier combat frames, and the rendered destruction and continuing-play
+anchors. At step 22,958 the owner-0 chain still held the selected native
+type-131 Hatchery at 10.328125 HP (the HUD showed 11). At 23,608
+that actor was absent from the validated chain and owner 0's broad building
+count had fallen from six to five. All four observed result bytes remained
+zero.
+
+At step 24,358 the surviving owner-0 chain included an Extractor at 750 HP,
+another Hatchery at 1,250 HP, two type-143 structures and one type-142
+structure. All three owner-3 Marines retained 40 HP. The next selection
+calibration did not select a Marine, so it sent neither group selection
+nor another attack. This proves an intermediate building removal and
+continued play; it does not settle last-building victory, owner retirement,
+surviving-unit transfer, or simultaneous outcomes.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Late witness manifest | `067108019460627d123656d54c916cde8896467dd04c79456e55996c345d714a` |
+| Read-only owner-chain map | `8ca1f2489eb16c0cac3d9a47c6beb389dfc3ed427a73fb231cd5dd7b371411be` |
