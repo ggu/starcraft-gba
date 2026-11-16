@@ -187,3 +187,41 @@ row layout, including full Moebius energy and legacy signed storage.
 Before a cartridge enables this, run independent writer/reader processes
 on real predecessors, malformed newest records, full payloads, and
 painting/descent saves, then qualify the normal ARM path and its guards.
+
+## First live Terran custom journal (November 16)
+
+`make test-sc64-ghost-covert-journal` runs three Terran HOST processes
+against prepared inputs. The new opt-in `SC64_GHOST_COVERT_HOST_JOURNAL`
+requires the authenticated active-strike and Terran packed save vector.
+It cannot be used in an ARM build or with Carrier or other research
+journals. Campaigns still accept and write their existing baseline
+format, and still refuse paid or earned changes the baseline cannot
+carry. No regular build opts in.
+
+The exact new outer namespace is `0x4f`; its inner version is the
+unchanged current Terran version. Only the journal selector can authorize
+that pair. The detached adapter normalizes the building damage marker and
+paid Covert rows before ordinary validation. It confirms occupied Terran
+payers, checks each unique grounded Science Facility socket, and checks
+live Ghost Q8 energy against the candidate's restored owner cap. A
+receipt without a current unique same-owner socket refuses before a
+write. Publication happens after selection and load preflight; the already
+validated strike and Silo projections keep their existing wire layout.
+Neither the fixed base nor the variable impact/Yamato/transport tail grows.
+
+On the authored custom map, the fixture saved a nuclear-only painting
+state, then paid for Moebius Reactor and Ocular Implants and saved an
+active painting state with Moebius earned and Ocular still pending. The
+new payload had the same 15,832 bytes as its predecessor. It wrote the
+other bank and left the earlier bank byte-identical. A fresh reader
+restored the 250-point Q8 Ghost, Ocular's remaining paid time, and the
+active strike, then wrote another combined snapshot. A checksum-valid
+newer receipt with an excessive timer fell back to the old nuclear-only
+painting state without writing SRAM. With the old bank absent, it
+refused without changing the live frame or strike. A detached live
+receipt also refused without overwriting either bank.
+
+These are scoped HOST fixtures. Remaining work includes both custom maps
+and the full lobby matrix, saved descent alongside separately armed
+Silos, saturated ordinary tails, campaign payer provenance, composition
+with Carrier and the other research journals, and ARM checks.

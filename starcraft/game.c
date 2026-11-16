@@ -48,6 +48,14 @@ static void sc64_contact_memo_move_cells(unsigned from, unsigned to);
 #if defined(SC64_NUKE_ACTIVE_JOURNAL) && !defined(SC64_NUKE_SILO_JOURNAL)
 #error "Active strikes require the authenticated Silo journal"
 #endif
+#if defined(SC64_GHOST_COVERT_HOST_JOURNAL) && (!defined(GBA_HOST) || \
+    !defined(SC64_GHOST_TECH_PROBE) || !defined(SC64_NUKE_ACTIVE_JOURNAL) || \
+    !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
+    !defined(SC64_LATE_TERRAN_STORAGE) || !defined(SC64_CAMPAIGN_RACE) || \
+    SC64_CAMPAIGN_RACE != 0 || defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || \
+    defined(SC64_CARRIER_RELEASE) || defined(SC64_TERRAN_CARRIER_PROBE))
+#error "The Covert journal is isolated to Terran HOST custom saves with active strikes"
+#endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_scope.h"
 #include "../common/gba_flash_journal.h"
@@ -2364,6 +2372,9 @@ static void race_impact_tick(void);
 static int race_impact_save_write(const GbaSaveSelection *previous
 #ifdef SC64_NUKE_SILO_JOURNAL
                                   , int nuke_silo_tag
+#endif
+#ifdef SC64_GHOST_COVERT_HOST_JOURNAL
+                                  , int ghost_covert_tag
 #endif
                                   );
 #else

@@ -76,6 +76,14 @@ build/test-sc64-ghost-tech-world-active: tests/sc64_ghost_tech_world_game.c $(ST
 test-sc64-ghost-tech-world-active: build/test-sc64-ghost-tech-world-active
 	./$<
 
+build/test-sc64-ghost-covert-journal: tests/sc64_ghost_covert_journal_game.c tests/sc64_ghost_tech_world_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
+	$(CLANG) $(SC64_NUKE_FIXTURE_FLAGS) $(SC64_NUKE_RUNTIME_FLAGS) $(SC64_NUKE_STRIKE_FLAGS) -DSC64_GHOST_TECH_PROBE -DSC64_GHOST_COVERT_HOST_JOURNAL $(TERRAN_ROM_FLAGS) $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-ghost-covert-journal
+test-sc64-ghost-covert-journal: build/test-sc64-ghost-covert-journal
+	./$< write build/test-sc64-ghost-covert.sav
+	./$< read build/test-sc64-ghost-covert.sav
+	./$< reject build/test-sc64-ghost-covert.sav
+
 define SC64_NUKE_STRIKE_FIXTURE
 build/test-sc64-nuke-strike-$(1): tests/sc64_nuke_strike_journal_game.c tests/sc64_nuke_silo_journal_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $$(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $$(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
 	$$(CLANG) $$(SC64_NUKE_FIXTURE_FLAGS) $$(SC64_NUKE_RUNTIME_FLAGS) $$(SC64_NUKE_STRIKE_FLAGS) $(2) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(4) -o $$@
