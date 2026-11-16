@@ -94,6 +94,38 @@ class TestCarrierReleasePhysical(unittest.TestCase):
             with self.assertRaises(gate.ContinuationError):
                 gate.verify_migration_journal(first, second, old_tag, target_tag)
 
+    def test_campaign_counts_world_updates_and_closes_modal_on_save_cut(self):
+        class ScriptedGame:
+            sym = {"sc64_text_box_missions": 1}
+            opened, frame, pages, acks = False, 1, 0, 0
+
+            def __init__(self):
+                self.rsp = self
+
+            def read(self, address, length):
+                assert (address, length) == (gate.TEXT_BOX_COUNT_VRAM, 2)
+                return int(self.pages > 0).to_bytes(2, "little")
+
+            def u32(self, field):
+                return {"screen": gate.SCREEN_PLAY, "frame": self.frame}[field]
+
+            def step(self):
+                assert not self.pages
+                self.frame += 1
+                if self.frame == 3 and not self.opened:
+                    self.opened, self.pages = True, 2
+
+            def tap(self, key):
+                assert key == gate.KEY_A and self.pages
+                self.pages -= 1
+                self.acks += 1
+
+        game = ScriptedGame()
+        gate.advance_world(game, {"mode": 0}, 1, 2)
+        self.assertEqual((game.frame, game.pages, game.acks), (3, 0, 2))
+        gate.advance_world(game, {"mode": 0}, 3, 10)
+        self.assertEqual((game.frame, game.acks), (13, 2))
+
 
 if __name__ == "__main__":
     unittest.main()

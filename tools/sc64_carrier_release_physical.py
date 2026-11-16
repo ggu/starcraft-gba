@@ -77,6 +77,7 @@ CASES = ("campaign", "migration", *(f"{m}-{lineup}" for m in MAPS for lineup in 
 RESERVE, FILE_LIMIT, OUTPUT_LIMIT = 5 * 2**30, 8 * 2**20, 16 * 2**20
 SLOT, SRAM = 16384, 32768
 MAX_STEPS, CONTINUE, KEY_R = 512, 60, 256
+TEXT_BOX_COUNT_VRAM, MAX_TEXT_BOX_PAGES, MAX_TEXT_BOX_ROWS = 0x06013FE0, 32, 13
 
 
 def require(ok, message):
@@ -254,14 +255,21 @@ def launch(game, plan):
             (FRONT_BRIEFING, plan["mission"]), "unexpected campaign briefing")
     game.tap(KEY_START)
     require(game.u32("screen") == SCREEN_PLAY, "campaign did not enter play")
-    # Only confirm an actual authored modal, never advance the live world with A.
-    if "sc64_text_box_missions" in game.sym:
-        for _ in range(8):
-            if not int.from_bytes(game.rsp.read(0x06013fe0, 2), "little"):
-                break
-            game.tap(KEY_A)
-        require(not int.from_bytes(game.rsp.read(0x06013fe0, 2), "little"),
-                "opening campaign dialogue exceeded its bound")
+    clear_campaign_dialogue(game, MAX_TEXT_BOX_PAGES)
+
+
+def clear_campaign_dialogue(game, remaining):
+    """Only acknowledge an actual queued modal that freezes the world."""
+    if "sc64_text_box_missions" not in game.sym:
+        return remaining
+    while count := int.from_bytes(game.rsp.read(TEXT_BOX_COUNT_VRAM, 2), "little"):
+        require(count <= MAX_TEXT_BOX_ROWS, "invalid campaign text-box count")
+        require(remaining > 0, "campaign dialogue exceeded its bound")
+        before = game.u32("frame")
+        game.tap(KEY_A)
+        require(game.u32("frame") == before, "text-box acknowledgement advanced the world")
+        remaining -= 1
+    return remaining
 
 
 def observed(game, plan, screen):
@@ -304,9 +312,27 @@ def pause_save(game, plan):
     return saved
 
 
+def advance_world(game, plan, frame, ticks):
+    if plan["mode"]:
+        game.step(0, ticks)
+        return
+    # A scripted message can arrive after launch (e.g., Wasteland frame 30).
+    # The save writer cannot serialize a queued message. Drain even the one
+    # that opens on the target frame, without spending another world update.
+    remaining = MAX_TEXT_BOX_PAGES
+    require(game.u32("frame") == frame, "campaign did not resume at the expected frame")
+    for expected in range(frame + 1, frame + ticks + 1):
+        remaining = clear_campaign_dialogue(game, remaining)
+        require(game.u32("screen") == SCREEN_PLAY, f"campaign ended at frame {expected - 1}")
+        game.step()
+        actual = game.u32("frame")
+        require(actual == expected, f"campaign stalled or skipped at frame {actual}; expected {expected}")
+    clear_campaign_dialogue(game, remaining)
+
+
 def advance_from_pause(game, plan, frame):
     game.step(KEY_A)
-    game.step(0, CONTINUE)
+    advance_world(game, plan, frame, CONTINUE)
     current = observed(game, plan, SCREEN_PLAY)
     require(current["frame"] == frame + CONTINUE, "neutral continuation did not advance exactly 60 frames")
     return current
@@ -340,7 +366,7 @@ def run(args, plan, pins):
         launch(game, plan)
         initial = observed(game, plan, SCREEN_PLAY)
         checkpoint("start", initial)
-        game.step(0, plan["idle"])
+        advance_world(game, plan, initial["frame"], plan["idle"])
         ready = observed(game, plan, SCREEN_PLAY)
         require(ready["frame"] == initial["frame"] + plan["idle"], "save cut did not advance")
         saved = pause_save(game, plan)

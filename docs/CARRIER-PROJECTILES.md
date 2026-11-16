@@ -765,7 +765,7 @@ and the test's SRAM files. It makes no guest memory writes. Only
 
 | Case | Product(s) | Ordinary input |
 | --- | --- | --- |
-| `campaign` | Terran and Z10 | Open chapter 1–10 in menu order; the default is chapter 10 (IDs 13 / 21). Begin play, clear any active opening dialogue with A, and save after 30 advancing updates. |
+| `campaign` | Terran and Z10 | Open chapter 1–10 in menu order; the default is chapter 10 (IDs 13 / 21). Acknowledge queued scripted dialogue with A only when it is active, and save after 30 advancing world updates. |
 | `outpost-mixed`, `blood-bath-mixed` | All three | Protoss human with named Terran, Zerg and Protoss opponents. |
 | `outpost-sparse`, `blood-bath-sparse` | All three | Zerg human with Protoss, Closed and Random on the three rows. |
 | `migration` | All three | Use the matched regular release to save Blood Bath as human Zerg with Protoss, Closed and Terran CPU rows. Use the candidate to load, advance, save in its compact format, and load the new bank on another boot. |
@@ -824,8 +824,23 @@ sequence 1 journal in an erased image. The candidate must restore the
 watched world, advance 60 updates, and commit a compact-tag sequence 2
 record while leaving the entire first bank intact. The third boot must
 restore the newer world without changing either bank: the 60-update
-gap catches a silent fallback to the preceding bank. These extended
-plans and checksum contracts were verified offline. No ARM result from
-these additional cases is counted in the 14 passes above. The selected
-regular writer represents one save generation and one opening cut per
-product.
+gap catches a silent fallback to the preceding bank.
+
+All three stock migration cases passed on ARM. Each restored its stock
+world at frame 121, wrote the compact bank at frame 181 and restored frame
+181 on the third boot. Re-exporting SRAM on the third boot reproduced the
+complete converted image. The stock and compact payload sizes were
+15,832 / 13,676 bytes for Terran, 16,312 / 14,072 for Z10, and 14,204 /
+16,128 for Showcase. The local index of receipt and SRAM hashes has SHA-256
+`a48ab6ee90ba4c0cad9d7e2785897096f55e6725b0cb8b4eebc040af5e8a77e9`.
+The selected regular writer represents one save generation and one opening
+cut per product.
+
+The full campaign matrix passed hash, layout and catalog checks offline.
+The first additional ARM run opened Wasteland correctly, then stopped at
+the neutral interval that crosses its scripted frame-30 dialogue. The
+fixture now counts actual world updates and acknowledges a text box only
+while it is active. Dialogues that open at the save cut are dismissed
+before START and B because their queues are not serialized. The other 18
+campaign save cuts are pending that updated ARM run and are not counted
+in the original 14 passes above.
