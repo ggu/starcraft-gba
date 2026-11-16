@@ -225,3 +225,24 @@ These are scoped HOST fixtures. Remaining work includes both custom maps
 and the full lobby matrix, saved descent alongside separately armed
 Silos, saturated ordinary tails, campaign payer provenance, composition
 with Carrier and the other research journals, and ARM checks.
+
+### Detached reader stack reduction
+
+The reader scans building rows in slot order and retains parent indices only
+for accepted receipts. It validates every row and checks each paid row's clean
+encoding before normalizing scratch. A malformed last slot cannot publish a
+partial result. The previous Terran reader's 96-slot facts, fields, and parent
+arrays alone represented 4,800 stack bytes. An asset-free ARM7TDMI Thumb
+compile with GCC 16.2.0 and `-Os -fstack-usage` measures the new scan type at
+128 bytes, its 16-parent array at 16 bytes, and the isolated pure wrapper at
+192 bytes of static stack. The game adapter additionally needs one building
+row and its codec/socket callees; the pure measurement is neither a
+linked-game frame bound nor a hardware stack high-water measurement.
+
+Pure research, stream/codec, and Nuclear Strike row tests pass under
+ASan/UBSan. The prepared HOST matrix requires at least 5 GiB free before
+launch; this follow-up was checked at 4,784,398,336 bytes free, so the previous
+prepared three-process receipt has not been rerun on the streaming adapter.
+The stage remains HOST-only. An eventual ARM build still needs the
+unmodified `__iwram_end < 0x03005000` and `__bss_end < 0x0203e000` guards,
+plus measured combined load stack use and ordinary gameplay validation.

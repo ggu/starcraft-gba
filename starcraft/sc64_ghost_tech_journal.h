@@ -10,7 +10,7 @@ _Static_assert(SC64_GHOST_SAVE_DAMAGE_WORD == SC64_BUILDING_DAMAGE_SAVE_MARKER &
 
 typedef struct {
     Sc64GhostSavePlan projected;
-    s16 parents[SC64_GHOST_SAVE_CO_MAX];
+    u8 parents[SC64_GHOST_SAVE_CO_MAX];
 } Sc64GhostJournalPlan;
 
 /* There are no source tech seeds and the payer key equals the occupied
@@ -107,40 +107,54 @@ static int race_ghost_save_write(void)
  * path. Restore the ordinary fields before any of its validators see them. */
 static int race_ghost_save_prepare(Sc64GhostJournalPlan *out, int extended)
 {
-    *out=(Sc64GhostJournalPlan){0};
-    if (race_data.state[0]!=1) return !extended;
+    if (race_data.state[0]!=1) {
+        if (extended) return 0;
+        *out=(Sc64GhostJournalPlan){0};
+        return 1;
+    }
     Sc64GhostSavePolicy policy=race_ghost_save_policy(&race_data);
-    Sc64GhostSaveFacts facts[MAX_BUILDINGS];
-    Sc64GhostSaveRow fields[MAX_BUILDINGS];
-    s16 parent_slot[MAX_BUILDINGS];
-    Sc64NukeSaveWorld world=race_nuke_save_world(1,race_data.state[4],2048,2048);
+    Sc64GhostSaveScan scan;
+    u8 parents[SC64_GHOST_SAVE_CO_MAX];
+    if (!sc64_ghost_save_scan_begin(&scan,
+            extended ? SC64_GHOST_SAVE_COVERT_CANDIDATE : SC64_GHOST_SAVE_BASE,
+            (u32)race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX],&policy,MAX_BUILDINGS))
+        return 0;
     for (unsigned i=0;i<MAX_BUILDINGS;++i) {
         Building row;
         if (!race_save_decode_building(&race_data,i,&row)) return 0;
-        facts[i]=race_ghost_save_facts(&row);
-        fields[i]=(Sc64GhostSaveRow){row.queue_progress,row.level};
-        parent_slot[i]=-1;
-        if (!extended || !sc64_ghost_save_claims_covert(&facts[i]) ||
-            (!row.queue_progress && !row.level)) continue;
-        int parent=race_ghost_save_find_parent(&race_data,i,&row);
-        if (parent<0) return 0;
-        parent_slot[i]=(s16)parent;
-        facts[i].attached=1;
-        facts[i].parent_key=facts[i].parent_owner=row.owner;
+        Sc64GhostSaveFacts facts=race_ghost_save_facts(&row);
+        Sc64GhostSaveRow fields={row.queue_progress,row.level};
+        int parent=-1;
+        if (extended && sc64_ghost_save_claims_covert(&facts) &&
+            (fields.progress || fields.level)) {
+            parent=race_ghost_save_find_parent(&race_data,i,&row);
+            if (parent<0) return 0;
+            facts.attached=1;
+            facts.parent_key=facts.parent_owner=row.owner;
+        }
+        unsigned next_receipt=scan.plan.count;
+        if (!sc64_ghost_save_scan_row(&scan,&facts,&fields)) return 0;
+        if (scan.plan.count!=next_receipt) {
+            Sc64PackedBuildingSave normalized;
+            if (parent<0) return 0;
+            parents[next_receipt]=(u8)parent;
+            row.queue_progress=row.level=0;
+            if (!sc64_building_save_encode(&normalized,&row,2048,2048)) return 0;
+        }
     }
-    if (!sc64_ghost_save_prepare(&out->projected,
-            extended ? SC64_GHOST_SAVE_COVERT_CANDIDATE : SC64_GHOST_SAVE_BASE,
-            (u32)race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX],&policy,facts,fields,MAX_BUILDINGS))
-        return 0;
-    for (unsigned i=0;i<out->projected.count;++i) {
-        unsigned slot=out->projected.receipts[i].building;
+    if (!sc64_ghost_save_scan_complete(&scan)) return 0;
+    /* Only now edit scratch. Each receipt names a different row. Its
+     * decoder and normalized encoder already passed on these same bytes. */
+    for (unsigned i=0;i<scan.plan.count;++i) {
+        unsigned slot=scan.plan.receipts[i].building;
         Building row;
-        if (parent_slot[slot]<0 || !race_save_decode_building(&race_data,slot,&row)) return 0;
-        out->parents[i]=parent_slot[slot];
+        if (!race_save_decode_building(&race_data,slot,&row)) return 0;
         row.queue_progress=row.level=0;
-        if (!race_nuke_save_replace_building(&race_data,slot,&row,&world)) return 0;
+        if (!sc64_building_save_encode(&race_data.buildings[slot],&row,2048,2048)) return 0;
     }
-    race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX]=(int)out->projected.canonical_damage_word;
+    race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX]=(int)scan.plan.canonical_damage_word;
+    out->projected=scan.plan;
+    memcpy(out->parents,parents,scan.plan.count*sizeof(*parents));
     return 1;
 }
 

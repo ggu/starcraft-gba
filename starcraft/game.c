@@ -51,7 +51,8 @@ static void sc64_contact_memo_move_cells(unsigned from, unsigned to);
 #if defined(SC64_GHOST_COVERT_HOST_JOURNAL) && (!defined(GBA_HOST) || \
     !defined(SC64_GHOST_TECH_PROBE) || !defined(SC64_NUKE_ACTIVE_JOURNAL) || \
     !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
-    !defined(SC64_LATE_TERRAN_STORAGE) || !defined(SC64_CAMPAIGN_RACE) || \
+    !defined(SC64_LATE_TERRAN_STORAGE) || !defined(SC64_T6_STORAGE) || \
+    defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_CAMPAIGN_RACE) || \
     SC64_CAMPAIGN_RACE != 0 || defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || \
     defined(SC64_CARRIER_RELEASE) || defined(SC64_TERRAN_CARRIER_PROBE))
 #error "The Covert journal is isolated to Terran HOST custom saves with active strikes"

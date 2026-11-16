@@ -74,6 +74,27 @@ static void expect_refused(unsigned format, uint32_t word, const Sc64GhostSavePo
     assert(!memcmp(before, &out, sizeof out)); /* Caller can try the older record. */
 }
 
+static void verify_stream_refusal(void)
+{
+    Sc64GhostSaveScan scan;
+    Sc64GhostSavePlan out;
+    unsigned char untouched[sizeof out];
+    const Sc64GhostSaveRow paid = {2500, 2}, malformed = {2501, 2}, empty = {0};
+    const Sc64GhostSaveFacts other = {.mapped_raw = 108};
+    memset(&out, 0x5a, sizeof out);
+    memcpy(untouched, &out, sizeof out);
+    assert(sc64_ghost_save_scan_begin(&scan, SC64_GHOST_SAVE_COVERT_CANDIDATE,
+                                     SC64_GHOST_SAVE_DAMAGE_WORD, &policy, 3));
+    assert(sc64_ghost_save_scan_row(&scan, &online, &paid));
+    assert(sc64_ghost_save_scan_row(&scan, &other, &empty));
+    assert(!sc64_ghost_save_scan_finish(&scan, &out)); /* The final slot is missing. */
+    assert(!memcmp(untouched, &out, sizeof out));
+    assert(!sc64_ghost_save_scan_row(&scan, &online, &malformed));
+    assert(!sc64_ghost_save_scan_row(&scan, &other, &empty)); /* Poisoned candidate. */
+    assert(!sc64_ghost_save_scan_finish(&scan, &out));
+    assert(!memcmp(untouched, &out, sizeof out));
+}
+
 int main(void)
 {
     for (uint32_t bits = 0; bits <= UINT16_MAX; ++bits)
@@ -173,6 +194,7 @@ int main(void)
     verify_nuclear_rows(older, older[SILO]);
     assert(sc64_ghost_save_prepare(&out, base, 0, &policy, facts, older, SLOTS));
     assert(!out.canonical_damage_word && !out.count);
+    verify_stream_refusal();
     puts("Ghost save wire: paid and earned projections, predecessor nuclear rows and atomic refusal");
     return 0;
 }

@@ -54,6 +54,16 @@ typedef struct {
     unsigned count;
 } Sc64GhostSavePlan;
 
+/* A detached scanner owns the tentative plan. Only a complete valid scan
+ * publishes it, and its size depends on the receipt limit, not row count. */
+typedef struct {
+    Sc64GhostSavePlan plan;
+    const Sc64GhostSavePolicy *policy;
+    unsigned format, next, rows;
+} Sc64GhostSaveScan;
+
+_Static_assert(sizeof(Sc64GhostSaveScan) <= 160, "Ghost streaming scan budget");
+
 static inline int sc64_ghost_save_policy_valid(const Sc64GhostSavePolicy *p)
 {
     if (!p || (p->seeded & ~SC64_GHOST_SAVE_UPGRADE_BITS) ||
@@ -158,51 +168,88 @@ static inline int sc64_ghost_save_encode_receipt(Sc64GhostSaveRow *out,
     return 1;
 }
 
-/* Validate the whole detached projection before publishing it. Non-Covert
- * rows (including the Silo's receipt and any nuclear missile unit row) are
- * left to their existing codecs. Normalization is only legal after success. */
-static inline int sc64_ghost_save_prepare(Sc64GhostSavePlan *out, unsigned format,
-    uint32_t word, const Sc64GhostSavePolicy *p, const Sc64GhostSaveFacts *facts,
-    const Sc64GhostSaveRow *rows, unsigned count)
+static inline int sc64_ghost_save_scan_begin(Sc64GhostSaveScan *scan, unsigned format,
+    uint32_t word, const Sc64GhostSavePolicy *p, unsigned rows)
 {
-    if (!out || !facts || !rows || count > SC64_GHOST_SAVE_BUILDINGS ||
+    if (!scan) return 0;
+    *scan = (Sc64GhostSaveScan){0};
+    if (rows > SC64_GHOST_SAVE_BUILDINGS ||
         !sc64_ghost_save_policy_valid(p)) return 0;
-    Sc64GhostSavePlan plan = {0};
-    plan.tech.completed = p->seeded;
-    uint32_t earned = 0;
+    scan->plan.tech.completed = p->seeded;
     if (format == SC64_GHOST_SAVE_BASE) {
         if (word && word != SC64_GHOST_SAVE_DAMAGE_WORD) return 0;
-        plan.canonical_damage_word = word;
+        scan->plan.canonical_damage_word = word;
     } else if (format == SC64_GHOST_SAVE_COVERT_CANDIDATE) {
         uint32_t projection = word ^ SC64_GHOST_SAVE_DAMAGE_WORD;
         if (projection >> 16) return 0;
-        earned = sc64_ghost_save_unrank(projection);
+        uint32_t earned = sc64_ghost_save_unrank(projection);
         if ((earned & p->seeded) || (earned & ~sc64_ghost_save_allowed(p))) return 0;
-        plan.tech.completed |= earned;
-        plan.canonical_damage_word = SC64_GHOST_SAVE_DAMAGE_WORD;
+        scan->plan.tech.completed |= earned;
+        scan->plan.canonical_damage_word = SC64_GHOST_SAVE_DAMAGE_WORD;
     } else return 0;
-    for (unsigned i = 0; i < count; ++i) {
-        const Sc64GhostSaveFacts *f = &facts[i];
-        const Sc64GhostSaveRow *row = &rows[i];
-        if (!sc64_ghost_save_claims_covert(f)) continue;
-        if (!sc64_ghost_save_valid_covert(f) || f->queue_empty != 1) return 0;
-        if (!row->level && !row->progress) continue;
-        if (format != SC64_GHOST_SAVE_COVERT_CANDIDATE ||
+    scan->policy = p;
+    scan->format = format;
+    scan->rows = rows;
+    return 1;
+}
+
+/* Every row advances the slot cursor, even when its contents are owned by a
+ * different decoder. A rejected row poisons the whole tentative plan. */
+static inline int sc64_ghost_save_scan_row(Sc64GhostSaveScan *scan,
+    const Sc64GhostSaveFacts *f, const Sc64GhostSaveRow *row)
+{
+    if (!scan || !scan->policy) return 0;
+    if (!f || !row || scan->next >= scan->rows) goto reject;
+    if (sc64_ghost_save_claims_covert(f)) {
+        if (!sc64_ghost_save_valid_covert(f) || f->queue_empty != 1) goto reject;
+        if (!row->level && !row->progress) { ++scan->next; return 1; }
+        if (scan->format != SC64_GHOST_SAVE_COVERT_CANDIDATE ||
             row->level <= 0 || row->level > SC64_GHOST_SAVE_CO_MAX ||
             row->progress <= 0 || row->progress > UINT16_MAX ||
-            plan.count >= SC64_GHOST_SAVE_CO_MAX) return 0;
+            scan->plan.count >= SC64_GHOST_SAVE_CO_MAX) goto reject;
         unsigned packed = (unsigned)row->level - 1;
         Sc64GhostTechJob job = {(uint16_t)row->progress,
             (uint8_t)(SC64_GHOST_TECH_OCULAR + (packed & 1u)), (uint8_t)(packed >> 1)};
         uint32_t bit = sc64_ghost_tech_bit(job.payer, job.kind);
-        if (!sc64_ghost_save_receipt_valid(p, f, &job) ||
-            ((plan.tech.completed | plan.tech.pending) & bit)) return 0;
-        plan.tech.pending |= bit;
-        plan.receipts[plan.count++] = (Sc64GhostSaveReceipt){job, (uint8_t)i, (uint8_t)f->owner};
+        if (!sc64_ghost_save_receipt_valid(scan->policy, f, &job) ||
+            ((scan->plan.tech.completed | scan->plan.tech.pending) & bit)) goto reject;
+        scan->plan.tech.pending |= bit;
+        scan->plan.receipts[scan->plan.count++] =
+            (Sc64GhostSaveReceipt){job, (uint8_t)scan->next, (uint8_t)f->owner};
     }
-    if (format == SC64_GHOST_SAVE_COVERT_CANDIDATE && !earned && !plan.count) return 0;
-    *out = plan;
+    ++scan->next;
     return 1;
+reject:
+    scan->policy = 0;
+    return 0;
+}
+
+static inline int sc64_ghost_save_scan_complete(const Sc64GhostSaveScan *scan)
+{
+    return scan && scan->policy && scan->next == scan->rows &&
+        (scan->format != SC64_GHOST_SAVE_COVERT_CANDIDATE ||
+         scan->plan.tech.completed != scan->policy->seeded || scan->plan.count);
+}
+
+static inline int sc64_ghost_save_scan_finish(const Sc64GhostSaveScan *scan,
+                                             Sc64GhostSavePlan *out)
+{
+    if (!out || !sc64_ghost_save_scan_complete(scan)) return 0;
+    *out = scan->plan;
+    return 1;
+}
+
+/* Bulk input is useful for independent pure fixtures; use the same scanner
+ * as the detached game reader and leave out unchanged on any refusal. */
+static inline int sc64_ghost_save_prepare(Sc64GhostSavePlan *out, unsigned format,
+    uint32_t word, const Sc64GhostSavePolicy *p, const Sc64GhostSaveFacts *facts,
+    const Sc64GhostSaveRow *rows, unsigned count)
+{
+    Sc64GhostSaveScan scan;
+    if (!out || !facts || !rows || !sc64_ghost_save_scan_begin(&scan,format,word,p,count)) return 0;
+    for (unsigned i=0;i<count;++i)
+        if (!sc64_ghost_save_scan_row(&scan,&facts[i],&rows[i])) return 0;
+    return sc64_ghost_save_scan_finish(&scan,out);
 }
 
 #endif
