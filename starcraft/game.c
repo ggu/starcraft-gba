@@ -10,6 +10,9 @@
 #if defined(SC64_CONTACT_CACHE)
 #define SC64_CONTACT_MEMO_ENABLED 1
 static void sc64_contact_memo_invalidate(void);
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+static void sc64_contact_memo_move_cells(unsigned from, unsigned to);
+#endif
 #define SC64_CONTACT_MEMO_INVALIDATE() sc64_contact_memo_invalidate()
 #endif
 #include "../common/gba.h"

@@ -1259,6 +1259,11 @@ static int race_builder_arrived(int worker)
             race_z6.human_drone_morphs<4u) ++race_z6.human_drone_morphs;
 #endif
         if (u[worker].owner == SIDE) supply_used -= supply;
+#ifdef SC64_CONTACT_MEMO_ENABLED
+        /* Build arrival can consume a Drone inside the active bucket pass,
+         * without going through hit_target or the bucket move hook. */
+        SC64_CONTACT_MEMO_INVALIDATE();
+#endif
         u[worker].alive = 0;
     } else {
         u[worker].order = ORDER_IDLE;

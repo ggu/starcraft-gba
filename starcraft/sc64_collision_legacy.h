@@ -179,16 +179,24 @@ sc64_unit_buckets_begin(void)
 static void GBA_HOT
 sc64_unit_bucket_move(Unit *q)
 {
-#ifdef SC64_CONTACT_MEMO_ENABLED
+#if defined(SC64_CONTACT_MEMO_ENABLED) && !defined(SC64_CONTACT_LOCAL_MEMO_PROBE)
     SC64_CONTACT_MEMO_INVALIDATE();
 #endif
 
     int slot = (int)(q - u), old_cell, new_cell;
     u8 before, after;
     if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
-    if (SC64_SCARAB_NONCOLLIDING(q)) { sc64_unit_bucket_active = 0; return; }
+    if (SC64_SCARAB_NONCOLLIDING(q)) {
+#if defined(SC64_CONTACT_MEMO_ENABLED) && defined(SC64_CONTACT_LOCAL_MEMO_PROBE)
+        SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+        sc64_unit_bucket_active = 0; return;
+    }
     old_cell = sc64_unit_bucket_cell[slot];
     new_cell = sc64_unit_bucket_cell_at(q->x, q->y);
+#if defined(SC64_CONTACT_MEMO_ENABLED) && defined(SC64_CONTACT_LOCAL_MEMO_PROBE)
+    sc64_contact_memo_move_cells((unsigned)old_cell, (unsigned)new_cell);
+#endif
     if (old_cell == 0xffffu) {
         sc64_unit_bucket_insert(slot, new_cell);
         return;

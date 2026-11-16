@@ -131,3 +131,120 @@ switch off pending broader dense-map timing and hardware checks.
 | Four paired Blood Bath save/load runs | `0096745b571d7c94c1bcf9ffeae9798f1b39cc3b12a72b42dd2d158f5160f187` |
 | T4 and P10 physical sequences | `f041133e2fedd2e22fd626b2d5ccc9214d46793afef5621b9a38645c69fedaae` |
 | Dense Zerg 7 comparison | `14a4d821be9bb50805541a0a5865a645b858a2b805ac2d0fe2520f8551e27748` |
+
+## Borrow the route queue tail (November 16)
+
+`CANONICAL_ROUTE_POINT_RETENTION=tail` replaces the dedicated plane with
+the last 6,144 bytes of the existing 32 KiB route queue on donor-free
+128×128 maps. The default remains `0`; `1` still uses the dedicated plane.
+The build key keeps all three modes separate.
+
+At most one logical slot references the borrowed tail. Before a full
+packed queue or a save/load operation can overwrite it, the slot moves
+back to the displaced pool backing and the parked key is forgotten. A
+reset drops an invalid binding without copying. The two range scratch
+planes keep their original addresses. Both wide linear writers cap their
+queues at 4,470 entries so their padded byte grid stays below the tail.
+The bounded monotone writer also stays below it; the old-grid writer
+explicitly releases it. The save fence matters: the P10 carrier
+candidate reaches byte 29,772, beyond the tail boundary at byte 26,624.
+
+On release `7b099fc7`, all four baselines match the packaged ROM hashes.
+All four candidate ROMs verify and pass unchanged ARM memory guards.
+The variant adds eight EWRAM bytes on Terran, Z10 and P10 and none on
+Showcase; it leaves 32 more IWRAM bytes before each guard. P10 has
+7,952 bytes of EWRAM headroom.
+
+The host ASan/UBSan differential covers 386,646 route queries with
+matching logical state, including donor-free wide geometry. A forced
+32-entry queue fallback verifies both fields against independent BFS
+after the whole-queue writer reuses the tail. The live-field release
+test clobbers the borrowed bytes after evacuation, and the range fixture
+checks both reserved plane addresses across a claim.
+
+On the same dense Zerg 7 window, the release and candidate match all
+131 checkpoints, 480 sampled states and route counters, and the raw
+world and packed route bytes at both endpoints.
+
+| Guest cycle counter | Release | Scratch tail | Change |
+| --- | ---: | ---: | ---: |
+| Whole loop, active mean | 2,941,970 | 2,905,182 | −1.25% |
+| Movement orders, active mean | 1,784,473 | 1,747,737 | −2.06% |
+| Whole loop, all calls p95 | 4,420,530 | 4,229,326 | −4.32% |
+| Whole loop, all calls maximum | 5,583,946 | 5,346,327 | −4.25% |
+
+All four ordinary Blood Bath pairs match 21 result fields and both raw
+SRAM files after a save and 180 more updates in fresh processes. At
+the separate Zerg 7 save cut at call 14,071, slot 6 holds live bytes in
+the borrowed tail before Save and no slot uses the tail after Save.
+Both ROMs write the same 32 KiB save and match five raw world samples
+over a fresh load and 180 neutral updates. A later save at call 48,237
+also matches through 180 neutral updates. The historical input suffix
+after that load diverges from its continuous run identically on both
+ROMs. The separate T4 and P10 physical prefixes match but avoid no
+floods. An independent source review at `e8f97ee` found no ownership
+blocker across queue writers, range copies, map shape changes, and
+aliases of the save union. It did not run a second replay. Keep the
+mode opt-in pending timing on another dense wide map and checking
+the facility FIFO composition.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Dense Zerg 7 comparison | `7b4a8b157aa814549fcc76e78cb5fa6c0c5607775471b37dfacc055325a57af1` |
+| Four paired Blood Bath save/load runs | `28f9f69c9aefbba16ba2d364ff241ed4e7c56687331d07ea65e3f19a7e1cc639` |
+| T4 and P10 physical sequences | `a7680f913722c6c9aee10a2caeb9dc4920f6a1184da112f0014c95cd0a5501ec` |
+| Zerg 7 SRAM written with a live borrowed slot | `b5f6c43a303f32f02299d0ff980431b86815a7d095c70b86f05adcd40236a0e1` |
+| Matching fresh-load world samples from that save | `108f9aedc07a98fc1632bd25be6aa4ede19433ac09eeb6b47c24df2ec75b3f0f` |
+
+## Other wide missions and facility composition (November 16)
+
+Both sides of each replay include the shipping coincident-collision
+shortcut. The baseline Z10 ROM matches the packaged `5d4b085` hash.
+The point counts below are reads at compiled branch addresses; the
+wide-flood deficit matches the direct retained-return count at every
+sampled checkpoint. Z9 records one additional outer point-wrapper
+observation after call 39,000; use the wide-entry and retained-return
+probes to count avoided floods.
+
+| Replay | Physical calls | Historical / raw snapshot pairs | Wide fills, control → tail | Retained returns | Mean active loop | All-call p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Zerg 8 | 26,506 | 11 / 38 | 235 → 219 | 16 | −0.05% | −0.47% |
+| Zerg 9 | 46,500 | 21 / 68 | 3,162 → 2,700 | 462 | −0.53% | −1.66% |
+| Zerg 9, facility FIFO on both sides | 33,500 | 16 / 50 | 1,486 → 1,187 | 299 | −0.53% | −3.33% |
+
+The final 500-call Z8 window has 14 retained hits and cuts mean active
+loop cost by 1.63%. The earlier window with the largest historical
+army has zero hits and nearly flat timing. The known 240-unit Z9 window
+has ten hits and a 0.98% mean reduction. The post-hoc 500-call Z9
+window with the most hits has 29 and cuts mean by 2.58%; it does not
+represent the whole match.
+
+The facility pairing runs 747 facility FIFO entries on each build,
+including 351 entries when the candidate already has a live borrowed
+field; no natural fallback occurs. Separate ASan/UBSan paired fixtures
+force the facility FIFO to overflow after 32 entries. Normal facility
+FIFO leaves the live tail bytes unchanged. The forced fallback
+evacuates byte-identical live point data to the pool before writing
+over the tail. All checked game state, logical route fields, and
+sampled counters match apart from expected physical work counts.
+
+All four current contact-enabled candidate links pass the original
+RAM bounds; the EWRAM difference is +8 bytes or zero. In four paired
+Blood Bath custom games, ordinary save at 600 updates and fresh load
+followed by 180 more updates match all 21 recorded fields and both
+SRAM files against the exact release. The full physical Protoss 10
+replay matches 20 checkpoints, ten briefing pages, 14 authored pages
+and 19 raw video/state samples through victory at frame 46,057.
+Mean cost is effectively unchanged (1,726,522 → 1,726,528 cycles).
+The switch remains opt-in.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paired Z8 timing and state | `f603ff1d346d4994175f013fb33004aa1499dea37cba5c46432b2e00bcdfaac6` |
+| Paired Z9 timing and state | `bbabfa3c84eb59ab6184186e2870c1e86a84ccedb628887b18d9abac2247cd4f` |
+| Exact Z10/P10 link receipt | `b85cad19ed2558ab6d73b2bc593a32c56d5f9d876e3c60159afb87640daee6e0` |
+| Paired Z9 facility timing and state | `68f11e6efe8b585228e5e0d1d3ea12c82044b2b257dd2cb89bc77c0f9b33cf4c` |
+| Facility composition link receipt | `e4f43e7b7fdb0ec60e58778c126b19e95e224995fc5c0eb6f30cd0c26639205c` |
+| Facility and forced-overflow host checks | `52944c04b0936c8cfdaa2df4f166f100dd5e515e4608baff552595958a10984d` |
+| Four paired current Blood Bath saves | `fe6e6b47703cf585fb44c8074bd4bc6cd6310346514097ed7b60d32add2329dd` |
+| Fully matched current Protoss 10 win | `81b68281e30040b0d12e47dc8bbec04aca503f90c03637052545f531e4bdf241` |

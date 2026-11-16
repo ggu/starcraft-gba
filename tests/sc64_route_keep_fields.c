@@ -604,6 +604,9 @@ static void scenario(int shape_cols, int shape_rows, int terrain, int kind, int 
     race_cols = shape_cols; race_rows = shape_rows;
     sc64_routes_reset();
     path_grid_valid = 0;
+#ifdef TEST_POINT_TAIL_DONOR_FREE
+    if (shape_cols == 128 && shape_rows == 128) sc64_route_pcount = 0;
+#endif
     make_terrain(terrain);
     ++grid_version;
     pick_pool();
@@ -684,6 +687,26 @@ static void check_single_retained_point(void)
     /* This fixture has no range reservation. Reproduce the pinned stock
      * 128x128 point bank: fixed identity slots and no ordinary donor planes. */
     sc64_route_pcount = 0;
+#if defined(SC64_ROUTE_POINT_TAIL_PROBE) && defined(TEST_LINEAR_OVERFLOW)
+    int protected_slot = sc64_route_slot(first);
+    int clobber_slot = protected_slot == 0 ? 1 : 0;
+    assert(protected_slot >= 0 && sc64_route_valid[protected_slot]);
+    sc64_route_point_spare = sc64_route_field[protected_slot];
+    memcpy(sc64_route_point_plane, sc64_route_point_spare, SC64_ROUTE_POINT_BYTES);
+    sc64_route_field[protected_slot] = sc64_route_point_plane;
+    assert(sc64_route_fill(clobber_slot, first+1) == count);
+    assert(sc64_route_point_spare == sc64_route_point_plane);
+    assert(sc64_route_field[protected_slot] != sc64_route_point_plane);
+    reference_bfs(&oracle[POOL], first);
+    for (int i = 0; i < count; ++i)
+        assert(sc64_route_get(protected_slot, i) == oracle[POOL].dir[i]);
+    reference_bfs(&oracle[POOL], first+1);
+    for (int i = 0; i < count; ++i)
+        assert(sc64_route_get(clobber_slot, i) == oracle[POOL].dir[i]);
+    check_grid_unchanged();
+    puts("forced whole-queue fallback releases the borrowed tail before writing");
+    return;
+#endif
     for (int i = 0; i <= SC64_ROUTE_SLOTS; ++i)
         assert(sc64_route_slot(first+i) >= 0);
     assert(sc64_route_point_saved == first);
@@ -699,6 +722,23 @@ static void check_single_retained_point(void)
     reference_bfs(&oracle[POOL], first);
     for (int i = 0; i < count; ++i) assert(sc64_route_get(slot, i) == oracle[POOL].dir[i]);
     check_grid_unchanged();
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+    /* Release while the scratch address is still logically occupied, then
+     * clobber every borrowed byte as a save or full queue would. */
+    int bound = -1;
+    for (int i = 0; i < SC64_ROUTE_SLOTS; ++i)
+        if (sc64_route_field[i] == sc64_route_point_plane) bound = i;
+    assert(bound >= 0 && sc64_route_valid[bound]);
+    int bound_goal = sc64_route_goal[bound];
+    u8 *pool_address = sc64_route_point_spare;
+    reference_bfs(&oracle[POOL], bound_goal);
+    SC64_ROUTE_POINT_TAIL_RELEASE();
+    memset(sc64_route_point_plane, 0x53, SC64_ROUTE_POINT_BYTES);
+    assert(sc64_route_point_spare == sc64_route_point_plane && sc64_route_point_saved == -1);
+    assert(sc64_route_field[bound] == pool_address && sc64_route_goal[bound] == bound_goal);
+    for (int i = 0; i < count; ++i)
+        assert(sc64_route_get(bound, i) == oracle[POOL].dir[i]);
+#endif
     sc64_routes_topology_changed();
     assert(sc64_route_point_saved == -1);
     assert(sc64_route_slot(first) >= 0 && keep_stat[KEEP_FILL] == old_fills+1);
