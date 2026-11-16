@@ -355,9 +355,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   2.79% and the worst update by 2.85%. Composing the two probes on Z9
   preserves all sampled world and route state. That busy interval's p95
   falls 13.35%, and the worst call now falls 1.86% against the release.
-  Run the byte lookup alone on the same Z9 prefix to separate the two
-  gains, then check longer runs, saves, other profiles and hardware.
-  Keep both options off.
+  Byte lookup alone preserves the same state and cuts the worst call
+  by 3.99%. The cold prefix improves p95 but gives back 497,335 cycles
+  at the peak. Prioritize the standalone lookup for longer runs, saves,
+  other profiles and hardware. Keep both options off.
   Dense play remains well short of 30 fps. In the
   [Z10](audits/2026-11-12-z10-battle-cycles.md) and
   [busy P10](audits/2026-11-06-current-p10-busy/README.md) samples,
