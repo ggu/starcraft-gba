@@ -384,9 +384,40 @@ reload. No guest memory was written or emulator state restored. The
 | Actual ARM-written SRAM | `98acc32fa1653c91d2e9bb077f2479f5167ba7d7593be83902bfba83475cf758` |
 | Save, restore, and impact result | `1f91847f1cfa43b000c53b04c4b5b1d9702e724570d320b45d81248d588da689` |
 
-This qualifies painting and descent in one prepared Terran custom game
-on map 0 with one Terran computer. Both-map coverage, mixed-race and
-multi-opponent lobbies, descent with other Silos still armed, composition
-with Carrier and other research journals, blank-start tech progression,
-malformed-newer ARM fallback, campaign payer provenance, measured load
-stack high-water, and hardware timing remain open.
+### Checksum-valid newer ARM record falls back
+
+The descent SRAM above held the genuine painting save in bank 0
+(sequence 3) and the genuine descent save in bank 1 (sequence 4).
+In a separate copy, change only the newer bank's Covert Ops slot 3
+`queue_progress`, an unsigned 16-bit value at bit 103 of that packed
+building row. Set it to 2,501 instead of 340: the packed field can
+represent it, but a paid Ocular receipt may have at most 2,500 source
+ticks. Recompute the newer payload's outer FNV-1a checksum. Only seven
+bytes differ: three timer bytes at zero-based SRAM offsets
+23,796–23,798 and four checksum bytes at 16,392–16,395. Both records
+still pass their envelope checks. The newer record kept its sequence,
+length, tag, earned marker, and descending missile; the older bank
+remained byte-identical.
+
+Start the same `SCCT` ROM in a fresh emulator with that copy and press
+L on the title. The loader restored frame 7,520 with Ocular pending
+for 685 ticks, Moebius earned, and the Ghost painting at age 1. The
+lobby, resources, energy, paid receipt, full strike, and missile
+reservation matched the independently observed painting save above.
+Cloning SRAM after the load returned the same 32 KiB, including the
+malformed newer bank. The input copy and original descent SRAM also
+remained unchanged. No guest memory writes or emulator save states
+were used; the existing disk guard passed before and after the run.
+
+| Fallback receipt | SHA-256 |
+| --- | --- |
+| Malformed input and SRAM after title L | `edd6c0a6983157ad969b64a09ba6b9b7326b58f8a67a7c3ddf4603a4c61dc13c` |
+| Restore and unchanged SRAM result | `6e9da77ff74ce0ddf41be9c83610fc59d457deb2504f90db985c2bcd901ec6fc` |
+
+These ARM checks cover painting, descent, and one malformed-receipt
+fallback in a prepared Terran custom game on map 0 with one Terran
+computer. They do not cover ARM rejection without a valid predecessor,
+the second map or mixed and multi-opponent lobbies, descent with other
+Silos still armed, composition with Carrier and other research journals,
+blank-start tech progression, campaign payer provenance, measured load
+stack high-water, or hardware timing.
