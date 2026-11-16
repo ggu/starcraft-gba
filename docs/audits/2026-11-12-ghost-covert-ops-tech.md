@@ -346,8 +346,47 @@ are identified here by hash; they are not build or test dependencies.
 | Actual ARM-written SRAM | `ab2be6ed9fbf9e1ffb94ce254cd840e3c9953a3a0dfe883c1d891538ecdd1f43` |
 | Save and restore result | `5f708021fa1084c18d43cad224546a93f86666cc804cc1eaf014899da70e0204` |
 
-This qualifies the combined painting save at one point in a Terran
-custom match. Building the tech tree from a blank match, saving during
-descent or advancing the restored strike through impact, malformed-newer
-ARM fallback, other lobby profiles, measured load stack high-water, and
-hardware timing remain open.
+### Combined physical ARM descent and impact
+
+The same `SCCT` ROM and observer started from the actual painting SRAM
+above. Press L at the title and let the match run with neutral input.
+The strike still had Ghost slot 8 at frame 7,942 (painting age 339) and
+released it on frame 7,943 (descent age 340). To check the descent save,
+use START then B once the Ghost is released but before impact. Resume
+with START and observe the reference impact without reloading. Start a
+fresh emulator with the new SRAM, press L at the title, and use neutral
+input again. Compare the saved fields and sample both runs one frame
+before impact, at impact, and one frame after it.
+
+The save and fresh load matched at frame 7,951: Moebius earned, Ocular
+pending for 340 source ticks, 51,688 Q8 Ghost energy, and 3,314/850
+resources. The single strike matched in owner, age (346), phase, timers,
+target, origin, absent spotter, and reservation bitmap (missile slot 28).
+The other bank retained the prior painting save byte for byte. The new
+bank verified as tag `0x764f5442`, sequence 4, with a 15,832-byte payload
+and the expected paid, earned, and independent missile records.
+
+In both runs the blast fired at frame 8,051 and released the missile
+slot. Across the live unit and building rows, the observed HP and shield
+losses and deaths on that frame matched: the blast killed the player's
+45 HP Ghost and reduced the Science Facility from 850 to 710 HP and
+the Covert Ops from 750 to 626 HP. On the following frame the impact
+animation advanced without reactivating the strike or its reservation.
+This compares the strike, its paired research state, and the damage on
+the impact frame; it does not establish full simulation equality after
+reload. No guest memory was written or emulator state restored. The
+5.25 GiB guard passed at start and finish (6,106,324,992 and
+6,102,024,192 bytes free).
+
+| Descent receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `5023c84010e628761ce4d181078d31653b63d1b8632064831592d041421253e6` |
+| Actual ARM-written SRAM | `98acc32fa1653c91d2e9bb077f2479f5167ba7d7593be83902bfba83475cf758` |
+| Save, restore, and impact result | `1f91847f1cfa43b000c53b04c4b5b1d9702e724570d320b45d81248d588da689` |
+
+This qualifies painting and descent in one prepared Terran custom game
+on map 0 with one Terran computer. Both-map coverage, mixed-race and
+multi-opponent lobbies, descent with other Silos still armed, composition
+with Carrier and other research journals, blank-start tech progression,
+malformed-newer ARM fallback, campaign payer provenance, measured load
+stack high-water, and hardware timing remain open.
