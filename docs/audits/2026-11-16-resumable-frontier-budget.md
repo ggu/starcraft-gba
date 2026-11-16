@@ -141,3 +141,36 @@ still exceeds the 30 fps target in this workload. Keep the option off
 while comparing another busy workload, other profile builds and real
 hardware. The paired receipt SHA-256 is
 `b85c153ff69db8205ad08ca88e79690656ac4bb2c9fda1a1cd51e40813fcf52e`.
+
+### Paired Z9 run with both changes
+
+Combine the byte lookup with the experimental cold-prefix dense FIFO
+continuation. The same physical Z9 replay stops at call 22,000. Across
+the release, cold-prefix-only build and combined build, all 12 named
+checkpoints and 21,987 call IDs, physical inputs and game frames match.
+All 34 raw world snapshots and their observed cache metadata, along
+with 317 completed route fields, match the release. The combined and
+cold-prefix-only builds also match the 53 sampled pending fields and
+all route-event counts exactly.
+
+| Guest cycles, active calls 21,001–22,000 | Packaged release | Cold prefix | Cold prefix and byte lookup |
+| --- | ---: | ---: | ---: |
+| Complete update, mean | 1,725,542 | 1,711,820 | 1,704,440 |
+| Complete update, p95 | 4,355,658 | 3,863,254 | 3,774,253 |
+| Complete update, maximum (call 21,879) | 23,327,324 | 23,793,795 | 22,892,902 |
+| Orders at call 21,879 | 21,653,977 | 22,099,797 | 21,198,917 |
+
+The combined build uses 900,893 fewer cycles than cold prefix alone at
+the peak, and 434,422 fewer than the release. Relative to the release,
+the active mean improves by 1.22%, p95 by 13.35%, and the peak by 1.86%.
+The combined link passes the Z10 RAM checks (EWRAM end `0x02038f18`,
+IWRAM end `0x03004d80`). Keep the experiments off. The peak still takes
+over 22 million guest cycles. A byte-lookup-only run on this same prefix
+is needed to attribute how much the cold prefix adds; longer replay,
+save and load, other product guards and GBA SP timing remain open.
+
+| Local artifact | SHA-256 |
+| --- | --- |
+| Combined Z10 replay ROM | `1bd96a61205f981d70ee81535ba010a11432f9206c6c6c7b45c818bf20bbb281` |
+| Matched checkpoints | `f27de8d6bf00393e4105527374623a6f37183e93d2e8e230a4c6b0eba083f971` |
+| Three-way comparison | `dabacc77e8b0f3a3e3939fe606ed41350afef2c4eacb1a1bd76ab52d4cb8eb1e` |
