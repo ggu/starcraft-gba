@@ -227,3 +227,50 @@ require a fresh check at the target before using B.
 | Second Marine in queue (step 11,871) | `67f56dea7d9434a855da92916277f12bc95b86c742a2e4da96a01e4e7d0938e6` |
 | Third Marine in queue (step 11,899) | `94e8b76fed0971b7ae6b0783203342a99cf2c4ed544067a80d8690a297be7489` |
 | Three Marines selected (step 15,961) | `354446384e8ab1413cc0b5f938a58c1f64742e0c159bfcaf89cdc7b46c71dc0f` |
+
+## Three Marines reach and damage a Hatchery (November 16)
+
+Two fresh runs with a separate read-only observer reproduce the exact
+15,962-step three-Marine input and all 18 visual anchors. Their six
+sampled guest-state records agree byte for byte at the same command
+boundaries. The last sample finds three selected owner-3 Marine
+records whose HP values agree with the 40 HP Marine shown earlier.
+The observer checks actor references against the owner chains and
+uses a cache-aware reader, without guest writes, save restoration or
+recompiler changes. No display corruption recurred in the pair, so it
+does not classify the earlier differences in raw video. The observer
+samples a bounded set of gameplay fields, and stops at group selection.
+
+In a fresh replay the group takes two ordinary C-Right Move waypoints.
+All three Marines are visible in the southeast Zerg base at observed
+step 18,496. The attack launcher requires all 24 archived raw frames
+to match, including the full frame showing the cursor on the hostile
+structure and the native contextual `B KILL UNIT` prompt at 18,571.
+It also requires the six prior guest-state records to match exactly.
+B then registers at observed input step 18,574 and releases at 18,580.
+The command and controller transition prefixes through the aim frame
+are byte-identical to the archived aiming replay.
+
+A subsequently selects the red Hatchery. Clean frames show 980,
+719 and 468 HP with Marine muzzle flashes and human supply remaining
+7/10. The run ends after 21,308 command steps and 28 frames, with the
+pinned inputs unchanged. This is ordinary group targeting and observed
+damage to one structure. It does not attribute individual shots,
+establish combat timing parity, or reach building destruction, owner
+elimination or a published result in the three-Marine run. The later
+HP values are visual observations; the six guest samples all predate
+the attack. Controller, file, wall-time, disk and isolation limits
+were unchanged.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paired precombat diagnostic report | `8d29a82cefa80dda2400dc07aa8dbce0a6aaa6344042f36326157a346cfbefed` |
+| Six matching precombat guest samples | `b8bad8d20658a5b9ac140fd612df6842a4e242705f13026e6d43b271241a0094` |
+| Three Marines in the hostile base (step 18,496) | `588f79ebca78d5d9507802637c1e9bc35cc717b7c6ea3519d12d02d6d2ad10db` |
+| Contextual attack anchor (step 18,571) | `c55fcee8722672c2badeb5e7a6350fbebc5ae204154d228c2a17c39ea29bbf86` |
+| Attack manifest | `58b26bffebb6ac500b398ef90e531c57f97a3be4eafc97de3d68337ad5b1c478` |
+| Complete input tape | `1e3495e906065f107dfefa986d206aaf49851e7fd0e3630367609c3e0477b3c7` |
+| Controller input log | `5df75b02382318d53d09ca0b151942488954dd1e13fb0ac49f63f494b1709a4a` |
+| Hatchery 980 HP (step 19,507) | `56db04f84936a74a4baebbb700f847e22aeabd1cdb411b0c5c0d003391a7347c` |
+| Hatchery 719 HP (step 20,407) | `918e3f31f2497b075c4ff624b8005c3bca8643f85a72db1ee2c6f234cd2be79e` |
+| Hatchery 468 HP (step 21,307) | `48e43a9f2aed720a759e7f1002c0c47b3159ea57edbd9e78bb96248ccce7d7bf` |

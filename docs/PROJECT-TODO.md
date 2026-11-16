@@ -171,8 +171,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reaches and destroys a hostile Hatchery using a normal Marine attack.
   An authenticated continuation selects the surviving Extractor at
   750 HP, so the Hatchery was not the last building. A new fork trains
-  three Marines and selects the group through ordinary input. Use it
-  to capture an owner's final building and the published result under
+  three Marines, scouts the Zerg base, and attacks its Hatchery after
+  matching all 24 archived frames and six read-only guest-state samples.
+  Clean frames show 980, 719 and 468 HP. That group run ends before
+  destruction or elimination and does not establish combat timing parity.
+  Continue toward an owner's final building and the published result under
   the same replay limits.
   Distinguish in-flight damage and simultaneous outcomes, then qualify
   complete ordinary-input matches on hardware.
@@ -318,9 +321,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The packed axis probe was slower. The [resumable route budget](audits/2026-11-16-resumable-frontier-budget.md)
   puts full point fills at 25.95% of the old dense Z7 loop and 4.95%
   of sampled Z9. Observed origins need about 39% and 2% of FIFO work,
-  with at most 52 pending entries at first discovery. Prioritize
-  preserving and resuming ordered frontier work; do not restart
-  or omit logical cache entries. Dense play remains well short of 30 fps.
+  with at most 52 pending entries at first discovery. The paired Z9 probe
+  continues declined searches in the same ordered grid. Busy p95 improves
+  11.3%, but the worst call still costs 2.0% more; leave it off and reduce
+  the decline cost before activation. Dense play remains well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
