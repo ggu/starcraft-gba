@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-15. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-16. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -171,10 +171,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   confirms the 31-decrement cadence and owner scan order. No live results
   were published in that opening. A separate ordinary-input replay
   verified placement, construction and completion of a Barracks, then
-  queued, selected and moved the resulting Marine. Next: reach hostile
-  contact under the native capture controls and record active elimination. Distinguish
-  in-flight damage and simultaneous outcomes, then qualify complete
-  ordinary-input matches on hardware.
+  queued, selected and moved the resulting Marine. The next bounded replay
+  reaches and destroys a hostile Hatchery using a normal Marine attack.
+  An authenticated continuation selects the surviving Extractor at
+  750 HP, so the Hatchery was not the last building. A new fork trains
+  three Marines and selects the group through ordinary input. Use it
+  to capture an owner's final building and the published result under
+  the same replay limits.
+  Distinguish in-flight damage and simultaneous outcomes, then qualify
+  complete ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
   now wins from HOME on the KODAK ROM and staged Terran ROM with all 95
   observations matching. The policy puts idle builders back on minerals,
@@ -295,12 +300,31 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now saves 2.85% mean loop and 8.29% p95 cycles on the same dense tape
   while keeping route oracles and scratch bindings unchanged. Composed
   builds and four paired SRAM continuations pass. T4 and P10 prefixes
-  match but exercise no retained hits. Keep the switch off while seeking
-  wider speed evidence and ways to avoid its 6 KiB EWRAM cost. The
+  match but exercise no retained hits. The [borrowed scratch tail](audits/2026-11-14-z7-point-flood-retention.md#borrow-the-route-queue-tail-november-16)
+  brings the cost down to at most eight EWRAM bytes and saves 1.25% mean
+  and 4.32% p95 cycles on dense Z7. Independent source review found no
+  queue, range or save ownership blocker. On the current 128×128 Z9
+  replay it avoids 462 of 3,162 wide floods (0.53% lower mean, 1.66%
+  lower p95). Z8 and the facility FIFO composition also match gameplay
+  checkpoints, including forced facility overflow under sanitizers.
+  All four current Blood Bath save/load pairs and the full P10 physical
+  win match. Keep the switch opt-in while checking the timing distribution
+  and worst cases on wider play and on hardware.
+  The
   [current instruction trace](audits/2026-11-15-z7-contact-cost.md) puts
   524k cycles in uncached collision masks in three no-flood samples,
-  about half those samples' order cost. Prioritize the candidate scan;
-  the dense workload is still well short of 30 fps.
+  about half those samples' order cost. The next replay shows that
+  44% of visited actors share the mover's exact coordinates. Rejecting
+  those early cuts mean dense Z7 cycles by 3.99%, with matching state.
+  The cheaper row-local memo keeps answers after unrelated movement
+  and cuts a further 6.51% mean overall and 11.05% in orders on this
+  window. It also fixes stale collision when a Drone starts a building.
+  The packed axis probe was slower. The [resumable route budget](audits/2026-11-16-resumable-frontier-budget.md)
+  puts full point fills at 25.95% of the old dense Z7 loop and 4.95%
+  of sampled Z9. Observed origins need about 39% and 2% of FIFO work,
+  with at most 52 pending entries at first discovery. Prioritize
+  preserving and resuming ordered frontier work; do not restart
+  or omit logical cache entries. Dense play remains well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
