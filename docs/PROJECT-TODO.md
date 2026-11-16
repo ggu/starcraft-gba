@@ -190,7 +190,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Hatchery while enemy buildings and mobile units remain. Read-only native
   rows now confirm the selected Hatchery leaves owner 0's chain, the count
   falls from six to five, and no result byte changes. The next target is
-  the still-full 750 HP Extractor. Continue toward the last structure and
+  the still-full 750 HP Extractor. The [scanout diagnostic](audits/2026-11-14-native-result-opening.md#localize-the-rejected-n64-scanout)
+  rejects an intermittent raw-frame error and locates it before palette
+  conversion and capture. Keep the exact gate; no second attack fired.
+  Continue toward the last structure and
   the published result under the same limits.
   Distinguish in-flight damage and simultaneous outcomes, then qualify
   complete ordinary-input matches on hardware.
