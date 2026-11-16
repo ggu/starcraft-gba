@@ -324,6 +324,9 @@ race_impact_save_write(void)
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
     ,SC64_SHOWCASE_CARRIER_TAG
 #endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    ,SC64_TERRAN_CARRIER_TAG
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     ,SC64_NUKE_SILO_TRANSPORT_TAG
 #endif
@@ -358,6 +361,22 @@ race_impact_save_write(void)
 #endif
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    if (race_mode) {
+        if (!race_p7_carrier_training_live_world_valid()) return 0;
+        unsigned packet=race_p7_projectile_encode(race_tc_packet);
+        Sc64ShowcaseProjectileCandidate view={&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H};
+        if (!packet || !sc64_compact_codec_validate(race_tc_packet,packet,SC64_POOL_CAPACITY,
+                                       race_showcase_projectile_row,&view)) return 0;
+        unsigned wire=sc64_tc_pack((const u8 *)&race_impact_record,
+            offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,race_tc_packet,packet,
+            (u8 *)&race_impact_record,sizeof(race_impact_record));
+        if (!wire) return 0;
+        return previous ? save_write_selected(&race_impact_record,wire,SC64_TERRAN_CARRIER_TAG,
+                    previous,tags,sizeof(tags)/sizeof(tags[0])) :
+                    save_write_first(&race_impact_record,wire,SC64_TERRAN_CARRIER_TAG);
+    }
+#endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     (void)previous; (void)tags;
     if (!race_q8_flash_write(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;

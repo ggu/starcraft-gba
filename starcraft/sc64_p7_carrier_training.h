@@ -3,7 +3,7 @@
 #define SC64_P7_CARRIER_TRAINING_H
 
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-#if !defined(SC64_P7_PROJECTILES_ENABLED) || !defined(SC64_P7_ACTORS)
+#if !defined(SC64_P7_PROJECTILES_ENABLED) || (!defined(SC64_P7_ACTORS) && !defined(SC64_TERRAN_CARRIER_PROBE))
 #error "P7 Carrier training requires the typed P7 Interceptor actor profile"
 #endif
 
@@ -186,10 +186,10 @@ static int race_p7_carrier_training_slots_available(unsigned wanted)
 {
     unsigned free_slots = 0, commitments = wanted;
     if (!race_protoss_services_active()) return 1;
-    /* Only P7 reserves slots for its three scripted Carrier creates. */
-#ifndef SC64_ZERG_CARRIER_PROBE
-    if (race_p7_active()) {
+#ifndef SC64_CUSTOM_CARRIER_PROBE
     unsigned created = 0;
+    /* Only P7 reserves slots for its three scripted Carrier creates. */
+    if (race_p7_active()) {
     if (race_p7.created_mask & 0xf8u) return 0;
     for (unsigned mask = race_p7.created_mask & 7u; mask; mask &= mask - 1u)
         ++created;
