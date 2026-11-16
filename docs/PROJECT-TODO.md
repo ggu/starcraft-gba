@@ -171,8 +171,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reaches and destroys a hostile Hatchery using a normal Marine attack.
   An authenticated continuation selects the surviving Extractor at
   750 HP, so the Hatchery was not the last building. A new fork trains
-  three Marines and selects the group through ordinary input. Use it
-  to capture an owner's final building and the published result under
+  three Marines, scouts the Zerg base, and attacks its Hatchery after
+  matching all 24 archived frames and six read-only guest-state samples.
+  Clean frames show 980, 719 and 468 HP. That group run ends before
+  destruction or elimination and does not establish combat timing parity.
+  Continue toward an owner's final building and the published result under
   the same replay limits.
   Distinguish in-flight damage and simultaneous outcomes, then qualify
   complete ordinary-input matches on hardware.
