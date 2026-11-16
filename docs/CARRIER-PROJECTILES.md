@@ -457,8 +457,9 @@ fixtures** with title L, then saved with START/B. Both ARM writes used the
 16,368-byte payload. The predecessor's original bank stayed byte-identical;
 the full journal's re-encoded 1,919-byte projectile packet matched its input
 byte for byte. This is ARM load/write evidence for constructed fixtures.
-Paid production and combat through ordinary ARM inputs, the full Showcase
-matrix, hardware stack high-water and battle timing remain open.
+This fixture does not exercise paid production or combat through ordinary
+controls; the separate replay below does. The full Showcase matrix, hardware
+stack high-water and battle timing remain open.
 
 A separate ordinary-input ARM run started a blank authored-map custom game
 as Protoss against one Terran bot. Probes gathered minerals and gas and
@@ -491,6 +492,20 @@ Hydralisk had 68 HP, down from 80 at the save point. This checks paid
 production, attack and a live projectile across a real ARM save. It does not
 attribute every hit to the Interceptor or qualify return and docking, other
 matchups, hardware stack use, or battle timing.
+
+The probe was also composed with release `cb210bc`. The standard Showcase
+ROM rebuilt byte for byte (`8d0d9f9464629ac3c…`); the optional ROM
+(`9d5dca67d8387a12…`) linked within the unchanged EWRAM and IWRAM limits
+(ends `0x0203aefc` and `0x03004d68`). A fresh ARM process read the earlier
+frame-12,888 active-flight journal and re-saved the 1,924-byte extension
+unchanged. After another fresh title-L load, ordinary buttons selected the
+Carrier and moved it away from the fight. Its Interceptor returned to the
+same Carrier and docked by frame 13,046 with 40 HP and 40 shields. A third
+fresh title-L load restored the observed game and docked child exactly.
+The private read-only observation receipt is pinned by SHA-256
+`546f0954a418b2a15568ba5da004d0ba6e4aa09f25a1a08a27493e812d4e8baa`.
+This is one emulator matchup with ordinary controls; the regular builds do
+not switch to the new tag and the physical GBA frame budget remains open.
 
 ### Terran custom journal study
 
