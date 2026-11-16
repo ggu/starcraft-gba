@@ -1600,6 +1600,24 @@ static const u32 sc64_dense_words[16] = {
     SC64_DENSE_WORD(8), SC64_DENSE_WORD(9), SC64_DENSE_WORD(10), SC64_DENSE_WORD(11),
     SC64_DENSE_WORD(12), SC64_DENSE_WORD(13), SC64_DENSE_WORD(14), SC64_DENSE_WORD(15),
 };
+#ifdef SC64_ROUTE_LINEAR_GRID_LUT8_PROBE
+/* The high nibble chooses a row and the low nibble chooses its column.
+ * Each entry has the same two aligned words as the scalar nibble loads. */
+#define SC64_DENSE_PAIR(l, h) { SC64_DENSE_WORD(l), SC64_DENSE_WORD(h) }
+#define SC64_DENSE_PAIRS(h) \
+    SC64_DENSE_PAIR(0, h), SC64_DENSE_PAIR(1, h), SC64_DENSE_PAIR(2, h), SC64_DENSE_PAIR(3, h), \
+    SC64_DENSE_PAIR(4, h), SC64_DENSE_PAIR(5, h), SC64_DENSE_PAIR(6, h), SC64_DENSE_PAIR(7, h), \
+    SC64_DENSE_PAIR(8, h), SC64_DENSE_PAIR(9, h), SC64_DENSE_PAIR(10, h), SC64_DENSE_PAIR(11, h), \
+    SC64_DENSE_PAIR(12, h), SC64_DENSE_PAIR(13, h), SC64_DENSE_PAIR(14, h), SC64_DENSE_PAIR(15, h)
+static const u32 sc64_dense_pairs[256][2] = {
+    SC64_DENSE_PAIRS(0), SC64_DENSE_PAIRS(1), SC64_DENSE_PAIRS(2), SC64_DENSE_PAIRS(3),
+    SC64_DENSE_PAIRS(4), SC64_DENSE_PAIRS(5), SC64_DENSE_PAIRS(6), SC64_DENSE_PAIRS(7),
+    SC64_DENSE_PAIRS(8), SC64_DENSE_PAIRS(9), SC64_DENSE_PAIRS(10), SC64_DENSE_PAIRS(11),
+    SC64_DENSE_PAIRS(12), SC64_DENSE_PAIRS(13), SC64_DENSE_PAIRS(14), SC64_DENSE_PAIRS(15),
+};
+#undef SC64_DENSE_PAIRS
+#undef SC64_DENSE_PAIR
+#endif
 #undef SC64_DENSE_BYTE
 #undef SC64_DENSE_WORD
 
@@ -1727,10 +1745,15 @@ static inline u8 *sc64_route_linear_grid(int cols, int rows, int stride, int cap
                          &border, 4);
         for (int x = 4; x < cols + 4; x += 8) {
             u32 bits = *walk++;
+#ifdef SC64_ROUTE_LINEAR_GRID_LUT8_PROBE
+            __builtin_memcpy(__builtin_assume_aligned(out + x, 4),
+                             sc64_dense_pairs[bits], 8);
+#else
             __builtin_memcpy(__builtin_assume_aligned(out + x, 4),
                              &sc64_dense_words[bits & 15u], 4);
             __builtin_memcpy(__builtin_assume_aligned(out + x + 4, 4),
                              &sc64_dense_words[bits >> 4], 4);
+#endif
         }
     }
     return dense;

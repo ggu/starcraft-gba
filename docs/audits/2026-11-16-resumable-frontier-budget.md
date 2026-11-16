@@ -70,3 +70,30 @@ These are guest cycle counts, not GBA SP frame-rate measurements.
 | --- | --- |
 | Paired Z9 prefix | `9cee2e36562a3a4e68e689c67b0fc2d506fa8a960541a926f097c8cd37bb299c` |
 | Peak-only attribution | `7fee9ae77e6ce1104b375e9fc40f9b83f85f8c73d75d51700e56437a7b7c9763` |
+
+## Cut the wide grid setup cost before changing admission
+
+The optional `CANONICAL_ROUTE_LINEAR_GRID_LUT8=1` expands each packed
+walkability byte with one 2 KiB ROM table. The entry stores the same two
+words that the two nibble lookups generate. The 64-column dedicated path,
+border values, queue bounds, seed ordering and field packing stay unchanged.
+The wide setup shared by point and optional depot floods uses the table.
+The configuration key includes the switch so a stale build cannot reuse
+the other route compiler flags.
+
+The prepared 96- and 128-column HOST route oracle and forced-overflow
+fallback have identical field, cache and residency receipts. A Z10 ARM
+build with the option off is byte-identical to packaged release
+`2b907cdecb5769dde471de04b280ffe7de79a3b43874b2eaabfc2a9b8be43eb8`.
+Both links end at EWRAM `0x02038b18` and IWRAM `0x03004d70`.
+The optional ROM is
+`f0d4ae5395cd4ed9fb1eeb6200891a7973f4e53196103e187b265848fe29450f`.
+
+In the emitted Z10 Thumb code the inner grid setup loop goes from
+14 instructions to eight per packed byte. The new loop loads and stores
+the adjacent words with `ldmia` and `stmia`. This is an instruction
+count, not a cycle or frame-rate measurement: ROM and EWRAM access timing
+also matter. The comparison against the exact dense Z7 release reached
+the disk floor before its timed window. Leave the switch off until a
+paired replay matches all checkpoints and route bytes and measures the
+mean and worst calls.

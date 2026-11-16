@@ -334,7 +334,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with at most 52 pending entries at first discovery. The paired Z9 probe
   continues declined searches in the same ordered grid. Busy p95 improves
   11.3%, but the worst call still costs 2.0% more; leave it off and reduce
-  the decline cost before activation. Dense play remains well short of 30 fps.
+  the decline cost before activation. The same audit tracks a byte lookup
+  that cuts the wide grid setup loop from 14 Thumb instructions to eight,
+  with identical HOST route and fallback receipts. Measure its actual ARM
+  mean and tail on the paired dense Z7 replay before enabling it.
+  Dense play remains well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
