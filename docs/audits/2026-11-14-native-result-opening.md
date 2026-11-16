@@ -345,3 +345,33 @@ for a future Extractor attack.
 | --- | --- |
 | Diagnostic replay manifest | `f49185b4d39d5912ff4ef23522d77e67e7724819e07754a1a0a6bd192547c8e0` |
 | Scanout stage rows | `7f441b820b9853f30cef4728d14a7881f944e371259eeb0daf4ee79641d535f9` |
+
+### Serial host RDP command calibration
+
+A fresh calibration used the same observer binary and tape with only
+`PARALLEL_RDP_SINGLE_THREADED_COMMAND=1` set. This dispatches RDP
+commands without the host worker ring; the GPU scanout and readback
+are still in use. The command prefix and six precombat guest samples
+match the rejected threaded run. The formerly differing frame now
+matches the archive, as do all 30 archived frames through the
+continuing-play anchor at observed step 24,357. The full 12-row guest
+record matches the earlier post-Hatchery replay. All 62 half-frame
+stage rows have valid indices, matching callback labels, and zero
+palette and copy differences. This one clean run does not identify the
+cause or show that serial dispatch fixes intermittent corruption.
+
+The run ended normally at command step 24,418 after 31 frame captures.
+The last frame followed cursor motion only. The live focus was an
+opposing actor, while the Terran selection was empty and all three
+Marines still had 40 HP. No new A, R or B was sent after the archived
+sequence, and there was no attack on the Extractor. Next, repeat a
+bounded cursor-only calibration on a surviving Marine. Keep the exact
+frame and live-focus checks before A, verify the selection before R,
+and require a separately verified full attack frame and live Extractor
+identity before B.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Serial command calibration manifest | `2de061f64681c1514dda1cf2497ff5dc5f0c1d089bbdbf226cd794e61a272d8b` |
+| Scheduling test receipt | `0d35ffb28acce2705c1e5e41436123b838f4efff9e3d1f0e3f8b36b9dc1800a5` |
+| Verified scanout stage rows | `c9cd83a5b5e109506164182623c51a509e5737c9e86eac518242f477a68e7b22` |
