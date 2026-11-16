@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Verify an ordinary HOME P8 tape recorded with HOST dialogue auto-acknowledgment."""
+"""Verify a normal P8 HOME tape, optionally reloading its physical pause save."""
 
 from pathlib import Path
 import argparse
@@ -11,7 +11,9 @@ import struct
 from emulator_smoke import symbols, symbol_sizes
 from sc64_races_profile import dwarf_struct_layout
 from sc64_skirmish_sram_continuation import PhysicalGame
-from sc64_p8_physical_replay import snapshot
+from sc64_p8_normal_replay import verify_restored
+from sc64_p8_physical_replay import snapshot, validate_plan as validate_save_plan
+from sc64_p8_physical_save import validate_neutral_journal
 from sc64_p8_arm_replay import load_trace
 from sc64_z7_normal_replay import input_hashes, require_unchanged
 
@@ -130,6 +132,10 @@ def main():
     parser.add_argument("--out", type=Path)
     parser.add_argument("--stop", type=int)
     parser.add_argument(
+        "--fresh-save", action="store_true",
+        help="export and reload the tape's pause save on the P10 worker-cargo build",
+    )
+    parser.add_argument(
         "--plan", action="store_true", help="validate without launching a guest"
     )
     args = parser.parse_args()
@@ -153,6 +159,11 @@ def main():
     plan, keys, checks, edges, briefchecks = parse_plan(tape, hostlog)
     stop = plan["stop"] if args.stop is None else args.stop
     require(0 < stop <= plan["stop"], "stop outside tape")
+    cut = saved_frame = None
+    if args.fresh_save:
+        save_plan, cut = validate_save_plan(tape)
+        saved_frame = save_plan["save"]["frame"] - 1
+        require(cut + 2 <= stop, "continuation must include the save and resume")
     checks = {call: row for call, row in checks.items() if call <= stop}
     rombytes = rom.read_bytes()
 
@@ -204,6 +215,7 @@ def main():
                     checkpoints=len(checks),
                     briefings=briefchecks,
                     authenticated_p8_rows=auth,
+                    fresh_save_cut=cut,
                     sha256=pins,
                 ),
                 indent=2,
@@ -219,8 +231,15 @@ def main():
     out.mkdir()
     resource.setrlimit(resource.RLIMIT_FSIZE, (256 * 1024, 256 * 1024))
     us, uf = dwarf_struct_layout(elf, "Unit")
-    g = PhysicalGame(runner, rom, elf, out / "guest")
+    save_path = out / "saved.sav" if cut is not None else None
+    g = PhysicalGame(runner, rom, elf, out / "guest", save_output=save_path)
     r = g.rsp
+    prior_calls = 0
+    saved = journal = None
+    fresh_load_verified = False
+
+    def completed():
+        return prior_calls + r.completed
 
     def hero_fields():
         raw = r.read(g.sym["u"], g.sizes["u"])
@@ -265,6 +284,8 @@ def main():
                     obs=obs,
                     first_frame_drift=drift,
                     first_mismatch=mismatch,
+                    journal=journal,
+                    fresh_load_verified=fresh_load_verified,
                     sha256=pins,
                 ),
                 indent=2,
@@ -288,7 +309,19 @@ def main():
                 emit("disk-floor", "partial.json")
                 raise SystemExit(75)
             held = keys.get(i, held)
-            step(held)
+            if i == cut:
+                require(saved is not None and held == 8, "unexpected P8 resume boundary")
+                step(512)
+                restored = snapshot(r, g.sym, g.sizes, elf)
+                require(restored["screen"] == 1 and restored["frame"] == saved_frame
+                        and restored["race_selected_mission"] == 27 and restored["race_mode"] == 0,
+                        "fresh title L did not restore the expected P8 frame")
+                verify_restored(saved["world"], restored["world"])
+                require(restored["p8_persistent_sha256"] == saved["p8_persistent_sha256"],
+                        "fresh title L changed P8 trigger state")
+                fresh_load_verified = True
+            else:
+                step(held)
             if i + 1 in briefchecks:
                 page, total = briefchecks[i + 1]
                 require(
@@ -338,7 +371,7 @@ def main():
                         page=page,
                         row=row,
                         frame=frame,
-                        physical=r.completed,
+                        physical=completed(),
                         held=held,
                         key=key,
                         **auth[row],
@@ -375,13 +408,13 @@ def main():
                 obs.append(
                     dict(
                         call=i + 1,
-                        physical=r.completed,
+                        physical=completed(),
                         fields=got,
                         mission=s["race_selected_mission"],
                         campaign=s["campaign"],
                     )
                 )
-                print("check", i + 1, r.completed, got["frame"], diff, flush=True)
+                print("check", i + 1, completed(), got["frame"], diff, flush=True)
                 require(
                     s["race_selected_mission"] == 27
                     and s["race_mode"] == 0
@@ -392,10 +425,33 @@ def main():
                     mismatch = dict(call=i + 1, diff=diff)
                     emit("diverged")
                     raise SystemExit(4)
+            if cut is not None and i + 1 == cut:
+                count, _, armed, _ = modal()
+                require(held == 0 and count == armed == 0,
+                        "save cut must be neutral and outside a dialogue")
+                saved = snapshot(r, g.sym, g.sizes, elf)
+                require(saved["screen"] == 2 and saved["frame"] == saved_frame,
+                        "ordinary pause save frame changed")
+                r.export_sram()
+                layout = dwarf_struct_layout(elf, "RaceSave")
+                journal = validate_neutral_journal(
+                    save_path.read_bytes(), layout, saved_frame, p10_cargo=True
+                )
+                prior_calls = completed()
+                g.close()
+                g = None
+                g = PhysicalGame(runner, rom, elf, out / "fresh", save_input=save_path)
+                r = g.rsp
+                require(n("screen") == n("frame") == f("page") == 0,
+                        "fresh process did not start at HOME")
         require(
-            r.completed == stop + 2 * len(pages),
-            "P8 replay check failed: r.completed==stop+2*len(pages)",
+            completed() == stop + 2 * len(pages),
+            "P8 replay lost a recorded or dialogue-only update",
         )
+        if cut is not None:
+            require(fresh_load_verified and journal is not None, "P8 fresh load was not verified")
+            require(input_hashes((save_path,))[str(save_path.resolve())] == journal["sha256"],
+                    "original P8 save changed during continuation")
         if stop == plan["stop"]:
             require(
                 s["screen"] == 3
@@ -421,7 +477,8 @@ def main():
         emit("error", "partial.json")
         raise
     finally:
-        g.close()
+        if g is not None:
+            g.close()
 
 
 if __name__ == "__main__":
