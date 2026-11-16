@@ -375,3 +375,37 @@ identity before B.
 | Serial command calibration manifest | `2de061f64681c1514dda1cf2497ff5dc5f0c1d089bbdbf226cd794e61a272d8b` |
 | Scheduling test receipt | `0d35ffb28acce2705c1e5e41436123b838f4efff9e3d1f0e3f8b36b9dc1800a5` |
 | Verified scanout stage rows | `c9cd83a5b5e109506164182623c51a509e5737c9e86eac518242f477a68e7b22` |
+
+### Traced serial replay rejects an early frame
+
+The traced replay used the same binary and serial command setting. Its
+third frame, at command step 7,659 (callback 7,658), differed from the
+clean serial reference in 63,483 pixels, all within x=8–623 and
+y=120–237. The earlier threaded failure at this step differed in 325
+pixels. Their upper halves and alpha bytes match the clean frame. In
+all three captures, the pre-palette input resolves exactly to the live
+callback and owned copy, with matching callback labels and no palette
+or copy disagreements.
+
+| Capture at the same step | Upper-half resolved digest | Lower-half resolved digest |
+| --- | --- | --- |
+| Rejected threaded | `f4807ae1ae6d2287` | `3100fa002b6e4812` |
+| Clean serial | `f4807ae1ae6d2287` | `c259400b632c7232` |
+| Rejected traced serial | `f4807ae1ae6d2287` | `f1e0349772d6f896` |
+
+The host and bridge traces agree on the full 1,613-byte opening batch:
+the host flushed it and the bridge forwarded it in full. The exact raw
+gate rejected the third frame, the host closed its input, and the bridge
+then observed EOF and closed the child input. The already-buffered
+opening finished at step 15,962. Its six guest samples and the other
+17 frames still matched, but the host authorized no next batch. This
+confirms intentional transport shutdown on the earlier raw mismatch
+and shows that serial dispatch can still see the corruption. It leaves
+the former 48-byte handoff after 21,308 untested. No cursor adjustment
+or new selection or attack occurred. Keep every exact gate before
+continuing toward the Extractor.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Traced replay manifest | `33e07db7c1960b9910e76e3d4b90fad67b85392c214793a756aa84a2f7d0b04b` |
+| Host and bridge trace link | `4cc0d21fa97aa4a027df7b18bc43bf49bae87fd85c4be5ebe90c06a0ff40052e` |
