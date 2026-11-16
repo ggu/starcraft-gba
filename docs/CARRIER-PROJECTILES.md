@@ -752,22 +752,23 @@ shared native lock. The command reads the existing inputs in place.
 
 ```sh
 python3 tools/sc64_carrier_release_physical.py --profile terran \
-  --case campaign --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --case campaign --chapter 9 --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
   --runner "$PHYSICAL_RUNNER" --plan
 ```
 
 With the native lane free, replace `--plan` with `--output` and a new
 directory name. The run takes the existing exclusive lock without
-waiting. Its two boots are capped at 512 physical updates each; the
+waiting. Each boot is capped at 512 physical updates; the
 default wall deadline is 180 seconds. It produces a small JSON receipt
 and the test's SRAM files. It makes no guest memory writes. Only
 `"status": "passed"` in the receipt qualifies as a completed case.
 
 | Case | Product(s) | Ordinary input |
 | --- | --- | --- |
-| `campaign` | Terran and Z10 | Open the final mission (IDs 13 / 21) via the menu, begin play, clear any active opening dialogue with A, and save after 30 advancing updates. |
+| `campaign` | Terran and Z10 | Open chapter 1–10 in menu order; the default is chapter 10 (IDs 13 / 21). Acknowledge queued scripted dialogue with A only when it is active, and save after 30 advancing world updates. |
 | `outpost-mixed`, `blood-bath-mixed` | All three | Protoss human with named Terran, Zerg and Protoss opponents. |
 | `outpost-sparse`, `blood-bath-sparse` | All three | Zerg human with Protoss, Closed and Random on the three rows. |
+| `migration` | All three | Use the matched regular release to save Blood Bath as human Zerg with Protoss, Closed and Terran CPU rows. Use the candidate to load, advance, save in its compact format, and load the new bank on another boot. |
 
 For skirmish cuts the fixture advances 120 updates before START/B. Both
 case types compare the resumed world against an uninterrupted 60-update
@@ -778,7 +779,7 @@ same checksummed payload in the other bank. Skirmishes also use R from
 pause after the continuation; the restart must preserve the chosen map,
 resolved races, seat mask and starting halls while resetting the frame.
 
-All 14 cases passed on the pinned ARM pair for each product. Both late
+The initial 14 cases passed on the pinned ARM pair for each product. Both late
 missions saved at frame 31 and matched their uninterrupted world at
 frame 91. The 12 skirmishes saved at frame 121, matched the uninterrupted
 world at frame 181, then restarted on the same map with the same resolved
@@ -795,6 +796,54 @@ while preserving the original bank.
 
 The local index of all 14 receipt hashes has SHA-256
 `e45d6b0a11d38facc72d5a8d24c1c9cef402a8da265baea45d288f0376dcd987`.
-These bounded cases qualify the sampled ARM boots, saves and continuations.
-They do not cover every campaign, end-to-end wins, cross-generation
-predecessor migration, full battles, physical stack use or GBA SP speed.
+
+The additional ARM run passed all 18 opening campaign save cuts for
+chapters 1–9. The fixture acknowledges queued dialogue before the cut;
+Wasteland's frame-30 message otherwise freezes play and the queue is not
+serialized. Each cut restored the watched world at frame 31 on a fresh
+title-L load, reproduced the complete checksummed payload while preserving
+the original bank, and matched the uninterrupted world at frame 91.
+Terran chapters 1–9 used the ordinary tag `0x76435442` with 15,832-byte
+payloads. Z10 used `0x56435a61` with 16,312-byte payloads. The index of
+all 18 receipts and their three SRAM images per case has SHA-256
+`065d3051bc7a056ffd889fa670cf9b71b557cfab47d32e0db66ea0dca1c98713`.
+
+Together with the two chapter-10 cases, these runs cover Terran mission IDs
+4–13 and Z10 mission IDs 0, 1 and 14–21 in compiled catalog order. This is
+one opening save and a short continuation per chapter. It does not qualify
+arbitrary mid-mission saves, end-to-end wins, full battles, physical stack
+use or GBA SP speed.
+
+The migration case uses the pinned ROM and matching ELF from the regular
+November 16 Transport1 package (source `cb210bc`) to produce a fresh save.
+It reads those files in place and never takes a player's SRAM as input.
+
+```sh
+python3 tools/sc64_carrier_release_physical.py --profile terran \
+  --case migration --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --stock-rom "$REGULAR_TERRAN_ROM" --stock-elf "$REGULAR_TERRAN_ELF" \
+  --runner "$PHYSICAL_RUNNER" --plan
+```
+
+| Product | Regular tag in bank 0 | Compact tag in bank 1 |
+| --- | --- | --- |
+| Terran | `0x76435442` | `0x764d5442` |
+| Z10 | `0x56435a61` | `0x564e5a61` |
+| Showcase | `0x76435058` | `0x764c5058` |
+
+The case takes three boots. The first must produce a valid regular-tag
+sequence 1 journal in an erased image. The candidate must restore the
+watched world, advance 60 updates, and commit a compact-tag sequence 2
+record while leaving the entire first bank intact. The third boot must
+restore the newer world without changing either bank: the 60-update
+gap catches a silent fallback to the preceding bank.
+
+All three stock migration cases passed on ARM. Each restored its stock
+world at frame 121, wrote the compact bank at frame 181 and restored frame
+181 on the third boot. Re-exporting SRAM on the third boot reproduced the
+complete converted image. The stock and compact payload sizes were
+15,832 / 13,676 bytes for Terran, 16,312 / 14,072 for Z10, and 14,204 /
+16,128 for Showcase. The local index of receipt and SRAM hashes has SHA-256
+`a48ab6ee90ba4c0cad9d7e2785897096f55e6725b0cb8b4eebc040af5e8a77e9`.
+The selected regular writer represents one save generation and one opening
+cut per product.
