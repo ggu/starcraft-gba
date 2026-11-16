@@ -3,7 +3,7 @@
 #define SC64_P7_PROJECTILE_SAVE_ADAPTER_H
 #include "sc64_save_decode_context.h"
 #ifdef SC64_P7_PROJECTILES_ENABLED
-#ifdef SC64_SHOWCASE_CARRIER_PROBE
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_TERRAN_CARRIER_PROBE)
 static int race_p7_projectile_candidate_row(const RaceSave *candidate,
         unsigned ww,unsigned wh,const Sc64ProjectileRow *row SC64_GCTX_DECL)
 {
@@ -61,6 +61,7 @@ static int race_showcase_projectile_row(void *context,u8 ordinal,const Sc64Proje
         race_p7_projectile_candidate_row(view->candidate,view->ww,view->wh,row);
 }
 
+#ifndef SC64_TERRAN_CARRIER_PROBE
 /* Candidate-only validation. No packet is decoded into live VRAM until the
  * complete save, actor links and mission state have passed preflight. */
 static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
@@ -85,6 +86,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
     return (p7 || size==2) && sc64_compact_codec_validate_target(&race_p7_projectiles,
         candidate->interceptor_projectiles,size,SC64_SHOWCASE_PROJECTILE_CAP,race_showcase_projectile_row,&view);
 }
+#endif
 #else
 /* Candidate-only validation. No packet is decoded into live VRAM until the
  * complete save, actor links and mission state have passed preflight. */

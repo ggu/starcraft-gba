@@ -2,8 +2,8 @@
 #ifndef SC64_TERRAN_CARRIER_ENVELOPE_H
 #define SC64_TERRAN_CARRIER_ENVELOPE_H
 
-/* Opt-in custom save study. Include after the Terran RaceSave and impact types.
- * Neither the ordinary writer nor the ordinary loader uses this envelope.
+/* Opt-in custom journal. Include after the Terran RaceSave and impact types.
+ * The ordinary Terran writer and loader still use the legacy payload.
  * The caller must authenticate the outer SRAM header and run the existing
  * complete game preflight on the reconstructed ordinary payload. */
 #include "sc64_interceptor_pool_codec.h"
@@ -49,7 +49,7 @@ static int sc64_tc_prefix_valid(const u8 *base)
            !memcmp(base+offsetof(RaceSave,state),&custom,sizeof(custom));
 }
 
-/* Buffers must be disjoint. Exact slice length or zero on rejection. */
+/* Base and out may be identical; packet must be disjoint. */
 static unsigned sc64_tc_pack(const u8 *base,unsigned len,const u8 *packet,
                               unsigned packet_len,u8 *out,unsigned capacity)
 {
@@ -63,21 +63,23 @@ static unsigned sc64_tc_pack(const u8 *base,unsigned len,const u8 *packet,
         if (base[i]) return 0;
     unsigned tail=len-SC64_TC_BASE, result=SC64_TC_HEADER+packet_len+tail;
     if (capacity<result) return 0;
-    memcpy(out,base,SC64_TC_PREFIX);
-    memset(out+SC64_TC_PREFIX,0,SC64_TC_INV_BYTES);
+    u8 inv[SC64_TC_INV_BYTES]={0};
     for (unsigned i=0;i<SC64_TC_INV_COUNT;++i)
-        out[SC64_TC_PREFIX+i/8] |= (u8)(base[SC64_TC_PREFIX+i]<<(i%8));
+        inv[i/8] |= (u8)(base[SC64_TC_PREFIX+i]<<(i%8));
+    if (out!=base) memcpy(out,base,SC64_TC_PREFIX);
+    memmove(out+SC64_TC_HEADER+packet_len,base+SC64_TC_BASE,tail);
+    memcpy(out+SC64_TC_PREFIX,inv,sizeof(inv));
     sc64_tc_put16(out+SC64_TC_COUNTS,packet_len);
     sc64_tc_put16(out+SC64_TC_COUNTS+2,tail);
     memcpy(out+SC64_TC_HEADER,packet,packet_len);
-    memcpy(out+SC64_TC_HEADER+packet_len,base+SC64_TC_BASE,tail);
     return result;
 }
 
-/* Detached format check and exact reconstruction. The active shot data is
- * still in wire; future runtime integration must validate its world links
- * against the accepted candidate before publishing either arena or world. */
-static unsigned sc64_tc_unpack(const u8 *wire,unsigned len,u8 *base,unsigned capacity)
+/* Detached format check and exact reconstruction, including in place. Copy
+ * the packet out before expanding in place; its world links still require
+ * validation against the reconstructed candidate. */
+static unsigned sc64_tc_unpack_packet(const u8 *wire,unsigned len,u8 *base,
+                                      unsigned capacity,u8 *saved_packet,u16 *saved_size)
 {
     if (!wire || !base || len<SC64_TC_HEADER || len>SC64_TC_WIRE_MAX ||
         !sc64_tc_prefix_valid(wire)) return 0;
@@ -89,11 +91,21 @@ static unsigned sc64_tc_unpack(const u8 *wire,unsigned len,u8 *base,unsigned cap
         (wire[SC64_TC_COUNTS-1]>>(SC64_TC_INV_COUNT%8))) return 0;
     if (!sc64_compact_codec_validate(wire+SC64_TC_HEADER,packet,SC64_POOL_CAPACITY,0,0))
         return 0;
-    memcpy(base,wire,SC64_TC_PREFIX);
+    if (saved_packet) {
+        memcpy(saved_packet,wire+SC64_TC_HEADER,packet);
+        *saved_size=(u16)packet;
+    }
+    u8 inv[SC64_TC_INV_BYTES];
+    memcpy(inv,wire+SC64_TC_PREFIX,sizeof(inv));
+    if (base!=wire) memcpy(base,wire,SC64_TC_PREFIX);
+    memmove(base+SC64_TC_BASE,wire+SC64_TC_HEADER+packet,tail);
     for (unsigned i=0;i<SC64_TC_INV_COUNT;++i)
-        base[SC64_TC_PREFIX+i]=(wire[SC64_TC_PREFIX+i/8]>>(i%8))&1u;
+        base[SC64_TC_PREFIX+i]=(inv[i/8]>>(i%8))&1u;
     memset(base+SC64_TC_OMITTED,0,SC64_TC_BASE-SC64_TC_OMITTED);
-    memcpy(base+SC64_TC_BASE,wire+SC64_TC_HEADER+packet,tail);
     return SC64_TC_BASE+tail;
 }
+#ifndef SC64_TERRAN_CARRIER_PROBE
+static unsigned sc64_tc_unpack(const u8 *wire,unsigned len,u8 *base,unsigned capacity)
+{ return sc64_tc_unpack_packet(wire,len,base,capacity,0,0); }
+#endif
 #endif

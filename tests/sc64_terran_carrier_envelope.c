@@ -5,8 +5,8 @@
 #include "../starcraft/game.c"
 #include "../starcraft/sc64_terran_carrier_envelope.h"
 
-/* Host-study tag; no production reader or writer recognizes it. */
-#define SC64_TC_FIXTURE_TAG ((SC64_TRANSPORT_SAVE_VERSION&~0x00ff0000u)|0x004d0000u)
+/* Use the probe tag; ordinary Terran readers never accept it. */
+#define SC64_TC_FIXTURE_TAG SC64_SAVE_TAG_TERRAN_CARRIER(SC64_TRANSPORT_SAVE_VERSION)
 _Static_assert(SC64_TC_FIXTURE_TAG!=SC64_TRANSPORT_SAVE_VERSION,"separate authenticated outer tag");
 
 static u8 old_wire[RACE_IMPACT_RECORD_MAX], compressed[RACE_IMPACT_RECORD_MAX];
@@ -93,6 +93,14 @@ int main(void)
         assert(n==SC64_TC_WIRE_MAX && n<=16368);
         assert(sc64_tc_unpack(compressed,n,reconstructed,sizeof(reconstructed))==old_length);
         assert(!memcmp(reconstructed,old_wire,old_length));
+        memcpy(input,old_wire,old_length);
+        assert(sc64_tc_pack(input,old_length,packet,sizeof(packet),input,sizeof(input))==n);
+        assert(!memcmp(input,compressed,n));
+        u8 recovered[SC64_TC_PACKET_MAX];
+        u16 recovered_size=0;
+        assert(sc64_tc_unpack_packet(input,n,input,sizeof(input),recovered,&recovered_size)==old_length);
+        assert(recovered_size==sizeof(packet) && !memcmp(recovered,packet,sizeof(packet)));
+        assert(!memcmp(input,old_wire,old_length));
         assert(!sc64_tc_pack(old_wire,old_length,packet,sizeof(packet),compressed,n-1));
         old_wire[SC64_TC_OMITTED]=1;
         assert(!sc64_tc_pack(old_wire,old_length,packet,sizeof(packet),compressed,sizeof(compressed)));

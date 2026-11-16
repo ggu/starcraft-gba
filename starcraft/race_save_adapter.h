@@ -157,6 +157,14 @@ static RaceImpactRecord race_impact_record;
 #else
 static RaceSave race_data;
 #endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+#define SC64_TERRAN_CARRIER_TAG SC64_SAVE_TAG_TERRAN_CARRIER(SC64_TRANSPORT_SAVE_VERSION)
+/* Keep the packet while the authenticated record expands in place and the
+ * existing detached validator prepares the ordinary world. */
+static u8 race_tc_packet[SC64_TC_PACKET_MAX];
+static u16 race_tc_size;
+static u8 race_tc_authenticated;
+#endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #include "sc64_guardian_wire.h"
 #include "sc64_stage_save_auth.h"
@@ -1518,6 +1526,24 @@ static int race_p5_save_candidate_valid(const RaceSave *candidate,
     return live + queued + race_p5_saved_remaining_creations(&candidate->p5) <= MAX_UNITS;
 }
 #endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+#include "sc64_p7_projectile_save_adapter.h"
+
+static int race_tc_candidate(unsigned ww,unsigned wh)
+{
+    Unit *actors=sc64_combined_route_save_scratch.carrier_candidate.units;
+    if (!race_tc_authenticated) return 1;
+    if (race_data.state[0]!=1) return 0;
+    /* Impacts and transport already live in the load plan. Decode the
+     * actor table into the route scratch after the impact wire tail. */
+    for (unsigned i=0;i<MAX_UNITS;++i)
+        if (!SC64_GUARD_DECODE(&race_data,i,ww,wh,&actors[i])) return 0;
+    Sc64ShowcaseProjectileCandidate view={&race_data,ww,wh};
+    return race_p7_carrier_training_candidate_valid(actors,MAX_UNITS) &&
+        sc64_compact_codec_validate_target(&race_p7_projectiles,race_tc_packet,
+            race_tc_size,SC64_POOL_CAPACITY,race_showcase_projectile_row,&view);
+}
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_projectile_save_adapter.h"
 
@@ -2868,7 +2894,7 @@ static int race_save_game(void) {
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
     race_data.interceptor_size=race_p7_projectile_encode(race_data.interceptor_projectiles);
     if (!race_p7_projectile_save_candidate_valid
@@ -2879,7 +2905,7 @@ static int race_save_game(void) {
         (&race_data,
             (unsigned)(race_cols*16),(unsigned)(race_rows*16) SC64_GCTX_ARG)) return 0;
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
     if (!race_p7_carrier_training_save_valid(&race_data,
             (unsigned)(race_cols*16),(unsigned)(race_rows*16) SC64_GCTX_ARG)) return 0;
 #endif
@@ -3073,7 +3099,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_SAVE_UI_CONTEXT
     if (!sc64_save_ui_valid((unsigned)v[SC64_SAVE_UI_STATE_INDEX], MAX_BUILDINGS)) return 0;
 #endif
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_TERRAN_CARRIER_PROBE)
     race_protoss_bind_candidate(v[0], v[2]);
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
@@ -3302,6 +3328,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                                   (unsigned)(width * 16),
                                   (unsigned)(height * 16),
                                   &candidate_unit)) return 0;
+#endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+        if (!race_tc_authenticated &&
+            (RACE_U(i,type)==U_P7_CARRIER || RACE_U(i,type)==U_P7_INTERCEPTOR)) return 0;
 #endif
 #ifdef SC64_NUKE_SILO_JOURNAL
         if (!race_nuke_save_unit_valid(RACE_U(i,type), RACE_U(i,raw_type), nuke_has_tag)) return 0;
@@ -3583,6 +3613,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             int type=race_data.buildings[i][offsetof(Building,queue)/sizeof(int)+(RACE_B(i,queue_head)+j)%5];
 #endif
             if(type<0||type>=SC_RU_COUNT)return 0;
+#ifdef SC64_TERRAN_CARRIER_PROBE
+            if (type==U_P7_INTERCEPTOR ||
+                (type==U_P7_CARRIER &&
+                 (!race_tc_authenticated || RACE_B(i,type)!=B_STARGATE))) return 0;
+#endif
 #ifdef SC64_P8_RUNTIME
             if (v[0]==0 && v[2]==SC64_P8_GLOBAL_ID &&
                 !race_p8_source_product_available(candidate_building.owner,candidate_building.raw_owner,
@@ -4417,7 +4452,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
     if (!v[0] && v[2] == SC64_T4_GLOBAL_ID && !plan->expanded_t4_valid) return 0;
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    if (!race_tc_candidate((unsigned)(width*16),(unsigned)(height*16))) return 0;
+#endif
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
     if (!race_p7_projectile_save_candidate_valid(&race_data,
             (unsigned)(width*16),(unsigned)(height*16) SC64_GCTX_ARG)) return 0;
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
@@ -4434,7 +4472,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     }
 #endif
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
     if (!race_p7_carrier_training_save_valid(&race_data,
             (unsigned)(width*16),(unsigned)(height*16) SC64_GCTX_ARG)) return 0;
 #endif
@@ -4502,12 +4540,12 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 }
 
 static int race_load_preflight(RaceLoadPlan *plan) {
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_TERRAN_CARRIER_PROBE)
     signed char prior_binding = race_protoss_binding_override;
     int prior_mission = race_protoss_override_mission;
 #endif
     int ok = race_load_preflight_candidate(plan);
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_TERRAN_CARRIER_PROBE)
     race_protoss_binding_override = prior_binding;
     race_protoss_override_mission = prior_mission;
 #endif
@@ -4730,6 +4768,23 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #elif defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_host_adapter.h"
 #endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+static int race_tc_prepare(const void *raw,u32 len,u32 tag,void *context)
+{
+    if (raw!=(const void *)&race_impact_record) return 0;
+    race_tc_authenticated=(tag==SC64_TERRAN_CARRIER_TAG);
+    race_tc_size=2;
+    race_tc_packet[0]=race_tc_packet[1]=0;
+    if (race_tc_authenticated) {
+        unsigned decoded=sc64_tc_unpack_packet(raw,len,(u8 *)&race_impact_record,
+            sizeof(race_impact_record),race_tc_packet,&race_tc_size);
+        if (!decoded) return 0;
+        len=decoded;
+        tag=SC64_TRANSPORT_SAVE_VERSION;
+    } else if (len>sizeof(race_impact_record)) return 0;
+    return race_worker_cargo_prepare_selected(&race_impact_record,len,tag,context);
+}
+#endif
 static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
 #ifdef SC64_SHARED_TRANSPORT
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
@@ -4746,6 +4801,9 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
         ,SC64_SHOWCASE_CARRIER_TAG
+#endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+        ,SC64_TERRAN_CARRIER_TAG
 #endif
 #ifdef SC64_NUKE_SILO_JOURNAL
         ,SC64_NUKE_SILO_TRANSPORT_TAG
@@ -4778,8 +4836,13 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     if (!selected) memset(plan,0,sizeof(*plan));
     return selected;
 #else
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    return save_select_prepared(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
+                                race_tc_prepare,plan,selection);
+#else
     return save_select_prepared(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
                                 race_worker_cargo_prepare_selected,plan,selection);
+#endif
 #endif
 }
 static int race_worker_cargo_previous(GbaSaveSelection *selection) {
@@ -5283,7 +5346,10 @@ static int race_load_game(void) {
     if (plan.expanded_terran_late_valid) race_late = plan.expanded.terran_late;
     else memset(&race_late, 0, sizeof(race_late));
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    if (!race_p7_projectile_restore(race_tc_packet,race_tc_size)) return 0;
+#endif
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
     /* Last commit step: later mission rebind failures must not clear the old
      * projectile arena. The candidate packet already passed full preflight. */
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles

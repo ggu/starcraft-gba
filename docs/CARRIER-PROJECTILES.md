@@ -528,8 +528,40 @@ also round-trips saves after 90 gameplay updates in all 18 map/human-race/bot
 configurations, and checks that truncation, excess length and insufficient
 output capacity fail before changing the destination.
 
-This proves storage and prepared selection only. The normal Terran ROM keeps
-its writer, reader and flags. Its future Carrier probe still needs appended
-actor IDs, appropriate facts and art, world validation of projectile
-references, a bounded live writer/commit path and its own ARM memory and
-ordinary gameplay qualification.
+This fixture proves the storage and prepared selection bounds; the separate
+runtime probe below connects them to paid Carrier gameplay.
+
+### Terran custom Carrier runtime probe
+
+The opt-in Terran build attaches shared paid Carrier production, Interceptor
+training and flight, and the projectile arena to its custom game roster.
+The original Terran actor IDs stay fixed; Carrier and Interceptor append
+as 44 and 45. The existing source-derived Terran art bank already has both
+actors and their directional frames. The probe also enables the shared
+Protoss bot planner. Campaigns keep the ordinary writer and save layout.
+
+```sh
+make -f Makefile -f tests/sc64-terran-carrier-runtime/Makefile \
+  test-sc64-terran-carrier-runtime build/StarCraft-Terran-Carrier-Probe.gba
+```
+
+New custom records use the distinct authenticated envelope above. The probe
+can select ordinary or compact banks. It expands the winning record in
+place in the existing save scratch, keeps the compact packet detached,
+checks the hangar and actor references in the candidate, and restores the
+projectile arena only after the ordinary preflight succeeds. The first
+upgrade writes to the other bank, retaining the ordinary predecessor.
+Neither the SRAM ceilings nor the linker memory guards change.
+
+With prepared Terran assets, the sanitizer fixture paid for a Carrier
+through the real Stargate queue, bought an Interceptor through the Carrier
+menu, and saved a live shot through the game's SRAM API. Loading restored
+every arena word and the hit reduced its target's HP. The fixture uses
+placed prerequisite buildings and a placed target. It also verifies that a
+malformed compact successor or a valid packet with a missing shooter falls
+back to its ordinary predecessor, and that a Terran campaign save in the probe still loads under the ordinary tag.
+The ARM link leaves 10,472 bytes before the EWRAM guard and 1,576 bytes
+before the IWRAM guard. With the probe flags off, the standard Terran ROM
+compares byte for byte with the precursor. This
+preview still needs ordinary-input blank-journal ARM play, fresh-process
+continuation, and physical stack and timing measurements.
