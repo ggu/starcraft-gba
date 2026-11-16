@@ -57,11 +57,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   that build on the Mac with the shared wide point FIFO (merged as
   `8935d56`), verified across all four ROMs. The November 16 package at
   `cb210bc` adds row-local steering and fixes stale collision after a Drone
-  starts a building. Its four regular ROMs and three separate Carrier
-  previews are staged in Downloads. KODAK was not detected during staging.
-  Older delivery notes below are
-  historical. Existing saves and older ROMs were retained. Next: test B-menu
-  scrolling and battle speed on a physical GBA SP.
+  starts a building. The regular `002a591` package adds the wide routing
+  lookup. All four ROMs were checked against their SHA-256 values and
+  are in Downloads with a quick test guide. The separate Carrier previews
+  remain available. KODAK was not detected during staging, so the older
+  card copy and all saves remain untouched. Next: test B-menu scrolling,
+  save/load and battle speed on a physical GBA SP.
 
 - **One ten-mission cartridge per race:** the default build and release
   profiles are Terran T10, Zerg Z10 and Protoss P10. All ten Zerg controllers
@@ -1138,8 +1139,14 @@ It has authenticated Silo and flight journals for queued, armed, painting
 and descending missiles and remains off in default builds. P10 generates
 separate actor tables for the world, silo and active-strike probes;
 local checks reject tables generated for a different mode.
-Finish the native timing comparison, Ghost abilities and AI and complete
-the persistence and ARM-input checks before enabling it.
+The [Covert Ops draft](https://github.com/ggu/starcraft-gba/pull/411)
+restored both painting and descent on ARM from prepared Terran saves,
+matched the uninterrupted blast, and rejected a malformed newer record
+without changing SRAM. A separate blank Blood Bath run paid for and
+finished its Barracks through ordinary controls. Next: mine gas and
+complete the Factory through Covert Ops chain from blank; qualify the
+resulting Ghost/Silo and paid research save. Finish native timing,
+other lobbies, combined journals and AI before enabling it.
 
 Other core rules to prioritize after this:
 
