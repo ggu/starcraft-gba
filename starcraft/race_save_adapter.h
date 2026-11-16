@@ -5444,7 +5444,6 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_ZERG_CARRIER_PROBE
     if (!race_p7_projectile_restore(race_zc_packet,race_zc_size)) return 0;
-#endif
 #elif defined(SC64_TERRAN_CARRIER_PROBE)
     if (!race_p7_projectile_restore(race_tc_packet,race_tc_size)) return 0;
 #endif
