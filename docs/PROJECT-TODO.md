@@ -346,14 +346,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   of sampled Z9. Observed origins need about 39% and 2% of FIFO work,
   with at most 52 pending entries at first discovery. The paired Z9 probe
   continues declined searches in the same ordered grid. Busy p95 improves
-  11.3%, but the worst call still costs 2.0% more; leave it off and reduce
-  the decline cost before activation. The same audit tracks a byte lookup
+  11.3%, but by itself the worst call still costs 2.0% more. The same
+  audit tracks a byte lookup
   that cuts the wide grid setup loop from 14 Thumb instructions to eight
   and its isolated mGBA cycles by 34.6%, with identical HOST route and
   fallback receipts. The paired dense Z7 replay matches 131 checkpoints
   and both raw route endpoints, cutting the active mean by 1.39%, p95 by
-  2.79% and the worst update by 2.85%. Keep the option off pending checks
-  on other workloads and release profiles and on real hardware.
+  2.79% and the worst update by 2.85%. Composing the two probes on Z9
+  preserves all sampled world and route state. That busy interval's p95
+  falls 13.35%, and the worst call now falls 1.86% against the release.
+  Run the byte lookup alone on the same Z9 prefix to separate the two
+  gains, then check longer runs, saves, other profiles and hardware.
+  Keep both options off.
   Dense play remains well short of 30 fps. In the
   [Z10](audits/2026-11-12-z10-battle-cycles.md) and
   [busy P10](audits/2026-11-06-current-p10-busy/README.md) samples,
