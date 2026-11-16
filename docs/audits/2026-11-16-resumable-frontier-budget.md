@@ -116,7 +116,28 @@ python3 tools/sc64_route_grid_loop_bench.py \
 
 The receipt SHA-256 is
 `f321c41740e811cdebc1717b560f81eaecf7f34b145fbeeb969dd23e0fb2744d`.
-The comparison against the exact dense Z7 release reached the disk
-floor before its timed window. Leave the switch off until a paired
-replay matches checkpoints and route bytes and measures the mean and
-worst calls.
+
+### Paired gameplay on the exact dense Z7 release
+
+The physical-key replay on the same release and candidate digests
+matched all 131 named checkpoints and all 480 sampled call indices,
+simulation frames and route counters. Both endpoints also matched
+the resident route fields, walkability, cache identities and ages,
+and the raw unit, building and map-state bytes. The replay executed
+477 active calls in the timed window.
+
+| Guest cycles, active calls | Packaged release | Byte lookup | Change |
+| --- | ---: | ---: | ---: |
+| Complete update, mean | 2,640,646 | 2,603,901 | −1.39% |
+| Complete update, p95 | 4,201,699 | 4,084,306 | −2.79% |
+| Complete update, maximum (call 47,823) | 5,174,688 | 5,027,328 | −2.85% |
+| Orders, mean | 1,483,645 | 1,447,017 | −2.47% |
+| Orders, p95 | 3,061,150 | 2,945,794 | −3.77% |
+| Orders, maximum (call 47,855) | 4,004,291 | 3,855,167 | −3.72% |
+
+The [isolated-loop](#cut-the-wide-grid-setup-cost-before-changing-admission)
+and gameplay results measure different scopes. The complete frame
+still exceeds the 30 fps target in this workload. Keep the option off
+while comparing another busy workload, other profile builds and real
+hardware. The paired receipt SHA-256 is
+`b85c153ff69db8205ad08ca88e79690656ac4bb2c9fda1a1cd51e40813fcf52e`.

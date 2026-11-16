@@ -342,8 +342,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the decline cost before activation. The same audit tracks a byte lookup
   that cuts the wide grid setup loop from 14 Thumb instructions to eight
   and its isolated mGBA cycles by 34.6%, with identical HOST route and
-  fallback receipts. Measure its full game mean and tail on the paired
-  dense Z7 replay before enabling it.
+  fallback receipts. The paired dense Z7 replay matches 131 checkpoints
+  and both raw route endpoints, cutting the active mean by 1.39%, p95 by
+  2.79% and the worst update by 2.85%. Keep the option off pending checks
+  on other workloads and release profiles and on real hardware.
   Dense play remains well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
