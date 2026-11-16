@@ -334,6 +334,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
     defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || \
     defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #error "Z10 Carrier probe requires the isolated full Z10 journal vector"
+#endif
 #elif defined(SC64_TERRAN_CARRIER_PROBE)
 #if !defined(SC64_TERRAN_LATE_RUNTIME) || !defined(SC64_LATE_TERRAN_STORAGE) || \
     !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || !defined(SC64_INTERCEPTOR_COMPACT_CODEC) || \

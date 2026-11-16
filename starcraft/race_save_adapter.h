@@ -4933,6 +4933,7 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     return save_select_prepared(&race_impact_record,sizeof(race_impact_record),tags,sizeof(tags)/sizeof(tags[0]),
                                 race_worker_cargo_prepare_selected,plan,selection);
 #endif
+#endif
 #endif /* Z10 Carrier probe */
 }
 static int race_worker_cargo_previous(GbaSaveSelection *selection) {
