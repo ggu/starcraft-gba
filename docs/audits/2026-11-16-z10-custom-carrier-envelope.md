@@ -98,5 +98,20 @@ shooter and a Hydralisk, slot 48, as target. A fresh process used title L
 to restore the frame, wallets, supply and observed actors, and the
 immediate re-save reproduced the full payload. The target was present at
 40 HP after restore and absent 80 updates later; the replay does not
-isolate the cause. Return and docking, physical stack high-water and
-timing, and the full custom and campaign matrix still need qualification.
+isolate the cause. Physical stack high-water, timing, and the full custom and campaign
+matrix still need qualification.
+
+A separate [withdrawal receipt](../../tools/sc64_z10_carrier_dock_receipt.py)
+resumes that live-shot journal with ordinary title L. The player directs the
+Carrier toward (101, 134) at frame 12,866. Interceptor slot 12 changes from
+attack to return and docks with Carrier slot 5 by 12,881, restoring its
+40 HP and 40 shields. START/B writes a 14,081-byte payload with no active
+projectiles. A fresh title-L load restores the docked actor and re-saving
+reproduces all 14,081 bytes.
+
+After composing the Terran and Z10 drafts with release `e05a0e52`, both
+separate probe builds pass their sanitizer fixtures and unchanged ARM
+memory guards. The composed Z10 probe also reproduces the withdrawal
+receipt from the original active-shot seed. With the probe disabled, the
+composed standard Z10 ROM matches the current packaged release exactly
+(SHA-256 `2b907cdecb5769dde471de04b280ffe7de79a3b43874b2eaabfc2a9b8be43eb8`).
