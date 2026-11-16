@@ -560,8 +560,25 @@ every arena word and the hit reduced its target's HP. The fixture uses
 placed prerequisite buildings and a placed target. It also verifies that a
 malformed compact successor or a valid packet with a missing shooter falls
 back to its ordinary predecessor, and that a Terran campaign save in the probe still loads under the ordinary tag.
-The ARM link leaves 10,472 bytes before the EWRAM guard and 1,576 bytes
-before the IWRAM guard. With the probe flags off, the standard Terran ROM
-compares byte for byte with the precursor. This
-preview still needs ordinary-input blank-journal ARM play, fresh-process
-continuation, and physical stack and timing measurements.
+The initial probe left the regular Terran ROM byte-identical with the probe
+flags off. When composed with release `cb210bc` as `e1058ca`, both HOST
+fixtures passed and the ARM link left 10,456 bytes before the EWRAM guard
+and 1,544 bytes before the IWRAM guard.
+
+The composed ARM probe
+(`eedcfd0e8fab20e566c8089f730fdc0986f73096c6c5410e95476deddfaeffdc`)
+also passed an ordinary-input authored-map custom match against one Zerg
+bot. A blank journal started the Protoss economy. The player paid 350
+minerals and 250 gas for a Carrier at frame 9,753 and 25 minerals for an
+Interceptor at frame 12,431. Ordinary controls launched the Interceptor
+at frame 12,870. A START/B save at frame 12,891 wrote a 13,704-byte
+custom record with one moving shot in a 30-byte packet, linked to the
+player's Interceptor (slot 12) and a Hydralisk (slot 33). Fresh title-L
+continuation restored the frame, wallet, supply and observed actor rows.
+An immediate guest re-save reproduced the entire payload byte for
+byte. After 80 more updates the Hydralisk had 56 HP, down from 80 at
+the save; the observation does not isolate the sources of damage.
+
+The memory guards and gameplay receipt do not establish physical stack
+use, timing, return and docking, or coverage of the other custom and
+campaign configurations. Keep the probe disabled in the standard build.
