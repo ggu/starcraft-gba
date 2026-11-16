@@ -194,9 +194,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   falls from six to five, and no result byte changes. The next target is
   the still-full 750 HP Extractor. The [scanout diagnostic](audits/2026-11-14-native-result-opening.md#localize-the-rejected-n64-scanout)
   rejects an intermittent raw-frame error and locates it before palette
-  conversion and capture. Keep the exact gate; no second attack fired.
-  Continue toward the last structure and
-  the published result under the same limits.
+  conversion and capture. One [serial host command replay](audits/2026-11-14-native-result-opening.md#serial-host-rdp-command-calibration)
+  matches all prior frames and guest samples. The cursor misses the
+  Marines, so no new selection or second attack occurs. Recalibrate
+  with bounded cursor-only input, then verify the live Marine selection
+  and exact Extractor attack frame before issuing B. Continue toward
+  the last structure and published result under the same limits.
   Distinguish in-flight damage and simultaneous outcomes, then qualify
   complete ordinary-input matches on hardware.
   [Terran versus one Zerg CPU on Outpost](audits/2026-11-13-outpost-human-win.md)
