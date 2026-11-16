@@ -739,3 +739,62 @@ These checks use actual engine input handling and HOST SRAM under
 ASan/UBSan. They do not prove a mission win, another process restoring a
 guest SRAM image, longer skirmishes, late-campaign saves, or GBA speed.
 The ARM and hardware gates above still apply to regular activation.
+
+### Pinned ARM release gate
+
+`tools/sc64_carrier_release_physical.py` provides a single bounded case
+per invocation for the exact selector-equivalent Terran, Z10 and
+Showcase ROMs listed above. Pass their matching direct-gate debug ELFs
+and the pinned port-free physical observer. Use `--plan` first: it checks
+the three hashes, frontend and actor layouts and (for a campaign) the
+compiled campaign catalog. It neither launches an emulator nor opens the
+shared native lock. The command reads the existing inputs in place.
+
+```sh
+python3 tools/sc64_carrier_release_physical.py --profile terran \
+  --case campaign --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --runner "$PHYSICAL_RUNNER" --plan
+```
+
+With the native lane free, replace `--plan` with `--output` and a new
+directory name. The run takes the existing exclusive lock without
+waiting. Its two boots are capped at 512 physical updates each; the
+default wall deadline is 180 seconds. It produces a small JSON receipt
+and the test's SRAM files. It makes no guest memory writes. Only
+`"status": "passed"` in the receipt qualifies as a completed case.
+
+| Case | Product(s) | Ordinary input |
+| --- | --- | --- |
+| `campaign` | Terran and Z10 | Open the final mission (IDs 13 / 21) via the menu, begin play, clear any active opening dialogue with A, and save after 30 advancing updates. |
+| `outpost-mixed`, `blood-bath-mixed` | All three | Protoss human with named Terran, Zerg and Protoss opponents. |
+| `outpost-sparse`, `blood-bath-sparse` | All three | Zerg human with Protoss, Closed and Random on the three rows. |
+
+For skirmish cuts the fixture advances 120 updates before START/B. Both
+case types compare the resumed world against an uninterrupted 60-update
+reference. Fresh title L must restore the watched world before any live
+update. An immediate re-save must use the same ordinary campaign or
+compact custom tag, leave the original bank byte-identical and write the
+same checksummed payload in the other bank. Skirmishes also use R from
+pause after the continuation; the restart must preserve the chosen map,
+resolved races, seat mask and starting halls while resetting the frame.
+
+All 14 cases passed on the pinned ARM pair for each product. Both late
+missions saved at frame 31 and matched their uninterrupted world at
+frame 91. The 12 skirmishes saved at frame 121, matched the uninterrupted
+world at frame 181, then restarted on the same map with the same resolved
+seats and halls. Every immediate re-save reproduced the complete payload
+while preserving the original bank.
+
+| ARM case | Passed | Journal tag | Payload bytes |
+| --- | ---: | --- | ---: |
+| Final Terran mission | 1 | `0x76435442` | 15,858 |
+| Final Z10 mission | 1 | `0x56435a61` | 16,312 |
+| Terran custom | 4 | `0x764d5442` | 13,676 |
+| Z10 custom | 4 | `0x564e5a61` | 14,072 |
+| Showcase custom | 4 | `0x764c5058` | 16,128 |
+
+The local index of all 14 receipt hashes has SHA-256
+`e45d6b0a11d38facc72d5a8d24c1c9cef402a8da265baea45d288f0376dcd987`.
+These bounded cases qualify the sampled ARM boots, saves and continuations.
+They do not cover every campaign, end-to-end wins, cross-generation
+predecessor migration, full battles, physical stack use or GBA SP speed.
