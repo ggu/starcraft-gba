@@ -417,3 +417,77 @@ Future integration still needs a save generation and exact byte budget,
 candidate actor and projectile validation, persistent unit IDs, generated
 facts, and per-product memory and gameplay checks. No profile, runtime
 projectile cap, or existing save format changes with this foundation.
+
+### Showcase Carrier probe
+
+With the prepared Showcase assets, run `make showcase-carrier-probe` and
+`make test-sc64-showcase-carrier`. The isolated cartridge is
+`StarCraft-Showcase-Carrier-Probe-GBA.gba` (game code `SCCP`).
+It runs the same shared Carrier and Interceptor services as the Protoss build.
+The regular Showcase target and its save format stay unchanged.
+
+The probe retains every existing Showcase actor ID and appends raw 73 at
+type 49. The custom-game Carrier uses the existing Stargate production rule
+and Fleet Beacon requirement; the ordinary selected-unit command pays for
+an Interceptor. The probe generates its own fact and rectangle tables from
+the matching actor vector.
+
+The probe's save tag distinguishes its projectile extension while retaining the
+predecessor's inner state version. The largest packet has 95 simultaneous
+Interceptor shots. The pool refuses a launch while all 95 slots are active. The
+1,924-byte extension includes the compact packet's length and zero padding.
+It raises the 14,228-byte predecessor base, including both Yamato rows, to
+16,152 bytes. Adding the 8-byte impact header, 32 six-byte impacts and 16-byte
+transport trailer gives exactly 16,368 bytes, the SRAM slot's payload limit.
+The saved shape cannot reduce the impact queue or truncate active Yamato rows.
+
+Old journals load through the detached selector, which reads their actors,
+impacts and Yamato rows at the original offsets and supplies an empty
+Interceptor pool. The test uses a real predecessor writer and fresh readers.
+It trains a paid Carrier and Interceptor, observes flight through the real
+firing path, saves all three queues at once and checks that a checksum-correct
+invalid extension falls back to the intact predecessor. With that
+predecessor removed, the invalid record changes neither live state nor SRAM.
+
+A bounded mGBA run drove the probe with the pinned physical-button runner
+(`4f655601…`), without writing guest memory. A blank guest reached frame 241
+of an authored-map custom game with a Protoss human and one Terran bot.
+Separate fresh guests loaded the predecessor and full-journal **host
+fixtures** with title L, then saved with START/B. Both ARM writes used the
+16,368-byte payload. The predecessor's original bank stayed byte-identical;
+the full journal's re-encoded 1,919-byte projectile packet matched its input
+byte for byte. This is ARM load/write evidence for constructed fixtures.
+Paid production and combat through ordinary ARM inputs, the full Showcase
+matrix, hardware stack high-water and battle timing remain open.
+
+A separate ordinary-input ARM run started a blank authored-map custom game
+as Protoss against one Terran bot. Probes gathered minerals and gas and
+completed the Assimilator, Pylon and Forge. The guest saved at frame 3,004
+with 476 minerals and 112 gas. From that save, the Gateway completed by
+frame 4,151, Cybernetics Core by 5,369 and Stargate by 6,754. A further
+normal-origin continuation completed the Fleet Beacon at (184, 120) by
+frame 8,800, with 316 minerals and 74 gas. START/B produced a 16,128-byte
+Carrier journal (tag `0x764c5058`); a fresh title-L load restored the same
+frame, wallet, supply and observed unit and building rows. This ordinary
+tech path is separate from the synthetic full-journal smoke. Waiting for
+Carrier gas did not reach a purchase before the match left play. The next
+ordinary-input run needs an earlier gas and defense plan to pay for the
+Carrier and Interceptor, attack, and save during flight.
+
+A defended ordinary-input run against one Zerg bot completed the next
+checkpoint on probe ROM SHA-256 `2a8a3849…`. From a blank custom game,
+ordinary buttons built the tech chain and kept Probes gathering gas. A
+Stargate queued a Carrier at frame 9,753 for exactly 350 minerals and 250
+gas. The Carrier completed at 12,386. Its selected-unit command paid 25
+minerals at frame 12,431; the Interceptor completed at 12,811 and was outside
+the hangar by 12,864.
+
+START/B at 12,888 wrote a 16,128-byte journal with one moving projectile in
+a 30-byte compact packet. The packet named the player's Interceptor (slot
+12) and a Hydralisk (slot 43). A fresh title-L load restored frame, wallet,
+supply and observed actors, and a guest re-save reproduced the entire
+1,924-byte compact extension. After 80 more updates the observed
+Hydralisk had 68 HP, down from 80 at the save point. This checks paid
+production, attack and a live projectile across a real ARM save. It does not
+attribute every hit to the Interceptor or qualify return and docking, other
+matchups, hardware stack use, or battle timing.

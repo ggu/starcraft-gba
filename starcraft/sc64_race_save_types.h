@@ -261,7 +261,10 @@ typedef struct {
     Sc64T4RuntimeState t4;
 #endif
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_SHOWCASE_CARRIER_PROBE)
+    u16 interceptor_size;
+    u8 interceptor_projectiles[SC64_SHOWCASE_PROJECTILE_BYTES];
+#elif defined(SC64_P7_PROJECTILES_ENABLED)
     u8 interceptor_projectiles[SC64_CODEC_BYTES];
     u8 interceptor_padding;
 #endif

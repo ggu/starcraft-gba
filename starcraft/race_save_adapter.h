@@ -2874,8 +2874,14 @@ static int race_save_game(void) {
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    race_data.interceptor_size=race_p7_projectile_encode(race_data.interceptor_projectiles);
+    if (!race_p7_projectile_save_candidate_valid
+#else
     if (!race_p7_projectile_encode(race_data.interceptor_projectiles) ||
-        !race_p7_projectile_save_candidate_valid(&race_data,
+        !race_p7_projectile_save_candidate_valid
+#endif
+        (&race_data,
             (unsigned)(race_cols*16),(unsigned)(race_rows*16) SC64_GCTX_ARG)) return 0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -3013,6 +3019,9 @@ typedef struct {
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
     int legacy_worker_cargo;
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    int legacy_showcase_carrier;
+#endif
 #endif
     union {
         int unused;
@@ -4416,6 +4425,19 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (!race_p7_projectile_save_candidate_valid(&race_data,
             (unsigned)(width*16),(unsigned)(height*16) SC64_GCTX_ARG)) return 0;
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    /* The predecessor did not have a persistent Interceptor type. */
+    if (plan->legacy_showcase_carrier) {
+        for (unsigned i=0;i<MAX_UNITS;++i) {
+            Unit actor;
+            if (!SC64_GUARD_DECODE(&race_data,i,(unsigned)(width*16),
+                                    (unsigned)(height*16),&actor) ||
+                actor.type==U_P7_INTERCEPTOR || RACE_PROTOSS_RAW(&actor)==73 ||
+                (actor.alive && actor.type==U_P7_CARRIER &&
+                 (actor.carry || actor.work_timer))) return 0;
+        }
+    }
+#endif
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (!race_p7_carrier_training_save_valid(&race_data,
@@ -4599,6 +4621,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
 #ifdef SC64_SHARED_TRANSPORT
     if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+        && tag != SC64_SHOWCASE_CARRIER_TAG
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
         && tag != SC64_RESEARCH_TRANSPORT_SAVE_VERSION
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
@@ -4610,6 +4635,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
        ) return 0;
     plan->legacy_worker_cargo=(tag==SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION);
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    plan->legacy_showcase_carrier=tag!=SC64_SHOWCASE_CARRIER_TAG;
+#endif
 #else
     if (tag != SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_SAVE_VERSION
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
@@ -4721,6 +4749,9 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+        ,SC64_SHOWCASE_CARRIER_TAG
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
         ,SC64_NUKE_SILO_TRANSPORT_TAG
 #endif
@@ -5265,7 +5296,11 @@ static int race_load_game(void) {
 #ifdef SC64_P7_PROJECTILES_ENABLED
     /* Last commit step: later mission rebind failures must not clear the old
      * projectile arena. The candidate packet already passed full preflight. */
-    if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
+    if (!race_p7_projectile_restore(race_data.interceptor_projectiles
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+                                    ,race_data.interceptor_size
+#endif
+                                   )) return 0;
 #endif
     clear_tracers();death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
 #ifdef SC64_SAVE_UI_CONTEXT
