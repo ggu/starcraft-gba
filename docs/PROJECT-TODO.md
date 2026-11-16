@@ -104,7 +104,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
   with both heroes at full health, 41 matching observations and twelve
-  authenticated in-game pages. Check a fresh save continuation separately.
+  authenticated in-game pages. A [fresh SRAM prefix on the current ROM](audits/2026-11-13-p8-host-hero-retreat.md#fresh-sram-prefix-on-the-november-16-normal-p10-build)
+  matches the pause save at frame 30,825 and the first resumed checkpoints.
+  Run the same continuation through victory and cover other save states.
 
 - **Independent custom opponents (K1):** the owned N64 Blood Bath lobby
   confirmed separate named, Random, and Closed seats and a middle-only

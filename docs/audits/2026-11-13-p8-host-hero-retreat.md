@@ -43,3 +43,30 @@ older KODAK ROM, a save continuation, or hardware frame rate.
 | Matching ELF | `6319d1647b73ffa7ac9c0f165c1db1a8dbdf3a5792dc066c97024203f6672d44` |
 | Physical mGBA observer | `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549` |
 | Full HOME receipt | `8dd9310a569246f50e3f155a4cf8e881a779f1fb02cfc3778c53f9e099ea6cd8` |
+
+## Fresh SRAM prefix on the November 16 normal P10 build
+
+On the packaged P10 ROM, the ordinary tape used START/B at its recorded
+pause to write frame 30,825. The physical observer exported the actual
+32 KiB journal. The neutral slot had outer tag `0x7643505f`, inner tag
+`0x7243505f`, 16,308 payload bytes, sequence 1 and a valid checksum.
+There were no active Yamato shots or pending impacts and the second slot
+was erased.
+
+An independent process started at HOME, loaded using title L, and matched
+the saved world fingerprint and persistent P8 trigger state before
+continuing. The 31,750-call prefix matched 13 checkpoints, all checked
+key edges, eight briefing pages and two in-game pages. The last named
+checkpoint was at frame 30,918, 93 game updates after the save. Both
+processes used physical inputs and a read-only state observer. The
+original exported journal stayed byte-identical. This prefix verifies
+one current pause-save cut; the continuation through victory is a
+separate check.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Packaged P10 ROM | `363a9aa963b7ff35aaf7e970fd310a60edb4db4afff43c2d0a33a1a1df76d45a` |
+| Matching ELF | `06582346f58a68c0d9761a7a66fa51dc01ba36aae6b3fd693a3125aef4e6dc22` |
+| Physical mGBA observer | `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549` |
+| Neutral physical journal | `eb85fbbf33fc2d14b4e75c8b8050e6f283a553c61341b306997093b82d62f1db` |
+| Prefix receipt | `258646e05e1bdfd862b5bae8b808dc0d631955ca89e9acbf90750e1e4f18c60f` |
