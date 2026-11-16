@@ -321,9 +321,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The packed axis probe was slower. The [resumable route budget](audits/2026-11-16-resumable-frontier-budget.md)
   puts full point fills at 25.95% of the old dense Z7 loop and 4.95%
   of sampled Z9. Observed origins need about 39% and 2% of FIFO work,
-  with at most 52 pending entries at first discovery. Prioritize
-  preserving and resuming ordered frontier work; do not restart
-  or omit logical cache entries. Dense play remains well short of 30 fps.
+  with at most 52 pending entries at first discovery. The paired Z9 probe
+  continues declined searches in the same ordered grid. Busy p95 improves
+  11.3%, but the worst call still costs 2.0% more; leave it off and reduce
+  the decline cost before activation. Dense play remains well short of 30 fps.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution

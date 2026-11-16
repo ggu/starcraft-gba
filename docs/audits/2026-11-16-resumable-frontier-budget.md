@@ -42,3 +42,31 @@ over these rendering switches.
 | Zerg 7 route attribution | `31ad233e50a616836fd60cef7ec3b5ff4736695dfc1219b144ffd8518c9e1eab` |
 | Zerg 9 route attribution | `acacbeaeef21465c76520b5b901a848c641786e87909c7dd48b474abcc6cbd98` |
 | Paired Zerg render checks | `e21b768f69d2edc4064a8ab142e22d0a09420c6b249712be4073f398e4f3bf70` |
+
+## Paired Z9 prototype: continue a declined search in place
+
+The cold-prefix probe starts in the normal padded grid. If the query cannot
+park within its budget, it continues from the same ordered frontier without
+clearing or reseeding. Sanitizer tests match the independent FIFO oracle
+across parked, declined and forced-overflow paths. The ARM guards pass for
+Z10 and P10, and opt-out Z10 is byte-identical to the release.
+
+On the pinned Z9 prefix, all 12 historical checkpoints, 34 raw observations,
+317 completed route-field pairs and 21,987 sampled frame IDs match.
+
+| Guest cycles | Exact release | Prior probe | Continue in place |
+| --- | ---: | ---: | ---: |
+| Worst loop | 23,327,324 | 27,816,467 | 23,793,795 |
+| Busy interval, active mean | 1,725,542 | 1,733,404 | 1,711,820 |
+| Busy interval, active p95 | 4,355,658 | 4,235,409 | 3,863,254 |
+
+The busy p95 is 11.3% lower than the release, but the worst call still costs
+2.0% more. Its 19 cold searches all declined parking and continued in the
+same grid. None restored a previously parked field. Leave the probe off;
+reduce the extra cost of declines before considering a broader rollout.
+These are guest cycle counts, not GBA SP frame-rate measurements.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paired Z9 prefix | `9cee2e36562a3a4e68e689c67b0fc2d506fa8a960541a926f097c8cd37bb299c` |
+| Peak-only attribution | `7fee9ae77e6ce1104b375e9fc40f9b83f85f8c73d75d51700e56437a7b7c9763` |
