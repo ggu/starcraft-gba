@@ -796,12 +796,24 @@ while preserving the original bank.
 
 The local index of all 14 receipt hashes has SHA-256
 `e45d6b0a11d38facc72d5a8d24c1c9cef402a8da265baea45d288f0376dcd987`.
-These bounded cases qualify the sampled ARM boots, saves and continuations.
-They do not cover the other campaign chapters, end-to-end wins, full
-battles, physical stack use or GBA SP speed.
 
-The extended plans cover Terran chapter IDs 4–13 and Z10 chapter IDs
-0, 1 and 14–21; their order must match each pinned ROM's compiled catalog.
+The additional ARM run passed all 18 opening campaign save cuts for
+chapters 1–9. The fixture acknowledges queued dialogue before the cut;
+Wasteland's frame-30 message otherwise freezes play and the queue is not
+serialized. Each cut restored the watched world at frame 31 on a fresh
+title-L load, reproduced the complete checksummed payload while preserving
+the original bank, and matched the uninterrupted world at frame 91.
+Terran chapters 1–9 used the ordinary tag `0x76435442` with 15,832-byte
+payloads. Z10 used `0x56435a61` with 16,312-byte payloads. The index of
+all 18 receipts and their three SRAM images per case has SHA-256
+`065d3051bc7a056ffd889fa670cf9b71b557cfab47d32e0db66ea0dca1c98713`.
+
+Together with the two chapter-10 cases, these runs cover Terran mission IDs
+4–13 and Z10 mission IDs 0, 1 and 14–21 in compiled catalog order. This is
+one opening save and a short continuation per chapter. It does not qualify
+arbitrary mid-mission saves, end-to-end wins, full battles, physical stack
+use or GBA SP speed.
+
 The migration case uses the pinned ROM and matching ELF from the regular
 November 16 Transport1 package (source `cb210bc`) to produce a fresh save.
 It reads those files in place and never takes a player's SRAM as input.
@@ -835,12 +847,3 @@ complete converted image. The stock and compact payload sizes were
 `a48ab6ee90ba4c0cad9d7e2785897096f55e6725b0cb8b4eebc040af5e8a77e9`.
 The selected regular writer represents one save generation and one opening
 cut per product.
-
-The full campaign matrix passed hash, layout and catalog checks offline.
-The first additional ARM run opened Wasteland correctly, then stopped at
-the neutral interval that crosses its scripted frame-30 dialogue. The
-fixture now counts actual world updates and acknowledges a text box only
-while it is active. Dialogues that open at the save cut are dismissed
-before START and B because their queues are not serialized. The other 18
-campaign save cuts are pending that updated ARM run and are not counted
-in the original 14 passes above.
