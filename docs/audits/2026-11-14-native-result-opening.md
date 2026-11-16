@@ -198,3 +198,32 @@ opening capture before sending new input.
 | Complete controller commands | `1652bd16f42525777a73f8ddec1b44311a622a87dbc5c7b75d874288fe9be843` |
 | Hovered structure (step 30,749) | `f23c0584b59e8b1dc17d2b988ae30140d3d8244e11fc904b08aa695c706b67db` |
 | Selected Extractor at 750 HP (step 30,787) | `972ae09bab4564a470286862b63068ca720061b68d16e68ecfa396433981bb7e` |
+
+## Build and select a three-Marine force (November 16)
+
+A new fork of the same blank-opening tape matches ten exact visual
+anchors through observed step 11,843, with one Marine already queued.
+Two ordinary A presses and releases add two paid queue entries.
+The queue shows both new icons at steps 11,871 and 11,899, with the
+wallet showing 153 and 106 minerals. The displayed price is 50, with
+mining continuing during the presses. By step 15,844, the queue is empty
+and three separate Marines are visible beside the Barracks (7/10 supply).
+B closes the production grid; A selects the 40 HP Marine and R selects
+the group, showing `UNITS: 3` and three green rings at step 15,961.
+
+A prior attempt rejected the exact early visual anchor before sending
+new inputs: eight pixels differed, though its other nine frames and all
+129 controller transition rows matched. No tolerance was added. The
+successful retry matches all ten anchors, under the same guard limits.
+This establishes a larger ordinary-input attack force. It neither
+executes a second attack nor confirms competitive elimination. The old
+southeast route is a starting point; the later departure and group size
+require a fresh check at the target before using B.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Completed force capture manifest | `c76e0081e547d30cca839b9e3304c65b779af596c3bfa407b00af415761873f8` |
+| Complete force input tape | `6f624d1a8ee718a2c39c5ef94a86cde6fbd74e084bfb7b8478b5cc71075634b4` |
+| Second Marine in queue (step 11,871) | `67f56dea7d9434a855da92916277f12bc95b86c742a2e4da96a01e4e7d0938e6` |
+| Third Marine in queue (step 11,899) | `94e8b76fed0971b7ae6b0783203342a99cf2c4ed544067a80d8690a297be7489` |
+| Three Marines selected (step 15,961) | `354446384e8ab1413cc0b5f938a58c1f64742e0c159bfcaf89cdc7b46c71dc0f` |
