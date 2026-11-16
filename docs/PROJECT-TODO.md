@@ -346,7 +346,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and both raw route endpoints, cutting the active mean by 1.39%, p95 by
   2.79% and the worst update by 2.85%. Keep the option off pending checks
   on other workloads and release profiles and on real hardware.
-  Dense play remains well short of 30 fps.
+  Dense play remains well short of 30 fps. In the
+  [Z10](audits/2026-11-12-z10-battle-cycles.md) and
+  [busy P10](audits/2026-11-06-current-p10-busy/README.md) samples,
+  simulation alone already exceeds the 561,792-cycle frame budget.
+  Prioritize routing and simulation. The
+  [Mode 0 experiment](VALIDATION.md#p7-mode-0-tile-renderer) traded draw
+  savings for VBlank copies and did not improve whole-game frame rate.
   The [packed mineral probe](audits/2026-11-13-static-mineral-word-draw.md)
   cuts Z7's sampled static resource pass by 18.82% and matches ordered
   pixels on Z7 and both custom tapes. Keep it opt-in pending attribution
