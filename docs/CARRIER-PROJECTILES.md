@@ -560,10 +560,11 @@ every arena word and the hit reduced its target's HP. The fixture uses
 placed prerequisite buildings and a placed target. It also verifies that a
 malformed compact successor or a valid packet with a missing shooter falls
 back to its ordinary predecessor, and that a Terran campaign save in the probe still loads under the ordinary tag.
-The initial probe left the regular Terran ROM byte-identical with the probe
-flags off. When composed with release `cb210bc` as `e1058ca`, both HOST
-fixtures passed and the ARM link left 10,456 bytes before the EWRAM guard
-and 1,544 bytes before the IWRAM guard.
+When composed with release `cb210bc` as `e1058ca`, both HOST fixtures passed
+and the ARM link left 10,456 bytes before the EWRAM guard and 1,544 bytes
+before the IWRAM guard. Built with the probe flags off, the packaged Terran
+ROM matches release `cb210bc` byte for byte
+(SHA-256 `a7ce64dadab8b334bbc2f6ccdbbc0aeff06378d2f44d6ecd39702ade2825aa59`).
 
 The composed ARM probe
 (`eedcfd0e8fab20e566c8089f730fdc0986f73096c6c5410e95476deddfaeffdc`)
@@ -579,6 +580,15 @@ An immediate guest re-save reproduced the entire payload byte for
 byte. After 80 more updates the Hydralisk had 56 HP, down from 80 at
 the save; the observation does not isolate the sources of damage.
 
-The memory guards and gameplay receipt do not establish physical stack
-use, timing, return and docking, or coverage of the other custom and
-campaign configurations. Keep the probe disabled in the standard build.
+A [second input receipt](../tools/sc64_terran_carrier_dock_receipt.py)
+resumes that same active-shot save, then uses the ordinary MOVE command
+to withdraw the Carrier toward (101, 134) at frame 12,945. Interceptor
+slot 12 was already on its return leg at the start of this sequence.
+It docks with Carrier slot 5 by frame 12,972 and returns to full 40 HP
+and 40 shields. The docked custom save has a 13,685-byte payload and no
+active projectiles. Fresh title-L continuation restores the docked actor,
+and the immediate re-save reproduces the entire payload byte for byte.
+
+The memory guards and these receipts do not establish physical stack
+use, timing, or coverage of the other custom and campaign configurations.
+Keep the probe disabled in the standard build.
