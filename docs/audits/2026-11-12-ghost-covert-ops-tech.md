@@ -275,6 +275,41 @@ frame (380 locals and 36 register saves) and its matching parent finder
 reserving 136 bytes for its own frame. These omit other callees, callers
 and interrupts, so they do not bound the total load stack.
 
-No emulator run was started. Ordinary ARM inputs, HOST-to-ARM SRAM
-migration/fallback, active descent, and measured combined stack and
-hardware timing remain open; neither preview is a release activation.
+### Bounded physical ARM research and reload
+
+On cart `SCCT` from `84a6833`, the pinned read-only observer launched a
+blank normal Custom Game as Terran on map 0 with one computer opponent.
+The paid trial started separately from the authenticated earlier slot of
+the HOST fixture: the original nuclear-only bank was retained verbatim,
+and the other bank was erased in a separate input image. No part of the
+blank match constructed the donor's Covert Ops, Ghost, Silo, or economy.
+
+In the paid trial, ordinary title L restored the donor at frame 1,874
+with a painting strike. The Ghost's field menu aborted that strike.
+Ordinary Covert commands spent 150 minerals and 150 gas on Moebius at
+frame 2,047, let it complete in play, then spent 100 minerals and 100 gas
+on Ocular at frame 5,252. An ordinary START/B pause save wrote a
+15,832-byte combined custom payload and left its older nuclear-only
+bank byte-identical. The new record had Moebius earned, Ocular pending with
+2,499 source ticks remaining, and 34,416 Q8 Ghost energy. A fresh process
+loaded it through ordinary title L and matched the frame, research masks,
+paid job, Ghost energy, and 2,410/1,050 bank exactly.
+
+The run used no guest memory writes or emulator state restoration. The
+5.25 GiB disk guard passed at start (5,669,859,328 bytes free) and finish
+(5,667,770,368 bytes free). The same local observer had SHA-256
+`4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549`.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Validated input plan | `54cc1c083e3b4fa55f6ce3e49ca5cc3c38cf7f00f22ab5004e95a95505eb2eb5` |
+| Controller inputs | `8ff6cf6ff6f3fb9dcff6a45d99f1af231903451b2aac9722c9310d2ef3465cbb` |
+| Nuclear-only predecessor input | `8286f5397e1c5d5536043f154fb39d930032ceed2cf40a25435b669585e98727` |
+| Actual ARM-written SRAM | `34bfc1bb7bd6d2f412d72c139408cfaeea3969f6ed8de2b7e230cb5d34031c85` |
+| Save and restore result | `c414dec6e778863eb986cba6eaec8b87efdc05b47ac0bb289a8a287a0faeb6ea` |
+
+This result establishes an ordinary paid ARM round trip using a prepared
+economy and a separate blank frontend check. Building the tech tree from
+blank play, a new combined ARM save during painting or descent,
+malformed-newer ARM fallback, measured load stack high-water and hardware
+timing remain open.
