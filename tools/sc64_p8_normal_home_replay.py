@@ -124,6 +124,27 @@ def parse_plan(tape, hostlog):
     return plan, keys, checks, edges, briefs
 
 
+def admit_resume_prefix(receipt, pins, checks, briefchecks, cut):
+    """Admit a separately digest-pinned, successful HOME-to-reload prefix."""
+    last = receipt["last_index"]
+    require(receipt["status"] == "prefix" and receipt["fresh_load_verified"] is True
+            and receipt["first_frame_drift"] is None and receipt["first_mismatch"] is None
+            and type(last) is int and last >= cut + 1, "unqualified P8 resume prefix")
+    require(all(receipt["sha256"].get(path) == digest for path, digest in pins.items()),
+            "resume prefix has different ROM, ELF, tape, log or observer")
+    expected = [call for call in checks if call <= last + 1]
+    require(any(call > cut for call in expected)
+            and [row["call"] for row in receipt["obs"]] == expected
+            and all(row["fields"] == {k: checks[row["call"]][k] for k in CHECK_FIELDS}
+                    and row["mission"] == row["campaign"]["mission"] == 27
+                    for row in receipt["obs"]), "resume prefix checkpoints differ")
+    require(receipt["briefing"] == [[call, page] for call, (page, _) in briefchecks.items()],
+            "resume prefix briefings differ")
+    return ([row for row in receipt["obs"] if row["call"] <= cut],
+            [page for page in receipt["pages"] if page["index"] < cut],
+            list(receipt["briefing"]))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("rom", "elf", "tape", "host-log", "runner"):
@@ -135,6 +156,9 @@ def main():
         "--fresh-save", action="store_true",
         help="export and reload the tape's pause save on the P10 worker-cargo build",
     )
+    parser.add_argument("--resume-save", type=Path)
+    parser.add_argument("--resume-prefix", type=Path)
+    parser.add_argument("--resume-prefix-sha256")
     parser.add_argument(
         "--plan", action="store_true", help="validate without launching a guest"
     )
@@ -159,11 +183,33 @@ def main():
     plan, keys, checks, edges, briefchecks = parse_plan(tape, hostlog)
     stop = plan["stop"] if args.stop is None else args.stop
     require(0 < stop <= plan["stop"], "stop outside tape")
-    cut = saved_frame = None
-    if args.fresh_save:
+    resume_values = (args.resume_save, args.resume_prefix, args.resume_prefix_sha256)
+    resume = any(value is not None for value in resume_values)
+    require(not resume or not args.fresh_save and all(resume_values),
+            "resume requires a save, verified prefix and its SHA-256; choose one save mode")
+    cut = saved_frame = receipt = resume_journal = None
+    resume_history = [], [], []
+    if args.fresh_save or resume:
         save_plan, cut = validate_save_plan(tape)
         saved_frame = save_plan["save"]["frame"] - 1
         require(cut + 2 <= stop, "continuation must include the save and resume")
+    if resume:
+        inputs = (args.resume_prefix, args.resume_save)
+        input_pins = input_hashes(inputs)
+        require(input_pins[str(args.resume_prefix.resolve())] == args.resume_prefix_sha256,
+                "resume prefix SHA-256 mismatch")
+        receipt = json.loads(args.resume_prefix.read_text())
+        require(type(receipt["last_index"]) is int and receipt["last_index"] < plan["stop"] - 1,
+                "resume receipt must end at a prefix")
+        rom_pins = {str(p.resolve()): pins[str(p.resolve())] for p in paths[:-1]}
+        resume_history = admit_resume_prefix(receipt, rom_pins, checks, briefchecks, cut)
+        layout = dwarf_struct_layout(elf, "RaceSave")
+        resume_journal = validate_neutral_journal(
+            args.resume_save.read_bytes(), layout, saved_frame, p10_cargo=True
+        )
+        require(resume_journal == receipt["journal"], "resume SRAM differs from the verified prefix")
+        paths += inputs
+        pins.update(input_pins)
     checks = {call: row for call, row in checks.items() if call <= stop}
     rombytes = rom.read_bytes()
 
@@ -216,6 +262,7 @@ def main():
                     briefings=briefchecks,
                     authenticated_p8_rows=auth,
                     fresh_save_cut=cut,
+                    resume_from_prefix=resume,
                     sha256=pins,
                 ),
                 indent=2,
@@ -231,11 +278,14 @@ def main():
     out.mkdir()
     resource.setrlimit(resource.RLIMIT_FSIZE, (256 * 1024, 256 * 1024))
     us, uf = dwarf_struct_layout(elf, "Unit")
-    save_path = out / "saved.sav" if cut is not None else None
-    g = PhysicalGame(runner, rom, elf, out / "guest", save_output=save_path)
+    save_path = args.resume_save if resume else out / "saved.sav" if cut is not None else None
+    g = PhysicalGame(runner, rom, elf, out / "guest",
+                     save_input=args.resume_save, save_output=None if resume else save_path)
     r = g.rsp
-    prior_calls = 0
-    saved = journal = None
+    obs, pages, brief = resume_history
+    prior_calls = cut + 2 * len(pages) if resume else 0
+    saved = None
+    journal = resume_journal
     fresh_load_verified = False
 
     def completed():
@@ -266,9 +316,6 @@ def main():
     def f(k):
         return g.front_field(k)
 
-    obs = []
-    pages = []
-    brief = []
     drift = None
     mismatch = None
 
@@ -286,6 +333,7 @@ def main():
                     first_mismatch=mismatch,
                     journal=journal,
                     fresh_load_verified=fresh_load_verified,
+                    resumed_from_prefix=resume,
                     sha256=pins,
                 ),
                 indent=2,
@@ -304,21 +352,22 @@ def main():
         def modal():
             return struct.unpack("<4H", r.read(0x06013FE0, 8))
 
-        for i in range(stop):
+        for i in range(cut if resume else 0, stop):
             if i % 500 == 0 and shutil.disk_usage(out).free < int(4.15 * 1024**3):
                 emit("disk-floor", "partial.json")
                 raise SystemExit(75)
             held = keys.get(i, held)
             if i == cut:
-                require(saved is not None and held == 8, "unexpected P8 resume boundary")
+                require((saved is not None or resume) and held == 8, "unexpected P8 resume boundary")
                 step(512)
                 restored = snapshot(r, g.sym, g.sizes, elf)
                 require(restored["screen"] == 1 and restored["frame"] == saved_frame
                         and restored["race_selected_mission"] == 27 and restored["race_mode"] == 0,
                         "fresh title L did not restore the expected P8 frame")
-                verify_restored(saved["world"], restored["world"])
-                require(restored["p8_persistent_sha256"] == saved["p8_persistent_sha256"],
-                        "fresh title L changed P8 trigger state")
+                if saved is not None:
+                    verify_restored(saved["world"], restored["world"])
+                    require(restored["p8_persistent_sha256"] == saved["p8_persistent_sha256"],
+                            "fresh title L changed P8 trigger state")
                 fresh_load_verified = True
             else:
                 step(held)
@@ -425,7 +474,7 @@ def main():
                     mismatch = dict(call=i + 1, diff=diff)
                     emit("diverged")
                     raise SystemExit(4)
-            if cut is not None and i + 1 == cut:
+            if args.fresh_save and i + 1 == cut:
                 count, _, armed, _ = modal()
                 require(held == 0 and count == armed == 0,
                         "save cut must be neutral and outside a dialogue")
