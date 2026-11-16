@@ -46,6 +46,7 @@ BUILDING_FIELDS = ("owner", "type", "x", "y", "hp", "shield", "under_constructio
                    "build_progress", "queue_count", "queue_head", "queue_progress",
                    "raw_type", "raw_owner", "larva", "level", "flags", "larva_timer", "shield_remainder")
 RACES = "tzp"
+SEAT_OPTIONS = RACES + "r-"
 
 
 class ContinuationError(RuntimeError):
@@ -186,7 +187,8 @@ class Game:
     def front_field(self, name: str, index: int = 0) -> int:
         return self.u32("race_front", self.front[name] + 4 * index)
 
-    def launch(self, map_id: int, human: int, bots: list[int]) -> None:
+    def launch(self, map_id: int, human: int, bots: list[int], *,
+               seats: list[int] | None = None, melee: bool = False) -> None:
         if (self.u32("screen"), self.front_field("page")) != (SCREEN_TITLE, FRONT_HOME):
             raise ContinuationError("fresh boot is not on HOME")
         self.step(0, 2)
@@ -201,7 +203,7 @@ class Game:
                 self.tap(KEY_DOWN if current < row else KEY_UP)
             raise ContinuationError(f"menu row {row} not reached")
         def set_field(name, value, index=0):
-            for _ in range(3):
+            for _ in range(5 if name == "bot_races" and "race_skirmish_slots" in self.sym else 3):
                 if self.front_field(name, index) == value:
                     return
                 self.tap(KEY_RIGHT)
@@ -209,13 +211,30 @@ class Game:
                 raise ContinuationError(f"menu field {name} not set to {value}")
         to_row(0); set_field("map", map_id)
         to_row(1); set_field("race", human)
-        to_row(2); set_field("bots", len(bots))
-        for i, race in enumerate(bots):
+        if seats is None:
+            to_row(2); set_field("bots", len(bots))
+        elif "race_skirmish_slots" not in self.sym:
+            raise ContinuationError("ROM lacks independent computer seats")
+        choices = list(enumerate(bots if seats is None else seats))
+        if seats is not None and "race_skirmish_melee" in self.sym and map_id == 1:
+            # Open the requested CPU rows before closing any others: the
+            # native lobby will not close its last open row.
+            choices.sort(key=lambda choice: choice[1] == SEAT_OPTIONS.index("-"))
+        for i, race in choices:
             to_row(3 + i); set_field("bot_races", race, i)
-        to_row(3 + len(bots)); self.tap(KEY_A)
+        if "race_skirmish_melee" in self.sym:
+            to_row(6); set_field("skirmish_melee", int(melee))
+            to_row(7)
+        elif melee:
+            raise ContinuationError("ROM lacks the Blood Bath Melee option")
+        else:
+            to_row(6 if "race_skirmish_slots" in self.sym else 3 + len(bots))
+        self.tap(KEY_A)
         if (self.u32("screen"), self.u32("race_mode"), self.u32("race_skirmish_map"),
                 self.u32("race_human"), self.u32("race_bots")) != (SCREEN_PLAY, 1, map_id, human, len(bots)):
             raise ContinuationError("custom game did not start with the selected lobby")
+        if "race_skirmish_melee" in self.sym and self.u32("race_skirmish_melee") != int(melee):
+            raise ContinuationError("custom game did not start with the selected game type")
 
     def state(self) -> dict:
         units = entity_rows(self.rsp.read(self.sym["u"], self.sizes["u"]), self.unit_stride,
@@ -275,6 +294,8 @@ class PhysicalGame(Game):
         state = super().state()
         for name in ("race_mode", "race_human", "race_bots", "race_skirmish_map"):
             state[name] = self.u32(name)
+        if "race_skirmish_melee" in self.sym:
+            state["race_skirmish_melee"] = self.u32("race_skirmish_melee")
         return state
 
 
@@ -282,6 +303,42 @@ def summary(state: dict) -> dict:
     return {"frame": state["frame"], "screen": state["screen"], "units": len(state["units"]),
             "buildings": len(state["buildings"]), "fingerprint": fingerprint(
                 {k: v for k, v in state.items() if k != "screen"})}
+
+
+def physical_seats(game: PhysicalGame) -> dict:
+    """The running match's occupied rows, resolved races and start IDs."""
+    if "race_skirmish_slots" not in game.sym:
+        raise ContinuationError("ROM lacks independent computer seats")
+    bots = game.u32("race_bots")
+    if not 1 <= bots <= 3:
+        raise ContinuationError("invalid number of computer opponents")
+    mask = game.u32("race_skirmish_slots") or (1 << bots) - 1
+    if not 1 <= mask <= 7 or mask.bit_count() != bots:
+        raise ContinuationError("invalid occupied computer rows")
+    order = game.u32("race_skirmish_start_order") if "race_skirmish_start_order" in game.sym else 0
+    starts = [(order >> (2 * i)) & 3 for i in range(bots + 1)] if order else [
+        0, *(i + 1 for i in range(3) if mask & (1 << i))]
+    if len(set(starts)) != len(starts) or order < 0 or order >> (2 * (bots + 1)):
+        raise ContinuationError("invalid saved start order")
+    races = [game.u32("race_bot_races", 4 * i) for i in range(bots)]
+    if any(race not in range(3) for race in races):
+        raise ContinuationError("computer race was not resolved at launch")
+    return {"mask": mask, "races": "".join(RACES[race] for race in races),
+            "start_order": order, "base_ids": starts}
+
+
+def validate_launch_seats(game: PhysicalGame, requested: str, seating: dict) -> None:
+    mask = sum(1 << i for i, race in enumerate(requested) if race != "-")
+    choices = [race for race in requested if race != "-"]
+    if seating["mask"] != mask or any(expected != "r" and expected != actual
+                                     for expected, actual in zip(choices, seating["races"])):
+        raise ContinuationError("launched computer seats do not match the lobby")
+    owners = (0, 1, 3, 4)
+    halls = sorted((row[1], row[3], row[4]) for row in game.state()["buildings"])
+    expected = sorted((owner, game.u32("race_base_x", 4 * base), game.u32("race_base_y", 4 * base))
+                      for owner, base in zip(owners, seating["base_ids"]))
+    if halls != expected:
+        raise ContinuationError(f"opening halls do not match resolved starts: {halls} vs {expected}")
 
 
 def verdict(record: dict) -> dict:
@@ -315,22 +372,37 @@ def run(args) -> dict:
     use_physical = getattr(args, "physical", False)
     if use_physical and getattr(args, "tamper_sram", False):
         raise ContinuationError("physical mode cannot tamper with SRAM")
+    seats = getattr(args, "seats", None)
+    melee = getattr(args, "melee", False)
+    if seats is not None and not use_physical:
+        raise ContinuationError("--seats requires physical-button mode")
+    if melee and (not use_physical or args.map != 1):
+        raise ContinuationError("--melee requires a physical Blood Bath launch")
     game_class = PhysicalGame if use_physical else Game
     out = args.output
     if out.exists():
         raise ContinuationError(f"{out} already exists")
     out.mkdir(parents=True)
     sram = out / "phase1.sav"
-    bots = [RACES.index(c) for c in args.bots]
+    requested = args.bots if seats is None else seats.replace("-", "")
+    bots = [SEAT_OPTIONS.index(c) for c in requested]
     human = RACES.index(args.human)
     record = {"rom_sha256": hashlib.sha256(args.rom.read_bytes()).hexdigest(),
               "elf_sha256": hashlib.sha256(args.elf.read_bytes()).hexdigest(),
               "runner_sha256": hashlib.sha256(args.runner.read_bytes()).hexdigest(),
-              "map": args.map, "human": args.human, "bots": args.bots,
+              "map": args.map, "human": args.human, "bots": requested,
               "play": args.play, "continue": args.continue_updates}
+    if seats is not None:
+        record["seats"] = seats
     game = game_class(args.runner, args.rom, args.elf, out / "phase1", save_output=sram)
     try:
-        game.launch(args.map, human, bots)
+        lobby_options = {"seats": None if seats is None else [SEAT_OPTIONS.index(c) for c in seats]}
+        if melee:
+            lobby_options["melee"] = True
+        game.launch(args.map, human, bots, **lobby_options)
+        if seats is not None:
+            record["launch_seats"] = physical_seats(game)
+            validate_launch_seats(game, seats, record["launch_seats"])
         game.step(0, args.play)
         if game.u32("screen") != SCREEN_PLAY:
             raise ContinuationError("match ended before the save point")
@@ -340,9 +412,13 @@ def run(args) -> dict:
         game.step(KEY_B)
         saved = game.state()
         record["saved"] = summary(saved)
+        if seats is not None:
+            record["saved_seats"] = physical_seats(game)
         if use_physical:
             record["saved_lobby"] = {name: saved[name] for name in
                 ("race_mode", "race_human", "race_bots", "race_skirmish_map")}
+            if "race_skirmish_melee" in saved:
+                record["saved_game_type"] = saved["race_skirmish_melee"]
         game.step(KEY_A)
         game.step(0, args.continue_updates)
         record["reference"] = summary(game.state())
@@ -367,9 +443,13 @@ def run(args) -> dict:
         record["loaded"] = bool(game.u32("screen") == SCREEN_PLAY and game.u32("race_mode") == 1)
         restored = game.state()
         record["restored"] = summary(restored)
+        if seats is not None and record["loaded"]:
+            record["restored_seats"] = physical_seats(game)
         if use_physical:
             record["restored_lobby"] = {name: restored[name] for name in
                 ("race_mode", "race_human", "race_bots", "race_skirmish_map")}
+            if "race_skirmish_melee" in restored:
+                record["restored_game_type"] = restored["race_skirmish_melee"]
         game.step(0, args.continue_updates)
         record["resumed"] = summary(game.state())
         record["phase2_stale_update_stops"] = game.stale_update_stops
@@ -388,6 +468,14 @@ def run(args) -> dict:
             record["reference"]["frame"] - record["saved"]["frame"] == args.continue_updates and
             record["resumed"]["frame"] - record["restored"]["frame"] == args.continue_updates)
         record["ok"] = record["ok"] and record["checks"]["lobby_matches"] and record["checks"]["game_updates_match"]
+        if "saved_game_type" in record or melee:
+            record["checks"]["game_type_matches"] = (
+                record.get("saved_game_type") == record.get("restored_game_type") == int(melee))
+            record["ok"] = record["ok"] and record["checks"]["game_type_matches"]
+    if seats is not None:
+        record["checks"]["seats_and_resolved_starts_match"] = (
+            record["launch_seats"] == record["saved_seats"] == record.get("restored_seats"))
+        record["ok"] = record["ok"] and record["checks"]["seats_and_resolved_starts_match"]
     for home in out.glob("phase*/home"):
         for path in sorted(home.rglob("*"), reverse=True):
             path.unlink() if path.is_file() or path.is_symlink() else path.rmdir()
@@ -403,17 +491,28 @@ def main(argv=None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--map", type=int, choices=(0, 1), default=1)
     parser.add_argument("--human", choices=tuple(RACES), default="t")
-    parser.add_argument("--bots", default="zpt")
+    opponents = parser.add_mutually_exclusive_group()
+    opponents.add_argument("--bots", default="zpt", help="one to three named opponents in the first rows")
+    opponents.add_argument("--seats", help="three physical rows using t, z, p, r (Random), or - (Closed)")
     parser.add_argument("--play", type=int, default=9000)
     parser.add_argument("--continue", dest="continue_updates", type=int, default=900)
     parser.add_argument("--physical", action="store_true",
                         help="use physical buttons and read-only guest state")
+    parser.add_argument("--melee", action="store_true",
+                        help="select allied CPUs in the Blood Bath preview")
     parser.add_argument("--tamper-sram", action="store_true",
                         help="negative control: corrupt the saved record before phase 2")
     args = parser.parse_args(argv)
     if args.physical and args.tamper_sram:
         parser.error("--physical cannot be combined with --tamper-sram")
-    if not 1 <= len(args.bots) <= 3 or any(c not in RACES for c in args.bots):
+    if args.melee and (not args.physical or args.map != 1):
+        parser.error("--melee requires --physical --map 1")
+    if args.seats is not None:
+        if not args.physical:
+            parser.error("--seats requires --physical")
+        if len(args.seats) != 3 or args.seats == "---" or any(c not in SEAT_OPTIONS for c in args.seats):
+            parser.error("--seats needs three rows using t, z, p, r or -, with at least one open")
+    elif not 1 <= len(args.bots) <= 3 or any(c not in RACES for c in args.bots):
         parser.error("--bots takes one to three of t, z, p")
     if not 60 <= args.continue_updates <= 20000 or not 60 <= args.play <= 60000:
         parser.error("--play must be in [60,60000] and --continue in [60,20000]")

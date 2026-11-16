@@ -891,8 +891,8 @@ class OnboardingTests(unittest.TestCase):
         self.assertIn('Z7_STEERING_FLAGS = $(Z7_FULL_RENDER_FLAGS) $(Z7_STEERING_OPTIONS)',
                       makefile)
         for fixture in (
-            '$(eval $(call Z7_CANONICAL_FIXTURE,carried-z5,sc64_z5_campaign_run.c))',
-            '$(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c))',
+            '$(eval $(call Z7_CANONICAL_FIXTURE,carried-z5,sc64_z5_campaign_run.c,,tests/sc64_route_purity.h))',
+            '$(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c,,tests/sc64_route_purity.h))',
             '$(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c))',
         ):
             self.assertIn(fixture, makefile)

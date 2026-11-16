@@ -598,3 +598,236 @@ sc64_codec_decode(Sc64Arena * a, const uint8_t * in, size_t n)
     sethead(a, H_FREE_COUNT, counts[1]);
     return sc64_pool_validate(a);
 }
+
+#ifdef SC64_INTERCEPTOR_COMPACT_CODEC
+/* Keep the compact bit layout independent so existing saved-game builds
+ * retain the fixed codec's ARM code. The active fixture exercises both
+ * implementations and the shared row domain. */
+static void
+putrow_fields(uint8_t * b, size_t * pos, const Sc64ProjectileRow * r)
+{
+    putbits(b, pos, (uint32_t) r->x_q8_source, 22);
+    putbits(b, pos, (uint32_t) r->y_q8_source, 22);
+    putbits(b, pos, (uint16_t) r->destination_x_source, 14);
+    putbits(b, pos, (uint16_t) r->destination_y_source, 14);
+    putbits(b, pos, r->next_speed, 15);
+    putbits(b, pos, r->turn_rate_raw, 9);
+    putbits(b, pos, r->heading, 8);
+    putbits(b, pos, r->next_velocity_direction, 8);
+    putbits(b, pos, r->target_ref, 9);
+    putbits(b, pos, r->owner_ref, 8);
+    putbits(b, pos, (uint16_t) r->remaining_time, 9);
+    putbits(b, pos, r->state, 2);
+    putbits(b, pos, r->order_signal_bit0, 1);
+    putbits(b, pos, r->movement_flags_low4, 4);
+    putbits(b, pos, r->hit_flags_low2, 2);
+    putbits(b, pos, r->script_phase, 2);
+    putbits(b, pos, r->raw_source_owner, 4);
+    putbits(b, pos, r->pending_damage_event, 1);
+}
+static Sc64ProjectileRow getrow_fields(const uint8_t * b, size_t * pos){
+    Sc64ProjectileRow r;
+    memset(&r, 0, sizeof r);
+    r.x_q8_source = signv(getbits(b, pos, 22), 22);
+    r.y_q8_source = signv(getbits(b, pos, 22), 22);
+    r.destination_x_source = (int16_t) signv(getbits(b, pos, 14), 14);
+    r.destination_y_source = (int16_t) signv(getbits(b, pos, 14), 14);
+    r.next_speed = (uint16_t) getbits(b, pos, 15);
+    r.turn_rate_raw = (uint16_t) getbits(b, pos, 9);
+    r.heading = (uint8_t) getbits(b, pos, 8);
+    r.next_velocity_direction = (uint8_t) getbits(b, pos, 8);
+    r.target_ref = (uint16_t) getbits(b, pos, 9);
+    r.owner_ref = (uint8_t) getbits(b, pos, 8);
+    r.remaining_time = (int16_t) signv(getbits(b, pos, 9), 9);
+    r.state = (uint8_t) getbits(b, pos, 2);
+    r.order_signal_bit0 = (uint8_t) getbits(b, pos, 1);
+    r.movement_flags_low4 = (uint8_t) getbits(b, pos, 4);
+    r.hit_flags_low2 = (uint8_t) getbits(b, pos, 2);
+    r.script_phase = (uint8_t) getbits(b, pos, 2);
+    r.raw_source_owner = (uint8_t) getbits(b, pos, 4);
+    r.pending_damage_event = (uint8_t) getbits(b, pos, 1);
+    return r;
+}
+/* Compact packet:
+ *   allocated groups (byte), active count (byte)
+ *   all allocated ordinals, active list then free list (7 bits each)
+ *   active row fields in that active order (154 bits each)
+ *   zero high bits to byte alignment
+ * The list permutation encodes both heads, tails and links losslessly.
+ * Free field values and omitted reserved bits are canonical by contract. */
+enum { COMPACT_HEADER_BYTES = 2, COMPACT_ROW_BITS = 154 };
+
+static unsigned compact_max_allocated(unsigned cap)
+{
+    if (!cap || cap >= SC64_POOL_CAPACITY) return cap;
+    /* Growth at one remaining free slot happens before acquisition. If the
+     * new active count is at most cap, the old allocated count was <= cap. */
+    return (cap / SC64_POOL_GROWTH + 1u) * SC64_POOL_GROWTH;
+}
+
+static size_t compact_bytes(unsigned allocated, unsigned active)
+{
+    return COMPACT_HEADER_BYTES + (allocated * 7u + active * COMPACT_ROW_BITS + 7u) / 8u;
+}
+
+size_t sc64_compact_codec_max_bytes(unsigned cap)
+{
+    return cap <= SC64_POOL_CAPACITY ? compact_bytes(compact_max_allocated(cap), cap) : 0;
+}
+
+int sc64_compact_pool_acquire(Sc64Arena *a, unsigned cap,
+                              uint8_t *ordinal, uint8_t *native_index)
+{
+    if (!arena_ok(a) || cap > SC64_POOL_CAPACITY ||
+        rd(a, H_SIZE) > compact_max_allocated(cap) || rd(a, H_ACTIVE_COUNT) >= cap)
+        return 0;
+    return sc64_pool_acquire(a, ordinal, native_index);
+}
+
+static Sc64ProjectileRow compact_free_row(void)
+{
+    Sc64ProjectileRow row = {0};
+    row.state = 3;
+    row.target_ref = 511;
+    row.owner_ref = 255;
+    return row;
+}
+
+int sc64_compact_pool_retire(Sc64Arena *a, uint8_t ordinal)
+{
+    Sc64ProjectileRow row = compact_free_row();
+    if (!sc64_pool_retire(a, ordinal)) return 0;
+    return sc64_pool_set_row(a, ordinal, &row);
+}
+
+size_t sc64_compact_codec_encode(const Sc64Arena *a, unsigned cap,
+                                  uint8_t *out, size_t out_capacity)
+{
+    if (!arena_ok(a) || !out || cap > SC64_POOL_CAPACITY || !sc64_pool_validate(a))
+        return 0;
+    unsigned allocated = head(a, H_SIZE), active = head(a, H_ACTIVE_COUNT);
+    size_t n = compact_bytes(allocated, active);
+    if (allocated > compact_max_allocated(cap) || active > cap || n > out_capacity ||
+        packet_overlaps_arena(a, out, n))
+        return 0;
+
+    for (uint8_t id = head(a, H_FREE); id != SC64_END;
+         id = (uint8_t)rfield(a, id, F_NEXT)) {
+        Sc64ProjectileRow row;
+        if (!sc64_pool_get_row(a, id, &row)) return 0;
+        row.state = row.next_link = 0;
+        if (!canonical_unallocated_row(&row)) return 0;
+    }
+
+    memset(out, 0, n);
+    out[0] = (uint8_t)(allocated / SC64_POOL_GROWTH);
+    out[1] = (uint8_t)active;
+    size_t pos = COMPACT_HEADER_BYTES * 8u;
+    for (unsigned list = 0; list < 2; ++list)
+        for (uint8_t id = head(a, list ? H_FREE : H_ACTIVE); id != SC64_END;
+             id = (uint8_t)rfield(a, id, F_NEXT))
+            putbits(out, &pos, id, 7);
+
+    for (uint8_t id = head(a, H_ACTIVE); id != SC64_END;
+         id = (uint8_t)rfield(a, id, F_NEXT)) {
+        Sc64ProjectileRow row;
+        if (!sc64_pool_get_row(a, id, &row)) return 0;
+        putrow_fields(out, &pos, &row);
+    }
+    return n;
+}
+
+typedef struct {
+    uint8_t allocated, active, ids[SC64_POOL_CAPACITY];
+    size_t row_pos;
+} CompactPacket;
+
+static Sc64ProjectileRow compact_active_row(const uint8_t *in, size_t *pos,
+                                            const CompactPacket *packet,
+                                            unsigned index)
+{
+    Sc64ProjectileRow row = getrow_fields(in, pos);
+    row.next_link = index + 1u < packet->active ? packet->ids[index + 1u] : SC64_END;
+    return row;
+}
+
+static int compact_preflight(const uint8_t *in, size_t n, unsigned cap,
+                             CompactPacket *packet)
+{
+    if (!in || n < COMPACT_HEADER_BYTES || cap > SC64_POOL_CAPACITY ||
+        in[0] > SC64_POOL_CAPACITY / SC64_POOL_GROWTH)
+        return 0;
+    unsigned allocated = in[0] * SC64_POOL_GROWTH, active = in[1];
+    if (allocated > compact_max_allocated(cap) || active > cap ||
+        active > allocated || n != compact_bytes(allocated, active))
+        return 0;
+    packet->allocated = (uint8_t)allocated;
+    packet->active = (uint8_t)active;
+
+    size_t pos = COMPACT_HEADER_BYTES * 8u;
+    uint8_t seen[(SC64_POOL_CAPACITY + 7u) / 8u] = {0};
+    for (unsigned i = 0; i < allocated; ++i) {
+        unsigned id = getbits(in, &pos, 7);
+        if (id >= allocated || (seen[id / 8u] & (1u << (id % 8u)))) return 0;
+        seen[id / 8u] |= (uint8_t)(1u << (id % 8u));
+        packet->ids[i] = (uint8_t)id;
+    }
+    packet->row_pos = pos;
+    for (unsigned i = 0; i < active; ++i) {
+        Sc64ProjectileRow row = compact_active_row(in, &pos, packet, i);
+        if (row.state == 3 || !validrow(&row)) return 0;
+    }
+    return getbits(in, &pos, (unsigned)(n * 8u - pos)) == 0;
+}
+
+int sc64_compact_codec_validate(const uint8_t *in, size_t n, unsigned cap,
+                                Sc64CompactRowCheck check, void *context)
+{
+    CompactPacket packet;
+    if (!compact_preflight(in, n, cap, &packet)) return 0;
+    size_t pos = packet.row_pos;
+    for (unsigned i = 0; check && i < packet.active; ++i) {
+        Sc64ProjectileRow row = compact_active_row(in, &pos, &packet, i);
+        if (!check(context, packet.ids[i], &row)) return 0;
+    }
+    return 1;
+}
+
+int sc64_compact_codec_validate_target(const Sc64Arena *a, const uint8_t *in,
+                                       size_t n, unsigned cap,
+                                       Sc64CompactRowCheck check, void *context)
+{
+    return arena_ok(a) && !packet_overlaps_arena(a, in, n) &&
+        sc64_compact_codec_validate(in, n, cap, check, context);
+}
+
+int sc64_compact_codec_decode(Sc64Arena *a, const uint8_t *in, size_t n,
+                              unsigned cap)
+{
+    CompactPacket packet;
+    if (!arena_ok(a) || packet_overlaps_arena(a, in, n) ||
+        !compact_preflight(in, n, cap, &packet)) return 0;
+
+    /* Preflight completed before the first halfword write. The permutation
+     * supplies every allocated slot once, so nothing can fail in commit. */
+    sc64_pool_init(a);
+    sethead(a, H_SIZE, packet.allocated);
+    size_t pos = packet.row_pos;
+    for (unsigned list = 0; list < 2; ++list) {
+        unsigned first = list ? packet.active : 0;
+        unsigned end = list ? packet.allocated : packet.active;
+        if (first == end) continue;
+        sethead(a, list ? H_FREE : H_ACTIVE, packet.ids[first]);
+        sethead(a, list ? H_FREE_TAIL : H_ACTIVE_TAIL, packet.ids[end - 1u]);
+        sethead(a, list ? H_FREE_COUNT : H_ACTIVE_COUNT, (uint8_t)(end - first));
+        for (unsigned i = first; i < end; ++i) {
+            uint8_t id = packet.ids[i];
+            Sc64ProjectileRow row = list ? compact_free_row() : compact_active_row(in, &pos, &packet, i);
+            sc64_pool_set_row(a, id, &row);
+            sfield(a, id, F_PREV, i == first ? SC64_END : packet.ids[i - 1u]);
+            sfield(a, id, F_NEXT, i + 1u == end ? SC64_END : packet.ids[i + 1u]);
+        }
+    }
+    return 1;
+}
+#endif

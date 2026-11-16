@@ -151,7 +151,7 @@ static void test_prefix_and_skirmish_save_layout(void)
             press(KEY_DOWN);
             while(race_front.bots!=bots)
                 press(race_front.bots<bots?KEY_RIGHT:KEY_LEFT);
-            while(race_front.row<3+bots)press(KEY_DOWN);
+            while(race_front.row<SC_FRONT_SKIRMISH_LAUNCH_ROW)press(KEY_DOWN);
             press(KEY_A);
             assert(screen==SCREEN_PLAY&&race_mode&&race_human==race&&
                    race_bots==bots&&race_skirmish_map==map);

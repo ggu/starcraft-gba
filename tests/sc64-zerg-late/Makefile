@@ -96,12 +96,23 @@ Z10_DESCRIPTOR ?= .local/build/z10-source/descriptor.json
 Z10_PROGRAM_HEADER := build/generated/z10/sc64_z10_program_generated.h
 $(Z10_PROGRAM_HEADER): $(Z10_DESCRIPTOR) tools/sc64_zerg_late_program_pack.py tools/sc64_zerg_late_pack.py tools/sc64_z8_program_pack.py | build
 	$(PYTHON) tools/sc64_zerg_late_program_pack.py $< $@
-ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -Ibuild/generated/z10
-ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES)
+# The ordinary Z10 renderer needs the same exact static key for lookup and
+# capture. Compute it once per draw, as the other capable products do.
+ZERG_Z10_DEFENSE_FLAGS ?= -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
+ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -DSC64_RENDER_KEY_ONCE -Ibuild/generated/z10 $(ZERG_Z10_DEFENSE_FLAGS) -DSC64_DEPOT_FIRST_NEAREST_PROBE
+ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES) $(CENSUS_FLAGS)
+# The packed frames belong to the qualified Z10 sprite bank.
+Z10_BUILDING_WORDS ?= 1
+ifneq ($(filter $(Z10_BUILDING_WORDS),0 1),$(Z10_BUILDING_WORDS))
+$(error Z10_BUILDING_WORDS must be 0 or 1)
+endif
+SC64_BUILDING_WORDS_HEADER = build/generated/sc64_building_words_generated.h
+Z10_BUILDING_WORDS_FLAGS = $(if $(filter 1,$(Z10_BUILDING_WORDS)),-DSC64_BUILDING_WORDS_PROBE)
+Z10_BUILDING_WORDS_CONFIG := $(if $(shell test -f build/z10-building-words-config && printf '%s\n' '$(Z10_BUILDING_WORDS)' | cmp -s - build/z10-building-words-config && printf matched),,force-z10-building-words-rebuild)
 ZERG_Z10_RELEASE_FLAGS = $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z9_CANONICAL_INPUTS)) $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h $(Z10_PROGRAM_HEADER)
-build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
+build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(SC64_BUILDING_WORDS_HEADER)) | build
+	$(CC) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -111,22 +122,27 @@ verify-zerg-z10: build/StarCraft-Zerg-Z10-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z10
 zerg-z10: verify-zerg-z10
 
-SC64_SIGHT_ROW_LUT_HEADER = build/generated/sc64_sight_row_lut_generated.h
-$(SC64_SIGHT_ROW_LUT_HEADER): tools/sc64_sight_row_lut.py | build
-	$(PYTHON) $< $@
-LATE_ZERG_SIGHT_CONFIG := $(if $(shell test -f build/late-zerg-sight-config && printf '%s\n' '$(LATE_ZERG_PACKED_SIGHT)' | cmp -s - build/late-zerg-sight-config && printf matched),,force-late-zerg-sight-rebuild)
-.PHONY: force-late-zerg-sight-config force-late-zerg-sight-rebuild
-force-late-zerg-sight-config:
-force-late-zerg-sight-rebuild:
-build/late-zerg-sight-config: force-late-zerg-sight-config | build
-	@printf '%s\n' '$(LATE_ZERG_PACKED_SIGHT)' > $@.tmp
-	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
-$(addprefix build/starcraft-zerg-z,$(addsuffix .elf,7 8 9 10)): build/late-zerg-sight-config $(LATE_ZERG_SIGHT_CONFIG) $(if $(LATE_ZERG_PACKED_SIGHT_FLAGS),$(SC64_SIGHT_ROW_LUT_HEADER))
 build/test-sc64-z10-sight-packed-rows: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_SIGHT_ROW_LUT_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_Z7_VISIBILITY_PACKED_ROWS,$(ZERG_Z10_RELEASE_FLAGS)) -DSC64_Z7_VISIBILITY_PACKED_ROWS $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 .PHONY: test-sc64-z10-sight-packed-rows
 test-sc64-z10-sight-packed-rows: build/test-sc64-z10-sight-packed-rows
 	./build/test-sc64-z10-sight-packed-rows
+
+.PHONY: force-z10-building-words-config force-z10-building-words-rebuild
+force-z10-building-words-config:
+force-z10-building-words-rebuild:
+build/z10-building-words-config: force-z10-building-words-config | build
+	@printf '%s\n' '$(Z10_BUILDING_WORDS)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+$(SC64_BUILDING_WORDS_HEADER): $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h tools/sc64_building_words.py tools/sc64_unit_facing.py | build
+	mkdir -p $(dir $@)
+	$(PYTHON) tools/sc64_building_words.py $< > $@.tmp
+	mv $@.tmp $@
+build/test-sc64-z10-building-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_BUILDING_WORDS_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(ZERG_Z10_RELEASE_FLAGS) -DSC64_BUILDING_WORDS_PROBE $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-building-words-pixels
+test-sc64-z10-building-words-pixels: build/test-sc64-z10-building-words-pixels
+	./build/test-sc64-z10-building-words-pixels
 
 ifeq ($(CANONICAL_WALK_WORDS),1)
 build/test-sc64-z10-walk-words-pixels: tests/sc64_walk_words_pixels.c tests/sc64_unit_walk_frames_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
@@ -143,6 +159,13 @@ build/test-sc64-z10-carried-z9: tests/sc64_z9_game.c $(STARCRAFT) $(wildcard sta
 test-zerg-z10: build/test-sc64-z10-game build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-carried-z9
 	./build/test-sc64-z10-game
+
+# Exercise the shared Z8 game bridge with the carried Z10 configuration.
+.PHONY: test-sc64-z10-command-census
+test-sc64-z10-command-census: build/test-sc64-z10-command-census
+	./build/test-sc64-z10-command-census
+build/test-sc64-z10-command-census: tests/sc64_z8_command_census.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(filter-out -DSC64_Z8_DIRECT_COMMAND_CENSUS,$(ZERG_Z10_CANONICAL_FLAGS)) -DSC64_Z8_DIRECT_COMMAND_CENSUS $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 
 # Current Z10 differential for the optional defense spatial query.
 build/test-sc64-z10-defense-spatial: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
@@ -163,6 +186,17 @@ build/test-sc64-z10-defense-combined: tests/sc64_zp_defense_targets.c $(STARCRAF
 .PHONY: test-sc64-z10-defense-combined
 test-sc64-z10-defense-combined: build/test-sc64-z10-defense-combined
 	./build/test-sc64-z10-defense-combined
+
+define Z10_DEPOT_FIRST_NEAREST_TEST
+build/test-sc64-z10-depot-first-nearest-$(1): tests/sc64_depot_first_nearest.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(filter-out -DSC64_DEPOT_FIRST_NEAREST_PROBE,$$(ZERG_Z10_RELEASE_FLAGS)) $(2) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) -o $$@
+endef
+$(eval $(call Z10_DEPOT_FIRST_NEAREST_TEST,stock,))
+$(eval $(call Z10_DEPOT_FIRST_NEAREST_TEST,probe,-DSC64_DEPOT_FIRST_NEAREST_PROBE))
+.PHONY: test-sc64-z10-depot-first-nearest
+test-sc64-z10-depot-first-nearest: build/test-sc64-z10-depot-first-nearest-stock build/test-sc64-z10-depot-first-nearest-probe
+	./build/test-sc64-z10-depot-first-nearest-stock
+	./build/test-sc64-z10-depot-first-nearest-probe
 
 
 # Source-art coverage over both authenticated maps and their CreateUnit rows.
@@ -245,21 +279,27 @@ test-zerg-z10: test-sc64-z10-carried-profile
 # Ordinary-input carried controllers must use the full cartridge vector,
 # including the extra save and campaign code in Z10.
 define ZERG_CARRIED_CONTROLLER
-build/test-sc64-$(1)-carried-$(3): tests/$(4).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
+build/test-sc64-$(1)-carried-$(3): tests/$(4).c $(6) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_$(2)_CANONICAL_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile tests/sc64-zerg-late/Makefile | build
 	$$(CLANG) $$(Z8_HOST_FLAGS) $$(ZERG_$(2)_CANONICAL_FLAGS) $$< $(5) -o $$@
 endef
 define ZERG_CARRIED_CONTROLLERS
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z1z2,race_campaign_run,common/gba.c))
-$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z3,sc64_z3_campaign_run,common/gba.c))
-$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z4,sc64_z4_campaign_run,common/gba.c))
-$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z5,sc64_z5_campaign_run,common/gba.c))
-$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z6,sc64_z6_campaign_run,common/gba.c))
-$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z7,sc64_z7_campaign_run,common/gba.c))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z3,sc64_z3_campaign_run,common/gba.c,tests/sc64_route_purity.h))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z4,sc64_z4_campaign_run,common/gba.c,tests/sc64_route_purity.h))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z5,sc64_z5_campaign_run,common/gba.c,tests/sc64_route_purity.h))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z6,sc64_z6_campaign_run,common/gba.c,tests/sc64_route_purity.h))
+$$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z7,sc64_z7_campaign_run,common/gba.c,tests/sc64_route_purity.h))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z8,sc64_z8_campaign_run,))
 $$(eval $$(call ZERG_CARRIED_CONTROLLER,$(1),$(2),z1,race_z1_controls,common/gba.c))
 endef
 $(eval $(call ZERG_CARRIED_CONTROLLERS,z9,Z9))
 $(eval $(call ZERG_CARRIED_CONTROLLERS,z10,Z10))
+
+# Z2 normal cartridge trace: reveal briefing pages and acknowledge authored
+# messages with physical key pairs; the existing carried suite is unchanged.
+build/test-sc64-z10-z2-normal-home: tests/race_campaign_run.c tests/sc64_controller_authored_pages.h tests/sc64_route_purity.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) $(ZERG_Z10_CANONICAL_FLAGS) -DSC64_Z2_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< common/gba.c -o $@
+
 $(eval $(call ZERG_CARRIED_CONTROLLER,z10,Z10,z9-run,sc64_z9_campaign_run,))
 
 # Z8 carried replay, compiled with the actual Z9 vector and strict cargo digest.
@@ -295,6 +335,11 @@ endef
 $(eval $(call Z9_Z7_CARRIED_REPLAY,full,-DZ7_ARM_MODE=0))
 $(eval $(call Z9_Z7_CARRIED_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=40000u))
 $(eval $(call Z9_Z7_CARRIED_REPLAY,resume,-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z9_Z7_CUT)u))
+# The carried Z10 runtime can fill its live unit bank before the historical
+# Z7 policy starts buying air support. Start that controller's paid air plan
+# earlier; the carried Z9 and standalone Z7 policies stay independent.
+ZERG_Z9_CARRIED_Z7_POLICY = $(ZERG_Z7_CONTROLLER_POLICY)
+ZERG_Z10_CARRIED_Z7_POLICY ?= $(ZERG_Z7_CONTROLLER_POLICY) --force-late-air-at-frame 85000
 # Controller 0 of the generic early-race runner is not the established Z1 route.
 define ZERG_CARRIED_MISSIONS
 .PHONY: test-sc64-$(1)-carried-missions
@@ -306,11 +351,11 @@ test-sc64-$(1)-carried-missions: $$(addprefix build/test-sc64-$(1)-carried-,z1 z
 	./build/test-sc64-$(1)-carried-z4 --limit 150000 --trace .local/sc64/$(1)-carried/z4.json
 	./build/test-sc64-$(1)-carried-z5 --limit 60000 --trace .local/sc64/$(1)-carried/z5-diagnostic.json --attempt .local/sc64/$(1)-carried/z5-attempt.json --verified .local/sc64/$(1)-carried/z5.json
 	./build/test-sc64-$(1)-carried-z6 --trace .local/sc64/$(1)-carried/z6.json
-	./build/test-sc64-$(1)-carried-z7 $$(ZERG_Z7_CONTROLLER_POLICY) --limit $$(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/$(1)-carried/z7.json
+	./build/test-sc64-$(1)-carried-z7 $$(ZERG_$(2)_CARRIED_Z7_POLICY) --limit $$(ZERG_Z7_CONTROLLER_LIMIT) --trace .local/sc64/$(1)-carried/z7.json
 	./build/test-sc64-$(1)-carried-z8 .local/sc64/$(1)-carried/z8.jsonl
 endef
-$(eval $(call ZERG_CARRIED_MISSIONS,z9))
-$(eval $(call ZERG_CARRIED_MISSIONS,z10))
+$(eval $(call ZERG_CARRIED_MISSIONS,z9,Z9))
+$(eval $(call ZERG_CARRIED_MISSIONS,z10,Z10))
 .PHONY: test-sc64-z10-carried-z9-controller
 test-sc64-z10-carried-z9-controller: build/test-sc64-z10-carried-z9-run
 	mkdir -p .local/sc64/z10-carried
@@ -342,3 +387,10 @@ build/test-sc64-z9-bulk-z5: tests/sc64_z5_bulk_grid.c tests/sc64_z5_runtime.c $(
 test-sc64-z9-bulk-grid: build/test-sc64-z9-bulk-grid build/test-sc64-z9-bulk-z5
 	./build/test-sc64-z9-bulk-grid
 	./build/test-sc64-z9-bulk-z5
+
+# Prepared opt-in Z7 census differential.
+$(eval $(call Z7_FULL_RENDER_FIXTURE,validated-census,sc64_z7_prune_game.c,-DSC64_Z7_PRUNE_STARTED -DSC64_Z7_VALIDATED_CENSUS))
+.PHONY: test-sc64-z7-validated-census
+test-sc64-z7-validated-census: build/test-sc64-z7-full-render-prune build/test-sc64-z7-full-render-validated-census
+	./build/test-sc64-z7-full-render-prune
+	./build/test-sc64-z7-full-render-validated-census

@@ -66,6 +66,56 @@ full-loop cycles fall from 1,338,144 to 1,325,662 (−0.93%); p95 falls
 from 1,696,800 to 1,687,167. Mean simulation cycles fall from 788,304
 to 776,058 (−1.55%).
 
-The normal selector stays off pending a legacy campaign continuation.
-Other race profiles use a different shared-span transition and need
-separate evaluation. These measurements still exceed the 30 fps budget.
+## Per-race supply build and legacy continuation
+
+The normal Z9 cartridge with packed rows loaded ordinary SRAM from the
+earlier Z8 mission in a fresh process and won with physical buttons at
+frame 45,468 (call 46,487). The 31 named observations, starting at saved
+frame 16,660, matched the earlier qualified Z8 route. The cartridge was
+`ec22e6ff01b2c0827833abd606f93160633a4ae143989cfbb069545c1915c90c`.
+The default Z9 cartridge at `20469c2` repeats that win from the same
+legacy SRAM, with all 31 raw and named observations identical, zero
+mission faults, and four ordinary text acknowledgments. Its SHA-256 is
+`93bafe49f7f0a22b713d90a2bface97070b2c19540d362958adf2448b92876e7`.
+
+After the per-race supply changes (`20469c2`), the historical Z10 save and
+button timings stopped reproducing the win with either sight path. A new
+normal, flag-off Z10 run in mGBA made its save from the pause menu at
+frame 2,527 (call 2,666). The exported SRAM was byte-identical to the new
+host controller save. Both stock and packed normal ROMs loaded that SRAM
+from the title screen in fresh emulator processes and won Full Circle at
+frame 59,997 (call 61,938), with zero mission faults. The 61 sampled gameplay
+states, including raw units, buildings and minerals, and the 24 sampled
+rendered pages, palettes, camera positions, visibility and exploration
+were identical. Each run acknowledged nine text boxes with physical buttons;
+the replay did not write guest memory.
+
+| Current Z10 campaign calls | Mean loop cycles, stock → packed | Mean update cycles, stock → packed | p95 loop, stock → packed |
+| --- | ---: | ---: | ---: |
+| 19,000–19,999 | 1,854,119 → 1,802,117 (−2.80%) | 972,899 → 920,970 (−5.34%) | 3,077,396 → 3,069,981 |
+| 35,000–35,999 | 1,849,036 → 1,791,044 (−3.14%) | 1,018,671 → 960,807 (−5.68%) | 2,822,000 → 2,809,013 |
+
+The maximum loop changed by +0.13% and −0.25% respectively; the large
+stalls remain. These measurements still exceed the 30 fps budget and
+do not establish physical hardware frame rate.
+The packed Z10 link adds 51,616 ROM bytes before padding and keeps the
+same IWRAM and EWRAM limits. Both cartridges are still 32 MiB.
+
+- Flag-off ROM: `e6eb6eeba139332eaff64c2af54f6602e222d78763dbe57ad0beb4321b6e2a03`.
+- Packed ROM: `0f144b2789f695658e09dd721d8b7349c29aacbde7edce93f476ce29b9c47608`.
+- Ordinary physical SRAM: `740ffc1f24454f67bdf3ca954850016a47e672040fa33035bdef1412bedc1888`.
+- Controller input trace: `bea076602f09b1c8496b8c3dfd5d49640be3a8352946763178f0ef40a8329310`.
+
+Packed sight is on by default for the late Zerg layout in Z7–Z10,
+including custom matches on those cartridges. Other layouts use a
+different shared-span transition and need separate evaluation. To compare
+against the scalar path, build with `LATE_ZERG_PACKED_SIGHT=0`.
+
+All four default ROMs verify under the unchanged linker guards. The
+default Z10 ROM is byte-identical to the packed ROM above.
+
+| Default cartridge | IWRAM code end | EWRAM BSS end |
+| --- | ---: | ---: |
+| Z7 | `0x03004e68` | `0x02039a24` |
+| Z8 | `0x03004ae0` | `0x02039ee4` |
+| Z9 / Z10 | `0x03004ae0` | `0x02038ae8` |

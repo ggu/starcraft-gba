@@ -7,10 +7,11 @@
 P10_FACT_V2_DIR := build/generated/p10-fact-v2
 P10_FACT_V2_HEADER := $(P10_FACT_V2_DIR)/sc64_fact_tables_generated.h
 P10_SCENARIO_HEADER := .local/sc64/zp-stage/generated/scenarios/sc64_p10_scenario_generated.h
-# Probes and SCVs serve two bases far apart, so cargo goes to the nearest depot.
+# Probes and SCVs serve two bases far apart, so cargo goes to the nearest
+# reachable depot. Rank candidates first to avoid filling unused routes.
 P10_CAMPAIGN_DEFINES := -DSC64_P10_DATA_ENABLED -DSC64_P10_RUNTIME -DSC64_P10_CAMPAIGN_ENTRY -DSC64_NEAREST_RESOURCE_DEPOT
-PROTOSS_P10_BASE_FLAGS = $(patsubst -I$(P9_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(PROTOSS_P9_FLAGS)) $(P10_CAMPAIGN_DEFINES)
-PROTOSS_P10_FLAGS = $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS)
+PROTOSS_P10_BASE_FLAGS = $(patsubst -I$(P9_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(PROTOSS_P9_FLAGS)) $(P10_CAMPAIGN_DEFINES) -DSC64_DEPOT_FIRST_NEAREST_PROBE
+PROTOSS_P10_FLAGS = $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS) -DSC64_TYPED_UNIT_CHUNK_READER $(CENSUS_FLAGS)
 PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P10_FACT_V2_HEADER) $(P10_SCENARIO_HEADER)
 $(P10_FACT_V2_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
 	mkdir -p $(P10_FACT_V2_DIR)
@@ -50,6 +51,17 @@ test-sc64-p10-mission: build/test-sc64-p10-mission
 	./build/test-sc64-p10-mission $(P10_HOST_DIR)
 test-sc64-protoss-p10: test-sc64-p10-mission test-sc64-p10-carried-profile
 
+# Optional shared census; use the full P10 roster to compare live providers.
+.PHONY: test-sc64-z8-command-census
+test-sc64-z8-command-census: build/test-sc64-z8-command-census
+	./build/test-sc64-z8-command-census
+build/test-sc64-z8-command-census: tests/sc64_z8_command_census.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(filter-out -DSC64_Z8_DIRECT_COMMAND_CENSUS,$(PROTOSS_P10_FLAGS)) -DSC64_Z8_DIRECT_COMMAND_CENSUS $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+
+# Carried P9 normal cartridge route with authored briefing and modal input.
+build/test-sc64-p10-p9-normal-home: tests/sc64_p9_campaign_run.c tests/sc64_controller_authored_pages.h tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_P9_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL -DP9_CONTROLLER_PROFILE=\"PROTOSS_P10_FLAGS\" $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+
 # P10 ordinary-input qualification, built like the P8 and P9 ones.
 P10_ARM_DIR := build/p10-arm
 P10_ARM_TRACE := $(P10_ARM_DIR)/p10-controller.jsonl
@@ -61,6 +73,11 @@ $(P10_ARM_TRACE): build/test-sc64-p10-campaign-run
 	./build/test-sc64-p10-campaign-run $@
 .PHONY: test-sc64-p10-controller
 test-sc64-p10-controller: $(P10_ARM_TRACE)
+# The normal cartridge proof carries briefing and authored text inputs in the
+# tape. Keep it separate from the replacement-main and save-resume fixtures.
+build/test-sc64-p10-normal-home: tests/sc64_p10_campaign_run.c tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_P10_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+
 $(P10_ARM_DIR)/sc64_p10_tape_generated.h: $(P10_ARM_TRACE) tools/sc64_p8_arm_replay.py mk/protoss-p10/Makefile
 	$(P10_REPLAY_TOOL) tape $< $@
 P10_REPLAY_DEPS = tests/sc64_p10_arm_replay.c $(P10_ARM_DIR)/sc64_p10_tape_generated.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile

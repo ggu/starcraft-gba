@@ -14,6 +14,11 @@ typedef struct {
     Unit units[MAX_UNITS];
     Building buildings[MAX_BUILDINGS];
     Tracer tracer_data[MAX_TRACERS];
+#ifdef SC64_IMPACT_EVENTS
+    Sc64ImpactEvent impacts[RACE_IMPACT_CAPACITY];
+    u8 impact_count, impact_high_water;
+    u16 impact_deferred;
+#endif
     u8 invincible_units[MAX_UNITS], invincible_buildings[MAX_BUILDINGS];
     int supply_used, supply_cap, path_valid;
 #ifdef SC64_P5_RUNTIME
@@ -37,6 +42,12 @@ static void world_save(DefenseWorld *s)
     memcpy(s->units, u, sizeof(u));
     memcpy(s->buildings, b, sizeof(b));
     memcpy(s->tracer_data, tracers, sizeof(tracers));
+#ifdef SC64_IMPACT_EVENTS
+    memcpy(s->impacts, race_impact_rows, sizeof(race_impact_rows));
+    s->impact_count = race_impact_count;
+    s->impact_high_water = race_impact_high_water;
+    s->impact_deferred = race_impact_deferred;
+#endif
     memcpy(s->invincible_units, invincible_units, sizeof(invincible_units));
     memcpy(s->invincible_buildings, invincible_buildings, sizeof(invincible_buildings));
     s->supply_used = supply_used;
@@ -52,6 +63,12 @@ static void world_restore(const DefenseWorld *s)
     memcpy(u, s->units, sizeof(u));
     memcpy(b, s->buildings, sizeof(b));
     memcpy(tracers, s->tracer_data, sizeof(tracers));
+#ifdef SC64_IMPACT_EVENTS
+    memcpy(race_impact_rows, s->impacts, sizeof(race_impact_rows));
+    race_impact_count = s->impact_count;
+    race_impact_high_water = s->impact_high_water;
+    race_impact_deferred = s->impact_deferred;
+#endif
     memcpy(invincible_units, s->invincible_units, sizeof(invincible_units));
     memcpy(invincible_buildings, s->invincible_buildings, sizeof(invincible_buildings));
     supply_used = s->supply_used;
@@ -92,7 +109,10 @@ static void clear_world(void)
         SC64_GRID_SET(visible, cell, 1);
     memset(u, 0, sizeof(u));
     memset(b, 0, sizeof(b));
-    memset(tracers, 0, sizeof(tracers));
+    clear_tracers();
+#ifdef SC64_IMPACT_EVENTS
+    memset(race_impact_rows, 0, sizeof(race_impact_rows));
+#endif
     memset(invincible_units, 0, sizeof(invincible_units));
     memset(invincible_buildings, 0, sizeof(invincible_buildings));
     supply_used = supply_cap = 0;
@@ -419,6 +439,27 @@ static void human_defense_fog_acquisition(void)
 }
 
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
+static void spatial_skips_target_killed_earlier_in_same_pass(void)
+{
+    clear_world();
+    /* Both targets are the same distance away, in different cells. The
+     * smaller slot wins even though its cell is visited second. Leave it
+     * in the cached cell list after death; the next Sunken must skip it. */
+    b[0] = (Building){ .x=255, .y=255, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_SUNKEN_COLONY, .alive=1, .raw_type=146 };
+    b[1] = b[0];
+    u[0] = (Unit){ .x=270, .y=270, .hp=15, .maxhp=15,
+        .owner=ENEMY, .type=U_ZERGLING, .alive=1, .raw_type=37 };
+    u[MAX_UNITS-1] = u[0];
+    u[MAX_UNITS-1].x = u[MAX_UNITS-1].y = 240;
+    u[MAX_UNITS-1].hp = u[MAX_UNITS-1].maxhp = 100;
+    compare_paths();
+    assert(!actual.units[0].alive);
+    assert(actual.units[MAX_UNITS-1].hp == 80);
+    assert(actual.buildings[0].queue_progress == 40);
+    assert(actual.buildings[1].queue_progress == 40);
+}
+
 static void spatial_boundaries_and_ties(void)
 {
     clear_world();
@@ -485,6 +526,40 @@ static void pylon_slot_state_at_defense_boundary(void)
 }
 #endif
 
+#if defined(SC64_DEFENSE_SPATIAL_PROBE) && defined(SC64_DEFENSE_PYLON_ROSTER) && \
+    defined(SC64_IMPACT_EVENTS)
+static void combined_cannons_preserve_projectile_admission(void)
+{
+    clear_world();
+    b[0] = (Building){ .x=255, .y=255, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_PHOTON_CANNON, .alive=1, .raw_type=162 };
+    b[1] = b[0];
+    b[2] = (Building){ .x=240, .y=255, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_PYLON, .alive=1, .raw_type=156 };
+    u[0] = (Unit){ .x=290, .y=290, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_ZERGLING, .alive=1, .raw_type=37 };
+    u[1] = u[0];
+    u[1].x = u[1].y = 220;
+    u[2] = u[0];
+    u[2].x = u[2].y = 900;
+    assert(race_impact_building_steps(&b[0], 0, 0) > 1);
+    assert(race_impact_building_steps(&b[0], 1, 0) > 1);
+
+    /* Only one projectile fits. The first cannon must choose the lower
+     * slot across the cell boundary; the second remains ready, with no
+     * projectile or damage recorded for its deferred shot. */
+    for (int i = 0; i < RACE_IMPACT_CAPACITY - 1; ++i)
+        race_impact_launch(2, 1, 1, SIDE, 0, U_MARINE, 200u);
+    compare_paths();
+    assert(actual.impact_count == RACE_IMPACT_CAPACITY);
+    assert(actual.impact_deferred == 1);
+    assert(sc64_impact_event_target(&actual.impacts[RACE_IMPACT_CAPACITY - 1]) == 0);
+    assert(actual.units[0].hp == 100 && actual.units[1].hp == 100);
+    assert(actual.buildings[0].queue_progress == 28);
+    assert(actual.buildings[1].queue_progress == 0);
+}
+#endif
+
 int main(void)
 {
     gba_init();
@@ -492,19 +567,26 @@ int main(void)
     randomized_differential();
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
     spatial_boundaries_and_ties();
+    spatial_skips_target_killed_earlier_in_same_pass();
 #endif
 #if !defined(SC64_DEFENSE_PYLON_ROSTER_TEST_ONLY) && !defined(SC64_DEFENSE_SPATIAL_PROBE)
     tie_range_and_early_kill();
     sunken_explosive_size_shields_and_armor();
     air_defense_filters_ground_goliath();
+    stock_defense_attack_intervals();
+#endif
+#ifndef SC64_DEFENSE_PYLON_ROSTER_TEST_ONLY
     same_update_mutations_precede_defense_query();
     invalid_owner_falls_back_before_mutation();
     dispatcher_preserves_p3_and_skirmish_paths();
-    stock_defense_attack_intervals();
     human_defense_fog_acquisition();
 #endif
 #ifdef SC64_DEFENSE_PYLON_ROSTER
     pylon_slot_state_at_defense_boundary();
+#endif
+#if defined(SC64_DEFENSE_SPATIAL_PROBE) && defined(SC64_DEFENSE_PYLON_ROSTER) && \
+    defined(SC64_IMPACT_EVENTS)
+    combined_cannons_preserve_projectile_admission();
 #endif
     puts("Z/P defense target differential tests passed");
     return 0;

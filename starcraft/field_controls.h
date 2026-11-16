@@ -69,13 +69,27 @@ ui_hostile_at(int x, int y, int *tx, int *ty)
 {
     int i;
     for (i = 0; i < MAX_UNITS; i++)
-        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && owners_hostile(SIDE, u[i].owner) &&
-            dist2(x, y, u[i].x, u[i].y) < 9 * 9 && currently_visible(u[i].x, u[i].y)) {
+        if (u[i].alive &&
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+            field_cursor_near(x, y, u[i].x, u[i].y, 9) &&
+#endif
+            !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && owners_hostile(SIDE, u[i].owner) &&
+#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
+            dist2(x, y, u[i].x, u[i].y) < 9 * 9 &&
+#endif
+            currently_visible(u[i].x, u[i].y)) {
             *tx = u[i].x; *ty = u[i].y;
             return 1;
         }
     for (i = 0; i < MAX_BUILDINGS; i++)
-        if (b[i].alive && owners_hostile(SIDE, b[i].owner) && dist2(x, y, b[i].x, b[i].y) < 16 * 16 &&
+        if (b[i].alive &&
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+            field_cursor_near(x, y, b[i].x, b[i].y, 16) &&
+#endif
+            owners_hostile(SIDE, b[i].owner) &&
+#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
+            dist2(x, y, b[i].x, b[i].y) < 16 * 16 &&
+#endif
             currently_visible(b[i].x, b[i].y)) {
             *tx = b[i].x; *ty = b[i].y;
             return 1;
@@ -96,16 +110,37 @@ static int
 field_ui_a_action(int selected)
 {
     int hx, hy, target;
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+    int worker, target_known = 0;
+#endif
     if (mode == MODE_MOVE) return UI_A_MOVE_HERE;
     if (mode == MODE_ATTACK) return UI_A_ATTACK_HERE;
     if (mode == MODE_BUILD) return UI_A_PLACE;
     if (mode != MODE_NORMAL) return UI_A_NONE;
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+    /* Most updates have no pending double tap. Preserve its priority, but
+     * defer the selection scan until after gas, building and hostile hints
+     * unless a double tap can still match. */
+    if (selected_building < 0 && unit_tap >= 0 &&
+        (u32)frame - unit_tap_frame <= UNIT_DOUBLE_TAP_TICKS &&
+        dist2(cx, cy, unit_tap_x, unit_tap_y) <= UNIT_DOUBLE_TAP_RADIUS * UNIT_DOUBLE_TAP_RADIUS) {
+        target = selection_target();
+        target_known = 1;
+        if (target == unit_tap) return UI_A_SELECT;
+    }
+#else
     target = selection_target();
     if (selected_building < 0 && unit_tap >= 0 && target == unit_tap &&
         (u32)frame - unit_tap_frame <= UNIT_DOUBLE_TAP_TICKS &&
         dist2(cx, cy, unit_tap_x, unit_tap_y) <= UNIT_DOUBLE_TAP_RADIUS * UNIT_DOUBLE_TAP_RADIUS)
         return UI_A_SELECT;
+#endif
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+    worker = find_selected_worker();
+    if (worker >= 0) {
+#else
     if (find_selected_worker() >= 0) {
+#endif
         int refinery = nearest_refinery(cx, cy);
         if (refinery >= 0 && dist2(cx, cy, b[refinery].x, b[refinery].y) < 24 * 24)
             return UI_A_GAS;
@@ -114,7 +149,12 @@ field_ui_a_action(int selected)
         race_building_trains(b[selected_building].type))
         return b[selected_building].under_construction ? UI_A_NONE : UI_A_TRAIN;
     if (selected && ui_hostile_at(cx, cy, &hx, &hy)) return UI_A_ATTACK;
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+    if (!target_known) target = selection_target();
+    if (worker >= 0 && target < 0 && field_cursor_mineral_at() >= 0) return UI_A_MINE;
+#else
     if (selected_worker_mineral_target() >= 0) return UI_A_MINE;
+#endif
     if (target >= 0) return UI_A_SELECT;
     if (selected_building >= 0) return UI_A_DESELECT;
     return selected ? UI_A_MOVE : UI_A_NONE;

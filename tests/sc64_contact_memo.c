@@ -35,6 +35,9 @@ typedef struct { unsigned top_speed_q10; } Sc64StockUnitProfile;
 static Unit u[MAX_UNITS];
 static int p6;
 static void sc64_contact_memo_invalidate(void);
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+static void sc64_contact_memo_move_cells(unsigned from, unsigned to);
+#endif
 #define SC64_CONTACT_MEMO_INVALIDATE() sc64_contact_memo_invalidate()
 static int sc64_race_unit_flying(int t) { return t == U_WRAITH; }
 static int sc64_race_raw_unit(int t) { return t; }

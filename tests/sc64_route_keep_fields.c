@@ -57,7 +57,7 @@ enum {
     KEEP_GATE_CALL, KEEP_GATE_HIT, KEEP_FAIL_BLOCKED, KEEP_FAIL_CODE,
     KEEP_FAIL_LENGTH, KEEP_FAIL_SEEDS, KEEP_FAIL_NEAR_GOAL, KEEP_FAIL_OPENED,
     KEEP_COMMIT_SAME, KEEP_COMMIT_OVERFLOW, KEEP_COMMIT_DROP, KEEP_MATERIALIZE,
-    KEEP_FILL, KEEP_ADOPT, KEEP_STATS
+    KEEP_FILL, KEEP_ADOPT, KEEP_POINT_POINTER, KEEP_STATS
 };
 static unsigned keep_stat[KEEP_STATS];
 #define SC64_ROUTE_KEEP_COUNT(name) (++keep_stat[KEEP_##name])
@@ -604,6 +604,9 @@ static void scenario(int shape_cols, int shape_rows, int terrain, int kind, int 
     race_cols = shape_cols; race_rows = shape_rows;
     sc64_routes_reset();
     path_grid_valid = 0;
+#ifdef TEST_POINT_TAIL_DONOR_FREE
+    if (shape_cols == 128 && shape_rows == 128) sc64_route_pcount = 0;
+#endif
     make_terrain(terrain);
     ++grid_version;
     pick_pool();
@@ -643,10 +646,130 @@ static void scenario(int shape_cols, int shape_rows, int terrain, int kind, int 
     kind_builds[kind] += floods_now() - (unsigned long)builds_before;
 }
 
+#ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
+static void check_linear_uses_expected_path(int cols)
+{
+    const int cells = cols * 128, goal = cols / 2 + 64 * cols;
+    int filled;
+    race_cols = cols;
+    race_rows = 128;
+    sc64_routes_reset();
+    assert(sc64_route_configure());
+    memset(desired, 1, (size_t)cells);
+    build_path_grid();
+    memset(sc64_route_field[0], 0x53, sc64_route_active_bytes);
+    memset(SC64_ROUTE_OLD_GRID, 0x5a, sizeof(path_walkable));
+    filled = sc64_route_fill_linear(sc64_route_field[0], goal);
+    for (unsigned i = 0; i < sizeof(path_walkable); ++i) assert(SC64_ROUTE_OLD_GRID[i] == 0x5a);
+#ifdef TEST_LINEAR_OVERFLOW
+    assert(filled == -1);
+    for (unsigned i = 0; i < sc64_route_active_bytes; ++i)
+        assert(sc64_route_field[0][i] == 0x53);
+    assert(sc64_route_fill(0, goal) == cells);
+#else
+    assert(filled == cells); /* must compact: the field is larger than the queue */
+#endif
+    reference_bfs(&oracle[POOL], goal);
+    for (int i = 0; i < cells; ++i) assert(sc64_route_get(0, i) == oracle[POOL].dir[i]);
+    check_grid_unchanged();
+}
+#endif
+
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+static void check_single_retained_point(void)
+{
+    const int first = 64 * 128 + 32, count = 128 * 128;
+    race_cols = race_rows = 128;
+    memset(desired, 1, count);
+    sc64_routes_reset();
+    build_path_grid();
+    assert(sc64_route_configure());
+    /* This fixture has no range reservation. Reproduce the pinned stock
+     * 128x128 point bank: fixed identity slots and no ordinary donor planes. */
+    sc64_route_pcount = 0;
+#if defined(SC64_ROUTE_POINT_TAIL_PROBE) && defined(TEST_LINEAR_OVERFLOW)
+    int protected_slot = sc64_route_slot(first);
+    int clobber_slot = protected_slot == 0 ? 1 : 0;
+    assert(protected_slot >= 0 && sc64_route_valid[protected_slot]);
+    sc64_route_point_spare = sc64_route_field[protected_slot];
+    memcpy(sc64_route_point_plane, sc64_route_point_spare, SC64_ROUTE_POINT_BYTES);
+    sc64_route_field[protected_slot] = sc64_route_point_plane;
+    assert(sc64_route_fill(clobber_slot, first+1) == count);
+    assert(sc64_route_point_spare == sc64_route_point_plane);
+    assert(sc64_route_field[protected_slot] != sc64_route_point_plane);
+    reference_bfs(&oracle[POOL], first);
+    for (int i = 0; i < count; ++i)
+        assert(sc64_route_get(protected_slot, i) == oracle[POOL].dir[i]);
+    reference_bfs(&oracle[POOL], first+1);
+    for (int i = 0; i < count; ++i)
+        assert(sc64_route_get(clobber_slot, i) == oracle[POOL].dir[i]);
+    check_grid_unchanged();
+    puts("forced whole-queue fallback releases the borrowed tail before writing");
+    return;
+#endif
+    for (int i = 0; i <= SC64_ROUTE_SLOTS; ++i)
+        assert(sc64_route_slot(first+i) >= 0);
+    assert(sc64_route_point_saved == first);
+    unsigned old_fills = keep_stat[KEEP_FILL], old_hits = keep_stat[KEEP_POINT_POINTER];
+    u32 old_logical = sc64_route_builds;
+    u8 *saved = sc64_route_point_spare;
+    int slot = sc64_route_slot(first);
+    assert(sc64_route_field[slot] == saved && sc64_route_point_spare != saved);
+    assert(slot >= 0 && sc64_route_goal[slot] == first && sc64_route_valid[slot] == 1);
+    assert(sc64_route_point_saved == first+1);
+    assert(keep_stat[KEEP_FILL] == old_fills && keep_stat[KEEP_POINT_POINTER] == old_hits+1);
+    assert(sc64_route_builds == old_logical+1);
+    reference_bfs(&oracle[POOL], first);
+    for (int i = 0; i < count; ++i) assert(sc64_route_get(slot, i) == oracle[POOL].dir[i]);
+    check_grid_unchanged();
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+    /* Release while the scratch address is still logically occupied, then
+     * clobber every borrowed byte as a save or full queue would. */
+    int bound = -1;
+    for (int i = 0; i < SC64_ROUTE_SLOTS; ++i)
+        if (sc64_route_field[i] == sc64_route_point_plane) bound = i;
+    assert(bound >= 0 && sc64_route_valid[bound]);
+    int bound_goal = sc64_route_goal[bound];
+    u8 *pool_address = sc64_route_point_spare;
+    reference_bfs(&oracle[POOL], bound_goal);
+    SC64_ROUTE_POINT_TAIL_RELEASE();
+    memset(sc64_route_point_plane, 0x53, SC64_ROUTE_POINT_BYTES);
+    assert(sc64_route_point_spare == sc64_route_point_plane && sc64_route_point_saved == -1);
+    assert(sc64_route_field[bound] == pool_address && sc64_route_goal[bound] == bound_goal);
+    for (int i = 0; i < count; ++i)
+        assert(sc64_route_get(bound, i) == oracle[POOL].dir[i]);
+#endif
+    sc64_routes_topology_changed();
+    assert(sc64_route_point_saved == -1);
+    assert(sc64_route_slot(first) >= 0 && keep_stat[KEEP_FILL] == old_fills+1);
+    sc64_routes_reset();
+    assert(sc64_route_point_saved == -1);
+    race_cols = race_rows = 64;
+    sc64_routes_reset();
+    assert(sc64_route_field[0] == sc64_route_pool &&
+           sc64_route_point_spare == sc64_route_point_plane);
+    race_cols = race_rows = 128;
+    sc64_routes_reset();
+    assert(sc64_route_field[SC64_ROUTE_SLOTS - 1] == sc64_route_pool +
+           (SC64_ROUTE_SLOTS - 1u) * SC64_ROUTE_POINT_BYTES);
+    puts("point pointer retention matches fresh BFS, logical miss and topology invalidation");
+}
+#endif
+
 int main(int argc, char **argv)
 {
-    static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 } };
+    static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
+#ifdef TEST_LINEAR_FLOOD
+                                    { 96, 128 },
+#endif
+    };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-pointer-only")) {
+        check_single_retained_point();
+        return 0;
+    }
+#endif
     for (int i = 1; i + 1 < argc; ++i) {
         if (!strcmp(argv[i], "--emit")) emit = argv[i + 1];
         if (!strcmp(argv[i], "--compare")) compare = argv[i + 1];
@@ -730,6 +853,10 @@ int main(int argc, char **argv)
         printf("total baseline builds %lu, keep builds %lu (%.1f%%)\n", total_base, total_keep,
                100.0 * (double)total_keep / (double)total_base);
     }
+#ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
+    check_linear_uses_expected_path(96);
+    check_linear_uses_expected_path(128);
+#endif
     puts("sc64 route keep-fields: ok");
     return 0;
 }

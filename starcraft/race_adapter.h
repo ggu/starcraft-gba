@@ -108,6 +108,20 @@ static int race_bot_index(int owner)
     return -1;
 }
 
+static int race_skirmish_owner_base(int owner)
+{
+    int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : owner == 4 ? 3 : -1;
+#ifdef SC64_IMPORTED_SKIRMISH
+    if (race_skirmish_start_order && base >= 0)
+        return base <= race_bots ? sc64_skirmish_start_base(race_skirmish_start_order,base) : -1;
+    if (base > 0 && race_skirmish_slots) {
+        int seat = sc64_skirmish_bot_seat(race_skirmish_slots, base - 1);
+        return seat >= 0 ? seat + 1 : -1;
+    }
+#endif
+    return base;
+}
+
 static int race_owner_identity(int owner)
 { return owner >= 0 && owner < 5 ? race_player[owner] : -1; }
 
@@ -1248,6 +1262,11 @@ static int race_builder_arrived(int worker)
             race_z6.human_drone_morphs<4u) ++race_z6.human_drone_morphs;
 #endif
         if (u[worker].owner == SIDE) supply_used -= supply;
+#ifdef SC64_CONTACT_MEMO_ENABLED
+        /* Build arrival can consume a Drone inside the active bucket pass,
+         * without going through hit_target or the bucket move hook. */
+        SC64_CONTACT_MEMO_INVALIDATE();
+#endif
         u[worker].alive = 0;
     } else {
         u[worker].order = ORDER_IDLE;
@@ -1888,8 +1907,9 @@ static void race_skirmish_init(void)
 #endif
     race_player[SIDE] = race_human;
     for (i = 0; i < 1 + race_bots && i < 4; ++i) {
-        int base = i;
         owner = i == 0 ? SIDE : race_bot_owner_ids[i - 1];
+        int base = race_skirmish_owner_base(owner);
+        if (base < 0) continue;
         if (owner != SIDE) race_minerals[owner] = 50;
         switch (race_owner_identity(owner)) {
         case R_ZERG: townhall = B_HATCHERY; worker_type = U_DRONE; break;
@@ -1925,14 +1945,15 @@ static void race_skirmish_init(void)
         }
     }
     supply_cap = race_owner_supply_capacity(SIDE);
-    cx = race_base_x[0]; cy = race_base_y[0]; camx = camy = 0;
+    int human_base = race_skirmish_owner_base(SIDE);
+    cx = race_base_x[human_base]; cy = race_base_y[human_base]; camx = camy = 0;
     selected_building = -1; mode = MODE_NORMAL; menu_open = 0;
     enemy_timer = 0; wave = 0; invalidate_path_grid(); update_exploration();
 }
 
 static int race_skirmish_site_for(int owner, int type, int *x, int *y)
 {
-    int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : owner == 4 ? 3 : -1;
+    int base = race_skirmish_owner_base(owner);
     static const int dx[8] = { 48,-48,0,0,48,-48,48,-48 };
     static const int dy[8] = { 0,0,48,-48,48,48,-48,-48 };
     int i;

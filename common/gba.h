@@ -18,6 +18,13 @@ enum { C_BLACK=0,C_WHITE,C_DIM,C_PANEL,C_EDGE,C_RED,C_RED_DARK,C_GREEN,C_GREEN_D
 void gba_init(void);
 u16 gba_keys(void);
 u32 gba_clock(void);
+#if defined(SC64_NATIVE_MELEE_STARTS) && defined(SC64_IMPORTED_SKIRMISH)
+void gba_elapsed_clock_sample(u32 cycles);
+u32 gba_elapsed_milliseconds(void);
+#ifdef GBA_HOST
+void gba_test_set_elapsed_milliseconds(u32 milliseconds);
+#endif
+#endif
 void gfx_begin(u8 background);
 #ifdef GBA_SCENE_CLIP
 /* Restrict drawing primitives to [top,bottom). Invalid ranges are ignored.
@@ -121,7 +128,12 @@ void save_write_migrating_feature(const void *data,u32 length,u32 tag,u32 legacy
 int save_read(void *data,u32 length,u32 tag);
 int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
 #if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN) || defined(SC64_WORKER_CARGO_KIND)
+#ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
+/* The combined P10 reader recognizes one new tag and five predecessors. */
+#define GBA_SAVE_MAX_ACCEPTED_TAGS 6u
+#else
 #define GBA_SAVE_MAX_ACCEPTED_TAGS 5u
+#endif
 /* Two-slot semantic selection. With SC64_SHARED_HP_REGEN, tags must have a
  * nonzero most-significant byte; that byte is the commit marker and zero
  * denotes an interrupted/uncommitted record. Other builds retain their

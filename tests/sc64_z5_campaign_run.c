@@ -2,6 +2,7 @@
  * delivered through game_update input; runtime state is observed only for
  * steering and diagnostics. A win is promoted only from SCREEN_RESULT. */
 #include "../starcraft/game.c"
+#include "sc64_route_purity.h"
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -194,6 +195,7 @@ static int first_enemy_on_route(int x0, int y0, int goal_x, int goal_y,
                                 int *enemy_x, int *enemy_y)
 {
     int px = x0, py = y0;
+    ROUTE_PURE_BEGIN();
     for (int step_index = 0; step_index < MAP_CELLS; ++step_index) {
         for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == ENEMY) {
             int dx = u[i].x - px, dy = u[i].y - py;
@@ -201,6 +203,7 @@ static int first_enemy_on_route(int x0, int y0, int goal_x, int goal_y,
             if (abs(dx) < radius && abs(dy) < radius &&
                 dx * dx + dy * dy < radius * radius) {
                 *enemy_x = u[i].x; *enemy_y = u[i].y;
+                ROUTE_PURE_END();
                 return i;
             }
         }
@@ -209,11 +212,13 @@ static int first_enemy_on_route(int x0, int y0, int goal_x, int goal_y,
             (nx == px && ny == py)) break;
         px = nx; py = ny;
     }
+    ROUTE_PURE_END();
     return -1;
 }
 
 static void checkpoint(const char *kind)
 {
+    ROUTE_PURE_BEGIN();
     int k = kerrigan_slot();
     int next_x = -1, next_y = -1;
     int side_count = owner_units(SIDE), ling_count = 0;
@@ -312,6 +317,7 @@ static void checkpoint(const char *kind)
                 u[k].tx, u[k].ty,
                 is_traversable(u[k].tx / 16, u[k].ty / 16, -1),
                 (unsigned)race_z5.doodad_enabled[0]);
+    ROUTE_PURE_END();
 }
 
 static void step(u16 held)
@@ -324,7 +330,15 @@ static void step(u16 held)
      * after death or promote a replay as the same run. */
     if (won || lost || screen == SCREEN_RESULT) return;
     u16 pressed = held & (u16)~prior_keys;
+    assert(route_pure_depth == 0);
+#ifdef ROUTE_PURITY_DEBUG
+    static uint64_t route_after_update;
+    if (host_ticks) assert(route_purity_hash() == route_after_update);
+#endif
     game_update(held, pressed);
+#ifdef ROUTE_PURITY_DEBUG
+    route_after_update = route_purity_hash();
+#endif
     prior_keys = held;
     ++host_ticks;
     if (replay_trace && held != (u16)replay_last_keys) {
@@ -660,14 +674,18 @@ static int controller_attackmove_click_point(int sx,int sy,int x,int y,int *out_
 #ifdef SC64_DIRECT_ATTACK
     if(sc64_direct_attack_find_target(x,y)>=0) {
         static const int dirs[8][2]={{1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}};
+        ROUTE_PURE_BEGIN();
         for(int radius=32;radius<=96;radius+=16) for(int d=0;d<8;d++) {
             int px=x+dirs[d][0]*radius,py=y+dirs[d][1]*radius,nx,ny;
             if(px<0||py<0||px>=WORLD_W||py>=WORLD_H)continue;
             if(sc64_direct_attack_find_target(px,py)>=0)continue;
             if(!is_traversable(px/16,py/16,-1))continue;
             if(!path_next_tile(sx,sy,px,py,&nx,&ny))continue;
-            *out_x=px;*out_y=py;return 1;
+            *out_x=px;*out_y=py;
+            ROUTE_PURE_END();
+            return 1;
         }
+        ROUTE_PURE_END();
         return 0;
     }
 #else
@@ -677,11 +695,12 @@ static int controller_attackmove_click_point(int sx,int sy,int x,int y,int *out_
 }
 
 
-/* Label the current walk grid after a source doodad transition.  This is test
- * steering only; it does not write game state or substitute for game pathing. */
+/* Label the current walk grid after a source doodad transition. Only the
+ * controller's labels survive: rebuilding the grid can change live routes. */
 static void nav_relabel(void)
 {
     unsigned component = 0;
+    ROUTE_PURE_BEGIN();
     build_path_grid();
     memset(nav_component, 0, sizeof(nav_component));
     for (int seed = 0; seed < MAP_CELLS; ++seed) {
@@ -706,6 +725,7 @@ static void nav_relabel(void)
             }
         }
     }
+    ROUTE_PURE_END();
 }
 
 static int reachable_point_in_location(unsigned id, int *x_out, int *y_out,
@@ -725,6 +745,7 @@ static int reachable_point_in_location(unsigned id, int *x_out, int *y_out,
     int c1 = limit((right - 1) / 16, 0, MAP_COLS - 1);
     int r0 = limit(top / 16, 0, MAP_ROWS - 1);
     int r1 = limit((bottom - 1) / 16, 0, MAP_ROWS - 1);
+    ROUTE_PURE_BEGIN();
     for (int row = r0; row <= r1; ++row) for (int col = c0; col <= c1; ++col) {
         int cell = col + row * MAP_COLS;
         int px = col * 16 + 8, py = row * 16 + 8;
@@ -741,6 +762,7 @@ static int reachable_point_in_location(unsigned id, int *x_out, int *y_out,
             best_clear_distance=distance; clear_x=px; clear_y=py;
         }
     }
+    ROUTE_PURE_END();
     if (clear_x >= 0) { best_x=clear_x; best_y=clear_y; }
     if (best_x < 0) return 0;
     *x_out = best_x; *y_out = best_y;
@@ -872,6 +894,7 @@ choose_next:
 static void dump_navigation_frontier(int k)
 {
     u16 origin_component = 0;
+    ROUTE_PURE_BEGIN();
     if (k >= 0) {
         nav_relabel();
         origin_component = nav_component[
@@ -931,6 +954,7 @@ static void dump_navigation_frontier(int k)
                 SC64_GRID_GET(path_walkable,col+r*MAP_COLS),
                 nav_component[col+r*MAP_COLS]);
     }
+    ROUTE_PURE_END();
 }
 
 static void launch_from_normal_menu(void)
@@ -1016,8 +1040,12 @@ static int retreat_side_point(const Unit *hero, int goal_x, int goal_y,
         if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == 37) {
             ling = i; break;
         }
-    if (ling < 0 || !path_next_tile(hero->x, hero->y, goal_x, goal_y, &nx, &ny))
+    if (ling < 0) return 0;
+    ROUTE_PURE_BEGIN();
+    if (!path_next_tile(hero->x, hero->y, goal_x, goal_y, &nx, &ny)) {
+        ROUTE_PURE_END();
         return 0;
+    }
     if (abs(nx - hero->x) >= abs(ny - hero->y)) {
         candidates[0][0]=hero->x; candidates[0][1]=hero->y+48;
         candidates[1][0]=hero->x; candidates[1][1]=hero->y-48;
@@ -1034,8 +1062,11 @@ static int retreat_side_point(const Unit *hero, int goal_x, int goal_y,
         int py=limit(candidates[i][1],8,WORLD_H-8), lx, ly;
         if (dist2(px,py,hero->x,hero->y) < 32*32 ||
             !path_next_tile(u[ling].x,u[ling].y,px,py,&lx,&ly)) continue;
-        *x_out=px; *y_out=py; return 1;
+        *x_out=px; *y_out=py;
+        ROUTE_PURE_END();
+        return 1;
     }
+    ROUTE_PURE_END();
     return 0;
 }
 
@@ -1162,8 +1193,10 @@ static void diagnose_stalled_step(unsigned trigger, int slot)
     ny = q->y < q->path_y ? q->y + speed :
          q->y > q->path_y ? q->y - speed : q->y;
     from_cell = q->x / 16 + (q->y / 16) * MAP_COLS;
+    ROUTE_PURE_BEGIN();
     terrain_clear = is_traversable(nx / 16, ny / 16, from_cell);
     actors_clear = unit_step_clear(q, nx, ny);
+    ROUTE_PURE_END();
     fprintf(stderr, "Z5 stalled-step trigger=%u unit=%d raw=%u type=%u xy=%d,%d next=%d,%d waypoint=%d,%d cell=%d,%d walk=%d actor_clear=%d retry=%d timer=%d cloak=%u carry=%d\n",
             trigger, slot, q->raw_type, q->type, q->x, q->y, nx, ny,
             q->path_x, q->path_y, nx / 16, ny / 16, terrain_clear,
@@ -1346,6 +1379,7 @@ int main(int argc, char **argv)
 
     {
         int side_count = 0, reachable = 0;
+        ROUTE_PURE_BEGIN();
         for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE) {
             int nx = -1, ny = -1;
             int can = path_next_tile(u[i].x, u[i].y, 1544, 328, &nx, &ny);
@@ -1354,6 +1388,7 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Z5 initial unit slot=%d raw=%d type=%d xy=%d,%d path-to-trigger23=%d next=%d,%d\n",
                         i, u[i].raw_type, u[i].type, u[i].x, u[i].y, can, nx, ny);
         }
+        ROUTE_PURE_END();
         fprintf(stderr, "Z5 initial side units=%d with path to reachable trigger23 region=%d\n", side_count, reachable);
     }
 
@@ -2037,6 +2072,8 @@ int main(int argc, char **argv)
         (unsigned)race_z5.cloak.active, cx, cy, order_count, trace_path,
         replay_output);
     fclose(attempt);
+    fprintf(stderr, "Z5 route observer: %lu scopes, %lu changed then restored\n",
+            route_pure_scopes, route_pure_changed_scopes);
     printf("Z5 controller attempt=%s frame=%u result=%d/%d screen=%d Kerrigan=%d orders=%d trace=%s attempt=%s\n",
            verified ? "VERIFIED-WIN" : lost ? "LOSS" : host_limited ? "HOST-LIMIT" : "LIMIT",
            (unsigned)frame,

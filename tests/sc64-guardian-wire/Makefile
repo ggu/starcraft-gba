@@ -4,10 +4,10 @@ GUARD_TEST_BIN_DIR ?= /tmp
 GUARD_HOST = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -DSC64_GUARDIAN_COCOON_STAGE
 GUARD_EXTRA = common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
 .PHONY: guardian-legacy-egg-context
-guardian-legacy-egg-context:
+guardian-legacy-egg-context: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_legacy_egg_context.c tests/sc64_guardian_journal_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $(GUARD_TEST_BIN_DIR)/guardian-legacy-egg-context
 	$(GUARD_TEST_BIN_DIR)/guardian-legacy-egg-context
-guardian-real:
+guardian-real: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-terran
 	$(GUARD_TEST_BIN_DIR)/guardian-real-terran
 	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-zerg
@@ -23,7 +23,7 @@ guardian-real-remaining:
 	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-showcase
 	$(GUARD_TEST_BIN_DIR)/guardian-real-showcase
 .PHONY: guardian-real-zps
-guardian-real-zps:
+guardian-real-zps: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-zerg
 	$(GUARD_TEST_BIN_DIR)/guardian-real-zerg
 	$(CLANG) $(GUARD_HOST) $(patsubst -Ibuild/generated/p10-fact-v2,-Ibuild/generated/guardian-p10-fact,$(PROTOSS_P10_BASE_FLAGS)) tests/sc64_guardian_wire_real.c $(GUARD_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-real-protoss
@@ -39,7 +39,7 @@ guardian-fact-generator:
 	cmp /tmp/guardian-facts-off.h /tmp/guardian-facts-on.h
 .PHONY: guardian-journal-real
 GUARD_JOURNAL_EXTRA = tests/sc64_guardian_journal_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
-guardian-journal-real:
+guardian-journal-real: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-terran
 	$(GUARD_TEST_BIN_DIR)/guardian-journal-terran
 	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-zerg
@@ -49,7 +49,7 @@ guardian-journal-real:
 	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-showcase
 	$(GUARD_TEST_BIN_DIR)/guardian-journal-showcase
 .PHONY: guardian-lifecycle-real
-guardian-lifecycle-real:
+guardian-lifecycle-real: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_lifecycle_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-lifecycle-terran
 	/tmp/guardian-lifecycle-terran
 	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_lifecycle_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-lifecycle-zerg
@@ -59,7 +59,7 @@ guardian-lifecycle-real:
 	$(CLANG) $(GUARD_HOST) $(SHOWCASE_FLAGS) tests/sc64_guardian_lifecycle_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-lifecycle-showcase
 	/tmp/guardian-lifecycle-showcase
 .PHONY: guardian-frame-real
-guardian-frame-real:
+guardian-frame-real: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-terran
 	/tmp/guardian-frame-terran
 	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-zerg
@@ -72,7 +72,7 @@ guardian-frame-real:
 guardian-render-game-fake:
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -DSC64_GUARDIAN_TEST_BANK_HEADER='"sc64_guardian_cocoon_fake_bank.h"' -Itests/guardian-render-fake tests/sc64_guardian_render_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-render-game-fake
 	/tmp/guardian-render-game-fake
-guardian-frame-render-real:
+guardian-frame-render-real: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -I.local/sc64/guardian-cocoon/bank tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-render-terran
 	/tmp/guardian-frame-render-terran
 	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) -DSC64_GUARDIAN_COCOON_RENDER_STAGE -I.local/sc64/guardian-cocoon/bank tests/sc64_guardian_frame_game.c $(GUARD_JOURNAL_EXTRA) -o /tmp/guardian-frame-render-zerg
@@ -88,7 +88,7 @@ guardian-journal-slice-terran:
 	$(CLANG) $(GUARD_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-terran
 	$(GUARD_TEST_BIN_DIR)/guardian-journal-terran
 .PHONY: guardian-journal-slice-zerg
-guardian-journal-slice-zerg:
+guardian-journal-slice-zerg: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(GUARD_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_journal_game.c $(GUARD_JOURNAL_EXTRA) -o $(GUARD_TEST_BIN_DIR)/guardian-journal-zerg
 	$(GUARD_TEST_BIN_DIR)/guardian-journal-zerg
 .PHONY: guardian-journal-slice-protoss

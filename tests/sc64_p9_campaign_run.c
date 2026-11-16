@@ -21,9 +21,14 @@
 
 static FILE *trace;
 static u16 prior;
-static unsigned host_tick;
+static unsigned long host_tick;
+#ifdef SC64_P9_NORMAL_HOME
+#include "sc64_route_purity.h"
+#include "sc64_controller_authored_pages.h"
+static uint64_t route_after;
+#endif
 
-static void input(u16 held)
+static void step(u16 held)
 {
     /* Once the mission ends, later calls are not inputs: the trace stops at
      * the deciding call, so a replay ends there too. */
@@ -32,13 +37,31 @@ static void input(u16 held)
     int changed=held!=prior;
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
+#ifdef SC64_P9_NORMAL_HOME
+    assert(route_purity_hash()==route_after);
+#endif
     game_update(held,pressed);
+#ifdef SC64_P9_NORMAL_HOME
+    route_after=route_purity_hash();
+#endif
     prior=held;
     ++host_tick;
     if(trace && changed)
         fprintf(trace,"{\"kind\":\"input\",\"call_index\":%u,\"frame_before\":%u,\"frame_after\":%u,\"held\":%u,\"pressed\":%u}\n",
             call_index,frame_before,(unsigned)frame,(unsigned)held,(unsigned)pressed);
 }
+
+static void input(u16 held)
+{
+    step(held);
+#ifdef SC64_P9_NORMAL_HOME
+    sc64_controller_ack_pages(step,held,&host_tick,stderr);
+#endif
+}
+
+#ifdef SC64_P9_NORMAL_HOME
+static void briefing_press(u16 held) { KEY_TAP(held); }
+#endif
 
 /* Read-only route query over the engine's current walkability plane. */
 static int waypoint_to(int sx,int sy,int tx,int ty,int *wx,int *wy,int *distance_out)
@@ -705,7 +728,7 @@ static void census(const char *label)
         "\"nexus\":%d,\"gateways\":%d,\"switches\":%u,\"done\":[%u,%u,%u,%u],\"outcome\":%u,"
         "\"towns\":[%u,%u,%u],\"waves\":%u,"
         "\"zeratul_cloaked\":%d,\"zeratul_detected_by\":%u,\"detect_peak\":%d,\"aura_peak\":%d}\n",
-        label,(unsigned)frame,host_tick,screen,won,lost,
+        label,(unsigned)frame,(unsigned)host_tick,screen,won,lost,
         live_units_owner(SIDE),army_count(),probe_count(),enemy,enemy_b,
         loc,c>=0?b[c].hp:-1,z>=0?u[z].owner:-1,z>=0?u[z].hp:-1,z>=0?u[z].shield:-1,z>=0?u[z].x:-1,z>=0?u[z].y:-1,
         f>=0?u[f].owner:-1,f>=0?u[f].hp:-1,f>=0?u[f].shield:-1,minerals,gas,
@@ -749,10 +772,18 @@ int main(int argc,char **argv)
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
     fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":28,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n",P9_CONTROLLER_PROFILE);
     game_init();prior=0;
+#ifdef SC64_P9_NORMAL_HOME
+    route_after=route_purity_hash();
+#endif
     assert(screen==SCREEN_TITLE&&race_front.page==SC_FRONT_HOME);
     /* Campaign, fifth page of the two-entry mission list, first row, briefing. */
     KEY_TAP(KEY_A);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);
-    KEY_TAP(KEY_A);KEY_TAP(KEY_START);
+    KEY_TAP(KEY_A);
+#ifdef SC64_P9_NORMAL_HOME
+    assert(sc64_controller_reveal_briefing(briefing_press,28,&host_tick,stderr));
+#else
+    KEY_TAP(KEY_START);
+#endif
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==28);
     census("launch");
     for(int i=0;i<MAX_UNITS;i++)pending_since[i]=-1;
@@ -1145,7 +1176,7 @@ int main(int argc,char **argv)
             if(!sf||fwrite(host_save,1,sizeof(host_save),sf)!=sizeof(host_save)){perror(save_path);return 2;}
             fclose(sf);
             fprintf(trace,"{\"kind\":\"save\",\"frame\":%u,\"first_call\":%u,\"resume_call\":%u,\"paused\":%d,\"screen\":%d,\"under_construction\":%d,\"menu_last\":%d}\n",
-                (unsigned)frame,first,host_tick,paused,screen,building,menu_last);
+                (unsigned)frame,first,(unsigned)host_tick,paused,screen,building,menu_last);
             census("saved");
         }
         service_sample();
@@ -1155,6 +1186,6 @@ int main(int argc,char **argv)
     census("final");
     fclose(trace);
     printf("p9 controller: frame=%u calls=%u won=%d lost=%d screen=%d switches=%u\n",
-           (unsigned)frame,host_tick,won,lost,screen,race_p9.switches);
+           (unsigned)frame,(unsigned)host_tick,won,lost,screen,race_p9.switches);
     return won?0:1;
 }

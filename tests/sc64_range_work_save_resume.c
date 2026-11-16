@@ -47,7 +47,7 @@ static void range_save_to_row(int row)
 
 static void range_save_set_field(int *field, int value)
 {
-    for (int step = 0; *field != value && step < 3; ++step)
+    for (int step = 0; *field != value && step < 5; ++step)
         range_save_tap(KEY_RIGHT);
     assert(*field == value);
 }
@@ -61,7 +61,7 @@ static void range_save_launch_skirmish(void)
     range_save_to_row(1); range_save_set_field(&race_front.race, R_TER);
     range_save_to_row(2); range_save_set_field(&race_front.bots, 1);
     range_save_to_row(3); range_save_set_field(&race_front.bot_races[0], R_ZERG);
-    range_save_to_row(4); range_save_tap(KEY_A);
+    range_save_to_row(SC_FRONT_SKIRMISH_LAUNCH_ROW); range_save_tap(KEY_A);
     assert(screen == SCREEN_PLAY && race_mode && race_skirmish_map == 0);
 }
 

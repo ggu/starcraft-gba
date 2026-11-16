@@ -161,9 +161,10 @@ def press_start(rsp, sym, map_id: int, race: int, bots: int) -> dict:
     for index in range(bots):
         wanted = (race + index + 1) % 3
         to_row(rsp, sym, 3 + index)
-        cycle(rsp, sym, FRONT_FIELDS["bot_races"] + 4 * index, wanted, 3)
+        cycle(rsp, sym, FRONT_FIELDS["bot_races"] + 4 * index, wanted,
+              5 if "race_skirmish_slots" in sym else 3)
         bot_races.append(wanted)
-    to_row(rsp, sym, 3 + bots)
+    to_row(rsp, sym, 6 if "race_skirmish_slots" in sym else 3 + bots)
     key(rsp, sym, KEY_A)
     dims = MAP_DIMS[map_id]
     got = {"screen": i32(rsp, sym["screen"]), "mode": i32(rsp, sym["race_mode"]),

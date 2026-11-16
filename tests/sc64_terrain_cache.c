@@ -93,6 +93,12 @@ gfx_blit_window(int y, int height, const u8 *src, int stride, int rows,
 #endif
 
 #include "../starcraft/sc64_terrain_cache.h"
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+#define fog_test_store(x, y) sc64_terrain_store((x), (y), 0, sc64_terrain_capture_page())
+#else
+#define fog_test_store(x, y) sc64_terrain_store((x), (y))
+#endif
+
 #ifdef SC64_SOFT_FOG
 #include "../starcraft/sc64_fog.h"
 #endif
@@ -116,7 +122,8 @@ static void fog_vram_canary_check(void)
 /* Exercise the same scenarios through the caller-supplied key API. */
 #define sc64_terrain_cached(x, y) \
     sc64_terrain_cached_key((x), (y), test_static_key)
-#define sc64_terrain_store(x, y) \
+#undef fog_test_store
+#define fog_test_store(x, y) \
     sc64_terrain_store_key((x), (y), test_static_key)
 #endif
 
@@ -158,7 +165,7 @@ test_diagnostic_counters(void)
     assert(!sc64_terrain_cached(0, 0));
     assert(sc64_terrain_diag_invalid_cache == 1);
     fill_band(0x41);
-    assert(sc64_terrain_store(0, 0));
+    assert(fog_test_store(0, 0));
     assert(sc64_terrain_diag_captured_pixels == 240u * SC64_TERRAIN_CACHE_HEIGHT);
     assert(sc64_terrain_diag_captured_tiles == (u32)sc64_terrain_cache_mask_count);
     assert(sc64_terrain_cached(0, 0));
@@ -174,11 +181,11 @@ test_diagnostic_counters(void)
     test_static_key++;
     assert(!sc64_terrain_cached(0, 0));
     assert(sc64_terrain_diag_static_key_change == 1);
-    assert(sc64_terrain_store(0, 0));
+    assert(fog_test_store(0, 0));
 #ifdef SC64_TERRAIN_SCROLL
     assert(!sc64_terrain_cached(240, 0));
     assert(sc64_terrain_diag_camera_oversize == 1);
-    assert(sc64_terrain_store(0, 0));
+    assert(fog_test_store(0, 0));
     sc64_terrain_cache_camx = -1;
     assert(!sc64_terrain_cached(1, 0));
     assert(sc64_terrain_diag_invalid_view == 1);
@@ -187,12 +194,12 @@ test_diagnostic_counters(void)
     assert(sc64_terrain_diag_camera_change == 1);
 #endif
 
-    assert(sc64_terrain_store(0, 0));
+    assert(fog_test_store(0, 0));
     ++sc64_terrain_cache_mask_count;
     assert(!sc64_terrain_cached(0, 0));
     assert(sc64_terrain_diag_invalid_mask == 1);
 #ifdef SC64_TERRAN_CAMPAIGN
-    assert(sc64_terrain_store(0, 0));
+    assert(fog_test_store(0, 0));
     campaign_mission++;
     assert(!sc64_terrain_cached(0, 0));
     assert(sc64_terrain_diag_mission_change == 1);
@@ -212,7 +219,7 @@ test_restore_preserves_surrounding_pixels(void)
     memset(bottom, 0x17, sizeof(bottom));
     FOG_TEST_SET(visible, 10 + 5 * MAP_COLS, 1);
     fill_band(0x5a);
-    assert(sc64_terrain_store(0, 0));
+    assert(fog_test_store(0, 0));
     assert(read_calls == 1);
     fill_band(0xc3); /* stand in for objects drawn after the terrain pass */
     assert(sc64_terrain_cached(0, 0));
@@ -230,7 +237,7 @@ test_camera_and_fog_invalidation(void)
 {
     fog_test_fill(0, 0);
     fill_band(0x31);
-    assert(sc64_terrain_store(0, 0));
+    assert(fog_test_store(0, 0));
     assert(!sc64_terrain_cached(16, 0));
 
     /* A changed fog cell outside the viewport does not dirty this band. */
@@ -238,12 +245,12 @@ test_camera_and_fog_invalidation(void)
     assert(sc64_terrain_cached(0, 0));
     assert(sc64_terrain_tile_clean(0, 0));
     /* At x=1, column 15 is visible by one pixel at the right edge. */
-    assert(sc64_terrain_store(1, 0));
+    assert(fog_test_store(1, 0));
     FOG_TEST_SET(visible, 15, 1);
     assert(!sc64_terrain_cached(1, 0));
     assert(!sc64_terrain_tile_clean(15, 0));
     assert(sc64_terrain_tile_clean(14, 0));
-    assert(sc64_terrain_store(1, 0));
+    assert(fog_test_store(1, 0));
     FOG_TEST_SET(visible, 15, 0);
     FOG_TEST_SET(explored, 15, 1);
     assert(!sc64_terrain_cached(1, 0));
@@ -256,7 +263,7 @@ test_edge_viewport_and_campaign_mission_key(void)
 {
     fog_test_fill(0, 0);
     fill_band(0x49);
-    assert(sc64_terrain_store(WORLD_W - 240, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT));
+    assert(fog_test_store(WORLD_W - 240, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT));
     assert(sc64_terrain_cached(WORLD_W - 240, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT));
     assert(!sc64_terrain_cached(WORLD_W - 241, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT));
     assert(!sc64_terrain_tile_clean(49, 57));
@@ -270,7 +277,7 @@ static void
 test_failed_capture_does_not_validate_cache(void)
 {
     read_ok = 0;
-    assert(!sc64_terrain_store(32, 32));
+    assert(!fog_test_store(32, 32));
     assert(!sc64_terrain_cached(32, 32));
     read_ok = 1;
 }
@@ -281,7 +288,7 @@ test_static_object_key_invalidates_full_base(void)
     fog_test_fill(0, 0);
     test_static_key = 17;
     fill_band(0x72);
-    assert(sc64_terrain_store(0, 0));
+    assert(fog_test_store(0, 0));
     test_static_key++;
     assert(!sc64_terrain_cached(0, 0));
     assert(!sc64_terrain_tile_clean(0, 0));
@@ -299,7 +306,7 @@ test_validated_tile_bounds(void)
             assert(sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1));
             memset(visible, 0, sizeof(visible));
             memset(explored, 0, sizeof(explored));
-            assert(sc64_terrain_store(x, y));
+            assert(fog_test_store(x, y));
             visible[col0 + row0 * MAP_COLS] = 1;
             assert(!sc64_terrain_cached(x, y));
             assert(sc64_terrain_cache_reused_base);
@@ -315,6 +322,7 @@ test_validated_tile_bounds(void)
             assert(!sc64_terrain_tile_clean(col0, row0));
         }
 }
+
 
 int
 main(void)
@@ -446,12 +454,12 @@ compare_incremental_with_fresh(int camx, int camy)
     _Alignas(4) u8 fresh[240 * SC64_TERRAIN_CACHE_HEIGHT];
     render_fixture(camx, camy, 1);
     assert(gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT, incremental));
-    assert(sc64_terrain_store(camx, camy));
+    assert(fog_test_store(camx, camy));
     render_fixture(camx, camy, 0);
     assert(gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT, fresh));
     assert(memcmp(incremental, fresh, sizeof(fresh)) == 0);
     render_fixture(camx, camy, 0);
-    assert(sc64_terrain_store(camx, camy));
+    assert(fog_test_store(camx, camy));
     fog_vram_canary_check();
 }
 
@@ -656,6 +664,39 @@ test_soft_fog_neighbor_cache(void)
 #endif
 }
 #endif
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+static void test_dirty_capture(void)
+{
+    enum { Y = SC64_TERRAIN_CACHE_Y, H = SC64_TERRAIN_CACHE_HEIGHT,
+           SPLIT = Y + SC64_TERRAIN_CACHE_VRAM_ROWS };
+    _Alignas(4) u8 expected[240 * H], observed[240 * H];
+    const Sc64StaticDirtyRowsPlan plan = {3, {{Y+2,Y+7},{SPLIT-3,SPLIT+4},{Y+H-3,Y+H}}};
+    const Sc64StaticDirtyRowsPlan bad = {2, {{Y,Y+4},{Y+2,Y+8}}};
+    for (int trial = 0; trial < 5; ++trial) {
+        gfx_begin(20);
+        Sc64TerrainCapturePage base = sc64_terrain_capture_page();
+        assert(sc64_terrain_store(1, 3, 0, base));
+        gfx_begin(0);
+        assert(sc64_terrain_cache_restore());
+        sc64_terrain_cache_reused_base = 1;
+        base = sc64_terrain_capture_page();
+        if (trial == 1) gfx_begin(41); /* same page, stale clear generation */
+        if (trial == 2) gfx_end(), gfx_begin(42); /* different back page */
+        if (trial == 3) ++test_static_key;
+        for (int i = 0; i < plan.count; ++i)
+            gfx_rect(0, plan.bands[i].top, 240, plan.bands[i].bottom - plan.bands[i].top, (u8)(60+i));
+        if (trial) gfx_rect(0, Y, 240, 1, 98); /* must survive full fallback */
+        assert(gfx_read_band(Y, H, expected));
+        assert(sc64_terrain_capture_dirty(trial == 4 ? &bad : &plan, base, 1, 3, test_static_key) ==
+               (trial ? 0 : 15));
+        assert(sc64_terrain_store(1, 3, trial == 4 ? &bad : &plan, base));
+        gfx_begin(88);
+        assert(sc64_terrain_cache_restore());
+        assert(gfx_read_band(Y, H, observed));
+        assert(!memcmp(expected, observed, sizeof(expected)));
+    }
+}
+#endif
 
 int
 main(void)
@@ -677,7 +718,7 @@ main(void)
         }
     render_fixture(1, 3, 0);
     assert(gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT, expected));
-    assert(sc64_terrain_store(1, 3));
+    assert(fog_test_store(1, 3));
     gfx_rect(24, 32, 80, 35, 255); /* dynamic units/structures over terrain */
     assert(sc64_terrain_cached(1, 3));
     assert(gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT, observed));
@@ -713,6 +754,9 @@ main(void)
     test_scroll_differential();
 #endif
 #ifdef SC64_TERRAIN_CACHE_VRAM
+#ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
+    test_dirty_capture();
+#endif
     verify_obj_guards();
 #endif
 #ifdef SC64_SOFT_FOG

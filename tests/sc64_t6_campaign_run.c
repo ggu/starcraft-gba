@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "sc64_route_purity.h"
+
 #ifndef SC64_T6_PROBE_ENTRY
 #error "compile with the private T6 probe-entry flag"
 #endif
@@ -46,7 +48,15 @@ static void step(u16 held)
     if (host_ticks >= (u32)run_limit || screen != SCREEN_PLAY || won || lost)
         return;
     u16 pressed = held & (u16)~prior_keys;
+#ifdef ROUTE_PURITY_DEBUG
+    static uint64_t prior_route_hash;
+    assert(!route_pure_depth);
+    assert(!host_ticks || route_purity_hash() == prior_route_hash);
+#endif
     game_update(held, pressed);
+#ifdef ROUTE_PURITY_DEBUG
+    prior_route_hash = route_purity_hash();
+#endif
     prior_keys = held;
     ++host_ticks;
     if (watch_norad && norad_slot >= 0 && (host_ticks % 250u) == 0) {
@@ -117,14 +127,21 @@ static int normal_field(void)
     return screen == SCREEN_PLAY && !menu_open && mode == MODE_NORMAL;
 }
 
-/* Field controls reopen the order list on the last command. These
- * sequences were written for a list that opens on Move, so a fresh
- * open starts there (no extra input, so the run's timing is unchanged). */
+/* The physical menu opens on its last command. Navigate back to Move
+ * with real input so the recorded tape contains the same state changes. */
 static void tap_b(void)
 {
     int fresh = !menu_open && mode == MODE_NORMAL;
     tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+    if (!fresh || !menu_open) return;
+    int rows = field_menu_count();
+    for (int i = 0; i < rows && menu_cursor != MENU_MOVE; ++i) {
+        int up = (menu_cursor - MENU_MOVE + rows) % rows;
+        int down = (MENU_MOVE - menu_cursor + rows) % rows;
+        tap(up <= down ? KEY_UP : KEY_DOWN);
+    }
+    assert(host_ticks >= (u32)run_limit || screen != SCREEN_PLAY || won || lost ||
+           (menu_open && menu_cursor == MENU_MOVE));
 }
 
 static void move_cursor(int x, int y)
@@ -188,13 +205,14 @@ static int reachable_point(int sx, int sy, unsigned loc, int *ox, int *oy)
     int start = sx / 16 + (sy / 16) * MAP_COLS;
     if (start < 0 || start >= MAP_CELLS) return -1;
     const Sc64T4Location *r = &sc64_t6_scenario.locations[loc - 1];
+    ROUTE_PURE_BEGIN();
     build_path_grid(); memset(seen, 0, sizeof(seen)); memset(d, 0, sizeof(d));
     int head = 0, tail = 0; q[tail++] = (u16)start; seen[start] = 1;
     while (head < tail) {
         int c = q[head++], col = c % MAP_COLS, row = c / MAP_COLS;
         int px = col * 16 + 8, py = row * 16 + 8;
         if ((u32)(px * 2) >= r->left && (u32)(px * 2) < r->right &&
-            (u32)(py * 2) >= r->top && (u32)(py * 2) < r->bottom) { *ox = px; *oy = py; return d[c]; }
+            (u32)(py * 2) >= r->top && (u32)(py * 2) < r->bottom) { *ox = px; *oy = py; ROUTE_PURE_END(); return d[c]; }
 #define NEXT_CELL(n_) do { int z_=(n_); if (!seen[z_] && SC64_GRID_GET(path_walkable,z_)) { seen[z_]=1; d[z_]=(u16)(d[c]+1); q[tail++]=(u16)z_; } } while (0)
         if (col) NEXT_CELL(c - 1);
         if (col + 1 < MAP_COLS) NEXT_CELL(c + 1);
@@ -202,6 +220,7 @@ static int reachable_point(int sx, int sy, unsigned loc, int *ox, int *oy)
         if (row + 1 < MAP_ROWS) NEXT_CELL(c + MAP_COLS);
 #undef NEXT_CELL
     }
+    ROUTE_PURE_END();
     return -1;
 }
 
@@ -210,19 +229,22 @@ static int reachable_building_contact(int actor, int sx, int sy, int slot, int *
     static u8 seen[MAP_CELLS]; static u16 q[MAP_CELLS], d[MAP_CELLS];
     if(actor<0||actor>=MAX_UNITS||!u[actor].alive||slot<0||slot>=MAX_BUILDINGS||!b[slot].alive||!ox||!oy)return -1;
     int start=sx/16+(sy/16)*MAP_COLS;if(start<0||start>=MAP_CELLS)return -1;
+    ROUTE_PURE_BEGIN();
     build_path_grid();memset(seen,0,sizeof(seen));memset(d,0,sizeof(d));
     int head=0,tail=0;q[tail++]=(u16)start;seen[start]=1;
     while(head<tail){int c=q[head++],col=c%MAP_COLS,row=c/MAP_COLS;
         int px=col*16+8,py=row*16+8;
         if(dist2(px,py,b[slot].x,b[slot].y)<=32*32&&unit_step_clear(&u[actor],px,py)){
-            *ox=px;*oy=py;return d[c];}
+            *ox=px;*oy=py;ROUTE_PURE_END();return d[c];}
 #define CONTACT_NEXT(n_) do {int z_=(n_);if(!seen[z_]&&SC64_GRID_GET(path_walkable,z_)){seen[z_]=1;d[z_]=(u16)(d[c]+1);q[tail++]=(u16)z_;}}while(0)
         if(col)CONTACT_NEXT(c-1);
         if(col+1<MAP_COLS)CONTACT_NEXT(c+1);
         if(row)CONTACT_NEXT(c-MAP_COLS);
         if(row+1<MAP_ROWS)CONTACT_NEXT(c+MAP_COLS);
 #undef CONTACT_NEXT
-    }return -1;
+    }
+    ROUTE_PURE_END();
+    return -1;
 }
 
 static int select_unit(int slot)

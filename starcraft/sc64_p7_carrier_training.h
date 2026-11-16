@@ -3,7 +3,7 @@
 #define SC64_P7_CARRIER_TRAINING_H
 
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-#if !defined(SC64_P7_PROJECTILES_ENABLED) || !defined(SC64_P7_ACTORS)
+#if !defined(SC64_P7_PROJECTILES_ENABLED) || (!defined(SC64_P7_ACTORS) && !defined(SC64_TERRAN_CARRIER_PROBE))
 #error "P7 Carrier training requires the typed P7 Interceptor actor profile"
 #endif
 
@@ -184,8 +184,10 @@ static unsigned race_p7_carrier_training_child_count(int carrier)
  * being considered by either Carrier queueing or the ordinary race queue. */
 static int race_p7_carrier_training_slots_available(unsigned wanted)
 {
-    unsigned free_slots = 0, commitments = wanted, created = 0;
+    unsigned free_slots = 0, commitments = wanted;
     if (!race_protoss_services_active()) return 1;
+#ifndef SC64_CUSTOM_CARRIER_PROBE
+    unsigned created = 0;
     /* Only P7 reserves slots for its three scripted Carrier creates. */
     if (race_p7_active()) {
     if (race_p7.created_mask & 0xf8u) return 0;
@@ -193,6 +195,7 @@ static int race_p7_carrier_training_slots_available(unsigned wanted)
         ++created;
     commitments += 3u - created;
     }
+#endif
     for (int i = 0; i < MAX_UNITS; ++i) {
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
         if (u[i].alive && u[i].type == SC64_EGG_ACTOR) {

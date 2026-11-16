@@ -12,7 +12,7 @@ combined-stage-facts:
 combined-journal-terran:
 	$(CLANG) $(COMBINED_HOST) $(TERRAN_ROM_FLAGS) tests/sc64_guardian_egg_combined_journal.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/combined-journal-terran
 	$(COMBINED_BIN_DIR)/combined-journal-terran
-combined-journal-zerg:
+combined-journal-zerg: | $(LATE_ZERG_SIGHT_INPUTS)
 	$(CLANG) $(COMBINED_HOST) $(ZERG_Z7_CANONICAL_FLAGS) tests/sc64_guardian_egg_combined_journal.c $(COMBINED_EXTRA) -o $(COMBINED_BIN_DIR)/combined-journal-zerg
 	$(COMBINED_BIN_DIR)/combined-journal-zerg
 combined-journal-protoss:

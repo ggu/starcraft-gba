@@ -345,7 +345,7 @@ static void to_row(int row)
 }
 static void set_field(int *field, int value)
 {
-    for (int i = 0; *field != value && i < 3; ++i) tap(KEY_RIGHT);
+    for (int i = 0; *field != value && i < 5; ++i) tap(KEY_RIGHT);
     assert(*field == value);
 }
 
@@ -358,7 +358,7 @@ static void launch(int map, int human, int bots, const int *bot_races)
     to_row(1); set_field(&race_front.race, human);
     to_row(2); set_field(&race_front.bots, bots);
     for (int i = 0; i < bots; ++i) { to_row(3 + i); set_field(&race_front.bot_races[i], bot_races[i]); }
-    to_row(3 + bots); tap(KEY_A);
+    to_row(SC_FRONT_SKIRMISH_LAUNCH_ROW); tap(KEY_A);
     assert(screen == SCREEN_PLAY && race_mode);
     assert(race_skirmish_map == map && race_human == human && race_bots == bots);
 }

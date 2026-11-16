@@ -158,11 +158,20 @@ def run_scenario(name: str, custom: bool, rom: pathlib.Path,
             press(KEY_DOWN)
             press(KEY_A)
             capture_page("custom", FRONT_SKIRMISH)
-            press(KEY_RIGHT)  # race row: default Zerg → Protoss
-            press(KEY_DOWN)  # opponents row
-            press(KEY_DOWN)  # launch row
+            fixed_seats = "race_skirmish_slots" in sym
+            if fixed_seats:
+                press(KEY_DOWN)  # human row follows map
+                for _ in range(3):
+                    if u32(rsp, front + 24) == 2:
+                        break
+                    press(KEY_RIGHT)
+                press(KEY_A)  # jump to launch without starting the game
+            else:
+                press(KEY_RIGHT)  # race row: default Zerg → Protoss
+                press(KEY_DOWN)  # opponents row
+                press(KEY_DOWN)  # launch row
             capture_page("custom-launch", FRONT_SKIRMISH)
-            if state()[2] != 2:
+            if state()[2] != (6 if fixed_seats else 2):
                 raise RuntimeError(f"custom launch row is not selected: {state()}")
             press(KEY_A)
             got = state()

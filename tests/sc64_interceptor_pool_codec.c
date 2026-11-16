@@ -582,9 +582,203 @@ test_target_preflight(void)
     assert(!memcmp(packet,packet_before,sizeof(packet)));
 }
 
+static Sc64ProjectileRow compact_fixture_row(unsigned i)
+{
+    Sc64ProjectileRow row = {0};
+    row.x_q8_source = i % 2 ? 2097151 : -2097152;
+    row.y_q8_source = (int32_t)(i * 38651u) - 1932550;
+    row.destination_x_source = -8192;
+    row.destination_y_source = 8191;
+    row.next_speed = (uint16_t)(21333 - i);
+    row.turn_rate_raw = (uint16_t)(511 - i);
+    row.heading = (uint8_t)(255 - i);
+    row.next_velocity_direction = (uint8_t)(i * 29u);
+    row.target_ref = i % 2 ? 399 : 511;
+    row.owner_ref = i % 2 ? 239 : 255;
+    row.remaining_time = i % 2 ? 255 : -1;
+    row.state = (uint8_t)(i % 3);
+    row.order_signal_bit0 = 1;
+    row.movement_flags_low4 = 15;
+    row.hit_flags_low2 = 3;
+    row.script_phase = 3;
+    row.raw_source_owner = 11;
+    row.pending_damage_event = (uint8_t)(i % 2);
+    return row;
+}
+
+static void test_compact_all_caps(void)
+{
+    uint16_t source_words[SC64_ARENA_WORDS], target_words[SC64_ARENA_WORDS];
+    Sc64Arena source = {source_words, SC64_ARENA_WORDS};
+    Sc64Arena target = {target_words, SC64_ARENA_WORDS};
+    uint8_t compact[SC64_CODEC_BYTES], second[SC64_CODEC_BYTES];
+    uint8_t id, native, duplicate, duplicate_native;
+    assert(sc64_compact_codec_max_bytes(0) == 2);
+    assert(sc64_compact_codec_max_bytes(21) == 433);
+    assert(sc64_compact_codec_max_bytes(24) == 491);
+    assert(sc64_compact_codec_max_bytes(100) == 2015);
+    assert(sc64_compact_codec_max_bytes(101) == 0);
+
+    for (unsigned cap = 0; cap <= SC64_POOL_CAPACITY; ++cap) {
+        assert(sc64_pool_init(&source));
+        for (unsigned i = 0; i < cap; ++i) {
+            Sc64ProjectileRow row = compact_fixture_row(i);
+            assert(sc64_compact_pool_acquire(&source, cap, &id, &native));
+            assert(id == i && native == sc64_native_index(id));
+            assert(sc64_pool_set_row(&source, id, &row));
+        }
+        assert(!sc64_compact_pool_acquire(&source, cap, &id, &native));
+        size_t limit = sc64_compact_codec_max_bytes(cap);
+        memset(compact, 0xa3, sizeof(compact));
+        assert(!sc64_compact_codec_encode(&source, cap, compact, limit - 1));
+        assert(compact[0] == 0xa3);
+        assert(sc64_compact_codec_encode(&source, cap, compact, limit) == limit);
+        assert(compact[limit] == 0xa3);
+        assert(sc64_compact_codec_validate(compact, limit, cap, NULL, NULL));
+        assert(sc64_compact_codec_decode(&target, compact, limit, cap));
+        assert(!memcmp(source_words, target_words, sizeof(source_words)));
+        if (cap == SC64_POOL_CAPACITY) {
+            /* The compact body uses the first 154 bits of the same ordinal's
+             * fixed row, even though the compact traversal is in list order. */
+            assert(sc64_codec_encode(&source, second, sizeof(second)));
+            size_t compact_bit = 16u + 7u * SC64_POOL_CAPACITY;
+            uint8_t current = sc64_pool_active_head(&source);
+            for (unsigned i = 0; i < cap; ++i) {
+                assert(current < cap);
+                size_t fixed_bit = (3u + 21u * current) * 8u;
+                for (unsigned j = 0; j < 154; ++j, ++compact_bit, ++fixed_bit)
+                    assert(((compact[compact_bit / 8u] >> (compact_bit % 8u)) & 1u) ==
+                           ((second[fixed_bit / 8u] >> (fixed_bit % 8u)) & 1u));
+                current = (uint8_t)source.words[row_word(current, TEST_F_NEXT)];
+            }
+            assert(current == SC64_END);
+        }
+
+        /* Vary the retirement order so neither list is an ordinal sort. */
+        for (unsigned i = cap; i > 0; --i)
+            if (i % 3 != 0) assert(sc64_compact_pool_retire(&source, (uint8_t)(i - 1u)));
+        size_t size = sc64_compact_codec_encode(&source, cap, compact, limit);
+        assert(size > 0 && size <= limit);
+        assert(sc64_compact_codec_decode(&target, compact, size, cap));
+        assert(!memcmp(source_words, target_words, sizeof(source_words)));
+        assert(sc64_compact_codec_encode(&target, cap, second, limit) == size);
+        assert(!memcmp(compact, second, size));
+        for (unsigned i = cap / 3; i < cap; ++i) {
+            assert(sc64_compact_pool_acquire(&source, cap, &id, &native));
+            assert(sc64_compact_pool_acquire(&target, cap, &duplicate, &duplicate_native));
+            assert(id == duplicate && native == duplicate_native);
+        }
+        assert(!memcmp(source_words, target_words, sizeof(source_words)));
+    }
+}
+
+static void test_compact_resume_growth(void)
+{
+    uint16_t source_words[SC64_ARENA_WORDS], target_words[SC64_ARENA_WORDS];
+    Sc64Arena source = {source_words, SC64_ARENA_WORDS};
+    Sc64Arena target = {target_words, SC64_ARENA_WORDS};
+    uint8_t packet[433], id, native, restored_id, restored_native;
+    assert(sc64_pool_init(&source));
+    for (unsigned i = 0; i < 19; ++i)
+        assert(sc64_compact_pool_acquire(&source, 21, &id, &native));
+    size_t n = sc64_compact_codec_encode(&source, 21, packet, sizeof(packet));
+    assert(n && packet[0] == 2 && packet[1] == 19);
+    assert(sc64_compact_codec_decode(&target, packet, n, 21));
+    assert(sc64_compact_pool_acquire(&source, 21, &id, &native));
+    assert(sc64_compact_pool_acquire(&target, 21, &restored_id, &restored_native));
+    assert(id == 19 && id == restored_id && native == restored_native);
+    assert(target_words[TEST_H_SIZE] == 30);
+    assert(!memcmp(source_words, target_words, sizeof(source_words)));
+}
+
+static int reject_compact_row(void *context, uint8_t ordinal, const Sc64ProjectileRow *row)
+{
+    unsigned *seen = context;
+    ++*seen;
+    assert(ordinal == 0 && row->next_link == SC64_END && row->state == 0);
+    return 0;
+}
+
+static void test_compact_bad_packets(void)
+{
+    uint16_t source_words[SC64_ARENA_WORDS], dest[SC64_ARENA_WORDS + 2];
+    uint16_t before[SC64_ARENA_WORDS + 2];
+    uint8_t compact[64], try[64], id, native;
+    Sc64Arena source = {source_words, SC64_ARENA_WORDS};
+    Sc64Arena target = {dest + 1, SC64_ARENA_WORDS};
+    Sc64Arena tiny = {dest + 1, SC64_ARENA_WORDS - 1};
+    assert(sc64_pool_init(&source));
+    assert(sc64_compact_pool_acquire(&source, 1, &id, &native));
+    Sc64ProjectileRow row = compact_fixture_row(0);
+    assert(sc64_pool_set_row(&source, id, &row));
+    size_t size = sc64_compact_codec_encode(&source, 1, compact, sizeof(compact));
+    assert(size == 30 && compact[0] == 1 && compact[1] == 1);
+    memset(dest, 0x5a, sizeof(dest));
+    memcpy(before, dest, sizeof(dest));
+    for (size_t n = 0; n < size; ++n)
+        assert(!sc64_compact_codec_decode(&target, compact, n, 1));
+    assert(!sc64_compact_codec_decode(&target, compact, size + 1, 1));
+    assert(!sc64_compact_codec_decode(&target, compact, size, 0));
+    assert(!sc64_compact_codec_decode(&target, compact, size, 101));
+    assert(!sc64_compact_codec_decode(&tiny, compact, size, 1));
+    assert(!sc64_compact_codec_encode(&source, 1, (uint8_t *)(void *)source_words, size));
+
+    const size_t row_start = 16u + 7u * 10u;
+    struct { size_t pos; unsigned bits, value; } bad[] = {
+        {0, 8, 11}, {8, 8, 11},       /* invalid counts */
+        {16, 7, 127}, {23, 7, 0},    /* out-of-range or duplicated slot */
+        {row_start + 72, 15, 21334}, /* invalid speed */
+        {row_start + 112, 9, 400},   /* invalid target */
+        {row_start + 121, 8, 240},   /* invalid owner */
+        {row_start + 129, 9, 510},   /* invalid negative timer */
+        {row_start + 138, 2, 3},     /* free state in the active run */
+        {row_start + 149, 4, 12},    /* invalid raw owner */
+    };
+    for (unsigned i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        memcpy(try, compact, size);
+        set_bits(try, bad[i].pos, bad[i].value, bad[i].bits);
+        unsigned n = 0;
+        assert(!sc64_compact_codec_validate(try, size, 1, reject_compact_row, &n));
+        assert(n == 0); /* No world predicate runs on an invalid packet. */
+        assert(!sc64_compact_codec_decode(&target, try, size, 1));
+        assert(!memcmp(before, dest, sizeof(dest)));
+    }
+    unsigned checked = 0;
+    assert(sc64_compact_codec_validate_target(&target, compact, size, 1, NULL, NULL));
+    assert(!sc64_compact_codec_validate_target(&target, compact, size, 1,
+                                               reject_compact_row, &checked));
+    assert(checked == 1 && !memcmp(before, dest, sizeof(dest)));
+    assert(sc64_compact_codec_decode(&target, compact, size, 1));
+    assert(dest[0] == before[0] && dest[SC64_ARENA_WORDS + 1] == before[SC64_ARENA_WORDS + 1]);
+    memcpy(dest + 1, compact, size);
+    memcpy(before, dest, sizeof(dest));
+    const uint8_t *overlap = (const uint8_t *)(const void *)(dest + 1);
+    assert(sc64_compact_codec_validate(overlap, size, 1, NULL, NULL));
+    assert(!sc64_compact_codec_validate_target(&target, overlap, size, 1, NULL, NULL));
+    assert(!sc64_compact_codec_decode(&target, overlap, size, 1));
+    assert(!memcmp(before, dest, sizeof(dest)));
+
+    /* A legacy retirement retains fields; the compact codec won't silently
+     * discard them. Canonical retirement produces a padded free-only packet. */
+    assert(sc64_pool_retire(&source, id));
+    assert(!sc64_compact_codec_encode(&source, 1, try, sizeof(try)));
+    assert(sc64_pool_init(&source));
+    assert(sc64_compact_pool_acquire(&source, 1, &id, &native));
+    assert(sc64_compact_pool_retire(&source, id));
+    size = sc64_compact_codec_encode(&source, 1, try, sizeof(try));
+    assert(size == 11);
+    assert(sc64_compact_codec_validate(try, size, 1, NULL, NULL));
+    try[size - 1] |= 0x80;
+    assert(!sc64_compact_codec_decode(&target, try, size, 1));
+    assert(!memcmp(before, dest, sizeof(dest)));
+}
+
 int
 main(void)
 {
+    test_compact_all_caps();
+    test_compact_bad_packets();
+    test_compact_resume_growth();
     test_order_oracle();
     test_random_transitions();
     test_arena_bounds_and_wide_fields();
@@ -593,6 +787,6 @@ main(void)
     test_target_preflight();
     test_codec_errors_and_roundtrip();
     test_randomized_field_roundtrips();
-    puts("PASS C fixed pool, ordering oracle, bounded arena, strict halfword validation, codec field roundtrips and transactionality");
+    puts("PASS C fixed pool, ordering oracle, bounded arena, strict halfword validation, legacy and compact codec roundtrips and transactionality");
     return 0;
 }

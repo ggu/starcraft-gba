@@ -94,7 +94,7 @@ enum {
     /* Raw 36 is a real, independently ticking Zerg Egg actor. */
     U_Z7_EGG,
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_SHOWCASE_CARRIER_PROBE) && !defined(SC64_ZERG_CARRIER_PROBE) && !defined(SC64_TERRAN_CARRIER_PROBE)
     /* Independent raw73 identity; child lifecycle is a separate feature. */
     U_P7_INTERCEPTOR,
 #endif
@@ -150,6 +150,13 @@ enum {
 #endif
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     U_SHARED_SHUTTLE,
+#endif
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_ZERG_CARRIER_PROBE)
+    /* The raw73 identity follows every predecessor row. */
+    U_P7_INTERCEPTOR,
+#endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    U_P7_CARRIER, U_P7_INTERCEPTOR,
 #endif
     SC_RU_LEGACY_COUNT,
 #ifdef SC64_GUARDIAN_COCOON_STAGE
@@ -543,6 +550,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     , [U_P7_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 12, 350, 250, 2100, 300, 150, 0 }
     , [U_P7_OBSERVER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 2, 25, 75, 600, 40, 20, 0 }
 #endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    , [U_P7_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 12, 350, 250, 2100, 300, 150, 0 }
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     /* Egg stats are raw36; product cost, supply and duration live on its
        target actor while it is unfinished. */
@@ -897,7 +907,7 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_Z7_EGG_PRODUCTION
         ,"EGG"
 #endif
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_SHOWCASE_CARRIER_PROBE) && !defined(SC64_ZERG_CARRIER_PROBE) && !defined(SC64_TERRAN_CARRIER_PROBE)
         ,"INTERCEPTOR"
 #endif
 #ifdef SC64_SKIRMISH_ROSTER
@@ -956,6 +966,11 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #ifdef SC64_NUKE_FALLBACK_GHOST
         ,[U_SHARED_GHOST] = "GHOST"
+#endif
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_ZERG_CARRIER_PROBE)
+        ,[U_P7_INTERCEPTOR] = "INTERCEPTOR"
+#elif defined(SC64_TERRAN_CARRIER_PROBE)
+        ,[U_P7_CARRIER] = "CARRIER", [U_P7_INTERCEPTOR] = "INTERCEPTOR"
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
         ,[U_GUARDIAN_COCOON] = "COCOON"
@@ -1899,6 +1914,9 @@ static inline int sc64_race_raw_unit(int type)
     case U_P6_HERO_DARK_TEMPLAR: return SC64_P6_RAW_HERO_DARK_TEMPLAR;
     case U_P6_ZERATUL: return SC64_P6_RAW_ZERATUL;
 #endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    case U_P7_CARRIER: return 72; case U_P7_INTERCEPTOR: return 73;
+#endif
 #ifdef SC64_P7_ACTORS
     case U_P7_ARCHON: return 68; case U_P7_ARBITER: return 71;
     case U_P7_CARRIER: return 72; case U_P7_OBSERVER: return 84;
@@ -2219,6 +2237,9 @@ static inline int sc64_race_unit_from_raw(int raw)
     case SC64_P6_RAW_INFESTED_TERRAN: return U_P6_INFESTED_TERRAN;
     case SC64_P6_RAW_HERO_DARK_TEMPLAR: return U_P6_HERO_DARK_TEMPLAR;
     case SC64_P6_RAW_ZERATUL: return U_P6_ZERATUL;
+#endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    case 72: return U_P7_CARRIER; case 73: return U_P7_INTERCEPTOR;
 #endif
 #ifdef SC64_P7_ACTORS
     case 68: return U_P7_ARCHON; case 71: return U_P7_ARBITER;
