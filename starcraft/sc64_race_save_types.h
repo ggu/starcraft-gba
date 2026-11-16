@@ -264,7 +264,7 @@ typedef struct {
 #if defined(SC64_SHOWCASE_CARRIER_PROBE)
     u16 interceptor_size;
     u8 interceptor_projectiles[SC64_SHOWCASE_PROJECTILE_BYTES];
-#elif defined(SC64_P7_PROJECTILES_ENABLED)
+#elif defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_TERRAN_CARRIER_PROBE)
     u8 interceptor_projectiles[SC64_CODEC_BYTES];
     u8 interceptor_padding;
 #endif

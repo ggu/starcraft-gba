@@ -36,6 +36,14 @@ static inline const Sc64TerranLateActorFact *sc64_terran_late_unit_fact(int type
         {69,  80,60, 1, 200,  0, 900,4,256, 20,16,19,15,1,  0,0,0,0,0,  0,0,0,0,0, 2,1 },
         {217,800, 0, 0,   1,  1,   1,0,160, 16,16,15,15,0,  0,0,0,0,0,  0,0,0,0,0, 1,1 }
     };
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    static const Sc64TerranLateActorFact carrier =
+        {72,300,150,4,350,250,2100,12,352,32,32,31,31,1,0,0,0,0,0,0,0,0,0,0,2,2};
+    static const Sc64TerranLateActorFact interceptor =
+        {73,40,40,0,25,0,300,0,192,8,8,7,7,1,0,0,0,0,0,0,0,0,0,0,1,1};
+    if (type==U_P7_CARRIER) return &carrier;
+    if (type==U_P7_INTERCEPTOR) return &interceptor;
+#endif
     unsigned index = (unsigned)(type - U_SCIENCE_VESSEL);
     return index < sizeof(facts)/sizeof(facts[0]) ? &facts[index] : 0;
 }
@@ -106,6 +114,13 @@ static inline unsigned sc64_terran_late_unit_actor_flags(int type)
                SC64_LATE_ACTOR_MEN |
                (sc64_terran_late_unit_fact(type)->ground_damage ||
                 sc64_terran_late_unit_fact(type)->air_damage ? SC64_LATE_ACTOR_WEAPON : 0);
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    case U_P7_CARRIER:
+        return SC64_LATE_ACTOR_SELECTABLE | SC64_LATE_ACTOR_MOVABLE |
+            SC64_LATE_ACTOR_COLLIDABLE | SC64_LATE_ACTOR_DRAWABLE | SC64_LATE_ACTOR_MEN;
+    case U_P7_INTERCEPTOR:
+        return SC64_LATE_ACTOR_MOVABLE | SC64_LATE_ACTOR_DRAWABLE;
+#endif
     case U_PSI_EMITTER:
         return SC64_LATE_ACTOR_DRAWABLE | SC64_LATE_ACTOR_INVINCIBLE;
     default: return 0;

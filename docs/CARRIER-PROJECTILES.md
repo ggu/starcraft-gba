@@ -506,3 +506,104 @@ The private read-only observation receipt is pinned by SHA-256
 `546f0954a418b2a15568ba5da004d0ba6e4aa09f25a1a08a27493e812d4e8baa`.
 This is one emulator matchup with ordinary controls; the regular builds do
 not switch to the new tag and the physical GBA frame budget remains open.
+
+### Terran custom journal study
+
+The Terran storage study is separate from the Showcase probe. With prepared
+Terran assets, run:
+
+```sh
+make -f Makefile -f tests/sc64-terran-carrier-envelope/Makefile test-sc64-terran-carrier-envelope
+```
+
+The host-only study wraps a current Terran custom save under a distinct
+checksum-verified SRAM tag. Its worst case is **15,929 of 16,368 bytes**:
+
+| Region | Bytes | Treatment |
+| --- | ---: | --- |
+| Prefix through Backwater state | 13,618 | Exact bytes: 192 unit and 96 building slots, full fog, wallets, campaign state and Backwater state |
+| Invincibility flags | 36 | Packs all 288 binary unit/building flags |
+| Packet and tail lengths | 4 | Two little-endian lengths |
+| Full compact Interceptor packet | 2,015 | 100 active projectiles |
+| Existing Yamato, impact and transport tail | 256 | Both active Yamatos, all 32 impacts and transport, in the existing wire order |
+
+The 1,910 bytes between the flags and the Yamato tail are T3/late-mission
+storage and padding. The writer refuses a custom save if any omitted byte
+is nonzero, and refuses nonbinary invincibility flags. No fog cells are
+omitted and no engine capacity changes. A separate ARM compile confirmed
+the same prefix, omitted range and total size.
+
+The host fixture saturates the three queues on both custom maps and
+reconstructs each original 16,072-byte save byte for byte. It writes and
+selects the study envelope through the ordinary SRAM journal routines, then
+runs the real Terran game's detached candidate preflight on the reconstructed
+save. Both a malformed compact packet and a structurally valid envelope with
+an invalid map fall back to the preserved ordinary predecessor. The fixture
+also round-trips saves after 90 gameplay updates in all 18 map/human-race/bot
+configurations, and checks that truncation, excess length and insufficient
+output capacity fail before changing the destination.
+
+This fixture proves the storage and prepared selection bounds; the separate
+runtime probe below connects them to paid Carrier gameplay.
+
+### Terran custom Carrier runtime probe
+
+The opt-in Terran build attaches shared paid Carrier production, Interceptor
+training and flight, and the projectile arena to its custom game roster.
+The original Terran actor IDs stay fixed; Carrier and Interceptor append
+as 44 and 45. The existing source-derived Terran art bank already has both
+actors and their directional frames. The probe also enables the shared
+Protoss bot planner. Campaigns keep the ordinary writer and save layout.
+
+```sh
+make -f Makefile -f tests/sc64-terran-carrier-runtime/Makefile \
+  test-sc64-terran-carrier-runtime build/StarCraft-Terran-Carrier-Probe.gba
+```
+
+New custom records use the distinct authenticated envelope above. The probe
+can select ordinary or compact banks. It expands the winning record in
+place in the existing save scratch, keeps the compact packet detached,
+checks the hangar and actor references in the candidate, and restores the
+projectile arena only after the ordinary preflight succeeds. The first
+upgrade writes to the other bank, retaining the ordinary predecessor.
+Neither the SRAM ceilings nor the linker memory guards change.
+
+With prepared Terran assets, the sanitizer fixture paid for a Carrier
+through the real Stargate queue, bought an Interceptor through the Carrier
+menu, and saved a live shot through the game's SRAM API. Loading restored
+every arena word and the hit reduced its target's HP. The fixture uses
+placed prerequisite buildings and a placed target. It also verifies that a
+malformed compact successor or a valid packet with a missing shooter falls
+back to its ordinary predecessor, and that a Terran campaign save in the probe still loads under the ordinary tag.
+When composed with release `cb210bc` as `e1058ca`, both HOST fixtures passed
+and the ARM link left 10,456 bytes before the EWRAM guard and 1,544 bytes
+before the IWRAM guard. Built with the probe flags off, the packaged Terran
+ROM matches release `cb210bc` byte for byte
+(SHA-256 `a7ce64dadab8b334bbc2f6ccdbbc0aeff06378d2f44d6ecd39702ade2825aa59`).
+
+The composed ARM probe
+(`eedcfd0e8fab20e566c8089f730fdc0986f73096c6c5410e95476deddfaeffdc`)
+also passed an ordinary-input authored-map custom match against one Zerg
+bot. A blank journal started the Protoss economy. The player paid 350
+minerals and 250 gas for a Carrier at frame 9,753 and 25 minerals for an
+Interceptor at frame 12,431. Ordinary controls launched the Interceptor
+at frame 12,870. A START/B save at frame 12,891 wrote a 13,704-byte
+custom record with one moving shot in a 30-byte packet, linked to the
+player's Interceptor (slot 12) and a Hydralisk (slot 33). Fresh title-L
+continuation restored the frame, wallet, supply and observed actor rows.
+An immediate guest re-save reproduced the entire payload byte for
+byte. After 80 more updates the Hydralisk had 56 HP, down from 80 at
+the save; the observation does not isolate the sources of damage.
+
+A [second input receipt](../tools/sc64_terran_carrier_dock_receipt.py)
+resumes that same active-shot save, then uses the ordinary MOVE command
+to withdraw the Carrier toward (101, 134) at frame 12,945. Interceptor
+slot 12 was already on its return leg at the start of this sequence.
+It docks with Carrier slot 5 by frame 12,972 and returns to full 40 HP
+and 40 shields. The docked custom save has a 13,685-byte payload and no
+active projectiles. Fresh title-L continuation restores the docked actor,
+and the immediate re-save reproduces the entire payload byte for byte.
+
+The memory guards and these receipts do not establish physical stack
+use, timing, or coverage of the other custom and campaign configurations.
+Keep the probe disabled in the standard build.
