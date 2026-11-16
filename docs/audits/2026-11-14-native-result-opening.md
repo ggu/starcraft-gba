@@ -274,3 +274,26 @@ were unchanged.
 | Hatchery 980 HP (step 19,507) | `56db04f84936a74a4baebbb700f847e22aeabd1cdb411b0c5c0d003391a7347c` |
 | Hatchery 719 HP (step 20,407) | `918e3f31f2497b075c4ff624b8005c3bca8643f85a72db1ee2c6f234cd2be79e` |
 | Hatchery 468 HP (step 21,307) | `48e43a9f2aed720a759e7f1002c0c47b3159ea57edbd9e78bb96248ccce7d7bf` |
+
+### Three Marines destroy the Hatchery
+
+A fresh replay matched all 24 pre-attack frames, six precombat guest
+snapshots and four attack frames. It sent only neutral inputs after the
+original attack tape. The selected Hatchery was down to 217 HP at step
+22,207 and 11 HP at 22,957. By 23,607 its selection ring, name and HP
+were gone and destruction remnants occupied the site. The fight continued
+through step 24,357 with Marines and enemy units still visible. An
+Extractor and other hostile buildings remained, so this is one structure
+destroyed, not faction elimination or a published result. The HP and
+destruction checks are rendered observations; they do not establish
+an exact damage tick or attack cadence.
+
+The replay ended at step 24,358, after 32 captures. Inputs, emulator and
+limits stayed pinned, and no guest memory was written.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Neutral continuation manifest | `ea7e733961d95a5276f543a4027bb5c079c1fb2e3caf9f89b27fa6358c4e64d4` |
+| Hatchery 217 HP | `23078af3f9ae79946c78e43bc21db034272fb4db2e282a2f0e0faa950c94d581` |
+| Hatchery 11 HP | `59b80037a3cc8ee119eb42bf1a3ec5213dc4ebaeb9228363f7acab1fac757042` |
+| Hatchery no longer selected, remains visible | `968cfaf7278caf4612bc6c15ebf4809df623364da5a7678b4e8964a6c10e23c6` |
