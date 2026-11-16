@@ -91,9 +91,32 @@ The optional ROM is
 
 In the emitted Z10 Thumb code the inner grid setup loop goes from
 14 instructions to eight per packed byte. The new loop loads and stores
-the adjacent words with `ldmia` and `stmia`. This is an instruction
-count, not a cycle or frame-rate measurement: ROM and EWRAM access timing
-also matter. The comparison against the exact dense Z7 release reached
-the disk floor before its timed window. Leave the switch off until a
-paired replay matches all checkpoints and route bytes and measures the
-mean and worst calls.
+the adjacent words with `ldmia` and `stmia`.
+
+[The isolated loop benchmark](../../tools/sc64_route_grid_loop_bench.py)
+relocates those exact emitted instructions and their authored tables
+into micro ROMs. It uses the game's wait-state register value, brackets
+each loop with the read-only mGBA observer and compares every output
+byte with an independent bit pattern. It does not boot either game.
+
+| Packed input | Stock cycles | Byte lookup cycles |
+| --- | ---: | ---: |
+| Wide, 2,048 all-open bytes | 106,490 | 69,626 |
+| Wide, 2,048 mixed bytes, either run order | 106,490 | 69,626 |
+| Midwidth, 1,536 mixed bytes | 79,866 | 52,218 |
+
+The isolated loop uses 34.6% fewer emulated cycles. The result says
+nothing about seeding, traversal, packing, rendering or complete frame
+rate. Reproduce with the pinned ROM pair above and physical observer:
+
+```sh
+python3 tools/sc64_route_grid_loop_bench.py \
+  --stock STOCK.gba --candidate CANDIDATE.gba --runner OBSERVER --out NEW_DIR
+```
+
+The receipt SHA-256 is
+`f321c41740e811cdebc1717b560f81eaecf7f34b145fbeeb969dd23e0fb2744d`.
+The comparison against the exact dense Z7 release reached the disk
+floor before its timed window. Leave the switch off until a paired
+replay matches checkpoints and route bytes and measures the mean and
+worst calls.
