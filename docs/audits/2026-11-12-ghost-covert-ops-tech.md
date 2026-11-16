@@ -414,10 +414,60 @@ were used; the existing disk guard passed before and after the run.
 | Malformed input and SRAM after title L | `edd6c0a6983157ad969b64a09ba6b9b7326b58f8a67a7c3ddf4603a4c61dc13c` |
 | Restore and unchanged SRAM result | `6e9da77ff74ce0ddf41be9c83610fc59d457deb2504f90db985c2bcd901ec6fc` |
 
-These ARM checks cover painting, descent, and one malformed-receipt
-fallback in a prepared Terran custom game on map 0 with one Terran
-computer. They do not cover ARM rejection without a valid predecessor,
-the second map or mixed and multi-opponent lobbies, descent with other
-Silos still armed, composition with Carrier and other research journals,
-blank-start tech progression, campaign payer provenance, measured load
-stack high-water, or hardware timing.
+### Blank Blood Bath opening through Barracks
+
+The same `SCCT` cart and read-only observer launched without any SRAM
+input. In Custom Game, select Blood Bath (map 1), choose Terran, open
+the third CPU row as Protoss, then close the first two CPU rows and
+launch. The running lobby used mask 4 and starting positions 0 and 3.
+At frame 0 the human had 50 minerals, no gas, one completed Command
+Center, four SCVs already assigned to minerals, and no Ghost research.
+
+Leave the SCVs mining, then open B and choose Barracks. Use the D-pad
+to find a valid build site and confirm with A. The bank reached 154
+minerals by frame 385. At frame 401, the placement at `(112, 120)`
+gave SCV slot 0 a pending construction order and the bank was still 154.
+The unfinished foundation appeared in building slot 2 at frame 429,
+when the bank was exactly 150 minerals lower. At frame 1,941 the same
+Barracks was complete at 1,000 HP, with the bank at 308 minerals and no
+gas. No save was loaded or written, no guest memory was written, and
+the 5.25 GiB disk guard passed at both ends.
+
+| Blank Blood Bath receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `1e78300ea8c3d06cd9444ec134b79e65bfafd1dbfcb1a3118e0d836944453d15` |
+| Opening, foundation, and completion result | `e9fd821c60639dae84eb65ba73cc7d73e198c73eead7c8db79d4894b26b60820` |
+
+The next milestones below follow this preview's custom-game catalog
+and costs (minerals/gas). They have not been replayed from blank:
+
+1. Place a Refinery (100/0) on the home geyser. Once complete, select
+   an SCV and press A on the Refinery. Observe its gas order and an
+   actual deposit while retaining enough SCVs on minerals.
+2. The completed Barracks unlocks Factory (200/100) and Academy
+   (150/0). Build the Factory, then a Starport (150/100), then a
+   Science Facility (100/150). These are SCV builds. Leave room on
+   the Science Facility's right for the add-on at `(x + 48, y + 8)`.
+3. Select the completed Science Facility and choose Covert Ops (50/50)
+   in its B menu. Verify completion at the socket and retain the
+   attached facility. The Academy and Covert Ops together unlock a
+   Ghost (25/75) at the Barracks. Select the Barracks, cycle to the
+   Ghost with R, and train with A. Keep the Command Center socket
+   free of a Comsat so the completed Science Facility and Covert Ops
+   can unlock a Nuclear Silo (100/100) there.
+4. Build enough Supply Depots (100/0 each) for the Ghost and missile.
+   Arm the completed Silo from its B menu (200/200, eight supply
+   and 1,500 source ticks). Pay for Ocular from the attached Covert
+   Ops (100/100) and save while it's pending. The next persistence
+   proof should reach ordinary title L from that newly written SRAM
+   and compare the paid receipt and armed or active missile.
+
+The combined ARM save checks cover painting, descent, and one
+malformed-receipt fallback in a prepared Terran custom game on map 0
+with one Terran computer. Blood Bath has a separate blank opening
+proof through Barracks only. Remaining gates include the rest of the
+blank tech path and its journal, ARM rejection without a valid
+predecessor, mixed and multi-opponent journal coverage, descent with
+other Silos still armed, composition with Carrier and other research
+journals, campaign payer provenance, measured load stack high-water,
+and hardware timing.
