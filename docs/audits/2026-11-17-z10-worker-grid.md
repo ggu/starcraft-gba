@@ -8,7 +8,9 @@ Frame 16,076 records 15 logical route builds and 41 hits. The bounded trace reta
 
 Example: workers 1, 2 and 4 request the same depot in succession from cells 197, 129 and 134. Their fills each restart from the same circle, visiting 41, 78 and 85 cells. Workers 7 and 13 make the corresponding first/restart queries for depot 2, with 165 and 200 cells; other depot queries intervene. This distinguishes repeated rebuilding of a bounded prefix from both a slow rank scan and generic point routes. At frame 16,079, a separate spike has four logical point builds, three donor adoptions and three actual point fills (676,486 cycles), including a lazy field materialized after adoption. Logical route counters alone conflate these cases.
 
-An opt-in single-depot candidate keeps the original FIFO suffix and its packed discovered cells so a later origin can resume that exact prefix. The prototype leaves cache age, physical field selection and logical builds unchanged, drops the suffix on overflow, incompatible requests or scratch ownership changes, and always discards it across topology change or load. The independent packed-field oracle passed with 46 observed resumes and 17 overflow cases. Its speed and whole-replay parity still require a paired ARM run; a single retained queue cannot remove restarts that alternate among different depots.
+An opt-in single-depot candidate keeps the original FIFO suffix and its packed discovered cells so a later origin can resume that exact prefix. The prototype leaves cache age, physical field selection and logical builds unchanged, drops the suffix on overflow, incompatible requests or scratch ownership changes, and always discards it across topology change or load. The independent packed-field oracle passed with 46 observed resumes and 17 overflow cases.
+
+The paired ARM test again matched all 43 world/arena checks, 62 framebuffer/palette samples, 1,000 route deltas, and the complete 32 KiB SRAM. Only two of the 1,000 updates actually resumed a search, nine times in total. Frame 16,076 saved 15,431 orders cycles (1,597,303 to 1,581,872), but the whole-window mean rose from 967,760 to 968,033 loop cycles and the 95th percentile rose from 1,295,233 to 1,297,322. Keep the prototype out of release builds: a single retained queue cannot remove restarts that alternate among different depots.
 
 | Local attribution evidence (SHA-256) | Digest |
 | --- | --- |
@@ -16,3 +18,5 @@ An opt-in single-depot candidate keeps the original FIFO suffix and its packed d
 | Worker route probe ROM | `fd9094d37c4c51deb5b2729aa880f010d54b6355c33c93b4882dfc2e88420345` |
 | Event ledger | `ae53332f28c5a705bea9d39c525a5b70746318d965056b0ce8b7d502cbb73150` |
 | Paired attribution receipt | `696767737fdaa2db1d7bba817c22a80ffbdd854b1badc6cb974b0fc12643ab58` |
+| Frontier candidate ROM | `b2c5f837d53accb5ec0431dee6aad2b7e05bade0bf5d2e6651fe357f834bc2cd` |
+| Paired frontier receipt | `2bc9d881fc01e1e7922df932499088b0b82b4b0dad2375d305b92272dfd65e23` |
