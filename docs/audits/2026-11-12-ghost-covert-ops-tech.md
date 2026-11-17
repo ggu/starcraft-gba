@@ -590,11 +590,44 @@ proof of the preceding build sequence.
 | Controller inputs | `f636a1af068a96427d397a00fe0027d6e6fb644c26c67ed27e820a56298b7801` |
 | Paid structures, completions, and builder stop | `d65319d839fab21908b82a85b215fd4e0f72d7f89baf58609b28c5af095fd086` |
 
+### Earlier Blood Bath Depot and Academy limit
+
+A second replay repeated the same Science checkpoint and paid Covert
+order. A clean R tap selected five Marines, and B Attack followed by
+A sent them toward `(216, 216)` at frame 9,934. The fifth SCV placed
+the earlier Depot at `(176, 216)` and paid 100 minerals at frame
+9,960 (976/24 to 876/24). Slot 25 completed at frame 10,720 with
+500 HP. The same SCV then paid 150 minerals for Academy slot 26 at
+`(160, 192)` at frame 10,741 (1,020/72 to 870/72).
+
+At frame 11,541 the match was still active and the Academy was not
+observed complete. Direct and aligned bytes agreed that SCV slot 16
+was dead at −2 HP. The run did not identify an attacker. It stopped
+before the planned infrastructure save or Ghost production. The
+earlier Depot succeeded; serializing both structures delayed the
+start of the Academy by about 800 updates compared with the first
+replay.
+
+The pinned preview's CPU planner can assign a replacement SCV to
+an abandoned foundation, but its ordinary human A-click path has no
+construction resume command. Its repair hooks are campaign gated and
+require complete structures. A safer continuation on this ROM is to
+order the Academy and nearby Depot in parallel, temporarily divert
+one mineral SCV, and save as soon as the Depot and Covert Ops are
+complete. Restore the diverted worker to minerals before saving and
+observe the Academy separately. A player-accessible resume command
+would be a separate engine change.
+
+| Earlier Depot receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `cb0636f31d698138b3b922e2b52a8f192d7a3d81444cb10089acf7b6381335d8` |
+| Depot completion, paid Academy, and builder stop | `194f74b22f2afdcf028150a59dca40e7270cbfd66b841350b802ad91a09d75eb` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed on the match
 that started from blank:
 
-1. Complete a Supply Depot to free capacity for the Ghost. The
+1. Finish a Supply Depot and Academy in the same continuation. The
    Academy and Covert Ops together unlock a Ghost (25/75) at the
    Barracks. Select the Barracks, cycle to the
    Ghost with R, and train with A. The opening Barracks blocks the
@@ -614,7 +647,8 @@ malformed-receipt fallback in a prepared Terran custom game on map 0
 with one Terran computer. The separate blank Blood Bath checks show a
 completed Barracks and Refinery, gas deposits, and a Factory, Starport,
 and Science Facility built and restored over a baseline journal. They
-also show an attached Covert Ops and a completed Academy in play.
+also show an attached Covert Ops, a completed Academy, and a completed
+Supply Depot across two attempts.
 Remaining gates include training the Ghost and qualifying the Covert
 journal in the blank-origin match, ARM rejection without a
 valid predecessor, mixed and multi-opponent journal coverage, descent
