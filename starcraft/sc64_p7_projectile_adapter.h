@@ -179,7 +179,7 @@ static void race_p7_projectile_source_tick(void)
         row.pending_damage_event=0;
 #if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)
         if (row.state==3) {
-            if (!sc64_compact_pool_retire(&race_p7_projectiles,id)) break;
+            if (!sc64_compact_pool_retire_live(&race_p7_projectiles,id)) break;
         } else
 #else
         if (row.state==3 && !sc64_pool_retire(&race_p7_projectiles,id)) break;

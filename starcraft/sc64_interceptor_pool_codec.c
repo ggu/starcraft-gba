@@ -188,14 +188,20 @@ sc64_pool_acquire(Sc64Arena * a, uint8_t * ordinal, uint8_t * native_index)
     *native_index = sc64_native_index(id);
     return 1;
 }
+static void
+pool_retire_linked(Sc64Arena *a, uint8_t id)
+{
+    list_erase(a, H_ACTIVE, H_ACTIVE_TAIL, H_ACTIVE_COUNT, id);
+    sfield(a, id, F_STATE, 3);
+    list_insert_after(a, H_FREE, H_FREE_TAIL, H_FREE_COUNT, id);
+}
+
 int
 sc64_pool_retire(Sc64Arena * a, uint8_t id)
 {
     if (!arena_ok(a) || !sc64_pool_validate(a) || id >= head(a, H_SIZE) || rfield(a, id, F_STATE) == 3)
 	return 0;
-    list_erase(a, H_ACTIVE, H_ACTIVE_TAIL, H_ACTIVE_COUNT, id);
-    sfield(a, id, F_STATE, 3);
-    list_insert_after(a, H_FREE, H_FREE_TAIL, H_FREE_COUNT, id);
+    pool_retire_linked(a, id);
     return 1;
 }
 static int
@@ -698,6 +704,55 @@ int sc64_compact_pool_retire(Sc64Arena *a, uint8_t ordinal)
     Sc64ProjectileRow row = compact_free_row();
     if (!sc64_pool_retire(a, ordinal)) return 0;
     return sc64_pool_set_row(a, ordinal, &row);
+}
+
+/* In a validated, exclusively owned arena the rest of both chains is already
+ * known-good. Check all endpoints and every link this splice will overwrite
+ * before touching storage. A suspect arena takes the original strict path. */
+static int compact_live_retire_links(const Sc64Arena *a, uint8_t id)
+{
+    unsigned size, active, free, ah, atail, fh, ftail, prev, next, second;
+    Sc64ProjectileRow row;
+    if (!arena_ok(a)) return 0;
+    size = rd(a, H_SIZE);
+    active = rd(a, H_ACTIVE_COUNT);
+    free = rd(a, H_FREE_COUNT);
+    ah = rd(a, H_ACTIVE); atail = rd(a, H_ACTIVE_TAIL);
+    fh = rd(a, H_FREE); ftail = rd(a, H_FREE_TAIL);
+    if (size > SC64_POOL_CAPACITY || size % SC64_POOL_GROWTH || id >= size ||
+        !active || active + free != size || rd(a, H_RESERVED) ||
+        ah >= size || atail >= size || (ah == atail) != (active == 1) ||
+        rfield(a, ah, F_PREV) != SC64_END || rfield(a, atail, F_NEXT) != SC64_END ||
+        rfield(a, ah, F_STATE) >= 3 || rfield(a, atail, F_STATE) >= 3 ||
+        !sc64_pool_get_row(a, id, &row) || !validrow(&row) || row.state == 3)
+        return 0;
+    prev = rfield(a, id, F_PREV); next = row.next_link;
+    if ((prev == SC64_END) != (id == ah) || (next == SC64_END) != (id == atail) ||
+        (prev != SC64_END && next != SC64_END && (prev == next || active < 3)) ||
+        (prev != SC64_END && (prev >= size || prev == id ||
+            rfield(a, prev, F_NEXT) != id || rfield(a, prev, F_STATE) >= 3)) ||
+        (next != SC64_END && (next >= size || next == id ||
+            rfield(a, next, F_PREV) != id || rfield(a, next, F_STATE) >= 3)))
+        return 0;
+    if (!free) return fh == SC64_END && ftail == SC64_END;
+    if (fh >= size || ftail >= size || (fh == ftail) != (free == 1) ||
+        rfield(a, fh, F_STATE) != 3 || rfield(a, ftail, F_STATE) != 3 ||
+        rfield(a, fh, F_PREV) != SC64_END || rfield(a, ftail, F_NEXT) != SC64_END)
+        return 0;
+    second = rfield(a, fh, F_NEXT);
+    return free == 1 ? second == SC64_END :
+        second < size && second != fh && (second == ftail) == (free == 2) &&
+        rfield(a, second, F_STATE) == 3 && rfield(a, second, F_PREV) == fh;
+}
+
+int sc64_compact_pool_retire_live(Sc64Arena *a, uint8_t ordinal)
+{
+    if (compact_live_retire_links(a, ordinal)) {
+        Sc64ProjectileRow row = compact_free_row();
+        pool_retire_linked(a, ordinal);
+        return sc64_pool_set_row(a, ordinal, &row);
+    }
+    return sc64_compact_pool_retire(a, ordinal);
 }
 
 size_t sc64_compact_codec_encode(const Sc64Arena *a, unsigned cap,
