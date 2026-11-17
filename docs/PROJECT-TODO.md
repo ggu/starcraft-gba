@@ -387,6 +387,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and the full Protoss 10 victory matches with effectively unchanged
   timing. Use `CANONICAL_ROUTE_LINEAR_GRID_LUT8=0` for comparisons.
   Keep cold-prefix continuation off and test the lookup on hardware.
+  The [target index fast link](audits/2026-11-12-target-index-bulk.md#reuse-validated-cells-and-occupancy-bits)
+  reuses validated cells and occupancy bits. The paired Z9 campaign
+  prefix matches raw world and route state and uses 1.32% fewer cycles
+  on average with bulk rebuild and fast link. Z10 keeps the same EWRAM
+  and uses 160 fewer IWRAM bytes. The peak barely changes. Keep it
+  optional until other products, mixed battles and saves pass.
   Dense play remains well short of 30 fps. In the
   [Z10](audits/2026-11-12-z10-battle-cycles.md) and
   [busy P10](audits/2026-11-06-current-p10-busy/README.md) samples,

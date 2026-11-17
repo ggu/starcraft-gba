@@ -83,8 +83,15 @@ sc64_target_link_cell(int entity, int owner, int cell, int x, int y)
     sc64_target_head[owner][cell] = (Sc64TargetIndex)entity;
     sc64_target_cell[entity] = (u16)cell;
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
-    sc64_target_owner_columns[owner] |= (u32)1u << (x >> 6);
-    sc64_target_owner_rows[owner] |= (u32)1u << (y >> 6);
+#ifdef SC64_TARGET_FAST_LINK_PROBE
+    /* A nonempty cell was already linked for this owner. Its axis bits
+     * stay set until the same clear that empties the cell. */
+    if (old == SC64_TARGET_NONE)
+#endif
+    {
+        sc64_target_owner_columns[owner] |= (u32)1u << (x >> 6);
+        sc64_target_owner_rows[owner] |= (u32)1u << (y >> 6);
+    }
 #else
     (void)x;
     (void)y;
@@ -218,8 +225,20 @@ sc64_target_index_move(Unit *q)
         return;
     }
     if (sc64_target_cell[entity] == cell) return;
+#ifdef SC64_TARGET_FAST_LINK_PROBE
+    const int owner = q->owner;
+    if ((unsigned)owner >= 5u) {
+        sc64_target_index_active = 0;
+        return;
+    }
+    /* cell_for already checked this position against the live map.
+     * Relink directly; a dirty-list overflow still disables the index. */
+    sc64_target_remove(entity, owner);
+    (void)sc64_target_link_cell(entity, owner, cell, q->x, q->y);
+#else
     sc64_target_remove(entity, q->owner);
     if (!sc64_target_insert(entity, q->owner, q->x, q->y)) sc64_target_index_active = 0;
+#endif
 }
 
 static void

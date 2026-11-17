@@ -17,9 +17,12 @@ class TargetOwnerIndexTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             exe = pathlib.Path(directory) / "index-diff"
             for profile, flags in profiles.items():
-                for bulk in (False, True):
-                    with self.subTest(profile=profile, bulk=bulk):
-                        options = ("-DSC64_TARGET_BULK_REBUILD_PROBE",) if bulk else ()
+                for label, options in (
+                    ("stock", ()),
+                    ("bulk", ("-DSC64_TARGET_BULK_REBUILD_PROBE",)),
+                    ("fast", ("-DSC64_TARGET_BULK_REBUILD_PROBE", "-DSC64_TARGET_FAST_LINK_PROBE")),
+                ):
+                    with self.subTest(profile=profile, implementation=label):
                         subprocess.run(["clang", "-std=c11", "-O1", "-g", "-Wall", "-Wextra",
                                         "-Werror", "-fsanitize=address,undefined", *flags, *options,
                                         str(ROOT / "tests/sc64_target_owner_index_diff.c"),
