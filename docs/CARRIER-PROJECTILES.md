@@ -992,10 +992,28 @@ stack use.
 | Mixed Blood Bath receipt | `b8529d8aa00e6c9307516b545d12b27a6609f9cad120f0293302d7dff0543b6d` |
 | Guest SRAM and fresh re-export | `fa70c0a04fed55fcb0e7c076271bda9d6cfcdb29bc50c8069e035d3ac5524f38` |
 
-For the next sustained check, continue the genuine frame-15,927 journal
-for at least 1,000 world updates. Record occupancy and ordinary computer
-purchases, and compare an uninterrupted route with a fresh load of a new
-mid-battle save. Cover bounded instruction windows around the busiest
-fight and save/load without claiming stack observations in between. This
-match does not qualify a full pool, every AI lineup, a win, or hardware
-performance.
+#### 1,000-update continuation of the same battle
+
+Continue from the actual frame-15,927 SRAM. One process advances all
+1,000 updates; the second uses ordinary START/B at frame 16,427, then
+opens that save through title L in a new process and advances to frame
+16,927. The midpoint journal carries one active projectile and three
+impacts. All 43 watched world and arena cuts match the uninterrupted
+branch. Both final saves contain the same complete 14,166-byte payload
+with two active projectiles and five impacts, despite different bank
+sequences. This also checks fields beyond the watched snapshot.
+
+Sampled occupancy ranges from 78 to 104 units, with peaks of 50
+buildings, seven projectiles and seven impacts. The single Protoss CPU
+Carrier gains a third Interceptor at frame 16,095 and a fourth at
+16,470. These are observed births; the later two debits were not
+measured. The uninterrupted gameplay window uses 1,006,866,202 emulated
+cycles. The two split gameplay intervals use 521,415,620 and 489,124,793
+cycles, excluding save/load and startup. This longer run uses the fast
+observer and does not measure stack minima. Neither battle sample
+qualifies a full pool, every AI lineup, a win, or GBA SP performance.
+
+| Local continuation evidence | SHA-256 |
+| --- | --- |
+| Paired 1,000-update receipt | `98a44e3b4cc3e30bd0ae623bfbb62be4377dd652d743bdf9b3950e4c70ff7bf7` |
+| Identical final payload | `683e6cb3486ba2a470f264abe9593a09d70ca97f2b71f8187ee9e17c87be6e96` |

@@ -51,10 +51,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   preview kept 101–104 live units in the sampled fight and restored a save
   with a live shot and four pending impacts. It averaged 1.01 million
   emulated cycles per update against a 561,792-cycle 30 fps budget.
-  Next: continue that genuine save through a longer fight, verify human
-  purchases and the other combined builds under busier play, and qualify
-  full pools, older journals and hardware before activation. Keep roster
-  and saved IDs stable.
+  The 1,000-update continuation matches 43 watched frames and the exact
+  final save payload after a fresh mid-battle load. Next: measure stack
+  in longer busy windows, verify human purchases and the other combined
+  builds under busier play, and qualify full pools, older journals and
+  hardware before activation. Keep roster and saved IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to
@@ -1159,9 +1160,11 @@ matched the uninterrupted blast, and rejected a malformed newer record
 without changing SRAM. A separate blank Blood Bath run paid for its
 Barracks and Refinery, then kept three SCVs on minerals while mining gas.
 The same match built and fresh-loaded a Factory, then a Starport and
-Science Facility, preserving the earlier bank. Next: complete Academy
-and Covert Ops, then qualify the resulting Ghost/Silo and paid research
-save from that blank-origin match. Finish native timing,
+Science Facility, preserving the earlier bank. The next replay built and
+completed Academy and attached Covert Ops, but the SCV needed for the
+Ghost's Supply Depot died during construction before a new save. Build
+and defend the Depot earlier, save the completed prerequisites, and
+qualify Ghost/Silo and paid research from that match. Finish native timing,
 other lobbies, combined journals and AI before enabling it.
 
 Other core rules to prioritize after this:
