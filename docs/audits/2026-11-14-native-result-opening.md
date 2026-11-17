@@ -409,3 +409,44 @@ continuing toward the Extractor.
 | --- | --- |
 | Traced replay manifest | `33e07db7c1960b9910e76e3d4b90fad67b85392c214793a756aa84a2f7d0b04b` |
 | Host and bridge trace link | `4cc0d21fa97aa4a027df7b18bc43bf49bae87fd85c4be5ebe90c06a0ff40052e` |
+
+### Fence-mapped readback contains the mismatch
+
+A read-only observer extension hashes the RGBA bytes at the existing
+Vulkan readback fence and predicts the RGB index before VI color
+conversion. It repeats the same serial input in three archived groups
+and stops by command end 7,659. The first attempt stopped after the
+launcher mistook an upstream cartridge log line for a protocol error.
+Its one completed frame at 3,695 matched the archive. No readback
+sample was collected. The corrected launcher accepts only that exact
+log line and keeps the original frame and guest-state checks.
+
+The corrected run matched the raw frames at 3,695 and 4,200 and the
+byte-exact guest row at 7,659. The third raw frame failed: 24 RGB bytes
+in eight pixels at x=8–15, y=126 differed from the clean serial frame.
+The mapped 640×240 image had these digests:
+
+| Half | Mapped RGBA | Mapped RGB prediction and observed pre-palette input | Clean serial pre-palette input |
+| --- | --- | --- | --- |
+| Upper | `5bee1beb136d2287` | `cee695d06c6d2287` | `cee695d06c6d2287` |
+| Lower | `4c168eb8bbb27162` | `4a94e62263b27162` | `ff34cf52a72c7232` |
+
+The lower palette output, callback and owned copy all matched digest
+`8342565b35b27162`; the stage recorded no conversion or copy differences.
+This run places its mismatch at or before mapped readback. The requested,
+callback and map labels were all 7,658; host submission 7,609 was tagged
+with wrapper step 7,657. These are different host observation points.
+Their labels do not establish stale-frame selection or game timing.
+The early stop sent no extra inputs, and the 21,308 handoff remains untested.
+
+Next, bind the submission tag to the actual scanout buffer and fence.
+At the existing synchronization points, compare small digest samples of
+the framebuffer input, GPU scanout output and mapped readback. This can
+distinguish a change in the source or VI processing from a copy or
+host-visibility problem. Keep all game-state and exact raw gates,
+including the independently verified attack frame and live target before B.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Parser stop manifest | `004f5623d3ae4cd5f32728365025e9f682b8177f1481ac44f0511e8116c34f14` |
+| Mapped readback diagnostic receipt | `751a3c1a7aa52872956f1e6535c4b2b6aa1aee2688b6d091224791692ce5a3d2` |

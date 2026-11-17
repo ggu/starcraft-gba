@@ -205,8 +205,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matches all prior frames and guest samples, but its cursor misses the
   Marines. A [traced serial repeat](audits/2026-11-14-native-result-opening.md#traced-serial-replay-rejects-an-early-frame)
   confirms that the raw gate closes the transport on an earlier
-  scanout mismatch. The later 21,308 handoff remains untested by the
-  trace. Recalibrate with bounded cursor-only input after exact replay,
+  scanout mismatch. A [bounded mapped readback](audits/2026-11-14-native-result-opening.md#fence-mapped-readback-contains-the-mismatch)
+  finds the differing RGB bytes already present at the readback fence.
+  Trace the same scanout buffer from framebuffer input through GPU output
+  and host mapping to isolate the cause. The later 21,308 handoff remains
+  untested. Recalibrate with bounded cursor-only input after exact replay,
   then verify live Marine selection and the exact Extractor attack
   frame before B. Continue toward the last structure and published
   result under the same limits.
