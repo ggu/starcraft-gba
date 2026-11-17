@@ -713,15 +713,44 @@ observed.
 | Tracked wallet, queue, and UI result | `dc2b9234daa52e2dc3a7e275b5832324ecc4aef133511d087b25fbfa2a4a71b3` |
 | ARM-written queued Ghost SRAM | `bb33c53e5a6189056738743ceed0e6e6709186e4e1d35fbe4389b6d71ed27d8d` |
 
+### Queued Blood Bath Ghost birth and fresh reload
+
+A fresh title-L load of the actual sequence 4 SRAM restored frame
+11,478 and the 925/37 wallet. The owned Barracks in slot 2 was at
+1,000 HP and held one Ghost at progress 1. There was no existing
+human Ghost. Neutral controller input was the only input during
+training. Worker changes and building damage were observed separately
+from the queue and birth checks.
+
+At frame 12,414 the Barracks still held its one Ghost at progress
+937. At frame 12,415 its queue was empty and a live Ghost appeared
+in slot 16 at `(132, 124)` with 45 HP and exactly 12,800 Q8 energy
+(50 displayed). The original SCV assigned to slot 16 had died by
+frame 11,566, so production reused that slot. The Barracks had 274
+HP at birth; the Factory, Starport, Science Facility, Covert Ops,
+Academy, and Depot were no longer live in their watched slots.
+
+Ordinary START/B wrote sequence 5 in the other SRAM bank, preserving
+the paid sequence 4 bank byte for byte. The new `0x76435442` payload
+was 15,870 bytes with five delayed impacts. The packed state carried
+the live Ghost and the 1,109/93 wallet at frame 12,415. A fresh
+title-L process matched the frame, wallet, Ghost row and energy,
+empty producer queue, lobby, workers, and watched building rows.
+No guest memory writes or emulator save states were used. Disk
+guards passed before and after the replay.
+
+| Blank-origin Ghost birth receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `1b6150ee58ddc3b6d371ed47760c6c6dec791b0ed231af9e595ff613998ab31a` |
+| ARM-written live Ghost SRAM | `c420f6423f6bcfce5c368c2f29d73ddde9cf9684211440491e57d4aabfde40d8` |
+| Queue, birth, and fresh restore result | `ef46d61e1bf9ef0c57ea5a852ac862237c086377ee7c1a03b471ed8d0e707584` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed on the match
 that started from blank:
 
-1. Start from the checked sequence 4 queued-Ghost SRAM, verify the
-   fresh title load, then observe the Ghost through birth. Track the
-   producer, queued product, active defenses and individual workers
-   separately.
-   The opening Barracks blocks the
+1. Use an earlier checkpoint and protect or rebuild the science
+   structures before attempting to arm a missile. The opening Barracks blocks the
    first Command Center's socket at `(112, 128)`. Build a second
    Command Center with a clear socket and keep it free of a Comsat
    so the completed Science Facility and Covert Ops can unlock a
@@ -739,10 +768,10 @@ with one Terran computer. The separate blank Blood Bath checks show a
 completed Barracks and Refinery, gas deposits, and a Factory, Starport,
 and Science Facility built and restored over a baseline journal. They
 also show an attached Covert Ops, a completed Academy and Supply Depot,
-and a paid Ghost in one continuous branch with a separately verified
-intermediate SRAM reload and a checked queued-Ghost save. Remaining
-gates include reloading that queue, completing Ghost production,
-qualifying the Covert journal in the blank-origin match,
+and an ordinary Ghost purchase, queued-save reload, live birth and
+fresh Ghost reload along one blank-origin chain. Remaining gates
+include building and arming a Silo and qualifying the Covert journal
+in the blank-origin match,
 ARM rejection without a
 valid predecessor, mixed and multi-opponent journal coverage, descent
 with other Silos still armed, composition with Carrier and other
