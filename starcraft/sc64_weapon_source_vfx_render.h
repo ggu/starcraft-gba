@@ -264,17 +264,14 @@ sc64_weapon_source_vfx_overlay_is_sprite(uint8_t opcode)
            opcode == 20u || opcode == 21u;
 }
 
-/* Build a process-local, data-derived envelope once. It is never serialized
- * and has three distinct states: unknown, invalid/unbounded, and valid. */
+/* Keep the original scan for legacy banks and for checking generated banks
+ * against the renderer's bounds rules on the host. */
 static inline uint32_t
-sc64_weapon_source_vfx_cached_bounds(void)
+sc64_weapon_source_vfx_scan_bounds(void)
 {
-    static uint32_t cached;
-    if (cached != SC64_WEAPON_SOURCE_VFX_BOUNDS_UNKNOWN) return cached;
 #if !defined(SC64_WEAPON_SOURCE_BANK_VERSION) || \
     SC64_WEAPON_SOURCE_BANK_VERSION != 1
-    cached = SC64_WEAPON_SOURCE_VFX_BOUNDS_INVALID;
-    return cached;
+    return SC64_WEAPON_SOURCE_VFX_BOUNDS_INVALID;
 #else
     Sc64WeaponSourceVfxBoundsWork work = {0};
     for (uint32_t i = 0; i < SC64_WEAPON_SOURCE_FRAME_COUNT; ++i) {
@@ -302,7 +299,19 @@ sc64_weapon_source_vfx_cached_bounds(void)
             sc64_weapon_source_lo_offsets[i].x,
             sc64_weapon_source_lo_offsets[i].y);
     }
-    cached = sc64_weapon_source_vfx_bounds_pack(&work);
+    return sc64_weapon_source_vfx_bounds_pack(&work);
+#endif
+}
+
+static inline uint32_t
+sc64_weapon_source_vfx_cached_bounds(void)
+{
+#ifdef SC64_WEAPON_SOURCE_GLOBAL_BOUNDS_V1
+    return SC64_WEAPON_SOURCE_GLOBAL_BOUNDS_V1;
+#else
+    static uint32_t cached;
+    if (cached == SC64_WEAPON_SOURCE_VFX_BOUNDS_UNKNOWN)
+        cached = sc64_weapon_source_vfx_scan_bounds();
     return cached;
 #endif
 }

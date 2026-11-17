@@ -55,7 +55,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   final save payload after a fresh mid-battle load. Its [cycle split](CARRIER-PROJECTILES.md#where-the-mixed-battle-spends-its-cycles)
   finds 648k cycles in game update and 359k after update per loop on
   average. Profile the worst zero-route-build order tail and first
-  post-load unit draw as separate targets. Terran and Showcase now also
+  post-load unit draw as separate targets. The [weapons bounds change](audits/2026-11-17-render-first-update.md)
+  removes the cold tracer scan: first update 3.00M → 1.80M cycles,
+  with sampled pixels and the final SRAM matching. Sustained play is
+  still about 1.01M cycles per update. Terran and Showcase now also
   reach paid Protoss AI Carrier combat from blank SRAM with three AIs.
   Both restore their compact battle bank byte for byte with active shots;
   the 192-update windows averaged 871k and 1.36M cycles respectively.
@@ -247,7 +250,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   ROM at 20.93 emulated updates/s. Check the other two on ARM and develop
   a winning Blood Bath route. Native automatic
   [SCV resumption](audits/2026-11-13-n64-scv-construction-resume-plan.md)
-  and the outcome of surviving actors still need native witnesses.
+  and the outcome of surviving actors still need native witnesses. A
+  [direct Move attempt](audits/2026-11-17-native-scv-foundation-interruption.md)
+  left the original SCV at the scaffold during construction and the same
+  Barracks completed at the control cut. Find a command that leaves the
+  paid foundation unfinished before testing a replacement SCV.
 
 - **Protoss route stalls (P1):** the normal P10 cartridge now uses the
   same nearest-first depot selection as Z10. [Normal P10 qualification](audits/2026-11-13-p10-nearest-normal.md)
@@ -1180,8 +1187,9 @@ Science Facility, preserving the earlier bank. The latest replay built
 the Depot and Academy in parallel, saved after the Depot and attached
 Covert Ops completed, then completed the Academy and paid 25 minerals
 and 75 gas through the ordinary Barracks Ghost order. A test assertion
-stopped the replay before the Ghost was born. Fresh-load the infrastructure
-bank and qualify Ghost completion, Silo and paid research from that match.
+stopped the replay before the Ghost was born. A fresh title-L run restored
+the unfinished Academy and its assigned SCV, and completed the Academy.
+Qualify Ghost completion, Silo and paid research from that match.
 Finish native timing, other lobbies, combined journals and AI before
 enabling it.
 
