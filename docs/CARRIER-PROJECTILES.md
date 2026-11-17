@@ -881,7 +881,72 @@ hashes has SHA-256
 `733e8c4a823648c0a988b01a7b2b4da4aa717e8f7a3e80f0a272afbb948b9392`.
 
 These runs establish minima for the sampled emulator intervals. The newer
-default lookup and Carrier have not been composed and measured together
-in this stack gate. Longer dense battles, saves and loads with full actor,
+default lookup was off in those samples; see the combined follow-up below.
+Longer dense battles, saves and loads with full actor,
 projectile and impact pools, and physical GBA stack and timing checks
 remain open. The product runs did not measure cycle or frame rates.
+
+### Carrier with the regular route lookup
+
+The shared Carrier preview on source `0e4b00a3` was linked with the
+regular wide route lookup and imported audio together. The three target
+RAM ends match the prior lookup-off previews exactly. The regenerated
+Showcase facts add the checks for the two other Carrier profiles; the table
+data matches the earlier preview. No ordinary product defaults changed.
+
+| Product | EWRAM end | IWRAM end | Combined preview ROM SHA-256 |
+| --- | --- | --- | --- |
+| Terran | `0x0203b728` | `0x030049f8` | `0da45f6833075f8e7b2077571ca0eb1c967ee464b56ce82e7bb07ae1e4dcd9d5` |
+| Z10 | `0x0203a5d8` | `0x03004d90` | `0a8514174ddd94375212fbe4e975ff1d8476d03b65772a4dc6805ae293c0e766` |
+| Showcase | `0x0203aefc` | `0x03004d68` | `856ae35ad296ac00b73e1408f17b467f197d12d3f674d2502e00435aee616ba3` |
+
+One genuine active-shot journal per product was loaded through title L
+on both the prior preview and combined build. Across the following 192
+world updates, all 13 watched world and projectile arena cuts matched.
+Ordinary START/B then produced matching compact successors, and a new
+boot reloaded the successor. The complete 32 KiB SRAM images and fresh
+re-exports matched byte for byte. Cycles in the measured battle window
+and at the wider phase boundaries were also identical within each pair.
+
+| Product | Loaded and final frames | Battle cycles | SYS / IRQ minima | Peak units / buildings / shots / impacts |
+| --- | --- | ---: | --- | --- |
+| Terran | 12,891 → 13,083 | 162,545,350 | `0x030066f8` / `0x03007e78` | 43 / 20 / 3 / 1 |
+| Z10 | 12,847 → 13,039 | 168,318,859 | `0x03007268` / `0x03007e78` | 43 / 19 / 1 / 1 |
+| Showcase | 12,888 → 13,080 | 185,794,057 | `0x030072e0` / `0x03007e78` | 43 / 20 / 2 / 1 |
+
+The IRQ margin was 120 bytes in each sample. These intervals are not
+full-pool, sustained-battle or physical hardware qualification, and the
+sample does not show a routing speedup with Carrier. Repeat paid Carrier
+and Interceptor production on the combined builds, exercise true dense
+custom fights and the older stock journal generations, and measure
+hardware before switching regular targets.
+
+| Local paired receipt | SHA-256 |
+| --- | --- |
+| Terran | `a8db96e58904f9dd9ab7ede39f5b73c5a0827a83e68f23c6445bf571f7710df3` |
+| Z10 | `bbb3e398d2aef550e7105a0d2134d212a9b84bad39892f968b8da6cd68636eb2` |
+| Showcase | `a88c99eff29d1c75ed9a829193c7143bc85f88acf9c2a27078cca7cc6ad9f0c5` |
+
+#### Invalid newer compact journal
+
+On a detached copy of each genuine two-bank seed, set the pending-damage
+bit on the first active projectile of the newer record and recompute its
+outer FNV checksum. An independent codec check accepts the packet's shape
+while rejecting that row for gameplay. The original files and the older
+compact bank are unchanged. For each combined ROM, a fresh title L from
+the unmodified pair loads the active shot; an older-bank-only control
+loads three frames earlier. A fresh title L with the invalid newer
+record restores the same watched world as that earlier control, without
+the projectile. With no valid predecessor, L stays on HOME with no
+actor state published. All four inputs per product are re-exported
+byte for byte without a save command.
+
+| Product | Earlier / newer sequence | Earlier / newer frame | Receipt SHA-256 |
+| --- | --- | --- | --- |
+| Terran | 8 / 9 | 12,888 / 12,891 | `11dc737a8961671700342af07f33d1b165fd7bd952c2aca9cf10be1766da0fe0` |
+| Z10 | 12 / 13 | 12,844 / 12,847 | `5a9d057bbe20c0061038fbba34a5ee9260e20039f3aa077048c6f5a6d49db48d` |
+| Showcase | 8 / 9 | 12,885 / 12,888 | `a987b066d5cddcfa1516ff9dc2aef7d60e78f8ba1ab0131eb1fcfbb079985aa2` |
+
+This checks a semantic compact-to-compact fallback. Fallback to a stock
+bank behind an invalid compact record, additional corruption patterns,
+pre-cargo writer migration, and cross-product refusal are separate cuts.

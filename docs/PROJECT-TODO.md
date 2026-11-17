@@ -43,10 +43,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [sampled ARM stack gate](CARRIER-PROJECTILES.md#sampled-arm-stack-use)
   measured title load, active Interceptor combat and pause/save. The
   smallest SYS margin was 5,880 bytes and all three had 120 bytes of
-  conservative IRQ margin. Next: repeat with the newer default route-grid
-  lookup, qualify longer dense battles and full-pool saves, and check
-  stack and timing on hardware before regular activation. Keep roster
-  and saved IDs stable.
+  conservative IRQ margin. The [combined follow-up](CARRIER-PROJECTILES.md#carrier-with-the-regular-route-lookup)
+  links all three with the regular lookup, matches 192-update battles and
+  complete saves against the earlier previews, and exercises malformed
+  newer compact journals on ARM. Next: paid production, longer dense or
+  full-pool workloads on the combined builds, broader predecessor and
+  corruption cuts, and hardware before activation. Keep roster and saved
+  IDs stable.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to
@@ -59,8 +62,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   `cb210bc` adds row-local steering and fixes stale collision after a Drone
   starts a building. The regular `002a591` package adds the wide routing
   lookup. All four ROMs were checked against their SHA-256 values and
-  are in Downloads with a quick test guide. The separate Carrier previews
-  remain available. KODAK was not detected during staging, so the older
+  are in Downloads with a quick test guide. The November 17 separate
+  Carrier previews add the regular lookup and are also in Downloads.
+  KODAK was not detected during staging, so the older
   card copy and all saves remain untouched. Next: test B-menu scrolling,
   save/load and battle speed on a physical GBA SP.
 
@@ -1145,9 +1149,10 @@ local checks reject tables generated for a different mode.
 The [Covert Ops draft](https://github.com/ggu/starcraft-gba/pull/411)
 restored both painting and descent on ARM from prepared Terran saves,
 matched the uninterrupted blast, and rejected a malformed newer record
-without changing SRAM. A separate blank Blood Bath run paid for and
-finished its Barracks through ordinary controls. Next: mine gas and
-complete the Factory through Covert Ops chain from blank; qualify the
+without changing SRAM. A separate blank Blood Bath run paid for its
+Barracks and Refinery, then deposited its first 8 gas through ordinary
+controls with three other SCVs mining. Next: complete the Factory
+through Covert Ops chain from blank; qualify the
 resulting Ghost/Silo and paid research save. Finish native timing,
 other lobbies, combined journals and AI before enabling it.
 
