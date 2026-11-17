@@ -623,14 +623,50 @@ would be a separate engine change.
 | Controller inputs | `cb0636f31d698138b3b922e2b52a8f192d7a3d81444cb10089acf7b6381335d8` |
 | Depot completion, paid Academy, and builder stop | `194f74b22f2afdcf028150a59dca40e7270cbfd66b841350b802ad91a09d75eb` |
 
+### Parallel Blood Bath construction and paid Ghost
+
+Another run started from the same verified Science Facility SRAM.
+The Covert Ops cost 50/50 at frame 9,914. SCV 16 paid 150 minerals
+for Academy slot 25 at frame 9,938; SCV 3 paid 100 minerals for Depot
+slot 26 at frame 10,139. Both paid foundations were under construction
+at that point with different SCVs. Five Marines took an ordinary
+attack order toward `(216, 216)` at frame 10,156.
+
+By frame 10,888 the Depot was complete at 500 HP and the attached
+Covert Ops was complete at 750 HP. An ordinary A click on the
+original mineral patch put SCV 3 back on its previous mineral order
+at frame 10,972. START/B then wrote the intermediate baseline
+checkpoint at 854 minerals and 80 gas. The Academy was still
+under construction at 1,035 progress and 432 HP. The new bank had
+tag `0x76435442`, sequence 3, a valid checksum and a 15,832-byte
+payload. The prior Science Facility bank was byte-identical. This
+run did not independently reload the intermediate save.
+
+After START resumed the same world, Academy slot 25 completed at
+frame 11,442 with 600 HP. R at Barracks slot 2 selected Ghost, and A
+queued it at frame 11,478. The wallet went from 950 minerals/112 gas
+to 925/37, the exact 25/75 charge. During the bounded wait for birth,
+the replay stopped because at least one original gather order or
+worker no longer matched the harness's predicate. It did not identify
+which worker changed or why. The Ghost queue is verified; its birth,
+starting energy, and a fresh Ghost save and load remain unverified.
+The original Science input and the new infrastructure save were
+retained separately.
+
+| Parallel construction receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `2ac99df70977d3812399298da27fb093366c60ef4447db7cdf0ef9dd8c341495` |
+| ARM-written infrastructure SRAM | `82075f29dc1a4c0ddc2257ded34ec4ed6d1f9f3cc62993cb6c0d5c165028a191` |
+| Parallel builds, checkpoint, and Ghost payment result | `032dfa33cb8ad0f731075129293941d10ad9bc1694d7529bd3eed7e77124ffa4` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed on the match
 that started from blank:
 
-1. Finish a Supply Depot and Academy in the same continuation. The
-   Academy and Covert Ops together unlock a Ghost (25/75) at the
-   Barracks. Select the Barracks, cycle to the
-   Ghost with R, and train with A. The opening Barracks blocks the
+1. Load the infrastructure checkpoint, finish its Academy, and
+   observe the paid Barracks Ghost through birth. Check the actual
+   producer, active defenses, and queued product during the wait;
+   observe changes to workers separately. The opening Barracks blocks the
    first Command Center's socket at `(112, 128)`. Build a second
    Command Center with a clear socket and keep it free of a Comsat
    so the completed Science Facility and Covert Ops can unlock a
@@ -647,10 +683,10 @@ malformed-receipt fallback in a prepared Terran custom game on map 0
 with one Terran computer. The separate blank Blood Bath checks show a
 completed Barracks and Refinery, gas deposits, and a Factory, Starport,
 and Science Facility built and restored over a baseline journal. They
-also show an attached Covert Ops, a completed Academy, and a completed
-Supply Depot across two attempts.
-Remaining gates include training the Ghost and qualifying the Covert
-journal in the blank-origin match, ARM rejection without a
+also show an attached Covert Ops, a completed Academy and Supply Depot,
+and a paid Ghost in one continuous branch with an intermediate SRAM
+checkpoint. Remaining gates include completing Ghost production,
+qualifying the Covert journal in the blank-origin match, ARM rejection without a
 valid predecessor, mixed and multi-opponent journal coverage, descent
 with other Silos still armed, composition with Carrier and other
 research journals, campaign payer provenance, measured load stack
