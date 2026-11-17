@@ -2321,8 +2321,17 @@ static int GBA_HOT sc64_route_slot(int goal)
  * requested goal. Decode the origin once and carry the coordinates along
  * the bounded walk, rather than dividing the cell index at every step. */
 static int __attribute__((noinline))
-sc64_route_near_root_reaches(int slot, int cell, int goal)
+sc64_route_near_root_reaches(int slot, int cell, int goal, int root)
 {
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    /* The gate proves the preferred path to the cached root still agrees
+     * with a fresh flood. If the new goal lies on it, the same suffix proof
+     * applies; keep the rest of the field lazy for independent origins. */
+    if (SC64_ROUTE_LAZY(slot) && !sc64_route_gate(slot, cell, root))
+        SC64_ROUTE_EXACT(slot);
+#else
+    (void)root;
+#endif
     int cols = MAP_COLS, rows = MAP_ROWS;
     int row = sc64_cell_row((unsigned)cell), col = cell - row * cols;
     if (!SC64_GRID_GET(path_walkable, cell)) return cell == goal;
@@ -2374,8 +2383,7 @@ sc64_route_step_slot_mode(int origin, int goal, int allow_build)
         gx = goal % MAP_COLS; gy = goal / MAP_COLS;
         if ((rx > gx ? rx-gx : gx-rx) + (ry > gy ? ry-gy : gy-ry) > 4) continue;
         ++used;
-        SC64_ROUTE_EXACT(i);
-        if (!sc64_route_near_root_reaches(i, origin, goal)) continue;
+        if (!sc64_route_near_root_reaches(i, origin, goal, root)) continue;
 #ifdef SC64_ROUTE_DECAY_FREQ
         sc64_route_age_request();
         sc64_route_age_touch(i, 1);
@@ -2436,8 +2444,7 @@ sc64_route_step_slot(int origin, int goal)
         gx = goal % MAP_COLS; gy = goal / MAP_COLS;
         if ((rx > gx ? rx-gx : gx-rx) + (ry > gy ? ry-gy : gy-ry) > 4) continue;
         ++used;
-        SC64_ROUTE_EXACT(i);
-        if (!sc64_route_near_root_reaches(i, origin, goal)) continue;
+        if (!sc64_route_near_root_reaches(i, origin, goal, root)) continue;
 #ifdef SC64_ROUTE_DECAY_FREQ
         sc64_route_age_request();
         sc64_route_age_touch(i, 1);
