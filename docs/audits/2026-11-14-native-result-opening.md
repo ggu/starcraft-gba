@@ -439,14 +439,35 @@ with wrapper step 7,657. These are different host observation points.
 Their labels do not establish stale-frame selection or game timing.
 The early stop sent no extra inputs, and the 21,308 handoff remains untested.
 
-Next, bind the submission tag to the actual scanout buffer and fence.
-At the existing synchronization points, compare small digest samples of
-the framebuffer input, GPU scanout output and mapped readback. This can
-distinguish a change in the source or VI processing from a copy or
-host-visibility problem. Keep all game-state and exact raw gates,
-including the independently verified attack frame and live target before B.
-
 | Local receipt | SHA-256 |
 | --- | --- |
 | Parser stop manifest | `004f5623d3ae4cd5f32728365025e9f682b8177f1481ac44f0511e8116c34f14` |
 | Mapped readback diagnostic receipt | `751a3c1a7aa52872956f1e6535c4b2b6aa1aee2688b6d091224791692ce5a3d2` |
+
+### Clean readback verifies the buffer and fence binding
+
+A separate observer checked the actual queued buffer and fence against
+the mapped slot after the existing wait. All 98 archived command rows,
+three raw frames, and the byte-exact guest sample matched through command
+end 7,659. The submitted and mapped slots shared generation 7,609,
+the same buffer and fence, and 614,400 bytes for the 640×240 image.
+Both mapped RGB digests matched the clean frame (`cee695d06c6d2287`
+upper, `ff34cf52a72c7232` lower).
+
+The clean run had the same wrapper labels as the earlier rejection:
+7,657 at submission and 7,658 at request, map and callback. That offset
+alone does not explain the corruption. The new binding was verified for
+this clean capture; it did not reproduce the mismatch or establish a
+fix. The short diagnostic stopped at 7,659 with no new controls.
+
+An optional next check would copy a small lower strip spanning row 126
+and an upper control strip from the same GPU image on the same fence.
+Compare those digests with the full readback to help distinguish the
+full copy or its host visibility from the shared source image. Keep
+the exact raw and guest gates, including the independently verified
+attack frame and live target before B.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Binding diagnostic receipt | `3037d8f018f6c57ddc9cb0259be6ee9f939e7bfa7106b15714b771ac741138a0` |
+| Binding replay manifest | `cd13e6f101098e9a9645b36986dafdf6a0657cb0468f9782f9650ae6af638ebd` |
