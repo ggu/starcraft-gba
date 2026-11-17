@@ -47,6 +47,13 @@ preference, with no evidence here of lost buildings at load. The existing
 [opt-in UI context](../Z7-SAVE-UI-AUDIT.md) is the candidate to qualify
 across current profiles before making it a regular build setting.
 
+Rebuilding the same P10 profile with only `SC64_SAVE_UI_CONTEXT` added
+left both RAM bounds unchanged. At the same P2 cut the tagged word
+`0xa1010100` retained menu row 1 with no selected building. After fresh
+title L, the same input tape matched all 36 checkpoints and won at frame
+33,803 with the hero alive. The regular build still resets the row;
+this result qualifies one experimental P10 replay.
+
 P3 won uninterrupted at frame 45,951 with all 47 checkpoints, nine
 briefing pages and three gameplay dialogue acknowledgments matched. A
 separate P3 attempt saved at call 24,581 (frame 23,993) before placing
@@ -66,6 +73,8 @@ command-menu finding does not yet explain this difference.
 | P2 uninterrupted ARM receipt | `2a961c2f3d49463e85724ec216d7db41a3a1add9af93c31fae1b36746a85cf9d` |
 | P2 first divergent checkpoint | `4c0b3a920082da3b7dfd1991aaa799fb70d29f549a6cb9111904e46f410cca40` |
 | P2 paired command trace comparison | `fcc66f0e866719eb31d44246d9703b1c6cd665d9630cccc573fa133b76261cf1` |
+| P2 opt-in P10 ROM | `c28cc7a024247cc542f0b1afde89983930b34304215832b52ed0a8082be447b8` |
+| P2 opt-in fresh SRAM win receipt | `f68a5be5dde18a6d2880790b682ad43eb9d0b2217fb8b6f5a11d90f368331ee1` |
 | P3 uninterrupted ARM receipt | `d5fb7257c27525d3082e5e980fd78553f32ec90ddce74f93527ec3b5e3bac527` |
 | P3 save cut receipt | `1f844395fe68f26df117dadea3ca021fd092133faff5ac01c4ef3cfaab5b3345` |
 | P1 host input tape | `70259667d448fabb7efc898e7674c6f051ac87f9e3f65ab414069bde818d94be` |
