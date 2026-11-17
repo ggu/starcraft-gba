@@ -523,16 +523,48 @@ passed (15,025,537,024 bytes free before and 15,021,035,520 after).
 | Actual ARM-written SRAM | `e280778b66f70065b36306daa432c9247fd6b5d6612edeb7a59f73ae233b316b` |
 | Build, save, and fresh load result | `eabc11398ae49ea4e194af1995dda4fe32614b8cee0eec7c0f73e66f71dce42c` |
 
+### Blank-origin Blood Bath Starport and Science Facility
+
+A fresh `SCCT` process used ordinary title L on the Factory SRAM
+above and matched the frame 6,096 checkpoint at 616 minerals and 92
+gas. Two ordinary Marine orders paid 50 minerals each. The original
+three mineral SCVs and one gas SCV continued gathering. Reuse the
+fifth builder and select Starport from B, move to `(176, 152)`, and
+confirm with A once the wallet holds at least 150 minerals and 100
+gas. The foundation in slot 17 charged the exact cost at frame
+6,203 (540/100 to 390/0). The same Starport was complete at frame
+7,523 with 1,300 HP.
+
+Keep the same gas and mineral orders while waiting for Science
+Facility (100/150), then select it from B and confirm a site with a
+clear add-on footprint. At `(216, 168)`, the SCV reached the site
+and paid the exact 100/150 at frame 8,769 (894/152 to 794/2).
+Building slot 23 was complete by frame 9,909 with 850 HP and the
+wallet at 1,002/66. The prospective Covert Ops socket `(264, 176)`
+passed a separate terrain, resource, and current collision check;
+this does not exercise the add-on command itself.
+
+Ordinary START/B appended sequence 2 in the other SRAM bank with
+tag `0x76435442` and a 15,832-byte payload. The original Factory
+bank remained byte-identical. A fresh title-L load matched the frame,
+wallet, sparse lobby, completed structures, fifth builder, original
+workers' orders and cargo, and empty Ghost research. No guest
+memory writes or emulator save states were used. The disk guard
+passed (17,776,709,632 bytes free before and 17,695,813,632 after).
+
+| Blank-origin Science Facility receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `bd8145313678465c42cedb25c9280dd0051a4637cb6745d1f10d9166b5f428e6` |
+| Actual ARM-written SRAM | `0f6c861c0582911012c3cc0d0706c02ce3366e3afae2b6fede0c1789d53205ab` |
+| Build, save, and fresh load result | `427a9bbaac20e596dc393bb5913cba15fe452f42478914fb73bc4868154331a5` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed on the match
 that started from blank:
 
-1. The completed Factory unlocks the Starport (150/100), which is
-   required for a Science Facility (100/150). The Barracks also
-   unlocks the Academy (150/0). These are SCV builds. Leave room on
-   the Science Facility's right for the add-on at `(x + 48, y + 8)`.
-2. Select the completed Science Facility and choose Covert Ops (50/50)
-   in its B menu. Verify completion at the socket and retain the
+1. Build an Academy (150/0), which the Barracks unlocks. Select the
+   completed Science Facility and choose Covert Ops (50/50) in its
+   B menu. Verify completion at the socket and retain the
    attached facility. The Academy and Covert Ops together unlock a
    Ghost (25/75) at the Barracks. Select the Barracks, cycle to the
    Ghost with R, and train with A. The opening Barracks blocks the
@@ -540,7 +572,7 @@ that started from blank:
    Command Center with a clear socket and keep it free of a Comsat
    so the completed Science Facility and Covert Ops can unlock a
    Nuclear Silo (100/100) there.
-3. Build enough Supply Depots (100/0 each) for the Ghost and missile.
+2. Build enough Supply Depots (100/0 each) for the Ghost and missile.
    Arm the completed Silo from its B menu (200/200, eight supply
    and 1,500 source ticks). Pay for Ocular from the attached Covert
    Ops (100/100) and save while it's pending. The next persistence
@@ -550,9 +582,10 @@ that started from blank:
 The combined ARM save checks cover painting, descent, and one
 malformed-receipt fallback in a prepared Terran custom game on map 0
 with one Terran computer. The separate blank Blood Bath checks show a
-completed Barracks and Refinery, gas deposits, and a Factory built and
-restored over a baseline journal. Remaining gates include progress
-from the Factory to Covert and its journal, ARM rejection without a
+completed Barracks and Refinery, gas deposits, and a Factory, Starport,
+and Science Facility built and restored over a baseline journal.
+Remaining gates include the Covert add-on and its journal in the
+blank-origin match, ARM rejection without a
 valid predecessor, mixed and multi-opponent journal coverage, descent
 with other Silos still armed, composition with Carrier and other
 research journals, campaign payer provenance, measured load stack
