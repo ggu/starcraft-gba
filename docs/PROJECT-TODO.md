@@ -54,8 +54,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The 1,000-update continuation matches 43 watched frames and the exact
   final save payload after a fresh mid-battle load. Its [cycle split](CARRIER-PROJECTILES.md#where-the-mixed-battle-spends-its-cycles)
   finds 648k cycles in game update and 359k after update per loop on
-  average. Profile the worst zero-route-build order tail and first
-  post-load unit draw as separate targets. The [weapons bounds change](audits/2026-11-17-render-first-update.md)
+  average. A [separate order breakdown](audits/2026-11-17-z10-order-tail.md)
+  attributes 995k cycles of the worst zero-build update to work after
+  actor orders; in this window the large spikes coincide with Carrier
+  projectile service. Another zero-build update spends 466k cycles in two
+  movement repaths. Time projectile motion, arena updates, damage and
+  transport separately, and split the direct ray from fallback routing.
+  The [weapons bounds change](audits/2026-11-17-render-first-update.md)
   removes the cold tracer scan: first update 3.00M → 1.80M cycles,
   with sampled pixels and the final SRAM matching. Sustained play is
   still about 1.01M cycles per update. Terran and Showcase now also

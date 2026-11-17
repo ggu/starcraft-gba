@@ -38,9 +38,17 @@ and the p95 rises 0.46% in this window. The battle remains well above the
 561,792-cycle 30 fps budget. Neither save behavior nor weapon graphics
 change. Native GBA SP timing remains open.
 
+The regular Terran, Z10, P10 and Showcase ROMs all link and pass their
+ROM verifiers with the new generated bank. IWRAM use is unchanged;
+EWRAM use is unchanged on P10 and falls by eight bytes on the other
+three. The default toolchain checks, build and asset-free suite passed.
+The prepared-bank fixture compares the generated bound to the C scan;
+its culling and wide-math differential checks also passed.
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | Render-pass breakdown | `06a879d2e8484f2fdf4061d0430e77891c4968cc4ba53d9c320055629174f9ce` |
 | Corrected timing and visual pair | `da9119b53e5ce77160dac703f30e6fc6e10e2da26390c2c1860ea0cd52314137` |
 | Compared indexed-page and palette hashes | `bf993d1be51143dfbbd0ce0ac0d3359bd1255d917376e9be1cbc51ff4316b0b4` |
 | Candidate cartridge used for the pair | `0aeddf0115cde90799301bd6f1df14f868fa63093946d5570dfc168cc95c5fd7` |
+| Regular build verification matrix | `b611f8a36463172916a57b5fac34d1c6d2a784e7e6c05890dd0d8d917f81bc39` |
