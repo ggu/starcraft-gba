@@ -54,6 +54,20 @@ title L, the same input tape matched all 36 checkpoints and won at frame
 33,803 with the hero alive. The regular build still resets the row;
 this result qualifies one experimental P10 replay.
 
+The two P2 journals differ only in the tagged word and its envelope
+checksum. Both P10 readers loaded both records and matched all sampled
+world fields. Only the opted-in reader restored the marked command row.
+Checksummed records with an invalid marker or a command row above the
+limit left it at HOME, before any world state was applied. Other current
+product vectors still need their own compatibility and replay tests.
+
+Before enabling the setting by default, run the existing six-profile UI
+host fixture, extend its coverage to the exact P10 and Z10 release flags,
+and check ordinary title-load behavior on each current regular cartridge.
+Include a legacy zero-word journal, a valid marked journal, a stale
+selected building, and a corrupt newer bank with a valid older one. Check
+both linked RAM bounds and a campaign and custom-game continuation.
+
 P3 won uninterrupted at frame 45,951 with all 47 checkpoints, nine
 briefing pages and three gameplay dialogue acknowledgments matched. A
 separate P3 attempt saved at call 24,581 (frame 23,993) before placing
@@ -75,6 +89,7 @@ command-menu finding does not yet explain this difference.
 | P2 paired command trace comparison | `fcc66f0e866719eb31d44246d9703b1c6cd665d9630cccc573fa133b76261cf1` |
 | P2 opt-in P10 ROM | `c28cc7a024247cc542f0b1afde89983930b34304215832b52ed0a8082be447b8` |
 | P2 opt-in fresh SRAM win receipt | `f68a5be5dde18a6d2880790b682ad43eb9d0b2217fb8b6f5a11d90f368331ee1` |
+| P2 P10 reader compatibility receipt | `7279a5878663bc3ad1c8dad5c1b48f7749c294086f1d7349e3486c66f9f189e0` |
 | P3 uninterrupted ARM receipt | `d5fb7257c27525d3082e5e980fd78553f32ec90ddce74f93527ec3b5e3bac527` |
 | P3 save cut receipt | `1f844395fe68f26df117dadea3ca021fd092133faff5ac01c4ef3cfaab5b3345` |
 | P1 host input tape | `70259667d448fabb7efc898e7674c6f051ac87f9e3f65ab414069bde818d94be` |

@@ -325,6 +325,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   twelve observed depot fills restarted a partial search for the same
   depot. Retaining one frontier matched the paired ARM checks but was
   slightly slower overall, so it stays out of the shared builds.
+  Next, measure the owner rank scan with a depot-only list that preserves
+  slot order and the same reachability calls. For rendering, test the
+  existing partial terrain capture alone on the dense Z7 ordinary replay,
+  counting copied rows and comparing exact video alongside timing.
   [Packed completed-building art](audits/2026-11-12-packed-buildings.md)
   saves another 1.64–2.19% in the Z10 windows, with matching gameplay and
   sampled video, the same RAM limits, and both three-AI outcomes matching.
