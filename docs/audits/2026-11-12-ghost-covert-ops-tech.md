@@ -684,14 +684,43 @@ with different defense orders.
 | Controller inputs | `9f5e56627f7308fcb9415d3c7e50a607a57c6e3081db38cf1f8de6e50200d725` |
 | Fresh load, defensive orders, and Academy completion result | `7e167d32d9b91c6cb529c321d6ac59745daaa85a1a9b0bccb49795a91e7a1406` |
 
+### Exact Blood Bath Ghost purchase and queued SRAM
+
+The next fresh title-L run replayed the successful purchase controls
+from the sequence 3 infrastructure save without the defense detour.
+Leave the world neutral until the Academy finishes, then select the
+Barracks at `(112, 120)`, use a clean R tap to select Ghost, and press
+A to train. Both sides of that last A were recorded. At frame 11,477,
+Barracks slot 2 was selected with 1,000 HP, an empty queue, and type
+28 selected. Supply was 10/36 and the wallet was 950/112. At frame
+11,478 the wallet was 925/37, the queue contained exactly type 28 at
+progress 1, and the game reported training with no refusal.
+
+Ordinary START/B exported a 32 KiB queued-Ghost save. The harness
+stopped at its save verification, so it did not resume training or
+reload that save. An independent offline check of the retained bytes
+confirmed the original sequence 3 bank was unchanged. The new bank
+was valid tag `0x76435442`, sequence 4, with the exact frame/wallet
+and Barracks queue above. Its 15,852-byte payload includes a 20-byte
+`IMP1` trailer with two delayed impacts; the previously observed
+empty-tail size of 15,832 bytes does not apply during this fight.
+The artifact contains a paid Ghost in the queue; no Ghost birth was
+observed.
+
+| Exact paid Ghost receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `817fde9931a607faf44a0950660df1b7a9e65b0e1b91fa996ed750c54c4ec10b` |
+| Tracked wallet, queue, and UI result | `dc2b9234daa52e2dc3a7e275b5832324ecc4aef133511d087b25fbfa2a4a71b3` |
+| ARM-written queued Ghost SRAM | `bb33c53e5a6189056738743ceed0e6e6709186e4e1d35fbe4389b6d71ed27d8d` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed on the match
 that started from blank:
 
-1. Starting from the now verified infrastructure load, log the
-   exact before and after fields of the Barracks A click, then
-   observe the paid Ghost through birth. Track the producer, queued
-   product, active defenses and individual workers separately.
+1. Start from the checked sequence 4 queued-Ghost SRAM, verify the
+   fresh title load, then observe the Ghost through birth. Track the
+   producer, queued product, active defenses and individual workers
+   separately.
    The opening Barracks blocks the
    first Command Center's socket at `(112, 128)`. Build a second
    Command Center with a clear socket and keep it free of a Comsat
@@ -711,8 +740,9 @@ completed Barracks and Refinery, gas deposits, and a Factory, Starport,
 and Science Facility built and restored over a baseline journal. They
 also show an attached Covert Ops, a completed Academy and Supply Depot,
 and a paid Ghost in one continuous branch with a separately verified
-intermediate SRAM reload. Remaining gates include completing Ghost
-production, qualifying the Covert journal in the blank-origin match,
+intermediate SRAM reload and a checked queued-Ghost save. Remaining
+gates include reloading that queue, completing Ghost production,
+qualifying the Covert journal in the blank-origin match,
 ARM rejection without a
 valid predecessor, mixed and multi-opponent journal coverage, descent
 with other Silos still armed, composition with Carrier and other
