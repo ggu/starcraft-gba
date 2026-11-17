@@ -1,0 +1,38 @@
+# Native Blood Bath: northwest minimap aim
+
+This is the first camera calibration toward a possible worker-loss
+witness. It builds on the [ordinary Barracks and Marine replay](2026-11-14-native-result-opening.md)
+and the [failed SCV interruption](2026-11-17-native-scv-foundation-interruption.md).
+It does not place a building or test combat.
+
+The one bounded replay matched all 137 archived command rows, 18 full
+frames, six guest rows, and the early renderer binding through 15,962.
+This included the 11,900 completed-Barracks anchor and the exact
+three-Marine selection at 15,962. The reference guest row has a live
+opposing Marine at (220,244); that is a prior sampled position, not a
+new sighting. Checked inputs stayed unchanged.
+
+The only new inputs were eleven stick-only steps at X=-22,000 and
+Y=+27,000 and twenty-two neutral steps. The frame at command end
+15,995 showed the green pointer at the northwest minimap's top edge.
+Its visible pixels span x=49–65, y=156–163, whereas the minimap border
+starts at y=158. The pointer tip is above that border, so this frame
+does not qualify an A click. No button, camera jump, unit move,
+enemy contact or construction was observed after the archived prefix.
+
+For a future interior calibration, first reauthenticate the complete
+archived prefix and this exact 15,995 frame. Hold X at zero and try
+only four steps at Y=+18,000 with sixteen neutral steps, capturing at
+16,015. Require a visibly identifiable pointer tip within x=44–62,
+y=166–175, inside the minimap and clear of the upper border. This is
+a proposed pulse, not an observed coordinate mapping. If it lands
+outside that interior box or the selection changes, stop without A.
+Only a separately reviewed and exactly reproduced interior frame can
+authorize a camera jump. A jump still would not authorize a Move,
+placement, or claim about enemy contact.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| West aim replay manifest | `51e44a8802b7151b1629d6ef411dfc6b642b25ec537f0817af2b9b687d052522` |
+| West aim diagnostic | `38dfac4964f729ec29d5972c409e0b05b9a553f6bd9f16f002e2cd5afaece636` |
+| Cursor-only frame at 15,995 | `b121db1daa98207c4a8ef9a09584d49458ea6aa4195a874a2a4beecab0d76eb6` |

@@ -1,7 +1,7 @@
 # Normal campaign cartridge qualification matrix
 
-This is an index of complete normal-ROM mGBA replays known as of November
-14. A win on the exact KODAK ROM is separate from a win on a preceding
+This is an index of complete normal-ROM mGBA replays. The KODAK column
+describes the November 13 set. A win on that ROM is separate from a win on a preceding
 normal ROM, a host controller win, or a prefix. No row represents a
 physical GBA check or all routes through a mission.
 
@@ -43,3 +43,8 @@ substitute for the normal cartridge row.
 All 30 original missions now have a checked HOME win on a normal ROM.
 This includes different P10 revisions for different Protoss missions;
 it does not establish all 30 on a single set of ROM revisions.
+
+On the [November 17 regular P10 ROM](2026-11-17-protoss-early-replays.md),
+P2–P6 also win from HOME, and P1 wins after a fresh SRAM load.
+The uninterrupted P2/P3 tapes win while the tested saved continuations
+diverge. The opt-in UI context P10 separately wins both saved routes.
