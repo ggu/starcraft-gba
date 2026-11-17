@@ -52,3 +52,43 @@ this rebase does not qualify enabling the option by default.
 | Zerg 10 | `ef36f3f0e8f44ea1207ef39c05ac1417c727b498a2596e93b98b765c74b9768e` |
 | Protoss 10 | `0505b233994dca90cda47d92f1a153a14f01e781d980b3498390d3b4005e7c41` |
 | Showcase | `5b9cf1ec7cee3809cec4a84130e60d656a26d9a2c4706d6c83f793bb98d33adb` |
+
+## Reuse validated cells and occupancy bits
+
+The optional fast link skips duplicate owner-axis writes when a cell is
+already occupied. Those masks only clear with the index. A cross-cell move
+also reuses the cell checked against the current map instead of computing
+and checking it again. The owner and dirty-list overflow checks still
+precede or guard the relink. Rebuild order, hostility, and tie rules are
+unchanged. Nine ASan/UBSan vectors compare the regular, bulk, and fast
+variants across the three geometries (90,000 randomized index builds).
+
+Compare both probes on the current regular wide-lookup Z10 ROM, running
+22,000 physical-input calls in Zerg 9. All 12 named checkpoints, 21,987
+sampled frame identities, and 34 raw world/cache cuts match, including
+all 370 route-field observations. Both ARM links pass the RAM guards
+with unchanged EWRAM. IWRAM ends at `0x03004d70` in the regular build,
+`0x03004ce0` with bulk rebuild only, and `0x03004cd0` with both changes.
+
+| Guest cycles per advancing update | Regular | Bulk only | Bulk and fast link |
+| --- | ---: | ---: | ---: |
+| Whole prefix mean | 1,319,069 | 1,306,607 | 1,301,649 |
+| Whole prefix p95 | 1,613,855 | 1,603,353 | 1,596,834 |
+| Busy tail mean | 1,720,501 | 1,706,404 | 1,700,064 |
+| Busy tail p95 | 4,255,649 | 4,244,721 | 4,232,251 |
+| Peak | 22,395,567 | 22,392,690 | 22,394,404 |
+
+The bulk and fast path cuts the whole-prefix mean by 1.32% and the tail
+mean by 1.19%. The peak is effectively unchanged. This is a bounded
+campaign emulator result, not a GBA SP rate. Keep the probes off in regular
+builds while checking other products, longer mixed skirmishes, and saves.
+
+```sh
+make SC64_DEFENSE_PROBE_FLAGS='-DSC64_TARGET_BULK_REBUILD_PROBE -DSC64_TARGET_FAST_LINK_PROBE' verify-zerg-z10
+```
+
+| Local artifact | SHA-256 |
+| --- | --- |
+| Bulk Z10 ROM | `16c576e86d965c7870c186bb676e921553cf4112727cd172cbea0e40556b7d64` |
+| Bulk and fast Z10 ROM | `48b971185e63b58e61466c64afa5eafcb2fea39c103b4cbe7a9af5f0bbd7bff5` |
+| Paired Z9 comparison | `e88924f3b9903966ee17a15e42563a459cb5f3be284fdfe335cccd42ac9d4046` |
