@@ -80,6 +80,14 @@ full fixtures subsequently passed at cc5a2dc, exercising all original
 construction/burn assertions and all three human races' UI tests. This
 establishes six UI-on product vectors, not twelve fresh off/on runs.
 
+The opt-in `make test-sc64-campaign-ui-context` target also builds the
+UI-only checks against the exact P10 Protoss and Z10 Zerg campaign vectors.
+It uses each campaign's generated inputs and runtime flags, while limiting
+execution to the UI save fixture so unrelated shared-mechanics assertions do
+not acquire campaign-specific assumptions. The ordinary product/default
+targets remain unchanged. These P10/Z10 runs require their pinned local
+campaign inputs to be present.
+
 The remaining builds used 109 verified pinned inputs and two independently
 hashed derived headers without regenerating them; all hashes matched before
 and after. Their log SHA-256 is recorded below. To preserve the unchanged
