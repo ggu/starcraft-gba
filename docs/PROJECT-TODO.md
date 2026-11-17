@@ -62,8 +62,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   still get full validation. A separate [route breakdown](audits/2026-11-17-z10-order-tail.md#why-a-zero-build-update-rebuilt-route-fields)
   found two actual floods the ordinary build counter did not count.
   Nearby route lookups now reuse a retained gradient when the current
-  grid still proves its exact path. Profile genuine misses and the dense
-  worker/target path next; the mixed battle still misses 30 fps.
+  grid still proves its exact path. Next, split counted route builds into
+  actual floods, retained field adoption and facility restarts, and profile
+  the dense worker/target path. The mixed battle still misses 30 fps.
   The [weapons bounds change](audits/2026-11-17-render-first-update.md)
   removes the cold tracer scan: first update 3.00M → 1.80M cycles,
   with sampled pixels and the final SRAM matching. Sustained play is
