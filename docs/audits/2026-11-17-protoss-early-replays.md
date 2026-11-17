@@ -37,6 +37,22 @@ run on the same ARM ROM passed that checkpoint with five buildings and
 won at frame 33,803 with all 36 checkpoints, 14 briefing pages, and six
 gameplay dialogue acknowledgments matched. The saved route stays open.
 
+A paired 2,000-call trace isolates the first consequential P2 difference.
+The live command menu remembered row 1 before saving; the fresh ROM reset
+both the cursor and last command to row 0. At call 951 the same confirmation
+entered building-placement mode in the uninterrupted run but attack mode
+after loading. At call 1,042 the uninterrupted run placed a Gateway and
+paid 150 minerals; the resumed run did neither. This is a dropped command
+preference, with no evidence here of lost buildings at load. The existing
+[opt-in UI context](../Z7-SAVE-UI-AUDIT.md) is the candidate to qualify
+across current profiles before making it a regular build setting.
+
+A separate P3 attempt saved at call 24,581 (frame 23,993) before placing
+the expansion Nexus. Fresh title L restored the named world sample, but
+the next checkpoint at call 25,598 had 2,375 minerals instead of 2,475.
+This attempt does not qualify a full P3 SRAM continuation, and the P2
+command-menu finding does not yet explain this difference.
+
 | Local evidence (SHA-256) | Digest |
 | --- | --- |
 | Regular P10 ROM | `a4c5c93c307bc275aca13a61e4e2526b1fabccfdfa4465382fa72afd28be0dff` |
@@ -47,6 +63,8 @@ gameplay dialogue acknowledgments matched. The saved route stays open.
 | P1 fresh SRAM win receipt | `f0a84a77b7159b6d109532c16dfc93bcdbd4d5e7df9a70d86614b66788529861` |
 | P2 uninterrupted ARM receipt | `2a961c2f3d49463e85724ec216d7db41a3a1add9af93c31fae1b36746a85cf9d` |
 | P2 first divergent checkpoint | `4c0b3a920082da3b7dfd1991aaa799fb70d29f549a6cb9111904e46f410cca40` |
+| P2 paired command trace comparison | `fcc66f0e866719eb31d44246d9703b1c6cd665d9630cccc573fa133b76261cf1` |
+| P3 save cut receipt | `1f844395fe68f26df117dadea3ca021fd092133faff5ac01c4ef3cfaab5b3345` |
 | P1 host input tape | `70259667d448fabb7efc898e7674c6f051ac87f9e3f65ab414069bde818d94be` |
 | P2 host input tape | `a1ab751c4e7cab20c1859405453a29196ab8e8c749da6296347b390f8652ab0b` |
 | P3 host input tape | `0a0540f40220daf10fa88c682caaccf0064128a2ceeb68d84dd854e5062cc95b` |
