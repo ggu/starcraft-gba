@@ -66,3 +66,29 @@ placement gates separate.
 | Interior-aim replay manifest | `bcaceeed8adde6261abce1ea45edc17a7560ded3f2f0f0d0658a188c5b5790a1` |
 | Interior-aim diagnostic | `e0b612ff7924b4b35fa4601b2d7e5021a270f6d1b3966ffbccf0f893c3d5a0df` |
 | Reviewed interior frame at 16,015 | `de3ad54a3dc99dfd945dbee06c32c4662e3d0a0260f2c2eec5463552b3d32a7e` |
+
+## One A jumps to the northwest without an order
+
+A fresh trial matched all 141 previous command rows, all 20 full frames
+and six guest rows through 16,015. The exact interior frame confirmed
+the blue tip at (49,168) and the unchanged three-Marine selection.
+Only after that check, the observer sent one eight-step A pulse and
+twenty neutral steps, ending at 16,043 with unchanged inputs.
+
+The white minimap viewport moved from x=124–162 to x=34–72, with its
+top still at y=159. The terminal HUD retained three selected units
+and the Move command. The northwest field was fogged and showed no
+enemy. This establishes the camera jump and the visible retained
+selection; there was no Move or attack input and no confirmed contact
+or build site. No second attempt was run.
+
+For the next scout stage, reproduce the exact landing first. Verify a
+world-space cursor target separately before using the displayed Move.
+Confirm a live enemy and reachable ground through ordinary scouting
+before choosing any site; the fogged landing cannot qualify one.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Camera-only replay manifest | `5003893f9351202e5b0f49ddd3d4ffe5a35a17fc3c3846be800a3285a6d54a44` |
+| Camera-only diagnostic | `2c7a637d5a630693beb1690784a0da880d450765004033957a3888d431a5aef4` |
+| Reviewed northwest landing at 16,043 | `424577f78a64ad8db2b36e8deb417f66cd30b4f9e75ba696581a905cbc7fc7c8` |
