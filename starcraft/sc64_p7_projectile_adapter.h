@@ -182,7 +182,7 @@ static void race_p7_projectile_source_tick(void)
             if (!sc64_compact_pool_retire_live(&race_p7_projectiles,id)) break;
         } else
 #else
-        if (row.state==3 && !sc64_pool_retire(&race_p7_projectiles,id)) break;
+        if (row.state==3 && !sc64_pool_retire_live(&race_p7_projectiles,id)) break;
 #endif
         if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) break;
         if (impact && race_p7_projectile_target_alive(row.target_ref)) {

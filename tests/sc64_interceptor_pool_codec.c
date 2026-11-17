@@ -773,37 +773,47 @@ static void test_compact_bad_packets(void)
     assert(!memcmp(before, dest, sizeof(dest)));
 }
 
-static void test_compact_live_retire_equivalence(void)
+static size_t encode_retire_test(const Sc64Arena *a, int compact, unsigned cap, uint8_t *packet)
+{
+    return compact ? sc64_compact_codec_encode(a, cap, packet, SC64_CODEC_BYTES) :
+        sc64_codec_encode(a, packet, SC64_CODEC_BYTES) ? SC64_CODEC_BYTES : 0;
+}
+
+static void test_live_retire_equivalence(int compact)
 {
     uint16_t strict_words[SC64_ARENA_WORDS], live_words[SC64_ARENA_WORDS];
     uint8_t strict_packet[SC64_CODEC_BYTES], live_packet[SC64_CODEC_BYTES];
     Sc64Arena strict = {strict_words, SC64_ARENA_WORDS};
     Sc64Arena live = {live_words, SC64_ARENA_WORDS};
+    int (*retire_strict)(Sc64Arena *, uint8_t) = compact ? sc64_compact_pool_retire : sc64_pool_retire;
+    int (*retire_live)(Sc64Arena *, uint8_t) = compact ? sc64_compact_pool_retire_live : sc64_pool_retire_live;
     unsigned trials = 0;
     for (unsigned cap = 1; cap <= SC64_POOL_CAPACITY; ++cap) {
         assert(sc64_pool_init(&strict));
         for (unsigned i = 0; i < cap; ++i) {
             uint8_t id, native;
-            assert(sc64_compact_pool_acquire(&strict, cap, &id, &native));
+            assert(compact ? sc64_compact_pool_acquire(&strict, cap, &id, &native) :
+                            sc64_pool_acquire(&strict, &id, &native));
             Sc64ProjectileRow row = compact_fixture_row(i);
             assert(sc64_pool_set_row(&strict, id, &row));
         }
-        size_t size = sc64_compact_codec_encode(&strict, cap, strict_packet, sizeof(strict_packet));
-        assert(size && sc64_compact_codec_decode(&live, strict_packet, size, cap));
+        size_t size = encode_retire_test(&strict, compact, cap, strict_packet);
+        assert(size && (compact ? sc64_compact_codec_decode(&live, strict_packet, size, cap) :
+                                  sc64_codec_decode(&live, strict_packet, size)));
         assert(!memcmp(strict_words, live_words, sizeof(strict_words)));
         for (unsigned i = cap; i; --i) {
             uint8_t ids[SC64_POOL_CAPACITY];
             assert(read_list(&strict, TEST_H_ACTIVE, ids) == i);
             unsigned choice = i % 3u == 0 ? 0 : i % 3u == 1 ? i-1 : next_random() % i;
-            assert(sc64_compact_pool_retire(&strict, ids[choice]));
-            assert(sc64_compact_pool_retire_live(&live, ids[choice]));
+            assert(retire_strict(&strict, ids[choice]));
+            assert(retire_live(&live, ids[choice]));
             assert(!memcmp(strict_words, live_words, sizeof(strict_words)));
-            assert(!sc64_compact_pool_retire_live(&live, ids[choice]));
+            assert(!retire_live(&live, ids[choice]));
             assert(!memcmp(strict_words, live_words, sizeof(strict_words)));
             ++trials;
             if (i % 13u == 0 || i <= 2 || i == cap) {
-                size = sc64_compact_codec_encode(&strict, cap, strict_packet, sizeof(strict_packet));
-                assert(size && size == sc64_compact_codec_encode(&live, cap, live_packet, sizeof(live_packet)));
+                size = encode_retire_test(&strict, compact, cap, strict_packet);
+                assert(size && size == encode_retire_test(&live, compact, cap, live_packet));
                 assert(!memcmp(strict_packet, live_packet, size));
             }
         }
@@ -811,13 +821,16 @@ static void test_compact_live_retire_equivalence(void)
          * reuse, including the full pool's final allocation. */
         for (unsigned i = 0; i < cap; ++i) {
             uint8_t a, b, an, bn;
-            assert(sc64_compact_pool_acquire(&strict, cap, &a, &an));
-            assert(sc64_compact_pool_acquire(&live, cap, &b, &bn));
+            assert(compact ? sc64_compact_pool_acquire(&strict, cap, &a, &an) :
+                            sc64_pool_acquire(&strict, &a, &an));
+            assert(compact ? sc64_compact_pool_acquire(&live, cap, &b, &bn) :
+                            sc64_pool_acquire(&live, &b, &bn));
             assert(a == b && an == bn && !memcmp(strict_words, live_words, sizeof(strict_words)));
         }
     }
     assert(trials == 5050);
-    printf("live compact retirement: %u arena comparisons across all caps\n", trials);
+    printf("live %s retirement: %u arena comparisons across all caps\n",
+           compact ? "compact" : "fixed", trials);
 }
 
 static void test_compact_live_retire_rejects_bad_splices(void)
@@ -850,6 +863,7 @@ static void test_compact_live_retire_rejects_bad_splices(void)
         guarded[corrupt[i].word+1] = corrupt[i].value;
         memcpy(before, guarded, sizeof before);
         assert(!sc64_pool_validate(&suspect));
+        assert(!sc64_pool_retire_live(&suspect, id));
         assert(!sc64_compact_pool_retire_live(&suspect, id));
         assert(!memcmp(before, guarded, sizeof before));
     }
@@ -866,7 +880,8 @@ main(void)
 {
     test_compact_all_caps();
     test_compact_bad_packets();
-    test_compact_live_retire_equivalence();
+    test_live_retire_equivalence(0);
+    test_live_retire_equivalence(1);
     test_compact_live_retire_rejects_bad_splices();
     test_compact_resume_growth();
     test_order_oracle();
