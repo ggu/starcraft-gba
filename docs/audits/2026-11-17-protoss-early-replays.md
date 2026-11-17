@@ -67,6 +67,9 @@ and check ordinary title-load behavior on each current regular cartridge.
 Include a legacy zero-word journal, a valid marked journal, a stale
 selected building, and a corrupt newer bank with a valid older one. Check
 both linked RAM bounds and a campaign and custom-game continuation.
+The [current custom-game matrix](2026-11-17-save-ui-product-matrix.md)
+records 32 compatible fresh loads across all four regular cartridges
+with those RAM guards retained.
 
 P3 won uninterrupted at frame 45,951 with all 47 checkpoints, nine
 briefing pages and three gameplay dialogue acknowledgments matched. A
