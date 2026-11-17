@@ -485,20 +485,61 @@ alive before making the paid placement.
 | Controller inputs | `b9e0597991f0e8197fe263cf81fe37a09f340936fdd81ed05f953a85371b866e` |
 | Paid SCV and funded Factory checkpoint | `759b326120d31620074653872a85727e1654a9448ae212bdcd50819982ebd89d` |
 
-The next milestones below follow this preview's custom-game catalog
-and costs (minerals/gas). They have not been replayed from blank:
+### Blank Blood Bath Factory and baseline journal
 
-1. The completed Barracks unlocks Factory (200/100) and Academy
-   (150/0). Build the Factory, then a Starport (150/100), then a
-   Science Facility (100/150). These are SCV builds. Leave room on
+The successful replay kept the same blank opening and first gas
+deposit. The earlier controller trace pressed SELECT with an empty
+selection, which opens Pause; in Pause, R is Restart. The corrected
+controls skip that SELECT, verify play stays active, and compare the
+SCV's direct and aligned memory reads.
+
+The Command Center queued the fifth SCV for 50 minerals at frame
+2,994, and the Barracks queued three Marines at 50 minerals each
+between frames 3,013 and 3,017. The fifth SCV appeared by frame
+3,371 and ordinary A selected it at frame 3,381 with 60 HP. Use the
+B menu's Move command to stage it near `(152, 160)` before the
+Factory is affordable. The original three mineral workers and gas
+worker continued gathering; the bank reached 520 minerals and 104
+gas by frame 4,570. All three Marines were alive at that observation.
+
+With the staged SCV still selected, choose Factory from B and confirm
+at `(152, 120)` with A. The game placed building slot 11 at frame
+4,584 and charged exactly 200 minerals and 100 gas (520/104 to 320/4).
+The same Factory was complete by frame 6,096 at 1,250 HP and the bank
+was 616/92.
+
+START then B wrote a 32 KiB SRAM image with an ordinary 15,832-byte
+payload, tag `0x76435442`, sequence 1, and a valid checksum. A fresh
+process used title L and matched the frame, resources, sparse lobby,
+Factory, Barracks, Refinery, original workers' positions/orders/cargo,
+and empty Ghost research. This is a baseline continuation from an
+unseeded match; it has no paid Covert receipt or nuclear state yet. No
+guest memory writes or emulator save states were used. Disk guards
+passed (15,025,537,024 bytes free before and 15,021,035,520 after).
+
+| Blank Factory receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `32c082db6c817b91021d9eda4d2b0747e986627052807ddb338a3260f8224b96` |
+| Actual ARM-written SRAM | `e280778b66f70065b36306daa432c9247fd6b5d6612edeb7a59f73ae233b316b` |
+| Build, save, and fresh load result | `eabc11398ae49ea4e194af1995dda4fe32614b8cee0eec7c0f73e66f71dce42c` |
+
+The next milestones below follow this preview's custom-game catalog
+and costs (minerals/gas). They have not been replayed on the match
+that started from blank:
+
+1. The completed Factory unlocks the Starport (150/100), which is
+   required for a Science Facility (100/150). The Barracks also
+   unlocks the Academy (150/0). These are SCV builds. Leave room on
    the Science Facility's right for the add-on at `(x + 48, y + 8)`.
 2. Select the completed Science Facility and choose Covert Ops (50/50)
    in its B menu. Verify completion at the socket and retain the
    attached facility. The Academy and Covert Ops together unlock a
    Ghost (25/75) at the Barracks. Select the Barracks, cycle to the
-   Ghost with R, and train with A. Keep the Command Center socket
-   free of a Comsat so the completed Science Facility and Covert Ops
-   can unlock a Nuclear Silo (100/100) there.
+   Ghost with R, and train with A. The opening Barracks blocks the
+   first Command Center's socket at `(112, 128)`. Build a second
+   Command Center with a clear socket and keep it free of a Comsat
+   so the completed Science Facility and Covert Ops can unlock a
+   Nuclear Silo (100/100) there.
 3. Build enough Supply Depots (100/0 each) for the Ghost and missile.
    Arm the completed Silo from its B menu (200/200, eight supply
    and 1,500 source ticks). Pay for Ocular from the attached Covert
@@ -509,10 +550,10 @@ and costs (minerals/gas). They have not been replayed from blank:
 The combined ARM save checks cover painting, descent, and one
 malformed-receipt fallback in a prepared Terran custom game on map 0
 with one Terran computer. The separate blank Blood Bath checks show a
-completed Barracks and Refinery, gas deposits, and Factory affordability.
-Factory placement and the rest of the blank tech path and its journal
-remain open, as do ARM rejection without a valid
-predecessor, mixed and multi-opponent journal coverage, descent with
-other Silos still armed, composition with Carrier and other research
-journals, campaign payer provenance, measured load stack high-water,
-and hardware timing.
+completed Barracks and Refinery, gas deposits, and a Factory built and
+restored over a baseline journal. Remaining gates include progress
+from the Factory to Covert and its journal, ARM rejection without a
+valid predecessor, mixed and multi-opponent journal coverage, descent
+with other Silos still armed, composition with Carrier and other
+research journals, campaign payer provenance, measured load stack
+high-water, and hardware timing.
