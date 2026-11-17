@@ -73,8 +73,12 @@ briefing pages and three gameplay dialogue acknowledgments matched. A
 separate P3 attempt saved at call 24,581 (frame 23,993) before placing
 the expansion Nexus. Fresh title L restored the named world sample, but
 the next checkpoint at call 25,598 had 2,375 minerals instead of 2,475.
-This attempt does not qualify a full P3 SRAM continuation, and the P2
-command-menu finding does not yet explain this difference.
+Rebuilding with the same opt-in UI setting preserved row 1 across a fresh
+load at the same cut. The same suffix matched 23 checkpoints and three
+gameplay dialogue pages and won at frame 45,951, with both hostile structure
+banks cleared. The original pause journal stayed byte identical and the
+terminal export contained two checksummed banks at sequences 1 and 2.
+The tested regular P3 save still diverges; the fix remains experimental.
 
 | Local evidence (SHA-256) | Digest |
 | --- | --- |
@@ -92,6 +96,8 @@ command-menu finding does not yet explain this difference.
 | P2 P10 reader compatibility receipt | `7279a5878663bc3ad1c8dad5c1b48f7749c294086f1d7349e3486c66f9f189e0` |
 | P3 uninterrupted ARM receipt | `d5fb7257c27525d3082e5e980fd78553f32ec90ddce74f93527ec3b5e3bac527` |
 | P3 save cut receipt | `1f844395fe68f26df117dadea3ca021fd092133faff5ac01c4ef3cfaab5b3345` |
+| P3 opt-in fresh SRAM win receipt | `aaee0cc99f456b45a0efad46b2132a109958fafc34354a2d8d62437c574629e1` |
+| P3 opt-in terminal SRAM | `753bb6e04607c750ba5009cf1753c5cbfbd1703f647f9624d51cd740e437b69f` |
 | P1 host input tape | `70259667d448fabb7efc898e7674c6f051ac87f9e3f65ab414069bde818d94be` |
 | P2 host input tape | `a1ab751c4e7cab20c1859405453a29196ab8e8c749da6296347b390f8652ab0b` |
 | P3 host input tape | `0a0540f40220daf10fa88c682caaccf0064128a2ceeb68d84dd854e5062cc95b` |

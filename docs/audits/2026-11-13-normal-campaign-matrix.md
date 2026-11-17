@@ -47,4 +47,4 @@ it does not establish all 30 on a single set of ROM revisions.
 On the [November 17 regular P10 ROM](2026-11-17-protoss-early-replays.md),
 P2–P6 also win from HOME, and P1 wins after a fresh SRAM load.
 The uninterrupted P2/P3 tapes win while the tested saved continuations
-diverge.
+diverge. The opt-in UI context P10 separately wins both saved routes.
