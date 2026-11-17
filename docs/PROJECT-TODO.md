@@ -52,7 +52,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with a live shot and four pending impacts. It averaged 1.01 million
   emulated cycles per update against a 561,792-cycle 30 fps budget.
   The 1,000-update continuation matches 43 watched frames and the exact
-  final save payload after a fresh mid-battle load. Next: measure stack
+  final save payload after a fresh mid-battle load. Its [cycle split](CARRIER-PROJECTILES.md#where-the-mixed-battle-spends-its-cycles)
+  finds 648k cycles in game update and 359k after update per loop on
+  average. Profile the worst zero-route-build order tail and first
+  post-load unit draw as separate targets. Next: measure stack
   in longer busy windows, verify human purchases and the other combined
   builds under busier play, and qualify full pools, older journals and
   hardware before activation. Keep roster and saved IDs stable.
@@ -392,7 +395,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   prefix matches raw world and route state and uses 1.32% fewer cycles
   on average with bulk rebuild and fast link. Z10 keeps the same EWRAM
   and uses 160 fewer IWRAM bytes. The peak barely changes. Keep it
-  optional until other products, mixed battles and saves pass.
+  optional until other products and broader saves pass. The first
+  [mixed Z10 Carrier battle](CARRIER-PROJECTILES.md#where-the-mixed-battle-spends-its-cycles)
+  matches the prior world and byte-identical 32 KiB save image;
+  mean cycles fall 0.78%. This is emulator evidence only.
   Dense play remains well short of 30 fps. In the
   [Z10](audits/2026-11-12-z10-battle-cycles.md) and
   [busy P10](audits/2026-11-06-current-p10-busy/README.md) samples,

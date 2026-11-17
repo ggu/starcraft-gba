@@ -1017,3 +1017,52 @@ qualifies a full pool, every AI lineup, a win, or GBA SP performance.
 | --- | --- |
 | Paired 1,000-update receipt | `98a44e3b4cc3e30bd0ae623bfbb62be4377dd652d743bdf9b3950e4c70ff7bf7` |
 | Identical final payload | `683e6cb3486ba2a470f264abe9593a09d70ca97f2b71f8187ee9e17c87be6e96` |
+
+#### Where the mixed battle spends its cycles
+
+A read-only repeat on the exact combined Z10 cartridge starts from the
+same journal, matches all 43 watched cuts and takes the same
+1,006,866,202 emulated clock cycles. The sum of 1,000 per-update loop
+counters independently matches the cartridge's accumulated loop timer.
+The small clock/counter difference is outside the measured loop body.
+
+| Scope | Mean cycles | p95 cycles |
+| --- | ---: | ---: |
+| Complete loop | 1,006,460 | 1,365,093 |
+| Game update | 647,780 | 1,003,959 |
+| Orders (inside update) | 356,111 | 624,570 |
+| Sight (inside update) | 36,670 | 45,761 |
+| Audio, drawing and presentation (after update) | 358,680 | 508,073 |
+| Map draw (within drawing) | 238,181 | 388,088 |
+| HUD draw (within drawing) | 91,313 | 119,131 |
+
+None of the 1,000 loops fits the 561,792-cycle target. Game update alone
+exceeds it on 599 samples. Even on the 564 updates without a new route
+field, average orders still take 329,776 cycles and the average loop is
+989,074. At frame 16,076, 15 new fields coincide with 1,597,233 orders
+cycles; at 16,902, orders still cost 1,267,104 cycles with zero builds.
+The first post-load frame is the worst overall (2,999,527 cycles), with
+1,240,613 in unit drawing. These counters distinguish several follow-up
+targets. They do not attribute all orders cost to routing or establish
+hardware FPS. Profile the zero-build order tail and first post-load draw
+independently; avoid adding nested timings together.
+
+| Local timing evidence | SHA-256 |
+| --- | --- |
+| Per-update counter observations | `feb42dc222540907733e150f4b7fc2b2515831dbc5e7e3308a21a740714f499f` |
+| Timing and exact replay receipt | `25fa0f624c79ff823d80c3ebff32b93af8262bbe389bac0d8f8d0f127d063938` |
+
+The [optional bulk/fast target link](audits/2026-11-12-target-index-bulk.md#reuse-validated-cells-and-occupancy-bits)
+also passes this mixed battle when composed with Carrier and the regular
+route lookup. It matches the same 43 cuts and the full 32 KiB final SRAM.
+Mean orders fall by 2.23%, from 356,111 to 348,158 cycles. The loop mean
+falls by 0.78% to 998,633 cycles; p95 falls by 0.33% to 1,360,523 and
+the worst loop still takes 2,990,092. IWRAM end falls by 160 bytes (from
+`0x03004d90` to `0x03004cf0`), with EWRAM unchanged at `0x0203a5d8`.
+The comparison does not qualify the other cartridges. Keep the options
+off in regular builds; the mean remains far above the hardware target.
+
+| Local optional build evidence | SHA-256 |
+| --- | --- |
+| Carrier plus fast target link ROM | `9576c0ac5928b999eff3e194218207229b53d2013698f8fafd3351417b7b0ce0` |
+| Optional timing and exact SRAM check | `20c964c75ee00eebaf8bc71d7efe9ff9a7c43158dcee2bf99c1929acd78f368d` |
