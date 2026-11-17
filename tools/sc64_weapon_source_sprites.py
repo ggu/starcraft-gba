@@ -25,6 +25,7 @@ ROM_SHA1 = "a36d91b5aac7bb95df0d7de5f9814f5270e25c2b"
 ANIMS = {"Init": 0, "Death": 1, "GndAttkInit": 2, "GndAttkRpt": 3,
          "AirAttkInit": 4, "AirAttkRpt": 5, "SpecialState1": 6, "WarpIn": 7}
 ANIM_ALIASES = {"GndAttkToIdle": 2, "AirAttkToIdle": 4}
+CULL_OVERLAY_OPCODES = frozenset((8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21))
 MODIFIER_TABLE_BINDING = "inferred from source shift, table dimensions, and pinned renderer; not claimed as native N64 pixel proof"
 
 
@@ -499,10 +500,37 @@ def _profile_rows(report: dict, animations: list[dict], events: list[dict], over
     return sorted(rows, key=lambda r: (r["actor_raw"], r["weapon_id"], r["mode"], r["variant"]))
 
 
+def _frame_cull_radii(frame):
+    width, height = frame["w"], frame["h"]
+    if not width or not height:
+        return 0, 0
+    left = frame["x"] - frame["canvas_w"] // 2
+    mirror = frame["mirror_x"] - frame["canvas_w"] // 2
+    top = frame["y"] - frame["canvas_h"] // 2
+    return (max(abs(left), abs(left + width - 1), abs(mirror), abs(mirror + width - 1)),
+            max(abs(top), abs(top + height - 1)))
+
+
+def _global_cull_bounds(frames, overlays, lo_offsets):
+    """The legacy renderer's whole-bank envelope, evaluated at generation."""
+    if any(o["opcode"] not in CULL_OVERLAY_OPCODES for o in overlays):
+        return 0x40000000
+    frame_x = frame_y = child_x = child_y = 0
+    for frame in frames:
+        rx, ry = _frame_cull_radii(frame)
+        frame_x, frame_y = max(frame_x, rx), max(frame_y, ry)
+    for offsets in (overlays, lo_offsets):
+        for offset in offsets:
+            # Magnitude after C's signed division truncates toward zero.
+            child_x = max(child_x, abs(offset["x"]) // 2)
+            child_y = max(child_y, abs(offset["y"]) // 2)
+    rx, ry = frame_x + child_x, frame_y + child_y
+    return 0x40000000 if max(rx, ry) > 0x7fff else 0x80000000 | (ry << 15) | rx
+
+
 def _profile_cull_bounds(profiles, images, frames, animations, overlays, lo_tables, lo_offsets, events, frame_directory, stats=None):
     """Conservative one-level render envelopes; invalid input falls back globally."""
     invalid = 0x40000000
-    allowed = {8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21}
     def number(value, low, high):
         if type(value) is not int or not low <= value <= high: raise ValueError("field range")
         return value
@@ -539,7 +567,7 @@ def _profile_cull_bounds(profiles, images, frames, animations, overlays, lo_tabl
         for o in overlays:
             for name in ("parent_image", "image_id"): number(o[name],0,65535)
             for name in ("x", "y"): number(o[name],-32768,32767)
-            if number(o["opcode"],0,255) not in allowed: raise ValueError("unknown overlay")
+            if number(o["opcode"],0,255) not in CULL_OVERLAY_OPCODES: raise ValueError("unknown overlay")
         for o in lo_offsets:
             number(o["x"],-128,127); number(o["y"],-128,127)
         for table in lo_tables:
@@ -591,11 +619,8 @@ def _profile_cull_bounds(profiles, images, frames, animations, overlays, lo_tabl
                 for f in frames[first:first+count]:
                     w, h = int(f["w"]), int(f["h"])
                     if w <= 0 or h <= 0: raise ValueError("empty frame")
-                    left = int(f["x"]) - int(f["canvas_w"])//2
-                    mirror = int(f["mirror_x"]) - int(f["canvas_w"])//2
-                    top = int(f["y"]) - int(f["canvas_h"])//2
-                    radius_x = max(radius_x,abs(left),abs(left+w-1),abs(mirror),abs(mirror+w-1))
-                    radius_y = max(radius_y,abs(top),abs(top+h-1))
+                    rx, ry = _frame_cull_radii(f)
+                    radius_x, radius_y = max(radius_x, rx), max(radius_y, ry)
             radius_x += ox; radius_y += oy
             if max(radius_x, radius_y) > 0x7fff: raise ValueError("radius overflow")
             result.append(0x80000000 | (radius_y << 15) | radius_x)
@@ -680,7 +705,7 @@ def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get,
                 events.append({"image_id":image_id,"source_tick":int(event["source_tick"]),"pc":int(event["pc"]),
                                "source_frame":arg0 if event["name"]=="playframe" else 0xFFFF,
                                "opcode":int(event["opcode"]),"flags":0})
-                if int(event["opcode"]) in (8,9,10,11,13,14,15,16,17,19,20,21):
+                if int(event["opcode"]) in CULL_OVERLAY_OPCODES:
                     opcode = int(event["opcode"])
                     ref_index = next((i for i,x in enumerate(visual_refs)
                                       if x.get("source_tick")==event.get("source_tick") and x.get("opcode")==event.get("opcode") and x.get("args")==args), None)
@@ -754,6 +779,8 @@ def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get,
         by_source = {f["source_frame_id"]: i for i,f in enumerate(frames) if f["image_id"] == image["image_id"]}
         frame_directory.extend(by_source.get(i,0xFFFF) for i in range(image["source_frame_count"]))
     bounds = _profile_cull_bounds(profiles, image_rows, frames, animations, overlays, lo_tables, lo_offsets, events, frame_directory, bound_fallbacks)
+    global_bounds = _global_cull_bounds(frames, overlays, lo_offsets)
+    lines.append(f"#define SC64_WEAPON_SOURCE_GLOBAL_BOUNDS_V1 0x{global_bounds:08x}u")
     lines.append("#define SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION 1")
     lines.extend(_c_array("uint32_t", "sc64_weapon_source_profile_bounds", [str(v) + "u" for v in bounds], 8))
     struct_rows("sc64_weapon_source_overlays", "Sc64WeaponSourceOverlay", overlays,
