@@ -1194,7 +1194,10 @@ Covert Ops completed, then completed the Academy and paid 25 minerals
 and 75 gas through the ordinary Barracks Ghost order. A test assertion
 stopped the replay before the Ghost was born. A fresh title-L run restored
 the unfinished Academy and its assigned SCV, and completed the Academy.
-Qualify Ghost completion, Silo and paid research from that match.
+The exact repeat spent 25/75 to queue a Ghost and saved it. Another fresh
+title-L run restored that active queue, trained a Ghost at frame 12,415,
+and saved and fresh-loaded the live actor while preserving the earlier
+queue bank. Qualify the Silo, missile and paid research from that match.
 Finish native timing, other lobbies, combined journals and AI before
 enabling it.
 
