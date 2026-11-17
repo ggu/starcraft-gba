@@ -460,14 +460,34 @@ alone does not explain the corruption. The new binding was verified for
 this clean capture; it did not reproduce the mismatch or establish a
 fix. The short diagnostic stopped at 7,659 with no new controls.
 
-An optional next check would copy a small lower strip spanning row 126
-and an upper control strip from the same GPU image on the same fence.
-Compare those digests with the full readback to help distinguish the
-full copy or its host visibility from the shared source image. Keep
-the exact raw and guest gates, including the independently verified
-attack frame and live target before B.
-
 | Local receipt | SHA-256 |
 | --- | --- |
 | Binding diagnostic receipt | `3037d8f018f6c57ddc9cb0259be6ee9f939e7bfa7106b15714b771ac741138a0` |
 | Binding replay manifest | `cd13e6f101098e9a9645b36986dafdf6a0657cb0468f9782f9650ae6af638ebd` |
+
+### Same-image strip copies match the clean readback
+
+An independent replay copied two 64×16 regions into a second 8 KiB
+buffer on the original scanout command and fence. The queue and map
+again agreed on generation 7,609, and both strips were copied and
+mapped successfully. The 98 archived command rows, all three raw
+frames and the exact guest row matched through 7,659. No later inputs
+were sent.
+
+| Region | RGB digest (both copies and clean archive) | Pixels differing between the copies (RGBA) |
+| --- | --- | --- |
+| x=0–63, y=94–109 | `ae03524a7862768d` | 0 |
+| x=0–63, y=118–133 (includes the earlier row 126 mismatch) | `8353b738ad951e40` | 0 |
+
+The intermittent mismatch did not recur. This verifies the comparison
+path on a clean frame but does not distinguish the original destination
+or host visibility from a bad shared source image. Keep the strip probe
+as diagnostic evidence if the fault recurs. The 21,308 handoff and new
+cursor calibration still need testing. Preserve the exact raw and guest
+gates, including the independently verified attack frame and live target
+before B.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Strip diagnostic receipt | `4af5e28882b86bfbee641d7a519db09c13362c9654e54761b7a1de0388dd000b` |
+| Strip replay manifest | `994a73a688bde01275fad6922d467abc1632015d71797ad5ae3de2188698df2f` |

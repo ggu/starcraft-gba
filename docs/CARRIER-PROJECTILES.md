@@ -916,10 +916,10 @@ and at the wider phase boundaries were also identical within each pair.
 
 The IRQ margin was 120 bytes in each sample. These intervals are not
 full-pool, sustained-battle or physical hardware qualification, and do not
-show a routing speedup with Carrier. The mixed Z10 check below adds a
-denser battle and computer purchases. Repeat with human-paid production,
-the other two combined builds, older stock journals, and hardware before
-switching regular targets.
+show a routing speedup with Carrier. The mixed battles below add computer
+purchases and busier saves on all three combined previews. Repeat with
+human-paid production, older stock journals, and hardware before switching
+regular targets.
 
 | Local paired receipt | SHA-256 |
 | --- | --- |
@@ -1017,3 +1017,107 @@ qualifies a full pool, every AI lineup, a win, or GBA SP performance.
 | --- | --- |
 | Paired 1,000-update receipt | `98a44e3b4cc3e30bd0ae623bfbb62be4377dd652d743bdf9b3950e4c70ff7bf7` |
 | Identical final payload | `683e6cb3486ba2a470f264abe9593a09d70ca97f2b71f8187ee9e17c87be6e96` |
+
+#### Where the mixed battle spends its cycles
+
+A read-only repeat on the exact combined Z10 cartridge starts from the
+same journal, matches all 43 watched cuts and takes the same
+1,006,866,202 emulated clock cycles. The sum of 1,000 per-update loop
+counters independently matches the cartridge's accumulated loop timer.
+The small clock/counter difference is outside the measured loop body.
+
+| Scope | Mean cycles | p95 cycles |
+| --- | ---: | ---: |
+| Complete loop | 1,006,460 | 1,365,093 |
+| Game update | 647,780 | 1,003,959 |
+| Orders (inside update) | 356,111 | 624,570 |
+| Sight (inside update) | 36,670 | 45,761 |
+| Audio, drawing and presentation (after update) | 358,680 | 508,073 |
+| Map draw (within drawing) | 238,181 | 388,088 |
+| HUD draw (within drawing) | 91,313 | 119,131 |
+
+None of the 1,000 loops fits the 561,792-cycle target. Game update alone
+exceeds it on 599 samples. Even on the 564 updates without a new route
+field, average orders still take 329,776 cycles and the average loop is
+989,074. At frame 16,076, 15 new fields coincide with 1,597,233 orders
+cycles; at 16,902, orders still cost 1,267,104 cycles with zero builds.
+The first post-load frame is the worst overall (2,999,527 cycles), with
+1,240,613 in unit drawing. These counters distinguish several follow-up
+targets. They do not attribute all orders cost to routing or establish
+hardware FPS. Profile the zero-build order tail and first post-load draw
+independently; avoid adding nested timings together.
+
+| Local timing evidence | SHA-256 |
+| --- | --- |
+| Per-update counter observations | `feb42dc222540907733e150f4b7fc2b2515831dbc5e7e3308a21a740714f499f` |
+| Timing and exact replay receipt | `25fa0f624c79ff823d80c3ebff32b93af8262bbe389bac0d8f8d0f127d063938` |
+
+The [optional bulk/fast target link](audits/2026-11-12-target-index-bulk.md#reuse-validated-cells-and-occupancy-bits)
+also passes this mixed battle when composed with Carrier and the regular
+route lookup. It matches the same 43 cuts and the full 32 KiB final SRAM.
+Mean orders fall by 2.23%, from 356,111 to 348,158 cycles. The loop mean
+falls by 0.78% to 998,633 cycles; p95 falls by 0.33% to 1,360,523 and
+the worst loop still takes 2,990,092. IWRAM end falls by 160 bytes (from
+`0x03004d90` to `0x03004cf0`), with EWRAM unchanged at `0x0203a5d8`.
+The comparison does not qualify the other cartridges. Keep the options
+off in regular builds; the mean remains far above the hardware target.
+
+| Local optional build evidence | SHA-256 |
+| --- | --- |
+| Carrier plus fast target link ROM | `9576c0ac5928b999eff3e194218207229b53d2013698f8fafd3351417b7b0ce0` |
+| Optional timing and exact SRAM check | `20c964c75ee00eebaf8bc71d7efe9ff9a7c43158dcee2bf99c1929acd78f368d` |
+
+#### Mixed Blood Bath on Terran and Showcase
+
+The pinned combined Terran and Showcase previews used the normal HOME
+menu and began with erased SRAM. In each free-for-all, the human was
+Terran and gave no field orders before saving. The Protoss computer in
+the first seat paid 350 minerals and 250 gas when its Stargate queued a
+Carrier, then paid 25 minerals for an Interceptor order that produced a
+child on the next update. These purchases were observed separately from
+the later combat samples.
+
+| Product | AI seats in order | Carrier payment frame | Interceptor payment frame |
+| --- | --- | ---: | ---: |
+| Terran | Protoss, Zerg, Terran | 12,048 | 17,712 |
+| Showcase | Protoss, Terran, Zerg | 11,616 | 19,152 |
+
+Each later window covers 192 game updates and 13 observed cuts. Terran
+has room for 192 units, 96 buildings, 100 shots and 32 impacts. Showcase
+has room for 240 units, 160 buildings, 95 shots and 32 impacts.
+
+| Product | Battle frames | Live units | Peak buildings / shots / impacts | Cuts with active Interceptor shots | Emulated cycles |
+| --- | --- | --- | --- | ---: | ---: |
+| Terran | 17,842–18,034 | 85–87 | 47 / 3 / 5 | 7 | 167,236,040 |
+| Showcase | 19,192–19,384 | 98–102 | 57 / 12 / 5 | 11 | 261,654,407 |
+
+The observed averages were 871,021 and 1,362,783 emulated cycles per
+update, respectively. Both exceed the 561,792-cycle budget for a 30 fps
+GBA update. The windows use different seat orders and are not a direct
+performance comparison between products or a GBA SP measurement.
+
+START/B at the final frame wrote a sequence-1 compact journal on each ROM.
+Fresh title L restored the watched world and active shots. The entire
+32 KiB SRAM re-export matched the guest's save byte for byte. Stack
+minima cover only the measured battle, save, and separate reload.
+
+| Product | Saved payload bytes | Shots / impacts at save | SYS minimum in battle / save / reload | IRQ minimum |
+| --- | ---: | --- | --- | --- |
+| Terran | 13,752 | 3 / 0 | `0x03007828` / `0x03006fc0` / `0x03006a98` | `0x03007e98` |
+| Showcase | 16,154 | 2 / 3 | `0x0300753c` / `0x0300753c` / `0x030072e0` | `0x03007e98` |
+
+The IRQ margin was 152 bytes in both runs. The minimum SYS margin was
+6,808 bytes on Terran and 8,928 on Showcase. The receipt index includes
+both individual receipts and SRAM hashes; SHA-256:
+`6fb90a44bfab8675b06e3c59ef41e34c409433c45dfff39b0c6e4fe1bdcc8852`.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Terran ARM receipt | `5fdce6581b3d1bf4d0f4bb607361b987ba53de7e35743486fee4176e675b77a2` |
+| Showcase ARM receipt | `5c12d4f282f3d07d9af17a3976cf33f06e9b11ebef35014c4cc18f69731b0ac9` |
+
+The three combined previews now have a mixed Blood Bath CPU purchase and
+live-shot reload witness. Human-paid production on those combined builds,
+longer Terran and Showcase continuations, full pools, broader journal
+compatibility and failure cases, and physical stack and battle timing
+remain separate gates.
