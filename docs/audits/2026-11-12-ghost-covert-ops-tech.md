@@ -463,6 +463,28 @@ written. Disk guards passed at start and finish (15,631,990,784 and
 | Controller inputs | `aa27ab6dcb68b3e3c87e1c9a6c0dc1de1781ac90cc090cf10503447421696753` |
 | Refinery, cargo, and deposit result | `dbcfdcd678820ee0b102982bf93aa46189e4d90cdd8118b0100c054c46798819` |
 
+### Blank Blood Bath Factory affordability
+
+A blank replay repeated the Barracks and gas checkpoints. At frame
+2,994, an ordinary Command Center training order paid 50 minerals for
+a fifth SCV (408 to 358 minerals, with gas unchanged at eight). At
+frame 4,564 the bank was 766 minerals and 104 gas, enough for a
+Factory. The fifth SCV was alive and mining in slot 16. SCV 0 still
+worked the Refinery and SCVs 1–3 still had mineral orders.
+
+The fifth SCV disappeared from its slot during the following cursor
+selection. The replay did not establish why and stopped before placing
+a Factory. It produced no save. In the next attempt, select the newly
+trained worker as soon as it appears and keep it available near the
+intended site while the original four workers gather. If enemies reach
+the base, use ordinary combat orders and verify the builder is still
+alive before making the paid placement.
+
+| Blank Factory affordability receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `b9e0597991f0e8197fe263cf81fe37a09f340936fdd81ed05f953a85371b866e` |
+| Paid SCV and funded Factory checkpoint | `759b326120d31620074653872a85727e1654a9448ae212bdcd50819982ebd89d` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed from blank:
 
@@ -486,9 +508,10 @@ and costs (minerals/gas). They have not been replayed from blank:
 
 The combined ARM save checks cover painting, descent, and one
 malformed-receipt fallback in a prepared Terran custom game on map 0
-with one Terran computer. Blood Bath has a separate blank opening
-proof through Barracks and first gas. Remaining gates include the rest of the
-blank tech path and its journal, ARM rejection without a valid
+with one Terran computer. The separate blank Blood Bath checks show a
+completed Barracks and Refinery, gas deposits, and Factory affordability.
+Factory placement and the rest of the blank tech path and its journal
+remain open, as do ARM rejection without a valid
 predecessor, mixed and multi-opponent journal coverage, descent with
 other Silos still armed, composition with Carrier and other research
 journals, campaign payer provenance, measured load stack high-water,
