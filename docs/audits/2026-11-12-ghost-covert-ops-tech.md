@@ -659,14 +659,40 @@ retained separately.
 | ARM-written infrastructure SRAM | `82075f29dc1a4c0ddc2257ded34ec4ed6d1f9f3cc62993cb6c0d5c165028a191` |
 | Parallel builds, checkpoint, and Ghost payment result | `032dfa33cb8ad0f731075129293941d10ad9bc1694d7529bd3eed7e77124ffa4` |
 
+### Fresh parallel-infrastructure reload
+
+A fresh `SCCT` process loaded the actual sequence 3 save through title
+L and matched frame 10,972, the 854/80 wallet, the sparse lobby, the
+completed Depot and attached Covert Ops, the original gather orders
+and cargo, and the Academy's unfinished 1,035 progress and 432 HP.
+SCV 16 was still building that Academy. The replay read each worker
+separately, including the builder.
+
+An ordinary Move order regrouped all five existing Marines toward
+`(128, 80)` at frame 11,001. SCV 3 paid exactly 100 minerals for a
+Bunker at `(112, 160)` at frame 11,050 (862/88 to 762/88). The
+reloaded Academy completed at frame 11,440 with 572 of 600 HP.
+The attached Covert Ops still qualified and the Barracks offered
+Ghost through R. The replay then stopped because its combined queue
+item and wallet check after A failed. It did not log which of those
+fields differed. There was no new queued or live Ghost save; the
+earlier paid Ghost result above came from a separate continuation
+with different defense orders.
+
+| Infrastructure reload receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `9f5e56627f7308fcb9415d3c7e50a607a57c6e3081db38cf1f8de6e50200d725` |
+| Fresh load, defensive orders, and Academy completion result | `7e167d32d9b91c6cb529c321d6ac59745daaa85a1a9b0bccb49795a91e7a1406` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed on the match
 that started from blank:
 
-1. Load the infrastructure checkpoint, finish its Academy, and
-   observe the paid Barracks Ghost through birth. Check the actual
-   producer, active defenses, and queued product during the wait;
-   observe changes to workers separately. The opening Barracks blocks the
+1. Starting from the now verified infrastructure load, log the
+   exact before and after fields of the Barracks A click, then
+   observe the paid Ghost through birth. Track the producer, queued
+   product, active defenses and individual workers separately.
+   The opening Barracks blocks the
    first Command Center's socket at `(112, 128)`. Build a second
    Command Center with a clear socket and keep it free of a Comsat
    so the completed Science Facility and Covert Ops can unlock a
@@ -684,9 +710,10 @@ with one Terran computer. The separate blank Blood Bath checks show a
 completed Barracks and Refinery, gas deposits, and a Factory, Starport,
 and Science Facility built and restored over a baseline journal. They
 also show an attached Covert Ops, a completed Academy and Supply Depot,
-and a paid Ghost in one continuous branch with an intermediate SRAM
-checkpoint. Remaining gates include completing Ghost production,
-qualifying the Covert journal in the blank-origin match, ARM rejection without a
+and a paid Ghost in one continuous branch with a separately verified
+intermediate SRAM reload. Remaining gates include completing Ghost
+production, qualifying the Covert journal in the blank-origin match,
+ARM rejection without a
 valid predecessor, mixed and multi-opponent journal coverage, descent
 with other Silos still armed, composition with Carrier and other
 research journals, campaign payer provenance, measured load stack
