@@ -20,8 +20,22 @@ Fresh host controller runs with the regular P10 flags also won P1 at frame
 25,621 (26,082 input calls; rescued hero alive), P2 at frame 33,803 (35,864
 calls; rescued hero alive), and P3 at frame 45,951 (46,735 calls; no enemy
 buildings). The P1/P2 input tapes are byte-for-byte identical to the archived
-winning staged tapes. This verifies the routes on the host; only the
-normal-ROM replays above establish current ARM wins here.
+winning staged tapes.
+
+P1 also won on the current regular ARM ROM after a fresh SRAM load. At
+call 478 (frame 448), with no buttons held, START and pause-menu B wrote
+the first journal to an empty cartridge. A separate emulator process
+loaded it with L from HOME, matching the pre-save game observations and
+all eight selected units. The unchanged input tape then reached the same
+victory at frame 25,621 with all 27 checkpoints, all six briefing pages,
+and all nine gameplay dialogue acknowledgments matched.
+
+The P2 save made the same immediate round trip at call 440 (frame 372)
+with six selected units. Checkpoint 1,000 matched, but at call 2,000 the
+resumed run had three player buildings instead of five. An uninterrupted
+run on the same ARM ROM passed that checkpoint with five buildings and
+won at frame 33,803 with all 36 checkpoints, 14 briefing pages, and six
+gameplay dialogue acknowledgments matched. The saved route stays open.
 
 | Local evidence (SHA-256) | Digest |
 | --- | --- |
@@ -30,6 +44,9 @@ normal-ROM replays above establish current ARM wins here.
 | P4 ARM receipt | `453910dd2232230f3f3d129d3a98ce6474ab03c5ce3f87ccc0513505800a8ea0` |
 | P5 ARM receipt | `48dd677bdc4215c416c18bcc10dd0026a25d98017d7195194c5e8604f078b65b` |
 | P6 ARM receipt | `b6be0f54215551d7068b20934bf5af33ccaf9db9c0cc826a2814b187a8cb9480` |
+| P1 fresh SRAM win receipt | `f0a84a77b7159b6d109532c16dfc93bcdbd4d5e7df9a70d86614b66788529861` |
+| P2 uninterrupted ARM receipt | `2a961c2f3d49463e85724ec216d7db41a3a1add9af93c31fae1b36746a85cf9d` |
+| P2 first divergent checkpoint | `4c0b3a920082da3b7dfd1991aaa799fb70d29f549a6cb9111904e46f410cca40` |
 | P1 host input tape | `70259667d448fabb7efc898e7674c6f051ac87f9e3f65ab414069bde818d94be` |
 | P2 host input tape | `a1ab751c4e7cab20c1859405453a29196ab8e8c749da6296347b390f8652ab0b` |
 | P3 host input tape | `0a0540f40220daf10fa88c682caaccf0064128a2ceeb68d84dd854e5062cc95b` |
