@@ -438,24 +438,46 @@ the 5.25 GiB disk guard passed at both ends.
 | Controller inputs | `1e78300ea8c3d06cd9444ec134b79e65bfafd1dbfcb1a3118e0d836944453d15` |
 | Opening, foundation, and completion result | `e9fd821c60639dae84eb65ba73cc7d73e198c73eead7c8db79d4894b26b60820` |
 
+### Blank Blood Bath Refinery and first gas deposit
+
+The same ROM started without SRAM and replayed the earlier controller
+inputs, matching the completed Barracks and its wallet at frame 1,941.
+Select the original builder, open B, choose Refinery (100 minerals),
+and use A on the home geyser at `(32, 208)`. SCV slot 0 accepted the
+order at frame 2,009. Building slot 5 held its foundation by frame
+2,077. The sampled wallet went from 332 to 240 around the 100-mineral
+construction charge, a net 92 because mining continued. The same
+Refinery finished at frame 2,837 with 750 HP.
+
+With the original SCV selected, press A on the completed Refinery.
+The worker took the gas order for Refinery slot 5 at frame 2,840,
+carried eight gas at frame 2,918 with the bank still at zero, and
+deposited it by frame 2,958. Its cargo and gas flag cleared on deposit.
+SCVs 1, 2, and 3 continued their mineral orders and the mineral bank
+rose from 376 to 400 during the gas trip. No save or guest memory was
+written. Disk guards passed at start and finish (15,631,990,784 and
+15,630,901,248 bytes free).
+
+| Blank gas receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `aa27ab6dcb68b3e3c87e1c9a6c0dc1de1781ac90cc090cf10503447421696753` |
+| Refinery, cargo, and deposit result | `dbcfdcd678820ee0b102982bf93aa46189e4d90cdd8118b0100c054c46798819` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed from blank:
 
-1. Place a Refinery (100/0) on the home geyser. Once complete, select
-   an SCV and press A on the Refinery. Observe its gas order and an
-   actual deposit while retaining enough SCVs on minerals.
-2. The completed Barracks unlocks Factory (200/100) and Academy
+1. The completed Barracks unlocks Factory (200/100) and Academy
    (150/0). Build the Factory, then a Starport (150/100), then a
    Science Facility (100/150). These are SCV builds. Leave room on
    the Science Facility's right for the add-on at `(x + 48, y + 8)`.
-3. Select the completed Science Facility and choose Covert Ops (50/50)
+2. Select the completed Science Facility and choose Covert Ops (50/50)
    in its B menu. Verify completion at the socket and retain the
    attached facility. The Academy and Covert Ops together unlock a
    Ghost (25/75) at the Barracks. Select the Barracks, cycle to the
    Ghost with R, and train with A. Keep the Command Center socket
    free of a Comsat so the completed Science Facility and Covert Ops
    can unlock a Nuclear Silo (100/100) there.
-4. Build enough Supply Depots (100/0 each) for the Ghost and missile.
+3. Build enough Supply Depots (100/0 each) for the Ghost and missile.
    Arm the completed Silo from its B menu (200/200, eight supply
    and 1,500 source ticks). Pay for Ocular from the attached Covert
    Ops (100/100) and save while it's pending. The next persistence
@@ -465,7 +487,7 @@ and costs (minerals/gas). They have not been replayed from blank:
 The combined ARM save checks cover painting, descent, and one
 malformed-receipt fallback in a prepared Terran custom game on map 0
 with one Terran computer. Blood Bath has a separate blank opening
-proof through Barracks only. Remaining gates include the rest of the
+proof through Barracks and first gas. Remaining gates include the rest of the
 blank tech path and its journal, ARM rejection without a valid
 predecessor, mixed and multi-opponent journal coverage, descent with
 other Silos still armed, composition with Carrier and other research
