@@ -780,15 +780,33 @@ it does not yet prove it survives the subsequent attack wave.
 | ARM-written defended fork SRAM | `6b0e3375b8e268de59eb20e2cac894e2b9e18e26e060a5889e7d92c59e4a0cd4` |
 | Defense, economy, Command Center, and reload result | `c6b4479d09de91ae55a6f92c9871b7d01843ac249a892cb3a37fbeeb66dbbd38` |
 
-The next milestones below follow this preview's custom-game catalog
-and costs (minerals/gas). They have not been replayed on the match
-that started from blank:
+The continuation from that defended bank paid for the north Starport,
+the outer Bunker and three Marines through ordinary controls. The
+Starport was complete at 1,300 HP by frame 11,408. At this checkpoint
+both Command Centers and both Bunkers were alive, but the second
+Bunker had no verified passengers. START/B wrote sequence 3 with a
+15,852-byte payload and two pending impacts. Independent verification
+matched its stored checksum and the entire earlier sequence-2 bank.
+The new bank has not yet been fresh-loaded. At frame 11,499, SCV 16
+placed a Science Facility foundation at `(288, 96)` for a net debit
+of 100 minerals and 150 gas. The building was absent during the
+completion wait. No Science Facility completion, Covert Ops or Silo
+was observed on this branch. The next attempt should start with the
+paid Starport bank and defend the construction site before spending.
 
-1. Continue from the defended fork and build the Starport (150/100),
-   Science Facility (100/150), and attached Covert Ops (50/50)
-   while protecting the base. Keep the verified second Command
-   Center's socket free of a Comsat and pay 100/100 for the Silo
-   once Science and Covert are complete.
+| Defended Starport and Science attempt | SHA-256 |
+| --- | --- |
+| Controller inputs | `3a083d78330685e4172ed4782ff09bd6fc65d3e46dd19e8cc69080135a1fafa5` |
+| ARM-written Starport SRAM | `2ee52bdd3509d763141a82ab9c61b76afd5c6f19a388e2b0384ec5e55748e5b4` |
+| Starport and Science attempt receipt | `df65852bf683ee3131b9f716d963950eb3848ac97885c60652ad5f2e3038e4a1` |
+
+The remaining milestones follow this preview's custom-game catalog
+and costs (minerals/gas):
+
+1. Fresh-load the defended Starport and complete the Science Facility
+   (100/150) and attached Covert Ops (50/50) while protecting the base.
+   Keep the second Command Center's socket free of a Comsat and pay
+   100/100 for the Silo once Science and Covert are complete.
 2. Build enough Supply Depots (100/0 each) for the Ghost and missile.
    Arm the completed Silo from its B menu (200/200, eight supply
    and 1,500 source ticks). Pay for Ocular from the attached Covert
