@@ -558,15 +558,45 @@ passed (17,776,709,632 bytes free before and 17,695,813,632 after).
 | Actual ARM-written SRAM | `0f6c861c0582911012c3cc0d0706c02ce3366e3afae2b6fede0c1789d53205ab` |
 | Build, save, and fresh load result | `427a9bbaac20e596dc393bb5913cba15fe452f42478914fb73bc4868154331a5` |
 
+### Blank-origin Blood Bath Covert Ops and Academy
+
+A fresh `SCCT` process used title L on the Science Facility SRAM and
+matched frame 9,909 at 1,002 minerals and 66 gas. Select the Science
+Facility and choose Covert Ops in its B menu. The order paid 50/50
+at frame 9,914 (1,002/66 to 952/16) and placed the owned add-on in
+slot 24 at `(264, 176)`, the socket for Facility slot 23. With the
+original mining and gas orders still active, the fifth SCV placed
+an Academy at `(160, 192)` at frame 9,938, paying exactly 150/0.
+At frame 11,438 the Academy was complete in slot 25 at 600 HP. The
+same Covert Ops was also complete at the Science Facility's socket,
+with 556 of 750 HP.
+
+Supply was short of the room needed for Ghost production. An ordinary
+SCV build order placed a Supply Depot in slot 27 at `(104, 168)` by
+frame 11,525, charging exactly 100 minerals and no gas. At frame
+12,285, while play was still active and the Depot was not observed
+complete, the SCV's direct and aligned row reads agreed: slot 16 was
+no longer alive and its HP was −4. The run did not identify an attacker.
+It ended before a Ghost purchase and produced no new SRAM.
+
+For the next attempt, build the needed Depot earlier or choose a
+site closer to the Marine group. Keep a backup SCV available, use
+ordinary orders to defend the builder, and save as soon as the core
+infrastructure is complete so a later unit loss cannot erase the
+proof of the preceding build sequence.
+
+| Blank-origin Covert and Academy receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `f636a1af068a96427d397a00fe0027d6e6fb644c26c67ed27e820a56298b7801` |
+| Paid structures, completions, and builder stop | `d65319d839fab21908b82a85b215fd4e0f72d7f89baf58609b28c5af095fd086` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed on the match
 that started from blank:
 
-1. Build an Academy (150/0), which the Barracks unlocks. Select the
-   completed Science Facility and choose Covert Ops (50/50) in its
-   B menu. Verify completion at the socket and retain the
-   attached facility. The Academy and Covert Ops together unlock a
-   Ghost (25/75) at the Barracks. Select the Barracks, cycle to the
+1. Complete a Supply Depot to free capacity for the Ghost. The
+   Academy and Covert Ops together unlock a Ghost (25/75) at the
+   Barracks. Select the Barracks, cycle to the
    Ghost with R, and train with A. The opening Barracks blocks the
    first Command Center's socket at `(112, 128)`. Build a second
    Command Center with a clear socket and keep it free of a Comsat
@@ -583,9 +613,10 @@ The combined ARM save checks cover painting, descent, and one
 malformed-receipt fallback in a prepared Terran custom game on map 0
 with one Terran computer. The separate blank Blood Bath checks show a
 completed Barracks and Refinery, gas deposits, and a Factory, Starport,
-and Science Facility built and restored over a baseline journal.
-Remaining gates include the Covert add-on and its journal in the
-blank-origin match, ARM rejection without a
+and Science Facility built and restored over a baseline journal. They
+also show an attached Covert Ops and a completed Academy in play.
+Remaining gates include training the Ghost and qualifying the Covert
+journal in the blank-origin match, ARM rejection without a
 valid predecessor, mixed and multi-opponent journal coverage, descent
 with other Silos still armed, composition with Carrier and other
 research journals, campaign payer provenance, measured load stack
