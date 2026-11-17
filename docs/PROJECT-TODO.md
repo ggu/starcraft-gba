@@ -1157,10 +1157,11 @@ The [Covert Ops draft](https://github.com/ggu/starcraft-gba/pull/411)
 restored both painting and descent on ARM from prepared Terran saves,
 matched the uninterrupted blast, and rejected a malformed newer record
 without changing SRAM. A separate blank Blood Bath run paid for its
-Barracks and Refinery, then deposited its first 8 gas through ordinary
-controls with three other SCVs mining. Next: complete the Factory
-through Covert Ops chain from blank; qualify the
-resulting Ghost/Silo and paid research save. Finish native timing,
+Barracks and Refinery, then kept three SCVs on minerals while mining gas.
+The same match built and fresh-loaded a Factory, then a Starport and
+Science Facility, preserving the earlier bank. Next: complete Academy
+and Covert Ops, then qualify the resulting Ghost/Silo and paid research
+save from that blank-origin match. Finish native timing,
 other lobbies, combined journals and AI before enabling it.
 
 Other core rules to prioritize after this:
