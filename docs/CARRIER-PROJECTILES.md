@@ -915,11 +915,11 @@ and at the wider phase boundaries were also identical within each pair.
 | Showcase | 12,888 → 13,080 | 185,794,057 | `0x030072e0` / `0x03007e78` | 43 / 20 / 2 / 1 |
 
 The IRQ margin was 120 bytes in each sample. These intervals are not
-full-pool, sustained-battle or physical hardware qualification, and the
-sample does not show a routing speedup with Carrier. Repeat paid Carrier
-and Interceptor production on the combined builds, exercise true dense
-custom fights and the older stock journal generations, and measure
-hardware before switching regular targets.
+full-pool, sustained-battle or physical hardware qualification, and do not
+show a routing speedup with Carrier. The mixed Z10 check below adds a
+denser battle and computer purchases. Repeat with human-paid production,
+the other two combined builds, older stock journals, and hardware before
+switching regular targets.
 
 | Local paired receipt | SHA-256 |
 | --- | --- |
@@ -950,3 +950,52 @@ byte for byte without a save command.
 This checks a semantic compact-to-compact fallback. Fallback to a stock
 bank behind an invalid compact record, additional corruption patterns,
 pre-cargo writer migration, and cross-product refusal are separate cuts.
+
+#### Mixed Blood Bath battle from blank SRAM
+
+The combined Z10 preview above entered Blood Bath through the ordinary
+HOME menu from blank SRAM. The human played Zerg with Zerg, Terran and
+Protoss in the three computer seats, in free-for-all. After launch the
+controller held no buttons until the save. The observer did not write
+guest memory.
+
+Two separate purchase cuts verified payments from the Protoss computer's
+wallet. At frame 12,704 a new Stargate Carrier order debited 350 minerals
+and 250 gas. At frame 15,344 a new Interceptor order debited 25 minerals;
+the Interceptor was present in the actor pool on the next update. This
+proves computer production in this match. The human did not buy either
+unit.
+
+The later battle window covered 192 world updates, from frame 15,735 to
+15,927. Across the 13 watched samples, unit occupancy ranged from 101 to
+104 of 240 slots, and 50 of 160 building slots were occupied. Six samples
+showed active Interceptor shots; the sampled peaks were two of 100 shots
+and four of 32 pending impacts. The capture contains 194,125,588 emulated
+cycles for the window (1,011,071 per update on average), with 691 audio
+IRQ callbacks. That is about 1.80 times the 561,792-cycle budget for a
+30 fps update on GBA. These cycles are an emulator measurement, not a
+GBA SP frame-rate result.
+
+Ordinary START/B at frame 15,927 committed a valid sequence-1
+`0x564e5a61` journal with a 14,132-byte payload. One active Interceptor
+shot and four pending impacts survived a fresh title-L load. The watched
+world and complete 32 KiB SRAM re-export matched the save. The calibrated
+observer saw SYS/IRQ minima of `0x03007898`/`0x03007e98` in the measured
+battle and save, and `0x03007268`/`0x03007e98` on fresh load. The smallest
+margins in those phases were 8,808 bytes above the SYS guard and 152
+bytes above the conservative IRQ boundary. The observer was armed for
+the battle, save and separate reload, so it did not measure opening
+stack use.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Mixed Blood Bath receipt | `b8529d8aa00e6c9307516b545d12b27a6609f9cad120f0293302d7dff0543b6d` |
+| Guest SRAM and fresh re-export | `fa70c0a04fed55fcb0e7c076271bda9d6cfcdb29bc50c8069e035d3ac5524f38` |
+
+For the next sustained check, continue the genuine frame-15,927 journal
+for at least 1,000 world updates. Record occupancy and ordinary computer
+purchases, and compare an uninterrupted route with a fresh load of a new
+mid-battle save. Cover bounded instruction windows around the busiest
+fight and save/load without claiming stack observations in between. This
+match does not qualify a full pool, every AI lineup, a win, or hardware
+performance.
