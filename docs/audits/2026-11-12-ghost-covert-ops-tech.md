@@ -745,16 +745,50 @@ guards passed before and after the replay.
 | ARM-written live Ghost SRAM | `c420f6423f6bcfce5c368c2f29d73ddde9cf9684211440491e57d4aabfde40d8` |
 | Queue, birth, and fresh restore result | `ef46d61e1bf9ef0c57ea5a852ac862237c086377ee7c1a03b471ed8d0e707584` |
 
+### Earlier defended Blood Bath fork for the Silo
+
+The live-Ghost checkpoint no longer contained the science buildings.
+This separate branch instead reloaded the actual Factory sequence 1
+at frame 6,096 with 616 minerals and 92 gas. Its original Barracks
+blocked the first Command Center's eastern add-on socket. The fork
+prepared new defenses, gas income, and a second Command Center before
+rebuilding the science path.
+
+Normal B/A construction placed a Depot and Bunker with separate
+SCVs. Both were complete by frame 6,874 with 500 and 350 HP. Two
+paid Marine orders supplemented the three original Marines; a clean
+R group selection and A on the Bunker boarded four by frame 6,993
+(slots 17, 21, 23, 32). The diverted mineral SCV returned to its
+original patch. The main Command Center paid 50 minerals for another
+SCV, and ordinary A at the Refinery assigned it alongside the
+original gas worker. SCV 37 carried eight gas and had deposited it
+by frame 7,666; the original three mineral orders remained active.
+
+The idle builder paid exactly 400 minerals for Command Center slot
+21 at `(208, 72)` at frame 7,776. At frame 10,032 it was complete
+at 1,500 HP, its prospective Silo socket `(256, 80)` was clear, and
+the wallet was 586/468. The Bunker still contained all four watched
+Marines. START/B wrote baseline sequence 2 with a 15,832-byte
+payload, preserved the original Factory bank, and a fresh title-L
+load matched the watched structures, garrison, workers and wallet.
+The fork proves that state is recoverable through ordinary controls;
+it does not yet prove it survives the subsequent attack wave.
+
+| Defended Factory fork receipt | SHA-256 |
+| --- | --- |
+| Controller inputs | `4ac0358afc0260f2f20714548db67f3154cfa40c15f919e32195e724395229c7` |
+| ARM-written defended fork SRAM | `6b0e3375b8e268de59eb20e2cac894e2b9e18e26e060a5889e7d92c59e4a0cd4` |
+| Defense, economy, Command Center, and reload result | `c6b4479d09de91ae55a6f92c9871b7d01843ac249a892cb3a37fbeeb66dbbd38` |
+
 The next milestones below follow this preview's custom-game catalog
 and costs (minerals/gas). They have not been replayed on the match
 that started from blank:
 
-1. Use an earlier checkpoint and protect or rebuild the science
-   structures before attempting to arm a missile. The opening Barracks blocks the
-   first Command Center's socket at `(112, 128)`. Build a second
-   Command Center with a clear socket and keep it free of a Comsat
-   so the completed Science Facility and Covert Ops can unlock a
-   Nuclear Silo (100/100) there.
+1. Continue from the defended fork and build the Starport (150/100),
+   Science Facility (100/150), and attached Covert Ops (50/50)
+   while protecting the base. Keep the verified second Command
+   Center's socket free of a Comsat and pay 100/100 for the Silo
+   once Science and Covert are complete.
 2. Build enough Supply Depots (100/0 each) for the Ghost and missile.
    Arm the completed Silo from its B menu (200/200, eight supply
    and 1,500 source ticks). Pay for Ocular from the attached Covert
