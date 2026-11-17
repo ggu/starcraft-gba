@@ -222,8 +222,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finds the differing RGB bytes already present at the readback fence.
   A [clean binding replay](audits/2026-11-14-native-result-opening.md#clean-readback-verifies-the-buffer-and-fence-binding)
   verifies the queued buffer and fence despite the same wrapper label
-  offset. A small second copy from the same GPU image could help isolate
-  the intermittent fault. The later 21,308 handoff remains untested.
+  offset. A [same-image strip comparison](audits/2026-11-14-native-result-opening.md#same-image-strip-copies-match-the-clean-readback)
+  matches both copies and the archive in one clean run; retain the probe
+  if the fault recurs. The later 21,308 handoff remains untested.
   Recalibrate with bounded cursor-only input after exact replay,
   then verify live Marine selection and the exact Extractor attack
   frame before B. Continue toward the last structure and published
