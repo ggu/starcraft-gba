@@ -30,6 +30,12 @@ typedef struct {
 int sc64_pool_init(Sc64Arena *a);
 int sc64_pool_acquire(Sc64Arena *a, uint8_t *ordinal, uint8_t *native_index);
 int sc64_pool_retire(Sc64Arena *a, uint8_t ordinal);
+/* Only for an exclusively owned live arena from init or validated decode,
+ * maintained by checked pool mutators and domain-valid row updates. Use an
+ * ordinal from the active chain. Check the splice, not unseen rows; retain
+ * the complete validator on incoming packets and save/export. Like strict
+ * retirement, leaves non-list fields in the newly free row unchanged. */
+int sc64_pool_retire_live(Sc64Arena *a, uint8_t ordinal);
 int sc64_pool_validate(const Sc64Arena *a);
 /* Bounded list cursor for the exclusively owned runtime arena. Returns 255
  * on malformed head metadata, SC64_END for an empty active list. */
@@ -67,6 +73,9 @@ uint8_t sc64_native_index(uint8_t ordinal);
 int sc64_compact_pool_acquire(Sc64Arena *a, unsigned cap,
                               uint8_t *ordinal, uint8_t *native_index);
 int sc64_compact_pool_retire(Sc64Arena *a, uint8_t ordinal);
+/* Live retirement with the same exclusive-ownership contract and compact
+ * canonicalization of all non-list fields in the newly free row. */
+int sc64_compact_pool_retire_live(Sc64Arena *a, uint8_t ordinal);
 /* Worst-case bytes, or zero for invalid cap. */
 size_t sc64_compact_codec_max_bytes(unsigned cap);
 /* Returns the bytes written, or zero on rejection. Writes only those bytes. */

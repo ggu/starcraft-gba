@@ -56,10 +56,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finds 648k cycles in game update and 359k after update per loop on
   average. A [separate order breakdown](audits/2026-11-17-z10-order-tail.md)
   attributes 995k cycles of the worst zero-build update to work after
-  actor orders; in this window the large spikes coincide with Carrier
-  projectile service. Another zero-build update spends 466k cycles in two
-  movement repaths. Time projectile motion, arena updates, damage and
-  transport separately, and split the direct ray from fallback routing.
+  actor orders. The [narrow projectile profile](audits/2026-11-17-z10-order-tail.md#follow-up-retirement-revalidates-the-whole-pool)
+  traced that cost to full-arena validation during retirement. Live
+  retirement now checks the links it changes; incoming and saved data
+  still get full validation. A separate [route breakdown](audits/2026-11-17-z10-order-tail.md#why-a-zero-build-update-rebuilt-route-fields)
+  found two actual floods the ordinary build counter did not count.
+  Nearby route lookups now reuse a retained gradient when the current
+  grid still proves its exact path. Next, split counted route builds into
+  actual floods, retained field adoption and facility restarts, and profile
+  the dense worker/target path. The mixed battle still misses 30 fps.
   The [weapons bounds change](audits/2026-11-17-render-first-update.md)
   removes the cold tracer scan: first update 3.00M → 1.80M cycles,
   with sampled pixels and the final SRAM matching. Sustained play is
@@ -258,8 +263,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and the outcome of surviving actors still need native witnesses. A
   [direct Move attempt](audits/2026-11-17-native-scv-foundation-interruption.md)
   left the original SCV at the scaffold during construction and the same
-  Barracks completed at the control cut. Find a command that leaves the
-  paid foundation unfinished before testing a replacement SCV.
+  Barracks completed at the control cut. The authenticated active SCV had
+  no displayed Stop before or after reselection. Use the archived enemy
+  position to stage a worker loss while preserving the same paid foundation.
 
 - **Protoss route stalls (P1):** the normal P10 cartridge now uses the
   same nearest-first depot selection as Z10. [Normal P10 qualification](audits/2026-11-13-p10-nearest-normal.md)
@@ -1197,7 +1203,11 @@ the unfinished Academy and its assigned SCV, and completed the Academy.
 The exact repeat spent 25/75 to queue a Ghost and saved it. Another fresh
 title-L run restored that active queue, trained a Ghost at frame 12,415,
 and saved and fresh-loaded the live actor while preserving the earlier
-queue bank. Qualify the Silo, missile and paid research from that match.
+queue bank. A separate defended fork fresh-loaded a second Command Center
+with a clear Silo socket, four Marines in a Bunker and two gas gatherers.
+It saved a completed Starport, but lost the new Science Facility before
+completion. Fresh-load the Starport bank, defend the next Science site and
+qualify the Silo, missile and paid research from that match.
 Finish native timing, other lobbies, combined journals and AI before
 enabling it.
 

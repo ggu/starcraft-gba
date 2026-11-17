@@ -2317,6 +2317,36 @@ static int GBA_HOT sc64_route_slot(int goal)
 #endif
 
 #if defined(SC64_RACES) && !defined(SC64_ROUTE_PARTIAL_FLOOD)
+/* A nearby cached field only qualifies when its exact gradient reaches the
+ * requested goal. Decode the origin once and carry the coordinates along
+ * the bounded walk, rather than dividing the cell index at every step. */
+static int __attribute__((noinline))
+sc64_route_near_root_reaches(int slot, int cell, int goal, int root)
+{
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    /* The gate proves the preferred path to the cached root still agrees
+     * with a fresh flood. If the new goal lies on it, the same suffix proof
+     * applies; keep the rest of the field lazy for independent origins. */
+    if (SC64_ROUTE_LAZY(slot) && !sc64_route_gate(slot, cell, root))
+        SC64_ROUTE_EXACT(slot);
+#else
+    (void)root;
+#endif
+    int cols = MAP_COLS, rows = MAP_ROWS;
+    int row = sc64_cell_row((unsigned)cell), col = cell - row * cols;
+    if (!SC64_GRID_GET(path_walkable, cell)) return cell == goal;
+    for (unsigned step = 0; step < 128u && cell != goal; ++step) {
+        int d = sc64_route_get(slot, cell);
+        if (d == 1) { if (++col >= cols) break; ++cell; }
+        else if (d == 2) { if (--col < 0) break; --cell; }
+        else if (d == 3) { if (++row >= rows) break; cell += cols; }
+        else if (d == 4) { if (--row < 0) break; cell -= cols; }
+        else break;
+        if (!SC64_GRID_GET(path_walkable, cell)) return 0;
+    }
+    return cell == goal;
+}
+
 #ifdef SC64_ROUTE_MONOTONE_ENABLED
 static int __attribute__((noinline))
 sc64_route_step_slot_mode(int origin, int goal, int allow_build)
@@ -2340,7 +2370,7 @@ sc64_route_step_slot_mode(int origin, int goal, int allow_build)
         return allow_build ? SC64_ROUTE_SLOT_Q(goal) : -1;
 #endif
     for (i = 0; i < active_slots && used < 2; ++i) {
-        int root, rx, ry, gx, gy, cur, steps, apart;
+        int root, rx, ry, gx, gy, apart;
         if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
         /* A root within four cells of the goal is at most four rows and four
@@ -2353,21 +2383,7 @@ sc64_route_step_slot_mode(int origin, int goal, int allow_build)
         gx = goal % MAP_COLS; gy = goal / MAP_COLS;
         if ((rx > gx ? rx-gx : gx-rx) + (ry > gy ? ry-gy : gy-ry) > 4) continue;
         ++used;
-        SC64_ROUTE_EXACT(i);
-        cur = origin;
-        for (steps = 0; steps < 128 && cur != goal; ++steps) {
-            int d, x, y;
-            if (!SC64_GRID_GET(path_walkable, cur)) break;
-            d = sc64_route_get(i, cur);
-            if (d < 1 || d > 4) break;
-            x = cur % MAP_COLS; y = cur / MAP_COLS;
-            if (d == 1) ++x; else if (d == 2) --x;
-            else if (d == 3) ++y; else --y;
-            if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) break;
-            cur = x + y * MAP_COLS;
-            if (!SC64_GRID_GET(path_walkable, cur)) break;
-        }
-        if (cur != goal) continue;
+        if (!sc64_route_near_root_reaches(i, origin, goal, root)) continue;
 #ifdef SC64_ROUTE_DECAY_FREQ
         sc64_route_age_request();
         sc64_route_age_touch(i, 1);
@@ -2415,7 +2431,7 @@ sc64_route_step_slot(int origin, int goal)
     if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) return SC64_ROUTE_SLOT_Q(goal);
 #endif
     for (i = 0; i < active_slots && used < 2; ++i) {
-        int root, rx, ry, gx, gy, cur, steps, apart;
+        int root, rx, ry, gx, gy, apart;
         if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
         /* A root within four cells of the goal is at most four rows and four
@@ -2428,21 +2444,7 @@ sc64_route_step_slot(int origin, int goal)
         gx = goal % MAP_COLS; gy = goal / MAP_COLS;
         if ((rx > gx ? rx-gx : gx-rx) + (ry > gy ? ry-gy : gy-ry) > 4) continue;
         ++used;
-        SC64_ROUTE_EXACT(i);
-        cur = origin;
-        for (steps = 0; steps < 128 && cur != goal; ++steps) {
-            int d, x, y;
-            if (!SC64_GRID_GET(path_walkable, cur)) break;
-            d = sc64_route_get(i, cur);
-            if (d < 1 || d > 4) break;
-            x = cur % MAP_COLS; y = cur / MAP_COLS;
-            if (d == 1) ++x; else if (d == 2) --x;
-            else if (d == 3) ++y; else --y;
-            if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) break;
-            cur = x + y * MAP_COLS;
-            if (!SC64_GRID_GET(path_walkable, cur)) break;
-        }
-        if (cur != goal) continue;
+        if (!sc64_route_near_root_reaches(i, origin, goal, root)) continue;
 #ifdef SC64_ROUTE_DECAY_FREQ
         sc64_route_age_request();
         sc64_route_age_touch(i, 1);

@@ -756,6 +756,38 @@ static void check_single_retained_point(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_KEEP_FIELDS
+/* Adopt an exact donor as lazy after a harmless closure, then request a
+ * nearby goal on that gradient. Closing a tile on the path must instead
+ * materialize the field before deciding the requested next step. */
+static void check_nearby_lazy_root(void)
+{
+    int slot, nx, ny;
+    race_cols = race_rows = 64;
+    int origin = 20 + 4 * MAP_COLS, root = origin + 4;
+    memset(desired, 1, sizeof desired);
+    sc64_routes_reset();
+    build_path_grid();
+    assert(sc64_route_slot_for(root, origin) >= 0);
+    desired[0] = 0;
+    invalidate();
+    build_path_grid();
+    slot = sc64_route_slot_for(root, origin);
+    assert(slot >= 0 && SC64_ROUTE_LAZY(slot));
+    assert(sc64_route_next(20 * 16 + 8, 4 * 16 + 8, 23 * 16 + 8, 4 * 16 + 8, &nx, &ny));
+    assert(nx == 21 * 16 + 8 && ny == 4 * 16 + 8 && SC64_ROUTE_LAZY(slot));
+
+    desired[origin + 1] = 0;
+    invalidate();
+    build_path_grid();
+    slot = sc64_route_slot_for(root, root + MAP_COLS);
+    assert(slot >= 0 && SC64_ROUTE_LAZY(slot));
+    assert(sc64_route_next(20 * 16 + 8, 4 * 16 + 8, 23 * 16 + 8, 4 * 16 + 8, &nx, &ny));
+    assert(nx == 20 * 16 + 8 && (ny == 3 * 16 + 8 || ny == 5 * 16 + 8));
+    assert(!SC64_ROUTE_LAZY(slot));
+}
+#endif
+
 int main(int argc, char **argv)
 {
     static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
@@ -774,6 +806,12 @@ int main(int argc, char **argv)
         if (!strcmp(argv[i], "--emit")) emit = argv[i + 1];
         if (!strcmp(argv[i], "--compare")) compare = argv[i + 1];
     }
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    if (argc == 2 && !strcmp(argv[1], "--nearby-lazy-only")) {
+        check_nearby_lazy_root();
+        return 0;
+    }
+#endif
     /* The same scenarios run in the same order in every configuration. */
     for (int round = 0; round < 3; ++round)
     for (unsigned s = 0; s < sizeof(shapes) / sizeof(shapes[0]); ++s)
@@ -856,6 +894,9 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
     check_linear_uses_expected_path(96);
     check_linear_uses_expected_path(128);
+#endif
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    check_nearby_lazy_root();
 #endif
     puts("sc64 route keep-fields: ok");
     return 0;
