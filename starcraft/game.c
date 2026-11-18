@@ -11836,6 +11836,10 @@ sc64_minimap_dot(int x, int y, u8 color)
 #endif
 }
 
+#if defined(SC_FRONTIER_FACTION) && !defined(SC64_IMPORTED_MISSION)
+#include "frontier_minimap.h"
+#endif
+
 static void
 draw_minimap(void)
 {
@@ -11870,6 +11874,8 @@ draw_minimap(void)
     sc64_minimap_draw_terrain(map_x, map_y,
                               sc64_minimap_visible, sc64_minimap_explored);
 #endif
+#elif defined(SC_FRONTIER_FACTION)
+    frontier_minimap_draw_terrain(map_x, map_y);
 #elif defined(SC_ORIGINAL_SKIRMISH)
     for (int row = 0; row < map_size; row++) {
         int grid_row = (2 * row + 1) * MAP_ROWS / (2 * map_size);

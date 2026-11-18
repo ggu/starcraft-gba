@@ -93,6 +93,30 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cost in active combat still need profiling and physical GBA timing
   remains open.
 
+- **Frontier busy combat (P1):** an instrumented ARM build attributed
+  about 41,000–98,000 cycles to point searches and 304,000–315,000 to
+  the HUD including its minimap in sampled combat and later movement.
+  The 64-entry point cache preserves the forward search result and its
+  topology invalidation. The Frontier minimap samples the same tile
+  centers and draws a 24×24 raster before the existing markers.
+  Together they add about 1.1 KiB of working RAM and save
+  about 176,000–181,000 draw cycles per sampled combat update.
+
+  | Match | Busy updates/s | Later movement updates/s |
+  | --- | ---: | ---: |
+  | Transit Yard, 2 CPUs | 23.67 to 28.18 | 25.48 to 29.77 |
+  | Stone Gardens, 3 CPUs | 22.48 to 28.63 | 24.22 to 29.04 |
+
+  These are 240-update mGBA windows beginning after updates 3,950 and
+  5,200. After the first 100 updates, complete matches averaged 28.90
+  on Transit Yard (previously 24.50) and 28.78 on Stone Gardens
+  (previously 22.69). Both reached the original victory tick. Twelve
+  gameplay and framebuffer checkpoints matched. Mid-match SRAM matched
+  byte for byte, and both builds continued each other's saves for
+  120 matching updates. A 3-VBlank update still appears at the 95th
+  percentile in both combat windows. Repeat timing on GBA SP hardware
+  and cover more high-load lineups.
+
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
   of 1,000 updates, mean simulation cost dropped from 101,614 to 65,583

@@ -59,3 +59,11 @@ build/test-frontier-route-cache: tests/frontier_route_cache.c $(STARCRAFT) $(wil
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ORIGINAL_SKIRMISH_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 test-frontier-route-cache: build/test-frontier-route-cache
 	./build/test-frontier-route-cache
+
+# Frontier minimap center-sample and framebuffer differential oracle.
+.PHONY: test-frontier-minimap
+build/test-frontier-minimap: tests/frontier_minimap.c starcraft/frontier_minimap.h build/gba-minimap-test.o common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -Icommon -Istarcraft $< build/gba-minimap-test.o -o $@
+test-frontier-minimap: build/test-frontier-minimap
+	./build/test-frontier-minimap
+test: test-frontier-minimap
