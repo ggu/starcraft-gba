@@ -126,9 +126,15 @@ On the updated Terran ROM the unchanged Outpost tape also wins after
 fresh title load at the same frame 41,951. The match verifies all 56
 remaining action observations after the save cut.
 
+P10 wins the full P7 replay at frame 55,892 after 57,678 physical calls.
+All 59 gameplay checkpoints, 11 briefing pages and 10 in-field pages
+match. The same ROM also [wins P2 and P3 after fresh title loads](2026-11-18-saved-repeat-command.md#early-protoss-campaign-continuation)
+at the previously divergent cuts.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Composed P7 timed comparison | `66a6a7f86744a9aae0d5d2d23e817dc9cfea43662264dbdf9a75bda3c56a0b97` |
 | Canonical link guards | `bc219f6fbb25a9a292d7581446542df01de251769f1dc7e583aa7216156f8a08` |
 | Bidirectional skirmish saves | `dd68a5697c8c2f108a84ee9c653fbd40ee36d36b5067d0a937348ffce9f441ac` |
 | Outpost fresh load through victory | `cba959cbf24af140bcbe84cc9c43469a4e9805b83845da7549f17cf16efe28a3` |
+| Full physical P7 victory | `ceb663b9638c3d0b83bc65747ae6d08376ebcc5bfe9ba722c5dbc1d9a2db3bc3` |

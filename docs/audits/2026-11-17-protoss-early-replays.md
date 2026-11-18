@@ -1,5 +1,8 @@
 # Early Protoss replays on November 17
 
+The later [normal P2 and P3 fresh-load tests](2026-11-18-saved-repeat-command.md#early-protoss-campaign-continuation)
+reach the same wins from the pause cuts discussed below.
+
 The November 17 regular P10 cartridge at `fc0d5e1` won Protoss missions 4–6
 from a fresh HOME screen in mGBA. The replay drove the existing controller
 tapes through the normal buttons, checked every recorded observation and

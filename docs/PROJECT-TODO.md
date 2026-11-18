@@ -1447,7 +1447,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - [Bulk target rebuild and fast insertion](audits/2026-11-12-target-index-bulk.md#canonical-release-qualification)
   lower the same P7 mean from 1.921M to 1.901M cycles and free 160 IWRAM
   bytes in each canonical cartridge. The composed Outpost replay wins
-  after a fresh load without changing the controller tape.
+  after a fresh load without changing the controller tape. The full P7
+  victory matches all 59 checkpoints. The normal P10 build also wins
+  [P2 and P3 after fresh loads](audits/2026-11-18-saved-repeat-command.md#early-protoss-campaign-continuation)
+  at the two previously divergent pause cuts.
   [Fusing P7 world checks with the mission census](audits/2026-11-18-p7-current-mgba.md#callback-based-census-experiment)
   increased mean cost 1.79% and stays outside the release.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
