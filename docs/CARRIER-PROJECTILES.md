@@ -1121,3 +1121,50 @@ live-shot reload witness. Human-paid production on those combined builds,
 longer Terran and Showcase continuations, full pools, broader journal
 compatibility and failure cases, and physical stack and battle timing
 remain separate gates.
+
+### Checked live projectile acquisition
+
+`SC64_POOL_LIVE_ACQUIRE_PROBE` uses the checked splice on the shared
+Interceptor firing path. A slot reuse checks pool counts, list endpoints,
+reciprocal links and the free row before changing the arena. Growth and
+suspect metadata call the original full validator. Load and save continue
+to validate the complete packet. The arena format and allocation order
+stay the same.
+
+ASan/UBSan compares the complete arenas through fill, retirement and
+reuse at every capacity in both encodings. The fixture also checks
+transactional rejection of malformed splice metadata and the strict
+growth fallback. ARM links keep the same IWRAM and EWRAM boundaries.
+
+An isolated mGBA benchmark allocates and retires rows in the actual OBJ
+VRAM arena. It compares complete arenas after each allocation. The
+reported clocks include the timing reads.
+
+| Active rows before allocation | Strict fixed, cycles | Checked fixed, cycles | Strict compact, cycles | Checked compact, cycles |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 178,533 | 2,979 | 178,616 | 3,102 |
+| 25 | 194,779 | 3,111 | 194,862 | 3,234 |
+| 70 | 235,059 | 3,111 | 235,142 | 3,234 |
+| 99 | 251,293 | 3,151 | 251,376 | 3,274 |
+
+The P10 Gantrithor host fixture stages enemies and writes a genuine
+pause-menu SRAM image. Both ARM builds load it from the title, then
+advance 1,000 updates using ordinary inputs. Projectiles are active in
+518 of those updates, with a sampled peak of ten. Mean guest cycles fall
+from 1,157,543 to 1,112,809 (3.86%). The 95th percentile falls from
+1,593,937 to 1,566,719 and the peak from 2,315,246 to 2,274,978.
+
+All 22 samples match the world, full projectile arena, both framebuffer
+pages and palette. The paired pause saves are byte identical. Each then
+loads in a new mGBA process and matches after 180 more updates. The next
+qualification uses a battle set up through ordinary gameplay and covers
+the compact arena in a full ARM save/load replay.
+
+The usual P7 combat tape allocates no projectile rows. It matches all
+its sampled state and timing with the probe on or off.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Isolated ARM allocations | `cbda7a68102af9a1715d6c5fb7a7224d961c4f2cabd297aab0f1fa542ebfffea` |
+| Staged ARM Carrier battle and save pair | `3dcb66f1689f17b88f583ee2bfd2a06eba8bc634f12acde76e7647ff81d77773` |
+| P7 comparison with an empty projectile arena | `cba63d691573808af871e740d8c20be16cdaa770c4e180cb4f9e2f97b48e0217` |
