@@ -83,6 +83,43 @@ state and 900 resumed updates with the uninterrupted path. This is a host
 regression check, not fresh-process emulator or physical-GBA qualification.
 See the [canonical skirmish resume audit](audits/2026-10-27-canonical-skirmish-resume/README.md).
 
+## Menus and session settings
+
+- On the title menu, press D-pad Right for Options. Up and Down choose Cursor
+  Speed, Menu Sound or Back. Left and Right edit the highlighted setting, and
+  A also toggles Menu Sound. Press B or confirm Back to return to the previous
+  title row. Load Game and the title B and L shortcuts open the saved
+  game. On Showcase, holding L and R and pressing Select still opens the hidden
+  scene picker.
+- In Custom Game, press Select to open the map preview picker on the current
+  map. Up and Down browse the available maps. A or Start applies the map and
+  returns to setup. B returns to setup without applying the change. Left and
+  Right on the setup's Map row still cycle maps directly.
+- In the normal field pause, Start or Select resumes from any page. The first
+  page offers Resume, Save Game, Load Save and Restart. B saves, L loads and R
+  restarts from this page. Press D-pad Right for More, where you can open
+  Objectives, change Settings, or choose Return to Title. Return to Title asks
+  for confirmation and defaults to Cancel. Confirming exits without saving.
+  B steps back one page, and A also closes Objectives.
+- Cursor Speed offers Slow, Normal and Fast. Menu Sound toggles the menu tones.
+  Title and field pause share these settings through matches and title returns
+  within the current session. Restarting or powering off the emulator or GBA
+  resets them to Normal with menu sound on.
+
+On the N64, the observed single-player custom route was Single-Player →
+Scenario → Setup Custom → Melee → Blood Bath. Native pause offers Options,
+Goals, Abort Mission and Resume, with Settings and save/load under Options.
+The N64 title's Load Saved shows two selectable slots. The GBA presents one
+quick-load save per ROM, and the map picker uses the maps and rules already
+supported by that build. The full native Scenario catalog, other modes and
+native Game Speed are separate work. See the [N64 menu parity audit](audits/2026-11-04-n64-parity/README.md),
+[Blood Bath setup observations](audits/2026-11-12-n64-blood-bath-opening.md),
+and [native Game Speed measurements](audits/2026-11-18-native-game-speed.md).
+
+With the optional source inputs prepared, `make test-sc64-menu-session`
+checks campaign launch, map picker cancellation and confirmation, cursor
+speed, pause navigation, confirmed exit and reloading a saved skirmish.
+
 ## Campaign progress
 
 The canonical Terran and Protoss profiles present ten missions each; Zerg

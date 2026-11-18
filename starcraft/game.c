@@ -10301,10 +10301,14 @@ field_ui_select_key(void)
 #endif
 
 static void
-pause_action(u16 pressed)
+pause_action(u16 held, u16 pressed)
 {
-#if defined(SC_DEFAULT_UI) || defined(SC64_FIELD_CONTROLS)
+    (void)held;
+#ifdef SC_DEFAULT_UI
     field_ui_pause_input(pressed);
+    return;
+#elif defined(SC64_FIELD_CONTROLS)
+    field_ui_pause_input(held, pressed);
     return;
 #endif
     if (pressed & KEY_A)
@@ -10372,6 +10376,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
 #endif
     int speed = (held & KEY_R) ? 4 : 2;
+#ifdef SC64_RACES
+    speed += race_front.settings.cursor_delta * ((held & KEY_R) ? 2 : 1);
+#endif
 #ifndef SC64_DEATH_VFX_DISABLED
     death_vfx_update(); /* bare call: game_update's size steers IWRAM inlining */
 #endif
@@ -10399,9 +10406,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
         int action=sc64_frontend_update(&race_front,held);
         race_front_briefing_configure();
         if(race_front_load_error)race_front_load_error--;
-        if(pressed){race_front_load_error=0;audio_tone((pressed&KEY_A)?660:440,2,2);}
+        if(pressed){race_front_load_error=0;race_menu_tone((pressed&KEY_A)?660:440,2,2);}
         if(old_page!=race_front.page)race_front_transition=race_front.ticks;
-        if(old_row!=race_front.row)audio_tone(440,2,2);
+        if(old_row!=race_front.row)race_menu_tone(440,2,2);
 #ifdef SC64_SHOWCASE_ENABLED
         if (action == SC_FRONT_START_SHOWCASE) {
             sc64_display_palette(sc64_palette+32);
@@ -10439,11 +10446,11 @@ SC64_GAME_STEP(u16 held, u16 pressed)
             race_selected_mission=race_front.mission;
             race_human=race_mode?skirmish_human:sc64_race_maps[race_selected_mission].owner_races[sc64_race_maps[race_selected_mission].human_slot];
             sc64_display_palette(sc64_palette+32);
-            audio_tone(880,5,3);
+            race_menu_tone(880,5,3);
             init_state();
         } else if(action==SC_FRONT_LOAD) {
             sc64_display_palette(sc64_palette+32);
-            if(!load_game()){race_front_load_error=90;audio_tone(180,6,2);}
+            if(!load_game()){race_front_load_error=90;race_menu_tone(180,6,2);}
         }
         return;
 #endif
@@ -10482,7 +10489,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 	return;
     }
     if (screen == SCREEN_PAUSE) {
-	pause_action(pressed);
+	pause_action(held, pressed);
 	return;
     }
     if (screen == SCREEN_RESULT) {

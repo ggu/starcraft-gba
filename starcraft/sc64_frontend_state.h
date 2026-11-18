@@ -24,9 +24,11 @@ static void race_front_briefing_configure(void)
 }
 static void race_frontend_reset(void)
 {
+    Sc64MenuSettings settings = race_front.settings;
     int completed=-1;
     for(int i=0;i<SC64_RACE_MAP_COUNT;i++)if(race_completed&(1<<i))completed=i;
     sc64_frontend_reset(&race_front,race_selected_mission,race_human,race_bots,completed);
+    race_front.settings = settings;
     race_front.map=race_skirmish_map;
 #ifdef SC64_IMPORTED_SKIRMISH
 #ifdef SC64_NATIVE_MELEE_STARTS
@@ -43,6 +45,11 @@ static void race_frontend_reset(void)
     for(int i=0;i<3;i++)race_front.bot_races[i]=race_bot_races[i];
 #endif
     race_front_transition=0;race_front_load_error=0;
+}
+
+static void race_menu_tone(int hz, int frames, int volume)
+{
+    if (!race_front.settings.quiet_menu) audio_tone(hz, frames, volume);
 }
 
 #endif

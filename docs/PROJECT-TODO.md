@@ -1396,6 +1396,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   its shared Egg service applies to custom games, not Z8–Z10 production.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
   and 1–3 independently raced AIs. Larger roster and behavior gaps remain below.
+- The [shared SC64 menu controls](RACE-CAMPAIGNS.md#menus-and-session-settings)
+  add title Options, a custom map preview, and a field pause page for objectives,
+  settings and returning to title. Cursor Speed and Menu Sound are session
+  settings. The full native map and mode catalog, Game Speed and the second
+  selectable save slot remain open.
 - The [current-release P7 comparison](audits/2026-11-18-p7-current-mgba.md)
   at `0e536f26` measures 8.10 updates/s on the normal P10 build and 8.28
   with the terrain-cache preview in the same mGBA combat window. All 11
@@ -1408,8 +1413,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals
-  at the starting setting and 184 at the higher setting. Match simulation
-  cadence and display pacing independently when qualifying speed controls.
+  at the starting setting and 184 at the higher setting. A separate pair of
+  read-only captures supports 18 and 24 gameplay advances over the same 61
+  resumed observer steps. Display pacing and the full speed range still need
+  independent qualification.
 - The [earlier P7 measurement](audits/2026-11-06-current-native-qualification/README.md)
   at `72a71d22` costs about **2,200,226 cycles per advancing full loop**, versus
   about **559,000 cycles** available at 30 fps. The paired diagnostic matches

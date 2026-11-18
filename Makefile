@@ -1846,6 +1846,13 @@ test-races-menu: build/test-sc64-frontend build/test-sc64-menu
 	./build/test-sc64-frontend
 	./build/test-sc64-menu
 
+.PHONY: test-sc64-menu-session
+build/test-sc64-menu-session: tests/sc64_menu_session.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACE_CAMPAIGN_FLAGS) tests/sc64_menu_session.c common/gba.c -o $@
+test-sc64-menu-session: build/test-sc64-menu-session
+	./build/test-sc64-menu-session
+test-unified: test-sc64-menu-session
+
 # Split race-campaign ROMs use the shared race engine, with isolated save IDs.
 race-campaigns: verify-terran verify-zerg verify-protoss
 terran: verify-terran

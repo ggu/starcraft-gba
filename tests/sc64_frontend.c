@@ -11,6 +11,50 @@ static int press(Sc64Frontend *f, unsigned key) {
     return action;
 }
 
+static void test_options_and_map_browser(void)
+{
+    Sc64Frontend f;
+    sc64_frontend_reset(&f,0,SC_FRONT_RACE_TERRAN,2,-1);
+    assert(press(&f,KEY_R)==SC_FRONT_NONE && f.page==SC_FRONT_HOME);
+    press(&f,KEY_DOWN);
+    assert(press(&f,KEY_RIGHT)==SC_FRONT_NONE && f.page==SC_FRONT_OPTIONS);
+    assert(f.settings.cursor_delta==0 && !f.settings.quiet_menu);
+    press(&f,KEY_LEFT);
+    press(&f,KEY_LEFT);
+    assert(f.settings.cursor_delta==-1);
+    press(&f,KEY_RIGHT);
+    press(&f,KEY_RIGHT);
+    press(&f,KEY_RIGHT);
+    assert(f.settings.cursor_delta==1);
+    press(&f,KEY_DOWN);
+    press(&f,KEY_A);
+    assert(f.settings.quiet_menu);
+    press(&f,KEY_DOWN);
+    assert(press(&f,KEY_A)==SC_FRONT_NONE && f.page==SC_FRONT_HOME && f.row==1);
+    press(&f,KEY_RIGHT);
+    assert(press(&f,KEY_B)==SC_FRONT_NONE && f.page==SC_FRONT_HOME && f.row==1);
+    assert(f.settings.cursor_delta==1 && f.settings.quiet_menu);
+
+    press(&f,KEY_A);
+    assert(f.page==SC_FRONT_SKIRMISH);
+#ifdef SC64_IMPORTED_SKIRMISH
+    press(&f,KEY_DOWN);
+    assert(press(&f,KEY_SELECT)==SC_FRONT_NONE && f.page==SC_FRONT_MAP_BROWSER);
+    assert(f.row==SC64_MAP_OUTPOST);
+    press(&f,KEY_DOWN);
+    assert(f.row==SC64_MAP_BLOOD_BATH && f.map==SC64_MAP_OUTPOST);
+    assert(press(&f,KEY_B)==SC_FRONT_NONE && f.page==SC_FRONT_SKIRMISH && f.row==1);
+    assert(f.map==SC64_MAP_OUTPOST);
+    press(&f,KEY_SELECT);
+    press(&f,KEY_UP);
+    assert(press(&f,KEY_A)==SC_FRONT_NONE && f.page==SC_FRONT_SKIRMISH && f.row==1);
+    assert(f.map==SC64_MAP_BLOOD_BATH && f.bots==2 && f.race==SC_FRONT_RACE_TERRAN);
+#else
+    assert(press(&f,KEY_SELECT)==SC_FRONT_NONE && f.page==SC_FRONT_SKIRMISH);
+#endif
+    assert(press(&f,KEY_L)==SC_FRONT_LOAD);
+}
+
 #ifdef SC64_SHOWCASE_ENABLED
 static void test_hidden_showcase(void) {
     Sc64Frontend f;
@@ -511,6 +555,7 @@ static void test_blood_bath_start_wire(void)
 #endif
 
 int main(void) {
+    test_options_and_map_browser();
 #ifdef SC64_IMPORTED_SKIRMISH
     test_independent_skirmish_seats();
     test_blood_bath_start_wire();
