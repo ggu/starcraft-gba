@@ -1156,9 +1156,22 @@ from 1,157,543 to 1,112,809 (3.86%). The 95th percentile falls from
 
 All 22 samples match the world, full projectile arena, both framebuffer
 pages and palette. The paired pause saves are byte identical. Each then
-loads in a new mGBA process and matches after 180 more updates. The next
-qualification uses a battle set up through ordinary gameplay and covers
-the compact arena in a full ARM save/load replay.
+loads in a new mGBA process and matches after 180 more updates.
+
+The Z10 Carrier preview also reaches a live firefight on Blood Bath
+from a fresh title and empty SRAM. The human chooses Zerg and the three
+CPU rows choose Zerg, Terran and Protoss. Both runs reach the first
+sampled active shot at frame 16,301. The next 1,000 updates include 629
+with active shots and peak at 11. Mean guest cycles fall from 938,580
+to 894,297 (4.72%). The 95th percentile falls from 1,266,290 to 1,125,962
+(11.08%). The largest sampled update stays near 5.65M cycles.
+
+All 22 sampled worlds, arenas, framebuffer pages and palettes match.
+The compact pause journals match byte for byte at frame 17,301. Both
+load in new processes and match after a further 180 updates. The two
+ARM links have the same memory bounds. The fixed-format test still has
+a staged opening, so an ordinary P10 Carrier fight remains the wider
+release check.
 
 The usual P7 combat tape allocates no projectile rows. It matches all
 its sampled state and timing with the probe on or off.
@@ -1176,4 +1189,5 @@ make test-sc64-interceptor-pool-codec test-sc64-interceptor-motion
 | --- | --- |
 | Isolated ARM allocations | `cbda7a68102af9a1715d6c5fb7a7224d961c4f2cabd297aab0f1fa542ebfffea` |
 | Staged ARM Carrier battle and save pair | `3dcb66f1689f17b88f583ee2bfd2a06eba8bc634f12acde76e7647ff81d77773` |
+| Ordinary compact Z10 Blood Bath battle and save pair | `9422a5127388dc8e9913170a678871f9b6078e279fd58444f032c8fbc2ede062` |
 | P7 comparison with an empty projectile arena | `cba63d691573808af871e740d8c20be16cdaa770c4e180cb4f9e2f97b48e0217` |

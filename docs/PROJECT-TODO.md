@@ -1456,9 +1456,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - [Projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
   is the next measured Carrier-combat candidate. A staged fight on the
   normal P10 engine averages 1.158M versus 1.113M guest cycles with exact
-  world, projectile, display and save samples. The older P7 tape leaves
-  the projectile arena empty and gives identical timings. Qualify ordinary
-  Carrier-heavy play and compact-profile saves before default activation.
+  world, projectile, display and save samples. An ordinary three-CPU
+  Blood Bath fight on the compact Z10 preview drops mean cost 4.72%
+  and p95 cost 11.08%, with matching fresh loads. The older P7 tape
+  leaves the arena empty and gives identical timings. Finish the ordinary
+  fixed-format P10 battle check before deciding on default activation.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals
