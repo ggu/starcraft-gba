@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-18. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-19. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -18,6 +18,14 @@ does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
+
+- [Native producer cancellation](audits/2026-11-19-n64-active-scv-cancel.md)
+  verifies that Cancel Last refunds the waiting SCV and preserves the
+  active job's progress. The change is shared across the GBA profiles
+  and the release-based Blood Bath ARM replay matches the transaction.
+  Native shows 5/10 with two paid SCVs while GBA shows 6/10. Observe
+  native admission at cap and the next head's start before changing
+  the shared supply ledger.
 
 - **Frontier Skirmish (P1):** an independently authored battle profile
   now starts Transit Yard and Stone Gardens with one to three computer

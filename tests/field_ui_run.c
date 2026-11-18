@@ -297,16 +297,24 @@ queue_panel_tests(void)
           "the Firebat moves to the active slot");
     check(slot_empty(1) && queue_bar_fill() == 0, "the queue shortens and progress restarts");
 
-    /* A full queue fills all five slots; L removes the oldest. */
+    /* A full wrapped queue fills all five slots; L removes the last. */
     train_type = U_MARINE;
     for (int i = 0; i < 6; i++) tap(KEY_A);
     check(b[barracks].queue_count == 5, "the queue holds five");
     render();
     for (int i = 0; i < 5; i++) check(slot_filled(i), "all five slots are filled");
+    int progress = b[barracks].queue_progress;
+    int head = b[barracks].queue_head;
+    int paid_minerals = minerals, paid_gas = gas;
     tap(KEY_L);
     render();
     check(b[barracks].queue_count == 4 && slot_empty(4) && slot_filled(3), "L cancels into a shorter queue");
-    check(count_color(QUEUE_X, QUEUE_Y, QUEUE_SLOT, QUEUE_SLOT, C_ORANGE) == 0, "L removes the oldest unit");
+    check(b[barracks].queue_head == head && b[barracks].queue_progress == progress + 2,
+          "the active job keeps its slot and training progress");
+    check(count_color(QUEUE_X, QUEUE_Y, QUEUE_SLOT, QUEUE_SLOT, C_ORANGE) > 0,
+          "the Firebat stays active after canceling a queued Marine");
+    check(minerals == paid_minerals + unit_cost(U_MARINE) && gas == paid_gas,
+          "the refund uses the removed Marine's cost");
 
     /* A Command Center's queue is drawn the same way. */
     fixture();
