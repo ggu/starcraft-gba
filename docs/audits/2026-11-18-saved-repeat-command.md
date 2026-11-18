@@ -95,7 +95,14 @@ the unchanged Outpost win after a fresh load at call 18,626. Its 56
 remaining action checks and terminal frame 41,951 match. All eight ARM
 cross-load cases also pass on the composed cartridges.
 
+From the title screen, physical controls launched all ten chapters in
+each of Terran, Z10 and P10. The same builds and Showcase completed 72
+skirmish openings covering both maps, every human race and each opponent
+count. Each opening checked the selected CPU races, start positions and
+at least 100 play updates. Campaign checks cover launch and opening play.
+
 | Composed receipt | SHA-256 |
 | --- | --- |
 | Outpost fresh-load win | `c7d3e7639843f335be956f1dd5c231af5ef3525db503f111e3623e5bc0995d55` |
 | ARM load matrix | `dea5eb6b088e6d1790dd1fe3ae8c67559b91acc10ff294d6cf11c597976a1722` |
+| Physical campaign and skirmish openings | `f8644030ebaa75ae0ea73e128b591e09757f1b6367c5bd96da5cf44bf7e86922` |
