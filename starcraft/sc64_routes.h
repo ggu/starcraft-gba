@@ -110,6 +110,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point component witnesses require resumable point prefixes"
 #endif
+#if defined(SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_COMPONENT_PROBE)
+#error "nearby-root component rejection requires point component witnesses"
+#endif
 
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
@@ -2467,6 +2470,14 @@ static int __attribute__((noinline))
 sc64_route_near_root_reaches(int slot, int cell, int goal, int root)
 {
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+#ifdef SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE
+    /* A complete open-root field that reaches just one endpoint proves
+     * the parked field cannot provide any gradient from this origin. */
+    if (cell != goal && sc64_point_prefix_find(slot) &&
+        sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE &&
+        sc64_point_prefix_component_reaches(slot, cell) == 0)
+        return 0;
+#endif
     sc64_point_prefix_require(slot, cell);
 #endif
 #ifdef SC64_ROUTE_KEEP_FIELDS

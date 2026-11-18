@@ -914,6 +914,10 @@ static void check_point_component_witness(void)
         assert(slot >= 0 && witness >= 0 && sc64_point_prefix_find(slot));
         assert(sc64_route_get(slot, left_far) == SC64_ROUTE_UNREACHABLE);
         u32 before = state_hash();
+#ifdef SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE
+        assert(!sc64_route_near_root_reaches(slot, middle_far, left + 1, left));
+        assert(sc64_point_prefix_find(slot) && state_hash() == before);
+#endif
         assert(SC64_ROUTE_REACHES(slot, left_far));
         assert(!SC64_ROUTE_REACHES(slot, middle_far));
         assert(sc64_point_prefix_find(slot) && state_hash() == before);
@@ -961,6 +965,15 @@ static void check_point_component_witness(void)
     SC64_ROUTE_PF(witness) |= SC64_ROUTE_FLAG_STALE;
     assert(SC64_ROUTE_REACHES(slot, left_far) && !sc64_point_prefix_find(slot));
     check_grid_unchanged();
+#ifdef SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    assert(sc64_route_slot(left_far) >= 0);
+    u32 before = state_hash();
+    assert(sc64_route_near_root_reaches(slot, left_far, left + 128, left));
+    assert(!sc64_point_prefix_find(slot) && state_hash() == before);
+    check_grid_unchanged();
+#endif
     puts("point witnesses preserve yes/no/fallback, selected slot and logical cache metadata");
 }
 #endif
