@@ -212,6 +212,17 @@ pose indexing or changing drawing rules.
 
 - Render instruction trace SHA-256 `3dc2a7eb36e8f6bffeffaad2760a6eee6a19e5f1dca37c9e826ead600901d048`.
 
+A local experiment replaces the facing-vector scan with an ordered
+search over exact direction boundaries. The host oracle matches
+16,785,409 directions within ±2,048 on both axes, all 32 large-delta
+ties and their neighbors, and the existing T5 framebuffer fixture.
+The ARM experiment matches all 25 Blood Bath cuts, logical totals
+and save bytes. It averages 795,439 cycles compared with 795,983 for
+the control, a 0.07% reduction. Keep the experiment local and use
+the measured tracer workload for the next rendering comparison.
+
+- Facing experiment receipt SHA-256 `d764a7fa66695b37da41c2f1709c5e820f364c0bc33fd0d359de9e5302a65615`.
+
 ## Independent 128 × 128 Zerg 9 check
 
 The same ROM pair replays 46,500 ordinary controller updates from
