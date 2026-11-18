@@ -276,7 +276,21 @@ The Terran differential covers the wider coordinate representation. Make
 dry runs show the flags exactly once in each canonical link and absent
 from the separate P7 and Z9 preview links.
 
+The full normal P10 replay wins Homeland at frame 55,892. It matches all
+59 checkpoints, 11 briefing pages, 10 field acknowledgments and 57,678
+physical calls against the verified earlier run.
+
+Four 12,000-call ordinary skirmishes, including a complete Outpost defeat,
+matched all sampled worlds. Instrumented variants left at least 8,200
+bytes of user stack untouched above the guard. One Showcase sample in
+the instrumented run flipped its page earlier. A follow-up at 25 adjacent
+calls matches the displayed page of the two uninstrumented builds at
+every sample and matches both framebuffer contents at the differing
+instrumented call. The stack check covers the sampled user stack.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | P7 timed pair | `4970e940d93dd29d5888c49c05c548a5cb86bda104c38e4dbb16ad60d4192f80` |
+| Full P7 victory | `33760bd5f4208fb8bfcf694fc9703299f1e2b0b17b742f4edbd4a937fda92fe9` |
 | Four paired skirmish SRAM continuations | `0351b2235afab469fba92d944d6f40ec173763739c57cdc3f1c9343bc015b609` |
+| Skirmish stack and display pairs | `d415f26b3c76b47ddcae102e8f8af6f8a854d799bc46c218157218944ca53c90` |
