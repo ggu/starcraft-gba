@@ -150,3 +150,86 @@ physical hardware before enabling it in regular builds.
 - Deferred-field ROM SHA-256 `2d9b4311908ee477bf711d425dc2a23ae45bac85ad86017f966064fcd8e2bfdb`.
 - Dense replay receipt SHA-256 `0c0555eb675867fc641a17c0fe39c0768e9a999a9ecc341d2da104e71c6daae5`.
 - Late save receipt SHA-256 `8110b55f5920b04225a86480f338ce0d598a4f43e2e6fa648bcefa26fee501f2`.
+
+## Three-opponent Blood Bath check
+
+The same two Z10 ROMs launch from blank SRAM with a human Zerg and
+Zerg, Terran and Protoss computer seats. Blood Bath is 64 × 64, outside
+the deferred wide-field path. Both runs advance through the opening
+and measure 1,000 consecutive updates beginning at game frame 16,302.
+All sampled logical counters, 25 world/route/display samples and the
+32 KiB pause-save export match. The final sample follows a title-L
+load in a new process and 180 more updates. The comparison includes
+every sampled map page and selected page.
+
+| Guest cycles per update | Control | Deferred field |
+| --- | ---: | ---: |
+| Mean | 795,983 | 796,128 |
+| p95 | 1,038,189 | 1,035,642 |
+| Maximum | 2,008,978 | 2,009,039 |
+
+The mean changes by +0.02%. The 64 × 64 match needs separate throughput
+work. Frame 17,056 is the slowest update in both runs.
+
+- Control receipt SHA-256 `6a3965ff2efda55260333afaf6f1c88065571bbc9ece4a70cc2d8069caa1cc30`.
+- Deferred-field receipt SHA-256 `ec8a426b02b2956acc7ee747f0bf65648d3482bbd898b8db448c052127b5c5cc`.
+- Common save SHA-256 `820e7f5ca85072ca8d117e9848ac42c7cbf9f0d54987cc2aca8dd9e95649540d`.
+
+### Separate 64 × 64 headroom
+
+A read-only facility-call trace of the control matches every
+frame, whole-update cycle count, orders counter and logical count
+from the 1,000-update run. It observes 2,263 facility lookups and
+110 builds. Facility lookup averages 19,473 inclusive cycles per
+update, inside 290,210 orders cycles. It accounts for 745,478 cycles
+on the slowest update, frame 17,056. The orders peak at frame 16,449
+uses 1,428,270 cycles with just 5,472 spent in facility lookups.
+
+The trace checks a carryover only when the previous update kept the
+same active partial field, geometry, and packed bytes and the new open
+origin has no direction in that field. Only one build meets the
+observed carryover condition, with 70 earlier FIFO pops. Keeping
+the existing facility frontiers alive across updates has little
+measured headroom in this match.
+
+Map drawing averages 244,689 cycles, including 114,794 for units
+and battle effects and 72,407 for the background. HUD drawing adds
+90,258 cycles. Profile these recurring costs alongside the
+non-facility part of the orders spikes.
+
+- Facility instruction trace SHA-256 `5881003bbf99080ffff34b7d279c5f4110215f37b309b787733dcbdd8b0d8e00`.
+
+An additional instruction-edge trace samples every 25th update and
+four of the largest update or orders spikes. It matches the
+control timeline and counters across all 1,000 updates. In the 44
+traced updates, tracer drawing averages 69,821 inclusive cycles.
+The mean body-draw costs are 23,395 cycles for 3.5 calls with a
+center inside the admitted rectangle and 10,581 for 87.3 calls
+outside it. Death effects average 2,124 cycles over their two
+passes. The traced attack-pose lookup has no calls. Separate
+tracer culling and setup from pixels drawn before adding new
+pose indexing or changing drawing rules.
+
+- Render instruction trace SHA-256 `3dc2a7eb36e8f6bffeffaad2760a6eee6a19e5f1dca37c9e826ead600901d048`.
+
+## Independent 128 × 128 Zerg 9 check
+
+The same ROM pair replays 46,500 ordinary controller updates from
+fresh HOME. Both open Zerg 9 on a 128 × 128 map and reach game frame
+45,265. The actor, resource, campaign and display bytes match at all
+68 paired samples and both runs match the 21 historical checks.
+Logical route counts and clock match at every sample. The final
+counts are 4,382 builds and 119,747 hits.
+
+| Guest cycles per controller update | Control | Deferred field |
+| --- | ---: | ---: |
+| Mean across the whole prefix | 1,445,458 | 1,445,433 |
+| Mean in the last 500 updates | 1,431,814 | 1,432,366 |
+| p95 in the last 500 updates | 1,576,751 | 1,577,127 |
+| Maximum in the last 500 updates | 4,444,782 | 4,444,554 |
+
+The late-window mean changes by +0.04%. Qualification covers the
+measured prefix through frame 45,265. Victory and fresh-load checks
+for this mission on this pair remain open.
+
+- Paired prefix receipt SHA-256 `57a5a7482b062d0b72bcfdcda63aadc8205960e20374179a75408ace83cba064`.

@@ -1572,9 +1572,17 @@ save/source-owner and timing evidence; do not advertise unwired components.
   from 614 to 626. The opt-in deferred-field candidate preserves
   logical slots, ages and counters. It drops mean cycles 11.02%, p95
   3.26%, and the maximum 17.81%, with matching dense replay and late-save
-  victory, and identical static RAM ends. Prefer it for cross-profile
-  comparison. Verify other dense campaigns and skirmishes, save/load,
-  and physical GBA timing before considering regular activation.
+  victory, and identical static RAM ends. The same pair matches 68
+  cuts in a 46,500-input Z9 prefix with flat timing, and 25 cuts plus
+  identical SRAM in a three-opponent Blood Bath battle and fresh load.
+  That 64 × 64 skirmish sits outside the wide-field shortcut and still
+  averages about 796,000 cycles per update. Its read-only trace finds
+  only one eligible cross-update facility reuse with 70 prior FIFO
+  pops. Tracer drawing averages 69,821 cycles in the 44 measured
+  render cuts. Attribute tracer culling/setup and actual raster work,
+  alongside HUD costs and the separate orders spikes. Finish other
+  cartridge profiles and physical GBA timing
+  before considering regular activation.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for

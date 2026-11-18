@@ -128,13 +128,18 @@ completed. The Command Center's Build grid was open on the SCV and
 its queue was empty. At step 6,121 the same run showed 5/10 supply
 with one active SCV and a paid SCV in the second slot.
 
-The first observer expired before receiving the suffix. Two prequeued
-attempts stalled before the first rendered frame. A process sample
-identified the Metal shader compiler on the first attempt. The native
-9/10 → 10/10 purchase, admission of a
+The first observer expired before receiving the suffix. Both prequeued
+attempts recorded `SIGXFSZ` before the first rendered frame and stopped
+in the observer's signal trap. A process sample showed the Metal shader
+compiler at the first stop. During a 64 MiB process-limit preflight,
+the only open writable file beyond that limit is the per-user Metal
+cache, at 83,722,240 bytes. A 128 MiB limit passes the first rendered
+frame with the original input and a separate capture limit.
+The native 9/10 → 10/10 purchase, admission of a
 paid tail at full supply, and promotion of that tail remain open.
 Keep the current GBA supply rule while the comparison is incomplete.
 
 - Native near-cap manifest SHA-256 `1ed5afe12a55eca7dc4b3c42b99189a2ca930d2c154ec2e1323eb4ab01dc47d5`.
 - Native near-cap input SHA-256 `76fe117f9dc3eda792479bccc113a5d67489975836409dbba1db834b066cf177`.
 - Guarded retry manifest SHA-256 `e5c572f1693117cb796d6c1b28f8eff2565f705add80b26805bfca8faa220bb0`.
+- Isolated 64 MiB diagnostic manifest SHA-256 `f5ecfb2502a92db84baf599906451cfa7fb84678d9231e5fc4166fccbbe7bc6f`.
