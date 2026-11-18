@@ -26,19 +26,22 @@ static FrontierRouteCacheEntry *frontier_route_cache_slot(int start, int goal)
     return &frontier_route_cache[hash & 63u];
 }
 
+static int frontier_route_result(int result, int tx, int ty, int *next_x, int *next_y)
+{
+    if (result == -1) return 0;
+    if (result == -2) { *next_x = tx; *next_y = ty; }
+    else { *next_x = (result & 255) * 16 + 8; *next_y = (result >> 8) * 16 + 8; }
+    return 1;
+}
+
 /* -1 means miss, 0 means cached failure, 1 means cached success. */
 static int frontier_route_cache_get(int start, int goal, int tx, int ty,
                                     int *next_x, int *next_y)
 {
     FrontierRouteCacheEntry *entry = frontier_route_cache_slot(start, goal);
-    int result;
     if (entry->generation != frontier_route_cache_generation ||
         entry->start != start || entry->goal != goal) return -1;
-    result = entry->result;
-    if (result == -1) return 0;
-    if (result == -2) { *next_x = tx; *next_y = ty; }
-    else { *next_x = (result & 255) * 16 + 8; *next_y = (result >> 8) * 16 + 8; }
-    return 1;
+    return frontier_route_result(entry->result, tx, ty, next_x, next_y);
 }
 
 static void frontier_route_cache_put(int start, int goal, int result)
