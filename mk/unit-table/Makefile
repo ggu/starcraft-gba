@@ -11,3 +11,11 @@ build/crowd-probe-%.elf: $(UNIT_TABLE_DEPS) | build
 build/StarCraft-Crowd-%.gba: build/crowd-probe-%.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC CROWD' SCCR
+
+# Asset-free codec checks (part of ./dev test).
+build/test-sc64-zp-unit-stream: tests/sc64_zp_unit_stream.c starcraft/sc64_zp_unit_stream.h mk/unit-table/Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-zp-unit-stream
+test-sc64-zp-unit-stream: build/test-sc64-zp-unit-stream
+	./build/test-sc64-zp-unit-stream
+test: test-sc64-zp-unit-stream

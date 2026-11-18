@@ -387,9 +387,14 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 
 #if defined(SC64_RACES)
 #if defined(SC64_ZP_FULL_STORAGE)
-/* SC64_ZP_UNIT_SLOTS sizes the unit table of a full-storage profile. */
+/* SC64_ZP_UNIT_SLOTS sizes the unit table of a full-storage profile. Past
+ * 240 slots, saves store units as a delta-coded stream under their own
+ * tags (sc64_zp_unit_stream.h). */
 #ifdef SC64_ZP_UNIT_SLOTS
 #define MAX_UNITS SC64_ZP_UNIT_SLOTS
+#if SC64_ZP_UNIT_SLOTS > 240
+#define SC64_ZP_UNIT_STREAM 1
+#endif
 #else
 #define MAX_UNITS 240
 #endif
@@ -531,7 +536,11 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_Z10_RUNTIME)
+/* Large-table saves store units as a stream (sc64_zp_unit_stream.h); the
+ * race letter in the tag separates Zerg and Protoss. */
+#if defined(SC64_ZP_UNIT_STREAM)
+#define SC64_RACE_SAVE_GENERATION 113u
+#elif defined(SC64_Z10_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 49u
 #elif defined(SC64_Z9_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 48u

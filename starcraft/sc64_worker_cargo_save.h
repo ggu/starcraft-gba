@@ -26,6 +26,8 @@ race_save_worker_cargo_prepare(RaceSave *candidate, unsigned width,
         if (!sc64_p7_typed_unit_encode(&candidate->units[i],&decoded,width,height)) return 0;
 #elif defined(SC64_Z7_DERIVED_SAVE)
         if (!sc64_derived_unit_encode(&candidate->units[i],&decoded,width,height)) return 0;
+#elif defined(SC64_ZP_UNIT_STREAM)
+        return 0;   /* stream saves never carry legacy cargo rows */
 #else
         if (!sc64_zp_unit_save_encode(&candidate->units[i],&decoded,width,height)) return 0;
 #endif

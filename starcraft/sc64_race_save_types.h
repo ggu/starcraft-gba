@@ -25,6 +25,17 @@
 #ifndef SC64_Z7_DERIVED_SAVE
 #include "sc64_zp_unit_save.h"
 #endif
+#ifdef SC64_ZP_UNIT_STREAM
+#if defined(SC64_P7_TYPED_COMPACT_ENABLED) || defined(SC64_Z7_DERIVED_SAVE)
+#error "the unit stream replaces the fixed-row unit codecs"
+#endif
+/* Data bytes left for unit rows once the rest of the record is in place;
+ * the record asserts below keep this exact. */
+#ifndef SC64_ZPS_DATA_BYTES
+#define SC64_ZPS_DATA_BYTES 7500
+#endif
+#include "sc64_zp_unit_stream.h"
+#endif
 #else
 #include "sc64_compact_unit_save.h"
 #endif
@@ -112,6 +123,8 @@ typedef struct {
 #ifdef SC64_ZP_FULL_STORAGE
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     Sc64P7TypedUnitSave units[MAX_UNITS];
+#elif defined(SC64_ZP_UNIT_STREAM)
+    Sc64ZpUnitStream units;
 #else
 #ifdef SC64_Z7_DERIVED_SAVE
     Sc64DerivedUnitSave units[MAX_UNITS];
