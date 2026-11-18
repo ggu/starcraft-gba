@@ -1716,7 +1716,16 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    saves. Keep partial prototypes gated; source splash may increase Z10 danger.
 3. In parallel, re-profile current-source order/detection, movement and
    rendering, then reduce measured busy-loop cost with paired state/pixel and
-   gameplay checks. The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
+   gameplay checks. Whole-bucket position and occupancy filters increase
+   mean P7 cost by 0.40% and 0.88%. An 8-pixel child-list probe can exclude
+   far more nodes, but its P10 link needs ROM placement for steering. It
+   gains only 0.16% against the placement-matched control and loses 6.28%
+   against shipping P10. Keep these probes local. The exact dense Z7 update
+   diagnostic attributes 170,171 guest cycles per advancing update to
+   mission dispatch and 80,037 to defenses. Break down the mission
+   dispatcher next and count duplicate friendly sight footprints. Continue
+   the terrain and HUD timing work alongside simulation. [Bucket measurements and native overlap](audits/2026-11-19-contact-bucket-boundaries.md)
+   The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
    saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
    [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
    seven opt-in ROMs link and the Z10 stack canary leaves 8,948 bytes

@@ -50,6 +50,7 @@ The same diagnostic in the 477 advancing updates of the dense Z7 tape
 matches all 131 historical checkpoints, 480 route and frame entries, and
 nine raw unit, building, mineral, palette and two-page display cuts.
 The linked-bucket coordinate check again finds zero mismatches.
+The closed game-frame interval is 46,500–46,976.
 
 | Counter | Visits |
 | --- | ---: |
@@ -65,12 +66,11 @@ The linked-bucket coordinate check again finds zero mismatches.
 | Nodes in an exact-position whole bucket | 86 |
 | Nodes in an exact-position 8-pixel subgroup | 75,090 |
 
-An entire bucket rarely shares the mover's coordinate. Nearby members
-often share a subcell with each other while other actors occupy other
-subcells in that bucket. The 75,090 figure includes the mover when present
-and counts complete lists. An exact-position feature would need to test
-the subgroup and measure saved visits before adding maintenance to
-ordinary movement.
+In this sample, a subcell can contain a uniform group while other
+subcells in the bucket contain actors at different coordinates. The
+75,090 figure includes the mover when present and counts complete lists.
+An exact-position feature would need to test the subgroup and measure
+saved visits before adding maintenance to ordinary movement.
 
 ## Whole-bucket probes
 
@@ -89,3 +89,100 @@ of 1,883,264 guest cycles, the uniform-position probe costs 1,890,846
 cycles (+0.40%), and 4-pixel occupancy costs 1,899,873 (+0.88%).
 Their P95s are 2,185,501 and 2,196,380 against 2,179,462. Setup and
 maintenance outweigh the whole-bucket opportunity in this replay.
+
+The position probe also matches all 131 dense Z7 checkpoints, 480
+route and frame entries, and nine raw world and display cuts. Mean
+cycles rise from 2,481,146 to 2,494,689 (+0.55%). P95 rises from
+3,628,357 to 3,639,650. Keep both whole-bucket versions outside the
+release profiles.
+
+## Lazy 8-pixel child lists
+
+The 8-pixel prototype retains the stock list for full coverage and
+uses secondary child lists only when a rectangle excludes part of a
+bucket. The child lists rebuild after a position crosses a child edge,
+an actor enters or leaves its parent, or the head changes. Host
+sanitizers compare the mask to the scalar query for both bucket
+implementations, including head transfer, same-cell moves during and
+between orders, and the fallback for a radius outside the certified
+bound.
+
+The normal P10 link hits the existing 11 KiB IWRAM stack guard.
+Moving the steering function to ROM on both sides preserves the
+guard and permits a placement-matched comparison. The candidate
+adds 1,264 EWRAM bytes. Both builds match the shipping 11 sampled
+world and display states and the 1,000-call route and terrain timeline.
+
+| Busy P7 build | Mean cycles | P95 | Peak |
+| --- | ---: | ---: | ---: |
+| Shipping P10 | 1,883,264 | 2,179,462 | 2,554,931 |
+| Stock steering in ROM | 2,004,697 | 2,308,998 | 2,674,840 |
+| 8-pixel lists and steering in ROM | 2,001,572 | 2,303,795 | 2,684,366 |
+
+The child lists save 0.16% mean against the placement-matched control
+and raise peak cost 0.36%. The viable candidate is 6.28% slower than
+the shipping build. Keep this prototype outside release and revisit
+it only if a design can retain fast-code placement and demonstrate a
+larger cycle reduction.
+
+- Placement-matched P7 receipt SHA-256 `fd1451f96e0a142c99f485a9953a261b4089ddbc30e4d03c7b6e23495016443c`.
+
+## Native overlap and retask
+
+A retained Ares Blood Bath capture tracks two independent human SCVs
+through field mining and an ordinary group Move. At step 4,230 both have
+position words `(496640, 75008)`, which decode to `(1940, 293)` at Q8
+scale. Their motion words are zero and their mining orders differ. At
+step 4,273 both have Move order 6 and a common destination. One still has
+the original position and the other has moved to approximately
+`(1940.25, 292.28)`. After the next field retarget, step 4,363 shows
+distinct positions and waypoints with the same new destination.
+
+This demonstrates that native workers can occupy the same coordinates
+and separate on retask. A separate native Wasteland capture has distinct
+positions for five Marines in the three retained samples. General native
+collision and separation rules need further controlled traces.
+
+- Native Blood Bath observation SHA-256 `884d4fadf377bc4fd039448f0def4c410bbe833c5470041d59be0076762ac64d`.
+
+## Remaining cycle budget
+
+With the separate routing candidate enabled, the same 477 advancing Z7
+updates average 2,221,786
+cycles. Orders consume about 1,112,800 cycles and draw consumes
+557,908. The interval after orders and before sight adds 312,195
+cycles, and sight adds 228,981. These timed intervals show why actor
+collision filtering alone cannot reach the 561,792-cycle target.
+In particular, orders could take zero cycles and the measured
+remainder would still exceed the full budget. [Routing replay evidence](https://github.com/ggu/starcraft-gba/blob/fe95427aa2f565c089da97c1eb33e9b1afb0b24e/docs/audits/2026-11-16-resumable-frontier-budget.md#reject-a-connected-lookup-with-exact-distance-bounds)
+
+The existing update diagnostic on the shipping Z10 vector separates
+the post-orders interval. It matches 131 historical checkpoints, 480
+route and frame checks, and all nine world and display cuts. Average
+costs over 477 advancing updates are 170,171 cycles in mission
+dispatch, 80,037 in defenses, 47,138 in race state, and 13,840 in
+production. Research and the remainder add 1,055 cycles. Profile Z7's
+mission dispatcher internally before deciding which simulation data
+to cache or update incrementally.
+
+For the next sight pass, count friendly movers with the same old and
+new absolute tile, footprint phase and effective sight radius after
+the existing no-change check. Batching is useful only when several
+eligible movers have identical row deltas. Preserve per-actor
+snapshots and exact source counts and compare fog, exploration and
+minimap output before adopting the change.
+
+- Combined census and whole-bucket replay receipt SHA-256 `921010d10575bb70efe1cf38dd13a5841db6dc04cc4675063ef3054d28bbf77d`.
+- Z7 update-stage receipt SHA-256 `e689eacc557196a0dd64feab85ceb9d634ee91500240072bea189cacdb30cadd`.
+- Paired Z7 update diagnostic SHA-256 `521387ae0ac42ef0c283eab359b2f45a71390a0ca29caa138e285cf7eee99874`.
+
+## Prepared sprite fixture
+
+The prepared-input roster test raises a missing raw-85 Scarab sprite
+in the selected Terran and Protoss headers. A clean `2655cb22` archive
+reproduces both failures with the same private inputs. The current
+exporter has raw 85, and Zerg's selected header already exports it.
+Protoss's alternate bank has the sprite but follows the stale P7
+header in the compiler include order. Refresh the selected complete
+private banks before using the roster fixture as a prepared-build
+release gate.
