@@ -114,6 +114,10 @@ static void play_match(int map, int bots, int human)
     check(screen == SCREEN_PLAY, "match remains playable for save");
     press(KEY_START);
     check(screen == SCREEN_PAUSE, "pause with Start");
+    int paused_frame = frame, paused_minerals = minerals;
+    for (int tick = 0; tick < 800; ++tick) game_update(0, 0);
+    check(screen == SCREEN_PAUSE && frame == paused_frame && minerals == paused_minerals,
+          "paused match holds the game clock and minerals");
     press(KEY_B);
     int saved_frame = frame;
     check(pause_notice == 1, "save with B");

@@ -3556,9 +3556,16 @@ terrain_blocked(int col, int row)
 #endif
 }
 
+#if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
+#include "frontier_route_cache.h"
+#endif
+
 static void
 invalidate_path_grid(void)
 {
+#if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
+    frontier_route_cache_invalidate();
+#endif
 #ifdef SC64_DEPOT_OWNER_LIST_PROBE
     sc64_depot_owner_lists_valid = 0;
 #endif
@@ -3785,6 +3792,10 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
     int goal_col = limit(tx / 16, 0, MAP_COLS - 1);
     int goal_row = limit(ty / 16, 0, MAP_ROWS - 1);
     int head = 0, best = -1, bestd = 0x7fffffff;
+#if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
+    int cached = frontier_route_cache_get(start, goal_col + goal_row * MAP_COLS, tx, ty, next_x, next_y);
+    if (cached >= 0) return cached;
+#endif
     int tail = walk_search_begin(start, start_col + start_row * 256);
     int goal_open = SC64_GRID_GET(path_walkable, goal_col + goal_row * MAP_COLS);
     while (head < tail) {
@@ -3805,6 +3816,10 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 	}
 	tail = walk_search_expand(packed, col, row, cell, start, tail);
     }
+#if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
+    frontier_route_cache_put(start, goal_col + goal_row * MAP_COLS,
+                             best < 0 ? -1 : best == start ? -2 : bfs_first[best]);
+#endif
     if (best < 0)
 	return 0;
     if (best == start) {
@@ -11821,6 +11836,10 @@ sc64_minimap_dot(int x, int y, u8 color)
 #endif
 }
 
+#if defined(SC_FRONTIER_FACTION) && !defined(SC64_IMPORTED_MISSION)
+#include "frontier_minimap.h"
+#endif
+
 static void
 draw_minimap(void)
 {
@@ -11855,6 +11874,8 @@ draw_minimap(void)
     sc64_minimap_draw_terrain(map_x, map_y,
                               sc64_minimap_visible, sc64_minimap_explored);
 #endif
+#elif defined(SC_FRONTIER_FACTION)
+    frontier_minimap_draw_terrain(map_x, map_y);
 #elif defined(SC_ORIGINAL_SKIRMISH)
     for (int row = 0; row < map_size; row++) {
         int grid_row = (2 * row + 1) * MAP_ROWS / (2 * map_size);

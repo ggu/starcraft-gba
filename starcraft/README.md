@@ -19,19 +19,6 @@ Box selection requires a ROM rebuilt from the updated source; an older copied RO
 
 An optional build replaces menu scrolling with a hold-B command ring: aim, hold B, press a direction and release. See [`docs/COMMAND-RING.md`](../docs/COMMAND-RING.md).
 
-Frontier Skirmish is a separate build with two original 64×64 battle maps,
-Transit Yard and Stone Gardens. Choose the map with Left/Right and one to
-three free-for-all computer opponents with Up/Down. A starts the match and
-B loads a saved match. All seats use the same roster. The pause screen
-saves the map and opponent count with the live match. Victory requires
-eliminating the other players' remaining units and buildings.
-
-Run `make original-skirmish` to build and verify
-`build/Frontier-Skirmish-GBA.gba`. Run `./dev play frontier` to build
-and open it in mGBA, and `make test-original-skirmish` to check both maps
-and all six map/opponent combinations. Frontier builds from the source
-tree without a reference ROM or extracted assets.
-
 In the optional race ROMs, the light-blue bar above a Protoss unit or building
 shows shields; the lower bar shows HP. An empty blue track means shields are
 depleted. The selection panel shows shields in blue beside the green hit points,
@@ -57,6 +44,24 @@ opens; buttons on the result screen still respond immediately.
 Select an empty worker and press A on a visible mineral field to begin gathering trips of up to eight minerals; STOP leaves the worker idle. Loaded workers finish their current trip before accepting a mineral reassignment. The current STOP command clears carried resources, so avoid STOP while a worker is carrying cargo. To build, select an SCV, open B, choose a structure, move to the site, and press A. Sites snap to an 8-pixel grid and a Refinery snaps to its geyser. The footprint is green when A will place it, red when the site is blocked, and gold when the site is clear but the build still needs minerals, a prerequisite, or a selected SCV; the panel below names the reason. Barracks require a completed Supply Depot; Academies require a completed Barracks. Refineries can only be placed on one of the two marked geysers. Select a worker and press A on a completed Refinery to assign gas harvesting, or select the Refinery and press A to assign an idle worker.
 
 Command Centers train SCVs. Barracks train Marines by default; select a Barracks and press R to choose Firebat or Medic. Production queues hold five units and reserve supply while training. A completed Depot provides eight displayed supply. The Engineering Bay offers up to two weapon and armor upgrades.
+
+## Frontier Skirmish
+
+Run `make frontier-factions` to build `Frontier-Foundry-GBA.gba`,
+`Frontier-Rovers-GBA.gba` and `Frontier-Bulwark-GBA.gba` in `build/`.
+Each cartridge defaults to its named faction and supports both original
+64×64 maps, Transit Yard and Stone Gardens. Move between setup rows with
+Up/Down and change each choice with Left/Right. Select a faction for
+yourself and each of one to three free-for-all computer opponents. A
+starts the match and B loads a saved match. Pause and save to retain
+the lineup and live match on that cartridge. Victory requires eliminating
+the other players' remaining units and buildings.
+
+Run `./dev play frontier-foundry` to open Foundry in mGBA, or substitute
+`frontier-rovers` or `frontier-bulwark`. Run `make test-frontier-factions`
+for the faction tests. The earlier single-roster build is also available
+with `make original-skirmish`. All Frontier builds use assets in the source
+tree.
 
 ## Fidelity and limits
 
