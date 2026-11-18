@@ -9199,8 +9199,8 @@ static inline int race_bc_order_dispatch_needed(const Unit *q,int slot,int recha
 }
 #endif
 
-#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(GBA_HOST)
-static void __attribute__((noinline,long_call))
+#ifdef SC64_IMPORTED_MISSION
+static void SC64_ORDERS_ATTR
 #else
 static void GBA_HOT
 #endif

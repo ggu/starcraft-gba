@@ -338,6 +338,10 @@ static int sc64_range_route_usable_slots(void);
     !defined(SC64_ROUTE_FACILITY_FIFO_PROBE) && !defined(SC64_ROUTE_POINT_TAIL_PROBE) && \
     SC64_ROUTE_GRID_CELLS_PER_BYTE == 8
 #define SC64_FACILITY_FRONTIERS 1
+#if defined(SC64_Z7_RUNTIME) && !defined(SC64_Z8_RUNTIME)
+/* Keep the older Z7 link's IWRAM stack reserve. */
+#define SC64_ORDERS_ROM 1
+#endif
 enum { SC64_FACILITY_FRONTIER_SIDE = 64, SC64_FACILITY_FRONTIER_CAPACITY = 128,
        SC64_FACILITY_FRONTIER_COUNT = 4 };
 typedef struct __attribute__((__may_alias__)) {
@@ -366,6 +370,11 @@ static void sc64_facility_frontiers_reset(void)
 #else
 #define sc64_facility_frontiers_reset() ((void)0)
 #define SC64_UPDATE_ORDERS() update_orders()
+#endif
+#if !defined(GBA_HOST) && (defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) || defined(SC64_ORDERS_ROM))
+#define SC64_ORDERS_ATTR __attribute__((noinline,long_call))
+#else
+#define SC64_ORDERS_ATTR GBA_HOT
 #endif
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* Rebind field bases after map-shape changes. Return false for invalid or
