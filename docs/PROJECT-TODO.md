@@ -64,8 +64,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   traced updates the minimap costs 89,410 cycles, the command panel
   59,082, and the resource strip 21,056 on average. The resource strip
   changes in 3 of 40 consecutive frame pairs, and the lower-left area
-  changes in 2. The minimap area changes in every pair. Prioritize
-  reusing the stable panels and batching minimap drawing, and check
+  changes in 2. The minimap area changes in every pair.
+
+- **Original-art minimap drawing (P1):** batch adjacent terrain cells
+  with the same shade while keeping the unit, building, and viewport
+  overlays. Mean draw cost in the 40-unit replay falls from 506,161 to
+  462,920 cycles and the complete update averages 700,949 cycles
+  (23.94 emulated updates per second). The normal opening still runs at
+  29.89 emulated updates per second. Both saves and all 28 checkpoints
+  match the preceding build. Reuse the stable HUD panels next and check
   display timing on GBA hardware.
 
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and

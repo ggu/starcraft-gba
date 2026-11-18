@@ -11694,20 +11694,22 @@ draw_minimap(void)
                               sc64_minimap_visible, sc64_minimap_explored);
 #endif
 #else
-    for (row = 0; row < MAP_ROWS; row++)
-	for (col = 0; col < MAP_COLS; col++) {
-	    if (!cell_explored(col, row))
-		continue;
-#ifdef SC64_IMPORTED_MISSION
-	    x = map_x + col * map_size / MAP_COLS;
-	    y = map_y + row * map_size / MAP_ROWS;
-	    gfx_pixel(x, y, SC64_GRID_GET(visible, col + row * MAP_COLS) ? C_GRASS : C_FOG);
-#else
-	    x = 185 + col * 2;
-	    y = 126 + row * 2;
-	    gfx_rect(x, y, 2, 2, SC64_GRID_GET(visible, col + row * MAP_COLS) ? C_GRASS : C_FOG);
-#endif
-	}
+    /* Neighboring tiles of the same shade can be painted together.
+     * Unexplored tiles leave the panel's background and frame intact. */
+    for (row = 0; row < MAP_ROWS; row++) {
+        int start = 0, shade = -1;
+        for (col = 0; col <= MAP_COLS; col++) {
+            int next = -1;
+            if (col < MAP_COLS && cell_explored(col, row))
+                next = SC64_GRID_GET(visible, col + row * MAP_COLS) ? C_GRASS : C_FOG;
+            if (next == shade)
+                continue;
+            if (shade >= 0)
+                gfx_rect(185 + start * 2, 126 + row * 2, (col - start) * 2, 2, (u8)shade);
+            start = col;
+            shade = next;
+        }
+    }
 #endif
     for (i = 0; i < MAX_BUILDINGS; i++) {
 	if (!b[i].alive) continue;
