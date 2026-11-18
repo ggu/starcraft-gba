@@ -66,6 +66,8 @@ static const u8 game_audio_heard[3] = { 0xffu, 1u << GAME_AUDIO_ALERT_RESEARCH, 
 /* Observer words after the snapshot (EWRAM has no room for them in the late
  * campaigns): when the last attack alert played, and the alerts waiting. */
 enum { GAME_AUDIO_STATE_ATTACK_TICK, GAME_AUDIO_STATE_PENDING, GAME_AUDIO_STATE_WORDS };
+#define GAME_AUDIO_STATE_WORD_COUNT 2
+_Static_assert(GAME_AUDIO_STATE_WORDS == GAME_AUDIO_STATE_WORD_COUNT, "audio state words");
 enum { GAME_AUDIO_PENDING_UNIT = 1, GAME_AUDIO_PENDING_BUILDING = 2,
        GAME_AUDIO_PENDING_RESEARCH = 4, GAME_AUDIO_PENDING_UPGRADE = 8,
        GAME_AUDIO_PENDING_NUCLEAR_WARNING = 16 };
@@ -76,12 +78,27 @@ int game_audio_last_alert = -1;
 u32 game_audio_alert_lines[GAME_AUDIO_ALERT_KINDS];
 static u16 game_audio_snapshot[MAX_UNITS + MAX_BUILDINGS + GAME_AUDIO_STATE_WORDS];
 #define GAME_AUDIO_SNAPSHOT game_audio_snapshot
-#else
-_Static_assert(GBA_AUDIO_MIX_BYTES + (MAX_UNITS + MAX_BUILDINGS + GAME_AUDIO_STATE_WORDS) * 2u <= GBA_AUDIO_ARENA_BYTES,
-               "audio snapshot exceeds the VRAM arena");
+#elif GBA_AUDIO_MIX_BYTES + (MAX_UNITS + MAX_BUILDINGS + GAME_AUDIO_STATE_WORD_COUNT) * 2 <= \
+      GBA_AUDIO_ARENA_BYTES
 #define GAME_AUDIO_SNAPSHOT ((volatile u16 *)(GBA_AUDIO_ARENA + GBA_AUDIO_MIX_BYTES))
+#else
+/* A unit table too large for the arena keeps the unit snapshot and the
+ * observer words there and moves only the building snapshot to work RAM. */
+_Static_assert(GBA_AUDIO_MIX_BYTES + (MAX_UNITS + GAME_AUDIO_STATE_WORDS) * 2u <= GBA_AUDIO_ARENA_BYTES,
+               "audio unit snapshot exceeds the VRAM arena");
+#define GAME_AUDIO_SNAPSHOT ((volatile u16 *)(GBA_AUDIO_ARENA + GBA_AUDIO_MIX_BYTES))
+#define GAME_AUDIO_BUILDINGS_IN_RAM 1
+static u16 game_audio_building_snapshot[MAX_BUILDINGS];
 #endif
+#ifdef GAME_AUDIO_BUILDINGS_IN_RAM
+#define GAME_AUDIO_STATE (GAME_AUDIO_SNAPSHOT + MAX_UNITS)
+#define GAME_AUDIO_BUILDING_SNAP(i) game_audio_building_snapshot[i]
+#else
 #define GAME_AUDIO_STATE (GAME_AUDIO_SNAPSHOT + MAX_UNITS + MAX_BUILDINGS)
+#define GAME_AUDIO_BUILDING_SNAP(i) snap[MAX_UNITS + (i)]
+#endif
+/* VRAM bytes the snapshot and observer words take after the mixer. */
+#define GAME_AUDIO_ARENA_USED_BYTES ((u32)(GAME_AUDIO_STATE + GAME_AUDIO_STATE_WORDS - GAME_AUDIO_SNAPSHOT) * 2u)
 
 /* Input edges come from the main loop's record of this tick's held keys, so
  * game_update() itself stays untouched (its inlining shapes IWRAM use). */
@@ -488,7 +505,7 @@ static void game_audio_observe(void)
     }
     for (i = 0; i < MAX_BUILDINGS; i++) {
         const Building *q = &b[i];
-        u32 prev = snap[MAX_UNITS + i];
+        u32 prev = GAME_AUDIO_BUILDING_SNAP(i);
         if (!q->alive && !prev) continue;
         u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE |
                   (q->under_construction ? GAME_AUDIO_SNAPSHOT_CONSTRUCTING : 0) : 0;
@@ -507,7 +524,7 @@ static void game_audio_observe(void)
                     game_audio_emit(GAME_AUDIO_BUILT, game_audio_building_raw(q));
             }
         }
-        snap[MAX_UNITS + i] = (u16)now;
+        GAME_AUDIO_BUILDING_SNAP(i) = (u16)now;
     }
     if (selected_building >= 0 && selected_building < MAX_BUILDINGS)
         selection = selection * 31u + 0x10000u + (u32)selected_building;

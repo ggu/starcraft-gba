@@ -2,6 +2,10 @@
 #define SC64_CONTACT_H
 #include "sc64_scarab_presence.h"
 #include "sc64_unit_index.h"
+#ifndef SC64_UB_HEAD
+/* Fixtures that supply their own byte bucket arrays. */
+#define SC64_UB_HEAD(cell) sc64_unit_bucket_head[cell]
+#endif
 
 /* SC64_CONTACT_CACHE: cached collision facts and one-pass blocked steering.
  *
@@ -226,7 +230,7 @@ sc64_contact_step_clear(const Unit *q, int nx, int ny, int strict)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != (int)SC64_UNIT_IX_NONE;
+            for (i = SC64_UB_HEAD(col + row * MAP_COLS); i != (int)SC64_UNIT_IX_NONE;
                  i = sc64_unit_bucket_next[i]) {
                 const Unit *c = &u[i];
                 u8 cc;
@@ -624,7 +628,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != (int)SC64_UNIT_IX_NONE;
+            for (i = SC64_UB_HEAD(col + row * MAP_COLS); i != (int)SC64_UNIT_IX_NONE;
                  i = sc64_unit_bucket_next[i]) {
                 const Unit *c = &u[i];
                 u8 cc;

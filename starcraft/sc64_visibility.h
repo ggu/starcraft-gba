@@ -115,9 +115,25 @@ typedef struct {
 
 static u8 sc64_visible_sources[MAP_CELLS];
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-/* Exact nine-bit counts avoid saturation when every actor shares one cell. */
+/* Exact counts avoid saturation when every actor shares one cell: a low
+ * byte per cell plus a high plane of one bit per cell (nine-bit counts) or,
+ * for unit tables whose actors can exceed 511, two bits (ten-bit counts). */
+#if MAX_UNITS + MAX_BUILDINGS <= 511
 static u8 sc64_visible_sources_high[(MAP_CELLS + 7) / 8];
-_Static_assert(MAX_UNITS + MAX_BUILDINGS <= 511, "nine-bit source count bound");
+#else
+#define SC64_VISIBILITY_TEN_BIT 1
+static u8 sc64_visible_sources_high[(MAP_CELLS + 3) / 4];
+_Static_assert(MAX_UNITS + MAX_BUILDINGS <= 1023, "ten-bit source count bound");
+#define SC64_VIS_HIGH2(cell) \
+    ((sc64_visible_sources_high[(unsigned)(cell) >> 2] >> (((unsigned)(cell) & 3u) * 2u)) & 3u)
+static inline void
+sc64_visibility_high2_set(int cell, unsigned value)
+{
+    u8 *p = &sc64_visible_sources_high[(unsigned)cell >> 2];
+    unsigned shift = ((unsigned)cell & 3u) * 2u;
+    *p = (u8)((*p & ~(3u << shift)) | ((value & 3u) << shift));
+}
+#endif
 #endif
 static u8 sc64_minimap_visible[24 * 24];
 static u8 sc64_minimap_explored[24 * 24];
@@ -218,7 +234,35 @@ sc64_minimap_explored_add(int cell)
 }
 #endif
 
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_VISIBILITY_TEN_BIT
+static unsigned
+sc64_visibility_source_count(int cell)
+{
+    return sc64_visible_sources[cell] | (SC64_VIS_HIGH2(cell) << 8);
+}
+
+static void
+sc64_visibility_source_change(int cell, int add)
+{
+    unsigned count = sc64_visibility_source_count(cell);
+    if (add) {
+        if (!count) {
+            SC64_MINIMAP_VISIBLE_ADD(cell); SC64_SIGHT_RECORD_VISIBLE(cell);
+            SC64_GRID_SET(visible, cell, 1);
+        }
+        ++count;
+    } else if (count) {
+        --count;
+        if (!count) {
+            SC64_MINIMAP_VISIBLE_REMOVE(cell);
+            SC64_GRID_SET(visible, cell, 0);
+        }
+    } else return;
+    sc64_visible_sources[cell] = (u8)count;
+    if ((count & 0xffu) == (add ? 0u : 0xffu))
+        sc64_visibility_high2_set(cell, count >> 8);
+}
+#elif defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 static unsigned
 sc64_visibility_source_count(int cell)
 {
@@ -579,7 +623,43 @@ sc64_visibility_row_span(int x, int y, int row, int radius, int extent,
     *last = col1;
 }
 
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_VISIBILITY_TEN_BIT
+/* As below, with a two-bit high count per cell. */
+static void __attribute__((noinline))
+sc64_visibility_apply_count_span(int first_cell, int last_cell, int add)
+{
+    int cell;
+    if (add) {
+        for (cell = first_cell; cell <= last_cell; ++cell) {
+            unsigned low = sc64_visible_sources[cell];
+            if (low == 255u) {
+                sc64_visibility_high2_set(cell, SC64_VIS_HIGH2(cell) + 1u);
+            } else if (!low && !SC64_VIS_HIGH2(cell)) {
+                SC64_MINIMAP_VISIBLE_ADD(cell); SC64_SIGHT_RECORD_VISIBLE(cell);
+                SC64_GRID_SET(visible, cell, 1);
+            }
+            sc64_visible_sources[cell] = (u8)(low + 1u);
+        }
+    } else {
+        for (cell = first_cell; cell <= last_cell; ++cell) {
+            unsigned low = sc64_visible_sources[cell];
+            if (!low) {
+                unsigned high = SC64_VIS_HIGH2(cell);
+                if (!high) continue;
+                sc64_visibility_high2_set(cell, high - 1u);
+                sc64_visible_sources[cell] = 255;
+            } else {
+                --low;
+                sc64_visible_sources[cell] = (u8)low;
+                if (!low && !SC64_VIS_HIGH2(cell)) {
+                    SC64_MINIMAP_VISIBLE_REMOVE(cell);
+                    SC64_GRID_SET(visible, cell, 0);
+                }
+            }
+        }
+    }
+}
+#elif defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 /* Counts stay within the asserted source-slot bound. For ordinary overlap,
  * only the low byte changes; inspect the ninth bit at boundary values. */
 static void __attribute__((noinline))

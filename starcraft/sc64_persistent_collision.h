@@ -6,6 +6,7 @@
 /* Exact broad-phase index for moving units. Built only for update_orders();
  * all candidates still use the engine's original overlap predicate. */
 static Sc64UnitIx sc64_unit_bucket_head[MAP_CELLS];
+#define SC64_UB_HEAD(cell) sc64_unit_bucket_head[cell]
 static Sc64UnitIx sc64_unit_bucket_next[MAX_UNITS];
 static Sc64UnitIx sc64_unit_bucket_prev[MAX_UNITS];
 static u16 sc64_unit_bucket_cell[MAX_UNITS];
@@ -179,7 +180,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != (int)SC64_UNIT_IX_NONE;
+            for (i = SC64_UB_HEAD(col + row * MAP_COLS); i != (int)SC64_UNIT_IX_NONE;
                  i = sc64_unit_bucket_next[i])
                 if (&u[i] != q && u[i].alive && !(SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i]))) {
 #ifdef SC64_P6_COMBAT_ENABLED

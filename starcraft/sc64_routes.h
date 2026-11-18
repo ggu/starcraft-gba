@@ -834,9 +834,21 @@ enum {
 #endif
 
 /* The actor namespace is bounded by the game ingress check. The packed
- * fields are accessed as fields, never through unaligned integer pointers. */
+ * fields are accessed as fields, never through unaligned integer pointers.
+ * Combined targets take nine bits, or ten for unit tables whose actors
+ * exceed 512; both fit the same packed words. */
+#if defined(MAX_UNITS) && defined(MAX_BUILDINGS) && MAX_UNITS + MAX_BUILDINGS > 512
+#define SC64_RANGE_TARGET_BITS 10
+#else
+#define SC64_RANGE_TARGET_BITS 9
+#endif
+#define SC64_RANGE_TARGET_MAX ((1 << SC64_RANGE_TARGET_BITS) - 1)
+#if defined(MAX_UNITS) && defined(MAX_BUILDINGS)
+_Static_assert(MAX_UNITS + MAX_BUILDINGS <= SC64_RANGE_TARGET_MAX + 1,
+               "range route targets fit the packed field");
+#endif
 typedef struct __attribute__((packed, aligned(2))) Sc64RangeRouteJob {
-    unsigned target : 9;
+    unsigned target : SC64_RANGE_TARGET_BITS;
     unsigned tx : 11;
     unsigned ty : 11;
     unsigned minimum : 13;
@@ -866,7 +878,7 @@ static unsigned short sc64_range_route_last_units;
 #define SC64_RANGE_RECORD_UNITS(n) ((void)(n))
 #endif
 typedef struct __attribute__((packed, aligned(2))) Sc64RangeRouteSnapshotKey {
-    unsigned target : 9, tx : 11, ty : 11, minimum : 13, maximum : 13, valid : 1;
+    unsigned target : SC64_RANGE_TARGET_BITS, tx : 11, ty : 11, minimum : 13, maximum : 13, valid : 1;
 } Sc64RangeRouteSnapshotKey;
 _Static_assert(sizeof(Sc64RangeRouteSnapshotKey) == 8, "range snapshot layout");
 static Sc64RangeRouteSnapshotKey sc64_range_route_snapshot_key;
@@ -1368,7 +1380,7 @@ static int sc64_range_route_next(int target, int tx, int ty,
     Sc64RangeRouteJob job = {0}, active;
     int status, nx = -1, ny = -1;
     unsigned exits = 0;
-    if (!next_col || !next_row || target < 0 || target > 0x1ff ||
+    if (!next_col || !next_row || target < 0 || target > SC64_RANGE_TARGET_MAX ||
         tx < 0 || ty < 0 || tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16 ||
         minimum < 0 || maximum < minimum || maximum > 4096 ||
         col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS)

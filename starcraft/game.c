@@ -387,7 +387,12 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 
 #if defined(SC64_RACES)
 #if defined(SC64_ZP_FULL_STORAGE)
+/* SC64_ZP_UNIT_SLOTS sizes the unit table of a full-storage profile. */
+#ifdef SC64_ZP_UNIT_SLOTS
+#define MAX_UNITS SC64_ZP_UNIT_SLOTS
+#else
 #define MAX_UNITS 240
+#endif
 #elif defined(SC64_ZP_CAMPAIGN_STORAGE) && SC64_CAMPAIGN_RACE == 2
 #define MAX_UNITS 240
 #elif defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)

@@ -16,11 +16,21 @@
  * This header holds no game state. Callers own the row storage, its
  * capacity and the resolution callback. */
 
+/* target_meta holds the combined target, owner and damage class in 15
+ * bits; unit tables whose actors exceed 512 use the spare top bit for a
+ * ten-bit target, with the same six-byte row. */
+#if defined(MAX_UNITS) && defined(MAX_BUILDINGS) && MAX_UNITS + MAX_BUILDINGS > 512
+#define SC64_IMPACT_TARGET_MASK 0x03ffu
+#define SC64_IMPACT_TARGET_LIMIT 1024u
+#define SC64_IMPACT_OWNER_SHIFT 10u
+#define SC64_IMPACT_CLASS_SHIFT 13u
+#else
 #define SC64_IMPACT_TARGET_MASK 0x01ffu
 #define SC64_IMPACT_TARGET_LIMIT 512u
 #define SC64_IMPACT_OWNER_SHIFT 9u
-#define SC64_IMPACT_OWNER_LIMIT 8u
 #define SC64_IMPACT_CLASS_SHIFT 12u
+#endif
+#define SC64_IMPACT_OWNER_LIMIT 8u
 #define SC64_IMPACT_CLASS_LIMIT 7     /* stored as class+1; 0 is the legacy path */
 #define SC64_IMPACT_DAMAGE_MASK 0x0fffu
 #define SC64_IMPACT_DAMAGE_LIMIT 4096
@@ -31,7 +41,7 @@
 #define SC64_IMPACT_CAPACITY_LIMIT 255u
 
 typedef struct {
-    uint16_t target_meta;  /* target | owner << 9 | (damage class + 1) << 12 */
+    uint16_t target_meta;  /* target | owner << OWNER_SHIFT | (damage class + 1) << CLASS_SHIFT */
     uint16_t damage_hits;  /* per-impact damage | (impacts - 1) << 12 */
     uint8_t steps;         /* end-of-update steps left; zero never appears */
     uint8_t source_type;   /* engine actor type that launched the weapon */
