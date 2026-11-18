@@ -107,6 +107,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #error "point prefix requires the exact linear packed route path"
 #endif
 #endif
+#if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
+#error "point component witnesses require resumable point prefixes"
+#endif
 
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
@@ -2148,8 +2151,13 @@ static void __attribute__((noinline)) sc64_route_exact(int slot)
 static int __attribute__((noinline)) sc64_route_reaches(int slot, int cell)
 {
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
-    if (sc64_point_prefix_find(slot) &&
-        sc64_route_get(slot, cell) != SC64_ROUTE_UNREACHABLE) return 1;
+    if (sc64_point_prefix_find(slot)) {
+        if (sc64_route_get(slot, cell) != SC64_ROUTE_UNREACHABLE) return 1;
+#ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
+        int connected = sc64_point_prefix_component_reaches(slot, cell);
+        if (connected >= 0) return connected;
+#endif
+    }
 #endif
     if (SC64_ROUTE_LAZY(slot) &&
         SC64_GRID_GET(path_walkable, cell) &&

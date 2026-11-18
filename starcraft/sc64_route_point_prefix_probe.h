@@ -161,4 +161,30 @@ static void sc64_point_prefix_require(int slot, int cell)
         (void)sc64_point_prefix_complete(slot);
 }
 
+#ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
+/* A complete field seeded at one open tile describes exactly one connected
+ * component. If it includes either endpoint, it decides their connectivity
+ * without consuming that field or completing the requested one. */
+static int __attribute__((noinline)) sc64_point_prefix_component_reaches(int slot, int cell)
+{
+    enum { MAX_WITNESSES = 4 };
+    const unsigned cells = (unsigned)MAP_COLS * (unsigned)MAP_ROWS;
+    const unsigned root = sc64_route_goal[slot];
+    if (root >= cells || !SC64_GRID_GET(path_walkable, root)) return -1;
+    const int active_slots = SC64_ROUTE_ACTIVE_SLOTS;
+    unsigned checked = 0;
+    for (int witness = 0; witness < active_slots && checked < MAX_WITNESSES; ++witness) {
+        if (witness == slot || sc64_route_valid[witness] != 1 || SC64_ROUTE_LAZY(witness) ||
+            sc64_point_prefix_find(witness)) continue;
+        const unsigned seed = sc64_route_goal[witness];
+        if (seed >= cells || !SC64_GRID_GET(path_walkable, seed)) continue;
+        ++checked;
+        int contains_root = sc64_route_get(witness, (int)root) != SC64_ROUTE_UNREACHABLE;
+        int contains_cell = sc64_route_get(witness, cell) != SC64_ROUTE_UNREACHABLE;
+        if (contains_root || contains_cell) return contains_root && contains_cell;
+    }
+    return -1;
+}
+#endif
+
 #endif

@@ -793,6 +793,9 @@ static void check_point_prefix_resume(void)
     u32 metadata = state_hash();
     for (int i = 0; i < SC64_POINT_PREFIX_SLOTS; ++i) {
         assert(SC64_ROUTE_REACHES(slots[i], distant));
+#ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
+        SC64_ROUTE_EXACT(slots[i]);
+#endif
         assert(!sc64_point_prefix_find(slots[i]));
         reference_bfs(&oracle[POOL], first + 10 * i);
         for (int cell = 0; cell < MAP_CELLS; ++cell)
@@ -879,6 +882,86 @@ static void check_point_prefix_tail_exchange(void)
 #endif
 #endif
 
+#ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
+static void point_component_map(void)
+{
+    race_cols = race_rows = 128;
+    memset(desired, 1, sizeof(desired));
+    for (int row = 0; row < MAP_ROWS; ++row) {
+        desired[40 + row * MAP_COLS] = 0;
+        desired[80 + row * MAP_COLS] = 0;
+    }
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    sc64_route_builds = sc64_route_hits = 0;
+}
+
+static void check_point_component_witness(void)
+{
+    const int left = 20 + 32 * 128, left_far = 20 + 100 * 128;
+    const int middle = 60 + 32 * 128, middle_far = 60 + 100 * 128;
+    const int right = 100 + 32 * 128, wall = 40 + 32 * 128;
+    u32 formation_meta[2];
+
+    for (int complete = 0; complete <= 1; ++complete) {
+        point_component_map();
+        int slot = sc64_route_slot_for(left, left + 1);
+        int witness = sc64_route_slot(left_far);
+        assert(slot >= 0 && witness >= 0 && sc64_point_prefix_find(slot));
+        assert(sc64_route_get(slot, left_far) == SC64_ROUTE_UNREACHABLE);
+        u32 before = state_hash();
+        assert(SC64_ROUTE_REACHES(slot, left_far));
+        assert(!SC64_ROUTE_REACHES(slot, middle_far));
+        assert(sc64_point_prefix_find(slot) && state_hash() == before);
+
+        if (complete) SC64_ROUTE_EXACT(slot);
+        int hints[] = {slot, -1, -1, -1}, roots[] = {left, -1, -1, -1}, next = 0;
+        u32 witness_age = sc64_route_age[witness];
+        assert(sc64_route_cells_connected(&left_far, 1, &left, 1, &middle_far, 1,
+                                           hints, roots, &next, 0) == 1);
+        assert(hints[0] == slot && roots[0] == left && next == 1);
+        assert(sc64_route_age[witness] == witness_age && sc64_route_hits == 1);
+        assert(sc64_route_builds == 2 && !!sc64_point_prefix_find(slot) == !complete);
+        formation_meta[complete] = state_hash();
+    }
+    assert(formation_meta[0] == formation_meta[1]);
+
+    point_component_map();
+    int slot = sc64_route_slot_for(left, left + 1);
+    assert(sc64_route_slot(middle) >= 0);
+    assert(!SC64_ROUTE_REACHES(slot, middle_far) && sc64_point_prefix_find(slot));
+
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    assert(sc64_route_slot(right) >= 0);
+    assert(!SC64_ROUTE_REACHES(slot, middle_far) && !sc64_point_prefix_find(slot));
+
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    int witness = sc64_route_slot(wall);
+    assert(sc64_route_get(witness, left) != SC64_ROUTE_UNREACHABLE);
+    assert(sc64_route_get(witness, middle_far) != SC64_ROUTE_UNREACHABLE);
+    assert(!SC64_ROUTE_REACHES(slot, middle_far) && !sc64_point_prefix_find(slot));
+
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    witness = sc64_route_slot_for(left_far, left_far + 1);
+    assert(sc64_point_prefix_find(witness));
+    assert(sc64_route_get(witness, left) == SC64_ROUTE_UNREACHABLE);
+    assert(SC64_ROUTE_REACHES(slot, left_far) && !sc64_point_prefix_find(slot));
+    assert(sc64_point_prefix_find(witness));
+
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    witness = sc64_route_slot(left_far);
+    SC64_ROUTE_PF(witness) |= SC64_ROUTE_FLAG_STALE;
+    assert(SC64_ROUTE_REACHES(slot, left_far) && !sc64_point_prefix_find(slot));
+    check_grid_unchanged();
+    puts("point witnesses preserve yes/no/fallback, selected slot and logical cache metadata");
+}
+#endif
+
 #ifdef SC64_ROUTE_KEEP_FIELDS
 /* Adopt an exact donor as lazy after a harmless closure, then request a
  * nearby goal on that gradient. Closing a tile on the path must instead
@@ -919,6 +1002,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-component-only")) {
+        check_point_component_witness();
+        return 0;
+    }
+#endif
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-prefix-only")) {
         check_point_prefix_resume();
