@@ -1404,6 +1404,12 @@ save/source-owner and timing evidence; do not advertise unwired components.
   its shared Egg service applies to custom games, not Z8–Z10 production.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
   and 1–3 independently raced AIs. Larger roster and behavior gaps remain below.
+- The [repeat-command save audit](audits/2026-11-18-saved-repeat-command.md)
+  traces a normal Terran Outpost reload that changed 22 attack-move orders
+  to move orders. Preserving only the remembered command keeps selection
+  clear and wins from a fresh SRAM load on the unchanged tape. All four
+  ARM products pass sampled fresh loads. A human Blood Bath win, wider
+  campaign SRAM replay and hardware timing remain open.
 - The [shared SC64 menu controls](RACE-CAMPAIGNS.md#menus-and-session-settings)
   add title Options, a custom map preview, and a field pause page for objectives,
   settings and returning to title. Cursor Speed and Menu Sound are session
