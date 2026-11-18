@@ -178,7 +178,9 @@ static void test_retained_point_with_range_planes(void)
            sc64_route_field[SC64_ROUTE_SLOTS - 1] == last_scratch);
     puts("PASS retained point backing moves while both claimed range planes stay fixed");
 }
-#elif defined(SC64_ROUTE_POINT_PREFIX_PROBE)
+#endif
+
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
 static void test_point_prefix_with_range_planes(void)
 {
     const int goal = 32 + 32 * 128;
@@ -212,9 +214,11 @@ int main(void)
     test_copy_alignment_and_remainders();
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
     test_retained_point_with_range_planes();
-#elif defined(SC64_ROUTE_POINT_PREFIX_PROBE)
+#endif
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     test_point_prefix_with_range_planes();
-#else
+#endif
+#if !defined(SC64_ROUTE_POINT_POINTER_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
     test_lazy_plane_reservation();
 #endif
     return 0;
