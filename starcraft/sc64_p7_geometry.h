@@ -16,6 +16,12 @@
 #endif
 #endif
 #ifdef SC64_P7_ACTORS
+static int sc64_p7_actor_rect_center_valid(int x,int y)
+{
+    /* Doubling the centre must leave room for all supported actor extents. */
+    return x>=0 && y>=0 && x<=(INT_MAX-256)/2 && y<=(INT_MAX-256)/2;
+}
+
 static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
                                       int *left,int *top,int *right,int *bottom)
 {
@@ -24,11 +30,8 @@ static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
 #else
     int type,l,u,r,d;
 #endif
-    /* Source centers are doubled below. Keep room for the largest supported
-     * actor extents on the positive edge so malformed INT_MAX coordinates
-     * cannot overflow either the multiply or the rectangle edge additions. */
-    if (!left || !top || !right || !bottom || raw>227u || x<0 || y<0 ||
-        x>(INT_MAX-256)/2 || y>(INT_MAX-256)/2)
+    if (!left || !top || !right || !bottom || raw>227u ||
+        !sc64_p7_actor_rect_center_valid(x,y))
         return 0;
 #if defined(SC64_P7_RECT_TABLES) && !defined(SC64_FACT_TABLE_GENERATOR)
     if (!sc64_fact_p7_rect_extents(raw,building,&l,&u,&r,&d)) return 0;

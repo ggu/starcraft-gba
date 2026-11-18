@@ -122,3 +122,33 @@ not full matches, elimination fidelity, or performance on hardware.
 | 24 same-build continuation cases | `131fc4f600c6d074f5ed3566ab7ddd3490f9d8d03a2ef9f2bdc785fd769a1bb3` |
 | Eight two-seat edit/launch checks | `8a1561c765a3e1686e4aa588b8fa60ece3114863d14e496a1b4c1bf28b88493e` |
 | Twenty cross-build checks | `3f9d628456f0a4c48c5af908bd4c2e7d5d2379a52f2aa22b2c659cbbe0bc3a49` |
+
+## Current Terran ARM terminal and save checks
+
+At release `82421976`, the standard Terran ROM and the opt-in Blood Bath
+preview each launched human Terran against a named Protoss, Zerg and Terran
+computer, using only ordinary buttons. The normal build used Free for All
+and the preview used Melee. The two runs had different starting layouts.
+
+| Terran build and mode | Resolved starts in player order | Human defeat from HOME | Human defeat from fresh SRAM |
+| --- | --- | ---: | ---: |
+| Preview Melee | 0, 3, 2, 1 | 11,706 | 11,706 |
+| Standard Free for All | 0, 1, 2, 3 | 21,957 | 21,957 |
+
+Within each mode, the uninterrupted run and a fresh emulator loaded from
+game frame 3,001 matched the recorded terminal world fingerprint and live
+unit and building counts. Free for All saves loaded across both builds
+in both directions and matched the next 900 updates and original 32 KiB of
+SRAM. The normal build rejected Melee SRAM and preserved its bytes.
+The preview build passed the original IWRAM and EWRAM guards.
+
+Both GBA defeats left two surviving human units under human ownership.
+The [native result audit](2026-11-13-n64-blood-bath-end-rules.md) records
+neutral transfer. Human victories, terminal checks on the other products,
+native end-of-match behavior and physical GBA timing remain open.
+
+| Local result | SHA-256 |
+| --- | --- |
+| Melee terminal comparison | `8359374882612387a89bcd36f6a555b7b338322053776910d5d4801b4f48215c` |
+| Standard Free for All terminal comparison | `e5255abf4d64a266c731d6321e78fb65fb60a777ff3bb32d6973d256d2cfc047` |
+| Cross-build save comparison | `f70b4aa3dfbcead27646c8f83624dac0f65f80c246378de29329907404d80380` |

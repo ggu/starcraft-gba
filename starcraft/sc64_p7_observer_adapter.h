@@ -393,8 +393,27 @@ static int sc64_p7_detector_lists_test_scalar;
 #endif
 _Static_assert(MAX_UNITS <= 256 && MAX_BUILDINGS <= 256, "detector slot indices must fit in u8");
 enum { SC64_P7_POWER_UNKNOWN = 2 };
+enum { SC64_P7_DETECTOR_OBSERVER, SC64_P7_DETECTOR_OVERLORD,
+       SC64_P7_DETECTOR_CANNON, SC64_P7_DETECTOR_SPORE };
 typedef struct {
-    u8 units[MAX_UNITS], buildings[MAX_BUILDINGS];
+    u8 slot, owners, kind;
+    s8 source;
+} Sc64P7Detector;
+static const u8 sc64_p7_detector_raw[] = {
+    SC64_P7_OBSERVER_RAW, SC64_OVERLORD_RAW,
+    SC64_P7_CANNON_RAW, SC64_SPORE_COLONY_RAW
+};
+static const u16 sc64_p7_detector_range[] = {
+    SC64_P7_OBSERVER_BASE_SIGHT_SOURCE_PX, SC64_OVERLORD_DETECTION_SOURCE_PX,
+    SC64_P7_CANNON_DETECTION_SOURCE_PX, SC64_SPORE_DETECTION_SOURCE_PX
+};
+
+typedef struct {
+    Sc64P7Detector units[MAX_UNITS], buildings[MAX_BUILDINGS];
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+    /* Detector rectangles differ only by the actor's centre within one kind. */
+    int extent[4][4];
+#endif
     u8 optical_units[MAX_UNITS], optical_unit_masks[MAX_UNITS];
     u8 optical_buildings[MAX_BUILDINGS], optical_building_masks[MAX_BUILDINGS];
     unsigned unit_count, building_count, optical_unit_count, optical_building_count;
@@ -477,22 +496,81 @@ static void sc64_p7_detector_lists_build_optical(Sc64P7DetectorLists *lists)
     lists->optical_ready=1;
 }
 
-/* Detector rows: Observers (and Overlords), Cannons (and Spore Colonies). */
+/* Source owners (as a bit mask) a detector with the given resolved source
+ * slot and live owner reports for. A malformed slot falls back to every
+ * non-human source owner mapped to the live owner when allowed. */
+static unsigned sc64_p7_detector_owner_bits(const Sc64P7DetectorLists *lists,
+                                            int source,int live_owner,
+                                            int slot_fallback)
+{
+    unsigned bits=0;
+    if(source>=0&&source<8)
+        return lists->owner_map[source]==live_owner ? 1u<<(unsigned)source : 0u;
+    if(slot_fallback) for(unsigned owner=0;owner<8;++owner)
+        if((int)owner!=lists->human_slot && lists->owner_map[owner]==live_owner)
+            bits|=1u<<owner;
+    return bits;
+}
+
+/* Compact detector rows hold the owner bitmask and actor eligibility, which
+ * cannot change while we update the target cache words. */
 static void sc64_p7_detector_lists_build_detectors(Sc64P7DetectorLists *lists)
 {
     lists->unit_count=lists->building_count=0;
-    for(int i=0;i<MAX_UNITS;++i)
-        if(u[i].alive && (RACE_PROTOSS_RAW(&u[i])==SC64_P7_OBSERVER_RAW
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
-                          || RACE_PROTOSS_RAW(&u[i])==SC64_OVERLORD_RAW
+    unsigned valid_kinds=0;
+    for(int kind=0;kind<4;++kind) {
+        int *ext=lists->extent[kind];
+        if(sc64_p7_actor_rect_source(sc64_p7_detector_raw[kind],0,0,
+                                    kind>=SC64_P7_DETECTOR_CANNON,ext,ext+1,ext+2,ext+3))
+            valid_kinds|=1u<<kind;
+    }
 #endif
-                          )) lists->units[lists->unit_count++]=(u8)i;
-    for(int i=0;i<MAX_BUILDINGS;++i)
-        if(b[i].alive && (RACE_PROTOSS_RAW(&b[i])==SC64_P7_CANNON_RAW
+    for(int i=0;i<MAX_UNITS;++i) {
+        if(!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])) continue;
+        int kind=SC64_P7_DETECTOR_OBSERVER;
+        unsigned raw=RACE_PROTOSS_RAW(&u[i]);
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
-                          || RACE_PROTOSS_RAW(&b[i])==SC64_SPORE_COLONY_RAW
+        if(raw==SC64_OVERLORD_RAW) kind=SC64_P7_DETECTOR_OVERLORD;
+        else
 #endif
-                          )) lists->buildings[lists->building_count++]=(u8)i;
+        if(raw!=SC64_P7_OBSERVER_RAW
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+           || SC64_CARRIER_HANGAR_HIDDEN(&u[i])
+#endif
+           ) continue;
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+        if(!(valid_kinds&(1u<<kind)) || !sc64_p7_actor_rect_center_valid(u[i].x,u[i].y))
+            continue;
+#endif
+        int source=sc64_p7_detector_bound_slot(lists->binding,lists->human_slot,
+                                              u[i].owner,u[i].raw_owner);
+        unsigned mask=sc64_p7_detector_owner_bits(lists,source,u[i].owner,
+                                                 kind==SC64_P7_DETECTOR_OBSERVER);
+        if(mask) lists->units[lists->unit_count++]=(Sc64P7Detector){(u8)i,(u8)mask,(u8)kind,-1};
+    }
+    for(int i=0;i<MAX_BUILDINGS;++i) {
+        if(!b[i].alive) continue;
+        int kind=SC64_P7_DETECTOR_CANNON;
+        unsigned raw=RACE_PROTOSS_RAW(&b[i]);
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+        if(raw==SC64_SPORE_COLONY_RAW) kind=SC64_P7_DETECTOR_SPORE;
+        else
+#endif
+        if(raw!=SC64_P7_CANNON_RAW) continue;
+        if(!building_complete(i)) continue;
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+        if(!(valid_kinds&(1u<<kind)) || !sc64_p7_actor_rect_center_valid(b[i].x,b[i].y))
+            continue;
+#endif
+        int source=sc64_p7_detector_bound_slot(lists->binding,lists->human_slot,
+                                              b[i].owner,b[i].raw_owner);
+        unsigned mask=sc64_p7_detector_owner_bits(lists,source,b[i].owner,
+                                                 kind==SC64_P7_DETECTOR_CANNON);
+        if(mask) lists->buildings[lists->building_count++]=(Sc64P7Detector){
+            (u8)i,(u8)mask,(u8)kind,source>=0&&source<8 ? (s8)source : -1
+        };
+    }
     lists->detectors_ready=1;
 }
 
@@ -626,7 +704,7 @@ static unsigned sc64_p7_arbiter_detected_mask_legacy(int target,
     sc64_optical_building_cycles+=gba_clock()-optical_diag_start;
 #endif
     for(int k=0;k<(lists?(int)lists->unit_count:MAX_UNITS);++k) {
-        int i=lists?lists->units[k]:k;
+        int i=lists?lists->units[k].slot:k;
         if(!(u[i].alive &&
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
@@ -653,7 +731,7 @@ static unsigned sc64_p7_arbiter_detected_mask_legacy(int target,
                (visible_owners&(1u<<owner))) detected|=1u<<owner;
     }
     for(int k=0;k<(lists?(int)lists->building_count:MAX_BUILDINGS);++k) {
-        int i=lists?lists->buildings[k]:k;
+        int i=lists?lists->buildings[k].slot:k;
         if(!(b[i].alive && RACE_PROTOSS_RAW(&b[i])==SC64_P7_CANNON_RAW &&
              building_complete(i) && powered_cannons[i])) continue;
         int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
@@ -680,7 +758,7 @@ static unsigned sc64_p7_arbiter_detected_mask_legacy(int target,
      * sight range (Overlord, 11 tiles, no Antennae); a completed structure
      * at 7 tiles (Spore Colony, as the Photon Cannon). */
     for(int k=0;k<(lists?(int)lists->unit_count:MAX_UNITS);++k) {
-        int i=lists?lists->units[k]:k;
+        int i=lists?lists->units[k].slot:k;
         if(!(u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
              RACE_PROTOSS_RAW(&u[i])==SC64_OVERLORD_RAW)) continue;
         int source=sc64_p7_detector_current_slot(u[i].owner,RACE_PROTOSS_SLOT(&u[i]));
@@ -694,7 +772,7 @@ static unsigned sc64_p7_arbiter_detected_mask_legacy(int target,
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
     }
     for(int k=0;k<(lists?(int)lists->building_count:MAX_BUILDINGS);++k) {
-        int i=lists?lists->buildings[k]:k;
+        int i=lists?lists->buildings[k].slot:k;
         if(!(b[i].alive && RACE_PROTOSS_RAW(&b[i])==SC64_SPORE_COLONY_RAW &&
              building_complete(i))) continue;
         int source=sc64_p7_detector_current_slot(b[i].owner,RACE_PROTOSS_SLOT(&b[i]));
@@ -711,22 +789,6 @@ static unsigned sc64_p7_arbiter_detected_mask_legacy(int target,
     return detected&255u;
 }
 #endif /* GBA_HOST */
-
-/* Source owners (as a bit mask) a detector with the given resolved source
- * slot and live owner reports for. A malformed slot falls back to every
- * non-human source owner mapped to the live owner when allowed. */
-static unsigned sc64_p7_detector_owner_bits(const Sc64P7DetectorLists *lists,
-                                            int source,int live_owner,
-                                            int slot_fallback)
-{
-    unsigned bits=0;
-    if(source>=0&&source<8)
-        return lists->owner_map[source]==live_owner ? 1u<<(unsigned)source : 0u;
-    if(slot_fallback) for(unsigned owner=0;owner<8;++owner)
-        if((int)owner!=lists->human_slot && lists->owner_map[owner]==live_owner)
-            bits|=1u<<owner;
-    return bits;
-}
 
 /* Cannon power for one tick: the explicit table when a fixture supplies it,
  * else computed on first need (nothing it reads changes inside the tick). */
@@ -818,85 +880,48 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
         if(human_slot>=0 && SC64_GRID_GET(visible,cell)) visible_owners|=1u<<(unsigned)human_slot;
     }
     if(!lists->detectors_ready) sc64_p7_detector_lists_build_detectors(lists);
-    for(unsigned k=0;k<lists->unit_count;++k) {
-        int i=lists->units[k];
-        if(!(u[i].alive &&
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-        !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
-#endif
-        !SC64_TRANSPORT_LOADED(&u[i]) &&
-        RACE_PROTOSS_RAW(&u[i])==SC64_P7_OBSERVER_RAW)) continue;
-        int source=sc64_p7_detector_bound_slot(lists->binding,human_slot,u[i].owner,u[i].raw_owner);
-#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
-        int ol,ot,or_,ob;
-        int distance=-1;
-        if(sc64_p7_actor_rect_source(SC64_P7_OBSERVER_RAW,u[i].x,u[i].y,0,
-                                     &ol,&ot,&or_,&ob))
-            distance=sc64_p7_observer_rect_distance_rects(
-                ol,ot,or_,ob,target_l,target_t,target_r,target_b);
-#else
-        int distance=sc64_p7_observer_rect_distance(SC64_P7_OBSERVER_RAW,
-            u[i].x,u[i].y,0,(unsigned)RACE_PROTOSS_RAW(&u[target]),u[target].x,u[target].y,0);
-#endif
-        if(distance<0||distance>SC64_P7_OBSERVER_BASE_SIGHT_SOURCE_PX) continue;
-        in_range|=sc64_p7_detector_owner_bits(lists,source,u[i].owner,1);
-    }
-    for(unsigned k=0;k<lists->building_count;++k) {
-        int i=lists->buildings[k];
-        if(!(b[i].alive && RACE_PROTOSS_RAW(&b[i])==SC64_P7_CANNON_RAW &&
-             building_complete(i))) continue;
-        int source=sc64_p7_detector_bound_slot(lists->binding,human_slot,b[i].owner,b[i].raw_owner);
-#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
-        int cl,ct,cr,cb;
-        int distance=-1;
-        if(sc64_p7_actor_rect_source(SC64_P7_CANNON_RAW,b[i].x,b[i].y,1,
-                                     &cl,&ct,&cr,&cb))
-            distance=sc64_p7_observer_rect_distance_rects(
-                cl,ct,cr,cb,target_l,target_t,target_r,target_b);
-#else
-        int distance=sc64_p7_observer_rect_distance(SC64_P7_CANNON_RAW,
-            b[i].x,b[i].y,1,(unsigned)RACE_PROTOSS_RAW(&u[target]),u[target].x,u[target].y,0);
-#endif
-        if(distance<0||distance>SC64_P7_CANNON_DETECTION_SOURCE_PX) continue;
-        if(!sc64_p7_detector_cannon_powered(lists,powered_cannons,i,source)) continue;
-        in_range|=sc64_p7_detector_owner_bits(lists,source,b[i].owner,1);
-    }
-#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
-    /* Zerg detectors. As for the Observer, a mobile detector detects at its
-     * sight range (Overlord, 11 tiles, no Antennae); a completed structure
-     * at 7 tiles (Spore Colony, as the Photon Cannon). */
-    for(unsigned k=0;k<lists->unit_count;++k) {
-        int i=lists->units[k];
-        if(!(u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
-             RACE_PROTOSS_RAW(&u[i])==SC64_OVERLORD_RAW)) continue;
-        int source=sc64_p7_detector_bound_slot(lists->binding,human_slot,u[i].owner,u[i].raw_owner);
-        int ol,ot,or_,ob,distance=-1;
-        if(sc64_p7_actor_rect_source(SC64_OVERLORD_RAW,u[i].x,u[i].y,0,
-                                     &ol,&ot,&or_,&ob))
-            distance=sc64_p7_observer_rect_distance_rects(
-                ol,ot,or_,ob,target_l,target_t,target_r,target_b);
-        if(distance<0||distance>SC64_OVERLORD_DETECTION_SOURCE_PX) continue;
-        in_range|=sc64_p7_detector_owner_bits(lists,source,u[i].owner,0);
-    }
-    for(unsigned k=0;k<lists->building_count;++k) {
-        int i=lists->buildings[k];
-        if(!(b[i].alive && RACE_PROTOSS_RAW(&b[i])==SC64_SPORE_COLONY_RAW &&
-             building_complete(i))) continue;
-        int source=sc64_p7_detector_bound_slot(lists->binding,human_slot,b[i].owner,b[i].raw_owner);
-        int sl,st,sr,sb,distance=-1;
-        if(sc64_p7_actor_rect_source(SC64_SPORE_COLONY_RAW,b[i].x,b[i].y,1,
-                                     &sl,&st,&sr,&sb))
-            distance=sc64_p7_observer_rect_distance_rects(
-                sl,st,sr,sb,target_l,target_t,target_r,target_b);
-        if(distance<0||distance>SC64_SPORE_DETECTION_SOURCE_PX) continue;
-        in_range|=sc64_p7_detector_owner_bits(lists,source,b[i].owner,0);
-    }
-#endif
-    need=in_range & ~visible_owners;
+    /* For the authenticated human slot, a detector is useless when the
+     * SIDE grid says the target cell is unseen. */
+    unsigned eligible=255u;
 #ifdef SC64_SOURCE_SIGHT_ALL_RACES
-    /* The SIDE grid is authoritative for the human slot. */
-    if(human_slot>=0) need&=~(1u<<(unsigned)human_slot);
+    if(human_slot>=0 && !visible_owners) eligible&=~(1u<<(unsigned)human_slot);
 #endif
+    for(unsigned k=0;k<lists->unit_count;++k) {
+        const Sc64P7Detector *detector=&lists->units[k];
+        unsigned mask=detector->owners & eligible & ~in_range;
+        if(!mask) continue;
+        int i=detector->slot, kind=detector->kind;
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+        const int *ext=lists->extent[kind];
+        int sx=u[i].x*2, sy=u[i].y*2;
+        int distance=sc64_p7_observer_rect_distance_rects(
+            sx+ext[0],sy+ext[1],sx+ext[2],sy+ext[3],target_l,target_t,target_r,target_b);
+#else
+        int distance=sc64_p7_observer_rect_distance(sc64_p7_detector_raw[kind],
+            u[i].x,u[i].y,0,(unsigned)RACE_PROTOSS_RAW(&u[target]),x,y,0);
+#endif
+        if(distance>=0 && distance<=sc64_p7_detector_range[kind]) in_range|=mask;
+    }
+    for(unsigned k=0;k<lists->building_count;++k) {
+        const Sc64P7Detector *detector=&lists->buildings[k];
+        unsigned mask=detector->owners & eligible & ~in_range;
+        if(!mask) continue;
+        int i=detector->slot, kind=detector->kind;
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+        const int *ext=lists->extent[kind];
+        int sx=b[i].x*2, sy=b[i].y*2;
+        int distance=sc64_p7_observer_rect_distance_rects(
+            sx+ext[0],sy+ext[1],sx+ext[2],sy+ext[3],target_l,target_t,target_r,target_b);
+#else
+        int distance=sc64_p7_observer_rect_distance(sc64_p7_detector_raw[kind],
+            b[i].x,b[i].y,1,(unsigned)RACE_PROTOSS_RAW(&u[target]),x,y,0);
+#endif
+        if(distance<0 || distance>sc64_p7_detector_range[kind]) continue;
+        if(kind==SC64_P7_DETECTOR_CANNON &&
+           !sc64_p7_detector_cannon_powered(lists,powered_cannons,i,detector->source)) continue;
+        in_range|=mask;
+    }
+    need=in_range & ~visible_owners;
     if(need) {
 #ifdef SC64_DIAGNOSTIC_SETUP
         u32 optical_diag_start=gba_clock();
