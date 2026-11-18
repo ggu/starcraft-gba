@@ -480,8 +480,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A passive replay did not reach elimination. [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
   tests retirement and neutral cargo on HOST. Its final victory now waits
   for deferred retirement, including a surviving Battlecruiser fixture.
-  Before ARM enablement, resolve in-flight damage and simultaneous
-  outcomes against native evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
+  [Draft #566](https://github.com/ggu/starcraft-gba/pull/566) qualifies the
+  opt-in ARM build. The Terran Free for All replay transfers a surviving
+  Overlord on CPU retirement at frame 13,905. The Melee replay transfers
+  both human survivors on defeat at frame 11,706. Fresh saves match in
+  both cases. Default enablement still needs native in-flight damage and
+  simultaneous-outcome evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
   were published in that opening. A separate ordinary-input replay
@@ -1420,6 +1424,9 @@ save/source-owner and timing evidence; do not advertise unwired components.
   existing memory guards. Full contact masks still merit attention, and
   the isolated 908,000-cycle point-field fill needs separate tail work.
   Keep physical GBA timing and peak-stack checks open.
+  [Reusing packed candidate coordinates](audits/2026-11-18-p7-current-mgba.md#reuse-the-collision-candidate-load)
+  reduces the same mean to 2.002M cycles. A speed-plane hoist had
+  negligible mean benefit and raised the sampled peak.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals
