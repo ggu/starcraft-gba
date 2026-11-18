@@ -8175,6 +8175,8 @@ add_owner_resources(int owner, int ore, int vespene)
 }
 #endif
 
+enum { SC64_MINERAL_SEARCH_RADIUS = 192 };
+
 /* Continue an established mineral job within its former mineral cluster.
  * OpenBW bounds depleted-field searches to 12 source tiles (192 pixels at
  * this engine's half scale). Reuse the normal route predicate; never assign
@@ -8184,7 +8186,7 @@ add_owner_resources(int owner, int ore, int vespene)
 static int __attribute__((noinline))
 worker_continue_minerals(Unit *q)
 {
-    int best = -1, best_d = 192 * 192 + 1;
+    int best = -1, best_d = SC64_MINERAL_SEARCH_RADIUS * SC64_MINERAL_SEARCH_RADIUS + 1;
     int origin_x, origin_y;
     if (q->target < 0 || q->target >= MAX_MINERALS) return 0;
     origin_x = m[q->target].x;
