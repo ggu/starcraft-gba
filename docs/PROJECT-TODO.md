@@ -54,17 +54,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   mining before and after a native N64 custom-game pause and an
   exact paused-clock and mineral check on all three Frontier host builds.
 
-- **Frontier victory replays (P1):** nine matches reached victory
-  using physical button packets in headless mGBA. Each of the three
-  player factions won on both maps against one CPU. Transit Yard and
-  Stone Gardens also had mixed two-CPU wins, and Foundry beat three
-  independent Bulwark opponents on Stone Gardens. The packets run on the
-  Foundry cartridge, which can select all three player factions. Each case
-  starts at the title, builds and trains a force, issues attack orders, and
-  checks the result screen and exact game tick. All nine reached the same
-  victory ticks on `f5e60854` and averaged 28.78–29.48 updates per second
-  after the first 100 updates in mGBA. Prioritize a Transit Yard three-CPU
-  win and hardware timings. To replay the checked-in inputs, build Foundry
+- **Frontier victory replays (P1):** each of the three player factions
+  has a normal-button win on both maps against one CPU. Both maps also
+  have mixed two- and three-CPU wins. The packets run on the Foundry
+  cartridge, which can select all three player factions. Each case starts
+  at the title, builds and trains a force, issues attack orders, and
+  checks the result screen and exact game tick. In the three-CPU matches,
+  Foundry beat independently controlled Rovers, Bulwark, and Foundry on
+  Transit Yard at game tick 14,727 and on Stone Gardens at tick 13,912.
+  These full mGBA replays averaged 29.05 and 29.40 updates per second
+  after the first 100 updates. Physical GBA SP timing remains open.
+  To replay the checked-in inputs, build Foundry
   and pass the physical observer from `tools/sc64_headless_replay.c` to
   the optional test.
 
@@ -76,6 +76,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Use a fresh output directory. Add `--case transit-yard-foundry`
   to run one match. The result file includes elapsed emulator cycles and
   average updates per second from the setup checkpoint to the result.
+
+- **Frontier four-player targeting (P1):** when all four corners are
+  occupied, break exact AI target-distance ties toward each attacker's
+  clockwise neighbor. In both maps' mixed three-CPU opening, the
+  northeastern CPU chose the human at tick 2,160 even though the
+  southeastern CPU was equally near at 47 planner cells. The new rule
+  chooses the southeastern CPU in that tie. The nearest hostile target
+  still wins when distances differ. The eight one- and two-CPU replay
+  victory ticks stayed fixed. Larger waves, including the rule that
+  counts queued fighters toward the dispatch threshold, remain open.
 
 - **Frontier frame time (P1):** clear the byte visibility grid with
   aligned stores, remember explored circle centers until a world load or

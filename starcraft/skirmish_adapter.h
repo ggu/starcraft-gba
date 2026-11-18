@@ -502,7 +502,15 @@ skirmish_update(void)
         skirmish_sync_ai(i);
         if (!skirmish_ai[i].active) continue;
         skirmish_make_world(i, &world);
+#ifdef SC_ORIGINAL_SKIRMISH
+        /* The authored starts are NW (human), SE, NE, SW. If all four
+         * sides remain, prefer the next clockwise corner on exact ties. */
+        static const unsigned char clockwise_rival[3] = {4, ENEMY, SIDE};
+        int preferred = world.count == 3 ? clockwise_rival[i] : -1;
+        count = sc64_ai_plan_prefer_target(&skirmish_ai[i], &world, intents, preferred);
+#else
         count = sc64_ai_plan(&skirmish_ai[i], &world, intents);
+#endif
         for (j = 0; j < count; ++j) skirmish_execute_intent(i, &intents[j]);
     }
 }
