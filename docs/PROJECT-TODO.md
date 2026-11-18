@@ -94,6 +94,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Use a fresh output directory. Add `--case transit-yard-foundry`
   to run one match. The result file includes elapsed emulator cycles and
   average updates per second from the setup checkpoint to the result.
+  On `50283403`, all twelve cases reached the same victory tick on each
+  of the three cartridges. The Rovers and Bulwark witness adjusted the
+  title inputs for the cartridge's default faction and kept every field
+  input at its original update relative to match start. The opening
+  game state, actors, resources, and random seed matched Foundry.
+  All 36 full matches averaged 28.68–29.48 updates per second in mGBA.
 
 - **Frontier four-player targeting (P1):** when all four corners are
   occupied, break exact AI target-distance ties toward each attacker's
@@ -165,6 +171,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   120 matching updates. A 3-VBlank update still appears at the 95th
   percentile in both combat windows. Repeat timing on GBA SP hardware
   and cover more high-load lineups.
+
+  On `50283403`, eight 240-update windows across the mixed three-CPU
+  Free for All and two-CPU Team wins averaged 28.50–29.80 updates per
+  second in mGBA. The median update was 33.49 ms and five windows had
+  a 50.23 ms 95th percentile. The worst sampled update was 83.71 ms at
+  Stone Gardens game tick 5,341, with 957,144 cycles inside simulation.
+  Two instrumented runs matched the release's world state around the
+  spike. The orders pass used about 926,000 cycles, including about
+  854,000 for movement. The point route and direct corridor probes used
+  about 2,200 cycles combined. Profile blocked movement and collision
+  steering at that update before changing route search. Physical GBA SP
+  timing remains open.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
