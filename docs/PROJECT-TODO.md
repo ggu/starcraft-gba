@@ -1471,11 +1471,20 @@ save/source-owner and timing evidence; do not advertise unwired components.
   cost 32.51%; that vector also moves the orders loop into IWRAM. All
   30 campaign starts, 72 skirmish starts and eight cross-loads pass on
   the four regular cartridges. Keep profiling average cost and wider battles.
+- The [post-#572 sustained P7 audit](audits/2026-11-18-p7-current-mgba.md#sustained-combat-after-572)
+  measures 1.902M guest cycles per active update. The camera moves in 912
+  of 957 adjacent samples. A vertical cache rotation saves 0.62% overall
+  and 31,444 cycles per vertical partial restore. Two collision memo
+  alternatives produce zero additional hits on 36,650 requests.
+  Prioritize the cost of the first collision lookup and repeated terrain
+  work during both axes of camera movement.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
-  on one row. Use more groups, destinations, and obstacle layouts to derive
-  a formation rule before changing shared Move or Attack Move.
+  on one row. [Four Blood Bath SCVs](audits/2026-11-07-native-actor-differential/README.md#blood-bath-workers-and-the-minimap)
+  instead receive one common destination per command, with different
+  intermediate waypoints. Compare troops and workers from matched starts,
+  including field and minimap orders, before changing shared formation.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals
