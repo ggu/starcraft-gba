@@ -1427,6 +1427,15 @@ save/source-owner and timing evidence; do not advertise unwired components.
   [Reusing packed candidate coordinates](audits/2026-11-18-p7-current-mgba.md#reuse-the-collision-candidate-load)
   reduces the same mean to 2.002M cycles. A speed-plane hoist had
   negligible mean benefit and raised the sampled peak.
+- [Terrain validation #567](audits/2026-11-18-terrain-fast-validate.md)
+  is enabled on the canonical cartridges. The carried P7 physical-input
+  window averages 1.959M cycles with the terrain change. [Spatial defense
+  queries](audits/2026-11-12-defense-combined.md#qualification-on-the-terrain-default)
+  bring the same window to 1.921M, with matched world and display samples.
+  All four canonical cartridges share the Pylon lookup. Zerg and Protoss
+  campaign passes with target lists search nearby cells. Keep prioritizing
+  unit orders and repeated mission world scans, and measure stack usage
+  and worst updates alongside mean cycles.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals

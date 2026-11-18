@@ -98,7 +98,7 @@ $(Z10_PROGRAM_HEADER): $(Z10_DESCRIPTOR) tools/sc64_zerg_late_program_pack.py to
 	$(PYTHON) tools/sc64_zerg_late_program_pack.py $< $@
 # The ordinary Z10 renderer needs the same exact static key for lookup and
 # capture. Compute it once per draw, as the other capable products do.
-ZERG_Z10_DEFENSE_FLAGS ?= -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
+ZERG_Z10_DEFENSE_FLAGS ?= $(CANONICAL_DEFENSE_FLAGS)
 ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -DSC64_RENDER_KEY_ONCE -Ibuild/generated/z10 $(ZERG_Z10_DEFENSE_FLAGS) -DSC64_DEPOT_FIRST_NEAREST_PROBE
 ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES) $(CENSUS_FLAGS)
 # The packed frames belong to the qualified Z10 sprite bank.
@@ -111,7 +111,7 @@ Z10_BUILDING_WORDS_FLAGS = $(if $(filter 1,$(Z10_BUILDING_WORDS)),-DSC64_BUILDIN
 Z10_BUILDING_WORDS_CONFIG := $(if $(shell test -f build/z10-building-words-config && printf '%s\n' '$(Z10_BUILDING_WORDS)' | cmp -s - build/z10-building-words-config && printf matched),,force-z10-building-words-rebuild)
 ZERG_Z10_RELEASE_FLAGS = $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z9_CANONICAL_INPUTS)) $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h $(Z10_PROGRAM_HEADER)
-build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(SC64_BUILDING_WORDS_HEADER)) | build
+build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(SC64_BUILDING_WORDS_HEADER)) | build
 	$(CC) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
