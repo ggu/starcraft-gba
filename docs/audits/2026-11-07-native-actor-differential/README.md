@@ -12,6 +12,30 @@ In fresh Terran custom play, visibly select individual SCV A and take a screensh
 
 Only after actor identities and fields are independently corroborated should a separately reviewed copied-ares interpreter hook record bounded CPU stores within the fully validated actor spans and candidate clock spans, retaining PC, address, width, value and sequence without guest reads in the hook. DMA and cache-writeback identity changes remain separate blind spots. A candidate world-update PC must independently withstand pause, speed and fresh-reset interventions; VI, the old linked-list countdown and the sampled zero CPU thread clock are not substitutes. No cadence-based engine change follows from this two-snapshot analysis.
 
+## November 18 reproduction from retained inputs
+
+After temporary captures were lost, the original observer source was
+recovered from Git blobs `b3dadc1cc00f312a68cab17e89b50c1fbbe8f0ca`
+(wrapper) and `3e4143f3e574e2d6503ceade23f46d3fde09c05b` (C++). Their
+SHA-256 hashes match the archived source receipt. A guarded fresh process
+replayed the original 4,919 commands with the retained binary, owned ROM,
+pinned ares checkout, and MoltenVK. It held the shared observer lock,
+required at least 6 GiB free, and sent no new controls. It exited 0.
+
+All three retained frames and both 8 MiB RAM captures matched byte for
+byte. The command, input, RAM-index and status logs also matched. The
+callback log differed, so this does not establish callback determinism
+or a game clock. It restores a reproducible starting point for the
+selection and movement investigation. The field hypotheses above remain
+unverified, and this trial does not recover the separate northwest scout
+sequence.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Retained observer binary | `3f779db1c809a8de385c85e1581f6e172a51ef5c0747373e3eb799ea153342b3` |
+| Matched command log | `bb29739983aed6997532130b47c647c54be72eb2b81dbd9c2d7e9561c66688d2` |
+| Fresh native replay manifest | `92da08cde592ccf6fe82ec971bd912e3524d21cf09cde2c3bfede585ef67e4d9` |
+
 ## Three-sample frontend budget proof before execution
 
 The separate follow-up observer permits at most three 8 MiB RDRAM samples and three frames within the existing 2 MiB frame budget. The parent caps stdout at 256 KiB and stderr at 512 KiB. The child normally runs with a 2 MiB per-file soft limit and 8 MiB hard limit; only while synchronously writing a validated RAM snapshot does it raise the soft limit to 8 MiB and immediately lower it again. During that synchronous copy no guest CPU execution is requested. The fixed pinned USA ROM copy is 32 MiB. The pinned ares `mia/medium/nintendo-64.cpp` identifies StarCraft 64 as a 128 KiB Flash game; the isolated frontend connects no controller pak.
