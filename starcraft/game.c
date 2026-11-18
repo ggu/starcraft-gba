@@ -664,7 +664,13 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #define MAX_UNITS 96
 #define MAX_MINERALS 16
 #define MAX_BUILDINGS 32
-#ifdef SC64_TERRAN_CAMPAIGN
+#ifdef SC_ORIGINAL_SKIRMISH
+#if !defined(SC64_SKIRMISH) || defined(SC64_IMPORTED_MISSION)
+#error "The original skirmish requires the standalone bot adapter"
+#endif
+#define SC64_BASE_SAVE_VERSION 0x53434F31u
+#define SC_DEFAULT_UI 1
+#elif defined(SC64_TERRAN_CAMPAIGN)
 #define SC64_BASE_SAVE_VERSION 0x53435431u
 #elif defined(SC64_BACKWATER)
 #define SC64_BASE_SAVE_VERSION 0x53434232u
@@ -1442,6 +1448,9 @@ typedef struct {
     Sc64AiState bots[3];
     int bot_count;
 #endif
+#ifdef SC_ORIGINAL_SKIRMISH
+    int skirmish_map;
+#endif
 } SaveData;
 _Static_assert(sizeof(SaveData) <= 16368, "Save exceeds an alternating SRAM record");
 /* Mission maps enlarge save payloads; keeping this single scratch record in
@@ -1904,12 +1913,20 @@ static void backwater_update(void);
 #ifdef SC64_SKIRMISH
 static Sc64AiState skirmish_ai[3];
 static int skirmish_bots = 2;
+#ifdef SC64_IMPORTED_MISSION
 static int skirmish_ground_tile;
+#endif
 static void skirmish_init(void);
 static void skirmish_update(void);
 static void skirmish_outcome(void);
 static int skirmish_hostile(int a, int b);
 static int skirmish_bot_index(int owner);
+#endif
+#ifdef SC_ORIGINAL_SKIRMISH
+#include "original_skirmish_map.h"
+_Static_assert(MAP_COLS == ORIGINAL_MAP_SIZE && MAP_ROWS == ORIGINAL_MAP_SIZE,
+               "Frontier map size must match the engine grid");
+static int original_skirmish_map;
 #endif
 #ifdef SC64_RACES
 #include "sc64_font.h"
@@ -3468,11 +3485,15 @@ terrain_blocked(int col, int row)
            (row==31&&col>3&&col<60&&!(col>=14&&col<=18)&&!(col>=45&&col<=49));
 #else
 #ifdef SC64_SKIRMISH
+#ifdef SC_ORIGINAL_SKIRMISH
+    return original_skirmish_blocked(original_skirmish_map, col, row);
+#else
     if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) return 1;
     return (col == 31 && row > 3 && row < 60 && !(row >= 14 && row <= 18) &&
             !(row >= 45 && row <= 49)) ||
            (row == 31 && col > 3 && col < 60 && !(col >= 14 && col <= 18) &&
             !(col >= 45 && col <= 49));
+#endif
 #else
 #ifdef SC64_IMPORTED_MISSION
 #ifdef SC64_HAS_TERRAIN_ART
@@ -5010,7 +5031,7 @@ destroy_building(int slot, int source_owner)
                 ++race_t3_buildings_killed;
 #endif
 	    if (q->type == B_COMMAND && q->owner == SIDE) {
-#ifndef SC64_IMPORTED_MISSION
+#if !defined(SC64_IMPORTED_MISSION) && !defined(SC_ORIGINAL_SKIRMISH)
 		lost = 1;
 #endif
 	    }
@@ -5373,6 +5394,9 @@ save_game(void)
     memcpy(data.bots, skirmish_ai, sizeof(skirmish_ai));
     data.bot_count = skirmish_bots;
 #endif
+#ifdef SC_ORIGINAL_SKIRMISH
+    data.skirmish_map = original_skirmish_map;
+#endif
     save_write(&data, sizeof(data), SAVE_VERSION);
     toast(7);
     return 1;
@@ -5434,6 +5458,9 @@ load_game(void)
 #endif
 #ifdef SC64_SKIRMISH
     if (data.bot_count < 1 || data.bot_count > 3) return 0;
+#endif
+#ifdef SC_ORIGINAL_SKIRMISH
+    if ((unsigned)data.skirmish_map >= ORIGINAL_MAP_COUNT) return 0;
 #endif
     for (i = 0; i < MAX_UNITS; i++) {
 	if (data.units[i].alive) {
@@ -5528,6 +5555,9 @@ load_game(void)
 #endif
 #ifdef SC64_SKIRMISH
     memcpy(skirmish_ai, data.bots, sizeof(skirmish_ai)); skirmish_bots = data.bot_count;
+#endif
+#ifdef SC_ORIGINAL_SKIRMISH
+    original_skirmish_map = data.skirmish_map;
 #endif
     mode = MODE_NORMAL;
     menu_open = 0;
@@ -5829,6 +5859,9 @@ init_state(void)
     train_type = U_MARINE;
     seed = 0x51a7c0deu;
     screen = SCREEN_PLAY;
+#ifdef SC_ORIGINAL_SKIRMISH
+    skirmish_init();
+#else
     spawn_build(SIDE, B_COMMAND, 76, 84, 0);
     spawn_build(ENEMY, B_HATCHERY, 314, 48, 0);
     /* Mission-start outpost: the opening fight is already underway, so this
@@ -5860,6 +5893,7 @@ init_state(void)
     spawn_unit(ENEMY, U_ZERGLING, 290, 75);
     spawn_unit(ENEMY, U_HYDRALISK, 300, 88);
     update_exploration();
+#endif
 }
 
 #ifdef SC64_IMPORTED_MISSION
@@ -6004,6 +6038,10 @@ game_init(void)
     death_vfx_reset();
     invalidate_path_grid();
     screen = SCREEN_TITLE;
+#ifdef SC_ORIGINAL_SKIRMISH
+    original_skirmish_map = 0;
+    skirmish_bots = 2;
+#endif
     help = 0;
     menu_open = 0;
     minerals = 500;
@@ -9254,7 +9292,7 @@ target_lists_unavailable:
 #endif
 	}
 
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
         /* An escort that reaches its waypoint must still return fire.
          * Holding combat units defend within weapon range without chasing
          * away from their post or interrupting worker mining/build orders. */
@@ -10282,9 +10320,21 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_TERRAN_CAMPAIGN
         if (pressed & (KEY_UP | KEY_DOWN)) campaign_mission = 1 - campaign_mission;
 #endif
+#ifdef SC_ORIGINAL_SKIRMISH
+        if (title_notice) title_notice--;
+        if (pressed & (KEY_LEFT | KEY_RIGHT)) {
+            int direction = (pressed & KEY_RIGHT) ? 1 : ORIGINAL_MAP_COUNT - 1;
+            original_skirmish_map = (original_skirmish_map + direction) % ORIGINAL_MAP_COUNT;
+        }
+#endif
 #ifdef SC64_SKIRMISH
         if (pressed & KEY_UP) skirmish_bots = skirmish_bots % 3 + 1;
         if (pressed & KEY_DOWN) skirmish_bots = (skirmish_bots + 1) % 3 + 1;
+#endif
+#ifdef SC_ORIGINAL_SKIRMISH
+        if (pressed & KEY_A) init_state();
+        else if ((pressed & (KEY_B | KEY_L)) && !load_game()) title_notice = 90;
+        return;
 #endif
 #ifdef SC_DEFAULT_UI
         field_ui_title_input(pressed);
@@ -10600,6 +10650,8 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
 #ifdef SC64_IMPORTED_MISSION
     update_imported_mission();
+#elif defined(SC_ORIGINAL_SKIRMISH)
+    skirmish_update();
 #endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
     sc64_update_mission_cycles = gba_clock() - sc64_update_stage_start;
@@ -10657,7 +10709,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 		u[i].hp++;
     }
 #endif
-#ifndef SC64_IMPORTED_MISSION
+#if !defined(SC64_IMPORTED_MISSION) && !defined(SC_ORIGINAL_SKIRMISH)
     enemy_wave();
 #endif
     update_tracers();
@@ -10686,8 +10738,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     {
 #ifdef SC64_IMPORTED_MISSION
 	check_imported_mission_outcome();
-#endif
-#ifndef SC64_IMPORTED_MISSION
+#elif defined(SC_ORIGINAL_SKIRMISH)
+	skirmish_outcome();
+#else
 	int enemies = 0, i;
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].owner == ENEMY)
@@ -11662,7 +11715,7 @@ sc64_minimap_dot(int x, int y, u8 color)
 static void
 draw_minimap(void)
 {
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
     int x, y, i;
     const int map_x = 197, map_y = 129, map_size = 24;
 #else
@@ -11693,6 +11746,17 @@ draw_minimap(void)
     sc64_minimap_draw_terrain(map_x, map_y,
                               sc64_minimap_visible, sc64_minimap_explored);
 #endif
+#elif defined(SC_ORIGINAL_SKIRMISH)
+    for (int row = 0; row < map_size; row++) {
+        int grid_row = (2 * row + 1) * MAP_ROWS / (2 * map_size);
+        for (int col = 0; col < map_size; col++) {
+            int cell = grid_row * MAP_COLS + (2 * col + 1) * MAP_COLS / (2 * map_size);
+            if (SC64_GRID_GET(visible, cell))
+                gfx_pixel(map_x + col, map_y + row, C_GRASS);
+            else if (SC64_GRID_GET(explored, cell))
+                gfx_pixel(map_x + col, map_y + row, C_FOG);
+        }
+    }
 #else
     /* Neighboring tiles of the same shade can be painted together.
      * Unexplored tiles leave the panel's background and frame intact. */
@@ -11720,7 +11784,7 @@ draw_minimap(void)
         if (sc64_game_building_actor_flags(b[i].type) &&
             !(sc64_game_building_actor_flags(b[i].type) & SC64_GAME_ACTOR_DRAWABLE)) continue;
 #endif
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
 	    x = map_x +
 #ifdef SC64_RACES
         sc64_minimap_pixel(b[i].x,MAP_COLS)
@@ -11777,7 +11841,7 @@ draw_minimap(void)
             (sc64_game_unit_actor_flags(u[i].type) &&
              !(sc64_game_unit_actor_flags(u[i].type) & SC64_GAME_ACTOR_DRAWABLE))) continue;
 #endif
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
 	    x = map_x +
 #ifdef SC64_RACES
         sc64_minimap_pixel(u[i].x,MAP_COLS)
@@ -11804,7 +11868,7 @@ draw_minimap(void)
 #endif
                 );
 	}
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
 	{
 	    int vx = map_x +
 #ifdef SC64_RACES
@@ -12314,6 +12378,20 @@ static unsigned sc64_static_dirty_rows_host_bands;
 static void
 draw_title(void)
 {
+#ifdef SC_ORIGINAL_SKIRMISH
+    gfx_rect(0, 0, 240, 160, C_BLACK);
+    gfx_rect(16, 16, 208, 128, C_PANEL);
+    gfx_frame(16, 16, 208, 128, C_CYAN);
+    gfx_text(38, 28, "FRONTIER SKIRMISH", C_GOLD);
+    gfx_text(30, 54, "MAP", C_WHITE);
+    gfx_text(78, 54, original_skirmish_maps[original_skirmish_map].title, C_HIGHLIGHT);
+    gfx_text(30, 75, "COMPUTER OPPONENTS", C_WHITE);
+    gfx_num(160, 75, skirmish_bots, C_HIGHLIGHT);
+    gfx_text(30, 96, "LEFT/RIGHT MAP  UP/DOWN AI", C_CYAN);
+    gfx_text(30, 113, "A START   B LOAD SAVE", C_CYAN);
+    if (title_notice) gfx_text(30, 127, "NO SAVED MATCH", C_RED);
+    return;
+#endif
 #ifdef SC64_RACES
     sc64_frontend_draw();return;
 #endif
@@ -12420,7 +12498,7 @@ draw_result(void)
         return;
     }
 #endif
-#ifdef SC_DEFAULT_UI
+#if defined(SC_DEFAULT_UI) && !defined(SC_ORIGINAL_SKIRMISH)
     field_ui_draw_result();
     return;
 #elif defined(SC64_FIELD_CONTROLS)

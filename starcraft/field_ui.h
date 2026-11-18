@@ -662,8 +662,13 @@ field_ui_draw_hud(void)
         int seconds = frame / 30;
         char clock[6] = {(char)('0' + seconds / 600 % 10), (char)('0' + seconds / 60 % 10), ':',
                          (char)('0' + seconds / 10 % 6), (char)('0' + seconds % 10), 0};
+#ifdef SC_ORIGINAL_SKIRMISH
+        ui_portrait(1, B_COMMAND);
+        gfx_text(30, 125, "ELIMINATE OPPONENTS", C_GOLD);
+#else
         ui_portrait(1, B_HATCHERY);
         gfx_text(30, 125, "DESTROY THE HATCHERY", C_GOLD);
+#endif
         gfx_text(30, 136, clock, C_WHITE);
     }
     ui_hint_line(action);
@@ -734,8 +739,13 @@ field_ui_draw_pause(void)
         ui_key(110, y, keys[i], 0, C_DIM);
     }
     gfx_text(130, 33, "OBJECTIVE", C_GOLD);
+#ifdef SC_ORIGINAL_SKIRMISH
+    gfx_text(130, 43, "ELIMINATE", C_DIM);
+    gfx_text(130, 52, "ALL ENEMIES", C_DIM);
+#else
     gfx_text(130, 43, "DESTROY THE", C_DIM);
     gfx_text(130, 52, "HATCHERY", C_DIM);
+#endif
     if (pause_notice) gfx_text(130, 66, pause_notice == 1 ? "GAME SAVED" : "NO SAVE FOUND",
                                pause_notice == 1 ? C_GREEN : C_RED);
     gfx_rect(30, 78, 180, 1, C_EDGE);

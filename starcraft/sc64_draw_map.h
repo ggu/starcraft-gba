@@ -74,7 +74,7 @@ draw_map(void)
     terrain_static_key = sc64_static_objects_key();
 #endif
 #endif
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
     col0 = limit(camx / 16, 0, MAP_COLS - 1);
     col1 = limit((camx + 240) / 16 + 1, 0, MAP_COLS);
     row0 = limit(camy / 16, 0, MAP_ROWS - 1);

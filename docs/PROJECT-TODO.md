@@ -19,6 +19,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Frontier Skirmish (P1):** an independently authored battle profile
+  now starts Transit Yard and Stone Gardens with one to three computer
+  opponents. The host checks cover all six setups through mining,
+  production construction, pause/save, title reload, and restart.
+  The three-opponent host match also reaches an AI army attack. Normal
+  ARM inputs start each setup, save at update 900, and reproduce
+  the sampled world and AI state on a fresh-process load. The first
+  240 updates measure 19.76–20.76 emulated updates per second across
+  the six setups. All seats share one roster. Profile the 64×64 routes
+  and rendering, verify a complete ARM match on both maps, and add
+  distinct original rosters.
+
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
   of 1,000 updates, mean simulation cost dropped from 101,614 to 65,583

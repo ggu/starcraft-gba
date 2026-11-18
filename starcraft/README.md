@@ -19,6 +19,19 @@ Box selection requires a ROM rebuilt from the updated source; an older copied RO
 
 An optional build replaces menu scrolling with a hold-B command ring: aim, hold B, press a direction and release. See [`docs/COMMAND-RING.md`](../docs/COMMAND-RING.md).
 
+Frontier Skirmish is a separate build with two original 64×64 battle maps,
+Transit Yard and Stone Gardens. Choose the map with Left/Right and one to
+three free-for-all computer opponents with Up/Down. A starts the match and
+B loads a saved match. All seats use the same roster. The pause screen
+saves the map and opponent count with the live match. Victory requires
+eliminating the other players' remaining units and buildings.
+
+Run `make original-skirmish` to build and verify
+`build/Frontier-Skirmish-GBA.gba`. Run `./dev play frontier` to build
+and open it in mGBA, and `make test-original-skirmish` to check both maps
+and all six map/opponent combinations. Frontier builds from the source
+tree without a reference ROM or extracted assets.
+
 In the optional race ROMs, the light-blue bar above a Protoss unit or building
 shows shields; the lower bar shows HP. An empty blue track means shields are
 depleted. The selection panel shows shields in blue beside the green hit points,

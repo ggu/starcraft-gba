@@ -18,6 +18,7 @@ REFERENCE_URL = "https://github.com/dmang-dev/sc64-maps.git"
 REFERENCE_COMMIT = "09b57f787a247107d1de82b8c5eab2734667ea1d"
 GAMES = {
     "starcraft": ("verify", "build/StarCraft-GBA.gba"),
+    "frontier": ("original-skirmish", "build/Frontier-Skirmish-GBA.gba"),
     "unified": ("unified", "build/StarCraft64-GBA.gba"),
     "races": ("races", "build/StarCraft64-Races-GBA.gba"),
     "wasteland": ("verify-sc64", "build/StarCraft64-Wasteland-GBA.gba"),
