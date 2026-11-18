@@ -94,12 +94,10 @@ control variants, including the refund and slot order. The candidate
 ARM build passes the existing memory guards. The same two-job
 result repeats on a separate build based directly on shipping
 source `2655cb22`. A single-item cancellation on the candidate
-also clears the queue and refunds 50. The P10-feature host fixture
-passes the same L-release gesture and the Gateway refund checks.
-The HUD still displays
-6/10 with the two paid SCVs, then 5/10 after cancel. Observe native
-admission at cap and the handoff to a blocked new head before changing
-when waiting jobs count against supply.
+also clears the queue and refunds 50. The HUD still displays
+6/10 with the two paid SCVs, then 5/10 after cancel. See the
+[native admission and promotion test](#native-admission-and-promotion-at-cap)
+for the separate discrepancy in how waiting jobs count against supply.
 
 - Native manifest SHA-256 `60cbcdb014c1bf55aaee2433f5a856046256a39db8fbe1f14d78a94b83275fb0`.
 - GBA shipping cancellation receipt SHA-256 `bb3754af6b0a9edd8498f8414fbe18d94bce25e9d0603592a4ce0f6e0369b0d7`.
@@ -107,3 +105,63 @@ when waiting jobs count against supply.
 - GBA tail cancellation receipt SHA-256 `eff219e30425e349352e74a513e0bd9ea8cceb0b28f7446a766a360ff750ab28`.
 - Release-based tail cancellation receipt SHA-256 `1c77e70dbc197d08804cdc6322bc28bb94f5e892a1add3060fbb70bb72012431`.
 - Candidate single-item cancellation receipt SHA-256 `f9f537a0994264632efbe5e8c5d8a927dae1e55dca6318baeff494028ea23f0b`.
+
+## GBA admission at the initial cap
+
+Two ordinary-input runs on the release-based Cancel Last ROM produce
+workers from an empty Blood Bath queue. In one run the player reaches
+9/10, then trains one SCV to reach 10/10. In the other run the player
+starts at 8/10 and pays for two orders, which also shows 10/10 on the GBA.
+In each run the next A press is refused with the supply warning. The
+queue and wallet match a fresh neutral replay at the same update,
+with enough minerals for the additional SCV. This establishes the
+current GBA admission rule independently of the displayed total.
+
+- GBA 9/10 admission receipt SHA-256 `712e876cdab1381a88c3aa51f7ae0848ed5112c85c77d8528fe6cbe43b124636`.
+- GBA 8/10 admission receipt SHA-256 `e444c814e22f5101a28483939803127e37c6592594568510b10505ebe62a6179`.
+
+## Native admission and promotion at cap
+
+Ordinary N64 input from a fresh Blood Bath start reached 9/10 supply
+and 240 minerals at observer step 11,458 after five additional SCVs
+completed. The Command Center's Build grid was open on the SCV and
+its queue was empty. At step 6,121 the same run showed 5/10 supply
+with one active SCV and a paid SCV in the second slot.
+
+The first observer expired before receiving the suffix. Both prequeued
+attempts recorded `SIGXFSZ` before the first rendered frame and stopped
+in the observer's signal trap. A process sample showed the Metal shader
+compiler at the first stop. During a 64 MiB process-limit preflight,
+the only open writable file beyond that limit is the per-user Metal
+cache, at 83,722,240 bytes. A 128 MiB limit passes the first rendered
+frame with the original input and a separate capture limit. That
+guarded run completes all 13,513 observer steps with ordinary controls.
+
+| Native ledger step | Minerals | HUD supply | Command Center production |
+| ---: | ---: | ---: | --- |
+| 11,772 | 248 | 9/10 | Empty queue |
+| 11,947 | 198 | 10/10 | One paid SCV training |
+| 12,062 | 148 | 10/10 | First SCV still training, second paid SCV visible in the queue |
+| 13,512 | 156 | 10/10 | Second SCV promoted to the front, progress bar empty |
+
+The second ordinary A press pays 50 minerals at 10/10 and adds a
+queued SCV without changing displayed supply. After the first SCV
+completes, the second occupies the front slot. The progress bar's
+filled width is six then eighteen pixels on the earlier active
+cuts and zero pixels in the final cut. One eight-mineral deposit
+accounts for the last wallet increase. The original ROM and Flash
+pins still match and the observer performs no guest writes.
+
+The GBA comparison rejects the second affordable order. To match
+the observed native case, separate paying for a waiting job from
+reserving supply for the current job. Carry waiting-head state
+through saves, cancellation and HUD updates. Observe empty-queue
+admission at cap, contention when two blocked producers regain
+capacity, and Zerg morph and hard-200 cases before generalizing
+those behaviors.
+
+- Native near-cap manifest SHA-256 `1ed5afe12a55eca7dc4b3c42b99189a2ca930d2c154ec2e1323eb4ab01dc47d5`.
+- Native near-cap input SHA-256 `76fe117f9dc3eda792479bccc113a5d67489975836409dbba1db834b066cf177`.
+- Guarded retry manifest SHA-256 `e5c572f1693117cb796d6c1b28f8eff2565f705add80b26805bfca8faa220bb0`.
+- Isolated 64 MiB diagnostic manifest SHA-256 `f5ecfb2502a92db84baf599906451cfa7fb84678d9231e5fc4166fccbbe7bc6f`.
+- Completed native cap manifest SHA-256 `41682dd5c9d3fdc0fc5289b5ac15369f3408c4062f2c51a327d08d1483e28ab7`.

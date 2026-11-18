@@ -14,6 +14,10 @@ static void check(uint32_t base) {
   uint32_t jobs=SC64_SAVE_TAG_RESEARCH_JOBS(old);
   uint32_t campaign=SC64_SAVE_TAG_CAMPAIGN_JOBS(old);
   uint32_t q8=SC64_SAVE_TAG_Q8_FLASH(old);
+  uint32_t waiting=SC64_SAVE_TAG_PAID_WAITING(old);
+  assert((waiting&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_PAID_WAITING_NAMESPACE);
+  assert((waiting&0xff00ffffu)==(old&0xff00ffffu));
+  assert(waiting!=old && waiting!=research && waiting!=jobs && waiting!=campaign && waiting!=q8);
   assert((q8&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_Q8_FLASH_NAMESPACE);
   assert((q8&0xff00ffffu)==(old&0xff00ffffu));
   assert((campaign&SC64_SAVE_TAG_NAMESPACE_MASK)==SC64_SAVE_TAG_CAMPAIGN_JOBS_NAMESPACE);

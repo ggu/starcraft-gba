@@ -1,6 +1,20 @@
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
 #include "sc64_construction_save.h"
+#ifdef SC64_PAID_WAITING_UNITS
+#if !defined(SC64_SHARED_TRANSPORT) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_IMPACT_EVENTS) || \
+    defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE) || \
+    defined(SC64_COMPOUND_FLASH_Z10_HOST_STAGE) || defined(SC64_NUKE_SILO_JOURNAL) || \
+    defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
+    defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_TERRAN_CARRIER_PROBE) || defined(SC64_ZERG_CARRIER_PROBE) || \
+    (defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) && \
+     (!defined(SC64_RESEARCH_SRAM_PRODUCT) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) || \
+      defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL)))
+#error "paid waiting units require the standard transport journal or the normal P10 research journal"
+#endif
+#define SC64_PAID_WAITING_TRANSPORT_TAG SC64_SAVE_TAG_PAID_WAITING(SC64_TRANSPORT_SAVE_VERSION)
+#endif
 #if defined(SC64_Q8_FLASH_ALL_CUSTOM_HOST) || defined(SC64_Q8_FLASH_ALL_CUSTOM_ARM_PROBE)
 #include "sc64_q8_flash_custom_roster.h"
 #endif
@@ -3052,6 +3066,9 @@ _Static_assert(SC64_PR_PAD_TUPLE_VALID(MAX_BUILDINGS,SC64_PR_ROW_WIDTH,SC64_PR_U
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_PAID_WAITING_UNITS
+    int paid_waiting_tag;
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     Sc64NukeSaveAuth nuke_silo_auth;
     u16 nuke_silo_receipts[MAX_BUILDINGS];
@@ -3622,6 +3639,13 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             RACE_B(i,queue_count)<0||RACE_B(i,queue_count)>5||RACE_B(i,queue_head)<0||RACE_B(i,queue_head)>4||
             RACE_B(i,queue_progress)<0||RACE_B(i,build_progress)<-1||RACE_B(i,shield)<0||
             RACE_B(i,larva)<0||RACE_B(i,larva)>3||RACE_B(i,shield_remainder)<0||RACE_B(i,shield_remainder)>=1280)return 0;
+#ifdef SC64_PAID_WAITING_UNITS
+        if (RACE_B(i,queue_count) && RACE_B(i,queue_progress)==SC64_QUEUE_WAITING_PROGRESS) {
+            Building waiting;
+            if (!plan->paid_waiting_tag || !race_save_decode_building(&race_data,(unsigned)i,&waiting) ||
+                !race_queue_head_waiting(&waiting)) return 0;
+        }
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
         if (!race_data.state[0] && race_data.state[2]==SC64_P7_GLOBAL_ID &&
             candidate_building.type==B_P7_SHIELD_BATTERY) {
@@ -4717,6 +4741,19 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (nuke_silo_tag) tag = SC64_TRANSPORT_SAVE_VERSION;
 #endif
 #ifdef SC64_SHARED_TRANSPORT
+#ifdef SC64_PAID_WAITING_UNITS
+    if (tag == SC64_PAID_WAITING_TRANSPORT_TAG) {
+        if (len < offsetof(RaceSave,state) + sizeof(race_data.state[0])) return 0;
+        plan->paid_waiting_tag = 1;
+        /* The payload retains the normal transport and research layout for
+         * its saved mode. Only the outer tag authorizes a waiting head. */
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+        tag = race_data.state[0] == 1 ? SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION;
+#else
+        tag = SC64_TRANSPORT_SAVE_VERSION;
+#endif
+    }
+#endif
     if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
         && tag != SC64_SHOWCASE_CARRIER_TAG
@@ -4895,6 +4932,9 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_PAID_WAITING_UNITS
+        ,SC64_PAID_WAITING_TRANSPORT_TAG
+#endif
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
         ,SC64_SHOWCASE_CARRIER_TAG
 #endif

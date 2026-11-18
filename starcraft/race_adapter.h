@@ -200,8 +200,13 @@ static int race_owner_queued_supply(int owner)
 #endif
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == owner)
         for (j = 0; j < b[i].queue_count; ++j) {
-            const Sc64RaceUnitRule *r = sc64_race_unit_rule(b[i].queue[(b[i].queue_head + j) % 5]);
-            if (r) total += r->supply * sc64_race_product_count(b[i].queue[(b[i].queue_head + j) % 5]);
+            int type = b[i].queue[(b[i].queue_head + j) % 5];
+            const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
+            if (r
+#ifdef SC64_PAID_WAITING_UNITS
+                && race_queue_entry_reserves_supply(&b[i], j, type)
+#endif
+            ) total += r->supply * sc64_race_product_count(type);
         }
     return total;
 }
@@ -1034,8 +1039,18 @@ static int race_queue_unit(int owner, int producer, int type)
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) count = sc64_z7_egg_product_count(type);
 #endif
+#ifdef SC64_PAID_WAITING_UNITS
+    /* A paid tail can wait for providers. The absolute cap still applies
+     * at purchase, and the live provider cap applies when its work begins. */
+    int purchase_cap = supply.provided;
+    if (b[producer].queue_count && race_queue_waiting_units_supported(&b[producer], type))
+        purchase_cap = SC64_SUPPLY_LIMIT;
+    if (!sc64_supply_allows(race_supply_ledger_reserved(supply), r->supply * count,
+                            purchase_cap)) { race_refusal = 2; return 0; }
+#else
     if (!sc64_supply_allows(race_supply_ledger_reserved(supply), r->supply * count,
                             supply.provided)) { race_refusal = 2; return 0; }
+#endif
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) {
         int free_slots = 0;
@@ -1080,6 +1095,11 @@ static int race_queue_unit(int owner, int producer, int type)
 #endif
     tail = (b[producer].queue_head + b[producer].queue_count) % 5;
     b[producer].queue[tail] = type;
+#ifdef SC64_PAID_WAITING_UNITS
+    /* An empty producer's admitted job reserves supply before its first tick. */
+    if (!b[producer].queue_count && race_queue_waiting_units_supported(&b[producer], type))
+        b[producer].queue_progress = 0;
+#endif
     ++b[producer].queue_count;
     return 1;
 }
@@ -1651,6 +1671,31 @@ static int sc64_p3_find_production_exit(int producer, int type,
 }
 #endif
 
+#ifdef SC64_PAID_WAITING_UNITS
+static void race_queue_try_start_waiting(Building *q, int type)
+{
+    const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
+    Sc64RaceSupplyLedger supply = race_owner_supply_ledger(q->owner, r->race);
+    if (sc64_supply_allows(race_supply_ledger_reserved(supply),
+                           r->supply * sc64_race_product_count(type), supply.provided))
+        q->queue_progress = 0;
+}
+
+static void race_queue_finish_head(Building *q)
+{
+    q->queue_head = (q->queue_head + 1) % 5;
+    --q->queue_count;
+    q->queue_progress = 0;
+    if (q->queue_count) {
+        int type = q->queue[q->queue_head];
+        if (race_queue_waiting_units_supported(q, type)) {
+            q->queue_progress = SC64_QUEUE_WAITING_PROGRESS;
+            race_queue_try_start_waiting(q, type);
+        }
+    }
+}
+#endif
+
 static void race_tick_buildings(void)
 {
     int i;
@@ -1726,6 +1771,12 @@ static void race_tick_buildings(void)
                 (race_mode && race_skirmish_power_required(b[i].type))) &&
                 !race_site_powered(owner, b[i].x, b[i].y)) continue;
         }
+#ifdef SC64_PAID_WAITING_UNITS
+        if (b[i].queue_progress == SC64_QUEUE_WAITING_PROGRESS) {
+            if (race_queue_head_waiting(&b[i])) race_queue_try_start_waiting(&b[i], type);
+            continue;
+        }
+#endif
         if (++b[i].queue_progress < frames) continue;
 #ifdef SC64_P4_RUNTIME
         if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
@@ -1790,9 +1841,13 @@ static void race_tick_buildings(void)
             }
             supply = sc64_race_unit_supply_provided(type);
             if (supply && owner == SIDE) supply_cap += supply;
+#ifdef SC64_PAID_WAITING_UNITS
+            race_queue_finish_head(&b[i]);
+#else
             b[i].queue_head = (b[i].queue_head + 1) % 5;
             --b[i].queue_count;
             b[i].queue_progress = 0;
+#endif
             continue;
         }
 #endif
@@ -1826,9 +1881,13 @@ static void race_tick_buildings(void)
         }
         supply = sc64_race_unit_supply_provided(type);
         if (supply && owner == SIDE) supply_cap += supply;
+#ifdef SC64_PAID_WAITING_UNITS
+        race_queue_finish_head(&b[i]);
+#else
         b[i].queue_head = (b[i].queue_head + 1) % 5;
         --b[i].queue_count;
         b[i].queue_progress = 0;
+#endif
     }
 }
 

@@ -106,7 +106,7 @@ hud_building_jobs(int slot, HudJobs *jobs, int with_eggs)
         for (i = 0; i < q->queue_count; i++)
             jobs->icon[i] = (short)card_portrait(sc64_race_raw_unit(q->queue[(q->queue_head + i) % 5]));
         jobs->count = q->queue_count;
-        hud_job_level(jobs, 0, q->queue_progress, unit_build_time(head));
+        hud_job_level(jobs, 0, SC64_QUEUE_DISPLAY_PROGRESS(q), unit_build_time(head));
         return;
     }
     if (q->under_construction) return;
@@ -779,7 +779,7 @@ hud_panel_bars(void)
         mode == MODE_BUILD || mode == MODE_MOVE || mode == MODE_ATTACK) return;
     q = &b[selected_building];
     if (q->queue_count > 0) { /* the common case, without resolving its icons */
-        gfx_bar(HUD_COLUMN, HUD_BAR_Y, HUD_BAR_W, HUD_BAR_H, q->queue_progress,
+        gfx_bar(HUD_COLUMN, HUD_BAR_Y, HUD_BAR_W, HUD_BAR_H, SC64_QUEUE_DISPLAY_PROGRESS(q),
                 unit_build_time(q->queue[q->queue_head]), C_GOLD, C_SHADOW);
         return;
     }
