@@ -114,8 +114,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   sanitizer fixture covers both maps and one to three CPUs, including
   reload after depletion, an unfinished hall, and a reachable local
   patch. All twelve existing victory inputs kept their result ticks and
-  averaged 28.68–29.48 updates per second in mGBA. CPU expansion after
-  local exhaustion remains open.
+  averaged 28.68–29.48 updates per second in mGBA. The paired long mGBA
+  runs also found nine remote assignments before the fix and zero after.
+  On each map a fresh load after local depletion matched the live game
+  for the next 120 updates. CPU expansion after local exhaustion remains
+  open.
 
 - **Frontier frame time (P1):** clear the byte visibility grid with
   aligned stores, remember explored circle centers until a world load or
