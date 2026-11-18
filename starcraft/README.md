@@ -52,10 +52,13 @@ Run `make frontier-factions` to build `Frontier-Foundry-GBA.gba`,
 Each cartridge defaults to its named faction and supports both original
 64×64 maps, Transit Yard and Stone Gardens. Move between setup rows with
 Up/Down and change each choice with Left/Right. Select a faction for
-yourself and each of one to three free-for-all computer opponents. A
-starts the match and B loads a saved match. Pause and save to retain
-the lineup and live match on that cartridge. Victory requires eliminating
-the other players' remaining units and buildings.
+yourself and each of one to three computer opponents. In Free for All,
+the computers fight each other as well as you. In CPU Team, they target
+you while keeping separate forces and resource banks. Press Up from the
+Map row to reach Mode directly. A starts the match and B loads a saved
+match. Pause and save to retain the mode, lineup, and live match on that
+cartridge. Victory requires eliminating the other players' remaining
+units and buildings.
 
 Run `./dev play frontier-foundry` to open Foundry in mGBA, or substitute
 `frontier-rovers` or `frontier-bulwark`. Run `make test-frontier-factions`

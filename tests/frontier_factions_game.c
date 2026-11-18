@@ -159,50 +159,136 @@ static void check_fighter_combat(int human)
           "fighter moves at its own speed");
 }
 
+static void check_team_world(int bots, int allied)
+{
+    for (int i = 0; i < bots; ++i) {
+        Sc64AiWorld world;
+        int owner = skirmish_owner_ids[i], seen_human = 0, seen_cpu = 0;
+        check(skirmish_ai[i].active && skirmish_ai[i].team == (allied ? ENEMY : owner),
+              "CPU team initialized");
+        check(skirmish_hostile(SIDE, owner) && skirmish_hostile(owner, SIDE),
+              "human and CPU are mutually hostile");
+        for (int j = 0; j < bots; ++j) if (i != j) {
+            int other = skirmish_owner_ids[j];
+            check(!!skirmish_hostile(owner, other) == !allied &&
+                  !!skirmish_hostile(other, owner) == !allied,
+                  "CPU relations match setup in both directions");
+        }
+        skirmish_make_world(i, &world);
+        for (int j = 0; j < world.count; ++j) {
+            if (world.targets[j].player == SIDE) ++seen_human;
+            for (int k = 0; k < bots; ++k)
+                if (k != i && world.targets[j].player == skirmish_owner_ids[k]) ++seen_cpu;
+        }
+        check(seen_human == 1 && seen_cpu == (allied ? 0 : bots - 1) &&
+              world.count == 1 + (allied ? 0 : bots - 1),
+              "AI world contains exactly the living hostile owners");
+    }
+}
+
+static void check_team_match(int map, int bots, int allied)
+{
+    game_init();
+    check(frontier_cpu_team == 0 && frontier_setup_row == FRONTIER_SETUP_MAP,
+          "team defaults to free for all");
+    if (map) press(KEY_RIGHT);
+    row(FRONTIER_SETUP_BOTS);
+    if (bots == 1) press(KEY_LEFT);
+    if (bots == 3) press(KEY_RIGHT);
+    row(FRONTIER_SETUP_MAP);
+    press(KEY_UP);
+    check(frontier_setup_row == FRONTIER_SETUP_CPU_FIRST + bots,
+          "up from map reaches appended team row");
+    press(KEY_RIGHT);
+    check(frontier_cpu_team == 1, "right enables CPU team");
+    press(KEY_LEFT);
+    check(frontier_cpu_team == 0, "left disables CPU team");
+    if (allied) press(KEY_LEFT);
+    check(frontier_cpu_team == allied, "team choice selected through title");
+    press(KEY_A);
+    check(screen == SCREEN_PLAY && original_skirmish_map == map && skirmish_bots == bots,
+          "team setup starts ordinary match");
+    check_team_world(bots, allied);
+    press(KEY_START);
+    check(screen == SCREEN_PAUSE, "team match pauses");
+    press(KEY_B);
+    check(pause_notice == 1, "team match saves");
+    game_init();
+    check(frontier_cpu_team == 0, "fresh title resets team choice");
+    press(KEY_B);
+    check(screen == SCREEN_PLAY && original_skirmish_map == map && skirmish_bots == bots &&
+          frontier_cpu_team == allied, "load restores team choice");
+    check_team_world(bots, allied);
+    press(KEY_START); press(KEY_R);
+    check(screen == SCREEN_PLAY && original_skirmish_map == map && skirmish_bots == bots &&
+          frontier_cpu_team == allied, "restart retains team choice");
+    check_team_world(bots, allied);
+}
+
+static void check_team_combat(int allied)
+{
+    game_init();
+    if (allied) { press(KEY_UP); press(KEY_RIGHT); }
+    press(KEY_A);
+    int attacker = spawn_unit(ENEMY, U_MARINE, 490, 492);
+    int cpu = spawn_unit(RESCUABLE, U_MARINE, 498, 492);
+    int human = spawn_unit(SIDE, U_MARINE, 514, 492);
+    check(attacker >= 0 && cpu >= 0 && human >= 0, "combat units spawned");
+    check(nearest_enemy_typed(490, 492, ENEMY, 64, U_MARINE) == (allied ? human : cpu),
+          "attack-move acquisition respects team even when another CPU is closer");
+}
+
 static void check_setup_codec(void)
 {
     const unsigned char choices[3] = {2, 1, 2};
     unsigned char decoded[3];
-    int map, human;
-    for (int selected = 0; selected < 3; ++selected) {
-        int packed = frontier_pack_setup(1, SC_FRONTIER_FACTION, selected, choices);
-        check(packed == (1 | (2 << 1) | (1 << 3) | (2 << 5) |
-                         (selected << 7) | ((SC_FRONTIER_FACTION + 1) << 9)),
-              "stable setup encoding");
-        map = human = -1;
-        decoded[0] = decoded[1] = decoded[2] = 9;
-        check(frontier_unpack_setup(packed, SC_FRONTIER_FACTION, &map, &human, decoded) &&
-              map == 1 && human == selected && decoded[0] == 2 &&
-              decoded[1] == 1 && decoded[2] == 2, "setup codec round trip");
-        const int invalid[] = {packed | (1 << 11), (packed & ~(3 << 1)) | (3 << 1),
-                               (packed & ~(3 << 3)) | (3 << 3),
-                               (packed & ~(3 << 5)) | (3 << 5),
-                               (packed & ~(3 << 7)) | (3 << 7), -1};
-        for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
-            map = human = 17; decoded[0] = decoded[1] = decoded[2] = 9;
-            check(!frontier_unpack_setup(invalid[i], SC_FRONTIER_FACTION, &map, &human, decoded) &&
-                  map == 17 && human == 17 && decoded[0] == 9 && decoded[1] == 9 && decoded[2] == 9,
-                  "corrupt setup rejected without mutating outputs");
+    int map, human, allied;
+    for (int selected = 0; selected < 3; ++selected)
+        for (int team = 0; team <= 1; ++team) {
+            int packed = frontier_pack_setup(1, SC_FRONTIER_FACTION, selected, choices, team);
+            check(packed == (1 | (2 << 1) | (1 << 3) | (2 << 5) |
+                             (selected << 7) | ((SC_FRONTIER_FACTION + 1) << 9) | (team << 11)),
+                  "stable setup encoding and team bit");
+            map = human = allied = -1;
+            decoded[0] = decoded[1] = decoded[2] = 9;
+            check(frontier_unpack_setup(packed, SC_FRONTIER_FACTION, &map, &human, decoded, &allied) &&
+                  map == 1 && human == selected && allied == team && decoded[0] == 2 &&
+                  decoded[1] == 1 && decoded[2] == 2, "setup codec round trip");
+            const int invalid[] = {packed | (1 << 12), (packed & ~(3 << 1)) | (3 << 1),
+                                   (packed & ~(3 << 3)) | (3 << 3),
+                                   (packed & ~(3 << 5)) | (3 << 5),
+                                   (packed & ~(3 << 7)) | (3 << 7),
+                                   (packed & ~(3 << 9)) | (1 << 11), -1};
+            for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+                map = human = allied = 17; decoded[0] = decoded[1] = decoded[2] = 9;
+                check(!frontier_unpack_setup(invalid[i], SC_FRONTIER_FACTION, &map, &human, decoded, &allied) &&
+                      map == 17 && human == 17 && allied == 17 &&
+                      decoded[0] == 9 && decoded[1] == 9 && decoded[2] == 9,
+                      "corrupt setup rejected without mutating outputs");
+            }
+            map = human = allied = 17; decoded[0] = decoded[1] = decoded[2] = 9;
+            check(!frontier_unpack_setup(packed, (SC_FRONTIER_FACTION + 1) % 3,
+                                         &map, &human, decoded, &allied) &&
+                  map == 17 && human == 17 && allied == 17 &&
+                  decoded[0] == 9 && decoded[1] == 9 && decoded[2] == 9,
+                  "other cartridge setup rejected without mutating outputs");
         }
-        map = human = 17; decoded[0] = decoded[1] = decoded[2] = 9;
-        check(!frontier_unpack_setup(packed, (SC_FRONTIER_FACTION + 1) % 3, &map, &human, decoded) &&
-              map == 17 && human == 17 && decoded[0] == 9 && decoded[1] == 9 && decoded[2] == 9,
-              "other cartridge setup rejected without mutating outputs");
-    }
     for (int old_map = 0; old_map < 2; ++old_map) {
         int legacy = old_map | (2 << 1) | (1 << 3) | (2 << 5) | (SC_FRONTIER_FACTION << 7);
-        map = human = 17; decoded[0] = decoded[1] = decoded[2] = 9;
-        check(frontier_unpack_setup(legacy, SC_FRONTIER_FACTION, &map, &human, decoded) &&
-              map == old_map && human == SC_FRONTIER_FACTION && decoded[0] == 2 &&
-              decoded[1] == 1 && decoded[2] == 2, "legacy cartridge setup accepted");
-        map = human = 17; decoded[0] = decoded[1] = decoded[2] = 9;
-        int ok = frontier_unpack_setup(old_map, SC_FRONTIER_FACTION, &map, &human, decoded);
+        map = human = allied = 17; decoded[0] = decoded[1] = decoded[2] = 9;
+        check(frontier_unpack_setup(legacy, SC_FRONTIER_FACTION, &map, &human, decoded, &allied) &&
+              map == old_map && human == SC_FRONTIER_FACTION && allied == 0 && decoded[0] == 2 &&
+              decoded[1] == 1 && decoded[2] == 2, "legacy cartridge setup defaults to FFA");
+        map = human = allied = 17; decoded[0] = decoded[1] = decoded[2] = 9;
+        int ok = frontier_unpack_setup(old_map, SC_FRONTIER_FACTION, &map, &human, decoded, &allied);
         if (SC_FRONTIER_FACTION == 0)
-            check(ok && map == old_map && human == 0 && decoded[0] == 0 && decoded[1] == 0 && decoded[2] == 0,
-                  "earliest setup defaults to Foundry");
+            check(ok && map == old_map && human == 0 && allied == 0 &&
+                  decoded[0] == 0 && decoded[1] == 0 && decoded[2] == 0,
+                  "earliest setup defaults to Foundry and FFA");
         else
-            check(!ok && map == 17 && human == 17 && decoded[0] == 9 && decoded[1] == 9 && decoded[2] == 9,
-                  "other cartridges reject earliest setup");
+            check(!ok && map == 17 && human == 17 && allied == 17 &&
+                  decoded[0] == 9 && decoded[1] == 9 && decoded[2] == 9,
+                  "other cartridges reject earliest setup without mutating outputs");
     }
 }
 
@@ -210,13 +296,19 @@ int main(void)
 {
     gba_init();
     check_setup_codec();
+    check_team_combat(0);
+    check_team_combat(1);
     for (int human = 0; human < 3; ++human)
         check_fighter_combat(human);
     for (int map = 0; map < ORIGINAL_MAP_COUNT; ++map)
         for (int bots = 1; bots <= 3; ++bots)
+            for (int allied = 0; allied <= 1; ++allied)
+                check_team_match(map, bots, allied);
+    for (int map = 0; map < ORIGINAL_MAP_COUNT; ++map)
+        for (int bots = 1; bots <= 3; ++bots)
             for (int human = 0; human < 3; ++human)
                 play_match(map, bots, human);
-    printf("Frontier faction cartridge %d: eighteen mixed setups, economy, saves and restart passed.\n",
+    printf("Frontier faction cartridge %d: setup, economy, team targeting, saves and restart passed.\n",
            SC_FRONTIER_FACTION);
     return 0;
 }

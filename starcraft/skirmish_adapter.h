@@ -33,6 +33,15 @@ skirmish_bot_index(int owner)
     return -1;
 }
 
+static inline unsigned char
+skirmish_team_for_owner(int owner)
+{
+#ifdef SC_FRONTIER_FACTION
+    if (frontier_cpu_team && owner != SIDE) return ENEMY;
+#endif
+    return (unsigned char)owner;
+}
+
 static int
 owner_minerals(int owner)
 {
@@ -87,7 +96,7 @@ skirmish_hostile(int a, int other)
     bot = skirmish_bot_index(a);
     if (bot < 0) return 1; /* Human is hostile to every other live skirmish slot. */
     target.player = (unsigned char)other;
-    target.team = (unsigned char)other; /* Free-for-all: each owner is its own team. */
+    target.team = skirmish_team_for_owner(other);
     target.alive = 1;
     target.neutral = 0;
     target.army = 0;
@@ -331,7 +340,7 @@ skirmish_make_world(int index, Sc64AiWorld *world)
             if (u[j].alive && u[j].owner == owner && u[j].type != U_SCV && u[j].type != U_MEDIC) ++army;
         if (!skirmish_target_point(owner, &x, &y, 0)) continue;
         world->targets[world->count].player = (unsigned char)owner;
-        world->targets[world->count].team = (unsigned char)owner;
+        world->targets[world->count].team = skirmish_team_for_owner(owner);
         world->targets[world->count].alive = 1;
         world->targets[world->count].neutral = 0;
         world->targets[world->count].army = (unsigned short)army;
@@ -455,7 +464,8 @@ skirmish_init(void)
     }
     for (i = 0; i < skirmish_bots; ++i) {
         owner = skirmish_owner_ids[i];
-        sc64_ai_init(&skirmish_ai[i], (unsigned char)owner, (unsigned char)owner, 200, 0, 4, 36);
+        sc64_ai_init(&skirmish_ai[i], (unsigned char)owner, skirmish_team_for_owner(owner),
+                     200, 0, 4, 36);
 #ifdef SC_FRONTIER_FACTION
         const FrontierFactionProfile *faction = frontier_owner_profile(owner);
         skirmish_ai[i].desired_workers = faction->desired_workers;

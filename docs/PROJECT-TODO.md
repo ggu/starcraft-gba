@@ -54,6 +54,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   mining before and after a native N64 custom-game pause and an
   exact paused-clock and mineral check on all three Frontier host builds.
 
+- **Frontier CPU Team (P1):** the title's Mode row lets players keep the
+  default Free for All or have the computers fight on one team. The CPUs
+  retain separate forces and banks. This follows the opponent relationships
+  observed at launch in the
+  [paired N64 Blood Bath runs](audits/2026-11-12-n64-blood-bath-opening.md#paired-blood-bath-launches).
+  Paired ARM runs on both Frontier maps sampled orders every 60 game updates
+  from ticks 1,980 to 3,960. Free-for-all CPUs sent attacks toward other
+  computers. In CPU Team all three sent attacks toward the human base.
+  The paired three-CPU Team openings averaged 29.09–29.25 updates per
+  second through tick 3,960 in mGBA. All 54 CPU Team setups started, with
+  the first 240 game updates averaging 29.56–29.57 updates per second.
+  One save on each cartridge loaded in a fresh process and matched the
+  next 120 updates before a restart kept the team. Three saves from
+  before the mode was added loaded as Free for All.
+
 - **Frontier victory replays (P1):** each of the three player factions
   has a normal-button win on both maps against one CPU. Both maps also
   have mixed two- and three-CPU wins. The packets run on the Foundry
@@ -64,6 +79,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Transit Yard at game tick 14,727 and on Stone Gardens at tick 13,912.
   These full mGBA replays averaged 29.05 and 29.40 updates per second
   after the first 100 updates. Physical GBA SP timing remains open.
+  The two-CPU Team cases reached victory at tick 14,649 on Transit Yard
+  and tick 12,980 on Stone Gardens at 28.68 and 28.85 updates per second.
+  A victory replay against three allied CPUs remains open.
   To replay the checked-in inputs, build Foundry
   and pass the physical observer from `tools/sc64_headless_replay.c` to
   the optional test.
