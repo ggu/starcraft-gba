@@ -49,8 +49,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   lowers the dense mean to 754,606 cycles (22.23 emulated updates per
   second). Dense p95 is essentially flat. During the opening, the flip
   phase shifts about 100–130 cycles per update before frame 430 waits an
-  extra 200,000 cycles at presentation. Fix that pacing drift and verify
-  scanout on hardware before enabling the option by default.
+  extra 200,000 cycles at presentation.
+
+- **Original-art skirmish frame pacing (P1):** the Mode 4 Outpost builds
+  count hardware VBlanks and require two video frames between flips. A
+  page finished during an eligible blank can present in that blank.
+  The ARM 40-unit sample averages 754,572 cycles (22.23 emulated updates
+  per second) and the opening averages 561,350, with no over-budget
+  update in that 1,000-update sample. Both saves and all 28 gameplay and
+  video checkpoints match the polled baseline. The emulator trace saw
+  2,000 consecutive opening flips on line 160 exactly two video frames
+  apart. All 640 dense flips occur on lines 160–226, with intervals from
+  two to four video frames. Dense combat remains above budget. Check
+  display timing on GBA hardware and continue reducing the draw cost.
 
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and
   Interceptor services. The standard Terran, Zerg and Showcase builds still

@@ -20,4 +20,14 @@ gba_present_ready(u32 elapsed_cycles, u16 vcount)
            vcount <= GBA_PRESENT_LAST_SAFE_VBLANK_LINE;
 }
 
+/* Each epoch begins at the hardware VBlank interrupt. Count the blanks that
+ * actually reached the screen, regardless of where in one the flip occurred. */
+static inline int
+gba_present_epoch_ready(u32 epoch, u32 last_flip_epoch, u16 vcount)
+{
+    return epoch - last_flip_epoch >= 2u &&
+           vcount >= GBA_PRESENT_FIRST_VBLANK_LINE &&
+           vcount <= GBA_PRESENT_LAST_SAFE_VBLANK_LINE;
+}
+
 #endif
