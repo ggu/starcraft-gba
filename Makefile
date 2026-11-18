@@ -5258,14 +5258,17 @@ test-sc64-direct-firing-points-game: test-sc64-direct-firing-flags build/test-sc
 # Asset-free exact contact memo contract fixture; the same collision headers
 # are compiled in their per-frame and persistent bucket lifecycle variants.
 SC64_CONTACT_MEMO_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST $(CS_MEMO_FLAGS) $(CS_STEER_FLAGS)
-build/test-sc64-contact-memo-legacy: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_collision_legacy.h common/gba.h Makefile | build
+SC64_CONTACT_MEMO_TEST_KEY := -rows$(CANONICAL_CONTACT_LOCAL_MEMO)-defer$(CANONICAL_CONTACT_DEFER_STEERING)
+SC64_CONTACT_MEMO_TEST_LEGACY := build/test-sc64-contact-memo-legacy$(SC64_CONTACT_MEMO_TEST_KEY)
+SC64_CONTACT_MEMO_TEST_PERSISTENT := build/test-sc64-contact-memo-persistent$(SC64_CONTACT_MEMO_TEST_KEY)
+$(SC64_CONTACT_MEMO_TEST_LEGACY): tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_collision_legacy.h common/gba.h Makefile config/contact-scan/Makefile | build
 	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) $< -o $@
-build/test-sc64-contact-memo-persistent: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_persistent_collision.h common/gba.h Makefile | build
+$(SC64_CONTACT_MEMO_TEST_PERSISTENT): tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_persistent_collision.h common/gba.h Makefile config/contact-scan/Makefile | build
 	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) -DSC64_PERSISTENT_COLLISION $< -o $@
 .PHONY: test-sc64-contact-memo
-test-sc64-contact-memo: build/test-sc64-contact-memo-legacy build/test-sc64-contact-memo-persistent
-	./build/test-sc64-contact-memo-legacy
-	./build/test-sc64-contact-memo-persistent
+test-sc64-contact-memo: $(SC64_CONTACT_MEMO_TEST_LEGACY) $(SC64_CONTACT_MEMO_TEST_PERSISTENT)
+	./$(SC64_CONTACT_MEMO_TEST_LEGACY)
+	./$(SC64_CONTACT_MEMO_TEST_PERSISTENT)
 test: test-sc64-contact-memo
 
 # Asset-free route-dispatch oracle for the exact monotone shortest-step probe.

@@ -329,9 +329,28 @@ plus the simulation, route and terrain timelines. Blood Bath matches all
 25 world, route, palette, arena and video cuts and the final SRAM after the
 usual pause save. A fresh title load continues to the same world.
 
+The full P7 route from HOME reaches victory on both ROMs at frame
+55,892. The 59 named checkpoints, 11 briefing acknowledgments, and 10
+dialogue acknowledgments match across 57,678 input updates. Whole-loop
+cost, including menu and presentation time, falls from 2,040,429 to
+2,019,915 cycles on average (1.01%). That is 8.31 emulated updates per
+second over this route.
+
+The regular Terran, Z10, P10 and Showcase recipes reproduce the measured
+ROMs byte for byte and pass their unchanged RAM guards. The six older
+Z7–Z9 and P7–P9 recipes also link within those guards. Ordinary buttons
+launch all 30 campaign entries and 72 skirmish setups across both maps,
+three player races, and one to three CPUs. Four paired custom saves
+match byte for byte and load in both directions between releases, with
+matching post-load play. The standalone source build and asset-free test
+suite pass locally, including 1,161 Python cases with 35 optional skips.
+
 | Local evidence (SHA-256) | Digest |
 | --- | --- |
 | Packed node P7 pair | `c00f28caad719e96e464ffd28004bee930f00c25b4a3993e2759aef6b0904987` |
 | Packed node live oracle | `a07363d27bd29cc50b43d1a36cef2485caf5e0c7680faed947b67897a52a608b` |
 | Deferred mask P7 replay | `3d21edd770c8da174fff431165dbc74ad23c16dcc9e79d25d81982de6636ae51` |
 | Deferred mask Z10 Blood Bath replay | `5b6e3d08e2984d9e3091f6073734b2ea646413eea80576c16b59d38378aff85c` |
+| Deferred mask full P7 victory | `238164016b75ce7fb70a4129b480f9f13db6837ec3f0a5da6a120e31fec62e29` |
+| Physical launch matrix | `f8644030ebaa75ae0ea73e128b591e09757f1b6367c5bd96da5cf44bf7e86922` |
+| Bidirectional save matrix | `d4028523e6fff80e9f67908805ba38c415a7721265b314d296f0c7ce42d90d3d` |

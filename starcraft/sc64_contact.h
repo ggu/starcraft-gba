@@ -713,16 +713,22 @@ sc64_contact_steering_query(const Unit *q, int speed, int *fresh)
 {
     unsigned mask;
 #ifdef SC64_CONTACT_MEMO_ORACLE
+    int eligible = sc64_contact_memo_eligible(q, speed);
     SC64_CONTACT_MEMO_ORACLE_CALL();
+    if (eligible) ++sc64_contact_memo_counts[sc64_contact_memo_window][1];
 #endif
     if (sc64_contact_memo_count && sc64_contact_memo_eligible(q, speed) &&
         sc64_contact_memo_lookup(q, speed, !!sc64_contact_p6_active(), &mask)) {
 #ifdef SC64_CONTACT_MEMO_ORACLE
+        ++sc64_contact_memo_counts[sc64_contact_memo_window][2];
         assert(mask == sc64_contact_blocked_mask_uncached(q, speed));
 #endif
         *fresh = 0;
         return mask;
     }
+#ifdef SC64_CONTACT_MEMO_ORACLE
+    if (eligible) ++sc64_contact_memo_counts[sc64_contact_memo_window][3];
+#endif
     *fresh = 1;
     return sc64_contact_blocked_mask_uncached(q, speed);
 }
