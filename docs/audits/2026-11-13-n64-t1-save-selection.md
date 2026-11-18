@@ -27,8 +27,8 @@ issued Move with C-Right. The HUD kept the fixed Hold, Move and Stop
 prompts before and after the order. The B prompt independently displayed
 Attack after moving the cursor into the field.
 
-The ordinary Load/Save path wrote a guest save and returned to the field
-with the Marine selected and moving. A follow-up reached Confirm Abort,
+The ordinary Load/Save path returned to the field after selecting Save
+This Game, with the Marine selected and moving. A follow-up reached Confirm Abort,
 then reached the observer's time limit before returning to title. The
 observed HUD has fixed command buttons. The earlier title-load evidence
 above supplies the Command Center selection comparison. The Marine's

@@ -1163,6 +1163,15 @@ the compact arena in a full ARM save/load replay.
 The usual P7 combat tape allocates no projectile rows. It matches all
 its sampled state and timing with the probe on or off.
 
+With prepared P10 inputs, use separate clean build directories to compare
+the normal cartridge and the opt-in one.
+
+```sh
+make verify-protoss-p10
+make SC64_DEFENSE_PROBE_FLAGS=-DSC64_POOL_LIVE_ACQUIRE_PROBE verify-protoss-p10
+make test-sc64-interceptor-pool-codec test-sc64-interceptor-motion
+```
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Isolated ARM allocations | `cbda7a68102af9a1715d6c5fb7a7224d961c4f2cabd297aab0f1fa542ebfffea` |

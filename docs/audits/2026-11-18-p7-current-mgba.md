@@ -175,3 +175,13 @@ callback-based fusion increased mean guest cycles from 1,958,744 to
 1,993,740. Mean cost outside orders and sight increased by 34,850 cycles.
 The callback implementation stays outside the release. Local comparison
 SHA-256 `db2d5cd981c61d435d093c697bab0428e186e4edff3e7dd1bb5d41229b9c41aa`.
+
+## Duplicate detector queries
+
+A counting build recorded 3,977 detector-list mask queries in the timed
+P7 window. Only 48 repeated the same raw unit type and exact position in
+the same refresh pass. At the measured average cost per query, replacing
+all 48 would save about 0.07% of the sampled interval before lookup costs.
+The full tape records 406 repeats in 33,660 queries. Leave this memo out
+of the runtime and prioritize the existing expensive paths with actual
+repeated work.
