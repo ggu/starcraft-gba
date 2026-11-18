@@ -1182,8 +1182,16 @@ builds. The tape holds 47,194 physical calls and reaches victory at
 frame 46,057. Both runs match 20 gameplay checkpoints, 10 briefing pages,
 14 field acknowledgments and the sampled fixed arena contents. The arena
 allocates 20 rows during the mission. The full mission spends about 0.06%
-fewer cycles with local acquisition. Projectile-heavy windows benefit
-more than the whole-mission average.
+fewer cycles with local acquisition. Its since-boot peak changes from
+36,578,402 to 36,603,937 cycles. Projectile-heavy windows benefit more
+than the whole-mission average.
+
+The final default P10 and compact Z10 preview reproduce the timed
+candidate binaries byte for byte. The final strict P10 build reproduces
+the timed reference. All four canonical ROM headers and memory guards
+pass. They launch 30 campaign chapters and 72 custom games with
+ordinary buttons. The eight canonical cross-load cases preserve the
+remembered command and continue to the same world.
 
 The usual P7 combat tape allocates no projectile rows. It matches all
 its sampled state and timing with the probe on or off.
@@ -1204,4 +1212,6 @@ make test-sc64-interceptor-pool-codec test-sc64-interceptor-motion
 | Ordinary compact Z10 Blood Bath battle and save pair | `9422a5127388dc8e9913170a678871f9b6078e279fd58444f032c8fbc2ede062` |
 | Same Z10 match with orders and route counters | `81038247490679fbf72eecb951a6163ece86d6037810327e0f0f5f289d67f425` |
 | Ordinary P10 victory pair | `6d1e6b98f77c624e7bb2dca6ef1b1015d54ace31d8013e92d616099c3d495c11` |
+| Final release campaign and skirmish openings | `f8644030ebaa75ae0ea73e128b591e09757f1b6367c5bd96da5cf44bf7e86922` |
+| Final release cross-load matrix | `1e7c0835db02865a206cb86ccb63648973d979db6470ec171d22e25bde2019e6` |
 | P7 comparison with an empty projectile arena | `cba63d691573808af871e740d8c20be16cdaa770c4e180cb4f9e2f97b48e0217` |
