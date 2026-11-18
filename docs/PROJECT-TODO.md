@@ -702,7 +702,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   existing memory guards and reproduce 30 campaign starts, 72 skirmish
   starts, and eight cross-build custom SRAM continuations. An uncovered
   cached range read can still resume synchronously. Qualify dense ranged
-  workloads and campaign save continuation before enabling it.
+  workloads and more campaign saves before enabling it. The [full Z9 replay](audits/2026-11-16-resumable-frontier-budget.md#full-z9-replay-and-campaign-saves)
+  wins on both builds, checks 32 historical checkpoints, and cuts full-replay
+  mean 1.32% and p95 7.84%. One retained Z9 campaign save now passes an
+  exact re-save and fresh cross-load in each direction.
   The packed second cutoff stays local.
   On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same

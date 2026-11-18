@@ -469,3 +469,33 @@ custom saves. Campaign continuation needs longer input and save traces.
 - Combined distance-bound replay SHA-256 `c3c0177c98a6afd34b164798a855a243a597d4fb2dc7ced3cad9c252645c89ae`.
 - Combined busy P7 pair SHA-256 `52b3fde1c97ee0c115eda8967ca252d51e9ad2a40d68f87ab10ef29d04eb4a1f`.
 - Combined three-AI Blood Bath receipt SHA-256 `448fbb1b39db0e9e181877a924d198454159778e868a88fac40f0fbeff58c426`.
+
+### Full Z9 replay and campaign saves
+
+The current normal Z10 pair also plays the retained [Z9 controller tape](2026-11-13-z9-normal-physical.md)
+from a blank title screen. Each run takes 74,386 recorded controller calls
+and 74,398 emulator calls after six modal page acknowledgments. Both match
+the 32 historical checkpoints and win at campaign frame 72,628. The raw
+world and displayed frame match at the 46,500-call boundary and the result.
+The mission pointer in each ELF resolves to that ELF's Z9 descriptor.
+
+| Guest cycles | Shipping tail | Component and distance checks |
+| --- | ---: | ---: |
+| Mean across full replay | 1,607,043 | 1,585,775 |
+| Full-replay p95 | 2,544,025 | 2,344,594 |
+| Full-replay maximum | 62,344,943 | 62,368,713 |
+| Mean across first 46,500 calls | 1,519,410 | 1,498,907 |
+
+The full mean falls 1.32% and full p95 falls 7.84%. These totals include
+menus, modal pages and the result transition. The last 500 calls of the
+46,500-call interval show nearly flat mean and order cost.
+
+Both builds also load a retained Z9 campaign SRAM through the title screen
+at frame 6,069. After 600 updates each writes the same 32 KiB SRAM through
+the pause menu. A fresh process then loads the other build's save over both
+directions and reaches frame 6,849 with matching raw actor, building,
+resource and mission state. This qualifies that campaign checkpoint in
+addition to the custom-game matrix.
+
+- Full timed Z9 receipt SHA-256 `5bfea9ac5c5b1f85e8c91ad905cede0a46e0c05c92e322e9ed3bfe142a7d2c69`.
+- Z9 fresh campaign cross-load receipt SHA-256 `0ea1b4025ff52287655a4fcef0ab65c2e198b1be0be712cb325ee90136d91219`.
