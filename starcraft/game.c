@@ -1856,7 +1856,7 @@ static void sc64_routes_grid_commit(void);
 static void sc64_range_route_forget_target(int target);
 #endif
 #else
-static int bfs_prev[MAP_CELLS], bfs_queue[MAP_CELLS];
+static u16 bfs_first[MAP_CELLS], bfs_queue[MAP_CELLS];
 static u16 bfs_seen[MAP_CELLS], bfs_generation;
 #endif
 /* Boolean cache state; a byte avoids padding before route/save scratch. */
@@ -3655,6 +3655,62 @@ is_traversable(int col, int row, int from_cell)
 #include "sc64_depot_goal.h"
 _Static_assert(MAX_BUILDINGS < 0x4000, "facility slot keys must fit the tagged route namespace");
 
+#ifndef SC64_IMPORTED_MISSION
+/* Keep column and row in the queue so visiting a tile never divides by the
+ * map width. Each entry inherits the first step of the parent that found it. */
+_Static_assert(MAP_COLS <= 256 && MAP_ROWS <= 256, "walk queue packs tile coordinates in bytes");
+
+static inline __attribute__((always_inline)) int
+walk_search_begin(int cell, int packed)
+{
+    if (!path_grid_valid)
+        build_path_grid();
+    if (++bfs_generation == 0) {
+        memset(bfs_seen, 0, sizeof(bfs_seen));
+        bfs_generation = 1;
+    }
+    bfs_seen[cell] = bfs_generation;
+    bfs_first[cell] = (u16)packed;
+    bfs_queue[0] = (u16)packed;
+    return 1;
+}
+
+static inline __attribute__((always_inline)) void
+walk_search_enqueue(int cell, int packed, int first, int *tail)
+{
+    if (bfs_seen[cell] == bfs_generation || !SC64_GRID_GET(path_walkable, cell))
+        return;
+    bfs_seen[cell] = bfs_generation;
+    bfs_first[cell] = (u16)(first < 0 ? packed : first);
+    bfs_queue[(*tail)++] = (u16)packed;
+}
+
+static inline __attribute__((always_inline)) int
+walk_search_expand(int packed, int col, int row, int cell, int start, int tail)
+{
+    int first = cell == start ? -1 : bfs_first[cell];
+    /* Keep the original neighbor order for equally short approaches. The
+     * blocked start can be processed but is already seen and never reentered. */
+    if (col + 1 < MAP_COLS)
+        walk_search_enqueue(cell + 1, packed + 1, first, &tail);
+    if (col > 0)
+        walk_search_enqueue(cell - 1, packed - 1, first, &tail);
+    if (row + 1 < MAP_ROWS)
+        walk_search_enqueue(cell + MAP_COLS, packed + 256, first, &tail);
+    if (row > 0)
+        walk_search_enqueue(cell - MAP_COLS, packed - 256, first, &tail);
+    return tail;
+}
+
+static inline __attribute__((always_inline)) void
+walk_search_step(int cell, int *next_x, int *next_y)
+{
+    unsigned first = bfs_first[cell];
+    *next_x = (first & 255u) * 16 + 8;
+    *next_y = (first >> 8) * 16 + 8;
+}
+#endif
+
 /* Breadth-first on the bounded walk grid; return the first tile toward goal. */
 static int GBA_HOT
 path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
@@ -3662,28 +3718,18 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 #ifdef SC64_IMPORTED_MISSION
     return sc64_route_next(x, y, tx, ty, next_x, next_y);
 #else
-    static const int dx[4] = {1, -1, 0, 0};
-    static const int dy[4] = {0, 0, 1, -1};
     int start_col = limit(x / 16, 0, MAP_COLS - 1);
     int start_row = limit(y / 16, 0, MAP_ROWS - 1);
     int start = start_col + start_row * MAP_COLS;
-    int goal_x = limit(tx / 16, 0, MAP_COLS - 1);
-    int goal_y = limit(ty / 16, 0, MAP_ROWS - 1);
-    int goal_col = goal_x, goal_row = goal_y;
-    int head = 0, tail = 0, i, cell, col, row, next, best = -1, bestd = 0x7fffffff;
-    int goal_open = is_traversable(goal_col, goal_row, -1);
-
-	if (++bfs_generation == 0) {
-	    memset(bfs_seen, 0, sizeof(bfs_seen));
-	    bfs_generation = 1;
-	}
-    bfs_prev[start] = -1;
-    bfs_seen[start] = bfs_generation;
-    bfs_queue[tail++] = start;
+    int goal_col = limit(tx / 16, 0, MAP_COLS - 1);
+    int goal_row = limit(ty / 16, 0, MAP_ROWS - 1);
+    int head = 0, best = -1, bestd = 0x7fffffff;
+    int tail = walk_search_begin(start, start_col + start_row * 256);
+    int goal_open = SC64_GRID_GET(path_walkable, goal_col + goal_row * MAP_COLS);
     while (head < tail) {
-	cell = bfs_queue[head++];
-	col = cell % MAP_COLS;
-	row = cell / MAP_COLS;
+	int packed = bfs_queue[head++];
+	int col = packed & 255, row = packed >> 8;
+	int cell = col + row * MAP_COLS;
 	if (FAST_ABS(col - goal_col) <= 1 && FAST_ABS(row - goal_row) <= 1) {
 	    int d = (col - goal_col) * (col - goal_col) + (row - goal_row) * (row - goal_row);
 	    if (d < bestd) {
@@ -3696,29 +3742,16 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 	    if (!d || !goal_open)
 		break;
 	}
-	for (i = 0; i < 4; i++) {
-	    int nc = col + dx[i], nr = row + dy[i];
-	    if (nc < 0 || nr < 0 || nc >= MAP_COLS || nr >= MAP_ROWS)
-		continue;
-	    next = nc + nr * MAP_COLS;
-	    if (bfs_seen[next] == bfs_generation || !is_traversable(nc, nr, start))
-		continue;
-	    bfs_prev[next] = cell;
-	    bfs_seen[next] = bfs_generation;
-	    bfs_queue[tail++] = next;
-	}
+	tail = walk_search_expand(packed, col, row, cell, start, tail);
     }
     if (best < 0)
 	return 0;
-    while (bfs_prev[best] != start && bfs_prev[best] >= 0)
-	best = bfs_prev[best];
     if (best == start) {
 	*next_x = tx;
 	*next_y = ty;
 	return 1;
     }
-    *next_x = (best % MAP_COLS) * 16 + 8;
-    *next_y = (best / MAP_COLS) * 16 + 8;
+    walk_search_step(best, next_x, next_y);
     return 1;
 #endif
 }
@@ -3732,32 +3765,22 @@ worker_depot_next(int x, int y, int home, int *next_x, int *next_y)
 #ifdef SC64_IMPORTED_MISSION
     return sc64_route_depot_next(x, y, home, b[home].x, b[home].y, next_x, next_y);
 #else
-    static const int dx[4] = { 1, -1, 0, 0 };
-    static const int dy[4] = { 0, 0, 1, -1 };
     int col = limit(x / 16, 0, MAP_COLS - 1), row = limit(y / 16, 0, MAP_ROWS - 1);
-    int start = col + row * MAP_COLS, head = 0, tail = 0, goal = -1, gx = 0, gy = 0;
-    if (++bfs_generation == 0) { memset(bfs_seen, 0, sizeof(bfs_seen)); bfs_generation = 1; }
-    bfs_prev[start] = -1; bfs_seen[start] = bfs_generation; bfs_queue[tail++] = start;
+    int start = col + row * MAP_COLS, head = 0, goal = -1, gx = 0, gy = 0;
+    int tail = walk_search_begin(start, col + row * 256);
     while (head < tail) {
-        int cell = bfs_queue[head++];
-        col = cell % MAP_COLS; row = cell / MAP_COLS;
-        if (is_traversable(col, row, -1) &&
+        int packed = bfs_queue[head++];
+        col = packed & 255; row = packed >> 8;
+        int cell = col + row * MAP_COLS;
+        if (SC64_GRID_GET(path_walkable, cell) &&
             sc64_depot_cell_point(b[home].x, b[home].y, col, row, &gx, &gy)) {
             goal = cell; break;
         }
-        for (int i = 0; i < 4; ++i) {
-            int nc = col + dx[i], nr = row + dy[i], next;
-            if (nc < 0 || nr < 0 || nc >= MAP_COLS || nr >= MAP_ROWS) continue;
-            next = nc + nr * MAP_COLS;
-            if (bfs_seen[next] == bfs_generation || !is_traversable(nc, nr, start)) continue;
-            bfs_seen[next] = bfs_generation; bfs_prev[next] = cell; bfs_queue[tail++] = next;
-        }
+        tail = walk_search_expand(packed, col, row, cell, start, tail);
     }
     if (goal < 0) return 0;
     if (goal == start) { *next_x = gx; *next_y = gy; return 1; }
-    while (bfs_prev[goal] != start && bfs_prev[goal] >= 0) goal = bfs_prev[goal];
-    *next_x = (goal % MAP_COLS) * 16 + 8;
-    *next_y = (goal / MAP_COLS) * 16 + 8;
+    walk_search_step(goal, next_x, next_y);
     return 1;
 #endif
 }

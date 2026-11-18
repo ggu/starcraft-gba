@@ -28,8 +28,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   continuation when each ROM loaded the other's save. A separate
   1,000-update first-wave sample matched 11 checkpoints and lowered mean
   simulation cost from 64,085 to 40,374 cycles. Complete update cost held at
-  561,660 cycles. Next, measure sustained combat with more units and confirm
-  timing on GBA hardware.
+  561,660 cycles.
+
+- **Original-art skirmish routing (P1):** the point and depot searches now
+  keep coordinates in the queue and record the first step during expansion.
+  A save with 40 units and simultaneous detours around the terrain barrier
+  exercised 640 ARM updates. Worst simulation cost dropped from 816,755
+  to 397,055 cycles, and mean complete update cost fell from 855,881 to
+  833,058 cycles (19.60 to 20.14 emulated updates per second). All 17
+  state and video checkpoints and the final SRAM image matched. In a
+  separate normal opening, updates over the 561,792-cycle budget fell from
+  four to zero out of 1,000. In the 40-unit scene, drawing still averages
+  505,994 cycles and 607 of 640 updates miss the budget. Use that scene
+  to quantify drawing and presentation costs, then verify timing on hardware.
 
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and
   Interceptor services. The standard Terran, Zerg and Showcase builds still
