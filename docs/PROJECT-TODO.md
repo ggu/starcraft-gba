@@ -71,12 +71,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 - **Frontier victory replays (P1):** each of the three player factions
   has a normal-button win on both maps against one CPU. Both maps also
-  have mixed two- and three-CPU wins. The packets run on the Foundry
-  cartridge, which can select all three player factions. Each case starts
-  at the title, builds and trains a force, issues attack orders, and
-  checks the result screen and exact game tick. In the three-CPU matches,
-  Foundry beat independently controlled Rovers, Bulwark, and Foundry on
-  Transit Yard at game tick 14,727 and on Stone Gardens at tick 13,912.
+  have mixed two- and three-CPU wins. The stored inputs use Foundry's
+  title defaults, and the replay tool translates setup for Rovers and
+  Bulwark. Each case starts at the title, builds and trains a force, issues
+  attack orders, and checks the result screen and exact game tick. In the
+  three-CPU matches, Foundry beat independently controlled Rovers, Bulwark,
+  and Foundry on Transit Yard at game tick 14,727 and on Stone Gardens at
+  tick 13,912.
   These full mGBA replays averaged 29.05 and 29.40 updates per second
   after the first 100 updates. Physical GBA SP timing remains open.
   The two-CPU Team cases reached victory at tick 14,649 on Transit Yard
@@ -98,6 +99,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Use a fresh output directory. Add `--case transit-yard-foundry`
   to run one match. The result file includes elapsed emulator cycles and
   average updates per second from the setup checkpoint to the result.
+  To replay on another cartridge, build its ROM and select it explicitly.
+
+  ```sh
+  make frontier-rovers
+  python3 tools/frontier_win_replay.py /absolute/path/to/sc64-headless-replay --cartridge rovers --case stone-gardens-three-cpu-team --output /tmp/frontier-rovers-team
+  ```
+
+  `--cartridge` accepts `foundry`, `rovers`, or `bulwark` and defaults to
+  Foundry. On Rovers and Bulwark the tool adjusts the title inputs for that
+  cartridge's starting faction while preserving field input timing.
   On `50283403`, all twelve cases reached the same victory tick on each
   of the three cartridges. The Rovers and Bulwark witness adjusted the
   title inputs for the cartridge's default faction and kept every field
