@@ -86,3 +86,16 @@ The win is at frame 10,120 with Raynor rescued, ten Marines and five SCVs.
 | Candidate fresh load through victory | `457846e7e6eb2a9d7038864236e9dd75814779d7a26dbf7abf4a10937dc695d8` |
 | Four-product and cross-load ARM matrix | `040e0bf33c516a1dbf38ed5b0a2f4d1ad3b6935432e915504cc60d873e0b2bc3` |
 | Wasteland ARM save/restart/load and victory | `bd4e45c8309dc4ca8d576c35abdb6f255ad0c3871446b5c96477e7dbf5942a8d` |
+
+## Composed canonical builds
+
+The four canonical builds with the terrain and defense defaults pass the
+same ARM memory guards and 12 sanitizer cases. The Terran build repeats
+the unchanged Outpost win after a fresh load at call 18,626. Its 56
+remaining action checks and terminal frame 41,951 match. All eight ARM
+cross-load cases also pass on the composed cartridges.
+
+| Composed receipt | SHA-256 |
+| --- | --- |
+| Outpost fresh-load win | `c7d3e7639843f335be956f1dd5c231af5ef3525db503f111e3623e5bc0995d55` |
+| ARM load matrix | `dea5eb6b088e6d1790dd1fe3ae8c67559b91acc10ff294d6cf11c597976a1722` |
