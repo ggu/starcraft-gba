@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-16. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-18. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -44,8 +44,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   900, resumed in a fresh process, and restarted with the same setup.
   Foundry also loaded the previous single-roster cartridge's SRAM at its
   saved map. The 240-update ARM openings measured 19.76–20.79 updates
-  per second. Full ARM matches, physical GBA performance, and distinct
-  support units and production remain open.
+  per second. In two normal-input ARM matches, a passive Foundry player
+  lost to Rovers on Transit Yard (game tick 5,584) and to Bulwark on
+  Stone Gardens (5,524). Human wins and hardware timings still need
+  verification. Add human faction selection within each skirmish cartridge
+  and distinct faction support units and production choices.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
