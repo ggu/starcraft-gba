@@ -248,3 +248,50 @@ The switch remains opt-in.
 | Facility and forced-overflow host checks | `52944c04b0936c8cfdaa2df4f166f100dd5e515e4608baff552595958a10984d` |
 | Four paired current Blood Bath saves | `fe6e6b47703cf585fb44c8074bd4bc6cd6310346514097ed7b60d32add2329dd` |
 | Fully matched current Protoss 10 win | `81b68281e30040b0d12e47dc8bbec04aca503f90c03637052545f531e4bdf241` |
+
+## Coexistence with the shipping small-map frontier
+
+The existing tail switch also removed the facility frontier from the
+compiled game. The two route users now share the scratch by shape.
+Small-map facility continuation is active on 64×64. Point retention
+can rotate the borrowed field on 128×128. If a shape change precedes
+route layout configuration, a live or retained wide field blocks the
+first small-map claim until the layout resets. The sanitizer regression
+changes shape with a real 6 KiB field still attached to the wide tail,
+checks its bytes, then resets the layout and claims the small scratch.
+
+The current release at `e7daddb1` and the composed build run the same
+ordinary-input Z7 tape from HOME through call 48,237. Both match all
+131 named gameplay checks, every sampled frame and route counter, and
+nine raw unit, building, mineral, palette and framebuffer cuts. The
+endpoints have 236–237 live units. The 477 advancing calls improve as
+follows. This is guest timing in mGBA.
+
+| Guest cycles | Release | Composed tail | Change |
+| --- | ---: | ---: | ---: |
+| Mean advancing call | 2,511,018 | 2,481,146 | −1.19% |
+| Mean advancing orders | 1,402,693 | 1,372,750 | −2.13% |
+| All-call p95 | 3,979,392 | 3,628,357 | −8.82% |
+| All-call maximum | 4,877,226 | 4,841,218 | −0.74% |
+
+The four normal ROMs pass header, size, and the existing ARM memory
+guards. Their 30 campaign launches and 72 skirmish setups match the
+current release matrix, and all eight custom save transfers match.
+The six older Z7–Z9 and P7–P9 recipes also link within the original
+guards. Regular three-AI Blood Bath matches all 25 raw world, route and
+video cuts and the fresh SRAM continuation. Its active mean changes
+from 802,552 to 802,530 cycles. The busy P7 sample also matches all 11
+world and display cuts and the frame, route, and terrain timeline. Its
+mean changes from 1,883,235 to 1,883,264 cycles.
+
+The shared build now defaults to `CANONICAL_ROUTE_POINT_RETENTION=tail`.
+Use `CANONICAL_ROUTE_POINT_RETENTION=0` for the earlier route path.
+The largest qualification gain is lower dense-update p95. Physical
+hardware timing and longer cases on other wide maps remain open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Current dense replay | `3ddec50626ae082029cf9258c1af769b0066b9fa70321ed00616fd6b48d01fbb` |
+| Three-AI Blood Bath and SRAM | `1c7e9894f3fbb9cd39bbaffc7c1292a92a0554b0357a4d27a1f3340fce991cb2` |
+| Launch matrix | `f8644030ebaa75ae0ea73e128b591e09757f1b6367c5bd96da5cf44bf7e86922` |
+| Bidirectional saves | `d4028523e6fff80e9f67908805ba38c415a7721265b314d296f0c7ce42d90d3d` |
