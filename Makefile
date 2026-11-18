@@ -290,9 +290,9 @@ else ifeq ($(SC64_AUDIO),1)
 $(error SC64_AUDIO=1 but $(SC64_AUDIO_DIR)/sc64_audio_generated.h is missing; run tools/sc64_audio_pack.py)
 endif
 endif
-SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
+SC64_FLAGS := -DSC64_IMPORTED_MISSION$(TFV) -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
 SC64_INPUTS := .local/sc64/generated/sc64_mission_generated.h .local/sc64/generated/sc64_assets_generated.h .local/sc64/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
-BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
+BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION$(TFV) -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
 BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
 CAMPAIGN_FLAGS := $(BACKWATER_FLAGS) -I.local/sc64/campaign/generated
 CAMPAIGN_INPUTS := $(BACKWATER_INPUTS) .local/sc64/campaign/generated/sc64_campaign_generated.h
@@ -3385,7 +3385,7 @@ $(TILE8_HEADER): tools/sc64_tile8_pack.py $(TILE8_SOURCE)
 	$(PYTHON) tools/sc64_tile8_pack.py --input $(TILE8_SOURCE) --output $@
 # Mode 0 needs the VRAM gap the sampled-audio buffers use between the mode-4
 # pages (see common/gba.c), so the tile probe builds silent, as SC64_AUDIO=0.
-P7_TILE_FLAGS := -I.local/sc64/tile8/generated $(filter-out $(SC64_AUDIO_FLAGS),$(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS)) -DSC64_TILE_RENDERER
+P7_TILE_FLAGS := -I.local/sc64/tile8/generated $(filter-out $(SC64_AUDIO_FLAGS)$(TFV),$(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS)) -DSC64_TILE_RENDERER
 build/test-sc64-p7-tile-reference: tests/sc64_p7_tile_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p7-tile-candidate: tests/sc64_p7_tile_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) $(TILE8_HEADER) common/gba.c common/gba.h Makefile | build
