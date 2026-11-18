@@ -50,6 +50,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   In two earlier normal-input ARM matches, a passive Foundry player lost
   to Rovers on Transit Yard (game tick 5,584) and to Bulwark on Stone
   Gardens (5,524). Add distinct faction support units and production choices.
+  The [pause comparison](audits/2026-11-18-skirmish-pause.md) records
+  mining before and after a native N64 custom-game pause and an
+  exact paused-clock and mineral check on all three Frontier host builds.
 
 - **Frontier victory replays (P1):** nine matches reached victory
   using physical button packets in headless mGBA. Each of the three
