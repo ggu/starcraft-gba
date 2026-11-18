@@ -75,6 +75,33 @@ static void check_blocked_start_is_not_goal(void)
     assert(!is_traversable(x/16,y/16,-1));
     assert(!worker_depot_next(x,y,home,&nx,&ny));
 }
+
+static void check_point_route_first_step(void)
+{
+    int x, y;
+    memset(path_walkable, 1, sizeof(path_walkable));
+    path_grid_valid = 1;
+    /* East and south are equally short. Leaving a blocked start must
+     * preserve the same east-first order even when the seen stamp wraps. */
+    SC64_GRID_SET(path_walkable, 3 + 3 * MAP_COLS, 0);
+    for (int i = 0; i < MAP_CELLS; i++)
+        bfs_seen[i] = 1;
+    bfs_generation = 65535;
+    assert(path_next_tile(56, 56, 72, 72, &x, &y));
+    assert(x == 72 && y == 56);
+
+    /* The nearest reachable neighbor of the blocked goal is diagonal to
+     * it. Keep the first step toward that neighbor, not toward the goal. */
+    SC64_GRID_SET(path_walkable, 3 + 3 * MAP_COLS, 1);
+    SC64_GRID_SET(path_walkable, 4 + 4 * MAP_COLS, 0);
+    assert(path_next_tile(40, 40, 72, 72, &x, &y));
+    assert(x == 56 && y == 40);
+    assert(path_next_tile(72, 72, 75, 77, &x, &y));
+    assert(x == 75 && y == 77);
+
+    SC64_GRID_CLEAR(path_walkable);
+    assert(!path_next_tile(40, 40, 72, 72, &x, &y));
+}
 #endif
 int main(void)
 {
@@ -82,7 +109,8 @@ int main(void)
     check_return(ORDER_MINE);
     check_return(ORDER_GAS);
     check_blocked_start_is_not_goal();
+    check_point_route_first_step();
 #endif
-    puts("default worker depot-circle return passed");
+    puts("default worker depot-circle return and point routes passed");
     return 0;
 }
