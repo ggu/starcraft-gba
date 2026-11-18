@@ -1550,8 +1550,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   one without resetting the active job. The shared GBA tail-cancel
   change matches that progress and the 50-mineral refund through ARM
   inputs. When two SCVs are paid for, N64 shows 5/10 and the GBA still
-  shows 6/10. Test native cap-bound admission and the new-head stall
-  before changing shared supply accounting and save validation.
+  shows 6/10. Ordinary GBA inputs show the wallet and queue stay unchanged
+  when a further affordable order is attempted at 10/10. Native input
+  reaches 9/10 and 240 minerals, but two retries stall before their
+  first rendered frame. Test native cap-bound admission and the new-head
+  stall before changing shared supply accounting and save validation.
 - The [dense Z7 orders audit](audits/2026-11-19-z7-order-cost.md)
   separates the movement, nearest-enemy and setup costs. Movement
   averages about 920,000 instrumented cycles on calls that advance
@@ -1560,6 +1563,15 @@ save/source-owner and timing evidence; do not advertise unwired components.
   cycles. Reusing the combat eligibility check saves about 429
   whole-update cycles and stays experimental. Attribute repeated
   goal searches, eviction and incomplete fields inside movement.
+- The [dense Z7 point request audit](audits/2026-11-19-z7-repeated-negative-route.md)
+  finds 151 complete point fields that all return failure. The repeat
+  acquisitions come from five open-origin and goal pairs. A 128-byte
+  opt-in memo matches 131 ordinary-input checkpoints, nine raw world
+  and display cuts, and the final 9,132 inputs of a fresh late-save win.
+  Mean cycles fall 2.13%, but p95 rises 17.4% and logical builds rise
+  from 614 to 626. Keep it experimental. Test deferring the flood while
+  preserving the logical slot and age, then check other dense scenarios
+  before considering shared default activation.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for

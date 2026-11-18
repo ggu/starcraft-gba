@@ -116,6 +116,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "near-root distance witnesses require resumable point prefixes"
 #endif
+#if defined(SC64_ROUTE_POINT_NEGATIVE_MEMO) && !defined(SC64_ROUTE_KEEP_FIELDS)
+#error "point negative memo requires complete active-stride routes and grid hooks"
+#endif
 
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
@@ -268,6 +271,13 @@ static void sc64_point_prefix_reset(void)
 #define SC64_POINT_PREFIX_RESET() sc64_point_prefix_reset()
 #else
 #define SC64_POINT_PREFIX_RESET() ((void)0)
+#endif
+#ifdef SC64_ROUTE_POINT_NEGATIVE_MEMO
+enum { SC64_POINT_NEGATIVE_SIDE = 128, SC64_POINT_NEGATIVE_INDEX_BITS = 5 };
+static u32 sc64_point_negative_keys[1u << SC64_POINT_NEGATIVE_INDEX_BITS];
+#define SC64_POINT_NEGATIVE_RESET() memset(sc64_point_negative_keys, 0, sizeof(sc64_point_negative_keys))
+#else
+#define SC64_POINT_NEGATIVE_RESET() ((void)0)
 #endif
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
 #if defined(SC64_ROUTE_POINT_POINTER_PROBE) && (!defined(SC64_ROUTE_ACTIVE_STRIDE) || \
@@ -434,6 +444,7 @@ static int sc64_route_configure(void)
             for (i = 0; i < SC64_ROUTE_SLOTS; ++i) sc64_route_field[i] = 0;
             memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
             SC64_POINT_PREFIX_RESET();
+            SC64_POINT_NEGATIVE_RESET();
             sc64_facility_frontiers_reset();
 #ifdef SC64_ROUTE_DECAY_FREQ
             memset(sc64_route_age, 0, sizeof(sc64_route_age));
@@ -479,6 +490,7 @@ static int sc64_route_configure(void)
         sc64_route_pf_owner[i] = i < SC64_ROUTE_SLOTS ? (u8)i : 0xff;
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
     SC64_POINT_PREFIX_RESET();
+    SC64_POINT_NEGATIVE_RESET();
     sc64_facility_frontiers_reset();
 #ifdef SC64_ROUTE_DECAY_FREQ
     memset(sc64_route_age, 0, sizeof(sc64_route_age));
@@ -627,6 +639,7 @@ sc64_routes_reset(void)
 #endif
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
     SC64_POINT_PREFIX_RESET();
+    SC64_POINT_NEGATIVE_RESET();
     sc64_facility_frontiers_reset();
     SC64_ROUTE_POINT_TAIL_RELEASE();
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
@@ -753,6 +766,7 @@ static void __attribute__((noinline, unused)) sc64_routes_topology_changed(void)
 /* Called by build_path_grid before it rewrites the grid. */
 static void __attribute__((noinline, unused)) sc64_routes_grid_begin(void)
 {
+    SC64_POINT_NEGATIVE_RESET();
     sc64_route_grid_copied = 0;
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
     sc64_route_point_saved = -1;
@@ -2781,6 +2795,38 @@ sc64_route_monotone_next_step(int origin, int goal, int tx, int ty,
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_NEGATIVE_MEMO
+static inline u32 sc64_point_negative_key(int origin, int goal)
+{
+    return (u32)goal * (SC64_POINT_NEGATIVE_SIDE * SC64_POINT_NEGATIVE_SIDE) +
+           (u32)origin + 1u;
+}
+
+static inline unsigned sc64_point_negative_index(u32 key)
+{
+    return ((key ^ (key >> 11)) * 0x9e3779b1u) >> (32 - SC64_POINT_NEGATIVE_INDEX_BITS);
+}
+
+/* Reuse only a proof of disconnection from this exact, current-grid field.
+ * A suffix of another root, a blocked endpoint and incomplete fields do
+ * not provide that proof. */
+static void __attribute__((noinline))
+#ifndef GBA_HOST
+__attribute__((long_call))
+#endif
+sc64_point_negative_record(int slot, int origin, int goal, u32 key)
+{
+    if (origin == goal || sc64_route_valid[slot] != 1 ||
+        sc64_route_goal[slot] != goal || SC64_ROUTE_LAZY(slot) ||
+        !SC64_GRID_GET(path_walkable, origin) || !SC64_GRID_GET(path_walkable, goal))
+        return;
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    if (sc64_point_prefix_find(slot)) return;
+#endif
+    sc64_point_negative_keys[sc64_point_negative_index(key)] = key;
+}
+#endif
+
 static int GBA_HOT
 sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
 {
@@ -2833,6 +2879,14 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
         return 1;
     }
 #endif
+#ifdef SC64_ROUTE_POINT_NEGATIVE_MEMO
+    u32 negative_key = 0;
+    if (MAP_COLS == SC64_POINT_NEGATIVE_SIDE && MAP_ROWS == SC64_POINT_NEGATIVE_SIDE) {
+        negative_key = sc64_point_negative_key(cell, goal);
+        if (sc64_point_negative_keys[sc64_point_negative_index(negative_key)] == negative_key)
+            return 0;
+    }
+#endif
 #if defined(SC64_RACES) && !defined(SC64_ROUTE_PARTIAL_FLOOD)
 #ifdef SC64_ROUTE_MONOTONE_ENABLED
     slot = sc64_route_step_slot_mode(cell, goal, 0);
@@ -2853,7 +2907,12 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
 #endif
 #ifdef SC64_RACES
     direction = sc64_route_get(slot, cell);
-    if (direction == SC64_ROUTE_UNREACHABLE) direction = -1;
+    if (direction == SC64_ROUTE_UNREACHABLE) {
+#ifdef SC64_ROUTE_POINT_NEGATIVE_MEMO
+        if (negative_key) sc64_point_negative_record(slot, cell, goal, negative_key);
+#endif
+        direction = -1;
+    }
 #else
     field = sc64_route_field[slot];
     direction = field[cell] == 0xFFFF ? -1 : field[cell] & 7;

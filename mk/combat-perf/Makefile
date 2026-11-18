@@ -178,6 +178,16 @@ test-sc64-route-point-prefix: build/test-sc64-route-point-prefix build/test-sc64
 	./$< --emit build/route-point-prefix-candidate.ref
 	cmp build/route-point-prefix-reference.ref.state build/route-point-prefix-candidate.ref.state
 
+build/test-sc64-route-point-negative: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DGBA_HOST -DSC64_ROUTE_POINT_NEGATIVE_MEMO $< -o $@
+.PHONY: test-sc64-route-point-negative
+test-sc64-route-point-negative: build/test-sc64-route-point-negative
+	./$< --point-negative-only
+	./$< --point-prefix-only
+	./$< --point-component-only
+	./$< --point-near-distance-only
+	./$<
+
 build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@
 build/test-sc64-route-linear-word-pack-overflow: $(ROUTE_KEEP_TEST_DEPS) | build

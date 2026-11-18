@@ -1073,6 +1073,73 @@ static void check_nearby_lazy_root(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_NEGATIVE_MEMO
+static int point_negative_next(int origin, int goal)
+{
+    int nx = -1, ny = -1;
+    int result = sc64_route_next(origin % MAP_COLS * 16 + 8, origin / MAP_COLS * 16 + 8,
+                                 goal % MAP_COLS * 16 + 8, goal / MAP_COLS * 16 + 8,
+                                 &nx, &ny);
+    assert(result ? nx >= 0 && ny >= 0 : nx == -1 && ny == -1);
+    return result;
+}
+
+static void check_point_negative_memo(void)
+{
+    const int origin = 8 + 8 * 128, goal = 96 + 24 * 128;
+    const int wall = 64 + 8 * 128;
+    const u32 key = sc64_point_negative_key(origin, goal);
+    const unsigned index = sc64_point_negative_index(key);
+    race_cols = race_rows = 128;
+    memset(desired, 1, sizeof(desired));
+    for (int row = 0; row < MAP_ROWS; ++row) desired[64 + row * MAP_COLS] = 0;
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+
+    u32 builds = sc64_route_builds;
+    assert(!point_negative_next(origin, goal));
+    assert(sc64_route_builds == builds + 1 && sc64_point_negative_keys[index] == key);
+    u32 metadata = state_hash();
+    assert(!point_negative_next(origin, goal));
+    assert(state_hash() == metadata);
+
+    int collision = -1;
+    for (int cell = 0; cell < MAP_COLS * MAP_ROWS; ++cell)
+        if (cell != origin && cell % MAP_COLS < 64 &&
+            sc64_point_negative_index(sc64_point_negative_key(origin, cell)) == index) {
+            collision = cell;
+            break;
+        }
+    assert(collision >= 0 && point_negative_next(origin, collision));
+    assert(sc64_point_negative_keys[index] == key);
+
+    assert(point_negative_next(wall, goal)); /* A blocked origin can step into a neighbor. */
+    u32 wall_key = sc64_point_negative_key(wall, goal);
+    assert(sc64_point_negative_keys[sc64_point_negative_index(wall_key)] != wall_key);
+    check_grid_unchanged();
+
+    /* A standalone grid rebuild must clear the memo even without a reset. */
+    build_path_grid();
+    assert(!sc64_point_negative_keys[index]);
+    assert(!point_negative_next(origin, goal) && sc64_point_negative_keys[index] == key);
+    desired[wall] = 1;
+    invalidate();
+    assert(!sc64_point_negative_keys[index]);
+    assert(point_negative_next(origin, goal));
+
+    desired[wall] = 0;
+    invalidate();
+    assert(!point_negative_next(origin, goal) && sc64_point_negative_keys[index] == key);
+    sc64_routes_reset();
+    assert(!sc64_point_negative_keys[index]);
+    assert(!point_negative_next(origin, goal) && sc64_point_negative_keys[index] == key);
+    race_cols = race_rows = 64;
+    assert(sc64_route_configure() && !sc64_point_negative_keys[index]);
+    puts("point negative memo preserves exact steps, collisions and grid invalidation");
+}
+#endif
+
 int main(int argc, char **argv)
 {
     static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
@@ -1081,6 +1148,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_POINT_NEGATIVE_MEMO
+    if (argc == 2 && !strcmp(argv[1], "--point-negative-only")) {
+        check_point_negative_memo();
+        return 0;
+    }
+#endif
 #ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-near-distance-only")) {
         check_point_near_distance();

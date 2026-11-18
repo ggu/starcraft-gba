@@ -105,3 +105,36 @@ when waiting jobs count against supply.
 - GBA tail cancellation receipt SHA-256 `eff219e30425e349352e74a513e0bd9ea8cceb0b28f7446a766a360ff750ab28`.
 - Release-based tail cancellation receipt SHA-256 `1c77e70dbc197d08804cdc6322bc28bb94f5e892a1add3060fbb70bb72012431`.
 - Candidate single-item cancellation receipt SHA-256 `f9f537a0994264632efbe5e8c5d8a927dae1e55dca6318baeff494028ea23f0b`.
+
+## GBA admission at the initial cap
+
+Two ordinary-input runs on the release-based Cancel Last ROM produce
+workers from an empty Blood Bath queue. In one run the player reaches
+9/10, then trains one SCV to reach 10/10. In the other run the player
+starts at 8/10 and pays for two orders, which also shows 10/10 on the GBA.
+In each run the next A press is refused with the supply warning. The
+queue and wallet match a fresh neutral replay at the same update,
+with enough minerals for the additional SCV. This establishes the
+current GBA admission rule independently of the displayed total.
+
+- GBA 9/10 admission receipt SHA-256 `712e876cdab1381a88c3aa51f7ae0848ed5112c85c77d8528fe6cbe43b124636`.
+- GBA 8/10 admission receipt SHA-256 `e444c814e22f5101a28483939803127e37c6592594568510b10505ebe62a6179`.
+
+## Native near-cap setup
+
+Ordinary N64 input from a fresh Blood Bath start reached 9/10 supply
+and 240 minerals at observer step 11,458 after five additional SCVs
+completed. The Command Center's Build grid was open on the SCV and
+its queue was empty. At step 6,121 the same run showed 5/10 supply
+with one active SCV and a paid SCV in the second slot.
+
+The first observer expired before receiving the suffix. Two prequeued
+attempts stalled before the first rendered frame. A process sample
+identified the Metal shader compiler on the first attempt. The native
+9/10 → 10/10 purchase, admission of a
+paid tail at full supply, and promotion of that tail remain open.
+Keep the current GBA supply rule while the comparison is incomplete.
+
+- Native near-cap manifest SHA-256 `1ed5afe12a55eca7dc4b3c42b99189a2ca930d2c154ec2e1323eb4ab01dc47d5`.
+- Native near-cap input SHA-256 `76fe117f9dc3eda792479bccc113a5d67489975836409dbba1db834b066cf177`.
+- Guarded retry manifest SHA-256 `e5c572f1693117cb796d6c1b28f8eff2565f705add80b26805bfca8faa220bb0`.
