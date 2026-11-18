@@ -1,45 +1,31 @@
 #ifndef SC64_FRONTEND_DRAW_H
 #define SC64_FRONTEND_DRAW_H
 
-#include "sc64_chrome.h"
+#include "sc64_font.h"
 
 static void front_text(int x, int y, const char *text, u8 color)
 {
     sc64_font_text(x, y, x < 240 ? 240 - x : 0, text, color);
 }
 
-static void front_center_text(int y, const char *text, u8 color)
+static void front_right_text(int right, int y, const char *text, u8 color)
 {
-    char fitted[64];
-    int width = sc64_font_width(text);
-    if (width > 216) {
-        sc64_font_ellipsis(text,216,fitted,sizeof(fitted));
-        text=fitted;
-        width=sc64_font_width(text);
-    }
-    int x = (240 - width) / 2;
-    if (x < 12) x = 12;
-    sc64_font_text(x, y, 216, text, color);
+    for (const char *letter = text; *letter; ++letter) right -= 6;
+    gfx_text(right, y, text, color);
 }
 
-/* Original N64 artwork is converted offline into ROM tables. These screens
- * draw straight into the existing Mode 4 framebuffer, using a temporary
- * interface palette; launching/loading restores the world palette. */
-static void front_button(int x,int y,int w,int h,const char *label,int selected)
+/* The menus use the common framebuffer palette and authored GBA glyphs. */
+static void front_shell(const char *title, const char *section)
 {
-    (void)w;
-    sc64_chrome_button(x,y,h<=15,h>=25,label,selected);
-}
-
-static void front_logo(void)
-{
-    sc64_chrome_draw_title_plate(72,31,"StarCraft");
-}
-
-static void front_header(const char *title,const char *subtitle)
-{
-    front_center_text(34,title,C_GOLD);
-    if(subtitle) front_center_text(45,subtitle,C_SILVER);
+    gfx_rect(0, 0, 240, 23, C_PANEL);
+    gfx_rect(0, 22, 240, 1, C_EDGE);
+    gfx_rect(0, 22, 52, 1, C_CYAN);
+    for (int x = 8; x < 240; x += 16)
+        gfx_rect(x, 23, 1, 113, C_PANEL);
+    for (int y = 32; y < 136; y += 16)
+        gfx_rect(0, y, 240, 1, C_PANEL);
+    gfx_text(12, 8, title, C_WHITE);
+    front_right_text(230, 8, section, C_CYAN);
 }
 
 static const char *front_mission_title(int mission)
@@ -48,58 +34,51 @@ static const char *front_mission_title(int mission)
     return info ? info->title : "Unknown Mission";
 }
 
-static const char *front_map_title(int map)
-{
-    static const char *names[2]={"Outpost","Blood Bath"};
-    if (map < 0 || map >= SC64_FRONT_MAP_COUNT) return names[0];
-    return names[map];
-}
-
-#ifdef SC64_SHOWCASE_ENABLED
-static const char *front_showcase_title(int scene)
-{
-    return sc64_front_showcase_name(scene);
-}
-#endif
-
 static const char *front_campaign_title(int faction)
 {
-#ifdef SC64_UNIFIED
-    return faction==SC_FRONT_TERRAN?"Terran Campaign":
-           faction==SC_FRONT_ZERG?"The Overmind":"The Fall";
-#else
-    return faction?"The Fall":"The Overmind";
-#endif
+    static const char *const names[] = { "Terran Campaign", "The Overmind", "The Fall" };
+    return names[sc64_front_catalog_faction(faction)];
 }
 
-static const u8 *front_campaign_art(int faction)
+static void front_panel(int x, int y, int width, int height)
 {
-#ifdef SC64_UNIFIED
-    return faction==SC_FRONT_TERRAN?sc64_chrome_menu_terran:
-           faction==SC_FRONT_PROTOSS?sc64_chrome_menu_protoss:sc64_chrome_menu_zerg;
-#else
-    return faction?sc64_chrome_menu_protoss:sc64_chrome_menu_zerg;
-#endif
+    gfx_rect(x, y, width, height, C_PANEL);
+    gfx_frame(x, y, width, height, C_EDGE);
 }
 
-static void front_footer(const char *text)
+static void front_row(int x, int y, int width, int height,
+                      const char *label, const char *value, int selected)
 {
-    sc64_chrome_draw_footer(text);
+    int text_y = y + (height - 7) / 2;
+    gfx_rect(x, y, width, height, selected ? C_BLUE_DARK : C_PANEL);
+    gfx_frame(x, y, width, height, selected ? C_GOLD : C_EDGE);
+    if (selected) gfx_rect(x + 3, y + 2, 2, height - 4, C_GOLD);
+    gfx_text(x + 10, text_y, label, selected ? C_WHITE : C_SILVER);
+    if (value) front_right_text(x + width - 8, text_y, value, selected ? C_GOLD : C_CYAN);
 }
 
-static void front_uplink(void)
+static void front_footer(const char *first, const char *second)
 {
-    front_text(24,136,"Uplink",C_DIM);
-    for(int i=0;i<8;i++) {
-        int level=2+((race_front.ticks/3+i*7)%9);
-        gfx_rect(55+i*5,135-level,3,level,(i+race_front.ticks/5)%3?C_GREEN_DARK:C_GREEN);
-    }
+    gfx_rect(0, 136, 240, 24, C_PANEL);
+    gfx_rect(0, 136, 240, 1, C_EDGE);
+    gfx_text(12, 140, first, C_WHITE);
+    gfx_text(12, 150, second, C_SILVER);
+}
+
+static void front_faction_mark(int x, int y, int faction)
+{
+    static const u8 colors[] = { C_TERRAN, C_ZERG, C_PROTOSS };
+    gfx_rect(x, y, 7, 7, colors[faction]);
+    gfx_frame(x, y, 7, 7, C_SILVER);
 }
 
 static void front_load_error(void)
 {
-    if(race_front_load_error)
-        sc64_chrome_draw_notice("No Saved Game Found","Start a Campaign or Custom Game");
+    if (!race_front_load_error) return;
+    gfx_rect(24, 80, 192, 42, C_PANEL);
+    gfx_frame(24, 80, 192, 42, C_GOLD);
+    gfx_text(66, 90, "NO SAVED GAME FOUND", C_GOLD);
+    gfx_text(42, 104, "START A CAMPAIGN OR BATTLE", C_WHITE);
 }
 
 /* Text is authored by the source script and wrapped offline to the visible
@@ -143,161 +122,215 @@ static void front_briefing(void)
     front_text(143,145,"Start Deploy",C_GOLD);
 }
 
+static void front_draw_home(void)
+{
+    front_shell("STARCRAFT GBA", "SINGLE PLAYER");
+    front_panel(10, 33, 82, 92);
+    gfx_frame(19, 47, 64, 64, C_EDGE);
+    gfx_rect(50, 48, 1, 62, C_EDGE);
+    gfx_rect(20, 79, 62, 1, C_EDGE);
+    gfx_diamond(50, 79, 26, 19, C_EDGE);
+    gfx_diamond(50, 79, 24, 17, C_PANEL);
+    gfx_diamond(50, 79, 14, 10, C_CYAN);
+    gfx_diamond(50, 79, 12, 8, C_BLUE_DARK);
+    gfx_rect(48, 77, 5, 5, C_GOLD);
+    front_row(102, 33, 128, 26, "CAMPAIGN", NULL, race_front.row == 0);
+    front_row(102, 66, 128, 26, "CUSTOM GAME", NULL, race_front.row == 1);
+    front_row(102, 99, 128, 26, "LOAD GAME", NULL, race_front.row == 2);
+    front_footer("D-PAD UP/DOWN PICK      A SELECT",
+                 "D-PAD RIGHT OPTIONS     L / B LOAD");
+}
+
+static void front_draw_campaign(void)
+{
+    static const char *const episodes[] = { "EPISODE I", "EPISODE II", "EPISODE III" };
+    front_shell("CAMPAIGN", "CHOOSE A FACTION");
+    for (int i = 0; i < sc64_front_campaign_count(); ++i) {
+        int faction = sc64_front_catalog_faction(sc64_front_campaign_faction_at(i));
+        int y = 33 + i * 33;
+        front_row(10, y, 220, 26, episodes[faction],
+                  sc64_race_names[faction], race_front.row == i);
+        front_faction_mark(164, y + 9, faction);
+    }
+    front_footer("D-PAD UP/DOWN PICK      A MISSIONS", "B BACK");
+}
+
+static void front_draw_missions(void)
+{
+    int faction = sc64_front_catalog_faction(race_front.faction);
+    int available = sc64_catalog_playable_count(faction);
+    int pages = (available + 1) / 2;
+    char page_label[] = "PAGE 0/0";
+    page_label[5] += race_front.mission_page + 1;
+    page_label[7] += pages;
+    front_shell(front_campaign_title(race_front.faction), "CAMPAIGN / MISSIONS");
+    front_faction_mark(13, 32, faction);
+    gfx_text(25, 32, sc64_race_names[faction], C_SILVER);
+    front_right_text(228, 32, page_label, C_CYAN);
+    for (int i = 0; i < 2; ++i) {
+        int mission = sc64_catalog_playable_at(faction, race_front.mission_page * 2 + i);
+        const Sc64MissionInfo *info = sc64_catalog_get(mission);
+        if (!info) continue;
+        int y = 46 + i * 41;
+        front_row(10, y, 220, 34, info->title,
+                  ((unsigned)race_completed & (1u << mission)) ? "CLEARED" : NULL,
+                  race_front.row == i);
+        gfx_text(20, y + 4, "MISSION", C_SILVER);
+        gfx_num(68, y + 4, info->chapter, C_CYAN);
+        gfx_rect(19, y + 23, 200, 1, C_EDGE);
+    }
+    front_footer("D-PAD UP/DOWN PICK      A BRIEFING",
+                 pages > 1 ? "D-PAD LEFT/RIGHT PAGE   B BACK" : "B BACK");
+}
+
+static void front_draw_options(void)
+{
+    front_shell("OPTIONS", "HOME / OPTIONS");
+    front_row(10, 33, 220, 26, "CURSOR SPEED",
+              sc64_front_setting_cursor_name(&race_front.settings),
+              race_front.row == SC_FRONT_SETTING_CURSOR);
+    front_row(10, 66, 220, 26, "MENU SOUND", race_front.settings.quiet_menu ? "OFF" : "ON",
+              race_front.row == SC_FRONT_SETTING_SOUND);
+    front_row(10, 99, 220, 26, "BACK TO HOME", NULL,
+              race_front.row == SC_FRONT_SETTING_BACK);
+    front_footer("D-PAD UP/DOWN PICK      B BACK",
+                 race_front.row == SC_FRONT_SETTING_BACK ? "A RETURN" :
+                 race_front.row == SC_FRONT_SETTING_SOUND ? "D-PAD LEFT/RIGHT OR A TOGGLE" :
+                 "D-PAD LEFT/RIGHT EDIT");
+}
+
+#ifdef SC64_IMPORTED_SKIRMISH
+static const char *front_map_title(int map)
+{
+    return map == SC64_MAP_BLOOD_BATH ? "BLOOD BATH" : "OUTPOST";
+}
+
+static void front_draw_map_browser(void)
+{
+    front_shell("MAP SELECT", "CUSTOM GAME / MAP");
+    for (int i = 0; i < SC64_FRONT_MAP_COUNT; ++i) {
+        front_row(10, 34 + i * 29, 126, 24, front_map_title(i),
+                  race_front.map == i ? "SET" : NULL, race_front.row == i);
+    }
+    front_panel(144, 34, 86, 92);
+    enum { PREVIEW_X = 163, PREVIEW_Y = 53, PREVIEW_SIZE = 48 };
+    const Sc64SkirmishMap *map = race_front.row > SC64_MAP_OUTPOST ?
+        &sc64_skirmish_maps[race_front.row - 1] : NULL;
+    int width = map ? map->width : 64;
+    int height = map ? map->height : 64;
+    gfx_text(151, 41, "START SITES", C_CYAN);
+    gfx_rect(PREVIEW_X, PREVIEW_Y, PREVIEW_SIZE, PREVIEW_SIZE, C_BLACK);
+    gfx_frame(PREVIEW_X, PREVIEW_Y, PREVIEW_SIZE, PREVIEW_SIZE, C_EDGE);
+    gfx_rect(PREVIEW_X + PREVIEW_SIZE / 2, PREVIEW_Y + 1, 1, PREVIEW_SIZE - 2, C_PANEL);
+    gfx_rect(PREVIEW_X + 1, PREVIEW_Y + PREVIEW_SIZE / 2, PREVIEW_SIZE - 2, 1, C_PANEL);
+    for (int i = 0; i < 4; ++i) {
+        /* Authored Outpost places bases 10 tiles in from its corners. */
+        int x = map ? map->start_x[i] : (i & 1 ? width - 10 : 10) * 16;
+        int y = map ? map->start_y[i] : (i & 2 ? height - 10 : 10) * 16;
+        int px = PREVIEW_X + 3 + x * (PREVIEW_SIZE - 7) / (width * 16);
+        int py = PREVIEW_Y + 3 + y * (PREVIEW_SIZE - 7) / (height * 16);
+        gfx_rect(px - 1, py - 1, 3, 3, C_GOLD);
+    }
+    gfx_num(163, 109, width, C_WHITE);
+    gfx_text(183, 109, "X", C_SILVER);
+    gfx_num(195, 109, height, C_WHITE);
+    gfx_text(16, 103, "1 HUMAN / 1-3 CPU", C_SILVER);
+    front_footer("D-PAD UP/DOWN PICK      A SET MAP", "B CANCEL");
+}
+#endif
+
+static void front_draw_skirmish(void)
+{
+    char opponents[] = { (char)('0' + race_front.bots), 0 };
+    front_shell("BATTLE SETUP", "CUSTOM GAME / LOBBY");
+#ifdef SC64_IMPORTED_SKIRMISH
+    enum { TOP = 27, STEP = 13, HEIGHT = 12 };
+    const char *human =
+#ifdef SC64_NATIVE_MELEE_STARTS
+        race_front.race == SC_FRONT_HUMAN_RANDOM ? "Random" :
+#endif
+        sc64_race_names[race_front.race];
+    front_row(10, TOP, 220, HEIGHT, "MAP", front_map_title(race_front.map), race_front.row == 0);
+    front_row(10, TOP + STEP, 220, HEIGHT, "HUMAN RACE", human, race_front.row == 1);
+    if ((unsigned)race_front.race < 3) front_faction_mark(164, TOP + STEP + 2, race_front.race);
+    front_row(10, TOP + 2 * STEP, 220, HEIGHT, "OPPONENTS", opponents, race_front.row == 2);
+    for (int row = SC_FRONT_BOT_FIRST_ROW; row < SC_FRONT_BOT_END_ROW; ++row) {
+        int seat = row - SC_FRONT_BOT_FIRST_ROW;
+        char label[] = { 'C', 'P', 'U', ' ', (char)('1' + seat), 0 };
+        int race = race_front.bot_races[seat];
+        const char *value = race == SC_FRONT_BOT_CLOSED ? "CLOSED" :
+            race == SC_FRONT_BOT_RANDOM ? "RANDOM" : sc64_race_names[race];
+        front_row(22, TOP + row * STEP, 208, HEIGHT, label, value, race_front.row == row);
+        if ((unsigned)race < 3) front_faction_mark(164, TOP + row * STEP + 2, race);
+    }
+#ifdef SC64_NATIVE_MELEE_STARTS
+    front_row(10, TOP + SC_FRONT_SKIRMISH_MODE_ROW * STEP, 220, HEIGHT, "MATCH TYPE",
+              race_front.skirmish_melee ? "MELEE" : "FREE FOR ALL",
+              race_front.row == SC_FRONT_SKIRMISH_MODE_ROW);
+#endif
+    int launch_selected = race_front.row == SC_FRONT_SKIRMISH_LAUNCH_ROW;
+    front_row(10, TOP + SC_FRONT_SKIRMISH_LAUNCH_ROW * STEP, 220, HEIGHT,
+              race_front.bots ? "START BATTLE" : "ADD AN OPPONENT", NULL, launch_selected);
+    const char *edit = launch_selected ? "SELECT MAP" : "D-PAD LEFT/RIGHT EDIT   SELECT MAP";
+#ifdef SC64_NATIVE_MELEE_STARTS
+    if (race_front.row == SC_FRONT_SKIRMISH_MODE_ROW && race_front.map != SC64_MAP_BLOOD_BATH)
+        edit = "SELECT MAP FOR MELEE";
+#endif
+    front_footer(launch_selected && race_front.bots ? "UP/DOWN ROW    A START     B BACK" :
+                 launch_selected ? "UP/DOWN ROW    B BACK" : "UP/DOWN ROW  A GO TO START  B BACK", edit);
+#else
+    front_row(10, 33, 220, 26, "HUMAN RACE", sc64_race_names[race_front.race], race_front.row == 0);
+    front_faction_mark(164, 42, race_front.race);
+    front_row(10, 66, 220, 26, "OPPONENTS", opponents, race_front.row == 1);
+    front_row(10, 99, 220, 26, "START BATTLE", NULL, race_front.row == 2);
+    front_footer(race_front.row == 2 ? "D-PAD UP/DOWN ROW       A START" :
+                 "D-PAD UP/DOWN ROW       A GO TO START", "D-PAD LEFT/RIGHT EDIT   B BACK");
+#endif
+}
+
+#ifdef SC64_SHOWCASE_ENABLED
+static void front_draw_showcase(void)
+{
+    front_shell("SHOWCASE SCENES", "SINGLE PLAYER");
+    for (int i = 0; i < SC64_FRONT_SHOWCASE_COUNT; ++i)
+        front_row(10, 27 + i * 13, 220, 12, sc64_front_showcase_name(i), NULL, race_front.row == i);
+    front_footer("D-PAD UP/DOWN PICK      A START", "B BACK");
+}
+#endif
+
 static void sc64_frontend_draw(void)
 {
-    int page=race_front.page,faction=page==SC_FRONT_CAMPAIGN?
-        sc64_front_campaign_faction(race_front.row):race_front.faction;
-    const u8 *background=sc64_chrome_menu_home;
-    if(page==SC_FRONT_CAMPAIGN||page==SC_FRONT_MISSION||page==SC_FRONT_BRIEFING)
-        background=front_campaign_art(faction);
-    if(page==SC_FRONT_SKIRMISH) {
-        int human=race_front.race;
-#if defined(SC64_IMPORTED_SKIRMISH) && defined(SC64_NATIVE_MELEE_STARTS)
-        if(human==SC_FRONT_HUMAN_RANDOM)human=race_front.human_last_race;
-#endif
-        background=human==R_TER?sc64_chrome_menu_terran:human==R_ZERG?sc64_chrome_menu_zerg:sc64_chrome_menu_protoss;
-    }
-    const u16 *palette=sc64_chrome_menu_palette;
-    if(page==SC_FRONT_BRIEFING) {
-        background=sc64_briefing_background;
-        palette=sc64_briefing_palette;
-    }
-    unsigned age=race_front.ticks-race_front_transition;
-    if(age<12) {
-        u16 fade[224];int amount=(int)age+1;
-        for(int i=0;i<224;i++) {
-            u16 p=palette[i];
-            fade[i]=((p&31)*amount/12)|((((p>>5)&31)*amount/12)<<5)|((((p>>10)&31)*amount/12)<<10);
-        }
-        gfx_set_palette(32,224,fade);
-    } else gfx_set_palette(32,224,palette);
-    gfx_blit_band(0,160,background);
-    if(page==SC_FRONT_BRIEFING) {
-        front_briefing();
-        front_load_error();
-        return;
-    }
-    sc64_chrome_draw_tab(page==SC_FRONT_HOME?SC64_CHROME_TAB_OVERVIEW:
-        page==SC_FRONT_CAMPAIGN?SC64_CHROME_TAB_UNITS:
-        page==SC_FRONT_MISSION?SC64_CHROME_TAB_BUILDINGS:SC64_CHROME_TAB_RESOURCES);
-    if(page==SC_FRONT_HOME) {
-        front_logo();
-        front_center_text(57,"Sector Command",C_DIM);
-        front_button(96,68,128,22,"Campaign",race_front.row==0);
-        front_button(96,92,128,22,"Custom Game",race_front.row==1);
-        front_button(96,116,128,22,"Load Game",race_front.row==2);
-        front_text(24,123,"Koprulu Sector",C_DIM);
-        front_uplink();
-        for(int i=0;i<8;i++) {
-            int x=17+(i*37)%96,y=50+(i*23)%62;
-            if(((race_front.ticks/8+i)%7)==0)gfx_pixel(x,y,C_SILVER);
-        }
-        front_footer("Up/Down Select  A Enter  L Load");
-    } else if(page==SC_FRONT_CAMPAIGN) {
-#ifdef SC64_CAMPAIGN_RACE
-        front_header("Campaign",0);
-        front_button(96,70,128,22,
-            faction==SC_FRONT_TERRAN?"TERRAN":faction==SC_FRONT_ZERG?"ZERG":"PROTOSS",1);
-        front_text(121,108,front_campaign_title(faction),C_GOLD);
-#else
-#ifdef SC64_UNIFIED
-        front_header("Choose a Campaign",0);
-        front_button(96,52,128,22,"Terran",race_front.row==0);
-        front_button(96,81,128,22,"Zerg",race_front.row==1);
-        front_button(96,110,128,22,"Protoss",race_front.row==2);
-        front_text(24,135,front_campaign_title(faction),C_GOLD);
-#else
-        front_header("Choose a Campaign",0);
-        front_button(96,62,128,22,"Zerg",race_front.row==0);
-        front_button(96,98,128,22,"Protoss",race_front.row==1);
-        front_text(24,128,faction?"III: The Fall":"II: The Overmind",C_GOLD);
-#endif
-#endif
-        front_uplink();front_footer("Arrows Change  A Select  B Back");
-    } else if(page==SC_FRONT_MISSION) {
-        front_header(front_campaign_title(faction),
-#ifdef SC64_UNIFIED
-                     faction==SC_FRONT_TERRAN?"Terran Campaign":faction==SC_FRONT_PROTOSS?"Protoss Campaign":"Zerg Campaign");
-#else
-                     faction?"Protoss Campaign":"Zerg Campaign");
-#endif
-        int catalog_faction=sc64_front_catalog_faction(faction);
-        int available=sc64_catalog_playable_count(catalog_faction);
-        for(int i=0;i<2;i++) {
-            int mission=sc64_catalog_playable_at(catalog_faction,race_front.mission_page*2+i);
-            if(mission<0) continue;
-            front_button(96,53+i*36,128,30,front_mission_title(mission),race_front.row==i);
-            if(race_completed&(1<<mission))gfx_rect(91,64+i*36,4,4,C_GREEN);
-        }
-        front_text(24,127,(race_completed&(1<<(sc64_catalog_playable_at(catalog_faction,race_front.mission_page*2+race_front.row))))?"Mission Complete":"Awaiting Your Orders",C_DIM);
-        if((available+1)/2>1) front_text(174,127,"L/R Page",C_GOLD);
-        front_uplink();front_footer("U/D Pick  L/R Page  A Brief  B Back");
-    }
-#ifdef SC64_SHOWCASE_ENABLED
-    else if(page==SC_FRONT_SHOWCASE) {
-        front_header("Showcase Scenes","Filming Setups");
-        for(int i=0;i<8;i++)
-            front_button(104,44+i*11,120,11,front_showcase_title(i),race_front.row==i);
-        front_text(24,58,"Staged",C_GOLD);
-        front_text(24,70,"Battles",C_GOLD);
-        front_text(24,94,"Quick",C_DIM);
-        front_text(24,104,"Restart",C_DIM);
-        if(race_front.row==0) {
-            front_text(24,119,"Carrier",C_SILVER);
-            front_text(24,129,"Preview",C_SILVER);
-        }
-        front_footer("Up/Down Scene  A Start  B Back");
-    }
-#endif
-    else if(page==SC_FRONT_SKIRMISH) {
-        front_header("Battle Setup",0);
+    switch (race_front.page) {
+    case SC_FRONT_HOME: front_draw_home(); break;
+    case SC_FRONT_CAMPAIGN: front_draw_campaign(); break;
+    case SC_FRONT_MISSION: front_draw_missions(); break;
+    case SC_FRONT_OPTIONS: front_draw_options(); break;
+    case SC_FRONT_SKIRMISH: front_draw_skirmish(); break;
 #ifdef SC64_IMPORTED_SKIRMISH
-        char option[24];
-        for(int row=0;row<SC_FRONT_SKIRMISH_LAUNCH_ROW;row++) {
-            if(row==0) {
-                int n=0;const char *label="MAP ";while(label[n]){option[n]=label[n];n++;}
-                const char *value=front_map_title(race_front.map);int j=0;while(value[j])option[n++]=value[j++];option[n]=0;
-            } else if(row==1) {
-                int n=0;const char *label="HUMAN ";while(label[n]){option[n]=label[n];n++;}
-                const char *value=
-#ifdef SC64_NATIVE_MELEE_STARTS
-                    race_front.race==SC_FRONT_HUMAN_RANDOM ? "Random" :
+    case SC_FRONT_MAP_BROWSER: front_draw_map_browser(); break;
 #endif
-                    sc64_race_names[race_front.race];
-                int j=0;while(value[j])option[n++]=value[j++];option[n]=0;
-            } else if(row==2) {
-                option[0]='O';option[1]='P';option[2]='P';option[3]='O';option[4]='N';option[5]='E';option[6]='N';option[7]='T';option[8]='S';option[9]=' ';
-                option[10]=(char)('0'+race_front.bots);option[11]=0;
-#ifdef SC64_NATIVE_MELEE_STARTS
-            } else if(row==SC_FRONT_SKIRMISH_MODE_ROW) {
-                const char *label=race_front.skirmish_melee ? "TYPE MELEE" : "TYPE FREE FOR ALL";
-                int j=0;while(label[j]){option[j]=label[j];++j;}option[j]=0;
+#ifdef SC64_SHOWCASE_ENABLED
+    case SC_FRONT_SHOWCASE: front_draw_showcase(); break;
 #endif
-            } else {
-                int ai=row-SC_FRONT_BOT_FIRST_ROW;option[0]='A';option[1]='I';option[2]=' ';
-                option[3]=(char)('1'+ai);option[4]=' ';
-                int choice=race_front.bot_races[ai],j=0;
-                const char *value=choice==SC_FRONT_BOT_CLOSED ? "Closed" :
-                    choice==SC_FRONT_BOT_RANDOM ? "Random" : sc64_race_names[choice];
-                while(value[j]) { option[5+j]=value[j]; ++j; }
-                option[5+j]=0;
+    case SC_FRONT_BRIEFING: {
+        unsigned age = race_front.ticks - race_front_transition;
+        if (age < 12) {
+            u16 fade[224];
+            int amount = (int)age + 1;
+            for (int i = 0; i < 224; ++i) {
+                u16 p = sc64_briefing_palette[i];
+                fade[i] = ((p & 31) * amount / 12) |
+                    ((((p >> 5) & 31) * amount / 12) << 5) |
+                    ((((p >> 10) & 31) * amount / 12) << 10);
             }
-            front_button(104,50+row*12,120,11,option,race_front.row==row);
+            gfx_set_palette(32, 224, fade);
+        } else {
+            gfx_set_palette(32, 224, sc64_briefing_palette);
         }
-        front_button(104,50+SC_FRONT_SKIRMISH_LAUNCH_ROW*12,120,11,
-            race_front.bots ? "LAUNCH" : "NEED OPPONENT",race_front.row==SC_FRONT_SKIRMISH_LAUNCH_ROW);
-        front_footer("U/D Row L/R Edit A OK B Back");
-#else
-        front_text(24,66,"Faction",C_DIM);
-        front_button(96,61,128,22,sc64_race_names[race_front.race],race_front.row==0);
-        front_text(24,87,"Computer",C_DIM);
-        front_text(24,98,"Opponents",C_DIM);
-        char opponents[6]={'<',' ',(char)('0'+race_front.bots),' ','>',0};
-        front_button(96,85,128,22,opponents,race_front.row==1);
-        front_button(96,111,128,22,"LAUNCH",race_front.row==2);
-        front_text(24,126,"Free for All",C_DIM);
-        front_footer("U/D Row L/R Edit A OK B Back");
-#endif
+        gfx_blit_band(0, 160, sc64_briefing_background);
+        front_briefing();
+        break;
+    }
     }
     front_load_error();
 }
