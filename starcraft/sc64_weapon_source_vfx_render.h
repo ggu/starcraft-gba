@@ -679,15 +679,16 @@ sc64_weapon_source_vfx_draw_trace_motion(Sc64WeaponSourceVfxKey key,
     uint32_t release_ticks = sc64_weapon_source_trace_release_ticks(p);
     /* The captured tracer begins at attack-init. Keep the attacker animation
      * on its absolute source clock, then start the projectile at attackwith. */
-    const Sc64WeaponSourceAnimation *actor_anim =
-        sc64_weapon_source_animation_lookup(p->attack_image, p->attack_anim);
-    const Sc64WeaponSourceImage *actor_image =
-        sc64_weapon_source_image_lookup(p->attack_image);
-    if (actor_anim && actor_image && p->attackwith_tick != UINT16_MAX) {
+    const Sc64WeaponSourceAnimation *actor_anim = p->attackwith_tick != UINT16_MAX ?
+        sc64_weapon_source_animation_lookup(p->attack_image, p->attack_anim) : 0;
+    /* The attacker frame here only anchors attached effects. Sampling it
+     * without overlay events cannot affect the rendered trace. */
+    const Sc64WeaponSourceImage *actor_image = actor_anim && actor_anim->overlay_count ?
+        sc64_weapon_source_image_lookup(p->attack_image) : 0;
+    if (actor_image) {
         int actor_mirror = 0;
         uint16_t actor_frame = sc64_weapon_source_vfx_source_frame(
             actor_image, actor_anim, attack_age, key.direction, &actor_mirror);
-        (void)actor_mirror;
         sc64_weapon_source_vfx_draw_overlays(actor_anim,
             attack_age, attack_age, p->attack_image, actor_frame, x0, y0,
             key.direction, actor_mirror, 0, 0, x0, y0, x1, y1, 0);
@@ -771,15 +772,17 @@ sc64_weapon_source_vfx_draw_trace_motion(Sc64WeaponSourceVfxKey key,
     /* Child images from each missile script remain independent while their
      * own Init animation is alive. This covers projectile trails and impact
      * sparks as well as ordinary IMGOL/SPROL records. */
-    if (init && source_age < init_ticks)
+    if (init && source_age < init_ticks && init->overlay_count)
         sc64_weapon_source_vfx_draw_overlays(init, source_age, source_age,
             image->image_id, projectile_frame, px, py, key.direction,
             projectile_mirror, 0, 0, launch_x, launch_y, x1, y1, 0);
-    if (flight_anim && source_age >= init_ticks && projectile_age < flight_ticks)
+    if (flight_anim && source_age >= init_ticks && projectile_age < flight_ticks &&
+        flight_anim->overlay_count)
         sc64_weapon_source_vfx_draw_overlays_motion(flight_anim, projectile_age,
             projectile_age, image->image_id, projectile_frame, px, py,
             key.direction, projectile_mirror, 0, p, launch_x, launch_y, x1, y1, 0, &motion);
-    if (death && source_age >= init_ticks + (moving ? flight_ticks : 0u)) {
+    if (death && source_age >= init_ticks + (moving ? flight_ticks : 0u) &&
+        death->overlay_count) {
         uint32_t death_age = source_age - init_ticks - (moving ? flight_ticks : 0u);
         sc64_weapon_source_vfx_draw_overlays_motion(death, death_age, death_age,
             image->image_id, projectile_frame, px, py, key.direction,
