@@ -1551,10 +1551,14 @@ save/source-owner and timing evidence; do not advertise unwired components.
   change matches that progress and the 50-mineral refund through ARM
   inputs. When two SCVs are paid for, N64 shows 5/10 and the GBA still
   shows 6/10. Ordinary GBA inputs show the wallet and queue stay unchanged
-  when a further affordable order is attempted at 10/10. Native input
-  reaches 9/10 and 240 minerals, but two retries stall before their
-  first rendered frame. Test native cap-bound admission and the new-head
-  stall before changing shared supply accounting and save validation.
+  when a further affordable order is attempted at 10/10. The completed
+  guarded native replay pays 50 for that second order at 10/10. The
+  paid SCV moves to the head with an empty progress bar when the first
+  SCV finishes. Separate paid waiting slots from active supply
+  reservations in shared production. Verify legacy and fresh-load saves,
+  refunds, HUD and releasing supply at cap. Empty-queue admission,
+  multiple producers, AI, Zerg morphs and hard-200 behavior need their
+  own native comparisons.
 - The [dense Z7 orders audit](audits/2026-11-19-z7-order-cost.md)
   separates the movement, nearest-enemy and setup costs. Movement
   averages about 920,000 instrumented cycles on calls that advance

@@ -95,9 +95,9 @@ ARM build passes the existing memory guards. The same two-job
 result repeats on a separate build based directly on shipping
 source `2655cb22`. A single-item cancellation on the candidate
 also clears the queue and refunds 50. The HUD still displays
-6/10 with the two paid SCVs, then 5/10 after cancel. Observe native
-admission at cap and the handoff to a blocked new head before changing
-when waiting jobs count against supply.
+6/10 with the two paid SCVs, then 5/10 after cancel. See the
+[native admission and promotion test](#native-admission-and-promotion-at-cap)
+for the separate discrepancy in how waiting jobs count against supply.
 
 - Native manifest SHA-256 `60cbcdb014c1bf55aaee2433f5a856046256a39db8fbe1f14d78a94b83275fb0`.
 - GBA shipping cancellation receipt SHA-256 `bb3754af6b0a9edd8498f8414fbe18d94bce25e9d0603592a4ce0f6e0369b0d7`.
@@ -120,7 +120,7 @@ current GBA admission rule independently of the displayed total.
 - GBA 9/10 admission receipt SHA-256 `712e876cdab1381a88c3aa51f7ae0848ed5112c85c77d8528fe6cbe43b124636`.
 - GBA 8/10 admission receipt SHA-256 `e444c814e22f5101a28483939803127e37c6592594568510b10505ebe62a6179`.
 
-## Native near-cap setup
+## Native admission and promotion at cap
 
 Ordinary N64 input from a fresh Blood Bath start reached 9/10 supply
 and 240 minerals at observer step 11,458 after five additional SCVs
@@ -134,12 +134,34 @@ in the observer's signal trap. A process sample showed the Metal shader
 compiler at the first stop. During a 64 MiB process-limit preflight,
 the only open writable file beyond that limit is the per-user Metal
 cache, at 83,722,240 bytes. A 128 MiB limit passes the first rendered
-frame with the original input and a separate capture limit.
-The native 9/10 → 10/10 purchase, admission of a
-paid tail at full supply, and promotion of that tail remain open.
-Keep the current GBA supply rule while the comparison is incomplete.
+frame with the original input and a separate capture limit. That
+guarded run completes all 13,513 observer steps with ordinary controls.
+
+| Native ledger step | Minerals | HUD supply | Command Center production |
+| ---: | ---: | ---: | --- |
+| 11,772 | 248 | 9/10 | Empty queue |
+| 11,947 | 198 | 10/10 | One paid SCV training |
+| 12,062 | 148 | 10/10 | First SCV still training, second paid SCV visible in the queue |
+| 13,512 | 156 | 10/10 | Second SCV promoted to the front, progress bar empty |
+
+The second ordinary A press pays 50 minerals at 10/10 and adds a
+queued SCV without changing displayed supply. After the first SCV
+completes, the second occupies the front slot. The progress bar's
+filled width is six then eighteen pixels on the earlier active
+cuts and zero pixels in the final cut. One eight-mineral deposit
+accounts for the last wallet increase. The original ROM and Flash
+pins still match and the observer performs no guest writes.
+
+The GBA comparison rejects the second affordable order. To match
+the observed native case, separate paying for a waiting job from
+reserving supply for the current job. Carry waiting-head state
+through saves, cancellation and HUD updates. Observe empty-queue
+admission at cap, contention when two blocked producers regain
+capacity, and Zerg morph and hard-200 cases before generalizing
+those behaviors.
 
 - Native near-cap manifest SHA-256 `1ed5afe12a55eca7dc4b3c42b99189a2ca930d2c154ec2e1323eb4ab01dc47d5`.
 - Native near-cap input SHA-256 `76fe117f9dc3eda792479bccc113a5d67489975836409dbba1db834b066cf177`.
 - Guarded retry manifest SHA-256 `e5c572f1693117cb796d6c1b28f8eff2565f705add80b26805bfca8faa220bb0`.
 - Isolated 64 MiB diagnostic manifest SHA-256 `f5ecfb2502a92db84baf599906451cfa7fb84678d9231e5fc4166fccbbe7bc6f`.
+- Completed native cap manifest SHA-256 `41682dd5c9d3fdc0fc5289b5ac15369f3408c4062f2c51a327d08d1483e28ab7`.
