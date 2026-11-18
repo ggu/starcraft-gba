@@ -223,6 +223,46 @@ the measured tracer workload for the next rendering comparison.
 
 - Facing experiment receipt SHA-256 `d764a7fa66695b37da41c2f1709c5e820f364c0bc33fd0d359de9e5302a65615`.
 
+Three finer instruction traces use the same 44 cuts. Each matches
+the 1,000-update control's frame, cycle and route counters. The
+renderer admits about 5.6 of 9.1 tagged traces per measured update.
+The lookup and immediate cull checks average 608 and 2,553 cycles.
+Work after acceptance averages 65,293 cycles. The overlay projector
+averages 23,599 inclusive cycles, including 3,352 cycles of the
+6,902-cycle raster total. Tracer division routines account for
+6,433 inclusive cycles across these stages, all in 32-bit routines.
+There are no calls to the partial-fog per-row edge in these cuts.
+
+The camera stays fixed through this run. On 8,660 of 8,967 live
+tracer observations, endpoints and keys match the preceding update
+and remaining life decreases by one. Even with that reuse, caching
+the existing cull results can avoid only about 2,846 cycles before
+cache bookkeeping. Prioritize reducing the work on accepted effects.
+The existing executable already enables its profile timing cache.
+An explicit build define reproduced identical ROM bytes and timings.
+
+- Tracer stage receipt SHA-256 `005d7de209c4b884234fc5e2f4895f1de54664774deb63ee634e5495d464496a`.
+- Overlay and raster receipt SHA-256 `766856190dfd046d774d3583e45bf9ac0cd57ce4378a86ecf6e516c32566a2cc`.
+- Tracer division receipt SHA-256 `c327a2a1d10f9e1f423ddd394ea468e71b3e257b238a78d7dbb0b5a63d90f9d6`.
+
+The per-profile bounds bank also leaves whole-update cost flat. The
+candidate generated header matches the control after removing only its
+bounds version marker and table. The 1,000-update comparison matches
+all 25 sampled cuts (including the fresh load), all frame IDs and route
+build/hit counters, and every exported SRAM byte.
+
+| Guest cycles per controller update | Control | Per-profile bounds |
+| --- | ---: | ---: |
+| Mean | 795,983 | 796,011 |
+| p95 | 1,038,189 | 1,038,171 |
+| Maximum | 2,008,978 | 2,008,930 |
+
+The mean changes by +0.0035% in this mixed Blood Bath window. This trial
+does not establish a performance benefit or qualify other maps.
+
+- Per-profile bounds replay SHA-256 `702d354903c8cc0a8e8f578cb4be0b21ace0475db3d90859c88345a742a71a71`.
+- Candidate ROM SHA-256 `4c04df50194fd5658f01ae1b4ecf1e292d5188ec5cfb53b58d66c8b5c987fdb8`.
+
 ## Independent 128 × 128 Zerg 9 check
 
 The same ROM pair replays 46,500 ordinary controller updates from

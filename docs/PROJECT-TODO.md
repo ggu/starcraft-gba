@@ -1556,17 +1556,21 @@ save/source-owner and timing evidence; do not advertise unwired components.
   paid SCV moves to the head with an empty progress bar when the first
   SCV finishes. Separate paid waiting slots from active supply
   reservations in shared production. Verify legacy and fresh-load saves,
-  refunds, HUD and releasing supply at cap. Empty-queue admission,
-  multiple producers, AI, Zerg morphs and hard-200 behavior need their
-  own native comparisons.
+  refunds, HUD and releasing supply at cap. Multiple producers, AI,
+  Zerg morphs and hard-200 behavior need their own native comparisons.
   The [paid waiting preview](https://github.com/ggu/starcraft-gba/blob/codex/sc64-paid-waiting-20261119/docs/audits/2026-11-19-paid-waiting-queue-preview.md)
   now admits the second SCV at 10/10 and holds the promoted order at zero.
   The Z10 ARM witness covers legacy migration, the empty wait bar, a fresh
   load, the 50-mineral refund and rejection of a mislabelled bank. P10's
   saved Shields upgrade resumes and completes with the tagged preview.
   The host fixture opens a freed supply slot and checks two producers
-  contending for it. Continue the native empty-queue and recovery tests,
-  broader ARM controls and performance before release activation.
+  contending for it. Both native and preview controls refuse the first
+  SCV order at 10/10 when the Command Center is idle. In the preview,
+  placing a Depot from the saved waiting state lets the paid SCV
+  resume and finish without another Train input. Quiet training timing
+  stays near 30 emulated updates/s and mixed Blood Bath mean cost rises
+  0.17% with matching sampled state. Continue native capacity recovery
+  and broader ARM controls before release activation.
 - The [dense Z7 orders audit](audits/2026-11-19-z7-order-cost.md)
   separates the movement, nearest-enemy and setup costs. Movement
   averages about 920,000 instrumented cycles on calls that advance
@@ -1591,9 +1595,13 @@ save/source-owner and timing evidence; do not advertise unwired components.
   averages about 796,000 cycles per update. Its read-only trace finds
   only one eligible cross-update facility reuse with 70 prior FIFO
   pops. Tracer drawing averages 69,821 cycles in the 44 measured
-  render cuts. Attribute tracer culling/setup and actual raster work,
-  alongside HUD costs and the separate orders spikes. Finish other
-  cartridge profiles and physical GBA timing
+  render cuts. About 65,293 cycles occur after acceptance and 6,902
+  inside the raster wrapper. Initial culling uses only 2,553 cycles.
+  The tighter per-profile bounds bank matches all 25 cuts and SRAM
+  bytes but leaves whole-update cost flat at about 796,000 cycles.
+  Prioritize admitted animation and overlay work, alongside HUD costs
+  and the separate orders spikes. Finish other cartridge profiles and
+  physical GBA timing
   before considering regular activation.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.

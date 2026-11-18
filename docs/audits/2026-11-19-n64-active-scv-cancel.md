@@ -155,13 +155,36 @@ pins still match and the observer performs no guest writes.
 The GBA comparison rejects the second affordable order. To match
 the observed native case, separate paying for a waiting job from
 reserving supply for the current job. Carry waiting-head state
-through saves, cancellation and HUD updates. Observe empty-queue
-admission at cap, contention when two blocked producers regain
-capacity, and Zerg morph and hard-200 cases before generalizing
-those behaviors.
+through saves, cancellation and HUD updates. Contention when two
+blocked producers regain capacity, Zerg morphs, and hard-200 cases
+still need their own native observations.
 
 - Native near-cap manifest SHA-256 `1ed5afe12a55eca7dc4b3c42b99189a2ca930d2c154ec2e1323eb4ab01dc47d5`.
 - Native near-cap input SHA-256 `76fe117f9dc3eda792479bccc113a5d67489975836409dbba1db834b066cf177`.
 - Guarded retry manifest SHA-256 `e5c572f1693117cb796d6c1b28f8eff2565f705add80b26805bfca8faa220bb0`.
 - Isolated 64 MiB diagnostic manifest SHA-256 `f5ecfb2502a92db84baf599906451cfa7fb84678d9231e5fc4166fccbbe7bc6f`.
 - Completed native cap manifest SHA-256 `41682dd5c9d3fdc0fc5289b5ac15369f3408c4062f2c51a327d08d1483e28ab7`.
+
+## Idle Command Center at 10/10
+
+The branch of the proven controller tape reproduces the sample
+with the first SCV active and 198 minerals exactly. It replaces
+the previous second Train press with neutral input and waits for
+the first SCV to finish. The Command Center is still selected.
+
+| N64 observer step | Minerals | Supply | Production |
+| ---: | ---: | ---: | --- |
+| 11,947 | 198 | 10/10 | First paid SCV training |
+| 13,512 | 206 | 10/10 | Empty after the SCV finishes |
+| 13,597 | 206 | 10/10 | Empty after A on Train SCV |
+
+The final sample displays **Not enough supplies.** The idle producer
+refuses a new head at cap and takes no payment. Together with the
+busy-producer sample, this establishes the initial-head and paid-tail
+rules for ordinary SCVs at the provided cap. The emulator reads the
+original ROM directly, uses isolated save and capture paths, and
+completes 13,598 steps. Native capacity recovery after an accepted
+tail remains a separate comparison.
+
+- Idle producer controller tape SHA-256 `ca1d2058a19385a3035529218e304231a8b5596489574ee398a30e924b1540cf`.
+- Idle producer manifest SHA-256 `66b8b1bd0205840bb142892778c0153a4db9fa6f4632fb2c54ac31a195f21fec`.
