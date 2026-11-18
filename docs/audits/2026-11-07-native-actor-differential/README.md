@@ -18,7 +18,7 @@ After temporary captures were lost, the original observer source was
 recovered from Git blobs `b3dadc1cc00f312a68cab17e89b50c1fbbe8f0ca`
 (wrapper) and `3e4143f3e574e2d6503ceade23f46d3fde09c05b` (C++). Their
 SHA-256 hashes match the archived source receipt. A guarded fresh process
-replayed the original 4,919 commands with the retained binary, owned ROM,
+replayed 4,919 original steps with the retained binary, owned ROM,
 pinned ares checkout, and MoltenVK. It held the shared observer lock,
 required at least 6 GiB free, and sent no new controls. It exited 0.
 
