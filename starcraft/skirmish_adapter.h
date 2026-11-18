@@ -6,8 +6,13 @@
  * engine's unit/building/economy helpers have been defined. */
 
 static const int skirmish_owner_ids[3] = { ENEMY, RESCUABLE, 4 };
+#ifdef SC_ORIGINAL_SKIRMISH
+#define skirmish_base_x (original_skirmish_maps[original_skirmish_map].start_x)
+#define skirmish_base_y (original_skirmish_maps[original_skirmish_map].start_y)
+#else
 static const int skirmish_base_x[4] = { 160, 864, 864, 160 };
 static const int skirmish_base_y[4] = { 160, 864, 160, 864 };
+#endif
 
 static int
 skirmish_base_index(int owner)
@@ -381,10 +386,18 @@ skirmish_init(void)
     memset(skirmish_ai, 0, sizeof(skirmish_ai));
     skirmish_bots = skirmish_bots < 1 ? 1 : skirmish_bots > 3 ? 3 : skirmish_bots;
     geyser_count = 4;
+#ifdef SC_ORIGINAL_SKIRMISH
+    for (int seat = 0; seat < 4; seat++) {
+        int x = skirmish_base_x[seat];
+        geysers[seat].x = x + (x < WORLD_W / 2 ? 64 : -64);
+        geysers[seat].y = skirmish_base_y[seat];
+    }
+#else
     geysers[0].x = 224; geysers[0].y = 160;
     geysers[1].x = 800; geysers[1].y = 864;
     geysers[2].x = 864; geysers[2].y = 224;
     geysers[3].x = 160; geysers[3].y = 800;
+#endif
     for (i = 0; i < MAX_MINERALS; ++i) {
         int base = i / 4, patch = i % 4;
         int sx = base % 2 == 0 ? -1 : 1;
@@ -422,7 +435,15 @@ skirmish_init(void)
             int x = skirmish_base_x[i] + (i % 2 == 0 ? -1 : 1) * mineral_dx[j];
             int y = skirmish_base_y[i] + (i == 0 || i == 2 ? 1 : -1) * mineral_dy[j];
             /* Mineral records are installed above; each worker begins nearby. */
-            spawn_unit(owner, U_SCV, x + 10, y + 10);
+            int slot = spawn_unit(owner, U_SCV, x + 10, y + 10);
+#ifdef SC_ORIGINAL_SKIRMISH
+            if (slot >= 0) {
+                u[slot].order = ORDER_MINE;
+                u[slot].target = i * 4 + j;
+            }
+#else
+            (void)slot;
+#endif
         }
     }
     for (i = 0; i < skirmish_bots; ++i) {
@@ -448,6 +469,23 @@ skirmish_update(void)
         Sc64AiWorld world;
         Sc64AiIntent intents[SC64_AI_MAX_INTENTS];
         unsigned char count, j;
+#ifdef SC_ORIGINAL_SKIRMISH
+        /* New and recovering CPU workers use the same mining orders as the
+         * starting crews. Human orders remain under player control. */
+        int owner = skirmish_owner_ids[i];
+        for (int slot = 0; slot < MAX_UNITS; slot++) {
+            Unit *worker = &u[slot];
+            if (!worker->alive || worker->owner != owner || worker->type != U_SCV ||
+                worker->order != ORDER_IDLE)
+                continue;
+            int patch = nearest_mineral(worker->x, worker->y);
+            if (patch < 0) continue;
+            worker->order = ORDER_MINE;
+            worker->target = patch;
+            worker->path_timer = worker->path_retry = 0;
+            worker->work_timer = 0;
+        }
+#endif
         skirmish_sync_ai(i);
         if (!skirmish_ai[i].active) continue;
         skirmish_make_world(i, &world);
