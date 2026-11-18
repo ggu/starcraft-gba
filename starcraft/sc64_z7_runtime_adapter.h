@@ -357,29 +357,42 @@ static int race_z7_authored_ai_pulse(void)
     return 1;
 }
 
+static inline void race_z7_reconcile_unit_provenance(Unit *q)
+{
+    if (q->raw_owner!=-1) return;
+    unsigned slot; int raw=sc64_race_raw_unit(q->type);
+    if (raw>=0 && sc64_race_unit_from_raw(raw)==q->type &&
+        race_z7_world_owner_slot(&race_z7_world,q->owner,&slot)) {
+        q->raw_owner=(s16)slot;
+        q->raw_type=(s16)raw;
+    }
+}
+
+static inline void race_z7_reconcile_building_provenance(Building *q)
+{
+    if (q->raw_owner!=-1) return;
+    unsigned slot; int raw=sc64_race_raw_building(q->type);
+    if (raw>=0 && sc64_race_building_from_raw(raw)>=0 &&
+        race_z7_world_owner_slot(&race_z7_world,q->owner,&slot)) {
+        q->raw_owner=(s16)slot;
+        q->raw_type=(s16)raw;
+    }
+}
+
+static void race_z7_reconcile_product_range(int first_unit,int first_building)
+{
+    for (int i=first_unit;i<MAX_UNITS;++i) if (u[i].alive)
+        race_z7_reconcile_unit_provenance(&u[i]);
+    for (int i=first_building;i<MAX_BUILDINGS;++i) if (b[i].alive)
+        race_z7_reconcile_building_provenance(&b[i]);
+}
+
 static void race_z7_reconcile_paid_products(void)
 {
     if (!race_z7_active() || !race_z7_map) return;
-    /* Production/build placement may create runtime actors with no CHK slot.
-       The descriptor gives a unique live owner for SIDE and ENEMY; bind those
-       products to their authored source slot without inventing provenance for
-       neutral/ambiguous actors. */
-    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].raw_owner==-1) {
-        unsigned slot; int raw=sc64_race_raw_unit(u[i].type);
-        if (raw>=0 && sc64_race_unit_from_raw(raw)==u[i].type &&
-            race_z7_world_owner_slot(&race_z7_world,u[i].owner,&slot)) {
-            u[i].raw_owner=(s16)slot;
-            u[i].raw_type=(s16)raw;
-        }
-    }
-    for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive && b[i].raw_owner==-1) {
-        unsigned slot; int raw=sc64_race_raw_building(b[i].type);
-        if (raw>=0 && sc64_race_building_from_raw(raw)>=0 &&
-            race_z7_world_owner_slot(&race_z7_world,b[i].owner,&slot)) {
-            b[i].raw_owner=(s16)slot;
-            b[i].raw_type=(s16)raw;
-        }
-    }
+    /* Production/build placement can leave an unbound source-owner slot.
+       Resolve it only for a uniquely mapped owner and supported product. */
+    race_z7_reconcile_product_range(0,0);
 }
 
 #if defined(SC64_Z7_VALIDATED_CENSUS) && \
@@ -387,7 +400,12 @@ static void race_z7_reconcile_paid_products(void)
 #error "Z7 validated census requires the prevalidated pruned count snapshot"
 #endif
 
+#ifdef SC64_Z7_FUSED_PROVENANCE_PROBE
+static inline __attribute__((always_inline)) int
+race_z7_validate_live_world_path(u32 *late,int reconcile)
+#else
 static int race_z7_validate_live_world(u32 *late)
+#endif
 {
 #ifdef SC64_Z7_VALIDATED_CENSUS
     u32 own=0, hostile=0;
@@ -397,21 +415,39 @@ static int race_z7_validate_live_world(u32 *late)
 #endif
     if (!race_z7_map) return 0;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive) {
+#ifdef SC64_Z7_FUSED_PROVENANCE_PROBE
+        if (reconcile) race_z7_reconcile_unit_provenance(&u[i]);
+#endif
         int raw=u[i].raw_type; unsigned slot=(unsigned)u[i].raw_owner;
         if (u[i].raw_owner<0 || slot>=8u ||
             !race_z7_world.source_slot_active[slot] ||
             race_z7_world.live_owner_for_source[slot]!=u[i].owner || raw<0 ||
-            sc64_race_unit_from_raw(raw)!=u[i].type) return 0;
+            sc64_race_unit_from_raw(raw)!=u[i].type) {
+#ifdef SC64_Z7_FUSED_PROVENANCE_PROBE
+            /* The reference finishes both provenance passes before reporting
+               a bad row. Complete the remaining writes and publish no counts. */
+            if (reconcile) race_z7_reconcile_product_range(i+1,0);
+#endif
+            return 0;
+        }
 #ifdef SC64_Z7_VALIDATED_CENSUS
         if (late) own+=slot==current;
 #endif
     }
     for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) {
+#ifdef SC64_Z7_FUSED_PROVENANCE_PROBE
+        if (reconcile) race_z7_reconcile_building_provenance(&b[i]);
+#endif
         unsigned slot=(unsigned)b[i].raw_owner;
         if (b[i].raw_owner<0 || slot>=8u ||
             !race_z7_world.source_slot_active[slot] ||
             race_z7_world.live_owner_for_source[slot]!=b[i].owner ||
-            b[i].raw_type<0 || sc64_race_building_from_raw(b[i].raw_type)<0) return 0;
+            b[i].raw_type<0 || sc64_race_building_from_raw(b[i].raw_type)<0) {
+#ifdef SC64_Z7_FUSED_PROVENANCE_PROBE
+            if (reconcile) race_z7_reconcile_product_range(MAX_UNITS,i+1);
+#endif
+            return 0;
+        }
 #ifdef SC64_Z7_VALIDATED_CENSUS
         if (late) {
             own+=slot==current;
@@ -424,6 +460,15 @@ static int race_z7_validate_live_world(u32 *late)
 #endif
     return 1;
 }
+
+#ifdef SC64_Z7_FUSED_PROVENANCE_PROBE
+static int race_z7_validate_live_world(u32 *late)
+{ return race_z7_validate_live_world_path(late,0); }
+
+/* The runtime has already checked that this is the active bound Z7 world. */
+static int __attribute__((noinline)) race_z7_reconcile_validate_live_world(u32 *late)
+{ return race_z7_validate_live_world_path(late,1); }
+#endif
 
 static int race_z7_live_world_valid(void)
 { return race_z7_validate_live_world(0); }
@@ -489,7 +534,8 @@ static int race_z7_rebind_loaded_world(const Sc64RaceMap *map)
 static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
 {
     int result;
-#if defined(SC64_Z7_PREVALIDATED_TICK) && defined(SC64_Z7_COUNT_SNAPSHOT) && defined(SC64_Z7_PRUNE_STARTED)
+#if defined(SC64_Z7_FUSED_PROVENANCE_PROBE) || \
+    (defined(SC64_Z7_PREVALIDATED_TICK) && defined(SC64_Z7_COUNT_SNAPSHOT) && defined(SC64_Z7_PRUNE_STARTED))
     u32 *validated_late=0;
 #endif
 #ifdef SC64_Z7_VALIDATED_CENSUS
@@ -501,13 +547,19 @@ static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
     }
     race_z7_world.elapsed_frames=elapsed_frames;
     if (user_paused || race_z7.runtime.model.outcome!=SC64_Z7_RUNNING) return 1;
+#ifndef SC64_Z7_FUSED_PROVENANCE_PROBE
     race_z7_reconcile_paid_products();
+#endif
 #ifdef SC64_Z7_VALIDATED_CENSUS
     /* Only the authenticated two-predicate late path can use these counts.
      * Validation still checks every live actor and publishes no partial counts. */
     if (race_z7_pruned_binding_valid() &&
         sc64_z7_count_snapshot_needed(race_z7.runtime.model.started)==3u)
         validated_late=late;
+#endif
+#ifdef SC64_Z7_FUSED_PROVENANCE_PROBE
+    if (!race_z7_reconcile_validate_live_world(validated_late)) {
+#elif defined(SC64_Z7_VALIDATED_CENSUS)
     if (!race_z7_validate_live_world(validated_late)) {
 #else
     if (!race_z7_live_world_valid()) {
