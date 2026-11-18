@@ -1489,6 +1489,12 @@ save/source-owner and timing evidence; do not advertise unwired components.
   updates per second. The 30 fps target remains open. The diagonal
   fog-strip probe saves 103 cycles overall and stays local. Prioritize
   recurring route and order work and larger terrain draw costs.
+- A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
+  corroborates the paid Terran worker opening in Blood Bath Melee.
+  The shared opening cuts show 50 minerals and an empty queue for
+  every owner. The Terran CPU spends 50 on a queued SCV before any
+  owner adds a building. Capture first purchases for Zerg and Protoss
+  before comparing the later AI build order.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
