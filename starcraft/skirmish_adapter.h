@@ -483,6 +483,44 @@ skirmish_init(void)
     update_exploration();
 }
 
+#ifdef SC_ORIGINAL_SKIRMISH
+static int
+skirmish_find_home_patch(const Unit *worker, int depot)
+{
+    int best = -1, best_distance = 0x7fffffff;
+    for (int patch = 0; patch < MAX_MINERALS; ++patch) {
+        int x = m[patch].x, y = m[patch].y;
+        if (m[patch].amount <= 0 || x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ||
+            dist2(b[depot].x, b[depot].y, x, y) >
+                SC64_MINERAL_SEARCH_RADIUS * SC64_MINERAL_SEARCH_RADIUS) continue;
+        int distance = dist2(worker->x, worker->y, x, y), next_x, next_y;
+        if (distance >= best_distance ||
+            !path_next_tile(worker->x, worker->y, x, y, &next_x, &next_y)) continue;
+        best = patch;
+        best_distance = distance;
+    }
+    return best;
+}
+
+static void
+skirmish_recover_idle_miners(int owner)
+{
+    int depot = owner_command_center(owner);
+    if (depot < 0) return;
+    for (int slot = 0; slot < MAX_UNITS; ++slot) {
+        Unit *worker = &u[slot];
+        if (!worker->alive || worker->owner != owner || worker->type != U_SCV ||
+            worker->order != ORDER_IDLE) continue;
+        int patch = skirmish_find_home_patch(worker, depot);
+        if (patch < 0) continue;
+        worker->order = ORDER_MINE;
+        worker->target = patch;
+        worker->path_timer = worker->path_retry = 0;
+        worker->work_timer = 0;
+    }
+}
+#endif
+
 static void
 skirmish_update(void)
 {
@@ -493,21 +531,7 @@ skirmish_update(void)
         Sc64AiIntent intents[SC64_AI_MAX_INTENTS];
         unsigned char count, j;
 #ifdef SC_ORIGINAL_SKIRMISH
-        /* New and recovering CPU workers use the same mining orders as the
-         * starting crews. Human orders remain under player control. */
-        int owner = skirmish_owner_ids[i];
-        for (int slot = 0; slot < MAX_UNITS; slot++) {
-            Unit *worker = &u[slot];
-            if (!worker->alive || worker->owner != owner || worker->type != U_SCV ||
-                worker->order != ORDER_IDLE)
-                continue;
-            int patch = nearest_mineral(worker->x, worker->y);
-            if (patch < 0) continue;
-            worker->order = ORDER_MINE;
-            worker->target = patch;
-            worker->path_timer = worker->path_retry = 0;
-            worker->work_timer = 0;
-        }
+        skirmish_recover_idle_miners(skirmish_owner_ids[i]);
 #endif
         skirmish_sync_ai(i);
         if (!skirmish_ai[i].active) continue;

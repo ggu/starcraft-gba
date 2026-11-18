@@ -105,6 +105,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   victory ticks stayed fixed. Larger waves, including the rule that
   counts queued fighters toward the dispatch threshold, remain open.
 
+- **Frontier CPU mining recovery (P1):** idle CPU workers look for
+  reachable ore within 192 pixels of a completed command center they own.
+  In twelve long defensive matches driven by identical normal inputs
+  on both versions, the CPU exhausted its four local patches around
+  game ticks 18,260–18,482. The old policy sent nine workers to other
+  corners. The new policy assigned none to a distant patch. The
+  sanitizer fixture covers both maps and one to three CPUs, including
+  reload after depletion, an unfinished hall, and a reachable local
+  patch. All twelve existing victory inputs kept their result ticks and
+  averaged 28.68–29.48 updates per second in mGBA. CPU expansion after
+  local exhaustion remains open.
+
 - **Frontier frame time (P1):** clear the byte visibility grid with
   aligned stores, remember explored circle centers until a world load or
   restart, and draw uninterrupted battlefield grass/fog as row spans.

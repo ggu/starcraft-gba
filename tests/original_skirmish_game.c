@@ -115,13 +115,68 @@ static void check_exploration_restore(void)
     }
 }
 
+/* Seed depletion rather than waiting for four full mineral fields to run out.
+ * The match itself, and the save/load boundary, use normal button input. */
+static void check_cpu_local_mining_recovery(int map, int bots)
+{
+    int worker = -1, nx, ny;
+    game_init();
+    if (map) press(KEY_RIGHT);
+    if (bots != 2) press(bots == 1 ? KEY_DOWN : KEY_UP);
+    press(KEY_A);
+    check(screen == SCREEN_PLAY && skirmish_bots == bots, "recovery fixture launches normally");
+    int hall = owner_command_center(ENEMY);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == ENEMY && u[i].type == U_SCV) {
+            worker = i;
+            break;
+        }
+    check(hall >= 0 && worker >= 0, "recovery fixture has a CPU hall and worker");
+    /* Seat 1's four fields are local; seat 0's fields remain live and remote. */
+    for (int i = 4; i < 8; ++i) m[i].amount = 0;
+    check(m[0].amount > 0 && dist2(b[hall].x, b[hall].y, m[0].x, m[0].y) > 192 * 192,
+          "remote fields remain live outside the local radius");
+    u[worker].order = ORDER_IDLE;
+    u[worker].target = -1;
+    u[worker].carry = 0;
+    frame = 60;
+    skirmish_update();
+    check(u[worker].order == ORDER_IDLE, "CPU does not recover onto a remote field");
+
+    /* Save the exhausted case, then reload by title button and retry recovery. */
+    press(KEY_START);
+    press(KEY_B);
+    check(pause_notice == 1, "recovery fixture saves normally");
+    int saved_frame = frame;
+    game_init();
+    game_update(KEY_B, KEY_B);
+    check(screen == SCREEN_PLAY && frame == saved_frame && u[worker].alive &&
+          u[worker].owner == ENEMY && u[worker].order == ORDER_IDLE && m[4].amount == 0,
+          "load restores the exhausted idle CPU worker");
+    skirmish_update();
+    check(u[worker].order == ORDER_IDLE, "reloaded CPU does not recover onto a remote field");
+
+    m[4].amount = 1200;
+    check(path_next_tile(u[worker].x, u[worker].y, m[4].x, m[4].y, &nx, &ny),
+          "local recovery target is reachable");
+    b[hall].under_construction = 1;
+    skirmish_update();
+    check(u[worker].order == ORDER_IDLE, "CPU without a completed hall stays idle");
+    b[hall].under_construction = 0;
+    skirmish_update();
+    check(u[worker].order == ORDER_MINE && u[worker].target == 4,
+          "CPU recovers onto an eligible reachable local field");
+}
+
 int main(void)
 {
     gba_init();
     check_exploration_restore();
     for (int map = 0; map < ORIGINAL_MAP_COUNT; map++)
-        for (int bots = 1; bots <= 3; bots++)
+        for (int bots = 1; bots <= 3; bots++) {
+            check_cpu_local_mining_recovery(map, bots);
             play_match(map, bots);
+        }
     puts("Frontier: all six setups run, each CPU builds an economy, and a CPU army launches an attack.");
     puts("Frontier: all six setups save, reload, and restart.");
     return 0;
