@@ -9040,6 +9040,7 @@ static inline int race_bc_order_dispatch_needed(const Unit *q,int slot,int recha
 }
 #endif
 
+#include "sc64_crowd_slice.h"
 #if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(GBA_HOST)
 static void __attribute__((noinline,long_call))
 #else
@@ -9078,11 +9079,13 @@ update_orders(void)
 #endif
     target_lists_valid = 0;
     for (i = 0; i < 5; ++i) target_unit_head[i] = target_building_head[i] = -1;
+    SC64_CROWD_SLICE_BEGIN();
     for (i = MAX_UNITS - 1; i >= 0; --i) if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_HIDDEN(&u[i])) {
         int owner = u[i].owner;
         if (owner < 0 || owner >= 5) goto target_lists_unavailable;
         target_unit_next[i] = target_unit_head[owner];
         target_unit_head[owner] = i;
+        SC64_CROWD_SLICE_COUNT();
     }
     for (i = MAX_BUILDINGS - 1; i >= 0; --i) if (b[i].alive) {
         int owner = b[i].owner;
@@ -9409,6 +9412,16 @@ target_lists_unavailable:
 
 	if (q->order == ORDER_ATTACK_MOVE) {
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
+#if SC64_UNIT_IX_WIDE
+            {
+                int far = SC64_PR_FAR_RANGE(q);
+                target = sc64_crowd_searches_now(i) ?
+                    nearest_enemy_typed(q->x,q->y,q->owner,far,
+                                        q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner)) :
+                    sc64_crowd_kept_target(q, far);
+                if (sc64_crowd_slicing) q->target = (s16)target;
+            }
+#else
             target = nearest_enemy_typed(q->x,q->y,q->owner,
 #ifdef SC64_RACES
                 SC64_PR_FAR_RANGE(q),
@@ -9416,6 +9429,7 @@ target_lists_unavailable:
                 64,
 #endif
                 q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
+#endif
             if (target >= 0) tick_combat(q, target);
             else if (dist2(q->x, q->y, q->tx, q->ty) > 36) move_toward(q, q->tx, q->ty);
             else q->order = ORDER_IDLE;
