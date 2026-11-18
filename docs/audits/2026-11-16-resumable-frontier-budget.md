@@ -359,3 +359,113 @@ demand prototype local while attributing the repeat requests.
 
 - Demand prototype ARM receipt SHA-256 `dbe4ff97e391f8225d911cb1fa3865275a00366e5a2153c70381218c0b465378`.
 - Read-only request and caller receipt SHA-256 `c85d50ffdff7b1b8d45c86f87b923807ad366ab83d4c6418e19d4d158fc2e47f`.
+
+### Prove the distant lookup is disconnected
+
+The exact live walkability grid and parked-field metadata at call 47,995
+identify two nearby-root requests. A separate L/R/U/D reference flood
+from cell 12,730 visits 9,625 cells and cannot reach origin 445. Six
+fresh, complete open-root fields reach the former cell and exclude the
+latter. The runtime now uses that existing component proof before it
+completes a parked nearby-root candidate. Selection order, the two
+candidate budget, cache ages, and counters follow the existing path.
+
+The 480-call Z7 replay matches all 131 gameplay checks, frame and route
+timelines, nine raw world cuts, and both video pages with their selected
+page. The original group-move spike falls from 5,310,998 to 4,445,672
+cycles compared with the component-witness composition, below the
+shipping cost of 4,641,164 for that call.
+
+| Guest cycles | Shipping tail | Nearby-root rejection |
+| --- | ---: | ---: |
+| Mean advancing call | 2,481,146 | 2,250,150 |
+| All-call p95 | 3,628,357 | 2,993,653 |
+| All-call maximum | 4,841,218 | 4,873,873 |
+
+The average falls 9.31% and p95 falls 17.49%. The maximum rises 0.67%
+and moves to call 47,823, where orders cost 733,859 cycles more than the
+shipping ROM on the same call. The dense rate is 7.46 emulated updates
+per second. The first and second known spikes no longer coincide with
+the maximum.
+
+The regular Blood Bath Z10 pair matches all 25 world, route, video and
+SRAM cuts through a fresh-process continuation. Mean changes from
+802,530 to 802,657 cycles. All four configured ROMs pass the original
+RAM guards. Showcase keeps prefix expansion in ROM to preserve the
+existing IWRAM stack reservation.
+
+The configured builds match all 30 campaign launches, 72 skirmish setups
+and eight ordinary SRAM transfers. The 958-update busy P7 sample matches
+11 world and display cuts and its complete route and terrain timeline.
+Its mean changes from 1,883,264 to 1,883,899 cycles, and its maximum rises
+from 2,554,931 to 2,583,019.
+
+An independent packed-continuation experiment starts the second cutoff
+directly in the packed field before dense setup. Matching host receipts
+cover 386,646 queries and 288 complete packed-field and pending FIFO
+comparisons. Its ARM mean improves only 0.075% versus the dense second
+cutoff, p95 remains flat, the maximum rises another 40,635 cycles, and
+the selected page differs at one cut. Keep this variant local.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Live nearby-root geometry and independent route checks | `38cd99a334313d09a3961a17ba48a2ac8eaf377ef617be9d1200d7ea3140ba9b` |
+| Nearby-root rejection in Z7 | `dfadc48446af0721cf726590d7d6f016c31d519d688c182c4726909e8317b83c` |
+| Nearby-root rejection in three-AI Blood Bath and SRAM | `448fbb1b39db0e9e181877a924d198454159778e868a88fac40f0fbeff58c426` |
+| Campaign and skirmish launch matrix | `f8644030ebaa75ae0ea73e128b591e09757f1b6367c5bd96da5cf44bf7e86922` |
+| Bidirectional SRAM matrix | `d4028523e6fff80e9f67908805ba38c415a7721265b314d296f0c7ce42d90d3d` |
+| Packed second-cutoff replay | `f3ec65f364bd59859fac7d8b0266c169af40ecaafbd18c3423d8e564f2d50c12` |
+
+### Reject a connected lookup with exact distance bounds
+
+The second live request can reach the cached root, though its preferred
+route misses the newly requested goal. The captured complete point field
+rooted at cell 6,033 gives a 42-step upper bound from its one-tile
+neighbor, the cached root, to the origin. A separate field rooted at
+6,290 gives a 44-step lower bound for any route through the requested
+goal. Neither the preferred L nor a Manhattan-only proof covers this
+request. Compare at most four fresh, complete point fields beside either
+endpoint, and use the strict bound before resuming the cached search.
+The existing exact path handles ties and unavailable witnesses.
+
+| Guest cycles | Shipping tail | Component and distance checks |
+| --- | ---: | ---: |
+| Mean advancing call | 2,481,146 | 2,221,786 |
+| All-call p95 | 3,628,357 | 2,914,594 |
+| All-call maximum | 4,841,218 | 4,451,529 |
+| Call 47,823 | 4,140,591 | 4,039,121 |
+| Call 47,855 | 4,841,218 | 4,011,998 |
+
+The paired Z10 replay again matches all 131 named checkpoints, every
+sampled route and frame counter, and nine world and display cuts. Mean
+falls 10.45%, p95 falls 19.67%, and the maximum falls 8.05% against the
+shipping build. This window runs at 7.55 emulated gameplay updates per
+second. The 30 fps goal remains open.
+
+`CANONICAL_ROUTE_POINT_PREFIX=1` selects the combined policy in configured
+builds. `make test-sc64-route-point-prefix` runs the focused sanitizer cases
+and compares the logical residency stream with the reference. The range
+fixture covers cached reads that need a parked route and checks both reserved
+range planes. An uncovered cached range read can still complete a parked
+search synchronously. Keep the policy opt-in until dense ranged-combat
+timing and wider campaign save continuation are qualified.
+
+The repeated 958-update P7 combat sample matches the 11 world and display
+cuts and the complete route and terrain timeline. Mean moves from 1,883,264
+to 1,883,991 cycles, p95 from 2,179,462 to 2,176,128, and the maximum from
+2,554,931 to 2,583,074. The three-AI Blood Bath replay again matches all 25
+world, route and display cuts and exact SRAM through a fresh-process reload.
+It reproduces the component-only timing receipt byte for byte. Its mean of
+802,657 cycles remains close to the shipping build's 802,530 cycles.
+
+All four profiles pass the standard header and RAM checks. The combined
+builds reproduce the launch matrix for all 30 campaign entries and 72
+skirmish setups, spanning both maps, three human races, and one to three AI
+opponents. Eight custom-game SRAM transfers cover both directions between the
+shipping and opt-in builds across the four profiles. Both matrix receipts
+match the earlier component-only run. These checks cover startup and sampled
+custom saves. Campaign continuation needs longer input and save traces.
+
+- Combined distance-bound replay SHA-256 `c3c0177c98a6afd34b164798a855a243a597d4fb2dc7ced3cad9c252645c89ae`.
+- Combined busy P7 pair SHA-256 `52b3fde1c97ee0c115eda8967ca252d51e9ad2a40d68f87ab10ef29d04eb4a1f`.
+- Combined three-AI Blood Bath receipt SHA-256 `448fbb1b39db0e9e181877a924d198454159778e868a88fac40f0fbeff58c426`.

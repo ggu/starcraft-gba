@@ -692,9 +692,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   parked search. A component proof postpones the completion into orders
   and raises the maximum. A second bounded search saves more mean and p95
   cycles but raises the maximum further after repeated requests in one
-  orders pass. First test a safe early rejection for distant nearby-root
-  scans. Then test how much a small cutoff halo helps two adjacent requests
-  before qualifying wider workloads, links and cross-loads.
+  orders pass. The [nearby-root component rejection](audits/2026-11-16-resumable-frontier-budget.md#prove-the-distant-lookup-is-disconnected)
+  removes the original group-move spike without changing route choices.
+  A [distance-bound check](audits/2026-11-16-resumable-frontier-budget.md#reject-a-connected-lookup-with-exact-distance-bounds)
+  then reduces the new maximum. The combined opt-in build reduces dense
+  mean 10.45%, p95 19.67%, and maximum 8.05% versus the shipping tail.
+  Busy P7 and three-AI Blood Bath match their sampled world and display
+  records, with near-flat mean timing. All four ROMs link within their
+  existing memory guards and reproduce 30 campaign starts, 72 skirmish
+  starts, and eight cross-build custom SRAM continuations. An uncovered
+  cached range read can still resume synchronously. Qualify dense ranged
+  workloads and campaign save continuation before enabling it.
+  The packed second cutoff stays local.
   On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
   audit tracks a byte lookup
@@ -1519,6 +1528,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
   and a waiting worker taking over after an eight-mineral pickup.
   Compare contention and interruption in the shared gather path before
   changing rates. Longer queue order and gas need separate evidence.
+  An opt-in shared gather prototype advances one ready worker per patch.
+  Its P10 host tests cover handoff for all three worker types, interruption,
+  independent patches, and existing saves with overlapping mining timers.
+  Qualify ARM timing and fresh-process saves before changing the economy.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
