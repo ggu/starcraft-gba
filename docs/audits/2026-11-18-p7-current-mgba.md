@@ -161,3 +161,17 @@ release skips that change.
 | Paired P7 coordinate reuse | `a22e24caf680d768d894cd8f45b8e552631e94176799e9d3047c85f4d92b764d` |
 | Four-profile ARM save comparison | `578799c6f4f246cfa1cd8fae8182eb94283f95a5edfb52cc523238a715f2683f` |
 | Separate speed-plane trial | `0b57e84083cad0eb627919ac2d1ceba601711260f54d79eb6b3b5e391d77b7a1` |
+
+## Callback-based census experiment
+
+A separate P7 prototype combined actor and Battery integrity checks with
+the eight live Command counts. It kept the two failure paths distinct
+and passed the host count and bad-state oracles. Both ARM builds kept
+the same IWRAM and EWRAM bounds.
+
+On the terrain-default P10 replay all 1,000 frame, route and display
+observations and 11 sampled world, fog and rendered pages matched. The
+callback-based fusion increased mean guest cycles from 1,958,744 to
+1,993,740. Mean cost outside orders and sight increased by 34,850 cycles.
+The callback implementation stays outside the release. Local comparison
+SHA-256 `db2d5cd981c61d435d093c697bab0428e186e4edff3e7dd1bb5d41229b9c41aa`.
