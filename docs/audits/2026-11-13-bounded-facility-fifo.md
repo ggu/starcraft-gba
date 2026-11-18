@@ -78,3 +78,31 @@ restored state, and 60 neutral updates in a fresh emulator process. Launch
 route builds and hits are 14 and 2; they reach 16 and 519 by the save prefix.
 Both ROMs export identical 32 KiB SRAM, which remains unchanged after load
 (SHA-256 `d28f76b40d5df666ca5eba94efccc68aefad06e1e59eee5c3fbddffa0a75e6fe`).
+
+## Current P10 check: keep off (November 15)
+
+A local 128-column-only variant avoids touching smaller maps. The
+straight port exceeds Showcase's unchanged IWRAM guard by 32 bytes. A
+smaller kernel moves the cold compaction copy to ROM, advances the FIFO
+through pointers and shares its origin-found exit. It passes four
+guarded links with no extra EWRAM; Showcase ends at `0x03004fe8`, 24
+bytes below the guard. The four asset-free facility oracle vectors pass
+for the wide dispatch, legacy dispatch, all-width FIFO and forced
+overflow. The implementation and flags stay off the normal release path.
+
+On current P10 with wide point FIFO, the Command census and the typed
+save reader, the smaller facility variant wins at the same frame after
+47,194 calls. It matches 20 campaign checks, all ten briefing reveals,
+14 authored pages and 19 ordered raw state and video samples. Current
+mean update cost changes from 1,722,799 to 1,726,502 guest cycles
+(+0.21%); the maximum changes from 36,634,088 to 36,637,289. The
+older large stall savings do not transfer to this current composition.
+The current control already enables nearest-first depot selection and
+does not show those peaks. Do not assume the prior gains stack or use the
+limited IWRAM reserve on this candidate.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Current P10 replay | `b7b4338b5fc5b30b34d835762ab3754cb3483d59bd24d3cc12f16f8789922804` |
+| Candidate P10 replay | `61715d3c51d11331ed4fcee71494eaada4ab3ace0e5a9cdfdeec0e747587d5ff` |
+| Identical 19 video and state samples | `be8a3a0d003d7f23ae90082b35c294ac39f56fe0a8843aca2bbd0dcb3775be7b` |

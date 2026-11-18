@@ -115,7 +115,9 @@ opponent survives. Observe the result byte, owner-chain transfer, and
 subsequent orders and targetability before qualifying the GBA behavior.
 The [linked survivor follow-up](2026-11-13-n64-blood-bath-linked-survivors.md)
 traces loaded cargo and records a later sample without an elimination.
-Also check last buildings in transitional states, simultaneous end
+The [result cadence follow-up](2026-11-13-n64-blood-bath-result-cadence.md)
+traces scan and publication order and specifies a direct-kill controller
+witness. Also check last buildings in transitional states, simultaneous end
 conditions, and whether other maps and modes install the same records.
 No emulator session, native ROM, snapshot, or extracted content is
 part of this source change.

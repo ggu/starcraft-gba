@@ -20,6 +20,12 @@ PX_DIR := build/protoss-px
 PX_TOOL = $(PYTHON) tools/sc64_p8_arm_replay.py --mission $(1) --prefix PX
 PX_CLANG = $(CLANG) -std=c11 -O1 -g -w -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_P10_FLAGS)
 PX_SOURCES = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c
+
+# These HOST controllers record the authored HOME path and isolate steering
+# reads. Their tapes are separate from the older replacement-loop checks.
+build/px-p5-normal-home build/px-p6-normal-home: build/px-p%-normal-home: tests/sc64_p%_campaign_run.c tests/sc64_route_purity.h tests/sc64_controller_authored_pages.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-carried/Makefile | build
+	$(PX_CLANG) -DSC64_P56_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< common/gba.c $(PX_SOURCES) -o $@
+
 # $(1) name, $(2) controller source, $(3) extra source, $(4) mission, $(5) recipe writing $@.raw
 define PX_MISSION
 build/px-$(1)-controller: tests/$(2).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(PROTOSS_P10_INPUTS) common/gba.c $$(COMMON_HEADERS) mk/protoss-carried/Makefile | build

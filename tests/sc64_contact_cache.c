@@ -482,6 +482,104 @@ stock_rates(void)
         for (k = 0; k < 3; ++k) stock_one(5 + 16 * k, t, t % MAX_UNITS, (int)(t & 1u));
 }
 
+static void
+coincident_steering(void)
+{
+    memset(u, 0, sizeof(u));
+    u[0].alive = u[1].alive = 1;
+    u[0].type = u[1].type = U_MARINE;
+    u[0].raw_type = u[1].raw_type = sc64_race_raw_unit(U_MARINE);
+    u[0].order = u[1].order = ORDER_IDLE;
+    u[0].x = u[1].x = 32;
+    u[0].y = u[1].y = 32;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    assert(sc64_contact_blocked_mask(&u[0], 0) == 0xffu);
+    for (int speed = 1; speed <= 14; ++speed)
+        assert(sc64_contact_blocked_mask(&u[0], speed) == 0);
+    ++u[1].x;
+    sc64_unit_bucket_move(&u[1]);
+    /* Now an eastward step enters the actor instead of moving away. */
+    assert(sc64_contact_blocked_mask(&u[0], 1) & 1u);
+    check_mask(&u[0], 0);
+    check_mask(&u[0], 1);
+    sc64_unit_buckets_end();
+}
+
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+static void
+row_disjoint_movement(void)
+{
+    memset(u, 0, sizeof(u));
+    for (int i = 0; i < 4; ++i) {
+        u[i].alive = 1;
+        u[i].type = U_MARINE;
+        u[i].raw_type = sc64_race_raw_unit(U_MARINE);
+        u[i].order = ORDER_IDLE;
+        u[i].x = 32;
+        u[i].y = i < 2 ? 32 : 112;
+    }
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    assert(sc64_contact_blocked_mask(&u[0], 1) == 0);
+    assert(sc64_contact_blocked_mask(&u[3], 1) == 0);
+    assert(sc64_contact_memo_count == 2);
+    ++u[2].x;
+    sc64_unit_bucket_move(&u[2]);
+    assert(sc64_contact_memo_count == 1);
+    /* A different actor with the same key may still use the retained
+     * result: coincident presence cannot block a nonzero step. */
+    assert(sc64_contact_blocked_mask(&u[1], 1) == 0);
+    assert(sc64_contact_memo_count == 1);
+    assert(sc64_contact_blocked_mask(&u[3], 1) & 1u);
+    u[2].y = 32;
+    sc64_unit_bucket_move(&u[2]);
+    assert(sc64_contact_memo_count == 0);
+    assert(sc64_contact_blocked_mask(&u[1], 1) & 1u);
+    u[2].y = 112;
+    sc64_unit_bucket_move(&u[2]);
+    assert(sc64_contact_memo_count == 0);
+    assert(sc64_contact_blocked_mask(&u[1], 1) == 0);
+    check_mask(&u[0], 1);
+    check_mask(&u[3], 1);
+    sc64_unit_buckets_end();
+}
+#endif
+
+/* Actual construction arrival rather than a fixture-only mutation:
+ * the Drone leaves collision immediately, even inside the index window. */
+static void
+drone_construction_invalidates(void)
+{
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    race_mode = 1;
+    race_player[SIDE] = R_ZERG;
+    u[0].alive = u[1].alive = b[0].alive = 1;
+    u[0].owner = u[1].owner = b[0].owner = SIDE;
+    u[0].type = U_MARINE;
+    u[1].type = U_DRONE;
+    u[0].raw_type = sc64_race_raw_unit(U_MARINE);
+    u[1].raw_type = sc64_race_raw_unit(U_DRONE);
+    b[0].type = B_HATCHERY;
+    b[0].under_construction = 1;
+    u[0].order = ORDER_IDLE;
+    u[1].order = ORDER_BUILD;
+    u[1].target = 0;
+    u[0].x = 32;
+    u[1].x = b[0].x = 33;
+    u[0].y = u[1].y = b[0].y = 32;
+    supply_used = unit_supply(U_DRONE);
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    assert(sc64_contact_blocked_mask(&u[0], 1) & 1u);
+    assert(race_builder_arrived(1));
+    assert(!u[1].alive && supply_used == 0);
+    assert(sc64_contact_blocked_mask_uncached(&u[0], 1) == 0);
+    assert(sc64_contact_blocked_mask(&u[0], 1) == 0);
+    sc64_unit_buckets_end();
+}
+
 int
 main(void)
 {
@@ -489,9 +587,14 @@ main(void)
     if (trace_path) { contact_trace = fopen(trace_path, "wb"); assert(contact_trace); }
     stock_rates();
     world_passes();
+    coincident_steering();
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+    row_disjoint_movement();
+#endif
 #ifndef SC64_PERSISTENT_COLLISION
     dirty_overflow();
 #endif
+    drone_construction_invalidates();
     printf("sc64 contact cache: %lu step, %lu strict, %lu mask, %lu inactive-mask, "
            "%lu stock checks; %lu passes (%lu P6-active), %lu mutations; "
            "%lu failures\n", step_checks, strict_checks, mask_checks, inactive_mask_checks,

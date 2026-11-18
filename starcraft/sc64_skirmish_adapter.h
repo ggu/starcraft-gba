@@ -91,7 +91,7 @@ static int race_skirmish_product_producer(int type)
 #endif
 #if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && \
     defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
-    defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_P7_ACTORS)
+    defined(SC64_P7_PROJECTILES_ENABLED) && (defined(SC64_P7_ACTORS) || defined(SC64_TERRAN_CARRIER_PROBE))
         if (raw == 72 && type == U_P7_CARRIER && race_protoss_services_active())
             return B_STARGATE;
 #endif

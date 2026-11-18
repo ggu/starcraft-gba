@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../starcraft/game.c"
-#ifdef SC64_Z2_NORMAL_HOME
+#if defined(SC64_Z2_NORMAL_HOME) || defined(SC64_EARLY_PROTOSS_NORMAL_HOME)
+#define SC64_CONTROLLER_NORMAL_HOME 1
 #include "sc64_route_purity.h"
 #include "sc64_controller_authored_pages.h"
 static uint64_t controller_route_after;
@@ -108,11 +109,11 @@ static void controller_step(u16 held)
             race_event_overflow = 1;
         }
     }
-#ifdef SC64_Z2_NORMAL_HOME
+#ifdef SC64_CONTROLLER_NORMAL_HOME
     if (route_purity_hash()!=controller_route_after) abort();
 #endif
     game_update(held, held & (u16)~controller_previous);
-#ifdef SC64_Z2_NORMAL_HOME
+#ifdef SC64_CONTROLLER_NORMAL_HOME
     controller_route_after=route_purity_hash();
 #endif
     controller_previous = held;
@@ -123,7 +124,7 @@ static void controller_step(u16 held)
 static void controller_frame(u16 held)
 {
     controller_step(held);
-#ifdef SC64_Z2_NORMAL_HOME
+#ifdef SC64_CONTROLLER_NORMAL_HOME
     sc64_controller_ack_pages(controller_step, held, &controller_ticks, controller_pages);
 #endif
 }
@@ -781,7 +782,7 @@ static int controller_mission(int mission)
     controller_previous = 0; controller_ticks = 0; controller_mission_started = 0;
     race_event_count = 0; race_checkpoint_count = 0; race_event_overflow = 0;
     game_init();
-#ifdef SC64_Z2_NORMAL_HOME
+#ifdef SC64_CONTROLLER_NORMAL_HOME
     controller_route_after=route_purity_hash();
 #endif
     /* HOME → CAMPAIGN; choose the mission's faction, then mission and briefing. */
@@ -823,7 +824,7 @@ static int controller_mission(int mission)
     if (mission & 1) controller_press(KEY_DOWN);
 #endif
     controller_press(KEY_A);
-#ifdef SC64_Z2_NORMAL_HOME
+#ifdef SC64_CONTROLLER_NORMAL_HOME
     if (!sc64_controller_reveal_briefing(controller_press, mission, &controller_ticks,
                                          controller_pages)) return 0;
 #else
@@ -1119,8 +1120,12 @@ main(int argc, char **argv)
             else return 64;
         }
         if (arg != argc || controller_start_delay < 0) return 64;
-#ifdef SC64_Z2_NORMAL_HOME
+#ifdef SC64_CONTROLLER_NORMAL_HOME
+#ifdef SC64_EARLY_PROTOSS_NORMAL_HOME
+        if ((mission!=SC64_RACE_MISSION_P1 && mission!=SC64_RACE_MISSION_P2) || !race_trace_path) return 64;
+#else
         if (mission!=SC64_RACE_MISSION_Z2 || !race_trace_path) return 64;
+#endif
         controller_pages=stderr;
 #endif
         controller_result = controller_mission(mission);

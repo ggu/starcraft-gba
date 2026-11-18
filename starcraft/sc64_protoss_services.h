@@ -144,7 +144,11 @@ static inline int race_protoss_query_slot(int source_owner, int live_owner)
 static inline int race_protoss_candidate_binding(int candidate_race_mode, int mission)
 {
     if (candidate_race_mode) return SC64_PROTOSS_BIND_GENERIC;
+#ifdef SC64_CUSTOM_CARRIER_PROBE
+    (void)mission;
+#else
     if (mission == SC64_P7_GLOBAL_ID) return SC64_PROTOSS_BIND_P7;
+#endif
 #ifdef SC64_PROTOSS_LATER_BINDINGS
     if (race_protoss_later_service_mission(mission)) return SC64_PROTOSS_BIND_LATER;
 #endif

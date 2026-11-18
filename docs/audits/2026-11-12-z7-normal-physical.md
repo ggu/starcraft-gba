@@ -119,3 +119,61 @@ actual slot and frame before continuing.
 - SRAM SHA-256: `632a64001689bbbc35ae7a2ca4cea20b93c94a1187c5ee7cdb95ffe88b05662f`.
 - Save export receipt SHA-256: `bd83af7627678c2448007fc1cc095c20f40403659a69fd339032df06f8478eb6`.
 - Verified reselection and victory receipt SHA-256: `9acb1daa2cfb68a9d458cb9d66b1fc078cb3e10220c45a2a9b2114b146bb86ab`.
+
+## Uninterrupted HOME on the exact KODAK cartridge
+
+The same November 13 KODAK Z10 ROM and held-key tape now also win without
+loading a save. The physical-button observer starts at fresh HOME and
+checks 253 named observations through call 197,455 and frame 194,998.
+All five simulation-frame observations shared with the fresh SRAM route
+match in the named state, excluding the different input counters. The
+objective completed with zero hostile buildings, 13 hostile units, and
+no observed trigger fault. No authored text box interrupted the run.
+
+Use the physical command above without save or cut options, with the
+KODAK ROM and ELF hashes listed in the preceding section. The full run
+averages 1,787,077 guest cycles per update (9.39 emulated main-loop
+updates/s), including UI and presentation waits. Its peak is 58,629,570
+cycles. This qualifies the route in mGBA; the 30 fps hardware goal remains
+open.
+
+- Uninterrupted KODAK HOME receipt SHA-256: `8767402601941f660ce5cdfa31fd62f4d03c82f5fa31990d56fc945af7e45c57`.
+
+The timing counters also separate sustained load from a single stall.
+Across simulation frames 50,015–75,289 the mean is 2,385,709 cycles
+(7.03 updates/s); across 75,289–101,083 it is 2,465,591 cycles (6.80
+updates/s). The interval at frames 46,499–46,976 averages 3,753,052
+cycles across 480 updates, with 236–237 live units at its endpoints.
+That interval is exactly calls 47,758–48,237. The clock advances from
+69,130,754,997 to 70,932,219,943 cycles, and 479 of the 480 calls land
+in the highest recorded presentation bucket.
+No interval between the 253 sampled checkpoints averages under the
+561,792-cycle budget. These are whole-loop measurements, including
+menu and presentation time. Profile the 480-update interval by stage
+before attributing its cost to actor count or a specific subsystem.
+
+`tools/sc64_z7_stage_window.py --first 47758 --last 48237` can replay
+the pinned inputs above and sample every completed call in that window.
+It takes `--trace`, `--rom`, `--elf`, and `--runner` with their corresponding
+`--*-sha256` values. Its `--plan` check verified the actual ROM, ELF, tape
+and observer, all 14 counter symbols, and the 131 checkpoints through the
+window. For a replay, use `--output` with a fresh directory and omit
+`--plan`. The tool checks the prefix and endpoints and reconciles the
+sampled loop cycles with the independent accumulated counter.
+
+The stock ARM run matched all 131 prefix checkpoints and captured all
+480 calls. The 477 updates that advanced simulation averaged 3,766,477
+cycles per loop. Simulation used 3,160,442 cycles, including 2,609,769
+in movement orders (69% of the whole loop), 312,487 in other update
+work, and 228,600 in sight. Map drawing averaged 417,654 cycles.
+
+Excluding the first sample, 357 active calls with a changed route-build
+counter averaged 3,142,755 cycles in movement orders. The 119 active
+calls without a changed counter still averaged 1,025,223 in orders.
+The counter increased by 614 between the first and last samples. The
+largest loop was call 47,823 at 9,087,886 cycles, including 7,895,389 in
+orders. These counters identify where to profile next; they do not say
+which fills were avoidable or measure hardware FPS. Preserve route-cache
+semantics and compare the same dense window before promoting a change.
+
+- Dense stage receipt SHA-256: `93809b1993233b716cdc09c9b132a69a775c0e4747989045413d9d00402e72cf`.

@@ -256,6 +256,26 @@ race_impact_save_write(void)
 #if defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
     (void)previous; /* This isolated stage fences all journal calls. */
 #endif
+#ifdef SC64_ZERG_CARRIER_PROBE
+    if (race_mode) {
+        if (race_impact_count>RACE_IMPACT_ROWS || !race_p7_carrier_training_live_world_valid()) return 0;
+        u8 *wire=SC64_ZC_SCRATCH, *packet=wire+SC64_ZC_PACKET_WORK;
+        unsigned n=race_p7_projectile_encode(packet);
+        Sc64ShowcaseProjectileCandidate view={&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H};
+        if (!n || !sc64_compact_codec_validate(packet,n,SC64_POOL_CAPACITY,
+                                             race_showcase_projectile_row,&view)) return 0;
+        unsigned tail=race_impact_count ? sc64_impact_save_bytes(race_impact_count) : 0;
+        if (tail && !sc64_impact_encode(race_impact_rows,race_impact_count,wire+sizeof(RaceSave)))
+            return 0;
+        sc64_sk_transport_encode(wire+sizeof(RaceSave)+tail,&race_skirmish_transport_candidate);
+        n=sc64_zc_pack(wire,sizeof(RaceSave)+tail+SC64_TRANSPORT_TRAILER_BYTES,
+                       packet,n,wire,RACE_IMPACT_RECORD_MAX);
+        if (!n) return 0;
+        return previous ? save_write_selected(wire,n,SC64_ZERG_CARRIER_TAG,previous,
+                        race_zc_tags,sizeof(race_zc_tags)/sizeof(race_zc_tags[0])) :
+                        save_write_first(wire,n,SC64_ZERG_CARRIER_TAG);
+    }
+#endif
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
 #ifdef SC64_NUKE_SILO_JOURNAL
@@ -290,6 +310,9 @@ race_impact_save_write(void)
         SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION : SC64_GUARDIAN_TRANSPORT_SAVE_VERSION)
+#elif defined(SC64_P10_RESEARCH_EGG_SRAM_PROBE)
+#define tags sc64_p10_research_egg_tags
+#define SC64_GUARDIAN_WRITE_TAG (race_mode==1 ? SC64_RESEARCH_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG (race_data.version==SC64_SHARED_EGG_SAVE_VERSION ? SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
@@ -298,6 +321,12 @@ race_impact_save_write(void)
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    ,SC64_SHOWCASE_CARRIER_TAG
+#endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    ,SC64_TERRAN_CARRIER_TAG
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     ,SC64_NUKE_SILO_TRANSPORT_TAG
 #endif
@@ -311,7 +340,9 @@ race_impact_save_write(void)
 #endif
 #endif
 };
-#ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+#define SC64_GUARDIAN_WRITE_TAG SC64_SHOWCASE_CARRIER_TAG
+#elif defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL)
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
 #define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION : SC64_RESEARCH_CAMPAIGN_JOBS_TRANSPORT_SAVE_VERSION)
@@ -330,6 +361,22 @@ race_impact_save_write(void)
 #endif
     sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
                              &race_skirmish_transport_candidate);
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    if (race_mode) {
+        if (!race_p7_carrier_training_live_world_valid()) return 0;
+        unsigned packet=race_p7_projectile_encode(race_tc_packet);
+        Sc64ShowcaseProjectileCandidate view={&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H};
+        if (!packet || !sc64_compact_codec_validate(race_tc_packet,packet,SC64_POOL_CAPACITY,
+                                       race_showcase_projectile_row,&view)) return 0;
+        unsigned wire=sc64_tc_pack((const u8 *)&race_impact_record,
+            offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,race_tc_packet,packet,
+            (u8 *)&race_impact_record,sizeof(race_impact_record));
+        if (!wire) return 0;
+        return previous ? save_write_selected(&race_impact_record,wire,SC64_TERRAN_CARRIER_TAG,
+                    previous,tags,sizeof(tags)/sizeof(tags[0])) :
+                    save_write_first(&race_impact_record,wire,SC64_TERRAN_CARRIER_TAG);
+    }
+#endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     (void)previous; (void)tags;
     if (!race_q8_flash_write(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;
@@ -385,6 +432,9 @@ race_impact_save_write(void)
         SC64_GUARDIAN_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION,
         SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG (race_mode ? SC64_GUARDIAN_EGG_TRANSPORT_SAVE_VERSION : SC64_GUARDIAN_TRANSPORT_SAVE_VERSION)
+#elif defined(SC64_P10_RESEARCH_EGG_SRAM_PROBE)
+#define tags sc64_p10_research_egg_tags
+#define SC64_GUARDIAN_WRITE_TAG (race_mode==1 ? SC64_RESEARCH_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
 #elif defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG (race_data.version==SC64_SHARED_EGG_SAVE_VERSION ? SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION : SC64_TRANSPORT_SAVE_VERSION)
@@ -393,6 +443,9 @@ race_impact_save_write(void)
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
+#ifdef SC64_ZERG_CARRIER_PROBE
+    ,SC64_ZERG_CARRIER_TAG
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     ,SC64_NUKE_SILO_TRANSPORT_TAG
 #endif
@@ -455,6 +508,9 @@ race_impact_save_write(void)
 #endif
 #endif
 #undef SC64_SILO_COMMIT_TAG
+#ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
+#undef tags
+#endif
     return 1;
 }
 
@@ -475,6 +531,11 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     int rows;
     *count = 0;
     if (len > (u32)sizeof(race_impact_record)) return 0;
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    int predecessor=selected_tag!=SC64_SHOWCASE_CARRIER_TAG;
+    if (len>RACE_IMPACT_RECORD_MAX) return 0;
+    if (!predecessor) selected_tag=SC64_TRANSPORT_SAVE_VERSION;
+#endif
 #ifdef SC64_SHARED_TRANSPORT
 #if defined(SC64_WORKER_CARGO_KIND)
     if ((selected_tag != SC64_TRANSPORT_SAVE_VERSION && selected_tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION) || len < SC64_TRANSPORT_TRAILER_BYTES) return 0;
@@ -496,7 +557,11 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
 #endif
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-    const u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES;
+    const u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+        - (predecessor ? SC64_SHOWCASE_PROJECTILE_EXTENSION : 0u)
+#endif
+        ;
     Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT] = {{0}};
     u32 offset = base, mask = 0, impact_bytes;
     int legacy = selected_tag == SC64_LEGACY_SAVE_VERSION;
@@ -532,10 +597,22 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     if (impact_bytes > sizeof(race_impact_record.impacts)) return 0;
     memmove(race_impact_record.impacts, (u8 *)&race_impact_record + offset, impact_bytes);
     memcpy(race_data.battlecruiser_shots, shots, sizeof(shots));
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    /* Both legacy queues were moved out of this range before normalizing. */
+    if (predecessor) {
+        race_data.interceptor_size=2;
+        memset(race_data.interceptor_projectiles,0,sizeof(race_data.interceptor_projectiles));
+    }
+#endif
     if (!impact_bytes) return 1;
     rows = sc64_impact_decode(race_impact_record.impacts, impact_bytes,
                               RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
-                              SC_RU_COUNT, candidate);
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+                              predecessor ? U_P7_INTERCEPTOR : SC_RU_COUNT,
+#else
+                              SC_RU_COUNT,
+#endif
+                              candidate);
 #else
     (void)selected_tag; /* Version validation remains in race_load_game. */
     if (len < sizeof(RaceSave)) return 0;
@@ -558,6 +635,9 @@ static int race_impact_save_decode_selected_guardian(u32 len,u32 tag,Sc64ImpactE
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
         (auth->features & ~(SC64_STAGE_SAVE_GUARDIAN|SC64_STAGE_SAVE_EGG)) ||
         tag!=(auth->features ? SC64_TRANSPORT_SAVE_VERSION : auth->outer)) return 0;
+#elif defined(SC64_P10_RESEARCH_EGG_SRAM_PROBE)
+        (auth->features & ~SC64_STAGE_SAVE_EGG) ||
+        tag!=race_p10_research_egg_impact_tag(auth)) return 0;
 #elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
         (auth->features & ~SC64_STAGE_SAVE_EGG) ||
         tag!=((auth->features & SC64_STAGE_SAVE_EGG) ?

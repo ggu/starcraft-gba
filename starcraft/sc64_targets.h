@@ -63,13 +63,11 @@ sc64_target_cell_for(int x, int y, int *cell)
     return 1;
 }
 
-static int GBA_HOT
-sc64_target_insert(int entity, int owner, int x, int y)
+/* The caller has validated the owner and position and computed the cell. */
+static inline __attribute__((always_inline)) int
+sc64_target_link_cell(int entity, int owner, int cell, int x, int y)
 {
-    int cell;
-    Sc64TargetIndex old;
-    if (owner < 0 || owner >= 5 || !sc64_target_cell_for(x, y, &cell)) return 0;
-    old = sc64_target_head[owner][cell];
+    Sc64TargetIndex old = sc64_target_head[owner][cell];
     if (old == SC64_TARGET_NONE) {
         if (sc64_target_dirty_count >= SC64_TARGET_DIRTY_CAPACITY) {
             sc64_target_dirty_overflowed = 1;
@@ -85,10 +83,28 @@ sc64_target_insert(int entity, int owner, int x, int y)
     sc64_target_head[owner][cell] = (Sc64TargetIndex)entity;
     sc64_target_cell[entity] = (u16)cell;
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
-    sc64_target_owner_columns[owner] |= (u32)1u << (x >> 6);
-    sc64_target_owner_rows[owner] |= (u32)1u << (y >> 6);
+#ifdef SC64_TARGET_FAST_LINK_PROBE
+    /* A nonempty cell was already linked for this owner. Its axis bits
+     * stay set until the same clear that empties the cell. */
+    if (old == SC64_TARGET_NONE)
+#endif
+    {
+        sc64_target_owner_columns[owner] |= (u32)1u << (x >> 6);
+        sc64_target_owner_rows[owner] |= (u32)1u << (y >> 6);
+    }
+#else
+    (void)x;
+    (void)y;
 #endif
     return 1;
+}
+
+static int GBA_HOT
+sc64_target_insert(int entity, int owner, int x, int y)
+{
+    int cell;
+    if (owner < 0 || owner >= 5 || !sc64_target_cell_for(x, y, &cell)) return 0;
+    return sc64_target_link_cell(entity, owner, cell, x, y);
 }
 
 static void
@@ -139,6 +155,18 @@ sc64_target_index_begin(void)
     sc64_target_index_active = 1;
 }
 
+#ifdef SC64_TARGET_BULK_REBUILD_PROBE
+static inline __attribute__((always_inline)) int
+sc64_target_link_in_world(int entity, int owner, int x, int y,
+                         unsigned width, unsigned height)
+{
+    if ((unsigned)x >= width || (unsigned)y >= height) return 0;
+    return sc64_target_link_cell(entity, owner,
+                                 (x >> 6) + (y >> 6) * SC64_TARGET_GRID_COLS,
+                                 x, y);
+}
+#endif
+
 /* Only use immediately after update_orders builds and validates these lists.
  * Each list is ascending by slot; unit entries precede building entries for
  * each owner, preserving insertion and tie order within every owner cell. */
@@ -150,11 +178,35 @@ static void
 sc64_target_index_begin_owner_lists(void)
 {
     sc64_target_index_clear();
+#ifdef SC64_TARGET_BULK_REBUILD_PROBE
+    const int width = WORLD_W, height = WORLD_H;
+    if (width <= 0 || height <= 0 ||
+        width > SC64_TARGET_GRID_COLS * SC64_TARGET_CELL_SIZE ||
+        height > SC64_TARGET_GRID_ROWS * SC64_TARGET_CELL_SIZE) {
+        /* The stock per-entry checks accept an empty index even when the
+         * geometry would reject its first entry. */
+        for (int owner = 0; owner < 5; ++owner)
+            if (target_unit_head[owner] >= 0 || target_building_head[owner] >= 0)
+                return;
+        sc64_target_index_active = 1;
+        return;
+    }
+#endif
     for (int owner = 0; owner < 5; ++owner) {
         for (int i = target_unit_head[owner]; i >= 0; i = target_unit_next[i])
+#ifdef SC64_TARGET_BULK_REBUILD_PROBE
+            if (!sc64_target_link_in_world(i, owner, u[i].x, u[i].y,
+                                          width, height)) return;
+#else
             if (!sc64_target_insert(i, owner, u[i].x, u[i].y)) return;
+#endif
         for (int i = target_building_head[owner]; i >= 0; i = target_building_next[i])
+#ifdef SC64_TARGET_BULK_REBUILD_PROBE
+            if (!sc64_target_link_in_world(MAX_UNITS + i, owner, b[i].x, b[i].y,
+                                          width, height)) return;
+#else
             if (!sc64_target_insert(MAX_UNITS + i, owner, b[i].x, b[i].y)) return;
+#endif
     }
     sc64_target_index_active = 1;
 }
@@ -173,8 +225,20 @@ sc64_target_index_move(Unit *q)
         return;
     }
     if (sc64_target_cell[entity] == cell) return;
+#ifdef SC64_TARGET_FAST_LINK_PROBE
+    const int owner = q->owner;
+    if ((unsigned)owner >= 5u) {
+        sc64_target_index_active = 0;
+        return;
+    }
+    /* cell_for already checked this position against the live map.
+     * Relink directly; a dirty-list overflow still disables the index. */
+    sc64_target_remove(entity, owner);
+    (void)sc64_target_link_cell(entity, owner, cell, q->x, q->y);
+#else
     sc64_target_remove(entity, q->owner);
     if (!sc64_target_insert(entity, q->owner, q->x, q->y)) sc64_target_index_active = 0;
+#endif
 }
 
 static void

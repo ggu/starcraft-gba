@@ -47,3 +47,28 @@ physical GBA frame-rate measurement.
 
 This qualifies one complete route from HOME. The replay did not test
 loading a save on the Z10 cartridge.
+
+## Exact November 13 KODAK cartridge
+
+The same held-key tape also won on the exact `cbba1c5` KODAK Z10
+cartridge from fresh HOME. All 19 host observations matched across 16
+named fields. The run used 46,487 tape calls and 46,501 physical
+calls, including seven authored dialogue acknowledgments. It issued
+the tape's ordinary pause-menu save and did not load SRAM.
+
+Victory occurred at frame 45,468 with both objective Nexuses destroyed,
+Kerrigan at 400 HP, the human scheduler outcome set to victory, the
+objective and campaign completion bits set, and zero faults. Mean loop
+cost was 1,229,243 guest cycles (13.65 emulated updates per second).
+This verifies one route on the existing ROM; it does not qualify
+hardware speed or a fresh save continuation.
+
+| Pinned input or receipt | SHA-256 |
+| --- | --- |
+| KODAK Z10 ROM | `e23e85d72041951e09c25e0b49111538c35ce174b4875aa4aed51143dfdfc907` |
+| Matching ELF | `74c4b2394c4aee619bf2ea0549c31de7987827a915c32c5c50e7a4fec58ad6c1` |
+| Port-free observer | `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549` |
+| Guard center plan | `5f899fffa2d96000071ac5671d4cdd6da2af59925b21e794391cf3154ae554f9` |
+| Replay harness | `c4335751285134f2fe83864ccad228a0503c8a993a96012463f5ac3800f0c73e` |
+| Full physical receipt | `6a5ad24890bbf7ce333ff6b6450d9d0b44542fb653fab3b300b9a09c5a31b6df` |
+| Ordered checkpoints | `3b13b9c953e1af58f2bbec9e452ed078acd4825219c37697202fa2c19457e303` |

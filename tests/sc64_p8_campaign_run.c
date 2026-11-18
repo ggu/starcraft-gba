@@ -24,24 +24,69 @@
 
 static FILE *trace;
 static u16 prior;
-static unsigned host_tick;
+static unsigned long host_tick;
+#ifdef SC64_P8_NORMAL_HOME
+#include "sc64_route_purity.h"
+#include "sc64_controller_authored_pages.h"
+static uint64_t route_after;
+static int hero(int raw);
+static unsigned last_hero_sample;
+static int prior_fenix_hp=-2, prior_hyperion_hp=-2;
 
-static void input(u16 held)
+static void observe_heroes(void)
+{
+    if (race_selected_mission != 27 || screen == SCREEN_TITLE) return;
+    int f=hero(78), h=hero(28);
+    int fh=f<0?-1:u[f].hp, hh=h<0?-1:u[h].hp;
+    if (fh==prior_fenix_hp && hh==prior_hyperion_hp &&
+        host_tick-last_hero_sample<240 && !won && !lost) return;
+    prior_fenix_hp=fh; prior_hyperion_hp=hh; last_hero_sample=host_tick;
+    fprintf(stderr,"hero call=%lu frame=%d result=%d/%d cursor=%d,%d menu=%d/%d selected=%d\n",
+            host_tick,frame,won,lost,cx,cy,menu_open,menu_cursor,selected_count());
+    for (int k=0;k<2;k++) {
+        int i=k?h:f;
+        if(i<0) { fprintf(stderr,"hero raw=%d absent\n",k?28:78); continue; }
+        fprintf(stderr,"hero raw=%d slot=%d owner=%d source=%d hp=%d shield=%d pos=%d,%d order=%d target=%d\n",
+                u[i].raw_type,i,u[i].owner,u[i].raw_owner,u[i].hp,u[i].shield,
+                u[i].x,u[i].y,u[i].order,u[i].target);
+    }
+}
+#endif
+
+static void step(u16 held)
 {
     /* Once the mission ends, later calls are not inputs: the trace stops at
      * the deciding call, so a replay ends there too. */
     if(screen==SCREEN_RESULT||won||lost)return;
     u16 pressed=(u16)(held & (u16)~prior);
     int changed=held!=prior;
-    unsigned call_index=host_tick;
+    unsigned long call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
+#ifdef SC64_P8_NORMAL_HOME
+    assert(route_purity_hash()==route_after);
+#endif
     game_update(held,pressed);
+#ifdef SC64_P8_NORMAL_HOME
+    route_after=route_purity_hash();
+#endif
     prior=held;
     ++host_tick;
     if(trace && changed)
-        fprintf(trace,"{\"kind\":\"input\",\"call_index\":%u,\"frame_before\":%u,\"frame_after\":%u,\"held\":%u,\"pressed\":%u}\n",
+        fprintf(trace,"{\"kind\":\"input\",\"call_index\":%lu,\"frame_before\":%u,\"frame_after\":%u,\"held\":%u,\"pressed\":%u}\n",
             call_index,frame_before,(unsigned)frame,(unsigned)held,(unsigned)pressed);
 }
+
+static void input(u16 held)
+{
+    step(held);
+#ifdef SC64_P8_NORMAL_HOME
+    sc64_controller_ack_pages(step,held,&host_tick,stderr);
+    observe_heroes();
+#endif
+}
+#ifdef SC64_P8_NORMAL_HOME
+static void briefing_press(u16 key) { KEY_TAP(key); }
+#endif
 
 /* Read-only route query over the engine's current walkability plane. */
 static int waypoint_to(int sx,int sy,int tx,int ty,int *wx,int *wy,int *distance_out)
@@ -634,7 +679,7 @@ static void census(const char *label)
         battery_energy+=b[i].queue_progress/256;
     for(int i=0;i<MAX_UNITS;i++)enemy+=u[i].alive&&u[i].owner==ENEMY;
     for(int i=0;i<MAX_BUILDINGS;i++)enemy_b+=b[i].alive&&b[i].owner==ENEMY;
-    fprintf(trace,"{\"kind\":\"checkpoint\",\"label\":\"%s\",\"frame\":%u,\"call_index\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,"
+    fprintf(trace,"{\"kind\":\"checkpoint\",\"label\":\"%s\",\"frame\":%u,\"call_index\":%lu,\"screen\":%d,\"won\":%d,\"lost\":%d,"
         "\"side_units\":%d,\"army\":%d,\"probes\":%d,\"enemy_units\":%d,\"enemy_buildings\":%d,"
         "\"stasis_hp\":%d,\"fenix\":[%d,%d,%d],\"hyperion\":[%d,%d,%d],\"bank\":[%d,%d],\"supply\":[%d,%d],"
         "\"gateways\":%d,\"cursor\":[%d,%d],\"triggers_done\":[%u,%u,%u],\"outcome\":%u,\"fault\":[%u,%u,%u],"
@@ -662,10 +707,18 @@ int main(int argc,char **argv)
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
     fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":27,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n",P8_CONTROLLER_PROFILE);
     game_init();prior=0;
+#ifdef SC64_P8_NORMAL_HOME
+    route_after=route_purity_hash();
+#endif
     assert(screen==SCREEN_TITLE&&race_front.page==SC_FRONT_HOME);
     /* Campaign, page 4 of the two-entry mission list, second row, briefing. */
     KEY_TAP(KEY_A);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);
-    KEY_TAP(KEY_DOWN);KEY_TAP(KEY_A);KEY_TAP(KEY_START);
+    KEY_TAP(KEY_DOWN);KEY_TAP(KEY_A);
+#ifdef SC64_P8_NORMAL_HOME
+    assert(sc64_controller_reveal_briefing(briefing_press,27,&host_tick,stderr));
+#else
+    KEY_TAP(KEY_START);
+#endif
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==27);
     census("launch");
     for(int i=0;i<MAX_UNITS;i++)pending_since[i]=-1;
@@ -734,14 +787,14 @@ int main(int argc,char **argv)
             FILE *sf=fopen(save_path,"wb");
             if(!sf||fwrite(host_save,1,sizeof(host_save),sf)!=sizeof(host_save)){perror(save_path);return 2;}
             fclose(sf);
-            fprintf(trace,"{\"kind\":\"save\",\"frame\":%u,\"first_call\":%u,\"resume_call\":%u,\"paused\":%d,\"screen\":%d,\"under_construction\":%d,\"menu_last\":%d}\n",
+            fprintf(trace,"{\"kind\":\"save\",\"frame\":%u,\"first_call\":%u,\"resume_call\":%lu,\"paused\":%d,\"screen\":%d,\"under_construction\":%d,\"menu_last\":%d}\n",
                 (unsigned)frame,first,host_tick,paused,screen,building,menu_last);
             census("saved");
         }
-#ifndef SC64_NEAREST_RESOURCE_DEPOT
-        /* A hero with an enemy in Scarab range steps to the walkable spot
-         * near the Nexus farthest from every enemy; Protoss hit points do
-         * not regenerate. (The nearest-depot economy parks Fenix instead.) */
+#if !defined(SC64_NEAREST_RESOURCE_DEPOT) || defined(SC64_P8_NORMAL_HOME)
+        /* A hero within Scarab range steps to the walkable spot near the
+         * Nexus farthest from enemies. Keep this emergency retreat available
+         * for the ordinary HOME controller even when Fenix parks early. */
         if(frame>=next_evade&&home>=0){
             int heroes[2]={f,h};
             for(int k=0;k<2;k++){
@@ -767,7 +820,16 @@ int main(int argc,char **argv)
                     best=clear;ex=x;ey=y;
                 }
                 if(best<=enemy_clearance(u[z].x,u[z].y))ex=-1;
-                if(ex>=0&&dist2(u[z].tx,u[z].ty,ex,ey)>48*48)(void)hero_command(z,ex,ey);
+                if(ex>=0&&dist2(u[z].tx,u[z].ty,ex,ey)>48*48) {
+#ifdef SC64_P8_NORMAL_HOME
+                    unsigned long call=host_tick;
+                    int issued=hero_command(z,ex,ey);
+                    fprintf(stderr,"retreat call=%lu..%lu slot=%d goal=%d,%d issued=%d\n",
+                            call,host_tick,z,ex,ey,issued);
+#else
+                    (void)hero_command(z,ex,ey);
+#endif
+                }
                 next_hero=frame+180;
             }
             next_evade=frame+150;
@@ -1053,7 +1115,7 @@ int main(int argc,char **argv)
     census("final");
     fclose(trace);
     printf("state: screen=%d menu_open=%d mode=%d src_pause=%u sel=%d selb=%d help=%d toast=%d\n",screen,menu_open,mode,race_p8.source_pause_active,selected_count(),selected_building,help,toast_timer);
-    printf("p8 controller: frame=%u calls=%u won=%d lost=%d screen=%d fault=%u/%u/%u\n",
+    printf("p8 controller: frame=%u calls=%lu won=%d lost=%d screen=%d fault=%u/%u/%u\n",
            (unsigned)frame,host_tick,won,lost,screen,race_p8.runtime[0].fault,
            race_p8.runtime[1].fault,race_p8.runtime[2].fault);
     return won?0:1;

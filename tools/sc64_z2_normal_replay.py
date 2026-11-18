@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Read-only normal Z10 replay of the Z2 HOME controller and its authored pages."""
+"""Read-only normal ROM replay of Z2 or P1/P2 HOME input and authored pages."""
 import argparse
 from collections import defaultdict
+from hashlib import sha256
 import json
 from pathlib import Path
 import resource
@@ -14,6 +15,59 @@ from sc64_skirmish_sram_continuation import BUILDING_FIELDS, UNIT_FIELDS, Physic
 from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta, timing_snapshot
 
 
+# Bound the authenticated, all-neutral HOST controller unwind after WIN.
+MAX_TERMINAL_NEUTRAL_CALLS = 5
+
+
+def p10_campaign_journal(data, layout, mission, frame):
+    """Authenticate one ordinary P10 campaign journal before title-L replay."""
+    slot = 16384
+    if len(data) != 2 * slot or data[slot:] != b"\xff" * slot:
+        raise ValueError("expected one fresh P10 SRAM bank")
+    tag, size, checksum, sequence = struct.unpack_from("<4I", data)
+    if tag != 0x7643505F or sequence != 1 or not 0 < size <= slot - 16:
+        raise ValueError("unsupported fresh P10 campaign envelope")
+    payload = data[16:16 + size]
+    h = 2166136261
+    for byte in payload:
+        h = ((h ^ byte) * 16777619) & 0xffffffff
+    if h != checksum:
+        raise ValueError("P10 SRAM checksum differs")
+    _, fields = layout
+    version, state = fields["version"], fields["state"]
+    if (fields.widths.get("version") != 4 or fields.arrays.get("state") != (32, 4, True)
+            or not 0 <= version <= size - 4 or not 0 <= state <= size - 128):
+        raise ValueError("unrecognized RaceSave layout")
+    words = struct.unpack_from("<32I", payload, state)
+    if struct.unpack_from("<I", payload, version)[0] != 0x7243505F or (
+            words[0], words[2], words[7]) != (0, mission, frame):
+        raise ValueError("P10 SRAM identity differs from live save cut")
+    return dict(frame=frame, sequence=sequence, tag=hex(tag), bytes=size,
+                sha256=sha256(data).hexdigest())
+
+
+def terminal_modal_release(call, stop, keys, checks, modal, frame, final):
+    """Recognize the final HOST neutral bookkeeping update after a modal WIN."""
+    count, _, armed, _ = modal
+    if (not 1 <= stop - call <= MAX_TERMINAL_NEUTRAL_CALLS
+            or keys.get(call) != 0
+            or any(keys.get(tick, 0) != 0 or checks.get(tick)
+                   for tick in range(call + 1, stop + 1))
+            or count or armed
+            or frame != final["frame"] or final["won"] != 1 or final["lost"]):
+        return False
+    for kind, *row in checks.get(call - 2, ()):
+        if kind != "modal":
+            continue
+        frozen, box, page, _, _, held, key = row
+        if (held and keys.get(call - 2) == held | key
+                and keys.get(call - 1) == held and frozen == frame
+                and ("armed", frame, box, page, key) in checks.get(call - 1, ())
+                and ("released", frame) in checks.get(call, ())):
+            return True
+    return False
+
+
 def run(args):
     if not __debug__:
         raise RuntimeError("Replay checks require Python assertions")
@@ -22,17 +76,29 @@ def run(args):
     files.append(args.pages)
     pins = input_hashes(files)
     data = json.loads(args.trace.read_text())
-    for key, value in dict(event_overflow=0, mission=1, race_selected_mission=1,
-                           race_human=1, race_mode=0, race_completed=2).items():
+    mission = args.mission
+    human = 1 if mission == 1 else 2
+    if args.pins:
+        for path, expected in zip(files[:4] + [args.pages], args.pins):
+            if pins[str(path.resolve())] != expected:
+                raise ValueError(f"SHA-256 mismatch: {path}")
+    for key, value in dict(event_overflow=0, mission=mission, race_selected_mission=mission,
+                           race_human=human, race_mode=0, race_completed=1 << mission).items():
         assert data[key] == value
     final = data["expected"]
-    for key, value in dict(screen=3, won=1, lost=0, phase=3, objective_flags=17,
-                           chrysalis_owner=0, chrysalis_alive=1).items():
+    outcome = dict(screen=3, won=1, lost=0, phase=3)
+    if mission == 1:
+        outcome.update(objective_flags=17, chrysalis_owner=0, chrysalis_alive=1)
+    else:
+        outcome.update(rescue_owner=0, rescue_alive=1)
+    for key, value in outcome.items():
         assert final[key] == value
     stop = data["total_ticks"]
     assert type(stop) is int and 1000 < stop < 128000
     events = [(r["tick"], r["held"]) for r in data["events"]]
-    assert events[:6] == [(0, 1), (1, 0), (2, 128), (3, 0), (4, 1), (5, 0)]
+    opening = [1,0,1,0] if mission == 2 else [1,0,128,0,1,0]
+    assert events[:len(opening)] == list(enumerate(opening))
+    assert all(a[0] < b[0] and a[1] != b[1] for a,b in zip(events,events[1:]))
     assert all(type(i) is int and type(k) is int and 0 <= i < stop for i, k in events)
     keys = dict(events)
     checks = defaultdict(list)
@@ -41,6 +107,8 @@ def run(args):
     briefing = []
     for line in args.pages.read_text().splitlines():
         fields = line.split()
+        if not fields or not fields[0].isdigit():
+            continue
         call = int(fields[0])
         assert 6 <= call < stop
         if fields[1] == "briefing":
@@ -55,10 +123,28 @@ def run(args):
             checks[call].append(("modal", frame, row, page, trigger, action, held, key))
             checks[call+1].append(("armed", frame, row, page, key))
             checks[call+2].append(("released", frame))
-    assert len(briefing) == 6 and all(n == len(briefing) for n in briefing)
+    assert 0 < len(briefing) <= 32 and all(n == len(briefing) for n in briefing)
     authored = [(check[2],check[3],check[4],check[5]) for call in sorted(checks)
                 for check in checks[call] if check[0] == "modal"]
-    assert authored == [(1,0,2,0), (1,1,2,0), (0,0,1,0)]
+    if mission == 1:
+        assert authored == [(1,0,2,0), (1,1,2,0), (0,0,1,0)]
+    save_window = getattr(args, "save_window", None)
+    if save_window:
+        lo, hi = save_window
+        if mission == 1 or not 1 <= lo <= hi < stop or hi - lo > 1024 or (
+                args.stop is not None and hi >= args.stop):
+            raise ValueError("fresh save requires a bounded live P1/P2 window before the stop")
+    if args.plan:
+        print(json.dumps(dict(mission=mission,calls=stop,edges=len(events),checkpoints=len(checkpoints)+1,
+                              briefings=len(briefing),authored=authored,save_window=save_window,
+                              sha256=pins),indent=2))
+        return
+    stop_at=args.stop or stop
+    assert 1 <= stop_at <= stop
+    if args.out is None:
+        raise ValueError("--out is required to replay")
+    if shutil.disk_usage(args.out.parent).free < int(5.25 * 1024**3):
+        raise RuntimeError("launch requires 5.25 GiB free")
     campaign = dwarf_struct_layout(args.elf, "Sc64RaceCampaignState")[1]
     u = {k: i + 1 for i, k in enumerate(UNIT_FIELDS)}
     b = {k: i + 1 for i, k in enumerate(BUILDING_FIELDS)}
@@ -67,8 +153,10 @@ def run(args):
     guest = args.out / "guest"
     guest.mkdir()
     (guest / "headless.log").symlink_to("/dev/null")
-    g = PhysicalGame(args.runner, args.rom, args.elf, guest)
+    save_path = args.out / "campaign.sav" if save_window else None
+    g = PhysicalGame(args.runner, args.rom, args.elf, guest, save_output=save_path)
     r = g.rsp
+    saved = None
 
     def n(k):
         return int.from_bytes(r.read(g.sym[k], g.sizes[k]), "little")
@@ -105,19 +193,48 @@ def run(args):
                     side_buildings=sum(x[b["owner"]]==0 for x in buildings),
                     enemy_buildings=sum(x[b["owner"]]==1 for x in buildings))
 
+    def continuation_world():
+        data = g.state()
+        data.pop("screen")
+        rows = r.read(g.sym["u"], g.sizes["u"])
+        offset = g.unit_layout["selected"]
+        width = g.unit_layout.widths["selected"]
+        selection = [slot for (slot, *_) in data["units"] if any(
+            rows[slot*g.unit_stride + offset:slot*g.unit_stride + offset + width])]
+        state = observe()
+        state.pop("screen")
+        return dict(world=data, campaign=state, selection=selection,
+                    cursor=[n("cx"), n("cy")], train=n("train_type"))
+
     try:
         assert n("screen") == n("frame") == g.front_field("page") == 0
         start = timing_snapshot(r, g.sym, g.sizes)
         pages, reveals, observations = [], [], []
-        for call in sorted(set(checks) | set(checkpoints) | {stop}):
-            assert shutil.disk_usage(args.out).free >= 4 * 1024**3
-            r.play_to(call, events)
-            for check in checks[call]:
+        boundaries = set(checks) | set(checkpoints) | {stop_at}
+        if mission != 1:
+            # The runner cannot stop a batch when RESULT or a modal opens.
+            # Never let a later tape edge restart a failed attempt.
+            boundaries.update(range(1, stop_at + 1))
+        terminal_release = None
+        terminal_snapshot = None
+        for call in sorted(n for n in boundaries if n <= stop_at):
+            if call % 500 == 0 or call == stop_at:
+                if shutil.disk_usage(args.out).free < int(4.15 * 1024**3):
+                    (args.out/"partial.json").write_text(json.dumps(dict(call=call, observations=observations,
+                        briefing=reveals, pages=pages, sha256=pins), indent=2))
+                    raise RuntimeError("runtime disk floor reached")
+            if mission == 1:
+                r.play_to(call, events)
+            else:
+                if call-1 in keys:
+                    r.set_keys(keys[call-1])
+                r._advance(1)
+            for check in checks.get(call, ()):
                 kind, *row = check
                 count, page, armed, current = struct.unpack("<4H", r.read(0x06013fe0, 8))
                 if kind == "briefing":
                     assert (g.front_field("page"),g.front_field("mission"),
-                            g.front_field("briefing_revealed"),n("screen")) == (3,1,1,0)
+                            g.front_field("briefing_revealed"),n("screen")) == (3,mission,1,0)
                     assert [g.front_field("briefing_page"),g.front_field("briefing_pages")] == row
                     reveals.append([call,*row])
                 elif kind == "modal":
@@ -130,6 +247,25 @@ def run(args):
                     assert count and (page,armed,current,n("frame")) == (expected_page,key,expected_row,frame)
                 else:
                     assert kind == "released" and not armed and n("frame") == row[0]
+            if terminal_snapshot is not None:
+                actual = observe()
+                count, _, armed, _ = struct.unpack("<4H", r.read(0x06013fe0, 8))
+                if actual != terminal_snapshot or r.held or count or armed:
+                    (args.out/"divergence.json").write_text(json.dumps(
+                        dict(call=call, terminal_before=terminal_snapshot, terminal_after=actual,
+                             held=r.held, modal_count=count, modal_armed=armed), indent=2))
+                    raise RuntimeError(f"terminal state changed during neutral tail at call {call}")
+            elif mission != 1 and call < stop and n("screen") == 3:
+                actual = observe()
+                active = struct.unpack("<4H", r.read(0x06013fe0, 8))
+                differences = {k: [v, actual[k]] for k, v in final.items() if actual[k] != v}
+                if differences or not terminal_modal_release(call, stop, keys, checks, active,
+                                                              actual["frame"], final):
+                    (args.out/"divergence.json").write_text(json.dumps(
+                        dict(call=call, unexpected_result=actual, differences=differences), indent=2))
+                    raise RuntimeError(f"unexpected RESULT at call {call}")
+                terminal_release = call
+                terminal_snapshot = actual
             if call in checkpoints or call == stop:
                 assert not int.from_bytes(r.read(0x06013fe0, 2), "little"), (call, "unacknowledged modal")
                 expected = final if call == stop else checkpoints[call]
@@ -139,19 +275,73 @@ def run(args):
                     (args.out/"divergence.json").write_text(json.dumps(dict(call=call, differences=mismatches),indent=2))
                     raise RuntimeError(f"Z2 diverged at call {call}: {mismatches}")
                 observations.append({k:actual[k] for k in expected})
-                print(f"Matched Z2 call {call}, frame {actual['frame']}",flush=True)
+                print(f"Matched mission {mission} call {call}, frame {actual['frame']}",flush=True)
+            if save_window and not saved and lo <= call <= hi and (
+                    not r.held and call not in checks and n("screen") == 1
+                    and n("frame") > 0 and n("selected_building") == 0xffffffff
+                    and n("mode") == n("menu_open") == n("box_state") == 0
+                    and r.read(0x06013fe0, 2) == b"\0\0"):
+                before = continuation_world()
+                g.tap(8)
+                assert n("screen") == 2 and n("frame") == before["world"]["frame"]
+                g.step(2)
+                assert n("screen") == 2 and n("frame") == before["world"]["frame"]
+                assert continuation_world() == before, "pause save changed persistent campaign state"
+                r.export_sram()
+                layout = dwarf_struct_layout(args.elf, "RaceSave")
+                saved = p10_campaign_journal(save_path.read_bytes(), layout,
+                                             mission, before["world"]["frame"])
+                g.close()
+                g = None
+                g = PhysicalGame(args.runner, args.rom, args.elf, args.out / "fresh",
+                                 save_input=save_path)
+                r = g.rsp
+                assert n("screen") == n("frame") == g.front_field("page") == 0
+                g.step(512)
+                after = continuation_world()
+                if n("screen") != 1 or after != before:
+                    changed = [key for key in before if before[key] != after[key]]
+                    (args.out/"save-mismatch.json").write_text(json.dumps(
+                        dict(call=call, screen=n("screen"), changed=changed,
+                             before=before, after=after), indent=2)+"\n")
+                    raise RuntimeError(f"fresh title L differed at call {call}: {changed}")
+                # The load has held L; the next tape call must set the keys
+                # even when it does not introduce a new archived transition.
+                r.set_keys(0)
+                saved.update(call=call, fresh_load_verified=True, units=len(before["world"]["units"]),
+                             buildings=len(before["world"]["buildings"]), selection=before["selection"])
+                (args.out/"save-cut.json").write_text(json.dumps(saved, indent=2)+"\n")
+                print(f"Fresh title L matched mission {mission} call {call}, frame {saved['frame']}",flush=True)
+            if save_window and not saved and call == hi:
+                raise RuntimeError("no ordinary neutral save cut in the requested window")
+        if save_window:
+            assert saved and sha256(save_path.read_bytes()).hexdigest() == saved["sha256"]
         require_unchanged(files, pins)
-        result = dict(status="won", calls=stop, observations=observations, briefing=reveals,
-                      pages=pages, sha256=pins,
-                      timing=timing_delta(start,timing_snapshot(r,g.sym,g.sizes),stop))
+        result = dict(status="won" if stop_at == stop else "prefix", calls=stop_at, observations=observations, briefing=reveals,
+                      pages=pages, terminal_modal_release=terminal_release, sha256=pins)
+        if saved:
+            result["save"] = saved
+        else:
+            result["timing"] = timing_delta(start,timing_snapshot(r,g.sym,g.sizes),stop_at)
         (args.out/"result.json").write_text(json.dumps(result,indent=2)+"\n")
     finally:
-        g.close()
+        if g is not None:
+            g.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("trace","rom","elf","runner","out"):
+    for name in ("trace","rom","elf","runner"):
         parser.add_argument("--"+name, type=Path, required=True)
     parser.add_argument("--pages", type=Path, required=True, help="authored HOST briefing and modal witnesses")
-    run(parser.parse_args())
+    parser.add_argument("--out", type=Path)
+    parser.add_argument("--mission", type=int, choices=(1,2,3), default=1, help="global mission ID")
+    parser.add_argument("--pins", nargs=5, metavar="SHA256", help="trace ROM ELF runner pages, in order")
+    parser.add_argument("--plan", action="store_true")
+    parser.add_argument("--stop", type=int)
+    parser.add_argument("--save-window", type=int, nargs=2, metavar=("START", "END"),
+                        help="save at the first eligible P1/P2 tape call in this window and reload through title L")
+    args=parser.parse_args()
+    if args.mission != 1 and not args.pins:
+        parser.error("P1/P2 require exact input SHA-256 pins")
+    run(args)

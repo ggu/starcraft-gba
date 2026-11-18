@@ -275,7 +275,8 @@ static int sc64_z7_count_snapshot_begin_full(Sc64Z7WorldContext *ctx)
 
 static int sc64_z7_count_snapshot_begin_masked(Sc64Z7WorldContext *ctx,
                                                unsigned needed_mask,
-                                               int actors_prevalidated)
+                                               int actors_prevalidated,
+                                               const u32 *validated_late)
 {
     static const u8 trigger[5]={0,2,4,6,7};
     static const u8 opcode[5]={2,2,3,3,3};
@@ -313,6 +314,16 @@ static int sc64_z7_count_snapshot_begin_masked(Sc64Z7WorldContext *ctx,
     if (needed_mask==3u && actors_prevalidated) {
         unsigned current=ctx->source_current_player;
         if (current>=12u || !ctx->source_slot_active[current]) return 0;
+#ifdef SC64_Z7_VALIDATED_CENSUS
+        if (validated_late) {
+            ctx->count_snapshot.count[0]=validated_late[0];
+            ctx->count_snapshot.count[1]=validated_late[1];
+            ctx->count_snapshot.active=3u;
+            return 1;
+        }
+#else
+        (void)validated_late;
+#endif
         for (int i=0;i<MAX_UNITS;++i)
             if (u[i].alive && u[i].raw_owner==(int)current) ++counts[0];
         for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) {
@@ -348,8 +359,17 @@ static int sc64_z7_count_snapshot_begin_masked(Sc64Z7WorldContext *ctx,
             if (!(owner13 || owner19 || owner18)) continue;
             raw=pass?(b[i].raw_type>=0?b[i].raw_type:sc64_race_raw_building(b[i].type)):
                      (u[i].raw_type>=0?u[i].raw_type:sc64_race_raw_unit(u[i].type));
-            if (raw<0 || raw>227 || (pass?sc64_race_building_from_raw(raw)<0:
-                                      sc64_race_unit_from_raw(raw)<0)) return 0;
+            if (raw<0 || raw>227) return 0;
+#ifdef SC64_Z7_VALIDATED_CENSUS
+            /* Live validation already proved the raw building lookup and
+             * raw-to-live unit equality. Keep the negative unit-type check:
+             * an invalid raw lookup and invalid live type can both be -1. */
+            if (actors_prevalidated) {
+                if (!pass && u[i].type<0) return 0;
+            } else
+#endif
+            if (pass?sc64_race_building_from_raw(raw)<0:
+                     sc64_race_unit_from_raw(raw)<0) return 0;
             if ((needed_mask&1u) && owner13) ++counts[0];
             if (pass && (needed_mask&2u) && owner19) ++counts[1];
             if (pass && (needed_mask&4u) && owner19) {
@@ -385,19 +405,26 @@ static int sc64_z7_count_snapshot_begin_masked(Sc64Z7WorldContext *ctx,
 static int sc64_z7_count_snapshot_begin(Sc64Z7WorldContext *ctx)
 { return sc64_z7_count_snapshot_begin_full(ctx); }
 
-/* Caller must be the game adapter after its per-tick actor validation. */
-static int sc64_z7_count_snapshot_begin_pruned(Sc64Z7WorldContext *ctx,
-                                               u16 started_mask)
+static unsigned sc64_z7_count_snapshot_needed(u16 started_mask)
 {
     static const u8 trigger[5]={0,2,4,6,7};
     unsigned needed=0;
+    for(unsigned q=0;q<5;++q)
+        if (!(started_mask&(1u<<trigger[q]))) needed|=1u<<q;
+    return needed;
+}
+
+/* Caller must be the game adapter after its per-tick actor validation. */
+static int sc64_z7_count_snapshot_begin_pruned(Sc64Z7WorldContext *ctx,
+                                               u16 started_mask,
+                                               const u32 *validated_late)
+{
     if (!ctx) return 0;
     ctx->count_snapshot.active=0;
     for(unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=0;
     if (started_mask&~0xffu) return 0;
-    for (unsigned q=0;q<5;++q)
-        if (!(started_mask&(1u<<trigger[q]))) needed|=1u<<q;
-    return sc64_z7_count_snapshot_begin_masked(ctx,needed,1);
+    return sc64_z7_count_snapshot_begin_masked(ctx,
+        sc64_z7_count_snapshot_needed(started_mask),1,validated_late);
 }
 #else
 static int sc64_z7_count_snapshot_begin(Sc64Z7WorldContext *ctx)

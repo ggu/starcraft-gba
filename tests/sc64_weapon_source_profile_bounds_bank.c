@@ -6,6 +6,7 @@
 int main(void)
 {
     uint32_t global=sc64_weapon_source_vfx_cached_bounds();
+    assert(global==sc64_weapon_source_vfx_scan_bounds());
     unsigned bounded=0, fallback=0;
     assert((global & 0xc0000000u)==SC64_WEAPON_SOURCE_VFX_BOUNDS_VALID);
     assert(sc64_weapon_source_vfx_profile_bounds(0)==global);

@@ -734,24 +734,36 @@ static int check_command_card(void)
             return fail("card: the top bar still draws the MIN or GAS label");
     }
 
-    /* Supply: used (with queued units), slash and cap never overlap, from
-     * 99 to three-digit counts. Overlapping glyphs share white pixels, so
-     * the drawn bar would hold fewer than the three drawn apart. */
+    /* Supply: feed the live Protoss ledger, including a queued Zealot.
+     * The displayed used count, slash and cap must never share white
+     * pixels, including three-digit counts and the 200-point ceiling. */
     {
-        static const int cases[][2] = {{99, 100}, {100, 200}, {200, 200}};
-        int producer = -1, saved_used = supply_used, saved_cap = supply_cap;
-        for (int i = 0; i < MAX_BUILDINGS && producer < 0; ++i)
-            if (b[i].alive && b[i].owner == SIDE && !b[i].queue_count) producer = i;
-        if (producer < 0) return fail("card: no friendly structure to queue supply on");
-        b[producer].queue_head = 0;
-        b[producer].queue_count = 1;
-        b[producer].queue[0] = U_ZEALOT;
-        int queued = race_owner_queued_supply(SIDE);
-        if (queued <= 0) return fail("card: the queued Zealot reserves no supply");
+        static const int cases[][4] = {
+            {99, 100, 4, 8}, {100, 200, 8, 16}, {200, 200, 0, 26}
+        };
+        static Unit saved_units[MAX_UNITS];
+        static Building saved_buildings[MAX_BUILDINGS];
+        memcpy(saved_units, u, sizeof u);
+        memcpy(saved_buildings, b, sizeof b);
+        race_human = R_PROTOSS;
         for (unsigned k = 0; k < sizeof cases / sizeof cases[0]; ++k) {
             int used = cases[k][0], cap = cases[k][1], apart = 0;
-            supply_used = used * 2 - queued;
-            supply_cap = cap * 2;
+            int nexus_count = cases[k][2], pylon_count = cases[k][3];
+            if (used - 2 > MAX_UNITS || 1 + nexus_count + pylon_count > MAX_BUILDINGS)
+                return fail("card: supply fixture exceeds actor capacity");
+            memset(u, 0, sizeof u);
+            memset(b, 0, sizeof b);
+            for (int i = 0; i < used - 2; ++i)
+                u[i] = (Unit){.alive = 1, .owner = SIDE, .type = U_PROBE};
+            b[0] = (Building){.alive = 1, .owner = SIDE, .type = B_GATEWAY, .queue_count = 1};
+            b[0].queue[0] = U_ZEALOT;
+            for (int i = 0; i < nexus_count + pylon_count; ++i)
+                b[i+1] = (Building){.alive = 1, .owner = SIDE,
+                                    .type = i < nexus_count ? B_NEXUS : B_PYLON};
+            Sc64RaceSupplyLedger ledger = race_owner_supply_ledger(SIDE, R_PROTOSS);
+            if (ledger.queued != 4 || race_supply_ledger_reserved(ledger) != 2 * used ||
+                ledger.provided != 18 * nexus_count + 16 * pylon_count)
+                return fail("card: supply fixture did not populate the live ledger");
             gfx_rect(0, 0, 240, 12, C_PANEL);
             gfx_num(10, 3, used, C_WHITE);
             gfx_text(60, 3, "/", C_WHITE);
@@ -761,9 +773,9 @@ static int check_command_card(void)
             if (card_pixels(139, 0, 101, 12, C_WHITE) != apart || !card_pixels(140, 0, 5, 12, C_WHITE))
                 return fail("card: the supply count overlaps its slash or cap");
         }
-        b[producer].queue_count = 0;
-        supply_used = saved_used;
-        supply_cap = saved_cap;
+        memcpy(u, saved_units, sizeof u);
+        memcpy(b, saved_buildings, sizeof b);
+        race_human = saved_race;
     }
 
     /* One selected unit. The selection panel (hud_panel.h) draws the portrait
@@ -1121,16 +1133,21 @@ int main(void)
     /* The current journal wraps RaceSave in the variable-length impact and
      * transport envelope. Verify the actual committed record before and after
      * corrupting it, rather than silently targeting the old inner schema. */
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+    const u32 selected_tag=SC64_SHOWCASE_CARRIER_TAG;
+#else
+    const u32 selected_tag=SC64_TRANSPORT_SAVE_VERSION;
+#endif
     static u8 saved_payload[sizeof(race_impact_record)];
     u32 saved_length = 0, after_length = 0;
     if (!save_read_latest(saved_payload, sizeof(saved_payload),
-                          SC64_TRANSPORT_SAVE_VERSION, &saved_length))
+                          selected_tag, &saved_length))
         return fail("could not locate committed transport save");
     fprintf(stderr, "Showcase committed save tag=%08lx length=%lu\n",
-            (unsigned long)SC64_TRANSPORT_SAVE_VERSION, (unsigned long)saved_length);
-    save_test_corrupt_latest(saved_length, SC64_TRANSPORT_SAVE_VERSION);
+            (unsigned long)selected_tag, (unsigned long)saved_length);
+    save_test_corrupt_latest(saved_length, selected_tag);
     if (save_read_latest(saved_payload, sizeof(saved_payload),
-                         SC64_TRANSPORT_SAVE_VERSION, &after_length))
+                         selected_tag, &after_length))
         return fail("corrupt helper did not invalidate committed transport save");
 #else
     save_test_corrupt_latest(sizeof(race_data), SAVE_VERSION);
@@ -1145,7 +1162,7 @@ int main(void)
 
     if (!enter_showcase_menu()) return fail("could not reopen showcase menu");
     press(KEY_A);
-    if (screen != SCREEN_PAUSE || sc64_showcase_scene != 0 || save_game())
+    if (screen != SCREEN_PAUSE || sc64_showcase_scene != 0 || save_game() || load_game())
         return fail("showcase save guard failed");
 
     for (int scene = 0; scene < 8; ++scene) {

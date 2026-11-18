@@ -5,7 +5,7 @@ import pathlib
 import sys
 import unittest
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]))
-from tools.sc64_weapon_source_sprites import _profile_cull_bounds
+from tools.sc64_weapon_source_sprites import _global_cull_bounds, _profile_cull_bounds
 
 INVALID=0x40000000
 
@@ -26,6 +26,21 @@ def fixture():
     return [profiles,images,frames,animations,overlays,lo_tables,lo_offsets,[],[0,1,2]]
 
 class ProfileBoundsTest(unittest.TestCase):
+    def test_global_bounds_include_every_offset_and_mirrored_edge(self):
+        f = fixture()
+        f[2][2].update(mirror_x=11)
+        f[4].append({'opcode': 8, 'x': -45, 'y': -13})
+        f[2].append({'w': 0, 'h': 9})
+        # Mirrored right edge is 13 pixels from center, plus 22;
+        # vertical extent is 2 pixels plus 6. Negative odd offsets truncate.
+        self.assertEqual(_global_cull_bounds(f[2], f[4], f[6]), 0x80000000 | (8 << 15) | 35)
+
+    def test_global_bounds_disable_culling_on_unknown_or_overflow(self):
+        f = fixture()
+        self.assertEqual(_global_cull_bounds(f[2], [{'opcode': 99}], f[6]), INVALID)
+        f[2][2].update(x=32767)
+        self.assertEqual(_global_cull_bounds(f[2], f[4], f[6]), INVALID)
+
     def test_children_mirrors_and_birth_offsets_included(self):
         values=_profile_cull_bounds(*fixture());self.assertEqual(values,[0x80000000 | (6<<15) | 23])
     def test_unrelated_offsets_do_not_expand_profile(self):

@@ -33,7 +33,7 @@ does not use cargo, invincibility, or positions.
 
 ## Direct shared Command census
 
-The opt-in `SC64_Z8_DIRECT_COMMAND_CENSUS` provider reads the live
+The `SC64_Z8_DIRECT_COMMAND_CENSUS` provider reads the live
 unit and building pools in their original order. It omits dead slots and
 avoids filling unused actor view fields. It still validates owner, raw
 type and geometry for every live actor, even when the actor cannot match
@@ -51,8 +51,8 @@ flags; in particular, the Zerg bridge can see an in-progress Egg.
 A separate ASan/UBSan differential built against the canonical Z10
 configuration compares the Z8 game pools and exercises the Egg branch:
 AtMost includes the in-progress Egg, other comparisons exclude it, and
-the next query sees the hatched unit. There is no paired ARM gameplay
-or save/load evidence for P8, P9 or Z8 yet.
+the next query sees the hatched unit. The original ARM comparison below
+covered P10; the current-build checks are recorded separately.
 
 The ASan/UBSan differential uses the actual P10 pools and compares 66,816
 queries over owners, forces, raw types, group types and comparisons. It
@@ -100,3 +100,50 @@ Candidate ROM SHA-256:
 `122eb131a5deeaeeb9ea25b68954e276a936564559caba762348e04c203de682`.
 Paired video/state receipt SHA-256:
 `e38da1afadb43098c23eb7f9140fee18e643a1d2beeee0d57704f4bab3bbb3b7`.
+
+## Current pointer FIFO cartridges (November 14)
+
+Builds based on `ecc8a6ac` differ from the released Z10 and P10 vectors
+only by the census flag. Both normal ARM links pass the unchanged memory
+guards: IWRAM stays at `0x03004d50` (Z10) and `0x03004c10` (P10), and
+EWRAM grows by eight bytes to `0x02038b08` and `0x0203c0e8` respectively.
+Both game-pool differentials passed again under ASan/UBSan. The stock
+actor provider remains available with `CANONICAL_COMMAND_CENSUS=0`.
+The flag applies where the current ROMs carry these trigger schedulers.
+The normal Terran and Showcase compile vectors do not change.
+
+| Mission on normal ROM | Matched world checks | Win frame | Mean guest cycles per call | Effective emulated updates/s |
+| --- | ---: | ---: | ---: | ---: |
+| Z8 (Z10) | 19 | 45,468 | 1,206,048 → 1,171,831 (−2.84%) | 13.91 → 14.32 |
+| P8 (P10) | 41 | 122,809 | 1,784,079 → 1,687,131 (−5.43%) | 9.40 → 9.94 |
+| P9 (P10) | 59 | 144,361 | 1,994,520 → 1,888,568 (−5.31%) | 8.41 → 8.88 |
+| P10 (P10) | 20 | 46,057 | 1,862,770 → 1,722,799 (−7.51%) | 9.01 → 9.74 |
+
+All four ordinary-controller replays match the no-census controls from
+HOME through victory with the same observed gameplay, authored pages and
+campaign outcomes. P8 retains both heroes, P9 clears both Cerebrate
+objectives, and all four report zero trigger faults. In a separate P10
+pair, a pause save at frame 36,761
+is byte-identical. A fresh HOME load restores the same sampled world and
+matches five continuation checkpoints through the win. The two result
+saves are also byte-identical; the result write adds a journal entry and
+preserves the earlier bank. Physical Blood Bath runs on both product
+pairs match all 21 tested fields, including the lobby, continuation and
+full SRAM bytes. These are emulator checks, not physical GBA timing.
+
+The opt-in P10 Egg/Forge preview from #406 was rebuilt with the census.
+Its guarded ARM link, ordinary mixed-job save/reload and completion,
+research-only ARM migration, and three sanitizer writers pass. The mixed
+save is byte-identical to the prior preview. The original-art ROM also
+builds to identical bytes with the census setting on or off.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z10 census ROM | `8e4737c9085dda0ed6f6084ed6f3150ae7dfd722dd97e466f766d6c6bad20efb` |
+| P10 census ROM | `6230e726153ed9dea2fd4f5bbcb5278cbcff1f68f0035855af59ee22626dfae8` |
+| Z8 census full win | `c70b8e168d51c8807616751b1f519505a5e69cc56b8f12b02f68604eebd2e085` |
+| P8 census full win | `5161c803372b3ed03f2bbfc9b12a6038a0465f670429917272a8e3df472bea8f` |
+| P9 census full win | `a64fd58cca64911998e5f0a1342aeab83c6cf1838822a68d9a767005a5830fb7` |
+| P10 census full win | `51a278871b6d9e5babb899621152d4b701fe3d9d3b2ae2a3300dda4dc847d0a6` |
+| P10 census fresh-load continuation | `0b2554a6ee36952c8d4429e0ce508283b6e78601d7e514ff5ca0b3b88276a82b` |
+| Two Blood Bath save and continuation comparisons | `5eaf0452ebe9586358d9df51893b7cd8aa4bac4b15d0b3579591dc2f03e16dfd` |

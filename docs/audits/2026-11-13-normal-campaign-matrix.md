@@ -1,7 +1,7 @@
 # Normal campaign cartridge qualification matrix
 
-This is an index of complete normal-ROM mGBA replays known on November
-13. A win on the exact KODAK ROM is separate from a win on a preceding
+This is an index of complete normal-ROM mGBA replays. The KODAK column
+describes the November 13 set. A win on that ROM is separate from a win on a preceding
 normal ROM, a host controller win, or a prefix. No row represents a
 physical GBA check or all routes through a mission.
 
@@ -20,16 +20,31 @@ physical GBA check or all routes through a mission.
 | Z4 | [HOME win](2026-11-13-z4-two-normal-roms.md) | All 42 checkpoints also match on staged `c906058`; Kerrigan survives. |
 | Z5 | [HOME win](2026-11-13-z5-kodak-replay.md) | All 55 checkpoints matched, with the source pause and Kerrigan alive. |
 | Z6 | [HOME win](2026-11-13-z6-kodak-replay.md) | All 65 checkpoints matched, including four with Kerrigan aboard the Overlord. |
-| Z7 | [Fresh SRAM win](2026-11-12-z7-normal-physical.md#fresh-sram-on-the-november-13-z10-kodak-cartridge) | Ordinary HOME reached the late save cut on the exact ROM; reselect the Hatchery after load. Full uninterrupted HOME win on a preceding Z10 ROM. |
-| Z8–Z9 | No complete exact-ROM receipt here | [Z8](2026-11-12-z8-normal-physical.md) and [Z9](2026-11-13-z9-normal-physical.md) win on a preceding normal Z10 ROM. |
-| Z10 | [Fresh SRAM win](2026-11-13-composed-performance.md) | Both normal ROMs in the comparison won from the same SRAM. [HOME win on the ARM test entry](2026-11-12-z10-arm-qualification.md). |
-| P1–P6 | No complete exact-ROM receipt here | [Host and replacement-loop wins, earlier normal save prefixes](2026-11-12-normal-campaign-replay-gaps.md). Rebuild stale P1 input and isolate controller route queries for P3–P6. |
+| Z7 | [HOME win](2026-11-12-z7-normal-physical.md#uninterrupted-home-on-the-exact-kodak-cartridge), [fresh SRAM win](2026-11-12-z7-normal-physical.md#fresh-sram-on-the-november-13-z10-kodak-cartridge) | All 253 HOME observations and five overlapping save observations matched. Reselect the Hatchery after load. |
+| Z8 | [HOME win](2026-11-12-z8-normal-physical.md#exact-november-13-kodak-cartridge) | Both objective Nexuses destroyed, Kerrigan at full HP; 19 checkpoints matched. |
+| Z9 | [HOME win](2026-11-13-z9-normal-physical.md#exact-november-13-kodak-cartridge) | The same Drone carries the crystal home; 32 checkpoints matched. |
+| Z10 | [HOME win](2026-11-13-z10-exact-home.md), [fresh SRAM win](2026-11-13-composed-performance.md) | All 61 shared world checkpoints match between the two routes. |
+| P1 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 27 matched observations and the rescued hero alive. |
+| P2 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 36 matched observations and the rescued hero alive. |
+| P3 | Not replayed on the November 13 KODAK binary | [HOME win on the packaged wide P10 ROM](2026-11-13-p3-p4-home-preparation.md#wide-p10-packaged-rom-p3-victory): 47 checkpoints, both enemy structure banks cleared, and a separate checked pause save and fresh-load prefix. |
+| P4 | [HOME win](2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win) | 146 matching observations on KODAK and staged P10; both heroes survive. |
+| P5–P6 | [HOME wins](2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays) | Seven and 113 matching checkpoints; both also win on newer staged P10. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
-| P8 | No complete exact-ROM receipt here | [Preceding normal P8 win and SRAM continuation](2026-10-31-protoss-cannon-lazy/README.md); verify the carried P10 route. |
+| P8 | No complete older exact-KODAK receipt here | [November 16 normal P10 fresh SRAM win](2026-11-13-p8-host-hero-retreat.md#fresh-sram-win-on-the-november-16-normal-p10-build) from frame 30,825, 41 matched checkpoints, both heroes alive and the Stasis Cell destroyed. |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |
 | P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | Full replay averaged 8.79 emulated updates/s; below the performance target. |
 
-All ten Terran missions now have a checked HOME win on the same exact
-cartridge. The exact ROMs in this index are the Terran, Z10 and P10 cartridges
-copied to KODAK under runtime `cbba1c5`. Tests on previews or composed
-performance builds do not substitute for the normal cartridge row.
+All ten Terran missions and all ten Zerg missions now have a checked HOME
+win on their respective exact cartridges. The exact ROMs in this index
+are the Terran, Z10 and P10 cartridges copied to KODAK under runtime
+`cbba1c5`. Tests on previews or composed performance builds do not
+substitute for the normal cartridge row.
+
+All 30 original missions now have a checked HOME win on a normal ROM.
+This includes different P10 revisions for different Protoss missions;
+it does not establish all 30 on a single set of ROM revisions.
+
+On the [November 17 regular P10 ROM](2026-11-17-protoss-early-replays.md),
+P2–P6 also win from HOME, and P1 wins after a fresh SRAM load.
+The uninterrupted P2/P3 tapes win while the tested saved continuations
+diverge. The opt-in UI context P10 separately wins both saved routes.

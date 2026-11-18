@@ -1,0 +1,90 @@
+# P8 ordinary controller protects Fenix on HOST
+
+The [retained route](2026-11-13-p8-staged-route-loss.md) lost Fenix at
+frame 10,905 on staged P10. The opt-in HOST controller now reads
+ordinary briefings, records Fenix and Hyperion health, location and
+orders, and allows both heroes to retreat from a nearby enemy on the
+nearest-depot profile. It selects actors and sends move orders through
+ordinary buttons. The route fingerprint is checked across each
+controller interval.
+
+The first opening witness passed frame 13,063 with both heroes at full
+health. A fresh ASan/UBSan run using the staged P10 gameplay flags won
+at frame 122,809, call 124,998. Fenix had 240 HP and 240 shields,
+Hyperion had 850 HP, the Stasis Cell was gone, and all three scheduler
+fault counts were zero. The trace includes eight ordinary briefing
+pages. This HOST build did not enable the test-only in-game modal flag,
+so the cartridge observer handles those authored pages separately.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Full HOST held-key tape | `43a5e267c1992bcc63f21d62691a3fb43e899cc578c032895b924c9c38bd046e` |
+| Full HOST telemetry | `2bcf79de3dbeb69d86bd3cbafe94cfe7baa3e39e6d27b389905536a00ee9153d` |
+
+## Complete HOME win on staged P10
+
+The same held-key tape wins from a fresh HOME boot on the normal staged
+P10 ROM. The physical mGBA observer made no guest writes and loaded no
+save. It matched 41 observations and every recorded key-edge frame,
+including the opening where the old tape lost Fenix. Eight briefing
+pages used the original tape; twelve in-game pages took 24 additional
+physical button calls while the simulation frame was frozen. Their
+row, action and page data were checked against the ROM table.
+
+Victory comes at frame 122,809 after 124,998 tape calls and 125,022
+physical calls. Fenix has 240 HP and 240 shields, the Hyperion has
+850 HP, the Stasis Cell is gone, and all three scheduler fault counts
+are zero. This is one route on staged P10. It does not qualify the
+older KODAK ROM, a save continuation, or hardware frame rate.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Staged P10 ROM | `0505b233994dca90cda47d92f1a153a14f01e781d980b3498390d3b4005e7c41` |
+| Matching ELF | `6319d1647b73ffa7ac9c0f165c1db1a8dbdf3a5792dc066c97024203f6672d44` |
+| Physical mGBA observer | `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549` |
+| Full HOME receipt | `8dd9310a569246f50e3f155a4cf8e881a779f1fb02cfc3778c53f9e099ea6cd8` |
+
+## Fresh SRAM prefix on the November 16 normal P10 build
+
+On the packaged P10 ROM, the ordinary tape used START/B at its recorded
+pause to write frame 30,825. The physical observer exported the actual
+32 KiB journal. The neutral slot had outer tag `0x7643505f`, inner tag
+`0x7243505f`, 16,308 payload bytes, sequence 1 and a valid checksum.
+There were no active Yamato shots or pending impacts and the second slot
+was erased.
+
+An independent process started at HOME, loaded using title L, and matched
+the saved world fingerprint and persistent P8 trigger state before
+continuing. The 31,750-call prefix matched 13 checkpoints, all checked
+key edges, eight briefing pages and two in-game pages. The last named
+checkpoint was at frame 30,918, 93 game updates after the save. Both
+processes used physical inputs and a read-only state observer. The
+original exported journal stayed byte-identical. This prefix verifies
+one current pause-save cut; the continuation through victory is a
+separate check.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Packaged P10 ROM | `363a9aa963b7ff35aaf7e970fd310a60edb4db4afff43c2d0a33a1a1df76d45a` |
+| Matching ELF | `06582346f58a68c0d9761a7a66fa51dc01ba36aae6b3fd693a3125aef4e6dc22` |
+| Physical mGBA observer | `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549` |
+| Neutral physical journal | `eb85fbbf33fc2d14b4e75c8b8050e6f283a553c61341b306997093b82d62f1db` |
+| Prefix receipt | `258646e05e1bdfd862b5bae8b808dc0d631955ca89e9acbf90750e1e4f18c60f` |
+
+## Fresh SRAM win on the November 16 normal P10 build
+
+The verifier reopened the independently checked physical prefix receipt and
+the byte-identical journal at frame 30,825. It authenticated the same ROM,
+ELF, tape and observer before a new HOME process loaded the journal through
+title L. The loaded game matched the first resumed checkpoints again and
+ran the remaining inputs through victory. The original SRAM did not change.
+
+Together the prefix and continuation match all 41 named checkpoints, eight
+briefing pages, twelve in-game pages and the recorded key edges. The win
+comes at frame 122,809. Fenix has 240 HP and 240 shields, the Hyperion has
+850 HP, the Stasis Cell is destroyed, and there are no trigger scheduler
+faults. The objective flag and completion bit are set. This qualifies one
+current physical save cut, not arbitrary P8 saves or hardware timing.
+
+The full combined receipt SHA-256 is
+`cd2935955e1b664f620a81a7998bdca0b4c45319c1bd83c9503dbafada1ed42b`.

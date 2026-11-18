@@ -517,17 +517,16 @@ endif
 # Complete point floods on eligible 64x64 maps use the faster scratch grid.
 # Set this empty to compare the previous packed flood with the same cache.
 CANONICAL_ROUTE_DENSE_FLAGS ?= -DSC64_ROUTE_DENSE_FLOOD_PROBE
-# Opt-in full-field experiment shared by all four cartridge profiles.
-CANONICAL_ROUTE_LINEAR ?= 0
+# Wide point FIFO; set 0 for the scalar comparison.
+CANONICAL_ROUTE_LINEAR ?= 1
 ifneq ($(filter $(CANONICAL_ROUTE_LINEAR),0 1),$(CANONICAL_ROUTE_LINEAR))
 $(error CANONICAL_ROUTE_LINEAR must be 0 or 1)
 endif
 ifneq ($(words $(CANONICAL_ROUTE_LINEAR)),1)
 $(error CANONICAL_ROUTE_LINEAR must be 0 or 1)
 endif
-CANONICAL_ROUTE_LINEAR_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_LINEAR)),-DSC64_ROUTE_LINEAR_FLOOD_PROBE)
 include config/facility-fifo/Makefile
-CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS) $(CANONICAL_ROUTE_DENSE_FLAGS) $(CANONICAL_ROUTE_LINEAR_FLAGS) $(CANONICAL_ROUTE_FACILITY_FIFO_FLAGS) $(ROUTE_PACK_FLAGS) $(CANONICAL_ROUTE_KEEP_FLAGS) $(CANONICAL_PATH_GRID_UPDATE_FLAGS)
+CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS) $(CANONICAL_ROUTE_DENSE_FLAGS) $(CANONICAL_ROUTE_LINEAR_FLAGS) $(CANONICAL_ROUTE_FACILITY_FIFO_FLAGS) $(LINEAR_GRID_LUT8_FLAGS) $(ROUTE_PACK_FLAGS) $(CANONICAL_ROUTE_KEEP_FLAGS) $(POINT_RETENTION_FLAGS) $(CS_FLAGS) $(CANONICAL_PATH_GRID_UPDATE_FLAGS)
 # The fresh-cell writer uses the paired-visit route configuration.
 CANONICAL_ROUTE_NEW_CELL ?= $(CANONICAL_ROUTE_INDEX)
 ifneq ($(words $(filter 0 1,$(CANONICAL_ROUTE_NEW_CELL))),1)
@@ -583,7 +582,7 @@ $(error CANONICAL_LOOKUP_INDEX must be 0 or 1)
 endif
 # Read-only key comparison also handles sub-second changes with macOS Make 3.81.
 sc64_lookup_quote = '$(subst ','"'"',$(1))'
-CANONICAL_LOOKUP_CONFIG_KEY := $(shell $(PYTHON) tools/sc64_weapon_lookup_index.py --config-key $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_INDEX)) $(call sc64_lookup_quote,$(WEAPON_SOURCE_HEADER)))-route$(CANONICAL_ROUTE_INDEX)$(if $(CANONICAL_ROUTE_LINEAR_FLAGS),-linear)$(FACILITY_FIFO_KEY)$(LINEAR_WORD_PACK_KEY)-newcell$(CANONICAL_ROUTE_NEW_CELL)-pathgrid$(CANONICAL_PATH_GRID)-showhud$(SHOWCASE_HUD_CACHE)-showcontact$(SHOWCASE_CONTACT_CACHE)-showterrain$(SHOWCASE_TERRAIN_CACHE_VRAM)-showconfig$(SHOWCASE_CACHE_CONFIG_KEY)-walk$(shell $(PYTHON) tools/sc64_unit_walk_words.py --config-key $(CANONICAL_WALK_WORDS) $(call sc64_lookup_quote,$(UNIT_WALK_HEADER)) $(call sc64_lookup_quote,$(UNIT_FACING_HEADER)))
+include config/canonical-lookup/Makefile
 CANONICAL_LOOKUP_REBUILD := $(if $(shell test -f build/canonical-lookup-config && printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' | cmp -s - build/canonical-lookup-config && printf matched),,force-canonical-lookup-rebuild)
 INDEXED_WEAPON_HEADER := build/generated/weapon-lookup/sc64_weapon_source_indexed.h
 CANONICAL_LOOKUP_INPUTS = $(if $(filter 1,$(CANONICAL_WALK_WORDS)),$(WALK_WORDS_HEADER)) $(if $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(INDEXED_WEAPON_HEADER)) build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
@@ -737,8 +736,10 @@ test-sc64-static-dirty-rows-game: build/test-sc64-static-dirty-rows-t4 build/tes
 	./build/test-sc64-static-dirty-rows-photon
 test-canonical-render: test-sc64-static-dirty-rows-game
 
+# The original-art Mode 4 builds own the VBlank IRQ.
+OUTPOST_PRESENT_FLAGS ?= -DGBA_PRESENT_VBLANK_EPOCH
 build/starcraft.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(OUTPOST_PRESENT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft.map -lgcc -o $@
 	$(SIZE) $@
 
 build/StarCraft-GBA.gba: build/starcraft.elf tools/fix_rom.py
@@ -751,7 +752,7 @@ build/test-starcraft: tests/host.c common/gba.c $(STARCRAFT) $(wildcard starcraf
 # Optional hold-B command ring for the default profile (docs/COMMAND-RING.md).
 COMMAND_RING_FLAGS := -DSC_COMMAND_RING
 build/starcraft-ring.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(COMMAND_RING_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-ring.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(OUTPOST_PRESENT_FLAGS) $(COMMAND_RING_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-ring.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-GBA-Ring.gba: build/starcraft-ring.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -4422,7 +4423,7 @@ include tests/sc64-typed-save/Makefile
 
 # Asset-free Carrier storage and codec coverage.
 build/test-sc64-interceptor-pool-codec: tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -DSC64_INTERCEPTOR_COMPACT_CODEC -Istarcraft tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c -o $@
 .PHONY: test-sc64-interceptor-pool-codec
 test-sc64-interceptor-pool-codec: build/test-sc64-interceptor-pool-codec
 	./build/test-sc64-interceptor-pool-codec
@@ -5256,7 +5257,7 @@ test-sc64-direct-firing-points-game: test-sc64-direct-firing-flags build/test-sc
 
 # Asset-free exact contact memo contract fixture; the same collision headers
 # are compiled in their per-frame and persistent bucket lifecycle variants.
-SC64_CONTACT_MEMO_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST
+SC64_CONTACT_MEMO_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST $(CS_MEMO_FLAGS)
 build/test-sc64-contact-memo-legacy: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_collision_legacy.h common/gba.h Makefile | build
 	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) $< -o $@
 build/test-sc64-contact-memo-persistent: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_persistent_collision.h common/gba.h Makefile | build

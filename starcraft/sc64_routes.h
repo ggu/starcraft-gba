@@ -234,6 +234,46 @@ static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
 
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
+#if defined(SC64_ROUTE_POINT_POINTER_PROBE) && (!defined(SC64_ROUTE_ACTIVE_STRIDE) || \
+    !defined(SC64_ROUTE_PACK3) || !defined(SC64_ROUTE_KEEP_FIELDS))
+#error "point pointer retention requires complete packed fields and active stride"
+#endif
+#if defined(SC64_ROUTE_POINT_TAIL_PROBE) && (!defined(SC64_ROUTE_POINT_POINTER_PROBE) || \
+    !defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || defined(SC64_ROUTE_PARTIAL_FLOOD))
+#error "route scratch tail retention requires the complete point and linear floods"
+#endif
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+enum { SC64_ROUTE_POINT_SIDE = 128, SC64_ROUTE_POINT_BYTES = 6144 };
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+#define sc64_route_point_plane ((u8 *)(void *)bfs_queue + sizeof(bfs_queue) - SC64_ROUTE_POINT_BYTES)
+#else
+static u8 sc64_route_point_plane[SC64_ROUTE_POINT_BYTES] __attribute__((aligned(4)));
+#endif
+static u8 *sc64_route_point_spare;
+static int sc64_route_point_saved = -1;
+#endif
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+/* At most one live slot uses the borrowed tail. Its displaced pool backing
+ * is the spare, and no other slot uses it. Restore the binding before a
+ * full-size queue or the save union can overwrite this part of scratch. */
+static void __attribute__((noinline)) sc64_route_point_tail_release(void)
+{
+    if (sc64_route_point_spare && sc64_route_point_spare != sc64_route_point_plane) {
+        for (int i = 0; i < SC64_ROUTE_SLOTS; ++i) {
+            if (sc64_route_field[i] != sc64_route_point_plane) continue;
+            if (sc64_route_valid[i])
+                memcpy(sc64_route_point_spare, sc64_route_point_plane, SC64_ROUTE_POINT_BYTES);
+            sc64_route_field[i] = sc64_route_point_spare;
+            break;
+        }
+    }
+    sc64_route_point_spare = sc64_route_point_plane;
+    sc64_route_point_saved = -1;
+}
+#define SC64_ROUTE_POINT_TAIL_RELEASE() sc64_route_point_tail_release()
+#else
+#define SC64_ROUTE_POINT_TAIL_RELEASE() ((void)0)
+#endif
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 #define SC64_ROUTE_FLAG_STALE 1  /* bytes flooded on an earlier grid */
 #define SC64_ROUTE_FLAG_DONOR 2  /* bytes of a complete point field, in no logical slot */
@@ -346,6 +386,10 @@ static int sc64_route_configure(void)
     sc64_route_active_bytes = bytes;
     sc64_route_active_slots = SC64_ROUTE_SLOTS;
     sc64_route_pcount = fit >= SC64_ROUTE_SLOTS ? (u8)fit : 0;
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    sc64_route_point_spare = sc64_route_point_plane;
+    sc64_route_point_saved = -1;
+#endif
     for (i = 0; i < SC64_ROUTE_SLOTS; ++i) {
         sc64_route_lphys[i] = (u8)i;
         sc64_route_field[i] = sc64_route_pool + i * bytes;
@@ -498,6 +542,10 @@ sc64_routes_reset(void)
     (void)sc64_route_configure();
 #endif
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+    SC64_ROUTE_POINT_TAIL_RELEASE();
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    sc64_route_point_saved = -1;
+#endif
 #ifdef SC64_RANGE_WORK
     sc64_range_route_reset();
 #endif
@@ -620,8 +668,12 @@ static void __attribute__((noinline, unused)) sc64_routes_topology_changed(void)
 static void __attribute__((noinline, unused)) sc64_routes_grid_begin(void)
 {
     sc64_route_grid_copied = 0;
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+    sc64_route_point_saved = -1;
+#endif
     if (sc64_route_pcount && sc64_route_grid_known &&
         sc64_route_keep_cols == (u8)MAP_COLS && sc64_route_keep_rows == (u8)MAP_ROWS) {
+        SC64_ROUTE_POINT_TAIL_RELEASE();
         memcpy(SC64_ROUTE_OLD_GRID, path_walkable, sizeof(path_walkable));
         sc64_route_grid_copied = 1;
     }
@@ -1548,6 +1600,24 @@ static const u32 sc64_dense_words[16] = {
     SC64_DENSE_WORD(8), SC64_DENSE_WORD(9), SC64_DENSE_WORD(10), SC64_DENSE_WORD(11),
     SC64_DENSE_WORD(12), SC64_DENSE_WORD(13), SC64_DENSE_WORD(14), SC64_DENSE_WORD(15),
 };
+#ifdef SC64_ROUTE_LINEAR_GRID_LUT8_PROBE
+/* The high nibble chooses a row and the low nibble chooses its column.
+ * Each entry has the same two aligned words as the scalar nibble loads. */
+#define SC64_DENSE_PAIR(l, h) { SC64_DENSE_WORD(l), SC64_DENSE_WORD(h) }
+#define SC64_DENSE_PAIRS(h) \
+    SC64_DENSE_PAIR(0, h), SC64_DENSE_PAIR(1, h), SC64_DENSE_PAIR(2, h), SC64_DENSE_PAIR(3, h), \
+    SC64_DENSE_PAIR(4, h), SC64_DENSE_PAIR(5, h), SC64_DENSE_PAIR(6, h), SC64_DENSE_PAIR(7, h), \
+    SC64_DENSE_PAIR(8, h), SC64_DENSE_PAIR(9, h), SC64_DENSE_PAIR(10, h), SC64_DENSE_PAIR(11, h), \
+    SC64_DENSE_PAIR(12, h), SC64_DENSE_PAIR(13, h), SC64_DENSE_PAIR(14, h), SC64_DENSE_PAIR(15, h)
+static const u32 sc64_dense_pairs[256][2] = {
+    SC64_DENSE_PAIRS(0), SC64_DENSE_PAIRS(1), SC64_DENSE_PAIRS(2), SC64_DENSE_PAIRS(3),
+    SC64_DENSE_PAIRS(4), SC64_DENSE_PAIRS(5), SC64_DENSE_PAIRS(6), SC64_DENSE_PAIRS(7),
+    SC64_DENSE_PAIRS(8), SC64_DENSE_PAIRS(9), SC64_DENSE_PAIRS(10), SC64_DENSE_PAIRS(11),
+    SC64_DENSE_PAIRS(12), SC64_DENSE_PAIRS(13), SC64_DENSE_PAIRS(14), SC64_DENSE_PAIRS(15),
+};
+#undef SC64_DENSE_PAIRS
+#undef SC64_DENSE_PAIR
+#endif
 #undef SC64_DENSE_BYTE
 #undef SC64_DENSE_WORD
 
@@ -1639,6 +1709,26 @@ _Static_assert(sizeof(bfs_queue) >= SC64_LINEAR_WIDE_QUEUE_CAP * sizeof(u16) +
                sizeof(path_walkable),
                "wide linear flood scratch overlaps the queue or retained grid");
 
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+enum { SC64_POINT_TAIL_LINEAR_BYTES = (SC64_LINEAR_MAX_ROWS + 2) *
+          (SC64_LINEAR_WIDE_COLS + SC64_LINEAR_PAD),
+       SC64_POINT_TAIL_QUEUE_CAP =
+          (sizeof(bfs_queue) - SC64_ROUTE_POINT_BYTES - SC64_POINT_TAIL_LINEAR_BYTES - 3) / sizeof(u16) };
+_Static_assert(sizeof(bfs_queue) >= SC64_ROUTE_POINT_BYTES + SC64_POINT_TAIL_LINEAR_BYTES + 3 + 8 * sizeof(u16),
+               "wide linear flood and point tail need disjoint scratch");
+#endif
+static inline int sc64_route_linear_queue_cap(int cols, int rows)
+{
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+    if (cols == SC64_ROUTE_POINT_SIDE && rows == SC64_ROUTE_POINT_SIDE)
+        return SC64_LINEAR_WIDE_QUEUE_CAP < SC64_POINT_TAIL_QUEUE_CAP ?
+               SC64_LINEAR_WIDE_QUEUE_CAP : SC64_POINT_TAIL_QUEUE_CAP;
+#else
+    (void)rows;
+#endif
+    return cols == SC64_LINEAR_WIDE_COLS ? SC64_LINEAR_WIDE_QUEUE_CAP : SC64_ROUTE_LINEAR_QUEUE_CAP;
+}
+
 static inline u8 *sc64_route_linear_grid(int cols, int rows, int stride, int cap)
 {
     uintptr_t scratch = ((uintptr_t)(void *)(bfs_queue + cap) + 3u) & ~(uintptr_t)3u;
@@ -1655,10 +1745,15 @@ static inline u8 *sc64_route_linear_grid(int cols, int rows, int stride, int cap
                          &border, 4);
         for (int x = 4; x < cols + 4; x += 8) {
             u32 bits = *walk++;
+#ifdef SC64_ROUTE_LINEAR_GRID_LUT8_PROBE
+            __builtin_memcpy(__builtin_assume_aligned(out + x, 4),
+                             sc64_dense_pairs[bits], 8);
+#else
             __builtin_memcpy(__builtin_assume_aligned(out + x, 4),
                              &sc64_dense_words[bits & 15u], 4);
             __builtin_memcpy(__builtin_assume_aligned(out + x + 4, 4),
                              &sc64_dense_words[bits >> 4], 4);
+#endif
         }
     }
     return dense;
@@ -1739,6 +1834,25 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
             tail = pending;
             continue;
         }
+#ifdef SC64_ROUTE_LINEAR_POINTER_FIFO_PROBE
+        u16 *read = bfs_queue + head, *write = bfs_queue + tail;
+        const u16 *end = bfs_queue + limit;
+        do {
+            const int c = *read++;
+#define SC64_LINEAR_STEP(offset, direction) \
+            if (dense[c + (offset)] == 7u) { \
+                dense[c + (offset)] = direction; \
+                *write++ = (u16)(c + (offset)); \
+            }
+            SC64_LINEAR_STEP(-1, 1)
+            SC64_LINEAR_STEP(1, 2)
+            SC64_LINEAR_STEP(-stride, 3)
+            SC64_LINEAR_STEP(stride, 4)
+#undef SC64_LINEAR_STEP
+        } while (read != end);
+        head = limit;
+        tail = (int)(write - bfs_queue);
+#else
         do {
             int c = bfs_queue[head++];
 #define SC64_LINEAR_STEP(offset, direction) \
@@ -1752,6 +1866,7 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
             SC64_LINEAR_STEP(stride, 4)
 #undef SC64_LINEAR_STEP
         } while (head < limit);
+#endif
     }
     return consumed + tail;
 }
@@ -1760,7 +1875,7 @@ static int __attribute__((noinline))
 sc64_route_fill_linear(u8 *field, int goal)
 {
     const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
-    const int cap = cols == SC64_LINEAR_WIDE_COLS ? SC64_LINEAR_WIDE_QUEUE_CAP : SC64_ROUTE_LINEAR_QUEUE_CAP;
+    const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
     const int row = sc64_cell_row(goal);
     const int start = goal + row * SC64_LINEAR_PAD + stride + 4;
@@ -1814,6 +1929,7 @@ static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
     }
 #endif
 
+    SC64_ROUTE_POINT_TAIL_RELEASE();
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
 #else
@@ -1863,6 +1979,38 @@ fill_finished:
     SC64_ROUTE_KEEP_COUNT(FILL);
     return tail;
 }
+
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+/* Wide fixed-layout slots keep their own metadata. Rotate only backing
+ * pointers on safe point misses; range scratch continues to use fixed
+ * pool offsets. The parked plane contributes no logical residency. */
+static int __attribute__((noinline)) sc64_route_fill_point_pointer(int slot, int goal)
+{
+    if (MAP_COLS == SC64_ROUTE_POINT_SIDE && MAP_ROWS == SC64_ROUTE_POINT_SIDE
+#ifdef SC64_RANGE_WORK
+        && slot < sc64_range_route_reduced_slots()
+#endif
+    ) {
+        const int victim = sc64_route_valid[slot] == 1 && !SC64_ROUTE_LAZY(slot) &&
+            sc64_route_goal[slot] < SC64_ROUTE_POINT_SIDE * SC64_ROUTE_POINT_SIDE ?
+            sc64_route_goal[slot] : -1;
+        const int hit = goal == sc64_route_point_saved;
+        if (hit || victim >= 0) {
+            u8 *old = sc64_route_field[slot];
+            sc64_route_field[slot] = sc64_route_point_spare;
+            sc64_route_point_spare = old;
+            sc64_route_point_saved = victim;
+        }
+        if (hit) {
+            SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
+            SC64_ROUTE_PF(slot) = 0;
+            SC64_ROUTE_KEEP_COUNT(POINT_POINTER);
+            return 0;
+        }
+    }
+    return sc64_route_fill(slot, goal);
+}
+#endif
 
 /* Give a lazy slot the bytes a flood on the current grid gives. The cache
  * bookkeeping is untouched. */
@@ -1998,7 +2146,11 @@ sc64_route_slot(int goal)
                 tail = sc64_route_fill(slot, goal);
             }
         } else {
+#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+            tail = sc64_route_fill_point_pointer(slot, goal);
+#else
             tail = sc64_route_fill(slot, goal);
+#endif
         }
         (void)tail;
     }
@@ -2165,6 +2317,36 @@ static int GBA_HOT sc64_route_slot(int goal)
 #endif
 
 #if defined(SC64_RACES) && !defined(SC64_ROUTE_PARTIAL_FLOOD)
+/* A nearby cached field only qualifies when its exact gradient reaches the
+ * requested goal. Decode the origin once and carry the coordinates along
+ * the bounded walk, rather than dividing the cell index at every step. */
+static int __attribute__((noinline))
+sc64_route_near_root_reaches(int slot, int cell, int goal, int root)
+{
+#ifdef SC64_ROUTE_KEEP_FIELDS
+    /* The gate proves the preferred path to the cached root still agrees
+     * with a fresh flood. If the new goal lies on it, the same suffix proof
+     * applies; keep the rest of the field lazy for independent origins. */
+    if (SC64_ROUTE_LAZY(slot) && !sc64_route_gate(slot, cell, root))
+        SC64_ROUTE_EXACT(slot);
+#else
+    (void)root;
+#endif
+    int cols = MAP_COLS, rows = MAP_ROWS;
+    int row = sc64_cell_row((unsigned)cell), col = cell - row * cols;
+    if (!SC64_GRID_GET(path_walkable, cell)) return cell == goal;
+    for (unsigned step = 0; step < 128u && cell != goal; ++step) {
+        int d = sc64_route_get(slot, cell);
+        if (d == 1) { if (++col >= cols) break; ++cell; }
+        else if (d == 2) { if (--col < 0) break; --cell; }
+        else if (d == 3) { if (++row >= rows) break; cell += cols; }
+        else if (d == 4) { if (--row < 0) break; cell -= cols; }
+        else break;
+        if (!SC64_GRID_GET(path_walkable, cell)) return 0;
+    }
+    return cell == goal;
+}
+
 #ifdef SC64_ROUTE_MONOTONE_ENABLED
 static int __attribute__((noinline))
 sc64_route_step_slot_mode(int origin, int goal, int allow_build)
@@ -2188,7 +2370,7 @@ sc64_route_step_slot_mode(int origin, int goal, int allow_build)
         return allow_build ? SC64_ROUTE_SLOT_Q(goal) : -1;
 #endif
     for (i = 0; i < active_slots && used < 2; ++i) {
-        int root, rx, ry, gx, gy, cur, steps, apart;
+        int root, rx, ry, gx, gy, apart;
         if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
         /* A root within four cells of the goal is at most four rows and four
@@ -2201,21 +2383,7 @@ sc64_route_step_slot_mode(int origin, int goal, int allow_build)
         gx = goal % MAP_COLS; gy = goal / MAP_COLS;
         if ((rx > gx ? rx-gx : gx-rx) + (ry > gy ? ry-gy : gy-ry) > 4) continue;
         ++used;
-        SC64_ROUTE_EXACT(i);
-        cur = origin;
-        for (steps = 0; steps < 128 && cur != goal; ++steps) {
-            int d, x, y;
-            if (!SC64_GRID_GET(path_walkable, cur)) break;
-            d = sc64_route_get(i, cur);
-            if (d < 1 || d > 4) break;
-            x = cur % MAP_COLS; y = cur / MAP_COLS;
-            if (d == 1) ++x; else if (d == 2) --x;
-            else if (d == 3) ++y; else --y;
-            if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) break;
-            cur = x + y * MAP_COLS;
-            if (!SC64_GRID_GET(path_walkable, cur)) break;
-        }
-        if (cur != goal) continue;
+        if (!sc64_route_near_root_reaches(i, origin, goal, root)) continue;
 #ifdef SC64_ROUTE_DECAY_FREQ
         sc64_route_age_request();
         sc64_route_age_touch(i, 1);
@@ -2263,7 +2431,7 @@ sc64_route_step_slot(int origin, int goal)
     if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) return SC64_ROUTE_SLOT_Q(goal);
 #endif
     for (i = 0; i < active_slots && used < 2; ++i) {
-        int root, rx, ry, gx, gy, cur, steps, apart;
+        int root, rx, ry, gx, gy, apart;
         if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
         /* A root within four cells of the goal is at most four rows and four
@@ -2276,21 +2444,7 @@ sc64_route_step_slot(int origin, int goal)
         gx = goal % MAP_COLS; gy = goal / MAP_COLS;
         if ((rx > gx ? rx-gx : gx-rx) + (ry > gy ? ry-gy : gy-ry) > 4) continue;
         ++used;
-        SC64_ROUTE_EXACT(i);
-        cur = origin;
-        for (steps = 0; steps < 128 && cur != goal; ++steps) {
-            int d, x, y;
-            if (!SC64_GRID_GET(path_walkable, cur)) break;
-            d = sc64_route_get(i, cur);
-            if (d < 1 || d > 4) break;
-            x = cur % MAP_COLS; y = cur / MAP_COLS;
-            if (d == 1) ++x; else if (d == 2) --x;
-            else if (d == 3) ++y; else --y;
-            if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) break;
-            cur = x + y * MAP_COLS;
-            if (!SC64_GRID_GET(path_walkable, cur)) break;
-        }
-        if (cur != goal) continue;
+        if (!sc64_route_near_root_reaches(i, origin, goal, root)) continue;
 #ifdef SC64_ROUTE_DECAY_FREQ
         sc64_route_age_request();
         sc64_route_age_touch(i, 1);
@@ -2423,8 +2577,18 @@ sc64_route_monotone_next_step(int origin, int goal, int tx, int ty,
 #ifdef SC64_ROUTE_DECAY_FREQ
     if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) return 0;
 #endif
+    /* Maximum memo and monotone depth: 128*128 bits, plus 255 u16 entries.
+     * Keep this writer below the borrowed tail without changing its budget. */
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+    _Static_assert(sizeof(bfs_queue) - SC64_ROUTE_POINT_BYTES >= 2048 + 255 * sizeof(u16),
+                   "monotone probe and route tail need disjoint scratch");
+#endif
     status = sc64_route_monotone_probe(path_walkable, cols, rows, active_cells,
-                                       bfs_queue, sizeof(bfs_queue), origin, goal,
+                                       bfs_queue, sizeof(bfs_queue)
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+                                       - SC64_ROUTE_POINT_BYTES
+#endif
+                                       , origin, goal,
                                        512u, &predecessor, &stats);
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     sc64_route_probe_diag.attempts++;
@@ -2650,7 +2814,7 @@ sc64_route_fill_facility_fifo(u8 *field, int center_x, int center_y,
                              int origin, int *complete)
 {
     const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
-    const int cap = cols == SC64_LINEAR_WIDE_COLS ? SC64_LINEAR_WIDE_QUEUE_CAP : SC64_ROUTE_LINEAR_QUEUE_CAP;
+    const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
     int tail = 0, start = 0;
     if (origin >= 0) start = origin + sc64_cell_row(origin) * SC64_LINEAR_PAD + stride + 4;
@@ -2789,6 +2953,7 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
         tail = 0;
     }
 #endif
+    SC64_ROUTE_POINT_TAIL_RELEASE();
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);

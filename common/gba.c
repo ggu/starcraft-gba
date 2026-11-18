@@ -11,7 +11,8 @@ static GbaElapsedClock gba_elapsed_clock;
 static u32 gba_host_elapsed_ms;
 #endif
 #endif
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE) || \
+    defined(GBA_PRESENT_VBLANK_EPOCH)
 #include "gba_present.h"
 #endif
 #ifdef GBA_HOST
@@ -51,6 +52,48 @@ static volatile u16 *pixels=(volatile u16*)0x0600a000;
 #if defined(GBA_ASYNC_PRESENT) && !defined(GBA_HOST) && \
     defined(SC64_AUDIO_IMPORTED) && !defined(SC64_TILE_RENDERER)
 #define GBA_ASYNC_PRESENT_ACTIVE 1
+#endif
+#if defined(GBA_PRESENT_VBLANK_EPOCH) && !defined(GBA_HOST)
+/* This counter owns the IRQ only in the software Mode 4 build without
+ * sampled audio. Tile uploads and the audio IRQ keep their own pacing. */
+#if defined(SC64_AUDIO_IMPORTED) || defined(SC64_TILE_RENDERER)
+#error "The standalone VBlank epoch counter needs software Mode 4 without sampled audio"
+#endif
+#define GBA_PRESENT_VBLANK_EPOCH_ACTIVE 1
+static volatile u32 vblank_epoch;
+static u32 last_flip_epoch;
+
+/* The BIOS enters the callback in ARM state. Only VBlank is enabled. */
+__attribute__((target("arm"), noinline)) static void present_epoch_irq(void)
+{
+    ++vblank_epoch;
+    REG16(0x04000202) = 1;
+    *(volatile u16 *)0x03007ff8 |= 1;
+}
+
+static void present_epoch_init(void)
+{
+    vblank_epoch = 0;
+    last_flip_epoch = (u32)-2; /* Allow the first page in the first safe blank. */
+    *(volatile u32 *)0x03007ffc = (u32)present_epoch_irq;
+    REG16(0x04000202) = 1;
+    REG16(0x04000004) |= 8;
+    REG16(0x04000200) = 1;
+    REG16(0x04000208) = 1;
+}
+
+static u32 present_wait_epoch(void)
+{
+    for (;;) {
+        u32 epoch = vblank_epoch;
+        u16 line = REG16(0x04000006);
+        /* The interrupt may begin between either read. Count the new epoch
+         * before admitting a line in its VBlank. */
+        if (gba_present_epoch_ready(epoch, last_flip_epoch, line) &&
+            !(REG16(0x04000202) & 1) && epoch == vblank_epoch)
+            return epoch;
+    }
+}
 #endif
 #ifdef GBA_ASYNC_PRESENT_ACTIVE
 /* The VBlank interrupt performs the page flip that gfx_end queues, so the
@@ -278,7 +321,7 @@ void gfx_host_frame_rgb(u16 *rgb) {
     for(int i=0;i<38400;i++){u16 a=host_fb[front][i/2];rgb[i]=host_palette[(i&1)?a>>8:a&255];}
 }
 #endif
-#ifndef GBA_ASYNC_PRESENT_ACTIVE
+#if !defined(GBA_ASYNC_PRESENT_ACTIVE) && !defined(GBA_PRESENT_VBLANK_EPOCH_ACTIVE)
 static u32 previous_present;
 #endif
 #ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
@@ -329,6 +372,9 @@ void gba_init(void) {
  front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
 #ifdef SC64_AUDIO_IMPORTED
  audio_hw_init();
+#endif
+#ifdef GBA_PRESENT_VBLANK_EPOCH_ACTIVE
+ present_epoch_init();
 #endif
 #endif
 }
@@ -413,7 +459,8 @@ return 0;
 return (~REG16(0x04000130))&1023;
 #endif
 }
-#if !defined(GBA_HOST) && !defined(SC64_LATE_TERRAN_STORAGE) && !defined(GBA_PRESENT_DEADLINE) && !defined(GBA_ASYNC_PRESENT_ACTIVE)
+#if !defined(GBA_HOST) && !defined(SC64_LATE_TERRAN_STORAGE) && !defined(GBA_PRESENT_DEADLINE) && \
+    !defined(GBA_ASYNC_PRESENT_ACTIVE) && !defined(GBA_PRESENT_VBLANK_EPOCH_ACTIVE)
 static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<160){}}
 #endif
 void gfx_begin(u8 color) {
@@ -662,7 +709,9 @@ void gfx_end(void) {
     return;
 #else
 #ifndef GBA_HOST
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
+#if defined(GBA_PRESENT_VBLANK_EPOCH_ACTIVE)
+    u32 epoch = present_wait_epoch();
+#elif defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
     while (!gba_present_ready(gba_clock()-previous_present,
                               REG16(0x04000006))) {}
 #else
@@ -699,7 +748,9 @@ void gfx_end(void) {
     front^=1;
 #ifndef GBA_HOST
     REG16(0x04000000)=0x0404|(front?16:0);
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
+#if defined(GBA_PRESENT_VBLANK_EPOCH_ACTIVE)
+    last_flip_epoch = epoch;
+#elif defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
     previous_present=gba_clock();
 #else
     if(elapsed<280896u)vblank();

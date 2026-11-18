@@ -39,7 +39,8 @@
  * this, to separate the cost of the engine change from that of the new play. */
 #if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && \
     defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
-    defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_P7_ACTORS) && \
+    defined(SC64_P7_PROJECTILES_ENABLED) && \
+    (defined(SC64_P7_ACTORS) || defined(SC64_TERRAN_CARRIER_PROBE)) && \
     !defined(RACE_AI_NO_CARRIERS)
 #define RACE_AI_CARRIERS 1
 #ifndef SC64_P7_INTERCEPTOR_COST

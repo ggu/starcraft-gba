@@ -382,8 +382,19 @@ static void race_z7_reconcile_paid_products(void)
     }
 }
 
-static int race_z7_live_world_valid(void)
+#if defined(SC64_Z7_VALIDATED_CENSUS) && \
+    !(defined(SC64_Z7_PREVALIDATED_TICK) && defined(SC64_Z7_COUNT_SNAPSHOT) && defined(SC64_Z7_PRUNE_STARTED))
+#error "Z7 validated census requires the prevalidated pruned count snapshot"
+#endif
+
+static int race_z7_validate_live_world(u32 *late)
 {
+#ifdef SC64_Z7_VALIDATED_CENSUS
+    u32 own=0, hostile=0;
+    unsigned current=race_z7_world.source_current_player;
+#else
+    (void)late;
+#endif
     if (!race_z7_map) return 0;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive) {
         int raw=u[i].raw_type; unsigned slot=(unsigned)u[i].raw_owner;
@@ -391,6 +402,9 @@ static int race_z7_live_world_valid(void)
             !race_z7_world.source_slot_active[slot] ||
             race_z7_world.live_owner_for_source[slot]!=u[i].owner || raw<0 ||
             sc64_race_unit_from_raw(raw)!=u[i].type) return 0;
+#ifdef SC64_Z7_VALIDATED_CENSUS
+        if (late) own+=slot==current;
+#endif
     }
     for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) {
         unsigned slot=(unsigned)b[i].raw_owner;
@@ -398,9 +412,21 @@ static int race_z7_live_world_valid(void)
             !race_z7_world.source_slot_active[slot] ||
             race_z7_world.live_owner_for_source[slot]!=b[i].owner ||
             b[i].raw_type<0 || sc64_race_building_from_raw(b[i].raw_type)<0) return 0;
+#ifdef SC64_Z7_VALIDATED_CENSUS
+        if (late) {
+            own+=slot==current;
+            hostile+=race_z7_world.source_force_for_slot[slot]==1u;
+        }
+#endif
     }
+#ifdef SC64_Z7_VALIDATED_CENSUS
+    if (late) { late[0]=own; late[1]=hostile; }
+#endif
     return 1;
 }
+
+static int race_z7_live_world_valid(void)
+{ return race_z7_validate_live_world(0); }
 
 static int race_z7_runtime_init(const Sc64RaceMap *map)
 {
@@ -463,6 +489,12 @@ static int race_z7_rebind_loaded_world(const Sc64RaceMap *map)
 static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
 {
     int result;
+#if defined(SC64_Z7_PREVALIDATED_TICK) && defined(SC64_Z7_COUNT_SNAPSHOT) && defined(SC64_Z7_PRUNE_STARTED)
+    u32 *validated_late=0;
+#endif
+#ifdef SC64_Z7_VALIDATED_CENSUS
+    u32 late[2];
+#endif
     if (!race_z7_active()) return 1;
     if (!race_z7_map || !sc64_z7_persistent_state_valid(&race_z7)) {
         race_z7.runtime.fault=SC64_Z7_RUNTIME_FAULT_BINDING; return 0;
@@ -470,7 +502,16 @@ static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
     race_z7_world.elapsed_frames=elapsed_frames;
     if (user_paused || race_z7.runtime.model.outcome!=SC64_Z7_RUNNING) return 1;
     race_z7_reconcile_paid_products();
+#ifdef SC64_Z7_VALIDATED_CENSUS
+    /* Only the authenticated two-predicate late path can use these counts.
+     * Validation still checks every live actor and publishes no partial counts. */
+    if (race_z7_pruned_binding_valid() &&
+        sc64_z7_count_snapshot_needed(race_z7.runtime.model.started)==3u)
+        validated_late=late;
+    if (!race_z7_validate_live_world(validated_late)) {
+#else
     if (!race_z7_live_world_valid()) {
+#endif
         race_z7.runtime.fault=SC64_Z7_RUNTIME_FAULT_ACTOR; return 0;
     }
 #if defined(SC64_Z7_PREVALIDATED_TICK)
@@ -481,7 +522,7 @@ static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
         if (race_z7_pruned_binding_valid()) {
             Sc64Z7WorldOps pruned_ops=race_z7_ops;
             if (sc64_z7_count_snapshot_begin_pruned(&race_z7_world,
-                    race_z7.runtime.model.started)) {
+                    race_z7.runtime.model.started,validated_late)) {
                 pruned_ops.condition=race_z7_pruned_condition_callback;
                 result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&pruned_ops,0);
             } else {

@@ -1,0 +1,131 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Fail-closed checks for the Carrier ARM gate's evidence parser."""
+import hashlib
+import struct
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+import sc64_carrier_release_physical as gate
+
+
+TAG = 0x764D5442
+
+
+def record(tag, sequence, data):
+    checksum = 2166136261
+    for value in data:
+        checksum = ((checksum ^ value) * 16777619) & 0xffffffff
+    return (struct.pack("<4I", tag, len(data), checksum, sequence) + data).ljust(gate.SLOT, b"\xff")
+
+
+class TestCarrierReleasePhysical(unittest.TestCase):
+    def setUp(self):
+        self.data = bytes(range(256)) * 40
+        self.old = record(TAG, 1, self.data)
+        self.erased = b"\xff" * gate.SLOT
+        self.first = self.old + self.erased
+
+    def test_immediate_payload_and_predecessor(self):
+        verified = gate.verify_journal(self.first, self.old + record(TAG, 2, self.data), TAG)
+        self.assertEqual(verified["payload_bytes"], len(self.data))
+
+    def test_reject_valid_but_wrong_generation_sequence_or_payload(self):
+        for changed in (record(0x76435442, 2, self.data), record(TAG, 3, self.data),
+                        record(TAG, 2, b"x" + self.data[1:])):
+            with self.subTest(header=changed[:16]), self.assertRaises(gate.ContinuationError):
+                gate.verify_journal(self.first, self.old + changed, TAG)
+
+    def test_reject_checksum_corruption_and_non_erased_other_bank(self):
+        new = record(TAG, 2, self.data)
+        with self.assertRaisesRegex(gate.ContinuationError, "checksum"):
+            gate.verify_journal(self.first, self.old + new[:16] + b"x" + new[17:], TAG)
+        with self.assertRaisesRegex(gate.ContinuationError, "other bank"):
+            gate.verify_journal(self.old + new, self.old + new, TAG)
+
+    def test_predecessor_padding_is_preserved(self):
+        new = record(TAG, 2, self.data)
+        with self.assertRaisesRegex(gate.ContinuationError, "predecessor"):
+            gate.verify_journal(self.first, self.old[:-1] + b"\x00" + new, TAG)
+
+    def test_showcase_has_no_campaign_cartridge_case(self):
+        with self.assertRaises(gate.ContinuationError):
+            gate.plan_case("showcase", "campaign")
+
+    def test_campaign_chapters_in_menu_order(self):
+        for profile, ids in (("terran", list(range(4, 14))),
+                             ("zerg", [0, 1, *range(14, 22)])):
+            plans = [gate.plan_case(profile, "campaign", chapter) for chapter in range(1, 11)]
+            self.assertEqual([plan["mission"] for plan in plans], ids)
+            self.assertEqual([plan["ordinal"] for plan in plans], list(range(10)))
+            self.assertEqual(gate.plan_case(profile, "campaign"), plans[-1])
+        for invalid in (0, 11, True):
+            with self.subTest(chapter=invalid), self.assertRaises(gate.ContinuationError):
+                gate.plan_case("terran", "campaign", invalid)
+        with self.assertRaises(gate.ContinuationError):
+            gate.plan_case("zerg", "migration", 3)
+
+    def test_stock_migration_preserves_bank_and_accepts_distinct_payload_layouts(self):
+        for profile in gate.PRODUCTS:
+            plan = gate.plan_case(profile, "migration")
+            a, b = plan["predecessor_tag"], plan["tag"]
+            stock = record(a, 1, self.data)
+            packed = b"migrated compact state"
+            converted = record(b, 2, packed)
+            with self.subTest(profile=profile):
+                evidence = gate.verify_migration_journal(stock + self.erased, stock + converted, a, b)
+                self.assertEqual(evidence["stock_payload_sha256"], hashlib.sha256(self.data).hexdigest())
+                self.assertEqual(evidence["new_payload_sha256"], hashlib.sha256(packed).hexdigest())
+
+    def test_stock_migration_rejects_fallback_overwrite_and_unqualified_source(self):
+        old_tag = 0x76435442
+        stock = record(old_tag, 1, self.data)
+        fresh = stock + self.erased
+        converted = record(TAG, 2, b"compact")
+        for first, second, target_tag in (
+            (fresh, stock + record(old_tag, 2, self.data), TAG),
+            (fresh, stock + record(TAG, 3, b"compact"), TAG),
+            (fresh, stock + converted[:16] + b"X" + converted[17:], TAG),
+            (fresh, stock[:-1] + b"\x00" + converted, TAG),
+            (stock + converted, stock + converted, TAG),
+            (fresh, stock + record(old_tag, 2, self.data), old_tag),
+        ):
+            with self.assertRaises(gate.ContinuationError):
+                gate.verify_migration_journal(first, second, old_tag, target_tag)
+
+    def test_campaign_counts_world_updates_and_closes_modal_on_save_cut(self):
+        class ScriptedGame:
+            sym = {"sc64_text_box_missions": 1}
+            opened, frame, pages, acks = False, 1, 0, 0
+
+            def __init__(self):
+                self.rsp = self
+
+            def read(self, address, length):
+                assert (address, length) == (gate.TEXT_BOX_COUNT_VRAM, 2)
+                return int(self.pages > 0).to_bytes(2, "little")
+
+            def u32(self, field):
+                return {"screen": gate.SCREEN_PLAY, "frame": self.frame}[field]
+
+            def step(self):
+                assert not self.pages
+                self.frame += 1
+                if self.frame == 3 and not self.opened:
+                    self.opened, self.pages = True, 2
+
+            def tap(self, key):
+                assert key == gate.KEY_A and self.pages
+                self.pages -= 1
+                self.acks += 1
+
+        game = ScriptedGame()
+        gate.advance_world(game, {"mode": 0}, 1, 2)
+        self.assertEqual((game.frame, game.pages, game.acks), (3, 0, 2))
+        gate.advance_world(game, {"mode": 0}, 3, 10)
+        self.assertEqual((game.frame, game.acks), (13, 2))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -30,6 +30,12 @@ typedef struct {
 int sc64_pool_init(Sc64Arena *a);
 int sc64_pool_acquire(Sc64Arena *a, uint8_t *ordinal, uint8_t *native_index);
 int sc64_pool_retire(Sc64Arena *a, uint8_t ordinal);
+/* Only for an exclusively owned live arena from init or validated decode,
+ * maintained by checked pool mutators and domain-valid row updates. Use an
+ * ordinal from the active chain. Check the splice, not unseen rows; retain
+ * the complete validator on incoming packets and save/export. Like strict
+ * retirement, leaves non-list fields in the newly free row unchanged. */
+int sc64_pool_retire_live(Sc64Arena *a, uint8_t ordinal);
 int sc64_pool_validate(const Sc64Arena *a);
 /* Bounded list cursor for the exclusively owned runtime arena. Returns 255
  * on malformed head metadata, SC64_END for an empty active list. */
@@ -58,6 +64,42 @@ int sc64_pool_get_row(const Sc64Arena *a, uint8_t ordinal, Sc64ProjectileRow *ou
  */
 int sc64_pool_set_row(Sc64Arena *a, uint8_t ordinal, const Sc64ProjectileRow *row);
 uint8_t sc64_native_index(uint8_t ordinal);
+
+#ifdef SC64_INTERCEPTOR_COMPACT_CODEC
+/* Standalone compact format. The enclosing save owns its version and the
+ * active cap (0..SC64_POOL_CAPACITY), fixed from pool init through loading.
+ * Use only the capped acquire and canonical retire operations for this pool.
+ * Every acquire must be followed by initialization before a save boundary. */
+int sc64_compact_pool_acquire(Sc64Arena *a, unsigned cap,
+                              uint8_t *ordinal, uint8_t *native_index);
+int sc64_compact_pool_retire(Sc64Arena *a, uint8_t ordinal);
+/* Live retirement with the same exclusive-ownership contract and compact
+ * canonicalization of all non-list fields in the newly free row. */
+int sc64_compact_pool_retire_live(Sc64Arena *a, uint8_t ordinal);
+/* Worst-case bytes, or zero for invalid cap. */
+size_t sc64_compact_codec_max_bytes(unsigned cap);
+/* Returns the bytes written, or zero on rejection. Writes only those bytes. */
+size_t sc64_compact_codec_encode(const Sc64Arena *a, unsigned cap,
+                                  uint8_t *out, size_t out_capacity);
+/* Detached preflight. Optionally visits active rows in list order, after
+ * validating the entire packet; the predicate must not mutate live state or
+ * the packet. Zero from the predicate rejects the candidate. The empty
+ * unallocated pool encodes as two bytes. */
+typedef int (*Sc64CompactRowCheck)(void *context, uint8_t ordinal,
+                                    const Sc64ProjectileRow *row);
+int sc64_compact_codec_validate(const uint8_t *in, size_t in_size,
+                                unsigned cap, Sc64CompactRowCheck check,
+                                void *context);
+/* Pass the exact encoded length. Malformed/overlapping packets leave every
+ * destination word intact. The caller keeps both descriptors and underlying
+ * buffers stable and independently owned throughout the call. */
+int sc64_compact_codec_validate_target(const Sc64Arena *a, const uint8_t *in,
+                                       size_t in_size, unsigned cap,
+                                       Sc64CompactRowCheck check, void *context);
+/* Commit after the same preflight, without a world predicate. */
+int sc64_compact_codec_decode(Sc64Arena *a, const uint8_t *in, size_t in_size,
+                              unsigned cap);
+#endif
 #ifdef __cplusplus
 }
 #endif

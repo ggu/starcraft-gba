@@ -10,6 +10,9 @@
 #if defined(SC64_CONTACT_CACHE)
 #define SC64_CONTACT_MEMO_ENABLED 1
 static void sc64_contact_memo_invalidate(void);
+#ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
+static void sc64_contact_memo_move_cells(unsigned from, unsigned to);
+#endif
 #define SC64_CONTACT_MEMO_INVALIDATE() sc64_contact_memo_invalidate()
 #endif
 #include "../common/gba.h"
@@ -303,8 +306,14 @@ static u32 sc64_unit_words_explicit_raw_calls;
 #error "P7 typed compact save requires unified P7 battery and Arbiter cache profile"
 #endif
 
+#if defined(SC64_TERRAN_CARRIER_PROBE) && defined(SC64_ZERG_CARRIER_PROBE)
+#error "Terran and Z10 Carrier journals are mutually exclusive"
+#endif
+#if defined(SC64_TERRAN_CARRIER_PROBE) || defined(SC64_ZERG_CARRIER_PROBE)
+#define SC64_CUSTOM_CARRIER_PROBE 1
+#endif
 #if defined(SC64_P7_PROJECTILES_ENABLED) && \
-    (!defined(SC64_P7_TYPED_COMPACT_ENABLED) || !defined(SC64_P7_ACTORS))
+    (!defined(SC64_P7_TYPED_COMPACT_ENABLED) || !defined(SC64_P7_ACTORS)) && !defined(SC64_CUSTOM_CARRIER_PROBE)
 #error "Interceptor projectiles require the P7 typed save and shared source clock"
 #endif
 #if defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_TILE_RENDERER)
@@ -314,6 +323,43 @@ static u32 sc64_unit_words_explicit_raw_calls;
 #include "sc64_interceptor_motion.h"
 _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
                "Interceptor arena exceeds Mode 4 OBJ reserve");
+#endif
+#ifdef SC64_ZERG_CARRIER_PROBE
+#if !defined(SC64_Z10_RUNTIME) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || !defined(SC64_INTERCEPTOR_COMPACT_CODEC) || \
+    !defined(SC64_IMPACT_EVENTS) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || \
+    defined(SC64_Z7_DERIVED_SAVE) || !defined(SC64_P7_ACTORS) || defined(SC64_SHOWCASE_CARRIER_PROBE) || \
+    defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
+    defined(SC64_NUKE_SILO_JOURNAL) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
+    defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || \
+    defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
+#error "Z10 Carrier probe requires the isolated full Z10 journal vector"
+#endif
+#elif defined(SC64_TERRAN_CARRIER_PROBE)
+#if !defined(SC64_TERRAN_LATE_RUNTIME) || !defined(SC64_LATE_TERRAN_STORAGE) || \
+    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || !defined(SC64_INTERCEPTOR_COMPACT_CODEC) || \
+    !defined(SC64_IMPACT_EVENTS) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
+    !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || \
+    defined(SC64_NUKE_SILO_JOURNAL) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
+    defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || defined(SC64_P7_ACTORS) || \
+    defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
+    defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
+#error "Terran Carrier probe requires the isolated full Terran journal vector"
+#endif
+#endif
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+#if !defined(SC64_SHOWCASE_ENABLED) || !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || \
+    !defined(SC64_INTERCEPTOR_COMPACT_CODEC) || !defined(SC64_IMPACT_EVENTS) || \
+    !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || \
+    !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
+    defined(SC64_NUKE_SILO_JOURNAL) || defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || \
+    defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
+    defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
+#error "Showcase Carrier probe requires the full Showcase journal and shared flight"
+#endif
+#include "sc64_showcase_carrier_wire.h"
 #endif
 #if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_P7_PROJECTILES_ENABLED)
 #error "Carrier training requires P7 projectile storage and typed actor state"
@@ -495,11 +541,14 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #define SC64_RACE_SAVE_GENERATION 45u
 #elif defined(SC64_P8_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 44u
-#elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
+#elif defined(SC64_SHOWCASE_CARRIER_PROBE)
+/* The outer tag selects the extension; preserve the predecessor inner token. */
+#define SC64_RACE_SAVE_GENERATION 40u
+#elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
 #define SC64_RACE_SAVE_GENERATION 43u
-#elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#elif defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
 #define SC64_RACE_SAVE_GENERATION 42u
-#elif defined(SC64_P7_PROJECTILES_ENABLED)
+#elif defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
 #define SC64_RACE_SAVE_GENERATION 41u
 #elif defined(SC64_P7_TYPED_COMPACT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 40u
@@ -668,6 +717,9 @@ _Static_assert((SC64_PRE_CARGO_SAVE_VERSION & 0x01000000u) != 0,
 #ifdef SC64_SHARED_TRANSPORT
 _Static_assert((SAVE_VERSION & 0x04000000u) == 0, "transport save namespace overlaps");
 #define SC64_TRANSPORT_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+#define SC64_SHOWCASE_CARRIER_TAG SC64_SAVE_TAG_SHOWCASE_CARRIER(SC64_TRANSPORT_SAVE_VERSION)
+#endif
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #if !defined(GBA_HOST) || !defined(SC64_WORKER_CARGO_KIND) || !defined(SC64_SHARED_TRANSPORT) || defined(SC64_SCARAB_NAMESPACE_STAGE)
@@ -1761,7 +1813,14 @@ typedef union {
 #ifdef SC64_IMPACT_EVENTS
     RaceImpactRecord impact_record;
 #endif
+#ifdef SC64_TERRAN_CARRIER_PROBE
+    struct { RaceSave save; Unit units[MAX_UNITS]; } carrier_candidate;
+#endif
 } Sc64CombinedRouteSaveScratch;
+#ifdef SC64_TERRAN_CARRIER_PROBE
+_Static_assert(sizeof(RaceSave)+sizeof(Unit)*MAX_UNITS<=sizeof(u16)*MAP_CELLS,
+               "Terran Carrier candidate decode must fit route scratch");
+#endif
 #ifdef SC64_IMPACT_EVENTS
 _Static_assert(sizeof(RaceImpactRecord) <= sizeof(u16) * MAP_CELLS,
                "impact save record must fit existing route scratch");
@@ -1772,6 +1831,9 @@ static Sc64CombinedRouteSaveScratch sc64_combined_route_save_scratch;
     _Static_assert(sizeof(((type *)0)->member) + sizeof(path_walkable) <= \
                    sizeof(((type *)0)->bfs_queue), \
                    "previous-grid copy overlaps " #member)
+#ifdef SC64_TERRAN_CARRIER_PROBE
+SC64_ROUTE_TAIL_CLEAR(Sc64CombinedRouteSaveScratch, carrier_candidate);
+#endif
 SC64_ROUTE_TAIL_CLEAR(Sc64CombinedRouteSaveScratch, save);
 #ifdef SC64_IMPACT_EVENTS
 SC64_ROUTE_TAIL_CLEAR(Sc64CombinedRouteSaveScratch, impact_record);
@@ -1797,7 +1859,7 @@ static void sc64_routes_grid_commit(void);
 static void sc64_range_route_forget_target(int target);
 #endif
 #else
-static int bfs_prev[MAP_CELLS], bfs_queue[MAP_CELLS];
+static u16 bfs_first[MAP_CELLS], bfs_queue[MAP_CELLS];
 static u16 bfs_seen[MAP_CELLS], bfs_generation;
 #endif
 /* Boolean cache state; a byte avoids padding before route/save scratch. */
@@ -2240,9 +2302,14 @@ enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
 static void hit_target_impl_ex(int,int,int,int,int,int);
 static void race_siege_splash_attack(Unit *,int,int);
 #endif
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_CUSTOM_CARRIER_PROBE)
 static int race_p7_active(void);
 #include "sc64_protoss_services.h"
+#ifdef SC64_CUSTOM_CARRIER_PROBE
+static int race_p7_active(void) { return 0; }
+static int race_p7_source_owner(unsigned slot) { (void)slot; return -1; }
+static u8 *race_protoss_service_clock(void) { return race_protoss_generic_clock; }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int race_p7_carrier_training_stock(int carrier, unsigned count);
 #endif
@@ -2278,7 +2345,11 @@ static void race_p7_projectile_source_tick(void);
 static void race_p7_projectile_tick_if_due(void);
 static void race_p7_projectile_draw(void);
 static int race_p7_projectile_encode(u8 *packet);
-static int race_p7_projectile_restore(const u8 *packet);
+static int race_p7_projectile_restore(const u8 *packet
+#if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)
+                                      ,u16 size
+#endif
+                                     );
 #endif
 #ifdef SC64_IMPACT_EVENTS
 static void race_impact_clear_target(int ref);
@@ -3609,6 +3680,62 @@ is_traversable(int col, int row, int from_cell)
 #include "sc64_depot_goal.h"
 _Static_assert(MAX_BUILDINGS < 0x4000, "facility slot keys must fit the tagged route namespace");
 
+#ifndef SC64_IMPORTED_MISSION
+/* Keep column and row in the queue so visiting a tile never divides by the
+ * map width. Each entry inherits the first step of the parent that found it. */
+_Static_assert(MAP_COLS <= 256 && MAP_ROWS <= 256, "walk queue packs tile coordinates in bytes");
+
+static inline __attribute__((always_inline)) int
+walk_search_begin(int cell, int packed)
+{
+    if (!path_grid_valid)
+        build_path_grid();
+    if (++bfs_generation == 0) {
+        memset(bfs_seen, 0, sizeof(bfs_seen));
+        bfs_generation = 1;
+    }
+    bfs_seen[cell] = bfs_generation;
+    bfs_first[cell] = (u16)packed;
+    bfs_queue[0] = (u16)packed;
+    return 1;
+}
+
+static inline __attribute__((always_inline)) void
+walk_search_enqueue(int cell, int packed, int first, int *tail)
+{
+    if (bfs_seen[cell] == bfs_generation || !SC64_GRID_GET(path_walkable, cell))
+        return;
+    bfs_seen[cell] = bfs_generation;
+    bfs_first[cell] = (u16)(first < 0 ? packed : first);
+    bfs_queue[(*tail)++] = (u16)packed;
+}
+
+static inline __attribute__((always_inline)) int
+walk_search_expand(int packed, int col, int row, int cell, int start, int tail)
+{
+    int first = cell == start ? -1 : bfs_first[cell];
+    /* Keep the original neighbor order for equally short approaches. The
+     * blocked start can be processed but is already seen and never reentered. */
+    if (col + 1 < MAP_COLS)
+        walk_search_enqueue(cell + 1, packed + 1, first, &tail);
+    if (col > 0)
+        walk_search_enqueue(cell - 1, packed - 1, first, &tail);
+    if (row + 1 < MAP_ROWS)
+        walk_search_enqueue(cell + MAP_COLS, packed + 256, first, &tail);
+    if (row > 0)
+        walk_search_enqueue(cell - MAP_COLS, packed - 256, first, &tail);
+    return tail;
+}
+
+static inline __attribute__((always_inline)) void
+walk_search_step(int cell, int *next_x, int *next_y)
+{
+    unsigned first = bfs_first[cell];
+    *next_x = (first & 255u) * 16 + 8;
+    *next_y = (first >> 8) * 16 + 8;
+}
+#endif
+
 /* Breadth-first on the bounded walk grid; return the first tile toward goal. */
 static int GBA_HOT
 path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
@@ -3616,28 +3743,18 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 #ifdef SC64_IMPORTED_MISSION
     return sc64_route_next(x, y, tx, ty, next_x, next_y);
 #else
-    static const int dx[4] = {1, -1, 0, 0};
-    static const int dy[4] = {0, 0, 1, -1};
     int start_col = limit(x / 16, 0, MAP_COLS - 1);
     int start_row = limit(y / 16, 0, MAP_ROWS - 1);
     int start = start_col + start_row * MAP_COLS;
-    int goal_x = limit(tx / 16, 0, MAP_COLS - 1);
-    int goal_y = limit(ty / 16, 0, MAP_ROWS - 1);
-    int goal_col = goal_x, goal_row = goal_y;
-    int head = 0, tail = 0, i, cell, col, row, next, best = -1, bestd = 0x7fffffff;
-    int goal_open = is_traversable(goal_col, goal_row, -1);
-
-	if (++bfs_generation == 0) {
-	    memset(bfs_seen, 0, sizeof(bfs_seen));
-	    bfs_generation = 1;
-	}
-    bfs_prev[start] = -1;
-    bfs_seen[start] = bfs_generation;
-    bfs_queue[tail++] = start;
+    int goal_col = limit(tx / 16, 0, MAP_COLS - 1);
+    int goal_row = limit(ty / 16, 0, MAP_ROWS - 1);
+    int head = 0, best = -1, bestd = 0x7fffffff;
+    int tail = walk_search_begin(start, start_col + start_row * 256);
+    int goal_open = SC64_GRID_GET(path_walkable, goal_col + goal_row * MAP_COLS);
     while (head < tail) {
-	cell = bfs_queue[head++];
-	col = cell % MAP_COLS;
-	row = cell / MAP_COLS;
+	int packed = bfs_queue[head++];
+	int col = packed & 255, row = packed >> 8;
+	int cell = col + row * MAP_COLS;
 	if (FAST_ABS(col - goal_col) <= 1 && FAST_ABS(row - goal_row) <= 1) {
 	    int d = (col - goal_col) * (col - goal_col) + (row - goal_row) * (row - goal_row);
 	    if (d < bestd) {
@@ -3650,29 +3767,16 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 	    if (!d || !goal_open)
 		break;
 	}
-	for (i = 0; i < 4; i++) {
-	    int nc = col + dx[i], nr = row + dy[i];
-	    if (nc < 0 || nr < 0 || nc >= MAP_COLS || nr >= MAP_ROWS)
-		continue;
-	    next = nc + nr * MAP_COLS;
-	    if (bfs_seen[next] == bfs_generation || !is_traversable(nc, nr, start))
-		continue;
-	    bfs_prev[next] = cell;
-	    bfs_seen[next] = bfs_generation;
-	    bfs_queue[tail++] = next;
-	}
+	tail = walk_search_expand(packed, col, row, cell, start, tail);
     }
     if (best < 0)
 	return 0;
-    while (bfs_prev[best] != start && bfs_prev[best] >= 0)
-	best = bfs_prev[best];
     if (best == start) {
 	*next_x = tx;
 	*next_y = ty;
 	return 1;
     }
-    *next_x = (best % MAP_COLS) * 16 + 8;
-    *next_y = (best / MAP_COLS) * 16 + 8;
+    walk_search_step(best, next_x, next_y);
     return 1;
 #endif
 }
@@ -3686,32 +3790,22 @@ worker_depot_next(int x, int y, int home, int *next_x, int *next_y)
 #ifdef SC64_IMPORTED_MISSION
     return sc64_route_depot_next(x, y, home, b[home].x, b[home].y, next_x, next_y);
 #else
-    static const int dx[4] = { 1, -1, 0, 0 };
-    static const int dy[4] = { 0, 0, 1, -1 };
     int col = limit(x / 16, 0, MAP_COLS - 1), row = limit(y / 16, 0, MAP_ROWS - 1);
-    int start = col + row * MAP_COLS, head = 0, tail = 0, goal = -1, gx = 0, gy = 0;
-    if (++bfs_generation == 0) { memset(bfs_seen, 0, sizeof(bfs_seen)); bfs_generation = 1; }
-    bfs_prev[start] = -1; bfs_seen[start] = bfs_generation; bfs_queue[tail++] = start;
+    int start = col + row * MAP_COLS, head = 0, goal = -1, gx = 0, gy = 0;
+    int tail = walk_search_begin(start, col + row * 256);
     while (head < tail) {
-        int cell = bfs_queue[head++];
-        col = cell % MAP_COLS; row = cell / MAP_COLS;
-        if (is_traversable(col, row, -1) &&
+        int packed = bfs_queue[head++];
+        col = packed & 255; row = packed >> 8;
+        int cell = col + row * MAP_COLS;
+        if (SC64_GRID_GET(path_walkable, cell) &&
             sc64_depot_cell_point(b[home].x, b[home].y, col, row, &gx, &gy)) {
             goal = cell; break;
         }
-        for (int i = 0; i < 4; ++i) {
-            int nc = col + dx[i], nr = row + dy[i], next;
-            if (nc < 0 || nr < 0 || nc >= MAP_COLS || nr >= MAP_ROWS) continue;
-            next = nc + nr * MAP_COLS;
-            if (bfs_seen[next] == bfs_generation || !is_traversable(nc, nr, start)) continue;
-            bfs_seen[next] = bfs_generation; bfs_prev[next] = cell; bfs_queue[tail++] = next;
-        }
+        tail = walk_search_expand(packed, col, row, cell, start, tail);
     }
     if (goal < 0) return 0;
     if (goal == start) { *next_x = gx; *next_y = gy; return 1; }
-    while (bfs_prev[goal] != start && bfs_prev[goal] >= 0) goal = bfs_prev[goal];
-    *next_x = (goal % MAP_COLS) * 16 + 8;
-    *next_y = (goal / MAP_COLS) * 16 + 8;
+    walk_search_step(goal, next_x, next_y);
     return 1;
 #endif
 }
@@ -9733,50 +9827,77 @@ death_vfx_update(void)
 }
 #endif
 
+#ifndef SC64_IMPORTED_MISSION
+/* The half-width at row offset d is floor(sqrt(radius² - d²)).
+ * Explored tiles use an actor's tile center. Current visibility instead
+ * uses the actor's pixel position, including its offset within that tile. */
+static const u8 explored_span_3[] = {3, 2, 2, 0};
+static const u8 explored_span_4[] = {4, 3, 3, 2, 0};
+static const u8 explored_span_5[] = {5, 4, 4, 4, 3, 0};
+static const u8 explored_span_7[] = {7, 6, 6, 6, 5, 4, 3, 0};
+
+static void GBA_HOT
+mark_explored_circle(int c, int r, int radius, const u8 *span)
+{
+    int top = r - radius < 0 ? 0 : r - radius;
+    int bottom = r + radius < MAP_ROWS ? r + radius : MAP_ROWS - 1;
+    for (int row = top; row <= bottom; row++) {
+        int width = span[row < r ? r - row : row - r];
+        int left = c - width < 0 ? 0 : c - width;
+        int right = c + width < MAP_COLS ? c + width : MAP_COLS - 1;
+        for (int col = left; col <= right; col++)
+            SC64_GRID_SET(explored, col + row * MAP_COLS, 1);
+    }
+}
+
+static void GBA_HOT
+mark_visible_circle(int x, int y, int radius, int tile_extent)
+{
+    int c = x / 16, r = y / 16;
+    int left = c - tile_extent < 0 ? 0 : c - tile_extent;
+    int right = c + tile_extent < MAP_COLS ? c + tile_extent : MAP_COLS - 1;
+    int top = r - tile_extent < 0 ? 0 : r - tile_extent;
+    int bottom = r + tile_extent < MAP_ROWS ? r + tile_extent : MAP_ROWS - 1;
+    int radius_squared = radius * radius;
+    int dy = top * 16 + 8 - y;
+    for (int row = top; row <= bottom; row++, dy += 16) {
+        int remaining = radius_squared - dy * dy;
+        if (remaining < 0)
+            continue;
+        int dx = left * 16 + 8 - x;
+        for (int col = left; col <= right; col++, dx += 16)
+            if (dx * dx <= remaining)
+                SC64_GRID_SET(visible, col + row * MAP_COLS, 1);
+    }
+}
+#endif
+
 static void GBA_HOT
 update_exploration(void)
 {
 #ifdef SC64_IMPORTED_MISSION
     sc64_update_exploration();
 #else
-    int i, col, row;
     SC64_GRID_CLEAR(visible);
-    for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_HIDDEN(&u[i]) && u[i].owner == SIDE) {
-	    int c = u[i].x / 16, r = u[i].y / 16, radius = IS_WORKER(u[i].type) ? 4 : 5;
-	    for (row = r - radius; row <= r + radius; row++)
-		for (col = c - radius; col <= c + radius; col++)
-		    if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS &&
-			(col - c) * (col - c) + (row - r) * (row - r) <= radius * radius)
-			SC64_GRID_SET(explored, col + row * MAP_COLS, 1);
-	    radius = IS_WORKER(u[i].type) ? 56 : 72;
-	    for (row = r - 5; row <= r + 5; row++)
-		for (col = c - 5; col <= c + 5; col++)
-		    if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS) {
-			int dx = col * 16 + 8 - u[i].x;
-			int dy = row * 16 + 8 - u[i].y;
-			if (dx * dx + dy * dy <= radius * radius)
-			    SC64_GRID_SET(visible, col + row * MAP_COLS, 1);
-		    }
-	}
-    for (i = 0; i < MAX_BUILDINGS; i++)
-	if (b[i].alive && b[i].owner == SIDE) {
-	    int c = b[i].x / 16, r = b[i].y / 16, radius = b[i].type == B_COMMAND ? 7 : 3;
-	    for (row = r - radius; row <= r + radius; row++)
-		for (col = c - radius; col <= c + radius; col++)
-		    if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS &&
-			(col - c) * (col - c) + (row - r) * (row - r) <= radius * radius)
-			SC64_GRID_SET(explored, col + row * MAP_COLS, 1);
-	    if (b[i].type == B_COMMAND)
-		for (row = r - 8; row <= r + 8; row++)
-		    for (col = c - 8; col <= c + 8; col++)
-			if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS) {
-			    int dx = col * 16 + 8 - b[i].x;
-			    int dy = row * 16 + 8 - b[i].y;
-			    if (dx * dx + dy * dy <= 112 * 112)
-				SC64_GRID_SET(visible, col + row * MAP_COLS, 1);
-			}
-	}
+    for (int i = 0; i < MAX_UNITS; i++) {
+        Unit *q = &u[i];
+        if (!q->alive || SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_HIDDEN(q) || q->owner != SIDE)
+            continue;
+        int worker = IS_WORKER(q->type);
+        mark_explored_circle(q->x / 16, q->y / 16, worker ? 4 : 5,
+                             worker ? explored_span_4 : explored_span_5);
+        mark_visible_circle(q->x, q->y, worker ? 56 : 72, 5);
+    }
+    for (int i = 0; i < MAX_BUILDINGS; i++) {
+        Building *q = &b[i];
+        if (!q->alive || q->owner != SIDE)
+            continue;
+        int command = q->type == B_COMMAND;
+        mark_explored_circle(q->x / 16, q->y / 16, command ? 7 : 3,
+                             command ? explored_span_7 : explored_span_3);
+        if (command)
+            mark_visible_circle(q->x, q->y, 112, 8);
+    }
 #endif
 }
 
@@ -10467,6 +10588,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     if (race_protoss_services_active()) sc64_p7_arbiter_cache_frame_tick();
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#ifdef SC64_CUSTOM_CARRIER_PROBE
+    race_protoss_generic_clock[0]=(u8)((unsigned)frame%5u);
+#endif
     race_p7_carrier_training_frame_tick();
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
@@ -13134,6 +13258,11 @@ static unsigned race_shared_trigger_obligations(void);
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
 #include "sc64_battery_adapter.h"
+#endif
+#ifdef SC64_CUSTOM_CARRIER_PROBE
+#include "sc64_p7_projectile_adapter.h"
+#include "sc64_p7_carrier_training.h"
+#include "sc64_p7_interceptor_flight.h"
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_runtime_adapter.h"

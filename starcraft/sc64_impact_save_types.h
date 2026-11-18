@@ -58,4 +58,15 @@ typedef struct {
 _Static_assert(sizeof(RaceImpactRecord) <= RACE_IMPACT_RECORD_MAX + SC64_BC_SAVE_EXTRA_BYTES,
                "impact record exceeds one SRAM record");
 
+#ifdef SC64_SHOWCASE_CARRIER_PROBE
+_Static_assert(RACE_IMPACT_SAVE_CAPACITY == RACE_IMPACT_ROWS,
+               "Showcase Carrier holds every pending impact");
+_Static_assert(sizeof(RaceSave) - SC64_SHOWCASE_PROJECTILE_EXTENSION == 14228,
+               "Showcase Carrier must retain the predecessor layout");
+_Static_assert(offsetof(RaceSave,battlecruiser_shots) - offsetof(RaceSave,interceptor_size) ==
+               SC64_SHOWCASE_PROJECTILE_EXTENSION, "Showcase Carrier extension layout");
+_Static_assert(sizeof(RaceImpactRecord) <= RACE_IMPACT_RECORD_MAX,
+               "Showcase Carrier must also hold both Yamato shots");
+#endif
+
 #endif
