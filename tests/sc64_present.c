@@ -71,11 +71,53 @@ test_underbudget_just_over_and_steady_work(void)
     }
 }
 
+static uint64_t
+next_epoch_present(u32 last_epoch, uint64_t ready)
+{
+    const u32 period = GBA_PRESENT_CYCLES_PER_FRAME;
+    for (;;) {
+        u32 epoch = (u32)(ready / period);
+        u16 line = line_at((u32)(ready % period));
+        if (gba_present_epoch_ready(epoch, last_epoch, line))
+            return ready;
+        /* The gate can only change at a line boundary. */
+        ready += 1232u - ready % 1232u;
+    }
+}
+
+static void
+test_epoch_pacing(void)
+{
+    const u32 period = GBA_PRESENT_CYCLES_PER_FRAME, blank = 160u * 1232u;
+    uint64_t shown = blank;
+    const u32 last_epoch = 14;
+    assert(gba_present_epoch_ready(0, (u32)-2, 160));
+    assert(!gba_present_epoch_ready(0, UINT32_MAX, 160));
+    assert(gba_present_epoch_ready(1, UINT32_MAX, 160));
+    assert(!gba_present_epoch_ready(last_epoch + 1, last_epoch, 226));
+    assert(!gba_present_epoch_ready(last_epoch + 2, last_epoch, 227));
+    assert(!gba_present_epoch_ready(last_epoch + 2, last_epoch, 159));
+
+    for (unsigned n = 0; n < 1200; ++n) {
+        u32 epoch = (u32)(shown / period);
+        /* Model work and varying bookkeeping after the previous flip. */
+        shown = next_epoch_present(epoch, shown + period + (n % 41) + 100);
+        assert(shown == (uint64_t)(epoch + 2) * period + blank);
+    }
+
+    uint64_t late = 17u * period + blank + 2000;
+    assert(next_epoch_present(last_epoch, late) == late);
+    assert(next_epoch_present(17, late + period) == 19u * period + blank);
+    assert(next_epoch_present(last_epoch, 16u * period + 227u * 1232u) ==
+           17u * period + blank);
+}
+
 int
 main(void)
 {
     test_ready_window_and_minimum_interval();
     test_wraparound_elapsed();
     test_underbudget_just_over_and_steady_work();
+    test_epoch_pacing();
     return 0;
 }
