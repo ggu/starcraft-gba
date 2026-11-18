@@ -1724,10 +1724,17 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    diagnostic attributes 170,171 guest cycles per advancing update to
    mission dispatch and 80,037 to defenses. Entry tracing locates 120,933
    cycles in the interval from the geometry-bearing count snapshot to the
-   campaign scheduler. Prioritize factoring repeated owner-selector checks
-   out of that census and measuring the geometry. Count duplicate friendly
-   sight footprints before proposing a batching change. Continue the terrain
-   and HUD timing work alongside simulation. [Bucket measurements and native overlap](audits/2026-11-19-contact-bucket-boundaries.md)
+   campaign scheduler. [Bucket measurements and native overlap](audits/2026-11-19-contact-bucket-boundaries.md)
+   The opt-in owner table, reused validation, and fused scan cut that
+   interval to 78,828 cycles and the full dense loop by 1.81%. The separate
+   rectangle cache tests score below the owner-table-only build. Combining
+   census and routing cuts the dense loop by 12.28% in total. The shipping
+   Z10 cartridge now generates the late Z7 save from HOME and all three
+   builds win from it with matching raw world and display. Gather wider
+   campaign and save evidence before enabling the census. Prioritize
+   terrain/HUD costs and measure duplicate friendly sight footprints
+   before batching them. A progressed N64 session is needed for the
+   native box-only Bring witness. [Census and fresh-load results](audits/2026-11-19-z7-snapshot-selectors.md)
    The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
    saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
    [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
