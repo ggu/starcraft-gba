@@ -1166,6 +1166,12 @@ with active shots and peak at 11. Mean guest cycles fall from 938,580
 to 894,297 (4.72%). The 95th percentile falls from 1,266,290 to 1,125,962
 (11.08%). The largest sampled update stays near 5.65M cycles.
 
+The same candidate reproduces the 5,644,044-cycle peak at frame 17,128.
+Orders account for 4,878,404 cycles and the route build counter rises
+by 12 on that update. The preceding and following updates make no
+new builds and take 998,803 and 778,035 cycles respectively. This
+isolates the next tail investigation to the update with the route burst.
+
 All 22 sampled worlds, arenas, framebuffer pages and palettes match.
 The compact pause journals match byte for byte at frame 17,301. Both
 load in new processes and match after a further 180 updates. The two
@@ -1190,4 +1196,5 @@ make test-sc64-interceptor-pool-codec test-sc64-interceptor-motion
 | Isolated ARM allocations | `cbda7a68102af9a1715d6c5fb7a7224d961c4f2cabd297aab0f1fa542ebfffea` |
 | Staged ARM Carrier battle and save pair | `3dcb66f1689f17b88f583ee2bfd2a06eba8bc634f12acde76e7647ff81d77773` |
 | Ordinary compact Z10 Blood Bath battle and save pair | `9422a5127388dc8e9913170a678871f9b6078e279fd58444f032c8fbc2ede062` |
+| Same Z10 match with orders and route counters | `81038247490679fbf72eecb951a6163ece86d6037810327e0f0f5f289d67f425` |
 | P7 comparison with an empty projectile arena | `cba63d691573808af871e740d8c20be16cdaa770c4e180cb4f9e2f97b48e0217` |
