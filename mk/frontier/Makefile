@@ -45,3 +45,10 @@ test-frontier-factions: build/test-frontier-foundry build/test-frontier-rovers b
 	./build/test-frontier-rovers
 	./build/test-frontier-bulwark
 test: test-frontier-factions
+
+.PHONY: test-frontier-terrain-spans
+build/test-frontier-terrain-spans: tests/frontier_terrain_spans.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile mk/frontier/Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ORIGINAL_SKIRMISH_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+test-frontier-terrain-spans: build/test-frontier-terrain-spans
+	./build/test-frontier-terrain-spans
+test: test-frontier-terrain-spans

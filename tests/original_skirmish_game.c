@@ -86,9 +86,39 @@ static void play_match(int map, int bots)
           frame < saved_frame, "restart retains the match setup");
 }
 
+static void check_exploration_restore(void)
+{
+    int worker = -1;
+    int target = 32 + 32 * MAP_COLS;
+    game_init();
+    press(KEY_A);
+    for (int i = 0; i < MAX_UNITS; i++)
+        if (u[i].alive && u[i].owner == SIDE && IS_WORKER(u[i].type)) {
+            worker = i;
+            break;
+        }
+    check(worker >= 0 && !SC64_GRID_GET(explored, target), "scout starts outside unexplored center");
+    press(KEY_START);
+    press(KEY_B);
+    press(KEY_START);
+    for (int pass = 0; pass < 3; pass++) {
+        /* Move the same source to the same cell after each world replacement. */
+        u[worker].x = u[worker].y = 512;
+        update_exploration();
+        check(SC64_GRID_GET(explored, target) && SC64_GRID_GET(visible, target),
+              "a revisited scout center marks both grids");
+        if (pass == 2) break;
+        press(KEY_START);
+        press(pass == 0 ? KEY_L : KEY_R);
+        check(screen == SCREEN_PLAY && !SC64_GRID_GET(explored, target) &&
+              !SC64_GRID_GET(visible, target), "load and restart restore unexplored center");
+    }
+}
+
 int main(void)
 {
     gba_init();
+    check_exploration_restore();
     for (int map = 0; map < ORIGINAL_MAP_COUNT; map++)
         for (int bots = 1; bots <= 3; bots++)
             play_match(map, bots);
