@@ -1,6 +1,10 @@
 #ifndef SC64_STATIC_KEY_H
 #define SC64_STATIC_KEY_H
 
+#ifdef SC64_TERRAIN_FAST_VALIDATE
+/* Same generations from bit words instead of per-slot drawn fields. */
+#include "sc64_static_key_fast.h"
+#else
 /* Track only art that the static pass can draw into this viewport. Payload
  * changes outside that set cannot affect the cached pixels; entering/leaving
  * the set is itself a key change. Keep exact values rather than a hash. */
@@ -112,5 +116,6 @@ sc64_static_objects_key(void)
     if (changed) ++generation;
     return generation;
 }
+#endif
 
 #endif

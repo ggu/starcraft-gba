@@ -10,6 +10,10 @@
 #define SC64_TERRAIN_LOCAL_GRID_GET
 #endif
 
+#if defined(SC64_TERRAIN_FAST_VALIDATE) && defined(SC64_TILE_RENDERER)
+#error "SC64_TERRAIN_FAST_VALIDATE covers the mode-4 terrain cache, not SC64_TILE_RENDERER"
+#endif
+
 #ifdef SC64_TILE_RENDERER
 /* The tile renderer keeps terrain in hardware layers. Its mode-4 fallback
  * (skirmish maps) redraws every frame, so no cache storage is reserved. */
@@ -30,6 +34,10 @@ static int sc64_terrain_store_key(int x, int y, unsigned int k) { (void)x; (void
 #define SC64_TERRAIN_CACHE_Y 12
 #define SC64_TERRAIN_CACHE_HEIGHT 108
 #define SC64_TERRAIN_CACHE_CELLS (17 * 9)
+#ifdef SC64_TERRAIN_FAST_VALIDATE
+/* A cache view starts at x/16 for 0 <= x, so it spans at most 16 columns. */
+#define SC64_TERRAIN_FAST_COLS 17
+#endif
 #ifndef SC64_TERRAIN_STATIC_KEY
 #define SC64_TERRAIN_STATIC_KEY 0u
 #endif
@@ -154,6 +162,36 @@ static const u8 sc64_terrain_fog_triple[64] = {
  * halo row of its window. While the window and these words are unchanged the
  * array is still exact, so a scroll inside one cell window, or a frame in which
  * no fog bit changed, skips the combine pass entirely. */
+#if defined(SC64_TERRAIN_FAST_VALIDATE) && !defined(SC64_SOFT_FOG_SHADE_ONLY)
+/* sc64_terrain_fog_triple for two adjacent columns per lookup. Index bits 0-3
+ * are the known bits of four cells, bits 4-7 their visible bits; the low byte
+ * is the triple of cells 0-2, the high byte that of cells 1-3. A triple is
+ * the sum over its three cells of (known + visible) * 3^position, exactly the
+ * single-column table above (the differential test compares every entry).
+ * fill_now reads the pairs back as bytes: low byte first (little-endian). */
+#define SC64_TERRAIN_T3(k, v) \
+    (((k) & 1) + ((v) & 1) + 3 * ((((k) >> 1) & 1) + (((v) >> 1) & 1)) + \
+     9 * ((((k) >> 2) & 1) + (((v) >> 2) & 1)))
+#define SC64_TERRAIN_T2(i) \
+    (SC64_TERRAIN_T3((i) & 15, ((i) >> 4) & 15) | \
+     (SC64_TERRAIN_T3(((i) & 15) >> 1, ((i) >> 5) & 7) << 8))
+#define SC64_TERRAIN_T2_4(i) SC64_TERRAIN_T2(i), SC64_TERRAIN_T2((i) + 1), \
+    SC64_TERRAIN_T2((i) + 2), SC64_TERRAIN_T2((i) + 3)
+#define SC64_TERRAIN_T2_16(i) SC64_TERRAIN_T2_4(i), SC64_TERRAIN_T2_4((i) + 4), \
+    SC64_TERRAIN_T2_4((i) + 8), SC64_TERRAIN_T2_4((i) + 12)
+#define SC64_TERRAIN_T2_64(i) SC64_TERRAIN_T2_16(i), SC64_TERRAIN_T2_16((i) + 16), \
+    SC64_TERRAIN_T2_16((i) + 32), SC64_TERRAIN_T2_16((i) + 48)
+static const u16 sc64_terrain_fog_triple2[256] = {
+    SC64_TERRAIN_T2_64(0), SC64_TERRAIN_T2_64(64),
+    SC64_TERRAIN_T2_64(128), SC64_TERRAIN_T2_64(192),
+};
+#undef SC64_TERRAIN_T2_64
+#undef SC64_TERRAIN_T2_16
+#undef SC64_TERRAIN_T2_4
+#undef SC64_TERRAIN_T2
+#undef SC64_TERRAIN_T3
+#endif
+
 static u32 sc64_terrain_fp_known[SC64_TERRAIN_FOG_ROWS + 2];
 static u32 sc64_terrain_fp_seen[SC64_TERRAIN_FOG_ROWS + 2];
 static int sc64_terrain_fp_valid;
@@ -197,6 +235,31 @@ sc64_terrain_fill_now(int col0, int row0, int col1, int row1)
         sc64_terrain_now_valid = 1;
         return;
     }
+#if defined(SC64_TERRAIN_FAST_VALIDATE) && !defined(SC64_SOFT_FOG_SHADE_ONLY)
+    /* The same triples, two columns per lookup, and the same sums with row
+     * pointers. Rows hold 18 bytes so the pair stores stay aligned; an odd
+     * last pair also writes the unused triple just past the view. */
+    u16 triple_pairs[SC64_TERRAIN_FOG_ROWS + 2][(SC64_TERRAIN_FOG_COLS + 1) / 2];
+    (void)triple;
+    for (hr = 0; hr < rows + 2; ++hr) {
+        unsigned known = known_row[hr], seen = seen_row[hr] << 4;
+        u16 *out = triple_pairs[hr];
+        sc64_terrain_fp_known[hr] = known_row[hr];
+        sc64_terrain_fp_seen[hr] = seen_row[hr];
+        for (c = 0; c < cols; c += 2, known >>= 2, seen >>= 2)
+            *out++ = sc64_terrain_fog_triple2[(known & 15u) | (seen & 0xf0u)];
+    }
+    {
+        u16 *out = sc64_terrain_now;
+        for (r = 0; r < rows; ++r) {
+            const u8 *top = (const u8 *)triple_pairs[r];
+            const u8 *mid = (const u8 *)triple_pairs[r + 1];
+            const u8 *low = (const u8 *)triple_pairs[r + 2];
+            for (c = 0; c < cols; ++c)
+                *out++ = (u16)(top[c] + 27u * mid[c] + 729u * low[c]);
+        }
+    }
+#else
     for (hr = 0; hr < rows + 2; ++hr) {
         unsigned known = known_row[hr], seen = seen_row[hr];
         sc64_terrain_fp_known[hr] = known;
@@ -214,6 +277,7 @@ sc64_terrain_fill_now(int col0, int row0, int col1, int row1)
 #else
             sc64_terrain_now[r * cols + c] =
                 (u16)(triple[r][c] + 27u * triple[r + 1][c] + 729u * triple[r + 2][c]);
+#endif
 #endif
     /* The combine above reads cells beyond the map as unknown; the
      * definition says they take the center's class. Fix the border cells. */
@@ -623,6 +687,26 @@ sc64_terrain_cached(int x, int y)
         }
 #else
         SC64_TERRAIN_FILL(old_col0, old_row0, old_col1, old_row1);
+#if defined(SC64_TERRAIN_FAST_VALIDATE) && defined(SC64_SOFT_FOG) && \
+    !defined(SC64_DIAGNOSTIC_TERRAIN)
+        /* Same camera: tile i of the view is cache-mask cell i. The soft-fog
+         * state of cell i is sc64_terrain_now[i], so the nested loop below
+         * reduces to one pass over the view's cells. */
+        {
+            const Sc64TerrainState *mask = sc64_terrain_cache_mask;
+            const u16 *now = sc64_terrain_now;
+            u8 *dirty = sc64_terrain_cache_dirty;
+            const int count = (old_col1 - old_col0) * (old_row1 - old_row0);
+            int any = 0;
+            for (i = 0; i < count; i++) {
+                int d = mask[i] != (Sc64TerrainState)now[i];
+                dirty[i] = (u8)d;
+                any |= d;
+            }
+            unchanged = !any;
+        }
+        if (0)
+#endif
         for (row = old_row0; row < old_row1; row++)
             for (col = old_col0; col < old_col1; col++) {
                 Sc64TerrainState state = SC64_TERRAIN_STATE_AT(i, col, row);
@@ -680,6 +764,71 @@ sc64_terrain_cached(int x, int y)
         (dy > 0 ? SC64_TERRAIN_CACHE_HEIGHT - dy : 0);
     sc64_terrain_strip_y1 = SC64_TERRAIN_CACHE_Y +
         (dy > 0 ? SC64_TERRAIN_CACHE_HEIGHT : (dy < 0 ? -dy : 0));
+#endif
+#ifdef SC64_TERRAIN_FAST_VALIDATE
+    /* The test below splits into a row half and a column half: whether the
+     * tile is in the old cell window and whether its clipped rectangle lies
+     * inside the old camera rectangle. Compute each half once per row and
+     * once per column; the per-tile work is the mask compare. The view is
+     * at most 16 columns wide; the general loop stays as the fallback. */
+    if (col1 - col0 <= SC64_TERRAIN_FAST_COLS) {
+        const int old_x = sc64_terrain_cache_camx, old_y = sc64_terrain_cache_camy;
+        const int old_width = old_col1 - old_col0, cols = col1 - col0;
+        /* Per column: the offset into an old mask row (-1 outside the old
+         * window) and whether the clipped tile leaves the old camera. */
+        signed char col_offset[SC64_TERRAIN_FAST_COLS], no_offset[SC64_TERRAIN_FAST_COLS];
+        u8 col_edge[SC64_TERRAIN_FAST_COLS];
+        int c, any_dirty = 0;
+        for (c = 0; c < cols; c++) {
+            int left = (col0 + c) * 16, right = left + 16;
+            if (left < x) left = x;
+            if (right > x + 240) right = x + 240;
+            col_offset[c] = (signed char)(col0 + c >= old_col0 && col0 + c < old_col1 ?
+                                          col0 + c - old_col0 : -1);
+            no_offset[c] = -1;
+            col_edge[c] = (u8)(left < old_x || right > old_x + 240);
+        }
+        for (row = row0; row < row1; row++) {
+            int top = row * 16, bottom = top + 16;
+            int row_in = row >= old_row0 && row < old_row1;
+            const signed char *offset = row_in ? col_offset : no_offset;
+            const Sc64TerrainState *old_row_mask = sc64_terrain_cache_mask +
+                (row_in ? (row - old_row0) * old_width : 0);
+            unsigned row_edge;
+            if (top < y) top = y;
+            if (bottom > y + SC64_TERRAIN_CACHE_HEIGHT)
+                bottom = y + SC64_TERRAIN_CACHE_HEIGHT;
+            row_edge = top < old_y || bottom > old_y + SC64_TERRAIN_CACHE_HEIGHT;
+            for (c = 0; c < cols; c++, i++) {
+                Sc64TerrainState state = SC64_TERRAIN_STATE_AT(i, col0 + c, row);
+                int off = offset[c];
+                unsigned dirty = 1;
+#ifdef SC64_SOFT_FOG
+                unsigned part = 1;
+#endif
+                if (off >= 0) {
+                    /* In the old window: dirty unless inside the old camera
+                     * with unchanged fog; partial when only the camera moved. */
+                    unsigned same = old_row_mask[off] == state;
+                    unsigned edge = row_edge | col_edge[c];
+                    dirty = edge | (same ^ 1u);
+#ifdef SC64_SOFT_FOG
+                    part = edge & same;
+#endif
+                }
+                sc64_terrain_cache_dirty[i] = (u8)dirty;
+#ifdef SC64_SOFT_FOG
+                sc64_terrain_part[i] = (u8)part;
+#endif
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+                SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, 1);
+                if (dirty) SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_dirty_tiles, 1);
+#endif
+                any_dirty |= (int)dirty;
+            }
+        }
+        if (any_dirty) unchanged = 0;
+    } else
 #endif
     for (row = row0; row < row1; row++)
         for (col = col0; col < col1; col++) {
@@ -849,6 +998,78 @@ sc64_terrain_fog_cell(int partial, int sx, int sy, u16 signature,
     else
         sc64_fog_raster_cell(sx, sy, signature, terrain, lut);
 }
+#endif
+
+#ifdef SC64_TERRAIN_FAST_VALIDATE
+/* Answers of sc64_terrain_tile_clean, sc64_terrain_tile_partial and
+ * sc64_terrain_state_view for the tiles of one draw window, visited row-major
+ * with a running index i. When the window is the cache view that the lookup
+ * just validated, tile i of the window is cache cell i, so each answer is
+ * one array read; for any other window the per-tile functions answer. */
+enum {
+    SC64_TERRAIN_TILES_NONE,    /* no reused base: no tile is clean or partial */
+    SC64_TERRAIN_TILES_INDEXED, /* the window is the reused cache view */
+    SC64_TERRAIN_TILES_CALL     /* another window: ask the per-tile functions */
+};
+typedef struct {
+    int clean_mode;
+#ifdef SC64_SOFT_FOG
+    int part_active, state_indexed;
+#endif
+} Sc64TerrainTiles;
+
+static inline void
+sc64_terrain_tiles_begin(Sc64TerrainTiles *t, int col0, int row0, int col1, int row1)
+{
+#ifdef SC64_TERRAIN_SCROLL
+    int x = sc64_terrain_cache_view_camx, y = sc64_terrain_cache_view_camy;
+#else
+    int x = sc64_terrain_cache_camx, y = sc64_terrain_cache_camy;
+#endif
+    t->clean_mode = SC64_TERRAIN_TILES_NONE;
+    if (sc64_terrain_cache_reused_base) {
+        /* The bounds sc64_terrain_tile_clean derives for every tile. */
+        int view_col1 = (x + 240) / 16 + 1;
+        int view_row1 = (y + SC64_TERRAIN_CACHE_HEIGHT) / 16 + 1;
+        if (view_col1 > MAP_COLS) view_col1 = MAP_COLS;
+        if (view_row1 > MAP_ROWS) view_row1 = MAP_ROWS;
+        t->clean_mode = x / 16 == col0 && y / 16 == row0 &&
+                        view_col1 == col1 && view_row1 == row1 &&
+                        col1 > col0 && row1 > row0 &&
+                        (col1 - col0) * (row1 - row0) <= SC64_TERRAIN_CACHE_CELLS ?
+                        SC64_TERRAIN_TILES_INDEXED : SC64_TERRAIN_TILES_CALL;
+    }
+#ifdef SC64_SOFT_FOG
+    t->part_active = sc64_terrain_part_active;
+    t->state_indexed = sc64_terrain_now_valid &&
+        sc64_terrain_now_col0 == col0 && sc64_terrain_now_row0 == row0 &&
+        sc64_terrain_now_cols == col1 - col0 && sc64_terrain_now_rows == row1 - row0;
+#endif
+}
+
+static inline int
+sc64_terrain_tiles_clean(const Sc64TerrainTiles *t, int i, int col, int row)
+{
+    if (t->clean_mode == SC64_TERRAIN_TILES_INDEXED) return !sc64_terrain_cache_dirty[i];
+    return t->clean_mode == SC64_TERRAIN_TILES_CALL && sc64_terrain_tile_clean(col, row);
+}
+
+#ifdef SC64_SOFT_FOG
+static inline int
+sc64_terrain_tiles_partial(const Sc64TerrainTiles *t, int i, int col, int row)
+{
+    if (t->clean_mode == SC64_TERRAIN_TILES_INDEXED)
+        return t->part_active ? sc64_terrain_part[i] : 0;
+    return t->clean_mode == SC64_TERRAIN_TILES_CALL ? sc64_terrain_tile_partial(col, row) : 0;
+}
+
+static inline Sc64TerrainState
+sc64_terrain_tiles_state(const Sc64TerrainTiles *t, int i, int col, int row)
+{
+    return t->state_indexed ? (Sc64TerrainState)sc64_terrain_now[i] :
+                              sc64_terrain_state_view(col, row);
+}
+#endif
 #endif
 
 #if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
