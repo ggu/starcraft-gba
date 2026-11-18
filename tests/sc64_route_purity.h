@@ -119,7 +119,7 @@ static const RoutePureRegion route_pure_regions[] = {
 #endif
     RP_REGION(bfs_queue),
 #ifndef SC64_IMPORTED_MISSION
-    RP_REGION(bfs_prev),
+    RP_REGION(bfs_first),
     RP_REGION(bfs_seen),
     RP_REGION(bfs_generation),
 #endif

@@ -737,8 +737,10 @@ test-sc64-static-dirty-rows-game: build/test-sc64-static-dirty-rows-t4 build/tes
 	./build/test-sc64-static-dirty-rows-photon
 test-canonical-render: test-sc64-static-dirty-rows-game
 
+# The original-art Mode 4 builds own the VBlank IRQ.
+OUTPOST_PRESENT_FLAGS ?= -DGBA_PRESENT_VBLANK_EPOCH
 build/starcraft.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(OUTPOST_PRESENT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft.map -lgcc -o $@
 	$(SIZE) $@
 
 build/StarCraft-GBA.gba: build/starcraft.elf tools/fix_rom.py
@@ -751,7 +753,7 @@ build/test-starcraft: tests/host.c common/gba.c $(STARCRAFT) $(wildcard starcraf
 # Optional hold-B command ring for the default profile (docs/COMMAND-RING.md).
 COMMAND_RING_FLAGS := -DSC_COMMAND_RING
 build/starcraft-ring.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(COMMAND_RING_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-ring.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(OUTPOST_PRESENT_FLAGS) $(COMMAND_RING_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-ring.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-GBA-Ring.gba: build/starcraft-ring.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@

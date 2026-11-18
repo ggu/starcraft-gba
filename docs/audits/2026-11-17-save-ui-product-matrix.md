@@ -48,14 +48,36 @@ checksum fell back to the genuine older checkpoint at frame 23,993 with
 menu row 1 preserved. A newer checksum alone does not publish malformed
 UI context over a valid older bank.
 
-Do not enable the setting yet. The archived T1 Wasteland input route
-still wins on the current regular Terran ROM at frame 10,120. On the
-opt-in Terran image the same route matches through call 6,000, then has
-427 minerals instead of 377 at call 7,000, with frame, actor counts and
-the captured objective fields unchanged. Neither leg has loaded a save
-at that point. The candidate replay stops at the first named difference;
-the test does not establish a cause or a candidate victory. Isolate the
-first command, queue or resource difference before enabling the setting.
+The November 17 fixed T1 Wasteland tape wins on the regular Terran
+ROM at frame 10,120. On the opt-in image it previously reported 427
+minerals instead of 377 at call 7,000. Both runs had already saved,
+restarted and loaded through pause-menu L at zero-based tape tick 6,235.
+The first audit overlooked this round trip. The fixed tape stopped at
+the next differing named checkpoint, so it did not establish a
+candidate victory or a changed game state at load.
+
+On November 18 the regular host controller regenerated the historical
+tape byte for byte. Rebuilding the controller with `SC64_SAVE_UI_CONTEXT`
+made it choose Barracks after one Down press instead of two, because
+the menu reopens on row 1. Both sanitized controllers win at game frame
+10,120 with 10 Marines, five SCVs, 417 minerals and the same terminal
+host state hash. The input counts differ by two, the extra Down press
+and release. The paired ROMs were relinked from the same prepared
+inputs and compiler vector, with only the UI-context flag toggled;
+they are different binaries from the archived November 17 pair.
+
+The [normal T1 replay driver](../../tools/sc64_t1_normal_replay.py)
+independently verifies the ordinary save/restart/load from a fresh
+boot, checks the restored semantic world, and records the saved and
+loaded menu fields. Both rebuilt ARM ROMs win with all 11 named
+checkpoints, nine briefing pages and eight in-field dialogue pages
+matched. Both restore the world at frame 6,214. The regular ROM resets
+the remembered row from 1 to 0; the opted-in ROM restores row 1 with
+its menu closed. Both then confirm Barracks in row 2 at game frame
+6,227. They finish with the same named victory state, including Raynor
+alive. This clears the Wasteland tape discrepancy for the tested pair;
+default enablement still needs a shared-profile release check with the
+restored menu behavior.
 
 | Local evidence (SHA-256) | Digest |
 | --- | --- |
@@ -66,3 +88,8 @@ first command, queue or resource difference before enabling the setting.
 | P3 corrupt-newer-bank fallback receipt | `0fc8a69a44cbd91568be0d8e6c9cc97951f5950894b013d6c91cedb7549faff5` |
 | Regular T1 HOME win receipt | `d2b779185231c3dc0342bda474be094a094f484b893a0632ac50c0270f8205b9` |
 | Opt-in T1 first divergence | `751738c2e63fdec33c925a7ddab7a7a17e9453c0e3b1b7b84e44b89ba416c58e` |
+| Rebuilt regular T1 host tape | `5b6fc3b6af2ad1206f587f35de4587d26ed567a1e98e93d487b4ec758a29ee38` |
+| Rebuilt opt-in T1 host tape | `27b78c4bcd6ee7076126a224c4a6fe362190fb7105631b446e19bde5689fc9ba` |
+| Rebuilt physical observer | `724715d35416c4d202041fc0585fa4f1542f1b4d8ed6b53a6db373c9d8caa50d` |
+| Rebuilt regular T1 ARM receipt | `541641b89e18d70843c4286aa503104f7c346536fa6bbade3d84761787385220` |
+| Rebuilt opt-in T1 ARM receipt | `7aac3954f2f25adaf2b0f8ea00e3f650573c33f7168ede790a48210ff79a1dcc` |
