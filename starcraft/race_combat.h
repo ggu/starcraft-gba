@@ -59,9 +59,10 @@ race_can_attack(int attacker,int target) {
 #if defined(SC64_ZP_DEFENSE_TARGETS) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
 #error "SC64_ZP_DEFENSE_TARGETS requires SC64_ZP_CAMPAIGN_STORAGE"
 #endif
-#ifdef SC64_ZP_DEFENSE_TARGETS
-_Static_assert(MAX_UNITS < 255,
-               "Z/P defense lists reserve 0xff as the end marker");
+#if defined(SC64_ZP_DEFENSE_TARGETS) || defined(SC64_TERRAN_LATE_RUNTIME) || \
+    defined(SC64_P3_DEFENSE_TARGETS)
+/* Defense candidate lists link unit slots and end at SC64_UNIT_IX_NONE. */
+#include "sc64_unit_index.h"
 #endif
 
 #ifdef SC64_DEFENSE_PYLON_ROSTER
@@ -205,8 +206,9 @@ enum { DEFENSE_CELL_SHIFT = 8, DEFENSE_CELL_SIDE = 8,
        DEFENSE_CELL_LIMIT = DEFENSE_CELL_SIDE << DEFENSE_CELL_SHIFT };
 
 typedef struct {
-    u8 head[DEFENSE_CELL_SIDE * DEFENSE_CELL_SIDE];
-    u8 next[MAX_UNITS], flying[MAX_UNITS];
+    Sc64UnitIx head[DEFENSE_CELL_SIDE * DEFENSE_CELL_SIDE];
+    Sc64UnitIx next[MAX_UNITS];
+    u8 flying[MAX_UNITS];
 } RaceDefenseCells;
 
 static int GBA_HOT __attribute__((noinline))
@@ -229,7 +231,7 @@ race_defense_target_from_zp_cells(const Building *q, int ground, int air,
     for (int row = top; row <= bottom; ++row) {
         for (int col = left; col <= right; ++col) {
             int cell = row * DEFENSE_CELL_SIDE + col;
-            for (int j = cells->head[cell]; j != 0xff; j = cells->next[j]) {
+            for (int j = cells->head[cell]; j != (int)SC64_UNIT_IX_NONE; j = cells->next[j]) {
                 const Unit *target = &u[j];
                 unsigned owner = target->owner;
                 if (!target->alive || owner >= 5 ||
@@ -256,15 +258,15 @@ race_defense_target_from_zp_cells(const Building *q, int ground, int air,
  * the lists prepared before the mission tick by update_orders. */
 static int GBA_HOT __attribute__((noinline))
 race_defense_target_from_zp_lists(const Building *q, int ground, int air,
-                                  int range, const u8 head[5][2],
-                                  const u8 next[MAX_UNITS], u8 hostile_mask)
+                                  int range, const Sc64UnitIx head[5][2],
+                                  const Sc64UnitIx next[MAX_UNITS], u8 hostile_mask)
 {
     int best = -1, bestd = range * range;
     for (int owner = 0; owner < 5; ++owner) {
         if (!(hostile_mask & (1u << owner))) continue;
         for (int flying = 0; flying < 2; ++flying) {
             if ((flying && !air) || (!flying && !ground)) continue;
-            for (int j = head[owner][flying]; j != 0xff; j = next[j]) {
+            for (int j = head[owner][flying]; j != (int)SC64_UNIT_IX_NONE; j = next[j]) {
                 if (!u[j].alive || u[j].owner != owner) continue;
                 if (FAST_ABS(q->x - u[j].x) >= range ||
                     FAST_ABS(q->y - u[j].y) >= range || (u[j].flags & 16) ||
@@ -290,7 +292,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
     RaceDefenseCells cells;
 #else
-    u8 head[5][2], next[MAX_UNITS];
+    Sc64UnitIx head[5][2], next[MAX_UNITS];
 #endif
 
     /* Finish validation before any cooldown or health mutation. The scalar
@@ -316,7 +318,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
                    (u[j].x >> DEFENSE_CELL_SHIFT);
         cells.flying[j] = (u8)sc64_race_unit_flying(u[j].type);
         cells.next[j] = cells.head[cell];
-        cells.head[cell] = (u8)j;
+        cells.head[cell] = (Sc64UnitIx)j;
     }
 #else
     for (int j = 0; j < MAX_UNITS; ++j) {
@@ -331,7 +333,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         int owner = u[j].owner;
         int flying = sc64_race_unit_flying(u[j].type);
         next[j] = head[owner][flying];
-        head[owner][flying] = (u8)j;
+        head[owner][flying] = (Sc64UnitIx)j;
     }
 #endif
     for (int owner = 0; owner < 5; ++owner) {
@@ -380,13 +382,13 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
  * Build their candidates once, in unit-slot order, rather than rescanning all
  * MAX_UNITS slots for each of the map's defensive buildings. */
 static __attribute__((noinline)) void race_tick_defenses_p3_targets(void) {
-    u8 side_targets[MAX_UNITS], force_targets[MAX_UNITS];
+    Sc64UnitIx side_targets[MAX_UNITS], force_targets[MAX_UNITS];
     int side_count = 0, force_count = 0;
 
     for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
-        if (u[j].owner == SIDE) side_targets[side_count++] = (u8)j;
+        if (u[j].owner == SIDE) side_targets[side_count++] = (Sc64UnitIx)j;
         else if (u[j].owner == ENEMY || u[j].owner == 4)
-            force_targets[force_count++] = (u8)j;
+            force_targets[force_count++] = (Sc64UnitIx)j;
     }
 
     RACE_DEFENSE_PYLONS;
@@ -447,19 +449,19 @@ static void race_tick_defenses(void) {
 }
 #elif defined(SC64_TERRAN_LATE_RUNTIME)
 /* Per-tick defense candidate lists reduce the 96-building x 192-unit scan to
- * the owners each defense can actually attack. The links use unit slots, so
- * their byte representation remains valid while MAX_UNITS is 192. */
+ * the owners each defense can actually attack. The links store unit slots in
+ * Sc64UnitIx, a byte while the table has fewer than 255 slots. */
 static int GBA_HOT __attribute__((noinline))
 race_defense_target_from_owner_lists(const Building *q, int ground, int air,
-                                     int range, const u8 head[5][2],
-                                     const u8 next[MAX_UNITS], u8 hostile_mask)
+                                     int range, const Sc64UnitIx head[5][2],
+                                     const Sc64UnitIx next[MAX_UNITS], u8 hostile_mask)
 {
     int best = -1, bestd = range * range;
     for (int owner = 0; owner < 5; ++owner) {
         if (!(hostile_mask & (1u << owner))) continue;
         for (int flying = 0; flying < 2; ++flying) {
             if ((flying && !air) || (!flying && !ground)) continue;
-            for (int j = head[owner][flying]; j != 0xff; j = next[j]) {
+            for (int j = head[owner][flying]; j != (int)SC64_UNIT_IX_NONE; j = next[j]) {
                 if (!u[j].alive || u[j].owner != owner) continue;
                 if (FAST_ABS(q->x - u[j].x) >= range ||
                     FAST_ABS(q->y - u[j].y) >= range || (u[j].flags & 16) ||
@@ -479,14 +481,15 @@ race_defense_target_from_owner_lists(const Building *q, int ground, int air,
 
 static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
 {
-    u8 head[5][2], next[MAX_UNITS], hostile_mask[5];
+    Sc64UnitIx head[5][2], next[MAX_UNITS];
+    u8 hostile_mask[5];
     memset(head, 0xff, sizeof(head));
     for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
         int owner = u[j].owner;
         if (owner < 0 || owner >= 5) continue;
         int flying = sc64_race_unit_flying(u[j].type);
         next[j] = head[owner][flying];
-        head[owner][flying] = (u8)j;
+        head[owner][flying] = (Sc64UnitIx)j;
     }
     for (int owner = 0; owner < 5; ++owner) {
         u8 mask = 0;

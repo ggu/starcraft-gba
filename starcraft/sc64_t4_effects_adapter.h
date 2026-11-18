@@ -2,6 +2,7 @@
 #define SC64_T4_EFFECTS_ADAPTER_H
 
 #include "sc64_text_box_hook.h"
+#include "sc64_unit_index.h"
 
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #include "sc64_t4_runtime.h"
@@ -394,7 +395,7 @@ race_t4_effect_men_destination(const Sc64T4RuntimeState *state,
 
 static int
 race_t4_effect_fit(const Unit *unit, int center_x, int center_y,
-                   const u8 *planned_slots, const u16 *planned_x,
+                   const Sc64UnitIx *planned_slots, const u16 *planned_x,
                    const u16 *planned_y, unsigned planned_count)
 {
     if (!is_traversable(center_x / 16, center_y / 16, -1)) return 0;
@@ -414,7 +415,7 @@ static int
 race_t4_effect_move_men(Sc64T4RuntimeState *state,
                         const Sc64T4Action *action, unsigned owner)
 {
-    u8 slots[MAX_UNITS];
+    Sc64UnitIx slots[MAX_UNITS];
     u16 xs[MAX_UNITS], ys[MAX_UNITS];
     unsigned count = 0;
     Sc64T4QueryRect source, destination;
@@ -443,7 +444,7 @@ race_t4_effect_move_men(Sc64T4RuntimeState *state,
                         y * 2 < destination.top || y * 2 >= destination.bottom)
                         continue;
                     if (race_t4_effect_fit(&u[i], x, y, slots, xs, ys, count)) {
-                        slots[count] = (u8)i; xs[count] = (u16)x; ys[count] = (u16)y;
+                        slots[count] = (Sc64UnitIx)i; xs[count] = (u16)x; ys[count] = (u16)y;
                         ++count; placed = 1;
                     }
                 }

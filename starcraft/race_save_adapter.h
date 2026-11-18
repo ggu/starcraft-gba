@@ -1408,7 +1408,7 @@ static int race_bunker_save_reference(const RaceSave *candidate, const Unit *act
     if (actor->order==ORDER_TRANSPORTED &&
         (actor->selected || actor->x!=bunker.x || actor->y!=bunker.y ||
          actor->path_timer || actor->path_retry || actor->build < -1 ||
-         actor->build >= MAX_UNITS+MAX_BUILDINGS || actor->build > 239)) return 0;
+         actor->build >= MAX_UNITS+MAX_BUILDINGS || actor->build >= SC64_BUNKER_TARGET_CACHE_LIMIT)) return 0;
     return 1;
 }
 static int race_bunker_save_world_valid(const RaceSave *candidate, int width, int height SC64_GCTX_DECL)

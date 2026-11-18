@@ -4907,7 +4907,7 @@ sc64_source_unit_vfx(Unit *q,int x1,int y1,int air)
     if(sc64_stock_attack_select(raw,air,&attack)) weapon=attack.weapon_id;
     else if(raw==83 && !air) weapon=82; /* Existing Reaver/Scarab adapter. */
     else return 0;
-    return sc64_source_emit(raw,(int)(q-u)+1,weapon,air,q->x,q->y,x1,y1);
+    return sc64_source_emit(raw,SC64_SOURCE_VFX_SLOT_TAG((int)(q-u)),weapon,air,q->x,q->y,x1,y1);
 }
 
 static int
@@ -11134,7 +11134,7 @@ static const Sc64SpriteFrame *
 sc64_source_unit_attack_pose(const Unit *q)
 {
     int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
-    int slot=(int)(q-u)+1, newest=0x7fffffff;
+    int slot=SC64_SOURCE_VFX_SLOT_TAG((int)(q-u)), newest=0x7fffffff;
     const Sc64SpriteFrame *pose=0;
     if(!q->cd) return 0;
     for(int i=0;i<MAX_TRACERS;++i) {

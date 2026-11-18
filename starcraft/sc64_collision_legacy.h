@@ -1,8 +1,7 @@
 #ifndef SC64_COLLISION_LEGACY_H
 #define SC64_COLLISION_LEGACY_H
 #include "sc64_scarab_presence.h"
-
-_Static_assert(MAX_UNITS < 255, "Spatial unit indices must fit below the sentinel");
+#include "sc64_unit_index.h"
 
 #if defined(SC64_COLLISION_PACKED_HIT) && !defined(SC64_COLLISION_CLASS_CACHE)
 #error "SC64_COLLISION_PACKED_HIT requires SC64_COLLISION_CLASS_CACHE"
@@ -10,9 +9,9 @@ _Static_assert(MAX_UNITS < 255, "Spatial unit indices must fit below the sentine
 
 /* Exact broad-phase index for moving units. Built only for update_orders();
  * all candidates still use the engine's original overlap predicate. */
-static u8 sc64_unit_bucket_head[MAP_CELLS];
-static u8 sc64_unit_bucket_next[MAX_UNITS];
-static u8 sc64_unit_bucket_prev[MAX_UNITS];
+static Sc64UnitIx sc64_unit_bucket_head[MAP_CELLS];
+static Sc64UnitIx sc64_unit_bucket_next[MAX_UNITS];
+static Sc64UnitIx sc64_unit_bucket_prev[MAX_UNITS];
 static u16 sc64_unit_bucket_cell[MAX_UNITS];
 static u16 sc64_unit_bucket_dirty[MAX_UNITS * 2];
 static u16 sc64_unit_bucket_dirty_count;
@@ -110,18 +109,18 @@ sc64_unit_bucket_cell_at(int x, int y)
 static void GBA_HOT
 sc64_unit_bucket_insert(int slot, int cell)
 {
-    u8 head = sc64_unit_bucket_head[cell];
-    if (head == 0xff) {
+    Sc64UnitIx head = sc64_unit_bucket_head[cell];
+    if (head == SC64_UNIT_IX_NONE) {
         if (sc64_unit_bucket_dirty_count >= MAX_UNITS * 2) {
             sc64_unit_bucket_active = 0;
             return;
         }
         sc64_unit_bucket_dirty[sc64_unit_bucket_dirty_count++] = (u16)cell;
     }
-    sc64_unit_bucket_prev[slot] = 0xff;
+    sc64_unit_bucket_prev[slot] = SC64_UNIT_IX_NONE;
     sc64_unit_bucket_next[slot] = head;
-    if (head != 0xff) sc64_unit_bucket_prev[head] = (u8)slot;
-    sc64_unit_bucket_head[cell] = (u8)slot;
+    if (head != SC64_UNIT_IX_NONE) sc64_unit_bucket_prev[head] = (Sc64UnitIx)slot;
+    sc64_unit_bucket_head[cell] = (Sc64UnitIx)slot;
     sc64_unit_bucket_cell[slot] = (u16)cell;
 }
 
@@ -150,7 +149,7 @@ sc64_unit_buckets_begin(void)
         sc64_unit_bucket_initialized = 1;
     } else {
         for (i = 0; i < sc64_unit_bucket_dirty_count; ++i)
-            sc64_unit_bucket_head[sc64_unit_bucket_dirty[i]] = 0xff;
+            sc64_unit_bucket_head[sc64_unit_bucket_dirty[i]] = SC64_UNIT_IX_NONE;
     }
     sc64_unit_bucket_dirty_count = 0;
     sc64_unit_bucket_active = 0;
@@ -159,8 +158,8 @@ sc64_unit_buckets_begin(void)
            sizeof(sc64_unit_collision_class_cache));
 #endif
     for (i = 0; i < MAX_UNITS; ++i) {
-        sc64_unit_bucket_next[i] = 0xff;
-        sc64_unit_bucket_prev[i] = 0xff;
+        sc64_unit_bucket_next[i] = SC64_UNIT_IX_NONE;
+        sc64_unit_bucket_prev[i] = SC64_UNIT_IX_NONE;
         /* A unit created after this index build may call bucket_move() on
          * its first movement. Distinguish it from a linked slot so it does
          * not unlink through a stale cell value. */
@@ -184,7 +183,7 @@ sc64_unit_bucket_move(Unit *q)
 #endif
 
     int slot = (int)(q - u), old_cell, new_cell;
-    u8 before, after;
+    Sc64UnitIx before, after;
     if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
     if (SC64_SCARAB_NONCOLLIDING(q)) {
 #if defined(SC64_CONTACT_MEMO_ENABLED) && defined(SC64_CONTACT_LOCAL_MEMO_PROBE)
@@ -204,9 +203,9 @@ sc64_unit_bucket_move(Unit *q)
     if (old_cell == new_cell) return;
     before = sc64_unit_bucket_prev[slot];
     after = sc64_unit_bucket_next[slot];
-    if (before == 0xff) sc64_unit_bucket_head[old_cell] = after;
+    if (before == SC64_UNIT_IX_NONE) sc64_unit_bucket_head[old_cell] = after;
     else sc64_unit_bucket_next[before] = after;
-    if (after != 0xff) sc64_unit_bucket_prev[after] = before;
+    if (after != SC64_UNIT_IX_NONE) sc64_unit_bucket_prev[after] = before;
     sc64_unit_bucket_insert(slot, new_cell);
 }
 
@@ -269,7 +268,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
+            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != (int)SC64_UNIT_IX_NONE;
                  i = sc64_unit_bucket_next[i])
                 if (&u[i] != q && u[i].alive && !(SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i]))) {
 #ifdef SC64_P6_COMBAT_ENABLED
@@ -441,7 +440,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
         for (row = miny; row <= maxy; ++row)
             for (col = minx; col <= maxx; ++col) {
                 int i;
-                for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
+                for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != (int)SC64_UNIT_IX_NONE;
                      i = sc64_unit_bucket_next[i])
                     if (++raw_nodes > SC64_STEER_LIST_CAPACITY) return 0;
             }
@@ -452,7 +451,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
+            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != (int)SC64_UNIT_IX_NONE;
                  i = sc64_unit_bucket_next[i]) {
                 int candidate_radius, candidate_flying, candidate_collidable;
                 if (&u[i] == q || !u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i]))

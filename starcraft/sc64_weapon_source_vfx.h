@@ -17,6 +17,15 @@
 #define SC64_SOURCE_VFX_MAX_SLOT_PLUS1 240u
 #define SC64_SOURCE_BULLET_APPEAR_AT_TARGET 2u
 
+/* Tag of the firing unit slot (slot + 1; zero means no unit). Unit tables
+ * larger than the byte holds reuse tags modulo the limit. Readers match the
+ * tag together with the attacker's raw type and exact firing position, so a
+ * shared tag needs two same-type units on one pixel and only changes which
+ * attack pose is drawn. */
+#define SC64_SOURCE_VFX_SLOT_TAG(slot) \
+    ((MAX_UNITS) > (int)SC64_SOURCE_VFX_MAX_SLOT_PLUS1 ? \
+     (int)((unsigned)(slot) % SC64_SOURCE_VFX_MAX_SLOT_PLUS1) + 1 : (slot) + 1)
+
 typedef struct {
     uint8_t actor_raw;
     uint8_t actor_slot_plus1;
