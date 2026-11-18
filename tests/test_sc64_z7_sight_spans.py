@@ -188,6 +188,47 @@ static int check_shared_packed_rows(void)
 }
 #endif
 
+#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+static int check_sparse_masks(void)
+{
+    int first;
+    if (sc64_z7_visibility_sparse_mask(0, -1, 0, 0, 0, &first) != ~0u ||
+        sc64_z7_visibility_sparse_mask(0, 0, 0, 3, 0, &first) != ~0u ||
+        sc64_z7_visibility_sparse_mask(0, 0, 3, 0, 0, &first) != ~0u ||
+        sc64_z7_visibility_try_sparse(0, 0, 0, 1, 65) ||
+        sc64_z7_visibility_try_sparse(0, 0, 0, 1, 192)) return 1;
+    /* Independent squared-distance check covering every phase, radius and
+     * signed direction before clipping, including center-tile crossings. */
+    for (int radius = 64; radius <= 176; radius += 16)
+        for (int y = 32; y < 48; ++y) for (int x = 32; x < 48; ++x)
+            for (int dy = -2; dy <= 2; ++dy) for (int dx = -2; dx <= 2; ++dx) {
+                int first_expected = (y < y + dy ? y : y + dy) / 16 - 12;
+                unsigned expected = 0;
+                for (int i = 0; i < 26; ++i) {
+                    int oy = (first_expected + i) * 16 + 8 - y;
+                    int ny = oy - dy;
+                    for (int col = -13; col <= 16; ++col) {
+                        int ox = col * 16 + 8 - x;
+                        int nx = ox - dx;
+                        if ((ox * ox + oy * oy <= radius * radius) !=
+                            (nx * nx + ny * ny <= radius * radius)) {
+                            expected |= 1u << i;
+                            break;
+                        }
+                    }
+                }
+                unsigned actual = sc64_z7_visibility_sparse_mask((unsigned)(radius - 64) / 16,
+                    x, y, x + dx, y + dy, &first);
+                if (first != first_expected || actual != expected) {
+                    fprintf(stderr, "sparse mismatch r=%d xy=%d,%d delta=%d,%d got=%x want=%x\n",
+                            radius, x, y, dx, dy, actual, expected);
+                    return 1;
+                }
+            }
+    return 0;
+}
+#endif
+
 static int owner_unit_radius(int type) {
     if (type == U_ZP_SOURCE) return 200; /* intentionally outside Z7 LUT */
     int radius = z7_active ? expected_radius(type) : 0;
@@ -402,6 +443,32 @@ static int run_dense_counts(int step) {
     return 0;
 }
 
+#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+static int run_sparse_edges(int step)
+{
+    static const int types[] = {35, 37, 38, 39, 103, 42, 45, 44};
+    static const int centers[][2] = {
+        {0, 0}, {1, 15}, {15, 1}, {1023, 1023}, {1022, 1008}, {1008, 1022}
+    };
+    for (unsigned t = 0; t < sizeof(types) / sizeof(types[0]); ++t)
+        for (unsigned p = 0; p < sizeof(centers) / sizeof(centers[0]); ++p) {
+            int x = centers[p][0], y = centers[p][1];
+            clear_world();
+            u[0] = (Unit){1, SIDE, x, y, types[t], 0};
+            u[1] = (Unit){1, SIDE, x, y, types[t], 0};
+            update(step++);
+            for (int dy = -2; dy <= 2; ++dy) for (int dx = -2; dx <= 2; ++dx) {
+                int nx = x + dx, ny = y + dy;
+                if (nx < 0 || nx >= MAP_COLS * 16 || ny < 0 || ny >= MAP_ROWS * 16)
+                    continue;
+                u[0].x = nx; u[0].y = ny; update(step++);
+                u[0].x = x; u[0].y = y; update(step++);
+            }
+        }
+    return step;
+}
+#endif
+
 int main(void) {
 #ifdef SC64_SHARED_SIGHT_PACKED_ROWS
     if (check_shared_packed_rows()) return 1;
@@ -414,11 +481,17 @@ int main(void) {
 #ifdef SC64_Z7_VISIBILITY_ROW_CONTEXT
     if (check_prepared_rows()) return 1;
 #endif
+#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+    if (check_sparse_masks()) return 1;
+#endif
     clear_world();
     step = run_radius_matrix();
     step = run_fallback_matrix(step);
     step = run_unsupported_radius(step);
     step = run_lifecycle_matrix(step);
+#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+    step = run_sparse_edges(step);
+#endif
     if (run_dense_counts(step)) return 1;
     puts("Z7 sight span full-grid oracle passed");
     return 0;
@@ -450,6 +523,12 @@ class Z7SightSpansTests(unittest.TestCase):
             subprocess.run(["python3", str(ROOT / "tools/sc64_sight_row_lut.py"),
                             str(Path(temp) / "sc64_sight_row_lut_generated.h")],
                            check=True, cwd=ROOT)
+            subprocess.run(["python3", str(ROOT / "tools/sc64_sight_row_lut.py"),
+                            "--sparse-mask", str(Path(temp) / "sc64_sight_row_mask_generated.h")],
+                           check=True, cwd=ROOT)
+            z7_packed = ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
+                         "-DSC64_Z7_VISIBILITY_PHASE_REJECT",
+                         "-DSC64_Z7_VISIBILITY_ROW_CONTEXT", "-DSC64_Z7_VISIBILITY_PACKED_ROWS"]
             variants = (
                 ("scalar", [], 0),
                 ("legacy-spans", ["-DSC64_VISIBILITY_SPANS"], 0),
@@ -462,10 +541,8 @@ class Z7SightSpansTests(unittest.TestCase):
                 ("z7-row-context", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
                                     "-DSC64_Z7_VISIBILITY_PHASE_REJECT",
                                     "-DSC64_Z7_VISIBILITY_ROW_CONTEXT"], 1),
-                ("z7-packed-rows", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
-                                    "-DSC64_Z7_VISIBILITY_PHASE_REJECT",
-                                    "-DSC64_Z7_VISIBILITY_ROW_CONTEXT",
-                                    "-DSC64_Z7_VISIBILITY_PACKED_ROWS"], 1),
+                ("z7-packed-rows", z7_packed, 1),
+                ("z7-sparse-rows", [*z7_packed, "-DSC64_Z7_VISIBILITY_SPARSE_ROWS"], 1),
             )
             for suffix, extra, expect_z7 in variants:
                 binary = Path(temp) / f"fixture-{suffix}"

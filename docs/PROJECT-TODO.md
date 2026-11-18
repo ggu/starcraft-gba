@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-18. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-19. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -1523,6 +1523,21 @@ save/source-owner and timing evidence; do not advertise unwired components.
   skips exact distance calculation when one inclusive gap exceeds the
   range. It saves 0.58% in P7 with matching sampled state and pixels.
   Keep it in qualification for the other prepared profiles.
+- The [dense Z7 sparse sight probe](audits/2026-11-19-z7-sparse-sight-rows.md)
+  skips identical packed sight rows for moves of up to two pixels per axis.
+  It saves 55.88% of sight cycles and 5.89% of the full advancing update
+  against the matched routing and census control, with 131 historical
+  checkpoints, exact visibility data and display cuts matching. The
+  combined build reaches 8.19 updates/s in mGBA. The shipping late save
+  loads on the sparse ROM and finishes Z7 with six matching world and
+  display samples. Keep it opt-in while checking other maps, save
+  points and physical timing. Profile background
+  paint, restore and capture separately on the same tape. Orders still
+  dominate the budget and remain the first performance priority.
+- [N64 active SCV cancellation](audits/2026-11-19-n64-active-scv-cancel.md)
+  removes an in-progress Blood Bath job and releases its reserved supply.
+  The displayed minerals rise after cancel while the miners operate and
+  the HUD is animating. Isolate the economy to pin the native refund.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for
