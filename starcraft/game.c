@@ -5919,6 +5919,9 @@ check_imported_mission_outcome(void)
 }
 #endif
 
+#ifdef SC64_CROWD_PROBE
+static void sc64_crowd_probe_start(void);
+#endif
 void
 game_init(void)
 {
@@ -6016,6 +6019,9 @@ game_init(void)
 #ifdef SC64_TERRAN_LATE_PROBE_MISSION
     race_selected_mission = SC64_TERRAN_LATE_PROBE_MISSION;
     init_state();
+#endif
+#if defined(SC64_CROWD_PROBE) && !defined(SC64_CROWD_PROBE_MANUAL)
+    sc64_crowd_probe_start();
 #endif
 }
 
@@ -10067,6 +10073,9 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
 
 #ifdef SC64_SHOWCASE_ENABLED
 #include "sc64_showcase_adapter.h"
+#endif
+#ifdef SC64_CROWD_PROBE
+#include "sc64_crowd_probe.h"
 #endif
 #ifdef SC_COMMAND_RING
 #include "command_ring.h"
