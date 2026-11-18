@@ -872,7 +872,9 @@ static void check_point_prefix_tail_exchange(void)
     memset(sc64_route_point_plane, 0x53, SC64_ROUTE_POINT_BYTES);
     assert(sc64_route_point_saved < 0 && sc64_route_field[slot] == saved);
     assert(sc64_point_prefix_find(slot));
-    assert(SC64_ROUTE_REACHES(slot, MAP_CELLS - 1) && !sc64_point_prefix_find(slot));
+    assert(SC64_ROUTE_REACHES(slot, MAP_CELLS - 1));
+    SC64_ROUTE_EXACT(slot);
+    assert(!sc64_point_prefix_find(slot));
     reference_bfs(&oracle[POOL], other + 2);
     for (int i = 0; i < MAP_CELLS; ++i)
         assert(sc64_route_get(slot, i) == oracle[POOL].dir[i]);
@@ -894,6 +896,7 @@ static void point_component_map(void)
     sc64_routes_reset();
     sc64_route_pcount = 0;
     build_path_grid();
+    sc64_route_clock = 0;
     sc64_route_builds = sc64_route_hits = 0;
 }
 

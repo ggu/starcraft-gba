@@ -686,9 +686,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   continues declined searches in the same ordered grid.
   The [wide first-origin prototype](audits/2026-11-16-resumable-frontier-budget.md#wide-point-prefix-on-the-current-dense-z7-replay)
   matches the dense Z7 tape and saves 9.09% mean against the pre-tail
-  control. The worst call rises 7.71%. Trace calls 47,995 and 48,100
-  against the shipping tail before enabling the prefix. Qualify other
-  wide workloads, memory guards and cross-loads after the spikes are understood.
+  control. The [tail and prefix composition](audits/2026-11-16-resumable-frontier-budget.md#keep-the-complete-tail-alongside-parked-prefixes)
+  saves 8.45% mean against the shipping tail and recovers its saved-field
+  adoption at call 48,100. At call 47,995 a formation read completes a
+  parked search. A component proof postpones the completion into orders
+  and raises the maximum. Measure a second bounded search to the newly
+  requested cell, then qualify wider workloads, links and cross-loads.
   On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
   audit tracks a byte lookup
@@ -1508,6 +1511,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   every owner. The Terran CPU spends 50 on a queued SCV before any
   owner adds a building. Capture first purchases for Zerg and Protoss
   before comparing the later AI build order.
+- [Native mineral handoff](audits/2026-11-12-n64-blood-bath-opening.md#mineral-patch-contention-and-handoff)
+  shows one timed worker per contested patch, release on interruption,
+  and a waiting worker taking over after an eight-mineral pickup.
+  Compare contention and interruption in the shared gather path before
+  changing rates. Longer queue order and gas need separate evidence.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie

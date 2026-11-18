@@ -257,3 +257,74 @@ links, save/load and timing on other wide workloads. These are guest-cycle
 results, with about 7.35 emulated updates per second in this dense sample.
 
 - Point-prefix comparison SHA-256 `160d75b965e5f6623f64087a12ccb41cffb6f4359b63ea79d76e7b0f8c35e617`.
+
+### Where the two wide-prefix spikes occur
+
+Read-only breakpoints on the exact shipping tail and first prefix ROMs
+reproduce the recorded loop costs and every sampled world check. At call
+47,995, an ordinary A press issues 37 formation reachability checks.
+The prefix's first completion runs between two reads from the first
+formation pair. `update_orders` begins 871,003 cycles later with the
+prefix. The render interval is effectively flat.
+
+At call 48,100 there is no formation work. The shipping tail does one
+wide linear fill and one verified cached-field adoption. The first
+prefix ROM enters its completion helper during orders. Orders cost
+1,026,713 cycles more even though both runs report two logical builds
+and three hits for that call. A logical build alone does not identify
+physical route work.
+
+| Call and counter | Shipping tail | First point prefix |
+| --- | ---: | ---: |
+| 47,995 start to orders entry | 253,979 | 1,124,982 |
+| 47,995 game update | 3,866,299 | 4,481,493 |
+| 47,995 draw | 774,479 | 771,395 |
+| 48,100 orders | 1,487,649 | 2,514,362 |
+| 48,100 draw | 505,888 | 506,299 |
+
+The component-witness variant answers boolean reachability from up to
+four complete, fresh route fields. The host oracle covers a positive
+proof, a negative proof, and exact fallback with the same cache ages.
+On ARM it moves the first completion after `update_orders` begins in
+call 47,995. The full step costs 5,286,590 cycles, 33,316 more than the
+first prefix ROM. An orders-stage reader still enters completion in that
+same update. Test a second bounded cutoff for exact cell requests.
+
+- Stage and entry comparison SHA-256 `002edc7270d4a83e459740c378ef64e7d5a9a6c1c51c5159d6dc1e9d2174f931`.
+
+### Keep the complete tail alongside parked prefixes
+
+A separate composition restores shipping tail reuse for complete fields
+while allowing new point prefixes. Only complete victims can enter the
+saved tail. A hit installs the complete field and retires the displaced
+prefix record, if present. The existing large-queue and save fences still
+release the borrowed backing. The focused host fixtures cover both exchanges,
+forced overflow and completing a field after its backing has moved.
+
+The host sanitizer pair matches the 386,646 logical residency samples
+for the shipping tail and combined build. Started physical fills differ
+by six in the tail-plus-prefix host pair. The physical ROM samples below
+match every named checkpoint, sampled actor/mineral bank, palette and
+framebuffer, and all sampled route counters.
+
+| Guest cycles | Shipping tail | Tail and prefix | Tail, prefix, and component proof |
+| --- | ---: | ---: | ---: |
+| Mean advancing call | 2,481,146 | 2,271,542 | 2,271,609 |
+| All-call p95 | 3,628,357 | 3,340,809 | 3,339,859 |
+| All-call maximum | 4,841,218 | 5,271,133 | 5,310,998 |
+| Call 47,995 | 4,641,164 | 5,271,133 | 5,310,998 |
+| Call 48,100 | 2,552,639 | 2,575,496 | 2,574,898 |
+
+Both composed variants avoid entering prefix completion on call 48,100.
+Tail plus prefix lowers mean cost by 8.45% and p95 by 7.92% against the
+shipping build. Call 47,995 still needs a continuation. The component
+proof relocates it into orders and grows the maximum by a further 39,865
+cycles. Keep the options off in release and prioritize the resumed search
+budget for that call before cross-profile qualification.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Verified shipping tail adoption | `8a56b15d58a8060bf6b879de3875ecde9eef1ff7d5861fb734371c959c795d4b` |
+| Component and first prefix | `68327ecfa5d551c9480335b3fdc4da59479ea1cb7473b726e1ce457be208a887` |
+| Tail and prefix | `bcddd1aa4b372beef7172ce6f1daa4d55f2713ab81d3045c221c929803a41ca7` |
+| Tail, prefix, and component proof | `6e5c7ccf7a189719fab42601caea7280a9af61899606e120dfc058ee2e8536c4` |
