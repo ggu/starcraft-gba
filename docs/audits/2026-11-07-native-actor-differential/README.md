@@ -68,6 +68,31 @@ obstacle, arrival timing, and the native formation algorithm remain open.
 | Native observation manifest | `b63cb64a4c61fd5c399c6417aa249f7a256854d045ee321eb90915b124690fee` |
 | Actor comparison | `6059687ea843cc3aad5b1628b40107d455a8aa2b6bb4eeaedab309d0a287f106` |
 
+### Blood Bath workers and the minimap
+
+A separate ares Blood Bath session placed human Terran in the northeast
+against Zerg, Terran and Protoss computers. The actor captures identified all
+four starting halls. R selected four human SCVs and the HUD showed `UNITS: 4`
+in all three samples. At observer step 4,230 the four 60-HP SCVs were mining
+with distinct mineral targets. A C-Right Move to a nearby field point gave
+all four order 6 and the same destination (1710, 337) by step 4,273. Their
+intermediate waypoints differed.
+
+With the visible cursor blue inside the minimap, a second C-Right replaced
+all four pending targets with (11, 288) by step 4,342, while the first move
+was still in progress. All four workers again had separate intermediate
+waypoints. The other Terran owner's SCVs kept their prior orders.
+
+The SCVs' two common destinations and the Marines' distinct destinations
+establish two observed cases. They differ in unit type, initial spread and
+target context. A matched same-unit comparison is still needed to determine
+when the original game assigns a formation destination.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Native observation manifest | `f600306182e49e3eddc40ae8f12f02d989c84465c072647bc5256bb578af7623` |
+| Offline actor analysis | `8a988d6542a66fbdfa1bcf40250eedfc2829edea5e0740e214e24c6a08053417` |
+
 ## Three-sample frontend budget proof before execution
 
 The separate follow-up observer permits at most three 8 MiB RDRAM samples and three frames within the existing 2 MiB frame budget. The parent caps stdout at 256 KiB and stderr at 512 KiB. The child normally runs with a 2 MiB per-file soft limit and 8 MiB hard limit; only while synchronously writing a validated RAM snapshot does it raise the soft limit to 8 MiB and immediately lower it again. During that synchronous copy no guest CPU execution is requested. The fixed pinned USA ROM copy is 32 MiB. The pinned ares `mia/medium/nintendo-64.cpp` identifies StarCraft 64 as a 128 KiB Flash game; the isolated frontend connects no controller pak.

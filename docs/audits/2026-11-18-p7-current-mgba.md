@@ -194,3 +194,74 @@ the HUD stage from 130,051 to 127,780 mean cycles and the whole loop by
 0.12%. IWRAM and EWRAM stay the same in Terran, P10 and Showcase. The
 prototype stays optional. Local timing receipt SHA-256
 `7d7dca2ce7694c78d045f2019f00678c294f7237f221dd2b08a660f48578e2a4`.
+
+## Sustained combat after #572
+
+The verified normal P10 build at `ca059860` averages 1,901,686 guest cycles
+per advancing update in the same 958-update window. Mean orders cost is
+893,661 cycles and mean background render cost is 228,131 cycles. Of 957
+advancing updates with an adjacent camera observation, 912 moved the
+camera. The renderer used a partial restore on 864 of those. The other
+48 moving updates also changed the static cache key. There were three
+stationary partial restores and 42 stationary full hits.
+
+An instrumented build adds 0.06% to the mean and matches all 11 world,
+fog, palette and displayed framebuffer samples, plus the complete
+1,000-call simulation, route and terrain-cache timeline. Mean background
+stages are 18,464 cycles for the static key and view bounds, 61,933 for
+validation and restore, 78,528 for tile drawing, 24,917 for static object
+redraw, and 45,208 for capturing the next cache. Stage values are guest
+cycle measurements from the diagnostic ROM.
+
+A vertical-rotation prototype keeps the existing VRAM/EWRAM cache split
+and shifts the logical start row. It reads back only the planned dirty
+rows after a vertical scroll. A full capture reestablishes the linear
+layout after lateral moves or key changes. The cache preserves the exposed
+strip requirement and rejects a stale backbuffer or incomplete dirty plan.
+An asset-free sanitizer fixture checks 68 vertical passes through the
+split and wrap in both directions, and a lateral restore after each pass.
+
+| Advancing update cohort | Release mean | Vertical-rotation mean |
+| --- | ---: | ---: |
+| All 958 updates | 1,901,686 | 1,889,950 |
+| 388 vertical partial restores | 1,883,204 | 1,851,760 |
+| Background on vertical partial restores | 218,856 | 186,611 |
+
+The p95 changes from 2,197,484 to 2,195,160 cycles and the peak changes
+from 2,566,464 to 2,530,420. The paired run matches the same 11 world and
+video cuts and all observed route, frame, and cache decisions. The current
+cartridge saves 0.62% mean in this window with the prototype. The vertical
+prototype remains local.
+
+A second prototype rotates the cache by words and copies dirty rectangle
+spans, allowing lateral and diagonal camera deltas to reuse the same
+physical pixels. It matches the same 11 checkpoints and full simulation,
+route and cache-decision timelines. Its mean is 1,900,419 cycles, down
+0.07% from the release, and its p95 rises to 2,205,884 cycles. On 475
+diagonal partial restores, background cost rises from 238,905 to 253,506
+cycles. Keep this prototype local. The next rendering measurement should
+separate the paint and transfer costs of diagonal redraws before changing
+how much of the cache is read back.
+
+Two collision memo alternatives were replayed as observers only. The
+exact query rectangle and the normalized geometry key each found **zero**
+reusable masks, as did the shipping memo. There were 36,650 eligible mask
+requests over 958 advancing updates. All 1,000 call classifications and
+11 world and display samples matched. Work on average collision cost should
+look inside the first lookup for each mover.
+
+A detector snapshot variant builds its rows from the validated actor owner
+lists. Its focused sanitizer oracle matches the slot scan and the independent
+detector mask. The normal P10 vector with this change matches the 11 replay
+cuts and the complete timelines. Its 1,905,023-cycle mean is 0.18% higher
+than the release, and p95 rises from 2,197,484 to 2,199,059. The owner-list
+prototype stays local.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Release camera and cache trace | `1a4e29b7e289417f7869275f9ff8894be785a55ac88036adbb4f147651c0d340` |
+| Background diagnostic | `59e0dbdb59b20f53cfe229b9af3397d93b160ab01096d7e84535bb14fc41d1d5` |
+| Vertical rotation comparison | `7889ae76d8e347a70d3f78afb6fe8d3292ea6e1f1ecc7e7b533a915f65a29712` |
+| Pixel rotation comparison | `d3c115f25ad1778f6e4cfb9e8755ff90871d18b4182ec238adf566e5c2a72622` |
+| Collision shadow receipt | `06d8797f03cbb20623cc8f5f27746d3668a11b293dca7cddcf2ee53a1ce62aef` |
+| Detector owner-list comparison | `0e44158cf6850ee7786994038127af0c564145ca8775b0f5c7a1caa8aea7db75` |
