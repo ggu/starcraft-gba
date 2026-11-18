@@ -39,8 +39,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   state and video checkpoints and the final SRAM image matched. In a
   separate normal opening, updates over the 561,792-cycle budget fell from
   four to zero out of 1,000. In the 40-unit scene, drawing still averages
-  505,994 cycles and 607 of 640 updates miss the budget. Use that scene
-  to quantify drawing and presentation costs, then verify timing on hardware.
+  505,994 cycles and 607 of 640 updates miss the budget. A read-only trace
+  of 80 of those updates measures 335,110 cycles from draw setup to the HUD,
+  171,023 cycles for the HUD, and 165,902 cycles from presentation entry to
+  the next input sample. The first figure includes clearing, the map,
+  field feedback, and audio observation. Compare how often the HUD panels
+  actually change before trying to reuse them, then verify timing on hardware.
 
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and
   Interceptor services. The standard Terran, Zerg and Showcase builds still
