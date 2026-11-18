@@ -422,8 +422,14 @@ static void check_resident_fields(void)
         {
             int goal = sc64_route_goal[slot];
             const Oracle *o = oracle_for(goal);
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+            int parked = sc64_point_prefix_find(slot) != 0;
+#endif
             for (int cell = 0; cell < MAP_COLS * MAP_ROWS; ++cell) {
                 int expected = o->dist[cell] < 0 ? SC64_ROUTE_UNREACHABLE : o->dir[cell];
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+                if (parked && sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE) continue;
+#endif
                 if (sc64_route_get(slot, cell) != expected) {
                     printf("RESIDENT FIELD WRONG: shape %dx%d slot %d goal %d cell %d stored %d fresh %d\n",
                            MAP_COLS, MAP_ROWS, slot, goal, cell, sc64_route_get(slot, cell), expected);
@@ -756,6 +762,68 @@ static void check_single_retained_point(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+static void check_point_prefix_resume(void)
+{
+    const int first = 32 + 32 * 128, distant = 100 + 100 * 128;
+    int slots[SC64_POINT_PREFIX_SLOTS + 1];
+    race_cols = race_rows = 128;
+    memset(desired, 1, sizeof(desired));
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    u32 before = sc64_route_builds;
+
+    for (int i = 0; i <= SC64_POINT_PREFIX_SLOTS; ++i) {
+        int root = first + 10 * i;
+        int origin = root + 1;
+        int slot = sc64_route_slot_for(root, origin);
+        assert(slot >= 0 && sc64_route_valid[slot] == 1 && sc64_route_goal[slot] == root);
+        assert(sc64_route_get(slot, origin) == 2);
+        slots[i] = slot;
+        if (i < SC64_POINT_PREFIX_SLOTS) {
+            assert(sc64_point_prefix_find(slot));
+            assert(sc64_route_get(slot, distant) == SC64_ROUTE_UNREACHABLE);
+        } else {
+            assert(!sc64_point_prefix_find(slot));
+            assert(sc64_route_get(slot, distant) != SC64_ROUTE_UNREACHABLE);
+        }
+    }
+    assert(sc64_route_builds == before + SC64_POINT_PREFIX_SLOTS + 1);
+    u32 metadata = state_hash();
+    for (int i = 0; i < SC64_POINT_PREFIX_SLOTS; ++i) {
+        assert(SC64_ROUTE_REACHES(slots[i], distant));
+        assert(!sc64_point_prefix_find(slots[i]));
+        reference_bfs(&oracle[POOL], first + 10 * i);
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slots[i], cell) == oracle[POOL].dir[cell]);
+    }
+    assert(metadata == state_hash());
+    check_grid_unchanged();
+
+    int blocked_goal = first + 2 * MAP_COLS;
+    desired[blocked_goal] = 0;
+    invalidate();
+    build_path_grid();
+    int slot = sc64_route_slot_for(blocked_goal, blocked_goal + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    assert(sc64_route_get(slot, blocked_goal + 1) == 0);
+    assert(sc64_route_slot_for(blocked_goal, distant) == slot);
+    assert(!sc64_point_prefix_find(slot));
+    reference_bfs(&oracle[POOL], blocked_goal);
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+    check_grid_unchanged();
+
+    slot = sc64_route_slot_for(first, first + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    invalidate();
+    for (unsigned i = 0; i < SC64_POINT_PREFIX_SLOTS; ++i)
+        assert(!sc64_point_prefixes[i].count);
+    puts("point prefixes preserve exact FIFO, capacity fallback, logical residency and topology reset");
+}
+#endif
+
 #ifdef SC64_ROUTE_KEEP_FIELDS
 /* Adopt an exact donor as lazy after a harmless closure, then request a
  * nearby goal on that gradient. Closing a tile on the path must instead
@@ -796,6 +864,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-prefix-only")) {
+        check_point_prefix_resume();
+        return 0;
+    }
+#endif
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-pointer-only")) {
         check_single_retained_point();

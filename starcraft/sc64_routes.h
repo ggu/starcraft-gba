@@ -101,6 +101,13 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #error "SC64_ROUTE_KEEP_FIELDS requires SC64_ROUTE_ACTIVE_STRIDE"
 #endif
 #endif
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+#if !defined(SC64_ROUTE_KEEP_FIELDS) || !defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || \
+    !defined(SC64_ROUTE_WORD_CLEAR) || !defined(SC64_ROUTE_NEW_CELL) || \
+    defined(SC64_ROUTE_POINT_POINTER_PROBE)
+#error "point prefix requires the exact linear packed route path without spare planes"
+#endif
+#endif
 
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
@@ -233,6 +240,27 @@ static u16 sc64_route_field[SC64_ROUTE_SLOTS][MAP_CELLS];
 static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
 
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+enum { SC64_POINT_PREFIX_SLOTS = 4, SC64_POINT_PREFIX_PENDING = 128,
+       SC64_POINT_PREFIX_LIMIT = 1024, SC64_POINT_PREFIX_BATCH = 32 };
+typedef struct {
+    u16 goal;
+    u8 slot, count;
+    u16 queue[SC64_POINT_PREFIX_PENDING];
+} Sc64PointPrefix;
+static Sc64PointPrefix sc64_point_prefixes[SC64_POINT_PREFIX_SLOTS];
+static u8 sc64_point_prefix_index[SC64_ROUTE_SLOTS];
+
+static void sc64_point_prefix_reset(void)
+{
+    memset(sc64_point_prefix_index, 0, sizeof(sc64_point_prefix_index));
+    for (unsigned i = 0; i < SC64_POINT_PREFIX_SLOTS; ++i)
+        sc64_point_prefixes[i].count = 0;
+}
+#define SC64_POINT_PREFIX_RESET() sc64_point_prefix_reset()
+#else
+#define SC64_POINT_PREFIX_RESET() ((void)0)
+#endif
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
 #if defined(SC64_ROUTE_POINT_POINTER_PROBE) && (!defined(SC64_ROUTE_ACTIVE_STRIDE) || \
     !defined(SC64_ROUTE_PACK3) || !defined(SC64_ROUTE_KEEP_FIELDS))
@@ -397,6 +425,7 @@ static int sc64_route_configure(void)
             sc64_route_pcount = 0;
             for (i = 0; i < SC64_ROUTE_SLOTS; ++i) sc64_route_field[i] = 0;
             memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+            SC64_POINT_PREFIX_RESET();
             sc64_facility_frontiers_reset();
 #ifdef SC64_ROUTE_DECAY_FREQ
             memset(sc64_route_age, 0, sizeof(sc64_route_age));
@@ -441,6 +470,7 @@ static int sc64_route_configure(void)
     for (i = 0; i < SC64_ROUTE_PHYS_MAX; ++i)
         sc64_route_pf_owner[i] = i < SC64_ROUTE_SLOTS ? (u8)i : 0xff;
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+    SC64_POINT_PREFIX_RESET();
     sc64_facility_frontiers_reset();
 #ifdef SC64_ROUTE_DECAY_FREQ
     memset(sc64_route_age, 0, sizeof(sc64_route_age));
@@ -517,6 +547,7 @@ static void sc64_route_age_request(void)
     int i;
     if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) {
         memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+        SC64_POINT_PREFIX_RESET();
         memset(sc64_route_age, 0, sizeof(sc64_route_age));
         sc64_route_clock = 0;
         SC64_ROUTE_DONORS_CLEAR();
@@ -587,6 +618,7 @@ sc64_routes_reset(void)
     (void)sc64_route_configure();
 #endif
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+    SC64_POINT_PREFIX_RESET();
     sc64_facility_frontiers_reset();
     SC64_ROUTE_POINT_TAIL_RELEASE();
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
@@ -1864,10 +1896,18 @@ static inline void sc64_route_pack_linear(u8 *field, const u8 *dense,
 /* Keep the oldest-to-newest FIFO order. A batch may append at most four
  * cells per pop; make room between batches instead of wrapping each access.
  * No live route bytes or grid bits have changed if a frontier does not fit. */
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+static int GBA_HOT __attribute__((noinline))
+sc64_route_expand_linear_from(u8 *dense, int tail, int stride, int cap, int head)
+#else
 static int GBA_HOT __attribute__((noinline))
 sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
+#endif
 {
-    int head = 0, consumed = 0;
+#ifndef SC64_ROUTE_POINT_PREFIX_PROBE
+    int head = 0;
+#endif
+    int consumed = 0;
     while (head < tail) {
         int limit = head + (cap - tail) / 4;
         if (limit > tail) limit = tail;
@@ -1917,16 +1957,16 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
     return consumed + tail;
 }
 
-static int __attribute__((noinline))
-sc64_route_fill_linear(u8 *field, int goal)
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+static inline int sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
 {
-    const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
-    const int cap = sc64_route_linear_queue_cap(cols, rows);
-    u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
-    const int row = sc64_cell_row(goal);
-    const int start = goal + row * SC64_LINEAR_PAD + stride + 4;
-    int tail = 0;
+    return sc64_route_expand_linear_from(dense, tail, stride, cap, 0);
+}
+#endif
 
+static inline int sc64_route_linear_seed(u8 *dense, int start, int stride)
+{
+    int tail = 0;
     if (dense[start] == 7u) {
         dense[start] = 0;
         bfs_queue[tail++] = (u16)start;
@@ -1938,6 +1978,18 @@ sc64_route_fill_linear(u8 *field, int goal)
             bfs_queue[tail++] = (u16)seed;
         }
     }
+    return tail;
+}
+
+static int __attribute__((noinline))
+sc64_route_fill_linear(u8 *field, int goal)
+{
+    const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
+    const int cap = sc64_route_linear_queue_cap(cols, rows);
+    u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
+    const int row = sc64_cell_row(goal);
+    const int start = goal + row * SC64_LINEAR_PAD + stride + 4;
+    int tail = sc64_route_linear_seed(dense, start, stride);
     tail = sc64_route_expand_linear(dense, tail, stride, cap);
     if (tail < 0) return tail;
     sc64_route_pack_linear(field, dense, cols, rows, stride);
@@ -1954,12 +2006,19 @@ sc64_route_fill_linear(u8 *field, int goal)
 #error "facility FIFO probe requires bounded depot and active-stride packed-grid dense helpers"
 #endif
 
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+#include "sc64_route_point_prefix_probe.h"
+#endif
+
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* Flood the whole field of a goal into a slot on the current grid. Returns the
  * number of queued cells (for diagnostics). */
 static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
 {
     int i, tail = 0;
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    sc64_point_prefix_forget(slot);
+#endif
 #ifdef SC64_ROUTE_DENSE_FLOOD
     if (MAP_COLS == SC64_DENSE_SIDE && MAP_ROWS == SC64_DENSE_SIDE)
         tail = sc64_route_fill_dense(sc64_route_field[slot], goal);
@@ -2062,6 +2121,9 @@ static int __attribute__((noinline)) sc64_route_fill_point_pointer(int slot, int
  * bookkeeping is untouched. */
 static void __attribute__((noinline)) sc64_route_exact(int slot)
 {
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    if (sc64_point_prefix_complete(slot)) return;
+#endif
     if (!SC64_ROUTE_LAZY(slot)) return;
     SC64_ROUTE_KEEP_COUNT(MATERIALIZE);
     (void)sc64_route_fill(slot, (int)sc64_route_goal[slot]);
@@ -2069,6 +2131,10 @@ static void __attribute__((noinline)) sc64_route_exact(int slot)
 
 static int __attribute__((noinline)) sc64_route_reaches(int slot, int cell)
 {
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    if (sc64_point_prefix_find(slot) &&
+        sc64_route_get(slot, cell) != SC64_ROUTE_UNREACHABLE) return 1;
+#endif
     if (SC64_ROUTE_LAZY(slot) &&
         SC64_GRID_GET(path_walkable, cell) &&
         sc64_route_gate(slot, cell, (int)sc64_route_goal[slot])) return 1;
@@ -2127,6 +2193,9 @@ sc64_route_slot(int goal)
             partial_slot = i;
 #else
 #ifdef SC64_ROUTE_KEEP_FIELDS
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+            sc64_point_prefix_require(i, origin);
+#endif
             if (SC64_ROUTE_LAZY(i) &&
                 (origin < 0 || !sc64_route_gate(i, origin, goal)))
                 sc64_route_exact(i);
@@ -2194,6 +2263,8 @@ sc64_route_slot(int goal)
         } else {
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
             tail = sc64_route_fill_point_pointer(slot, goal);
+#elif defined(SC64_ROUTE_POINT_PREFIX_PROBE)
+            tail = sc64_point_prefix_fill(slot, goal, origin);
 #else
             tail = sc64_route_fill(slot, goal);
 #endif
@@ -2369,6 +2440,9 @@ static int GBA_HOT sc64_route_slot(int goal)
 static int __attribute__((noinline))
 sc64_route_near_root_reaches(int slot, int cell, int goal, int root)
 {
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    sc64_point_prefix_require(slot, cell);
+#endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     /* The gate proves the preferred path to the cached root still agrees
      * with a fresh flood. If the new goal lies on it, the same suffix proof
@@ -2563,6 +2637,9 @@ sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
         slot = i; break;
     }
     if (slot < 0) return 0;
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    sc64_point_prefix_require(slot, cell);
+#endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     if (SC64_ROUTE_LAZY(slot) &&
         (!SC64_GRID_GET(path_walkable, cell) || !sc64_route_gate(slot, cell, goal)))
