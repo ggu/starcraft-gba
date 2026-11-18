@@ -122,3 +122,16 @@ not enter the combined comparison.
 | Detector snapshot | `23107fda9ea033dd2352689d1a716dfbe5ecdb0f5f84bd051b23762f8cabc9fa` |
 | Contact and detector combined | `be44765f3f4c9f10c79fcc8559aef765602c379146df6b931b9825ca62764489` |
 | Earlier contact memo miss | `4c932b5c80c258faad5c7f710152b70777dfb270ac1f02c3970ea15f6f4168ea` |
+
+The combined P10 build replayed the complete P7 victory from HOME at
+game frame 55,892 after 57,678 physical updates. All 59 named gameplay
+checkpoints, 11 briefing pages and 10 field acknowledgments matched
+the verified standard replay above. Paired receipt SHA-256
+`deedf718800b168810f9e3f4a25e6774da1998b15becf84b5648031cdebcab3c`.
+
+All four combined cartridges passed a separate fresh SRAM continuation
+after 3,000 updates of ordinary custom play, with 900 more updates
+matching uninterrupted play. The four lobbies covered both maps, all
+human races, one to three CPUs, and a sparse two-CPU lineup. The clean
+source checkout passed `./dev test` with 1,161 Python cases, 35 skips,
+and the compiled and auxiliary checks.

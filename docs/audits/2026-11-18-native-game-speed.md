@@ -37,35 +37,43 @@ Both isolated manifests passed. Captures and game data stay local.
 ## Paired gameplay cadence
 
 A separate pair used the same two controller plans and took read-only RAM
-snapshots from the same emulator executable. At completed observer step
-5,370 both runs were in Settings with the pause flag set. The two visible
-slider positions differed, but the active selector and pacing-table value
-were still 4 and 56 in both runs. The world and trigger countdowns were
-also identical at 66 and 12.
+snapshots from the same emulator executable. A third run substituted four
+ten-step analog-left holds for the default run's four neutral holds. At
+observer step 5,370 all three runs were in Settings with the pause flag set.
+The visible slider positions differed. The active selector was still 4,
+the pacing-table value was 56, and the two gameplay countdowns were 66
+and 12 in every run.
 
-Both runs had resumed at the 5,940 and 6,001 snapshots. The nearby field
-captures in both runs showed 74 minerals and 4/9 supply.
+All three runs had resumed at the 5,940 and 6,001 snapshots. The nearby
+field captures at the starting and higher settings showed 74 minerals
+and 4/9 supply.
 
-| Snapshot reading, steps 5,940 → 6,001 | Starting slider | Higher slider |
-| --- | ---: | ---: |
-| Active selector / pacing-table value at both steps | 4 / 56 | 6 / 42 |
-| World countdown, modulo 101 | 53 → 35 | 49 → 25 |
-| Trigger countdown, modulo 31 | 30 → 12 | 26 → 2 |
-| Outer scheduler word | 755 → 773 | 794 → 818 |
-| Advances supported by all three readings | 18 | 24 |
+| Snapshot reading, steps 5,940 → 6,001 | Lower endpoint | Starting slider | Higher slider |
+| --- | ---: | ---: | ---: |
+| Active selector / pacing-table value at both steps | 0 / 167 | 4 / 56 | 6 / 42 |
+| World countdown, modulo 101 | 62 → 55 | 53 → 35 | 49 → 25 |
+| Trigger countdown, modulo 31 | 8 → 1 | 30 → 12 | 26 → 2 |
+| Outer scheduler word | 677 → 684 | 755 → 773 | 794 → 818 |
+| Advances supported by all three readings | 7 | 18 | 24 |
 
-Both gameplay countdowns and the outer word agree on 18 advances at the
-starting slider and 24 at the higher setting over the same 61 observer
-steps. The outer word can also advance while gameplay is paused, so it
+Both gameplay countdowns and the outer word agree on 7, 18 and 24 advances
+at these three settings over the same 61 resumed observer steps. The outer
+word can also advance while gameplay is paused, so it
 serves as corroboration within the resumed interval. This establishes a
-gameplay cadence difference for the sampled match and settings. The lower
-endpoint, the full selector-to-cadence mapping and physical refresh timing
-remain open. The GBA's session settings cover cursor movement and menu sound.
+gameplay cadence difference for the sampled match and settings. The full
+selector-to-cadence mapping and physical refresh timing remain open. The
+GBA's session settings cover cursor movement and menu sound.
 
 A separate visual endpoint check moved the slider marker from capture x=346
 to x=400 after four Right presses. Six further ten-step Right holds, with
 neutral input and a capture after each, left the marker at x=400. The command
 log SHA-256 is `a8ac365d2f77dcac5a942304d82a87f42dcfd276d2811195d2f4b371293985a0`.
+
+The same opening and Settings route reached the lower visual endpoint.
+Four ten-step analog-left holds moved the marker through x=320, 292, 266
+and 238 from the starting x=346. Six more holds left it at x=238. The
+verified 22-capture endpoint receipt SHA-256 is
+`fb711a25c8a59088af7d63976570db3a59ae5f684079eae28212b1d65846ed8a`.
 
 | Pinned observer or receipt | SHA-256 |
 | --- | --- |
@@ -73,3 +81,5 @@ log SHA-256 is `a8ac365d2f77dcac5a942304d82a87f42dcfd276d2811195d2f4b371293985a0
 | Starting slider capture manifest | `d213ac2c431b51657683736122667c50f7637015efa5dc7a76de5a331b93b688` |
 | Higher slider capture manifest | `0e82bf5df5668783d4b37550fab8cbb89ad5ced16e09f62f591d8ee360a25063` |
 | Verified snapshot readings and deltas | `dde67e8f8fca6105b1e0ab7b5047e3637628c46f502071e9f473a105cd781252` |
+| Lower endpoint capture manifest | `097698e241ea4ec33dd32e04ce02816433074466a6d78e2fd676a6a6f34ac4f0` |
+| Verified lower endpoint cadence | `3f0bf4dd7bbfd5901df003871a3964fe68e75e9fc3d36e864415b51017cdf219` |
