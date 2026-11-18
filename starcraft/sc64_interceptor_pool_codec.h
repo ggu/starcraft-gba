@@ -29,6 +29,10 @@ typedef struct {
 } Sc64ProjectileRow;
 int sc64_pool_init(Sc64Arena *a);
 int sc64_pool_acquire(Sc64Arena *a, uint8_t *ordinal, uint8_t *native_index);
+/* Check the splice in an exclusively owned, validated arena. Growth and
+ * suspect links retain the full validator. Initialize the acquired row
+ * before any save or gameplay boundary, as with the full acquire. */
+int sc64_pool_acquire_live(Sc64Arena *a, uint8_t *ordinal, uint8_t *native_index);
 int sc64_pool_retire(Sc64Arena *a, uint8_t ordinal);
 /* Only for an exclusively owned live arena from init or validated decode,
  * maintained by checked pool mutators and domain-valid row updates. Use an
@@ -72,6 +76,8 @@ uint8_t sc64_native_index(uint8_t ordinal);
  * Every acquire must be followed by initialization before a save boundary. */
 int sc64_compact_pool_acquire(Sc64Arena *a, unsigned cap,
                               uint8_t *ordinal, uint8_t *native_index);
+int sc64_compact_pool_acquire_live(Sc64Arena *a, unsigned cap,
+                                   uint8_t *ordinal, uint8_t *native_index);
 int sc64_compact_pool_retire(Sc64Arena *a, uint8_t ordinal);
 /* Live retirement with the same exclusive-ownership contract and compact
  * canonicalization of all non-list fields in the newly free row. */
