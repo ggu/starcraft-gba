@@ -1439,11 +1439,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals
-  at the starting setting and 184 at the higher setting. Read-only captures
-  support 7, 18 and 24 gameplay advances at the lower endpoint, default and
-  higher setting over the same 61 resumed observer steps. Finish mapping the
-  intervening settings and qualify display pacing separately before wiring a
-  GBA Game Speed option.
+  at the starting setting and 184 at the higher setting. The full set of
+  seven positions gives 7, 9, 12, 15, 18, 22 and 24 gameplay advances in
+  61 resumed observer steps. Use this ordering for a GBA Game Speed option,
+  with display pacing and long gameplay timing qualified independently.
 - The [earlier P7 measurement](audits/2026-11-06-current-native-qualification/README.md)
   at `72a71d22` costs about **2,200,226 cycles per advancing full loop**, versus
   about **559,000 cycles** available at 30 fps. The paired diagnostic matches
