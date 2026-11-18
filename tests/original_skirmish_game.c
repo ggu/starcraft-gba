@@ -18,6 +18,50 @@ static void press(u16 button)
     game_update(0, 0);
 }
 
+/* Independent cell-wise oracle for the original terrain and circular building
+ * collision rule, including unfinished buildings and overlapping footprints. */
+static void check_walkability_grid(void)
+{
+    invalidate_path_grid();
+    build_path_grid();
+    for (int row = 0; row < MAP_ROWS; ++row)
+        for (int col = 0; col < MAP_COLS; ++col) {
+            int open = !terrain_blocked(col, row);
+            for (int i = 0; i < MAX_BUILDINGS && open; ++i) {
+                int dx = col * 16 + 8 - b[i].x;
+                int dy = row * 16 + 8 - b[i].y;
+                if (b[i].alive && dx * dx + dy * dy < 18 * 18) open = 0;
+            }
+            check(SC64_GRID_GET(path_walkable, col + row * MAP_COLS) == open,
+                  "walkability grid matches terrain and building oracle");
+        }
+}
+
+static void check_walkability_maps(void)
+{
+    game_init();
+    for (int map = 0; map < ORIGINAL_MAP_COUNT; ++map) {
+        original_skirmish_map = map;
+        memset(b, 0, sizeof b);
+        check_walkability_grid();
+        /* Overlap and an unfinished structure, plus both clipped map edges. */
+        b[0].alive = b[1].alive = b[2].alive = b[3].alive = 1;
+        b[0].x = 320; b[0].y = 320;
+        b[1].x = 328; b[1].y = 320; b[1].under_construction = 1;
+        b[2].x = 0; b[2].y = 0;
+        b[3].x = MAP_COLS * 16 - 1; b[3].y = MAP_ROWS * 16 - 1;
+        check_walkability_grid();
+        b[0].alive = 0;
+        check_walkability_grid();
+        b[0].alive = 1; b[0].x = 337; b[0].y = 337;
+        b[1].under_construction = 0;
+        check_walkability_grid();
+    }
+    /* Switching back with the same structures must restore the other map. */
+    original_skirmish_map = 0;
+    check_walkability_grid();
+}
+
 static void play_match(int map, int bots)
 {
     game_init();
@@ -171,6 +215,7 @@ static void check_cpu_local_mining_recovery(int map, int bots)
 int main(void)
 {
     gba_init();
+    check_walkability_maps();
     check_exploration_restore();
     for (int map = 0; map < ORIGINAL_MAP_COUNT; map++)
         for (int bots = 1; bots <= 3; bots++) {
