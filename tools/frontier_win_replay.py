@@ -45,6 +45,14 @@ def run_case(case, runner, output, sym, sizes):
                     "bots": len(cpu), "cpu": cpu}
         if setup != expected:
             raise RuntimeError(f"{case['name']}: setup {setup} != {expected}")
+        cpu_team = case.get("cpu_team", False)
+        if type(cpu_team) is not bool:
+            raise ValueError("cpu_team must be a boolean")
+        if "frontier_cpu_team" in sym or cpu_team:
+            if read_value(replay, sym, sizes, "frontier_cpu_team", 4) != int(cpu_team):
+                raise RuntimeError(f"{case['name']}: wrong CPU team mode")
+        if "cpu_team" in case:
+            setup["cpu_team"] = cpu_team
         start_cycle = replay.clock()
         replay.play_to(case["end"], edges)
         cycles = replay.clock() - start_cycle

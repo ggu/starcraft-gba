@@ -1926,6 +1926,7 @@ static void skirmish_update(void);
 static void skirmish_outcome(void);
 static int skirmish_hostile(int a, int b);
 static int skirmish_bot_index(int owner);
+static inline unsigned char skirmish_team_for_owner(int owner);
 #endif
 #ifdef SC_ORIGINAL_SKIRMISH
 #include "original_skirmish_map.h"
@@ -1945,6 +1946,7 @@ enum { FRONTIER_SETUP_MAP, FRONTIER_SETUP_BOTS, FRONTIER_SETUP_PLAYER, FRONTIER_
 
 static unsigned char frontier_human_faction;
 static unsigned char frontier_cpu_faction[3];
+static int frontier_cpu_team;
 static int frontier_setup_row;
 
 static inline int
@@ -5454,7 +5456,8 @@ save_game(void)
 #endif
 #ifdef SC_FRONTIER_FACTION
     data.skirmish_map = frontier_pack_setup(original_skirmish_map, SC_FRONTIER_FACTION,
-                                           frontier_human_faction, frontier_cpu_faction);
+                                           frontier_human_faction, frontier_cpu_faction,
+                                           frontier_cpu_team);
 #elif defined(SC_ORIGINAL_SKIRMISH)
     data.skirmish_map = original_skirmish_map;
 #endif
@@ -5521,10 +5524,10 @@ load_game(void)
     if (data.bot_count < 1 || data.bot_count > 3) return 0;
 #endif
 #ifdef SC_FRONTIER_FACTION
-    int saved_map, saved_human;
+    int saved_map, saved_human, saved_team;
     unsigned char saved_factions[3];
     if (!frontier_unpack_setup(data.skirmish_map, SC_FRONTIER_FACTION, &saved_map,
-                               &saved_human, saved_factions)) return 0;
+                               &saved_human, saved_factions, &saved_team)) return 0;
 #elif defined(SC_ORIGINAL_SKIRMISH)
     if ((unsigned)data.skirmish_map >= ORIGINAL_MAP_COUNT) return 0;
 #endif
@@ -5629,6 +5632,9 @@ load_game(void)
     original_skirmish_map = saved_map;
     frontier_human_faction = saved_human;
     memcpy(frontier_cpu_faction, saved_factions, sizeof(frontier_cpu_faction));
+    frontier_cpu_team = saved_team;
+    for (i = 0; i < skirmish_bots; ++i)
+        skirmish_ai[i].team = skirmish_team_for_owner(skirmish_ai[i].player);
     frontier_setup_row = FRONTIER_SETUP_MAP;
 #elif defined(SC_ORIGINAL_SKIRMISH)
     original_skirmish_map = data.skirmish_map;
@@ -6124,6 +6130,7 @@ game_init(void)
     frontier_cpu_faction[0] = FRONTIER_ROVERS;
     frontier_cpu_faction[1] = FRONTIER_BULWARK;
     frontier_cpu_faction[2] = FRONTIER_FOUNDRY;
+    frontier_cpu_team = 0;
     frontier_setup_row = FRONTIER_SETUP_MAP;
 #endif
     help = 0;
