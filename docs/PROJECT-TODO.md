@@ -1474,8 +1474,9 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - The [post-#572 sustained P7 audit](audits/2026-11-18-p7-current-mgba.md#sustained-combat-after-572)
   measures 1.902M guest cycles per active update. The camera moves in 912
   of 957 adjacent samples. A vertical cache rotation saves 0.62% overall
-  and 31,444 cycles per vertical partial restore. Two collision memo
-  alternatives produce zero additional hits on 36,650 requests.
+  and 31,444 cycles per vertical partial restore. The two-axis rotation
+  raises p95. Two collision memo alternatives produce zero additional
+  hits on 36,650 requests.
   Prioritize the cost of the first collision lookup and repeated terrain
   work during both axes of camera movement.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)

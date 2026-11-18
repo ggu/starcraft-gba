@@ -233,6 +233,16 @@ video cuts and all observed route, frame, and cache decisions. The current
 cartridge saves 0.62% mean in this window with the prototype. The vertical
 prototype remains local.
 
+A second prototype rotates the cache by words and copies dirty rectangle
+spans, allowing lateral and diagonal camera deltas to reuse the same
+physical pixels. It matches the same 11 checkpoints and full simulation,
+route and cache-decision timelines. Its mean is 1,900,419 cycles, down
+0.07% from the release, and its p95 rises to 2,205,884 cycles. On 475
+diagonal partial restores, background cost rises from 238,905 to 253,506
+cycles. Keep this prototype local. The next rendering measurement should
+separate the paint and transfer costs of diagonal redraws before changing
+how much of the cache is read back.
+
 Two collision memo alternatives were replayed as observers only. The
 exact query rectangle and the normalized geometry key each found **zero**
 reusable masks, as did the shipping memo. There were 36,650 eligible mask
@@ -245,4 +255,5 @@ look inside the first lookup for each mover.
 | Release camera and cache trace | `1a4e29b7e289417f7869275f9ff8894be785a55ac88036adbb4f147651c0d340` |
 | Background diagnostic | `59e0dbdb59b20f53cfe229b9af3397d93b160ab01096d7e84535bb14fc41d1d5` |
 | Vertical rotation comparison | `7889ae76d8e347a70d3f78afb6fe8d3292ea6e1f1ecc7e7b533a915f65a29712` |
+| Pixel rotation comparison | `d3c115f25ad1778f6e4cfb9e8755ff90871d18b4182ec238adf566e5c2a72622` |
 | Collision shadow receipt | `06d8797f03cbb20623cc8f5f27746d3668a11b293dca7cddcf2ee53a1ce62aef` |
