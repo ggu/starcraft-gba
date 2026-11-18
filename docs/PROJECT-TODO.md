@@ -29,8 +29,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   240 updates measure 19.76–20.76 emulated updates per second across
   the six setups. Both three-opponent openings average about 560,000
   draw cycles and 110,000 simulation cycles. Prioritize draw cost and
-  profile the slowest simulation updates separately. Verify a complete
-  ARM match on both maps.
+  profile the slowest simulation updates separately. The faction builds
+  below now have complete ARM win replays on both maps.
 
 - **Frontier factions (P1):** each of the three cartridges defaults to
   its own faction. Skirmish setup offers all player factions, both maps,
@@ -48,8 +48,28 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The first 240 updates measured 19.75–20.75 emulated updates per second.
   In two earlier normal-input ARM matches, a passive Foundry player lost
   to Rovers on Transit Yard (game tick 5,584) and to Bulwark on Stone
-  Gardens (5,524). Human wins and hardware timings still need verification.
-  Add distinct faction support units and production choices.
+  Gardens (5,524). Add distinct faction support units and production choices.
+
+- **Frontier victory replays (P1):** nine matches reached victory
+  using physical button packets in headless mGBA. Each of the three
+  player factions won on both maps against one CPU. Transit Yard and
+  Stone Gardens also had mixed two-CPU wins, and Foundry beat three
+  independent Bulwark opponents on Stone Gardens. Each case starts at
+  the title, builds and trains a force, issues attack orders, and checks
+  the result screen and exact game tick. The one-CPU Foundry replays
+  averaged 22.71 emulated updates per second on Transit Yard and 22.11
+  on Stone Gardens after the first 100 updates. Prioritize a Transit Yard
+  three-CPU win and hardware timings. To replay the checked-in inputs,
+  build Foundry and pass the physical observer from
+  `tools/sc64_headless_replay.c` to the optional test.
+
+  ```sh
+  make frontier-foundry
+  python3 tools/frontier_win_replay.py /absolute/path/to/sc64-headless-replay --output /tmp/frontier-victories
+  ```
+
+  Use a fresh output directory. Add `--case transit-yard-foundry`
+  to run one match.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
