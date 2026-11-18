@@ -1374,16 +1374,18 @@ usable shared Forge/Core research, reduce measured recurring collision work,
 and repair current campaign/winning-replay gaps. Continue native visual/audio comparison with explicit
 save/source-owner and timing evidence; do not advertise unwired components.
 
-## Current baseline
+## Release and measurement baselines
 
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-34c101e0`:
+- The November 7 normal Mac package was `StarCraft-GBA-2026-11-07-34c101e0`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The last recorded KODAK
-  package was `20261106-e9838086-campaigns`; its present contents are unverified.
-  Content coverage remains **29/30**;
-  this is not a claim of complete native mechanics or campaign parity.
+  package in this November 7 check was `20261106-e9838086-campaigns`.
+  This package carried 29 of 30 missions. The later November 13 cartridge
+  audits verify all ten Terran and all ten Zerg missions on their exact
+  builds. The T10, Z10, and P10 sources expose all 30 mission entries. The
+  campaign replay and save checks below track verification by ROM revision.
   P10 and Showcase include the shared aura optimization; T10/Z9/Z10 retain
   their qualified `f1fbf106` ROM bytes. All five 32 MiB headers, SRAM markers
   and package checksums pass read-back. Research/Flash, paid Scarab and Egg
@@ -1394,6 +1396,20 @@ save/source-owner and timing evidence; do not advertise unwired components.
   its shared Egg service applies to custom games, not Z8–Z10 production.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
   and 1–3 independently raced AIs. Larger roster and behavior gaps remain below.
+- The [current-release P7 comparison](audits/2026-11-18-p7-current-mgba.md)
+  at `0e536f26` measures 8.10 updates/s on the normal P10 build and 8.28
+  with the terrain-cache preview in the same mGBA combat window. All 11
+  sampled world and display checkpoints match. Unit orders still take
+  about 985,000 cycles per advancing update. Matched order diagnostics
+  attribute 392,902 cycles to movement and 269,588 to Arbiter cache work.
+  Both builds also won the carried P7 mission from HOME at frame 55,892
+  with 59 matching named checkpoints. Prioritize exact improvements in
+  movement and Arbiter work in the campaign builds.
+- The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
+  matched two fresh Challenger openings and changed only the Game Speed
+  slider. The same 2,700 observer steps after resume earned 128 minerals
+  at the starting setting and 184 at the higher setting. Match simulation
+  cadence and display pacing independently when qualifying speed controls.
 - The [earlier P7 measurement](audits/2026-11-06-current-native-qualification/README.md)
   at `72a71d22` costs about **2,200,226 cycles per advancing full loop**, versus
   about **559,000 cycles** available at 30 fps. The paired diagnostic matches
