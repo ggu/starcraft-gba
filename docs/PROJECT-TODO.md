@@ -180,9 +180,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Two instrumented runs matched the release's world state around the
   spike. The orders pass used about 926,000 cycles, including about
   854,000 for movement. The point route and direct corridor probes used
-  about 2,200 cycles combined. Profile blocked movement and collision
-  steering at that update before changing route search. Physical GBA SP
-  timing remains open.
+  about 2,200 cycles combined.
+
+  A follow-up attributed the movement spike to one walkability rebuild.
+  Initialize the authored terrain with the map's rectangle spans and
+  apply the existing building footprints. This cut the measured rebuild
+  from 801,870 to 75,375 cycles with identical world checkpoints. The
+  normal ROM's tick 5,341 dropped from 83.71 to 33.49 ms. Its 240-update
+  window improved from 29.56 to 29.74 updates per second, and its worst
+  update dropped to 50.23 ms. The full-grid oracle covers both maps,
+  overlaps, unfinished buildings, removal, replacement, and clipped
+  footprints at the map edges. Seven other sampled windows kept their
+  reported average rates. Continue profiling the remaining combat stalls
+  and measure on GBA SP hardware.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
