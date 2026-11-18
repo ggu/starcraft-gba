@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Independently authored battle maps and the deterministic standalone bot AI.
-ORIGINAL_SKIRMISH_FLAGS := -DSC64_SKIRMISH -DSC_ORIGINAL_SKIRMISH
+FRONTIER_ROUTE_CACHE_FLAGS ?= -DSC_FRONTIER_ROUTE_CACHE
+ORIGINAL_SKIRMISH_FLAGS := -DSC64_SKIRMISH -DSC_ORIGINAL_SKIRMISH $(FRONTIER_ROUTE_CACHE_FLAGS)
 .PHONY: original-skirmish test-original-skirmish
 original-skirmish: build/Frontier-Skirmish-GBA.gba
 	$(PYTHON) tools/verify_roms.py --frontier
@@ -52,3 +53,9 @@ build/test-frontier-terrain-spans: tests/frontier_terrain_spans.c $(STARCRAFT) $
 test-frontier-terrain-spans: build/test-frontier-terrain-spans
 	./build/test-frontier-terrain-spans
 test: test-frontier-terrain-spans
+
+.PHONY: test-frontier-route-cache
+build/test-frontier-route-cache: tests/frontier_route_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile mk/frontier/Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ORIGINAL_SKIRMISH_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+test-frontier-route-cache: build/test-frontier-route-cache
+	./build/test-frontier-route-cache
