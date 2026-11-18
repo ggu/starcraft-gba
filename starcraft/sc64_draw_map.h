@@ -6,12 +6,33 @@
 #if defined(SC_ORIGINAL_SKIRMISH) && !defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_SOFT_FOG) && !defined(SC64_IMPORTED_MISSION)
 #include "frontier_terrain.h"
 #endif
+#if defined(SC64_BACKGROUND_PROFILE_COUNTS) && \
+    (!defined(SC64_BACKGROUND_PROFILE) || !defined(SC64_SOFT_FOG))
+#error "background paint counts require the background profiler and soft fog"
+#endif
+#ifdef SC64_BACKGROUND_PROFILE
+#if !defined(SC64_IMPORTED_MISSION) || defined(SC64_TILE_RENDERER)
+#error "the background profiler requires the imported Mode 4 renderer"
+#endif
+/* Last completed map draw. Read camx/camy and the existing terrain-cache
+ * counters at the same input boundary. Covered stages include their setup. */
+static volatile u32 sc64_bg_key, sc64_bg_reuse, sc64_bg_tiles, sc64_bg_static, sc64_bg_capture;
+static volatile u32 sc64_bg_restore; /* 0 miss, 1 partial restore, 2 full hit */
+#define SC64_BG_MARK(scope) do { \
+    u32 now = gba_clock(); sc64_bg_##scope = now - bg_start; bg_start = now; \
+} while (0)
+#else
+#define SC64_BG_MARK(scope) ((void)0)
+#endif
 /* Static objects are part of the saved terrain band. Keep their painter
  * order and existing visibility/viewport culls together for cache redraws. */
 static void
 draw_map_static_objects(void)
 {
     int i, x, y;
+#ifdef SC64_BACKGROUND_PROFILE_COUNTS
+    SC64_BG_COUNT_PATH(SC64_BG_STATIC_PASSES);
+#endif
     for (i = 0; i < MAX_MINERALS; i++)
 	if (m[i].amount > 0) {
 	    x = m[i].x - camx;
@@ -20,8 +41,12 @@ draw_map_static_objects(void)
 	        currently_visible(m[i].x, m[i].y)) {
 #ifdef SC64_HAS_SPRITES
 		const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
-		if (sprite) draw_static_mineral_sprite(sprite, x, y);
-		else {
+		if (sprite) {
+#ifdef SC64_BACKGROUND_PROFILE_COUNTS
+                    SC64_BG_COUNT_PATH(SC64_BG_MINERAL_ART);
+#endif
+                    draw_static_mineral_sprite(sprite, x, y);
+                } else {
 #endif
 		gfx_diamond(x, y, 7, 4, C_CYAN);
 		gfx_pixel(x, y, C_WHITE);
@@ -37,8 +62,12 @@ draw_map_static_objects(void)
 	    currently_visible(geysers[i].x, geysers[i].y)) {
 #ifdef SC64_HAS_SPRITES
             const Sc64SpriteFrame *sprite = mission_geyser_sprite();
-            if (sprite) draw_mission_sprite(sprite, x, y);
-            else
+            if (sprite) {
+#ifdef SC64_BACKGROUND_PROFILE_COUNTS
+                SC64_BG_COUNT_PATH(SC64_BG_GEYSER_ART);
+#endif
+                draw_mission_sprite(sprite, x, y);
+            } else
 #endif
 	        gfx_diamond(x, y, 6, 4, C_GREEN);
         }
@@ -69,6 +98,14 @@ draw_map(void)
     camy = viewport_top();
 #ifdef SC64_IMPORTED_MISSION
     profile_stage_start = gba_clock();
+#endif
+#ifdef SC64_BACKGROUND_PROFILE
+    u32 bg_start = profile_stage_start;
+    sc64_bg_tiles = sc64_bg_static = sc64_bg_capture = 0;
+#ifdef SC64_BACKGROUND_PROFILE_COUNTS
+    for (unsigned path = 0; path < SC64_BG_COUNT; ++path)
+        sc64_bg_counts[path] = 0;
+#endif
 #endif
 #if (defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)) && \
     defined(SC64_IMPORTED_MISSION)
@@ -151,11 +188,20 @@ draw_map(void)
     /* Each tile gets one terrain/fog pass. Unknown space stays black from
      * gfx_begin, so it needs no second opaque fill after sprites are drawn. */
 #ifdef SC64_IMPORTED_MISSION
-#if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
-    if (!sc64_terrain_cached_key(camx, camy, terrain_static_key)) {
-#else
-    if (!sc64_terrain_cached(camx, camy)) {
+#ifdef SC64_BACKGROUND_PROFILE
+    unsigned bg_partial_before = sc64_terrain_partial;
 #endif
+    SC64_BG_MARK(key);
+#if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
+    int cached = sc64_terrain_cached_key(camx, camy, terrain_static_key);
+#else
+    int cached = sc64_terrain_cached(camx, camy);
+#endif
+    SC64_BG_MARK(reuse);
+#ifdef SC64_BACKGROUND_PROFILE
+    sc64_bg_restore = cached ? 2u : (unsigned)(sc64_terrain_partial != bg_partial_before);
+#endif
+    if (!cached) {
 #endif
 #ifdef SC64_SOFT_FOG
     const u8 *fog_shade = (const u8 *)(const void *)SC64_OBJ_VRAM_FOG;
@@ -282,6 +328,7 @@ draw_map(void)
 	    }
 #undef SC64_DRAW_TILE_STATE
 #endif
+    SC64_BG_MARK(tiles);
 #ifdef SC64_STATIC_DIRTY_ROWS
     {
         u16 saved_clip = gfx_get_clip_y();
@@ -329,6 +376,7 @@ draw_map(void)
     draw_map_static_objects();
 #endif
 #ifdef SC64_IMPORTED_MISSION
+    SC64_BG_MARK(static);
 #if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
     sc64_terrain_store_key(camx, camy, terrain_static_key
 #ifdef SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE
@@ -342,6 +390,7 @@ draw_map(void)
 #endif
                        );
 #endif
+    SC64_BG_MARK(capture);
     }
 #ifdef SC64_TILE_RENDERER
 sc64_tile_background_done:

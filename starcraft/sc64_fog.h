@@ -1,8 +1,21 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_FOG_H
 #define SC64_FOG_H
-
 #include "../common/gba.h"
+
+#ifdef SC64_BACKGROUND_PROFILE_COUNTS
+/* Paint counts are separate from the stage-timing build. One compact-barrier
+ * tile can invoke both its ordinary tile paint and the overlaid wall paint. */
+enum {
+    SC64_BG_BLACK, SC64_BG_DIRECT, SC64_BG_SHADE_HIT, SC64_BG_SHADE_MISS,
+    SC64_BG_MIXED_FULL, SC64_BG_MIXED_STRIPS, SC64_BG_MINERAL_ART,
+    SC64_BG_GEYSER_ART, SC64_BG_STATIC_PASSES, SC64_BG_COUNT
+};
+static volatile u32 sc64_bg_counts[SC64_BG_COUNT];
+#define SC64_BG_COUNT_PATH(path) (++sc64_bg_counts[path])
+#else
+#define SC64_BG_COUNT_PATH(path) ((void)0)
+#endif
 
 /* Cosmetic fog state. Visibility always wins if a stale explored bit remains. */
 enum {
@@ -197,6 +210,7 @@ sc64_fog_shaded_tile(const u8 *terrain, const u8 *lut)
     unsigned slot = (unsigned)((uintptr_t)terrain >> 8) & (SC64_FOG_TILE_SLOTS - 1u);
     u8 *out = sc64_fog_tile_pixels[slot];
     if (sc64_fog_tile_tag[slot] != terrain || sc64_fog_tile_lut_tag != lut) {
+        SC64_BG_COUNT_PATH(SC64_BG_SHADE_MISS);
         const u8 *src = terrain, *end = terrain + 256;
         if (sc64_fog_tile_lut_tag != lut) {
             for (unsigned i = 0; i < SC64_FOG_TILE_SLOTS; ++i) sc64_fog_tile_tag[i] = 0;
@@ -219,6 +233,8 @@ sc64_fog_shaded_tile(const u8 *terrain, const u8 *lut)
         }
         sc64_fog_tile_tag[slot] = terrain;
         out = sc64_fog_tile_pixels[slot];
+    } else {
+        SC64_BG_COUNT_PATH(SC64_BG_SHADE_HIT);
     }
     return out;
 }
@@ -346,10 +362,12 @@ sc64_fog_raster_cell(int sx, int sy, u16 signature,
     /* This path uses only a few scalars and does not reserve the compositing
      * scratch buffer. All-visible cells bypass the edge masks entirely. */
     if (center == SC64_FOG_VISIBLE && !unknown_neighbors && !explored_neighbors && terrain) {
+        SC64_BG_COUNT_PATH(SC64_BG_DIRECT);
         sc64_fog_blit_cell(sx, sy, terrain);
         return;
     }
     if (center == SC64_FOG_UNKNOWN || !terrain || !shade_lut) {
+        SC64_BG_COUNT_PATH(SC64_BG_BLACK);
         sc64_fog_blit_cell(sx, sy, 0);
         return;
     }
@@ -357,6 +375,7 @@ sc64_fog_raster_cell(int sx, int sy, u16 signature,
         sc64_fog_blit_cell(sx, sy, sc64_fog_shaded_tile(terrain, shade_lut));
         return;
     }
+    SC64_BG_COUNT_PATH(SC64_BG_MIXED_FULL);
     sc64_fog_raster_compose(sx, sy, center, unknown_neighbors,
                             explored_neighbors, terrain, shade_lut);
 }
@@ -461,10 +480,12 @@ sc64_fog_raster_strips(int sx, int sy, u16 signature,
     if (!sc64_fog_cell_clip(sx, sy, &top, &bottom)) return;
     center = sc64_fog_decode(signature, &unknown_neighbors, &explored_neighbors);
     if (center == SC64_FOG_UNKNOWN || !terrain || !shade_lut) {
+        SC64_BG_COUNT_PATH(SC64_BG_BLACK);
         sc64_fog_blit_cell(sx, sy, 0);
         return;
     }
     if (center == SC64_FOG_VISIBLE && !unknown_neighbors && !explored_neighbors) {
+        SC64_BG_COUNT_PATH(SC64_BG_DIRECT);
         sc64_fog_blit_cell(sx, sy, terrain);
         return;
     }
@@ -472,6 +493,7 @@ sc64_fog_raster_strips(int sx, int sy, u16 signature,
         sc64_fog_blit_cell(sx, sy, sc64_fog_shaded_tile(terrain, shade_lut));
         return;
     }
+    SC64_BG_COUNT_PATH(SC64_BG_MIXED_STRIPS);
     /* Only the part of the cell inside the world band, scene clip and
      * screen is worth composing. */
     {

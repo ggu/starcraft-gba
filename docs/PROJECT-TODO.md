@@ -1531,13 +1531,22 @@ save/source-owner and timing evidence; do not advertise unwired components.
   combined build reaches 8.19 updates/s in mGBA. The shipping late save
   loads on the sparse ROM and finishes Z7 with six matching world and
   display samples. Keep it opt-in while checking other maps, save
-  points and physical timing. Profile background
-  paint, restore and capture separately on the same tape. Orders still
-  dominate the budget and remain the first performance priority.
+  points and physical timing. Orders still dominate the budget and
+  remain the first performance priority.
+- The [dense Z7 background profile](audits/2026-11-19-z7-background-stages.md)
+  attributes about 110,000 cycles to tile selection and paint, 60,000 to
+  cache restore and 39,000 to capture. The measured camera moves on both
+  axes in 408 of 476 adjacent advancing cuts. The shaded-tile cache misses
+  on 3,520 of 6,441 draws in the 16-slot build. Doubling the slots cuts
+  misses to 2,208 and saves 0.54% of whole-update cycles for another
+  4,160 EWRAM bytes. Keep the 16-slot default. Measure ordered shaded-tile
+  requests to evaluate a better index at the current footprint. Packed
+  mineral drawing gives no measurable whole-loop win in this window.
 - [N64 active SCV cancellation](audits/2026-11-19-n64-active-scv-cancel.md)
-  removes an in-progress Blood Bath job and releases its reserved supply.
-  The displayed minerals rise after cancel while the miners operate and
-  the HUD is animating. Isolate the economy to pin the native refund.
+  removes an in-progress Blood Bath job, returns all 50 minerals with
+  the workers parked, and restores 4/10 supply. The shipping Z10 ARM
+  replay matches the wallet, queue, and HUD reservation using ordinary
+  controls. Other products and multiple queued jobs need separate checks.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for

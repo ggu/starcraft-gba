@@ -989,9 +989,10 @@ static void __attribute__((unused))
 sc64_terrain_fog_cell(int partial, int sx, int sy, u16 signature,
                       const u8 *terrain, const u8 *lut)
 {
-    if (signature == SC64_FOG_SIGNATURE_COUNT - 1 && terrain)
+    if (signature == SC64_FOG_SIGNATURE_COUNT - 1 && terrain) {
+        SC64_BG_COUNT_PATH(SC64_BG_DIRECT);
         sc64_fog_blit_cell(sx, sy, terrain); /* fully visible: as the base draws it */
-    else if (partial)
+    } else if (partial)
         sc64_fog_raster_strips(sx, sy, signature, terrain, lut,
                                sc64_terrain_strip_x0, sc64_terrain_strip_x1,
                                sc64_terrain_strip_y0, sc64_terrain_strip_y1);
