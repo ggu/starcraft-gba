@@ -1928,6 +1928,38 @@ _Static_assert(MAP_COLS == ORIGINAL_MAP_SIZE && MAP_ROWS == ORIGINAL_MAP_SIZE,
                "Frontier map size must match the engine grid");
 static int original_skirmish_map;
 #endif
+#ifdef SC_FRONTIER_FACTION
+#ifndef SC_ORIGINAL_SKIRMISH
+#error "Frontier factions require the original skirmish profile"
+#endif
+#include "frontier_factions.h"
+_Static_assert(SC_FRONTIER_FACTION >= FRONTIER_FOUNDRY &&
+               SC_FRONTIER_FACTION < FRONTIER_FACTION_COUNT, "Unknown cartridge faction");
+_Static_assert(ORIGINAL_MAP_COUNT == 2, "Frontier saves reserve one bit for the map");
+enum { FRONTIER_SETUP_MAP, FRONTIER_SETUP_BOTS, FRONTIER_SETUP_PLAYER, FRONTIER_SETUP_CPU_FIRST };
+
+static unsigned char frontier_human_faction;
+static unsigned char frontier_cpu_faction[3];
+static int frontier_setup_row;
+
+static inline int
+frontier_owner_faction(int owner)
+{
+    switch (owner) {
+    case SIDE: return frontier_human_faction;
+    case ENEMY: return frontier_cpu_faction[0];
+    case RESCUABLE: return frontier_cpu_faction[1];
+    case 4: return frontier_cpu_faction[2];
+    default: return FRONTIER_FOUNDRY;
+    }
+}
+
+static inline const FrontierFactionProfile *
+frontier_owner_profile(int owner)
+{
+    return &frontier_faction_profiles[frontier_owner_faction(owner)];
+}
+#endif
 #ifdef SC64_RACES
 #include "sc64_font.h"
 #include "sc64_icons.h"
@@ -3047,6 +3079,9 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].maxhp = type == U_RAYNOR ? 200 : type == U_SCV ? 60 : type == U_MARINE ? 40 :
 	type == U_FIREBAT ? 50 : type == U_MEDIC ? 60 :
 	type == U_ZERGLING ? 35 : 80;
+#ifdef SC_FRONTIER_FACTION
+    if (type == U_MARINE) u[i].maxhp = frontier_owner_profile(owner)->hp;
+#endif
 #ifdef SC64_RACES
     u[i].maxhp=sc64_race_unit_rules[type].hp;
     u[i].shield=sc64_race_unit_rules[type].shields;
@@ -4002,6 +4037,9 @@ __attribute__((optimize("Os")))
 move_toward(Unit * q, int tx, int ty)
 {
 	int nx, ny, speed = q->type == U_ZERGLING || q->type == U_FIREBAT || q->type == U_RAYNOR ? 2 : 1;
+#ifdef SC_FRONTIER_FACTION
+    if (q->type == U_MARINE) speed = frontier_owner_profile(q->owner)->speed;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     if (q->type == U_ZP_RAYNOR_VULTURE) speed = 2;
 #endif
@@ -5394,7 +5432,10 @@ save_game(void)
     memcpy(data.bots, skirmish_ai, sizeof(skirmish_ai));
     data.bot_count = skirmish_bots;
 #endif
-#ifdef SC_ORIGINAL_SKIRMISH
+#ifdef SC_FRONTIER_FACTION
+    data.skirmish_map = frontier_pack_setup(original_skirmish_map, SC_FRONTIER_FACTION,
+                                           frontier_human_faction, frontier_cpu_faction);
+#elif defined(SC_ORIGINAL_SKIRMISH)
     data.skirmish_map = original_skirmish_map;
 #endif
     save_write(&data, sizeof(data), SAVE_VERSION);
@@ -5459,7 +5500,12 @@ load_game(void)
 #ifdef SC64_SKIRMISH
     if (data.bot_count < 1 || data.bot_count > 3) return 0;
 #endif
-#ifdef SC_ORIGINAL_SKIRMISH
+#ifdef SC_FRONTIER_FACTION
+    int saved_map, saved_human;
+    unsigned char saved_factions[3];
+    if (!frontier_unpack_setup(data.skirmish_map, SC_FRONTIER_FACTION, &saved_map,
+                               &saved_human, saved_factions)) return 0;
+#elif defined(SC_ORIGINAL_SKIRMISH)
     if ((unsigned)data.skirmish_map >= ORIGINAL_MAP_COUNT) return 0;
 #endif
     for (i = 0; i < MAX_UNITS; i++) {
@@ -5556,7 +5602,12 @@ load_game(void)
 #ifdef SC64_SKIRMISH
     memcpy(skirmish_ai, data.bots, sizeof(skirmish_ai)); skirmish_bots = data.bot_count;
 #endif
-#ifdef SC_ORIGINAL_SKIRMISH
+#ifdef SC_FRONTIER_FACTION
+    original_skirmish_map = saved_map;
+    frontier_human_faction = saved_human;
+    memcpy(frontier_cpu_faction, saved_factions, sizeof(frontier_cpu_faction));
+    frontier_setup_row = FRONTIER_SETUP_MAP;
+#elif defined(SC_ORIGINAL_SKIRMISH)
     original_skirmish_map = data.skirmish_map;
 #endif
     mode = MODE_NORMAL;
@@ -6041,6 +6092,13 @@ game_init(void)
 #ifdef SC_ORIGINAL_SKIRMISH
     original_skirmish_map = 0;
     skirmish_bots = 2;
+#endif
+#ifdef SC_FRONTIER_FACTION
+    frontier_human_faction = SC_FRONTIER_FACTION;
+    frontier_cpu_faction[0] = FRONTIER_ROVERS;
+    frontier_cpu_faction[1] = FRONTIER_BULWARK;
+    frontier_cpu_faction[2] = FRONTIER_FOUNDRY;
+    frontier_setup_row = FRONTIER_SETUP_MAP;
 #endif
     help = 0;
     menu_open = 0;
@@ -8344,6 +8402,14 @@ static int __attribute__((noinline)) sc64_pr_unit_range(const Unit *q)
 #define SC64_PR_ACQUIRE_RANGE(q) sc64_pr_unit_range(q)
 /* One evaluation: a second unit_range() call is not folded across the bonus. */
 #define SC64_PR_FAR_RANGE(q) ({ int ar_=SC64_PR_ACQUIRE_RANGE(q); ar_>64?ar_+18:64; })
+#elif defined(SC_FRONTIER_FACTION)
+static inline int
+frontier_actor_range(const Unit *q)
+{
+    return q->type == U_MARINE ? frontier_owner_profile(q->owner)->range : unit_range(q->type);
+}
+#define SC64_PR_ACQUIRE_RANGE(q) frontier_actor_range(q)
+#define SC64_PR_FAR_RANGE(q) ({ int ar_ = frontier_actor_range(q); ar_ > 64 ? ar_ + 18 : 64; })
 #else
 #define SC64_PR_ACQUIRE_RANGE(q) unit_range((q)->type)
 #define SC64_PR_FAR_RANGE(q) (SC64_PR_ACQUIRE_RANGE(q)>64?SC64_PR_ACQUIRE_RANGE(q)+18:64)
@@ -8802,6 +8868,13 @@ tick_combat(Unit * q, int target)
     dy = target_y(target) - q->y;
     range = unit_range(q->type);
     damage = unit_damage(q->type);
+#ifdef SC_FRONTIER_FACTION
+    const FrontierFactionProfile *faction = q->type == U_MARINE ? frontier_owner_profile(q->owner) : NULL;
+    if (faction) {
+        range = faction->range;
+        damage = faction->damage + weapons_level;
+    }
+#endif
 #ifdef SC64_RACES
     int flying=target<MAX_UNITS&&sc64_race_unit_flying(u[target].type);
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
@@ -8996,6 +9069,9 @@ tick_combat(Unit * q, int target)
                 sc64_race_unit_cooldown_vs(q->type,flying))*5+3)/4;
 #else
         q->cd = q->type == U_ZERGLING ? 10 : q->type == U_FIREBAT ? 28 : q->type == U_RAYNOR ? 30 : 19;
+#ifdef SC_FRONTIER_FACTION
+        if (faction) q->cd = faction->cooldown;
+#endif
 #endif
 	}
     } else {
@@ -10192,6 +10268,10 @@ pause_action(u16 pressed)
 	init_state();
 }
 
+#ifdef SC_FRONTIER_FACTION
+#include "frontier_title.h"
+#endif
+
 #ifdef SC64_TEXT_BOXES
 #include "sc64_text_box_runtime.h"
 /* All text-enabled paths finish through the same boundary. A message posted
@@ -10320,7 +10400,10 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_TERRAN_CAMPAIGN
         if (pressed & (KEY_UP | KEY_DOWN)) campaign_mission = 1 - campaign_mission;
 #endif
-#ifdef SC_ORIGINAL_SKIRMISH
+#ifdef SC_FRONTIER_FACTION
+        frontier_title_input(pressed);
+        return;
+#elif defined(SC_ORIGINAL_SKIRMISH)
         if (title_notice) title_notice--;
         if (pressed & (KEY_LEFT | KEY_RIGHT)) {
             int direction = (pressed & KEY_RIGHT) ? 1 : ORIGINAL_MAP_COUNT - 1;
@@ -11408,10 +11491,18 @@ draw_unit_pass(Unit * q, int selection_pass)
 	gfx_pixel(x - 3, y + 3, C_GOLD);
 	if (walk) sc64_walk_treads(x, feet + 3, walk, C_SHADOW);
     } else if (q->type == U_MARINE) {
+#ifdef SC_FRONTIER_FACTION
+        int fighter = frontier_owner_faction(q->owner);
+        frontier_fighter_glyph(fighter, x, y, col);
+        if (walk && fighter == FRONTIER_ROVERS)
+            gfx_pixel(x - 5, y + 1, (walk & 1) ? C_ORANGE : C_CYAN);
+        else if (walk) sc64_walk_legs(x, feet + 4, walk, C_SILVER);
+#else
 	gfx_rect(x - 2, y - 4, 5, 8, col);
 	gfx_rect(x - 3, y - 5, 6, 2, C_SILVER);
 	gfx_line(x + 1, y, x + 5, y - 2, C_SILVER);
 	if (walk) sc64_walk_legs(x, feet + 4, walk, C_SILVER);
+#endif
     } else if (q->type == U_FIREBAT) {
 	gfx_rect(x - 3, y - 4, 7, 8, col);
 	gfx_rect(x - 4, y - 5, 8, 2, C_ORANGE);
@@ -12378,7 +12469,10 @@ static unsigned sc64_static_dirty_rows_host_bands;
 static void
 draw_title(void)
 {
-#ifdef SC_ORIGINAL_SKIRMISH
+#ifdef SC_FRONTIER_FACTION
+    frontier_title_draw();
+    return;
+#elif defined(SC_ORIGINAL_SKIRMISH)
     gfx_rect(0, 0, 240, 160, C_BLACK);
     gfx_rect(16, 16, 208, 128, C_PANEL);
     gfx_frame(16, 16, 208, 128, C_CYAN);
@@ -12558,6 +12652,12 @@ unit_name(int type)
 {
 #ifdef SC64_RACES
     return sc64_race_unit_name(type);
+#endif
+#ifdef SC_FRONTIER_FACTION
+    if (type == U_SCV) return "HAULER";
+    if (type == U_MARINE) return frontier_owner_profile(SIDE)->fighter;
+    if (type == U_FIREBAT) return "BREACHER";
+    if (type == U_MEDIC) return "PATCHER";
 #endif
     if (type == U_SCV)
 	return "SCV WORKER";

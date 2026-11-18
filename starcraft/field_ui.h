@@ -42,6 +42,28 @@ static const u8 ui_command_building[MENU_COUNT] = {
 
 #include "ui_widgets.h"
 
+#ifdef SC_FRONTIER_FACTION
+static void
+frontier_fighter_glyph(int faction, int x, int y, u8 col)
+{
+    if (faction == FRONTIER_ROVERS) {
+        gfx_rect(x - 4, y - 1, 9, 3, col);
+        gfx_rect(x - 2, y - 3, 6, 2, C_CYAN);
+        gfx_rect(x - 5, y + 2, 7, 1, C_SILVER);
+        gfx_pixel(x + 5, y, C_WHITE);
+    } else if (faction == FRONTIER_BULWARK) {
+        gfx_rect(x - 4, y - 3, 9, 7, col);
+        gfx_rect(x - 3, y - 5, 7, 2, C_GOLD);
+        gfx_rect(x - 3, y + 1, 7, 2, C_SHADOW);
+        gfx_rect(x + 4, y - 2, 2, 4, C_SILVER);
+    } else {
+        gfx_rect(x - 2, y - 4, 5, 8, col);
+        gfx_rect(x - 3, y - 5, 6, 2, C_SILVER);
+        gfx_line(x + 1, y, x + 5, y - 2, C_SILVER);
+    }
+}
+#endif
+
 static void
 ui_unit_glyph(int type, int x, int y, u8 col)
 {
@@ -50,9 +72,13 @@ ui_unit_glyph(int type, int x, int y, u8 col)
         gfx_pixel(x + 2, y - 3, C_SILVER);
         gfx_pixel(x - 3, y + 3, C_GOLD);
     } else if (type == U_MARINE) {
+#ifdef SC_FRONTIER_FACTION
+        frontier_fighter_glyph(frontier_owner_faction(SIDE), x, y, col);
+#else
         gfx_rect(x - 2, y - 4, 5, 8, col);
         gfx_rect(x - 3, y - 5, 6, 2, C_SILVER);
         gfx_line(x + 1, y, x + 5, y - 2, C_SILVER);
+#endif
     } else if (type == U_FIREBAT) {
         gfx_rect(x - 3, y - 4, 7, 8, col);
         gfx_rect(x - 4, y - 5, 8, 2, C_ORANGE);
