@@ -273,6 +273,27 @@ static int sc64_z7_count_snapshot_begin_full(Sc64Z7WorldContext *ctx)
     return 1;
 }
 
+#ifdef SC64_Z7_CENSUS_OWNER_TABLE
+/* Selectors and source slots are constant for an entire snapshot. Store
+ * the needed predicate bits once per slot. A negative entry retains the
+ * reference fault when a live actor names an inactive source slot. */
+static void sc64_z7_census_owner_table(const Sc64Z7WorldContext *ctx,
+                                     unsigned needed, s8 owners[12])
+{
+    for (int slot=0;slot<12;++slot) {
+        int current=sc64_z7_world_owner_matches(ctx,13u,slot);
+        if (current<0) {
+            owners[slot]=-1;
+            continue;
+        }
+        unsigned flags=current ? 1u : 0u;
+        if ((needed&6u) && sc64_z7_world_owner_matches(ctx,19u,slot)) flags|=6u;
+        if ((needed&24u) && sc64_z7_world_owner_matches(ctx,18u,slot)) flags|=24u;
+        owners[slot]=(s8)(flags&needed);
+    }
+}
+#endif
+
 static int sc64_z7_count_snapshot_begin_masked(Sc64Z7WorldContext *ctx,
                                                unsigned needed_mask,
                                                int actors_prevalidated,
@@ -337,18 +358,30 @@ static int sc64_z7_count_snapshot_begin_masked(Sc64Z7WorldContext *ctx,
         return 1;
     }
 
+#ifdef SC64_Z7_CENSUS_OWNER_TABLE
+    s8 owners[12];
+    if (needed_mask) sc64_z7_census_owner_table(ctx,needed_mask,owners);
+#endif
     if (needed_mask) for (int pass=0;pass<2;++pass) {
         int limit=pass?MAX_BUILDINGS:MAX_UNITS;
         for (int i=0;i<limit;++i) {
             int alive=pass?b[i].alive:u[i].alive;
             int raw_owner=pass?b[i].raw_owner:u[i].raw_owner;
             int x=pass?b[i].x:u[i].x, y=pass?b[i].y:u[i].y;
-            int need13=(needed_mask&1u)!=0;
-            int need19=(needed_mask&6u)!=0;
-            int need18=(needed_mask&24u)!=0;
             int raw,owner13=0,owner19=0,owner18=0;
             int actor_left=0,actor_top=0,actor_right=0,actor_bottom=0,have_rect=0;
             if (!alive) continue;
+#ifdef SC64_Z7_CENSUS_OWNER_TABLE
+            if ((unsigned)raw_owner>=12u) return 0;
+            int matches=owners[raw_owner];
+            if (matches<0) return 0;
+            owner13=matches&1;
+            owner19=matches&6;
+            owner18=matches&24;
+#else
+            int need13=(needed_mask&1u)!=0;
+            int need19=(needed_mask&6u)!=0;
+            int need18=(needed_mask&24u)!=0;
             if (need13) owner13=sc64_z7_world_owner_matches(ctx,13u,raw_owner);
             if (need19) owner19=sc64_z7_world_owner_matches(ctx,19u,raw_owner);
             if (need18) owner18=sc64_z7_world_owner_matches(ctx,18u,raw_owner);
@@ -356,6 +389,7 @@ static int sc64_z7_count_snapshot_begin_masked(Sc64Z7WorldContext *ctx,
                 (actors_prevalidated && ((need13&&owner13<0) ||
                                          (need19&&owner19<0) ||
                                          (need18&&owner18<0)))) return 0;
+#endif
             if (!(owner13 || owner19 || owner18)) continue;
             raw=pass?(b[i].raw_type>=0?b[i].raw_type:sc64_race_raw_building(b[i].type)):
                      (u[i].raw_type>=0?u[i].raw_type:sc64_race_raw_unit(u[i].type));

@@ -103,6 +103,52 @@ static void assert_pruned_snapshot(u16 started)
     }
 }
 
+static void test_snapshot_owner_boundaries(void)
+{
+    load_canonical_z7();
+    Sc64Z7WorldContext ctx=race_z7_world;
+    memset(u,0,sizeof(u));
+    memset(b,0,sizeof(b));
+    u[0].alive=1;
+    u[0].raw_owner=8;
+    u[0].raw_type=37;
+    ctx.source_slot_active[8]=1;
+    ctx.source_current_player=8;
+
+    /* The current-player selector can use extended slots. Force
+       selectors are limited to the eight slots with force metadata. */
+    assert(sc64_z7_count_snapshot_begin_masked(&ctx,0x19u,0,0));
+    assert(ctx.count_snapshot.active==0x19u);
+    assert(ctx.count_snapshot.count[0]==1u);
+    assert(ctx.count_snapshot.count[3]==0u && ctx.count_snapshot.count[4]==0u);
+    ctx.source_current_player=12;
+    assert(sc64_z7_count_snapshot_begin_masked(&ctx,1u,0,0));
+    assert(ctx.count_snapshot.count[0]==0u);
+
+    ctx.source_slot_active[8]=0;
+    assert(!sc64_z7_count_snapshot_begin_masked(&ctx,1u,0,0));
+    assert(!ctx.count_snapshot.active);
+    for (int i=0;i<2;++i) {
+        u[0].raw_owner=i ? 12 : -1;
+        ctx.count_snapshot.active=31;
+        ctx.count_snapshot.count[0]=99;
+        assert(!sc64_z7_count_snapshot_begin_masked(&ctx,1u,0,0));
+        assert(!ctx.count_snapshot.active && !ctx.count_snapshot.count[0]);
+        assert(sc64_z7_count_snapshot_begin_masked(&ctx,0u,0,0));
+        assert(!ctx.count_snapshot.active);
+    }
+
+    /* A force-1 unit is still validated for the building-only counters. */
+    u[0].raw_owner=3;
+    u[0].raw_type=228;
+    ctx.source_slot_active[3]=1;
+    ctx.source_force_for_slot[3]=1;
+    assert(!sc64_z7_count_snapshot_begin_masked(&ctx,2u,0,0));
+    assert(!sc64_z7_count_snapshot_begin_masked(&ctx,4u,0,0));
+    assert(sc64_z7_count_snapshot_begin_masked(&ctx,0x18u,0,0));
+    assert(!ctx.count_snapshot.count[3] && !ctx.count_snapshot.count[4]);
+}
+
 #ifdef SC64_Z7_VALIDATED_CENSUS
 static void test_validated_late_census(void)
 {
@@ -336,6 +382,7 @@ int main(void)
 {
     test_reference_path_remains_checked();
 #ifdef SC64_Z7_PRUNE_STARTED
+    test_snapshot_owner_boundaries();
 #ifdef SC64_Z7_VALIDATED_CENSUS
     test_validated_late_census();
 #endif
