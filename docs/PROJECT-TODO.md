@@ -71,6 +71,28 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Use a fresh output directory. Add `--case transit-yard-foundry`
   to run one match.
 
+- **Frontier frame time (P1):** clear the byte visibility grid with
+  aligned stores, remember explored circle centers until a world load or
+  restart, and draw uninterrupted battlefield grass/fog as row spans.
+  In two normal-button ARM replays, each 240-update opening and combat
+  window starts after updates 100 and 3,950 respectively.
+
+  | Match | Opening updates/s | Combat updates/s |
+  | --- | ---: | ---: |
+  | Transit Yard, 2 CPUs | 22.31 to 29.89 | 20.60 to 23.67 |
+  | Stone Gardens, 3 CPUs | 21.50 to 29.69 | 20.43 to 22.48 |
+
+  About 54,000 simulation cycles and 63,000 draw cycles were removed per
+  opening update. Sixteen sampled world and framebuffer checkpoints
+  matched across the baseline, each change alone, and the combined
+  build. The original terrain oracle covered 512 map, camera and fog
+  cases. The combined build finished both replays with the same victory
+  ticks, produced identical mid-match SRAM, and matched 120 updates
+  after loading each build's save in the other. The cache adds 2 KiB
+  of working RAM. The measurements are from mGBA. Route and rendering
+  cost in active combat still need profiling and physical GBA timing
+  remains open.
+
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
   of 1,000 updates, mean simulation cost dropped from 101,614 to 65,583

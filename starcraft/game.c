@@ -1745,7 +1745,12 @@ death_vfx_reset(void)
 #define death_vfx_reset() ((void)0)
 #endif
 static u8 explored[SC64_GRID_STORAGE_BYTES];
+#ifdef SC_ORIGINAL_SKIRMISH
+_Alignas(u32) static u8 visible[SC64_GRID_STORAGE_BYTES];
+#include "frontier_exploration.h"
+#else
 static u8 visible[SC64_GRID_STORAGE_BYTES];
+#endif
 static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 #ifdef SC64_Z8_RUNTIME
@@ -5563,6 +5568,9 @@ load_game(void)
     sc64_trace_slots_reset();
     death_vfx_reset();
     memcpy(explored, data.explored_map, sizeof(explored));
+#ifdef SC_ORIGINAL_SKIRMISH
+    frontier_reset_exploration_cache();
+#endif
 #ifdef SC64_TERRAN_CAMPAIGN
     campaign_mission = data.campaign_mission;
     campaign_completed = data.campaign_completed;
@@ -5816,6 +5824,9 @@ init_state(void)
     death_vfx_reset();
     SC64_GRID_CLEAR(explored);
     SC64_GRID_CLEAR(visible);
+#ifdef SC_ORIGINAL_SKIRMISH
+    frontier_reset_exploration_cache();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_visibility_reset();
     geyser_count = 0;
@@ -9912,6 +9923,9 @@ static const u8 explored_span_7[] = {7, 6, 6, 6, 5, 4, 3, 0};
 static void GBA_HOT
 mark_explored_circle(int c, int r, int radius, const u8 *span)
 {
+#ifdef SC_ORIGINAL_SKIRMISH
+    if (frontier_explored_before(c, r, radius)) return;
+#endif
     int top = r - radius < 0 ? 0 : r - radius;
     int bottom = r + radius < MAP_ROWS ? r + radius : MAP_ROWS - 1;
     for (int row = top; row <= bottom; row++) {
@@ -9951,7 +9965,11 @@ update_exploration(void)
 #ifdef SC64_IMPORTED_MISSION
     sc64_update_exploration();
 #else
+#ifdef SC_ORIGINAL_SKIRMISH
+    frontier_clear_visible();
+#else
     SC64_GRID_CLEAR(visible);
+#endif
     for (int i = 0; i < MAX_UNITS; i++) {
         Unit *q = &u[i];
         if (!q->alive || SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_HIDDEN(q) || q->owner != SIDE)

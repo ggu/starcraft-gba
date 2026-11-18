@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Included by game.c at the terrain rendering call site. */
+#if defined(SC_ORIGINAL_SKIRMISH) && !defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_SOFT_FOG) && !defined(SC64_IMPORTED_MISSION)
+#include "frontier_terrain.h"
+#endif
 /* Static objects are part of the saved terrain band. Keep their painter
  * order and existing visibility/viewport culls together for cache redraws. */
 static void
@@ -156,6 +159,9 @@ draw_map(void)
     /* A lookup that did not reach its signature pass leaves none behind. */
     sc64_terrain_prepare(camx, camy);
 #endif
+#if defined(SC_ORIGINAL_SKIRMISH) && !defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_SOFT_FOG) && !defined(SC64_IMPORTED_MISSION)
+    frontier_draw_terrain(col0, row0, col1, row1);
+#else
     for (row = row0; row < row1; row++)
 	for (col = col0; col < col1; col++) {
 	    int idx = col + row * MAP_COLS;
@@ -245,6 +251,7 @@ draw_map(void)
 		gfx_rect(x, y, 16, 16, C_GRASS);
 #endif
 	    }
+#endif
 #ifdef SC64_STATIC_DIRTY_ROWS
     {
         u16 saved_clip = gfx_get_clip_y();
