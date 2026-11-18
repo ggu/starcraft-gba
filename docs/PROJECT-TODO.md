@@ -81,7 +81,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   after the first 100 updates. Physical GBA SP timing remains open.
   The two-CPU Team cases reached victory at tick 14,649 on Transit Yard
   and tick 12,980 on Stone Gardens at 28.68 and 28.85 updates per second.
-  A victory replay against three allied CPUs remains open.
+  On Stone Gardens, Foundry beat three allied Bulwark CPUs at tick 15,510
+  by protecting its miners with one early barracks and attacking with a
+  larger force later. The same field input reached victory on Foundry,
+  Rovers and Bulwark with identical opening state and at 28.53 updates
+  per second in mGBA. A corresponding Transit Yard replay remains open.
   To replay the checked-in inputs, build Foundry
   and pass the physical observer from `tools/sc64_headless_replay.c` to
   the optional test.
