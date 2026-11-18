@@ -1559,6 +1559,14 @@ save/source-owner and timing evidence; do not advertise unwired components.
   refunds, HUD and releasing supply at cap. Empty-queue admission,
   multiple producers, AI, Zerg morphs and hard-200 behavior need their
   own native comparisons.
+  The [paid waiting preview](https://github.com/ggu/starcraft-gba/blob/codex/sc64-paid-waiting-20261119/docs/audits/2026-11-19-paid-waiting-queue-preview.md)
+  now admits the second SCV at 10/10 and holds the promoted order at zero.
+  The Z10 ARM witness covers legacy migration, the empty wait bar, a fresh
+  load, the 50-mineral refund and rejection of a mislabelled bank. P10's
+  saved Shields upgrade resumes and completes with the tagged preview.
+  The host fixture opens a freed supply slot and checks two producers
+  contending for it. Continue the native empty-queue and recovery tests,
+  broader ARM controls and performance before release activation.
 - The [dense Z7 orders audit](audits/2026-11-19-z7-order-cost.md)
   separates the movement, nearest-enemy and setup costs. Movement
   averages about 920,000 instrumented cycles on calls that advance
