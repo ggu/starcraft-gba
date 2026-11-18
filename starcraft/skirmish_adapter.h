@@ -6,8 +6,13 @@
  * engine's unit/building/economy helpers have been defined. */
 
 static const int skirmish_owner_ids[3] = { ENEMY, RESCUABLE, 4 };
+#ifdef SC_ORIGINAL_SKIRMISH
+#define skirmish_base_x (original_skirmish_maps[original_skirmish_map].start_x)
+#define skirmish_base_y (original_skirmish_maps[original_skirmish_map].start_y)
+#else
 static const int skirmish_base_x[4] = { 160, 864, 864, 160 };
 static const int skirmish_base_y[4] = { 160, 864, 160, 864 };
+#endif
 
 static int
 skirmish_base_index(int owner)
@@ -26,6 +31,15 @@ skirmish_bot_index(int owner)
     for (i = 0; i < skirmish_bots && i < 3; ++i)
         if (skirmish_owner_ids[i] == owner) return i;
     return -1;
+}
+
+static inline unsigned char
+skirmish_team_for_owner(int owner)
+{
+#ifdef SC_FRONTIER_FACTION
+    if (frontier_cpu_team && owner != SIDE) return ENEMY;
+#endif
+    return (unsigned char)owner;
 }
 
 static int
@@ -82,7 +96,7 @@ skirmish_hostile(int a, int other)
     bot = skirmish_bot_index(a);
     if (bot < 0) return 1; /* Human is hostile to every other live skirmish slot. */
     target.player = (unsigned char)other;
-    target.team = (unsigned char)other; /* Free-for-all: each owner is its own team. */
+    target.team = skirmish_team_for_owner(other);
     target.alive = 1;
     target.neutral = 0;
     target.army = 0;
@@ -279,9 +293,16 @@ skirmish_sync_ai(int index)
     ai->queued_army = queued_army;
     ai->workers_mining = mining + (workers - mining - gas_workers);
     ai->workers_gas = gas_workers;
+#ifdef SC_FRONTIER_FACTION
+    const FrontierFactionProfile *faction = frontier_owner_profile(owner);
+    ai->desired_workers = faction->desired_workers;
+    ai->desired_gas_workers = 0;
+    ai->attack_threshold = faction->attack_threshold;
+#else
     ai->desired_workers = 8;
     ai->desired_gas_workers = 0;
     ai->attack_threshold = 8;
+#endif
 }
 
 static void
@@ -319,7 +340,7 @@ skirmish_make_world(int index, Sc64AiWorld *world)
             if (u[j].alive && u[j].owner == owner && u[j].type != U_SCV && u[j].type != U_MEDIC) ++army;
         if (!skirmish_target_point(owner, &x, &y, 0)) continue;
         world->targets[world->count].player = (unsigned char)owner;
-        world->targets[world->count].team = (unsigned char)owner;
+        world->targets[world->count].team = skirmish_team_for_owner(owner);
         world->targets[world->count].alive = 1;
         world->targets[world->count].neutral = 0;
         world->targets[world->count].army = (unsigned short)army;
@@ -381,10 +402,18 @@ skirmish_init(void)
     memset(skirmish_ai, 0, sizeof(skirmish_ai));
     skirmish_bots = skirmish_bots < 1 ? 1 : skirmish_bots > 3 ? 3 : skirmish_bots;
     geyser_count = 4;
+#ifdef SC_ORIGINAL_SKIRMISH
+    for (int seat = 0; seat < 4; seat++) {
+        int x = skirmish_base_x[seat];
+        geysers[seat].x = x + (x < WORLD_W / 2 ? 64 : -64);
+        geysers[seat].y = skirmish_base_y[seat];
+    }
+#else
     geysers[0].x = 224; geysers[0].y = 160;
     geysers[1].x = 800; geysers[1].y = 864;
     geysers[2].x = 864; geysers[2].y = 224;
     geysers[3].x = 160; geysers[3].y = 800;
+#endif
     for (i = 0; i < MAX_MINERALS; ++i) {
         int base = i / 4, patch = i % 4;
         int sx = base % 2 == 0 ? -1 : 1;
@@ -422,14 +451,29 @@ skirmish_init(void)
             int x = skirmish_base_x[i] + (i % 2 == 0 ? -1 : 1) * mineral_dx[j];
             int y = skirmish_base_y[i] + (i == 0 || i == 2 ? 1 : -1) * mineral_dy[j];
             /* Mineral records are installed above; each worker begins nearby. */
-            spawn_unit(owner, U_SCV, x + 10, y + 10);
+            int slot = spawn_unit(owner, U_SCV, x + 10, y + 10);
+#ifdef SC_ORIGINAL_SKIRMISH
+            if (slot >= 0) {
+                u[slot].order = ORDER_MINE;
+                u[slot].target = i * 4 + j;
+            }
+#else
+            (void)slot;
+#endif
         }
     }
     for (i = 0; i < skirmish_bots; ++i) {
         owner = skirmish_owner_ids[i];
-        sc64_ai_init(&skirmish_ai[i], (unsigned char)owner, (unsigned char)owner, 200, 0, 4, 36);
+        sc64_ai_init(&skirmish_ai[i], (unsigned char)owner, skirmish_team_for_owner(owner),
+                     200, 0, 4, 36);
+#ifdef SC_FRONTIER_FACTION
+        const FrontierFactionProfile *faction = frontier_owner_profile(owner);
+        skirmish_ai[i].desired_workers = faction->desired_workers;
+        skirmish_ai[i].attack_threshold = faction->attack_threshold;
+#else
         skirmish_ai[i].desired_workers = 8;
         skirmish_ai[i].attack_threshold = 8;
+#endif
     }
     frame = 0;
     death_vfx_reset();
@@ -448,10 +492,35 @@ skirmish_update(void)
         Sc64AiWorld world;
         Sc64AiIntent intents[SC64_AI_MAX_INTENTS];
         unsigned char count, j;
+#ifdef SC_ORIGINAL_SKIRMISH
+        /* New and recovering CPU workers use the same mining orders as the
+         * starting crews. Human orders remain under player control. */
+        int owner = skirmish_owner_ids[i];
+        for (int slot = 0; slot < MAX_UNITS; slot++) {
+            Unit *worker = &u[slot];
+            if (!worker->alive || worker->owner != owner || worker->type != U_SCV ||
+                worker->order != ORDER_IDLE)
+                continue;
+            int patch = nearest_mineral(worker->x, worker->y);
+            if (patch < 0) continue;
+            worker->order = ORDER_MINE;
+            worker->target = patch;
+            worker->path_timer = worker->path_retry = 0;
+            worker->work_timer = 0;
+        }
+#endif
         skirmish_sync_ai(i);
         if (!skirmish_ai[i].active) continue;
         skirmish_make_world(i, &world);
+#ifdef SC_ORIGINAL_SKIRMISH
+        /* The authored starts are NW (human), SE, NE, SW. If all four
+         * sides remain, prefer the next clockwise corner on exact ties. */
+        static const unsigned char clockwise_rival[3] = {4, ENEMY, SIDE};
+        int preferred = world.count == 3 ? clockwise_rival[i] : -1;
+        count = sc64_ai_plan_prefer_target(&skirmish_ai[i], &world, intents, preferred);
+#else
         count = sc64_ai_plan(&skirmish_ai[i], &world, intents);
+#endif
         for (j = 0; j < count; ++j) skirmish_execute_intent(i, &intents[j]);
     }
 }

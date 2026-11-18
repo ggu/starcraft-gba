@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-16. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-18. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -18,6 +18,138 @@ does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
+
+- **Frontier Skirmish (P1):** an independently authored battle profile
+  now starts Transit Yard and Stone Gardens with one to three computer
+  opponents. The host checks cover all six setups through mining,
+  production construction, pause/save, title reload, and restart.
+  The three-opponent host match also reaches an AI army attack. Normal
+  ARM inputs start each setup, save at update 900, and reproduce
+  the sampled world and AI state on a fresh-process load. The first
+  240 updates measure 19.76–20.76 emulated updates per second across
+  the six setups. Both three-opponent openings average about 560,000
+  draw cycles and 110,000 simulation cycles. The timing work and the
+  current set of complete ARM win replays for both maps are recorded below.
+
+- **Frontier factions (P1):** each of the three cartridges defaults to
+  its own faction. Skirmish setup offers all player factions, both maps,
+  and one to three independently configured CPUs. Foundry Riflers,
+  Rovers Skimmers, and Bulwark Wardens have different reach, damage,
+  cadence, movement, health, and silhouettes. The AI uses faction-specific
+  worker and attack thresholds. The factions share support units and
+  structures. All 54 cartridge, human faction, map, and CPU-count setups
+  started using ordinary buttons under host sanitizers and in mGBA.
+  On all three cartridges a save with a non-default human faction
+  resumed in a fresh emulator process and restarted with the same setup.
+  Each cartridge loaded an earlier fixed-player save and rejected another
+  cartridge's new save even when the player faction matched its default.
+  Foundry also loaded a save from the original single-roster cartridge.
+  All 54 starts and those save checks passed again on `f5e60854`.
+  The first 240 gameplay updates measured 29.50–29.57 updates per second
+  in mGBA, up from 19.75–20.75 in the earlier qualification.
+  In two earlier normal-input ARM matches, a passive Foundry player lost
+  to Rovers on Transit Yard (game tick 5,584) and to Bulwark on Stone
+  Gardens (5,524). Add distinct faction support units and production choices.
+  The [pause comparison](audits/2026-11-18-skirmish-pause.md) records
+  mining before and after a native N64 custom-game pause and an
+  exact paused-clock and mineral check on all three Frontier host builds.
+
+- **Frontier CPU Team (P1):** the title's Mode row lets players keep the
+  default Free for All or have the computers fight on one team. The CPUs
+  retain separate forces and banks. This follows the opponent relationships
+  observed at launch in the
+  [paired N64 Blood Bath runs](audits/2026-11-12-n64-blood-bath-opening.md#paired-blood-bath-launches).
+  Paired ARM runs on both Frontier maps sampled orders every 60 game updates
+  from ticks 1,980 to 3,960. Free-for-all CPUs sent attacks toward other
+  computers. In CPU Team all three sent attacks toward the human base.
+  The paired three-CPU Team openings averaged 29.09–29.25 updates per
+  second through tick 3,960 in mGBA. All 54 CPU Team setups started, with
+  the first 240 game updates averaging 29.56–29.57 updates per second.
+  One save on each cartridge loaded in a fresh process and matched the
+  next 120 updates before a restart kept the team. Three saves from
+  before the mode was added loaded as Free for All.
+
+- **Frontier victory replays (P1):** each of the three player factions
+  has a normal-button win on both maps against one CPU. Both maps also
+  have mixed two- and three-CPU wins. The packets run on the Foundry
+  cartridge, which can select all three player factions. Each case starts
+  at the title, builds and trains a force, issues attack orders, and
+  checks the result screen and exact game tick. In the three-CPU matches,
+  Foundry beat independently controlled Rovers, Bulwark, and Foundry on
+  Transit Yard at game tick 14,727 and on Stone Gardens at tick 13,912.
+  These full mGBA replays averaged 29.05 and 29.40 updates per second
+  after the first 100 updates. Physical GBA SP timing remains open.
+  The two-CPU Team cases reached victory at tick 14,649 on Transit Yard
+  and tick 12,980 on Stone Gardens at 28.68 and 28.85 updates per second.
+  A victory replay against three allied CPUs remains open.
+  To replay the checked-in inputs, build Foundry
+  and pass the physical observer from `tools/sc64_headless_replay.c` to
+  the optional test.
+
+  ```sh
+  make frontier-foundry
+  python3 tools/frontier_win_replay.py /absolute/path/to/sc64-headless-replay --output /tmp/frontier-victories
+  ```
+
+  Use a fresh output directory. Add `--case transit-yard-foundry`
+  to run one match. The result file includes elapsed emulator cycles and
+  average updates per second from the setup checkpoint to the result.
+
+- **Frontier four-player targeting (P1):** when all four corners are
+  occupied, break exact AI target-distance ties toward each attacker's
+  clockwise neighbor. In both maps' mixed three-CPU opening, the
+  northeastern CPU chose the human at tick 2,160 even though the
+  southeastern CPU was equally near at 47 planner cells. The new rule
+  chooses the southeastern CPU in that tie. The nearest hostile target
+  still wins when distances differ. The eight one- and two-CPU replay
+  victory ticks stayed fixed. Larger waves, including the rule that
+  counts queued fighters toward the dispatch threshold, remain open.
+
+- **Frontier frame time (P1):** clear the byte visibility grid with
+  aligned stores, remember explored circle centers until a world load or
+  restart, and draw uninterrupted battlefield grass/fog as row spans.
+  In two normal-button ARM replays, each 240-update opening and combat
+  window starts after updates 100 and 3,950 respectively.
+
+  | Match | Opening updates/s | Combat updates/s |
+  | --- | ---: | ---: |
+  | Transit Yard, 2 CPUs | 22.31 to 29.89 | 20.60 to 23.67 |
+  | Stone Gardens, 3 CPUs | 21.50 to 29.69 | 20.43 to 22.48 |
+
+  About 54,000 simulation cycles and 63,000 draw cycles were removed per
+  opening update. Sixteen sampled world and framebuffer checkpoints
+  matched across the baseline, each change alone, and the combined
+  build. The original terrain oracle covered 512 map, camera and fog
+  cases. The combined build finished both replays with the same victory
+  ticks, produced identical mid-match SRAM, and matched 120 updates
+  after loading each build's save in the other. The cache adds 2 KiB
+  of working RAM. The measurements are from mGBA. Route and rendering
+  cost in active combat still need profiling and physical GBA timing
+  remains open.
+
+- **Frontier busy combat (P1):** an instrumented ARM build attributed
+  about 41,000–98,000 cycles to point searches and 304,000–315,000 to
+  the HUD including its minimap in sampled combat and later movement.
+  The 64-entry point cache preserves the forward search result and its
+  topology invalidation. The Frontier minimap samples the same tile
+  centers and draws a 24×24 raster before the existing markers.
+  Together they add about 1.1 KiB of working RAM and save
+  about 176,000–181,000 draw cycles per sampled combat update.
+
+  | Match | Busy updates/s | Later movement updates/s |
+  | --- | ---: | ---: |
+  | Transit Yard, 2 CPUs | 23.67 to 28.18 | 25.48 to 29.77 |
+  | Stone Gardens, 3 CPUs | 22.48 to 28.63 | 24.22 to 29.04 |
+
+  These are 240-update mGBA windows beginning after updates 3,950 and
+  5,200. After the first 100 updates, complete matches averaged 28.90
+  on Transit Yard (previously 24.50) and 28.78 on Stone Gardens
+  (previously 22.69). Both reached the original victory tick. Twelve
+  gameplay and framebuffer checkpoints matched. Mid-match SRAM matched
+  byte for byte, and both builds continued each other's saves for
+  120 matching updates. A 3-VBlank update still appears at the 95th
+  percentile in both combat windows. Repeat timing on GBA SP hardware
+  and cover more high-load lineups.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
@@ -64,8 +196,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   traced updates the minimap costs 89,410 cycles, the command panel
   59,082, and the resource strip 21,056 on average. The resource strip
   changes in 3 of 40 consecutive frame pairs, and the lower-left area
-  changes in 2. The minimap area changes in every pair. Prioritize
-  reusing the stable panels and batching minimap drawing, and check
+  changes in 2. The minimap area changes in every pair.
+
+- **Original-art minimap drawing (P1):** batch adjacent terrain cells
+  with the same shade while keeping the unit, building, and viewport
+  overlays. Mean draw cost in the 40-unit replay falls from 506,161 to
+  462,920 cycles and the complete update averages 700,949 cycles
+  (23.94 emulated updates per second). The normal opening still runs at
+  29.89 emulated updates per second. Both saves and all 28 checkpoints
+  match the preceding build. Reuse the stable HUD panels next and check
   display timing on GBA hardware.
 
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and

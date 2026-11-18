@@ -12,6 +12,10 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
+    "--frontier": ("Frontier-Skirmish-GBA", "frontier-skirmish", "XFR1", "FRONTIER RTS"),
+    "--frontier-foundry": ("Frontier-Foundry-GBA", "frontier-foundry", "XFF1", "FR FOUNDRY"),
+    "--frontier-rovers": ("Frontier-Rovers-GBA", "frontier-rovers", "XFR2", "FR ROVERS"),
+    "--frontier-bulwark": ("Frontier-Bulwark-GBA", "frontier-bulwark", "XFB1", "FR BULWARK"),
     "--sc64": ("StarCraft64-Wasteland-GBA", "starcraft64", "SC64"),
     "--backwater": ("StarCraft64-Backwater-GBA", "starcraft64-backwater", "SCB2"),
     "--skirmish": ("StarCraft64-Skirmish-GBA", "starcraft64-skirmish", "SCK1"),

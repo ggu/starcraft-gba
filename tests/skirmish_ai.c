@@ -94,10 +94,42 @@ static void test_teams_neutrals_and_explicit_diplomacy(void)
     }
 }
 
+static int attack_target(const Sc64AiState *ai, const Sc64AiWorld *world,
+                         int preferred)
+{
+    Sc64AiIntent intents[SC64_AI_MAX_INTENTS];
+    unsigned char count = sc64_ai_plan_prefer_target(ai, world, intents, preferred);
+    for (unsigned char i = 0; i < count; ++i)
+        if (intents[i].kind == SC64_AI_INTENT_ATTACK) return intents[i].target_player;
+    return -1;
+}
+
+static void test_preferred_rival_breaks_only_hostile_ties(void)
+{
+    Sc64AiState ai;
+    Sc64AiWorld world = {3, {{0, 0, 1, 0, 0, 40},
+                            {1, 1, 1, 0, 0, 40},
+                            {4, 4, 1, 0, 0, 80}}};
+    sc64_ai_init(&ai, 3, 3, 0, 0, 4, 20);
+    ai.army = ai.attack_threshold;
+    assert(attack_target(&ai, &world, -1) == 0);
+    assert(attack_target(&ai, &world, 1) == 1);
+    assert(attack_target(&ai, &world, 4) == 0);
+    world.targets[1].alive = 0;
+    assert(attack_target(&ai, &world, 1) == 0);
+    world.targets[1].alive = 1;
+    sc64_ai_set_relation(&ai, 1, SC64_AI_REL_ALLY);
+    assert(attack_target(&ai, &world, 1) == 0);
+    sc64_ai_set_relation(&ai, 1, SC64_AI_REL_DEFAULT);
+    world.targets[1].distance = 41;
+    assert(attack_target(&ai, &world, 1) == 0);
+}
+
 int main(void)
 {
     test_independent_economies_and_production();
     test_teams_neutrals_and_explicit_diplomacy();
+    test_preferred_rival_breaks_only_hostile_ties();
     puts("skirmish AI: independent banks, worker income, costs, completion and diplomacy pass");
     return 0;
 }

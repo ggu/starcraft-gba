@@ -45,6 +45,27 @@ Select an empty worker and press A on a visible mineral field to begin gathering
 
 Command Centers train SCVs. Barracks train Marines by default; select a Barracks and press R to choose Firebat or Medic. Production queues hold five units and reserve supply while training. A completed Depot provides eight displayed supply. The Engineering Bay offers up to two weapon and armor upgrades.
 
+## Frontier Skirmish
+
+Run `make frontier-factions` to build `Frontier-Foundry-GBA.gba`,
+`Frontier-Rovers-GBA.gba` and `Frontier-Bulwark-GBA.gba` in `build/`.
+Each cartridge defaults to its named faction and supports both original
+64×64 maps, Transit Yard and Stone Gardens. Move between setup rows with
+Up/Down and change each choice with Left/Right. Select a faction for
+yourself and each of one to three computer opponents. In Free for All,
+the computers fight each other as well as you. In CPU Team, they target
+you while keeping separate forces and resource banks. Press Up from the
+Map row to reach Mode directly. A starts the match and B loads a saved
+match. Pause and save to retain the mode, lineup, and live match on that
+cartridge. Victory requires eliminating the other players' remaining
+units and buildings.
+
+Run `./dev play frontier-foundry` to open Foundry in mGBA, or substitute
+`frontier-rovers` or `frontier-bulwark`. Run `make test-frontier-factions`
+for the faction tests. The earlier single-roster build is also available
+with `make original-skirmish`. All Frontier builds use assets in the source
+tree.
+
 ## Fidelity and limits
 
 This is an original-art RTS demake rather than a full StarCraft engine. It uses fixed-size unit/building pools, a compact map, simplified collision, direct routing across open ground, and BFS detours around blocked routes on a 16-pixel grid, with authored map balance. Combat uses the basic unit roles, hit points, armor, costs, supply, build times, and weapon values referenced below, scaled to the GBA's 30 updates per second. Resource trips preserve the eight-mineral harvest amount, with a shorter final trip for depleted patches. Gas uses a small worker pool and two fixed geysers.

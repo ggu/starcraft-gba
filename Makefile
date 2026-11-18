@@ -747,6 +747,8 @@ build/StarCraft-GBA.gba: build/starcraft.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC GBA DEMO' SCGD
 
+include mk/frontier/Makefile
+
 build/test-starcraft: tests/host.c common/gba.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon tests/host.c common/gba.c $(STARCRAFT) -o $@
 
