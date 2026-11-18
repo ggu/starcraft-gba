@@ -3779,6 +3779,7 @@ walk_search_step(int cell, int *next_x, int *next_y)
     *next_x = (first & 255u) * 16 + 8;
     *next_y = (first >> 8) * 16 + 8;
 }
+
 #endif
 
 /* Breadth-first on the bounded walk grid; return the first tile toward goal. */
@@ -3795,8 +3796,15 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
     int goal_row = limit(ty / 16, 0, MAP_ROWS - 1);
     int head = 0, best = -1, bestd = 0x7fffffff;
 #if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
-    int cached = frontier_route_cache_get(start, goal_col + goal_row * MAP_COLS, tx, ty, next_x, next_y);
+    int goal = goal_col + goal_row * MAP_COLS;
+    int cached = frontier_route_cache_get(start, goal, tx, ty, next_x, next_y);
     if (cached >= 0) return cached;
+    if (!path_grid_valid) build_path_grid();
+    int first = frontier_shortest_axis_step(start_col, start_row, goal_col, goal_row);
+    if (first != -1) {
+        frontier_route_cache_put(start, goal, first);
+        return frontier_route_result(first, tx, ty, next_x, next_y);
+    }
 #endif
     int tail = walk_search_begin(start, start_col + start_row * 256);
     int goal_open = SC64_GRID_GET(path_walkable, goal_col + goal_row * MAP_COLS);

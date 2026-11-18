@@ -45,6 +45,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cartridge's new save even when the player faction matched its default.
   Foundry also loaded a save from the original single-roster cartridge.
   All 54 starts and those save checks passed again on `f5e60854`.
+  An additional sanitizer run on `f804475f` exercised all 1,404 setups
+  across the three cartridges, including every CPU faction permutation
+  in Free for All and CPU Team. Ordinary inputs started, saved, loaded,
+  and restarted each match with the same map, factions, and mode.
   The first 240 gameplay updates measured 29.50–29.57 updates per second
   in mGBA, up from 19.75–20.75 in the earlier qualification.
   In two earlier normal-input ARM matches, a passive Foundry player lost
@@ -197,6 +201,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   footprints at the map edges. Seven other sampled windows kept their
   reported average rates. Continue profiling the remaining combat stalls
   and measure on GBA SP hardware.
+
+  In the Stone Gardens CPU Team match, the remaining repeat spike came from
+  a point-route search on each new starting tile. The wall time of the
+  largest update dropped from 62.25 to 33.49 ms after checking whether the
+  shortest horizontal-then-vertical route is clear before starting the
+  full search. Simulation dropped from 506,796 to 97,449 cycles at that
+  update. The 240-update window rose from 28.96 to 29.86 updates per second
+  in mGBA. Its 95th percentile fell from 50.23 to 33.49 ms and its worst
+  update fell to 37.88 ms. All sampled worlds and walkability grids matched
+  on both maps, and an independent breadth-first search checked 2,968
+  authored and randomized query pairs plus directed edge cases. The four
+  Transit Yard windows kept their rates or improved. At game tick 5,163,
+  both builds saved identical SRAM through the pause menu. Each accepted
+  the other's image in a fresh emulator process and matched the next 120
+  updates. Physical GBA SP measurements remain open.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening

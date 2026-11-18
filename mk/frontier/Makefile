@@ -59,6 +59,7 @@ build/test-frontier-route-cache: tests/frontier_route_cache.c $(STARCRAFT) $(wil
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ORIGINAL_SKIRMISH_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 test-frontier-route-cache: build/test-frontier-route-cache
 	./build/test-frontier-route-cache
+test: test-frontier-route-cache
 
 # Frontier minimap center-sample and framebuffer differential oracle.
 .PHONY: test-frontier-minimap
