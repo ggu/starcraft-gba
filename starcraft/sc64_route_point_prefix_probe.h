@@ -67,6 +67,73 @@ static inline int sc64_point_prefix_seed_only(const Sc64PointPrefix *prefix)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+enum {
+    SC64_PREFIX_ROW_STRIDE = SC64_LINEAR_WIDE_COLS + SC64_LINEAR_PAD,
+    SC64_PREFIX_PADDED_BYTES = (SC64_LINEAR_MAX_ROWS + 2) * SC64_PREFIX_ROW_STRIDE,
+    SC64_PREFIX_ROW_GROW_BYTES = 8 * SC64_PREFIX_ROW_STRIDE
+};
+
+typedef struct {
+    int first, end;
+} Sc64PointPrefixBand;
+
+/* Initialize whole padded rows in a 128-by-128 point-prefix scratch plane.
+ * Keep every assigned direction in an already initialized row intact. */
+static void __attribute__((noinline))
+sc64_point_prefix_init_rows(u8 *dense, int first, int end)
+{
+    if (first >= end) return;
+    if (!first) {
+        memset(dense, 15, SC64_PREFIX_ROW_STRIDE);
+        first += SC64_PREFIX_ROW_STRIDE;
+    }
+    if (end == SC64_PREFIX_PADDED_BYTES) {
+        end -= SC64_PREFIX_ROW_STRIDE;
+        memset(dense + end, 15, SC64_PREFIX_ROW_STRIDE);
+    }
+    if (first >= end) return;
+    const u8 *walk = path_walkable + (first / SC64_PREFIX_ROW_STRIDE - 1) *
+                     (SC64_LINEAR_WIDE_COLS / 8);
+    for (int at = first; at < end; at += SC64_PREFIX_ROW_STRIDE) {
+        u8 *out = dense + at;
+        const u32 border = 0x0f0f0f0fu;
+        __builtin_memcpy(__builtin_assume_aligned(out, 4), &border, 4);
+        __builtin_memcpy(__builtin_assume_aligned(out + SC64_LINEAR_WIDE_COLS + 4, 4),
+                         &border, 4);
+        for (int x = 4; x < SC64_LINEAR_WIDE_COLS + 4; x += 8) {
+            u32 bits = *walk++;
+#ifdef SC64_ROUTE_LINEAR_GRID_LUT8_PROBE
+            __builtin_memcpy(__builtin_assume_aligned(out + x, 4),
+                             sc64_dense_pairs[bits], 8);
+#else
+            __builtin_memcpy(__builtin_assume_aligned(out + x, 4),
+                             &sc64_dense_words[bits & 15u], 4);
+            __builtin_memcpy(__builtin_assume_aligned(out + x + 4, 4),
+                             &sc64_dense_words[bits >> 4], 4);
+#endif
+        }
+    }
+}
+
+static inline u8 *sc64_point_prefix_begin_band(int cap, int row, Sc64PointPrefixBand *band)
+{
+    uintptr_t scratch = ((uintptr_t)(void *)(bfs_queue + cap) + 3u) & ~(uintptr_t)3u;
+    u8 *dense = (u8 *)(void *)scratch;
+    /* The seed may include neighbors on either side of a blocked root. */
+    band->first = (row > 4 ? row - 4 : 0) * SC64_PREFIX_ROW_STRIDE;
+    band->end = (row + 5 < SC64_LINEAR_MAX_ROWS + 2 ?
+                 row + 5 : SC64_LINEAR_MAX_ROWS + 2) * SC64_PREFIX_ROW_STRIDE;
+    sc64_point_prefix_init_rows(dense, band->first, band->end);
+    return dense;
+}
+
+#define SC64_POINT_PREFIX_GRID() \
+    sc64_point_prefix_begin_band(cap, sc64_cell_row((unsigned)goal) + 1, &band)
+#else
+#define SC64_POINT_PREFIX_GRID() sc64_route_linear_grid(cols, rows, stride, cap)
+#endif
+
 /* The caller already checked stride and the open origin. Check for it after
  * whole 32-pop batches, preserving seed and neighbour order even on decline.
  * Showcase keeps this loop in ROM to reserve its IWRAM stack. */
@@ -76,9 +143,23 @@ GBA_HOT
 #endif
 __attribute__((noinline))
 sc64_point_prefix_expand(u8 *dense, int start, int stride, int cap,
-                         int *head, int tail)
+                         int *head, int tail
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+                         , Sc64PointPrefixBand *band
+#endif
+                         )
 {
-    while (*head < tail && *head < SC64_POINT_PREFIX_LIMIT && dense[start] == 7u) {
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+    int band_first = band->first, band_end = band->end;
+    int interior = band_first + stride, interior_size = band_end - band_first - 2 * stride;
+#endif
+    while (*head < tail && *head < SC64_POINT_PREFIX_LIMIT &&
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+           ((unsigned)(start - band_first) >= (unsigned)(band_end - band_first) || dense[start] == 7u)
+#else
+           dense[start] == 7u
+#endif
+    ) {
         int limit = *head + (cap - tail) / 4;
         if (limit > tail) limit = tail;
         if (limit > *head + SC64_POINT_PREFIX_BATCH)
@@ -89,6 +170,25 @@ sc64_point_prefix_expand(u8 *dense, int start, int stride, int cap,
         u16 *write = bfs_queue + tail;
         do {
             int cell = *read++;
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+            /* A queued cell has an initialized row. Before reading its
+             * vertical neighbors, extend the band if it touches an edge. */
+            if ((unsigned)(cell - interior) >= (unsigned)interior_size) {
+                if (cell < interior) {
+                    int grown = band_first > SC64_PREFIX_ROW_GROW_BYTES ?
+                                band_first - SC64_PREFIX_ROW_GROW_BYTES : 0;
+                    sc64_point_prefix_init_rows(dense, grown, band_first);
+                    band_first = grown;
+                } else {
+                    int grown = band_end + SC64_PREFIX_ROW_GROW_BYTES;
+                    if (grown > SC64_PREFIX_PADDED_BYTES) grown = SC64_PREFIX_PADDED_BYTES;
+                    sc64_point_prefix_init_rows(dense, band_end, grown);
+                    band_end = grown;
+                }
+                interior = band_first + stride;
+                interior_size = band_end - band_first - 2 * stride;
+            }
+#endif
 #define SC64_PREFIX_STEP(offset, direction) \
             if (dense[cell + (offset)] == 7u) { \
                 dense[cell + (offset)] = direction; \
@@ -103,6 +203,10 @@ sc64_point_prefix_expand(u8 *dense, int start, int stride, int cap,
         *head = limit;
         tail = (int)(write - bfs_queue);
     }
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+    band->first = band_first;
+    band->end = band_end;
+#endif
     return tail;
 }
 
@@ -118,8 +222,11 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
     const int stride = cols + SC64_LINEAR_PAD;
     const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *field = sc64_route_field[slot];
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+    Sc64PointPrefixBand band;
+#endif
 #ifndef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
-    u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
+    u8 *dense = SC64_POINT_PREFIX_GRID();
 #endif
     int goal_start = goal + sc64_cell_row(goal) * SC64_LINEAR_PAD + stride + 4;
     int origin_start = origin + sc64_cell_row(origin) * SC64_LINEAR_PAD + stride + 4;
@@ -135,14 +242,22 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
         tail = 1;
         goto filled;
     }
-    u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
+    u8 *dense = SC64_POINT_PREFIX_GRID();
     tail = sc64_route_linear_seed(dense, goal_start, stride);
 #else
     int head = 0, tail = sc64_route_linear_seed(dense, goal_start, stride);
 #endif
-    tail = sc64_point_prefix_expand(dense, origin_start, stride, cap, &head, tail);
+    tail = sc64_point_prefix_expand(dense, origin_start, stride, cap, &head, tail
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+                                    , &band
+#endif
+                                    );
     int pending = tail - head;
-    if (pending > 0 && pending <= SC64_POINT_PREFIX_PENDING && dense[origin_start] != 7u) {
+    if (pending > 0 && pending <= SC64_POINT_PREFIX_PENDING &&
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+        (unsigned)(origin_start - band.first) < (unsigned)(band.end - band.first) &&
+#endif
+        dense[origin_start] != 7u) {
         sc64_route_field_clear(field);
         for (int i = 0; i < tail; ++i) {
             int at = bfs_queue[i];
@@ -164,6 +279,10 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
         sc64_point_prefix_index[slot] = (u8)(prefix - sc64_point_prefixes + 1);
 #endif
     } else {
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+        sc64_point_prefix_init_rows(dense, 0, band.first);
+        sc64_point_prefix_init_rows(dense, band.end, SC64_PREFIX_PADDED_BYTES);
+#endif
         tail = sc64_route_expand_linear_from(dense, tail, stride, cap, head);
         if (tail < 0) return sc64_route_fill(slot, goal);
         sc64_route_pack_linear(field, dense, cols, rows, stride);
@@ -176,6 +295,7 @@ filled:
     SC64_ROUTE_KEEP_COUNT(FILL);
     return tail;
 }
+#undef SC64_POINT_PREFIX_GRID
 
 /* Once a reader requests undiscovered data, restore the directions already
  * assigned and resume the exact pending FIFO in the original order. */
