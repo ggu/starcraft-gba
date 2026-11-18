@@ -328,3 +328,34 @@ budget for that call before cross-profile qualification.
 | Component and first prefix | `68327ecfa5d551c9480335b3fdc4da59479ea1cb7473b726e1ce457be208a887` |
 | Tail and prefix | `bcddd1aa4b372beef7172ce6f1daa4d55f2713ab81d3045c221c929803a41ca7` |
 | Tail, prefix, and component proof | `6e5c7ccf7a189719fab42601caea7280a9af61899606e120dfc058ee2e8536c4` |
+
+### A second bounded cutoff makes the tail heavier
+
+The demand prototype allows a resumed search to park once more after
+discovering a newly requested open cell. It writes only newly discovered
+steps and retains the remaining FIFO. The host sanitizer comparison
+matches 386,646 checks against the combined control, including the range
+reader, forced overflow, and a later full completion.
+
+The ARM sample averages 2,219,308 cycles, down 10.55% against the shipping
+tail. Its p95 is 3,011,967, down 16.99%, and its maximum rises to 5,583,455,
+up 15.33%. Call 47,995 takes all of that maximum. The read-only snapshots
+show the point field rooted at cell 6,161 park again during orders. A
+register-only observer reproduces the timing and state exactly and
+identifies the requests. Its first resume comes from the nearby-root
+test, which needs cell 445 from the field rooted at 12,730, 99 Manhattan
+steps away. The later two requests both use the field rooted at 6,161.
+The cutoff for cell 6,300 reparks the field, then a nearby-root request
+for diagonally adjacent cell 6,427 enters the resume path again. An exact
+early rejection for the first distant scan is the larger opportunity.
+A small halo around the cutoff is a separate test for the repeated
+nearby requests.
+
+All 131 named world checkpoints, all 480 frame/route entries, and nine
+actor/resource and palette cuts match. The bytes of both 240×160 frame
+pages match at all nine cuts. The selected display page differs at the
+last cut, so the stricter presentation check remains open. Keep the
+demand prototype local while attributing the repeat requests.
+
+- Demand prototype ARM receipt SHA-256 `dbe4ff97e391f8225d911cb1fa3865275a00366e5a2153c70381218c0b465378`.
+- Read-only request and caller receipt SHA-256 `c85d50ffdff7b1b8d45c86f87b923807ad366ab83d4c6418e19d4d158fc2e47f`.

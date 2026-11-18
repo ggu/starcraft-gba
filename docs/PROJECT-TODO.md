@@ -687,11 +687,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [wide first-origin prototype](audits/2026-11-16-resumable-frontier-budget.md#wide-point-prefix-on-the-current-dense-z7-replay)
   matches the dense Z7 tape and saves 9.09% mean against the pre-tail
   control. The [tail and prefix composition](audits/2026-11-16-resumable-frontier-budget.md#keep-the-complete-tail-alongside-parked-prefixes)
-  saves 8.45% mean against the shipping tail and recovers its saved-field
-  adoption at call 48,100. At call 47,995 a formation read completes a
+  saves 8.45% mean against the shipping tail and recovers nearly all of
+  the measured regression at call 48,100. At call 47,995 a formation read completes a
   parked search. A component proof postpones the completion into orders
-  and raises the maximum. Measure a second bounded search to the newly
-  requested cell, then qualify wider workloads, links and cross-loads.
+  and raises the maximum. A second bounded search saves more mean and p95
+  cycles but raises the maximum further after repeated requests in one
+  orders pass. First test a safe early rejection for distant nearby-root
+  scans. Then test how much a small cutoff halo helps two adjacent requests
+  before qualifying wider workloads, links and cross-loads.
   On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
   audit tracks a byte lookup
