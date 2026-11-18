@@ -594,6 +594,10 @@ sc64_contact_blocked_mask_memo(const Unit *q, int speed)
 }
 #endif
 
+#ifdef SC64_CONTACT_FILTER_CENSUS
+#include "sc64_contact_filter_census.h"
+#endif
+
 static unsigned
 #if defined(SC64_CONTACT_STEER_ROM)
 __attribute__((noinline))
@@ -619,6 +623,10 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 #endif
     if (sc64_contact_mask_prepare(q, speed, &mask, &mover_radius, &mover_flying))
         return mask;
+#ifdef SC64_CONTACT_FILTER_CENSUS
+    int census = frame >= SC64_CENSUS_FIRST_FRAME && frame <= SC64_CENSUS_LAST_FRAME;
+    if (census) ++sc64_contact_filter_counts[CONTACT_CENSUS_QUERIES];
+#endif
     p6 = sc64_contact_p6_active();
     reach = SC64_CONTACT_REACH(mover_flying) + speed;
     minx = (q->x - reach) >> 4; maxx = (q->x + reach) >> 4;
@@ -630,8 +638,16 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
+#ifdef SC64_CONTACT_FILTER_CENSUS
+            if (census)
+                sc64_contact_count_bucket(q, sc64_unit_bucket_head[col + row * MAP_COLS],
+                                          col, row, reach, speed);
+#endif
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i]) {
+#ifdef SC64_CONTACT_FILTER_CENSUS
+                if (census) ++sc64_contact_filter_counts[CONTACT_CENSUS_VISITED_NODES];
+#endif
                 const Unit *c = &u[i];
                 u8 cc;
                 int radius, ox, oy, limit_axis;
