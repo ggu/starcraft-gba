@@ -39,8 +39,13 @@ static Sc64PointPrefix *sc64_point_prefix_free(void)
 }
 
 /* The caller already checked stride and the open origin. Check for it after
- * whole 32-pop batches, preserving seed and neighbour order even on decline. */
-static int GBA_HOT __attribute__((noinline))
+ * whole 32-pop batches, preserving seed and neighbour order even on decline.
+ * Showcase keeps this loop in ROM to reserve its IWRAM stack. */
+static int
+#ifndef SC64_SHOWCASE_ENABLED
+GBA_HOT
+#endif
+__attribute__((noinline))
 sc64_point_prefix_expand(u8 *dense, int start, int stride, int cap,
                          int *head, int tail)
 {
