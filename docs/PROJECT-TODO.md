@@ -27,9 +27,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   ARM inputs start each setup, save at update 900, and reproduce
   the sampled world and AI state on a fresh-process load. The first
   240 updates measure 19.76–20.76 emulated updates per second across
-  the six setups. All seats share one roster. Profile the 64×64 routes
-  and rendering, verify a complete ARM match on both maps, and add
-  distinct original rosters.
+  the six setups. Both three-opponent openings average about 560,000
+  draw cycles and 110,000 simulation cycles. Prioritize draw cost and
+  profile the slowest simulation updates separately. All seats share
+  one roster. Verify a complete ARM match on both maps and add distinct
+  original rosters.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
