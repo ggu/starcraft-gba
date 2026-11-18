@@ -142,14 +142,14 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
             (s16)(target_x(target)*2),(s16)(target_y(target)*2),heading,
             (u16)target,(u8)shooter,(u8)RACE_PROTOSS_SLOT(&u[shooter]))) return 0;
 #if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)
-#ifdef SC64_POOL_LIVE_ACQUIRE_PROBE
+#ifndef SC64_POOL_STRICT_ACQUIRE
     if (!sc64_compact_pool_acquire_live(&race_p7_projectiles,SC64_COMPACT_PROJECTILE_CAP,
                                          &id,&native_index)) return 0;
 #else
     if (!sc64_compact_pool_acquire(&race_p7_projectiles,SC64_COMPACT_PROJECTILE_CAP,
                                     &id,&native_index)) return 0;
 #endif
-#elif defined(SC64_POOL_LIVE_ACQUIRE_PROBE)
+#elif !defined(SC64_POOL_STRICT_ACQUIRE)
     if (!sc64_pool_acquire_live(&race_p7_projectiles,&id,&native_index)) return 0;
 #else
     if (!sc64_pool_acquire(&race_p7_projectiles,&id,&native_index)) return 0;

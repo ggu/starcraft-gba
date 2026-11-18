@@ -1453,14 +1453,15 @@ save/source-owner and timing evidence; do not advertise unwired components.
   at the two previously divergent pause cuts.
   [Fusing P7 world checks with the mission census](audits/2026-11-18-p7-current-mgba.md#callback-based-census-experiment)
   increased mean cost 1.79% and stays outside the release.
-- [Projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
-  is the next measured Carrier-combat candidate. A staged fight on the
+- [Checked projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
+  speeds up the shared Interceptor firing path. A staged fight on the
   normal P10 engine averages 1.158M versus 1.113M guest cycles with exact
   world, projectile, display and save samples. An ordinary three-CPU
   Blood Bath fight on the compact Z10 preview drops mean cost 4.72%
   and p95 cost 11.08%, with matching fresh loads. The older P7 tape
-  leaves the arena empty and gives identical timings. Finish the ordinary
-  fixed-format P10 battle check before deciding on default activation.
+  leaves the arena empty and gives identical timings. The full ordinary
+  fixed-format P10 victory also matches. Target the remaining route burst
+  at Blood Bath frame 17,128, when 12 builds share a single update.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals

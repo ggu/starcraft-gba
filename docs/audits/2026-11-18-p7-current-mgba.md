@@ -185,3 +185,12 @@ all 48 would save about 0.07% of the sampled interval before lookup costs.
 The full tape records 406 repeats in 33,660 queries. Leave this memo out
 of the runtime and prioritize the existing expensive paths with actual
 repeated work.
+
+## Opaque minimap copy
+
+An aligned-word copy in the 24-pixel opaque minimap matches 256 host
+pixel comparisons and the same P7 world and display samples. It reduces
+the HUD stage from 130,051 to 127,780 mean cycles and the whole loop by
+0.12%. IWRAM and EWRAM stay the same in Terran, P10 and Showcase. The
+prototype stays optional. Local timing receipt SHA-256
+`7d7dca2ce7694c78d045f2019f00678c294f7237f221dd2b08a660f48578e2a4`.

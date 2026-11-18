@@ -1124,9 +1124,9 @@ remain separate gates.
 
 ### Checked live projectile acquisition
 
-`SC64_POOL_LIVE_ACQUIRE_PROBE` uses the checked splice on the shared
-Interceptor firing path. A slot reuse checks pool counts, list endpoints,
-reciprocal links and the free row before changing the arena. Growth and
+`SC64_POOL_STRICT_ACQUIRE` selects the full-check reference. The shared
+Interceptor firing path checks pool counts, list endpoints, reciprocal
+links and the free row before reusing a slot. Growth and
 suspect metadata call the original full validator. Load and save continue
 to validate the complete packet. The arena format and allocation order
 stay the same.
@@ -1175,19 +1175,25 @@ isolates the next tail investigation to the update with the route burst.
 All 22 sampled worlds, arenas, framebuffer pages and palettes match.
 The compact pause journals match byte for byte at frame 17,301. Both
 load in new processes and match after a further 180 updates. The two
-ARM links have the same memory bounds. The fixed-format test still has
-a staged opening, so an ordinary P10 Carrier fight remains the wider
-release check.
+ARM links have the same memory bounds.
+
+Eye of the Storm also wins from the ordinary P10 title screen in both
+builds. The tape holds 47,194 physical calls and reaches victory at
+frame 46,057. Both runs match 20 gameplay checkpoints, 10 briefing pages,
+14 field acknowledgments and the sampled fixed arena contents. The arena
+allocates 20 rows during the mission. The full mission spends about 0.06%
+fewer cycles with local acquisition. Projectile-heavy windows benefit
+more than the whole-mission average.
 
 The usual P7 combat tape allocates no projectile rows. It matches all
 its sampled state and timing with the probe on or off.
 
 With prepared P10 inputs, use separate clean build directories to compare
-the normal cartridge and the opt-in one.
+the normal cartridge and the full-check reference.
 
 ```sh
 make verify-protoss-p10
-make SC64_DEFENSE_PROBE_FLAGS=-DSC64_POOL_LIVE_ACQUIRE_PROBE verify-protoss-p10
+make SC64_DEFENSE_PROBE_FLAGS=-DSC64_POOL_STRICT_ACQUIRE verify-protoss-p10
 make test-sc64-interceptor-pool-codec test-sc64-interceptor-motion
 ```
 
@@ -1197,4 +1203,5 @@ make test-sc64-interceptor-pool-codec test-sc64-interceptor-motion
 | Staged ARM Carrier battle and save pair | `3dcb66f1689f17b88f583ee2bfd2a06eba8bc634f12acde76e7647ff81d77773` |
 | Ordinary compact Z10 Blood Bath battle and save pair | `9422a5127388dc8e9913170a678871f9b6078e279fd58444f032c8fbc2ede062` |
 | Same Z10 match with orders and route counters | `81038247490679fbf72eecb951a6163ece86d6037810327e0f0f5f289d67f425` |
+| Ordinary P10 victory pair | `6d1e6b98f77c624e7bb2dca6ef1b1015d54ace31d8013e92d616099c3d495c11` |
 | P7 comparison with an empty projectile arena | `cba63d691573808af871e740d8c20be16cdaa770c4e180cb4f9e2f97b48e0217` |
