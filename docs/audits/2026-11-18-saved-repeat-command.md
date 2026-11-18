@@ -1,9 +1,10 @@
 # Preserve the repeat command when loading a race save
 
 Press Start to open pause, then B to save. The title's L shortcut loads the
-game in a fresh process. The field selection clears and the command menu
-stays closed. Once a unit is selected again, B highlights the remembered
-command if its row is available. A confirms that command.
+game in a fresh process. The selected building and menu highlight clear.
+The command menu stays closed and the existing unit-selection fields
+keep their format-specific behavior. With a unit selected, B highlights
+the remembered command if its row is available. A confirms that command.
 
 The normal race writer uses the existing tagged word 31. It stores only the
 last command in bits 16–23. The selected-building and highlighted-row
@@ -106,3 +107,25 @@ at least 100 play updates. Campaign checks cover launch and opening play.
 | Outpost fresh-load win | `c7d3e7639843f335be956f1dd5c231af5ef3525db503f111e3623e5bc0995d55` |
 | ARM load matrix | `dea5eb6b088e6d1790dd1fe3ae8c67559b91acc10ff294d6cf11c597976a1722` |
 | Physical campaign and skirmish openings | `f8644030ebaa75ae0ea73e128b591e09757f1b6367c5bd96da5cf44bf7e86922` |
+
+## Early Protoss campaign continuation
+
+The normal P10 build with repeat-command persistence and the verified
+target-index options wins P2 and P3 from the same ordinary pause cuts
+that previously diverged. Both use the byte-identical archived input
+tapes after title L in a fresh mGBA process.
+
+| Mission | Save call / frame | Victory frame | Matched checkpoints | Briefing / field pages |
+| --- | ---: | ---: | ---: | ---: |
+| P2 | 440 / 372 | 33,803 | 36 | 14 / 6 |
+| P3 | 24,581 / 23,993 | 45,951 | 47 | 9 / 3 |
+
+P2 restores six selected unit slots before continuing and wins with the
+hero alive. P3 matches its saved world, keeps last command 1 and clears
+the menu highlight. Both hostile structure banks are gone at its win.
+The original input journal stays byte-identical in both tests.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| P2 pause and fresh load to victory | `957883f4a9c86e5b73f5bc93d301cfe59f522d5ef6b78ac100e4f9cc5cde0463` |
+| P3 pause and fresh load to victory | `784776b6ec4f7e92309b07aa7414bbef78932f273a9f73468a2b7401f62a1298` |
