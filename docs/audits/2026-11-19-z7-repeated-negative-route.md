@@ -286,7 +286,10 @@ route build and hit counts, and exact 32 KiB SRAM exports match, including
 the fresh load and its 180-update continuation. The asset-free sanitizer
 suite passes, as does the generated-bank fixture compiled directly with
 the retained original and indexed headers. This run measures one fixed-camera
-three-AI match in emulation. The 30-updates/s budget remains 561,792 cycles.
+three-AI match in emulation. The two derived images used direct ELF-to-ROM
+conversion and have no final boot-header fixup. They are timing probes for
+the emulator, which accepts these images. The 30-updates/s budget remains
+561,792 cycles.
 
 - Indexed replay SHA-256 `982d97421d4ad397a79acc2eb8cb96099d7e055144966941377a9755a3d05f9b`.
 - Overlay guard replay SHA-256 `89f51ae8cc506765eecb9a6fe18feef32407b1a0baecbe48a3a200ab563115c6`.

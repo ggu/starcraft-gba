@@ -188,3 +188,28 @@ tail remains a separate comparison.
 
 - Idle producer controller tape SHA-256 `ca1d2058a19385a3035529218e304231a8b5596489574ee398a30e924b1540cf`.
 - Idle producer manifest SHA-256 `66b8b1bd0205840bb142892778c0153a4db9fa6f4632fb2c54ac31a195f21fec`.
+
+## Cancel a paid waiting head at 10/10
+
+A new isolated native replay matches the guarded 13,512-step raw picture
+byte for byte. The second SCV has moved to the front, the bar has zero
+filled pixels, and the second slot is empty. Ordinary input highlights
+Cancel Last. The wallet, supply and bar stay unchanged during a
+115-step neutral control. The next equal-length interval includes one
+A press on Cancel Last.
+
+| N64 observer step | Minerals | Supply | Command Center production |
+| ---: | ---: | ---: | --- |
+| 13,512 | 156 | 10/10 | Paid SCV at the front, bar empty |
+| 13,534 | 156 | 10/10 | Cancel Last highlighted |
+| 13,649 | 156 | 10/10 | End of neutral control, bar still empty |
+| 13,764 | 206 | 10/10 | Queue, bar and Cancel Last icon gone |
+
+Canceling the paid waiting head refunds 50 minerals and leaves the
+displayed supply at 10/10. This matches the GBA preview's cancellation
+of a saved waiting head. The native run exits normally after 13,765
+steps with the original ROM and Flash hashes still matching. Resumption
+after a completed native Supply Depot remains unverified.
+
+- Waiting-head cancel tape SHA-256 `45c3e3a403f344c4aac71854b244886b36dd5e83f755b2dbda46f3c2b5861ce0`.
+- Waiting-head cancel manifest SHA-256 `799bf380f29305aa7785c9d4c87ee1c5cd1e8ab0722c1201077da29fba7cd576`.

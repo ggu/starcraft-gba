@@ -1569,8 +1569,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
   placing a Depot from the saved waiting state lets the paid SCV
   resume and finish without another Train input. Quiet training timing
   stays near 30 emulated updates/s and mixed Blood Bath mean cost rises
-  0.17% with matching sampled state. Continue native capacity recovery
-  and broader ARM controls before release activation.
+  0.17% with matching sampled state. The N64 also refunds all 50 minerals
+  and keeps 10/10 supply when Cancel Last removes the stalled paid head,
+  matching the GBA preview. Continue native capacity recovery and broader
+  ARM controls before release activation.
 - The [dense Z7 orders audit](audits/2026-11-19-z7-order-cost.md)
   separates the movement, nearest-enemy and setup costs. Movement
   averages about 920,000 instrumented cycles on calls that advance
