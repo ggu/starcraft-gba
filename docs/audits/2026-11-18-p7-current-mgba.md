@@ -250,6 +250,13 @@ requests over 958 advancing updates. All 1,000 call classifications and
 11 world and display samples matched. Work on average collision cost should
 look inside the first lookup for each mover.
 
+A detector snapshot variant builds its rows from the validated actor owner
+lists. Its focused sanitizer oracle matches the slot scan and the independent
+detector mask. The normal P10 vector with this change matches the 11 replay
+cuts and the complete timelines. Its 1,905,023-cycle mean is 0.18% higher
+than the release, and p95 rises from 2,197,484 to 2,199,059. The owner-list
+prototype stays local.
+
 | Local evidence (SHA-256) | Digest |
 | --- | --- |
 | Release camera and cache trace | `1a4e29b7e289417f7869275f9ff8894be785a55ac88036adbb4f147651c0d340` |
@@ -257,3 +264,4 @@ look inside the first lookup for each mover.
 | Vertical rotation comparison | `7889ae76d8e347a70d3f78afb6fe8d3292ea6e1f1ecc7e7b533a915f65a29712` |
 | Pixel rotation comparison | `d3c115f25ad1778f6e4cfb9e8755ff90871d18b4182ec238adf566e5c2a72622` |
 | Collision shadow receipt | `06d8797f03cbb20623cc8f5f27746d3668a11b293dca7cddcf2ee53a1ce62aef` |
+| Detector owner-list comparison | `0e44158cf6850ee7786994038127af0c564145ca8775b0f5c7a1caa8aea7db75` |
