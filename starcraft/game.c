@@ -3716,7 +3716,6 @@ is_traversable(int col, int row, int from_cell)
 
 #ifdef SC64_IMPORTED_MISSION
 #ifdef SC64_RANGE_WORK
-/* target_alive itself expects an in-range entity reference. */
 #define SC64_RANGE_TARGET_VALID(t) \
     ((unsigned)(t) < (unsigned)(MAX_UNITS + MAX_BUILDINGS) && target_alive(t))
 #endif
@@ -9200,8 +9199,8 @@ static inline int race_bc_order_dispatch_needed(const Unit *q,int slot,int recha
 }
 #endif
 
-#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(GBA_HOST)
-static void __attribute__((noinline,long_call))
+#ifdef SC64_IMPORTED_MISSION
+static void SC64_ORDERS_ATTR
 #else
 static void GBA_HOT
 #endif
@@ -10754,7 +10753,11 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_sync_references();
 #endif
+#ifdef SC64_IMPORTED_MISSION
+    SC64_UPDATE_ORDERS();
+#else
     update_orders();
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_tick();
 #endif

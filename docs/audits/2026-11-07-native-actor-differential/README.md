@@ -36,6 +36,38 @@ sequence.
 | Matched command log | `bb29739983aed6997532130b47c647c54be72eb2b81dbd9c2d7e9561c66688d2` |
 | Fresh native replay manifest | `92da08cde592ccf6fe82ec971bd912e3524d21cf09cde2c3bfede585ef67e4d9` |
 
+## November 18 Wasteland group movement
+
+A separate ares run used the pinned Wasteland Marine observer under the
+native lock. Ordinary A and R selected the five visible Marines. C-Right
+issued a distant Move, and a second C-Right replaced it before arrival.
+The HUD showed five selected Marines in all three captures. The corresponding
+40-HP, owner-1 Marine records were idle at observer step 7,121. All five
+changed to move order 6 at step 7,196 and kept that order with new destinations
+at step 7,263. One record had an intermediate waypoint at (273, 90) while its
+first destination was (708, 162).
+
+| Marine | Before Move | First destination | Second destination |
+| --- | --- | --- | --- |
+| 1 | (173, 95) | (690, 120) | (297, 128) |
+| 2 | (197, 121) | (714, 146) | (318, 155) |
+| 3 | (209, 154) | (708, 162) | (294, 160) |
+| 4 | (174, 135) | (691, 160) | (270, 175) |
+| 5 | (172, 167) | (689, 180) | (249, 181) |
+
+Three first destinations are the corresponding starting positions plus
+(517, 25). Destinations vary on both axes for both orders. GBA
+`issue_order` starts the first five selected units in one row at eight-pixel
+spacing, with an optional reachability fallback to the cursor. This trace
+gives a native group-target comparison for a future formation change.
+The second Move was player-issued. Automatic replanning after a new
+obstacle, arrival timing, and the native formation algorithm remain open.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Native observation manifest | `b63cb64a4c61fd5c399c6417aa249f7a256854d045ee321eb90915b124690fee` |
+| Actor comparison | `6059687ea843cc3aad5b1628b40107d455a8aa2b6bb4eeaedab309d0a287f106` |
+
 ## Three-sample frontend budget proof before execution
 
 The separate follow-up observer permits at most three 8 MiB RDRAM samples and three frames within the existing 2 MiB frame budget. The parent caps stdout at 256 KiB and stderr at 512 KiB. The child normally runs with a 2 MiB per-file soft limit and 8 MiB hard limit; only while synchronously writing a validated RAM snapshot does it raise the soft limit to 8 MiB and immediately lower it again. During that synchronous copy no guest CPU execution is requested. The fixed pinned USA ROM copy is 32 MiB. The pinned ares `mia/medium/nintendo-64.cpp` identifies StarCraft 64 as a 128 KiB Flash game; the isolated frontend connects no controller pak.

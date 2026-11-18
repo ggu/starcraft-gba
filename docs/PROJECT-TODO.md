@@ -1462,6 +1462,20 @@ save/source-owner and timing evidence; do not advertise unwired components.
   leaves the arena empty and gives identical timings. The full ordinary
   fixed-format P10 victory also matches. Target the remaining route burst
   at Blood Bath frame 17,128, when 12 builds share a single update.
+- The [interleaved depot flood audit](audits/2026-11-17-z10-order-tail.md#interleaved-depot-floods-after-a-building-dies)
+  found three partial depot fields restarting after six cells opened.
+  Keeping each pending queue within the orders pass cuts the worst compact
+  Blood Bath update from 5.644M to 2.621M cycles with matching route counters,
+  sampled fields, display and fresh SRAM continuation. Mean savings are
+  0.41%. The regular Z10 match drops mean cost 3.65% and worst-update
+  cost 32.51%; that vector also moves the orders loop into IWRAM. All
+  30 campaign starts, 72 skirmish starts and eight cross-loads pass on
+  the four regular cartridges. Keep profiling average cost and wider battles.
+- The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
+  follows five selected Marines in ares. Two ordinary Move commands assign
+  destinations on both axes, while the GBA's initial five destinations lie
+  on one row. Use more groups, destinations, and obstacle layouts to derive
+  a formation rule before changing shared Move or Attack Move.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals
