@@ -28,9 +28,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the sampled world and AI state on a fresh-process load. The first
   240 updates measure 19.76–20.76 emulated updates per second across
   the six setups. Both three-opponent openings average about 560,000
-  draw cycles and 110,000 simulation cycles. Prioritize draw cost and
-  profile the slowest simulation updates separately. The faction builds
-  below now have complete ARM win replays on both maps.
+  draw cycles and 110,000 simulation cycles. The timing work and the
+  current set of complete ARM win replays for both maps are recorded below.
 
 - **Frontier factions (P1):** each of the three cartridges defaults to
   its own faction. Skirmish setup offers all player factions, both maps,
@@ -45,7 +44,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Each cartridge loaded an earlier fixed-player save and rejected another
   cartridge's new save even when the player faction matched its default.
   Foundry also loaded a save from the original single-roster cartridge.
-  The first 240 updates measured 19.75–20.75 emulated updates per second.
+  All 54 starts and those save checks passed again on `f5e60854`.
+  The first 240 gameplay updates measured 29.50–29.57 updates per second
+  in mGBA, up from 19.75–20.75 in the earlier qualification.
   In two earlier normal-input ARM matches, a passive Foundry player lost
   to Rovers on Transit Yard (game tick 5,584) and to Bulwark on Stone
   Gardens (5,524). Add distinct faction support units and production choices.
@@ -54,14 +55,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   using physical button packets in headless mGBA. Each of the three
   player factions won on both maps against one CPU. Transit Yard and
   Stone Gardens also had mixed two-CPU wins, and Foundry beat three
-  independent Bulwark opponents on Stone Gardens. Each case starts at
-  the title, builds and trains a force, issues attack orders, and checks
-  the result screen and exact game tick. The one-CPU Foundry replays
-  averaged 22.71 emulated updates per second on Transit Yard and 22.11
-  on Stone Gardens after the first 100 updates. Prioritize a Transit Yard
-  three-CPU win and hardware timings. To replay the checked-in inputs,
-  build Foundry and pass the physical observer from
-  `tools/sc64_headless_replay.c` to the optional test.
+  independent Bulwark opponents on Stone Gardens. The packets run on the
+  Foundry cartridge, which can select all three player factions. Each case
+  starts at the title, builds and trains a force, issues attack orders, and
+  checks the result screen and exact game tick. All nine reached the same
+  victory ticks on `f5e60854` and averaged 28.78–29.48 updates per second
+  after the first 100 updates in mGBA. Prioritize a Transit Yard three-CPU
+  win and hardware timings. To replay the checked-in inputs, build Foundry
+  and pass the physical observer from `tools/sc64_headless_replay.c` to
+  the optional test.
 
   ```sh
   make frontier-foundry
@@ -69,7 +71,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   ```
 
   Use a fresh output directory. Add `--case transit-yard-foundry`
-  to run one match.
+  to run one match. The result file includes elapsed emulator cycles and
+  average updates per second from the setup checkpoint to the result.
 
 - **Frontier frame time (P1):** clear the byte visibility grid with
   aligned stores, remember explored circle centers until a world load or

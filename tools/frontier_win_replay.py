@@ -10,6 +10,8 @@ from emulator_smoke import symbol_sizes, symbols
 import sc64_headless_physical as physical
 
 ROOT = Path(__file__).resolve().parents[1]
+GBA_CLOCK_HZ = 16_777_216
+SETUP_UPDATE = 100
 
 
 def read_value(replay, sym, sizes, name, size):
@@ -24,9 +26,9 @@ def run_case(case, runner, output, sym, sizes):
     )
     try:
         edges = [tuple(edge) for edge in case["button_edges"]]
-        if case["end"] < 100:
-            raise ValueError("case ends before setup checkpoint")
-        replay.play_to(100, edges)
+        if case["end"] <= SETUP_UPDATE:
+            raise ValueError("case must continue beyond the setup checkpoint")
+        replay.play_to(SETUP_UPDATE, edges)
         cpu = case["cpu"]
         if not isinstance(cpu, list) or not 1 <= len(cpu) <= 3:
             raise ValueError("cpu must contain one to three faction IDs")
@@ -43,15 +45,23 @@ def run_case(case, runner, output, sym, sizes):
                     "bots": len(cpu), "cpu": cpu}
         if setup != expected:
             raise RuntimeError(f"{case['name']}: setup {setup} != {expected}")
+        start_cycle = replay.clock()
         replay.play_to(case["end"], edges)
+        cycles = replay.clock() - start_cycle
+        if cycles <= 0:
+            raise RuntimeError(f"{case['name']}: emulator clock did not advance")
         result = {name: read_value(replay, sym, sizes, name, 4)
                   for name in ("screen", "won", "lost", "frame")}
         expected_result = {"screen": 3, "won": 1, "lost": 0,
                            "frame": case["game_tick"]}
         if result != expected_result:
             raise RuntimeError(f"{case['name']}: result {result} != {expected_result}")
+        updates = case["end"] - SETUP_UPDATE
+        timing = {"after_update": SETUP_UPDATE, "updates": updates,
+                  "emulated_cycles": cycles,
+                  "updates_per_second": round(GBA_CLOCK_HZ * updates / cycles, 2)}
         return {"name": case["name"], "setup": setup, "end": case["end"],
-                "result": result}
+                "result": result, "timing": timing}
     finally:
         proc.terminate()
         try:
