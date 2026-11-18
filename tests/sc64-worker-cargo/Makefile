@@ -65,3 +65,10 @@ test-sc64-depot-owner-capability:
 	$(CLANG) -std=c11 -Werror -fsyntax-only -DSC64_NEAREST_RESOURCE_DEPOT -DEXPECT_OWNER_LIST_ON tests/sc64_depot_owner_capability.c
 	$(CLANG) -std=c11 -Werror -fsyntax-only -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DEPOT_OWNER_LIST_DISABLED -DEXPECT_OWNER_LIST_OFF tests/sc64_depot_owner_capability.c
 	$(CLANG) -std=c11 -Werror -fsyntax-only -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DEPOT_OWNER_LIST_DISABLED -DSC64_DEPOT_OWNER_LIST_PROBE -DEXPECT_OWNER_LIST_OFF tests/sc64_depot_owner_capability.c
+
+# Authored contention on the shared worker path with the prepared P10 profile.
+build/test-sc64-mineral-contention-p10: tests/sc64_mineral_contention.c tests/sc64_worker_gather_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile tests/sc64-worker-cargo/Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(WORKER_CARGO_CPPFLAGS) $(WORKER_CARGO_p10_FLAGS) -DSC64_WORKER_CARGO_KIND -DSC64_MINERAL_CONTENTION_PROBE $< common/gba.c $(WORKER_CARGO_p10_SOURCES) -o $@
+.PHONY: test-sc64-mineral-contention-p10
+test-sc64-mineral-contention-p10: build/test-sc64-mineral-contention-p10
+	./build/test-sc64-mineral-contention-p10

@@ -8230,6 +8230,8 @@ worker_gather_ready(Unit *q)
     return --q->work_timer == 0;
 }
 
+#include "sc64_mineral_gather.h"
+
 #if defined(SC64_NEAREST_RESOURCE_DEPOT) || defined(SC64_WORKER_CARGO_KIND)
 /* Leave combat orders in fast RAM. Keeping the less frequent worker return
  * state machine in ROM prevents GCC's inlining decision from placing the
@@ -8334,30 +8336,15 @@ race_update_resource_worker(Unit *q)
     if (dist2(q->x, q->y, tx, ty) >
         (q->order == ORDER_GAS ? 24 * 24 : 7 * 7)) {
         move_toward(q, tx, ty);
-    } else if (!worker_gather_ready(q)) {
         return;
-    } else if (q->order == ORDER_MINE) {
-#ifdef SC64_WORKER_CARGO_KIND
-        int collected = m[q->target].amount < 8 ? m[q->target].amount : 8;
-        if (collected > 0) {
-            q->carry = collected;
-            m[q->target].amount -= collected;
-#ifdef SC64_WORKER_CARGO_KIND
-            if (IS_WORKER(q->type)) {
-                sc64_worker_cargo_clear(q);
-                sc64_worker_gather_pending_set(q, 0);
-            }
-#endif
-        }
-        if (q->carry > 0) q->build = -1;
-        if (collected <= 0) q->order = ORDER_IDLE;
+    }
+    if (q->order == ORDER_MINE) {
+#ifdef SC64_MINERAL_CONTENTION_PROBE
+        sc64_mineral_request(q);
 #else
-        q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
-        m[q->target].amount -= q->carry;
-        if (q->carry > 0) q->build = -1;
-        if (q->carry <= 0) q->order = ORDER_IDLE;
+        if (worker_gather_ready(q)) race_collect_mineral(q);
 #endif
-    } else {
+    } else if (worker_gather_ready(q)) {
         q->carry = 8;
 #ifdef SC64_WORKER_CARGO_KIND
         if (IS_WORKER(q->type)) q->flags = (q->flags & ~SC64_WORKER_CARGO_MASK) | SC64_WORKER_CARGO_GAS;
@@ -9207,6 +9194,9 @@ static void GBA_HOT
 update_orders(void)
 {
     int i, target;
+#ifdef SC64_MINERAL_CONTENTION_PROBE
+    memset(sc64_mineral_requests, 0, sizeof(sc64_mineral_requests));
+#endif
 #ifdef SC64_DEPOT_OWNER_LIST_PROBE
     sc64_depot_owner_lists_valid = 0;
 #endif
@@ -9618,6 +9608,9 @@ target_lists_unavailable:
 #endif
 	}
     }
+#ifdef SC64_MINERAL_CONTENTION_PROBE
+    sc64_mineral_finish_orders();
+#endif
     target_lists_valid = 0;
 #ifdef SC64_DEPOT_OWNER_LIST_PROBE
     sc64_depot_owner_lists_valid = 0;
