@@ -1484,7 +1484,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   after reading actor facts, and only 2% fail the flight layer. Packed
   nodes raise mean cost 0.35%. Deferring admission of a fresh steering
   mask until the mover stays put saves 0.97% on P7 and 0.39% in regular
-  Z10 Blood Bath. Qualify a dense Z7 case separately.
+  Z10 Blood Bath. Dense Z7 saves 0.17% mean with a 0.10% p95 increase.
+  Full P7 matches victory, dialogue and 59 checkpoints at 8.31 emulated
+  updates per second. The 30 fps target remains open. The diagonal
+  fog-strip probe saves 103 cycles overall and stays local. Prioritize
+  recurring route and order work and larger terrain draw costs.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
