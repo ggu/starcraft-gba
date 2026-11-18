@@ -60,8 +60,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   video checkpoints match the polled baseline. The emulator trace saw
   2,000 consecutive opening flips on line 160 exactly two video frames
   apart. All 640 dense flips occur on lines 160–226, with intervals from
-  two to four video frames. Dense combat remains above budget. Check
-  display timing on GBA hardware and continue reducing the draw cost.
+  two to four video frames. Dense combat remains above budget. In 80
+  traced updates the minimap costs 89,410 cycles, the command panel
+  59,082, and the resource strip 21,056 on average. The resource strip
+  changes in 3 of 40 consecutive frame pairs, and the lower-left area
+  changes in 2. The minimap area changes in every pair. Prioritize
+  reusing the stable panels and batching minimap drawing, and check
+  display timing on GBA hardware.
 
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and
   Interceptor services. The standard Terran, Zerg and Showcase builds still
