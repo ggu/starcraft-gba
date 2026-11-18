@@ -192,4 +192,61 @@ static int __attribute__((noinline)) sc64_point_prefix_component_reaches(int slo
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
+static int sc64_point_near_neighbor(int a, int b)
+{
+    const int cols = MAP_COLS;
+    int delta = a - b;
+    return delta == cols || delta == -cols ||
+        ((delta == 1 || delta == -1) &&
+         sc64_cell_row((unsigned)a) == sc64_cell_row((unsigned)b));
+}
+
+static int sc64_point_witness_distance(int slot, int origin, int seed)
+{
+    const int delta[] = {0, 1, -1, MAP_COLS, -MAP_COLS};
+    int distance = 0;
+    while (origin != seed && distance < 128) {
+        unsigned direction = (unsigned)sc64_route_get(slot, origin);
+        if (direction < 1 || direction > 4) return -1;
+        origin += delta[direction];
+        ++distance;
+    }
+    return origin == seed ? distance : -1;
+}
+
+/* An open neighbor of the root gives an upper bound via its exact field.
+ * An open neighbor of the queried goal gives a lower bound by the reverse
+ * triangle inequality. Reject only when the bounds rule out every shortest
+ * path through the goal. A tie still needs the canonical gradient. */
+static int __attribute__((noinline))
+sc64_point_prefix_near_distance_miss(int slot, int origin, int goal, int root)
+{
+    enum { MAX_WITNESSES = 4, NO_UPPER_BOUND = 32767 };
+    const int cols = MAP_COLS, active_slots = SC64_ROUTE_ACTIVE_SLOTS;
+    int root_row = sc64_cell_row((unsigned)root), goal_row = sc64_cell_row((unsigned)goal);
+    int dx = root - root_row * cols - (goal - goal_row * cols);
+    int dy = root_row - goal_row;
+    int via_gap = (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy);
+    int upper = NO_UPPER_BOUND, lower = 0, checked = 0;
+    for (int witness = 0; witness < active_slots && checked < MAX_WITNESSES; ++witness) {
+        if (witness == slot || sc64_route_valid[witness] != 1 ||
+            SC64_ROUTE_LAZY(witness)) continue;
+        int seed = sc64_route_goal[witness];
+        if ((unsigned)seed >= (unsigned)(cols * MAP_ROWS)) continue;
+        int by_root = sc64_point_near_neighbor(seed, root);
+        int by_goal = sc64_point_near_neighbor(seed, goal);
+        if ((!by_root && !by_goal) || !SC64_GRID_GET(path_walkable, seed) ||
+            sc64_point_prefix_find(witness)) continue;
+        ++checked;
+        int distance = sc64_point_witness_distance(witness, origin, seed);
+        if (distance < 0) continue;
+        if (by_root && distance + 1 < upper) upper = distance + 1;
+        if (by_goal && distance - 1 > lower) lower = distance - 1;
+        if (lower + via_gap > upper) return 1;
+    }
+    return 0;
+}
+#endif
+
 #endif

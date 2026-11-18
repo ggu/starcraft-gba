@@ -978,6 +978,69 @@ static void check_point_component_witness(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
+static void check_point_near_distance(void)
+{
+    const int width = 128, root = 24 + 24 * width;
+    enum { PROOF, TIE, STALE, PARKED, BLOCKED };
+    for (int mode = PROOF; mode <= BLOCKED; ++mode) {
+        const int tie = mode == TIE;
+        int origin = root + 10 - (tie ? 10 * width : 0);
+        int goal = root + (tie ? 1 : width);
+        int upper_seed = root + (tie ? -width : 1);
+        int lower_seed = goal + width;
+        race_cols = race_rows = width;
+        memset(desired, 1, sizeof(desired));
+        if (!tie) {
+            for (int y = 22; y <= 30; ++y) desired[29 + y * width] = 0;
+        }
+        if (mode == BLOCKED) desired[lower_seed] = 0;
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        sc64_route_clock = 0;
+        int upper_slot = sc64_route_slot(upper_seed);
+        int lower_slot = mode == PARKED ? sc64_route_slot_for(lower_seed, lower_seed + 1) :
+            sc64_route_slot(lower_seed);
+        int slot = sc64_route_slot_for(root, root - width);
+        assert(slot >= 0 && upper_slot >= 0 && lower_slot >= 0);
+        assert(sc64_point_prefix_find(slot) &&
+               sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+        assert(!!sc64_point_prefix_find(lower_slot) == (mode == PARKED));
+        if (mode == STALE) SC64_ROUTE_PF(lower_slot) |= SC64_ROUTE_FLAG_STALE;
+        assert(!sc64_point_near_neighbor(width - 1, width));
+
+        reference_bfs(&oracle[POOL], upper_seed);
+        int upper = oracle[POOL].dist[origin] + 1;
+        reference_bfs(&oracle[POOL], lower_seed);
+        if (tie) assert(oracle[POOL].dist[origin] == upper);
+        if (mode == PROOF) assert(oracle[POOL].dist[origin] > upper);
+        reference_bfs(&oracle[POOL], root);
+        int cursor = origin;
+        for (unsigned step = 0; step < 128 && cursor != goal; ++step) {
+            int at_root, next;
+            if (!expected_next(&oracle[POOL], cursor % width, cursor / width, root,
+                               &next, &at_root) || at_root) break;
+            cursor = next;
+        }
+        int hit = cursor == goal;
+        assert(hit == tie);
+
+        u32 before = state_hash(), hits = sc64_route_hits, builds = sc64_route_builds;
+        assert(sc64_route_near_root_reaches(slot, origin, goal, root) == hit);
+        assert(state_hash() == before);
+        assert(!!sc64_point_prefix_find(slot) == (mode == PROOF));
+        assert((sc64_route_step_slot(origin, goal) == slot) == hit);
+        if (hit) {
+            assert(sc64_route_builds == builds && sc64_route_hits == hits + 1);
+            assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+        }
+        check_grid_unchanged();
+    }
+    puts("near-root distance witnesses preserve strict misses, ties and invalid witness fallback");
+}
+#endif
+
 #ifdef SC64_ROUTE_KEEP_FIELDS
 /* Adopt an exact donor as lazy after a harmless closure, then request a
  * nearby goal on that gradient. Closing a tile on the path must instead
@@ -1018,6 +1081,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-near-distance-only")) {
+        check_point_near_distance();
+        return 0;
+    }
+#endif
 #ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-component-only")) {
         check_point_component_witness();
@@ -1134,6 +1203,9 @@ int main(int argc, char **argv)
 #endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     check_nearby_lazy_root();
+#endif
+#ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
+    check_point_near_distance();
 #endif
     puts("sc64 route keep-fields: ok");
     return 0;
