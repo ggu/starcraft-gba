@@ -67,3 +67,58 @@ The paired receipt SHA-256 is
 | --- | --- |
 | Standard P10 | `153d80f72c5184b745faf54f4c2edd1aa27805e427ea36aef1950a406c1ff14a` |
 | P10 terrain-cache preview | `04e703ad953a4fdb8cf3f5cdfd9ebaf6485d7611af580280ba794f650ece7f69` |
+
+## Contact and detection on the post-menu build
+
+The instrumented 958-update sample separates local contact work from
+routing. Contact and steering average 323,796 cycles per advancing
+update. Full contact masks account for 183,335 of those cycles. Point
+routing averages 24,099 cycles, direct routing averages 4,719, and the
+one new point field at tape call 8,347 costs 907,678 cycles. The deferred
+optical visibility pass averages 40,427 cycles within the 116,849-cycle
+detector refresh scope. These are nested measurements.
+
+Two changes reduce recurring work. A contact mask checks three endpoints
+on each axis and applies each result to the directions sharing it. The
+detector snapshot resolves metadata and source-owner masks once per
+source update. It reuses the same validated detector dimensions at each
+actor position. Ownership, power checks, optical sight, distance and
+refresh cadence keep their existing rules.
+
+The standard P10 control is release `82421976`. Each candidate used the
+same 1,000-call physical-button P7 window. All four replays matched the
+11 sampled worlds, complete indexed framebuffers and palettes, and all
+1,000 frame, screen, mode and advance classifications. Each advanced
+the simulation 958 times.
+
+| Build | Mean cycles | 95th percentile | Worst cycles |
+| --- | ---: | ---: | ---: |
+| Standard post-menu P10 | 2,073,302 | 2,388,348 | 2,689,507 |
+| Contact world bounds | 2,055,422 | 2,370,649 | 2,677,732 |
+| Detector snapshot | 2,029,382 | 2,325,930 | 2,693,637 |
+| Both changes | 2,011,436 | 2,307,879 | 2,681,419 |
+
+Together the changes reduce mean cost by 2.98%, from 8.09 to 8.34
+updates per second in this window. The combined normal Terran, Z10, P10
+and Showcase cartridges linked within the existing IWRAM and EWRAM guards.
+P10's detector source-tick function uses 3,144 bytes in its own stack
+frame, up from 1,888. This is a compiled frame size. Hardware stack
+high-water and the 30 fps gameplay target remain open.
+
+The detector differential matched the reference for 240 worlds of 420
+updates on P10 and 80 worlds of 420 updates on each of the plain P7,
+rectangle-enabled P7 and Showcase configurations. The contact fixture
+compared all eight direction bits with a scalar reference at 4,860
+rectangular-map cases, including off-map origins and nonpositive steps.
+The exact-shared contact and memo tests also passed.
+
+An earlier memo-miss shortcut reduced mean cost by about 0.55% against
+the pre-menu control. It remains a separate experiment. Its result does
+not enter the combined comparison.
+
+| Paired record | SHA-256 |
+| --- | --- |
+| Contact world bounds | `11c501152303972ceeed8edf96083100414edf08fc7046613c074a439a52b508` |
+| Detector snapshot | `23107fda9ea033dd2352689d1a716dfbe5ecdb0f5f84bd051b23762f8cabc9fa` |
+| Contact and detector combined | `be44765f3f4c9f10c79fcc8559aef765602c379146df6b931b9825ca62764489` |
+| Earlier contact memo miss | `4c932b5c80c258faad5c7f710152b70777dfb270ac1f02c3970ea15f6f4168ea` |

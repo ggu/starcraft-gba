@@ -261,12 +261,19 @@ static const s8 sc64_contact_dy[8] = {0,1,1,1,0,-1,-1,-1};
 static unsigned __attribute__((noinline))
 sc64_contact_bounds_mask(const Unit *q, int speed)
 {
+    unsigned x = (unsigned)q->x, y = (unsigned)q->y;
+    unsigned step = (unsigned)speed;
+    unsigned width = (unsigned)WORLD_W, height = (unsigned)WORLD_H;
     unsigned mask = 0;
-    int k;
-    for (k = 0; k < 8; ++k) {
-        int sx = q->x + sc64_contact_dx[k] * speed, sy = q->y + sc64_contact_dy[k] * speed;
-        if (sx < 0 || sy < 0 || sx >= WORLD_W || sy >= WORLD_H) mask |= 1u << k;
-    }
+
+    /* Each axis has three endpoints shared by the directions above.
+     * An unsigned range check excludes negative endpoints as well. */
+    if (x + step >= width) mask |= 0x83u;
+    if (x >= width)        mask |= 0x44u;
+    if (x - step >= width) mask |= 0x38u;
+    if (y + step >= height) mask |= 0x0eu;
+    if (y >= height)        mask |= 0x11u;
+    if (y - step >= height) mask |= 0xe0u;
     return mask;
 }
 

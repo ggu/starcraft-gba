@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Exhaustive pure-math fixture for the optional ROM geometry kernel. This
+/* Pure-math fixture for world bounds and the optional ROM geometry kernel. This
  * compiles the real contact header with minimal context for unrelated game
  * paths; it does not test full game.c integration. The arithmetic fallback
  * under test is the implementation in sc64_contact.h, not a copied oracle. */
@@ -15,9 +15,9 @@ typedef struct Unit {
 typedef struct Sc64StockUnitProfile { unsigned top_speed_q10; } Sc64StockUnitProfile;
 
 #define MAP_COLS 64
-#define MAP_ROWS 64
-#define WORLD_W 1024
-#define WORLD_H 1024
+#define MAP_ROWS 96
+#define WORLD_W (MAP_COLS * 16)
+#define WORLD_H (MAP_ROWS * 16)
 #define U_CHRYSALIS 255
 #define ORDER_MINE 1
 #define ORDER_GAS 2
@@ -51,6 +51,34 @@ static int sc64_unit_bucket_step_clear_reference(const Unit *q, int x, int y, in
 #ifndef SC64_CONTACT_MASK_TABLE
 #error "Compile this fixture with SC64_CONTACT_MASK_TABLE"
 #endif
+
+static void
+check_world_bounds(void)
+{
+    const int speeds[] = {-WORLD_H, -WORLD_W, -255, -15, -14, -2, -1, 0,
+                         1, 2, 14, 15, 255, WORLD_W, WORLD_H};
+    for (unsigned si = 0; si < sizeof(speeds) / sizeof(speeds[0]); ++si) {
+        int speed = speeds[si];
+        /* Test both sides of every endpoint transition, including when the
+         * origin is outside but a nonzero step can enter the map. */
+        const int x_limits[] = {-speed, 0, speed, WORLD_W - speed, WORLD_W, WORLD_W + speed};
+        const int y_limits[] = {-speed, 0, speed, WORLD_H - speed, WORLD_H, WORLD_H + speed};
+        for (unsigned xi = 0; xi < sizeof(x_limits) / sizeof(x_limits[0]); ++xi)
+            for (unsigned yi = 0; yi < sizeof(y_limits) / sizeof(y_limits[0]); ++yi)
+                for (int dx = -1; dx <= 1; ++dx)
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        Unit q = {.x = x_limits[xi] + dx, .y = y_limits[yi] + dy};
+                        unsigned want = 0;
+                        for (int k = 0; k < 8; ++k) {
+                            int x = q.x + sc64_contact_dx[k] * speed;
+                            int y = q.y + sc64_contact_dy[k] * speed;
+                            if (x < 0 || x >= WORLD_W || y < 0 || y >= WORLD_H)
+                                want |= 1u << k;
+                        }
+                        assert(sc64_contact_bounds_mask(&q, speed) == want);
+                    }
+    }
+}
 
 static void
 check_full_table(void)
@@ -107,12 +135,13 @@ check_fallback_domain(void)
 int
 main(void)
 {
+    check_world_bounds();
     check_full_table();
     check_fallback_domain();
     /* With zero stock speed every offset coincides; a deep overlap blocks
      * every direction, while a separated actor blocks none. */
     assert(sc64_contact_mask_apply_geometry(0,19,0,0,0) == 0xffu);
     assert(sc64_contact_mask_apply_geometry(0,19,0,20,0) == 0u);
-    puts("contact mask math: exhaustive table and fallback domains PASS");
+    puts("contact mask math: world bounds, exhaustive table and fallback domains PASS");
     return 0;
 }

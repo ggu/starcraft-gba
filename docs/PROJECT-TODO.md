@@ -434,7 +434,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   separate qualification. The [ordinary-profile Blood Bath preview](audits/2026-11-12-skirmish-seat-options.md#ordinary-four-profile-blood-bath-preview)
   matches the last-open CPU edit and passes 24 physical same-build checks
   and 20 cross-build checks. The old ROMs reject Melee saves as intended.
-  Keep the flag off while full matches and native elimination are open.
+  The [November 18 Terran terminal pair](audits/2026-11-12-skirmish-seat-options.md#current-terran-arm-terminal-and-save-checks)
+  reaches identical defeats from HOME and fresh SRAM within each mode. Two
+  human survivors keep their owner on GBA. Keep the flag off while active
+  human wins, terminal checks on the other products and native elimination
+  are open.
   The [native T1 fresh-load witness](audits/2026-11-13-n64-t1-save-selection.md)
   clears the selected Command Center, consistent with the normal GBA
   selection reset; native Z7 remains untested.
@@ -1410,6 +1414,12 @@ save/source-owner and timing evidence; do not advertise unwired components.
   Both builds also won the carried P7 mission from HOME at frame 55,892
   with 59 matching named checkpoints. Prioritize exact improvements in
   movement and Arbiter work in the campaign builds.
+- [Post-menu contact and detection changes](audits/2026-11-18-p7-current-mgba.md#contact-and-detection-on-the-post-menu-build)
+  reduce mean P7 cost from 2.073M to 2.011M cycles with matching sampled
+  worlds and display. Normal Terran, Z10, P10 and Showcase links pass the
+  existing memory guards. Full contact masks still merit attention, and
+  the isolated 908,000-cycle point-field fill needs separate tail work.
+  Keep physical GBA timing and peak-stack checks open.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals
