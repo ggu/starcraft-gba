@@ -333,6 +333,40 @@ static inline int sc64_route_gate(int slot, int origin, int goal)
 static void sc64_range_route_reset(void);
 static int sc64_range_route_usable_slots(void);
 #endif
+#if defined(SC64_FACILITY_FRONTIERS_PROBE) && defined(SC64_DEPOT_BOUNDED) && \
+    defined(SC64_ROUTE_ACTIVE_STRIDE) && defined(SC64_GRID_SET) && \
+    !defined(SC64_ROUTE_FACILITY_FIFO_PROBE) && !defined(SC64_ROUTE_POINT_TAIL_PROBE) && \
+    SC64_ROUTE_GRID_CELLS_PER_BYTE == 8
+#define SC64_FACILITY_FRONTIERS 1
+enum { SC64_FACILITY_FRONTIER_SIDE = 64, SC64_FACILITY_FRONTIER_CAPACITY = 128,
+       SC64_FACILITY_FRONTIER_COUNT = 4 };
+typedef struct __attribute__((__may_alias__)) {
+    const u8 *field;
+    u16 key, count, discovered;
+    u16 center_x, center_y;
+    short x0, x1, y0, y1;
+    _Alignas(4) u16 pending[SC64_FACILITY_FRONTIER_CAPACITY];
+    u8 available[SC64_FACILITY_FRONTIER_SIDE * SC64_FACILITY_FRONTIER_SIDE / 8];
+} Sc64FacilityFrontier;
+static Sc64FacilityFrontier *sc64_facility_frontiers;
+static u8 sc64_facility_frontier_next;
+
+static void sc64_facility_frontiers_reset(void)
+{
+    if (!sc64_facility_frontiers) return;
+    for (unsigned i = 0; i < SC64_FACILITY_FRONTIER_COUNT; ++i)
+        sc64_facility_frontiers[i].count = 0;
+    sc64_facility_frontier_next = 0;
+}
+#define SC64_UPDATE_ORDERS() do { \
+    sc64_facility_frontiers_begin(); \
+    update_orders(); \
+    sc64_facility_frontiers = 0; \
+} while (0)
+#else
+#define sc64_facility_frontiers_reset() ((void)0)
+#define SC64_UPDATE_ORDERS() update_orders()
+#endif
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* Rebind field bases after map-shape changes. Return false for invalid or
  * oversized geometry before any route-grid access can use these fields. */
@@ -354,6 +388,7 @@ static int sc64_route_configure(void)
             sc64_route_pcount = 0;
             for (i = 0; i < SC64_ROUTE_SLOTS; ++i) sc64_route_field[i] = 0;
             memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+            sc64_facility_frontiers_reset();
 #ifdef SC64_ROUTE_DECAY_FREQ
             memset(sc64_route_age, 0, sizeof(sc64_route_age));
             sc64_route_clock = 0;
@@ -397,6 +432,7 @@ static int sc64_route_configure(void)
     for (i = 0; i < SC64_ROUTE_PHYS_MAX; ++i)
         sc64_route_pf_owner[i] = i < SC64_ROUTE_SLOTS ? (u8)i : 0xff;
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+    sc64_facility_frontiers_reset();
 #ifdef SC64_ROUTE_DECAY_FREQ
     memset(sc64_route_age, 0, sizeof(sc64_route_age));
     sc64_route_clock = 0;
@@ -542,6 +578,7 @@ sc64_routes_reset(void)
     (void)sc64_route_configure();
 #endif
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+    sc64_facility_frontiers_reset();
     SC64_ROUTE_POINT_TAIL_RELEASE();
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
     sc64_route_point_saved = -1;
@@ -2831,6 +2868,81 @@ sc64_route_fill_facility_fifo(u8 *field, int center_x, int center_y,
 }
 #endif
 
+#ifdef SC64_FACILITY_FRONTIERS
+/* Share the queue's upper scratch with saves. Frontiers exist only during
+ * update_orders. Keep the prior walkability grid and every 64x64 flood's
+ * queue and padded grid outside this slice. */
+static void sc64_facility_frontiers_begin(void)
+{
+    enum { side = SC64_FACILITY_FRONTIER_SIDE, stride = side + 8,
+           frontier_bytes = SC64_FACILITY_FRONTIER_COUNT * sizeof(Sc64FacilityFrontier),
+           alignment = _Alignof(Sc64FacilityFrontier),
+#ifdef SC64_ROUTE_LINEAR_QUEUE_CAP
+           queue_cells = (SC64_ROUTE_LINEAR_QUEUE_CAP > side * side ?
+                          SC64_ROUTE_LINEAR_QUEUE_CAP : side * side),
+#else
+           queue_cells = side * side,
+#endif
+           flood_bytes = queue_cells * sizeof(u16) + 3 + (side + 2) * stride };
+    const size_t reserved = sizeof(path_walkable) + frontier_bytes;
+    if (MAP_COLS != side || MAP_ROWS != side ||
+        sizeof(bfs_queue) < reserved + alignment - 1u + flood_bytes) return;
+    uintptr_t end = (uintptr_t)(void *)bfs_queue + sizeof(bfs_queue);
+    sc64_facility_frontiers = (Sc64FacilityFrontier *)(void *)
+        ((end - reserved) & ~(uintptr_t)(alignment - 1u));
+    sc64_facility_frontiers_reset();
+}
+
+/* A partial field is the prefix of the deterministic facility flood.
+ * An undiscovered origin can only stop it after that prefix. Keep the
+ * pending cells in pop order and the remaining walkable bits together. */
+static Sc64FacilityFrontier *sc64_facility_frontier(int slot, int partial_slot,
+                                                    u16 key, int cx, int cy,
+                                                    int x0, int x1, int y0, int y1)
+{
+    Sc64FacilityFrontier *spare = 0;
+    for (unsigned i = 0; i < SC64_FACILITY_FRONTIER_COUNT; ++i) {
+        Sc64FacilityFrontier *p = &sc64_facility_frontiers[i];
+        if (p->count && p->key == key) {
+            if (slot != partial_slot || p->field != sc64_route_field[slot] ||
+                p->center_x != cx || p->center_y != cy ||
+                p->x0 != x0 || p->x1 != x1 || p->y0 != y0 || p->y1 != y1)
+                p->count = 0;
+            return p;
+        }
+        if (!p->count) spare = p;
+    }
+    if (!spare) {
+        spare = &sc64_facility_frontiers[sc64_facility_frontier_next];
+        sc64_facility_frontier_next = (sc64_facility_frontier_next + 1u) % SC64_FACILITY_FRONTIER_COUNT;
+        spare->count = 0;
+    }
+    return spare;
+}
+
+static void sc64_facility_frontier_park(Sc64FacilityFrontier *p, const u8 *field,
+                                        u16 key, int cx, int cy, int x0, int x1,
+                                        int y0, int y1, int head, int tail, int total)
+{
+    int pending = tail - head;
+    if (pending <= 0 || pending > SC64_FACILITY_FRONTIER_CAPACITY) {
+        p->count = 0;
+        return;
+    }
+    p->field = field;
+    p->key = key;
+    p->center_x = (u16)cx;
+    p->center_y = (u16)cy;
+    p->x0 = (short)x0;
+    p->x1 = (short)x1;
+    p->y0 = (short)y0;
+    p->y1 = (short)y1;
+    p->count = (u16)pending;
+    p->discovered = (u16)total;
+    memcpy(p->pending, bfs_queue + head, (size_t)pending * sizeof(*bfs_queue));
+}
+#endif
+
 /* Depot fields use a separate key namespace and all reachable deposit cells
  * as roots. A depot moving, being removed or reusing its slot must invalidate
  * the route cache. The existing topology/load invalidation owns that contract.
@@ -2848,6 +2960,15 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
     int x0, x1, y0, y1, col, row;
     int partial_slot=-1, complete=1;
     u16 key;
+#ifdef SC64_FACILITY_FRONTIERS
+    Sc64FacilityFrontier *frontier = 0;
+    u8 *facility_walkable = path_walkable;
+    const u8 *origin_byte;
+    unsigned origin_mask;
+    int previous_pops = 0;
+#else
+#define facility_walkable path_walkable
+#endif
 #ifndef SC64_RACES
     u16 *field;
 #endif
@@ -2914,7 +3035,7 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
     }
     if (partial_slot>=0) slot=partial_slot;
     if (slot < 0) return -1;
-#ifdef SC64_ROUTE_ACTIVE_STRIDE
+#if defined(SC64_ROUTE_ACTIVE_STRIDE) && !defined(SC64_FACILITY_FRONTIERS)
     sc64_route_take_scratch(slot);
 #endif
 #ifdef SC64_RANGE_WORK
@@ -2938,6 +3059,36 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
         x1 = (center_x + 32) / 16; if (x1 >= MAP_COLS) x1 = MAP_COLS - 1;
         y1 = (center_y + 32) / 16; if (y1 >= MAP_ROWS) y1 = MAP_ROWS - 1;
     }
+#ifdef SC64_FACILITY_FRONTIERS
+    if (sc64_facility_frontiers && MAP_COLS == SC64_FACILITY_FRONTIER_SIDE &&
+        MAP_ROWS == SC64_FACILITY_FRONTIER_SIDE) {
+        frontier = sc64_facility_frontier(slot, partial_slot, key, center_x, center_y, x0, x1, y0, y1);
+        facility_walkable = frontier->available;
+    }
+    sc64_route_take_scratch(slot);
+    origin_byte = facility_walkable + (origin < 0 ? 0 : (unsigned)origin / 8u);
+    origin_mask = origin < 0 ? 0 : 1u << ((unsigned)origin % 8u);
+    if (frontier) {
+        if (frontier->count) {
+            if (frontier->field != sc64_route_field[slot]) {
+#ifdef SC64_RANGE_WORK
+                sc64_range_copy_bytes(sc64_route_field[slot], frontier->field, sc64_route_active_bytes);
+#else
+                memcpy(sc64_route_field[slot], frontier->field, sc64_route_active_bytes);
+#endif
+            }
+            tail = frontier->count;
+            previous_pops = frontier->discovered - tail;
+            memcpy(bfs_queue, frontier->pending, (size_t)tail * sizeof(*bfs_queue));
+        } else {
+#ifdef SC64_RANGE_WORK
+            sc64_range_copy_bytes(facility_walkable, path_walkable, sizeof(frontier->available));
+#else
+            memcpy(facility_walkable, path_walkable, sizeof(frontier->available));
+#endif
+        }
+    }
+#endif
 #ifdef SC64_ROUTE_FACILITY_FIFO_PROBE
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     int perimeter = edges != 0;
@@ -2954,6 +3105,12 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
     }
 #endif
     SC64_ROUTE_POINT_TAIL_RELEASE();
+#ifdef SC64_ROUTE_NEW_CELL
+    u8 *new_field = sc64_route_field[slot];
+#endif
+#ifdef SC64_FACILITY_FRONTIERS
+    if (tail) goto facility_expand;
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
@@ -2970,12 +3127,6 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
     field = sc64_route_field[slot];
     memset(field, 255, MAP_CELLS * sizeof(*field));
 #endif
-#ifdef SC64_ROUTE_NEW_CELL
-    /* Every depot rebuild clears the field above, including re-created
-     * partial fields. Seed cells use the generic writer; newly discovered
-     * neighbors are visited once while the walkability bit is borrowed. */
-    u8 *new_field = sc64_route_field[slot];
-#endif
     for (row = y0; row <= y1; ++row) for (col = x0; col <= x1; ++col) {
         int cell, px, py;
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
@@ -2986,7 +3137,7 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
         }
 #endif
         cell = col + row * MAP_COLS;
-        if (!SC64_GRID_GET(path_walkable, cell)) continue;
+        if (!SC64_GRID_GET(facility_walkable, cell)) continue;
         if (
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
             !edges &&
@@ -2995,16 +3146,25 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
 #ifdef SC64_RACES
         sc64_route_put(slot, cell, 0);
 #ifdef SC64_GRID_SET
-        SC64_GRID_SET(path_walkable, cell, 0);
+        SC64_GRID_SET(facility_walkable, cell, 0);
 #endif
 #else
         field[cell] = 0;
 #endif
         bfs_queue[tail++] = (u16)cell;
     }
+#ifdef SC64_FACILITY_FRONTIERS
+facility_expand:
+#endif
     while (head < tail) {
 #ifdef SC64_DEPOT_BOUNDED
+#ifdef SC64_FACILITY_FRONTIERS
+        /* The origin was walkable at entry. A seed or discovery clears
+         * its bit at the same point it assigns the first direction. */
+        if ((*origin_byte & origin_mask) != origin_mask) {
+#else
         if (origin>=0 && sc64_route_get(slot,origin)!=SC64_ROUTE_UNREACHABLE) {
+#endif
             complete=0; break;
         }
 #endif
@@ -3026,9 +3186,9 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
 #endif
 #define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
-            if (SC64_GRID_GET(path_walkable, next)) { \
+            if (SC64_GRID_GET(facility_walkable, next)) { \
                 SC64_ROUTE_DEPOT_PUT(next, direction); bfs_queue[tail++] = (u16)next; \
-                SC64_GRID_SET(path_walkable, next, 0); } }
+                SC64_GRID_SET(facility_walkable, next, 0); } }
 #else
 #define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
@@ -3050,6 +3210,13 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
 #undef SC64_ROUTE_DEPOT_PUT
 #endif
     }
+#ifdef SC64_FACILITY_FRONTIERS
+    if (frontier) {
+        sc64_facility_frontier_park(frontier, sc64_route_field[slot], key, center_x, center_y,
+                                    x0, x1, y0, y1, head, tail, previous_pops + tail);
+        tail += previous_pops;
+    } else
+#endif
 #if defined(SC64_RACES) && defined(SC64_GRID_SET)
     for (i=0;i<tail;++i) SC64_GRID_SET(path_walkable,bfs_queue[i],1);
 #endif
@@ -3066,6 +3233,9 @@ facility_finished:
     sc64_route_builds++;
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     sc64_route_probe_host_flood((unsigned)tail);
+#endif
+#ifndef SC64_FACILITY_FRONTIERS
+#undef facility_walkable
 #endif
     return slot;
 }

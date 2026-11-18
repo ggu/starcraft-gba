@@ -3716,7 +3716,6 @@ is_traversable(int col, int row, int from_cell)
 
 #ifdef SC64_IMPORTED_MISSION
 #ifdef SC64_RANGE_WORK
-/* target_alive itself expects an in-range entity reference. */
 #define SC64_RANGE_TARGET_VALID(t) \
     ((unsigned)(t) < (unsigned)(MAX_UNITS + MAX_BUILDINGS) && target_alive(t))
 #endif
@@ -10754,7 +10753,11 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_sync_references();
 #endif
+#ifdef SC64_IMPORTED_MISSION
+    SC64_UPDATE_ORDERS();
+#else
     update_orders();
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_tick();
 #endif

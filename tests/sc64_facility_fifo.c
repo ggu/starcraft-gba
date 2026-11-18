@@ -164,6 +164,47 @@ static void run_map(int w, int h)
 #endif
 }
 
+#ifdef SC64_FACILITY_FRONTIERS
+static void check_interleaved_frontiers(void)
+{
+    const int center[] = { 8, 24, 40, 56 };
+    int slots[4];
+    fixture_cols = fixture_rows = 64;
+    sc64_routes_reset();
+    sc64_facility_frontiers_begin();
+    assert(sc64_facility_frontiers);
+    memset(path_walkable, 255, sizeof(path_walkable));
+    for (int i = 0; i < 4; ++i) {
+        int xy = center[i];
+        slots[i] = query(i, xy * 16 + 8, xy * 16 + 8, xy * 65, 0, -1, 0);
+        assert(sc64_route_valid[slots[i]] == 2);
+    }
+    unsigned retained = 0;
+    for (int i = 0; i < 4; ++i) retained += sc64_facility_frontiers[i].count != 0;
+    assert(retained == 4);
+    for (int distance = 3; distance <= 7; ++distance) {
+        for (int i = 0; i < 4; ++i) {
+            int xy = center[i];
+            query(i, xy * 16 + 8, xy * 16 + 8, xy * 65 + distance, 0, slots[i], 0);
+        }
+    }
+    for (int i = 0; i < 4; ++i) {
+        int xy = center[i];
+        query(i, xy * 16 + 8, xy * 16 + 8, -1, 0, slots[i], 0);
+        assert(sc64_route_valid[slots[i]] == 1);
+    }
+    sc64_routes_topology_changed();
+    for (int i = 0; i < 4; ++i) assert(!sc64_facility_frontiers[i].count);
+    SC64_GRID_SET(path_walkable, 8 * 65 + 2, 0);
+    query(0, 8 * 16 + 8, 8 * 16 + 8, 8 * 65 + 6, 0, -1, 0);
+    sc64_facility_frontiers = 0;
+    memset(bfs_queue, 0xa5, sizeof(bfs_queue));
+    sc64_facility_frontiers_begin();
+    for (int i = 0; i < 4; ++i) assert(!sc64_facility_frontiers[i].count);
+    sc64_facility_frontiers = 0;
+}
+#endif
+
 #ifdef SC64_ROUTE_LINEAR_WORD_PACK_PROBE
 static void check_pack_alignments(void)
 {
@@ -206,6 +247,9 @@ int main(void)
     run_map(128, 96);
     run_map(128, 128);
     run_map(80, 48);
+#ifdef SC64_FACILITY_FRONTIERS
+    check_interleaved_frontiers();
+#endif
     puts("facility FIFO matched packed bytes, validity, cache, grid, and diagnostics");
     return 0;
 }
