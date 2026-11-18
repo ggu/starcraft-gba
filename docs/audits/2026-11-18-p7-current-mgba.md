@@ -265,3 +265,116 @@ prototype stays local.
 | Pixel rotation comparison | `d3c115f25ad1778f6e4cfb9e8755ff90871d18b4182ec238adf566e5c2a72622` |
 | Collision shadow receipt | `06d8797f03cbb20623cc8f5f27746d3668a11b293dca7cddcf2ee53a1ce62aef` |
 | Detector owner-list comparison | `0e44158cf6850ee7786994038127af0c564145ca8775b0f5c7a1caa8aea7db75` |
+
+### Work inside the first collision lookup
+
+A diagnostic on the regular P10 vector at `3f19bcc5` matches the simulation,
+route and terrain decisions for all 1,000 input calls and all 11 world and
+display cuts. The diagnostic's counters add 2.52% to the mean advancing
+guest time. Counts below cover calls 8,021–9,019, between the boundary
+reads after calls 8,020 and 9,019.
+
+| Event | Count |
+| --- | ---: |
+| Uncached steering masks | 36,610 |
+| Ground movers at speed 1 | 23,379 |
+| Ground movers at speed 2 | 13,231 |
+| Bucket cells visited | 192,303 |
+| Empty bucket cells | 48,415 |
+| Actor nodes visited | 730,400 |
+| Mover self visits | 35,417 |
+| Wrong flight layer | 17,155 |
+| Outside the candidate's axis limit | 560,448 |
+| Geometry evaluations | 117,380 |
+| Masks ending with all eight directions blocked | 6,928 |
+
+All other instrumented rejection cases, including coincident actors and
+invalid or noncollidable type records, are zero in this window. About
+77% of nodes pass the other checks and fail the actor-specific axis limit.
+The measured misses favor a cheaper position and type read in the
+collision scan. Dense Z7 has a different rejection mix, with 44% of
+visited actors at the mover's exact coordinates in the earlier
+[Z7 experiment](2026-11-15-z7-contact-cost.md#exact-position-crowds-november-16).
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Collision scan classification trace | `c974921aa0ee41b01da11e4859c4f1edecf1eb4ba459f2e01a737aa6e88fa99d` |
+
+#### Packed nodes and deferred cache admission
+
+A packed-node experiment combines the next link, local coordinates and
+collision facts. Its live oracle checks 1,308,607 nodes across 87,497
+queries on P7 without a mismatch. The observer-off P7 pair matches all
+1,000 input calls and 11 world and display cuts. Against the normal release
+ROM, mean cycles increase 0.35% and p95 increases 0.34%. This layout stays
+experimental.
+
+The deferred-admission change computes the same steering mask and keeps
+the original direction loop and terrain checks. When steering moves the
+unit, the answer for its old position is immediately invalidated. When
+steering leaves the unit in place, a fresh result may enter the existing
+cache. With an empty cache, lookup also skips the eligibility pass until an
+answer needs admission. The asset-free sanitizer tests cover both legacy
+and persistent bucket implementations, a same-cell move, and reuse of a
+stopped mover's answer. Use `CANONICAL_CONTACT_DEFER_STEERING=0` for the
+control path.
+
+| Replay | Control mean | Candidate mean | Control p95 | Candidate p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Busy P7, 958 advancing calls | 1,901,686 | 1,883,235 | 2,197,484 | 2,179,910 |
+| Regular Z10 Blood Bath, three CPUs | 805,680 | 802,552 | 1,049,139 | 1,044,789 |
+| Dense carried Z7, 477 advancing calls | 2,515,275 | 2,511,018 | 3,975,511 | 3,979,392 |
+
+The paired P7 run matches the 11 world, fog, palette and display cuts,
+plus the simulation, route and terrain timelines. Blood Bath matches all
+25 world, route, palette, arena and video cuts and the final SRAM after the
+usual pause save. A fresh title load continues to the same world.
+
+The dense Z7 pair starts each regular Z10 ROM at HOME and takes the
+same ordinary input tape through call 48,237. Both match all 131 named
+checkpoints and every frame and route counter in the 480-call sample.
+Nine samples match the raw unit, building and mineral banks, display
+control, palette, and the two 240×160 framebuffers. There are 236–237
+live units at the window endpoints. Mean cost falls by 0.17%, p95 rises
+by 0.10%, and the peak stays within 14 cycles.
+
+The full P7 route from HOME reaches victory on both ROMs at frame
+55,892. The 59 named checkpoints, 11 briefing acknowledgments, and 10
+dialogue acknowledgments match across 57,678 input updates. Whole-loop
+cost, including menu and presentation time, falls from 2,040,429 to
+2,019,915 cycles on average (1.01%). That is 8.31 emulated updates per
+second over this route.
+
+The regular Terran, Z10, P10 and Showcase recipes reproduce the measured
+ROMs byte for byte and pass their unchanged RAM guards. The six older
+Z7–Z9 and P7–P9 recipes also link within those guards. Ordinary buttons
+launch all 30 campaign entries and 72 skirmish setups across both maps,
+three player races, and one to three CPUs. Four paired custom saves
+match byte for byte and load in both directions between releases, with
+matching post-load play. The standalone source build and asset-free test
+suite pass locally, including 1,161 Python cases with 35 optional skips.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Packed node P7 pair | `c00f28caad719e96e464ffd28004bee930f00c25b4a3993e2759aef6b0904987` |
+| Packed node live oracle | `a07363d27bd29cc50b43d1a36cef2485caf5e0c7680faed947b67897a52a608b` |
+| Deferred mask P7 replay | `3d21edd770c8da174fff431165dbc74ad23c16dcc9e79d25d81982de6636ae51` |
+| Deferred mask Z10 Blood Bath replay | `5b6e3d08e2984d9e3091f6073734b2ea646413eea80576c16b59d38378aff85c` |
+| Deferred mask dense Z7 replay | `5d65bf42d374e5cd7db0edbc1c2eb49e71098b337bc1f29cfe3cef914285bc5a` |
+| Deferred mask full P7 victory | `238164016b75ce7fb70a4129b480f9f13db6837ec3f0a5da6a120e31fec62e29` |
+| Physical launch matrix | `f8644030ebaa75ae0ea73e128b591e09757f1b6367c5bd96da5cf44bf7e86922` |
+| Bidirectional save matrix | `d4028523e6fff80e9f67908805ba38c415a7721265b314d296f0c7ce42d90d3d` |
+
+#### Diagonal fog strip paint
+
+An opt-in probe shares the fog masks and paints the overlap once when
+two exposed strips intersect a blended tile. The host pixel oracle
+passes 19,683 cold signatures and 7,448 restored-strip cases, with
+scene clipping on and off. Seven existing terrain checks also pass.
+Against the deferred-admission P7 build, the probe matches all 11
+world and display samples and all 1,000 timeline classifications. The
+475 diagonal restores average 238,449 background cycles, down 316.
+Mean total cost drops 103 cycles and peak rises 6,604. Leave this
+probe local and focus on larger route and paint costs.
+
+- Paired diagonal strip receipt SHA-256 `07957ef791fe9424a10d9630ed27f92bd73145d24aa8cb9bddf308257d2a7a6b`.

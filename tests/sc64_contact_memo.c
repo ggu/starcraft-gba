@@ -171,8 +171,35 @@ static void test_stacked_masks(void)
     p6=0;
 }
 
+#ifdef SC64_CONTACT_DEFER_STEERING_MEMO
+static void test_deferred_steering_admission(void)
+{
+    int fresh;
+    clear_world(); setunit(0,80,80,U_MARINE,1); setunit(1,86,80,U_MARINE,1);
+    sc64_unit_buckets_begin();
+    unsigned mask = SC64_STEER_MASK(&u[0],2,&fresh);
+    same(mask,uncached(&u[0],2));
+    assert(fresh && !sc64_contact_memo_count && (mask & 1u));
+    SC64_STEER_REMEMBER(&u[0],2,mask,4,fresh);
+    assert(!sc64_contact_memo_count);
+    u[0].x -= 2; sc64_unit_bucket_move(&u[0]);
+    mask = SC64_STEER_MASK(&u[0],2,&fresh);
+    same(mask,uncached(&u[0],2));
+    assert(fresh && !sc64_contact_memo_count);
+    SC64_STEER_REMEMBER(&u[0],2,mask,-1,fresh);
+    assert(sc64_contact_memo_count == 1);
+    same(SC64_STEER_MASK(&u[0],2,&fresh),mask);
+    assert(!fresh);
+    sc64_unit_buckets_end();
+    assert(!sc64_contact_memo_count);
+}
+#endif
+
 int main(void)
 {
     test_geometry_and_key(); test_self_exclusion_and_lru(); test_eligibility_and_invalidation(); test_stacked_masks();
+#ifdef SC64_CONTACT_DEFER_STEERING_MEMO
+    test_deferred_steering_admission();
+#endif
     puts("contact memo contract: ok"); return 0;
 }
