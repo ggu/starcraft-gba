@@ -12,15 +12,16 @@
 
 #include "sc64_zerg_late_triggers.h"
 #include "sc64_z8_state.h" /* sc64_z8_rect_is_source() */
+#include "sc64_unit_index.h"
 
 enum {
     /* One byte per instance: flags in the low nibble, cursor in the high. */
     SC64_ZL_SAVE_INSTANCES = 16,
     SC64_ZL_SAVE_MOVED_LOCATIONS = 2,
     SC64_ZL_AI_TOWNS = 3,
-    SC64_ZL_SAVE_AI_BYTES = 24,
-    SC64_ZL_NO_CARRIER = 0xff
+    SC64_ZL_SAVE_AI_BYTES = 24
 };
+#define SC64_ZL_NO_CARRIER SC64_UNIT_IX_NONE
 
 typedef struct {
     u32 frames, passes, elapsed_seconds, countdown;
@@ -30,7 +31,7 @@ typedef struct {
     u8 outcome[SC64_Z8_OWNER_LIMIT];
     u8 waiting_mask, pass_counter, second_counter;
     /* Unit slot of the Drone carrying the Khaydarin Crystal, or NO_CARRIER. */
-    u8 crystal_carrier;
+    Sc64UnitIx crystal_carrier;
     Sc64Z8Rect moved[SC64_ZL_SAVE_MOVED_LOCATIONS];
     /* Source wallets of the three scripted Protoss towns. */
     u16 ai_minerals[SC64_ZL_AI_TOWNS], ai_gas[SC64_ZL_AI_TOWNS];
@@ -38,8 +39,10 @@ typedef struct {
     u8 ai[SC64_ZL_SAVE_AI_BYTES];
 } Sc64ZlPersistentState;
 
+#if !SC64_UNIT_IX_WIDE
 _Static_assert(sizeof(Sc64ZlPersistentState) == 160,
                "late Zerg save state fits the shared Zerg payload");
+#endif
 
 /* MoveLocation destinations (group2) are the only locations whose rectangle
  * can differ from the source. Collect them in ascending location order. */

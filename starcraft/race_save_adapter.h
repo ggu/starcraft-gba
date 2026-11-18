@@ -214,6 +214,8 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
 #elif defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_SCARAB_NAMESPACE_STAGE) && !defined(SC64_GUARDIAN_COCOON_STAGE)
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     return sc64_p7_typed_unit_decode(out, &candidate->units[slot], world_width, world_height);
+#elif defined(SC64_ZP_UNIT_STREAM)
+    return sc64_zp_stream_decode(&candidate->units, slot, world_width, world_height, out);
 #elif defined(SC64_Z7_DERIVED_SAVE)
     return sc64_derived_unit_decode(out, &candidate->units[slot], world_width, world_height);
 #else
@@ -1220,6 +1222,11 @@ static int race_battery_save_encode_unit(RaceSave *candidate, unsigned slot,
     return sc64_p7_typed_unit_encode(&candidate->units[slot],q,ww,wh);
 #elif defined(SC64_Z7_DERIVED_SAVE)
     return sc64_derived_unit_encode(&candidate->units[slot],q,ww,wh);
+#elif defined(SC64_ZP_UNIT_STREAM)
+    /* Legacy shield-phase migration rewrites single rows; stream saves are
+     * never legacy, so a candidate that needs it is refused. */
+    (void)ww; (void)wh; (void)q;
+    return 0;
 #else
     return sc64_zp_unit_save_encode(&candidate->units[slot],q,ww,wh);
 #endif
@@ -1408,7 +1415,7 @@ static int race_bunker_save_reference(const RaceSave *candidate, const Unit *act
     if (actor->order==ORDER_TRANSPORTED &&
         (actor->selected || actor->x!=bunker.x || actor->y!=bunker.y ||
          actor->path_timer || actor->path_retry || actor->build < -1 ||
-         actor->build >= MAX_UNITS+MAX_BUILDINGS || actor->build > 239)) return 0;
+         actor->build >= MAX_UNITS+MAX_BUILDINGS || actor->build >= SC64_BUNKER_TARGET_CACHE_LIMIT)) return 0;
     return 1;
 }
 static int race_bunker_save_world_valid(const RaceSave *candidate, int width, int height SC64_GCTX_DECL)
@@ -2277,6 +2284,9 @@ static int race_save_game(void) {
             !race_scarab_zp_encode(&race_data,(unsigned)i,&wire,
                                    (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
     }
+#elif defined(SC64_ZP_UNIT_STREAM)
+    if(!sc64_zp_stream_encode(&race_data.units, u, (unsigned)(race_cols * 16),
+                              (unsigned)(race_rows * 16))) return 0;
 #else
     for(int i=0;i<MAX_UNITS;i++)
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
@@ -3137,6 +3147,9 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
     const int *v=race_data.state;
+#ifdef SC64_ZP_UNIT_STREAM
+    if (!sc64_zp_stream_canonical(&race_data.units)) return 0;
+#endif
 #ifdef SC64_SHARED_TRANSPORT
     if (!race_sk_transport_candidate_valid(&race_data)) return 0;
 #endif
@@ -5138,7 +5151,7 @@ static int race_load_game(void) {
     for(int i=0;i<MAX_UNITS;i++) {
         Unit decoded;
 #ifdef SC64_ZP_FULL_STORAGE
-#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+#if defined(SC64_P7_TYPED_COMPACT_ENABLED) || defined(SC64_ZP_UNIT_STREAM)
         if(!SC64_GUARD_DECODE(&race_data, (unsigned)i, (unsigned)(race_cols * 16), (unsigned)(race_rows * 16), &decoded)) return 0;
 #elif defined(SC64_Z7_DERIVED_SAVE)
         if(!SC64_GUARD_DECODE(&race_data, (unsigned)i,

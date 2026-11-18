@@ -162,7 +162,7 @@ static u32 race_zl_ai_minerals[SC64_ZL_AI_TOWNS], race_zl_ai_gas[SC64_ZL_AI_TOWN
 #define race_zl_view race_z8_view
 static u32 race_zl_human_minerals, race_zl_human_gas;
 static u8 race_zl_camera_release;
-static u8 race_zl_crystal_carrier = SC64_ZL_NO_CARRIER;
+static Sc64UnitIx race_zl_crystal_carrier = SC64_ZL_NO_CARRIER;
 static const Sc64RaceMap *race_zl_map;
 static const Sc64ZlMission *race_zl_mission;
 /* Source slot for products of the building currently completing a queue. */
@@ -759,7 +759,7 @@ static void race_zl_crystal_tick(void)
         if (d < best_d) { best = i; best_d = d; }
     }
     if (best >= 0) {
-        race_zl_crystal_carrier = (u8)best;
+        race_zl_crystal_carrier = (Sc64UnitIx)best;
         u[crystal].x = u[best].x;
         u[crystal].y = u[best].y;
         u[crystal].selected = 0;

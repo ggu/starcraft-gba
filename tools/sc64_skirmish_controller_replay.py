@@ -63,7 +63,7 @@ def _check_counts(counts: object, label: str) -> dict:
     _exact_keys(counts, {"owner", "race", "units", "buildings"}, label)
     _integer(counts["owner"], f"{label}.owner", 0, 4)
     _integer(counts["race"], f"{label}.race", 0, 2)
-    _integer(counts["units"], f"{label}.units", 0, 240)
+    _integer(counts["units"], f"{label}.units", 0, 1023)
     _integer(counts["buildings"], f"{label}.buildings", 0, 160)
     return counts
 
@@ -324,7 +324,7 @@ def bank_layout(elf: Path, sizes: dict[str, int]) -> dict:
             building_bytes % building_stride):
         raise RuntimeError("entity-bank symbol sizes do not agree with Unit/Building DWARF")
     unit_capacity, building_capacity = unit_bytes // unit_stride, building_bytes // building_stride
-    if not 1 <= unit_capacity <= 240 or not 1 <= building_capacity <= 160:
+    if not 1 <= unit_capacity <= 1023 or not 1 <= building_capacity <= 160:
         raise RuntimeError("entity-bank capacities exceed supported unified-race limits")
     if unit_stride not in (56, 96, 100, 108) or building_stride not in (48, 100, 112):
         raise RuntimeError(f"unsupported Unit/{building_name} layout {unit_stride}/{building_stride}")

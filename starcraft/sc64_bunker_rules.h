@@ -32,14 +32,21 @@ static inline int sc64_bunker_firing_raw(int raw)
     default: return 0;
     }
 }
+/* Passengers keep MAX_UNITS + Bunker slot in Unit.target. Save rows hold
+ * targets up to 511, or 1023 in profiles whose actors exceed 511. */
+#if defined(MAX_UNITS) && defined(MAX_BUILDINGS) && MAX_UNITS + MAX_BUILDINGS > 511
+#define SC64_BUNKER_ACTOR_LIMIT 1023
+#else
+#define SC64_BUNKER_ACTOR_LIMIT 511
+#endif
 static inline int sc64_bunker_target_encode(int units, int buildings, int slot)
 {
-    if (units<=0 || buildings<=0 || units+buildings>511 || slot<0 || slot>=buildings) return -1;
+    if (units<=0 || buildings<=0 || units+buildings>SC64_BUNKER_ACTOR_LIMIT || slot<0 || slot>=buildings) return -1;
     return units+slot;
 }
 static inline int sc64_bunker_target_decode(int units, int buildings, int target)
 {
-    if (units<=0 || buildings<=0 || units+buildings>511 || target<units || target>=units+buildings) return -1;
+    if (units<=0 || buildings<=0 || units+buildings>SC64_BUNKER_ACTOR_LIMIT || target<units || target>=units+buildings) return -1;
     return target-units;
 }
 #endif

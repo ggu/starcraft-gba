@@ -387,7 +387,17 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 
 #if defined(SC64_RACES)
 #if defined(SC64_ZP_FULL_STORAGE)
+/* SC64_ZP_UNIT_SLOTS sizes the unit table of a full-storage profile. Past
+ * 240 slots, saves store units as a delta-coded stream under their own
+ * tags (sc64_zp_unit_stream.h). */
+#ifdef SC64_ZP_UNIT_SLOTS
+#define MAX_UNITS SC64_ZP_UNIT_SLOTS
+#if SC64_ZP_UNIT_SLOTS > 240
+#define SC64_ZP_UNIT_STREAM 1
+#endif
+#else
 #define MAX_UNITS 240
+#endif
 #elif defined(SC64_ZP_CAMPAIGN_STORAGE) && SC64_CAMPAIGN_RACE == 2
 #define MAX_UNITS 240
 #elif defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
@@ -526,7 +536,11 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_Z10_RUNTIME)
+/* Large-table saves store units as a stream (sc64_zp_unit_stream.h); the
+ * race letter in the tag separates Zerg and Protoss. */
+#if defined(SC64_ZP_UNIT_STREAM)
+#define SC64_RACE_SAVE_GENERATION 113u
+#elif defined(SC64_Z10_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 49u
 #elif defined(SC64_Z9_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 48u
@@ -4930,7 +4944,7 @@ sc64_source_unit_vfx(Unit *q,int x1,int y1,int air)
     if(sc64_stock_attack_select(raw,air,&attack)) weapon=attack.weapon_id;
     else if(raw==83 && !air) weapon=82; /* Existing Reaver/Scarab adapter. */
     else return 0;
-    return sc64_source_emit(raw,(int)(q-u)+1,weapon,air,q->x,q->y,x1,y1);
+    return sc64_source_emit(raw,SC64_SOURCE_VFX_SLOT_TAG((int)(q-u)),weapon,air,q->x,q->y,x1,y1);
 }
 
 static int
@@ -5942,6 +5956,9 @@ check_imported_mission_outcome(void)
 }
 #endif
 
+#ifdef SC64_CROWD_PROBE
+static void sc64_crowd_probe_start(void);
+#endif
 void
 game_init(void)
 {
@@ -6039,6 +6056,9 @@ game_init(void)
 #ifdef SC64_TERRAN_LATE_PROBE_MISSION
     race_selected_mission = SC64_TERRAN_LATE_PROBE_MISSION;
     init_state();
+#endif
+#if defined(SC64_CROWD_PROBE) && !defined(SC64_CROWD_PROBE_MANUAL)
+    sc64_crowd_probe_start();
 #endif
 }
 
@@ -9043,6 +9063,7 @@ static inline int race_bc_order_dispatch_needed(const Unit *q,int slot,int recha
 }
 #endif
 
+#include "sc64_crowd_slice.h"
 #if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(GBA_HOST)
 static void __attribute__((noinline,long_call))
 #else
@@ -9081,11 +9102,13 @@ update_orders(void)
 #endif
     target_lists_valid = 0;
     for (i = 0; i < 5; ++i) target_unit_head[i] = target_building_head[i] = -1;
+    SC64_CROWD_SLICE_BEGIN();
     for (i = MAX_UNITS - 1; i >= 0; --i) if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_HIDDEN(&u[i])) {
         int owner = u[i].owner;
         if (owner < 0 || owner >= 5) goto target_lists_unavailable;
         target_unit_next[i] = target_unit_head[owner];
         target_unit_head[owner] = i;
+        SC64_CROWD_SLICE_COUNT();
     }
     for (i = MAX_BUILDINGS - 1; i >= 0; --i) if (b[i].alive) {
         int owner = b[i].owner;
@@ -9412,6 +9435,16 @@ target_lists_unavailable:
 
 	if (q->order == ORDER_ATTACK_MOVE) {
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
+#if SC64_UNIT_IX_WIDE
+            {
+                int far = SC64_PR_FAR_RANGE(q);
+                target = sc64_crowd_searches_now(i) ?
+                    nearest_enemy_typed(q->x,q->y,q->owner,far,
+                                        q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner)) :
+                    sc64_crowd_kept_target(q, far);
+                if (sc64_crowd_slicing) q->target = (s16)target;
+            }
+#else
             target = nearest_enemy_typed(q->x,q->y,q->owner,
 #ifdef SC64_RACES
                 SC64_PR_FAR_RANGE(q),
@@ -9419,6 +9452,7 @@ target_lists_unavailable:
                 64,
 #endif
                 q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
+#endif
             if (target >= 0) tick_combat(q, target);
             else if (dist2(q->x, q->y, q->tx, q->ty) > 36) move_toward(q, q->tx, q->ty);
             else q->order = ORDER_IDLE;
@@ -10117,6 +10151,9 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
 
 #ifdef SC64_SHOWCASE_ENABLED
 #include "sc64_showcase_adapter.h"
+#endif
+#ifdef SC64_CROWD_PROBE
+#include "sc64_crowd_probe.h"
 #endif
 #ifdef SC_COMMAND_RING
 #include "command_ring.h"
@@ -11175,7 +11212,7 @@ static const Sc64SpriteFrame *
 sc64_source_unit_attack_pose(const Unit *q)
 {
     int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
-    int slot=(int)(q-u)+1, newest=0x7fffffff;
+    int slot=SC64_SOURCE_VFX_SLOT_TAG((int)(q-u)), newest=0x7fffffff;
     const Sc64SpriteFrame *pose=0;
     if(!q->cd) return 0;
     for(int i=0;i<MAX_TRACERS;++i) {

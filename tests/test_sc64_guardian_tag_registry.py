@@ -9,6 +9,9 @@ import re
 import subprocess
 import unittest
 
+# Large unit tables save a unit stream (starcraft/sc64_zp_unit_stream.h) under
+# this generation; its tag byte (0x30 + 113) is above every historical one.
+LARGE_TABLE_GENERATION = 113
 FIXTURE = Path(__file__).with_name("sc64_guardian_tag_sources.json")
 SELECTORS = (0x80000000, 0x20000000, 0x01000000, 0x04000000, 0x08000000)
 GUARDIAN_XOR = 0x10000000
@@ -28,7 +31,7 @@ def catalog(definitions):
         _, name, expr = line.split(None, 2)
         if name == "SC64_RACE_SAVE_GENERATION":
             match = GEN.fullmatch(expr)
-            if not match or not 2 <= int(match[1]) <= 50:
+            if not match or not (2 <= int(match[1]) <= 50 or int(match[1]) == LARGE_TABLE_GENERATION):
                 raise AssertionError("unrecognized generation: " + line)
             gens.add(int(match[1]))
         elif name == "SC64_BASE_SAVE_VERSION":
@@ -36,7 +39,7 @@ def catalog(definitions):
             if not match:
                 raise AssertionError("unrecognized base arithmetic: " + line)
             base = int(match[1] or match[2], 16)
-            bases.update(base + n for n in range(2, 51)) if match[1] else bases.add(base)
+            bases.update(base + n for n in (*range(2, 51), LARGE_TABLE_GENERATION)) if match[1] else bases.add(base)
         else:
             if not EXPR.fullmatch(expr):
                 raise AssertionError("unrecognized selector arithmetic: " + line)
@@ -60,7 +63,8 @@ class GuardianTags(unittest.TestCase):
                 self.assertEqual(extract(data.decode()), record["definitions"])
         # Also fail closed if this checkout introduces unfamiliar expressions.
         b, g = catalog(extract(Path("starcraft/game.c").read_text()))
-        self.assertTrue(b <= bases and g <= gens, "current source extends fixture; refresh and re-audit")
+        self.assertTrue(b <= bases and g <= gens | {LARGE_TABLE_GENERATION},
+                        "current source extends fixture; refresh and re-audit")
         old = set()
         for base, bits in itertools.product(bases, itertools.product((False, True), repeat=len(SELECTORS))):
             value = base

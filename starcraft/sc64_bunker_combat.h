@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_BUNKER_COMBAT_H
 #define SC64_BUNKER_COMBAT_H
+
+/* A passenger caches its last target in Unit.build. Compact save codecs
+ * accept -2..239 there, so only targets below this limit are cached; a
+ * unit table larger than 240 slots caches every unit slot instead. */
+#define SC64_BUNKER_TARGET_CACHE_LIMIT (MAX_UNITS > 240 ? MAX_UNITS : 240)
 /* Included immediately after tick_combat. Coordinates use the existing GBA
  * center/footprint approximation; this is not N64 collision geometry. */
 static int __attribute__((noinline))
@@ -39,7 +44,7 @@ static void __attribute__((noinline)) race_bunker_fire_unit(int unit,int slot)
     int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
     if (!sc64_bunker_firing_raw(raw)) {q->build=-1;return;}
     int cached=q->build;
-    if (cached>=0 && cached<240 && race_bunker_target_in_range(q,cached,raw)) {
+    if (cached>=0 && cached<SC64_BUNKER_TARGET_CACHE_LIMIT && race_bunker_target_in_range(q,cached,raw)) {
         tick_combat(q,cached);return;
     }
     q->build=-1;
@@ -63,9 +68,9 @@ static void __attribute__((noinline)) race_bunker_fire_unit(int unit,int slot)
         best=target;best_distance=distance;
     }
     if (best<0) return;
-    /* P7's compact codec accepts only -2..239; larger building target IDs
-     * remain valid to fire at, but are deliberately reacquired each shot. */
-    if (best<240) q->build=best;
+    /* Larger target IDs remain valid to fire at, but are deliberately
+     * reacquired each shot. */
+    if (best<SC64_BUNKER_TARGET_CACHE_LIMIT) q->build=best;
     tick_combat(q,best);
 }
 #endif

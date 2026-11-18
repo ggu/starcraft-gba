@@ -45,7 +45,7 @@ _Static_assert(RACE_IMPACT_SAVE_CAPACITY >= 8 || RACE_IMPACT_SAVE_CAPACITY == RA
                "a save must hold at least eight pending impacts");
 #endif
 _Static_assert(MAX_UNITS + MAX_BUILDINGS <= SC64_IMPACT_TARGET_LIMIT,
-               "impact target references use nine bits");
+               "impact target references fit the packed target field");
 _Static_assert(SC_RU_COUNT <= SC64_IMPACT_TYPE_LIMIT,
                "impact source types use one byte below 64");
 

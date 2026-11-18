@@ -2,6 +2,7 @@
 #define SC64_T5_SCENARIO_ADAPTER_H
 
 #include "sc64_text_box_hook.h"
+#include "sc64_unit_index.h"
 
 #if defined(SC64_T5_RUNTIME) && defined(SC64_T4_RUNTIME) && \
     defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)
@@ -496,7 +497,7 @@ race_t5_create_action(Sc64T5RuntimeState *state, const Sc64T4Action *action,
 static int
 race_t5_move_action(const Sc64T4Action *action, unsigned trigger_owner)
 {
-    u8 slots[MAX_UNITS];
+    Sc64UnitIx slots[MAX_UNITS];
     u16 xs[MAX_UNITS], ys[MAX_UNITS];
     unsigned count = 0;
     Sc64T4QueryRect source, destination;
@@ -545,7 +546,7 @@ race_t5_move_action(const Sc64T4Action *action, unsigned trigger_owner)
                     for (unsigned j = 0; j < count; ++j)
                         if (dist2(x, y, xs[j], ys[j]) < 36) { apart = 0; break; }
                     if (!apart) continue;
-                    slots[count] = (u8)i; xs[count] = (u16)x; ys[count] = (u16)y;
+                    slots[count] = (Sc64UnitIx)i; xs[count] = (u16)x; ys[count] = (u16)y;
                     ++count; found = 1;
                 }
             }

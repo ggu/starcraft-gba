@@ -1,6 +1,15 @@
 #ifndef SC64_Z7_SAVE_H
 #define SC64_Z7_SAVE_H
 #include "sc64_save_decode_context.h"
+#include "sc64_unit_index.h"
+
+/* Per (owner, raw type) census of a candidate save. A byte holds every
+ * count while the unit table has fewer than 255 slots. */
+#if SC64_UNIT_IX_WIDE
+typedef u16 Sc64Z7CensusCount;
+#else
+typedef u8 Sc64Z7CensusCount;
+#endif
 
 /* Pure candidate validation for the seventh Zerg map.  This deliberately
  * authenticates the canonical imported map and decoded candidate rather than
@@ -262,12 +271,13 @@ race_z7_save_candidate_valid(const RaceSave *candidate,
     u8 unit_owner_meta[MAX_UNITS], unit_raw_meta[MAX_UNITS];
     u8 unit_type_meta[MAX_UNITS], unit_player_meta[MAX_UNITS];
     u8 unit_flags[MAX_UNITS];
-    u8 unit_counts[8][228]={{0}};
+    Sc64Z7CensusCount unit_counts[8][228]={{0}};
     unsigned live=0,queued=0,source_geysers=0,source_extractors=0;
     unsigned live_human_source_actors=0,live_enemy_source_buildings=0;
     unsigned live_enemy_ling_eggs=0;
     unsigned enemy_ling_bound;
-    _Static_assert(MAX_UNITS <= 255, "save census counters must fit u8");
+    _Static_assert(MAX_UNITS < (Sc64Z7CensusCount)~0u,
+                   "save census counters hold every unit slot");
 
     map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];
     for (unsigned row=0;row<map->unit_count;++row) {
@@ -334,7 +344,8 @@ race_z7_save_candidate_valid(const RaceSave *candidate,
         unit_type_meta[i]=saved.type>=0 && saved.type<255 ? (u8)saved.type : 255u;
         unit_player_meta[i]=saved.owner>=0 && saved.owner<255 ? (u8)saved.owner : 255u;
         if (unit_owner_meta[i]<8u && unit_raw_meta[i]<228u) {
-            if (unit_counts[unit_owner_meta[i]][unit_raw_meta[i]]==255u) return 0;
+            if (unit_counts[unit_owner_meta[i]][unit_raw_meta[i]]==
+                (Sc64Z7CensusCount)~0u) return 0;
             ++unit_counts[unit_owner_meta[i]][unit_raw_meta[i]];
         }
 #ifdef SC64_Z7_EGG_PRODUCTION
