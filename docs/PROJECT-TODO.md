@@ -1402,7 +1402,9 @@ save/source-owner and timing evidence; do not advertise unwired components.
   sampled world and display checkpoints match. Unit orders still take
   about 985,000 cycles per advancing update. Matched order diagnostics
   attribute 392,902 cycles to movement and 269,588 to Arbiter cache work.
-  Prioritize exact improvements in those paths in the campaign builds.
+  Both builds also won the carried P7 mission from HOME at frame 55,892
+  with 59 matching named checkpoints. Prioritize exact improvements in
+  movement and Arbiter work in the campaign builds.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals
