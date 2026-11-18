@@ -822,6 +822,61 @@ static void check_point_prefix_resume(void)
         assert(!sc64_point_prefixes[i].count);
     puts("point prefixes preserve exact FIFO, capacity fallback, logical residency and topology reset");
 }
+
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+static void check_point_prefix_tail_exchange(void)
+{
+    const int first = 32 + 32 * 128;
+    const int other = 64 + 64 * 128;
+    race_cols = race_rows = 128;
+    memset(desired, 1, sizeof(desired));
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    int slot = sc64_route_slot(first);
+    assert(slot >= 0);
+    for (int i = 1; i < SC64_ROUTE_SLOTS; ++i)
+        assert(sc64_route_slot(first + i) >= 0);
+
+    /* Preserve a completed victim and park the incoming prefix in the
+     * borrowed plane. A hit swaps the full field back into the slot. */
+    sc64_route_age[slot] = 0;
+    assert(sc64_route_slot_for(other, other + 1) == slot);
+    assert(sc64_route_point_saved == first && sc64_point_prefix_find(slot));
+    assert(sc64_route_field[slot] == sc64_route_point_plane);
+    u8 *saved = sc64_route_point_spare;
+    unsigned fills = keep_stat[KEEP_FILL], hits = keep_stat[KEEP_POINT_POINTER];
+    sc64_route_age[slot] = 0;
+    assert(sc64_route_slot(first) == slot);
+    assert(!sc64_point_prefix_find(slot) && sc64_route_point_saved < 0);
+    assert(sc64_route_field[slot] == saved && sc64_route_point_spare == sc64_route_point_plane);
+    assert(keep_stat[KEEP_FILL] == fills && keep_stat[KEEP_POINT_POINTER] == hits + 1);
+    reference_bfs(&oracle[POOL], first);
+    for (int i = 0; i < MAP_CELLS; ++i)
+        assert(sc64_route_get(slot, i) == oracle[POOL].dir[i]);
+
+    /* A miss can evict a parked prefix and preserve the complete tail.
+     * A full-queue user can then release the bound prefix's backing. */
+    sc64_route_age[slot] = 0;
+    assert(sc64_route_slot_for(other, other + 1) == slot);
+    assert(sc64_route_point_saved == first && sc64_point_prefix_find(slot));
+    assert(sc64_route_point_spare == saved);
+    sc64_route_age[slot] = 0;
+    assert(sc64_route_slot_for(other + 2, other + 3) == slot);
+    assert(sc64_route_point_saved == first && sc64_route_point_spare == saved);
+    assert(sc64_point_prefix_find(slot) && sc64_route_field[slot] == sc64_route_point_plane);
+    SC64_ROUTE_POINT_TAIL_RELEASE();
+    memset(sc64_route_point_plane, 0x53, SC64_ROUTE_POINT_BYTES);
+    assert(sc64_route_point_saved < 0 && sc64_route_field[slot] == saved);
+    assert(sc64_point_prefix_find(slot));
+    assert(SC64_ROUTE_REACHES(slot, MAP_CELLS - 1) && !sc64_point_prefix_find(slot));
+    reference_bfs(&oracle[POOL], other + 2);
+    for (int i = 0; i < MAP_CELLS; ++i)
+        assert(sc64_route_get(slot, i) == oracle[POOL].dir[i]);
+    check_grid_unchanged();
+    puts("completed tail exchange excludes parked prefix victims");
+}
+#endif
 #endif
 
 #ifdef SC64_ROUTE_KEEP_FIELDS
@@ -867,6 +922,9 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-prefix-only")) {
         check_point_prefix_resume();
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+        check_point_prefix_tail_exchange();
+#endif
         return 0;
     }
 #endif

@@ -103,9 +103,8 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #endif
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
 #if !defined(SC64_ROUTE_KEEP_FIELDS) || !defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || \
-    !defined(SC64_ROUTE_WORD_CLEAR) || !defined(SC64_ROUTE_NEW_CELL) || \
-    defined(SC64_ROUTE_POINT_POINTER_PROBE)
-#error "point prefix requires the exact linear packed route path without spare planes"
+    !defined(SC64_ROUTE_WORD_CLEAR) || !defined(SC64_ROUTE_NEW_CELL)
+#error "point prefix requires the exact linear packed route path"
 #endif
 #endif
 
@@ -2089,7 +2088,12 @@ fill_finished:
 /* Wide fixed-layout slots keep their own metadata. Rotate only backing
  * pointers on safe point misses; range scratch continues to use fixed
  * pool offsets. The parked plane contributes no logical residency. */
-static int __attribute__((noinline)) sc64_route_fill_point_pointer(int slot, int goal)
+static int __attribute__((noinline))
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+sc64_route_fill_point_pointer(int slot, int goal, int origin)
+#else
+sc64_route_fill_point_pointer(int slot, int goal)
+#endif
 {
     if (MAP_COLS == SC64_ROUTE_POINT_SIDE && MAP_ROWS == SC64_ROUTE_POINT_SIDE
 #ifdef SC64_RANGE_WORK
@@ -2097,6 +2101,9 @@ static int __attribute__((noinline)) sc64_route_fill_point_pointer(int slot, int
 #endif
     ) {
         const int victim = sc64_route_valid[slot] == 1 && !SC64_ROUTE_LAZY(slot) &&
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+            !sc64_point_prefix_find(slot) &&
+#endif
             sc64_route_goal[slot] < SC64_ROUTE_POINT_SIDE * SC64_ROUTE_POINT_SIDE ?
             sc64_route_goal[slot] : -1;
         const int hit = goal == sc64_route_point_saved;
@@ -2107,13 +2114,22 @@ static int __attribute__((noinline)) sc64_route_fill_point_pointer(int slot, int
             sc64_route_point_saved = victim;
         }
         if (hit) {
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+            /* The incoming field is complete. The displaced parked field
+             * has no tail key and no longer belongs to this logical slot. */
+            sc64_point_prefix_forget(slot);
+#endif
             SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
             SC64_ROUTE_PF(slot) = 0;
             SC64_ROUTE_KEEP_COUNT(POINT_POINTER);
             return 0;
         }
     }
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    return sc64_point_prefix_fill(slot, goal, origin);
+#else
     return sc64_route_fill(slot, goal);
+#endif
 }
 #endif
 
@@ -2261,7 +2277,9 @@ sc64_route_slot(int goal)
                 tail = sc64_route_fill(slot, goal);
             }
         } else {
-#ifdef SC64_ROUTE_POINT_POINTER_PROBE
+#if defined(SC64_ROUTE_POINT_POINTER_PROBE) && defined(SC64_ROUTE_POINT_PREFIX_PROBE)
+            tail = sc64_route_fill_point_pointer(slot, goal, origin);
+#elif defined(SC64_ROUTE_POINT_POINTER_PROBE)
             tail = sc64_route_fill_point_pointer(slot, goal);
 #elif defined(SC64_ROUTE_POINT_PREFIX_PROBE)
             tail = sc64_point_prefix_fill(slot, goal, origin);
