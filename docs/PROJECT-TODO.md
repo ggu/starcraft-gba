@@ -703,9 +703,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   starts, and eight cross-build custom SRAM continuations. An uncovered
   cached range read can still resume synchronously. Qualify dense ranged
   workloads and more campaign saves before enabling it. The [full Z9 replay](audits/2026-11-16-resumable-frontier-budget.md#full-z9-replay-and-campaign-saves)
-  wins on both builds, checks 32 historical checkpoints, and cuts full-replay
-  mean 1.32% and p95 7.84%. One retained Z9 campaign save now passes an
-  exact re-save and fresh cross-load in each direction.
+  wins on both builds with 32 historical checkpoints and 106 matching
+  state and display samples. Full-replay mean falls 1.32% and p95 falls
+  7.84%. Retained Z9 and P9 campaign saves pass exact re-saves and fresh
+  cross-loads in both directions, as does a fresh T9 opening journal. A
+  bounded FIFO read preserves the route in dense Z7 with no measurable
+  cycle savings. Count actual range-read hits before extending it.
   The packed second cutoff stays local.
   On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
@@ -1749,7 +1752,12 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    saves. Keep partial prototypes gated; source splash may increase Z10 danger.
 3. In parallel, re-profile current-source order/detection, movement and
    rendering, then reduce measured busy-loop cost with paired state/pixel and
-   gameplay checks. The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
+   gameplay checks. For the next movement pass, count actor visits a finer
+   boundary-bucket filter could skip before adding another index. The
+   [busy P7 scan](audits/2026-11-18-p7-current-mgba.md#work-inside-the-first-collision-lookup)
+   rejects 560,448 of 730,400 actor visits on distance. [Dense Z7](audits/2026-11-15-z7-contact-cost.md#exact-position-crowds-november-16)
+   has 44% coincident visits, so measure both before choosing a filter.
+   The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
    saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
    [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
    seven opt-in ROMs link and the Z10 stack canary leaves 8,948 bytes

@@ -466,6 +466,11 @@ shipping and opt-in builds across the four profiles. Both matrix receipts
 match the earlier component-only run. These checks cover startup and sampled
 custom saves. Campaign continuation needs longer input and save traces.
 
+With the opt-in disabled, all four rebuilds retain the shipping memory
+limits. Each ROM differs by four bytes. Disassembly shows the same two
+independent stack loads into `r4` and `r6` in reversed order in the linear
+flood. All other ROM bytes match the shipping build.
+
 - Combined distance-bound replay SHA-256 `c3c0177c98a6afd34b164798a855a243a597d4fb2dc7ced3cad9c252645c89ae`.
 - Combined busy P7 pair SHA-256 `52b3fde1c97ee0c115eda8967ca252d51e9ad2a40d68f87ab10ef29d04eb4a1f`.
 - Combined three-AI Blood Bath receipt SHA-256 `448fbb1b39db0e9e181877a924d198454159778e868a88fac40f0fbeff58c426`.
@@ -475,9 +480,12 @@ custom saves. Campaign continuation needs longer input and save traces.
 The current normal Z10 pair also plays the retained [Z9 controller tape](2026-11-13-z9-normal-physical.md)
 from a blank title screen. Each run takes 74,386 recorded controller calls
 and 74,398 emulator calls after six modal page acknowledgments. Both match
-the 32 historical checkpoints and win at campaign frame 72,628. The raw
-world and displayed frame match at the 46,500-call boundary and the result.
-The mission pointer in each ELF resolves to that ELF's Z9 descriptor.
+the 32 historical checkpoints and win at campaign frame 72,628 with no
+trigger faults. A second replay confirms all 106 sampled state and display
+hashes and the separate cut at physical call 46,500. The comparator verifies
+the relocated mission pointer against each ELF's Z9 descriptor and compares
+the resolved mission identity. Both finish with 6,612 route builds and
+233,939 hits.
 
 | Guest cycles | Shipping tail | Component and distance checks |
 | --- | ---: | ---: |
@@ -497,5 +505,31 @@ directions and reaches frame 6,849 with matching raw actor, building,
 resource and mission state. This qualifies that campaign checkpoint in
 addition to the custom-game matrix.
 
+A retained P9 campaign save also loads in both builds at frame 30,109.
+Each build writes the same journal at frame 30,709, and fresh loads in
+both directions continue to frame 30,889 with matching simulation state.
+Both builds launch T9 from a blank title screen and produce the same
+opening journal at frame 601. Fresh cross-loads continue to frame 781
+with matching simulation state.
+
 - Full timed Z9 receipt SHA-256 `5bfea9ac5c5b1f85e8c91ad905cede0a46e0c05c92e322e9ed3bfe142a7d2c69`.
+- Full normalized Z9 replay SHA-256 `1fe8979e0c1c42fca721066f830eb40fffd1f7a9e148b440e9c26cb0e54bace0`.
 - Z9 fresh campaign cross-load receipt SHA-256 `0ea1b4025ff52287655a4fcef0ab65c2e198b1be0be712cb325ee90136d91219`.
+- P9 fresh campaign cross-load receipt SHA-256 `ae946c4e5fb9f38648f0133ac0d6840a01b973299c98501467e112c857a276e2`.
+- T9 fresh campaign cross-load receipt SHA-256 `30de9534a6788c16558439c45eb28d6ea8aff793347e046bed29a1812b425303`.
+- Disabled configuration link comparison SHA-256 `17bff2280fada694646227b91aca19d0f5398dd77bf6f4b7f2de92cd3b30e393`.
+
+### Bounded read of a parked range route
+
+An uncovered open origin next to a pending FIFO cell gets its exact step
+from the first adjacent pending cell. A visited neighbor would have already
+discovered the origin, and later neighbors enter the FIFO after the pending
+cells. A local range-reader prototype uses this witness without updating the
+packed field. The host tests cover FIFO ties, blocked and covered origins, and
+a full scan of 128 entries. Distant reads retain the existing fallback.
+
+In dense Z7 the prototype matches all 131 checkpoints and the 480-call
+route and display comparison. It changes mean cost by 15 cycles and p95
+by 46 cycles across the 477 advancing calls relative to the combined opt-in
+build. Keep it local and count hits on a ranged-heavy workload before more
+qualification. Receipt SHA-256 `118a7c9708afb4d71394bbc0b4f7713f75a5a153f5684ec52e0a8062f22511df`.
