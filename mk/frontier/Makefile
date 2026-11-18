@@ -19,7 +19,7 @@ test-original-skirmish: build/test-original-skirmish-map build/test-original-ski
 	./build/test-original-skirmish-game
 test: test-original-skirmish
 
-# A cartridge fixes the human faction. Every cartridge includes all AI choices.
+# Each cartridge has its own defaults and saves. All faction choices are shared.
 define frontier_faction
 .PHONY: frontier-$(1)
 frontier-$(1): build/Frontier-$(2)-GBA.gba

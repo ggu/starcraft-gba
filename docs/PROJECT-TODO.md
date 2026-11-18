@@ -32,23 +32,24 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   profile the slowest simulation updates separately. Verify a complete
   ARM match on both maps.
 
-- **Frontier factions (P1):** three separate asset-free cartridges fix
-  the human faction while retaining the two maps, one to three opponents,
-  and independent CPU faction selection. Foundry Riflers, Rovers
-  Skimmers, and Bulwark Wardens have different weapon reach, damage,
-  cadence, movement, health, and silhouettes. The AI uses a faction's
-  worker and attack thresholds. All three currently share support units
-  and structures. All 18 cartridge, map, and opponent-count combinations
-  passed ordinary-input host and mGBA startup checks. The host cases
-  reached CPU production and the six three-CPU ARM cases saved at update
-  900, resumed in a fresh process, and restarted with the same setup.
-  Foundry also loaded the previous single-roster cartridge's SRAM at its
-  saved map. The 240-update ARM openings measured 19.76–20.79 updates
-  per second. In two normal-input ARM matches, a passive Foundry player
-  lost to Rovers on Transit Yard (game tick 5,584) and to Bulwark on
-  Stone Gardens (5,524). Human wins and hardware timings still need
-  verification. Add human faction selection within each skirmish cartridge
-  and distinct faction support units and production choices.
+- **Frontier factions (P1):** each of the three cartridges defaults to
+  its own faction. Skirmish setup offers all player factions, both maps,
+  and one to three independently configured CPUs. Foundry Riflers,
+  Rovers Skimmers, and Bulwark Wardens have different reach, damage,
+  cadence, movement, health, and silhouettes. The AI uses faction-specific
+  worker and attack thresholds. The factions share support units and
+  structures. All 54 cartridge, human faction, map, and CPU-count setups
+  started using ordinary buttons under host sanitizers and in mGBA.
+  On all three cartridges a save with a non-default human faction
+  resumed in a fresh emulator process and restarted with the same setup.
+  Each cartridge loaded an earlier fixed-player save and rejected another
+  cartridge's new save even when the player faction matched its default.
+  Foundry also loaded a save from the original single-roster cartridge.
+  The first 240 updates measured 19.75–20.75 emulated updates per second.
+  In two earlier normal-input ARM matches, a passive Foundry player lost
+  to Rovers on Transit Yard (game tick 5,584) and to Bulwark on Stone
+  Gardens (5,524). Human wins and hardware timings still need verification.
+  Add distinct faction support units and production choices.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening

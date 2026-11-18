@@ -73,7 +73,7 @@ ui_unit_glyph(int type, int x, int y, u8 col)
         gfx_pixel(x - 3, y + 3, C_GOLD);
     } else if (type == U_MARINE) {
 #ifdef SC_FRONTIER_FACTION
-        frontier_fighter_glyph(SC_FRONTIER_FACTION, x, y, col);
+        frontier_fighter_glyph(frontier_owner_faction(SIDE), x, y, col);
 #else
         gfx_rect(x - 2, y - 4, 5, 8, col);
         gfx_rect(x - 3, y - 5, 6, 2, C_SILVER);

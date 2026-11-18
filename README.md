@@ -46,16 +46,19 @@ Playing is optional. Install mGBA using the instructions in [Development](docs/D
 
 Run `make frontier-factions` to build three original skirmish cartridges.
 Use `./dev play frontier-foundry`, `./dev play frontier-rovers`, or
-`./dev play frontier-bulwark` to launch one in mGBA. Each cartridge fixes
-the player's faction and lets you choose Transit Yard or Stone Gardens
-and any combination of one to three CPU factions. At the title screen,
-Up/Down selects a row, Left/Right edits it, A starts, and B loads.
+`./dev play frontier-bulwark` to launch one in mGBA. Each cartridge starts
+with its own faction selected. The Player row lets you switch factions,
+and you can choose Transit Yard or Stone Gardens with any combination
+of one to three CPU factions. Up/Down selects a row, Left/Right edits
+it, A starts, and B loads.
 
 The Foundry Rifler has the longest reach. The Rovers Skimmer moves and
 fires faster. The Bulwark Warden hits hardest and has the most health,
 with shorter reach. The factions share their economy and support units.
-Each cartridge has its own save file. A legacy Frontier save can be
-loaded in Foundry, where all its original crews are treated as Foundry.
+Each cartridge keeps its own save file, including the selected player
+faction. Saves from earlier faction builds load on their respective
+cartridges. Foundry also accepts saves from the single-roster build,
+where all crews are treated as Foundry.
 
 ## Optional StarCraft 64 profiles
 

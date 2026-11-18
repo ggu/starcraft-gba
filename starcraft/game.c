@@ -1936,6 +1936,9 @@ static int original_skirmish_map;
 _Static_assert(SC_FRONTIER_FACTION >= FRONTIER_FOUNDRY &&
                SC_FRONTIER_FACTION < FRONTIER_FACTION_COUNT, "Unknown cartridge faction");
 _Static_assert(ORIGINAL_MAP_COUNT == 2, "Frontier saves reserve one bit for the map");
+enum { FRONTIER_SETUP_MAP, FRONTIER_SETUP_BOTS, FRONTIER_SETUP_PLAYER, FRONTIER_SETUP_CPU_FIRST };
+
+static unsigned char frontier_human_faction;
 static unsigned char frontier_cpu_faction[3];
 static int frontier_setup_row;
 
@@ -1943,7 +1946,7 @@ static inline int
 frontier_owner_faction(int owner)
 {
     switch (owner) {
-    case SIDE: return SC_FRONTIER_FACTION;
+    case SIDE: return frontier_human_faction;
     case ENEMY: return frontier_cpu_faction[0];
     case RESCUABLE: return frontier_cpu_faction[1];
     case 4: return frontier_cpu_faction[2];
@@ -5431,7 +5434,7 @@ save_game(void)
 #endif
 #ifdef SC_FRONTIER_FACTION
     data.skirmish_map = frontier_pack_setup(original_skirmish_map, SC_FRONTIER_FACTION,
-                                            frontier_cpu_faction);
+                                           frontier_human_faction, frontier_cpu_faction);
 #elif defined(SC_ORIGINAL_SKIRMISH)
     data.skirmish_map = original_skirmish_map;
 #endif
@@ -5498,10 +5501,10 @@ load_game(void)
     if (data.bot_count < 1 || data.bot_count > 3) return 0;
 #endif
 #ifdef SC_FRONTIER_FACTION
-    int saved_map;
+    int saved_map, saved_human;
     unsigned char saved_factions[3];
     if (!frontier_unpack_setup(data.skirmish_map, SC_FRONTIER_FACTION, &saved_map,
-                               saved_factions)) return 0;
+                               &saved_human, saved_factions)) return 0;
 #elif defined(SC_ORIGINAL_SKIRMISH)
     if ((unsigned)data.skirmish_map >= ORIGINAL_MAP_COUNT) return 0;
 #endif
@@ -5601,8 +5604,9 @@ load_game(void)
 #endif
 #ifdef SC_FRONTIER_FACTION
     original_skirmish_map = saved_map;
+    frontier_human_faction = saved_human;
     memcpy(frontier_cpu_faction, saved_factions, sizeof(frontier_cpu_faction));
-    frontier_setup_row = 0;
+    frontier_setup_row = FRONTIER_SETUP_MAP;
 #elif defined(SC_ORIGINAL_SKIRMISH)
     original_skirmish_map = data.skirmish_map;
 #endif
@@ -6090,10 +6094,11 @@ game_init(void)
     skirmish_bots = 2;
 #endif
 #ifdef SC_FRONTIER_FACTION
+    frontier_human_faction = SC_FRONTIER_FACTION;
     frontier_cpu_faction[0] = FRONTIER_ROVERS;
     frontier_cpu_faction[1] = FRONTIER_BULWARK;
     frontier_cpu_faction[2] = FRONTIER_FOUNDRY;
-    frontier_setup_row = 0;
+    frontier_setup_row = FRONTIER_SETUP_MAP;
 #endif
     help = 0;
     menu_open = 0;
@@ -10263,6 +10268,10 @@ pause_action(u16 pressed)
 	init_state();
 }
 
+#ifdef SC_FRONTIER_FACTION
+#include "frontier_title.h"
+#endif
+
 #ifdef SC64_TEXT_BOXES
 #include "sc64_text_box_runtime.h"
 /* All text-enabled paths finish through the same boundary. A message posted
@@ -10392,27 +10401,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
         if (pressed & (KEY_UP | KEY_DOWN)) campaign_mission = 1 - campaign_mission;
 #endif
 #ifdef SC_FRONTIER_FACTION
-        if (title_notice) title_notice--;
-        if (pressed & KEY_A) init_state();
-        else if (pressed & (KEY_B | KEY_L)) {
-            if (!load_game()) title_notice = 90;
-        } else if (pressed & (KEY_UP | KEY_DOWN)) {
-            int rows = skirmish_bots + 2;
-            int direction = (pressed & KEY_DOWN) ? 1 : rows - 1;
-            frontier_setup_row = (frontier_setup_row + direction) % rows;
-        } else if (pressed & (KEY_LEFT | KEY_RIGHT)) {
-            int forward = pressed & KEY_RIGHT;
-            if (frontier_setup_row == 0) {
-                int direction = forward ? 1 : ORIGINAL_MAP_COUNT - 1;
-                original_skirmish_map = (original_skirmish_map + direction) % ORIGINAL_MAP_COUNT;
-            } else if (frontier_setup_row == 1) {
-                skirmish_bots = (skirmish_bots - 1 + (forward ? 1 : 2)) % 3 + 1;
-            } else {
-                unsigned char *faction = &frontier_cpu_faction[frontier_setup_row - 2];
-                int direction = forward ? 1 : FRONTIER_FACTION_COUNT - 1;
-                *faction = (*faction + direction) % FRONTIER_FACTION_COUNT;
-            }
-        }
+        frontier_title_input(pressed);
         return;
 #elif defined(SC_ORIGINAL_SKIRMISH)
         if (title_notice) title_notice--;
@@ -12481,27 +12470,7 @@ static void
 draw_title(void)
 {
 #ifdef SC_FRONTIER_FACTION
-    static const char *const labels[] = {"MAP", "OPPONENTS", "CPU 1", "CPU 2", "CPU 3"};
-    gfx_rect(0, 0, 240, 160, C_BLACK);
-    gfx_rect(12, 8, 216, 144, C_PANEL);
-    gfx_frame(12, 8, 216, 144, C_CYAN);
-    gfx_text(25, 17, "FRONTIER SKIRMISH", C_GOLD);
-    gfx_text(25, 31, "YOU PLAY", C_WHITE);
-    gfx_text(102, 31, frontier_owner_profile(SIDE)->name, C_CYAN);
-    for (int row = 0; row < 5; row++) {
-        int y = 48 + row * 12;
-        int active = row < skirmish_bots + 2;
-        int color = row == frontier_setup_row ? C_HIGHLIGHT : active ? C_WHITE : C_DIM;
-        if (row == frontier_setup_row) gfx_text(19, y, ">", C_HIGHLIGHT);
-        gfx_text(32, y, labels[row], color);
-        if (row == 0) gfx_text(108, y, original_skirmish_maps[original_skirmish_map].title, color);
-        else if (row == 1) gfx_num(108, y, skirmish_bots, color);
-        else gfx_text(108, y, active ? frontier_faction_profiles[frontier_cpu_faction[row - 2]].name
-                                    : "CLOSED", color);
-    }
-    gfx_text(25, 113, "UP/DOWN ROW  LEFT/RIGHT EDIT", C_CYAN);
-    gfx_text(25, 125, "A START  B LOAD", C_CYAN);
-    if (title_notice) gfx_text(25, 137, "NO COMPATIBLE SAVE", C_RED);
+    frontier_title_draw();
     return;
 #elif defined(SC_ORIGINAL_SKIRMISH)
     gfx_rect(0, 0, 240, 160, C_BLACK);
