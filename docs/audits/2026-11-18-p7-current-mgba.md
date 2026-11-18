@@ -378,3 +378,20 @@ Mean total cost drops 103 cycles and peak rises 6,604. Leave this
 probe local and focus on larger route and paint costs.
 
 - Paired diagonal strip receipt SHA-256 `07957ef791fe9424a10d9630ed27f92bd73145d24aa8cb9bddf308257d2a7a6b`.
+
+#### Detector range rejection
+
+A separate probe rejects validated mobile and building detector rectangles
+when one inclusive axis gap already exceeds the detector range. The
+existing distance and source-owner checks decide the remaining pairs.
+Aura, visibility, and Cannon power logic retain their own checks. The
+sanitizer proof compares about 1.19 million threshold cases and a prepared
+2,000-case source-owner and geometry differential.
+
+On `e7daddb1`, the ARM candidate matches all 11 P7 game and display cuts
+and every recorded frame, route and terrain-cache decision. Mean cycles
+fall from 1,883,235 to 1,872,385 (0.58%), p95 from 2,179,910 to
+2,166,246, and the peak is effectively flat. The P10 RAM ends match.
+Qualify the other prepared profiles and saves before enabling the probe.
+
+- Paired detector range receipt SHA-256 `ae2d497db4c8981aa24bc0353455e87a76c9c42e7ec6e31e223ab52e75eae9fa`.

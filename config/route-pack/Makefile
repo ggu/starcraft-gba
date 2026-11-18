@@ -13,7 +13,7 @@ LINEAR_WORD_PACK_KEY = $(if $(ROUTE_PACK_FLAGS),-linearwordpack)$(POINT_RETENTIO
 
 # Select an experimental backing only when requested: a dedicated EWRAM
 # plane (1), or the borrowed tail of the route/save queue (tail).
-CANONICAL_ROUTE_POINT_RETENTION ?= 0
+CANONICAL_ROUTE_POINT_RETENTION ?= tail
 ifneq ($(words $(CANONICAL_ROUTE_POINT_RETENTION)),1)
 $(error CANONICAL_ROUTE_POINT_RETENTION must be 0, 1 or tail)
 endif

@@ -363,7 +363,7 @@ static int sc64_range_route_usable_slots(void);
 #endif
 #if defined(SC64_FACILITY_FRONTIERS_PROBE) && defined(SC64_DEPOT_BOUNDED) && \
     defined(SC64_ROUTE_ACTIVE_STRIDE) && defined(SC64_GRID_SET) && \
-    !defined(SC64_ROUTE_FACILITY_FIFO_PROBE) && !defined(SC64_ROUTE_POINT_TAIL_PROBE) && \
+    !defined(SC64_ROUTE_FACILITY_FIFO_PROBE) && \
     SC64_ROUTE_GRID_CELLS_PER_BYTE == 8
 #define SC64_FACILITY_FRONTIERS 1
 #if defined(SC64_Z7_RUNTIME) && !defined(SC64_Z8_RUNTIME)
@@ -2973,6 +2973,13 @@ static void sc64_facility_frontiers_begin(void)
     const size_t reserved = sizeof(path_walkable) + frontier_bytes;
     if (MAP_COLS != side || MAP_ROWS != side ||
         sizeof(bfs_queue) < reserved + alignment - 1u + flood_bytes) return;
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+    /* The two users only share physical bytes across map shapes. If the
+     * route layout has not caught up to a shape change, wait until it has
+     * released both the old live binding and the retained wide field. */
+    if (sc64_route_point_saved >= 0 || (sc64_route_point_spare &&
+        sc64_route_point_spare != sc64_route_point_plane)) return;
+#endif
     uintptr_t end = (uintptr_t)(void *)bfs_queue + sizeof(bfs_queue);
     sc64_facility_frontiers = (Sc64FacilityFrontier *)(void *)
         ((end - reserved) & ~(uintptr_t)(alignment - 1u));

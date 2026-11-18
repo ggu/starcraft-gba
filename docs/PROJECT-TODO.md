@@ -665,8 +665,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   lower p95). Z8 and the facility FIFO composition also match gameplay
   checkpoints, including forced facility overflow under sanitizers.
   All four current Blood Bath save/load pairs and the full P10 physical
-  win match. Keep the switch opt-in while checking the timing distribution
-  and worst cases on wider play and on hardware.
+  win match. The [current composition](audits/2026-11-14-z7-point-flood-retention.md#coexistence-with-the-shipping-small-map-frontier)
+  preserves the small-map facility frontiers and enables the scratch tail
+  in the shared builds. Dense Z7 saves 1.19% mean and 8.82% p95, with
+  effectively flat means in busy P7 and three-AI Blood Bath. Keep testing
+  hardware timing and prioritize the count and cost of remaining wide fills.
   The
   [current instruction trace](audits/2026-11-15-z7-contact-cost.md) puts
   524k cycles in uncached collision masks in three no-flood samples,
@@ -1495,6 +1498,16 @@ save/source-owner and timing evidence; do not advertise unwired components.
   updates per second. The 30 fps target remains open. The diagonal
   fog-strip probe saves 103 cycles overall and stays local. Prioritize
   recurring route and order work and larger terrain draw costs.
+- The [detector range probe](audits/2026-11-18-p7-current-mgba.md#detector-range-rejection)
+  skips exact distance calculation when one inclusive gap exceeds the
+  range. It saves 0.58% in P7 with matching sampled state and pixels.
+  Keep it in qualification for the other prepared profiles.
+- A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
+  corroborates the paid Terran worker opening in Blood Bath Melee.
+  The shared opening cuts show 50 minerals and an empty queue for
+  every owner. The Terran CPU spends 50 on a queued SCV before any
+  owner adds a building. Capture first purchases for Zerg and Protoss
+  before comparing the later AI build order.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
