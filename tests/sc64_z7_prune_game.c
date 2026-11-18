@@ -378,9 +378,76 @@ static void test_reference_path_remains_checked(void)
     assert(!race_z7.runtime.fault);
 }
 
+#ifdef SC64_Z7_FUSED_PROVENANCE_PROBE
+static void test_fused_live_provenance(void)
+{
+    enum { VALID_ROWS, BAD_UNIT, BAD_BUILDING };
+    static Unit before_u[MAX_UNITS], reference_u[MAX_UNITS];
+    static Building before_b[MAX_BUILDINGS], reference_b[MAX_BUILDINGS];
+    for (int cases=VALID_ROWS;cases<=BAD_BUILDING;++cases) {
+        load_canonical_z7();
+        int bad_unit=-1, bad_building=-1, product=-1, structure=-1;
+        for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].owner==ENEMY) {
+            if (bad_unit<0) bad_unit=i;
+            product=i;
+        }
+        for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive && b[i].owner==ENEMY) {
+            if (bad_building<0) bad_building=i;
+            structure=i;
+        }
+        assert(bad_unit>=0 && product>bad_unit && bad_building>=0 && structure>bad_building);
+        const int product_raw=sc64_race_raw_unit(u[product].type);
+        const int structure_raw=sc64_race_raw_building(b[structure].type);
+        assert(product_raw>=0 && structure_raw>=0);
+        u[product].raw_owner=-1;
+        u[product].raw_type=-1;
+        b[structure].raw_owner=-1;
+        b[structure].raw_type=-1;
+        if (cases==BAD_UNIT) u[bad_unit].raw_owner=12;
+        if (cases==BAD_BUILDING) b[bad_building].raw_type=-1;
+        memcpy(before_u,u,sizeof(before_u));
+        memcpy(before_b,b,sizeof(before_b));
+
+        u32 expected_counts[2]={0xcafeu,0xd00du};
+        race_z7_reconcile_paid_products();
+        int valid=race_z7_validate_live_world(expected_counts);
+        assert(valid==(cases==VALID_ROWS));
+        assert(u[product].raw_owner==4 && u[product].raw_type==product_raw);
+        assert(b[structure].raw_owner==4 && b[structure].raw_type==structure_raw);
+        memcpy(reference_u,u,sizeof(reference_u));
+        memcpy(reference_b,b,sizeof(reference_b));
+
+        memcpy(u,before_u,sizeof(before_u));
+        memcpy(b,before_b,sizeof(before_b));
+        u32 actual_counts[2]={0xcafeu,0xd00du};
+        assert(race_z7_reconcile_validate_live_world(actual_counts)==valid);
+        assert(!memcmp(actual_counts,expected_counts,sizeof(actual_counts)));
+        if (!valid) assert(actual_counts[0]==0xcafeu && actual_counts[1]==0xd00du);
+        assert(!memcmp(reference_u,u,sizeof(reference_u)));
+        assert(!memcmp(reference_b,b,sizeof(reference_b)));
+
+        if (!valid) {
+            memcpy(u,before_u,sizeof(before_u));
+            memcpy(b,before_b,sizeof(before_b));
+            Sc64Z7WorldContext before=race_z7_world;
+            assert(!race_z7_runtime_tick(0,1u));
+            assert(race_z7.runtime.fault==SC64_Z7_RUNTIME_FAULT_ACTOR);
+            assert(!memcmp(&before.count_snapshot,&race_z7_world.count_snapshot,
+                           sizeof(before.count_snapshot)));
+            assert(!memcmp(reference_u,u,sizeof(reference_u)));
+            assert(!memcmp(reference_b,b,sizeof(reference_b)));
+        }
+    }
+    puts("Z7 fused provenance preserves later repairs and count publication on actor faults");
+}
+#endif
+
 int main(void)
 {
     test_reference_path_remains_checked();
+#ifdef SC64_Z7_FUSED_PROVENANCE_PROBE
+    test_fused_live_provenance();
+#endif
 #ifdef SC64_Z7_PRUNE_STARTED
     test_snapshot_owner_boundaries();
 #ifdef SC64_Z7_VALIDATED_CENSUS
