@@ -44,7 +44,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   171,023 cycles for the HUD, and 165,902 cycles from presentation entry to
   the next input sample. The first figure includes clearing, the map,
   field feedback, and audio observation. Compare how often the HUD panels
-  actually change before trying to reuse them, then verify timing on hardware.
+  actually change before trying to reuse them. A separate build with
+  `GBA_PRESENT_DEADLINE` retains the 28 checkpoints and both saves and
+  lowers the dense mean to 754,606 cycles (22.23 emulated updates per
+  second). Dense p95 is essentially flat. During the opening, the flip
+  phase shifts about 100–130 cycles per update before frame 430 waits an
+  extra 200,000 cycles at presentation. Fix that pacing drift and verify
+  scanout on hardware before enabling the option by default.
 
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and
   Interceptor services. The standard Terran, Zerg and Showcase builds still
