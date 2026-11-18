@@ -1607,6 +1607,18 @@ save/source-owner and timing evidence; do not advertise unwired components.
   Prioritize the separate movement and orders spikes. Check the other
   cartridge profiles and physical GBA timing before regular activation
   of the route candidate.
+- The [lazy row candidate](audits/2026-11-19-z7-positive-prefix-rows.md)
+  avoids initializing untouched rows during successful point prefixes.
+  The dense Z7 mean falls another 2.08% to 1,784,538 cycles per update,
+  with all 131 input checkpoints, nine raw cuts and route counters
+  matching. The same ROM loads the authenticated late save and wins at
+  frame 194,998, with all six state and video cuts matching. Keep it
+  opt-in. Check IWRAM fit and timing on other profiles before promotion.
+- The [post-orders trace](audits/2026-11-19-z7-repeated-negative-route.md#what-remains-after-orders-in-dense-zerg-7)
+  measures about 127,000 cycles in mission and AI, 81,000 in defense
+  targeting, and 46,000 in race state. Attribute defense index construction
+  and queries separately. Measure the remaining mission actor traversal
+  before combining it with provenance validation.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for

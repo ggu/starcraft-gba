@@ -316,3 +316,28 @@ measured prefix through frame 45,265. Victory and fresh-load checks
 for this mission on this pair remain open.
 
 - Paired prefix receipt SHA-256 `57a5a7482b062d0b72bcfdcda63aadc8205960e20374179a75408ace83cba064`.
+
+## What remains after orders in dense Zerg 7
+
+A read-only instruction-edge sample of the deferred-seed control uses
+24 evenly spaced advancing updates from the same dense input window.
+All 131 historical checkpoints match. Sampled whole-update and order
+timers match the retained replay, and the sum at the instruction
+edges equals the existing post-orders counter on all 24 samples.
+
+| Scope | Mean guest cycles |
+| --- | ---: |
+| Mission and AI | 126,922 |
+| Defense targeting | 80,808 |
+| Race state | 45,934 |
+| Production | 14,052 |
+| Impact and tracer lifecycle | 918 |
+| Research and transport | 60 |
+| Post-orders total | 268,694 |
+
+The mission path still scans the live actor pools once for provenance
+and once for several trigger counts. Measure the second traversal before
+fusing it with validation. For defenses, separate candidate index
+construction from the actual target queries before changing cell size.
+
+- Post-orders receipt SHA-256 `7e3631e8c1053d210c75da0ac5352e6a3ddca76edec36764c3a3badb1eab3311`.
