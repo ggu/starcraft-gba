@@ -1722,9 +1722,12 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    gains only 0.16% against the placement-matched control and loses 6.28%
    against shipping P10. Keep these probes local. The exact dense Z7 update
    diagnostic attributes 170,171 guest cycles per advancing update to
-   mission dispatch and 80,037 to defenses. Break down the mission
-   dispatcher next and count duplicate friendly sight footprints. Continue
-   the terrain and HUD timing work alongside simulation. [Bucket measurements and native overlap](audits/2026-11-19-contact-bucket-boundaries.md)
+   mission dispatch and 80,037 to defenses. Entry tracing locates 120,933
+   cycles in the interval from the geometry-bearing count snapshot to the
+   campaign scheduler. Prioritize factoring repeated owner-selector checks
+   out of that census and measuring the geometry. Count duplicate friendly
+   sight footprints before proposing a batching change. Continue the terrain
+   and HUD timing work alongside simulation. [Bucket measurements and native overlap](audits/2026-11-19-contact-bucket-boundaries.md)
    The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
    saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
    [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;

@@ -161,9 +161,31 @@ the post-orders interval. It matches 131 historical checkpoints, 480
 route and frame checks, and all nine world and display cuts. Average
 costs over 477 advancing updates are 170,171 cycles in mission
 dispatch, 80,037 in defenses, 47,138 in race state, and 13,840 in
-production. Research and the remainder add 1,055 cycles. Profile Z7's
-mission dispatcher internally before deciding which simulation data
-to cache or update incrementally.
+production. Research and the remainder add 1,055 cycles.
+
+Function-entry tracing on the exact shipping ROM locates the main
+cost. All 477 advancing updates hit each of the five boundaries once.
+The 480 input frame, route and loop timing records match the
+unobserved run with nine matching raw world and display cuts.
+
+| Consecutive entries | Mean cycles |
+| --- | ---: |
+| Reconcile products → live validation | 9,926 |
+| Live validation → masked count snapshot | 25,736 |
+| Masked count snapshot → campaign scheduler | 120,933 |
+| Campaign scheduler → production | 12,051 |
+
+The measured snapshot needs mask `0x1b`, including two geographic
+predicates. It does not use the existing owner-only mask-`3` path.
+Use the same checked descriptor to build selector results per source
+slot before walking the actors, then measure geometry separately.
+The two AI pulses occur within the scheduler interval.
+
+A separate local opt-in prototype fuses provenance reconciliation and
+validation while preserving all provenance writes on an invalid row.
+Both prepared sanitizer fixtures pass including the ordinary and
+validated-census configurations. The first interval bounds the likely
+gain from removing that scan. ARM timing of the prototype is open.
 
 For the next sight pass, count friendly movers with the same old and
 new absolute tile, footprint phase and effective sight radius after
@@ -175,6 +197,7 @@ minimap output before adopting the change.
 - Combined census and whole-bucket replay receipt SHA-256 `921010d10575bb70efe1cf38dd13a5841db6dc04cc4675063ef3054d28bbf77d`.
 - Z7 update-stage receipt SHA-256 `e689eacc557196a0dd64feab85ceb9d634ee91500240072bea189cacdb30cadd`.
 - Paired Z7 update diagnostic SHA-256 `521387ae0ac42ef0c283eab359b2f45a71390a0ca29caa138e285cf7eee99874`.
+- Shipping Z7 function-entry timing SHA-256 `58265efe399b2f614115d1826257d2fed90aea8f32580e48dbe80fb64153115d`.
 
 ## Prepared sprite fixture
 
@@ -186,3 +209,8 @@ Protoss's alternate bank has the sprite but follows the stale P7
 header in the compiler include order. Refresh the selected complete
 private banks before using the roster fixture as a prepared-build
 release gate.
+
+The default build verifies. The isolated asset-free `./dev test`
+run completes 1,161 Python tests with 35 optional skips and passes
+the C targets. The steering prototypes and private data stay outside
+this source branch.
