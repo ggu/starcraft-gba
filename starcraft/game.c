@@ -3780,36 +3780,6 @@ walk_search_step(int cell, int *next_x, int *next_y)
     *next_y = (first >> 8) * 16 + 8;
 }
 
-#if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
-/* A clear horizontal-then-vertical route reaches the Manhattan lower bound
- * and starts in the direction that the breadth-first neighbor order prefers.
- * For a blocked goal the projection into its 3x3 approach area is uniquely
- * closest. If any tile on this route is blocked, let the full search decide. */
-static int frontier_shortest_axis_step(int col, int row, int goal_col, int goal_row)
-{
-    if (!SC64_GRID_GET(path_walkable, goal_col + goal_row * MAP_COLS)) {
-        goal_col = limit(col, goal_col - 1, goal_col + 1);
-        goal_row = limit(row, goal_row - 1, goal_row + 1);
-    }
-    if (col == goal_col && row == goal_row) return -2;
-
-    int col_step = goal_col > col ? 1 : -1;
-    int row_step = goal_row > row ? 1 : -1;
-    int first = col != goal_col ? col + col_step + row * 256 : col + (row + row_step) * 256;
-    int cell = col + row * MAP_COLS;
-    while (col != goal_col) {
-        col += col_step;
-        cell += col_step;
-        if (!SC64_GRID_GET(path_walkable, cell)) return -1;
-    }
-    while (row != goal_row) {
-        row += row_step;
-        cell += row_step * MAP_COLS;
-        if (!SC64_GRID_GET(path_walkable, cell)) return -1;
-    }
-    return first;
-}
-#endif
 #endif
 
 /* Breadth-first on the bounded walk grid; return the first tile toward goal. */
