@@ -58,6 +58,9 @@ static int race_spawn_product(int owner, int type, int x, int y, int source_owne
     /* Mission-specific spawn hooks have priority over this shared fallback. */
     if (slot >= 0 && source_owner >= 0 && u[slot].raw_owner < 0)
         u[slot].raw_owner = source_owner;
+#ifdef SC64_GHOST_TECH_PROBE
+    if (slot >= 0 && source_owner >= 0) race_ghost_birth(&u[slot], 0);
+#endif
     return slot;
 }
 #ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE

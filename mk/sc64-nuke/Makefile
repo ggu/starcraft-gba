@@ -1,4 +1,18 @@
 # Private prepared-input gate. Default ROM targets never opt in.
+build/test-sc64-ghost-tech: tests/sc64_ghost_tech.c starcraft/sc64_ghost_tech.h starcraft/sc64_battlecruiser_rules.h starcraft/sc64_nuke_rules.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-ghost-tech
+test-sc64-ghost-tech: build/test-sc64-ghost-tech
+	./$<
+
+
+# Asset-free detached HOST codec; this does not select any journal tag.
+build/test-sc64-ghost-tech-save-wire: tests/sc64_ghost_tech_save_wire.c starcraft/sc64_ghost_tech_save_wire.h starcraft/sc64_ghost_tech.h starcraft/sc64_battlecruiser_rules.h starcraft/sc64_nuke_save_rows.h starcraft/sc64_nuke_rules.h starcraft/sc64_save_tag_namespace.h mk/sc64-nuke/Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST $< -o $@
+.PHONY: test-sc64-ghost-tech-save-wire
+test-sc64-ghost-tech-save-wire: build/test-sc64-ghost-tech-save-wire
+	./$<
+
 SC64_NUKE_RUNTIME_FLAGS := -DSC64_SHARED_NUKE_PROBE -I$(SC64_NUKE_ASSET_DIR)
 SC64_NUKE_RUNTIME_ASSETS := $(addprefix $(SC64_NUKE_ASSET_DIR)/,sc64_nuke_source_generated.h sc64_nuke_building_source_generated.h sc64_nuke_ghost_source_generated.h)
 SC64_NUKE_FIXTURE_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
@@ -23,6 +37,12 @@ endef
 $(eval $(call SC64_NUKE_P10_FACT,$(SC64_NUKE_P10_FACT_DIR)))
 $(eval $(call SC64_NUKE_P10_FACT,$(SC64_NUKE_SILO_P10_FACT_DIR),$(SC64_NUKE_SILO_FLAGS)))
 $(eval $(call SC64_NUKE_P10_FACT,$(SC64_NUKE_STRIKE_P10_FACT_DIR),$(SC64_NUKE_STRIKE_FLAGS)))
+
+build/test-sc64-ghost-tech-world: tests/sc64_ghost_tech_world_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
+	$(CLANG) $(SC64_NUKE_FIXTURE_FLAGS) $(SC64_NUKE_RUNTIME_FLAGS) -DSC64_NUKE_SILO_JOURNAL -DSC64_GHOST_TECH_PROBE $(TERRAN_ROM_FLAGS) $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-ghost-tech-world
+test-sc64-ghost-tech-world: build/test-sc64-ghost-tech-world
+	./$<
 
 define SC64_NUKE_FIXTURE
 build/test-sc64-nuke-world-$(1): tests/sc64_nuke_world_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $$(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $$(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
@@ -49,6 +69,20 @@ test-sc64-nuke-silo-journal: $(addprefix build/test-sc64-nuke-silo-,terran z10 p
 		"$$test" fallback "$$test.sav"; "$$test" bad-payer "$$test.sav"; done
 	build/test-sc64-nuke-silo-terran campaign-write build/test-sc64-nuke-silo-t8.sav
 	build/test-sc64-nuke-silo-terran campaign-read build/test-sc64-nuke-silo-t8.sav
+
+build/test-sc64-ghost-tech-world-active: tests/sc64_ghost_tech_world_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
+	$(CLANG) $(SC64_NUKE_FIXTURE_FLAGS) $(SC64_NUKE_RUNTIME_FLAGS) $(SC64_NUKE_STRIKE_FLAGS) -DSC64_GHOST_TECH_PROBE $(TERRAN_ROM_FLAGS) $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-ghost-tech-world-active
+test-sc64-ghost-tech-world-active: build/test-sc64-ghost-tech-world-active
+	./$<
+
+build/test-sc64-ghost-covert-journal: tests/sc64_ghost_covert_journal_game.c tests/sc64_ghost_tech_world_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
+	$(CLANG) $(SC64_NUKE_FIXTURE_FLAGS) $(SC64_NUKE_RUNTIME_FLAGS) $(SC64_NUKE_STRIKE_FLAGS) -DSC64_GHOST_TECH_PROBE -DSC64_GHOST_COVERT_HOST_JOURNAL $(TERRAN_ROM_FLAGS) $< $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-ghost-covert-journal
+test-sc64-ghost-covert-journal: build/test-sc64-ghost-covert-journal
+	./$< write build/test-sc64-ghost-covert.sav
+	./$< read build/test-sc64-ghost-covert.sav
+	./$< reject build/test-sc64-ghost-covert.sav
 
 define SC64_NUKE_STRIKE_FIXTURE
 build/test-sc64-nuke-strike-$(1): tests/sc64_nuke_strike_journal_game.c tests/sc64_nuke_silo_journal_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $$(SC64_NUKE_RUNTIME_ASSETS) common/gba.c $$(COMMON_HEADERS) mk/sc64-nuke/Makefile Makefile | build
@@ -85,6 +119,15 @@ $(eval $(call SC64_NUKE_ARM,showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_INPUTS),$(P7_I
 
 .PHONY: sc64-nuke-probe
 sc64-nuke-probe: $(foreach profile,terran z10 p10 showcase,build/StarCraft-Nuke-Probe-$(profile)-GBA.gba)
+
+# Separate executable and cart identity; neither the stock Terran nor the
+# ordinary Nuclear Strike preview enables the Covert journal.
+$(eval $(call SC64_NUKE_ARM,terran-covert,$(TERRAN_ROM_FLAGS) -DSC64_GHOST_TECH_PROBE -DSC64_GHOST_COVERT_ARM_PROBE,$(TERRAN_FULL_INPUTS),,SC COVERT T,SCCT))
+build/starcraft-nuke-terran-covert.elf: | sc64-ghost-covert-arm-disk-check
+.PHONY: sc64-ghost-covert-arm sc64-ghost-covert-arm-disk-check
+sc64-ghost-covert-arm: build/StarCraft-Nuke-Probe-terran-covert-GBA.gba
+sc64-ghost-covert-arm-disk-check:
+	@$(PYTHON) -c 'from shutil import disk_usage; import sys; sys.exit("Covert ARM link requires 5.25 GiB free") if disk_usage(".").free < 5637144576 else None'
 
 .PHONY: sc64-nuke-arm-world
 sc64-nuke-arm-world: build/StarCraft-Nuke-World-ARM-Test-GBA.gba

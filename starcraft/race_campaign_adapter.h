@@ -894,6 +894,9 @@ race_campaign_init(void)
             }
             u[slot].raw_type = raw;
             u[slot].raw_owner = src->owner;
+#ifdef SC64_GHOST_TECH_PROBE
+            if (raw == 1) race_ghost_birth(&u[slot], 1);
+#endif
 #ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
             if (sc64_controller_valid(src->owner, owner)) sc64_current_unit[slot] = (u8)src->owner;
 #endif

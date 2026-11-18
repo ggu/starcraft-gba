@@ -29,6 +29,10 @@ static void sc64_contact_memo_move_cells(unsigned from, unsigned to);
 #include "sc64_nuke_rules.h"
 #include "sc64_nuke_render.h"
 #endif
+#if defined(SC64_GHOST_TECH_PROBE) && (!defined(SC64_SHARED_NUKE_PROBE) || \
+    !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || !defined(SC64_SOURCE_SIGHT_ALL_RACES))
+#error "Ghost research probe requires the shared Nuke, energy and sight adapters"
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
 #if !defined(SC64_SHARED_NUKE_PROBE) || !defined(SC64_SHARED_TRANSPORT) || \
     !defined(SC64_WORKER_CARGO_KIND) || defined(SC64_IMPACT_EVENTS_DISABLED) || \
@@ -43,6 +47,25 @@ static void sc64_contact_memo_move_cells(unsigned from, unsigned to);
 #endif
 #if defined(SC64_NUKE_ACTIVE_JOURNAL) && !defined(SC64_NUKE_SILO_JOURNAL)
 #error "Active strikes require the authenticated Silo journal"
+#endif
+#ifdef SC64_GHOST_COVERT_JOURNAL
+#error "Use the guarded HOST or ARM Covert journal entry point"
+#endif
+#if (defined(SC64_GHOST_COVERT_HOST_JOURNAL) && !defined(GBA_HOST)) || \
+    (defined(SC64_GHOST_COVERT_ARM_PROBE) && defined(GBA_HOST))
+#error "The Covert HOST and ARM journal gates require their respective targets"
+#endif
+#if defined(SC64_GHOST_COVERT_HOST_JOURNAL) || defined(SC64_GHOST_COVERT_ARM_PROBE)
+#if !defined(SC64_GHOST_TECH_PROBE) || !defined(SC64_NUKE_ACTIVE_JOURNAL) || \
+    !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
+    !defined(SC64_LATE_TERRAN_STORAGE) || !defined(SC64_T6_STORAGE) || \
+    defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_CAMPAIGN_RACE) || \
+    SC64_CAMPAIGN_RACE != 0 || defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || \
+    defined(SC64_CARRIER_RELEASE) || defined(SC64_TERRAN_CARRIER_PROBE) || \
+    defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#error "The Covert journal is isolated to Terran custom saves with active strikes"
+#endif
+#define SC64_GHOST_COVERT_JOURNAL 1
 #endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
 #include "sc64_q8_flash_scope.h"
@@ -2361,6 +2384,9 @@ static int race_impact_save_write(const GbaSaveSelection *previous
 #ifdef SC64_NUKE_SILO_JOURNAL
                                   , int nuke_silo_tag
 #endif
+#ifdef SC64_GHOST_COVERT_JOURNAL
+                                  , int ghost_covert_tag
+#endif
                                   );
 #else
 static int race_impact_save_write(void);
@@ -2541,6 +2567,9 @@ static int race_nuke_draw_ghost(int slot, int x, int y);
 static int race_nuke_silo_status(int slot);
 #endif
 static const char *race_nuke_menu_label(int action);
+#endif
+#ifdef SC64_GHOST_TECH_PROBE
+#include "sc64_ghost_tech_hooks.h"
 #endif
 static void race_add_owner_resources(int owner,int ore,int vespene);
 #ifdef SC64_SHARED_TRANSPORT
@@ -3109,6 +3138,9 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].tx = x;
     u[i].ty = y;
     u[i].carry = 0;
+#ifdef SC64_GHOST_TECH_PROBE
+    race_ghost_birth(&u[i], 0);
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     if (sc64_race_raw_unit(type) == 12) {
         int key = sc64_battlecruiser_owner_key(race_mode, race_selected_mission, owner, u[i].raw_owner);
@@ -4949,6 +4981,9 @@ destroy_building(int slot, int source_owner)
 {
     Building *q = &b[slot];
     if (!q->alive) return;
+#ifdef SC64_GHOST_TECH_PROBE
+    race_ghost_tech_destroy(slot);
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_detach_addon(slot);
 #endif
@@ -5662,6 +5697,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_GHOST_TECH_PROBE
+    race_ghost_tech_reset();
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_reset();
 #endif
@@ -6728,6 +6766,9 @@ enum {
 #ifdef SC64_SHARED_NUKE_PROBE
     RACE_CONTEXT_NUKE,
 #endif
+#ifdef SC64_GHOST_TECH_PROBE
+    RACE_CONTEXT_GHOST_TECH,
+#endif
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
     RACE_CONTEXT_EGG,
 #endif
@@ -6792,6 +6833,9 @@ static int race_context_command_width(int context)
 #ifdef SC64_SHARED_NUKE_PROBE
     case RACE_CONTEXT_NUKE: return race_nuke_menu_action() != NUKE_MENU_NONE;
 #endif
+#ifdef SC64_GHOST_TECH_PROBE
+    case RACE_CONTEXT_GHOST_TECH: return race_ghost_tech_menu_width();
+#endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     case RACE_CONTEXT_SCARAB: return race_scarab_human_selected() >= 0;
 #endif
@@ -6843,6 +6887,13 @@ static int race_carrier_command_base(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_GHOST_TECH_PROBE
+    int ghost_tech = race_ghost_tech_menu_kind(choice);
+    if (ghost_tech) {
+        menu_open = 0; mode = MODE_NORMAL;
+        toast(race_ghost_tech_menu_choose(ghost_tech)); return;
+    }
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     if (choice == race_nuke_command_index()) {
         int action = race_nuke_menu_action();
@@ -7322,9 +7373,21 @@ static int race_nuke_command_index(void)
     return race_mode ? race_context_command_base(RACE_CONTEXT_NUKE) :
                        field_menu_count_without_nuke();
 }
+#ifdef SC64_GHOST_TECH_PROBE
+static int race_ghost_tech_command_index(void)
+{
+    return race_mode ? race_context_command_base(RACE_CONTEXT_GHOST_TECH) :
+        race_nuke_command_index() + (race_nuke_menu_action() != NUKE_MENU_NONE);
+}
+#endif
 static int field_menu_count(void)
 {
-    return field_menu_count_without_nuke() + (!race_mode && race_nuke_menu_action() != NUKE_MENU_NONE);
+    int count = field_menu_count_without_nuke();
+    if (race_mode) return count;
+#ifdef SC64_GHOST_TECH_PROBE
+    count += race_ghost_tech_menu_width();
+#endif
+    return count + (race_nuke_menu_action() != NUKE_MENU_NONE);
 }
 #endif
 
@@ -7354,6 +7417,10 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_GHOST_TECH_PROBE
+    int ghost_tech = race_ghost_tech_menu_kind(i);
+    if (ghost_tech) return race_ghost_tech_menu_label(ghost_tech);
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     if (i == race_nuke_command_index()) {
         int action = race_nuke_menu_action();
@@ -9134,6 +9201,10 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+#ifdef SC64_GHOST_TECH_PROBE
+        if (sc64_race_ordinary_ghost(q->type) && sc64_battlecruiser_source_tick_due())
+            race_ghost_tick_energy(q);
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
         if (sc64_race_ordinary_ghost(q->type) && race_nuke_ghost_locked(i)) continue;
 #endif
@@ -10565,6 +10636,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     race_bc_yamato_sync_references();
 #endif
     update_orders();
+#ifdef SC64_GHOST_TECH_PROBE
+    race_ghost_tech_tick();
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_tick();
 #endif
@@ -10951,6 +11025,9 @@ static int
 sc64_unit_energy(const Unit *q,int *maximum)
 {
     *maximum=0;
+#ifdef SC64_GHOST_TECH_PROBE
+    if (sc64_race_ordinary_ghost(q->type)) *maximum = race_ghost_max_energy(q);
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     if (sc64_race_is_battlecruiser(q->type)) {
         int key=sc64_battlecruiser_owner_key(race_mode, race_selected_mission,q->owner,q->raw_owner);
@@ -13204,6 +13281,9 @@ static unsigned race_shared_trigger_obligations(void);
 #include "race_adapter.h"
 #ifdef SC64_SHARED_NUKE_PROBE
 #include "sc64_nuke_runtime.h"
+#endif
+#ifdef SC64_GHOST_TECH_PROBE
+#include "sc64_ghost_tech_runtime.h"
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #include "sc64_guardian_morph_adapter.h"
