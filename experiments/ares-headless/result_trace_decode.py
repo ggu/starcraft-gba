@@ -100,6 +100,33 @@ def inspect_cadence(rows):
             'trailing_decrements': len(values), 'trailing_resets': resets}
 
 
+def require_cadence(rows):
+    """Qualify a bounded capture without making a game-result claim."""
+    report = inspect_cadence(rows)
+    scans = report['scans']
+    for scan in scans:
+        if scan['ordering_issues']:
+            raise ValueError('invalid result scan ordering: ' + ', '.join(scan['ordering_issues']))
+        leading_partial = scan['row'] == 0 and rows[0][4] == 0xffff
+        if not scan['underflow_anchor'] and not leading_partial:
+            raise ValueError('result scan lacks an underflow anchor inside the window')
+
+    kinds = [interval['kind'] for interval in report['intervals']
+             if interval['kind'] != 'unknown_anchor']
+    if not kinds or any(kind not in ('ordinary', 'reset') for kind in kinds):
+        raise ValueError('trace lacks valid cadence between anchored result scans')
+
+    anchored = [scan for scan in scans if scan['underflow_anchor']]
+    passes = [{'step': scan['step'], 'owners': scan['owners']} for scan in anchored
+              if scan['returned'] and scan['owners']]
+    if not passes:
+        raise ValueError('trace lacks a complete returned owner-dispatch pass')
+    return {'anchored_scan_steps': [scan['step'] for scan in anchored],
+            'ordinary_intervals': kinds.count('ordinary'),
+            'reset_intervals': kinds.count('reset'),
+            'returned_owner_passes': passes}
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace', type=Path)

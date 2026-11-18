@@ -227,11 +227,12 @@ def main(argv=None):
   for name in ('ram.csv','commands.csv','inputs.csv','callbacks.csv','status.log','sigxfsz.bin','images.bin','stopped-fds.txt'):result[name+'_sha256']=sha(a.output/name) if (a.output/name).is_file() else None
   diagnostic=a.output/'sigxfsz.bin';images=a.output/'images.bin';result['ok']=result['ok'] and diagnostic.is_file() and diagnostic.stat().st_size in (0,40) and images.is_file() and images.stat().st_size<=12+128*528
   if RESULT_TRACE_WINDOW is not None:
-   from result_trace_decode import read_trace
+   from result_trace_decode import read_trace, require_cadence
    trace=a.output/'result-trace.bin'
    try:
     rows=read_trace(trace,*RESULT_TRACE_WINDOW)
     result['result_trace_rows']=len(rows);result['result_trace_sha256']=sha(trace)
+    result['result_trace_cadence']=require_cadence(rows)
    except (OSError,ValueError) as exc:
     result['result_trace_error']=str(exc);result['ok']=False
   result['planned_witness_complete']=planned_witness(a.output,expected)

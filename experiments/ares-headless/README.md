@@ -68,9 +68,15 @@ that wrote the building counter. Decode with
 `python3 result_trace_decode.py /path/to/result-trace.bin BEGIN END`. Add
 `--cadence` to report underflow anchors, dispatched owners, result-pass
 ordering, reset intervals, and complete reset-free `30 … 0` intervals.
-A trace without two anchored scans cannot verify the 31-decrement cadence.
-A relink in the result pass still requires survivor identity and ownership
-confirmation from the full snapshots.
+A passing capture needs a verified countdown interval between anchored
+scans, ordered scan events, and at least one anchored pass that dispatches
+owners and returns. Partial scans at the window edges can still appear in
+the diagnostic report. The manifest records the anchored scan steps,
+ordinary and reset interval counts, and the steps and owners of the
+complete passes. A 31-decrement observation requires an ordinary interval.
+Qualifying defeat also requires the victim's observed census and result
+transition. A relink in the result pass still requires survivor identity
+and ownership confirmation from the full snapshots.
 Trace overflow, opcode mismatch, incomplete window, or an ambiguous
 cache read rejects the witness; the output is never truncated to a
 passing trace. The extension is source-only until a pinned build and
