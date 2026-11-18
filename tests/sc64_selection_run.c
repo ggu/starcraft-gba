@@ -240,28 +240,28 @@ drag_suppression_and_cancel_tests(void)
 static int
 queue_cancel_tests(void)
 {
-    /* Other friendly producers use the same paid queue. Cancellation is
-     * delivered on L release, refunds the front item once, and preserves
-     * the remaining ring entry. */
+    /* L release refunds the tail once and preserves the active head. */
     fixture();
     put_unit(0, SIDE, U_MARINE, 80, 80, 1, 1);
     b[0].owner = SIDE; b[0].type = B_COMMAND; b[0].alive = 1;
     b[0].queue_head = 4; b[0].queue_count = 2;
     b[0].queue[4] = U_SCV; b[0].queue[0] = U_SCV;
     b[0].queue_progress = 5; selected_building = 0;
+    int initial_progress = b[0].queue_progress, initial_frame = frame;
     input(KEY_L);
     if (b[0].queue_count != 2 || minerals != 500) return 20;
     input(0);
-    if (b[0].queue_count != 1 || b[0].queue_head != 0 ||
-        b[0].queue[0] != U_SCV || b[0].queue_progress > 1 ||
+    if (b[0].queue_count != 1 || b[0].queue_head != 4 ||
+        b[0].queue[4] != U_SCV || b[0].queue_progress != initial_progress + frame - initial_frame ||
         minerals != 550 || selected_building != 0) {
         fprintf(stderr, "queue count=%d head=%d next=%d progress=%d minerals=%d selection=%d\n",
-                b[0].queue_count, b[0].queue_head, b[0].queue[0], b[0].queue_progress,
+                b[0].queue_count, b[0].queue_head, b[0].queue[4], b[0].queue_progress,
                 minerals, selected_building);
         return 21;
     }
     input(0);
-    if (b[0].queue_count != 1 || minerals != 550) return 22;
+    if (b[0].queue_count != 1 || b[0].queue_progress != initial_progress + frame - initial_frame ||
+        minerals != 550) return 22;
 
 #ifdef SC64_RACES
     fixture();

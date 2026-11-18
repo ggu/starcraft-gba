@@ -18,8 +18,8 @@ The display shows 14 minerals in the active-job sample and 46 after
 cancellation. Workers were still mining and the HUD animates mineral
 changes. The refund needed a second run with the economy held fixed.
 
-The GBA `cancel_queue()` removes the active entry, resets its progress
-and refunds its mineral and gas costs. The first N64 run verifies
+The GBA can remove a single active entry, reset its progress and refund
+its mineral and gas costs. The first N64 run verifies
 active-job cancellation and supply release. [GBA queue code](../../starcraft/game.c)
 
 The native observer exited normally at step 4,408 after two requested
@@ -60,3 +60,48 @@ uses its regular Blood Bath custom mode.
 
 The read-only physical replay sampled calls 50, 64 and 66. Its receipt
 SHA-256 is `5abbd6bc2135f86abc1819eece551fbb52cb7a3e650600fb99e76468011f4dda`.
+
+## Cancel Last with two paid orders
+
+In a fresh N64 Blood Bath run, the workers collected 122 minerals
+before being parked away from the patches. The player paid for two
+SCVs at the same Command Center, then selected the native Cancel Last
+command.
+
+| Native observer step | Minerals | Supply | Production |
+| ---: | ---: | ---: | --- |
+| 6,185 | 122 | 4/10 | Empty |
+| 6,444 | 22 | 5/10 | One active SCV and a second SCV in slot 2 |
+| 6,581 | 72 | 5/10 | The first SCV remains active and its bar advances |
+
+The GBA physical comparison used ordinary buttons from HOME in three
+fresh emulator processes. The shipping Z10 and tail-cancel build
+received identical inputs. A neutral run replaced the final L tap
+with two idle input calls to account for an eight-mineral deposit
+at that boundary. Both cancellation runs refunded 50 above the
+neutral wallet. The candidate matched the neutral head progress.
+
+| GBA sample | Queue before | Head progress before → after | Final wallet |
+| --- | ---: | ---: | ---: |
+| Idle control | 2 | 20 → 22 | 22 |
+| Shipping L | 2 | 20 → 1 | 72 |
+| Cancel Last | 2 | 20 → 22 | 72 |
+
+The shared GBA control now removes the last paid queue entry and
+keeps the head index and progress while another order remains. A
+wrapped full mixed Marine/Firebat queue passed under both host
+control variants, including the refund and slot order. The candidate
+ARM build passes the existing memory guards. The same two-job
+result repeats on a separate build based directly on shipping
+source `2655cb22`. A single-item cancellation on the candidate
+also clears the queue and refunds 50. The HUD still displays
+6/10 with the two paid SCVs, then 5/10 after cancel. Observe native
+admission at cap and the handoff to a blocked new head before changing
+when waiting jobs count against supply.
+
+- Native manifest SHA-256 `60cbcdb014c1bf55aaee2433f5a856046256a39db8fbe1f14d78a94b83275fb0`.
+- GBA shipping cancellation receipt SHA-256 `bb3754af6b0a9edd8498f8414fbe18d94bce25e9d0603592a4ce0f6e0369b0d7`.
+- GBA idle control receipt SHA-256 `87566d0361055fa101aaf96ae9ecc85f8a73adf266c871d6786f1ba498999817`.
+- GBA tail cancellation receipt SHA-256 `eff219e30425e349352e74a513e0bd9ea8cceb0b28f7446a766a360ff750ab28`.
+- Release-based tail cancellation receipt SHA-256 `1c77e70dbc197d08804cdc6322bc28bb94f5e892a1add3060fbb70bb72012431`.
+- Candidate single-item cancellation receipt SHA-256 `f9f537a0994264632efbe5e8c5d8a927dae1e55dca6318baeff494028ea23f0b`.

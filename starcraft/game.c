@@ -10026,10 +10026,11 @@ update_exploration(void)
 static void
 cancel_queue(int building)
 {
-    int type;
-    if (building < 0 || building >= MAX_BUILDINGS || !b[building].queue_count)
-	return;
-    type = b[building].queue[b[building].queue_head];
+    if (building < 0 || building >= MAX_BUILDINGS) return;
+    Building *producer = &b[building];
+    if (!producer->queue_count) return;
+    int tail = (producer->queue_head + producer->queue_count - 1) % 5;
+    int type = producer->queue[tail];
     minerals += unit_cost(type);
     gas += unit_gas_cost(type);
 #ifdef SC64_RACES
@@ -10037,13 +10038,14 @@ cancel_queue(int building)
      * Egg is a separate actor with its own cancellation path. */
     {
         const Sc64RaceUnitRule *rule = sc64_race_unit_rule(type);
-        if (rule && (rule->flags & SC_RACE_F_LARVA) && b[building].larva < 3)
-            ++b[building].larva;
+        if (rule && (rule->flags & SC_RACE_F_LARVA) && producer->larva < 3)
+            ++producer->larva;
     }
 #endif
-    b[building].queue_head = (b[building].queue_head + 1) % 5;
-    b[building].queue_count--;
-    b[building].queue_progress = 0;
+    if (--producer->queue_count == 0) {
+        producer->queue_head = (producer->queue_head + 1) % 5;
+        producer->queue_progress = 0;
+    }
     toast(0);
 }
 
@@ -12844,9 +12846,9 @@ draw_hud_commands_body(void)
             gfx_text(65, 126, unit_name(train_type), C_WHITE);
             gfx_text(125, 126, "Q", C_CYAN);
             gfx_num(137, 126, q->queue_count, C_GOLD);
-            gfx_text(5, 137, "A TRAIN L CANCEL R TYPE", C_GOLD);
+            gfx_text(5, 137, "A TRAIN L CANCEL LAST R TYPE", C_GOLD);
 	} else if (q->type == B_COMMAND)
-	    gfx_text(5, 137, "A TRAIN SCV  L CANCEL QUEUE", C_GOLD);
+	    gfx_text(5, 137, "A TRAIN SCV  L CANCEL LAST", C_GOLD);
 	else if (q->type == B_REFINERY)
 	    gfx_text(5, 137, "A ASSIGN WORKER TO GAS", C_CYAN);
     } else if (n) {
