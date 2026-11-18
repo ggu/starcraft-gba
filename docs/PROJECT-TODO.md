@@ -1427,14 +1427,22 @@ save/source-owner and timing evidence; do not advertise unwired components.
   [Reusing packed candidate coordinates](audits/2026-11-18-p7-current-mgba.md#reuse-the-collision-candidate-load)
   reduces the same mean to 2.002M cycles. A speed-plane hoist had
   negligible mean benefit and raised the sampled peak.
+- [Terrain validation #567](audits/2026-11-18-terrain-fast-validate.md)
+  is enabled on the canonical cartridges. The carried P7 physical-input
+  window averages 1.959M cycles with the terrain change. [Spatial defense
+  queries](audits/2026-11-12-defense-combined.md#qualification-on-the-terrain-default)
+  bring the same window to 1.921M, with matched world and display samples.
+  All four canonical cartridges share the Pylon lookup. Zerg and Protoss
+  campaign passes with target lists search nearby cells. Keep prioritizing
+  unit orders and repeated mission world scans, and measure stack usage
+  and worst updates alongside mean cycles.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals
-  at the starting setting and 184 at the higher setting. Read-only captures
-  support 7, 18 and 24 gameplay advances at the lower endpoint, default and
-  higher setting over the same 61 resumed observer steps. Finish mapping the
-  intervening settings and qualify display pacing separately before wiring a
-  GBA Game Speed option.
+  at the starting setting and 184 at the higher setting. The full set of
+  seven positions gives 7, 9, 12, 15, 18, 22 and 24 gameplay advances in
+  61 resumed observer steps. Use this ordering for a GBA Game Speed option,
+  with display pacing and long gameplay timing qualified independently.
 - The [earlier P7 measurement](audits/2026-11-06-current-native-qualification/README.md)
   at `72a71d22` costs about **2,200,226 cycles per advancing full loop**, versus
   about **559,000 cycles** available at 30 fps. The paired diagnostic matches

@@ -27,6 +27,10 @@ CANONICAL_ROUTE_KEEP_FLAGS ?= -DSC64_ROUTE_KEEP_FIELDS
 # compare every incremental update with a full rebuild.
 CANONICAL_PATH_GRID_UPDATE_FLAGS ?= -DSC64_PATH_GRID_INCREMENTAL
 
+# Snapshot Pylon power during defense passes. Campaign runtimes with Z/P
+# target lists can also restrict target searches to nearby spatial cells.
+CANONICAL_DEFENSE_FLAGS = -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
+
 # Optional differential of the per-profile tick cache, the 32-bit flight and
 # position paths against retained earlier code, over every prepared profile.
 .PHONY: test-sc64-weapon-source-ticks-bank
