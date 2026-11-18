@@ -680,7 +680,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   puts full point fills at 25.95% of the old dense Z7 loop and 4.95%
   of sampled Z9. Observed origins need about 39% and 2% of FIFO work,
   with at most 52 pending entries at first discovery. The paired Z9 probe
-  continues declined searches in the same ordered grid. Busy p95 improves
+  continues declined searches in the same ordered grid.
+  The [wide first-origin prototype](audits/2026-11-16-resumable-frontier-budget.md#wide-point-prefix-on-the-current-dense-z7-replay)
+  matches the dense Z7 tape and saves 9.09% mean against the pre-tail
+  control. The worst call rises 7.71%. Trace calls 47,995 and 48,100
+  against the shipping tail before enabling the prefix. Qualify other
+  wide workloads, memory guards and cross-loads after the spikes are understood.
+  On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
   audit tracks a byte lookup
   that cuts the wide grid setup loop from 14 Thumb instructions to eight

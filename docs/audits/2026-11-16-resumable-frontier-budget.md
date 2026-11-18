@@ -215,3 +215,45 @@ combinations and arbitrary mid-battle saves.
 | --- | --- |
 | Eight skirmish comparisons | `85e78368c9c6be7ba1f9472af50ec7e2203e7a7234275a5af8c2dee0fd25dd6c` |
 | Protoss 10 victory comparison | `4f85ff68fda54ef92285f71cb7abc302ed2e0ccf7e265462843905da2a7ee94b` |
+
+## Wide point prefix on the current dense Z7 replay
+
+The opt-in point-prefix prototype pauses a wide flood after the requested
+origin is discovered. Four ordered pending queues retain up to 128 cells
+each. The queue restores the exact assignments when a later reader needs
+more of the field. Logical insertions, ages and route counters keep the
+previous order. Saturation, blocked origins and unsupported layouts use the
+complete flood. Topology reset discards the parked work.
+
+The host sanitizer pair matches 386,646 route queries and the full logical
+residency stream. Focused oracles check all 16,384 directions after resume,
+blocked seeds, four simultaneous queues, forced overflow, the range
+reader, and fixed range scratch bindings. The residency receipt SHA-256 is
+`829634c7cb6709f6cff3745a23427180ef5d283cef158355d08d7386e849f516`.
+
+On Z10, `SC64_ROUTE_POINT_PREFIX_PROBE` with point-tail retention off
+matches all 131 ordinary HOME checkpoints, all 480 frame and route
+samples, and nine raw world and display samples through call 48,237.
+The comparison includes the separately measured shipping tail for context.
+
+| Guest cycles | `e7daddb1` control | Shipping tail | Point prefix |
+| --- | ---: | ---: | ---: |
+| Mean advancing call | 2,511,018 | 2,481,146 | 2,282,745 |
+| Mean advancing orders | 1,402,693 | 1,372,750 | 1,172,333 |
+| All-call p95 | 3,979,392 | 3,628,357 | 3,384,700 |
+| All-call maximum | 4,877,226 | 4,841,218 | 5,253,274 |
+
+The prefix cuts mean cost by 9.09% and p95 by 14.94% against `e7daddb1`.
+The maximum rises 7.71%. At call 47,995, game frame 46,734, orders cost
+251,543 fewer cycles than the no-tail control, while work outside that
+orders counter grows by 877,724 cycles. Trace that call by stage before
+changing the frontier. Call 48,100 adds 1,021,162 cycles against the
+shipping tail, mostly within orders. Both ROMs count two builds and
+three hits on that call. Trace both paths before enabling the prefix.
+
+The Z10 ARM link stays within its original guards at `0x03004e28` IWRAM
+and `0x02038d10` EWRAM. The probe stays experimental pending other profile
+links, save/load and timing on other wide workloads. These are guest-cycle
+results, with about 7.35 emulated updates per second in this dense sample.
+
+- Point-prefix comparison SHA-256 `160d75b965e5f6623f64087a12ccb41cffb6f4359b63ea79d76e7b0f8c35e617`.
