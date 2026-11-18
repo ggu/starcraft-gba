@@ -480,11 +480,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A passive replay did not reach elimination. [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
   tests retirement and neutral cargo on HOST. Its final victory now waits
   for deferred retirement, including a surviving Battlecruiser fixture.
-  The [opt-in ARM elimination replay](audits/2026-11-18-blood-bath-elimination-arm.md)
-  verifies a surviving Overlord transfers after CPU retirement and two
-  surviving units transfer on human defeat. Both states persist in fresh SRAM
-  loads. Default enablement still needs native in-flight damage and
-  simultaneous-outcome evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
+  Before ARM enablement, resolve in-flight damage and simultaneous
+  outcomes against native evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
   were published in that opening. A separate ordinary-input replay

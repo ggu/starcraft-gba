@@ -50,6 +50,15 @@ make test-sc64-native-skirmish-elimination
 The ARM target builds four independently identified preview cartridges.
 Their files and the input data stay in ignored local storage.
 
+## Emulated transition cost
+
+The Terran preview's retiring update took 671,303 elapsed ARM cycles,
+including the next input-sample boundary. Across 129 nearby advancing
+updates in each direction, average costs were 657,905 before retirement
+and 635,986 afterwards. These are local world samples around one event;
+the active armies and build counts change across it. Receipt SHA-256
+`c195aa91fa6ba3b1ec3d12838a3f7ebaa43f3ec746d74c4b2c4111aceb8e32d7`.
+
 ## Native qualification still open
 
 The [native end-rule audit](2026-11-13-n64-blood-bath-end-rules.md) identifies
