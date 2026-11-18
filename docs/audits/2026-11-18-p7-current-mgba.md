@@ -265,3 +265,73 @@ prototype stays local.
 | Pixel rotation comparison | `d3c115f25ad1778f6e4cfb9e8755ff90871d18b4182ec238adf566e5c2a72622` |
 | Collision shadow receipt | `06d8797f03cbb20623cc8f5f27746d3668a11b293dca7cddcf2ee53a1ce62aef` |
 | Detector owner-list comparison | `0e44158cf6850ee7786994038127af0c564145ca8775b0f5c7a1caa8aea7db75` |
+
+### Work inside the first collision lookup
+
+A diagnostic on the regular P10 vector at `3f19bcc5` matches the simulation,
+route and terrain decisions for all 1,000 input calls and all 11 world and
+display cuts. The diagnostic's counters add 2.52% to the mean advancing
+guest time. Counts below cover calls 8,021–9,019, between the boundary
+reads after calls 8,020 and 9,019.
+
+| Event | Count |
+| --- | ---: |
+| Uncached steering masks | 36,610 |
+| Ground movers at speed 1 | 23,379 |
+| Ground movers at speed 2 | 13,231 |
+| Bucket cells visited | 192,303 |
+| Empty bucket cells | 48,415 |
+| Actor nodes visited | 730,400 |
+| Mover self visits | 35,417 |
+| Wrong flight layer | 17,155 |
+| Outside the candidate's axis limit | 560,448 |
+| Geometry evaluations | 117,380 |
+| Masks ending with all eight directions blocked | 6,928 |
+
+All other instrumented rejection cases, including coincident actors and
+invalid or noncollidable type records, are zero in this window. About
+77% of nodes pass the other checks and fail the actor-specific axis limit.
+The measured misses favor a cheaper position and type read in the
+collision scan. Dense Z7 has a different rejection mix, with 44% of
+visited actors at the mover's exact coordinates in the earlier
+[Z7 experiment](2026-11-15-z7-contact-cost.md#exact-position-crowds-november-16).
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Collision scan classification trace | `c974921aa0ee41b01da11e4859c4f1edecf1eb4ba459f2e01a737aa6e88fa99d` |
+
+#### Packed nodes and deferred cache admission
+
+A packed-node experiment combines the next link, local coordinates and
+collision facts. Its live oracle checks 1,308,607 nodes across 87,497
+queries on P7 without a mismatch. The observer-off P7 pair matches all
+1,000 input calls and 11 world and display cuts. Against the normal release
+ROM, mean cycles increase 0.35% and p95 increases 0.34%. This layout stays
+experimental.
+
+The deferred-admission change computes the same steering mask and keeps
+the original direction loop and terrain checks. When steering moves the
+unit, the answer for its old position is immediately invalidated. When
+steering leaves the unit in place, a fresh result may enter the existing
+cache. With an empty cache, lookup also skips the eligibility pass until an
+answer needs admission. The asset-free sanitizer tests cover both legacy
+and persistent bucket implementations, a same-cell move, and reuse of a
+stopped mover's answer. Use `CANONICAL_CONTACT_DEFER_STEERING=0` for the
+control path.
+
+| Replay | Control mean | Candidate mean | Control p95 | Candidate p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Busy P7, 958 advancing calls | 1,901,686 | 1,883,235 | 2,197,484 | 2,179,910 |
+| Regular Z10 Blood Bath, three CPUs | 805,680 | 802,552 | 1,049,139 | 1,044,789 |
+
+The paired P7 run matches the 11 world, fog, palette and display cuts,
+plus the simulation, route and terrain timelines. Blood Bath matches all
+25 world, route, palette, arena and video cuts and the final SRAM after the
+usual pause save. A fresh title load continues to the same world.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Packed node P7 pair | `c00f28caad719e96e464ffd28004bee930f00c25b4a3993e2759aef6b0904987` |
+| Packed node live oracle | `a07363d27bd29cc50b43d1a36cef2485caf5e0c7680faed947b67897a52a608b` |
+| Deferred mask P7 replay | `3d21edd770c8da174fff431165dbc74ad23c16dcc9e79d25d81982de6636ae51` |
+| Deferred mask Z10 Blood Bath replay | `5b6e3d08e2984d9e3091f6073734b2ea646413eea80576c16b59d38378aff85c` |

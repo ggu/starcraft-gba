@@ -704,6 +704,45 @@ sc64_contact_blocked_mask(const Unit *q, int speed)
 #define sc64_contact_blocked_mask sc64_contact_blocked_mask_uncached
 #endif
 
+#if defined(SC64_CONTACT_DEFER_STEERING_MEMO) && defined(SC64_CONTACT_MEMO_ENABLED)
+/* Terrain checks run between the lookup and the final choice. A successful
+ * move immediately invalidates an answer for the mover's old position.
+ * Defer admission until the caller knows that the mover will stay put. */
+static unsigned __attribute__((noinline))
+sc64_contact_steering_query(const Unit *q, int speed, int *fresh)
+{
+    unsigned mask;
+#ifdef SC64_CONTACT_MEMO_ORACLE
+    SC64_CONTACT_MEMO_ORACLE_CALL();
+#endif
+    if (sc64_contact_memo_count && sc64_contact_memo_eligible(q, speed) &&
+        sc64_contact_memo_lookup(q, speed, !!sc64_contact_p6_active(), &mask)) {
+#ifdef SC64_CONTACT_MEMO_ORACLE
+        assert(mask == sc64_contact_blocked_mask_uncached(q, speed));
+#endif
+        *fresh = 0;
+        return mask;
+    }
+    *fresh = 1;
+    return sc64_contact_blocked_mask_uncached(q, speed);
+}
+
+static void __attribute__((noinline))
+sc64_contact_steering_remember(const Unit *q, int speed, unsigned mask)
+{
+    if (sc64_contact_memo_eligible(q, speed))
+        sc64_contact_memo_remember(q, speed, !!sc64_contact_p6_active(), mask);
+}
+
+#define SC64_STEER_MASK(q, speed, fresh) sc64_contact_steering_query(q, speed, fresh)
+#define SC64_STEER_REMEMBER(q, speed, blocked, best, fresh) do { \
+    if ((best) < 0 && (fresh)) sc64_contact_steering_remember(q, speed, blocked); \
+} while (0)
+#else
+#define SC64_STEER_MASK(q, speed, fresh) ((void)(fresh), sc64_contact_blocked_mask(q, speed))
+#define SC64_STEER_REMEMBER(q, speed, blocked, best, fresh) ((void)0)
+#endif
+
 /* Stock motion rate without the software division: (N * 52429) >> 18 equals
  * N / 5 for every N below 81920, which covers the whole profile table
  * (largest top speed 34130, so N = 68262). Larger values keep the division. */

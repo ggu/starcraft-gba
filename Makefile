@@ -5257,7 +5257,7 @@ test-sc64-direct-firing-points-game: test-sc64-direct-firing-flags build/test-sc
 
 # Asset-free exact contact memo contract fixture; the same collision headers
 # are compiled in their per-frame and persistent bucket lifecycle variants.
-SC64_CONTACT_MEMO_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST $(CS_MEMO_FLAGS)
+SC64_CONTACT_MEMO_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST $(CS_MEMO_FLAGS) $(CS_STEER_FLAGS)
 build/test-sc64-contact-memo-legacy: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_collision_legacy.h common/gba.h Makefile | build
 	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) $< -o $@
 build/test-sc64-contact-memo-persistent: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_persistent_collision.h common/gba.h Makefile | build

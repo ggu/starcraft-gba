@@ -1479,13 +1479,20 @@ save/source-owner and timing evidence; do not advertise unwired components.
   hits on 36,650 requests.
   Prioritize the cost of the first collision lookup and repeated terrain
   work during both axes of camera movement.
+- The [first-lookup breakdown](audits/2026-11-18-p7-current-mgba.md#work-inside-the-first-collision-lookup)
+  visits about 20 actor nodes per mask. About 77% fail the distance check
+  after reading actor facts, and only 2% fail the flight layer. Packed
+  nodes raise mean cost 0.35%. Deferring admission of a fresh steering
+  mask until the mover stays put saves 0.97% on P7 and 0.39% in regular
+  Z10 Blood Bath. Qualify a dense Z7 case separately.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
   on one row. [Four Blood Bath SCVs](audits/2026-11-07-native-actor-differential/README.md#blood-bath-workers-and-the-minimap)
   instead receive one common destination per command, with different
-  intermediate waypoints. Compare troops and workers from matched starts,
-  including field and minimap orders, before changing shared formation.
+  intermediate waypoints. A matched follow-up gives the same SCVs common
+  targets at both short and long field distances. Compare troops and
+  workers from matched starts before changing shared formation.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals

@@ -93,6 +93,24 @@ when the original game assigns a formation destination.
 | Native observation manifest | `f600306182e49e3eddc40ae8f12f02d989c84465c072647bc5256bb578af7623` |
 | Offline actor analysis | `8a988d6542a66fbdfa1bcf40250eedfc2829edea5e0740e214e24c6a08053417` |
 
+#### Matched near and far field orders
+
+A second ares run reproduces the Blood Bath baseline and first Move, with
+byte-identical RAM and raw frames at those two points. The same four SCVs
+first target (1710, 337), 234–271 source pixels from their sampled
+positions. The second Move is issued with the green field pointer above the
+minimap. All four replace their pending target with (1216, 152) at observer
+step 4,363, at sampled distances of 487–720 source pixels. Their
+intermediate waypoints are distinct at both points. Common destinations
+occur in this scene for short and long field orders as well as for the
+minimap order. The remaining differences from the Wasteland Marines
+include the actors, initial spread and map geometry.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Matched field observation manifest | `a84e71edb291c0f45178f0da4fde50567d09f710bba4b6f18534f0647386a25b` |
+| Matched field actor analysis | `884d4fadf377bc4fd039448f0def4c410bbe833c5470041d59be0076762ac64d` |
+
 ## Three-sample frontend budget proof before execution
 
 The separate follow-up observer permits at most three 8 MiB RDRAM samples and three frames within the existing 2 MiB frame budget. The parent caps stdout at 256 KiB and stderr at 512 KiB. The child normally runs with a 2 MiB per-file soft limit and 8 MiB hard limit; only while synchronously writing a validated RAM snapshot does it raise the soft limit to 8 MiB and immediately lower it again. During that synchronous copy no guest CPU execution is requested. The fixed pinned USA ROM copy is 32 MiB. The pinned ares `mia/medium/nintendo-64.cpp` identifies StarCraft 64 as a 128 KiB Flash game; the isolated frontend connects no controller pak.
