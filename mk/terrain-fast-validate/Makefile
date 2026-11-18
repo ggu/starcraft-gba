@@ -1,6 +1,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Opt-in SC64_TERRAIN_FAST_VALIDATE (cheaper per-frame terrain-cache
-# validation with the same results). Asset-free host checks:
+# SC64_TERRAIN_FAST_VALIDATE (cheaper per-frame terrain-cache validation with
+# the same results) is on in every imported-mission build: the top-level
+# Makefile appends $(TFV) to SC64_FLAGS and BACKWATER_FLAGS, the roots of
+# every imported flag set. TERRAIN_FAST_VALIDATE=0 restores the earlier
+# compile lines exactly (the value carries its own leading space, so an empty
+# one leaves no trace). The tile renderer has its own terrain path and drops
+# the flag (P7_TILE_FLAGS). Defined here, before those sets are assigned.
+TERRAIN_FAST_VALIDATE ?= 1
+TFV :=
+ifneq ($(TERRAIN_FAST_VALIDATE),0)
+TFV := $(TFV) -DSC64_TERRAIN_FAST_VALIDATE
+endif
+# Asset-free host checks:
 #   test-terrain-fast-validate        differential test, reference vs. fast side
 #   test-terrain-fast-validate-cache  the existing terrain-cache, scroll,
 #                                     key-once, soft-fog and dirty-capture
