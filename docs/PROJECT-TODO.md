@@ -1420,6 +1420,9 @@ save/source-owner and timing evidence; do not advertise unwired components.
   existing memory guards. Full contact masks still merit attention, and
   the isolated 908,000-cycle point-field fill needs separate tail work.
   Keep physical GBA timing and peak-stack checks open.
+  [Reusing packed candidate coordinates](audits/2026-11-18-p7-current-mgba.md#reuse-the-collision-candidate-load)
+  reduces the same mean to 2.002M cycles. A speed-plane hoist had
+  negligible mean benefit and raised the sampled peak.
 - The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
   matched two fresh Challenger openings and changed only the Game Speed
   slider. The same 2,700 observer steps after resume earned 128 minerals

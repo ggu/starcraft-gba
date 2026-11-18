@@ -659,7 +659,15 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 if (((cc & SC64_CONTACT_FLYING) != 0) != mover_flying) continue;
                 if (sc64_contact_burrowed(c, cc, p6)) continue;
                 if (radius < mover_radius) radius = mover_radius;
+#if defined(SC64_CONTACT_COINCIDENT_PROBE) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE))
+                /* The word from the coincident test already contains both
+                 * coordinates. Extract them in native halfword order. */
+                s16 coordinates[2];
+                __builtin_memcpy(coordinates, &xy, sizeof(xy));
+                ox = coordinates[0] - q->x; oy = coordinates[1] - q->y;
+#else
                 ox = c->x - q->x; oy = c->y - q->y;
+#endif
                 /* For nonzero speed every step is farther than the current
                  * zero distance. Keep speed zero and invalid-class fallback. */
                 if (speed != 0 && ox == 0 && oy == 0) continue;

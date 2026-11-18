@@ -135,3 +135,29 @@ matching uninterrupted play. The four lobbies covered both maps, all
 human races, one to three CPUs, and a sparse two-CPU lineup. The clean
 source checkout passed `./dev test` with 1,161 Python cases, 35 skips,
 and the compiled and auxiliary checks.
+
+## Reuse the collision candidate load
+
+The packed collision path already reads a candidate's aligned pair of
+signed coordinates for the coincident-position test. The next candidate
+build reuses those two halfwords when calculating the mask offset.
+
+The same physical P7 window on release `ca822ea7` passed all 11
+world, framebuffer and palette checks and all 1,000 checked update and
+route observations. Mean cost moved from 2,011,436 to 2,002,131 cycles
+per advancing update, a 0.46% reduction. The 95th percentile moved from
+2,307,879 to 2,298,965, and the peak from 2,681,419 to 2,664,696.
+The P10 sanitizer oracle matched 636,690 active and 130,616 inactive
+contact masks. All four standard ARM products passed link guards and
+their three-CPU Blood Bath menu smoke. Each 32 KiB SRAM export matched
+its release counterpart byte-for-byte and loaded in a fresh emulator.
+
+A separate trial moved the collision table's speed-plane calculation out
+of the candidate scan. Its mean fell by 0.018% and its peak rose, so the
+release skips that change.
+
+| Record | SHA-256 |
+| --- | --- |
+| Paired P7 coordinate reuse | `a22e24caf680d768d894cd8f45b8e552631e94176799e9d3047c85f4d92b764d` |
+| Four-profile ARM save comparison | `578799c6f4f246cfa1cd8fae8182eb94283f95a5edfb52cc523238a715f2683f` |
+| Separate speed-plane trial | `0b57e84083cad0eb627919ac2d1ceba601711260f54d79eb6b3b5e391d77b7a1` |
