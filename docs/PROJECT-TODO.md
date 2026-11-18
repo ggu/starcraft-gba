@@ -1599,10 +1599,12 @@ save/source-owner and timing evidence; do not advertise unwired components.
   inside the raster wrapper. Initial culling uses only 2,553 cycles.
   The tighter per-profile bounds bank matches all 25 cuts and SRAM
   bytes but leaves whole-update cost flat at about 796,000 cycles.
-  Prioritize admitted animation and overlay work, alongside HUD costs
-  and the separate orders spikes. Finish other cartridge profiles and
-  physical GBA timing
-  before considering regular activation.
+  The standard managed index saves 1.01% in this exact link vector.
+  Skipping empty overlay streams saves another 0.95% with matching
+  cuts and save bytes, leaving this match around 21.5 emulated updates/s.
+  Prioritize the separate movement and orders spikes. Check the other
+  cartridge profiles and physical GBA timing before regular activation
+  of the route candidate.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for

@@ -263,6 +263,35 @@ does not establish a performance benefit or qualify other maps.
 - Per-profile bounds replay SHA-256 `702d354903c8cc0a8e8f578cb4be0b21ace0475db3d90859c88345a742a71a71`.
 - Candidate ROM SHA-256 `4c04df50194fd5658f01ae1b4ecf1e292d5188ec5cfb53b58d66c8b5c987fdb8`.
 
+### Managed index and empty overlay streams
+
+The sampled route control uses the original lookup bank. Standard builds
+already select the managed lookup index. Replay the same 1,000-update
+window first with that index as the only link-vector change, then with
+the same index and an early guard for empty overlay streams. The guard
+avoids sampling the attacker's frame solely to anchor an empty stream.
+Projectile Init, Flight and Death still choose their normal frames and
+timings. Each skips only its empty overlay pass.
+
+| Guest cycles per controller update | Original lookup | Managed index | Managed index + overlay guard |
+| --- | ---: | ---: | ---: |
+| Mean | 795,983 | 787,931 | 780,471 |
+| p95 | 1,038,189 | 1,025,081 | 1,019,443 |
+| Maximum | 2,008,978 | 1,990,887 | 1,981,107 |
+
+The index saves 1.01% on this window. The guard independently saves
+0.95% against the indexed control, with unchanged linked data and BSS
+sizes and 16 added text bytes. All 25 world and display cuts, frame IDs,
+route build and hit counts, and exact 32 KiB SRAM exports match, including
+the fresh load and its 180-update continuation. The asset-free sanitizer
+suite passes, as does the generated-bank fixture compiled directly with
+the retained original and indexed headers. This run measures one fixed-camera
+three-AI match in emulation. The 30-updates/s budget remains 561,792 cycles.
+
+- Indexed replay SHA-256 `982d97421d4ad397a79acc2eb8cb96099d7e055144966941377a9755a3d05f9b`.
+- Overlay guard replay SHA-256 `89f51ae8cc506765eecb9a6fe18feef32407b1a0baecbe48a3a200ab563115c6`.
+- Overlay guard ROM SHA-256 `2ab1bfd8a4802457c82b4b6b038b26abda7771357f1520fa314a76d15f6920ef`.
+
 ## Independent 128 × 128 Zerg 9 check
 
 The same ROM pair replays 46,500 ordinary controller updates from
