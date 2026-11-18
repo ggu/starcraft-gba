@@ -29,9 +29,23 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   240 updates measure 19.76–20.76 emulated updates per second across
   the six setups. Both three-opponent openings average about 560,000
   draw cycles and 110,000 simulation cycles. Prioritize draw cost and
-  profile the slowest simulation updates separately. All seats share
-  one roster. Verify a complete ARM match on both maps and add distinct
-  original rosters.
+  profile the slowest simulation updates separately. Verify a complete
+  ARM match on both maps.
+
+- **Frontier factions (P1):** three separate asset-free cartridges fix
+  the human faction while retaining the two maps, one to three opponents,
+  and independent CPU faction selection. Foundry Riflers, Rovers
+  Skimmers, and Bulwark Wardens have different weapon reach, damage,
+  cadence, movement, health, and silhouettes. The AI uses a faction's
+  worker and attack thresholds. All three currently share support units
+  and structures. All 18 cartridge, map, and opponent-count combinations
+  passed ordinary-input host and mGBA startup checks. The host cases
+  reached CPU production and the six three-CPU ARM cases saved at update
+  900, resumed in a fresh process, and restarted with the same setup.
+  Foundry also loaded the previous single-roster cartridge's SRAM at its
+  saved map. The 240-update ARM openings measured 19.76–20.79 updates
+  per second. Full ARM matches, physical GBA performance, and distinct
+  support units and production remain open.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening

@@ -284,9 +284,16 @@ skirmish_sync_ai(int index)
     ai->queued_army = queued_army;
     ai->workers_mining = mining + (workers - mining - gas_workers);
     ai->workers_gas = gas_workers;
+#ifdef SC_FRONTIER_FACTION
+    const FrontierFactionProfile *faction = frontier_owner_profile(owner);
+    ai->desired_workers = faction->desired_workers;
+    ai->desired_gas_workers = 0;
+    ai->attack_threshold = faction->attack_threshold;
+#else
     ai->desired_workers = 8;
     ai->desired_gas_workers = 0;
     ai->attack_threshold = 8;
+#endif
 }
 
 static void
@@ -449,8 +456,14 @@ skirmish_init(void)
     for (i = 0; i < skirmish_bots; ++i) {
         owner = skirmish_owner_ids[i];
         sc64_ai_init(&skirmish_ai[i], (unsigned char)owner, (unsigned char)owner, 200, 0, 4, 36);
+#ifdef SC_FRONTIER_FACTION
+        const FrontierFactionProfile *faction = frontier_owner_profile(owner);
+        skirmish_ai[i].desired_workers = faction->desired_workers;
+        skirmish_ai[i].attack_threshold = faction->attack_threshold;
+#else
         skirmish_ai[i].desired_workers = 8;
         skirmish_ai[i].attack_threshold = 8;
+#endif
     }
     frame = 0;
     death_vfx_reset();
