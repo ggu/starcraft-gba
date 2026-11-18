@@ -978,6 +978,64 @@ static void check_point_component_witness(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+static void check_point_seed_component(void)
+{
+    const int origin = 20 + 32 * 128, root = 100 + 32 * 128;
+    const int seed = 100 + 100 * 128, connected = 105 + 64 * 128;
+    const int target_x = 100 * 16 + 8, target_y = 32 * 16 + 8;
+    enum { FRESH, STALE, PARKED, ABSENT };
+
+    for (int mode = FRESH; mode <= ABSENT; ++mode) {
+        int witness = -1, nx = -1, ny = -1;
+        point_component_map();
+        if (mode == PARKED) {
+            witness = sc64_route_slot_for(seed, seed + 1);
+            assert(witness >= 0 && sc64_point_prefix_find(witness));
+        } else if (mode != ABSENT) {
+            witness = sc64_route_slot(seed);
+            assert(witness >= 0);
+            if (mode == STALE) SC64_ROUTE_PF(witness) |= SC64_ROUTE_FLAG_STALE;
+        }
+        const u32 builds = sc64_route_builds, hits = sc64_route_hits;
+        const u32 witness_age = witness >= 0 ? sc64_route_age[witness] : 0;
+        assert(!sc64_route_next(20 * 16 + 8, target_y, target_x, target_y, &nx, &ny));
+        assert(nx == -1 && ny == -1);
+        assert(sc64_route_builds == builds + 1 && sc64_route_hits == hits);
+        int slot = -1;
+        for (int i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i)
+            if (sc64_route_valid[i] == 1 && sc64_route_goal[i] == root) slot = i;
+        assert(slot >= 0 && sc64_route_get(slot, root) == 0 &&
+               sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+        if (witness >= 0) assert(sc64_route_age[witness] == witness_age);
+        if (mode != FRESH) {
+            assert(!sc64_point_prefix_find(slot) &&
+                   sc64_route_get(slot, connected) != SC64_ROUTE_UNREACHABLE);
+            continue;
+        }
+
+        const Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+        assert(prefix && sc64_point_prefix_seed_only(prefix));
+        assert(sc64_route_get(slot, connected) == SC64_ROUTE_UNREACHABLE);
+        const u32 inserted_age = sc64_route_age[slot];
+        assert(!sc64_route_next(20 * 16 + 8, target_y, target_x, target_y, &nx, &ny));
+        assert(nx == -1 && ny == -1 && sc64_point_prefix_find(slot) == prefix);
+        assert(sc64_route_builds == builds + 1 && sc64_route_hits == hits + 1 &&
+               sc64_route_age[slot] > inserted_age && sc64_route_age[witness] == witness_age);
+
+        /* A strict reader still obtains the complete, tie-ordered field. */
+        const u32 before = state_hash();
+        sc64_point_prefix_require(slot, connected);
+        assert(!sc64_point_prefix_find(slot) && state_hash() == before);
+        reference_bfs(&oracle[POOL], root);
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+        check_grid_unchanged();
+    }
+    puts("disconnected seed preserves insertion, hit order and exact later reads");
+}
+#endif
+
 #ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
 static void check_point_near_distance(void)
 {
@@ -1148,6 +1206,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-seed-component-only")) {
+        check_point_seed_component();
+        return 0;
+    }
+#endif
 #ifdef SC64_ROUTE_POINT_NEGATIVE_MEMO
     if (argc == 2 && !strcmp(argv[1], "--point-negative-only")) {
         check_point_negative_memo();

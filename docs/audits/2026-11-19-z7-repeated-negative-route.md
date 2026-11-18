@@ -94,3 +94,59 @@ target, other dense fights and real GBA timing remain open.
 
 - Same-source control ROM SHA-256 `28e7dd6852ec8e00a98fef6a76de32c14976d7c60f52719644f5c60f7527e73b`.
 - Same-source control receipt SHA-256 `5bb1f63cfaea8b883642b891235b1aee1adee43f11946a0d44fc67b5eb5295ee`.
+
+The read-only instruction trace of the memo binary explains the
+cost tradeoff. The input and result of every ordinary point query
+matches the control. The memo answers 513 of those requests, while
+retained-field acquisitions fall from 13 to 6 and real complete
+fields increase from 151 to 168. The complete acquisitions now use
+about 272,600 cycles per advancing update. A raw memo hit says little
+about the overall benefit when the cache residency changes.
+
+- Memo instruction trace SHA-256 `9c74af5429fc80e071aaa2cbe156006d4658f95315ef8123afbf82bd69579396`.
+
+## Deferred field with ordinary cache insertion
+
+An independent analysis labels the captured static walkability grid.
+For all 163 observed failed acquisitions, the first eligible complete
+resident field other than the victim proves the two open endpoints
+are disconnected. The existing parked-prefix pool has spare capacity
+at each of those acquisitions.
+
+With `SC64_ROUTE_POINT_SEED_COMPONENT_PROBE`, a disconnected request
+still chooses, inserts and ages the ordinary cache slot. The slot
+starts with just the goal cell in the existing FIFO. A repeated move
+can use a fresh disconnection proof. Other reads use the established
+exact materialization path when the parked field cannot answer, and
+the old build path remains available when the proof or a FIFO slot
+is unavailable. Link-time EWRAM and IWRAM ends match the control.
+
+`make test-sc64-route-point-seed-component` checks stale, parked,
+missing and complete witnesses, then compares per-query cache state
+across 386,646 route queries and 26,306 independent resident-field
+checks per variant. The physical fill counters can differ because
+the candidate defers fills. Logical cache state matches byte for
+byte. The existing range-copy sanitizer fixture also passes all
+8,320 cases with the new flag.
+
+| Dense Z7, 477 advancing updates | Control | Deferred field |
+| --- | ---: | ---: |
+| Mean cycles per update | 2,048,123 | 1,822,508 |
+| p95 cycles per update | 2,741,649 | 2,652,372 |
+| Slowest update, cycles | 4,258,918 | 3,500,472 |
+| Mean order cycles | 1,111,345 | 885,334 |
+| Cycle-based emulated updates per second | 8.19 | 9.21 |
+
+Mean cost falls 11.02%, p95 falls 3.26%, and the slowest update
+falls 17.81%. Logical route counters match at every measured call.
+All 131 historical checkpoints, 480 frame and screen records, nine
+raw world and display cuts, and per-call sampled actor changes
+match. The separate authenticated late Z7 save reaches victory with
+all six raw world and display cuts identical to the control.
+The deferred field is the candidate for further qualification.
+Check dense skirmish and other campaign timing, fresh saves, and
+physical hardware before enabling it in regular builds.
+
+- Deferred-field ROM SHA-256 `2d9b4311908ee477bf711d425dc2a23ae45bac85ad86017f966064fcd8e2bfdb`.
+- Dense replay receipt SHA-256 `0c0555eb675867fc641a17c0fe39c0768e9a999a9ecc341d2da104e71c6daae5`.
+- Late save receipt SHA-256 `8110b55f5920b04225a86480f338ce0d598a4f43e2e6fa648bcefa26fee501f2`.

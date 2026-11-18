@@ -1569,9 +1569,12 @@ save/source-owner and timing evidence; do not advertise unwired components.
   opt-in memo matches 131 ordinary-input checkpoints, nine raw world
   and display cuts, and the final 9,132 inputs of a fresh late-save win.
   Mean cycles fall 2.13%, but p95 rises 17.4% and logical builds rise
-  from 614 to 626. Keep it experimental. Test deferring the flood while
-  preserving the logical slot and age, then check other dense scenarios
-  before considering shared default activation.
+  from 614 to 626. The opt-in deferred-field candidate preserves
+  logical slots, ages and counters. It drops mean cycles 11.02%, p95
+  3.26%, and the maximum 17.81%, with matching dense replay and late-save
+  victory, and identical static RAM ends. Prefer it for cross-profile
+  comparison. Verify other dense campaigns and skirmishes, save/load,
+  and physical GBA timing before considering regular activation.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for

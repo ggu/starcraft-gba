@@ -110,6 +110,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point component witnesses require resumable point prefixes"
 #endif
+#if defined(SC64_ROUTE_POINT_SEED_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_COMPONENT_PROBE)
+#error "deferred point seeds require component witnesses"
+#endif
 #if defined(SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_COMPONENT_PROBE)
 #error "nearby-root component rejection requires point component witnesses"
 #endif
@@ -2238,7 +2241,11 @@ sc64_route_slot(int goal)
 #else
 #ifdef SC64_ROUTE_KEEP_FIELDS
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+            sc64_point_prefix_require_mode(i, origin, 1);
+#else
             sc64_point_prefix_require(i, origin);
+#endif
 #endif
             if (SC64_ROUTE_LAZY(i) &&
                 (origin < 0 || !sc64_route_gate(i, origin, goal)))

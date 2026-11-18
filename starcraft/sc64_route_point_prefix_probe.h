@@ -38,6 +38,35 @@ static Sc64PointPrefix *sc64_point_prefix_free(void)
     return 0;
 }
 
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+static inline void sc64_point_prefix_park(Sc64PointPrefix *prefix, int slot, int goal,
+                                          const u16 *pending, int count)
+{
+    sc64_point_prefix_discard(prefix);
+    prefix->goal = (u16)goal;
+    prefix->slot = (u8)slot;
+    memcpy(prefix->queue, pending, (size_t)count * sizeof(*pending));
+    prefix->count = (u8)count;
+    sc64_point_prefix_index[slot] = (u8)(prefix - sc64_point_prefixes + 1);
+}
+
+static int sc64_point_component_reaches(int slot, unsigned root, int cell, unsigned limit);
+
+static inline int sc64_point_prefix_padded_seed(int root)
+{
+    return root + (root / SC64_LINEAR_WIDE_COLS + 1) * SC64_LINEAR_PAD +
+           SC64_LINEAR_WIDE_COLS + 4;
+}
+
+/* An open seed enters the FIFO once. If it is still the only pending cell,
+ * no expansion has run and a full reader can start the ordinary fill. */
+static inline int sc64_point_prefix_seed_only(const Sc64PointPrefix *prefix)
+{
+    return prefix->count == 1 &&
+           prefix->queue[0] == sc64_point_prefix_padded_seed(prefix->goal);
+}
+#endif
+
 /* The caller already checked stride and the open origin. Check for it after
  * whole 32-pop batches, preserving seed and neighbour order even on decline.
  * Showcase keeps this loop in ROM to reserve its IWRAM stack. */
@@ -89,10 +118,28 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
     const int stride = cols + SC64_LINEAR_PAD;
     const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *field = sc64_route_field[slot];
+#ifndef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
+#endif
     int goal_start = goal + sc64_cell_row(goal) * SC64_LINEAR_PAD + stride + 4;
     int origin_start = origin + sc64_cell_row(origin) * SC64_LINEAR_PAD + stride + 4;
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+    int head = 0, tail;
+    /* A negative witness can answer this open origin immediately. Keep the
+     * ordinary logical insertion and a real FIFO seed for future readers. */
+    if (sc64_point_component_reaches(slot, (unsigned)goal, origin, 1) == 0) {
+        const u16 seed = (u16)goal_start;
+        sc64_route_field_clear(field);
+        sc64_route_put_new(field, goal, 0);
+        sc64_point_prefix_park(prefix, slot, goal, &seed, 1);
+        tail = 1;
+        goto filled;
+    }
+    u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
+    tail = sc64_route_linear_seed(dense, goal_start, stride);
+#else
     int head = 0, tail = sc64_route_linear_seed(dense, goal_start, stride);
+#endif
     tail = sc64_point_prefix_expand(dense, origin_start, stride, cap, &head, tail);
     int pending = tail - head;
     if (pending > 0 && pending <= SC64_POINT_PREFIX_PENDING && dense[origin_start] != 7u) {
@@ -106,17 +153,24 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
             int cell = at - dense_row * SC64_LINEAR_PAD - cols - 4;
             sc64_route_put_new(field, cell, dense[at]);
         }
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+        sc64_point_prefix_park(prefix, slot, goal, bfs_queue + head, pending);
+#else
         sc64_point_prefix_discard(prefix);
         prefix->goal = (u16)goal;
         prefix->slot = (u8)slot;
         memcpy(prefix->queue, bfs_queue + head, (size_t)pending * sizeof(*bfs_queue));
         prefix->count = (u8)pending;
         sc64_point_prefix_index[slot] = (u8)(prefix - sc64_point_prefixes + 1);
+#endif
     } else {
         tail = sc64_route_expand_linear_from(dense, tail, stride, cap, head);
         if (tail < 0) return sc64_route_fill(slot, goal);
         sc64_route_pack_linear(field, dense, cols, rows, stride);
     }
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+filled:
+#endif
     SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
     SC64_ROUTE_PF(slot) = 0;
     SC64_ROUTE_KEEP_COUNT(FILL);
@@ -129,6 +183,12 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
 {
     Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
     if (!prefix) return 0;
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+    if (sc64_point_prefix_seed_only(prefix)) {
+        (void)sc64_route_fill(slot, sc64_route_goal[slot]);
+        return 1;
+    }
+#endif
     const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
     const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *field = sc64_route_field[slot];
@@ -159,26 +219,57 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
     return 1;
 }
 
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+static void sc64_point_prefix_require_mode(int slot, int cell, int ordinary_move)
+{
+    Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+    if (!prefix || (cell >= 0 && sc64_route_get(slot, cell) != SC64_ROUTE_UNREACHABLE)) return;
+    if (ordinary_move && cell >= 0 && SC64_GRID_GET(path_walkable, cell) &&
+        sc64_point_prefix_seed_only(prefix) &&
+        sc64_point_component_reaches(slot, prefix->goal, cell, 1) == 0)
+        return;
+    (void)sc64_point_prefix_complete(slot);
+}
+
+static void sc64_point_prefix_require(int slot, int cell)
+{
+    sc64_point_prefix_require_mode(slot, cell, 0);
+}
+#else
 static void sc64_point_prefix_require(int slot, int cell)
 {
     if (sc64_point_prefix_find(slot) &&
         (cell < 0 || sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE))
         (void)sc64_point_prefix_complete(slot);
 }
+#endif
 
 #ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
 /* A complete field seeded at one open tile describes exactly one connected
  * component. If it includes either endpoint, it decides their connectivity
  * without consuming that field or completing the requested one. */
-static int __attribute__((noinline)) sc64_point_prefix_component_reaches(int slot, int cell)
+static int __attribute__((noinline))
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+sc64_point_component_reaches(int slot, unsigned root, int cell, unsigned limit)
+#else
+sc64_point_prefix_component_reaches(int slot, int cell)
+#endif
 {
+#ifndef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
     enum { MAX_WITNESSES = 4 };
+#endif
     const unsigned cells = (unsigned)MAP_COLS * (unsigned)MAP_ROWS;
+#ifndef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
     const unsigned root = sc64_route_goal[slot];
+#endif
     if (root >= cells || !SC64_GRID_GET(path_walkable, root)) return -1;
     const int active_slots = SC64_ROUTE_ACTIVE_SLOTS;
     unsigned checked = 0;
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+    for (int witness = 0; witness < active_slots && checked < limit; ++witness) {
+#else
     for (int witness = 0; witness < active_slots && checked < MAX_WITNESSES; ++witness) {
+#endif
         if (witness == slot || sc64_route_valid[witness] != 1 || SC64_ROUTE_LAZY(witness) ||
             sc64_point_prefix_find(witness)) continue;
         const unsigned seed = sc64_route_goal[witness];
@@ -190,6 +281,12 @@ static int __attribute__((noinline)) sc64_point_prefix_component_reaches(int slo
     }
     return -1;
 }
+#ifdef SC64_ROUTE_POINT_SEED_COMPONENT_PROBE
+static int sc64_point_prefix_component_reaches(int slot, int cell)
+{
+    return sc64_point_component_reaches(slot, sc64_route_goal[slot], cell, 4);
+}
+#endif
 #endif
 
 #ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
