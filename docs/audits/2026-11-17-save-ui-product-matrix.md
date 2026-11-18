@@ -67,13 +67,17 @@ inputs and compiler vector, with only the UI-context flag toggled;
 they are different binaries from the archived November 17 pair.
 
 The [normal T1 replay driver](../../tools/sc64_t1_normal_replay.py)
-independently verifies the ordinary save/restart/load using a fresh
+independently verifies the ordinary save/restart/load from a fresh
 boot, checks the restored semantic world, and records the saved and
-loaded menu fields. The rebuilt regular ROM wins with all 11 named
+loaded menu fields. Both rebuilt ARM ROMs win with all 11 named
 checkpoints, nine briefing pages and eight in-field dialogue pages
-observed. Its pause load preserves the world and resets the remembered
-row from 1 to 0. The optional build still needs this ARM check against
-its newly generated input tape before default enablement.
+matched. Both restore the world at frame 6,214. The regular ROM resets
+the remembered row from 1 to 0; the opted-in ROM restores row 1 with
+its menu closed. Both then confirm Barracks in row 2 at game frame
+6,227. They finish with the same named victory state, including Raynor
+alive. This clears the Wasteland tape discrepancy for the tested pair;
+default enablement still needs a shared-profile release check with the
+restored menu behavior.
 
 | Local evidence (SHA-256) | Digest |
 | --- | --- |
@@ -88,3 +92,4 @@ its newly generated input tape before default enablement.
 | Rebuilt opt-in T1 host tape | `27b78c4bcd6ee7076126a224c4a6fe362190fb7105631b446e19bde5689fc9ba` |
 | Rebuilt physical observer | `724715d35416c4d202041fc0585fa4f1542f1b4d8ed6b53a6db373c9d8caa50d` |
 | Rebuilt regular T1 ARM receipt | `541641b89e18d70843c4286aa503104f7c346536fa6bbade3d84761787385220` |
+| Rebuilt opt-in T1 ARM receipt | `7aac3954f2f25adaf2b0f8ea00e3f650573c33f7168ede790a48210ff79a1dcc` |
