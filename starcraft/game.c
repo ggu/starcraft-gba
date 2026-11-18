@@ -9763,50 +9763,77 @@ death_vfx_update(void)
 }
 #endif
 
+#ifndef SC64_IMPORTED_MISSION
+/* The half-width at row offset d is floor(sqrt(radius² - d²)).
+ * Explored tiles use an actor's tile center. Current visibility instead
+ * uses the actor's pixel position, including its offset within that tile. */
+static const u8 explored_span_3[] = {3, 2, 2, 0};
+static const u8 explored_span_4[] = {4, 3, 3, 2, 0};
+static const u8 explored_span_5[] = {5, 4, 4, 4, 3, 0};
+static const u8 explored_span_7[] = {7, 6, 6, 6, 5, 4, 3, 0};
+
+static void GBA_HOT
+mark_explored_circle(int c, int r, int radius, const u8 *span)
+{
+    int top = r - radius < 0 ? 0 : r - radius;
+    int bottom = r + radius < MAP_ROWS ? r + radius : MAP_ROWS - 1;
+    for (int row = top; row <= bottom; row++) {
+        int width = span[row < r ? r - row : row - r];
+        int left = c - width < 0 ? 0 : c - width;
+        int right = c + width < MAP_COLS ? c + width : MAP_COLS - 1;
+        for (int col = left; col <= right; col++)
+            SC64_GRID_SET(explored, col + row * MAP_COLS, 1);
+    }
+}
+
+static void GBA_HOT
+mark_visible_circle(int x, int y, int radius, int tile_extent)
+{
+    int c = x / 16, r = y / 16;
+    int left = c - tile_extent < 0 ? 0 : c - tile_extent;
+    int right = c + tile_extent < MAP_COLS ? c + tile_extent : MAP_COLS - 1;
+    int top = r - tile_extent < 0 ? 0 : r - tile_extent;
+    int bottom = r + tile_extent < MAP_ROWS ? r + tile_extent : MAP_ROWS - 1;
+    int radius_squared = radius * radius;
+    int dy = top * 16 + 8 - y;
+    for (int row = top; row <= bottom; row++, dy += 16) {
+        int remaining = radius_squared - dy * dy;
+        if (remaining < 0)
+            continue;
+        int dx = left * 16 + 8 - x;
+        for (int col = left; col <= right; col++, dx += 16)
+            if (dx * dx <= remaining)
+                SC64_GRID_SET(visible, col + row * MAP_COLS, 1);
+    }
+}
+#endif
+
 static void GBA_HOT
 update_exploration(void)
 {
 #ifdef SC64_IMPORTED_MISSION
     sc64_update_exploration();
 #else
-    int i, col, row;
     SC64_GRID_CLEAR(visible);
-    for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_HIDDEN(&u[i]) && u[i].owner == SIDE) {
-	    int c = u[i].x / 16, r = u[i].y / 16, radius = IS_WORKER(u[i].type) ? 4 : 5;
-	    for (row = r - radius; row <= r + radius; row++)
-		for (col = c - radius; col <= c + radius; col++)
-		    if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS &&
-			(col - c) * (col - c) + (row - r) * (row - r) <= radius * radius)
-			SC64_GRID_SET(explored, col + row * MAP_COLS, 1);
-	    radius = IS_WORKER(u[i].type) ? 56 : 72;
-	    for (row = r - 5; row <= r + 5; row++)
-		for (col = c - 5; col <= c + 5; col++)
-		    if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS) {
-			int dx = col * 16 + 8 - u[i].x;
-			int dy = row * 16 + 8 - u[i].y;
-			if (dx * dx + dy * dy <= radius * radius)
-			    SC64_GRID_SET(visible, col + row * MAP_COLS, 1);
-		    }
-	}
-    for (i = 0; i < MAX_BUILDINGS; i++)
-	if (b[i].alive && b[i].owner == SIDE) {
-	    int c = b[i].x / 16, r = b[i].y / 16, radius = b[i].type == B_COMMAND ? 7 : 3;
-	    for (row = r - radius; row <= r + radius; row++)
-		for (col = c - radius; col <= c + radius; col++)
-		    if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS &&
-			(col - c) * (col - c) + (row - r) * (row - r) <= radius * radius)
-			SC64_GRID_SET(explored, col + row * MAP_COLS, 1);
-	    if (b[i].type == B_COMMAND)
-		for (row = r - 8; row <= r + 8; row++)
-		    for (col = c - 8; col <= c + 8; col++)
-			if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS) {
-			    int dx = col * 16 + 8 - b[i].x;
-			    int dy = row * 16 + 8 - b[i].y;
-			    if (dx * dx + dy * dy <= 112 * 112)
-				SC64_GRID_SET(visible, col + row * MAP_COLS, 1);
-			}
-	}
+    for (int i = 0; i < MAX_UNITS; i++) {
+        Unit *q = &u[i];
+        if (!q->alive || SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_HIDDEN(q) || q->owner != SIDE)
+            continue;
+        int worker = IS_WORKER(q->type);
+        mark_explored_circle(q->x / 16, q->y / 16, worker ? 4 : 5,
+                             worker ? explored_span_4 : explored_span_5);
+        mark_visible_circle(q->x, q->y, worker ? 56 : 72, 5);
+    }
+    for (int i = 0; i < MAX_BUILDINGS; i++) {
+        Building *q = &b[i];
+        if (!q->alive || q->owner != SIDE)
+            continue;
+        int command = q->type == B_COMMAND;
+        mark_explored_circle(q->x / 16, q->y / 16, command ? 7 : 3,
+                             command ? explored_span_7 : explored_span_3);
+        if (command)
+            mark_visible_circle(q->x, q->y, 112, 8);
+    }
 #endif
 }
 

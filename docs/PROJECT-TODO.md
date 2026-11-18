@@ -19,6 +19,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
+  and use exact integer spans for explored tiles. In a paired ARM opening
+  of 1,000 updates, mean simulation cost dropped from 101,614 to 65,583
+  cycles. Mean complete update cost moved from 563,907 to 562,503 cycles
+  because the main loop often waits for presentation. The comparison
+  matched 14 state and video checkpoints, the SRAM image, and the
+  continuation when each ROM loaded the other's save. A separate
+  1,000-update first-wave sample matched 11 checkpoints and lowered mean
+  simulation cost from 64,085 to 40,374 cycles. Complete update cost held at
+  561,660 cycles. Next, measure sustained combat with more units and confirm
+  timing on GBA hardware.
+
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and
   Interceptor services. The standard Terran, Zerg and Showcase builds still
   lack working Carriers. The [Showcase probe](CARRIER-PROJECTILES.md#showcase-carrier-probe)
