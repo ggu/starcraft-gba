@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Included by game.c at the terrain rendering call site. */
+#if defined(SC64_TERRAIN_FAST_VALIDATE) && !defined(SC64_IMPORTED_MISSION)
+#error "SC64_TERRAIN_FAST_VALIDATE applies to the imported-mission terrain cache"
+#endif
 #if defined(SC_ORIGINAL_SKIRMISH) && !defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_SOFT_FOG) && !defined(SC64_IMPORTED_MISSION)
 #include "frontier_terrain.h"
 #endif
@@ -162,16 +165,42 @@ draw_map(void)
 #if defined(SC_ORIGINAL_SKIRMISH) && !defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_SOFT_FOG) && !defined(SC64_IMPORTED_MISSION)
     frontier_draw_terrain(col0, row0, col1, row1);
 #else
+#ifdef SC64_TERRAIN_FAST_VALIDATE
+    /* Tile answers by running index; see sc64_terrain_tiles_begin. */
+    Sc64TerrainTiles terrain_tiles;
+    int terrain_tile = -1;
+    sc64_terrain_tiles_begin(&terrain_tiles, col0, row0, col1, row1);
+#define SC64_DRAW_TILE_STATE(col, row) \
+    sc64_terrain_tiles_state(&terrain_tiles, terrain_tile, (col), (row))
+#else
+#define SC64_DRAW_TILE_STATE(col, row) sc64_terrain_state_view((col), (row))
+#endif
     for (row = row0; row < row1; row++)
 	for (col = col0; col < col1; col++) {
+#ifdef SC64_TERRAIN_FAST_VALIDATE
+            /* A clean tile costs only its index step and dirty-flag read. */
+            int idx;
+#ifdef SC64_SOFT_FOG
+            int part;
+#endif
+            ++terrain_tile;
+            if (sc64_terrain_tiles_clean(&terrain_tiles, terrain_tile, col, row)) continue;
+            idx = col + row * MAP_COLS;
+#ifdef SC64_SOFT_FOG
+            part = sc64_terrain_tiles_partial(&terrain_tiles, terrain_tile, col, row);
+#endif
+#else
 	    int idx = col + row * MAP_COLS;
 #ifdef SC64_SOFT_FOG
             int part = 0;
 #endif
+#endif
 #ifdef SC64_IMPORTED_MISSION
+#ifndef SC64_TERRAIN_FAST_VALIDATE
             if (sc64_terrain_tile_clean(col, row)) continue;
 #ifdef SC64_SOFT_FOG
             part = sc64_terrain_tile_partial(col, row);
+#endif
 #endif
             if (!SC64_GRID_GET(visible, idx) && !SC64_GRID_GET(explored, idx)) {
                 /* Restored pixels must disappear after load/restart removes fog. */
@@ -197,7 +226,7 @@ draw_map(void)
 #endif
 #ifdef SC64_HAS_TERRAIN_ART
 #ifdef SC64_SOFT_FOG
-            sc64_terrain_fog_cell(part, x, y, sc64_terrain_state_view(col, row),
+            sc64_terrain_fog_cell(part, x, y, SC64_DRAW_TILE_STATE(col, row),
 #else
 	    gfx_blit16(x, y,
 #endif
@@ -233,7 +262,7 @@ draw_map(void)
 #endif
                 terrain_blocked(col, row)) {
 #ifdef SC64_SOFT_FOG
-                sc64_fog_compact_barrier(part, x, y, sc64_terrain_state_view(col, row), fog_shade);
+                sc64_fog_compact_barrier(part, x, y, SC64_DRAW_TILE_STATE(col, row), fog_shade);
 #else
                 gfx_rect(x, y, 16, 16, C_STONE);
                 gfx_frame(x + 2, y + 2, 12, 12, C_SILVER);
@@ -251,6 +280,7 @@ draw_map(void)
 		gfx_rect(x, y, 16, 16, C_GRASS);
 #endif
 	    }
+#undef SC64_DRAW_TILE_STATE
 #endif
 #ifdef SC64_STATIC_DIRTY_ROWS
     {

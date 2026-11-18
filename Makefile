@@ -19,6 +19,7 @@ test: test-scarab-save-selection
 include tests/gba-save-parts/Makefile
 include mk/text-box/Makefile
 include mk/combat-perf/Makefile
+include mk/terrain-fast-validate/Makefile
 
 .PHONY: test-scarab-parent-migration
 build/test-scarab-parent-migration: tests/sc64_scarab_parent_migration.c starcraft/sc64_scarab_fields.h Makefile | build
