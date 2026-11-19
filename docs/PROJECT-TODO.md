@@ -732,6 +732,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   of the Blood Bath menu timing tail and hardware checks.
   The [P10 profile](audits/2026-11-13-p10-command-census.md) finds depot
   facility floods account for 41.94M cycles of the largest gameplay update.
+  On the draw-order release, a [blocked-worker trace](audits/2026-11-20-p10-blocked-depot.md)
+  locates 4.89M cycles in one full depot search. The exact wide FIFO
+  cuts the full update from 7.54M to 3.61M cycles with matching field
+  bytes and world state. Qualify the whole P10 timing distribution and
+  another wide campaign before enabling the trial.
   The shared Command census cuts mean cost in current normal P8, P9, P10,
   and Z8 replays with matching outcomes. Fresh HOME reload matches P10
   through victory; both current products match paired Blood Bath saves.
