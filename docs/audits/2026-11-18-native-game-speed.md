@@ -60,9 +60,8 @@ Both gameplay countdowns and the outer word agree on 7, 18 and 24 advances
 at these three settings over the same 61 resumed observer steps. The outer
 word can also advance while gameplay is paused, so it
 serves as corroboration within the resumed interval. This establishes a
-gameplay cadence difference for the sampled match and settings. The full
-selector-to-cadence mapping and physical refresh timing remain open. The
-GBA's session settings cover cursor movement and menu sound.
+gameplay cadence difference for the sampled match and settings. The GBA's
+session settings cover cursor movement and menu sound.
 
 A separate visual endpoint check moved the slider marker from capture x=346
 to x=400 after four Right presses. Six further ten-step Right holds, with
@@ -83,3 +82,33 @@ verified 22-capture endpoint receipt SHA-256 is
 | Verified snapshot readings and deltas | `dde67e8f8fca6105b1e0ab7b5047e3637628c46f502071e9f473a105cd781252` |
 | Lower endpoint capture manifest | `097698e241ea4ec33dd32e04ce02816433074466a6d78e2fd676a6a6f34ac4f0` |
 | Verified lower endpoint cadence | `3f0bf4dd7bbfd5901df003871a3964fe68e75e9fc3d36e864415b51017cdf219` |
+
+## All seven Game Speed positions
+
+Four more fresh ares sessions used the same Challenger match and opening.
+The inputs changed only inside the same four slider intervals. Three,
+two or one analog-left holds reached settings 1, 2 or 3. One D-pad Right
+hold reached setting 5. All sessions, including the three earlier controls,
+matched the paused scheduler readings before leaving Settings.
+
+| Selector, slowest to fastest | Pacing-table byte | Advances in 61 resumed observer steps |
+| ---: | ---: | ---: |
+| 0 | 167 | 7 |
+| 1 | 111 | 9 |
+| 2 | 83 | 12 |
+| 3 | 67 | 15 |
+| 4 (starting position) | 56 | 18 |
+| 5 | 48 | 22 |
+| 6 | 42 | 24 |
+
+Both gameplay countdowns and the outer scheduler word match at each
+advance count. The active selector and pacing-table byte stay constant
+across the sampled interval. The full local result SHA-256 is
+`2613267d333e199eade4aa1f58c038d15ba8825fd06483e310e83d87bcd6630b`.
+Per-run manifests for settings 1, 2, 3 and 5 are respectively
+`3464a9098875b3a458712278f3f5f93b5920af93ff206d8004df5419cebc54be`,
+`45d2580a2d849c10d774e553ac34aa3ff3f2d1fa9b27de17f8fee83147a52122`,
+`102b80273b3266cd646e5c10354b7f1b39591cbdd04c86d8de043d21def0cecb` and
+`b34553bf3e9553d01f93d8ed7891d5732c1f8e2949f1d0b8d54347a16a22c448`.
+These are per-window simulation advances. A GBA implementation still
+needs independent display pacing and an end-to-end timing check.

@@ -1,5 +1,17 @@
-# Showcase HOST suite. Included by the top-level Makefile after SHOWCASE_FLAGS.
+# Showcase ROM and HOST suite. Included by the top-level Makefile after SHOWCASE_FLAGS.
 SHOWCASE_FLAGS += -DSC64_TYPED_UNIT_CHUNK_READER
+
+build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile mk/showcase/Makefile | build
+	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Showcase-Transport1-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC SHOWCASE' SCSH
+.PHONY: showcase verify-showcase test-sc64-showcase test-sc64-showcase-front
+showcase: build/StarCraft-Showcase-Transport1-GBA.gba
+verify-showcase: build/StarCraft-Showcase-Transport1-GBA.gba
+	$(PYTHON) tools/verify_roms.py --showcase
+
 # The indexed build drops packed word sprites, so it also drops the walk-word
 # poses that depend on them (sc64_unit_facing.h rejects one without the other).
 build/test-sc64-showcase-front: tests/sc64_frontend.c starcraft/sc64_frontend.h Makefile | build

@@ -14,11 +14,11 @@ NAMES = ("photon_cannon", "pylon", "sunken_colony", "spore_colony", "hatchery",
 PHOTON = tuple(f"photon_cannon_frame_{i}" for i in range(4))
 
 
-def emit(source: str) -> str:
+def emit(source: str, frames: tuple[str, ...] = (*NAMES, *PHOTON)) -> str:
     output = ["/* Private derived building frames. Do not commit. */"]
     entries = []
     packed = {}
-    for name in (*NAMES, *PHOTON):
+    for name in frames:
         symbol = f"sc64_race_sprite_{name}"
         frame = re.findall(
             rf"static const Sc64SpriteFrame {symbol}\s*=\s*\{{"
@@ -75,8 +75,10 @@ def emit(source: str) -> str:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("sprite_bank", type=Path)
+    parser.add_argument("--frame", choices=NAMES, help="Pack only this building frame")
     args = parser.parse_args()
-    print(emit(args.sprite_bank.read_text(encoding="ascii")))
+    source = args.sprite_bank.read_text(encoding="ascii")
+    print(emit(source, (args.frame,)) if args.frame else emit(source))
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@
  * structures whose raw type/owner/position remain part of T4 save validation.
  * Live field bounds are checked before encoding; no value is saturated. */
 #define SC64_PACKED_BUILDING_SAVE_BYTES 28
+#define SC64_PACKED_BUILDING_SAVE_USED_BITS 217
 #define SC64_PACKED_BUILDING_HP_BIAS 131072
 
 typedef struct {
@@ -120,7 +121,7 @@ sc64_building_save_encode(Sc64PackedBuildingSave *row, const Building *bld,
      * first previously reserved bit at the end of the row. */
     SC64_PUT(1, (unsigned)bld->type >> 6);
 #undef SC64_PUT
-    if (bit != 217) return 0;
+    if (bit != SC64_PACKED_BUILDING_SAVE_USED_BITS) return 0;
     *row = encoded;
     return 1;
 }
@@ -153,7 +154,7 @@ sc64_building_save_decode(Building *out, const Sc64PackedBuildingSave *row)
     SC64_GET(16, decoded.flags); SC64_GET(2, decoded.larva);
     SC64_GET(9, decoded.larva_timer); SC64_GET(11, decoded.shield_remainder);
 #undef SC64_GET
-    if (bit != 216 || decoded.alive > 1 ||
+    if (bit != SC64_PACKED_BUILDING_SAVE_USED_BITS - 1 || decoded.alive > 1 ||
         (decoded.alive && decoded.hp < 0) || decoded.maxhp > 131071 ||
         decoded.owner > 4 || decoded.queue_head > 4 || decoded.queue_count > 5 ||
         decoded.level > 127 || decoded.raw_type > 255 ||

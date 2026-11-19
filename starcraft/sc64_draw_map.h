@@ -6,49 +6,59 @@
 #if defined(SC_ORIGINAL_SKIRMISH) && !defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_SOFT_FOG) && !defined(SC64_IMPORTED_MISSION)
 #include "frontier_terrain.h"
 #endif
-/* Static objects are part of the saved terrain band. Keep their painter
- * order and existing visibility/viewport culls together for cache redraws. */
-static void
+static inline void
+draw_map_mineral(int i)
+{
+    if (m[i].amount <= 0) return;
+    int x = m[i].x - camx, y = m[i].y - camy + 12;
+    if (x <= -6 || x >= 245 || y <= 7 || y >= 123 ||
+        !currently_visible(m[i].x, m[i].y)) return;
+#ifdef SC64_HAS_SPRITES
+    const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
+    if (sprite) {
+        draw_static_mineral_sprite(sprite, x, y);
+        return;
+    }
+#endif
+    gfx_diamond(x, y, 7, 4, C_CYAN);
+    gfx_pixel(x, y, C_WHITE);
+}
+
+static inline void
+draw_map_geyser(int i)
+{
+    int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
+    if (!geyser_in_view(x, y) || !currently_visible(geysers[i].x, geysers[i].y)) return;
+#ifdef SC64_HAS_SPRITES
+    const Sc64SpriteFrame *sprite = mission_geyser_sprite();
+    if (sprite) {
+        draw_mission_sprite(sprite, x, y);
+        return;
+    }
+#endif
+    gfx_diamond(x, y, 6, 4, C_GREEN);
+}
+
+/* The tile renderer still lifts its static objects into a background
+ * plane. Mode 4 race builds paint them with the other world actors. */
+static inline void
 draw_map_static_objects(void)
 {
-    int i, x, y;
-    for (i = 0; i < MAX_MINERALS; i++)
-	if (m[i].amount > 0) {
-	    x = m[i].x - camx;
-	    y = m[i].y - camy + 12;
-	    if (x > -6 && x < 245 && y > 7 && y < 123 &&
-	        currently_visible(m[i].x, m[i].y)) {
-#ifdef SC64_HAS_SPRITES
-		const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
-		if (sprite) draw_static_mineral_sprite(sprite, x, y);
-		else {
-#endif
-		gfx_diamond(x, y, 7, 4, C_CYAN);
-		gfx_pixel(x, y, C_WHITE);
-#ifdef SC64_HAS_SPRITES
-		}
-#endif
-	    }
-	}
-    for (i = 0; i < geyser_count; i++) {
-	x = geysers[i].x - camx;
-	y = geysers[i].y - camy + 12;
-	if (geyser_in_view(x, y) &&
-	    currently_visible(geysers[i].x, geysers[i].y)) {
-#ifdef SC64_HAS_SPRITES
-            const Sc64SpriteFrame *sprite = mission_geyser_sprite();
-            if (sprite) draw_mission_sprite(sprite, x, y);
-            else
-#endif
-	        gfx_diamond(x, y, 6, 4, C_GREEN);
-        }
-    }
+#ifndef SC64_WORLD_DEPTH
+    int i;
+    for (i = 0; i < MAX_MINERALS; i++) draw_map_mineral(i);
+    for (i = 0; i < geyser_count; i++) draw_map_geyser(i);
 #ifdef SC64_IMPORTED_MISSION
     for (i = 0; i < MAX_BUILDINGS; i++)
         if (b[i].alive)
             draw_building_art(&b[i]);
 #endif
+#endif
 }
+
+#ifdef SC64_WORLD_DEPTH
+#include "sc64_world_depth.h"
+#endif
 
 static void
 draw_map(void)
@@ -75,9 +85,9 @@ draw_map(void)
     /* Rendering below only reads world state and writes pixels. The exact
      * roster/visibility key therefore remains valid through cache capture. */
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-    { u32 diag_t=gba_clock(); terrain_static_key = sc64_static_objects_key(); diag_key_cycles=gba_clock()-diag_t; }
+    { u32 diag_t=gba_clock(); terrain_static_key = SC64_TERRAIN_STATIC_KEY; diag_key_cycles=gba_clock()-diag_t; }
 #else
-    terrain_static_key = sc64_static_objects_key();
+    terrain_static_key = SC64_TERRAIN_STATIC_KEY;
 #endif
 #endif
 #if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
@@ -282,7 +292,8 @@ draw_map(void)
 	    }
 #undef SC64_DRAW_TILE_STATE
 #endif
-#ifdef SC64_STATIC_DIRTY_ROWS
+#if defined(SC64_STATIC_DIRTY_ROWS) && \
+    (!defined(SC64_WORLD_DEPTH) || defined(SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE))
     {
         u16 saved_clip = gfx_get_clip_y();
         int view_col0, view_row0, view_col1, view_row1;
@@ -311,6 +322,7 @@ draw_map(void)
                 (unsigned)(view_row1 - view_row0), view_row0, camy,
                 (int)(saved_clip & 0xffu), (int)(saved_clip >> 8), plan);
 
+#ifndef SC64_WORLD_DEPTH
         if (planned) {
             for (unsigned band = 0; band < plan->count; ++band) {
                 gfx_set_clip_y(plan->bands[band].top, plan->bands[band].bottom);
@@ -324,8 +336,13 @@ draw_map(void)
             /* Full misses and non-map caller clips retain the full pass. */
             draw_map_static_objects();
         }
-    }
 #else
+        /* World actors are drawn after capture. The row plan is only
+         * needed as input to the optional dirty terrain capture. */
+        (void)planned;
+#endif
+    }
+#elif !defined(SC64_WORLD_DEPTH)
     draw_map_static_objects();
 #endif
 #ifdef SC64_IMPORTED_MISSION
@@ -349,6 +366,7 @@ sc64_tile_background_done:
     sc64_background_cycles = gba_clock() - profile_stage_start;
     profile_stage_start = gba_clock();
 #endif
+#ifndef SC64_WORLD_DEPTH
     for (i = 0; i < MAX_BUILDINGS; i++)
 #ifdef SC64_IMPORTED_MISSION
         if (b[i].alive)
@@ -362,15 +380,22 @@ sc64_tile_background_done:
             draw_building_overlay(&b[i]);
         }
 #endif
+#else
+    sc64_building_cycles = 0;
+#endif
 #ifndef SC64_DEATH_VFX_DISABLED
     draw_death_vfx(1);
 #endif
+#ifdef SC64_WORLD_DEPTH
+    sc64_draw_depth_ordered_actors();
+#else
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && u[i].selected)
 	    draw_unit_pass(&u[i], 1);
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive)
 	    draw_unit(&u[i]);
+#endif
 #ifndef SC64_DEATH_VFX_DISABLED
     draw_death_vfx(0);
 #endif

@@ -26,6 +26,10 @@ PX_SOURCES = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft
 build/px-p5-normal-home build/px-p6-normal-home: build/px-p%-normal-home: tests/sc64_p%_campaign_run.c tests/sc64_route_purity.h tests/sc64_controller_authored_pages.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-carried/Makefile | build
 	$(PX_CLANG) -DSC64_P56_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< common/gba.c $(PX_SOURCES) -o $@
 
+# The physical P8 replay checks and acknowledges dialogue in the guest.
+build/px-p8-normal-home: tests/sc64_p8_campaign_run.c tests/sc64_route_purity.h tests/sc64_controller_authored_pages.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-carried/Makefile | build
+	$(PX_CLANG) -DSC64_P8_NORMAL_HOME '-DP8_CONTROLLER_PROFILE="PROTOSS_P10_FLAGS"' $< $(PX_SOURCES) -o $@
+
 # $(1) name, $(2) controller source, $(3) extra source, $(4) mission, $(5) recipe writing $@.raw
 define PX_MISSION
 build/px-$(1)-controller: tests/$(2).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(PROTOSS_P10_INPUTS) common/gba.c $$(COMMON_HEADERS) mk/protoss-carried/Makefile | build

@@ -7,7 +7,7 @@
 #if defined(SC64_WORKER_CARGO_KIND) && (!defined(SC64_IMPACT_EVENTS) || defined(SC64_SCARAB_NAMESPACE_STAGE))
 #error "worker cargo requires the impact journal and does not support the Scarab draft"
 #endif
-#ifdef SC64_SAVE_UI_CONTEXT
+#if defined(SC64_SAVE_UI_CONTEXT) || defined(SC_FIELD_FEEDBACK)
 #include "sc64_save_ui_context.h"
 _Static_assert(MAX_BUILDINGS <= 254, "UI save index exceeds one-byte encoding");
 #endif
@@ -2495,6 +2495,12 @@ static int race_save_game(void) {
         race_data.state[SC64_SAVE_UI_STATE_INDEX] = (int)sc64_save_ui_encode(
             selected, MAX_BUILDINGS, menu_cursor, last);
     }
+#elif defined(SC_FIELD_FEEDBACK)
+    /* The next B menu needs its repeat command. Selection and open-menu
+     * state are transient and still clear on an ordinary reload. */
+    race_data.state[SC64_SAVE_UI_STATE_INDEX] =
+        menu_last && menu_last <= SC64_SAVE_UI_MENU_MAX ?
+        (int)sc64_save_ui_encode(-1, MAX_BUILDINGS, 0, menu_last) : 0;
 #endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     race_data.state[27] = 0x42450000 | sc64_battlecruiser_tech_bits;
@@ -3213,7 +3219,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_SHARED_TRANSPORT
     if (!race_sk_transport_candidate_valid(&race_data)) return 0;
 #endif
-#ifdef SC64_SAVE_UI_CONTEXT
+#if defined(SC64_SAVE_UI_CONTEXT) || defined(SC_FIELD_FEEDBACK)
     if (!sc64_save_ui_valid((unsigned)v[SC64_SAVE_UI_STATE_INDEX], MAX_BUILDINGS)) return 0;
 #endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_CUSTOM_CARRIER_PROBE)
@@ -5575,6 +5581,9 @@ static int race_load_game(void) {
         menu_last = (u8)((ui >> 16) & 255u);
 #endif
     }
+#elif defined(SC_FIELD_FEEDBACK)
+    menu_cursor = 0;
+    menu_last = (u8)((unsigned)v[SC64_SAVE_UI_STATE_INDEX] >> 16);
 #endif
 #ifdef SC64_IMPACT_EVENTS
     race_impact_restore(plan.impact_candidate,plan.impact_candidate_count);

@@ -135,3 +135,394 @@ matching uninterrupted play. The four lobbies covered both maps, all
 human races, one to three CPUs, and a sparse two-CPU lineup. The clean
 source checkout passed `./dev test` with 1,161 Python cases, 35 skips,
 and the compiled and auxiliary checks.
+
+## Reuse the collision candidate load
+
+The packed collision path already reads a candidate's aligned pair of
+signed coordinates for the coincident-position test. The next candidate
+build reuses those two halfwords when calculating the mask offset.
+
+The same physical P7 window on release `ca822ea7` passed all 11
+world, framebuffer and palette checks and all 1,000 checked update and
+route observations. Mean cost moved from 2,011,436 to 2,002,131 cycles
+per advancing update, a 0.46% reduction. The 95th percentile moved from
+2,307,879 to 2,298,965, and the peak from 2,681,419 to 2,664,696.
+The P10 sanitizer oracle matched 636,690 active and 130,616 inactive
+contact masks. All four standard ARM products passed link guards and
+their three-CPU Blood Bath menu smoke. Each 32 KiB SRAM export matched
+its release counterpart byte-for-byte and loaded in a fresh emulator.
+
+A separate trial moved the collision table's speed-plane calculation out
+of the candidate scan. Its mean fell by 0.018% and its peak rose, so the
+release skips that change.
+
+| Record | SHA-256 |
+| --- | --- |
+| Paired P7 coordinate reuse | `a22e24caf680d768d894cd8f45b8e552631e94176799e9d3047c85f4d92b764d` |
+| Four-profile ARM save comparison | `578799c6f4f246cfa1cd8fae8182eb94283f95a5edfb52cc523238a715f2683f` |
+| Separate speed-plane trial | `0b57e84083cad0eb627919ac2d1ceba601711260f54d79eb6b3b5e391d77b7a1` |
+
+## Callback-based census experiment
+
+A separate P7 prototype combined actor and Battery integrity checks with
+the eight live Command counts. It kept the two failure paths distinct
+and passed the host count and bad-state oracles. Both ARM builds kept
+the same IWRAM and EWRAM bounds.
+
+On the terrain-default P10 replay all 1,000 frame, route and display
+observations and 11 sampled world, fog and rendered pages matched. The
+callback-based fusion increased mean guest cycles from 1,958,744 to
+1,993,740. Mean cost outside orders and sight increased by 34,850 cycles.
+The callback implementation stays outside the release. Local comparison
+SHA-256 `db2d5cd981c61d435d093c697bab0428e186e4edff3e7dd1bb5d41229b9c41aa`.
+
+## Duplicate detector queries
+
+A counting build recorded 3,977 detector-list mask queries in the timed
+P7 window. Only 48 repeated the same raw unit type and exact position in
+the same refresh pass. At the measured average cost per query, replacing
+all 48 would save about 0.07% of the sampled interval before lookup costs.
+The full tape records 406 repeats in 33,660 queries. Leave this memo out
+of the runtime and prioritize the existing expensive paths with actual
+repeated work.
+
+## Opaque minimap copy
+
+An aligned-word copy in the 24-pixel opaque minimap matches 256 host
+pixel comparisons and the same P7 world and display samples. It reduces
+the HUD stage from 130,051 to 127,780 mean cycles and the whole loop by
+0.12%. IWRAM and EWRAM stay the same in Terran, P10 and Showcase. The
+prototype stays optional. Local timing receipt SHA-256
+`7d7dca2ce7694c78d045f2019f00678c294f7237f221dd2b08a660f48578e2a4`.
+
+## Sustained combat after #572
+
+The verified normal P10 build at `ca059860` averages 1,901,686 guest cycles
+per advancing update in the same 958-update window. Mean orders cost is
+893,661 cycles and mean background render cost is 228,131 cycles. Of 957
+advancing updates with an adjacent camera observation, 912 moved the
+camera. The renderer used a partial restore on 864 of those. The other
+48 moving updates also changed the static cache key. There were three
+stationary partial restores and 42 stationary full hits.
+
+An instrumented build adds 0.06% to the mean and matches all 11 world,
+fog, palette and displayed framebuffer samples, plus the complete
+1,000-call simulation, route and terrain-cache timeline. Mean background
+stages are 18,464 cycles for the static key and view bounds, 61,933 for
+validation and restore, 78,528 for tile drawing, 24,917 for static object
+redraw, and 45,208 for capturing the next cache. Stage values are guest
+cycle measurements from the diagnostic ROM.
+
+A vertical-rotation prototype keeps the existing VRAM/EWRAM cache split
+and shifts the logical start row. It reads back only the planned dirty
+rows after a vertical scroll. A full capture reestablishes the linear
+layout after lateral moves or key changes. The cache preserves the exposed
+strip requirement and rejects a stale backbuffer or incomplete dirty plan.
+An asset-free sanitizer fixture checks 68 vertical passes through the
+split and wrap in both directions, and a lateral restore after each pass.
+
+| Advancing update cohort | Release mean | Vertical-rotation mean |
+| --- | ---: | ---: |
+| All 958 updates | 1,901,686 | 1,889,950 |
+| 388 vertical partial restores | 1,883,204 | 1,851,760 |
+| Background on vertical partial restores | 218,856 | 186,611 |
+
+The p95 changes from 2,197,484 to 2,195,160 cycles and the peak changes
+from 2,566,464 to 2,530,420. The paired run matches the same 11 world and
+video cuts and all observed route, frame, and cache decisions. The current
+cartridge saves 0.62% mean in this window with the prototype. The vertical
+prototype remains local.
+
+A second prototype rotates the cache by words and copies dirty rectangle
+spans, allowing lateral and diagonal camera deltas to reuse the same
+physical pixels. It matches the same 11 checkpoints and full simulation,
+route and cache-decision timelines. Its mean is 1,900,419 cycles, down
+0.07% from the release, and its p95 rises to 2,205,884 cycles. On 475
+diagonal partial restores, background cost rises from 238,905 to 253,506
+cycles. Keep this prototype local. The next rendering measurement should
+separate the paint and transfer costs of diagonal redraws before changing
+how much of the cache is read back.
+
+Two collision memo alternatives were replayed as observers only. The
+exact query rectangle and the normalized geometry key each found **zero**
+reusable masks, as did the shipping memo. There were 36,650 eligible mask
+requests over 958 advancing updates. All 1,000 call classifications and
+11 world and display samples matched. Work on average collision cost should
+look inside the first lookup for each mover.
+
+A detector snapshot variant builds its rows from the validated actor owner
+lists. Its focused sanitizer oracle matches the slot scan and the independent
+detector mask. The normal P10 vector with this change matches the 11 replay
+cuts and the complete timelines. Its 1,905,023-cycle mean is 0.18% higher
+than the release, and p95 rises from 2,197,484 to 2,199,059. The owner-list
+prototype stays local.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Release camera and cache trace | `1a4e29b7e289417f7869275f9ff8894be785a55ac88036adbb4f147651c0d340` |
+| Background diagnostic | `59e0dbdb59b20f53cfe229b9af3397d93b160ab01096d7e84535bb14fc41d1d5` |
+| Vertical rotation comparison | `7889ae76d8e347a70d3f78afb6fe8d3292ea6e1f1ecc7e7b533a915f65a29712` |
+| Pixel rotation comparison | `d3c115f25ad1778f6e4cfb9e8755ff90871d18b4182ec238adf566e5c2a72622` |
+| Collision shadow receipt | `06d8797f03cbb20623cc8f5f27746d3668a11b293dca7cddcf2ee53a1ce62aef` |
+| Detector owner-list comparison | `0e44158cf6850ee7786994038127af0c564145ca8775b0f5c7a1caa8aea7db75` |
+
+### Work inside the first collision lookup
+
+A diagnostic on the regular P10 vector at `3f19bcc5` matches the simulation,
+route and terrain decisions for all 1,000 input calls and all 11 world and
+display cuts. The diagnostic's counters add 2.52% to the mean advancing
+guest time. Counts below cover calls 8,021–9,019, between the boundary
+reads after calls 8,020 and 9,019.
+
+| Event | Count |
+| --- | ---: |
+| Uncached steering masks | 36,610 |
+| Ground movers at speed 1 | 23,379 |
+| Ground movers at speed 2 | 13,231 |
+| Bucket cells visited | 192,303 |
+| Empty bucket cells | 48,415 |
+| Actor nodes visited | 730,400 |
+| Mover self visits | 35,417 |
+| Wrong flight layer | 17,155 |
+| Outside the candidate's axis limit | 560,448 |
+| Geometry evaluations | 117,380 |
+| Masks ending with all eight directions blocked | 6,928 |
+
+All other instrumented rejection cases, including coincident actors and
+invalid or noncollidable type records, are zero in this window. About
+77% of nodes pass the other checks and fail the actor-specific axis limit.
+The measured misses favor a cheaper position and type read in the
+collision scan. Dense Z7 has a different rejection mix, with 44% of
+visited actors at the mover's exact coordinates in the earlier
+[Z7 experiment](2026-11-15-z7-contact-cost.md#exact-position-crowds-november-16).
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Collision scan classification trace | `c974921aa0ee41b01da11e4859c4f1edecf1eb4ba459f2e01a737aa6e88fa99d` |
+
+#### Packed nodes and deferred cache admission
+
+A packed-node experiment combines the next link, local coordinates and
+collision facts. Its live oracle checks 1,308,607 nodes across 87,497
+queries on P7 without a mismatch. The observer-off P7 pair matches all
+1,000 input calls and 11 world and display cuts. Against the normal release
+ROM, mean cycles increase 0.35% and p95 increases 0.34%. This layout stays
+experimental.
+
+The deferred-admission change computes the same steering mask and keeps
+the original direction loop and terrain checks. When steering moves the
+unit, the answer for its old position is immediately invalidated. When
+steering leaves the unit in place, a fresh result may enter the existing
+cache. With an empty cache, lookup also skips the eligibility pass until an
+answer needs admission. The asset-free sanitizer tests cover both legacy
+and persistent bucket implementations, a same-cell move, and reuse of a
+stopped mover's answer. Use `CANONICAL_CONTACT_DEFER_STEERING=0` for the
+control path.
+
+| Replay | Control mean | Candidate mean | Control p95 | Candidate p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Busy P7, 958 advancing calls | 1,901,686 | 1,883,235 | 2,197,484 | 2,179,910 |
+| Regular Z10 Blood Bath, three CPUs | 805,680 | 802,552 | 1,049,139 | 1,044,789 |
+| Dense carried Z7, 477 advancing calls | 2,515,275 | 2,511,018 | 3,975,511 | 3,979,392 |
+
+The paired P7 run matches the 11 world, fog, palette and display cuts,
+plus the simulation, route and terrain timelines. Blood Bath matches all
+25 world, route, palette, arena and video cuts and the final SRAM after the
+usual pause save. A fresh title load continues to the same world.
+
+The dense Z7 pair starts each regular Z10 ROM at HOME and takes the
+same ordinary input tape through call 48,237. Both match all 131 named
+checkpoints and every frame and route counter in the 480-call sample.
+Nine samples match the raw unit, building and mineral banks, display
+control, palette, and the two 240×160 framebuffers. There are 236–237
+live units at the window endpoints. Mean cost falls by 0.17%, p95 rises
+by 0.10%, and the peak stays within 14 cycles.
+
+The full P7 route from HOME reaches victory on both ROMs at frame
+55,892. The 59 named checkpoints, 11 briefing acknowledgments, and 10
+dialogue acknowledgments match across 57,678 input updates. Whole-loop
+cost, including menu and presentation time, falls from 2,040,429 to
+2,019,915 cycles on average (1.01%). That is 8.31 emulated updates per
+second over this route.
+
+The regular Terran, Z10, P10 and Showcase recipes reproduce the measured
+ROMs byte for byte and pass their unchanged RAM guards. The six older
+Z7–Z9 and P7–P9 recipes also link within those guards. Ordinary buttons
+launch all 30 campaign entries and 72 skirmish setups across both maps,
+three player races, and one to three CPUs. Four paired custom saves
+match byte for byte and load in both directions between releases, with
+matching post-load play. The standalone source build and asset-free test
+suite pass locally, including 1,161 Python cases with 35 optional skips.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Packed node P7 pair | `c00f28caad719e96e464ffd28004bee930f00c25b4a3993e2759aef6b0904987` |
+| Packed node live oracle | `a07363d27bd29cc50b43d1a36cef2485caf5e0c7680faed947b67897a52a608b` |
+| Deferred mask P7 replay | `3d21edd770c8da174fff431165dbc74ad23c16dcc9e79d25d81982de6636ae51` |
+| Deferred mask Z10 Blood Bath replay | `5b6e3d08e2984d9e3091f6073734b2ea646413eea80576c16b59d38378aff85c` |
+| Deferred mask dense Z7 replay | `5d65bf42d374e5cd7db0edbc1c2eb49e71098b337bc1f29cfe3cef914285bc5a` |
+| Deferred mask full P7 victory | `238164016b75ce7fb70a4129b480f9f13db6837ec3f0a5da6a120e31fec62e29` |
+| Physical launch matrix | `f8644030ebaa75ae0ea73e128b591e09757f1b6367c5bd96da5cf44bf7e86922` |
+| Bidirectional save matrix | `d4028523e6fff80e9f67908805ba38c415a7721265b314d296f0c7ce42d90d3d` |
+
+#### Diagonal fog strip paint
+
+An opt-in probe shares the fog masks and paints the overlap once when
+two exposed strips intersect a blended tile. The host pixel oracle
+passes 19,683 cold signatures and 7,448 restored-strip cases, with
+scene clipping on and off. Seven existing terrain checks also pass.
+Against the deferred-admission P7 build, the probe matches all 11
+world and display samples and all 1,000 timeline classifications. The
+475 diagonal restores average 238,449 background cycles, down 316.
+Mean total cost drops 103 cycles and peak rises 6,604. Leave this
+probe local and focus on larger route and paint costs.
+
+- Paired diagonal strip receipt SHA-256 `07957ef791fe9424a10d9630ed27f92bd73145d24aa8cb9bddf308257d2a7a6b`.
+
+#### Detector range rejection
+
+A separate probe rejects validated mobile and building detector rectangles
+when one inclusive axis gap already exceeds the detector range. The
+existing distance and source-owner checks decide the remaining pairs.
+Aura, visibility, and Cannon power logic retain their own checks. The
+sanitizer proof compares about 1.19 million threshold cases and a prepared
+2,000-case source-owner and geometry differential.
+
+On `e7daddb1`, the ARM candidate matches all 11 P7 game and display cuts
+and every recorded frame, route and terrain-cache decision. Mean cycles
+fall from 1,883,235 to 1,872,385 (0.58%), p95 from 2,179,910 to
+2,166,246, and the peak is effectively flat. The P10 RAM ends match.
+Qualify the other prepared profiles and saves before enabling the probe.
+
+- Paired detector range receipt SHA-256 `ae2d497db4c8981aa24bc0353455e87a76c9c42e7ec6e31e223ab52e75eae9fa`.
+
+##### P10 with the shared depth renderer
+
+On release `9dfba082`, the normal P10 recipe enables the range check when
+the validated rectangle path is present. The check uses the existing
+inclusive edge gap and integer distance for pairs inside its axis bounds.
+The separate optical visibility test and Cannon power gate stay in place.
+
+The physical P7 replay matches all 1,000 frame, route and terrain
+observations and 11 sampled world states, palettes and full indexed
+framebuffer pairs. These are the 958 advancing updates in that window.
+
+| Guest cycles | Release | Detector range check |
+| --- | ---: | ---: |
+| Mean | 1,766,498 | 1,755,536 |
+| p95 | 2,066,456 | 2,052,956 |
+| Maximum | 2,433,880 | 2,436,936 |
+| Mean orders | 841,983 | 831,148 |
+
+At the maximum update, simulation costs 6,940 fewer cycles while draw
+and presentation cost 9,996 more. Linked EWRAM and IWRAM endpoints stay
+at `0x0203b434` and `0x03004d78`. The detector source-tick function's
+compiled stack frame grows from 3,144 to 3,152 bytes. Linked ROM content
+grows by 392 bytes within the 32 MiB cartridge.
+At 11 read-only replay cuts, the 648 bytes below the reserved stack floor
+and above the linked image remain unchanged. The lowest observed changed
+stack byte is 8,208 bytes above that floor. This measures sampled writes.
+
+`make test-sc64-p7-detector-range` checks the inclusive thresholds under
+ASan and UBSan. The prepared owner-mask test matches 2,000 cases including
+optical, Cannon power, movement and source-owner changes. Forty frozen
+inputs match between ARM builds. The normal target reproduces the measured
+candidate bytes, SHA-256
+`4ebad7dfc416e3c498144f019ba1d2d471b7165388dd327dcf86871499a70c74`.
+The replay comparison SHA-256 is
+`217a33acda855a949299fc7ec68fb196a084eaa0e8c50942b8450825d3a850db`.
+The stack observation SHA-256 is
+`1caaf2120794bd66a7c74b74cbd96c28b59ac44522c7e406866856dd6e8605b7`.
+
+##### Composition with selection-ring depth
+
+The normal P10 cartridge with both changes passed ROM header, SRAM
+signature, and memory checks. The 40 private build input hashes and
+linked RAM endpoints matched release `108690d5`. The detector flag
+is scoped to P10 builds with validated rectangles. Campaign and custom
+games in that cartridge use the same detector path.
+
+Against `108690d5`, the same 958 advancing P7 updates averaged
+1,749,589 cycles, down from 1,760,602 (0.63%). The p95 fell from
+2,059,279 to 2,047,006. The peak rose from 2,427,848 to 2,437,534.
+All 1,000 timeline records and 11 sampled world, palette, and full
+indexed framebuffer pairs matched. The scalar sanitizer fixture passed.
+
+The composed ROM SHA-256 is
+`fe8da4798ad548b433627121ab31f4d9894eee60119d266936ace5159ed8f2c4`.
+The paired replay comparison SHA-256 is
+`028cfd891fd251456abac5efb25d8439a671104f08d1cdde10f53ab2ee45caac`.
+
+### Compose minimap dots during the HUD census
+
+Read-only breakpoints in the `ea041527` release P10 time the HUD
+census, existing minimap pass, and the extra supply scan on resource
+strip redraws. The captured frame and HUD counters match the retained
+normal replays. The Homeland row covers advancing gameplay calls.
+
+| Workload | Samples | HUD cycles | Census cycles | Minimap pass cycles | Additional supply cycles per update |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| P10 Homeland | 117 | 131,075 | 22,107 | 86,369 | 1,199 |
+| Late three-AI Blood Bath | 124 | 76,438 | 14,836 | 55,078 | 365 |
+
+The prototype fuses only the minimap actor pass into the HUD census.
+It composites the 24×24 interior in 576 scratch bytes, in ascending
+building and then unit slots. The camera and stage-specific indicators
+draw afterward. A marker outside the interior uses the original scalar
+path, including its bottom-band invalidation. HUD page policy, fog,
+actor eligibility and player selection are shared with the reference.
+When the build lacks a maintained terrain raster, the staged draw
+uses the existing visible and explored counts and repaints the original
+panel border and margin. The tile renderer retains its own path.
+
+The opt-in `SC64_HUD_MINIMAP_CENSUS` preparations pass the P10 and Z10
+host ASan/UBSan fixtures. The scalar and fused indexed frames match
+with alternating poisoned pages, overlapping markers, fine fog, camera
+overlay, a marker crossing the minimap boundary, and the neighboring
+halfwords. The Z10
+classic terrain path exercises unseen black and visible overrides.
+The classic arena build also compiles and the default Foundry host
+sanitizer check passes.
+
+The maintained-raster P10 build at `44ed6ded` matches the retained
+11 Homeland and 32 Blood Bath world, fog, palette and framebuffer
+cuts, including both pages and the displayed page. All 1,000 Homeland
+timeline rows and 1,600 Blood Bath frame and route rows match.
+
+| ARM comparison window | Release update mean | Staged update mean | Release HUD mean | Staged HUD mean |
+| --- | ---: | ---: | ---: | ---: |
+| P10 Homeland, 958 advancing updates | 1,728,244 | 1,724,966 | 129,421 | 124,215 |
+| P10 Blood Bath, 1,000 late updates | 998,765 | 996,434 | 74,080 | 70,705 |
+
+Whole-update means improve 0.19% and 0.23%. Homeland p95 rises 0.17%.
+The 86K-cycle minimap scope includes visibility and marker projection
+that the fused implementation still has to perform. Its measured
+whole-HUD savings are about 5.2K and 3.4K cycles.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Homeland HUD phase timings | `7c4fab75399eaf73e029d59d219a36c4a4a351cf74e0b836821fea6c43ac5858` |
+| Blood Bath HUD phase timings | `a78b7e855699fb6690664229762f81e16bdb4fd97c5a662b41f97e9b9897ec02` |
+| Maintained-raster P10 ROM | `5c21618b687cdb6355f294b9c820dc0137e7d04857a7dfec187996ee85d144e5` |
+| Maintained-raster Homeland | `c6476885653a61bf29d69870b46c226ecd2f12e50a4a97fbb0bb8eafdebf449c` |
+| Maintained-raster Blood Bath | `2b4e808dc7d2b00bda27b753adf6827ea7d4c8552f0fa55fef0e99c6b14766bf` |
+| Classic-terrain Z10 ROM | `419569c9cdc16a167b7d8fcf8423b9a824483c8e715acb540299870c2d5b2d6b` |
+| Classic-terrain dense Z7 | `dc31d9d2af7d4d05caf9d9cda98d9d6e90bb3e17c2277aad6226dd6db1230c26` |
+
+The classic-terrain Z10 build at `6ffa7e68` matches all 131 historical
+Z7 checks, all 480 timeline and route rows, and eight sampled worlds,
+fog masks, palette and both framebuffer pages. The sampled hardware
+page also matches. In 477 advancing updates the mean moves from
+2,340,889 to 2,340,042 cycles, p95 from 3,389,340 to 3,386,870 and peak
+from 4,696,376 to 4,697,098. Its HUD mean rises from 144,587 to
+145,277 cycles. Both preview ROMs pass their header, SRAM signature
+and memory checks with the same prepared dependencies as release.
+The links use 584 additional EWRAM bytes and keep the same IWRAM end.
+
+The two terrain paths are available in the
+[source-only experiment](https://github.com/ggu/starcraft-gba/tree/6ffa7e68fa6a5cd409cfcfa01fc67c52d9ef548a).
+Keep the normal renderer. The measured whole-update gains are small,
+and the Z10 HUD work increases. The same release P7 window spends
+183,372 mean cycles restoring and painting the background and 810,395
+in orders. Profile those larger scopes before another HUD traversal
+change.

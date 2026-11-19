@@ -705,6 +705,135 @@ class ScenarioFixtures(unittest.TestCase):
             ai.evaluate(("no-ore", "terran", 1, 1, "t", 0), 17, "\n".join(self.no_ore(0)), 1800)
 
 
+class FirstWaveAndRaid(unittest.TestCase):
+    def wave(self, race, **kw):
+        gate = ai.FIRST_WAVE[race]
+        row = {"kind": "first-wave", "owner": 1, "race": race, "gate": gate, "frame": gate + 9, "sent": 18,
+               "army": 18, "army_supply": 74, "wave_supply": ai.WAVE_SUPPLY, "all_in": 0, "before_gate": 0, "ok": 1}
+        row.update(kw)
+        return [json.dumps(row)]
+
+    def test_gates_follow_the_measured_order(self):
+        # Protoss first, then Terran, then Zerg; none before the earliest.
+        self.assertLess(ai.FIRST_WAVE[2], ai.FIRST_WAVE[0])
+        self.assertLess(ai.FIRST_WAVE[0], ai.FIRST_WAVE[1])
+        self.assertEqual(ai.OFFENSIVE_FRAME, ai.FIRST_WAVE[2])
+
+    def test_first_wave_records(self):
+        for race, bot in enumerate(ai.RACES):
+            case = ("first-wave", "terran", 1, 0, bot, 0)
+            self.assertTrue(ai.evaluate(case, 0, "\n".join(self.wave(race)), 1800)["ok"])
+            gate = ai.FIRST_WAVE[race]
+            # Early, late, sent before the gate, one or two units ahead of the rest, a
+            # minority of the army, or too small without being all in.
+            for change in (dict(frame=gate - 1), dict(frame=gate + ai.FIRST_WAVE_WINDOW), dict(before_gate=1),
+                           dict(sent=2), dict(sent=8), dict(army_supply=ai.WAVE_SUPPLY - 1), dict(frame=-1)):
+                with self.assertRaisesRegex(ai.RecordError, "disagrees", msg=str(change)):
+                    ai.validate_first_wave(self.wave(race, **change), race)
+            # An owner at its unit share goes with what it has.
+            small = self.wave(race, army_supply=ai.WAVE_SUPPLY - 1, all_in=1)
+            self.assertEqual(ai.validate_first_wave(small, race)["ok"], 1)
+            late = self.wave(race, frame=gate + ai.FIRST_WAVE_WINDOW, ok=0)
+            self.assertEqual(ai.validate_first_wave(late, race)["ok"], 0)
+            with self.assertRaisesRegex(ai.RecordError, "disagree"):
+                ai.evaluate(case, 18, "\n".join(self.wave(race)), 1800)
+        # The old shared six-minute gate is not any race's gate.
+        with self.assertRaisesRegex(ai.RecordError, "gate"):
+            ai.validate_first_wave(self.wave(1, gate=10800, frame=10809), 1)
+        with self.assertRaisesRegex(ai.RecordError, "gate"):
+            ai.validate_first_wave(self.wave(0), 2)
+        with self.assertRaisesRegex(ai.RecordError, "gate"):
+            ai.validate_first_wave(self.wave(0, wave_supply=24), 0)
+        with self.assertRaisesRegex(ai.RecordError, "exactly one"):
+            ai.validate_first_wave(self.wave(0) * 2, 0)
+        # Records that cannot be: another owner, more sent than the army, units without supply.
+        with self.assertRaisesRegex(ai.RecordError, "opponent"):
+            ai.validate_first_wave(self.wave(0, owner=3), 0)
+        for change in (dict(sent=21), dict(army=0, sent=0), dict(army_supply=0)):
+            with self.assertRaisesRegex(ai.RecordError, "more units sent", msg=str(change)):
+                ai.validate_first_wave(self.wave(0, **change), 0)
+
+    def raid(self, scenario, **kw):
+        row = {"kind": "raid", "scenario": ai.RAID_SCENARIOS[scenario], "owner": 1, "race": 0, "raid_frame": 9000,
+               "workers_before": 18, "killed": 18 - 2 * scenario, "depot_killed": scenario, "bank": 570,
+               "workers_after": 2 * scenario, "recovered_frame": 12120, "delivered_frame": 12600,
+               "delivered": 5400, "audit_first_bad": -1, "audit_model_errors": 0, "audit_supply_bad": 0,
+               "peak_workers": 12,
+               "army_after": 37, "end_frame": 21324, "won": 0,
+               "lost": 1, "ok": 1}
+        row.update(kw)
+        return [json.dumps(row)]
+
+    def test_raid_records(self):
+        for scenario in (0, 1):
+            case = ("raid", "terran", 1, 1, "t", scenario)
+            self.assertTrue(ai.evaluate(case, 0, "\n".join(self.raid(scenario)), 1800)["ok"])
+            # No recovery, no cargo delivered after it, no result, a raid that spared workers
+            # or the depot, or an economy that was never whole.
+            for change in (dict(recovered_frame=-1), dict(delivered_frame=-1), dict(delivered=199),
+                           dict(delivered_frame=12000), dict(delivered_frame=12120), dict(audit_first_bad=12300),
+                           dict(audit_model_errors=1), dict(audit_supply_bad=2), dict(lost=0), dict(won=1),
+                           dict(killed=5),
+                           dict(workers_after=7), dict(workers_before=7, killed=7 - 2 * scenario),
+                           dict(peak_workers=5), dict(raid_frame=8000), dict(end_frame=12000),
+                           dict(depot_killed=1 - scenario)):
+                with self.assertRaisesRegex(ai.RecordError, "disagrees", msg=str(change)):
+                    ai.validate_raid(self.raid(scenario, **change), scenario, 0)
+            unrecovered = self.raid(scenario, ok=0, recovered_frame=-1, delivered_frame=-1, peak_workers=2)
+            self.assertEqual(ai.validate_raid(unrecovered, scenario, 0)["ok"], 0)
+            # The delivery may land on the update that ends the match.
+            same = self.raid(scenario, delivered_frame=21324)
+            self.assertEqual(ai.validate_raid(same, scenario, 0)["ok"], 1)
+            with self.assertRaisesRegex(ai.RecordError, "disagree"):
+                ai.evaluate(case, 19, "\n".join(self.raid(scenario)), 1800)
+            with self.assertRaisesRegex(ai.RecordError, "opponent"):
+                ai.validate_raid(self.raid(scenario, owner=3), scenario, 0)
+            with self.assertRaisesRegex(ai.RecordError, "opponent"):
+                ai.validate_raid(self.raid(scenario), scenario, 2)
+        with self.assertRaisesRegex(ai.RecordError, "does not match"):
+            ai.validate_raid(self.raid(0), 1, 0)
+
+    def test_cases_cover_every_single_opponent_lobby(self):
+        cases = ai.cases(36000)
+        for profile in ai.PROFILES:
+            waves = {(c[2], c[3], c[4]) for c in cases if c[0] == "first-wave" and c[1] == profile}
+            self.assertEqual(waves, {(m, h, b) for m in (0, 1) for h in range(3) for b in ai.RACES})
+            raids = {(c[2], c[3], c[4], c[5]) for c in cases if c[0] == "raid" and c[1] == profile}
+            self.assertEqual(raids, set(ai.RAID_LOBBIES))
+            # Blood Bath: every human race, every opponent race, both scenarios,
+            # except the listed lobbies that end before the opponent can answer.
+            self.assertEqual({r for r in raids if r[0] == 1},
+                             {(1, h, b, s) for h in range(3) for b in ai.RACES for s in (0, 1)} -
+                             set(ai.RAID_UNANSWERED))
+            self.assertEqual({r[3] for r in raids if r[0] == 0}, {0})
+            self.assertEqual({(r[1], r[2]) for r in raids if r[0] == 1},
+                             {(h, b) for h in range(3) for b in ai.RACES})
+            self.assertFalse(raids & set(ai.RAID_UNANSWERED))
+        self.assertEqual(len(ai.RAID_LOBBIES), len(set(ai.RAID_LOBBIES)))
+        self.assertFalse(any(c[0] in ("first-wave", "raid") for c in ai.cases(36000, "economy")))
+
+    def test_run_case_builds_the_commands(self):
+        seen = []
+
+        class Done:
+            returncode, stdout, stderr = 0, "", ""
+
+        def fake(argv, **kw):
+            seen.append((argv, kw.get("timeout")))
+            return Done()
+        real = ai.subprocess.run
+        ai.subprocess.run = fake
+        try:
+            ai.run_case(Path("build"), ("first-wave", "zerg", 0, 2, "z", 0), 600)
+            ai.run_case(Path("build"), ("raid", "protoss", 1, 1, "p", 1), 600)
+        finally:
+            ai.subprocess.run = real
+        self.assertEqual(seen[0][0][1:], ["--map", "0", "--human", "p", "--bots", "z", "--first-wave"])
+        self.assertEqual(seen[1][0][1:], ["--map", "1", "--human", "z", "--bots", "p", "--ticks",
+                                           str(ai.MATCH_TICKS), "--raid", "1"])
+        self.assertEqual([t for _, t in seen], [900, 3600])
+
+
 def engine_catalog(override=None):
     """The engine's catalog rows for the prerequisite table, reconstructed from it."""
     rows = []

@@ -3708,7 +3708,6 @@ is_traversable(int col, int row, int from_cell)
 
 #ifdef SC64_IMPORTED_MISSION
 #ifdef SC64_RANGE_WORK
-/* target_alive itself expects an in-range entity reference. */
 #define SC64_RANGE_TARGET_VALID(t) \
     ((unsigned)(t) < (unsigned)(MAX_UNITS + MAX_BUILDINGS) && target_alive(t))
 #endif
@@ -4144,15 +4143,15 @@ move_toward(Unit * q, int tx, int ty)
 	 * Static terrain still uses BFS; candidates may leave an occupied tile
 	 * but may never enter a different blocked cell. */
 #if defined(SC64_CONTACT_CACHE)
-	/* One bucket pass answers all eight unit_step_clear() offsets; the
-	 * selection order and tie-breaking below are unchanged. */
-	unsigned blocked = sc64_contact_blocked_mask(q, speed);
+	int fresh;
+	unsigned blocked = SC64_STEER_MASK(q, speed, &fresh);
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);
 	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
 		!(blocked & (1u << i))) { best = i; best_cost = cost; }
 	}
+	SC64_STEER_REMEMBER(q, speed, blocked, best, fresh);
 #elif defined(SC64_COLLISION_STEER_LIST)
 	#if defined(SC64_Z7_RUNTIME)
 	best = sc64_steer_best_direction(q, speed, from_cell,
@@ -9193,8 +9192,8 @@ static inline int race_bc_order_dispatch_needed(const Unit *q,int slot,int recha
 }
 #endif
 
-#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(GBA_HOST)
-static void __attribute__((noinline,long_call))
+#ifdef SC64_IMPORTED_MISSION
+static void SC64_ORDERS_ATTR
 #else
 static void GBA_HOT
 #endif
@@ -10752,7 +10751,11 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_sync_references();
 #endif
+#ifdef SC64_IMPORTED_MISSION
+    SC64_UPDATE_ORDERS();
+#else
     update_orders();
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_tick();
 #endif
@@ -11176,11 +11179,10 @@ sc64_unit_energy(const Unit *q,int *maximum)
 /* StarCraft marks a selection with an ellipse at the actor's base, coloured
  * by relationship: green for the player, yellow for neutral, red for others.
  * This draws a one-pixel outline sized from the sprite, so it needs no source
- * art. Art covers a ring's far arc and sits behind its near arc. A unit draws
- * its whole ring before any unit, and a directly drawn building draws the far
- * arc before its art. Art in the static cache is already on screen, so its
- * frame is passed as a cover: the far arc only fills the frame's transparent
- * pixels, the same result without redrawing the art. */
+ * art. A unit draws its whole ring before its body, and a directly drawn
+ * building draws the far arc before its art and the near arc after. Art in the
+ * static cache is already on screen, so use its frame as a cover. The far arc
+ * only fills the frame's transparent pixels. */
 #define SELECTION_RX_MAX 64
 #define SELECTION_RY_MAX 38
 #define SELECTION_NEAR 1
@@ -11403,6 +11405,8 @@ static int sc64_cocoon_world_visible(int x,int y)
 }
 #endif
 
+#include "sc64_actor_draw_view.h"
+
 static void
 draw_unit_pass(Unit * q, int selection_pass)
 {
@@ -11411,15 +11415,8 @@ draw_unit_pass(Unit * q, int selection_pass)
     if (race_p6_combat_unit_burrowed((int)(q - u))) return;
 #endif
     int x = q->x - camx, y = q->y - camy + 12;
+    if (!sc64_unit_anchor_in_view(q, x, y)) return;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
-#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
-    if (q->type == U_GUARDIAN_COCOON) {
-        /* Include both the primary canvas and its displaced underlay. */
-        if (x < -64 || x > 304 || y < -80 || y > 180) return;
-    } else
-#endif
-    if (x < -8 || x > 247 || y < 10 || y > 125)
-	return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
 #ifdef SC64_P7_OBSERVER_ENABLED
@@ -11478,9 +11475,8 @@ draw_unit_pass(Unit * q, int selection_pass)
     int sprite_x = x - 4, sprite_y = y - 4, sprite_w = 8, sprite_h = 8;
 #endif
     if (selection_pass) {
-        /* Drawn for every selected unit before any unit, so no circle
-         * covers a neighbour. The ellipse's lower edge sits just below the
-         * sprite, and the sprite drawn later hides its far arc. */
+        /* The lower edge sits just below the standing sprite. Drawing the
+         * body after the ring lets its opaque pixels cover the arc. */
         int rx = (sprite_w + 3) / 2, ry = (rx * 3 + 2) / 5;
         if (ry < 2) ry = 2;
         draw_selection_ellipse(x, sprite_y + sprite_h + 1 - ry, rx, ry,
@@ -12485,7 +12481,13 @@ sc64_static_objects_key(void)
     return generation;
 }
 #endif
+#ifdef SC64_WORLD_DEPTH
+/* The sorted painter runs after this cache. Actor changes cannot dirty the
+ * terrain underneath, while fog and camera invalidation still apply. */
+#define SC64_TERRAIN_STATIC_KEY 0u
+#else
 #define SC64_TERRAIN_STATIC_KEY sc64_static_objects_key()
+#endif
 #include "sc64_terrain_cache.h"
 #ifdef SC64_SOFT_FOG
 #if !defined(SC64_HAS_TERRAIN_ART) || \

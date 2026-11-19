@@ -65,7 +65,21 @@ enum {
     RACE_AI_OBJECTIVE_REACH = 64,
     RACE_AI_HOME_PYLON_RANGE = 256,
     RACE_AI_WORKER_FLOOR = 4,
-    RACE_AI_FLOAT_MINERALS = 400
+    RACE_AI_FLOAT_MINERALS = 400,
+    /* First offensive, measured on the StarCraft 64 computer players (Blood
+     * Bath, Free for All; docs/audits/2026-11-19-n64-skirmish-ai.md). Their
+     * first wave left at game frame 8,253, 8,505 and 13,363 for Protoss,
+     * 8,688, 9,865 and 12,807 for Terran, and 13,396, 13,780 and after
+     * 14,055 for Zerg, with a median of 46 to 50 army supply (this engine's
+     * doubled units) held at that moment. Each gate is the median for its
+     * race; one game frame is 1.25 updates. Workers here mine about twice
+     * as fast as theirs, so the army is ready early and the gate decides
+     * when the wave leaves. Before this every race attacked at update
+     * 10,800 with 24 supply. */
+    RACE_AI_FIRST_WAVE_TERRAN = 9865 * 5 / 4,       /* update 12,331, 6:51 */
+    RACE_AI_FIRST_WAVE_ZERG = 13780 * 5 / 4,        /* update 17,225, 9:34 */
+    RACE_AI_FIRST_WAVE_PROTOSS = 8505 * 5 / 4,      /* update 10,631, 5:54 */
+    RACE_AI_WAVE_SUPPLY = 46
 #ifdef RACE_AI_CARRIERS
     ,
     /* At most four Carriers, and one more only once the ground line (Zealots
@@ -703,11 +717,10 @@ static int race_ai_ring(const RaceAiCensus *c, int type, int ax, int ay, int rad
  * the direction of the map center.
  *
  * A Protoss structure that needs psi power gets one more ring when that
- * search finds nothing: the half of an inner ring around one of the owner's
- * completed home Pylons that faces the Nexus (the map center for defenses),
- * a different Pylon and radius as the passes go by. Rings around the Nexus
- * alone often miss every psi field, which left Gateways unplaced for the
- * rest of a match. The expensive-check budget is shared by both rings. */
+ * search finds nothing: an inner ring around one of the owner's completed
+ * home Pylons. Start on the side facing the Nexus (the map center for
+ * defenses). The first Gateway also checks the far side so edge Pylons
+ * can support it. The expensive-check budget is shared by both rings. */
 static int __attribute__((noinline))
 race_ai_find_site(RaceAiCensus *c, int type, int ax, int ay, int min_ring,
                   int max_ring, int front_first, int *out_x, int *out_y)
@@ -723,10 +736,12 @@ race_ai_find_site(RaceAiCensus *c, int type, int ax, int ay, int min_ring,
         int n = race_ai_home_pylon(c, -1), pylon;
         if (n > 0 && (pylon = race_ai_home_pylon(c, (pass / 2) % n)) >= 0) {
             int px = b[pylon].x, py = b[pylon].y;
+            int steps = 9;
+            if (type == B_GATEWAY && !race_ai_count(c, AK_GATEWAY)) steps = 16;
             return race_ai_ring(c, type, px, py, radius[pass & 1],
                                 front_first ? WORLD_W / 2 - px : c->hx - px,
                                 front_first ? WORLD_H / 2 - py : c->hy - py,
-                                0, 9, &checks, out_x, out_y);
+                                0, steps, &checks, out_x, out_y);
         }
     }
     return 0;
@@ -1287,12 +1302,19 @@ static int race_ai_all_in(const RaceAiCensus *c)
            (!c->patches && race_owner_minerals(c->owner) < 100);
 }
 
+/* The update before which this race starts no offensive. */
+static int race_ai_first_wave(int race)
+{
+    return race == R_ZERG ? RACE_AI_FIRST_WAVE_ZERG :
+           race == R_PROTOSS ? RACE_AI_FIRST_WAVE_PROTOSS : RACE_AI_FIRST_WAVE_TERRAN;
+}
+
 static int race_ai_attack_threshold(const RaceAiCensus *c)
 {
-    int minutes = frame / 1800, t = 24;
-    /* No offensive before six minutes; defense is unaffected. */
-    if (minutes < 6) return 0x7fff;
-    t += (minutes - 6) * 2;
+    int first = race_ai_first_wave(c->race), t = RACE_AI_WAVE_SUPPLY;
+    /* No offensive before the race's first wave; defense is unaffected. */
+    if (frame < first) return 0x7fff;
+    t += (frame - first) / 1800 * 2;
     t += c->enemy_defense * 2 > 16 ? 16 : c->enemy_defense * 2;
     if (t > 64) t = 64;
     /* All in: even an army below the normal threshold attacks. */
@@ -1407,9 +1429,62 @@ static void __attribute__((noinline)) race_ai_military(RaceAiCensus *c)
     }
     if (c->deployed) {
         int deployed_tx = -1, deployed_ty = -1, any_x = 0, any_y = 0;
-        /* Too few left: regroup at the rally point. */
+        /* Too few left, or the race's first wave is not due yet: regroup at
+         * the rally point. */
         int regroup = threshold > 64 ? 64 : threshold;
-        if (c->deployed_supply * 4 < regroup && home_supply < regroup) {
+        int recall = frame < race_ai_first_wave(c->race) ||
+                     (c->deployed_supply * 4 < regroup && home_supply < regroup);
+        if (!recall) {
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (race_ai_movable_army(&u[i], c->owner) &&
+                    dist2(u[i].x, u[i].y, c->hx, c->hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) {
+                    any_x = u[i].x; any_y = u[i].y;
+                    if (u[i].order == ORDER_ATTACK_MOVE) { deployed_tx = u[i].tx; deployed_ty = u[i].ty; break; }
+                }
+            /* A destroyed objective leaves units crowding its old position in
+             * attack-move; retarget once nothing hostile remains near it. */
+            if (deployed_tx >= 0 &&
+                !race_ai_hostile_near(c, deployed_tx, deployed_ty, RACE_AI_OBJECTIVE_REACH)) {
+                any_x = deployed_tx; any_y = deployed_ty; deployed_tx = -1;
+            }
+            /* With no live objective, choosing one is a launch and needs what
+             * the launch from home needs: the full threshold (which is the
+             * whole army for an owner that is all in). Units far from home
+             * that are on no offensive, born at a distant Hatchery or left
+             * where they defended an expansion, otherwise started one with a
+             * dozen supply; and an army worn down below the threshold goes
+             * home after its objective falls instead of taking the next. */
+            if (deployed_tx < 0) {
+                if (c->army_supply < threshold) {
+                    /* The group stands on a block of slots around the
+                     * ordered point, and only the first unit's slot was
+                     * tested. While any other slot still has a hostile in
+                     * reach the fight is not over: leave the orders alone.
+                     * Each distinct destination is tested once, 16 at most
+                     * (the block has 15 slots and one fallback point); with
+                     * more than that still untested, hold for this pass
+                     * rather than call the objective clear. */
+                    short seen_x[16], seen_y[16];
+                    int seen = 0;
+                    for (int i = 0; i < MAX_UNITS; ++i) {
+                        const Unit *q = &u[i];
+                        int k;
+                        if (!race_ai_movable_army(q, c->owner) || q->order != ORDER_ATTACK_MOVE ||
+                            (q->tx == any_x && q->ty == any_y) ||
+                            dist2(q->x, q->y, c->hx, c->hy) <= RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE)
+                            continue;
+                        for (k = 0; k < seen; ++k)
+                            if (seen_x[k] == q->tx && seen_y[k] == q->ty) break;
+                        if (k < seen) continue;
+                        if (seen == 16) return;
+                        seen_x[seen] = (short)q->tx; seen_y[seen] = (short)q->ty; ++seen;
+                        if (race_ai_hostile_near(c, q->tx, q->ty, RACE_AI_OBJECTIVE_REACH)) return;
+                    }
+                    recall = 1;
+                } else if (!race_ai_target(c, any_x, any_y, &deployed_tx, &deployed_ty)) return;
+            }
+        }
+        if (recall) {
             /* Units already fighting a target finish that fight. */
             for (int i = 0; i < MAX_UNITS; ++i)
                 if (race_ai_movable_army(&u[i], c->owner) && u[i].order != ORDER_ATTACK_TARGET &&
@@ -1417,19 +1492,6 @@ static void __attribute__((noinline)) race_ai_military(RaceAiCensus *c)
                     race_ai_order(&u[i], ORDER_MOVE, rx, ry, n++);
             return;
         }
-        for (int i = 0; i < MAX_UNITS; ++i)
-            if (race_ai_movable_army(&u[i], c->owner) &&
-                dist2(u[i].x, u[i].y, c->hx, c->hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) {
-                any_x = u[i].x; any_y = u[i].y;
-                if (u[i].order == ORDER_ATTACK_MOVE) { deployed_tx = u[i].tx; deployed_ty = u[i].ty; break; }
-            }
-        /* A destroyed objective leaves units crowding its old position in
-         * attack-move; retarget once nothing hostile remains near it. */
-        if (deployed_tx >= 0 &&
-            !race_ai_hostile_near(c, deployed_tx, deployed_ty, RACE_AI_OBJECTIVE_REACH)) {
-            any_x = deployed_tx; any_y = deployed_ty; deployed_tx = -1;
-        }
-        if (deployed_tx < 0 && !race_ai_target(c, any_x, any_y, &deployed_tx, &deployed_ty)) return;
         for (int i = 0; i < MAX_UNITS; ++i) {
             Unit *q = &u[i];
             int far;

@@ -417,3 +417,27 @@ in both GBA modes. The GBA preview can display all Closed while editing
 but disables Launch; the native observation supports the same launch
 floor and identifies a separate menu difference. It does not cover
 other maps, all directions or injected state.
+
+## Terran CPU's first observed purchase
+
+A separate read of the retained ordinary-input Melee captures checks the
+three CPU resource banks and starting production queues. The native queue
+and refund routines identify the queue's first slot and the paid SCV cost.
+The two captures share the opening at observer steps 4,230 and 4,273.
+At both cuts all four mineral/gas banks read 50/0 and all four town hall
+queues are empty.
+
+At observer step 4,363 in the field-move branch, the Terran CPU alone has
+spent its 50 minerals. Its Command Center has an SCV in its first queue
+slot and links the newly allocated, incomplete SCV at the hall. All
+four owners still have one registered building each. The other three
+banks still read 50/0 and their queues remain empty. A separate branch's
+step 4,342 queue is empty; the later controller paths differ, so the
+shared step 4,273 is the lower bound for the observed purchase.
+
+This agrees with the GBA AI's paid worker-first opening for the sampled
+Terran CPU. It does not establish the first purchase for Zerg or Protoss
+or the exact elapsed time between purchase and completion. The analysis
+uses existing emulator captures and starts no additional emulator session.
+The private receipt SHA-256 is
+`a9ab3f109b69eb78e091727e5505aaa15ccc31193fdeb5cb07332826f6131772`.

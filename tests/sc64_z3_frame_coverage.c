@@ -363,6 +363,154 @@ test_consecutive_viewport_edge_frames(void)
     return failures;
 }
 
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
+typedef struct {
+    int type, y, building, selected;
+} DepthActor;
+
+static void
+depth_spawn(DepthActor actor)
+{
+    if (actor.type < 0) return;
+    int slot = actor.building ? spawn_build(SIDE, actor.type, 96, actor.y, 0)
+                              : spawn_unit(SIDE, actor.type, 96, actor.y);
+    assert(slot >= 0);
+    if (!actor.building) u[slot].selected = actor.selected;
+}
+
+static void
+depth_capture(DepthActor first, DepthActor second, u8 *out)
+{
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    depth_spawn(first);
+    depth_spawn(second);
+    reset_render_caches();
+    gfx_begin(C_BLACK);
+    gfx_set_clip_y(12, 120);
+    draw_map();
+    assert(camx == 0 && camy == 0);
+    capture(out);
+    gfx_end();
+}
+
+static void
+setup_depth_profile(int human_race)
+{
+    game_init();
+    race_mode = 1;
+    race_human = human_race;
+    race_bots = 1;
+    race_skirmish_map = 0;
+    race_skirmish_init();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    cx = 120;
+    cy = 54;
+    screen = SCREEN_PLAY;
+}
+
+static int
+test_actor_depth(void)
+{
+    static u8 pixels[5][FB_SIZE];
+    const DepthActor empty = { -1, 0, 0, 0 };
+    const DepthActor tank = { U_TANK, 50, 0, 0 };
+    const struct {
+        const char *name;
+        DepthActor back, front;
+    } cases[] = {
+        { "air-over-ground", tank, { U_WRAITH, 50, 0, 0 } },
+        { "ground-by-y", tank, { U_GOLIATH, 56, 0, 0 } },
+        { "building-over-unit", tank, { B_BARRACKS, 58, 1, 0 } },
+        { "unit-over-building", { B_BARRACKS, 43, 1, 0 }, tank },
+    };
+    int failures = 0;
+
+    setup_depth_profile(R_TER);
+    depth_capture(empty, empty, pixels[0]);
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        DepthActor back = cases[n].back, front = cases[n].front;
+        depth_capture(back, empty, pixels[1]);
+        depth_capture(front, empty, pixels[2]);
+        depth_capture(back, front, pixels[3]);
+        depth_capture(front, back, pixels[4]);
+        unsigned overlap = 0, incorrect = 0;
+        for (unsigned i = 0; i < FB_SIZE; ++i) {
+            u8 base = pixels[0][i], a = pixels[1][i], c = pixels[2][i];
+            if (a == base || c == base || a == c) continue;
+            ++overlap;
+            incorrect += pixels[3][i] != c || pixels[4][i] != c;
+        }
+        if (!overlap || incorrect) {
+            fprintf(stderr, "Actor depth %s: %u incorrect of %u overlap pixels\n",
+                    cases[n].name, incorrect, overlap);
+            ++failures;
+        }
+    }
+    return failures;
+}
+
+static int
+test_selection_depth(void)
+{
+    static u8 ring[FB_SIZE], background[FB_SIZE], unit[FB_SIZE], building[FB_SIZE], pair[FB_SIZE];
+    const DepthActor empty = { -1, 0, 0, 0 };
+    const struct {
+        const char *name;
+        int race, ring_in_front;
+        DepthActor unit, building;
+    } cases[] = {
+        { "Overlord over Hatchery", R_ZERG, 1, { U_OVERLORD, 50, 0, 0 }, { B_HATCHERY, 50, 1, 0 } },
+        { "Tank behind Barracks", R_TER, 0, { U_TANK, 50, 0, 0 }, { B_BARRACKS, 58, 1, 0 } },
+    };
+    int failures = 0;
+
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        setup_depth_profile(cases[n].race);
+        DepthActor actor = cases[n].unit;
+        depth_capture(empty, empty, background);
+        depth_capture(actor, empty, unit);
+        depth_capture(cases[n].building, empty, building);
+
+        /* Isolate the actual ring so body, vitals and team colours cannot
+         * satisfy the overlap assertion by accident. */
+        memset(u, 0, sizeof(u));
+        actor.selected = 1;
+        depth_spawn(actor);
+        gfx_begin(C_BLACK);
+        gfx_set_clip_y(12, 120);
+        draw_unit_pass(&u[0], 1);
+        capture(ring);
+        gfx_end();
+
+        depth_capture(actor, cases[n].building, pair);
+        unsigned overlap = 0, body_overlap = 0, incorrect = 0;
+        for (unsigned i = 0; i < FB_SIZE; ++i) {
+            if (ring[i] != C_GREEN) continue;
+            if (cases[n].ring_in_front && unit[i] != background[i] && unit[i] != C_GREEN) {
+                ++body_overlap;
+                incorrect += pair[i] != unit[i];
+            }
+            if (unit[i] != background[i] || building[i] == background[i] || building[i] == C_GREEN)
+                continue;
+            ++overlap;
+            u8 expected = cases[n].ring_in_front ? C_GREEN : building[i];
+            incorrect += pair[i] != expected;
+        }
+        if (!overlap || (cases[n].ring_in_front && !body_overlap) || incorrect) {
+            fprintf(stderr, "Selection depth %s: %u incorrect, %u building pixels, %u own-body pixels\n",
+                    cases[n].name, incorrect, overlap, body_overlap);
+            ++failures;
+        } else {
+            printf("Selection depth %s: %u building pixels and %u own-body pixels match\n",
+                   cases[n].name, overlap, body_overlap);
+        }
+    }
+    return failures;
+}
+#endif
+
 int
 main(void)
 {
@@ -375,6 +523,10 @@ main(void)
     failures += test_consecutive_viewport_edge_frames();
 #if defined(SC64_P6_RUNTIME)
     failures += test_p6_doodad_action_cold_warm();
+#endif
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
+    failures += test_actor_depth();
+    failures += test_selection_depth();
 #endif
     if (failures) fprintf(stderr, "Race no-clear coverage failures: %d\n", failures);
     else puts("Race framebuffer coverage: all full-clear comparisons match");

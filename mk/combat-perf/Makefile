@@ -27,6 +27,28 @@ CANONICAL_ROUTE_KEEP_FLAGS ?= -DSC64_ROUTE_KEEP_FIELDS
 # compare every incremental update with a full rebuild.
 CANONICAL_PATH_GRID_UPDATE_FLAGS ?= -DSC64_PATH_GRID_INCREMENTAL
 
+# Snapshot Pylon power during defense passes. Campaign runtimes with Z/P
+# target lists can also restrict target searches to nearby spatial cells.
+CANONICAL_DEFENSE_FLAGS = -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
+
+# Exact target-index rebuild and list insertion for the four shipped imported ROMs.
+# Set to 0 for a baseline comparison with the same imported inputs.
+CANONICAL_TARGET_INDEX ?= 1
+ifneq ($(CANONICAL_TARGET_INDEX),0)
+ifneq ($(CANONICAL_TARGET_INDEX),1)
+$(error CANONICAL_TARGET_INDEX must be 0 or 1)
+endif
+endif
+CANONICAL_TARGET_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_INDEX)),-DSC64_TARGET_BULK_REBUILD_PROBE -DSC64_TARGET_FAST_LINK_PROBE)
+CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_INDEX)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
+.PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
+force-canonical-target-index-config:
+force-canonical-target-index-rebuild:
+build/canonical-target-index-config: force-canonical-target-index-config | build
+	@printf '%s\n' '$(CANONICAL_TARGET_INDEX)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
+
 # Optional differential of the per-profile tick cache, the 32-bit flight and
 # position paths against retained earlier code, over every prepared profile.
 .PHONY: test-sc64-weapon-source-ticks-bank
@@ -94,6 +116,15 @@ test-sc64-route-linear: build/test-sc64-route-linear-ref build/test-sc64-route-l
 	cmp build/route-linear-base.ref build/route-linear-overflow.ref
 	cmp build/route-linear-base.ref.state build/route-linear-probe.ref.state
 	cmp build/route-linear-base.ref.state build/route-linear-overflow.ref.state
+
+build/test-sc64-route-linear-empty-goal: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE $< -o $@
+.PHONY: test-sc64-route-linear-empty-goal
+test-sc64-route-linear-empty-goal: build/test-sc64-route-linear-ref build/test-sc64-route-linear-empty-goal
+	./build/test-sc64-route-linear-ref --emit build/route-linear-empty-goal.ref
+	./build/test-sc64-route-linear-empty-goal --emit build/route-linear-empty-goal.probe
+	cmp build/route-linear-empty-goal.ref build/route-linear-empty-goal.probe
+	cmp build/route-linear-empty-goal.ref.state build/route-linear-empty-goal.probe.state
 
 # Compare the same route and residency receipts with and without pointer FIFO
 # access, including the forced small queue that exercises fallback.
