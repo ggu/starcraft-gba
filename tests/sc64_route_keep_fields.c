@@ -826,7 +826,6 @@ static void check_point_prefix_resume(void)
     puts("point prefixes preserve exact FIFO, capacity fallback, logical residency and topology reset");
 }
 
-#ifdef SC64_ROUTE_POINT_PREFIX_ROW_SPAN
 static void check_point_prefix_row_span(void)
 {
     const int distant = 100 + 64 * 128;
@@ -858,7 +857,6 @@ static void check_point_prefix_row_span(void)
     }
     puts("point prefix row bounds preserve exact directions at both map edges");
 }
-#endif
 
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
 static void check_point_prefix_tail_exchange(void)
@@ -1130,9 +1128,7 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-prefix-only")) {
         check_point_prefix_resume();
-#ifdef SC64_ROUTE_POINT_PREFIX_ROW_SPAN
         check_point_prefix_row_span();
-#endif
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
         check_point_prefix_tail_exchange();
 #endif

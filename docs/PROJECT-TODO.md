@@ -720,8 +720,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   completions. The stock skirmish maps are 64×64 and prefixes require
   128×128. The [forced ARM case](audits/2026-11-16-resumable-frontier-budget.md#forced-cached-range-completion-on-arm)
   produces the same route step and measures a 1.20M-cycle synchronous
-  read. Reduce or bound exact completion cost before enabling the
-  selector. The packed second cutoff stays local.
+  read. [Restoring just the visited row span](audits/2026-11-16-resumable-frontier-budget.md#restore-only-rows-reached-by-the-parked-prefix)
+  cuts that read to 1.09M cycles with identical packed directions.
+  Ordered expansion alone still takes about 864,000 cycles. Reduce or
+  bound the expansion cost and verify the display-page timing before
+  enabling the selector. The packed second cutoff stays local.
   On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
   audit tracks a byte lookup

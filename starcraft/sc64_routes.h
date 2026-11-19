@@ -254,9 +254,7 @@ enum { SC64_POINT_PREFIX_SLOTS = 4, SC64_POINT_PREFIX_PENDING = 128,
 typedef struct {
     u16 goal;
     u8 slot, count;
-#ifdef SC64_ROUTE_POINT_PREFIX_ROW_SPAN
     u8 restore_first_row, restore_last_row;
-#endif
     u16 queue[SC64_POINT_PREFIX_PENDING];
 } Sc64PointPrefix;
 static Sc64PointPrefix sc64_point_prefixes[SC64_POINT_PREFIX_SLOTS];

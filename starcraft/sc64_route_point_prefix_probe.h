@@ -110,14 +110,12 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
         sc64_point_prefix_discard(prefix);
         prefix->goal = (u16)goal;
         prefix->slot = (u8)slot;
-#ifdef SC64_ROUTE_POINT_PREFIX_ROW_SPAN
         /* Each discovered cell lies at most head edges from a seed. The
          * blocked-goal seeds can start one row away from the goal. Include
          * those rows without bookkeeping in the pop or packing loops. */
         int radius = head + (dense[goal_start] != 0);
         prefix->restore_first_row = (u8)limit(goal_row + 1 - radius, 1, rows);
         prefix->restore_last_row = (u8)limit(goal_row + 1 + radius, 1, rows);
-#endif
         memcpy(prefix->queue, bfs_queue + head, (size_t)pending * sizeof(*bfs_queue));
         prefix->count = (u8)pending;
         sc64_point_prefix_index[slot] = (u8)(prefix - sc64_point_prefixes + 1);
@@ -143,7 +141,6 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
     u8 *field = sc64_route_field[slot];
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
     int first_row = 1, last_row = rows;
-#ifdef SC64_ROUTE_POINT_PREFIX_ROW_SPAN
     if (prefix->restore_first_row >= 1 &&
         prefix->restore_first_row <= prefix->restore_last_row &&
         prefix->restore_last_row <= rows) {
@@ -152,9 +149,6 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
     }
     /* The initial clear left all other rows at the undiscovered code. */
     const u8 *in = field + (first_row - 1) * (cols / 8) * 3;
-#else
-    const u8 *in = field;
-#endif
     for (int row = first_row; row <= last_row; ++row) {
         u8 *out = dense + row * stride + 4;
         for (int col = 0; col < cols; col += 8) {

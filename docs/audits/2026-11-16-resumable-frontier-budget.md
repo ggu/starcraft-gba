@@ -646,8 +646,8 @@ undiscovered. Copy the same pending FIFO and use the existing ordered
 expansion and packing. Route metadata and save formats are unchanged.
 Invalid row bounds use the full restore.
 
-`CANONICAL_ROUTE_POINT_PREFIX_ROW_SPAN=1` requires
-`CANONICAL_ROUTE_POINT_PREFIX=1`. The opt-in ASan/UBSan target
+The existing `CANONICAL_ROUTE_POINT_PREFIX=1` selector includes the row
+bounds. The opt-in ASan/UBSan target
 `test-sc64-route-point-prefix` passed the 386,646-query residency
 comparison, the range reader with both reserved planes, and the new
 open and blocked seed cases at the top and bottom of the map.
@@ -670,7 +670,9 @@ packed directions.
 Ordered expansion still takes about 864,000 cycles in the forced
 read, so the read remains above the 561,792-cycle budget for 30 updates
 per second. Normal P10 and Z10 links retain their previous IWRAM
-endpoints and each uses eight additional EWRAM bytes.
+endpoints and each uses eight additional EWRAM bytes. Folding the
+bounds into the existing selector produces byte-identical P10 and
+Z10 ROMs. Terran and Showcase also fit both link guards.
 
 The dense Z7 replay on Z10 matches 131 historical checks, all 480
 simulation and route-counter records, and all nine sampled actor,
