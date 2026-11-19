@@ -284,3 +284,32 @@ the original world through frame 184.
 | Release Z10 ROM | `f784da09d7f772b1598b8f7c31be212d648e955a0c7f171c7e0a357db035da99` |
 | Opt-in Z10 ROM | `9091074cd2401e2446701c9c79ac80e27def634da2f13ba08310874700d93ead` |
 | Z10 physical selection and save/load receipt | `2b037ab3516cdd55710137368b14f842cdd38fe2aab94260172a23f907f0b874` |
+
+### Terran on ARM
+
+The Terran opt-in at `f2908551` composes the selector with the
+`ea041527` release and uses the same 38 prepared inputs as that
+release's existing control ROM. The opt-in passes the ROM header,
+SRAM signature, and memory checks. Both images end IWRAM at
+`0x030048a8` and EWRAM at `0x02038d5c`.
+
+From HOME, the first 1,100 physical calls of the T4 campaign tape
+reach frame 1,079 in both images. Both match all frame and screen
+observations, eight A command-menu transitions, and six sampled
+world, framebuffer, palette and fog states. The release also matches
+the retained T4 checkpoint at call 1,000.
+
+A second route follows the tape through 91 calls, presses Select to
+clear the group, moves left seven steps and up five, and presses A
+at (1825,1940). At frame 96 both builds select only unit slot 84 and
+leave the building selection empty. This covers a direct click in
+the campaign. The P10 case above covers the changed overlap result.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Release Terran ROM | `f0691c9e08bf2a30b554382a179998c2daa96b6295b2f0f61f1f642693e66973` |
+| Opt-in Terran ROM | `4bbe59da8a42cf90647d425d69e4a1e91539eb16ae2e4ed7a6180e6974929dac` |
+| T4 controller tape | `e9b505111c6777ed4adc98218c2009091702be171f4259fbeaa56114c72dd5a0` |
+| Physical controller observer | `ff2c5a8b1f6764ed399d8a1b59df6ffde135ae2cd01a6d67500684b8429d23b7` |
+| Bounded T4 campaign receipt | `14db9a85889a2fe1095498a652279f1fc8b6e0d4dcb336990707b95493b3e2b0` |
+| Direct A selection receipt | `8ef8301197af3f14d3e64c505a77ed2df636676a36efb832571ccdb32b09bd53` |
