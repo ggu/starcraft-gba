@@ -341,3 +341,50 @@ fusing it with validation. For defenses, separate candidate index
 construction from the actual target queries before changing cell size.
 
 - Post-orders receipt SHA-256 `7e3631e8c1053d210c75da0ac5352e6a3ddca76edec36764c3a3badb1eab3311`.
+
+### Campaign defense grid size
+
+An opt-in 128-pixel grid retains the same world envelope and target
+comparison as the 256-pixel grid. It adds 192 bytes to the temporary
+cell-head array. Both prepared Z10 sanitizer builds match the scalar
+defense implementation, including slot ties across the new boundary,
+strict range exclusion and searches spanning three cells on one axis.
+
+The matched dense Z7 ARM replay preserves all 131 historical checks,
+480 frame and route records, nine raw world and display cuts, and
+per-update actor transition observations. Mean whole-update cycles
+change from 1,822,508 to 1,822,015 and p95 rises from 2,652,372 to
+2,657,081. Mean post-orders cycles change from 268,636 to 268,294.
+This is effectively flat and does not justify expanding the grid.
+
+- 128-pixel replay SHA-256 `842c23c538b10baab6f1a182d0a5d0397522a325be2dadb28aba05f9e84bf5f5`.
+- 128-pixel ROM SHA-256 `d578200b48e2ff83d4a1d7967068accd1b7b7df4be44cf9c47ab87461af3d220`.
+
+### Pack target owner and flight class without growing the index
+
+The 256-pixel candidate uses the same byte per indexed unit to store
+owner and flight class. A query builds its accepted mask once and
+checks it before reading the candidate unit. Liveness, geometry,
+fog and targetability are still checked against live state. The
+prepared Z10 candidate and flag-off control pass the scalar
+ASan/UBSan differential. This includes a Spore Colony choosing the
+hostile flyer ahead of closer ineligible actors.
+
+The ARM pairing on the same dense window matches all 131 historical
+checks, 480 frame and route records, nine raw cuts and the actor
+transition records. EWRAM occupancy is unchanged and the linked
+IWRAM end is 112 bytes lower, leaving 600 bytes before the guard.
+
+| Dense Z7 timing | Control | Packed filter |
+| --- | ---: | ---: |
+| Mean whole-update cycles | 1,822,508 | 1,817,191 |
+| p95 whole-update cycles | 2,652,372 | 2,651,654 |
+| Slowest update, cycles | 3,500,472 | 3,493,471 |
+| Mean post-orders cycles | 268,636 | 263,135 |
+
+The 0.29% whole-update reduction is modest. The filter stays opt-in
+while other heavy defense configurations and profiles are checked.
+[Source candidate](https://github.com/ggu/starcraft-gba/commit/2935c943bf94cea00d1037943f3b0d87adcdee8a)
+
+- Packed filter replay SHA-256 `e87843dfbf97841d5fe4bd46bafa1a86fe6a98188985f4be4dbe327565938140`.
+- Packed filter ROM SHA-256 `4071ecc6882f913f81372c288963e5af8628b13f0ff8c01a683e67ede8046ce1`.

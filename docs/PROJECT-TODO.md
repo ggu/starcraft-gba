@@ -1571,8 +1571,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
   stays near 30 emulated updates/s and mixed Blood Bath mean cost rises
   0.17% with matching sampled state. The N64 also refunds all 50 minerals
   and keeps 10/10 supply when Cancel Last removes the stalled paid head,
-  matching the GBA preview. Continue native capacity recovery and broader
-  ARM controls before release activation.
+  matching the GBA preview. Its Depot replay confirms the existing SCV
+  automatically takes the new reservation and completes after 10/10
+  becomes 11/18. Broader ARM controls and other producer classes remain
+  in qualification before release activation.
 - The [dense Z7 orders audit](audits/2026-11-19-z7-order-cost.md)
   separates the movement, nearest-enemy and setup costs. Movement
   averages about 920,000 instrumented cycles on calls that advance
@@ -1612,13 +1614,19 @@ save/source-owner and timing evidence; do not advertise unwired components.
   The dense Z7 mean falls another 2.08% to 1,784,538 cycles per update,
   with all 131 input checkpoints, nine raw cuts and route counters
   matching. The same ROM loads the authenticated late save and wins at
-  frame 194,998, with all six state and video cuts matching. Keep it
-  opt-in. Check IWRAM fit and timing on other profiles before promotion.
+  frame 194,998, with all six state and video cuts matching. Zerg 9 wins
+  on both builds with 106 matching cuts and broadly flat timing. In a
+  separate early Zerg 9 save test, both exports are byte-identical and
+  each ROM successfully loads the other's SRAM. Keep the flag opt-in
+  while checking IWRAM fit and timing on the other race profiles.
 - The [post-orders trace](audits/2026-11-19-z7-repeated-negative-route.md#what-remains-after-orders-in-dense-zerg-7)
   measures about 127,000 cycles in mission and AI, 81,000 in defense
   targeting, and 46,000 in race state. Attribute defense index construction
   and queries separately. Measure the remaining mission actor traversal
   before combining it with provenance validation.
+  A finer 128-pixel defense grid is effectively flat in dense Z7.
+  Packing owner and flight eligibility into the existing index byte
+  saves about 5,300 whole-update cycles with matching replay cuts.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for

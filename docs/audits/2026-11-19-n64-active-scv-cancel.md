@@ -183,8 +183,8 @@ refuses a new head at cap and takes no payment. Together with the
 busy-producer sample, this establishes the initial-head and paid-tail
 rules for ordinary SCVs at the provided cap. The emulator reads the
 original ROM directly, uses isolated save and capture paths, and
-completes 13,598 steps. Native capacity recovery after an accepted
-tail remains a separate comparison.
+completes 13,598 steps. The [Depot replay](#resume-the-paid-scv-after-a-supply-depot)
+tests recovery after the paid tail becomes the head.
 
 - Idle producer controller tape SHA-256 `ca1d2058a19385a3035529218e304231a8b5596489574ee398a30e924b1540cf`.
 - Idle producer manifest SHA-256 `66b8b1bd0205840bb142892778c0153a4db9fa6f4632fb2c54ac31a195f21fec`.
@@ -208,8 +208,33 @@ A press on Cancel Last.
 Canceling the paid waiting head refunds 50 minerals and leaves the
 displayed supply at 10/10. This matches the GBA preview's cancellation
 of a saved waiting head. The native run exits normally after 13,765
-steps with the original ROM and Flash hashes still matching. Resumption
-after a completed native Supply Depot remains unverified.
+steps with the original ROM and Flash hashes still matching.
 
 - Waiting-head cancel tape SHA-256 `45c3e3a403f344c4aac71854b244886b36dd5e83f755b2dbda46f3c2b5861ce0`.
 - Waiting-head cancel manifest SHA-256 `799bf380f29305aa7785c9d4c87ee1c5cd1e8ab0722c1201077da29fba7cd576`.
+
+## Resume the paid SCV after a Supply Depot
+
+The native observer replays the blocked-head tape and matches its
+13,512-step frame byte for byte. The player selects a nearby parked
+SCV, opens its worker Build grid, chooses Supply Depot and confirms a
+green placement. The player recalls the original Command Center with
+its controller group. The last A release is the placement at step
+13,721. The remaining inputs are the group recall and neutral holds.
+
+| N64 observer step | Minerals | HUD supply | State |
+| ---: | ---: | ---: | --- |
+| 14,160 | — | 10/10 | Depot under construction, paid SCV bar empty |
+| 15,710 | — | 10/10 | Depot incomplete, paid SCV still at zero |
+| 15,960 | 88 | 11/18 | Depot complete, existing SCV takes the supply reservation |
+| 16,410 | 88 | 11/18 | Existing SCV has 46 filled pixels of progress |
+| 17,160 | 104 | 11/18 | Training portrait and bar gone after SCV completion |
+
+The paid SCV starts without another Train command or second debit.
+The original ROM and Flash hashes still match. The isolated replay
+closes cleanly after 17,161 steps and 12 captured cuts. The comparison
+covers the human SCV flow at one Command Center.
+
+- Depot recovery manifest SHA-256 `768e28050c3f2f5ce0c2cdee4dd40dd60d2eaff6bd7956c8a75c0d5b2d0d2d7b`.
+- Executed controller tape SHA-256 `72ec8f62da453435f3710dbd361c6aa5ef0ccc12410b41e33e6961e6d43e809a`.
+- Isolated observer SHA-256 `2733e77b91ecec5343ff996c23e268bff24d27e7f3f793e53141fecc14a40c7a`.
