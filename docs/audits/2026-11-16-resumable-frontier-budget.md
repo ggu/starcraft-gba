@@ -533,3 +533,61 @@ route and display comparison. It changes mean cost by 15 cycles and p95
 by 46 cycles across the 477 advancing calls relative to the combined opt-in
 build. Keep it local and count hits on a ranged-heavy workload before more
 qualification. Receipt SHA-256 `118a7c9708afb4d71394bbc0b4f7713f75a5a153f5684ec52e0a8062f22511df`.
+
+### Qualification with merged P10 steering
+
+The paired build uses composed source `e2126e74` on release `03b5db64`.
+Within each cartridge pair the prepared assets and compiler recipe match
+apart from the route-prefix selector. The P10 control differs from the
+released ROM by four bytes that swap two independent stack loads in
+`sc64_route_fill_linear`. Both orders write the same registers before the
+next instruction uses them.
+
+The dense Z7 tape matches all 131 checkpoints, 480 frame and logical
+route entries, and nine raw actor, resource and framebuffer cuts.
+The average covers 477 advancing updates. The other timing statistics
+cover the full 480-update window.
+
+| Dense Z7 ARM cycles | Former route search | Resumable route search | Change |
+| --- | ---: | ---: | ---: |
+| Advancing mean | 2,410,142 | 2,149,956 | −10.80% |
+| All-update p95 | 3,547,005 | 2,844,577 | −19.80% |
+| All-update peak | 4,760,373 | 4,369,053 | −8.22% |
+
+On P10 both cartridges win after 47,194 ordinary inputs at campaign frame
+46,057. The twenty named checks, ten briefing pages, 14 dialogue
+acknowledgments and all 48 sampled world, fog, route, displayed pixel
+and palette states match. The replay includes an in-session save. It
+uses the same ordinary HOME launch and victory tape in both arms.
+
+| P10 ARM cycles | Former route search | Resumable route search |
+| --- | ---: | ---: |
+| Full mean | 1,664,780 | 1,664,708 |
+| Full p95 | 2,351,458 | 2,351,224 |
+| Full peak including result | 36,561,939 | 36,559,572 |
+| Late combat mean, calls 41,913–47,193 | 1,885,647 | 1,886,070 |
+| Late combat p95 | 2,565,223 | 2,566,304 |
+| Late combat peak | 7,797,162 | 7,801,582 |
+
+The separate P10 attribution run uses the original candidate ROM and
+one emulator breakpoint at the direct call from
+`sc64_range_cached_point_step` to `sc64_point_prefix_complete`
+(ARM address `0x08047d92` for this ELF). It observes zero calls in the
+complete victory tape, with the same final state, cuts and timing
+counters as the uninstrumented candidate. The host range fixture
+forces this fallback and verifies its returned step. Live frequency
+under dense ranged skirmish remains open.
+
+All eight ARM links pass the existing guards. The smallest candidate
+IWRAM and EWRAM margins across products are 240 and 7,428 bytes.
+The route sanitizer target passes on the composed source. Keep the
+selector off by default while qualifying the remaining dense ranged
+workloads. In these campaign windows both builds exceed the
+561,792-cycle budget for 30 updates per second.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Dense Z7 current composition | `5dd45e37aa9915e831b1155fb2f41b42737e643d684edd2dd0b996b8a723de3e` |
+| Full P10 control | `ba52668a599e893211538fc92cbfba1d626cc97e1e0513cc52c065e019242cbc` |
+| Full P10 candidate | `d964d5fa6cbc5984725be085b36bc7946abb36568c822019e0911198b484f97a` |
+| Cached range observer | `4862627b1699e59f7b94dc36b71679d48a4cca5ced0b1aca4f49d4db8ae27991` |
