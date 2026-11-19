@@ -699,7 +699,44 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   puts full point fills at 25.95% of the old dense Z7 loop and 4.95%
   of sampled Z9. Observed origins need about 39% and 2% of FIFO work,
   with at most 52 pending entries at first discovery. The paired Z9 probe
-  continues declined searches in the same ordered grid. Busy p95 improves
+  continues declined searches in the same ordered grid.
+  The [wide first-origin prototype](audits/2026-11-16-resumable-frontier-budget.md#wide-point-prefix-on-the-current-dense-z7-replay)
+  matches the dense Z7 tape and saves 9.09% mean against the pre-tail
+  control. The [tail and prefix composition](audits/2026-11-16-resumable-frontier-budget.md#keep-the-complete-tail-alongside-parked-prefixes)
+  saves 8.45% mean against the shipping tail and recovers nearly all of
+  the measured regression at call 48,100. At call 47,995 a formation read completes a
+  parked search. A component proof postpones the completion into orders
+  and raises the maximum. A second bounded search saves more mean and p95
+  cycles but raises the maximum further after repeated requests in one
+  orders pass. The [nearby-root component rejection](audits/2026-11-16-resumable-frontier-budget.md#prove-the-distant-lookup-is-disconnected)
+  removes the original group-move spike without changing route choices.
+  A [distance-bound check](audits/2026-11-16-resumable-frontier-budget.md#reject-a-connected-lookup-with-exact-distance-bounds)
+  then reduces the new maximum. The combined opt-in build reduces dense
+  mean 10.45%, p95 19.67%, and maximum 8.05% versus the shipping tail.
+  Busy P7 and three-AI Blood Bath match their sampled world and display
+  records, with near-flat mean timing. All four ROMs link within their
+  existing memory guards and reproduce 30 campaign starts, 72 skirmish
+  starts, and eight cross-build custom SRAM continuations. An uncovered
+  cached range read can still resume synchronously. Qualify dense ranged
+  workloads and more campaign saves before enabling it. The [full Z9 replay](audits/2026-11-16-resumable-frontier-budget.md#full-z9-replay-and-campaign-saves)
+  wins on both builds with 32 historical checkpoints and 106 matching
+  state and display samples. Full-replay mean falls 1.32% and p95 falls
+  7.84%. Retained Z9 and P9 campaign saves pass exact re-saves and fresh
+  cross-loads in both directions, as does a fresh T9 opening journal. A
+  bounded FIFO read preserves the route in dense Z7 with no measurable
+  cycle savings. The [current release replay](audits/2026-11-16-resumable-frontier-budget.md#qualification-with-merged-p10-steering)
+  saves 10.80% mean and 19.80% p95 on dense Z7. The full P10 win matches
+  gameplay and display and has effectively flat timing. Its separate
+  breakpoint run and the 48,237-call Z7 observer see zero cached range
+  completions. The stock skirmish maps are 64×64 and prefixes require
+  128×128. The [forced ARM case](audits/2026-11-16-resumable-frontier-budget.md#forced-cached-range-completion-on-arm)
+  produces the same route step and measures a 1.20M-cycle synchronous
+  read. [Restoring just the visited row span](audits/2026-11-16-resumable-frontier-budget.md#restore-only-rows-reached-by-the-parked-prefix)
+  cuts that read to 1.09M cycles with identical packed directions.
+  Ordered expansion alone still takes about 864,000 cycles. Reduce or
+  bound the expansion cost and verify the display-page timing before
+  enabling the selector. The packed second cutoff stays local.
+  On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
   audit tracks a byte lookup
   that cuts the wide grid setup loop from 14 Thumb instructions to eight
@@ -1534,6 +1571,15 @@ save/source-owner and timing evidence; do not advertise unwired components.
   every owner. The Terran CPU spends 50 on a queued SCV before any
   owner adds a building. Capture first purchases for Zerg and Protoss
   before comparing the later AI build order.
+- [Native mineral handoff](audits/2026-11-12-n64-blood-bath-opening.md#mineral-patch-contention-and-handoff)
+  shows one timed worker per contested patch, release on interruption,
+  and a waiting worker taking over after an eight-mineral pickup.
+  Compare contention and interruption in the shared gather path before
+  changing rates. Longer queue order and gas need separate evidence.
+  An opt-in shared gather prototype advances one ready worker per patch.
+  Its P10 host tests cover handoff for all three worker types, interruption,
+  independent patches, and existing saves with overlapping mining timers.
+  Qualify ARM timing and fresh-process saves before changing the economy.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
@@ -1748,7 +1794,12 @@ reduce the campaign, custom-game, shared-engine or near-30-fps objective.
    saves. Keep partial prototypes gated; source splash may increase Z10 danger.
 3. In parallel, re-profile current-source order/detection, movement and
    rendering, then reduce measured busy-loop cost with paired state/pixel and
-   gameplay checks. The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
+   gameplay checks. For the next movement pass, count actor visits a finer
+   boundary-bucket filter could skip before adding another index. The
+   [busy P7 scan](audits/2026-11-18-p7-current-mgba.md#work-inside-the-first-collision-lookup)
+   rejects 560,448 of 730,400 actor visits on distance. [Dense Z7](audits/2026-11-15-z7-contact-cost.md#exact-position-crowds-november-16)
+   has 44% coincident visits, so measure both before choosing a filter.
+   The [Z10 spatial defense probe](audits/2026-11-12-defense-spatial-probe.md)
    saves 2.85–5.98% full-loop cycles with matching campaign checkpoints. The
    [combined Z10 probe](audits/2026-11-12-defense-combined.md) saves 4.74–7.50%;
    seven opt-in ROMs link and the Z10 stack canary leaves 8,948 bytes
