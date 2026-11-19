@@ -442,6 +442,57 @@ uses existing emulator captures and starts no additional emulator session.
 The private receipt SHA-256 is
 `a9ab3f109b69eb78e091727e5505aaa15ccc31193fdeb5cb07332826f6131772`.
 
+## Zerg and Protoss CPUs train their first workers
+
+Two isolated Ares runs replay the same four-seat Melee launch. The
+human plays Terran from the southwest and leaves the controls neutral
+after Start. The autonomous Zerg joins in the northeast and the
+autonomous Protoss in the southeast. The observer reads actor and
+wallet fields with no guest state writes. The clean run collects 6,001
+valid samples through observer step 10,200. Its economy trace is
+byte-identical to the independent first run.
+
+| CPU | First debit | Production and completion |
+| --- | --- | --- |
+| Zerg | 50 → 0 at step 4,373 | Slot 1 is Larva raw 35 before the debit, Egg raw 36 at 4,376 and full-health Drone raw 41 at 5,441. The Hatchery's normal train slot stays empty during this morph. |
+| Protoss | 58 → 8 at step 4,546 | The Nexus queues raw 64 and links the newly allocated Probe in slot 25. That Probe reaches full health at 5,512 and releases from the Nexus link into gathering at 5,555. |
+
+The first separate mineral deposit for Zerg is +8 at 4,476. Protoss
+receives a +8 deposit at 4,426 before paying for its Probe. Each CPU
+still has only its starting building at the end of this trace. These
+are observations for the sampled four-seat launch and difficulty.
+
+### GBA opening comparison across the three products
+
+Ordinary controllers launch 54 lobbies across the retained Terran,
+Z10 and P10 builds. For each product and map the matrix includes all
+three human races, one to three opponents, and sparse and filled seat
+layouts. Each resolved seat and starting hall is checked against the
+selected setup. All 108 opponents start with four workers, 50 minerals
+and a single hall. Each pays exactly 50 for its first worker before a
+new owned structure appears. The debit occurs at frames 16, 32 or 48
+depending on the seat's planning phase. All fifth workers appear by
+the sampled frame 424. The native VI step numbers and GBA update
+numbers are separate clocks.
+
+The standard GBA Zerg queues its Drone in the Hatchery and consumes a
+larva counter. In six separate ordinary-input tests, older retained
+flag-off and custom Egg preview builds for Terran, Z10 and P10 all pay
+for the first Drone at frame 48. Each preview creates raw Egg 36 in
+slot 9 with an empty Hatchery queue. Each regular control keeps the
+Drone in the Hatchery queue. Both paths save through the pause menu,
+load into a fresh process and have a fifth Drone in slot 9 by the
+observed frame 424. The preview represents available larvae with a
+counter and allocates an Egg slot on payment. Native Larva persists
+as an actor through the entire morph. Native Protoss also allocates
+the Probe before completion, while the standard GBA queues its type
+until the worker appears.
+
+- Native manifest SHA-256 `206b63ffed44b01da51468061fcd3b76de8adc991c1a81349f2b0ff0fdf54e87`.
+- Native repeated economy trace SHA-256 `c996e2940320b254c1f3ea9ee6c9ae00e6241c48f9f3fe39e5766ede6b4c41d1`.
+- GBA opening matrix SHA-256 `c87f57cc444f36d92b87365d2ec691ede58da0bdcafda46043c9c1726e725161`.
+- GBA Egg selector and SRAM comparison SHA-256 `ccfadd1650b5c26d528c67aad550c1a7ab8c05ddddfee08160c92521429f6153`.
+
 ## Mineral patch contention and handoff
 
 The same retained Melee captures show four starting workers assigned to

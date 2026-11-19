@@ -414,3 +414,37 @@ the reference classification with the table-backed lookup before
 adding storage.
 
 - Instrumented replay SHA-256 `4ca95c7df9bc20dbaf061010720f1206a690ad357871af0d14c41f553846b1de`.
+
+### Classify flight only when a search needs it
+
+The lazy candidate leaves each existing slot byte unclassified at
+index construction. A single-plane weapon classifies a live slot after
+the cheaper owner, distance and flag checks and reuses the answer for
+that pass. Dual-plane weapons skip classification. The slot storage
+and live damage checks remain the same. The candidate and its flag-off
+control pass the prepared Z10 ASan/UBSan scalar differential, including
+ground and air defenses that can reach the same units.
+
+The matched ARM ROMs use the same source, banks and build flags apart
+from the lazy selector. Both match all 131 historical checks, nine raw
+world and display cuts, 480 frame and route records, and the per-update
+actor transitions. The linker reports identical EWRAM occupancy and a
+16-byte IWRAM increase for the lazy variant, leaving 512 bytes before
+the stack guard.
+
+| Dense Z7, 477 advancing updates | Same-source control | Lazy flight class |
+| --- | ---: | ---: |
+| Mean whole-update cycles | 1,821,774 | 1,801,551 |
+| p95 whole-update cycles | 2,653,513 | 2,636,601 |
+| Slowest update, cycles | 3,508,155 | 3,479,004 |
+| Mean post-orders cycles | 267,881 | 246,785 |
+
+The mean whole-update cost falls 1.11%. Both builds also load the
+authenticated late Z7 save in fresh processes and win at frame 194,998.
+All six raw world and display cuts match through that continuation.
+The candidate stays opt-in for further profile and workload checks.
+[Source candidate](https://github.com/ggu/starcraft-gba/commit/ed5ec8297a25f3e3bdc181c8eddb5d92b7c187ae)
+
+- Paired control replay SHA-256 `d9b485d46a3e9df2535401526f9bd5ad8d94e1e49af59f027e2c80abaf6d685d`.
+- Lazy replay SHA-256 `c5f1612cbce278298d6e95f1d74d7f5e10138d1208440c6aa0662957f5ea6b38`.
+- Lazy late-save receipt SHA-256 `1084529150f9ba3142fed0bc168c6ac0821df5ff8a958d5015798855c4dde3c6`.

@@ -1575,8 +1575,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
   automatically takes the new reservation and completes after 10/10
   becomes 11/18. The canonical Terran preview now also passes ordinary
   cap admission, waiting-head save and fresh load, exact refund, and
-  legacy-bank fallback on its own ROM. Broader ARM controls and other
-  producer classes remain in qualification before release activation.
+  legacy-bank fallback on its own ROM. The P10 preview buys a Zealot
+  at 17/17, reloads the stalled Gateway, and automatically trains that
+  order after a second Pylon raises capacity to 25. Verify remaining
+  native producer classes and wider release integration before activation.
 - The [dense Z7 orders audit](audits/2026-11-19-z7-order-cost.md)
   separates the movement, nearest-enemy and setup costs. Movement
   averages about 920,000 instrumented cycles on calls that advance
@@ -1630,14 +1632,23 @@ save/source-owner and timing evidence; do not advertise unwired components.
   saves about 5,300 whole-update cycles with matching replay cuts and
   frees 112 linked IWRAM bytes. Instrumentation measures about 43,000
   cycles in unit index construction and 31,000 in target queries.
-  Every measured update has ready defenses. Prioritize exact unit
-  classification and index insertion costs before revisiting grid size.
+  Every measured update has ready defenses. An alternative that defers
+  flight classification until a single-plane query needs it saves 1.11%
+  against its same-source control. That candidate preserves all nine
+  display and state cuts and reaches the same late-save Z7 victory.
+  Qualify the other profiles and workload shapes before activation.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for
   every owner. The Terran CPU spends 50 on a queued SCV before any
-  owner adds a building. Capture first purchases for Zerg and Protoss
-  before comparing the later AI build order.
+  owner adds a building. The [Zerg and Protoss repeat](audits/2026-11-12-n64-blood-bath-opening.md#zerg-and-protoss-cpus-train-their-first-workers)
+  observes a 50-mineral Larva-to-Egg-to-Drone morph and a 50-mineral
+  linked Probe purchase, with mineral income sampled separately.
+  Across 54 ordinary GBA lobbies on three products and both maps,
+  all 108 opponents also pay for a worker first. Older Egg previews
+  on the three products preserve a paid CPU Egg through fresh SRAM
+  load and Drone completion. Compare later AI build order and native
+  Probe and Larva actor lifecycles in their own tests.
 - [Native mineral handoff](audits/2026-11-12-n64-blood-bath-opening.md#mineral-patch-contention-and-handoff)
   shows one timed worker per contested patch, release on interruption,
   and a waiting worker taking over after an eight-mineral pickup.
