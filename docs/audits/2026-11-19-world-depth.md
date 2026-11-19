@@ -80,5 +80,34 @@ The former-renderer receipt SHA-256 is
 `b21cc587f2f6fec72aeba1f5eac38e977a2426bfc01c5f10db49c08a8ffd5849`.
 The depth-painter receipt SHA-256 is
 `0eec46ab8ea1510e12095aa8485ffc4d2dbdd941f4b26354ff4be7b5758de410`.
-The result is scoped to the emulator replay. Busy skirmishes and hardware
-timing still need this comparison.
+The result is scoped to the emulator replay. Hardware timing remains open.
+
+## Three-AI skirmish follow-up
+
+The Protoss 10 ROM launches Blood Bath through the Custom Game menu with
+a Zerg player and Zerg, Terran and Protoss CPUs. The last 1,000 updates
+end at frame 17,301. Twenty sampled world states, actor arrays, resource
+rows, and fog masks match in all four builds.
+
+| P10 renderer and steering combination | Mean cycles | p95 | Peak |
+| --- | ---: | ---: | ---: |
+| Release `f924b9df` | 1,001,597 | 1,407,402 | 2,193,638 |
+| Early steering only | 999,806 | 1,403,992 | 2,195,675 |
+| World depth only | 1,028,478 | 1,427,845 | 2,211,542 |
+| Early steering and world depth | 1,026,648 | 1,426,164 | 2,209,088 |
+
+World depth increases mean cycles by 2.68% on this skirmish. The
+combined build takes 25,051 more cycles on average than the release.
+The combined build still saves 6.28% mean in the P7 replay with the
+same sampled world and one changed frame pixel hash. Keep the paired
+skirmish run in the release gate. The main cost increase is the actor
+pass, which now paints resources and buildings on every frame. A
+trial that rejects hidden actors before sorting adds about 520 mean
+cycles to this skirmish, so it stays out of the candidate.
+
+The stock, depth-only and combined skirmish receipt SHA-256 values are
+`7e18c69916088d3a9c07fe3abfef68606d9e95323a6090fe55105fc2c1431385`,
+`af4bf37336699599bea1da3be7f05c69c6cc0ba7c056ad558951b9255565ab13`, and
+`51ef3c3342ba4af6b2a30d89ded095f88b070f64da7aba8ac09fc11525feb76e`.
+The combined P7 receipt SHA-256 is
+`381c66228c11c7e30c296ee5a4956f5cc278e5a0c2c8975b122a895ea5a0cbe9`.
