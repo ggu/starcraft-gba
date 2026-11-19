@@ -82,7 +82,10 @@ the combined cost with background and full-update timings.
 
 `make test-sc64-terrain-transfer-scenes` runs the first case for Terran,
 Zerg, Protoss and Showcase. `make test-sc64-static-dirty-rows-game` covers
-the legacy path. Keep the fixed-camera case in the replay harness backlog.
+the legacy path. A local Protoss sanitizer probe checks the fixed-camera
+case at 16 camera phases. It reproduces every fresh-frame pixel on all 64
+fog changes, capturing 48 of 108 rows per change. Keep the fixed-camera
+case in the ordinary-input replay harness backlog.
 The world-depth renderer no longer computes static clip bands on the
 default full-capture path. With optional dirty capture, the planner still
 supplies terrain row ranges, while the sorted actors draw after capture.
