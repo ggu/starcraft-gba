@@ -43,13 +43,18 @@
  *   halved beyond 20 and quartered beyond 40; burrowed actors only inside
  *   20. Normal damage: shields, then armor.
  *
- *   Starting stock. A Reaver made by production starts empty. A Reaver that
- *   a mission places, reinforces or rescues (any owner, including a campaign
- *   enemy) and a Reaver from a save written before this service existed
- *   starts with a full load, the first time the service looks at it.
- *   Campaign enemies do not buy more: their money is a scripted source bank,
- *   not an engine bank. Computer opponents in custom games buy through the
- *   same command as the human, from their own bank.
+ *   Starting stock. A Reaver made by production starts empty. A Reaver a
+ *   mission places at its start (seen within SC64_PSC_PLACED_FRAMES updates)
+ *   starts empty too: the imported placed-unit rows (Sc64ImportedUnit) carry
+ *   no hangar count, so there is no per-unit source value to use. The N64 shows
+ *   one placed pair starting with 5 (P7 owner 0); this is a known difference.
+ *   A Reaver that appears later (reinforced, rescued) and one loaded from a
+ *   save written before this service existed starts full the first time the
+ *   service looks at it: a project assumption, not a source fact.
+ *   A computer-owned Reaver in a campaign mission restocks on its own, one
+ *   Scarab at a time on the build timer, with no payment (scripted source
+ *   banks). Computer opponents in custom games buy through the same command
+ *   as the human, from their own bank.
  *
  *   Save. Reaver state and the flying Scarab use fields the typed unit row
  *   already stores. RaceSave does not grow. A save from before this service
@@ -73,6 +78,7 @@ enum {
     SC64_PSC_ARRIVE = 10,          /* source pixels from the target bounds */
     SC64_PSC_RAW = 85,
     SC64_PSC_PARENT_RAW = 83,
+    SC64_PSC_PLACED_FRAMES = 36,   /* updates (about 30 source ticks) in which a Reaver is "placed" */
     SC64_PSC_INIT = 1 << 13,
     SC64_PSC_CARRY_MASK = (1 << 14) - 1
 };
@@ -204,17 +210,28 @@ static int race_paid_scarab_queued(int slot)
 /* ---- source tick: production and cooldown, once per source tick ---- */
 
 /* Returns whether the Reaver still has work or a cooldown pending. */
+/* A computer-owned Reaver in a campaign mission restocks by itself: it starts
+ * a Scarab whenever it holds fewer than its capacity and has none on order, one
+ * at a time, on the build timer. No money is taken: the owners that field
+ * Reavers there (see docs/PAID-SCARABS.md) are paid from scripted source
+ * banks, not engine banks. Custom-game opponents buy through the order list. */
+static int sc64_psc_campaign_ai(const Unit *q)
+{ return !race_mode && q->owner != SIDE && owners_hostile(SIDE, q->owner); }
+
 static int sc64_psc_parent_tick(int slot)
 {
     Sc64PscState s;
     Unit *q = &u[slot];
+    int ai;
     if (!sc64_psc_load(q, &s)) return 0;
+    ai = sc64_psc_campaign_ai(q);
+    if (ai && !s.queued && s.stock < sc64_psc_capacity(q->owner)) { s.queued = 1; s.progress = 0; }
     if (s.cooldown) --s.cooldown;
     if (s.queued && ++s.progress >= sc64_psc_build_ticks()) {
         ++s.stock; --s.queued; s.progress = 0;
     }
     sc64_psc_store(q, &s);
-    return s.queued || s.cooldown;
+    return s.queued || s.cooldown || ai;
 }
 
 /* ---- launch ---- */
@@ -435,6 +452,14 @@ static void race_paid_scarab_clear_slot(int slot)
  * what it launched. */
 static void race_paid_scarab_end_frame(void)
 {
+    /* Reavers a mission places at its start hold nothing: the import carries no
+     * hangar count (see docs/PAID-SCARABS.md). Establish them empty. */
+    if ((unsigned)frame <= SC64_PSC_PLACED_FRAMES)
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].type == U_REAVER && !u[i].carry && !u[i].work_timer) {
+                u[i].carry = SC64_PSC_INIT;
+                if (u[i].owner != SIDE) sc64_psc_hint = 1;
+            }
     if (!sc64_psc_hint) return;
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];

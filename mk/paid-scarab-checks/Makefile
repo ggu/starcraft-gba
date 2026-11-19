@@ -19,10 +19,13 @@ $(PSC_DIR)/product: $(PSC_DEPS) | build
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_FLAGS) $(PSC_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 .PHONY: test-sc64-paid-scarab test-sc64-paid-scarab-old
 test-sc64-paid-scarab: $(PSC_DIR)/product
-	for t in economy combat splash loss validate save-process; do ./$(PSC_DIR)/product $$t || exit 1; done
+	for t in economy combat splash loss validate save-process campaign; do ./$(PSC_DIR)/product $$t || exit 1; done
 	rm -f $(PSC_DIR)/scarab.sav $(PSC_DIR)/scarab.sav.state
 	./$(PSC_DIR)/product save-write $(PSC_DIR)/scarab.sav
 	./$(PSC_DIR)/product save-read $(PSC_DIR)/scarab.sav
+	rm -f $(PSC_DIR)/camp.sav $(PSC_DIR)/camp.sav.state
+	./$(PSC_DIR)/product campaign-write $(PSC_DIR)/camp.sav
+	./$(PSC_DIR)/product campaign-read $(PSC_DIR)/camp.sav
 	$(MAKE) test-sc64-paid-scarab-old
 test-sc64-paid-scarab-old: $(PSC_DIR)/product
 	@if [ -z "$(PSC_BASE_TREE)" ]; then echo "test-sc64-paid-scarab-old: set PSC_BASE_TREE to an unchanged default-branch checkout; skipped"; exit 0; fi

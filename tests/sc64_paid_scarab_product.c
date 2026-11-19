@@ -682,6 +682,108 @@ static void save_in_process(void)
     puts("save-in-process PASS");
 }
 
+
+/* ---- campaign enemy Reavers: placed empty, restocked on the timer, no pay ---- */
+
+static u16 prev_keys;
+static void pad(u16 h) { game_update(h, (u16)(h & (u16)~prev_keys)); prev_keys = h; }
+static void ptap(u16 k) { pad(k); pad(0); }
+static void start_campaign(int gid)
+{
+    int ord;
+    game_init(); prev_keys = 0;
+    assert(screen == SCREEN_TITLE && race_front.page == SC_FRONT_HOME);
+    ptap(KEY_A);
+    ord = sc64_catalog_playable_ordinal(SC64_FACTION_PROTOSS, gid);
+    assert(ord > 0);
+    for (int i = 0; i < ord / 2; ++i) ptap(KEY_RIGHT);
+    if (ord & 1) ptap(KEY_DOWN);
+    ptap(KEY_A);
+    assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == gid);
+    pad(KEY_START);
+    assert(screen == SCREEN_PLAY && !race_mode);
+}
+static int enemy_reavers(int *out, int max)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_UNITS && n < max; ++i)
+        if (u[i].alive && u[i].type == U_REAVER && u[i].owner != SIDE) out[n++] = i;
+    return n;
+}
+
+static void campaign(void)
+{
+    int rv[8], n, fired = 0, one_at_a_time = 1, bank[5];
+    start_campaign(SC64_P8_GLOBAL_ID);
+    for (int k = 0; k < 4; ++k) pad(0);
+    n = enemy_reavers(rv, 8);
+    assert(n >= 1);
+    for (int k = 0; k < n; ++k)
+        assert(race_paid_scarab_stock(rv[k]) == 0 && race_paid_scarab_queued(rv[k]) <= 1);
+    printf("campaign: %d placed enemy Reavers start with 0 Scarabs at frame %d\n", n, frame);
+    for (int o = 0; o < 5; ++o) bank[o] = race_minerals[o];
+    for (int t = 0; t < 5 * 131 + 120; ++t) {
+        pad(0);
+        for (int k = 0; k < n; ++k)
+            if (u[rv[k]].alive && race_paid_scarab_queued(rv[k]) > 1) one_at_a_time = 0;
+    }
+    for (int k = 0; k < n; ++k)
+        if (u[rv[k]].alive) {
+            printf("campaign: Reaver %d holds %d after %d updates\n", rv[k], race_paid_scarab_stock(rv[k]), frame);
+            assert(race_paid_scarab_stock(rv[k]) == 5);
+        }
+    assert(one_at_a_time);
+    for (int o = 0; o < 5; ++o) assert(race_minerals[o] == bank[o]);      /* no engine bank was charged */
+    {   /* A target in reach: it fires and starts a replacement. */
+        int r = rv[0], z = spawn_unit(SIDE, U_ZEALOT, u[r].x + 70, u[r].y);
+        assert(z >= 0); u[z].order = ORDER_IDLE;
+        for (int t = 0; t < 300 && !fired; ++t) { pad(0); fired = scarab_in_flight(r) >= 0; }
+        assert(fired);
+        for (int t = 0; t < 40; ++t) pad(0);
+        printf("campaign: it fired (stock now %d, queued %d)\n", race_paid_scarab_stock(r), race_paid_scarab_queued(r));
+        assert(race_paid_scarab_stock(r) + race_paid_scarab_queued(r) >= 4);
+    }
+    puts("campaign PASS");
+}
+
+static void campaign_write(const char *path)
+{
+    unsigned digests[7]; int rv[8], n;
+    start_campaign(SC64_P8_GLOBAL_ID);
+    for (int k = 0; k < 4; ++k) pad(0);
+    n = enemy_reavers(rv, 8); assert(n >= 1);
+    for (int t = 0; t < 200; ++t) pad(0);
+    assert(race_paid_scarab_queued(rv[0]) == 1 && u[rv[0]].work_timer > 0 && u[rv[0]].work_timer < 105);
+    assert(race_save_game()); write_sram(path);
+    {
+        char side[512]; FILE *f;
+        snprintf(side, sizeof side, "%s.state", path);
+        digests[0] = state_digest();
+        for (int k = 1; k < 7; ++k) { for (int t = 0; t < 100; ++t) pad(0); digests[k] = state_digest(); }
+        f = fopen(side, "w"); assert(f);
+        fprintf(f, "%d %d %d\n", rv[0], race_paid_scarab_stock(rv[0]), (int)u[rv[0]].work_timer);
+        for (int k = 0; k < 7; ++k) fprintf(f, "%u\n", digests[k]);
+        assert(!fclose(f));
+    }
+    puts("campaign-write: saved mid-restock (one on order, part built), continued 600 updates");
+}
+static void campaign_read(const char *path)
+{
+    char side[512]; FILE *f; unsigned want[7]; int rv, stock_after, progress_after;
+    snprintf(side, sizeof side, "%s.state", path);
+    f = fopen(side, "r"); assert(f);
+    assert(fscanf(f, "%d %d %d", &rv, &stock_after, &progress_after) == 3);
+    for (int k = 0; k < 7; ++k) assert(fscanf(f, "%u", &want[k]) == 1);
+    fclose(f);
+    gba_init(); game_init(); read_sram(path);
+    assert(race_load_game() && !race_mode);
+    assert(race_paid_scarab_queued(rv) == 1 && u[rv].work_timer > 0 && u[rv].work_timer < 105);
+    assert(state_digest() == want[0]);
+    for (int k = 1; k < 7; ++k) { for (int t = 0; t < 100; ++t) pad(0); assert(state_digest() == want[k]); }
+    printf("campaign-read: fresh process resumed mid-restock; 6 digests match; Reaver now holds %d\n",
+           race_paid_scarab_stock(rv));
+}
+
 /* The old-save check: build the same file against the unchanged tree. */
 static void t_old_write(const char *path)
 {
@@ -736,6 +838,9 @@ int main(int argc, char **argv)
     else if (argc == 2 && !strcmp(argv[1], "loss")) loss();
     else if (argc == 2 && !strcmp(argv[1], "validate")) validate();
     else if (argc == 2 && !strcmp(argv[1], "save-process")) save_in_process();
+    else if (argc == 2 && !strcmp(argv[1], "campaign")) campaign();
+    else if (argc == 3 && !strcmp(argv[1], "campaign-write")) campaign_write(argv[2]);
+    else if (argc == 3 && !strcmp(argv[1], "campaign-read")) campaign_read(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "save-write")) t_save_write(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "save-read")) t_save_read(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "old-read")) t_old_read(argv[2]);
