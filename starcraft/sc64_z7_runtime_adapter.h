@@ -19,6 +19,7 @@
 
 #include "sc64_z7_state.h"
 #include "sc64_z7_world_adapter.h"
+#include "sc64_z7_census.h"
 
 enum {
     SC64_Z7_RUNTIME_FAULT_MAP = 0x50,
@@ -405,6 +406,10 @@ static int race_z7_validate_live_world(u32 *late)
 #ifdef SC64_Z7_VALIDATED_CENSUS
         if (late) own+=slot==current;
 #endif
+#ifdef SC64_Z7_VALIDATED_CENSUS
+        if (late && sc64_z7_census.armed)
+            sc64_z7_census_unit(slot,raw,u[i].type,u[i].x,u[i].y);
+#endif
     }
     for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) {
         unsigned slot=(unsigned)b[i].raw_owner;
@@ -418,9 +423,13 @@ static int race_z7_validate_live_world(u32 *late)
             hostile+=race_z7_world.source_force_for_slot[slot]==1u;
         }
 #endif
+#ifdef SC64_Z7_VALIDATED_CENSUS
+        if (late && sc64_z7_census.armed)
+            sc64_z7_census_building(slot,b[i].raw_type,b[i].x,b[i].y);
+#endif
     }
 #ifdef SC64_Z7_VALIDATED_CENSUS
-    if (late) { late[0]=own; late[1]=hostile; }
+    if (late) { late[0]=own; late[1]=hostile; sc64_z7_census_done(); }
 #endif
     return 1;
 }
@@ -506,7 +515,7 @@ static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
     /* Only the authenticated two-predicate late path can use these counts.
      * Validation still checks every live actor and publishes no partial counts. */
     if (race_z7_pruned_binding_valid() &&
-        sc64_z7_count_snapshot_needed(race_z7.runtime.model.started)==3u)
+        sc64_z7_census_arm(&race_z7_world,race_z7.runtime.model.started))
         validated_late=late;
     if (!race_z7_validate_live_world(validated_late)) {
 #else
@@ -521,7 +530,7 @@ static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
 #ifdef SC64_Z7_PRUNE_STARTED
         if (race_z7_pruned_binding_valid()) {
             Sc64Z7WorldOps pruned_ops=race_z7_ops;
-            if (sc64_z7_count_snapshot_begin_pruned(&race_z7_world,
+            if (sc64_z7_census_begin_pruned(&race_z7_world,
                     race_z7.runtime.model.started,validated_late)) {
                 pruned_ops.condition=race_z7_pruned_condition_callback;
                 result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&pruned_ops,0);
