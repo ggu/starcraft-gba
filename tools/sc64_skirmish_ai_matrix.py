@@ -41,7 +41,13 @@ OWNER_MAPS = ("unit_raw", "building_raw", "first_made", "first_complete")
 # Structures beyond the first producer and supply that show tech progress.
 TECH = {0: {112, 113, 114, 120, 122, 123}, 1: {132, 135, 139, 141, 144, 146}, 2: {162, 164, 166, 167, 169}}
 WORKERS = {0: 7, 1: 41, 2: 64}
-OFFENSIVE_FRAME = 10800
+# The update before which each race starts no offensive, and the army supply
+# it gathers first (RACE_AI_FIRST_WAVE_* and RACE_AI_WAVE_SUPPLY in
+# starcraft/race_skirmish_ai.h). The offensive window opens with the earliest.
+FIRST_WAVE = {0: 12331, 1: 17225, 2: 10631}
+WAVE_SUPPLY = 46
+FIRST_WAVE_WINDOW = 600
+OFFENSIVE_FRAME = min(FIRST_WAVE.values())
 # Full-match cases: the harness cap and the snapshot spacing the thresholds
 # below are expressed in (one snapshot is one minute of game time).
 MATCH_TICKS = 216000
@@ -690,6 +696,83 @@ def validate_air_pin(lines, scenario):
     return r
 
 
+RAID_SCENARIOS = ("worker-line-killed", "main-and-workers-killed")
+RAID_FRAME = 9000
+RAID_DELIVERED = 200
+# Raided lobbies (map, human, opponent, scenario): on Blood Bath every human
+# race against every opponent race, both scenarios; on the smaller map the
+# worker-line raid with a Terran or Zerg human. Left out, in every profile:
+# - the smaller map with a Protoss human, whose first wave ends the match
+#   before a raided opponent has six workers again, and the depot raid
+#   there, where some opponents never bank a depot's price by update 12,000;
+# - a Terran human against a Protoss opponent (the worker raid on the
+#   smaller map, the depot raid on Blood Bath). The Protoss does put six
+#   workers back to mining, but the Terran wave of update 12,331 destroys it
+#   before they deliver 200 minerals: on the smaller map its home field is
+#   low and they haul from its second Nexus to its first, where the engine
+#   returns all cargo; on Blood Bath its new Nexus has only just finished.
+RAID_UNANSWERED = ((0, 0, "p", 0), (1, 0, "p", 1))
+RAID_LOBBIES = tuple(lobby for lobby in
+                     tuple((1, h, b, s) for h in range(3) for b in RACES for s in (0, 1)) +
+                     tuple((0, h, b, 0) for h in (0, 1) for b in RACES)
+                     if lobby not in RAID_UNANSWERED)
+
+
+def validate_first_wave(lines, bot_race):
+    """A lone opponent's first offensive order: not before its race's gate,
+    within FIRST_WAVE_WINDOW updates of it, a wave on the update it is given
+    (three units or more and at least half the army, none sent ahead), and
+    with the wave supply unless the owner is all in. The ok flag is
+    recomputed."""
+    r = _one(lines, "first-wave")
+    for f in ("owner", "race", "gate", "frame", "sent", "army", "army_supply", "wave_supply", "before_gate"):
+        _int(r.get(f), f, -1, 1 << 24)
+    for f in ("all_in", "ok"):
+        _int(r.get(f), f, 0, 1)
+    if (r["owner"] != BOT_OWNERS[0] or r["race"] != bot_race or r["gate"] != FIRST_WAVE[bot_race] or
+            r["wave_supply"] != WAVE_SUPPLY):
+        raise RecordError("first-wave record does not carry its opponent, its race's gate and the wave supply")
+    # army and army_supply are the smaller of the counts before and after
+    # the update, so a unit trained on it may put sent one or two above army.
+    if r["sent"] > r["army"] + 2 or r["army_supply"] < 0 or (r["army"] > 0) != (r["army_supply"] > 0):
+        raise RecordError("first-wave record counts more units sent than the army holds")
+    good = (r["gate"] <= r["frame"] < r["gate"] + FIRST_WAVE_WINDOW and r["before_gate"] == 0 and
+            r["sent"] >= 3 and r["sent"] * 2 >= r["army"] and
+            (r["army_supply"] >= WAVE_SUPPLY or r["all_in"] == 1))
+    if r["ok"] != int(good):
+        raise RecordError("first-wave ok flag disagrees with the recorded orders")
+    return r
+
+
+def validate_raid(lines, scenario, bot_race):
+    """An opponent whose worker line (and, in the second scenario, main depot)
+    is destroyed mid-match mines again: six workers with four of them mining
+    (the harness's test), then RAID_DELIVERED minerals of cargo brought in
+    after that under a clean spending audit, and the mirrored match still
+    ends in the engine's result. The ok flag is recomputed."""
+    r = _one(lines, "raid")
+    if r.get("scenario") != RAID_SCENARIOS[scenario]:
+        raise RecordError("raid record does not match its scenario")
+    for f in ("owner", "race", "raid_frame", "workers_before", "killed", "bank", "workers_after",
+              "recovered_frame", "delivered_frame", "delivered", "audit_first_bad", "audit_model_errors",
+              "audit_supply_bad", "peak_workers", "army_after", "end_frame"):
+        _int(r.get(f), f, -1, 1 << 24)
+    for f in ("depot_killed", "won", "lost", "ok"):
+        _int(r.get(f), f, 0, 1)
+    if r["owner"] != BOT_OWNERS[0] or r["race"] != bot_race:
+        raise RecordError("raid record does not name the lobby's opponent")
+    spare = 2 if scenario == 1 else 0
+    good = (r["workers_before"] >= 8 and r["killed"] == r["workers_before"] - spare and
+            r["workers_after"] == spare and r["depot_killed"] == scenario and
+            RAID_FRAME <= r["raid_frame"] < r["recovered_frame"] < r["delivered_frame"] <= r["end_frame"] and
+            r["peak_workers"] >= 6 and r["delivered"] >= RAID_DELIVERED and
+            r["audit_first_bad"] == -1 and r["audit_model_errors"] == 0 and r["audit_supply_bad"] == 0 and
+            r["won"] + r["lost"] == 1)
+    if r["ok"] != int(good):
+        raise RecordError("raid ok flag disagrees with the recorded recovery")
+    return r
+
+
 def validate_no_ore(lines, scenario):
     """With every mineral field gone, no worker is queued and the bank goes to
     army units: below the cheapest army unit, or the unit share is full."""
@@ -786,7 +869,7 @@ INTERCEPTOR = 73
 # four owners on the small map with every field mined out. Which lobbies end
 # this way shifts with any planner change; when this one starts to resolve,
 # pick another from the report.
-MATCH_DRAWS = {"zerg": (0, "t", "ppp")}
+MATCH_DRAWS = {"zerg": (0, "p", "ppp")}
 
 
 def cases(ticks, criteria="development"):
@@ -799,8 +882,9 @@ def cases(ticks, criteria="development"):
     for profile, race in zip(PROFILES[:3], RACES):
         for map_id in (0, 1):
             out.append(("run", profile, map_id, (RACES.index(race) + 1) % 3, race * 3, ticks))
-            # The passive human usually falls soon after the six-minute mark on
-            # the smaller map; save before that while opponents are teching.
+            # The passive human usually falls soon after the first offensive
+            # (from update 10,631) on the smaller map; save before that while
+            # opponents are teching.
             out.append(("resume", profile, map_id, (RACES.index(race) + 1) % 3, race * 3,
                         9000 if map_id == 0 else 15000))
     for profile in PROFILES:
@@ -852,6 +936,16 @@ def cases(ticks, criteria="development"):
             for s in range(len(NO_ORE_SCENARIOS)):
                 for map_id, human, bots in ((1, 1, "t"), (0, 0, "z"), (1, 1, "p")):
                     out.append(("no-ore", profile, map_id, human, bots, s))
+            # One opponent of each race against each human race on both maps:
+            # when and with what its first offensive leaves. Then whether an
+            # opponent recovers from a raid on its economy and the match
+            # still ends.
+            for map_id in (0, 1):
+                for human in range(3):
+                    for bot in RACES:
+                        out.append(("first-wave", profile, map_id, human, bot, 0))
+            for map_id, human, bot, s in RAID_LOBBIES:
+                out.append(("raid", profile, map_id, human, bot, s))
     scenarios = ("pending-builder-killed", "constructing-scv-killed", "foundation-destroyed", "depot-destroyed")
     for profile in PROFILES:
         for map_id in (0, 1):
@@ -915,12 +1009,16 @@ def run_case(build: Path, case, every):
         argv += ["--air-pin", str(arg)]
     elif kind == "no-ore":
         argv += ["--no-ore", str(arg)]
+    elif kind == "first-wave":
+        argv += ["--first-wave"]
+    elif kind == "raid":
+        argv += ["--ticks", str(MATCH_TICKS), "--raid", str(arg)]
     elif kind == "run":
         argv += ["--ticks", str(arg), "--every", str(every)]
     else:
         argv += ["--recovery", str(arg)]
     proc = subprocess.run(argv, capture_output=True, text=True,
-                          timeout=3600 if kind in ("match", "match-draw", "match-carrier") else 900)
+                          timeout=3600 if kind in ("match", "match-draw", "match-carrier", "raid") else 900)
     return case, argv, proc.returncode, proc.stdout, sanitizer_report(proc.stderr) + proc.stderr[-2000:]
 
 
@@ -969,6 +1067,12 @@ def evaluate(case, returncode, stdout, every, criteria="development"):
                        "no-ore": (validate_no_ore, 17)}[kind]
         r = check(lines, arg)
         if (returncode == 0) != bool(r["ok"]) or returncode not in (0, code):
+            raise RecordError(f"exit code and {kind} record disagree")
+        return {"ok": bool(r["ok"]), kind: r}
+    if kind in ("first-wave", "raid"):
+        r = (validate_first_wave(lines, bot_races[0]) if kind == "first-wave"
+             else validate_raid(lines, arg, bot_races[0]))
+        if (returncode == 0) != bool(r["ok"]) or returncode not in (0, 18 if kind == "first-wave" else 19):
             raise RecordError(f"exit code and {kind} record disagree")
         return {"ok": bool(r["ok"]), kind: r}
     if kind == "morph-hp":
