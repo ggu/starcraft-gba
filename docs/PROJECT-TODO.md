@@ -1500,6 +1500,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   at the two previously divergent pause cuts.
   [Fusing P7 world checks with the mission census](audits/2026-11-18-p7-current-mgba.md#callback-based-census-experiment)
   increased mean cost 1.79% and stays outside the release.
+  [HUD census composition](audits/2026-11-18-p7-current-mgba.md#compose-minimap-dots-during-the-hud-census)
+  matches sampled pixels and saves 0.19–0.23% mean in P10 Homeland
+  and three-AI Blood Bath. Dense Z7 is flat overall and spends about
+  690 more cycles in the HUD. Keep the normal renderer and use the
+  current background and orders profiles for larger savings.
 - [Checked projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
   speeds up the shared Interceptor firing path. A staged fight on the
   normal P10 engine averages 1.158M versus 1.113M guest cycles with exact
