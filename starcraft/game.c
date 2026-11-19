@@ -11408,6 +11408,8 @@ static int sc64_cocoon_world_visible(int x,int y)
 }
 #endif
 
+#include "sc64_actor_draw_view.h"
+
 static void
 draw_unit_pass(Unit * q, int selection_pass)
 {
@@ -11416,15 +11418,8 @@ draw_unit_pass(Unit * q, int selection_pass)
     if (race_p6_combat_unit_burrowed((int)(q - u))) return;
 #endif
     int x = q->x - camx, y = q->y - camy + 12;
+    if (!sc64_unit_anchor_in_view(q, x, y)) return;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
-#ifdef SC64_GUARDIAN_COCOON_RENDER_STAGE
-    if (q->type == U_GUARDIAN_COCOON) {
-        /* Include both the primary canvas and its displaced underlay. */
-        if (x < -64 || x > 304 || y < -80 || y > 180) return;
-    } else
-#endif
-    if (x < -8 || x > 247 || y < 10 || y > 125)
-	return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
 #ifdef SC64_P7_OBSERVER_ENABLED
@@ -12490,7 +12485,13 @@ sc64_static_objects_key(void)
     return generation;
 }
 #endif
+#ifdef SC64_WORLD_DEPTH
+/* The sorted painter runs after this cache. Actor changes cannot dirty the
+ * terrain underneath, while fog and camera invalidation still apply. */
+#define SC64_TERRAIN_STATIC_KEY 0u
+#else
 #define SC64_TERRAIN_STATIC_KEY sc64_static_objects_key()
+#endif
 #include "sc64_terrain_cache.h"
 #ifdef SC64_SOFT_FOG
 #if !defined(SC64_HAS_TERRAIN_ART) || \

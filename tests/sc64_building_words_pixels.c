@@ -38,7 +38,11 @@ int main(void)
                     ++count;
                 }
     }
+#ifdef SC64_HATCHERY_WORDS_EXPECTED
+    assert(count == 120 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery);
+#else
     assert(count == 1800);
+#endif
     const Sc64SpriteFrame *fallback = sc64_race_building_art_sprite(142);
     assert(fallback && sc64_building_word_lookup(fallback) == NULL);
     fill(12, 120);
