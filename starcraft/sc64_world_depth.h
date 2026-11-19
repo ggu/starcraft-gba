@@ -124,6 +124,7 @@ sc64_draw_depth_ordered_actors(void)
             draw_building_overlay(&b[i]);
             break;
         case DEPTH_UNIT:
+            if (u[i].selected) draw_unit_pass(&u[i], 1);
             draw_unit(&u[i]);
             break;
         }
