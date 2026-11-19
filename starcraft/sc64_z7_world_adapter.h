@@ -6,6 +6,18 @@
 #include "sc64_z7_adapter.h"
 #include "sc64_resource_actions.h"
 
+/* In the prevalidated pruned-snapshot build the trigger counts that the
+ * current mission state needs are collected during the live-actor validation
+ * pass (sc64_z7_census.h), so the actor pools are walked once.
+ * SC64_Z7_SEPARATE_CENSUS selects the separate census loop for reference
+ * builds; SC64_Z7_CENSUS_VERIFY (HOST) runs both and aborts on any
+ * difference. */
+#if defined(SC64_Z7_PREVALIDATED_TICK) && defined(SC64_Z7_COUNT_SNAPSHOT) && \
+    defined(SC64_Z7_PRUNE_STARTED) && !defined(SC64_Z7_SEPARATE_CENSUS) && \
+    !defined(SC64_Z7_VALIDATED_CENSUS)
+#define SC64_Z7_VALIDATED_CENSUS 1
+#endif
+
 static int sc64_z7_world_location_source(const Sc64Z7WorldContext *ctx,unsigned id,
                                           unsigned *left,unsigned *top,
                                           unsigned *right,unsigned *bottom)
