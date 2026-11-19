@@ -72,6 +72,53 @@ the sorted actor pass, including buildings, to `sc64_unit_draw_cycles`.
 For before/after comparisons sum building and unit draw counters and compare
 the combined cost with background and full-update timings.
 
+### Cache and clip regressions
+
+| ID | Setup | Expected framebuffer |
+| --- | --- | --- |
+| `depth-cache-scroll` | Put a building and a mineral patch at each horizontal viewport edge. Scroll either way by 4 pixels across all 16 camera phases on each axis. Change a visible fog cell, construction state or mineral depletion on the next frame. | Every indexed pixel matches a fresh render of the same world and animation tick. The actors keep their depth order as they enter and leave view. |
+| `depth-cache-fixed-fog` | Hold the camera, change fog near overlapping actors, and render across alternating backbuffers. Run with full capture and again with optional dirty capture. | Both captures reproduce the fresh render, including the pixels between dirty bands and at each HUD boundary. Dirty capture reports fewer captured rows when its reuse checks pass. |
+| `legacy-static-clip` | Compile the static-row fixture with world depth disabled. Change two separated fog rows while overlapping static props share a band. | Each dirty band replays the static props in painter order, and `draw_map` restores the incoming clip. |
+
+`make test-sc64-terrain-transfer-scenes` runs the first case for Terran,
+Zerg, Protoss and Showcase. `make test-sc64-static-dirty-rows-game` covers
+the legacy path. A local Protoss sanitizer probe checks the fixed-camera
+case at 16 camera phases. It reproduces every fresh-frame pixel on all 64
+fog changes, capturing 48 of 108 rows per change. Keep the fixed-camera
+case in the ordinary-input replay harness backlog.
+The world-depth renderer no longer computes static clip bands on the
+default full-capture path. With optional dirty capture, the planner still
+supplies terrain row ranges, while the sorted actors draw after capture.
+
+### Removing the empty static clip pass
+
+On the release P10 build, the measured Homeland window contains 907
+moving-camera partial restores, all with word-aligned horizontal shifts.
+Instruction-edge measurements across 113 of those updates attribute a mean
+41,254 cycles to restoring the scrolled background, 11,557 to filling fog
+signatures, and 42,150 to capturing the two cache regions. The total
+background pass averages 191,287 cycles in this subset. These intervals
+include any audio interrupt time. The full capture remains a candidate for
+further profiling.
+
+The table compares the release renderer on `0994f416` with the same
+build inputs after removing the empty clip pass. Eleven sampled Homeland
+and 32 Blood Bath states match, including both indexed pages, palette,
+fog, units, buildings and resources. Camera positions, route counters
+and frame advancement match across the measured windows.
+
+| P10 ARM replay | Advancing updates | Mean background cycles | Mean update cycles | Peak update cycles |
+| --- | ---: | ---: | ---: | ---: |
+| Homeland | 958 | 183,372 → 181,031 | 1,728,678 → 1,726,409 | 2,418,393 → 2,405,240 |
+| Blood Bath, three AIs | 1,000 | 54,903 → 54,657 | 998,765 → 998,489 | 2,184,140 → 2,185,216 |
+
+The Homeland, Blood Bath and instruction-edge receipt SHA-256 values are
+`9c4283413d0c2bd41519acefcb17fe07613856988b7a0747e98aa581edc981f3`,
+`f48814330def8cb9af91089c03dfaacc3ff93fd682e37edb125a4bae0826dfd8`
+and `ac5bf6cb73cd9e48f0911b5d4450035f6d9367cef0899b26acc54b39f3293df5`.
+These are emulator cycle measurements. Blood Bath's peak rises 0.05%,
+and performance on hardware remains unmeasured.
+
 ## Local ARM performance
 
 An ordinary-input Protoss 10 ROM replay starts P7 and runs 9,020 tape
