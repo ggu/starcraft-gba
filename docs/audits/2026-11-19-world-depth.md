@@ -46,6 +46,7 @@ pinned sprites and are allowed to change when the private art is regenerated.
 | `unit-over-building` | Barracks at (96,43), Tank at (96,50), both layer 4 | Tank | 380/380 |
 | `air-tiers-ignore-y` | Move a Wraith north and south across a Carrier or Overlord, layers 18 and 16 | Wraith during overlap | Future replay |
 | `camera-and-hud` | Scroll an overlapping pair past screen rows 12 and 119 while flipping framebuffer pages | Foreground stays stable, HUD rows stay clear of actor pixels | Future paired replay |
+| `selected-overlap` | Select the Tank in both Tank/Barracks cases and compare pixels outside the Tank's opaque crop | Check the N64 ring against the nearer and farther building | Future native check |
 
 The old renderer flipped all 192 Wraith/Tank pixels on unit slot swap and
 drew the Tank over all 459 pixels occupied by the southern Barracks. Use
@@ -53,7 +54,12 @@ drew the Tank over all 459 pixels occupied by the southern Barracks. Use
 source. The current canonical Terran framebuffer test is
 `build/test-sc64-terran-full-frame`. Add campaign and skirmish replay cases
 for picking the topmost actor and for dynamic layers such as workers against
-resources or Interceptors around Carriers.
+resources or Interceptors around Carriers. The current GBA selection
+ellipses are a world underlay beneath the actor bodies. A Barracks can
+cover part of an overlapping ring even when the Tank's body is nearer.
+Verify the ring order separately on N64. The PC implementation draws
+the ring within its selected sprite's turn in the sorted pass.
+[OpenBW sprite renderer](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/ui/ui.h)
 
 The terrain cache now holds background and fog. Profile counters attribute
 the sorted actor pass, including buildings, to `sc64_unit_draw_cycles`.
@@ -146,3 +152,29 @@ The integrated Blood Bath receipt SHA-256 is
 `c4a8090ef2854b13110591fc44a11c6ec541560fcfba797ab1fd10a6fd70cb0c`.
 The integrated P7 receipt SHA-256 is
 `de9aa79d7b953b32accf6d88b1ac14d0d1b7f6b4585a8c644b279ab1cd9ad350`.
+
+## Release composition
+
+Composed source `063c54fb` applies the renderer and packed Hatchery to
+release `2dec1556`, including the P10 steering and standalone P6 save
+changes. All four ARM builds pass ROM, header, SRAM signature and memory
+checks. Each image is byte-identical to its previously qualified renderer
+image, including the packed P10 run above.
+
+Thirteen local renderer checks pass. They cover framebuffer and HUD
+rendering for the three race products, dirty-row transitions, packed
+Hatchery clipping, and Showcase with its normal, packed and indexed
+sprite paths.
+
+The exact three race images complete 702 ordinary-input custom-game
+launches. The matrix covers both maps, each human race, and every ordered
+one-, two- and three-CPU race lineup. Each case checks the starting roster
+and plays 120 updates. Across 54 sampled lineups the player saves through
+the pause menu, reloads in a fresh emulator, and reproduces the following
+60 updates. This is early skirmish and save coverage. Longer campaigns,
+endgame skirmishes and hardware timing have their own checks.
+
+The renderer receipt SHA-256 is
+`e68e0fae1c284e6a44d8694e0944636823fb281050080d39e032c83b63b19098`.
+The skirmish receipt SHA-256 is
+`99571add436acc888849844cbbb50d04f2a4c6078d3866aa19c2dadc40082e0c`.
