@@ -691,3 +691,25 @@ Keep the option disabled by default.
 | Candidate restoration phase | `b35c537fcbcaedf4b24057e8352de6f56809f7e60620dd79763dd067820d0273` |
 | Dense Z7 candidate replay | `8d2b9687054a0a45b6383997cbf075b200b44c6cb3c583742cdea44e94e1d92e` |
 | Dense Z7 repeated display comparison | `ff30e273dd184a04de728cc4cb0f5e2235ea84a5129e7c7e7c5f925244017441` |
+
+### Composed with the draw-order release
+
+Composed source `35989f23` includes release `9dfba082` and the
+row-bounded prefix. Terran, Z10, P10 and Showcase all pass the ROM
+header, SRAM signature and memory checks with the existing prefix
+selector both on and off. Each pair uses the same frozen inputs. The
+off images differ from the four packaged release ROMs only in the
+order of two independent stack loads inside
+`sc64_route_fill_linear`.
+
+The packaged P10 ROM creates a 32 KiB pause save at campaign frame
+36,761. It loads the journal through the title menu in a fresh
+emulator and matches six checkpoint records through victory at frame
+46,057. The composed opt-in P10 ROM loads the same journal in a fresh
+emulator, matches the same six records and wins. Both runs preserve
+the input journal's SHA-256. This checks one campaign save cut.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Released P10 fresh SRAM win | `10a6c5394948b9d1f14817047ce00fa75ce06719aaada445ba328af5fba8c573` |
+| Composed opt-in P10 fresh SRAM win | `28965dfec4cd8dc44a53f0a50a35ecfd47bacf50c41e6f2c03605c175831778f` |
