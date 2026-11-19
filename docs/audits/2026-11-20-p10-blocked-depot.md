@@ -36,9 +36,28 @@ The asset-free `make test-sc64-facility-fifo` suite passes all six
 ASan/UBSan variants, including the wide full-field path with existing
 frontier and point-tail support. Use a fresh prepared build directory
 and `make CC='arm-none-eabi-gcc -DSC64_ROUTE_WIDE_DEPOT_FULL' verify-protoss-p10`
-to reproduce the trial. The normal build leaves the flag off. Full
-campaign timing, other wide campaign samples, and hardware qualification
-remain open.
+to reproduce the trial. The normal build leaves the flag off. Other wide
+campaign samples and hardware qualification remain open.
+
+## Complete P10 controller replay
+
+Both ROMs win from HOME in 47,194 ordinary controller calls at
+simulation frame 46,057. All 20 gameplay checkpoints, 10 briefing
+records, 14 modal records, and final campaign state match. Across 48
+samples, actor and resource bytes, visibility, explored fog, camera,
+route counters, and palette match. At call 33,000 the displayed page
+and its pixel hash differ. The other 47 sampled display and pixel
+records match.
+
+| Timing | Released P10 | Wide depot trial |
+| --- | ---: | ---: |
+| Whole replay mean main-loop cycles | 1,604,030 | 1,603,948 |
+| Late combat p95 update cycles | 2,511,239 | 2,510,479 |
+| Late combat peak update cycles | 7,556,344 | 5,416,948 |
+
+The depot update itself falls from 7,556,344 to 3,612,590 cycles
+in the uninterrupted run. The peak moves to a different update.
+The whole replay remains at about 10.46 emulated updates per second.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -46,3 +65,5 @@ remain open.
 | Paired release update | `6e003d476984c18ea14bd94648f59e660d73ee41eae618861dd792de93a1fcb2` |
 | Paired trial update | `1f85ce09cade81664ce134bcec57002d876e3fce651b99647841b19a88213f33` |
 | Trial fresh-SRAM victory | `968b49fb59cfca8d1a388371b62e9f3df19a915723f36b33b041fa8d7a3510b5` |
+| Release full HOME victory | `dd40e45c0578c03a9a0a59b861c86d61643d44c727ea048a9a85cd9e417c5aae` |
+| Trial full HOME victory | `207d3f5ffdd208f62912fcf217598382b45d0c24ae10e34b7d9db0ca80263a3d` |
