@@ -36,8 +36,8 @@ The asset-free `make test-sc64-facility-fifo` suite passes all six
 ASan/UBSan variants, including the wide full-field path with existing
 frontier and point-tail support. Use a fresh prepared build directory
 and `make CC='arm-none-eabi-gcc -DSC64_ROUTE_WIDE_DEPOT_FULL' verify-protoss-p10`
-to reproduce the trial. The normal build leaves the flag off. Other wide
-campaign samples and hardware qualification remain open.
+to reproduce this initial trial. Later production composition and
+broader qualification are recorded below.
 
 ## Complete P10 controller replay
 
@@ -97,10 +97,8 @@ no walkable seed, it writes the same packed unreachable field directly.
 The caller publishes the same cache identity, age, validity and counters.
 All searches with a seed keep the existing expansion and tie order.
 
-The normal build leaves this probe off. Build it on top of the depot
-trial with `make CC='arm-none-eabi-gcc -DSC64_ROUTE_WIDE_DEPOT_FULL -DSC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE' verify-protoss-p10`
-in a fresh prepared checkout. The combined ARM build retains the same
-IWRAM and EWRAM endpoints.
+The first paired test enabled both flags in a fresh prepared checkout.
+The combined ARM build retained the same IWRAM and EWRAM endpoints.
 
 | Cycles at P10 call 45,231 after SRAM load | Wide depot trial | With empty point fields |
 | --- | ---: | ---: |
@@ -117,6 +115,52 @@ The exact combined cartridge also loads the same P10 pause SRAM in a
 fresh emulator and wins at frame 46,057, matching six checkpoint records.
 The source save stays byte-identical.
 
+## Current release composition
+
+Compose both shortcuts with release `4a3d18ad`, including the shared
+world depth and P10 detector changes. Both P10 cartridges win from
+HOME in 47,194 ordinary inputs. All 20 checkpoints, briefing, modal
+sequence and final state match. Across 48 samples, both full indexed
+framebuffer pages, palette, fog, actors, mineral state, camera, route
+counters and the visible page match.
+
+| P10 timing | Release | Both shortcuts |
+| --- | ---: | ---: |
+| Mean main-loop cycles | 1,599,105 | 1,598,999 |
+| Late combat p95 | 2,506,855 | 2,506,866 |
+| Late combat peak | 7,545,068 | 4,770,776 |
+| Blocked worker at call 43,604 | 7,545,068 | 3,605,028 |
+| Empty point goals at call 45,231 | 5,414,354 | 4,770,776 |
+| Call 45,452 | 4,019,891 | 3,321,935 |
+
+The late sample covers controller calls 41,913–47,193. The mean remains
+about 10.49 emulated updates per second across the full replay.
+
+The 128×128 T4 and T10 controller replays both win in each ARM build.
+All 15 gameplay checkpoints, 63 framebuffer samples, per-call frame
+and screen sequences, and both final 32 KiB save images match. The
+retained T4 fog tile cache differs at one or more samples. The visible
+and explored masks and both framebuffer pages match. The busiest 600
+play calls average 981,599 and 981,592 cycles on T4, and 1,092,986 in
+both T10 builds. These Terran runs verify the combined cartridge across
+two other wide missions. The individual shortcut hits were attributed in P10.
+
+The canonical Z10 cartridge also matches every non-timing field at all
+131 named checkpoints through 48,237 ordinary Z7 calls, including its
+dense late section. This is a campaign prefix. Mean cycles move from
+1,251,013 to 1,251,048, and the recorded peak from 17,793,413 to
+17,811,948. This replay covers named state and economy fields.
+
+`CANONICAL_ROUTE_WIDE_SHORTCUTS=1` is the common default when the
+canonical linear route path is enabled. Use `CANONICAL_ROUTE_WIDE_SHORTCUTS=0`
+for a comparison build. The lookup build key carries the setting.
+The four normal launch recipes reproduce the qualified candidate ROMs
+byte for byte. All four pass ROM header, save signature and RAM checks
+with unchanged RAM endpoints. Both host route suites pass, including
+the six facility FIFO variants. The normal P10 image loads the retained
+pause save from HOME and wins with the same six checkpoint records and
+unchanged input SRAM. Physical GBA timing remains open.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Release depot call trace | `69c7d9ccea076be6fb59d37d9f96e2d20f789d23debe44dc652389078edaa705` |
@@ -132,3 +176,10 @@ The source save stays byte-identical.
 | Empty goal comparison candidate | `94dacb5e9872f20cfc5d5c39f6fa51e8b575521fe48cc4092e13e8c0fbc32686` |
 | Combined trial fresh-SRAM victory | `6d37629432a713aebc3303daaad0d4b3457cbdfd4c4978227d7dd8691ff22e7c` |
 | Verified combined trial ROM | `33335858af82835db1b31638c8d9a25c50d20257091c56b3aed54377a7cf4049` |
+| Current release P10 full HOME | `37e4783a6a5dab9be893ff0f1fd38ec3faca49d1a45a97e1efbccaee2c92df5f` |
+| Current composed P10 full HOME | `a01b0e81b7fd4ee2a7dd95fb36eecd3c3428682dbe1313c3ceab6dcf6e161f0c` |
+| Current T4 ARM comparison | `b1c23790e4548597f0f98139d3a59cb04c11e562cda5e51faeff411998a2f84d` |
+| Current T10 ARM comparison | `e7bd87a6db72c8545ac959d29e4efdbf474df401b3ead0529fbf41d361dacd13` |
+| Current release Z7 prefix | `757c6aaf0538cc55e4e307b18770533dab48d07cfaf4aa45b8c00cc63dc415cd` |
+| Current composed Z7 prefix | `8fed0713920ca4ba72f398ff28d44633f0f89cbc46554953b51a4d75e81718ed` |
+| Normal P10 fresh-SRAM victory | `90ccb45b794f243184febb7ceaf058911b2fced7a21c37ac82a0fdff843788b5` |

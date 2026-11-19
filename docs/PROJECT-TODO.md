@@ -496,8 +496,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   opt-in ARM build. The Terran Free for All replay transfers a surviving
   Overlord on CPU retirement at frame 13,905. The Melee replay transfers
   both human survivors on defeat at frame 11,706. Fresh saves match in
-  both cases. Default enablement still needs native in-flight damage and
-  simultaneous-outcome evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
+  both cases. The draft now requires a later result pass for victory
+  after retirement. Four HOST profiles pass pause/save and fresh load
+  between retirement and victory. Qualify the ARM boundary and native
+  countdown. Coupled survivor teardown, in-flight damage and simultaneous
+  outcomes still need evidence before default enablement.
+  The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
   were published in that opening. A separate ordinary-input replay
@@ -741,13 +745,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cuts the full update from 7.54M to 3.61M cycles with matching field
   bytes and world state. Both full HOME replays win with matching sampled
   state. Late combat peak drops from 7.56M to 5.42M cycles, and the whole
-  replay mean is effectively flat. Qualify another wide campaign and
-  check the one sampled display-page timing difference before enabling.
+  replay mean is effectively flat.
   The next stall at P10 call 45,231 spends 3.43M cycles in six distinct
   point floods. Directly writing three empty fields cuts the resumed
-  update from 5.42M to 4.79M cycles. Keep this trial off pending whole-run
-  timing and another wide replay. Traversal of the other three fields
-  takes 2.09M cycles in the measured update.
+  update from 5.42M to 4.79M cycles. The current canonical composition
+  enables both shortcuts across all four builds. Full P10 wins match all
+  sampled world and framebuffer states, and late peak falls from 7.55M
+  to 4.77M cycles. Both T4 and T10 wins and the Z7 campaign prefix match
+  their recorded gameplay checks. P10 still averages 10.49 emulated
+  updates per second. Traversal of the other three fields takes 2.09M
+  cycles in the measured update. Prioritize sustained simulation and draw
+  cost, and verify physical GBA timing.
   The shared Command census cuts mean cost in current normal P8, P9, P10,
   and Z8 replays with matching outcomes. Fresh HOME reload matches P10
   through victory; both current products match paired Blood Bath saves.
@@ -1835,7 +1843,12 @@ AI wallets and full-match behavior remain unverified.
   [shared transport](SHARED-TRANSPORT.md), [validation](VALIDATION.md), and the
   dated audits for the actual scope of each earlier result.
 - Pick up the [world depth overlap cases](audits/2026-11-19-world-depth.md)
-  when extending the framebuffer replay harness.
+  when extending the framebuffer replay harness. The N64 Challenger
+  overlap click selected the foreground Overlord over a Hatchery.
+  [Draft #587](https://github.com/ggu/starcraft-gba/pull/587) applies the
+  same depth rule to cross-kind opaque hits and passes the HOST A-input
+  fixture. Add ordinary ARM input replays and qualify other poses before
+  enabling it.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
   serialize native builds, tests and emulation and reserve their output space.
