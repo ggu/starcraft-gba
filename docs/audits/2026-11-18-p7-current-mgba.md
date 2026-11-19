@@ -452,3 +452,77 @@ The composed ROM SHA-256 is
 `fe8da4798ad548b433627121ab31f4d9894eee60119d266936ace5159ed8f2c4`.
 The paired replay comparison SHA-256 is
 `028cfd891fd251456abac5efb25d8439a671104f08d1cdde10f53ab2ee45caac`.
+
+### Compose minimap dots during the HUD census
+
+Read-only breakpoints in the `ea041527` release P10 time the HUD
+census, existing minimap pass, and the extra supply scan on resource
+strip redraws. The captured frame and HUD counters match the retained
+normal replays. The Homeland row covers advancing gameplay calls.
+
+| Workload | Samples | HUD cycles | Census cycles | Minimap pass cycles | Additional supply cycles per update |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| P10 Homeland | 117 | 131,075 | 22,107 | 86,369 | 1,199 |
+| Late three-AI Blood Bath | 124 | 76,438 | 14,836 | 55,078 | 365 |
+
+The prototype fuses only the minimap actor pass into the HUD census.
+It composites the 24×24 interior in 576 scratch bytes, in ascending
+building and then unit slots. The camera and stage-specific indicators
+draw afterward. A marker outside the interior uses the original scalar
+path, including its bottom-band invalidation. HUD page policy, fog,
+actor eligibility and player selection are shared with the reference.
+When the build lacks a maintained terrain raster, the staged draw
+uses the existing visible and explored counts and repaints the original
+panel border and margin. The tile renderer retains its own path.
+
+The opt-in `SC64_HUD_MINIMAP_CENSUS` preparations pass the P10 and Z10
+host ASan/UBSan fixtures. The scalar and fused indexed frames match
+with alternating poisoned pages, overlapping markers, fine fog, camera
+overlay, a marker crossing the minimap boundary, and the neighboring
+halfwords. The Z10
+classic terrain path exercises unseen black and visible overrides.
+The classic arena build also compiles and the default Foundry host
+sanitizer check passes.
+
+The maintained-raster P10 build at `44ed6ded` matches the retained
+11 Homeland and 32 Blood Bath world, fog, palette and framebuffer
+cuts, including both pages and the displayed page. All 1,000 Homeland
+timeline rows and 1,600 Blood Bath frame and route rows match.
+
+| ARM comparison window | Release update mean | Staged update mean | Release HUD mean | Staged HUD mean |
+| --- | ---: | ---: | ---: | ---: |
+| P10 Homeland, 958 advancing updates | 1,728,244 | 1,724,966 | 129,421 | 124,215 |
+| P10 Blood Bath, 1,000 late updates | 998,765 | 996,434 | 74,080 | 70,705 |
+
+Whole-update means improve 0.19% and 0.23%. Homeland p95 rises 0.17%.
+The 86K-cycle minimap scope includes visibility and marker projection
+that the fused implementation still has to perform. Its measured
+whole-HUD savings are about 5.2K and 3.4K cycles.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Homeland HUD phase timings | `7c4fab75399eaf73e029d59d219a36c4a4a351cf74e0b836821fea6c43ac5858` |
+| Blood Bath HUD phase timings | `a78b7e855699fb6690664229762f81e16bdb4fd97c5a662b41f97e9b9897ec02` |
+| Maintained-raster P10 ROM | `5c21618b687cdb6355f294b9c820dc0137e7d04857a7dfec187996ee85d144e5` |
+| Maintained-raster Homeland | `c6476885653a61bf29d69870b46c226ecd2f12e50a4a97fbb0bb8eafdebf449c` |
+| Maintained-raster Blood Bath | `2b4e808dc7d2b00bda27b753adf6827ea7d4c8552f0fa55fef0e99c6b14766bf` |
+| Classic-terrain Z10 ROM | `419569c9cdc16a167b7d8fcf8423b9a824483c8e715acb540299870c2d5b2d6b` |
+| Classic-terrain dense Z7 | `dc31d9d2af7d4d05caf9d9cda98d9d6e90bb3e17c2277aad6226dd6db1230c26` |
+
+The classic-terrain Z10 build at `6ffa7e68` matches all 131 historical
+Z7 checks, all 480 timeline and route rows, and eight sampled worlds,
+fog masks, palette and both framebuffer pages. The sampled hardware
+page also matches. In 477 advancing updates the mean moves from
+2,340,889 to 2,340,042 cycles, p95 from 3,389,340 to 3,386,870 and peak
+from 4,696,376 to 4,697,098. Its HUD mean rises from 144,587 to
+145,277 cycles. Both preview ROMs pass their header, SRAM signature
+and memory checks with the same prepared dependencies as release.
+The links use 584 additional EWRAM bytes and keep the same IWRAM end.
+
+The two terrain paths are available in the
+[source-only experiment](https://github.com/ggu/starcraft-gba/tree/6ffa7e68fa6a5cd409cfcfa01fc67c52d9ef548a).
+Keep the normal renderer. The measured whole-update gains are small,
+and the Z10 HUD work increases. The same release P7 window spends
+183,372 mean cycles restoring and painting the background and 810,395
+in orders. Profile those larger scopes before another HUD traversal
+change.
