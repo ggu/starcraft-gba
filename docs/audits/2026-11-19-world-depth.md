@@ -303,7 +303,15 @@ A second route follows the tape through 91 calls, presses Select to
 clear the group, moves left seven steps and up five, and presses A
 at (1825,1940). At frame 96 both builds select only unit slot 84 and
 leave the building selection empty. This covers a direct click in
-the campaign. The P10 case above covers the changed overlap result.
+the campaign.
+
+A 44-call Terran Outpost tape repeats the opaque overlap case from HOME
+as human Zerg against one Terran computer. Both ROMs select the isolated
+Hatchery at (160,160). At (140,162) both actors cover the cursor in both
+hover poses. With A, frame 15 advances to 16. The release selects the
+Hatchery; the opt-in selects the foreground Overlord. The world matches
+before and after the click. Both indexed pages, palette and displayed page
+also match immediately before the click.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -313,3 +321,4 @@ the campaign. The P10 case above covers the changed overlap result.
 | Physical controller observer | `ff2c5a8b1f6764ed399d8a1b59df6ffde135ae2cd01a6d67500684b8429d23b7` |
 | Bounded T4 campaign receipt | `14db9a85889a2fe1095498a652279f1fc8b6e0d4dcb336990707b95493b3e2b0` |
 | Direct A selection receipt | `8ef8301197af3f14d3e64c505a77ed2df636676a36efb832571ccdb32b09bd53` |
+| Terran Outpost overlap receipt | `3f3df62631c6929c5756dfddcae41e6fde693fa8ce756216039f2ea094b4816d` |
